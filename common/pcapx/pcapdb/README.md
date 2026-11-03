@@ -158,6 +158,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | --- | --- | --- |
 | `withProtocols(bool)` | false | 启用 BIN Parser 协议消息与 JSONB 字段分析 |
 | `withStreams(bool)` | true | 启用网络 session、方向 stream 和分块重组 |
+| `withTLSKeyLog(text)` | 无 | 解析授权 NSS keylog 并在协议重放中使用；要求协议分析开启，只在元数据保存内容摘要 |
 | `withBatchSize(n)` | 2000，1..100000 | 批量行数；内部还按字节预算刷盘，增大它不保证更快 |
 | `withFieldIndex(path)` | 无；每库最多 16 路径 | 可重复添加；要求协议分析开启 |
 | `withContext(ctx)` | 继承调用环境 | ctx 必须是有效 Go context；不能覆盖父任务取消 |
@@ -299,6 +300,8 @@ println(json.dumps({
     "full_sha256": meta.FullSHA256,
 }, json.withIndent("")))
 ```
+
+有用户明确授权的 NSS keylog 时，追加 `pcapdb.withTLSKeyLog(keyLogText)`。keylog 只在协议重放中使用，不写入结果；元数据只保存摘要并通过 `tls_keylog_applied` 表示分析是否启用过 keylog。对同一捕获先用无 keylog 导入、再带 keylog 导入，会复用 DatasetID 并重建协议/session/stream 分析。
 
 后续保存 dataset_id，不必反复导入来源文件。若已有库缺少协议能力，先报告缺失，再用明确的补建分析操作开启；不能查询失败后声称没有协议消息。
 
@@ -698,7 +701,7 @@ resultBytes 测量的是 pcapdb 的紧凑 encoding/json 结果，包括字符串
 
 | 脚本 | 核心 API | 职责 |
 | --- | --- | --- |
-| load_pcapfile.yak | GetOrCreatePCAPDatabase | 导入/去重，建立协议与 session/stream 分析，返回 DatasetID、状态和计数 |
+| load_pcapfile.yak | GetOrCreatePCAPDatabase | 导入/去重，建立协议与 session/stream 分析；可选授权 NSS keylog，返回 DatasetID、状态、计数和 keylog 生效标记 |
 | query_pcapdb.yak | 各类 Query/Discover/Details/Read/Reference Page | query_type 选择协议字段发现/检索、物理包、会话、方向流、详情、预览和关联；有结果预算 |
 | manage_pcapdb.yak | ListPage / Count / Validate / Export / Delete | op=list/count/validate/export/delete；发现、校验、导出和删除库 |
 

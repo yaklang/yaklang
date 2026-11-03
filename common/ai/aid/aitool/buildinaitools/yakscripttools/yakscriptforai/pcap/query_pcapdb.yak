@@ -1,10 +1,11 @@
 __DESC__ = "Query a pcapdb capture by persistent dataset ID or auto-import a local PCAP/PCAPNG path. Return bounded packet/protocol/session/stream evidence, source-observed MAC/IP endpoints, real protocol fields, previews and indexed associations so the caller can answer traffic questions."
 __VERBOSE_NAME__ = "Query PCAP Database"
 __VERBOSE_NAME_ZH__ = "查询 PCAP 流量库"
-__KEYWORDS__ = "pcap,pcapng,pcapdb,query,流量分析,协议字段,mac,ip,主机,session,stream"
+__KEYWORDS__ = "pcap,pcapng,pcapdb,keylog,tls,https,query,流量分析,协议字段,mac,ip,主机,session,stream,密钥日志,解密"
 __INPUT_CONSTRAINTS__ = '{"oneOf":[{"required":["id"],"not":{"required":["pcapfile"]}},{"required":["pcapfile"],"not":{"required":["id"]}}]}'
 __USAGE__ = <<<USAGE
 id 为 load_pcapfile 返回的 dataset_id；或传 pcapfile 自动导入/按内容复用，并开启协议和 stream 分析。只能传一个身份参数，后续优先使用返回的 dataset_id。
+使用 pcapfile 自动导入且用户提供授权 NSS keylog 时，可同时传 tls_keylog_file；该参数不能和 id 一起使用。keylog 内容只供本次协议重放，不回显或持久化。已有库的 metadata.tls_keylog_applied 表示其分析是否使用过 keylog。
 query_type: metadata / packets / protocols(default) / macs / endpoint_bindings / fields / sessions / streams / details / body_summary / packet_data / protocol_data / stream_data / protocol_packets / chunk_packets / packet_sessions。
 这是 PCAP/PCAPNG 应用层分析的首选工具。不要因为缺少 tshark 而自行解析 pcapng 或猜 HTTP 字段：protocols 摘要包含 transaction_id/response_to，response_to 指向对应请求的消息 ID。先用 protocol=http 获取摘要，再用 details 核对 URL、Host、Method、Path、状态码和正文边界。包级摘要不能替代这类协议字段和证据查询。
 macs 先按捕获域汇总源 MAC、源 IP 数和包数；endpoint_bindings 展开源 MAC/IP 观测边并返回首末时间、首末包号。它们只表示帧内共同出现的源地址，不代表路由/NAT 后的地址归属。需要主机或用户身份时，先用 IP 与时间范围缩小候选，再查询协议和详情，不要逐包读取原始帧或自行解析以太网头。
@@ -29,6 +30,7 @@ arguments 示例：
 USAGE
 id = cli.String("id", cli.setHelp("持久流量库 DatasetID；与 pcapfile 二选一"))
 pcapfile = cli.String("pcapfile", cli.setHelp("自动导入/复用的捕获文件路径；与 id 二选一"))
+tlsKeylogFile = cli.String("tls_keylog_file", cli.setHelp("自动导入时可选：授权 NSS keylog 文件路径；与 id 模式互斥"))
 mode = cli.String("query_type", cli.setDefault("protocols"), cli.setHelp("metadata/packets/protocols/macs/endpoint_bindings/fields/sessions/streams/details/body_summary/packet_data/protocol_data/stream_data/protocol_packets/chunk_packets/packet_sessions"))
 recordID = cli.Int("record_id", cli.setDefault(0), cli.setHelp("详情、预览或关联的目标记录 ID，类型由 query_type 决定"))
 limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("本页记录数 1–1000；fields 为采样消息数"))
@@ -53,6 +55,7 @@ fieldValue = cli.String("field_value", cli.setHelp("eq 条件的文本值；允�
 cli.check()
 
 assert (id != "") != (pcapfile != ""), "Provide exactly one of id or pcapfile"
+if tlsKeylogFile != "" { assert pcapfile != "", "tls_keylog_file requires pcapfile" }
 assert mode in ["metadata","packets","protocols","macs","endpoint_bindings","fields","sessions","streams","details","body_summary","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"], "Unsupported query_type"
 assert limit >= 1 && limit <= 1000 && after >= 0, "Invalid limit/after"
 assert resultBytes >= 4096 && resultBytes <= 65536 && previewBytes >= 0 && previewBytes <= 4096, "Invalid output budget"
@@ -129,7 +132,13 @@ db = nil
 if id != "" {
     db = pcapdb.OpenPCAPDatabase(id)~
 } else {
-    db = pcapdb.GetOrCreatePCAPDatabase(pcapfile,pcapdb.withProtocols(true),pcapdb.withStreams(true))~
+    importOptions = [pcapdb.withProtocols(true),pcapdb.withStreams(true)]
+    if tlsKeylogFile != "" {
+        keylogRaw, readErr := file.ReadFile(tlsKeylogFile)
+        if readErr != nil { die("read tls_keylog_file: " + string(readErr)) }
+        importOptions = append(importOptions,pcapdb.withTLSKeyLog(string(keylogRaw)))
+    }
+    db = pcapdb.GetOrCreatePCAPDatabase(pcapfile,importOptions...)~
 }
 defer db.Close()
 RESULT = nil
@@ -145,6 +154,7 @@ case "metadata":
         "protocol_message_count":meta.ProtocolCount,"protocol_kind_count":overview.ProtocolKindCount,
         "session_count":meta.SessionCount,"stream_count":meta.StreamCount,
         "protocols_indexed":meta.ProtocolsIndexed,"streams_indexed":meta.StreamsIndexed,
+        "tls_keylog_applied":meta.TLSKeyLogSHA256 != "",
         "first_timestamp_ns":overview.FirstTimestampNS,"last_timestamp_ns":overview.LastTimestampNS,
         "protocols":overview.Protocols,"statuses":overview.Statuses,"transports":overview.Transports,
         "link_types":overview.LinkTypes,"section_count":overview.SectionCount,"interface_count":overview.InterfaceCount,

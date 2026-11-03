@@ -1,9 +1,10 @@
-__DESC__ = "Import a stable local PCAP/PCAPNG into a self-contained pcapdb SQLite library, deduplicate exact content, and return the persistent dataset ID, state, counts and analysis capabilities."
+__DESC__ = "Import a stable local PCAP/PCAPNG into a self-contained pcapdb SQLite library, optionally replaying TLS with an authorized NSS key log, deduplicate exact content, and return the persistent dataset ID, state, counts and analysis capabilities."
 __VERBOSE_NAME__ = "Load PCAP File"
 __VERBOSE_NAME_ZH__ = "加载 PCAP 流量库"
-__KEYWORDS__ = "pcap,pcapng,pcapdb,import,流量,导入,协议,会话"
+__KEYWORDS__ = "pcap,pcapng,pcapdb,keylog,tls,https,import,流量,导入,协议,会话,密钥日志,解密"
 __USAGE__ = <<<USAGE
 pcapfile 为稳定的本地 PCAP/PCAPNG 文件路径。导入写入独立流量库，完整内容去重，并建立协议及 session/stream 分析。返回结构化 result，dataset_id 是后续 query_pcapdb/manage_pcapdb 的 id，不能用数字登记行 ID 替代。
+若用户明确提供授权的 NSS keylog 文件，传 tls_keylog_file；工具只读取该文件并在本次协议重放中使用，不把密钥写入流量库或结果。keylog 只影响可认证解密的 TLS/QUIC 应用数据，不等于证书可信或应用身份已验证。
 state=ready 代表所选阶段完成，还要检查 protocols_indexed/streams_indexed。protocol_count 为消息数。来源删除后可按 dataset_id 查询；首次导入和协议重放可能耗时，执行取消跟随任务 context。
 [[- if .FunctionCallMode -]]
 arguments 示例：
@@ -18,11 +19,17 @@ arguments 示例：
 [[- end -]]
 USAGE
 pcapfile = cli.String("pcapfile", cli.setRequired(true), cli.setHelp("稳定的本地 PCAP/PCAPNG 文件路径"))
+tlsKeylogFile = cli.String("tls_keylog_file", cli.setHelp("可选的授权 NSS keylog 文件路径；不在结果或日志中回显内容"))
 cli.check()
 
 lastProgress = time.Now()
-db, err = pcapdb.GetOrCreatePCAPDatabase(pcapfile,
-    pcapdb.withProtocols(true), pcapdb.withStreams(true),
+options = [pcapdb.withProtocols(true), pcapdb.withStreams(true)]
+if tlsKeylogFile != "" {
+    keylogRaw, readErr := file.ReadFile(tlsKeylogFile)
+    if readErr != nil { die("read tls_keylog_file: " + string(readErr)) }
+    options = append(options, pcapdb.withTLSKeyLog(string(keylogRaw)))
+}
+options = append(options,
     pcapdb.onProgress(func(update) {
         if time.Since(lastProgress).Seconds() >= 2 {
             yakit.Info("pcapdb %s: %s bytes=%d/%d packets=%d",
@@ -30,6 +37,7 @@ db, err = pcapdb.GetOrCreatePCAPDatabase(pcapfile,
             lastProgress = time.Now()
         }
     }))
+db, err = pcapdb.GetOrCreatePCAPDatabase(pcapfile, options...)
 if err != nil { die(err) }
 defer db.Close()
 meta = db.Metadata()~
@@ -39,6 +47,7 @@ RESULT = {
     "source_size": meta.SourceSize, "full_sha256": meta.FullSHA256,
     "schema_version": meta.SchemaVersion,
     "protocols_indexed": meta.ProtocolsIndexed, "streams_indexed": meta.StreamsIndexed,
+    "tls_keylog_applied": meta.TLSKeyLogSHA256 != "",
     "packet_count": meta.PacketCount, "protocol_count": meta.ProtocolCount,
     "session_count": meta.SessionCount, "stream_count": meta.StreamCount,
 }
