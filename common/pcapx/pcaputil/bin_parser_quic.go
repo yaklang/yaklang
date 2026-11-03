@@ -1379,6 +1379,9 @@ func (q *binQUIC) initialMemory() int64 {
 	}
 	for d := 0; d < 2; d++ {
 		n += int64(q.qpack.table[d].size)
+		// Reserve conservative entry-array headroom for the atomic encoder
+		// batch copy. Strings are shared, but the entry slots must coexist.
+		n += int64(cap(q.qpack.table[d].entries)) * 48
 	}
 	n += int64(len(q.cids) * 128)
 	n += int64((len(q.cidRetired[0]) + len(q.cidRetired[1])) * 128)

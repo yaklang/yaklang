@@ -15,6 +15,7 @@ type qpackConn struct {
 	table      [2]qpackTable
 	maxCap     [2]uint64
 	maxBlocked [2]uint64
+	maxKnown   [2]bool // complete peer SETTINGS; an omitted capacity means known zero
 }
 
 type qpackEntry struct {
@@ -146,9 +147,25 @@ func (c *qpackConn) applyEncoder(dir int, buf []byte, maxItems int) (int, []map[
 	if dir != 0 && dir != 1 {
 		dir = 0
 	}
+	// A rejected suffix must not leave a previously accepted instruction prefix
+	// in the live table: the stream cursor has not advanced on that error. Stage
+	// the batch, including evictions, so a retry cannot insert its prefix twice.
+	staged := *c
+	staged.table[dir].entries = append([]qpackEntry(nil), c.table[dir].entries...)
+	n, instructions, err := staged.applyEncoderInstructions(dir, buf, maxItems)
+	if err == nil {
+		c.table[dir] = staged.table[dir]
+	}
+	return n, instructions, err
+}
+
+func (c *qpackConn) applyEncoderInstructions(dir int, buf []byte, maxItems int) (int, []map[string]any, error) {
 	t := &c.table[dir]
 	max := c.maxCap[dir]
 	if len(buf) > 0 && max == 0 {
+		if c.maxKnown[dir] {
+			return 0, nil, protocolError(ErrMalformedMessage, "qpack: encoder instructions contradict the observed zero peer maximum")
+		}
 		return 0, nil, protocolError(ErrContextRequired, "qpack: encoder instructions require observed peer maximum capacity")
 	}
 	off := 0
@@ -216,7 +233,11 @@ func (c *qpackConn) applyEncoder(dir int, buf []byte, maxItems int) (int, []map[
 			}
 			n = k
 			if capv > max {
-				return off, inst, protocolError(ErrResourceExceeded, "qpack: capacity exceeds observed peer maximum")
+				kind := ErrResourceExceeded // declared-stream API's existing limit contract
+				if c.maxKnown[dir] {
+					kind = ErrMalformedMessage // independently observed native peer SETTINGS
+				}
+				return off, inst, protocolError(kind, "qpack: capacity exceeds observed peer maximum")
 			}
 			t.capacity = capv
 			t.evict(capv)

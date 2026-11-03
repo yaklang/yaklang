@@ -13,6 +13,8 @@ import (
 type h3StreamState struct {
 	blocked        [2]bool
 	blockedPDU     [2]uint64
+	encoderWaiting [2]bool
+	encoderWaitPDU [2]uint64
 	seenSettings   bool
 	headers        [2]int
 	fieldFailure   [2]ProtocolErrorKind
@@ -119,8 +121,24 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		return protocolError(ErrMalformedMessage, "HTTP3 critical stream closed")
 	}
 	if h3.kind == "encoder" {
+		// Authenticated h3 ALPN and the complete stream type identify QPACK
+		// independently of whether its peer decoder settings were captured.
+		info["HTTP3"], fr["HTTP3"] = true, true
+		info["Protocol Transition"] = "quic->http3"
+		info["HTTP3 Stream Kind"], fr["HTTP3 Stream Kind"] = "encoder", "encoder"
+		info["HTTP3 Stream ID"] = sid
+		h3.encoderWaiting[dir] = false
 		n, inst, err := q.qpack.applyEncoder(dir, buf, max)
 		if err != nil {
+			var typed *ProtocolError
+			if q.native && errors.As(err, &typed) && typed.Kind == ErrContextRequired && !q.qpack.maxKnown[dir] && q.qpack.maxCap[dir] == 0 {
+				h3.encoderWaiting[dir] = true
+				if h3.encoderWaitPDU[dir] == 0 {
+					h3.encoderWaitPDU[dir] = q.eventID
+				}
+				info["QPACK Decoder Context"], fr["QPACK Decoder Context"] = "peer SETTINGS not observed", "peer SETTINGS not observed"
+				return &h3EncoderContextError{err}
+			}
 			return err
 		}
 		h3.parsed[dir] += n
@@ -150,22 +168,30 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			}
 			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 			var resumed []map[string]any
+			var dependencyError error
 			for _, id := range ids {
 				other := q.streams[id].h3
 				sf, si := map[string]any{}, map[string]any{}
 				err := q.feedHTTP3(dir, id, uint64(len(other.buf[dir])), nil, other.fin[dir], max, sf, si)
 				if err != nil {
-					return err
+					if dependencyError == nil || !isRecoverableH3ObservationError(err) {
+						dependencyError = err
+					}
+					si["Decode Error"] = err.Error()
 				}
-				if !other.blocked[dir] {
+				if !other.blocked[dir] || err != nil {
 					si["Blocked PDU ID"] = other.blockedPDU[dir]
 					si["Transaction ID"] = q.streams[id].requestPDU
 					resumed = append(resumed, si)
+				}
+				if err != nil && !isRecoverableH3ObservationError(err) {
+					break
 				}
 			}
 			if len(resumed) > 0 {
 				info["QPACK Resumed Streams"] = resumed
 			}
+			return dependencyError
 		}
 		return nil
 	}
@@ -281,6 +307,11 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 		if ft == 4 {
 			h3.seenSettings = true
+			if q.native && h3.kind == "control" {
+				if err := q.resumeSettingsEncoders(1-dir, max, info); err != nil {
+					return err
+				}
+			}
 		}
 		h3.blocked[dir] = false
 		informational := false
@@ -498,6 +529,9 @@ func (q *binQUIC) h3DecodeFrame(dir int, ft uint64, payload []byte, h3 *h3Stream
 		if dir != 0 && dir != 1 {
 			peer = 1
 		}
+		// Only validated native placement is a captured peer observation. The
+		// explicitly declared decrypted-stream API keeps its prior limit contract.
+		q.qpack.maxKnown[peer] = q.native
 		for _, s := range settings {
 			id, _ := s["ID"].(uint64)
 			val, _ := s["Value"].(uint64)

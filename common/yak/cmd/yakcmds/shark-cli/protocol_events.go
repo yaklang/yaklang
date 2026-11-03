@@ -18,7 +18,8 @@ var semanticFieldPriority = map[string]int{
 	"Protocol": 0, "ID": 0, "Status": 1, "Packet Name": 2, "Message Name": 2, "Mechanism": 2,
 	"Authentication Verified": 3, "Negotiation Context": 3, "Identification Conformance": 3, "Identification Warning": 3, "User Name": 4, "Domain": 5, "Method": 4, "Request Method": 4, "Request URI": 5, "Query": 5, "SQL": 5, "Topic": 5,
 	"Message Type": 6, "QNAME": 4, "QTYPE Name": 5, "Response": 3, "RCODE": 4, "Questions": 5, "Answers": 6, "Headers": 5,
-	"MIC Verified": 7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
+	"QPACK Resumed Encoders": 6,
+	"MIC Verified":           7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
 }
 
 var ripngEntryPriority = map[string]int{
@@ -59,6 +60,8 @@ var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, 
 var http3StreamPriority = map[string]int{"Frame Type": 0, "Stream ID": 1, "Offset": 2, "Length": 3, "FIN": 4, "Contiguous Offset": 5, "Delivered Bytes": 6, "HTTP3 Frame Error": 7, "Stream Data": 8, "HTTP3 Frames": 9, "Byte Source": 50, "Delivered Byte Source": 51}
 
 var quicCryptoFramePriority = map[string]int{"Frame Type": 0, "Offset": 1, "Length": 2, "Crypto Data": 3}
+
+var qpackRecoveryPriority = map[string]int{"HTTP3 Stream ID": 0, "Direction": 1, "Status": 2, "Error": 3, "Expert Code": 4, "QPACK Instructions": 5, "QPACK Capacity": 6, "QPACK Insert Count": 7, "Instruction Bytes": 8, "Incomplete Suffix Bytes": 9, "Reprocessed From PDU": 10, "Reprocessed In PDU": 11, "Observation Scope": 12, "Byte Source": 50}
 
 // Detail snapshots include owned public and private parser evidence, unlike
 // the compact scalar observations used by streaming JSON. Keep a separate
@@ -179,6 +182,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var http3FrameKind string
 	var http1StartLineKind string
 	var http3StreamID uint64
+	var http3RecoveredEncoder bool
 	var http3HeaderSource int
 	var http3HeaderRanges map[string][]int
 	var fieldViewLimited bool
@@ -249,6 +253,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if protocol == "http3" {
+				if strings.HasPrefix(name, "QPACK Resumed Encoders[") {
+					previous, previousID := http3RecoveredEncoder, http3StreamID
+					defer func() { http3RecoveredEncoder, http3StreamID = previous, previousID }()
+					http3RecoveredEncoder = x["Status"] == "decoded"
+					http3StreamID = number(x["HTTP3 Stream ID"])
+				}
 				if x["Frame Type"] == "STREAM" {
 					previous := http3StreamID
 					defer func() { http3StreamID = previous }()
@@ -425,6 +435,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						a = rank
 					}
 					if rank, ok := http3StreamPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if protocol == "http3" && strings.HasPrefix(name, "QPACK Resumed Encoders[") {
+					if rank, ok := qpackRecoveryPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := qpackRecoveryPriority[keys[j]]; ok {
 						b = rank
 					}
 				}
@@ -840,6 +858,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				sourceName = "QUIC wire remainder · extracted octets"
 			}
 			if protocol == "http3" && authenticatedQUIC {
+				if name == "Instruction Bytes" && http3RecoveredEncoder {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 QPACK encoder · retained stream %d · SETTINGS is context", http3StreamID)
+				}
 				if name == "Partial Frame Bytes" {
 					generated = bytesValue(x)
 					sourceName = fmt.Sprintf("HTTP/3 partial frame · stream %d · layout error", http3StreamID)

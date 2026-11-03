@@ -33,7 +33,7 @@ func isH3ConnectionObservationError(err error) bool {
 	return errors.As(err, &e)
 }
 func isRecoverableH3ObservationError(err error) bool {
-	return isH3FieldStreamError(err) || isH3ConnectionObservationError(err)
+	return isH3FieldStreamError(err) || isH3ConnectionObservationError(err) || isH3EncoderContextError(err)
 }
 
 func (q *binQUIC) annotateH3ConnectionFault(info map[string]any) {
