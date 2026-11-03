@@ -56,6 +56,9 @@ description: >
 
 可选参数：`rule_name`、`file_content`、`query`（说明）、`source_name`（影响输出文件名）。
 
+**调用纪律**：使用单次 `directly_call_tool` 标量形式，不要用 `directly_call_tool_params_group`
+批量形式；`write_output` 是布尔值，直接写 `true`，不要写成 `"true"`。
+
 工具内部完成：读规则 → AI 补全 desc/alert → 内存合并 → 写盘。
 默认输出到 `~/yakit-projects/code/<基名>-completed.sf`。
 
