@@ -1784,8 +1784,8 @@ func WithDynamicContextProvider(name string, provider ContextProvider) ConfigOpt
 	}
 }
 
-// WithTracedDynamicContextProvider registers a dynamic context provider with tracing capabilities
-// It tracks changes between calls and provides diff information
+// WithTracedDynamicContextProvider retains the legacy option name. It supplies
+// the current provider snapshot without appending a historical change diff.
 func WithTracedDynamicContextProvider(name string, provider ContextProvider) ConfigOption {
 	return func(c *Config) error {
 		if name != "" {
@@ -1795,7 +1795,8 @@ func WithTracedDynamicContextProvider(name string, provider ContextProvider) Con
 	}
 }
 
-// WithTracedFileContext monitors a file and provides its content as context with change tracking
+// WithTracedFileContext rereads a file for each context snapshot. The legacy
+// option name is retained, but old file contents are not repeated in a diff.
 func WithTracedFileContext(name string, filePath string) ConfigOption {
 	return func(c *Config) error {
 		if name != "" && filePath != "" {

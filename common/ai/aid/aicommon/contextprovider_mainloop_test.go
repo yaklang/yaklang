@@ -18,15 +18,15 @@ func TestContextProviderMainLoopAttachmentDiffDoesNotEchoHelperQuery(t *testing.
 		if updated {
 			require.NoError(t, os.WriteFile(path, []byte("AFTER_FILE_CONTENT"), 0o600))
 		}
-		// Rendering another context must not change this context's diff baseline.
+		// Helper-only query headers and retired file contents must not return.
 		helper := manager.ExecuteWithNonce(nil, nil, "helper")
 		require.Contains(t, helper, "User Prompt: "+query)
 		main := manager.ExecuteMainLoopWithNonce(nil, nil, "main")
 		require.NotContains(t, main, query)
 		if updated {
 			for _, rendered := range []string{helper, main} {
-				require.Contains(t, rendered, "CHANGES_DIFF_")
-				require.Contains(t, rendered, "BEFORE_FILE_CONTENT")
+				require.NotContains(t, rendered, "CHANGES_DIFF_")
+				require.NotContains(t, rendered, "BEFORE_FILE_CONTENT")
 				require.Contains(t, rendered, "AFTER_FILE_CONTENT")
 			}
 		}

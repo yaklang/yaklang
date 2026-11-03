@@ -648,9 +648,8 @@ func TestContextProviderManager_EmptyProviderResult(t *testing.T) {
 
 	result := cpm.Execute(nil, nil)
 
-	// 即使结果为空，也应该有标签
-	if !strings.Contains(result, "<|AUTO_PROVIDE_CTX_") {
-		t.Fatal("Result should contain tags even for empty provider result")
+	if result != "" {
+		t.Fatalf("Empty provider should omit its tags and body: %s", result)
 	}
 }
 
@@ -715,8 +714,8 @@ func TestContextProviderManager_ExecuteWithNonce_UsesProvidedNonceAcrossTags(t *
 	if !strings.Contains(result, "<|AUTO_PROVIDE_CTX_[loopN1_provider_one]_START key=provider-one|>") {
 		t.Fatalf("nonce execution should use provided nonce in provider tag: %s", result)
 	}
-	if !strings.Contains(result, "<|CHANGES_DIFF_loopN1_provider_one|>") {
-		t.Fatalf("nonce execution should normalize diff tags with the same nonce flag: %s", result)
+	if strings.Contains(result, "CHANGES_DIFF_") {
+		t.Fatalf("nonce execution should send only current content: %s", result)
 	}
 }
 
@@ -758,7 +757,7 @@ func TestContextProviderManager_RegisterTracedContent_BasicFunctionality(t *test
 		t.Fatalf("First result should contain content_version_1: %s", result1)
 	}
 
-	// 第二次执行 - 应该包含差异信息
+	// 第二次执行只发送当前内容，不重新引入旧内容。
 	result2 := cpm.Execute(nil, nil)
 	if callCount != 2 {
 		t.Fatalf("Expected 2 calls, got %d", callCount)
@@ -768,18 +767,16 @@ func TestContextProviderManager_RegisterTracedContent_BasicFunctionality(t *test
 		t.Fatalf("Second result should contain content_version_2: %s", result2)
 	}
 
-	// 第二次结果应该包含差异信息
-	if !strings.Contains(result2, "CHANGES_DIFF_") {
-		t.Fatalf("Second result should contain diff markers: %s", result2)
+	if strings.Contains(result2, "CHANGES_DIFF_") {
+		t.Fatalf("Second result should not contain diff markers: %s", result2)
 	}
 
-	// 验证差异内容包含了正确的变化
-	if !strings.Contains(result2, "-content_version_1") {
-		t.Fatalf("Second result should contain old content in diff: %s", result2)
+	if strings.Contains(result2, "content_version_1") {
+		t.Fatalf("Second result should not contain retired content: %s", result2)
 	}
 
-	if !strings.Contains(result2, "+content_version_2") {
-		t.Fatalf("Second result should contain new content in diff: %s", result2)
+	if strings.Count(result2, "content_version_2") != 1 {
+		t.Fatalf("Second result should contain the current content once: %s", result2)
 	}
 
 	t.Logf("First result: %s", result1)
@@ -821,14 +818,12 @@ func TestContextProviderManager_RegisterTracedContent_ErrorHandling(t *testing.T
 		t.Fatalf("Third result should contain recovered_content: %s", result3)
 	}
 
-	// 验证第三次结果包含差异信息和错误解决信息
-	if !strings.Contains(result3, "CHANGES_DIFF_") {
-		t.Fatalf("Third result should contain diff markers: %s", result3)
+	if strings.Contains(result3, "CHANGES_DIFF_") {
+		t.Fatalf("Recovered result should not contain diff markers: %s", result3)
 	}
 
-	// 验证包含错误解决信息
-	if !strings.Contains(result3, "Error resolved") {
-		t.Fatalf("Third result should contain error resolution info: %s", result3)
+	if strings.Contains(result3, "test error") {
+		t.Fatalf("Recovered result should not repeat a stale error: %s", result3)
 	}
 
 	t.Logf("Error handling test - Result1: %s", result1)
@@ -845,14 +840,11 @@ func TestContextProviderManager_RegisterTracedContent_EmptyContent(t *testing.T)
 
 	cpm.RegisterTracedContent("traced_empty_test", tracedProvider)
 
-	result := cpm.Execute(nil, nil)
-
-	// 即使内容为空，也应该有基本的标签结构
-	if !strings.Contains(result, "AUTO_PROVIDE_CTX_") {
-		t.Fatal("Result should contain proper tags even for empty content")
+	for i := 0; i < 3; i++ {
+		if result := cpm.Execute(nil, nil); result != "" {
+			t.Fatalf("Empty content should omit the entire provider block: %s", result)
+		}
 	}
-
-	t.Logf("Empty content result: %s", result)
 }
 
 func TestContextProviderManager_RegisterTracedContent_LargeContentDiff(t *testing.T) {
@@ -883,9 +875,8 @@ func TestContextProviderManager_RegisterTracedContent_LargeContentDiff(t *testin
 		t.Fatalf("Second result should contain new content: %s", result2)
 	}
 
-	// 验证差异信息存在
-	if !strings.Contains(result2, "CHANGES_DIFF_") {
-		t.Fatalf("Second result should contain diff markers: %s", result2)
+	if strings.Contains(result2, "CHANGES_DIFF_") || strings.Contains(result2, "First version.") {
+		t.Fatalf("Second result should contain only the current snapshot: %s", result2)
 	}
 
 	t.Logf("Large content diff - Result2: %s", utils.ShrinkString(result2, 200))
@@ -1026,9 +1017,8 @@ line5: another new line`, nil
 			t.Fatalf("Result %d should contain 'final content'", i)
 		}
 
-		// 验证从第二次调用开始有差异信息
-		if i > 0 && !strings.Contains(result, "CHANGES_DIFF_") {
-			t.Fatalf("Result %d should contain diff markers", i)
+		if strings.Contains(result, "CHANGES_DIFF_") {
+			t.Fatalf("Result %d should not contain diff markers", i)
 		}
 
 		t.Logf("Complex diff - Result %d: %s", i, utils.ShrinkString(result, 150))

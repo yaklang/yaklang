@@ -164,9 +164,8 @@ func (p *PerceptionState) FormatForContext() string {
 	if p == nil {
 		return ""
 	}
-	age := time.Since(p.LastUpdateAt).Truncate(time.Second)
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("## Current Perception (epoch %d, %v ago)\n", p.Epoch, age))
+	buf.WriteString(fmt.Sprintf("## Current Perception (epoch %d)\n", p.Epoch))
 	if p.OneLinerSummary != "" {
 		buf.WriteString(fmt.Sprintf("Summary: %s\n", p.OneLinerSummary))
 	}

@@ -6,7 +6,6 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -615,93 +613,10 @@ func (r *ContextProviderManager) WithoutTaskContext() *ContextProviderManager {
 	return &ContextProviderManager{maxTokens: r.maxTokens, ordinary: ordinary}
 }
 
+// RegisterTracedContent retains the legacy registration entry point. Each
+// invocation reads the current snapshot without appending historical diffs.
 func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextProvider) {
-	update := newContextProviderTrace()
-	mainLoopUpdate := newContextProviderTrace()
-	wrapper := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		result, err := cb(config, emitter, key)
-		trace := update
-		if _, mainLoop := config.(*mainLoopContextProviderConfig); mainLoop {
-			// Helper-only query headers must never return via a change diff.
-			trace = mainLoopUpdate
-		}
-		extra := trace(result, err)
-		if err != nil {
-			if extra == "" {
-				return result, err
-			}
-			return result + "\n\n" + extra, err
-		}
-		log.Infof("ContextProvider %s result: %s", name, utils.ShrinkString(result, 200))
-		if extra == "" {
-			return result, nil
-		}
-		return result + "\n\n" + extra, nil
-	}
-	r.Register(name, wrapper)
-}
-
-func newContextProviderTrace() func(string, error) string {
-	var m = new(sync.Mutex)
-	var firstCall = utils.NewOnce()
-	var lastErr error
-	var lastContent string
-	var buf bytes.Buffer
-
-	return func(content string, newErr error) string {
-		m.Lock()
-		defer m.Unlock()
-		var result string
-		firstCall.DoOr(func() {
-			lastContent = content
-			lastErr = newErr
-			buf.Reset()
-		}, func() {
-			var diffResult string
-			var err error
-			if lastContent != "" && content != "" {
-				diffResult, err = yakdiff.DiffToString(lastContent, content)
-				if err != nil {
-					log.Warnf("diff to string failed: %v", err)
-				}
-			} else if lastContent == "" {
-				diffResult = "last-content is empty, new content added"
-			}
-
-			if newErr == nil && lastErr != nil {
-				diffResult += fmt.Sprintf("\n[Error resolved: %v]", lastErr)
-			} else if newErr != nil && lastErr == nil {
-				diffResult += fmt.Sprintf("\n[New error occurred: %v]", newErr)
-			} else if newErr != nil && lastErr != nil && newErr.Error() != lastErr.Error() {
-				diffResult += fmt.Sprintf("\n[Error changed from: %v to: %v]", lastErr, newErr)
-			}
-
-			if strings.TrimSpace(diffResult) == "" {
-				lastContent = content
-				lastErr = newErr
-				buf.Reset()
-				return
-			}
-
-			diff, err := utils.RenderTemplate(`<|CHANGES_DIFF_{{ .nonce }}|>
-{{ .diff }}
-<|CHANGES_DIFF_{{ .nonce }}|>`, map[string]any{
-				"diff":  diffResult,
-				"nonce": utils.RandStringBytes(4),
-			})
-			if err != nil {
-				log.Warnf("render template failed: %v", err)
-			} else {
-				buf.WriteString(diff)
-				buf.WriteString("\n")
-			}
-			result = buf.String()
-			lastContent = content
-			lastErr = newErr
-			buf.Reset()
-		})
-		return result
-	}
+	r.Register(name, cb)
 }
 
 func (r *ContextProviderManager) Register(name string, cb ContextProvider) {
@@ -791,6 +706,9 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 		if err != nil {
 			result = `[Error getting context: ` + err.Error() + `]`
 		}
+		if strings.TrimSpace(result) == "" {
+			return true
+		}
 		flag := ""
 		if tagStrategy != nil {
 			flag = tagStrategy(name)
@@ -798,7 +716,6 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 		if strings.TrimSpace(flag) == "" {
 			flag = "ctx"
 		}
-		result = normalizeContextProviderDynamicTags(result, flag)
 		buf.WriteString(fmt.Sprintf("<|AUTO_PROVIDE_CTX_[%v]_START key=%v|>\n", flag, name))
 		buf.WriteString(result)
 		buf.WriteString(fmt.Sprintf("\n<|AUTO_PROVIDE_CTX_[%v]_END|>", flag))
@@ -854,13 +771,4 @@ func sanitizeContextProviderTag(name string, lower bool) string {
 		}
 	}
 	return strings.Trim(buf.String(), "_")
-}
-
-var changesDiffTagRegexp = regexp.MustCompile(`<\|CHANGES_DIFF_[^\s\|\n>]+\|>`)
-
-func normalizeContextProviderDynamicTags(result string, flag string) string {
-	if strings.TrimSpace(result) == "" || strings.TrimSpace(flag) == "" {
-		return result
-	}
-	return changesDiffTagRegexp.ReplaceAllString(result, "<|CHANGES_DIFF_"+flag+"|>")
 }

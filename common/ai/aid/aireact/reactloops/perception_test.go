@@ -410,6 +410,10 @@ func TestPerceptionState_FormatForContext(t *testing.T) {
 		LastUpdateAt:    time.Now().Add(-30 * time.Second),
 	}
 	output := state.FormatForContext()
+	state.LastUpdateAt = state.LastUpdateAt.Add(-time.Minute)
+	if later := state.FormatForContext(); output != later {
+		t.Fatal("elapsed wall time must not change unchanged perception context")
+	}
 	if !strings.Contains(output, "Current Perception") {
 		t.Fatal("expected header in context output")
 	}
