@@ -1,5 +1,14 @@
 # M2-10 非 SMB 有限差异清单
 
+2026-11-03后续：[M2-85 CONNECT 隧道帧序列、晚到上下文与实际Windows](shark-m2-http3-connect-tunnel-20261103.md)。
+当前85项75有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，17–34 AI实施小时。
+R07四个真实来源目标有限关闭；客户端跨方向先后不可证明时显示 order-unverified，完整N09继续开放。
+CONNECT运行b08完整291224pass/25历史skip、92新增；普通合并86b完整保留远端#5387 WCF framing，
+合并后1369定向pass/1外部WCF样本可选skip、完整CLI1719pass/2历史skip，合并集合291382pass/26skip，不冒充一次完整86b运行。
+86b实抓84保护包/16消息/28参考头对、41小源/15新参考、90实际Windows、17528插桩、六完整公共及四strict域通过。
+WCF正文仍opaque，外部企业样本本机未验，不额外计作完整协议验收；SMB不分析不修复。
+父4d52296c8已独立47/91/2及316231原始ID/官方产物全绿；新最终SHA须另验316482原始ID/动作、131084 required零skip及全部CI。
+
 2026-11-03后续：[M2-84 晚到方法的响应正文复验与实际Windows](shark-m2-http3-late-body-20261103.md)。
 当前84项74有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，18–36 AI实施小时。
 R06四个真实来源乱序目标有限关闭；新R07成功CONNECT后的HEADERS帧序列缺口已复现并保留，完整N09仍开放。
@@ -43,7 +52,7 @@ N09新增的可验收子项（包含在既有开放N09内，不重复计算父�
 | N09.R04 迟到peer SETTINGS后的QPACK恢复 | 有限完成（M2-82，最终CI归11） | 当前owner/方向的既有后缀重试，不重放PN/STREAM；双方向/v1/v2三套件、接口/VLAN、分片/批事务、拒绝/资源和关闭/退休通过。frame18/PDU28的3fe11f在frame19/PDU29提供设置后恢复容量4096，来源仍18；新参考逐字段及最终Windows独立源高亮。原不可变诊断保留，完整跨连接remembered SETTINGS/全部QPACK生命周期仍归开放N09 |
 | N09.R05 晚到已解码请求的响应关联补充 | 有限完成（M2-83，最终CI归11） | 不可变原观察加有界当前视图；私有Flow/域/头观察号与字节源分开，七个冻结来源变换全部正确，64边/预算/歧义/淘汰显式；49新ID、21109插桩、36实际Windows、六完整公共回放。[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md) |
 | N09.R06 晚到方法未复验先前响应正文 | 有限完成（M2-84，最终CI归11） | 新实抓1708与独立1710来源；四个冻结乱序目标、88保护包比较/16消息/56头/32帧，区分原始DATA/FIN和后来方法、有效当前请求；41新ID、34791插桩、72实际Windows、六完整公共及四strict域通过。正文已观察合同不替代R07隧道帧序列或完整生命周期。[84证据](shark-m2-http3-late-body-20261103.md) |
-| N09.R07 成功CONNECT后的已知HEADERS/trailers帧序列 | 已复现，未实施 | 仓库外1748 authored overlay：普通GET trailers合法负例1pass，已知CONNECT与晚到CONNECT两个叶子失败，加父3fail；原stdout与源码/overlay哈希保留，不算实抓或通过分母。RFC9114 4.4要求connection H3_FRAME_UNEXPECTED，需补连接级原生错误、晚到发现、复用/域隔离、独立来源和Windows |
+| N09.R07 成功CONNECT后的已知非DATA帧序列 | 有限完成（M2-85，最终CI归11） | 原生类型先于长度/QPACK、首个连接错误0x105、晚到有界证据及不变历史；客户端跨方向旧类型保留order-unverified。新实抓及三冻结变换84保护包/16消息/28参考头对、复用合法连接不染错；92新增、17528最终源fuzz、90 Windows、六完整公共及四strict域通过。未知扩展、ACK因果/完整生命周期不自动关闭。[85证据](shark-m2-http3-connect-tunnel-20261103.md) |
 
 2026-11-03后续[M2-78 RFC8773配套、EE位置及拒绝Hello展示](shark-m2-tls-certificate-psk-20261103.md)：
 224新增、114最终小源、12复用/接口/VLAN profile/216引用、72坏CH ACK无TLS粘性，94实际Windows通过。

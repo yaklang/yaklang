@@ -114,7 +114,7 @@ func h3LateBodySource(o *h3BodyObservation, observed uint64) map[string]any {
 	return map[string]any{"Observed Payload Bytes": o.bytes, "Parent PDUs": append([]uint64(nil), o.origins...), "Packet References": quicSourceReferences(o.refs), "References Complete": o.complete && o.bytes == observed}
 }
 
-func (q *binQUIC) revalidateH3LateResponse(st *quicStream, sid uint64, response *h3ResponseObservation, request map[string]any) map[string]any {
+func (q *binQUIC) revalidateH3LateResponse(st *quicStream, sid uint64, response *h3ResponseObservation, request, info map[string]any) map[string]any {
 	h3 := st.h3
 	fin := st.reassembly[1].deliveredFIN && !h3.blocked[1] && !h3.framingFailure[1] && h3.parsed[1] == len(h3.buf[1])
 	m, err := h3.checkBody(1, sid, fin)
@@ -166,5 +166,17 @@ func (q *binQUIC) revalidateH3LateResponse(st *quicStream, sid uint64, response 
 	}
 	m["Observed FIN Source"] = finSource
 	m["Body Coverage Complete"] = fin && response.originsFull && response.refsFull && body["References Complete"] == true && finSource["References Complete"] == true
+	if rows, ok := info["HTTP3 Tunnel Observations"].([]map[string]any); ok {
+		for _, fault := range rows {
+			if fault["Stream ID"] == sid {
+				m["Tunnel Frame Check"] = cloneSession(fault)
+				if fault["Observation Verdict"] == "violation-observed" {
+					m["Observation Verdict"] = "violation-observed"
+					m["Error"] = "H3_FRAME_UNEXPECTED: known non-DATA frame after successful CONNECT"
+				}
+				break
+			}
+		}
+	}
 	return m
 }

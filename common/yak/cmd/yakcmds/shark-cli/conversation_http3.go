@@ -100,6 +100,24 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 	if view, ok := e.Session["HTTP3 Association View"].(map[string]any); ok {
 		m["HTTP3 Association View"] = copyConformance(view)
 	}
+	for _, kind := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations"} {
+		var rows []map[string]any
+		for _, row := range mapList(e.Session[kind]) {
+			copy := copyConformance(row)
+			// Worker JSON encodes []byte as base64 strings. The overview still
+			// excludes byte arenas; only packet details own their provenance.
+			delete(copy, "Frame Header Bytes")
+			delete(copy, "Frame Header Ranges")
+			delete(copy, "Byte Source")
+			rows = append(rows, copy)
+		}
+		if len(rows) > 0 {
+			m[kind] = rows
+		}
+	}
+	if view, ok := e.Session["HTTP3 Tunnel View"].(map[string]any); ok {
+		m["HTTP3 Tunnel View"] = copyConformance(view)
+	}
 	if len(groups) == 0 && len(mapList(m["Headers"])) > 0 {
 		groups = append(groups, map[string]any{"Stream ID": number(e.Session["HTTP3 Stream ID"]), "Headers": m["Headers"]})
 	}

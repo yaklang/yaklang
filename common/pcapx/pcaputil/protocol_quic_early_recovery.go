@@ -267,10 +267,12 @@ func (a *binParser) projectNativeQUICSession(e *ProtocolEvent, q *binQUIC, off i
 		// Duplicate/protected packets can return before finishFrames. Their
 		// connection context still includes an earlier observed HTTP3 fault.
 		q.annotateH3ConnectionFault(e.Session)
-		if links, ok := e.Session["HTTP3 Late Associations"].([]map[string]any); ok {
-			for _, link := range links {
-				link["Flow ID"], link["Observed In PDU ID"] = e.FlowID, e.ID
-				link["Capture Domain"] = map[string]any{"Section": e.Domain.Section, "Interface": e.Domain.Interface, "Encapsulation": e.Domain.Encapsulation}
+		for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Tunnel Observations"} {
+			if links, ok := e.Session[kind].([]map[string]any); ok {
+				for _, link := range links {
+					link["Flow ID"], link["Observed In PDU ID"] = e.FlowID, e.ID
+					link["Capture Domain"] = map[string]any{"Section": e.Domain.Section, "Interface": e.Domain.Interface, "Encapsulation": e.Domain.Encapsulation}
+				}
 			}
 		}
 	}

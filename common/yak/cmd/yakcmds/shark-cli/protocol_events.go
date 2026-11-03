@@ -18,10 +18,11 @@ var semanticFieldPriority = map[string]int{
 	"Protocol": 0, "ID": 0, "Status": 1, "Packet Name": 2, "Message Name": 2, "Mechanism": 2,
 	"Authentication Verified": 3, "Negotiation Context": 3, "Identification Conformance": 3, "Identification Warning": 3, "User Name": 4, "Domain": 5, "Method": 4, "Request Method": 4, "Request URI": 5, "Query": 5, "SQL": 5, "Topic": 5,
 	"Message Type": 6, "QNAME": 4, "QTYPE Name": 5, "Response": 3, "RCODE": 4, "Questions": 5, "Answers": 6, "Headers": 5,
-	"QPACK Resumed Encoders":        6,
-	"HTTP3 Late Associations":       6,
-	"HTTP3 Resolved Associations":   6,
-	"HTTP3 Association View":        6,
+	"QPACK Resumed Encoders":      6,
+	"HTTP3 Late Associations":     6,
+	"HTTP3 Resolved Associations": 6,
+	"HTTP3 Association View":      6,
+	"HTTP3 Tunnel Observations":   4, "HTTP3 Resolved Tunnel Observations": 4, "HTTP3 Tunnel View": 5, "Tunnel Frame Check": 4,
 	"Response Message Revalidation": 5, "Observation Verdict": 1, "Request Method Class": 2, "Body Coverage Complete": 3,
 	"Observed DATA Byte Source": 800, "Observed FIN Source": 801,
 	"MIC Verified": 7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
@@ -63,6 +64,8 @@ var ipfixHeaderPriority = map[string]int{
 var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, "Payload Length": 2, "Frame Wire Length": 3, "Stream ID": 4, "Stream Offset": 5, "Direction": 6, "Frame Header Bytes": 7, "Headers": 8, "DATA Length": 9, "Payload": 10, "QPACK Block": 10, "Header Conformance Status": 11, "Header Conformance Error": 12, "Header Conformance Scope": 13, "Message Conformance": 14, "Byte Source": 50, "Payload Byte Source": 51, "Frame SHA256": 52}
 
 var http3StreamPriority = map[string]int{"Frame Type": 0, "Stream ID": 1, "Offset": 2, "Length": 3, "FIN": 4, "Contiguous Offset": 5, "Delivered Bytes": 6, "HTTP3 Frame Error": 7, "Stream Data": 8, "HTTP3 Frames": 9, "Byte Source": 50, "Delivered Byte Source": 51}
+
+var http3TunnelPriority = map[string]int{"Error Name": 0, "Error Code": 1, "Error Scope": 2, "Observation Verdict": 3, "Frame Type": 4, "Frame Type Value": 5, "Frame PDU ID": 6, "Observed In PDU ID": 7, "Stream ID": 8, "Direction": 9, "Frame Offset": 10, "Frame Header Bytes": 11, "Byte Source": 800, "Scope": 801}
 
 var quicCryptoFramePriority = map[string]int{"Frame Type": 0, "Offset": 1, "Length": 2, "Crypto Data": 3}
 
@@ -190,6 +193,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var http3RecoveredEncoder bool
 	var http3HeaderSource int
 	var http3HeaderRanges map[string][]int
+	var http3TunnelType bool
 	var fieldViewLimited bool
 	var byteSourceLimited bool
 	fieldValueBytes := 0
@@ -258,6 +262,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if protocol == "http3" {
+				previousTunnel, previousStream := http3TunnelType, http3StreamID
+				defer func() { http3TunnelType, http3StreamID = previousTunnel, previousStream }()
+				http3TunnelType = strings.HasPrefix(name, "HTTP3 Tunnel Observations[") || strings.HasPrefix(name, "HTTP3 Resolved Tunnel Observations[") || name == "Tunnel Frame Check" || name == "HTTP3 Connection Error" && x["Error Name"] == "H3_FRAME_UNEXPECTED"
+				if http3TunnelType {
+					http3StreamID = number(x["Stream ID"])
+				}
 				previousEncoder := http3RecoveredEncoder
 				defer func() { http3RecoveredEncoder = previousEncoder }()
 				http3RecoveredEncoder = false
@@ -443,6 +453,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						a = rank
 					}
 					if rank, ok := http3StreamPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if protocol == "http3" && x["Frame PDU ID"] != nil && (x["Observation Verdict"] == "violation-observed" || x["Observation Verdict"] == "order-unverified") {
+					if rank, ok := http3TunnelPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := http3TunnelPriority[keys[j]]; ok {
 						b = rank
 					}
 				}
@@ -866,6 +884,16 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				sourceName = "QUIC wire remainder · extracted octets"
 			}
 			if protocol == "http3" && authenticatedQUIC {
+				if name == "Frame Header Bytes" && http3TunnelType {
+					// Only the owned byte type (preserved by the worker descriptor)
+					// establishes octets. A Base64-looking text value is not proof.
+					// This is the observed type varint, not a physical-frame span or
+					// evidence that its following length/payload has been decoded.
+					if octets, ok := x.([]byte); ok && len(octets) > 0 && len(octets) <= 8 {
+						generated = octets
+						sourceName = fmt.Sprintf("HTTP/3 CONNECT frame type · stream %d · extracted bytes; frame offsets unavailable", http3StreamID)
+					}
+				}
 				if name == "Instruction Bytes" && http3RecoveredEncoder {
 					generated = bytesValue(x)
 					sourceName = fmt.Sprintf("HTTP/3 QPACK encoder · retained stream %d · SETTINGS is context", http3StreamID)

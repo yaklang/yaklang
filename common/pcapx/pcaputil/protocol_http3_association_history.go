@@ -7,6 +7,7 @@ func (v *ProtocolInspector) observeHTTP3Associations(e *ProtocolEvent) {
 	if !e.nativeQUICObservation || e.semanticSession["Authentication Verified"] != true {
 		return
 	}
+	v.observeHTTP3Tunnel(e)
 	links, _ := e.semanticSession["HTTP3 Late Associations"].([]map[string]any)
 	// Native frame budgets already bound this observation. Do not silently
 	// discard the 65th target: each retained response has its own edge budget.
@@ -31,6 +32,9 @@ func (v *ProtocolInspector) observeHTTP3Associations(e *ProtocolEvent) {
 		}
 		duplicate := false
 		for _, old := range row.http3Associations {
+			if old["Context Kind"] == "tunnel-frame-type" {
+				continue
+			}
 			if old["Stream ID"] == stream {
 				duplicate = true
 				if old["Request PDU ID"] != request {
@@ -66,11 +70,27 @@ func (entry *protocolHistoryEntry) materializeHTTP3Associations(e *ProtocolEvent
 	if e.semanticSession == nil {
 		e.semanticSession = make(map[string]any)
 	}
+	var links, tunnel []map[string]any
+	for _, row := range entry.http3Associations {
+		if row["Context Kind"] == "tunnel-frame-type" {
+			owned := cloneSession(row)
+			delete(owned, "Context Kind") // private shared-slot discriminator
+			tunnel = append(tunnel, owned)
+		} else {
+			links = append(links, row)
+		}
+	}
 	for _, session := range []map[string]any{e.Session, e.semanticSession} {
 		// Ambiguous edges remain visible but do not yield resolved_response_to.
 		// A budget limit still exposes the already retained validated relations.
-		session["HTTP3 Resolved Associations"] = cloneSessionValue(entry.http3Associations)
-		session["HTTP3 Association View"] = map[string]any{"Scope": "later retained header associations; original wire observation and byte contributors are unchanged", "Complete": !entry.http3AssociationLimited}
+		if len(links) > 0 || !entry.http3TunnelContext {
+			session["HTTP3 Resolved Associations"] = cloneSessionValue(links)
+			session["HTTP3 Association View"] = map[string]any{"Scope": "later retained header associations; original wire observation and byte contributors are unchanged", "Complete": !entry.http3AssociationLimited}
+		}
+		if entry.http3TunnelContext {
+			session["HTTP3 Resolved Tunnel Observations"] = cloneSessionValue(tunnel)
+			session["HTTP3 Tunnel View"] = map[string]any{"Scope": "later connection-context findings; original packet, parse status and byte contributors are unchanged", "Complete": !entry.http3AssociationLimited}
+		}
 	}
 	e.nativeFieldsIncomplete = e.nativeFieldsIncomplete || entry.http3AssociationLimited
 }

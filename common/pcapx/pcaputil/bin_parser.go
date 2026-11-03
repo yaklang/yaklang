@@ -2220,6 +2220,7 @@ type protocolHistoryEntry struct {
 	BinParserEvent
 	retainedCost            int
 	packetIndexed           bool
+	http3TunnelContext      bool // shares existing alignment headroom and context budget
 	http3Associations       []map[string]any
 	http3ContextSequence    uint64
 	http3AssociationLimited bool
