@@ -83,6 +83,10 @@ func TestPCAPDBLeaseCancellationReachesDetailReads(t *testing.T) {
 			_, err := h.ProtocolDetails(1, QueryContext(context.Background()))
 			return err
 		},
+		"protocol detail batch": func(h *DatabaseHandle) error {
+			_, err := h.ProtocolDetailsBatchPage([]uint{1}, QueryContext(context.Background()))
+			return err
+		},
 		"sessions": func(h *DatabaseHandle) error {
 			_, err := h.QuerySessions(QueryContext(context.Background()))
 			return err

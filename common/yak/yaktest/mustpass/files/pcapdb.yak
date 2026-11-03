@@ -66,6 +66,10 @@ assert len(messages) == 2
 assert messages[0].SessionID == sessions[0].ID
 assert messages[0].StreamID == requestStream.ID
 assert len(library.ProtocolDetails(messages[0].ID)~.Fields) > 0
+batchDetails = library.ProtocolDetailsBatchPage([messages[1].ID, messages[0].ID], libraryTools.resultBytes(65536))~
+assert len(batchDetails.Items) == 2
+assert batchDetails.Items[0].ID == messages[1].ID && batchDetails.Items[1].ID == messages[0].ID
+assert batchDetails.Items[0].Protocol == "http" && len(batchDetails.Items[0].Fields) > 0
 assert len(library.ReadProtocol(messages[0].ID)~) > 0
 assert len(library.ProtocolPacketIDs(messages[0].ID)~) == 2
 searched = library.QueryProtocols(libraryTools.protocol("http"), libraryTools.fieldMissing("$.pcapdb_smoke_absent"))~

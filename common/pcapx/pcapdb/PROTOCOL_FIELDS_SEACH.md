@@ -88,6 +88,7 @@ println(library.ProtocolFieldIndexes()~)
 | 协议/块到包，以及包到会话 | `ProtocolPacketIDsPage / StreamChunkPacketIDsPage / PacketSessionsPage` |
 | 包、协议消息、流块的二进制预览 | `ReadPacketPage / ReadProtocolPage / ReadStreamPage` |
 | 完整协议字段详情 | `ProtocolDetailsPage` |
+| 多条已选协议字段详情 | `ProtocolDetailsBatchPage`，最多 50 个唯一消息 ID |
 
 所有结果使用 `dataset_id, state, items, next_cursor, cursor_kind, has_more, truncated, error`。登记页的 dataset_id 为空，每条 item 自带身份。未能读取有效快照时 state 为 `unknown`。error 为 null 或 `{code, message, retryable}`；原生 Go 同时返回 error，Yak 使用通常的错误处理语法。失败不返回成功的部分结果，也不推进输入游标。
 

@@ -270,6 +270,18 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, string(encoded), "/pcap-skill-proof")
 		require.Contains(t, string(encoded), "skill.example")
+		batch := query("details_batch", map[string]any{
+			"record_ids":   []int{int(next.Items[0].ID), int(messageID), 999999},
+			"result_bytes": 65536,
+		}).(*pcapdb.ResultPage[pcapdb.ProtocolDetailBatchItem])
+		require.Nil(t, batch.Error)
+		require.Len(t, batch.Items, 3)
+		require.Equal(t, next.Items[0].ID, batch.Items[0].ID)
+		require.Equal(t, messageID, batch.Items[1].ID)
+		require.NotEmpty(t, batch.Items[0].Fields)
+		require.NotEmpty(t, batch.Items[1].Fields)
+		require.NotNil(t, batch.Items[2].Error)
+		require.Equal(t, "not_found", batch.Items[2].Error.Code)
 		// A discovered path is usable, while missing is different from JSON null.
 		var path string
 		for _, field := range fields.Items {
@@ -444,6 +456,10 @@ func TestPCAPAnalysisTools(t *testing.T) {
 			{"pcapfile": filepath.Join(home, "missing.pcap")},
 			{"id": id, "query_type": "metadata", "protocol": "http"},
 			{"id": id, "query_type": "protocols", "source_ip": "10.23.0.10"},
+			{"id": id, "query_type": "protocols", "record_ids": []int{1}},
+			{"id": id, "query_type": "details_batch"},
+			{"id": id, "query_type": "details_batch", "record_ids": []int{int(messageID), int(messageID)}},
+			{"id": id, "query_type": "details_batch", "record_id": messageID, "record_ids": []int{int(messageID)}},
 			{"id": id, "field_path": "$.x", "field_type": "integer", "field_value": "abc"},
 			{"id": id, "field_path": "$.x", "field_type": "integer", "field_value": "9223372036854775808"},
 			{"id": id, "field_path": "$.x", "field_type": "real", "field_value": "NaN"},

@@ -133,6 +133,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | `db.ReadProtocolPage(messageID, options...)` | 协议消息 BLOB 的受限预览 |
 | `db.ReadStreamPage(streamID, options...)` | 逐块受限预览，以 chunk ID 翻页 |
 | `db.ProtocolDetailsPage(messageID, options...)` | 完整 Fields 与 Session JSON 树，超过预算报错 |
+| `db.ProtocolDetailsBatchPage(messageIDs, options...)` | 按输入顺序批量返回最多 50 条完整 Fields/Session；每项附协议/会话关联和独立 error，整页受 resultBytes 预算约束 |
 | `db.HTTPBodyProfilePage(messageID, options...)` | HTTP/1 消息的非可逆正文画像：长度、完整性、编码/压缩/二进制特征、敏感类别及消息/wire body/decoded body SHA256；不返回正文 |
 | `db.DiscoverProtocolFields(options...)` | 字段路径/类型的受限采样，不返回字段值 |
 | `db.ProtocolFieldIndexes(options...)` | 已有路径索引定义；条目数受库级上限约束 |
@@ -192,6 +193,8 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 
 协议摘要还包含 `TransactionID` 和 `ResponseTo`。对 HTTP 等已建立请求响应关联的协议，响应记录的 `ResponseTo` 是请求消息 ID，可直接用于配对；不要根据相邻行、时间接近或 TCP 流顺序猜测配对。
 
+`ProtocolDetailsBatchPage` 使用一个只读快照和一次有界 `IN` 查询读取一组消息。输入是 1–50 个唯一、正整数 ID，输出顺序与输入完全一致；批项携带 protocol、transport、status、completeness、session/stream/transaction/response_to 关联。页面同时受 `resultBytes` 和 10K-token 硬预算约束，并为 AI 工具体保留 6K-token 的包装余量。缺失记录写为该项 `not_found`，单项或全局预算不足时把最大的 Fields/Session 项降级为该项 `result_too_large`，不会清空其他 ID；页面 `truncated=true` 表示至少发生一次预算降级。重复 ID、零 ID、超过 50 项和空数组整体拒绝。
+
 `HTTPBodyProfilePage` 用于需要完整正文统计但不能回显正文的场景。单条存储消息上限 16 MiB。`MessageSHA256` 覆盖完整 HTTP/1 消息；`WireBodySHA256` 覆盖去除 HTTP transfer framing（如 chunked）后的 body；`DecodedBodySHA256` 覆盖按 `Content-Encoding` 解压后的 body。只有相应完整性成立时才返回哈希。`SensitiveIndicators` 是字段/值模式的候选标记，不等同于已确认敏感数据泄漏。
 
 各选项不是通用 SQL 语言。以下矩阵列出工具可以承诺的筛选语义；对于没有支持的组合，工具应拒绝输入或先做关联查询，不能静默丢弃。
@@ -206,6 +209,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | ReadStreamPage / 原生 ReadStream | 不支持 | 不支持 | 目标由参数 streamID 固定 | 不支持 | chunk ID |
 | ProtocolPacketIDsPage / StreamChunkPacketIDsPage | 不提供这些筛选语义 | 不提供这些筛选语义 | 不提供这些筛选语义 | 不提供 | 包 ID |
 | ReadPacketPage / ReadProtocolPage / ProtocolDetailsPage / Export* 单记录 | 不支持 | 不支持 | 目标由参数 id 固定 | 不支持 | 不接受非零 after |
+| ProtocolDetailsBatchPage | 不支持 | 不支持 | 目标由 1–50 个 message ID 固定 | 不支持 | 不接受 after；next_cursor 仅记录最后一项，不是续页游标 |
 
 关联 ID 页只暴露 context、limit、after 和输出预算。某些底层兼容接口会接受其他选项却不应用，不能据此设计工具参数。
 
@@ -563,7 +567,7 @@ PayloadArtifact 返回 `dataset_id, record_id, kind, path, bytes, sha256`。SHA2
 | result_too_large | false | 降低预览、按限额增加预算或改文件输出；同参数盲重试不会前进 |
 | query_failed | false | 未分类错误，包括部分参数/能力错误；保留错误并核对输入和元数据 |
 
-Retryable 仅表示底层分类，不是自动循环指令。读取失败不应触发重建。ProtocolDetailsPage 超预算会整体失败，不会返回一个被裁掉一半的 JSON 树。
+Retryable 仅表示底层分类，不是自动循环指令。读取失败不应触发重建。`ProtocolDetailsPage` 超预算会整体失败，不会返回一个被裁掉一半的 JSON 树；`ProtocolDetailsBatchPage` 则把单项超预算降级为该 ID 的 `result_too_large`，让同页其他可容纳详情继续返回。
 
 关闭阶段也可能报错。正文查询失败时，保留其错误并另行记录 cleanup 错误；正文成功但关闭/checkpoint 失败时，应报告清理状态，不能默默宣布库文件已可安全搬走。
 

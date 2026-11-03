@@ -309,6 +309,14 @@ func (h *DatabaseHandle) ProtocolDetailsPage(id uint, options ...QueryOption) (*
 	return h.database.ProtocolDetailsPage(id, bound...)
 }
 
+func (h *DatabaseHandle) ProtocolDetailsBatchPage(ids []uint, options ...QueryOption) (*ResultPage[ProtocolDetailBatchItem], error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return failedHandlePage[ProtocolDetailBatchItem](h, options, "record_id_batch", err)
+	}
+	return h.database.ProtocolDetailsBatchPage(ids, bound...)
+}
+
 // HTTPBodyProfilePage returns non-reversible HTTP body statistics and hashes. It
 // never returns the body bytes themselves.
 func (h *DatabaseHandle) HTTPBodyProfilePage(id uint, options ...QueryOption) (*ResultPage[HTTPBodyProfile], error) {

@@ -1,0 +1,58 @@
+// Invoked by run.py in a private home seeded with the GUI's AI configuration.
+// No model override or tool allowlist: observe the real agent's choices.
+root = os.Getenv("PCAP_LAB_ROOT")
+assert root != "", "Use pcap_lab/run.py"
+settings = json.loads(string(file.ReadFile(file.Join(root,"run.json"))~))
+task = string(file.ReadFile(file.Join(root,"task.txt"))~)
+events = file.Create(file.Join(root,"events.jsonl"))~
+defer events.Close()
+mu = sync.NewMutex()
+seq,answer = 0,""
+streams = {}
+started = time.Now().UnixMilli()
+
+func record(op,e) {
+    mu.Lock()
+    defer mu.Unlock()
+    seq++
+    row = {"seq":seq,"ts":time.Now().UnixMilli(),"type":string(e.Type),"node":e.NodeId,
+        "task":e.TaskIndex,"coordinator":e.CoordinatorId,"is_stream":e.IsStream,
+        "content":string(e.Content),"delta":string(e.StreamDelta)}
+    events.WriteString(json.dumps(row,json.withIndent(""))+"\n")~
+    if string(e.Type)=="result" {
+        value,err = json.New(string(e.Content))
+        if err==nil && value.Value().result!=nil {
+            answer=string(value.Value().result)
+            file.Save(file.Join(root,"answer.md"),answer)~
+        }
+    }
+    if string(e.Type)=="stream" {
+        key=sprintf("%s|%s|%s",e.CoordinatorId,e.TaskIndex,e.NodeId)
+        if streams[key]==nil { streams[key]="" }
+        streams[key]+=string(e.StreamDelta)
+    }
+    if string(e.Type) in ["tool_call_start","tool_call_error","tool_call_cancel","result","fail_react_task"] {
+        printf("PCAP_LAB event=%s seq=%d node=%s\n",string(e.Type),seq,e.NodeId)
+    }
+}
+
+engine = aim.NewAIEngine(
+    aim.sessionID(settings.session),aim.workdir(file.Join(root,"workspace")),
+    aim.timeout(settings.timeout),aim.context(context.WithTimeoutSeconds(settings.timeout)),
+    aim.maxIteration(int(settings.iterations)),aim.reviewPolicy("yolo"),aim.allowUserInteract(false),
+    aim.onEvent(record),
+)~
+defer engine.Close()
+err = engine.SendMsg(task)
+cfg = engine.GetOperator().GetConfig()
+file.Save(file.Join(root,"timeline.txt"),cfg.GetTimeline().Dump())~
+file.Save(file.Join(root,"evidence.txt"),cfg.GetSessionEvidenceRendered())~
+mu.Lock()
+file.SaveJson(file.Join(root,"streams.json"),streams)~
+errorText=""
+if err!=nil { errorText=string(err) }
+file.SaveJson(file.Join(root,"result.json"),{"error":errorText,"events":seq,
+    "duration_ms":time.Now().UnixMilli()-started,"engine_finished":engine.IsFinished()})~
+mu.Unlock()
+println("PCAP_LAB_FINISHED error=",errorText)
+if err!=nil { die(err) }
