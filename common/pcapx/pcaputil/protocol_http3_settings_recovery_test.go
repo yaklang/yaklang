@@ -304,15 +304,19 @@ func FuzzQPACKLateSettingsFragmentation(f *testing.F) {
 	f.Add([]byte("value"), uint8(1), true)
 	f.Add([]byte{0, 0xff, '\r'}, uint8(5), false)
 	f.Add([]byte{}, uint8(0), true)
+	f.Add(bytes.Repeat([]byte{'0'}, 32), uint8(29), false)
 	f.Fuzz(func(t *testing.T, value []byte, split uint8, settingsBefore bool) {
 		if len(value) > 32 {
 			return
 		}
 		q := &binQUIC{native: true, byteLimit: 65536, alpn: "h3"}
-		wire := append([]byte{2, 0x3f, 0x21, 0x41, 'x', byte(len(value))}, value...)
+		// Capacity 96 includes the entry's name and 32-byte RFC overhead,
+		// including the largest generated value. Oversized entries have their
+		// own refusal regression below instead of a false valid-input oracle.
+		wire := append([]byte{2, 0x3f, 0x41, 0x41, 'x', byte(len(value))}, value...)
 		at := int(split) % (len(wire) + 1)
 		settings := func() {
-			_, err := qpackRecoveryStream(t, q, 12, 1, 3, 0, h3ControlSETTINGS(1, 64))
+			_, err := qpackRecoveryStream(t, q, 12, 1, 3, 0, h3ControlSETTINGS(1, 128))
 			require.NoError(t, err)
 		}
 		if settingsBefore {
@@ -328,7 +332,7 @@ func FuzzQPACKLateSettingsFragmentation(f *testing.F) {
 		_, err = qpackRecoveryStream(t, q, 13, 0, 6, uint64(at), wire[at:])
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), q.qpack.table[0].insertCount)
-		require.Equal(t, uint64(64), q.qpack.table[0].capacity)
+		require.Equal(t, uint64(96), q.qpack.table[0].capacity)
 		require.Equal(t, []qpackEntry{{name: "x", value: string(value), absolute: 0}}, q.qpack.table[0].entries)
 		require.Equal(t, len(wire), q.streams[6].h3.parsed[0])
 		require.Empty(t, q.streams[6].sources[0].ranges)
@@ -337,6 +341,55 @@ func FuzzQPACKLateSettingsFragmentation(f *testing.F) {
 		require.NotContains(t, info, "QPACK Instructions")
 		require.Equal(t, uint64(1), q.qpack.table[0].insertCount)
 	})
+}
+
+func TestQPACKOversizedEntryKeepsInstructionPrefixAtomic(t *testing.T) {
+	for _, settingsBefore := range []bool{false, true} {
+		t.Run(fmt.Sprintf("settingsBefore%v", settingsBefore), func(t *testing.T) {
+			// The minimized fuzz input's 32 value bytes require 65 table bytes:
+			// one name byte plus the 32-byte RFC 9204 entry overhead.
+			wire := append([]byte{2, 0x3f, 0x21, 0x41, 'x', 32}, bytes.Repeat([]byte{'0'}, 32)...)
+			for at := 0; at <= len(wire); at++ {
+				q := &binQUIC{native: true, byteLimit: 65536, alpn: "h3"}
+				refusals := 0
+				feed := func(pdu uint64, dir int, sid, off uint64, data []byte) {
+					info, err := qpackRecoveryStream(t, q, pdu, dir, sid, off, data)
+					if err != nil && !isH3EncoderContextError(err) {
+						var typed *ProtocolError
+						require.ErrorAs(t, err, &typed)
+						require.Equal(t, ErrMalformedMessage, typed.Kind, "split=%d", at)
+						refusals++
+					}
+					if rows, ok := info["QPACK Resumed Encoders"].([]map[string]any); ok {
+						for _, row := range rows {
+							if row["Status"] == "malformed" {
+								require.Equal(t, string(ErrMalformedMessage), row["Expert Code"])
+								refusals++
+							}
+						}
+					}
+				}
+				settings := func() { feed(12, 1, 3, 0, h3ControlSETTINGS(1, 64)) }
+				if settingsBefore {
+					settings()
+				}
+				feed(11, 0, 6, 0, wire[:at])
+				if !settingsBefore {
+					settings()
+				}
+				feed(13, 0, 6, uint64(at), wire[at:])
+				require.Equal(t, 1, refusals, "split=%d", at)
+				require.Zero(t, q.qpack.table[0].insertCount, "split=%d", at)
+				require.Empty(t, q.qpack.table[0].entries)
+				capacity, cursor := uint64(0), 1
+				if at >= 3 && at < len(wire) {
+					capacity, cursor = 64, 3
+				}
+				require.Equal(t, capacity, q.qpack.table[0].capacity, "only a separately completed prefix may commit; split=%d", at)
+				require.Equal(t, cursor, q.streams[6].h3.parsed[0], "split=%d", at)
+			}
+		})
+	}
 }
 
 func TestQPACKObservedPeerLimitIsProtocolConformance(t *testing.T) {

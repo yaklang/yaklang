@@ -258,6 +258,9 @@ func (c *qpackConn) applyEncoderInstructions(dir int, buf []byte, maxItems int) 
 			}
 		}
 		if b&0xe0 != 0x20 {
+			if c.maxKnown[dir] && uint64(len(e.name)+len(e.value)+32) > t.capacity {
+				return off, inst, protocolError(ErrMalformedMessage, "qpack: entry exceeds observed dynamic table capacity")
+			}
 			if err := t.insert(e, maxItems); err != nil {
 				return off, inst, err
 			}
