@@ -1,19 +1,20 @@
-__DESC__ = "Search existing cybersecurity risks in the current runtime project database or a database_id from list_yak_projects. Read risk IDs, titles, targets, severity, evidence excerpts and remediation with pagination."
+__DESC__ = "Search existing cybersecurity risks and their recoverable triage disposition. Supports multiple risk IDs, pagination, evidence excerpts and remediation."
 __VERBOSE_NAME__ = "Query Cybersecurity Risk"
 __VERBOSE_NAME_ZH__ = "搜索已有安全风险"
 __KEYWORDS__ = "risk,vulnerability,security,finding,history,query,search,风险,漏洞,查询,证据"
 __USAGE__ = <<<USAGE
-搜索已有风险，或在上报前检查同一目标、类型和输入点是否已有记录。不传 database_id 查询本次运行绑定的当前项目库；其他项目先用 list_yak_projects 获取 database_id，再只读查询。risk_id 只在对应数据库内有效。
-query 搜索目标、标题、类型、参数、payload、details、description 和 solution；url 是 URL 子串；type 精确匹配风险类型（如 sqli）或中文类型，支持逗号列表；severity 支持逗号列表，如 high,critical。title 是标题关键词，runtime_id 精确匹配运行 ID。waiting_verified 默认 false 查询未处于等待验证状态的风险，true 查询待验证风险。
+搜索已有风险，或在上报前检查同一目标、类型和输入点是否已有记录。不传 database_id 查询本次运行绑定的当前项目库；其他项目先用 list_yak_projects 获取 database_id，再只读查询。risk_ids 只在对应数据库内有效。任务带有 risk 附件时，本工具自动查询附件中的 Risk 集合；risk_ids 可用于进一步筛选该集合内的子集，不能越界。
+query 搜索目标、标题、类型、参数、payload、details、description 和 solution；url 是 URL 子串；type 精确匹配风险类型（如 sqli）或中文类型，支持逗号列表；severity 支持逗号列表，如 high,critical。title 是标题关键词，runtime_id 精确匹配运行 ID。risk_ids 是逗号分隔的正整数 ID 列表，最多 100 个。disposition 默认 active，可填 duplicate、false_positive、ignored 或 all；active 包含历史空值记录。waiting_verified 默认 false 查询未处于等待验证状态的风险，true 查询待验证风险。
 按风险 ID 降序输出，使用 next_offset 续查。stdout 展示摘要和已有证据，保留文本换行；不包含原始 HTTP 报文。文本字段有 SQL 展示预算，截断会明确标记；缩小过滤范围并降低 limit 可增大每条摘要的预算，每字段最多 2048 字符。details 是数据库存储文本，可能含引号转义。没有匹配时 hits=0；查询不会修改风险的已读状态或切换项目库。
+归并重复、排除误报或暂时隐藏风险时先查询摘要，再确认 ID 后调用 triage_cybersecurity_risks；本工具只读。
 
 [[- if .FunctionCallMode -]]
 ```json
-{"query":"login","type":"sqli","severity":"high,critical","limit":5}
+{"query":"login","type":"sqli","severity":"high,critical","risk_ids":"101,102","disposition":"active","limit":5}
 ```
 [[- else -]]
 ```json
-{"@action":"directly_call_tool","directly_call_tool_name":"query_cybersecurity_risk","directly_call_tool_params":{"query":"login","type":"sqli","severity":"high,critical","limit":5}}
+{"@action":"directly_call_tool","directly_call_tool_name":"query_cybersecurity_risk","directly_call_tool_params":{"query":"login","type":"sqli","severity":"high,critical","risk_ids":"101,102","disposition":"active","limit":5}}
 ```
 [[- end -]]
 USAGE
@@ -24,16 +25,26 @@ riskType = cli.String("type", cli.setHelp("精确风险类型或中文类型，�
 severity = cli.String("severity", cli.setHelp("严重程度，逗号分隔，如 high,critical,middle,low,info"))
 title = cli.String("title", cli.setHelp("风险标题关键词"))
 runtimeID = cli.String("runtime_id", cli.setHelp("精确运行 ID"))
-riskID = cli.Int("risk_id", cli.setDefault(0), cli.setHelp("精确风险 ID，0 不限制"))
+riskIDsRaw = cli.String("risk_ids", cli.setHelp("精确风险 ID，逗号分隔，最多100个"))
+disposition = cli.String("disposition", cli.setDefault("active"), cli.setHelp("处置状态：active/duplicate/false_positive/ignored/all"))
 waitingVerified = cli.Bool("waiting_verified", cli.setDefault(false), cli.setHelp("false 查询未处于等待验证状态的风险，true 查询待验证风险"))
 afterID = cli.Int("after_id", cli.setDefault(0), cli.setHelp("仅查询 ID 大于该值的风险，0 不限制"))
 beforeID = cli.Int("before_id", cli.setDefault(0), cli.setHelp("仅查询 ID 小于该值的风险，0 不限制"))
 limit = cli.Int("limit", cli.setDefault(10), cli.setHelp("返回条数，1–100；更小的 limit 提供更大的文本预算"))
 offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("记录偏移，使用 next_offset 续查"))
 cli.check()
-if riskID < 0 { die("risk_id must be nonnegative") }
-filter = {"type": riskType, "severity": severity, "title": title, "runtime_id": runtimeID, "waiting_verified": waitingVerified}
-if riskID > 0 { filter["ids"] = [riskID] }
+ids = []
+if str.TrimSpace(riskIDsRaw) != "" {
+    for rawID in str.Split(riskIDsRaw, ",") {
+        rawID = str.TrimSpace(rawID)
+        if rawID == "" { continue }
+        id, err = atoi(rawID)
+        if err != nil || id <= 0 { die(sprintf("invalid risk ID: %s", rawID)) }
+        ids.Push(id)
+    }
+}
+filter = {"type": riskType, "severity": severity, "title": title, "runtime_id": runtimeID, "disposition": disposition, "waiting_verified": waitingVerified}
+if len(ids) > 0 { filter["ids"] = ids }
 page, err = risk.QueryRiskInDatabase(filter, db.projectID(databaseID), db.keyword(query), db.url(url), db.limit(limit), db.offset(offset), db.afterID(afterID), db.beforeID(beforeID))
 if err != nil { die(err) }
 println(page.Dump())

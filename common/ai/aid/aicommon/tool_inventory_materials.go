@@ -43,6 +43,7 @@ var inventoryPriorityToolNames = []string{
 	"simple_crawler",
 	"cybersecurity-risk",
 	"query_cybersecurity_risk",
+	"triage_cybersecurity_risks",
 	"brute",
 }
 

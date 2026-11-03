@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestQueryCybersecurityRiskTool(t *testing.T) {
@@ -93,6 +94,10 @@ for project in projects {
 assert foreignID != ""
 foreignRisk = risk.QueryRiskInDatabase({"ids":[1]}, db.projectID(foreignID))~
 assert foreignRisk.Items[0].Title == "Foreign project risk"
+	triaged = risk.TriageRiskInDatabase([3], "ignored", 0, "ordinary script triage")~
+	assert triaged.UpdatedCount == 1
+	restored = risk.TriageRiskInDatabase([3], "active", 0, "")~
+	assert restored.UpdatedCount == 1
 history = db.QueryHTTPFlows(db.methods("POST"), db.statusCode("403"), db.packetLimit(128))~
 assert history.Total == 1 && history.Items[0].ID == 11
 exact = db.QueryHTTPFlowByID(11)~
@@ -126,12 +131,30 @@ assert str.Contains(exact.GetResponse(), "ordinary-script-evidence")
 	second := invoke(map[string]any{"type": "sqli", "offset": 1, "limit": 1})
 	require.Contains(t, second, "risk_id=1")
 	require.Contains(t, second, "has_more=false")
-	require.Contains(t, invoke(map[string]any{"risk_id": 1}), "hits=1")
+	require.Contains(t, invoke(map[string]any{"risk_ids": "1"}), "hits=1")
+	multiIDs := invoke(map[string]any{"risk_ids": "1,2", "disposition": "all"})
+	require.Contains(t, multiIDs, "risk_id=2")
+	require.Contains(t, multiIDs, "risk_id=1")
+	scopedCfg := aitool.NewToolInvokeConfig()
+	aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+		ProjectDatabase:            db,
+		ProfileDatabase:            profile,
+		RiskSelectionScopeRequired: true,
+		RiskSelectionAllowedIDs:    []int64{1, 2},
+	})(scopedCfg)
+	scoped, err := tools[0].ExecuteToolWithCapture(ctx, map[string]any{"disposition": "all"}, scopedCfg)
+	require.NoError(t, err)
+	require.Contains(t, scoped.Stdout, "risk_id=2")
+	require.Contains(t, scoped.Stdout, "risk_id=1")
+	require.NotContains(t, scoped.Stdout, "risk_id=3")
+	require.NotContains(t, scoped.Stdout, "risk_id=4")
+	_, err = tools[0].ExecuteToolWithCapture(ctx, map[string]any{"risk_ids": "3"}, scopedCfg)
+	require.ErrorContains(t, err, "outside the attached risk selection")
 	require.Contains(t, invoke(map[string]any{"after_id": 1, "before_id": 3}), "risk_id=2")
 	require.Contains(t, invoke(map[string]any{"query": "no such finding"}), "hits=0")
 	require.Contains(t, invoke(map[string]any{"waiting_verified": true}), "Pending risk")
 	require.Contains(t, invoke(map[string]any{"query": "参数化查询"}), "hits=3")
-	require.Contains(t, invoke(map[string]any{"type": "SQL 注入", "risk_id": 1}), "hits=1")
+	require.Contains(t, invoke(map[string]any{"type": "SQL 注入", "risk_ids": "1"}), "hits=1")
 	// The same risk ID in another registered project must stay isolated.
 	projects, err := yaklib.ListYakProjects(yaklib.WithDBHistoryRuntime(ctx, db, profile))
 	require.NoError(t, err)
@@ -142,14 +165,32 @@ assert str.Contains(exact.GetResponse(), "ordinary-script-evidence")
 		}
 	}
 	require.NotEmpty(t, foreignID)
-	cross := invoke(map[string]any{"database_id": foreignID, "risk_id": 1})
+	cross := invoke(map[string]any{"database_id": foreignID, "risk_ids": "1"})
 	require.Contains(t, cross, "Foreign project risk")
 	require.NotContains(t, cross, "SQL injection first")
-	require.Contains(t, invoke(map[string]any{"risk_id": 1}), "SQL injection first")
+	require.Contains(t, invoke(map[string]any{"risk_ids": "1"}), "SQL injection first")
 	var unchanged schema.Risk
 	require.NoError(t, foreign.First(&unchanged, 1).Error)
 	require.False(t, unchanged.IsRead)
 	require.Equal(t, "Foreign project risk", unchanged.Title)
+	_, err = yakit.UpdateRiskDispositions(
+		db,
+		[]int64{3},
+		schema.RiskDispositionIgnored,
+		0,
+		"expected framework behavior",
+	)
+	require.NoError(t, err)
+	ignored := invoke(map[string]any{"disposition": "ignored"})
+	require.Contains(t, ignored, "risk_id=3")
+	require.NotContains(t, ignored, "risk_id=1")
+	active := invoke(map[string]any{"disposition": "active", "limit": 100})
+	require.Contains(t, active, "risk_id=1")
+	require.NotContains(t, active, "risk_id=3")
+	allDispositions := invoke(map[string]any{"disposition": "all", "limit": 10})
+	require.Contains(t, allDispositions, "risk_id=3")
+	require.Contains(t, allDispositions, "disposition=ignored")
+	require.Contains(t, allDispositions, "tag_reason=expected framework behavior")
 	// A large UTF-8 field is searched in full but only its bounded excerpt is loaded.
 	require.NoError(t, db.Model(&schema.Risk{}).Where("id = ?", 1).UpdateColumn("description", strings.Repeat("证据😀", 10000)+"needle-at-tail").Error)
 	large := invoke(map[string]any{"query": "needle-at-tail", "limit": 1})
@@ -157,7 +198,7 @@ assert str.Contains(exact.GetResponse(), "ordinary-script-evidence")
 	require.Contains(t, large, "[truncated:")
 	require.True(t, utf8.ValidString(large))
 	require.Less(t, len(large), 140000)
-	for _, params := range []map[string]any{{"risk_id": -1}, {"limit": 0}, {"limit": 101}, {"offset": -1}, {"database_id": "unknown"}, {"after_id": -1}} {
+	for _, params := range []map[string]any{{"risk_ids": "-1"}, {"risk_ids": "1,invalid"}, {"disposition": "unknown"}, {"limit": 0}, {"limit": 101}, {"offset": -1}, {"database_id": "unknown"}, {"after_id": -1}} {
 		_, err := execute(ctx, params)
 		require.Error(t, err, "%v", params)
 	}
