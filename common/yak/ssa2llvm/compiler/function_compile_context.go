@@ -23,6 +23,13 @@ type redirectedSlotSource struct {
 	index       int64
 }
 
+// materializedClosureArg is a closure object built for a call argument, paired
+// with the SSA function it was materialized from.
+type materializedClosureArg struct {
+	value llvm.Value
+	fnID  int64
+}
+
 type functionCompileContext struct {
 	current *ssa.Function
 
@@ -69,8 +76,11 @@ type functionCompileContext struct {
 	materializedClosures map[int64]llvm.Value
 	// materializedClosureArgs maps a call instruction id to closure objects
 	// passed as call arguments (extern/yaklib callbacks). SideEffects after
-	// the call read captured variables from these slots as well.
-	materializedClosureArgs map[int64][]llvm.Value
+	// the call read captured variables from these slots as well. Each entry
+	// remembers the SSA function it was built from, because one call can pass
+	// several callbacks and a side effect must read the slot of the callback
+	// that performed the write.
+	materializedClosureArgs map[int64][]materializedClosureArg
 	// redirectedSlots maps an SSA value id whose storage was redirected to a
 	// closure's heap free-value slot. Reads/writes of that id resolve the slot
 	// pointer lazily at each use site (calling yak_runtime_get_closure_free_slot),

@@ -146,7 +146,17 @@ func (b *FunctionBuilder) readValueEx(
 	local := GetFristLocalVariableFromScopeAndParent(scope, name)
 
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
-		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
+		// Prefer the local version only when it lives in a DEEPER scope than
+		// the one the read resolved to, i.e. it really shadows an outer
+		// variable. Two other cases must keep the resolved value:
+		//   - a plain reassignment (`ret = f()`) creates a second variable in
+		//     the SAME scope, so the newest assignment has to win;
+		//   - a loop condition read resolves to the spin phi of the condition
+		//     scope while the local copy sits in the enclosing header scope,
+		//     so preferring it would freeze the condition at the pre-loop value.
+		if local != nil && ret.GetCaptured() != nil && local.GetCaptured() != nil &&
+			ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() &&
+			variableScopeIsDeeper(local, ret) {
 			ret = local
 		}
 		if b.CurrentRange != nil {

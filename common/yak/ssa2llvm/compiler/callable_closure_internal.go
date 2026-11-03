@@ -431,7 +431,77 @@ func (c *Compiler) callableClosureFreeValueIDs(contextInst ssa.Instruction, call
 	return out
 }
 
+// sideEffectOfCall reports whether id names a side effect attached to this
+// very call. A closure variable that is only written (never read) inside the
+// closure is bound to that side effect in the call binding map, because the
+// side effect is the only value the front end created for the name. Building
+// the closure from it would compile the side effect before the closure object
+// exists: its slot IS the closure's free value. The captured variable's own
+// default (the value before the call) is the correct initial word.
+func sideEffectOfCall(fn *ssa.Function, id, callID int64) bool {
+	if fn == nil || id <= 0 || callID <= 0 {
+		return false
+	}
+	value, ok := fn.GetValueById(id)
+	if !ok || value == nil {
+		return false
+	}
+	se, ok := value.(*ssa.SideEffect)
+	return ok && se != nil && se.CallSite == callID
+}
+
 func (c *Compiler) resolveCallableFreeValueID(callerFn *ssa.Function, call *ssa.Call, binding callframe.FreeValueBinding) int64 {
+	id := c.resolveCallableFreeValueIDCandidate(callerFn, call, binding)
+	if id <= 0 {
+		return id
+	}
+	if isSideEffectValue(callerFn, id) {
+		// A side effect is the front end's report of a write some closure
+		// performed; it is never a word the closure can start from. Two cases
+		// reach here: the side effect of this very call (write-only capture),
+		// and the side effect of a LATER call that merely reuses the same
+		// variable name. Compiling either one while building this closure is
+		// a forward reference, and its slot is another closure's cell. Start
+		// from the captured value's own default instead.
+		return c.capturedDefaultValueID(callerFn, binding)
+	}
+	return id
+}
+
+// capturedDefaultValueID returns the caller-side value a free-value parameter
+// was built from (the variable's word before the closure ran).
+func (c *Compiler) capturedDefaultValueID(callerFn *ssa.Function, binding callframe.FreeValueBinding) int64 {
+	if callerFn == nil || binding.Variable == nil {
+		return 0
+	}
+	value := binding.Variable.GetValue()
+	if value == nil {
+		return 0
+	}
+	param, ok := ssa.ToParameter(value)
+	if !ok || param == nil || param.GetDefault() == nil {
+		return 0
+	}
+	def := param.GetDefault()
+	if def.GetFunc() != callerFn || isSideEffectValue(callerFn, def.GetId()) {
+		return 0
+	}
+	return def.GetId()
+}
+
+func isSideEffectValue(fn *ssa.Function, id int64) bool {
+	if fn == nil || id <= 0 {
+		return false
+	}
+	value, ok := fn.GetValueById(id)
+	if !ok || value == nil {
+		return false
+	}
+	_, isSideEffect := value.(*ssa.SideEffect)
+	return isSideEffect
+}
+
+func (c *Compiler) resolveCallableFreeValueIDCandidate(callerFn *ssa.Function, call *ssa.Call, binding callframe.FreeValueBinding) int64 {
 	name := binding.Name
 	if call != nil && name != "" {
 		if actualID, ok := call.Binding[name]; ok && actualID > 0 && valueBelongsToFunction(callerFn, actualID) {
@@ -717,10 +787,10 @@ func (c *Compiler) capturedCellPointer(val ssa.Value) llvm.Value {
 	if c == nil || val == nil {
 		return llvm.Value{}
 	}
-	// GetName is the variable the instruction was created for. A later member
-	// use (the count inside a format list) becomes the last variable and
-	// would hide the cell.
-	if name := val.GetName(); name != "" {
+	// A nested literal can inherit its parent's display name (`params.info`
+	// is also named "params") without binding that variable. Only a real
+	// binding may resolve through the parent's capture cell.
+	if name := val.GetName(); name != "" && (!val.IsMember() || val.GetVariable(name) != nil) {
 		if ptr := c.capturedCell(name); !ptr.IsNil() {
 			return ptr
 		}

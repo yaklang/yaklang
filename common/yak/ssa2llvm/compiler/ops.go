@@ -71,21 +71,15 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if id == 0 {
 		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 	}
-	// Exception values (try/catch `err`) are backed by the current function's panic slot.
-	// These values can be referenced in multiple blocks, so do not cache the load.
+	// A catch variable snapshots the panic at catch entry. recover() clears
+	// the live panic word, but must not change that variable's value.
 	if c != nil && c.function != nil && c.function.exceptionValueIDs != nil {
 		if _, ok := c.function.exceptionValueIDs[id]; ok {
-			// The catch binding tracks the live panic word. recover() clears
-			// it, so neither the value cache nor a slot materialized before the
-			// recover call may satisfy a later read.
-			delete(c.Values, id)
-			if c.function.valueSlots != nil {
-				delete(c.function.valueSlots, id)
+			slot := c.ensureExceptionSlot(id)
+			if slot.IsNil() {
+				return llvm.Value{}, fmt.Errorf("getValue: no slot for exception %d", id)
 			}
-			if c.function.storedValues != nil {
-				delete(c.function.storedValues, id)
-			}
-			return c.loadContextPanic(fmt.Sprintf("yak_exc_%d", id))
+			return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), slot, fmt.Sprintf("yak_exc_%d", id)), nil
 		}
 	}
 
