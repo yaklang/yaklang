@@ -76,7 +76,8 @@ Kerberos decoder 新增有界 `Semantic Summary` metadata；该 metadata 只包�
 
 本地最终结果（2026-11-03）：
 
-- `go test ./common/pcapx/pcaputil -count=1`：PASS，260.044s。
+- 合入最新 #5371 源分支后
+  `go test ./common/pcapx/pcaputil -count=1`：PASS，250.331s。
 - `go test ./common/bin-parser -count=1`：PASS，79.744s。
 - `go test ./common/bin-parser/parser/stream_parser -count=1`：PASS，4.228s。
 - Kerberos facts、摘要合同、真实三协议捕获和 SMB2 session 定向 `-race`：
