@@ -396,6 +396,19 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if v["Retired Destination CID"] == true {
 			parts = append(parts, "late packet · retired CID")
 		}
+		for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Resolved Associations"} {
+			for i, link := range mapList(v[kind]) {
+				if i >= 2 {
+					break
+				}
+				if link["Ambiguous"] == true {
+					continue
+				}
+				if m, ok := link["Response Message Revalidation"].(map[string]any); ok && m["Observation Verdict"] == "violation-observed" {
+					parts = append([]string{fmt.Sprintf("earlier response PDU #%d violation: %s", number(link["Response PDU ID"]), textValue(m["Error"]))}, parts...)
+				}
+			}
+		}
 		return strings.Join(parts, " · ")
 	}
 	var parts []string

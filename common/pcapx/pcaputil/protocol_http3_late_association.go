@@ -9,6 +9,7 @@ type h3ResponseObservation struct {
 	refs                  []PacketReference
 	originsFull, refsFull bool
 	linked                bool
+	body                  *h3BodyObservation
 }
 
 const h3LateAssociationScope = "validated header field sections on the current captured QUIC connection and stream; not whole-message conformance or peer delivery"
@@ -17,6 +18,9 @@ func (o *h3ResponseObservation) memory() int64 {
 	n := int64(128 + cap(o.origins)*8 + cap(o.refs)*64)
 	for _, ref := range o.refs {
 		n += int64(len(ref.Domain.Encapsulation))
+	}
+	if o.body != nil {
+		n += o.body.memory()
 	}
 	return n
 }
@@ -50,6 +54,9 @@ func (q *binQUIC) observeH3HeaderAssociation(st *quicStream, dir int, sid uint64
 		return
 	}
 	h3 := st.h3
+	if dir == 0 && frame["Header Kind"] == "request" && h3.response == nil {
+		st.responseFIN = nil // a future response will already know this method
+	}
 	if dir == 1 && frame["Header Kind"] == "response" && h3.response == nil {
 		if h3.reqHeaders > 0 && st.requestPDU != 0 {
 			return
@@ -71,6 +78,7 @@ func (q *binQUIC) observeH3HeaderAssociation(st *quicStream, dir int, sid uint64
 		"Response Header References Complete": response.originsFull && response.refsFull,
 		"PDU Namespace":                       "header observation PDUs; byte-origin PDUs and packet references are listed separately",
 	}
+	link["Response Message Revalidation"] = q.revalidateH3LateResponse(st, sid, response, frame)
 	links, _ := info["HTTP3 Late Associations"].([]map[string]any)
 	info["HTTP3 Late Associations"] = append(links, link)
 	// Existing response snapshots and their ResponseTo values are immutable.
@@ -78,4 +86,5 @@ func (q *binQUIC) observeH3HeaderAssociation(st *quicStream, dir int, sid uint64
 	frame["Late Associated Response PDU"] = response.pdu
 	response.linked = true
 	response.origins, response.refs = nil, nil
+	response.body, st.responseFIN = nil, nil
 }

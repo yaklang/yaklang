@@ -18,11 +18,13 @@ var semanticFieldPriority = map[string]int{
 	"Protocol": 0, "ID": 0, "Status": 1, "Packet Name": 2, "Message Name": 2, "Mechanism": 2,
 	"Authentication Verified": 3, "Negotiation Context": 3, "Identification Conformance": 3, "Identification Warning": 3, "User Name": 4, "Domain": 5, "Method": 4, "Request Method": 4, "Request URI": 5, "Query": 5, "SQL": 5, "Topic": 5,
 	"Message Type": 6, "QNAME": 4, "QTYPE Name": 5, "Response": 3, "RCODE": 4, "Questions": 5, "Answers": 6, "Headers": 5,
-	"QPACK Resumed Encoders":      6,
-	"HTTP3 Late Associations":     6,
-	"HTTP3 Resolved Associations": 6,
-	"HTTP3 Association View":      6,
-	"MIC Verified":                7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
+	"QPACK Resumed Encoders":        6,
+	"HTTP3 Late Associations":       6,
+	"HTTP3 Resolved Associations":   6,
+	"HTTP3 Association View":        6,
+	"Response Message Revalidation": 5, "Observation Verdict": 1, "Request Method Class": 2, "Body Coverage Complete": 3,
+	"Observed DATA Byte Source": 800, "Observed FIN Source": 801,
+	"MIC Verified": 7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
 }
 
 var ripngEntryPriority = map[string]int{

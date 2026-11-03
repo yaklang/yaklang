@@ -88,6 +88,9 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 					row[key] = value
 				}
 			}
+			if m, ok := link["Response Message Revalidation"].(map[string]any); ok {
+				row["Response Message Revalidation"] = copyConformance(m)
+			}
 			links = append(links, row)
 		}
 		if len(links) > 0 {

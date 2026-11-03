@@ -77,6 +77,7 @@ type quicStream struct {
 	fin            bool
 	reset          bool
 	stop           bool
+	responseFIN    *h3FINObservation
 	h3             *h3StreamState
 	doq            *doqStreamState
 }
@@ -540,11 +541,13 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 					return protocolError(ErrMalformedMessage, "QUIC unidirectional stream wrong sender")
 				}
 				originalOffset, originalLength := off, len(data)
+				wireFIN := fin
 				var err error
 				data, off, fin, err = st.reassembly[dir].feed(off, data, fin, q.byteLimit, max)
 				if err != nil {
 					return err
 				}
+				q.rememberH3LateFIN(st, dir, sid, wireFIN)
 				start, end := originalOffset, originalOffset+uint64(originalLength)
 				if st.h3 != nil {
 					start = max64(start, uint64(st.h3.parsed[dir]))
@@ -601,7 +604,9 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 						return err
 					}
 					st.resetDirection[dir] = true
+					st.responseFIN = nil
 					if st.h3 != nil {
+						st.h3.response = nil
 						st.h3.blocked[dir] = false
 						st.h3.parsed[dir] = len(st.h3.buf[dir])
 					}
@@ -1359,6 +1364,9 @@ func (q *binQUIC) initialMemory() int64 {
 	}
 	for _, st := range q.streams {
 		n += 512
+		if st.responseFIN != nil {
+			n += st.responseFIN.memory()
+		}
 		if st.h3 != nil {
 			n += 384
 			if st.h3.response != nil {
