@@ -63,6 +63,7 @@ func TestHTTP3TunnelProtectedLateContextUpdatesOwnedHistory(t *testing.T) {
 					require.NotEqual(t, before, history.PacketQueryRevision(ref, []uint64{old.ID}, true))
 					view, err := history.Details(old.ID)
 					require.NoError(t, err)
+					require.Equal(t, current.Session["HTTP3 Tunnel Observations"], view.Session["HTTP3 Resolved Tunnel Observations"], "history must not expose its internal shared-slot discriminator")
 					require.Equal(t, old.SourceBytes, view.SourceBytes)
 					if late == "method" {
 						require.Equal(t, []any{uint64(0x105)}, view.DisplayFieldValues().FieldMap()["http3.tunnel.error_code"])

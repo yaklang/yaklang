@@ -73,7 +73,9 @@ func (entry *protocolHistoryEntry) materializeHTTP3Associations(e *ProtocolEvent
 	var links, tunnel []map[string]any
 	for _, row := range entry.http3Associations {
 		if row["Context Kind"] == "tunnel-frame-type" {
-			tunnel = append(tunnel, row)
+			owned := cloneSession(row)
+			delete(owned, "Context Kind") // private shared-slot discriminator
+			tunnel = append(tunnel, owned)
 		} else {
 			links = append(links, row)
 		}
