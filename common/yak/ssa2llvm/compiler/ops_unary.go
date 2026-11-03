@@ -24,8 +24,11 @@ func (c *Compiler) compileUnOp(inst *ssa.UnOp, resultID int64) error {
 
 	switch inst.Op {
 	case ssa.OpNot:
-		one := llvm.ConstInt(i64, 1, false)
-		val = c.Builder.CreateXor(x, one, name)
+		// Bool results read from tuples or objects may be shadow words, not
+		// raw 0/1. Normalize truthiness before negating the value.
+		truth := c.coerceToI1(x, name+"_truth")
+		negated := c.Builder.CreateXor(truth, llvm.ConstInt(c.LLVMCtx.Int1Type(), 1, false), name)
+		val = c.coerceToInt64(negated)
 	case ssa.OpNeg:
 		if c.valueCarriesFloatBits(inst.GetFunc(), inst.X, 0) {
 			// A float operand is a float64 bit pattern in an i64 word, so

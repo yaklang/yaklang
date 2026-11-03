@@ -860,7 +860,7 @@ println("ok")
 func TestYaklibSSA_WithExcludeFileEmptySlice(t *testing.T) {
 	code := `
 yakit.AutoInitYakit()
-config, err = ssa.NewConfig(ssa.ModeAll, ssa.withProgramName("t"), ssa.withLanguage("php"), ssa.withExcludeFile([]))
+config, err = ssa.NewConfig(ssa.ModeAll, ssa.withProgramName("t"), ssa.withLanguage("php"), ssa.withExcludeFile([]...))
 if err != nil { die("err: %v", err) }
 if config == nil { die("config nil") }
 println("ok")

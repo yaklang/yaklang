@@ -230,6 +230,22 @@ func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	return findVariableFromScope(scope, name, true, true)
 }
 
+// variableScopeIsDeeper reports whether a was created in a scope nested inside
+// b's scope. Only such a variable shadows the one b belongs to.
+func variableScopeIsDeeper(a, b *Variable) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	scopeA, scopeB := a.GetScope(), b.GetScope()
+	if utils.IsNil(scopeA) || utils.IsNil(scopeB) {
+		return false
+	}
+	if scopeA.Compare(scopeB) {
+		return false
+	}
+	return scopeA.IsSameOrSubScope(scopeB)
+}
+
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
 	return findVariableFromScope(scope, name, false, true)
 }

@@ -196,36 +196,61 @@ func sliceElementKind(typ ssa.Type) abi.SliceElemKind {
 	}
 }
 
-func makeInitialMemberCount(inst *ssa.Make) int64 {
+func (c *Compiler) makeInitialMemberCount(inst *ssa.Make) int64 {
 	if inst == nil {
 		return 0
 	}
 	count := int64(0)
 	for _, pair := range ssa.GetMemberPairs(inst) {
 		key, member := pair.Key, pair.Member
-		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
-			continue
-		}
-		// Reads merged into the Make's pair list (e.g. a[-1] later in the
-		// program) carry an Undefined member placeholder; they must not
-		// inflate the initial length. A placeholder that references another
-		// value is a copy (`[host, port]` from a multi-return binding) and
-		// does count. Loop-carried member phis are reads too.
-		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil && u.GetReference() == nil {
-			continue
-		}
-		if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
-			continue
-		}
-		if _, isPhi := member.(*ssa.Phi); isPhi {
-			continue
-		}
-		if _, isPhi := key.(*ssa.Phi); isPhi {
+		if _, ok := c.initialMakeMemberSource(key, member, inst.GetId()); !ok {
 			continue
 		}
 		count++
 	}
 	return count
+}
+
+// initialMakeMemberSource decides whether a Make's member pair names a literal
+// element that has to be materialized when the container is built, and returns
+// the value to read.
+//
+// Reads folded into the same pair list (a later `m[i]`) carry an Undefined
+// placeholder and must not inflate the initial length or be written at the Make.
+// Two placeholder shapes DO name a real element:
+//   - one that references another value (`m = {"k": x}` shares x's word);
+//   - one that is itself a member read of a producing call, which is how
+//     `a, b = f(); g = [a, b]` reuses the unpack element `#<call>[0]`.
+//
+// Loop-carried member phis are reads as well.
+func (c *Compiler) initialMakeMemberSource(key, member ssa.Value, ownerID int64) (ssa.Value, bool) {
+	if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == ownerID {
+		return nil, false
+	}
+	if _, isPhi := member.(*ssa.Phi); isPhi {
+		return nil, false
+	}
+	if _, isPhi := key.(*ssa.Phi); isPhi {
+		return nil, false
+	}
+	if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
+		return nil, false
+	}
+	if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil {
+		if ref := u.GetReference(); ref != nil {
+			return ref, true
+		}
+		// `a, b = f(); g = [a, b]` reuses the unpack element placeholder
+		// `#<call>[0]`: its first owner is the producing call and its first
+		// key is the numeric tuple index. Any other member placeholder is a
+		// read (`a.Push`, `m[i]`) resolved at its own use site, never at the
+		// Make, so it must not inflate the length or be written here.
+		if c.isTupleElementPlaceholder(u) {
+			return u, true
+		}
+		return nil, false
+	}
+	return member, true
 }
 
 func (c *Compiler) compileMakeSlice(inst *ssa.Make, typ ssa.Type) error {
@@ -269,7 +294,7 @@ func (c *Compiler) compileMakeSlice(inst *ssa.Make, typ ssa.Type) error {
 			return err
 		}
 		length = c.coerceToInt64(val)
-	} else if memberCount := makeInitialMemberCount(inst); memberCount > 0 {
+	} else if memberCount := c.makeInitialMemberCount(inst); memberCount > 0 {
 		length = llvm.ConstInt(i64, uint64(memberCount), false)
 	}
 
@@ -1705,6 +1730,32 @@ func (c *Compiler) memberDynamicReadReady(contextInst ssa.Instruction, member ss
 	return false
 }
 
+// isTupleElementPlaceholder reports whether an Undefined member placeholder is
+// a multi-return unpack element: its first owner must be the producing call and
+// its first key must be that call's numeric result index.
+func (c *Compiler) isTupleElementPlaceholder(u *ssa.Undefined) bool {
+	if c == nil || u == nil || !u.IsMember() {
+		return false
+	}
+	obj, key := c.firstOwnerObjectKey(u)
+	if obj == nil || key == nil {
+		return false
+	}
+	if _, isCall := obj.(*ssa.Call); !isCall {
+		return false
+	}
+	index := c.resolveMemberKeyString(key)
+	if index == "" {
+		return false
+	}
+	for _, r := range index {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // memberValueAvailableAtBlock reports whether val is available at the end of
 // blockID. It is the block-positional form of memberValueAvailableAt.
 func (c *Compiler) memberValueAvailableAtBlock(fn *ssa.Function, blockID int64, val ssa.Value) bool {
@@ -1986,26 +2037,8 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 		if key == nil || member == nil || member.GetId() <= 0 || member.GetId() == inst.GetId() {
 			continue
 		}
-		// Undefined member placeholders (e.g. m[i] or m[0] later in the
-		// program) are resolved at their real use site, not during the Make.
-		// A placeholder with a reference copies that value into the slot.
-		source := member
-		if u, isUndef := member.(*ssa.Undefined); isUndef && u != nil {
-			ref := u.GetReference()
-			if ref == nil {
-				continue
-			}
-			source = ref
-		}
-		if u, isUndef := key.(*ssa.Undefined); isUndef && u != nil {
-			continue
-		}
-		// Loop-carried member phis are reads merged by the front end, not
-		// literal members to initialize here.
-		if _, isPhi := member.(*ssa.Phi); isPhi {
-			continue
-		}
-		if _, isPhi := key.(*ssa.Phi); isPhi {
+		source, isInitial := c.initialMakeMemberSource(key, member, inst.GetId())
+		if !isInitial {
 			continue
 		}
 		memberInst, memberIsInst := member.(ssa.Instruction)

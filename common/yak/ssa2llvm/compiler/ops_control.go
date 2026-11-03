@@ -597,6 +597,14 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	if len(preds) == 0 {
 		preds = predecessorBlockIDs(fn, blockID)
 	}
+	// A loop exit merges the break scopes FIRST and the loop's own final
+	// value LAST (ssautil Merge with hasSelf writes the self value into the
+	// last slot), while the CFG lists the condition block as the first
+	// predecessor. Aligning the two by position therefore hands every break
+	// predecessor the loop-carried word and vice versa, so `target = r; break`
+	// reads the pre-loop value. Rotate the loop's own edge to the condition
+	// predecessor and keep the break edges in order after it.
+	edges = reorderLoopExitEdges(fn, blockID, preds, edges)
 
 	edgeByPred := make(map[int64]int64, len(preds))
 	for i, predBlockID := range preds {
@@ -811,6 +819,67 @@ func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Functio
 		}
 	}
 	return resolved, nil
+}
+
+// reorderLoopExitEdges aligns phi edges with CFG predecessors for a loop exit
+// block. The front end merges the break scopes first and the loop's own final
+// value last, but the CFG lists the loop condition block as the first
+// predecessor; without this rotation every break edge is read by the wrong
+// predecessor (a `target = r; break` after the loop sees the pre-loop value).
+func reorderLoopExitEdges(fn *ssa.Function, blockID int64, preds, edges []int64) []int64 {
+	if fn == nil || blockID <= 0 || len(preds) < 2 || len(edges) != len(preds) {
+		return edges
+	}
+	condBlockID := int64(0)
+	for _, loopID := range collectFunctionLoopIDs(fn) {
+		loopVal, ok := fn.GetInstructionById(loopID)
+		if !ok {
+			continue
+		}
+		loop, ok := loopVal.(*ssa.Loop)
+		if !ok || loop == nil || loop.Exit != blockID {
+			continue
+		}
+		if block := loop.GetBlock(); block != nil {
+			condBlockID = block.GetId()
+		}
+	}
+	if condBlockID <= 0 || preds[0] != condBlockID {
+		return edges
+	}
+	out := make([]int64, len(edges))
+	copy(out, edges)
+	// The loop's own edge is the last one; it belongs to the first predecessor.
+	out[0] = edges[len(edges)-1]
+	for i := 1; i < len(edges); i++ {
+		out[i] = edges[i-1]
+	}
+	return out
+}
+
+func collectFunctionLoopIDs(fn *ssa.Function) []int64 {
+	if fn == nil {
+		return nil
+	}
+	var ids []int64
+	for _, blockID := range collectFunctionBlockIDs(fn) {
+		blockVal, ok := fn.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		block, ok := ssa.ToBasicBlock(blockVal)
+		if !ok || block == nil {
+			continue
+		}
+		for _, instID := range block.Insts {
+			if inst, ok := fn.GetInstructionById(instID); ok && inst != nil {
+				if _, isLoop := inst.(*ssa.Loop); isLoop {
+					ids = append(ids, instID)
+				}
+			}
+		}
+	}
+	return ids
 }
 
 func predecessorBlockIDs(fn *ssa.Function, blockID int64) []int64 {

@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 const (
@@ -273,5 +274,5 @@ check = () => {
 	require.Regexp(t, regexp.MustCompile(`add i64 [^,\n]+, 1`), ir)
 	require.Regexp(t, regexp.MustCompile(`add i64 [^,\n]+, 2`), ir)
 	require.Regexp(t, regexp.MustCompile(`stageprobe_llvm_add_3_3 = add i64 [^,\n]+, 3`), ir)
-	require.Contains(t, ir, "@one")
+	require.Contains(t, ir, "@"+abi.UserSymbolPrefix+"one")
 }

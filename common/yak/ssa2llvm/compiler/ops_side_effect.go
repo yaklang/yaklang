@@ -547,11 +547,20 @@ func (c *Compiler) resolveClosureSideEffect(inst *ssa.SideEffect, actualID int64
 			return closureVal, uint64(index), byRef, true
 		}
 	}
-	// Closure passed as a callback argument (extern/yaklib callee).
+	// Closure passed as a callback argument (extern/yaklib callee). A call can
+	// take several callbacks (progress + finished, for example); pick the one
+	// whose body performed the write, so this side effect reads that closure's
+	// free-value slot instead of the first callback's.
 	if c.function.materializedClosureArgs != nil {
-		for _, closureVal := range c.function.materializedClosureArgs[inst.CallSite] {
-			if !closureVal.IsNil() {
-				return closureVal, uint64(index), byRef, true
+		args := c.function.materializedClosureArgs[inst.CallSite]
+		for _, arg := range args {
+			if arg.fnID == closureFn.GetId() && !arg.value.IsNil() {
+				return arg.value, uint64(index), byRef, true
+			}
+		}
+		for _, arg := range args {
+			if !arg.value.IsNil() {
+				return arg.value, uint64(index), byRef, true
 			}
 		}
 	}

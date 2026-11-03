@@ -77,10 +77,12 @@ func (c *Compiler) resolveContextCallArg(inst ssa.Instruction, argID int64, tagP
 					// mutates count).
 					if c.function != nil && inst != nil {
 						if c.function.materializedClosureArgs == nil {
-							c.function.materializedClosureArgs = make(map[int64][]llvm.Value)
+							c.function.materializedClosureArgs = make(map[int64][]materializedClosureArg)
 						}
 						c.function.materializedClosureArgs[inst.GetId()] = append(
-							c.function.materializedClosureArgs[inst.GetId()], closure)
+							c.function.materializedClosureArgs[inst.GetId()],
+							materializedClosureArg{value: closure, fnID: ssaFn.GetId()},
+						)
 					}
 					if tagPointerArgs {
 						tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
