@@ -33,7 +33,7 @@ Push、渲染、Save、恢复和 fork/merge 都不会自行调用 AI 压缩。�
 
 技能仍按名字整份淘汰（包含分页与 metadata），证据按观测 id 淘汰；没有点名的全部保留。工具 Schema、用户输入、TODO、任务指令和目录不允许删除。旧的 `timeline-summary` action、`ratain_timeline_item_range` 与 `retire_promoted_entries` 输出协议不再解析。
 
-输入安全上限为 `512 * 1024` tokens；摘要与保留原文的输出安全上限默认 `16 * 1024` tokens。超限或非法选择会报错，不静默截断。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 解析都只接受单一 `compress_context`，非法 action、范围或 TODO 修改交给现有 AI transaction 引导重试；原子提交仍在下面的统一 action 执行阶段。
+输入安全上限为 `512 * 1024` tokens；摘要与保留原文的合计告警阈值为 `64 * 1024` tokens。超过阈值时复用 `warning` 普通流，按当前会话语言发出提示并继续提交，不截断输出；非法选择仍会报错。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 解析都只接受单一 `compress_context`，非法 action、范围或 TODO 修改交给现有 AI transaction 引导重试。
 
 ## 提交、并发与保存
 

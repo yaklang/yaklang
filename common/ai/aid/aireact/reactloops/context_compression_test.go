@@ -253,6 +253,67 @@ func TestContextCompressionHandlerParsesSelection(t *testing.T) {
 	require.ErrorContains(t, op.contextCompressionError, "retain_timeline")
 }
 
+func TestContextCompressionSummaryOverAdvisoryLimitWarnsAndCommits(t *testing.T) {
+	ctx := context.Background()
+	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
+	retiredHistory := uuid.NewString()
+	cfg.Timeline.PushText(12, "%s", retiredHistory)
+	loop := makeSchemaStabilityTestLoop(cfg)
+	summary := strings.TrimSpace(strings.Repeat("long summary ", aicommon.TimelineCompressionMaxSummaryTokens+1))
+	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{
+		"summary": summary, "retain_timeline": "", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
+	})
+	require.Greater(t, aicommon.MeasureTokens(summary), aicommon.TimelineCompressionMaxSummaryTokens)
+
+	capture := captureActivityStatus(loop)
+	op := NewActionHandlerOperator(nil)
+	handleCompressContext(loop, action, op)
+	terminated, err := op.IsTerminated()
+	require.NoError(t, err)
+	require.False(t, terminated)
+	require.NoError(t, op.contextCompressionError)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "上下文压缩结果超过建议阈值"))
+	loop.GetEmitter().WaitForStream()
+	capture.mu.Lock()
+	allNormalStreams := true
+	for _, event := range capture.events {
+		if event.NodeId == contextCompressionWarningNodeID && event.IsStream && event.IsSystem {
+			allNormalStreams = false
+		}
+	}
+	capture.mu.Unlock()
+	require.True(t, allNormalStreams, "context compression warning must use a normal user-visible stream")
+	serialized, err := aicommon.MarshalTimeline(cfg.Timeline)
+	require.NoError(t, err)
+	require.Contains(t, serialized, summary)
+	view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
+	require.NotContains(t, view.Frozen, retiredHistory)
+}
+
+func TestContextCompressionAdvisoryWarningUsesConfiguredLanguage(t *testing.T) {
+	for _, test := range []struct {
+		language string
+		expected string
+	}{
+		{language: "zh", expected: "上下文压缩结果超过建议阈值"},
+		{language: "en-US", expected: "Context compression exceeded the advisory limit"},
+	} {
+		t.Run(test.language, func(t *testing.T) {
+			cfg := aicommon.NewConfig(
+				context.Background(),
+				aicommon.WithDisableAutoSkills(true),
+				aicommon.WithDisableCreateDBRuntime(true),
+				aicommon.WithLanguage(test.language),
+			)
+			loop := makeSchemaStabilityTestLoop(cfg)
+			capture := captureActivityStatus(loop)
+			loop.emitContextCompressionAdvisoryLimit(70_000, 65_536)
+			require.True(t, capture.waitStream(contextCompressionWarningNodeID, test.expected))
+			loop.GetEmitter().WaitForStream()
+		})
+	}
+}
+
 func TestContextCompressionExamplesSupportScatteredRanges(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
