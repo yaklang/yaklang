@@ -109,39 +109,97 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 	return vals
 }
 
-// crossFunctionMemberTopDefs follows package-level field writes that land on
-// the same object after this const was captured. Members are latest-first, so
-// values before this const are newer writes. Same-function writes are left
-// alone: a read compiled before an assignment in that function must not see it.
-func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...OperationOption) Values {
+// memberWriteFanoutLimit bounds how many sibling writers one member read may
+// follow. A field with more writers than this has no single useful definition,
+// and following all of them only adds cost without adding certainty.
+const memberWriteFanoutLimit = 32
+
+// isPackageLevelObject reports whether the object lives in the program-wide
+// scope rather than inside one function body. Only such an object is shared
+// between functions; a function-local instance is reached through its own call
+// path and must not pick up writes from unrelated functions.
+func isPackageLevelObject(obj ssa.Value) bool {
+	if utils.IsNil(obj) {
+		return false
+	}
+	if prog := obj.GetProgram(); prog != nil {
+		if global := prog.GlobalVariablesBlueprint; global != nil {
+			if container := global.Container(); !utils.IsNil(container) && container.GetId() == obj.GetId() {
+				return true
+			}
+		}
+	}
+	// Package-level declarations are emitted into the package entry function,
+	// so an object created there belongs to every function of the package.
+	fn := obj.GetFunc()
+	return fn != nil && fn.IsMain()
+}
+
+// crossFunctionMemberTopDefs reports the writers of the same field when the
+// read reads a package-level object, plus whether the read value is itself the
+// field's declaration default.
+//
+// A field read is bound to the member that already existed when its function
+// was compiled, so a write emitted by a function compiled later is not part of
+// the read's own chain. Without this step the answer depends on compile order:
+// a read compiled first resolves to the struct zero value or to an older write,
+// while the same read compiled last resolves to the newest one.
+//
+// Only a package-level object is widened. Its field is genuinely shared, so a
+// writer in another function is a possible definition. The widening is a
+// best-effort over-approximation: the bound member carries no identity of the
+// function that reads it, so a write that follows the read inside the reading
+// function is reported too. Keeping it is the price of an answer that does not
+// depend on compile order; dropping it would require the read to keep its own
+// function, which the IR does not record.
+func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...OperationOption) (writers Values, readIsDefault bool) {
 	raw := i.getValue()
 	if utils.IsNil(raw) || !raw.IsMember() {
-		return nil
+		return nil, false
 	}
 	obj := raw.GetObject()
 	key := raw.GetKey()
 	if utils.IsNil(obj) || utils.IsNil(key) {
-		return nil
+		return nil, false
 	}
-	ownFunction := raw.GetFunc()
-	members := ssa.GetMembersByKey(obj, key)
-	var later Values
+	if !isPackageLevelObject(obj) {
+		return nil, false
+	}
+	if !actx.beginMemberWiden(i) {
+		return nil, false
+	}
+	members := actx.memberWrites(obj, key)
+	if len(members) <= 1 {
+		// The field has a single writer, which is this value itself; there is
+		// nothing outside its own chain to follow.
+		return nil, false
+	}
+	if len(members) > memberWriteFanoutLimit {
+		log.Debugf("member %q has %d writers, skip cross-function widening", ssa.GetKeyString(key), len(members))
+		return nil, false
+	}
+	// The oldest member of a package-level field is the value the package
+	// initializer materialises when the field is declared. It stands for "not
+	// written yet", so it is not a definition once a real writer exists. A
+	// field that is only ever declared keeps a single member and never reaches
+	// this point.
+	defaultMember := members[len(members)-1]
+	readIsDefault = !utils.IsNil(defaultMember) && defaultMember.GetId() == raw.GetId()
 	for _, member := range members {
 		if utils.IsNil(member) {
 			continue
 		}
 		if member.GetId() == raw.GetId() {
-			break
+			continue
 		}
-		memberFunction := member.GetFunc()
-		if ownFunction != nil && memberFunction != nil && ownFunction.GetId() == memberFunction.GetId() {
+		if !utils.IsNil(defaultMember) && member.GetId() == defaultMember.GetId() && ssa.IsConstInst(member) {
 			continue
 		}
 		if traced := i.NewValue(member); traced != nil {
-			later = append(later, traced.getTopDefs(actx, opt...)...)
+			writers = append(writers, traced.getTopDefs(actx, opt...)...)
 		}
 	}
-	return later
+	return writers, readIsDefault
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
@@ -263,6 +321,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return i.visitedDefs(actx, opt...)
 	}
+	// A member read adds the writers that live in other functions. A const is
+	// handled in its own case below: it has no producer, so its writers replace
+	// its value instead of being added to it.
+	if _, isConst := ssa.ToConstInst(i.getValue()); !isConst {
+		if extra, _ := crossFunctionMemberTopDefs(i, actx, opt...); len(extra) > 0 {
+			defer func() {
+				result = append(result, extra...)
+			}()
+		}
+	}
 	switch inst := i.getValue().(type) {
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
@@ -272,13 +340,18 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	case *ssa.ConstInst:
 		// A struct zero value is a const member. A later write in another
 		// function does not rewrite that const, so a package-level field read
-		// compiled first would otherwise stop at "". Follow only writes that
-		// belong to a different function; a same-function use keeps the value
-		// observed at that instruction.
-		if later := crossFunctionMemberTopDefs(i, actx, opt...); len(later) > 0 {
+		// compiled first would otherwise stop at "".
+		later, readIsDefault := crossFunctionMemberTopDefs(i, actx, opt...)
+		if len(later) == 0 {
+			return i.visitedDefs(actx, opt...)
+		}
+		// The declaration-time value stands for "not written yet", so the real
+		// writers replace it. A const that a function actually assigned is a
+		// write of its own and stays in the set.
+		if readIsDefault {
 			return later
 		}
-		return i.visitedDefs(actx, opt...)
+		return append(i.visitedDefs(actx, opt...), later...)
 	case *ssa.Phi:
 		conds := inst.GetControlFlowConditions()
 		result := getMemberCall(i, inst, actx)
