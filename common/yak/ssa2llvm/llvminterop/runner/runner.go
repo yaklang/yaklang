@@ -87,6 +87,16 @@ func runOpt(cfg *Config) (*Result, error) {
 	if optBin == "" {
 		optBin = "opt"
 	}
+	// Resolve through the same lookup the version detection uses: the distro
+	// installs the toolchain under /usr/lib/llvm-<major>/bin, which is not on
+	// PATH for a plain runner. A bare exec.Command would then fail with
+	// `exec: "opt": executable file not found in $PATH` after detection had
+	// already succeeded.
+	resolvedOpt, err := resolveLLVMToolBinary(optBin)
+	if err != nil {
+		return nil, fmt.Errorf("runner: %w", err)
+	}
+	optBin = resolvedOpt
 
 	args := make([]string, 0, 16)
 
@@ -116,7 +126,19 @@ func runTool(cfg *Config) (*Result, error) {
 }
 
 func executeCommand(binary string, args []string, verbose bool) (*Result, error) {
-	cmd := exec.Command(binary, args...)
+	// A tool plugin names its program in the manifest (the builtin
+	// instcombine-simplifycfg pack uses "opt"). Resolve it the same way as the
+	// pass-plugin path: the distro installs opt under /usr/lib/llvm-<major>/bin,
+	// which is not on PATH for a plain runner, and a bare exec.Command would fail
+	// with `exec: "opt": executable file not found in $PATH`.
+	resolved := binary
+	if !strings.ContainsRune(binary, '/') {
+		if found, err := resolveLLVMToolBinary(binary); err == nil {
+			resolved = found
+		}
+	}
+
+	cmd := exec.Command(resolved, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

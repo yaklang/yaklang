@@ -211,13 +211,24 @@ func main() {
 }
 
 func TestSync_Pool_PutGet(t *testing.T) {
+	// sync.Pool may drop a Put value at any garbage collection, and Get may then
+	// return nil. That is the documented contract, so asserting `Get() == 13`
+	// failed whenever a collection landed between Put and Get (seen on a CI
+	// runner as "expected 13, got 0"). Exercise the same Put/Get path through
+	// the AOT runtime, but accept both outcomes the contract allows and only
+	// reject a crash or a wrong value.
 	code := `
 func main() {
 	p = sync.NewPool()
 	p.Put(13)
-	println(p.Get())
+	v = p.Get()
+	if v == nil {
+		println("dropped")
+	} else {
+		println(v)
+	}
 }
 `
 	output := runBinaryWithEnv(t, code, "main", nil)
-	require.Equal(t, "13\n", output)
+	require.Contains(t, []string{"13\n", "dropped\n"}, output)
 }

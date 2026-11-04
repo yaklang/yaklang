@@ -787,6 +787,60 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	return nil
 }
 
+// closureWritebackSite is one captured-variable write the front end recorded
+// for a closure. The front end collapses the per-return maps into
+// Function.SideEffectReturnSites during Finish, because their Variable keys
+// retain the body scope, so both forms are accepted here: the maps when the
+// function has not finished yet, the scope-free list afterwards.
+type closureWritebackSite struct {
+	name         string
+	verboseName  string
+	modify       int64
+	kind         ssa.SideEffectKind
+	variableName string
+}
+
+// closureWritebackSites lists every writeback site recorded for fn.
+func closureWritebackSites(fn *ssa.Function) []closureWritebackSite {
+	if fn == nil {
+		return nil
+	}
+	if len(fn.SideEffectReturnSites) > 0 {
+		sites := make([]closureWritebackSite, 0, len(fn.SideEffectReturnSites))
+		for _, site := range fn.SideEffectReturnSites {
+			sites = append(sites, closureWritebackSite{
+				name:         site.Name,
+				verboseName:  site.VerboseName,
+				modify:       site.Modify,
+				kind:         site.Kind,
+				variableName: site.VariableName,
+			})
+		}
+		return sites
+	}
+	var sites []closureWritebackSite
+	for _, ser := range fn.SideEffectsReturn {
+		for variable, se := range ser {
+			if se == nil {
+				continue
+			}
+			site := closureWritebackSite{
+				name:        se.Name,
+				verboseName: se.VerboseName,
+				modify:      se.Modify,
+				kind:        se.Kind,
+			}
+			if variable != nil {
+				site.variableName = variable.GetName()
+			} else if se.Variable != nil {
+				site.variableName = se.Variable.GetName()
+			}
+			sites = append(sites, site)
+		}
+	}
+	return sites
+}
+
 // storeClosureCaptureAtDefinition writes a by-ref capture in the block that
 // produces the new value. Exit writeback only stores a modification that
 // dominates the exit, so a branch-local assignment such as
@@ -804,32 +858,30 @@ func (c *Compiler) storeClosureCaptureAtDefinition(fn *ssa.Function, inst ssa.In
 	if id <= 0 {
 		return nil
 	}
-	for _, ser := range fn.SideEffectsReturn {
-		for _, se := range ser {
-			if se == nil || se.Modify != id {
-				continue
-			}
-			if err := c.storeFreeValueSideEffect(fn, se, inst); err != nil {
-				return err
-			}
+	for _, site := range closureWritebackSites(fn) {
+		if site.modify != id {
+			continue
+		}
+		if err := c.storeFreeValueSideEffect(fn, site, inst); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func (c *Compiler) storeFreeValueSideEffect(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction) error {
-	return c.storeFreeValueSideEffectWord(fn, se, contextInst, llvm.Value{})
+func (c *Compiler) storeFreeValueSideEffect(fn *ssa.Function, site closureWritebackSite, contextInst ssa.Instruction) error {
+	return c.storeFreeValueSideEffectWord(fn, site, contextInst, llvm.Value{})
 }
 
 // sideEffectModifiesOwnMember reports a side effect that writes a member of
 // the captured value itself: the front end records `m["c"] = 7` as a side
 // effect on `m` whose Modify is the member value. The captured cell holds the
 // object, so it must keep that word.
-func (c *Compiler) sideEffectModifiesOwnMember(fn *ssa.Function, se *ssa.FunctionSideEffect, binding callframe.FreeValueBinding) bool {
-	if fn == nil || se == nil || binding.ValueID <= 0 || se.Modify <= 0 {
+func (c *Compiler) sideEffectModifiesOwnMember(fn *ssa.Function, site closureWritebackSite, binding callframe.FreeValueBinding) bool {
+	if fn == nil || binding.ValueID <= 0 || site.modify <= 0 {
 		return false
 	}
-	modify, ok := fn.GetValueById(se.Modify)
+	modify, ok := fn.GetValueById(site.modify)
 	if !ok || modify == nil || !modify.IsMember() {
 		return false
 	}
@@ -847,16 +899,16 @@ func (c *Compiler) sideEffectModifiesOwnMember(fn *ssa.Function, se *ssa.Functio
 	return false
 }
 
-func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction, preset llvm.Value) error {
-	if fn == nil || se == nil || se.Modify <= 0 || c == nil || c.function == nil {
+func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, site closureWritebackSite, contextInst ssa.Instruction, preset llvm.Value) error {
+	if fn == nil || site.modify <= 0 || c == nil || c.function == nil {
 		return nil
 	}
 	for _, binding := range callframe.OrderedFreeValueBindings(fn) {
-		if se.Variable != nil && binding.Variable != nil {
-			if se.Variable.GetName() != binding.Variable.GetName() {
+		if site.variableName != "" && binding.Variable != nil {
+			if site.variableName != binding.Variable.GetName() {
 				continue
 			}
-		} else if se.Name != binding.Name {
+		} else if site.name != binding.Name {
 			continue
 		}
 		if c.freeValueCaptureMode(fn, binding) == freeValueCaptureByValue {
@@ -867,7 +919,7 @@ func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.Functi
 		// emitted where the assignment happens; storing the member's word here
 		// would replace the captured object with the field value, and every
 		// later read of `m` (inside or after the closure) would see garbage.
-		if c.sideEffectModifiesOwnMember(fn, se, binding) {
+		if c.sideEffectModifiesOwnMember(fn, site, binding) {
 			continue
 		}
 		ptr, ok := c.function.freeValuePointers[binding.ValueID]
@@ -880,15 +932,15 @@ func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.Functi
 		var modifyVal llvm.Value
 		if !preset.IsNil() {
 			modifyVal = preset
-		} else if contextInst != nil && contextInst.GetId() == se.Modify {
-			cached, ok := c.getCachedValue(contextInst, se.Modify)
+		} else if contextInst != nil && contextInst.GetId() == site.modify {
+			cached, ok := c.getCachedValue(contextInst, site.modify)
 			if !ok || cached.IsNil() {
 				return nil
 			}
 			modifyVal = cached
 		} else {
 			var err error
-			modifyVal, err = c.getValue(contextInst, se.Modify)
+			modifyVal, err = c.getValue(contextInst, site.modify)
 			if err != nil {
 				return err
 			}
@@ -906,29 +958,31 @@ func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.Functi
 // merged word is stored here, after both incoming edges have filled the phi
 // slot. A path that returns before this block does not reach the store.
 func (c *Compiler) publishPhiClosureCapture(fn *ssa.Function, phi *ssa.Phi) error {
-	if fn == nil || phi == nil || c == nil || c.function == nil || len(c.function.freeValuePointers) == 0 || len(fn.SideEffectsReturn) == 0 {
+	if fn == nil || phi == nil || c == nil || c.function == nil || len(c.function.freeValuePointers) == 0 {
 		return nil
 	}
 	phiID := phi.GetId()
 	if phiID <= 0 {
 		return nil
 	}
-	matched := make([]*ssa.FunctionSideEffect, 0, 1)
-	seen := make(map[*ssa.FunctionSideEffect]struct{})
-	for _, ser := range fn.SideEffectsReturn {
-		for _, se := range ser {
-			if se == nil || se.Modify <= 0 {
-				continue
-			}
-			if _, ok := seen[se]; ok {
-				continue
-			}
-			if !phiCarriesSideEffect(phi, se.Modify) {
-				continue
-			}
-			seen[se] = struct{}{}
-			matched = append(matched, se)
+	sites := closureWritebackSites(fn)
+	if len(sites) == 0 {
+		return nil
+	}
+	matched := make([]closureWritebackSite, 0, 1)
+	seen := make(map[int64]struct{})
+	for _, site := range sites {
+		if site.modify <= 0 {
+			continue
 		}
+		if _, ok := seen[site.modify]; ok {
+			continue
+		}
+		if !phiCarriesSideEffect(phi, site.modify) {
+			continue
+		}
+		seen[site.modify] = struct{}{}
+		matched = append(matched, site)
 	}
 	if len(matched) == 0 {
 		return nil
@@ -968,8 +1022,8 @@ func (c *Compiler) publishPhiClosureCapture(fn *ssa.Function, phi *ssa.Phi) erro
 	if word.IsNil() {
 		return nil
 	}
-	for _, se := range matched {
-		if err := c.storeFreeValueSideEffectWord(fn, se, nil, word); err != nil {
+	for _, site := range matched {
+		if err := c.storeFreeValueSideEffectWord(fn, site, nil, word); err != nil {
 			return err
 		}
 	}
@@ -1014,31 +1068,29 @@ func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst
 			}
 		}
 	}
-	for _, ser := range fn.SideEffectsReturn {
-		for variable, se := range ser {
-			if variable == nil || se == nil || se.Modify <= 0 {
-				continue
-			}
-			// Only write back on return paths where the modification actually
-			// executed: an early-return branch that skips the assignment (e.g.
-			// `if dir { return }` before `files = append(files, x)`) must not
-			// clobber the free-value slot with an uninitialized value. The
-			// modified value's defining block dominates the return iff every
-			// path to the return executed the side effect.
-			if !c.sideEffectModifyDominates(fn, se, retBlock) {
-				continue
-			}
-			// The assignment already stored this word into the capture cell
-			// (at the instruction, or at a phi). Storing the same register
-			// again at the exit replays a snapshot from this call. Under a
-			// user lock that only covers the assignment, that replay lands
-			// after Unlock and races with other goroutines.
-			if sideEffectStoredBeforeExit(fn, se) {
-				continue
-			}
-			if err := c.storeFreeValueSideEffect(fn, se, contextInst); err != nil {
-				continue
-			}
+	for _, site := range closureWritebackSites(fn) {
+		if site.modify <= 0 {
+			continue
+		}
+		// Only write back on return paths where the modification actually
+		// executed: an early-return branch that skips the assignment (e.g.
+		// `if dir { return }` before `files = append(files, x)`) must not
+		// clobber the free-value slot with an uninitialized value. The
+		// modified value's defining block dominates the return iff every
+		// path to the return executed the side effect.
+		if !c.sideEffectModifyDominates(fn, site, retBlock) {
+			continue
+		}
+		// The assignment already stored this word into the capture cell
+		// (at the instruction, or at a phi). Storing the same register
+		// again at the exit replays a snapshot from this call. Under a
+		// user lock that only covers the assignment, that replay lands
+		// after Unlock and races with other goroutines.
+		if sideEffectStoredBeforeExit(fn, site) {
+			continue
+		}
+		if err := c.storeFreeValueSideEffect(fn, site, contextInst); err != nil {
+			continue
 		}
 	}
 	return nil
@@ -1049,11 +1101,11 @@ func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst
 // go through storeClosureCaptureAtDefinition. Phis go through
 // publishPhiClosureCapture. A modify that is only materialized later (a
 // parameter member, a constant) still needs the exit store.
-func sideEffectStoredBeforeExit(fn *ssa.Function, se *ssa.FunctionSideEffect) bool {
-	if fn == nil || se == nil || se.Modify <= 0 {
+func sideEffectStoredBeforeExit(fn *ssa.Function, site closureWritebackSite) bool {
+	if fn == nil || site.modify <= 0 {
 		return false
 	}
-	modifyVal, ok := fn.GetValueById(se.Modify)
+	modifyVal, ok := fn.GetValueById(site.modify)
 	if !ok || modifyVal == nil {
 		return false
 	}
@@ -1082,11 +1134,11 @@ func sideEffectStoredBeforeExit(fn *ssa.Function, se *ssa.FunctionSideEffect) bo
 // modification is guaranteed to have executed on every path reaching the
 // return. A nil defining block (e.g. a constant) is treated as dominating so
 // constant assignments keep their previous writeback behavior.
-func (c *Compiler) sideEffectModifyDominates(fn *ssa.Function, se *ssa.FunctionSideEffect, retBlock *ssa.BasicBlock) bool {
-	if fn == nil || se == nil || se.Modify <= 0 || retBlock == nil {
+func (c *Compiler) sideEffectModifyDominates(fn *ssa.Function, site closureWritebackSite, retBlock *ssa.BasicBlock) bool {
+	if fn == nil || site.modify <= 0 || retBlock == nil {
 		return false
 	}
-	modifyVal, ok := fn.GetValueById(se.Modify)
+	modifyVal, ok := fn.GetValueById(site.modify)
 	if !ok || modifyVal == nil {
 		return false
 	}

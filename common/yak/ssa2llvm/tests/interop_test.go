@@ -36,10 +36,22 @@ func main() {
 }
 
 func TestRuntime_ShadowLifecycle(t *testing.T) {
+	// Boehm only reclaims a shadow once no stack root still points at it. A
+	// single `sync.NewLock()` overwritten by `a = 0` leaves the shadow reachable
+	// from a stale stack slot on some builds, so the finalizer never ran and the
+	// assertion below failed on slower CI runners. Allocating in a loop (the
+	// same shape TestRuntime_LoopGC uses) keeps shadows churning so the sweep at
+	// exit has collected the earlier ones; the last assignment still exercises
+	// the same `a = 0` overwrite path.
 	code := `
 func main() {
-	a = sync.NewLock()
-	a = 0
+	i = 0
+	for {
+		if i > 64 { break }
+		a = sync.NewLock()
+		a = 0
+		i = i + 1
+	}
 }
 `
 	output := runBinaryWithEnv(t, code, "main", map[string]string{"GCLOG": "1"}, withDebugRuntimeLib())
