@@ -28,6 +28,10 @@ type typeStore struct {
 	// it. Equal types reuse one id, so a program keeps one row per distinct
 	// content instead of one row per created type object.
 	interned map[[sha256.Size]byte]int64
+	// adopted records the pre-numbered ids whose body already entered
+	// interned. remember runs on every SetType, so the per-id check keeps a
+	// repeated type from being snapshotted again.
+	adopted  map[int64]struct{}
 	internMu sync.Mutex
 	// identity remembers the last persisted map-cache key. A matching key
 	// whose fingerprint is already stored skips snapshot and hashing.
@@ -69,6 +73,14 @@ func (s *typeStore) remember(typ Type) Type {
 			return typ
 		}
 		id = s.claimTypeID(typ)
+	} else if s.mode == ProgramCacheDBWrite {
+		// A type can arrive already numbered: a shared global such as
+		// defaultAnyType, a type carried over from a memory-only program, or
+		// one reloaded from the database. Its id must stay (persisted
+		// ir_codes rows already point at it), but its body must still enter
+		// the intern table. Otherwise the next equal type allocates a second
+		// id and writes a duplicate row.
+		s.adoptNumberedType(typ, id)
 	}
 	// Imported/shared types may already own an ID. Reserve it before the
 	// next new allocation, otherwise a primitive can replace that resident.
@@ -117,6 +129,35 @@ func (s *typeStore) adoptInternedType(id int64, duplicate Type) {
 	s.resident.Set(id, duplicate)
 }
 
+// adoptNumberedType registers an already numbered type in the intern table so
+// a later fresh type with the same body reuses this id instead of writing a
+// second row. The id itself is never changed.
+func (s *typeStore) adoptNumberedType(typ Type, id int64) {
+	if id <= 0 || !typeIsInternable(typ) {
+		return
+	}
+	s.internMu.Lock()
+	if s.adopted == nil {
+		s.adopted = make(map[int64]struct{})
+	}
+	if _, seen := s.adopted[id]; seen {
+		s.internMu.Unlock()
+		return
+	}
+	s.adopted[id] = struct{}{}
+	s.internMu.Unlock()
+
+	fingerprint := snapshotTypePersistence(typ).fingerprint()
+	s.internMu.Lock()
+	defer s.internMu.Unlock()
+	if s.interned == nil {
+		s.interned = make(map[[sha256.Size]byte]int64)
+	}
+	if _, seen := s.interned[fingerprint]; !seen {
+		s.interned[fingerprint] = id
+	}
+}
+
 // claimTypeID assigns the next free id. A shared type may have been claimed
 // by another worker, in which case the object itself returns the winner's id.
 func (s *typeStore) claimTypeID(typ Type) int64 {
@@ -137,22 +178,33 @@ func (s *typeStore) claimTypeID(typ Type) int64 {
 // typeIsInternable reports whether two objects with one persisted body are
 // interchangeable for the whole run.
 //
-// Blueprints are excluded: their parents, interfaces and container arrive
-// after the first reference and differ per class. Struct, tuple and plain
-// object types are excluded too: the frontend grows them field by field, so
-// two declarations can start equal and diverge. Function types are fixed by
-// their parameter list, and slice/map wrappers are fixed at construction.
+// One rule decides this: the persisted body must be final when the id is
+// handed out. Merging is a promise that a later snapshot of the id equals the
+// body that taught the intern table, so a type that is still being filled in
+// must never take part.
+//
+// Every composite is excluded because the IR fills it after first use:
+//
+//   - Blueprint: parents, interfaces and container arrive later.
+//   - FunctionType: NewFunctionType starts empty and Finish() writes
+//     Parameter/ReturnType/ParameterLen/SideEffects in place. Probing a real
+//     compile showed 176 unnamed function types whose body changed after
+//     claiming an id, 55 of them after another type had already reused it.
+//   - Struct/tuple/anonymous ObjectType: fields are appended while parsing.
+//   - Slice/map ObjectType: FieldType/KeyTyp are rewritten by coverType and
+//     ApplyGenericType, and a slice that becomes []byte is replaced wholesale.
+//
+// What is left is the basic types, whose body is fixed at construction, and
+// the named object types, whose body is their name.
 func typeIsInternable(typ Type) bool {
-	switch t := typ.(type) {
-	case *Blueprint:
+	switch typ.(type) {
+	case *Blueprint, *FunctionType:
 		return false
-	case *FunctionType:
-		return true
 	case *ObjectType:
-		switch t.GetTypeKind() {
-		case SliceTypeKind, MapTypeKind:
-			return true
-		}
+		// A named object is identified by its name; an unnamed one only by
+		// the fields that are still being mutated.
+		_, stable := typePersistIdentityOf(typ)
+		return stable
 	}
 	_, stable := typePersistIdentityOf(typ)
 	return stable

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -80,8 +81,7 @@ func TestTypeStoreInternsConcurrently(t *testing.T) {
 
 // A type that already carries an id keeps it. That id may already be
 // referenced by persisted instructions, so rewriting it to a shared id would
-// break those rows. Interning is therefore best effort: it covers types whose
-// id this store assigns, not types that arrive pre-numbered.
+// break those rows.
 func TestTypeStoreKeepsPreassignedID(t *testing.T) {
 	db, store := newTypeSnapshotStore(t, "preassigned")
 	first := CreateStringType()
@@ -96,5 +96,82 @@ func TestTypeStoreKeepsPreassignedID(t *testing.T) {
 	require.NoError(t, store.flush())
 
 	require.Equal(t, int64(2), countIrTypeRowsForProgram(t, db, "preassigned"),
-		"a pre-numbered equal type still gets its own row")
+		"two ids that already exist cannot be merged after the fact")
+}
+
+// The other order is the one that used to leak a duplicate row: a shared
+// global such as defaultAnyType arrives already numbered, then a fresh equal
+// type is created. The numbered body must still teach the intern table.
+func TestTypeStoreAdoptsNumberedTypeForLaterMatches(t *testing.T) {
+	db, store := newTypeSnapshotStore(t, "numbered-first")
+	preset := CreateAnyType()
+	preset.SetId(1)
+	store.remember(preset)
+
+	fresh := CreateAnyType()
+	store.remember(fresh)
+	require.Equal(t, int64(1), preset.GetId(), "a preset id is never rewritten")
+	require.Equal(t, int64(1), fresh.GetId(), "a later equal type must reuse the preset id")
+	require.NoError(t, store.flush())
+	require.Equal(t, int64(1), countIrTypeRowsForProgram(t, db, "numbered-first"))
+}
+
+// remember runs on every SetType, and most of those types already carry an id.
+// Adopting such a type must cost one map lookup after the first time, not a
+// snapshot per call.
+func BenchmarkTypeRememberNumbered(b *testing.B) {
+	store := &typeStore{
+		mode:        ProgramCacheDBWrite,
+		programName: "bench",
+		nextID:      newTestTypeStore().nextID,
+		resident:    utils.NewSafeMapWithKey[int64, Type](),
+	}
+	typ := CreateStringType()
+	typ.SetId(1)
+	store.remember(typ)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.remember(typ)
+	}
+}
+
+// A function type is filled in place by Finish() after its first use: it
+// starts as "() -> " and later becomes "(number) -> any". Sharing an id at the
+// empty stage would bind unrelated signatures to one row, so function types
+// must never intern. Probing a real compile showed 176 such rewrites, 55 of
+// them after another type had already reused the id.
+func TestTypeStoreDoesNotInternFunctionTypes(t *testing.T) {
+	_, store := newTypeSnapshotStore(t, "intern-func")
+	first := NewFunctionType("", nil, nil, false)
+	second := NewFunctionType("", nil, nil, false)
+	store.remember(first)
+	store.remember(second)
+	require.NotEqual(t, first.GetId(), second.GetId())
+	require.Equal(t, 2, store.resident.Count())
+
+	// The bodies diverge after the ids were handed out; each keeps its own.
+	first.ReturnType, second.ReturnType = CreateNumberType(), CreateStringType()
+	require.NotEqual(t, first.GetId(), second.GetId())
+	require.NotEqual(t, first.String(), second.String())
+}
+
+// Slice and map wrappers are rewritten too: coverType copies FieldType/KeyTyp
+// in, ApplyGenericType substitutes type parameters, and a slice that becomes
+// []byte is replaced wholesale. Two equal-looking wrappers can therefore stop
+// being equal, so they must not share an id.
+func TestTypeStoreDoesNotInternSliceOrMapWrappers(t *testing.T) {
+	_, store := newTypeSnapshotStore(t, "intern-wrapper")
+	sliceA, sliceB := NewSliceType(CreateAnyType()), NewSliceType(CreateAnyType())
+	store.remember(sliceA)
+	store.remember(sliceB)
+	require.NotEqual(t, sliceA.GetId(), sliceB.GetId(), "slice wrappers are mutated after construction")
+
+	sliceA.FieldType = CreateStringType()
+	require.NotEqual(t, sliceA.String(), sliceB.String())
+
+	mapA, mapB := NewMapType(CreateStringType(), CreateAnyType()), NewMapType(CreateStringType(), CreateAnyType())
+	store.remember(mapA)
+	store.remember(mapB)
+	require.NotEqual(t, mapA.GetId(), mapB.GetId(), "map wrappers are mutated after construction")
 }
