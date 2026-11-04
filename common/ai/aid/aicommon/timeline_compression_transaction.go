@@ -128,19 +128,7 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 	if err != nil {
 		return nil, nil, err
 	}
-	observed := compressionObservedIDs(selection.ObservedIDs)
-	for _, ids := range [][]int64{selection.RetainedIDs, selection.RetiredPromotedEntries} {
-		for _, id := range ids {
-			if id > source.ThroughID {
-				return nil, nil, fmt.Errorf("compression item %d is outside the request history boundary %d", id, source.ThroughID)
-			}
-		}
-	}
-	for _, id := range selection.RetiredPromotedEntries {
-		if observed != nil && !observed[id] {
-			return nil, nil, fmt.Errorf("compression item %d was not present in the request", id)
-		}
-	}
+	selection = normalizeCompressionSelectionForSource(source, selection)
 	_ = prepareCompressionSnapshot(source)
 	summary := strings.TrimSpace(selection.Summary)
 	if summary == "" && source.hasSummarySource() {
@@ -178,6 +166,54 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 			notify()
 		}
 	}, nil
+}
+
+// normalizeCompressionSelectionForSource treats model-generated IDs as
+// best-effort references. Out-of-boundary, unknown, duplicate and unobserved
+// IDs are dropped individually instead of failing the whole compression.
+func normalizeCompressionSelectionForSource(source *timelineCompressionSnapshot, selection *TimelineCompressionSelection) *TimelineCompressionSelection {
+	if source == nil || selection == nil {
+		return selection
+	}
+	normalized := *selection
+	retainable := make(map[int64]bool, len(source.Items))
+	for _, item := range source.Items {
+		if item.ID > 0 && item.ID <= source.ThroughID && strings.TrimSpace(item.PromptText) != "" {
+			retainable[item.ID] = true
+		}
+	}
+	promoted := make(map[int64]bool, len(source.PromotedItems))
+	for _, item := range source.PromotedItems {
+		if item.ID > 0 && item.ID <= source.ThroughID {
+			promoted[item.ID] = true
+		}
+	}
+	observed := compressionObservedIDs(selection.ObservedIDs)
+	normalized.RetainedIDs = normalizeCompressionIDs(selection.RetainedIDs, retainable)
+	retireable := make(map[int64]bool, len(promoted))
+	for id := range promoted {
+		if observed == nil || observed[id] {
+			retireable[id] = true
+		}
+	}
+	normalized.RetiredPromotedEntries = normalizeCompressionIDs(selection.RetiredPromotedEntries, retireable)
+	return &normalized
+}
+
+func normalizeCompressionIDs(ids []int64, allowed map[int64]bool) []int64 {
+	if len(ids) == 0 || len(allowed) == 0 {
+		return nil
+	}
+	seen := make(map[int64]bool, len(ids))
+	normalized := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if allowed[id] && !seen[id] {
+			seen[id] = true
+			normalized = append(normalized, id)
+		}
+	}
+	sort.Slice(normalized, func(i, j int) bool { return normalized[i] < normalized[j] })
+	return normalized
 }
 
 // compressionSelectionResult applies the whitelist to ordinary history.
