@@ -168,7 +168,7 @@ func contextCompressionTestResponse(t *testing.T, c aicommon.AICallerConfigIf, r
 
 func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	for _, native := range []bool{false, true} {
-		for _, invalid := range []string{"wrong_action", "missing_action", "todo_delta", "retire_type"} {
+		for _, invalid := range []string{"wrong_action", "missing_action"} {
 			t.Run(fmt.Sprintf("native=%v/%s", native, invalid), func(t *testing.T) {
 				ctx := context.Background()
 				qualityCalls, otherCalls := 0, 0
@@ -191,10 +191,6 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 								name = "unsafe_action"
 							case "missing_action":
 								name = ""
-							case "todo_delta":
-								params["todo_delta"] = map[string]any{"add": []any{map[string]any{"id": "bad", "text": "must not apply"}}}
-							case "retire_type":
-								params["retire_skill_names"] = "not-an-array"
 							}
 						} else {
 							require.Contains(t, req.GetPrompt(), "# 重试纠正")
@@ -236,21 +232,85 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	}
 }
 
-func TestContextCompressionHandlerParsesSelection(t *testing.T) {
+func TestContextCompressionCommitsWhenSummaryIsUsable(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		params aitool.InvokeParams
+	}{
+		{name: "summary only", params: aitool.InvokeParams{"summary": "summary"}},
+		{name: "non ordinary retain id", params: aitool.InvokeParams{"summary": "summary", "retain_timeline": "4498"}},
+		{name: "malformed retain and retire values", params: aitool.InvokeParams{
+			"summary": "summary", "retain_timeline": "12-abc,4498",
+			"retire_skill_names": "not-an-array", "retire_evidence_ids": map[string]any{"invalid": true},
+			"memory_entities": "invalid",
+		}},
+		{name: "structured summary and todo delta", params: aitool.InvokeParams{
+			"summary": []any{"summary part one", "summary part two"},
+			"todo_delta": map[string]any{"add": []any{
+				map[string]any{"id": "bad", "text": "must not apply"},
+			}},
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
+			cfg.Timeline.PushText(12, "history")
+			loop := makeSchemaStabilityTestLoop(cfg)
+			action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, test.params)
+			require.NoError(t, loop.verifyContextCompressionAction(action), "only a missing summary is structural")
+			_, hasTodoDelta := action.LookupCanonicalParam("todo_delta")
+			require.False(t, hasTodoDelta, "compression must ignore todo_delta")
+
+			op := NewActionHandlerOperator(nil)
+			handleCompressContext(loop, action, op)
+			terminated, err := op.IsTerminated()
+			require.NoError(t, err)
+			require.False(t, terminated)
+			require.NoError(t, op.contextCompressionError)
+			view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
+			require.Contains(t, view.Frozen, "summary")
+			require.NotContains(t, view.Frozen, "history")
+		})
+	}
+}
+
+func TestContextCompressionWithoutSummaryStillRequestsCorrection(t *testing.T) {
 	ctx := context.Background()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
 	cfg.Timeline.PushText(12, "history")
 	loop := makeSchemaStabilityTestLoop(cfg)
-	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{
-		"summary": "summary", "retain_timeline": "99", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
-	})
-	require.NoError(t, loop.verifyContextCompressionAction(action), "verification only checks action compliance")
+	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{"retain_timeline": "12"})
+	require.ErrorContains(t, loop.verifyContextCompressionAction(action), "requires summary")
+
 	op := NewActionHandlerOperator(nil)
 	handleCompressContext(loop, action, op)
-	terminated, err := op.IsTerminated()
+	_, err := op.IsTerminated()
 	require.NoError(t, err)
-	require.False(t, terminated, "an invalid selection must be correctable without ending the task")
-	require.ErrorContains(t, op.contextCompressionError, "retain_timeline")
+	require.ErrorContains(t, op.contextCompressionError, "summary 不能为空")
+}
+
+func TestParseContextCompressionRetainedIDsIntersectsOrdinaryCandidates(t *testing.T) {
+	candidates := []aicommon.TimelineCompressionCandidate{
+		{ID: 12, PromptText: "twelve"},
+		{ID: 20, PromptText: "twenty"},
+		{ID: 30, PromptText: "thirty"},
+		{ID: 4498, PromptText: "protected", Kind: aicommon.TimelinePromotedKindUserInput},
+	}
+	for _, test := range []struct {
+		name string
+		text string
+		want []int64
+	}{
+		{name: "protected single id", text: "4498", want: nil},
+		{name: "range endpoints need not be ordinary", text: "10-21,4498", want: []int64{12, 20}},
+		{name: "ordinary single ids", text: "12,30", want: []int64{12, 30}},
+		{name: "malformed segments are ignored", text: "12-abc,broken,30", want: []int64{30}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := parseContextCompressionRetainedIDs(test.text, candidates)
+			require.Equal(t, test.want, got)
+		})
+	}
 }
 
 func TestContextCompressionSummaryOverAdvisoryLimitWarnsAndCommits(t *testing.T) {
