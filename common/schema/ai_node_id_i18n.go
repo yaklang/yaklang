@@ -95,6 +95,10 @@ func saveNodeIdI18nToDB(nodeId string, i18n *I18n) {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"context_compression_warning": {
+		Zh: "上下文压缩警告",
+		En: "Context Compression Warning",
+	},
 	"todo_added": {
 		Zh: "待办任务",
 		En: "TODO Added",

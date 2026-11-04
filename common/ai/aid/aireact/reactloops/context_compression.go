@@ -27,8 +27,7 @@ const defaultWholePromptTokenLimit int64 = 300 * 1024
 
 const contextCompressionPromptHeadroomTokens int64 = 200 * 1024
 
-// Reuse the generic warning stream; the localized payload identifies the source.
-const contextCompressionWarningNodeID = "warning"
+const contextCompressionWarningNodeID = "context_compression_warning"
 
 // Selection mistakes can be corrected by the model; runtime failures cannot.
 type contextCompressionSelectionError struct{ err error }
@@ -73,72 +72,46 @@ func (r *ReActLoop) noteCompressionStatus() {
 }
 
 func (r *ReActLoop) emitContextCompressionAdvisoryLimit(actualTokens, limitTokens int) {
-	messageZh := fmt.Sprintf(
-		"上下文压缩结果超过建议阈值（实际 %d tokens，建议 %d tokens），已继续处理。\n摘要和保留历史不会因该建议阈值被截断。",
-		actualTokens, limitTokens,
-	)
-	messageEn := fmt.Sprintf(
+	message := fmt.Sprintf(
 		"Context compression exceeded the advisory limit (%d actual tokens, %d recommended tokens); processing continued.\nThe summary and retained history will not be truncated because of this advisory threshold.",
 		actualTokens, limitTokens,
 	)
-	r.emitContextCompressionWarning(messageZh, messageEn)
+	r.emitContextCompressionWarning(message)
 }
 
-func (r *ReActLoop) emitContextCompressionUnavailable(promptTokens, limitTokens int64) {
-	messageZh := fmt.Sprintf(
-		"当前 prompt 约 %d tokens，配置压缩阈值为 %d tokens，但 Timeline 没有可压缩内容，本轮已退出压缩模式并继续执行。",
+func (r *ReActLoop) emitContextCompressionUnavailable(promptTokens, limitTokens int64, cause error) {
+	message := fmt.Sprintf(
+		"Context compression is unavailable for this turn (prompt: %d tokens, configured threshold: %d tokens); falling back to normal mode.",
 		promptTokens, limitTokens,
 	)
-	messageEn := fmt.Sprintf(
-		"The prompt is about %d tokens and the configured compression threshold is %d tokens, but the timeline has no compressible content. Compression mode was skipped for this turn.",
-		promptTokens, limitTokens,
-	)
-	log.Warnf("%s", messageEn)
-	r.emitContextCompressionWarning(messageZh, messageEn)
+	if cause != nil {
+		message += fmt.Sprintf(" Reason: %v", cause)
+	}
+	log.Warnf("%s", message)
+	r.emitContextCompressionWarning(message)
 }
 
 func (r *ReActLoop) emitContextCompressionNoProgress(previousTokens, currentTokens int) {
-	messageZh := fmt.Sprintf(
-		"上下文压缩后 token 未明显下降（%d -> %d），可能仍有大量不可压缩内容；本次继续执行，不终止任务。",
-		previousTokens, currentTokens,
-	)
-	messageEn := fmt.Sprintf(
+	message := fmt.Sprintf(
 		"Context compression made little progress (%d -> %d tokens); non-compressible content may remain. Continuing without terminating the task.",
 		previousTokens, currentTokens,
 	)
-	log.Warnf("%s", messageEn)
-	r.emitContextCompressionWarning(messageZh, messageEn)
+	log.Warnf("%s", message)
+	r.emitContextCompressionWarning(message)
 }
 
-func (r *ReActLoop) emitContextCompressionRuntimeWarning(stageZh, stageEn string, err error) {
-	messageZh := fmt.Sprintf(
-		"上下文压缩在“%s”阶段未完成：%v。本次没有修改 Timeline，将重新构建下一次压缩请求。",
-		stageZh, err,
-	)
-	messageEn := fmt.Sprintf(
+func (r *ReActLoop) emitContextCompressionRuntimeWarning(stage string, err error) {
+	message := fmt.Sprintf(
 		"Context compression did not complete while %s: %v. The timeline was not modified; the next compression request will be rebuilt.",
-		stageEn, err,
+		stage, err,
 	)
-	log.Warnf("%s", messageEn)
-	r.emitContextCompressionWarning(messageZh, messageEn)
+	log.Warnf("%s", message)
+	r.emitContextCompressionWarning(message)
 }
 
-func (r *ReActLoop) emitContextCompressionWarning(messageZh, messageEn string) {
+func (r *ReActLoop) emitContextCompressionWarning(message string) {
 	if r == nil || r.GetEmitter() == nil {
 		return
-	}
-	message := messageZh
-	language := ""
-	if r.config != nil {
-		if languageProvider, ok := r.config.(interface{ GetLanguage() string }); ok {
-			language = languageProvider.GetLanguage()
-		}
-		if language == "" {
-			language = r.config.GetConfigString("language")
-		}
-	}
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(language)), "en") {
-		message = messageEn
 	}
 	taskID := ""
 	if task := r.GetCurrentTask(); task != nil {

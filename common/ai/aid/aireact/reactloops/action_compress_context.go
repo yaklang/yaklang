@@ -80,7 +80,7 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 			operator.Continue()
 			return
 		}
-		loop.emitContextCompressionRuntimeWarning("读取 Timeline 候选", "reading timeline candidates", err)
+		loop.emitContextCompressionRuntimeWarning("reading timeline candidates", err)
 		operator.Continue()
 		return
 	}
@@ -89,7 +89,7 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 			operator.Fail(err)
 			return
 		}
-		loop.emitContextCompressionRuntimeWarning("提交 Timeline 压缩结果", "committing the timeline compression result", err)
+		loop.emitContextCompressionRuntimeWarning("committing the timeline compression result", err)
 		operator.Continue()
 		return
 	}

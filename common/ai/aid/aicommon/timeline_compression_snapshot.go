@@ -3,7 +3,6 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -12,10 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 )
-
-// ErrTimelineCompressionNoCompressibleContent means the full prompt may be
-// over budget, but the Timeline has nothing the compression action can shrink.
-var ErrTimelineCompressionNoCompressibleContent = errors.New("timeline has no compressible content")
 
 // timelineCompressionSnapshot is a detached read of the current timeline.
 // Guide rendering and action application capture it locally and drop it.
@@ -68,7 +63,7 @@ type timelineCompressionPromotedItem struct {
 	Operation string
 }
 
-func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
+func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) {
 	previous := ""
 	if snapshot.Head != nil {
 		previous = snapshot.Head.Text
@@ -85,10 +80,6 @@ func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
 	}
 	snapshot.InputText = strings.TrimSpace(strings.Join(parts, "\n"))
 	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
-	if !snapshot.hasCompressionInput() {
-		return ErrTimelineCompressionNoCompressibleContent
-	}
-	return nil
 }
 
 // hasSummarySource distinguishes actual history from a promoted-only decision,

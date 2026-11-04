@@ -2,7 +2,6 @@ package reactloops
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -532,6 +531,12 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		return result, nil
 	}
+	fallbackToNormal := func(stage string, cause error) (*LoopPromptAssemblyResult, error) {
+		r.emitContextCompressionRuntimeWarning(stage, cause)
+		assembly.PromptMode = aicommon.LoopPromptModeNormal
+		assembly.CompressionGuide = ""
+		return assemble()
+	}
 	limit := r.wholePromptTokenLimit()
 	result, err := assemble()
 	if err != nil {
@@ -562,21 +567,18 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			assembly.HistoryThroughID = &throughID
 		}
 		guide, guideErr := timeline.RenderCompressionGuide(options)
-		if errors.Is(guideErr, aicommon.ErrTimelineCompressionNoCompressibleContent) {
-			r.emitContextCompressionUnavailable(promptTokens, limit)
+		if guideErr != nil || strings.TrimSpace(guide) == "" {
+			r.emitContextCompressionUnavailable(promptTokens, limit, guideErr)
 			result, err = assemble()
 			if err != nil {
 				return nil, err
 			}
 			return result, nil
 		}
-		if guideErr != nil {
-			return nil, guideErr
-		}
 		instructions, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
 			map[string]any{"FunctionCallMode": r.functionCallMode})
 		if err != nil {
-			return nil, err
+			return fallbackToNormal("rendering the compression instructions", err)
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(instructions) + "\n\n" + guide
@@ -586,7 +588,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		result, err = assemble()
 		if err != nil {
-			return nil, err
+			return fallbackToNormal("assembling the compression prompt", err)
 		}
 		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
 		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))

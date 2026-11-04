@@ -167,7 +167,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				}
 				if mode == "ineffective_compression" {
 					wantRequests = 1
-					require.Contains(t, capture.warningText(), "未明显下降")
+					require.Contains(t, capture.warningText(), "made little progress")
 				}
 				wantIterations := 1
 				if mode == "ai_compression" || mode == "provider_overflow" {

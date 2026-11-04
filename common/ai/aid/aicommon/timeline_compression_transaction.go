@@ -129,7 +129,7 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 		return nil, nil, err
 	}
 	selection = normalizeCompressionSelectionForSource(source, selection)
-	_ = prepareCompressionSnapshot(source)
+	prepareCompressionSnapshot(source)
 	summary := strings.TrimSpace(selection.Summary)
 	if summary == "" && source.hasSummarySource() {
 		return nil, nil, fmt.Errorf("invalid compression selection")
@@ -305,7 +305,7 @@ func (m *Timeline) compressionObservedSourceLocked(source *timelineCompressionSn
 	}
 	evidence, _ := m.evidenceStoreMatchingLocked(func(id int64) bool { return observed[id] })
 	copy.Evidence = renderEvidenceItems(evidence.Items)
-	_ = prepareCompressionSnapshot(&copy)
+	prepareCompressionSnapshot(&copy)
 	return &copy
 }
 
