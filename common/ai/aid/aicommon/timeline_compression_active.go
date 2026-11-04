@@ -78,7 +78,7 @@ func (m *Timeline) RenderCompressionGuide(options TimelineCompressionOptions) (s
 	if err != nil {
 		return "", err
 	}
-	if err := prepareCompressionSnapshot(snapshot); err != nil && len(snapshot.ExactItemIDs) == 0 {
+	if err := prepareCompressionSnapshot(snapshot); err != nil {
 		return "", err
 	}
 	return renderCompressionGuide(snapshot, options), nil

@@ -33,7 +33,9 @@ Push、渲染、Save、恢复和 fork/merge 都不会自行调用 AI 压缩。�
 
 技能仍按名字整份淘汰（包含分页与 metadata），证据按观测 id 淘汰；没有点名、未知或格式无效的项全部保留。工具 Schema、用户输入、TODO、任务指令和目录不允许删除。旧的 `timeline-summary` action、`ratain_timeline_item_range` 与 `retire_promoted_entries` 输出协议不再解析。
 
-输入安全上限为 `512 * 1024` tokens；摘要与保留原文的合计告警阈值为 `64 * 1024` tokens。超过阈值时复用 `warning` 普通流，按当前会话语言发出提示并继续提交，不截断输出。`summary` 是唯一必需内容；可用的 summary 足以提交压缩，缺失或无法使用 summary 才要求 AI 重试。`retain_timeline`、技能/证据淘汰、memory 和附带 TODO 均为 best-effort，解析失败时降级为空，其中 TODO 永远不会由压缩 action 应用。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 仍只接受单一 `compress_context`。
+压缩 prompt 的建议输入上限为配置的 Timeline 限制再加 `200 * 1024` tokens。超过时只记录 warning 并继续请求，不截断 prompt。Timeline 没有旧摘要、普通历史或可处理 promoted 项时，本轮直接退出压缩模式并继续普通执行；摘要与保留原文的合计告警阈值为 `64 * 1024` tokens，超过时复用 `warning` 普通流。压缩后 prompt 未下降至少 1% 时同时记录日志并发送普通 warning 流，不再终止任务。
+
+`summary` 是唯一必需内容；可用的 summary 足以提交压缩，缺失或无法使用 summary 才要求 AI 重试。`retain_timeline`、技能/证据淘汰、memory 和附带 TODO 均为 best-effort，解析失败时降级为空，其中 TODO 永远不会由压缩 action 应用。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 仍只接受单一 `compress_context`。
 
 ## 提交、并发与保存
 

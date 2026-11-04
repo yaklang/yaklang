@@ -734,9 +734,7 @@ LOOP:
 				r.noteCompressionStatus()
 			}
 			if r.promptMode == aicommon.LoopPromptModeCompressContext && operator.contextCompressionError == nil && lastCompressionTokens > 0 && tokens >= lastCompressionTokens*99/100 {
-				finalError = utils.Errorf("context compression made no progress (%d -> %d tokens)", lastCompressionTokens, tokens)
-				r.finishIterationLoopWithError(iterationCount, task, finalError)
-				return finalError
+				r.emitContextCompressionNoProgress(lastCompressionTokens, tokens)
 			}
 			if r.promptMode == aicommon.LoopPromptModeNormal && transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) && tokens >= lastPromptTokens*99/100 {
 				break

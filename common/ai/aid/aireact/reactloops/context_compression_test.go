@@ -101,6 +101,30 @@ func TestContextCompressionMeasuresWholePrompt(t *testing.T) {
 	require.Contains(t, result.Prompt, "接近 1000 tokens")
 }
 
+func TestContextCompressionSkipsModeWhenTimelineHasNoCompressibleContent(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(6000))
+	loop := makeSchemaStabilityTestLoop(cfg)
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	invoker := &compressionPromptInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), timeline: cfg.Timeline}
+	invoker.SetConfig(cfg)
+	loop.invoker = invoker
+	capture := captureActivityStatus(loop)
+
+	input := loop.captureLoopPromptBuildInput("no-compressible-input", "", strings.Repeat("frozen context ", 9000), nil, "", &LoopActionHandlerOperator{})
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "没有可压缩内容"))
+}
+
+func TestContextCompressionPromptTokenLimitUsesConfiguredLimitPlusHeadroom(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(40*1024))
+	loop := makeSchemaStabilityTestLoop(cfg)
+	require.EqualValues(t, 240*1024, loop.contextCompressionPromptTokenLimit())
+}
+
 func TestContextCompressionPropagatesPromptBuildError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

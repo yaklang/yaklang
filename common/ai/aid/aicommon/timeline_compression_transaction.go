@@ -42,6 +42,8 @@ const (
 const ContextCompressionAction = "compress_context"
 
 const (
+	// TimelineCompressionMaxInputTokens bounds memory-finalization input. The
+	// main prompt budget is derived from Config.TimelineContentSizeLimit + 200K.
 	TimelineCompressionMaxInputTokens   = 512 * 1024
 	TimelineCompressionMaxSummaryTokens = 64 * 1024
 )
