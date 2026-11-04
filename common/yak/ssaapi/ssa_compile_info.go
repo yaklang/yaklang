@@ -12,13 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
@@ -46,14 +45,10 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 			return nil, err
 		}
 	case ssaconfig.CodeSourceJar:
-		jarFS, err := getJarFS(c)
+		baseFS, err = c.prepareArchiveFS(c.GetCodeSourceLocalFile())
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		unifiedFS := filesys.NewUnifiedFS(jarFS,
-			filesys.WithUnifiedFsExtMap(".class", ".java"),
-		)
-		baseFS = unifiedFS
 	case ssaconfig.CodeSourceGit:
 		baseFS, err = gitFs(c)
 		if err != nil {
@@ -91,37 +86,52 @@ func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
 	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
 }
 
-// getJarFS creates a javaclassparser.JarFS from either a local file or a
-// downloaded URL.
-func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
-	// use local
-	if c.GetCodeSourceLocalFile() != "" {
-		return java2ssa.OpenJarFS(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
+// prepareArchiveFS asks the frontend to open an archive code source. A jar is
+// one opaque file to the pipeline: only the language that produced it knows how
+// its classes become readable source, so the pipeline never names a language.
+func (c *Config) prepareArchiveFS(localFile string) (fi.FileSystem, error) {
+	if localFile == "" {
+		if c.GetCodeSourceURL() == "" {
+			return nil, utils.Errorf("url is empty ")
+		}
+		downloaded, err := downloadCodeSourceToTemp(c.GetCodeSourceURL(), "yaklang-jar-*.jar")
+		if err != nil {
+			return nil, err
+		}
+		defer os.Remove(downloaded)
+		localFile = downloaded
 	}
-	if c.GetCodeSourceURL() == "" {
-		return nil, utils.Errorf("url is empty ")
+	c.ensureLanguageBuilder()
+	preparer, ok := c.LanguageBuilder.(ssa.ArchivePreparer)
+	if !ok {
+		return nil, utils.Errorf("language %q cannot open an archive code source", c.GetLanguage())
 	}
-	// download file
-	resp, _, err := poc.DoGET(c.GetCodeSourceURL())
+	return preparer.PrepareFS(ssa.ArchiveCodeSource{
+		LocalFile: localFile,
+		Recursive: c.GetCodeSourceJarRecursiveParse(),
+	})
+}
+
+// downloadCodeSourceToTemp fetches url into a temp file and returns its path.
+func downloadCodeSourceToTemp(url, pattern string) (string, error) {
+	resp, _, err := poc.DoGET(url)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if resp.GetStatusCode() != 200 {
-		return nil, utils.Errorf("download file error: %v", resp.GetStatusCode())
+		return "", utils.Errorf("download file error: %v", resp.GetStatusCode())
 	}
-	// Write downloaded bytes to a temp file so we can use NewJarFSFromLocal
-	tmpFile, err := os.CreateTemp("", "yaklang-jar-*.jar")
+	tmpFile, err := os.CreateTemp("", pattern)
 	if err != nil {
-		return nil, utils.Errorf("create temp file error: %v", err)
+		return "", utils.Errorf("create temp file error: %v", err)
 	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
 	if _, err := tmpFile.Write(resp.GetBody()); err != nil {
 		tmpFile.Close()
-		return nil, utils.Errorf("write temp file error: %v", err)
+		os.Remove(tmpFile.Name())
+		return "", utils.Errorf("write temp file error: %v", err)
 	}
 	tmpFile.Close()
-	return java2ssa.OpenJarFS(tmpPath, c.GetCodeSourceJarRecursiveParse())
+	return tmpFile.Name(), nil
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {

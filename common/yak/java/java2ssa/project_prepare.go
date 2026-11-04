@@ -705,6 +705,19 @@ func (s *SSABuilder) PrepareProject(fsys fi.FileSystem, opts ssa.ProjectPrepareO
 	return sources, nil
 }
 
+// PrepareFS opens a jar/war code source as the filesystem this frontend reads.
+// Compiled classes become the source names the rest of the pipeline expects, so
+// a caller outside Java never needs the decompiler API or the extension map.
+func (s *SSABuilder) PrepareFS(codeSource ssa.ArchiveCodeSource) (fi.FileSystem, error) {
+	jarFS, err := OpenJarFS(codeSource.LocalFile, codeSource.Recursive)
+	if err != nil {
+		return nil, err
+	}
+	return filesys.NewUnifiedFS(jarFS,
+		filesys.WithUnifiedFsExtMap(".class", ".java"),
+	), nil
+}
+
 // OpenJarFS opens a local jar/war as a decompiling filesystem.
 //
 // Retaining unproved sources is the frontend contract: when javac cannot
