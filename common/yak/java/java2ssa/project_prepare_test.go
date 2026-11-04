@@ -1,4 +1,4 @@
-package ssautils
+package java2ssa
 
 import (
 	"os"
@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 // TestPrepareReleasesJSPRuntimeBeforePrehandler is the memory boundary: JSP
@@ -25,13 +25,13 @@ func TestPrepareReleasesJSPRuntimeBeforePrehandler(t *testing.T) {
 
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("webapp/index.jsp", `<html><body>hello</body></html>`)
-	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	builder, ok := CreateBuilder().(*SSABuilder)
 	require.True(t, ok)
 	wrapped := builder.WrapWithPreprocessedFS(vf, true)
 
-	sources := NewPreparedSources(0, "")
+	sources := newPreparedSources(nil, 0, "")
 	defer sources.Close()
-	sources.Prepare(wrapped, PrepareOptions{Root: ".", Concurrency: 2})
+	sources.prepare(wrapped, ssa.ProjectPrepareOptions{Root: ".", Concurrency: 2})
 
 	require.Zero(t, jspparser.JSPRuntimeDFAStates())
 }
@@ -41,7 +41,7 @@ func TestPrepareReleasesJSPRuntimeBeforePrehandler(t *testing.T) {
 // frontend accepts. It covers both halves — a class decompiled out of an
 // archive and a JSP page turned into a servlet.
 func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
-	jarBytes, err := os.ReadFile("../ssaapi/test/ssatest/testfile/test.jar")
+	jarBytes, err := os.ReadFile("../../ssaapi/test/ssatest/testfile/test.jar")
 	require.NoError(t, err)
 
 	vf := filesys.NewVirtualFs()
@@ -50,14 +50,14 @@ func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
 	vf.AddFile("webapp/index.jsp", `<html><body>${fn:escapeXml(param.name)}</body></html>`)
 	vf.AddFile("webapp/legacy.jsp", `<%@ page pageEncoding="GBK" %><c:if test="${!empty param.uid}">uid</c:if>`)
 
-	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	builder, ok := CreateBuilder().(*SSABuilder)
 	require.True(t, ok)
 	wrapped := builder.WrapWithPreprocessedFS(vf, true)
 
-	sources := NewPreparedSources(0, "")
+	sources := newPreparedSources(nil, 0, "")
 	defer sources.Close()
 	fsys := sources.Wrap(wrapped)
-	sources.Prepare(fsys, PrepareOptions{Root: ".", Concurrency: 4})
+	sources.prepare(fsys, ssa.ProjectPrepareOptions{Root: ".", Concurrency: 4})
 
 	stats := sources.Stats()
 	require.Greater(t, stats.Paths, int64(0), "prepare materialized nothing")
@@ -89,7 +89,7 @@ func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
 			} else {
 				checkedJava++
 			}
-			if _, err := java2ssa.Frontend(string(src)); err != nil {
+			if _, err := Frontend(string(src)); err != nil {
 				msg := err.Error()
 				if len(msg) > 200 {
 					msg = msg[:200]
@@ -103,7 +103,7 @@ func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
 	require.Greater(t, checkedJava, 0, "the jar class must be decompiled into a .java source")
 	require.Greater(t, checkedJSP, 0, "the jsp pages must be converted")
 	require.Empty(t, failures, "prepared sources must parse with java2ssa")
-	t.Logf("prepared: %d java, %d jsp, %s", checkedJava, checkedJSP, filesys.FormatSpillFSStats(stats))
+	t.Logf("prepared: %d java, %d jsp, %s", checkedJava, checkedJSP, stats)
 }
 
 // TestPrepareMaterializeOutWritesUsableJava checks the tree mirror: classes
@@ -114,13 +114,13 @@ func TestPrepareMaterializeOutWritesUsableJava(t *testing.T) {
 	vf.AddFile("pkg/A.class", "class A {}")
 	vf.AddFile("web/index.jsp", `<html>${1}</html>`)
 
-	sources := NewPreparedSources(0, "")
+	sources := newPreparedSources(nil, 0, "")
 	defer sources.Close()
 	sources.SetMaterializeOut(dir)
 	// The publisher writes whatever the cache stores; this test seeds the two
 	// shapes directly because real class decompilation is covered above.
-	sources.spill.Put("pkg/A.class", []byte("class A {}"))
-	sources.spill.Put("web/index.jsp", []byte("class Index {}"))
+	sources.cache.Put("pkg/A.class", []byte("class A {}"))
+	sources.cache.Put("web/index.jsp", []byte("class Index {}"))
 
 	javaBytes, err := os.ReadFile(dir + "/pkg/A.java")
 	require.NoError(t, err)

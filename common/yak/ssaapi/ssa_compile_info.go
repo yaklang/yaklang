@@ -18,9 +18,9 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
-	"github.com/yaklang/yaklang/common/yak/ssautils"
 )
 
 var (
@@ -96,7 +96,7 @@ func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
 func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 	// use local
 	if c.GetCodeSourceLocalFile() != "" {
-		return ssautils.OpenJarFS(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
+		return java2ssa.OpenJarFS(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
 	}
 	if c.GetCodeSourceURL() == "" {
 		return nil, utils.Errorf("url is empty ")
@@ -121,7 +121,7 @@ func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 		return nil, utils.Errorf("write temp file error: %v", err)
 	}
 	tmpFile.Close()
-	return ssautils.OpenJarFS(tmpPath, c.GetCodeSourceJarRecursiveParse())
+	return java2ssa.OpenJarFS(tmpPath, c.GetCodeSourceJarRecursiveParse())
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {

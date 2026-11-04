@@ -269,11 +269,13 @@ func (c *Config) parseProjectWithFSUnits(
 
 	sourceFilesystem := filesystem
 	// The builder must exist before the wrap: it is what expands jar/zip members.
-	c.resolveLanguageBuilder(filesystem)
+	c.ensureLanguageBuilder()
 	filesystem = c.swapLanguageFs(filesystem)
-	// Jar/zip members, class files and JSP are transformed into source before the
-	// source scan. ScanProjectFiles then only classifies an already-prepared tree.
+	// The frontend rewrites its own inputs (archive members, bytecode, pages)
+	// before the source scan. ScanProjectFiles then only classifies a prepared
+	// tree, and every later stage reads the same prepared view.
 	timings := c.prepareProjectSources(filesystem, reportProcess, storeProcess)
+	filesystem = c.wrapPreparedSources(filesystem)
 	if out := c.GetCompileMaterializeOut(); out != "" {
 		if timings.TemplateErrors > 0 {
 			return nil, utils.Errorf("materialize-out %s: %d jsp files failed to convert", out, timings.TemplateErrors)
@@ -796,7 +798,9 @@ func (c *Config) parseProjectWithFSLegacy(
 		folder2Save = append(folder2Save, []string{"/", programName})
 	}
 
+	c.ensureLanguageBuilder()
 	filesystem = c.swapLanguageFs(filesystem)
+	filesystem = c.wrapPreparedSources(filesystem)
 	// get total size
 	// scan project files
 	scanResult, err := ScanProjectFiles(ScanConfig{

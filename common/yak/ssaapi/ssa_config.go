@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssautils"
 )
 
 type ProcessFunc func(msg string, process float64)
@@ -85,9 +84,10 @@ type Config struct {
 	// jar_recursive_parse setting.
 	disableArchiveExpansion bool
 	// preparedSources is the compile's prepared-source view: decompiled classes,
-	// translated pages and their template ranges. ssautils owns the language
-	// preparation; this field only ties one instance to the compile lifetime.
-	preparedSources *ssautils.PreparedSources
+	// translated pages and their template ranges. The frontend owns what
+	// preparation means; this field only ties one instance to the compile
+	// lifetime.
+	preparedSources ssa.PreparedProject
 }
 
 func (c *Config) CalcHash() string {
