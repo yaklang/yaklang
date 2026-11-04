@@ -192,7 +192,11 @@ func contextCompressionTestResponse(t *testing.T, c aicommon.AICallerConfigIf, r
 
 func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	for _, native := range []bool{false, true} {
-		for _, invalid := range []string{"wrong_action", "missing_action"} {
+		invalidCases := []string{"wrong_action", "missing_action"}
+		if native {
+			invalidCases = append(invalidCases, "multiple_calls")
+		}
+		for _, invalid := range invalidCases {
 			t.Run(fmt.Sprintf("native=%v/%s", native, invalid), func(t *testing.T) {
 				ctx := context.Background()
 				qualityCalls, otherCalls := 0, 0
@@ -209,17 +213,20 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 						require.Equal(t, aicommon.CallerLabelContextCompress, req.GetCallerLabel())
 						params := map[string]any{"summary": summary, "retain_timeline": "3-8,12,20-26,37,41-45", "retire_skill_names": []string{}, "retire_evidence_ids": []string{}}
 						name := aicommon.ContextCompressionAction
+						multiple := false
 						if qualityCalls == 1 {
 							switch invalid {
 							case "wrong_action":
 								name = "unsafe_action"
 							case "missing_action":
 								name = ""
+							case "multiple_calls":
+								multiple = true
 							}
 						} else {
 							require.Contains(t, req.GetPrompt(), "# 重试纠正")
 						}
-						return contextCompressionTestResponse(t, c, req, name, params, false), nil
+						return contextCompressionTestResponse(t, c, req, name, params, multiple), nil
 					}))
 				for _, id := range []int64{3, 8, 10, 12, 20, 26, 37, 41, 45} {
 					historyText[id] = uuid.NewString()
@@ -253,6 +260,49 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 				require.Contains(t, view.Frozen, historyText[12])
 			})
 		}
+	}
+}
+
+func TestContextCompressionRuntimeReadAndApplyFailuresWarnWithoutFailingTask(t *testing.T) {
+	for _, test := range []struct {
+		name                 string
+		throughID            *int64
+		itemIDs              []int64
+		summary              string
+		expectedWarningStage string
+	}{
+		{
+			name: "candidate read failure", throughID: func() *int64 { id := int64(-1); return &id }(),
+			summary: "summary", expectedWarningStage: "读取 Timeline 候选",
+		},
+		{
+			name: "apply sees unobserved history", itemIDs: []int64{},
+			summary: "", expectedWarningStage: "提交 Timeline 压缩结果",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+				aicommon.WithDisableCreateDBRuntime(true))
+			history := uuid.NewString()
+			cfg.Timeline.PushText(12, "%s", history)
+			loop := makeSchemaStabilityTestLoop(cfg)
+			capture := captureActivityStatus(loop)
+			action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{
+				"summary": test.summary, "retain_timeline": "", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
+			})
+			op := NewActionHandlerOperator(nil)
+			op.requestTimelineThroughID = test.throughID
+			op.requestTimelineItemIDs = test.itemIDs
+
+			handleCompressContext(loop, action, op)
+			terminated, err := op.IsTerminated()
+			require.NoError(t, err)
+			require.False(t, terminated)
+			require.Nil(t, op.contextCompressionError)
+			require.True(t, capture.waitStream(contextCompressionWarningNodeID, test.expectedWarningStage))
+			require.Contains(t, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).PromptText(), history,
+				"failed compression must leave the timeline unchanged")
+		})
 	}
 }
 
