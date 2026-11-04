@@ -55,6 +55,19 @@ type AnalyzeContext struct {
 	// best-effort; taint result unaffected).
 	savedPathEdges int64
 
+	// memberWritesCache memoizes the writer list of one object field for the
+	// rest of THIS descent. memberWrites scans the whole member table of the
+	// object, so a package-level struct with many fields pays that scan once per
+	// distinct field instead of once per read.
+	memberWritesCache map[memberWriteKey][]ssa.Value
+
+	// widenedMembers records the member reads already widened during THIS
+	// descent, and memberWidenBudget caps how many widenings one descent may
+	// perform. The memo keeps a read reached by several paths to a single
+	// widening; the budget bounds a chain of widenings across different reads.
+	widenedMembers    map[memberWidenKey]struct{}
+	memberWidenBudget int
+
 	// savedPath map[*Value]struct{}
 	recursiveStatusIsLeaf *utils.Stack[node]
 
@@ -133,6 +146,96 @@ func (a *AnalyzeContext) structAllowValue(v *Value) bool {
 		return true
 	}
 	return a.config.structBound.Allow(inst)
+}
+
+// memberWriteKey identifies one object field within a descent. keyText covers
+// keys that carry no id (synthetic or still-unassigned placeholders).
+type memberWriteKey struct {
+	objectID int64
+	keyID    int64
+	keyText  string
+}
+
+// memberWidenLimit bounds how many member reads one descent may widen. A
+// descent is a single top-def or bottom-use query, so this is a per-query cost
+// ceiling: a large program with thousands of field reads stops widening after
+// this many and keeps the ordinary resolution for the rest.
+const memberWidenLimit = 256
+
+// memberWritesCacheLimit bounds the per-descent field cache. A descent that
+// touches more distinct fields than this stops growing the cache instead of
+// paying an unbounded amount of memory for a diagnostic-only lookup.
+const memberWritesCacheLimit = 256
+
+// memberWidenKey identifies one member read by its underlying instruction.
+// The program participates so a relocated overlay value cannot collide with a
+// same-numbered instruction of another program.
+type memberWidenKey struct {
+	program *ssa.Program
+	id      int64
+}
+
+// beginMemberWiden reports whether a member read still needs widening in this
+// descent, and consumes one unit of the descent's widening budget. A read that
+// was already widened is not widened again: its writers were followed once
+// already, and repeating that on every path would multiply the cost without
+// adding an answer.
+func (a *AnalyzeContext) beginMemberWiden(v *Value) bool {
+	if a == nil || v == nil {
+		return false
+	}
+	raw := v.getValue()
+	if raw == nil {
+		return false
+	}
+	if a.memberWidenBudget == 0 && a.widenedMembers == nil {
+		a.memberWidenBudget = memberWidenLimit
+	}
+	if a.memberWidenBudget <= 0 {
+		return false
+	}
+	// The visited set of a descent is path-scoped, so the same instruction is
+	// reached again through a different path with a fresh *Value wrapper. Key
+	// on the underlying instruction instead of the wrapper, otherwise the read
+	// is widened once per path and the cost multiplies.
+	key := memberWidenKey{id: raw.GetId()}
+	if prog := raw.GetProgram(); prog != nil {
+		key.program = prog
+	}
+	if _, done := a.widenedMembers[key]; done {
+		return false
+	}
+	if a.widenedMembers == nil {
+		a.widenedMembers = make(map[memberWidenKey]struct{}, 8)
+	}
+	a.widenedMembers[key] = struct{}{}
+	a.memberWidenBudget--
+	return true
+}
+
+// memberWrites returns the writers of object.key, newest first, memoized for
+// the rest of this descent. It is the single place that reads the member table
+// on behalf of top-def member resolution.
+func (a *AnalyzeContext) memberWrites(object, key ssa.Value) []ssa.Value {
+	if a == nil || utils.IsNil(object) || utils.IsNil(key) {
+		return nil
+	}
+	cacheKey := memberWriteKey{
+		objectID: object.GetId(),
+		keyID:    key.GetId(),
+		keyText:  ssa.GetKeyString(key),
+	}
+	if cached, ok := a.memberWritesCache[cacheKey]; ok {
+		return cached
+	}
+	members := ssa.GetMembersByKey(object, key)
+	if a.memberWritesCache == nil {
+		a.memberWritesCache = make(map[memberWriteKey][]ssa.Value, 8)
+	}
+	if len(a.memberWritesCache) < memberWritesCacheLimit {
+		a.memberWritesCache[cacheKey] = members
+	}
+	return members
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
