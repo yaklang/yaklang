@@ -107,6 +107,12 @@ func main() {
 		}
 
 		files := collectPackageFiles(p)
+		srcs, err := collectPackageTreeSources(pdir, files, len(p.CgoFiles) > 0)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		files = srcs
 		for _, f := range files {
 			f = filepath.Clean(f)
 			if f == "." || f == "" {
@@ -135,6 +141,57 @@ func main() {
 	}
 
 	fmt.Printf("gomodsrc: wrote %d files into %s\n", copied, dstDir)
+}
+
+// collectPackageTreeSources returns files plus the C sources and headers that
+// live in subdirectories of the package directory. `go list` only reports files
+// directly inside the package directory, but a cgo package may `#include` a
+// header from a subdirectory (common/minirehs includes native/mvscan/mvscan.h).
+// Copying only the reported files produces a pruned tree that cannot compile.
+func collectPackageTreeSources(pdir string, files []string, hasCgo bool) ([]string, error) {
+	if !hasCgo {
+		return files, nil
+	}
+
+	known := make(map[string]struct{}, len(files))
+	for _, f := range files {
+		known[filepath.Clean(f)] = struct{}{}
+	}
+
+	var extra []string
+	err := filepath.WalkDir(pdir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return utils.Errorf("gomodsrc: walk %s failed: %v", path, walkErr)
+		}
+		if d.IsDir() {
+			return nil
+		}
+		switch filepath.Ext(d.Name()) {
+		case ".c", ".h", ".inc", ".cc", ".cpp", ".hh", ".hpp", ".m", ".mm":
+		default:
+			return nil
+		}
+		rel, relErr := filepath.Rel(pdir, path)
+		if relErr != nil {
+			return utils.Errorf("gomodsrc: rel %s -> %s failed: %v", pdir, path, relErr)
+		}
+		rel = filepath.Clean(rel)
+		if _, ok := known[rel]; ok {
+			return nil
+		}
+		known[rel] = struct{}{}
+		extra = append(extra, rel)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(extra) == 0 {
+		return files, nil
+	}
+
+	sort.Strings(extra)
+	return append(files, extra...), nil
 }
 
 func collectPackageFiles(p *goPackage) []string {

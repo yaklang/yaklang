@@ -43,6 +43,18 @@ type FunctionSideEffect struct {
 	*parameterMemberInner
 }
 
+// FunctionSideEffectSite is the scope-free form of one recorded side effect.
+// It carries the same fields the AOT compiler needs to find the capture cell
+// and the value to store, but holds no *Variable, so it can outlive the maps
+// that Finish releases.
+type FunctionSideEffectSite struct {
+	Name         string
+	VerboseName  string
+	Modify       int64
+	Kind         SideEffectKind
+	VariableName string
+}
+
 func (f *Function) AddForceSideEffect(variable *Variable, value Value, index int, kind SideEffectKind) {
 	defer f.markPersistenceDirty()
 	if variable.IsMemberCall() {
@@ -895,6 +907,15 @@ func propagateOpaqueCallbackSideEffects(c *Call, builder *FunctionBuilder, curre
 				if !ok || utils.IsNil(modify) {
 					continue
 				}
+			}
+			// Only the closure's own writes belong to this call site. A write the
+			// closure inherited from a callee inside its body already reached the
+			// closure's own member/variable cell, and reporting it here would
+			// overwrite an unrelated variable of the same name in the caller. Such
+			// entries point at a SideEffect value rather than at a real value the
+			// closure computed (a local write, a call result, or a literal).
+			if modify.IsSideEffect() {
+				continue
 			}
 			varName := se.Name
 			if se.Variable != nil && se.Variable.GetName() != "" {

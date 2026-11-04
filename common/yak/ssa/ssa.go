@@ -445,6 +445,13 @@ type Function struct {
 	// function side effects
 	SideEffects       []*FunctionSideEffect
 	SideEffectsReturn []map[*Variable]*FunctionSideEffect
+	// SideEffectReturnSites is the scope-free copy of SideEffectsReturn.
+	// SetReturnSideEffects appends one entry per recorded side effect, and
+	// Finish releases SideEffectsReturn because its Variable keys retain the
+	// body scope for as long as the function lives. Backends that run after
+	// Finish (the AOT compiler writing captured values back to their slots)
+	// read this list instead of the maps.
+	SideEffectReturnSites []FunctionSideEffectSite
 
 	// throws clause
 	Throws []int64
