@@ -110,6 +110,19 @@ func (r *ReActLoop) emitContextCompressionNoProgress(previousTokens, currentToke
 	r.emitContextCompressionWarning(messageZh, messageEn)
 }
 
+func (r *ReActLoop) emitContextCompressionRuntimeWarning(stageZh, stageEn string, err error) {
+	messageZh := fmt.Sprintf(
+		"上下文压缩在“%s”阶段未完成：%v。本次没有修改 Timeline，将重新构建下一次压缩请求。",
+		stageZh, err,
+	)
+	messageEn := fmt.Sprintf(
+		"Context compression did not complete while %s: %v. The timeline was not modified; the next compression request will be rebuilt.",
+		stageEn, err,
+	)
+	log.Warnf("%s", messageEn)
+	r.emitContextCompressionWarning(messageZh, messageEn)
+}
+
 func (r *ReActLoop) emitContextCompressionWarning(messageZh, messageEn string) {
 	if r == nil || r.GetEmitter() == nil {
 		return

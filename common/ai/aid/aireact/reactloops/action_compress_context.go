@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -79,11 +80,17 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 			operator.Continue()
 			return
 		}
-		operator.Fail(err)
+		loop.emitContextCompressionRuntimeWarning("读取 Timeline 候选", "reading timeline candidates", err)
+		operator.Continue()
 		return
 	}
 	if _, err := timeline.ApplyCompressionSelection(selection, operator.requestPrompt, operator.trajectoryResponse); err != nil {
-		operator.Fail(err)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			operator.Fail(err)
+			return
+		}
+		loop.emitContextCompressionRuntimeWarning("提交 Timeline 压缩结果", "committing the timeline compression result", err)
+		operator.Continue()
 		return
 	}
 	operator.Continue()

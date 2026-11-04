@@ -37,6 +37,8 @@ Push、渲染、Save、恢复和 fork/merge 都不会自行调用 AI 压缩。�
 
 `summary` 是唯一必需内容；可用的 summary 足以提交压缩，缺失或无法使用 summary 才要求 AI 重试。`retain_timeline`、技能/证据淘汰、memory 和附带 TODO 均为 best-effort，解析失败时降级为空，其中 TODO 永远不会由压缩 action 应用。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 仍只接受单一 `compress_context`。
 
+候选读取或结果提交遇到 Timeline 边界、并发状态或快照错误时，不修改 Timeline，也不把基础设施错误交给 AI 纠正；系统发送普通 warning，并在下一轮用最新 Timeline 重新构建压缩 prompt，让 AI 重新生成选择。任务取消仍作为正常停止处理。原生 tool-call 如果一次返回多个 `compress_context`，在 AI transaction 内视为结构错误并重试，不会直接终止核心循环。
+
 ## 提交、并发与保存
 
 `RenderCompressionGuide` 只读取当前 timeline 并返回动态段，不保留快照。`compress_context` 是普通 action，模型可以主动调用；超限时主循环只把动态段换成压缩指引，并要求这一轮响应是单个 `compress_context`。verifier 只检查 action 合规；handler 再读一次当前 timeline，把 action 翻译成 ID，然后调用 `ApplyCompressionSelection`。应用看当时的 timeline，不再对照引导生成时的快照：
