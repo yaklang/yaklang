@@ -43,7 +43,7 @@ const ContextCompressionAction = "compress_context"
 
 const (
 	TimelineCompressionMaxInputTokens   = 512 * 1024
-	TimelineCompressionMaxSummaryTokens = 16 * 1024
+	TimelineCompressionMaxSummaryTokens = 64 * 1024
 )
 
 // TimelineCompressionOptions describes one explicit compression, not automatic
