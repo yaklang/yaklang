@@ -2,6 +2,7 @@ package ssa_compile_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"regexp"
@@ -634,4 +635,59 @@ func TestExcludeFile(t *testing.T) {
 		require.NotContains(t, fileList, "/a/a.java")
 		require.NotContains(t, fileList, "/a/b.java")
 	})
+}
+
+// A directory whose only readable inputs are archives still has a language:
+// Java is the one builder that can expand a jar, so anything else would leave
+// the whole classes tree invisible. This is the fallback, not the rule — the
+// next tests prove an archive never outvotes real source.
+func TestSSAAutoDetectiveUsesArchiveWhenNothingElseScores(t *testing.T) {
+	initDB.Do(func() {
+		yakit.InitialDatabase()
+	})
+	jarPath, err := ssatest.GetJarFile()
+	require.NoError(t, err)
+	jarBytes, err := os.ReadFile(jarPath)
+	require.NoError(t, err)
+
+	tempDir, cleanup := setupTempDirWithFiles(t, map[string]string{
+		"lib/app.jar":  string(jarBytes),
+		"lib/util.war": "PK\x05\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+	})
+	defer cleanup()
+
+	res, err := ssa_compile.ParseProjectWithAutoDetective(context.Background(), &ssa_compile.SSADetectConfig{
+		Target: tempDir,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Info)
+	require.Equal(t, "java", string(res.Info.Config.GetLanguage()),
+		"an archive-only tree must read as Java")
+}
+
+// A webapp carries far more JavaScript than Java. The bundled .js must win the
+// score: the archive fallback only applies when nothing scored at all.
+func TestSSAAutoDetectiveLetsBundledJSOutvoteAnArchive(t *testing.T) {
+	initDB.Do(func() {
+		yakit.InitialDatabase()
+	})
+	jarPath, err := ssatest.GetJarFile()
+	require.NoError(t, err)
+	jarBytes, err := os.ReadFile(jarPath)
+	require.NoError(t, err)
+
+	files := map[string]string{"lib/app.jar": string(jarBytes)}
+	for i := 0; i < 8; i++ {
+		files[fmt.Sprintf("webapp/frontend/bundle%d.js", i)] = "console.log('x')\n"
+	}
+	tempDir, cleanup := setupTempDirWithFiles(t, files)
+	defer cleanup()
+
+	res, err := ssa_compile.ParseProjectWithAutoDetective(context.Background(), &ssa_compile.SSADetectConfig{
+		Target: tempDir,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Info)
+	require.Equal(t, "js", string(res.Info.Config.GetLanguage()),
+		"an archive must not override a JavaScript source majority")
 }
