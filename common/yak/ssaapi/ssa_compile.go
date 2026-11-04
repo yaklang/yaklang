@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
-	"github.com/yaklang/yaklang/common/yak/ssautils"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
@@ -244,24 +243,33 @@ func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
 		jarRecursiveParse := !c.disableArchiveExpansion && c.GetCodeSourceJarRecursiveParse()
 		fs = c.LanguageBuilder.WrapWithPreprocessedFS(fs, jarRecursiveParse)
 	}
-	// Archive-backed sources decompile on every read. Wrap them so the decompiled tree is
-	// materialized once and reused by planning, dependency scan and AST build.
-	return c.preparedSourceCache().Wrap(fs)
+	return fs
 }
 
-// resolveLanguageBuilder picks the language builder before the filesystem is
-// wrapped. WrapWithPreprocessedFS is language-specific — Java expands jar/zip
-// members into sources — and ScanProjectFiles runs after the wrap. The probe
-// and the "configured language wins" rule live in ssautils; this method only
-// supplies the frontend registry.
-func (c *Config) resolveLanguageBuilder(filesystem fi.FileSystem) {
-	if c == nil {
+// wrapPreparedSources puts the prepared view in front of fs, so the scan, the
+// unit planning and the AST build all read the same produced sources instead of
+// producing them again. It is a no-op when the frontend has no preparation
+// step or the tree needed none.
+func (c *Config) wrapPreparedSources(fs fi.FileSystem) fi.FileSystem {
+	if c == nil || c.preparedSources == nil {
+		return fs
+	}
+	return c.preparedSources.Wrap(fs)
+}
+
+// ensureLanguageBuilder maps an already decided language onto its frontend.
+// Which language a project is in is decided once, by the project inspector
+// ("SSA 项目探测"); this method only looks up the frontend for that decision and
+// never guesses a language of its own.
+func (c *Config) ensureLanguageBuilder() {
+	if c == nil || c.LanguageBuilder != nil {
 		return
 	}
-	c.LanguageBuilder = ssautils.ResolveLanguageBuilder(c.LanguageBuilder, filesystem, c.programPath, c.GetLanguage(), func(lang ssaconfig.Language) ssa.Builder {
-		if create, ok := LanguageBuilderCreater[lang]; ok && create != nil {
-			return create()
-		}
-		return nil
-	})
+	language := c.GetLanguage()
+	if language == "" {
+		return
+	}
+	if create, ok := LanguageBuilderCreater[language]; ok && create != nil {
+		c.LanguageBuilder = create()
+	}
 }

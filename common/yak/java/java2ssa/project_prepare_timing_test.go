@@ -1,4 +1,4 @@
-package ssautils
+package java2ssa
 
 import (
 	"os"
@@ -13,7 +13,7 @@ func TestMaterializeReportsSeparatePreparationPhases(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	result, err := MaterializeProject(root, 2)
+	result, err := PrepareProjectSources(root, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

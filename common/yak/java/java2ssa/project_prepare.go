@@ -1,8 +1,4 @@
-// Package ssautils holds compile-time source preparation that is shared by the
-// SSA frontends but is not itself part of the IR. It sits above the language
-// packages (Java/JSP) and below ssaapi: ssaapi only orchestrates a compile, it
-// must not know how a class is decompiled or a page is translated.
-package ssautils
+package java2ssa
 
 import (
 	"context"
@@ -19,22 +15,31 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memorybudget"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
-// defaultSpillMemoryLimit keeps half of the usable heap for prepared sources;
-// the rest belongs to planning and IR. Every byte over the limit spills to a
-// private temp directory instead of failing the compile.
-func defaultSpillMemoryLimit() int64 {
+// This file owns Java source preparation: what a Java project looks like before
+// the SSA pipeline can read it as Java source.
+//
+// A walk sees an archive as one opaque file and a page as markup, so neither is
+// a compilation unit. Preparation turns both into Java, keeps the result behind
+// a read-through cache, and records the page ranges so a finding points at the
+// page instead of the generated unit. It runs once per compile and every later
+// stage reads the same prepared view.
+
+// defaultPrepareMemoryLimit keeps half of the usable heap for prepared sources;
+// the rest belongs to planning and IR. Bytes over the limit go to the
+// preparation's private directory instead of failing the compile.
+func defaultPrepareMemoryLimit() int64 {
 	limit := memorybudget.Usable() / 2
 	if limit < 256<<20 {
 		limit = 256 << 20
@@ -42,110 +47,93 @@ func defaultSpillMemoryLimit() int64 {
 	return limit
 }
 
-// Timings keeps serial phase wall times separate from summed worker service
-// times. ArchiveRead includes I/O + decompilation; it is not pure CPU time.
-type Timings struct {
-	SourceCount                      int     `json:"source_count"`
-	TemplateCount                    int     `json:"template_count"`
-	WalkSeconds                      float64 `json:"walk_seconds"`
-	ArchivePrepareSeconds            float64 `json:"archive_prepare_seconds"`
-	TemplatePrepareSeconds           float64 `json:"template_prepare_seconds"`
-	TemplateTranslationWorkerSeconds float64 `json:"template_translation_worker_seconds"`
-	TemplateJavaWorkerSeconds        float64 `json:"template_java_worker_seconds"`
-	ArchiveReadWorkerSeconds         float64 `json:"archive_read_worker_seconds"`
-	StoreWorkerSeconds               float64 `json:"store_worker_seconds"`
-	// Spill time and retained spill bytes when prepared sources exceed the
-	// in-memory budget. Kept under the historical JSON names.
-	DiskWriteWorkerSeconds float64 `json:"disk_write_worker_seconds"`
-	DiskWriteBytes         int64   `json:"disk_write_bytes"`
-	ReleaseSeconds         float64 `json:"release_seconds"`
-	TemplateErrors         int64   `json:"template_errors"`
-	WalkErrors             int64   `json:"walk_errors"`
-}
-
-// PrepareOptions describes one source-preparation pass. Every field has a
-// zero-value default: no excludes, machine concurrency, half-heap budget.
-type PrepareOptions struct {
-	Context     context.Context
-	Root        string
-	Concurrency int
-	MemoryLimit int64
-	// MaterializeOut writes every prepared source under a real .java tree.
-	MaterializeOut string
-	// Exclude prunes directories and files from preparation.
-	Exclude func(string) bool
-	// Report receives user-visible progress; StoreProgress persists it.
-	Report        func(float64, string, ...any)
-	StoreProgress func(float64)
-	// ReleaseRuntime drops frontend scratch (DFA tables) before prehandler.
-	ReleaseRuntime func()
-}
-
-// PreparedSources owns the compile's source view: a spill-backed read-through
-// filesystem plus the template ranges of the pages it generated.
-type PreparedSources struct {
-	spill *filesys.SpillFS
+// preparedSources is the compile's prepared view of a Java project: a
+// read-through cache over the archive-expanded filesystem, plus the page range
+// maps of the pages it generated.
+type preparedSources struct {
+	builder *SSABuilder
+	cache   *filesys.FileCache
 
 	mu        sync.Mutex
 	templates map[string]tl.TemplateGeneratedInfo
-
-	treeDir string
+	treeDir   string
+	timings   ssa.ProjectPrepareTimings
 }
 
-// NewPreparedSources creates the source cache. memoryLimit <= 0 uses half of
-// the usable heap; tempParent defaults to os.TempDir().
-func NewPreparedSources(memoryLimit int64, tempParent string) *PreparedSources {
+var _ ssa.PreparedProject = (*preparedSources)(nil)
+
+func newPreparedSources(builder *SSABuilder, memoryLimit int64, overflowParent string) *preparedSources {
 	if memoryLimit <= 0 {
-		memoryLimit = defaultSpillMemoryLimit()
+		memoryLimit = defaultPrepareMemoryLimit()
 	}
-	p := &PreparedSources{}
-	opts := []filesys.SpillFSOption{
-		filesys.WithSpillMemoryLimit(memoryLimit),
-		filesys.WithSpillTempParent(tempParent),
+	p := &preparedSources{builder: builder}
+	opts := []filesys.FileCacheOption{
+		filesys.WithFileCacheMemoryLimit(memoryLimit),
+		filesys.WithFileCacheOverflowDir(overflowParent),
+		filesys.WithFileCachePublisher(func(name string, data []byte) {
+			p.publishTree(name, data)
+		}),
 	}
-	opts = append(opts, filesys.WithSpillPublisher(func(name string, data []byte) {
-		p.publishTree(name, data)
-	}))
-	p.spill = filesys.NewSpillFS(opts...)
+	p.cache = filesys.NewFileCache(opts...)
 	return p
 }
 
 // Wrap serves reads from the prepared cache while keeping the tree shape of
 // base. Wrapping is idempotent for the same cache.
-func (p *PreparedSources) Wrap(base fi.FileSystem) fi.FileSystem {
+func (p *preparedSources) Wrap(base fi.FileSystem) fi.FileSystem {
 	if p == nil {
 		return base
 	}
-	return filesys.WrapWithSpillFS(base, p.spill)
+	return filesys.WrapWithFileCache(base, p.cache)
 }
 
-// Close drops cached sources and the private spill directory.
-func (p *PreparedSources) Close() error {
+// Close drops cached sources and the private overflow directory.
+func (p *preparedSources) Close() error {
 	if p == nil {
 		return nil
 	}
-	return p.spill.Close()
+	return p.cache.Close()
 }
 
 // Stats reports cache counters.
-func (p *PreparedSources) Stats() filesys.SpillFSStats {
+func (p *preparedSources) Stats() ssa.ProjectPrepareStats {
 	if p == nil {
-		return filesys.SpillFSStats{}
+		return ssa.ProjectPrepareStats{}
 	}
-	return p.spill.Stats()
+	stats := p.cache.Stats()
+	return ssa.ProjectPrepareStats{
+		Paths:      stats.Paths,
+		Hits:       stats.Hits,
+		Misses:     stats.Misses,
+		Errors:     stats.Errors,
+		Prefetched: stats.Prefetched,
+		MemoryHold: stats.MemoryHold,
+		DiskHold:   stats.DiskHold,
+	}
+}
+
+// Timings reports the phase measurements of the pass that produced these
+// sources.
+func (p *preparedSources) Timings() ssa.ProjectPrepareTimings {
+	if p == nil {
+		return ssa.ProjectPrepareTimings{}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.timings
 }
 
 // WalkEntries visits every prepared path with its size. The callback may read
 // from the prepared filesystem.
-func (p *PreparedSources) WalkEntries(fn func(name string, size int64) error) error {
+func (p *preparedSources) WalkEntries(fn func(name string, size int64) error) error {
 	if p == nil {
 		return nil
 	}
-	return p.spill.WalkEntries(fn)
+	return p.cache.WalkEntries(fn)
 }
 
 // Templates returns the generated page metadata, keyed by the original path.
-func (p *PreparedSources) Templates() map[string]tl.TemplateGeneratedInfo {
+func (p *preparedSources) Templates() map[string]tl.TemplateGeneratedInfo {
 	if p == nil {
 		return nil
 	}
@@ -158,7 +146,7 @@ func (p *PreparedSources) Templates() map[string]tl.TemplateGeneratedInfo {
 	return out
 }
 
-func (p *PreparedSources) rememberTemplate(path string, info tl.TemplateGeneratedInfo) {
+func (p *preparedSources) rememberTemplate(path string, info tl.TemplateGeneratedInfo) {
 	if p == nil || info == nil || path == "" {
 		return
 	}
@@ -171,17 +159,17 @@ func (p *PreparedSources) rememberTemplate(path string, info tl.TemplateGenerate
 }
 
 // Prefetch warms the cache for already-planned compile files.
-func (p *PreparedSources) Prefetch(ctx context.Context, base fi.FileSystem, paths []string, workers int, onProgress func(done, total int)) error {
+func (p *preparedSources) Prefetch(ctx context.Context, base fi.FileSystem, paths []string, workers int, onProgress func(done, total int)) error {
 	if p == nil {
 		return nil
 	}
-	return p.spill.Prefetch(ctx, base, paths, workers, onProgress)
+	return p.cache.Prefetch(ctx, base, paths, workers, onProgress)
 }
 
-// Prepare walks the preprocessed filesystem, decompiles every class/java file
-// and translates every page into Java before the compile stages read them.
-func (p *PreparedSources) Prepare(base fi.FileSystem, opts PrepareOptions) Timings {
-	var timings Timings
+// prepare walks the expanded filesystem once and produces every source the
+// compile will read: each archive member decompiled, each page translated.
+func (p *preparedSources) prepare(base fi.FileSystem, opts ssa.ProjectPrepareOptions) ssa.ProjectPrepareTimings {
+	var timings ssa.ProjectPrepareTimings
 	if p == nil || base == nil {
 		return timings
 	}
@@ -224,25 +212,26 @@ func (p *PreparedSources) Prepare(base fi.FileSystem, opts PrepareOptions) Timin
 	timings.SourceCount, timings.TemplateCount = len(sources), len(templates)
 	if err != nil {
 		timings.WalkErrors++
-		log.Warnf("[ssa-compile] source prepare walk: %v", err)
+		log.Warnf("[ssa-compile] java source prepare walk: %v", err)
 	}
 	total := len(sources) + len(templates)
 	if total == 0 {
 		return timings
 	}
 
-	workers := PrefetchWorkers(opts.Concurrency)
+	workers := prepareWorkers(opts.Concurrency)
 	start := time.Now()
-	log.Infof("[ssa-compile] source prepare start class/java=%d jsp=%d workers=%d", len(sources), len(templates), workers)
+	log.Infof("[ssa-compile] java source prepare start class/java=%d jsp=%d workers=%d", len(sources), len(templates), workers)
 
 	var done atomic.Int64
 	var reportMu sync.Mutex
 	var lastReported int
-	report := func() {
+	report := func(label string) {
 		n := int(done.Add(1))
-		if opts.Report == nil {
+		if opts.Progress == nil {
 			return
 		}
+		// Report at most ~100 times: one event per file would flood the job stream.
 		step := total / 100
 		if step < 1 {
 			step = 1
@@ -254,15 +243,11 @@ func (p *PreparedSources) Prepare(base fi.FileSystem, opts PrepareOptions) Timin
 		}
 		lastReported = n
 		reportMu.Unlock()
-		pr := sourcePrefetchProcessEnd * (float64(n) / float64(total))
-		if opts.StoreProgress != nil {
-			opts.StoreProgress(pr)
-		}
-		opts.Report(pr, fmt.Sprintf("[%s] prepare sources jar/zip/class/jsp (%d/%d)", "f0_prepare", n, total))
+		opts.Progress(float64(n)/float64(total), fmt.Sprintf("%s (%d/%d)", label, n, total))
 	}
 
-	// Classes inside one jar are consecutive after the walk. A worker window
-	// then sits inside a single jar; round-robin puts several jars in flight.
+	// Classes inside one archive are consecutive after the walk. A worker window
+	// then sits inside a single archive; round-robin puts several in flight.
 	sources = stripeByArchive(sources)
 	var prep sync.WaitGroup
 	var archiveSeconds float64
@@ -274,9 +259,11 @@ func (p *PreparedSources) Prepare(base fi.FileSystem, opts PrepareOptions) Timin
 		go func() {
 			defer prep.Done()
 			archiveStarted := time.Now()
-			if err := p.spill.Prefetch(ctx, base, sources, workers, func(_, _ int) { report() }); err != nil {
+			if err := p.cache.Prefetch(ctx, base, sources, workers, func(_, _ int) {
+				report("[f0_prepare] decompile sources")
+			}); err != nil {
 				prefetchErrors++
-				log.Warnf("[ssa-compile] source prepare prefetch: %v", err)
+				log.Warnf("[ssa-compile] java source prepare prefetch: %v", err)
 			}
 			archiveSeconds = time.Since(archiveStarted).Seconds()
 		}()
@@ -306,49 +293,53 @@ func (p *PreparedSources) Prepare(base fi.FileSystem, opts PrepareOptions) Timin
 	timings.TemplateErrors = templateErrors
 	releaseStarted := time.Now()
 	filesys.ReleasePreparationCaches(base)
-	// The virtual filesystem now holds the generated Java. JSP prediction state
-	// must not survive into prehandler: the shared DFA only grows.
-	p.releaseJSPRuntime(opts.ReleaseRuntime)
+	// The cache now holds the generated Java. JSP prediction state must not
+	// survive into prehandler: the shared DFA only grows.
+	p.releaseJSPRuntime()
 	timings.ReleaseSeconds = time.Since(releaseStarted).Seconds()
 
-	stats := p.spill.Stats()
+	stats := p.cache.Stats()
 	timings.ArchiveReadWorkerSeconds = stats.BaseRead
 	timings.StoreWorkerSeconds = stats.Store
-	timings.DiskWriteWorkerSeconds, timings.DiskWriteBytes = stats.Spill, stats.DiskHold
-	log.Infof("[ssa-compile] source prepare finish cost=%v %s", time.Since(start), filesys.FormatSpillFSStats(stats))
-	if opts.Report != nil {
-		opts.Report(sourcePrefetchProcessEnd, fmt.Sprintf(
+	timings.DiskWriteWorkerSeconds, timings.DiskWriteBytes = stats.DiskWrite, stats.DiskHold
+	log.Infof("[ssa-compile] java source prepare finish cost=%v %s", time.Since(start), filesys.FormatFileCacheStats(stats))
+	if opts.Progress != nil {
+		opts.Progress(1, fmt.Sprintf(
 			"[f0_prepare] prepared %d sources (%d jsp) in %v (%s)",
-			stats.Paths, len(templates), time.Since(start).Round(time.Millisecond), filesys.FormatSpillFSStats(stats),
+			stats.Paths, len(templates), time.Since(start).Round(time.Millisecond), filesys.FormatFileCacheStats(stats),
 		))
 	}
 	return timings
 }
 
-// MaterializeResult is the in-memory Java tree produced from jars, classes and JSP.
-type MaterializeResult struct {
-	Sources *PreparedSources
+// PreparedProjectResult is the Java source tree produced from archives, class
+// files and pages for a whole project.
+type PreparedProjectResult struct {
+	Sources ssa.PreparedProject
 	FS      fi.FileSystem
 	Files   int64
 	Bytes   int64
 	Errors  int64
 	Elapsed time.Duration
-	Timings Timings
+	Timings ssa.ProjectPrepareTimings
 }
 
-// MaterializeProject turns a local Java project into one prepared filesystem.
-// It decompiles jar/class files and converts JSP, then drops JSP parser tables.
-// It does not compile SSA.
-func MaterializeProject(root string, concurrency int) (*MaterializeResult, error) {
+// PrepareProjectSources turns a local Java project into one prepared
+// filesystem. It decompiles jar/class files and converts JSP, then drops the
+// parser tables. It does not compile SSA.
+//
+// This is the Java frontend's own entry point: a caller that wants a prepared
+// Java tree asks Java for it instead of reimplementing the steps.
+func PrepareProjectSources(root string, concurrency int) (*PreparedProjectResult, error) {
 	local := filesys.NewRelLocalFs(root)
-	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	builder, ok := CreateBuilder().(*SSABuilder)
 	if !ok {
 		return nil, utils.Errorf("java builder is unavailable")
 	}
 	wrapped := builder.WrapWithPreprocessedFS(local, true)
-	sources := NewPreparedSources(0, "")
+	sources := newPreparedSources(builder, 0, "")
 	started := time.Now()
-	timings := sources.Prepare(wrapped, PrepareOptions{
+	timings := sources.prepare(wrapped, ssa.ProjectPrepareOptions{
 		Root:        ".",
 		Concurrency: concurrency,
 	})
@@ -364,7 +355,7 @@ func MaterializeProject(root string, concurrency int) (*MaterializeResult, error
 	runtime.GC()
 	debug.FreeOSMemory()
 	stats := sources.Stats()
-	return &MaterializeResult{
+	return &PreparedProjectResult{
 		Sources: sources,
 		FS:      fsys,
 		Files:   files,
@@ -375,12 +366,12 @@ func MaterializeProject(root string, concurrency int) (*MaterializeResult, error
 	}, nil
 }
 
-func (p *PreparedSources) prepareTemplates(
+func (p *preparedSources) prepareTemplates(
 	ctx context.Context,
 	base fi.FileSystem,
 	paths []string,
 	workers int,
-	report func(),
+	report func(string),
 ) (translationSeconds, javaSeconds float64, conversionErrors int64) {
 	if len(paths) == 0 {
 		return
@@ -411,15 +402,15 @@ func (p *PreparedSources) prepareTemplates(
 			workerParses := 0
 			for path := range jobs {
 				if ctx.Err() != nil {
-					report()
+					report("[f0_prepare] translate pages")
 					continue
 				}
 				// Read the raw page from the inner filesystem: only the generated
 				// Java belongs in the cache and the materialize-out tree.
-				raw, err := filesys.UnwrapSpillFS(base, p.spill).ReadFile(path)
+				raw, err := filesys.UnwrapFileCache(base, p.cache).ReadFile(path)
 				if err != nil {
 					log.Debugf("[ssa-compile] read jsp %s: %v", path, err)
-					report()
+					report("[f0_prepare] translate pages")
 					continue
 				}
 				fileStart := time.Now()
@@ -434,7 +425,7 @@ func (p *PreparedSources) prepareTemplates(
 				if err != nil {
 					errors.Add(1)
 					log.Warnf("[ssa-compile] prepare jsp %s: %v", path, err)
-					report()
+					report("[f0_prepare] translate pages")
 					continue
 				}
 				javaSource := info.GetContent()
@@ -442,7 +433,7 @@ func (p *PreparedSources) prepareTemplates(
 					log.Warnf("[ssa-compile] slow jsp convert %s cost=%v source=%d generated=%d", path, elapsed, len(raw), len(javaSource))
 				}
 				p.rememberTemplate(path, info)
-				p.spill.Put(path, []byte(javaSource))
+				p.cache.Put(path, []byte(javaSource))
 				converted.Add(1)
 				generatedBytes.Add(int64(len(javaSource)))
 				n := doneCount.Add(1)
@@ -450,7 +441,7 @@ func (p *PreparedSources) prepareTemplates(
 					log.Infof("[ssa-compile] jsp convert progress=%d/%d converted=%d generated=%.1fMB heap=%.1fMB cost=%v",
 						n, len(paths), converted.Load(), float64(generatedBytes.Load())/1048576, currentHeapInuseMB(), time.Since(started))
 				}
-				report()
+				report("[f0_prepare] translate pages")
 			}
 		}()
 	}
@@ -467,13 +458,13 @@ func (p *PreparedSources) prepareTemplates(
 	return float64(translationNS.Load()) / float64(time.Second), float64(javaNS.Load()) / float64(time.Second), errors.Load()
 }
 
-// releaseJSPRuntime runs at the virtual-filesystem boundary, before prehandler.
+// releaseJSPRuntime runs at the prepared-source boundary, before prehandler.
 // Generated Java is already stored; JSP lexer/parser tables and Java caches
 // created while checking that Java are scratch.
-func (p *PreparedSources) releaseJSPRuntime(frontend func()) {
+func (p *preparedSources) releaseJSPRuntime() {
 	before := currentHeapInuseMB()
-	if frontend != nil {
-		frontend()
+	if p.builder != nil {
+		p.builder.Clearup()
 	}
 	jspparser.ResetJSPRuntimeCaches()
 	runtime.GC()
@@ -484,7 +475,7 @@ func (p *PreparedSources) releaseJSPRuntime(frontend func()) {
 // publishTree mirrors a prepared source into MaterializeOut. Non-template
 // files keep the class-file name with a .java suffix; pages get page.jsp.java
 // so they cannot collide with a real page.java.
-func (p *PreparedSources) publishTree(name string, data []byte) {
+func (p *preparedSources) publishTree(name string, data []byte) {
 	if p == nil || len(data) == 0 {
 		return
 	}
@@ -510,7 +501,7 @@ func (p *PreparedSources) publishTree(name string, data []byte) {
 }
 
 // SetMaterializeOut enables writing the prepared tree.
-func (p *PreparedSources) SetMaterializeOut(dir string) {
+func (p *preparedSources) SetMaterializeOut(dir string) {
 	if p == nil {
 		return
 	}
@@ -537,11 +528,11 @@ func treeRel(name string) (string, error) {
 	return name, nil
 }
 
-// PrefetchWorkers returns the worker count for source preparation.
+// prepareWorkers returns the worker count for source preparation.
 // YAK_SSA_SOURCE_WORKERS overrides the compile concurrency.
-func PrefetchWorkers(compileConcurrency int) int {
+func prepareWorkers(compileConcurrency int) int {
 	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_SOURCE_WORKERS")); raw != "" {
-		if v, err := parseInt(raw); err == nil && v > 0 {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
 			return v
 		}
 	}
@@ -555,12 +546,8 @@ func PrefetchWorkers(compileConcurrency int) int {
 	return workers
 }
 
-func parseInt(raw string) (int, error) {
-	return strconv.Atoi(strings.TrimSpace(raw))
-}
-
 // archiveGroupKey is the archive that owns path. Nested archives use the
-// innermost jar/war/ear/zip. A loose class or jsp is its own group.
+// innermost jar/war/ear/zip. A loose class or page is its own group.
 func archiveGroupKey(path string) string {
 	normalized := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
 	best := -1
@@ -613,6 +600,9 @@ func stripeByArchive(paths []string) []string {
 	return out
 }
 
+// jspJavaForSSAWithTiming translates a page and proves the result parses as
+// Java. The grammar-based translation is preferred; the linear fallback covers
+// pages the grammar rejects but Java can still parse.
 func jspJavaForSSAWithTiming(content, path string, cache *ssa.AntlrCache) (info tl.TemplateGeneratedInfo, translation, javaParse time.Duration, err error) {
 	parses := func(src string) bool {
 		started := time.Now()
@@ -649,13 +639,13 @@ func javaSourceParses(src string, cache *ssa.AntlrCache) bool {
 		return false
 	}
 	// Use the same frontend the AST stage uses.
-	_, err := java2ssa.Frontend(src, cache)
+	_, err := Frontend(src, cache)
 	return err == nil
 }
 
 // newJavaParseCache builds an isolated parser cache for one prepare worker.
 func newJavaParseCache() *ssa.AntlrCache {
-	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	builder, ok := CreateBuilder().(*SSABuilder)
 	if !ok {
 		return nil
 	}
@@ -669,5 +659,63 @@ func currentHeapInuseMB() float64 {
 	return float64(ms.HeapInuse) / 1048576
 }
 
-// sourcePrefetchProcessEnd is the compile-progress share preparation owns.
-const sourcePrefetchProcessEnd = 0.12
+// javaPrepareEvidence marks a file the Java pipeline must rewrite before a scan
+// can read it: an archive to expand, a bytecode file to decompile, or a page to
+// translate.
+var javaPrepareEvidence = map[string]struct{}{
+	".jar": {}, ".war": {}, ".ear": {},
+	".class": {}, ".jsp": {}, ".jspx": {},
+}
+
+// NeedsProjectPreparation reports whether the tree holds inputs that must be
+// rewritten before they are Java source. It stops at the first such file, so it
+// costs one bounded walk and no read.
+func (*SSABuilder) NeedsProjectPreparation(fsys fi.FileSystem, root string) bool {
+	if fsys == nil {
+		return false
+	}
+	found := false
+	_ = filesys.Recursive(root,
+		filesys.WithFileSystem(fsys),
+		filesys.WithFileStat(func(path string, info fs.FileInfo) error {
+			if info == nil || info.IsDir() {
+				return nil
+			}
+			if _, ok := javaPrepareEvidence[strings.ToLower(filepath.Ext(path))]; ok {
+				found = true
+				return filesys.SkipAll
+			}
+			return nil
+		}),
+	)
+	return found
+}
+
+// PrepareProject produces every Java source the compile will read, behind one
+// read-through cache.
+func (s *SSABuilder) PrepareProject(fsys fi.FileSystem, opts ssa.ProjectPrepareOptions) (ssa.PreparedProject, error) {
+	if fsys == nil {
+		return nil, utils.Errorf("prepare java project: nil filesystem")
+	}
+	sources := newPreparedSources(s, opts.MemoryLimit, "")
+	timings := sources.prepare(fsys, opts)
+	sources.mu.Lock()
+	sources.timings = timings
+	sources.mu.Unlock()
+	return sources, nil
+}
+
+// OpenJarFS opens a local jar/war as a decompiling filesystem.
+//
+// Retaining unproved sources is the frontend contract: when javac cannot
+// recompile a decompiler spelling, the original stays visible instead of being
+// replaced by a failure comment. Both settings belong to the Java frontend, so
+// a caller outside it never touches the decompiler API.
+func OpenJarFS(local string, recursive bool) (*javaclassparser.JarFS, error) {
+	jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(local, recursive)
+	if err != nil {
+		return nil, err
+	}
+	jarFS.SetRetainUnprovedSource(true)
+	return jarFS, nil
+}
