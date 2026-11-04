@@ -116,7 +116,7 @@ type CodeSourceInfo struct {
 	Path              string           `json:"path,omitempty"`                // git仓库中的子路径
 	Auth              *AuthConfigInfo  `json:"auth,omitempty"`                // 认证信息
 	Proxy             *ProxyConfigInfo `json:"proxy,omitempty"`               // 代理配置
-	JarRecursiveParse *bool            `json:"jar_recursive_parse,omitempty"` // Jar递归解析开关，nil或true表示启用，false表示禁用
+	JarRecursiveParse *bool            `json:"jar_recursive_parse,omitempty"` // Jar解析开关，nil或true表示解析，false表示跳过归档文件
 }
 
 func NewLocalFileCodeSourceConfig(localFile string) *CodeSourceInfo {
@@ -623,9 +623,10 @@ func WithCodeSourceInfo(info *CodeSourceInfo) Option {
 	}
 }
 
-// WithCodeSourceJarRecursiveParse 设置是否对 Jar 包进行递归解析（导出名为 ssa.withCodeSourceJarRecursiveParse）
+// WithCodeSourceJarRecursiveParse 设置是否解析 Jar 文件（导出名为 ssa.withCodeSourceJarRecursiveParse）
+// 关闭后基础文件系统直接跳过 Jar/War 等归档文件，语言前端不会收到它们。
 // 参数:
-//   - enable: 是否递归解析 Jar 包
+//   - enable: 是否解析 Jar 文件
 //
 // 返回值:
 //   - 代码源配置可选项

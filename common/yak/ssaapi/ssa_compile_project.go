@@ -968,6 +968,15 @@ func isRawArchiveDiffEntry(pathname string) bool {
 	return javaclassparser.IsArchiveFile(pathname)
 }
 
+// hideArchiveFiles keeps archive files out of the tree the frontend walks. An
+// archive that is not parsed has no readable source, so leaving it in the walk
+// would only offer the frontend a file it must reject.
+func hideArchiveFiles(fs fi.FileSystem) fi.FileSystem {
+	hook := filesys.NewHookFS(fs)
+	hook.SetSkipMatcher(filesys.CustomMatcher(javaclassparser.IsArchiveFile))
+	return hook
+}
+
 func hasDeleteEntries(fileHashMap map[string]int) bool {
 	for _, v := range fileHashMap {
 		if v == -1 {

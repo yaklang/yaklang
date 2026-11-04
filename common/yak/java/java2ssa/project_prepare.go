@@ -691,6 +691,27 @@ func (*SSABuilder) NeedsProjectPreparation(fsys fi.FileSystem, root string) bool
 	return found
 }
 
+// OpenArchiveCodeSource opens a jar/war code source as a filesystem whose
+// classes read as Java source.
+//
+// The code source is the archive itself, so its classes must go through the jar
+// reader: that reader resolves the declaration scope of every member (anonymous
+// and enum bodies included). A plain zip view does not, and rejects classes
+// whose constant-specific bodies then cannot be folded back.
+func OpenArchiveCodeSource(local string, recursive bool) (fi.FileSystem, error) {
+	jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(local, recursive)
+	if err != nil {
+		return nil, err
+	}
+	// SSA parses the rendered text. Keep a unique original member when javac
+	// cannot recompile that spelling, instead of replacing the class with a
+	// failure comment.
+	jarFS.SetRetainUnprovedSource(true)
+	return filesys.NewUnifiedFS(jarFS,
+		filesys.WithUnifiedFsExtMap(".class", ".java"),
+	), nil
+}
+
 // PrepareProject produces every Java source the compile will read, behind one
 // read-through cache.
 func (s *SSABuilder) PrepareProject(fsys fi.FileSystem, opts ssa.ProjectPrepareOptions) (ssa.PreparedProject, error) {
@@ -703,32 +724,4 @@ func (s *SSABuilder) PrepareProject(fsys fi.FileSystem, opts ssa.ProjectPrepareO
 	sources.timings = timings
 	sources.mu.Unlock()
 	return sources, nil
-}
-
-// PrepareFS opens a jar/war code source as the filesystem this frontend reads.
-// Compiled classes become the source names the rest of the pipeline expects, so
-// a caller outside Java never needs the decompiler API or the extension map.
-func (s *SSABuilder) PrepareFS(codeSource ssa.ArchiveCodeSource) (fi.FileSystem, error) {
-	jarFS, err := OpenJarFS(codeSource.LocalFile, codeSource.Recursive)
-	if err != nil {
-		return nil, err
-	}
-	return filesys.NewUnifiedFS(jarFS,
-		filesys.WithUnifiedFsExtMap(".class", ".java"),
-	), nil
-}
-
-// OpenJarFS opens a local jar/war as a decompiling filesystem.
-//
-// Retaining unproved sources is the frontend contract: when javac cannot
-// recompile a decompiler spelling, the original stays visible instead of being
-// replaced by a failure comment. Both settings belong to the Java frontend, so
-// a caller outside it never touches the decompiler API.
-func OpenJarFS(local string, recursive bool) (*javaclassparser.JarFS, error) {
-	jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(local, recursive)
-	if err != nil {
-		return nil, err
-	}
-	jarFS.SetRetainUnprovedSource(true)
-	return jarFS, nil
 }

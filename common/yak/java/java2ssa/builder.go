@@ -75,8 +75,13 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	return nil
 }
 
-func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, jarRecursiveParse bool) fi.FileSystem {
-	if fs == nil || !jarRecursiveParse {
+// WrapWithPreprocessedFS gives the compile a tree it can read as Java source:
+// archives become enterable directories and their class entries are presented
+// under .java names. expandArchive is the caller's decision to allow that
+// expansion at all; the incremental sequence turns it off so archive members
+// stay out of the walk.
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, expandArchive bool) fi.FileSystem {
+	if fs == nil || !expandArchive {
 		return fs
 	}
 	if expanded, ok := fs.(*javaclassparser.ExpandedZipFS); ok {
@@ -87,20 +92,20 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, jarRecursiveParse 
 		return fs
 	}
 
-	wrapped := javaclassparser.MaybeWrapExpandedArchiveFS(fs, jarRecursiveParse)
+	wrapped := javaclassparser.MaybeWrapExpandedArchiveFS(fs, expandArchive)
 	if expanded, ok := wrapped.(*javaclassparser.ExpandedZipFS); ok {
 		expanded.SetRetainUnprovedSource(true)
 	}
 	if wrapped == fs {
 		return fs
 	}
-	// Jar/zip roots from parseFSFromInfo may already be UnifiedFS(.class -> .java).
-	if _, ok := fs.(*filesys.UnifiedFS); !ok {
-		wrapped = filesys.NewUnifiedFS(wrapped,
-			filesys.WithUnifiedFsExtMap(".class", ".java"),
-		)
+	// A caller that already presents class entries as source keeps its own view.
+	if _, ok := fs.(*filesys.UnifiedFS); ok {
+		return wrapped
 	}
-	return wrapped
+	return filesys.NewUnifiedFS(wrapped,
+		filesys.WithUnifiedFsExtMap(".class", ".java"),
+	)
 }
 
 func (*SSABuilder) FilterFile(path string) bool {

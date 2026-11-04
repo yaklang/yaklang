@@ -1,33 +1,21 @@
 package ssaapi
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// archiveOnlyBuilder is a frontend that can open an archive but has no
-// preparation step of its own.
-type archiveOnlyBuilder struct {
-	ssa.Builder
-	opened ssa.ArchiveCodeSource
-}
-
-func (b *archiveOnlyBuilder) PrepareFS(src ssa.ArchiveCodeSource) (fi.FileSystem, error) {
-	b.opened = src
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("A.java", "class A {}")
-	return vf, nil
-}
-
 // A jar is the Java archive format, so the config settles the language even
-// when the caller named none. Without that, opening the archive would need a
-// frontend the pipeline is not allowed to name itself.
-func TestArchiveCodeSourceSettlesJavaLanguage(t *testing.T) {
+// when the caller named none. Without that, the frontend that reads the classes
+// would not be selected.
+func TestJarCodeSourceSettlesJavaLanguage(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithCodeSourceMap(map[string]any{
 		"kind":       "jar",
 		"local_file": "/tmp/app.jar",
@@ -54,31 +42,76 @@ func TestArchiveCodeSourceSettlesJavaLanguage(t *testing.T) {
 	require.Empty(t, string(zipCfg.GetLanguage()), "a zip does not imply a language")
 }
 
-// The pipeline asks the frontend to open the archive; it never names one.
-func TestPrepareArchiveFSDelegatesToFrontend(t *testing.T) {
-	builder := &archiveOnlyBuilder{}
-	c := &Config{
-		Config:          &ssaconfig.Config{},
-		LanguageBuilder: builder,
-	}
-	fsys, err := c.prepareArchiveFS("/tmp/whatever.jar")
+// jarCodeSourceConfig builds a Java compile over an existing jar file.
+func jarCodeSourceConfig(t *testing.T, jarPath string, extra ...ssaconfig.Option) *Config {
+	t.Helper()
+	opts := append([]ssaconfig.Option{
+		WithLanguage(ssaconfig.JAVA),
+		ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceJar),
+		ssaconfig.WithCodeSourceLocalFile(jarPath),
+	}, extra...)
+	cfg, err := DefaultConfig(opts...)
 	require.NoError(t, err)
-	require.NotNil(t, fsys)
-	require.Equal(t, "/tmp/whatever.jar", builder.opened.LocalFile,
-		"the frontend receives the archive path instead of ssaapi opening it")
-	// jar_recursive_parse defaults on, so the frontend is told to expand.
-	require.True(t, builder.opened.Recursive)
+	require.NotNil(t, cfg.LanguageBuilder)
+	require.NotNil(t, cfg.fs)
+	return cfg
 }
 
-// A frontend without archive support fails loudly instead of silently reading
-// nothing.
-func TestPrepareArchiveFSRejectsFrontendWithoutArchiveSupport(t *testing.T) {
-	c := &Config{
-		Config:          &ssaconfig.Config{},
-		LanguageBuilder: &archiveOnlyBuilder{},
+// A jar code source is opened by the language registry, not by the pipeline: it
+// arrives already readable as Java source.
+func TestJarCodeSourceIsReadableThroughTheFrontend(t *testing.T) {
+	jarPath := filepath.Join("test", "ssatest", "testfile", "test.jar")
+	require.FileExists(t, jarPath)
+
+	cfg := jarCodeSourceConfig(t, jarPath)
+	unified, ok := cfg.fs.(*filesys.UnifiedFS)
+	require.True(t, ok, "DefaultConfig normalizes the view, got %T", cfg.fs)
+	_, isJarFS := unified.GetFileSystem().(*javaclassparser.JarFS)
+	require.True(t, isJarFS, "the registered opener must use the jar reader, got %T",
+		unified.GetFileSystem())
+
+	langFS := cfg.swapLanguageFs(cfg.fs)
+	walked := assertWalkPaths(t, langFS)
+	require.Contains(t, walked, "com/java/main/Main.java",
+		"class entries must be offered under source names, walked %v", walked)
+
+	rawSrc, err := langFS.ReadFile("com/java/main/Main.java")
+	require.NoError(t, err)
+	require.Contains(t, string(rawSrc), "class Main",
+		"the frontend must serve decompiled source, got %q", string(rawSrc))
+}
+
+// jar_recursive_parse is the "parse jars" setting. Turning it off removes
+// archive files from the tree the frontend walks; an archive that is not parsed
+// has no readable source, so the frontend must never be handed one.
+func TestJarRecursiveParseOffSkipsArchiveFiles(t *testing.T) {
+	jarBytes, err := os.ReadFile(filepath.Join("test", "ssatest", "testfile", "test.jar"))
+	require.NoError(t, err)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "lib.jar"), jarBytes, 0o644))
+
+	newConfig := func(extra ...ssaconfig.Option) *Config {
+		opts := append([]ssaconfig.Option{WithLanguage(ssaconfig.JAVA), WithLocalFs(dir)}, extra...)
+		cfg, err := DefaultConfig(opts...)
+		require.NoError(t, err)
+		return cfg
 	}
-	c.LanguageBuilder = nil
-	_, err := c.prepareArchiveFS("/tmp/whatever.jar")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot open an archive code source")
+
+	// Default: jars are parsed, so the archive becomes a directory and its
+	// classes are readable as source.
+	cfg := newConfig()
+	langFS := cfg.swapLanguageFs(cfg.fs)
+	expanded := assertWalkPaths(t, langFS)
+	require.Contains(t, expanded, "lib.jar/com/java/main/Main.java",
+		"an expanded jar exposes its classes, walked %v", expanded)
+	info, err := langFS.Stat("lib.jar")
+	require.NoError(t, err)
+	require.True(t, info.IsDir(), "an expanded archive is enterable, got %T", info)
+
+	// Parsing off: the archive is not part of the tree at all.
+	off := newConfig(ssaconfig.WithCodeSourceJarRecursiveParse(false))
+	walked := assertWalkPaths(t, off.swapLanguageFs(off.fs))
+	require.Empty(t, walked, "a jar that is not parsed must not be walked, walked %v", walked)
+	_, err = off.swapLanguageFs(off.fs).Stat("lib.jar")
+	require.ErrorIs(t, err, fs.ErrNotExist, "a skipped archive must look absent")
 }

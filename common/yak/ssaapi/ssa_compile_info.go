@@ -17,7 +17,6 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
 )
@@ -29,6 +28,7 @@ var (
 )
 
 func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
+	c.NormalizeCodeSourceKind()
 	c.Processf(0, "parse info: %s", c.GetCodeSourceKind())
 	defer func() {
 		c.Processf(0, "parse info finish")
@@ -45,7 +45,7 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 			return nil, err
 		}
 	case ssaconfig.CodeSourceJar:
-		baseFS, err = c.prepareArchiveFS(c.GetCodeSourceLocalFile())
+		baseFS, err = c.openArchiveCodeSource()
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
@@ -65,32 +65,12 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	return baseFS, nil
 }
 
-func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
-	// use local
-	if codeSource.GetCodeSourceLocalFile() != "" {
-		return filesys.NewZipFSFromLocal(codeSource.GetCodeSourceLocalFile())
-	}
-	if codeSource.GetCodeSourceURL() == "" {
-		return nil, utils.Errorf("url is empty ")
-	}
-	// download file
-	resp, _, err := poc.DoGET(codeSource.GetCodeSourceURL())
-	if err != nil {
-		return nil, err
-	}
-	if resp.GetStatusCode() != 200 {
-		return nil, utils.Errorf("download file error: %v", resp.GetStatusCode())
-	}
-
-	bytes.NewReader(resp.GetBody())
-	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
-}
-
-// prepareArchiveFS asks the frontend to open an archive code source. A jar is
-// one opaque file to the pipeline: only the language that produced it knows how
-// its classes become readable source, so the pipeline never names a language.
-func (c *Config) prepareArchiveFS(localFile string) (fi.FileSystem, error) {
-	if localFile == "" {
+// openArchiveCodeSource hands the archive to the language registry. The
+// pipeline never names a language: it only looks up the opener registered for
+// the language the project was classified as.
+func (c *Config) openArchiveCodeSource() (fi.FileSystem, error) {
+	local := c.GetCodeSourceLocalFile()
+	if local == "" {
 		if c.GetCodeSourceURL() == "" {
 			return nil, utils.Errorf("url is empty ")
 		}
@@ -99,17 +79,13 @@ func (c *Config) prepareArchiveFS(localFile string) (fi.FileSystem, error) {
 			return nil, err
 		}
 		defer os.Remove(downloaded)
-		localFile = downloaded
+		local = downloaded
 	}
-	c.ensureLanguageBuilder()
-	preparer, ok := c.LanguageBuilder.(ssa.ArchivePreparer)
+	open, ok := archiveCodeSourceOpeners[c.GetLanguage()]
 	if !ok {
 		return nil, utils.Errorf("language %q cannot open an archive code source", c.GetLanguage())
 	}
-	return preparer.PrepareFS(ssa.ArchiveCodeSource{
-		LocalFile: localFile,
-		Recursive: c.GetCodeSourceJarRecursiveParse(),
-	})
+	return open(local, c.GetCodeSourceJarRecursiveParse())
 }
 
 // downloadCodeSourceToTemp fetches url into a temp file and returns its path.
@@ -132,6 +108,27 @@ func downloadCodeSourceToTemp(url, pattern string) (string, error) {
 	}
 	tmpFile.Close()
 	return tmpFile.Name(), nil
+}
+
+func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
+	// use local
+	if codeSource.GetCodeSourceLocalFile() != "" {
+		return filesys.NewZipFSFromLocal(codeSource.GetCodeSourceLocalFile())
+	}
+	if codeSource.GetCodeSourceURL() == "" {
+		return nil, utils.Errorf("url is empty ")
+	}
+	// download file
+	resp, _, err := poc.DoGET(codeSource.GetCodeSourceURL())
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetStatusCode() != 200 {
+		return nil, utils.Errorf("download file error: %v", resp.GetStatusCode())
+	}
+
+	bytes.NewReader(resp.GetBody())
+	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {

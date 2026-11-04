@@ -1,6 +1,9 @@
 package filesys
 
 import (
+	"errors"
+	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -63,6 +66,63 @@ func TestHookFSPathHook(t *testing.T) {
 	for i := range want {
 		if inner.reads[i] != want[i] {
 			t.Fatalf("reads: %#v", inner.reads)
+		}
+	}
+}
+
+// A skip matcher hides entries from the walk: ReadDir drops them and every
+// direct lookup reports absence, so a caller cannot reach them around the
+// listing.
+func TestHookFSSkipMatcher(t *testing.T) {
+	inner := NewVirtualFs()
+	inner.AddFile("src/Keep.java", "class Keep {}")
+	inner.AddFile("src/drop.jar", "binary")
+	inner.AddFile("lib/nested.war", "binary")
+
+	hooked := NewHookFS(inner)
+	hooked.SetSkipMatcher(SuffixMatcher(".jar", ".war"))
+
+	walked := map[string]bool{}
+	err := Recursive(".",
+		WithFileSystem(hooked),
+		WithFileStat(func(pathname string, _ fs.FileInfo) error {
+			walked[pathname] = true
+			return nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	if !walked["src/Keep.java"] {
+		t.Fatalf("kept file missing from walk: %#v", walked)
+	}
+	for _, hidden := range []string{"src/drop.jar", "lib/nested.war"} {
+		if walked[hidden] {
+			t.Fatalf("%s must not be walked: %#v", hidden, walked)
+		}
+		if _, err := hooked.Stat(hidden); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("Stat(%s) err = %v, want fs.ErrNotExist", hidden, err)
+		}
+		if ok, err := hooked.Exists(hidden); err != nil || ok {
+			t.Fatalf("Exists(%s) = %v, %v; want false, nil", hidden, ok, err)
+		}
+		if _, err := hooked.ReadFile(hidden); !errors.Is(err, fs.ErrNotExist) {
+			t.Fatalf("ReadFile(%s) err = %v, want fs.ErrNotExist", hidden, err)
+		}
+	}
+
+	// Disabling the hook restores the full view.
+	hooked.SetEnabled(false)
+	if entries, err := hooked.ReadDir("src"); err != nil {
+		t.Fatalf("disabled ReadDir: %v", err)
+	} else {
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		slices.Sort(names)
+		if strings.Join(names, ",") != "Keep.java,drop.jar" {
+			t.Fatalf("disabled ReadDir names = %v", names)
 		}
 	}
 }
