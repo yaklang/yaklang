@@ -748,6 +748,7 @@ func rewritePCRelativeBranches(
 	if fnEnd > uint64(len(data)) || fn.newOff+fn.size > uint64(len(destination)) {
 		return nil, fmt.Errorf("function %q range out of bounds", fn.name)
 	}
+	clean := -1 // decoded lazily: 1 clean, 0 drifted
 	for pos := uint64(0); pos < fn.size; {
 		inst, err := x86asm.Decode(data[fnStart+pos:fnEnd], 64)
 		if err != nil || inst.Len <= 0 || pos+uint64(inst.Len) > fn.size {
@@ -836,6 +837,35 @@ func rewritePCRelativeBranches(
 			continue
 		}
 
+		// A branch to a label of this same function needs no rewrite: the body
+		// is copied contiguously, so source and target move by an identical
+		// delta and the existing displacement stays correct.
+		if targetIdx == fnIdx {
+			pos += uint64(inst.Len)
+			continue
+		}
+		// x86asm has no AVX2/AVX512 tables: vpor decodes as JMP and rorx as a
+		// single byte. In a function holding such an encoding the decoder
+		// therefore drifts, and the byte-by-byte recovery scan starts reading
+		// real operands as PC-relative fields. Rewriting one of those bogus
+		// displacements overwrites the instructions that follow: three
+		// displacements inside crypto/internal/fips140/sha512.blockAVX2 were
+		// clobbered this way and the compiled binary died of SIGILL there.
+		//
+		// When the body does not decode cleanly, keep only the one shape a
+		// stray operand byte cannot produce: a rel32 call/jmp naming another
+		// function's exact entry. That is the runtime.morestack call the Go
+		// assembler appends to each of those hand-written AVX routines.
+		if clean < 0 {
+			clean = 0
+			if decodesCleanly(data, fnStart, fn) {
+				clean = 1
+			}
+		}
+		if clean == 0 && (oldTarget != target.oldOff || inst.Len != 5 || inst.PCRel != 4 || inst.PCRelOff != 1) {
+			pos += uint64(inst.Len)
+			continue
+		}
 		if target.module == fn.module {
 			newTarget := int64(target.newOff + oldTarget - target.oldOff)
 			newPC := int64(fn.newOff + pos + uint64(inst.Len))
@@ -858,6 +888,25 @@ func rewritePCRelativeBranches(
 		pos += uint64(inst.Len)
 	}
 	return synthetic, nil
+}
+
+// decodesCleanly reports whether x86asm decodes the whole function body as one
+// uninterrupted instruction stream. A function containing an AVX2/AVX512
+// encoding fails this check, and any PC-relative operand found in it is
+// suspect.
+func decodesCleanly(data []byte, fnStart uint64, fn codePlacement) bool {
+	fnEnd := fnStart + fn.size
+	if fnEnd > uint64(len(data)) {
+		return false
+	}
+	for pos := uint64(0); pos < fn.size; {
+		inst, err := x86asm.Decode(data[fnStart+pos:fnEnd], 64)
+		if err != nil || inst.Len <= 0 || pos+uint64(inst.Len) > fn.size {
+			return false
+		}
+		pos += uint64(inst.Len)
+	}
+	return true
 }
 
 func findSymbol(symbols []symMeta, name string) (symMeta, bool) {
