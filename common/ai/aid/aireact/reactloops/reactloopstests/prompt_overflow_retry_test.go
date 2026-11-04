@@ -12,8 +12,8 @@ import (
 )
 
 // A confirmed prompt overflow must not replay the same prompt. The loop records
-// a tighter limit and may retry after the compression action shrinks the prompt.
-// Compression requests are not replays of the main decision request.
+// a tighter limit. With no compressible Timeline content, it warns and falls
+// back to normal mode without issuing a compression request.
 func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
 	var mainPromptTokens []int
 	compressionCalls := 0
@@ -47,7 +47,7 @@ func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
 	require.True(t, aicommon.IsPromptTooLong(err), "the typed overflow must reach the caller: %v", err)
 	require.NotEmpty(t, mainPromptTokens)
 	require.LessOrEqual(t, len(mainPromptTokens), cfg.GetPromptOverflowRetryMax()+1, "main-loop retries must remain bounded")
-	require.Equal(t, 1, compressionCalls, "the lower limit triggers one compression action")
+	require.Zero(t, compressionCalls, "user input alone is not compressible, so no compression request is issued")
 	for i := 1; i < len(mainPromptTokens); i++ {
 		require.Less(t, mainPromptTokens[i], mainPromptTokens[i-1]*99/100, "a main-loop retry requires measurable progress, not replay of the same prompt")
 	}
