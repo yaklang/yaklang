@@ -97,22 +97,3 @@ type ProjectPreparer interface {
 	// PrepareProject produces every source the compile will read.
 	PrepareProject(fsys fi.FileSystem, opts ProjectPrepareOptions) (PreparedProject, error)
 }
-
-// ArchivePreparer is implemented by a frontend whose code source may be an
-// archive of compiled artifacts instead of a source tree. Opening it is a
-// language capability, not a pipeline one: only the frontend knows how its own
-// archive becomes readable source, so the pipeline hands it the path rather
-// than naming a language. A frontend without archives does not implement this.
-type ArchivePreparer interface {
-	// PrepareFS opens the archive as the filesystem the compile will walk.
-	PrepareFS(codeSource ArchiveCodeSource) (fi.FileSystem, error)
-}
-
-// ArchiveCodeSource names an archive handed to a frontend to open.
-type ArchiveCodeSource struct {
-	// LocalFile is the archive on disk. The caller downloads a remote source
-	// to a temp file first.
-	LocalFile string
-	// Recursive expands archives nested inside this one.
-	Recursive bool
-}

@@ -3,6 +3,7 @@
 package ssaapi
 
 import (
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
@@ -78,3 +79,9 @@ import (
 var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.Yak: yak2ssa.CreateBuilder,
 }
+
+// ArchiveCodeSourceOpener opens a code source that is itself an archive.
+type ArchiveCodeSourceOpener func(local string, recursive bool) (fi.FileSystem, error)
+
+// archiveCodeSourceOpeners is empty here: this build has no archive frontend.
+var archiveCodeSourceOpeners = map[ssaconfig.Language]ArchiveCodeSourceOpener{}

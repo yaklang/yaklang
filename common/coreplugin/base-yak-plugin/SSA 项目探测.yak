@@ -268,7 +268,7 @@ baseProgramName := cli.String(
     cli.setCliGroup("compile"),
 )
 
-jarRecursiveParse := cli.Bool("jar-recursive-parse", cli.setDefault(true), cli.setVerboseName("Jar递归解析"), cli.setHelp("是否递归解析Jar文件中的嵌套Jar。默认开启，项目太大时可关闭以提高性能。"), cli.setCliGroup("compile"))
+jarRecursiveParse := cli.Bool("jar-recursive-parse", cli.setDefault(true), cli.setVerboseName("Jar解析"), cli.setHelp("是否解析Jar文件。开启时Jar/War等归档展开为目录并反编译class；关闭时基础文件系统直接跳过归档文件。"), cli.setCliGroup("compile"))
 
 // {{ compile option
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
