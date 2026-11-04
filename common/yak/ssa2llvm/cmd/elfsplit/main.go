@@ -1335,6 +1335,10 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/syntaxflow",
 			"github.com/yaklang/yaklang/common/yak/syntaxflow_scan",
 			"github.com/yaklang/yaklang/common/ai/ytoken",
+			// c2ssa's package-level vars (cSpecialTypes) call ssa.CreateAnyType
+			// while the package initializes, so it must stay with the ssa core:
+			// pruning the ssa group would leave its stub in that start-up path.
+			"github.com/yaklang/yaklang/common/yak/c2ssa",
 		},
 		// Language frontends used by ssaapi. They are only pulled in when a
 		// script actually uses the ssa module; poc/cli/http scripts must not
