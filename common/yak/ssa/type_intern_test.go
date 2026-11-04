@@ -77,3 +77,24 @@ func TestTypeStoreInternsConcurrently(t *testing.T) {
 	}
 	require.Equal(t, 1, store.resident.Count())
 }
+
+// A type that already carries an id keeps it. That id may already be
+// referenced by persisted instructions, so rewriting it to a shared id would
+// break those rows. Interning is therefore best effort: it covers types whose
+// id this store assigns, not types that arrive pre-numbered.
+func TestTypeStoreKeepsPreassignedID(t *testing.T) {
+	db, store := newTypeSnapshotStore(t, "preassigned")
+	first := CreateStringType()
+	store.remember(first)
+	require.NoError(t, store.flush())
+	assigned := first.GetId()
+
+	imported := CreateStringType()
+	imported.SetId(assigned + 41)
+	store.remember(imported)
+	require.Equal(t, assigned+41, imported.GetId(), "an assigned id is never rewritten")
+	require.NoError(t, store.flush())
+
+	require.Equal(t, int64(2), countIrTypeRowsForProgram(t, db, "preassigned"),
+		"a pre-numbered equal type still gets its own row")
+}
