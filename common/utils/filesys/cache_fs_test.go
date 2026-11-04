@@ -67,11 +67,11 @@ type releasableSourceFS struct {
 
 func (f *releasableSourceFS) ReleasePreparationCaches() { f.released++ }
 
-// TestSpillFSDecompilesOncePerPath is the core contract: a source is produced
+// TestFileCacheLoadsOncePerPath is the core contract: content is produced
 // once even when several compile stages (and goroutines) ask for it.
-func TestSpillFSDecompilesOncePerPath(t *testing.T) {
+func TestFileCacheLoadsOncePerPath(t *testing.T) {
 	base := seedSourceFS(t, "a/B.java")
-	s := NewSpillFS()
+	s := NewFileCache()
 
 	const callers = 32
 	var wg sync.WaitGroup
@@ -93,9 +93,9 @@ func TestSpillFSDecompilesOncePerPath(t *testing.T) {
 	require.Equal(t, 1, base.readCount("a/B.java"), "concurrent readers must share one production")
 }
 
-// TestSpillFSPrefetchRunsInParallel proves the prefetch pass uses the worker
+// TestFileCachePrefetchRunsInParallel proves the prefetch pass uses the worker
 // pool instead of producing serially.
-func TestSpillFSPrefetchRunsInParallel(t *testing.T) {
+func TestFileCachePrefetchRunsInParallel(t *testing.T) {
 	const (
 		paths   = 8
 		delay   = 60 * time.Millisecond
@@ -107,7 +107,7 @@ func TestSpillFSPrefetchRunsInParallel(t *testing.T) {
 	}
 	base := seedSourceFS(t, list...)
 	base.delay = delay
-	s := NewSpillFS()
+	s := NewFileCache()
 
 	var progress int
 	var progressMu sync.Mutex
@@ -138,8 +138,8 @@ func TestSpillFSPrefetchRunsInParallel(t *testing.T) {
 // cache. That re-entry used to wait on its own in-flight load.
 func TestPrefetchThroughWrappedFSDoesNotDeadlock(t *testing.T) {
 	base := seedSourceFS(t, "a/B.java", "a/C.java")
-	s := NewSpillFS()
-	wrapped := WrapWithSpillFS(base, s)
+	s := NewFileCache()
+	wrapped := WrapWithFileCache(base, s)
 
 	done := make(chan error, 1)
 	go func() {
@@ -159,15 +159,15 @@ func TestPrefetchThroughWrappedFSDoesNotDeadlock(t *testing.T) {
 	require.Equal(t, 1, base.readCount("a/C.java"))
 }
 
-// TestSpillFSServesContentAndKeepsTreeShape checks the wrapper keeps the tree
+// TestFileCacheServesContentAndKeepsTreeShape checks the wrapper keeps the tree
 // shape of the wrapped filesystem while replacing ReadFile content.
-func TestSpillFSServesContentAndKeepsTreeShape(t *testing.T) {
+func TestFileCacheServesContentAndKeepsTreeShape(t *testing.T) {
 	base := seedSourceFS(t, "WEB-INF/classes/a/B.java", "WEB-INF/web.xml")
-	s := NewSpillFS()
-	wrapped := WrapWithSpillFS(base, s)
+	s := NewFileCache()
+	wrapped := WrapWithFileCache(base, s)
 
-	require.Nil(t, SpillOf(base))
-	require.Same(t, s, SpillOf(wrapped))
+	require.Nil(t, FileCacheOf(base))
+	require.Same(t, s, FileCacheOf(wrapped))
 
 	info, err := wrapped.Stat("WEB-INF/classes/a/B.java")
 	require.NoError(t, err)
@@ -189,24 +189,24 @@ func TestSpillFSServesContentAndKeepsTreeShape(t *testing.T) {
 	require.Equal(t, "source-of:WEB-INF/web.xml", string(xml))
 }
 
-// TestSpillFSPutReplacesCachedContent is the page case: the raw page is read
-// first, which caches it, and the generated Java is then Put under the same
-// path. Later reads must return the replacement.
-func TestSpillFSPutReplacesCachedContent(t *testing.T) {
-	base := seedSourceFS(t, "webapp/index.jsp")
-	s := NewSpillFS()
+// TestFileCachePutReplacesCachedContent is the replacement case: the base
+// content is read first, which caches it, and transformed content is then Put
+// under the same name. Later reads must return the replacement.
+func TestFileCachePutReplacesCachedContent(t *testing.T) {
+	base := seedSourceFS(t, "webapp/page.txt")
+	s := NewFileCache()
 
-	first, err := s.ReadFile(base, "webapp/index.jsp")
+	first, err := s.ReadFile(base, "webapp/page.txt")
 	require.NoError(t, err)
-	require.Equal(t, "source-of:webapp/index.jsp", string(first))
+	require.Equal(t, "source-of:webapp/page.txt", string(first))
 
-	generated := "public class Index { void service() {} }"
-	s.Put("webapp/index.jsp", []byte(generated))
+	generated := "transformed body"
+	s.Put("webapp/page.txt", []byte(generated))
 
-	got, err := s.ReadFile(base, "webapp/index.jsp")
+	got, err := s.ReadFile(base, "webapp/page.txt")
 	require.NoError(t, err)
 	require.Equal(t, generated, string(got))
-	require.Equal(t, 1, base.readCount("webapp/index.jsp"))
+	require.Equal(t, 1, base.readCount("webapp/page.txt"))
 
 	stats := s.Stats()
 	require.EqualValues(t, 1, stats.Paths)
@@ -215,12 +215,12 @@ func TestSpillFSPutReplacesCachedContent(t *testing.T) {
 	require.GreaterOrEqual(t, stats.Hits, int64(1))
 }
 
-// TestSpillFSSpillsOverMemoryLimit is the budget contract: once retained
-// bytes would exceed the limit, the entry goes to the private temp directory
+// TestFileCacheOverflowsMemoryLimit is the budget contract: once retained
+// bytes would exceed the limit, the entry goes to the private overflow directory
 // and remains readable; Close removes that directory.
-func TestSpillFSSpillsOverMemoryLimit(t *testing.T) {
+func TestFileCacheOverflowsMemoryLimit(t *testing.T) {
 	base := seedSourceFS(t, "a/A.java", "a/B.java", "a/C.java")
-	s := NewSpillFS(WithSpillMemoryLimit(16))
+	s := NewFileCache(WithFileCacheMemoryLimit(16))
 	defer s.Close()
 
 	first, err := s.ReadFile(base, "a/A.java")
@@ -233,8 +233,8 @@ func TestSpillFSSpillsOverMemoryLimit(t *testing.T) {
 
 	stats := s.Stats()
 	require.EqualValues(t, 2, stats.Paths)
-	require.Greater(t, stats.DiskHold, int64(0), "over-limit entry must spill")
-	require.GreaterOrEqual(t, stats.SpillWrites, int64(1))
+	require.Greater(t, stats.DiskHold, int64(0), "over-limit entry must be written to disk")
+	require.GreaterOrEqual(t, stats.DiskWrites, int64(1))
 
 	// Both entries remain readable: one from memory, one from disk.
 	for _, p := range []string{"a/A.java", "a/B.java"} {
@@ -251,10 +251,10 @@ func TestSpillFSSpillsOverMemoryLimit(t *testing.T) {
 	require.Zero(t, after.DiskHold)
 }
 
-// TestSpillFSWalkEntries lists cached paths without exposing internals.
-func TestSpillFSWalkEntries(t *testing.T) {
+// TestFileCacheWalkEntries lists cached paths without exposing internals.
+func TestFileCacheWalkEntries(t *testing.T) {
 	base := seedSourceFS(t, "a/A.java", "a/B.java")
-	s := NewSpillFS()
+	s := NewFileCache()
 	_, err := s.ReadFile(base, "a/A.java")
 	require.NoError(t, err)
 	s.Put("a/B.java", []byte("generated"))
@@ -268,19 +268,19 @@ func TestSpillFSWalkEntries(t *testing.T) {
 	require.ElementsMatch(t, []string{"a/A.java", "a/B.java"}, got)
 }
 
-// TestSpillFLoaderAndPublisher observes one load and one replacement.
-func TestSpillFLoaderAndPublisher(t *testing.T) {
+// TestFileCacheLoaderAndPublisher observes one load and one replacement.
+func TestFileCacheLoaderAndPublisher(t *testing.T) {
 	base := seedSourceFS(t, "a/A.class")
 	var loads, publishes int
 	var mu sync.Mutex
-	s := NewSpillFS(
-		WithSpillLoader(func(base fi.FileSystem, name string) ([]byte, error) {
+	s := NewFileCache(
+		WithFileCacheLoader(func(base fi.FileSystem, name string) ([]byte, error) {
 			mu.Lock()
 			loads++
 			mu.Unlock()
 			return []byte("compiled:" + name), nil
 		}),
-		WithSpillPublisher(func(name string, data []byte) {
+		WithFileCachePublisher(func(name string, data []byte) {
 			mu.Lock()
 			publishes++
 			mu.Unlock()
@@ -296,12 +296,12 @@ func TestSpillFLoaderAndPublisher(t *testing.T) {
 	mu.Unlock()
 }
 
-// TestSpillFSPrefetchHonorsContext makes sure a cancelled scan stops producing.
-func TestSpillFSPrefetchHonorsContext(t *testing.T) {
+// TestFileCachePrefetchHonorsContext makes sure a cancelled scan stops producing.
+func TestFileCachePrefetchHonorsContext(t *testing.T) {
 	list := []string{"a/1.java", "a/2.java", "a/3.java", "a/4.java"}
 	base := seedSourceFS(t, list...)
 	base.delay = 40 * time.Millisecond
-	s := NewSpillFS()
+	s := NewFileCache()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -314,8 +314,8 @@ func TestSpillFSPrefetchHonorsContext(t *testing.T) {
 // release separate from cached sources.
 func TestReleasePreparationCachesPreservesCachedContent(t *testing.T) {
 	base := &releasableSourceFS{countingSourceFS: seedSourceFS(t, "a/B.java")}
-	s := NewSpillFS()
-	fsys := WrapWithSpillFS(NewUnifiedFS(base), s)
+	s := NewFileCache()
+	fsys := WrapWithFileCache(NewUnifiedFS(base), s)
 	first, err := fsys.ReadFile("a/B.java")
 	require.NoError(t, err)
 	ReleasePreparationCaches(fsys)
