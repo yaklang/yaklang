@@ -137,10 +137,11 @@ assert str.Contains(exact.GetResponse(), "ordinary-script-evidence")
 	require.Contains(t, multiIDs, "risk_id=1")
 	scopedCfg := aitool.NewToolInvokeConfig()
 	aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-		ProjectDatabase:            db,
-		ProfileDatabase:            profile,
-		RiskSelectionScopeRequired: true,
-		RiskSelectionAllowedIDs:    []int64{1, 2},
+		ProjectDatabase: db,
+		ProfileDatabase: profile,
+		RiskSelectionScope: &aitool.RiskSelectionScope{
+			AllowedIDs: []int64{1, 2},
+		},
 	})(scopedCfg)
 	scoped, err := tools[0].ExecuteToolWithCapture(ctx, map[string]any{"disposition": "all"}, scopedCfg)
 	require.NoError(t, err)
@@ -150,6 +151,16 @@ assert str.Contains(exact.GetResponse(), "ordinary-script-evidence")
 	require.NotContains(t, scoped.Stdout, "risk_id=4")
 	_, err = tools[0].ExecuteToolWithCapture(ctx, map[string]any{"risk_ids": "3"}, scopedCfg)
 	require.ErrorContains(t, err, "outside the attached risk selection")
+
+	emptyScopeCfg := aitool.NewToolInvokeConfig()
+	aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
+		ProjectDatabase:    db,
+		ProfileDatabase:    profile,
+		RiskSelectionScope: &aitool.RiskSelectionScope{},
+	})(emptyScopeCfg)
+	_, err = tools[0].ExecuteToolWithCapture(ctx, map[string]any{"disposition": "all"}, emptyScopeCfg)
+	require.ErrorContains(t, err, "attached risk selection is empty or invalid")
+
 	require.Contains(t, invoke(map[string]any{"after_id": 1, "before_id": 3}), "risk_id=2")
 	require.Contains(t, invoke(map[string]any{"query": "no such finding"}), "hits=0")
 	require.Contains(t, invoke(map[string]any{"waiting_verified": true}), "Pending risk")

@@ -99,9 +99,10 @@ func TestTriageCybersecurityRisksTool(t *testing.T) {
 
 	scopedCfg := aitool.NewToolInvokeConfig()
 	aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-		ProjectDatabase:            db,
-		RiskSelectionScopeRequired: true,
-		RiskSelectionAllowedIDs:    []int64{int64(canonical.ID)},
+		ProjectDatabase: db,
+		RiskSelectionScope: &aitool.RiskSelectionScope{
+			AllowedIDs: []int64{int64(canonical.ID)},
+		},
 	})(scopedCfg)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

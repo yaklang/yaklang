@@ -22,8 +22,8 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 	}
 	riskScopeOptions := func(opts []yaklib.DBHistoryOption) []yaklib.DBHistoryOption {
 		result := options(opts)
-		if runtime != nil && runtime.RiskSelectionScopeRequired {
-			result = append(result, yaklib.WithDBHistoryRiskSelectionScope(runtime.RiskSelectionAllowedIDs))
+		if runtime != nil && runtime.RiskSelectionScope != nil {
+			result = append(result, yaklib.WithDBHistoryRiskSelectionScope(runtime.RiskSelectionScope.AllowedIDs))
 		}
 		return result
 	}
