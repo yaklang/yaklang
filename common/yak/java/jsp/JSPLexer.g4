@@ -120,6 +120,21 @@ EL_EXPR_START
     : EL_EXPR_OPEN ->pushMode(EL_EXPR_MODE)
     ;
 
+// A lone '$' or '#' is static text; '${' and '#{' open an EL expression.
+// A semantic predicate would decide that, but predicates disable DFA edge
+// caching for the busiest rule in a page. Instead each marker consumes itself
+// plus the rest of the static run, and the optional group refuses '{' so
+// EL_EXPR_START wins the longest-match race. '<' and '\\' stay out of the group
+// so a tag or escape right after the marker is not swallowed; '$' and '#' stay
+// out too, so a marker inside the run cannot start a second, unnoticed EL.
+JSP_STATIC_DOLLAR_TEXT
+    : '$' ( ~[<\\{$#] JSP_STATIC_CONTENT_CHAR* )? -> type(JSP_STATIC_CONTENT_CHARS)
+    ;
+
+JSP_STATIC_HASH_TEXT
+    : '#' ( ~[<\\{$#] JSP_STATIC_CONTENT_CHAR* )? -> type(JSP_STATIC_CONTENT_CHARS)
+    ;
+
 JSP_STATIC_CONTENT_CHARS
     :  JSP_STATIC_CONTENT_CHAR+
     ;
@@ -216,13 +231,11 @@ fragment JSP_END_TAG
     : '%>'
     ;
 
-// '$' and '#' are ordinary static text unless the following '{' makes them
-// EL_EXPR_START ('${' / '#{'). ANTLR already prefers the longer match at the
-// same position, so no semantic predicate is needed here. Predicates disable
-// DFA edge caching and run again on every match, which is the wrong trade for
-// the hottest rule in a JSP page.
+// '$' and '#' are handled by the marker rules above, so a plain static run
+// stops in front of them and the marker rules decide whether an EL expression
+// or static text follows.
 fragment JSP_STATIC_CONTENT_CHAR
-    : ~[<\\]
+    : ~[<\\$#]
     | ESCAPED_DOLLAR
     | '\\'
     ;
