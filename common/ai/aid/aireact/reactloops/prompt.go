@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -561,6 +562,14 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			assembly.HistoryThroughID = &throughID
 		}
 		guide, guideErr := timeline.RenderCompressionGuide(options)
+		if errors.Is(guideErr, aicommon.ErrTimelineCompressionNoCompressibleContent) {
+			r.emitContextCompressionUnavailable(promptTokens, limit)
+			result, err = assemble()
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
+		}
 		if guideErr != nil {
 			return nil, guideErr
 		}
@@ -579,8 +588,13 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if err != nil {
 			return nil, err
 		}
-		if aicommon.TokenCountExceeds(result.Prompt, aicommon.TimelineCompressionMaxInputTokens) {
-			return nil, utils.Error("context-compression prompt exceeds the input safety limit")
+		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
+		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))
+		if compressionPromptTokens > compressionPromptLimit {
+			log.Warnf(
+				"context-compression prompt exceeds advisory input budget: actual=%d limit=%d; continuing",
+				compressionPromptTokens, compressionPromptLimit,
+			)
 		}
 	}
 	r.commitSubAgentPrompt(subAgentRevision)

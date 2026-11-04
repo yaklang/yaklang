@@ -25,6 +25,8 @@ var contextOptimizationStatusNames = []actionStatusName{
 
 const defaultWholePromptTokenLimit int64 = 300 * 1024
 
+const contextCompressionPromptHeadroomTokens int64 = 200 * 1024
+
 // Reuse the generic warning stream; the localized payload identifies the source.
 const contextCompressionWarningNodeID = "warning"
 
@@ -51,6 +53,16 @@ func (r *ReActLoop) wholePromptTokenLimit() int64 {
 	return config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
 }
 
+func (r *ReActLoop) contextCompressionPromptTokenLimit() int64 {
+	base := defaultWholePromptTokenLimit
+	if r != nil && r.config != nil {
+		if configured := r.config.GetTimelineContentSizeLimit(); configured > 0 {
+			base = configured
+		}
+	}
+	return base + contextCompressionPromptHeadroomTokens
+}
+
 func (r *ReActLoop) noteCompressionStatus() {
 	if r == nil {
 		return
@@ -61,9 +73,6 @@ func (r *ReActLoop) noteCompressionStatus() {
 }
 
 func (r *ReActLoop) emitContextCompressionAdvisoryLimit(actualTokens, limitTokens int) {
-	if r == nil || r.GetEmitter() == nil {
-		return
-	}
 	messageZh := fmt.Sprintf(
 		"上下文压缩结果超过建议阈值（实际 %d tokens，建议 %d tokens），已继续处理。\n摘要和保留历史不会因该建议阈值被截断。",
 		actualTokens, limitTokens,
@@ -72,6 +81,39 @@ func (r *ReActLoop) emitContextCompressionAdvisoryLimit(actualTokens, limitToken
 		"Context compression exceeded the advisory limit (%d actual tokens, %d recommended tokens); processing continued.\nThe summary and retained history will not be truncated because of this advisory threshold.",
 		actualTokens, limitTokens,
 	)
+	r.emitContextCompressionWarning(messageZh, messageEn)
+}
+
+func (r *ReActLoop) emitContextCompressionUnavailable(promptTokens, limitTokens int64) {
+	messageZh := fmt.Sprintf(
+		"当前 prompt 约 %d tokens，配置压缩阈值为 %d tokens，但 Timeline 没有可压缩内容，本轮已退出压缩模式并继续执行。",
+		promptTokens, limitTokens,
+	)
+	messageEn := fmt.Sprintf(
+		"The prompt is about %d tokens and the configured compression threshold is %d tokens, but the timeline has no compressible content. Compression mode was skipped for this turn.",
+		promptTokens, limitTokens,
+	)
+	log.Warnf("%s", messageEn)
+	r.emitContextCompressionWarning(messageZh, messageEn)
+}
+
+func (r *ReActLoop) emitContextCompressionNoProgress(previousTokens, currentTokens int) {
+	messageZh := fmt.Sprintf(
+		"上下文压缩后 token 未明显下降（%d -> %d），可能仍有大量不可压缩内容；本次继续执行，不终止任务。",
+		previousTokens, currentTokens,
+	)
+	messageEn := fmt.Sprintf(
+		"Context compression made little progress (%d -> %d tokens); non-compressible content may remain. Continuing without terminating the task.",
+		previousTokens, currentTokens,
+	)
+	log.Warnf("%s", messageEn)
+	r.emitContextCompressionWarning(messageZh, messageEn)
+}
+
+func (r *ReActLoop) emitContextCompressionWarning(messageZh, messageEn string) {
+	if r == nil || r.GetEmitter() == nil {
+		return
+	}
 	message := messageZh
 	language := ""
 	if r.config != nil {

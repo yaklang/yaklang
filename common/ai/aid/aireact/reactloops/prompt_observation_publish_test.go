@@ -20,10 +20,16 @@ import (
 type promptProfileCapture struct {
 	mu       sync.Mutex
 	profiles []PromptObservationStatus
+	warnings strings.Builder
 }
 
 func (c *promptProfileCapture) emitter() *aicommon.Emitter {
 	return aicommon.NewEmitter(uuid.NewString(), func(event *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		if event.IsStream && event.NodeId == contextCompressionWarningNodeID {
+			c.mu.Lock()
+			c.warnings.Write(event.StreamDelta)
+			c.mu.Unlock()
+		}
 		if event.Type != schema.EVENT_TYPE_PROMPT_PROFILE {
 			return event, nil
 		}
@@ -42,6 +48,12 @@ func (c *promptProfileCapture) snapshot() []PromptObservationStatus {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]PromptObservationStatus(nil), c.profiles...)
+}
+
+func (c *promptProfileCapture) warningText() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.warnings.String()
 }
 
 type observedCompressionInvoker struct {
@@ -83,6 +95,10 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				if mode == "provider_overflow" || mode == "overflow_no_progress" {
 					limit = 10000
 				}
+				maxIterations := 2
+				if mode == "ineffective_compression" {
+					maxIterations = 3
+				}
 				cfg := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()),
 					aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true),
 					aicommon.WithDisableCreateDBRuntime(true), aicommon.WithNoOpMemoryTriage(),
@@ -95,7 +111,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 							loop.WaitForInflightObservation()
 							require.Len(t, capture.snapshot(), len(requests), "compression builds must not generate profiles")
 							retain := ""
-							if mode == "ineffective_compression" {
+							if mode == "ineffective_compression" && compressionCalls == 1 {
 								retain = fmt.Sprint(historyID)
 							}
 							return contextCompressionTestResponse(t, c, req, aicommon.ContextCompressionAction, map[string]any{
@@ -120,7 +136,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				loop, err = NewReActLoop("observation-compression", invoker,
 					WithFunctionCallMode(native), WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false),
 					WithAllowPlanAndExec(false), WithAllowUserInteract(false), WithDisableLoopPerception(true),
-					WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true), WithMaxIterations(2),
+					WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true), WithMaxIterations(maxIterations),
 					WithRegisterLoopAction("require_tool", "unused routing", nil, nil, nil),
 					WithRegisterLoopAction("observation_done", "finish observation test", nil, nil,
 						func(_ *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) { op.Exit() }))
@@ -133,7 +149,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				if mode == "overflow_no_progress" {
 					require.True(t, aicommon.IsPromptTooLong(executeErr), "an unchanged rebuild should stop without another request")
 				} else if mode == "ineffective_compression" {
-					require.ErrorContains(t, executeErr, "compression made no progress")
+					require.NoError(t, executeErr)
 				} else {
 					require.NoError(t, executeErr)
 				}
@@ -141,18 +157,24 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				profiles := capture.snapshot()
 				wantRequests, wantCompression := 1, 0
 				switch mode {
-				case "ai_compression", "provider_overflow", "ineffective_compression":
+				case "ai_compression", "provider_overflow":
 					wantCompression = 1
+				case "ineffective_compression":
+					wantCompression = 2
 				}
 				if mode == "provider_overflow" {
 					wantRequests = 2
 				}
 				if mode == "ineffective_compression" {
-					wantRequests = 0
+					wantRequests = 1
+					require.Contains(t, capture.warningText(), "未明显下降")
 				}
 				wantIterations := 1
 				if mode == "ai_compression" || mode == "provider_overflow" {
 					wantIterations = 2
+				}
+				if mode == "ineffective_compression" {
+					wantIterations = 3
 				}
 				if mode == "overflow_no_progress" {
 					wantIterations = 0
