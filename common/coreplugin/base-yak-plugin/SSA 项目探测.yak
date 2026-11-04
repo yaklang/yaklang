@@ -7,7 +7,7 @@ langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c", "csharp"]
 
 // 源码扩展名 -> 语言（一个语言可对应多个扩展名）
 langExts = {
-    "java":   ["java"],
+    "java":   ["java", "jsp", "jspx"],
     "php":    ["php"],
     "go":     ["go"],
     "python": ["py", "pyi", "pyw"],
@@ -56,9 +56,10 @@ for _, lang := range langOrder {
 var scoreMap = map[string]int{}
 var markerMap = map[string]int{}
 var manifestMap = map[string]int{}
-// javaArchiveCount 只统计归档个数，暂不参与语言判定。归档存在不等于项目正文
-// 就是 Java：webapp 里可能有成千上万个 .js，把语言强行钉成 Java 会掩盖真正的
-// 工程组成。这里先收集事实，判定规则另行设计。
+// javaArchiveCount 统计 jar/war 个数，只在没有任何语言得分时作为兜底判据。
+// 归档存在不等于项目正文就是 Java：webapp 里可能有成千上万个 .js，所以它
+// 不能压过源码计分。但一个只有 jar 的目录里，Java 是唯一能读这些文件的
+// 语言，此时归档就是仅有的证据。
 var javaArchiveCount = 0
 for _, lang := range langOrder {
     scoreMap[lang] = 0
@@ -469,6 +470,10 @@ func AutoParseLanguage() {
 
     if bestScore != 0 {
         setLanguage(best)
+    } else if javaArchiveCount > 0 {
+        // 没有任何源码/标记/清单可识别，但目录里有 jar/war：Java 是唯一能
+        // 读取这些归档的语言，否则整个 classes 树都不可见。
+        setLanguage("java")
     } else {
         newLanguageNeedSelectException(f`${params.info.kind} 无法自动检测项目的语言，请手动指定语言。`)
     }
