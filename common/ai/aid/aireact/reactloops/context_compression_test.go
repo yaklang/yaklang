@@ -115,7 +115,28 @@ func TestContextCompressionSkipsModeWhenTimelineHasNoCompressibleContent(t *test
 	result, err := loop.generateLoopPromptFromInput(input)
 	require.NoError(t, err)
 	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
-	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "没有可压缩内容"))
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression is unavailable for this turn"))
+}
+
+func TestContextCompressionGuideErrorsFallbackToNormalMode(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(6000))
+	cfg.Timeline.PushText(cfg.AcquireId(), "compressible history")
+	loop := makeSchemaStabilityTestLoop(cfg)
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	invoker := &compressionPromptInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), timeline: cfg.Timeline}
+	invoker.SetConfig(cfg)
+	loop.invoker = invoker
+	invalidThroughID := int64(-1)
+	loop.lastFittingTimelineThroughID = &invalidThroughID
+	capture := captureActivityStatus(loop)
+
+	input := loop.captureLoopPromptBuildInput("guide-error", "", "", nil, "", &LoopActionHandlerOperator{})
+	input.overflowCompression = true
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression is unavailable for this turn"))
 }
 
 func TestContextCompressionPromptTokenLimitUsesConfiguredLimitPlusHeadroom(t *testing.T) {
@@ -125,7 +146,7 @@ func TestContextCompressionPromptTokenLimitUsesConfiguredLimitPlusHeadroom(t *te
 	require.EqualValues(t, 240*1024, loop.contextCompressionPromptTokenLimit())
 }
 
-func TestContextCompressionPropagatesPromptBuildError(t *testing.T) {
+func TestContextCompressionPromptBuildErrorFallsBackToNormalMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true),
@@ -139,10 +160,13 @@ func TestContextCompressionPropagatesPromptBuildError(t *testing.T) {
 	}
 	invoker.SetConfig(cfg)
 	loop.invoker = invoker
+	capture := captureActivityStatus(loop)
 
 	input := loop.captureLoopPromptBuildInput("build-error", "", strings.Repeat("TASK_CONTEXT ", 9000), nil, "", &LoopActionHandlerOperator{})
-	_, err := loop.generateLoopPromptFromInput(input)
-	require.ErrorIs(t, err, buildErr)
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "assembling the compression prompt"))
 }
 
 func TestContextCompressionActionFailsOnCancelledTask(t *testing.T) {
@@ -273,11 +297,11 @@ func TestContextCompressionRuntimeReadAndApplyFailuresWarnWithoutFailingTask(t *
 	}{
 		{
 			name: "candidate read failure", throughID: func() *int64 { id := int64(-1); return &id }(),
-			summary: "summary", expectedWarningStage: "读取 Timeline 候选",
+			summary: "summary", expectedWarningStage: "reading timeline candidates",
 		},
 		{
 			name: "apply sees unobserved history", itemIDs: []int64{},
-			summary: "", expectedWarningStage: "提交 Timeline 压缩结果",
+			summary: "", expectedWarningStage: "committing the timeline compression result",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -406,7 +430,7 @@ func TestContextCompressionSummaryOverAdvisoryLimitWarnsAndCommits(t *testing.T)
 	require.NoError(t, err)
 	require.False(t, terminated)
 	require.NoError(t, op.contextCompressionError)
-	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "上下文压缩结果超过建议阈值"))
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression exceeded the advisory limit"))
 	loop.GetEmitter().WaitForStream()
 	capture.mu.Lock()
 	allNormalStreams := true
@@ -424,28 +448,19 @@ func TestContextCompressionSummaryOverAdvisoryLimitWarnsAndCommits(t *testing.T)
 	require.NotContains(t, view.Frozen, retiredHistory)
 }
 
-func TestContextCompressionAdvisoryWarningUsesConfiguredLanguage(t *testing.T) {
-	for _, test := range []struct {
-		language string
-		expected string
-	}{
-		{language: "zh", expected: "上下文压缩结果超过建议阈值"},
-		{language: "en-US", expected: "Context compression exceeded the advisory limit"},
-	} {
-		t.Run(test.language, func(t *testing.T) {
-			cfg := aicommon.NewConfig(
-				context.Background(),
-				aicommon.WithDisableAutoSkills(true),
-				aicommon.WithDisableCreateDBRuntime(true),
-				aicommon.WithLanguage(test.language),
-			)
-			loop := makeSchemaStabilityTestLoop(cfg)
-			capture := captureActivityStatus(loop)
-			loop.emitContextCompressionAdvisoryLimit(70_000, 65_536)
-			require.True(t, capture.waitStream(contextCompressionWarningNodeID, test.expected))
-			loop.GetEmitter().WaitForStream()
-		})
-	}
+func TestContextCompressionWarningUsesDedicatedNodeAndEnglishBody(t *testing.T) {
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithLanguage("zh"),
+	)
+	loop := makeSchemaStabilityTestLoop(cfg)
+	capture := captureActivityStatus(loop)
+	loop.emitContextCompressionAdvisoryLimit(70_000, 65_536)
+	require.Equal(t, "context_compression_warning", contextCompressionWarningNodeID)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression exceeded the advisory limit"))
+	loop.GetEmitter().WaitForStream()
 }
 
 func TestContextCompressionExamplesSupportScatteredRanges(t *testing.T) {

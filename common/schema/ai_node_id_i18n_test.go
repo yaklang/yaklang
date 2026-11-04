@@ -18,6 +18,7 @@ func TestNodeIdI18n_RequiredNodeIds(t *testing.T) {
 		{"notify", "系统通知", "System Notification"},
 		{"plan-mode", "规划模式", "Plan Mode"},
 		{"warning", "警告", "Warning"},
+		{"context_compression_warning", "上下文压缩警告", "Context Compression Warning"},
 	}
 
 	for _, tc := range requiredNodeIds {
