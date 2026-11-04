@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var contextOptimizationStatusIndex atomic.Uint64
@@ -23,6 +24,9 @@ var contextOptimizationStatusNames = []actionStatusName{
 }
 
 const defaultWholePromptTokenLimit int64 = 300 * 1024
+
+// Reuse the generic warning stream; the localized payload identifies the source.
+const contextCompressionWarningNodeID = "warning"
 
 // Selection mistakes can be corrected by the model; runtime failures cannot.
 type contextCompressionSelectionError struct{ err error }
@@ -54,6 +58,44 @@ func (r *ReActLoop) noteCompressionStatus() {
 	index := (contextOptimizationStatusIndex.Add(1) - 1) % uint64(len(contextOptimizationStatusNames))
 	label := contextOptimizationStatusNames[index]
 	r.UserStatus(label.zh, label.en, aicommon.WithStatusCode("context.optimizing"))
+}
+
+func (r *ReActLoop) emitContextCompressionAdvisoryLimit(actualTokens, limitTokens int) {
+	if r == nil || r.GetEmitter() == nil {
+		return
+	}
+	messageZh := fmt.Sprintf(
+		"上下文压缩结果超过建议阈值（实际 %d tokens，建议 %d tokens），已继续处理。\n摘要和保留历史不会因该建议阈值被截断。",
+		actualTokens, limitTokens,
+	)
+	messageEn := fmt.Sprintf(
+		"Context compression exceeded the advisory limit (%d actual tokens, %d recommended tokens); processing continued.\nThe summary and retained history will not be truncated because of this advisory threshold.",
+		actualTokens, limitTokens,
+	)
+	message := messageZh
+	language := ""
+	if r.config != nil {
+		if languageProvider, ok := r.config.(interface{ GetLanguage() string }); ok {
+			language = languageProvider.GetLanguage()
+		}
+		if language == "" {
+			language = r.config.GetConfigString("language")
+		}
+	}
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(language)), "en") {
+		message = messageEn
+	}
+	taskID := ""
+	if task := r.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+	if _, err := r.GetEmitter().EmitDefaultStreamEvent(
+		contextCompressionWarningNodeID,
+		strings.NewReader(message),
+		taskID,
+	); err != nil {
+		log.Warnf("emit context compression advisory warning: %v", err)
+	}
 }
 
 func (r *ReActLoop) parseContextCompressionSelection(action *aicommon.Action, candidates []aicommon.TimelineCompressionCandidate, maxSummaryTokens int) (*aicommon.TimelineCompressionSelection, error) {
@@ -111,8 +153,8 @@ func (r *ReActLoop) parseContextCompressionSelection(action *aicommon.Action, ca
 		}
 		memoryJSON, _ := json.Marshal(aicommon.ParseTimelineCompressionMemoryEntities(action))
 		retainedText.Write(memoryJSON)
-		if aicommon.TokenCountExceeds(retainedText.String(), maxSummaryTokens) {
-			return nil, fmt.Errorf("timeline compression summary and retained items exceed safety limit %d", maxSummaryTokens)
+		if actualTokens := aicommon.MeasureTokens(retainedText.String()); actualTokens > maxSummaryTokens {
+			r.emitContextCompressionAdvisoryLimit(actualTokens, maxSummaryTokens)
 		}
 	}
 	return selection, nil
