@@ -91,6 +91,111 @@ func TestRewriteBackwardRIPRelativeLEACrossSection(t *testing.T) {
 	}
 }
 
+// x86asm has no AVX2 tables, so the four bytes of `rorx $0x29,%rax,%r13`
+// (c4 63 fb f0) plus the following bytes decode as an unrelated 9-byte CALL
+// whose immediate happens to sit five bytes in. The byte-by-byte recovery scan
+// then treats the middle of a real instruction as a PC-relative field and
+// rewrites it in place, corrupting everything that follows. This is how
+// crypto/internal/fips140/sha512.blockAVX2 lost three instructions and the
+// compiled binary died of SIGILL. Any PC-relative operand found in a function
+// whose body does not decode cleanly, and which does not name an exact
+// function entry, must be left alone.
+func TestSkipFalseBranchInAVX2Body(t *testing.T) {
+	const (
+		textSize   = 0x400
+		avxOld     = 0x100
+		avxSize    = 0x40
+		avxNew     = 0x200
+		targetOld  = 0x300
+		targetSize = 0x40
+		// The bogus CALL must land here: inside the target function, but not
+		// on its entry, which is what marks it as a decoding artifact.
+		targetMid = targetOld + 8
+	)
+	avx := make([]byte, avxSize)
+	for i := range avx {
+		avx[i] = 0x90
+	}
+	// rorx's own bytes, followed by a displacement that makes the phantom CALL
+	// reach targetMid.
+	copy(avx, []byte{0xc4, 0x63, 0xfb, 0xf0, 0xe8})
+	binary.LittleEndian.PutUint32(avx[5:], uint32(int64(targetMid)-(int64(avxOld)+9)))
+	// A byte x86asm cannot decode marks the body as drifted.
+	avx[avxSize-1] = 0x06
+
+	data := make([]byte, textSize)
+	copy(data[avxOld:], avx)
+	for i := 0; i < targetSize; i++ {
+		data[targetOld+i] = 0x90
+	}
+	dest := make([]byte, textSize)
+	copy(dest[avxNew:], avx)
+
+	placements := []codePlacement{
+		{symIdx: 3, name: "avx", oldOff: avxOld, size: avxSize, newOff: avxNew, module: "shared"},
+		{symIdx: 4, name: "target", oldOff: targetOld, size: targetSize, newOff: avxNew + 0x80, module: "shared"},
+	}
+	if _, err := rewritePCRelativeBranches(data, dest, 0, 0, placements, map[uint64]struct{}{}, textSize, newCallGraph(len(placements))); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < avxSize; i++ {
+		if dest[avxNew+i] != avx[i] {
+			t.Fatalf("byte %d of an AVX2 body was rewritten: got %#02x want %#02x", i, dest[avxNew+i], avx[i])
+		}
+	}
+}
+
+// A real rel32 call emitted from inside an AVX2 routine (the Go assembler puts
+// one runtime.morestack call at the end of each) still has to be relocated: it
+// names the callee's exact entry, which a drifted decode cannot invent.
+func TestRelocateRealCallInsideAVX2Body(t *testing.T) {
+	const (
+		textSize   = 0x400
+		avxOld     = 0x100
+		avxSize    = 0x40
+		avxNew     = 0x200
+		targetOld  = 0x300
+		targetSize = 0x40
+	)
+	data := make([]byte, textSize)
+	avx := make([]byte, avxSize)
+	avx[0] = 0xc5 // vpor prefix: x86asm cannot decode it, so the body drifts
+	avx[1] = 0xed
+	avx[2] = 0x74
+	avx[3] = 0xd9
+	// call rel32 at offset 0x20, landing exactly on targetOld.
+	callOff := 0x20
+	avx[callOff] = 0xe8
+	binary.LittleEndian.PutUint32(avx[callOff+1:], uint32(int64(targetOld)-(int64(avxOld)+int64(callOff)+5)))
+	for i := range avx {
+		if avx[i] == 0 && i != callOff+1 && i != callOff+2 && i != callOff+3 && i != callOff+4 {
+			avx[i] = 0x90
+		}
+	}
+	avx[0], avx[1], avx[2], avx[3] = 0xc5, 0xed, 0x74, 0xd9
+	copy(data[avxOld:], avx)
+	dest := make([]byte, textSize)
+	copy(dest[avxNew:], avx)
+
+	placements := []codePlacement{
+		{symIdx: 3, name: "avx", oldOff: avxOld, size: avxSize, newOff: avxNew, module: "shared"},
+		{symIdx: 4, name: "target", oldOff: targetOld, size: targetSize, newOff: 0, module: "other"},
+	}
+	rel, err := rewritePCRelativeBranches(data, dest, 0, 0, placements, map[uint64]struct{}{}, textSize, newCallGraph(len(placements)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rel) != 24 {
+		t.Fatalf("relocation entry len=%d, want 24", len(rel))
+	}
+	if off := binary.LittleEndian.Uint64(rel[0:]); off != avxNew+uint64(callOff)+1 {
+		t.Fatalf("reloc offset=%#x, want %#x", off, avxNew+callOff+1)
+	}
+	if addend := int64(binary.LittleEndian.Uint64(rel[16:])); addend != -4 {
+		t.Fatalf("reloc addend=%d, want -4 (exact entry, immediate width 4)", addend)
+	}
+}
+
 func TestModuledataTextsectMapUsesGo126Layout(t *testing.T) {
 	res, err := textsectlayout.Check(runtime.GOROOT())
 	if err != nil {
