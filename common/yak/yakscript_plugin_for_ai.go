@@ -192,10 +192,12 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 	for k, v := range params {
 		switch ret := v.(type) {
 		case bool:
-			if ret {
-				args = append(args, "--"+k)
-				paramDesc = append(paramDesc, fmt.Sprintf("%s=true", k))
-			}
+			// Pass the value even when it is false. Dropping it made "set this
+			// switch to false" indistinguishable from "leave the switch alone",
+			// so a plugin whose default is true kept the default. The AI tool
+			// layer always knows the value, so it should say it.
+			args = append(args, "--"+k, strconv.FormatBool(ret))
+			paramDesc = append(paramDesc, fmt.Sprintf("%s=%v", k, ret))
 		default:
 			valStr := nativeYakPluginArgString(ret)
 			args = append(args, "--"+k, valStr)
