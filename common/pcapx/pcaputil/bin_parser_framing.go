@@ -756,10 +756,22 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			a.messages.Add(1)
 			a.messageBytes.Add(uint64(len(wire)))
 			if a.config.Deferred {
-				a.deferred.Add(1)
+				e.normalizeKerberosContext()
+				if e.Status == "context-required" {
+					a.contextRequired.Add(1)
+				} else if e.Status == "malformed" {
+					a.malformed.Add(1)
+				} else {
+					a.deferred.Add(1)
+				}
 			} else if result, err := e.Decode(); err != nil {
 				e.Status, e.Error = "malformed", err.Error()
-				a.malformed.Add(1)
+				e.normalizeKerberosContext()
+				if e.Status == "context-required" {
+					a.contextRequired.Add(1)
+				} else {
+					a.malformed.Add(1)
+				}
 			} else {
 				e.Status, e.Structured = "decoded", result
 				a.decoded.Add(1)

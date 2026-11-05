@@ -10,8 +10,8 @@ import (
 const protocolSummaryLimit = 240
 
 func (e *ProtocolEvent) kerberosSummary() string {
-	var facts map[string]any
-	if metadata, ok := e.Metadata.(map[string]any); ok {
+	facts := e.kerberosSummaryFacts
+	if metadata, ok := e.Metadata.(map[string]any); ok && facts == nil {
 		facts, _ = metadata["Semantic Summary"].(map[string]any)
 	}
 	if facts == nil {
