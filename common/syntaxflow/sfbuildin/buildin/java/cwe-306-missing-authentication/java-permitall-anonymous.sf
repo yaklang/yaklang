@@ -1,18 +1,18 @@
 desc(
-    title: "匿名访问接口 @PermitAll 白名单核对",
-    title_zh: "匿名访问接口 @PermitAll 白名单核对",
-    risk: "access-control",
-    type: audit,
-    level: warning,
-    rule_id: "java-permitall-anonymous",
-    desc: <<<DESC
+	title: "匿名访问接口 @PermitAll 白名单核对",
+	title_zh: "匿名访问接口 @PermitAll 白名单核对",
+	risk: "access-control"
+	type: audit
+	level: warning
+	rule_id: "java-permitall-anonymous"
+	desc: <<<DESC
 标记 @PermitAll 的接口为匿名可访问，需人工核对白名单是否合理。
 DESC
-    solution: <<<SOLUTION
+	solution: <<<SOLUTION
 逐个核对 @PermitAll 接口，确认匿名访问是否业务必需。
 SOLUTION
-    alert_min: 1
-    "file://J.java": <<<POS
+	alert_min: 1
+	"file://J.java": <<<POS
 @PermitAll
 @Controller
 class J {
@@ -21,7 +21,7 @@ class J {
 }
 
 POS
-    "safefile://S.java": <<<NEG
+	"safefile://S.java": <<<NEG
 @Controller
 class S {
   @RequestMapping("/x")
@@ -37,6 +37,6 @@ ${*.java}.re("@PermitAll") as $permitAll;
 check $permitAll then "permitAll found" else "none";
 
 alert $permitAll for {
-    message: "匿名访问接口（@PermitAll），核对白名单",
-    level: warning,
+	message: "匿名访问接口（@PermitAll），核对白名单",
+	level: "warning",
 }
