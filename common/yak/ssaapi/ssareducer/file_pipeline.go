@@ -2,6 +2,7 @@ package ssareducer
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -90,7 +91,32 @@ const (
 	FileStatusFsError
 	FileParseASTError
 	FileParseASTSuccess
+	// FileStatusUnsupportedSyntax is a file the language front end recognizes
+	// but cannot parse, such as Python 2 source. It is skipped on purpose and
+	// must not be reported as an engine parse failure.
+	FileStatusUnsupportedSyntax
 )
+
+// UnsupportedSyntaxError lets a language front end classify a parse failure it
+// will never handle. The pipeline then skips the file with one diagnostic
+// instead of logging a parse error for every vendored legacy file.
+type UnsupportedSyntaxError interface {
+	error
+	UnsupportedSyntaxReason() string
+}
+
+// UnsupportedSyntaxReason returns the skip reason when err is a classified
+// unsupported-syntax error, and "" otherwise.
+func UnsupportedSyntaxReason(err error) string {
+	if err == nil {
+		return ""
+	}
+	var target UnsupportedSyntaxError
+	if errors.As(err, &target) {
+		return target.UnsupportedSyntaxReason()
+	}
+	return ""
+}
 
 type FileContent struct {
 	Path        string
@@ -180,8 +206,13 @@ func FilesHandler(
 		fileContent.AST = ast
 		fileContent.Err = err
 		if err != nil {
-			log.Errorf("parse file[%s] error: %s", fileContent.Path, err)
-			fileContent.Status = FileParseASTError
+			if reason := UnsupportedSyntaxReason(err); reason != "" {
+				log.Infof("skip file[%s]: %s", fileContent.Path, reason)
+				fileContent.Status = FileStatusUnsupportedSyntax
+			} else {
+				log.Errorf("parse file[%s] error: %s", fileContent.Path, err)
+				fileContent.Status = FileParseASTError
+			}
 		} else {
 			fileContent.Status = FileParseASTSuccess
 		}
