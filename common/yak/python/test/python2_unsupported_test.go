@@ -21,6 +21,7 @@ func TestDetectUnsupportedPython2(t *testing.T) {
 		"raise comma":     "raise ValueError, 'bad'\n",
 		"lambda tuple":    "f = lambda (a, b): a + b\n",
 		"print chevron":   "print >> stream, value\n",
+		"async import":    "import sys, ldap, ldap.async\n",
 	}
 	for name, src := range py2 {
 		t.Run(name, func(t *testing.T) {
@@ -35,6 +36,8 @@ func TestDetectUnsupportedPython2(t *testing.T) {
 		"not equal":    "if a != b:\n    pass\n",
 		"lambda":       "f = lambda a, b: a + b\n",
 		"digit suffix": "size = 10\n",
+		"async def":    "async def f():\n    await g()\n",
+		"asyncio":      "import asyncio\n",
 		"empty source": "",
 	}
 	for name, src := range py3 {
