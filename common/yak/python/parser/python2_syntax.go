@@ -61,6 +61,7 @@ var python2Features = []python2Feature{
 	{"octal literal", regexp.MustCompile(`\b0[0-7]{2,}\b`)},
 	{"<> operator", regexp.MustCompile(`[^<]<>[^>]`)},
 	{"lambda tuple parameter", regexp.MustCompile(`lambda[ \t]*\([^)\n]*,[^)\n]*\)[ \t]*:`)},
+	{"async module import", regexp.MustCompile(`(?m)^[ \t]*(?:import|from)[ \t]+[^\n#]*\basync\b`)},
 }
 
 // DetectUnsupportedPython2 classifies source after a failed Python 3 parse.
