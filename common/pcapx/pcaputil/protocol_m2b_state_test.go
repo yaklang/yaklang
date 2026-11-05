@@ -271,7 +271,7 @@ func TestM2QUICApplicationBoundaries(t *testing.T) {
 	t.Run("cid-budget-and-retirement", func(t *testing.T) {
 		q := &binQUIC{native: true, cids: map[string]int{}}
 		frame := func(seq, retire uint64, cid string) map[string]any {
-			return map[string]any{"Frame Type": "NEW_CONNECTION_ID", "Sequence": seq, "Retire Prior To": retire, "CID": []byte(cid)}
+			return map[string]any{"Frame Type": "NEW_CONNECTION_ID", "Sequence": seq, "Retire Prior To": retire, "CID": []byte(cid), "Reset Token": make([]byte, 16)}
 		}
 		require.NoError(t, q.applyFrames(0, 2, []map[string]any{frame(1, 0, "a"), frame(2, 0, "b")}, map[string]any{}, 2))
 		require.Error(t, q.applyFrames(0, 2, []map[string]any{frame(3, 0, "c")}, map[string]any{}, 2))
@@ -350,7 +350,7 @@ func TestM2QUICRepeatedKeyUpdate(t *testing.T) {
 		}
 		return raw
 	}
-	q := &binQUIC{native: true, byteLimit: 4096, keys: ring, cids: map[string]int{"cid": 1}}
+	q := &binQUIC{native: true, byteLimit: 4096, keys: ring, cids: map[string]int{"cid": 2}}
 	for _, pair := range [][2]int{{0, 1}, {1, 3}, {2, 4}, {1, 2}, {3, 5}} {
 		info, e := q.consume(0, packet(pair[0], uint64(pair[1])), 64)
 		require.NoError(t, e)

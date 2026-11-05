@@ -79,6 +79,45 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		}
 	}
 	m["HTTP3 Frames"], m["Headers"] = frames, copyHeaders(e.Session["Headers"])
+	for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Resolved Associations"} {
+		var links []map[string]any
+		for _, link := range mapList(e.Session[kind]) {
+			row := map[string]any{}
+			for _, key := range []string{"Stream ID", "Request PDU ID", "Request Headers PDU ID", "Response PDU ID", "Observed In PDU ID", "Flow ID", "Association Scope", "PDU Namespace", "Ambiguous"} {
+				if value, ok := link[key]; ok {
+					row[key] = value
+				}
+			}
+			if m, ok := link["Response Message Revalidation"].(map[string]any); ok {
+				row["Response Message Revalidation"] = copyConformance(m)
+			}
+			links = append(links, row)
+		}
+		if len(links) > 0 {
+			m[kind] = links
+		}
+	}
+	if view, ok := e.Session["HTTP3 Association View"].(map[string]any); ok {
+		m["HTTP3 Association View"] = copyConformance(view)
+	}
+	for _, kind := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations"} {
+		var rows []map[string]any
+		for _, row := range mapList(e.Session[kind]) {
+			copy := copyConformance(row)
+			// Worker JSON encodes []byte as base64 strings. The overview still
+			// excludes byte arenas; only packet details own their provenance.
+			delete(copy, "Frame Header Bytes")
+			delete(copy, "Frame Header Ranges")
+			delete(copy, "Byte Source")
+			rows = append(rows, copy)
+		}
+		if len(rows) > 0 {
+			m[kind] = rows
+		}
+	}
+	if view, ok := e.Session["HTTP3 Tunnel View"].(map[string]any); ok {
+		m["HTTP3 Tunnel View"] = copyConformance(view)
+	}
 	if len(groups) == 0 && len(mapList(m["Headers"])) > 0 {
 		groups = append(groups, map[string]any{"Stream ID": number(e.Session["HTTP3 Stream ID"]), "Headers": m["Headers"]})
 	}

@@ -1,15 +1,22 @@
 # Explicit complete TLS 1.2 Handshake messages, not TLS record streams.
 # https://www.rfc-editor.org/rfc/rfc5246.html#section-7.4.5
 # https://www.rfc-editor.org/rfc/rfc5077.html#section-3.3
+# https://www.rfc-editor.org/rfc/rfc6066.html#section-8
 # Caller supplies TLS 1.2 plaintext context; no version/phase/direction inference.
 # A zero-length ticket is valid syntax; lifetime_hint=0 means unspecified.
 # Ticket bytes remain opaque. No Finished validation, ticket validation, expiry
 # calculation, resumption inference, TLS 1.3 ticket, or shared TLS dispatch.
-# Parse-only, bounded at 65545 bytes (4+4+2+65535). Carriers use the same bound,
-# including raw fallback. No TCP reassembly is performed by these entries.
+# SHD/NST parse-only bound: 65545 bytes (4+4+2+65535), including carrier fallback.
+# CertificateStatus: complete status_type=ocsp and nonempty uint24 response,
+# resource-bounded at 1 MiB total handshake; DER, revocation and trust unverified.
+# No TCP reassembly is performed by these entries.
 endian: big
 unit: byte
 Package:
+  TLS12CertificateStatus:
+    operator: |
+      err = parseTLS12ControlHandshake(22)
+      if err != nil { panic(err) }
   TLS12ServerHelloDone:
     operator: |
       err = parseTLS12ControlHandshake(14)

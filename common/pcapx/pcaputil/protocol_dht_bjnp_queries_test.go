@@ -170,9 +170,11 @@ func testOwnedDatagramMatrix(t *testing.T, protocol string) {
 				e := out.Events[0]
 				require.Empty(t, e.Protocol)
 				require.Equal(t, "unrecognized", e.Status)
-				// Unrecognized traffic deliberately retains only the bounded
-				// 64-byte probe, while Consumed accounts for the whole datagram.
-				require.Equal(t, wire[:min(len(wire), 64)], e.Raw)
+				// Unknown application identity does not shorten a complete,
+				// bounded carrier. Retain the prior prefix check as well.
+				require.Equal(t, wire, e.Raw)
+				require.Equal(t, wire[:min(len(wire), 64)], e.Raw[:min(len(e.Raw), 64)])
+				require.Equal(t, "datagram", e.Completeness)
 				require.Nil(t, e.Session)
 				require.Zero(t, e.TransactionID)
 				require.Zero(t, e.ResponseTo)

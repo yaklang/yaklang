@@ -36,13 +36,13 @@ func (q *binQUIC) consumeRetry(dir int, raw []byte, h quicHdr, info map[string]a
 	if err := q.verifyRetryContext(dir, raw, h); err != nil {
 		return info, err
 	}
-	if _, present := q.cids[string(h.scid)]; !present && len(q.cids) >= max {
+	if !q.hasNativeCID(1, string(h.scid)) && q.nativeCIDRouteCount() >= max {
 		return info, protocolError(ErrResourceExceeded, "QUIC Retry CID budget")
 	}
 	q.retrySeen, q.retrySCID = true, bytes.Clone(h.scid)
 	token := raw[h.payloadOff : len(raw)-16]
 	q.retryTokenHash, q.retryTokenLen = sha256.Sum256(token), len(token)
-	q.cids[string(h.scid)] = 1
+	q.addNativeCID(1, string(h.scid))
 	info["Retry Integrity Verified"] = true
 	info["Connection State"] = "retry-integrity-verified"
 	info["Token Bytes"] = len(token)

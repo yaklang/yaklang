@@ -12,6 +12,13 @@ func quicRetainUndeliveredPayload(info map[string]any, plain []byte) {
 	info["Payload Delivery"] = "not delivered to protocol state; packet AEAD verified"
 }
 
+func quicRetainStoppedPayload(info map[string]any, plain []byte) {
+	quicRetainUndeliveredPayload(info, plain)
+	// applyFrames can have processed preceding frames before refusing CRYPTO
+	// or stream content. This diagnostic is not a whole-packet rollback.
+	info["Payload Delivery"] = "packet parsing stopped at refused frame; earlier validated frames may have been applied"
+}
+
 // These are observed wire-role and packet-type constraints, not complete TLS,
 // transport-parameter, stream-state or endpoint conformance certification.
 func quicValidateNativePacketFrames(h quicHdr, dir int, frames []map[string]any) error {
@@ -23,6 +30,20 @@ func quicValidateNativePacketFrames(h quicHdr, dir int, frames []map[string]any)
 	}
 	for _, frame := range frames {
 		name, _ := frame["Frame Type"].(string)
+		// RFC9000 19.4/19.5: validate uni-stream roles before any
+		// CID/stream mutation, PN delivery or candidate key-epoch commit.
+		if sid, ok := frame["Stream ID"].(uint64); ok && sid&2 != 0 {
+			sender := int(sid & 1)
+			if name == "STREAM" && sender != dir {
+				return protocolError(ErrMalformedMessage, "QUIC unidirectional stream wrong sender")
+			}
+			if name == "RESET_STREAM" && sender != dir {
+				return protocolError(ErrMalformedMessage, "QUIC RESET_STREAM from unidirectional receiver")
+			}
+			if name == "STOP_SENDING" && sender == dir {
+				return protocolError(ErrMalformedMessage, "QUIC STOP_SENDING from unidirectional sender")
+			}
+		}
 		if h.typeName == "0-RTT" {
 			switch name {
 			case "ACK", "CRYPTO", "NEW_TOKEN", "PATH_RESPONSE", "HANDSHAKE_DONE", "RETIRE_CONNECTION_ID":

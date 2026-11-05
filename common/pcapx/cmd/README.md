@@ -79,6 +79,5 @@ For hotspot analysis, add `-cpu-profile capture.cpu` and inspect with
 `go tool pprof pcap-inspect.exe capture.cpu`. Profiled runs have additional CPU
 cost and should be reported separately from unprofiled throughput tests.
 
-Go/Yak options, protocol coverage and ownership contracts are documented in
-[PROTOCOL_PARSER.md](../pcaputil/PROTOCOL_PARSER.md); a script implementation is
-[shark.yak](../examples/shark.yak).
+The Go protocol entry points are in [bin_parser.go](../pcaputil/bin_parser.go);
+a script implementation is [shark.yak](../examples/shark.yak).

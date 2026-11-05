@@ -29,6 +29,36 @@ const boundedDispatchMiddle = `l = total - getNode("@Internet Protocol").Length(
 var node
 switch protocol {`
 
+// Match the entire common header program. Only the no-options, unfragmented
+// case is admitted below; every other case runs the original VM before effects.
+const boundedIPv4HeaderPrelude = `header = getNodeResult("@Internet Protocol/Header Length").Value * 4
+if getNodeResult("@Internet Protocol/Version").Value != 4 || header < 20 || total < header { panic("ip: invalid IPv4 header boundary") }
+data = []byte{}
+if header > 20 {
+  options = this.NewSubNode("IP Header Options")
+  options.SetMaxLength(header-20)
+  data = options.Process().Value
+  for position = 0; position < len(data); {
+    optionType = int(data[position])
+    if optionType == 0 { break }
+    if optionType == 1 { position++; continue }
+    if position+1 >= len(data) { panic("ip: incomplete IPv4 option") }
+    optionLength = int(data[position+1])
+    if optionLength < 2 || optionLength > len(data)-position { panic("ip: invalid IPv4 option length") }
+    position += optionLength
+  }
+}
+fragments = getNodeResult("@Internet Protocol/Flags And Fragment Offset").Value
+if (int(fragments[0]) & 63) != 0 || fragments[1] != 0 {
+  if protocol == 33 { panic("dccp: IPv4 fragments require caller reassembly") }
+  if total > header {
+    fragment = this.NewUnknownNode("IP Fragment Data")
+    fragment.SetMaxLength(total-header)
+    fragment.Process()
+  }
+  return
+}`
+
 // Bounded protocol-number routing. Guarded branches retain their complete Yak
 // implementation; their protocol numbers are excluded before executing a plan.
 // An admitted route executes the same NewSubNode/SetMaxLength/Process calls.
@@ -38,7 +68,12 @@ func compileBoundedDispatchPlan(tokens string) *operatorPlan {
 	if !strings.HasPrefix(tokens, prefix) {
 		return nil
 	}
-	parts := planLex(strings.TrimPrefix(tokens, prefix))
+	rest := strings.TrimPrefix(tokens, prefix)
+	ipv4Bounds := strings.HasPrefix(rest, planTokens(boundedIPv4HeaderPrelude)+" ")
+	if ipv4Bounds {
+		rest = strings.TrimPrefix(rest, planTokens(boundedIPv4HeaderPrelude)+" ")
+	}
+	parts := planLex(rest)
 	legacy := make(map[uint64]bool)
 	consumeGuards := func() bool {
 		for len(parts) > 0 && parts[0] == "if" {
@@ -148,7 +183,24 @@ func compileBoundedDispatchPlan(tokens string) *operatorPlan {
 		if !pok || !tok || legacy[uint64(protocol)] {
 			return false
 		}
-		for _, node := range []*base.Node{protocolNode, totalNode} {
+		observed := []*base.Node{protocolNode, totalNode}
+		if ipv4Bounds {
+			headerNode := getNodeByPath(e.this.origin, "@Internet Protocol/Header Length")
+			versionNode := getNodeByPath(e.this.origin, "@Internet Protocol/Version")
+			fragmentNode := getNodeByPath(e.this.origin, "@Internet Protocol/Flags And Fragment Offset")
+			hv, _ := planScalar(headerNode)
+			vv, _ := planScalar(versionNode)
+			fv, _ := planScalar(fragmentNode)
+			header, hok := hv.(uint8)
+			version, vok := vv.(uint8)
+			fragments, fok := fv.([]byte)
+			if !hok || !vok || !fok || header != 5 || version != 4 || total < 20 ||
+				len(fragments) != 2 || fragments[0]&63 != 0 || fragments[1] != 0 {
+				return false
+			}
+			observed = append(observed, headerNode, versionNode, fragmentNode)
+		}
+		for _, node := range observed {
 			e.at("getNodeResult(" + strconv.Quote("@Internet Protocol/"+node.Name) + ")")
 			if _, err := node.Result(); err != nil {
 				panic(err)

@@ -76,6 +76,11 @@ func identityProjection(e *pcaputil.ProtocolEvent) packetPresentation {
 // complete handshake messages, authenticated records or a clear Alert may
 // establish a TLS identity. Previously established connection metadata survives.
 func credibleTLSIdentity(e *pcaputil.ProtocolEvent) bool {
+	if _, ok := e.NativeWCFTLSCarrier(); ok {
+		// The native MC-NMF peer accepted this exact TLS upgrade. It proves
+		// the carried protocol, not negotiation, version or authentication.
+		return true
+	}
 	if e.Protocol != "tls" {
 		return true
 	}
@@ -177,6 +182,9 @@ func (s *streamStore) datagramVersion(raw *capturedPacket) uint64 {
 }
 
 func eventCarriers(e *pcaputil.ProtocolEvent) []string {
+	if _, ok := e.NativeWCFTLSCarrier(); ok {
+		return []string{"WCF/MC-NMF"}
+	}
 	if e != nil && len(e.CarrierLayers) > 0 {
 		return append([]string(nil), e.CarrierLayers...)
 	}
@@ -422,6 +430,15 @@ func (s *streamStore) observeProtocol(e *pcaputil.ProtocolEvent) {
 	if s == nil || e == nil {
 		return
 	}
+	var framingEpoch uint64
+	if observation, ok := e.NativeWCFTLSCarrier(); ok {
+		framingEpoch = observation.ObservedSessionIndex
+		e = protocolDisplayEvent(e)
+	} else if _, ok := e.NativeWCFObservation(); ok {
+		owned, _ := e.NativeWCFFields()
+		framingEpoch = number(owned["Observed Session Index"])
+		e = protocolDisplayEvent(e)
+	}
 	if e.Transport == "udp" || e.Transport == "network" && observedL2TPAssociation(e) {
 		s.observeDatagram(e)
 		return
@@ -459,6 +476,22 @@ func (s *streamStore) observeProtocol(e *pcaputil.ProtocolEvent) {
 		}
 		if !contributes {
 			continue
+		}
+		if framingEpoch != 0 {
+			if framingEpoch < r.wcfFramingEpoch {
+				return // old published context cannot relabel the active epoch
+			}
+			if framingEpoch > r.wcfFramingEpoch {
+				// A privately admitted new framing epoch ends the previous
+				// display affinity, without claiming its TLS shutdown was verified.
+				// Keep the TCP owner, accounting, bytes and older snapshots.
+				r.wcfFramingEpoch = framingEpoch
+				r.protocol, r.protocolStack = p.protocol, append([]string(nil), p.stack...)
+				r.nativeIdentity, r.evidence = true, "validated protocol events"
+				r.lastTLSRecordID, r.tlsRecordCount = 0, 0
+				r.sshEncrypted = [2]bool{}
+				r.decodeDiagnostic = ""
+			}
 		}
 		if haltedTLS {
 			// Keep the observed connection identity while invalidating decoding.

@@ -70,6 +70,7 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 		var seen [1024]uint64
 		count := 0
 		var psk, versions, modes []byte
+		var certificatePSK tlsCertificatePSKHelloExtensions
 		for q := p; q < len(body); {
 			if len(body)-q < 4 {
 				return bad()
@@ -85,6 +86,12 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 			}
 			seen[kind/64] |= bit
 			switch kind {
+			case 33:
+				certificatePSK.present = true
+			case 42:
+				certificatePSK.early = true
+			case 51:
+				certificatePSK.share = body[q : q+n]
 			case 41:
 				psk = body[q : q+n]
 			case 43:
@@ -94,6 +101,13 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 			}
 			count++
 			q += n
+		}
+		certificatePSK.psk, certificatePSK.versions, certificatePSK.modes = psk, versions, modes
+		if err := certificatePSK.check(client); err != nil {
+			return nil, err
+		}
+		if client && certificatePSK.early && psk == nil {
+			return nil, protocolError(ErrMalformedMessage, "TLS early_data offer requires pre_shared_key")
 		}
 		if client && psk != nil {
 			if err := tlsPSKClientRequirements(versions, modes); err != nil {
@@ -139,7 +153,15 @@ func tlsHelloExtensionStructure(h *tlsHelloView, client bool) error {
 			return err
 		}
 	}
-	return nil
+	_, present := h.ext[33]
+	_, early := h.ext[42]
+	if client && early {
+		if _, present := h.ext[41]; !present {
+			return protocolError(ErrMalformedMessage, "TLS early_data offer requires pre_shared_key")
+		}
+	}
+	return (tlsCertificatePSKHelloExtensions{present: present, early: early,
+		psk: h.ext[41], share: h.ext[51], modes: h.ext[45], versions: h.ext[43]}).check(client)
 }
 
 func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) error {
@@ -147,6 +169,10 @@ func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) er
 		return err
 	}
 	switch kind {
+	case 33:
+		if len(v) != 0 {
+			return protocolError(ErrMalformedMessage, "TLS certificate-with-external-PSK flag must be empty")
+		}
 	case 0:
 		if client {
 			_, err := tlsSNIName(v)
@@ -158,6 +184,10 @@ func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) er
 	case 43:
 		if !client && len(v) != 2 {
 			return protocolError(ErrMalformedMessage, "TLS selected version length")
+		}
+	case 49:
+		if !client || len(v) != 0 {
+			return protocolError(ErrMalformedMessage, "TLS post_handshake_auth must be an empty ClientHello extension")
 		}
 	}
 	return nil
@@ -237,6 +267,14 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 	if err := tlsHelloExtensionStructure(h, typ == 1); err != nil {
 		return false, err
 	}
+	if typ == 2 {
+		if err := tls13ServerHelloLocations(body, h); err != nil {
+			return false, err
+		}
+		if err := tlsServerHelloGREASE(body, h); err != nil {
+			return false, err
+		}
+	}
 	if alpn, present := h.ext[16]; present {
 		if _, err := tlsALPNName(alpn, typ == 2, limits...); err != nil {
 			return false, err
@@ -301,6 +339,18 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		} else if t.firstHello == nil {
 			t.firstHello = bytes.Clone(body)
 		}
+		// Final ServerHello releases firstHello. Keep the complete, admitted
+		// client's PHA offer as connection state across that release and KU.
+		t.earlyDataOfferKnown = true
+		_, t.earlyDataOffered = h.ext[42]
+		t.phaOfferKnown = true
+		_, t.phaOffered = h.ext[49]
+		// EncryptedExtensions follows final ServerHello, which releases the
+		// complete retry body. Keep only the admitted ALPN offer needed to
+		// qualify the later server selection; absence is also known evidence.
+		t.alpnOfferKnown = true
+		t.alpnOffer = bytes.Clone(h.ext[16])
+		t.observeKeyExchangeOffers(h)
 		return false, nil
 	}
 	retry := bytes.Equal(body[2:34], tlsRetryRandom[:])
@@ -415,6 +465,7 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		}
 	}
 	t.finalHello = true
+	t.serverHelloDirectionKnown, t.serverHelloDirection = true, int8(dir)
 	t.firstHello, t.retryCookie = nil, nil
 	return false, nil
 }

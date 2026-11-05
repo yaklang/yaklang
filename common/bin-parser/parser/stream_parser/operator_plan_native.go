@@ -9,9 +9,12 @@ import (
 // Unbound Go functions, never node-bound library closures. Only these audited
 // parser helpers may be lowered; arbitrary callables remain Yak programs.
 var planNativeCalls = map[string]any{
-	"parseSSDPMessage":     parseSSDPMessage,
-	"parseNetworkControl":  parseNetworkControl,
-	"parseMemcachedFields": parseMemcachedFields, "parseCassandraFields": parseCassandraFields,
+	"parseCIFSSessionSetup":    parseCIFSSessionSetup,
+	"parseCIFSTreeConnectAndX": parseCIFSTreeConnectAndX,
+	"parseCIFSDelete":          parseCIFSDelete,
+	"parseSSDPMessage":         parseSSDPMessage,
+	"parseNetworkControl":      parseNetworkControl,
+	"parseMemcachedFields":     parseMemcachedFields, "parseCassandraFields": parseCassandraFields,
 	"parseTNSFields": parseTNSFields, "parseTDSFields": parseTDSFields,
 	"parseLDAPFields": parseLDAPFields, "parseSMB3TransformFields": parseSMB3TransformFields,
 	"parsePostgreSQLFields": parsePostgreSQLFields, "parseMySQLFields": parseMySQLFields,
@@ -22,6 +25,7 @@ var planNativeCalls = map[string]any{
 	"parseKerberosFields": parseKerberosFields, "parseHTTP2Fields": parseHTTP2Fields,
 	"parseSSHPlaintextPacket":        parseSSHPlaintextPacket,
 	"parseTLSChangeCipherSpecRecord": parseTLSChangeCipherSpecRecord,
+	"parseTLSEndOfEarlyData":         parseTLSEndOfEarlyData,
 	"parseTLS12CertificateAuth":      parseTLS12CertificateAuth, "parseTLS12KeyExchange": parseTLS12KeyExchange,
 	"parseTLS12ControlHandshake": parseTLS12ControlHandshake, "parseTLSCertificateHandshake": parseTLSCertificateHandshake,
 	"parseZlibJSONRecord": parseZlibJSONRecord, "parseKCP": parseKCP,

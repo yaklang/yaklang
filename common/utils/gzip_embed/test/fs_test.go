@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	"os"
 
@@ -73,18 +72,26 @@ func TestCache(t *testing.T) {
 		t.Fatal(errors.New("read file by not cached fs failed"))
 	}
 	calcDuration := func(fs *gzip_embed.PreprocessingEmbed) int64 {
-		start := time.Now()
-		for i := 0; i < 100; i++ {
-			_, err := fs.ReadFile("1.txt")
-			if err != nil {
-				t.Fatal(err)
+		// A fixed batch of 100 hot-cache reads may measure zero or one
+		// scheduler pause. Calibrate enough operations for per-read timings
+		// while keeping the same tenfold performance regression gate.
+		var readErr error
+		measured := testing.Benchmark(func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				if _, err := fs.ReadFile("1.txt"); err != nil {
+					readErr = err
+					b.Fatal(err)
+				}
 			}
+		})
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
-		return time.Since(start).Nanoseconds()
+		return measured.NsPerOp()
 	}
 	cachedDu := calcDuration(cachedFs)
 	notcachedDu := calcDuration(notcachedFs)
-	fmt.Printf("cached fs duration: %d, not cached fs duration: %d\n", cachedDu, notcachedDu)
+	fmt.Printf("cached fs ns/op: %d, not cached fs ns/op: %d\n", cachedDu, notcachedDu)
 	if cachedDu*10 >= notcachedDu {
 		t.Fatal(errors.New("cached fs should be at least 10 times faster than not cached fs"))
 	}

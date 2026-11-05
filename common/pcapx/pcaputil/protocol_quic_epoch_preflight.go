@@ -4,15 +4,7 @@ package pcaputil
 // install keys or deliver any of its preceding frames. Application dissectors
 // are intentionally not invoked: a bad HTTP/3 message is not a bad AEAD key.
 func (q *binQUIC) validateFutureTransportFrames(dir, space int, frames []map[string]any, max int) error {
-	probe := *q
-	probe.cids = make(map[string]int, len(q.cids))
-	for cid, owner := range q.cids {
-		probe.cids[cid] = owner
-	}
-	for d := 0; d < 2; d++ {
-		probe.cidSequences[d] = cloneQUICCIDSequences(q.cidSequences[d])
-		probe.cidRetired[d] = cloneQUICCIDSequences(q.cidRetired[d])
-	}
+	probe := q.cloneCIDState()
 	streams := map[uint64]*quicAssembler{}
 	created := 0
 	stream := func(id uint64) *quicAssembler {

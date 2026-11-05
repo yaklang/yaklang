@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -36,9 +35,12 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 
 	prog := b.GetProgram()
 	root := prog.GetApplication()
-	var currentEditor *memedit.MemEditor
-	if root != nil {
-		currentEditor = root.GetCurrentEditor()
+	// Includes build on their own program while the application's editor
+	// stack still belongs to the caller. Deduplicate and record the source
+	// this builder actually consumes, independently of file completion order.
+	currentEditor := b.GetEditor()
+	if currentEditor == nil && prog != nil {
+		currentEditor = prog.GetCurrentEditor()
 	}
 	if currentEditor != nil && root != nil {
 		hasFile := func(p *ssa.Program) bool {
@@ -49,7 +51,10 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 			}
 			return false
 		}
-		if hasFile(root) {
+		// A source already consumed in the application's main scope is not
+		// necessarily built in an include's own scope. The include loader owns
+		// its subprogram cache; skipping that body would publish an empty module.
+		if prog == root && hasFile(root) {
 			return
 		}
 	}

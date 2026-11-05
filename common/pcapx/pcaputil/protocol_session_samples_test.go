@@ -364,6 +364,24 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 		}
 		negativeWS := sample.name == "websocket-upgrade-text"
 		plaintext := (sample.protocol == "quic" && sample.name != "quic-v1-rfc9001-initial") || sample.protocol == "http3" || sample.protocol == "doq"
+		if sample.protocol == "quic" || sample.protocol == "http3" || sample.protocol == "doq" {
+			// These archived records really carry TCP. Retain every original
+			// byte/hash and require carrier rejection, rather than requiring a
+			// falsely selected QUIC session to produce a context error.
+			requireNoUDPOnlyQUICOnTCP(t, events)
+			require.Zero(t, stats.Decoded+stats.Deferred, sample.name)
+			require.Positive(t, stats.Unknown+stats.Incomplete, sample.name)
+			inputBytes := 0
+			for _, step := range sample.steps {
+				inputBytes += len(step.wire)
+			}
+			require.EqualValues(t, inputBytes, stats.InputBytes, "carrier qualification must not discard the TCP input")
+			require.Zero(t, stats.BufferedBytes)
+			for _, e := range events {
+				require.Equal(t, "tcp", e.Transport)
+				require.NotEqual(t, true, e.Session["Authentication Verified"])
+			}
+		}
 		if plaintext {
 			// Historical TCP-wrapped plaintext fixtures remain byte-identical. Their
 			// ordinary replay is now a negative authentication test, not wire coverage.
@@ -373,7 +391,6 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 				require.NotEqual(t, "http3", e.Protocol, sample.name)
 				require.NotEqual(t, "doq", e.Protocol, sample.name)
 			}
-			require.Positive(t, stats.Malformed+stats.ContextRequired, sample.name)
 			session, err := NewDecryptedQUICSession(DefaultParserBudget(), "synthetic fixture: "+sample.name)
 			require.NoError(t, err)
 			events = nil
@@ -383,6 +400,25 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 				for _, e := range result.Events {
 					require.Equal(t, "decrypted-stream", e.Session["Input Representation"])
 					require.Equal(t, false, e.Session["Authentication Verified"])
+				}
+				events = append(events, result.Events...)
+			}
+			require.Len(t, events, len(sample.steps), sample.name)
+			session.Close("fixture-end")
+			require.Zero(t, session.Stats().BufferedBytes)
+		} else if sample.name == "quic-v1-rfc9001-initial" {
+			// The same complete protected packet remains a positive algorithm
+			// test through the explicit QUIC-capable API. That does not turn its
+			// archived TCP wrapper into native UDP capture coverage.
+			session, sessionErr := NewProtocolSession(DefaultParserBudget())
+			require.NoError(t, sessionErr)
+			events = nil
+			for _, step := range sample.steps {
+				result := session.Feed(step.dir, time.Unix(1, 0), step.wire)
+				require.Nil(t, result.Err, sample.name)
+				for _, e := range result.Events {
+					require.Equal(t, true, e.Session["Authentication Verified"])
+					require.NotEqual(t, true, e.Session["Plaintext Input"])
 				}
 				events = append(events, result.Events...)
 			}

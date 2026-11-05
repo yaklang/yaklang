@@ -161,6 +161,7 @@ func (u *tui) resize(width, height int) {
 	byteOffset := u.hexTop * oldColumns
 	u.width = width
 	u.height = height
+	u.fieldLeft = clamp(u.fieldLeft, 0, u.fieldTextLimit())
 	u.drag = scrollbarDrag{}
 	u.hexTop = byteOffset / u.hexPerRow()
 	for pane := 0; pane < 4; pane++ {
@@ -243,7 +244,10 @@ func (u *tui) mouse(m mouseEvent) {
 	if m.action == mouseWheel {
 		// Terminals report trackpad horizontal movement separately; consume it
 		// without treating the report's trailing bytes as keyboard shortcuts.
-		if !m.horizontal && !m.shift {
+		if (m.horizontal || m.shift) && pane == 1 {
+			u.focusPane(1)
+			u.scrollFieldText(m.delta * 4)
+		} else if !m.horizontal && !m.shift {
 			u.scroll(pane, m.delta)
 		}
 		return
@@ -283,6 +287,9 @@ func (u *tui) mouse(m mouseEvent) {
 		u.touchFields()
 		indices := u.fieldIndices()
 		if index < len(indices) {
+			if u.fieldSelection != index {
+				u.fieldLeft = 0
+			}
 			u.fieldSelection = index
 			u.selectFieldBytes()
 		}
@@ -362,6 +369,7 @@ func (u *tui) installDetail(detail packetDetail) {
 	u.fields = detail
 	u.fieldTop = 0
 	u.fieldSelection = 0
+	u.fieldLeft = 0
 	u.bytesSource, u.hexTop = 0, 0
 	u.hexStart, u.hexEnd = 0, 0
 	u.pendingDetail = nil
@@ -407,6 +415,9 @@ func (u *tui) move(delta int) {
 		u.selection = selected
 		u.selected = u.visible[selected].packet.number
 	} else {
+		if u.fieldSelection != selected {
+			u.fieldLeft = 0
+		}
 		u.fieldSelection = selected
 		u.selectFieldBytes()
 	}
@@ -428,6 +439,9 @@ func (u *tui) boundary(last bool) {
 		}
 	case 1:
 		u.touchFields()
+		if u.fieldSelection != at {
+			u.fieldLeft = 0
+		}
 		u.fieldSelection = at
 		u.selectFieldBytes()
 		u.ensureSelectionVisible(1)

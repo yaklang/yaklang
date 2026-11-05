@@ -59,6 +59,7 @@ type tcpStream struct {
 	firstReference, lastReference                   uint64
 	acceptedPacketNumber                            uint64
 	lastTLSRecordID                                 uint64
+	wcfFramingEpoch                                 uint64
 	tlsRecordCount                                  uint8
 	sshEncrypted                                    [2]bool
 	first                                           time.Time
@@ -277,6 +278,9 @@ func (s *streamStore) add(raw *capturedPacket) {
 }
 
 func (s *streamStore) addDecoded(raw *capturedPacket, p gopacket.Packet, domain pcaputil.CaptureDomain) {
+	if raw.presentation.networkRefused || presentEvents(raw.protocolEvents()).networkRefused {
+		return // A native parent refusal cannot feed fallback preview state.
+	}
 	// A capture session already owns sequence validation and generation state.
 	// Never feed its bytes into a second assembler, even with a known flow ID.
 	if raw.history != nil {

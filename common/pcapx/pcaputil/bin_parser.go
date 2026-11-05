@@ -17,7 +17,12 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
+	smb1SetupBodyRefusal               bool
+	smb1FileBodyRefusal                bool
 	nativeSessionMessage               bool
+	nativePPPoEHeader                  *pppoeHeaderObservation
+	nativeWCF                          *wcfObservation
+	nativeWCFTLS                       *wcfTLSCarrierObservation
 	nativeNetFlowObservation           bool
 	rtmpChildren                       []*ProtocolEvent
 	nativeCarrierObservation           bool
@@ -36,6 +41,7 @@ type ProtocolEvent struct {
 	nativeSTUNObservation              bool
 	nativeSIPObservation               bool
 	nativeSSHObservation               bool
+	nativeHTTPHeaderObservation        bool
 	nativeIMAPObservation              bool
 	nativeDCERPCObservation            bool
 	nativeTFTPObservation              bool
@@ -55,6 +61,7 @@ type ProtocolEvent struct {
 	semanticMetadata                   any
 	ownedRuleEnvelope, hasRuleMetadata bool
 	nativeQUICObservation              bool
+	nativeQUICApplication              uint8 // 1: HTTP3, 2: DoQ; retained even in metadata-only rows
 	nativeQUICWire                     bool
 	nativeQUICWireBytes                []byte // immutable accepted envelope; expand byte leaves only on query
 	nativeDoIPObservation              bool
@@ -104,6 +111,9 @@ type BinParserEvent = ProtocolEvent
 // cannot be decoded as if they were messages. The returned object belongs to
 // the caller; no JSON conversion takes place.
 func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
+	if observation, ok := e.NativePPPoEHeaderObservation(); ok {
+		return map[string]any{"fields": observation.Fields}, nil
+	}
 	defer func() {
 		session := e.Session
 		if e.nativeSessionMessage && e.semanticFields != nil {
@@ -319,6 +329,19 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	}
 	// Native TLS/DTLS identity survives edits to every public projection,
 	// including a protocol name that would select a legacy cache below.
+	if o := e.nativeWCFTLS; o != nil && o.Status != "" && o.Status != "decoded" && o.Status != "deferred" {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		kind := ErrContextRequired
+		if o.Status == "incomplete" {
+			kind = ErrNeedMore
+		} else if o.Status == "limited" {
+			kind = ErrResourceExceeded
+		}
+		return nil, protocolError(kind, "%s", o.Summary)
+	}
 	if e.nativeTLSObservation || e.nativeDTLSObservation {
 		if e.sessionError != nil {
 			owned := *e.sessionError
@@ -327,6 +350,12 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
+	}
+	if e.nativeHTTPHeaderObservation {
+		if e.semanticFields == nil {
+			return nil, protocolError(ErrContextRequired, "accepted HTTP response header fields unavailable")
+		}
+		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 	}
 	if e.nativeDiagnosticError != "" {
 		return nil, fmt.Errorf("%s", e.nativeDiagnosticError)
@@ -443,6 +472,12 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativePPPoEHeader != nil || e.nativeWCF != nil || e.nativeWCFTLS != nil {
+		return true
+	}
+	if e.nativeHTTPHeaderObservation {
+		return true
+	}
 	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeESPObservation {
 		return true
 	}
@@ -924,9 +959,17 @@ func (a *binParser) emit(e *BinParserEvent) {
 		return
 	}
 	e.setStructured(e.Structured)
+	if e.nativeSessionMessage && (e.Protocol == "smb" || e.Protocol == "smb2") {
+		// Structured/Fields are public compatibility projections. Keep the
+		// accepted native tree independent before handing either to callers.
+		e.semanticFields = cloneSession(e.semanticFields)
+		e.semanticSession = cloneSession(e.semanticSession)
+	}
 	e.finalizeEvidence()
 	e.freezeNativeNetworkFields()
 	e.summarizeProtocol()
+	e.freezeWCFObservation()
+	e.freezeWCFTLSObservation()
 	// IEC104, DNP3, GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
 	// session context. Freeze the final context before handing out public maps.
 	if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.ocpp || e.Protocol == "rtp" && e.Transport != "udp") && e.semanticSession == nil && e.Session != nil {
@@ -945,15 +988,19 @@ func (a *binParser) emit(e *BinParserEvent) {
 }
 
 type binDirection struct {
-	tlsPlaintextGap bool
-	contributions   []contribution
-	evidenceLimited bool
-	headerScan      int
-	http            *binHTTPState
-	buffer          []byte
-	offset          uint64
-	ts              time.Time
-	stopped         bool
+	httpUnframedHeaderID   uint64
+	httpUnframedVersion    string
+	httpUnframedHeaderHash [32]byte
+	tlsPlaintextGap        bool
+	tlsGapHTTPPending      bool
+	contributions          []contribution
+	evidenceLimited        bool
+	headerScan             int
+	http                   *binHTTPState
+	buffer                 []byte
+	offset                 uint64
+	ts                     time.Time
+	stopped                bool
 	// RFC4253 section 7.3 switches SSH keys independently in each direction.
 	// Only ErrEncrypted after observed NEWKEYS preserves the peer's plaintext
 	// phase; malformed data, resource exhaustion and panics still invalidate it.
@@ -1047,6 +1094,7 @@ type binFlow struct {
 	zookeeper         *binZooKeeper
 	clickhouse        *binClickHouse
 	stomp             *binSTOMP
+	wcf               *binWCF
 	rfb               *binRFB
 	diameter          *binDiameter
 	iec104            *binIEC104
@@ -1079,6 +1127,13 @@ type binFlow struct {
 	level             byte
 	binding           *BinParserBinding
 	directions        [2]binDirection
+
+	httpRequestDirections byte
+	httpReplaying         bool
+	wcfReplaying          bool
+	wcfReplayAfterPDU     uint64
+	wcfTLS                *wcfTLSCarrier
+	wcfTLSReplaying       bool
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
@@ -1088,6 +1143,23 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if (f.protocol == "smb" || f.protocol == "smb2") && status == "incomplete" {
+		// A trailing or unselected close observation has no complete-message
+		// field tree. Preserve its existing refusal before mutable public
+		// fields, protocol/status, or a caller-supplied rule can promote it.
+		e.nativeDiagnosticError = "protocol parser: event is incomplete, not an exact message"
+	}
+	if f.protocol == "wcf" && f.wcf != nil {
+		e.nativeWCF = newWCFObservation(e.Raw)
+		// Preserve observed MC-NMF context on refusal and truncation events.
+		// A complete record replaces this with consumeWCF's record snapshot.
+		e.Session = f.wcf.contextFields()
+		if len(raw) > 0 {
+			e.Session["Observed Record Type"] = uint64(raw[0])
+			e.Session["Observed Record Name"] = wcfRecordName(raw[0])
+		}
+		e.Profile, e.Completeness = "wcf-mc-nmf", "record"
+	}
 	if f.transportFlow != nil {
 		e.TCPFlowID = f.transportFlow.Index
 	}
@@ -1201,6 +1273,17 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 	if f.protocol == "tls" && f.binding == nil {
 		e.nativeTLSObservation = true
 	}
+	if s := f.wcfTLS; s != nil && f.binding == nil && (f.protocol == "tls" || f.protocol == "" && status != "deferred") {
+		e.nativeWCFTLS = &wcfTLSCarrierObservation{WCFObservation: newWCFObservation(e.Raw).WCFObservation, ObservedSessionIndex: s.observedIndex, Returned: s.returned}
+		e.CarrierLayers = []string{"WCF/MC-NMF"}
+		if status != "deferred" {
+			e.Session = map[string]any{"Observed WCF Carrier": s.contextFields()}
+			e.semanticFields = cloneSession(e.Session)
+		}
+		if f.protocol == "" {
+			e.Profile, e.Completeness = "wcf-tls-upgrade-observation", status
+		}
+	}
 	if f.hart != nil {
 		e.nativeHARTIPObservation = true
 		e.Profile, e.Completeness = hartIPProfile, "message"
@@ -1220,6 +1303,8 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 }
 
 func (f *binFlow) release(d *binDirection) {
+	f.releaseHTTPAwait(d.http)
+	d.tlsGapHTTPPending = false
 	f.a.buffered.Add(-int64(cap(d.buffer)) - int64(len(d.contributions))*80)
 	d.contributions = nil
 	d.buffer = nil
@@ -1261,6 +1346,7 @@ func (f *binFlow) retain(d *binDirection, data []byte) bool {
 
 func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d := &f.directions[dir]
+	f.prepareHTTPAwaitDiagnostic(dir)
 	preview := wire[:min(len(wire), f.a.config.ProbeBytes)]
 	retainedHTTPHeader := f.protocol == "http" && d.http != nil && !d.http.omitted && len(d.http.rawHeader) > 0 && d.http.headerFields != nil
 	if retainedHTTPHeader {
@@ -1277,6 +1363,27 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		}
 	}
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
+	if (f.protocol == "smb" || f.protocol == "smb2") && f.binding == nil && f.smb2 != nil {
+		// The native carrier was identified independently of the resource
+		// refusal. Keep that refusal private before any public cache/status.
+		// A clipped diagnostic is not an accepted response body.
+		e.nativeSessionMessage = true
+		e.Profile, e.Completeness = f.protocol+"-record-diagnostic", status
+		if status == "limited" {
+			e.Profile = f.protocol + "-record-resource-diagnostic"
+		}
+		e.SourceBytes.CompletedIn = nil
+		if e.sessionError == nil {
+			kind := ErrMalformedMessage
+			if status == "limited" {
+				kind = ErrResourceExceeded
+			} else if status == "context-required" {
+				kind = ErrContextRequired
+			}
+			e.sessionError = &ProtocolError{Kind: kind, Message: reason}
+		}
+		e.Error = e.sessionError.Error()
+	}
 	if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
@@ -1314,7 +1421,11 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		if d.http.omitted && !d.http.response {
 			e.ID = 0
 		}
-		e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		if d.http.awaitRequest {
+			e.Session = map[string]any{"Request Context Available": false, "Body Boundary Known": false, "Retained Stream Bytes": len(wire)}
+		} else {
+			e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		}
 		if d.http.response && d.http.status == 101 {
 			e.ExpertCode = "HTTPUpgradeUnverified"
 			e.Session["Upgrade Validated"] = false
@@ -1327,6 +1438,9 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 			e.Completeness = "headers"
 			e.semanticFields = d.http.retainedHeaderFields()
 			e.Structured = map[string]any{"fields": cloneSession(e.semanticFields)}
+			if charge := f.retainHTTPUnframedObservation(dir, e, wire); charge != 0 {
+				defer f.a.buffered.Add(-charge)
+			}
 		}
 	}
 	if status == "limited" {
@@ -1361,6 +1475,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d.offset += uint64(len(wire))
 	d.stopped = true
 	f.release(d)
+	f.rememberHTTPHeaderObservation(dir, e)
 	f.a.emit(e)
 }
 
@@ -1372,6 +1487,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			a.malformed.Add(1)
 			d.stopped = true
 			d.sshOpaque = false
+			d.httpUnframedHeaderID = 0
 			f.release(d)
 		}
 		// Resource exhaustion and panic containment invalidate connection-wide
@@ -1388,6 +1504,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	}()
 	a.input.Add(uint64(len(data)))
 	if d.stopped {
+		if d.httpUnframedHeaderID != 0 && len(data) > 0 {
+			f.emitHTTPUnframedArrival(dir, data, ts)
+		}
 		a.unclassified.Add(uint64(len(data)))
 		d.offset += uint64(len(data))
 		return
@@ -1510,10 +1629,25 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
+					if len(wire) < 4+smb2HeaderSize && probeSMB2(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
 						break
 					}
-					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
+					// A response can be structurally identifiable yet exceed its
+					// parser frame budget. Keep only this finite format prefix so
+					// the completed record is refused as limited, not unrecognized.
+					if len(wire) < 65582 && len(wire) < a.config.MaxMessageBytes && probeSMB1FileCommand(wire, 65582).Verdict == ProbeNeedMore {
+						break
+					}
+					if len(wire) < 65598 && len(wire) < a.config.MaxMessageBytes && probeSMB1SessionSetupExtended(wire, 65598).Verdict == ProbeNeedMore {
+						break
+					}
+					if len(wire) < 65608 && len(wire) < a.config.MaxMessageBytes && probeSMB1NegotiateExtendedResponse(wire, 65608).Verdict == ProbeNeedMore {
+						break
+					}
+					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || probeWCF(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "TCP application protocol not recognized")
@@ -1559,6 +1693,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		if n < 0 || n > a.config.MaxMessageBytes || f.protocol != "http2" && n > a.budget.MaxFrameBytes {
 			reason := fmt.Sprintf("declared message exceeds limit: message_bytes=%d max_message_bytes=%d", n, a.config.MaxMessageBytes)
+			if f.protocol == "smb" {
+				reason += fmt.Sprintf(" max_frame_bytes=%d", a.budget.MaxFrameBytes)
+			}
 			if h := d.http; f.protocol == "http" && h != nil && h.declared > 0 {
 				reason = fmt.Sprintf("HTTP declared message exceeds limit: message_bytes=%d max_message_bytes=%d; increase pcap_protocolBudget to decode the body", h.declared, a.config.MaxMessageBytes)
 			}
@@ -1650,8 +1787,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, "nested TLS carrier")
 				} else {
 					result, err = f.consumeTLS(dir, e)
+					if err == nil {
+						f.observeWCFTLSRecord(dir, e.Raw)
+					}
 				}
-			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || (f.protocol == "smb" && f.binding == nil && f.smb2 != nil) || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "wcf" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspNativeControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1728,7 +1868,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
-				if (f.protocol == "stomp" || f.protocol == "nats") && e.Session != nil {
+				if (f.protocol == "stomp" || f.protocol == "nats" || e.nativeWCF != nil) && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
@@ -1892,11 +2032,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// Only complete frames with an independently retained boundary carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
 		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
+		recoverableSMB1Setup := e.smb1SetupBodyRefusal || e.smb1FileBodyRefusal
 		recoverableRADIUS := e.nativeRADIUSObservation && radiusRecoverableFrame(e.Raw, e.sessionError, e.radiusApplicationRefusal)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
 		tlsParent := e
-		if !failed && f.tls != nil && f.tls.plaintext != nil {
+		if f.tls != nil && (!failed && (f.tls.plaintext != nil || f.tls.closeNotifyPending[dir] || len(f.tls.early.pending) != 0) || f.tlsHTTPGapPending(dir)) {
 			if e.ID == 0 {
 				e.ID = a.ids.Add(1)
 			}
@@ -1908,12 +2049,25 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
 		stopAfterFailure := failed && !(e.Protocol == "tls" && e.Session["Record Failure Isolated"] == true) && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
-		if e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
+		if recoverableSMB1Setup || e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
 			stopAfterFailure = false
 		}
+		// Snapshot from private flow state before handing the public DTO to callbacks.
+		httpReplayPending := f.httpAwaitingPeerReady(dir)
 		children := e.rtmpChildren
 		e.rtmpChildren = nil
+		var observedWCFPDU uint64
+		wcfUpgradeReady := e.nativeWCF != nil && !failed && (f.protocol == "" || f.protocol == "tls") && f.wcfTLS != nil
+		if e.nativeWCF != nil && !failed {
+			if e.ID == 0 {
+				e.ID = a.ids.Add(1)
+			}
+			observedWCFPDU = e.ID // A public callback cannot replace context identity.
+		}
 		a.emit(e)
+		if observedWCFPDU != 0 && f.wcf != nil {
+			f.wcf.lastPDU = observedWCFPDU
+		}
 		for _, child := range children {
 			a.messages.Add(1)
 			a.messageBytes.Add(uint64(child.Length))
@@ -1931,7 +2085,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			a.emit(child)
 		}
+		f.deliverTLSHTTPGap(dir, tlsParent)
 		if !failed {
+			f.resumeTLSEarly(tlsParent)
 			f.deliverTLS(dir, tlsParent)
 		}
 		if stopAfterFailure {
@@ -1950,15 +2106,30 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// A peer SETTINGS already captured before a complete client preface
 		// must be applied before subsequent coalesced request header blocks.
 		// Never replay the peer after only a partial greeting/preface.
-		if detected || stateful && (strings.HasSuffix(fmt.Sprint(e.Session["Protocol Transition"]), "->tls") || e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
+		if detected && !f.wcfTLSReplaying || wcfUpgradeReady || stateful && (strings.HasSuffix(fmt.Sprint(e.Session["Protocol Transition"]), "->tls") || e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
 			detected = false
 			other := &f.directions[1-dir]
 			if len(other.buffer) > 0 && !other.stopped {
+				wasWCFReplay := f.wcfTLSReplaying
+				if wcfUpgradeReady {
+					// The receiver's current buffer still owns this response.
+					// A replayed ClientHello must not feed that buffer again.
+					f.wcfTLSReplaying = true
+				}
 				f.feed(1-dir, nil, other.ts)
+				f.wcfTLSReplaying = wasWCFReplay
 			}
 			if d.stopped {
 				return
 			}
+		}
+		// Complete request callbacks precede callbacks for responses that had
+		// to await this observed method.
+		if httpReplayPending {
+			f.replayHTTPAwaitingPeer(dir)
+		}
+		if d.stopped {
+			return
 		}
 		d.ts = ts
 	}
@@ -1974,7 +2145,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		f.stop(dir, wire, "limited", "capture buffer limit reached")
 	}
-	if detected && f.protocol != "" && !f.hasSession() {
+	// A valid request header can unblock an informational response before
+	// its body arrives (Expect: 100-continue). Retain this direction first.
+	f.replayHTTPAwaitingPeer(dir)
+	f.replayWCFAwaitingPeer(dir)
+	f.replayWCFTLSPeer(dir)
+	if detected && f.protocol != "" && (!f.hasSession() || f.protocol == "wcf") {
 		other := &f.directions[1-dir]
 		if len(other.buffer) > 0 && !other.stopped {
 			f.feed(1-dir, nil, other.ts)
@@ -2010,61 +2186,33 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 	}()
 	for dir := range f.directions {
 		d := &f.directions[dir]
+		if d.tlsGapHTTPPending {
+			f.emitHTTPGapObservation(dir, nil)
+			continue
+		}
+		if reason == TrafficFlowCloseReason_FIN && f.finishHTTPCloseDelimited(dir, nil) {
+			continue
+		}
+		if h := d.http; h != nil && h.awaitRequest && len(d.buffer) > 0 {
+			f.lastSessionError = &ProtocolError{Kind: ErrContextRequired, Message: "HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)"}
+			f.stop(dir, d.buffer, "context-required", string(reason)+": HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
+			continue
+		}
 		if h := d.http; h != nil && h.omitted {
-			if h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
-				f.finishHTTP(dir)
-			} else {
-				e := f.event(dir, nil, "incomplete", string(reason)+": omitted HTTP body boundary was not reached")
-				e.TransactionID = h.requestID
-				if h.response && len(f.httpIDs) > 0 {
-					e.TransactionID = f.httpIDs[0]
-					e.ResponseTo = f.httpIDs[0]
-				}
-				f.a.incomplete.Add(1)
-				f.a.emit(e)
+			e := f.event(dir, nil, "incomplete", string(reason)+": omitted HTTP body boundary was not reached")
+			e.TransactionID = h.requestID
+			if h.response && len(f.httpIDs) > 0 {
+				e.TransactionID = f.httpIDs[0]
+				e.ResponseTo = f.httpIDs[0]
 			}
+			f.a.incomplete.Add(1)
+			f.a.emit(e)
 			f.release(d)
 			continue
 		}
 		if len(d.buffer) != 0 {
-			if h := d.http; h != nil && h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
-				e := f.event(dir, d.buffer, "deferred", h.summary)
-				e.Rule, e.Entry, e.decodeConfig = "application-layer.http", "HTTPExact", h.config(f.a.config.MaxMessageBytes)
-				e.ipp = h.ipp
-				f.httpEvidence(dir, e)
-				f.a.messages.Add(1)
-				f.a.messageBytes.Add(uint64(len(d.buffer)))
-				if !f.a.config.Deferred || h.doh || h.ipp {
-					result, err := e.Decode()
-					if err == nil && (h.doh || h.ipp) {
-						err = f.consumeSession(dir, e, result)
-					}
-					if err != nil {
-						e.Status, e.sessionError = classifySessionError(err)
-						f.lastSessionError = e.sessionError
-						e.Error = err.Error()
-					} else if !f.a.config.Deferred {
-						e.Status, e.Structured = "decoded", result
-					}
-				}
-				switch e.Status {
-				case "decoded":
-					f.a.decoded.Add(1)
-				case "deferred":
-					f.a.deferred.Add(1)
-				case "limited":
-					f.a.limited.Add(uint64(len(d.buffer)))
-				case "context-required":
-					f.a.contextRequired.Add(1)
-				default:
-					f.a.malformed.Add(1)
-				}
-				f.release(d)
-				f.finishHTTP(dir)
-				f.a.emit(e)
-				continue
-			}
 			e := f.event(dir, d.buffer, "incomplete", string(reason)+": exact message boundary was not reached")
+			f.retainHTTPIncompleteHeader(dir, e)
 			if f.radius != nil {
 				e.nativeRADIUSObservation = true
 				e.Profile, e.Completeness = f.radius.profile(), "incomplete"
@@ -2104,8 +2252,12 @@ type ProtocolInspector struct {
 
 type protocolHistoryEntry struct {
 	BinParserEvent
-	retainedCost  int
-	packetIndexed bool
+	retainedCost            int
+	packetIndexed           bool
+	http3TunnelContext      bool // shares existing alignment headroom and context budget
+	http3Associations       []map[string]any
+	http3ContextSequence    uint64
+	http3AssociationLimited bool
 }
 
 // BinParserInspector is retained for source compatibility. Use ProtocolInspector.
@@ -2127,6 +2279,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 		v.received++
 		v.evicted++
 		v.identities.observe(e, v.received)
+		v.observeHTTP3Associations(e)
 		v.mu.Unlock()
 		return
 	}
@@ -2165,6 +2318,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	v.count++
 	v.bytes += row.retainedCost
 	v.index(&row)
+	v.observeHTTP3Associations(&row.BinParserEvent)
 }
 
 // Rows returns metadata only, oldest first, optionally filtered by protocol and
@@ -2226,6 +2380,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 		copyEvent.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
 		copyEvent.Session = cloneSession(e.Session)
 		copyEvent.Raw = append([]byte(nil), e.Raw...)
+		entries[0].materializeHTTP3Associations(&copyEvent)
 		row = &copyEvent
 	}
 	v.mu.Unlock()

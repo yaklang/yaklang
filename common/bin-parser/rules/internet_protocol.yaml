@@ -18,37 +18,42 @@ Package:
       operator: |
         protocol = getNodeResult("@Internet Protocol/Protocol").Value
         total = getNodeResult("@Internet Protocol/Total Length").Value
-        // These bounded carriers must not interpret IPv4 options or a
-        // fragment as a complete protocol message. Reassembly is caller-owned.
-        if protocol == 9 || protocol == 2 || protocol == 36 || protocol == 53 {
-          header = getNodeResult("@Internet Protocol/Header Length").Value * 4
-          if getNodeResult("@Internet Protocol/Version").Value != 4 || header < 20 || total < header { panic("ip: invalid routing-message IPv4 header boundary") }
-          if header > 20 {
-            options = this.NewSubNode("IP Header Options")
-            options.SetMaxLength(header-20)
-            options.Process()
+        header = getNodeResult("@Internet Protocol/Header Length").Value * 4
+        if getNodeResult("@Internet Protocol/Version").Value != 4 || header < 20 || total < header { panic("ip: invalid IPv4 header boundary") }
+        // Every child starts after this header's own IHL, including options.
+        // Keep opaque option bytes and validate their bounded TLV envelope;
+        // they must never be interpreted as transport ports or tunnel headers.
+        data = []byte{}
+        if header > 20 {
+          options = this.NewSubNode("IP Header Options")
+          options.SetMaxLength(header-20)
+          data = options.Process().Value
+          for position = 0; position < len(data); {
+            optionType = int(data[position])
+            if optionType == 0 { break }
+            if optionType == 1 { position++; continue }
+            if position+1 >= len(data) { panic("ip: incomplete IPv4 option") }
+            optionLength = int(data[position+1])
+            if optionLength < 2 || optionLength > len(data)-position { panic("ip: invalid IPv4 option length") }
+            position += optionLength
           }
-          fragments = getNodeResult("@Internet Protocol/Flags And Fragment Offset").Value
-          if (int(fragments[0]) & 63) != 0 || fragments[1] != 0 {
-            if total > header {
-              fragment = this.NewUnknownNode("IP Fragment Data")
-              fragment.SetMaxLength(total-header)
-              fragment.Process()
-            }
-            return
+        }
+        // A physical fragment is not a complete child message. Reassembly is
+        // caller-owned; do not guess a transport from a plausible body prefix.
+        fragments = getNodeResult("@Internet Protocol/Flags And Fragment Offset").Value
+        if (int(fragments[0]) & 63) != 0 || fragments[1] != 0 {
+          if protocol == 33 { panic("dccp: IPv4 fragments require caller reassembly") }
+          if total > header {
+            fragment = this.NewUnknownNode("IP Fragment Data")
+            fragment.SetMaxLength(total-header)
+            fragment.Process()
           }
+          return
         }
         dccpDestination = nil
         if protocol == 33 {
           dccpDestination = getNodeResult("@Internet Protocol/Destination").Value
-          header = getNodeResult("@Internet Protocol/Header Length").Value * 4
-          if getNodeResult("@Internet Protocol/Version").Value != 4 || header < 20 || total < header { panic("dccp: invalid enclosing IPv4 length") }
-          fragments = getNodeResult("@Internet Protocol/Flags And Fragment Offset").Value
-          if (int(fragments[0]) & 63) != 0 || fragments[1] != 0 { panic("dccp: IPv4 fragments require caller reassembly") }
           if header > 20 {
-            options = this.NewSubNode("IP Header Options")
-            options.SetMaxLength(header-20)
-            data = options.Process().Value
             for position = 0; position < len(data); {
               optionType = int(data[position])
               if optionType == 0 { break }

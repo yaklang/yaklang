@@ -51,6 +51,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	}
 	var zeroTuples []zeroTupleRoute
 	dir, retiredDir := 0, 0
+	var activeDirections, historicalDirections, retiredDirections uint8
 	retiredCID, retiredAmbiguous := false, false
 	retiredProfile := ""
 	selectRetired := func(candidate *list.Element, d int, byCID bool) {
@@ -64,6 +65,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			retiredAmbiguous = true
 		}
 		retired, retiredDir = candidate, d
+		retiredDirections |= 1 << d
 		retiredCID = retiredCID || byCID
 	}
 	for _, candidate := range s.entries {
@@ -80,25 +82,29 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 					selectRetired(candidate, d, false)
 					continue
 				}
-				// An endpoint tuple is not an epoch identifier, even when the
-				// old close packet was lost. Resolve competing tuple/CID routes
-				// by packet protection after collecting all candidates.
 				zeroTuples = append(zeroTuples, zeroTupleRoute{candidate, d})
 			}
 		}
-		for cid, owner := range q.cids {
+		for cid, owners := range q.cids {
 			match := long && string(first.dcid) == cid || !long && len(wire) >= 1+len(cid) && string(wire[1:1+len(cid)]) == cid
-			if match {
-				retireMatchedIdle(v)
+			if !match {
+				continue
+			}
+			retireMatchedIdle(v)
+			for owner := 0; owner < 2; owner++ {
+				if owners&(1<<owner) == 0 {
+					continue
+				}
+				d := 1 - owner
 				if q.retired {
-					selectRetired(candidate, 1-owner, true)
+					selectRetired(candidate, d, true)
 					continue
 				}
 				if el != nil && el != candidate {
 					return nil, false
 				}
-				el = candidate
-				dir = 1 - owner
+				el, dir = candidate, d
+				activeDirections |= 1 << d
 			}
 		}
 	}
@@ -107,9 +113,13 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		zeroTuples = nil // One active captured tuple has no competing epoch.
 	}
 	if retired != nil && (retiredCID || el == nil && len(zeroTuples) == 0) {
-		// After retirement, packet protection with public Initial keys cannot
-		// establish a fresh captured generation. Preserve the entire refused
-		// datagram without pretending its coalesced packets were decoded.
+		// Equal CID bytes can describe both endpoint namespaces. After key
+		// retirement only the observed private tuple can resolve their roles.
+		if !retiredAmbiguous && retiredDirections == 3 {
+			var unique bool
+			retiredDir, unique = quicObservedTupleDirection(retired.Value.(*binUDPEntry).flow, base, retiredDirections)
+			retiredAmbiguous = !unique
+		}
 		e := *base
 		e.Protocol, e.Profile = "quic", retiredProfile
 		if long {
@@ -122,40 +132,78 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if !retiredAmbiguous {
 			e.FlowID = retired.Value.(*binUDPEntry).flow.id
 		} else {
-			e.Direction = 0 // No unique captured endpoint role; never depend on map iteration.
+			e.Direction = 0
 		}
 		e.Length, e.Session = len(wire), nil
 		a.finishProtocolDatagram(&e, wire, nil, protocolError(ErrContextRequired, "QUIC captured connection ID was retired"))
 		return []*ProtocolEvent{&e}, true
 	}
-	historical := false
-	if el == nil && !long {
+	// A peer may keep using the same CID bytes after the other issuer retires
+	// its route. Collect both namespaces before attempting packet protection;
+	// an active route must not hide a reordered packet for the retired peer.
+	if !long {
 		for _, candidate := range s.entries {
 			v := candidate.Value.(*binUDPEntry)
 			q := v.flow.quic
 			if q == nil || q.retired || q.keys == nil || v.key.domain != base.Domain {
 				continue
 			}
-			for owner, retired := range q.cidRetired {
-				if q.keys.app[1-owner][q.keyPhase[1-owner]] == nil {
+			for owner, history := range q.cidRetired {
+				d := 1 - owner
+				if q.keys.app[d][q.keyPhase[d]] == nil {
 					continue
 				}
-				for _, cid := range retired {
-					if len(wire) >= 1+len(cid) && string(wire[1:1+len(cid)]) == cid {
-						if el != nil && el != candidate {
-							return nil, false
-						}
-						el, dir, historical = candidate, 1-owner, true
+				for _, cid := range history {
+					if len(wire) < 1+len(cid) || string(wire[1:1+len(cid)]) != cid {
+						continue
 					}
+					if el != nil && el != candidate {
+						// Keep the established conservative refusal across distinct
+						// connections; a tuple alone cannot choose a generation.
+						if activeDirections != 0 {
+							continue
+						}
+						return nil, false
+					}
+					el, dir = candidate, d
+					historicalDirections |= 1 << d
 				}
 			}
 		}
 	}
+	historical := false
+	if el != nil && activeDirections|historicalDirections == 3 {
+		q := el.Value.(*binUDPEntry).flow.quic
+		matchedDir, matches := 0, 0
+		for d := 0; d < 2; d++ {
+			if q.matchesExistingWireContext(d, wire) {
+				matchedDir, matches = d, matches+1
+			}
+		}
+		if matches == 1 {
+			dir = matchedDir
+		} else if observed, unique := quicObservedTupleDirection(el.Value.(*binUDPEntry).flow, base, 3); unique {
+			dir = observed
+		} else {
+			// Never advance PN/key/stream state by choosing a map iteration
+			// winner. A later authenticated packet can still recover normally.
+			e := *base
+			e.Protocol, e.Profile = "quic", quicNativeProfile(q.effectiveVersion())
+			e.nativeQUICObservation = true
+			e.Admission, e.Completeness = "unresolved-CID-endpoint", "datagram"
+			e.ID, e.Direction, e.FlowID = a.ids.Add(1), 0, 0
+			e.ResponseTo, e.TransactionID, e.Session = 0, 0, nil
+			e.Length = len(wire)
+			a.finishProtocolDatagram(&e, wire, nil, protocolError(ErrContextRequired, "QUIC CID belongs to both captured endpoints; no unique packet protection or observed tuple"))
+			return []*ProtocolEvent{&e}, true
+		}
+	}
+	if el != nil {
+		historical = historicalDirections&(1<<dir) != 0 && activeDirections&(1<<dir) == 0
+	}
 	if len(zeroTuples) > 0 {
-		// Old zero-CID packets can be reordered past both CONNECTION_CLOSE and
-		// a new handshake on the same tuple, or the close can be lost entirely.
 		// Probe protection without changing PN/key/stream state or leases,
-		// then deliver to exactly one owner.
+		// then deliver to exactly one captured generation and endpoint.
 		var owner *list.Element
 		ownerDir, matches := 0, 0
 		selectOwner := func(candidate *list.Element, d int) {
@@ -265,6 +313,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err == nil && h.long {
 			e.Profile = quicNativeProfile(h.version)
 		}
+		if f.quic.retired {
+			// A replay between coalesced packets may exhaust the owner budget.
+			// Retain the remaining wire once; public Initial keys cannot reopen it.
+			err = protocolError(ErrResourceExceeded, "QUIC recovery exhausted the conversation budget")
+		}
 		if err != nil {
 			if _, typed := classifySessionError(err); typed == nil {
 				err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC header: %v", err)
@@ -275,6 +328,10 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC length")
 		}
 		bounded := err == nil
+		// Prefix routing may find an active shorter CID before authentication
+		// resolves a longer retired CID from the same issuer (or vice versa).
+		// Describe the exact authenticated header, not the coarse route mask.
+		packetHistorical := historical || bounded && !h.long && !f.quic.hasNativeCID(1-dir, string(h.dcid)) && f.quic.isRetiredNativeCID(1-dir, h.dcid)
 		if bounded {
 			size = h.size
 			if off == 0 {
@@ -301,15 +358,20 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err == nil {
 			e.Session, err = f.quic.consume(dir, raw, a.budget.MaxCollectionElements)
 		}
+		if bounded && !rejectedCID && el != nil {
+			if pendingError := f.quic.retainEarly(&e, h, raw, off, a.budget.MaxCollectionElements, err); pendingError != nil {
+				err = pendingError
+			}
+		}
 		f.quic.eventRefs = nil
-		if historical && e.Session["Authentication Verified"] != true {
+		if packetHistorical && e.Session["Authentication Verified"] != true {
 			return nil, false
 		}
-		if historical {
+		if packetHistorical {
 			e.Session["Retired Destination CID"] = true
 			e.Session["CID Association"] = "authenticated late packet on retired CID"
 		}
-		if err == nil || isRecoverableH3ObservationError(err) {
+		if err == nil || isRecoverableH3ObservationError(err) || recoverableQUICEarlyError(err) || len(f.quic.earlyPending) > 0 {
 			if budgetError := f.reserveSession(f.quic.initialMemory()); budgetError != nil {
 				err = budgetError
 			}
@@ -323,7 +385,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			v := el.Value.(*binUDPEntry)
 			// Closed-generation evidence may be inspected, but must not keep
 			// obsolete keys alive indefinitely through late packets.
-			if !f.quic.closed {
+			if !f.quic.closed && !f.quic.retired {
 				if base.Timestamp.After(v.touched) {
 					v.touched = base.Timestamp
 				}
@@ -331,56 +393,13 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			}
 			e.FlowID = f.id
 		}
-		if e.Session != nil {
-			e.Session["Observation Scope"] = "UDP capture domain and observed CID"
-			e.Session["Datagram Offset"] = off
-			e.Session["Native Carrier"] = true
-			e.Session["ALPN"] = f.quic.alpn
-			// Duplicate/protected packets can return before finishFrames. Their
-			// connection context still includes an earlier observed HTTP3 fault.
-			f.quic.annotateH3ConnectionFault(e.Session)
-		}
-		if e.Session != nil {
-			var transaction uint64
-			multiple := false
-			frames, _ := e.Session["Frames"].([]map[string]any)
-			for _, fr := range frames {
-				if id, ok := fr["Request PDU ID"].(uint64); ok && id != 0 {
-					if transaction != 0 && transaction != id {
-						multiple = true
-					}
-					transaction = id
-				}
-			}
-			if !multiple && transaction != 0 {
-				e.TransactionID = transaction
-				if dir == 1 {
-					e.ResponseTo = transaction
-				}
-			}
-			if e.Session["Encrypted"] == true {
-				e.Completeness = "encrypted"
-				e.Session["Content Visibility"] = "encrypted"
-				e.Admission = "observed-CID-protected-payload"
-			}
-		}
-		if e.Session["HTTP3"] == true {
-			e.Protocol = "http3"
-			e.Profile = "http3-native"
-		}
-		if e.Session["DoQ"] == true {
-			e.Protocol = "doq"
-			e.Profile = "doq-native"
-			if d, ok := e.Session["DoQ Message"].(map[string]any); ok {
-				e.Session["DNS"] = d["DNS"]
-			}
-		}
+		a.projectNativeQUICSession(&e, f.quic, off)
 		// A failed AEAD or unavailable key does not invalidate the long-header
 		// length (RFC9000 12.2). Never scan ciphertext for a guessed boundary.
 		// Other failures, notably resource refusal, stop processing and retain
 		// the entire unprocessed remainder in one bounded diagnostic.
 		_, typed := classifySessionError(err)
-		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage || isRecoverableH3ObservationError(err))
+		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage || isRecoverableH3ObservationError(err) || recoverableQUICEarlyError(err))
 		if err != nil && !recoverable {
 			// Keep an existing single-packet error envelope. It cannot describe
 			// an aggregated remainder or a refused resource reservation.
@@ -408,22 +427,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		default:
 			e.Admission = "unverified-QUIC-candidate"
 		}
-		// The authenticated session already parsed this header. Preserve the wire
-		// field view without executing a YAML operator for every ciphertext octet.
-		e.nativeQUICWire = err == nil
-		if bounded && size == h.size && e.Session != nil {
-			observed := h
-			if !h.long {
-				// The session resolves a short header's CID size from observed
-				// receiver context; the stateless outer header has no size byte.
-				observed.dcid, _ = e.Session["DCID"].([]byte)
-			}
-			e.Session["Wire Field Ranges"] = quicHeaderWireRanges(observed, raw)
-		}
-		// Query identity and passive context are private even on a refused
-		// native event; mutable public labels/caches cannot grant success.
-		e.semanticSession = cloneSession(e.Session)
-		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
+		a.finishNativeQUICWire(&e, h, raw, err, bounded)
 		datagramAuthenticated = datagramAuthenticated || e.Admission == "authenticated-wire-and-observed-CID" && e.Session["Authentication Verified"] == true
 		lastLongBoundary = bounded && h.long && size == h.size && !rejectedCID
 		if e.Admission == "unparsed-datagram-remainder" {
@@ -437,9 +441,26 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err != nil && !recoverable {
 			break
 		}
+		if err == nil && h.space == quicSpaceHandshake && off < len(wire) && el != nil &&
+			!f.quic.retired && !f.quic.closed && len(f.quic.earlyPending) > 0 && f.quic.earlyAccepted() {
+			// An accepted early request can precede a response in the next
+			// coalesced packet. Restore it now, reserving every remaining wire
+			// observation before spending a slot on the earlier capture.
+			available := a.budget.MaxCollectionElements - len(events)
+			if available > 0 {
+				reserved := f.quic.remainingWireEvents(dir, wire[off:], available)
+				events = append(events, a.resumeEarlyQUIC(f, base, available-reserved)...)
+			}
+		}
 	}
 	if el == nil {
 		f.closeSession()
+	} else if f.quic.closed {
+		f.quic.earlyPending, f.quic.earlyPendingBytes = nil, 0
+	} else {
+		// Also retry at the datagram boundary after late keys/control context,
+		// without allowing replay to authenticate this datagram's padding.
+		events = append(events, a.resumeEarlyQUIC(f, base, a.budget.MaxCollectionElements-len(events))...)
 	}
 	return events, true
 }
@@ -452,6 +473,15 @@ func (q *binQUIC) authenticatesExistingWire(dir int, wire []byte) bool {
 	}
 	h, err := q.wireHeader(wire, dir)
 	if err != nil || h.retry || h.vn || h.size <= 0 || h.size > len(wire) {
+		return false
+	}
+	return q.authenticatesParsedWire(dir, wire, h)
+}
+
+// The caller already resolved this candidate's CID length. This probe must
+// never recurse through wireHeader or commit PN/key/CID/stream state.
+func (q *binQUIC) authenticatesParsedWire(dir int, wire []byte, h quicHdr) bool {
+	if q == nil || q.retired || q.keys == nil || dir < 0 || dir > 1 || h.retry || h.vn || h.size <= 0 || h.size > len(wire) {
 		return false
 	}
 	probe, _, err := q.protectionCandidate(dir, h)

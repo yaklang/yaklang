@@ -81,6 +81,16 @@ func tlsResumptionContext(t *testing.T, s *binTLS) map[string]any {
 	return v
 }
 
+// These are complete TLS 1.3 key-exchange declarations, not derived secrets or
+// evidence that a cryptographic handshake/PSK binder has been verified.
+func tlsResumptionDHExtensions(client bool) []tlsResumptionExt {
+	share := append([]byte{0, 29, 0, 32}, bytes.Repeat([]byte{7}, 32)...)
+	if client {
+		return []tlsResumptionExt{{10, []byte{0, 2, 0, 29}}, {51, append(binary.BigEndian.AppendUint16(nil, uint16(len(share))), share...)}}
+	}
+	return []tlsResumptionExt{{51, share}}
+}
+
 func TestTLSResumptionSessionIDEvidenceIsVersionScoped(t *testing.T) {
 	for _, client := range []int{0, 1} {
 		for _, version := range []uint16{0x303, 0x304} {
@@ -91,8 +101,8 @@ func TestTLSResumptionSessionIDEvidenceIsVersionScoped(t *testing.T) {
 					var ch, sh []tlsResumptionExt
 					if version == 0x304 {
 						suite = 0x1301
-						ch = []tlsResumptionExt{{43, []byte{2, 3, 4}}}
-						sh = []tlsResumptionExt{{43, []byte{3, 4}}}
+						ch = append([]tlsResumptionExt{{43, []byte{2, 3, 4}}}, tlsResumptionDHExtensions(true)...)
+						sh = append([]tlsResumptionExt{{43, []byte{3, 4}}}, tlsResumptionDHExtensions(false)...)
 					}
 					m, err := s.handshakeMessage(client, reliabilityHS(1, tlsResumptionHello(true, sid, suite, ch...)), false)
 					require.NoError(t, err)
@@ -572,7 +582,7 @@ func TestTLSResumptionQUICMetadataFollowsAuthenticatedCIDEpoch(t *testing.T) {
 		seed := bytes.Repeat([]byte{epoch}, 8)
 		ch := tlsResumptionPSKClient(nil, offer, 0)
 		if epoch == 2 {
-			ch = tlsResumptionHello(true, nil, 0x1301, tlsResumptionExt{43, []byte{2, 3, 4}})
+			ch = tlsResumptionHello(true, nil, 0x1301, append([]tlsResumptionExt{{43, []byte{2, 3, 4}}}, tlsResumptionDHExtensions(true)...)...)
 		}
 		events, ok := a.decodeQUICDatagram(base, retryTestInitialFrames(t, seed, seed, nil, nil, 0, 0, crypto(reliabilityHS(1, ch))))
 		require.True(t, ok)
@@ -585,7 +595,7 @@ func TestTLSResumptionQUICMetadataFollowsAuthenticatedCIDEpoch(t *testing.T) {
 		reverse.Source, reverse.Destination = base.Destination, base.Source
 		sh := tlsResumptionPSKServer(nil, 0)
 		if epoch == 2 {
-			sh = tlsResumptionHello(false, nil, 0x1301, tlsResumptionExt{43, []byte{3, 4}})
+			sh = tlsResumptionHello(false, nil, 0x1301, append([]tlsResumptionExt{{43, []byte{3, 4}}}, tlsResumptionDHExtensions(false)...)...)
 		}
 		events, ok = a.decodeQUICDatagram(&reverse, retryTestInitialFrames(t, seed, nil, nil, nil, 0, 1, crypto(reliabilityHS(2, sh))))
 		require.True(t, ok)

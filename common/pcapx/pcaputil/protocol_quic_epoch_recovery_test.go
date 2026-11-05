@@ -257,19 +257,20 @@ func TestQUICFutureEpochTransportStateRefusalIsAtomic(t *testing.T) {
 			{"conflicting-crypto", []byte{6, 0, 1, 'X'}, "conflicting retransmission"},
 		} {
 			t.Run(fmt.Sprintf("steps%d/%s", steps, tc.name), func(t *testing.T) {
-				q, key := quicConformanceContext(t, quicVersion1, quicAEADAES128GCM)
+				n := n09ObservedCIDOwner(t, quicVersion1, quicAEADAES128GCM, [2]bool{}, true)
+				q, key := n.q, n.key
 				q.byteLimit = 4096
-				q.cids = map[string]int{"old-cid8": 0}
-				q.cidSequences[0] = map[uint64]string{1: "old-cid8"}
+				q.cids["old-cid8"] = 1
+				q.cidSequences[0][1] = "old-cid8"
 				q.streams = map[uint64]*quicStream{0: {id: 0}}
 				q.streams[0].reassembly[0].data = []byte("abc")
 				q.cryptoData[0][quicSpaceApplication].data = []byte("abcd")
-				_, err := q.consume(0, epochQUICPacket(t, key, nil, 10, 0, 2), 128)
+				_, err := q.consume(0, epochQUICPacket(t, key, n.cid[1], 10, 0, 2), 128)
 				require.NoError(t, err)
 				epochs := missedQUICEpochKeys(t, key, steps)
 				// A preceding valid new stream must also remain undelivered.
 				plain := append(streamFrame(4, "ok"), tc.body...)
-				wire := quicConformancePacket(t, epochs[steps], "1-RTT", 100, byte((steps&1)<<2), plain)
+				wire := n09ObservedCIDPacket(t, epochs[steps], n.cid[1], 100, steps&1, plain)
 				assertQUICEpochProbeUnchanged(t, q, 0, wire, true)
 				before := cloneQUICKeyring(q.keys)
 				info, err := q.consume(0, wire, 128)
@@ -282,7 +283,7 @@ func TestQUICFutureEpochTransportStateRefusalIsAtomic(t *testing.T) {
 				require.Equal(t, []byte("abc"), q.streams[0].reassembly[0].data)
 				require.Equal(t, []byte("abcd"), q.cryptoData[0][quicSpaceApplication].data)
 				require.NotContains(t, info, "Frames")
-				_, err = q.consume(0, epochQUICPacket(t, epochs[steps], nil, 99, steps&1, 2), 128)
+				_, err = q.consume(0, epochQUICPacket(t, epochs[steps], n.cid[1], 99, steps&1, 2), 128)
 				require.NoError(t, err)
 			})
 		}

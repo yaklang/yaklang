@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"google.golang.org/grpc"
 	"io"
 	"sort"
 	"strings"
@@ -420,12 +422,14 @@ func startScanWithConcurrency(client ypb.YakClient, t *testing.T, progID string,
 		},
 	})
 
+	var initial []*ypb.SyntaxFlowScanResponse
 	for {
 		resp, err := stream.Recv()
 		require.NoError(t, err)
 		log.Infof("resp: %v", resp)
+		initial = append(initial, resp)
 		if resp.TaskID != "" {
-			return resp.TaskID, stream
+			return resp.TaskID, &syntaxFlowScanReplayClient{Yak_SyntaxFlowScanClient: stream, pending: initial}
 		}
 	}
 }
@@ -2018,4 +2022,79 @@ alert $low for {
 		checkGRPCDiffProgScanTest(t, client, config)
 	})
 	// }
+}
+
+// Waiting for a task ID must not consume a real progress/status event that
+// the test later asserts. Keep every response in its original receive order.
+type syntaxFlowScanReplayClient struct {
+	ypb.Yak_SyntaxFlowScanClient
+	pending []*ypb.SyntaxFlowScanResponse
+}
+
+func (s *syntaxFlowScanReplayClient) Recv() (*ypb.SyntaxFlowScanResponse, error) {
+	if len(s.pending) > 0 {
+		first := s.pending[0]
+		s.pending = s.pending[1:]
+		return first, nil
+	}
+	return s.Yak_SyntaxFlowScanClient.Recv()
+}
+
+type syntaxFlowScanInitialFake struct {
+	ypb.Yak_SyntaxFlowScanClient
+	responses []*ypb.SyntaxFlowScanResponse
+	requests  []*ypb.SyntaxFlowScanRequest
+}
+
+func (s *syntaxFlowScanInitialFake) Recv() (*ypb.SyntaxFlowScanResponse, error) {
+	if len(s.responses) == 0 {
+		return nil, io.EOF
+	}
+	r := s.responses[0]
+	s.responses = s.responses[1:]
+	return r, nil
+}
+func (s *syntaxFlowScanInitialFake) Send(r *ypb.SyntaxFlowScanRequest) error {
+	s.requests = append(s.requests, r)
+	return nil
+}
+
+type syntaxFlowInitialClientFake struct {
+	ypb.YakClient
+	stream *syntaxFlowScanInitialFake
+}
+
+func (c *syntaxFlowInitialClientFake) SyntaxFlowScan(context.Context, ...grpc.CallOption) (ypb.Yak_SyntaxFlowScanClient, error) {
+	return c.stream, nil
+}
+func TestGRPCMUSTPASS_SyntaxFlow_StartScanRetainsInitialProgress(t *testing.T) {
+	for _, prefix := range []bool{false, true} {
+		t.Run(fmt.Sprint(prefix), func(t *testing.T) {
+			progress := &ypb.SyntaxFlowScanResponse{TaskID: "task", Status: "executing", ExecResult: yaklib.NewYakitProgressExecResult("main", .5)}
+			done := &ypb.SyntaxFlowScanResponse{TaskID: "task", Status: "done"}
+			want := []*ypb.SyntaxFlowScanResponse{progress, done}
+			if prefix {
+				want = append([]*ypb.SyntaxFlowScanResponse{{Status: "preparing"}}, want...)
+			}
+			stream := &syntaxFlowScanInitialFake{responses: append([]*ypb.SyntaxFlowScanResponse(nil), want...)}
+			id, got := startScanWithConcurrency(&syntaxFlowInitialClientFake{stream: stream}, t, "program", context.Background(), 3, &ypb.SyntaxFlowRuleFilter{RuleNames: []string{"one", "two"}})
+			require.Equal(t, "task", id)
+			require.Len(t, stream.requests, 1)
+			require.Equal(t, "start", stream.requests[0].ControlMode)
+			require.Equal(t, uint32(3), stream.requests[0].Concurrency)
+			for _, expected := range want {
+				r, err := got.Recv()
+				require.NoError(t, err)
+				require.Same(t, expected, r)
+				if r.ExecResult != nil {
+					var decoded msg
+					require.NoError(t, json.Unmarshal(r.ExecResult.Message, &decoded))
+					require.Equal(t, "progress", decoded.Type)
+					require.Equal(t, .5, decoded.Content.Process)
+				}
+			}
+			_, err := got.Recv()
+			require.ErrorIs(t, err, io.EOF)
+		})
+	}
 }

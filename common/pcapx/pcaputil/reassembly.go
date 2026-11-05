@@ -365,6 +365,9 @@ func (t *TrafficConnection) pendingConflict(i int, seq uint32, payload []byte) b
 // FeedClient and FeedServer share the passive receive algorithm. Each direction
 // can start midstream; SYN retransmits never reset an established cursor.
 func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
+	// Queued segments retain their own ACK with their byte provenance. A later
+	// callback packet must not establish completeness for an earlier response.
+	t.evidence.tcpACK, t.evidence.tcpACKKnown = tcp.Ack, tcp.ACK
 	// Before a new connection has a reverse cursor, a late ACK from the previous
 	// use of this tuple must not close it or supply that cursor. RFC 9293 3.10.7.3
 	// rejects ACK <= ISS and non-SYN segments without ACK in SYN-SENT.

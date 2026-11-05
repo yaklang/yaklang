@@ -605,6 +605,10 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		h(packet)
 	}
 	if failure := packet.ErrorLayer(); failure != nil {
+		if _, refused := packet.(*ipv4IPIPExtentRefusedPacket); refused {
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
 		if hasUnselectedEtherIP(packet) {
 			// networkPacket already published the parent refusal. Keep the
 			// original decoder failure for strict capture/error accounting, but

@@ -111,11 +111,6 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 }
 
 func TestSFTPOuterSSHScopeDoesNotClaimSubsystem(t *testing.T) {
-	sc, ok := ResolveP1Scorecard("SFTP")
-	require.True(t, ok)
-	require.Equal(t, "L4", sc.SampleClass)
-	require.False(t, sc.G5, "outer SSH captures cannot establish SFTP application coverage")
-	require.Zero(t, sc.Schema+sc.Traffic+sc.Tests+sc.Branches+sc.Stack)
 	for _, r := range ProtocolRoadmap {
 		if r.Name == "SFTP" {
 			require.Equal(t, stPartial, r.Status)

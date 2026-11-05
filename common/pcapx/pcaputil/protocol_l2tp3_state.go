@@ -713,7 +713,7 @@ func (a *binParser) l2tp3ControlObserve(e *ProtocolEvent, m map[string]any, w []
 	m["Control Context Proof"] = l2tp3ProofValues(c.proofs)
 }
 
-func (a *binParser) l2tp3DataResolve(e *ProtocolEvent, m map[string]any, w []byte, udp bool) (map[string]any, []byte, string, error) {
+func (a *binParser) l2tp3DataResolve(e *ProtocolEvent, m map[string]any, w []byte, udp bool, firstHeader ...l2tp3FirstHeaderExtent) (map[string]any, []byte, string, error) {
 	s := a.l2tp3
 	if s == nil {
 		return m, nil, "", nil
@@ -761,6 +761,9 @@ func (a *binParser) l2tp3DataResolve(e *ProtocolEvent, m map[string]any, w []byt
 	b := matches[0]
 	v := b.session
 	c := v.c
+	if err := l2tp3SelectedFirstHeaderError(v, b, firstHeader, m); err != nil {
+		return m, nil, "", err
+	}
 	e.FlowID, e.Direction = v.id, 1-b.receiver
 	context := func(x map[string]any) {
 		l2tp3SessionValues(x, v)

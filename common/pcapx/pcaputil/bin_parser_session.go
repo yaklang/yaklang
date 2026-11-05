@@ -20,6 +20,82 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	if p := probeSMB1FileCommand(wire, 65582); p.Verdict == ProbeAccept {
+		client := dir
+		if wire[13]&0x80 != 0 {
+			client = 1 - dir
+		}
+		f.protocol, f.smb2 = "smb", &binSMB2{client: client}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		if len(wire) >= 39 {
+			fixed := 39 + 2*int(wire[36])
+			if len(wire) >= fixed && (smb2DirectLength(wire)+4 > f.a.budget.MaxFrameBytes || smb2DirectLength(wire)+4 > f.a.config.MaxMessageBytes) {
+				client := dir
+				if wire[13]&0x80 != 0 {
+					client = 1 - dir
+				}
+				f.protocol, f.smb2 = "smb", &binSMB2{client: client}
+			}
+		}
+		return
+	}
+	if p := probeSMB1SessionSetupExtended(wire, 65598); p.Verdict == ProbeAccept {
+		client := dir
+		if wire[13]&0x80 != 0 {
+			client = 1 - dir
+		}
+		f.protocol, f.smb2 = "smb", &binSMB2{client: client}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		fixed := 63
+		if len(wire) > 13 && wire[13]&0x80 != 0 {
+			fixed = 47
+		}
+		if len(wire) >= fixed && (smb2DirectLength(wire)+4 > f.a.budget.MaxFrameBytes || smb2DirectLength(wire)+4 > f.a.config.MaxMessageBytes) {
+			client := dir
+			if wire[13]&0x80 != 0 {
+				client = 1 - dir
+			}
+			f.protocol, f.smb2 = "smb", &binSMB2{client: client}
+		}
+		return
+	}
+	// A complete SMB1 multi-protocol offer can exceed ProbeBytes. Preserve its
+	// validated boundary so this direction can continue with the following SMB2
+	// request instead of being permanently stopped as an unknown prefix.
+	if p := probeSMB1Negotiate(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.smb2 = "smb", &binSMB2{client: dir}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
+	// Response identity is checked against its hard format bound. Configured
+	// parser budgets still refuse it with a typed error before Node allocation;
+	// an otherwise valid over-budget response is not an unknown protocol.
+	if p := probeSMB1NegotiateExtendedResponse(wire, 65608); p.Verdict == ProbeAccept {
+		f.protocol, f.smb2 = "smb", &binSMB2{client: 1 - dir}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		// Complete fixed words and ByteCount can prove this finite prefix
+		// exceeds the caller's byte budget. Route it to a private resource
+		// refusal without buffering or decoding its unavailable payload.
+		if len(wire) >= 73 && (smb2DirectLength(wire)+4 > f.a.budget.MaxFrameBytes || smb2DirectLength(wire)+4 > f.a.config.MaxMessageBytes) {
+			f.protocol, f.smb2 = "smb", &binSMB2{client: 1 - dir}
+		}
+		return
+	}
+	// SMB2's fixed header is 68 bytes including Direct TCP, four more than
+	// the default generic probe window. Check that bounded header before
+	// clipping; a signature alone cannot establish this protocol.
+	if len(wire) >= 8 {
+		if p := probeSMB2(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+			f.protocol, f.smb2 = "smb2", &binSMB2{client: dir}
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
+	}
 	if f.port(4739) {
 		if p := probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 			f.protocol = "ipfix"
@@ -147,6 +223,17 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
+	if p := probeWCF(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		clientDir, clientKnown := f.tcpClientDir, f.tcpClientKnown
+		midstream := p.Version == "midstream"
+		if !midstream {
+			clientDir, clientKnown = dir, true
+		}
+		f.protocol, f.wcf = "wcf", newBinWCF(clientDir, clientKnown, midstream)
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	// A long MySQL greeting can begin with 'P\x00\x00\x00\x0a', which
 	// resembles a tiny PostgreSQL Parse frame. Check the numeric version,
 	// salt/filler and protocol-41 capabilities before weak typed messages.
@@ -187,10 +274,9 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: true}
 		return
 	}
-	if f.captureTCP && probeQUIC(w, f.a.config.ProbeBytes).Verdict == ProbeAccept {
-		f.protocol = "quic" // report unsupported TCP carrier without decoding its payload
-		return
-	}
+	// A QUIC-shaped prefix cannot select a UDP-only native protocol on a
+	// captured TCP stream. Selecting it here made an unconfirmed candidate
+	// sticky and published a QUIC context diagnostic for arbitrary TCP bytes.
 	if f.captureTCP {
 		if s := f.probeTextInternet(dir, w); s != nil {
 			f.protocol, f.textInternet = s.protocol, s
@@ -316,6 +402,13 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.clickhouse = "clickhouse", &binClickHouse{clientDir: clientDir}
 	case "stomp":
 		f.protocol, f.stomp = "stomp", &binSTOMP{clientDir: dir}
+	case "wcf":
+		clientDir, clientKnown := f.tcpClientDir, f.tcpClientKnown
+		midstream := p.Version == "midstream"
+		if !midstream {
+			clientDir, clientKnown = dir, true
+		}
+		f.protocol, f.wcf = "wcf", newBinWCF(clientDir, clientKnown, midstream)
 	case "socks5":
 		f.protocol, f.socks5 = "socks5", &binSOCKS5{client: dir, phase: socks5Greeting}
 	case "stratum":
@@ -372,8 +465,8 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.tds = "tds", &binTDS{client: -1, encrypt: tdsEncryptUnknown}
 	case "amqp":
 		f.protocol, f.amqp = "amqp", &binAMQP{client: -1, pending: map[uint16][]string{}, delivers: map[uint64]uint16{}, chans: map[uint16]*amqpChan{}}
-	case "smb2":
-		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir, pending: map[smb2PendingKey]smb2Pending{}, async: map[smb2AsyncKey]smb2PendingKey{}, files: map[smb2FileKey]string{}}
+	case "smb", "smb2":
+		f.protocol, f.smb2 = p.Protocol, &binSMB2{client: dir, pending: map[smb2PendingKey]smb2Pending{}, async: map[smb2AsyncKey]smb2PendingKey{}, files: map[smb2FileKey]string{}}
 	case "dcerpc":
 		f.protocol, f.dcerpc = "dcerpc", &binDCERPC{
 			client: dir, ctx: map[uint16]string{}, uuid: map[uint16][]byte{}, ctxVersion: map[uint16]uint32{},
@@ -779,8 +872,22 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+	case "smb":
+		if isSMB1FileEntry(e.Entry) {
+			err = f.consumeSMB1FileCommand(dir, e)
+		} else if isSMB1SetupEntry(e.Entry) {
+			err = f.consumeSMB1Setup(dir, e)
+		} else {
+			err = f.consumeSMB1Negotiate(dir, e)
+		}
 	case "smb2":
-		e.Session, err = f.smb2.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		err = f.consumeSMB2(dir, e)
+		if err == nil && f.smb2 != nil {
+			// A successfully accepted modern carrier makes any old legacy
+			// offer ineligible. Do not reuse its MID or infer an SMB2 dialect.
+			f.smb2.smb1Modern, f.smb2.smb1, f.smb2.smb1Setup, f.smb2.smb1Legacy = true, nil, nil, nil
+			err = f.smb2.reserveState(0)
+		}
 		if err == nil && f.nbss {
 			e.Session["Carrier"] = "NetBIOS Session Service"
 		}
@@ -1167,6 +1274,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil {
 			e.Profile, e.Completeness = "stomp-bounded-frame", "message"
 		}
+	case "wcf":
+		err = f.consumeWCF(dir, e)
 	case "syslog":
 		framing := syslogStreamFraming(e.Raw)
 		e.Session, err = f.syslog.consume(e.Raw, framing, f.a.config.MaxMessageBytes, f.a.budget.MaxCollectionElements)
@@ -1239,7 +1348,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "postgresql":
 			e.Summary = fmt.Sprintf("PostgreSQL %v", e.Session["Message Name"])
 		case "ldap":
-			e.Summary = fmt.Sprintf("LDAP %v id %v", e.Session["Message Name"], e.Session["Message ID"])
+			e.Summary = ldapSessionSummary(e.Session, e.semanticFields)
 		case "redis":
 			e.Summary = fmt.Sprintf("Redis %v", e.Session["RESP Type"])
 		case "websocket":
@@ -1254,6 +1363,42 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("TDS %v", e.Session["Packet Name"])
 		case "amqp":
 			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
+		case "smb":
+			if isSMB1FileEntry(e.Entry) {
+				role := "request"
+				if e.Session["Response"] == true {
+					role = "response"
+				}
+				e.Summary = fmt.Sprintf("SMB1 %v %s", e.Session["Packet Name"], role)
+				body, _ := e.Session["Body"].(map[string]any)
+				for _, key := range []string{"Path", "File Name", "Service", "Native File System"} {
+					if value, ok := body[key].(string); ok && value != "" {
+						e.Summary += " · " + value
+					}
+				}
+			} else if isSMB1SetupEntry(e.Entry) {
+				body, _ := e.Session["Body"].(map[string]any)
+				blob, _ := body["Security Blob"].([]byte)
+				e.Summary = fmt.Sprintf("SMB1 SESSION_SETUP_ANDX · %v · opaque security blob %d B", e.Session["Setup Phase"], len(blob))
+			} else if e.Session["Response"] == true {
+				body, _ := e.Session["Body"].(map[string]any)
+				blob, _ := body["Security Blob"].([]byte)
+				e.Summary = "SMB1 NEGOTIATE response"
+				if name, ok := e.Session["Selected Dialect Name"].(string); ok {
+					e.Summary += " · " + name
+				}
+				e.Summary += fmt.Sprintf(" · opaque security blob %d B · dialect index %v", len(blob), body["Dialect Index"])
+				if _, matched := e.Session["Selected Dialect Name"]; !matched {
+					if reason, ok := e.Session["Selection Status"].(string); ok {
+						e.Summary += " · " + reason
+					}
+				}
+			} else {
+				e.Summary = "SMB1 SMB_COM_NEGOTIATE · dialect offers"
+				if e.Session["SMB2 Upgrade Offered"] == true {
+					e.Summary += " · SMB2 upgrade offered"
+				}
+			}
 		case "smb2":
 			e.Summary = smb2SessionSummary(e.Session)
 		case "dcerpc":
@@ -1327,19 +1472,49 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 }
 
 func smb2SessionSummary(session map[string]any) string {
-	name := fmt.Sprint(session["Packet Name"])
-	summary := "SMB2 " + name
+	name := sanitizeSummaryText(fmt.Sprint(session["Packet Name"]), 48)
+	if session["Encrypted"] == true || name == "transform" {
+		summary := "SMB2 transform ciphertext=opaque decrypt=no"
+		if size, ok := summaryUnsigned(session["Original Size"]); ok {
+			summary += fmt.Sprintf(" len=%d", size)
+		}
+		return limitSummary(summary, protocolSummaryLimit)
+	}
+	role := "request"
+	if session["Response"] == true {
+		role = "response"
+	}
+	summary := "SMB2 " + name + " " + role
+	if count, ok := summaryUnsigned(session["Compound Count"]); ok && count > 1 {
+		summary += fmt.Sprintf(" compound=%d", count)
+	}
 	if target := smb2SummaryTarget(session); target != "" {
-		summary += " " + target
+		summary += " target=" + target
 	}
 	if value, ok := smb2SummaryQuantity(session); ok {
 		summary += " " + value
 	}
+	var tail string
 	if status, ok := session["Status"].(uint32); ok {
-		summary += fmt.Sprintf(" status=0x%08x", status)
+		tail += fmt.Sprintf(" status=0x%08x", status)
 	}
-	summary += fmt.Sprintf(" mid %v", session["Message ID"])
-	return limitSummary(summary, 240)
+	if session["Response"] == true {
+		if status, ok := session["Status"].(uint32); ok && status == 0x00000103 {
+			tail += " result=pending"
+		} else {
+			tail += " result=response-status-observed"
+		}
+	} else {
+		tail += " result=request-pending"
+	}
+	if session["Association Status"] == "matched" {
+		tail += " matched"
+	} else if session["Unmatched"] == true {
+		tail += " unmatched"
+	}
+	tail += fmt.Sprintf(" mid=%v", session["Message ID"])
+	summary = limitSummary(summary, protocolSummaryLimit-len([]rune(tail)))
+	return summary + tail
 }
 
 func smb2SummaryTarget(session map[string]any) string {
@@ -1421,7 +1596,9 @@ func (f *binFlow) closeSession() {
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
 	f.httpUpgradeIssues = nil
+	f.httpRequestDirections = 0
 	for dir := range f.directions {
+		f.releaseHTTPAwait(f.directions[dir].http)
 		f.directions[dir].http = nil
 	}
 	if f.tls != nil && f.tls.child != nil {
@@ -1452,6 +1629,8 @@ func (f *binFlow) closeSession() {
 		f.memcached = nil
 	}
 	f.iso8583 = nil
+	f.wcf = nil
+	f.wcfTLS = nil
 	f.stratum = nil
 	f.gearman = nil
 	f.beanstalk = nil
@@ -1970,6 +2149,11 @@ func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
 // Conservative capacity accounting includes dictionaries and map/queue slots.
 // Reservations are released on close; repeated streams reuse the high-water budget.
 func (f *binFlow) reserveSession(target int64) error {
+	if f.wcfTLS != nil {
+		// The private carrier witness outlives the clear preamble. Charge it
+		// in addition to whichever TLS/framing parser currently owns bytes.
+		target += 256
+	}
 	if target <= f.sessionBytes {
 		return nil
 	}
@@ -2152,6 +2336,12 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
 	n := len(e.Raw) + len(e.nativeQUICWireBytes) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	if e.nativeWCF != nil {
+		n += 128 + len(e.nativeWCF.Status) + len(e.nativeWCF.Summary) + len(e.nativeWCF.Error)
+	}
+	if e.nativeWCFTLS != nil {
+		n += 160 + len(e.nativeWCFTLS.Status) + len(e.nativeWCFTLS.Summary) + len(e.nativeWCFTLS.Error)
+	}
 	n += len(e.Domain.Encapsulation)
 	for _, ref := range e.SourceBytes.PacketRefs {
 		n += len(ref.Domain.Encapsulation)

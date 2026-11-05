@@ -16,6 +16,8 @@ import (
 var errBinContext = errors.New("protocol context required")
 
 type binHTTPState struct {
+	awaitRequest                                                   bool
+	awaitCharge                                                    int64
 	ws                                                             *binWebSocket
 	requestID                                                      uint64
 	declared                                                       int64
@@ -51,6 +53,10 @@ func (h *binHTTPState) config(bodyLimit int) map[string]any {
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
 		switch f.protocol {
+		case "tls":
+			if f.wcfTLS != nil {
+				return f.frameWCFTLS(dir, w)
+			}
 		case "ipfix":
 			return f.frameIPFIX(w)
 		case "ldp":
@@ -113,7 +119,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameTDS(w)
 		case "amqp":
 			return f.frameAMQP(w)
-		case "smb2":
+		case "smb", "smb2":
 			return f.frameSMB2(w)
 		case "dcerpc":
 			return f.frameDCERPC(w)
@@ -240,6 +246,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameClickHouse(dir, w)
 		case "stomp":
 			return f.frameSTOMP(dir, w)
+		case "wcf":
+			return f.frameWCF(dir, w)
 		case "dnp3":
 			return f.frameDNP3(w)
 		case "c37118":
@@ -255,6 +263,15 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	}
 	d := &f.directions[dir]
 	h := d.http
+	if h != nil && h.awaitRequest {
+		if len(f.httpMethods) == 0 || !f.httpMayAwaitRequest(dir) {
+			return 0, nil, nil
+		}
+		// Reparse the same owned bytes with the actually observed method.
+		// Await state has no initialized body length or tunnel decision.
+		defer f.releaseHTTPAwait(h)
+		d.http, d.headerScan, h = nil, 0, nil
+	}
 	if h == nil {
 		end := incrementalHTTPIndex(w, 0, &d.headerScan, "\r\n\r\n")
 		if end < 0 {
@@ -294,6 +311,9 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.rawHeader = bytes.Clone(w[:end])
 			d.http = h
 			if len(f.httpMethods) == 0 {
+				if f.httpMayAwaitRequest(dir) {
+					return 0, nil, f.awaitHTTPRequest(h)
+				}
 				return 0, nil, sessionContext("HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
 			}
 			// Interim responses do not complete the queued request and carry
@@ -393,9 +413,6 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 		// Expect: 100-continue can produce a response before the request body.
 		// Associate the method as soon as its complete header is validated.
 		if !h.response {
-			h.requestID = f.a.ids.Add(1)
-			f.httpIDs = append(f.httpIDs, h.requestID)
-			f.httpTimes = append(f.httpTimes, d.ts)
 			cost := int64(3*end + 128*(len(f.httpMethods)+1) + len(h.wsKey) + len(h.wsOffer) + len(h.wsProtocols) + len(h.method))
 			for _, s := range f.httpWSKeys {
 				cost += int64(len(s))
@@ -409,6 +426,9 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			if err := f.reserveSession(cost); err != nil {
 				return 0, nil, err
 			}
+			h.requestID = f.a.ids.Add(1)
+			f.httpIDs = append(f.httpIDs, h.requestID)
+			f.httpTimes = append(f.httpTimes, d.ts)
 			f.httpMethods = append(f.httpMethods, h.method)
 			f.httpUpgrades = append(f.httpUpgrades, h.websocket)
 			f.httpUpgradeIssues = append(f.httpUpgradeIssues, h.wsIssue)
@@ -423,6 +443,9 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 				}
 				f.httpIPP = append(f.httpIPP, h.ipp)
 			}
+			// Commit the observed role only after every request queue and its
+			// reservation succeeded. Opposite request roles disable waiting.
+			f.httpRequestDirections |= byte(1 << uint(dir))
 		}
 	}
 	if h.declared > int64(f.a.config.MaxMessageBytes) {
@@ -430,7 +453,7 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	}
 	if h.closeDelimited {
 		return 0, nil, nil
-	} // only a clean TCP FIN can end this body
+	} // A clean transport FIN or authenticated TLS sender EOF ends this body.
 	if !h.chunked {
 		return h.total, f.spec("http", "HTTPExact"), nil
 	}
@@ -517,6 +540,7 @@ func (f *binFlow) finishHTTP(dir int) {
 	f.directions[dir].http = nil
 	f.directions[dir].headerScan = 0
 	if h.tunnel {
+		f.httpRequestDirections = 0
 		f.httpIDs, f.httpTimes = nil, nil
 		f.httpWSKeys, f.httpWSExtensions = nil, nil
 		f.httpWSProtocols = nil
@@ -575,6 +599,10 @@ func (f *binFlow) httpEvidence(dir int, e *ProtocolEvent) {
 	h := f.directions[dir].http
 	if h == nil {
 		return
+	}
+	if h.awaitRequest {
+		e.Completeness = "headers"
+		return // No guessed method, request ID, or message boundary.
 	}
 	e.Completeness = "message"
 	if !h.response {

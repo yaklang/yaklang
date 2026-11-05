@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 )
@@ -19,6 +20,8 @@ type kerberosFieldsDecoder struct {
 	r                                      *x509DERReader
 	values, padata                         []map[string]any
 	ciphers, cipherBytes, tickets, unknown int
+	messageDepth                           int
+	semantic                               map[string]any
 }
 
 type kerberosFieldSpec struct {
@@ -192,6 +195,151 @@ func (d *kerberosFieldsDecoder) principal(n *x509DERElement) error {
 	}
 	return d.list(f[1], "Name Components", true, d.string)
 }
+
+// principalSummary returns only the observed name components. It does not
+// infer authentication or account validity from message contents.
+func (d *kerberosFieldsDecoder) principalSummary(n *x509DERElement) string {
+	if n == nil {
+		return ""
+	}
+	var parts []string
+	total := 0
+	var walk func(*x509DERElement)
+	walk = func(current *x509DERElement) {
+		if current == nil || len(parts) >= 16 || total >= 512 {
+			return
+		}
+		if current.tag == 0x1b {
+			value := string(d.r.wire[current.content:current.end])
+			if remaining := 512 - total; len(value) > remaining {
+				value = value[:remaining]
+			}
+			parts = append(parts, value)
+			total += len(value)
+			return
+		}
+		for _, child := range current.children {
+			walk(child)
+		}
+	}
+	walk(n)
+	return strings.Join(parts, "/")
+}
+
+func (d *kerberosFieldsDecoder) context(n *x509DERElement, id byte) *x509DERElement {
+	if n == nil {
+		return nil
+	}
+	for _, child := range n.children {
+		if child.tag == 0xa0+id && len(child.children) == 1 {
+			return child.children[0]
+		}
+	}
+	return nil
+}
+
+func (d *kerberosFieldsDecoder) integerSummary(n *x509DERElement) (int64, bool) {
+	if n == nil || n.tag != 2 || n.end <= n.content || n.end-n.content > 8 {
+		return 0, false
+	}
+	b := d.r.wire[n.content:n.end]
+	var value int64
+	if b[0]&0x80 != 0 {
+		value = -1
+	}
+	for _, octet := range b {
+		value = value<<8 | int64(octet)
+	}
+	return value, true
+}
+
+func (d *kerberosFieldsDecoder) setSemanticString(name string, n *x509DERElement) {
+	if d.semantic == nil || n == nil || n.tag != 0x1b {
+		return
+	}
+	value := d.r.wire[n.content:n.end]
+	if len(value) > 512 {
+		value = value[:512]
+	}
+	d.semantic[name] = string(value)
+}
+
+func (d *kerberosFieldsDecoder) setSemanticPrincipal(name string, n *x509DERElement) {
+	if d.semantic == nil {
+		return
+	}
+	if value := d.principalSummary(n); value != "" {
+		d.semantic[name] = value
+	}
+}
+
+func (d *kerberosFieldsDecoder) semanticIntegers(name string, n *x509DERElement) {
+	if d.semantic == nil || n == nil {
+		return
+	}
+	seen := make(map[int64]bool)
+	values := make([]int64, 0, min(len(n.children), 16))
+	for _, item := range n.children {
+		if len(values) >= 16 {
+			break
+		}
+		value, ok := d.integerSummary(item)
+		if !ok || seen[value] {
+			continue
+		}
+		seen[value] = true
+		values = append(values, value)
+	}
+	if len(values) != 0 {
+		d.semantic[name] = values
+	}
+}
+
+func (d *kerberosFieldsDecoder) noteEncryptionType(n *x509DERElement) {
+	if d.semantic == nil {
+		return
+	}
+	value, ok := d.integerSummary(d.context(n, 0))
+	if !ok {
+		return
+	}
+	values, _ := d.semantic["Observed Encryption Types"].([]int64)
+	for _, existing := range values {
+		if existing == value {
+			return
+		}
+	}
+	if len(values) < 16 {
+		d.semantic["Observed Encryption Types"] = append(values, value)
+	}
+}
+
+func (d *kerberosFieldsDecoder) noteTicket(n *x509DERElement) {
+	if d.semantic == nil || n == nil || len(n.children) != 1 || len(n.children[0].children) < 3 {
+		return
+	}
+	fields := n.children[0]
+	var realm, server *x509DERElement
+	for _, field := range fields.children {
+		switch field.tag {
+		case 0xa1:
+			if len(field.children) == 1 {
+				realm = field.children[0]
+			}
+		case 0xa2:
+			if len(field.children) == 1 {
+				server = field.children[0]
+			}
+		}
+	}
+	if _, exists := d.semantic["Ticket Realm"]; !exists {
+		d.setSemanticString("Ticket Realm", realm)
+	}
+	if _, exists := d.semantic["Ticket Server"]; !exists {
+		d.setSemanticPrincipal("Ticket Server", server)
+	}
+}
+
 func (d *kerberosFieldsDecoder) encrypted(n *x509DERElement) error {
 	if n == nil {
 		return nil
@@ -211,6 +359,7 @@ func (d *kerberosFieldsDecoder) encrypted(n *x509DERElement) error {
 	}
 	d.ciphers++
 	d.cipherBytes += f[2].end - f[2].content
+	d.noteEncryptionType(n)
 	return nil
 }
 func (d *kerberosFieldsDecoder) checksum(n *x509DERElement) error {
@@ -252,6 +401,7 @@ func (d *kerberosFieldsDecoder) ticket(n *x509DERElement) error {
 		return err
 	}
 	d.tickets++
+	d.noteTicket(n)
 	return nil
 }
 func (d *kerberosFieldsDecoder) address(n *x509DERElement) error {
@@ -289,6 +439,12 @@ func (d *kerberosFieldsDecoder) requestBody(n *x509DERElement) error {
 		if err := call(); err != nil {
 			return err
 		}
+	}
+	if d.messageDepth == 1 {
+		d.setSemanticPrincipal("Client Principal", f[1])
+		d.setSemanticString("Realm", f[2])
+		d.setSemanticPrincipal("Server Principal", f[3])
+		d.semanticIntegers("Requested Encryption Types", f[8])
 	}
 	return nil
 }
@@ -397,6 +553,13 @@ func (d *kerberosFieldsDecoder) message(n *x509DERElement) error {
 	if name == "" {
 		return fmt.Errorf("kerberos-fields: unsupported message application tag")
 	}
+	d.messageDepth++
+	defer func() { d.messageDepth-- }()
+	root := d.messageDepth == 1
+	if root {
+		d.semantic["Message Name"] = name
+		d.semantic["Message Type"] = int64(msg)
+	}
 	s, err := d.application(n, 0x60|msg, name)
 	if err != nil {
 		return err
@@ -453,6 +616,11 @@ func (d *kerberosFieldsDecoder) message(n *x509DERElement) error {
 		if err = d.ticket(f[5]); err != nil {
 			return err
 		}
+		if root {
+			d.setSemanticString("Client Realm", f[3])
+			d.setSemanticPrincipal("Client Principal", f[4])
+			d.noteTicket(f[5])
+		}
 		return d.encrypted(f[6])
 	case 14:
 		if err = d.flags(f[2]); err != nil {
@@ -460,6 +628,9 @@ func (d *kerberosFieldsDecoder) message(n *x509DERElement) error {
 		}
 		if err = d.ticket(f[3]); err != nil {
 			return err
+		}
+		if root {
+			d.noteTicket(f[3])
 		}
 		return d.encrypted(f[4])
 	case 15:
@@ -489,6 +660,13 @@ func (d *kerberosFieldsDecoder) message(n *x509DERElement) error {
 				return err
 			}
 		}
+		if root {
+			d.semantic["Error Code"] = code
+			d.setSemanticString("Client Realm", f[7])
+			d.setSemanticPrincipal("Client Principal", f[8])
+			d.setSemanticString("Realm", f[9])
+			d.setSemanticPrincipal("Server Principal", f[10])
+		}
 		if f[12] != nil {
 			if err = d.octets(f[12]); err != nil {
 				return err
@@ -514,7 +692,7 @@ func decodeKerberosFields(wire []byte, tcp bool) ([]tlsCertificateField, map[str
 		fields = append(fields, tlsCertificateLeaf("Record Length", "uint32", 0, 4))
 		at = 4
 	}
-	d := &kerberosFieldsDecoder{r: &x509DERReader{wire: wire}}
+	d := &kerberosFieldsDecoder{r: &x509DERReader{wire: wire}, semantic: map[string]any{}}
 	root, err := d.r.element(at, len(wire), 0)
 	if err != nil {
 		return nil, nil, fmt.Errorf("kerberos-fields: %w", err)
@@ -526,8 +704,26 @@ func decodeKerberosFields(wire []byte, tcp bool) ([]tlsCertificateField, map[str
 		return nil, nil, err
 	}
 	fields = append(fields, d.r.field(root))
-	info := map[string]any{"Profile": "Kerberos DER message fields", "Message Type": int64(root.tag & 31), "TCP Record Wrapped": tcp, "Decoded Fields": d.values, "PA-DATA Details": d.padata, "Ticket Count": d.tickets, "Encrypted Part Count": d.ciphers, "Cipher Byte Count": d.cipherBytes, "Unparsed Extension Count": d.unknown, "DER Element Count": d.r.nodes, "Decryption Performed": false, "Checksums Verified": false, "Peer Identity Validated": false, "Message Exchange Validated": false, "TCP Reassembly Performed": false, "Structured Generation Supported": false}
+	d.semantic["Ticket Count"] = d.tickets
+	d.semantic["Encrypted Part Count"] = d.ciphers
+	d.semantic["Cipher Byte Count"] = d.cipherBytes
+	info := map[string]any{"Profile": "Kerberos DER message fields", "Message Type": int64(root.tag & 31), "TCP Record Wrapped": tcp, "Decoded Fields": d.values, "PA-DATA Details": d.padata, "Ticket Count": d.tickets, "Encrypted Part Count": d.ciphers, "Cipher Byte Count": d.cipherBytes, "Unparsed Extension Count": d.unknown, "DER Element Count": d.r.nodes, "Semantic Summary": d.semantic, "Decryption Performed": false, "Checksums Verified": false, "Peer Identity Validated": false, "Message Exchange Validated": false, "TCP Reassembly Performed": false, "Structured Generation Supported": false}
 	return fields, info, nil
+}
+
+// DecodeKerberosSummaryFacts exposes the schema-derived identity and algorithm
+// facts needed by the capture row summary without publishing the full field
+// tree. Ciphertext, checksums and unknown PA-DATA remain outside this result.
+func DecodeKerberosSummaryFacts(wire []byte, tcp bool) (map[string]any, error) {
+	_, info, err := decodeKerberosFields(wire, tcp)
+	if err != nil {
+		return nil, err
+	}
+	facts, _ := info["Semantic Summary"].(map[string]any)
+	if facts == nil {
+		return nil, fmt.Errorf("kerberos-fields: semantic summary unavailable")
+	}
+	return facts, nil
 }
 
 func parseKerberosFields(node *base.Node, process func(*base.Node) (func(bool), error), tcp bool) error {

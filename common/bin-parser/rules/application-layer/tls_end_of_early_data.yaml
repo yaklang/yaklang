@@ -1,0 +1,10 @@
+# RFC8446 section 4.5. Exactly one caller-selected plaintext handshake.
+# No record decryption, server-acceptance/direction/epoch validation, or
+# connection state. Shared native TLS dispatch separately enforces those.
+endian: big
+unit: byte
+Package:
+  TLSEndOfEarlyData:
+    operator: |
+      err = parseTLSEndOfEarlyData()
+      if err != nil { panic(err) }

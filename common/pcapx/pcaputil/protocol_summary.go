@@ -32,6 +32,27 @@ func (e *ProtocolEvent) summarizeProtocol() {
 			op = "reply"
 		}
 		e.Summary = fmt.Sprintf("ARP %s %s -> %s sender_mac=%v", op, e.Source, e.Destination, e.Session["Sender MAC"])
+	case "kerberos":
+		e.Summary = e.kerberosSummary()
+	case "wcf":
+		name, _ := e.Session["Record Name"].(string)
+		if name == "" {
+			return
+		}
+		e.Summary = "WCF MC-NMF " + name
+		if kind, ok := e.Session["Envelope Kind"].(string); ok {
+			if length, ok := e.Session["Payload Length"].(uint64); ok {
+				e.Summary += fmt.Sprintf(" · %d-byte opaque %s body", length, kind)
+			}
+		} else if version, ok := e.Session["Version"].(string); ok {
+			e.Summary += " · v" + version
+		}
+		if mode, ok := e.Session["Mode Name"].(string); ok && mode != "" {
+			e.Summary += " · " + mode
+		}
+		if encoding, ok := e.Session["Encoding Name"].(string); ok && encoding != "" {
+			e.Summary += " · " + encoding
+		}
 	case "icmp", "icmpv6":
 		typ, ok := e.Session["Type"].(uint8)
 		code, codeOK := e.Session["Code"].(uint8)
@@ -68,7 +89,22 @@ func (e *ProtocolEvent) summarizeProtocol() {
 				name = "ClientHello"
 			case byte(2):
 				name = "ServerHello"
+			case byte(22):
+				name = "CertificateStatus · body uninterpreted"
+				if body, ok := messages[0]["Certificate Status"].(map[string]any); ok && body["Status Type"] == byte(1) {
+					name = "CertificateStatus · OCSP unvalidated"
+				}
+			case byte(24):
+				if e.Session["Authentication Verified"] == true && messages[0]["Authenticated"] == true {
+					if request, ok := messages[0]["Key Update Request"].(byte); ok && request <= 1 {
+						name = "KeyUpdate · " + []string{"update_not_requested", "update_requested"}[request]
+					}
+				}
 			}
+		}
+		if e.Session["Authentication Verified"] == true && e.Session["Inner Content Type"] == byte(22) &&
+			e.Session["Handshake Parsing"] == "unavailable after missing protected handshake bytes" {
+			name = "Handshake · boundary unavailable"
 		}
 		e.Summary = fmt.Sprintf("TLS %s (%v bytes, %v)", name, e.Session["Record Length"], e.Session["Content Visibility"])
 		if sni, ok := e.Session["SNI"].(string); ok && sni != "" {

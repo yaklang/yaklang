@@ -51,6 +51,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"rdp", "tcp", "TPKT/X224 negotiation and selected TLS carrier", "no complete desktop/session decoding claim"},
 		{"rtsp", "tcp", "RTSP control/interleaved frames", "observed CSeq/session/SETUP mapping"},
 		{"redis", "tcp", "RESP messages", "complete structured initial admission and observed flow"},
+		{"smb", "tcp", "exact Direct TCP SMB1 NEGOTIATE and Unicode extended-security terminal SESSION_SETUP_ANDX", "bounded TCP reassembly; owned raw offers, WC17 response and WC12/WC4 setup words/UTF-16 strings with opaque tokens/extensions. PID32/MID and observed UID continuation are capture-domain/TCP-generation scoped; duplicate/orphan/reused identifiers and validated modern envelopes cannot lend old context. No OEM codepage, active AndX, authentication/signature verification, established session or legacy-to-SMB2 MID/dialect inference"},
 		{"smb2", "tcp", "direct TCP SMB2/3 messages", "observed dialect/session/MID; encrypted SMB3 opaque"},
 		{"tds", "tcp", "TDS packets/messages", "observed native TDS profile, protected values opaque"},
 		{"rfb", "tcp", "RFB/VNC handshake and messages", "observed native negotiated profile"},
@@ -113,7 +114,9 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"memcached", "tcp", "text get/gets/set and binary GET/SET", "observed direction, text reply order or binary opaque ID; values bounded by declared length; legacy stats layout remains available"},
 		{"doip", "tcp/udp", "DoIP v2/v3 TCP routing activation/alive/diagnostic and UDP VehicleIdentification0001-0004", "TCP observed routing/logical addresses and UDS DiagnosticSessionControl positive/negative/pending only; UDP exact datagram discovery fields, request-only FF and raw invalidity/unknown values, unassociated unverified observations; no vehicle identity/synchronization verification, TLS, manufacturer policy or v4 claim"},
 		{"nats", "tcp", "plaintext client control/payload frames including HPUB/HMSG", "observed INFO/CONNECT capabilities, client direction and subscription; no TLS plaintext inference"},
+		{"wcf", "tcp", "MC-NMF v1.0 Version/Mode/Via/Encoding, Preamble, one bounded Envelope record per message, End/Fault and selected upgrade records", "strong net.tcp preamble or SOAP/Binary XML envelope evidence; observed flow/direction and bounded owned wire records; envelope bodies remain opaque; no SOAP/.NET Binary XML object decoding, authenticated endpoint, operation success or singleton-sized unframed body claim"},
 		{"stomp", "tcp", "STOMP 1.0/1.1/1.2 commands and binary bodies", "observed CONNECT/CONNECTED version, escapes, content-length and transaction state"},
+		{"cldap", "udp", "RFC1798 LDAPMessage over UDP/389 with selected SearchRequest structure", "service hint plus complete bounded BER envelope; SearchRequest base/scope/filter/attributes from the canonical CLDAP rule, unsupported SearchResultEntry/Done/Reference retained as explicit context-required observations; UDP response operations never borrow TCP LDAP state or authentication"},
 		{"opcua", "tcp", "UA TCP HEL/ACK/RHE and bounded secure-channel chunks", "observed endpoints/channel/policy; protected OPN/MSG/CLO payload remains opaque"},
 		{"goose", "l2", "IEC 61850 Ethernet GOOSE BER", "EtherType/application ID and bounded BER fields; subscriber identity remains unverified"},
 		{"sv", "l2", "IEC 61850 Sampled Values bounded raw ASDUs", "EtherType, declared length, ordered mandatory/optional fields; dataset octets without SCL interpretation; extensions require another profile"},
@@ -155,7 +158,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 		}
 		switch protocol {
 		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix", "esp-natt", "gtpv2":
-		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
+		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "cldap", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -209,6 +212,7 @@ var nativeDatagrams = []nativeDatagramProfile{
 	{"semtech-udp", []uint16{1700}, validSemtechDatagram, decodeSemtechDatagram},
 	{"nmea", nil, validNMEADatagram, decodeNMEADatagram},
 	{"nbns", []uint16{137}, func(w []byte) bool { return len(w) >= 13 && w[12] == 32 }, decodeNBNS},
+	{"cldap", []uint16{389}, validCLDAPDatagram, decodeCLDAPDatagram},
 	{"mdns", []uint16{5353}, dnsHeader, DecodeDNSMessage},
 	{"llmnr", []uint16{5355}, dnsHeader, DecodeDNSMessage},
 	{"dns", []uint16{53}, dnsHeader, DecodeDNSMessage},
@@ -442,6 +446,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			fields, err = decodeRTPSControlBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
 		} else if p.name == "nmea" {
 			fields, err = decodeNMEADatagramBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
+		} else if p.name == "cldap" {
+			fields, err = a.decodeCLDAPDatagram(w)
 		} else if p.name == "rtps" && rtpsDatagramHeader(w) && w[5] == 0 {
 			fields, err = decodeRTPS20DatagramBudget(w, a.budget.MaxCollectionElements, a.budget.MaxRecursionDepth)
 		} else {
@@ -503,6 +509,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		}
 		e.Status = "decoded"
 		e.Summary = p.name
+		if p.name == "cldap" {
+			e.Summary = cldapDatagramSummary(fields)
+		}
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(len(w)))
 		if err != nil {

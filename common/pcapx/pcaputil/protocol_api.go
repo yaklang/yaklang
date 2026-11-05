@@ -52,7 +52,9 @@ func WithOnProtocolMessage(callback func(message *ProtocolEvent)) CaptureOption 
 
 // pcap_onProtocolStats 注册协议分析的最终统计回调，配合 StartSniff 或 OpenPcapFile 使用。
 // 分析启动后，在捕获结束并处理完已接收任务时回调一次，不提供周期统计；初始化失败时不保证回调。
-// 仅注册此回调也会执行协议解析。Messages 是消息/诊断事件数，Decoded 是完整解码数，
+// 仅注册此回调也会执行协议解析。Messages 是已接纳消息边界的计数，Decoded 是完整解码数；
+// 没有完整消息边界的头部/残片诊断不计入 Messages。Malformed、Incomplete 等诊断计数单列，
+// 不能用 Messages 代替全部回调次数，也不能直接将这些计数相加作消息总量。
 // InputBytes 是送入协议分析的字节数，不是网卡捕获字节数；驱动丢包请使用 pcap_onTCPReassemblyStats。
 //
 // 参数:

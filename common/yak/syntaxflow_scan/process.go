@@ -32,7 +32,8 @@ type processMonitor struct {
 	processCallBack RuleProcessCallback
 	resultCallback  RuleResultCallback
 	monitorTTL      time.Duration
-	eventCh         chan struct{}
+	eventMu         sync.Mutex // orders snapshots with their publication
+	eventCh         chan *RuleProcessInfoList
 	resultCh        chan *ssaapi.SyntaxFlowResult
 	waitGroup       sync.WaitGroup
 	closed          atomic.Bool
@@ -108,7 +109,9 @@ func (pm *processMonitor) Close() {
 	}
 
 	log.Infof("process monitor closed wait !!!!")
+	pm.eventMu.Lock()
 	close(pm.eventCh)
+	pm.eventMu.Unlock()
 	close(pm.resultCh)
 	pm.waitGroup.Wait()
 }
@@ -120,7 +123,7 @@ func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProc
 		processCallBack: callback,
 		resultCallback:  resultCallback,
 		monitorTTL:      ttl,
-		eventCh:         make(chan struct{}, 128),
+		eventCh:         make(chan *RuleProcessInfoList, 128),
 		resultCh:        make(chan *ssaapi.SyntaxFlowResult, 128),
 		eventWithRule:   eventWithRule,
 	}
@@ -128,7 +131,7 @@ func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProc
 }
 func (pm *processMonitor) StartMonitor() {
 	pm.Status = omap.NewEmptyOrderedMap[string, *RuleProcessInfo]()
-	pm.eventCh = make(chan struct{}, 128)
+	pm.eventCh = make(chan *RuleProcessInfoList, 128)
 	pm.resultCh = make(chan *ssaapi.SyntaxFlowResult, 128)
 	pm.closed.Store(false)
 
@@ -141,16 +144,17 @@ func (pm *processMonitor) StartMonitor() {
 
 		defer pm.reportProcess(true) // final event
 		defer pm.drainResults()
+		defer pm.drainProgress()
 
 		for {
 			select {
 			case <-pm.ctx.Done():
 				return
-			case _, ok := <-pm.eventCh:
+			case snapshot, ok := <-pm.eventCh:
 				if !ok {
 					return
 				}
-				pm.reportProcess(pm.eventWithRule)
+				pm.reportSnapshot(snapshot)
 			case res, ok := <-pm.resultCh:
 				if !ok {
 					return
@@ -188,30 +192,49 @@ func (pm *processMonitor) drainResults() {
 	}
 }
 
+// Flush older observations before a timer/final live snapshot. Capture and
+// enqueue are serialized, but callbacks run without the publication lock so a
+// callback can itself emit an event without blocking the monitor.
 func (p *processMonitor) reportProcess(withRule bool) {
-	if p.processCallBack != nil {
-		info := p.snapshotInfoList(withRule)
-		// log.Errorf("process report process: %v ", info.Progress)
-		p.processCallBack(info.Progress, info)
+	if p.processCallBack == nil {
+		return
 	}
+	p.eventMu.Lock()
+	var pending []*RuleProcessInfoList
+drain:
+	for {
+		select {
+		case snapshot, ok := <-p.eventCh:
+			if !ok {
+				break drain
+			}
+			pending = append(pending, snapshot)
+		default:
+			break drain
+		}
+	}
+	current := p.snapshotInfoList(withRule)
+	p.eventMu.Unlock()
+	for _, snapshot := range pending {
+		p.reportSnapshot(snapshot)
+	}
+	p.reportSnapshot(current)
 }
 
 func (p *processMonitor) EmitEvent() {
+	p.eventMu.Lock()
+	defer p.eventMu.Unlock()
 	if p.closed.Load() {
 		return
 	}
-	defer func() {
-		if e := recover(); e != nil {
-			log.Errorf("err: %v", e)
-		}
-	}()
-	// Build a consistent snapshot at emit time
-	// log.Infof("write to eventCh")
-	select {
-	case p.eventCh <- struct{}{}:
-	default:
-		// channel full, drop event to avoid blocking
+	// A full queue must not mark finished rules as reported when no observer
+	// will receive that snapshot. Only this lock's owner can enqueue, while
+	// the monitor can only make more room by receiving an event.
+	if len(p.eventCh) == cap(p.eventCh) {
+		return
 	}
+	snapshot := p.snapshotInfoList(p.eventWithRule)
+	p.eventCh <- snapshot
 }
 
 func (p *processMonitor) PublishResult(res *ssaapi.SyntaxFlowResult) {
@@ -429,4 +452,29 @@ func (m *scanManager) SetFinishedQuery(num int64) {
 
 func (m *scanManager) GetFinishedQuery() int64 {
 	return m.processMonitor.FinishedQuery.Load()
+}
+
+// An event represents the work observed when it was emitted. A fast scan can
+// finish several rules before this observer runs; reading live counters here
+// would turn every queued intermediate event into the final progress value.
+func (p *processMonitor) reportSnapshot(snapshot *RuleProcessInfoList) {
+	if p.processCallBack != nil && snapshot != nil {
+		p.processCallBack(snapshot.Progress, snapshot)
+	}
+}
+
+// Either closed channel can win the select during shutdown. Drain queued
+// progress as well as results before publishing the final live snapshot.
+func (p *processMonitor) drainProgress() {
+	for p.eventCh != nil {
+		select {
+		case snapshot, ok := <-p.eventCh:
+			if !ok {
+				return
+			}
+			p.reportSnapshot(snapshot)
+		default:
+			return
+		}
+	}
 }

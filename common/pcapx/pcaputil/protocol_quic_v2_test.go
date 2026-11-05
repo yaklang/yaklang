@@ -142,7 +142,7 @@ func FuzzQUICVersionAndKeyPhaseIsolation(f *testing.F) {
 			}
 			q := &binQUIC{native: true, version: version, keys: &quicKeyring{version: version}, zeroCID: [2]bool{len(cid) == 0, len(cid) == 0}, cids: map[string]int{}}
 			if len(cid) > 0 {
-				q.cids[string(cid)] = 1
+				q.cids[string(cid)] = 2
 			}
 			q.keys.app[0] = [2]*quicTrafficKeys{key, next}
 			q.spaces[0][quicSpaceApplication].largest = pn - 1

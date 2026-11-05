@@ -117,27 +117,52 @@ func (q *binQUIC) wireHeader(raw []byte, dir int) (quicHdr, error) {
 	if err != nil || h.long || !q.native {
 		return h, err
 	}
-	for cid, owner := range q.cids {
-		if owner == 1-dir && len(raw) >= 1+len(cid) && string(raw[1:1+len(cid)]) == cid {
-			h.dcid = []byte(cid)
-			h.payloadOff = 1 + len(cid)
-			return h, nil
+	// A short header carries no CID length. A prefix match alone cannot
+	// choose between two observed issuer-qualified lengths, including history.
+	// There are at most twenty nonzero lengths; deduplicate retired/active
+	// copies without depending on map iteration or preferring the longest CID.
+	var candidates []quicHdr
+	var seen [21]bool
+	add := func(cid string) {
+		n := len(cid)
+		if n < 1 || n > 20 || seen[n] || len(raw) < 1+n || string(raw[1:1+n]) != cid {
+			return
+		}
+		seen[n] = true
+		candidate := h
+		candidate.dcid, candidate.payloadOff = []byte(cid), 1+n
+		candidates = append(candidates, candidate)
+	}
+	for cid, owners := range q.cids {
+		if owners&(1<<(1-dir)) != 0 {
+			add(cid)
 		}
 	}
-	// A retired CID is no longer an active route, but a packet sent before
-	// retirement can arrive afterwards. Native admission authenticates these
-	// historical candidates before associating them with a conversation.
 	for _, cid := range q.cidRetired[1-dir] {
-		if len(raw) >= 1+len(cid) && string(raw[1:1+len(cid)]) == cid {
-			h.dcid, h.payloadOff = []byte(cid), 1+len(cid)
-			return h, nil
-		}
+		add(cid)
 	}
 	if q.zeroCID[1-dir] {
-		h.payloadOff = 1
-		return h, nil
+		candidate := h
+		candidate.payloadOff = 1
+		candidates = append(candidates, candidate)
 	}
-	return h, sessionContext("QUIC short header requires observed destination CID")
+	if len(candidates) == 1 {
+		return candidates[0], nil
+	}
+	if len(candidates) == 0 {
+		return h, sessionContext("QUIC short header requires observed destination CID")
+	}
+	var selected quicHdr
+	matches := 0
+	for _, candidate := range candidates {
+		if q.authenticatesParsedWire(dir, raw, candidate) {
+			selected, matches = candidate, matches+1
+		}
+	}
+	if matches == 1 {
+		return selected, nil
+	}
+	return h, sessionContext("QUIC short header CID length is ambiguous without unique packet protection")
 }
 
 func (q *binQUIC) rememberRetiredCID(owner int, seq uint64, cid string, max int) {
@@ -155,21 +180,35 @@ func (q *binQUIC) rememberRetiredCID(owner int, seq uint64, cid string, max int)
 			}
 		}
 		delete(q.cidRetired[owner], oldest)
+		if _, active := q.cidSequences[owner][oldest]; !active {
+			delete(q.cidTokens[owner], oldest)
+		}
 	}
 	q.cidRetired[owner][seq] = cid
 }
 func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[string]any, max int) error {
+	if dir < 0 || dir > 1 || space < quicSpaceInitial || space > quicSpaceApplication {
+		return protocolError(ErrMalformedMessage, "QUIC CRYPTO direction or encryption level")
+	}
 	a := &q.cryptoData[dir][space]
 	_, _, _, err := a.feed(off, data, false, q.byteLimit, max)
 	if err != nil {
 		return err
 	}
-	if q.tls == nil {
-		q.tls = &binTLS{client: -1}
+	// All complete messages made available by this delivery form one TLS
+	// transaction. A valid prefix followed by a refused message must not leave
+	// a ClientHello/ALPN/key epoch committed while cryptoRead remains unchanged.
+	next := binTLS{client: -1}
+	if q.tls != nil {
+		next = *q.tls
 	}
 	at := q.cryptoRead[dir][space]
+	nextEarly := q.earlyContext
 	var messages []map[string]any
 	for len(a.data)-at >= 4 {
+		if space == quicSpaceHandshake && next.app[dir] {
+			return protocolError(ErrMalformedMessage, "QUIC handshake CRYPTO extends beyond observed Finished")
+		}
 		b := a.data[at:]
 		n := 4 + (int(b[1]) << 16) + (int(b[2]) << 8) + int(b[3])
 		if n > q.byteLimit {
@@ -178,15 +217,42 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		if len(b) < n {
 			break
 		}
+		if err := quicTLSMessageLevel(b[0], space); err != nil {
+			return err
+		}
+		if err := quicTLSHelloVersion(b[:n], max); err != nil {
+			return err
+		}
+		if b[0] == 4 && next.version == 0 {
+			return sessionContext("QUIC NewSessionTicket needs the observed negotiated TLS version")
+		}
 		// Initial protection authenticates packet bytes, not peer identity.
-		m, err := q.tls.handshakeMessage(dir, b[:n], space != quicSpaceInitial, max)
+		m, err := next.handshakeMessage(dir, b[:n], space != quicSpaceInitial, max)
 		if err != nil {
+			return err
+		}
+		if err := quicTLSTicketValues(m); err != nil {
+			return err
+		}
+		if err := nextEarly.observe(&next, b[0], b[4:n], max); err != nil {
 			return err
 		}
 		messages = append(messages, m)
 		at += n
 	}
+	if space == quicSpaceHandshake && next.app[dir] && (at < len(a.data) || len(a.pending) > 0) {
+		// Even an incomplete header or an out-of-order tail cannot extend
+		// this old level once its complete Finished is observed. Refuse the
+		// entire TLS batch rather than committing just the Finished prefix.
+		return protocolError(ErrMalformedMessage, "QUIC handshake CRYPTO extends beyond observed Finished")
+	}
+	if q.tls == nil {
+		q.tls = &next
+	} else {
+		*q.tls = next
+	}
 	q.cryptoRead[dir][space] = at
+	q.earlyContext = nextEarly
 	if len(messages) > 0 {
 		info["TLS Handshakes"] = messages
 	}
@@ -212,7 +278,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 			return protocolError(ErrUnsupportedFeature, "QUIC traffic cipher unsupported")
 		}
 		secrets := map[string][]byte{}
-		for _, label := range []string{"CLIENT_HANDSHAKE_TRAFFIC_SECRET", "SERVER_HANDSHAKE_TRAFFIC_SECRET", "CLIENT_TRAFFIC_SECRET_0", "SERVER_TRAFFIC_SECRET_0"} {
+		for _, label := range []string{"CLIENT_HANDSHAKE_TRAFFIC_SECRET", "SERVER_HANDSHAKE_TRAFFIC_SECRET", "CLIENT_TRAFFIC_SECRET_0", "SERVER_TRAFFIC_SECRET_0", "CLIENT_EARLY_TRAFFIC_SECRET"} {
 			if v, ok := q.provider.LookupTLSSecret(label, q.tls.random); ok {
 				secrets[label] = v
 			}
@@ -223,7 +289,22 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		}
 		ring.initial = q.keys.initial
 		q.keys = ring
-		q.loadedKeys = len(secrets) == 4
+		// The optional early secret must neither be omitted nor make five
+		// provider entries look like incomplete regular keys. Replacing the
+		// ring again would discard already established application key epochs.
+		q.loadedKeys = ring.handshake[0] != nil && ring.handshake[1] != nil && ring.app[0][0] != nil && ring.app[1][0] != nil
 	}
 	return nil
+}
+
+func (q *binQUIC) isRetiredNativeCID(owner int, cid []byte) bool {
+	if len(cid) == 0 {
+		return false
+	}
+	for _, old := range q.cidRetired[owner] {
+		if old == string(cid) {
+			return true
+		}
+	}
+	return false
 }

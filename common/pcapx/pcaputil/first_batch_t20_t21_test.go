@@ -887,6 +887,35 @@ func testT21NativeKerberosCapture(t *testing.T) {
 				wantTypeText := strings.Split(row[2], ",")[0]
 				wantType, parseErr := strconv.ParseInt(wantTypeText, 10, 64)
 				require.NoError(t, parseErr)
+				require.Contains(t, event.Summary, "Kerberos "+kerberosMessageName(wantType))
+				require.Contains(t, event.Summary, "decrypt=no")
+				require.Contains(t, event.Summary, "identity=unverified")
+				for _, column := range []int{3, 4, 5} {
+					found := false
+					hasValue := false
+					for _, value := range strings.Split(row[column], ",") {
+						if value == "" {
+							continue
+						}
+						hasValue = true
+						found = found || strings.Contains(event.Summary, value)
+					}
+					if hasValue {
+						require.True(t, found, "Kerberos summary at frame %d should expose at least one independent identity/realm value from column %d: values=%q summary=%q", frame, column, row[column], event.Summary)
+					}
+				}
+				etypeFound := false
+				etypePresent := false
+				for _, value := range strings.Split(row[6], ",") {
+					if value == "" {
+						continue
+					}
+					etypePresent = true
+					etypeFound = etypeFound || strings.Contains(event.Summary, value)
+				}
+				if etypePresent {
+					require.True(t, etypeFound, "Kerberos summary at frame %d should expose an observed etype: %q", frame, event.Summary)
+				}
 				decoded, decodeErr := event.Decode()
 				require.NoError(t, decodeErr)
 				metadata, ok := decoded["metadata"].(map[string]any)
@@ -1375,6 +1404,17 @@ func testT21NativeSMBCapture(t *testing.T, capturePath, oraclePath, captureHash,
 				}
 				response := row[7] == "True"
 				require.Equal(t, response, e.Session["Response"])
+				role := "request"
+				if response {
+					role = "response"
+				}
+				require.Contains(t, e.Summary, "SMB2 "+smb2CommandName(uint16(command))+" "+role)
+				require.Contains(t, e.Summary, fmt.Sprintf("mid=%d", messageID))
+				if response {
+					require.Contains(t, e.Summary, "result=")
+				} else {
+					require.Contains(t, e.Summary, "result=request-pending")
+				}
 			}
 			require.Len(t, got, len(want), "SMB2 PDU coverage must match the independent TShark oracle")
 			for frame := range authByFrame {
@@ -1433,13 +1473,25 @@ func testT21NativeLDAPCapture(t *testing.T, capturePath, oraclePath, captureHash
 					messageID, parseErr := strconv.ParseUint(row[2], 10, 64)
 					require.NoError(t, parseErr)
 					require.Equal(t, messageID, e.Session["Message ID"])
-					require.Equal(t, commandNames[row[3]], e.Session["Message Name"])
+					messageName := commandNames[row[3]]
+					require.Equal(t, messageName, e.Session["Message Name"])
+					require.Contains(t, e.Summary, "LDAP "+messageName+" id="+row[2])
+					if row[4] != "" {
+						require.Contains(t, e.Summary, "result="+row[4])
+					}
 					if row[5] != "" {
+						require.Contains(t, e.Summary, row[5])
 						fields, fieldErr := e.GetFields()
 						require.NoError(t, fieldErr)
 						encoded, marshalErr := json.Marshal(fields)
 						require.NoError(t, marshalErr)
 						require.Contains(t, string(encoded), row[5], "LDAP base/object values should match the TShark oracle")
+					}
+					if messageName == "BindRequest" {
+						require.Contains(t, e.Summary, "credentials=opaque")
+					}
+					if messageName == "BindResponse" {
+						require.Contains(t, e.Summary, "identity=unverified")
 					}
 					if row[4] != "" {
 						result, parseErr := strconv.ParseUint(row[4], 10, 64)

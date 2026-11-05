@@ -295,7 +295,11 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		// A new valid ClientHello starts a fresh observation scope. The outer
 		// transaction discards this reset if renegotiation/HRR checks fail.
 		t.resumption.context = nil
+		t.initialPSKAuthentication = tlsPSKAuthenticationUnconstrained
 		return nil
+	}
+	if err := tls13ServerHelloLocations(body, h); err != nil {
+		return err
 	}
 	version := binary.BigEndian.Uint16(body)
 	if v, ok := h.ext[43]; ok {
@@ -313,6 +317,11 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		if err != nil {
 			return err
 		}
+		if _, selected := h.ext[33]; selected {
+			if _, offered := current.ext[33]; !offered {
+				return protocolError(ErrMalformedMessage, "TLS certificate-with-external-PSK was not offered")
+			}
+		}
 	}
 	ctx := map[string]any{"Evidence Scope": "current connection hello observations", "Certificate Trust": "not-evaluated"}
 	if current != nil {
@@ -325,13 +334,34 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		}
 	}
 	selected, present := h.ext[41]
+	t.initialPSKAuthentication = tlsPSKAuthenticationUnconstrained
 	if version == 0x304 && current != nil {
 		versions := current.ext[43]
 		if len(versions) < 3 || int(versions[0]) != len(versions)-1 || (len(versions)-1)%2 != 0 || !tlsContains16(versions[1:], version) {
 			return protocolError(ErrMalformedMessage, "TLS selected version was not offered")
 		}
-		if binary.BigEndian.Uint16(body) != 0x303 || !bytes.Equal(h.session, current.session) || h.compression[0] != 0 {
-			return protocolError(ErrMalformedMessage, "TLS 1.3 ServerHello legacy parameters")
+	}
+	// These two literal constraints are provable from ServerHello alone.
+	// Missing ClientHello only prevents checking its offered versions and
+	// compatibility session-ID echo; it cannot legalize a different legacy
+	// version or compression method (RFC 8446 4.1.3).
+	if version == 0x304 && (binary.BigEndian.Uint16(body) != 0x303 || h.compression[0] != 0 || current != nil && !bytes.Equal(h.session, current.session)) {
+		return protocolError(ErrMalformedMessage, "TLS 1.3 ServerHello legacy parameters")
+	}
+	if err := tls13FinalServerKeyExchange(body, h); err != nil {
+		return err
+	}
+	if err := tlsServerHelloGREASE(body, h); err != nil {
+		return err
+	}
+	if err := tls13NonPSKServerKeyShareSelection(body, h, current, limits...); err != nil {
+		return err
+	}
+	if version == 0x304 && !bytes.Equal(body[2:34], tlsRetryRandom[:]) {
+		t.earlyDataSelectionKnown, t.earlyDataPSKSelected = true, present
+		t.earlyDataIdentity = 0
+		if present {
+			t.earlyDataIdentity = binary.BigEndian.Uint16(selected)
 		}
 	}
 	if present {
@@ -380,6 +410,13 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		m["PSK Selection"] = selection
 		ctx["PSK Selection"] = cloneSession(selection)
 		ctx["PSK Selected"] = true
+		t.initialPSKAuthentication = tlsPSKAuthenticationOrdinary
+		if _, present := h.ext[33]; present {
+			// RFC 8773 can combine a certificate with an external PSK. The
+			// observed flag prevents an ordinary-PSK inference; this is not
+			// validation of all companion extensions, binders or trust.
+			t.initialPSKAuthentication = tlsPSKAuthenticationCertificateExtension
+		}
 	} else if version == 0x304 && current != nil && !bytes.Equal(body[2:34], tlsRetryRandom[:]) {
 		ctx["PSK Selected"] = false
 	}

@@ -14,17 +14,24 @@ func TestProtocolCatalogP0AliasesMatchCanonicalEntries(t *testing.T) {
 	for _, item := range ProtocolCatalog {
 		catalog[item.Name] = item
 	}
-	for _, score := range P0Scorecards {
-		if score.AliasOf == "" {
+	aliases := []struct{ Name, AliasOf string }{
+		{"CIFS", "SMB"},
+		{"MSRPC", "DCE/RPC"},
+		{"AS-REP / TGS", "Kerberos"},
+		{"NTLM v1/v2", "NTLMSSP"},
+		{"TNS", "Oracle TNS"},
+	}
+	for _, alias := range aliases {
+		if alias.AliasOf == "" {
 			continue
 		}
-		item, registered := catalog[score.Name]
+		item, registered := catalog[alias.Name]
 		if !registered {
-			continue // Some historical scorecard aliases have no catalog row.
+			continue // Some historical capture aliases have no catalog row.
 		}
-		t.Run(score.Name, func(t *testing.T) {
-			canonical, exists := catalog[score.AliasOf]
-			require.True(t, exists, "catalog alias %s has no canonical registration %s", item.Name, score.AliasOf)
+		t.Run(alias.Name, func(t *testing.T) {
+			canonical, exists := catalog[alias.AliasOf]
+			require.True(t, exists, "catalog alias %s has no canonical registration %s", item.Name, alias.AliasOf)
 			require.NotEqual(t, item.Name, canonical.Name)
 			require.Equal(t, canonical.RuleFile, item.RuleFile)
 			require.Equal(t, canonical.EntryNode, item.EntryNode)

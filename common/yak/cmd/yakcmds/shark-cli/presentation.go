@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -32,11 +33,19 @@ type packetPresentation struct {
 	priority                              int
 	count                                 int
 	rejectedTLS                           bool
+	tlsIncompleteSummary                  bool
+	tlsDetailedSummaryRank                int
+	tlsRecordProblem                      string
+	tlsHandshakeBoundaryUnavailable       bool
+	quicPacketProblem                     string
+	quicPacketProblemRank                 int
 	h3ConnectionFaultPDU                  uint64
 	networkRefused                        bool
 	nativeESPIncomplete                   bool
 	nativeESPBytes                        int
 	nativeESPSHA                          [32]byte
+	smbDecodedRecordSummary               string
+	smbRefusedRecordSummary               string
 }
 
 var protocolDisplayNames = map[string]string{
@@ -53,14 +62,18 @@ var protocolDisplayNames = map[string]string{
 	"tls": "TLS", "dtls": "DTLS", "dns": "DNS", "dot": "DoT", "doh": "DoH", "doq": "DoQ",
 	"quic": "QUIC", "websocket": "WebSocket", "postgresql": "PostgreSQL", "mysql": "MySQL",
 	"ssdp": "SSDP", "rdpudp": "RDPUDP",
+	"wcf":   "WCF/MC-NMF",
 	"redis": "Redis", "mongodb": "MongoDB", "kafka": "Kafka", "mqtt": "MQTT",
-	"smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
+	"smb": "SMB1", "smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
 	"ntlmssp": "NTLMSSP", "spnego": "SPNEGO", "mdns": "mDNS", "llmnr": "LLMNR",
 	"snmp": "SNMP", "dhcp": "DHCP", "dhcpv6": "DHCPv6", "syslog": "Syslog",
 	"icmp": "ICMP", "icmpv6": "ICMPv6",
 }
 
 func protocolName(protocol string) string {
+	if strings.EqualFold(protocol, "pppoe") {
+		return "PPPoE"
+	}
 	if name := protocolDisplayNames[strings.ToLower(protocol)]; name != "" {
 		return name
 	}
@@ -246,7 +259,7 @@ func recordType(v any) string {
 }
 
 func handshakeType(v any) string {
-	if name := map[uint64]string{1: "Client Hello", 2: "Server Hello", 4: "New Session Ticket", 8: "Encrypted Extensions", 11: "Certificate", 12: "Server Key Exchange", 13: "Certificate Request", 14: "Server Hello Done", 15: "Certificate Verify", 16: "Client Key Exchange", 20: "Finished", 24: "Key Update", 254: "Message Hash"}[number(v)]; name != "" {
+	if name := map[uint64]string{1: "Client Hello", 2: "Server Hello", 4: "New Session Ticket", 5: "End Of Early Data", 8: "Encrypted Extensions", 11: "Certificate", 12: "Server Key Exchange", 13: "Certificate Request", 14: "Server Hello Done", 15: "Certificate Verify", 16: "Client Key Exchange", 20: "Finished", 22: "Certificate Status", 24: "Key Update", 25: "Compressed Certificate", 254: "Message Hash"}[number(v)]; name != "" {
 		return name
 	}
 	return fmt.Sprintf("Handshake type %d", number(v))
@@ -275,6 +288,15 @@ func tlsKeyStatus(info map[string]any) string {
 		return "decryption recovery budget exhausted; encrypted record only"
 	}
 	return ""
+}
+
+func tlsHandshakeBoundaryUnavailable(e *pcaputil.ProtocolEvent) bool {
+	if e == nil || e.Protocol != "tls" || e.Error != "" || e.Status != "decoded" && e.Status != "deferred" {
+		return false
+	}
+	v := eventValues(e)
+	return v["Authentication Verified"] == true && number(v["Inner Content Type"]) == 22 &&
+		v["Handshake Parsing"] == "unavailable after missing protected handshake bytes"
 }
 
 func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
@@ -312,6 +334,15 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	}
 	if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
 		parts := []string{textValue(v["Packet Name"])}
+		if summary := quicQPACKSummary(v); summary != "" {
+			parts = append([]string{summary}, parts...)
+		}
+		if summary, _ := quicTLSMessageSummary(e); summary != "" {
+			parts = append([]string{summary}, parts...)
+		}
+		if e.Protocol == "quic" && v["Native Carrier"] == true && v["Authentication Verified"] == true && v["CRYPTO Incomplete"] == true {
+			parts = append(parts, "TLS handshake reassembly incomplete")
+		}
 		if _, ok := v["Packet Number"]; ok {
 			parts = append(parts, fmt.Sprintf("pn=%d", number(v["Packet Number"])))
 		}
@@ -348,6 +379,22 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if dns, ok := v["DoQ Message"].(map[string]any); ok {
 			parts = append(parts, "DNS="+textValue(dns["QNAME"]))
 		}
+		for i, link := range mapList(v["HTTP3 Late Associations"]) {
+			if i >= 2 {
+				break
+			}
+			parts = append(parts, fmt.Sprintf("late association: stream=%d response PDU #%d", number(link["Stream ID"]), number(link["Response PDU ID"])))
+		}
+		for i, link := range mapList(v["HTTP3 Resolved Associations"]) {
+			if i >= 2 {
+				break
+			}
+			if link["Ambiguous"] == true {
+				parts = append(parts, fmt.Sprintf("ambiguous request association: stream=%d", number(link["Stream ID"])))
+			} else {
+				parts = append(parts, fmt.Sprintf("later request PDU #%d: stream=%d", number(link["Request PDU ID"]), number(link["Stream ID"])))
+			}
+		}
 		if v["Authentication Verified"] == true {
 			parts = append(parts, "packet AEAD verified")
 		} else if v["Encrypted"] == true {
@@ -356,27 +403,162 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if v["Retired Destination CID"] == true {
 			parts = append(parts, "late packet · retired CID")
 		}
+		for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Resolved Associations"} {
+			for i, link := range mapList(v[kind]) {
+				if i >= 2 {
+					break
+				}
+				if link["Ambiguous"] == true {
+					continue
+				}
+				if m, ok := link["Response Message Revalidation"].(map[string]any); ok && m["Observation Verdict"] == "violation-observed" {
+					parts = append([]string{fmt.Sprintf("earlier response PDU #%d violation: %s", number(link["Response PDU ID"]), textValue(m["Error"]))}, parts...)
+				}
+			}
+		}
+		for _, kind := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations"} {
+			for i, row := range mapList(v[kind]) {
+				if i >= 2 {
+					break
+				}
+				if row["Ambiguous"] != true {
+					message := fmt.Sprintf("CONNECT %s · frame PDU #%d · observed PDU #%d", textValue(row["Error Name"]), number(row["Frame PDU ID"]), number(row["Observed In PDU ID"]))
+					if row["Observation Verdict"] == "order-unverified" {
+						message = fmt.Sprintf("CONNECT order unverified · frame PDU #%d · success context PDU #%d", number(row["Frame PDU ID"]), number(row["Observed In PDU ID"]))
+					}
+					parts = append([]string{message}, parts...)
+				}
+			}
+		}
 		return strings.Join(parts, " · ")
 	}
 	var parts []string
+	messageALPN := false
+	var handshakes []struct {
+		text string
+		rank int
+	}
 	for _, h := range mapList(v["Handshake Messages"]) {
 		name := handshakeType(h["Type"])
+		messageRank := 0
 		if h["Hello Retry Request"] == true {
 			name = "Hello Retry Request"
 		}
-		parts = append(parts, name)
+		if encrypted, _, _ := tlsEncryptedExtensionsDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); encrypted != nil {
+			for _, extension := range mapList(encrypted.Fields["Extensions"]) {
+				if number(extension["Type"]) == 16 {
+					name += " · ALPN=" + strconv.QuoteToASCII(string(bytesValue(extension["Protocol"])))
+					messageALPN = true
+				}
+			}
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		}
+		if certificate, _, _ := tlsCertificateDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); certificate != nil {
+			name += fmt.Sprintf(" · %d entries · context %d bytes · trust not evaluated", len(mapList(certificate.Fields["Certificate Entries"])), number(certificate.Fields["Context Length"]))
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		}
+		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
+			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
+			messageRank = tlsKeyUpdateRank
+		}
+		if exchange, _, _ := tlsServerKeyExchangeDetail(h, number(v["Negotiated Version"]), number(v["Cipher Suite"]), v["Authentication Verified"] == true); exchange != nil {
+			if group, ok := exchange.Fields["Named Group"]; ok {
+				name += " · ECDHE · " + tlsServerKeyExchangeGroup(uint16(number(group)))
+			} else {
+				name += fmt.Sprintf(" · DHE · %d-byte modulus", number(exchange.Fields["DH Modulus Length"]))
+			}
+			name += " · " + tlsCertificateRequestAlgorithm(uint16(number(exchange.Fields["Signature Algorithm"])), 0x303) + " · signature not evaluated"
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		} else if number(h["Type"]) == 12 && strings.Contains(textValue(h["Server Key Exchange Status"]), "unavailable") {
+			name += " envelope · negotiated version or cipher layout unavailable"
+		}
+		if exchange, _, _ := tlsClientKeyExchangeDetail(h, number(v["Negotiated Version"]), number(v["Cipher Suite"]), v["Authentication Verified"] == true); exchange != nil {
+			switch exchange.Profile {
+			case "ECDHEClient":
+				name += fmt.Sprintf(" · ECDHE · %d-byte public value · public value not evaluated", number(exchange.Fields["Client EC Point Length"]))
+			case "DHEClient":
+				name += fmt.Sprintf(" · DHE · %d-byte public value · public value not evaluated", number(exchange.Fields["Client DH Public Value Length"]))
+			case "RSAClient":
+				name += fmt.Sprintf(" · RSA · %d-byte encrypted premaster · premaster not decrypted", number(exchange.Fields["Encrypted Premaster Length"]))
+			}
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		} else if number(h["Type"]) == 16 && strings.Contains(textValue(h["Client Key Exchange Status"]), "unavailable") {
+			name += " envelope · " + strings.Split(textValue(h["Client Key Exchange Status"]), ";")[0]
+		}
+		if status, _, _ := tlsCertificateStatusDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); status != nil {
+			if strings.Contains(textValue(h["Certificate Status Validation"]), "unavailable") {
+				name += " · context unavailable"
+			}
+			name += fmt.Sprintf(" · OCSP · %d-byte response · revocation and trust not evaluated", number(status.Fields["OCSP Response Length"]))
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		} else if number(h["Type"]) == 22 {
+			name += " envelope · " + textValue(h["Certificate Status Validation"])
+		}
+		if request, _, _ := tlsCertificateRequestDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); request != nil {
+			algorithms := len(mapList(request.Fields["Signature Algorithms"]))
+			for _, ext := range mapList(request.Fields["Extensions"]) {
+				if number(ext["Type"]) == 13 {
+					algorithms = len(mapList(ext["Signature Algorithms"]))
+				}
+			}
+			name += fmt.Sprintf(" · %d signature algorithms", algorithms)
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		} else if number(h["Type"]) == 13 && strings.Contains(textValue(h["Certificate Request Status"]), "unavailable") {
+			name += " envelope · negotiated version unavailable"
+		}
+		if verify, _, _ := tlsCertificateVerifyDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); verify != nil {
+			if algorithm, ok := verify.Fields["Signature Algorithm"]; ok {
+				name += " · " + tlsCertificateRequestAlgorithm(uint16(number(algorithm)), uint16(number(v["Negotiated Version"])))
+			}
+			name += fmt.Sprintf(" · %d signature bytes · signature not evaluated", number(verify.Fields["Signature Length"]))
+			messageRank = max(messageRank, tlsCertificateVerifyRank)
+		} else if number(h["Type"]) == 15 && strings.Contains(textValue(h["Certificate Verify Status"]), "unavailable") {
+			name += " envelope · negotiated version unavailable or unsupported"
+		}
+		if wire, _ := tlsFinishedDetail(h, number(v["Negotiated Version"]), number(v["Cipher Suite"]), v["Authentication Verified"] == true); wire != nil {
+			name += " · " + textValue(h["Finished Phase"]) + " epoch · transcript MAC not evaluated"
+			if h["Finished Phase"] == "application" {
+				messageRank = max(messageRank, tlsHandshakeBodyRank)
+			}
+		} else if number(h["Type"]) == 20 && strings.Contains(textValue(h["Finished Status"]), "unavailable") {
+			name += " envelope · negotiated version unavailable or unsupported"
+		}
+		handshakes = append(handshakes, struct {
+			text string
+			rank int
+		}{name, messageRank})
+	}
+	// The detail tree retains wire order. Put every body-qualified message
+	// before envelope-only names, so an earlier request cannot hide a later
+	// CertificateVerify behind a long coalesced flight. Equal ranks stay stable.
+	sort.SliceStable(handshakes, func(i, j int) bool { return handshakes[i].rank > handshakes[j].rank })
+	for _, handshake := range handshakes {
+		parts = append(parts, handshake.text)
 	}
 	if len(parts) == 0 {
-		if _, ok := v["Alert Description"]; ok {
+		if tlsHandshakeBoundaryUnavailable(e) {
+			parts = append(parts, "Handshake · boundary unavailable")
+		} else if _, ok := v["Alert Description"]; ok {
 			level := "warning"
 			if number(v["Alert Level"]) == 2 {
 				level = "fatal"
 			}
 			parts = append(parts, "Alert · "+level+" · "+alertName(v["Alert Description"]))
 		} else if textValue(v["Content Visibility"]) == "encrypted" {
-			parts = append(parts, "Encrypted record")
+			if decision := textValue(v["Early Data Decision"]); decision != "" {
+				parts = append(parts, "Early data record · "+decision)
+			} else {
+				parts = append(parts, "Encrypted record")
+			}
 		} else if typ, ok := v["Inner Content Type"]; ok && v["Authentication Verified"] == true {
-			parts = append(parts, recordType(typ))
+			label := recordType(typ)
+			if v["TLS Key Epoch"] == "early" {
+				label = "Early " + label
+				if v["Early Data Decision"] == "rejected by observed server" {
+					label = "Rejected " + label
+				}
+			}
+			parts = append(parts, label)
 		} else if typ, ok := v["Record Type"]; ok {
 			parts = append(parts, recordType(typ))
 		} else {
@@ -397,7 +579,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	if name := textValue(v["SNI"]); name != "" {
 		parts = append(parts, "SNI="+name)
 	}
-	if alpn := textValue(v["ALPN"]); alpn != "" {
+	if alpn := textValue(v["ALPN"]); alpn != "" && !messageALPN {
 		parts = append(parts, "ALPN="+alpn)
 	}
 	if e.Error != "" {
@@ -414,6 +596,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := smbQueryInfoSummary(e); ok {
+		return summary
+	}
 	if e.Protocol == "ospf" && e.Profile == "ospfv2-bounded-control" {
 		v := eventValues(e)
 		h, _ := v["Header"].(map[string]any)
@@ -869,8 +1054,54 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 	return names, label, label != ""
 }
 
+// A packet diagnostic is separate from connection identity and from any
+// successfully decoded neighbour in a coalesced UDP datagram. Public short
+// header guesses alone cannot qualify this overview.
+func quicPacketDiagnosticRank(e *pcaputil.ProtocolEvent) int {
+	if e == nil || e.Protocol != "quic" || e.Completeness == "evicted" || e.Error == "" {
+		return 0
+	}
+	if e.Session["Authentication Verified"] != true && (e.FlowID == 0 || e.Admission != "authenticated-wire-and-observed-CID" && e.Admission != "observed-CID-unverified-payload") {
+		return 0
+	}
+	if e.ExpertCode == string(pcaputil.ErrMalformedMessage) || e.ExpertCode == string(pcaputil.ErrAuthenticationFailed) {
+		return 2
+	}
+	return 1
+}
+
+func quicPayloadDisposition(delivery any) string {
+	switch delivery {
+	case "not delivered to protocol state; packet AEAD verified":
+		return "not delivered"
+	case "packet parsing stopped at refused frame; earlier validated frames may have been applied":
+		return "parsing stopped"
+	default:
+		return "delivery not certified"
+	}
+}
+
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
-	if e == nil || p.networkRefused {
+	if e == nil || p.networkRefused || unsupportedQUICTCPCarrier(e) {
+		return
+	}
+	// A single captured packet can contain both a refused body and another
+	// complete SMB2 record. Preserve that mixed outcome in either callback order.
+	if smbBodyDiagnostic(e) && p.smbRefusedRecordSummary == "" {
+		p.smbRefusedRecordSummary = clipText(smbRefusedRecordSummary(e), 384)
+	}
+	if e.Protocol == "smb2" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && smbSummaryOwnedRecord(e) && p.smbDecodedRecordSummary == "" {
+		p.smbDecodedRecordSummary = clipText(applicationEventSummary(e), 384)
+	}
+	if names, view, ok := pppoeHeaderRefusalPresentation(e); ok {
+		visibility := "unconfirmed-session-owner"
+		if view.Status == "limited" {
+			visibility = "unselected-pppoe-profile"
+		}
+		if view.Status == "malformed" {
+			visibility = "invalid-pppoe-header"
+		}
+		*p = packetPresentation{networkRefused: true, protocol: "PPPoE", summary: safeText(view.Summary), status: view.Status, visibility: visibility, scope: "PPPoE fixed header observed; child identity not admitted", evidence: "native owned PPPoE header; fragment, transport and application state not admitted", nativeHeaders: names, nativeDomain: view.Domain, priority: 1000}
 		return
 	}
 	if validRSVPControlObservation(e) {
@@ -903,6 +1134,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			p.summary += " · " + e.Error
 		}
 		p.addLayer("OSPFv3")
+		return
+	}
+	if names, ok := ipv4IPIPExtentRefusal(e); ok {
+		*p = packetPresentation{networkRefused: true, protocol: "IPv4", summary: safeText(e.Summary), status: "malformed", visibility: "invalid-carrier-extent", scope: "observed IPv4 parent header; IP-in-IP normalization not admitted", evidence: "literal zero Total Length; captured length cannot establish enclosing carrier extent", nativeHeaders: append([]string(nil), names...), nativeDomain: e.Domain, priority: 1000}
+		return
+	}
+	if names, ok := ipv4FragmentExtentRefusal(e); ok {
+		*p = packetPresentation{networkRefused: true, protocol: "IPv4", summary: safeText(e.Summary), status: "malformed", visibility: "invalid-fragment-extent", scope: "observed IPv4 fragment header; reassembly not admitted", evidence: "literal zero Total Length; captured length cannot establish fragment extent", nativeHeaders: append([]string(nil), names...), nativeDomain: e.Domain, priority: 1000}
 		return
 	}
 	if names, label, ok := networkHeaderRefusalPresentation(e); ok {
@@ -983,7 +1222,37 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			return
 		}
 	}
+	e = tlsCiphertextRefusalDisplayEvent(e)
 	defer p.observeHTTP3ConnectionFault(e)
+	if observation, ok := e.NativeWCFTLSCarrier(); ok {
+		e = wcfTLSDisplayEvent(e)
+		if observation.Status != "decoded" && observation.Status != "deferred" && !tlsCiphertextRefusalCaption(e, false) {
+			p.addLayer("WCF/MC-NMF")
+			p.addLayer("TLS")
+			if p.priority <= 25 {
+				p.protocol, p.priority, p.status, p.visibility = "TLS", 25, observation.Status, "framing-diagnostic"
+				p.evidence = "native observed MC-NMF TLS upgrade; incomplete or refused bytes are not an admitted TLS record"
+				p.scope, p.summary = "observed WCF/TLS carrier context", clipText(observation.Summary, 384)
+			}
+			return
+		}
+	}
+	if observation, ok := e.NativeWCFObservation(); ok {
+		owned := *e
+		owned.Protocol, owned.Status = "wcf", observation.Status
+		owned.Summary, owned.Error = observation.Summary, observation.Error
+		owned.Session, _ = e.NativeWCFFields()
+		e = &owned
+		if observation.Status != "decoded" && observation.Status != "deferred" {
+			p.addLayer("WCF/MC-NMF")
+			if p.priority <= 20 {
+				p.protocol, p.priority, p.status, p.visibility = "WCF/MC-NMF", 20, observation.Status, "framing-diagnostic"
+				p.evidence = "native observed MC-NMF connection; refused or incomplete record is not decoded"
+				p.scope, p.summary = "observed framing context", clipText(observation.Summary, 384)
+			}
+			return
+		}
+	}
 	if e.AuthenticatedQUICApplicationProtocol() == "http3" && e.Session["HTTP3 Wire Only"] == true && e.Error == "" {
 		p.addLayer("QUIC")
 		p.addLayer("HTTP/3")
@@ -1060,6 +1329,13 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	// These parsers validated a complete outer message before refusing inner
 	// decryption/extensions. A missing key/profile must not erase that proven
 	// identity, and it must not turn the inner payload into decoded fields.
+	if summary := cldapResponseEnvelopeSummary(e); summary != "" {
+		p.protocol, p.priority, p.status, p.visibility = "CLDAP", 20, e.Status, "headers"
+		p.evidence = "complete LDAP BER message envelopes over UDP; response body unparsed; peer unverified"
+		p.scope, p.summary = "message envelopes; response body opaque", clipText(summary, 384)
+		p.addLayer("CLDAP")
+		return
+	}
 	if e.Status == "context-required" && e.Protocol == "snmp" && e.ExpertCode == string(pcaputil.ErrEncrypted) && e.Session["Encrypted"] == true && number(e.Session["Version"]) == 3 {
 		p.protocol, p.priority, p.status, p.visibility = "SNMP", 20, e.Status, "encrypted"
 		p.evidence, p.summary = "validated SNMPv3 USM envelope", "SNMPv3 · encrypted scoped PDU · decryption key unavailable; authentication not verified"
@@ -1136,6 +1412,16 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("RTSP")
 		return
 	}
+	if smbBodyDiagnostic(e) {
+		p.addLayer("SMB2")
+		if p.priority <= eventPriority(e) {
+			p.protocol, p.priority, p.status, p.visibility = "SMB2", eventPriority(e), e.Status, "opaque-body"
+			p.scope = "complete SMB2 record; command body not decoded"
+			p.evidence = "owned Direct TCP boundary and fixed headers; body semantics unavailable"
+			p.summary = smbRefusedRecordSummary(e)
+		}
+		return
+	}
 	if e.Transport == "network" && (e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" || e.Protocol == "igmp" && e.Profile == "igmp-membership-wire") && (e.Status == "incomplete" || e.Status == "malformed" || e.Status == "limited") && e.Completeness == e.Status {
 		label := eventProtocolName(e)
 		if e.Protocol == "icmpv6" {
@@ -1186,14 +1472,108 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.evidence = "packet authentication is per packet; datagram padding is unprotected"
 		return
 	}
+	if h := observedHTTPIncompleteHeader(e); h != nil {
+		for _, layer := range eventCarriers(e) {
+			p.addLayer(layer)
+		}
+		label := strings.SplitN(h.line, " ", 2)[0]
+		p.addLayer(label)
+		if rank := eventPriority(e); rank >= p.priority {
+			p.protocol, p.priority, p.status = label, rank, e.Status
+			p.visibility, p.scope = "headers", "validated response header; message incomplete"
+			p.evidence = "complete header observed; exact body boundary not reached"
+			p.summary = safeText(h.line) + " · header observed · message incomplete"
+		}
+		return
+	}
+	if h := observedHTTPResponseHeader(e); h != nil {
+		for _, layer := range eventCarriers(e) {
+			p.addLayer(layer)
+		}
+		label := strings.SplitN(h.line, " ", 2)[0]
+		p.addLayer(label)
+		if rank := eventPriority(e); rank >= p.priority {
+			p.protocol, p.priority, p.status = label, rank, e.Status
+			p.visibility, p.scope = "headers", "response header only; message boundary unavailable"
+			p.evidence = "validated complete response header; request method unavailable"
+			p.summary = safeText(h.line) + " · header only · request method unavailable"
+		}
+		return
+	}
+	if label := observedHTTPUnframedContext(e); label != "" {
+		p.addLayer(label)
+		if rank := eventPriority(e); rank >= p.priority {
+			p.protocol, p.priority, p.status = label, rank, e.Status
+			p.visibility, p.scope = "unframed-stream", "observed header context; current message boundary unavailable"
+			p.evidence = "earlier complete response header on this direction; no request method or complete message"
+			p.summary = clipText(e.Summary, 384)
+		}
+		return
+	}
+	if isHTTPObservationProfile(e) {
+		p.diagnostic = "HTTP observation · context or owned source unavailable"
+		return
+	}
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
 			label := protocolName(e.Protocol)
+			authenticatedTLS := authenticatedTLSRecordDiagnostic(e)
+			envelope, rejectedEnvelope := e.NativeTLSCiphertextRefusal()
+			if authenticatedTLS {
+				label = eventProtocolName(e)
+			}
+			if rejectedEnvelope {
+				label = tlsVersion(envelope.Version)
+			}
 			if e.Protocol == "" && e.Transport != "" {
 				label = strings.ToUpper(e.Transport)
 			}
 			cause := strings.TrimPrefix(e.Error, e.ExpertCode+": ")
 			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+cause, 256)
+			if rank := quicPacketDiagnosticRank(e); rank > p.quicPacketProblemRank {
+				p.quicPacketProblem, p.quicPacketProblemRank = p.diagnostic, rank
+			}
+			if e.Protocol == "tls" && e.ExpertCode == string(pcaputil.ErrMalformedMessage) && p.tlsRecordProblem == "" {
+				// A later consequence (for example invalidated stream affinity)
+				// must not replace the original rejected-record diagnosis.
+				p.tlsRecordProblem = p.diagnostic
+			}
+			if authenticatedTLS && p.protocol == "" {
+				for _, layer := range eventCarriers(e) {
+					p.addLayer(layer)
+				}
+				p.addLayer(label)
+				p.protocol, p.priority, p.status = label, eventPriority(e), e.Status
+				p.visibility, p.scope = "authenticated-plaintext", "authenticated TLS record diagnostic"
+				p.evidence = "record AEAD verified; handshake message rejected"
+				p.summary = "Handshake rejected · record AEAD verified"
+				if number(eventValues(e)["Inner Content Type"]) == 23 {
+					p.evidence = "record AEAD verified; post-handshake response interrupted"
+					p.summary = "Response interrupted · record AEAD verified"
+				}
+			}
+			if rejectedEnvelope {
+				for _, layer := range eventCarriers(e) {
+					p.addLayer(layer)
+				}
+				p.addLayer(label)
+				if p.protocol == "" {
+					p.protocol, p.priority, p.status = label, eventPriority(e), "malformed"
+					p.visibility, p.scope = "encrypted", "rejected TLS ciphertext envelope"
+					p.evidence = "observed TLS negotiation; record structure invalid; authentication not verified"
+					p.summary = "Ciphertext envelope rejected · plaintext unavailable"
+				}
+			}
+			if helloName := rejectedTLSHelloName(e); p.protocol == "" && helloName != "" {
+				for _, layer := range eventCarriers(e) {
+					p.addLayer(layer)
+				}
+				p.addLayer("TLS")
+				p.protocol, p.priority, p.status = "TLS", eventPriority(e), e.Status
+				p.visibility, p.scope = "cleartext", "rejected TLS "+helloName
+				p.evidence = "complete " + helloName + " declaration; negotiation not established"
+				p.summary = helloName + " rejected · negotiation not established"
+			}
 			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 				p.diagnostic = clipText(e.Summary, 256)
 				if p.protocol == "" && e.FlowID != 0 {
@@ -1234,7 +1614,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				p.summary = p.diagnostic
 				if _, retained := e.Session["Rejected Packet Payload"]; retained && e.Session["Authentication Verified"] == true {
 					p.visibility, p.scope = "authenticated-plaintext", "authenticated packet diagnostic"
-					p.evidence = "packet AEAD verified; payload not delivered"
+					switch quicPayloadDisposition(e.Session["Payload Delivery"]) {
+					case "not delivered":
+						p.evidence = "packet AEAD verified; payload not delivered"
+					case "parsing stopped":
+						p.evidence = "packet AEAD verified; parsing stopped; earlier validated frame effects may remain"
+					default:
+						p.evidence = "packet AEAD verified; payload delivery not certified"
+					}
 				}
 			}
 		}
@@ -1242,6 +1629,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	}
 	if e.Protocol == "" {
 		return
+	}
+	if tlsHandshakeBoundaryUnavailable(e) {
+		p.tlsHandshakeBoundaryUnavailable = true
 	}
 	label := eventProtocolName(e)
 	for _, layer := range eventCarriers(e) {
@@ -1253,11 +1643,37 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		return
 	}
 	info := clipText(applicationEventSummary(e), 384)
+	if tlsHandshakeBoundaryUnavailable(e) {
+		// Keep one packet-level warning even when several records share
+		// this outcome. Only remove our own leading TLS phrase here;
+		// application text must not suppress or be rewritten by it.
+		if rest, ok := strings.CutPrefix(info, "Handshake · boundary unavailable"); ok {
+			info = "Handshake" + rest
+		}
+	}
+	incompleteTLS := e.Protocol == "tls" && eventValues(e)["Handshake Incomplete"] == true
+	detailedTLS := tlsDetailedHandshakeRank(e)
+	if _, rank := quicTLSMessageSummary(e); rank > detailedTLS {
+		detailedTLS = rank
+	}
 	if rank > p.priority || p.protocol != label {
 		p.summary, p.count = info, 1
+		p.tlsIncompleteSummary = incompleteTLS
+		p.tlsDetailedSummaryRank = detailedTLS
 	} else {
 		p.count++
-		if p.count <= 3 && info != "" && !strings.Contains(p.summary, info) {
+		if info != "" && (detailedTLS > p.tlsDetailedSummaryRank || detailedTLS > 0 && detailedTLS < tlsKeyUpdateRank && detailedTLS == p.tlsDetailedSummaryRank && !strings.Contains(p.summary, info)) {
+			// Distinct qualified messages in separate records of one frame
+			// remain visible beyond the ordinary three-record sample budget.
+			p.summary = info + " | " + clipText(p.summary, 384)
+			p.tlsDetailedSummaryRank, p.tlsIncompleteSummary = detailedTLS, false
+		} else if e.Protocol == "tls" && p.tlsIncompleteSummary && !incompleteTLS && info != "" {
+			// Put a completed message before fragment/context text, including
+			// when it arrives beyond the first three coalesced record samples.
+			// Keep the fragment evidence and the existing bounded row budget.
+			p.summary = info + " | " + clipText(p.summary, 384)
+			p.tlsIncompleteSummary = false
+		} else if p.count <= 3 && info != "" && !strings.Contains(p.summary, info) {
 			p.summary += " | " + info
 		}
 	}
@@ -1374,6 +1790,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 				row.Protocol = strings.ToUpper(row.Transport)
 			}
 		}
+		if p.tlsRecordProblem != "" && p.tlsRecordProblem != p.diagnostic {
+			row.Info = p.tlsRecordProblem + " · " + row.Info
+			row.ProtocolStatus = "malformed"
+		}
 		return row
 	}
 	row.Protocol = p.protocol
@@ -1395,7 +1815,9 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.networkRefused {
 		row.ConnectionProtocol, row.ConnectionEvidence = "", ""
 		row.ConnectionStack = nil
-		row.StreamID = 0
+		row.StreamID, row.ConversationID, row.TCPFlowID = 0, 0, 0
+		row.TCPFlowState, row.ConnectionDiagnostic = "", ""
+		row.TCPFlowDomain, row.TransportView = nil, nil
 		if p.visibility == "tunnel-header" {
 			// Keep the physical capture domain separate from this admitted
 			// header's VNI namespace. Neither establishes a data session.
@@ -1508,6 +1930,25 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	}
 	row.Visibility, row.ProtocolStatus = p.visibility, p.status
 	row.Info = p.summary
+	if p.tlsRecordProblem != "" {
+		row.Info = p.tlsRecordProblem + " | " + row.Info
+		if p.count > 0 {
+			row.ProtocolStatus = "mixed-record-outcomes"
+		}
+	}
+	if p.tlsHandshakeBoundaryUnavailable {
+		row.Info = "TLS handshake boundary unavailable | " + row.Info
+	}
+	if p.quicPacketProblem != "" {
+		if p.quicPacketProblem != p.summary {
+			row.Info = p.quicPacketProblem + " | " + row.Info
+		}
+		if p.count > 0 {
+			row.ProtocolStatus, row.Visibility = "mixed-packet-outcomes", "mixed-packet-outcomes"
+			row.ProtocolScope = "mixed QUIC datagram outcomes"
+			row.ProtocolEvidence = "packet protection and parsing are per packet; at least one QUIC packet was refused"
+		}
+	}
 	if p.rejectedTLS && p.count > 0 {
 		row.Info = "Includes rejected TLS record · " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
@@ -1515,8 +1956,14 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.count > 3 {
 		row.Info += fmt.Sprintf(" (+%d further PDUs)", p.count-3)
 	}
-	if p.diagnostic != "" && p.diagnostic != p.summary {
+	if p.diagnostic != "" && p.diagnostic != p.summary && p.diagnostic != p.tlsRecordProblem && p.diagnostic != p.quicPacketProblem {
 		row.Info += " · " + p.diagnostic
+	}
+	if p.smbDecodedRecordSummary != "" && p.smbRefusedRecordSummary != "" {
+		row.ProtocolStatus, row.Visibility = "partial", "mixed-record-outcomes"
+		row.ProtocolScope = "SMB2 records with refused command bodies"
+		row.ProtocolEvidence = "record framing and body decoding are separate; at least one body was refused"
+		row.Info = "Mixed SMB2 records · " + p.smbDecodedRecordSummary + " · " + p.smbRefusedRecordSummary
 	}
 	if row.Info == "" {
 		row.Info = p.protocol
@@ -1534,13 +1981,19 @@ func tlsDisplayValue(name string, value any) string {
 		return fmt.Sprintf("%s (0x%04x)", tlsVersion(value), n)
 	case "Record Version":
 		return fmt.Sprintf("0x%04x · record legacy version", n)
-	case "Cipher Suite":
+	case "Cipher Suite", "Early Cipher Suite":
 		if n == 0 {
 			return "not selected yet"
 		}
-		return fmt.Sprintf("%s (0x%04x)", tls.CipherSuiteName(uint16(n)), n)
+		label := tls.CipherSuiteName(uint16(n))
+		if name := map[uint64]string{0x009e: "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256", 0x009f: "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384", 0xccaa: "TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256"}[n]; name != "" {
+			label = name
+		}
+		return fmt.Sprintf("%s (0x%04x)", label, n)
 	case "Record Type", "Inner Content Type":
 		return fmt.Sprintf("%s (%d)", recordType(value), n)
+	case "Key Update Request":
+		return fmt.Sprintf("%s (%d)", tlsKeyUpdateRequestName(value), n)
 	case "Alert Description":
 		return fmt.Sprintf("%s (%d)", alertName(value), n)
 	case "Alert Level":

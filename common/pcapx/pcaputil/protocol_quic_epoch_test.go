@@ -48,7 +48,7 @@ func TestQUICRetiredCIDLatePacketsRequireAuthentication(t *testing.T) {
 	next, err := quicNextPhase(k)
 	require.NoError(t, err)
 	cid := []byte("retired!")
-	q := &binQUIC{native: true, byteLimit: 4096, keys: &quicKeyring{}, cids: map[string]int{string(cid): 1}}
+	q := &binQUIC{native: true, byteLimit: 4096, keys: &quicKeyring{}, cids: map[string]int{string(cid): 2}}
 	q.keys.app[0] = [2]*quicTrafficKeys{k, next}
 	q.cidSequences[1] = map[uint64]string{0: string(cid)}
 	require.NoError(t, q.applyFrames(0, 2, []map[string]any{{"Frame Type": "RETIRE_CONNECTION_ID", "Sequence": uint64(0)}}, map[string]any{}, 8))
@@ -94,7 +94,7 @@ func TestQUICAuthenticatedPNWindowAndKeyEpochRecovery(t *testing.T) {
 			next, err := quicNextPhase(k)
 			require.NoError(t, err)
 			cid := []byte("serverid")
-			q := &binQUIC{native: true, keys: &quicKeyring{}, cids: map[string]int{string(cid): 1}}
+			q := &binQUIC{native: true, keys: &quicKeyring{}, cids: map[string]int{string(cid): 2}}
 			q.keys.app[0] = [2]*quicTrafficKeys{k, next}
 			// One-byte PN is ambiguous after loss of 768 packets. Only verified
 			// authentication, not the unauthenticated header, resolves that window.

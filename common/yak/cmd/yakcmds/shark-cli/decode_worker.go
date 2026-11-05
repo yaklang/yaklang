@@ -28,13 +28,14 @@ const decoderInputLimit = 2 << 20
 const decoderOutputLimit = 8 << 20
 
 type decodeRequest struct {
-	ByteFields         []workerByteField    `json:",omitempty"`
-	TransportView      *packetTransportView `json:",omitempty"`
-	TransportHeader    []byte               `json:",omitempty"`
-	ConnectionStack    []string             `json:",omitempty"`
-	ConnectionProtocol string               `json:",omitempty"`
-	ConnectionEvidence string               `json:",omitempty"`
-	OpaqueTransport    bool                 `json:",omitempty"`
+	PPPoEHeaderProof   *pppoeHeaderWorkerProof `json:",omitempty"`
+	ByteFields         []workerByteField       `json:",omitempty"`
+	TransportView      *packetTransportView    `json:",omitempty"`
+	TransportHeader    []byte                  `json:",omitempty"`
+	ConnectionStack    []string                `json:",omitempty"`
+	ConnectionProtocol string                  `json:",omitempty"`
+	ConnectionEvidence string                  `json:",omitempty"`
+	OpaqueTransport    bool                    `json:",omitempty"`
 	Events             []*pcaputil.ProtocolEvent
 	Stream             *streamDecodeRequest
 	Number             uint64
@@ -91,6 +92,28 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 	}
 	if req.Reference.Number != 0 && req.Reference.Number != req.Number {
 		return fmt.Errorf("captured reference does not match decoder packet number")
+	}
+	if req.Stream == nil && req.PPPoEHeaderProof != nil {
+		proof := req.PPPoEHeaderProof
+		ci := gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}
+		if proof.Reference == req.Reference && req.Reference.Number == req.Number && len(proof.Header) == 6 {
+			if event, ok := pcaputil.ObservePPPoEHeaderAtCapture(req.Data, ci, req.Link, req.Reference); ok && event.NativePPPoEHeaderWireMatches(proof.Header) {
+				if len(req.Events) > 0 && req.Events[0] != nil {
+					event.ID = req.Events[0].ID
+				}
+				req.Events = []*pcaputil.ProtocolEvent{event}
+				req.TransportView, req.TransportHeader = nil, nil
+				req.ConnectionProtocol, req.ConnectionEvidence = "", ""
+				req.ConnectionStack = nil
+			}
+		}
+	}
+	if req.Stream == nil && projectedPPPoEHeaderMetadata(req.Events) {
+		// No physical-header proof survived the parent projection. Keep only
+		// the refusal metadata; no child dissection or Source0 range is allowed.
+		if _, native := req.Events[0].NativePPPoEHeaderObservation(); !native {
+			req.Stream = &streamDecodeRequest{ID: req.Number, Events: req.Events}
+		}
 	}
 	events := req.Events
 	if req.Stream != nil {
@@ -200,7 +223,8 @@ func runIsolated(parent context.Context, request decodeRequest) ([]byte, error) 
 func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 	// JSON escapes and repeated maps are charged as transmitted bytes. Work
 	// on shallow copies: history snapshots still belong to their callers.
-	request.ByteFields = nil // Parent facts are regenerated from actual Go types.
+	request.ByteFields = nil       // Parent facts are regenerated from actual Go types.
+	request.PPPoEHeaderProof = nil // Public DTOs cannot supply native parent proof.
 	var events []*pcaputil.ProtocolEvent
 	if request.Stream != nil {
 		stream := *request.Stream
@@ -208,6 +232,13 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 		events, stream.Events = stream.Events, nil
 	} else {
 		events, request.Events = request.Events, nil
+	}
+	for _, event := range events {
+		if _, ok := event.NativePPPoEHeaderObservation(); ok {
+			request.PPPoEHeaderProof = pppoeWorkerProofFor(request, event)
+			events = []*pcaputil.ProtocolEvent{event}
+			break // Native parent refusal suppresses stale child DTOs as well.
+		}
 	}
 	base, err := json.Marshal(request)
 	if err != nil {
@@ -334,9 +365,15 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 		if observed.protocol != "" {
 			d.protocol = observed.protocol
 		}
+	} else if caption := wcfTLSObservationCaption(raw.protocolEvents()); caption != "" {
+		d.protocol = caption
 	} else if raw.presentation.protocol == "HTTP/3" {
 		// Complete public IPC fields can still omit the native ALPN proof,
 		// including authenticated STREAM observations blocked on QPACK.
+		d.protocol = raw.presentation.protocol
+	} else if raw.presentation.protocol == "WCF/MC-NMF" {
+		// The owned capture-time caption includes known-connection framing
+		// diagnostics; a public worker DTO cannot recreate its native proof.
 		d.protocol = raw.presentation.protocol
 	}
 	d.fields = nil
@@ -360,9 +397,26 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 func decodeStream(req streamDecodeRequest) (d packetDetail) {
 	d.number = req.ID
 	if req.Events != nil {
+		for _, event := range req.Events {
+			var values map[string]any
+			if observation, ok := event.NativePPPoEHeaderObservation(); ok {
+				values = observation.Fields
+			} else if projectedPPPoEHeaderMetadata(req.Events) {
+				values = event.Session
+			} else {
+				continue
+			}
+			// Stream/metadata requests have no physical frame proof. Their
+			// header context cannot create byte sources or child dissectors.
+			d.protocol = "PPPoE"
+			d.fields, _ = observedMetadataFields(values, 8192, "PPPoE fixed header observation", "Scope: observed header metadata; child identity not admitted; no physical byte ranges")
+			return
+		}
 		d.unavailable = protocolDetailsUnavailable(req.Events)
 		for _, event := range req.Events {
-			if _, _, refused := networkHeaderRefusalPresentation(event); refused {
+			_, extentRefused := ipv4FragmentExtentRefusal(event)
+			_, carrierExtentRefused := ipv4IPIPExtentRefusal(event)
+			if _, _, refused := networkHeaderRefusalPresentation(event); refused || extentRefused || carrierExtentRefused {
 				// There is no captured frame in a stream-only request. Retain the
 				// exact diagnostic and its observed prefix identity, without child
 				// dissectors or fabricated physical network-header byte ranges.

@@ -8,15 +8,25 @@ import (
 )
 
 func parseTLS12ControlHandshake(node *base.Node, process func(*base.Node) (func(bool), error), messageType uint8) error {
-	if messageType != 4 && messageType != 14 {
+	if messageType != 4 && messageType != 14 && messageType != 22 {
 		return fmt.Errorf("tls12-control: unsupported handshake profile")
 	}
+	return parseTLSControlHandshakeTree(node, process, tls12ControlLimit(messageType), "tls12-control", func(wire []byte) ([]tls12ControlField, map[string]any, error) {
+		return decodeTLS12ControlHandshake(wire, messageType)
+	})
+}
+
+func parseTLSEndOfEarlyData(node *base.Node, process func(*base.Node) (func(bool), error)) error {
+	return parseTLSControlHandshakeTree(node, process, 4, "tls-end-of-early-data", DecodeTLSEndOfEarlyDataLayout)
+}
+
+func parseTLSControlHandshakeTree(node *base.Node, process func(*base.Node) (func(bool), error), limit int, profile string, decode func([]byte) ([]tls12ControlField, map[string]any, error)) error {
 	bits, bounded, err := parseLengthByLengthConfig(node)
 	if err != nil {
 		return err
 	}
-	if !bounded || bits < 32 || bits%8 != 0 || bits > tls12ControlMaxBytes*8 {
-		return fmt.Errorf("tls12-control: explicit 4..65545 byte handshake boundary required")
+	if !bounded || bits < 32 || bits%8 != 0 || bits > uint64(limit)*8 {
+		return fmt.Errorf("%s: explicit 4..%d byte handshake boundary required", profile, limit)
 	}
 	raw, err := base.NewNodeTreeWithConfig(node.Cfg, "TLS control staged handshake", "raw", node.Ctx)
 	if err != nil {
@@ -38,9 +48,9 @@ func parseTLS12ControlHandshake(node *base.Node, process func(*base.Node) (func(
 	}
 	wire, ok := value.([]byte)
 	if !ok {
-		return fmt.Errorf("tls12-control: staged value is not raw")
+		return fmt.Errorf("%s: staged value is not raw", profile)
 	}
-	fields, info, err := decodeTLS12ControlHandshake(wire, messageType)
+	fields, info, err := decode(wire)
 	if err != nil {
 		return err
 	}
@@ -49,7 +59,7 @@ func parseTLS12ControlHandshake(node *base.Node, process func(*base.Node) (func(
 	staged.Cfg.SetItem(CfgEndian, "big")
 	for _, f := range fields {
 		if f.Start < 0 || f.End < f.Start || uint64(f.End)*8 > bits {
-			return fmt.Errorf("tls12-control: invalid field span")
+			return fmt.Errorf("%s: invalid field span", profile)
 		}
 		child, err := base.NewNodeTreeWithConfig(staged.Cfg, f.Name, f.Type, node.Ctx)
 		if err != nil {
