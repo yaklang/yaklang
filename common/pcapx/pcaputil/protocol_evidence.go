@@ -179,6 +179,7 @@ func ipEncapsulation(protocol layers.IPProtocol, outer string) string {
 	}
 }
 func (e *ProtocolEvent) finalizeEvidence() {
+	e.normalizeKerberosContext()
 	e.SourceBytes.CompletedIn = nil
 	if (e.Status == "decoded" || e.Status == "deferred") && len(e.Raw) > 0 {
 		for _, ref := range e.SourceBytes.PacketRefs {

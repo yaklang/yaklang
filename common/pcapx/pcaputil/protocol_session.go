@@ -862,6 +862,10 @@ func protocolError(kind ProtocolErrorKind, format string, args ...any) error {
 }
 
 func classifySessionError(err error) (string, *ProtocolError) {
+	var kerberosContext *stream_parser.KerberosContextRequired
+	if errors.As(err, &kerberosContext) {
+		return "context-required", &ProtocolError{Kind: ErrContextRequired, Message: kerberosContext.Error()}
+	}
 	var typed *ProtocolError
 	if errors.As(err, &typed) {
 		// Preserve the established capture status for connection-state budgets.
