@@ -57,15 +57,20 @@ type SyntaxFlowResult struct {
 
 	riskMap      map[string]*schema.SSARisk
 	riskCountMap map[string]int64
+	// riskPositions holds the (rule, file, code range) of every published risk.
+	// One source position is one report row: unrolled loops and container-level
+	// struct alerts otherwise produce N rows that point at the same code.
+	riskPositions map[string]struct{}
 	*ssaconfig.Config
 }
 
 func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
-		symbol:       make(map[string]Values),
-		riskMap:      make(map[string]*schema.SSARisk),
-		riskCountMap: make(map[string]int64),
-		resultUUID:   uuid.NewString(),
+		symbol:        make(map[string]Values),
+		riskMap:       make(map[string]*schema.SSARisk),
+		riskCountMap:  make(map[string]int64),
+		riskPositions: make(map[string]struct{}),
+		resultUUID:    uuid.NewString(),
 	}
 }
 
