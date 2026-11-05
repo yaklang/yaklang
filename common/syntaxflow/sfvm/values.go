@@ -338,6 +338,39 @@ func (v Values) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Config
 	})
 }
 
+// dataflowFanoutEliminationEnabled reports whether the dataflow opcode fanout
+// may eliminate covered inputs for this (frame, SFI-config) pair. Every gate
+// below protects a semantic the coverage law breaks:
+//   - anchor scope active: per-source filter attribution must be preserved
+//     (each source's results carry its own anchor bits; skipping a source
+//     silently drops its mask slot);
+//   - until/hook configs: until collects matches mid-descent and hooks have
+//     side effects a skipped source must still observe;
+//   - depth configs: the depth window is relative to the source, so a segment
+//     computed inside A's window is not an independent topdef of A1.
+func dataflowFanoutEliminationEnabled(sfConfig *Config, config []*RecursiveConfigItem, anchorScopeActive bool) bool {
+	if sfConfig == nil {
+		return false
+	}
+	if anchorScopeActive {
+		return false
+	}
+	for _, item := range config {
+		if item == nil {
+			continue
+		}
+		switch item.Key {
+		case string(RecursiveConfig_Depth),
+			string(RecursiveConfig_DepthMin),
+			string(RecursiveConfig_DepthMax),
+			string(RecursiveConfig_Until),
+			string(RecursiveConfig_Hook):
+			return false
+		}
+	}
+	return true
+}
+
 func (v Values) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, Values, error) {
 	ret, err := v.pipeLineRun(func(vo ValueOperator) (Values, error) {
 		_, nextValue, err := vo.ExactMatch(ctx, mod, s)

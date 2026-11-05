@@ -49,6 +49,10 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 		}
 		return nil
 	}
+	// Descent completed untruncated: publish the elimination coverage marks so
+	// the fanout can skip inputs this descent fully expanded. All abort paths
+	// above (panic/limit/ctx) intentionally return without publishing.
+	actx.publishFanoutCoverage()
 	ret = MergeValues(ret)
 	return
 }

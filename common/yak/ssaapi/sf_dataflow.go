@@ -434,6 +434,15 @@ func DataFlowWithSFConfig(
 	}
 
 	options = append(options, WithExclusiveContext(config.GetContext()))
+	// Input-elimination session for this descent: when the opcode fanout has
+	// elimination enabled, the descent reports each node it fully expands so
+	// the eliminator can later skip fanout inputs whose topdef the completed
+	// descent already covers. The session is dropped (never publishes) when
+	// the descent funnels detect truncation or a cycle cut (see
+	// AnalyzeContext.check and the GetTopDefs/GetBottomUses limit paths).
+	if session := config.DataflowEliminatorFor(); session != nil {
+		options = append(options, WithFanoutCollector(session))
+	}
 	// Propagate the per-rule total-work budget into the recursive descent so
 	// AnalyzeContext.check() increments it per node across all sources (the
 	// per-source recursiveCounter cap resets each GetTopDefs call; this shared
