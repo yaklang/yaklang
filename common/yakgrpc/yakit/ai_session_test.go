@@ -14,10 +14,16 @@ import (
 func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
+	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AISessionTaskInput{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
+	require.NoError(t, SaveAISessionTaskInput(projectDB, &SaveAISessionTaskInputParams{
+		SessionID: sessionA, TaskID: "task-a", TaskUUID: uuid.NewString(), UserInput: "session a",
+	}))
+	require.NoError(t, SaveAISessionTaskInput(projectDB, &SaveAISessionTaskInputParams{
+		SessionID: sessionB, TaskID: "task-b", TaskUUID: uuid.NewString(), UserInput: "session b",
+	}))
 
 	// runtimes (project DB)
 	runtimeA1 := uuid.NewString()
@@ -82,6 +88,12 @@ func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	require.Equal(t, int64(0), checkpointCount)
 	require.NoError(t, projectDB.Model(&schema.AiCheckpoint{}).Where("coordinator_uuid = ?", runtimeB1).Count(&checkpointCount).Error)
 	require.Equal(t, int64(1), checkpointCount)
+
+	var taskInputCount int64
+	require.NoError(t, projectDB.Model(&schema.AISessionTaskInput{}).Where("session_id = ?", sessionA).Count(&taskInputCount).Error)
+	require.Zero(t, taskInputCount)
+	require.NoError(t, projectDB.Model(&schema.AISessionTaskInput{}).Where("session_id = ?", sessionB).Count(&taskInputCount).Error)
+	require.EqualValues(t, 1, taskInputCount)
 }
 
 func TestDeleteAllAISessionData(t *testing.T) {
@@ -90,6 +102,7 @@ func TestDeleteAllAISessionData(t *testing.T) {
 
 	require.NoError(t, projectDB.AutoMigrate(
 		&schema.AISession{},
+		&schema.AISessionTaskInput{},
 		&schema.AIAgentRuntime{},
 		&schema.AiCheckpoint{},
 		&schema.AiOutputEvent{},
@@ -99,6 +112,12 @@ func TestDeleteAllAISessionData(t *testing.T) {
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
+	require.NoError(t, SaveAISessionTaskInput(projectDB, &SaveAISessionTaskInputParams{
+		SessionID: sessionA, TaskID: "task-a", TaskUUID: uuid.NewString(), UserInput: "session a",
+	}))
+	require.NoError(t, SaveAISessionTaskInput(projectDB, &SaveAISessionTaskInputParams{
+		SessionID: sessionB, TaskID: "task-b", TaskUUID: uuid.NewString(), UserInput: "session b",
+	}))
 
 	_, err = CreateOrUpdateAISessionMeta(projectDB, sessionA, "title-a")
 	require.NoError(t, err)
@@ -170,6 +189,8 @@ func TestDeleteAllAISessionData(t *testing.T) {
 	require.NoError(t, projectDB.Model(&schema.AISession{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)
 	require.NoError(t, projectDB.Model(&schema.AISessionPlanAndExec{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+	require.NoError(t, projectDB.Model(&schema.AISessionTaskInput{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)
 }
 

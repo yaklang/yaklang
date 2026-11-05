@@ -1,0 +1,30 @@
+package schema
+
+import "github.com/yaklang/gorm"
+
+// AISessionTaskInput stores the user input and attachment snapshot for one
+// accepted AI task. The session ID is a logical lookup key only; this table
+// deliberately has no foreign-key or association relationship with AISession.
+type AISessionTaskInput struct {
+	gorm.Model
+
+	SessionID       string `json:"session_id" gorm:"column:session_id;index;not null"`
+	TaskID          string `json:"task_id" gorm:"column:task_id;index;not null"`
+	TaskUUID        string `json:"task_uuid" gorm:"column:task_uuid;unique_index;not null"`
+	UserInputUUID   string `json:"user_input_uuid" gorm:"column:user_input_uuid;index"`
+	UserInput       string `json:"user_input" gorm:"column:user_input;type:text"`
+	InputSource     string `json:"input_source" gorm:"column:input_source;index"`
+	FocusModeLoop   string `json:"focus_mode_loop" gorm:"column:focus_mode_loop"`
+	ScheduleUUID    string `json:"schedule_uuid" gorm:"column:schedule_uuid"`
+	ScheduleName    string `json:"schedule_name" gorm:"column:schedule_name"`
+	ScheduledAt     string `json:"scheduled_at" gorm:"column:scheduled_at"`
+	ScheduleTrigger string `json:"schedule_trigger" gorm:"column:schedule_trigger"`
+
+	AttachedFilePaths  string `json:"attached_file_paths" gorm:"column:attached_file_paths;type:text"`
+	ExplicitResources  string `json:"explicit_resources" gorm:"column:explicit_resources;type:text"`
+	EffectiveResources string `json:"effective_resources" gorm:"column:effective_resources;type:text"`
+}
+
+func (a *AISessionTaskInput) TableName() string {
+	return "ai_session_task_inputs_v1"
+}
