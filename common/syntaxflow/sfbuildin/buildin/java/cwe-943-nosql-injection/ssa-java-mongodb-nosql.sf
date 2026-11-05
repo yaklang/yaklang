@@ -36,17 +36,19 @@ DESC
 SOLUTION
 	alert_min: 1
 	"file://bad.java": <<<POS
-class Bad { void q(org.bson.Document d, javax.servlet.http.HttpServletRequest req) { d.put("$where", req.getParameter("id")); } }
+class Bad { void q(Document d, javax.servlet.http.HttpServletRequest req) { d.put("$where", req.getParameter("id")); } }
+class Document { void put(String k, Object v) {} }
 
 POS
 	"safefile://ok.java": <<<NEG
-class Ok { void q(org.bson.Document d) { d.put("name", "fixed"); } }
+class Ok { void q(Document d) { d.put("name", "fixed"); } }
+class Document { void put(String k, Object v) {} }
 
 NEG
 )
-Document?{<typeName>?{have:'org.bson'}}.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
-BasicDBObject?{<typeName>?{have:'com.mongodb'}}.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
-DBObject?{<typeName>?{have:'com.mongodb'}}.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
+Document.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
+BasicDBObject.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
+DBObject.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
 alert $dyn for {
 	level: "low",
 	title: "数据流：Java MongoDB 查询拼接",
