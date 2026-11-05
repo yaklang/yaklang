@@ -78,6 +78,9 @@ func exportFromPCAPDatabase(ctx context.Context, identifier string, outputs ...s
 		return "", err
 	}
 	output := meta.SourcePath + ".export." + meta.Format
+	if meta.FingerprintMode == liveFingerprintMode && len(outputs) == 0 {
+		return "", fmt.Errorf("pcapdb: live capture export requires an explicit output path")
+	}
 	if len(outputs) > 0 {
 		output = outputs[0]
 	}
