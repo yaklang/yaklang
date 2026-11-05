@@ -1,0 +1,45 @@
+desc(
+    title: "越权 IDOR：资源按用户可控 key 查询无归属校验",
+    title_zh: "越权 IDOR：资源按用户可控 key 查询无归属校验",
+    risk: "authorization-bypass",
+    type: vuln,
+    level: high,
+    rule_id: "java-idor-user-controlled-key",
+    desc: <<<DESC
+资源查询用 user_id/id 参数直接引用对象，无归属校验(CWE-639)。
+DESC
+    solution: <<<SOLUTION
+资源访问前校验对象归属(owner == 当前身份)。
+SOLUTION
+    alert_min: 1
+    "file://J.java": <<<POS
+class J {
+  void bad(Long id) {
+    Object o = dao.findById(id);
+  }
+}
+
+POS
+    "safefile://S.java": <<<NEG
+class S {
+  void ok() {
+    Object o = dao.queryList();
+  }
+}
+
+NEG
+)
+
+// 资源查询方法，追踪 id 参数来源
+.findById(* as $id) as $query;
+.getById(* as $id) as $query;
+.selectById(* as $id) as $query;
+
+$id #-> as $source;
+
+check $query then "idor query" else "no idor";
+
+alert $query for {
+    message: "资源按 id 查询，检查是否校验归属（IDOR）",
+    level: warning,
+}

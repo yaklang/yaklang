@@ -1,0 +1,45 @@
+desc(
+    title: "RSA 解密 Token 作为认证（加密即认证）",
+    title_zh: "RSA 解密 Token 作为认证（加密即认证）",
+    risk: "authentication-bypass",
+    type: vuln,
+    level: high,
+    rule_id: "java-rsa-decrypt-as-auth",
+    desc: <<<DESC
+token 用 RSA 私钥解密，且公钥公开时构成"加密即认证"缺陷(CWE-347/CWE-290)。
+任何持有公钥者可加密任意明文伪造 token。应改为服务端签名+验签。
+DESC
+    solution: <<<SOLUTION
+token 认证改为 HMAC/RSA 签名+验签，不要用解密作为认证手段。
+SOLUTION
+    alert_min: 1
+    "file://J.java": <<<POS
+class J {
+  String decryptToken(String token) {
+    return new String(rsa.decrypt(Base64.decode(token), privateKey));
+  }
+}
+
+POS
+    "safefile://S.java": <<<NEG
+class S {
+  String ok(String data) {
+    return new String(rsa.encrypt(data, publicKey));
+  }
+}
+
+NEG
+)
+
+// 定位解密调用：第一参为待解密数据(token)，第二参为密钥
+.decrypt(* as $token, * as $key) as $decrypt;
+
+// 追踪 token 的定义来源（客户端输入）
+$token #-> as $source;
+
+check $decrypt then "RSA decrypt as auth" else "no decrypt call";
+
+alert $decrypt for {
+    message: "RSA 解密 token 作为认证，token 无签名可被公钥伪造",
+    level: high,
+}
