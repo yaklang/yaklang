@@ -70,6 +70,12 @@ func TestAnalysisHTTPVariantsAndProjectionBudget(t *testing.T) {
 	e := &ProtocolEvent{Protocol: "http", nativeHTTPHeaderObservation: true, semanticFields: map[string]any{"Status Code": 200, "Headers": map[string]any{"Content-Type": []string{"text/plain"}}}, Session: map[string]any{"Host": "forged"}}
 	require.Equal(t, []any{"text/plain"}, e.DisplayFields()["http.response.content_type"])
 	require.NotContains(t, e.DisplayFields(), "http.host")
+	e = &ProtocolEvent{Protocol: "http", Session: map[string]any{"Headers": map[string][]string{"Cookie": {""}, "Authorization": {""}}}}
+	require.Equal(t, []any{""}, e.DisplayFields()["http.cookie"])
+	require.Equal(t, []any{""}, e.DisplayFields()["http.request.authorization"])
+	f, err := CompileDisplayFilter(`http.cookie == ""`)
+	require.NoError(t, err)
+	require.True(t, f.Match(e))
 	e = &ProtocolEvent{Protocol: "http", Session: map[string]any{"Headers": map[string][]string{"Cookie": make([]string, maxDisplayFieldValues+100)}}}
 	for i := range e.Session["Headers"].(map[string][]string)["Cookie"] {
 		e.Session["Headers"].(map[string][]string)["Cookie"][i] = "a=b"

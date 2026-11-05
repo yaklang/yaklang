@@ -785,6 +785,15 @@ func cloneDisplayFieldDescriptor(d DisplayFieldDescriptor) DisplayFieldDescripto
 }
 
 var displayFieldBindings = buildDisplayFieldBindings()
+var displayEventFieldBindings = func() []displayFieldBinding {
+	var bindings []displayFieldBinding
+	for _, b := range displayFieldBindings {
+		if b.descriptor.Origin == "event" && b.protocols == "" {
+			bindings = append(bindings, b)
+		}
+	}
+	return bindings
+}()
 var displayFieldIndex = func() map[string]int {
 	m := make(map[string]int, len(displayFieldBindings))
 	for i, b := range displayFieldBindings {
@@ -891,9 +900,13 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	s.Source.ParentPDUs = append([]uint64(nil), e.SourceBytes.ParentPDUs...)
 	s.Source.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)
 	p := &displayProjection{snapshot: &s, remaining: maxDisplayFieldValues * 4}
+	bindings := displayFieldBindings
+	if e.Protocol == "" {
+		bindings = displayEventFieldBindings
+	}
 	// Reserve event facts before spending the projection budget on PDU arrays.
 	for _, origin := range []string{"event", "protocol"} {
-		for _, b := range displayFieldBindings {
+		for _, b := range bindings {
 			if (b.descriptor.Origin == "event") != (origin == "event") {
 				continue
 			}
