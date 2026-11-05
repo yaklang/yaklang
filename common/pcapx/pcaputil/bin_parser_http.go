@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -622,6 +623,9 @@ func (f *binFlow) httpEvidence(dir int, e *ProtocolEvent) {
 			e.Completeness = "transaction"
 		}
 	}
+	// The framer has already admitted these headers. Keep their literal values
+	// independently of connection context and the optional deferred rule tree.
+	e.nativeHTTPMessage = &httpMessageEvidence{fields: cloneSession(h.headerFields), header: h.header, response: h.response, chunked: h.chunked, complete: !h.omitted, digest: sha256.Sum256(e.Raw)}
 }
 
 func websocketRequestIssue(request *http.Request) string {

@@ -8,7 +8,10 @@ import (
 	"unicode"
 )
 
-type DisplayFilter struct{ match fieldPredicate }
+type DisplayFilter struct {
+	match    fieldPredicate
+	contents []contentPredicate
+}
 
 type DisplayFilterResult struct {
 	Matched bool `json:"matched"`
@@ -36,12 +39,13 @@ func (f *DisplayFilter) MatchEvents(events []*ProtocolEvent) bool {
 }
 
 func (f *DisplayFilter) EvaluateEvents(events []*ProtocolEvent) DisplayFilterResult {
+	observer := f.NewObserver()
 	return f.evaluateSnapshots(len(events), func(i int) DisplayFieldSnapshot {
 		e := events[i]
 		if e != nil && e.Completeness == "evicted" {
 			return DisplayFieldSnapshot{Completeness: e.Completeness}
 		}
-		return e.DisplayFieldValues()
+		return observer.Observe(e)
 	})
 }
 
@@ -56,7 +60,7 @@ func (f *DisplayFilter) evaluateSnapshots(length int, at func(int) DisplayFieldS
 	if f == nil {
 		return DisplayFilterResult{Matched: true, Complete: true}
 	}
-	m := fieldObservation{values: map[string][]any{}, exhaustive: true}
+	m := fieldObservation{values: map[string][]any{}, content: map[string]fieldTruth{}, exhaustive: true}
 	reason := ""
 	partial := func(s string) {
 		m.exhaustive = false
@@ -68,6 +72,17 @@ func (f *DisplayFilter) evaluateSnapshots(length int, at func(int) DisplayFieldS
 snapshots:
 	for i := 0; i < length; i++ {
 		snapshot := at(i)
+		for key, value := range snapshot.content {
+			previous, exists := m.content[key]
+			if !exists {
+				m.content[key] = value
+			} else {
+				m.content[key] = fieldOr(previous, value)
+			}
+			if value == fieldUnknown {
+				partial("content evidence unavailable or discontinuous")
+			}
+		}
 		if snapshot.Completeness == "evicted" || snapshot.Completeness == "detail-unavailable" || snapshot.Completeness == "limited" {
 			if snapshot.Completeness == "evicted" {
 				partial("protocol detail unavailable in retained history")
@@ -118,6 +133,9 @@ snapshots:
 		}
 	}
 	decision := f.match(m)
+	if decision == fieldUnknown && reason == "" {
+		partial("predicate requires an unobserved field or content")
+	}
 	return DisplayFilterResult{Matched: decision == fieldTrue, Complete: decision != fieldUnknown, Partial: !m.exhaustive, Reason: reason}
 }
 
@@ -185,12 +203,13 @@ func CompileDisplayFilter(expr string) (*DisplayFilter, error) {
 	if p.pos != len(tokens) {
 		return nil, fmt.Errorf("unexpected filter token")
 	}
-	return &DisplayFilter{fn}, nil
+	return &DisplayFilter{match: fn, contents: p.contents}, nil
 }
 
 type filterParser struct {
-	tokens []filterToken
-	pos    int
+	contents []contentPredicate
+	tokens   []filterToken
+	pos      int
 }
 type fieldTruth uint8
 
@@ -201,6 +220,7 @@ const (
 )
 
 type fieldObservation struct {
+	content    map[string]fieldTruth
 	values     map[string][]any
 	exhaustive bool
 }
@@ -295,6 +315,9 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 	if quoted || !registered {
 		return nil, fmt.Errorf("unknown display field %q", name)
 	}
+	if name == "pdu.content" || name == "stream.content" {
+		return p.content(name)
+	}
 	op := ""
 	for _, candidate := range []string{"==", "!=", ">=", "<=", ">", "<", "contains", "in"} {
 		if p.take(candidate) {
@@ -325,9 +348,6 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 	return func(m fieldObservation) fieldTruth {
 		vals := m.values[name]
 		if len(vals) == 0 {
-			if m.exhaustive {
-				return fieldFalse
-			}
 			return fieldUnknown
 		}
 		equal := false
