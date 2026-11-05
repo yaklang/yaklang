@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -158,6 +159,40 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.NoError(t, json.Unmarshal(data, &result))
 		return result
 	}
+	t.Run("live dataset uses the same query tool", func(t *testing.T) {
+		manager, err := pcapdb.DefaultManager()
+		require.NoError(t, err)
+		writer, err := manager.CreateLiveDataset(ctx, pcapdb.LiveCaptureConfig{Interface: "controlled", BatchSize: 1}, layers.LinkTypeEthernet)
+		require.NoError(t, err)
+		defer writer.Close()
+		reader, err := pcapgo.NewReader(bytes.NewReader(pcapAnalysisCapture(t, "live-tool.example")))
+		require.NoError(t, err)
+		for {
+			raw, ci, err := reader.ReadPacketData()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+			ci.Timestamp = time.Now()
+			require.NoError(t, writer.Feed(raw, ci))
+		}
+		meta := object(invoke("query_pcapdb", map[string]any{"id": writer.ID, "query_type": "metadata"}))
+		require.Equal(t, "ready", meta["state"])
+		require.EqualValues(t, 8, meta["packet_count"])
+		require.EqualValues(t, 2, meta["protocol_count"])
+		page := invoke("query_pcapdb", map[string]any{"id": writer.ID, "query_type": "protocols", "protocol": "http"}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		require.Equal(t, "ready", page.State)
+		require.Len(t, page.Items, 2)
+		requestID := page.Items[0].ID
+		invoke("query_pcapdb", map[string]any{"id": writer.ID, "query_type": "details", "record_id": requestID, "result_bytes": 65536})
+		require.NoError(t, writer.Close())
+		final := invoke("query_pcapdb", map[string]any{"id": writer.ID, "query_type": "protocols", "protocol": "http"}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		require.Equal(t, "ready", final.State)
+		require.Equal(t, requestID, final.Items[0].ID)
+		deleted, err := manager.Delete(context.Background(), writer.ID)
+		require.NoError(t, err)
+		require.True(t, deleted.Deleted)
+	})
 	capture := pcapAnalysisCapture(t, "skill.example")
 	// The live-model harness consumes the exact same bytes and known answers.
 	liveFixture, err := trafficfixture.ReadFile(filepath.Join("..", "..", "..", "..", "..", "aismoking", "live", "testdata", "pcap_analysis.pcap"))
