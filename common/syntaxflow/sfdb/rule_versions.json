@@ -7321,9 +7321,9 @@
   },
   {
     "rule_id": "java-idor-user-controlled-key",
-    "rule_name": "越权 IDOR：资源按用户可控 key 查询无归属校验",
-    "hash": "5bc129c13a1f8fc06c4f89fd60452e55dd218ec0c1f9a7e4f6f7c85fcddc6de1",
-    "version": "20261105.0001"
+    "rule_name": "越权 IDOR：资源按 id 查询需复核归属校验",
+    "hash": "bd7e3e91f1da28319b97acfbd4f7a91ae4fa8291c4d7df646abd892041d4439d",
+    "version": "20261105.0002"
   },
   {
     "rule_id": "java-permitall-anonymous",
