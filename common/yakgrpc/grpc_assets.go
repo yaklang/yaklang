@@ -1109,7 +1109,7 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 			if err := db.Model(&schema.Risk{}).Where("hash = ?", item.RiskHash).Updates(map[string]interface{}{
 				"tags":              item.Tags,
 				"verifier_uid":      item.VerifierUid,
-				"fix_time":          time.Unix(item.FixTime, 0),
+				"fix_time":          schema.FixTimeFromUnix(item.FixTime),
 				"fix_suggestion":    item.FixSuggestion,
 				"tag_reason":        item.TagReason,
 				"risk_type_verbose": item.RiskTypeVerbose,
@@ -1147,7 +1147,7 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 				FromYakScript:   item.FromYakScript,
 				Tags:            item.Tags,
 				VerifierUid:     item.VerifierUid,
-				FixTime:         time.Unix(item.FixTime, 0),
+				FixTime:         schema.FixTimeFromUnix(item.FixTime),
 				FixSuggestion:   item.FixSuggestion,
 				TagReason:       item.TagReason,
 				IsPotential:     item.IsPotential,
@@ -1195,7 +1195,7 @@ func applyBatchSetPage(db *gorm.DB, paging *ypb.Paging) (*gorm.DB, error) {
 func (s *Server) BatchSetRiskTags(_ context.Context, req *ypb.BatchSetRiskTagsRequest) (*ypb.BatchSetRiskTagsResponse, error) {
 	tags := strings.Join(utils.RemoveRepeatStringSlice(req.SetTags), "|")
 	verifierUid := strings.TrimSpace(req.VerifierUid)
-	fixTime := time.Unix(req.FixTime, 0)
+	fixTime := schema.FixTimeFromUnix(req.FixTime)
 	fixSuggestion := strings.TrimSpace(req.FixSuggestion)
 	tagReason := strings.TrimSpace(req.TagReason)
 	riskTypeVerbose := strings.TrimSpace(req.RiskTypeVerbose)

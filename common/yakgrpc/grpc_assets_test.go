@@ -271,6 +271,10 @@ func TestBatchSetRiskTags(t *testing.T) {
 	require.NoError(t, yakit.SaveRisk(risk))
 	defer yakit.DeleteRiskByID(db, int64(risk.ID))
 
+	created, err := yakit.GetRiskByIDOrHash(db, 0, risk.Hash)
+	require.NoError(t, err)
+	assert.Nil(t, created.FixTime)
+
 	var gotRiskReq struct {
 		Hash            []string `json:"hash"`
 		SetTags         []string `json:"setTags"`
@@ -335,6 +339,7 @@ func TestBatchSetRiskTags(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "confirmed|verified", updated.Tags)
 	assert.Equal(t, "123456", updated.VerifierUid)
+	require.NotNil(t, updated.FixTime)
 	assert.True(t, updated.FixTime.Equal(time.Unix(1757174400, 0)))
 	assert.Equal(t, "upgrade dependency", updated.FixSuggestion)
 	assert.Equal(t, "disposal done", updated.TagReason)
@@ -424,6 +429,7 @@ func TestRisksFromOnline(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new-tag", updated.Tags)
 	assert.Equal(t, "123456", updated.VerifierUid)
+	require.NotNil(t, updated.FixTime)
 	assert.True(t, updated.FixTime.Equal(time.Unix(1757174400, 0)))
 	assert.Equal(t, "upgrade dependency", updated.FixSuggestion)
 	assert.Equal(t, "verified and fixed", updated.TagReason)
@@ -437,6 +443,7 @@ func TestRisksFromOnline(t *testing.T) {
 	assert.Equal(t, "medium", newRisk.Severity)
 	assert.Equal(t, "downloaded", newRisk.Tags)
 	assert.Equal(t, 5.0, newRisk.SeverityScore)
+	assert.Nil(t, newRisk.FixTime)
 
 	yakit.DeleteRiskByID(db, int64(newRisk.ID))
 }
