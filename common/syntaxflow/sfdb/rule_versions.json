@@ -7372,5 +7372,11 @@
     "rule_name": "令牌/会话标识出现在 URL 查询串",
     "hash": "47b4382a545cc6761bf8c8cccf6f5df7377128b54ca26e1eefddfe328dff6198",
     "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-unfinished-auth-validation",
+    "rule_name": "认证逻辑存在未完成的校验（TODO 校验 token/密码）",
+    "hash": "c8b5c05be80d4aa47e2f312aebdff664485458d7c6c8b30ee3bec5ef0eefd43a",
+    "version": "20261105.0001"
   }
 ]
