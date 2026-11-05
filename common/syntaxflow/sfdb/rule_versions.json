@@ -7360,5 +7360,17 @@
     "rule_name": "弱密码恢复：密码重置/找回接口未校验身份",
     "hash": "b4553a8675d6d9a11e94e3f71a8a68ad1e95c02c3a42c9a7c6e8db117d419fa1",
     "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-passwordless-login",
+    "rule_name": "无密码登录/模拟登录（凭用户名创建登录上下文）",
+    "hash": "56c5ea8b1c08ea38e40ef035bb1423c53b9a9cf8b55df778b1aa90690340272a",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-token-in-url",
+    "rule_name": "令牌/会话标识出现在 URL 查询串",
+    "hash": "47b4382a545cc6761bf8c8cccf6f5df7377128b54ca26e1eefddfe328dff6198",
+    "version": "20261105.0001"
   }
 ]
