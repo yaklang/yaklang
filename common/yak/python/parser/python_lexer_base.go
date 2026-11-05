@@ -117,9 +117,14 @@ func (p *PythonLexerBase) NextToken() antlr.Token {
 	next := p.BaseLexer.NextToken()
 
 	// Track if this token is LINE_JOIN, so the next HandleSpaces call knows
-	// not to treat leading whitespace as indentation
+	// not to treat leading whitespace as indentation.
 	if next.GetTokenType() == PythonLexerLINE_JOIN {
 		p.wasLineJoin = true
+	} else if p.wasLineJoin {
+		// The continuation line starts with a non-space token (for example a
+		// string at column zero). HandleSpaces did not run, so clear the flag
+		// here. Otherwise the next statement's indentation would be ignored.
+		p.wasLineJoin = false
 	}
 
 	// If synthetic tokens were added to the buffer, return from buffer first.
@@ -182,6 +187,11 @@ func (p *PythonLexerBase) HandleNewLine() {
 func (p *PythonLexerBase) HandleSpaces() {
 	p.ensureInitialized()
 	next := p.GetInputStream().LA(1)
+	if next == antlr.TokenEOF {
+		// A whitespace-only line at EOF is a blank line, not indentation.
+		p.wasLineJoin = false
+		return
+	}
 
 	// Only process indentation if:
 	// 1. We are at the start of a line (TokenStartColumn == 0)
