@@ -75,6 +75,41 @@ func TestNormalizeSessionSnapshot_FullPayload(t *testing.T) {
 	require.Equal(t, "processing", snapshot.Execution.Status)
 }
 
+func TestNormalizeSessionSnapshot_DerivesMinutesFromExecutionSeconds(t *testing.T) {
+	snapshot := &SessionSnapshot{
+		Execution: &SessionSnapshotExecution{
+			ExecutionSeconds: 125,
+			ExecutionMinutes: 99,
+		},
+	}
+
+	NormalizeSessionSnapshot(snapshot)
+
+	require.EqualValues(t, 125, snapshot.Execution.ExecutionSeconds)
+	require.Equal(t, 2, snapshot.Execution.ExecutionMinutes)
+}
+
+func TestNormalizeSessionSnapshot_DerivesSecondsFromLegacyExecutionMinutes(t *testing.T) {
+	snapshot := &SessionSnapshot{
+		Execution: &SessionSnapshotExecution{
+			ExecutionMinutes: 8,
+		},
+	}
+
+	NormalizeSessionSnapshot(snapshot)
+
+	require.EqualValues(t, 480, snapshot.Execution.ExecutionSeconds)
+	require.Equal(t, 8, snapshot.Execution.ExecutionMinutes)
+
+	raw, err := json.Marshal(snapshot.Execution)
+	require.NoError(t, err)
+	var payload map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &payload))
+	require.Contains(t, payload, "execution_seconds")
+	require.Contains(t, payload, "execution_minutes")
+	require.NotContains(t, payload, "execution_duration")
+}
+
 func TestSessionSnapshot_BackgroundProcesses(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	cfg.AddSessionSnapshotBackgroundProcess(SessionSnapshotProcessTypeBrowser, "scanner", "Scanner Browser")

@@ -56,10 +56,13 @@ type SessionSnapshotExecution struct {
 	EndedAt   int64  `json:"ended_at"`
 	// Legacy wire names retained for frontend compatibility. These count
 	// protocol-completed and protocol-failed calls, not execution outcomes.
-	ToolCallSuccess  int `json:"tool_call_success"`
-	ToolCallFailed   int `json:"tool_call_failed"`
-	ToolCallTotal    int `json:"tool_call_total"`
-	ExecutionMinutes int `json:"execution_minutes"`
+	ToolCallSuccess int `json:"tool_call_success"`
+	ToolCallFailed  int `json:"tool_call_failed"`
+	ToolCallTotal   int `json:"tool_call_total"`
+	// ExecutionSeconds is the active execution time in seconds.
+	// ExecutionMinutes is the fuzzy minute representation derived from it.
+	ExecutionSeconds int64 `json:"execution_seconds"`
+	ExecutionMinutes int   `json:"execution_minutes"`
 	// ExecutionRounds is the raw number of ReAct loop iterations executed.
 	ExecutionRounds   int `json:"execution_rounds"`
 	HTTPFlowCount     int `json:"http_flow_count"`
@@ -513,6 +516,13 @@ func NormalizeSessionSnapshot(snapshot *SessionSnapshot) {
 	if snapshot.Execution == nil {
 		snapshot.Execution = emptySessionSnapshotExecution()
 	}
+	executionSeconds := snapshot.Execution.ExecutionSeconds
+	if executionSeconds == 0 && snapshot.Execution.ExecutionMinutes > 0 {
+		executionSeconds = int64(snapshot.Execution.ExecutionMinutes) * int64(time.Minute/time.Second)
+	}
+	if executionSeconds != 0 {
+		setSessionSnapshotExecutionSeconds(snapshot.Execution, executionSeconds)
+	}
 	if snapshot.Perception == nil {
 		snapshot.Perception = &SessionSnapshotPerception{}
 	}
@@ -616,7 +626,19 @@ func (c *Config) refreshSessionSnapshotDurationLocked(state *sessionSnapshotStat
 	default:
 		endAt = time.Now()
 	}
-	state.execution.stats.ExecutionMinutes = int(endAt.Sub(time.Unix(state.execution.stats.StartedAt, 0)).Minutes())
+	executionSeconds := int64(endAt.Sub(time.Unix(state.execution.stats.StartedAt, 0)) / time.Second)
+	setSessionSnapshotExecutionSeconds(&state.execution.stats, executionSeconds)
+}
+
+func setSessionSnapshotExecutionSeconds(execution *SessionSnapshotExecution, seconds int64) {
+	if execution == nil {
+		return
+	}
+	if seconds < 0 {
+		seconds = 0
+	}
+	execution.ExecutionSeconds = seconds
+	execution.ExecutionMinutes = int(seconds / int64(time.Minute/time.Second))
 }
 
 func (c *Config) syncExecutionToolCountsLocked(state *sessionSnapshotState, task AIStatefulTask) {
