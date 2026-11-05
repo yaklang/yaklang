@@ -9,7 +9,7 @@ import (
 // Only the inspector's source-indexed arrivals can provide identity witnesses
 // after detail eviction. Placeholder/eventIDs/knownIDs are not field evidence.
 func (p *capturedPacket) protocolQuerySnapshots(events []*pcaputil.ProtocolEvent) []pcaputil.DisplayFieldSnapshot {
-	var snapshots []pcaputil.DisplayFieldSnapshot
+	snapshots := []pcaputil.DisplayFieldSnapshot{p.packetFieldSnapshot(summarize(p))}
 	fullArrivals := make(map[uint64]struct{}, len(events))
 	for _, e := range events {
 		if e == nil {

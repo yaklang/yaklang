@@ -33,6 +33,7 @@ type captureConfig struct {
 	protocolHistoryMiB            int
 	freezePacketFields            bool
 	exportProtocolPublications    bool
+	collectObjects                bool
 }
 
 func protocolHistoryBudget(packets int) (int, int) {
@@ -157,6 +158,8 @@ type capturedPacket struct {
 	observedPDUs          []map[string]any
 	publishedPDUs         []map[string]any
 	observedFields        []pcaputil.DisplayFieldSnapshot
+	objects               []*objectObservation
+	filterObserver        *pcaputil.DisplayFilterObserver
 	observedFieldBudget   int
 	observedFieldsLimited bool
 	fieldsAtObservation   bool
@@ -193,6 +196,9 @@ func startCapture(parent context.Context, src *captureSource, cfg captureConfig,
 	if cfg.freezePacketFields || cfg.exportProtocolPublications {
 		queue = 64
 	} // bounded field snapshots backpressure plain/JSON output
+	if cfg.collectObjects {
+		queue = 1
+	} // body ownership shares capture backpressure
 	s := &captureSession{packets: make(chan *capturedPacket, queue), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
 	s.streams.captureReplay = src.offline
 	go func() {
@@ -221,6 +227,8 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		s.streams.mu.Unlock()
 	}
 	var current *capturedPacket
+	displayFilter, _ := pcaputil.CompileDisplayFilter(cfg.initialDisplayFilter)
+	filterObserver := displayFilter.NewObserver()
 	publishingClose := false
 	// Duration expiry ends input, but the consumer still needs close diagnostics.
 	// Explicit parent cancellation also cancels publication backpressure.
@@ -267,6 +275,11 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 			s.streams.observeProtocol(e)
 		}
 		if current != nil {
+			if cfg.collectObjects {
+				if observation := observedObject(e); observation != nil {
+					current.objects = append(current.objects, observation)
+				}
+			}
 			current.history = history
 			contributes := false
 			// Time-based flushing can emit events from another flow. Only an
@@ -300,8 +313,13 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				current.recordPublishedPDU(e)
 			}
 		} else if publishingClose && cfg.exportProtocolPublications {
-			publication := &capturedPacket{publicationPhase: "capture_close", fieldsAtObservation: true, observedFieldBudget: observedPacketFieldBytes - 1024}
+			publication := &capturedPacket{publicationPhase: "capture_close", fieldsAtObservation: true, observedFieldBudget: observedPacketFieldBytes - 1024, filterObserver: filterObserver}
 			publication.recordObservedPDU(e)
+			if cfg.collectObjects {
+				if observation := observedObject(e); observation != nil {
+					publication.objects = append(publication.objects, observation)
+				}
+			}
 			select {
 			case s.packets <- publication:
 			case <-publicationContext.Done():
@@ -445,7 +463,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 			ref.Number = n
 		}
 		ref.Domain = pcaputil.PacketDomain(data, ci, link)
-		packet := &capturedPacket{physicalRecord: true, number: ref.Number, data: data, ci: ci, link: link, history: history, reference: ref}
+		packet := &capturedPacket{physicalRecord: true, number: ref.Number, data: data, ci: ci, link: link, history: history, reference: ref, filterObserver: filterObserver}
 		if cfg.freezePacketFields {
 			packet.fieldsAtObservation = true
 			packet.observedFieldBudget = observedPacketFieldBytes - 1024
