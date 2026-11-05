@@ -307,14 +307,33 @@ func (v Values) GetSyntaxFlowUse() (Values, error) {
 	})
 }
 
+// dedupDataflowFanoutInput exact-dedups the per-source fanout input of a
+// topdef/bottomuse opcode. The stack value feeding `#->` / `<-?` can carry
+// the same node multiple times (filters and the small-set inline pipeline
+// path preserve multiplicity; only the >inlinePipelineThreshold pipe path
+// MergeValues'es its output). Every input element costs its own recursive
+// descent — on a large project one opcode was fed 52,842 values and ran for
+// 71+ minutes — so duplicates are pure waste. MergeValues is the same
+// identity rule (id -> hash -> type:pointer) and the same provenance merge
+// (MergeProvenanceFrom + MergeAnchor) the VM already applies at OpMergeRef
+// and symbol capture, so collapsing duplicates here changes no observable
+// semantics, it only drops redundant descents. O(N) once, before the N
+// per-source descents.
+func dedupDataflowFanoutInput(v Values) Values {
+	if v.Count() < 2 {
+		return v
+	}
+	return MergeValues(v)
+}
+
 func (v Values) GetSyntaxFlowTopDef(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (Values, error) {
-	return v.pipeLineRun(func(vo ValueOperator) (Values, error) {
+	return dedupDataflowFanoutInput(v).pipeLineRun(func(vo ValueOperator) (Values, error) {
 		return vo.GetSyntaxFlowTopDef(sfResult, sfConfig, config...)
 	})
 }
 
 func (v Values) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (Values, error) {
-	return v.pipeLineRun(func(vo ValueOperator) (Values, error) {
+	return dedupDataflowFanoutInput(v).pipeLineRun(func(vo ValueOperator) (Values, error) {
 		return vo.GetSyntaxFlowBottomUse(sfResult, sfConfig, config...)
 	})
 }

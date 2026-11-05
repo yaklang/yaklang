@@ -914,6 +914,10 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
+		// Collapse exact-duplicate inputs before the per-source descent fanout
+		// (see dedupDataflowFanoutInput); report the real fanout size so a
+		// heavy opcode's progress info reflects the work actually pending.
+		value = dedupDataflowFanoutInput(value)
 		n := ValuesLen(value)
 		if summary := FormatRecursiveConfigSummary(i.SyntaxFlowConfig); summary != "" {
 			s.ProcessCallback("get topdef: %d values, {%s}", n, summary)
