@@ -14,6 +14,7 @@ import (
 type ByteReader struct {
 	name  string
 	src   io.ReaderAt
+	base  uint64
 	size  uint64
 	order ByteOrder
 	owned bool
@@ -51,6 +52,23 @@ func (r *ByteReader) WithOrder(order ByteOrder) (*ByteReader, error) {
 	return &view, nil
 }
 
+// Slice returns a borrowed view of [offset, offset+size). The view keeps the
+// parent's source and byte order. All reads on the view use offsets relative to
+// the slice, and the view never closes the source.
+func (r *ByteReader) Slice(offset, size uint64) (*ByteReader, error) {
+	if r == nil {
+		return nil, fmt.Errorf("byte reader is nil")
+	}
+	if err := r.CheckRange(offset, size); err != nil {
+		return nil, err
+	}
+	view := *r
+	view.base += offset
+	view.size = size
+	view.owned = false
+	return &view, nil
+}
+
 // CheckRange verifies that [offset, offset+size) lies within the input.
 func (r *ByteReader) CheckRange(offset, size uint64) error {
 	if offset > r.size || size > r.size-offset {
@@ -80,6 +98,9 @@ func (r *ByteReader) Close() error {
 
 // ReadAt implements io.ReaderAt with the declared size as a hard boundary.
 func (r *ByteReader) ReadAt(p []byte, off int64) (int, error) {
+	if r == nil {
+		return 0, fmt.Errorf("byte reader is nil")
+	}
 	if off < 0 {
 		return 0, fmt.Errorf("negative read offset: %d", off)
 	}
@@ -89,15 +110,16 @@ func (r *ByteReader) ReadAt(p []byte, off int64) (int, error) {
 		}
 		return 0, io.EOF
 	}
+	absolute := r.base + uint64(off)
 	remain := r.size - uint64(off)
 	if uint64(len(p)) > remain {
-		n, err := r.src.ReadAt(p[:int(remain)], off)
+		n, err := r.src.ReadAt(p[:int(remain)], int64(absolute))
 		if err == nil || err == io.EOF {
 			err = io.EOF
 		}
 		return n, err
 	}
-	n, err := r.src.ReadAt(p, off)
+	n, err := r.src.ReadAt(p, int64(absolute))
 	if err == nil && n < len(p) {
 		err = io.ErrUnexpectedEOF
 	}
@@ -116,7 +138,7 @@ func (r *ByteReader) Bytes(offset, size uint64) ([]byte, error) {
 	if size == 0 {
 		return raw, nil
 	}
-	n, err := r.src.ReadAt(raw, int64(offset))
+	n, err := r.src.ReadAt(raw, int64(r.base+offset))
 	if err != nil && !(err == io.EOF && n == len(raw)) {
 		return nil, err
 	}

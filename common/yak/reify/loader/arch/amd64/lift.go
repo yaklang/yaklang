@@ -1,4 +1,4 @@
-package arch
+package amd64
 
 import (
 	"fmt"
@@ -25,7 +25,15 @@ type amd64Place struct {
 }
 
 func liftAMD64(target core.Target, blocks []amd64Block, blockIDs map[uint64]core.BlockID, diagnostics *amd64Diagnostics) *core.LowIR {
-	ir := &core.LowIR{Target: target, Blocks: make([]core.Block, 0, len(blocks))}
+	ir := &core.LowIR{Target: target}
+	if len(blocks) == 0 {
+		return ir
+	}
+	function := core.Function{
+		ID:      1,
+		Address: blocks[0].start,
+		Blocks:  make([]core.Block, 0, len(blocks)),
+	}
 	lifter := &amd64Lifter{blockIDs: blockIDs, diagnostics: diagnostics, values: make(map[core.ValueID]core.ValueType)}
 	for index, block := range blocks {
 		lifter.instructions = make([]core.Instruction, 0, len(block.instructions)*2)
@@ -46,8 +54,9 @@ func liftAMD64(target core.Target, blocks []amd64Block, blockIDs map[uint64]core
 				diagnostics.add("block-falls-off-region", fmt.Sprintf("block at 0x%x reaches the end of the decoded region", block.start))
 			}
 		}
-		ir.Blocks = append(ir.Blocks, core.Block{ID: core.BlockID(index + 1), Address: block.start, Instructions: lifter.instructions})
+		function.Blocks = append(function.Blocks, core.Block{ID: core.BlockID(index + 1), Address: block.start, Instructions: lifter.instructions})
 	}
+	ir.Functions = append(ir.Functions, function)
 	return ir
 }
 
@@ -86,6 +95,16 @@ func (l *amd64Lifter) lift(ins amd64Instruction) {
 		l.compare(ins, "cmp")
 	case x86asm.TEST:
 		l.compare(ins, "test")
+	case x86asm.BT:
+		l.bitTest(ins)
+	case x86asm.MUL:
+		l.multiply(ins)
+	case x86asm.DIV:
+		l.divide(ins, "div")
+	case x86asm.IDIV:
+		l.divide(ins, "idiv")
+	case x86asm.PUNPCKLQDQ:
+		l.vectorIntrinsic(ins, "x86.punpcklqdq")
 	case x86asm.INC:
 		l.increment(ins, core.OpAdd, "inc")
 	case x86asm.DEC:
@@ -308,6 +327,94 @@ func (l *amd64Lifter) compare(ins amd64Instruction, flag string) {
 		return
 	}
 	l.setFlags(ins, flag, left, right)
+}
+
+func (l *amd64Lifter) bitTest(ins amd64Instruction) {
+	args := amd64Args(ins)
+	if len(args) != 2 || !amd64Source(args[0]) || !amd64Source(args[1]) {
+		l.unsupported(ins)
+		return
+	}
+	bits := l.argBits(ins, args[0], 64)
+	value, ok := l.readSource(ins, args[0], bits)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	index, ok := l.readSource(ins, args[1], bits)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	l.setFlags(ins, "bt", value, index)
+}
+
+func (l *amd64Lifter) multiply(ins amd64Instruction) {
+	args := amd64Args(ins)
+	if len(args) != 1 || !amd64Source(args[0]) {
+		l.unsupported(ins)
+		return
+	}
+	bits := l.argBits(ins, args[0], 64)
+	accumulator, high := amd64AccumulatorNames(bits)
+	left := l.readRegister(ins.address, accumulator, bits)
+	right, ok := l.readSource(ins, args[0], bits)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	low := l.operation(ins, core.OpIntrinsic, []core.Operand{amd64Symbol("x86.mul.lo"), l.value(left), l.value(right)}, bits, core.EffectNone)
+	upper := l.operation(ins, core.OpIntrinsic, []core.Operand{amd64Symbol("x86.mul.hi"), l.value(left), l.value(right)}, bits, core.EffectNone)
+	l.writeRegister(ins.address, accumulator, bits, low)
+	l.writeRegister(ins.address, high, bits, upper)
+	l.setFlags(ins, "mul", low, upper)
+}
+
+func (l *amd64Lifter) divide(ins amd64Instruction, name string) {
+	args := amd64Args(ins)
+	if len(args) != 1 || !amd64Source(args[0]) {
+		l.unsupported(ins)
+		return
+	}
+	bits := l.argBits(ins, args[0], 64)
+	quotient, remainder := amd64AccumulatorNames(bits)
+	low := l.readRegister(ins.address, quotient, bits)
+	high := l.readRegister(ins.address, remainder, bits)
+	divisor, ok := l.readSource(ins, args[0], bits)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	operands := []core.Operand{l.value(high), l.value(low), l.value(divisor)}
+	quot := l.operation(ins, core.OpIntrinsic, append([]core.Operand{amd64Symbol("x86." + name + ".quot")}, operands...), bits, core.EffectMayTrap)
+	rem := l.operation(ins, core.OpIntrinsic, append([]core.Operand{amd64Symbol("x86." + name + ".rem")}, operands...), bits, core.EffectMayTrap)
+	l.writeRegister(ins.address, quotient, bits, quot)
+	l.writeRegister(ins.address, remainder, bits, rem)
+}
+
+func (l *amd64Lifter) vectorIntrinsic(ins amd64Instruction, symbol string) {
+	args := amd64Args(ins)
+	if len(args) != 2 || !amd64Movable(args[0]) || !amd64Source(args[1]) {
+		l.unsupported(ins)
+		return
+	}
+	destination, ok := l.place(ins, args[0], 128)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	current, ok := l.readPlace(ins, destination)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	source, ok := l.readSource(ins, args[1], 128)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	result := l.operation(ins, core.OpIntrinsic, []core.Operand{amd64Symbol(symbol), l.value(current), l.value(source)}, 128, core.EffectNone)
+	l.writePlace(ins, destination, result)
 }
 
 func (l *amd64Lifter) increment(ins amd64Instruction, kind core.Opcode, flag string) {
@@ -1010,6 +1117,19 @@ func (l *amd64Lifter) value(id core.ValueID) core.Operand {
 
 func amd64Pointer(value uint64) core.Operand {
 	return core.Operand{Kind: core.OperandConstant, Type: core.ValueType{Kind: core.TypePointer, Bits: 64}, Literal: amd64Literal(value, 64)}
+}
+
+func amd64AccumulatorNames(bits uint16) (string, string) {
+	switch bits {
+	case 8:
+		return "al", "ah"
+	case 16:
+		return "ax", "dx"
+	case 32:
+		return "eax", "edx"
+	default:
+		return "rax", "rdx"
+	}
 }
 
 func amd64Symbol(name string) core.Operand {

@@ -1,6 +1,6 @@
 # 命令行
 
-入口：[cmd/reify/main.go](../cmd/reify/main.go)。命令用于查看注册项、加载元数据、检查头部，以及把 AMD64 代码区域提升为 LowIR。
+入口：[cmd/reify/main.go](../cmd/reify/main.go)。命令用于查看注册项、加载元数据、检查头部，以及按阶段渲染 AMD64 代码区域。
 
 ## 构建
 
@@ -20,8 +20,21 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 | `parsers` | `--json` 可选 | 按 Architecture 注册的 parser 与解码器状态 |
 | `inspect` | `<file>`，`--json` 可选 | Artifact、Target、Image、节和诊断 |
 | `check` | `<file>`，`--json` 可选 | 头部检查、loader 和 parser 选择 |
-| `lift` | `<file>`，`--json` 可选 | AMD64 LowIR |
+| `lift` | `<file>`，`--mode`、`--json` 可选 | AMD64 汇编、LowIR、YakSSA 或伪源码 |
 | `help` | 无 | 用法 |
+
+`lift` 的 `--mode`：
+
+| 模式 | 输出 | 状态 |
+| --- | --- | --- |
+| `asm` | 地址、机器字节、GNU 语法汇编 | 已实现，默认 |
+| `lowir` | 块、值、操作、目标和效果 | 已实现 |
+| `ssair` | YakSSA 文本 | 已实现 |
+| `source` | 伪源码 | 已实现 |
+
+`lift` 的转换选项：
+
+- `--keep-stack-canary`：保留 stack-protector 代码。默认删除。只影响 `ssair` 和 `source`。
 
 `lift` 的区域选择：
 
@@ -36,8 +49,11 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" parsers --json
 "$OUT/bin/reify" inspect --json /bin/true
 "$OUT/bin/reify" check /bin/true
-"$OUT/bin/reify" lift --json --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --section .text /bin/true
+"$OUT/bin/reify" lift --mode asm --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode lowir --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode ssair --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode source --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --json --mode lowir /bin/true
 ```
 
 ## loaders 与 parsers
@@ -136,15 +152,54 @@ JSON 结构：
 
 ## lift
 
-`lift` 默认解码 `.text`。文本输出给出区域、块数、指令数、值数和诊断数：
+### asm
+
+默认模式输出汇编。文本头部给出区域和指令数，随后一行一条指令：
+
+```text
+Scope: amd64 assembly
+Region: address=0x2590 size=48
+Instructions: 14
+Diagnostics: 0
+0x2590  f3 0f 1e fa               endbr64
+0x2594  31 ed                     xor %ebp,%ebp
+0x2596  49 89 d1                  mov %rdx,%r9
+0x2599  5e                        pop %rsi
+...
+```
+
+JSON 结构：
+
+```json
+{
+  "scope": "amd64-assembly",
+  "mode": "asm",
+  "region": {"address": 9616, "offset": 9616, "size": 48},
+  "assembly": "0x2590  f3 0f 1e fa  endbr64\n...",
+  "instructions": 14
+}
+```
+
+空的 `diagnostics` 字段会省略。汇编由 parser 的可选 `Disassembler` 能力生成。没有该能力的架构返回 `ErrNoDisassembler`。
+
+### lowir
+
+`--mode lowir` 输出区域统计和 LowIR 文本：
 
 ```text
 Scope: amd64 LowIR
 Region: address=0x2590 size=48
+Functions: 1
 Blocks: 2
 Instructions: 59
 Values: 37
 Diagnostics: 1
+target: unknown/amd64 (64-bit, little-endian)
+function f1 @ 0x2590
+block b1 @ 0x2590
+  0x2590  intrinsic @x86.endbr64
+  0x2594  v1:i32 = read-register %ebp [read-register]
+  ...
 Note [block-falls-off-region]: block at 0x25b6 reaches the end of the decoded region
 ```
 
@@ -153,6 +208,7 @@ JSON 结构：
 ```json
 {
   "scope": "amd64-lowir",
+  "mode": "lowir",
   "region": {"address": 9616, "offset": 9616, "size": 48},
   "ir": {
     "target": {
@@ -163,15 +219,21 @@ JSON 结构：
       "abi": "ELFOSABI_NONE",
       "machine": "EM_X86_64"
     },
-    "blocks": [
+    "functions": [
       {
         "id": 1,
         "address": 9616,
-        "instructions": [
+        "blocks": [
           {
-            "kind": "intrinsic",
-            "operands": [{"kind": "symbol", "name": "x86.endbr64"}],
-            "address": 9616
+            "id": 1,
+            "address": 9616,
+            "instructions": [
+              {
+                "kind": "intrinsic",
+                "operands": [{"kind": "symbol", "name": "x86.endbr64"}],
+                "address": 9616
+              }
+            ]
           }
         ]
       }
@@ -183,11 +245,106 @@ JSON 结构：
 }
 ```
 
-示例只显示第一条指令。实际结果包含完整块和指令。
+示例只显示第一条指令。实际结果按 `functions → blocks → instructions` 组织。
 
-解码行为：
+### ssair
 
-- 区域按线性顺序解码。遇到无法解码的字节时停止，并返回已经产生的 LowIR。
+`--mode ssair` 先构建 LowIR，再调用 `lowir2ssa.Convert`，最后输出 YakSSA 文本：
+
+```text
+Scope: amd64 SSair
+Region: address=0x2590 size=48
+Functions: 1
+Diagnostics: 1
+sub_0x2590
+type: () -> any
+entry-0: (<nil condition>)
+	<any> t6 = call <any> reify.intrinsic.x86.endbr64 () binding[] member[]
+	<i32> t8 = type-case[i32] <any> t7
+	<i32> t9 = type-case[i32] <any> t7
+	<i32> t10 = <i32> t8 xor <i32> t9
+	<i64> t11 = type-case[i64] <i32> t10
+	<i64> t14 = call <any> reify.intrinsic.x86.flags.xor (<i32> t8, <i32> t9, <i32> t10) binding[] member[]
+	...
+```
+
+JSON 增加 `ssair` 字段，并保留 `ir` 与 `diagnostics`：
+
+```json
+{
+  "scope": "amd64-ssair",
+  "mode": "ssair",
+  "region": {"address": 9616, "offset": 9616, "size": 48},
+  "ssair": "sub_0x2590\ntype: () -> any\n...",
+  "ir": {"target": {}, "functions": []},
+  "diagnostics": []
+}
+```
+
+### source
+
+`--mode source` 在同一个 YakSSA 程序上调用 `ssa2source.Render`：
+
+```text
+Scope: amd64 source
+Region: address=0x2590 size=48
+Functions: 1
+Diagnostics: 1
+function sub_0x2590() {
+entry-0:
+  rbp = undefined;
+  rsp = undefined;
+  v6 = reify.intrinsic.x86.endbr64();
+  v8 = cast(i32, rbp);
+  v9 = cast(i32, rbp);
+  v10 = v8 ^ v9;
+  rbp = cast(i64, v10);
+  rflags = reify.intrinsic.x86.flags.xor(v8, v9, v10);
+  ...
+}
+```
+
+JSON 增加 `source` 字段。伪源码不是可编译源码，也不还原语言级类型和控制结构。
+
+数值类型保留位宽：`i8`、`i16`、`i32`、`i64`、`ptr64`、`i1`。部分寄存器由类型区分。转换不插入 Phi；寄存器读取最近一次赋值。
+
+转换规则和诊断码见 [SSA 文档](ssa.md)。
+
+## 批量导出
+
+[scripts/lift-all.sh](../scripts/lift-all.sh) 用 `go run` 依次执行四种模式：
+
+```bash
+common/yak/reify/scripts/lift-all.sh -o /mnt/data/scan-outputs/reify-lift /bin/true
+```
+
+输出目录由 `-o` 指定，默认 `./reify-out`。用 `-a ADDRESS -s SIZE` 只拆一个映像地址区间，例如单个函数。文件名取自输入文件名：
+
+| 文件 | 内容 |
+| --- | --- |
+| `<name>.asm.txt` | 汇编 |
+| `<name>.lowir.txt` | LowIR |
+| `<name>.ssair.txt` | YakSSA |
+| `<name>.source.txt` | 伪源码 |
+| `version` | 版本、提交哈希、分支、时间、输入路径、SHA-256 与区间 |
+
+任一模式失败时，脚本把错误写入对应文件，继续其余模式，最后返回 1。
+
+示例二进制：[examples/hello.c](../examples/hello.c)。
+
+```bash
+gcc -O1 -fno-pie -no-pie -o /tmp/hello common/yak/reify/examples/hello.c
+main_addr=$(nm -S --defined-only /tmp/hello | awk '$4 == "main" {print "0x"$1}')
+main_size=$(nm -S --defined-only /tmp/hello | awk '$4 == "main" {print "0x"$2}')
+
+common/yak/reify/scripts/lift-all.sh -o /tmp/hello-all /tmp/hello
+common/yak/reify/scripts/lift-all.sh -o /tmp/hello-main -a "$main_addr" -s "$main_size" /tmp/hello
+```
+
+### 解码行为
+
+- 区域按线性顺序解码。遇到无法解码的字节时停止，并返回已经产生的汇编或 LowIR。
+- `asm` 和 `lowir` 是同一解码与提升管线的两个视图，报告相同诊断。`asm` 不构建 LowIR，但仍会执行提升检查。
 - 无法解码时产生 `decode-error` 诊断；区域末尾截断也走这条路径。至少解码一条指令时命令返回 0。
 - 未支持的指令产生 `unsupported-instruction` 诊断，并在 LowIR 中保留 `x86.<mnemonic>` 内建操作。
 - 块到达区域末尾时补 `trap`，并产生 `block-falls-off-region` 诊断。
@@ -199,14 +356,15 @@ JSON 结构：
 - Mach-O：OS 暂为 unknown，入口不恢复，诊断 `entry-point-unavailable`。
 - 缺少入口字段时不输出 `entry_point`；这不表示文件没有入口。
 - 入口和节地址是映像地址，不是 ASLR 后的运行时地址。
-- `lift` 只解释 AMD64。其他架构返回 `ErrDecoderUnavailable`。
+- `lift` 只解释 AMD64。其他架构的 `lowir` 返回 `ErrDecoderUnavailable`，`asm` 返回 `ErrNoDisassembler`。
+- `ssair` 和 `source` 依赖 LowIR，因此也只对已实现解码器的架构有效。
 
 ## 返回码
 
 | 返回码 | 含义 |
 | --- | --- |
 | `0` | 帮助、列表、检查、加载或部分解码完成 |
-| `1` | 文件、格式、区域、解析、取消或输出错误 |
+| `1` | 文件、格式、区域、解析、转换、取消或输出错误 |
 | `2` | 命令或参数错误 |
 
 `check` 只验证头部和节范围。`lift` 只做静态解码，不执行输入，也不证明文件安全或语义完整。`debug/*` 解析器不是对抗性输入的安全沙箱；不可信文件应在资源隔离环境中处理。
@@ -224,7 +382,7 @@ export TMPDIR="$RUN/tmp"
 scripts/ssa-test.sh -count=1 ./common/yak/reify/...
 ```
 
-测试覆盖 ByteReader、Image/Artifact 校验、区域映射、三个格式 loader、Catalog 注册与分派、parser 目标校验、AMD64 解码与提升，以及 CLI 的 lift 路径。
+测试覆盖 ByteReader、Image/Artifact 校验、区域映射、三个格式 loader、Catalog 注册与分派、parser 目标校验、AMD64 解码、汇编渲染与 LowIR 提升，以及 CLI 的 lift 模式。
 
 ## 参考资料
 

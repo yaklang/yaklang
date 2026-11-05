@@ -128,6 +128,67 @@ func TestByteReaderBytesAreCopies(t *testing.T) {
 	}
 }
 
+func TestByteReaderSlice(t *testing.T) {
+	base := newReader(t, []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	view, err := base.Slice(2, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Size() != 4 || view.Name() != "fixture" {
+		t.Fatalf("bad view metadata: %+v", view)
+	}
+	code, err := view.Bytes(0, 4)
+	if err != nil || !bytes.Equal(code, []byte{3, 4, 5, 6}) {
+		t.Fatalf("view bytes: %v %v", code, err)
+	}
+	buffer := make([]byte, 2)
+	if n, err := view.ReadAt(buffer, 1); err != nil || n != 2 || !bytes.Equal(buffer, []byte{4, 5}) {
+		t.Fatalf("view read: %v %v %v", n, buffer, err)
+	}
+	if _, err := view.Bytes(0, 5); err == nil {
+		t.Fatal("view accepted a read past its end")
+	}
+	if _, err := base.Slice(7, 2); err == nil {
+		t.Fatal("slice accepted a range past the parent")
+	}
+	if base.Size() != 8 {
+		t.Fatal("slice changed the parent size")
+	}
+	if _, err := base.Bytes(0, 8); err != nil {
+		t.Fatalf("parent changed: %v", err)
+	}
+	ordered, err := base.WithOrder(BigEndian)
+	if err != nil {
+		t.Fatal(err)
+	}
+	big, err := ordered.Slice(1, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, err := big.Uint16(0); err != nil || value != 0x0203 {
+		t.Fatalf("view byte order: %#x %v", value, err)
+	}
+}
+
+func TestByteReaderSliceIsBorrowed(t *testing.T) {
+	closer := &countingCloser{ReaderAt: bytes.NewReader([]byte{1, 2, 3, 4})}
+	reader, err := NewByteReader("owned", closer, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owned := reader.WithOwner()
+	view, err := owned.Slice(1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := view.Close(); err != nil || closer.closed {
+		t.Fatalf("slice closed its source: %v %v", err, closer.closed)
+	}
+	if err := owned.Close(); err != nil || !closer.closed {
+		t.Fatalf("owner did not close its source: %v %v", err, closer.closed)
+	}
+}
+
 func TestByteOrderOf(t *testing.T) {
 	if ByteOrderOf(binary.LittleEndian) != LittleEndian {
 		t.Fatal("little endian mapping failed")

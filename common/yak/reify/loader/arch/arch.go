@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/amd64"
 )
 
 var ErrDecoderUnavailable = errors.New("instruction decoder is not implemented")
@@ -16,14 +17,13 @@ var ErrDecoderUnavailable = errors.New("instruction decoder is not implemented")
 // All returns one registered parser per architecture.
 func All() []core.Parser {
 	return []core.Parser{
-		AMD64{}, X86{}, ARM{}, ARM64{}, RISCV32{}, RISCV64{}, MIPS{}, MIPS64{}, PPC{}, PPC64{},
+		amd64.Parser{}, X86{}, ARM{}, ARM64{}, RISCV32{}, RISCV64{}, MIPS{}, MIPS64{}, PPC{}, PPC64{},
 	}
 }
 
 type rule struct {
-	bits       int
-	littleOnly bool
-	modes      []string
+	bits  int
+	modes []string
 }
 
 func checkTarget(target core.Target, kind core.Architecture, spec rule) error {
@@ -32,9 +32,6 @@ func checkTarget(target core.Target, kind core.Architecture, spec rule) error {
 	}
 	if target.Bits != spec.bits {
 		return fmt.Errorf("%s requires %d-bit addresses, got %d", kind, spec.bits, target.Bits)
-	}
-	if spec.littleOnly && target.ByteOrder != core.LittleEndian {
-		return fmt.Errorf("%s requires little-endian byte order", kind)
 	}
 	if target.Mode != "" {
 		for _, mode := range spec.modes {

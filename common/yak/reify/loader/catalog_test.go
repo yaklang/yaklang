@@ -125,7 +125,11 @@ func (fakeParser) Check(core.Target) error   { return nil }
 func (p *fakeParser) Parse(_ context.Context, request core.ParseRequest) (*core.ParseResult, error) {
 	p.calls++
 	return &core.ParseResult{
-		IR: &core.LowIR{Target: request.Target, Blocks: []core.Block{{ID: 1, Address: request.Address}}},
+		IR: &core.LowIR{Target: request.Target, Functions: []core.Function{{
+			ID:      1,
+			Address: request.Address,
+			Blocks:  []core.Block{{ID: 1, Address: request.Address}},
+		}}},
 	}, nil
 }
 
@@ -269,7 +273,7 @@ func TestCatalogParserSelectionAndParse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parser.calls != 1 || result.IR == nil || len(result.IR.Blocks) != 1 {
+	if parser.calls != 1 || result.IR == nil || len(result.IR.Functions) != 1 || len(result.IR.Functions[0].Blocks) != 1 {
 		t.Fatalf("parse did not reach the parser: %+v", result)
 	}
 	other := &fakeParser{kind: core.ArchARM64, usable: true}

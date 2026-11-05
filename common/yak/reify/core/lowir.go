@@ -1,23 +1,33 @@
 package core
 
 // LowIR is the machine-level program representation. It is a concrete value,
-// not an interface: every parser produces the same Block and Instruction
-// shapes. Block and value IDs are local to one LowIR unit; zero denotes an
-// absent ID. Values have single definitions. Registers and memory remain
-// explicit effects rather than implicit mutable SSA values.
+// not an interface: every parser produces the same Function, Block and
+// Instruction shapes. Function IDs are local to one LowIR; block and value IDs
+// are local to one Function. Zero denotes an absent ID. Values have single
+// definitions. Registers and memory remain explicit effects rather than
+// implicit mutable SSA values.
 type LowIR struct {
-	Target Target  `json:"target"`
-	Blocks []Block `json:"blocks"`
+	Target    Target     `json:"target"`
+	Functions []Function `json:"functions"`
+}
+
+// Function is one decoded unit. Address is its entry address. The current
+// parsers create one function for each ParseRequest region.
+type Function struct {
+	ID      FunctionID `json:"id"`
+	Address uint64     `json:"address"`
+	Blocks  []Block    `json:"blocks"`
 }
 
 // Block contains ordered operations and ends in a control-transfer operation.
-// Targets on that operation identify known successors.
+// Targets on that operation identify known successors within the same function.
 type Block struct {
 	ID           BlockID       `json:"id"`
 	Address      uint64        `json:"address"`
 	Instructions []Instruction `json:"instructions"`
 }
 
+type FunctionID uint64
 type BlockID uint64
 type ValueID uint64
 

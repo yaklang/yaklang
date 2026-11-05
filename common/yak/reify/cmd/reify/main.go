@@ -14,6 +14,8 @@ import (
 
 	utilscli "github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa"
+	"github.com/yaklang/yaklang/common/yak/reify/core/ssa2source"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
 )
 
@@ -31,7 +33,7 @@ Usage:
   reify parsers [--json]
   reify inspect [--json] <file>
   reify check [--json] <file>
-  reify lift [--json] [--section NAME | --address ADDRESS --size SIZE] <file>
+  reify lift [--json] [--keep-stack-canary] [--mode asm|lowir|ssair|source] [--section NAME | --address ADDRESS --size SIZE] <file>
   reify help
 
 Commands:
@@ -39,9 +41,10 @@ Commands:
   parsers  List parsers registered by architecture.
   inspect  Load headers and display the artifact, target and sections.
   check    Validate headers and report the selected loader and parser.
-  lift     Decode a code region into AMD64 LowIR.
+  lift     Decode a code region; --mode selects asm, lowir, ssair or source.
 
-Scope: file headers, target platforms, section metadata and AMD64 LowIR.
+Scope: file headers, target platforms, section metadata, AMD64 assembly,
+LowIR, YakSSA and source-like text.
 Loaders: ELF, PE and thin Mach-O. AMD64 has an instruction decoder; the other
 architectures are registered without decoders. Flags may appear before or after
 the file argument. Files are opened read-only. debug/* parsers are not a sandbox.
@@ -59,10 +62,33 @@ type checkReport struct {
 }
 
 type liftReport struct {
-	Scope       string            `json:"scope"`
-	Region      core.Region       `json:"region"`
-	IR          *core.LowIR       `json:"ir"`
-	Diagnostics []core.Diagnostic `json:"diagnostics,omitempty"`
+	Scope        string            `json:"scope"`
+	Mode         string            `json:"mode"`
+	Region       core.Region       `json:"region"`
+	Assembly     string            `json:"assembly,omitempty"`
+	Instructions int               `json:"instructions,omitempty"`
+	IR           *core.LowIR       `json:"ir,omitempty"`
+	SSAIR        string            `json:"ssair,omitempty"`
+	Source       string            `json:"source,omitempty"`
+	Diagnostics  []core.Diagnostic `json:"diagnostics,omitempty"`
+}
+
+type liftMode string
+
+const (
+	liftModeASM    liftMode = "asm"
+	liftModeLowIR  liftMode = "lowir"
+	liftModeSSAIR  liftMode = "ssair"
+	liftModeSource liftMode = "source"
+)
+
+func parseLiftMode(raw string) (liftMode, error) {
+	switch liftMode(raw) {
+	case liftModeASM, liftModeLowIR, liftModeSSAIR, liftModeSource:
+		return liftMode(raw), nil
+	default:
+		return "", fmt.Errorf("unknown lift mode %q (want asm, lowir, ssair or source)", raw)
+	}
 }
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -84,6 +110,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 
 	valueFlags := map[string]bool{}
 	if command == "lift" {
+		valueFlags["mode"] = true
 		valueFlags["section"] = true
 		valueFlags["address"] = true
 		valueFlags["size"] = true
@@ -107,11 +134,22 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	app.SetArgs(args[1:])
 	asJSON := app.Bool("json")
 	section := ".text"
+	mode := liftModeASM
+	keepStackCanary := false
 	var addressText, sizeText string
 	if command == "lift" {
+		rawMode := app.String("mode", app.SetDefault("asm"))
+		parsedMode, modeErr := parseLiftMode(rawMode)
+		if modeErr != nil {
+			fmt.Fprintf(stderr, "reify: %v\n", modeErr)
+			printCommandUsage(stderr, command)
+			return 2
+		}
+		mode = parsedMode
 		section = app.String("section", app.SetDefault(".text"))
 		addressText = app.String("address")
 		sizeText = app.String("size")
+		keepStackCanary = app.Bool("keep-stack-canary")
 	}
 	address, size := uint64(0), uint64(0)
 	if addressText != "" {
@@ -171,25 +209,116 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return reportError(err, stderr)
 		}
-		result, err := artifact.Parse(ctx, region)
-		if err != nil {
+		switch mode {
+		case liftModeASM:
+			disassembly, err := artifact.Disassemble(ctx, region)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			if asJSON {
+				return reportError(writeJSON(stdout, liftReport{
+					Scope:        "amd64-assembly",
+					Mode:         string(mode),
+					Region:       region,
+					Assembly:     disassembly.Text,
+					Instructions: disassembly.Instructions,
+					Diagnostics:  disassembly.Diagnostics,
+				}), stderr)
+			}
+			var text bytes.Buffer
+			fmt.Fprintf(&text, "Scope: amd64 assembly\n")
+			fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", region.Address, region.Size)
+			fmt.Fprintf(&text, "Instructions: %d\n", disassembly.Instructions)
+			fmt.Fprintf(&text, "Diagnostics: %d\n", len(disassembly.Diagnostics))
+			text.WriteString(disassembly.Text)
+			for _, diagnostic := range disassembly.Diagnostics {
+				fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
+			}
+			_, err = io.Copy(stdout, &text)
+			return reportError(err, stderr)
+		case liftModeLowIR:
+			result, err := artifact.Parse(ctx, region)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			if asJSON {
+				return reportError(writeJSON(stdout, liftReport{
+					Scope:       "amd64-lowir",
+					Mode:        string(mode),
+					Region:      region,
+					IR:          result.IR,
+					Diagnostics: result.Diagnostics,
+				}), stderr)
+			}
+			var text bytes.Buffer
+			fmt.Fprintf(&text, "Scope: amd64 LowIR\n")
+			fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", region.Address, region.Size)
+			fmt.Fprintf(&text, "Functions: %d\n", len(result.IR.Functions))
+			fmt.Fprintf(&text, "Blocks: %d\n", countBlocks(result.IR))
+			fmt.Fprintf(&text, "Instructions: %d\n", countInstructions(result.IR))
+			fmt.Fprintf(&text, "Values: %d\n", countValues(result.IR))
+			fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
+			text.WriteString(core.FormatLowIR(result.IR))
+			for _, diagnostic := range result.Diagnostics {
+				fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
+			}
+			_, err = io.Copy(stdout, &text)
+			return reportError(err, stderr)
+		case liftModeSSAIR, liftModeSource:
+			result, err := artifact.Parse(ctx, region)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			var convertOptions []lowir2ssa.Option
+			if keepStackCanary {
+				convertOptions = append(convertOptions, lowir2ssa.WithKeepStackCanary())
+			}
+			converted, err := lowir2ssa.Convert(ctx, result.IR, convertOptions...)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			diagnostics := append([]core.Diagnostic{}, result.Diagnostics...)
+			diagnostics = append(diagnostics, converted.Diagnostics...)
+			var body string
+			if mode == liftModeSSAIR {
+				body = lowir2ssa.Text(converted.Program)
+			} else {
+				body, err = ssa2source.Render(ctx, converted.Program)
+				if err != nil {
+					return reportError(err, stderr)
+				}
+			}
+			if asJSON {
+				report := liftReport{
+					Scope:       "amd64-" + string(mode),
+					Mode:        string(mode),
+					Region:      region,
+					IR:          result.IR,
+					Diagnostics: diagnostics,
+				}
+				if mode == liftModeSSAIR {
+					report.SSAIR = body
+				} else {
+					report.Source = body
+				}
+				return reportError(writeJSON(stdout, report), stderr)
+			}
+			var text bytes.Buffer
+			if mode == liftModeSSAIR {
+				fmt.Fprintf(&text, "Scope: amd64 SSair\n")
+			} else {
+				fmt.Fprintf(&text, "Scope: amd64 source\n")
+			}
+			fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", region.Address, region.Size)
+			fmt.Fprintf(&text, "Functions: %d\n", len(result.IR.Functions))
+			fmt.Fprintf(&text, "Diagnostics: %d\n", len(diagnostics))
+			text.WriteString(body)
+			for _, diagnostic := range diagnostics {
+				fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
+			}
+			_, err = io.Copy(stdout, &text)
 			return reportError(err, stderr)
 		}
-		if asJSON {
-			return reportError(writeJSON(stdout, liftReport{Scope: "amd64-lowir", Region: region, IR: result.IR, Diagnostics: result.Diagnostics}), stderr)
-		}
-		var text bytes.Buffer
-		fmt.Fprintf(&text, "Scope: amd64 LowIR\n")
-		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", region.Address, region.Size)
-		fmt.Fprintf(&text, "Blocks: %d\n", len(result.IR.Blocks))
-		fmt.Fprintf(&text, "Instructions: %d\n", countInstructions(result.IR))
-		fmt.Fprintf(&text, "Values: %d\n", countValues(result.IR))
-		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
-		for _, diagnostic := range result.Diagnostics {
-			fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
-		}
-		_, err = io.Copy(stdout, &text)
-		return reportError(err, stderr)
 	}
 
 	if command == "check" {
@@ -263,7 +392,7 @@ func splitCLIArgs(args []string, valueFlags map[string]bool) ([]string, error) {
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
-		case arg == "--json":
+		case arg == "--json", arg == "--keep-stack-canary":
 			continue
 		case strings.HasPrefix(arg, "--"):
 			name := strings.TrimPrefix(arg, "--")
@@ -294,7 +423,7 @@ func printCommandUsage(w io.Writer, command string) {
 	case "inspect", "check":
 		fmt.Fprintf(w, "Usage: reify %s [--json] <file>\n", command)
 	case "lift":
-		fmt.Fprint(w, "Usage: reify lift [--json] [--section NAME | --address ADDRESS --size SIZE] <file>\n")
+		fmt.Fprint(w, "Usage: reify lift [--json] [--keep-stack-canary] [--mode asm|lowir|ssair|source] [--section NAME | --address ADDRESS --size SIZE] <file>\n")
 	}
 }
 
@@ -368,22 +497,32 @@ func liftRegion(artifact *core.Artifact, section string, address, size uint64) (
 	return core.Region{}, fmt.Errorf("lift: section %q not found", section)
 }
 
+func countBlocks(ir *core.LowIR) int {
+	total := 0
+	for _, function := range ir.Functions {
+		total += len(function.Blocks)
+	}
+	return total
+}
+
 func countInstructions(ir *core.LowIR) int {
 	total := 0
-	for _, block := range ir.Blocks {
-		total += len(block.Instructions)
+	for _, function := range ir.Functions {
+		for _, block := range function.Blocks {
+			total += len(block.Instructions)
+		}
 	}
 	return total
 }
 
 func countValues(ir *core.LowIR) int {
-	seen := map[core.ValueID]bool{}
-	for _, block := range ir.Blocks {
-		for _, instruction := range block.Instructions {
-			for _, result := range instruction.Results {
-				seen[result.ID] = true
+	total := 0
+	for _, function := range ir.Functions {
+		for _, block := range function.Blocks {
+			for _, instruction := range block.Instructions {
+				total += len(instruction.Results)
 			}
 		}
 	}
-	return len(seen)
+	return total
 }

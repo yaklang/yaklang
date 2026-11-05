@@ -15,7 +15,7 @@ func (X86) Kind() core.Architecture { return core.Arch386 }
 func (X86) Name() string            { return "386" }
 func (X86) Available() bool         { return false }
 func (X86) Check(target core.Target) error {
-	return checkTarget(target, core.Arch386, rule{bits: 32, littleOnly: true})
+	return checkTarget(target, core.Arch386, rule{bits: 32})
 }
 func (X86) Parse(context.Context, core.ParseRequest) (*core.ParseResult, error) {
 	return unavailable(core.Arch386)

@@ -9,9 +9,10 @@
 ```go
 reader, err := core.NewByteReader(name, src, size)
 ordered, err := reader.WithOrder(core.LittleEndian)
+region, err := ordered.Slice(offset, size)
 ```
 
-ByteReader 是单次输入的字节视图。它限制所有读取不超过声明大小，并为一个字节序提供多字节整数读取。
+ByteReader 是单次输入的字节视图。它限制所有读取不超过声明大小，并为一个字节序提供多字节整数读取。`Slice` 返回共享 source 的有界视图，视图内的偏移从零开始。
 
 | 方法 | 说明 |
 | --- | --- |
@@ -20,6 +21,7 @@ ByteReader 是单次输入的字节视图。它限制所有读取不超过声明
 | `Kind() ByteOrder` | 当前读取字节序 |
 | `Source() io.ReaderAt` | 借出的底层 source |
 | `WithOrder(ByteOrder)` | 返回共享 source 的新视图 |
+| `Slice(offset, size)` | 返回共享 source 的有界子视图 |
 | `WithOwner()` | 标记 source 归 reader 所有 |
 | `Close()` | 只关闭带所有权的 source |
 | `CheckRange(offset, size)` | 检查范围是否越界或溢出 |
@@ -100,11 +102,14 @@ type Artifact struct {
 | `RegionAt(address, size)` | 虚拟地址 → 文件区域 |
 | `EntryRegion(size)` | 从入口点开始的文件区域 |
 | `Parse(ctx, region)` | 用 artifact 的 parser 解析区域 |
+| `Disassemble(ctx, region)` | 用 parser 的可选能力渲染汇编文本 |
 | `Close()` | 释放拥有的 source |
 
 `RegionAt` 要求整个范围落在同一个节的文件数据内。零填充区域、跨节范围和溢出地址都返回 `ErrRegion`。
 
-`Parse` 要求 Artifact 已有 parser。没有 parser 时返回 `ErrNoParser`。调用前会再次执行 `Parser.Check`；解析结果必须包含 LowIR，且 LowIR 的 Target 必须与 Artifact 一致，否则返回错误。
+`Parse` 要求 Artifact 已有 parser。没有 parser 时返回 `ErrNoParser`。调用前会再次执行 `Parser.Check`；解析结果必须包含 LowIR、至少一个 Function，且 LowIR 的 Target 必须与 Artifact 一致，否则返回错误。`Parse` 把区域切成有界 ByteReader，不复制整段代码。
+
+`Disassemble` 要求 parser 实现 `core.Disassembler`。没有该能力时返回 `ErrNoDisassembler`；它不构建 LowIR。
 
 ## Image 与 Section
 
@@ -138,11 +143,33 @@ type Parser interface {
 ```
 
 - `Kind` 对齐 Architecture，是 Catalog 的键。
-- `Check` 校验位数、字节序和执行模式；不匹配时返回错误。
+- `Check` 校验架构、位数和执行模式；不匹配时返回错误。字节序由 ByteReader 处理，不在 parser 中判断。
 - `Available` 表示 `Parse` 是否具备解码能力。
-- `Parse` 接收 Target、首地址和连续代码字节。
+- `Parse` 接收 Target、首地址和区域 ByteReader。
 
-`ParseRequest.Code` 是只读借用。`ParseResult` 只包含 `IR` 和 `Diagnostics`；解析器不返回汇编记录。需要保留机器字节时，解析器必须把字节复制进 LowIR 常量或诊断。
+```go
+type ParseRequest struct {
+    Target  Target
+    Address uint64
+    Reader  *ByteReader
+}
+```
+
+`ParseRequest.Reader` 是只读借用，范围就是当前区域，偏移从零开始。parser 用 `Bytes`、`ReadAt` 或 `Uint*` 读取；不要关闭 reader，也不要从 `Target.ByteOrder` 重新解释字节。`ParseResult` 只包含 `IR` 和 `Diagnostics`；汇编文本通过独立的可选接口返回。需要保留机器字节时，解析器必须把字节复制进 LowIR 常量或诊断。
+
+```go
+type Disassembler interface {
+    Disassemble(context.Context, ParseRequest) (*Disassembly, error)
+}
+
+type Disassembly struct {
+    Text         string
+    Instructions int
+    Diagnostics  []Diagnostic
+}
+```
+
+`Disassembly.Text` 一行一条指令，格式由架构 parser 决定。AMD64 使用 GNU 语法。
 
 ## 架构实现状态
 
@@ -150,17 +177,18 @@ type Parser interface {
 
 `arch.All()` 返回十个 parser 实例。
 
-`AMD64` 的实现：
+`AMD64` 的实现位于 [loader/arch/amd64](../loader/arch/amd64)，是独立包：
 
 - `Available() == true`。
-- `Check` 要求 64 位、小端、`ArchAMD64`。
-- `Parse` 用 `x86asm` 解码，构建基本块，并输出 LowIR。
+- `Check` 要求 64 位和 `ArchAMD64`；不检查 Target 的字节序。
+- `Parse` 用 `x86asm` 解码，构建 Function 与基本块，并输出 LowIR。
+- `Disassemble` 复用解码结果，输出地址、机器字节和 GNU 语法汇编。
 - 支持的指令族和限制见[架构文档](architecture.md#amd64)。
 
 其余九个架构仍是骨架：
 
 - `Available() == false`。
-- `Check` 校验 Target 的位数、字节序与模式。
+- `Check` 校验 Target 的架构、位数与执行模式。
 - `Parse` 返回 `ErrDecoderUnavailable`。
 
 实现某个架构时替换该类型的 `Parse`，并让 `Available` 返回 true。接口和注册方式不变。
@@ -169,21 +197,33 @@ type Parser interface {
 
 定义：[core/lowir.go](../core/lowir.go)。
 
-LowIR 是具体结构，不是接口。`ParseResult.IR` 是指向 `core.LowIR` 的指针。直接调用 `Parser.Parse` 时，nil 表示解析器没有产出表示；`Artifact.Parse` 要求结果非 nil，且 Target 与 Artifact 一致。
+LowIR 是具体结构，不是接口。`ParseResult.IR` 是指向 `core.LowIR` 的指针。LowIR 包含 `Functions`；每个 Function 包含 `Blocks`；每个 Block 包含 `Instructions`。直接调用 `Parser.Parse` 时，nil 表示解析器没有产出表示；`Artifact.Parse` 要求结果非 nil、至少一个 Function，且 Target 与 Artifact 一致。
 
 详细约束见 [LowIR 文档](lowir.md)。
 
-## 变换边界
+## SSA 边界
 
-定义：[rewriter/pass.go](../rewriter/pass.go)。
+定义：[core/stage.go](../core/stage.go)。
 
 ```go
-type Pass interface {
-    Name() string
-    Rewrite(context.Context, *ssa.Program) error
+type SSAIRBuilder interface {
+    BuildSSAIR(context.Context, *LowIR) (*ssa.Program, error)
+}
+
+type SourceRenderer interface {
+    RenderSource(context.Context, *ssa.Program) (string, error)
 }
 ```
 
-Pass 面向已有 YakSSA 程序。LowIR 到 YakSSA 的转换尚未实现；转换层需要保留位宽、效果和来源，不能只按操作名称映射。
+两个契约都有实现：
+
+- [core/lowir2ssa](../core/lowir2ssa)：`Convert` 返回 `Result{Program, Diagnostics}`；`Builder` 满足 `SSAIRBuilder`；`Text` 输出 YakSSA 文本；`WithKeepStackCanary` 保留 stack-protector 代码。
+- [core/ssa2source](../core/ssa2source)：`Render` 输出伪源码；`Renderer` 满足 `SourceRenderer`。
+
+LowIR 的文本形式由 `core.FormatLowIR` 提供，不属于 parser 契约。它保留函数、块、值、操作、目标和效果，JSON 仍是机器可读形式。
+
+转换把通用寄存器提升为带位宽类型的变量，不插入 Phi。内存、调用、intrinsic 和未支持操作保留为 `reify.*` 调用。转换不做语言级类型恢复和内存 SSA。默认删除 stack canary；`WithKeepStackCanary` 可保留。完整映射和诊断见 [SSA 文档](ssa.md)。
+
+`rewriter` 包已删除。需要变换时直接对 `*ssa.Program` 编写 Pass。
 
 [返回 README](../README.md)

@@ -1,11 +1,13 @@
-package arch
+package amd64
 
 import (
+	"bytes"
 	"context"
 	"debug/elf"
 	"encoding/binary"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -15,18 +17,44 @@ func amd64Target() core.Target {
 	return core.Target{OS: core.OSLinux, Architecture: core.ArchAMD64, Bits: 64, ByteOrder: core.LittleEndian}
 }
 
+func amd64Reader(t *testing.T, code []byte) *core.ByteReader {
+	t.Helper()
+	reader, err := core.NewByteReader("test", bytes.NewReader(code), int64(len(code)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err = reader.WithOrder(core.LittleEndian)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reader
+}
+
+func amd64Request(t *testing.T, address uint64, code []byte) core.ParseRequest {
+	t.Helper()
+	return core.ParseRequest{Target: amd64Target(), Address: address, Reader: amd64Reader(t, code)}
+}
+
 func parseAMD64At(t *testing.T, address uint64, code []byte) *core.ParseResult {
 	t.Helper()
-	result, err := (AMD64{}).Parse(context.Background(), core.ParseRequest{Target: amd64Target(), Address: address, Code: code})
+	result, err := (Parser{}).Parse(context.Background(), amd64Request(t, address, code))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
 	return result
 }
 
+func allBlocks(ir *core.LowIR) []core.Block {
+	var result []core.Block
+	for _, function := range ir.Functions {
+		result = append(result, function.Blocks...)
+	}
+	return result
+}
+
 func allInstructions(ir *core.LowIR) []core.Instruction {
 	var result []core.Instruction
-	for _, block := range ir.Blocks {
+	for _, block := range allBlocks(ir) {
 		result = append(result, block.Instructions...)
 	}
 	return result
@@ -85,20 +113,63 @@ func diagnosticCount(result *core.ParseResult, code string) int {
 }
 
 func TestAMD64AvailableAndChecksTarget(t *testing.T) {
-	if !(AMD64{}).Available() {
+	if !(Parser{}).Available() {
 		t.Fatal("amd64 decoder is not available")
 	}
-	if err := (AMD64{}).Check(amd64Target()); err != nil {
+	if err := (Parser{}).Check(amd64Target()); err != nil {
 		t.Fatalf("linux/amd64 rejected: %v", err)
+	}
+	if err := (Parser{}).Check(core.Target{OS: core.OSLinux, Architecture: core.ArchAMD64, Bits: 64, ByteOrder: core.BigEndian}); err != nil {
+		t.Fatalf("parser interpreted target byte order: %v", err)
 	}
 	for _, target := range []core.Target{
 		{OS: core.OSLinux, Architecture: core.ArchAMD64, Bits: 32, ByteOrder: core.LittleEndian},
-		{OS: core.OSLinux, Architecture: core.ArchAMD64, Bits: 64, ByteOrder: core.BigEndian},
 		{OS: core.OSLinux, Architecture: core.Arch386, Bits: 32, ByteOrder: core.LittleEndian},
 	} {
-		if err := (AMD64{}).Check(target); err == nil {
+		if err := (Parser{}).Check(target); err == nil {
 			t.Fatalf("invalid target accepted: %+v", target)
 		}
+	}
+}
+
+func TestAMD64Disassembles(t *testing.T) {
+	request := amd64Request(t, 0x1000, []byte{0xf3, 0x0f, 0x1e, 0xfa, 0x48, 0x89, 0xe5, 0xc3})
+	result, err := (Parser{}).Disassemble(context.Background(), request)
+	if err != nil {
+		t.Fatalf("disassemble: %v", err)
+	}
+	if result.Instructions != 3 || len(result.Diagnostics) != 0 {
+		t.Fatalf("bad disassembly: %+v", result)
+	}
+	for _, fragment := range []string{"f3 0f 1e fa", "endbr64", "mov", "ret"} {
+		if !strings.Contains(result.Text, fragment) {
+			t.Fatalf("disassembly lacks %q: %s", fragment, result.Text)
+		}
+	}
+
+	partial, err := (Parser{}).Disassemble(context.Background(), amd64Request(t, 0x2000, []byte{0x90, 0x0f}))
+	if err != nil {
+		t.Fatalf("partial disassemble: %v", err)
+	}
+	decodeErrors := 0
+	for _, diagnostic := range partial.Diagnostics {
+		if diagnostic.Code == "decode-error" {
+			decodeErrors++
+		}
+	}
+	if partial.Instructions != 1 || decodeErrors != 1 {
+		t.Fatalf("bad partial disassembly: %+v", partial)
+	}
+}
+
+func TestAMD64DisassembleRejectsEmptyAndCancellation(t *testing.T) {
+	if _, err := (Parser{}).Disassemble(context.Background(), core.ParseRequest{Target: amd64Target()}); err == nil {
+		t.Fatal("empty code accepted")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := (Parser{}).Disassemble(ctx, amd64Request(t, 0x3000, []byte{0x90})); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation: %v", err)
 	}
 }
 
@@ -115,10 +186,14 @@ func TestAMD64PrologueLiftsStackAndReturn(t *testing.T) {
 	if result.IR == nil || result.IR.Target != amd64Target() {
 		t.Fatalf("bad IR target: %+v", result.IR)
 	}
-	if len(result.IR.Blocks) != 1 {
-		t.Fatalf("wanted one fallthrough block, got %d", len(result.IR.Blocks))
+	if len(result.IR.Functions) != 1 || result.IR.Functions[0].ID != 1 || result.IR.Functions[0].Address != 0x1000 {
+		t.Fatalf("bad function: %+v", result.IR.Functions)
 	}
-	block := result.IR.Blocks[0]
+	blocks := allBlocks(result.IR)
+	if len(blocks) != 1 {
+		t.Fatalf("wanted one fallthrough block, got %d", len(blocks))
+	}
+	block := blocks[0]
 	if block.Address != 0x1000 || block.Instructions[len(block.Instructions)-1].Kind != core.OpReturn {
 		t.Fatalf("block does not end in return: %+v", block)
 	}
@@ -153,8 +228,8 @@ func TestAMD64ConditionalBranchBuildsTwoTargets(t *testing.T) {
 		0xc3, // ret
 	}
 	result := parseAMD64At(t, 0x1000, code)
-	if len(result.IR.Blocks) != 3 {
-		t.Fatalf("wanted three blocks, got %d", len(result.IR.Blocks))
+	if blocks := allBlocks(result.IR); len(blocks) != 3 {
+		t.Fatalf("wanted three blocks, got %d", len(blocks))
 	}
 	branch, ok := findInstruction(result.IR, core.OpBranch, nil)
 	if !ok || len(branch.Targets) != 2 {
@@ -162,7 +237,7 @@ func TestAMD64ConditionalBranchBuildsTwoTargets(t *testing.T) {
 	}
 	addresses := map[uint64]bool{}
 	for _, id := range branch.Targets {
-		for _, block := range result.IR.Blocks {
+		for _, block := range allBlocks(result.IR) {
 			if block.ID == id {
 				addresses[block.Address] = true
 			}
@@ -203,7 +278,7 @@ func TestAMD64CallAndJumpTargets(t *testing.T) {
 		t.Fatal("direct jump has no block target")
 	}
 	targetBlock := core.BlockID(0)
-	for _, block := range result.IR.Blocks {
+	for _, block := range allBlocks(result.IR) {
 		if block.ID == jump.Targets[0] {
 			targetBlock = block.ID
 			if block.Address != 0x200a {
@@ -291,18 +366,61 @@ func TestAMD64UnsupportedInstructionIsExplicit(t *testing.T) {
 	}
 }
 
+func TestAMD64NewlyLiftedInstructions(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		code   []byte
+		symbol string
+	}{
+		{"bt", []byte{0x48, 0x0f, 0xa3, 0xd8, 0xc3}, "x86.flags.bt"},
+		{"mul", []byte{0x48, 0xf7, 0xe1, 0xc3}, "x86.mul.lo"},
+		{"div", []byte{0x48, 0xf7, 0xf1, 0xc3}, "x86.div.quot"},
+		{"idiv", []byte{0x48, 0xf7, 0xf9, 0xc3}, "x86.idiv.rem"},
+		{"punpcklqdq", []byte{0x66, 0x0f, 0x6c, 0xc1, 0xc3}, "x86.punpcklqdq"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := parseAMD64At(t, 0xf000, tc.code)
+			if diagnosticCount(result, "unsupported-instruction") != 0 {
+				t.Fatalf("%s is still unsupported: %+v", tc.name, result.Diagnostics)
+			}
+			if _, ok := findSymbol(result.IR, core.OpIntrinsic, tc.symbol); !ok {
+				t.Fatalf("%s did not emit %s", tc.name, tc.symbol)
+			}
+		})
+	}
+}
+
+func TestAMD64DisassembleReportsLiftDiagnostics(t *testing.T) {
+	code := []byte{0x0f, 0x58, 0xc1, 0xc3}
+	parsed := parseAMD64At(t, 0x4000, code)
+	disassembly, err := (Parser{}).Disassemble(context.Background(), amd64Request(t, 0x4000, code))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsedCount := diagnosticCount(parsed, "unsupported-instruction")
+	disassembledCount := 0
+	for _, diagnostic := range disassembly.Diagnostics {
+		if diagnostic.Code == "unsupported-instruction" {
+			disassembledCount++
+		}
+	}
+	if disassembledCount != parsedCount || disassembledCount == 0 {
+		t.Fatalf("asm and lowir diagnostics differ: asm=%d lowir=%d", disassembledCount, parsedCount)
+	}
+}
+
 func TestAMD64DecodeErrors(t *testing.T) {
-	if _, err := (AMD64{}).Parse(context.Background(), core.ParseRequest{Target: amd64Target(), Address: 0x5000, Code: []byte{0x0f}}); err == nil {
+	if _, err := (Parser{}).Parse(context.Background(), amd64Request(t, 0x5000, []byte{0x0f})); err == nil {
 		t.Fatal("undecodable region accepted")
 	}
-	result, err := (AMD64{}).Parse(context.Background(), core.ParseRequest{Target: amd64Target(), Address: 0x5000, Code: []byte{0x90, 0x0f}})
+	result, err := (Parser{}).Parse(context.Background(), amd64Request(t, 0x5000, []byte{0x90, 0x0f}))
 	if err != nil {
 		t.Fatalf("partially decodable region rejected: %v", err)
 	}
 	if diagnosticCount(result, "decode-error") != 1 {
 		t.Fatalf("decode error was not reported: %+v", result.Diagnostics)
 	}
-	if len(result.IR.Blocks) == 0 || result.IR.Blocks[len(result.IR.Blocks)-1].Instructions[len(result.IR.Blocks[len(result.IR.Blocks)-1].Instructions)-1].Kind != core.OpTrap {
+	if blocks := allBlocks(result.IR); len(blocks) == 0 || blocks[len(blocks)-1].Instructions[len(blocks[len(blocks)-1].Instructions)-1].Kind != core.OpTrap {
 		t.Fatal("truncated region did not end in a trap")
 	}
 }
@@ -312,7 +430,8 @@ func TestAMD64BlockFallsOffRegion(t *testing.T) {
 	if diagnosticCount(result, "block-falls-off-region") != 1 {
 		t.Fatalf("missing fallthrough diagnostic: %+v", result.Diagnostics)
 	}
-	last := result.IR.Blocks[0].Instructions[len(result.IR.Blocks[0].Instructions)-1]
+	blocks := allBlocks(result.IR)
+	last := blocks[0].Instructions[len(blocks[0].Instructions)-1]
 	if last.Kind != core.OpTrap || len(last.Operands) == 0 || last.Operands[0].Name != "region-end" {
 		t.Fatalf("block does not end at a region-end trap: %+v", last)
 	}
@@ -346,7 +465,7 @@ func TestAMD64Deterministic(t *testing.T) {
 func TestAMD64ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := (AMD64{}).Parse(ctx, core.ParseRequest{Target: amd64Target(), Address: 0x9000, Code: []byte{0x90}})
+	_, err := (Parser{}).Parse(ctx, amd64Request(t, 0x9000, []byte{0x90}))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation ignored: %v", err)
 	}
@@ -371,8 +490,8 @@ func TestAMD64ParsesSystemBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := parseAMD64At(t, section.Addr, code)
-	if len(result.IR.Blocks) < 10 {
-		t.Fatalf("only %d blocks recovered", len(result.IR.Blocks))
+	if blocks := allBlocks(result.IR); len(blocks) < 10 {
+		t.Fatalf("only %d blocks recovered", len(blocks))
 	}
 	if len(allInstructions(result.IR)) < 100 {
 		t.Fatalf("only %d instructions recovered", len(allInstructions(result.IR)))
@@ -411,46 +530,56 @@ func TestAMD64VectorMovesAndBitwiseOps(t *testing.T) {
 
 func validateAMD64IR(t *testing.T, ir *core.LowIR) {
 	t.Helper()
-	blocks := map[core.BlockID]bool{}
-	for _, block := range ir.Blocks {
-		if block.ID == 0 || blocks[block.ID] {
-			t.Fatalf("duplicate or zero block id %d", block.ID)
-		}
-		blocks[block.ID] = true
-		if len(block.Instructions) == 0 {
-			t.Fatalf("empty block %d", block.ID)
-		}
-		if !amd64ControlTransfer(block.Instructions[len(block.Instructions)-1].Kind) {
-			t.Fatalf("block %d does not end in a control transfer", block.ID)
-		}
+	if len(ir.Functions) == 0 {
+		t.Fatal("LowIR has no functions")
 	}
-	values := map[core.ValueID]core.ValueType{}
-	for _, block := range ir.Blocks {
-		for _, instruction := range block.Instructions {
-			for _, operand := range instruction.Operands {
-				if operand.Kind != core.OperandValue {
-					continue
-				}
-				typ, ok := values[operand.Value]
-				if !ok {
-					t.Fatalf("operand %d is used before definition at %#x", operand.Value, instruction.Address)
-				}
-				if typ != operand.Type {
-					t.Fatalf("operand %d type = %+v, defined as %+v", operand.Value, operand.Type, typ)
-				}
+	functions := map[core.FunctionID]bool{}
+	for _, function := range ir.Functions {
+		if function.ID == 0 || functions[function.ID] {
+			t.Fatalf("duplicate or zero function id %d", function.ID)
+		}
+		functions[function.ID] = true
+		blocks := map[core.BlockID]bool{}
+		for _, block := range function.Blocks {
+			if block.ID == 0 || blocks[block.ID] {
+				t.Fatalf("duplicate or zero block id %d", block.ID)
 			}
-			for _, result := range instruction.Results {
-				if result.ID == 0 {
-					t.Fatalf("zero value id at %#x", instruction.Address)
-				}
-				if _, ok := values[result.ID]; ok {
-					t.Fatalf("value %d is defined twice", result.ID)
-				}
-				values[result.ID] = result.Type
+			blocks[block.ID] = true
+			if len(block.Instructions) == 0 {
+				t.Fatalf("empty block %d", block.ID)
 			}
-			for _, target := range instruction.Targets {
-				if !blocks[target] {
-					t.Fatalf("instruction at %#x targets missing block %d", instruction.Address, target)
+			if !amd64ControlTransfer(block.Instructions[len(block.Instructions)-1].Kind) {
+				t.Fatalf("block %d does not end in a control transfer", block.ID)
+			}
+		}
+		values := map[core.ValueID]core.ValueType{}
+		for _, block := range function.Blocks {
+			for _, instruction := range block.Instructions {
+				for _, operand := range instruction.Operands {
+					if operand.Kind != core.OperandValue {
+						continue
+					}
+					typ, ok := values[operand.Value]
+					if !ok {
+						t.Fatalf("operand %d is used before definition at %#x", operand.Value, instruction.Address)
+					}
+					if typ != operand.Type {
+						t.Fatalf("operand %d type = %+v, defined as %+v", operand.Value, operand.Type, typ)
+					}
+				}
+				for _, result := range instruction.Results {
+					if result.ID == 0 {
+						t.Fatalf("zero value id at %#x", instruction.Address)
+					}
+					if _, ok := values[result.ID]; ok {
+						t.Fatalf("value %d is defined twice", result.ID)
+					}
+					values[result.ID] = result.Type
+				}
+				for _, target := range instruction.Targets {
+					if !blocks[target] {
+						t.Fatalf("instruction at %#x targets missing block %d", instruction.Address, target)
+					}
 				}
 			}
 		}

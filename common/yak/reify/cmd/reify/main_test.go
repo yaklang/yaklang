@@ -30,7 +30,7 @@ func TestCLIHelpAndUsage(t *testing.T) {
 			t.Fatalf("help %v: %d %q %q", args, code, out, errOut)
 		}
 	}
-	for _, args := range [][]string{{"analyze"}, {"inspect"}, {"check"}, {"lift"}, {"loaders", "extra"}, {"parsers", "extra"}, {"inspect", "--unknown"}, {"inspect", "a", "b"}, {"lift", "a", "b"}} {
+	for _, args := range [][]string{{"analyze"}, {"inspect"}, {"check"}, {"lift"}, {"loaders", "extra"}, {"parsers", "extra"}, {"inspect", "--unknown"}, {"inspect", "a", "b"}, {"lift", "a", "b"}, {"lift", "--mode", "bogus", "a"}} {
 		code, _, errOut := runCLI(args...)
 		if code != 2 || errOut == "" {
 			t.Fatalf("usage %v: %d %q", args, code, errOut)
@@ -193,7 +193,7 @@ func TestCLILiftsAMD64Region(t *testing.T) {
 	if size > text.Size {
 		size = text.Size
 	}
-	code, out, errOut := runCLI("lift", "--json", "--address", strconv.FormatUint(text.Addr, 10), "--size", strconv.FormatUint(size, 10), path)
+	code, out, errOut := runCLI("lift", "--json", "--mode", "lowir", "--address", strconv.FormatUint(text.Addr, 10), "--size", strconv.FormatUint(size, 10), path)
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift: %d %s", code, errOut)
 	}
@@ -209,7 +209,7 @@ func TestCLILiftsAMD64Region(t *testing.T) {
 	if report.Scope != "amd64-lowir" || report.IR == nil || report.IR.Target.Architecture != core.ArchAMD64 {
 		t.Fatalf("bad lift report: %+v", report)
 	}
-	if report.Region.Address != text.Addr || report.Region.Size != size || len(report.IR.Blocks) == 0 {
+	if report.Region.Address != text.Addr || report.Region.Size != size || len(report.IR.Functions) == 0 || len(report.IR.Functions[0].Blocks) == 0 {
 		t.Fatalf("bad region or blocks: %+v", report)
 	}
 }
@@ -224,7 +224,7 @@ func TestCLILiftsBinTrue(t *testing.T) {
 	if file.Machine != elf.EM_X86_64 {
 		t.Skipf("%s is not x86-64", path)
 	}
-	code, out, errOut := runCLI("lift", "--json", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
+	code, out, errOut := runCLI("lift", "--json", "--mode", "lowir", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift /bin/true: %d %s", code, errOut)
 	}
@@ -234,11 +234,11 @@ func TestCLILiftsBinTrue(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatal(err)
 	}
-	if report.IR == nil || len(report.IR.Blocks) == 0 || report.IR.Target.Architecture != core.ArchAMD64 {
+	if report.IR == nil || len(report.IR.Functions) == 0 || len(report.IR.Functions[0].Blocks) == 0 || report.IR.Target.Architecture != core.ArchAMD64 {
 		t.Fatalf("bad /bin/true lift: %+v", report)
 	}
 
-	code, out, errOut = runCLI("lift", path, "--json", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16")
+	code, out, errOut = runCLI("lift", path, "--json", "--mode", "lowir", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16")
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift with flags after file: %d %s", code, errOut)
 	}
@@ -246,7 +246,7 @@ func TestCLILiftsBinTrue(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatal(err)
 	}
-	if report.IR == nil || len(report.IR.Blocks) == 0 {
+	if report.IR == nil || len(report.IR.Functions) == 0 || len(report.IR.Functions[0].Blocks) == 0 {
 		t.Fatalf("bad /bin/true lift after file: %+v", report)
 	}
 }
@@ -267,6 +267,110 @@ func TestCLILiftNeedsAddressAndSizeTogether(t *testing.T) {
 	}
 }
 
+func TestCLILiftsAssembly(t *testing.T) {
+	path := "/bin/true"
+	file, err := elf.Open(path)
+	if err != nil {
+		t.Skipf("%s unavailable: %v", path, err)
+	}
+	defer file.Close()
+	if file.Machine != elf.EM_X86_64 {
+		t.Skipf("%s is not x86-64", path)
+	}
+	code, out, errOut := runCLI("lift", "--mode", "asm", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
+	if code != 0 || errOut != "" {
+		t.Fatalf("lift asm: %d %s", code, errOut)
+	}
+	for _, fragment := range []string{"Scope: amd64 assembly", "Region: address=", "Instructions:", "0x"} {
+		if !strings.Contains(out, fragment) {
+			t.Fatalf("asm output lacks %q: %s", fragment, out)
+		}
+	}
+
+	code, out, errOut = runCLI("lift", "--json", "--mode", "asm", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
+	if code != 0 || errOut != "" {
+		t.Fatalf("lift asm json: %d %s", code, errOut)
+	}
+	var report struct {
+		Scope        string `json:"scope"`
+		Mode         string `json:"mode"`
+		Assembly     string `json:"assembly"`
+		Instructions int    `json:"instructions"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Scope != "amd64-assembly" || report.Mode != "asm" || report.Assembly == "" || report.Instructions == 0 {
+		t.Fatalf("bad asm report: %+v", report)
+	}
+}
+
+func TestCLILiftsSSAIRAndSource(t *testing.T) {
+	path, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		mode     string
+		scope    string
+		fragment string
+	}{
+		{"ssair", "Scope: amd64 SSair", "ret"},
+		{"source", "Scope: amd64 source", "function "},
+	} {
+		code, out, errOut := runCLI("lift", "--mode", tc.mode, path)
+		if code != 0 || errOut != "" {
+			t.Fatalf("mode %s: %d %q", tc.mode, code, errOut)
+		}
+		if !strings.Contains(out, tc.scope) || !strings.Contains(out, tc.fragment) {
+			t.Fatalf("mode %s output lacks %q/%q: %s", tc.mode, tc.scope, tc.fragment, out)
+		}
+	}
+}
+
+func TestCLILiftsSSAIRAndSourceJSON(t *testing.T) {
+	path := "/bin/true"
+	file, err := elf.Open(path)
+	if err != nil {
+		t.Skipf("%s unavailable: %v", path, err)
+	}
+	defer file.Close()
+	if file.Machine != elf.EM_X86_64 {
+		t.Skipf("%s is not x86-64", path)
+	}
+	for _, tc := range []struct {
+		mode     string
+		field    string
+		scope    string
+		fragment string
+	}{
+		{"ssair", "ssair", "amd64-ssair", "ret"},
+		{"source", "source", "amd64-source", "function "},
+	} {
+		code, out, errOut := runCLI("lift", "--json", "--mode", tc.mode, "--address", strconv.FormatUint(file.Entry, 10), "--size", "48", path)
+		if code != 0 || errOut != "" {
+			t.Fatalf("mode %s: %d %s", tc.mode, code, errOut)
+		}
+		var report struct {
+			Scope       string            `json:"scope"`
+			SSAIR       string            `json:"ssair"`
+			Source      string            `json:"source"`
+			IR          *core.LowIR       `json:"ir"`
+			Diagnostics []core.Diagnostic `json:"diagnostics"`
+		}
+		if err := json.Unmarshal([]byte(out), &report); err != nil {
+			t.Fatal(err)
+		}
+		body := report.SSAIR
+		if tc.field == "source" {
+			body = report.Source
+		}
+		if report.Scope != tc.scope || report.IR == nil || !strings.Contains(body, tc.fragment) {
+			t.Fatalf("bad %s report: %+v", tc.mode, report)
+		}
+	}
+}
+
 func TestCLILiftsDefaultTextSection(t *testing.T) {
 	path := "/bin/true"
 	file, err := elf.Open(path)
@@ -281,12 +385,21 @@ func TestCLILiftsDefaultTextSection(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift default section: %d %s", code, errOut)
 	}
-	for _, fragment := range []string{"Scope: amd64 LowIR", "Region: address=", "Blocks:", "Instructions:", "Diagnostics:"} {
+	for _, fragment := range []string{"Scope: amd64 assembly", "Region: address=", "Instructions:", "Diagnostics:"} {
 		if !strings.Contains(out, fragment) {
 			t.Fatalf("lift output lacks %q: %s", fragment, out)
 		}
 	}
-	if code, out, errOut := runCLI("lift", "--section", ".text", path); code != 0 || errOut != "" || !strings.Contains(out, "Blocks:") {
-		t.Fatalf("lift .text: %d %s %s", code, errOut, out)
+	code, out, errOut = runCLI("lift", "--mode", "lowir", path)
+	if code != 0 || errOut != "" {
+		t.Fatalf("lift lowir default section: %d %s", code, errOut)
+	}
+	for _, fragment := range []string{"Scope: amd64 LowIR", "Functions:", "Blocks:", "target:"} {
+		if !strings.Contains(out, fragment) {
+			t.Fatalf("lowir output lacks %q", fragment)
+		}
+	}
+	if code, out, errOut := runCLI("lift", "--mode", "lowir", "--section", ".text", path); code != 0 || errOut != "" || !strings.Contains(out, "Blocks:") {
+		t.Fatalf("lift lowir .text: %d %s %s", code, errOut, out)
 	}
 }

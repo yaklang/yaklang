@@ -51,10 +51,10 @@ func TestCheckTargetMatrix(t *testing.T) {
 		valid  bool
 	}{
 		{"amd64", target(core.ArchAMD64, 64, core.LittleEndian, ""), true},
-		{"amd64 big endian", target(core.ArchAMD64, 64, core.BigEndian, ""), false},
+		{"amd64 ignores byte order", target(core.ArchAMD64, 64, core.BigEndian, ""), true},
 		{"amd64 32-bit", target(core.ArchAMD64, 32, core.LittleEndian, ""), false},
 		{"386", target(core.Arch386, 32, core.LittleEndian, ""), true},
-		{"386 big endian", target(core.Arch386, 32, core.BigEndian, ""), false},
+		{"386 ignores byte order", target(core.Arch386, 32, core.BigEndian, ""), true},
 		{"arm", target(core.ArchARM, 32, core.LittleEndian, ""), true},
 		{"arm thumb", target(core.ArchARM, 32, core.BigEndian, "thumb"), true},
 		{"arm mode", target(core.ArchARM, 32, core.LittleEndian, "aarch64"), false},
@@ -83,7 +83,7 @@ func TestCheckTargetMatrix(t *testing.T) {
 }
 
 func TestParseReportsUnavailable(t *testing.T) {
-	request := core.ParseRequest{Target: target(core.ArchAMD64, 64, core.LittleEndian, ""), Address: 0x1000, Code: []byte{0x90}}
+	request := core.ParseRequest{Target: target(core.ArchAMD64, 64, core.LittleEndian, ""), Address: 0x1000}
 	for _, parser := range All() {
 		if parser.Kind() == core.ArchAMD64 {
 			continue

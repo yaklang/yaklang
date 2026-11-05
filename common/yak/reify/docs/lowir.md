@@ -1,6 +1,6 @@
 # LowIR
 
-LowIR 是 Reify 的机器级程序表示。它是具体结构，不是接口：所有 parser 产出相同的 Block、Instruction、Operand 和 Effect 形状。
+LowIR 是 Reify 的机器级程序表示。它是具体结构，不是接口：所有 parser 产出相同的 Function、Block、Instruction、Operand 和 Effect 形状。
 
 声明位于 [core/lowir.go](../core/lowir.go)。架构 parser 负责把机器码转换为这些结构；core 不包含 ISA 解码表、寄存器别名表或提升规则。
 
@@ -8,8 +8,14 @@ LowIR 是 Reify 的机器级程序表示。它是具体结构，不是接口：�
 
 ```go
 type LowIR struct {
-    Target Target
-    Blocks []Block
+    Target    Target
+    Functions []Function
+}
+
+type Function struct {
+    ID      FunctionID
+    Address uint64
+    Blocks  []Block
 }
 
 type Block struct {
@@ -28,18 +34,18 @@ type Instruction struct {
 }
 ```
 
-LowIR 单元对应 parser 处理的连续代码范围，不要求等于整个文件或已恢复的函数。
+一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64 parser 对一个 `ParseRequest` 区域产出一个 Function；后续可以通过符号、调用目标或异常表扩展函数发现，不要求一个区域等于整个文件。
 
 `Instruction.Kind` 是统一的指令种类。它不使用接口方法，也不包装原始 ISA 指令；操作数、结果、控制目标和效果都在同一结构上表达。
 
 ## 标识与顺序
 
-- `BlockID` 和 `ValueID` 的作用域是一个 LowIR 单元。
+- `FunctionID` 的作用域是一个 LowIR；`BlockID` 和 `ValueID` 的作用域是一个 Function。
 - 零表示缺失标识。
 - 值采用单次定义，使用位置通过 `ValueID` 引用定义。
 - 基本块内的指令顺序有意义，必须保持。
 - 基本块以控制转移指令结束。
-- `Instruction.Targets` 在控制转移中表示后继块，在 Phi 中表示前驱块。
+- `Instruction.Targets` 在控制转移中表示同一 Function 内的后继块，在 Phi 中表示前驱块。
 - Phi 的 `Targets` 与 `Operands` 一一对应。
 
 寄存器和内存不是隐式可变的临时值。它们通过读写操作和效果位表达。
@@ -147,19 +153,44 @@ LowIR 不声称仅凭效果位完成别名分析、MemorySSA 或并发语义验�
 
 `Instruction.Address` 记录对应的机器指令地址。一个机器指令可以产生多个 LowIR 指令；同一条机器指令产生的合成操作沿用该指令地址。块尾补的 `jump` 或 `trap` 使用块边界地址。
 
-解析器只输出 LowIR，不返回汇编文本。汇编文本不是公共契约，也不是 LowIR 的语义来源。
+`Parse` 只输出 LowIR。汇编文本由可选的 `Disassembler` 单独渲染，不是 LowIR 的语义来源。LowIR 文本由 `core.FormatLowIR` 渲染，JSON 是机器可读形式。
+
+## 文本形式
+
+`core.FormatLowIR` 输出稳定的逐行表示，用于人工检查：
+
+```text
+target: unknown/amd64 (64-bit, little-endian)
+function f1 @ 0x2590
+block b1 @ 0x2590
+  0x2590  intrinsic @x86.endbr64
+  0x2594  v1:i32 = read-register %ebp [read-register]
+  0x2594  v2:i32 = read-register %ebp [read-register]
+  0x2594  v3:i32 = xor v1, v2
+  0x2594  write-register %ebp, v3 [write-register]
+  ...
+```
+
+文本保留函数、块、值 ID、类型、操作、操作数、目标和效果。它不是新的存储格式，也不改变 JSON 契约。
 
 ## 与 YakSSA 的关系
 
 LowIR 聚焦机器精度与执行效果；YakSSA 面向更高层程序关系与现有分析生态。
 
-LowIR → YakSSA 的转换尚未实现。实现时必须保留：
+[core/lowir2ssa](../core/lowir2ssa) 已提供转换：
+
+- 值、算术、比较和宽度转换进入 YakSSA 值。
+- 通用寄存器提升为带位宽类型的变量；不插入 Phi。
+- 内存、调用、intrinsic 和未支持操作保留为 `reify.*` 调用。
+- 控制流转换成 `jump`、`if` 和 `return`。
+
+转换不做内存 SSA、语言级类型恢复和调用图恢复，并提供可选的 stack canary 删除。映射与诊断见 [SSA 文档](ssa.md)。
+
+实现新的提升规则时必须保留：
 
 - 整数与指针位宽。
 - 内存、寄存器和异常效果。
 - 控制流目标。
 - 指令来源地址。
-
-不能只按操作名称逐项替换，也不能把机器语义降级为源码级假设。
 
 [返回 README](../README.md)

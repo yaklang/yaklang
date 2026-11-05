@@ -1,8 +1,10 @@
-package arch
+package amd64
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 
 	"golang.org/x/arch/x86/x86asm"
 
@@ -19,18 +21,19 @@ type amd64Instruction struct {
 	size    int
 	inst    x86asm.Inst
 	endbr   string
+	raw     []byte
 }
 
-func parseAMD64(ctx context.Context, request core.ParseRequest) (*core.ParseResult, error) {
-	parser := AMD64{}
+func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, error) {
+	parser := Parser{}
 	if err := parser.Check(request.Target); err != nil {
 		return nil, err
 	}
-	if len(request.Code) == 0 {
+	if request.Reader == nil || request.Reader.Size() == 0 {
 		return nil, fmt.Errorf("amd64: empty code region")
 	}
 	diagnostics := &amd64Diagnostics{}
-	decoded, err := decodeAMD64(ctx, request, diagnostics)
+	decoded, err := decodeAMD64(ctx, request, diagnostics, false)
 	if err != nil {
 		return nil, err
 	}
@@ -48,25 +51,41 @@ func parseAMD64(ctx context.Context, request core.ParseRequest) (*core.ParseResu
 	}, nil
 }
 
-func decodeAMD64(ctx context.Context, request core.ParseRequest, diagnostics *amd64Diagnostics) ([]amd64Instruction, error) {
-	decoded := make([]amd64Instruction, 0, len(request.Code)/3)
+func decodeAMD64(ctx context.Context, request core.ParseRequest, diagnostics *amd64Diagnostics, keepRaw bool) ([]amd64Instruction, error) {
+	if request.Reader == nil {
+		return nil, fmt.Errorf("amd64: parse request has no reader")
+	}
+	result := make([]amd64Instruction, 0)
+	var code [15]byte
+	total := request.Reader.Size()
 	address := request.Address
-	for offset := 0; offset < len(request.Code); {
+	for offset := int64(0); offset < total; {
 		if offset&0xfff == 0 {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
 		}
-		instruction, size, err := decodeAMD64One(request.Code[offset:], address)
+		n, err := request.Reader.ReadAt(code[:], offset)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		if n == 0 {
+			diagnostics.add("decode-error", fmt.Sprintf("reader returned no bytes at 0x%x", address))
+			break
+		}
+		instruction, size, err := decodeAMD64One(code[:n], address)
 		if err != nil {
 			diagnostics.add("decode-error", fmt.Sprintf("cannot decode instruction at 0x%x: %v", address, err))
 			break
 		}
-		decoded = append(decoded, instruction)
-		offset += size
+		if keepRaw {
+			instruction.raw = append([]byte(nil), code[:size]...)
+		}
+		result = append(result, instruction)
+		offset += int64(size)
 		address += uint64(size)
 	}
-	return decoded, nil
+	return result, nil
 }
 
 func decodeAMD64One(code []byte, address uint64) (amd64Instruction, int, error) {

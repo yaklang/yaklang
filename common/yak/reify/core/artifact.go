@@ -34,8 +34,9 @@ type Artifact struct {
 }
 
 var (
-	ErrNoParser = errors.New("no parser for target architecture")
-	ErrRegion   = errors.New("region is outside the artifact")
+	ErrNoParser       = errors.New("no parser for target architecture")
+	ErrNoDisassembler = errors.New("parser cannot render assembly")
+	ErrRegion         = errors.New("region is outside the artifact")
 )
 
 // Close releases the input source when it is owned by the artifact, as in
@@ -95,8 +96,8 @@ func (a *Artifact) EntryRegion(size uint64) (Region, error) {
 }
 
 // Parse decodes one region with the artifact's architecture parser. The parser
-// owns produced bytes; this method passes a copy of the region. It rejects a
-// parser result that has no LowIR or reports a different target.
+// receives a borrowed, region-bounded ByteReader. It rejects a parser result
+// that has no LowIR, no functions, or a different target.
 func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -107,16 +108,7 @@ func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, erro
 	if a.Parser == nil {
 		return nil, fmt.Errorf("%w: %s", ErrNoParser, a.Target.Architecture)
 	}
-	if region.Size == 0 {
-		return nil, fmt.Errorf("%w: empty range", ErrRegion)
-	}
-	if err := a.Reader.CheckRange(region.Offset, region.Size); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRegion, err)
-	}
-	if region.Size > math.MaxUint64-region.Address {
-		return nil, fmt.Errorf("%w: address range overflows", ErrRegion)
-	}
-	code, err := a.Reader.Bytes(region.Offset, region.Size)
+	reader, err := a.regionReader(region)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +118,7 @@ func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, erro
 	result, err := a.Parser.Parse(ctx, ParseRequest{
 		Target:  a.Target,
 		Address: region.Address,
-		Code:    code,
+		Reader:  reader,
 	})
 	if err != nil {
 		return nil, err
@@ -137,5 +129,62 @@ func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, erro
 	if result.IR.Target != a.Target {
 		return nil, fmt.Errorf("parser %s returned an inconsistent target", a.Parser.Name())
 	}
+	if len(result.IR.Functions) == 0 {
+		return nil, fmt.Errorf("parser %s returned no functions", a.Parser.Name())
+	}
 	return result, nil
+}
+
+// Disassemble renders one region as text through an optional parser capability.
+// It does not build LowIR.
+func (a *Artifact) Disassemble(ctx context.Context, region Region) (*Disassembly, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if a == nil || a.Reader == nil {
+		return nil, fmt.Errorf("artifact has no reader")
+	}
+	if a.Parser == nil {
+		return nil, fmt.Errorf("%w: %s", ErrNoParser, a.Target.Architecture)
+	}
+	disassembler, ok := a.Parser.(Disassembler)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrNoDisassembler, a.Parser.Name())
+	}
+	reader, err := a.regionReader(region)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.Parser.Check(a.Target); err != nil {
+		return nil, fmt.Errorf("parser %s: %w", a.Parser.Name(), err)
+	}
+	result, err := disassembler.Disassemble(ctx, ParseRequest{
+		Target:  a.Target,
+		Address: region.Address,
+		Reader:  reader,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, fmt.Errorf("parser %s returned no disassembly", a.Parser.Name())
+	}
+	return result, nil
+}
+
+func (a *Artifact) regionReader(region Region) (*ByteReader, error) {
+	if region.Size == 0 {
+		return nil, fmt.Errorf("%w: empty range", ErrRegion)
+	}
+	if err := a.Reader.CheckRange(region.Offset, region.Size); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrRegion, err)
+	}
+	if region.Size > math.MaxUint64-region.Address {
+		return nil, fmt.Errorf("%w: address range overflows", ErrRegion)
+	}
+	reader, err := a.Reader.Slice(region.Offset, region.Size)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrRegion, err)
+	}
+	return reader, nil
 }

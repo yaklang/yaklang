@@ -1,4 +1,4 @@
-package arch
+package amd64
 
 import (
 	"fmt"
