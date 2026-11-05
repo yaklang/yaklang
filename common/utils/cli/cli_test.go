@@ -353,3 +353,14 @@ func TestCliBoolFlagOverridesDefault(t *testing.T) {
 		check()
 	})
 }
+
+// A required boolean flag has no implicit default: the caller must say so.
+// The SyntaxFlow searcher declares "fuzz" required with default true, and a
+// caller that omits it asks for an exact search, not a fuzzy one.
+func TestCliBoolRequiredFlagIgnoresDefault(t *testing.T) {
+	testCliParam(t, []string{"--required-present"}, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.False(app.Bool("required-default-true", app.SetRequired(true), app.SetDefault(true)))
+		test.True(app.Bool("required-present", app.SetRequired(true), app.SetDefault(true)))
+		check()
+	})
+}
