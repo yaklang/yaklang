@@ -51,6 +51,20 @@ func TestCopyErrorsFromSeparateOwnerTransfersOnce(t *testing.T) {
 	require.Len(t, app.GetErrors(), 2)
 }
 
+func TestGetErrorsReturnsLiveViewWithoutClone(t *testing.T) {
+	app := newErrorTestProgram(t)
+	app.AddError(&SSAError{Message: "first"})
+
+	first := app.GetErrors()
+	second := app.GetErrors()
+	require.Len(t, first, 1)
+	require.True(t, &first[0] == &second[0], "GetErrors must not clone the backing array")
+
+	snapshot := app.GetErrorsSnapshot()
+	require.Len(t, snapshot, 1)
+	require.False(t, &first[0] == &snapshot[0], "snapshot must own a separate backing array")
+}
+
 func TestCopyErrorsFromNilIsSafe(t *testing.T) {
 	app := newErrorTestProgram(t)
 	require.NotPanics(t, func() {

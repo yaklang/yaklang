@@ -142,18 +142,35 @@ func (prog *Program) CopyErrorsFrom(src *Program) {
 	if srcOwner == dstOwner {
 		return
 	}
+	// Read the source header under its lock, then append the same pointers to
+	// the destination. The error values are immutable after AddError, so the
+	// header stays valid even if the source appends (and possibly reallocates)
+	// after the lock is released. Do not clone: a per-file copy of a growing
+	// list is quadratic in the project's error count.
 	srcOwner.errorsMu.Lock()
-	errs := slices.Clone(srcOwner.errors)
+	srcErrs := srcOwner.errors
 	srcOwner.errorsMu.Unlock()
-	if len(errs) == 0 {
+	if len(srcErrs) == 0 {
 		return
 	}
 	dstOwner.errorsMu.Lock()
-	dstOwner.errors = append(dstOwner.errors, errs...)
+	dstOwner.errors = append(dstOwner.errors, srcErrs...)
 	dstOwner.errorsMu.Unlock()
 }
 
+// GetErrors returns the program's live error slice as a read-only view.
+// Callers must not modify the returned slice. The slice header is copied, so a
+// later AddError cannot change the caller's length; the error values are
+// immutable. Use GetErrorsSnapshot when an isolated copy is required.
 func (prog *Program) GetErrors() SSAErrors {
+	app := prog.errorOwner()
+	app.errorsMu.Lock()
+	defer app.errorsMu.Unlock()
+	return app.errors
+}
+
+// GetErrorsSnapshot returns an isolated copy of the error slice.
+func (prog *Program) GetErrorsSnapshot() SSAErrors {
 	app := prog.errorOwner()
 	app.errorsMu.Lock()
 	defer app.errorsMu.Unlock()
