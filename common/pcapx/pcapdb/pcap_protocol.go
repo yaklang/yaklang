@@ -6,13 +6,128 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
+
+// protocolBatch is shared by offline replay and live capture. All mutation is
+// serialized by mu, including callbacks from the reassembler's idle expiry.
+type protocolBatch struct {
+	mu         sync.Mutex
+	ctx        context.Context
+	db         *gorm.DB
+	meta       *PCAPFileDBMetadata
+	config     *importConfig
+	sessions   *sessionIndexer
+	messages   []PCAPProtocolMessage
+	references []PCAPMessagePacket
+	bytes      int
+	hasher     hash.Hash
+	err        error
+}
+
+func newProtocolBatch(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) *protocolBatch {
+	return &protocolBatch{ctx: ctx, db: db, meta: meta, config: config, sessions: newSessionIndexer(meta), hasher: sha256.New()}
+}
+
+// appendEvent runs under mu. Session associations consult the current batch
+// before the committed database, so references work across commit boundaries.
+func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
+	if event.ID > math.MaxInt64 || event.FlowID > math.MaxInt64 || event.Offset > math.MaxInt64 || event.TransactionID > math.MaxInt64 || event.ResponseTo > math.MaxInt64 {
+		return fmt.Errorf("pcapdb: protocol identifier exceeds SQLite integer range")
+	}
+	fields := event.Fields
+	var decodeError string
+	if fields == nil {
+		decoded, err := event.GetFields()
+		if err != nil {
+			decodeError = err.Error()
+		} else {
+			fields = decoded
+		}
+	}
+	fieldsJSON, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	sessionJSON, err := json.Marshal(event.Session)
+	if err != nil {
+		return err
+	}
+	sourceJSON, err := json.Marshal(event.SourceBytes)
+	if err != nil {
+		return err
+	}
+	if len(event.Raw) > maxCaptureBlock || len(fieldsJSON)+len(sessionJSON)+len(sourceJSON) > 8<<20 {
+		return fmt.Errorf("pcapdb: protocol message or JSON metadata exceeds storage budget")
+	}
+	var sessionID, streamID uint
+	if b.config.streams {
+		sessionID, streamID, err = b.sessions.association(b.ctx, b.db, event)
+		if err != nil {
+			return err
+		}
+	}
+	id := b.meta.ProtocolCount + 1
+	b.messages = append(b.messages, PCAPProtocolMessage{
+		Model: gorm.Model{ID: uint(id)}, EventID: int64(event.ID), FlowID: int64(event.FlowID), TimestampNS: timestampNano(event.Timestamp),
+		Protocol: event.Protocol, Transport: event.Transport, Source: event.Source, Destination: event.Destination, Direction: int(event.Direction), LogicalOffset: int64(event.Offset), Length: event.Length,
+		Status: event.Status, Summary: event.Summary, Error: event.Error, DecodeError: decodeError, Section: int64(event.Domain.Section), Interface: event.Domain.Interface, Encapsulation: event.Domain.Encapsulation,
+		Profile: event.Profile, Rule: event.Rule, Entry: event.Entry, Completeness: event.Completeness, ExpertCode: event.ExpertCode, TransactionID: int64(event.TransactionID), ResponseTo: int64(event.ResponseTo),
+		Data: append([]byte{}, event.Raw...), DataLength: len(event.Raw), SessionID: sessionID, StreamID: streamID, FieldsJSON: fieldsJSON, SessionJSON: sessionJSON, SourceBytesJSON: sourceJSON,
+	})
+	seen := make(map[uint64]bool, len(event.SourceBytes.PacketRefs))
+	for _, packet := range event.SourceBytes.PacketRefs {
+		if packet.Number == 0 || packet.Number > uint64(b.meta.PacketCount) {
+			return fmt.Errorf("pcapdb: protocol refers to unknown packet %d", packet.Number)
+		}
+		if !seen[packet.Number] {
+			b.references = append(b.references, PCAPMessagePacket{MessageID: uint(id), PacketID: uint(packet.Number)})
+			seen[packet.Number] = true
+		}
+	}
+	b.hasher.Write(event.Raw)
+	b.meta.ProtocolCount++
+	b.meta.ProtocolDataSize += int64(len(event.Raw))
+	b.bytes += len(event.Raw) + len(fieldsJSON) + len(sessionJSON) + len(sourceJSON)
+	return nil
+}
+
+func (b *protocolBatch) flush(ctx context.Context, tx *gorm.DB) error {
+	if err := b.sessions.flush(ctx, tx); err != nil {
+		return err
+	}
+	if err := tx.CreateInBatches(&b.messages).Error; err != nil {
+		return err
+	}
+	if len(b.messages) > 0 {
+		if err := tx.Model(&PCAPProtocolMessage{}).Where("id >= ? AND id <= ?", b.messages[0].ID, b.messages[len(b.messages)-1].ID).UpdateColumns(map[string]interface{}{
+			"fields": gorm.Expr("jsonb(CAST(fields AS TEXT))"), "session": gorm.Expr("jsonb(CAST(session AS TEXT))"), "source_bytes": gorm.Expr("jsonb(CAST(source_bytes AS TEXT))"),
+		}).Error; err != nil {
+			return err
+		}
+	}
+	return tx.CreateInBatches(&b.references).Error
+}
+
+func (b *protocolBatch) clear() {
+	clear(b.messages)
+	b.messages = b.messages[:0]
+	clear(b.references)
+	b.references = b.references[:0]
+	b.bytes = 0
+	b.sessions.clearBatch()
+}
+
+func (b *protocolBatch) full() bool {
+	return len(b.messages) >= b.config.batchSize || len(b.references) >= b.config.batchSize || b.sessions.pending() >= b.config.batchSize || b.bytes+b.sessions.bytes >= maxImportBatchBytes
+}
 
 func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) (resultErr error) {
 	if err := m.transition(ctx, db, meta, StateAnalyzing); err != nil {
@@ -47,11 +162,8 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 	defer readerDB.Close()
 	capture := newCaptureStoreReader(ctx, readerDB, meta)
 	defer capture.Close()
-	sessions := newSessionIndexer(meta)
-	var batchBytes int
-	hasher := sha256.New()
-	messages := make([]PCAPProtocolMessage, 0, min(config.batchSize, 2000))
-	references := make([]PCAPMessagePacket, 0)
+	batch := newProtocolBatch(ctx, readerDB, meta, config)
+	sessions := batch.sessions
 	var lastCatalog time.Time
 	commit := func(final bool) error {
 		tx := db.BeginTx(ctx, nil)
@@ -60,24 +172,7 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 		}
 		defer tx.Rollback()
 		scoped := indexWithContext(ctx, tx)
-		if err := sessions.flush(ctx, scoped); err != nil {
-			return err
-		}
-		if err := scoped.CreateInBatches(&messages).Error; err != nil {
-			return err
-		}
-		if len(messages) > 0 {
-			// Convert the new batch once, inside the same transaction. GORM v1
-			// batch Create does not support per-row SQL expressions.
-			if err := scoped.Model(&PCAPProtocolMessage{}).Where("id >= ? AND id <= ?", messages[0].ID, messages[len(messages)-1].ID).UpdateColumns(map[string]interface{}{
-				"fields":       gorm.Expr("jsonb(CAST(fields AS TEXT))"),
-				"session":      gorm.Expr("jsonb(CAST(session AS TEXT))"),
-				"source_bytes": gorm.Expr("jsonb(CAST(source_bytes AS TEXT))"),
-			}).Error; err != nil {
-				return err
-			}
-		}
-		if err := scoped.CreateInBatches(&references).Error; err != nil {
+		if err := batch.flush(ctx, scoped); err != nil {
 			return err
 		}
 		meta.UpdatedAt = time.Now().UTC()
@@ -94,12 +189,7 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 			config.notify(meta)
 			lastCatalog = time.Now()
 		}
-		// Release variable-sized JSON slices between batches.
-		clear(messages)
-		messages = messages[:0]
-		references = references[:0]
-		batchBytes = 0
-		sessions.clearBatch()
+		batch.clear()
 		return ctx.Err()
 	}
 	replayCtx, cancel := context.WithCancel(ctx)
@@ -110,91 +200,10 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 			return
 		}
 		persist := func() error {
-			if event.ID > math.MaxInt64 || event.FlowID > math.MaxInt64 || event.Offset > math.MaxInt64 || event.TransactionID > math.MaxInt64 || event.ResponseTo > math.MaxInt64 {
-				return fmt.Errorf("pcapdb: protocol identifier exceeds SQLite integer range")
-			}
-			fields := event.Fields
-			var decodeError string
-			if fields == nil {
-				decoded, err := event.GetFields()
-				if err != nil {
-					decodeError = err.Error()
-				} else {
-					fields = decoded
-				}
-			}
-			fieldsJSON, err := json.Marshal(fields)
-			if err != nil {
+			if err := batch.appendEvent(event); err != nil {
 				return err
 			}
-			sessionJSON, err := json.Marshal(event.Session)
-			if err != nil {
-				return err
-			}
-			sourceJSON, err := json.Marshal(event.SourceBytes)
-			if err != nil {
-				return err
-			}
-			if len(event.Raw) > maxCaptureBlock || len(fieldsJSON)+len(sessionJSON)+len(sourceJSON) > 8<<20 {
-				return fmt.Errorf("pcapdb: protocol message or JSON metadata exceeds storage budget")
-			}
-			var sessionID, streamID uint
-			if config.streams {
-				sessionID, streamID, err = sessions.association(ctx, readerDB, event)
-				if err != nil {
-					return err
-				}
-			}
-			hasher.Write(event.Raw)
-			id := meta.ProtocolCount + 1
-			messages = append(messages, PCAPProtocolMessage{
-				Model:           gorm.Model{ID: uint(id)},
-				EventID:         int64(event.ID),
-				FlowID:          int64(event.FlowID),
-				TimestampNS:     timestampNano(event.Timestamp),
-				Protocol:        event.Protocol,
-				Transport:       event.Transport,
-				Source:          event.Source,
-				Destination:     event.Destination,
-				Direction:       int(event.Direction),
-				LogicalOffset:   int64(event.Offset),
-				Length:          event.Length,
-				Status:          event.Status,
-				Summary:         event.Summary,
-				Error:           event.Error,
-				DecodeError:     decodeError,
-				Section:         int64(event.Domain.Section),
-				Interface:       event.Domain.Interface,
-				Encapsulation:   event.Domain.Encapsulation,
-				Profile:         event.Profile,
-				Rule:            event.Rule,
-				Entry:           event.Entry,
-				Completeness:    event.Completeness,
-				ExpertCode:      event.ExpertCode,
-				TransactionID:   int64(event.TransactionID),
-				ResponseTo:      int64(event.ResponseTo),
-				Data:            append([]byte{}, event.Raw...),
-				DataLength:      len(event.Raw),
-				SessionID:       sessionID,
-				StreamID:        streamID,
-				FieldsJSON:      fieldsJSON,
-				SessionJSON:     sessionJSON,
-				SourceBytesJSON: sourceJSON,
-			})
-			seen := make(map[uint64]bool, len(event.SourceBytes.PacketRefs))
-			for _, packet := range event.SourceBytes.PacketRefs {
-				if packet.Number == 0 || packet.Number > uint64(meta.PacketCount) {
-					return fmt.Errorf("pcapdb: protocol refers to unknown packet %d", packet.Number)
-				}
-				if !seen[packet.Number] {
-					references = append(references, PCAPMessagePacket{MessageID: uint(id), PacketID: uint(packet.Number)})
-					seen[packet.Number] = true
-				}
-			}
-			meta.ProtocolCount++
-			meta.ProtocolDataSize += int64(len(event.Raw))
-			batchBytes += len(event.Raw) + len(fieldsJSON) + len(sessionJSON) + len(sourceJSON)
-			if len(messages) >= config.batchSize || len(references) >= config.batchSize || batchBytes+sessions.bytes >= maxImportBatchBytes {
+			if batch.full() {
 				return commit(false)
 			}
 			return nil
@@ -211,7 +220,7 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 			return
 		}
 		consumerErr = work()
-		if consumerErr == nil && (sessions.pending() >= config.batchSize || batchBytes+sessions.bytes >= maxImportBatchBytes) {
+		if consumerErr == nil && batch.full() {
 			consumerErr = commit(false)
 		}
 		if consumerErr != nil {
@@ -258,7 +267,7 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 		meta.StreamDataSHA256 = sessions.digest()
 	}
 	if config.protocols {
-		meta.ProtocolDataSHA256 = hex.EncodeToString(hasher.Sum(nil))
+		meta.ProtocolDataSHA256 = hex.EncodeToString(batch.hasher.Sum(nil))
 	}
 	if err = commit(true); err != nil {
 		return err
