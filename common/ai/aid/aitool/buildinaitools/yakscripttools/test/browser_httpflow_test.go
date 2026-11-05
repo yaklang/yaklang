@@ -75,13 +75,13 @@ func TestDoHTTPRequestBrowserIdentityPersistsToSQLite(t *testing.T) {
 		}(badge)
 	}
 	wg.Wait()
-	for badge, color := range map[string]string{"A": schema.FLOW_COLOR_ORANGE, "B": schema.FLOW_COLOR_BLUE} {
+	for _, badge := range []string{"A", "B"} {
 		var flows []schema.HTTPFlow
 		require.NoError(t, db.Where("runtime_id = ?", "browser-fixture-"+badge).Find(&flows).Error)
 		require.Len(t, flows, 6, "two redirect hops per batch item plus the form retry")
 		for _, flow := range flows {
 			require.Contains(t, flow.Tags, fmt.Sprintf("[浏览器 %s]", badge))
-			require.Contains(t, flow.Tags, color)
+			require.NotContains(t, flow.Tags, schema.COLORPREFIX)
 			require.Equal(t, "scan", flow.SourceType)
 			if !strings.HasSuffix(flow.Url, "/done") {
 				require.Contains(t, flow.GetRequest(), "fixture="+badge)
