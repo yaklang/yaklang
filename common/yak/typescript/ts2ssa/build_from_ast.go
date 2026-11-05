@@ -33,8 +33,11 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 
 	prog := b.GetProgram()
 
-	fileName := b.GetEditor().GetFilename()
-	folderPath := b.GetEditor().GetGlobalFolderPath()
+	// Compile units can run concurrently. Keep the editor attached to this
+	// file's builder instead of reading the application's shared editor stack.
+	sourceEditor := b.GetEditor()
+	fileName := sourceEditor.GetFilename()
+	folderPath := sourceEditor.GetGlobalFolderPath()
 	fileUrl := path.Join([]string{folderPath, fileName}...)
 	if fileUrl == "" || fileUrl == "." {
 		fileUrl = "/"
@@ -46,17 +49,13 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			lib = prog.NewLibrary(fileUrl, []string{fileUrl})
 		}
 
-		lib.PushEditor(prog.GetCurrentEditor())
+		lib.PushEditor(sourceEditor)
 
 		subBuilder := lib.GetAndCreateFunctionBuilder(fileName, string(ssa.MainFunctionName))
 
 		if subBuilder != nil {
 			subBuilder.SetBuildSupport(b.FunctionBuilder)
-			currentEditor := prog.GetApplication().GetCurrentEditor()
-			if currentEditor == nil {
-				currentEditor = b.GetEditor()
-			}
-			subBuilder.SetEditor(currentEditor)
+			subBuilder.SetEditor(sourceEditor)
 			currentBuilder := b.FunctionBuilder
 			b.FunctionBuilder = subBuilder
 			defer func() {
@@ -122,7 +121,7 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 
 	if subBuilder != nil {
 		subBuilder.SetBuildSupport(b.FunctionBuilder)
-		subBuilder.SetEditor(prog.GetApplication().GetCurrentEditor())
+		subBuilder.SetEditor(sourceEditor)
 		currentBuilder := b.FunctionBuilder
 		b.FunctionBuilder = subBuilder
 		defer func() {
@@ -1237,9 +1236,16 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		}
 
 	case ast.IsBindingPattern(name): // 解构模式: let {a, b} = obj 或 let [x, y] = arr
-		// 检查是否有初始化值
-		if initValue == nil {
+		// Prehandling deliberately does not evaluate initializers. Check the
+		// declaration's syntax, not the deferred SSA value, for a missing RHS.
+		if decl.Initializer == nil {
 			b.NewError(ssa.Error, TAG, BindPatternDeclarationWithoutInitializer())
+			return nil
+		}
+		if b.PreHandler() {
+			if isExport {
+				b.predeclareBindingPatternExports(name)
+			}
 			return nil
 		}
 
@@ -4058,6 +4064,41 @@ func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
 	return nil
 }
 
+// predeclareBindingPatternExports registers only binding names. Reading members,
+// computed keys or defaults here would emit executable IR during prehandling.
+func (b *builder) predeclareBindingPatternExports(name *ast.Node) {
+	if name == nil {
+		return
+	}
+	if ast.IsIdentifier(name) {
+		identifier := name.AsIdentifier().Text
+		b.GetProgram().SetExportValue(identifier, b.EmitUndefined(identifier))
+		return
+	}
+	if !ast.IsBindingPattern(name) {
+		return
+	}
+	pattern := name.AsBindingPattern()
+	if pattern.Elements == nil {
+		return
+	}
+	for _, element := range pattern.Elements.Nodes {
+		if element != nil && !ast.IsOmittedExpression(element) {
+			b.predeclareBindingPatternExports(element.AsBindingElement().Name())
+		}
+	}
+}
+
+func (b *builder) resolveBindingPatternExport(name string, value ssa.Value) {
+	prog := b.GetProgram()
+	placeholder := prog.GetExportValue(name)
+	// Another file in this compile unit may already have read a member of
+	// the export placeholder. Resolve those member reads as well as its users.
+	ssa.ReplaceMemberCall(placeholder, value)
+	ssa.ReplaceAllValue(placeholder, value)
+	prog.SetExportValue(name, value)
+}
+
 // ProcessObjectBindingPattern 处理对象解构模式
 func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourceObj ssa.Value, isLocal bool, isExport bool) {
 	if pattern == nil || sourceObj == nil || b.IsStop() {
@@ -4093,6 +4134,9 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 				}
 				// 直接赋值整个对象
 				b.AssignVariable(restVar, sourceObj)
+				if isExport {
+					b.resolveBindingPatternExport(restName, sourceObj)
+				}
 			} else {
 				b.NewError(ssa.Error, TAG, RestElementRequiresIdentifier())
 			}
@@ -4142,8 +4186,7 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 					b.GetProgram().SetExportValue(varName, b.EmitUndefined(varName))
 				} else {
 					if !utils.IsNil(propValue) {
-						ssa.ReplaceAllValue(b.GetProgram().GetExportValue(varName), propValue)
-						b.GetProgram().SetExportValue(varName, propValue)
+						b.resolveBindingPatternExport(varName, propValue)
 					}
 				}
 			}
@@ -4215,6 +4258,9 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 					restVar = b.CreateJSVariable(restName)
 				}
 				b.AssignVariable(restVar, sourceArr)
+				if isExport {
+					b.resolveBindingPatternExport(restName, sourceArr)
+				}
 			}
 			continue
 		} else {
@@ -4241,8 +4287,7 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 					b.GetProgram().SetExportValue(varName, b.EmitUndefined(varName))
 				} else {
 					if !utils.IsNil(elementValue) {
-						ssa.ReplaceAllValue(b.GetProgram().GetExportValue(varName), elementValue)
-						b.GetProgram().SetExportValue(varName, elementValue)
+						b.resolveBindingPatternExport(varName, elementValue)
 					}
 				}
 			}
