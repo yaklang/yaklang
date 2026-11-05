@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+// mustpassCompileTimeout bounds one ssa2llvm compile. A cold link takes tens of
+// seconds; the point is to turn a hung compile into a subtest failure that
+// names the script, not to police slow links.
+const mustpassCompileTimeout = 5 * time.Minute
+
 // RepoRoot walks up from the current working directory until it finds go.mod.
 func RepoRoot(t *testing.T) string {
 	t.Helper()
@@ -271,8 +276,9 @@ func RunYakScriptFileWithCLI(t *testing.T, scriptPath string, env map[string]str
 // RunYakScriptFileWithCLITimeout is like RunYakScriptFileWithCLI but runs the
 // compiled binary with a deadline so a hung script fails the subtest instead
 // of blocking the whole mustpass suite. The deadline starts when the binary
-// starts. Compile stays on the test process timeout; a cold link can take
-// most of a minute and must not consume the run budget.
+// starts. The compile gets its own, much larger budget: a cold link can take
+// most of a minute, but a hung compile must still name the script instead of
+// waiting for the package timeout.
 func RunYakScriptFileWithCLITimeout(t *testing.T, timeout time.Duration, scriptPath string, env map[string]string) string {
 	t.Helper()
 
@@ -287,7 +293,7 @@ func RunYakScriptFileWithCLITimeout(t *testing.T, timeout time.Duration, scriptP
 	// the source script's name never becomes part of the executable path.
 	bin := filepath.Join(tmpDir, "script.bin")
 
-	res := runSSA2LLVMCLIInDirScratch(t, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
+	res := runSSA2LLVMCLIInDirScratchTimeout(t, mustpassCompileTimeout, "compile", scriptAbs, "-o", bin, "-f", "", "-a")
 	if res.ExitCode != 0 {
 		t.Fatalf("ssa2llvm compile failed (exit %d):\n%s", res.ExitCode, res.Output)
 	}

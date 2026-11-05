@@ -108,3 +108,43 @@ func TestNameCacheConcurrentIDsStayUniqueAcrossPrograms(t *testing.T) {
 	require.Equal(t, "a-03", cacheA.GetName(idsA[3]))
 	require.Equal(t, "b-03", cacheB.GetName(idsB[3]))
 }
+
+// TestNamePoolIDsStayUniqueAcrossDatabaseRebind covers the failure mode where
+// the global SSA handle is rebound while a cache still holds unflushed
+// reservations. Re-seeding the allocator from MAX(name_id) alone reissues those
+// ids, and the pending flush then hits
+// "UNIQUE constraint failed: ir_name_pool_v1.name_id".
+func TestNamePoolIDsStayUniqueAcrossDatabaseRebind(t *testing.T) {
+	db1, cleanup := setupNameCacheFileDB(t)
+	defer cleanup()
+
+	cache1 := NewNameCache("progA", true)
+	pending := make([]int64, 0, 8)
+	for i := 0; i < 8; i++ {
+		id := cache1.GetID(fmt.Sprintf("pending-%02d", i))
+		require.NotZero(t, id)
+		pending = append(pending, id)
+	}
+
+	db2, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "rebind.db"))
+	require.NoError(t, err)
+	require.NoError(t, db2.AutoMigrate(&IrNamePool{}).Error)
+	SetDB(db2)
+	cache2 := NewNameCache("progB", true)
+	require.NotZero(t, cache2.GetID("other"))
+	require.NoError(t, cache2.Flush())
+	require.NoError(t, db2.Close())
+
+	SetDB(db1)
+	late := cache1.GetID("late")
+	require.NotZero(t, late)
+	for _, id := range pending {
+		require.NotEqual(t, id, late, "a rebind must not reissue an unflushed id")
+	}
+	require.NoError(t, cache1.Flush())
+
+	var rows, distinct int64
+	require.NoError(t, db1.Raw("SELECT COUNT(*), COUNT(DISTINCT name_id) FROM \""+TableIrNamePool+"\"").Row().Scan(&rows, &distinct))
+	require.Equal(t, int64(9), rows)
+	require.Equal(t, rows, distinct, "name_id must stay unique after the rebind")
+}
