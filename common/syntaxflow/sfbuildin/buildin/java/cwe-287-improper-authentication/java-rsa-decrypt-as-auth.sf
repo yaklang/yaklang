@@ -15,16 +15,20 @@ SOLUTION
 	alert_min: 1
 	"file://J.java": <<<POS
 class J {
-  String decryptToken(String token) {
-    return new String(rsa.decrypt(Base64.decode(token), privateKey));
+  RSA rsa = new RSA();
+  void bad(byte[] data, Object key) {
+    Object o = rsa.decrypt(data, key);
   }
+}
+class RSA {
+  byte[] decrypt(byte[] data, Object key) { return null; }
 }
 
 POS
 	"safefile://S.java": <<<NEG
 class S {
-  String ok(String data) {
-    return new String(rsa.encrypt(data, publicKey));
+  void ok() {
+    System.out.println("no decrypt");
   }
 }
 

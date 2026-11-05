@@ -7028,8 +7028,8 @@
   {
     "rule_id": "ssa-java-mongodb-nosql",
     "rule_name": "数据流：Java MongoDB 查询拼接",
-    "hash": "d3b2248a206e25b48e0c33e9372cdfe2c9ff1f1dc4b2c31cb034a81a27bf0172",
-    "version": "20261105.0001"
+    "hash": "d0b0262bdb4dce41c219dbfc67ab289f93db1c5d63c56af5de017d54ec2e55ab",
+    "version": "20261105.0002"
   },
   {
     "rule_id": "ssa-java-pattern-from-request",
@@ -7340,8 +7340,8 @@
   {
     "rule_id": "java-rsa-decrypt-as-auth",
     "rule_name": "RSA 解密 Token 作为认证（加密即认证）",
-    "hash": "6d2f1448071f81370a3f0458969f20ccd6e3fc967a8516b4f61a9089fb60f54a",
-    "version": "20261105.0002"
+    "hash": "7b1eec2b713938af6c3923ff0989f97fceb562e9d3626c190de94eec59e4a9bb",
+    "version": "20261105.0003"
   },
   {
     "rule_id": "java-token-cache-no-verify",
