@@ -8,6 +8,10 @@ import (
 
 const SchemaVersion = 5
 
+// Live snapshots use the existing fingerprint fields for their committed
+// capture digest; FullSHA256 remains reserved for offline content deduplication.
+const liveFingerprintMode = "live-sha256"
+
 // String alias keeps state values directly comparable in Yak scripts.
 type State = string
 
@@ -52,6 +56,13 @@ type ValidationResult struct {
 
 func activeState(state State) bool {
 	return state == StateRegistered || state == StateImporting || state == StateIndexing || state == StateAnalyzing
+}
+
+func (m *PCAPFileDBMetadata) captureDigest() string {
+	if m.FingerprintMode == liveFingerprintMode {
+		return m.Fingerprint
+	}
+	return m.FullSHA256
 }
 
 func knownState(state State) bool {

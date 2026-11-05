@@ -39,7 +39,7 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 	if err != nil {
 		return nil, err
 	}
-	lock, err := acquireFileLock(ctx, datasetLockPath(catalog), true)
+	lock, err := acquireFileLock(ctx, datasetLockPath(catalog), catalog.FingerprintMode != liveFingerprintMode)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 	if meta.DatabasePath != catalog.DatabasePath {
 		return nil, fmt.Errorf("pcapdb: manifest/catalog paths disagree")
 	}
-	if meta.BytesIndexed != meta.SourceSize || len(meta.FullSHA256) != 64 || meta.CaptureRecordCount == 0 {
+	if meta.BytesIndexed != meta.SourceSize || len(meta.captureDigest()) != 64 || meta.CaptureRecordCount == 0 {
 		return nil, fmt.Errorf("pcapdb: capture import is incomplete; reimport the original file")
 	}
 	config.protocols = config.protocols || meta.ProtocolsIndexed
@@ -80,7 +80,7 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	if hashErr == nil && hex.EncodeToString(hash.Sum(nil)) != meta.FullSHA256 {
+	if hashErr == nil && hex.EncodeToString(hash.Sum(nil)) != meta.captureDigest() {
 		hashErr = fmt.Errorf("pcapdb: capture BLOB hash mismatch; source bytes cannot be repaired from derived data")
 	}
 	writer, err := openIndex(meta.DatabasePath, true, false)
