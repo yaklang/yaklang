@@ -14,6 +14,7 @@ const observedPacketFieldBytes = 256 << 10
 // 128-PDU budget or change an already published physical row.
 type protocolPublication struct {
 	RecordType        string           `json:"record_type"`
+	Physical          bool             `json:"physical"`
 	PublicationPhase  string           `json:"publication_phase"`
 	PublishedPDUScope string           `json:"published_pdu_scope"`
 	PublishedPDUs     []map[string]any `json:"published_pdus"`
@@ -52,8 +53,13 @@ func (p *capturedPacket) recordPDUAtObservation(e *pcaputil.ProtocolEvent, publi
 		limited()
 		return
 	}
-	values := e.DisplayFieldValues()
-	row := map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": values.Source, "fields": values.FieldMap(), "field_values": values}
+	var values pcaputil.DisplayFieldSnapshot
+	if p.filterObserver != nil {
+		values = p.filterObserver.Observe(e)
+	} else {
+		values = e.DisplayFieldValues()
+	}
+	row := map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "length": e.Length, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": values.Source, "fields": values.FieldMap(), "field_values": values}
 	if e.TCPFlowID != 0 {
 		row["tcp_flow_id"] = e.TCPFlowID
 	}

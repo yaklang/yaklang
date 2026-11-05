@@ -219,51 +219,14 @@ func (t searchTerm) stringMatch(value string) bool {
 // frames to strings or allocating lowercase copies on every refresh.
 type foldMatcher struct {
 	needle  []byte
-	failure []int
+	matcher *pcaputil.ContentMatcher
 }
 
-func foldByte(b byte) byte {
-	if b >= 'A' && b <= 'Z' {
-		return b + 'a' - 'A'
-	}
-	return b
-}
 func newFoldMatcher(needle []byte) *foldMatcher {
-	m := &foldMatcher{needle: append([]byte(nil), needle...), failure: make([]int, len(needle))}
-	for i, b := range m.needle {
-		m.needle[i] = foldByte(b)
-	}
-	for i, j := 1, 0; i < len(m.needle); i++ {
-		for j > 0 && m.needle[i] != m.needle[j] {
-			j = m.failure[j-1]
-		}
-		if m.needle[i] == m.needle[j] {
-			j++
-		}
-		m.failure[i] = j
-	}
-	return m
+	return &foldMatcher{needle: append([]byte(nil), needle...), matcher: pcaputil.NewContentMatcher(needle, true)}
 }
-func containsFold(data, needle []byte) bool { return newFoldMatcher(needle).contains(data) }
-func (m *foldMatcher) contains(data []byte) bool {
-	if len(m.needle) == 0 {
-		return true
-	}
-	matched := 0
-	for _, b := range data {
-		b = foldByte(b)
-		for matched > 0 && b != m.needle[matched] {
-			matched = m.failure[matched-1]
-		}
-		if b == m.needle[matched] {
-			matched++
-		}
-		if matched == len(m.needle) {
-			return true
-		}
-	}
-	return false
-}
+func containsFold(data, needle []byte) bool      { return newFoldMatcher(needle).contains(data) }
+func (m *foldMatcher) contains(data []byte) bool { return m.matcher.Contains(data) }
 
 type searchStream struct {
 	version            uint64
