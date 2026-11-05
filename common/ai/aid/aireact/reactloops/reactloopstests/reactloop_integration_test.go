@@ -334,12 +334,19 @@ func TestReActLoop_CustomAction(t *testing.T) {
 	t.Logf("Custom action executed successfully")
 }
 
-// TestReActLoop_ActionVerifierError 测试动作验证失败
-func TestReActLoop_ActionVerifierError(t *testing.T) {
+// TestReActLoop_ActionVerifierErrorRecoversWithinTransaction 测试验证失败会在 transaction 内纠正。
+func TestReActLoop_ActionVerifierErrorRecoversWithinTransaction(t *testing.T) {
+	callCount := 0
+	handlerCalled := false
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "error_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "error_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -357,7 +364,7 @@ func TestReActLoop_ActionVerifierError(t *testing.T) {
 				return fmt.Errorf("verification failed: invalid params")
 			},
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-				t.Error("Handler should not be called when verifier fails")
+				handlerCalled = true
 			},
 		),
 	)
@@ -365,11 +372,18 @@ func TestReActLoop_ActionVerifierError(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	err = loop.Execute("verifier-error-task", context.Background(), "test verifier error")
-
-	// ActionVerifier失败会导致AI transaction重试，最终可能因重试次数耗尽而失败
-	// 这是正常行为，不一定立即返回error
-	t.Logf("Verifier error test result: %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err = loop.Execute("verifier-error-task", ctx, "test verifier error")
+	if err != nil {
+		t.Fatalf("verifier error should be corrected within transaction: %v", err)
+	}
+	if callCount < 2 {
+		t.Fatalf("expected a corrected retry, got %d calls", callCount)
+	}
+	if handlerCalled {
+		t.Fatal("handler must not run for an action rejected by its verifier")
+	}
 }
 
 // TestReActLoop_OperatorFeedback 测试反馈机制
