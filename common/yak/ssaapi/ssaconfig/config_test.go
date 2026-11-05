@@ -26,6 +26,41 @@ func TestConfigInitializationByMode(t *testing.T) {
 	require.Equal(t, ModeSyntaxFlowScan, cfg.Mode)
 }
 
+// TestScanBudgetDefaultsWhenSubConfigMissing guards the library-scan default:
+// a scan config built without a single scan option leaves SyntaxFlowScan nil,
+// and its budget getters must fall back to the CLI defaults instead of 0
+// (disabled). This is the gap that let one topdef(include=*) rule run for
+// 71+ minutes in a large-project scan started through the library/gRPC path.
+func TestScanBudgetDefaultsWhenSubConfigMissing(t *testing.T) {
+	cfg, err := New(ModeSyntaxFlowScan)
+	require.NoError(t, err)
+	require.Nil(t, cfg.SyntaxFlowScan, "precondition: no scan option materialized the sub-config")
+	require.Equal(t, DefaultScanRuleWorkLimit, cfg.GetScanRuleWorkLimit())
+	require.Equal(t, DefaultScanRuleTimeout, cfg.GetScanRuleTimeout())
+
+	// Materializing the sub-config via an unrelated option keeps the defaults.
+	cfg2, err := New(ModeSyntaxFlowScan, WithScanConcurrency(3))
+	require.NoError(t, err)
+	require.NotNil(t, cfg2.SyntaxFlowScan)
+	require.Equal(t, DefaultScanRuleWorkLimit, cfg2.GetScanRuleWorkLimit())
+	require.Equal(t, DefaultScanRuleTimeout, cfg2.GetScanRuleTimeout())
+
+	// Explicit opt-out (0 = disabled) must survive the defaults.
+	cfg3, err := New(ModeSyntaxFlowScan,
+		WithScanRuleWorkLimit(0),
+		WithScanRuleTimeout(0),
+	)
+	require.NoError(t, err)
+	require.Zero(t, cfg3.GetScanRuleWorkLimit())
+	require.Zero(t, cfg3.GetScanRuleTimeout())
+
+	// Explicit non-default values are kept as-is (never auto-scaled as
+	// "default", see effectiveRuleWorkLimit).
+	cfg4, err := New(ModeSyntaxFlowScan, WithScanRuleWorkLimit(5000))
+	require.NoError(t, err)
+	require.Equal(t, int64(5000), cfg4.GetScanRuleWorkLimit())
+}
+
 func TestCompileConcurrencyFallsBackToDefault(t *testing.T) {
 	cfg, err := New(ModeSSACompile)
 	require.NoError(t, err)
@@ -359,6 +394,10 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Empty(t, config.Language)
 		require.Equal(t, uint32(DefaultCPUConcurrency()), config.Concurrency,
 			"scan concurrency must follow DefaultCPUConcurrency (max(1, GOMAXPROCS-1)), not a fixed constant")
+		require.Equal(t, DefaultScanRuleWorkLimit, config.RuleWorkLimit,
+			"per-rule work budget must default ON (matches `yak code-scan`); library/gRPC scans without it hang on pathological rules")
+		require.Equal(t, DefaultScanRuleTimeout, config.RuleTimeout,
+			"per-rule wall-clock backstop must default ON (matches `yak code-scan`)")
 	})
 
 	t.Run("defaultSyntaxFlowRuleConfig", func(t *testing.T) {

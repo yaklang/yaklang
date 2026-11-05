@@ -24,6 +24,13 @@ const (
 // guard on that project.
 const DefaultScanRuleWorkLimit int64 = 50_000
 
+// DefaultScanRuleTimeout is the default per-rule wall-clock budget, a loose
+// backstop (mirrors the `yak code-scan --rule-timeout` default) so a rule
+// stuck in a path the structural work budget cannot count still ends instead
+// of hanging the scan. A rule that legitimately needs more can raise it via
+// WithScanRuleTimeout.
+const DefaultScanRuleTimeout = 4 * time.Hour
+
 type SyntaxFlowConfig struct {
 	Memory         bool             `json:"memory"`
 	ResultSaveKind SFResultSaveKind `json:"result_save_kind"`
@@ -165,18 +172,32 @@ func (c *Config) GetScanConcurrency() uint32 {
 }
 
 // GetScanRuleTimeout returns the per-rule wall-clock budget. 0 means no budget.
+// A scan config that never materialized its SyntaxFlowScan sub-config (no
+// scan option touched it) falls back to DefaultScanRuleTimeout: library and
+// gRPC scan callers that pass no budget options must not silently run rules
+// unbounded — only the CLI used to set this, which is how a single
+// `topdef(include=*)` rule hung a large-project scan for hours.
 func (c *Config) GetScanRuleTimeout() time.Duration {
-	if c == nil || c.SyntaxFlowScan == nil {
+	if c == nil {
 		return 0
+	}
+	if c.SyntaxFlowScan == nil {
+		return DefaultScanRuleTimeout
 	}
 	return c.SyntaxFlowScan.RuleTimeout
 }
 
 // GetScanRuleWorkLimit returns the per-rule total-work budget (max fanout
-// elements per rule). 0 means no work budget (only RuleTimeout applies).
+// elements per rule). 0 means no work budget (only RuleTimeout applies). A
+// scan config that never materialized its SyntaxFlowScan sub-config falls
+// back to DefaultScanRuleWorkLimit — see GetScanRuleTimeout for why the
+// library default must match the CLI instead of disabling the budget.
 func (c *Config) GetScanRuleWorkLimit() int64 {
-	if c == nil || c.SyntaxFlowScan == nil {
+	if c == nil {
 		return 0
+	}
+	if c.SyntaxFlowScan == nil {
+		return DefaultScanRuleWorkLimit
 	}
 	return c.SyntaxFlowScan.RuleWorkLimit
 }

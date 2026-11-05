@@ -2,6 +2,7 @@ package syntaxflow_scan
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -137,4 +138,48 @@ func TestEffectiveRuleWorkLimitAutoScale(t *testing.T) {
 		"non-default explicit limits are never auto-scaled")
 	require.Equal(t, int64(0), effectiveRuleWorkLimit(0, 5_000_000),
 		"disabled work limit stays disabled")
+}
+
+// TestStartScan_DefaultWorkBudget_BailsHeavyTopDefRule guards the scan-entry
+// DEFAULT: a caller that passes no budget options at all (the library/gRPC
+// path, e.g. a platform-driven ScanProject) must still get the CLI-default
+// per-rule work budget. The workload (n sources x chainDepth-deep call chains
+// > DefaultScanRuleWorkLimit descent nodes) exceeds the default, so the rule
+// must bail at the budget with partial results instead of running unbounded —
+// the gap that let one topdef(include=*) rule hang a large-project scan for
+// 71+ minutes with zero budget log lines.
+func TestStartScan_DefaultWorkBudget_BailsHeavyTopDefRule(t *testing.T) {
+	const n, chainDepth = 1000, 60 // ~60k descent nodes > 50k default limit
+	progID := uuid.NewString()
+	cleanup := prepareHeavyPHPProgram(t, progID, n, chainDepth)
+	defer cleanup()
+
+	errs := &errorCapture{}
+	var scanErr error
+	done := make(chan struct{})
+	start := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		// No WithScanRuleWorkLimit / WithScanRuleTimeout: the defaults must apply.
+		scanErr = StartScan(ctx,
+			ssaconfig.WithProgramNames(progID),
+			ssaconfig.WithRuleInputRaw(heavyTopDefRule),
+			WithErrorCallback(errs.cb()),
+		)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Minute):
+		cancel()
+		t.Fatalf("StartScan (default budgets) hung > 3m; the default per-rule work budget is not bounding the heavy getTopDef descent")
+	}
+	require.NoError(t, scanErr)
+	require.True(t, errs.has("per-rule budget"),
+		"default-budget scan should bail the heavy rule (expected 'per-rule budget' error callback), got: %v", errs.msgs)
+	require.True(t, errs.has(fmt.Sprintf("work-limit=%d", ssaconfig.DefaultScanRuleWorkLimit)),
+		"default-budget bail should report the default work limit, got: %v", errs.msgs)
+	require.Less(t, time.Since(start), 2*time.Minute,
+		"default-budget bail should finish well under the hard backstop")
 }

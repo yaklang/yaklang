@@ -163,6 +163,13 @@ func defaultSyntaxFlowScanConfig() *SyntaxFlowScanConfig {
 	return &SyntaxFlowScanConfig{
 		IgnoreLanguage: false,
 		Concurrency:    uint32(DefaultCPUConcurrency()),
+		// Budgets default ON for library/gRPC/yak-script scan callers, matching
+		// the `yak code-scan` CLI defaults. Without them a pathological rule
+		// (e.g. topdef with include=* over tens of thousands of sources) has no
+		// bound at all and hangs large-project scans for hours. Explicit
+		// WithScanRuleWorkLimit(0)/WithScanRuleTimeout(0) still disables.
+		RuleWorkLimit: DefaultScanRuleWorkLimit,
+		RuleTimeout:   DefaultScanRuleTimeout,
 	}
 }
 

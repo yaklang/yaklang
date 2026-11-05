@@ -370,6 +370,25 @@ func DataFlowWithSFConfig(
 	analysisType AnalysisType,
 	opts ...*sf.RecursiveConfigItem,
 ) sfvm.Values {
+	// Per-source guard. One topdef/bottomuse opcode over N matched values calls
+	// this once per source; each call recompiles the include/exclude sub-rule
+	// checks (CreateCheck x3) and runs a fresh recursive descent whose
+	// per-source visited budget resets every time. The only cross-source bound
+	// is the shared per-rule budget/ctx. Once it fires, bail the remaining
+	// sources here instead of paying the per-source setup for tens of
+	// thousands of sources (the descent's check() would unwind each one
+	// anyway, but only after the filter compiles). Empty return keeps the
+	// partial results earlier sources already produced.
+	if config != nil {
+		select {
+		case <-config.GetContext().Done():
+			return sfvm.NewEmptyValues()
+		default:
+		}
+		if config.EnterWork() {
+			return sfvm.NewEmptyValues()
+		}
+	}
 	filterCondition := make([]*filterCondition, 0)
 	addHandler := func(key sf.RecursiveConfigKey, code string) {
 		filterCondition = append(filterCondition, withFilterCondition(key, code))
