@@ -491,15 +491,20 @@ func (c *CliApp) _cliFromString(name string, opts ...SetCliExtraParam) (string, 
 func (c *CliApp) Bool(name string, opts ...SetCliExtraParam) bool {
 	p := c._getExtraParams(name, opts...)
 	p._type = "bool"
+	// setRequired means the caller decides; a missing required flag must not
+	// silently take the declared default. The SyntaxFlow searcher relies on it:
+	// "fuzz" is required with default true, and a caller that omits it asks for
+	// an exact search, not a fuzzy one.
+	required := p.required
 	p.required = false
 
 	index := p.foundArgsIndex()
 	if index < 0 {
-		// A boolean flag with an explicit default keeps that default when the
-		// flag is absent. Plugins executed programmatically have no argv at all:
-		// "SSA 项目探测" declares jar-recursive-parse default true, and ignoring
-		// it silently disabled jar expansion for every CLI compile.
-		if p.defaultValue != nil {
+		// An optional boolean flag with an explicit default keeps that default
+		// when the flag is absent. Plugins executed programmatically have no argv
+		// at all: "SSA 项目探测" declares jar-recursive-parse default true, and
+		// ignoring it silently disabled jar expansion for every CLI compile.
+		if p.defaultValue != nil && !required {
 			return utils.InterfaceToBoolean(p.defaultValue)
 		}
 		return false
