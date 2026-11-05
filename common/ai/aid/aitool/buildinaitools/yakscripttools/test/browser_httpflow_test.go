@@ -54,39 +54,50 @@ func TestDoHTTPRequestBrowserIdentityPersistsToSQLite(t *testing.T) {
 	require.True(t, hasBrowserRef)
 	valid, validationErrors := tool.ValidateParams(aitool.InvokeParams{"url": server.URL, "device_id": "device-a"})
 	require.True(t, valid, "bound infrastructure identity must pass tool validation: %v", validationErrors)
-	var wg sync.WaitGroup
-	for _, badge := range []string{"A", "B"} {
-		wg.Add(1)
-		go func(badge string) {
-			defer wg.Done()
-			ctx := httpctx.WithBrowserInstance(context.Background(), httpctx.BrowserInstance{
-				Manager: "ytray", InstanceID: "instance-" + badge, Badge: badge,
-			})
-			for _, params := range []aitool.InvokeParams{
-				{"url": server.URL + "/redirect/{{int(1-2)}}", "fuzztag": true, "concurrent": 2},
-				{"url": server.URL + "/retry", "method": "POST", "content-type": "application/json", "body": `{"username":"fixture"}`},
-			} {
-				params["headers"] = map[string]any{"Cookie": "fixture=" + badge}
-				result, err := tool.InvokeWithParams(params, aitool.WithContext(ctx),
-					aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{RuntimeID: "browser-fixture-" + badge}))
-				require.NoError(t, err)
-				cleanupHTTPArtifacts(t, utils.InterfaceToGeneralMap(result.Data.(*aitool.ToolExecutionResult).Result))
+	for _, scenario := range []struct {
+		name     string
+		colorize bool
+	}{{"ordinary-browser", false}, {"agent-single", false}, {"agent-multiple", true}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			var wg sync.WaitGroup
+			for _, badge := range []string{"A", "B"} {
+				wg.Add(1)
+				go func(badge string) {
+					defer wg.Done()
+					ctx := httpctx.WithBrowserInstance(context.Background(), httpctx.BrowserInstance{
+						Manager: "ytray", InstanceID: "instance-" + badge, Badge: badge, ColorizeHTTPFlow: scenario.colorize,
+					})
+					for _, params := range []aitool.InvokeParams{
+						{"url": server.URL + "/redirect/{{int(1-2)}}", "fuzztag": true, "concurrent": 2},
+						{"url": server.URL + "/retry", "method": "POST", "content-type": "application/json", "body": `{"username":"fixture"}`},
+					} {
+						params["headers"] = map[string]any{"Cookie": "fixture=" + badge}
+						result, err := tool.InvokeWithParams(params, aitool.WithContext(ctx),
+							aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{RuntimeID: scenario.name + "-" + badge}))
+						require.NoError(t, err)
+						cleanupHTTPArtifacts(t, utils.InterfaceToGeneralMap(result.Data.(*aitool.ToolExecutionResult).Result))
+					}
+				}(badge)
 			}
-		}(badge)
-	}
-	wg.Wait()
-	for _, badge := range []string{"A", "B"} {
-		var flows []schema.HTTPFlow
-		require.NoError(t, db.Where("runtime_id = ?", "browser-fixture-"+badge).Find(&flows).Error)
-		require.Len(t, flows, 6, "two redirect hops per batch item plus the form retry")
-		for _, flow := range flows {
-			require.Contains(t, flow.Tags, fmt.Sprintf("[浏览器 %s]", badge))
-			require.NotContains(t, flow.Tags, schema.COLORPREFIX)
-			require.Equal(t, "scan", flow.SourceType)
-			if !strings.HasSuffix(flow.Url, "/done") {
-				require.Contains(t, flow.GetRequest(), "fixture="+badge)
+			wg.Wait()
+			for badge, color := range map[string]string{"A": schema.FLOW_COLOR_ORANGE, "B": schema.FLOW_COLOR_BLUE} {
+				var flows []schema.HTTPFlow
+				require.NoError(t, db.Where("runtime_id = ?", scenario.name+"-"+badge).Find(&flows).Error)
+				require.Len(t, flows, 6, "two redirect hops per batch item plus the form retry")
+				for _, flow := range flows {
+					require.Contains(t, flow.Tags, fmt.Sprintf("[浏览器 %s]", badge))
+					if scenario.colorize {
+						require.Contains(t, flow.Tags, color)
+					} else {
+						require.NotContains(t, flow.Tags, schema.COLORPREFIX)
+					}
+					require.Equal(t, "scan", flow.SourceType)
+					if !strings.HasSuffix(flow.Url, "/done") {
+						require.Contains(t, flow.GetRequest(), "fixture="+badge)
+					}
+				}
 			}
-		}
+		})
 	}
 	result, err := tool.InvokeWithParams(aitool.InvokeParams{
 		"url": server.URL + "/done", "headers": map[string]any{"X-Browser-Instance": "A"},

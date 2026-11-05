@@ -23,7 +23,7 @@ func TestBrowserInstanceHTTPFlowTags(t *testing.T) {
 }
 
 func TestBrowserInstanceHTTPFlowPreservesExplicitColor(t *testing.T) {
-	identity := httpctx.BrowserInstance{Manager: "ytray", InstanceID: "instance-b", Badge: "B"}
+	identity := httpctx.BrowserInstance{Manager: "ytray", InstanceID: "instance-b", Badge: "B", ColorizeHTTPFlow: true}
 	flow := &schema.HTTPFlow{Tags: "important|" + schema.FLOW_COLOR_RED}
 	ApplyBrowserInstanceToHTTPFlow(flow, identity)
 	require.Equal(t, "important|"+schema.FLOW_COLOR_RED+"|[浏览器 B]", flow.Tags)
@@ -41,4 +41,21 @@ func TestBrowserInstanceHTTPFlowDoesNotAssignColor(t *testing.T) {
 	ordinary := &schema.HTTPFlow{Tags: "custom"}
 	ApplyBrowserInstanceToHTTPFlow(ordinary, httpctx.BrowserInstance{})
 	require.Equal(t, "custom", ordinary.Tags)
+}
+
+func TestBrowserInstanceHTTPFlowAgentColorIsOptIn(t *testing.T) {
+	shared := make([]string, 1, 8)
+	shared[0] = "custom"
+	for badge, color := range map[string]string{"A": schema.FLOW_COLOR_ORANGE, "B": schema.FLOW_COLOR_BLUE} {
+		t.Run(badge, func(t *testing.T) {
+			identity := httpctx.BrowserInstance{Badge: badge}
+			ordinary := AppendBrowserInstanceHTTPFlowTags(shared, identity)
+			require.Equal(t, []string{"custom", identity.HTTPFlowTag()}, ordinary)
+			identity.ColorizeHTTPFlow = true
+			agent := AppendBrowserInstanceHTTPFlowTags(shared, identity)
+			require.Equal(t, []string{"custom", identity.HTTPFlowTag(), color}, agent)
+			require.Equal(t, agent, AppendBrowserInstanceHTTPFlowTags(agent, identity))
+			require.Equal(t, []string{"custom"}, shared)
+		})
+	}
 }

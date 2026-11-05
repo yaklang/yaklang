@@ -552,6 +552,7 @@ func executeBrowserAgentHTTPRequest(
 	if err != nil {
 		return nil, err
 	}
+	runtime.instance.ColorizeHTTPFlow = multipleOnlineBrowserInstances(bridge.Connections())
 	runtime.evidence = make(map[string]interface{})
 	wireRequest := runtime.beforeHook(ctx)(isHTTPS, nil, plainRequest)
 	if reason := browserTransformRequestFailureReason(wireRequest); reason != "" {

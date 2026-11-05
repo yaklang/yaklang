@@ -56,7 +56,7 @@ func TestToolCallerBindsBrowserHTTPFlowIdentity(t *testing.T) {
 		badge := map[string]string{"device-a": "A", "device-b": "B"}[deviceID]
 		require.NotEmpty(t, badge)
 		require.Equal(t, badge, strings.TrimPrefix(browserRef, "@"))
-		return httpctx.BrowserInstance{Manager: "ytray", InstanceID: deviceID, Badge: badge}, nil
+		return httpctx.BrowserInstance{Manager: "ytray", InstanceID: deviceID, Badge: badge, ColorizeHTTPFlow: true}, nil
 	}
 	cfg := NewTestConfig(ctx, WithWorkdir(t.TempDir()), WithBrowserHTTPFlowIdentityResolver(resolver))
 	for _, badge := range []string{"A", "B"} {
@@ -70,6 +70,7 @@ func TestToolCallerBindsBrowserHTTPFlowIdentity(t *testing.T) {
 					identity, ok := httpctx.GetBrowserInstance(req)
 					require.True(t, ok)
 					require.Equal(t, badge, identity.Badge)
+					require.True(t, identity.ColorizeHTTPFlow)
 					invoked = true
 					return "ok", nil
 				}),

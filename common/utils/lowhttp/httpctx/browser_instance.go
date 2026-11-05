@@ -17,6 +17,8 @@ type BrowserInstance struct {
 	InstanceID     string
 	InstallationID string
 	Badge          string
+	// ColorizeHTTPFlow is enabled only for Agent HTTP tests with multiple online browsers.
+	ColorizeHTTPFlow bool
 }
 
 func (identity BrowserInstance) HTTPFlowTag() string {

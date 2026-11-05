@@ -61,12 +61,35 @@ func (b serverBrowserExtensionBridge) resolveHTTPFlowIdentity(deviceID, browserR
 	if err != nil {
 		return httpctx.BrowserInstance{}, err
 	}
-	for _, connection := range b.Connections() {
+	connections := b.Connections()
+	for _, connection := range connections {
 		if connection.DeviceID == deviceID {
-			return connection.BrowserInstance(), nil
+			identity := connection.BrowserInstance()
+			identity.ColorizeHTTPFlow = multipleOnlineBrowserInstances(connections)
+			return identity, nil
 		}
 	}
 	return httpctx.BrowserInstance{}, errors.New("the selected browser instance disconnected")
+}
+
+func multipleOnlineBrowserInstances(connections []browser.ExtensionBridgeConnection) bool {
+	instances := make(map[string]struct{})
+	for _, connection := range connections {
+		if connection.DeviceID == "" {
+			continue
+		}
+		key := "device:" + connection.DeviceID
+		if connection.ManagedInstance != nil && connection.ManagedInstance.InstanceID != "" {
+			key = connection.ManagedInstance.Manager + ":" + connection.ManagedInstance.InstanceID
+		} else if connection.InstallationID != "" {
+			key = "installation:" + connection.InstallationID
+		}
+		instances[key] = struct{}{}
+		if len(instances) >= 2 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) buildBrowserAgentTools() ([]*aitool.Tool, error) {
