@@ -3,6 +3,7 @@ package reactloops
 import (
 	"bytes"
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,16 +12,21 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 )
 
-func TestExecuteWithExistedTask_PanicReturnsErrorAndPreservesTerminalStatus(t *testing.T) {
+func TestExecuteWithExistedTask_PanicCanRecoverUnlessCancelled(t *testing.T) {
 	for _, scenario := range []string{"ordinary", "active_child", "user_cancelled"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
+			var calls atomic.Int32
 			cfg := aicommon.NewConfig(ctx,
 				aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true), aicommon.WithWorkdir(t.TempDir()),
 				aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					response := c.NewAIResponse()
-					response.EmitOutputStream(bytes.NewBufferString(`{"@action":"panic_action"}`))
+					if calls.Add(1) == 1 {
+						response.EmitOutputStream(bytes.NewBufferString(`{"@action":"panic_action"}`))
+					} else {
+						response.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish"}`))
+					}
 					response.Close()
 					return response, nil
 				}))
@@ -64,13 +70,13 @@ func TestExecuteWithExistedTask_PanicReturnsErrorAndPreservesTerminalStatus(t *t
 					}))
 			require.NoError(t, err)
 			err = loop.ExecuteWithExistedTask(task)
-			require.ErrorContains(t, err, "action failed unexpectedly")
 			if scenario == "user_cancelled" {
+				require.ErrorContains(t, err, "action failed unexpectedly")
 				require.Equal(t, aicommon.AITaskState_Skipped, task.GetStatus())
 				require.NotContains(t, task.GetResult(), "[Error]")
 			} else {
-				require.Equal(t, aicommon.AITaskState_Aborted, task.GetStatus())
-				require.Contains(t, task.GetResult(), "action failed unexpectedly")
+				require.NoError(t, err)
+				require.NotEqual(t, aicommon.AITaskState_Aborted, task.GetStatus())
 			}
 			if scenario == "active_child" {
 				jobs, err := loop.GetSubAgentManager().Inspect(nil)

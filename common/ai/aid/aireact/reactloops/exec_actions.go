@@ -1,7 +1,9 @@
 package reactloops
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
@@ -21,13 +23,15 @@ const (
 	loopActionsContinue loopActionsDisposition = iota
 	loopActionsExit
 	loopActionsAsync
+	loopActionsRecover
 	loopActionsError
 )
 
 type loopActionsResult struct {
-	operator *LoopActionHandlerOperator
-	result   loopActionsDisposition
-	err      error
+	operator       *LoopActionHandlerOperator
+	result         loopActionsDisposition
+	err            error
+	recoveredError error
 	// Internal execution facts are combined once per model response, even when
 	// the response contains several native function calls.
 	appliedTodoDelta         *aicommon.TodoDelta
@@ -164,7 +168,9 @@ func (r *ReActLoop) execCalls(
 	defer r.clearCallsExecutionValues(calls)
 	result := loopActionsResult{operator: newLoopActionHandlerOperator(task), result: loopActionsContinue}
 	if len(calls) == 0 {
-		result.result, result.err = loopActionsError, fmt.Errorf("AI loop returned no actions")
+		// 模型输出校验应在进入执行器前完成。
+		// 走到这里说明循环自身前置条件已经被破坏。
+		result.result, result.err = loopActionsError, fmt.Errorf("action executor requires at least one call")
 		return result
 	}
 	r.Delete(loopVarNativeTodoBatchAdjusted)
@@ -241,6 +247,7 @@ func (r *ReActLoop) execCalls(
 		}
 		if outcome.result != loopActionsContinue || outcome.skipPostIteration {
 			result.result, result.err, result.skipPostIteration = outcome.result, outcome.err, outcome.skipPostIteration
+			result.recoveredError = outcome.recoveredError
 			result.skipErrorFinalization, result.skipErrorSummary = outcome.skipErrorFinalization, outcome.skipErrorSummary
 			for _, skipped := range calls[index+1:] {
 				emitLoopActionEvent(eventSink, skipped, "skipped", "An earlier action ended this batch before this call could run.")
@@ -257,9 +264,6 @@ func mergeLoopActionOperator(dst, src *LoopActionHandlerOperator) {
 	}
 	if feedback := strings.TrimSpace(src.GetFeedback().String()); feedback != "" {
 		dst.Feedback(feedback)
-	}
-	if src.contextCompressionError != nil {
-		dst.contextCompressionError = src.contextCompressionError
 	}
 	dst.nextActionMustUse = append(dst.nextActionMustUse, src.nextActionMustUse...)
 	dst.nextActionDisabled = append(dst.nextActionDisabled, src.nextActionDisabled...)
@@ -308,6 +312,9 @@ func (r *ReActLoop) execOneCall(
 		case result.err != nil || result.result == loopActionsError:
 			r.UserStatus(fmt.Sprintf("%s失败", actionProgress), fmt.Sprintf("%s failed", actionProgressEn), append(statusOptions,
 				aicommon.WithStatusCode("action.failed"), aicommon.WithStatusState(aicommon.StatusStateError))...)
+		case result.result == loopActionsRecover:
+			r.UserStatus(fmt.Sprintf("%s遇到问题，正在根据执行结果重新规划", actionProgress), fmt.Sprintf("%s encountered an issue; replanning from the execution result", actionProgressEn), append(statusOptions,
+				aicommon.WithStatusCode("action.recovering"), aicommon.WithStatusState(aicommon.StatusStateRecovering))...)
 		case result.skipPostIteration:
 			r.UserStatus(fmt.Sprintf("%s未通过检查，正在重新确认", actionProgress), fmt.Sprintf("%s was rejected; reconsidering", actionProgressEn), append(statusOptions,
 				aicommon.WithStatusCode("action.rejected"), aicommon.WithStatusState(aicommon.StatusStateRecovering))...)
@@ -415,28 +422,43 @@ func (r *ReActLoop) execOneCall(
 	if actionName != aicommon.ContextCompressionAction {
 		r.initActionApplied = true
 	}
+	var handlerPanicErr error
 	func() {
 		defer invoker.SetCurrentTask(previousTask)
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				handlerPanicErr = utils.Errorf("action[%s] handler panicked: %v", actionName, recovered)
+			}
+		}()
 		handler.ActionHandler(r, action, op)
 	}()
+	if handlerPanicErr != nil {
+		if task.GetContext().Err() != nil || task.IsUserCancelled() {
+			result.result, result.err = loopActionsError, handlerPanicErr
+			result.skipErrorFinalization, result.skipErrorSummary = true, true
+			emitLoopActionEvent(eventSink, call, "failed", handlerPanicErr.Error())
+			return result
+		}
+		r.shutdownSubAgents()
+		emitLoopActionEvent(eventSink, call, "failed", handlerPanicErr.Error())
+		result = r.recoverActionExecutionFailure(op, call, iteration, handlerPanicErr)
+		return result
+	}
 	r.applyActionExecutionRecord(record, op)
-	if op.contextCompressionError != nil {
-		result.countsEffectiveIteration = false
-		result.skipPostIteration = true
-		emitLoopActionEvent(eventSink, call, "rejected", op.contextCompressionError.Error())
-		return result
-	}
 	if err := r.recordSubAgentControl(actionName, op, appliedTodoDelta); err != nil {
-		result.result, result.err = loopActionsError, err
-		result.skipErrorSummary = true
 		emitLoopActionEvent(eventSink, call, "failed", err.Error())
+		result = r.recoverActionExecutionFailure(op, call, iteration, err)
 		return result
-	}
-	if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
-		r.recordCurrentTodoIteration(task)
 	}
 	if terminated, opErr := op.IsTerminated(); terminated {
 		if opErr != nil {
+			if !op.IsFatal() &&
+				!errors.Is(opErr, context.Canceled) &&
+				!errors.Is(opErr, context.DeadlineExceeded) {
+				emitLoopActionEvent(eventSink, call, "failed", opErr.Error())
+				result = r.recoverActionExecutionFailure(op, call, iteration, opErr)
+				return result
+			}
 			result.result, result.err = loopActionsError, opErr
 			result.skipErrorSummary = true
 			emitLoopActionEvent(eventSink, call, "failed", opErr.Error())
@@ -449,9 +471,16 @@ func (r *ReActLoop) execOneCall(
 			result.skipPostIteration = true
 			return result
 		}
+		if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
+			r.recordCurrentTodoIteration(task)
+		}
 		emitLoopActionEvent(eventSink, call, "completed", strings.TrimSpace(op.GetFeedback().String()))
+		resetRecoverableLoopFailureCounters(r)
 		result.result = loopActionsExit
 		return result
+	}
+	if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
+		r.recordCurrentTodoIteration(task)
 	}
 	if !(op.IsAsyncModeRequested() || task.IsAsyncMode()) {
 		if err := task.GetContext().Err(); err != nil {
@@ -480,10 +509,12 @@ func (r *ReActLoop) execOneCall(
 		}
 		r.UserStatus("这项工作已转入后台继续处理", "This work is continuing in the background", aicommon.WithStatusCode("task.background"))
 		emitLoopActionEvent(eventSink, call, "async", "Execution continues in the background; later timeline events may contain the final result.")
+		resetRecoverableLoopFailureCounters(r)
 		result.result = loopActionsAsync
 		return result
 	}
 	emitLoopActionEvent(eventSink, call, "completed", strings.TrimSpace(op.GetFeedback().String()))
+	resetRecoverableLoopFailureCounters(r)
 	return result
 }
 

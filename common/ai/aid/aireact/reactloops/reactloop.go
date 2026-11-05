@@ -118,6 +118,9 @@ type ReActLoop struct {
 	promptMode               aicommon.LoopPromptMode
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
+	// consecutiveCompressionAttempts 限制压缩无法推进时的连续维护轮数。
+	// 构建普通 Prompt 后，连续计数会清零。
+	consecutiveCompressionAttempts int
 	// lastFittingTimelineThroughID is the boundary of the latest prompt the
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64
@@ -168,6 +171,10 @@ type ReActLoop struct {
 	// Invocation-local verifier results belong to the loop, never Action data.
 	actionExecutionMu     sync.Mutex
 	actionExecutionValues map[*aicommon.Action]map[string]any
+
+	// recoverableFailureMu 保护模型输出错误或 Action 执行错误的自愈预算。
+	recoverableFailureMu sync.Mutex
+	recoverableFailures  map[string]int
 
 	// modelThinkingBuf holds reason-stream deltas for the in-flight AI transaction;
 	// flushed into the timeline iteration line above the action summary.

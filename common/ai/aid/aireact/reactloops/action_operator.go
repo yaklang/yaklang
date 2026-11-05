@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -18,6 +19,7 @@ type LoopActionHandlerOperator struct {
 	isContinued       bool
 	isTerminated      bool
 	failedError       error
+	failureFatal      bool
 	isSilence         bool
 	userRequestedExit bool
 
@@ -35,7 +37,6 @@ type LoopActionHandlerOperator struct {
 	trajectoryResponse       aicommon.TrajectoryResponseReceipt
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
-	contextCompressionError  error
 
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
@@ -137,12 +138,32 @@ func (l *LoopActionHandlerOperator) Fail(i any) {
 	})
 }
 
+// Fatal 标记当前循环无法安全继续的错误。
+// 普通 Fail 会由循环执行边界转换为可恢复的 Timeline 事件。
+func (l *LoopActionHandlerOperator) Fatal(i any) {
+	l.terminateOperateOnce.Do(func() {
+		l.failedError = utils.Error(i)
+		l.failureFatal = true
+		l.isTerminated = true
+	})
+}
+
+func (l *LoopActionHandlerOperator) IsFatal() bool {
+	return l != nil && l.failureFatal
+}
+
 func (l *LoopActionHandlerOperator) Feedback(i any) {
+	if l.feedbacks == nil {
+		l.feedbacks = new(bytes.Buffer)
+	}
 	_, _ = l.feedbacks.WriteString(utils.InterfaceToString(i))
 	l.feedbacks.WriteRune('\n')
 }
 
 func (l *LoopActionHandlerOperator) GetFeedback() *bytes.Buffer {
+	if l.feedbacks == nil {
+		l.feedbacks = new(bytes.Buffer)
+	}
 	return l.feedbacks
 }
 
@@ -271,7 +292,14 @@ func (o *OnPostIterationOperator) DeferAfterCallbacks(fn func()) {
 // Called by callOnPostIteration after the main callback chain completes.
 func (o *OnPostIterationOperator) RunDeferredFuncs() {
 	for _, fn := range o.deferredFuncs {
-		fn()
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					log.Warnf("deferred post-iteration callback panicked and was skipped: %v", recovered)
+				}
+			}()
+			fn()
+		}()
 	}
 }
 

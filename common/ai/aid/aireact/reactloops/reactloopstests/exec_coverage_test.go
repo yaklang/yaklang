@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -18,10 +19,16 @@ import (
 
 // TestExec_PanicRecovery 测试panic恢复
 func TestExec_PanicRecovery(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -170,10 +177,16 @@ func TestExec_NoActionHandler(t *testing.T) {
 
 // TestExec_OperatorFail 测试operator Fail
 func TestExec_OperatorFail(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "fail_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "fail_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -198,11 +211,14 @@ func TestExec_OperatorFail(t *testing.T) {
 	}
 
 	err = loop.Execute("test", context.Background(), "test operator fail")
-	if err == nil {
-		t.Error("Should return error when operator fails")
-	} else {
-		t.Logf("Expected error for operator fail: %v", err)
-	}
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, callCount, 2)
+	cfg, ok := reactIns.GetConfig().(*aicommon.Config)
+	require.True(t, ok)
+	serialized, marshalErr := aicommon.MarshalTimeline(cfg.Timeline)
+	require.NoError(t, marshalErr)
+	require.Contains(t, serialized, "REACT_RECOVERABLE_ERROR")
+	require.NotContains(t, serialized, "[[REACT_RECOVERABLE_ERROR]]")
 }
 
 // TestExec_CompleteWithReason 测试complete with reason
