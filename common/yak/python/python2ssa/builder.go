@@ -812,6 +812,10 @@ func FrontendWithCache(src string, caches ...*ssa.AntlrCache) (pythonparser.IRoo
 			py2.Err = joined
 			return nil, py2
 		}
+		if template := pythonparser.DetectUnsupportedTemplate(src); template != nil {
+			template.Err = joined
+			return nil, template
+		}
 	}
 	return ast, joined
 }
