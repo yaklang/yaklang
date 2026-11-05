@@ -110,7 +110,7 @@ func decodeDHCP4(w []byte, limit int) (map[string]any, error) {
 	for _, opt := range []struct {
 		code byte
 		name string
-	}{{12, "Hostname"}, {15, "Domain"}, {61, "Client Identifier"}} {
+	}{{12, "Hostname"}, {15, "Domain"}, {60, "Vendor Class"}, {61, "Client Identifier"}} {
 		if b, ok := opts[opt.code]; ok {
 			out[opt.name] = bytes.Clone(b)
 		}

@@ -70,6 +70,7 @@ type DisplayFieldValue struct {
 // than silently presenting a sampled projection as exhaustive. Source refers
 // to the whole logical PDU; byte spans are relative to ProtocolEvent.Raw only.
 type DisplayFieldSnapshot struct {
+	content       map[string]fieldTruth
 	SchemaVersion int                 `json:"schema_version"`
 	PDU           uint64              `json:"pdu"`
 	Source        ByteSource          `json:"source"`
@@ -135,6 +136,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		}
 		return nil
 	})
+	out = append(out, packetDisplayBindings()...)
 	meta("pdu.response_to", "Response to PDU", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
 		if e.ResponseTo != 0 {
 			return e.ResponseTo
@@ -210,6 +212,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		}
 	}
 	path("dns|mdns|llmnr|dot|doh|doq", "dns", "dns.qry.name.escaped", "Lossless escaped DNS question name", DisplayString, 0, "pdu", "DNS", "Questions", "*", "Name")
+	out = append(out, analysisDisplayBindings()...)
 	out = append(out, routingDisplayBindings()...)
 	out = append(out, pimDisplayBindings()...)
 	out = append(out, ospfv3DisplayBindings()...)
@@ -1030,8 +1033,10 @@ func displayUint(value any) (uint64, bool) {
 }
 
 type displayProjection struct {
-	snapshot  *DisplayFieldSnapshot
-	remaining int
+	kerberosFacts  map[string]any
+	kerberosLoaded bool
+	snapshot       *DisplayFieldSnapshot
+	remaining      int
 	// One bounded traversal per event, rather than spending the graph budget
 	// again for every registered information-element alias.
 	netflowV9ByType map[uint64][]map[string]any

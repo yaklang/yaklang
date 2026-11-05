@@ -2336,6 +2336,9 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
 	n := len(e.Raw) + len(e.nativeQUICWireBytes) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	if e.nativeHTTPMessage != nil {
+		n += 64 + sessionSnapshotSize(e.nativeHTTPMessage.fields, false)
+	}
 	n += sessionSnapshotSize(e.kerberosSummaryFacts, false)
 	if e.nativeWCF != nil {
 		n += 128 + len(e.nativeWCF.Status) + len(e.nativeWCF.Summary) + len(e.nativeWCF.Error)
