@@ -88,6 +88,47 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 	}, nil
 }
 
+func convertAISessionTaskResourceInfos(resources []yakit.AISessionTaskResource) []*ypb.AISessionTaskResourceInfo {
+	result := make([]*ypb.AISessionTaskResourceInfo, 0, len(resources))
+	for _, resource := range resources {
+		result = append(result, &ypb.AISessionTaskResourceInfo{
+			Type:   resource.Type,
+			Key:    resource.Key,
+			Value:  resource.Value,
+			Scope:  resource.Scope,
+			Source: resource.Source,
+		})
+	}
+	return result
+}
+
+func (s *Server) GetAISessionCurrentResources(ctx context.Context, req *ypb.GetAISessionCurrentResourcesRequest) (*ypb.GetAISessionCurrentResourcesResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if req == nil {
+		return nil, utils.Error("request is nil")
+	}
+	sessionID := strings.TrimSpace(req.GetSessionID())
+	if sessionID == "" {
+		return nil, utils.Error("session_id is required")
+	}
+	current, err := yakit.GetAISessionCurrentResources(s.GetProjectDatabase(), sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return &ypb.GetAISessionCurrentResourcesResponse{SessionID: sessionID}, nil
+	}
+	return &ypb.GetAISessionCurrentResourcesResponse{
+		SessionID:        current.SessionID,
+		TaskID:           current.TaskID,
+		UserInputUUID:    current.UserInputUUID,
+		TaskResources:    convertAISessionTaskResourceInfos(current.TaskResources),
+		SessionResources: convertAISessionTaskResourceInfos(current.SessionResources),
+	}, nil
+}
+
 func (s *Server) isAISessionRunning(sessionID string) bool {
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {

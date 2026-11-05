@@ -99,6 +99,55 @@ func TestServer_QueryAISession_Pagination(t *testing.T) {
 	require.Equal(t, sessionIDs[0], page3.GetData()[0].GetSessionID())
 }
 
+func TestServer_GetAISessionCurrentResources(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISessionTaskInput{}).Error)
+
+	sessionID := "session-current-resources-" + uuid.NewString()
+	fileResource := yakit.AISessionTaskResource{
+		Type: "file", Key: "file_path", Value: "/tmp/workspace",
+		Scope: yakit.AISessionTaskResourceScopeSession, Source: yakit.AISessionTaskResourceSourceAttachedFilePath,
+	}
+	browserResource := yakit.AISessionTaskResource{
+		Type: "browser", Key: "browser_device", Value: `{"deviceId":"device-a"}`,
+		Scope: yakit.AISessionTaskResourceScopeSession, Source: yakit.AISessionTaskResourceSourceAttachedResourceInfo,
+	}
+	require.NoError(t, yakit.SaveAISessionTaskInput(db, &yakit.SaveAISessionTaskInputParams{
+		SessionID:          sessionID,
+		TaskID:             "task-current-resources",
+		TaskUUID:           uuid.NewString(),
+		UserInputUUID:      "input-current-resources",
+		UserInput:          "inspect",
+		AttachedFilePaths:  []string{fileResource.Value},
+		ExplicitResources:  []yakit.AISessionTaskResource{fileResource, browserResource},
+		EffectiveResources: []yakit.AISessionTaskResource{fileResource, browserResource},
+	}))
+
+	server := &Server{projectDatabase: db}
+	response, err := server.GetAISessionCurrentResources(context.Background(), &ypb.GetAISessionCurrentResourcesRequest{
+		SessionID: sessionID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, sessionID, response.GetSessionID())
+	require.Equal(t, "task-current-resources", response.GetTaskID())
+	require.Equal(t, "input-current-resources", response.GetUserInputUUID())
+	require.Len(t, response.GetTaskResources(), 2)
+	require.Equal(t, "file", response.GetTaskResources()[0].GetType())
+	require.Equal(t, yakit.AISessionTaskResourceScopeSession, response.GetTaskResources()[0].GetScope())
+	require.Equal(t, yakit.AISessionTaskResourceSourceAttachedFilePath, response.GetTaskResources()[0].GetSource())
+	require.Len(t, response.GetSessionResources(), 2)
+
+	missing, err := server.GetAISessionCurrentResources(context.Background(), &ypb.GetAISessionCurrentResourcesRequest{
+		SessionID: "missing-" + uuid.NewString(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, missing)
+	require.Empty(t, missing.GetTaskID())
+	require.Empty(t, missing.GetTaskResources())
+	require.Empty(t, missing.GetSessionResources())
+}
+
 func TestServer_QueryAISession_DefaultPagination(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
