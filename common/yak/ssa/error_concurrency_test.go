@@ -36,6 +36,7 @@ func TestConcurrentUnitErrorsAreRetained(t *testing.T) {
 		require.False(t, seen[err.Message], "concurrent appends must not overwrite another unit's error")
 		seen[err.Message] = true
 	}
-	errors[0] = nil
-	require.NotNil(t, app.GetErrors()[0], "callers must not mutate the program's error slice through a snapshot")
+	snapshot := app.GetErrorsSnapshot()
+	snapshot[0] = nil
+	require.NotNil(t, app.GetErrors()[0], "snapshots must be isolated from the program's error slice")
 }
