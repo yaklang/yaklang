@@ -11,6 +11,12 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-22.04
+    # Hard ceiling for one run: queue wait, toolchain install, CLI build and the
+    # test step all count. Queue alone has varied from 5m to 17m, and shared
+    # runners have died silently around the 100m mark, so the goal is to keep
+    # the whole job well below that. Each lane below bounds itself with a 60m
+    # go-test timeout; this cap only stops a runaway job.
+    timeout-minutes: 150
 
     env:
       # go-llvm vendors the LLVM 18.1.3 static archives inside the module, but
@@ -64,11 +70,40 @@ jobs:
       # -x is intentionally NOT passed: it prints every external command and is
       # only useful for manual debugging. Keep CI output lean and deterministic.
       #
-      # The timeout covers the whole ./common/yak/ssa2llvm/... tree, and the
-      # mustpass suite alone compiles and runs 115 scripts (measured 30.1 min on
-      # a 32-core workstation, and each script has its own 90s runtime cap), so
-      # 30m kills the run just before it finishes. A runner is slower than this
-      # workstation, not faster.
-      # Serial package builds avoid running several multi-GB Go/LLVM linkers
-      # at once; every test still runs uncached with the same runtime budgets.
-      run: bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v ./common/yak/ssa2llvm/...
+      # The suite is three independent groups. Running them as one serial go
+      # test walk took 36-75m on shared runners and twice died at ~100m with no
+      # logs, so they run as three lanes here. Each lane keeps -p 1 (no
+      # concurrent multi-GB Go/LLVM linkers inside a lane) and has its own 60m
+      # go-test timeout. Lane output is streamed with a prefix instead of
+      # buffered to a file, so a killed step still leaves usable logs.
+      #
+      # Lane mustpass: the 117-script mustpass sweep.
+      # Lane heavy: runtime/coreplugin compile sweeps.
+      # Lane rest: every other package and test.
+      run: |
+        set -u
+        heavy='^(TestMustPass_SSA2LLVM_AllScripts|TestRuntime_ShadowLifecycle|TestCorePlugin_CompileAll|TestArtifactPruning_DualEvidence|TestCorePluginBaseYakPluginsCompileToIR|TestCorePlugin_RunSSADetectProject|TestCorePluginSSADetectPrunedRuntimeDependencies)$'
+
+        ( set -o pipefail
+          bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v \
+            -run '^TestMustPass_SSA2LLVM_AllScripts$' ./common/yak/ssa2llvm/tests 2>&1 \
+            | sed -u 's/^/[mustpass] /'
+        ) & p_mustpass=$!
+
+        ( set -o pipefail
+          bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v \
+            -run "$heavy" ./common/yak/ssa2llvm/tests 2>&1 \
+            | sed -u 's/^/[heavy] /'
+        ) & p_heavy=$!
+
+        ( set -o pipefail
+          bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v \
+            -skip "$heavy" ./common/yak/ssa2llvm/... 2>&1 \
+            | sed -u 's/^/[rest] /'
+        ) & p_rest=$!
+
+        status=0
+        wait "$p_mustpass" || status=1
+        wait "$p_heavy" || status=1
+        wait "$p_rest" || status=1
+        exit "$status"

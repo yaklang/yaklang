@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 )
 
 var (
@@ -67,8 +69,28 @@ func runProcess(t *testing.T, bin string, env map[string]string, args ...string)
 
 func runProcessInDir(t *testing.T, dir, bin string, env map[string]string, args ...string) processResult {
 	t.Helper()
+	return runProcessInDirContext(t, nil, dir, bin, env, args...)
+}
 
-	cmd := exec.Command(bin, args...)
+// runProcessInDirTimeout is runProcessInDir with a wall-clock deadline. A
+// hung compile must name the script that hung instead of blocking the package
+// until its go-test timeout (or the CI job cap) kills every other test with it.
+func runProcessInDirTimeout(t *testing.T, timeout time.Duration, dir, bin string, env map[string]string, args ...string) processResult {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return runProcessInDirContext(t, ctx, dir, bin, env, args...)
+}
+
+func runProcessInDirContext(t *testing.T, ctx context.Context, dir, bin string, env map[string]string, args ...string) processResult {
+	t.Helper()
+
+	var cmd *exec.Cmd
+	if ctx != nil {
+		cmd = exec.CommandContext(ctx, bin, args...)
+	} else {
+		cmd = exec.Command(bin, args...)
+	}
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -77,6 +99,9 @@ func runProcessInDir(t *testing.T, dir, bin string, env map[string]string, args 
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 	output, err := cmd.CombinedOutput()
+	if ctx != nil && ctx.Err() == context.DeadlineExceeded {
+		t.Fatalf("process %q timed out\nArgs: %v\nOutput: %s", bin, args, output)
+	}
 	if err == nil {
 		return processResult{ExitCode: 0, Output: string(output)}
 	}
@@ -102,10 +127,20 @@ func runSSA2LLVMCLIInDir(t *testing.T, dir string, args ...string) processResult
 // what keeps a long run — 115 mustpass scripts — from piling up tens of
 // gigabytes in the shared temp dir.
 func runSSA2LLVMCLIInDirScratch(t *testing.T, args ...string) processResult {
-	return runSSA2LLVMCLIInDirEnv(t, "", map[string]string{"TMPDIR": t.TempDir()}, args...)
+	return runSSA2LLVMCLIInDirScratchTimeout(t, 0, args...)
+}
+
+// runSSA2LLVMCLIInDirScratchTimeout is runSSA2LLVMCLIInDirScratch with an
+// optional wall-clock deadline; timeout <= 0 keeps the old unbounded behavior.
+func runSSA2LLVMCLIInDirScratchTimeout(t *testing.T, timeout time.Duration, args ...string) processResult {
+	return runSSA2LLVMCLIInDirEnvTimeout(t, timeout, "", map[string]string{"TMPDIR": t.TempDir()}, args...)
 }
 
 func runSSA2LLVMCLIInDirEnv(t *testing.T, dir string, extraEnv map[string]string, args ...string) processResult {
+	return runSSA2LLVMCLIInDirEnvTimeout(t, 0, dir, extraEnv, args...)
+}
+
+func runSSA2LLVMCLIInDirEnvTimeout(t *testing.T, timeout time.Duration, dir string, extraEnv map[string]string, args ...string) processResult {
 	t.Helper()
 
 	if len(args) == 0 {
@@ -135,6 +170,9 @@ func runSSA2LLVMCLIInDirEnv(t *testing.T, dir string, extraEnv map[string]string
 	env := map[string]string{"YAKIT_HOME": yakitHome}
 	for k, v := range extraEnv {
 		env[k] = v
+	}
+	if timeout > 0 {
+		return runProcessInDirTimeout(t, timeout, dir, cliPath, env, args...)
 	}
 	return runProcessInDir(t, dir, cliPath, env, args...)
 }

@@ -169,14 +169,19 @@ func (c *NameCache) cachedID(name string) (int64, bool) {
 	return id, ok
 }
 
-// namePoolSeq hands out name_id values for one open database. NameID is the
-// table primary key, shared by every program, so two caches must not both
-// start from the same MAX.
+// namePoolSeq hands out name_id values for this process. NameID is the table
+// primary key, shared by every program, and a NameCache can hold ids that it
+// reserved but has not flushed yet. The counter must therefore never move
+// backwards across a database rebind: re-seeding it from MAX(name_id) alone
+// would hand out a still-pending id a second time, and the older cache's flush
+// would then fail with "UNIQUE constraint failed: ir_name_pool_v1.name_id".
+// Rebinding happens whenever the global SSA handle changes, so the sequence is
+// tracked per underlying database but always keeps the highest value issued.
 var namePoolSeq = struct {
 	sync.Mutex
-	db    interface{}
-	next  int64
-	ready bool
+	db     interface{}
+	next   int64
+	seeded bool
 }{}
 
 func reserveNamePoolID(db *gorm.DB) (int64, error) {
@@ -186,19 +191,19 @@ func reserveNamePoolID(db *gorm.DB) (int64, error) {
 	namePoolSeq.Lock()
 	defer namePoolSeq.Unlock()
 	sqlDB := db.DB()
-	if namePoolSeq.db != sqlDB {
-		namePoolSeq.db = sqlDB
-		namePoolSeq.ready = false
-		namePoolSeq.next = 0
-	}
-	if !namePoolSeq.ready {
+	if !namePoolSeq.seeded || namePoolSeq.db != sqlDB {
 		var maxID int64
 		query := "SELECT COALESCE(MAX(name_id), 0) FROM \"" + TableIrNamePool + "\""
 		if err := db.Raw(query).Row().Scan(&maxID); err != nil {
 			return 0, err
 		}
-		namePoolSeq.next = maxID
-		namePoolSeq.ready = true
+		// Jump forward for a database that already holds ids, never back:
+		// reservations made before the rebind are still unflushed.
+		if maxID > namePoolSeq.next {
+			namePoolSeq.next = maxID
+		}
+		namePoolSeq.db = sqlDB
+		namePoolSeq.seeded = true
 	}
 	namePoolSeq.next++
 	return namePoolSeq.next, nil
