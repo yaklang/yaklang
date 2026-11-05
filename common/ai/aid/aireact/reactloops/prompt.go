@@ -407,7 +407,9 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	if r.reactiveDataBuilder != nil {
 		reactiveData, err = r.reactiveDataBuilder(r, operator.GetFeedback(), nonce)
 		if err != nil {
-			return nil, utils.Wrap(err, "build reactive data failed")
+			log.Warnf("build reactive data failed; continuing without it: %v", err)
+			reactiveData = ""
+			err = nil
 		}
 		if reactiveData != "" {
 			utils.Debug(func() {
