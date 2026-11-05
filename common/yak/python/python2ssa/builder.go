@@ -806,7 +806,14 @@ func FrontendWithCache(src string, caches ...*ssa.AntlrCache) (pythonparser.IRoo
 			return parser.Root()
 		},
 	)
-	return ast, errors.Join(err, lexicalErrors.Error())
+	joined := errors.Join(err, lexicalErrors.Error())
+	if joined != nil {
+		if py2 := pythonparser.DetectUnsupportedPython2(src); py2 != nil {
+			py2.Err = joined
+			return nil, py2
+		}
+	}
+	return ast, joined
 }
 
 // Keep lexical diagnostics across the SLL to LL listener replacement. The LL

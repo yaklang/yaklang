@@ -932,6 +932,7 @@ func (c *Config) parseProjectWithFSLegacy(
 					return
 				}
 
+				unsupportedSyntax := fileContent.Status == ssareducer.FileStatusUnsupportedSyntax
 				if fileContent.Status == ssareducer.FileParseASTError {
 					if astParseErrLogged < maxAstParseErrLogs {
 						log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
@@ -950,7 +951,7 @@ func (c *Config) parseProjectWithFSLegacy(
 				fileContent.Editor = editor
 				fileContent.Content = nil
 
-				if fileContent.Err != nil {
+				if fileContent.Err != nil && !unsupportedSyntax {
 					prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
 					AstErr = utils.JoinErrors(AstErr,
 						utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),

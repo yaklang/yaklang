@@ -541,18 +541,26 @@ func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsCont
 		if !ok || constant == nil || constant.Identifier() == nil {
 			continue
 		}
-		enumName := constant.Identifier().GetText()
-		obj := y.EmitMakeWithoutType(nil, nil)
-		obj.SetType(class)
-		value := ssa.Value(obj)
-		if class.Constructor != nil || len(y.constructorOverloads[class]) != 0 {
-			args := []ssa.Value{obj}
-			args = append(args, y.VisitArguments(constant.Arguments())...)
-			if constructed := y.callJavaConstructorWithOverload(class, args, false); !utils.IsNil(constructed) {
-				value = constructed
+		// Each constant has its own source range. Building every constant under
+		// the EnumConstants range made all constructor calls (and their argument
+		// calls) share one code_range, so N findings collapsed onto one position.
+		func() {
+			recoverRange := y.SetRange(constant)
+			defer recoverRange()
+
+			enumName := constant.Identifier().GetText()
+			obj := y.EmitMakeWithoutType(nil, nil)
+			obj.SetType(class)
+			value := ssa.Value(obj)
+			if class.Constructor != nil || len(y.constructorOverloads[class]) != 0 {
+				args := []ssa.Value{obj}
+				args = append(args, y.VisitArguments(constant.Arguments())...)
+				if constructed := y.callJavaConstructorWithOverload(class, args, false); !utils.IsNil(constructed) {
+					value = constructed
+				}
 			}
-		}
-		class.RegisterStaticMember(enumName, value)
+			class.RegisterStaticMember(enumName, value)
+		}()
 	}
 }
 

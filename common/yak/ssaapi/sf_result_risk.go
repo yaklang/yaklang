@@ -178,6 +178,36 @@ func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
 
+// isDuplicateRiskPosition reports whether another risk already covers the same
+// rule at the same source position. Findings are unique by code range for one
+// result: loop unrolling creates one IR call per iteration and container-level
+// alerts (struct scans) share the container range, so without this check the
+// report shows N identical rows for one source location.
+func (r *SyntaxFlowResult) isDuplicateRiskPosition(risk *schema.SSARisk) bool {
+	if risk == nil || risk.Line == 0 || risk.CodeSourceUrl == "" || risk.CodeRange == "" {
+		return false
+	}
+	// Rules run from raw content carry no RuleName; the title is then the only
+	// stable identity. Loaded rules set FromRule, which keeps two rules with the
+	// same title apart.
+	ruleKey := risk.FromRule
+	if ruleKey == "" {
+		ruleKey = risk.Title
+	}
+	if ruleKey == "" {
+		return false
+	}
+	if r.riskPositions == nil {
+		r.riskPositions = make(map[string]struct{})
+	}
+	key := strings.Join([]string{ruleKey, risk.ProgramName, risk.CodeSourceUrl, risk.CodeRange}, "\x00")
+	if _, ok := r.riskPositions[key]; ok {
+		return true
+	}
+	r.riskPositions[key] = struct{}{}
+	return false
+}
+
 func (r *SyntaxFlowResult) GetRisks() []*schema.SSARisk {
 	if r == nil || r.riskMap == nil {
 		return nil
@@ -230,6 +260,9 @@ func (r *SyntaxFlowResult) stageRisk(variable string, index int, value *Value) (
 	}
 	ssaRisk := buildSSARisk(r, variable, index, value)
 	if ssaRisk == nil {
+		return "", false
+	}
+	if r.isDuplicateRiskPosition(ssaRisk) {
 		return "", false
 	}
 

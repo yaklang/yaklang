@@ -203,7 +203,13 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		env.prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 		return
 	}
-	if fileContent.Status == ssareducer.FileParseASTError {
+	unsupportedSyntax := fileContent.Status == ssareducer.FileStatusUnsupportedSyntax
+	if unsupportedSyntax {
+		// Known and deliberately skipped (for example Python 2 source). Keep
+		// the diagnostic, but do not count it as a failed parse: strict mode
+		// must not fail on vendored legacy files.
+		env.prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
+	} else if fileContent.Status == ssareducer.FileParseASTError {
 		env.prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
 		env.astErrMu.Lock()
 		if env.astParseErrLogged < env.maxAstParseErrLogs {
@@ -223,7 +229,7 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 	editor := env.prog.CreateEditor(fileContent.Content, fileContent.Path)
 	fileContent.Editor = editor
 	fileContent.Content = nil
-	if fileContent.Err != nil {
+	if fileContent.Err != nil && !unsupportedSyntax {
 		env.prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
 		env.astErrMu.Lock()
 		env.astErr = utils.JoinErrors(env.astErr, utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err))
