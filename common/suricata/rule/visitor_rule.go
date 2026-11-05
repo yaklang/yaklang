@@ -41,7 +41,7 @@ func (v *RuleSyntaxVisitor) VisitRules(ctx *parser.RulesContext) interface{} {
 }
 
 func (v *RuleSyntaxVisitor) MergeErrors() error {
-	if v.Errors == nil {
+	if len(v.Errors) == 0 {
 		return nil
 	}
 	errors := funk.Map(v.Errors, func(er error) string {
@@ -62,13 +62,12 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 		if err := recover(); err != nil {
 			start := rule.GetStart()
 			end := rule.GetStop()
-			log.Errorf("visit rule %v (%v:%v-%v:%v) failed: %s",
+			v.Errorf("visit rule %v (%v:%v-%v:%v) failed: %v",
 				rule.GetText(),
 				start.GetLine(), start.GetColumn(),
 				end.GetLine(), end.GetColumn(),
 				err,
 			)
-			//panic(err)
 		}
 	}()
 	ruleIns := &Rule{
@@ -88,6 +87,10 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 	action := rule.Action_()
 	ruleIns.Action = trim(action.GetText())
 	ruleIns.Protocol = trim(rule.Protocol().GetText())
+	ruleIns.Direction = "->"
+	if rule.BothDirect() != nil {
+		ruleIns.Direction = "<>"
+	}
 	ruleIns.SourceAddress = v.VisitSrcAddress(rule.Src_address().(*parser.Src_addressContext))
 	ruleIns.DestinationAddress = v.VisitDstAddress(rule.Dest_address().(*parser.Dest_addressContext))
 	ruleIns.SourcePort = v.VisitSrcPort(rule.Src_port().(*parser.Src_portContext))

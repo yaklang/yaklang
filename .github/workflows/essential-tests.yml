@@ -593,7 +593,7 @@ jobs:
                 {"package": "./common/twofa/...", "timeout": "20s"},
                 {"package": "./common/cybertunnel/..."},
                 {"package": "./common/fp/...", "timeout": "60s"},
-                {"package": "./common/suricata/...", "timeout": "20s", "run": "^TestMUSTPASS.*$"},
+                {"package": "./common/suricata/...", "timeout": "90s"},
                 {"package": "./common/chaosmaker", "timeout": "20s", "run": "^(TestMUSTPASS_CrossVerify|TestMUSTPASS_CrossVerifyGroup|TestGenerateBangPortTrafficBug|TestGenerateHttpTrafficBug)$", "retry": 1, "retry_delay": 5},
                 {"package": "./common/netx/mustpass", "timeout": "20s"},
                 {"package": "./common/authhack/...", "timeout": "1m"},

@@ -44,12 +44,15 @@ func atoi(i string) int {
 	return parsed
 }
 
-func atoistar(i string) *int {
+func parseOptionalInt(i string) (*int, error) {
 	if i == "" {
-		return nil
+		return nil, nil
 	}
-	parsed, _ := strconv.Atoi(i)
-	return &parsed
+	parsed, err := strconv.Atoi(i)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
 }
 
 func getHighPort() uint16 {

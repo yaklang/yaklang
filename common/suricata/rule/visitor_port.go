@@ -47,7 +47,7 @@ func (p *PortRule) postHandle() {
 		}
 	}
 
-	if len(p.Rules) > 0 {
+	if len(p.Rules) > 0 && len(p.negativeRules) == 0 && len(p.positiveRules) == 0 {
 		for _, r := range p.Rules {
 			if r.Negative {
 				p.negativeRules = append(p.negativeRules, r)
@@ -56,6 +56,17 @@ func (p *PortRule) postHandle() {
 			}
 		}
 	}
+}
+
+// Prepare materializes all matcher state before a Rule is shared by matchers.
+func (p *PortRule) Prepare() {
+	if p == nil {
+		return
+	}
+	for _, sub := range p.Rules {
+		sub.Prepare()
+	}
+	p.postHandle()
 }
 
 func (p *PortRule) _matchWithoutNegative(i int) bool {
@@ -98,8 +109,8 @@ func (p *PortRule) _matchWithoutNegative(i int) bool {
 	}
 	if p.Env != "" && p.Config != nil {
 		if !p.Config.HasVar(p.Env) {
-			log.Warnf("suricata env %s not found, fallback to any", p.Env)
-			return true
+			log.Warnf("suricata env %s not found", p.Env)
+			return false
 		}
 		return p.Config.MatchVar(p.Env, i)
 	}
@@ -181,13 +192,14 @@ func (v *RuleSyntaxVisitor) VisitPortRule(i *parser.PortContext) *PortRule {
 		return nil
 	}
 	r := &PortRule{Config: v.Config}
+	defer r.Prepare()
 	if i.Any() != nil {
 		r.Any = true
 		return r
 	}
 
 	if i.Environment_var() != nil {
-		r.Env = trim(i.Environment_var().GetText())
+		r.Env = strings.Trim(trim(i.Environment_var().GetText()), "${}")
 		return r
 	}
 

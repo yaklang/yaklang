@@ -2,15 +2,61 @@ package pcre
 
 import (
 	"fmt"
+	"regexp/syntax"
+	"strings"
+	"sync/atomic"
+
 	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/utils/regen"
-	"regexp/syntax"
-	"strings"
 )
+
+const (
+	// DefaultMatchLimit bounds the amount of backtracking work for one match
+	// attempt. It is deliberately lower than PCRE2's library default.
+	DefaultMatchLimit uint32 = 100_000
+	// DefaultDepthLimit bounds the backtracking depth for one match attempt.
+	DefaultDepthLimit   uint32 = 10_000
+	DefaultSubjectLimit        = 8 << 20
+	DefaultResultLimit         = 65_536
+)
+
+var (
+	defaultMatchLimits atomic.Uint64
+	// ErrZeroLengthMatchLoop indicates that the regexp backend did not advance
+	// after a zero-length match. This protects callers even if backend iteration
+	// behavior regresses.
+	ErrZeroLengthMatchLoop = errors.New("pcre zero-length match did not advance")
+	ErrSubjectLimit        = errors.New("pcre subject size limit exceeded")
+	ErrResultLimit         = errors.New("pcre result count limit exceeded")
+)
+
+func init() {
+	defaultMatchLimits.Store(packMatchLimits(DefaultMatchLimit, DefaultDepthLimit))
+}
+
+// SetDefaultMatchLimits configures the limits applied to subsequently compiled
+// matchers. Both limits must be non-zero so matchers cannot accidentally fall
+// back to the much larger PCRE2 library defaults.
+func SetDefaultMatchLimits(matchLimit, depthLimit uint32) error {
+	if matchLimit == 0 || depthLimit == 0 {
+		return errors.New("pcre match and depth limits must be non-zero")
+	}
+	defaultMatchLimits.Store(packMatchLimits(matchLimit, depthLimit))
+	return nil
+}
+
+// GetDefaultMatchLimits returns the limits applied to new matchers.
+func GetDefaultMatchLimits() (matchLimit, depthLimit uint32) {
+	limits := defaultMatchLimits.Load()
+	return uint32(limits >> 32), uint32(limits)
+}
+
+func packMatchLimits(matchLimit, depthLimit uint32) uint64 {
+	return uint64(matchLimit)<<32 | uint64(depthLimit)
+}
 
 type PCRE struct {
 	expr string
@@ -82,9 +128,7 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 			case 'E':
 				pcre.ignoreEndNewline = true
 			case 'G':
-				log.Warnf("pcre modifier G not implemented, %s may not works as expected\n", pattern)
-				// Inverts the greediness.
-				// not implemented
+				return nil, fmt.Errorf("pcre modifier G is not implemented")
 			case 'R':
 				pcre.relative = true
 			case 'U':
@@ -117,9 +161,9 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 			case 'Y':
 				pcre.modifier = modifier.HTTPStatMsg
 			case 'B':
-				//log.Warnf("pcre modifier B not implemented, %s may not works as expected\n", pattern)
+				return nil, fmt.Errorf("pcre modifier B is not implemented")
 			case 'O':
-				log.Warnf("pcre modifier O not implemented, %s may not works as expected\n", pattern)
+				return nil, fmt.Errorf("pcre modifier O is not implemented")
 			case 'V':
 				pcre.modifier = modifier.HTTPUserAgent
 			case 'W':
@@ -142,6 +186,10 @@ func (p *PCRE) Matcher() (*Matcher, error) {
 	matcher, err := regexp2.Compile(p.expr, p.opts)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
+	}
+	matchLimit, depthLimit := GetDefaultMatchLimits()
+	if err := matcher.SetMatchLimits(matchLimit, depthLimit); err != nil {
+		return nil, errors.Wrap(err, "configure pcre match limits")
 	}
 	return &Matcher{
 		PCRE:    p,
@@ -187,17 +235,34 @@ func (p *PCRE) IgnoreCase() bool {
 	return p.opts&regexp2.IgnoreCase != 0
 }
 
-func (p *Matcher) Match(content []byte) []data.Matched {
-	var matches []data.Matched
-	match, _ := p.matcher.FindStringMatch(string(content))
+func (p *Matcher) Match(content []byte) ([]data.Matched, error) {
+	if len(content) > DefaultSubjectLimit {
+		return nil, ErrSubjectLimit
+	}
+	matches := make([]data.Matched, 0, 16)
+	match, err := p.matcher.FindStringMatch(string(content))
+	if err != nil {
+		return nil, fmt.Errorf("find first pcre match: %w", err)
+	}
 	for match != nil {
+		if len(matches) >= DefaultResultLimit {
+			return nil, ErrResultLimit
+		}
 		matches = append(matches, data.Matched{
 			Pos: match.Index,
 			Len: match.Length,
 		})
-		match, _ = p.matcher.FindNextMatch(match)
+
+		previous := match
+		match, err = p.matcher.FindNextMatch(previous)
+		if err != nil {
+			return nil, fmt.Errorf("find next pcre match: %w", err)
+		}
+		if previous.Length == 0 && match != nil && match.Index <= previous.Index {
+			return nil, fmt.Errorf("%w at rune offset %d", ErrZeroLengthMatchLoop, previous.Index)
+		}
 	}
-	return matches
+	return matches, nil
 }
 
 func (p *Generator) Generate() []byte {
