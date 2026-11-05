@@ -55,6 +55,22 @@ func TestScanProjectFiles(t *testing.T) {
 		require.GreaterOrEqual(t, len(result.Folders), 1)
 	})
 
+	t.Run("With Entry Files", func(t *testing.T) {
+		result, err := ScanProjectFiles(ScanConfig{
+			ProgramName:     "test_prog",
+			ProgramPath:     "src",
+			FileSystem:      fs,
+			ExcludeFunc:     newExcludeFunc(nil, "", true),
+			CheckLanguage:   checkLanguage,
+			CheckPreHandler: checkLanguage,
+			EntryFiles:      []string{"./src/main.go"},
+			Context:         context.Background(),
+		})
+		require.NoError(t, err)
+		require.Equal(t, []string{"src/main.go"}, result.HandlerFiles)
+		require.Equal(t, []string{"src/main.go"}, result.PreHandlerFiles)
+	})
+
 	t.Run("With Exclude", func(t *testing.T) {
 		excludeFunc := newExcludeFunc([]string{"src/vendor/"}, "", true)
 
