@@ -3,11 +3,11 @@ package rule
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/yaklang/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
 	config2 "github.com/yaklang/yaklang/common/suricata/config"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,62 +31,78 @@ import (
 // rules, err = suricata.ParseSuricata(ruleContent, "HOME_NET=192.168.1.0/24", "EXTERNAL_NET=any")
 // ```
 func Parse(data string, envs ...string) ([]*Rule, error) {
-	config, err := config2.ParseSuricataConfig(config2.DefaultConfigYaml)
-	if err != nil {
-		log.Errorf("initing suricata default config failed: %v", err)
-	}
-	var buf strings.Builder
-	var dataBuf = bufio.NewReader(strings.NewReader(data))
-	for {
-		line, err := utils.BufioReadLineString(dataBuf)
-		if err != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") || line == "" {
-			buf.WriteByte('\n')
-			continue
-		}
-		buf.WriteString(line)
-		buf.WriteByte('\n')
-	}
-
-	compileRaw := buf.String()
-	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(compileRaw))
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := rule.NewSuricataRuleParser(tokenStream)
-	parser.RemoveErrorListeners()
-	errListener := antlr4util.NewErrorListener()
-	parser.AddErrorListener(errListener)
-	v := &RuleSyntaxVisitor{Raw: []byte(data), CompileRaw: compileRaw, Config: config}
-	for _, e := range envs {
-		before, after, cut := strings.Cut(e, "=")
-		if !cut {
-			log.Warnf("env input:[%v] cannot parse as key=value", e)
-			continue
-		}
-		v.Config.AddVar(before, after)
-	}
-	ruleCtx := parser.Rules().(*rule.RulesContext)
-	v.VisitRules(ruleCtx)
-	for _, r := range v.Rules {
-		ParseRuleMetadata(r)
-	}
-	if len(v.Rules) > 0 {
-		return v.Rules, nil
-	} else {
-		return nil, v.MergeErrors()
-	}
+	return parseRules(data, false, envs...)
 }
+
 func ParseStrictRule(data string, envs ...string) ([]*Rule, error) {
-	config, err := config2.ParseSuricataConfig(config2.DefaultConfigYaml)
-	if err != nil {
-		log.Errorf("initing suricata default config failed: %v", err)
+	return parseRules(data, true, envs...)
+}
+
+func parseRules(data string, strict bool, envs ...string) ([]*Rule, error) {
+	config := config2.DefaultConfig.Clone()
+	var envErrors []error
+	for _, env := range envs {
+		name, value, ok := strings.Cut(env, "=")
+		if !ok {
+			envErrors = append(envErrors, fmt.Errorf("suricata env %q must use key=value format", env))
+			continue
+		}
+		name = strings.Trim(strings.TrimSpace(name), "${}")
+		if name == "" {
+			envErrors = append(envErrors, fmt.Errorf("suricata env %q has an empty name", env))
+			continue
+		}
+		if err := config.AddVar(name, strings.TrimSpace(value)); err != nil {
+			envErrors = append(envErrors, fmt.Errorf("add suricata env %s: %w", name, err))
+		}
 	}
+
+	compileRaw := preprocessRules(data)
+	input := antlr.NewInputStream(compileRaw)
+	errListener := antlr4util.NewErrorListener()
+	lexer := rule.NewSuricataRuleLexer(input)
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errListener)
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := rule.NewSuricataRuleParser(tokenStream)
+	parser.RemoveErrorListeners()
+	parser.AddErrorListener(errListener)
+
+	ctx, ok := parser.Rules().(*rule.RulesContext)
+	if !ok || ctx == nil {
+		return nil, errors.Join(append(envErrors, errors.New("suricata parser returned no rule context"))...)
+	}
+	if strict && len(errListener.GetErrors()) > 0 {
+		return nil, errors.Join(append(envErrors, errListener.Error())...)
+	}
+
+	visitor := &RuleSyntaxVisitor{Raw: []byte(data), CompileRaw: compileRaw, Config: config}
+	visitor.VisitRules(ctx)
+	for _, parsed := range visitor.Rules {
+		ParseRuleMetadata(parsed)
+	}
+
+	parseErrors := append([]error(nil), envErrors...)
+	if strict || len(visitor.Rules) == 0 {
+		parseErrors = append(parseErrors, visitor.Errors...)
+		if syntaxErr := errListener.Error(); syntaxErr != nil {
+			parseErrors = append(parseErrors, syntaxErr)
+		}
+	}
+	if len(visitor.Rules) == 0 && len(parseErrors) == 0 {
+		parseErrors = append(parseErrors, errors.New("no valid suricata rules found"))
+	}
+	if len(parseErrors) > 0 {
+		return visitor.Rules, errors.Join(parseErrors...)
+	}
+	return visitor.Rules, nil
+}
+
+func preprocessRules(data string) string {
 	var buf strings.Builder
-	var dataBuf = bufio.NewReader(strings.NewReader(data))
+	reader := bufio.NewReader(strings.NewReader(data))
 	for {
-		line, err := utils.BufioReadLineString(dataBuf)
+		line, err := utils.BufioReadLineString(reader)
 		if err != nil {
 			break
 		}
@@ -98,42 +114,13 @@ func ParseStrictRule(data string, envs ...string) ([]*Rule, error) {
 		buf.WriteString(line)
 		buf.WriteByte('\n')
 	}
-
-	compileRaw := buf.String()
-	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(compileRaw))
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := rule.NewSuricataRuleParser(tokenStream)
-	parser.RemoveErrorListeners()
-	errListener := antlr4util.NewErrorListener()
-	parser.AddErrorListener(errListener)
-	v := &RuleSyntaxVisitor{Raw: []byte(data), CompileRaw: compileRaw, Config: config}
-	for _, e := range envs {
-		before, after, cut := strings.Cut(e, "=")
-		if !cut {
-			log.Warnf("env input:[%v] cannot parse as key=value", e)
-			continue
-		}
-		v.Config.AddVar(before, after)
-	}
-	ruleCtx := parser.Rules().(*rule.RulesContext)
-	if len(errListener.GetErrors()) > 0 {
-		return nil, errors.New(errListener.GetErrorString())
-	}
-	v.VisitRules(ruleCtx)
-	for _, r := range v.Rules {
-		ParseRuleMetadata(r)
-	}
-	if len(v.Rules) > 0 {
-		return v.Rules, nil
-	} else {
-		return nil, v.MergeErrors()
-	}
+	return buf.String()
 }
 
 func ParseRuleMetadata(rule *Rule) {
 	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("parse rule metadata failed: %s", err)
+		if recover() != nil {
+			return
 		}
 	}()
 	if rule == nil {

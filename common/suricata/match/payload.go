@@ -1,27 +1,66 @@
 package match
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+	"github.com/yaklang/yaklang/common/suricata/data/numrange"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"golang.org/x/exp/slices"
-	"strconv"
-	"strings"
 )
 
-func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler {
-	if r.PCREParsed != nil {
-		// pcre match
-		return newPCREMatch(r)
+func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) (matchHandler, error) {
+	var bsizeRange, dsizeRange *numrange.NumRange
+	var err error
+	if r.BSize != "" {
+		bsizeRange, err = numrange.ParseNumRange(r.BSize)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid bsize")
+		}
 	}
+	if r.DSize != "" {
+		dsizeRange, err = numrange.ParseNumRange(r.DSize)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid dsize")
+		}
+	}
+
+	var contentMatcher matchHandler
+	if r.PCREParsed != nil {
+		contentMatcher, err = newPCREMatch(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return func(c *matchContext) error {
-		if len(r.Content) == 0 {
+		buffer := c.GetBuffer(mdf)
+		if bsizeRange != nil && !c.Must(bsizeRange.Match(len(buffer))) {
 			return nil
 		}
+		if dsizeRange != nil {
+			packetPayload := c.GetBuffer(modifier.Default)
+			if transportLayer := c.PK.TransportLayer(); transportLayer != nil {
+				packetPayload = transportLayer.LayerPayload()
+			}
+			if !c.Must(dsizeRange.Match(len(packetPayload))) {
+				return nil
+			}
+		}
+		if contentMatcher != nil {
+			return contentMatcher(c)
+		}
+		if len(r.Content) == 0 {
+			if r.IsDataAt == "" {
+				return nil
+			}
+			return matchStandaloneIsDataAt(c, buffer, r.IsDataAt)
+		}
 
-		var indexes []data.Matched
-		buffer := c.GetBuffer(mdf)
+		indexes := bytesIndexAll(buffer, r.Content, r.Nocase)
 
 		defer func() {
 			if r.Negative && c.IsRejected() {
@@ -31,72 +70,55 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 			}
 		}()
 
-		// match all
-		indexes = bytesIndexAll(buffer, r.Content, r.Nocase)
 		if !c.Must(len(indexes) > 0) {
 			return nil
 		}
 
-		// special options startswith
 		if r.StartsWith {
 			if !c.Must(indexes[0].Pos == 0) {
 				return nil
 			}
-			c.Value["prevMatch"] = []data.Matched{indexes[0]}
-			c.SetPrevMatched(mdf, indexes)
+			c.SetPrevMatched(mdf, []data.Matched{indexes[0]})
 			return nil
 		}
 
-		// special options endswith
 		if r.EndsWith {
 			targetPos := len(buffer) - len(r.Content)
-			// depth is valid in endswith
 			if r.Depth != nil {
 				targetPos = *r.Depth - len(r.Content)
 			}
 
-			if _, found := slices.BinarySearchFunc(indexes, targetPos, func(m data.Matched, i int) int {
+			idx, found := slices.BinarySearchFunc(indexes, targetPos, func(m data.Matched, i int) int {
 				return m.Pos - i
-			}); !c.Must(found) {
-				c.Value["prevMatch"] = []data.Matched{indexes[0]}
+			})
+			if !c.Must(found) {
+				return nil
 			}
-
+			c.SetPrevMatched(mdf, []data.Matched{indexes[idx]})
 			return nil
 		}
 
-		// depth & offset
-		// [le,ri]
 		if r.Depth != nil || r.Offset != nil {
-			le := 0
-			ri := len(buffer)
-
+			left := 0
 			if r.Offset != nil {
-				le = *r.Offset
+				left = *r.Offset
 			}
-
-			if r.Depth != nil {
-				ri = le + *r.Depth - len(r.Content) + 1
+			if !c.Must(left >= 0) {
+				return nil
 			}
-
-			// [lp,rp)
-			lp, _ := slices.BinarySearchFunc(indexes, le, func(m data.Matched, i int) int {
-				return m.Pos - i
+			indexes = slices.DeleteFunc(indexes, func(m data.Matched) bool {
+				if m.Pos < left {
+					return true
+				}
+				return r.Depth != nil && (*r.Depth < 0 || m.Pos+m.Len > left+*r.Depth)
 			})
-
-			rp, _ := slices.BinarySearchFunc(indexes, ri, func(m data.Matched, i int) int {
-				return m.Pos - i
-			})
-
-			indexes = indexes[lp:rp]
 			if !c.Must(len(indexes) != 0) {
 				return nil
 			}
 		}
 
-		// load prev matches for rel checker
 		prevMatch, existed := c.GetPrevMatched(mdf)
 
-		// distance
 		if r.Distance != nil && existed {
 			indexes = slices.DeleteFunc(indexes, func(m data.Matched) bool {
 				for _, pm := range prevMatch {
@@ -111,11 +133,10 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 			}
 		}
 
-		// within
 		if r.Within != nil && existed {
 			indexes = slices.DeleteFunc(indexes, func(m data.Matched) bool {
 				for _, pm := range prevMatch {
-					if m.Pos+m.Len <= pm.Pos+pm.Len+*r.Within {
+					if m.Pos >= pm.Pos+pm.Len && m.Pos+m.Len <= pm.Pos+pm.Len+*r.Within {
 						return false
 					}
 				}
@@ -125,7 +146,7 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 				return nil
 			}
 		}
-		// isdataat
+
 		if r.IsDataAt != "" {
 			strpos := strings.Split(r.IsDataAt, ",")
 			var neg bool
@@ -141,12 +162,10 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 				return errors.Wrap(err, "isdataat format error")
 			}
 			if len(strpos) == 1 {
-				// no relative
-				indexes = slices.DeleteFunc(indexes, func(m data.Matched) bool {
+				indexes = slices.DeleteFunc(indexes, func(data.Matched) bool {
 					return negIf(neg, pos >= len(buffer))
 				})
 			} else {
-				// with reletive
 				if !c.Must(len(strpos) == 2 && strpos[1] == "relative") {
 					return errors.New("isdataat format error")
 				}
@@ -159,39 +178,75 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) matchHandler 
 			}
 		}
 
-		// todo:bsize dsize
-		if r.DSize != "" && r.Modifier == modifier.Default {
-
-		}
-
 		c.SetPrevMatched(mdf, indexes)
 		return nil
-	}
+	}, nil
 }
 
-func attachPayloadMatcher(c *matchContext) {
-	// register buffer provider
-	for _, r := range c.Rule.ContentRuleConfig.ContentRules {
-		c.Attach(newPayloadMatcher(r, r.Modifier))
+func matchStandaloneIsDataAt(c *matchContext, buffer []byte, raw string) error {
+	parts := strings.Split(raw, ",")
+	if len(parts) != 1 {
+		return errors.New("standalone isdataat does not support relative")
 	}
+	value := strings.TrimSpace(parts[0])
+	negative := strings.HasPrefix(value, "!")
+	value = strings.TrimPrefix(value, "!")
+	position, err := strconv.Atoi(value)
+	if err != nil || position < 0 {
+		return errors.Wrap(err, "isdataat format error")
+	}
+	c.Must(negIf(negative, position < len(buffer)))
+	return nil
 }
 
-func attachFastPattern(c *matchContext) {
-	// fast pattern
-	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
-		return rule.FastPattern
-	})
-	if idx != -1 {
-		fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
-		if fastPatternRule.Modifier == modifier.FileData {
-			// filedata has its individual matcher
-			c.Attach(newFileDataMatcher(fastPatternRule))
-		} else {
-			c.Attach(
-				newPayloadMatcher(
-					fastPatternCopy(fastPatternRule),
-					fastPatternRule.Modifier),
-			)
+func attachPayloadMatcher(c *matchContext) error {
+	contentRules := c.Rule.ContentRuleConfig.ContentRules
+	if len(contentRules) == 0 {
+		if bsize, ok := c.Rule.SettingMap["bsize"]; ok {
+			contentRules = append(contentRules, &rule.ContentRule{BSize: bsize})
+		}
+		if dsize, ok := c.Rule.SettingMap["dsize"]; ok {
+			if len(contentRules) == 0 {
+				contentRules = append(contentRules, &rule.ContentRule{DSize: dsize})
+			} else {
+				contentRules[0].DSize = dsize
+			}
 		}
 	}
+	for _, r := range contentRules {
+		matcher, err := newPayloadMatcher(r, r.Modifier)
+		if err != nil {
+			return err
+		}
+		c.Attach(matcher)
+	}
+	return nil
+}
+
+func attachFastPattern(c *matchContext) error {
+	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
+		return rule.FastPattern && !rule.Negative
+	})
+	if idx == -1 {
+		return nil
+	}
+
+	fastPatternRule := c.Rule.ContentRuleConfig.ContentRules[idx]
+	fastPatternRule = fastPatternCopy(fastPatternRule)
+	if fastPatternRule.Modifier == modifier.FileData {
+		c.Attach(newFileDataMatcher(fastPatternRule))
+		return nil
+	}
+	matcher, err := newPayloadMatcher(fastPatternRule, fastPatternRule.Modifier)
+	if err != nil {
+		return err
+	}
+	c.Attach(func(c *matchContext) error {
+		prevMatched, prevModifier := c.prevMatched, c.prevModifier
+		defer func() {
+			c.prevMatched, c.prevModifier = prevMatched, prevModifier
+		}()
+		return matcher(c)
+	})
+	return nil
 }

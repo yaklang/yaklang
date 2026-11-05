@@ -11,7 +11,11 @@ import (
 
 // untested
 func newFileDataMatcher(r *rule.ContentRule) func(c *matchContext) error {
+	matcher, compileErr := newPayloadMatcher(r, modifier.FileData)
 	return func(c *matchContext) error {
+		if compileErr != nil {
+			return compileErr
+		}
 		// 10 MB
 		data := c.Value["data"]
 		if !c.Must(data != nil) {
@@ -56,7 +60,7 @@ func newFileDataMatcher(r *rule.ContentRule) func(c *matchContext) error {
 			if !c.Must(err == nil) {
 				return nil
 			}
-			if err := newPayloadMatcher(r, modifier.FileData)(c); err != nil {
+			if err := matcher(c); err != nil {
 				return err
 			}
 			if !c.IsRejected() {

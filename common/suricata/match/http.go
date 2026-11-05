@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -47,7 +48,7 @@ func (h *HttpFlow) ToRequestPacket() []gopacket.Packet {
 }
 
 func (h *HttpFlow) createRequestPacket() []gopacket.Packet {
-	var packets = make([]gopacket.Packet, 2)
+	packets := make([]gopacket.Packet, 0, 2)
 
 	// 如果 TrafficFlow 不为空，优先使用其中的网络信息
 	if h.TrafficFlow != nil {
@@ -139,17 +140,17 @@ func httpParser(c *matchContext) error {
 }
 
 func attachHTTPMatcher(c *matchContext) {
-	// http match
-	if isreq, ok := c.Value["isReq"].(bool); ok && isreq {
+	if c.Rule.ContentRuleConfig.HTTPConfig != nil {
 		c.Attach(httpReqMatcher)
-	} else {
-		// suricata 文档没有 http resp 的非 sticky modifier
-		// c.Attach(httpResMatcher)
 	}
 }
 
 func httpReqMatcher(c *matchContext) error {
 	if cf := c.Rule.ContentRuleConfig.HTTPConfig; cf != nil {
+		isRequest, _ := c.Value["isReq"].(bool)
+		if !c.Must(isRequest) {
+			return nil
+		}
 		if cf.Uricontent != "" {
 			log.Errorf("uricontent has been deprecated and not implemented yet")
 		}
@@ -242,6 +243,18 @@ func (h *httpProvider) Get(modi modifier.Modifier) []byte {
 	return nil
 }
 
+func rawHTTPHeaderValue(raw []byte, name string) []byte {
+	lines := bytes.Split(raw, []byte("\r\n"))
+	for _, line := range lines[1:] {
+		index := bytes.IndexByte(line, ':')
+		if index <= 0 || !strings.EqualFold(string(line[:index]), name) {
+			continue
+		}
+		return bytes.TrimSpace(line[index+1:])
+	}
+	return nil
+}
+
 func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 	switch modi {
 	case modifier.HTTPUri:
@@ -276,17 +289,17 @@ func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 	case modifier.HTTPUserAgent:
 		return []byte(h.req.UserAgent())
 	case modifier.HTTPHost:
-		return []byte(h.req.Host)
+		host := h.req.Host
+		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+			host = parsedHost
+		} else if index := strings.LastIndexByte(host, ':'); index > 0 && !strings.Contains(host[index+1:], "]") {
+			if _, err := strconv.Atoi(host[index+1:]); err == nil {
+				host = host[:index]
+			}
+		}
+		return []byte(strings.ToLower(host))
 	case modifier.HTTPHostRaw:
-		st := bytes.Index(h.raw, []byte("\r\nHost: "))
-		if st == -1 {
-			return nil
-		}
-		ed := bytes.Index(h.raw[st+8:], []byte("\r\n"))
-		if ed == -1 {
-			return nil
-		}
-		return h.raw[st+8 : st+8+ed]
+		return rawHTTPHeaderValue(h.raw, "host")
 	case modifier.HTTPAccept:
 		return []byte(h.req.Header.Get("Accept"))
 	case modifier.HTTPAcceptLang:
