@@ -71,6 +71,16 @@ func hasUnselectedEtherIP(p gopacket.Packet) bool {
 	return false
 }
 
+// selectedGeneve is shared by native admission and capture-domain projection.
+// Only the existing option-free version-zero Ethernet data profile owns children.
+func selectedGeneve(v *layers.Geneve) bool {
+	if v == nil {
+		return false
+	}
+	h := v.LayerContents()
+	return len(h) == 8 && h[0] == 0 && h[1] == 0 && h[7] == 0 && v.Protocol == layers.EthernetTypeTransparentEthernetBridging
+}
+
 func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner gopacket.NetworkLayer, networks, tunnels int, unsupported bool) {
 	for _, l := range p.Layers() {
 		if stop != nil && l == stop {
@@ -110,8 +120,7 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 		case *layers.Geneve:
 			tunnels++
 			// Only option-free v0 Ethernet data is selected for normalization.
-			header := v.LayerContents()
-			if len(header) != 8 || header[0] != 0 || header[1] != 0 || header[7] != 0 || v.Protocol != layers.EthernetTypeTransparentEthernetBridging {
+			if !selectedGeneve(v) {
 				unsupported = true
 			}
 		case *layers.IPv4:
@@ -285,6 +294,18 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			// transport ingress rejects this original error-bearing packet.
 			return p, false
 		}
+		return nil, true
+	}
+	if a.refuseUnconfirmedPPPoEOwner(p, e, ci) {
+		return nil, true
+	}
+	if a.refuseIPv4IPIPExtent(p, e, ci) {
+		if p.ErrorLayer() != nil {
+			return &ipv4IPIPExtentRefusedPacket{p}, false
+		}
+		return nil, true
+	}
+	if a.refuseIPv4FragmentExtent(p, e, ci) {
 		return nil, true
 	}
 	if failure := p.ErrorLayer(); failure != nil {
@@ -890,6 +911,12 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	// RFC 6946: atomic fragments neither join nor remove a matching pending
 	// datagram, including one quarantined after an overlap.
 	if key.v6 && off == 0 && !more {
+		// Removing Fragment must not legalize an on-wire HBH after it.
+		// RFC 8200 section 4 requires HBH immediately after the IPv6 header.
+		if f, ok := p.Layer(layers.LayerTypeIPv6Fragment).(*layers.IPv6Fragment); ok && f.NextHeader == layers.IPProtocolIPv6HopByHop {
+			a.networkDiagnostic(e, ci, "malformed", "IPv6OptionsHeaderOrder")
+			return nil, true
+		}
 		header, err := fragmentHeader(p, true)
 		if err != nil || p.Metadata().Truncated || ci.CaptureLength < ci.Length || len(header)-40+len(payload) > 65535 {
 			a.networkDiagnostic(e, ci, "malformed", "FragmentLength")
@@ -958,6 +985,11 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	}
 	if key.v6 && off == 0 {
 		f, ok := p.Layer(layers.LayerTypeIPv6Fragment).(*layers.IPv6Fragment)
+		// Only offset zero supplies the reassembled Next Header. A later
+		// fragment's value must not change this datagram's interpretation.
+		if ok && f.NextHeader == layers.IPProtocolIPv6HopByHop {
+			return invalid("IPv6OptionsHeaderOrder")
+		}
 		if !ok || !completeFragmentFirstHeader(byte(f.NextHeader), payload) {
 			return invalid("FragmentFirstHeader")
 		}
@@ -1081,7 +1113,11 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if e.carrierOwned {
 		e.byteSourceKind = "reassembled"
 	}
-	return a.reassembledPacket(header, raw, e, ci, key.v6)
+	q, handled := a.reassembledPacket(header, raw, e, ci, key.v6)
+	if key.v6 && q != nil && len(header) == 40 && header[6] == 115 && len(v.parts) > 0 && v.parts[0].start == 0 {
+		q = &l2tp3IPv6FragmentPacket{Packet: q, firstPayloadBytes: len(v.parts[0].data)}
+	}
+	return q, handled
 }
 
 // RFC 8200 section 4.5 requires the offset-zero fragment to contain the
@@ -1119,12 +1155,87 @@ func completeFragmentFirstHeader(next byte, b []byte) bool {
 			return n >= 20 && n <= len(b)
 		case 41:
 			return len(b) >= 40
+		case 46: // Selected RSVP common header.
+			return len(b) >= 8
+		case 47:
+			return completeFragmentGREHeader(b)
+		case 89: // IPv6's selected OSPFv3 fixed header, not its message body.
+			return len(b) >= 16
+		case 103: // Only the PIM common header, not its type-specific body.
+			return len(b) >= 4
+		case 115:
+			if len(b) < 4 {
+				return false
+			}
+			// Zero SID selects control16; nonzero data remains context-dependent.
+			return binary.BigEndian.Uint32(b[:4]) != 0 || len(b) >= 16
 		default:
 			// Unknown upper layers remain unknown to normal ingress; no
 			// transport admission is inferred from their identifier.
 			return true
 		}
 	}
+}
+
+// Check only the currently selected GRE header's complete byte extent. The
+// normal carrier gate still decides version, flags, child profile and semantics.
+// Unsupported versions/profiles must retain their existing refusal, not acquire
+// a fabricated minimum upper-header grammar here.
+func completeFragmentGREHeader(b []byte) bool {
+	if len(b) < 4 {
+		return false
+	}
+	version := b[1] & 7
+	if version == 1 {
+		flags := binary.BigEndian.Uint16(b[:2])
+		if flags&^uint16(0x3081) != 0 || flags&0x2000 == 0 || binary.BigEndian.Uint16(b[2:4]) != uint16(layers.EthernetTypePPP) {
+			return true // The existing PPTP profile gate owns this refusal.
+		}
+		n := 8
+		if flags&0x1000 != 0 {
+			n += 4
+		}
+		if flags&0x80 != 0 {
+			n += 4
+		}
+		return n <= len(b)
+	}
+	if version != 0 {
+		return true // An unselected GRE version is not an admitted child.
+	}
+	at := 4
+	if b[0]&0xc0 != 0 {
+		at += 4
+	}
+	if b[0]&0x20 != 0 {
+		at += 4
+	}
+	if b[0]&0x10 != 0 {
+		at += 4
+	}
+	if at > len(b) {
+		return false
+	}
+	if b[0]&0x40 != 0 {
+		for {
+			if at+4 > len(b) {
+				return false
+			}
+			size := int(b[at+3])
+			end := b[at] == 0 && b[at+1] == 0 && size == 0
+			at += 4 + size
+			if at > len(b) {
+				return false
+			}
+			if end {
+				break
+			}
+		}
+	}
+	if b[1]&0x80 != 0 {
+		at += 4
+	}
+	return at <= len(b)
 }
 
 // Retain the offset-zero IP header and pre-fragment extension headers. Rebuilding

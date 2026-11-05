@@ -61,7 +61,13 @@ func TestSSHEncryptedByteSourceDoesNotRelabelOtherObservations(t *testing.T) {
 		{"quic", "context-required", "Encrypted", "captured"},
 	} {
 		t.Run(tc.protocol+"/"+tc.status+"/"+tc.expert, func(t *testing.T) {
-			e := &pcaputil.ProtocolEvent{ID: 3, Protocol: tc.protocol, Transport: "tcp", Status: tc.status, ExpertCode: tc.expert,
+			transport := "tcp"
+			if tc.protocol == "quic" {
+				// This fixture checks unrelated, supported carriers. QUIC-shaped
+				// TCP candidates have a separate unconfirmed-observation contract.
+				transport = "udp"
+			}
+			e := &pcaputil.ProtocolEvent{ID: 3, Protocol: tc.protocol, Transport: transport, Status: tc.status, ExpertCode: tc.expert,
 				Length: 192, Raw: bytes.Repeat([]byte{0x42}, 64), SourceBytes: pcaputil.ByteSource{Kind: tc.kind}}
 			fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 			for _, f := range fields {

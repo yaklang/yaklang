@@ -416,6 +416,25 @@ func (y *singleFileBuilder) VisitClassOrInterfaceType(raw javaparser.IClassOrInt
 		return importType
 	}
 	typ = y.CreateBlueprint(className, raw)
+	if imported, ok := y.fullTypeNameMap[className]; ok {
+		pkg := y.GetProgram().PkgName
+		if pkg == "" {
+			pkg = "main"
+		}
+		fallback := pkg + "." + className
+		if strings.Join(imported, ".") != fallback {
+			// A deferred explicit import can reach this fallback before its
+			// package is bound. It must not also acquire the importing package's
+			// guessed identity merely because that package compiled first.
+			names := make([]string, 0, len(typ.GetFullTypeNames()))
+			for _, name := range typ.GetFullTypeNames() {
+				if name != fallback {
+					names = append(names, name)
+				}
+			}
+			typ.SetFullTypeNames(names)
+		}
+	}
 	typ = y.AddFullTypeNameFromMap(className, typ)
 	return typ
 }

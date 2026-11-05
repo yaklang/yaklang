@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -221,7 +222,10 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, netflowV9DisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
 	out = append(out, tlsResumptionDisplayBindings()...)
+	out = append(out, tlsCertificateRequestDisplayBindings()...)
+	out = append(out, tlsPHADisplayBindings()...)
 	out = append(out, espDisplayBindings()...)
+	out = append(out, smb1DisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
 		typ       DisplayFieldType
@@ -288,6 +292,11 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"rdpudp", "rdpudp.data.sourceStart", "RDPUDP reliable source sequence", "Source Sequence", "pdu", DisplayUnsigned, 32},
 		{"tls", "tls.version", "Negotiated TLS version", "Negotiated Version", "context", DisplayUnsigned, 16},
 		{"tls", "tls.record.authenticated", "TLS record authentication verified", "Authentication Verified", "derived", DisplayBoolean, 0},
+		{"tls", "tls.record.key_epoch", "TLS authenticated record key epoch", "TLS Key Epoch", "derived", DisplayString, 0},
+		{"tls", "tls.early_data.decision", "TLS observed early-data decision", "Early Data Decision", "context", DisplayString, 0},
+		{"tls", "tls.early_data.cipher_suite", "TLS uniquely authenticated early-data cipher suite", "Early Cipher Suite", "derived", DisplayUnsigned, 16},
+		{"tls", "tls.early_data.record_sequence", "TLS authenticated early-epoch record sequence", "Early Record Sequence", "derived", DisplayUnsigned, 64},
+		{"tls", "tls.early_data.decision_pdu", "TLS early-data decision context PDU", "Early Data Decision PDU", "context", DisplayUnsigned, 64},
 		{"tls", "tls.record.wire_type", "TLS on-wire record type", "Record Type", "pdu", DisplayUnsigned, 8},
 		{"tls", "tls.record.version", "TLS legacy record version", "Record Version", "pdu", DisplayUnsigned, 16},
 		{"tls", "tls.record.length", "TLS record payload length", "Record Length", "pdu", DisplayUnsigned, 16},
@@ -411,7 +420,10 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			emit(typ)
 		}
 	})
+	b.rangeKey = "Record Type"
 	out = append(out, b)
+	path("tls", "tls", "tls.handshake.key_update.request_update", "TLS KeyUpdate request decoded from authenticated handshake plaintext", DisplayUnsigned, 8, "derived", "Handshake Messages", "*", "Key Update Request")
+	out[len(out)-1].descriptor.Description = "Literal request byte in authenticated KeyUpdate handshake plaintext; derived by decryption, with no ciphertext PDU or physical-frame span"
 	path("rip", "rip", "rip.metric", "RIP route metric", DisplayUnsigned, 32, "pdu", "Entries", "*", "Metric")
 	path("http2|grpc|doh", "http2", "http2.streamid", "HTTP/2 stream ID", DisplayUnsigned, 31, "pdu", "Stream ID")
 	path("grpc", "grpc", "grpc.status", "gRPC status", DisplayUnsigned, 32, "pdu", "GRPC Status")
@@ -506,6 +518,56 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		name, key string
 		bits      int
 	}{
+		{"http3.late_association.request_pdu", "Request PDU ID", 64},
+		{"http3.late_association.request_headers_pdu", "Request Headers PDU ID", 64},
+		{"http3.late_association.response_pdu", "Response PDU ID", 64},
+		{"http3.late_association.streamid", "Stream ID", 62},
+	} {
+		spec := spec
+		out = append(out, displayCustom("http3", spec.name, "Later association of validated header observations; not a literal wire field or whole-message verdict", DisplayUnsigned, spec.bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			p.maps(e.Session["HTTP3 Late Associations"], func(link map[string]any) { emit(link[spec.key]) })
+			p.maps(e.Session["HTTP3 Resolved Associations"], func(link map[string]any) { emit(link[spec.key]) })
+		}))
+	}
+	out = append(out, displayCustom("http3", "pdu.resolved_response_to", "Request relation learned later in the retained capture view; original pdu.response_to is unchanged", DisplayUnsigned, 64, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		p.maps(e.Session["HTTP3 Resolved Associations"], func(link map[string]any) {
+			if link["Ambiguous"] != true {
+				emit(link["Request PDU ID"])
+			}
+		})
+	}))
+	for _, spec := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"http3.late_message.verdict", "Observation Verdict", DisplayString, 0},
+		{"http3.late_message.length_check", "Length Check", DisplayString, 0},
+		{"http3.late_message.request_method_class", "Request Method Class", DisplayString, 0},
+		{"http3.late_message.request_method", "Request Method", DisplayString, 0},
+		{"http3.late_message.observed_data_bytes", "Observed DATA Bytes", DisplayUnsigned, 64},
+		{"http3.late_message.header_pdu", "Header PDU ID", DisplayUnsigned, 64},
+		{"http3.late_message.observed_in_pdu", "Observed In PDU ID", DisplayUnsigned, 64},
+		{"http3.late_message.streamid", "Stream ID", DisplayUnsigned, 62},
+		{"http3.late_message.direction", "Direction", DisplayUnsigned, 1},
+		{"http3.late_message.coverage_complete", "Body Coverage Complete", DisplayBoolean, 0},
+	} {
+		spec := spec
+		out = append(out, displayCustom("http3", spec.name, "Later method check of retained response observations; no wire range or whole-message/peer-delivery certificate", spec.typ, spec.bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			displayHTTP3LateMessage(e, p, func(m map[string]any) { emit(m[spec.key]) })
+		}))
+	}
+	out = append(out, displayCustom("http3", "http3.late_message.fin_pdu", "Original FIN observation, independent of the later contiguous delivery or method PDU", DisplayUnsigned, 64, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		displayHTTP3LateMessage(e, p, func(m map[string]any) {
+			if f, ok := m["Observed FIN Source"].(map[string]any); ok && f["Available"] == true {
+				emit(f["PDU ID"])
+			}
+		})
+	}))
+	for _, spec := range []struct {
+		name, key string
+		bits      int
+	}{
 		{"http3.connection.error_code", "Error Code", 62},
 		{"http3.connection.error_pdu", "First PDU ID", 64},
 		{"http3.connection.error_streamid", "Stream ID", 62},
@@ -540,6 +602,145 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			emit(m[spec.key])
 		}))
 	}
+	for _, spec := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"http3.tunnel.error_code", "Error Code", DisplayUnsigned, 62},
+		{"http3.tunnel.frame_type", "Frame Type Value", DisplayUnsigned, 62},
+		{"http3.tunnel.frame_pdu", "Frame PDU ID", DisplayUnsigned, 64},
+		{"http3.tunnel.observed_in_pdu", "Observed In PDU ID", DisplayUnsigned, 64},
+		{"http3.tunnel.streamid", "Stream ID", DisplayUnsigned, 62},
+		{"http3.tunnel.direction", "Direction", DisplayUnsigned, 1},
+		{"http3.tunnel.frame_offset", "Frame Offset", DisplayUnsigned, 62},
+		{"http3.tunnel.error_name", "Error Name", DisplayString, 0},
+		{"http3.tunnel.verdict", "Observation Verdict", DisplayString, 0},
+	} {
+		spec := spec
+		b := displayCustom("http3", spec.name, "Observed CONNECT frame-type violation and later context; not ciphertext offsets or inferred peer closure", spec.typ, spec.bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			if !e.nativeQUICObservation || e.semanticSession["Authentication Verified"] != true {
+				return
+			}
+			for _, kind := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations"} {
+				p.maps(e.semanticSession[kind], func(m map[string]any) {
+					if m["Ambiguous"] != true {
+						emit(m[spec.key])
+					}
+				})
+			}
+		})
+		b.protocols = "|quic|http3|"
+		out = append(out, b)
+	}
+	for _, f := range []struct {
+		name, label, key string
+		typ              DisplayFieldType
+		bits             int
+		origin           string
+	}{
+		{"wcf.record_type", "MC-NMF record type", "Record Type", DisplayUnsigned, 8, "pdu"},
+		{"wcf.record_name", "MC-NMF record name", "Record Name", DisplayString, 0, "context"},
+		{"wcf.major_version", "MC-NMF major version", "Major Version", DisplayUnsigned, 8, "pdu"},
+		{"wcf.minor_version", "MC-NMF minor version", "Minor Version", DisplayUnsigned, 8, "pdu"},
+		{"wcf.mode", "MC-NMF communication mode", "Mode", DisplayUnsigned, 8, "pdu"},
+		{"wcf.via", "MC-NMF Via URI", "Via", DisplayString, 0, "pdu"},
+		{"wcf.via_length", "MC-NMF Via byte length", "Via Length", DisplayUnsigned, 31, "pdu"},
+		{"wcf.encoding", "MC-NMF envelope encoding", "Encoding", DisplayUnsigned, 8, "pdu"},
+		{"wcf.extensible_encoding", "MC-NMF extensible encoding MIME type", "Encoding Type", DisplayString, 0, "pdu"},
+		{"wcf.extensible_encoding_length", "MC-NMF extensible encoding byte length", "Encoding Length", DisplayUnsigned, 31, "pdu"},
+		{"wcf.upgrade_protocol", "MC-NMF requested upgrade protocol", "Upgrade Protocol", DisplayString, 0, "pdu"},
+		{"wcf.upgrade_length", "MC-NMF upgrade protocol byte length", "Upgrade Length", DisplayUnsigned, 31, "pdu"},
+		{"wcf.fault", "MC-NMF receiver fault", "Fault", DisplayString, 0, "pdu"},
+		{"wcf.fault_length", "MC-NMF fault byte length", "Fault Length", DisplayUnsigned, 31, "pdu"},
+		{"wcf.terminator", "MC-NMF unsized envelope terminator", "Terminator", DisplayUnsigned, 8, "pdu"},
+		{"wcf.chunk_count", "Observed MC-NMF envelope chunks", "Chunk Count", DisplayUnsigned, 64, "derived"},
+		{"wcf.encoding_name", "MC-NMF envelope encoding name", "Encoding Name", DisplayString, 0, "context"},
+		{"wcf.envelope_kind", "MC-NMF envelope record kind", "Envelope Kind", DisplayString, 0, "context"},
+		{"wcf.envelope_sequence", "Observed MC-NMF envelope ordinal", "Envelope Sequence", DisplayUnsigned, 64, "derived"},
+		{"wcf.declared_length", "MC-NMF declared envelope length", "Declared Length", DisplayUnsigned, 64, "pdu"},
+		{"wcf.payload_length", "MC-NMF opaque envelope bytes", "Payload Length", DisplayUnsigned, 64, "derived"},
+		{"wcf.payload_sha256", "MC-NMF opaque envelope SHA-256", "Envelope Body SHA256", DisplayString, 0, "derived"},
+		{"wcf.envelope_opaque", "MC-NMF envelope body remains opaque", "Envelope Body Opaque", DisplayBoolean, 0, "context"},
+		{"wcf.role", "MC-NMF observed role", "Role", DisplayString, 0, "context"},
+	} {
+		b := displayRoot("wcf", f.name, f.label, f.typ, f.bits, f.origin, f.key)
+		b.protocols = "|wcf|"
+		if f.origin == "pdu" {
+			key := f.key
+			rangeKey := key
+			if key == "Declared Length" {
+				rangeKey = "Envelope Length"
+			}
+			b.custom = func(e *ProtocolEvent, emit func(any), _ *displayProjection) {
+				// Legacy Session contains cached context too. Only a current
+				// exact record's own span can publish a literal record alias.
+				if e.nativeDiagnosticError == "" && e.displayPDUFieldRange(rangeKey) != nil {
+					emit(e.Session[key])
+				}
+			}
+		}
+		switch f.key {
+		case "Declared Length":
+			b.rangeKey = "Envelope Length"
+		}
+		out = append(out, b)
+	}
+	for _, f := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"wcf.context.mode", "Mode", DisplayUnsigned, 8},
+		{"wcf.context.via", "Via", DisplayString, 0},
+		{"wcf.context.encoding", "Encoding", DisplayUnsigned, 8},
+		{"wcf.context.version", "Version", DisplayString, 0},
+		{"wcf.observed_session", "Observed Session Index", DisplayUnsigned, 64},
+		{"wcf.context_ready_after_pdu", "Context Ready After PDU", DisplayUnsigned, 64},
+	} {
+		b := displayRoot("wcf", f.name, "Observed MC-NMF "+f.key, f.typ, f.bits, "context", f.key)
+		if f.name == "wcf.observed_session" {
+			b.descriptor.Origin = "derived"
+		}
+		out = append(out, b)
+	}
+	for _, f := range []struct {
+		name, label, key string
+		typ              DisplayFieldType
+		bits             int
+		origin           string
+	}{
+		{"cldap.message_id", "CLDAP message ID", "Message ID", DisplayUnsigned, 64, "context"},
+		{"cldap.message_count", "CLDAP messages in this UDP datagram", "Message Count", DisplayUnsigned, 32, "derived"},
+		{"cldap.operation", "CLDAP protocol operation tag", "Operation", DisplayUnsigned, 8, "context"},
+		{"cldap.operation_name", "CLDAP protocol operation", "Message Name", DisplayString, 0, "context"},
+		{"cldap.base_object", "CLDAP SearchRequest base object", "Base Object", DisplayString, 0, "context"},
+		{"cldap.scope", "CLDAP SearchRequest scope", "Scope", DisplayUnsigned, 8, "context"},
+		{"cldap.filter_present_attribute", "CLDAP present-filter attribute", "Present Attribute", DisplayString, 0, "context"},
+		{"cldap.result_code", "Observed CLDAP SearchResultDone result code", "Result Code", DisplayUnsigned, 64, "context"},
+		{"cldap.response_opaque", "CLDAP response body remains opaque", "Response Body Opaque", DisplayBoolean, 0, "context"},
+	} {
+		b := displayRoot("cldap", f.name, f.label, f.typ, f.bits, f.origin, f.key)
+		b.protocols = "|cldap|"
+		if f.name == "cldap.base_object" {
+			b.descriptor.AllowEmpty = true
+		}
+		out = append(out, b)
+	}
+	b = displayCustom("cldap", "cldap.attribute", "CLDAP requested attributes", DisplayString, 0, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		switch attributes := e.Session["Requested Attributes"].(type) {
+		case []string:
+			for _, attribute := range attributes {
+				emit(attribute)
+			}
+		case []any:
+			for _, attribute := range attributes {
+				emit(attribute)
+			}
+		}
+	})
+	b.protocols = "|cldap|"
+	out = append(out, b)
 	out = append(out, nativeNetworkDisplayBindings()...)
 	out = append(out, nativeMLDDisplayBindings()...)
 	out = append(out, nativeIGMPDisplayBindings()...)
@@ -621,6 +822,24 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 		owned.ID, owned.FlowID, owned.Length, owned.Domain = n.id, n.flow, n.length, n.domain
 		owned.Source, owned.Destination, owned.SourceBytes = n.source, n.destination, cloneNativeNetworkSource(n.bytes)
 		owned.Session = e.semanticSession
+		e = &owned
+	}
+	if e.nativeQUICObservation {
+		// Decode and field queries share the captured private context. Public
+		// aliases and Session maps must not invent or retarget HTTP3/DoQ facts.
+		owned := *e
+		owned.Protocol, owned.Session = "quic", e.semanticSession
+		if e.nativeQUICApplication == 1 || owned.Session["HTTP3"] == true {
+			owned.Protocol = "http3"
+		}
+		if e.nativeQUICApplication == 2 || owned.Session["DoQ"] == true {
+			owned.Protocol = "doq"
+		}
+		e = &owned
+	}
+	if e.nativeWCF != nil {
+		owned := *e
+		owned.Protocol, owned.Status, owned.Session = "wcf", e.nativeWCF.Status, e.semanticSession
 		e = &owned
 	}
 	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation || e.nativeTLSObservation || e.nativeESPObservation {
@@ -719,6 +938,19 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	}
 
 	return s
+}
+
+func displayHTTP3LateMessage(e *ProtocolEvent, p *displayProjection, visit func(map[string]any)) {
+	for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Resolved Associations"} {
+		p.maps(e.Session[kind], func(link map[string]any) {
+			if link["Ambiguous"] == true {
+				return
+			}
+			if m, ok := link["Response Message Revalidation"].(map[string]any); ok {
+				visit(m)
+			}
+		})
+	}
 }
 
 func normalizeDisplayValue(value any, d DisplayFieldDescriptor) (any, bool) {
@@ -852,6 +1084,21 @@ func (p *displayProjection) maps(value any, fn func(map[string]any)) {
 }
 
 func displayHTTPValues(e *ProtocolEvent, request bool, emit func(any), p *displayProjection) {
+	// A private framing refusal is not an admitted HTTP message. Opaque
+	// continuation bytes may themselves contain a full-looking request or
+	// response line; publishing aliases from them would invent a boundary.
+	if e.nativeDiagnosticError != "" {
+		return
+	}
+	if e.nativeHTTPHeaderObservation {
+		// Header-only queries use the accepted literal snapshot, including
+		// after public Raw/Fields/Session edits. This is header evidence only,
+		// including an incomplete body with an observed request method.
+		if !request {
+			emit(e.semanticFields["Status Code"])
+		}
+		return
+	}
 	header := ":status"
 	if request {
 		header = ":method"
@@ -897,6 +1144,12 @@ func displayHTTPValues(e *ProtocolEvent, request bool, emit func(any), p *displa
 }
 
 func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
+	if e.nativeWCF != nil && !e.NativeWCFWireMatches() {
+		return nil
+	}
+	if e.nativeTLSObservation {
+		return e.displayTLSRecordHeaderRange(key)
+	}
 	if f, ok := e.ownedNativeNetworkField(key); ok {
 		span := f.span
 		return &span
@@ -919,6 +1172,34 @@ func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
 		return nil
 	}
 	return &DisplayFieldRange{Offset: int(lo), Length: int(hi - lo)}
+}
+
+// Native TLS already freezes literal record words, including on codec refusals.
+// Publish their occurrence spans without adding metadata to the established
+// GetFields tree. Public edits cannot grant spans to a different visible header;
+// negotiated values and authenticated inner types have separate provenance.
+func (e *ProtocolEvent) displayTLSRecordHeaderRange(key string) *DisplayFieldRange {
+	if len(e.Raw) < 5 || e.semanticFields == nil {
+		return nil
+	}
+	typ, typeOK := displayUint(e.semanticFields["Record Type"])
+	version, versionOK := displayUint(e.semanticFields["Record Version"])
+	length, lengthOK := displayUint(e.semanticFields["Record Length"])
+	if !typeOK || !versionOK || !lengthOK || typ != uint64(e.Raw[0]) ||
+		version != uint64(binary.BigEndian.Uint16(e.Raw[1:3])) ||
+		length != uint64(binary.BigEndian.Uint16(e.Raw[3:5])) || length+5 != uint64(len(e.Raw)) {
+		return nil
+	}
+	switch key {
+	case "Record Type":
+		return &DisplayFieldRange{Offset: 0, Length: 1}
+	case "Record Version":
+		return &DisplayFieldRange{Offset: 1, Length: 2}
+	case "Record Length":
+		return &DisplayFieldRange{Offset: 3, Length: 2}
+	default:
+		return nil
+	}
 }
 
 func validateDisplayFieldLiteral(d DisplayFieldDescriptor, op string, token filterToken) (any, error) {
@@ -1009,6 +1290,31 @@ func displayFieldEnums(name string) []DisplayFieldEnum {
 		return []DisplayFieldEnum{{250, "Subnegotiation"}, {251, "WILL"}, {252, "WONT"}, {253, "DO"}, {254, "DONT"}, {255, "Escaped IAC"}}
 	case "nbss.type":
 		return []DisplayFieldEnum{{129, "Session Request"}, {130, "Positive Session Response"}, {131, "Negative Session Response"}, {132, "Retarget Session Response"}, {133, "Session Keepalive"}}
+	case "cldap.operation":
+		return []DisplayFieldEnum{
+			{0x63, "Search Request"},
+			{0x64, "Search Result Entry"},
+			{0x65, "Search Result Done"},
+			{0x73, "Search Result Reference"},
+		}
+	case "cldap.scope":
+		return []DisplayFieldEnum{{0, "Base Object"}, {1, "Single Level"}, {2, "Whole Subtree"}}
+	case "wcf.record_type":
+		return []DisplayFieldEnum{
+			{0x00, "Version"},
+			{0x01, "Mode"},
+			{0x02, "Via"},
+			{0x03, "Known Encoding"},
+			{0x04, "Extensible Encoding"},
+			{0x05, "Unsized Envelope"},
+			{0x06, "Sized Envelope"},
+			{0x07, "End"},
+			{0x08, "Fault"},
+			{0x09, "Upgrade Request"},
+			{0x0a, "Upgrade Response"},
+			{0x0b, "Preamble Ack"},
+			{0x0c, "Preamble End"},
+		}
 	}
 	return nil
 }

@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
 	"time"
 
@@ -18,6 +20,28 @@ import (
 type crashCheckpoint struct {
 	Committed PCAPFileDBMetadata
 	Pending   *PCAPFileDBMetadata
+}
+
+func readCrashCheckpoint(marker string) (checkpoint crashCheckpoint, ready bool, err error) {
+	data, err := os.ReadFile(marker)
+	if errors.Is(err, os.ErrNotExist) {
+		return checkpoint, false, nil
+	}
+	// The child closes a complete temporary file before atomically publishing
+	// it. Windows may briefly deny a reader during that rename (or a scanner's
+	// exclusive open). Retry only these sharing/lock conditions within the
+	// caller's existing deadline; permission and malformed JSON still fail.
+	var errno syscall.Errno
+	if runtime.GOOS == "windows" && errors.As(err, &errno) && (errno == 32 || errno == 33) {
+		return checkpoint, false, nil
+	}
+	if err != nil {
+		return checkpoint, false, err
+	}
+	if err := json.Unmarshal(data, &checkpoint); err != nil {
+		return checkpoint, false, err
+	}
+	return checkpoint, true, nil
 }
 
 // This helper runs only in a child copy of the test binary. Process.Kill skips
@@ -200,12 +224,12 @@ func startCrashProcess(t *testing.T, scenario string) *crashProcess {
 			output, _ := os.ReadFile(log.Name())
 			t.Fatalf("child did not reach crash checkpoint\n%s", output)
 		case <-ticker.C:
-			data, err := os.ReadFile(marker)
-			if errors.Is(err, os.ErrNotExist) {
+			checkpoint, ready, err := readCrashCheckpoint(marker)
+			require.NoError(t, err)
+			if !ready {
 				continue
 			}
-			require.NoError(t, err)
-			require.NoError(t, json.Unmarshal(data, &child.marker))
+			child.marker = checkpoint
 			return child
 		}
 	}

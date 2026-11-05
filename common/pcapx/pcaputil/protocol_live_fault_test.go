@@ -9,7 +9,7 @@ import (
 )
 
 func TestQUICRepeatedCIDRetirementDoesNotInvalidateFollowingFrames(t *testing.T) {
-	q := &binQUIC{native: true, byteLimit: 4096, cids: map[string]int{"server": 1}}
+	q := &binQUIC{native: true, byteLimit: 4096, cids: map[string]int{"server": 2}}
 	q.cidSequences[1] = map[uint64]string{0: "server"}
 	retire := func() map[string]any {
 		return map[string]any{"Frame Type": "RETIRE_CONNECTION_ID", "Sequence": uint64(0)}
@@ -22,7 +22,7 @@ func TestQUICRepeatedCIDRetirementDoesNotInvalidateFollowingFrames(t *testing.T)
 	require.Equal(t, []byte("body"), q.streams[0].reassembly[0].data)
 	require.NotContains(t, q.cids, "server")
 	// A retransmitted NEW_CONNECTION_ID cannot resurrect a retired route.
-	newCID := map[string]any{"Frame Type": "NEW_CONNECTION_ID", "Sequence": uint64(0), "Retire Prior To": uint64(0), "CID": []byte("server")}
+	newCID := map[string]any{"Frame Type": "NEW_CONNECTION_ID", "Sequence": uint64(0), "Retire Prior To": uint64(0), "CID": []byte("server"), "Reset Token": make([]byte, 16)}
 	require.NoError(t, q.applyFrames(1, 2, []map[string]any{newCID}, info, 8))
 	require.NotContains(t, q.cids, "server")
 	newCID["CID"] = []byte("changed")

@@ -145,11 +145,12 @@ func appendCapturedNetworkPrefix(d *packetDetail, raw *capturedPacket, events []
 	}
 	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 	headers := capturedNetworkPrefix(p, raw.data, presentationNetworkHeaders(presentation, events))
-	if len(headers) == 0 {
-		return
+	if len(headers) > 0 {
+		d.fields = append(d.fields, field{text: "Captured network prefix", branch: true})
+		for _, h := range headers {
+			d.fields = append(d.fields, field{text: h.label + " header", branch: true, start: h.start, end: h.end, hasRange: true}, field{depth: 1, text: "Source: " + h.source, start: h.sourceStart, end: h.sourceEnd, hasRange: true}, field{depth: 1, text: "Destination: " + h.destination, start: h.destStart, end: h.destEnd, hasRange: true})
+		}
 	}
-	d.fields = append(d.fields, field{text: "Captured network prefix", branch: true})
-	for _, h := range headers {
-		d.fields = append(d.fields, field{text: h.label + " header", branch: true, start: h.start, end: h.end, hasRange: true}, field{depth: 1, text: "Source: " + h.source, start: h.sourceStart, end: h.sourceEnd, hasRange: true}, field{depth: 1, text: "Destination: " + h.destination, start: h.destStart, end: h.destEnd, hasRange: true})
-	}
+	appendCapturedIPv4FragmentExtentFields(d, raw, p, events)
+	appendCapturedPPPoEOwnerHeaderFields(d, raw, p, events)
 }

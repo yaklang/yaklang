@@ -15,6 +15,18 @@ type tls12KeyExchangeField struct {
 	Start, End int
 }
 
+// TLS12KeyExchangeField identifies a literal in the complete handshake encoding,
+// including its four-byte header. It never identifies ciphertext/frame offsets.
+type TLS12KeyExchangeField = tls12KeyExchangeField
+
+// DecodeTLS12KeyExchangeLayout exposes the same exact, bounded grammar used by
+// the canonical YAML rules. The caller must independently select the profile
+// from observed version/cipher context; this function does no auto-detection,
+// negotiation, public-key validation or signature verification.
+func DecodeTLS12KeyExchangeLayout(wire []byte, profile string) ([]TLS12KeyExchangeField, map[string]any, error) {
+	return decodeTLS12KeyExchange(wire, profile)
+}
+
 func decodeTLS12KeyExchange(wire []byte, profile string) ([]tls12KeyExchangeField, map[string]any, error) {
 	fail := func(reason string) ([]tls12KeyExchangeField, map[string]any, error) {
 		return nil, nil, fmt.Errorf("tls12-key-exchange: %s", reason)

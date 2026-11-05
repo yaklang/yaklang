@@ -128,6 +128,7 @@ type tui struct {
 	pane                             int
 	fields                           packetDetail
 	fieldSelection, fieldTop, hexTop int
+	fieldLeft                        int
 	hexStart, hexEnd                 int
 	displayFilter                    *pcap.BPF
 	filterText                       string
@@ -286,9 +287,7 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 				stop()
 			}
 		}
-		if ui.rate.sample(time.Now(), s) {
-			ui.updateMix()
-		}
+		ui.refreshProtocolMix(time.Now(), s)
 		return screen.draw(ui.view(s, src, cfg), ui.width, ui.height)
 	}
 	if err := refresh(true); err != nil {
@@ -347,6 +346,7 @@ func (u *tui) syncInspection(now time.Time) {
 			u.inspect = nil
 			u.bytesSource = 0
 			u.fields = packetDetail{}
+			u.fieldLeft = 0
 			u.hexStart, u.hexEnd = 0, 0
 			u.pendingDetail = nil
 			u.fieldsTouched = false
@@ -363,6 +363,7 @@ func (u *tui) syncInspection(now time.Time) {
 	u.inspectionChanged = now
 	u.fieldSelection = 0
 	u.fieldTop = 0
+	u.fieldLeft = 0
 	u.hexTop = 0
 	u.bytesSource = 0
 	u.hexStart, u.hexEnd = 0, 0
@@ -567,6 +568,14 @@ func (u *tui) key(key string, src *captureSource) bool {
 		u.move(1)
 	case "k", "\x1b[A":
 		u.move(-1)
+	case "\x1b[C":
+		if u.pane == 1 {
+			u.scrollFieldText(4)
+		}
+	case "\x1b[D":
+		if u.pane == 1 {
+			u.scrollFieldText(-4)
+		}
 	case "\x1b[6~":
 		u.move(max(1, u.viewport(u.pane).h-1))
 	case "\x1b[5~":

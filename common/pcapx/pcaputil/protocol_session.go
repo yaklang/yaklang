@@ -341,6 +341,25 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		limit = 64
 	}
 	input := data
+	if p := probeSMB1FileCommand(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1SessionSetupExtended(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1Negotiate(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1NegotiateExtendedResponse(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	// A short zero-prefixed carrier is ambiguous. Only move SMB2 ahead of
+	// specialized carrier probes once its signature is actually present.
+	if len(input) >= 8 {
+		if p := probeSMB2(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+			return p
+		}
+	}
 	if telnetNegotiationStart(input) && (s.f.port(23) || telnetInitialEvidence(input)) {
 		return probeAccept("telnet", "IAC-negotiation", 95)
 	}
@@ -389,6 +408,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		return p
 	}
 	if p := probeDoIP(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeWCF(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
 		return p
 	}
 	if isHTTPStartLineCandidate(input) {
@@ -544,7 +566,7 @@ func (f *binFlow) hasSession() bool {
 	if f.protocol == "nats" || f.protocol == "telnet" || f.protocol == "nbss" {
 		return true // NATS allocates its budgeted negotiation state at consumption.
 	}
-	return f.hart != nil || f.fins != nil || f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil || f.iso8583 != nil
+	return f.hart != nil || f.fins != nil || f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil || f.wcf != nil || f.wcfTLS != nil || f.iso8583 != nil
 }
 
 func (f *binFlow) mailLike() bool {
@@ -604,6 +626,9 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return p
 	}
 	if p := probeSTOMP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeWCF(w, max(limit, len(w))); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSOCKS5(w, limit); p.Verdict != ProbeReject {
@@ -705,6 +730,18 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return p
 	}
 	if p := probeAMQP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1FileCommand(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1SessionSetupExtended(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1Negotiate(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1NegotiateExtendedResponse(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSMB2(w, limit); p.Verdict != ProbeReject {

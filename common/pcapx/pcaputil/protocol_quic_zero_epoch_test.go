@@ -144,7 +144,7 @@ func TestQUICZeroCIDClosedEpochRequiresUniquePacketProtection(t *testing.T) {
 			cid := bytes.Repeat([]byte{0xa5}, 20)
 			flows[1].quic.closed = false // Missing old close must not block a new explicit CID.
 			flows[2].quic.zeroCID = [2]bool{}
-			flows[2].quic.cids = map[string]int{string(cid): 1}
+			flows[2].quic.cids = map[string]int{string(cid): 2}
 			base.Source, base.Destination = "client", "server"
 			events, ok = a.decodeQUICDatagram(base, epochQUICPacket(t, keys[2], cid, 31, 0, 2))
 			require.True(t, ok)

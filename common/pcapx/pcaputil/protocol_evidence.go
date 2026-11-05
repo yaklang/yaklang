@@ -44,6 +44,8 @@ type captureEvidence struct {
 	networkPrefix        []gopacket.LayerType
 	networkPrefixLimited bool
 	tcpMissingTail       uint32 // validated captured TCP payload suffix; no invented bytes
+	tcpACK               uint32 // ACK on this byte contributor, never a later packet's ACK
+	tcpACKKnown          bool
 	Ref                  PacketReference
 	refs                 []PacketReference
 	// Applies to the current IP packet, not an outer tunnel carrier.
@@ -73,7 +75,14 @@ func withEvidence(ci gopacket.CaptureInfo, e captureEvidence) gopacket.CaptureIn
 func packetEvidence(p gopacket.Packet) captureEvidence {
 	e := evidenceFrom(p.Metadata().CaptureInfo)
 	outer, directionalOuter := "", ""
+	ethernetPeers := ""
 	for _, l := range p.Layers() {
+		// A generic decoder can expose apparent children behind a parent
+		// whose native profile is unselected. Their VLAN/SID bytes cannot
+		// become part of the capture-session identity.
+		if unselectedEtherIPLayer(l) {
+			break
+		}
 		if n, ok := l.(gopacket.NetworkLayer); ok {
 			a, b := n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 			directionalOuter = a + ">" + b
@@ -83,6 +92,19 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 			outer = a + "~" + b
 		}
 		switch v := l.(type) {
+		case *layers.Ethernet:
+			// RFC 2516 scopes Session ID to the Ethernet source/destination
+			// pair. Keep the nearest Ethernet after any tunnel normalization.
+			ethernetPeers = ""
+			if len(v.SrcMAC) == 6 && len(v.DstMAC) == 6 {
+				src, dst := v.SrcMAC.String(), v.DstMAC.String()
+				if src > dst {
+					src, dst = dst, src
+				}
+				ethernetPeers = src + "~" + dst
+			}
+		case *layers.LinuxSLL, *layers.LinuxSLL2:
+			ethernetPeers = "" // One cooked link address is not a peer pair.
 		case *capturePIM:
 			if v.Type == 1 && !v.NullRegister && v.ChecksumVerified && v.MessageExtentComplete {
 				e.Ref.Domain.Encapsulation += "/pim-register:" + outer
@@ -95,7 +117,13 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 		case *captureMPacket:
 			e.Ref.Domain.Encapsulation += "/mpacket:express"
 		case *layers.PPPoE:
-			e.Ref.Domain.Encapsulation += fmt.Sprintf("/pppoe:%d", v.SessionId)
+			if ethernetPeers != "" {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/pppoe:%s:%d", ethernetPeers, v.SessionId)
+			} else {
+				// Header observations retain the literal SID. Native ingress
+				// refuses capture-session ownership without the peer pair.
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/pppoe:%d", v.SessionId)
+			}
 		case *layers.IPv6:
 			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
 				e.Ref.Domain.Encapsulation += fmt.Sprintf("/ip6-tunnel:%s:%d", outer, v.NextHeader)
@@ -126,6 +154,9 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 			}
 		case *layers.Geneve:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/geneve:%s:%d", outer, v.VNI)
+			if !selectedGeneve(v) {
+				return e // Keep its literal outer VNI, never unselected child IDs.
+			}
 		case *layers.IPv4:
 			// A fragmented outer packet has no decoded inner carrier yet. Defer
 			// that domain suffix until reassembly instead of applying it twice.
@@ -205,9 +236,20 @@ func cloneEvidence(e *ProtocolEvent) {
 }
 
 type contribution struct {
-	start, end uint64
-	ref        PacketReference
-	parent     uint64
+	start, end  uint64
+	ref         PacketReference
+	parent      uint64
+	tcpACK      uint32
+	tcpACKKnown bool
+}
+
+func (f *binFlow) contributeCaptured(dir, n int, ref PacketReference, evidence captureEvidence, parent ...uint64) {
+	d := &f.directions[dir]
+	before := len(d.contributions)
+	f.contribute(dir, n, ref, parent...)
+	if len(d.contributions) > before {
+		d.contributions[before].tcpACK, d.contributions[before].tcpACKKnown = evidence.tcpACK, evidence.tcpACKKnown
+	}
 }
 
 func (f *binFlow) contribute(dir int, n int, ref PacketReference, parent ...uint64) {

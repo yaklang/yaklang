@@ -31,6 +31,23 @@ func duplicateSSHInitialFields(e *pcaputil.ProtocolEvent) bool {
 // equality decision in the parent, while both original maps are still owned
 // Go values. Only the outgoing display copy loses its redundant subtree.
 func protocolDisplayEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
+	if _, ok := e.NativePPPoEHeaderObservation(); ok {
+		return pppoeHeaderDisplayEvent(e)
+	}
+	if e != nil {
+		if _, ok := e.NativeTLSCiphertextRefusal(); ok {
+			return tlsCiphertextRefusalDisplayEvent(e)
+		}
+		if _, ok := e.NativeWCFObservation(); ok {
+			return wcfDisplayEvent(e)
+		}
+		if _, ok := e.NativeWCFTLSCarrier(); ok {
+			return wcfTLSDisplayEvent(e)
+		}
+	}
+	if e != nil && smbDetailProtocol(e.Protocol) {
+		return smbDisplayEvent(e)
+	}
 	redundant := ""
 	if duplicateDNSSessionFields(e) {
 		redundant = "DNS"
@@ -65,6 +82,10 @@ var connectionObservationPriority = map[string]int{
 // keys through the wire/PDU walker: a metadata key named Payload, GRPC Messages
 // or HTTP3 Frames cannot authorize another byte source or a captured range.
 func connectionObservationFields(values map[string]any, budget int) ([]field, bool) {
+	return observedMetadataFields(values, budget, "Session Establishment · observed connection context", "Scope: retained hello metadata; no new handshake or authentication result implied")
+}
+
+func observedMetadataFields(values map[string]any, budget int, title, scope string) ([]field, bool) {
 	var fields []field
 	limited := false
 	add := func(text string, depth int, branch bool) bool {
@@ -138,8 +159,8 @@ func connectionObservationFields(values map[string]any, budget int) ([]field, bo
 			add(name+": "+text, depth, false)
 		}
 	}
-	if add("Session Establishment · observed connection context", 0, true) {
-		add("Scope: retained hello metadata; no new handshake or authentication result implied", 1, false)
+	if add(title, 0, true) {
+		add(scope, 1, false)
 		mapChildren(values, 1)
 	}
 	return fields, limited

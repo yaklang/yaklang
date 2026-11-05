@@ -366,7 +366,6 @@ func (r *EntityRepository) YieldKHopEx(ctx context.Context, startInput <-chan st
 	var result = chanx.NewUnlimitedChan[*KHopPath](subCtx, 1000)
 	go func() {
 		defer result.Close()
-		defer cancel()
 
 		total := 0
 		for path := range channel.OutputChannel() {
@@ -384,7 +383,30 @@ func (r *EntityRepository) YieldKHopEx(ctx context.Context, startInput <-chan st
 		}
 	}()
 
-	return result.OutputChannel()
+	// Closing an UnlimitedChan only closes its input; its buffered results
+	// still need to drain. Canceling subCtx in the producer would discard
+	// that tail, even when the caller has not canceled the query.
+	output := make(chan *KHopPath)
+	go func() {
+		defer close(output)
+		defer cancel()
+		for {
+			select {
+			case path, ok := <-result.OutputChannel():
+				if !ok {
+					return
+				}
+				select {
+				case output <- path:
+				case <-ctx.Done():
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return output
 }
 
 // findAllPathSegments 找到所有可能的路径片段

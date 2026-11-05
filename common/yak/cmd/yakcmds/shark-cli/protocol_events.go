@@ -18,6 +18,15 @@ var semanticFieldPriority = map[string]int{
 	"Protocol": 0, "ID": 0, "Status": 1, "Packet Name": 2, "Message Name": 2, "Mechanism": 2,
 	"Authentication Verified": 3, "Negotiation Context": 3, "Identification Conformance": 3, "Identification Warning": 3, "User Name": 4, "Domain": 5, "Method": 4, "Request Method": 4, "Request URI": 5, "Query": 5, "SQL": 5, "Topic": 5,
 	"Message Type": 6, "QNAME": 4, "QTYPE Name": 5, "Response": 3, "RCODE": 4, "Questions": 5, "Answers": 6, "Headers": 5,
+	"QPACK Resumed Encoders": 6,
+	"QPACK Field Context":    1, "QPACK Field Error": 1, "QPACK Blocked": 2, "QPACK Blocked Scope": 3, "QPACK Decoder Context": 2,
+	"QPACK Resumed Field Contexts": 6, "QPACK Resumed Streams": 6,
+	"HTTP3 Late Associations":     6,
+	"HTTP3 Resolved Associations": 6,
+	"HTTP3 Association View":      6,
+	"HTTP3 Tunnel Observations":   4, "HTTP3 Resolved Tunnel Observations": 4, "HTTP3 Tunnel View": 5, "Tunnel Frame Check": 4,
+	"Response Message Revalidation": 5, "Observation Verdict": 1, "Request Method Class": 2, "Body Coverage Complete": 3,
+	"Observed DATA Byte Source": 800, "Observed FIN Source": 801,
 	"MIC Verified": 7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
 }
 
@@ -57,6 +66,13 @@ var ipfixHeaderPriority = map[string]int{
 var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, "Payload Length": 2, "Frame Wire Length": 3, "Stream ID": 4, "Stream Offset": 5, "Direction": 6, "Frame Header Bytes": 7, "Headers": 8, "DATA Length": 9, "Payload": 10, "QPACK Block": 10, "Header Conformance Status": 11, "Header Conformance Error": 12, "Header Conformance Scope": 13, "Message Conformance": 14, "Byte Source": 50, "Payload Byte Source": 51, "Frame SHA256": 52}
 
 var http3StreamPriority = map[string]int{"Frame Type": 0, "Stream ID": 1, "Offset": 2, "Length": 3, "FIN": 4, "Contiguous Offset": 5, "Delivered Bytes": 6, "HTTP3 Frame Error": 7, "Stream Data": 8, "HTTP3 Frames": 9, "Byte Source": 50, "Delivered Byte Source": 51}
+
+var http3TunnelPriority = map[string]int{"Error Name": 0, "Error Code": 1, "Error Scope": 2, "Observation Verdict": 3, "Frame Type": 4, "Frame Type Value": 5, "Frame PDU ID": 6, "Observed In PDU ID": 7, "Stream ID": 8, "Direction": 9, "Frame Offset": 10, "Frame Header Bytes": 11, "Byte Source": 800, "Scope": 801}
+
+var quicCryptoFramePriority = map[string]int{"Frame Type": 0, "Offset": 1, "Length": 2, "Crypto Data": 3}
+var quicCIDFramePriority = map[string]int{"Frame Type": 0, "Sequence": 1, "Retire Prior To": 2, "CID": 3, "Reset Token": 4}
+
+var qpackRecoveryPriority = map[string]int{"HTTP3 Stream ID": 0, "Direction": 1, "Status": 2, "Error": 3, "Expert Code": 4, "QPACK Field Context": 4, "QPACK Instructions": 5, "QPACK Capacity": 6, "QPACK Insert Count": 7, "Instruction Bytes": 8, "Field Section Frame Bytes": 8, "Incomplete Suffix Bytes": 9, "Reprocessed From PDU": 10, "Reprocessed In PDU": 11, "Observation Scope": 12, "Byte Source": 50}
 
 // Detail snapshots include owned public and private parser evidence, unlike
 // the compact scalar observations used by streaming JSON. Keep a separate
@@ -114,7 +130,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	}
 	seenH3Fault := map[uint64]bool{}
 	for _, e := range ordered {
-		if e == nil || e.Completeness == "evicted" {
+		if e == nil || e.Completeness == "evicted" || unsupportedQUICTCPCarrier(e) {
 			continue
 		}
 		fault, ok := e.Session["HTTP3 Connection Error"].(map[string]any)
@@ -134,9 +150,26 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	// Packet authentication never covers an unparsed datagram neighbour. Put
 	// this range warning before possibly large authenticated CRYPTO/STREAM trees.
 	for _, e := range ordered {
-		if e != nil && e.Completeness != "evicted" && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
+		if e != nil && e.Completeness != "evicted" && !unsupportedQUICTCPCarrier(e) && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 			add(fmt.Sprintf("QUIC remainder #%d: %d bytes · authentication not verified", e.ID, e.Length), false)
 			add(e.Summary, false)
+		}
+	}
+	// A large admitted Initial/Handshake tree must not bury a later packet's
+	// refusal. Keep byte-source order and all individual trees unchanged.
+	quicPackets := 0
+	for _, e := range ordered {
+		if e != nil && e.Completeness != "evicted" && !unsupportedQUICTCPCarrier(e) && (e.Protocol == "quic" || (e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Native Carrier"] == true) {
+			quicPackets++
+		}
+	}
+	frontloadedQUIC := map[*pcaputil.ProtocolEvent]bool{}
+	if quicPackets > 1 {
+		for _, e := range ordered {
+			if quicPacketDiagnosticRank(e) > 0 && len(frontloadedQUIC) < 8 {
+				add(fmt.Sprintf("Packet diagnostic: QUIC PDU #%d · %s", e.ID, e.Error), false)
+				frontloadedQUIC[e] = true
+			}
 		}
 	}
 	var protocol string
@@ -150,11 +183,23 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var dcerpcResultKnown bool
 	var dcerpcMessage bool
 	var authenticatedQUIC bool
+	var authenticatedQUICHandshake bool
+	var quicPayloadState string
+	quicCryptoSize := -1
 	var authenticatedTLS bool
+	var recoveredTLSContext bool
+	var tls13KeyUpdates bool
+	var tlsEarlyEpoch bool
+	var tlsNegotiatedVersion uint64
+	var tlsCipherSuite uint64
 	var http3FrameKind string
+	var http1StartLineKind string
 	var http3StreamID uint64
+	var http3RecoveredEncoder bool
+	var http3RetainedField bool
 	var http3HeaderSource int
 	var http3HeaderRanges map[string][]int
+	var http3TunnelType bool
 	var fieldViewLimited bool
 	var byteSourceLimited bool
 	fieldValueBytes := 0
@@ -177,6 +222,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		add := func(text string, branch bool) {
 			out = append(out, field{text: clipText(text, 2048), branch: branch, depth: max(0, depth+1)})
 		}
+		var sequenceLimited bool
+		v, sequenceLimited = detailScalarSequence(v, 4096-len(out))
+		fieldViewLimited = fieldViewLimited || sequenceLimited
 		if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
 			if octets, ok := fieldOctetList(v); ok {
 				v = octets
@@ -184,6 +232,28 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		}
 		switch x := v.(type) {
 		case map[string]any:
+			if protocol == "http" {
+				previous := http1StartLineKind
+				defer func() { http1StartLineKind = previous }()
+				switch name {
+				case "HTTP Request", "HTTP Response":
+					http1StartLineKind = name
+				case "FirstLine":
+				default:
+					// A payload dictionary named FirstLine is not a start line.
+					http1StartLineKind = ""
+				}
+			}
+			if protocol == "quic" || protocol == "http3" || protocol == "doq" {
+				previous := quicCryptoSize
+				defer func() { quicCryptoSize = previous }()
+				quicCryptoSize = -1
+				if x["Frame Type"] == "CRYPTO" {
+					if length, ok := detailRangeOffset(x["Length"]); ok {
+						quicCryptoSize = length
+					}
+				}
+			}
 			if protocol == "dcerpc" {
 				if name == "Reassembled Message" {
 					previous := dcerpcMessage
@@ -201,9 +271,36 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if protocol == "http3" {
+				previousTunnel, previousStream := http3TunnelType, http3StreamID
+				defer func() { http3TunnelType, http3StreamID = previousTunnel, previousStream }()
+				http3TunnelType = strings.HasPrefix(name, "HTTP3 Tunnel Observations[") || strings.HasPrefix(name, "HTTP3 Resolved Tunnel Observations[") || name == "Tunnel Frame Check" || name == "HTTP3 Connection Error" && x["Error Name"] == "H3_FRAME_UNEXPECTED"
+				if http3TunnelType {
+					http3StreamID = number(x["Stream ID"])
+				}
+				previousEncoder := http3RecoveredEncoder
+				defer func() { http3RecoveredEncoder = previousEncoder }()
+				http3RecoveredEncoder = false
+				previousField := http3RetainedField
+				defer func() { http3RetainedField = previousField }()
+				http3RetainedField = false
+				if strings.HasPrefix(name, "QPACK Resumed Field Contexts[") {
+					previousID := http3StreamID
+					defer func() { http3StreamID = previousID }()
+					http3RetainedField = true
+					http3StreamID = number(x["HTTP3 Stream ID"])
+				}
+				if strings.HasPrefix(name, "QPACK Resumed Encoders[") {
+					previousID := http3StreamID
+					defer func() { http3StreamID = previousID }()
+					http3RecoveredEncoder = x["Status"] == "decoded"
+					http3StreamID = number(x["HTTP3 Stream ID"])
+				}
 				if x["Frame Type"] == "STREAM" {
 					previous := http3StreamID
 					defer func() { http3StreamID = previous }()
+					http3StreamID = number(x["Stream ID"])
+				}
+				if name == "QPACK Field Error" {
 					http3StreamID = number(x["Stream ID"])
 				}
 				if strings.HasPrefix(name, "HTTP3 Frames[") {
@@ -237,7 +334,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					}
 				}
 			}
-			if protocol == "ssh" {
+			if protocol == "ssh" || smbDetailProtocol(protocol) {
 				// Every nested owner starts its own scope. A context map without
 				// metadata must not borrow a same-named parent's wire occurrence.
 				previous := wireRanges
@@ -279,7 +376,34 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				keys = append(keys, k)
 			}
 			sort.Slice(keys, func(i, j int) bool {
+				if smbDetailProtocol(protocol) {
+					return smbDetailFieldLess(keys[i], keys[j], wireRanges)
+				}
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
+				if protocol == "http" {
+					if rank, ok := http1MessageDetailPriority(name, http1StartLineKind, keys[i]); ok {
+						a = rank
+					}
+					if rank, ok := http1MessageDetailPriority(name, http1StartLineKind, keys[j]); ok {
+						b = rank
+					}
+				}
+				if (protocol == "quic" || protocol == "http3" || protocol == "doq") && x["Frame Type"] == "CRYPTO" {
+					if rank, ok := quicCryptoFramePriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := quicCryptoFramePriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if (protocol == "quic" || protocol == "http3" || protocol == "doq") && (x["Frame Type"] == "NEW_CONNECTION_ID" || x["Frame Type"] == "RETIRE_CONNECTION_ID") {
+					if rank, ok := quicCIDFramePriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := quicCIDFramePriority[keys[j]]; ok {
+						b = rank
+					}
+				}
 				if protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" {
 					// Wire children lead; checksum/authentication context follows
 					// them. Equal values still keep their own nested occurrence.
@@ -361,6 +485,22 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						b = rank
 					}
 				}
+				if protocol == "http3" && x["Frame PDU ID"] != nil && (x["Observation Verdict"] == "violation-observed" || x["Observation Verdict"] == "order-unverified") {
+					if rank, ok := http3TunnelPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := http3TunnelPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if protocol == "http3" && (strings.HasPrefix(name, "QPACK Resumed Encoders[") || strings.HasPrefix(name, "QPACK Resumed Field Contexts[")) {
+					if rank, ok := qpackRecoveryPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := qpackRecoveryPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
 				if protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix" {
 					if rank, ok := netflowV9EntryPriority[keys[i]]; ok {
 						a = rank
@@ -403,6 +543,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				walk(label, x[k], depth+1)
 			}
 		case []map[string]any:
+			if len(x) == 0 {
+				add(name+": []", false)
+				return
+			}
 			for i, r := range x {
 				if name == "Headers" {
 					add(textValue(r["Name"])+": "+textValue(r["Value"]), false)
@@ -420,6 +564,32 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 							f := &out[len(out)-1]
 							f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 						}
+					}
+					continue
+				}
+				if protocol == "wcf" && name == "Chunks" {
+					if len(out) >= 4096 {
+						fieldViewLimited = true
+						break
+					}
+					add(fmt.Sprintf("MC-NMF chunk %d", i+1), true)
+					for _, key := range []string{"Declared Length", "Header Offset", "Header Length", "Body Offset", "Body Length", "Body SHA256"} {
+						if value, ok := r[key]; ok {
+							before := len(out)
+							walk(key, value, depth+1)
+							at, length := number(r["Header Offset"]), number(r["Header Length"])
+							if key == "Declared Length" && len(out) > before && currentSource > 0 && at <= uint64(len(sources[currentSource-1].Data)) && length > 0 && length <= uint64(len(sources[currentSource-1].Data))-at {
+								f := &out[len(out)-1]
+								f.source, f.start, f.end, f.hasRange = currentSource, int(at), int(at+length), true
+							}
+						}
+					}
+					at, length := number(r["Body Offset"]), number(r["Body Length"])
+					before := len(out)
+					walk("Chunk Body (opaque)", fmt.Sprintf("%d bytes", length), depth+1)
+					if len(out) > before && currentSource > 0 && at <= uint64(len(sources[currentSource-1].Data)) && length > 0 && length <= uint64(len(sources[currentSource-1].Data))-at {
+						f := &out[len(out)-1]
+						f.source, f.start, f.end, f.hasRange = currentSource, int(at), int(at+length), true
 					}
 					continue
 				}
@@ -443,8 +613,188 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					}
 					continue
 				}
-				if name == "Handshake Messages" {
-					add(handshakeType(r["Type"]), true)
+				if name == "Handshake Messages" || name == "TLS Handshakes" || name == "Recovered Context Handshake Messages" && recoveredTLSContext {
+					label := handshakeType(r["Type"])
+					if name == "Recovered Context Handshake Messages" {
+						label = "Recovered earlier " + label
+					}
+					add(label, true)
+					encryptedVersion, encryptedAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" {
+						encryptedVersion, encryptedAuthenticated = 0x304, authenticatedQUICHandshake
+					}
+					encrypted, encryptedWire, encryptedName := tlsEncryptedExtensionsDetail(r, encryptedVersion, encryptedAuthenticated)
+					encryptedSource := 0
+					if encrypted != nil {
+						if fieldValueSourceCount < 256 && len(encryptedWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: encryptedName, Data: bytes.Clone(encryptedWire)})
+							encryptedSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(encryptedWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Encrypted Extensions (8)", depth: depth + 2, source: encryptedSource, start: 0, end: 1, hasRange: encryptedSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					certificateVersion, certificateAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Version"]) == 0x304 {
+						certificateVersion, certificateAuthenticated = 0x304, true
+					}
+					certificate, certificateWire, certificateName := tlsCertificateDetail(r, certificateVersion, certificateAuthenticated)
+					certificateSource := 0
+					if certificate != nil {
+						if fieldValueSourceCount < 256 && len(certificateWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: certificateName, Data: bytes.Clone(certificateWire)})
+							certificateSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(certificateWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Certificate (11)", depth: depth + 2,
+								source: certificateSource, start: 0, end: 1, hasRange: certificateSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					exchange, exchangeWire, exchangeName := tlsServerKeyExchangeDetail(r, tlsNegotiatedVersion, tlsCipherSuite, authenticatedTLS)
+					exchangeSource := 0
+					if exchange != nil {
+						if fieldValueSourceCount < 256 && len(exchangeWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: exchangeName, Data: bytes.Clone(exchangeWire)})
+							exchangeSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(exchangeWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Server Key Exchange (12)", depth: depth + 2,
+								source: exchangeSource, start: 0, end: 1, hasRange: exchangeSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					statusView, statusWire, statusName := tlsCertificateStatusDetail(r, tlsNegotiatedVersion, authenticatedTLS)
+					statusSource := 0
+					if statusView != nil {
+						if fieldValueSourceCount < 256 && len(statusWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: statusName, Data: bytes.Clone(statusWire)})
+							statusSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(statusWire)
+						} else {
+							byteSourceLimited = true
+						}
+					}
+					clientExchange, clientExchangeWire, clientExchangeName := tlsClientKeyExchangeDetail(r, tlsNegotiatedVersion, tlsCipherSuite, authenticatedTLS)
+					clientExchangeSource := 0
+					if clientExchange != nil {
+						if fieldValueSourceCount < 256 && len(clientExchangeWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: clientExchangeName, Data: bytes.Clone(clientExchangeWire)})
+							clientExchangeSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(clientExchangeWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Client Key Exchange (16)", depth: depth + 2,
+								source: clientExchangeSource, start: 0, end: 1, hasRange: clientExchangeSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					requestVersion, requestAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Request Version"]) == 0x304 {
+						requestVersion, requestAuthenticated = 0x304, true
+					}
+					request, requestWire, requestName := tlsCertificateRequestDetail(r, requestVersion, requestAuthenticated)
+					requestSource := 0
+					if request != nil {
+						if fieldValueSourceCount < 256 && len(requestWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: requestName, Data: bytes.Clone(requestWire)})
+							requestSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(requestWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Certificate Request (13)", depth: depth + 2,
+								source: requestSource, start: 0, end: 1, hasRange: requestSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					finishedVersion, finishedSuite, finishedAuthenticated := tlsNegotiatedVersion, tlsCipherSuite, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Finished Version"]) == 0x304 && r["Finished Phase"] == "handshake" {
+						finishedVersion, finishedSuite, finishedAuthenticated = 0x304, number(r["Finished Cipher Suite"]), true
+					}
+					finishedWire, finishedName := tlsFinishedDetail(r, finishedVersion, finishedSuite, finishedAuthenticated)
+					if finishedWire != nil && name == "Recovered Context Handshake Messages" {
+						finishedName = "TLS Finished · recovered earlier authenticated handshake plaintext · frame offsets unavailable"
+					}
+					finishedSource := 0
+					if finishedWire != nil {
+						if fieldValueSourceCount < 256 && len(finishedWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: finishedName, Data: bytes.Clone(finishedWire)})
+							finishedSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(finishedWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Finished (20)", depth: depth + 2,
+								source: finishedSource, start: 0, end: 1, hasRange: finishedSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					verifyVersion, verifyAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Verify Version"]) == 0x304 {
+						verifyVersion, verifyAuthenticated = 0x304, true
+					}
+					verify, verifyWire, verifyName := tlsCertificateVerifyDetail(r, verifyVersion, verifyAuthenticated)
+					verifySource := 0
+					if verify != nil {
+						if fieldValueSourceCount < 256 && len(verifyWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: verifyName, Data: bytes.Clone(verifyWire)})
+							verifySource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(verifyWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Certificate Verify (15)", depth: depth + 2,
+								source: verifySource, start: 0, end: 1, hasRange: verifySource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
+					keyUpdateSource := 0
+					if data := tlsKeyUpdatePlaintext(r, authenticatedTLS && tls13KeyUpdates); data != nil {
+						sources = append(sources, detailSource{Name: "TLS Key Update · authenticated handshake plaintext", Data: bytes.Clone(data)})
+						keyUpdateSource = len(sources)
+					}
+					earlyEndSource := 0
+					if data := tlsEndOfEarlyDataPlaintext(r, authenticatedTLS && tlsEarlyEpoch && tlsNegotiatedVersion == 0x304); data != nil {
+						if fieldValueSourceCount < 256 && len(data) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: "TLS End Of Early Data · authenticated early-epoch handshake plaintext", Data: bytes.Clone(data)})
+							earlyEndSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(data)
+						} else {
+							byteSourceLimited = true
+						}
+					}
 					keys := make([]string, 0, len(r))
 					for key := range r {
 						if key != "Type" {
@@ -452,14 +802,203 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						}
 					}
 					sort.Strings(keys)
+					if encrypted != nil {
+						order := map[string]int{"Length": 0, "Encrypted Extensions": 1, "Authenticated": 2, "Encrypted Extensions Version": 3, "Encoded Encrypted Extensions": 4}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if certificate != nil {
+						order := map[string]int{"Length": 0, "Certificate Body": 1, "Certificates": 2, "Authenticated": 3, "Certificate Version": 4, "Certificate Body Status": 5, "Certificate Message SHA256": 6, "Encoded Certificate": 7, "Post Handshake Response": 8}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if request != nil {
+						order := map[string]int{"Length": 0, "Authenticated": 1, "Certificate Request": 2, "Certificate Request Version": 3, "Certificate Request Status": 4, "Encoded Certificate Request": 5, "Certificate Request Admission": 6}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if finishedWire != nil {
+						order := map[string]int{"Length": 0, "Finished Verify Data": 1, "Finished Phase": 2, "Authenticated": 3, "Finished Version": 4, "Finished Cipher Suite": 5, "Finished Verification Status": 6, "Finished Context Status": 7, "Encoded Finished": 8, "Post Handshake Response": 9}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if verify != nil {
+						order := map[string]int{"Length": 0, "Certificate Verify": 1, "Certificate Verify Phase": 2, "Authenticated": 3, "Certificate Verify Version": 4, "Certificate Verify Status": 5, "Encoded Certificate Verify": 6, "Post Handshake Response": 7}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if exchange != nil {
+						order := map[string]int{"Length": 0, "Server Key Exchange": 1, "Authenticated": 2, "Server Key Exchange Version": 3, "Server Key Exchange Cipher Suite": 4, "Server Key Exchange Status": 5, "Encoded Server Key Exchange": 6}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if clientExchange != nil {
+						order := map[string]int{"Length": 0, "Client Key Exchange": 1, "Authenticated": 2, "Client Key Exchange Version": 3, "Client Key Exchange Cipher Suite": 4, "Client Key Exchange Status": 5, "Encoded Client Key Exchange": 6, "Client Key Exchange Profile": 7}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
+					if statusView != nil {
+						order := map[string]int{"Length": 0, "Certificate Status Validation": 1, "Certificate Status": 2, "Authenticated": 3, "Certificate Status Version": 4, "Encoded Certificate Status": 5}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
 					for _, key := range keys {
+						if statusView != nil && key == "Certificate Status" {
+							rows, limited := tlsCertificateStatusFields(statusView, statusSource, depth+2, max(0, 4096-len(out)), uint16(tlsNegotiatedVersion))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if statusView != nil && key == "Encoded Certificate Status" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Certificate Status: " + formatFieldValue(key, statusWire), depth: depth + 2,
+									source: statusSource, start: 0, end: len(statusWire), hasRange: statusSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						if exchange != nil && key == "Server Key Exchange" {
+							rows, limited := tlsServerKeyExchangeFields(exchange, exchangeSource, depth+2, max(0, 4096-len(out)))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if exchange != nil && key == "Encoded Server Key Exchange" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Server Key Exchange: " + formatFieldValue(key, exchangeWire), depth: depth + 2,
+									source: exchangeSource, start: 0, end: len(exchangeWire), hasRange: exchangeSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						if clientExchange != nil && key == "Client Key Exchange" {
+							rows, limited := tlsClientKeyExchangeFields(clientExchange, clientExchangeSource, depth+2, max(0, 4096-len(out)))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if clientExchange != nil && key == "Encoded Client Key Exchange" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Client Key Exchange: " + formatFieldValue(key, clientExchangeWire), depth: depth + 2,
+									source: clientExchangeSource, start: 0, end: len(clientExchangeWire), hasRange: clientExchangeSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						if encrypted != nil && key == "Encrypted Extensions" {
+							rows, limited := tlsEncryptedExtensionsFields(encrypted, encryptedSource, depth+2, max(0, 4096-len(out)))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if encrypted != nil && key == "Encoded Encrypted Extensions" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Encrypted Extensions: " + formatFieldValue(key, encryptedWire), depth: depth + 2, source: encryptedSource, start: 0, end: len(encryptedWire), hasRange: encryptedSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						if certificate != nil && key == "Certificate Body" {
+							rows, limited := tlsCertificateFields(certificate, certificateSource, depth+2, max(0, 4096-len(out)))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if certificate != nil && key == "Encoded Certificate" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Certificate: " + formatFieldValue(key, certificateWire), depth: depth + 2,
+									source: certificateSource, start: 0, end: len(certificateWire), hasRange: certificateSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						if verify != nil && key == "Certificate Verify" {
+							rows, limited := tlsCertificateVerifyFields(verify, verifySource, depth+2, max(0, 4096-len(out)), uint16(verifyVersion))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if finishedWire != nil && key == "Finished Verify Data" {
+							if len(out)+2 <= 4096 {
+								out = append(out, field{text: "Finished body", depth: depth + 2, branch: true},
+									field{text: "Finished Verify Data: " + formatFieldValue(key, finishedWire[4:]), depth: depth + 3,
+										source: finishedSource, start: 4, end: len(finishedWire), hasRange: finishedSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						if request != nil && key == "Certificate Request" {
+							rows, limited := tlsCertificateRequestFields(request, requestSource, depth+2, max(0, 4096-len(out)), uint16(requestVersion))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if request != nil && key == "Encoded Certificate Request" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Certificate Request: " + formatFieldValue(key, requestWire), depth: depth + 2,
+									source: requestSource, start: 0, end: len(requestWire), hasRange: requestSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						before := len(out)
 						walk(key, r[key], depth+1)
+						if exchange != nil && key == "Length" && exchangeSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = exchangeSource, 1, 4, true
+						}
+						if encrypted != nil && key == "Length" && encryptedSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = encryptedSource, 1, 4, true
+						}
+						if certificate != nil && key == "Length" && certificateSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = certificateSource, 1, 4, true
+						}
+						if request != nil && key == "Length" && requestSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = requestSource, 1, 4, true
+						}
+						if finishedSource > 0 && len(out) > before && (key == "Length" || key == "Encoded Finished") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = finishedSource, 1, 4, true
+							if key == "Encoded Finished" {
+								field.start, field.end = 0, len(finishedWire)
+								field.text = "Encoded Finished: " + formatFieldValue(key, finishedWire)
+							}
+						}
+						if verifySource > 0 && len(out) > before && (key == "Length" || key == "Encoded Certificate Verify") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = verifySource, 1, 4, true
+							if key == "Encoded Certificate Verify" {
+								field.start, field.end = 0, len(verifyWire)
+								field.text = "Encoded Certificate Verify: " + formatFieldValue(key, verifyWire)
+							}
+						}
+						if keyUpdateSource > 0 && (key == "Key Update Request" || key == "Encoded Key Update") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = keyUpdateSource, 4, 5, true
+							if key == "Encoded Key Update" {
+								field.start = 0
+								field.text = "Encoded Key Update: " + formatFieldValue(key, bytesValue(r[key]))
+							}
+						}
+						if earlyEndSource > 0 && len(out) > before && (key == "Length" || key == "Encoded End Of Early Data") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = earlyEndSource, 1, 4, true
+							if key == "Encoded End Of Early Data" {
+								field.start = 0
+							}
+						}
 					}
 					continue
 				}
 				walk(fmt.Sprintf("%s[%d]", name, i), r, depth)
 			}
 		case []any:
+			if len(x) == 0 {
+				add(name+": []", false)
+				return
+			}
 			if rows := mapList(x); len(rows) == len(x) && len(rows) > 0 {
 				walk(name, rows, depth)
 				return
@@ -501,6 +1040,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			var generated []byte
 			sourceName := ""
+			if protocol == "smb" && name == "Selected Dialect Raw Name Bytes" {
+				generated = bytesValue(x)
+				sourceName = "SMB1 selected dialect · request context bytes · response offsets unavailable"
+			}
 			if protocol == "dcerpc" && dcerpcMessage && name == "Stub" {
 				generated = bytesValue(x)
 				x = generated
@@ -523,18 +1066,46 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				generated = bytesValue(x)
 				sourceName = "QUIC STREAM · authenticated plaintext"
 			}
+			if name == "Crypto Data" && authenticatedQUIC && quicCryptoSize >= 0 {
+				if octets := bytesValue(x); octets != nil && len(octets) == quicCryptoSize {
+					generated = octets
+					sourceName = "QUIC CRYPTO · packet AEAD verified"
+				}
+			}
 			if name == "Rejected Packet Payload" && authenticatedQUIC {
 				generated = bytesValue(x)
-				sourceName = "QUIC packet payload · AEAD verified · not delivered"
+				sourceName = "QUIC packet payload · AEAD verified · " + quicPayloadState
 			}
 			if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
 				generated = bytesValue(x)
 				sourceName = "QUIC wire remainder · extracted octets"
 			}
 			if protocol == "http3" && authenticatedQUIC {
+				if name == "Frame Header Bytes" && http3TunnelType {
+					// Only the owned byte type (preserved by the worker descriptor)
+					// establishes octets. A Base64-looking text value is not proof.
+					// This is the observed type varint, not a physical-frame span or
+					// evidence that its following length/payload has been decoded.
+					if octets, ok := x.([]byte); ok && len(octets) > 0 && len(octets) <= 8 {
+						generated = octets
+						sourceName = fmt.Sprintf("HTTP/3 CONNECT frame type · stream %d · extracted bytes; frame offsets unavailable", http3StreamID)
+					}
+				}
+				if name == "Instruction Bytes" && http3RecoveredEncoder {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 QPACK encoder · retained stream %d · SETTINGS is context", http3StreamID)
+				}
+				if name == "Field Section Frame Bytes" && http3RetainedField {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 QPACK field bytes · retained stream %d · SETTINGS is context", http3StreamID)
+				}
 				if name == "Partial Frame Bytes" {
 					generated = bytesValue(x)
 					sourceName = fmt.Sprintf("HTTP/3 partial frame · stream %d · layout error", http3StreamID)
+				}
+				if name == "Rejected QPACK Block" {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 rejected QPACK · stream %d · packet AEAD verified", http3StreamID)
 				}
 				if name == "Payload" && http3FrameKind == "DATA" {
 					generated = bytesValue(x)
@@ -589,7 +1160,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if name == "Rejected Packet Payload" && authenticatedQUIC && emptyCID {
-				value = "0 bytes (AEAD verified; not delivered)"
+				value = "0 bytes (AEAD verified; " + quicPayloadState + ")"
 			}
 			if protocol == "ipfix" && name == "Export Time" && number(x) <= 0xffffffff {
 				value = fmt.Sprintf("%s · Unix seconds %d", time.Unix(int64(number(x)), 0).UTC().Format(time.RFC3339), number(x))
@@ -649,6 +1220,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					value = display
 				}
 			}
+			if x == nil && value == "<nil>" {
+				return // unset collection metadata, after protocol-specific absence labels
+			}
 			add(label+": "+value, false)
 			if len(generated) > 0 {
 				sources = append(sources, detailSource{Name: sourceName, Data: bytes.Clone(generated)})
@@ -665,7 +1239,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
 				}
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "ssh" || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || (protocol == "ssh" || smbDetailProtocol(protocol)) || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -712,6 +1286,20 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		if e == nil {
 			continue
 		}
+		if _, ok := e.NativeTLSCiphertextRefusal(); allowSessionDedup && ok {
+			e = protocolDisplayEvent(e)
+		}
+		if allowSessionDedup && smbDetailProtocol(e.Protocol) {
+			// Commit typed equality decisions before the common walker. The
+			// isolated worker receives this copy and only lays it out.
+			e = protocolDisplayEvent(e)
+		}
+		if _, nativeWCF := e.NativeWCFObservation(); allowSessionDedup && nativeWCF {
+			e = protocolDisplayEvent(e)
+		}
+		if _, nativeWCFTLS := e.NativeWCFTLSCarrier(); allowSessionDedup && nativeWCFTLS {
+			e = protocolDisplayEvent(e)
+		}
 		if e.Completeness == "evicted" {
 			// Coverage markers are context, not decoded protocol PDUs. In
 			// particular, ID zero must never look like an observed PDU #0.
@@ -732,6 +1320,26 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			continue
 		}
+		if unsupportedQUICTCPCarrier(e) {
+			appendUnsupportedQUICTCPCarrier(&out, &sources, e)
+			continue
+		}
+		if h := observedHTTPIncompleteHeader(e); h != nil {
+			appendHTTPIncompleteHeader(&out, &sources, e, h)
+			continue
+		}
+		if h := observedHTTPResponseHeader(e); h != nil {
+			appendHTTPHeaderObservation(&out, &sources, e, h)
+			continue
+		}
+		if observedHTTPUnframedContext(e) != "" {
+			appendHTTPUnframedContext(&out, &sources, e)
+			continue
+		}
+		if isHTTPObservationProfile(e) {
+			appendUnqualifiedHTTPObservation(&out, &sources, e)
+			continue
+		}
 		protocol, currentSource = e.Protocol, 0
 		ospfv3Display = e.Profile == "ospfv3-bounded-control"
 		ospfv2Display = e.Profile == "ospfv2-bounded-control"
@@ -740,14 +1348,32 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		wireRanges = detailWireRanges(e.Session["Wire Field Ranges"])
 		dcerpcResult, dcerpcResultKnown = 0, false
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
+		recoveredTLSContext = e.Protocol == "tls" && tlsPrecontextFinishedContext(e.Session, e.ID)
+		tls13KeyUpdates = number(e.Session["Negotiated Version"]) == 0x304
+		tlsEarlyEpoch = e.Session["TLS Key Epoch"] == "early"
+		tlsNegotiatedVersion = number(e.Session["Negotiated Version"])
+		tlsCipherSuite = number(e.Session["Cipher Suite"])
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
+		authenticatedQUICHandshake = authenticatedQUIC && e.Session["Native Carrier"] == true && e.Session["Packet Number Space"] == "handshake" && (e.Status == "decoded" || e.Status == "deferred")
+		quicPayloadState = quicPayloadDisposition(e.Session["Payload Delivery"])
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil
 		kind := e.SourceBytes.Kind
+		_, nativeWCFUpgrade := e.NativeWCFTLSCarrier()
+		wcfUpgradeCaption := nativeWCFUpgrade || !allowSessionDedup && projectedWCFTLSUpgrade(e)
+		tlsRemainder := tlsStoppedStreamRemainder(e)
+		rejectedLegacyHello := rejectedTLSServerHelloDiagnostic(e)
+		certificatePSKHello := rejectedTLSCertificatePSKHelloDiagnostic(e)
+		earlyDataHello := rejectedTLSEarlyDataHelloDiagnostic(e)
+		rejectedHelloName := rejectedTLSHelloName(e)
+		rejectedHello := rejectedHelloName != ""
 		if kind == "" {
 			kind = "message"
 		}
-		if !credibleTLSIdentity(e) {
+		if rejectedHello {
+			kind += " · complete " + rejectedHelloName + " declaration; negotiation not established"
+		}
+		if !credibleTLSIdentity(e) && !wcfUpgradeCaption && !tlsRemainder && !rejectedHello {
 			if strongTLSRecord(e) {
 				kind += " · TLS record framing; handshake not captured"
 			} else {
@@ -755,30 +1381,71 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 		}
 		label := eventProtocolName(e)
+		if wcfUpgradeCaption {
+			label = tlsVersion(e.Session["Negotiated Version"])
+		}
 		udpPayload := e.Protocol == "" && e.Transport == "udp"
 		udpPreview := udpPayload && e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw)
+		// Only the reassembly-owned extent certifies a TCP stream payload.
+		// A captured transport failure can instead retain a header prefix.
+		tcpPayload := e.Protocol == "" && e.Transport == "tcp" && e.SourceBytes.Kind == "reassembled"
+		tcpPreview := tcpPayload && e.Length > len(e.Raw)
+		if tcpPayload {
+			label = "TCP payload · application unrecognized"
+		}
 		if udpPayload {
 			label = "UDP payload · application unrecognized"
 			if e.Error != "" {
 				label = "UDP carrier diagnostic"
 			}
 		}
-		if !credibleTLSIdentity(e) {
+		if !credibleTLSIdentity(e) && !wcfUpgradeCaption && !tlsRemainder && !rejectedHello {
 			label = "TLS?"
 			if strongTLSRecord(e) {
 				label = "TLS · record framing only"
 			}
 		}
+		if rejectedHello {
+			label = "TLS " + rejectedHelloName + " (rejected)"
+		}
 		unit := "PDU"
+		if tcpPayload {
+			unit = "observation"
+		}
+		if tlsRemainder {
+			label, unit = "TLS stream remainder", "observation"
+		}
+		smbPreview := e.Protocol == "smb" && (e.Profile == "smb-record-resource-diagnostic" || e.Profile == "smb-record-diagnostic")
+		if smbPreview {
+			unit = "observation"
+		}
 		opaqueSSH := protectedSSHEvent(e)
 		if opaqueSSH {
 			// NEWKEYS establishes opaque stream context. Neither a complete
 			// retained arrival nor its bounded preview proves a decoded PDU.
 			unit = "observation"
 		}
+		wcfDiagnostic := e.Protocol == "wcf" && e.Status != "decoded" && e.Status != "deferred"
+		_, hasWCFCarrier := e.Session["Observed WCF Carrier"]
+		wcfTLSDiagnostic := e.Protocol == "tls" && hasWCFCarrier && e.Status != "decoded" && e.Status != "deferred" && !tlsCiphertextRefusalCaption(e, !allowSessionDedup)
+		if wcfTLSDiagnostic {
+			label = "TLS carrier context"
+		}
+		if wcfDiagnostic || wcfTLSDiagnostic {
+			unit = "observation"
+		}
 		add(fmt.Sprintf("%s · %s #%d · %s", label, unit, e.ID, kind), true)
 		if len(e.Raw) > 0 {
 			name := eventProtocolName(e)
+			if wcfUpgradeCaption {
+				name = tlsVersion(e.Session["Negotiated Version"])
+			}
+			if tcpPayload {
+				name = "Unidentified TCP payload · observed stream bytes"
+				if tcpPreview {
+					name = fmt.Sprintf("Unidentified TCP payload preview · %d/%d observed bytes", len(e.Raw), e.Length)
+				}
+			}
 			if e.Protocol == "dcerpc" {
 				name = "DCE/RPC wire"
 			}
@@ -801,6 +1468,21 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				name = "SMB2 wire PDU (authentication)"
 			}
 			sourceName := name + " · " + kind + " PDU"
+			if wcfDiagnostic || wcfTLSDiagnostic {
+				sourceName = fmt.Sprintf("%s · %s stream bytes · %s", name, kind, e.Status)
+			}
+			if tcpPayload {
+				sourceName = name // An unidentified byte extent is not a decoded PDU.
+			}
+			if tlsRemainder {
+				sourceName = fmt.Sprintf("Unparsed TLS stream remainder · %d observed bytes", e.Length)
+				if e.Length > len(e.Raw) {
+					sourceName = fmt.Sprintf("Unparsed TLS stream remainder preview · %d/%d observed bytes", len(e.Raw), e.Length)
+				}
+			}
+			if smbPreview {
+				sourceName = fmt.Sprintf("SMB1 record preview · %d/%d observed bytes · %s", len(e.Raw), e.Length, kind)
+			}
 			if udpPreview {
 				sourceName = name // A bounded preview is not a complete application PDU.
 			}
@@ -815,8 +1497,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
-		earlyQUICDiagnostic := e.Protocol == "quic" && e.Error != "" && e.Session["Authentication Verified"] == true
-		if earlyQUICDiagnostic {
+		earlyQUICDiagnostic := frontloadedQUIC[e] || e.Protocol == "quic" && e.Error != "" && e.Session["Authentication Verified"] == true
+		if earlyQUICDiagnostic && !frontloadedQUIC[e] {
 			add("Packet diagnostic: "+e.Error, false)
 		}
 		if e.Protocol == "http3" && e.Error != "" {
@@ -836,219 +1518,374 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		}
 		if e.SourceBytes.CompletedIn != nil {
 			kind := "Message"
+			if tcpPayload {
+				kind = "Observed TCP"
+			}
 			if e.Protocol == "dcerpc" {
 				kind = "RPC wire PDU"
 			}
 			if e.Session["Native Carrier"] == true && (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") {
 				kind = "QUIC wire packet"
 			}
-			add(fmt.Sprintf("%s bytes complete in frame #%d · %d contributing packet(s)", kind, e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
+			if wcfDiagnostic {
+				add(fmt.Sprintf("Observed stream bytes in frame #%d · complete record boundary unavailable", e.SourceBytes.CompletedIn.Number), false)
+			} else {
+				add(fmt.Sprintf("%s bytes complete in frame #%d · %d contributing packet(s)", kind, e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
+			}
 		}
-		if !credibleTLSIdentity(e) {
+		if rejectedLegacyHello {
+			observation, _ := pcaputil.ObserveTLSServerHelloRecord(e.Raw, 4096)
+			add("TLS "+rejectedHelloName+": complete observed declaration; rejected", false)
+			add("Negotiated TLS version: unavailable · "+rejectedHelloName+" rejected", false)
+			add("Cleartext declaration: parsed; peer authentication not verified", false)
+			add("Rejected "+rejectedHelloName+" declaration", true)
+			legacyRequirement, compressionRequirement := "", ""
+			if observation.SelectedVersion == 0x304 {
+				legacyRequirement, compressionRequirement = " · required 0x0303", " · required 0"
+			}
+			// These spans belong to this complete, owned cleartext record.
+			// The declared selected version remains an observation, not an
+			// admitted session value or a successful handshake-body alias.
+			out = append(out,
+				field{text: fmt.Sprintf("Declared selected version: %s (0x%04x) · not negotiated", tlsVersion(observation.SelectedVersion), observation.SelectedVersion), depth: 1},
+				field{text: fmt.Sprintf("Declared legacy version: 0x%04x%s", observation.LegacyVersion, legacyRequirement), depth: 1, source: currentSource, start: 9, end: 11, hasRange: true},
+				field{text: fmt.Sprintf("Declared cipher suite: 0x%04x", observation.CipherSuite), depth: 1, source: currentSource, start: 44 + observation.SessionIDLength, end: 46 + observation.SessionIDLength, hasRange: true},
+				field{text: fmt.Sprintf("Declared compression: %d%s", observation.Compression, compressionRequirement), depth: 1, source: currentSource, start: 46 + observation.SessionIDLength, end: 47 + observation.SessionIDLength, hasRange: true},
+			)
+			if reserved, err := pcaputil.ObserveTLSGREASEServerHelloRecord(e.Raw, 4096); err == nil && reserved.RefusalReason == e.Error {
+				out = append(out,
+					field{text: "Reserved GREASE selection", branch: true},
+					field{text: fmt.Sprintf("Reserved %s: 0x%04x", reserved.SelectionKind, reserved.Value), depth: 1, source: currentSource, start: reserved.Offset, end: reserved.Offset + 2, hasRange: true},
+					field{text: "Selection admission: reserved proposal value; cannot be negotiated", depth: 1},
+				)
+			}
+			if misplaced, err := pcaputil.ObserveTLSMisplacedServerHelloExtensionRecord(e.Raw, 4096); err == nil && misplaced.RefusalReason == e.Error {
+				at := misplaced.ExtensionOffset
+				out = append(out,
+					field{text: "Misplaced ServerHello extension declaration", branch: true},
+					field{text: fmt.Sprintf("Extension type: %s (%d)", misplaced.ExtensionName, misplaced.ExtensionType), depth: 1, source: currentSource, start: at, end: at + 2, hasRange: true},
+					field{text: fmt.Sprintf("Extension data length: %d", misplaced.ExtensionDataLength), depth: 1, source: currentSource, start: at + 2, end: at + 4, hasRange: true},
+					field{text: fmt.Sprintf("Declared extension data: %d bytes", misplaced.ExtensionDataLength), depth: 1, source: currentSource, start: at + 4, end: at + 4 + misplaced.ExtensionDataLength, hasRange: misplaced.ExtensionDataLength > 0},
+					field{text: "Extension location: not permitted in final TLS 1.3 ServerHello; selection not applied", depth: 1},
+				)
+			}
+			if share, err := pcaputil.ObserveTLSKeyShareServerHelloRecord(e.Raw, 4096); err == nil && strings.Contains(e.Error, "ServerHello key_share group") {
+				at := share.ExtensionOffset + 4
+				out = append(out,
+					field{text: "Rejected key_share selection", branch: true},
+					field{text: fmt.Sprintf("Declared key_share group: 0x%04x", share.Group), depth: 1, source: currentSource, start: at, end: at + 2, hasRange: true},
+					field{text: fmt.Sprintf("Key exchange length: %d", share.KeyExchangeLength), depth: 1, source: currentSource, start: at + 2, end: at + 4, hasRange: true},
+					field{text: fmt.Sprintf("Declared key exchange: %d bytes · public key validity not evaluated", share.KeyExchangeLength), depth: 1, source: currentSource, start: at + 4, end: at + 4 + share.KeyExchangeLength, hasRange: true},
+					field{text: "Current ClientHello match: refused by native parser; selection not applied", depth: 1},
+				)
+			}
+		}
+		if o := certificatePSKHello; o != nil {
+			add("TLS "+rejectedHelloName+": complete observed envelope; rejected", false)
+			add("Negotiated TLS version: unavailable · Hello rejected", false)
+			add("Cleartext envelope observed; extensions rejected; peer authentication not verified", false)
+			add("Rejected "+rejectedHelloName+" certificate/PSK declaration", true)
+			at := o.ExtensionOffset
+			out = append(out,
+				field{text: "Certificate/PSK extension type: tls_cert_with_extern_psk (33)", depth: 1, source: currentSource, start: at, end: at + 2, hasRange: true},
+				field{text: fmt.Sprintf("Certificate/PSK extension data length: %d · required 0", o.ExtensionDataLength), depth: 1, source: currentSource, start: at + 2, end: at + 4, hasRange: true},
+				field{text: fmt.Sprintf("Certificate/PSK extension data: %d bytes", o.ExtensionDataLength), depth: 1, source: currentSource, start: at + 4, end: at + 4 + o.ExtensionDataLength, hasRange: o.ExtensionDataLength > 0},
+			)
+		}
+		if o := earlyDataHello; o != nil {
+			add("TLS ClientHello: complete observed envelope; rejected", false)
+			add("Negotiated TLS version: unavailable · ClientHello rejected", false)
+			add("Rejected ClientHello early_data declaration", true)
+			at := o.ExtensionOffset
+			out = append(out,
+				field{text: "Extension type: early_data (42)", depth: 1, source: currentSource, start: at, end: at + 2, hasRange: true},
+				field{text: fmt.Sprintf("Extension data length: %d", o.ExtensionDataLength), depth: 1, source: currentSource, start: at + 2, end: at + 4, hasRange: true},
+			)
+		}
+		if wcfTLSDiagnostic {
+			add("TLS record identity: unconfirmed · incomplete or refused upgrade stream; no complete record admitted", false)
+			add("Plaintext: unavailable · no complete record admitted for authentication", false)
+		} else if !credibleTLSIdentity(e) && !tlsRemainder && !rejectedHello {
 			add("TLS session identity: unconfirmed · complete record header/body, handshake context not observed", false)
 			add("Negotiated TLS version: unavailable · record legacy version is not negotiation evidence", false)
 			add("Plaintext: unavailable · record authentication has not been verified", false)
 		}
-		values := map[string]any{}
-		if protocol == "ssh" {
-			wireRanges = detailWireRanges(e.Fields["Wire Field Ranges"])
-			for key := range e.Session {
-				delete(wireRanges, key) // Session may replace a wire offer with context.
-			}
-			for key, span := range detailWireRanges(e.Session["Wire Field Ranges"]) {
-				wireRanges[key] = span
-			}
+		if tlsRemainder {
+			add("Remainder decoding: stopped; no additional records admitted", false)
+			add("Remainder authentication: not evaluated", false)
 		}
-		for k, v := range e.Fields {
-			values[k] = v
-		}
-		for k, v := range e.Session {
-			if allowSessionDedup && (k == "DNS" && duplicateDNSSessionFields(e) || k == "Initial Packet Fields" && duplicateSSHInitialFields(e)) {
-				continue // A complete typed copy of this same PDU is already in Fields.
+		if smbDetailProtocol(e.Protocol) {
+			for _, node := range smbDetailNodes(e) {
+				walk(node.name, node.value, 0)
 			}
-			values[k] = v
-		}
-		delete(values, "Wire Field Ranges")
-		if hasTLSConnectionObservation(e.Protocol) {
-			if context, ok := values["Session Establishment"].(map[string]any); ok {
-				fields, limited := connectionObservationFields(context, 4096-len(out))
-				out = append(out, fields...)
-				fieldViewLimited = fieldViewLimited || limited
-				delete(values, "Session Establishment")
-			}
-		}
-		if e.Protocol == "tls" {
-			// Retained hello metadata and this record are separate evidence
-			// scopes. End the metadata branch before publishing wire ranges.
-			add("TLS record and observed context", true)
-		}
-		if e.Protocol == "dcerpc" {
-			add("DCE/RPC message and observed association", true)
-			if e.ResponseTo != 0 {
-				add(fmt.Sprintf("Response to PDU: #%d (observed request on this connection)", e.ResponseTo), false)
-			}
-			for _, key := range []string{"Packet Name", "Call ID", "Reject Reason", "Version Count", "Protocol Versions", "Trailing Padding", "Context ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Fragment Stub Bytes", "Message ID", "Fragment Index", "Reassembled Message", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
+		} else {
+			values := map[string]any{}
+			if protocol == "ssh" || protocol == "smb" {
+				wireRanges = detailWireRanges(e.Fields["Wire Field Ranges"])
+				for key := range e.Session {
+					delete(wireRanges, key) // Session may replace a wire offer with context.
+				}
+				for key, span := range detailWireRanges(e.Session["Wire Field Ranges"]) {
+					wireRanges[key] = span
 				}
 			}
-		}
-		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
-			add("QUIC wire header and observed context", true)
-			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
+			for k, v := range e.Fields {
+				values[k] = v
+			}
+			for k, v := range e.Session {
+				if allowSessionDedup && (k == "DNS" && duplicateDNSSessionFields(e) || k == "Initial Packet Fields" && duplicateSSHInitialFields(e)) {
+					continue // A complete typed copy of this same PDU is already in Fields.
+				}
+				values[k] = v
+			}
+			delete(values, "Wire Field Ranges")
+			if e.Protocol == "wcf" {
+				if context, ok := values[wcfObservedContext].(map[string]any); ok {
+					fields, limited := observedMetadataFields(context, 4096-len(out), "Observed WCF Session · connection context", "Scope: locally observed framing session; retained values have no current-record offsets; envelope body remains opaque")
+					out = append(out, fields...)
+					fieldViewLimited = fieldViewLimited || limited
+					delete(values, wcfObservedContext)
+					if wcfDiagnostic {
+						add("MC-NMF framing diagnostic · no complete record fields", true)
+					} else {
+						add("MC-NMF record · literal and derived fields", true)
+					}
 				}
 			}
-		}
-		if e.Protocol == "esp" {
-			for _, key := range []string{"SPI", "Sequence", "Sequence Number", "Header Complete", "Algorithm Context Available", "Authentication Verified", "Extended Sequence Reconstructed", "Observation Scope"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
+			if hasTLSConnectionObservation(e.Protocol) {
+				if context, ok := values["Observed WCF Carrier"].(map[string]any); ok {
+					fields, limited := observedMetadataFields(context, 4096-len(out), "Observed WCF upgrade · carrier context", "Scope: observed MC-NMF upgrade; no current-record offsets, decrypted WCF body or verified preceding closure implied")
+					out = append(out, fields...)
+					fieldViewLimited = fieldViewLimited || limited
+					delete(values, "Observed WCF Carrier")
+					if wcfTLSDiagnostic {
+						add("TLS upgrade stream observation · no complete record fields", true)
+					}
+				}
+				if context, ok := values["Session Establishment"].(map[string]any); ok {
+					fields, limited := connectionObservationFields(context, 4096-len(out))
+					out = append(out, fields...)
+					fieldViewLimited = fieldViewLimited || limited
+					delete(values, "Session Establishment")
 				}
 			}
-		}
-		if e.Protocol == "ntp" {
-			for _, key := range []string{"Packet Name", "Version", "Mode", "Legacy Reserved", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Requested Association ID", "Response Association Observation", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Synchronizing Distance Seconds", "Synchronizing Dispersion Seconds", "Estimated Drift Rate", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Control Payload Failure", "Reported Association Count", "Reported Association List Decode", "Reported Associations"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
+			if e.Protocol == "tls" && !tlsRemainder && !wcfTLSDiagnostic {
+				// Retained hello metadata and this record are separate evidence
+				// scopes. End the metadata branch before publishing wire ranges.
+				add("TLS record and observed context", true)
+				for _, group := range []struct {
+					name string
+					keys []string
+				}{
+					{"Record header", []string{"Record Type", "Record Version", "Record Length"}},
+					{"Early data observation", []string{"TLS Key Epoch", "Early Cipher Suite", "Early Record Sequence", "Early Data Decision", "Early Data Decision PDU", "Early Data Pending Records", "Early Data End", "Reprocessed From PDU", "Reprocessed In PDU"}},
+					{"Record decoding", []string{"Content Visibility", "Secret Lookup Status", "Authentication Verified", "Inner Content Type", "Record Recovery Verified", "Recovered Record Sequence", "Missing Earlier Plaintext", "Recovery State", "Application Epoch Inferred From Authenticated Record", "Unobserved KeyUpdate Inferred From Authentication", "Discarded Handshake Fragment Bytes", "Handshake Boundary", "Application Decoding", "Handshake Parsing", "Handshake Incomplete", "Handshake Messages", "Precontext Finished Recovery Verified", "Precontext Finished Recovery Status", "Precontext Finished Original PDUs", "Precontext Finished Original Record SHA256", "Recovered Context Handshake Messages", "Alert Level", "Alert Description"}},
+					{"Observed connection", []string{"Negotiated Version", "Cipher Suite", "SNI", "ALPN", "Certificate Trust"}},
+				} {
+					present := false
+					for _, key := range group.keys {
+						if _, ok := values[key]; ok {
+							present = true
+							break
+						}
+					}
+					if !present {
+						continue
+					}
+					if len(out) >= 4096 {
+						fieldViewLimited = true
+						break
+					}
+					add(group.name, true)
+					out[len(out)-1].depth = 1
+					for _, key := range group.keys {
+						if value, ok := values[key]; ok {
+							start := len(out)
+							// Preserve the existing source/range scope of each root
+							// value, then indent its presentation below this heading.
+							walk(key, value, 0)
+							for i := start; i < len(out); i++ {
+								out[i].depth++
+							}
+							delete(values, key)
+						}
+					}
 				}
 			}
-		}
-		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
-		if e.Protocol == "http3" && e.Error != "" {
-			delete(values, "HTTP3 Stream Errors") // early, before possibly large byte witnesses
-		}
-		if e.Protocol == "isis" {
-			for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "Fixed Header Complete", "Wire Grammar Complete", "TLV Decode Failure", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
+			if e.Protocol == "dcerpc" {
+				add("DCE/RPC message and observed association", true)
+				if e.ResponseTo != 0 {
+					add(fmt.Sprintf("Response to PDU: #%d (observed request on this connection)", e.ResponseTo), false)
+				}
+				for _, key := range []string{"Packet Name", "Call ID", "Reject Reason", "Version Count", "Protocol Versions", "Trailing Padding", "Context ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Fragment Stub Bytes", "Message ID", "Fragment Index", "Reassembled Message", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
+				add("QUIC wire header and observed context", true)
+				for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "CID Frame Admission", "Rejected CID Frames", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "esp" {
+				for _, key := range []string{"SPI", "Sequence", "Sequence Number", "Header Complete", "Algorithm Context Available", "Authentication Verified", "Extended Sequence Reconstructed", "Observation Scope"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ntp" {
+				for _, key := range []string{"Packet Name", "Version", "Mode", "Legacy Reserved", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Requested Association ID", "Response Association Observation", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Synchronizing Distance Seconds", "Synchronizing Dispersion Seconds", "Estimated Drift Rate", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Control Payload Failure", "Reported Association Count", "Reported Association List Decode", "Reported Associations"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
+			if e.Protocol == "http3" && e.Error != "" {
+				delete(values, "HTTP3 Stream Errors") // early, before possibly large byte witnesses
+			}
+			if e.Protocol == "isis" {
+				for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "Fixed Header Complete", "Wire Grammar Complete", "TLV Decode Failure", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ripng" {
+				for _, key := range []string{"Packet Name", "Command", "Version", "Reserved", "Conformance Warning", "Whole Table Request", "Route Count", "Next Hop Count", "Entries", "Authentication Verified", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
+				delete(values, "Opaque Session Payload")
+				delete(values, "Ethernet Bytes")
+				for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Control Setup Complete", "Session Setup Complete", "Observed Control Connection", "Observed Session", "Receiver Proposal Side", "Cookie Length", "Cookie", "Sublayer Type", "Data Sequencing", "Sequence Present", "Sequence Number", "Sequence Observation", "Unobserved Sequence Count", "Payload Decoded", "Payload Admission", "Opaque Payload Bytes", "Association Diagnostic", "Conformance Warning", "AVPs", "Control Context Proof", "Context Proof", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "stp" {
+				for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Conformance Warning", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "rsvp" {
+				for _, key := range []string{"Message Name", "Header", "Objects", "Unparsed Body", "Trailing Bytes", "Checksum Omitted", "Checksum Verified", "Wire Grammar Complete", "Field Layouts Complete", "Procedure Semantics Verified", "Reservation State Inferred", "Authentication Verified", "Observation Scope"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "gtpv2" {
+				for _, key := range []string{"Messages", "Observed Message Count", "Wire Grammar Complete", "Procedure Semantics Verified", "Bearer State Inferred", "Authentication Verified", "Observation Scope"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ospf" {
+				keys := []string{"Packet Name", "Header", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
+				if ospfv2Display {
+					// Keep the authentication field next to its declaring header,
+					// then the packet body and independently bounded LLS trailer.
+					keys = []string{"Packet Name", "Header", "Authentication", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "LLS", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
+				}
+				for _, key := range keys {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "pim" {
+				// Lead with the actual control message and advertised (S,G), not
+				// unrelated generic metadata or a large base64 copy of its body.
+				// The complete PDU remains selectable in the byte-source pane.
+				delete(values, "Encapsulated Bytes")
+				for _, key := range []string{"Packet Name", "Version", "Type", "Null Register", "Border", "Register IP Header", "Upstream Neighbor", "Group Count", "Hold Time", "Group", "Source", "Originator", "Groups", "Options", "Fragment Tag", "Hash Mask Length", "BSR Priority", "BSR", "Priority", "RP", "Prefix Count", "Advertised Groups", "RPT", "Metric Preference", "Metric", "Mask Length", "TTL", "Prune Indicator", "Prune Now", "Assert Override", "Interval", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope", "Bootstrap Reassembly"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ldp" {
+				for _, key := range []string{"Packet Name", "Version", "PDU Length", "LSR ID", "Label Space ID", "Observation Scope", "Messages"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
+				delete(values, "Strong Identity")
+				for _, key := range []string{"Packet Name", "Version", "Protocol Version", "Opcode", "State", "Group", "Virtual IP", "Identifier", "Owner ID", "Priority", "Hello Time", "Hold Time", "My Discriminator", "Your Discriminator", "Poll", "Final", "Detect Multiplier", "Desired Min TX", "Required Min RX", "Required Min Echo RX"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ssh" {
+				for _, key := range []string{"Packet Name", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Encryption C2S", "Encryption S2C", "Signature Verified", "Peer Identity Verified", "Identification", "Version", "Kex Family", "Host Key Format", "First Kex Packet Follows", "Languages C2S", "Languages S2C"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ssdp" {
+				for _, key := range []string{"Message Kind", "Notification Subtype", "Discovery Target", "USN", "Location", "Maximum Age Seconds", "Boot ID", "Next Boot ID", "Config ID", "Conformance Warnings", "Identity Verified"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			for _, key := range []string{"Negotiated Version", "Content Visibility", "Secret Lookup Status", "Cipher Suite", "SNI", "ALPN", "HTTP3 Connection Error", "HTTP3 Connection Conformance", "HTTP3 Message Conformance", "Handshake Messages", "Alert Level", "Alert Description", "Stream ID", "Request Method", "Headers", "GRPC Status", "GRPC Messages", "Authentication", "Guest Session", "Record Type", "Record Version", "Record Length", "Inner Content Type", "Authentication Verified", "Certificate Trust"} {
 				if v, ok := values[key]; ok {
 					walk(key, v, 0)
 					delete(values, key)
 				}
 			}
-		}
-		if e.Protocol == "ripng" {
-			for _, key := range []string{"Packet Name", "Command", "Version", "Reserved", "Conformance Warning", "Whole Table Request", "Route Count", "Next Hop Count", "Entries", "Authentication Verified", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
+			if len(values) > 0 {
+				if protocol == "ssh" || protocol == "smb" {
+					// This synthetic root owns the explicitly merged root ranges;
+					// nested maps still establish independent scopes in walk.
+					values["Wire Field Ranges"] = wireRanges
 				}
-			}
-		}
-		if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
-			delete(values, "Opaque Session Payload")
-			delete(values, "Ethernet Bytes")
-			for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Control Setup Complete", "Session Setup Complete", "Observed Control Connection", "Observed Session", "Receiver Proposal Side", "Cookie Length", "Cookie", "Sublayer Type", "Data Sequencing", "Sequence Present", "Sequence Number", "Sequence Observation", "Unobserved Sequence Count", "Payload Decoded", "Payload Admission", "Opaque Payload Bytes", "Association Diagnostic", "Conformance Warning", "AVPs", "Control Context Proof", "Context Proof", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
+				depth := 0
+				if len(wireRanges) > 0 {
+					depth = -1
 				}
-			}
-		}
-		if e.Protocol == "stp" {
-			for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Conformance Warning", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
+				label := "Other decoded fields"
+				_, fragmentExtent := ipv4FragmentExtentRefusal(e)
+				_, carrierExtent := ipv4IPIPExtentRefusal(e)
+				if fragmentExtent || carrierExtent {
+					label = "Header observation context"
 				}
+				walk(label, values, depth)
 			}
-		}
-		if e.Protocol == "rsvp" {
-			for _, key := range []string{"Message Name", "Header", "Objects", "Unparsed Body", "Trailing Bytes", "Checksum Omitted", "Checksum Verified", "Wire Grammar Complete", "Field Layouts Complete", "Procedure Semantics Verified", "Reservation State Inferred", "Authentication Verified", "Observation Scope"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "gtpv2" {
-			for _, key := range []string{"Messages", "Observed Message Count", "Wire Grammar Complete", "Procedure Semantics Verified", "Bearer State Inferred", "Authentication Verified", "Observation Scope"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ospf" {
-			keys := []string{"Packet Name", "Header", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
-			if ospfv2Display {
-				// Keep the authentication field next to its declaring header,
-				// then the packet body and independently bounded LLS trailer.
-				keys = []string{"Packet Name", "Header", "Authentication", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "LLS", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
-			}
-			for _, key := range keys {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "pim" {
-			// Lead with the actual control message and advertised (S,G), not
-			// unrelated generic metadata or a large base64 copy of its body.
-			// The complete PDU remains selectable in the byte-source pane.
-			delete(values, "Encapsulated Bytes")
-			for _, key := range []string{"Packet Name", "Version", "Type", "Null Register", "Border", "Register IP Header", "Upstream Neighbor", "Group Count", "Hold Time", "Group", "Source", "Originator", "Groups", "Options", "Fragment Tag", "Hash Mask Length", "BSR Priority", "BSR", "Priority", "RP", "Prefix Count", "Advertised Groups", "RPT", "Metric Preference", "Metric", "Mask Length", "TTL", "Prune Indicator", "Prune Now", "Assert Override", "Interval", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope", "Bootstrap Reassembly"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ldp" {
-			for _, key := range []string{"Packet Name", "Version", "PDU Length", "LSR ID", "Label Space ID", "Observation Scope", "Messages"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
-			delete(values, "Strong Identity")
-			for _, key := range []string{"Packet Name", "Version", "Protocol Version", "Opcode", "State", "Group", "Virtual IP", "Identifier", "Owner ID", "Priority", "Hello Time", "Hold Time", "My Discriminator", "Your Discriminator", "Poll", "Final", "Detect Multiplier", "Desired Min TX", "Required Min RX", "Required Min Echo RX"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ssh" {
-			for _, key := range []string{"Packet Name", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Encryption C2S", "Encryption S2C", "Signature Verified", "Peer Identity Verified", "Identification", "Version", "Kex Family", "Host Key Format", "First Kex Packet Follows", "Languages C2S", "Languages S2C"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ssdp" {
-			for _, key := range []string{"Message Kind", "Notification Subtype", "Discovery Target", "USN", "Location", "Maximum Age Seconds", "Boot ID", "Next Boot ID", "Config ID", "Conformance Warnings", "Identity Verified"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		for _, key := range []string{"Negotiated Version", "Content Visibility", "Secret Lookup Status", "Cipher Suite", "SNI", "ALPN", "HTTP3 Connection Error", "HTTP3 Connection Conformance", "HTTP3 Message Conformance", "Handshake Messages", "Alert Level", "Alert Description", "Stream ID", "Request Method", "Headers", "GRPC Status", "GRPC Messages", "Authentication", "Guest Session", "Record Type", "Record Version", "Record Length", "Inner Content Type", "Authentication Verified", "Certificate Trust"} {
-			if v, ok := values[key]; ok {
-				walk(key, v, 0)
-				delete(values, key)
-			}
-		}
-		if len(values) > 0 {
-			if protocol == "ssh" {
-				// This synthetic root owns the explicitly merged root ranges;
-				// nested maps still establish independent scopes in walk.
-				values["Wire Field Ranges"] = wireRanges
-			}
-			depth := 0
-			if len(wireRanges) > 0 {
-				depth = -1
-			}
-			walk("Other decoded fields", values, depth)
 		}
 		state := e.Status
 		if e.Completeness != "" && e.Completeness != state {
@@ -1057,16 +1894,22 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		add(protocolEventStatusText(e, state), false)
 		if e.Error != "" && !earlyQUICDiagnostic {
 			message := e.Error
-			if e.Protocol == "ssh" && e.ExpertCode != "" && strings.HasPrefix(message, e.ExpertCode+": ") {
+			if e.ExpertCode != "" {
 				// Keep the reason visible in a split inspector. These are exact
 				// diagnostic components; the original event error stays intact.
 				add("Diagnostic code: "+e.ExpertCode, false)
-				message = strings.TrimPrefix(message, e.ExpertCode+": ")
-				for _, decoder := range []string{"ssh-plaintext", "ssh"} {
-					if strings.HasPrefix(message, decoder+": ") {
-						add("Decoder: "+decoder, false)
-						message = strings.TrimPrefix(message, decoder+": ")
-						break
+				if strings.HasPrefix(message, e.ExpertCode+": ") {
+					message = strings.TrimPrefix(message, e.ExpertCode+": ")
+					// Decoder labels are protocol-specific, unlike the typed
+					// diagnostic code. Preserve other protocols' literal colons.
+					if e.Protocol == "ssh" {
+						for _, decoder := range []string{"ssh-plaintext", "ssh"} {
+							if strings.HasPrefix(message, decoder+": ") {
+								add("Decoder: "+decoder, false)
+								message = strings.TrimPrefix(message, decoder+": ")
+								break
+							}
+						}
 					}
 				}
 			}
@@ -1130,10 +1973,19 @@ func eventProtocols(events []*pcaputil.ProtocolEvent) string {
 		if e == nil {
 			continue
 		}
-		if e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) && !validESPIncompleteObservation(e) {
-			continue
+		name := ""
+		if h := observedHTTPIncompleteHeader(e); h != nil {
+			name = strings.SplitN(h.line, " ", 2)[0]
+		} else if h := observedHTTPResponseHeader(e); h != nil {
+			name = strings.SplitN(h.line, " ", 2)[0]
+		} else if context := observedHTTPUnframedContext(e); context != "" {
+			name = context
+		} else {
+			if isHTTPObservationProfile(e) || e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) && !validESPIncompleteObservation(e) {
+				continue
+			}
+			name = eventProtocolName(e)
 		}
-		name := eventProtocolName(e)
 		if !credibleTLSIdentity(e) {
 			name = "TLS?"
 			if strongTLSRecord(e) {
@@ -1268,6 +2120,12 @@ func boundedEvent(e *pcaputil.ProtocolEvent, remaining *int) *pcaputil.ProtocolE
 // observation denotes absence/eviction; a retained diagnostic remains visible.
 func retainedProtocolDetail(history *pcaputil.ProtocolInspector, id uint64) *pcaputil.ProtocolEvent {
 	e, err := history.Details(id)
+	if observation, ok := e.NativeWCFTLSCarrier(); ok && observation.Status != "decoded" && observation.Status != "deferred" {
+		// An expected record-query refusal does not mean this retained
+		// observation was evicted. Its dedicated native context stays visible;
+		// no complete record fields or bytes are admitted by this path.
+		return e
+	}
 	if e != nil && err != nil {
 		if e.Error == "" {
 			e.Error = err.Error()

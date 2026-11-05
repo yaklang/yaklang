@@ -31,15 +31,15 @@ func (v *ProtocolInspector) PacketQueryRevision(ref PacketReference, initialIDs 
 	if physical {
 		entries = v.byPhysical[ref]
 	}
-	if len(entries) > 0 {
-		r.Contributions = entries[len(entries)-1].historySequence
+	for _, entry := range entries {
+		r.Contributions = max(r.Contributions, entry.historySequence, entry.http3ContextSequence)
 	}
 	if v.unindexed > 0 || len(initialIDs) > 128 {
 		r.Fallback = v.received
 	}
 	for _, id := range initialIDs[:min(len(initialIDs), 128)] {
-		if rows := v.byID[id]; len(rows) > 0 && rows[0].historySequence > r.InitialIDs {
-			r.InitialIDs = rows[0].historySequence
+		if rows := v.byID[id]; len(rows) > 0 {
+			r.InitialIDs = max(r.InitialIDs, rows[0].historySequence, rows[0].http3ContextSequence)
 		}
 	}
 	return r

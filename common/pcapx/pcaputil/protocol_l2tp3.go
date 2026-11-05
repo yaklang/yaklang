@@ -26,7 +26,7 @@ func (a *binParser) l2tp3UDPNeedsPacket(network gopacket.NetworkLayer, udp *laye
 
 // Inner bytes own a separate copy. An event callback cannot alter subsequent
 // normalized transport by editing the public wire/field projections.
-func (a *binParser) decodeL2TPv3Event(e *ProtocolEvent, wire []byte, udp, truncated bool, carrierErr error) (inner []byte, suffix string, parent uint64) {
+func (a *binParser) decodeL2TPv3Event(e *ProtocolEvent, wire []byte, udp, truncated bool, carrierErr error, firstHeader ...l2tp3FirstHeaderExtent) (inner []byte, suffix string, parent uint64) {
 	e.Protocol, e.Rule, e.Profile, e.nativeSessionMessage = "l2tp", "l2tp3", "l2tp3-bounded-wire-envelope", true
 	e.Entry = "L2TPv3IPFields"
 	if udp {
@@ -55,7 +55,7 @@ func (a *binParser) decodeL2TPv3Event(e *ProtocolEvent, wire []byte, udp, trunca
 		if m["Control"] == true {
 			a.l2tp3ControlObserve(e, m, wire, udp)
 		} else {
-			m, inner, suffix, err = a.l2tp3DataResolve(e, m, wire, udp)
+			m, inner, suffix, err = a.l2tp3DataResolve(e, m, wire, udp, firstHeader...)
 		}
 		a.l2tp3Mu.Unlock()
 		if m["Unparsed Parameters"] == true || m["Unparsed Message Type"] == true || m["Ambiguous Parameters"] == true || m["Association Diagnostic"] != nil {
@@ -162,7 +162,11 @@ func (a *binParser) observeL2TPv3(p gopacket.Packet, evidence captureEvidence) (
 		a.observeNetFlowV9Boundary(e, wire, carrierErr != nil)
 		a.observeIPFIXBoundary(e, wire, carrierErr != nil)
 	}
-	inner, suffix, parent := a.decodeL2TPv3Event(e, wire, udp, truncated, carrierErr)
+	var firstHeader []l2tp3FirstHeaderExtent
+	if fragment, ok := p.(*l2tp3IPv6FragmentPacket); ok && !udp {
+		firstHeader = []l2tp3FirstHeaderExtent{{firstPayloadBytes: fragment.firstPayloadBytes}}
+	}
+	inner, suffix, parent := a.decodeL2TPv3Event(e, wire, udp, truncated, carrierErr, firstHeader...)
 	if len(inner) == 0 {
 		return nil, true
 	}

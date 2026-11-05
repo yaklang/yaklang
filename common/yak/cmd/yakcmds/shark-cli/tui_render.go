@@ -215,6 +215,16 @@ type protocolShare struct {
 	count int
 }
 
+func (u *tui) refreshProtocolMix(now time.Time, s *captureSession) {
+	// The final batch can arrive before the next rate tick. Once the input
+	// channel is drained, EOF must show that final physical window immediately.
+	// Rechecking it also reflects late retained protocol observations without
+	// inventing new traffic samples. The window is bounded to 128 packets.
+	if u.rate.sample(now, s) || u.finished {
+		u.updateMix()
+	}
+}
+
 func (u *tui) updateMix() {
 	counts := map[string]int{}
 	u.mixTotal = min(128, u.ring.size)
@@ -538,6 +548,9 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 	}
 	c.text(2, l.footer+1, width-4, notice, inkGold)
 	help := "q quit  / search  f BPF  c cache  ↑↓ move  Tab pane  b bytes source  4 Stream  Space live  p protocol  d fields"
+	if u.pane == 1 {
+		help = "←→ field text  ↑↓ move  Tab pane  b bytes source  4 Stream  / search  d fields  q quit"
+	}
 	if u.pane == 3 {
 		help = "a messages/wire  h beginning  l recent  e evidence  v A/B  t text  x hex  d fields  r refresh  / search  q quit"
 		if u.stream != nil && u.stream.messageBoundaries() {
@@ -704,19 +717,13 @@ func (u *tui) drawFields(c *canvas, r rect) {
 		return
 	}
 	u.fieldSelection = clamp(u.fieldSelection, 0, len(indices)-1)
+	u.fieldLeft = clamp(u.fieldLeft, 0, u.fieldTextLimit())
 	for i := 0; i < r.h; i++ {
 		at := u.fieldTop + i
 		if at >= len(indices) {
 			break
 		}
 		f := u.fields.fields[indices[at]]
-		prefix := "  "
-		if f.branch {
-			prefix = "── "
-		} else if f.depth > 0 {
-			prefix = ""
-		}
-		prefix = strings.Repeat("  ", min(max(0, f.depth), 16)) + prefix
 		style := inkText
 		if f.branch {
 			style = inkCyan
@@ -725,7 +732,7 @@ func (u *tui) drawFields(c *canvas, r rect) {
 			style = inkSelected
 			c.fill(r.x, r.y+i, r.w, style)
 		}
-		c.text(r.x, r.y+i, r.w, prefix+f.text, style)
+		c.text(r.x, r.y+i, r.w, fieldTextAfterColumns(fieldDisplayText(f), u.fieldLeft), style)
 	}
 }
 func (u *tui) drawBytes(c *canvas, r rect) {

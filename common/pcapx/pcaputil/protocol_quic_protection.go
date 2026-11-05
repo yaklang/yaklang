@@ -47,8 +47,7 @@ func (q *binQUIC) protectionCandidate(dir int, h quicHdr) (binQUIC, bool, error)
 				candidate.keys.initial = [2]*quicTrafficKeys{}
 			}
 		case q.spaces[1][quicSpaceInitial].init:
-			owner, observed := q.cids[string(h.dcid)]
-			observedServerCID := observed && owner == 1 || len(h.dcid) == 0 && q.zeroCID[1]
+			observedServerCID := q.hasNativeCID(1, string(h.dcid)) || len(h.dcid) == 0 && q.zeroCID[1]
 			if !observedServerCID || len(h.token) != q.retryTokenLen || sha256.Sum256(h.token) != q.retryTokenHash {
 				return candidate, false, protocolError(ErrContextRequired, "QUIC Initial does not match the post-Retry server CID/token")
 			}

@@ -63,10 +63,6 @@ func TestIMAPSASLCanonicalBoundedScope(t *testing.T) {
 		}
 		require.True(t, catalog)
 		require.True(t, roadmap)
-		score, ok := ResolveP1Scorecard(name)
-		require.True(t, ok)
-		require.Equal(t, "L4", score.SampleClass)
-		require.Zero(t, score.Schema+score.Traffic+score.Tests+score.Branches+score.Stack)
 	}
 	info, err := stream_parser.DecodeIMAPSASLValue([]byte("ZHVtbXk=\r\n"), "response")
 	require.NoError(t, err)

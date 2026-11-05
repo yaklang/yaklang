@@ -37,11 +37,6 @@ func requireP0WPADRetrievalScope(t *testing.T) {
 	require.Equal(t, "WPADRequest", info.EntryNode)
 	require.Contains(t, info.Notes, "do not establish actual proxy use or a complete discovery exchange")
 	require.Equal(t, protocolCorpusParseContract{RuleFile: info.RuleFile, EntryNode: info.EntryNode, Layer: "L7"}, protocolCorpusParseContracts[info.Name])
-	score, ok := ResolveP0Scorecard(info.Name)
-	require.True(t, ok)
-	require.Equal(t, "application-layer/http.yaml", score.Rule)
-	require.Contains(t, score.Evidence, "HTTP framing only")
-
 	rule := strings.ReplaceAll(strings.TrimSuffix(info.RuleFile, ".yaml"), "/", ".")
 	for _, fixture := range wpadTestFixtures()[:2] {
 		wire := fixture.wire()

@@ -112,7 +112,10 @@ func dhtContactAssert(t *testing.T, c dhtContactControl, e *ProtocolEvent) {
 		require.Equal(t, "unrecognized", e.Status)
 		require.Nil(t, e.Session)
 		require.Nil(t, e.Structured)
-		require.Equal(t, wire[:min(len(wire), 64)], e.Raw)
+		require.Equal(t, wire, e.Raw, "complete carrier bytes do not admit malformed DHT")
+		require.Equal(t, wire[:min(len(wire), 64)], e.Raw[:min(len(e.Raw), 64)], "retain the original probe-prefix check")
+		require.Equal(t, "datagram", e.Completeness)
+		require.Equal(t, len(wire), e.Length)
 		return
 	}
 	require.NoError(t, err)

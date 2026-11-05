@@ -170,7 +170,15 @@ func testRTPSSealedReplayProfile(t *testing.T, cases []rtpsControl, profile stri
 									if profile != "" {
 										require.Equal(t, profile+"-native", e.Profile)
 									}
-									require.Equal(t, answer.Raw, hex.EncodeToString(e.Raw), "complete admitted PDU or the documented 64-byte unknown probe prefix")
+									if e.Protocol == "" && e.Status == "unrecognized" {
+										wire, err := hex.DecodeString(want.Wires[i])
+										require.NoError(t, err)
+										require.Equal(t, answer.Raw, hex.EncodeToString(wire[:min(len(wire), 64)]), "frozen legacy probe prefix remains checked")
+										require.Equal(t, wire, e.Raw, "complete unknown carrier; no RTPS admission")
+										require.Equal(t, "datagram", e.Completeness)
+									} else {
+										require.Equal(t, answer.Raw, hex.EncodeToString(e.Raw), "complete admitted PDU")
+									}
 									require.Equal(t, "udp", e.Transport)
 									require.Equal(t, "192.0.2.10:38000", e.Source)
 									require.Equal(t, "192.0.2.20:28400", e.Destination)
