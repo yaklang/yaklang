@@ -364,3 +364,14 @@ func TestCliBoolRequiredFlagIgnoresDefault(t *testing.T) {
 		check()
 	})
 }
+
+// --flag=false is a single argument. The exact-name lookup cannot see it, so
+// the explicit value must be parsed before the declared default applies.
+func TestCliBoolParsesExplicitValue(t *testing.T) {
+	testCliParam(t, []string{"--enabled=false", "--default-true=false", "--enabled-true=true"}, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.False(app.Bool("enabled", app.SetDefault(true)))
+		test.False(app.Bool("default-true", app.SetDefault(true)))
+		test.True(app.Bool("enabled-true", app.SetDefault(false)))
+		check()
+	})
+}
