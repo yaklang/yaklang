@@ -471,7 +471,7 @@ func (m *InstanceManager) validateLocked(ctx context.Context, catalog *PCAPFileD
 			if hashErr != nil {
 				return m.invalid(ctx, meta, hashErr)
 			}
-			if hex.EncodeToString(hash.Sum(nil)) != meta.FullSHA256 {
+			if hex.EncodeToString(hash.Sum(nil)) != meta.captureDigest() {
 				return m.invalid(ctx, meta, fmt.Errorf("pcapdb: capture BLOB hash mismatch"))
 			}
 			if meta.ProtocolsIndexed {
@@ -636,6 +636,29 @@ func (m *InstanceManager) open(ctx context.Context, identifier string, leased bo
 		return nil, err
 	}
 	defer m.ops.Done()
+	// A live writer owns the instance lock for its whole lifetime. Readers
+	// validate its committed manifest without entering exclusive recovery.
+	if catalog, err := m.resolveContext(ctx, identifier); err != nil {
+		return nil, err
+	} else if catalog.FingerprintMode == liveFingerprintMode {
+		reader, lock, err := openReaderPool(ctx, catalog.DatabasePath)
+		if err != nil {
+			return nil, err
+		}
+		defer reader.Close()
+		defer releaseFileLock(lock)
+		meta, err := readManifest(ctx, reader, catalog.DatasetID)
+		if err != nil {
+			return nil, err
+		}
+		if meta.DatabasePath != catalog.DatabasePath {
+			return nil, fmt.Errorf("pcapdb: manifest/catalog paths disagree")
+		}
+		if meta.State != StateReady {
+			return nil, ErrNotReady
+		}
+		return m.openReady(meta, leased)
+	}
 	result, err := m.validate(ctx, identifier, false, leased)
 	if err != nil {
 		return nil, err

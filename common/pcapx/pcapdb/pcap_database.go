@@ -128,7 +128,7 @@ func readManifest(ctx context.Context, db *gorm.DB, id string) (*PCAPFileDBMetad
 	if meta.SourceSize < 0 || meta.PacketCount < 0 || meta.ProtocolCount < 0 || meta.ProtocolDataSize < 0 || meta.BytesIndexed < 0 || meta.BytesIndexed > meta.SourceSize || meta.CaptureRecordCount < 0 || meta.SessionCount < 0 || meta.StreamCount < 0 || meta.StreamChunkCount < 0 || meta.StreamDataSize < 0 {
 		return nil, fmt.Errorf("pcapdb: invalid checkpoint counters")
 	}
-	if meta.State == StateReady && (len(meta.FullSHA256) != 64 || meta.BytesIndexed != meta.SourceSize || (meta.Format != "pcap" && meta.Format != "pcapng")) {
+	if meta.State == StateReady && (len(meta.captureDigest()) != 64 || meta.BytesIndexed != meta.SourceSize || (meta.Format != "pcap" && meta.Format != "pcapng")) {
 		return nil, fmt.Errorf("pcapdb: incomplete ready checkpoint")
 	}
 	if meta.State == StateReady {
