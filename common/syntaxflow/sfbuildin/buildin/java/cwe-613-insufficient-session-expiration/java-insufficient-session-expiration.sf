@@ -1,0 +1,45 @@
+desc(
+	title: "会话过期不足：登出/会话超时配置审计",
+	title_zh: "会话过期不足：登出/会话超时配置审计",
+	risk: "session-security"
+	type: audit
+	level: warning
+	rule_id: "java-insufficient-session-expiration"
+	cwe: "CWE-613"
+	desc: <<<DESC
+登出(logout/signOut)与会话超时(setMaxInactiveInterval)配置需人工复核：
+登出是否真正失效服务端会话、超时是否过长或永不过期(CWE-613)。
+DESC
+	solution: <<<SOLUTION
+登出时失效服务端会话；设置合理的会话超时时间，避免永不过期。
+SOLUTION
+	alert_min: 1
+	"file://J.java": <<<POS
+class J {
+  void logout(String token) {
+    service.logout(token);
+  }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S {
+  void ok() {
+    service.queryList();
+  }
+}
+
+NEG
+)
+
+// 登出/会话超时方法，人工复核失效逻辑
+.logout(* as $arg) as $sink;
+.signOut(* as $arg) as $sink;
+.setMaxInactiveInterval(* as $interval) as $sink;
+
+check $sink then "session end" else "no session end";
+
+alert $sink for {
+	message: "登出/会话超时配置，检查是否真正失效服务端会话",
+	level: "warning",
+}

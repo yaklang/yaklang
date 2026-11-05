@@ -7348,5 +7348,17 @@
     "rule_name": "Token 直接作缓存 Key 查询，无校验",
     "hash": "9d843179164fe48638e7549ce6a933386aec9aa4dd30db187936349e0d7fc6ff",
     "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-insufficient-session-expiration",
+    "rule_name": "会话过期不足：登出/会话超时配置审计",
+    "hash": "c4ecc8d99ed897ce9744e257a33f0f09724c6896a077eca7739ae5dcdcc7c9ad",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-weak-password-recovery",
+    "rule_name": "弱密码恢复：密码重置/找回接口未校验身份",
+    "hash": "b4553a8675d6d9a11e94e3f71a8a68ad1e95c02c3a42c9a7c6e8db117d419fa1",
+    "version": "20261105.0001"
   }
 ]
