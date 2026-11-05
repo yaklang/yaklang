@@ -44,7 +44,9 @@ class Ok { void q(org.bson.Document d) { d.put("name", "fixed"); } }
 
 NEG
 )
-put(*?{!opcode: const && !opcode: param} as $dyn) as $call
+Document?{<typeName>?{have:'org.bson'}}.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
+BasicDBObject?{<typeName>?{have:'com.mongodb'}}.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
+DBObject?{<typeName>?{have:'com.mongodb'}}.put(*?{!opcode: const && !opcode: param} as $dyn) as $call;
 alert $dyn for {
 	level: "low",
 	title: "数据流：Java MongoDB 查询拼接",
