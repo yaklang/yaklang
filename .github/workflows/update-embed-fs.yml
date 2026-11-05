@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   generate-commit:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
