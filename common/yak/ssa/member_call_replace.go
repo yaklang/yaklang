@@ -139,23 +139,12 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				}
 			}
 			if utils.IsNil(toMember) {
-				// An undefined member has no payload to merge. Reuse it when the
-				// replacement is another unresolved object: synthesizing a fresh
-				// undefined and deleting the old one indexes both instructions, and
-				// on a decompiled loop that ran once per historical pair.
-				// A parameter (or parameter member) is not unresolved. Reading it
-				// creates the one ParameterMember the call site already promised;
-				// reusing the undefined would hide that member from every consumer.
-				// A phi is a merge: its member exists to join the edge members, so
-				// reading it is the point. Reusing the undefined would drop the merge.
-				if member.GetOpcode() == SSAOpcodeUndefined &&
-					!replacementBindsRealMember(replacement) &&
-					replacement.GetOpcode() != SSAOpcodePhi {
-					setMemberCallRelationship(replacement, key, member)
-					toMember = member
-				} else {
-					toMember = builder.ReadMemberCallValue(replacement, key)
-				}
+				// Always read through the replacement. Reusing the unresolved
+				// member instead looks cheaper — it skips one create/delete pair —
+				// but the read is what propagates the element type: a loop header
+				// rebinds every edge member, and copying the old undefined leaves
+				// the reading side with an untyped placeholder.
+				toMember = builder.ReadMemberCallValue(replacement, key)
 			}
 
 			if toMemberObj := GetLatestObject(toMember); utils.IsNil(toMemberObj) || toMemberObj.GetId() == target.GetId() || toMemberObj.GetId() == holder.GetId() {
@@ -322,22 +311,6 @@ func snapshotMemberReplacementSources(root Value) map[int64]memberReplacementSou
 		sources[id] = source
 	}
 	return sources
-}
-
-// replacementBindsRealMember reports that reading a member of replacement
-// has a declared form (parameter member), so an undefined placeholder must
-// not be reused in its place.
-func replacementBindsRealMember(replacement Value) bool {
-	if utils.IsNil(replacement) {
-		return false
-	}
-	if _, ok := ToParameter(replacement); ok {
-		return true
-	}
-	if _, ok := ToParameterMember(replacement); ok {
-		return true
-	}
-	return false
 }
 
 func pickMemberKey(member, fallback Value) Value {
