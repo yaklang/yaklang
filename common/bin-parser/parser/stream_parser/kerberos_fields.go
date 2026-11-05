@@ -12,6 +12,26 @@ import (
 const kerberosFieldsMaxBytes = 1 << 20
 const kerberosFieldsMaxList = 1024
 
+// KerberosContextRequired describes a well-bounded opaque ASN.1 value whose
+// layout is outside this passive profile. Shared X.509 DER errors stay intact.
+type KerberosContextRequired struct{}
+
+func (*KerberosContextRequired) Error() string {
+	return "Kerberos opaque ASN.1 ticket body requires an additional structure definition"
+}
+
+func kerberosFieldsBoundaryError(err error) error {
+	message := err.Error()
+	if message == "x509-der: missing element" ||
+		strings.HasSuffix(message, " requires SEQUENCE") ||
+		strings.HasSuffix(message, " application wrapper required") ||
+		message == "kerberos-fields: unsupported message application tag" ||
+		message == "kerberos-fields: unsupported FAST choice" {
+		return &KerberosContextRequired{}
+	}
+	return fmt.Errorf("kerberos-fields: %w", err)
+}
+
 // Passive, exact DER message layouts (RFC 4120 and RFC 6113). Ciphertext,
 // checksums and unrecognized PA-DATA stay bytes; no keys or session outcomes
 // are computed. Integer metadata retains signed values without treating short
@@ -695,13 +715,13 @@ func decodeKerberosFields(wire []byte, tcp bool) ([]tlsCertificateField, map[str
 	d := &kerberosFieldsDecoder{r: &x509DERReader{wire: wire}, semantic: map[string]any{}}
 	root, err := d.r.element(at, len(wire), 0)
 	if err != nil {
-		return nil, nil, fmt.Errorf("kerberos-fields: %w", err)
+		return nil, nil, kerberosFieldsBoundaryError(err)
 	}
 	if root.end != len(wire) {
 		return nil, nil, fmt.Errorf("kerberos-fields: trailing message bytes")
 	}
 	if err = d.message(root); err != nil {
-		return nil, nil, err
+		return nil, nil, kerberosFieldsBoundaryError(err)
 	}
 	fields = append(fields, d.r.field(root))
 	d.semantic["Ticket Count"] = d.tickets
