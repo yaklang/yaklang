@@ -10,7 +10,7 @@
 
 - `operator.Fail()` 表示当前 Action 失败，由循环统一写入 Timeline 并继续下一轮。
 - `operator.Fatal()` 表示循环无法安全继续，直接终止。
-- `ModelOutputValidationError` 表示模型输出可以通过纠正 Prompt 或下一轮 Timeline 自愈。
+- `RecoverableError` 表示当前错误可以交给循环通过纠正 Prompt 或下一轮 Timeline 自愈。
 - 展示、字段流等观测失败只记录 warning，不影响 canonical AI 响应。
 - 压缩失败属于维护失败，不终止业务任务。
 
@@ -30,7 +30,7 @@
 1. 无条件派生本轮响应形态。
 2. 将可能失败的模式校验、零 Action、function-call 回放和压缩凭证写入同一个 `turnErr`。
 3. 在唯一错误决策点处理：
-   - `ModelOutputValidationError`：写 Timeline 后继续。
+   - `RecoverableError`：写 Timeline 后继续。
    - 其他错误：终止当前任务。
 
 ## 3. 已实现的自愈路径
@@ -103,7 +103,7 @@ next_step=<guidance>
 
 `answerAsyncReview` 调用 `DirectlyAnswer` 后直接返回 error。当前没有区分：
 
-- `ModelOutputValidationError`：应当自愈。
+- `RecoverableError`：应当自愈。
 - 网络或 API 错误：应按请求错误处理。
 - context 取消：应当终止。
 

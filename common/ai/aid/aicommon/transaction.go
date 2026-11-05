@@ -263,7 +263,7 @@ func callAITransaction(
 		postHandlerErr = normalizeTransactionPostHandlerError(rsp, postHandlerErr)
 		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, rsp.GetError())
 		if postHandlerErr != nil && consts.IsAIRetryForeverEnabled() && rsp.GetError() == nil &&
-			rsp.GetHTTPStatusCode() < 400 && IsModelOutputValidationError(postHandlerErr) {
+			rsp.GetHTTPStatusCode() < 400 && IsRecoverableError(postHandlerErr) {
 			// This path rejects model protocol output before action execution.
 			// Retain only the latest bounded correction, not an unbounded history.
 			rec := recordAttempt(i+1, nil, rsp)

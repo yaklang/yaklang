@@ -274,7 +274,7 @@ func actionTypeResolutionError(requested string, availableActions []string, reas
 	if requested == "" {
 		requested = "<missing>"
 	}
-	return aicommon.NewModelOutputValidationError(utils.Errorf(
+	return aicommon.NewRecoverableError(utils.Errorf(
 		"action resolution failed: requested=%q; matcher=exact registered action or alias; available_actions=%v; reason=%s",
 		requested,
 		availableActions,
@@ -788,12 +788,12 @@ LOOP:
 
 		// 需要判断错误的模型响应校验。任一校验失败都写入 turnErr，最后统一处理。
 		if turnErr == nil && r.promptMode == aicommon.LoopPromptModeCompressContext && !compressionOnly {
-			turnErr = aicommon.NewModelOutputValidationError(utils.Error(
+			turnErr = aicommon.NewRecoverableError(utils.Error(
 				"context-compression mode requires exactly one compress_context action",
 			))
 		}
 		if turnErr == nil && len(loopCalls) == 0 {
-			turnErr = aicommon.NewModelOutputValidationError(utils.Error("AI loop returned no actions"))
+			turnErr = aicommon.NewRecoverableError(utils.Error("AI loop returned no actions"))
 		}
 
 		// 执行前需要判断错误的协议准备，例如 function-call 回放记录。
@@ -801,7 +801,7 @@ LOOP:
 			!compressionOnly && stopReason == LoopStopToolCalls {
 			if err := r.appendFunctionCallActionResponse(loopCalls, resultDescriptor); err != nil {
 				r.clearCallsExecutionValues(loopCalls)
-				turnErr = aicommon.NewModelOutputValidationError(err)
+				turnErr = aicommon.NewRecoverableError(err)
 			} else {
 				eventSink = r.appendFunctionCallActionEvent
 			}
@@ -812,7 +812,7 @@ LOOP:
 					continue
 				}
 				if resultDescriptor == nil {
-					turnErr = aicommon.NewModelOutputValidationError(
+					turnErr = aicommon.NewRecoverableError(
 						utils.Error("context compression requires a result descriptor"),
 					)
 					break
@@ -824,7 +824,7 @@ LOOP:
 		// 唯一的响应错误决策点：模型输出错误进入自愈，请求错误和机制错误终止任务。
 		if turnErr != nil {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
-			if aicommon.IsModelOutputValidationError(turnErr) {
+			if aicommon.IsRecoverableError(turnErr) {
 				r.recordRecoverableModelOutputError(iterationCount, turnErr)
 				continue LOOP
 			}
