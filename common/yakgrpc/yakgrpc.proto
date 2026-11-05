@@ -1132,6 +1132,9 @@ service Yak {
   // filesystem. Returned paths are engine paths and can be used by file
   // Fuzztags in both local and remote-engine modes.
   rpc UploadToTemporaryFile(stream UploadToTemporaryFileRequest) returns (UploadToTemporaryFileResponse);
+
+  // AI session resource snapshot query.
+  rpc GetAISessionCurrentResources(GetAISessionCurrentResourcesRequest) returns (GetAISessionCurrentResourcesResponse);
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
@@ -10527,4 +10530,28 @@ message BrowserExtensionTaskEvent {
   bytes Data = 5;
   int64 Timestamp = 6;
   uint64 Sequence = 7;
+}
+
+message AISessionTaskResourceInfo {
+  string Type = 1;
+  string Key = 2;
+  string Value = 3;
+  // turn: current task only; session: retained across tasks in the session.
+  string Scope = 4;
+  // attached_resource_info / attached_file_path / inherited
+  string Source = 5;
+}
+
+message GetAISessionCurrentResourcesRequest {
+  string SessionID = 1;
+}
+
+message GetAISessionCurrentResourcesResponse {
+  string SessionID = 1;
+  string TaskID = 2;
+  string UserInputUUID = 3;
+  // Resources explicitly attached to or inherited by the latest task.
+  repeated AISessionTaskResourceInfo TaskResources = 4;
+  // Session-scoped resources reconstructed from task input history.
+  repeated AISessionTaskResourceInfo SessionResources = 5;
 }
