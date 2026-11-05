@@ -31,8 +31,8 @@ class S {
 NEG
 )
 
-// 定位解密调用：第一参为待解密数据(token)，第二参为密钥
-.decrypt(* as $token, * as $key) as $decrypt;
+// 定位 RSA 解密调用：约束 receiver 为 RSA 类型，排除 SM2/SM4 数据解密
+RSA.decrypt(* as $token, * as $key) as $decrypt;
 
 // 追踪 token 的定义来源（客户端输入）
 $token #-> as $source;
