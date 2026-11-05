@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"io"
 	"net"
 	"net/http/httputil"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 // DisplayFrameObservation describes a physical capture record, independently
@@ -260,6 +261,7 @@ func analysisDisplayBindings() []displayFieldBinding {
 			}
 		})
 		b.protocols = "|http|ipp|http2|grpc|doh|http3|"
+		b.descriptor.AllowEmpty = f.header && f.typ == DisplayString
 		out = append(out, b)
 	}
 	for _, f := range []struct {
@@ -283,6 +285,7 @@ func analysisDisplayBindings() []displayFieldBinding {
 			})
 		})
 		b.protocols = "|dns|mdns|llmnr|dot|doh|doq|"
+		b.descriptor.AllowEmpty = f.name == "dns.txt" || f.name == "dns.rr.name"
 		out = append(out, b)
 	}
 	b := displayRoot("dns", "dns.rcode", "DNS response code", DisplayUnsigned, 8, "pdu", "")
