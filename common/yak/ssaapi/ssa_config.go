@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -36,6 +37,10 @@ type Config struct {
 	databaseKind ssa.ProgramCacheKind
 	// process
 	process ProcessFunc
+	// processMu guards processLast. Progress is reported from unit workers,
+	// so the climb to 1.0 has to be serialized.
+	processMu   sync.Mutex
+	processLast float64
 
 	// for build
 	externLib               map[string]map[string]any
@@ -113,13 +118,38 @@ func CompileExcludeFunc(extraPatterns []string, basePath string) ExcludeFunc {
 	return ssaconfig.BuildCompileExcludeFunc(extraPatterns, basePath, true)
 }
 
+// Processf reports compile progress.
+//
+// The reported value is clamped so the bar never moves backwards. Phases map
+// onto fixed bands (prepare 0..0.06, plan 0.06..0.08, pre-handler 0.08..0.40),
+// and a nested compile or a per-file step that starts its own count at 0 would
+// otherwise reset the bar to the beginning of the phase.
 func (c *Config) Processf(process float64, format string, arg ...any) {
+	process = c.clampProcess(process)
 	msg := fmt.Sprintf(format, arg...)
 	if c.process != nil {
 		c.process(msg, process)
 	} else {
 		log.Debug(msg, process)
 	}
+}
+
+// clampProcess keeps the reported progress in [0, 1] and never below the last
+// value already reported.
+func (c *Config) clampProcess(process float64) float64 {
+	if process < 0 {
+		process = 0
+	}
+	if process > 1 {
+		process = 1
+	}
+	c.processMu.Lock()
+	defer c.processMu.Unlock()
+	if process < c.processLast {
+		process = c.processLast
+	}
+	c.processLast = process
+	return process
 }
 
 var WithLogLevel = ssaconfig.SetOption("ssa_compile/log_level", func(c *Config, v string) {
