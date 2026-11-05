@@ -17,6 +17,8 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
+	kerberosSummaryFacts               map[string]any
+	kerberosClassified                 bool
 	smb1SetupBodyRefusal               bool
 	smb1FileBodyRefusal                bool
 	nativeSessionMessage               bool
@@ -2011,6 +2013,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Count the final outcome after all semantic validation, including DNS
 		// RDATA validation in deferred mode. Each framed message counts once.
+		e.normalizeKerberosContext()
 		switch e.Status {
 		case "decoded":
 			a.decoded.Add(1)
@@ -2333,6 +2336,7 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 			row := *e
 			cloneEvidence(&row)
 			row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+			row.kerberosSummaryFacts = nil
 			row.nativeQUICWireBytes = nil
 			row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 			rows = append(rows, &row)
@@ -2359,6 +2363,7 @@ func (v *ProtocolInspector) TCPFlowRows(domain CaptureDomain, tcpFlow uint64) []
 		row := *e
 		cloneEvidence(&row)
 		row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+		row.kerberosSummaryFacts = nil
 		row.nativeQUICWireBytes = nil
 		row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 		rows = append(rows, &row)
@@ -2431,6 +2436,7 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 				row := *e
 				cloneEvidence(&row)
 				row.Raw, row.Structured, row.Session, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+				row.kerberosSummaryFacts = nil
 				row.nativeQUICWireBytes = nil
 				row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 				rows = append(rows, &row)

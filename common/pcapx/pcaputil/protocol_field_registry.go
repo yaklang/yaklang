@@ -117,6 +117,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	}
 	meta("protocol", "Protocol", DisplayString, 0, func(e *ProtocolEvent) any { return e.Protocol })
 	meta("status", "Decode status", DisplayString, 0, func(e *ProtocolEvent) any { return e.Status })
+	meta("expert", "Protocol diagnostic classification", DisplayString, 0, func(e *ProtocolEvent) any { return e.ExpertCode })
 	meta("pdu.id", "PDU identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.ID })
 	meta("pdu.length", "PDU length", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.Length })
 	meta("pdu.completed_in", "Complete message byte contributor", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
