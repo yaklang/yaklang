@@ -105,10 +105,15 @@ func TestReplaceMemberCallKeepsUndefinedMembers(t *testing.T) {
 	updated := result[name]
 	_, ok := ToUndefined(updated)
 	require.True(t, ok, "undefined member should remain undefined after replacement")
-	require.Equal(t, undefinedMember.GetId(), updated.GetId(), "unresolved member replacement should reuse the existing undefined")
+	// The member is read through the replacement instead of being copied over.
+	// Reading is what carries the type of the destination: a loop header merges
+	// one member per edge, and copying the old undefined would keep the reading
+	// side untyped.
+	require.NotEqual(t, undefinedMember.GetId(), updated.GetId(),
+		"the replacement must own the member it exposes, not the source placeholder")
 	latest, ok := GetLatestMemberByKey(replacement, key)
-	require.True(t, ok, "replacement should expose the reused undefined")
-	require.Equal(t, undefinedMember.GetId(), latest.GetId())
+	require.True(t, ok, "replacement should expose the member it produced")
+	require.Equal(t, updated.GetId(), latest.GetId())
 }
 
 func TestReplaceMemberCallOnParameterCreatesParameterMember(t *testing.T) {
