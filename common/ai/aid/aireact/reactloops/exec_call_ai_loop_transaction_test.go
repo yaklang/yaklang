@@ -595,7 +595,7 @@ func TestCallAILoopTransactionNativeArgumentsFragmentedEscapesMatchAcceptedActio
 	require.Equal(t, 1, finishes)
 }
 
-func TestCallAILoopTransactionNativeArgumentsRejectDuplicateVisibleField(t *testing.T) {
+func TestCallAILoopTransactionNativeArgumentsIgnoreDuplicateVisibleFieldError(t *testing.T) {
 	loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, cfg *aispec.AIConfig) (*aicommon.AIResponse, error) {
 		resp := aicommon.NewAIResponse(nil)
 		cfg.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: "answer", Type: "function",
@@ -614,8 +614,8 @@ func TestCallAILoopTransactionNativeArgumentsRejectDuplicateVisibleField(t *test
 	}
 	calls, _, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
 		drain, func(_, _ string, description, arguments io.Reader) { drain(description, arguments) })
-	require.ErrorContains(t, err, `duplicate top-level native argument "answer_payload"`)
-	require.Empty(t, calls, "the action must not execute with a different value from its displayed field")
+	require.NoError(t, err)
+	require.Len(t, calls, 1, "display-only field errors must not reject canonical tool calls")
 }
 
 func TestCallAILoopTransactionNativeArgumentsDoNotDisplayUnadvertisedAction(t *testing.T) {

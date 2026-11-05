@@ -146,6 +146,23 @@ func TestContextCompressionPromptTokenLimitUsesConfiguredLimitPlusHeadroom(t *te
 	require.EqualValues(t, 240*1024, loop.contextCompressionPromptTokenLimit())
 }
 
+func TestConsecutiveContextCompressionAttemptsLimitAndReset(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true))
+	loop := makeSchemaStabilityTestLoop(cfg)
+
+	for i := 0; i < maxConsecutiveContextCompressionAttempts; i++ {
+		require.NoError(t, loop.trackCompressionPromptMode(aicommon.LoopPromptModeCompressContext))
+	}
+	err := loop.trackCompressionPromptMode(aicommon.LoopPromptModeCompressContext)
+	require.ErrorContains(t, err, "after 5 consecutive attempts")
+
+	require.NoError(t, loop.trackCompressionPromptMode(aicommon.LoopPromptModeNormal))
+	require.Zero(t, loop.consecutiveCompressionAttempts)
+	require.NoError(t, loop.trackCompressionPromptMode(aicommon.LoopPromptModeCompressContext))
+	require.Equal(t, 1, loop.consecutiveCompressionAttempts)
+}
+
 func TestContextCompressionPromptBuildErrorFallsBackToNormalMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -287,21 +304,21 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	}
 }
 
-func TestContextCompressionRuntimeReadAndApplyFailuresWarnWithoutFailingTask(t *testing.T) {
+func TestContextCompressionRuntimeReadAndApplyFailuresAreRecoverableActionErrors(t *testing.T) {
 	for _, test := range []struct {
-		name                 string
-		throughID            *int64
-		itemIDs              []int64
-		summary              string
-		expectedWarningStage string
+		name          string
+		throughID     *int64
+		itemIDs       []int64
+		summary       string
+		expectedError string
 	}{
 		{
 			name: "candidate read failure", throughID: func() *int64 { id := int64(-1); return &id }(),
-			summary: "summary", expectedWarningStage: "reading timeline candidates",
+			summary: "summary", expectedError: "invalid compression history boundary",
 		},
 		{
 			name: "apply sees unobserved history", itemIDs: []int64{},
-			summary: "", expectedWarningStage: "committing the timeline compression result",
+			summary: "", expectedError: "invalid compression selection",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -310,7 +327,6 @@ func TestContextCompressionRuntimeReadAndApplyFailuresWarnWithoutFailingTask(t *
 			history := uuid.NewString()
 			cfg.Timeline.PushText(12, "%s", history)
 			loop := makeSchemaStabilityTestLoop(cfg)
-			capture := captureActivityStatus(loop)
 			action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{
 				"summary": test.summary, "retain_timeline": "", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
 			})
@@ -320,10 +336,8 @@ func TestContextCompressionRuntimeReadAndApplyFailuresWarnWithoutFailingTask(t *
 
 			handleCompressContext(loop, action, op)
 			terminated, err := op.IsTerminated()
-			require.NoError(t, err)
-			require.False(t, terminated)
-			require.Nil(t, op.contextCompressionError)
-			require.True(t, capture.waitStream(contextCompressionWarningNodeID, test.expectedWarningStage))
+			require.True(t, terminated)
+			require.ErrorContains(t, err, test.expectedError)
 			require.Contains(t, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).PromptText(), history,
 				"failed compression must leave the timeline unchanged")
 		})
@@ -364,7 +378,6 @@ func TestContextCompressionCommitsWhenSummaryIsUsable(t *testing.T) {
 			terminated, err := op.IsTerminated()
 			require.NoError(t, err)
 			require.False(t, terminated)
-			require.NoError(t, op.contextCompressionError)
 			view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
 			require.Contains(t, view.Frozen, "summary")
 			require.NotContains(t, view.Frozen, "history")
@@ -382,9 +395,9 @@ func TestContextCompressionWithoutSummaryStillRequestsCorrection(t *testing.T) {
 
 	op := NewActionHandlerOperator(nil)
 	handleCompressContext(loop, action, op)
-	_, err := op.IsTerminated()
-	require.NoError(t, err)
-	require.ErrorContains(t, op.contextCompressionError, "summary 不能为空")
+	terminated, err := op.IsTerminated()
+	require.True(t, terminated)
+	require.ErrorContains(t, err, "summary 不能为空")
 }
 
 func TestParseContextCompressionRetainedIDsIntersectsOrdinaryCandidates(t *testing.T) {
@@ -429,7 +442,6 @@ func TestContextCompressionSummaryOverAdvisoryLimitWarnsAndCommits(t *testing.T)
 	terminated, err := op.IsTerminated()
 	require.NoError(t, err)
 	require.False(t, terminated)
-	require.NoError(t, op.contextCompressionError)
 	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression exceeded the advisory limit"))
 	loop.GetEmitter().WaitForStream()
 	capture.mu.Lock()

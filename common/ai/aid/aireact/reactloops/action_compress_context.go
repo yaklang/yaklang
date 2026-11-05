@@ -61,36 +61,32 @@ func (r *ReActLoop) verifyContextCompressionAction(action *aicommon.Action) erro
 func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 	if loop == nil || operator == nil {
 		if operator != nil {
-			operator.Fail(fmt.Errorf("context compression requires a loop"))
+			operator.Fatal(fmt.Errorf("context compression requires a loop"))
 		}
 		return
 	}
 	timeline := timelineFromConfig(loop.config)
 	if timeline == nil {
-		operator.Fail(fmt.Errorf("context compression requires a timeline"))
+		operator.Fatal(fmt.Errorf("context compression requires a timeline"))
 		return
 	}
 	selection, err := loop.prepareContextCompression(action, contextCompressionRequest{
 		throughID: operator.requestTimelineThroughID, itemIDs: operator.requestTimelineItemIDs,
 	})
 	if err != nil {
-		var rejected *contextCompressionSelectionError
-		if errors.As(err, &rejected) {
-			operator.contextCompressionError = err
-			operator.Continue()
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			operator.Fatal(err)
 			return
 		}
-		loop.emitContextCompressionRuntimeWarning("reading timeline candidates", err)
-		operator.Continue()
+		operator.Fail(err)
 		return
 	}
 	if _, err := timeline.ApplyCompressionSelection(selection, operator.requestPrompt, operator.trajectoryResponse); err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			operator.Fail(err)
+			operator.Fatal(err)
 			return
 		}
-		loop.emitContextCompressionRuntimeWarning("committing the timeline compression result", err)
-		operator.Continue()
+		operator.Fail(err)
 		return
 	}
 	operator.Continue()

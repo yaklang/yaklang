@@ -99,6 +99,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "上下文压缩警告",
 		En: "Context Compression Warning",
 	},
+	"react_recovery_warning": {
+		Zh: "Agent Recovery Warning",
+		En: "Agent Recovery Warning",
+	},
 	"todo_added": {
 		Zh: "待办任务",
 		En: "TODO Added",

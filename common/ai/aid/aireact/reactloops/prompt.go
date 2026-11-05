@@ -398,7 +398,8 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	if !r.functionCallMode && r.outputExampleProvider != nil {
 		outputExample, err = r.outputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
-			return nil, utils.Wrap(err, "build output example failed")
+			log.Warnf("build output example failed; continuing without an output example: %v", err)
+			outputExample = ""
 		}
 	}
 
@@ -531,28 +532,20 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		return result, nil
 	}
-	fallbackToNormal := func(stage string, cause error) (*LoopPromptAssemblyResult, error) {
-		r.emitContextCompressionRuntimeWarning(stage, cause)
-		assembly.PromptMode = aicommon.LoopPromptModeNormal
-		assembly.CompressionGuide = ""
-		return assemble()
-	}
+	// 先缓存已经成功生成的普通 Prompt；后续压缩任一步失败时直接返回它。
+	var normalResult *LoopPromptAssemblyResult
 	limit := r.wholePromptTokenLimit()
-	result, err := assemble()
+	normalResult, err = assemble()
 	if err != nil {
 		return nil, err
 	}
+	result := normalResult
 	promptTokens := int64(aicommon.MeasureTokens(result.Prompt))
-	var compressionSelectionErr error
-	if operator != nil {
-		compressionSelectionErr = operator.contextCompressionError
-	}
 
-	// A selection error is a correction retry, independent of prompt volume.
 	// overflowCompression is a provider signal and may use the last fitting
 	// timeline boundary; an ordinary over-limit prompt keeps the full history.
 	if timeline := timelineFromConfig(r.config); timeline != nil &&
-		(compressionSelectionErr != nil || input.overflowCompression || promptTokens > limit) {
+		(input.overflowCompression || promptTokens > limit) {
 		ctx := r.config.GetContext()
 		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
 			ctx = task.GetContext()
@@ -568,27 +561,24 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		guide, guideErr := timeline.RenderCompressionGuide(options)
 		if guideErr != nil || strings.TrimSpace(guide) == "" {
+			r.recordContextCompressionFailure("rendering the compression guide", guideErr)
 			r.emitContextCompressionUnavailable(promptTokens, limit, guideErr)
-			result, err = assemble()
-			if err != nil {
-				return nil, err
-			}
-			return result, nil
+			return normalResult, nil
 		}
 		instructions, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
 			map[string]any{"FunctionCallMode": r.functionCallMode})
 		if err != nil {
-			return fallbackToNormal("rendering the compression instructions", err)
+			r.recordContextCompressionFailure("rendering the compression instructions", err)
+			r.emitContextCompressionRuntimeWarning("rendering the compression instructions", err)
+			return normalResult, nil
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(instructions) + "\n\n" + guide
-		if compressionSelectionErr != nil {
-			assembly.CompressionGuide += "\n\n# 上次压缩选择未通过校验\n请修正以下错误，重新提交 compress_context；当前历史尚未按这次无效选择修改。\n" +
-				utils.ShrinkString(compressionSelectionErr.Error(), 2048)
-		}
 		result, err = assemble()
 		if err != nil {
-			return fallbackToNormal("assembling the compression prompt", err)
+			r.recordContextCompressionFailure("assembling the compression prompt", err)
+			r.emitContextCompressionRuntimeWarning("assembling the compression prompt", err)
+			return normalResult, nil
 		}
 		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
 		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))
