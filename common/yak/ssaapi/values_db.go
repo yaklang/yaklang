@@ -271,8 +271,8 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		}
 	case EdgeTypePredecessor:
 		var (
-			label string
-			step  int64
+			label = edge.Label
+			step  = edge.Step
 		)
 		if msg != nil {
 			if l, ok := msg["label"].(string); ok {
