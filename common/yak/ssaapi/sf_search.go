@@ -113,8 +113,8 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 }
 
 type userNodeItems struct {
-	names  []string
-	values ssa.Values
+	names []string
+	ids   []int64
 }
 
 func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
@@ -125,10 +125,10 @@ func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool,
 	}
 
 	items := []*userNodeItems{}
-	addItems := func(names []string, value ...int64) {
+	addItems := func(names []string, ids ...int64) {
 		items = append(items, &userNodeItems{
-			names:  names,
-			values: inst.GetValuesByIDs(value),
+			names: names,
+			ids:   ids,
 		})
 	}
 
@@ -165,7 +165,10 @@ func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool,
 	for _, item := range items {
 		for _, name := range item.names {
 			if compare(name) {
-				add(item.values...)
+				// Most member lookups ask for a single CFG property. Loading
+				// every property first (e.g. catch.body when asking for
+				// catch.exception) causes needless lazy DB reads.
+				add(inst.GetValuesByIDs(item.ids)...)
 			}
 		}
 	}
