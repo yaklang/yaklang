@@ -14,6 +14,9 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// Matcher is the low-level stateless rule evaluator. StatefulEngine embeds it
+// per rule and adds flow state, alerts, capture binding and pooling. New code
+// should prefer StatefulEngine; Matcher and Group remain for compatibility.
 type Matcher struct {
 	matcher *matchContext
 }
@@ -53,6 +56,26 @@ func New(r *rule.Rule) *Matcher {
 		return &Matcher{}
 	}
 	return &Matcher{matcher: ctx}
+}
+
+// Clone returns an independent matcher sharing only the immutable rule and
+// workflow. Clones can run concurrently because match state lives in the
+// per-clone matchContext.
+func (m *Matcher) Clone() *Matcher {
+	if m == nil || m.matcher == nil {
+		return &Matcher{}
+	}
+	return &Matcher{matcher: m.matcher.Clone()}
+}
+
+// Reset releases per-match packet, payload and buffer references. Call it
+// before returning a matcher to a pool so pooled matchers do not retain the
+// previous capture's memory.
+func (m *Matcher) Reset() {
+	if m == nil || m.matcher == nil {
+		return
+	}
+	m.matcher.Tidy()
 }
 
 func (m *Matcher) Match(flow []byte) bool {

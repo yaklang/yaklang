@@ -32,6 +32,7 @@ type Stats struct {
 	Diagnostics  uint64
 	ActiveFlows  int
 	State        state.Stats
+	Capture      AdapterStats
 }
 
 type StatefulEngine struct {
@@ -50,6 +51,10 @@ type StatefulEngine struct {
 	streamBytes         int64
 	maxFlows            int
 	maxTotalStreamBytes int64
+
+	captureMu      sync.Mutex
+	captureAdapter *PcapAdapter
+	captureOption  pcaputil.CaptureOption
 
 	events       atomic.Uint64
 	packetEvents atomic.Uint64
@@ -176,6 +181,7 @@ func (e *StatefulEngine) Stats() Stats {
 		Diagnostics:  e.diagnostics.Load(),
 		ActiveFlows:  active,
 		State:        stateStats,
+		Capture:      e.CaptureStats(),
 	}
 }
 

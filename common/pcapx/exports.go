@@ -479,6 +479,7 @@ var (
 		"WithdrawPermission": pcapfix.Withdraw,
 		"PacketBuilder":      PacketBuilder,
 		"WithPayload":        WithPayload,
+		"pcap_suricata":      WithSuricataEngine,
 	}
 )
 

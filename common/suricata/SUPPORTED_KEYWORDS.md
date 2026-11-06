@@ -21,9 +21,15 @@ The matcher targets Suricata 8 rule syntax while preserving the legacy underscor
 - HTTP: the registered request/response buffers, including legacy aliases and `http.accept_lang`.
 - Metadata: `sid`, `rev`, `gid`, `msg`, `classtype`, `reference`, `priority`, and `metadata`.
 
-## Stateful TCP engine
+## Unified engine
 
-`engine.StatefulEngine` and `engine.PcapAdapter` compose the public `pcaputil` callbacks without modifying the capture or protocol packages. TCP flow identity is capture domain plus reassembly generation; ordered bytes come from pcaputil's accepted stream callback, while header predicates use the associated real packet.
+`engine.StatefulEngine` is the primary API. It embeds the stateless matcher per rule and adds flow state, alerts, capture binding and pooling:
+
+- Stateless TCP/HTTP/DNS/TLS/UDP/ICMP rules run on the packet view.
+- Stateless TCP rules can also run on the ordered stream view.
+- Stateful TCP rules add `flow`, `flowbits`, `threshold` and FIN/RST/generation cleanup.
+- `MatchPacket`, `MatchRaw`, `MatchStream` and `MatchHTTPFlow` expose the matcher's direct evaluation API on the engine.
+- `engine.OpenPcapFile`/`StartSniff` and `pcapx.pcap_suricata(engine)` bind the engine without a session object.
 
 M1 executes:
 
@@ -33,11 +39,11 @@ M1 executes:
 - capture-time windows and FIN/RST/inactive/generation cleanup
 - packet/stream separation, retransmission deduplication, bounded stream storage and fail-closed diagnostics
 
-The bundled ET scan corpus currently has 55 TCP rules: 52 compile into the stateful engine; the remaining 3 require `byte_test` and remain rejected.
+The bundled ET scan corpus has 284 rules. The legacy stateless matcher executes 28; the engine executes 79 and accepts every rule the matcher accepts. Of the 55 TCP rules, 52 compile into the stateful engine; the remaining 3 require `byte_test` and remain rejected. Non-TCP rules that need `flow`, `threshold` or cross-packet state remain fail-closed until non-TCP flow tracking is implemented.
 
-The AST and bounded state store already model `flowint`, `xbits`, `stream_size`, `flow.age`, `flow.pkts`, and `flow.bytes`, but M1 compilation deliberately rejects these until their runtime predicates/effects are connected. Protocol transactions are emitted as owned `ProtocolEvent` inspection events; incomplete/malformed/resource-limited events produce diagnostics, while application protocol rule providers remain a later milestone.
+The AST and bounded state store already model `flowint`, `xbits`, `stream_size`, `flow.age`, `flow.pkts`, and `flow.bytes`, but M1 compilation deliberately rejects these until their runtime predicates/effects are connected. Protocol transactions are emitted as owned `ProtocolEvent` inspection events; incomplete/malformed/resource-limited events produce diagnostics, while transaction-backed application rules remain a later milestone.
 
-The stateless `match.CompileRule` and legacy `Group` still reject every stateful-required option. Callers must explicitly choose `engine.CompileStatefulRule` / `engine.NewStatefulEngine`.
+`match.Matcher`/`match.Group` and the yak `NewSuricataMatcher`/`NewSuricataMatcherGroup` exports remain as compatibility APIs. They are stateless and reject stateful-required options; new code should use `StatefulEngine`.
 
 ## Recognized but unsupported
 
