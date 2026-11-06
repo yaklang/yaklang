@@ -40,8 +40,8 @@ func (p *CompiledRulePlan) streamOverlap() int {
 }
 
 // CompileStatefulRule compiles a rule for the unified engine. It accepts every
-// stateless rule the matcher supports; non-TCP rules that require flow state
-// are rejected until non-TCP flow tracking exists.
+// stateless rule the matcher supports, stateful HTTP over TCP, and stateful
+// UDP/DNS over the UDP pseudo-flow.
 func CompileStatefulRule(r *rule.Rule) (*CompiledRulePlan, error) {
 	matcher, err := match.CompileStatefulRule(r)
 	if err != nil {
@@ -70,32 +70,45 @@ func CompileStatefulRule(r *rule.Rule) (*CompiledRulePlan, error) {
 	return plan, nil
 }
 
-// validateProtocolState keeps non-TCP rules fail-closed. The matcher can
-// evaluate them statelessly, but flow direction, connection state, thresholds
-// and cross-packet state still require a non-TCP flow tracker that M1 does not
-// have.
+// validateProtocolState allows HTTP state over the TCP flow and UDP/DNS state
+// over the bounded UDP pseudo-flow. Other non-TCP protocols remain stateless:
+// flow direction, connection state, thresholds and cross-packet state need a
+// protocol-specific flow tracker.
 func (p *CompiledRulePlan) validateProtocolState() error {
-	if p.Rule == nil || p.Rule.Protocol == "tcp" {
+	if p.Rule == nil {
 		return nil
 	}
 	protocol := p.Rule.Protocol
-	if p.Flow != nil {
-		if p.Flow.OnlyStream {
+	switch protocol {
+	case "tcp", "http":
+		// HTTP is carried over the same TCP flowRuntime that drives the
+		// handshake, direction, flowbits and threshold state.
+		return nil
+	case "udp", "dns":
+		if p.Flow != nil && p.Flow.OnlyStream {
 			return fmt.Errorf("%s rules cannot use only_stream", protocol)
 		}
-		if p.Flow.Established || p.Flow.NotEstablished || p.Flow.ToServer || p.Flow.ToClient {
-			return fmt.Errorf("stateful flow tracking for %s rules is not supported; only stateless %s rules are supported", protocol, protocol)
+		// UDP/DNS use the engine's bounded UDP pseudo-flow.
+		return nil
+	default:
+		if p.Flow != nil {
+			if p.Flow.OnlyStream {
+				return fmt.Errorf("%s rules cannot use only_stream", protocol)
+			}
+			if p.Flow.Established || p.Flow.NotEstablished || p.Flow.ToServer || p.Flow.ToClient {
+				return fmt.Errorf("stateful flow tracking for %s rules is not supported; only stateless %s rules are supported", protocol, protocol)
+			}
 		}
-	}
-	if p.Threshold != nil {
-		return fmt.Errorf("threshold for %s rules requires non-TCP flow state", protocol)
-	}
-	for _, option := range p.Options {
-		if option.FlowBits != nil || option.FlowInt != nil || option.XBits != nil || option.NoAlert {
-			return fmt.Errorf("state option %s for %s rules requires non-TCP flow state", option.Keyword, protocol)
+		if p.Threshold != nil {
+			return fmt.Errorf("threshold for %s rules requires non-TCP flow state", protocol)
 		}
+		for _, option := range p.Options {
+			if option.FlowBits != nil || option.FlowInt != nil || option.XBits != nil || option.NoAlert {
+				return fmt.Errorf("state option %s for %s rules requires non-TCP flow state", option.Keyword, protocol)
+			}
+		}
+		return nil
 	}
-	return nil
 }
 
 // stateless reports whether the plan can run without a flowRuntime. Direct

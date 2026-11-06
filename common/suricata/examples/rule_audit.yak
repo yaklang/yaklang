@@ -1,0 +1,23 @@
+// 典型 4：规则兼容性审计。
+// 逐条编译，打印可执行/拒绝数量；ET 语料里不支持或需要非 TCP 状态的规则会被明确报告。
+//
+// 运行：
+//   yak common/suricata/examples/rule_audit.yak \
+//     --rules common/suricata/rules/emerging-scan.rules
+cli.SetDoc("审计 Suricata 规则文件，报告可执行与拒绝原因。")
+rulesPath = cli.String("rules", cli.setRequired(true), cli.setHelp("规则文件或目录（递归 .rules）"))
+show = cli.Int("show", cli.setDefault(10), cli.setHelp("最多显示多少条拒绝原因"))
+cli.check()
+
+loaded = suricata.LoadStatefulRules(rulesPath)~
+tcp = 0
+for _, current = range loaded.Rules {
+    if current.Protocol == "tcp" { tcp++ }
+}
+printf("[SUMMARY] executable=%d tcp=%d rejected=%d\n",
+    len(loaded.Rules), tcp, len(loaded.Rejected))
+for index, skipped = range loaded.Rejected {
+    if index >= show { break }
+    printf("[REJECT] sid=%d gid=%d msg=%q reason=%s\n",
+        skipped.SID, skipped.GID, skipped.Message, skipped.Reason)
+}

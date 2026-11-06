@@ -1,0 +1,4 @@
+alert http any any -> any any (msg:"HTTP GET seen (packet view)"; content:"GET"; http_method; sid:9500001; rev:1;)
+alert tcp any any -> any any (msg:"GET /pcap-skill-proof (stream view)"; flow:established,to_server,only_stream; content:"GET /pcap-skill-proof"; sid:9500002; rev:1;)
+alert http any any -> any any (msg:"HTTP request stateful"; flow:established,to_server,only_stream; content:"GET"; http_method; content:"/pcap-skill-proof"; http_uri; sid:9500003; rev:1;)
+alert http any any -> any any (msg:"HTTP response stateful"; flow:established,to_client,only_stream; content:"200"; http_stat_code; sid:9500004; rev:1;)

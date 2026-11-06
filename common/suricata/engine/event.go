@@ -37,6 +37,9 @@ type FlowSnapshot struct {
 	IPv6        bool
 	HalfOpen    bool
 	PendingGaps bool
+	// IPProtocol is the transport protocol number (TCP=6, UDP=17). Zero is
+	// treated as TCP for snapshots created by older callers.
+	IPProtocol uint8
 }
 
 type InspectionEvent struct {

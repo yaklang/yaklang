@@ -8,10 +8,22 @@ import (
 )
 
 func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
-	// Non-TCP protocols are evaluated from packet buffers (HTTP/DNS/TLS/UDP/
-	// ICMP). Only TCP rules use the ordered stream lane.
-	if p.Rule != nil && p.Rule.Protocol != "tcp" {
-		return view == ViewNormalizedPacket
+	if p.Rule != nil {
+		switch p.Rule.Protocol {
+		case "http":
+			// Stateful HTTP rules inspect the ordered per-direction TCP stream
+			// so split requests/responses are parsed as one message. Explicit
+			// stateless/no_stream rules stay on the packet lane.
+			if p.Flow != nil && !p.Flow.Stateless && !p.Flow.NoStream {
+				return view == ViewStream
+			}
+			return view == ViewNormalizedPacket
+		case "tcp":
+			// handled below
+		default:
+			// DNS/TLS/UDP/ICMP are evaluated from packet buffers.
+			return view == ViewNormalizedPacket
+		}
 	}
 	if p.Flow != nil {
 		if p.Flow.OnlyStream {

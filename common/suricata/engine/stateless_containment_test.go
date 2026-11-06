@@ -80,13 +80,14 @@ func TestEngineMatchesStatelessHTTPRule(t *testing.T) {
 	require.True(t, matched, "engine must contain MatchHTTPFlow")
 }
 
-func TestEngineRejectsStatefulHTTPRule(t *testing.T) {
+func TestEngineAcceptsStatefulHTTPRuleMatcherDoesNot(t *testing.T) {
 	rules, err := rule.ParseStrictRule(`alert http any any -> any any (msg:"stateful http"; flow:established,to_server; content:"GET"; http_method; sid:9300002; rev:1;)`)
 	require.NoError(t, err)
 	_, matcherErr := match.CompileRule(rules[0])
-	require.Error(t, matcherErr, "legacy matcher rejects stateful requirements")
-	_, err = NewStatefulEngine(rules, Config{State: state.DefaultConfig()})
-	require.ErrorContains(t, err, "stateful flow tracking for http rules")
+	require.Error(t, matcherErr, "legacy stateless matcher rejects stateful requirements")
+	engine, err := NewStatefulEngine(rules, Config{State: state.DefaultConfig()})
+	require.NoError(t, err)
+	require.NoError(t, engine.Close())
 }
 
 func TestEngineMatchPacketConcurrent(t *testing.T) {
