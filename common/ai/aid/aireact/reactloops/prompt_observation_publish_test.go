@@ -18,9 +18,10 @@ import (
 )
 
 type promptProfileCapture struct {
-	mu       sync.Mutex
-	profiles []PromptObservationStatus
-	warnings strings.Builder
+	mu            sync.Mutex
+	profiles      []PromptObservationStatus
+	warnings      strings.Builder
+	notifyNodeIDs []string
 }
 
 func (c *promptProfileCapture) emitter() *aicommon.Emitter {
@@ -28,6 +29,11 @@ func (c *promptProfileCapture) emitter() *aicommon.Emitter {
 		if event.IsStream && event.NodeId == contextCompressionWarningNodeID {
 			c.mu.Lock()
 			c.warnings.Write(event.StreamDelta)
+			c.mu.Unlock()
+		}
+		if event.Type == schema.EVENT_TYPE_NOTIFY {
+			c.mu.Lock()
+			c.notifyNodeIDs = append(c.notifyNodeIDs, event.NodeId)
 			c.mu.Unlock()
 		}
 		if event.Type != schema.EVENT_TYPE_PROMPT_PROFILE {
@@ -54,6 +60,12 @@ func (c *promptProfileCapture) warningText() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.warnings.String()
+}
+
+func (c *promptProfileCapture) notifications() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.notifyNodeIDs...)
 }
 
 type observedCompressionInvoker struct {
@@ -146,24 +158,22 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 					cfg.Timeline.PushText(historyID, "%s %s", originalHistory, strings.Repeat("history-filler ", 2000))
 				}
 				executeErr := loop.Execute("observation-task", ctx, "continue the task")
-				if mode == "overflow_no_progress" {
-					require.True(t, aicommon.IsPromptTooLong(executeErr), "an unchanged rebuild should stop without another request")
-				} else if mode == "ineffective_compression" {
-					require.NoError(t, executeErr)
-				} else {
-					require.NoError(t, executeErr)
-				}
+				require.NoError(t, executeErr)
 				loop.WaitForInflightObservation()
 				profiles := capture.snapshot()
 				wantRequests, wantCompression := 1, 0
 				switch mode {
-				case "ai_compression", "provider_overflow":
+				case "ai_compression":
 					wantCompression = 1
+				case "provider_overflow":
+					// provider overflow 是可恢复的 API 错误：记录 notify 和 Timeline
+					// 后重新生成 Prompt，不再把 typed error 返回给任务调用方。
+					wantRequests = 2
+					wantCompression = 1
+				case "overflow_no_progress":
+					wantRequests = 2
 				case "ineffective_compression":
 					wantCompression = 2
-				}
-				if mode == "provider_overflow" {
-					wantRequests = 2
 				}
 				if mode == "ineffective_compression" {
 					wantRequests = 1
@@ -177,10 +187,14 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 					wantIterations = 3
 				}
 				if mode == "overflow_no_progress" {
-					wantIterations = 0
+					wantIterations = 1
 				}
 				require.Len(t, requests, wantRequests)
 				require.Equal(t, wantCompression, compressionCalls)
+				if mode == "provider_overflow" || mode == "overflow_no_progress" {
+					require.Contains(t, capture.notifications(), "api_error",
+						"provider overflow must be visible as a user-facing API notification")
+				}
 				require.Len(t, profiles, len(requests), "only actual main-loop requests produce profiles")
 				if mode != "normal" {
 					require.Greater(t, invoker.builds, len(requests), "the regression must exercise discarded prompt rebuilds")

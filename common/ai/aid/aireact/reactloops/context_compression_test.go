@@ -146,23 +146,6 @@ func TestContextCompressionPromptTokenLimitUsesConfiguredLimitPlusHeadroom(t *te
 	require.EqualValues(t, 240*1024, loop.contextCompressionPromptTokenLimit())
 }
 
-func TestConsecutiveContextCompressionAttemptsLimitAndReset(t *testing.T) {
-	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
-		aicommon.WithDisableCreateDBRuntime(true))
-	loop := makeSchemaStabilityTestLoop(cfg)
-
-	for i := 0; i < maxConsecutiveContextCompressionAttempts; i++ {
-		require.NoError(t, loop.trackCompressionPromptMode(aicommon.LoopPromptModeCompressContext))
-	}
-	err := loop.trackCompressionPromptMode(aicommon.LoopPromptModeCompressContext)
-	require.ErrorContains(t, err, "after 5 consecutive attempts")
-
-	require.NoError(t, loop.trackCompressionPromptMode(aicommon.LoopPromptModeNormal))
-	require.Zero(t, loop.consecutiveCompressionAttempts)
-	require.NoError(t, loop.trackCompressionPromptMode(aicommon.LoopPromptModeCompressContext))
-	require.Equal(t, 1, loop.consecutiveCompressionAttempts)
-}
-
 func TestContextCompressionPromptBuildErrorFallsBackToNormalMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

@@ -61,13 +61,13 @@ func (r *ReActLoop) verifyContextCompressionAction(action *aicommon.Action) erro
 func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 	if loop == nil || operator == nil {
 		if operator != nil {
-			operator.Fatal(fmt.Errorf("context compression requires a loop"))
+			operator.Fail(fmt.Errorf("context compression requires a loop"))
 		}
 		return
 	}
 	timeline := timelineFromConfig(loop.config)
 	if timeline == nil {
-		operator.Fatal(fmt.Errorf("context compression requires a timeline"))
+		operator.Fail(fmt.Errorf("context compression requires a timeline"))
 		return
 	}
 	selection, err := loop.prepareContextCompression(action, contextCompressionRequest{
@@ -75,7 +75,7 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 	})
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			operator.Fatal(err)
+			operator.Fail(err)
 			return
 		}
 		operator.Fail(err)
@@ -83,7 +83,7 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 	}
 	if _, err := timeline.ApplyCompressionSelection(selection, operator.requestPrompt, operator.trajectoryResponse); err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			operator.Fatal(err)
+			operator.Fail(err)
 			return
 		}
 		operator.Fail(err)

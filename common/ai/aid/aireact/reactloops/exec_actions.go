@@ -38,9 +38,7 @@ type loopActionsResult struct {
 	countsEffectiveIteration bool
 	// An admission rejection starts another model iteration without a
 	// post-iteration callback, matching the existing single-action path.
-	skipPostIteration     bool
-	skipErrorFinalization bool
-	skipErrorSummary      bool
+	skipPostIteration bool
 }
 
 type loopActionEventSink func(LoopCall, string, string)
@@ -170,8 +168,12 @@ func (r *ReActLoop) execCalls(
 	if len(calls) == 0 {
 		// 模型输出校验应在进入执行器前完成。
 		// 走到这里说明循环自身前置条件已经被破坏。
-		result.result, result.err = loopActionsError, fmt.Errorf("action executor requires at least one call")
-		return result
+		return r.recoverActionExecutionFailure(
+			result.operator,
+			LoopCall{},
+			iteration,
+			fmt.Errorf("action executor requires at least one call"),
+		)
 	}
 	r.Delete(loopVarNativeTodoBatchAdjusted)
 	defer r.Delete(loopVarNativeTodoBatchAdjusted)
@@ -207,12 +209,17 @@ func (r *ReActLoop) execCalls(
 			r.StopSubAgentsForUser()
 		} else {
 			result.err = r.answerAsyncReview(task)
+			if result.err != nil {
+				return r.recoverActionExecutionFailure(
+					result.operator,
+					LoopCall{},
+					iteration,
+					result.err,
+				)
+			}
 		}
 		result.result = loopActionsExit
 		result.operator.ExitForUser()
-		if result.err != nil {
-			result.result = loopActionsError
-		}
 		return result
 	}
 
@@ -248,7 +255,6 @@ func (r *ReActLoop) execCalls(
 		if outcome.result != loopActionsContinue || outcome.skipPostIteration {
 			result.result, result.err, result.skipPostIteration = outcome.result, outcome.err, outcome.skipPostIteration
 			result.recoveredError = outcome.recoveredError
-			result.skipErrorFinalization, result.skipErrorSummary = outcome.skipErrorFinalization, outcome.skipErrorSummary
 			for _, skipped := range calls[index+1:] {
 				emitLoopActionEvent(eventSink, skipped, "skipped", "An earlier action ended this batch before this call could run.")
 			}
@@ -287,8 +293,12 @@ func (r *ReActLoop) execOneCall(
 	result := loopActionsResult{operator: op, result: loopActionsContinue}
 	action, handler := call.Action, call.LoopAction
 	if action == nil || handler == nil {
-		result.result, result.err = loopActionsError, fmt.Errorf("nil action or handler for call %q", call.ToolCallID)
-		return result
+		return r.recoverActionExecutionFailure(
+			op,
+			call,
+			iteration,
+			fmt.Errorf("nil action or handler for call %q", call.ToolCallID),
+		)
 	}
 	actionName := action.Name()
 	toolOwnsStatus := actionName == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL
@@ -394,9 +404,9 @@ func (r *ReActLoop) execOneCall(
 		done.Do(func() { log.Infof("async mode, not update task status in mainloop") })
 	}
 	if handler.ActionHandler == nil {
-		result.result, result.err = loopActionsError, fmt.Errorf("action[%s] has no ActionHandler", actionName)
-		emitLoopActionEvent(eventSink, call, "failed", result.err.Error())
-		return result
+		err := fmt.Errorf("action[%s] has no ActionHandler", actionName)
+		emitLoopActionEvent(eventSink, call, "failed", err.Error())
+		return r.recoverActionExecutionFailure(op, call, iteration, err)
 	}
 	// Transaction-time verification may accept an adjust_todolist that turns
 	// out to be idempotent at apply time. Recheck before delivering a repeated
@@ -412,7 +422,6 @@ func (r *ReActLoop) execOneCall(
 	}
 	if err := task.GetContext().Err(); err != nil {
 		result.result, result.err = loopActionsError, fmt.Errorf("task context done before action handler: %w", err)
-		result.skipErrorFinalization, result.skipErrorSummary = true, true
 		emitLoopActionEvent(eventSink, call, "failed", result.err.Error())
 		return result
 	}
@@ -435,7 +444,6 @@ func (r *ReActLoop) execOneCall(
 	if handlerPanicErr != nil {
 		if task.GetContext().Err() != nil || task.IsUserCancelled() {
 			result.result, result.err = loopActionsError, handlerPanicErr
-			result.skipErrorFinalization, result.skipErrorSummary = true, true
 			emitLoopActionEvent(eventSink, call, "failed", handlerPanicErr.Error())
 			return result
 		}
@@ -452,15 +460,13 @@ func (r *ReActLoop) execOneCall(
 	}
 	if terminated, opErr := op.IsTerminated(); terminated {
 		if opErr != nil {
-			if !op.IsFatal() &&
-				!errors.Is(opErr, context.Canceled) &&
+			if !errors.Is(opErr, context.Canceled) &&
 				!errors.Is(opErr, context.DeadlineExceeded) {
 				emitLoopActionEvent(eventSink, call, "failed", opErr.Error())
 				result = r.recoverActionExecutionFailure(op, call, iteration, opErr)
 				return result
 			}
 			result.result, result.err = loopActionsError, opErr
-			result.skipErrorSummary = true
 			emitLoopActionEvent(eventSink, call, "failed", opErr.Error())
 			return result
 		}
@@ -485,7 +491,6 @@ func (r *ReActLoop) execOneCall(
 	if !(op.IsAsyncModeRequested() || task.IsAsyncMode()) {
 		if err := task.GetContext().Err(); err != nil {
 			result.result, result.err = loopActionsError, fmt.Errorf("task context done after action handler: %w", err)
-			result.skipErrorFinalization, result.skipErrorSummary = true, true
 			emitLoopActionEvent(eventSink, call, "failed", result.err.Error())
 			return result
 		}

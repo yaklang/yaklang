@@ -462,7 +462,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 				aicommon.WithStatusState(aicommon.StatusStateError),
 			)
 			inv := r.GetInvoker()
-			inv.AddToTimeline("error", fmt.Sprintf("ReActLoop[%v] task init handler execute failed: %v", r.loopName, failErr))
+			r.recordRecoverableTurnError(0, "init", "<init-handler>", failErr)
 			query := "Task initialization failed: " + failErr.Error() + "\n\n Origin INPUT: " + task.GetUserInput() + "\n\n Please give some practical advice for fix this issue or help user"
 			ctx := inv.GetConfig().GetContext()
 			if !utils.IsNil(task.GetContext()) {
@@ -470,10 +470,14 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 			}
 			result, err := inv.DirectlyAnswer(ctx, query, nil)
 			if err != nil {
-				return utils.Errorf("re-act loop [%v] task init handler execute failed: %v; additionally, failed to get direct answer: %v", r.loopName, failErr, err)
+				r.emitRecoveryWarning(fmt.Sprintf(
+					"ReActLoop[%v] init failure advice could not be generated; continuing with initialized state: %v",
+					r.loopName,
+					err,
+				))
+			} else {
+				inv.EmitFileArtifactWithExt("init_error_advice.txt", ".md", result)
 			}
-			inv.EmitFileArtifactWithExt("init_error_advice.txt", ".md", result)
-			return utils.Errorf("re-act loop [%v] task init handler execute failed: %v", r.loopName, failErr)
 		}
 
 		// Continue with normal execution
@@ -634,6 +638,14 @@ LOOP:
 	for {
 		if r.asyncReviewRequiresAnswer() {
 			answerErr := r.answerAsyncReview(task)
+			if answerErr != nil {
+				if isLoopControlTermination(answerErr) || task.GetContext().Err() != nil {
+					r.finishIterationLoopWithError(iterationCount, task, answerErr)
+					return answerErr
+				}
+				r.recordRecoverableTurnError(iterationCount, "async_review", "<async-review>", answerErr)
+				continue LOOP
+			}
 			r.finishIterationLoopWithError(iterationCount, task, answerErr)
 			return answerErr
 		}
@@ -730,10 +742,8 @@ LOOP:
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
 			tokens := aicommon.MeasureTokens(prompt)
-			if compressionErr := r.trackCompressionPromptMode(r.promptMode); compressionErr != nil {
-				r.finishIterationLoopWithError(iterationCount, task, compressionErr)
-				needSummary.SetTo(true)
-				return compressionErr
+			if r.promptMode == aicommon.LoopPromptModeCompressContext {
+				r.noteCompressionStatus()
 			}
 			if r.promptMode == aicommon.LoopPromptModeCompressContext && lastCompressionTokens > 0 && tokens >= lastCompressionTokens*99/100 {
 				r.emitContextCompressionNoProgress(lastCompressionTokens, tokens)
@@ -759,6 +769,14 @@ LOOP:
 			if r.asyncReviewRequiresAnswer() {
 				r.clearCallsExecutionValues(loopCalls)
 				answerErr := r.answerAsyncReview(task)
+				if answerErr != nil {
+					if isLoopControlTermination(answerErr) || task.GetContext().Err() != nil {
+						r.finishIterationLoopWithError(iterationCount, task, answerErr)
+						return answerErr
+					}
+					r.recordRecoverableTurnError(iterationCount, "async_review", "<async-review>", answerErr)
+					continue LOOP
+				}
 				r.finishIterationLoopWithError(iterationCount, task, answerErr)
 				return answerErr
 			}
@@ -821,17 +839,19 @@ LOOP:
 			}
 		}
 
-		// 唯一的响应错误决策点：模型输出错误进入自愈，请求错误和机制错误终止任务。
+		// Prompt 已成功构建后，除取消控制信号外，所有错误都写入 Timeline 后继续。
 		if turnErr != nil {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
-			if aicommon.IsRecoverableError(turnErr) {
-				r.recordRecoverableModelOutputError(iterationCount, turnErr)
-				continue LOOP
+			if isLoopControlTermination(turnErr) || task.GetContext().Err() != nil {
+				r.finishIterationLoopWithError(iterationCount, task, turnErr)
+				return turnErr
 			}
-			r.finishIterationLoopWithError(iterationCount, task, turnErr)
-			log.Errorf("Failed to execute loop: %v", turnErr)
-			needSummary.SetTo(true)
-			return turnErr
+			phase, action := "execute_ai_output", "<model-response>"
+			if transactionErr != nil {
+				phase, action = "request_ai", "<ai-request>"
+			}
+			r.recordRecoverableTurnError(iterationCount, phase, action, turnErr)
+			continue LOOP
 		}
 
 		// 文本协议校验通过后，再记录本轮 reasoning 和 decision。
@@ -855,6 +875,9 @@ LOOP:
 			}
 		}
 		operator = batch.operator
+		if operator == nil {
+			operator = newLoopActionHandlerOperator(task)
+		}
 		if batch.result == loopActionsRecover {
 			continue LOOP
 		}
@@ -863,13 +886,12 @@ LOOP:
 			if finalError == nil {
 				finalError = utils.Error("action batch failed")
 			}
-			if !batch.skipErrorFinalization {
+			if isLoopControlTermination(finalError) || task.GetContext().Err() != nil {
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
+				return finalError
 			}
-			if !batch.skipErrorSummary {
-				needSummary.SetTo(true)
-			}
-			return finalError
+			r.recordRecoverableTurnError(iterationCount, "execute_ai_output", "<action-batch>", finalError)
+			continue LOOP
 		}
 		if r.promptMode == aicommon.LoopPromptModeCompressContext {
 			lastCompressionTokens = aicommon.MeasureTokens(prompt)

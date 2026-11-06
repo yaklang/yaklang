@@ -19,7 +19,6 @@ type LoopActionHandlerOperator struct {
 	isContinued       bool
 	isTerminated      bool
 	failedError       error
-	failureFatal      bool
 	isSilence         bool
 	userRequestedExit bool
 
@@ -136,20 +135,6 @@ func (l *LoopActionHandlerOperator) Fail(i any) {
 		l.failedError = utils.Error(i)
 		l.isTerminated = true
 	})
-}
-
-// Fatal 标记当前循环无法安全继续的错误。
-// 普通 Fail 会由循环执行边界转换为可恢复的 Timeline 事件。
-func (l *LoopActionHandlerOperator) Fatal(i any) {
-	l.terminateOperateOnce.Do(func() {
-		l.failedError = utils.Error(i)
-		l.failureFatal = true
-		l.isTerminated = true
-	})
-}
-
-func (l *LoopActionHandlerOperator) IsFatal() bool {
-	return l != nil && l.failureFatal
 }
 
 func (l *LoopActionHandlerOperator) Feedback(i any) {

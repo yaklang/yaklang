@@ -364,6 +364,10 @@ func callAITransaction(
 		structuredExtra["attempts"] = attempts
 	}
 	emittedStructuredFailure := EmitAICallFailureIfApplicable(c, tier, lastRsp, finalErr, structuredExtra)
+	if lastCallAiErr != nil || nonRetryableHTTPFailure || promptOverflowFailure ||
+		(lastRsp != nil && (lastRsp.GetHTTPStatusCode() >= 400 || lastRsp.GetError() != nil)) {
+		emitAITransactionFailureNotify(c, lastRsp, finalErr)
+	}
 	if !emittedStructuredFailure {
 		finalErrMsg += formatAttemptHistory(attemptHistory)
 		bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")

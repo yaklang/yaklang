@@ -29,33 +29,10 @@ const contextCompressionPromptHeadroomTokens int64 = 200 * 1024
 
 const contextCompressionWarningNodeID = "context_compression_warning"
 
-const maxConsecutiveContextCompressionAttempts = 5
-
 // isContextCompressionCall 判断本次模型调用是否为上下文压缩维护动作。
 func isContextCompressionCall(call LoopCall) bool {
 	return call.Action != nil &&
 		strings.TrimSpace(call.Action.Name()) == aicommon.ContextCompressionAction
-}
-
-// trackCompressionPromptMode 维护连续压缩轮次：
-// 进入普通 Prompt 时清零，连续压缩超过上限时返回硬错误。
-func (r *ReActLoop) trackCompressionPromptMode(mode aicommon.LoopPromptMode) error {
-	if r == nil {
-		return nil
-	}
-	if mode == aicommon.LoopPromptModeNormal {
-		r.consecutiveCompressionAttempts = 0
-		return nil
-	}
-	r.consecutiveCompressionAttempts++
-	if r.consecutiveCompressionAttempts > maxConsecutiveContextCompressionAttempts {
-		return fmt.Errorf(
-			"context compression failed after %d consecutive attempts",
-			maxConsecutiveContextCompressionAttempts,
-		)
-	}
-	r.noteCompressionStatus()
-	return nil
 }
 
 // wholePromptTokenLimit is the limit for the assembled main-loop prompt.

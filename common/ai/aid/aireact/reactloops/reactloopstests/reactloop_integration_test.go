@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -566,11 +567,19 @@ func TestReActLoop_StatusTransitions(t *testing.T) {
 	t.Log("Status transition test completed successfully")
 }
 
-// TestReActLoop_ErrorHandling 测试错误处理
+// TestReActLoop_ErrorHandling 测试请求错误写入 Timeline 后继续执行。
 func TestReActLoop_ErrorHandling(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return nil, fmt.Errorf("simulated AI error")
+			callCount++
+			if callCount == 1 {
+				return nil, fmt.Errorf("simulated AI error")
+			}
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "recovered"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		// Reduce retry counts to speed up test
 		aicommon.WithAIAutoRetry(1),            // Only retry once (default 5)
@@ -586,10 +595,14 @@ func TestReActLoop_ErrorHandling(t *testing.T) {
 	}
 
 	err = loop.Execute("error-task", context.Background(), "test error")
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, callCount, 2)
 
-	// AI错误会触发重试机制，最终可能会返回error或nil
-	// 这取决于重试次数和重试策略
-	t.Logf("Error handling test result: %v", err)
+	cfg, ok := reactIns.GetConfig().(*aicommon.Config)
+	require.True(t, ok)
+	serialized, marshalErr := aicommon.MarshalTimeline(cfg.Timeline)
+	require.NoError(t, marshalErr)
+	require.Contains(t, serialized, "simulated AI error")
 }
 
 // TestReActLoop_AsyncMode 测试异步模式

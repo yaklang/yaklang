@@ -1074,6 +1074,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "额度耗尽",
 		En: "Quota Exceeded",
 	},
+	"network_error": {
+		Zh: "网络错误",
+		En: "Network Error",
+	},
+	"api_error": {
+		Zh: "API 错误",
+		En: "API Error",
+	},
+	"authentication_failed": {
+		Zh: "鉴权失败",
+		En: "Authentication Failed",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{

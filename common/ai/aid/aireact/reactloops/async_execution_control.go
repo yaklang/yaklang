@@ -37,6 +37,7 @@ func (r *ReActLoop) asyncReviewRequiresAnswer() bool {
 		return false
 	}
 }
+
 func (r *ReActLoop) answerAsyncReview(task aicommon.AIStatefulTask) error {
 	r.StopSubAgentsForUser()
 	r.onReleaseMutex.Lock()

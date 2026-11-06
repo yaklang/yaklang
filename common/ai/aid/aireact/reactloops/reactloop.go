@@ -118,9 +118,6 @@ type ReActLoop struct {
 	promptMode               aicommon.LoopPromptMode
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
-	// consecutiveCompressionAttempts 限制压缩无法推进时的连续维护轮数。
-	// 构建普通 Prompt 后，连续计数会清零。
-	consecutiveCompressionAttempts int
 	// lastFittingTimelineThroughID is the boundary of the latest prompt the
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64

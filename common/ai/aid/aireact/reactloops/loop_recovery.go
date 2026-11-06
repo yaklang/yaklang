@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -28,6 +30,10 @@ type recoverableTimelineEvent struct {
 	retryCount        int
 	sideEffectUnknown bool
 	nextStep          string
+}
+
+func isLoopControlTermination(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // noteRecoverableFailure 按 action 和错误内容累计相同失败。
@@ -139,21 +145,21 @@ func (r *ReActLoop) recoverActionExecutionFailure(
 	}
 }
 
-// recordRecoverableModelOutputError 记录模型输出校验错误。
+// recordRecoverableTurnError 记录单轮执行中可恢复的错误。
 // 该函数只负责写入 Timeline，实际 continue 由 exec 统一决定。
-func (r *ReActLoop) recordRecoverableModelOutputError(iteration int, err error) {
+func (r *ReActLoop) recordRecoverableTurnError(iteration int, phase, action string, err error) {
 	if err == nil {
 		return
 	}
-	attempt, exhausted := r.noteRecoverableFailure("<model-response>", err)
-	nextStep := "Regenerate the model response and follow the advertised action schema."
+	attempt, exhausted := r.noteRecoverableFailure(action, err)
+	nextStep := "Continue from the current Timeline state. Change the next action or parameters when the same failure is likely to repeat."
 	if exhausted {
-		nextStep = "The model response has repeatedly failed validation. Simplify the next response and return exactly one valid action."
+		nextStep = "The same failure repeated too many times. Avoid repeating the same call; inspect the state and choose a different path."
 	}
 
 	errorText := r.recordRecoverableTimelineEvent(recoverableTimelineEvent{
-		phase:      "execute_ai_output",
-		action:     "<model-response>",
+		phase:      phase,
+		action:     action,
 		iteration:  iteration,
 		err:        err,
 		retryCount: attempt,
@@ -161,7 +167,8 @@ func (r *ReActLoop) recordRecoverableModelOutputError(iteration int, err error) 
 	})
 	if errorText != "" {
 		r.emitRecoveryWarning(fmt.Sprintf(
-			"AI output could not be executed and was converted into a recoverable error (attempt %d): %s",
+			"Loop stage %s could not be completed and was converted into a recoverable error (attempt %d): %s",
+			phase,
 			attempt,
 			errorText,
 		))
