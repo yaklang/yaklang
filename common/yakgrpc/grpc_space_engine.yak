@@ -18,6 +18,7 @@ randomDelay = getFromScope("RANDOM_DELAY",0)
 retryTimes = getFromScope("RETRY_TIMES",0)
 
 total = 0
+uniqueEndpoints = make(map[string]bool)
 scanTotal = 0
 activeTask = 0
 
@@ -35,17 +36,23 @@ deltaActiveTask = i => {
     activeTask += i
 }
 
+reportStatus = () => {
+    statusLock.Lock()
+    defer statusLock.Unlock()
+    yakit.StatusCard("已获取记录", f`${total}`)
+    yakit.StatusCard("唯一端点", f`${len(uniqueEndpoints)}`)
+    if scanTotal > 0 {
+        yakit.StatusCard("验证扫描", f`${scanTotal}`)
+    }
+
+    if activeTask > 0 {
+        yakit.StatusCard("正在扫描验证", f`${activeTask}`)
+    }
+}
+
 go func {
     for {
-        yakit.StatusCard("获取数据", f`${total}`)
-        if scanTotal > 0 {
-            yakit.StatusCard("验证扫描", f`${scanTotal}`)
-        }
-
-        if activeTask > 0 {
-            yakit.StatusCard("正在扫描验证", f`${activeTask}`)
-        }
-
+        reportStatus()
         sleep(1)
     }
 }
@@ -72,10 +79,15 @@ feeddata = (result) => {
         title = result.GetHtmlTitle()
     }
 
+    endpoint = str.HostPort(host, port)
     yakit.TableData(
         tableName,
-        {"uuid": str.HostPort(host, port), "主机": host, "端口": port, "基础指纹": service, "网站标题": title},
+        {"uuid": endpoint, "主机": host, "端口": port, "基础指纹": service, "网站标题": title},
     )
+    // 与表格使用相同的主机+端口唯一键，验证扫描更新已有行时不重复计数。
+    statusLock.Lock()
+    uniqueEndpoints[endpoint] = true
+    statusLock.Unlock()
 }
 queryResult, err = spacengine.Query(
     filter,
@@ -91,7 +103,9 @@ if err != nil {
 }
 
 for result in queryResult {
+    statusLock.Lock()
     total++
+    statusLock.Unlock()
     feeddata(result)
     if !scan {
         continue
@@ -118,4 +132,5 @@ for result in queryResult {
 
 
 swg.Wait()
+reportStatus()
 sleep(2)
