@@ -61,19 +61,19 @@ type Risk struct {
 	// 潜在威胁：用于输出合规性质的漏洞内容
 	IsPotential bool `json:"is_potential"`
 
-	CVE                 string    `json:"cve"`
-	IsRead              bool      `json:"is_read"`
-	Ignore              bool      `json:"ignore"`
-	UploadOnline        bool      `json:"upload_online"`
-	TaskName            string    `json:"task_name"`
-	CveAccessVector     string    `json:"cve_access_vector"`
-	CveAccessComplexity string    `json:"cve_access_complexity"`
-	Tags                string    `json:"tags"`
-	VerifierUid         string    `json:"verifierUid"`    // 验证人
-	FixTime             time.Time `json:"fix_time"`       // 修复时间
-	FixSuggestion       string    `json:"fix_suggestion"` // 修复建议
-	TagReason           string    `json:"tag_reason"`     // 处置原因
-	SeverityScore       float64   `json:"severity_score"`
+	CVE                 string     `json:"cve"`
+	IsRead              bool       `json:"is_read"`
+	Ignore              bool       `json:"ignore"`
+	UploadOnline        bool       `json:"upload_online"`
+	TaskName            string     `json:"task_name"`
+	CveAccessVector     string     `json:"cve_access_vector"`
+	CveAccessComplexity string     `json:"cve_access_complexity"`
+	Tags                string     `json:"tags"`
+	VerifierUid         string     `json:"verifierUid"`    // 验证人
+	FixTime             *time.Time `json:"fix_time"`       // 修复时间  //未设置时为 nil，数据库存 NULL，避免零值
+	FixSuggestion       string     `json:"fix_suggestion"` // 修复建议
+	TagReason           string     `json:"tag_reason"`     // 处置原因
+	SeverityScore       float64    `json:"severity_score"`
 
 	// SyntaxFlow
 	ResultID    uint   `json:"result_id"`
@@ -232,7 +232,7 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		IsPotential:        p.IsPotential,
 		SeverityScore:      p.SeverityScore,
 		TagReason:          p.TagReason,
-		FixTime:            p.FixTime.Unix(),
+		FixTime:            p.FixTimeUnix(),
 		FixSuggestion:      p.FixSuggestion,
 	}
 }
@@ -267,7 +267,28 @@ func (p *Risk) BeforeSave() error {
 		p.RiskTypeVerbose = "信息"
 	}
 
+	if p.FixTime != nil && !p.FixTime.After(time.Unix(0, 0)) {
+		p.FixTime = nil
+	}
+
 	return nil
+}
+
+// <= 0 返回 nil
+func FixTimeFromUnix(sec int64) *time.Time {
+	if sec <= 0 {
+		return nil
+	}
+	t := time.Unix(sec, 0).UTC()
+	return &t
+}
+
+// FixTimeUnix 返回修复时间的秒级时间戳。未设置或零值返回 0。
+func (p *Risk) FixTimeUnix() int64 {
+	if p == nil || p.FixTime == nil || !p.FixTime.After(time.Unix(0, 0)) {
+		return 0
+	}
+	return p.FixTime.Unix()
 }
 
 // ComputeRiskHashForSchema returns a deterministic hash for a Risk based on
