@@ -23,9 +23,9 @@ func TestCorpusCapabilityBaseline(t *testing.T) {
 		stateful    int
 	}
 	corpora := map[string]expectation{
-		"emerging-scan": {raw: readEmergingScanRules(t), rules: 284, diagnostics: 689, unsupported: 14, stateful: 675},
-		"badrules":      {raw: badrule, rules: 176, diagnostics: 405, unsupported: 46, stateful: 359},
-		"badrules-mini": {raw: badrule_mini, rules: 3, diagnostics: 6, unsupported: 2, stateful: 4},
+		"emerging-scan": {raw: readEmergingScanRules(t), rules: 284, diagnostics: 675, unsupported: 0, stateful: 675},
+		"badrules":      {raw: badrule, rules: 177, diagnostics: 361, unsupported: 0, stateful: 361},
+		"badrules-mini": {raw: badrule_mini, rules: 7, diagnostics: 32, unsupported: 20, stateful: 12},
 	}
 	for name, expected := range corpora {
 		t.Run(name, func(t *testing.T) {

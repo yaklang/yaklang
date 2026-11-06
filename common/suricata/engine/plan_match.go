@@ -3,12 +3,20 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
+	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 
 func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 	if p.Rule != nil {
+		if rule.UsesRawBytes(p.Rule) {
+			return view == ViewNormalizedPacket
+		}
+		if len(p.StreamSize) > 0 && p.Rule.Protocol != "tcp-pkt" {
+			return view == ViewStream
+		}
 		switch p.Rule.Protocol {
 		case "http":
 			// Stateful HTTP rules inspect the ordered per-direction TCP stream
@@ -18,10 +26,22 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 				return view == ViewStream
 			}
 			return view == ViewNormalizedPacket
-		case "tcp":
+		case "tcp", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "tcp-stream":
 			// handled below
+		case "tls":
+			// Stateful TLS handshake fields (SNI, JA3, certificates) are parsed
+			// from the ordered stream so split records are visible. Explicit
+			// stateless/no_stream rules keep the packet view.
+			if p.Flow != nil && !p.Flow.Stateless && !p.Flow.NoStream {
+				return view == ViewStream
+			}
+			return view == ViewNormalizedPacket
+		case "tcp-pkt":
+			// tcp-pkt is explicitly packet-scoped, including stateless rules
+			// and rules without payload content.
+			return view == ViewNormalizedPacket
 		default:
-			// DNS/TLS/UDP/ICMP are evaluated from packet buffers.
+			// DNS/UDP/ICMP are evaluated from packet buffers.
 			return view == ViewNormalizedPacket
 		}
 	}
@@ -37,6 +57,52 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 		return view == ViewStream
 	}
 	return view == ViewNormalizedPacket
+}
+
+func (p *CompiledRulePlan) matchStreamSize(flow *flowRuntime, packetView bool) bool {
+	if len(p.StreamSize) == 0 {
+		return true
+	}
+	if flow == nil || !flow.roleConfirmed {
+		return false
+	}
+	if flow.transport != 0 && flow.transport != uint8(layers.IPProtocolTCP) {
+		return false
+	}
+	var clientBytes, serverBytes int
+	if packetView {
+		clientBytes = int(flow.tcpPacketBytes[flow.synDirection])
+		serverBytes = int(flow.tcpPacketBytes[1-flow.synDirection])
+	} else {
+		clientBytes = len(flow.stream[flow.synDirection])
+		serverBytes = len(flow.stream[1-flow.synDirection])
+	}
+	for _, metric := range p.StreamSize {
+		if metric == nil || metric.Range == nil {
+			return false
+		}
+		switch strings.ToLower(strings.TrimSpace(metric.Direction)) {
+		case "client":
+			if !metric.Range.Match(clientBytes) {
+				return false
+			}
+		case "server":
+			if !metric.Range.Match(serverBytes) {
+				return false
+			}
+		case "both":
+			if !metric.Range.Match(clientBytes) || !metric.Range.Match(serverBytes) {
+				return false
+			}
+		case "either":
+			if !metric.Range.Match(clientBytes) && !metric.Range.Match(serverBytes) {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (p *CompiledRulePlan) match(event InspectionEvent, flow *flowRuntime, streamPayload []byte) (bool, int, error) {

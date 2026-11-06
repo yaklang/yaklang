@@ -22,6 +22,63 @@ func mustMatcher(t testing.TB, pattern string) *Matcher {
 	return matcher
 }
 
+func TestPCREUngreedyAndRawBytesOptions(t *testing.T) {
+	matches, err := mustMatcher(t, `/^(a.*b)/G`).Match([]byte("aXbYb"))
+	if err != nil || len(matches) != 1 || matches[0].Len != 3 {
+		t.Fatalf("ungreedy option must shorten the match: matches=%v err=%v", matches, err)
+	}
+	parsed, err := ParsePCREStr(`/foo/B`)
+	if err != nil || !parsed.RawBytes() {
+		t.Fatalf("rawbytes option was not parsed: parsed=%v err=%v", parsed, err)
+	}
+	if _, err := ParsePCREStr(`/foo/O`); err != nil {
+		t.Fatalf("match-limit option must be accepted: %v", err)
+	}
+	ungreedy, err := ParsePCREStr(`/^(a.*b)/G`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ungreedy.Generator(); err != nil {
+		t.Fatalf("ungreedy rules must remain generatable: %v", err)
+	}
+}
+
+func TestExtendedOption(t *testing.T) {
+	matches, err := mustMatcher(t, `/a  b # ignored comment/x`).Match([]byte("ab"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("extended mode must ignore whitespace and comments: matches=%v err=%v", matches, err)
+	}
+}
+
+func TestDollarEndOnlyOption(t *testing.T) {
+	normal, err := mustMatcher(t, `/abc$/`).Match([]byte("abc\n"))
+	if err != nil || len(normal) != 1 {
+		t.Fatalf("default $ must match before a final newline: matches=%v err=%v", normal, err)
+	}
+	endOnly, err := mustMatcher(t, `/abc$/E`).Match([]byte("abc\n"))
+	if err != nil || len(endOnly) != 0 {
+		t.Fatalf("$ with /E must not match before a final newline: matches=%v err=%v", endOnly, err)
+	}
+	exact, err := mustMatcher(t, `/abc$/E`).Match([]byte("abc"))
+	if err != nil || len(exact) != 1 {
+		t.Fatalf("$ with /E must match at end of subject: matches=%v err=%v", exact, err)
+	}
+}
+
+func TestPCREMatchesRawBytes(t *testing.T) {
+	matches, err := mustMatcher(t, `/\xff\x00/`).Match([]byte{0xff, 0x00})
+	if err != nil || len(matches) != 1 || matches[0].Pos != 0 || matches[0].Len != 2 {
+		t.Fatalf("byte-oriented PCRE must match non-UTF8 input: matches=%v err=%v", matches, err)
+	}
+}
+
+func TestEscapedDelimiterTrailingBackslash(t *testing.T) {
+	matches, err := mustMatcher(t, `/^[A-Z]\x3a\/Ri`).Match([]byte("A:"))
+	if err != nil || len(matches) == 0 {
+		t.Fatalf("escaped delimiter pattern did not match: matches=%v err=%v", matches, err)
+	}
+}
+
 func TestDefaultMatchLimitsConfigurable(t *testing.T) {
 	oldMatchLimit, oldDepthLimit := GetDefaultMatchLimits()
 	t.Cleanup(func() {

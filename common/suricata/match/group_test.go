@@ -178,7 +178,7 @@ func TestGroup_LoadRuleResults(t *testing.T) {
 
 	valid := mustParseGroupRules(t, `alert tcp any any -> any any (msg:"valid"; content:"valid"; sid:2000001; rev:1;)`)[0]
 	invalid := *valid
-	invalid.Protocol = "ftp"
+	invalid.Protocol = "modbus"
 	results := group.LoadRulesWithResults(valid, &invalid, nil)
 	if len(results) != 3 {
 		t.Fatalf("got %d load results, want 3", len(results))

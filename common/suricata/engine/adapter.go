@@ -104,6 +104,13 @@ func (a *PcapAdapter) Stats() AdapterStats {
 func (a *PcapAdapter) onPhysicalPacket(packet gopacket.Packet) {
 	a.counters.physicalPackets.Add(1)
 	a.emitPacket(ViewPhysicalPacket, packet)
+	// pcaputil's normalized callback is transport-oriented. ICMP and other
+	// transport-less IP packets only reach the physical lane, so publish a
+	// normalized view for them as well.
+	if packet.TransportLayer() == nil {
+		a.counters.normalizedPackets.Add(1)
+		a.emitPacket(ViewNormalizedPacket, packet)
+	}
 }
 
 func (a *PcapAdapter) onNormalizedPacket(packet gopacket.Packet) {

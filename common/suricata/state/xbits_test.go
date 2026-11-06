@@ -50,6 +50,28 @@ func TestXBitScopesExpiryBoundaryAndRollback(t *testing.T) {
 	}
 }
 
+func TestXBitAtUsesCaptureTime(t *testing.T) {
+	start := time.Unix(200, 0)
+	store := testStore(t, newFakeClock(start))
+	key := HostXBitKey(NewHostKey(1, testDomain(1), netip.MustParseAddr("192.0.2.1")), "tag")
+
+	if err := store.SetXBitAt(key, 5*time.Second, start); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.TestXBitAt(key, start.Add(4*time.Second)); err != nil || !got {
+		t.Fatalf("end-1s got=%v err=%v", got, err)
+	}
+	if got, err := store.TestXBitAt(key, start.Add(5*time.Second)); err != nil || got {
+		t.Fatalf("exact end got=%v err=%v", got, err)
+	}
+	if got, err := store.ToggleXBitAt(key, 5*time.Second, start.Add(10*time.Second)); err != nil || !got {
+		t.Fatalf("toggle set got=%v err=%v", got, err)
+	}
+	if got, err := store.TestXBitAt(key, start.Add(15*time.Second)); err != nil || got {
+		t.Fatalf("toggle expiry got=%v err=%v", got, err)
+	}
+}
+
 func TestXBitEpochDomainAndCapacityIsolation(t *testing.T) {
 	cfg := testConfig()
 	cfg.MaxXBits = 2

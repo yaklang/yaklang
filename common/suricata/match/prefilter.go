@@ -7,8 +7,10 @@ import (
 
 func fastPatternCopy(c *rule.ContentRule) *rule.ContentRule {
 	return &rule.ContentRule{
-		Content:  utils.CopyBytes(c.Content),
-		Nocase:   c.Nocase,
-		Modifier: c.Modifier,
+		Content:   utils.CopyBytes(c.Content),
+		Nocase:    c.Nocase,
+		Modifier:  c.Modifier,
+		DotPrefix: c.DotPrefix,
+		RawBytes:  c.RawBytes,
 	}
 }

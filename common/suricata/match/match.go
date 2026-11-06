@@ -131,6 +131,11 @@ type matchHandler func(*matchContext) error
 
 type bufferProvider func(modifier modifier.Modifier) []byte
 
+type jumpCursorState struct {
+	position int
+	active   bool
+}
+
 type matchContext struct {
 	// matcher itself not designed for multi threads, you'd best clone it before use.
 	// lock is used to protect the matcher from being used by multiple goroutines.
@@ -146,6 +151,8 @@ type matchContext struct {
 
 	prevMatched  []data.Matched
 	prevModifier modifier.Modifier
+	jumpCursor   map[modifier.Modifier]jumpCursorState
+	variables    map[string]int64
 
 	PK              gopacket.Packet
 	Rule            *rule.Rule
@@ -156,11 +163,13 @@ type matchContext struct {
 
 func (c *matchContext) Clone() *matchContext {
 	return &matchContext{
-		Value:    make(map[string]any),
-		pos:      -1,
-		buffer:   make(map[modifier.Modifier][]byte),
-		Rule:     c.Rule,
-		workflow: c.workflow,
+		Value:      make(map[string]any),
+		pos:        -1,
+		buffer:     make(map[modifier.Modifier][]byte),
+		Rule:       c.Rule,
+		workflow:   c.workflow,
+		jumpCursor: make(map[modifier.Modifier]jumpCursorState),
+		variables:  make(map[string]int64),
 	}
 }
 
@@ -219,14 +228,18 @@ func (c *matchContext) Tidy() {
 	c.rejected = false
 	c.prevMatched = nil
 	c.prevModifier = modifier.Default
+	c.jumpCursor = make(map[modifier.Modifier]jumpCursorState)
+	c.variables = make(map[string]int64)
 }
 
 func compile(r *rule.Rule) (*matchContext, error) {
 	c := &matchContext{
-		Value:  make(map[string]any),
-		Rule:   r,
-		pos:    -1,
-		buffer: make(map[modifier.Modifier][]byte),
+		Value:      make(map[string]any),
+		Rule:       r,
+		pos:        -1,
+		buffer:     make(map[modifier.Modifier][]byte),
+		jumpCursor: make(map[modifier.Modifier]jumpCursorState),
+		variables:  make(map[string]int64),
 	}
 
 	if err := matchMutex(c); err != nil {
@@ -293,6 +306,16 @@ func (c *matchContext) matchPacket(pk gopacket.Packet, overridePayload []byte) (
 
 func matchMutex(c *matchContext) error {
 	switch c.Rule.Protocol {
+	case protocol.IP:
+		c.Attach(ipMatcher, ipCfgMatch, ipParser)
+		if c.Rule.SourcePort != nil && !c.Rule.SourcePort.Any ||
+			c.Rule.DestinationPort != nil && !c.Rule.DestinationPort.Any {
+			c.Attach(portMatcher)
+		}
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
+		return attachPayloadMatcher(c)
 	case protocol.DNS:
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, dnsParser)
 		if err := attachFastPattern(c); err != nil {
@@ -307,8 +330,60 @@ func matchMutex(c *matchContext) error {
 		}
 		attachHTTPMatcher(c)
 		return attachPayloadMatcher(c)
-	case protocol.TCP:
+	case protocol.TCP, protocol.TCPPacket:
+		if rule.UsesSSHBuffers(c.Rule) {
+			c.Attach(ipMatcher, ipCfgMatch, portMatcher, sshProtoParser)
+			if err := attachFastPattern(c); err != nil {
+				return err
+			}
+			c.Attach(tcpCfgMatch)
+			return attachPayloadMatcher(c)
+		}
+		if rule.UsesHTTPBuffers(c.Rule) {
+			// A tcp rule that selects HTTP sticky buffers carries HTTP even
+			// when the header protocol is not literally "http".
+			c.Attach(ipMatcher, ipCfgMatch, portMatcher, httpParser)
+			c.Attach(tcpCfgMatch)
+			if err := attachFastPattern(c); err != nil {
+				return err
+			}
+			attachHTTPMatcher(c)
+			return attachPayloadMatcher(c)
+		}
+		if rule.UsesTLSBuffers(c.Rule) {
+			c.Attach(ipMatcher, ipCfgMatch, portMatcher, tlsParser)
+			c.Attach(tcpCfgMatch)
+			if err := attachFastPattern(c); err != nil {
+				return err
+			}
+			return attachPayloadMatcher(c)
+		}
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tcpParser)
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
+		c.Attach(tcpCfgMatch)
+		return attachPayloadMatcher(c)
+	case protocol.SMTP:
+		parser := tcpParser
+		if rule.UsesFileData(c.Rule) {
+			parser = smtpParser
+		}
+		c.Attach(ipMatcher, ipCfgMatch, portMatcher, parser)
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
+		c.Attach(tcpCfgMatch)
+		return attachPayloadMatcher(c)
+	case protocol.FTP, protocol.FTPData, protocol.SMB,
+		protocol.SSH, protocol.DCERPC, protocol.TCPStream:
+		// Application protocols that ride on TCP share the TCP header/payload
+		// pipeline. SSH additionally exposes its version banner as a buffer.
+		parser := tcpParser
+		if protocol.SSH == c.Rule.Protocol && rule.UsesSSHBuffers(c.Rule) {
+			parser = sshProtoParser
+		}
+		c.Attach(ipMatcher, ipCfgMatch, portMatcher, parser)
 		if err := attachFastPattern(c); err != nil {
 			return err
 		}
@@ -327,12 +402,21 @@ func matchMutex(c *matchContext) error {
 		}
 		c.Attach(icmpCfgMatch)
 		return attachPayloadMatcher(c)
-	case protocol.TLS:
-		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tlsParser)
+	case protocol.ICMPv6:
+		c.Attach(ipMatcher, ipCfgMatch, icmpv6Parser)
 		if err := attachFastPattern(c); err != nil {
 			return err
 		}
-		// c.Attach(tlsMatcher)
+		c.Attach(icmpv6CfgMatch)
+		return attachPayloadMatcher(c)
+	case protocol.TLS:
+		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tlsParser)
+		if c.Rule.ContentRuleConfig.TLSConfig != nil {
+			c.Attach(tlsMatcher)
+		}
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
 		return attachPayloadMatcher(c)
 	default:
 		return fmt.Errorf("unsupported protocol: %s", c.Rule.Protocol)
@@ -352,6 +436,15 @@ func (c *matchContext) GetBuffer(modifier modifier.Modifier) []byte {
 
 func (c *matchContext) SetBuffer(modifier modifier.Modifier, buf []byte) {
 	c.buffer[modifier] = buf
+}
+
+func (c *matchContext) takeJumpCursor(mdf modifier.Modifier) (int, bool) {
+	state, ok := c.jumpCursor[mdf]
+	if !ok || !state.active {
+		return 0, false
+	}
+	delete(c.jumpCursor, mdf)
+	return state.position, true
 }
 
 // GetPrevMatched return true if the previous motch for current modifier existed.

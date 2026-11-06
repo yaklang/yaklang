@@ -18,10 +18,14 @@ func TestKeywordCapabilityRegistry(t *testing.T) {
 		{keyword: "HTTP.URI", status: KeywordSupported},
 		{keyword: "flowbits", status: KeywordStatefulRequired},
 		{keyword: "threshold", status: KeywordStatefulRequired},
-		{keyword: "byte_test", status: KeywordUnsupported},
+		{keyword: "byte_test", status: KeywordSupported},
+		{keyword: "byte_jump", status: KeywordSupported},
 		{keyword: "detection_filter", status: KeywordStatefulRequired},
 		{keyword: "dataset", status: KeywordUnsupported},
-		{keyword: "tls.sni", status: KeywordUnsupported},
+		{keyword: "tls.sni", status: KeywordSupported},
+		{keyword: "tls.version", status: KeywordSupported},
+		{keyword: "ja3s.hash", status: KeywordSupported},
+		{keyword: "tls.cert_expired", status: KeywordUnsupported},
 	}
 	for _, test := range tests {
 		test := test
@@ -58,7 +62,8 @@ func TestVisitorKeywordsHaveCapabilities(t *testing.T) {
 		"replace", "pcre", "tcp.mss", "fast_pattern", "flowbits", "noalert", "base64_decode",
 		"base64_data", "flowint", "xbits", "stream_size", "flow.age", "flow.pkts", "flow.bytes",
 		"detection_filter", "app-layer-event", "file_data", "http_uri",
-		"http.header", "dns.query", "ja3.hash", "tls.cert_subject", "ipv4.hdr", "tcp.hdr",
+		"http.header", "dns.query", "ja3.hash", "ja3_hash", "tls.cert_subject", "ipv4.hdr", "tcp.hdr",
+		"target", "dotprefix", "tls.sni", "tls_sni",
 	}
 	for _, keyword := range keywords {
 		_, ok := LookupKeywordCapability(keyword)
@@ -81,9 +86,7 @@ func TestParseAndValidateReportsStructuredDiagnostics(t *testing.T) {
 	require.Equal(t, KeywordStatefulRequired, flow.Capability)
 	require.NotEmpty(t, flow.Reason)
 
-	byteTest := findDiagnostic(diagnostics, ValidationStageCapability, "byte_test")
-	require.NotNil(t, byteTest)
-	require.Equal(t, KeywordUnsupported, byteTest.Capability)
+	require.Nil(t, findDiagnostic(diagnostics, ValidationStageCapability, "byte_test"))
 
 	unknown := findDiagnostic(diagnostics, ValidationStageCapability, "mystery_keyword")
 	require.NotNil(t, unknown)

@@ -175,7 +175,7 @@ func newTCPProvider(pk gopacket.Packet, override ...[]byte) func(modifier modifi
 		switch mdf {
 		case modifier.TCPHDR:
 			return tcp.Contents
-		case modifier.Default:
+		case modifier.Default, modifier.FileData:
 			if len(override) > 0 && override[0] != nil {
 				return override[0]
 			}

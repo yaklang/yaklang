@@ -28,7 +28,7 @@ func TestStrictParserRejectsInvalidNumbers(t *testing.T) {
 		`alert icmp any any -> any any (itype:bogus; sid:20;)`,
 		`alert tcp any any -> any any (seq:bogus; sid:21;)`,
 		`alert http any any -> any any (urilen:bogus; sid:22;)`,
-		`alert tcp any any -> any any (content:"x"; offset:bogus; sid:23;)`,
+		`alert tcp any any -> any any (content:"x"; offset:1bogus; sid:23;)`,
 	} {
 		_, err := rule.ParseStrictRule(raw)
 		require.Error(t, err)
@@ -56,7 +56,7 @@ func TestStickyBufferPCRE(t *testing.T) {
 }
 
 func TestUnsupportedTLSBuffersRejected(t *testing.T) {
-	for _, keyword := range []string{"ja3s.hash", "ja3s.string", "tls.cert_subject"} {
+	for _, keyword := range []string{"tls.cert_chain_len", "tls.cert_expired", "tls.cert_valid"} {
 		rules, err := rule.Parse(`alert tls any any -> any any (` + keyword + `; content:"x"; sid:50;)`)
 		require.NoError(t, err)
 		_, err = CompileRule(rules[0])

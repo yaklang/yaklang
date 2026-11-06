@@ -9,8 +9,9 @@ import (
 )
 
 type NumRange struct {
-	// Op can be '>' '<' '=' '-' '!'.
-	// they are larger,smaller,equal,between,not
+	// Op can be '>' '<' 'G' 'L' '=' '-' '!'.
+	// They are greater, less, greater-or-equal, less-or-equal, equal,
+	// between, and not-equal.
 	Op   int
 	Num1 int
 	Num2 int
@@ -20,11 +21,26 @@ func ParseNumRange(s string) (r *NumRange, err error) {
 	if len(s) == 0 {
 		return nil, errors.New("empty string")
 	}
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "\t", "")
+	if len(s) == 0 {
+		return nil, errors.New("empty string")
+	}
 
 	switch s[0] {
 	case '<':
 		if len(s) < 2 {
 			return nil, errors.New("no char after '<'")
+		}
+		if s[1] == '=' {
+			if len(s) < 3 {
+				return nil, errors.New("no number after '<='")
+			}
+			num, err := strconv.Atoi(s[2:])
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid number after '<='")
+			}
+			return &NumRange{Op: 'L', Num1: num}, nil
 		}
 		num, err := strconv.Atoi(s[1:])
 		if err != nil {
@@ -35,14 +51,43 @@ func ParseNumRange(s string) (r *NumRange, err error) {
 		if len(s) < 2 {
 			return nil, errors.New("no char after '>'")
 		}
+		if s[1] == '=' {
+			if len(s) < 3 {
+				return nil, errors.New("no number after '>='")
+			}
+			num, err := strconv.Atoi(s[2:])
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid number after '>='")
+			}
+			return &NumRange{Op: 'G', Num1: num}, nil
+		}
 		num, err := strconv.Atoi(s[1:])
 		if err != nil {
 			return nil, errors.Wrap(err, "invalid number after '>'")
 		}
 		return &NumRange{Op: '>', Num1: num}, nil
+	case '=':
+		if len(s) < 2 {
+			return nil, errors.New("no number after '='")
+		}
+		num, err := strconv.Atoi(s[1:])
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid number after '='")
+		}
+		return &NumRange{Op: '=', Num1: num}, nil
 	case '!':
 		if len(s) < 2 {
 			return nil, errors.New("no char after '!'")
+		}
+		if s[1] == '=' {
+			if len(s) < 3 {
+				return nil, errors.New("no number after '!='")
+			}
+			num, err := strconv.Atoi(s[2:])
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid number after '!='")
+			}
+			return &NumRange{Op: '!', Num1: num}, nil
 		}
 		num, err := strconv.Atoi(s[1:])
 		if err != nil {
@@ -104,6 +149,10 @@ func (r *NumRange) Match(num int) bool {
 		return num > r.Num1
 	case '<':
 		return num < r.Num1
+	case 'G':
+		return num >= r.Num1
+	case 'L':
+		return num <= r.Num1
 	case '=':
 		return num == r.Num1
 	case '-':
@@ -120,6 +169,10 @@ func (r *NumRange) Generate() int {
 		return r.Num1 + rand.Intn(utils.Max(r.Num1/5, 20))
 	case '<':
 		return rand.Intn(r.Num1)
+	case 'G':
+		return r.Num1 + rand.Intn(utils.Max(r.Num1/5, 20))
+	case 'L':
+		return rand.Intn(utils.Max(r.Num1, 1))
 	case '=':
 		return r.Num1
 	case '-':

@@ -11,6 +11,79 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/state"
 )
 
+func TestETHTTPStatefulRuleMatches(t *testing.T) {
+	etRule := `alert http $EXTERNAL_NET any -> $HOME_NET any (msg:"ET SCAN Acunetix scan in progress acunetix_wvs_security_test in http_uri"; flow:established,to_server; threshold: type limit, count 1, seconds 60, track by_src; http.uri; content:"acunetix_wvs_security_test"; fast_pattern; reference:url,www.acunetix.com/; classtype:web-application-attack; sid:2023687; rev:7; metadata:affected_product Any, attack_target Web_Server, created_at 2016_12_28, deployment Datacenter, performance_impact Low, signature_severity Major, updated_at 2020_12_03;)`
+	rules, err := rule.ParseStrictRule(etRule, "HOME_NET=192.0.2.2", "EXTERNAL_NET=192.0.2.1")
+	require.NoError(t, err)
+	require.Len(t, rules, 1)
+	var mu sync.Mutex
+	var alerts []Alert
+	engine, err := NewStatefulEngine(rules, Config{Epoch: 19, State: state.DefaultConfig(), OnAlert: func(alert Alert) {
+		mu.Lock()
+		alerts = append(alerts, alert)
+		mu.Unlock()
+	}})
+	require.NoError(t, err)
+	defer engine.Close()
+
+	adapter, err := NewPcapAdapter(128, func(event InspectionEvent) { engine.Handle(event) })
+	require.NoError(t, err)
+	analyzer, err := pcaputil.NewPacketAnalyzer(adapter.Options()...)
+	require.NoError(t, err)
+
+	base := time.Unix(1700010000, 0)
+	clientSeq, serverSeq := uint32(100), uint32(900)
+	feedTCP(t, analyzer, base, 41000, 80, clientSeq, 0, "syn", nil)
+	feedTCP(t, analyzer, base.Add(time.Millisecond), 80, 41000, serverSeq, clientSeq+1, "syn,ack", nil)
+	feedTCP(t, analyzer, base.Add(2*time.Millisecond), 41000, 80, clientSeq+1, serverSeq+1, "ack", nil)
+	request := []byte("GET /acunetix_wvs_security_test HTTP/1.1\r\nHost: example.com\r\n\r\n")
+	feedTCP(t, analyzer, base.Add(3*time.Millisecond), 41000, 80, clientSeq+1, serverSeq+1, "ack,psh", request)
+	require.NoError(t, analyzer.Close())
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, alerts, 1)
+	require.Equal(t, 2023687, alerts[0].Rule.Sid)
+	require.Equal(t, ViewStream, alerts[0].View)
+	require.Equal(t, 0, alerts[0].Direction)
+}
+
+func TestHTTPStatefulChunkedBody(t *testing.T) {
+	rules, err := rule.ParseStrictRule(`alert http any any -> any any (msg:"http chunked body"; flow:established,to_server,only_stream; content:"payload"; http_client_body; sid:9700018; rev:1;)`)
+	require.NoError(t, err)
+	var mu sync.Mutex
+	var alerts []Alert
+	engine, err := NewStatefulEngine(rules, Config{Epoch: 20, State: state.DefaultConfig(), OnAlert: func(alert Alert) {
+		mu.Lock()
+		alerts = append(alerts, alert)
+		mu.Unlock()
+	}})
+	require.NoError(t, err)
+	defer engine.Close()
+
+	adapter, err := NewPcapAdapter(128, func(event InspectionEvent) { engine.Handle(event) })
+	require.NoError(t, err)
+	analyzer, err := pcaputil.NewPacketAnalyzer(adapter.Options()...)
+	require.NoError(t, err)
+
+	base := time.Unix(1700010100, 0)
+	clientSeq, serverSeq := uint32(100), uint32(900)
+	feedTCP(t, analyzer, base, 41000, 80, clientSeq, 0, "syn", nil)
+	feedTCP(t, analyzer, base.Add(time.Millisecond), 80, 41000, serverSeq, clientSeq+1, "syn,ack", nil)
+	feedTCP(t, analyzer, base.Add(2*time.Millisecond), 41000, 80, clientSeq+1, serverSeq+1, "ack", nil)
+
+	headers := []byte("POST /upload HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\n\r\n")
+	firstPayload := append(append([]byte(nil), headers...), []byte("4\r\npayl\r\n")...)
+	feedTCP(t, analyzer, base.Add(3*time.Millisecond), 41000, 80, clientSeq+1, serverSeq+1, "ack,psh", firstPayload)
+	feedTCP(t, analyzer, base.Add(4*time.Millisecond), 41000, 80, clientSeq+1+uint32(len(firstPayload)), serverSeq+1, "ack,psh", []byte("4\r\noade\r\n0\r\n\r\n"))
+	require.NoError(t, analyzer.Close())
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, alerts, 1, "chunked body must be decoded before matching")
+	require.Equal(t, 9700018, alerts[0].Rule.Sid)
+}
+
 func TestHTTPFlowbitsAcrossRequestResponse(t *testing.T) {
 	rules, err := rule.ParseStrictRule(`
 alert http any any -> any any (msg:"http set"; flow:established,to_server,only_stream; content:"/one"; http_uri; flowbits:set,http_one; flowbits:noalert; sid:9700016; rev:1;)

@@ -30,6 +30,8 @@ type StatefulAlert struct {
 	ClassType       string
 	Action          string
 	Protocol        string
+	Target          string
+	Tagged          bool
 	View            string
 	Direction       int
 	Source          string
@@ -246,6 +248,8 @@ func newStatefulAlert(alert engine.Alert) StatefulAlert {
 		View:            view,
 		Direction:       alert.Direction,
 		Protocol:        alert.Protocol,
+		Target:          alert.Target,
+		Tagged:          alert.Tagged,
 		Summary:         alert.Summary,
 		EventID:         alert.EventID,
 		FlowID:          alert.FlowID,
