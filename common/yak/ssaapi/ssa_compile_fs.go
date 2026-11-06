@@ -300,7 +300,6 @@ func (c *Config) parseProjectWithFSUnits(
 		ExcludeFunc:     c.excludeMatcher,
 		CheckLanguage:   c.checkLanguage,
 		CheckPreHandler: c.checkLanguagePreHandler,
-		EntryFiles:      c.GetCompileEntryFiles(),
 		Context:         c.ctx,
 	})
 	if err != nil {
@@ -816,7 +815,6 @@ func (c *Config) parseProjectWithFSLegacy(
 		ExcludeFunc:     c.excludeMatcher,
 		CheckLanguage:   c.checkLanguage,
 		CheckPreHandler: c.checkLanguagePreHandler,
-		EntryFiles:      c.GetCompileEntryFiles(),
 		Context:         c.ctx,
 	})
 	if err != nil {

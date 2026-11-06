@@ -21,6 +21,13 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
 
+// RiskSelectionScope constrains risk reads and writes to an explicit set of
+// attached risk IDs. A nil scope means no attachment scope is active. A
+// non-nil scope with no allowed IDs is invalid and must fail closed.
+type RiskSelectionScope struct {
+	AllowedIDs []int64
+}
+
 type ToolRuntimeConfig struct {
 	// Detach transfers this invocation to its owning loop's background manager.
 	// It returns the same execution ID on repeated calls. Nil means unsupported.
@@ -43,6 +50,9 @@ type ToolRuntimeConfig struct {
 	// RiskSaveHandler replaces the process-local SQLite write for a risk when
 	// the current AI runtime is bound to a platform-owned result sink.
 	RiskSaveHandler func(context.Context, *schema.Risk) error
+	// RiskSelectionScope limits risk queries and triage writes to the task's
+	// attached risk IDs. It is nil only when the task has no risk attachment.
+	RiskSelectionScope *RiskSelectionScope
 	// EmitUIEvent emits structured metadata for a local UI surface. Tool callbacks
 	// must never place binary or base64 content in this channel.
 	EmitUIEvent func(schema.EventType, string, any) error

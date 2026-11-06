@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -22,6 +24,8 @@ type RiskDatabaseItem struct {
 	Title, TitleVerbose, RiskType, RiskTypeVerbose, Severity string
 	Description, Solution, Parameter, Payload, Details       string
 	Tags, FromYakScript, RuntimeId                           string
+	Disposition, TagReason                                   string
+	DuplicateOfRiskID                                        uint
 	WaitingVerified, Truncated                               bool
 }
 
@@ -46,7 +50,7 @@ func (p *RiskDatabasePage) Dump() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "database_id=%s total=%d offset=%d next_offset=%d has_more=%t hits=%d field_limit=%d characters\n", p.DatabaseID, p.Total, p.Offset, p.NextOffset, p.HasMore, len(p.Items), p.FieldLimit)
 	for _, r := range p.Items {
-		fmt.Fprintf(&b, "\n--- risk_id=%d hash=%s ---\ncreated_at=%s updated_at=%s\ntitle=%s\ntitle_verbose=%s\ntype=%s type_verbose=%s severity=%s\nurl=%s host=%s ip=%s port=%d\nparameter=%s payload=%s\ntags=%s source=%s runtime_id=%s waiting_verified=%t\ndescription:\n%s\nsolution:\n%s\ndetails (stored text):\n%s\n", r.ID, r.Hash, r.CreatedAt.Format(time.RFC3339), r.UpdatedAt.Format(time.RFC3339), r.Title, r.TitleVerbose, r.RiskType, r.RiskTypeVerbose, r.Severity, r.Url, r.Host, r.IP, r.Port, r.Parameter, r.Payload, r.Tags, r.FromYakScript, r.RuntimeId, r.WaitingVerified, r.Description, r.Solution, r.Details)
+		fmt.Fprintf(&b, "\n--- risk_id=%d hash=%s ---\ncreated_at=%s updated_at=%s\ntitle=%s\ntitle_verbose=%s\ntype=%s type_verbose=%s severity=%s\nurl=%s host=%s ip=%s port=%d\nparameter=%s payload=%s\ntags=%s source=%s runtime_id=%s waiting_verified=%t\ndisposition=%s duplicate_of_risk_id=%d tag_reason=%s\ndescription:\n%s\nsolution:\n%s\ndetails (stored text):\n%s\n", r.ID, r.Hash, r.CreatedAt.Format(time.RFC3339), r.UpdatedAt.Format(time.RFC3339), r.Title, r.TitleVerbose, r.RiskType, r.RiskTypeVerbose, r.Severity, r.Url, r.Host, r.IP, r.Port, r.Parameter, r.Payload, r.Tags, r.FromYakScript, r.RuntimeId, r.WaitingVerified, schema.NormalizeRiskDisposition(r.Disposition), r.DuplicateOfRiskID, r.TagReason, r.Description, r.Solution, r.Details)
 		if r.Truncated {
 			fmt.Fprintf(&b, "[truncated: one or more text fields exceed %d characters; narrow filters or lower limit for larger excerpts]\n", p.FieldLimit)
 		}
@@ -60,6 +64,7 @@ type riskDatabaseFilter struct {
 	Title           string  `json:"title"`
 	RuntimeID       string  `json:"runtime_id"`
 	IDs             []int64 `json:"ids"`
+	Disposition     string  `json:"disposition"`
 	WaitingVerified bool    `json:"waiting_verified"`
 }
 
@@ -71,7 +76,7 @@ func init() {
 // QueryRiskInDatabase 分页搜索已保存的风险（导出名为 risk.QueryRiskInDatabase）。
 // 普通脚本默认查询当前项目库，AI 工具默认查询本次运行绑定的项目库；两者均可用 db.projectID 选择 db.ListYakProjects 返回的数据库标识，跨项目只读，不切换当前库。
 // 参数:
-//   - filter: 过滤字典；type 精确匹配风险类型或中文类型，支持逗号列表；severity 支持逗号列表；title 为标题关键词；runtime_id 为精确运行 ID；ids 为正整数 ID 列表；waiting_verified 默认 false，查询未处于等待验证状态的记录，true 仅查待验证记录。nil 或空字典使用默认过滤。
+//   - filter: 过滤字典；type 精确匹配风险类型或中文类型，支持逗号列表；severity 支持逗号列表；title 为标题关键词；runtime_id 为精确运行 ID；ids 为正整数 ID 列表；disposition 支持 active/duplicate/false_positive/ignored/all；waiting_verified 默认 false，查询未处于等待验证状态的记录，true 仅查待验证记录。nil 或空字典使用默认过滤。
 //   - opts: db.projectID、db.keyword、db.url、db.limit、db.offset、db.afterID、db.beforeID；按 ID 降序，limit 默认 10，范围 1–100。
 //
 // 返回值:
@@ -103,7 +108,7 @@ func QueryRiskInDatabase(filter map[string]any, opts ...DBHistoryOption) (*RiskD
 	if err := decoder.Decode(&f); err != nil {
 		return nil, fmt.Errorf("invalid risk filter: %w", err)
 	}
-	if len(f.Type) > 256 || len(f.Severity) > 256 || len(f.Title) > 1024 || len(f.RuntimeID) > 256 || len(f.IDs) > 100 {
+	if len(f.Type) > 256 || len(f.Severity) > 256 || len(f.Title) > 1024 || len(f.RuntimeID) > 256 || len(f.Disposition) > 256 || len(f.IDs) > 100 {
 		return nil, fmt.Errorf("risk filter exceeds its size limit")
 	}
 	for _, id := range f.IDs {
@@ -111,12 +116,22 @@ func QueryRiskInDatabase(filter map[string]any, opts ...DBHistoryOption) (*RiskD
 			return nil, fmt.Errorf("risk IDs must be positive")
 		}
 	}
+	if err := validateRiskSelectionScope(c, f.IDs); err != nil {
+		return nil, err
+	}
 	db, closeDB, err := historyProjectDatabase(c)
 	if err != nil {
 		return nil, err
 	}
 	defer closeDB()
 	query := yakit.FilterByQueryRisks(db, &ypb.QueryRisksRequest{Severity: f.Severity, Title: f.Title, RuntimeId: f.RuntimeID, Ids: f.IDs, WaitingVerified: f.WaitingVerified})
+	if c.riskSelectionScopeSet && len(f.IDs) == 0 {
+		query = bizhelper.ExactQueryInt64ArrayOr(query, "id", c.riskSelectionAllowedIDs)
+	}
+	query, err = filterRiskDispositions(query, f.Disposition)
+	if err != nil {
+		return nil, err
+	}
 	query = bizhelper.FuzzSearchEx(query, []string{"ip", "url", "title", "title_verbose", "risk_type", "risk_type_verbose", "parameter", "payload", "details", "description", "solution"}, c.keyword, false)
 	if types := utils.PrettifyListFromStringSplitEx(f.Type); len(types) > 0 {
 		query = query.Where("(risk_type IN (?) OR risk_type_verbose IN (?))", types, types)
@@ -136,12 +151,12 @@ func QueryRiskInDatabase(filter map[string]any, opts ...DBHistoryOption) (*RiskD
 	}
 	// SQLite substr counts Unicode characters. Reserve four bytes per character
 	// so even a page containing only multibyte text stays within the text budget.
-	columns := []string{"hash", "ip", "host", "url", "title", "title_verbose", "risk_type", "risk_type_verbose", "severity", "description", "solution", "parameter", "payload", "details", "tags", "from_yak_script", "runtime_id"}
+	columns := []string{"hash", "ip", "host", "url", "title", "title_verbose", "risk_type", "risk_type_verbose", "severity", "description", "solution", "parameter", "payload", "details", "tags", "from_yak_script", "runtime_id", "disposition", "tag_reason"}
 	fieldLimit := 131072 / (c.limit * len(columns) * 4)
 	if fieldLimit > 2048 {
 		fieldLimit = 2048
 	}
-	projection := []string{"id", "created_at", "updated_at", "port", "waiting_verified"}
+	projection := []string{"id", "created_at", "updated_at", "port", "waiting_verified", "duplicate_of_risk_id"}
 	truncated := []string{}
 	for _, col := range columns {
 		projection = append(projection, fmt.Sprintf("substr(%s, 1, %d) AS %s", col, fieldLimit, col))
@@ -157,4 +172,57 @@ func QueryRiskInDatabase(filter map[string]any, opts ...DBHistoryOption) (*RiskD
 		id = "current"
 	}
 	return &RiskDatabasePage{DatabaseID: id, Items: items, Total: total, Offset: c.offset, NextOffset: c.offset + len(items), HasMore: c.offset+len(items) < total, FieldLimit: fieldLimit}, c.ctx.Err()
+}
+
+func filterRiskDispositions(query *gorm.DB, raw string) (*gorm.DB, error) {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" || raw == "all" {
+		return query, nil
+	}
+
+	var clauses []string
+	var args []any
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		disposition := schema.NormalizeRiskDisposition(item)
+		if !schema.IsValidRiskDisposition(disposition) {
+			return nil, fmt.Errorf("invalid risk disposition filter: %q", item)
+		}
+		if disposition == schema.RiskDispositionActive {
+			clauses = append(clauses, "(disposition IS NULL OR disposition = '' OR disposition = ?)")
+			args = append(args, schema.RiskDispositionActive)
+			continue
+		}
+		clauses = append(clauses, "disposition = ?")
+		args = append(args, disposition)
+	}
+	if len(clauses) == 0 {
+		return query, nil
+	}
+	return query.Where("("+strings.Join(clauses, " OR ")+")", args...), nil
+}
+
+func validateRiskSelectionScope(c *dbHistoryConfig, ids []int64) error {
+	if c == nil || !c.riskSelectionScopeSet {
+		return nil
+	}
+	if c.projectID != "" && c.projectID != "current" {
+		return fmt.Errorf("risk operations with an attached selection are limited to the current project database")
+	}
+	if len(c.riskSelectionAllowedIDs) == 0 {
+		return fmt.Errorf("attached risk selection is empty or invalid")
+	}
+	allowed := make(map[int64]struct{}, len(c.riskSelectionAllowedIDs))
+	for _, id := range c.riskSelectionAllowedIDs {
+		allowed[id] = struct{}{}
+	}
+	for _, id := range ids {
+		if _, ok := allowed[id]; !ok {
+			return fmt.Errorf("risk %d is outside the attached risk selection", id)
+		}
+	}
+	return nil
 }

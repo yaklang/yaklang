@@ -42,6 +42,7 @@ var allBuiltinSkills = []struct {
 	{"syntaxflow-rule", "skills/syntaxflow-rule/SKILL.md", []string{"UNSAFE", "#->", "check-syntaxflow-syntax", "matched=true"}},
 	{"sf-rule-completion", "skills/sf-rule-completion/SKILL.md", []string{"syntaxflow_rule_completion", "rule_id", "risk 预设值", "check-syntaxflow-syntax"}},
 	{"yaklang-codegen", "skills/yaklang-codegen/SKILL.md", []string{"YAK_MAIN", "poc.HTTPEx", "cli.check", "check_yaklang_syntax"}},
+	{"risk-review", "skills/risk-review/SKILL.md", []string{"query_cybersecurity_risk", "get_cybersecurity_risk_evidence", "do_http_request", "triage_cybersecurity_risks", "false_positive", "duplicate", "inconclusive"}},
 }
 
 // Keep the reference skill complete as the engine's tag registry evolves.

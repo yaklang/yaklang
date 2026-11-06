@@ -12,16 +12,18 @@ import (
 func TestGetAIReActRecommendedSkills(t *testing.T) {
 	response, err := (&Server{}).GetAIReActRecommendedSkills(context.Background(), &ypb.Empty{})
 	require.NoError(t, err)
-	require.Len(t, response.GetData(), 3)
+	require.Len(t, response.GetData(), 4)
 
 	require.Equal(t, []string{
 		"security-engineering",
 		"code-review",
 		"pentest-task-design",
+		"risk-review",
 	}, []string{
 		response.GetData()[0].GetName(),
 		response.GetData()[1].GetName(),
 		response.GetData()[2].GetName(),
+		response.GetData()[3].GetName(),
 	})
 	for _, skill := range response.GetData() {
 		require.Equal(t, aicommon.EnabledCapabilityTypeSkill, skill.GetType())
@@ -43,5 +45,6 @@ func TestGetAIReActRecommendedSkills(t *testing.T) {
 		"security-engineering",
 		"code-review",
 		"pentest-task-design",
+		"risk-review",
 	}, config.GetEnabledSkillNames())
 }

@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -59,7 +60,15 @@ func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 		}
 	}
 
-	result := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(risk)
+	createDB := db
+	var existing schema.Risk
+	if findErr := db.Where("hash = ?", hash).First(&existing).Error; findErr == nil {
+		// Re-discovering a risk must not clear the user's or AI's triage state.
+		createDB = db.Omit("disposition", "duplicate_of_risk_id", "tag_reason")
+	} else if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return utils.Errorf("check existing Risk failed: %s", findErr)
+	}
+	result := createDB.Where("hash = ?", hash).Assign(i).FirstOrCreate(risk)
 	if result.Error != nil {
 		return utils.Errorf("create/update Risk failed: %s", result.Error)
 	}

@@ -17,6 +17,30 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	RiskDispositionActive        = "active"
+	RiskDispositionDuplicate     = "duplicate"
+	RiskDispositionFalsePositive = "false_positive"
+	RiskDispositionIgnored       = "ignored"
+)
+
+func NormalizeRiskDisposition(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return RiskDispositionActive
+	}
+	return value
+}
+
+func IsValidRiskDisposition(value string) bool {
+	switch NormalizeRiskDisposition(value) {
+	case RiskDispositionActive, RiskDispositionDuplicate, RiskDispositionFalsePositive, RiskDispositionIgnored:
+		return true
+	default:
+		return false
+	}
+}
+
 type Risk struct {
 	gorm.Model
 
@@ -64,6 +88,8 @@ type Risk struct {
 	CVE                 string     `json:"cve"`
 	IsRead              bool       `json:"is_read"`
 	Ignore              bool       `json:"ignore"`
+	Disposition         string     `json:"disposition" gorm:"index;size:32"`
+	DuplicateOfRiskID   uint       `json:"duplicate_of_risk_id" gorm:"index"`
 	UploadOnline        bool       `json:"upload_online"`
 	TaskName            string     `json:"task_name"`
 	CveAccessVector     string     `json:"cve_access_vector"`
@@ -269,6 +295,21 @@ func (p *Risk) BeforeSave() error {
 
 	if p.FixTime != nil && !p.FixTime.After(time.Unix(0, 0)) {
 		p.FixTime = nil
+	}
+
+	p.Disposition = NormalizeRiskDisposition(p.Disposition)
+	if !IsValidRiskDisposition(p.Disposition) {
+		return fmt.Errorf("invalid risk disposition: %q", p.Disposition)
+	}
+	if p.Disposition != RiskDispositionDuplicate {
+		p.DuplicateOfRiskID = 0
+	} else {
+		if p.DuplicateOfRiskID == 0 {
+			return fmt.Errorf("duplicate risk must reference a canonical risk")
+		}
+		if p.ID > 0 && p.DuplicateOfRiskID == p.ID {
+			return fmt.Errorf("duplicate risk cannot reference itself")
+		}
 	}
 
 	return nil

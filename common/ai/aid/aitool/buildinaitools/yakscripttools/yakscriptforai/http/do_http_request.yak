@@ -1,5 +1,5 @@
 __INPUT_CONSTRAINTS__ = `{
-  "description": "Provide either 'url' or 'packet', exclusively. Callback is not started on validation failure.",
+  "description": "Provide exactly one of 'url', 'packet', or 'packet-file'. Callback is not started on validation failure.",
   "oneOf": [
     {
       "required": [
@@ -22,6 +22,17 @@ __INPUT_CONSTRAINTS__ = `{
           "pattern": "\\S"
         }
       }
+    },
+    {
+      "required": [
+        "packet-file"
+      ],
+      "properties": {
+        "packet-file": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
     }
   ],
   "properties": {
@@ -34,13 +45,13 @@ __INPUT_CONSTRAINTS__ = `{
   }
 }`
 
-__DESC__ = "统一执行单包与批量 HTTP 测试、路径枚举、接口批量验证、IDOR/越权验证和请求重放。url 或 packet 二选一；fuzztag=true 时用 {{int(1-10)}}、{{list(a|b)}}、{{params(name)}} 的 variables 数组构成多包，同层 ::row 同步配对，其余标签取笛卡尔积，支持嵌套编码与 repeat 重复请求。一次调用完成展开、并发发包、响应筛选、逐包请求/响应预览、关键词/正则匹配上下文、状态统计、汇总表和完整响应/结果文件；单包保留详细报文。"
+__DESC__ = "统一执行单包与批量 HTTP 测试、路径枚举、接口批量验证、IDOR/越权验证和请求重放。url、packet 或 packet-file 三选一；packet-file 用于精确重放本地完整报文。fuzztag=true 时用 {{int(1-10)}}、{{list(a|b)}}、{{params(name)}} 的 variables 数组构成多包，同层 ::row 同步配对，其余标签取笛卡尔积，支持嵌套编码与 repeat 重复请求。一次调用完成展开、并发发包、响应筛选、逐包请求/响应预览、关键词/正则匹配上下文、状态统计、汇总表和完整响应/结果文件；单包保留详细报文。"
 __VERBOSE_NAME__ = "HTTP Request"
 __VERBOSE_NAME_ZH__ = "HTTP请求"
 __KEYWORDS__ = "batch http,batch request,concurrent,multi path,path enumeration,api endpoint validation,idor validation,request replay,批量HTTP,并发请求,路径枚举,接口批量验证,未授权访问验证,越权验证,IDOR验证,请求重放,http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK
-HTTP 请求测试：`url` 与 `packet` 二选一。URL 模式由工具生成请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`。`fuzztag:true` 可将同一模板展开成多包并发测试；批量请求也使用本工具，先把变化的路径、目标或载荷放入 FuzzTag/variables；一次调用执行全部组合，不要逐个循环调用。
+HTTP 请求测试：`url`、`packet`、`packet-file` 三选一。URL 模式由工具生成请求包；需要重复参数、固定顺序或自定义编码时用原样 `packet`；`packet-file` 从本地文件读取完整报文，优先于 `packet`，用于精确重放已保存的 Risk/HTTP 证据。`fuzztag:true` 可将同一模板展开成多包并发测试；批量请求也使用本工具，先把变化的路径、目标或载荷放入 FuzzTag/variables；一次调用执行全部组合，不要逐个循环调用。
 
 参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；仅在结果可能涉及漏洞或确需完整报文复核时设置 `save-packet=true` 保存请求和响应，普通探测保持默认，大报文内联输出会截断。
 
@@ -111,6 +122,16 @@ Content-Type: application/x-www-form-urlencoded
 
 name=a%20%26%20b
 <|TOOL_PARAM_packet_END_{NONCE}|>
+[[- end -]]
+已有完整报文文件时，直接使用 `packet-file`，避免重新抄写原始报文：
+[[- if .FunctionCallMode -]]
+```json
+{"packet-file":"/absolute/path/to/request.http","save-packet":true,"timeout":10}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"do_http_request","directly_call_tool_params":{"packet-file":"/absolute/path/to/request.http","save-packet":true,"timeout":10}}
+```
 [[- end -]]
 FuzzTag 发包辅助：设置 `fuzztag=true`，直接在 `packet` 或 URL 模式的 `url`、`headers`、`body`、`query`/`form` 值中写标签，省去先调用 exec_fuzztag 再复制报文的步骤。默认 false 保留原样文本。`variables` 支持标量或数组，用 `{{params(name)}}` 取值；变量插入后不会作为标签再次执行。URL 模式先渲染再编码 query/form 一次，结构化值不要再套 urlescape/urlenc；精确 packet 模式自行处理编码。自动根据展开结果选择单包或多包输出；`max-requests` 默认 100、最多 500，超限整批不发送；`concurrent` 默认 5，设为 1 可顺序发送。文件/插件标签未启用；未知标签、缺失变量、未闭合模板会报错。
 
@@ -228,6 +249,7 @@ postParams = cli.String("post-params", cli.setHelp("legacy k=v&k2=v2 form string
 
 // Packet mode params
 packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode; request target/query must already be encoded"), cli.setRequired(false))
+packetFile = cli.String("packet-file", cli.setHelp("local file containing a complete raw HTTP request; takes priority over packet"), cli.setRequired(false))
 
 // Template rendering is opt-in for existing raw request callers.
 fuzztag = cli.Bool("fuzztag", cli.setDefault(false), cli.setHelp("render FuzzTag in packet or URL-mode fields before encoding; single or multiple variants are sent automatically"))
@@ -257,6 +279,13 @@ savePacket = cli.Bool("save-packet", cli.setHelp("dump full request+response pac
 verbose = cli.Bool("verbose", cli.setHelp("verbose output: print connection trace + mode line; the generated request packet is always printed"))
 proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
 cli.check()
+
+if str.TrimSpace(packetFile) != "" {
+    rawPacket, err := file.ReadFile(packetFile)
+    if err != nil { die(sprintf("failed to read packet-file %s: %v", packetFile, err)) }
+    if len(rawPacket) == 0 { die(sprintf("packet-file is empty: %s", packetFile)) }
+    packet = string(rawPacket)
+}
 
 // RESULT is the objective HTTP execution channel. A received 404/500 is still
 // a received response; it must not be collapsed into a protocol failure.

@@ -1,0 +1,42 @@
+__DESC__ = "Read bounded evidence for up to five attached risks, including decoded saved HTTP request/response packets, packet pairs and replay files. Read-only."
+__VERBOSE_NAME__ = "Get Cybersecurity Risk Evidence"
+__VERBOSE_NAME_ZH__ = "读取安全风险证据"
+__KEYWORDS__ = "risk,evidence,request,response,packet,replay,false positive,duplicate,风险,证据,报文,重放,误报,重复"
+
+__USAGE__ = <<<USAGE
+读取当前任务 Risk 附件中的原始证据，用于审查重复或误报。risk_ids 是逗号分隔的正整数 ID，单次最多 5 个；任务带 Risk 附件时，所有 ID 必须位于附件范围内。packet_limit 是每份请求/响应在 stdout 中的预览字节数，范围 256–32768，默认 4096。
+
+完整的原始请求和响应始终写入私有临时文件，并返回 request_file / response_file。需要实际验证时，优先把 request_file 传给 do_http_request 的 packet-file 参数，避免模型复制报文导致内容变化。输出中的 method、replayable、state_changing、has_auth_material 只是验证前提示：state_changing=true 时必须遵守用户授权，不得直接高频重放写操作。
+
+本工具只读，不修改 Risk、不发送请求。先读取证据，再决定是直接判重复、用 do_http_request 实际验证，还是标记 inconclusive。
+
+[[- if .FunctionCallMode -]]
+```json
+{"risk_ids":"101,102","packet_limit":4096}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"get_cybersecurity_risk_evidence","directly_call_tool_params":{"risk_ids":"101,102","packet_limit":4096}}
+```
+[[- end -]]
+USAGE
+
+riskIDsRaw = cli.String("risk_ids", cli.setRequired(true), cli.setHelp("逗号分隔的 Risk ID，单次最多5个"))
+packetLimit = cli.Int("packet_limit", cli.setDefault(4096), cli.setHelp("每份报文预览字节数，256–32768"))
+cli.check()
+
+ids = []
+for rawID in str.Split(riskIDsRaw, ",") {
+    rawID = str.TrimSpace(rawID)
+    if rawID == "" { continue }
+    id, err = atoi(rawID)
+    if err != nil || id <= 0 { die(sprintf("invalid risk ID: %s", rawID)) }
+    ids.Push(id)
+}
+if len(ids) == 0 { die("risk_ids is required") }
+if len(ids) > 5 { die("risk_ids supports at most 5 IDs per call") }
+if packetLimit < 256 || packetLimit > 32768 { die("packet_limit must be 256..32768") }
+
+result, err = risk.GetRiskEvidenceInDatabase(ids, packetLimit)
+if err != nil { die(err) }
+println(result.Dump())

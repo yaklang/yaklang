@@ -15,17 +15,19 @@ import (
 func TestGetRecommendedBuiltinSkills(t *testing.T) {
 	skills, err := GetRecommendedBuiltinSkills()
 	require.NoError(t, err)
-	require.Len(t, skills, 3)
+	require.Len(t, skills, 4)
 	require.Equal(t, []string{
 		"security-engineering",
 		"code-review",
 		"pentest-task-design",
-	}, []string{skills[0].Name, skills[1].Name, skills[2].Name})
+		"risk-review",
+	}, []string{skills[0].Name, skills[1].Name, skills[2].Name, skills[3].Name})
 	require.Equal(t, []string{
 		"安全领域",
 		"代码安全审计",
 		"渗透测试",
-	}, []string{skills[0].DisplayNameZhCN, skills[1].DisplayNameZhCN, skills[2].DisplayNameZhCN})
+		"风险审查",
+	}, []string{skills[0].DisplayNameZhCN, skills[1].DisplayNameZhCN, skills[2].DisplayNameZhCN, skills[3].DisplayNameZhCN})
 	for _, skill := range skills {
 		require.NotEmpty(t, skill.Description)
 		require.NotEmpty(t, skill.Content)

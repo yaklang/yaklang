@@ -496,11 +496,20 @@ func (a *ToolCaller) invoke(
 			runtimeCfg.MemoryNamespace = memory.GetSessionID()
 		}
 	}
+	setRiskSelectionScope := func(task AIStatefulTask) {
+		if required, ids := AttachedRiskSelectionScope(task); required {
+			runtimeCfg.RiskSelectionScope = &aitool.RiskSelectionScope{AllowedIDs: ids}
+		}
+	}
 	if statefulTask, ok := a.task.(AIStatefulTask); ok && statefulTask != nil {
 		runtimeCfg.CurrentTaskUserInput = statefulTask.GetOriginUserInput()
+		setRiskSelectionScope(statefulTask)
 	} else if a.invokeRuntime != nil {
 		if currentTask := a.invokeRuntime.GetCurrentTask(); currentTask != nil {
 			runtimeCfg.CurrentTaskUserInput = currentTask.GetOriginUserInput()
+			if statefulTask, ok := currentTask.(AIStatefulTask); ok {
+				setRiskSelectionScope(statefulTask)
+			}
 		}
 	}
 	runtimeCfg.Detach = a.Detach

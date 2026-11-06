@@ -1,0 +1,43 @@
+__DESC__ = "Batch-triage existing cybersecurity risks by marking duplicates, false positives, ignored findings, or restoring them to active. This tool never hard-deletes risk records."
+__VERBOSE_NAME__ = "Triage Cybersecurity Risks"
+__VERBOSE_NAME_ZH__ = "批量处置安全风险"
+__KEYWORDS__ = "risk,vulnerability,security,finding,triage,duplicate,false positive,ignore,restore,风险,漏洞,去重,误报,忽略,恢复"
+
+__USAGE__ = <<<USAGE
+批量修改已有 Risk 的可恢复处置状态。risk_ids 必填，是逗号分隔的正整数 ID，单次最多 200 个。disposition 只能是 duplicate、false_positive、ignored 或 active。
+
+duplicate 必须填写 duplicate_of，指向同一项目中仍为 active 的 canonical Risk，且不能包含在 risk_ids 中。false_positive 和 ignored 必须填写 reason。active 表示恢复为正常状态，会清空 duplicate_of 和处置原因。reason 写入 Risk 的 tag_reason。
+
+本工具没有硬删除能力。用户要求“删除风险”时应说明该操作只做可恢复隐藏，并使用 ignored。任务带有 risk 附件时，只能修改附件范围内的 Risk；没有附件时才可按用户明确要求操作当前项目中的指定 Risk。执行前先用 query_cybersecurity_risk 核对候选 ID、标题、目标和证据；不要把不同漏洞随意归并，也不要在没有证据时批量标记误报。
+
+[[- if .FunctionCallMode -]]
+```json
+{"risk_ids":"101,102","disposition":"duplicate","duplicate_of":100,"reason":"same target, type, and input parameter"}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"triage_cybersecurity_risks","directly_call_tool_params":{"risk_ids":"101,102","disposition":"duplicate","duplicate_of":100,"reason":"same target, type, and input parameter"}}
+```
+[[- end -]]
+USAGE
+
+riskIDsRaw = cli.String("risk_ids", cli.setRequired(true), cli.setHelp("逗号分隔的风险 ID，单次最多200个"))
+disposition = cli.String("disposition", cli.setRequired(true), cli.setHelp("duplicate/false_positive/ignored/active"))
+duplicateOf = cli.Int("duplicate_of", cli.setDefault(0), cli.setHelp("disposition=duplicate 时必填，canonical Risk ID"))
+reason = cli.Text("reason", cli.setHelp("处置原因；false_positive 和 ignored 必填"))
+cli.check()
+
+ids = []
+for rawID in str.Split(riskIDsRaw, ",") {
+    rawID = str.TrimSpace(rawID)
+    if rawID == "" { continue }
+    id, err = atoi(rawID)
+    if err != nil || id <= 0 { die(sprintf("invalid risk ID: %s", rawID)) }
+    ids.Push(id)
+}
+if len(ids) == 0 { die("risk_ids is required") }
+if len(ids) > 200 { die("risk_ids supports at most 200 IDs per call") }
+
+result, err = risk.TriageRiskInDatabase(ids, disposition, duplicateOf, reason)
+if err != nil { die(err) }
+println(result.Dump())
