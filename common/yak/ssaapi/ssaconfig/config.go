@@ -163,6 +163,8 @@ func defaultSyntaxFlowScanConfig() *SyntaxFlowScanConfig {
 	return &SyntaxFlowScanConfig{
 		IgnoreLanguage: false,
 		Concurrency:    uint32(DefaultCPUConcurrency()),
+		RuleTimeout:    DefaultScanRuleTimeout,
+		RuleWorkLimit:  DefaultScanRuleWorkLimit,
 	}
 }
 
