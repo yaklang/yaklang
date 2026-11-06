@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -379,6 +380,7 @@ func DataFlowWithSFConfig(
 	hookRunner := CreateCheck(sfResult, config)
 
 	var topDefReachParsed []topDefReachConstraint
+	descentCustomized := len(config.RuntimeOptions) > 0
 
 	for _, opt := range config.RuntimeOptions {
 		if item, ok := opt.(OperationOption); ok {
@@ -389,20 +391,25 @@ func DataFlowWithSFConfig(
 	for _, item := range opts {
 		switch item.Key {
 		case sf.RecursiveConfig_DepthMin:
+			descentCustomized = true
 			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithMinDepth(ret))
 			}
 		case sf.RecursiveConfig_Depth:
+			descentCustomized = true
 			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithDepthLimit(ret))
 			}
 		case sf.RecursiveConfig_DepthMax:
+			descentCustomized = true
 			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithMaxDepth(ret))
 			}
 		case sf.RecursiveConfig_Until:
+			descentCustomized = true
 			untilCheck.AppendItems(item)
 		case sf.RecursiveConfig_Hook:
+			descentCustomized = true
 			hookRunner.AppendItems(item)
 		case sf.RecursiveConfig_Exclude:
 			addHandler(sf.RecursiveConfig_Exclude, item.Value)
@@ -448,8 +455,56 @@ func DataFlowWithSFConfig(
 		dataflowRecursiveFunc = value.GetBottomUses
 	}
 
+	// Reuse one descent across repeated dataflow opcodes on the same input
+	// value when only the post-descent filters differ. The servlet XSS rule
+	// evaluates `$sink#->` twice (include+exclude, then include-only); both
+	// would otherwise run the identical, expensive GetTopDefs descent. Depth /
+	// until / hook / runtime options change the descent itself, so those keep
+	// the old behavior.
+	cacheKey := ""
+	if sfResult != nil && !descentCustomized && sfResult.DataflowDescentReuse() {
+		cacheKey = dataflowDescentCacheKey(analysisType, value)
+	}
+	if os.Getenv("YAK_DF_CACHE_DEBUG") != "" {
+		fmt.Printf("[df-cache] type=%s uid=%d reuse=%v result=%p key=%q\n", analysisType, value.GetUID(), sfResult.DataflowDescentReuse(), sfResult, cacheKey)
+	}
 	// dataflow analysis
-	ret := dataflowRecursiveFunc(options...)
+	ret := Values(nil)
+	cacheHit := false
+	if cacheKey != "" {
+		if cached, ok := sfResult.TakeDataflowResult(cacheKey); ok {
+			if values, ok := cached.(Values); ok {
+				ret = values
+				cacheHit = true
+				dataflowDescentCacheCounter.addHit()
+				if os.Getenv("YAK_DF_CACHE_DEBUG") != "" {
+					fmt.Printf("[df-cache] HIT key=%q values=%d\n", cacheKey, len(values))
+				}
+			}
+		}
+	}
+	if !cacheHit {
+		if cacheKey != "" {
+			dataflowDescentCacheCounter.addMiss()
+		}
+		ret = dataflowRecursiveFunc(options...)
+		if cacheKey != "" {
+			ctxDone := false
+			select {
+			case <-config.GetContext().Done():
+				ctxDone = true
+			default:
+			}
+			if !ctxDone {
+				if budget := config.GetWorkBudget(); budget == nil || !budget.Exceeded() {
+					sfResult.SetDataflowResult(cacheKey, ret)
+					if os.Getenv("YAK_DF_CACHE_DEBUG") != "" {
+						fmt.Printf("[df-cache] STORE key=%q values=%d\n", cacheKey, len(ret))
+					}
+				}
+			}
+		}
+	}
 
 	inputProg, inputProgErr := fetchProgram(ToSFVMValues(ret))
 	reachOpt := reachableOptions{icfg: false, maxDepth: 0, maxNodes: 0, skipLoopBackedge: true}
@@ -465,6 +520,40 @@ func DataFlowWithSFConfig(
 	retValue := ToSFVMValues(ret)
 	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
 	return retValue
+}
+
+// dataflowDescentCacheCounter is a test-only hit/miss counter. Production never
+// reads it; the atomics are negligible per dataflow opcode and let tests prove
+// repeated `#->` opcodes actually reuse the descent.
+type dataflowDescentCacheStats struct {
+	hits   int64
+	misses int64
+}
+
+var dataflowDescentCacheCounter dataflowDescentCacheStats
+
+func (c *dataflowDescentCacheStats) addHit()  { atomic.AddInt64(&c.hits, 1) }
+func (c *dataflowDescentCacheStats) addMiss() { atomic.AddInt64(&c.misses, 1) }
+
+// DataflowDescentCacheStats returns process-wide hits/misses for the repeated
+// dataflow descent cache.
+func DataflowDescentCacheStats() (hits, misses int64) {
+	return atomic.LoadInt64(&dataflowDescentCacheCounter.hits),
+		atomic.LoadInt64(&dataflowDescentCacheCounter.misses)
+}
+
+// dataflowDescentCacheKey identifies one input value's raw descent result.
+// GetUID is unique per *Value instance; returning "" for a zero uid disables
+// caching rather than risking a collision.
+func dataflowDescentCacheKey(analysisType AnalysisType, value *Value) string {
+	if value == nil {
+		return ""
+	}
+	uid := value.GetUID()
+	if uid == 0 {
+		return ""
+	}
+	return "dataflow:" + string(analysisType) + ":" + strconv.FormatInt(uid, 10)
 }
 
 var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
@@ -655,7 +744,32 @@ func dataFlowFilter(
 	// every node; without passing ctx it ran under context.Background() and the
 	// per-rule deadline never fired — heavy rules ran for hours on large projects.
 	pathCtx := config.GetContext()
-	var enumeratePaths func(v *Value) []Values
+	// Exclude branch pruning: `*<getCallee> & $filter` is monotone, so a call
+	// whose callee is a filter value rejects every longer path. Drop that
+	// subtree instead of enumerating it only to fail CheckMatch. The pattern is
+	// gated in sfCheck; unsupported exclude shapes leave prune nil.
+	var prune func(*Value) bool
+	if pathCheck.ExcludePrunable() {
+		prune = pathCheck.CheckExcludeNode
+	}
+
+	// Include reachability prefilter: for simple `* & $symbol` includes, a
+	// candidate whose effect/depend component cannot reach any bound symbol
+	// value cannot produce a matching path. Reachability is linear in the saved
+	// edge graph, while path enumeration can be exponential; this skips the
+	// latter entirely for disconnected candidates. Unknown/complex includes
+	// leave includeReach nil.
+	var includeReach *dataflowIncludeReach
+	if sourceIDs, ok := pathCheck.SimpleIncludeSourceIDs(); ok {
+		includeReach = newDataflowIncludeReach(pathCtx, sourceIDs)
+	}
+
+	// walkPaths streams paths and reports false as soon as the current source is
+	// accepted, so the old eager effect×depend product is never materialized. A
+	// heavy dataflow(include=...) rule only needs the existence of one accepted
+	// path per source; enumerating and allocating every path first was pure
+	// overhead (and could explode combinatorially on large projects).
+	var walkPaths func(v *Value, visit func(Values) bool) bool
 	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
 		memo := make(map[int64]*CfgCtxValue)
 		condMemo := make(map[int64]*ssa.BlockConditionSummary)
@@ -668,18 +782,18 @@ func dataFlowFilter(
 			}
 			return reachableWithOptions(pathReach.prog, cfgTo, pathReach.targetCfg, pathReach.opt)
 		}
-		enumeratePaths = func(v *Value) []Values {
+		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, FromSFVMValues(end)...)
+				return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit, FromSFVMValues(end)...)
 			}
-			return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter)
+			return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit)
 		}
 	} else {
-		enumeratePaths = func(v *Value) []Values {
+		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.GetDataflowPathWithContext(pathCtx, FromSFVMValues(end)...)
+				return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit, FromSFVMValues(end)...)
 			}
-			return v.GetDataflowPathWithContext(pathCtx)
+			return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit)
 		}
 	}
 
@@ -688,7 +802,7 @@ func dataFlowFilter(
 		// Honor the rule ctx + total-work budget in the outer per-source loop. On
 		// a large project `vs` can hold tens of thousands of sources (e.g. every
 		// servlet/spring param for an include, or every call site reaching a sink
-		// for an exclude-only dataflow); enumeratePaths is fast per-source but the
+		// for an exclude-only dataflow); walkPaths is fast per-source but the
 		// outer loop itself never re-checked the per-rule deadline, so a heavy
 		// rule kept feeding sources long after its budget fired. Bailing here
 		// returns the partial matches found so far.
@@ -700,16 +814,159 @@ func dataFlowFilter(
 		if config.EnterWork() {
 			return ret
 		}
+		// The center value is part of every enumerated path. If it alone
+		// matches the monotone exclude, skip the walk entirely.
+		if prune != nil && prune(v) {
+			continue
+		}
+		if includeReach != nil && !includeReach.CanReach(v) {
+			continue
+		}
 		flag := false
-		for _, path := range enumeratePaths(v) {
+		walkPaths(v, func(path Values) bool {
 			if checkMatch(path) {
 				flag = true
-				break
+				return false
 			}
-		}
+			return true
+		})
 		if flag {
 			ret = append(ret, v)
 		}
 	}
 	return ret
+}
+
+// dataflowIncludeReach pre-filters top-def candidates for simple
+// `* & $symbol` includes. A path emitted by GetDataflowPath is a V shape:
+// EffectOn* <-> center <-> DependOn*. If none of the center's effect/depend
+// reachable values is a symbol value, no enumerated path can satisfy the
+// include, so walking that candidate's paths is pointless.
+//
+// states memoizes per Value instance (uid; pointer fallback) whether it can
+// reach a source. When a BFS succeeds we may safely over-mark visited nodes as
+// reachable (it only disables future pruning). When it exhausts the reachable
+// set without a source, every visited node is provably unreachable: a path
+// from any visited node to a source would also be a path from the start.
+type dataflowIncludeReach struct {
+	sourceIDs map[int64]struct{}
+	states    map[dataflowReachKey]uint8
+	ctx       context.Context
+	steps     int
+}
+
+type dataflowReachKey struct {
+	uid int64
+	ptr *Value
+}
+
+const (
+	includeReachUnknown uint8 = iota
+	includeReachNo
+	includeReachYes
+)
+
+func newDataflowIncludeReach(ctx context.Context, sourceIDs map[int64]struct{}) *dataflowIncludeReach {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return &dataflowIncludeReach{
+		sourceIDs: sourceIDs,
+		states:    make(map[dataflowReachKey]uint8),
+		ctx:       ctx,
+	}
+}
+
+func dataflowReachKeyFor(v *Value) dataflowReachKey {
+	if uid := v.GetUID(); uid != 0 {
+		return dataflowReachKey{uid: uid}
+	}
+	return dataflowReachKey{ptr: v}
+}
+
+func (r *dataflowIncludeReach) markVisited(visited map[dataflowReachKey]struct{}, state uint8) {
+	for key := range visited {
+		if state == includeReachYes && r.states[key] == includeReachNo {
+			continue
+		}
+		r.states[key] = state
+	}
+}
+
+// CanReach reports whether any source is reachable from v through the saved
+// EffectOn/DependOn graph (including v itself). It returns true on uncertainty
+// (nil state, cancelled ctx) so the caller never skips a potentially valid
+// candidate.
+func (r *dataflowIncludeReach) CanReach(v *Value) bool {
+	if r == nil || v == nil {
+		return true
+	}
+	if _, ok := r.sourceIDs[v.GetId()]; ok {
+		r.states[dataflowReachKeyFor(v)] = includeReachYes
+		return true
+	}
+	startKey := dataflowReachKeyFor(v)
+	switch r.states[startKey] {
+	case includeReachYes:
+		return true
+	case includeReachNo:
+		return false
+	}
+
+	visited := map[dataflowReachKey]struct{}{startKey: {}}
+	queue := []*Value{v}
+	hit := false
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		r.steps++
+		if r.steps%4096 == 0 {
+			select {
+			case <-r.ctx.Done():
+				return true
+			default:
+			}
+		}
+		if node == nil {
+			continue
+		}
+		if node != v {
+			if _, ok := r.sourceIDs[node.GetId()]; ok {
+				hit = true
+				break
+			}
+			switch r.states[dataflowReachKeyFor(node)] {
+			case includeReachYes:
+				hit = true
+			case includeReachNo:
+				continue
+			}
+			if hit {
+				break
+			}
+		}
+		enqueue := func(child *Value) {
+			if child == nil {
+				return
+			}
+			key := dataflowReachKeyFor(child)
+			if _, ok := visited[key]; ok {
+				return
+			}
+			visited[key] = struct{}{}
+			queue = append(queue, child)
+		}
+		for _, child := range node.GetEffectOn() {
+			enqueue(child)
+		}
+		for _, child := range node.GetDependOn() {
+			enqueue(child)
+		}
+	}
+	if hit {
+		r.markVisited(visited, includeReachYes)
+		return true
+	}
+	r.markVisited(visited, includeReachNo)
+	return false
 }

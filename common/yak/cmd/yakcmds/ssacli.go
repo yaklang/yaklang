@@ -1538,7 +1538,7 @@ Exports structured report (sarif/irify).`,
 		cli.DurationFlag{
 			Name:  "rule-timeout",
 			Usage: "per-rule wall-clock budget (e.g. 5m, 4h); a pathological rule is bailed at the budget instead of hanging the scan. default 4h (loose backstop so slow rules surface real perf bugs, not masked); 0 disables",
-			Value: 4 * time.Hour,
+			Value: ssaconfig.DefaultScanRuleTimeout,
 		},
 
 		cli.Int64Flag{
