@@ -87,10 +87,9 @@ func nativeInsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) (bool, err
 				item.UpdatedAt = now
 			}
 			// GORM runs BeforeSave on every element of CreateInBatches. The
-			// native writer must keep PostgreSQL's byte-level sanitization.
-			if name == "postgres" || name == "postgresql" || name == "cloudsqlpostgres" {
-				sanitizeStructStringsForPG(item)
-			}
+			// native writer keeps that sanitization on every dialect so the
+			// stored bytes match the GORM path, including SQLite tests.
+			sanitizeStructStringsForPG(item)
 			args = appendIrCodeInsertArgs(args, item)
 		}
 		values := strings.TrimSuffix(strings.Repeat(rowPlaceholder+",", rowCount), ",")
