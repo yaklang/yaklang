@@ -48,7 +48,7 @@ func TestToolResultDumpAndTimelineUseNeutralProtocolSemantics(t *testing.T) {
 	require.NotContains(t, failed, "execution failed")
 }
 
-func TestToolResultGetExecutionStatusUsesOnlyExplicitSignals(t *testing.T) {
+func TestToolResultGetExecutionStatusUsesExecutionSemantics(t *testing.T) {
 	tests := []struct {
 		name       string
 		result     any
@@ -88,12 +88,12 @@ func TestToolResultGetExecutionStatusUsesOnlyExplicitSignals(t *testing.T) {
 		{
 			name:       "http error response is task dependent",
 			result:     map[string]any{"status_code": 500, "response_received": true, "transport_error": ""},
-			wantStatus: ToolExecutionStatusUnknown,
+			wantStatus: ToolExecutionStatusSucceeded,
 		},
 		{
 			name:       "arbitrary domain result is task dependent",
 			result:     map[string]any{"matches": 3},
-			wantStatus: ToolExecutionStatusUnknown,
+			wantStatus: ToolExecutionStatusSucceeded,
 		},
 	}
 
@@ -111,6 +111,45 @@ func TestToolResultGetExecutionStatusUsesOnlyExplicitSignals(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestToolResultExecutionStatusParsesCanonicalEnvelope(t *testing.T) {
+	success := &ToolResult{
+		Name:    "read_file",
+		Success: true,
+		Data:    "RESULT:\n  1 | package main\n\nOBSERVATIONS:\ntotal-bytes: 13\n\nARTIFACT:\n- combined: /tmp/combined\n- result: /tmp/result",
+	}
+	status, _ := success.GetExecutionStatus()
+	require.Equal(t, ToolExecutionStatusSucceeded, status)
+
+	failed := &ToolResult{
+		Name:    "bash",
+		Success: true,
+		Data:    "RESULT:\n{\n  \"exit_code\": 9,\n  \"exit_code_accepted\": false\n}\n\nOBSERVATIONS:\ncommand line\n\nARTIFACT:\n- combined: /tmp/combined\n- result: /tmp/result",
+	}
+	status, detail := failed.GetExecutionStatus()
+	require.Equal(t, ToolExecutionStatusFailed, status)
+	require.Contains(t, detail, "exit_code_accepted=false")
+
+	protocolFailed := &ToolResult{Name: "read_file", Success: false, Error: "permission denied"}
+	status, _ = protocolFailed.GetExecutionStatus()
+	require.Equal(t, ToolExecutionStatusFailed, status)
+
+	errorObservation := &ToolResult{
+		Name:    "legacy_tool",
+		Success: true,
+		Data:    "OBSERVATIONS:\n[error] open file failed\n\nARTIFACT:\n- combined: /tmp/combined\n- result: /tmp/result",
+	}
+	status, _ = errorObservation.GetExecutionStatus()
+	require.Equal(t, ToolExecutionStatusFailed, status)
+
+	observationOnly := &ToolResult{
+		Name:    "legacy_tool",
+		Success: true,
+		Data:    "OBSERVATIONS:\ncompleted without an explicit result\n\nARTIFACT:\n- combined: /tmp/combined\n- result: /tmp/result",
+	}
+	status, _ = observationOnly.GetExecutionStatus()
+	require.Equal(t, ToolExecutionStatusUnknown, status)
 }
 
 func TestToolResultShrinkCannotHideExplicitExecutionFailure(t *testing.T) {

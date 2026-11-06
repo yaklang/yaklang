@@ -872,7 +872,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 	}()
 
 	toolResult := &aitool.ToolResult{}
-	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
+	// Defer arguments are evaluated immediately. Pass a closure so the summary
+	// is derived after t.invoke has populated toolResult; otherwise every event
+	// is emitted while Data is still nil and serializes as the string "null".
+	defer func() {
+		_, _ = t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
+	}()
 
 	t.start.Do(func() { t.emitStart(tool) })
 
@@ -1446,14 +1451,33 @@ func BuildTaskResultSummaryFilename(index, semanticIdentifier string) string {
 }
 
 func SummaryRank(task AITask, callResult *aitool.ToolResult) string {
+	if callResult == nil {
+		return "tool result unavailable"
+	}
 	if callResult.ShrinkResult != "" {
 		return callResult.ShrinkResult
 	}
 	if callResult.ShrinkSimilarResult != "" {
 		return callResult.ShrinkSimilarResult
 	}
-	if task.GetSummary() != "" {
+	if task != nil && task.GetSummary() != "" {
 		return task.GetSummary()
 	}
-	return string(utils.Jsonify(callResult.Data))
+	if callResult.Error != "" {
+		return shrinkToolSummary("tool failed: " + callResult.Error)
+	}
+	result := strings.TrimSpace(utils.InterfaceToString(callResult.Data))
+	if result == "" {
+		return "tool completed without a summary"
+	}
+	return shrinkToolSummary(result)
+}
+
+func shrinkToolSummary(summary string) string {
+	const maxRunes = 2048
+	runes := []rune(strings.TrimSpace(summary))
+	if len(runes) <= maxRunes {
+		return string(runes)
+	}
+	return string(runes[:maxRunes-3]) + "..."
 }
