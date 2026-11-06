@@ -54,7 +54,7 @@ on:
 
 jobs:
   build_and_upload_asset:
-    runs-on: ${{ inputs.os == 'windows-arm64' && 'windows-11-arm' || ((inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest') || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || 'macos-14' }}
+    runs-on: ${{ inputs.os == 'windows-arm64' && 'windows-11-arm' || ((inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest') || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || (inputs.os == 'darwin-amd64' && 'macos-15-intel') || 'macos-15' }}
     steps:
       - name: Preserve source bytes on Windows
         if: runner.os == 'Windows'
