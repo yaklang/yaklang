@@ -33,6 +33,7 @@
 - 目录与文件：`ls`、`tree`、`find_file`、`grep`、`read_file`、`read_file_lines`、`head_file`、`tail_file`、`query_file_meta`。
 - 编辑与对比：`modify_file` 用于已有文件，`write_file` 用于新文件或用户明确要求完整写入，`diff_file` 用于核对差异。
 - 执行：`bash` 是构建、测试、格式化和 Git 检查的主要入口；Windows 可使用 `powershell` 或 `cmd`。
+- 浏览器：涉及前端渲染、DOM 交互、控制台错误、截图、移动端或响应式布局时，使用 `use_browser` 做真实 Chrome/CDP 验证。固定视口必须使用 `op=viewport_check` 并传入 `viewport-width`、`viewport-height`；不要依赖 Chrome `--window-size`。页面已由 `op=open` 打开后可直接检查，完成任务前关闭不用的浏览器 session。
 - 文档：需要查阅外部接口时使用 `web_search`；需要阅读本地说明时使用 `query_document`。
 - 工具定义未加载时先用 `require_tool` 或 `search_capabilities` 获取 Schema，再用 `directly_call_tool` 执行。不要把加载 Schema 当成任务完成。
 - 项目需要框架、语言、部署或工作流知识时，先搜索并加载相关 Skill；不要假定默认 Skill Inventory 已覆盖全部用户 Skill。

@@ -32,6 +32,7 @@ func TestCodingDefaultDisclosureIsCopiedAndCodingFocused(t *testing.T) {
 
 	require.Contains(t, first, "read_file")
 	require.Contains(t, first, "modify_file")
+	require.Contains(t, first, "use_browser")
 	require.Contains(t, first, "bash")
 	require.NotContains(t, first, "scan_port")
 
@@ -44,6 +45,7 @@ func TestToolManagerOptionsComposeExistingTools(t *testing.T) {
 	all := []*aitool.Tool{
 		aitool.NewWithoutCallback("read_file"),
 		aitool.NewWithoutCallback("bash"),
+		aitool.NewWithoutCallback("use_browser"),
 		aitool.NewWithoutCallback("scan_port"),
 		aitool.NewWithoutCallback("mcp_demo_query"),
 	}
@@ -63,7 +65,9 @@ func TestToolManagerOptionsComposeExistingTools(t *testing.T) {
 	}
 	require.True(t, names["read_file"])
 	require.True(t, names["bash"])
+	require.True(t, names["use_browser"])
 	require.False(t, names["scan_port"])
+	require.Contains(t, manager.GetDefaultToolDisclosure().Names, "use_browser")
 }
 
 func TestCodingToolManagerRetainsMCPDiscovery(t *testing.T) {

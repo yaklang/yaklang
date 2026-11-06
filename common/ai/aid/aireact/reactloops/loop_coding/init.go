@@ -43,6 +43,7 @@ var codingDefaultToolNames = []string{
 	"diff_file",
 	"query_document",
 	"web_search",
+	"use_browser",
 	"bash",
 	"powershell",
 	"cmd",
