@@ -1,0 +1,44 @@
+// 典型 6：实时抓包并送入 StatefulEngine。
+// 需要 libpcap/Npcap 与抓包权限；Ctrl-C 或 --duration 到期后退出。
+//
+// 运行：
+//   yak common/suricata/examples/live_sniff.yak \
+//     --rules common/suricata/examples/testdata/http.rules \
+//     -i en0 -f "tcp port 80" --duration 30
+cli.SetDoc("实时抓包并用 StatefulEngine 告警。需要抓包权限。")
+rulesPath = cli.String("rules", cli.setRequired(true), cli.setHelp("规则文件或目录（递归 .rules）"))
+iface = cli.String("interface,i", cli.setRequired(true), cli.setHelp("网卡名称，例如 en0"))
+bpf = cli.String("filter,f", cli.setHelp("BPF 过滤，例如 tcp port 80"))
+duration = cli.Float("duration", cli.setDefault(0), cli.setHelp("抓包秒数，0 表示直到 Ctrl-C"))
+cli.check()
+
+loaded = suricata.LoadStatefulRules(rulesPath)~
+for _, skipped = range loaded.Rejected {
+    printf("[SKIP] sid=%d reason=%s\n", skipped.SID, skipped.Reason)
+}
+if len(loaded.Rules) == 0 { die("没有可执行的 stateful 规则") }
+
+alerts = []
+engine = suricata.NewStatefulEngine(
+    loaded.Rules,
+    suricata.engineOnAlert(func(alert) {
+        alerts = append(alerts, alert)
+        printf("[ALERT] sid=%d view=%s %s:%d -> %s:%d %s\n",
+            alert.SID, alert.View, alert.Source, alert.SourcePort,
+            alert.Destination, alert.DestinationPort, alert.Message)
+    }),
+)~
+defer engine.Close()
+
+options = []
+if bpf != "" { options = append(options, pcapx.pcap_bpfFilter(bpf)) }
+if duration > 0 {
+    ctx, stop = pcapx.CaptureContext(duration)~
+    defer stop()
+    options = append(options, pcapx.pcap_context(ctx))
+}
+engine.StartSniff(iface, options...)~
+
+stats = engine.Stats()
+printf("[DONE] alerts=%d packets=%d streams=%d diagnostics=%d\n",
+    len(alerts), stats.Capture.PhysicalPackets, stats.StreamEvents, stats.Diagnostics)

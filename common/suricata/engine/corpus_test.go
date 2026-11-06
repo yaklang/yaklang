@@ -8,6 +8,26 @@ import (
 	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 
+func TestETCorpusHTTPAndUDPStatefulCoverage(t *testing.T) {
+	data, err := os.ReadFile("../rules/emerging-scan.rules")
+	require.NoError(t, err)
+	rules, err := rule.Parse(string(data))
+	require.NoError(t, err)
+	executable, rejected := 0, 0
+	for _, current := range rules {
+		if current == nil {
+			continue
+		}
+		if _, err := CompileStatefulRule(current); err == nil {
+			executable++
+		} else {
+			rejected++
+		}
+	}
+	require.Equal(t, 275, executable)
+	require.Equal(t, 9, rejected)
+}
+
 func TestETTCPCorpusStatefulCompilation(t *testing.T) {
 	data, err := os.ReadFile("../rules/emerging-scan.rules")
 	require.NoError(t, err)

@@ -19,21 +19,20 @@ func TestLoadStatefulRulesReportsRejectedRules(t *testing.T) {
 alert tcp any any -> any any (msg:"byte test"; content:"x"; byte_test:1,=,1; sid:9100002; rev:1;)
 alert http any any -> any any (msg:"stateless http"; content:"GET"; http_method; sid:9100003; rev:1;)
 alert http any any -> any any (msg:"stateful http"; flow:established,to_server; content:"GET"; http_method; sid:9100004; rev:1;)
+alert udp any any -> any any (msg:"udp threshold"; flow:to_server; content:"x"; threshold:type both,track by_src,count 1,seconds 60; sid:9100005; rev:1;)
 `
 	require.NoError(t, os.WriteFile(path, []byte(raw), 0o600))
 
 	loaded, err := LoadStatefulRules(path)
 	require.NoError(t, err)
-	require.Len(t, loaded.Rules, 2)
+	require.Len(t, loaded.Rules, 4)
 	require.Equal(t, 9100001, loaded.Rules[0].Sid)
 	require.Equal(t, 9100003, loaded.Rules[1].Sid)
-	require.Len(t, loaded.Rejected, 2)
-	rejected := map[int]string{}
-	for _, item := range loaded.Rejected {
-		rejected[item.SID] = item.Reason
-	}
-	require.Contains(t, rejected[9100002], "byte_test")
-	require.Contains(t, rejected[9100004], "stateful flow tracking")
+	require.Equal(t, 9100004, loaded.Rules[2].Sid)
+	require.Equal(t, 9100005, loaded.Rules[3].Sid)
+	require.Len(t, loaded.Rejected, 1)
+	require.Equal(t, 9100002, loaded.Rejected[0].SID)
+	require.Contains(t, loaded.Rejected[0].Reason, "byte_test")
 }
 
 func TestLoadStatefulRulesRejectsDuplicateIdentity(t *testing.T) {

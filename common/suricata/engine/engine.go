@@ -8,6 +8,7 @@ import (
 
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/suricata/match"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/suricata/state"
 )
@@ -17,6 +18,7 @@ type Config struct {
 	MaxStreamBytes      int
 	MaxTotalStreamBytes int64
 	MaxFlows            int
+	UDPFlowTimeout      time.Duration
 	State               state.Config
 	OnAlert             func(Alert)
 	OnDiagnostic        func(Diagnostic)
@@ -56,6 +58,10 @@ type StatefulEngine struct {
 	captureAdapter *PcapAdapter
 	captureOption  pcaputil.CaptureOption
 
+	udpIndex      map[udpTupleKey]FlowKey
+	udpGeneration atomic.Uint64
+	udpTimeout    time.Duration
+
 	events       atomic.Uint64
 	packetEvents atomic.Uint64
 	streamEvents atomic.Uint64
@@ -78,6 +84,9 @@ func NewStatefulEngine(rules []*rule.Rule, config Config) (*StatefulEngine, erro
 	if config.MaxFlows <= 0 {
 		config.MaxFlows = 65536
 	}
+	if config.UDPFlowTimeout <= 0 {
+		config.UDPFlowTimeout = 30 * time.Second
+	}
 	stateConfig := config.State
 	if stateConfig.Shards == 0 {
 		stateConfig = state.DefaultConfig()
@@ -96,7 +105,12 @@ func NewStatefulEngine(rules []*rule.Rule, config Config) (*StatefulEngine, erro
 		onDiagnostic:        config.OnDiagnostic,
 		flows:               make(map[FlowKey]*flowRuntime),
 		tombstones:          make(map[FlowKey]struct{}),
+		udpIndex:            make(map[udpTupleKey]FlowKey),
+		udpTimeout:          config.UDPFlowTimeout,
 	}
+	// Keep UDP pseudo-flow generations disjoint from pcaputil TCP generation
+	// numbers so the engine's FlowKey map cannot collide across transports.
+	engine.udpGeneration.Store(uint64(1) << 63)
 	identities := make(map[[2]int]struct{}, len(rules))
 	for index, current := range rules {
 		identity := [2]int{current.Gid, current.Sid}
@@ -126,6 +140,7 @@ func (e *StatefulEngine) Handle(event InspectionEvent) Result {
 	}
 	e.events.Add(1)
 	if e.events.Load()%1024 == 0 {
+		e.cleanupUDPFlows(eventTime(event))
 		_, _ = e.store.Cleanup(eventTime(event))
 	}
 	switch event.View {
@@ -139,6 +154,7 @@ func (e *StatefulEngine) Handle(event InspectionEvent) Result {
 		return e.closeFlow(event)
 	case ViewNormalizedPacket:
 		e.packetEvents.Add(1)
+		event = e.attachUDPFlow(event)
 	case ViewStream:
 		e.streamEvents.Add(1)
 	case ViewTransaction:
@@ -162,6 +178,7 @@ func (e *StatefulEngine) Close() error {
 	}
 	e.flowsMu.Lock()
 	e.flows = make(map[FlowKey]*flowRuntime)
+	e.udpIndex = make(map[udpTupleKey]FlowKey)
 	e.flowsMu.Unlock()
 	return e.store.Close()
 }
@@ -260,6 +277,12 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		if flow.closed {
 			return result
 		}
+		if flow.transport == 0 {
+			flow.transport = event.Flow.IPProtocol
+			if flow.transport == 0 {
+				flow.transport = uint8(layers.IPProtocolTCP)
+			}
+		}
 		if event.View == ViewNormalizedPacket && event.Packet != nil {
 			if tcp, _ := event.Packet.Layer(layers.LayerTypeTCP).(*layers.TCP); tcp != nil {
 				flow.observeTCP(event.Direction, tcp)
@@ -294,6 +317,15 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		}
 	}
 
+	httpOffset := 0
+	var httpPayload []byte
+	if event.View == ViewStream && flow != nil {
+		httpOffset = flow.httpNextOffset[event.Direction]
+		if httpOffset < len(flow.stream[event.Direction]) {
+			httpPayload = flow.stream[event.Direction][httpOffset:]
+		}
+	}
+
 	for index, plan := range e.plans {
 		if !plan.acceptsView(event.View) {
 			continue
@@ -304,17 +336,29 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		streamKey := ruleDirection{ruleIndex: index, direction: event.Direction}
 		var streamPayload []byte
 		cursor := 0
+		isHTTP := plan.Rule != nil && plan.Rule.Protocol == "http"
 		if event.View == ViewStream && flow != nil {
-			cursor = flow.streamCursor[streamKey]
-			streamPayload = flow.stream[event.Direction]
-			flow.streamCursor[streamKey] = len(streamPayload)
+			if isHTTP {
+				cursor = httpOffset
+				streamPayload = httpPayload
+				if len(streamPayload) == 0 {
+					continue
+				}
+			} else {
+				cursor = flow.streamCursor[streamKey]
+				streamPayload = flow.stream[event.Direction]
+				flow.streamCursor[streamKey] = len(streamPayload)
+			}
 		}
 		matched, evidenceEnd, err := plan.match(event, flow, streamPayload)
 		if err != nil {
 			e.diagnostic(&result, event, plan.Rule, "match-error", err.Error())
 			continue
 		}
-		if !matched || event.View == ViewStream && evidenceEnd <= cursor {
+		if !matched {
+			continue
+		}
+		if event.View == ViewStream && !isHTTP && evidenceEnd <= cursor {
 			continue
 		}
 		stateResult, err := e.applyState(plan, event)
@@ -334,6 +378,14 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		e.alerts.Add(1)
 		if e.onAlert != nil {
 			e.onAlert(alert)
+		}
+	}
+	// Advance the per-direction HTTP message cursor only after every HTTP rule
+	// has seen this message. Incomplete messages stay at the same offset until
+	// more stream bytes arrive.
+	if event.View == ViewStream && flow != nil && len(httpPayload) > 0 {
+		if length, complete := match.HTTPMessageLength(httpPayload); complete && length > 0 {
+			flow.httpNextOffset[event.Direction] = httpOffset + length
 		}
 	}
 	return result

@@ -1,0 +1,15 @@
+// 典型 5：不经过 pcap，直接匹配一个 Ether frame。
+// frame 是 Ethernet/IPv4/TCP，payload 为 GET /stateless-proof HTTP/1.1。
+//
+// 运行：
+//   yak common/suricata/examples/stateless_match.yak
+hexFrame = "00000000000000000000000008004700006c00000000400652ce0a0000010a000002020405b403040700b7980050000000000000000070000000cfc50000020405b403030700474554202f73746174656c6573732d70726f6f6620485454502f312e310d0a486f73743a206578616d706c652e636f6d0d0a0d0a"
+raw = codec.DecodeHex(hexFrame)~
+rules = suricata.ParseSuricata(`alert http any any -> any any (msg:"stateless HTTP"; content:"GET"; http_method; content:"/stateless-proof"; http_uri; sid:9500021; rev:1;)`)~
+engine = suricata.NewStatefulEngine(rules)~
+defer engine.Close()
+
+matched, err = engine.MatchRaw(raw)
+assert err == nil, sprintf("match error: %v", err)
+assert matched, "expected the stateless HTTP rule to match"
+println("[OK] stateless MatchRaw matched")

@@ -1,0 +1,40 @@
+// 典型 1：StatefulEngine 自己打开 pcap。
+// 规则逐条 fail-closed 加载，无状态 HTTP 与有状态 TCP 规则可以混在一个引擎里。
+//
+// 运行：
+//   yak common/suricata/examples/replay_engine.yak \
+//     --rules common/suricata/examples/testdata/http.rules \
+//     -r /tmp/pcap_analysis.pcap
+cli.SetDoc("回放 pcap，用 StatefulEngine 输出告警和统计。")
+rulesPath = cli.String("rules", cli.setRequired(true), cli.setHelp("规则文件或目录（递归 .rules）"))
+pcapPath = cli.String("read,r", cli.setRequired(true), cli.setHelp("pcap / pcapng 路径"))
+cli.check()
+
+loaded = suricata.LoadStatefulRules(rulesPath)~
+printf("[LOAD] executable=%d rejected=%d\n", len(loaded.Rules), len(loaded.Rejected))
+for _, skipped = range loaded.Rejected {
+    printf("[SKIP] sid=%d reason=%s\n", skipped.SID, skipped.Reason)
+}
+if len(loaded.Rules) == 0 { die("没有可执行的 stateful 规则") }
+
+alerts = []
+engine = suricata.NewStatefulEngine(
+    loaded.Rules,
+    suricata.engineOnAlert(func(alert) {
+        alerts = append(alerts, alert)
+        printf("[ALERT] sid=%d view=%s %s:%d -> %s:%d %s\n",
+            alert.SID, alert.View, alert.Source, alert.SourcePort,
+            alert.Destination, alert.DestinationPort, alert.Message)
+    }),
+    suricata.engineOnDiagnostic(func(diagnostic) {
+        printf("[DIAG] kind=%s sid=%d %s\n", diagnostic.Kind, diagnostic.SID, diagnostic.Message)
+    }),
+)~
+defer engine.Close()
+
+engine.OpenPcapFile(pcapPath)~
+
+stats = engine.Stats()
+printf("[DONE] alerts=%d packets=%d streams=%d diagnostics=%d active_flows=%d\n",
+    len(alerts), stats.Capture.PhysicalPackets, stats.StreamEvents,
+    stats.Diagnostics, stats.ActiveFlows)

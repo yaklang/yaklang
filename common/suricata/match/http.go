@@ -125,8 +125,18 @@ func httpParser(c *matchContext) error {
 		return nil
 	}
 
-	// buffer provider
-	provider := newHTTPBufferProvider(c.PK)
+	// Stream inspection passes reassembled bytes through overridePayload while
+	// the real packet still supplies IP/TCP headers. Packet matching keeps the
+	// legacy behavior of accepting header blocks without a trailing blank line.
+	payload := c.overridePayload
+	requireComplete := len(payload) > 0
+	if len(payload) == 0 {
+		if c.PK == nil || c.PK.TransportLayer() == nil {
+			return nil
+		}
+		payload = c.PK.TransportLayer().LayerPayload()
+	}
+	provider := newHTTPBufferProviderFromPayload(c.PK, payload, requireComplete)
 	if !c.Must(provider != nil) {
 		return nil
 	}
@@ -177,7 +187,25 @@ type httpProvider struct {
 
 // if success, return value not nil
 func newHTTPBufferProvider(pk gopacket.Packet) *httpProvider {
-	payload := pk.TransportLayer().LayerPayload()
+	if pk == nil || pk.TransportLayer() == nil {
+		return nil
+	}
+	return newHTTPBufferProviderFromPayload(pk, pk.TransportLayer().LayerPayload(), false)
+}
+
+func newHTTPBufferProviderFromPayload(pk gopacket.Packet, payload []byte, requireComplete bool) *httpProvider {
+	if len(payload) == 0 {
+		return nil
+	}
+	// Do not expose a partial HTTP stream message as matchable. Waiting for
+	// the header block and a declared body prevents split request lines or
+	// partial bodies from producing early or duplicate matches; packet
+	// matching keeps the legacy tolerance.
+	if requireComplete {
+		if _, complete := HTTPMessageLength(payload); !complete {
+			return nil
+		}
+	}
 	a, b, c := lowhttp.GetHTTPPacketFirstLine(payload)
 	if a == "" || b == "" || c == "" {
 		return nil
@@ -201,6 +229,87 @@ func newHTTPBufferProvider(pk gopacket.Packet) *httpProvider {
 		PK:  pk,
 		req: request,
 		raw: payload,
+	}
+}
+
+// HTTPMessageLength returns the byte length of the first complete HTTP message
+// in payload. The boolean is false while the header block or the declared body
+// is still incomplete, allowing the engine to wait for more stream bytes.
+func HTTPMessageLength(payload []byte) (int, bool) {
+	headerEnd := bytes.Index(payload, []byte("\r\n\r\n"))
+	if headerEnd < 0 {
+		return 0, false
+	}
+	headerLength := headerEnd + 4
+	body := payload[headerLength:]
+	contentLength := -1
+	chunked := false
+	for _, line := range bytes.Split(payload[:headerEnd], []byte("\r\n"))[1:] {
+		name, value, ok := bytes.Cut(line, []byte(":"))
+		if !ok {
+			continue
+		}
+		switch {
+		case strings.EqualFold(strings.TrimSpace(string(name)), "Content-Length"):
+			parsed, err := strconv.Atoi(strings.TrimSpace(string(value)))
+			if err != nil || parsed < 0 {
+				return 0, false
+			}
+			contentLength = parsed
+		case strings.EqualFold(strings.TrimSpace(string(name)), "Transfer-Encoding"):
+			if strings.Contains(strings.ToLower(string(value)), "chunked") {
+				chunked = true
+			}
+		}
+	}
+	if contentLength >= 0 {
+		total := headerLength + contentLength
+		return total, len(payload) >= total
+	}
+	if chunked {
+		bodyLength, ok := chunkedBodyLength(body)
+		if !ok {
+			return 0, false
+		}
+		return headerLength + bodyLength, true
+	}
+	return headerLength, true
+}
+
+func chunkedBodyLength(body []byte) (int, bool) {
+	offset := 0
+	for {
+		lineEnd := bytes.Index(body[offset:], []byte("\r\n"))
+		if lineEnd < 0 {
+			return 0, false
+		}
+		sizeText := string(body[offset : offset+lineEnd])
+		if semi := strings.IndexByte(sizeText, ';'); semi >= 0 {
+			sizeText = sizeText[:semi]
+		}
+		size, err := strconv.ParseInt(strings.TrimSpace(sizeText), 16, 64)
+		if err != nil || size < 0 {
+			return 0, false
+		}
+		offset += lineEnd + 2
+		if size == 0 {
+			if bytes.HasPrefix(body[offset:], []byte("\r\n")) {
+				return offset + 2, true
+			}
+			trailerEnd := bytes.Index(body[offset:], []byte("\r\n\r\n"))
+			if trailerEnd < 0 {
+				return 0, false
+			}
+			return offset + trailerEnd + 4, true
+		}
+		if size > int64(len(body)-offset) {
+			return 0, false
+		}
+		offset += int(size)
+		if !bytes.HasPrefix(body[offset:], []byte("\r\n")) {
+			return 0, false
+		}
+		offset += 2
 	}
 }
 

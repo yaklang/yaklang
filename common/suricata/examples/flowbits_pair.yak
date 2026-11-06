@@ -1,0 +1,41 @@
+// 典型 3：跨包/跨规则状态。
+// 请求规则 set flowbits + noalert；响应规则 isset 后才告警。
+//
+// 运行：
+//   yak common/suricata/examples/flowbits_pair.yak \
+//     --rules common/suricata/examples/testdata/flowbits.rules \
+//     -r /tmp/pcap_analysis.pcap
+cli.SetDoc("演示 flowbits:set/noalert 与 isset 的跨规则状态。")
+rulesPath = cli.String("rules", cli.setRequired(true), cli.setHelp("规则文件或目录（递归 .rules）"))
+pcapPath = cli.String("read,r", cli.setRequired(true), cli.setHelp("pcap / pcapng 路径"))
+cli.check()
+
+loaded = suricata.LoadStatefulRules(rulesPath)~
+for _, skipped = range loaded.Rejected {
+    printf("[SKIP] sid=%d reason=%s\n", skipped.SID, skipped.Reason)
+}
+
+alerts = []
+engine = suricata.NewStatefulEngine(
+    loaded.Rules,
+    suricata.engineOnAlert(func(alert) {
+        alerts = append(alerts, alert)
+        // Alert.Source/Destination are flow endpoints (client/server).
+        // Direction==1 means the matching packet traveled server -> client.
+        source, destination = alert.Source, alert.Destination
+        sourcePort, destinationPort = alert.SourcePort, alert.DestinationPort
+        if alert.Direction == 1 {
+            source, destination = alert.Destination, alert.Source
+            sourcePort, destinationPort = alert.DestinationPort, alert.SourcePort
+        }
+        printf("[ALERT] sid=%d dir=%d %s:%d -> %s:%d %s\n",
+            alert.SID, alert.Direction, source, sourcePort,
+            destination, destinationPort, alert.Message)
+    }),
+)~
+defer engine.Close()
+
+engine.OpenPcapFile(pcapPath)~
+printf("[DONE] alerts=%d (request rule is suppressed by noalert)\n", len(alerts))
+assert len(alerts) == 1, sprintf("expected only the response alert, got %d", len(alerts))
+assert alerts[0].SID == 9500012, "unexpected rule fired"

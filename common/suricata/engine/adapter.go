@@ -281,12 +281,13 @@ func snapshotFlow(flow *pcaputil.TrafficFlow) FlowSnapshot {
 		return FlowSnapshot{}
 	}
 	return FlowSnapshot{
-		Key:      FlowKey{Domain: flow.CaptureDomain(), Generation: flow.Index},
-		First:    snapshotEndpoint(flow.ClientConn),
-		Second:   snapshotEndpoint(flow.ServerConn),
-		IPv4:     flow.IsIpv4,
-		IPv6:     flow.IsIpv6,
-		HalfOpen: flow.IsHalfOpen,
+		Key:        FlowKey{Domain: flow.CaptureDomain(), Generation: flow.Index},
+		First:      snapshotEndpoint(flow.ClientConn),
+		Second:     snapshotEndpoint(flow.ServerConn),
+		IPv4:       flow.IsIpv4,
+		IPv6:       flow.IsIpv6,
+		HalfOpen:   flow.IsHalfOpen,
+		IPProtocol: uint8(layers.IPProtocolTCP),
 	}
 }
 

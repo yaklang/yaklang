@@ -28,18 +28,22 @@ The matcher targets Suricata 8 rule syntax while preserving the legacy underscor
 - Stateless TCP/HTTP/DNS/TLS/UDP/ICMP rules run on the packet view.
 - Stateless TCP rules can also run on the ordered stream view.
 - Stateful TCP rules add `flow`, `flowbits`, `threshold` and FIN/RST/generation cleanup.
+- Stateful HTTP rules run on the ordered TCP stream, including split requests and responses; HTTP buffers are parsed from the reassembled payload. The engine waits for complete headers and a declared `Content-Length`/chunked body, and advances a per-direction message cursor so keep-alive requests are matched one by one.
+- Stateful UDP/DNS rules run on a bounded UDP pseudo-flow: first observed direction is client-to-server, `established` requires datagrams in both directions, and idle flows are evicted. A reused 5-tuple gets a new generation after eviction, so flowbits/threshold state does not leak.
 - `MatchPacket`, `MatchRaw`, `MatchStream` and `MatchHTTPFlow` expose the matcher's direct evaluation API on the engine.
 - `engine.OpenPcapFile`/`StartSniff` and `pcapx.pcap_suricata(engine)` bind the engine without a session object.
 
-M1 executes:
+The engine executes:
 
-- `flow:to_server/to_client,established/not_established,stateless,only_stream/no_stream`
-- `flowbits:set/unset/toggle/isset/isnotset/noalert`
-- `threshold` (`limit`, `threshold`, `both`) and `detection_filter`
-- capture-time windows and FIN/RST/inactive/generation cleanup
+- `flow:to_server/to_client,established/not_established,stateless,only_stream/no_stream` (TCP/HTTP; UDP/DNS except `only_stream`)
+- `flowbits:set/unset/toggle/isset/isnotset/noalert` (TCP/HTTP/UDP/DNS)
+- `threshold` (`limit`, `threshold`, `both`) and `detection_filter` (TCP/HTTP/UDP/DNS)
+- capture-time windows, TCP FIN/RST cleanup, UDP idle cleanup, and generation isolation
 - packet/stream separation, retransmission deduplication, bounded stream storage and fail-closed diagnostics
 
-The bundled ET scan corpus has 284 rules. The legacy stateless matcher executes 28; the engine executes 79 and accepts every rule the matcher accepts. Of the 55 TCP rules, 52 compile into the stateful engine; the remaining 3 require `byte_test` and remain rejected. Non-TCP rules that need `flow`, `threshold` or cross-packet state remain fail-closed until non-TCP flow tracking is implemented.
+The bundled ET scan corpus has 284 rules. The legacy stateless matcher executes 28; the engine executes 275 and accepts every rule the matcher accepts. Of the 55 TCP rules, 52 compile statefully; the three `byte_test` rules remain rejected. The remaining engine rejections are 2 SSH, 2 FTP, 1 SMTP and 1 `file_data` rule. UDP/DNS stateful rules are supported through the pseudo-flow; other non-TCP application protocols remain stateless until their transaction buffers are implemented.
+
+HTTP stateful matching uses the TCP stream and therefore expects a visible handshake for `flow:established`; mid-stream captures can use `flow:stateless`/`flow:no_stream` rules. Responses without `Content-Length` or chunked framing are matched at header completion; HTTP/2 and HTTP/3 transaction buffers remain unsupported.
 
 The AST and bounded state store already model `flowint`, `xbits`, `stream_size`, `flow.age`, `flow.pkts`, and `flow.bytes`, but M1 compilation deliberately rejects these until their runtime predicates/effects are connected. Protocol transactions are emitted as owned `ProtocolEvent` inspection events; incomplete/malformed/resource-limited events produce diagnostics, while transaction-backed application rules remain a later milestone.
 
