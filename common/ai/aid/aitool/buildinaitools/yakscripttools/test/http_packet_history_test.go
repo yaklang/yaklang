@@ -25,6 +25,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -108,6 +109,10 @@ func TestHTTPPacketHistoryTools(t *testing.T) {
 		t.Helper()
 		out, err := execute(name, params)
 		require.NoError(t, err)
+		if name == "grep" {
+			require.NotNil(t, out.Result, "grep must expose semantic matches through RESULT")
+			return utils.InterfaceToString(out.Result) + "\n" + out.Stdout
+		}
 		require.Nil(t, out.Result, "history must be raw stdout, not RESULT")
 		return out.Stdout
 	}

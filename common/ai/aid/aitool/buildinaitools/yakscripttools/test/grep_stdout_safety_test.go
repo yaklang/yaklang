@@ -1,8 +1,6 @@
 package test
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -61,21 +59,12 @@ func TestGrepTool_StdoutSafety(t *testing.T) {
 	t.Logf("Created test file: %s, size: %d bytes (~%.2f MB)", tmpFileName, fileSize, float64(fileSize)/1024/1024)
 
 	// Execute grep tool
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":           tmpFileName,
 		"pattern":        uniqueMarker,
 		"context-buffer": 20,
-	}, nil, stdout, stderr)
-
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
-	stderrStr := stderr.String()
+	})
+	stderrStr := ""
 
 	t.Logf("Original file size: %d bytes (~%.2f MB)", fileSize, float64(fileSize)/1024/1024)
 	t.Logf("Stdout size: %d bytes (~%.2f KB)", len(stdoutStr), float64(len(stdoutStr))/1024)
@@ -113,7 +102,7 @@ func TestGrepTool_StdoutSafety(t *testing.T) {
 	}
 	t.Logf("✓ Stdout size is safe: %d bytes (max allowed: %d bytes)", len(stdoutStr), maxAllowedStdoutSize)
 
-	// 5. Verify grep results section is present (from println in grep.yak)
+	// 5. Verify grep results section is present in the semantic result.
 	if strings.Contains(stdoutStr, "=== grep results ===") {
 		t.Log("✓ Grep results section found (from println)")
 	}
@@ -122,8 +111,6 @@ func TestGrepTool_StdoutSafety(t *testing.T) {
 }
 
 func TestGrepTool_RegexpLimitWithoutContext(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	content := strings.Repeat(`<a href="/demo/path">demo</a>`+"\n", 4000)
 	tmpFile, err := consts.TempFile("grep_regexp_limit_*.txt")
 	if err != nil {
@@ -134,26 +121,19 @@ func TestGrepTool_RegexpLimitWithoutContext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
 	start := time.Now()
 
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":           tmpFile.Name(),
 		"pattern":        `href="/[^"]*"|href='/[^']*'`,
 		"pattern-mode":   "regexp",
 		"context-buffer": 0,
 		"limit":          5,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	if strings.Contains(stdoutStr, "No matches found") {
 		t.Fatalf("expected grep output to report matches, got: %s", stdoutStr)
 	}
-	if !strings.Contains(stdoutStr, "=== Grep Results Summary: 5 matches ===") {
+	if !strings.Contains(stdoutStr, "=== Grep Results: 5 matches") {
 		t.Fatalf("expected grep output to summarize 5 matches, got: %s", stdoutStr)
 	}
 	if !strings.Contains(stdoutStr, `href="/demo/path"`) {
@@ -169,9 +149,6 @@ func TestGrepTool_RegexpLimitWithoutContext(t *testing.T) {
 	if elapsed := time.Since(start); elapsed > 5*time.Second {
 		t.Fatalf("grep regexp search took too long: %s", elapsed)
 	}
-	if stderr.Len() > 0 {
-		t.Logf("stderr: %s", stderr.String())
-	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Logf("regexp grep finished in %s", elapsed)
 	}
@@ -181,8 +158,6 @@ func TestGrepTool_RegexpLimitWithoutContext(t *testing.T) {
 // "filepath:lineNo: line content" format instead of the old "index:N-M" byte-offset format.
 // This is critical for code auditing: the AI must receive human-readable line numbers.
 func TestGrepTool_LineNumberOutput(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	// Build a known file with a target string on a predictable line number.
 	// Line 1-9: padding, Line 10: the target
 	var sb strings.Builder
@@ -203,17 +178,10 @@ func TestGrepTool_LineNumberOutput(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":    tmp.Name(),
 		"pattern": "SecretHandler",
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	// Must contain the match
@@ -236,8 +204,6 @@ func TestGrepTool_LineNumberOutput(t *testing.T) {
 // TestGrepTool_LineNumberOutput_WithContext verifies that context-buffer mode
 // also outputs in the readable filepath:lineNo: format with surrounding lines.
 func TestGrepTool_LineNumberOutput_WithContext(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	content := "line one\nline two\nTARGET_MATCH_HERE\nline four\nline five\n"
 	tmp, err := consts.TempFile("grep_ctx_test_*.txt")
 	if err != nil {
@@ -248,18 +214,11 @@ func TestGrepTool_LineNumberOutput_WithContext(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":           tmp.Name(),
 		"pattern":        "TARGET_MATCH_HERE",
 		"context-buffer": 30,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	assert.Assert(t, strings.Contains(stdoutStr, "TARGET_MATCH_HERE"),

@@ -143,8 +143,20 @@ lines := cli.Int("lines", cli.setRequired(false), cli.setHelp("how many lines yo
 lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max columns in a line when mode=lines, default 1024"), cli.setDefault(defaultLineSize))
 cli.check()
 
+RESULT = nil
+failRead = (format, args...) => {
+    message = sprintf(format, args...)
+    yakit.Error("%s", message)
+    RESULT = {
+        "operation": "read_file",
+        "operation_status": "error",
+        "file": t,
+        "error": message,
+    }
+}
+
 if !file.IsExisted(t) {
-    yakit.Warn("%v is not existed. Pass an absolute path such as /abs/path/to/file instead of test.txt or ./test.txt. Use find_file or grep to locate the correct path before calling read_file.", t)
+    failRead("%v is not existed. Pass an absolute path such as /abs/path/to/file instead of test.txt or ./test.txt. Use find_file or grep to locate the correct path before calling read_file.", t)
     return
 }
 
@@ -341,6 +353,13 @@ if isBinaryFile {
         "%s",
         typeName, ext, mimeInfo, size, suggestion,
     )
+    RESULT = {
+        "operation": "read_file",
+        "operation_status": "error",
+        "file": t,
+        "error": sprintf("%v cannot be read as text", typeName),
+        "mime": detectedMime,
+    }
     return
 }
 
@@ -399,6 +418,13 @@ if detectedMime == "" {
                     "  3. Use search_capabilities or tools_search to find matching tools.",
                     size, probeMimeInfo, t,
                 )
+                RESULT = {
+                    "operation": "read_file",
+                    "operation_status": "error",
+                    "file": t,
+                    "error": "file appears to contain binary data",
+                    "mime": probeMime,
+                }
                 return
             }
         }
@@ -406,7 +432,7 @@ if detectedMime == "" {
 }
 
 if mode != "auto" && mode != "chunk" && mode != "lines" {
-    yakit.Error("invalid mode: %v, must be 'auto', 'chunk' or 'lines'", mode)
+    failRead("invalid mode: %v, must be 'auto', 'chunk' or 'lines'", mode)
     return
 }
 
@@ -428,30 +454,34 @@ if effectiveMode == "chunk" {
     }
 
     if effectiveChunkSize > defaultChunkSize {
-        yakit.Warn("chunksize you input is too large, override %v, for save memory, shrink it.", defaultChunkSize)
+        failRead("chunksize %v exceeds maximum %v; reduce chunk-size and retry", effectiveChunkSize, defaultChunkSize)
         return
     }
 
     f, err := file.OpenFile(t, file.O_RDONLY, 0644)
     if err != nil {
-        yakit.Error("openfile failed: %v", err)
+        failRead("openfile failed: %v", err)
         return
     }
     defer f.Close()
     _, err := f.Seek(offset, 0)
     if err != nil {
-        yakit.Error("seek offset failed: %v", err)
+        failRead("seek offset failed: %v", err)
         return
     }
     raw, err := io.ReadAll(io.LimitReader(f, effectiveChunkSize))
     _ = err
     n := len(string(raw))
     if n <= 0 && err != nil {
-        yakit.Error("MET ERR: %v", err)
+        failRead("read chunk failed: %v", err)
+        return
     }
     if n > 0 {
-        yakit.Info("CHUNK[offset: %v, read: %v bytes, total: %v bytes]\n%v", offset, n, size, string(raw))
-        yakit.File(t, yakit.fileReadAction(offset, n, "byte", string(raw)))
+        RESULT = string(raw)
+        yakit.Info("CHUNK[offset: %v, read: %v bytes, total: %v bytes]", offset, n, size)
+        yakit.File(t, yakit.fileReadAction(offset, n, "byte", RESULT))
+    } else {
+        RESULT = sprintf("No bytes read from offset %v (file size: %v)", offset, size)
     }
 } else {
     // 按行读取模式
@@ -466,7 +496,7 @@ if effectiveMode == "chunk" {
 
     f, err := file.OpenFile(t, file.O_RDONLY, 0644)
     if err != nil {
-        yakit.Error("openfile failed: %v", err)
+        failRead("openfile failed: %v", err)
         return
     }
     defer f.Close()
@@ -523,11 +553,14 @@ if effectiveMode == "chunk" {
         }
         if err != nil { break }
     }
-    println(formattedContent)
-    yakit.File(t, yakit.fileReadAction(offset, selectedLines, "line", allContent))
     if formattedContent != "" {
-        yakit.Info("%s\n\ntotal-bytes: %v read-bytes: %v displayed-lines: %v displayed-bytes: %v percent: %.2f%%", formattedContent, size, bytesCount, selectedLines, visibleBytes, (float64(bytesCount) / float64(size)) * 100)
+        // The numbered text is the semantic result consumed by the agent.
+        // Keep it out of stdout observations so the same file body is not
+        // rendered once as observations and again as an info-level log.
+        RESULT = formattedContent
+        yakit.File(t, yakit.fileReadAction(offset, selectedLines, "line", allContent))
+        yakit.Info("total-bytes: %v read-bytes: %v displayed-lines: %v displayed-bytes: %v percent: %.2f%%", size, bytesCount, selectedLines, visibleBytes, (float64(bytesCount) / float64(size)) * 100)
     } else {
-        yakit.Info("No lines read from offset %v\ntotal-bytes: %v read-bytes: %v percent: %.2f%%", offset, size, bytesCount, (float64(bytesCount) / float64(size)) * 100)
+        RESULT = sprintf("No lines read from offset %v (total-bytes: %v read-bytes: %v)", offset, size, bytesCount)
     }
 }

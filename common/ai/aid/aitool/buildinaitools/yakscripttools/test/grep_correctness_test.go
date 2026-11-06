@@ -1,8 +1,6 @@
 package test
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -20,8 +18,6 @@ import (
 // when contextBuffer==0. This meant the final println summary had 0 results in findRes,
 // so the AI's result.Data was always empty even when matches existed.
 func TestGrepTool_ExecutionResultNotEmpty(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	// Build a simple Go-like file with a known function
 	var sb strings.Builder
 	for i := 1; i <= 20; i++ {
@@ -40,19 +36,12 @@ func TestGrepTool_ExecutionResultNotEmpty(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":           tmp.Name(),
 		"pattern":        "func main()",
 		"pattern-mode":   "substr",
 		"context-buffer": 0, // default - this triggered the bug
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	// The AI sees tool results through the stdout writer (which receives yakit.Info output as
@@ -72,7 +61,7 @@ func TestGrepTool_ExecutionResultNotEmpty(t *testing.T) {
 	// After the fix: findRes has entries, so the summary lists actual matches.
 	// Must have either the "=== Grep Results Summary:" line (from yakit.Info)
 	// or the match lines with file:lineNo: format
-	hasSummary := strings.Contains(stdoutStr, "=== Grep Results Summary:")
+	hasSummary := strings.Contains(stdoutStr, "=== Grep Results:")
 	hasMatchLine := strings.Contains(stdoutStr, "[match 1]")
 	if !hasSummary && !hasMatchLine {
 		t.Fatalf("BUG: stdout missing grep results summary or match lines.\n"+
@@ -89,8 +78,6 @@ func TestGrepTool_ExecutionResultNotEmpty(t *testing.T) {
 // representation issues could shift the offset, reporting the wrong line.
 // Also, the match was reported at the wrong line in the actual run (1125 vs 1180).
 func TestGrepTool_CorrectLineNumber(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	// Build a file with func main() at a known exact line number.
 	// We want line 50 to have "func main() {" and verify grep reports line 50.
 	const targetLine = 50
@@ -112,19 +99,12 @@ func TestGrepTool_CorrectLineNumber(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":           tmp.Name(),
 		"pattern":        "func main()",
 		"pattern-mode":   "substr",
 		"context-buffer": 0,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	expectedMarker := fmt.Sprintf(":%d:", targetLine)
@@ -144,8 +124,6 @@ func TestGrepTool_CorrectLineNumber(t *testing.T) {
 // the pattern silently matches nothing.
 // Fix: automatically prepend (?m) to enable multi-line mode.
 func TestGrepTool_RegexpCaretMatchesLineStart(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	var sb strings.Builder
 	for i := 1; i <= 20; i++ {
 		sb.WriteString(fmt.Sprintf("// line %d\n", i))
@@ -162,19 +140,12 @@ func TestGrepTool_RegexpCaretMatchesLineStart(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":         tmp.Name(),
 		"pattern":      `^func main\s*\(`,
 		"pattern-mode": "regexp",
 		"limit":        10,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	if strings.Contains(stdoutStr, "matched 0 results") {
@@ -191,8 +162,6 @@ func TestGrepTool_RegexpCaretMatchesLineStart(t *testing.T) {
 // TestGrepTool_RegexpDollarMatchesLineEnd verifies that $ in regexp mode matches
 // the end of each line, not just the end of the entire file.
 func TestGrepTool_RegexpDollarMatchesLineEnd(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	content := "line one\nline two target$\nline three\n"
 	tmp, err := consts.TempFile("grep_dollar_test_*.txt")
 	if err != nil {
@@ -203,19 +172,12 @@ func TestGrepTool_RegexpDollarMatchesLineEnd(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":         tmp.Name(),
 		"pattern":      `target\$$`,
 		"pattern-mode": "regexp",
 		"limit":        10,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	if strings.Contains(stdoutStr, "matched 0 results") {
@@ -229,8 +191,6 @@ func TestGrepTool_RegexpDollarMatchesLineEnd(t *testing.T) {
 // occurrence on the same line. This is intentional for bundled/minified JS where
 // one long line may contain many API-like matches.
 func TestGrepTool_SameLineMultipleMatches(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	content := "aaa bbb aaa ccc aaa\nxxx\naaa end\n"
 	tmp, err := consts.TempFile("grep_dedup_test_*.txt")
 	if err != nil {
@@ -241,18 +201,11 @@ func TestGrepTool_SameLineMultipleMatches(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":    tmp.Name(),
 		"pattern": "aaa",
 		"limit":   20,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	// "aaa" appears on line 1 (3 times) and line 3 (1 time).
@@ -266,8 +219,6 @@ func TestGrepTool_SameLineMultipleMatches(t *testing.T) {
 // output works in regexp mode too.
 // Pattern `\d+` on "a1b2c3\n" should report 3 occurrences on that line.
 func TestGrepTool_RegexpSameLineMultipleMatches(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	content := "a1b2c3\nno digits here\nx9y\n"
 	tmp, err := consts.TempFile("grep_re_dedup_test_*.txt")
 	if err != nil {
@@ -278,19 +229,12 @@ func TestGrepTool_RegexpSameLineMultipleMatches(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":         tmp.Name(),
 		"pattern":      `\d+`,
 		"pattern-mode": "regexp",
 		"limit":        20,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	// \d+ matches 3 times on line 1 ("1","2","3") and once on line 3 ("9").
@@ -303,8 +247,6 @@ func TestGrepTool_RegexpSameLineMultipleMatches(t *testing.T) {
 // even in large files with many lines (simulating the yaklang/yak.go scenario
 // where func main() is at line 1125 but grep reported line 1180).
 func TestGrepTool_LargeFileCorrectLineNumber(t *testing.T) {
-	grepTool := getGrepToolFromEmbed(t)
-
 	// Simulate a large file like yak.go: func main() at line 1125,
 	// with many different-length lines before it.
 	const targetLine = 1125
@@ -327,19 +269,12 @@ func TestGrepTool_LargeFileCorrectLineNumber(t *testing.T) {
 		t.Fatalf("failed to write temp file: %v", err)
 	}
 
-	stdout := bytes.NewBuffer(nil)
-	stderr := bytes.NewBuffer(nil)
-	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+	stdoutStr := runGrep(t, aitool.InvokeParams{
 		"path":           tmp.Name(),
 		"pattern":        "func main()",
 		"pattern-mode":   "substr",
 		"context-buffer": 0,
-	}, nil, stdout, stderr)
-	if err != nil {
-		t.Fatalf("grep tool execution failed: %v", err)
-	}
-
-	stdoutStr := stdout.String()
+	})
 	t.Logf("stdout:\n%s", stdoutStr)
 
 	expectedMarker := fmt.Sprintf(":%d:", targetLine)
