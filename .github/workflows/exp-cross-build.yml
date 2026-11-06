@@ -18,6 +18,11 @@ name: Cross-Build-Yak
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing v* release tag to rebuild and publish without moving the tag"
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -39,21 +44,41 @@ concurrency:
 jobs:
   check_commit_msg:
     runs-on: ubuntu-22.04
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+      source_ref: ${{ steps.source.outputs.source_ref }}
     steps:
       - name: Check Commit Message
+        id: source
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           git clone https://github.com/yaklang/yaklang && cd yaklang
           git fetch --all
           
-          if [[ -n "$GITHUB_HEAD_REF" ]]; then
+          if [[ -n "$RELEASE_TAG" ]]; then
+            if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9A-Za-z_-]+)+$ ]]; then
+              echo "::error::release_tag must be an existing version tag such as v1.4.9-beta6"
+              exit 1
+            fi
+            REF="refs/tags/$RELEASE_TAG"
+            git show-ref --verify "$REF"
+          elif [[ -n "$GITHUB_HEAD_REF" ]]; then
             REF=$GITHUB_HEAD_REF
           else
-            REF=${GITHUB_REF#refs/*/}
+            REF=$GITHUB_REF
           fi
-          git checkout $REF
+          git checkout "$REF"
           echo "Switched to $REF"
+          SOURCE_SHA=$(git rev-parse HEAD)
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          # Keep named tags in shallow checkouts so repos-tag embeds the release version.
+          if [[ "$REF" == refs/tags/* ]]; then
+            echo "source_ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "source_ref=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          fi
 
-          git checkout $REF
           echo "generate commit messages ... "
           ./scripts/generate-commit.sh
           echo "-------------"
@@ -127,7 +152,7 @@ jobs:
             GOARCH: arm64
             runs-on: ubuntu-24.04-arm
             manylinux_image: quay.io/pypa/manylinux2014_aarch64
-    runs-on: ${{ matrix.runs-on || ((matrix.os == 'windows' || matrix.os == 'windows7') && 'windows-latest' || 'macos-14') }}
+    runs-on: ${{ matrix.runs-on || ((matrix.os == 'windows' || matrix.os == 'windows7') && 'windows-latest' || matrix.os) }}
     steps:
       # build
       - name: Preserve source bytes on Windows
@@ -135,6 +160,8 @@ jobs:
         shell: bash
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v2
+        with:
+          ref: ${{ needs.check_commit_msg.outputs.source_ref }}
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -614,6 +641,7 @@ jobs:
     uses: ./.github/workflows/reuse-build.yml
     with:
       os: ${{ matrix.os }}
+      source_ref: ${{ needs.check_commit_msg.outputs.source_ref }}
       build_type: yakslim
       # Slim is a Yakit engine drop-in. It must embed the same official license
       # certs as the full engine; otherwise GetLicense/CheckLicense use a random
@@ -628,6 +656,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: ${{ needs.check_commit_msg.outputs.source_ref }}
 
       - name: Download slim binaries
         uses: actions/download-artifact@v4
@@ -688,10 +718,12 @@ jobs:
 
   check_version_and_github_release:
     runs-on: ubuntu-22.04
-    needs: [build_and_upload_to_oss, resolve_slim_build, build_slim_binaries]
+    needs: [check_commit_msg, build_and_upload_to_oss, resolve_slim_build, build_slim_binaries]
     if: always() && needs.build_and_upload_to_oss.result == 'success' && (needs.build_slim_binaries.result == 'success' || needs.build_slim_binaries.result == 'skipped')
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: ${{ needs.check_commit_msg.outputs.source_ref }}
 
       # download assets
       - name: Download all artifacts
@@ -806,12 +838,13 @@ jobs:
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
-        if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags') && !contains(env.YAK_TAG, 'alpha') }}
+        if: ${{ ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) && !contains(env.YAK_TAG, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           name: ${{ env.YAK_TAG }}
           tag_name: ${{ env.YAK_TAG }}
+          target_commitish: ${{ needs.check_commit_msg.outputs.source_sha }}
           body: |
             Release ${{ env.YAK_TAG }}
           draft: false

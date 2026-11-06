@@ -3,6 +3,10 @@ name: Reuse-Build-Yak
 on:
   workflow_dispatch:
     inputs:
+      source_ref:
+        description: "Source commit or ref to build (defaults to this workflow's commit)"
+        required: false
+        type: string
       os:
         description: "System to build"
         required: true
@@ -34,6 +38,10 @@ on:
   
   workflow_call:
     inputs:
+      source_ref:
+        description: "Source commit or ref to build (defaults to the caller's commit)"
+        required: false
+        type: string
       os:
         description: "System to build"
         required: true
@@ -54,13 +62,15 @@ on:
 
 jobs:
   build_and_upload_asset:
-    runs-on: ${{ inputs.os == 'windows-arm64' && 'windows-11-arm' || ((inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest') || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || 'macos-14' }}
+    runs-on: ${{ inputs.os == 'windows-arm64' && 'windows-11-arm' || ((inputs.os == 'windows' || inputs.os == 'windows7') && 'windows-latest') || (inputs.os == 'linux-amd64' && 'ubuntu-22.04') || (inputs.os == 'linux-arm64' && 'ubuntu-24.04-arm') || (inputs.os == 'darwin-amd64' && 'macos-15-intel') || 'macos-15' }}
     steps:
       - name: Preserve source bytes on Windows
         if: runner.os == 'Windows'
         shell: bash
         run: git config --global core.autocrlf false
       - uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.source_ref }}
       
       - name: Set up Go
         uses: actions/setup-go@v5
