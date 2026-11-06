@@ -37,7 +37,7 @@ jobs:
   check-wip:
     timeout-minutes: 10
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       statuses: read
@@ -184,7 +184,7 @@ jobs:
     timeout-minutes: 30
     needs: check-wip
     if: needs.check-wip.outputs.should_run_tests == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       yak_artifact_id: ${{ steps.upload_yak.outputs.artifact-id }}
       target_ref: ${{ needs.check-wip.outputs.target_ref }}
@@ -250,7 +250,7 @@ jobs:
     name: Prepared engine startup smoke
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Check out the prepared revision
@@ -305,7 +305,7 @@ jobs:
             platform: Windows npipe
           - os: macos-15
             platform: macOS unix
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             platform: Linux unix
     runs-on: ${{ matrix.os }}
     timeout-minutes: 3
@@ -360,7 +360,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022]
+        os: [ubuntu-24.04, windows-2022]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -397,7 +397,7 @@ jobs:
     timeout-minutes: 15
     needs: [check-wip, prepare-yak]
     if: needs.check-wip.outputs.should_run_tests == 'true' && needs.prepare-yak.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -417,7 +417,7 @@ jobs:
     timeout-minutes: 25
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
       target_ref: ${{ needs.prepare-yak.outputs.target_ref }}
@@ -476,7 +476,7 @@ jobs:
     timeout-minutes: 25
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
       target_ref: ${{ needs.prepare-yak.outputs.target_ref }}
@@ -532,7 +532,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: prepare-yak
     if: needs.prepare-yak.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -830,7 +830,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: [prepare-yak, prepare-yakgrpc]
     if: needs.prepare-yak.result == 'success' && needs.prepare-yakgrpc.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -1000,7 +1000,7 @@ jobs:
     timeout-minutes: 60
     needs: [prepare-yak, prepare-coreplugin]
     if: needs.prepare-yak.result == 'success' && needs.prepare-coreplugin.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -1112,7 +1112,7 @@ jobs:
   cleanup-yakgrpc-artifact:
     needs: [prepare-yakgrpc, test-prepared-yakgrpc]
     if: needs.prepare-yakgrpc.result == 'success' && needs.test-prepared-yakgrpc.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # Hygiene only: reclaiming a prepared artifact must never fail the run, and
     # must never hang it waiting on the API.
     continue-on-error: true
@@ -1135,7 +1135,7 @@ jobs:
   cleanup-coreplugin-artifact:
     needs: [prepare-coreplugin, test-prepared-coreplugin]
     if: needs.prepare-coreplugin.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # Hygiene only, same as cleanup-yakgrpc-artifact.
     continue-on-error: true
     timeout-minutes: 10
@@ -1157,7 +1157,7 @@ jobs:
   cleanup-yak-artifact:
     needs: [prepare-yak, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: always() && !cancelled() && needs.prepare-yak.result == 'success'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # Hygiene only: deleting the shared binary and pruning caches reclaims
     # storage for the next run. A missing or already-expired entry is expected
     # and must not turn a green run red. Skip when cancelled so an abandoned
@@ -1200,7 +1200,7 @@ jobs:
     name: Save Test Results to Cache
     needs: [check-wip, ipc-smoke, prepared-startup, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # Records a commit status so a later run on the same commit can skip work.
     # Fork PRs get a read-only token, so the write is rejected; that is a
     # degradation, not a test failure, and must not fail the run.
@@ -1236,7 +1236,7 @@ jobs:
     # and test failure, but skips when cancelled so an abandoned superseded run
     # immediately terminates and frees concurrency locks for the latest commit.
     if: always() && !cancelled()
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Verify selected test scope
         env:
