@@ -85,7 +85,7 @@ func exportCapture(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, o
 	defer os.Remove(temp.Name())
 	hash := sha256.New()
 	n, err := copyContext(ctx, io.MultiWriter(temp, hash), source)
-	if err == nil && (n != meta.SourceSize || hex.EncodeToString(hash.Sum(nil)) != meta.FullSHA256) {
+	if err == nil && (n != meta.SourceSize || hex.EncodeToString(hash.Sum(nil)) != meta.captureDigest()) {
 		err = fmt.Errorf("pcapdb: managed capture content changed; export aborted")
 	}
 	if err == nil {
