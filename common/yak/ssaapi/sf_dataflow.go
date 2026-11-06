@@ -655,6 +655,15 @@ func dataFlowFilter(
 	// every node; without passing ctx it ran under context.Background() and the
 	// per-rule deadline never fired — heavy rules ran for hours on large projects.
 	pathCtx := config.GetContext()
+	// Exclude branch pruning: `*<getCallee> & $filter` is monotone, so a call
+	// whose callee is a filter value rejects every longer path. Drop that
+	// subtree instead of enumerating it only to fail CheckMatch. The pattern is
+	// gated in sfCheck; unsupported exclude shapes leave prune nil.
+	var prune func(*Value) bool
+	if pathCheck.ExcludePrunable() {
+		prune = pathCheck.CheckExcludeNode
+	}
+
 	// walkPaths streams paths and reports false as soon as the current source is
 	// accepted, so the old eager effect×depend product is never materialized. A
 	// heavy dataflow(include=...) rule only needs the existence of one accepted
@@ -675,16 +684,16 @@ func dataFlowFilter(
 		}
 		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.WalkDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, visit, FromSFVMValues(end)...)
+				return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit, FromSFVMValues(end)...)
 			}
-			return v.WalkDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, visit)
+			return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit)
 		}
 	} else {
 		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.WalkDataflowPathWithContext(pathCtx, visit, FromSFVMValues(end)...)
+				return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit, FromSFVMValues(end)...)
 			}
-			return v.WalkDataflowPathWithContext(pathCtx, visit)
+			return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit)
 		}
 	}
 
@@ -704,6 +713,11 @@ func dataFlowFilter(
 		}
 		if config.EnterWork() {
 			return ret
+		}
+		// The center value is part of every enumerated path. If it alone
+		// matches the monotone exclude, skip the walk entirely.
+		if prune != nil && prune(v) {
+			continue
 		}
 		flag := false
 		walkPaths(v, func(path Values) bool {
