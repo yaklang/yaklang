@@ -42,6 +42,11 @@ type xbitEntry struct {
 
 // SetXBit sets a scoped bit. ttl == 0 means no expiry; negative ttl is invalid.
 func (s *Store) SetXBit(key XBitKey, ttl time.Duration) error {
+	return s.SetXBitAt(key, ttl, s.clock.Now())
+}
+
+// SetXBitAt sets a scoped bit using the caller-supplied capture timestamp.
+func (s *Store) SetXBitAt(key XBitKey, ttl time.Duration, now time.Time) error {
 	if ttl < 0 {
 		return ErrInvalidArgument
 	}
@@ -55,7 +60,6 @@ func (s *Store) SetXBit(key XBitKey, ttl time.Duration) error {
 	sh := &s.xbits[hashXBitKey(key)%uint64(len(s.xbits))]
 	sh.Lock()
 	defer sh.Unlock()
-	now := s.clock.Now()
 	entry, exists := sh.items[key]
 	if exists && now.Before(entry.lastTime) {
 		now = entry.lastTime
@@ -92,6 +96,11 @@ func (s *Store) UnsetXBit(key XBitKey) (bool, error) {
 }
 
 func (s *Store) ToggleXBit(key XBitKey, ttl time.Duration) (bool, error) {
+	return s.ToggleXBitAt(key, ttl, s.clock.Now())
+}
+
+// ToggleXBitAt toggles a scoped bit using the caller-supplied capture timestamp.
+func (s *Store) ToggleXBitAt(key XBitKey, ttl time.Duration, now time.Time) (bool, error) {
 	if ttl < 0 {
 		return false, ErrInvalidArgument
 	}
@@ -105,7 +114,6 @@ func (s *Store) ToggleXBit(key XBitKey, ttl time.Duration) (bool, error) {
 	sh := &s.xbits[hashXBitKey(key)%uint64(len(s.xbits))]
 	sh.Lock()
 	defer sh.Unlock()
-	now := s.clock.Now()
 	if entry, exists := sh.items[key]; exists {
 		if now.Before(entry.lastTime) {
 			now = entry.lastTime
@@ -130,6 +138,11 @@ func (s *Store) ToggleXBit(key XBitKey, ttl time.Duration) (bool, error) {
 }
 
 func (s *Store) TestXBit(key XBitKey) (bool, error) {
+	return s.TestXBitAt(key, s.clock.Now())
+}
+
+// TestXBitAt tests a scoped bit using the caller-supplied capture timestamp.
+func (s *Store) TestXBitAt(key XBitKey, now time.Time) (bool, error) {
 	if err := s.validateXBitKey(key); err != nil {
 		return false, err
 	}
@@ -144,7 +157,6 @@ func (s *Store) TestXBit(key XBitKey) (bool, error) {
 	if !exists {
 		return false, nil
 	}
-	now := s.clock.Now()
 	if now.Before(entry.lastTime) {
 		now = entry.lastTime
 	}

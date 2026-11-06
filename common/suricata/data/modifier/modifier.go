@@ -61,6 +61,7 @@ const (
 	TLSCertIssuer
 	TLSCertSerial
 	TLSCertFingerprint
+	TLSCerts
 	TLSSNI
 	TLSRandom
 	TLSRandomTime
@@ -71,6 +72,12 @@ const (
 	JA3String
 	JA3SHash
 	JA3SString
+
+	// Base64
+	Base64Data
+
+	// SSH
+	SSHProto
 )
 
 var HTTP_REQ_ONLY = []Modifier{
@@ -98,5 +105,5 @@ var HTTP_RESP_ONLY = []Modifier{
 }
 
 func IsHTTPModifier(mdf Modifier) bool {
-	return mdf >= HTTPUri && mdf <= HTTPHeaderNames
+	return mdf >= HTTPUri && mdf <= HTTPHeaderNames && mdf != FileData
 }

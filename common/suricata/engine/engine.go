@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -213,7 +214,10 @@ func (e *StatefulEngine) flow(key FlowKey, create bool) *flowRuntime {
 	}
 	flow := e.flows[key]
 	if flow == nil && create && len(e.flows) < e.maxFlows {
-		flow = &flowRuntime{streamCursor: make(map[ruleDirection]int)}
+		flow = &flowRuntime{
+			streamCursor: make(map[ruleDirection]int),
+			tlsMatched:   make(map[ruleDirection]bool),
+		}
 		e.flows[key] = flow
 	}
 	return flow
@@ -266,6 +270,9 @@ func (e *StatefulEngine) releaseFlowStreams(flow *flowRuntime) {
 
 func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 	var result Result
+	if event.View == ViewNormalizedPacket {
+		populatePacketEndpoints(&event)
+	}
 	flow := e.flow(event.Flow.Key, event.Flow.Key.Generation != 0)
 	if event.Flow.Key.Generation != 0 && flow == nil {
 		e.diagnostic(&result, event, nil, "flow-unavailable", "flow is closed or engine flow capacity was exceeded")
@@ -276,6 +283,9 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		defer flow.mu.Unlock()
 		if flow.closed {
 			return result
+		}
+		if event.View == ViewNormalizedPacket {
+			e.emitTaggedAlerts(flow, event, &result)
 		}
 		if flow.transport == 0 {
 			flow.transport = event.Flow.IPProtocol
@@ -333,10 +343,23 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		if flow != nil && !matchFlow(plan.Flow, flow, event.Direction) {
 			continue
 		}
+		if len(plan.StreamSize) > 0 {
+			packetView := plan.Rule != nil && plan.Rule.Protocol == "tcp-pkt"
+			if !plan.matchStreamSize(flow, packetView) {
+				continue
+			}
+		}
 		streamKey := ruleDirection{ruleIndex: index, direction: event.Direction}
 		var streamPayload []byte
 		cursor := 0
-		isHTTP := plan.Rule != nil && plan.Rule.Protocol == "http"
+		isHTTP := plan.Rule != nil && (plan.Rule.Protocol == "http" || rule.UsesHTTPBuffers(plan.Rule))
+		isTLS := plan.Rule != nil && (plan.Rule.Protocol == "tls" || rule.UsesTLSBuffers(plan.Rule))
+		if event.View == ViewStream && flow != nil && isTLS && flow.tlsMatched[streamKey] {
+			// TLS buffers are handshake-scoped. Once a rule matched a
+			// direction, later stream frames repeat the same certificate or
+			// SNI data and must not produce duplicate alerts or state effects.
+			continue
+		}
 		if event.View == ViewStream && flow != nil {
 			if isHTTP {
 				cursor = httpOffset
@@ -358,13 +381,16 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		if !matched {
 			continue
 		}
-		if event.View == ViewStream && !isHTTP && evidenceEnd <= cursor {
+		if event.View == ViewStream && !isHTTP && !isTLS && evidenceEnd <= cursor {
 			continue
 		}
 		stateResult, err := e.applyState(plan, event)
 		if err != nil {
 			e.diagnostic(&result, event, plan.Rule, "state-error", err.Error())
 			continue
+		}
+		if event.View == ViewStream && flow != nil && isTLS {
+			flow.tlsMatched[streamKey] = true
 		}
 		if !stateResult.qualified {
 			continue
@@ -378,6 +404,16 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		e.alerts.Add(1)
 		if e.onAlert != nil {
 			e.onAlert(alert)
+		}
+		if plan.Tag != nil && flow != nil {
+			tag := flowTag{plan: plan, unit: plan.Tag.Unit}
+			switch plan.Tag.Unit {
+			case "packets":
+				tag.remaining = uint64(plan.Tag.Count)
+			case "seconds":
+				tag.expiresAt = eventTime(event).Add(time.Duration(plan.Tag.Count) * time.Second)
+			}
+			flow.tags = append(flow.tags, tag)
 		}
 	}
 	// Advance the per-direction HTTP message cursor only after every HTTP rule
@@ -402,6 +438,9 @@ func (e *StatefulEngine) diagnostic(result *Result, event InspectionEvent, curre
 
 func buildAlert(currentRule *rule.Rule, event InspectionEvent) Alert {
 	alert := Alert{Timestamp: event.Timestamp, Rule: currentRule, Flow: event.Flow, Direction: event.Direction, View: event.View, References: append([]pcaputil.PacketReference(nil), event.References...)}
+	if currentRule != nil {
+		alert.Target = currentRule.Target
+	}
 	if event.Protocol != nil {
 		alert.Protocol = event.Protocol.Protocol
 		alert.Profile = event.Protocol.Profile
@@ -413,6 +452,87 @@ func buildAlert(currentRule *rule.Rule, event InspectionEvent) Alert {
 		alert.Summary = event.Protocol.Summary
 	}
 	return alert
+}
+
+func populatePacketEndpoints(event *InspectionEvent) {
+	if event == nil || event.Packet == nil || event.Flow.First.Address.IsValid() {
+		return
+	}
+	network := event.Packet.NetworkLayer()
+	if network == nil {
+		return
+	}
+	flow := network.NetworkFlow()
+	source, err := netip.ParseAddr(flow.Src().String())
+	if err != nil {
+		return
+	}
+	destination, err := netip.ParseAddr(flow.Dst().String())
+	if err != nil {
+		return
+	}
+	var sourcePort, destinationPort uint16
+	if transport := event.Packet.TransportLayer(); transport != nil {
+		transportFlow := transport.TransportFlow()
+		if endpoint, err := netip.ParseAddrPort(transportFlow.Src().String()); err == nil {
+			sourcePort = endpoint.Port()
+		}
+		if endpoint, err := netip.ParseAddrPort(transportFlow.Dst().String()); err == nil {
+			destinationPort = endpoint.Port()
+		}
+	}
+	event.Flow.First = Endpoint{Address: source.Unmap(), Port: sourcePort}
+	event.Flow.Second = Endpoint{Address: destination.Unmap(), Port: destinationPort}
+	switch network := network.(type) {
+	case *layers.IPv4:
+		event.Flow.IPv4 = true
+		event.Flow.IPProtocol = uint8(network.Protocol)
+	case *layers.IPv6:
+		event.Flow.IPv6 = true
+		event.Flow.IPProtocol = uint8(network.NextHeader)
+	}
+}
+
+func (e *StatefulEngine) emitTaggedAlerts(flow *flowRuntime, event InspectionEvent, result *Result) {
+	if flow == nil || len(flow.tags) == 0 {
+		return
+	}
+	now := eventTime(event)
+	kept := flow.tags[:0]
+	for index := range flow.tags {
+		tag := flow.tags[index]
+		switch tag.unit {
+		case "seconds":
+			if !now.Before(tag.expiresAt) {
+				continue
+			}
+			e.emitTaggedAlert(tag.plan, event, result)
+			kept = append(kept, tag)
+		case "packets":
+			if tag.remaining == 0 {
+				continue
+			}
+			e.emitTaggedAlert(tag.plan, event, result)
+			tag.remaining--
+			if tag.remaining > 0 {
+				kept = append(kept, tag)
+			}
+		}
+	}
+	flow.tags = kept
+}
+
+func (e *StatefulEngine) emitTaggedAlert(plan *CompiledRulePlan, event InspectionEvent, result *Result) {
+	if plan == nil || plan.Rule == nil {
+		return
+	}
+	alert := buildAlert(plan.Rule, event)
+	alert.Tagged = true
+	result.Alerts = append(result.Alerts, alert)
+	e.alerts.Add(1)
+	if e.onAlert != nil {
+		e.onAlert(alert)
+	}
 }
 
 func eventTime(event InspectionEvent) time.Time {

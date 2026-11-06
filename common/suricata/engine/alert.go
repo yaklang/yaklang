@@ -15,6 +15,8 @@ type Alert struct {
 	View          InspectionView
 	Protocol      string
 	Profile       string
+	Target        string
+	Tagged        bool
 	EventID       uint64
 	FlowID        uint64
 	TCPFlowID     uint64

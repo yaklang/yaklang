@@ -24,8 +24,8 @@ func TestETCorpusHTTPAndUDPStatefulCoverage(t *testing.T) {
 			rejected++
 		}
 	}
-	require.Equal(t, 275, executable)
-	require.Equal(t, 9, rejected)
+	require.Equal(t, 284, executable)
+	require.Equal(t, 0, rejected)
 }
 
 func TestETTCPCorpusStatefulCompilation(t *testing.T) {
@@ -47,10 +47,7 @@ func TestETTCPCorpusStatefulCompilation(t *testing.T) {
 		executable++
 	}
 	require.Equal(t, 55, tcpRules)
-	require.Equal(t, 52, executable)
-	require.Len(t, rejections, 3)
-	for reason, count := range rejections {
-		t.Logf("rejected=%d reason=%s", count, reason)
-	}
+	require.Equal(t, 55, executable)
+	require.Empty(t, rejections)
 	t.Logf("ET TCP rules=%d executable=%d rejected=%d", tcpRules, executable, tcpRules-executable)
 }

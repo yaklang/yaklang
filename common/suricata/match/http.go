@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -180,9 +179,11 @@ type httpProvider struct {
 	PK gopacket.Packet
 
 	// cache
-	raw []byte
-	req *http.Request
-	res *http.Response
+	raw        []byte
+	body       []byte
+	bodyCached bool
+	req        *http.Request
+	res        *http.Response
 }
 
 // if success, return value not nil
@@ -211,7 +212,15 @@ func newHTTPBufferProviderFromPayload(pk gopacket.Packet, payload []byte, requir
 		return nil
 	}
 	if strings.HasPrefix(a, "HTTP/") {
-		res, err := lowhttp.ParseBytesToHTTPResponse(payload)
+		var res *http.Response
+		var err error
+		if requireComplete {
+			// The bufio reader decodes a chunked response body; the legacy
+			// packet parser intentionally keeps the raw wire body.
+			res, err = lowhttp.ReadHTTPResponseFromBufioReader(bytes.NewReader(payload), &http.Request{Method: http.MethodGet})
+		} else {
+			res, err = lowhttp.ParseBytesToHTTPResponse(payload)
+		}
 		if err != nil {
 			return nil
 		}
@@ -221,7 +230,14 @@ func newHTTPBufferProviderFromPayload(pk gopacket.Packet, payload []byte, requir
 			raw: payload,
 		}
 	}
-	request, err := lowhttp.ParseBytesToHttpRequest(payload)
+	var request *http.Request
+	var err error
+	if requireComplete {
+		// The bufio reader decodes chunked bodies and stops at Content-Length.
+		request, err = lowhttp.ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(payload)))
+	} else {
+		request, err = lowhttp.ParseBytesToHttpRequest(payload)
+	}
 	if err != nil {
 		return nil
 	}
@@ -230,6 +246,21 @@ func newHTTPBufferProviderFromPayload(pk gopacket.Packet, payload []byte, requir
 		req: request,
 		raw: payload,
 	}
+}
+
+func rawHeaderValue(raw []byte, name string) []byte {
+	headerBlock, _, _ := bytes.Cut(raw, []byte("\r\n\r\n"))
+	lines := bytes.Split(headerBlock, []byte("\r\n"))
+	for _, line := range lines[1:] {
+		key, value, ok := bytes.Cut(line, []byte(":"))
+		if !ok {
+			continue
+		}
+		if bytes.EqualFold(bytes.TrimSpace(key), []byte(name)) {
+			return bytes.TrimSpace(value)
+		}
+	}
+	return nil
 }
 
 // HTTPMessageLength returns the byte length of the first complete HTTP message
@@ -244,7 +275,16 @@ func HTTPMessageLength(payload []byte) (int, bool) {
 	body := payload[headerLength:]
 	contentLength := -1
 	chunked := false
-	for _, line := range bytes.Split(payload[:headerEnd], []byte("\r\n"))[1:] {
+	lines := bytes.Split(payload[:headerEnd], []byte("\r\n"))
+	request, http11 := false, false
+	if len(lines) > 0 {
+		fields := bytes.Fields(lines[0])
+		if len(fields) >= 3 && !bytes.HasPrefix(fields[0], []byte("HTTP/")) {
+			request = true
+			http11 = bytes.Equal(fields[len(fields)-1], []byte("HTTP/1.1"))
+		}
+	}
+	for _, line := range lines[1:] {
 		name, value, ok := bytes.Cut(line, []byte(":"))
 		if !ok {
 			continue
@@ -257,7 +297,14 @@ func HTTPMessageLength(payload []byte) (int, bool) {
 			}
 			contentLength = parsed
 		case strings.EqualFold(strings.TrimSpace(string(name)), "Transfer-Encoding"):
-			if strings.Contains(strings.ToLower(string(value)), "chunked") {
+			if request {
+				// libhtp only frames a request as chunked when the value is
+				// exactly "chunked" and HTTP/1.1 or newer is used. Other
+				// values are invalid and do not describe a body.
+				if http11 && bytes.EqualFold(bytes.TrimSpace(value), []byte("chunked")) {
+					chunked = true
+				}
+			} else if strings.Contains(strings.ToLower(string(value)), "chunked") {
 				chunked = true
 			}
 		}
@@ -274,6 +321,50 @@ func HTTPMessageLength(payload []byte) (int, bool) {
 		return headerLength + bodyLength, true
 	}
 	return headerLength, true
+}
+
+func hasChunkedEncoding(values []string) bool {
+	for _, value := range values {
+		if strings.Contains(strings.ToLower(value), "chunked") {
+			return true
+		}
+	}
+	return false
+}
+
+// decodeChunkedBody decodes Transfer-Encoding: chunked wire bytes. lowhttp's
+// fixed-content-length request reader retains the wire body, so the matcher
+// decodes it lazily for HTTP request/response body buffers.
+func decodeChunkedBody(body []byte) ([]byte, bool) {
+	var decoded bytes.Buffer
+	offset := 0
+	for {
+		lineEnd := bytes.Index(body[offset:], []byte("\r\n"))
+		if lineEnd < 0 {
+			return nil, false
+		}
+		sizeText := string(body[offset : offset+lineEnd])
+		if semi := strings.IndexByte(sizeText, ';'); semi >= 0 {
+			sizeText = sizeText[:semi]
+		}
+		size, err := strconv.ParseInt(strings.TrimSpace(sizeText), 16, 64)
+		if err != nil || size < 0 {
+			return nil, false
+		}
+		offset += lineEnd + 2
+		if size == 0 {
+			return decoded.Bytes(), true
+		}
+		if size > int64(len(body)-offset) {
+			return nil, false
+		}
+		decoded.Write(body[offset : offset+int(size)])
+		offset += int(size)
+		if !bytes.HasPrefix(body[offset:], []byte("\r\n")) {
+			return nil, false
+		}
+		offset += 2
+	}
 }
 
 func chunkedBodyLength(body []byte) (int, bool) {
@@ -341,6 +432,37 @@ func (h *httpProvider) GetResponse() *http.Response {
 	return h.res
 }
 
+func (h *httpProvider) bodyBuffer() []byte {
+	if h.bodyCached {
+		return h.body
+	}
+	h.bodyCached = true
+	index := bytes.Index(h.raw, []byte("\r\n\r\n"))
+	if index < 0 {
+		return nil
+	}
+	body := h.raw[index+4:]
+	if length, complete := HTTPMessageLength(h.raw); complete && length >= index+4 && length <= len(h.raw) {
+		// Keep-alive streams contain subsequent messages after the first one;
+		// the body buffer must stop at the first message boundary.
+		body = h.raw[index+4 : length]
+	}
+	chunked := false
+	if h.req != nil {
+		chunked = hasChunkedEncoding(h.req.TransferEncoding)
+	}
+	if h.res != nil {
+		chunked = hasChunkedEncoding(h.res.TransferEncoding)
+	}
+	if chunked {
+		if decoded, ok := decodeChunkedBody(body); ok {
+			body = decoded
+		}
+	}
+	h.body = body
+	return body
+}
+
 // Get part of http.
 func (h *httpProvider) Get(modi modifier.Modifier) []byte {
 	if h.req != nil {
@@ -389,12 +511,8 @@ func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 			return nil
 		}
 		return h.raw[:idx+2]
-	case modifier.HTTPRequestBody:
-		all, err := io.ReadAll(h.req.Body)
-		if err != nil {
-			return nil
-		}
-		return all
+	case modifier.HTTPRequestBody, modifier.FileData:
+		return h.bodyBuffer()
 	case modifier.HTTPUserAgent:
 		return []byte(h.req.UserAgent())
 	case modifier.HTTPHost:
@@ -449,6 +567,9 @@ func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 	case modifier.HTTPContentType:
 		return []byte(h.req.Header.Get("Content-Type"))
 	case modifier.HTTPContentLen:
+		if value := rawHeaderValue(h.raw, "Content-Length"); value != nil {
+			return value
+		}
 		return []byte(h.req.Header.Get("Content-Length"))
 	case modifier.HTTPStart:
 		idx := bytes.Index(h.raw, []byte("\r\n\r\n"))
@@ -520,12 +641,8 @@ func (h *httpProvider) getRes(modi modifier.Modifier) []byte {
 		return h.raw[st+2 : ed+2]
 	case modifier.HTTPCookie:
 		return []byte(h.res.Header.Get("Set-Cookie"))
-	case modifier.HTTPResponseBody:
-		idx := bytes.Index(h.raw, []byte("\r\n\r\n"))
-		if idx == -1 {
-			return nil
-		}
-		return h.raw[idx+4:]
+	case modifier.HTTPResponseBody, modifier.FileData:
+		return h.bodyBuffer()
 	case modifier.HTTPServer:
 		return []byte(h.res.Header.Get("Server"))
 	case modifier.HTTPLocation:
@@ -533,6 +650,9 @@ func (h *httpProvider) getRes(modi modifier.Modifier) []byte {
 	case modifier.HTTPContentType:
 		return []byte(h.res.Header.Get("Content-Type"))
 	case modifier.HTTPContentLen:
+		if value := rawHeaderValue(h.raw, "Content-Length"); value != nil {
+			return value
+		}
 		return []byte(h.res.Header.Get("Content-Length"))
 	case modifier.HTTPStart:
 		idx := bytes.Index(h.raw, []byte("\r\n\r\n"))

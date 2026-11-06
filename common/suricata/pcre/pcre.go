@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
+	pcre2lite "github.com/VillanCh/go-pcre2-lite"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
@@ -61,17 +61,22 @@ func packMatchLimits(matchLimit, depthLimit uint32) uint64 {
 type PCRE struct {
 	expr string
 
-	opts     regexp2.RegexOptions
-	modifier modifier.Modifier
+	ignoreCase bool
+	multiline  bool
+	singleline bool
+	extended   bool
+	modifier   modifier.Modifier
 
-	relative         bool
-	ignoreEndNewline bool
-	startsWith       bool
+	relative      bool
+	dollarEndOnly bool
+	startsWith    bool
+	rawBytes      bool
+	ungreedy      bool
 }
 
 type Matcher struct {
 	*PCRE
-	matcher *regexp2.Regexp
+	matcher *pcre2lite.Regexp
 }
 
 type Generator struct {
@@ -89,69 +94,65 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 		return nil, errors.New("invalid pcre pattern")
 	}
 	var pcre PCRE
-	var opt regexp2.RegexOptions = 0
-	normailized := strings.Contains(pattern[idx+1:], "U")
-	unnormalized := strings.Contains(pattern[idx+1:], "D")
 	pcre.expr = pattern[1:idx]
-	re, err := syntax.Parse(pcre.expr, syntax.Perl)
-	if err != nil {
-		return nil, errors.Wrap(err, "invalid pcre pattern")
+	// Suricata PCRE delimiters are sometimes escaped as `\/`; LastIndexByte
+	// then leaves the escape backslash at the end of the expression. Remove
+	// only an odd trailing backslash, preserving an escaped literal backslash.
+	if trailing := trailingBackslashCount(pcre.expr); trailing%2 == 1 {
+		pcre.expr = pcre.expr[:len(pcre.expr)-1]
 	}
-
-	var beginText bool
-	var walkPositionControlOp func(regexpIns *syntax.Regexp)
-	walkPositionControlOp = func(regexpIns *syntax.Regexp) {
-		if regexpIns.Op == syntax.OpConcat {
-			if len(regexpIns.Sub) > 0 {
-				walkPositionControlOp(regexpIns.Sub[0])
-				return
+	// The matching backend is 8-bit PCRE2. Go's regexp/syntax rejects
+	// PCRE constructs such as lookarounds, so use it only for anchor analysis
+	// and let Matcher validate the complete pattern.
+	beginText := strings.HasPrefix(pcre.expr, "^") || strings.HasPrefix(pcre.expr, `\A`)
+	if re, err := syntax.Parse(pcre.expr, syntax.Perl); err == nil {
+		var walkPositionControlOp func(regexpIns *syntax.Regexp)
+		walkPositionControlOp = func(regexpIns *syntax.Regexp) {
+			if regexpIns.Op == syntax.OpConcat {
+				if len(regexpIns.Sub) > 0 {
+					walkPositionControlOp(regexpIns.Sub[0])
+					return
+				}
+			}
+			if regexpIns.Op == syntax.OpBeginText {
+				beginText = true
 			}
 		}
-		if regexpIns.Op == syntax.OpBeginText {
-			beginText = true
-		}
+		walkPositionControlOp(re)
 	}
-	walkPositionControlOp(re)
 
 	if idx != len(pattern)-1 {
 		optstr := pattern[idx+1:]
 		for _, v := range optstr {
 			switch v {
 			case 'i':
-				opt |= regexp2.IgnoreCase
+				pcre.ignoreCase = true
 			case 'm':
-				opt |= regexp2.Multiline
+				pcre.multiline = true
 			case 's':
-				opt |= regexp2.Singleline
+				pcre.singleline = true
+			case 'x':
+				pcre.extended = true
 			case 'A':
 				pcre.startsWith = true
 			case 'E':
-				pcre.ignoreEndNewline = true
+				pcre.dollarEndOnly = true
 			case 'G':
-				return nil, fmt.Errorf("pcre modifier G is not implemented")
+				pcre.ungreedy = true
 			case 'R':
 				pcre.relative = true
 			case 'U':
-				// skip
 				pcre.modifier = modifier.HTTPUri
 			case 'I':
-				if normailized {
-					pcre.modifier = modifier.HTTPUri
-				} else {
-					pcre.modifier = modifier.HTTPUriRaw
-				}
+				pcre.modifier = modifier.HTTPUriRaw
 			case 'P':
 				pcre.modifier = modifier.HTTPRequestBody
 			case 'Q':
 				pcre.modifier = modifier.HTTPResponseBody
 			case 'H':
-				if unnormalized {
-					pcre.modifier = modifier.HTTPHeaderRaw
-				} else {
-					pcre.modifier = modifier.HTTPHeader
-				}
+				pcre.modifier = modifier.HTTPHeader
 			case 'D':
-				// skip
+				pcre.modifier = modifier.HTTPHeaderRaw
 			case 'M':
 				pcre.modifier = modifier.HTTPMethod
 			case 'C':
@@ -161,35 +162,50 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 			case 'Y':
 				pcre.modifier = modifier.HTTPStatMsg
 			case 'B':
-				return nil, fmt.Errorf("pcre modifier B is not implemented")
+				pcre.rawBytes = true
 			case 'O':
-				return nil, fmt.Errorf("pcre modifier O is not implemented")
+				// Suricata uses O to opt into its configured PCRE match
+				// limits. Matchers always enforce those limits here.
+
 			case 'V':
 				pcre.modifier = modifier.HTTPUserAgent
 			case 'W':
-				if unnormalized {
-					pcre.modifier = modifier.HTTPHostRaw
-				} else {
-					pcre.modifier = modifier.HTTPHost
-				}
+				pcre.modifier = modifier.HTTPHost
 			default:
 				return nil, fmt.Errorf("invalid pcre opt: %s", optstr)
 			}
 		}
 	}
-	pcre.opts = opt
 	pcre.startsWith = pcre.startsWith || beginText
 	return &pcre, nil
 }
 
+func (p *PCRE) RawBytes() bool {
+	return p.rawBytes
+}
+
+func trailingBackslashCount(value string) int {
+	count := 0
+	for index := len(value) - 1; index >= 0 && value[index] == '\\'; index-- {
+		count++
+	}
+	return count
+}
+
 func (p *PCRE) Matcher() (*Matcher, error) {
-	matcher, err := regexp2.Compile(p.expr, p.opts)
+	matchLimit, depthLimit := GetDefaultMatchLimits()
+	matcher, err := pcre2lite.Compile(p.expr, pcre2lite.CompileOptions{
+		Caseless:      p.ignoreCase,
+		Multiline:     p.multiline,
+		DotAll:        p.singleline,
+		Extended:      p.extended,
+		Ungreedy:      p.ungreedy,
+		DollarEndOnly: p.dollarEndOnly,
+		MatchLimit:    matchLimit,
+		DepthLimit:    depthLimit,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid pcre pattern")
-	}
-	matchLimit, depthLimit := GetDefaultMatchLimits()
-	if err := matcher.SetMatchLimits(matchLimit, depthLimit); err != nil {
-		return nil, errors.Wrap(err, "configure pcre match limits")
 	}
 	return &Matcher{
 		PCRE:    p,
@@ -205,8 +221,14 @@ func (p *PCRE) Relative() bool {
 	return p.relative
 }
 
+// IgnoreEndNewline is retained for compatibility. Suricata's /E option is
+// PCRE2_DOLLAR_ENDONLY, exposed through DollarEndOnly.
 func (p *PCRE) IgnoreEndNewline() bool {
-	return p.ignoreEndNewline
+	return p.dollarEndOnly
+}
+
+func (p *PCRE) DollarEndOnly() bool {
+	return p.dollarEndOnly
 }
 
 func (p *PCRE) StartsWith() bool {
@@ -232,35 +254,34 @@ func (p *PCRE) Generator() (*Generator, error) {
 }
 
 func (p *PCRE) IgnoreCase() bool {
-	return p.opts&regexp2.IgnoreCase != 0
+	return p.ignoreCase
 }
 
 func (p *Matcher) Match(content []byte) ([]data.Matched, error) {
 	if len(content) > DefaultSubjectLimit {
 		return nil, ErrSubjectLimit
 	}
-	matches := make([]data.Matched, 0, 16)
-	match, err := p.matcher.FindStringMatch(string(content))
+	// Request one extra match so the result budget can be reported exactly.
+	found, err := p.matcher.FindAll(content, DefaultResultLimit+1)
 	if err != nil {
-		return nil, fmt.Errorf("find first pcre match: %w", err)
+		return nil, fmt.Errorf("match pcre: %w", err)
 	}
-	for match != nil {
-		if len(matches) >= DefaultResultLimit {
-			return nil, ErrResultLimit
+	if len(found) > DefaultResultLimit {
+		return nil, ErrResultLimit
+	}
+	matches := make([]data.Matched, 0, len(found))
+	for _, match := range found {
+		if len(match.Groups) == 0 {
+			continue
+		}
+		span := match.Groups[0]
+		if span.IsUnset() {
+			continue
 		}
 		matches = append(matches, data.Matched{
-			Pos: match.Index,
-			Len: match.Length,
+			Pos: span.Start,
+			Len: span.End - span.Start,
 		})
-
-		previous := match
-		match, err = p.matcher.FindNextMatch(previous)
-		if err != nil {
-			return nil, fmt.Errorf("find next pcre match: %w", err)
-		}
-		if previous.Length == 0 && match != nil && match.Index <= previous.Index {
-			return nil, fmt.Errorf("%w at rune offset %d", ErrZeroLengthMatchLoop, previous.Index)
-		}
 	}
 	return matches, nil
 }

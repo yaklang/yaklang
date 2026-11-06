@@ -4,7 +4,7 @@ options {
     tokenVocab=SuricataRuleLexer;
 }
 
-rules : rule+ EOF;
+rules : rule* EOF;
 rule : action protocol src_address src_port ('->' | '<>' ) dest_address dest_port params;
 
 action : ID;
@@ -77,6 +77,8 @@ keyword
 setting : singleSetting ( ParamComma singleSetting )*;
 singleSetting
     : negative? settingcontent
+    | negative NonQuotedString
+    | NonQuotedString ModeStringStart ModeString? ModeStringEnd
     | NonQuotedString
     ;
 negative: ParamNegative;

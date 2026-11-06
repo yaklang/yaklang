@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/rule"
+	"golang.org/x/exp/slices"
 )
 
 func newPCREMatch(r *rule.ContentRule) (matchHandler, error) {
@@ -15,10 +16,14 @@ func newPCREMatch(r *rule.ContentRule) (matchHandler, error) {
 	return func(c *matchContext) error {
 		var indexes []data.Matched
 		buffer := c.GetBuffer(r.Modifier)
-
-		if r.PCREParsed.IgnoreEndNewline() && len(buffer) > 0 && buffer[len(buffer)-1] == '\n' {
-			buffer = buffer[:len(buffer)-1]
+		if (r.PCREParsed.RawBytes() || r.RawBytes) && c.PK != nil {
+			buffer = c.PK.Data()
 		}
+		if r.DotPrefix {
+			buffer = dotPrefixBuffer(buffer)
+		}
+
+		jumpPosition, hasJump := c.takeJumpCursor(r.Modifier)
 
 		baseOffset := 0
 		allPrevMatches, existed := c.GetPrevMatched(r.Modifier)
@@ -39,14 +44,28 @@ func newPCREMatch(r *rule.ContentRule) (matchHandler, error) {
 			c.Reject()
 			return fmt.Errorf("match pcre %q: %w", r.PCRE, err)
 		}
-		if !c.Must(len(indexes) > 0) {
+		if hasJump {
+			indexes = slices.DeleteFunc(indexes, func(match data.Matched) bool {
+				absolute := match.Pos + baseOffset
+				if r.PCREParsed.StartsWith() {
+					return absolute != jumpPosition
+				}
+				return absolute < jumpPosition
+			})
+		}
+		if r.PCREParsed.StartsWith() && !hasJump {
+			indexes = slices.DeleteFunc(indexes, func(match data.Matched) bool {
+				return match.Pos != 0
+			})
+		}
+		if r.Negative {
+			if len(indexes) > 0 {
+				c.Reject()
+			}
 			return nil
 		}
-
-		if r.PCREParsed.StartsWith() {
-			if !c.Must(indexes[0].Pos == 0) {
-				return nil
-			}
+		if !c.Must(len(indexes) > 0) {
+			return nil
 		}
 		if baseOffset != 0 {
 			for i := range indexes {

@@ -2,12 +2,15 @@ package engine
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/rule"
@@ -53,6 +56,47 @@ alert udp any any -> any any (msg:"udp response"; flow:established,to_client; co
 	responseAlert, ok := bySID[9700022]
 	require.True(t, ok, "missing UDP response alert")
 	require.Equal(t, 1, responseAlert.Direction)
+}
+
+func TestUDPStatefulPcapReplay(t *testing.T) {
+	rules, err := rule.ParseStrictRule(`
+alert udp any any -> any any (msg:"udp request"; flow:to_server; content:"hello"; threshold:type both,track by_src,count 1,seconds 60; sid:9700031; rev:1;)
+alert udp any any -> any any (msg:"udp response"; flow:established,to_client; content:"world"; sid:9700032; rev:1;)
+`)
+	require.NoError(t, err)
+	var mu sync.Mutex
+	var alerts []Alert
+	engine, err := NewStatefulEngine(rules, Config{Epoch: 21, UDPFlowTimeout: time.Minute, State: state.DefaultConfig(), OnAlert: func(alert Alert) {
+		mu.Lock()
+		alerts = append(alerts, alert)
+		mu.Unlock()
+	}})
+	require.NoError(t, err)
+	defer engine.Close()
+
+	base := time.Unix(1700011000, 0)
+	query := serializeUDP(t, "10.0.0.1", "10.0.0.2", 40000, 9999, gopacket.Payload([]byte("hello")))
+	response := serializeUDP(t, "10.0.0.2", "10.0.0.1", 9999, 40000, gopacket.Payload([]byte("world")))
+	path := filepath.Join(t.TempDir(), "udp.pcap")
+	file, err := os.Create(path)
+	require.NoError(t, err)
+	writer := pcapgo.NewWriter(file)
+	require.NoError(t, writer.WriteFileHeader(65535, layers.LinkTypeEthernet))
+	require.NoError(t, writer.WritePacket(gopacket.CaptureInfo{Timestamp: base, CaptureLength: len(query), Length: len(query)}, query))
+	require.NoError(t, writer.WritePacket(gopacket.CaptureInfo{Timestamp: base.Add(time.Millisecond), CaptureLength: len(response), Length: len(response)}, response))
+	require.NoError(t, file.Close())
+
+	require.NoError(t, engine.OpenPcapFile(path))
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, alerts, 2)
+	seen := map[int]bool{}
+	for _, alert := range alerts {
+		seen[alert.Rule.Sid] = true
+	}
+	require.True(t, seen[9700031])
+	require.True(t, seen[9700032])
 }
 
 func TestUDPFlowbitsAcrossDirections(t *testing.T) {

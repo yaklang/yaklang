@@ -1,5 +1,10 @@
 package match
 
+import (
+	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+)
+
 const (
 	headerDirectionForward uint8 = 1 << iota
 	headerDirectionReverse
@@ -10,6 +15,12 @@ func ipMatcher(c *matchContext) error {
 	nw := c.PK.NetworkLayer()
 	if !c.Must(nw != nil) {
 		return nil
+	}
+	switch network := nw.(type) {
+	case *layers.IPv4:
+		c.SetBuffer(modifier.IPv4HDR, network.LayerContents())
+	case *layers.IPv6:
+		c.SetBuffer(modifier.IPv6HDR, network.LayerContents())
 	}
 	flow := nw.NetworkFlow()
 	directions := uint8(0)

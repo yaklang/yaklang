@@ -95,8 +95,34 @@ Poor Reputation 翻译为"恶意"。Observed 翻译为 "检测到"。 "CINS Acti
 	}
 }
 
+type TagRule struct {
+	Kind  string `json:"kind"`
+	Count int    `json:"count"`
+	Unit  string `json:"unit"`
+}
+
+// AppLayerEvent is one app-layer-event predicate. Suricata evaluates the event
+// flag produced by the application parser for the current transaction.
+type AppLayerEvent struct {
+	Name    string `json:"name"`
+	Negated bool   `json:"negated,omitempty"`
+}
+
+// ASN1Rule models the Suricata asn1 keyword. Checks are combined with OR
+// semantics: matching any enabled malformed-encoding condition satisfies the
+// keyword.
+type ASN1Rule struct {
+	Raw               string `json:"raw"`
+	OversizeLength    *uint32
+	AbsoluteOffset    *uint16
+	RelativeOffset    *int
+	BitstringOverflow bool
+	DoubleOverflow    bool
+}
+
 type ContentRuleConfig struct {
 	Flow *FlowRule
+	Tag  *TagRule
 
 	Thresholding *ThresholdingConfig
 	StreamSize   *StateMetricRule
@@ -124,6 +150,13 @@ type ContentRuleConfig struct {
 
 	/* TLS */
 	TLSConfig *TLSRule
+
+	/* Application-layer protocol/event predicates */
+	AppLayerProtocol        string
+	AppLayerProtocolNegated bool
+	AppLayerEvents          []AppLayerEvent
+	FTPBounce               bool
+	ASN1                    *ASN1Rule
 
 	/* Payload Match */
 	ContentRules []*ContentRule
@@ -192,29 +225,46 @@ type StateMetricRule struct {
 	Range     *numrange.NumRange `json:"range"`
 }
 
+type ByteOp struct {
+	Kind string `json:"kind"`
+	Raw  string `json:"raw"`
+}
+
 type ContentRule struct {
 	Negative bool
 	Content  []byte
 
 	// payload config
-	Nocase     bool // case insensitive
-	Depth      *int
-	Offset     *int
-	StartsWith bool
-	EndsWith   bool
-	Distance   *int
-	Within     *int
+	Nocase      bool // case insensitive
+	Depth       *int
+	Offset      *int
+	StartsWith  bool
+	EndsWith    bool
+	Distance    *int
+	Within      *int
+	DepthVar    string
+	OffsetVar   string
+	DistanceVar string
+	WithinVar   string
+	// DotPrefix applies the Suricata dotprefix transform to the selected
+	// sticky buffer before this content match.
+	DotPrefix bool
 	// no effect
 	RawBytes bool
 	IsDataAt string
 	BSize    string
 	DSize    string
-	// won't support
-	ByteTest string
+	// ByteTests preserves every byte_test in source order. ByteTest keeps the
+	// last value for compatibility with older callers.
+	ByteTests []string
+	ByteTest  string
 	// won't support
 	ByteMath string
-	// won't support
-	ByteJump string
+	// ByteJumps preserves every byte_jump in source order.
+	ByteJumps []string
+	ByteJump  string
+	// ByteOps preserves byte_test/byte_jump order when they are interleaved.
+	ByteOps []ByteOp
 	// won't support
 	ByteExtract string
 	// won't support

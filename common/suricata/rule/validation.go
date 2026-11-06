@@ -65,6 +65,85 @@ func ParseAndValidate(data string, envs ...string) ([]*Rule, []ValidationDiagnos
 	return rules, ValidateRules(rules), nil
 }
 
+// UsesHTTPBuffers reports whether the rule selects HTTP sticky buffers or
+// HTTP request/response configuration. Such TCP rules must use the HTTP
+// parser instead of the raw TCP parser.
+func UsesHTTPBuffers(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	if r.ContentRuleConfig.HTTPConfig != nil {
+		return true
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && modifier.IsHTTPModifier(content.Modifier) {
+			return true
+		}
+	}
+	return false
+}
+
+// UsesTLSBuffers reports whether the rule selects a TLS certificate, SNI,
+// random or JA3 sticky buffer.
+func UsesTLSBuffers(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && content.Modifier >= modifier.TLSCertSubject && content.Modifier <= modifier.JA3SString {
+			return true
+		}
+	}
+	return false
+}
+
+// UsesSSHBuffers reports whether the rule selects the SSH protocol banner
+// sticky buffer.
+func UsesSSHBuffers(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && content.Modifier == modifier.SSHProto {
+			return true
+		}
+	}
+	return false
+}
+
+func UsesFileData(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && content.Modifier == modifier.FileData {
+			return true
+		}
+	}
+	return false
+}
+
+func UsesRawBytes(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && content.RawBytes {
+			return true
+		}
+	}
+	return false
+}
+
+func isTCPBasedProtocol(protocol string) bool {
+	switch protocol {
+	case "tcp", "tcp-pkt", "http", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "tcp-stream":
+		return true
+	default:
+		return false
+	}
+}
+
 type ruleValidator struct {
 	rule        *Rule
 	diagnostics []ValidationDiagnostic
@@ -94,7 +173,8 @@ func (v *ruleValidator) validateHeader() {
 	}
 
 	switch normalizeKeyword(v.rule.Protocol) {
-	case "dns", "http", "tcp", "udp", "icmp", "tls":
+	case "ip", "dns", "http", "tcp", "tcp-pkt", "udp", "icmp", "icmpv6", "tls",
+		"smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "tcp-stream":
 	default:
 		v.add(ValidationStageHeader, "protocol", fmt.Sprintf("protocol %q is not supported by the matcher", v.rule.Protocol), KeywordUnsupported)
 	}
@@ -145,6 +225,23 @@ func (v *ruleValidator) validateModel() {
 	if config == nil {
 		return
 	}
+	switch v.rule.Target {
+	case "", "src_ip", "dest_ip":
+	default:
+		v.add(ValidationStageModel, "target", fmt.Sprintf("target %q must be src_ip or dest_ip", v.rule.Target), KeywordUnsupported)
+	}
+	if config.Tag != nil {
+		switch {
+		case config.Tag.Kind != "session":
+			v.add(ValidationStageModel, "tag", "tag only supports session scope", KeywordUnsupported)
+		case config.Tag.Count <= 0:
+			v.add(ValidationStageModel, "tag", "tag count must be positive", KeywordUnsupported)
+		case config.Tag.Unit != "packets" && config.Tag.Unit != "seconds":
+			v.add(ValidationStageModel, "tag", "tag unit must be packets or seconds", KeywordUnsupported)
+		case !isTCPBasedProtocol(normalizeKeyword(v.rule.Protocol)):
+			v.add(ValidationStageModel, "tag", "tag requires a TCP-based flow", KeywordUnsupported)
+		}
+	}
 	if config.Flow != nil {
 		v.add(ValidationStageModel, "flow", "parsed flow constraints require a stateful flow tracker", KeywordStatefulRequired)
 	}
@@ -181,51 +278,117 @@ func (v *ruleValidator) validateModel() {
 		v.add(ValidationStageModel, "uricontent", "deprecated uricontent matching is not implemented", KeywordUnsupported)
 	}
 	if config.TLSConfig != nil {
-		v.add(ValidationStageModel, "tls-config", "TLSConfig fields are not attached to the matcher pipeline", KeywordUnsupported)
+		if config.TLSConfig.Version != "" {
+			switch config.TLSConfig.Version {
+			case "1.0", "1.1", "1.2", "1.3":
+			default:
+				v.add(ValidationStageModel, "tls.version", "tls.version only supports 1.0, 1.1, 1.2 and 1.3", KeywordUnsupported)
+			}
+		}
+		if config.TLSConfig.CertExpired != nil || config.TLSConfig.CertValid != nil ||
+			config.TLSConfig.Store || config.TLSConfig.CertSubject != "" ||
+			config.TLSConfig.CertIssuer != "" || config.TLSConfig.CertSerial != "" ||
+			config.TLSConfig.CertFingerprint != "" || config.TLSConfig.SNI != "" {
+			v.add(ValidationStageModel, "tls-config", "the populated TLSConfig field is not evaluated by the matcher", KeywordUnsupported)
+		}
 	}
 
 	protocol := normalizeKeyword(v.rule.Protocol)
 	if config.DNS != nil && protocol != "dns" {
 		v.add(ValidationStageModel, "dns", "DNS constraints require the dns protocol", KeywordUnsupported)
 	}
-	if config.TcpConfig != nil && protocol != "tcp" && protocol != "http" && protocol != "tls" {
+	if config.TcpConfig != nil && !isTCPBasedProtocol(protocol) {
 		v.add(ValidationStageModel, "tcp", "TCP constraints require a TCP-based protocol", KeywordUnsupported)
 	}
-	if config.IcmpConfig != nil && protocol != "icmp" {
-		v.add(ValidationStageModel, "icmp", "ICMP constraints require the icmp protocol", KeywordUnsupported)
+	if config.IcmpConfig != nil {
+		switch protocol {
+		case "icmp":
+		case "icmpv6":
+			if config.IcmpConfig.ICMPId != nil || config.IcmpConfig.ICMPSeq != nil {
+				v.add(ValidationStageModel, "icmp", "icmp_id/icmp_seq require the icmp protocol", KeywordUnsupported)
+			}
+		default:
+			v.add(ValidationStageModel, "icmp", "ICMP constraints require the icmp or icmpv6 protocol", KeywordUnsupported)
+		}
 	}
-	if config.HTTPConfig != nil && protocol != "http" {
+	if config.HTTPConfig != nil && protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
 		v.add(ValidationStageModel, "http", "HTTP constraints require the http protocol", KeywordUnsupported)
+	}
+	if config.AppLayerProtocol != "" {
+		if config.AppLayerProtocol != "http" {
+			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol only supports http", KeywordUnsupported)
+		}
+		if protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol requires the http, tcp or tcp-pkt protocol", KeywordUnsupported)
+		}
+	}
+	if len(config.AppLayerEvents) > 0 {
+		if protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+			v.add(ValidationStageModel, "app-layer-event", "app-layer-event requires an HTTP-capable protocol", KeywordUnsupported)
+		}
+		for _, event := range config.AppLayerEvents {
+			switch event.Name {
+			case "http.invalid_transfer_encoding_value_in_request":
+			default:
+				v.add(ValidationStageModel, "app-layer-event", fmt.Sprintf("app-layer-event %q is not implemented", event.Name), KeywordUnsupported)
+			}
+		}
+	}
+	if config.FTPBounce && protocol != "tcp" && protocol != "ftp" {
+		v.add(ValidationStageModel, "ftpbounce", "ftpbounce requires the tcp or ftp protocol", KeywordUnsupported)
 	}
 
 	for _, contentRule := range config.ContentRules {
 		if contentRule == nil {
 			continue
 		}
-		if modifier.IsHTTPModifier(contentRule.Modifier) && protocol != "http" {
+		if modifier.IsHTTPModifier(contentRule.Modifier) && protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
 			v.add(ValidationStageModel, "http-buffer", "HTTP sticky buffers require the http protocol", KeywordUnsupported)
+		}
+		if (protocol == "tcp" || protocol == "tcp-pkt") && UsesHTTPBuffers(v.rule) && contentRule.Modifier == modifier.TCPHDR {
+			v.add(ValidationStageModel, "tcp.hdr", "TCP header buffers cannot be combined with HTTP sticky buffers", KeywordUnsupported)
 		}
 		if contentRule.Modifier == modifier.DNSQuery && protocol != "dns" {
 			v.add(ValidationStageModel, "dns.query", "DNS query buffers require the dns protocol", KeywordUnsupported)
 		}
-		if contentRule.Modifier == modifier.TCPHDR && protocol != "tcp" && protocol != "http" && protocol != "tls" {
+		if contentRule.Modifier == modifier.UDPHDR && protocol != "udp" {
+			v.add(ValidationStageModel, "udp.hdr", "UDP header buffers require the udp protocol", KeywordUnsupported)
+		}
+		if contentRule.Modifier == modifier.ICMPV4HDR && protocol != "icmp" {
+			v.add(ValidationStageModel, "icmpv4.hdr", "ICMPv4 header buffers require the icmp protocol", KeywordUnsupported)
+		}
+		if contentRule.Modifier == modifier.ICMPV6HDR && protocol != "icmpv6" {
+			v.add(ValidationStageModel, "icmpv6.hdr", "ICMPv6 header buffers require the icmpv6 protocol", KeywordUnsupported)
+		}
+		if contentRule.Modifier == modifier.FileData {
+			switch protocol {
+			case "http", "tcp", "tcp-pkt", "smtp":
+			default:
+				v.add(ValidationStageModel, "file_data", "file_data requires HTTP, TCP payload or SMTP DATA body matching", KeywordUnsupported)
+			}
+		}
+		if contentRule.Modifier == modifier.TCPHDR && !isTCPBasedProtocol(protocol) {
 			v.add(ValidationStageModel, "tcp.hdr", "TCP header buffers require a TCP-based protocol", KeywordUnsupported)
 		}
-		if contentRule.Modifier >= modifier.TLSCertSubject && protocol != "tls" {
-			v.add(ValidationStageModel, "tls-buffer", "TLS buffers require the tls protocol", KeywordUnsupported)
+		if contentRule.Modifier == modifier.SSHProto && protocol != "ssh" && protocol != "tcp" && protocol != "tcp-pkt" {
+			v.add(ValidationStageModel, "ssh.proto", "SSH protocol buffers require the ssh, tcp or tcp-pkt protocol", KeywordUnsupported)
+		}
+		if contentRule.Modifier >= modifier.TLSCertSubject && contentRule.Modifier <= modifier.JA3SString &&
+			protocol != "tls" && protocol != "tcp" && protocol != "tcp-pkt" {
+			v.add(ValidationStageModel, "tls-buffer", "TLS buffers require the tls, tcp or tcp-pkt protocol", KeywordUnsupported)
+		}
+		if (protocol == "tcp" || protocol == "tcp-pkt") && UsesHTTPBuffers(v.rule) && UsesTLSBuffers(v.rule) {
+			v.add(ValidationStageModel, "tls-buffer", "HTTP and TLS sticky buffers cannot be combined in one TCP rule", KeywordUnsupported)
+		}
+		if contentRule.DotPrefix && contentRule.Modifier == modifier.Default {
+			v.add(ValidationStageModel, "dotprefix", "dotprefix requires a sticky buffer", KeywordUnsupported)
 		}
 		if contentRule.Within != nil && *contentRule.Within < 0 {
 			v.add(ValidationStageModel, "within", "negative within ranges are not implemented", KeywordUnsupported)
 		}
-		if contentRule.RawBytes {
-			v.add(ValidationStageModel, "rawbytes", "rawbytes does not change the selected payload buffer", KeywordUnsupported)
-		}
 		for keyword, value := range map[string]string{
-			"byte_test":    contentRule.ByteTest,
-			"byte_math":    contentRule.ByteMath,
-			"byte_jump":    contentRule.ByteJump,
-			"byte_extract": contentRule.ByteExtract,
-			"rpc":          contentRule.RPC,
+			"byte_math": contentRule.ByteMath,
+			"rpc":       contentRule.RPC,
 		} {
 			if value != "" {
 				v.add(ValidationStageModel, keyword, "parsed field is not evaluated by the matcher", KeywordUnsupported)
@@ -235,10 +398,9 @@ func (v *ruleValidator) validateModel() {
 			v.add(ValidationStageModel, "replace", "payload replacement is not implemented", KeywordUnsupported)
 		}
 		for keyword, value := range map[string]string{
-			"flowbits":      contentRule.FlowBits,
-			"flowint":       contentRule.FlowInt,
-			"xbits":         contentRule.XBits,
-			"base64_decode": contentRule.Base64Decode,
+			"flowbits": contentRule.FlowBits,
+			"flowint":  contentRule.FlowInt,
+			"xbits":    contentRule.XBits,
 		} {
 			if value == "" {
 				continue
@@ -249,9 +411,6 @@ func (v *ruleValidator) validateModel() {
 		if contentRule.NoAlert {
 			capability, _ := LookupKeywordCapability("noalert")
 			v.add(ValidationStageModel, "noalert", capability.Reason, capability.Status)
-		}
-		if contentRule.Base64Data {
-			v.add(ValidationStageModel, "base64_data", "base64 data buffers are not implemented", KeywordUnsupported)
 		}
 	}
 }

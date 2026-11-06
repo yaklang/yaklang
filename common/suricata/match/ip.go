@@ -6,7 +6,26 @@ import (
 	"strings"
 
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 )
+
+func ipParser(c *matchContext) error {
+	if c.PK == nil {
+		c.Reject()
+		return nil
+	}
+	network := c.PK.NetworkLayer()
+	if !c.Must(network != nil) {
+		return nil
+	}
+	c.SetBufferProvider(func(mdf modifier.Modifier) []byte {
+		if mdf == modifier.Default {
+			return network.LayerPayload()
+		}
+		return nil
+	})
+	return nil
+}
 
 func ipCfgMatch(c *matchContext) error {
 	if c.Rule.ContentRuleConfig == nil {

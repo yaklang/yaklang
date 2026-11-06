@@ -26,6 +26,28 @@ func parseCommaParts(raw string) []string {
 	return parts
 }
 
+func parseTagRule(raw string) (*TagRule, error) {
+	parts := parseCommaParts(raw)
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("tag requires scope, count and unit")
+	}
+	kind := strings.ToLower(parts[0])
+	if kind != "session" {
+		return nil, fmt.Errorf("unsupported tag scope %q", parts[0])
+	}
+	count, err := strconv.Atoi(parts[1])
+	if err != nil || count <= 0 {
+		return nil, fmt.Errorf("tag count %q must be a positive integer", parts[1])
+	}
+	unit := strings.ToLower(parts[2])
+	switch unit {
+	case "packets", "seconds":
+	default:
+		return nil, fmt.Errorf("tag unit %q must be packets or seconds", parts[2])
+	}
+	return &TagRule{Kind: kind, Count: count, Unit: unit}, nil
+}
+
 func parseFlowRule(parts []string) (*FlowRule, error) {
 	flow := &FlowRule{}
 	seen := make(map[string]bool)
@@ -243,16 +265,36 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.IPv6HDR
 	case "tcp.hdr", "tcp_hdr":
 		return modifier.TCPHDR
-	case "ja3.hash":
+	case "udp.hdr", "udp_hdr":
+		return modifier.UDPHDR
+	case "icmpv4.hdr", "icmpv4_hdr":
+		return modifier.ICMPV4HDR
+	case "icmpv6.hdr", "icmpv6_hdr":
+		return modifier.ICMPV6HDR
+	case "ja3.hash", "ja3_hash":
 		return modifier.JA3Hash
-	case "ja3s.hash":
+	case "ja3s.hash", "ja3s_hash":
 		return modifier.JA3SHash
-	case "ja3.string":
+	case "ja3.string", "ja3_string":
 		return modifier.JA3String
-	case "ja3s.string":
+	case "ja3s.string", "ja3s_string":
 		return modifier.JA3SString
-	case "tls.cert_subject":
+	case "tls.cert_subject", "tls_cert_subject":
 		return modifier.TLSCertSubject
+	case "tls.cert_issuer", "tls_cert_issuer":
+		return modifier.TLSCertIssuer
+	case "tls.cert_serial", "tls_cert_serial":
+		return modifier.TLSCertSerial
+	case "tls.cert_fingerprint", "tls_cert_fingerprint":
+		return modifier.TLSCertFingerprint
+	case "tls.certs", "tls_certs":
+		return modifier.TLSCerts
+	case "tls.sni", "tls_sni":
+		return modifier.TLSSNI
+	case "base64_data", "base64.data":
+		return modifier.Base64Data
+	case "ssh.proto", "ssh_proto":
+		return modifier.SSHProto
 	}
 	return modifier.Default
 }
@@ -261,24 +303,52 @@ func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 		return false, ""
 	}
 	ctx := ssts[0].(*parser.SingleSettingContext)
+	negative := ctx.Negative() != nil
 	data := ctx.GetText()
-	return ctx.Negative() != nil, data
+	if negative {
+		data = strings.TrimPrefix(data, "!")
+	} else if ctx.Settingcontent() == nil && strings.HasPrefix(data, "!") {
+		// The lexer keeps '!' inside unquoted settings so byte_test operators
+		// such as !& and != survive. A leading '!' on a non-quoted setting is
+		// still the Suricata negative prefix.
+		negative = true
+		data = strings.TrimPrefix(data, "!")
+	}
+	return negative, data
 }
 
 type MultipleBufferMatching struct {
-	last modifier.Modifier
+	last      modifier.Modifier
+	dotPrefix bool
 }
 
-func (m *MultipleBufferMatching) transfer(mdf modifier.Modifier) modifier.Modifier {
-	switch mdf {
-	case modifier.DNSQuery, modifier.FileData, modifier.HTTPHeader:
-		m.last = mdf
+// start records a newly selected sticky buffer. Transforms only apply to the
+// buffer that follows them, so a new buffer clears the pending dotprefix.
+func (m *MultipleBufferMatching) start(mdf modifier.Modifier) {
+	m.last = mdf
+	m.dotPrefix = false
+}
+
+func (m *MultipleBufferMatching) setDotPrefix() {
+	m.dotPrefix = true
+}
+
+func (m *MultipleBufferMatching) transfer(contentRule *ContentRule) {
+	switch contentRule.Modifier {
+	case modifier.DNSQuery, modifier.FileData, modifier.HTTPHeader,
+		modifier.HTTPHost, modifier.HTTPHostRaw,
+		modifier.TLSSNI, modifier.TLSCertSubject, modifier.TLSCertIssuer,
+		modifier.TLSCertSerial, modifier.TLSCertFingerprint, modifier.TLSCerts,
+		modifier.Base64Data, modifier.SSHProto:
+		m.last = contentRule.Modifier
 	case modifier.Default:
-		mdf = m.last
+		contentRule.Modifier = m.last
 	default:
 		m.last = modifier.Default
 	}
-	return mdf
+	if m.dotPrefix {
+		contentRule.DotPrefix = true
+	}
 }
 
 func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (parseError error) {
@@ -302,7 +372,10 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 		}
 		paramctx := params[i].(*parser.ParamContext)
 		key := paramctx.Keyword().GetText()
-		key = strings.TrimSpace(key)
+		// Suricata resolves rule keyword names case-insensitively. Normalizing
+		// here also keeps SettingMap/capability lookups consistent for rules
+		// such as "Content:".
+		key = strings.ToLower(strings.TrimSpace(key))
 		if key == "" {
 			continue
 		}
@@ -333,14 +406,24 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			}
 		case HasContent:
 			if modifierMapping(key) != modifier.Default {
-				STATUS = ContentModif
+				if key == "base64_data" {
+					// base64_data always opens a new sticky buffer. Do not
+					// attach it backwards to the content that produced the
+					// base64 input.
+					multipleBufferMatching.transfer(contentRule)
+					contents = append(contents, contentRule)
+					contentRule = new(ContentRule)
+					STATUS = HasNone
+				} else {
+					STATUS = ContentModif
+				}
 			} else if key == "content" {
-				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				multipleBufferMatching.transfer(contentRule)
 				contents = append(contents, contentRule)
 				contentRule = new(ContentRule)
 				STATUS = HasContent
 			} else if key == "pcre" {
-				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				multipleBufferMatching.transfer(contentRule)
 				contents = append(contents, contentRule)
 				contentRule = new(ContentRule)
 				STATUS = SavingPCRE
@@ -361,7 +444,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			}
 		case HasModif:
 			if modifierMapping(key) != modifier.Default {
-				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				multipleBufferMatching.transfer(contentRule)
 				contents = append(contents, contentRule)
 				contentRule = new(ContentRule)
 				STATUS = HasModif
@@ -372,17 +455,17 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			}
 		case ModifContent, ContentModif:
 			if modifierMapping(key) != modifier.Default {
-				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				multipleBufferMatching.transfer(contentRule)
 				contents = append(contents, contentRule)
 				contentRule = new(ContentRule)
 				STATUS = HasModif
 			} else if key == "content" {
-				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				multipleBufferMatching.transfer(contentRule)
 				contents = append(contents, contentRule)
 				contentRule = new(ContentRule)
 				STATUS = HasContent
 			} else if key == "pcre" {
-				contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+				multipleBufferMatching.transfer(contentRule)
 				contents = append(contents, contentRule)
 				contentRule = new(ContentRule)
 				STATUS = SavingPCRE
@@ -418,10 +501,32 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			for _, v := range ssts {
 				rule.Metadata = append(rule.Metadata, v.GetText())
 			}
+		case "target":
+			// target only selects which endpoint an alert points at; it does
+			// not change matching. Keep the normalized Suricata spelling.
+			rule.Target = strings.ToLower(vStr)
+		case "tag":
+			if rule.ContentRuleConfig.Tag != nil {
+				v.Errorf("parse tag %q: duplicate tag option", vStr)
+				parseError = fmt.Errorf("parse tag %q: duplicate tag option", vStr)
+				return
+			}
+			tag, err := parseTagRule(vStr)
+			if err != nil {
+				v.Errorf("parse tag %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse tag %q: %w", vStr, err)
+				return
+			}
+			rule.ContentRuleConfig.Tag = tag
 		case "content":
 			neg, content := mustSoloSingleSetting(ssts)
 			contentRule.Content = []byte(unquoteAndParseHex(content))
 			contentRule.Negative = neg
+		case "tls.version", "tls_version":
+			if rule.ContentRuleConfig.TLSConfig == nil {
+				rule.ContentRuleConfig.TLSConfig = &TLSRule{}
+			}
+			rule.ContentRuleConfig.TLSConfig.Version = strings.ToLower(strings.TrimSpace(vStr))
 		case "dns.opcode", "dns_opcode":
 			neg, content := mustSoloSingleSetting(ssts)
 			if rule.ContentRuleConfig.DNS == nil {
@@ -695,41 +800,44 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 		case "nocase":
 			contentRule.Nocase = true
 		case "depth":
-			value, err := parseOptionalInt(vStr)
+			value, variable, err := parseOptionalIntOrVar(vStr)
 			if err != nil {
 				v.Errorf("parse depth %q: %v", vStr, err)
 				parseError = fmt.Errorf("parse depth %q: %w", vStr, err)
 				return
 			}
-			contentRule.Depth = value
+			contentRule.Depth, contentRule.DepthVar = value, variable
 		case "offset":
-			value, err := parseOptionalInt(vStr)
+			value, variable, err := parseOptionalIntOrVar(vStr)
 			if err != nil {
 				v.Errorf("parse offset %q: %v", vStr, err)
 				parseError = fmt.Errorf("parse offset %q: %w", vStr, err)
 				return
 			}
-			contentRule.Offset = value
+			contentRule.Offset, contentRule.OffsetVar = value, variable
 		case "startswith":
 			contentRule.StartsWith = true
 		case "endswith":
 			contentRule.EndsWith = true
+		case "dotprefix":
+			contentRule.DotPrefix = true
+			multipleBufferMatching.setDotPrefix()
 		case "distance":
-			value, err := parseOptionalInt(vStr)
+			value, variable, err := parseOptionalIntOrVar(vStr)
 			if err != nil {
 				v.Errorf("parse distance %q: %v", vStr, err)
 				parseError = fmt.Errorf("parse distance %q: %w", vStr, err)
 				return
 			}
-			contentRule.Distance = value
+			contentRule.Distance, contentRule.DistanceVar = value, variable
 		case "within":
-			value, err := parseOptionalInt(vStr)
+			value, variable, err := parseOptionalIntOrVar(vStr)
 			if err != nil {
 				v.Errorf("parse within %q: %v", vStr, err)
 				parseError = fmt.Errorf("parse within %q: %w", vStr, err)
 				return
 			}
-			contentRule.Within = value
+			contentRule.Within, contentRule.WithinVar = value, variable
 		case "rawbytes":
 			contentRule.RawBytes = true
 		case "isdataat":
@@ -743,18 +851,34 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			contentRule.DSize = vStr
 		case "byte_test":
 			contentRule.ByteTest = vStr
+			contentRule.ByteTests = append(contentRule.ByteTests, vStr)
+			contentRule.ByteOps = append(contentRule.ByteOps, ByteOp{Kind: "test", Raw: vStr})
+			if STATUS == HasNone {
+				STATUS = HasContent
+			}
 		case "byte_math":
 			contentRule.ByteMath = vStr
 		case "byte_extract":
 			contentRule.ByteExtract = vStr
+			contentRule.ByteOps = append(contentRule.ByteOps, ByteOp{Kind: "extract", Raw: vStr})
+			if STATUS == HasNone {
+				STATUS = HasContent
+			}
 		case "byte_jump":
 			contentRule.ByteJump = vStr
+			contentRule.ByteJumps = append(contentRule.ByteJumps, vStr)
+			contentRule.ByteOps = append(contentRule.ByteOps, ByteOp{Kind: "jump", Raw: vStr})
+			if STATUS == HasNone {
+				STATUS = HasContent
+			}
 		case "rpc":
 			contentRule.RPC = vStr
 		case "replace":
 			contentRule.Replace = []byte(unquoteAndParseHex(vStr))
 		case "pcre":
-			contentRule.PCRE = unquoteString(vStr)
+			negative, pcreValue := mustSoloSingleSetting(ssts)
+			contentRule.Negative = negative
+			contentRule.PCRE = unquotePCREString(pcreValue)
 			parsed, err := pcre.ParsePCREStr(contentRule.PCRE)
 			if err != nil {
 				v.Errorf("parsePCREStr err:%v", err)
@@ -797,6 +921,8 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			contentRule.Base64Decode = vStr
 		case "base64_data":
 			contentRule.Base64Data = true
+			contentRule.Modifier = modifier.Base64Data
+			multipleBufferMatching.start(modifier.Base64Data)
 		case "flowint":
 			flowInt, err := parseStateValueOption(key, vStr, parseCommaParts(vStr))
 			if err != nil {
@@ -815,11 +941,36 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			}
 			contentRule.XBits = vStr
 			rule.StateOptions = append(rule.StateOptions, StateOption{Keyword: key, Raw: vStr, XBits: xBits})
+		case "app-layer-protocol":
+			negative, value := mustSoloSingleSetting(ssts)
+			if value == "" {
+				value = vStr
+			}
+			rule.ContentRuleConfig.AppLayerProtocol = strings.ToLower(strings.TrimSpace(value))
+			rule.ContentRuleConfig.AppLayerProtocolNegated = negative
 		case "app-layer-event":
-			contentRule.ExtraFlags = append(contentRule.ExtraFlags, fmt.Sprintf("%v:%v", key, vStr))
+			negative, value := mustSoloSingleSetting(ssts)
+			if value == "" {
+				value = vStr
+			}
+			rule.ContentRuleConfig.AppLayerEvents = append(rule.ContentRuleConfig.AppLayerEvents, AppLayerEvent{
+				Name:    strings.ToLower(strings.TrimSpace(value)),
+				Negated: negative,
+			})
+		case "ftpbounce":
+			rule.ContentRuleConfig.FTPBounce = true
+		case "asn1":
+			config, err := parseASN1Rule(vStr)
+			if err != nil {
+				v.Errorf("parse asn1 %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse asn1 %q: %w", vStr, err)
+				return
+			}
+			rule.ContentRuleConfig.ASN1 = config
 		default:
-			if modifierMapping(key) != modifier.Default {
-				contentRule.Modifier = modifierMapping(key)
+			if mdf := modifierMapping(key); mdf != modifier.Default {
+				contentRule.Modifier = mdf
+				multipleBufferMatching.start(mdf)
 				break
 			}
 			// fallback
@@ -833,7 +984,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 	}
 
 	if STATUS != HasNone {
-		contentRule.Modifier = multipleBufferMatching.transfer(contentRule.Modifier)
+		multipleBufferMatching.transfer(contentRule)
 		contents = append(contents, contentRule)
 	}
 
