@@ -13,6 +13,7 @@ metadata:
 
 1. 通过 require_tool 加载 `list_pcap_interfaces` 和 `start_pcap_capture`，列出设备并明确选择一个 interface。BPF 是入口过滤，query_pcapdb 的 protocol/IP 等条件是查询过滤。
 2. `start_pcap_capture` 默认异步，无需显式设置 async。省略 duration_seconds 表示持续捕获，直到停止或所属任务结束。提交只返回 execute_id，不能据此宣称网卡已经成功打开。
+   打开网卡遇到权限错误时会调用现有 pcapfix 修复流程，macOS 会弹出系统管理员授权框，成功后重试一次；已有权限或网卡/驱动等非权限错误不触发授权。用户取消授权时报告失败，不自行重复启动。授权过程跟随当前任务取消。
 3. 用顶层 action `manage_async_execution_runtime` 的 inspect 读取该执行的 stdout，启动成功后会输出一行包含 dataset_id 的 JSON。它不是 directly_call_tool 下的业务工具。启动失败需要检查执行错误，不能解释为没有流量。
 4. 立即用原来的 `query_pcapdb(id=dataset_id)` 查询 metadata、protocols、sessions、streams、details 等。数据库从首次提交起为 ready，每次读取已提交数据；抓包是否仍在运行由异步执行状态判断。尚未完成边界的消息可能后续才出现。
 5. 同一连接持续分析，不按时间切片重启。has_more=false 或空页只描述当前已提交结果，不表示捕获结束。after 用于普通分页，不能跟踪旧 session 的关闭或 stream 计数更新；需要时重新查询对应会话/流或 metadata。

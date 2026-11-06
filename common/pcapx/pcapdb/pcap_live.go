@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils/pcapfix"
 )
 
 // LiveCaptureConfig describes one continuous, single-interface capture. A zero
@@ -415,7 +417,9 @@ func (m *InstanceManager) RunLiveCapture(ctx context.Context, config LiveCapture
 	if err != nil {
 		return nil, err
 	}
-	h, err := pcap.OpenLive(device, int32(config.Snaplen), config.Promisc, 100*time.Millisecond)
+	h, err := openLiveWithPermission(ctx, func() (*pcap.Handle, error) {
+		return pcap.OpenLive(device, int32(config.Snaplen), config.Promisc, 100*time.Millisecond)
+	}, pcapfix.FixWithContext)
 	if err != nil {
 		return nil, fmt.Errorf("pcapdb: open capture %q: %w", device, err)
 	}
@@ -466,4 +470,46 @@ func (m *InstanceManager) RunLiveCapture(ctx context.Context, config LiveCapture
 		}
 	}
 	return nil, nil
+}
+
+// Only permission failures enter the existing authorization flow. Retrying
+// once also verifies that authorization actually made this process able to
+// capture; a successful repair command alone is not capture readiness.
+func openLiveWithPermission(ctx context.Context, open func() (*pcap.Handle, error), authorize func(context.Context) error) (*pcap.Handle, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	handle, err := open()
+	if err == nil || !isCapturePermissionError(err) {
+		return handle, err
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	authErr := authorize(ctx)
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if authErr != nil {
+		return nil, errors.Join(err, fmt.Errorf("capture permission authorization failed: %w", authErr))
+	}
+	handle, retryErr := open()
+	if retryErr != nil {
+		return nil, errors.Join(err, fmt.Errorf("open capture after permission authorization: %w", retryErr))
+	}
+	return handle, nil
+}
+
+func isCapturePermissionError(err error) bool {
+	if errors.Is(err, os.ErrPermission) {
+		return true
+	}
+	// libpcap/Npcap normally return untyped native error strings.
+	message := strings.ToLower(err.Error())
+	for _, text := range []string{"permission denied", "operation not permitted", "don't have permission", "access is denied", "access denied", "requires superuser"} {
+		if strings.Contains(message, text) {
+			return true
+		}
+	}
+	return false
 }
