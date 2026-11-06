@@ -142,3 +142,18 @@ go test ./common/ai/aid/aireact ./common/ai/aid/aicommon -run '^TestToolDefaultA
 真实网卡用例仍因本机 BPF 权限不足未完成；可控包源、实际 SQLite 读写及脚本查询测试通过。race 链接阶段出现 macOS LC_DYSYMTAB 警告，测试退出码为零，未报告数据竞争。
 
 提交范围仅包含本任务代码、测试和本文档。工作区原有的 docs/session-skill-sync-api.md 未改动。
+
+## 7. 网卡权限授权修正（2026-11-06）
+
+参考 lowtun 的 privileged.Executor 授权方式，复用仓库已有 pcapfix；打开设备发生权限错误时请求系统授权，再重试一次。正常打开、网卡不存在和驱动错误不发起授权，用户拒绝或取消任务后不会继续重试。
+
+为 pcapfix 增加保持原 Fix() 兼容的 FixWithContext(ctx)，让授权进程跟随抓包任务取消。macOS 直接使用系统管理员授权框，沿用现有 BPF 权限修复脚本。抓包原生测试的启动等待延长为一分钟，以允许人工完成授权。
+
+授权分支使用注入的打开/授权函数验证，不在自动化测试中改变系统权限。真实授权弹窗与授权后的原生抓包需在运行引擎的桌面会话内手工验证。
+
+修正后的回归通过：
+
+```sh
+go test ./common/pcapx/pcapdb ./common/utils/pcapfix ./common/ai/aid/aitool/buildinaitools/pcaptools -count=1
+go test -race ./common/pcapx/pcapdb ./common/utils/pcapfix -run '^TestLiveCapturePermission|^TestFixWithContext' -count=1
+```

@@ -21,14 +21,28 @@ import (
 // ```
 // // SYN 扫描需要原始套接字权限，扫描前先修复一次
 // err = synscan.FixPermission()
-// if err != nil {
-//     log.error("fix pcap permission failed: %v", err)
-//     return
-// }
+//
+//	if err != nil {
+//	    log.error("fix pcap permission failed: %v", err)
+//	    return
+//	}
+//
 // log.info("pcap permission is ready for syn scan")
 // ```
 // <|EXAMPLE_END|>
 func Fix() error {
+	return FixWithContext(context.Background())
+}
+
+// FixWithContext repairs pcap permissions using the existing system
+// authorization flow. Cancelling ctx also cancels the authorization process.
+func FixWithContext(ctx context.Context) error {
+	if ctx == nil {
+		return utils.Error("pcap permission repair requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	switch runtime.GOOS {
 	case "linux":
 		// setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip
@@ -36,11 +50,11 @@ func Fix() error {
 		if err != nil {
 			return utils.Errorf("cannot locate os.Executable: %v", err)
 		}
-		return permutil.Sudo(`setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip ` + strconv.Quote(f))
+		return permutil.Sudo(`setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip `+strconv.Quote(f), permutil.WithContext(ctx))
 	case "windows":
 		return utils.Error("in windows, u should just start yakit or yak.exe as administrator, or set acl for wpcap.dll")
 	case "darwin":
-		return fixMacOSPcap()
+		return fixMacOSPcap(ctx)
 	}
 	return nil
 }
@@ -53,8 +67,7 @@ func Fix() error {
 // 4. 将 BPF 设备的组改为 access_bpf
 // 5. 设置组读写权限
 // 6. 将当前用户添加到 access_bpf 组
-func fixMacOSPcap() error {
-	ctx := context.Background()
+func fixMacOSPcap(ctx context.Context) error {
 	executor := privileged.NewExecutor("Fix Pcap Permission")
 
 	// 构建完整的修复脚本
@@ -62,11 +75,15 @@ func fixMacOSPcap() error {
 
 	log.Info("executing fix pcap permission script on macOS")
 	output, err := executor.Execute(ctx, script,
+		privileged.WithSkipConfirmDialog(),
 		privileged.WithDescription("Fix BPF device permissions for packet capture"),
 		privileged.WithTitle("Fix Pcap Permission"),
 	)
 
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return utils.Errorf("failed to fix pcap permission: %s, output: %s", err, string(output))
 	}
 
