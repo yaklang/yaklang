@@ -80,7 +80,7 @@ func TestNativeInsertIrCodesRoundTrip(t *testing.T) {
 		SourceCodeStartOffset: 3,
 		SourceCodeEndOffset:   8,
 	}
-	second := &IrCode{ProgramName: prog, CodeID: 2, Name: "b"}
+	second := &IrCode{ProgramName: prog, CodeID: 2, Name: "b", String: "a\x00b"}
 	require.NoError(t, InsertIrCodes(db, []*IrCode{nil, first, second}, 2))
 
 	got := GetIrCodeItemById(db, prog, 1)
@@ -99,6 +99,10 @@ func TestNativeInsertIrCodesRoundTrip(t *testing.T) {
 	require.Equal(t, int64(3), got.SourceCodeStartOffset)
 	require.Equal(t, int64(8), got.SourceCodeEndOffset)
 	require.False(t, got.CreatedAt.IsZero())
+
+	sanitized := GetIrCodeItemById(db, prog, 2)
+	require.NotNil(t, sanitized)
+	require.Equal(t, "ab", sanitized.String, "native insert must keep BeforeSave sanitization")
 
 	var total int64
 	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", prog).Count(&total).Error)
