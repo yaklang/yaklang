@@ -107,6 +107,7 @@ const (
 	Yak_QueryHistoryHTTPFuzzerTask_FullMethodName                 = "/ypb.Yak/QueryHistoryHTTPFuzzerTask"
 	Yak_QueryHistoryHTTPFuzzerTaskEx_FullMethodName               = "/ypb.Yak/QueryHistoryHTTPFuzzerTaskEx"
 	Yak_DeleteHistoryHTTPFuzzerTask_FullMethodName                = "/ypb.Yak/DeleteHistoryHTTPFuzzerTask"
+	Yak_FetchHTTPPreviewResource_FullMethodName                   = "/ypb.Yak/FetchHTTPPreviewResource"
 	Yak_HTTPFuzzer_FullMethodName                                 = "/ypb.Yak/HTTPFuzzer"
 	Yak_HTTPFuzzerSequence_FullMethodName                         = "/ypb.Yak/HTTPFuzzerSequence"
 	Yak_HTTPFuzzerGroup_FullMethodName                            = "/ypb.Yak/HTTPFuzzerGroup"
@@ -797,6 +798,7 @@ type YakClient interface {
 	QueryHistoryHTTPFuzzerTask(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*HistoryHTTPFuzzerTasks, error)
 	QueryHistoryHTTPFuzzerTaskEx(ctx context.Context, in *QueryHistoryHTTPFuzzerTaskExParams, opts ...grpc.CallOption) (*HistoryHTTPFuzzerTasksResponse, error)
 	DeleteHistoryHTTPFuzzerTask(ctx context.Context, in *DeleteHistoryHTTPFuzzerTaskRequest, opts ...grpc.CallOption) (*Empty, error)
+	FetchHTTPPreviewResource(ctx context.Context, in *HTTPPreviewResourceRequest, opts ...grpc.CallOption) (*HTTPPreviewResourceResponse, error)
 	HTTPFuzzer(ctx context.Context, in *FuzzerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FuzzerResponse], error)
 	HTTPFuzzerSequence(ctx context.Context, in *FuzzerRequests, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FuzzerSequenceResponse], error)
 	HTTPFuzzerGroup(ctx context.Context, in *GroupHTTPFuzzerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GroupHTTPFuzzerResponse], error)
@@ -2582,6 +2584,16 @@ func (c *yakClient) DeleteHistoryHTTPFuzzerTask(ctx context.Context, in *DeleteH
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_DeleteHistoryHTTPFuzzerTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) FetchHTTPPreviewResource(ctx context.Context, in *HTTPPreviewResourceRequest, opts ...grpc.CallOption) (*HTTPPreviewResourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HTTPPreviewResourceResponse)
+	err := c.cc.Invoke(ctx, Yak_FetchHTTPPreviewResource_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9330,6 +9342,7 @@ type YakServer interface {
 	QueryHistoryHTTPFuzzerTask(context.Context, *Empty) (*HistoryHTTPFuzzerTasks, error)
 	QueryHistoryHTTPFuzzerTaskEx(context.Context, *QueryHistoryHTTPFuzzerTaskExParams) (*HistoryHTTPFuzzerTasksResponse, error)
 	DeleteHistoryHTTPFuzzerTask(context.Context, *DeleteHistoryHTTPFuzzerTaskRequest) (*Empty, error)
+	FetchHTTPPreviewResource(context.Context, *HTTPPreviewResourceRequest) (*HTTPPreviewResourceResponse, error)
 	HTTPFuzzer(*FuzzerRequest, grpc.ServerStreamingServer[FuzzerResponse]) error
 	HTTPFuzzerSequence(*FuzzerRequests, grpc.ServerStreamingServer[FuzzerSequenceResponse]) error
 	HTTPFuzzerGroup(*GroupHTTPFuzzerRequest, grpc.ServerStreamingServer[GroupHTTPFuzzerResponse]) error
@@ -10348,6 +10361,9 @@ func (UnimplementedYakServer) QueryHistoryHTTPFuzzerTaskEx(context.Context, *Que
 }
 func (UnimplementedYakServer) DeleteHistoryHTTPFuzzerTask(context.Context, *DeleteHistoryHTTPFuzzerTaskRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteHistoryHTTPFuzzerTask not implemented")
+}
+func (UnimplementedYakServer) FetchHTTPPreviewResource(context.Context, *HTTPPreviewResourceRequest) (*HTTPPreviewResourceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FetchHTTPPreviewResource not implemented")
 }
 func (UnimplementedYakServer) HTTPFuzzer(*FuzzerRequest, grpc.ServerStreamingServer[FuzzerResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method HTTPFuzzer not implemented")
@@ -13528,6 +13544,24 @@ func _Yak_DeleteHistoryHTTPFuzzerTask_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).DeleteHistoryHTTPFuzzerTask(ctx, req.(*DeleteHistoryHTTPFuzzerTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_FetchHTTPPreviewResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPPreviewResourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).FetchHTTPPreviewResource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_FetchHTTPPreviewResource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).FetchHTTPPreviewResource(ctx, req.(*HTTPPreviewResourceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -23430,6 +23464,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteHistoryHTTPFuzzerTask",
 			Handler:    _Yak_DeleteHistoryHTTPFuzzerTask_Handler,
+		},
+		{
+			MethodName: "FetchHTTPPreviewResource",
+			Handler:    _Yak_FetchHTTPPreviewResource_Handler,
 		},
 		{
 			MethodName: "PreloadHTTPFuzzerParams",
