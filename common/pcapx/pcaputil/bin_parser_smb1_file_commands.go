@@ -32,7 +32,10 @@ func smb1FileEntry(command byte, response bool) (entry, profile, name string, ma
 	case 0xa2:
 		entry, profile, name, maxSize = "CIFSDirectTCPNTCreateAndX"+suffix, "cifs-nt-create-andx-request", "SMB_COM_NT_CREATE_ANDX", 65582
 		if response {
-			profile, maxSize = "cifs-nt-create-andx-response", 107
+			// MS-SMB 2.2.4.9.2: WC42 extended responses carry a 32-byte
+			// VolumeGuid/FileId64/MaximalAccess/GuestAccess tail after the
+			// 34 standard words, so the complete record is 139 bytes.
+			profile, maxSize = "cifs-nt-create-andx-response", 139
 		}
 	case 0x2f:
 		entry, profile, name, maxSize = "CIFSDirectTCPWriteAndX"+suffix, "cifs-write-andx-request", "SMB_COM_WRITE_ANDX", 65582
@@ -100,6 +103,19 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 	}
 	response := w[13]&0x80 != 0
 	_, profile, _, maxSize := smb1FileEntry(w[8], response)
+	// MS-CIFS 2.2.3.2: a non-success reply with WordCount 0 and ByteCount 0 is
+	// the error layout. Check it before any success-layout envelope so an
+	// error reply is not rejected merely because its command has a larger
+	// success base (for example NT_CREATE_ANDX or TRANSACTION2).
+	if response && binary.LittleEndian.Uint32(w[9:13]) != 0 {
+		if len(w) < 39 {
+			return probeNeed("smb", profile, len(w), 39)
+		}
+		if total == 39 && w[36] == 0 && binary.LittleEndian.Uint16(w[37:39]) == 0 {
+			return probeAccept("smb", profile, 90)
+		}
+		return reject
+	}
 	base, wc := 47, byte(4)
 	if w[8] == 0x75 && response {
 		base, wc = 45, 3
@@ -114,6 +130,11 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 		base, wc = 87, 24
 		if response {
 			base, wc = 107, 34
+			// A WC42 (or larger) response is the extended form: 32 bytes of
+			// extra fields follow the standard words before ByteCount.
+			if len(w) >= 37 && w[36] >= 42 {
+				wc, base = w[36], 139
+			}
 		}
 	}
 	if w[8] == 0x2f {
@@ -158,17 +179,6 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 	if exact && total != base || total < base || total > maxSize {
 		return reject
 	}
-	// MS-CIFS 2.2.3.2: a non-success reply with WordCount 0 and ByteCount 0 is
-	// the error layout. Any other non-success shape is not the success profile.
-	if response && binary.LittleEndian.Uint32(w[9:13]) != 0 {
-		if len(w) < 39 {
-			return probeNeed("smb", profile, len(w), 39)
-		}
-		if total == 39 && w[36] == 0 && binary.LittleEndian.Uint16(w[37:39]) == 0 {
-			return probeAccept("smb", profile, 90)
-		}
-		return reject
-	}
 	// SET/QUERY_INFORMATION2 have no strings. TRANSACTION2 decodes an
 	// SMB_STRING only when FLAGS2_UNICODE is set and leaves OEM opaque.
 	if (w[8] == 0x75 || !response && w[8] != 0x22 && w[8] != 0x23 && w[8] != 0x32 && w[8] != 0x33) && binary.LittleEndian.Uint16(w[14:16])&0x8000 == 0 {
@@ -196,6 +206,12 @@ func boundedSMB1FileEnvelope(w []byte) bool {
 		return false
 	}
 	fixed := 39 + 2*int(w[36])
+	if w[8] == 0xa2 && w[13]&0x80 != 0 && w[36] >= 42 {
+		// MS-SMB 2.2.4.9.2: the extended NT_CREATE_ANDX response declares
+		// WordCount 42 but physically carries 50 words. ByteCount sits at
+		// 137:139, after the VolumeGuid/FileId64/access tail.
+		fixed = 139
+	}
 	return fixed <= len(w) && int(binary.LittleEndian.Uint16(w[fixed-2:fixed])) == len(w)-fixed
 }
 

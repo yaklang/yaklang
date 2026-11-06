@@ -80,6 +80,13 @@ func cifsOpenWriteTree(w []byte, create, response bool) ([]tlsCertificateField, 
 		wc, fixed = 24, 87
 		if response {
 			wc, fixed = 34, 107
+			if len(w) >= 37 && w[36] >= 42 {
+				// MS-SMB 2.2.4.9.2 extended response: the declared WordCount is
+				// 42, but the physical word array also carries the 32-byte
+				// VolumeGuid/FileId64/MaximalAccess/GuestAccess tail before
+				// ByteCount. ByteCount therefore sits at 137:139.
+				wc, fixed = w[36], 139
+			}
 		}
 	}
 	fields, err := cifsFileCommandEnvelope(w, command, wc, fixed, fixed+65535, response, true)
@@ -131,8 +138,18 @@ func cifsOpenWriteTree(w []byte, create, response bool) ([]tlsCertificateField, 
 			cifsWord("Resource Type", "uint16", 100, 102),
 			cifsWord("Named Pipe Status", "uint16", 102, 104),
 			cifsWord("Directory", "uint8", 104, 105),
-			cifsWord("Byte Count", "uint16", 105, 107),
 		)
+		if wc >= 42 {
+			words = append(words,
+				cifsWord("Volume GUID", "raw", 105, 121),
+				cifsWord("File ID", "uint64", 121, 129),
+				cifsWord("Maximal Access", "uint32", 129, 133),
+				cifsWord("Guest Maximal Access", "uint32", 133, 137),
+				cifsWord("Byte Count", "uint16", 137, 139),
+			)
+		} else {
+			words = append(words, cifsWord("Byte Count", "uint16", 105, 107))
+		}
 	}
 	if !create && !response {
 		words = append(words,
@@ -185,15 +202,21 @@ func cifsOpenWriteTree(w []byte, create, response bool) ([]tlsCertificateField, 
 		if binary.LittleEndian.Uint16(w[55:57]) != 0 {
 			return nil, nil, fmt.Errorf("%w: nonzero Data Length High", ErrCIFSFileCommandUnsupported)
 		}
-		// Data Offset is relative to the SMB header at PDU byte 4.
-		at := 4 + dataOff
-		if at < fixed || at+dataLen != len(w) || dataLen != len(w)-fixed {
-			return nil, nil, fmt.Errorf("CIFS WRITE_ANDX: data is outside this command")
+		// Data Offset is relative to the SMB header at PDU byte 4. MS-CIFS
+		// 2.2.4.43.1 allows one alignment Pad byte between the fixed words and
+		// Data, so ByteCount may exceed DataLength by that pad.
+		if dataLen != 0 || dataOff != 0 {
+			at := 4 + dataOff
+			if at < fixed || at+dataLen != len(w) {
+				return nil, nil, fmt.Errorf("CIFS WRITE_ANDX: data is outside this command")
+			}
+			if at > fixed {
+				body.Children = append(body.Children, tlsCertificateLeaf("Alignment Pad", "raw", fixed, at))
+			}
+			if dataLen > 0 {
+				body.Children = append(body.Children, tlsCertificateLeaf("Data", "raw", at, at+dataLen))
+			}
 		}
-		if at > fixed {
-			body.Children = append(body.Children, tlsCertificateLeaf("Alignment Pad", "raw", fixed, at))
-		}
-		body.Children = append(body.Children, tlsCertificateLeaf("Data", "raw", at, at+dataLen))
 	}
 	fields = append(fields, body)
 	return fields, info, nil
@@ -224,6 +247,8 @@ func cifsOpenWriteValue(raw []byte, leaf tlsCertificateField) (any, error) {
 		return binary.LittleEndian.Uint16(b), nil
 	case "uint32":
 		return binary.LittleEndian.Uint32(b), nil
+	case "uint64":
+		return binary.LittleEndian.Uint64(b), nil
 	case "int64":
 		return int64(binary.LittleEndian.Uint64(b)), nil
 	case "raw":

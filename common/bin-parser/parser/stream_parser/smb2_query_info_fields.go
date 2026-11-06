@@ -49,7 +49,10 @@ func decodeSMB2QueryInfoBody(wire []byte, response bool, status uint32) ([]tlsCe
 		return nil, nil, fmt.Errorf("smb2 query info: body exceeds bounded profile")
 	}
 	minimum, structure := 40, uint16(41)
-	errorResponse := response && status != 0 && status != 0x80000005 // STATUS_BUFFER_OVERFLOW carries the response layout.
+	// STATUS_BUFFER_OVERFLOW carries the response layout. STATUS_PENDING keeps
+	// the selected command layout, matching the native SMB2 dispatcher; only
+	// other non-success statuses use the SMB2 ERROR body.
+	errorResponse := response && status != 0 && status != 0x80000005 && status != 0x00000103
 	if errorResponse {
 		return decodeSMB2ErrorBody(wire)
 	}
