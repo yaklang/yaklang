@@ -451,15 +451,21 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 	t.Logf("Status transitions verified: Processing=%v, Completed=%v", hasProcessing, hasCompleted)
 }
 
-// TestExec_TaskStatusAborted 测试任务中止状态
-func TestExec_TaskStatusAborted(t *testing.T) {
+// TestExec_TaskStatusRecoversAfterPanic 测试 handler panic 后通过 Timeline 自愈完成任务。
+func TestExec_TaskStatusRecoversAfterPanic(t *testing.T) {
 	var finalStatus aicommon.AITaskState
 	var capturedTask aicommon.AIStatefulTask
+	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -486,21 +492,20 @@ func TestExec_TaskStatusAborted(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	// Panic应该被recover，状态可能是Aborted或Completed
-	_ = loop.Execute("abort-task", context.Background(), "test abort")
-
-	time.Sleep(50 * time.Millisecond) // Reduced from 200ms for faster tests
-
-	if capturedTask != nil {
-		finalStatus = capturedTask.GetStatus()
-		// Panic被recover后，defer中的complete可能执行，状态可能是Completed或Aborted
-		if finalStatus == aicommon.AITaskState_Aborted {
-			t.Logf("Task aborted after panic: %v", finalStatus)
-		} else if finalStatus == aicommon.AITaskState_Completed {
-			t.Logf("Task completed after panic recovery: %v", finalStatus)
-		} else {
-			t.Errorf("Unexpected task status after panic: %v", finalStatus)
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := loop.Execute("recover-panic-task", ctx, "test panic recovery status"); err != nil {
+		t.Fatalf("panic should be recovered: %v", err)
+	}
+	if callCount < 2 {
+		t.Fatalf("expected a retry after panic, got %d calls", callCount)
+	}
+	if capturedTask == nil {
+		t.Fatal("task should be captured")
+	}
+	finalStatus = capturedTask.GetStatus()
+	if finalStatus != aicommon.AITaskState_Completed {
+		t.Fatalf("task should complete after panic recovery, got %v", finalStatus)
 	}
 }
 

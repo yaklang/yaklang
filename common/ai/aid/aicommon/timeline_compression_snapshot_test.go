@@ -79,6 +79,17 @@ func TestTimelineCompressionSnapshotRange(t *testing.T) {
 	require.Greater(t, snapshot.InputTokens, withoutHead.InputTokens, "old summary contributes to full input")
 }
 
+func TestRenderCompressionGuideDoesNotRecompressExistingHead(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	tl.compressedHead = &TimelineCompressedHead{
+		Text: "existing compressed summary", CoveredEndItemID: 0, Version: 1,
+	}
+
+	guide, err := tl.RenderCompressionGuide(TimelineCompressionOptions{})
+	require.NoError(t, err)
+	require.Empty(t, guide, "an existing compressed head without new candidates is not compressible")
+}
+
 func TestTimelineCompressionSnapshotDetachedFromLaterChanges(t *testing.T) {
 	tl := compressionSnapshotFixture()
 	snapshot, err := tl.buildCompressionSnapshot()

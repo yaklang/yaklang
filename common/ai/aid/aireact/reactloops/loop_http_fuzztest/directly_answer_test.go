@@ -170,13 +170,16 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 		promptMu.Unlock()
 		atomic.AddInt32(&attempts, 1)
 
-		// 始终返回空 payload 让 verifier 持续失败, 这样可以严格抓到"第二轮 prompt
-		// 必须包含 AITAG 纠正"这一关键回归点. 即便 retry 全部用尽, 测试只关心
-		// hint 是否被注入到下一轮 prompt, 不关心最终是否成功 (那是上游 AI 行为).
+		// 第一次返回空 payload 触发 verifier 失败，验证第二轮 prompt 注入
+		// AITAG 纠正；随后返回 finish，避免新的自愈语义让测试无限继续。
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(
-			`{"@action":"directly_answer","identifier":"phase_status"}`,
-		))
+		if atomic.LoadInt32(&attempts) == 1 {
+			rsp.EmitOutputStream(bytes.NewBufferString(
+				`{"@action":"directly_answer","identifier":"phase_status"}`,
+			))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish"}`))
+		}
 		rsp.Close()
 		return rsp, nil
 	})
@@ -196,9 +199,11 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 		t.Fatalf("create http_fuzztest loop: %v", err)
 	}
 
-	// 故意忽略 Execute 返回值: 全部 attempts 都失败时它会返回 error, 这里关心
-	// 的是 retry 链路是否正确把 hint 注入下一轮 prompt, 不关心最终是否成功.
-	_ = loop.Execute("http-fuzztest-direct-answer-retry", context.Background(), "总结一下当前阶段进展")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := loop.Execute("http-fuzztest-direct-answer-retry", ctx, "总结一下当前阶段进展"); err != nil {
+		t.Fatalf("execute loop after verifier retry: %v", err)
+	}
 
 	got := atomic.LoadInt32(&attempts)
 	if got < 2 {

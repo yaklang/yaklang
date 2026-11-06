@@ -29,11 +29,11 @@ const contextCompressionPromptHeadroomTokens int64 = 200 * 1024
 
 const contextCompressionWarningNodeID = "context_compression_warning"
 
-// Selection mistakes can be corrected by the model; runtime failures cannot.
-type contextCompressionSelectionError struct{ err error }
-
-func (e *contextCompressionSelectionError) Error() string { return e.err.Error() }
-func (e *contextCompressionSelectionError) Unwrap() error { return e.err }
+// isContextCompressionCall 判断本次模型调用是否为上下文压缩维护动作。
+func isContextCompressionCall(call LoopCall) bool {
+	return call.Action != nil &&
+		strings.TrimSpace(call.Action.Name()) == aicommon.ContextCompressionAction
+}
 
 // wholePromptTokenLimit is the limit for the assembled main-loop prompt.
 // The configured timeline limit defaults to 300k; a too-large response lowers it.
@@ -215,7 +215,7 @@ func (r *ReActLoop) prepareContextCompression(action *aicommon.Action, request .
 	}
 	selection, err := r.parseContextCompressionSelection(action, candidates, aicommon.TimelineCompressionMaxSummaryTokens)
 	if err != nil {
-		return nil, &contextCompressionSelectionError{err: err}
+		return nil, err
 	}
 	if len(through) > 0 {
 		selection.ThroughID = &through[0]

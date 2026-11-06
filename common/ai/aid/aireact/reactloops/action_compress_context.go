@@ -74,14 +74,11 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 		throughID: operator.requestTimelineThroughID, itemIDs: operator.requestTimelineItemIDs,
 	})
 	if err != nil {
-		var rejected *contextCompressionSelectionError
-		if errors.As(err, &rejected) {
-			operator.contextCompressionError = err
-			operator.Continue()
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			operator.Fail(err)
 			return
 		}
-		loop.emitContextCompressionRuntimeWarning("reading timeline candidates", err)
-		operator.Continue()
+		operator.Fail(err)
 		return
 	}
 	if _, err := timeline.ApplyCompressionSelection(selection, operator.requestPrompt, operator.trajectoryResponse); err != nil {
@@ -89,8 +86,7 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 			operator.Fail(err)
 			return
 		}
-		loop.emitContextCompressionRuntimeWarning("committing the timeline compression result", err)
-		operator.Continue()
+		operator.Fail(err)
 		return
 	}
 	operator.Continue()

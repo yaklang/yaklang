@@ -131,6 +131,7 @@ type ReActLoop struct {
 	asyncExecutionManager      *asyncexecmanager.Manager
 	asyncDirectAnswer          chan struct{}
 	asyncDirectAnswerRequested bool
+	asyncDirectAnswerHandled   bool
 
 	// memory management
 	memorySizeLimit        int
@@ -172,6 +173,10 @@ type ReActLoop struct {
 	// Invocation-local verifier results belong to the loop, never Action data.
 	actionExecutionMu     sync.Mutex
 	actionExecutionValues map[*aicommon.Action]map[string]any
+
+	// recoverableFailureMu 保护模型输出错误或 Action 执行错误的自愈预算。
+	recoverableFailureMu sync.Mutex
+	recoverableFailures  map[string]int
 
 	// modelThinkingBuf holds reason-stream deltas for the in-flight AI transaction;
 	// flushed into the timeline iteration line above the action summary.

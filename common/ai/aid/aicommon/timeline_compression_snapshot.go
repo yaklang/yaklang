@@ -89,9 +89,9 @@ func (s *timelineCompressionSnapshot) hasSummarySource() bool {
 	if s == nil {
 		return false
 	}
-	if s.Head != nil && strings.TrimSpace(s.Head.Text) != "" {
-		return true
-	}
+	// compressed head 已经是上一轮压缩产物，不再单独作为可压缩输入。
+	// 只有出现新的普通历史、最终记忆候选，或者可淘汰的 promoted 项时，
+	// 才允许再次进入压缩模式，避免对同一份摘要反复压缩。
 	return strings.TrimSpace(renderCompressionSnapshotItems(s.Items)) != "" ||
 		(s.FinalizingMemory && (len(s.UserContexts) > 0 || strings.TrimSpace(s.Evidence) != ""))
 }

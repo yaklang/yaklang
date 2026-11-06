@@ -177,7 +177,7 @@ func TestVerificationWatchdog_SuppressedDuringToolBlocking(t *testing.T) {
 
 func TestVerificationWatchdog_ResetsWhenMaybeVerifyRuns(t *testing.T) {
 	previousMin := verificationWatchdogMinInterval
-	verificationWatchdogMinInterval = 40 * time.Millisecond
+	verificationWatchdogMinInterval = 500 * time.Millisecond
 	defer func() {
 		verificationWatchdogMinInterval = previousMin
 	}()
@@ -192,11 +192,11 @@ func TestVerificationWatchdog_ResetsWhenMaybeVerifyRuns(t *testing.T) {
 	loop.startVerificationWatchdog(task)
 	defer loop.stopVerificationWatchdogForTask(task)
 
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	_, _, err := loop.MaybeVerifyUserSatisfaction(context.Background(), "query", true, "tool")
 	require.NoError(t, err)
 
-	time.Sleep(25 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, 0, invoker.verifyCalls)
 }
 

@@ -135,7 +135,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			)
 			if err != nil {
 				if !hasAnswerPayloadKey.Load() {
-					err = aicommon.NewModelOutputValidationError(err)
+					err = aicommon.NewRecoverableError(err)
 				}
 				return errorWarp(err)
 			}
@@ -148,7 +148,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 				payload = action.GetString("next_action.answer_payload")
 			}
 			if payload == "" && !hasAnswerPayloadKey.Load() {
-				return errorWarp(aicommon.NewModelOutputValidationError(utils.Error("no answer_payload key in stream")))
+				return errorWarp(aicommon.NewRecoverableError(utils.Error("no answer_payload key in stream")))
 			}
 			finalResult = payload
 			return nil

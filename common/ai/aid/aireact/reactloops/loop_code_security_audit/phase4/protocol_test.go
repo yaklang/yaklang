@@ -75,7 +75,9 @@ func TestAuditReportDelegationProtocolAndFailure(t *testing.T) {
 				err = loop.ExecuteWithExistedTask(task)
 				timeline := runtime.GetConfig().(*aicommon.Config).GetTimeline().Dump()
 				if fail {
-					require.ErrorContains(t, err, "report provider unavailable")
+					require.ErrorContains(t, err, context.DeadlineExceeded.Error())
+					require.GreaterOrEqual(t, calls, 2)
+					require.Contains(t, timeline, "report provider unavailable")
 					require.NotContains(t, timeline, "PHASE4_COMPLETE")
 				} else {
 					require.NoError(t, err)

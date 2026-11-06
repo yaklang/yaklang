@@ -18,7 +18,7 @@ func useGlobalOutputRecovery(t *testing.T, enabled bool) {
 	t.Cleanup(func() { consts.SetTieredAIConfig(old) })
 }
 
-func TestModelOutputRecoveryBeyondRetryBudget(t *testing.T) {
+func TestRecoverableErrorBeyondRetryBudget(t *testing.T) {
 	useGlobalOutputRecovery(t, true)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -44,7 +44,7 @@ func TestModelOutputRecoveryBeyondRetryBudget(t *testing.T) {
 	require.Equal(t, 1, validated)
 }
 
-func TestModelOutputRecoveryCancellationAndNonProtocolErrors(t *testing.T) {
+func TestRecoverableErrorCancellationAndNonProtocolErrors(t *testing.T) {
 	t.Run("stop while waiting", func(t *testing.T) {
 		useGlobalOutputRecovery(t, true)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -56,7 +56,7 @@ func TestModelOutputRecoveryCancellationAndNonProtocolErrors(t *testing.T) {
 			calls++
 			rsp := NewUnboundAIResponse()
 			return rsp, nil
-		}, func(*AIResponse) error { return NewModelOutputValidationError(errors.New("missing action")) })
+		}, func(*AIResponse) error { return NewRecoverableError(errors.New("missing action")) })
 		require.ErrorIs(t, err, context.Canceled)
 		require.Equal(t, 1, calls)
 	})
@@ -78,19 +78,19 @@ func TestModelOutputRecoveryCancellationAndNonProtocolErrors(t *testing.T) {
 		cfg := newTransactionTestConfig(context.Background())
 		cfg.retryMax = 1
 		calls := 0
-		err := CallAITransaction(cfg, "fixture", func(*AIRequest) (*AIResponse, error) { calls++; return NewUnboundAIResponse(), nil }, func(*AIResponse) error { return NewModelOutputValidationError(errors.New("missing action")) })
+		err := CallAITransaction(cfg, "fixture", func(*AIRequest) (*AIResponse, error) { calls++; return NewUnboundAIResponse(), nil }, func(*AIResponse) error { return NewRecoverableError(errors.New("missing action")) })
 		require.Error(t, err)
 		require.Equal(t, 1, calls)
 	})
 }
 
-func TestModelOutputValidationTag(t *testing.T) {
+func TestRecoverableErrorTag(t *testing.T) {
 	_, err := ExtractValidActionFromStream(context.Background(), strings.NewReader("plain answer"), "finish")
-	require.True(t, IsModelOutputValidationError(err))
-	require.False(t, IsModelOutputValidationError(errors.New("tool failed")))
+	require.True(t, IsRecoverableError(err))
+	require.False(t, IsRecoverableError(errors.New("tool failed")))
 }
 
-func TestGlobalModelOutputRecovery(t *testing.T) {
+func TestGlobalRecoverableErrorRetry(t *testing.T) {
 	old := consts.GetTieredAIConfig()
 	t.Cleanup(func() { consts.SetTieredAIConfig(old) })
 	for _, enabled := range []bool{true, false} {
@@ -104,7 +104,7 @@ func TestGlobalModelOutputRecovery(t *testing.T) {
 			return rsp, nil
 		}, func(*AIResponse) error {
 			if calls < 9 {
-				return NewModelOutputValidationError(errors.New("invalid action"))
+				return NewRecoverableError(errors.New("invalid action"))
 			}
 			executions++
 			return nil

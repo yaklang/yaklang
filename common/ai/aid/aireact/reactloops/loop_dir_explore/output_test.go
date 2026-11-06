@@ -82,7 +82,10 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 						return nil, ctx.Err()
 					}
 					if calls >= len(responses) {
-						return nil, context.Canceled
+						response := c.NewAIResponse()
+						response.EmitOutputStream(strings.NewReader(`{"@action":"finish","identifier":"finish_report"}`))
+						response.Close()
+						return response, nil
 					}
 					response := c.NewAIResponse()
 					if calls == 0 {
@@ -198,11 +201,7 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 			require.Contains(t, visibleThoughts.String(), exploreReason)
 			require.Contains(t, visibleThoughts.String(), "内部：写探索笔记")
 			require.NotContains(t, visibleThoughts.String(), "内部：撰写报告", "the parent must still own report generation output")
-			expectedMilestones := 4
-			if outcome == "cancelled" || outcome == "success" {
-				expectedMilestones = 3
-			} // Stream producers stop with their context.
-			require.Equal(t, expectedMilestones, noteMilestones, "duplicate writes must not repeat a committed-note milestone")
+			require.Equal(t, 3, noteMilestones, "duplicate writes and recovery must not repeat a committed-note milestone")
 			if outcome == "success" {
 				require.Equal(t, []string{"dir_explore.exploring", "dir_explore.exploring", "dir_explore.reporting", "dir_explore.completed"}, phases)
 				require.Equal(t, 1, finishes)
@@ -218,8 +217,8 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 					require.Equal(t, "cancelled", loop.Get("explore_phase"))
 					require.False(t, failureResult)
 				} else {
-					require.Equal(t, "dir_explore.failed", phases[len(phases)-1])
-					require.True(t, failureResult, "failed report generation must leave a visible explanation")
+					require.Equal(t, "dir_explore.reporting", phases[len(phases)-1],
+						"report validation errors are recovered in-place until the caller cancels")
 				}
 			}
 		})

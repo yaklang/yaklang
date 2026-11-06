@@ -57,7 +57,9 @@ func TestActionExecutionStateClearedAfterCalls(t *testing.T) {
 			}
 			result := loop.execCalls(calls, 1, task, "prompt", utils.NewOnce(), nil)
 			if fail {
-				require.Error(t, result.err)
+				require.Equal(t, loopActionsRecover, result.result)
+				require.NoError(t, result.err)
+				require.ErrorContains(t, result.recoveredError, "execution failed")
 			} else {
 				require.NoError(t, result.err)
 			}

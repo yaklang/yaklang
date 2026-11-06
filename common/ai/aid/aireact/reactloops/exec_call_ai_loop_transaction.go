@@ -703,20 +703,19 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		rawCalls, err := collector.finish()
 		fieldStream.activity.close()
 		lastOutput, lastReason, lastRawCalls = output.String(), reason.String(), rawCalls
-		if callbackErr != nil {
-			return callbackErr
-		}
+		r.warnOptionalOutputFailure("general output callback", callbackErr)
 		if err != nil {
 			return err
 		}
-		if err := fieldStream.error(); err != nil {
-			return err
-		}
+		r.warnOptionalOutputFailure("field display", fieldStream.error())
 		if descriptor.Snapshot().ProviderFinishReason != "tool_calls" {
-			return utils.Errorf("function-call response ended with %q, expected tool_calls", descriptor.Snapshot().ProviderFinishReason)
+			return aicommon.NewRecoverableError(utils.Errorf(
+				"function-call response ended with %q, expected tool_calls",
+				descriptor.Snapshot().ProviderFinishReason,
+			))
 		}
 		if len(rawCalls) == 0 {
-			return utils.Error("function-call response contained no tool calls")
+			return aicommon.NewRecoverableError(utils.Error("function-call response contained no tool calls"))
 		}
 		r.Delete(loopVarNativeTodoBatchAdjusted)
 		defer r.Delete(loopVarNativeTodoBatchAdjusted)
@@ -729,7 +728,10 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		}()
 		for _, rawCall := range rawCalls {
 			if !validActionToolName(rawCall.Function.Name) {
-				return utils.Errorf("invalid function-call action name %q", rawCall.Function.Name)
+				return aicommon.NewRecoverableError(utils.Errorf(
+					"invalid function-call action name %q",
+					rawCall.Function.Name,
+				))
 			}
 			if advertisedActions != nil && !slices.Contains(advertisedActions, rawCall.Function.Name) {
 				return actionTypeResolutionError(rawCall.Function.Name, availableActions,
@@ -742,20 +744,38 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			params := make(map[string]any)
 			dec := json.NewDecoder(strings.NewReader(rawCall.Function.Arguments))
 			if err := dec.Decode(&params); err != nil {
-				return fmt.Errorf("invalid JSON arguments for tool call %q: %w", rawCall.ID, err)
+				return aicommon.NewRecoverableError(fmt.Errorf(
+					"invalid JSON arguments for tool call %q: %w",
+					rawCall.ID,
+					err,
+				))
 			}
 			if params == nil {
-				return utils.Errorf("invalid JSON arguments for tool call %q: expected a non-null object", rawCall.ID)
+				return aicommon.NewRecoverableError(utils.Errorf(
+					"invalid JSON arguments for tool call %q: expected a non-null object",
+					rawCall.ID,
+				))
 			}
 			var extra any
 			if err := dec.Decode(&extra); err != io.EOF {
 				if err != nil {
-					return fmt.Errorf("trailing JSON arguments for tool call %q: %w", rawCall.ID, err)
+					return aicommon.NewRecoverableError(fmt.Errorf(
+						"trailing JSON arguments for tool call %q: %w",
+						rawCall.ID,
+						err,
+					))
 				}
-				return utils.Errorf("trailing JSON arguments for tool call %q", rawCall.ID)
+				return aicommon.NewRecoverableError(utils.Errorf(
+					"trailing JSON arguments for tool call %q",
+					rawCall.ID,
+				))
 			}
 			if proposed, exists := params["@action"]; exists && proposed != rawCall.Function.Name {
-				return utils.Errorf("tool call %q has conflicting @action %v", rawCall.ID, proposed)
+				return aicommon.NewRecoverableError(utils.Errorf(
+					"tool call %q has conflicting @action %v",
+					rawCall.ID,
+					proposed,
+				))
 			}
 			params["@action"] = rawCall.Function.Name
 			action := aicommon.NewSimpleAction(rawCall.Function.Name, aitool.InvokeParams(params))
@@ -767,7 +787,10 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		}
 
 		if compressionMode && len(calls) != 1 {
-			return utils.Errorf("compress_context must be called exactly once in compression mode, got %d calls", len(calls))
+			return aicommon.NewRecoverableError(utils.Errorf(
+				"compress_context must be called exactly once in compression mode, got %d calls",
+				len(calls),
+			))
 		}
 
 		// Normalize all deltas before action-specific verification. An adjustment
@@ -789,13 +812,15 @@ func (r *ReActLoop) callAIFunctionTransaction(
 					aicommon.WithStatusCode("action.verifying"),
 					aicommon.WithStatusProgress(int64(index+1), int64(len(calls)), "action"))
 				if err := call.LoopAction.ActionVerifier(r, call.Action); err != nil {
-					return utils.Wrapf(err, "verify tool call %q", call.ToolCallID)
+					return aicommon.NewRecoverableError(utils.Wrapf(
+						err,
+						"verify tool call %q",
+						call.ToolCallID,
+					))
 				}
 			}
 		}
-		if err := r.emitNativeActionStreamFields(resp, calls, fieldStream); err != nil {
-			return err
-		}
+		r.warnOptionalOutputFailure("field emission", r.emitNativeActionStreamFields(resp, calls, fieldStream))
 		acceptedCalls = calls
 		verified = true
 		r.Set("last_ai_decision_nonce", nonce)
@@ -1119,7 +1144,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			if currentCtxCanceled() {
 				actionErr = utils.Wrap(actionErr, "task context canceled while parsing action")
 			}
-			return aicommon.NewModelOutputValidationError(utils.Wrap(actionErr, "failed to parse action"))
+			return aicommon.NewRecoverableError(utils.Wrap(actionErr, "failed to parse action"))
 		}
 		observedActionType := ""
 		admittedActionType := ""
@@ -1209,7 +1234,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 				aicommon.WithStatusCode("action.verifying"),
 			)
 			if err := verifier.ActionVerifier(r, action); err != nil {
-				return err
+				return aicommon.NewRecoverableError(err)
 			}
 		}
 		return nil
@@ -1267,7 +1292,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			aicommon.WithStatusCode("action.empty"),
 			aicommon.WithStatusState(aicommon.StatusStateError),
 		)
-		return nil, nil, utils.Error("action is nil in ReActLoop")
+		return nil, nil, aicommon.NewRecoverableError(utils.Error("action is nil in ReActLoop"))
 	}
 
 	handler, err := r.GetActionHandler(inferActionTypeFromPayload(action, r.Get("tag_final_answer")))
@@ -1275,7 +1300,10 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
 	}
 	if utils.IsNil(handler) {
-		return nil, nil, utils.Errorf("action[%s] 's handler is nil in ReActLoop.actions", action.Name())
+		return nil, nil, utils.Errorf(
+			"action[%s] 's handler is nil in ReActLoop.actions",
+			action.Name(),
+		)
 	}
 
 	// Wait for all streams to complete with timeout (max 3 seconds)

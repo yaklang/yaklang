@@ -2,6 +2,7 @@ package reactloopstests
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,24 +12,32 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
 
-// A confirmed prompt overflow must not replay the same prompt. The loop records
-// a tighter limit. With no compressible Timeline content, it warns and falls
-// back to normal mode without issuing a compression request.
-func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
+// Prompt overflow 只收紧下一次 Prompt 的边界；错误写入 Timeline 后继续执行，
+// 不把 provider 的 typed overflow 直接作为任务终态返回。
+func TestReActLoop_PromptOverflowRecordsLimitAndContinues(t *testing.T) {
 	var mainPromptTokens []int
 	compressionCalls := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if req.GetCallerLabel() == aicommon.CallerLabelContextCompress {
 				compressionCalls++
-			} else {
-				mainPromptTokens = append(mainPromptTokens, aicommon.MeasureTokens(req.GetPrompt()))
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(strings.NewReader(
+					`{"@action":"compress_context","summary":"已删除重复的溢出诊断，保留当前任务。","retain_timeline":"","retire_skill_names":[],"retire_evidence_ids":[]}`,
+				))
+				rsp.Close()
+				return rsp, nil
 			}
+			mainPromptTokens = append(mainPromptTokens, aicommon.MeasureTokens(req.GetPrompt()))
 			rsp := i.NewAIResponse()
-			rsp.SetRawHTTPResponseData(
-				[]byte("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n"),
-				[]byte(`{"error":{"code":"context_length_exceeded","message":"This model's maximum context length is 8192 tokens. However, your messages resulted in 12000 tokens."}}`),
-			)
+			if len(mainPromptTokens) == 1 {
+				rsp.SetRawHTTPResponseData(
+					[]byte("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n"),
+					[]byte(`{"error":{"code":"context_length_exceeded","message":"This model's maximum context length is 32000 tokens. However, your messages resulted in 40000 tokens."}}`),
+				)
+			} else {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish","answer":"recovered"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -43,31 +52,30 @@ func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
 	require.NoError(t, err)
 	err = loop.Execute("prompt-overflow-task", context.Background(), "test input")
 
-	require.Error(t, err)
-	require.True(t, aicommon.IsPromptTooLong(err), "the typed overflow must reach the caller: %v", err)
-	require.NotEmpty(t, mainPromptTokens)
-	require.LessOrEqual(t, len(mainPromptTokens), cfg.GetPromptOverflowRetryMax()+1, "main-loop retries must remain bounded")
-	require.Zero(t, compressionCalls, "user input alone is not compressible, so no compression request is issued")
-	for i := 1; i < len(mainPromptTokens); i++ {
-		require.Less(t, mainPromptTokens[i], mainPromptTokens[i-1]*99/100, "a main-loop retry requires measurable progress, not replay of the same prompt")
-	}
-	require.EqualValues(t, 8192*8/10, cfg.GetTimeline().GetTimelineContentLimit(),
+	require.NoError(t, err)
+	require.Len(t, mainPromptTokens, 2, "overflow recovery must continue with a new outer-loop request")
+	require.LessOrEqual(t, len(mainPromptTokens), cfg.GetPromptOverflowRetryMax()+2, "main-loop retries must remain bounded")
+	require.Zero(t, compressionCalls, "the recorded provider limit still fits the static prompt")
+	require.EqualValues(t, 32000*8/10, cfg.GetTimeline().GetTimelineContentLimit(),
 		"the loop records a tighter limit for the model that rejected the prompt")
 	require.Less(t, cfg.GetTimeline().GetTimelineContentLimit(), base)
 }
 
-// Non-overflow provider failures keep their existing handling: no dynamic limit
-// is recorded for them.
+// 普通 API 失败同样进入 Timeline 自愈，但不会错误地收紧 Prompt 容量限制。
 func TestReActLoop_PlainRequestFailureDoesNotTouchTheLimit(t *testing.T) {
 	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
-			rsp.SetRawHTTPResponseData(
-				[]byte("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n"),
-				[]byte(`{"error":{"message":"invalid schema for function"}}`),
-			)
+			if callCount == 1 {
+				rsp.SetRawHTTPResponseData(
+					[]byte("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n"),
+					[]byte(`{"error":{"message":"invalid schema for function"}}`),
+				)
+			} else {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish","answer":"recovered"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -81,7 +89,7 @@ func TestReActLoop_PlainRequestFailureDoesNotTouchTheLimit(t *testing.T) {
 	require.NoError(t, err)
 	err = loop.Execute("plain-failure-task", context.Background(), "test input")
 
-	require.Error(t, err)
-	require.False(t, aicommon.IsPromptTooLong(err))
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, callCount, 2)
 	require.Equal(t, base, cfg.GetTimeline().GetTimelineContentLimit())
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -18,10 +19,16 @@ import (
 
 // TestExec_PanicRecovery 测试panic恢复
 func TestExec_PanicRecovery(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -108,13 +115,19 @@ func TestExec_NoActions(t *testing.T) {
 	t.Logf("No actions test result: %v", err)
 }
 
-// TestExec_ActionNotFound 测试action不存在的情况
-func TestExec_ActionNotFound(t *testing.T) {
+// TestExec_ActionNotFoundRecoversWithinTransaction 测试非法 action 会在 transaction 内纠正。
+func TestExec_ActionNotFoundRecoversWithinTransaction(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			// 返回一个不存在的action
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "nonexistent_action_xyz"}`))
+			if callCount == 1 {
+				// 首次返回不存在的 action，验证会进入 Timeline 自愈。
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "nonexistent_action_xyz"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -129,16 +142,22 @@ func TestExec_ActionNotFound(t *testing.T) {
 	}
 
 	err = loop.Execute("test", context.Background(), "test action not found")
-	// 应该失败，因为action不存在
-	t.Logf("Action not found test result: %v", err)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, callCount, 2)
 }
 
 // TestExec_NoActionHandler 测试action没有handler的情况
 func TestExec_NoActionHandler(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "no_handler_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "no_handler_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -160,20 +179,28 @@ func TestExec_NoActionHandler(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	err = loop.Execute("test", context.Background(), "test no handler")
-	if err == nil {
-		t.Error("Should return error when ActionHandler is nil")
-	} else {
-		t.Logf("Expected error for nil ActionHandler: %v", err)
-	}
+	require.NoError(t, loop.Execute("test", context.Background(), "test no handler"))
+	require.GreaterOrEqual(t, callCount, 2)
+	cfg, ok := reactIns.GetConfig().(*aicommon.Config)
+	require.True(t, ok)
+	serialized, marshalErr := aicommon.MarshalTimeline(cfg.Timeline)
+	require.NoError(t, marshalErr)
+	require.Contains(t, serialized, "REACT_RECOVERABLE_ERROR")
+	require.Contains(t, serialized, "has no ActionHandler")
 }
 
 // TestExec_OperatorFail 测试operator Fail
 func TestExec_OperatorFail(t *testing.T) {
+	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "fail_action"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "fail_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -198,11 +225,14 @@ func TestExec_OperatorFail(t *testing.T) {
 	}
 
 	err = loop.Execute("test", context.Background(), "test operator fail")
-	if err == nil {
-		t.Error("Should return error when operator fails")
-	} else {
-		t.Logf("Expected error for operator fail: %v", err)
-	}
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, callCount, 2)
+	cfg, ok := reactIns.GetConfig().(*aicommon.Config)
+	require.True(t, ok)
+	serialized, marshalErr := aicommon.MarshalTimeline(cfg.Timeline)
+	require.NoError(t, marshalErr)
+	require.Contains(t, serialized, "REACT_RECOVERABLE_ERROR")
+	require.NotContains(t, serialized, "[[REACT_RECOVERABLE_ERROR]]")
 }
 
 // TestExec_CompleteWithReason 测试complete with reason
@@ -304,7 +334,7 @@ func TestExec_OnTaskCreatedCallback(t *testing.T) {
 	}
 }
 
-// TestExec_AsyncModeWithCallback 测试async模式的回调
+// TestExec_AsyncModeWithCallback 测试 loop-local async action 会触发回调并以异步方式退出。
 func TestExec_AsyncModeWithCallback(t *testing.T) {
 	asyncCalled := false
 	var capturedAction *reactloops.LoopAction
@@ -318,87 +348,76 @@ func TestExec_AsyncModeWithCallback(t *testing.T) {
 			return rsp, nil
 		}),
 	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct: %v", err)
-	}
+	require.NoError(t, err)
 
 	loop, err := reactloops.NewReActLoop("async-callback-loop", reactIns,
 		reactloops.WithOnAsyncTaskTrigger(func(action *reactloops.LoopAction, task aicommon.AIStatefulTask) {
 			asyncCalled = true
 			capturedAction = action
 			capturedTask = task
-			t.Logf("Async task triggered: action=%s, task=%s", action.ActionType, task.GetId())
 		}),
+		reactloops.WithRegisterLoopActionWithStreamField(
+			"async_test_action",
+			"Async test action",
+			nil,
+			nil,
+			nil,
+			func(_ *reactloops.ReActLoop, _ *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+				op.Continue()
+			},
+			func(action *reactloops.LoopAction) {
+				action.AsyncMode = true
+			},
+		),
 	)
-	if err != nil {
-		t.Fatalf("Failed to create loop: %v", err)
-	}
+	require.NoError(t, err)
 
-	// 手动创建并注册一个async action
-	asyncAction := &reactloops.LoopAction{
-		ActionType:  "async_test_action",
-		Description: "Async test action",
-		AsyncMode:   true,
-		ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-			t.Log("Async action handler called")
-			operator.Continue()
-		},
-	}
-	reactloops.RegisterAction(asyncAction)
-
-	err = loop.Execute("async-test-task", context.Background(), "test async callback")
-	// Async模式会直接退出，不应该有error
-	if err != nil {
-		t.Logf("Async mode result: %v", err)
-	}
-
-	// Async测试可能因action未正确注册而失败，这里只记录结果
-	t.Logf("Async callback called: %v, captured action: %v, captured task: %v",
-		asyncCalled, capturedAction != nil, capturedTask != nil)
+	require.NoError(t, loop.Execute("async-test-task", context.Background(), "test async callback"))
+	require.True(t, asyncCalled)
+	require.NotNil(t, capturedAction)
+	require.Equal(t, "async_test_action", capturedAction.ActionType)
+	require.NotNil(t, capturedTask)
+	require.True(t, capturedTask.IsAsyncMode())
 }
 
-// TestExec_ActionVerifierOnly 测试只有verifier没有handler的情况（已修复）
+// TestExec_ActionVerifierOnly 测试 verifier 通过但 handler 缺失时进入 Timeline
+// 自愈，而不是把机制错误直接作为任务终态。
 func TestExec_ActionVerifierOnly(t *testing.T) {
 	verifierCalled := false
+	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verifier_only"}`))
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verifier_only"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
 	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct: %v", err)
-	}
+	require.NoError(t, err)
 
 	loop, err := reactloops.NewReActLoop("verifier-only-loop", reactIns,
 		reactloops.WithRegisterLoopAction(
 			"verifier_only",
 			"Verifier only action",
 			nil,
-			func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+			func(_ *reactloops.ReActLoop, _ *aicommon.Action) error {
 				verifierCalled = true
-				t.Log("Verifier called")
 				return nil
 			},
-			nil, // 没有handler
+			nil,
 		),
 	)
-	if err != nil {
-		t.Fatalf("Failed to create loop: %v", err)
-	}
+	require.NoError(t, err)
 
-	err = loop.Execute("test", context.Background(), "test verifier only")
-	// 应该失败，因为ActionHandler为nil
-	if err == nil {
-		t.Error("Should return error when ActionHandler is nil")
-	}
-
-	if !verifierCalled {
-		t.Log("Verifier was called during transaction")
-	}
+	require.NoError(t, loop.Execute("test", context.Background(), "test verifier only"))
+	require.True(t, verifierCalled)
+	require.GreaterOrEqual(t, callCount, 2)
 }
 
 // TestExec_ComplexIterations 测试复杂的多次迭代场景

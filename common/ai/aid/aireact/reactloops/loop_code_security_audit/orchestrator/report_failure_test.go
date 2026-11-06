@@ -16,7 +16,7 @@ import (
 )
 
 func TestReportFallbackPreservesFailure(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableAutoSkills(true),
 		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
@@ -34,7 +34,7 @@ func TestReportFallbackPreservesFailure(t *testing.T) {
 	state.WorkDir = t.TempDir()
 	state.ProjectPath = t.TempDir()
 	err = runPhase4(loop, runtime, task, state, state.WorkDir)
-	require.ErrorContains(t, err, "report unavailable", "saving a fallback must not turn failure into success")
+	require.ErrorContains(t, err, context.DeadlineExceeded.Error(), "persistent provider failure continues until the caller cancels")
 	written, err := os.ReadFile(state.GetFinalReportPath())
 	require.NoError(t, err)
 	require.Contains(t, string(written), "报告生成阶段未完成")

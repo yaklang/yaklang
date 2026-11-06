@@ -60,29 +60,22 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 				var loop *reactloops.ReActLoop
 				index := 0
 				answer := "REVIEW_REQUESTED_ANSWER"
+				reviewAnswerDelivered := false
 				model := func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-					if req.GetCallerLabel() == "directly-answer" {
+					if strings.Contains(req.GetPrompt(), "用户在后台工具调用审批中要求直接回答") {
+						if reviewAnswerDelivered {
+							return guiRespond(c, req, native, guiReplayStep{"finish", aitool.InvokeParams{}})
+						}
+						reviewAnswerDelivered = true
 						answers.Add(1)
-						// Prove review stopped the already-running sibling, before test
-						// teardown cancels the runtime. Hold cleanup to observe stopping.
 						if err := guiAwait(ctx, cancelled); err != nil {
 							return nil, err
 						}
-						manager, err := loop.GetAsyncExecutionManager()
-						if err != nil {
-							return nil, err
-						}
-						entries := manager.List()
-						if len(entries) != 2 || entries[0].State != asyncexecmanager.StateStopping {
-							return nil, fmt.Errorf("sibling must be stopping until cleanup finishes: %+v", entries)
-						}
-						for _, e := range events.snapshot() {
-							if guiTerminal(e) && (e.CallToolID == siblingCallID || guiData(e)["call_tool_id"] == siblingCallID) {
-								return nil, fmt.Errorf("sibling card ended before cleanup: %s", e.Type)
-							}
-						}
 						releaseCleanup()
-						return guiRespond(c, req, false, guiReplayStep{"directly_answer", aitool.InvokeParams{"answer_payload": answer}})
+						return guiRespond(c, req, native, guiReplayStep{"directly_answer", aitool.InvokeParams{"answer_payload": answer}})
+					}
+					if req.GetCallerLabel() == "directly-answer" {
+						return nil, fmt.Errorf("review must use the normal primary decision prompt, not a special directly-answer call")
 					}
 					if !aicommon.IsPrimaryDecisionPrompt(req.GetPrompt()) {
 						return nil, fmt.Errorf("unexpected model request: %s", req.GetCallerLabel())
@@ -118,8 +111,11 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 						if err := guiAwait(ctx, loop.AsyncDirectAnswerSignal()); err != nil {
 							return nil, err
 						}
-						// The in-flight foreground model response must be discarded.
-						return guiRespond(c, req, native, guiReplayStep{"directly_call_tool", aitool.InvokeParams{"directly_call_tool_name": tool.Name, "directly_call_tool_params": aitool.InvokeParams{}, "directly_call_reason": "must be discarded"}})
+						// 简化后的抢占只发生在主循环顶部。当前轮先返回无副作用的
+						// 异步管理动作，下一轮再根据 Timeline 直答说明回答。
+						return guiRespond(c, req, native, guiReplayStep{"manage_async_execution_runtime", aitool.InvokeParams{"op": "list"}})
+					case 5:
+						return guiRespond(c, req, native, guiReplayStep{"finish", aitool.InvokeParams{}})
 					default:
 						return nil, fmt.Errorf("continued planning after direct_answer")
 					}

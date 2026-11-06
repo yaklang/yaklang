@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -35,7 +36,6 @@ type LoopActionHandlerOperator struct {
 	trajectoryResponse       aicommon.TrajectoryResponseReceipt
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
-	contextCompressionError  error
 
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
@@ -138,11 +138,17 @@ func (l *LoopActionHandlerOperator) Fail(i any) {
 }
 
 func (l *LoopActionHandlerOperator) Feedback(i any) {
+	if l.feedbacks == nil {
+		l.feedbacks = new(bytes.Buffer)
+	}
 	_, _ = l.feedbacks.WriteString(utils.InterfaceToString(i))
 	l.feedbacks.WriteRune('\n')
 }
 
 func (l *LoopActionHandlerOperator) GetFeedback() *bytes.Buffer {
+	if l.feedbacks == nil {
+		l.feedbacks = new(bytes.Buffer)
+	}
 	return l.feedbacks
 }
 
@@ -271,7 +277,14 @@ func (o *OnPostIterationOperator) DeferAfterCallbacks(fn func()) {
 // Called by callOnPostIteration after the main callback chain completes.
 func (o *OnPostIterationOperator) RunDeferredFuncs() {
 	for _, fn := range o.deferredFuncs {
-		fn()
+		func() {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					log.Warnf("deferred post-iteration callback panicked and was skipped: %v", recovered)
+				}
+			}()
+			fn()
+		}()
 	}
 }
 
