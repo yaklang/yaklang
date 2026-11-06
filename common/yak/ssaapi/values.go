@@ -1160,16 +1160,16 @@ func (v *Value) GetCallee() *Value {
 func (v *Value) GetPredecessors() []*PredecessorValue {
 	if len(v.Predecessors) == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			edges := ssadb.GetPredecessorEdgeByFromID(ssadb.GetDB(), auditNode.NodeID)
-			var preds []*PredecessorValue
-			for _, edge := range edges {
+			stepEdges := ssadb.GetPredecessorTargetsByFromID(ssadb.GetDB(), auditNode.NodeID)
+			preds := make([]*PredecessorValue, 0, len(stepEdges))
+			for _, edge := range stepEdges {
 				p := v.NewValueFromAuditNode(edge.ToNode)
 				if p != nil {
 					preds = append(preds, &PredecessorValue{
 						Node: p,
 						Info: sfvm.AnalysisContext{
-							Step:  int(edge.AnalysisStep),
-							Label: edge.AnalysisLabel,
+							Step:  int(edge.Step),
+							Label: edge.Label,
 						},
 					})
 				}
