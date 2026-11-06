@@ -31,6 +31,11 @@ type Edge struct {
 	From, To *Value
 	Kind     EdgeType
 	Msg      map[string]any
+	// Label and Step carry the predecessor metadata without allocating a map
+	// for every edge on the dataflow hot path. Msg remains for callers that
+	// still use the generic form.
+	Label string
+	Step  int64
 }
 
 func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
@@ -39,7 +44,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 		ctx = ctxs[0]
 	}
 
-	sendRawEdge := func(from, to *Value, kind EdgeType, msg map[string]any) error {
+	sendRawEdge := func(from, to *Value, kind EdgeType, label string, step int64) error {
 		switch g.GetGraphKind() {
 		case GraphKindShow:
 			from, to = to, from // show graph, show from(prev) -> to(v)
@@ -54,10 +59,11 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 			return utils.Errorf("unknown graph kind: %v", g.GetGraphKind())
 		}
 		err := g.CreateEdge(Edge{
-			From: from,
-			To:   to,
-			Kind: kind,
-			Msg:  msg,
+			From:  from,
+			To:    to,
+			Kind:  kind,
+			Label: label,
+			Step:  step,
 		})
 		if err != nil {
 			return err
@@ -77,7 +83,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 					depende := v.GetDependOn()
 					// log.Errorf("%v prev: %v", v, prev)
 					for _, d := range depende {
-						if err := sendRawEdge(v, d, EdgeTypeDependOn, nil); err != nil {
+						if err := sendRawEdge(v, d, EdgeTypeDependOn, "", 0); err != nil {
 							return nil, err
 						}
 					}
@@ -88,7 +94,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 					effect := v.GetEffectOn()
 					// log.Errorf("%v prev: %v", v, prev)
 					for _, e := range effect {
-						if err := sendRawEdge(v, e, EdgeTypeEffectOn, nil); err != nil {
+						if err := sendRawEdge(v, e, EdgeTypeEffectOn, "", 0); err != nil {
 							return nil, err
 						}
 					}
@@ -98,10 +104,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 			}
 			next = append(next, prev.Node)
 			// add predecessor edge
-			if err := sendRawEdge(v, prev.Node, EdgeTypePredecessor, map[string]any{
-				"label": prev.Info.Label,
-				"step":  prev.Info.Step,
-			}); err != nil {
+			if err := sendRawEdge(v, prev.Node, EdgeTypePredecessor, prev.Info.Label, int64(prev.Info.Step)); err != nil {
 				return nil, err
 			}
 		}
@@ -113,7 +116,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 				dependon := v.GetDependOn()
 				// log.Errorf("%v prev: %v", v, prev)
 				for _, depend := range dependon {
-					if err := sendRawEdge(v, depend, EdgeTypeDependOn, nil); err != nil {
+					if err := sendRawEdge(v, depend, EdgeTypeDependOn, "", 0); err != nil {
 						return nil, err
 					}
 				}
@@ -125,7 +128,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 				effecton := v.GetEffectOn()
 				// log.Errorf("%v prev: %v", v, prev)
 				for _, effect := range effecton {
-					if err := sendRawEdge(v, effect, EdgeTypeEffectOn, nil); err != nil {
+					if err := sendRawEdge(v, effect, EdgeTypeEffectOn, "", 0); err != nil {
 						return nil, err
 					}
 				}
