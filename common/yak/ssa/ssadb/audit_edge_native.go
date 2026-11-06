@@ -136,3 +136,68 @@ func nativePredecessorEdges(db *gorm.DB, fromID string) []*AuditEdge {
 	RecordDBRead(time.Since(started), false)
 	return out
 }
+
+// AuditPredecessor is the projection GetPredecessors needs from a predecessor
+// edge. Reading only these columns avoids materializing the wide AuditEdge for
+// every step in a dataflow report.
+type AuditPredecessor struct {
+	ToNode string
+	Step   int64
+	Label  string
+}
+
+func nativePredecessorTargets(db *gorm.DB, fromID string) []AuditPredecessor {
+	if db == nil {
+		db = GetDB()
+	}
+	if db == nil || fromID == "" {
+		return nil
+	}
+
+	ctx, cancel := nativeQueryContext(context.Background())
+	defer cancel()
+	query := bindSQLPlaceholdersDB(db,
+		`SELECT to_node, analysis_step, analysis_label FROM "`+TableAuditEdges+`" `+
+			`WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL`)
+	started := time.Now()
+	rows, err := nativeQueryContextDB(db, ctx, query, fromID, string(EdgeType_Predecessor))
+	if err != nil {
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(query, time.Since(started), err)
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AuditPredecessor
+	for rows.Next() {
+		var (
+			toNode sql.NullString
+			step   sql.NullInt64
+			label  sql.NullString
+		)
+		if err := rows.Scan(&toNode, &step, &label); err != nil {
+			RecordDBRead(time.Since(started), true)
+			logNativeSQL(query, time.Since(started), err)
+			return out
+		}
+		if !toNode.Valid {
+			continue
+		}
+		out = append(out, AuditPredecessor{
+			ToNode: toNode.String,
+			Step:   step.Int64,
+			Label:  label.String,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(query, time.Since(started), err)
+		return out
+	}
+	RecordDBRead(time.Since(started), false)
+	return out
+}
+
+func GetPredecessorTargetsByFromID(db *gorm.DB, fromID string) []AuditPredecessor {
+	return nativePredecessorTargets(db, fromID)
+}

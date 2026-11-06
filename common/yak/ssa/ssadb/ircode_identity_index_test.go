@@ -57,3 +57,50 @@ func TestIrCodeIdentityIndexIsAlwaysPresent(t *testing.T) {
 		OpcodeName:  "ConstInst",
 	}}, 1), "a plain insert must be rejected by the unique index")
 }
+
+func TestNativeInsertIrCodesRoundTrip(t *testing.T) {
+	db := setupIdentityDB(t)
+	prog := t.Name()
+	first := &IrCode{
+		ProgramName:           prog,
+		CodeID:                1,
+		OpcodeName:            "ConstInst",
+		Name:                  "a",
+		String:                "hello",
+		FormalArgs:            Int64Slice{1, 2},
+		Variable:              StringSlice{"x", "y"},
+		ObjectMembers:         Int64Map{{1, 2}},
+		ObjectMemberPairs:     Int64Map{{3, 4}},
+		ObjectOwnerPairs:      Int64Map{{5, 6}},
+		MaskedCodes:           Int64Slice{7},
+		ProgramCompileHash:    "hash",
+		TypeID:                9,
+		ExtraInformation:      "extra",
+		ConstType:             "normal",
+		SourceCodeStartOffset: 3,
+		SourceCodeEndOffset:   8,
+	}
+	second := &IrCode{ProgramName: prog, CodeID: 2, Name: "b"}
+	require.NoError(t, InsertIrCodes(db, []*IrCode{nil, first, second}, 2))
+
+	got := GetIrCodeItemById(db, prog, 1)
+	require.NotNil(t, got)
+	require.Equal(t, "hello", got.String)
+	require.Equal(t, Int64Slice{1, 2}, got.FormalArgs)
+	require.Equal(t, StringSlice{"x", "y"}, got.Variable)
+	require.Equal(t, Int64Map{{1, 2}}, got.ObjectMembers)
+	require.Equal(t, Int64Map{{3, 4}}, got.ObjectMemberPairs)
+	require.Equal(t, Int64Map{{5, 6}}, got.ObjectOwnerPairs)
+	require.Equal(t, Int64Slice{7}, got.MaskedCodes)
+	require.Equal(t, "hash", got.ProgramCompileHash)
+	require.Equal(t, int64(9), got.TypeID)
+	require.Equal(t, "extra", got.ExtraInformation)
+	require.Equal(t, "normal", got.ConstType)
+	require.Equal(t, int64(3), got.SourceCodeStartOffset)
+	require.Equal(t, int64(8), got.SourceCodeEndOffset)
+	require.False(t, got.CreatedAt.IsZero())
+
+	var total int64
+	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", prog).Count(&total).Error)
+	require.Equal(t, int64(2), total)
+}

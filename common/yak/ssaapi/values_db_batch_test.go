@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -8,8 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // TestBatchSaveAuditNodesAndEdgesIsEquivalencePreserving guards the batched
@@ -140,4 +144,36 @@ func TestBatchSaveAuditSources(t *testing.T) {
 	require.ErrorIs(t, err, rollback)
 	require.NoError(t, db.Model(&ssadb.IrSource{}).Where("program_name = ?", program).Count(&n).Error)
 	require.EqualValues(t, count, n, "a source batch stays in its caller's transaction")
+}
+
+func TestCaptureAuditGraphDeduplicatesIdenticalEdges(t *testing.T) {
+	prog, err := Parse("", WithProgramName("dedup-"+uuid.NewString()), WithLanguage(ssaconfig.Yak))
+	require.NoError(t, err)
+
+	newValue := func(id int64) *Value {
+		inst := ssa.NewConst(id)
+		inst.SetId(id)
+		v, err := prog.NewValue(inst)
+		require.NoError(t, err)
+		return v
+	}
+	from, to := newValue(1), newValue(2)
+	info := sfvm.AnalysisContext{Step: -1}
+	// AppendPredecessor deduplicates this pair, so seed the slice directly:
+	// the graph walker must still not emit two identical DB edges if another
+	// producer supplied duplicates.
+	from.Predecessors = []*PredecessorValue{
+		{Node: to, Info: info},
+		{Node: to, Info: info},
+	}
+
+	nodes, edges, sources, err := captureAuditGraph(
+		context.Background(), from,
+		OptionSaveValue_ProgramName(prog.GetProgramName()),
+		OptionSaveValue_ResultVariable("res"),
+	)
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	require.Len(t, edges, 1)
+	require.Empty(t, sources)
 }

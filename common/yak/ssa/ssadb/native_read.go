@@ -489,3 +489,28 @@ func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args .
 		return db.CommonDB().Query(query, args...)
 	}
 }
+
+// nativeExecContextDB executes a statement on the database or transaction
+// behind a gorm handle without building a gorm scope.
+func nativeExecContextDB(db *gorm.DB, ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	if db == nil {
+		return nil, sql.ErrConnDone
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if damenggorm.IsDM(db) {
+		query = damenggorm.NormalizeQuery(query)
+	}
+	switch q := db.CommonDB().(type) {
+	case *sql.DB:
+		return q.ExecContext(ctx, query, args...)
+	case *sql.Tx:
+		return q.ExecContext(ctx, query, args...)
+	default:
+		return db.CommonDB().Exec(query, args...)
+	}
+}
