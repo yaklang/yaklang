@@ -16,19 +16,25 @@ const (
 	SFResultSaveDatabase SFResultSaveKind = "database" // in database
 )
 
+// TEMPORARY (pruning validation only): both defaults are 0 so a scan measures
+// the dataflow pruning work without the budget guardrail cutting it short.
+// RESTORE 50_000 / 4h before merging this branch.
+//
 // DefaultScanRuleWorkLimit is the default for both the CLI and the Yak script
 // per-rule structural work budget. Keep the default in one place so API
 // documentation and callers do not drift apart. 50k was validated on
 // dotCMS/core (188 SSA rules): it finishes in ~2m at default concurrency with
 // ~4GB peak RSS, while the legacy 200k default still reached the node's 24GiB
 // guard on that project.
-const DefaultScanRuleWorkLimit int64 = 50_000
+const DefaultScanRuleWorkLimit int64 = 0
 
+// TEMPORARY (pruning validation only): restored with the work limit above.
+//
 // DefaultScanRuleTimeout is the default per-rule wall-clock budget for every
 // scan entry point. It is a loose backstop: a pathological rule is bailed at
 // the deadline instead of hanging the whole scan, while normal slow rules keep
 // enough time to finish. Explicit 0 still disables the budget.
-const DefaultScanRuleTimeout = 4 * time.Hour
+const DefaultScanRuleTimeout = time.Duration(0)
 
 type SyntaxFlowConfig struct {
 	Memory         bool             `json:"memory"`
