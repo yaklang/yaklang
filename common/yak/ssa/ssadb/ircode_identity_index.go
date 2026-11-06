@@ -18,6 +18,11 @@ func InsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) error {
 	if batchSize < 1 {
 		batchSize = len(items)
 	}
+	// Native multi-row INSERT avoids gorm's per-row field reflection. The
+	// helper returns handled=false for dialects that keep the GORM path.
+	if handled, err := nativeInsertIrCodes(db, items, batchSize); handled {
+		return err
+	}
 	// The batched insert bypasses the GORM create callbacks, so record it
 	// here or db-stats silently loses every bulk IR write.
 	started := time.Now()

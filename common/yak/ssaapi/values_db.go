@@ -162,8 +162,20 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	return err
 }
 
+type dbGraphEdgeKey struct {
+	from  string
+	to    string
+	kind  ssadb.AuditEdgeType
+	step  int64
+	label string
+}
+
 type DBGraph struct {
 	*saveValueCtx
+	// A dump may reach the same predecessor edge through several paths. The
+	// database only needs one row per exact (from, to, kind, step, label), and
+	// duplicates cost an AuditEdge allocation and an INSERT each.
+	seenEdges map[dbGraphEdgeKey]struct{}
 }
 
 var _ Graph = (*DBGraph)(nil)
@@ -171,6 +183,7 @@ var _ Graph = (*DBGraph)(nil)
 func NewDBGraph(ctx *saveValueCtx) *DBGraph {
 	return &DBGraph{
 		saveValueCtx: ctx,
+		seenEdges:    make(map[dbGraphEdgeKey]struct{}),
 	}
 }
 
@@ -257,38 +270,56 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		})
 		return err
 	}
-	msg := edge.Msg
-	switch edge.Kind {
-	case EdgeTypeDependOn:
-		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode)
-		if err := saveEdge(edge); err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
+	label, step := edge.Label, edge.Step
+	if msg := edge.Msg; msg != nil {
+		if l, ok := msg["label"].(string); ok {
+			label = l
 		}
-	case EdgeTypeEffectOn:
-		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode)
-		if err := saveEdge(edge); err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
-		}
-	case EdgeTypePredecessor:
-		var (
-			label = edge.Label
-			step  = edge.Step
-		)
-		if msg != nil {
-			if l, ok := msg["label"].(string); ok {
-				label = l
-			}
-			if s, ok := msg["step"].(int64); ok {
-				step = s
-			}
-		}
-		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode, step, label)
-		if err := saveEdge(edge); err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
+		switch s := msg["step"].(type) {
+		case int:
+			step = int64(s)
+		case int64:
+			step = s
 		}
 	}
-	return nil
 
+	var kind ssadb.AuditEdgeType
+	switch edge.Kind {
+	case EdgeTypeDependOn:
+		kind = ssadb.EdgeType_DependsOn
+	case EdgeTypeEffectOn:
+		kind = ssadb.EdgeType_EffectsOn
+	case EdgeTypePredecessor:
+		kind = ssadb.EdgeType_Predecessor
+	default:
+		return nil
+	}
+
+	key := dbGraphEdgeKey{
+		from:  fromNode.NodeID,
+		to:    toNode.NodeID,
+		kind:  kind,
+		step:  step,
+		label: label,
+	}
+	if _, ok := g.seenEdges[key]; ok {
+		return nil
+	}
+
+	var audit *ssadb.AuditEdge
+	switch edge.Kind {
+	case EdgeTypeDependOn:
+		audit = fromNode.CreateDependsOnEdge(g.ProgramName, toNode)
+	case EdgeTypeEffectOn:
+		audit = fromNode.CreateEffectsOnEdge(g.ProgramName, toNode)
+	case EdgeTypePredecessor:
+		audit = fromNode.CreatePredecessorEdge(g.ProgramName, toNode, step, label)
+	}
+	if err := saveEdge(audit); err != nil {
+		log.Errorf("save AuditEdge failed: %v", err)
+	}
+	g.seenEdges[key] = struct{}{}
+	return nil
 }
 
 type auditDatabase struct {
@@ -377,9 +408,9 @@ func captureAuditGraph(ctx context.Context, value *Value, opts ...SaveValueOptio
 		ctx = context.Background()
 	}
 	var mu sync.Mutex
-	var nodes []*ssadb.AuditNode
-	var edges []*ssadb.AuditEdge
-	var sources []*ssadb.IrSource
+	nodes := make([]*ssadb.AuditNode, 0, 256)
+	edges := make([]*ssadb.AuditEdge, 0, 256)
+	sources := make([]*ssadb.IrSource, 0, 16)
 	db := &auditDatabase{}
 	queue := dbcache.WithInitialBufferSize(64)
 	saveSize := dbcache.WithSaveSize(defaultSize)

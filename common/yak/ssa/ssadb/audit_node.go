@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"sync"
 	"time"
@@ -176,24 +177,34 @@ func GetAuditNodeById(db *gorm.DB, id string) (*AuditNode, error) {
 	if db == nil {
 		db = GetDB()
 	}
-	var an AuditNode
-	if err := db.Model(&AuditNode{}).Where("node_id = ?", id).First(&an).Error; err != nil {
-		return nil, err
-	} else {
-		return &an, nil
+	an, err := nativeGetAuditNodeById(db, id)
+	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
+		return an, err
 	}
+	// Keep the GORM path as a compatibility fallback for dialects whose
+	// native scan does not match the configured schema.
+	var fallback AuditNode
+	if err := db.Model(&AuditNode{}).Where("node_id = ?", id).First(&fallback).Error; err != nil {
+		return nil, err
+	}
+	return &fallback, nil
 }
 
 func GetAuditNodesByIds(db *gorm.DB, ids []string) ([]*AuditNode, error) {
 	if db == nil {
 		db = GetDB()
 	}
-	var ans []*AuditNode
-	if err := db.Model(&AuditNode{}).Where("node_id IN (?)", ids).Find(&ans).Error; err != nil {
-		return nil, err
-	} else {
+	ans, err := nativeGetAuditNodesByIds(db, ids)
+	if err == nil {
 		return ans, nil
 	}
+	// Compatibility fallback for schemas/dialects the fixed native scan does
+	// not support. The native query and GORM both apply the soft-delete scope.
+	var fallback []*AuditNode
+	if err := db.Model(&AuditNode{}).Where("node_id IN (?)", ids).Find(&fallback).Error; err != nil {
+		return nil, err
+	}
+	return fallback, nil
 }
 
 type AuditEdgeType string

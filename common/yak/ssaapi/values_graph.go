@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type EdgeType string
@@ -142,8 +141,10 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 const MAXLevel = 1000
 
 func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Context) error {
-	// Perform DFS traversal
-	stack := omap.NewEmptyOrderedMap[int64, *Value]()
+	// Only membership is used here; the ordered map's key slice was pure
+	// allocation. Traversal order is defined by handler's returned Values, not
+	// by the visited set.
+	visited := make(map[int64]struct{}, 64)
 	level := 0
 	var dfs func(v *Value) error
 	dfs = func(v *Value) error {
@@ -156,11 +157,12 @@ func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Con
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if stack.Have(v.GetUID()) {
+		uid := v.GetUID()
+		if _, ok := visited[uid]; ok {
 			return nil
 		}
-		stack.PushKey(v.GetUID(), v)
-		defer stack.Pop()
+		visited[uid] = struct{}{}
+		defer delete(visited, uid)
 
 		vs, err := handler(v)
 		if err != nil {

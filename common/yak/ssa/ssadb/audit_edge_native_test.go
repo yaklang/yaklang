@@ -110,3 +110,26 @@ func TestNativeAuditEdgeGettersReadNullableColumns(t *testing.T) {
 	require.Zero(t, edges[0].AnalysisStep)
 	require.Empty(t, edges[0].AnalysisLabel)
 }
+
+func TestNativePredecessorTargetsProjection(t *testing.T) {
+	db := newAuditEdgeTestDB(t)
+	from := "01HZZZZZZZZZZZZZZZZZZZZZZZ"
+	require.NoError(t, db.Create(&AuditEdge{
+		FromNode:      from,
+		ToNode:        "target-a",
+		EdgeType:      EdgeType_Predecessor,
+		AnalysisStep:  7,
+		AnalysisLabel: "bottom-use",
+	}).Error)
+	require.NoError(t, db.Create(&AuditEdge{
+		FromNode: from,
+		ToNode:   "depends-target",
+		EdgeType: EdgeType_DependsOn,
+	}).Error)
+
+	targets := GetPredecessorTargetsByFromID(db, from)
+	require.Len(t, targets, 1)
+	require.Equal(t, "target-a", targets[0].ToNode)
+	require.Equal(t, int64(7), targets[0].Step)
+	require.Equal(t, "bottom-use", targets[0].Label)
+}
