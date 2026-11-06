@@ -431,7 +431,12 @@ func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
 		if c.program != nil {
 			ssaProg = c.program.Program
 		}
-		bound := newStructBound(unit, ssaProg)
+		var bound *structBound
+		if c.program != nil {
+			bound = c.program.getStructBound(unit)
+		} else {
+			bound = newStructBound(unit, ssaProg)
+		}
 		c.structBound = bound
 		if len(c.value) == 0 && c.program != nil {
 			c.value = sfvm.ValuesOf(NewStructQueryTarget(c.program, unit, bound))

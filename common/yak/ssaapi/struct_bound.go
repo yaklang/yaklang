@@ -42,6 +42,29 @@ func newStructBound(unit *ssa.CompileUnit, ssaProg *ssa.Program) *structBound {
 	}
 }
 
+// getStructBound returns the immutable per-unit filter, building it once per
+// Program. Struct rules run concurrently and each used to call
+// BuildFilePathSet for the same unit, keeping one full path set per query.
+func (p *Program) getStructBound(unit *ssa.CompileUnit) *structBound {
+	if unit == nil {
+		return newStructBound(nil, nil)
+	}
+	if p == nil {
+		return newStructBound(unit, nil)
+	}
+	if cached, ok := p.structBoundCache.Load(unit.Key); ok {
+		if bound, ok := cached.(*structBound); ok && bound != nil {
+			return bound
+		}
+	}
+	bound := newStructBound(unit, p.Program)
+	actual, _ := p.structBoundCache.LoadOrStore(unit.Key, bound)
+	if cached, ok := actual.(*structBound); ok && cached != nil {
+		return cached
+	}
+	return bound
+}
+
 func (b *structBound) compileUnit() *ssa.CompileUnit {
 	if b == nil {
 		return nil
