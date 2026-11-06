@@ -297,13 +297,36 @@ func LoadConfigFromJSON(data []byte) (*Config, error) {
 	if c.Mode == 0 {
 		return nil, errors.New("mode not specified in config json file")
 	}
+	if err := normalizeConfigLanguage(&c); err != nil {
+		return nil, err
+	}
 	return &c, nil
+}
+
+// normalizeConfigLanguage maps aliases such as "go" to the canonical
+// Language value. Without it, a JSON config bypassed WithProjectRawLanguage
+// and LanguageBuilderCreater missed the frontend; the compile then fell back
+// to the first registered builder and parsed the whole project as that
+// language (artex was scanned as TypeScript, with every .go file skipped).
+func normalizeConfigLanguage(c *Config) error {
+	if c == nil || c.BaseInfo == nil || c.BaseInfo.Language == "" {
+		return nil
+	}
+	language, err := ValidateLanguage(string(c.BaseInfo.Language))
+	if err != nil {
+		return err
+	}
+	c.BaseInfo.Language = language
+	return nil
 }
 
 func WithConfigJson(jsonStr string) Option {
 	return func(c *Config) error {
 		var temp Config
 		if err := json.Unmarshal([]byte(jsonStr), &temp); err != nil {
+			return err
+		}
+		if err := normalizeConfigLanguage(&temp); err != nil {
 			return err
 		}
 		*c = temp
@@ -330,6 +353,9 @@ func WithJsonRawConfig(raw []byte) Option {
 		}
 		err := json.Unmarshal(raw, &c)
 		if err != nil {
+			return err
+		}
+		if err := normalizeConfigLanguage(c); err != nil {
 			return err
 		}
 
