@@ -57,6 +57,10 @@ class C {
 	require.True(t, check.ExcludePrunable(), "the simple getCallee exclude must enable branch pruning")
 	require.False(t, check.CheckExcludeNode(callee), "a non-call node cannot match *<getCallee>")
 	require.True(t, check.CheckExcludeNode(call), "a call whose callee is in $filter must prune the branch")
+	require.Len(t, check.matchItem, 1)
+	require.Nil(t, check.matchItem[0].frame, "a simple exclude must not compile a sub-rule frame")
+	require.False(t, check.CheckMatch(sf.Values{call}), "the fast path must match the filter call on the path")
+	require.True(t, check.CheckMatch(sf.Values{callee}), "a path without the filter call must not be excluded")
 
 	unsupported := CreateCheck(contextResult, config)
 	unsupported.AppendItems(&sf.RecursiveConfigItem{
@@ -105,6 +109,10 @@ func TestSimpleIncludeSourceIDs(t *testing.T) {
 	ids, ok := check.SimpleIncludeSourceIDs()
 	require.True(t, ok)
 	require.Contains(t, ids, source.GetId())
+	require.Len(t, check.matchItem, 1)
+	require.Nil(t, check.matchItem[0].frame, "a simple include must not compile a sub-rule frame")
+	require.True(t, check.CheckMatch(sf.Values{source}))
+	require.False(t, check.CheckMatch(sf.Values{fastMatchTestValue(t, prog, 99)}))
 
 	complexCheck := CreateCheck(result, config)
 	complexCheck.AppendItems(&sf.RecursiveConfigItem{
