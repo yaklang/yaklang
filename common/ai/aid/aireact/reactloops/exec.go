@@ -636,18 +636,8 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	lastCompressionTokens := 0
 LOOP:
 	for {
-		if r.asyncReviewRequiresAnswer() {
-			answerErr := r.answerAsyncReview(task)
-			if answerErr != nil {
-				if isLoopControlTermination(answerErr) || task.GetContext().Err() != nil {
-					r.finishIterationLoopWithError(iterationCount, task, answerErr)
-					return answerErr
-				}
-				r.recordRecoverableTurnError(iterationCount, "async_review", "<async-review>", answerErr)
-				continue LOOP
-			}
-			r.finishIterationLoopWithError(iterationCount, task, answerErr)
-			return answerErr
+		if r.handleAsyncDirectAnswerSignal() {
+			continue LOOP
 		}
 		iterationCount++
 		r.currentIterationIndex = iterationCount
@@ -749,6 +739,12 @@ LOOP:
 				r.emitContextCompressionNoProgress(lastCompressionTokens, tokens)
 			}
 			if r.promptMode == aicommon.LoopPromptModeNormal && transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) && tokens >= lastPromptTokens*99/100 {
+				// 这里只结束本轮的 Prompt 重建重试，不退出主 LOOP。
+				// transactionErr 会走下面的统一恢复分支写入 Timeline，然后 continue LOOP。
+				log.Warnf(
+					"prompt overflow retry made no measurable progress (%d >= %d); recording a recoverable error and continuing the outer loop",
+					tokens, lastPromptTokens*99/100,
+				)
 				break
 			}
 			lastPromptTokens = tokens
@@ -766,20 +762,6 @@ LOOP:
 				log.Debugf("AI loop transaction stop=%s provider_finish=%q", stopReason, resultDescriptor.Snapshot().ProviderFinishReason)
 			}
 			streamWg.Wait()
-			if r.asyncReviewRequiresAnswer() {
-				r.clearCallsExecutionValues(loopCalls)
-				answerErr := r.answerAsyncReview(task)
-				if answerErr != nil {
-					if isLoopControlTermination(answerErr) || task.GetContext().Err() != nil {
-						r.finishIterationLoopWithError(iterationCount, task, answerErr)
-						return answerErr
-					}
-					r.recordRecoverableTurnError(iterationCount, "async_review", "<async-review>", answerErr)
-					continue LOOP
-				}
-				r.finishIterationLoopWithError(iterationCount, task, answerErr)
-				return answerErr
-			}
 			if transactionErr == nil {
 				r.noteFittingTimelineThroughID(assembled.TimelineThroughID)
 				break

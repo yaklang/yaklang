@@ -202,31 +202,7 @@ func (r *ReActLoop) execCalls(
 			r.effectiveIterationCount++
 		}
 	}()
-	finishAsyncReview := func() loopActionsResult {
-		if answerDelivered {
-			// A review may arrive while the foreground is already answering.
-			// The answer just delivered satisfies it; do not generate a duplicate.
-			r.StopSubAgentsForUser()
-		} else {
-			result.err = r.answerAsyncReview(task)
-			if result.err != nil {
-				return r.recoverActionExecutionFailure(
-					result.operator,
-					LoopCall{},
-					iteration,
-					result.err,
-				)
-			}
-		}
-		result.result = loopActionsExit
-		result.operator.ExitForUser()
-		return result
-	}
-
 	for index, call := range calls {
-		if r.asyncReviewRequiresAnswer() {
-			return finishAsyncReview()
-		}
 		if appliedAdjustment || remainingAdjustments > 0 {
 			r.Set(loopVarNativeTodoBatchAdjusted, true)
 		} else {
@@ -236,9 +212,6 @@ func (r *ReActLoop) execCalls(
 		if call.Action != nil && call.Action.Name() == loopAction_DirectlyAnswer.ActionType &&
 			outcome.err == nil && !outcome.skipPostIteration {
 			answerDelivered = true
-		}
-		if r.asyncReviewRequiresAnswer() {
-			return finishAsyncReview()
 		}
 		countIteration = countIteration || outcome.countsEffectiveIteration
 		if call.Action != nil && call.Action.Name() == nativeAdjustTodolistActionName {

@@ -127,6 +127,7 @@ type ReActLoop struct {
 	asyncExecutionManager      *asyncexecmanager.Manager
 	asyncDirectAnswer          chan struct{}
 	asyncDirectAnswerRequested bool
+	asyncDirectAnswerHandled   bool
 
 	// memory management
 	memorySizeLimit        int
