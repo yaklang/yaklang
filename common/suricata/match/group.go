@@ -44,12 +44,14 @@ type RuleLoadResult struct {
 	Err  error
 }
 
-// Group is a group of rules.
 type callbackTask struct {
 	packet gopacket.Packet
 	rule   *rule.Rule
 }
 
+// Group is the legacy asynchronous stateless dispatcher. It remains available
+// for compatibility; new code should use engine.StatefulEngine and its capture
+// binding.
 type Group struct {
 	pkCache *utils.Cache[gopacket.Packet]
 

@@ -8,6 +8,11 @@ import (
 )
 
 func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
+	// Non-TCP protocols are evaluated from packet buffers (HTTP/DNS/TLS/UDP/
+	// ICMP). Only TCP rules use the ordered stream lane.
+	if p.Rule != nil && p.Rule.Protocol != "tcp" {
+		return view == ViewNormalizedPacket
+	}
 	if p.Flow != nil {
 		if p.Flow.OnlyStream {
 			return view == ViewStream
@@ -23,12 +28,14 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 }
 
 func (p *CompiledRulePlan) match(event InspectionEvent, flow *flowRuntime, streamPayload []byte) (bool, int, error) {
+	matcher := p.acquireMatcher()
+	defer p.releaseMatcher(matcher)
 	switch event.View {
 	case ViewNormalizedPacket:
 		if event.Packet == nil {
 			return false, 0, fmt.Errorf("packet reference could not be joined to a flow")
 		}
-		matched, err := p.Matcher.MatchPackageWithError(event.Packet)
+		matched, err := matcher.MatchPackageWithError(event.Packet)
 		return matched, 0, err
 	case ViewStream:
 		if event.Packet == nil {
@@ -37,7 +44,7 @@ func (p *CompiledRulePlan) match(event InspectionEvent, flow *flowRuntime, strea
 		if flow == nil || event.Direction < 0 || event.Direction > 1 || flow.streamOverflow[event.Direction] {
 			return false, 0, nil
 		}
-		return p.Matcher.MatchStreamEvidence(event.Packet, streamPayload)
+		return matcher.MatchStreamEvidence(event.Packet, streamPayload)
 	default:
 		return false, 0, nil
 	}
