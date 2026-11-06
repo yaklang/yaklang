@@ -41,6 +41,7 @@ func newResumePropagationHarness(t *testing.T) (
 	restore func(),
 ) {
 	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	parentEmitter := aicommon.NewEmitter("resume-prop-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		return e, nil
@@ -58,7 +59,7 @@ func newResumePropagationHarness(t *testing.T) (
 		return rsp, nil
 	}
 	cfg := aicommon.NewConfig(
-		context.Background(),
+		ctx,
 		aicommon.WithTimeline(aicommon.NewTimeline(nil, nil)),
 		aicommon.WithEmitter(parentEmitter),
 		aicommon.WithDisableAutoSkills(true),
@@ -71,20 +72,23 @@ func newResumePropagationHarness(t *testing.T) (
 		}),
 	)
 
-	invoker := &resumePropagationInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), cfg: cfg}
+	invoker := &resumePropagationInvoker{MockInvoker: mock.NewMockInvoker(ctx), cfg: cfg}
 
 	origGetter := aicommon.AIRuntimeInvokerGetter
 	aicommon.AIRuntimeInvokerGetter = func(ctx context.Context, opts ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
 		return &resumePropagationInvoker{MockInvoker: mock.NewMockInvoker(ctx), cfg: aicommon.NewConfig(ctx, opts...)}, nil
 	}
-	restore = func() { aicommon.AIRuntimeInvokerGetter = origGetter }
+	restore = func() {
+		aicommon.AIRuntimeInvokerGetter = origGetter
+		cancel()
+	}
 
 	// 直接构造父 loop（与注册工厂等价，仅省略 init task——本测试只依赖
 	// runAllCategoryScans 对 *ReActLoop 的 GetMaxSubAgents 契约）。
 	loop, loopErr := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT, invoker)
 	require.NoError(t, loopErr)
 	require.NotNil(t, loop)
-	task = mock.NewMockStatefulTask(context.Background(), "phase2-parent", "audit project")
+	task = mock.NewMockStatefulTask(ctx, "phase2-parent", "audit project")
 	state = model.NewAuditState()
 	state.WorkDir = t.TempDir()
 	state.ProjectPath = t.TempDir()
@@ -115,8 +119,8 @@ func TestRunAllCategoryScans_ResumeExecErrPropagatedToFallbackSummary(t *testing
 	require.Equal(t, "not_run_interrupted", obs.StopReason)
 	require.NotContains(t, summary, "execErr=<nil>",
 		"resume-round exec error must be propagated instead of a hardcoded nil")
-	require.Contains(t, summary, "action resolution failed",
-		"the real transaction failure cause must surface in the fallback summary")
+	require.Contains(t, summary, context.DeadlineExceeded.Error(),
+		"the child execution failure must surface in the fallback summary")
 }
 
 // TestResumeJobIdentifierStability 派发与复查必须共用同一 identifier 来源，

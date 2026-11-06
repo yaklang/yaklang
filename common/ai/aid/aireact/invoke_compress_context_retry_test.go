@@ -62,7 +62,7 @@ func TestReAct_CompressContextSelectionRetry(t *testing.T) {
 								"summary": summary, "retain_timeline": compressionHistoryIDFromPrompt(t, req.GetPrompt(), history[len(history)-1]),
 								"retire_skill_names": []string{}, "retire_evidence_ids": []string{},
 							}
-							if invalid == "retry_exhausted" {
+							if invalid == "retry_exhausted" && attempt <= 2 {
 								params["summary"] = ""
 							} else if attempt == 1 {
 								switch invalid {
@@ -74,8 +74,8 @@ func TestReAct_CompressContextSelectionRetry(t *testing.T) {
 									params["retain_timeline"] = "999999999"
 								}
 							}
-							if invalid == "retry_exhausted" && attempt > 1 {
-								require.Contains(t, req.GetPrompt(), "# 上次压缩选择未通过校验")
+							if invalid == "retry_exhausted" && attempt == 2 {
+								require.Contains(t, req.GetPrompt(), "REACT_RECOVERABLE_ERROR")
 								require.Equal(t, aicommon.CallerLabelContextCompress, req.GetCallerLabel())
 							}
 							return compressionActionResponse(t, cfg, req, aicommon.ContextCompressionAction, params), nil
@@ -83,7 +83,7 @@ func TestReAct_CompressContextSelectionRetry(t *testing.T) {
 						if !aicommon.IsPrimaryDecisionPrompt(req.GetPrompt()) {
 							return nil, fmt.Errorf("unexpected auxiliary request %q", req.GetCallerLabel())
 						}
-					require.GreaterOrEqual(t, attempts.Load(), int32(1), "business work must only start after a usable compression selection")
+						require.GreaterOrEqual(t, attempts.Load(), int32(1), "business work must only start after a usable compression selection")
 						return compressionActionResponse(t, cfg, req, "finish", map[string]any{}), nil
 					}))
 				require.NoError(t, err)
@@ -100,18 +100,23 @@ func TestReAct_CompressContextSelectionRetry(t *testing.T) {
 					}
 					react.config.Timeline.PushText(react.config.AcquireId(), "%s %s", marker, padding)
 				}
+				maxIterations := 2
+				if invalid == "retry_exhausted" {
+					maxIterations = 4
+				}
 				loop, err := reactloops.NewReActLoop("compression-selection-retry", react,
 					reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
-					reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(2))
+					reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(maxIterations))
 				require.NoError(t, err)
 				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 				defer cancel()
 				err = loop.Execute("selection-retry-task", ctx, "Compact the context and continue.")
 				view := aicommon.RenderTimelineFrozenOpen(react.config.Timeline).PromptText()
 				if invalid == "retry_exhausted" {
-					require.EqualValues(t, 2, attempts.Load())
-					require.ErrorContains(t, err, "selection rejected after 2 attempts")
-					require.Contains(t, view, history[0], "failed proposals must leave the original history intact")
+					require.GreaterOrEqual(t, attempts.Load(), int32(3), "retry exhaustion must recover in a subsequent loop turn")
+					require.NoError(t, err)
+					require.Contains(t, view, summary)
+					require.NotContains(t, view, history[0])
 				} else {
 					require.GreaterOrEqual(t, attempts.Load(), int32(1))
 					require.NoError(t, err)

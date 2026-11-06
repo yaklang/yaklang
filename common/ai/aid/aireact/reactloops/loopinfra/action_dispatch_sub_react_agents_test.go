@@ -477,24 +477,29 @@ func (e *elaborationObservingInvoker) InvokeQualityPriorityLiteForge(
 // goal elaboration) and check that the sub-task is already in the Processing
 // state at that point — not still in Created.
 func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	parentTimeline := aicommon.NewTimeline(nil, nil)
 	parentTimeline.PushText(1, "parent-seed")
 	parentCfg := aicommon.NewConfig(
-		context.Background(),
+		ctx,
 		aicommon.WithTimeline(parentTimeline),
 		aicommon.WithDisableAutoSkills(true),
 		// Provide a dummy AI callback so the sub-loop does not panic when the
 		// mock invoker cannot reach a real AI backend.
 		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
-			Original: func(_ aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				return &aicommon.AIResponse{}, nil
+			Original: func(cfg aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := cfg.NewAIResponse()
+				rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
+				rsp.Close()
+				return rsp, nil
 			},
 		}),
 	)
 
 	parentInvoker := &configBackedDispatchInvoker{
-		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(context.Background()),
+		dispatchSubReactTestInvoker: newDispatchSubReactTestInvoker(ctx),
 		cfg:                         parentCfg,
 	}
 
@@ -516,7 +521,7 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 	}
 
 	parentTask := aicommon.NewStatefulTaskBase(
-		"parent-task", "parent input", context.Background(), parentCfg.GetEmitter(), true,
+		"parent-task", "parent input", ctx, parentCfg.GetEmitter(), true,
 	)
 
 	job := reactloops.SubAgentJob{

@@ -133,20 +133,34 @@ func TestE2E_ComprehensiveShowcase_SidekickReachable(t *testing.T) {
 }
 
 // ----- 测试 3：verifier 拒绝非法参数（验证 verifier 真的被调用） -----
-// verifier 抛出的错误会被 reactloops 当成 ai transaction error 上抛，
-// 因此 Execute 应当返回包含 verifier 报错信息的 error。
-// 关键词: yak focus mode verifier rejection, error propagation
+// verifier 抛出的错误会被写入 Timeline，循环随后恢复正常动作。
+// 关键词: yak focus mode verifier rejection, timeline recovery
 
 func TestE2E_YakScanDemo_VerifierRejects(t *testing.T) {
 	require.NoError(t, LoadAllFromEmbed())
 
-	mock := &mockAIScript{
-		t:        t,
-		fallback: `{"@action":"scan_target","target":"not-a-url"}`,
+	decisionCalls := 0
+	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		rsp := i.NewAIResponse()
+		if utils.MatchAllOfSubString(req.GetPrompt(), "verify-satisfaction", "user_satisfied", "reasoning") {
+			rsp.EmitOutputStream(bytes.NewBufferString(
+				`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"ok"}`,
+			))
+			rsp.Close()
+			return rsp, nil
+		}
+		decisionCalls++
+		if decisionCalls == 1 {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"scan_target","target":"not-a-url"}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"finish"}`))
+		}
+		rsp.Close()
+		return rsp, nil
 	}
 
 	reactIns, err := aireact.NewTestReAct(
-		aicommon.WithAICallback(mock.callback()),
+		aicommon.WithAICallback(callback),
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
 		aicommon.WithAIAutoRetry(1),
 		aicommon.WithAITransactionAutoRetry(1),
@@ -161,9 +175,10 @@ func TestE2E_YakScanDemo_VerifierRejects(t *testing.T) {
 
 	err = loop.Execute("e2e-yak-scan-bad-"+utils.RandStringBytes(4), ctx,
 		"scan something weird")
-	require.Error(t, err, "verifier must reject invalid url and propagate error")
-	require.Contains(t, err.Error(), "invalid url",
-		"error message must come from yak verifier's error('invalid url: ...')")
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, decisionCalls, 2)
+	require.Contains(t, reactIns.GetConfig().(*aicommon.Config).GetTimeline().Dump(), "invalid url",
+		"verifier error must be preserved in Timeline")
 
 	// verifier 失败的语义是不写入 current_target；handler 也没机会跑。
 	require.Nil(t, loop.GetVariable("current_target"),
