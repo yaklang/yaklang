@@ -59,8 +59,13 @@ $sink#{include:` + "`* & $source`" + `}-> as $all;
 
 	prog, err := ssaapi.Parse(source, ssaapi.WithLanguage(ssaconfig.JAVA))
 	require.NoError(t, err)
+	beforeHits, beforeMisses := ssaapi.DataflowDescentCacheStats()
 	res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithContext(ctx), ssaapi.QueryWithMemory())
 	require.NoError(t, err)
+	afterHits, afterMisses := ssaapi.DataflowDescentCacheStats()
+	t.Logf("dataflow descent cache: hits=%d misses=%d", afterHits-beforeHits, afterMisses-beforeMisses)
+	require.Greater(t, afterHits-beforeHits, int64(0),
+		"the second $sink#-> opcode must reuse the first opcode's descent")
 
 	mid := res.GetValues("mid")
 	all := res.GetValues("all")

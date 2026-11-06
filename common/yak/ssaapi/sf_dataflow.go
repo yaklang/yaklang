@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -379,6 +380,7 @@ func DataFlowWithSFConfig(
 	hookRunner := CreateCheck(sfResult, config)
 
 	var topDefReachParsed []topDefReachConstraint
+	descentCustomized := len(config.RuntimeOptions) > 0
 
 	for _, opt := range config.RuntimeOptions {
 		if item, ok := opt.(OperationOption); ok {
@@ -389,20 +391,25 @@ func DataFlowWithSFConfig(
 	for _, item := range opts {
 		switch item.Key {
 		case sf.RecursiveConfig_DepthMin:
+			descentCustomized = true
 			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithMinDepth(ret))
 			}
 		case sf.RecursiveConfig_Depth:
+			descentCustomized = true
 			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithDepthLimit(ret))
 			}
 		case sf.RecursiveConfig_DepthMax:
+			descentCustomized = true
 			if ret := codec.Atoi(item.Value); ret > 0 {
 				options = append(options, WithMaxDepth(ret))
 			}
 		case sf.RecursiveConfig_Until:
+			descentCustomized = true
 			untilCheck.AppendItems(item)
 		case sf.RecursiveConfig_Hook:
+			descentCustomized = true
 			hookRunner.AppendItems(item)
 		case sf.RecursiveConfig_Exclude:
 			addHandler(sf.RecursiveConfig_Exclude, item.Value)
@@ -448,8 +455,56 @@ func DataFlowWithSFConfig(
 		dataflowRecursiveFunc = value.GetBottomUses
 	}
 
+	// Reuse one descent across repeated dataflow opcodes on the same input
+	// value when only the post-descent filters differ. The servlet XSS rule
+	// evaluates `$sink#->` twice (include+exclude, then include-only); both
+	// would otherwise run the identical, expensive GetTopDefs descent. Depth /
+	// until / hook / runtime options change the descent itself, so those keep
+	// the old behavior.
+	cacheKey := ""
+	if sfResult != nil && !descentCustomized && sfResult.DataflowDescentReuse() {
+		cacheKey = dataflowDescentCacheKey(analysisType, value)
+	}
+	if os.Getenv("YAK_DF_CACHE_DEBUG") != "" {
+		fmt.Printf("[df-cache] type=%s uid=%d reuse=%v result=%p key=%q\n", analysisType, value.GetUID(), sfResult.DataflowDescentReuse(), sfResult, cacheKey)
+	}
 	// dataflow analysis
-	ret := dataflowRecursiveFunc(options...)
+	ret := Values(nil)
+	cacheHit := false
+	if cacheKey != "" {
+		if cached, ok := sfResult.TakeDataflowResult(cacheKey); ok {
+			if values, ok := cached.(Values); ok {
+				ret = values
+				cacheHit = true
+				dataflowDescentCacheCounter.addHit()
+				if os.Getenv("YAK_DF_CACHE_DEBUG") != "" {
+					fmt.Printf("[df-cache] HIT key=%q values=%d\n", cacheKey, len(values))
+				}
+			}
+		}
+	}
+	if !cacheHit {
+		if cacheKey != "" {
+			dataflowDescentCacheCounter.addMiss()
+		}
+		ret = dataflowRecursiveFunc(options...)
+		if cacheKey != "" {
+			ctxDone := false
+			select {
+			case <-config.GetContext().Done():
+				ctxDone = true
+			default:
+			}
+			if !ctxDone {
+				if budget := config.GetWorkBudget(); budget == nil || !budget.Exceeded() {
+					sfResult.SetDataflowResult(cacheKey, ret)
+					if os.Getenv("YAK_DF_CACHE_DEBUG") != "" {
+						fmt.Printf("[df-cache] STORE key=%q values=%d\n", cacheKey, len(ret))
+					}
+				}
+			}
+		}
+	}
 
 	inputProg, inputProgErr := fetchProgram(ToSFVMValues(ret))
 	reachOpt := reachableOptions{icfg: false, maxDepth: 0, maxNodes: 0, skipLoopBackedge: true}
@@ -465,6 +520,40 @@ func DataFlowWithSFConfig(
 	retValue := ToSFVMValues(ret)
 	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
 	return retValue
+}
+
+// dataflowDescentCacheCounter is a test-only hit/miss counter. Production never
+// reads it; the atomics are negligible per dataflow opcode and let tests prove
+// repeated `#->` opcodes actually reuse the descent.
+type dataflowDescentCacheStats struct {
+	hits   int64
+	misses int64
+}
+
+var dataflowDescentCacheCounter dataflowDescentCacheStats
+
+func (c *dataflowDescentCacheStats) addHit()  { atomic.AddInt64(&c.hits, 1) }
+func (c *dataflowDescentCacheStats) addMiss() { atomic.AddInt64(&c.misses, 1) }
+
+// DataflowDescentCacheStats returns process-wide hits/misses for the repeated
+// dataflow descent cache.
+func DataflowDescentCacheStats() (hits, misses int64) {
+	return atomic.LoadInt64(&dataflowDescentCacheCounter.hits),
+		atomic.LoadInt64(&dataflowDescentCacheCounter.misses)
+}
+
+// dataflowDescentCacheKey identifies one input value's raw descent result.
+// GetUID is unique per *Value instance; returning "" for a zero uid disables
+// caching rather than risking a collision.
+func dataflowDescentCacheKey(analysisType AnalysisType, value *Value) string {
+	if value == nil {
+		return ""
+	}
+	uid := value.GetUID()
+	if uid == 0 {
+		return ""
+	}
+	return "dataflow:" + string(analysisType) + ":" + strconv.FormatInt(uid, 10)
 }
 
 var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
