@@ -39,13 +39,15 @@ func nativeAuditEdgeTargets(db *gorm.DB, fromID string, edgeType AuditEdgeType) 
 
 	var out []string
 	for rows.Next() {
-		var toNode string
+		var toNode sql.NullString
 		if err := rows.Scan(&toNode); err != nil {
 			RecordDBRead(time.Since(started), true)
 			logNativeSQL(query, time.Since(started), err)
 			return out
 		}
-		out = append(out, toNode)
+		if toNode.Valid {
+			out = append(out, toNode.String)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		RecordDBRead(time.Since(started), true)
@@ -83,18 +85,18 @@ func nativePredecessorEdges(db *gorm.DB, fromID string) []*AuditEdge {
 	for rows.Next() {
 		var (
 			id        uint
-			createdAt time.Time
-			updatedAt time.Time
+			createdAt sql.NullTime
+			updatedAt sql.NullTime
 			deletedAt sql.NullTime
-			taskID    string
-			resultID  uint
-			fromNode  string
-			toNode    string
-			program   string
-			riskHash  string
-			edgeType  string
-			step      int64
-			stepLabel string
+			taskID    sql.NullString
+			resultID  sql.NullInt64
+			fromNode  sql.NullString
+			toNode    sql.NullString
+			program   sql.NullString
+			riskHash  sql.NullString
+			edgeType  sql.NullString
+			step      sql.NullInt64
+			stepLabel sql.NullString
 		)
 		if err := rows.Scan(
 			&id, &createdAt, &updatedAt, &deletedAt, &taskID, &resultID,
@@ -107,18 +109,18 @@ func nativePredecessorEdges(db *gorm.DB, fromID string) []*AuditEdge {
 		edge := &AuditEdge{
 			Model: gorm.Model{
 				ID:        id,
-				CreatedAt: createdAt,
-				UpdatedAt: updatedAt,
+				CreatedAt: createdAt.Time,
+				UpdatedAt: updatedAt.Time,
 			},
-			TaskId:          taskID,
-			ResultId:        resultID,
-			FromNode:        fromNode,
-			ToNode:          toNode,
-			ProgramName:     program,
-			RiskFeatureHash: riskHash,
-			EdgeType:        AuditEdgeType(edgeType),
-			AnalysisStep:    step,
-			AnalysisLabel:   stepLabel,
+			TaskId:          taskID.String,
+			ResultId:        uint(resultID.Int64),
+			FromNode:        fromNode.String,
+			ToNode:          toNode.String,
+			ProgramName:     program.String,
+			RiskFeatureHash: riskHash.String,
+			EdgeType:        AuditEdgeType(edgeType.String),
+			AnalysisStep:    step.Int64,
+			AnalysisLabel:   stepLabel.String,
 		}
 		if deletedAt.Valid {
 			deleted := deletedAt.Time

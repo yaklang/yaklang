@@ -77,3 +77,36 @@ func TestNativeAuditEdgeGettersEmptyInput(t *testing.T) {
 	require.Nil(t, GetPredecessorEdgeByFromID(db, ""))
 	require.Nil(t, GetEffectOnEdgeByFromNodeId(db, "missing"))
 }
+
+func TestNativeAuditEdgeGettersReadNullableColumns(t *testing.T) {
+	db := newAuditEdgeTestDB(t)
+	from := "01HZZZZZZZZZZZZZZZZZZZZZZZ"
+	edge := &AuditEdge{
+		FromNode:        from,
+		ToNode:          "nullable-target",
+		EdgeType:        EdgeType_Predecessor,
+		RiskFeatureHash: "placeholder",
+		TaskId:          "placeholder",
+		ProgramName:     "placeholder",
+		AnalysisStep:    9,
+		AnalysisLabel:   "placeholder",
+	}
+	require.NoError(t, db.Create(edge).Error)
+	// Reports imported from older versions can leave these columns NULL. GORM
+	// decodes NULL into the zero value; the native path must do the same
+	// instead of aborting the scan and dropping every predecessor edge.
+	require.NoError(t, db.Exec(
+		`UPDATE "`+TableAuditEdges+`" SET risk_feature_hash = NULL, task_id = NULL, `+
+			`program_name = NULL, analysis_step = NULL, analysis_label = NULL WHERE id = ?`,
+		edge.ID,
+	).Error)
+
+	edges := GetPredecessorEdgeByFromID(db, from)
+	require.Len(t, edges, 1)
+	require.Equal(t, edge.ToNode, edges[0].ToNode)
+	require.Empty(t, edges[0].RiskFeatureHash)
+	require.Empty(t, edges[0].TaskId)
+	require.Empty(t, edges[0].ProgramName)
+	require.Zero(t, edges[0].AnalysisStep)
+	require.Empty(t, edges[0].AnalysisLabel)
+}
