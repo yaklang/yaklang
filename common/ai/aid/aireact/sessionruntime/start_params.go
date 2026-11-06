@@ -83,9 +83,18 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	}
 
 	// EnablePlan 晚于 DisableAISearchForge 应用，用于控制 PE / 蓝图动作；与 AI 搜索 Forge 工具独立。
-	opts = append(opts, aicommon.WithEnablePlanAndExec(i.GetEnablePlan()))
-	if i.GetEnablePlan() {
-		opts = append(opts, coordinator.WithNativeHelpers())
+	// StartParams 指定了 Forge（mention 智能体）时强制开启：forge 执行必经 PE，
+	// 不能让缺省零值把蓝图动作关掉、导致 AI 看不到 forge 列表而直接作答。
+	if i.GetForgeName() != "" {
+		opts = append(opts, aicommon.WithEnablePlanAndExec(true))
+		if i.GetEnablePlan() {
+			opts = append(opts, coordinator.WithNativeHelpers())
+		}
+	} else {
+		opts = append(opts, aicommon.WithEnablePlanAndExec(i.GetEnablePlan()))
+		if i.GetEnablePlan() {
+			opts = append(opts, coordinator.WithNativeHelpers())
+		}
 	}
 	if i.GetEnableDetachedPlan() {
 		opts = append(opts, aicommon.WithEnableDetachedPlan(true))
