@@ -46,6 +46,44 @@ type SFFrameResult struct {
 	// result (not Config) because sub-rule frames share the parent Config but
 	// have independent result/cache lifetimes.
 	dataflowDescentReuse atomic.Bool
+
+	// symbolIDCache memoizes symbol-name -> {value count, id set}. SyntaxFlow
+	// symbols are append-merged, so an unchanged count means the id set is
+	// unchanged. Without this, every per-sink dataflow filter re-walked the
+	// entire $source/$filter symbol table resolving GetId (the hot path on
+	// 52k-sink rules). The entry is rebuilt when the count grows.
+	symbolIDCache sync.Map
+}
+
+type symbolIDCacheEntry struct {
+	count int
+	ids   map[int64]struct{}
+}
+
+// GetSymbolIDSet returns a cached id set for name when it was built for the
+// current symbol value count.
+func (s *SFFrameResult) GetSymbolIDSet(name string, count int) (map[int64]struct{}, bool) {
+	if s == nil || name == "" {
+		return nil, false
+	}
+	raw, ok := s.symbolIDCache.Load(name)
+	if !ok {
+		return nil, false
+	}
+	entry, ok := raw.(symbolIDCacheEntry)
+	if !ok || entry.count != count {
+		return nil, false
+	}
+	return entry.ids, true
+}
+
+// SetSymbolIDSet stores an id set for name/count for the rest of this frame
+// execution.
+func (s *SFFrameResult) SetSymbolIDSet(name string, count int, ids map[int64]struct{}) {
+	if s == nil || name == "" {
+		return
+	}
+	s.symbolIDCache.Store(name, symbolIDCacheEntry{count: count, ids: ids})
 }
 
 // SetDataflowDescentReuse records whether repeated descents may reuse cached

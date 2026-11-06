@@ -79,11 +79,23 @@ type sfCheck struct {
 	excludePruneOnce  sync.Once
 	excludePruneIDs   map[int64]struct{}
 	excludePruneReady bool
+
+	// needSymbolSnapshot is set when at least one item must run the full
+	// sub-query/clearup path. Fast-path-only checks skip TakeSymbolSnapshot,
+	// which otherwise copies the (large) $source/$filter symbol table once per
+	// dataflow filter on every sink.
+	needSymbolSnapshot bool
 }
 
 type checkItem struct {
 	*sf.RecursiveConfigItem
 	frame *sf.SFFrame
+	// fastPathOnly marks a simple include/exclude that fastPathMatch can always
+	// evaluate from symbol ids. Such an item needs no compiled frame and never
+	// runs the sub-query/clearup path, so it also needs no symbol snapshot. On a
+	// large project the same two dataflow filters are otherwise recompiled for
+	// every sink (tens of thousands of times).
+	fastPathOnly bool
 	// matchCache memoizes per-node until/hook match results (keyed by SSA
 	// node ID) so the same node is not re-queried via a full SF sub-query
 	// when it appears in multiple descent paths. CheckUntil is the hot
@@ -167,20 +179,26 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		if item == nil {
 			continue
 		}
-		frame, err := c.compiledFrame(item.Value)
-		if err != nil {
-			keyName := recursiveCheckKeyLabel(item.Key)
-			// 暴露编译错误，添加到结果中以便前端可以获取
-			errorMsg := utils.Errorf("SyntaxFlow compile error for %s rule [%s]: %v", keyName, item.Value, err).Error()
-			log.Errorf(errorMsg)
-			if c.contextResult != nil {
-				c.contextResult.Errors = append(c.contextResult.Errors, errorMsg)
+		fastPathOnly := c.isSimpleFastPathItem(item)
+		var frame *sf.SFFrame
+		if !fastPathOnly {
+			var err error
+			frame, err = c.compiledFrame(item.Value)
+			if err != nil {
+				keyName := recursiveCheckKeyLabel(item.Key)
+				// 暴露编译错误，添加到结果中以便前端可以获取
+				errorMsg := utils.Errorf("SyntaxFlow compile error for %s rule [%s]: %v", keyName, item.Value, err).Error()
+				log.Errorf(errorMsg)
+				if c.contextResult != nil {
+					c.contextResult.Errors = append(c.contextResult.Errors, errorMsg)
+				}
+				continue
 			}
-			continue
 		}
 		checkItem := &checkItem{
 			RecursiveConfigItem: item,
 			frame:               frame,
+			fastPathOnly:        fastPathOnly,
 		}
 		switch item.Key {
 		case sf.RecursiveConfig_Include, sf.RecursiveConfig_Exclude:
@@ -194,8 +212,32 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		case sf.RecursiveConfig_Until, sf.RecursiveConfig_Hook:
 			c.untilItem = append(c.untilItem, checkItem)
 		}
-		// A real sub-rule item was added; build the parent snapshot lazily (once).
-		c.ensureOriginalSnapshot()
+		// A non-fast item can run check()/clearup(), which needs the parent
+		// snapshot. Fast-path-only items never do, so skip the (large) copy.
+		if !fastPathOnly {
+			c.needSymbolSnapshot = true
+			c.ensureOriginalSnapshot()
+		}
+	}
+}
+
+// isSimpleFastPathItem reports whether Appending this item can skip compilation
+// entirely: the text is one of the simple include/exclude forms fastPathMatch
+// evaluates from a bound symbol id set. The symbol must already be bound;
+// otherwise the full query stays authoritative.
+func (c *sfCheck) isSimpleFastPathItem(item *sf.RecursiveConfigItem) bool {
+	if c == nil || item == nil {
+		return false
+	}
+	switch item.Key {
+	case sf.RecursiveConfig_Include:
+		sym, ok := simpleIncludeSymbol(item.Value)
+		return ok && len(c.fastMatchSymbolIDs(sym)) > 0
+	case sf.RecursiveConfig_Exclude:
+		sym, ok := simpleGetCalleeExcludeSymbol(item.Value)
+		return ok && len(c.fastMatchSymbolIDs(sym)) > 0
+	default:
+		return false
 	}
 }
 
@@ -316,6 +358,15 @@ func (r *sfCheck) check(
 			}
 			continue
 		}
+		if it.frame == nil {
+			// Fast-path-only item whose symbol disappeared after AppendItems.
+			// There is no compiled sub-rule to fall back to; an unbound symbol
+			// cannot match, so treat it as a non-match.
+			if !fn(it.Key, false) {
+				return
+			}
+			continue
+		}
 		if cacheKey != "" {
 			if cached, ok := it.matchCache.Load(cacheKey); ok {
 				if !fn(it.Key, cached.(bool)) {
@@ -353,26 +404,48 @@ func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 		return false, false
 	}
 	text := strings.TrimSpace(item.Value)
-	var sym string
-	switch text {
-	case "* & $source", "<self> & $source", "*& $source", "* &$source", "<self>& $source", "<self> &$source":
-		sym = "source"
-	case "* & $sink", "<self> & $sink", "*& $sink", "* &$sink", "<self>& $sink", "<self> &$sink":
-		sym = "sink"
-	default:
-		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
-		if os.Getenv("YAK_SSA_FAST_MATCH_DEBUG") != "" && atomic.AddInt64(&fastPathFallbackLogCount, 1) <= 20 {
-			log.Infof("fast-path fallback text: %q", text)
+
+	// `* & $symbol` / `<self> & $symbol`: path intersects the symbol's ids.
+	if sym, ok := simpleIncludeSymbol(text); ok {
+		if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
+			matched := pathContainsAnyID(path, ids)
+			atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+			return matched, true
 		}
-		return false, false
 	}
-	ids := r.fastMatchSymbolIDs(sym)
-	if len(ids) == 0 {
-		// Unbound/empty symbol: the full sub-query would also produce no match,
-		// but fall back to preserve exact semantics.
-		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
-		return false, false
+	// `*<getCallee> & $symbol`: a call on the path has a callee in the symbol.
+	if sym, ok := simpleGetCalleeExcludeSymbol(text); ok {
+		if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
+			matched := pathCalleeMatchesAnyID(path, ids)
+			atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+			return matched, true
+		}
 	}
+
+	atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
+	if os.Getenv("YAK_SSA_FAST_MATCH_DEBUG") != "" && atomic.AddInt64(&fastPathFallbackLogCount, 1) <= 20 {
+		log.Infof("fast-path fallback text: %q", text)
+	}
+	return false, false
+}
+
+func simpleIncludeSymbol(text string) (string, bool) {
+	m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(text))
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
+}
+
+func simpleGetCalleeExcludeSymbol(text string) (string, bool) {
+	m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(text))
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
+}
+
+func pathContainsAnyID(path sf.Values, ids map[int64]struct{}) bool {
 	matched := false
 	path.Recursive(func(op sf.ValueOperator) error {
 		if id, ok := op.(interface{ GetId() int64 }); ok {
@@ -383,8 +456,27 @@ func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 		}
 		return nil
 	})
-	atomic.AddInt64(&fastPathMatchCounter.hit, 1)
-	return matched, true
+	return matched
+}
+
+func pathCalleeMatchesAnyID(path sf.Values, ids map[int64]struct{}) bool {
+	matched := false
+	path.Recursive(func(op sf.ValueOperator) error {
+		value, ok := op.(*Value)
+		if !ok || !value.IsCall() {
+			return nil
+		}
+		callee := value.GetCallee()
+		if callee == nil {
+			return nil
+		}
+		if _, ok := ids[callee.GetId()]; ok {
+			matched = true
+			return utils.Error("abort")
+		}
+		return nil
+	})
+	return matched
 }
 
 // ExcludePrunable reports whether every exclude sub-rule is the monotone
@@ -488,6 +580,10 @@ func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
 		r.fastMatchIDs[name] = nil
 		return nil
 	}
+	if cached, ok := r.contextResult.GetSymbolIDSet(name, len(vals)); ok {
+		r.fastMatchIDs[name] = cached
+		return cached
+	}
 	set := make(map[int64]struct{}, len(vals))
 	for _, op := range vals {
 		if id, ok := op.(interface{ GetId() int64 }); ok {
@@ -497,6 +593,9 @@ func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
 		}
 	}
 	r.fastMatchIDs[name] = set
+	// Share the set across the per-sink sfChecks of this rule execution; the
+	// symbol values are append-merged, so the count is a safe invalidation key.
+	r.contextResult.SetSymbolIDSet(name, len(vals), set)
 	return set
 }
 
