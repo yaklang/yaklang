@@ -94,12 +94,19 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 	)
 
 	edgeLabel = string(edge.Kind)
+	step = edge.Step
+	if edge.Label != "" {
+		edgeLabel = edge.Label
+	}
 	if edge.Msg != nil {
 		if label, ok := edge.Msg["label"].(string); ok {
 			edgeLabel = label
 		}
-		if s, ok := edge.Msg["step"].(int); ok {
+		switch s := edge.Msg["step"].(type) {
+		case int:
 			step = int64(s)
+		case int64:
+			step = s
 		}
 	}
 	if step > 0 {
