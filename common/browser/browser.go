@@ -169,6 +169,12 @@ func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {
 	}
 
 	bp := newBrowserPage(page, inst, inst.config.timeout)
+	// Install before navigation so syntax errors, unhandled rejections and
+	// console.error calls emitted during initial scripts are retained for
+	// coding/responsive verification.
+	if err := bp.InstallRuntimeDiagnostics(); err != nil {
+		log.Warnf("install browser runtime diagnostics: %v", err)
+	}
 	err = bp.Navigate(urlStr)
 	if err != nil {
 		// A dialog is recoverable through CurrentPage/HandleJavaScriptDialog.
