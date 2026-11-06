@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -144,6 +145,14 @@ func TestBatchSaveAuditSources(t *testing.T) {
 	require.ErrorIs(t, err, rollback)
 	require.NoError(t, db.Model(&ssadb.IrSource{}).Where("program_name = ?", program).Count(&n).Error)
 	require.EqualValues(t, count, n, "a source batch stays in its caller's transaction")
+}
+
+func TestAuditSaverSkipsMemoryOnlyResults(t *testing.T) {
+	// A memory-only scan streams risks to its reporter and never registers the
+	// audit database writer. Capture would build a graph that no consumer can
+	// persist, so it must stay a no-op.
+	result := &SyntaxFlowResult{saveKind: ssaconfig.SFResultSaveMemory}
+	require.Nil(t, result.auditSaver(&Value{}, "res", 0, &schema.SSARisk{}))
 }
 
 func TestCaptureAuditGraphDeduplicatesIdenticalEdges(t *testing.T) {

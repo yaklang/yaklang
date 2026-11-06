@@ -162,29 +162,14 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	return err
 }
 
-type dbGraphEdgeKey struct {
-	from  string
-	to    string
-	kind  ssadb.AuditEdgeType
-	step  int64
-	label string
-}
-
 type DBGraph struct {
 	*saveValueCtx
-	// A dump may reach the same predecessor edge through several paths. The
-	// database only needs one row per exact (from, to, kind, step, label), and
-	// duplicates cost an AuditEdge allocation and an INSERT each.
-	seenEdges map[dbGraphEdgeKey]struct{}
 }
 
 var _ Graph = (*DBGraph)(nil)
 
 func NewDBGraph(ctx *saveValueCtx) *DBGraph {
-	return &DBGraph{
-		saveValueCtx: ctx,
-		seenEdges:    make(map[dbGraphEdgeKey]struct{}),
-	}
+	return &DBGraph{saveValueCtx: ctx}
 }
 
 func (g *DBGraph) GetGraphKind() GraphKind {
@@ -283,29 +268,6 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		}
 	}
 
-	var kind ssadb.AuditEdgeType
-	switch edge.Kind {
-	case EdgeTypeDependOn:
-		kind = ssadb.EdgeType_DependsOn
-	case EdgeTypeEffectOn:
-		kind = ssadb.EdgeType_EffectsOn
-	case EdgeTypePredecessor:
-		kind = ssadb.EdgeType_Predecessor
-	default:
-		return nil
-	}
-
-	key := dbGraphEdgeKey{
-		from:  fromNode.NodeID,
-		to:    toNode.NodeID,
-		kind:  kind,
-		step:  step,
-		label: label,
-	}
-	if _, ok := g.seenEdges[key]; ok {
-		return nil
-	}
-
 	var audit *ssadb.AuditEdge
 	switch edge.Kind {
 	case EdgeTypeDependOn:
@@ -314,11 +276,12 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		audit = fromNode.CreateEffectsOnEdge(g.ProgramName, toNode)
 	case EdgeTypePredecessor:
 		audit = fromNode.CreatePredecessorEdge(g.ProgramName, toNode, step, label)
+	default:
+		return nil
 	}
 	if err := saveEdge(audit); err != nil {
 		log.Errorf("save AuditEdge failed: %v", err)
 	}
-	g.seenEdges[key] = struct{}{}
 	return nil
 }
 
