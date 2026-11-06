@@ -327,8 +327,10 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	for _, path := range s.files {
 		pathBytes += int64(len(path))
 	}
-	// Includes the private chain identity and the retained QUERY_INFO selector.
-	target := int64(256) + int64(len(s.pending)+1)*160 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
+	// Includes the private chain identity, the retained QUERY_INFO selector,
+	// the observed CREATE target and the QUERY_DIRECTORY class. The per-pending
+	// figure is the merged struct's 168-byte layout rounded up to alignment.
+	target := int64(256) + int64(len(s.pending)+1)*176 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
 	target += pathBytes + chainBytes + additionalPathBytes + s.smb1.ownedBytes() + s.smb1Setup.ownedBytes() + s.smb1Legacy.ownedBytes()
 	return s.flow.reserveSession(target)
 }
