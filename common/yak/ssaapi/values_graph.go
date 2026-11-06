@@ -37,6 +37,12 @@ type Edge struct {
 	Step  int64
 }
 
+type predecessorIdentity struct {
+	node  int64
+	label string
+	step  int
+}
+
 func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 	ctx := context.Background()
 	if len(ctxs) > 0 && !utils.IsNil(ctxs[0]) {
@@ -70,18 +76,62 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 		return nil
 	}
 	show := false
+	// A value can be reached through many paths. valueDFS intentionally keeps
+	// per-path semantics for callers that need them, but graph generation only
+	// needs every node expanded once: the graph deduplicates repeated edges.
+	// Without these markers a diamond-shaped dataflow graph revisits every
+	// shared node once per path, which is exponential on real audit graphs.
+	mainVisited := make(map[int64]struct{}, 256)
+	dependVisited := make(map[int64]struct{}, 256)
+	effectVisited := make(map[int64]struct{}, 256)
 	valueDFS(v, func(v *Value) (Values, error) {
+		uid := v.GetUID()
+		if _, ok := mainVisited[uid]; ok {
+			return nil, nil
+		}
+		mainVisited[uid] = struct{}{}
+
 		prevs := v.GetPredecessors()
 		next := make([]*Value, 0, len(prevs))
+		// A predecessor slice can contain the same edge twice when more than
+		// one producer appended it. Emit it once here, so DBGraph does not
+		// need a graph-wide string-keyed dedupe map.
+		var seenPredecessors map[predecessorIdentity]struct{}
+		if len(prevs) > 1 {
+			seenPredecessors = make(map[predecessorIdentity]struct{}, len(prevs))
+		}
 		for _, prev := range prevs {
+			if seenPredecessors != nil {
+				key := predecessorIdentity{node: prev.Node.GetUID(), label: prev.Info.Label, step: prev.Info.Step}
+				if _, ok := seenPredecessors[key]; ok {
+					continue
+				}
+				seenPredecessors[key] = struct{}{}
+			}
 			show = true
-			// log.Errorf("%v prev: %v", v, prev.Node)
+			// log.Errorf("%v prev: %v", v, prev)
 			switch prev.Info.Label {
 			case Predecessors_BottomUseLabel:
 				valueDFS(v, func(v *Value) (Values, error) {
+					uid := v.GetUID()
+					if _, ok := dependVisited[uid]; ok {
+						return nil, nil
+					}
+					dependVisited[uid] = struct{}{}
 					depende := v.GetDependOn()
 					// log.Errorf("%v prev: %v", v, prev)
+					var seenDepend map[int64]struct{}
+					if len(depende) > 1 {
+						seenDepend = make(map[int64]struct{}, len(depende))
+					}
 					for _, d := range depende {
+						if seenDepend != nil {
+							uid := d.GetUID()
+							if _, ok := seenDepend[uid]; ok {
+								continue
+							}
+							seenDepend[uid] = struct{}{}
+						}
 						if err := sendRawEdge(v, d, EdgeTypeDependOn, "", 0); err != nil {
 							return nil, err
 						}
@@ -90,9 +140,25 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 				}, ctx)
 			case Predecessors_TopDefLabel:
 				valueDFS(v, func(v *Value) (Values, error) {
+					uid := v.GetUID()
+					if _, ok := effectVisited[uid]; ok {
+						return nil, nil
+					}
+					effectVisited[uid] = struct{}{}
 					effect := v.GetEffectOn()
 					// log.Errorf("%v prev: %v", v, prev)
+					var seenEffect map[int64]struct{}
+					if len(effect) > 1 {
+						seenEffect = make(map[int64]struct{}, len(effect))
+					}
 					for _, e := range effect {
+						if seenEffect != nil {
+							uid := e.GetUID()
+							if _, ok := seenEffect[uid]; ok {
+								continue
+							}
+							seenEffect[uid] = struct{}{}
+						}
 						if err := sendRawEdge(v, e, EdgeTypeEffectOn, "", 0); err != nil {
 							return nil, err
 						}
@@ -112,6 +178,11 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 	if !show {
 		if v.GetDependOn().Len() > 0 {
 			valueDFS(v, func(v *Value) (Values, error) {
+				uid := v.GetUID()
+				if _, ok := dependVisited[uid]; ok {
+					return nil, nil
+				}
+				dependVisited[uid] = struct{}{}
 				dependon := v.GetDependOn()
 				// log.Errorf("%v prev: %v", v, prev)
 				for _, depend := range dependon {
@@ -124,6 +195,11 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 		}
 		if v.GetEffectOn().Len() > 0 {
 			valueDFS(v, func(v *Value) (Values, error) {
+				uid := v.GetUID()
+				if _, ok := effectVisited[uid]; ok {
+					return nil, nil
+				}
+				effectVisited[uid] = struct{}{}
 				effecton := v.GetEffectOn()
 				// log.Errorf("%v prev: %v", v, prev)
 				for _, effect := range effecton {

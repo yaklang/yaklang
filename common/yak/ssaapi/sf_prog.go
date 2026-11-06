@@ -41,8 +41,10 @@ func (p *Program) compareOpcodeWithFileFilter(
 	includeFiles, excludeFiles []string,
 ) (sfvm.Values, []bool) {
 	ctx := opcodeItems.Context
+	insts := ssa.MatchInstructionByOpcodesWithFileFilter(ctx, p.Program, includeFiles, excludeFiles, opcodeItems.Opcodes...)
+	p.prefetchErrorCatchCFG(insts)
 	var res Values = lo.FilterMap(
-		ssa.MatchInstructionByOpcodesWithFileFilter(ctx, p.Program, includeFiles, excludeFiles, opcodeItems.Opcodes...),
+		insts,
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			val, err := p.NewValue(i)
 			if err != nil {
@@ -53,6 +55,40 @@ func (p *Program) compareOpcodeWithFileFilter(
 		},
 	)
 	return ToSFVMValues(res), nil
+}
+
+// prefetchErrorCatchCFG batches the lazy reads that a struct rule's
+// `*?{opcode:catch}.exception` traversal would otherwise issue one by one.
+// A large Java program can contain tens of thousands of catch clauses; each
+// exception lookup otherwise fetches its IR row and offset row separately.
+// The cache hits keep the traversal semantics unchanged.
+func (p *Program) prefetchErrorCatchCFG(insts []ssa.Instruction) {
+	if p == nil || p.Program == nil || p.Program.Cache == nil || len(insts) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(insts))
+	for _, inst := range insts {
+		if inst == nil || inst.GetOpcode() != ssa.SSAOpcodeErrorCatch {
+			continue
+		}
+		var catch *ssa.ErrorCatch
+		switch v := inst.(type) {
+		case *ssa.ErrorCatch:
+			catch = v
+		case *ssa.LazyInstruction:
+			if self, ok := v.Self().(*ssa.ErrorCatch); ok {
+				catch = self
+			}
+		}
+		if catch != nil && catch.Exception > 0 {
+			ids = append(ids, catch.Exception)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	p.Program.Cache.PreloadInstructionsByIDsFast(ids)
+	_ = ssadb.PreloadOffsetsByValueIDs(ssadb.GetDB(), p.GetProgramName(), ids)
 }
 
 func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
