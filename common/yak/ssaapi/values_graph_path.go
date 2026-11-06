@@ -20,32 +20,124 @@ func (v *Value) GetDataflowPath(end ...*Value) []Values {
 // per-rule deadline never fired — heavy rules ran for hours.
 func (v *Value) GetDataflowPathWithContext(ctx context.Context, end ...*Value) []Values {
 	var paths []Values
-	effectPath := v.GetEffectOnPathWithContext(ctx, end...)
-	dependPath := v.GetDependOnPathWithContext(ctx, end...)
-	addPath := func(effect, depend Values) {
-		path := make(Values, 0, len(effect)+len(depend)+1)
-		path = append(path, effect...)
-		path = append(path, v)
-		path = append(path, depend...)
+	v.walkDataflowPathWithContext(ctx, nil, nil, func(path Values) bool {
 		paths = append(paths, path)
+		return true
+	}, end...)
+	return paths
+}
+
+// WalkDataflowPathWithContext is the streaming form of
+// [GetDataflowPathWithContext]. visit receives each dataflow path (effect ->
+// center -> depend) as it is completed; returning false stops the enumeration
+// immediately. This lets dataflow(include/exclude) stop at the first accepted
+// path instead of materializing every effect×depend combination.
+func (v *Value) WalkDataflowPathWithContext(ctx context.Context, visit func(Values) bool, end ...*Value) bool {
+	return v.walkDataflowPathWithContext(ctx, nil, nil, visit, end...)
+}
+
+// WalkDataflowPathWithEdgeFilterWithContext is the edge-filtered streaming
+// form of [GetDataflowPathWithEdgeFilterWithContext].
+func (v *Value) WalkDataflowPathWithEdgeFilterWithContext(
+	ctx context.Context,
+	edgeFilter func(from, to *Value) bool,
+	visit func(Values) bool,
+	end ...*Value,
+) bool {
+	return v.walkDataflowPathWithContext(ctx, edgeFilter, nil, visit, end...)
+}
+
+// walkDataflowPathWithContext streams effect×depend paths without building the
+// cross product. prune, when non-nil, drops a branch subtree during DFS (used
+// by dataflow exclude pruning).
+func (v *Value) walkDataflowPathWithContext(
+	ctx context.Context,
+	edgeFilter func(from, to *Value) bool,
+	prune func(*Value) bool,
+	visit func(Values) bool,
+	end ...*Value,
+) bool {
+	if v == nil {
+		return true
 	}
 
-	if len(effectPath) == 0 { // if no effect, then depend is the path
-		for _, depend := range dependPath {
-			addPath(Values{}, depend)
+	effectNext := func(node *Value) Values { return node.GetEffectOn() }
+	dependNext := func(node *Value) Values { return node.GetDependOn() }
+
+	// A direction that originally had outgoing edges but produced no path was
+	// fully pruned. The old enumerator would have produced paths through those
+	// edges (all rejected), so the "other direction only" fallback below must
+	// stay disabled; otherwise pruning would invent a shorter path that never
+	// existed.
+	effectHadChildren := v.walkDirectionHasChildren(edgeFilter, effectNext, end...)
+	dependHadChildren := v.walkDirectionHasChildren(edgeFilter, dependNext, end...)
+
+	var effectPaths []Values
+	if !v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, func(path Values) bool {
+		effectPaths = append(effectPaths, path)
+		return true
+	}, effectNext, end...) {
+		return false
+	}
+	if len(effectPaths) == 0 && effectHadChildren {
+		// Every effect branch was pruned; no combined path can survive.
+		return true
+	}
+
+	dependCount := 0
+	completed := v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, func(depend Values) bool {
+		dependCount++
+		if len(effectPaths) == 0 {
+			return visit(v.makeDataflowPath(Values{}, depend))
+		}
+		for _, effect := range effectPaths {
+			if !visit(v.makeDataflowPath(effect, depend)) {
+				return false
+			}
+		}
+		return true
+	}, dependNext, end...)
+	if !completed {
+		return false
+	}
+	if dependCount == 0 && !dependHadChildren {
+		for _, effect := range effectPaths {
+			if !visit(v.makeDataflowPath(effect, Values{})) {
+				return false
+			}
 		}
 	}
-	if len(dependPath) == 0 { // if no depend, then effect is the path
-		for _, effect := range effectPath {
-			addPath(effect, Values{})
+	return true
+}
+
+func (v *Value) makeDataflowPath(effect, depend Values) Values {
+	path := make(Values, 0, len(effect)+len(depend)+1)
+	path = append(path, effect...)
+	path = append(path, v)
+	path = append(path, depend...)
+	return path
+}
+
+// walkDirectionHasChildren reports whether a directional walk from v would
+// start with at least one child (i.e. v is not itself an end target and the
+// edge filter keeps a neighbor).
+func (v *Value) walkDirectionHasChildren(
+	edgeFilter func(from, to *Value) bool,
+	next func(*Value) Values,
+	end ...*Value,
+) bool {
+	if ValueContain(v, end...) {
+		return false
+	}
+	for _, child := range next(v) {
+		if child == nil {
+			continue
+		}
+		if edgeFilter == nil || edgeFilter(v, child) {
+			return true
 		}
 	}
-	for _, effect := range effectPath {
-		for _, depend := range dependPath {
-			addPath(effect, depend) // effect -> v -> depend
-		}
-	}
-	return paths
+	return false
 }
 
 func (v *Value) GetEffectOnPath(end ...*Value) []Values {
@@ -92,40 +184,37 @@ func (v *Value) GetDataflowPathWithEdgeFilter(edgeFilter func(from, to *Value) b
 }
 func (v *Value) GetDataflowPathWithEdgeFilterWithContext(ctx context.Context, edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
 	var paths []Values
-	effectPath := v.GetEffectOnPathWithEdgeFilterWithContext(ctx, edgeFilter, end...)
-	dependPath := v.GetDependOnPathWithEdgeFilterWithContext(ctx, edgeFilter, end...)
-	addPath := func(effect, depend Values) {
-		path := make(Values, 0, len(effect)+len(depend)+1)
-		path = append(path, effect...)
-		path = append(path, v)
-		path = append(path, depend...)
+	v.walkDataflowPathWithContext(ctx, edgeFilter, nil, func(path Values) bool {
 		paths = append(paths, path)
-	}
-
-	if len(effectPath) == 0 {
-		for _, depend := range dependPath {
-			addPath(Values{}, depend)
-		}
-	}
-	if len(dependPath) == 0 {
-		for _, effect := range effectPath {
-			addPath(effect, Values{})
-		}
-	}
-	for _, effect := range effectPath {
-		for _, depend := range dependPath {
-			addPath(effect, depend)
-		}
-	}
+		return true
+	}, end...)
 	return paths
 }
 
-// getPathWithDirectionWithContext drives the DFS with ctx. GraphPathEx already
-// checks ctx.Done() at every node (DeepFirstPath.deepFirst), so a cancelled
-// rule ctx stops the enumeration. GraphPathWithKey (the old caller) hard-coded
-// context.Background(), which is why the per-rule budget never bounded it.
+// getPathWithDirectionWithContext drives the DFS with ctx. WalkGraphPathEx
+// already checks ctx.Done() at every node, so a cancelled rule ctx stops the
+// enumeration.
 func (this *Value) getPathWithDirectionWithContext(ctx context.Context, edgeFilter func(from, to *Value) bool, next func(*Value) Values, end ...*Value) []Values {
-	ret := graph.GraphPathEx[int64, *Value, *Value](
+	paths := make([]Values, 0)
+	this.walkPathWithDirectionWithContext(ctx, edgeFilter, nil, func(path Values) bool {
+		paths = append(paths, path)
+		return true
+	}, next, end...)
+	return paths
+}
+
+// walkPathWithDirectionWithContext streams one direction's DFS paths. The
+// starting value is removed from each path and, when end is set, only paths
+// containing an end value are delivered (matching the slice-returning form).
+func (this *Value) walkPathWithDirectionWithContext(
+	ctx context.Context,
+	edgeFilter func(from, to *Value) bool,
+	prune func(*Value) bool,
+	visit func(Values) bool,
+	next func(*Value) Values,
+	end ...*Value,
+) bool {
+	return graph.WalkGraphPathEx[int64, *Value, *Value](
 		ctx,
 		this,
 		func(node *Value) []*Value { // next
@@ -150,22 +239,21 @@ func (this *Value) getPathWithDirectionWithContext(ctx context.Context, edgeFilt
 		func(t *Value) *Value { // getValue
 			return t
 		},
-	)
-	paths := make([]Values, 0, len(ret))
-	for _, path := range ret {
-		path = utils.RemoveSliceItem(path, this)
-		if len(end) == 0 {
-			paths = append(paths, path)
-			continue
-		}
-		for _, end := range end {
-			if ValueContain(end, path...) {
-				paths = append(paths, path)
-				break
+		prune,
+		func(path []*Value) bool {
+			path = utils.RemoveSliceItem(path, this)
+			if len(end) == 0 {
+				return visit(path)
 			}
-		}
-	}
-	return paths
+			for _, end := range end {
+				if ValueContain(end, path...) {
+					return visit(path)
+				}
+			}
+			return true
+		},
+		end...,
+	)
 }
 
 func (vs Values) GetDataflowPath(end ...*Value) []Values {
