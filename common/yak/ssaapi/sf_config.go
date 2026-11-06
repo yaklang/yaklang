@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,6 +11,14 @@ import (
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// simpleGetCalleeExclude matches the dataflow exclude shape
+// `*<getCallee> & $filter` (optionally `<self>`/spacing variants we do not
+// claim). This pattern is monotone: once a path contains a call whose callee is
+// in $filter, adding more path values cannot make the exclude stop matching.
+// That property is what makes branch pruning sound; any other exclude text
+// disables pruning and keeps the full path enumeration.
+var simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
 
 type sfCheck struct {
 	contextResult *sf.SFFrameResult
@@ -55,6 +64,16 @@ type sfCheck struct {
 	// simple `* & $source` / `<self> & $source` fast path.
 	fastMatchMu  sync.Mutex
 	fastMatchIDs map[string]map[int64]struct{}
+
+	// excludeItems is the exclude-only subset of matchItem. excludePrunable is
+	// true only when every exclude uses the monotone `*<getCallee> & $symbol`
+	// shape; then a call node whose callee is in that symbol's value set rejects
+	// every path through it, so the DFS can drop the branch.
+	excludeItems      []*checkItem
+	excludePrunable   bool
+	excludePruneOnce  sync.Once
+	excludePruneIDs   map[int64]struct{}
+	excludePruneReady bool
 }
 
 type checkItem struct {
@@ -98,10 +117,11 @@ func CreateCheck(
 	configItems ...*sf.RecursiveConfigItem,
 ) *sfCheck {
 	res := &sfCheck{
-		contextResult: contextResult,
-		config:        config,
-		vm:            sf.NewSyntaxFlowVirtualMachine(),
-		matchItem:     make([]*checkItem, 0, len(configItems)),
+		contextResult:   contextResult,
+		config:          config,
+		vm:              sf.NewSyntaxFlowVirtualMachine(),
+		matchItem:       make([]*checkItem, 0, len(configItems)),
+		excludePrunable: true,
 	}
 	contextResult.AlertSymbolTable.Delete(sf.RecursiveMagicVariable)
 	contextResult.SymbolTable.Delete(sf.RecursiveMagicVariable)
@@ -160,6 +180,12 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		switch item.Key {
 		case sf.RecursiveConfig_Include, sf.RecursiveConfig_Exclude:
 			c.matchItem = append(c.matchItem, checkItem)
+			if item.Key == sf.RecursiveConfig_Exclude {
+				c.excludeItems = append(c.excludeItems, checkItem)
+				if !simpleGetCalleeExclude.MatchString(strings.TrimSpace(item.Value)) {
+					c.excludePrunable = false
+				}
+			}
 		case sf.RecursiveConfig_Until, sf.RecursiveConfig_Hook:
 			c.untilItem = append(c.untilItem, checkItem)
 		}
@@ -354,6 +380,56 @@ func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 	})
 	atomic.AddInt64(&fastPathMatchCounter.hit, 1)
 	return matched, true
+}
+
+// ExcludePrunable reports whether every exclude sub-rule is the monotone
+// `*<getCallee> & $symbol` shape, so a single call node can reject a branch.
+func (r *sfCheck) ExcludePrunable() bool {
+	return r != nil && r.excludePrunable && len(r.excludeItems) > 0
+}
+
+// CheckExcludeNode reports whether node alone is enough to reject every path
+// containing it: the node is a call whose callee id is bound to an exclude
+// filter symbol. Because the exclude pattern is monotone, extending the path
+// cannot make it stop matching, so the caller may prune the entire subtree.
+func (r *sfCheck) CheckExcludeNode(node *Value) bool {
+	if r == nil || !r.ExcludePrunable() || node == nil || !node.IsCall() {
+		return false
+	}
+	if !r.prepareExcludePruneIDs() {
+		return false
+	}
+	callee := node.GetCallee()
+	if callee == nil {
+		return false
+	}
+	_, ok := r.excludePruneIDs[callee.GetId()]
+	return ok
+}
+
+// prepareExcludePruneIDs resolves the exclude filter symbol(s) once. Any
+// unresolved/empty symbol leaves pruning disabled (the full query is still
+// authoritative; this is only an optional branch cut).
+func (r *sfCheck) prepareExcludePruneIDs() bool {
+	r.excludePruneOnce.Do(func() {
+		ids := make(map[int64]struct{})
+		for _, item := range r.excludeItems {
+			m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(item.Value))
+			if len(m) != 2 {
+				r.excludePrunable = false
+				return
+			}
+			for id := range r.fastMatchSymbolIDs(m[1]) {
+				ids[id] = struct{}{}
+			}
+		}
+		if len(ids) == 0 {
+			return
+		}
+		r.excludePruneIDs = ids
+		r.excludePruneReady = true
+	})
+	return r.excludePruneReady
 }
 
 func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
