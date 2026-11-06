@@ -14,8 +14,8 @@ jobs:
     # Hard ceiling for one run: queue wait, toolchain install, CLI build and the
     # test step all count. Queue alone has varied from 5m to 17m, and shared
     # runners have died silently around the 100m mark, so the goal is to keep
-    # the whole job well below that. Each lane below bounds itself with a 60m
-    # go-test timeout; this cap only stops a runaway job.
+    # the whole job well below that. The three test groups below bound
+    # themselves at 40m + 40m + 55m; this cap only stops a runaway job.
     timeout-minutes: 150
 
     env:
@@ -70,40 +70,47 @@ jobs:
       # -x is intentionally NOT passed: it prints every external command and is
       # only useful for manual debugging. Keep CI output lean and deterministic.
       #
-      # The suite is three independent groups. Running them as one serial go
-      # test walk took 36-75m on shared runners and twice died at ~100m with no
-      # logs, so they run as three lanes here. Each lane keeps -p 1 (no
-      # concurrent multi-GB Go/LLVM linkers inside a lane) and has its own 60m
-      # go-test timeout. Lane output is streamed with a prefix instead of
-      # buffered to a file, so a killed step still leaves usable logs.
+      # The suite is three groups, run one after the other. They were three
+      # concurrent lanes until run 42119967112: on the 4-core shared runner the
+      # lanes spawned three multi-GB Go/LLVM linkers at once: the mustpass
+      # sweep went from ~5s to ~30s per script, both compile groups hit their
+      # go-test timeout, and the third group still needed over an hour. Serial
+      # groups match the 36-51m a plain serial walk measured, and each group
+      # keeps its own timeout so a hang in one still leaves the others' results.
       #
-      # Lane mustpass: the 117-script mustpass sweep.
-      # Lane heavy: runtime/coreplugin compile sweeps.
-      # Lane rest: every other package and test.
+      # -p 1 keeps concurrent multi-GB Go/LLVM linkers out of a group as well.
+      # Group output is streamed with a prefix instead of buffered to a file,
+      # so a killed step still leaves usable logs.
+      #
+      # Group mustpass: the 117-script mustpass sweep.
+      # Group heavy: runtime/coreplugin compile sweeps. Two of the six live in
+      # the compiler package, so the group covers both packages; -run only
+      # keeps the named tests in each.
+      # Group rest: every other package and test.
       run: |
-        set -u
-        heavy='^(TestMustPass_SSA2LLVM_AllScripts|TestRuntime_ShadowLifecycle|TestCorePlugin_CompileAll|TestArtifactPruning_DualEvidence|TestCorePluginBaseYakPluginsCompileToIR|TestCorePlugin_RunSSADetectProject|TestCorePluginSSADetectPrunedRuntimeDependencies)$'
+        set -u -o pipefail
 
-        ( set -o pipefail
-          bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v \
-            -run '^TestMustPass_SSA2LLVM_AllScripts$' ./common/yak/ssa2llvm/tests 2>&1 \
-            | sed -u 's/^/[mustpass] /'
-        ) & p_mustpass=$!
+        heavy='^(TestRuntime_ShadowLifecycle|TestCorePlugin_CompileAll|TestArtifactPruning_DualEvidence|TestCorePluginBaseYakPluginsCompileToIR|TestCorePlugin_RunSSADetectProject|TestCorePluginSSADetectPrunedRuntimeDependencies)$'
+        # The rest group must also skip the mustpass sweep, which has its own
+        # group. It used to be part of the heavy regex, so both groups compiled
+        # the same 117 scripts.
+        rest_skip='^(TestMustPass_SSA2LLVM_AllScripts|TestRuntime_ShadowLifecycle|TestCorePlugin_CompileAll|TestArtifactPruning_DualEvidence|TestCorePluginBaseYakPluginsCompileToIR|TestCorePlugin_RunSSADetectProject|TestCorePluginSSADetectPrunedRuntimeDependencies)$'
 
-        ( set -o pipefail
-          bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v \
-            -run "$heavy" ./common/yak/ssa2llvm/tests 2>&1 \
-            | sed -u 's/^/[heavy] /'
-        ) & p_heavy=$!
-
-        ( set -o pipefail
-          bash scripts/ssa-test.sh -p 1 -count=1 -timeout 60m -v \
-            -skip "$heavy" ./common/yak/ssa2llvm/... 2>&1 \
-            | sed -u 's/^/[rest] /'
-        ) & p_rest=$!
+        run_group() {
+          group=$1
+          shift
+          echo "::group::$group"
+          bash scripts/ssa-test.sh "$@" 2>&1 | sed -u "s/^/[$group] /"
+          rc=$?
+          echo "::endgroup::"
+          return $rc
+        }
 
         status=0
-        wait "$p_mustpass" || status=1
-        wait "$p_heavy" || status=1
-        wait "$p_rest" || status=1
+        run_group mustpass -p 1 -count=1 -timeout 40m -v \
+          -run '^TestMustPass_SSA2LLVM_AllScripts$' ./common/yak/ssa2llvm/tests || status=1
+        run_group heavy -p 1 -count=1 -timeout 40m -v \
+          -run "$heavy" ./common/yak/ssa2llvm/tests ./common/yak/ssa2llvm/compiler || status=1
+        run_group rest -p 1 -count=1 -timeout 55m -v \
+          -skip "$rest_skip" ./common/yak/ssa2llvm/... || status=1
         exit "$status"
