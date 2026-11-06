@@ -38,6 +38,13 @@ func NormalizeStartParams(params *ypb.AIStartParams) (*ypb.AIStartParams, error)
 	params.Source = "ai"
 	params.DisallowRequireForUserPrompt = true
 	params.AllowPlanUserInteract = false
+	// Scheduled runs always need plan-and-execute: forge/blueprint dispatch and
+	// the PE loop are gated behind EnablePlan, and an unattended run has no UI to
+	// flip it on. Chat sessions set this from the frontend toggle; schedules
+	// default it on unless the caller explicitly opted out.
+	if !params.EnablePlan {
+		params.EnablePlan = true
+	}
 	// A schedule is an unattended execution boundary. Keeping the review
 	// policy inherited from the chat can either block forever or, when a run is
 	// restored, unexpectedly ask the user to approve a background tool call.
