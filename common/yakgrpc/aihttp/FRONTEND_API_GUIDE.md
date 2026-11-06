@@ -378,6 +378,8 @@
 }
 ```
 
+OpenAI 兼容服务的 `/models` 返回 404、405 或 501 时，接口正常返回空模型列表。调用方应允许手动填写模型名称，并继续通过 `/setting/aiconfig/healthcheck` 检测该模型；空列表本身不表示对话接口不可用。鉴权、限流、服务异常和网络错误仍正常报错。
+
 ### `POST /setting/aifocus/get`
 
 - 用途：获取可用的 AI Focus 模式
