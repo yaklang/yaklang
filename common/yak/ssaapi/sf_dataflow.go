@@ -655,7 +655,12 @@ func dataFlowFilter(
 	// every node; without passing ctx it ran under context.Background() and the
 	// per-rule deadline never fired — heavy rules ran for hours on large projects.
 	pathCtx := config.GetContext()
-	var enumeratePaths func(v *Value) []Values
+	// walkPaths streams paths and reports false as soon as the current source is
+	// accepted, so the old eager effect×depend product is never materialized. A
+	// heavy dataflow(include=...) rule only needs the existence of one accepted
+	// path per source; enumerating and allocating every path first was pure
+	// overhead (and could explode combinatorially on large projects).
+	var walkPaths func(v *Value, visit func(Values) bool) bool
 	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
 		memo := make(map[int64]*CfgCtxValue)
 		condMemo := make(map[int64]*ssa.BlockConditionSummary)
@@ -668,18 +673,18 @@ func dataFlowFilter(
 			}
 			return reachableWithOptions(pathReach.prog, cfgTo, pathReach.targetCfg, pathReach.opt)
 		}
-		enumeratePaths = func(v *Value) []Values {
+		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, FromSFVMValues(end)...)
+				return v.WalkDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, visit, FromSFVMValues(end)...)
 			}
-			return v.GetDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter)
+			return v.WalkDataflowPathWithEdgeFilterWithContext(pathCtx, edgeFilter, visit)
 		}
 	} else {
-		enumeratePaths = func(v *Value) []Values {
+		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.GetDataflowPathWithContext(pathCtx, FromSFVMValues(end)...)
+				return v.WalkDataflowPathWithContext(pathCtx, visit, FromSFVMValues(end)...)
 			}
-			return v.GetDataflowPathWithContext(pathCtx)
+			return v.WalkDataflowPathWithContext(pathCtx, visit)
 		}
 	}
 
@@ -688,7 +693,7 @@ func dataFlowFilter(
 		// Honor the rule ctx + total-work budget in the outer per-source loop. On
 		// a large project `vs` can hold tens of thousands of sources (e.g. every
 		// servlet/spring param for an include, or every call site reaching a sink
-		// for an exclude-only dataflow); enumeratePaths is fast per-source but the
+		// for an exclude-only dataflow); walkPaths is fast per-source but the
 		// outer loop itself never re-checked the per-rule deadline, so a heavy
 		// rule kept feeding sources long after its budget fired. Bailing here
 		// returns the partial matches found so far.
@@ -701,12 +706,13 @@ func dataFlowFilter(
 			return ret
 		}
 		flag := false
-		for _, path := range enumeratePaths(v) {
+		walkPaths(v, func(path Values) bool {
 			if checkMatch(path) {
 				flag = true
-				break
+				return false
 			}
-		}
+			return true
+		})
 		if flag {
 			ret = append(ret, v)
 		}
