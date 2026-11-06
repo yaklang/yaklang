@@ -26,6 +26,15 @@ type OperationConfig struct {
 	// DataFlowWithSFConfig (which reads it off the sfvm.Config). nil = no budget.
 	workBudget *sf.RuleWorkBudget
 
+	// fanoutCollector, when non-nil, receives this descent's coverage events
+	// for the sfvm input-elimination optimization: each fully-expanded node
+	// (MarkVisited), each on-path cycle cut (OnCycleCut), and the completion
+	// decision (Publish). The descent funnels only publish when the descent
+	// completes untruncated; a cycle cut anywhere invalidates the marks
+	// because a segment computed under a cut is not an independent topdef of
+	// the cut node. nil = elimination off for this descent (the common case).
+	fanoutCollector sf.DataflowFanoutCollector
+
 	//用来记录上一次的值
 	lastValue *Value
 
@@ -104,6 +113,18 @@ func WithExclusiveContext(ctx context.Context) OperationOption {
 func WithExclusiveWorkBudget(b *sf.RuleWorkBudget) OperationOption {
 	return func(operationConfig *OperationConfig) {
 		operationConfig.workBudget = b
+	}
+}
+
+// WithFanoutCollector attaches the sfvm input-elimination session for one
+// descent. The AnalyzeContext reports expanded nodes and cycle cuts to it and
+// the descent funnel publishes the marks when the descent completes
+// untruncated. nil is a no-op.
+func WithFanoutCollector(c sf.DataflowFanoutCollector) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		if c != nil {
+			operationConfig.fanoutCollector = c
+		}
 	}
 }
 

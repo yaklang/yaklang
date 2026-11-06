@@ -333,6 +333,10 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// 跨过程分析
 	exit, recoverCrossProcess := a.tryCrossProcess(v)
 	if exit {
+		// A cross-process revisit is a cycle cut: segments computed under it
+		// are not independent topdefs of the cut node, so this descent's
+		// elimination marks must not publish.
+		a.notifyCycleCut()
 		return true, recoverCrossProcess
 	}
 	// 过程内分析
@@ -348,6 +352,8 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 		a.recursiveStatusIsLeaf.Pop()
 	}
 	if !needVisited {
+		// On-path revisit (cycle): same invalidation as the cross-process cut.
+		a.notifyCycleCut()
 		return true, recoverStack
 	}
 
@@ -396,8 +402,67 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	default:
 	}
 
+	// Input-elimination mark: this node passed all checks (not a cut, not a
+	// limit exit) and no object-expansion context is active, so a segment
+	// computed from here would be an independent topdef of this node — a
+	// completed descent may therefore cover it. Nodes visited inside an
+	// object expansion have entry-context-dependent segments and are never
+	// marked.
+	a.markFanoutCovered(v)
+
 	needExit = false
 	return
+}
+
+// markFanoutCovered reports one fully-expanded node to the input-elimination
+// session, when enabled and not inside an object expansion.
+func (a *AnalyzeContext) markFanoutCovered(v *Value) {
+	if a == nil || a.config == nil || a.config.fanoutCollector == nil {
+		return
+	}
+	if a._objectStack.Len() > 0 {
+		return
+	}
+	// A call node's bottom-use expansion is root-relative: as the descent root
+	// it walks the call's users, but met mid-descent it resolves the callee and
+	// continues inside the function. The two segments differ, so a call met
+	// mid-descent does not cover its independent bottomuse.
+	if a.direct == BottomUseAnalysis && !ValueCompare(v, a.Self) {
+		if _, ok := ssa.ToCall(v.GetSSAInst()); ok {
+			return
+		}
+	}
+	a.config.fanoutCollector.MarkVisited(v.GetId())
+}
+
+// notifyCycleCut invalidates the input-elimination marks of this descent: a
+// segment computed under an on-path cut returned a path node as a result that
+// an independent descent would have expanded further, so no mark can publish.
+func (a *AnalyzeContext) notifyCycleCut() {
+	if a == nil || a.config == nil || a.config.fanoutCollector == nil {
+		return
+	}
+	a.config.fanoutCollector.OnCycleCut()
+}
+
+// publishFanoutCoverage publishes this descent's elimination marks. Called
+// only from the descent funnels when the descent completed untruncated; a
+// limit exit or context cancellation returned a partial closure whose marks
+// must not promote, so both are re-checked here (the funnels cannot see the
+// ctx.Done exit of check(), which does not set reachedDepthLimited).
+func (a *AnalyzeContext) publishFanoutCoverage() {
+	if a == nil || a.config == nil || a.config.fanoutCollector == nil {
+		return
+	}
+	if a.reachedDepthLimited {
+		return
+	}
+	select {
+	case <-a.getContext().Done():
+		return
+	default:
+	}
+	a.config.fanoutCollector.Publish()
 }
 
 func (a *AnalyzeContext) getContext() context.Context {

@@ -861,6 +861,11 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "BUG: get bottom uses failed, empty stack")
 		}
 		s.debugSubLog("- call BottomUses")
+		value = dedupDataflowFanoutInput(value)
+		eliminator := s.beginDataflowElimination(i.SyntaxFlowConfig, value)
+		if eliminator != nil {
+			defer s.config.ClearDataflowEliminator()
+		}
 
 		// diagnostics: track value operation timing
 		var vals Values
@@ -869,6 +874,10 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			done := s.startValueOpTiming("GetSyntaxFlowBottomUse")
 			defer done()
 			vals, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				if eliminator != nil && eliminator.Eliminated(vo) {
+					s.debugSubLog("bottomuse: skip covered input %v", vo)
+					return nil, nil
+				}
 				return vo.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
 			})
 			return err
@@ -878,6 +887,11 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
+		}
+		if eliminator != nil {
+			if skipped := eliminator.Skipped(); skipped > 0 {
+				s.ProcessCallback("get bottomuse: skipped %d covered inputs", skipped)
+			}
 		}
 		s.debugSubLog("<< push bottom uses %v", ValuesLen(vals))
 		s.pushStack(vals)
@@ -914,6 +928,14 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
+		// Collapse exact-duplicate inputs before the per-source descent fanout
+		// (see dedupDataflowFanoutInput); report the real fanout size so a
+		// heavy opcode's progress info reflects the work actually pending.
+		value = dedupDataflowFanoutInput(value)
+		eliminator := s.beginDataflowElimination(i.SyntaxFlowConfig, value)
+		if eliminator != nil {
+			defer s.config.ClearDataflowEliminator()
+		}
 		n := ValuesLen(value)
 		if summary := FormatRecursiveConfigSummary(i.SyntaxFlowConfig); summary != "" {
 			s.ProcessCallback("get topdef: %d values, {%s}", n, summary)
@@ -928,6 +950,10 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			done := s.startValueOpTiming("GetSyntaxFlowTopDef")
 			defer done()
 			vals, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				if eliminator != nil && eliminator.Eliminated(vo) {
+					s.debugSubLog("topdef: skip covered input %v", vo)
+					return nil, nil
+				}
 				return vo.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
 			})
 			return err
@@ -938,12 +964,47 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
+		if eliminator != nil {
+			if skipped := eliminator.Skipped(); skipped > 0 {
+				s.ProcessCallback("get topdef: skipped %d covered inputs", skipped)
+			}
+		}
 		s.debugSubLog("<< push top defs %v", ValuesLen(vals))
 		s.pushStack(vals)
 		return true, nil
 	default:
 		return false, nil
 	}
+}
+
+// beginDataflowElimination installs the input-elimination state for one
+// dataflow opcode fanout when it is safe (dataflowFanoutEliminationEnabled:
+// no anchor scope, no until/hook/depth configs) and worthwhile (more than one
+// distinct input). The returned eliminator lets the fanout closure skip any
+// input a previously completed descent already covered (coverage law: an
+// input fully expanded inside A's complete descent has topdef(A1) ⊆ topdef(A),
+// so its own descent is redundant). Returns nil when elimination is off; the
+// caller then runs the fanout unchanged. The caller must ClearDataflowEliminator
+// on the config when the fanout ends (the eliminator is visible to the ssaapi
+// descents through the same config).
+func (s *SFFrame) beginDataflowElimination(config []*RecursiveConfigItem, input Values) *dataflowFanoutEliminator {
+	if s.config == nil || input.Count() < 2 {
+		return nil
+	}
+	if !dataflowFanoutEliminationEnabled(s.config, config, s.anchorScopeActive()) {
+		return nil
+	}
+	e := NewDataflowEliminator(input)
+	s.config.SetDataflowEliminator(e)
+	return e
+}
+
+// anchorScopeActive reports whether a filter anchor scope is currently active
+// on the frame; elimination is disabled while one is because per-source
+// filter attribution must be preserved.
+func (s *SFFrame) anchorScopeActive() bool {
+	_, _, ok := s.ActiveAnchorScope()
+	return ok
 }
 
 // execSyntaxFlowOp handles syntax flow and stack operations

@@ -49,6 +49,47 @@ type Config struct {
 	// ctx is cancelled (cancel) so the existing ctx-bail path surfaces partial
 	// results instead of a hard failure. nil = no budget (legacy behavior).
 	workBudget *RuleWorkBudget
+
+	// dataflowEliminator carries the per-opcode input-elimination state of the
+	// dataflow fanout currently running (OpGetTopDefs / OpGetBottomUsers). Set
+	// by the opcode handler before the fanout and cleared when it ends; the
+	// ssaapi descent (DataFlowWithSFConfig) reads it via
+	// DataflowEliminatorFor and reports expanded nodes back through its
+	// StartDescent session. Guarded by dataflowEliminatorMu because the >256
+	// input fanout runs its per-source descents concurrently (pipeline pipe).
+	dataflowEliminator   *dataflowFanoutEliminator
+	dataflowEliminatorMu sync.RWMutex
+}
+
+// SetDataflowEliminator installs the fanout eliminator for the duration of
+// one dataflow opcode execution.
+func (c *Config) SetDataflowEliminator(e *dataflowFanoutEliminator) {
+	c.dataflowEliminatorMu.Lock()
+	defer c.dataflowEliminatorMu.Unlock()
+	c.dataflowEliminator = e
+}
+
+// ClearDataflowEliminator removes the fanout eliminator (fanout ended).
+func (c *Config) ClearDataflowEliminator() {
+	c.dataflowEliminatorMu.Lock()
+	defer c.dataflowEliminatorMu.Unlock()
+	c.dataflowEliminator = nil
+}
+
+// DataflowEliminatorFor returns the dataflow eliminator currently active for
+// the fanout, or nil when the fanout has elimination disabled. It also opens
+// the per-descent session so the descent funnel can publish coverage marks on
+// completion.
+func (c *Config) DataflowEliminatorFor() DataflowFanoutCollector {
+	if c == nil {
+		return nil
+	}
+	c.dataflowEliminatorMu.RLock()
+	defer c.dataflowEliminatorMu.RUnlock()
+	if c.dataflowEliminator == nil {
+		return nil
+	}
+	return c.dataflowEliminator.StartDescent()
 }
 
 // RuleWorkBudget is a per-rule atomic counter+limit that bounds total fanout

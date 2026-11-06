@@ -307,16 +307,68 @@ func (v Values) GetSyntaxFlowUse() (Values, error) {
 	})
 }
 
+// dedupDataflowFanoutInput exact-dedups the per-source fanout input of a
+// topdef/bottomuse opcode. The stack value feeding `#->` / `<-?` can carry
+// the same node multiple times (filters and the small-set inline pipeline
+// path preserve multiplicity; only the >inlinePipelineThreshold pipe path
+// MergeValues'es its output). Every input element costs its own recursive
+// descent — on a large project one opcode was fed 52,842 values and ran for
+// 71+ minutes — so duplicates are pure waste. MergeValues is the same
+// identity rule (id -> hash -> type:pointer) and the same provenance merge
+// (MergeProvenanceFrom + MergeAnchor) the VM already applies at OpMergeRef
+// and symbol capture, so collapsing duplicates here changes no observable
+// semantics, it only drops redundant descents. O(N) once, before the N
+// per-source descents.
+func dedupDataflowFanoutInput(v Values) Values {
+	if v.Count() < 2 {
+		return v
+	}
+	return MergeValues(v)
+}
+
 func (v Values) GetSyntaxFlowTopDef(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (Values, error) {
-	return v.pipeLineRun(func(vo ValueOperator) (Values, error) {
+	return dedupDataflowFanoutInput(v).pipeLineRun(func(vo ValueOperator) (Values, error) {
 		return vo.GetSyntaxFlowTopDef(sfResult, sfConfig, config...)
 	})
 }
 
 func (v Values) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (Values, error) {
-	return v.pipeLineRun(func(vo ValueOperator) (Values, error) {
+	return dedupDataflowFanoutInput(v).pipeLineRun(func(vo ValueOperator) (Values, error) {
 		return vo.GetSyntaxFlowBottomUse(sfResult, sfConfig, config...)
 	})
+}
+
+// dataflowFanoutEliminationEnabled reports whether the dataflow opcode fanout
+// may eliminate covered inputs for this (frame, SFI-config) pair. Every gate
+// below protects a semantic the coverage law breaks:
+//   - anchor scope active: per-source filter attribution must be preserved
+//     (each source's results carry its own anchor bits; skipping a source
+//     silently drops its mask slot);
+//   - until/hook configs: until collects matches mid-descent and hooks have
+//     side effects a skipped source must still observe;
+//   - depth configs: the depth window is relative to the source, so a segment
+//     computed inside A's window is not an independent topdef of A1.
+func dataflowFanoutEliminationEnabled(sfConfig *Config, config []*RecursiveConfigItem, anchorScopeActive bool) bool {
+	if sfConfig == nil {
+		return false
+	}
+	if anchorScopeActive {
+		return false
+	}
+	for _, item := range config {
+		if item == nil {
+			continue
+		}
+		switch item.Key {
+		case string(RecursiveConfig_Depth),
+			string(RecursiveConfig_DepthMin),
+			string(RecursiveConfig_DepthMax),
+			string(RecursiveConfig_Until),
+			string(RecursiveConfig_Hook):
+			return false
+		}
+	}
+	return true
 }
 
 func (v Values) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, Values, error) {
