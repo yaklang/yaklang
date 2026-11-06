@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const SessionSnapshotDocumentSchemaVersion = 2
+const SessionSnapshotDocumentSchemaVersion = 3
 
 // SessionSnapshotTaskSummary is the lightweight task index embedded in the
 // cumulative session snapshot. TaskIndex is display-only; TaskID is the stable
@@ -109,7 +109,7 @@ func newSessionSnapshotDocument() SessionSnapshotDocument {
 }
 
 func normalizeSessionSnapshotDocument(doc *SessionSnapshotDocument) {
-	if doc.SchemaVersion <= 0 {
+	if doc.SchemaVersion < SessionSnapshotDocumentSchemaVersion {
 		doc.SchemaVersion = SessionSnapshotDocumentSchemaVersion
 	}
 	if doc.Tasks == nil {
@@ -144,6 +144,67 @@ func normalizeSessionSnapshotDocument(doc *SessionSnapshotDocument) {
 	}
 	if doc.Session != nil {
 		NormalizeSessionSnapshot(doc.Session)
+	}
+	normalizeSessionSnapshotDocumentExecutionSeconds(doc)
+}
+
+func normalizeSessionSnapshotDocumentExecutionSeconds(doc *SessionSnapshotDocument) {
+	if doc == nil {
+		return
+	}
+	for _, task := range doc.Tasks {
+		if task == nil {
+			continue
+		}
+		normalizeSessionTaskExecutionSeconds(task.Snapshot)
+		for _, attempt := range task.PreviousAttempts {
+			normalizeSessionTaskExecutionSeconds(attempt.Snapshot)
+		}
+	}
+	if doc.Session == nil || doc.Session.Execution == nil {
+		return
+	}
+
+	execution := doc.Session.Execution
+	if intervals := sessionSnapshotDocumentExecutionIntervals(doc); len(intervals) > 0 {
+		// Task intervals are authoritative. Repair the cached aggregate while
+		// loading instead of waiting for the session to execute again.
+		setSessionSnapshotExecutionSeconds(
+			execution,
+			cumulativeSessionSnapshotExecutionSeconds(intervals),
+		)
+		return
+	}
+	if execution.ExecutionSeconds != 0 {
+		setSessionSnapshotExecutionSeconds(execution, execution.ExecutionSeconds)
+		return
+	}
+	if execution.ExecutionMinutes > 0 {
+		setSessionSnapshotExecutionSeconds(
+			execution,
+			int64(execution.ExecutionMinutes)*int64(time.Minute/time.Second),
+		)
+	}
+}
+
+func normalizeSessionTaskExecutionSeconds(snapshot *SessionSnapshot) {
+	if snapshot == nil || snapshot.Execution == nil {
+		return
+	}
+	execution := snapshot.Execution
+	if execution.StartedAt > 0 && execution.EndedAt >= execution.StartedAt {
+		setSessionSnapshotExecutionSeconds(execution, execution.EndedAt-execution.StartedAt)
+		return
+	}
+	if execution.ExecutionSeconds != 0 {
+		setSessionSnapshotExecutionSeconds(execution, execution.ExecutionSeconds)
+		return
+	}
+	if execution.ExecutionMinutes > 0 {
+		setSessionSnapshotExecutionSeconds(
+			execution,
+			int64(execution.ExecutionMinutes)*int64(time.Minute/time.Second),
+		)
 	}
 }
 
@@ -359,16 +420,12 @@ func (s *sessionSnapshotDocumentStore) buildCumulativeExecutionLocked(c *Config,
 		}
 		exec := task.Snapshot.Execution
 		result.ExecutionRounds += exec.ExecutionRounds
+		updateSessionSnapshotExecutionTimeRange(result, exec)
 		for _, attempt := range task.PreviousAttempts {
 			if attempt.Snapshot != nil && attempt.Snapshot.Execution != nil {
 				result.ExecutionRounds += attempt.Snapshot.Execution.ExecutionRounds
+				updateSessionSnapshotExecutionTimeRange(result, attempt.Snapshot.Execution)
 			}
-		}
-		if result.StartedAt == 0 || exec.StartedAt > 0 && exec.StartedAt < result.StartedAt {
-			result.StartedAt = exec.StartedAt
-		}
-		if exec.EndedAt > result.EndedAt {
-			result.EndedAt = exec.EndedAt
 		}
 		if !task.IsFinal {
 			result.Status = "processing"
@@ -406,10 +463,85 @@ func (s *sessionSnapshotDocumentStore) buildCumulativeExecutionLocked(c *Config,
 			}
 		}
 	}
-	if result.StartedAt > 0 && result.EndedAt >= result.StartedAt {
-		result.ExecutionMinutes = int(time.Unix(result.EndedAt, 0).Sub(time.Unix(result.StartedAt, 0)).Minutes())
-	}
+	setSessionSnapshotExecutionSeconds(
+		result,
+		cumulativeSessionSnapshotExecutionSeconds(sessionSnapshotDocumentExecutionIntervals(&s.document)),
+	)
 	return result
+}
+
+func updateSessionSnapshotExecutionTimeRange(result, execution *SessionSnapshotExecution) {
+	if result == nil || execution == nil {
+		return
+	}
+	if execution.StartedAt > 0 && (result.StartedAt == 0 || execution.StartedAt < result.StartedAt) {
+		result.StartedAt = execution.StartedAt
+	}
+	if execution.EndedAt > result.EndedAt {
+		result.EndedAt = execution.EndedAt
+	}
+}
+
+type sessionSnapshotExecutionInterval struct {
+	startedAt int64
+	endedAt   int64
+}
+
+func sessionSnapshotDocumentExecutionIntervals(doc *SessionSnapshotDocument) []sessionSnapshotExecutionInterval {
+	if doc == nil {
+		return nil
+	}
+	intervals := make([]sessionSnapshotExecutionInterval, 0, len(doc.Tasks))
+	appendExecutionInterval := func(exec *SessionSnapshotExecution) {
+		if exec == nil || exec.StartedAt <= 0 || exec.EndedAt < exec.StartedAt {
+			return
+		}
+		intervals = append(intervals, sessionSnapshotExecutionInterval{
+			startedAt: exec.StartedAt,
+			endedAt:   exec.EndedAt,
+		})
+	}
+	for _, task := range doc.Tasks {
+		if task == nil || task.Snapshot == nil {
+			continue
+		}
+		appendExecutionInterval(task.Snapshot.Execution)
+		for _, attempt := range task.PreviousAttempts {
+			if attempt.Snapshot != nil {
+				appendExecutionInterval(attempt.Snapshot.Execution)
+			}
+		}
+	}
+	return intervals
+}
+
+// cumulativeSessionSnapshotExecutionSeconds counts merged task execution
+// intervals, excluding idle gaps between tasks and overlapping concurrent work.
+func cumulativeSessionSnapshotExecutionSeconds(intervals []sessionSnapshotExecutionInterval) int64 {
+	if len(intervals) == 0 {
+		return 0
+	}
+	sort.SliceStable(intervals, func(i, j int) bool {
+		if intervals[i].startedAt == intervals[j].startedAt {
+			return intervals[i].endedAt < intervals[j].endedAt
+		}
+		return intervals[i].startedAt < intervals[j].startedAt
+	})
+
+	var activeSeconds int64
+	merged := intervals[0]
+	for _, interval := range intervals[1:] {
+		if interval.startedAt <= merged.endedAt {
+			if interval.endedAt > merged.endedAt {
+				merged.endedAt = interval.endedAt
+			}
+			continue
+		}
+		activeSeconds += merged.endedAt - merged.startedAt
+		merged = interval
+	}
+	activeSeconds += merged.endedAt - merged.startedAt
+	return activeSeconds
 }
 
 func (s *sessionSnapshotDocumentStore) taskSummariesLocked() []SessionSnapshotTaskSummary {
@@ -462,10 +594,12 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 			if latest.Execution != nil && strings.TrimSpace(latest.Execution.Status) != "" {
 				status = strings.TrimSpace(latest.Execution.Status)
 			}
+			taskSnapshot := cloneSessionSnapshot(latest)
+			normalizeSessionTaskExecutionSeconds(taskSnapshot)
 			store.document.Tasks[taskID] = &SessionTaskSnapshot{
 				TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName,
 				Attempt: attempt, Status: status, IsFinal: isSessionSnapshotExecutionTerminal(status),
-				Revision: revision, UpdatedAt: now, Snapshot: cloneSessionSnapshot(latest),
+				Revision: revision, UpdatedAt: now, Snapshot: taskSnapshot,
 				PreviousAttempts: previousAttempts,
 				Todo:             store.taskTodoLocked(taskID),
 			}

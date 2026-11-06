@@ -33,6 +33,9 @@ func TestBuildSessionSnapshot_AlwaysEmitsFullPayload(t *testing.T) {
 	require.NoError(t, json.Unmarshal(payload["execution"], &execution))
 	require.Equal(t, "processing", execution["status"])
 	require.Contains(t, execution, "execution_rounds")
+	require.Contains(t, execution, "execution_seconds")
+	require.Contains(t, execution, "execution_minutes")
+	require.NotContains(t, execution, "execution_duration")
 }
 
 func TestBuildSessionSnapshot_ExecutionRoundsFromLoop(t *testing.T) {
