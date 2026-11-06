@@ -1,9 +1,10 @@
 package template2java
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/text/encoding"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -22,9 +23,19 @@ type JavaTemplate struct {
 	pkgName   string
 	className string
 
+	// sourceEncoding is the charset declared by the template header (nil = UTF-8).
+	// Text written into the generated Java is decoded with it first, so a GBK JSP
+	// page does not leak raw bytes into a Java string literal.
+	sourceEncoding encoding.Encoding
+
 	classDeclLine int
 	builder       strings.Builder
 	currentLine   int
+	// frames tracks braces inside _JavaTemplateService. 'm' is the method,
+	// 'b' a normal block, 't' a try. A '}' that would pop 'm' is dropped.
+	// Finish closes a leftover try with a catch so the method still parses
+	// when the catch scriptlet was not emitted.
+	frames []byte
 }
 
 func (t *JavaTemplate) WriteDeclaration(code string) {
@@ -53,11 +64,15 @@ func (t *JavaTemplate) WriteImport(path string) {
 }
 
 func (t *JavaTemplate) WritePureOut(expression string) {
-	expression = tryUnquote(expression)
+	expression = expressionText(expression)
 	t.append("\tout.print(" + expression + ");\r\n")
 }
 
 func (t *JavaTemplate) WritePureCode(code string) {
+	code = t.keepMethodOpen(code)
+	if strings.TrimSpace(code) == "" {
+		return
+	}
 	t.append("\t" + code + "\r\n")
 }
 
@@ -67,9 +82,21 @@ func (t *JavaTemplate) String() string {
 
 func (t *JavaTemplate) WritePureText(texts string) {
 	texts = tryUnquote(texts)
+	// Decode with the template's declared charset, then emit a Java-legal literal:
+	// Go's %q would produce \xNN escapes for legacy-encoded bytes, which Java cannot parse.
+	texts = decodeTemplateText(texts, t.sourceEncoding)
 	for _, text := range strings.Split(texts, "\n") {
-		t.append(fmt.Sprintf("	out.write(%q);\n", text))
+		t.append("\tout.write(\"" + javaStringLiteral(text) + "\");\n")
 	}
+}
+
+// SetSourceEncoding records the charset declared by the template header. It must be called
+// before the template is generated; a nil encoding keeps UTF-8 passthrough.
+func (t *JavaTemplate) SetSourceEncoding(enc encoding.Encoding) {
+	if t == nil {
+		return
+	}
+	t.sourceEncoding = enc
 }
 
 func (t *JavaTemplate) WriteGetAttribute(variable string) {
@@ -78,12 +105,12 @@ func (t *JavaTemplate) WriteGetAttribute(variable string) {
 }
 
 func (t *JavaTemplate) WriteOutput(variable string) {
-	variable = tryUnquote(variable)
+	variable = expressionText(variable)
 	t.append("\tout." + JAVA_UNESCAPE_OUTPUT_PRINT + "(" + variable + ");\r\n")
 }
 
 func (t *JavaTemplate) WriteEscapeOutput(variable string) {
-	variable = tryUnquote(variable)
+	variable = expressionText(variable)
 	t.append("\tout.printWithEscape(" + variable + ");\r\n")
 }
 
@@ -98,6 +125,15 @@ func (t *JavaTemplate) CurrentLine() int {
 }
 
 func (t *JavaTemplate) Finish() {
+	for len(t.frames) > 1 {
+		top := t.frames[len(t.frames)-1]
+		t.frames = t.frames[:len(t.frames)-1]
+		if top == 't' {
+			t.append("\t} catch (Throwable __jspCaught) {}\r\n")
+			continue
+		}
+		t.append("\t}\r\n")
+	}
 	t.append("}}")
 }
 
@@ -126,13 +162,159 @@ func (t *JavaTemplate) generateTemplate() {
 	t.append("public class " + t.className + " {\r\n")
 	t.classDeclLine = len(strings.Split(t.builder.String(), "\r\n")) - 1
 	t.append("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
+	t.frames = []byte{'m'}
 	t.append("\tout = response.getWriter(); \r\n")
+}
+
+// keepMethodOpen drops a '}' that would close _JavaTemplateService, and a
+// following else, when the matching '{' was never emitted.
+func (t *JavaTemplate) keepMethodOpen(code string) string {
+	if t == nil || code == "" {
+		return code
+	}
+	if t.frames == nil {
+		t.frames = []byte{'m'}
+	}
+	var b strings.Builder
+	b.Grow(len(code))
+	var inStr byte
+	esc := false
+	ident := ""
+	i := 0
+	flushIdent := func() {
+		ident = ""
+	}
+	for i < len(code) {
+		c := code[i]
+		if inStr != 0 {
+			b.WriteByte(c)
+			flushIdent()
+			if esc {
+				esc = false
+			} else if c == '\\' {
+				esc = true
+			} else if c == inStr {
+				inStr = 0
+			}
+			i++
+			continue
+		}
+		if c == '"' || c == '\'' {
+			inStr = c
+			b.WriteByte(c)
+			flushIdent()
+			i++
+			continue
+		}
+		// Braces inside comments are not blocks. Counting them made Finish emit
+		// an extra '}' after the class.
+		if c == '/' && i+1 < len(code) && (code[i+1] == '/' || code[i+1] == '*') {
+			if code[i+1] == '/' {
+				for i < len(code) && code[i] != '\n' {
+					b.WriteByte(code[i])
+					i++
+				}
+				flushIdent()
+				continue
+			}
+			b.WriteByte(code[i])
+			b.WriteByte(code[i+1])
+			i += 2
+			for i+1 < len(code) && !(code[i] == '*' && code[i+1] == '/') {
+				b.WriteByte(code[i])
+				i++
+			}
+			if i+1 < len(code) {
+				b.WriteByte(code[i])
+				b.WriteByte(code[i+1])
+				i += 2
+			}
+			flushIdent()
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || (len(ident) > 0 && c >= '0' && c <= '9') {
+			ident += string(c)
+			b.WriteByte(c)
+			i++
+			continue
+		}
+		if c == '{' {
+			kind := byte('b')
+			if ident == "try" {
+				kind = 't'
+			}
+			t.frames = append(t.frames, kind)
+			b.WriteByte(c)
+			flushIdent()
+			i++
+			continue
+		}
+		if c == '}' && len(t.frames) <= 1 {
+			i++
+			j := i
+			for j < len(code) && (code[j] == ' ' || code[j] == '\t' || code[j] == '\n' || code[j] == '\r') {
+				j++
+			}
+			if strings.HasPrefix(code[j:], "else") {
+				j += len("else")
+				for j < len(code) && (code[j] == ' ' || code[j] == '\t' || code[j] == '\n' || code[j] == '\r') {
+					j++
+				}
+				if j < len(code) && code[j] == '{' {
+					j++
+				}
+				i = j
+			}
+			flushIdent()
+			continue
+		}
+		if c == '}' {
+			t.frames = t.frames[:len(t.frames)-1]
+		}
+		if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+			flushIdent()
+		}
+		b.WriteByte(c)
+		i++
+	}
+	return b.String()
 }
 
 func tryUnquote(text string) string {
 	text = yakunquote.TryUnquote(text)
 	text = strings.ReplaceAll(text, "\r", "")
 	return text
+}
+
+// expressionText keeps a quoted literal such as "****" or "<soap:Body>".
+// Unquoting those produced printWithEscape(****), which is not Java. A
+// quoted identifier ("var1") stays an identifier, matching older templates.
+func expressionText(text string) string {
+	text = strings.ReplaceAll(text, "\r", "")
+	unquoted := yakunquote.TryUnquote(text)
+	if unquoted == text || !javaIdent(unquoted) {
+		return text
+	}
+	return unquoted
+}
+
+func javaIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if i == 0 {
+			if c != '_' && c != '$' && (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') {
+				return false
+			}
+			continue
+		}
+		if c != '_' && c != '$' && (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *JavaTemplate) append(s string) {

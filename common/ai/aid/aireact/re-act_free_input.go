@@ -223,15 +223,17 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 	if task == nil {
 		return fmt.Errorf("failed to build task from event")
 	}
-	log.Infof("Task enqueue started processing: %s", task.GetId())
 	// 任务不相关，进入排队状态
 	task.SetFocusMode(event.GetFocusModeLoop())
 	task.SetStatus(aicommon.AITaskState_Queueing)
+	taskInput := r.buildSessionTaskInput(task, event)
+	log.Infof("Task enqueue started processing: %s", task.GetId())
 	err := r.taskQueue.Append(task)
 	if err != nil {
 		log.Errorf("Failed to add task to queue: %v", err)
 		return fmt.Errorf("failed to enqueue task: %v", err)
 	}
+	r.saveAISessionTaskInput(taskInput)
 	if r.config.DebugEvent {
 		log.Infof("Task enqueued: %s with input: %s", task.GetId(), event.FreeInput)
 	}

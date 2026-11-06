@@ -1,6 +1,11 @@
 package aotlib
 
-import "os"
+import (
+	"fmt"
+	"net"
+	"os"
+	"time"
+)
 
 func Getenv(key string) string            { return os.Getenv(key) }
 func Setenv(key, value string) error      { return os.Setenv(key, value) }
@@ -27,6 +32,44 @@ func Executable() (string, error) { return os.Executable() }
 func ExpandEnv(s string) string   { return os.ExpandEnv(s) }
 func Args() []string              { return os.Args }
 
+// GetRandomAvailableTCPPort binds a TCP listener on an ephemeral port and
+// returns the port number, mirroring yaklib's os.GetRandomAvailableTCPPort.
+func GetRandomAvailableTCPPort() int {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0
+	}
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// GetRandomAvailableUDPPort mirrors yaklib's os.GetRandomAvailableUDPPort.
+func GetRandomAvailableUDPPort() int {
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		return 0
+	}
+	defer pc.Close()
+	return pc.LocalAddr().(*net.UDPAddr).Port
+}
+
+// WaitConnect mirrors yaklib's os.WaitConnect: poll the TCP address until it
+// accepts a connection or the timeout (seconds) elapses.
+func WaitConnect(addr string, timeout float64) error {
+	deadline := time.Now().Add(time.Duration(timeout * float64(time.Second)))
+	for {
+		conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("wait connect %s timeout: %w", addr, err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // SystemExports mirrors the os module's export table (the AOT-supported
 // subset). Entries match common/yak/yaklib.SystemExports signatures.
 var SystemExports = map[string]any{
@@ -52,4 +95,7 @@ var SystemExports = map[string]any{
 	"Args":       Args,
 	"Executable": Executable,
 	"ExpandEnv":  ExpandEnv,
+	"GetRandomAvailableTCPPort": GetRandomAvailableTCPPort,
+	"GetRandomAvailableUDPPort": GetRandomAvailableUDPPort,
+	"WaitConnect":               WaitConnect,
 }

@@ -230,6 +230,34 @@ func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	return findVariableFromScope(scope, name, true, true)
 }
 
+// preferLocalVariable reports whether the first local variable found for a name
+// must override the version the scope lookup returned.
+//
+// Two cases keep the looked-up value even though the local version differs:
+//   - a plain reassignment (`ret = f()`) adds a second variable in the SAME
+//     scope, so the newest assignment has to win;
+//   - a loop condition resolves to the spin phi of the condition scope while
+//     the local copy sits in the enclosing header scope, so preferring the copy
+//     would freeze the condition at the pre-loop value.
+func preferLocalVariable(ret, local *Variable) bool {
+	if ret == nil || local == nil {
+		return false
+	}
+	scopeRet, scopeLocal := ret.GetScope(), local.GetScope()
+	if utils.IsNil(scopeRet) || utils.IsNil(scopeLocal) {
+		return false
+	}
+	if scopeRet.Compare(scopeLocal) || scopeLocal.Compare(scopeRet) {
+		return false
+	}
+	if v := ret.GetValue(); v != nil {
+		if _, isPhi := ToPhi(v); isPhi {
+			return false
+		}
+	}
+	return true
+}
+
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
 	return findVariableFromScope(scope, name, false, true)
 }

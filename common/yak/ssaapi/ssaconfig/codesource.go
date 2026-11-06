@@ -50,24 +50,46 @@ func ClassifyLocalCodeSourceKind(localFile string) CodeSourceKind {
 // NormalizeCodeSourceKind restores archive classification for configs that pin
 // kind=local (or leave it empty) while pointing local_file at a zip/jar. An
 // explicit git/svn/compression/jar kind stays authoritative.
+//
+// It also settles the language an archive implies. A jar/war holds JVM class
+// files, so "jar" already means Java: that is a fact about the file format, the
+// same one that produced the kind, not a guess about the project. Leaving it
+// empty only made every archive caller set it again.
 func (c *Config) NormalizeCodeSourceKind() {
 	if c == nil || c.CodeSource == nil {
 		return
 	}
-	if c.CodeSource.Kind != "" && c.CodeSource.Kind != CodeSourceLocal {
-		return
-	}
-	localFile := strings.TrimSpace(c.CodeSource.LocalFile)
-	if localFile == "" {
-		return
-	}
-	if info, err := os.Stat(localFile); err == nil && info.IsDir() {
+	if c.CodeSource.Kind == "" || c.CodeSource.Kind == CodeSourceLocal {
+		localFile := strings.TrimSpace(c.CodeSource.LocalFile)
 		// A real directory wins over the suffix: "project.zip/" is still a tree.
+		isDir := false
+		if localFile != "" {
+			if info, err := os.Stat(localFile); err == nil && info.IsDir() {
+				isDir = true
+			}
+		}
+		if localFile != "" && !isDir {
+			if kind := ClassifyLocalCodeSourceKind(localFile); kind != CodeSourceLocal {
+				c.CodeSource.Kind = kind
+			}
+		}
+	}
+	c.normalizeArchiveLanguage()
+}
+
+// normalizeArchiveLanguage settles the language a jar/war code source implies
+// when the caller did not name one.
+func (c *Config) normalizeArchiveLanguage() {
+	if c.CodeSource.Kind != CodeSourceJar {
 		return
 	}
-	if kind := ClassifyLocalCodeSourceKind(localFile); kind != CodeSourceLocal {
-		c.CodeSource.Kind = kind
+	if c.BaseInfo != nil && c.BaseInfo.Language != "" {
+		return
 	}
+	if err := c.ensureBase("Program Language"); err != nil {
+		return
+	}
+	c.BaseInfo.Language = JAVA
 }
 
 type AuthConfigInfo struct {
@@ -94,7 +116,7 @@ type CodeSourceInfo struct {
 	Path              string           `json:"path,omitempty"`                // git仓库中的子路径
 	Auth              *AuthConfigInfo  `json:"auth,omitempty"`                // 认证信息
 	Proxy             *ProxyConfigInfo `json:"proxy,omitempty"`               // 代理配置
-	JarRecursiveParse *bool            `json:"jar_recursive_parse,omitempty"` // Jar递归解析开关，nil或true表示启用，false表示禁用
+	JarRecursiveParse *bool            `json:"jar_recursive_parse,omitempty"` // Jar解析开关，nil或true表示解析，false表示跳过归档文件
 }
 
 func NewLocalFileCodeSourceConfig(localFile string) *CodeSourceInfo {
@@ -601,9 +623,10 @@ func WithCodeSourceInfo(info *CodeSourceInfo) Option {
 	}
 }
 
-// WithCodeSourceJarRecursiveParse 设置是否对 Jar 包进行递归解析（导出名为 ssa.withCodeSourceJarRecursiveParse）
+// WithCodeSourceJarRecursiveParse 设置是否解析 Jar 文件（导出名为 ssa.withCodeSourceJarRecursiveParse）
+// 关闭后基础文件系统直接跳过 Jar/War 等归档文件，语言前端不会收到它们。
 // 参数:
-//   - enable: 是否递归解析 Jar 包
+//   - enable: 是否解析 Jar 文件
 //
 // 返回值:
 //   - 代码源配置可选项

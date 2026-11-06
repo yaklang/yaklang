@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func getAssignExternErrorPos(scope ScopeIF, variable *Variable) *memedit.Range {
@@ -146,7 +147,17 @@ func (b *FunctionBuilder) readValueEx(
 	local := GetFristLocalVariableFromScopeAndParent(scope, name)
 
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
-		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
+		// Yak resolves a name to the newest assignment in the same scope and to
+		// the loop spin phi in a loop condition; the other front ends (Go, C,
+		// PHP, ...) keep the historical "first local wins" rule so their
+		// shadowing and pointer semantics stay unchanged.
+		preferLocal := true
+		if b.GetLanguage() == ssaconfig.Yak {
+			preferLocal = preferLocalVariable(ret, local)
+		}
+		if local != nil && preferLocal &&
+			ret.GetCaptured() != nil && local.GetCaptured() != nil &&
+			ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
 			ret = local
 		}
 		if b.CurrentRange != nil {

@@ -27,6 +27,13 @@ type UnitPlan struct {
 // cycles into SCCs). The engine fills CompileUnit.Language from the project
 // language so language Builders need not set it themselves.
 func buildCompileUnitPlan(builder ssa.Builder, language ssaconfig.Language, fs filesys_interface.FileSystem, files []string) *UnitPlan {
+	return buildCompileUnitPlanEdges(builder, language, fs, files, true)
+}
+
+// buildCompileUnitPlanEdges partitions files into compile units. AST-only
+// parsing does not schedule bodies, so it skips import and template edges.
+// Those edges read every source file before any AST is parsed.
+func buildCompileUnitPlanEdges(builder ssa.Builder, language ssaconfig.Language, fs filesys_interface.FileSystem, files []string, dependencies bool) *UnitPlan {
 	files = append([]string(nil), files...)
 	unitSlice := builder.PartitionCompileUnits(fs, files)
 	units := make(map[string]*CompileUnit, len(unitSlice))
@@ -37,7 +44,10 @@ func buildCompileUnitPlan(builder ssa.Builder, language ssaconfig.Language, fs f
 		u.Language = language
 		units[u.Key] = u
 	}
-	edges := builder.CompileUnitDependencies(fs, unitSlice)
+	var edges []ssa.UnitRef
+	if dependencies {
+		edges = builder.CompileUnitDependencies(fs, unitSlice)
+	}
 	return topoCompileUnits(units, edges)
 }
 

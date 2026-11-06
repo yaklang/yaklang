@@ -1,0 +1,116 @@
+name: ssa2llvm-test
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'common/yak/ssa2llvm/**'
+      - '.github/workflows/ssa2llvm-test.yml'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-22.04
+    # Hard ceiling for one run: queue wait, toolchain install, CLI build and the
+    # test step all count. Queue alone has varied from 5m to 17m, and shared
+    # runners have died silently around the 100m mark, so the goal is to keep
+    # the whole job well below that. The three test groups below bound
+    # themselves at 40m + 40m + 55m; this cap only stops a runaway job.
+    timeout-minutes: 150
+
+    env:
+      # go-llvm vendors the LLVM 18.1.3 static archives inside the module, but
+      # not the LLVM C/C++ headers (the module zip has none). install_deps
+      # adds the official apt.llvm.org repo for jammy; point cgo at the
+      # versioned headers so the distro default (LLVM 14) cannot shadow them.
+      CGO_CFLAGS: -I/usr/lib/llvm-18/include
+      CGO_CXXFLAGS: -I/usr/lib/llvm-18/include
+      # go-llvm's bundled LLVM 18.1.3 static archives were built against a
+      # newer glibc (they reference __isoc23_*/arc4random, absent on Ubuntu
+      # 22.04's glibc 2.35). Put the system LLVM 18.1.8 lib dir first so the
+      # link uses the distro-compatible archives.
+      CGO_LDFLAGS: -L/usr/lib/llvm-18/lib
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        # The runtime patch (runtime/patch, elfsplit) is validated against the
+        # Go 1.26 moduledata layout. go.mod only declares a minimum (1.22.12);
+        # using 1.22.12 here produces binaries whose moduledata fields sit at
+        # different offsets and fail runtime.moduledataverify.
+        go-version: '1.26.5'
+        cache: false
+      id: go
+
+    - name: Install LLVM dependencies
+      run: |
+        sudo bash common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh
+
+    - name: Patch Go runtime text section lookup
+      run: bash common/yak/ssa2llvm/scripts/patch_go_runtime.sh
+
+    - name: Init Module
+      run: go mod tidy
+
+    - name: Build CLI and embedded runtime assets
+      # The embedded libyak.a/crt/libc assets are gitignored (generated), and
+      # the CLI embeds them, so build the whole self-contained CLI up front:
+      # later test builds reuse the Go build cache and EnsureRuntimeArchive
+      # sees a fresh runtime/libyak.a.
+      run: |
+        bash common/yak/ssa2llvm/scripts/build_cli.sh -o build/tools/ssa2llvm
+
+    - name: Test
+      # -x is intentionally NOT passed: it prints every external command and is
+      # only useful for manual debugging. Keep CI output lean and deterministic.
+      #
+      # The suite is three groups, run one after the other. They were three
+      # concurrent lanes until run 42119967112: on the 4-core shared runner the
+      # lanes spawned three multi-GB Go/LLVM linkers at once: the mustpass
+      # sweep went from ~5s to ~30s per script, both compile groups hit their
+      # go-test timeout, and the third group still needed over an hour. Serial
+      # groups match the 36-51m a plain serial walk measured, and each group
+      # keeps its own timeout so a hang in one still leaves the others' results.
+      #
+      # -p 1 keeps concurrent multi-GB Go/LLVM linkers out of a group as well.
+      # Group output is streamed with a prefix instead of buffered to a file,
+      # so a killed step still leaves usable logs.
+      #
+      # Group mustpass: the 117-script mustpass sweep.
+      # Group heavy: runtime/coreplugin compile sweeps. Two of the six live in
+      # the compiler package, so the group covers both packages; -run only
+      # keeps the named tests in each.
+      # Group rest: every other package and test.
+      run: |
+        set -u -o pipefail
+
+        heavy='^(TestRuntime_ShadowLifecycle|TestCorePlugin_CompileAll|TestArtifactPruning_DualEvidence|TestCorePluginBaseYakPluginsCompileToIR|TestCorePlugin_RunSSADetectProject|TestCorePluginSSADetectPrunedRuntimeDependencies)$'
+        # The rest group must also skip the mustpass sweep, which has its own
+        # group. It used to be part of the heavy regex, so both groups compiled
+        # the same 117 scripts.
+        rest_skip='^(TestMustPass_SSA2LLVM_AllScripts|TestRuntime_ShadowLifecycle|TestCorePlugin_CompileAll|TestArtifactPruning_DualEvidence|TestCorePluginBaseYakPluginsCompileToIR|TestCorePlugin_RunSSADetectProject|TestCorePluginSSADetectPrunedRuntimeDependencies)$'
+
+        run_group() {
+          group=$1
+          shift
+          echo "::group::$group"
+          bash scripts/ssa-test.sh "$@" 2>&1 | sed -u "s/^/[$group] /"
+          rc=$?
+          echo "::endgroup::"
+          return $rc
+        }
+
+        status=0
+        run_group mustpass -p 1 -count=1 -timeout 40m -v \
+          -run '^TestMustPass_SSA2LLVM_AllScripts$' ./common/yak/ssa2llvm/tests || status=1
+        run_group heavy -p 1 -count=1 -timeout 40m -v \
+          -run "$heavy" ./common/yak/ssa2llvm/tests ./common/yak/ssa2llvm/compiler || status=1
+        run_group rest -p 1 -count=1 -timeout 55m -v \
+          -skip "$rest_skip" ./common/yak/ssa2llvm/... || status=1
+        exit "$status"

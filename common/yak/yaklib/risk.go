@@ -27,12 +27,26 @@ import (
 // Example:
 // ```
 // risk.NewRisk("http://example.com",
-//     risk.title("SQL Injection"),
-//     risk.type("sqli"),
-//     risk.severity("high"),
+//
+//	risk.title("SQL Injection"),
+//	risk.type("sqli"),
+//	risk.severity("high"),
+//
 // )
 // // 写入后可用 risk.YieldRiskByTarget 等查询（示意性示例）
 // ```
+// outputRiskToYakit sends the risk through the captured client when present;
+// AOT exports may be initialized before the process-wide client is installed.
+func outputRiskToYakit(client *YakitClient, risk *schema.Risk) {
+	if client == nil {
+		client = GetYakitClientInstance()
+	}
+	if client == nil {
+		return
+	}
+	client.Output(risk)
+}
+
 func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.RiskParamsOpt) {
 	if client == nil {
 		client = emptyVirtualClient
@@ -62,7 +76,7 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 `, title, risk.IP))
 			}
 		}
-		client.Output(risk)
+		outputRiskToYakit(client, risk)
 	}
 }
 
@@ -112,7 +126,7 @@ func YakitSaveRiskBuilder(client *YakitClient) func(r *schema.Risk) error {
 `, title, risk.IP))
 			}
 		}
-		client.Output(risk)
+		outputRiskToYakit(client, risk)
 		return nil
 	}
 }

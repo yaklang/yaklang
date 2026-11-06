@@ -18,19 +18,22 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 type importConfig struct {
-	ctx          context.Context
-	parent       context.Context
-	batchSize    int
-	protocols    bool
-	streams      bool
-	fieldIndexes []string
-	progress     func(Progress)
-	cancel       context.CancelFunc
-	progressErr  error
-	leased       bool
+	ctx             context.Context
+	parent          context.Context
+	batchSize       int
+	protocols       bool
+	streams         bool
+	fieldIndexes    []string
+	progress        func(Progress)
+	cancel          context.CancelFunc
+	progressErr     error
+	leased          bool
+	tlsSecrets      pcaputil.TLSSecretProvider
+	tlsKeyLogSHA256 string
 }
 type ImportOption func(*importConfig) error
 
@@ -62,6 +65,23 @@ func WithProtocols(enabled bool) ImportOption {
 // Enabled by default. Disable it for a packet-only import with no replay cost.
 func WithStreams(enabled bool) ImportOption {
 	return func(c *importConfig) error { c.streams = enabled; return nil }
+}
+
+// WithTLSKeyLog enables authorized NSS key-log decryption during protocol
+// replay. The key material is retained only for this import operation; its
+// SHA256 is persisted so a different key log can invalidate cached analysis
+// without storing the secrets themselves.
+func WithTLSKeyLog(text string) ImportOption {
+	return func(c *importConfig) error {
+		keys, err := pcaputil.ParseTLSKeyLog(text)
+		if err != nil {
+			return fmt.Errorf("pcapdb: invalid TLS key log: %w", err)
+		}
+		digest := sha256.Sum256([]byte(text))
+		c.tlsSecrets = keys
+		c.tlsKeyLogSHA256 = hex.EncodeToString(digest[:])
+		return nil
+	}
 }
 
 // WithFieldIndex creates a scalar expression index for one frequently searched
@@ -125,6 +145,9 @@ func (m *InstanceManager) GetOrCreate(filename string, options ...ImportOption) 
 	}
 	if len(config.fieldIndexes) != 0 && !config.protocols {
 		return nil, fmt.Errorf("pcapdb: field indexes require withProtocols(true)")
+	}
+	if config.tlsSecrets != nil && !config.protocols {
+		return nil, fmt.Errorf("pcapdb: TLS key log requires withProtocols(true)")
 	}
 	ctx, cancel := m.operationContext(config.ctx)
 	defer cancel()
@@ -260,7 +283,8 @@ func (m *InstanceManager) useExisting(source *os.File, info os.FileInfo, fp *Fin
 		if err = m.addAlias(config.ctx, meta, path); err != nil {
 			return nil, err
 		}
-		if (config.protocols && !meta.ProtocolsIndexed) || (config.streams && !meta.StreamsIndexed) {
+		keyLogChanged := config.tlsSecrets != nil && config.tlsKeyLogSHA256 != meta.TLSKeyLogSHA256
+		if (config.protocols && (!meta.ProtocolsIndexed || keyLogChanged)) || (config.streams && !meta.StreamsIndexed) {
 			config.protocols = config.protocols || meta.ProtocolsIndexed
 			config.streams = config.streams || meta.StreamsIndexed
 			writer, err := openIndex(meta.DatabasePath, true, false)

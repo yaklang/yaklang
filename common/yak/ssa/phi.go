@@ -109,6 +109,10 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 		// step 2
 		if phi2, ok := ToPhi(latch); ok {
 			if index := slices.Index(phi2.Edge, phiValue.GetId()); index != -1 {
+				// Record that this edge means "unchanged in this iteration"
+				// before it is folded to the pre-loop value; code generation
+				// must read the phi's own previous value on such an edge.
+				phi2.MarkLoopCarriedEdge(index)
 				phi2.Edge[index] = header.GetId()
 				ret[name] = phi2
 				// phi2 的 Edge 已在上方把 phiValue 替换为 header，不能再对 phi2 调用 ReplaceValue(v, to)，

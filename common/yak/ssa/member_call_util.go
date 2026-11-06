@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -398,10 +399,31 @@ func isBlueprintStaticAccessValue(value Value, blueprint *Blueprint) bool {
 	return false
 }
 
+// maxMemberVerboseNameLen bounds the dotted path stored on one member. Member
+// chains are recursive (this.a.a.a...), and every member used to keep a full
+// copy of its ancestor path, so the total cost grew quadratically with chain
+// depth. One 397-class archive was enough to hold 23GB of these strings and get
+// the scan OOM-killed. The name is display-only — the relationship itself is
+// carried by the ObjectKeyPair — so clipping it changes nothing semantic.
+const maxMemberVerboseNameLen = 256
+
+// clipMemberVerboseName keeps the head of the path, which is what identifies the
+// object, and never splits a rune.
+func clipMemberVerboseName(name string) string {
+	if len(name) <= maxMemberVerboseNameLen {
+		return name
+	}
+	cut := maxMemberVerboseNameLen
+	for cut > 0 && !utf8.RuneStart(name[cut]) {
+		cut--
+	}
+	return name[:cut] + "..."
+}
+
 func getMemberVerboseName(obj, key Value) string {
 	keyName := GetKeyString(key)
 	if utils.IsNil(obj) {
-		return keyName
+		return clipMemberVerboseName(keyName)
 	}
 	objName := obj.GetVerboseName()
 	if objName == "" {
@@ -413,15 +435,17 @@ func getMemberVerboseName(obj, key Value) string {
 		if keyName == "" {
 			return ""
 		}
-		return fmt.Sprintf(".%s", keyName)
+		return clipMemberVerboseName("." + keyName)
 	}
 	if keyName == "" {
-		return objName
+		return clipMemberVerboseName(objName)
 	}
-	if strings.HasPrefix(keyName, objName+".") {
-		return keyName
+	// keyName already carries the object prefix; comparing without building
+	// objName+"." avoids one allocation per member on the hot path.
+	if len(keyName) > len(objName) && keyName[len(objName)] == '.' && keyName[:len(objName)] == objName {
+		return clipMemberVerboseName(keyName)
 	}
-	return fmt.Sprintf("%s.%s", objName, keyName)
+	return clipMemberVerboseName(objName + "." + keyName)
 }
 
 func setMemberVerboseName(member Value) {
@@ -434,6 +458,9 @@ func setMemberVerboseName(member Value) {
 		return
 	}
 	text := getMemberVerboseName(obj, key)
+	if text == "" || member.GetVerboseName() == text {
+		return
+	}
 	member.SetVerboseName(text)
 }
 

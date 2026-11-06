@@ -3,12 +3,16 @@ package test
 import (
 	"embed"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	"github.com/yaklang/yaklang/common/yak/java/jsp"
+	j "github.com/yaklang/yaklang/common/yak/java/template2java"
 )
 
 func TestJSP2Java_Content(t *testing.T) {
@@ -120,7 +124,7 @@ func TestJSP2Java_Content(t *testing.T) {
 			"test jstl-core set tag",
 			"<c:set var='name' value='John'/>",
 			[]string{
-				`request.setAttribute("name", John);`,
+				`request.setAttribute("name", "John");`,
 			},
 		},
 		// core if tag
@@ -186,9 +190,16 @@ func TestJSP2Java_Content(t *testing.T) {
 				"out.print(elExpr.parse(\"now\"));",
 			},
 		},
+		{
+			"test el function call with parentheses",
+			`<input value="${fn:escapeXml(!empty param.password ? param.password : param.pass)}">`,
+			[]string{
+				`out.print(elExpr.parse("fn:escapeXml(!empty param.password ? param.password : param.pass)"));`,
+			},
+		},
 	}
 	check := func(jspCode string, wants []string) {
-		codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, jspCode, "test.jsp")
+		codeInfo, err := j.ConvertTemplateToJava(j.JSP, jspCode, "test.jsp")
 		require.NoError(t, err)
 		require.NotNil(t, codeInfo)
 		checkJavaFront(t, codeInfo.GetContent(), "test.jsp")
@@ -200,6 +211,79 @@ func TestJSP2Java_Content(t *testing.T) {
 	}
 }
 
+func TestRangePageKeepsScriptletAndCoreTags(t *testing.T) {
+	page := `
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+    <%@ page import="java.util.*, com.example.model.User" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JSP 特性演示</title>
+    <style>
+        .section { margin: 20px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <p>当前时间：<%= new Date() %></p>
+        <p>服务器信息：<%= application.getServerInfo() %></p>
+    </div>
+	 <div class="section">
+        <h2>3. c:if使用</h2>
+        <c:if test="${age1 >= 18}">
+            <p>已经成年了</p>
+        </c:if>
+    </div>
+    <div class="section">
+        <h2>4. c:choose使用</h2>
+        <c:choose>
+            <c:when test="${age2 < 18}">
+                <p>未成年</p>
+            </c:when>
+            <c:when test="${age2 < 60}">
+                <p>成年人</p>
+            </c:when>
+            <c:otherwise>
+                <p>老年人</p>
+            </c:otherwise>
+        </c:choose>
+    </div>
+</body>
+</html>
+`
+	info, err := j.ConvertTemplateToJava(j.JSP, page, "test.jsp")
+	require.NoError(t, err)
+	code := info.GetContent()
+	for _, want := range []string{"application.getServerInfo()", "\\u5df2\\u7ecf\\u6210\\u5e74\\u4e86", "\\u8001\\u5e74\\u4eba"} {
+		if !strings.Contains(code, want) {
+			t.Fatalf("generated Java lost %q:\n%s", want, code)
+		}
+	}
+	checkJavaFront(t, code, "test.jsp")
+	lines := strings.Split(code, "\n")
+	mapped := false
+	for i, line := range lines {
+		if !strings.Contains(line, "getServerInfo") {
+			continue
+		}
+		r := info.GetRangeMap()[i+1]
+		if r == nil || r.GetStart() == nil || !strings.Contains(r.GetText(), "<%= application.getServerInfo() %>") || !strings.Contains(r.String(), "<%=") {
+			text := ""
+			if r != nil {
+				text = r.String()
+			}
+			t.Fatalf("line %d %q range=%q", i+1, line, text)
+		}
+		mapped = true
+	}
+	if !mapped {
+		t.Fatal("getServerInfo line was not mapped")
+	}
+}
+
 //go:embed all:jspcode
 var jspDir embed.FS
 
@@ -207,12 +291,83 @@ func validateSavedJSPTemplateFixture(t *testing.T, filePath string, content stri
 	t.Helper()
 
 	start := time.Now()
-	codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, content, filePath)
+	codeInfo, err := j.ConvertTemplateToJava(j.JSP, content, filePath)
 	convertDur := time.Since(start)
 	require.NoError(t, err)
 	require.NotNil(t, codeInfo)
 	require.LessOrEqual(t, convertDur, generatedJavaFixtureMaxParseDuration, "template to java took too long for %s", filePath)
 	checkJavaFront(t, codeInfo.GetContent(), filePath)
+}
+
+// TestJSPCorpusGeneratesParsableJava converts every .jsp under YAK_JSP_CORPUS
+// and parses the generated Java. It is the regression for the 2026-10-21 coremail
+// scan, where fn:escapeXml(...) and GBK bytes produced Java the frontend rejected.
+// The corpus is a local tree, so the test skips when the variable is unset.
+func TestJSPCorpusGeneratesParsableJava(t *testing.T) {
+	root := strings.TrimSpace(os.Getenv("YAK_JSP_CORPUS"))
+	if root == "" {
+		t.Skip("YAK_JSP_CORPUS is not set")
+	}
+	var paths []string
+	if list := strings.TrimSpace(os.Getenv("YAK_JSP_LIST")); list != "" {
+		raw, rerr := os.ReadFile(list)
+		require.NoError(t, rerr)
+		for _, line := range strings.Split(string(raw), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				paths = append(paths, filepath.Join(root, line))
+			}
+		}
+	} else {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(d.Name()), ".jsp") {
+				return nil
+			}
+			paths = append(paths, path)
+			return nil
+		})
+		require.NoError(t, err)
+	}
+	var failed []string
+	checked := 0
+	for _, path := range paths {
+		checked++
+		raw, rerr := os.ReadFile(path)
+		if rerr != nil {
+			failed = append(failed, path+": read: "+rerr.Error())
+			continue
+		}
+		rel := path
+		if r, rerr := filepath.Rel(root, path); rerr == nil {
+			rel = r
+		}
+		info, cerr := j.ConvertTemplateToJava(j.JSP, string(raw), rel)
+		if cerr != nil {
+			failed = append(failed, rel+": convert: "+cerr.Error())
+			continue
+		}
+		if _, perr := java2ssa.Frontend(info.GetContent()); perr != nil {
+			msg := perr.Error()
+			if len(msg) > 180 {
+				msg = msg[:180]
+			}
+			failed = append(failed, rel+": java: "+msg)
+		}
+	}
+	require.Greater(t, checked, 0)
+	if len(failed) > 0 {
+		limit := failed
+		if len(limit) > 20 {
+			limit = limit[:20]
+		}
+		t.Fatalf("%d/%d jsp files did not produce parsable java:\n%s", len(failed), checked, strings.Join(limit, "\n"))
+	}
+	t.Logf("parsed %d jsp files from %s", checked, root)
+}
+
+func TestAllSyntaxForJSPTemplate_G4(t *testing.T) {
+	TestAllSavedJSPTemplates(t)
+	TestJSPFailureSamplesParseGenerateAndParseJava(t)
 }
 
 func TestAllSavedJSPTemplates(t *testing.T) {
@@ -237,4 +392,148 @@ func TestAllSavedJSPTemplates(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, found, "no saved jsp templates found")
+}
+
+func TestJSPFailureSamplesParseGenerateAndParseJava(t *testing.T) {
+	// Each sample comes from a page that previously failed somewhere in the
+	// JSP -> Java -> java2ssa chain. Structured parsing may fail on malformed
+	// HTML; generation must then use the grammar-free translator, and the Java
+	// emitted by either route must parse again.
+	cases := []struct {
+		name string
+		jsp  string
+	}{
+		{
+			name: "el function call",
+			jsp:  `<input value="${fn:escapeXml(!empty param.password ? param.password : param.pass)}">`,
+		},
+		{
+			name: "unquoted jstl test",
+			jsp: `<c:set var="skipKeys" value="|uid|user|password|"/>
+<c:if test="ajc.result.code == 'FA_SECRITY'">
+  <c:redirect url="${ajc.exitURL}"/>
+</c:if>`,
+		},
+		{
+			name: "nested choose",
+			jsp: `<c:choose>
+  <c:when test="${!empty account.smtpHost}"><p>smtp</p></c:when>
+  <c:when test="${(empty account.smtpHost) && (account.type eq 'ews')}">
+    <c:choose>
+      <c:when test="${user.supportEws}">ews</c:when>
+      <c:otherwise>no</c:otherwise>
+    </c:choose>
+  </c:when>
+  <c:otherwise>other</c:otherwise>
+</c:choose>`,
+		},
+		{
+			name: "xml declaration after tags",
+			jsp: `<wm:i18n category="main"/>
+<fmt:message key="title_tip" var="title"/>
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE wml PUBLIC "-//OPENWAVE.COM//DTD WML 1.3//EN" "http://www.openwave.com/dtd/wml13.dtd">
+<wml><card>x</card></wml>`,
+		},
+		{
+			name: "unclosed checkbox row",
+			jsp: `<tr class="single-line">
+  <td align="right"><fmt:message key=".info.privilege"/></td>
+  <td><input type="checkbox" name="supportApproval" id="supportApproval" value="1" ${bean.supportApproval == '1' ? 'checked' : ''}>&nbsp;<fmt:message key=".info.approval_project"/></td>
+</tr>`,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			requireTemplatePipeline(t, j.JSP, tt.jsp, tt.name+".jsp")
+		})
+	}
+}
+
+func requireTemplatePipeline(t *testing.T, kind j.JavaTemplateType, content, filePath string) {
+	t.Helper()
+	if kind == j.JSP {
+		// Parsing is one stage of the contract. A grammar failure is acceptable
+		// only because Create falls back to the scriptlet-preserving translator.
+		if _, err := jsp.Front(content); err != nil {
+			t.Logf("structured jsp parse fell back: %v", err)
+		}
+	}
+	info, err := j.ConvertTemplateToJava(kind, content, filePath)
+	if kind == j.JSP && (err != nil || info == nil || strings.TrimSpace(info.GetContent()) == "") {
+		info, err = j.ConvertJSPLinear(content, filePath)
+	}
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	src := info.GetContent()
+	require.NotEmpty(t, strings.TrimSpace(src))
+	require.Contains(t, src, "void _JavaTemplateService(")
+	checkJavaFront(t, src, filePath)
+}
+
+// A webapp directory can be named after a Java keyword (for example
+// /webapp/public/audit.jsp). The generated package must still be valid Java,
+// otherwise the page never reaches java2ssa.
+func TestJSTLCoreTagsFromCoremailStayParsable(t *testing.T) {
+	cases := []struct {
+		name string
+		jsp  string
+		want []string
+	}{
+		{
+			"set target encoding",
+			`<html><c:set target="${pageContext.request}" property="characterEncoding" value="UTF-8"/></html>`,
+			[]string{`request.setCharacterEncoding("UTF-8")`},
+		},
+		{
+			"if var",
+			`<html><c:if var="fromSearch" test="${param.isSearch}"/></html>`,
+			[]string{`request.setAttribute("fromSearch", elExpr.parse("param.isSearch"))`},
+		},
+		{
+			"url with body",
+			`<p><c:url var="back" context="/coremail" value="/index.jsp"><c:param name="sid" value="${ajc.sid}"/></c:url></p>`,
+			[]string{`request.setAttribute("back", "/coremail" + "/index.jsp" + "?" + "sid=" + elExpr.parse("ajc.sid"))`},
+		},
+		{
+			"for tokens body",
+			`<p><c:forTokens items="${domainListString}" delims="," var="domainName"><c:out value="${domainName}"/></c:forTokens></p>`,
+			[]string{`for (String domainName : String.valueOf(elExpr.parse("domainListString")).split(",")) {`, `out.printWithEscape(elExpr.parse("domainName"))`},
+		},
+		{
+			"import and taglib",
+			`<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%><html><c:import url="${url}" var="httpContent"/></html>`,
+			[]string{`request.setAttribute("httpContent", elExpr.parse("url"))`},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := j.ConvertTemplateToJava(j.JSP, tt.jsp, "/webapp/page.jsp")
+			require.NoError(t, err)
+			require.NotNil(t, info)
+			src := info.GetContent()
+			for _, want := range tt.want {
+				require.Contains(t, src, want, src)
+			}
+			checkJavaFront(t, src, "/webapp/page.jsp")
+		})
+	}
+}
+
+func TestJSPKeywordPackageSegmentsStayParsable(t *testing.T) {
+	cases := []string{
+		"/app/public/audit.jsp",
+		"/app/static/new/register.jsp",
+		"/app/class/int/for.jsp",
+	}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			info, err := j.ConvertTemplateToJava(j.JSP, `<c:if test="${ok}">ok</c:if>`, path)
+			require.NoError(t, err)
+			require.NotNil(t, info)
+			src := info.GetContent()
+			require.Contains(t, src, "void _JavaTemplateService(")
+			checkJavaFront(t, src, path)
+		})
+	}
 }

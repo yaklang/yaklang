@@ -3,6 +3,7 @@ package java2ssa
 import (
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/scanner"
 
@@ -23,6 +24,14 @@ func (*SSABuilder) SupportsConcurrentUnitBuild() bool { return true }
 
 func (*SSABuilder) DeferMethodBuildOnLookup() bool { return true }
 
+// javaMaxFilesPerUnit caps how many files one directory-backed unit holds. A jar
+// of obfuscated classes carries no package declaration, so every one of its
+// classes lands in a single dir: unit — and one unit is one worker, because the
+// unit's files share a builder. coremail's webinst.jar put 390 classes in one
+// unit and compiled them serially while the other workers sat idle. Package
+// units are not sharded: their classes reference each other directly.
+const javaMaxFilesPerUnit = 64
+
 // PartitionCompileUnits groups .java files by their declared package, and
 // non-.java resources (templates, etc.) by directory under a "resource:" key.
 func (*SSABuilder) PartitionCompileUnits(fs filesys_interface.FileSystem, files []string) []*ssa.CompileUnit {
@@ -38,6 +47,25 @@ func (*SSABuilder) PartitionCompileUnits(fs filesys_interface.FileSystem, files 
 			unit = &ssa.CompileUnit{Key: key, Path: unitPath, Language: ssaconfig.JAVA}
 			units[key] = unit
 			order = append(order, unit)
+		}
+		if len(unit.Files) >= javaMaxFilesPerUnit && isShardableUnitKey(key) {
+			// Overflow into a shard so one huge directory cannot serialize the
+			// whole batch. The suffix is a path segment, which keeps the library
+			// name derived from the key (libraryNameFromCompileUnitKey) a legal
+			// dotted name.
+			for shard := 2; ; shard++ {
+				shardKey := key + "/__shard" + strconv.Itoa(shard)
+				next := units[shardKey]
+				if next == nil {
+					next = &ssa.CompileUnit{Key: shardKey, Path: unitPath, Language: ssaconfig.JAVA}
+					units[shardKey] = next
+					order = append(order, next)
+				}
+				unit = next
+				if len(unit.Files) < javaMaxFilesPerUnit {
+					break
+				}
+			}
 		}
 		unit.Files = append(unit.Files, file)
 		if info, err := fs.Stat(file); err == nil && info != nil {
@@ -61,6 +89,14 @@ func (*SSABuilder) PartitionCompileUnits(fs filesys_interface.FileSystem, files 
 		sort.Strings(unit.Files)
 	}
 	return order
+}
+
+// isShardableUnitKey reports whether a unit may be split across workers. Only
+// directory-backed units are: a package unit's classes are bound by the
+// language's own package semantics, and a resource unit is not compiled on its
+// own.
+func isShardableUnitKey(key string) bool {
+	return strings.HasPrefix(key, "dir:") || strings.HasPrefix(key, "unit:")
 }
 
 // CompileUnitDependencies extracts Java import edges plus template-resource

@@ -72,6 +72,9 @@ jobs:
       matrix:
         package:
           - ./common/yak/java/tests
+          - ./common/yak/java/jsp/tests
+          - ./common/yak/java/freemarker/tests
+          - ./common/yak/java/template2java/test
           - ./common/yak/go2ssa/test
           - ./common/yak/python/test
           - ./common/yak/csharp/tests
@@ -91,7 +94,17 @@ jobs:
           cache: false
 
       - name: Run G4 syntax corpus tests
-        run: go test -count=1 -timeout 20m -run '^TestAllSyntax.*_G4$' ${{ matrix.package }}
+        run: |
+          case '${{ matrix.package }}' in
+            ./common/yak/java/jsp/tests|./common/yak/java/freemarker/tests|./common/yak/java/template2java/test)
+              # Template packages prove grammar parse, Java generation, and a
+              # second parse through the java2ssa ANTLR frontend.
+              go test -count=1 -timeout 20m '${{ matrix.package }}'
+              ;;
+            *)
+              go test -count=1 -timeout 20m -run '^TestAllSyntax.*_G4$' '${{ matrix.package }}'
+              ;;
+          esac
 
       - name: Java prediction and frontend race regressions
         if: matrix.package == './common/yak/java/tests'

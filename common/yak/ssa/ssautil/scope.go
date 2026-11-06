@@ -294,8 +294,13 @@ func (v *ScopedVersionedTable[T]) GetParent() ScopedVersionedTableIF[T] {
 
 func (v *ScopedVersionedTable[T]) GetHead() ScopedVersionedTableIF[T] {
 	var headScope ScopedVersionedTableIF[T]
+	depth := 0
 	for headScope = v; headScope.GetParent() != nil; headScope = headScope.GetParent() {
-
+		// The chain can cycle; stop instead of spinning forever.
+		if depth++; depth > maxScopeChainDepth {
+			log.Errorf("scope chain deeper than %d at %q while walking to the head", maxScopeChainDepth, v.GetScopeName())
+			break
+		}
 	}
 	return headScope
 }
@@ -369,7 +374,25 @@ func (scope *ScopedVersionedTable[T]) ReadVariableFromLinkSideEffect(name string
 	return nil, nil
 }
 
+// maxScopeChainDepth bounds a parent-chain walk. A scope whose parent resolves
+// back to itself (through a ScopeInstance wrapper) makes the chain a cycle;
+// ReadVariable used to recurse along it until the goroutine stack overflowed,
+// which surfaced as "fatal error: stack overflow" and, before the stack grew
+// large enough, as a scan that looked hung while GC scanned the giant stack.
+const maxScopeChainDepth = 512
+
+// depthAwareScope is implemented by every ScopedVersionedTable and by wrappers
+// that embed one, so a parent-chain walk can thread its depth through the
+// interface without changing the public signatures.
+type depthAwareScope[T versionedValue] interface {
+	readVariableAt(name string, depth int, current ...bool) VersionedIF[T]
+}
+
 func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool) VersionedIF[T] {
+	return scope.readVariableAt(name, 0, current...)
+}
+
+func (scope *ScopedVersionedTable[T]) readVariableAt(name string, depth int, current ...bool) VersionedIF[T] {
 	// var parent = v
 	// for parent != nil {
 	var ret VersionedIF[T]
@@ -382,8 +405,16 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool)
 	if result := scope.getLatestVersionInCurrentLexicalScope(name); result != nil {
 		ret = result
 	} else {
-		if scope.GetParent() != nil && !isCurrent {
-			ret = scope.GetParent().ReadVariable(name, current...)
+		if depth >= maxScopeChainDepth {
+			log.Errorf("scope chain deeper than %d at %q; treating the variable as missing", maxScopeChainDepth, scope.GetScopeName())
+			return nil
+		}
+		if parent := scope.GetParent(); parent != nil && !isCurrent {
+			if aware, ok := parent.(depthAwareScope[T]); ok {
+				ret = aware.readVariableAt(name, depth+1, current...)
+			} else {
+				ret = parent.ReadVariable(name, current...)
+			}
 		} else {
 			ret = nil
 		}

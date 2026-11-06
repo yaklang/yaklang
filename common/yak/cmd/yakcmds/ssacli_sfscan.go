@@ -425,6 +425,9 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	if entry := c.String("entry"); entry != "" {
 		opts = append(opts, ssaconfig.WithCompileEntryFiles(entry))
 	}
+	if c.Bool("ast-only") {
+		opts = append(opts, ssaconfig.WithCompileAstOnly(true))
+	}
 
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
 	if err != nil {
@@ -452,6 +455,12 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	opts = append(opts, ssaconfig.WithProjectRawLanguage(string(cfg.GetLanguage())))
 	if cfg.GetCompileMemory() || cfg.GetSyntaxFlowMemory() {
 		opts = append(opts, ssaconfig.WithCompileMemoryCompile(true))
+	}
+	if cfg.GetCompileAstOnly() {
+		opts = append(opts, ssaconfig.WithCompileAstOnly(true))
+	}
+	if out := cfg.GetCompileMaterializeOut(); out != "" {
+		opts = append(opts, ssaconfig.WithCompileMaterializeOut(out))
 	}
 	if excludes := cfg.GetCompileExcludeFiles(); len(excludes) > 0 {
 		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludes...))
@@ -507,6 +516,9 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 			ssaconfig.WithSyntaxFlowMemory(enable),
 		)
 	}
+	if cliCtx.IsSet("ast-only") {
+		opts = append(opts, ssaconfig.WithCompileAstOnly(cliCtx.Bool("ast-only")))
+	}
 	if cliCtx.IsSet("no-save-risk") {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(cliCtx.Bool("no-save-risk")))
 	}
@@ -558,7 +570,7 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 //  2. Reuses ssaapi.StartDebugOutput for MkdirAll / ssadb / log / pprof
 //
 // The returned cleanup function stops the pprof collector and should be deferred.
-func setupDebugDir(c *cli.Context, dir string) (func(), error) {
+func setupDebugDir(c *cli.Context, dir string, memory bool) (func(), error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, utils.Errorf("create debug dir %s: %v", dir, err)
 	}
@@ -575,8 +587,13 @@ func setupDebugDir(c *cli.Context, dir string) (func(), error) {
 		return nil, utils.Errorf("write cmd.txt: %v", err)
 	}
 
-	// Standalone CLI scans redirect SSA DB into the debug dir.
-	cleanup, err := ssaapi.StartDebugOutput(dir, true)
+	// Standalone CLI scans redirect SSA DB into the debug dir. Memory mode keeps
+	// the dry-parse contract: diagnostics only, never a database beside them.
+	var opts []ssaapi.DebugOutputOption
+	if memory {
+		opts = append(opts, ssaapi.WithoutDebugDBStats())
+	}
+	cleanup, err := ssaapi.StartDebugOutput(dir, !memory, opts...)
 	if err != nil {
 		return nil, utils.Errorf("setup debug output: %v", err)
 	}

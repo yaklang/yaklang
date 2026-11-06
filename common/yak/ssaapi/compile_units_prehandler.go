@@ -13,6 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
+// slowPreHandlerFileThreshold is when one file's pre-handler pass is worth
+// reporting. Normal files finish in milliseconds; the ones that stall a batch
+// run for minutes.
+const slowPreHandlerFileThreshold = time.Second
+
 type prehandleBatchEnv struct {
 	c                     *Config
 	prog                  *ssa.Program
@@ -157,6 +162,21 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		return
 	}
 	defer fileContent.Release()
+	// A file that takes minutes in here pins one worker and stalls its whole
+	// batch, and the batch log only prints after the batch ends — so the run
+	// looks hung with no clue which file did it. Report the culprit by name.
+	filePath := fileContent.Path
+	fileStarted := time.Now()
+	defer func() {
+		if elapsed := time.Since(fileStarted); elapsed > slowPreHandlerFileThreshold {
+			log.Warnf("[ssa-compile] slow pre-handler file %s took %v", filePath, elapsed)
+		}
+	}()
+	// Progress counts finished files: the heavy work (pre-handler + inline file build) is
+	// below, and a file picked up by a worker must not advance the bar before it is done.
+	if env.preHandlerProcess != nil {
+		defer env.preHandlerProcess()
+	}
 	unitKey := env.fileUnits[fileContent.Path]
 	owner := env.prog.EnsureLibraryForCompileUnit(unitKey)
 	if owner == nil {
@@ -196,6 +216,10 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		env.astErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
 		env.astErrMu.Unlock()
 	}
+	if env.c.GetCompileAstOnly() {
+		ssa.ReleaseASTRoot(fileContent.AST)
+		return
+	}
 	editor := env.prog.CreateEditor(fileContent.Content, fileContent.Path)
 	fileContent.Editor = editor
 	fileContent.Content = nil
@@ -205,7 +229,6 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		env.astErr = utils.JoinErrors(env.astErr, utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err))
 		env.astErrMu.Unlock()
 	}
-	env.preHandlerProcess()
 	unitBuilder := env.prog.GetOrCreateUnitBuilder(unitKey, env.builder)
 	if unitBuilder == nil {
 		unitBuilder = env.builder

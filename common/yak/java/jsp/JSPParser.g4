@@ -12,6 +12,7 @@ jspDocument
     | jspScript
     | jspIfBlock
     | jspElements
+    | htmlCloseElement
     ;
 
 jspStart
@@ -20,7 +21,7 @@ jspStart
     ;
 
 jspElements
-    :beforeContent=htmlMiscs (htmlElement|htmlCloseElement|jspScript|jspExpression|jspIfBlock|style|javaScript) afterContent=htmlMiscs
+    :beforeContent=htmlMiscs (htmlElement|jspScript|jspExpression|jspIfBlock|style|javaScript) afterContent=htmlMiscs
     ;
 
 htmlMiscs

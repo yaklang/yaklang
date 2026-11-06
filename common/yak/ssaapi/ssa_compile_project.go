@@ -235,6 +235,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	defer debugCleanup()
 
 	programName := c.GetProgramName()
+	// A memory-mode compile owns no database row, so it must not look one up,
+	// delete one, or open the database just to clean up after a failure.
+	memoryOnly := c.GetCompileMemory()
 	// Routing mode: the incremental paths diff against a filesystem, so a
 	// config without one degrades to a full compile regardless of the flags.
 	mode := c.compileMode()
@@ -259,12 +262,12 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			err = utils.Errorf("compile panic: %v", r)
 			log.Errorf("compile panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
-			if programNameToDelete != "" {
+			if !memoryOnly && programNameToDelete != "" {
 				log.Infof("cleaning up program data due to panic: %s", programNameToDelete)
 				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
 		} else if err != nil {
-			if programNameToDelete != "" {
+			if !memoryOnly && programNameToDelete != "" {
 				log.Infof("cleaning up program data due to error: %s", programNameToDelete)
 				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
@@ -291,8 +294,10 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		if c.GetCompileReCompile() {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
-	} else if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
-		return nil, err
+	} else if !memoryOnly {
+		if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
+			return nil, err
+		}
 	}
 
 	var suspendErr error
@@ -961,6 +966,15 @@ func calculateFileSystemDiff(baseFS, newFS fi.FileSystem, exclude ExcludeFunc, p
 // stays in lockstep with the archives the preprocessor actually expands.
 func isRawArchiveDiffEntry(pathname string) bool {
 	return javaclassparser.IsArchiveFile(pathname)
+}
+
+// hideArchiveFiles keeps archive files out of the tree the frontend walks. An
+// archive that is not parsed has no readable source, so leaving it in the walk
+// would only offer the frontend a file it must reject.
+func hideArchiveFiles(fs fi.FileSystem) fi.FileSystem {
+	hook := filesys.NewHookFS(fs)
+	hook.SetSkipMatcher(filesys.CustomMatcher(javaclassparser.IsArchiveFile))
+	return hook
 }
 
 func hasDeleteEntries(fileHashMap map[string]int) bool {

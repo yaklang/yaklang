@@ -22,11 +22,14 @@ type indexStore struct {
 	program *Program
 	db      *gorm.DB
 
-	variable     *utils.SafeMapWithKey[string, []int64]
-	member       *utils.SafeMapWithKey[string, []int64]
-	class        *utils.SafeMapWithKey[string, []int64]
-	consts       *utils.SafeMapWithKey[string, []int64]
-	residentKeys *utils.SafeMapWithKey[residentIndexKey, struct{}]
+	variable *utils.SafeMapWithKey[string, []int64]
+	member   *utils.SafeMapWithKey[string, []int64]
+	class    *utils.SafeMapWithKey[string, []int64]
+	consts   *utils.SafeMapWithKey[string, []int64]
+	// residentKeys is a plain map guarded by residentMu. It already shares that
+	// lock with every index mutation, so a second locking wrapper only added
+	// overhead — and it made "was this id ever indexed?" a two-step check.
+	residentKeys map[residentIndexKey]struct{}
 	residentMu   sync.Mutex
 	indexSaved   *utils.SafeMapWithKey[indexRelationshipKey, struct{}]
 
@@ -52,7 +55,7 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 		member:       utils.NewSafeMapWithKey[string, []int64](),
 		class:        utils.NewSafeMapWithKey[string, []int64](),
 		consts:       utils.NewSafeMapWithKey[string, []int64](),
-		residentKeys: utils.NewSafeMapWithKey[residentIndexKey, struct{}](),
+		residentKeys: make(map[residentIndexKey]struct{}),
 		indexSaved:   utils.NewSafeMapWithKey[indexRelationshipKey, struct{}](),
 		offsetSaved:  utils.NewSafeMapWithKey[offsetLocationKey, struct{}](),
 	}
@@ -172,13 +175,19 @@ func (s *indexStore) RemoveVariable(name string, inst Instruction) {
 	name, member := normalizeVariableName(name)
 	s.residentMu.Lock()
 	defer s.residentMu.Unlock()
+	index, indexName := s.variable, name
 	if member != "" {
-		removeResidentIndex(s.member, member, inst.GetId())
-		s.residentKeys.Delete(residentIndexKey{s.member, member, inst.GetId()})
+		index, indexName = s.member, member
+	}
+	key := residentIndexKey{index, indexName, inst.GetId()}
+	// An id that was never indexed cannot be in the list, and scanning the list
+	// to remove nothing was the bulk of the allocation while members were being
+	// replaced: every miss still copied the whole slice.
+	if _, exists := s.residentKeys[key]; !exists {
 		return
 	}
-	removeResidentIndex(s.variable, name, inst.GetId())
-	s.residentKeys.Delete(residentIndexKey{s.variable, name, inst.GetId()})
+	delete(s.residentKeys, key)
+	removeResidentIndex(index, indexName, inst.GetId())
 }
 
 func (s *indexStore) AddClassInstance(name string, inst Instruction) {
@@ -228,15 +237,20 @@ func (s *indexStore) programLabel() string {
 // pre-handler allocates a local first and registers its name while the AST is
 // built, which can land after a mid-batch release.
 func (s *indexStore) ReleaseSettled(programName string) int {
-	if s == nil || programName == "" || programName != s.programLabel() || s.residentKeys == nil {
+	if s == nil || programName == "" || programName != s.programLabel() {
 		return 0
 	}
-	released := s.residentKeys.Count()
+	s.residentMu.Lock()
+	defer s.residentMu.Unlock()
+	if s.residentKeys == nil {
+		return 0
+	}
+	released := len(s.residentKeys)
 	// Clear drops every entry, not just the finished batch. A key above the
 	// batch is only a guard against appending the same id twice, so losing it
 	// costs one duplicate slice entry. Index rows are still deduped by
 	// indexSaved, and scanning 7M keys per batch to keep the guard is worse.
-	s.residentKeys.Clear()
+	clear(s.residentKeys)
 	return released
 }
 
@@ -294,12 +308,12 @@ func (s *indexStore) appendIndex(index *utils.SafeMapWithKey[string, []int64], n
 	s.residentMu.Lock()
 	defer s.residentMu.Unlock()
 	// Appending and publishing membership share one lock, including removal.
-	s.residentKeys.Update(residentIndexKey{index, name, id}, func(_ struct{}, exists bool) (struct{}, bool) {
-		if !exists {
-			appendResidentIndex(index, name, id)
-		}
-		return struct{}{}, true
-	})
+	key := residentIndexKey{index, name, id}
+	if _, exists := s.residentKeys[key]; exists {
+		return
+	}
+	s.residentKeys[key] = struct{}{}
+	appendResidentIndex(index, name, id)
 }
 
 // checkValue is a pure exact/glob/regexp predicate. Key filtering can run under

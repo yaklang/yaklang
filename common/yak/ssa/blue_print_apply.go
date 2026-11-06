@@ -40,11 +40,27 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	return
 }
 
+// Apply binds obj to this blueprint. Hierarchy cycles are rejected when the
+// relation is added, but not every path goes through that check: interface
+// blueprints restored from the database and from cached types are appended
+// directly. A cycle there used to recurse until the goroutine stack overflowed
+// and took the whole compile down (coremail's wmsvr.jar hit it).
 func (c *Blueprint) Apply(obj Value) Type {
+	return c.applyWithVisited(obj, make(map[*Blueprint]struct{}))
+}
+
+func (c *Blueprint) applyWithVisited(obj Value, visiting map[*Blueprint]struct{}) Type {
 	if c == nil {
 		log.Error("BUG: ClassBluePrint is nil")
 		return NewAny().GetType()
 	}
+	if _, seen := visiting[c]; seen {
+		// Already applying this blueprint up the chain: return the type and stop.
+		return c
+	}
+	visiting[c] = struct{}{}
+	// A later independent branch may legitimately reach this blueprint again.
+	defer delete(visiting, c)
 	if obj == nil {
 		log.Errorf("BUG: ClassBluePrint.Apply: obj is nil, c: %v", c)
 		return NewAny().GetType()
@@ -68,7 +84,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 			log.Warn("ClassBluePrint.ParentBlueprints is nil")
 			continue
 		}
-		parent.Apply(obj)
+		parent.applyWithVisited(obj, visiting)
 		_, i := lo.Difference(c.GetFullTypeNames(), parent.GetFullTypeNames())
 		c.addFullTypeNames(i)
 	}
@@ -78,7 +94,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 			log.Warn("ClassBluePrint.ParentBlueprints is nil")
 			continue
 		}
-		bp.Apply(obj)
+		bp.applyWithVisited(obj, visiting)
 		_, i := lo.Difference(c.GetFullTypeNames(), bp.GetFullTypeNames())
 		c.addFullTypeNames(i)
 	}
@@ -98,7 +114,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 	objTyp.SetName(c.Name)
 	objTyp.SetMethod(c.GetMethod())
 	for _, parent := range c.ParentBlueprints {
-		parent.Apply(obj)
+		parent.applyWithVisited(obj, visiting)
 	}
 
 	c.NormalMember.ForEach(func(rawKey string, members []Value) bool {

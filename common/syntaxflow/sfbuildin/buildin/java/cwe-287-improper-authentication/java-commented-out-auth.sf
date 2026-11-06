@@ -1,0 +1,45 @@
+desc(
+	title: "注释掉的认证/鉴权代码",
+	title_zh: "注释掉的认证/鉴权代码",
+	risk: "authentication-bypass"
+	type: audit
+	level: high
+	rule_id: "java-commented-auth"
+	desc: <<<DESC
+源码注释中含被注释掉的认证/鉴权代码（decryptToken/BusinessError/token无效等）。
+DESC
+	solution: <<<SOLUTION
+确认注释掉的认证代码是刻意移除还是遗漏，补回鉴权。
+SOLUTION
+	alert_min: 1
+	"file://J.java": <<<POS
+class J {
+  void invoke() {
+    // String token = request.getHeader("iscm-token");
+    // String decryptToken = decryptToken(token);
+    // if (!"XIONGAN".equals(decryptToken)) {
+    //   throw new BusinessError("token无效", this.getClass());
+    // }
+  }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S {
+  void ok() {
+    String decryptToken = decryptToken(token);
+  }
+}
+
+NEG
+)
+
+// 用文件内容正则匹配注释掉的认证代码（源码文本，含注释）
+${*.java}.re("//\\s*(String\\s+(token|decryptToken)|decryptToken|BusinessError|token无效|getHeader)") as $commentedAuth;
+
+check $commentedAuth then "commented auth found" else "none";
+
+alert $commentedAuth for {
+	message: "注释掉的认证/鉴权代码",
+	level: "high",
+}

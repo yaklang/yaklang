@@ -67,6 +67,9 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 	if len(config.fieldIndexes) > 0 && !config.protocols {
 		return nil, fmt.Errorf("pcapdb: field indexes require withProtocols(true)")
 	}
+	if config.tlsSecrets != nil && !config.protocols {
+		return nil, fmt.Errorf("pcapdb: TLS key log requires withProtocols(true)")
+	}
 	if !config.protocols && !config.streams {
 		return nil, fmt.Errorf("pcapdb: no analysis selected for rebuild")
 	}

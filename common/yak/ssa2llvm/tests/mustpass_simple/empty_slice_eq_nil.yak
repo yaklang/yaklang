@@ -1,0 +1,12 @@
+// Regression: yak treats an empty slice/map as equal to nil
+// (make([]string) == nil is true), while a non-empty container is never nil.
+// The AOT runtime must match the yakvm semantics for `==` on containers.
+assert(make([]string) == nil)
+assert(make([]string, 0) == nil)
+assert([]string{} == nil)
+assert([] == nil)
+assert(make(map[string]int) == nil)
+a = [1, 2, 3]
+assert a != nil
+assert a == a
+println("empty-slice-eq-nil OK")

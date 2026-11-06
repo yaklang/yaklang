@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
-	"sort"
-	"strings"
 )
 
 // timelineCompressionSnapshot is a detached read of the current timeline.
@@ -62,7 +63,7 @@ type timelineCompressionPromotedItem struct {
 	Operation string
 }
 
-func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
+func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) {
 	previous := ""
 	if snapshot.Head != nil {
 		previous = snapshot.Head.Text
@@ -79,10 +80,6 @@ func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
 	}
 	snapshot.InputText = strings.TrimSpace(strings.Join(parts, "\n"))
 	snapshot.InputTokens = MeasureTokens(snapshot.InputText)
-	if !snapshot.hasCompressionInput() {
-		return fmt.Errorf("compression snapshot has no visible history")
-	}
-	return nil
 }
 
 // hasSummarySource distinguishes actual history from a promoted-only decision,

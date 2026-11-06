@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var contextOptimizationStatusIndex atomic.Uint64
@@ -23,6 +24,10 @@ var contextOptimizationStatusNames = []actionStatusName{
 }
 
 const defaultWholePromptTokenLimit int64 = 300 * 1024
+
+const contextCompressionPromptHeadroomTokens int64 = 200 * 1024
+
+const contextCompressionWarningNodeID = "context_compression_warning"
 
 // Selection mistakes can be corrected by the model; runtime failures cannot.
 type contextCompressionSelectionError struct{ err error }
@@ -47,6 +52,16 @@ func (r *ReActLoop) wholePromptTokenLimit() int64 {
 	return config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
 }
 
+func (r *ReActLoop) contextCompressionPromptTokenLimit() int64 {
+	base := defaultWholePromptTokenLimit
+	if r != nil && r.config != nil {
+		if configured := r.config.GetTimelineContentSizeLimit(); configured > 0 {
+			base = configured
+		}
+	}
+	return base + contextCompressionPromptHeadroomTokens
+}
+
 func (r *ReActLoop) noteCompressionStatus() {
 	if r == nil {
 		return
@@ -56,29 +71,71 @@ func (r *ReActLoop) noteCompressionStatus() {
 	r.UserStatus(label.zh, label.en, aicommon.WithStatusCode("context.optimizing"))
 }
 
+func (r *ReActLoop) emitContextCompressionAdvisoryLimit(actualTokens, limitTokens int) {
+	message := fmt.Sprintf(
+		"Context compression exceeded the advisory limit (%d actual tokens, %d recommended tokens); processing continued.\nThe summary and retained history will not be truncated because of this advisory threshold.",
+		actualTokens, limitTokens,
+	)
+	r.emitContextCompressionWarning(message)
+}
+
+func (r *ReActLoop) emitContextCompressionUnavailable(promptTokens, limitTokens int64, cause error) {
+	message := fmt.Sprintf(
+		"Context compression is unavailable for this turn (prompt: %d tokens, configured threshold: %d tokens); falling back to normal mode.",
+		promptTokens, limitTokens,
+	)
+	if cause != nil {
+		message += fmt.Sprintf(" Reason: %v", cause)
+	}
+	log.Warnf("%s", message)
+	r.emitContextCompressionWarning(message)
+}
+
+func (r *ReActLoop) emitContextCompressionNoProgress(previousTokens, currentTokens int) {
+	message := fmt.Sprintf(
+		"Context compression made little progress (%d -> %d tokens); non-compressible content may remain. Continuing without terminating the task.",
+		previousTokens, currentTokens,
+	)
+	log.Warnf("%s", message)
+	r.emitContextCompressionWarning(message)
+}
+
+func (r *ReActLoop) emitContextCompressionRuntimeWarning(stage string, err error) {
+	message := fmt.Sprintf(
+		"Context compression did not complete while %s: %v. The timeline was not modified; the next compression request will be rebuilt.",
+		stage, err,
+	)
+	log.Warnf("%s", message)
+	r.emitContextCompressionWarning(message)
+}
+
+func (r *ReActLoop) emitContextCompressionWarning(message string) {
+	if r == nil || r.GetEmitter() == nil {
+		return
+	}
+	taskID := ""
+	if task := r.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+	if _, err := r.GetEmitter().EmitDefaultStreamEvent(
+		contextCompressionWarningNodeID,
+		strings.NewReader(message),
+		taskID,
+	); err != nil {
+		log.Warnf("emit context compression advisory warning: %v", err)
+	}
+}
+
 func (r *ReActLoop) parseContextCompressionSelection(action *aicommon.Action, candidates []aicommon.TimelineCompressionCandidate, maxSummaryTokens int) (*aicommon.TimelineCompressionSelection, error) {
 	if action == nil {
 		return nil, fmt.Errorf("context compression requires an action")
 	}
 	rawSummary, _ := action.LookupCanonicalParam("summary")
-	summary, ok := rawSummary.(string)
-	if !ok {
-		return nil, fmt.Errorf("summary 必须是字符串")
-	}
-	summary = strings.TrimSpace(summary)
+	summary := strings.TrimSpace(contextCompressionTextValue(rawSummary, "\n"))
 	rawRange, _ := action.LookupCanonicalParam("retain_timeline")
-	retainedRange, ok := rawRange.(string)
-	if !ok {
-		return nil, fmt.Errorf("retain_timeline 必须是 ID/范围字符串，例如 12,18-23；全部概括时返回空字符串")
-	}
-	retained, err := parseContextCompressionRetainedIDs(retainedRange, candidates)
-	if err != nil {
-		return nil, err
-	}
-	retired, err := resolveContextCompressionRetirements(action, candidates)
-	if err != nil {
-		return nil, err
-	}
+	retainedRange := strings.TrimSpace(contextCompressionTextValue(rawRange, ","))
+	retained := parseContextCompressionRetainedIDs(retainedRange, candidates)
+	retired := resolveContextCompressionRetirements(action, candidates)
 	hasSummarySource := false
 	for _, candidate := range candidates {
 		if candidate.Kind == "" && strings.TrimSpace(candidate.PromptText) != "" {
@@ -111,8 +168,8 @@ func (r *ReActLoop) parseContextCompressionSelection(action *aicommon.Action, ca
 		}
 		memoryJSON, _ := json.Marshal(aicommon.ParseTimelineCompressionMemoryEntities(action))
 		retainedText.Write(memoryJSON)
-		if aicommon.TokenCountExceeds(retainedText.String(), maxSummaryTokens) {
-			return nil, fmt.Errorf("timeline compression summary and retained items exceed safety limit %d", maxSummaryTokens)
+		if actualTokens := aicommon.MeasureTokens(retainedText.String()); actualTokens > maxSummaryTokens {
+			r.emitContextCompressionAdvisoryLimit(actualTokens, maxSummaryTokens)
 		}
 	}
 	return selection, nil
@@ -167,9 +224,9 @@ func (r *ReActLoop) prepareContextCompression(action *aicommon.Action, request .
 	return selection, nil
 }
 
-func parseContextCompressionRetainedIDs(text string, candidates []aicommon.TimelineCompressionCandidate) ([]int64, error) {
+func parseContextCompressionRetainedIDs(text string, candidates []aicommon.TimelineCompressionCandidate) []int64 {
 	if strings.TrimSpace(text) == "" {
-		return nil, nil
+		return nil
 	}
 	eligible := make(map[int64]bool)
 	for _, candidate := range candidates {
@@ -180,39 +237,45 @@ func parseContextCompressionRetainedIDs(text string, candidates []aicommon.Timel
 	selected := make(map[int64]bool)
 	for _, part := range strings.Split(text, ",") {
 		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
 		first, last, ranged := strings.Cut(part, "-")
 		if !ranged {
 			last = first
 		}
-		start, startErr := strconv.ParseInt(first, 10, 64)
-		end, endErr := strconv.ParseInt(last, 10, 64)
+		start, startErr := strconv.ParseInt(strings.TrimSpace(first), 10, 64)
+		end, endErr := strconv.ParseInt(strings.TrimSpace(last), 10, 64)
 		if startErr != nil || endErr != nil || start <= 0 || end < start ||
-			strings.HasPrefix(first, "+") || strings.HasPrefix(last, "+") || !eligible[start] || !eligible[end] {
-			return nil, fmt.Errorf("retain_timeline 范围 %q 无效；使用动态区列出的普通历史 ID，例如 12,18-23，起止 ID 都必须存在且递增", part)
+			strings.HasPrefix(strings.TrimSpace(first), "+") || strings.HasPrefix(strings.TrimSpace(last), "+") {
+			// Optional selections are best-effort. Ignore only the malformed
+			// segment and keep any other usable IDs from the same action.
+			continue
 		}
+		// A selected ID does not have to be ordinary history. It can identify
+		// protected user input, a promoted item, or an internal entry that this
+		// action cannot retire. Intersect with ordinary candidates and retain the
+		// actual compressible items covered by the selection.
 		for id := range eligible {
 			if id >= start && id <= end {
 				selected[id] = true
 			}
 		}
 	}
+	if len(selected) == 0 {
+		return nil
+	}
 	ids := make([]int64, 0, len(selected))
 	for id := range selected {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	return ids, nil
+	return ids
 }
 
-func resolveContextCompressionRetirements(action *aicommon.Action, candidates []aicommon.TimelineCompressionCandidate) ([]int64, error) {
-	skills, err := contextCompressionStringArray(action, "retire_skill_names")
-	if err != nil {
-		return nil, err
-	}
-	evidence, err := contextCompressionStringArray(action, "retire_evidence_ids")
-	if err != nil {
-		return nil, err
-	}
+func resolveContextCompressionRetirements(action *aicommon.Action, candidates []aicommon.TimelineCompressionCandidate) []int64 {
+	skills := contextCompressionStringArray(action, "retire_skill_names")
+	evidence := contextCompressionStringArray(action, "retire_evidence_ids")
 	knownSkills := map[string][]int64{}
 	knownEvidence := map[string][]int64{}
 	for _, candidate := range candidates {
@@ -238,40 +301,109 @@ func resolveContextCompressionRetirements(action *aicommon.Action, candidates []
 		}
 	}
 	for _, name := range skills {
+		name = strings.TrimSpace(name)
 		ids, ok := knownSkills[name]
 		if !ok {
-			return nil, fmt.Errorf("retire_skill_names 有未知技能 %q，只能使用动态区列出的技能名", name)
+			log.Debugf("ignore unknown context compression skill %q", name)
+			continue
 		}
 		add(ids)
 	}
 	for _, name := range evidence {
+		name = strings.TrimSpace(name)
 		ids, ok := knownEvidence[name]
 		if !ok {
-			return nil, fmt.Errorf("retire_evidence_ids 有未知证据 %q，只能使用动态区列出的证据 id", name)
+			log.Debugf("ignore unknown context compression evidence %q", name)
+			continue
 		}
 		add(ids)
 	}
 	sort.Slice(retired, func(i, j int) bool { return retired[i] < retired[j] })
-	return retired, nil
+	return retired
 }
 
-func contextCompressionStringArray(action *aicommon.Action, name string) ([]string, error) {
+func contextCompressionStringArray(action *aicommon.Action, name string) []string {
 	raw, _ := action.LookupCanonicalParam(name)
+	return contextCompressionStringValues(raw)
+}
+
+func contextCompressionStringValues(raw any) []string {
 	switch values := raw.(type) {
 	case []string:
-		return values, nil
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			if value = strings.TrimSpace(value); value != "" {
+				result = append(result, value)
+			}
+		}
+		return result
 	case []any:
 		result := make([]string, 0, len(values))
 		for _, value := range values {
-			text, ok := value.(string)
-			if !ok {
-				return nil, fmt.Errorf("%s must be an array of strings", name)
-			}
-			result = append(result, text)
+			result = append(result, contextCompressionStringValues(value)...)
 		}
-		return result, nil
+		return result
+	case string:
+		text := strings.TrimSpace(values)
+		if text == "" {
+			return nil
+		}
+		var decoded []any
+		if json.Unmarshal([]byte(text), &decoded) == nil {
+			return contextCompressionStringValues(decoded)
+		}
+		parts := strings.FieldsFunc(text, func(r rune) bool {
+			return r == ',' || r == '，' || r == ';' || r == '；' || r == '\n' || r == '\r'
+		})
+		result := make([]string, 0, len(parts))
+		for _, part := range parts {
+			if part = strings.TrimSpace(part); part != "" {
+				result = append(result, part)
+			}
+		}
+		return result
+	case nil:
+		return nil
 	default:
-		return nil, fmt.Errorf("%s must be an array of strings", name)
+		if text := strings.TrimSpace(fmt.Sprint(values)); text != "" {
+			return []string{text}
+		}
+		return nil
+	}
+}
+
+func contextCompressionTextValue(raw any, separator string) string {
+	switch value := raw.(type) {
+	case nil:
+		return ""
+	case string:
+		return value
+	case []byte:
+		return string(value)
+	case json.Number:
+		return value.String()
+	case []string:
+		return strings.Join(value, separator)
+	case []any:
+		parts := make([]string, 0, len(value))
+		for _, item := range value {
+			if text := strings.TrimSpace(contextCompressionTextValue(item, separator)); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.Join(parts, separator)
+	case map[string]any:
+		for _, key := range []string{"text", "content", "summary", "value", "id"} {
+			if item, ok := value[key]; ok {
+				return contextCompressionTextValue(item, separator)
+			}
+		}
+		if encoded, err := json.Marshal(value); err == nil {
+			return string(encoded)
+		}
+		return fmt.Sprint(value)
+	default:
+		return fmt.Sprint(value)
 	}
 }
 

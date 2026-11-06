@@ -3,7 +3,7 @@ desc(
 	language: "java"
 	title: "Audit Java Generic Exception Throws Declaration"
 	title_zh: "审计Java方法声明中抛出过于宽泛的异常"
-	type: "Code Vulnerability"
+	type: audit
 	severity: "low"
 	risk:  "error-handling"
 	cwe: "CWE-397"

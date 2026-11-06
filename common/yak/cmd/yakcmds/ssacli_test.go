@@ -244,3 +244,98 @@ alert $result`
 		})
 	}
 }
+
+// The dry-parse contract for the memory mode: `ssa-compile --memory --debug
+// <dir> --pprof` must compile the target and leave diagnostics only -- never a
+// database, neither beside the diagnostics nor in the yak home.
+func TestSSACompileMemoryModeWritesNoDatabase(t *testing.T) {
+	srcDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(srcDir, "Hello.java"),
+		[]byte("public class Hello {\n  public static int add(int a, int b) { return a + b; }\n}\n"),
+		0o644,
+	))
+	homeDir := t.TempDir()
+	t.Setenv("YAKIT_HOME", homeDir)
+	debugDir := filepath.Join(t.TempDir(), "debug")
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "ssa-compile",
+		"-t", srcDir,
+		"--memory",
+		"--debug", debugDir,
+		"--pprof",
+	})
+	require.NoError(t, err)
+
+	require.NoFileExists(t, filepath.Join(debugDir, "ssadb.db"))
+	require.FileExists(t, filepath.Join(debugDir, "log"))
+	require.DirExists(t, filepath.Join(debugDir, "cpu-pprof"))
+	require.DirExists(t, filepath.Join(debugDir, "memory-pprof"))
+
+	// Memory mode must not create a database in the yak home either.
+	entries, err := os.ReadDir(homeDir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		require.NotContains(t, entry.Name(), ".db", "memory mode created %s", entry.Name())
+	}
+}
+
+// --pprof without --debug has nowhere to write snapshots; fail loudly instead
+// of silently dropping the profiling request.
+func TestSSACompilePprofRequiresDebug(t *testing.T) {
+	srcDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "a.yak"), []byte("a = 1\n"), 0o644))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{"yak", "ssa-compile", "-t", srcDir, "--memory", "--pprof"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "--pprof requires --debug")
+}
+
+// --ast-only parses source/prepared ASTs and stops before prehandler and SSA
+// body build. This allows fast verification of jar/jsp decompiler output and
+// parser correctness without paying for full SSA construction.
+func TestSSACompileAstOnlySucceedsOnValidJava(t *testing.T) {
+	srcDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(srcDir, "Valid.java"),
+		[]byte("package com.test;\npublic class Valid {\n  public int sum(int a, int b) { return a + b; }\n}\n"),
+		0o644,
+	))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "ssa-compile",
+		"-t", srcDir,
+		"--memory",
+		"--ast-only",
+	})
+	require.NoError(t, err)
+}
+
+// In ast-only mode, any syntax error rejected by the language parser must cause
+// the command to fail and report the parser error.
+func TestSSACompileAstOnlyFailsOnSyntaxError(t *testing.T) {
+	srcDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(srcDir, "Broken.java"),
+		[]byte("public class Broken { this is not valid java code !!! }"),
+		0o644,
+	))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "ssa-compile",
+		"-t", srcDir,
+		"--memory",
+		"--ast-only",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parse")
+}

@@ -5,8 +5,6 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
 // SizedWaitGroup has the same role and close to the
@@ -18,6 +16,7 @@ type SizedWaitGroup struct {
 	WaitingEventCount atomic.Int64
 	current           chan struct{}
 	wg                *sync.WaitGroup
+	countMu           sync.Mutex // keeps wg and WaitingEventCount in sync with SetZero
 }
 
 // New creates a SizedWaitGroup.
@@ -50,8 +49,13 @@ func (s *SizedWaitGroup) SetContext(ctx context.Context) {
 	}()
 }
 
+// SetZero releases Wait early. Outstanding tasks still need to call Done to
+// release their concurrency slots and finish before this group is reused.
 func (s *SizedWaitGroup) SetZero() {
-	s.Add(0 - int(s.WaitingEventCount.Load()))
+	s.countMu.Lock()
+	defer s.countMu.Unlock()
+	count := s.WaitingEventCount.Swap(0)
+	s.wg.Add(-int(count))
 }
 
 // Add increments the internal WaitGroup counter.
@@ -113,6 +117,8 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 		}
 	}
 
+	s.countMu.Lock()
+	defer s.countMu.Unlock()
 	s.wg.Add(n)
 	s.WaitingEventCount.Add(int64(n))
 	return nil
@@ -121,18 +127,16 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 // Done decrements the SizedWaitGroup counter.
 // See sync.WaitGroup documentation for more information.
 func (s *SizedWaitGroup) Done() {
-	defer func() {
-		if r := recover(); r != nil {
-			if errMsg := InterfaceToString(r); errMsg == "sync: negative WaitGroup counter" {
-				log.Error(errMsg)
-			} else {
-				panic(r)
-			}
-		}
-	}()
 	<-s.current
-	s.wg.Done()
+	s.countMu.Lock()
+	defer s.countMu.Unlock()
+	// Cancellation already discharged these tasks from Wait. They still
+	// release their concurrency slots, but must not decrement wg again.
+	if s.WaitingEventCount.Load() == 0 {
+		return
+	}
 	s.WaitingEventCount.Add(-1)
+	s.wg.Done()
 }
 
 // Wait blocks until the SizedWaitGroup counter is zero.

@@ -44,6 +44,7 @@ type PCAPFileDBMetadata struct {
 	ProtocolDataSHA256 string    `json:"protocol_data_sha256"`
 	BytesIndexed       int64     `json:"bytes_indexed"`
 	ProtocolsIndexed   bool      `json:"protocols_indexed"`
+	TLSKeyLogSHA256    string    `json:"tls_keylog_sha256,omitempty"`
 	LastError          string    `gorm:"type:text" json:"last_error"`
 	ValidatedAt        time.Time `json:"validated_at"`
 }

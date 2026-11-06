@@ -219,10 +219,10 @@ configData = cli.Json("config_data",
           "description": "增量编译的基础程序名称。可选；不提供时自动以项目上一次编译的程序作为基础程序（首次增量编译则当前编译即基础程序）。"
         },
         "jar_recursive_parse": {
-          "title": "Jar嵌套解析",
+          "title": "Jar解析",
           "type": "boolean",
           "default": true,
-          "description": "是否将目录中的 Jar/War/Par 作为可展开归档递归解析（含嵌套 Jar）并反编译 class 参与 SSA 编译。默认开启；项目过大时可关闭以提高性能。"
+          "description": "是否解析 Jar 文件。开启时目录中的 Jar/War/Par 展开为可进入的归档并反编译 class 参与 SSA 编译；关闭时基础文件系统直接跳过这些归档文件。"
         }
       }
     }

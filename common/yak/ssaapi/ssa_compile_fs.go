@@ -26,6 +26,21 @@ import (
 // at ~70-170K on Hadoop (12,581 Java files).
 const defaultFlushCompileUnitThreshold = 100000
 
+// In-stage progress bands for the unit compile. They are contiguous so the
+// reported fraction only moves forward:
+//
+//	[0.00, 0.06)  prepare sources (jar/zip/class/jsp, full compile concurrency)
+//	[0.06, 0.08)  source scan + compile-unit planning
+//	[0.08, 0.40)  pre-handler + inline file build, one tick per finished file
+//	[0.40, 0.88)  deferred unit build (see deferredBuildProcessFraction)
+//	[0.88, 1.00)  finish + IR persist
+const (
+	sourcePrefetchProcessEnd   = 0.06
+	compilePlanProcessEnd      = 0.08
+	preHandlerProcessBandStart = 0.08
+	preHandlerProcessEnd       = 0.40
+)
+
 // flushCompileUnitThreshold returns the configured threshold for mid-batch
 // flush. Reads YAK_SSA_FLUSH_COMPILE_UNIT_THRESHOLD; non-positive or
 // unparseable values fall back to defaultFlushCompileUnitThreshold.
@@ -246,7 +261,6 @@ func (c *Config) parseProjectWithFSUnits(
 
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
 	processCallback(0.0, fmt.Sprintf("[%s] parse project in fs: %v, path: %v", compilePhase, filesystem, c.GetCodeSource().ToJSONString()))
-	processCallback(0.0, fmt.Sprintf("[%s] calculate total size of project", compilePhase))
 
 	folder2Save := make([][]string, 0)
 	if programName != "" {
@@ -254,7 +268,31 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 
 	sourceFilesystem := filesystem
+	// The builder must exist before the wrap: it is what expands jar/zip members.
+	c.ensureLanguageBuilder()
 	filesystem = c.swapLanguageFs(filesystem)
+	// The frontend rewrites its own inputs (archive members, bytecode, pages)
+	// before the source scan. ScanProjectFiles then only classifies a prepared
+	// tree, and every later stage reads the same prepared view.
+	timings := c.prepareProjectSources(filesystem, reportProcess, storeProcess)
+	filesystem = c.wrapPreparedSources(filesystem)
+	if out := c.GetCompileMaterializeOut(); out != "" {
+		if timings.TemplateErrors > 0 {
+			return nil, utils.Errorf("materialize-out %s: %d jsp files failed to convert", out, timings.TemplateErrors)
+		}
+		var paths, nbytes, readErrors int64
+		if sources := c.preparedSources; sources != nil {
+			st := sources.Stats()
+			paths, nbytes, readErrors = st.Paths, st.MemoryHold+st.DiskHold, st.Errors
+		}
+		if readErrors > 0 {
+			return nil, utils.Errorf("materialize-out %s: %d source reads failed", out, readErrors)
+		}
+		log.Infof("[ssa-compile] materialize-out: wrote %d sources (%.1fMB) to %s in %v; AST not run",
+			paths, float64(nbytes)/1048576, out, time.Since(start).Round(time.Millisecond))
+		return &Program{}, nil
+	}
+	reportProcess(sourcePrefetchProcessEnd, "[%s] calculate total size of project", compilePhase)
 	scanResult, err := ScanProjectFiles(ScanConfig{
 		ProgramName:     programName,
 		ProgramPath:     programPath,
@@ -293,7 +331,13 @@ func (c *Config) parseProjectWithFSUnits(
 		defer restoreGC()
 	}
 
-	plan := buildCompileUnitPlan(c.LanguageBuilder, c.GetLanguage(), filesystem, preHandlerFiles)
+	// Sources were prepared before this scan. Planning and AST build read the
+	// materializer; this second pass only fills files the prepare walk missed.
+	c.prefetchCompileSources(filesystem, preHandlerFiles, reportProcess, storeProcess)
+	storeProcess(compilePlanProcessEnd)
+	reportProcess(compilePlanProcessEnd, "[%s] compile unit planning start files=%d", "f0_plan", len(preHandlerFiles))
+
+	plan := buildCompileUnitPlanEdges(c.LanguageBuilder, c.GetLanguage(), filesystem, preHandlerFiles, !c.GetCompileAstOnly())
 	if len(plan.Order) == 0 {
 		unit := &CompileUnit{Key: "unit:all", Path: ".", Files: append([]string(nil), preHandlerFiles...), Language: c.GetLanguage()}
 		plan = &UnitPlan{Units: map[string]*CompileUnit{unit.Key: unit}, Order: [][]*CompileUnit{{unit}}}
@@ -407,9 +451,14 @@ func (c *Config) parseProjectWithFSUnits(
 	var preHandlerNum atomic.Int32
 	preHandlerProcess := func() {
 		n := preHandlerNum.Add(1)
-		p := (float64(n) / float64(preHandlerTotal)) * 0.4
-		if p > 0.4 {
-			p = 0.4
+		// Count finished files (the callback runs from a defer in prehandleFile), so the bar
+		// tracks completed work instead of files merely picked up by a worker.
+		p := preHandlerProcessBandStart
+		if preHandlerTotal > 0 {
+			p += (float64(n) / float64(preHandlerTotal)) * (preHandlerProcessEnd - preHandlerProcessBandStart)
+		}
+		if p > preHandlerProcessEnd {
+			p = preHandlerProcessEnd
 		}
 		storeProcess(p)
 		reportProcess(p, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, n, preHandlerTotal))
@@ -492,17 +541,24 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		if c.GetCompileAstOnly() {
+			continue
+		}
 		if language := c.LanguageBuilder; language != nil {
+			phaseStart := time.Now()
 			language.AfterPreHandlerProject(builder)
 			language.Clearup()
+			log.Infof("[ssa-compile] batch=%d after-prehandler cost=%v", batchIndex+1, time.Since(phaseStart))
 		}
 		// Binding then hierarchy run after every skeleton has released its
 		// builder and before prehandler mode is cleared. Frontends register
 		// those phases by kind. Other deferred work stays on the later pass.
 		for _, kind := range []ssa.DeferredBuildKind{ssa.DeferredBuildKindBinding, ssa.DeferredBuildKindHierarchy} {
+			phaseStart := time.Now()
 			if !prog.RunDeferredBuildsForUnitsOfKind(unitKeys, kind, nil, nil) {
 				return nil, ErrContextCancel
 			}
+			log.Infof("[ssa-compile] batch=%d deferred-kind=%v cost=%v", batchIndex+1, kind, time.Since(phaseStart))
 		}
 		prog.SetPreHandler(false)
 		if holdSCCIR && !structScanOn && prog.Cache != nil {
@@ -519,6 +575,7 @@ func (c *Config) parseProjectWithFSUnits(
 				// Spread that band across all batches so batch 1/N cannot claim ~87%.
 				p := deferredBuildProcessFraction(batchIndex, len(batches), index, total)
 				storeProcess(p)
+				log.Infof("[ssa-compile] batch=%d body build progress %d/%d elapsed=%v", batchIndex+1, index, total, time.Since(unitBuildStart))
 				reportProcess(p, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
 				return !c.isStop()
 			},
@@ -537,6 +594,7 @@ func (c *Config) parseProjectWithFSUnits(
 		) {
 			return nil, ErrContextCancel
 		}
+		log.Infof("[ssa-compile] batch=%d body build done units=%d cost=%v", batchIndex+1, len(unitKeys), time.Since(unitBuildStart))
 		// Unit-end and batch-boundary instruction flushes enqueue ordinary
 		// instructions for asynchronous persistence. Boundary instructions stay
 		// resident for cross-unit resolution, while the completion callback logs
@@ -582,8 +640,19 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 	}
 	preHandlerTime = time.Since(unitStart) - parseTime
-	if astErr != nil && c.GetCompileStrictMode() {
+	if astErr != nil && (c.GetCompileStrictMode() || c.GetCompileAstOnly()) {
 		return nil, utils.Errorf("pre-handler parse project error: %v", astErr)
+	}
+	if c.GetCompileAstOnly() {
+		log.Infof("[ssa-compile] ast-only mode: successfully parsed ASTs for all %d files", len(preHandlerFiles))
+		prog.Finish()
+		p := structProgAPI
+		if p == nil {
+			p = NewProgram(prog, c)
+		}
+		SaveConfig(c, p)
+		SetProgramCache(p)
+		return p, nil
 	}
 
 	compilePhase = "f4_finish"
@@ -734,7 +803,9 @@ func (c *Config) parseProjectWithFSLegacy(
 		folder2Save = append(folder2Save, []string{"/", programName})
 	}
 
+	c.ensureLanguageBuilder()
 	filesystem = c.swapLanguageFs(filesystem)
+	filesystem = c.wrapPreparedSources(filesystem)
 	// get total size
 	// scan project files
 	scanResult, err := ScanProjectFiles(ScanConfig{

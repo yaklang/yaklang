@@ -35,10 +35,9 @@ hash-pinned corpus ZIP 直接读取。Go 测试不需要解压；本地已有展
 
 - `pcaputil` 支持部分 TLS/QUIC keylog 解密。
 - `pcap-inspect` 有 `-tls-keylog`。
-- `pcapdb` 当前没有 keylog 导入选项。
-- `load_pcapfile` 和 `query_pcapdb` 没有 keylog 参数。
+- `pcapdb`、`load_pcapfile` 和 `query_pcapdb` 支持授权 NSS keylog 文件。
 
-因此 `https-keylog-dridex` 的即时重放可测；AI 导入并持久化查询解密后的 HTTPS 当前应标记为不支持。
+因此 `https-keylog-dridex` 既可用 `pcap-inspect` 即时重放，也可通过 AI 持久化链路导入并查询解密后的 HTTP。回答必须区分 keylog 解密覆盖范围、证书信任和应用身份验证。
 
 ## 基础回归
 

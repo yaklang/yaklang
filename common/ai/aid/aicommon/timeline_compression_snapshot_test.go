@@ -19,8 +19,9 @@ func (m *Timeline) buildCompressionSnapshot() (*timelineCompressionSnapshot, err
 	if err != nil {
 		return nil, err
 	}
-	if err := prepareCompressionSnapshot(snapshot); err != nil {
-		return nil, err
+	prepareCompressionSnapshot(snapshot)
+	if !snapshot.hasCompressionInput() {
+		return nil, fmt.Errorf("compression snapshot has no compressible content")
 	}
 	return snapshot, nil
 }

@@ -24,6 +24,7 @@ func TestTimelinePromptThroughIDOmitsLaterHistory(t *testing.T) {
 		Context: context.Background(), TargetTokens: 8, ThroughID: &capID,
 	})
 	require.NoError(t, err)
+	require.NotEmpty(t, guide)
 	require.NotContains(t, guide, dropped)
 }
 

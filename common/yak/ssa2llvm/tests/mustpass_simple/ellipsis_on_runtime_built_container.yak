@@ -1,0 +1,22 @@
+// Regression: `a...` expanded by walking the container's member pairs. A
+// container built at runtime (a.Push(x)) has no literal members — its pair
+// list holds only read placeholders — so the expansion produced an empty
+// argument list and the argument disappeared entirely. dictutil.Mix(a...)
+// then received zero dictionaries and failed with "no selected tick ring",
+// and the later `for i in r` blocked forever on a nil channel (90s timeout).
+//
+// A literal container already worked because the empty-pair path passed the
+// value through; the fallback now covers the placeholder-only case too.
+dict = []
+dict.Push(1, 2, 3)
+outer = []
+outer.Push(dict)
+
+r, err = dictutil.Mix(outer...)
+assert err == nil, f"Mix must accept a Push-built dictionary: ${err}"
+
+count = 0
+for comb in r {
+    count++
+}
+assert count == 3, f"one 3-entry dictionary must yield 3 combinations, got ${count}"

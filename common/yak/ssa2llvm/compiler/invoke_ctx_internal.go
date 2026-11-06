@@ -94,6 +94,17 @@ func (c *Compiler) storeContextPanic(val llvm.Value, flags uint64) error {
 	return nil
 }
 
+// clearContextPanic resets the invoke-context panic state after a yak-level
+// catch handler has consumed the panic. Without this, a caught panic still
+// leaves WordPanic/flags set and the main wrapper exits 255 even though the
+// catch/finally bodies ran.
+func (c *Compiler) clearContextPanic() error {
+	if err := c.storeContextWord(abi.WordPanic, llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+		return err
+	}
+	return c.clearContextFlags(abi.FlagPanicTaggedPointer)
+}
+
 func (c *Compiler) loadContextPanic(name string) (llvm.Value, error) {
 	if c == nil || c.function == nil || c.function.invokeCtx.IsNil() {
 		return llvm.Value{}, fmt.Errorf("missing invoke context")
@@ -123,11 +134,41 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 	}
 
 	freeValueBase := int64(len(fn.Params) + len(fn.ParameterMembers))
+	i64Ptr := llvm.PointerType(i64, 0)
 	for i, binding := range callframe.OrderedFreeValueBindings(fn) {
 		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
-		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ValueID))
-		c.cacheValue(binding.ValueID, val)
+		raw := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ValueID))
+		if c.freeValueCaptureMode(fn, binding) != freeValueCaptureByValue {
+			// The captured word is a slot pointer; reads/writes go through it
+			// so mutable state persists across calls and shared loop variables
+			// observe the final value.
+			ptr := c.Builder.CreateIntToPtr(raw, i64Ptr, fmt.Sprintf("fv_ptr_%d", binding.ValueID))
+			if c.function.freeValuePointers == nil {
+				c.function.freeValuePointers = make(map[int64]llvm.Value)
+			}
+			c.function.freeValuePointers[binding.ValueID] = ptr
+			val := c.Builder.CreateLoad(i64, ptr, fmt.Sprintf("fv_deref_%d", binding.ValueID))
+			c.cacheValue(binding.ValueID, val)
+			continue
+		}
+		c.cacheValue(binding.ValueID, raw)
+	}
+
+	// Nested callbacks can capture a variable this function never names
+	// (tcp.serverCallback closing over a channel). Those cells are appended
+	// after the declared free values and keyed by the ancestor value id so
+	// the inner closure shares the slot instead of capturing zero.
+	declaredFree := int64(len(callframe.OrderedFreeValueBindings(fn)))
+	for i, extra := range c.extraCaptures(fn) {
+		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+declaredFree+int64(i)), false)
+		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
+		raw := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_extra_%d", extra.OriginID))
+		ptr := c.Builder.CreateIntToPtr(raw, i64Ptr, fmt.Sprintf("fv_extra_ptr_%d", extra.OriginID))
+		if c.function.transitiveCapturePointers == nil {
+			c.function.transitiveCapturePointers = make(map[int64]llvm.Value)
+		}
+		c.function.transitiveCapturePointers[extra.OriginID] = ptr
 	}
 
 	for _, paramID := range fn.Params {

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
@@ -25,6 +26,9 @@ var Command = &cli.Command{
 		"  yak shark\n  yak shark -i en0 --protocol dns,tls --bpf 'host 1.1.1.1'\n" +
 		"  yak shark --pcap-file traffic.pcapng\n  yak shark --output-file capture.pcapng\n" +
 		"  yak shark --plain --protocol tcp --count 100\n  yak shark --pcap-file traffic.pcap --json\n\n" +
+		"  yak shark -r traffic.pcap --export-objects ./objects --json\n" +
+		"  yak shark -r traffic.pcap --stats proto --stats conv --json\n" +
+		"  yak shark -r traffic.pcap --json-physical-only -Y 'frame.number <= 5'\n\n" +
 		"Interactive: wheel/trackpad scrolls the hovered pane; click selects; drag scrollbars.\n" +
 		"Arrows/j/k select, Tab switches panes, Enter pins flat fields, / searches, f edits BPF,\n" +
 		"p builds a protocol filter, Space freezes/resumes the list, g/G first/follow, q quits.\n" +
@@ -48,9 +52,13 @@ var Command = &cli.Command{
 		cli.BoolFlag{Name: "list-interfaces,D", Usage: "List capture interfaces and exit"},
 		cli.BoolFlag{Name: "list-protocols", Usage: "List protocol shortcuts and their BPF expressions"},
 		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types, scope and supported protocols; --json prints the versioned schema"},
-		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter, e.g. wg.type == 4 and wg.counter >= 2; saved capture remains complete"},
+		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter: http.host == \"example.test\", pdu.content contains \"GET /\", pdu.content hex:00ff, stream.content contains \"example\"; selects proven matches; missing evidence is unknown; saved capture remains complete"},
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
 		cli.BoolFlag{Name: "json", Usage: "Print JSONL packet snapshots plus nonphysical record_type=protocol_publication records for capture-close diagnostics; byte_source defines original contributors"},
+		cli.BoolFlag{Name: "json-physical-only", Usage: "Print JSONL physical frames only; implies --json and omits nonphysical publications"},
+		cli.StringFlag{Name: "export-objects", Usage: "Export complete HTTP response bodies to a directory (new files only) and print JSONL object manifests"},
+		cli.StringSliceFlag{Name: "stats", Usage: "Print statistics over display-filter matches: conv, io, proto, endpoints (repeatable; replaces packet summaries)"},
+		cli.DurationFlag{Name: "stats-interval", Value: time.Second, Usage: "IO statistics bucket width, e.g. 1s or 100ms"},
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
 		cli.DurationFlag{Name: "duration", Usage: "Stop capture after this duration, e.g. 30s (0: unlimited)"},
 		cli.IntFlag{Name: "max-packets", Value: defaultPacketCapacity, Usage: "Packets retained in the TUI (also editable with c); output file keeps all captured packets"},
@@ -68,12 +76,13 @@ func run(c *cli.Context) error {
 	if out == nil {
 		out = os.Stdout
 	}
+	asJSON := c.Bool("json") || c.Bool("json-physical-only")
 	if c.NArg() != 0 {
 		return fmt.Errorf("unexpected argument %q; use --protocol dns or --bpf 'tcp port 80'", c.Args().First())
 	}
 	if c.Bool("list-fields") {
 		fields := pcaputil.RegisteredDisplayFields()
-		if c.Bool("json") {
+		if asJSON {
 			return json.NewEncoder(out).Encode(struct {
 				SchemaVersion int                               `json:"schema_version"`
 				Fields        []pcaputil.DisplayFieldDescriptor `json:"fields"`
@@ -125,6 +134,17 @@ func run(c *cli.Context) error {
 	}
 	if c.Int("count") < 0 || c.Duration("duration") < 0 {
 		return fmt.Errorf("count and duration must be non-negative")
+	}
+	if c.Bool("json-physical-only") && (len(c.StringSlice("stats")) > 0 || c.String("export-objects") != "") {
+		return fmt.Errorf("json-physical-only cannot be combined with stats or export-objects, which produce nonphysical records")
+	}
+	var statistics *trafficStatistics
+	if len(c.StringSlice("stats")) > 0 {
+		var err error
+		statistics, err = newTrafficStatistics(c.StringSlice("stats"), c.Duration("stats-interval"))
+		if err != nil {
+			return err
+		}
 	}
 	if c.Int("max-packets") < 1 || c.Int("max-packets") > 100000 {
 		return fmt.Errorf("max-packets must be between 1 and 100000")
@@ -193,9 +213,17 @@ func run(c *cli.Context) error {
 	defer src.Close()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	interactive := !c.Bool("plain") && !c.Bool("json") && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) && os.Getenv("TERM") != "dumb"
-	cfg.freezePacketFields = !interactive && (c.Bool("json") || displayFilter != nil)
-	cfg.exportProtocolPublications = c.Bool("json")
+	var exporter *objectExporter
+	if directory := c.String("export-objects"); directory != "" {
+		exporter, err = newObjectExporter(directory)
+		if err != nil {
+			return err
+		}
+	}
+	interactive := !c.Bool("plain") && !asJSON && statistics == nil && exporter == nil && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) && os.Getenv("TERM") != "dumb"
+	cfg.freezePacketFields = !interactive && (asJSON || displayFilter != nil || statistics != nil || exporter != nil)
+	cfg.exportProtocolPublications = asJSON || exporter != nil || statistics != nil
+	cfg.collectObjects = exporter != nil
 	session := startCapture(ctx, src, cfg, interactive)
 	defer session.Stop()
 	if interactive {
@@ -206,7 +234,7 @@ func run(c *cli.Context) error {
 		}
 		return session.result()
 	}
-	return runPlainDisplay(ctx, session, out, c.Bool("json"), displayFilter)
+	return runPlainAnalysis(ctx, session, out, asJSON, displayFilter, plainAnalysisOptions{physicalOnly: c.Bool("json-physical-only"), statistics: statistics, exporter: exporter})
 }
 
 func runPlain(ctx context.Context, s *captureSession, out io.Writer, asJSON bool) error {
@@ -214,25 +242,87 @@ func runPlain(ctx context.Context, s *captureSession, out io.Writer, asJSON bool
 }
 
 func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJSON bool, filter *pcaputil.DisplayFilter) error {
+	return runPlainAnalysis(ctx, s, out, asJSON, filter, plainAnalysisOptions{})
+}
+
+type plainAnalysisOptions struct {
+	physicalOnly bool
+	statistics   *trafficStatistics
+	exporter     *objectExporter
+}
+
+func runPlainAnalysis(ctx context.Context, s *captureSession, out io.Writer, asJSON bool, filter *pcaputil.DisplayFilter, options plainAnalysisOptions) error {
 	encoder := json.NewEncoder(out)
+	finish := func() error {
+		if err := s.result(); err != nil {
+			return err
+		}
+		return options.statistics.write(out, asJSON)
+	}
+	unknownIsMissing := func(result pcaputil.DisplayFilterResult) bool {
+		return result.Reason == "predicate requires an unobserved field or content" || result.Reason == "content evidence unavailable or discontinuous"
+	}
+	exportObjects := func(packet *capturedPacket, matched bool) error {
+		if options.exporter == nil {
+			return nil
+		}
+		for _, observation := range packet.objects {
+			if observation.request {
+				continue
+			}
+			if matched {
+				manifest, err := options.exporter.export(observation)
+				if err != nil {
+					return err
+				}
+				if manifest != nil {
+					if err = encoder.Encode(manifest); err != nil {
+						return err
+					}
+				}
+			}
+			options.exporter.forget(observation)
+		}
+		return nil
+	}
 	for {
 		select {
 		case packet, ok := <-s.packets:
 			if !ok {
-				return s.result()
+				return finish()
+			}
+			if options.exporter != nil {
+				if err := options.exporter.observe(packet.objects); err != nil {
+					return err
+				}
 			}
 			if packet.publicationPhase != "" {
-				if !asJSON {
+				if options.physicalOnly || !asJSON && options.statistics == nil && options.exporter == nil {
 					continue
 				}
 				if filter != nil {
 					result := filter.EvaluateSnapshots(packet.observedFields)
 					if !result.Complete {
-						return fmt.Errorf("display filter unavailable for %s protocol publication: %s", packet.publicationPhase, result.Reason)
+						if !unknownIsMissing(result) {
+							return fmt.Errorf("display filter unavailable for %s protocol publication: %s", packet.publicationPhase, result.Reason)
+						}
 					}
 					if !result.Matched {
+						if err := exportObjects(packet, false); err != nil {
+							return err
+						}
 						continue
 					}
+				}
+				if err := exportObjects(packet, true); err != nil {
+					return err
+				}
+				if options.statistics != nil {
+					options.statistics.addPDUs(packet.observedPDUs)
+					continue
+				}
+				if !asJSON {
+					continue
 				}
 				if err := encoder.Encode(protocolPublication{RecordType: "protocol_publication", PublicationPhase: packet.publicationPhase, PublishedPDUs: packet.observedPDUs, PublishedPDUScope: "analysis_publication_only; byte_contribution_is_defined_by_byte_source"}); err != nil {
 					return err
@@ -240,6 +330,13 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 				continue
 			}
 			row := summarize(packet)
+			var packetFields pcaputil.DisplayFieldSnapshot
+			if asJSON && options.statistics == nil || filter != nil {
+				packetFields = packet.packetFieldSnapshot(row)
+			}
+			if asJSON && options.statistics == nil {
+				row.FieldValues = &packetFields
+			}
 			var events []*pcaputil.ProtocolEvent
 			if packet.fieldsAtObservation {
 				row.PDUObservationScope = "observed_at_packet"
@@ -249,19 +346,27 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 			if filter != nil {
 				var result pcaputil.DisplayFilterResult
 				if packet.fieldsAtObservation {
-					result = filter.EvaluateSnapshots(packet.observedFields)
+					result = filter.EvaluateSnapshots(append([]pcaputil.DisplayFieldSnapshot{packetFields}, packet.observedFields...))
 				} else {
 					result = filter.EvaluateSnapshots(packet.protocolQuerySnapshots(events))
 				}
 				if !result.Complete {
-					return fmt.Errorf("display filter unavailable for frame %d: %s", row.Number, result.Reason)
+					if !unknownIsMissing(result) {
+						return fmt.Errorf("display filter unavailable for frame %d: %s", row.Number, result.Reason)
+					}
 				}
 				if !result.Matched {
+					if err := exportObjects(packet, false); err != nil {
+						return err
+					}
 					continue
 				}
 			}
+			if err := exportObjects(packet, true); err != nil {
+				return err
+			}
 			var err error
-			if asJSON {
+			if asJSON || options.statistics != nil {
 				if packet.fieldsAtObservation {
 					row.PDUs = packet.observedPDUs
 					if len(packet.publishedPDUs) != 0 {
@@ -273,6 +378,12 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 					values := e.DisplayFieldValues()
 					row.PDUs = append(row.PDUs, map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": e.SourceBytes, "fields": values.FieldMap(), "field_values": values})
 				}
+				if options.statistics != nil {
+					if err = options.statistics.add(row); err != nil {
+						return err
+					}
+					continue
+				}
 				err = encoder.Encode(row)
 			} else {
 				_, err = fmt.Fprintf(out, "%6d %s %-24s → %-24s %-12s %6d %s\n", row.Number, row.Time.Format("15:04:05.000000"), row.Source, row.Destination, row.Protocol, row.Length, row.Info)
@@ -282,7 +393,7 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 			}
 		case <-ctx.Done():
 			s.Stop()
-			return s.result()
+			return finish()
 		}
 	}
 }

@@ -3,6 +3,7 @@ package template2java
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/java/jsp"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
@@ -59,9 +60,46 @@ func (g *GeneratedJavaInfo) GetContent() string {
 	return g.content
 }
 
-func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.TemplateGeneratedInfo, error) {
+// ConvertJSPLinear is the grammar-free JSP translation. java2ssa uses it when
+// the structured page does not parse.
+func ConvertJSPLinear(content, filePath string) (tl.TemplateGeneratedInfo, error) {
 	if content == "" || filePath == "" {
 		return nil, utils.Errorf("content or filePath is empty")
+	}
+	editor := memedit.NewMemEditorWithFileUrl(content, filePath)
+	visitor, err := jsp.CreateLinearJSPVisitor(editor)
+	if err != nil {
+		return nil, err
+	}
+	t, err := CreateJavaTemplate(filePath)
+	if err != nil {
+		return nil, err
+	}
+	if enc := templateEncodingFromSource(content); enc != nil {
+		t.SetSourceEncoding(enc)
+	}
+	interpreter := tl.NewInterpreter(visitor.GetInstructions())
+	interpreter.SetTemplate(t)
+	if err := interpreter.GenerateCode(); err != nil {
+		return nil, err
+	}
+	return &GeneratedJavaInfo{
+		pkgName:       t.pkgName,
+		className:     t.className,
+		content:       interpreter.GetGeneratedCode(),
+		java2Template: interpreter.GetRangeMap(),
+	}, nil
+}
+
+func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.TemplateGeneratedInfo, error) {
+	if filePath == "" {
+		return nil, utils.Errorf("filePath is empty")
+	}
+	// An empty page is still a compilation unit. Rejecting it failed the
+	// whole project on a zero-byte nav.jsp.
+	if content == "" {
+		editor := memedit.NewMemEditorWithFileUrl(" ", filePath)
+		return ConvertTemplateToJavaWithEditor(typ, editor)
 	}
 	editor := memedit.NewMemEditorWithFileUrl(content, filePath)
 	return ConvertTemplateToJavaWithEditor(typ, editor)
@@ -88,6 +126,13 @@ func ConvertTemplateToJavaWithEditor(typ JavaTemplateType, editor *memedit.MemEd
 	t, err := CreateJavaTemplate(filePath)
 	if err != nil {
 		return nil, err
+	}
+	// Legacy pages declare their own charset (GBK JSP is common); decode with it before the
+	// template text is emitted, otherwise the generated Java carries raw non-UTF-8 bytes.
+	if src := editor.GetSourceCode(); src != "" {
+		if enc := templateEncodingFromSource(src); enc != nil {
+			t.SetSourceEncoding(enc)
+		}
 	}
 	interpreter := tl.NewInterpreter(visitor.GetInstructions())
 	interpreter.SetTemplate(t)

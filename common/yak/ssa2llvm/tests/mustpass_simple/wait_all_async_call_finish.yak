@@ -1,0 +1,12 @@
+// Regression: waitAllAsyncCallFinish() is a yak global builtin, not a yaklib
+// module function. Without an AOT binding the compiler emitted a call to an
+// undefined symbol and the in-process lld took the whole compiler down with
+// SIGSEGV while reporting it, so scripts that waited for their goroutines
+// could never be compiled.
+counter = 0
+go func {
+    time.sleep(0.05)
+    counter++
+}
+waitAllAsyncCallFinish()
+assert counter == 1, f"goroutine must have finished before the wait returns: ${counter}"

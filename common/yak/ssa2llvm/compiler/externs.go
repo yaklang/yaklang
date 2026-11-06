@@ -53,6 +53,25 @@ var defaultExternBindings = map[string]ExternBinding{
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDAppend,
 	},
+	"__yak_chan_send": {
+		Return:     ExternTypeVoid,
+		DispatchID: abi.IDRuntimeChanSend,
+	},
+	// waitAllAsyncCallFinish blocks until every `go func` has returned. It is a
+	// yak global builtin rather than a yaklib module function, so without a
+	// binding the compiler emitted a call to an undefined symbol and the
+	// in-process lld died with SIGSEGV while reporting it.
+	"waitAllAsyncCallFinish": {
+		Return:     ExternTypeVoid,
+		DispatchID: abi.IDRuntimeWaitAsync,
+	},
+	// yak2ssa lowers every select to a call of this compiler-generated name.
+	// Without a binding the call becomes an undefined symbol and the linked
+	// binary crashes inside the runtime allocator.
+	"$yak:select$": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDRuntimeSelect,
+	},
 }
 
 func cloneExternBindings(src map[string]ExternBinding) map[string]ExternBinding {

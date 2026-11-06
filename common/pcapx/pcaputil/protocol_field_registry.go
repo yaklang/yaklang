@@ -70,6 +70,7 @@ type DisplayFieldValue struct {
 // than silently presenting a sampled projection as exhaustive. Source refers
 // to the whole logical PDU; byte spans are relative to ProtocolEvent.Raw only.
 type DisplayFieldSnapshot struct {
+	content       map[string]fieldTruth
 	SchemaVersion int                 `json:"schema_version"`
 	PDU           uint64              `json:"pdu"`
 	Source        ByteSource          `json:"source"`
@@ -117,6 +118,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	}
 	meta("protocol", "Protocol", DisplayString, 0, func(e *ProtocolEvent) any { return e.Protocol })
 	meta("status", "Decode status", DisplayString, 0, func(e *ProtocolEvent) any { return e.Status })
+	meta("expert", "Protocol diagnostic classification", DisplayString, 0, func(e *ProtocolEvent) any { return e.ExpertCode })
 	meta("pdu.id", "PDU identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.ID })
 	meta("pdu.length", "PDU length", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.Length })
 	meta("pdu.completed_in", "Complete message byte contributor", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
@@ -134,6 +136,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		}
 		return nil
 	})
+	out = append(out, packetDisplayBindings()...)
 	meta("pdu.response_to", "Response to PDU", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
 		if e.ResponseTo != 0 {
 			return e.ResponseTo
@@ -209,6 +212,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		}
 	}
 	path("dns|mdns|llmnr|dot|doh|doq", "dns", "dns.qry.name.escaped", "Lossless escaped DNS question name", DisplayString, 0, "pdu", "DNS", "Questions", "*", "Name")
+	out = append(out, analysisDisplayBindings()...)
 	out = append(out, routingDisplayBindings()...)
 	out = append(out, pimDisplayBindings()...)
 	out = append(out, ospfv3DisplayBindings()...)
@@ -781,6 +785,15 @@ func cloneDisplayFieldDescriptor(d DisplayFieldDescriptor) DisplayFieldDescripto
 }
 
 var displayFieldBindings = buildDisplayFieldBindings()
+var displayEventFieldBindings = func() []displayFieldBinding {
+	var bindings []displayFieldBinding
+	for _, b := range displayFieldBindings {
+		if b.descriptor.Origin == "event" && b.protocols == "" {
+			bindings = append(bindings, b)
+		}
+	}
+	return bindings
+}()
 var displayFieldIndex = func() map[string]int {
 	m := make(map[string]int, len(displayFieldBindings))
 	for i, b := range displayFieldBindings {
@@ -887,9 +900,13 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	s.Source.ParentPDUs = append([]uint64(nil), e.SourceBytes.ParentPDUs...)
 	s.Source.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)
 	p := &displayProjection{snapshot: &s, remaining: maxDisplayFieldValues * 4}
+	bindings := displayFieldBindings
+	if e.Protocol == "" {
+		bindings = displayEventFieldBindings
+	}
 	// Reserve event facts before spending the projection budget on PDU arrays.
 	for _, origin := range []string{"event", "protocol"} {
-		for _, b := range displayFieldBindings {
+		for _, b := range bindings {
 			if (b.descriptor.Origin == "event") != (origin == "event") {
 				continue
 			}
@@ -1029,8 +1046,10 @@ func displayUint(value any) (uint64, bool) {
 }
 
 type displayProjection struct {
-	snapshot  *DisplayFieldSnapshot
-	remaining int
+	kerberosFacts  map[string]any
+	kerberosLoaded bool
+	snapshot       *DisplayFieldSnapshot
+	remaining      int
 	// One bounded traversal per event, rather than spending the graph budget
 	// again for every registered information-element alias.
 	netflowV9ByType map[uint64][]map[string]any

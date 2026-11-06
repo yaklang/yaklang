@@ -1136,14 +1136,14 @@
   {
     "rule_id": "761c9e67-552c-44bf-a241-e90829057c88",
     "rule_name": "检测Java空Catch块",
-    "hash": "9244c08dafd7bf6036ca8f0ee967d434f5a028b31d7028c0dc8eb679090a4a48",
-    "version": "20260916.0001"
+    "hash": "dea2cb5f088001ea1b7ccd0bd69564f5fa76515d6bad2b17f24bc9272e0ee3d8",
+    "version": "20261105.0001"
   },
   {
     "rule_id": "0f9bad23-cac6-4ec9-8509-5c96c2b72175",
     "rule_name": "检测Java泛型异常捕获",
-    "hash": "8e8672c1e20c18edf217fcd74cb6938720f394b9dfd36175a8fb94d6e932a67f",
-    "version": "20260916.0001"
+    "hash": "0314b523f0c975f725ed0a422d73dafa45f7a7a66aef9b419a06cab5479d4160",
+    "version": "20261105.0001"
   },
   {
     "rule_id": "99ae5b5c-905a-412c-bbbf-a14bfd488563",
@@ -1154,8 +1154,8 @@
   {
     "rule_id": "8b5be577-f8ad-45a4-ab1f-5f50188fa33b",
     "rule_name": "审计Java方法声明中抛出过于宽泛的异常",
-    "hash": "4aea247893403712363de890aadbb8c19eec61b251efc22ac057bf71922f9207",
-    "version": "20260916.0001"
+    "hash": "00e47e18558afca314c100206cb5c15524c8a508d2b89899ee5f5a4aa8e0298f",
+    "version": "20261105.0001"
   },
   {
     "rule_id": "5a737536-4f00-45e7-aa92-75ab7f4bd971",
@@ -7028,8 +7028,8 @@
   {
     "rule_id": "ssa-java-mongodb-nosql",
     "rule_name": "数据流：Java MongoDB 查询拼接",
-    "hash": "eee1ae154da3751e4c0b907668d7fac1fbd763784c1f0ef36161200f33d1c3ae",
-    "version": "20261022.0001"
+    "hash": "d0b0262bdb4dce41c219dbfc67ab289f93db1c5d63c56af5de017d54ec2e55ab",
+    "version": "20261105.0002"
   },
   {
     "rule_id": "ssa-java-pattern-from-request",
@@ -7312,5 +7312,71 @@
     "rule_name": "检测 C# 不受限制的文件上传",
     "hash": "2c84931f33eb536216591f206d3132b5be889f233b96eed32a92ba55f90db06a",
     "version": "20261028.0001"
+  },
+  {
+    "rule_id": "java-commented-auth",
+    "rule_name": "注释掉的认证/鉴权代码",
+    "hash": "5d8b2639a2a65bb0f2f061ef16da178f09bcba27d7a9589ef93b88168d9078b5",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-idor-user-controlled-key",
+    "rule_name": "越权 IDOR：资源按 id 查询需复核归属校验",
+    "hash": "bd7e3e91f1da28319b97acfbd4f7a91ae4fa8291c4d7df646abd892041d4439d",
+    "version": "20261105.0002"
+  },
+  {
+    "rule_id": "java-permitall-anonymous",
+    "rule_name": "匿名访问接口 @PermitAll 白名单核对",
+    "hash": "ba0732ad3b2604fd35e1f9a08b36d46ed931cef48bf9a21704e11f02dd8ccd9e",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-privilege-escalation",
+    "rule_name": "权限提升：角色/权限由客户端可控输入赋值",
+    "hash": "f4f716d93b8790de72629aecf3c4f0511879aacad0e75a2c19610af2156d2718",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-rsa-decrypt-as-auth",
+    "rule_name": "RSA 解密 Token 作为认证（加密即认证）",
+    "hash": "7b1eec2b713938af6c3923ff0989f97fceb562e9d3626c190de94eec59e4a9bb",
+    "version": "20261105.0003"
+  },
+  {
+    "rule_id": "java-token-cache-no-verify",
+    "rule_name": "Token 直接作缓存 Key 查询，无校验",
+    "hash": "9d843179164fe48638e7549ce6a933386aec9aa4dd30db187936349e0d7fc6ff",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-insufficient-session-expiration",
+    "rule_name": "会话过期不足：登出/会话超时配置审计",
+    "hash": "c4ecc8d99ed897ce9744e257a33f0f09724c6896a077eca7739ae5dcdcc7c9ad",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-weak-password-recovery",
+    "rule_name": "弱密码恢复：密码重置/找回接口未校验身份",
+    "hash": "b4553a8675d6d9a11e94e3f71a8a68ad1e95c02c3a42c9a7c6e8db117d419fa1",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-passwordless-login",
+    "rule_name": "无密码登录/模拟登录（凭用户名创建登录上下文）",
+    "hash": "56c5ea8b1c08ea38e40ef035bb1423c53b9a9cf8b55df778b1aa90690340272a",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-token-in-url",
+    "rule_name": "令牌/会话标识出现在 URL 查询串",
+    "hash": "47b4382a545cc6761bf8c8cccf6f5df7377128b54ca26e1eefddfe328dff6198",
+    "version": "20261105.0001"
+  },
+  {
+    "rule_id": "java-unfinished-auth-validation",
+    "rule_name": "认证逻辑存在未完成的校验（TODO 校验 token/密码）",
+    "hash": "c8b5c05be80d4aa47e2f312aebdff664485458d7c6c8b30ee3bec5ef0eefd43a",
+    "version": "20261105.0001"
   }
 ]

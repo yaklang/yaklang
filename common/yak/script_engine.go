@@ -682,10 +682,20 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	if e.client != nil {
 		client = e.client
 	} else {
-		yaklib.AutoInitYakit()
-		clientIns := *yaklib.GetYakitClientInstance()
-		client = &clientIns // 设置全局 client 的 log
+		// AOT builds skip the yaklib init that installs this client.
+		// AutoInitYakit returns nil when a client is already installed, so
+		// read the instance again after asking it to create one.
+		client = yaklib.GetYakitClientInstance()
+		if client == nil {
+			yaklib.AutoInitYakit()
+			client = yaklib.GetYakitClientInstance()
+		}
 	}
+	if client == nil {
+		return nil, utils.Error("yakit client is not initialized")
+	}
+	clientIns := *client
+	client = &clientIns // 设置全局 client 的 log
 	client.SetYakLog(*e.logger)
 	yaklib.BindEngineClient(engine, client)
 	vars["yakit"] = yaklib.GetExtYakitLibByClient(client)

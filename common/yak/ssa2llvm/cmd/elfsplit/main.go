@@ -16,23 +16,22 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/textsectlayout"
 	"golang.org/x/arch/x86/x86asm"
 )
 
 const (
-	elf64SymSize                = 24
-	elf64RelaSize               = 24
-	elf64ShdrSize               = 64
-	moduledataTextsectMapOffset = 0x150
-	moduledataTextsectMapLenOff = moduledataTextsectMapOffset + 8
-	moduledataTextsectMapCapOff = moduledataTextsectMapOffset + 16
-	textSectionMapEntrySize     = 24
-	textSectionMapSectionName   = ".data.rel.ro.yaktextmap"
-	textSectionMapRelocName     = ".rela.data.rel.ro.yaktextmap"
-	textSectionEndName          = ".zz_yak_text_end"
+	elf64SymSize              = 24
+	elf64RelaSize             = 24
+	elf64ShdrSize             = 64
+	textSectionMapEntrySize   = 24
+	textSectionMapSectionName = ".data.rel.ro.yaktextmap"
+	textSectionMapRelocName   = ".rela.data.rel.ro.yaktextmap"
+	textSectionEndName        = ".zz_yak_text_end"
 )
 
 type sectionMeta struct {
@@ -562,9 +561,15 @@ func main() {
 
 	textMapEntries := buildTextMapEntries(keepChunks, modGroups, modules, textSym.idx, originalTextSize, etextSym.idx)
 	textMapData, textMapRelas := encodeTextMap(textMapEntries)
+	// Reserve a second map for textAddr's virtual-offset lookup. The first
+	// map is sorted by physical address after link; its vaddrs are unordered.
+	// Leave the copy zero until unused-module relocations have been pruned and
+	// lld has resolved all addresses. Keep the original symbol size so the
+	// moduledata slice still describes exactly the first map.
+	textMapStorage := append(append([]byte(nil), textMapData...), make([]byte, len(textMapData))...)
 	newSections = append(newSections, newSec{
 		name: textSectionMapSectionName, typ: uint32(elf.SHT_PROGBITS),
-		flags: uint64(elf.SHF_ALLOC | elf.SHF_WRITE), data: textMapData, align: 8,
+		flags: uint64(elf.SHF_ALLOC | elf.SHF_WRITE), data: textMapStorage, align: 8,
 	})
 	newSections = append(newSections, newSec{
 		name: textSectionMapRelocName, typ: uint32(elf.SHT_RELA), data: textMapRelas,
@@ -632,12 +637,19 @@ func main() {
 	}
 	firstModuleSec := secMetaList[firstModuleSecIdx]
 	firstModuleOff := firstModuleSec.offset + firstModuleSym.value
-	if firstModuleOff+moduledataTextsectMapCapOff+8 > uint64(len(out)) {
+	textsectOff, err := textsectlayout.Check(runtime.GOROOT())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "elfsplit: %v\n", err)
+		os.Exit(1)
+	}
+	textsectLenOff := uint64(textsectOff.Offset + 8)
+	textsectCapOff := uint64(textsectOff.Offset + 16)
+	if firstModuleOff+textsectCapOff+8 > uint64(len(out)) {
 		fmt.Fprintln(os.Stderr, "elfsplit: runtime.firstmoduledata is too small")
 		os.Exit(1)
 	}
-	binary.LittleEndian.PutUint64(out[firstModuleOff+moduledataTextsectMapLenOff:], uint64(len(textMapEntries)))
-	binary.LittleEndian.PutUint64(out[firstModuleOff+moduledataTextsectMapCapOff:], uint64(len(textMapEntries)))
+	binary.LittleEndian.PutUint64(out[firstModuleOff+textsectLenOff:], uint64(len(textMapEntries)))
+	binary.LittleEndian.PutUint64(out[firstModuleOff+textsectCapOff:], uint64(len(textMapEntries)))
 
 	// 5. Append new section names to .shstrtab
 	shstrtabSec := secMetaList[e_shstrndx]
@@ -736,6 +748,7 @@ func rewritePCRelativeBranches(
 	if fnEnd > uint64(len(data)) || fn.newOff+fn.size > uint64(len(destination)) {
 		return nil, fmt.Errorf("function %q range out of bounds", fn.name)
 	}
+	clean := -1 // decoded lazily: 1 clean, 0 drifted
 	for pos := uint64(0); pos < fn.size; {
 		inst, err := x86asm.Decode(data[fnStart+pos:fnEnd], 64)
 		if err != nil || inst.Len <= 0 || pos+uint64(inst.Len) > fn.size {
@@ -768,7 +781,12 @@ func rewritePCRelativeBranches(
 				disp, hasDisp, isBranch = int64(v), true, true
 			case x86asm.Mem:
 				if v.Base == x86asm.RIP {
-					disp, hasDisp = v.Disp, true
+					// x86asm zero-extends Mem.Disp. A backward leaq/movq
+					// (closure bodies are emitted before the function that
+					// takes their address) therefore looks like a huge
+					// positive offset, fails the text-range check below, and
+					// keeps the pre-split displacement.
+					disp, hasDisp = signExtendDisp(v.Disp, inst.PCRel), true
 				}
 			}
 			if hasDisp {
@@ -819,6 +837,35 @@ func rewritePCRelativeBranches(
 			continue
 		}
 
+		// A branch to a label of this same function needs no rewrite: the body
+		// is copied contiguously, so source and target move by an identical
+		// delta and the existing displacement stays correct.
+		if targetIdx == fnIdx {
+			pos += uint64(inst.Len)
+			continue
+		}
+		// x86asm has no AVX2/AVX512 tables: vpor decodes as JMP and rorx as a
+		// single byte. In a function holding such an encoding the decoder
+		// therefore drifts, and the byte-by-byte recovery scan starts reading
+		// real operands as PC-relative fields. Rewriting one of those bogus
+		// displacements overwrites the instructions that follow: three
+		// displacements inside crypto/internal/fips140/sha512.blockAVX2 were
+		// clobbered this way and the compiled binary died of SIGILL there.
+		//
+		// When the body does not decode cleanly, keep only the one shape a
+		// stray operand byte cannot produce: a rel32 call/jmp naming another
+		// function's exact entry. That is the runtime.morestack call the Go
+		// assembler appends to each of those hand-written AVX routines.
+		if clean < 0 {
+			clean = 0
+			if decodesCleanly(data, fnStart, fn) {
+				clean = 1
+			}
+		}
+		if clean == 0 && (oldTarget != target.oldOff || inst.Len != 5 || inst.PCRel != 4 || inst.PCRelOff != 1) {
+			pos += uint64(inst.Len)
+			continue
+		}
 		if target.module == fn.module {
 			newTarget := int64(target.newOff + oldTarget - target.oldOff)
 			newPC := int64(fn.newOff + pos + uint64(inst.Len))
@@ -841,6 +888,25 @@ func rewritePCRelativeBranches(
 		pos += uint64(inst.Len)
 	}
 	return synthetic, nil
+}
+
+// decodesCleanly reports whether x86asm decodes the whole function body as one
+// uninterrupted instruction stream. A function containing an AVX2/AVX512
+// encoding fails this check, and any PC-relative operand found in it is
+// suspect.
+func decodesCleanly(data []byte, fnStart uint64, fn codePlacement) bool {
+	fnEnd := fnStart + fn.size
+	if fnEnd > uint64(len(data)) {
+		return false
+	}
+	for pos := uint64(0); pos < fn.size; {
+		inst, err := x86asm.Decode(data[fnStart+pos:fnEnd], 64)
+		if err != nil || inst.Len <= 0 || pos+uint64(inst.Len) > fn.size {
+			return false
+		}
+		pos += uint64(inst.Len)
+	}
+	return true
 }
 
 func findSymbol(symbols []symMeta, name string) (symMeta, bool) {
@@ -1089,6 +1155,22 @@ func symbolByIndex(symbols []symMeta, index int) *symMeta {
 	return nil
 }
 
+// signExtendDisp corrects x86asm.Mem.Disp, which stores a RIP-relative
+// displacement as a zero-extended unsigned value. Rel operands are already
+// sign-extended and must not be passed here.
+func signExtendDisp(disp int64, width int) int64 {
+	switch width {
+	case 1:
+		return int64(int8(disp))
+	case 2:
+		return int64(int16(disp))
+	case 4:
+		return int64(int32(disp))
+	default:
+		return disp
+	}
+}
+
 func writePCRelativeValue(data []byte, offset uint64, width int, value int64) error {
 	if offset+uint64(width) > uint64(len(data)) {
 		return fmt.Errorf("PC-relative immediate out of bounds")
@@ -1169,10 +1251,12 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"encoding/gob",
 			"github.com/andybalholm/brotli",
 			"github.com/cloudflare/circl",
+			"github.com/denisenkom/go-mssqldb",
 			"github.com/go-sql-driver/mysql",
 			"github.com/gobwas/glob",
 			"github.com/gorilla/websocket",
 			"github.com/hpcloud/tail",
+			"github.com/sijms/go-ora/v2",
 			// kataras/golog and lestrrat/go-file-rotatelogs are deliberately
 			// absent: common/log imports them and common/log is base
 			// infrastructure that the AOT runtime itself uses from init
@@ -1185,6 +1269,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/quic-go/quic-go",
 			"github.com/yaklang/gorm",
 			"github.com/yaklang/javajive",
+			"go.mongodb.org/mongo-driver",
 			"github.com/yaklang/yaklang/common/ai/aispec",
 			"github.com/yaklang/yaklang/common/consts",
 			"github.com/yaklang/yaklang/common/cybertunnel",
@@ -1198,9 +1283,15 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/minimartian",
 			"github.com/yaklang/yaklang/common/mutate",
 			"github.com/yaklang/yaklang/common/netx",
+			// notify/drivers/feishu registers a protobuf file in its init,
+			// which reaches google.golang.org/protobuf in the shared
+			// closure below. Staying in the base .text would make that
+			// call hit the shared stub whenever shared is pruned.
+			"github.com/yaklang/yaklang/common/notify/drivers/feishu",
 			"github.com/yaklang/yaklang/common/pcapx",
 			"github.com/yaklang/yaklang/common/sca",
 			"github.com/yaklang/yaklang/common/schema",
+			"github.com/yaklang/yaklang/common/suricata/generate",
 			"github.com/yaklang/yaklang/common/third_party/utls",
 			"github.com/yaklang/yaklang/common/utils/bruteutils",
 			"github.com/yaklang/yaklang/common/utils/bufpipe",
@@ -1281,9 +1372,22 @@ func buildModulePackageMap(modules []string) map[string][]string {
 			"github.com/yaklang/yaklang/common/yakgrpc",
 			"github.com/yaklang/yaklang/common/yak/ssa/ssadb",
 			"github.com/yaklang/yaklang/common/yak/ssa/ssalog",
+			"github.com/yaklang/yaklang/common/yak/static_analyzer",
+			"github.com/yaklang/yaklang/common/coreplugin",
+			"github.com/yaklang/yaklang/common/rpa/core",
+			"github.com/yaklang/yaklang/common/thirdparty_bin",
+			"github.com/yaklang/yaklang/common/utils/pprofutils",
+			"github.com/yaklang/yaklang/common/aiforge",
+			"github.com/yaklang/yaklang/common/chaosmaker",
+			"github.com/yaklang/yaklang/common/rpa/implement",
+			"github.com/yaklang/yaklang/common/simulator",
 			"github.com/yaklang/yaklang/common/syntaxflow",
 			"github.com/yaklang/yaklang/common/yak/syntaxflow_scan",
 			"github.com/yaklang/yaklang/common/ai/ytoken",
+			// c2ssa's package-level vars (cSpecialTypes) call ssa.CreateAnyType
+			// while the package initializes, so it must stay with the ssa core:
+			// pruning the ssa group would leave its stub in that start-up path.
+			"github.com/yaklang/yaklang/common/yak/c2ssa",
 		},
 		// Language frontends used by ssaapi. They are only pulled in when a
 		// script actually uses the ssa module; poc/cli/http scripts must not
@@ -1313,7 +1417,7 @@ func buildModulePackageMap(modules []string) map[string][]string {
 		"facades":    {"github.com/yaklang/yaklang/common/facades"},
 		"nuclei":     {"github.com/yaklang/yaklang/common/yak/httptpl"},
 		"httptpl":    {"github.com/yaklang/yaklang/common/yak/httptpl"},
-		"ai":         {"github.com/yaklang/yaklang/common/ai"},
+		"ai":         {"github.com/yaklang/yaklang/common/ai", "github.com/yaklang/yaklang/common/yak"},
 		"liteforge":  {"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"},
 		"hids":       {"github.com/yaklang/yaklang/common/hids"},
 		"java":       {"github.com/yaklang/yaklang/common/yserx"},

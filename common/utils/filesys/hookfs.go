@@ -16,6 +16,9 @@ type HookFS struct {
 	readHooks []*ReadHook
 	// pathHook rewrites a caller path into the underlying filesystem path.
 	pathHook MapPathHook
+	// skipMatcher hides matching paths from this view: directory listings drop
+	// them and every direct lookup reports the path as absent.
+	skipMatcher HookMatcher
 }
 
 // MapPathHook rewrites a path before it is passed to the underlying filesystem.
@@ -75,6 +78,18 @@ func (f *HookFS) SetPathHook(hook MapPathHook) {
 	f.pathHook = hook
 }
 
+// SetSkipMatcher hides matching paths from this view. A skipped path is left
+// out of ReadDir results and reported as absent by Stat, Exists, Open, OpenFile
+// and ReadFile, so a walk neither visits it nor descends into it. The matcher
+// sees the caller's path, the same one the read hooks see.
+func (f *HookFS) SetSkipMatcher(matcher HookMatcher) {
+	f.skipMatcher = matcher
+}
+
+func (f *HookFS) skipped(name string) bool {
+	return f != nil && f.enabled && f.skipMatcher != nil && f.skipMatcher.Match(name)
+}
+
 func (f *HookFS) mapPath(name string) (string, error) {
 	if f == nil || f.pathHook == nil {
 		return name, nil
@@ -102,6 +117,9 @@ func (f *HookFS) matchReadHooks(name string) []*ReadHook {
 }
 
 func (f *HookFS) ReadFile(name string) ([]byte, error) {
+	if f.skipped(name) {
+		return nil, fs.ErrNotExist
+	}
 	mapped, err := f.mapPath(name)
 	if err != nil {
 		return nil, err
@@ -181,6 +199,9 @@ func CustomMatcher(fn func(string) bool) HookMatcher {
 // ------- FileSystem 接口默认实现 -------
 
 func (f *HookFS) Open(name string) (fs.File, error) {
+	if f.skipped(name) {
+		return nil, fs.ErrNotExist
+	}
 	mapped, err := f.mapPath(name)
 	if err != nil {
 		return nil, err
@@ -189,6 +210,9 @@ func (f *HookFS) Open(name string) (fs.File, error) {
 }
 
 func (f *HookFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
+	if f.skipped(name) {
+		return nil, fs.ErrNotExist
+	}
 	mapped, err := f.mapPath(name)
 	if err != nil {
 		return nil, err
@@ -197,6 +221,9 @@ func (f *HookFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, err
 }
 
 func (f *HookFS) Stat(name string) (fs.FileInfo, error) {
+	if f.skipped(name) {
+		return nil, fs.ErrNotExist
+	}
 	mapped, err := f.mapPath(name)
 	if err != nil {
 		return nil, err
@@ -209,7 +236,18 @@ func (f *HookFS) ReadDir(dirname string) ([]fs.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return f.underlying.ReadDir(mapped)
+	entries, err := f.underlying.ReadDir(mapped)
+	if err != nil || !f.enabled || f.skipMatcher == nil {
+		return entries, err
+	}
+	kept := make([]fs.DirEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil || f.skipped(f.Join(dirname, entry.Name())) {
+			continue
+		}
+		kept = append(kept, entry)
+	}
+	return kept, nil
 }
 
 func (f *HookFS) GetSeparators() rune {
@@ -229,6 +267,9 @@ func (f *HookFS) Getwd() (string, error) {
 }
 
 func (f *HookFS) Exists(name string) (bool, error) {
+	if f.skipped(name) {
+		return false, nil
+	}
 	mapped, err := f.mapPath(name)
 	if err != nil {
 		return false, err

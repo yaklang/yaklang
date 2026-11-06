@@ -29,11 +29,15 @@ Push、渲染、Save、恢复和 fork/merge 都不会自行调用 AI 压缩。�
 }
 ```
 
-`retain_timeline` 是逗号分隔的单个 ID 与闭区间组合，支持多个散落段。空字符串表示普通历史全部由 summary 概括。范围起止必须属于本次快照列出的普通历史；只筛选这些候选，不展开区间中的每个整数，不影响夹在其中的受保护内容。重叠及重复 ID 自动去重，工具调用与结果按完整条目保留。
+`retain_timeline` 是逗号分隔的单个 ID 与闭区间组合，支持多个散落段。空字符串表示普通历史全部由 summary 概括。选择会与本次请求中的普通历史候选求交集，因此 ID 可以是用户输入、技能、证据或内部条目的 ID，也可以是已经不在本次范围内的旧 ID；这些 ID 不会报错，也不会让受保护内容被淘汰。格式损坏的段和未知 ID 单独忽略，其他有效段继续生效。提交前还会按实际 source 再收敛一次：越界、不存在、重复或未在请求中观测到的 ID 单独丢弃，promoted 淘汰也不会作用于未观测项。工具调用与结果按完整条目保留。
 
-技能仍按名字整份淘汰（包含分页与 metadata），证据按观测 id 淘汰；没有点名的全部保留。工具 Schema、用户输入、TODO、任务指令和目录不允许删除。旧的 `timeline-summary` action、`ratain_timeline_item_range` 与 `retire_promoted_entries` 输出协议不再解析。
+技能仍按名字整份淘汰（包含分页与 metadata），证据按观测 id 淘汰；没有点名、未知或格式无效的项全部保留。工具 Schema、用户输入、TODO、任务指令和目录不允许删除。旧的 `timeline-summary` action、`ratain_timeline_item_range` 与 `retire_promoted_entries` 输出协议不再解析。
 
-输入安全上限为 `512 * 1024` tokens；摘要与保留原文的输出安全上限默认 `16 * 1024` tokens。超限或非法选择会报错，不静默截断。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 解析都只接受单一 `compress_context`，非法 action、范围或 TODO 修改交给现有 AI transaction 引导重试；原子提交仍在下面的统一 action 执行阶段。
+压缩 prompt 的建议输入上限为配置的 Timeline 限制再加 `200 * 1024` tokens。超过时只记录 warning 并继续请求，不截断 prompt。Timeline 没有旧摘要、普通历史或可处理 promoted 项时，本轮直接退出压缩模式并继续普通执行；摘要与保留原文的合计告警阈值为 `64 * 1024` tokens，超过时复用 `warning` 普通流。压缩后 prompt 未下降至少 1% 时同时记录日志并发送普通 warning 流，不再终止任务。
+
+`summary` 是唯一必需内容；可用的 summary 足以提交压缩，缺失或无法使用 summary 才要求 AI 重试。`retain_timeline`、技能/证据淘汰、memory 和附带 TODO 均为 best-effort，解析失败时降级为空，其中 TODO 永远不会由压缩 action 应用。正常模式沿用既有模型策略；压缩模式由主循环使用质量优先模型。文本和原生 tool-call 仍只接受单一 `compress_context`。
+
+压缩 guide 构建、候选读取或结果提交遇到 Timeline 边界、并发状态、快照或模板错误时，不修改 Timeline，也不把基础设施错误交给 AI 纠正；系统发送普通 warning，并回退普通模式或下一轮重新构建压缩 prompt。Task context 的取消状态仍由核心循环统一验证。原生 tool-call 如果一次返回多个 `compress_context`，在 AI transaction 内视为结构错误并重试，不会直接终止核心循环。
 
 ## 提交、并发与保存
 

@@ -139,6 +139,11 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				}
 			}
 			if utils.IsNil(toMember) {
+				// Always read through the replacement. Reusing the unresolved
+				// member instead looks cheaper — it skips one create/delete pair —
+				// but the read is what propagates the element type: a loop header
+				// rebinds every edge member, and copying the old undefined leaves
+				// the reading side with an untyped placeholder.
 				toMember = builder.ReadMemberCallValue(replacement, key)
 			}
 
@@ -337,23 +342,42 @@ func repeatedMemberSourceKeys(pairs []MemberPair) map[int64]Value {
 }
 
 func pickUndefinedMemberSourceKey(member, fallback Value) Value {
-	pairs := GetObjectKeyPairs(member)
-	if len(pairs) == 0 || utils.IsNil(fallback) {
+	if utils.IsNil(fallback) || utils.IsNil(member) {
+		return fallback
+	}
+	value := member.getAnValue()
+	if value == nil {
+		return fallback
+	}
+	pairs := value.snapshotOwnerPairs()
+	if len(pairs) == 0 {
 		return fallback
 	}
 	fallbackSignature := memberKeySignature(fallback)
-	latestFallbackIndex := -1
+	// The function returns the fallback unless the newest owner key IS that
+	// fallback. Resolve keys newest-first and stop at the first difference:
+	// the common case reads two keys, while GetObjectKeyPairs used to resolve
+	// and allocate for every pair (each miss is a cache/DB lookup).
+	newest := true
 	for index := len(pairs) - 1; index >= 0; index-- {
-		if memberKeySignature(pairs[index].Key) == fallbackSignature {
-			latestFallbackIndex = index
-			break
+		pair := pairs[index]
+		if pair.key <= 0 {
+			continue
 		}
-	}
-	if latestFallbackIndex == len(pairs)-1 {
-		for index := latestFallbackIndex - 1; index >= 0; index-- {
-			if memberKeySignature(pairs[index].Key) != fallbackSignature {
-				return pairs[index].Key
+		key, ok := value.resolveLinkedValue(pair.key)
+		if !ok {
+			continue
+		}
+		differs := memberKeySignature(key) != fallbackSignature
+		if newest {
+			if !differs {
+				return fallback
 			}
+			newest = false
+			continue
+		}
+		if differs {
+			return key
 		}
 	}
 	return fallback

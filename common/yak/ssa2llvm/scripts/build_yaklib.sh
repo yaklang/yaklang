@@ -35,7 +35,7 @@ EXTDEPS_DIR="${ASSETS_DIR}/extdeps"
 # libyak.a stays complete (all modules below); per-script pruning happens at
 # link time via --gc-sections, so a plain print script drops the poc/cli/http
 # code and their dependency closures while a poc script keeps them.
-DEFAULT_MODULES="os,poc,cli,http,codec,yakit,ssa"
+DEFAULT_MODULES="ai,bufio,cli,codec,context,db,file,filesys,fuzz,http,httpool,js,json,jsonschema,liteforge,log,math,mitm,netstack,os,poc,pprof,rag,re,risk,sfreport,ssa,str,sync,syntaxflow,time,tls,xhtml,xpath,yakit,yso,zip"
 # SSA2LLVM_TIER names a rung of the pre-built ladder (runtime/tiers); its module
 # set comes from the same Go definition the compiler selects with, so the two
 # cannot drift. SSA2LLVM_EMBED_MODULES still takes an arbitrary list.
@@ -57,6 +57,24 @@ AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},shared,sharednet"
 case ",${MODULES}," in
   *,ssa,*) AOT_SPLIT_MODULES="${AOT_SPLIT_MODULES},ssafront" ;;
 esac
+
+# The AOT runtime's textsectmap has one entry per function. Go's linear
+# textAddr/textOff scan of that table makes every traceback take milliseconds,
+# which blows mustpass read timeouts. The lookup is patched to a binary search
+# in this toolchain's GOROOT (marker below). Refuse to build a runtime that
+# still has the linear scan.
+GOROOT_SYMTAB="$(go env GOROOT)/src/runtime/symtab.go"
+if ! grep -q 'ssa2llvm: textsect binary search' "${GOROOT_SYMTAB}" ||
+   ! grep -q 'ssa2llvm: virtual textsect binary search' "${GOROOT_SYMTAB}"; then
+  echo "[yaklib] ERROR: ${GOROOT_SYMTAB} must have both physical and virtual textsect binary-search patches" >&2
+  exit 1
+fi
+# Derive textsectmap from this GOROOT and refuse an unknown or mismatched
+# Go release. A wrong constant patches the slice header over typelinks.
+if ! ( cd "${REPO_ROOT}" && go run ./common/yak/ssa2llvm/cmd/textsectlayout -goroot "$(go env GOROOT)" ); then
+  echo "[yaklib] ERROR: refusing to build; moduledata layout check failed" >&2
+  exit 1
+fi
 
 mkdir -p "${ASSETS_DIR}"
 rm -rf "${EXTDEPS_DIR}"
@@ -159,34 +177,46 @@ echo "[yaklib] post-processing go.o (per-module .text split)..."
 # Build the elfsplit tool
 ( cd "${REPO_ROOT}" && go build -o "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ./common/yak/ssa2llvm/cmd/elfsplit )
 
-# Extract go.o from libyak.a, split it, repack
+# Extract go.o from libyak.a, split it, repack. The archiver is not called
+# `llvm-ar` everywhere (Ubuntu ships llvm-ar-18; the bare name exists only when
+# the default LLVM is on PATH), so resolve the first available one. Splitting
+# is essential to per-script pruning: if it is skipped the archive stays a
+# monolithic .text and every produced binary carries the full yaklib. A missing
+# archiver or member is a hard error, not a silent skip.
+LLVM_AR=""
+for cand in llvm-ar llvm-ar-18 llvm-ar-17 ar; do
+  if command -v "${cand}" >/dev/null 2>&1; then LLVM_AR="${cand}"; break; fi
+done
+if [[ -z "${LLVM_AR}" ]]; then
+  echo "[yaklib] no archiver found (tried llvm-ar, llvm-ar-18, llvm-ar-17, ar)" >&2
+  exit 1
+fi
+
 SPLIT_DIR="$(mktemp -d)"
 REPACK_DIR="$(mktemp -d)"
 trap 'rm -rf "${SPLIT_DIR}" "${REPACK_DIR}"; rm -f "${GENFULL_OUT}"; [ -n "${STUB_BACKUP:-}" ] && cp "${STUB_BACKUP}" "${IMPORTS_FILE}" 2>/dev/null || true; rm -f "${STUB_BACKUP:-/dev/null}" 2>/dev/null || true' EXIT
 # Extract only go.o, split it, then repack the archive from a fresh dir so the
 # split go.o is NOT overwritten by the original member.
-llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${SPLIT_DIR}" go.o 2>/dev/null || true
+( cd "${SPLIT_DIR}" && "${LLVM_AR}" x "${RUNTIME_DIR}/libyak.a" go.o )
+if [[ ! -f "${SPLIT_DIR}/go.o" ]]; then
+  echo "[yaklib] go.o not found in libyak.a; cannot split runtime for pruning" >&2
+  exit 1
+fi
 # Function-name folding drops ~35% of .gopclntab from every produced binary, at
 # the cost of function names in tracebacks. Opt-in until it has soaked.
 ELFSPLIT_FLAGS=()
 case "${SSA2LLVM_FOLD_FUNCNAMES:-}" in
   1|true|yes) ELFSPLIT_FLAGS+=(-fold-funcnames); echo "[yaklib] pclntab function-name folding: ON" ;;
 esac
-if [ -f "${SPLIT_DIR}/go.o" ]; then
-    "${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ${ELFSPLIT_FLAGS[@]+"${ELFSPLIT_FLAGS[@]}"} \
-        "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
-    # Extract all original members into a fresh repack dir.
-    llvm-ar x "${RUNTIME_DIR}/libyak.a" --output="${REPACK_DIR}"
-    # Replace go.o with the split version.
-    cp "${SPLIT_DIR}/go_split.o" "${REPACK_DIR}/go.o"
-    # Repack all members (keep original order via listing).
-    cd "${REPACK_DIR}"
-    llvm-ar rcs "${RUNTIME_DIR}/libyak.a" $(ls *.o)
-    cd - >/dev/null
-    echo "[yaklib] go.o split into per-module sections"
-else
-    echo "[yaklib] WARNING: go.o not found in libyak.a, skipping split"
-fi
+"${SSA2LLVM_DIR}/cmd/elfsplit/elfsplit" ${ELFSPLIT_FLAGS[@]+"${ELFSPLIT_FLAGS[@]}"} \
+    "${SPLIT_DIR}/go.o" "${SPLIT_DIR}/go_split.o" "${AOT_SPLIT_MODULES}"
+# Extract all original members into a fresh repack dir.
+( cd "${REPACK_DIR}" && "${LLVM_AR}" x "${RUNTIME_DIR}/libyak.a" )
+# Replace go.o with the split version.
+cp "${SPLIT_DIR}/go_split.o" "${REPACK_DIR}/go.o"
+# Repack all members (keep original order via listing).
+( cd "${REPACK_DIR}" && "${LLVM_AR}" rcs "${RUNTIME_DIR}/libyak.a" $(ls *.o) )
+echo "[yaklib] go.o split into per-module sections"
 rm -rf "${SPLIT_DIR}" "${REPACK_DIR}"
 
 # ── 4. Locate system libraries (libgc, crt, libc, libgcc) ───────────────────
@@ -220,6 +250,10 @@ cp "${CRTBEGIN}" "${ASSETS_DIR}/crtbegin.o"; cp "${CRTEND}" "${ASSETS_DIR}/crten
 cp "${LIBC_A}"     "${ASSETS_DIR}/libc.a"
 cp "${LIBGCC_A}"   "${ASSETS_DIR}/libgcc.a"
 cp "${LIBGCC_EH_A}" "${ASSETS_DIR}/libgcc_eh.a"
+# Disables Boehm's automatic collection and registers the explicit collector
+# thread. See runtime/boehm_wrap.c. Not part of libyak.a, so tier rebuilds
+# pick it up here without a runtime source change.
+gcc -c -O2 -fno-strict-aliasing -fno-stack-protector -o "${ASSETS_DIR}/yak_boehm_wrap.o" "${RUNTIME_DIR}/boehm_wrap.c"
 
 # ── 6. Generate manifest_generated.go ──────────────────────────────────────
 sha_of() { sha256sum "$1" | awk '{print $1}'; }
@@ -254,8 +288,9 @@ fi
   gen_field CrtBegin "${ASSETS_DIR}/crtbegin.o"
   gen_field CrtEnd   "${ASSETS_DIR}/crtend.o"
   gen_field Libc     "${ASSETS_DIR}/libc.a"
-  gen_field Libgcc   "${ASSETS_DIR}/libgcc.a"
-  gen_field LibgccEh "${ASSETS_DIR}/libgcc_eh.a"
+  gen_field Libgcc     "${ASSETS_DIR}/libgcc.a"
+  gen_field LibgccEh   "${ASSETS_DIR}/libgcc_eh.a"
+  gen_field BoehmWrap  "${ASSETS_DIR}/yak_boehm_wrap.o"
   echo "}"
   echo ""
   echo "// extdepManifest lists the extra cgo C static libraries embedded under"
@@ -279,6 +314,14 @@ if [[ -n "${SSA2LLVM_TIER_OUT:-}" ]]; then
   mkdir -p "${TIER_OUT_DIR}"
   cp "${ASSETS_DIR}/libyak.a" "${TIER_OUT_DIR}/libyak.a"
   echo "[yaklib] published tier '${TIER_NAME}' to ${TIER_OUT_DIR}/libyak.a"
+fi
+
+# Every tier build also publishes its archive into the embedded assets so the
+# compiler can switch tiers by dependency without an on-disk tier directory.
+if [[ "${TIER_NAME}" != "custom" ]]; then
+  EMBED_TIER_DIR="${ASSETS_DIR}/tiers/${TIER_NAME}"
+  mkdir -p "${EMBED_TIER_DIR}"
+  cp "${ASSETS_DIR}/libyak.a" "${EMBED_TIER_DIR}/libyak.a"
 fi
 
 echo "[yaklib] embedded runtime assets prepared in ${ASSETS_DIR}"

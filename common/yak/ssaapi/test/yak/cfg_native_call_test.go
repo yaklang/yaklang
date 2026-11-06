@@ -1438,7 +1438,10 @@ $from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
 `, sfExpect{
 			WantVarContainsExact: exact,
 			WantMinCount:         map[string]int{"guard": 3},
-			WantVarContains:      map[string][]string{"guard": {"gt(phi(j)[0,add(j, 1)], 0)", "lt(0, Parameter-n)", "lt(0, Parameter-n)"}},
+			// The loop condition reads the induction variable's spin phi now
+			// instead of its pre-loop constant, so the guard names the value
+			// that actually decides the branch.
+			WantVarContains: map[string][]string{"guard": {"gt(phi(j)[0,add(j, 1)], 0)", "lt(phi(i)[0,add(i, 1)], Parameter-n)", "lt(phi(j)[0,add(j, 1)], Parameter-n)"}},
 		})
 	})
 	t.Run("loop_continue_then_sink_conditions", func(t *testing.T) {
@@ -1458,7 +1461,7 @@ $from<reachabilityGuard(target="$to", mode="mustExecute")> as $guard;
 `, sfExpect{
 			WantVarContainsExact: exact,
 			WantMinCount:         map[string]int{"guard": 1},
-			WantVarContains:      map[string][]string{"guard": {"lt(0, Parameter-n)"}},
+			WantVarContains:      map[string][]string{"guard": {"lt(phi(i)[0,add(i, 1)], Parameter-n)"}},
 		})
 	})
 	t.Run("switch_early_return_sink_conditions", func(t *testing.T) {

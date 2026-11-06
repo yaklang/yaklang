@@ -1,5 +1,45 @@
 lexer grammar  JSPLexer;
 
+@lexer::members {
+func (l *JSPLexer) attrLTStartsTag() bool {
+	// value="<soap:Body>" is text. A nested tag has attributes, so the name is
+	// followed by whitespace: <fmt:message key=...>. <%, <!, <? stay tags.
+	in := l.GetInputStream()
+	first := in.LA(1)
+	switch first {
+	case '!', '%', '?':
+		return true
+	}
+	i := 1
+	if first == '/' {
+		i = 2
+	}
+	saw := false
+	for {
+		c := in.LA(i)
+		if c == ':' || c == '_' || c == '-' || c == '.' ||
+			(c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') || c > 127 {
+			if (c >= '0' && c <= '9') && !saw {
+				return false
+			}
+			saw = true
+			i++
+			continue
+		}
+		break
+	}
+	if !saw {
+		return false
+	}
+	switch in.LA(i) {
+	case ' ', '\t', '\n', '\r':
+		return true
+	}
+	return false
+}
+}
+
 JSP_COMMENT: '<!--' .*? '-->'->skip;
 
 JSP_SCRIPT_COMMENT: '<%--' .*? '--%>' -> skip;
@@ -78,6 +118,21 @@ EQUALS
 
 EL_EXPR_START
     : EL_EXPR_OPEN ->pushMode(EL_EXPR_MODE)
+    ;
+
+// A lone '$' or '#' is static text; '${' and '#{' open an EL expression.
+// A semantic predicate would decide that, but predicates disable DFA edge
+// caching for the busiest rule in a page. Instead each marker consumes itself
+// plus the rest of the static run, and the optional group refuses '{' so
+// EL_EXPR_START wins the longest-match race. '<' and '\\' stay out of the group
+// so a tag or escape right after the marker is not swallowed; '$' and '#' stay
+// out too, so a marker inside the run cannot start a second, unnoticed EL.
+JSP_STATIC_DOLLAR_TEXT
+    : '$' ( ~[<\\{$#] JSP_STATIC_CONTENT_CHAR* )? -> type(JSP_STATIC_CONTENT_CHARS)
+    ;
+
+JSP_STATIC_HASH_TEXT
+    : '#' ( ~[<\\{$#] JSP_STATIC_CONTENT_CHAR* )? -> type(JSP_STATIC_CONTENT_CHARS)
     ;
 
 JSP_STATIC_CONTENT_CHARS
@@ -176,12 +231,13 @@ fragment JSP_END_TAG
     : '%>'
     ;
 
+// '$' and '#' are handled by the marker rules above, so a plain static run
+// stops in front of them and the marker rules decide whether an EL expression
+// or static text follows.
 fragment JSP_STATIC_CONTENT_CHAR
     : ~[<\\$#]
     | ESCAPED_DOLLAR
     | '\\'
-    | '$' { this.GetInputStream().LA(1) != '{' }?
-    | '#' { this.GetInputStream().LA(1) != '{' }?
     ;
 
 
@@ -413,7 +469,11 @@ ATTVAL_SINGLE_QUOTE_END_TAG_OPEN
     ;
 
 ATTVAL_SINGLE_QUOTE_TAG_OPEN
-    :  BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
+    : '<' { this.attrLTStartsTag() }? -> type(TAG_BEGIN), pushMode(TAG)
+    ;
+
+ATTVAL_SINGLE_QUOTE_LT
+    : '<' -> type(ATTVAL_ATTRIBUTE)
     ;
 
 ATTVAL_SINGLE_QUOTE_TEXT
@@ -439,7 +499,11 @@ ATTVAL_DOUBLE_QUOTE_END_TAG_OPEN
     ;
 
 ATTVAL_DOUBLE_QUOTE_TAG_OPEN
-    :  BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
+    : '<' { this.attrLTStartsTag() }? -> type(TAG_BEGIN), pushMode(TAG)
+    ;
+
+ATTVAL_DOUBLE_QUOTE_LT
+    : '<' -> type(ATTVAL_ATTRIBUTE)
     ;
 
 ATTVAL_DOUBLE_QUOTE_TEXT

@@ -531,6 +531,12 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		return result, nil
 	}
+	fallbackToNormal := func(stage string, cause error) (*LoopPromptAssemblyResult, error) {
+		r.emitContextCompressionRuntimeWarning(stage, cause)
+		assembly.PromptMode = aicommon.LoopPromptModeNormal
+		assembly.CompressionGuide = ""
+		return assemble()
+	}
 	limit := r.wholePromptTokenLimit()
 	result, err := assemble()
 	if err != nil {
@@ -561,13 +567,18 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			assembly.HistoryThroughID = &throughID
 		}
 		guide, guideErr := timeline.RenderCompressionGuide(options)
-		if guideErr != nil {
-			return nil, guideErr
+		if guideErr != nil || strings.TrimSpace(guide) == "" {
+			r.emitContextCompressionUnavailable(promptTokens, limit, guideErr)
+			result, err = assemble()
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
 		}
 		instructions, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
 			map[string]any{"FunctionCallMode": r.functionCallMode})
 		if err != nil {
-			return nil, err
+			return fallbackToNormal("rendering the compression instructions", err)
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(instructions) + "\n\n" + guide
@@ -577,10 +588,15 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		result, err = assemble()
 		if err != nil {
-			return nil, err
+			return fallbackToNormal("assembling the compression prompt", err)
 		}
-		if aicommon.TokenCountExceeds(result.Prompt, aicommon.TimelineCompressionMaxInputTokens) {
-			return nil, utils.Error("context-compression prompt exceeds the input safety limit")
+		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
+		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))
+		if compressionPromptTokens > compressionPromptLimit {
+			log.Warnf(
+				"context-compression prompt exceeds advisory input budget: actual=%d limit=%d; continuing",
+				compressionPromptTokens, compressionPromptLimit,
+			)
 		}
 	}
 	r.commitSubAgentPrompt(subAgentRevision)

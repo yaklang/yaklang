@@ -36,6 +36,131 @@ func init() {
 	}()
 }
 
+// candidateAddrs resolves every address through the configured resolver,
+// preserving hosts overrides, DNS policy and callbacks. A literal IP bypasses DNS.
+func candidateAddrs(ctx context.Context, host string, config *dialXConfig) []string {
+	if net.ParseIP(utils.FixForParseIP(host)) != nil {
+		return []string{host}
+	}
+	return lookupAllWithContext(ctx, host, config.DNSOpts...)
+}
+
+func dialOneTCP(ctx context.Context, dialTarget string, timeout time.Duration, config *dialXConfig, localAddr *net.TCPAddr) (net.Conn, error) {
+	if config.Dialer != nil {
+		return config.Dialer(timeout, dialTarget)
+	}
+	if localAddr != nil {
+		dialer := &net.Dialer{
+			Timeout:   timeout,
+			LocalAddr: localAddr,
+		}
+		return dialer.DialContext(ctx, "tcp", dialTarget)
+	}
+	return (&net.Dialer{Timeout: timeout}).DialContext(ctx, "tcp", dialTarget)
+}
+
+// interleaveTCPAddrs preserves each family's order while giving the other
+// family the second attempt, rather than waiting behind several blackholes.
+func interleaveTCPAddrs(ips []string) []string {
+	if len(ips) < 2 {
+		return ips
+	}
+	isV4 := func(ip string) bool { return net.ParseIP(utils.FixForParseIP(ip)).To4() != nil }
+	firstV4 := isV4(ips[0])
+	var first, other []string
+	for _, ip := range ips {
+		if isV4(ip) == firstV4 {
+			first = append(first, ip)
+		} else {
+			other = append(other, ip)
+		}
+	}
+	out := make([]string, 0, len(ips))
+	for i := 0; i < len(first) || i < len(other); i++ {
+		if i < len(first) {
+			out = append(out, first[i])
+		}
+		if i < len(other) {
+			out = append(out, other[i])
+		}
+	}
+	return out
+}
+
+// dialTCPAddrs dials resolved addresses. One address keeps the caller's timeout,
+// including a zero timeout (wait until the context ends). Several addresses use
+// a 250ms head-start. Return the first success immediately, cancel other dials,
+// and close any connection a legacy custom dialer returns after cancellation.
+func dialTCPAddrs(ctx context.Context, ips []string, port string, config *dialXConfig, localAddr *net.TCPAddr) (net.Conn, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(ips) == 0 {
+		return nil, utils.Error("no address to dial")
+	}
+	if len(ips) == 1 {
+		return dialOneTCP(ctx, utils.HostPort(ips[0], port), config.Timeout, config, localAddr)
+	}
+	timeout := config.Timeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	dialCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	type dialResult struct {
+		conn net.Conn
+		err  error
+	}
+	// An unbuffered handoff transfers connection ownership to exactly one
+	// receiver. Once it returns, cancellation makes every late dial close its
+	// own connection; the caller never waits for an uninterruptible dialer.
+	ch := make(chan dialResult)
+	for i, ip := range interleaveTCPAddrs(ips) {
+		delay := time.Duration(i) * 250 * time.Millisecond
+		go func(ip string) {
+			if delay > 0 {
+				timer := time.NewTimer(delay)
+				defer timer.Stop()
+				select {
+				case <-dialCtx.Done():
+					return
+				case <-timer.C:
+				}
+			}
+			conn, err := dialOneTCP(dialCtx, utils.HostPort(ip, port), timeout, config, localAddr)
+			if err == nil && conn == nil {
+				err = utils.Error("dial returned a nil connection")
+			}
+			if err != nil && conn != nil {
+				_ = conn.Close()
+				conn = nil
+			}
+			select {
+			case ch <- dialResult{conn: conn, err: err}:
+			case <-dialCtx.Done():
+				if conn != nil {
+					_ = conn.Close()
+				}
+			}
+		}(ip)
+	}
+
+	var errs error
+	for pending := len(ips); pending > 0; pending-- {
+		select {
+		case <-dialCtx.Done():
+			return nil, dialCtx.Err()
+		case r := <-ch:
+			if r.conn != nil {
+				return r.conn, nil
+			}
+			errs = utils.JoinErrors(errs, r.err)
+		}
+	}
+	return nil, errs
+}
+
 // dialPlainTCPConnWithRetry just handle plain tcp connection
 // no tls here, but proxy here
 func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (retConn net.Conn, err error) {
@@ -145,27 +270,28 @@ RETRY:
 			return nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
 		}
 
-		// Resolve hostname to IP for dialing
-		ip := host
-		if net.ParseIP(utils.FixForParseIP(host)) == nil {
-			// not valid ip
-			ip = lookupFirstWithContext(ctx, host, config.DNSOpts...)
-		}
+		// Resolve hostname to every address. A blackholed family (broken IPv6
+		// with a working IPv4, or the reverse) must not be the only attempt.
+		ips := candidateAddrs(ctx, host, config)
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if ip == "" {
-			return nil, utils.Errorf("cannot resolve %v", target)
-		}
-
-		// handle ip address
-		if config.DisallowAddress != nil {
-			if config.DisallowAddress.Contains(ip) {
-				return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", ip)
+		allowed := make([]string, 0, len(ips))
+		for _, ip := range ips {
+			if ip == "" {
+				continue
 			}
+			if config.DisallowAddress != nil && config.DisallowAddress.Contains(ip) {
+				continue
+			}
+			allowed = append(allowed, ip)
 		}
-
-		dialTarget := utils.HostPort(ip, port)
+		if len(allowed) == 0 {
+			if len(ips) == 0 {
+				return nil, utils.Errorf("cannot resolve %v", target)
+			}
+			return nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", ips[0])
+		}
 
 		// Handle strong host mode: bind to specific local IP address
 		var localAddr *net.TCPAddr
@@ -193,19 +319,7 @@ RETRY:
 			}
 		}
 
-		// Dial with local address binding if specified
-		if config.Dialer != nil {
-			conn, err = config.Dialer(config.Timeout, dialTarget)
-		} else if localAddr != nil {
-			// Use net.Dialer to bind to local address
-			dialer := &net.Dialer{
-				Timeout:   config.Timeout,
-				LocalAddr: localAddr,
-			}
-			conn, err = dialer.DialContext(ctx, "tcp", dialTarget)
-		} else {
-			conn, err = (&net.Dialer{Timeout: config.Timeout}).DialContext(ctx, "tcp", dialTarget)
-		}
+		conn, err = dialTCPAddrs(ctx, allowed, fmt.Sprint(port), config, localAddr)
 		if err != nil {
 			if config.Debug {
 				log.Errorf("dial %s failed: %v", target, err)

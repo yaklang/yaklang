@@ -55,11 +55,43 @@ func GetLatestObject(member Value) Value {
 }
 
 func GetLatestKey(member Value) Value {
+	if utils.IsNil(member) {
+		return nil
+	}
+	// Fast path: resolve only the newest owner pair's key. GetObjectKeyPairs
+	// resolves every pair — each miss is an instruction-cache lookup that can
+	// fall through to the database — and allocates a fresh slice, so this
+	// constant-time lookup used to scan a member's whole history. It sits on
+	// the member-replacement hot path, where it dominated the profile.
+	if key := latestObjectKeyDirect(member); !utils.IsNil(key) {
+		return key
+	}
 	pair, ok := GetLatestObjectKeyPair(member)
 	if !ok {
 		return nil
 	}
 	return pair.Key
+}
+
+func latestObjectKeyDirect(member Value) Value {
+	if utils.IsNil(member) {
+		return nil
+	}
+	value := member.getAnValue()
+	if value == nil {
+		return nil
+	}
+	pairs := value.snapshotOwnerPairs()
+	for index := len(pairs) - 1; index >= 0; index-- {
+		pair := pairs[index]
+		if pair.key <= 0 {
+			continue
+		}
+		if key, ok := value.resolveLinkedValue(pair.key); ok {
+			return key
+		}
+	}
+	return nil
 }
 
 func SetObjectKeyPairs(member Value, pairs []ObjectKeyPair) {
@@ -117,6 +149,18 @@ func GetMembersByKey(object, key Value) []Value {
 }
 
 func GetLatestMemberByKey(object, key Value) (Value, bool) {
+	if utils.IsNil(object) || utils.IsNil(key) {
+		return nil, false
+	}
+	// Newest match only. GetMembersByKey resolves every historical pair and
+	// allocates the full list; replacement looks this up several times per pair,
+	// so the scan was quadratic in how many members a value had ever had.
+	if value := object.getAnValue(); value != nil {
+		if member, ok := value.latestMemberByKey(key); ok {
+			return member, true
+		}
+		return nil, false
+	}
 	members := GetMembersByKey(object, key)
 	if len(members) == 0 {
 		return nil, false

@@ -19,6 +19,7 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 		return err
 	}
 	config.notify(meta)
+	meta.TLSKeyLogSHA256 = config.tlsKeyLogSHA256
 	meta.ProtocolCount, meta.ProtocolDataSize, meta.ProtocolsIndexed = 0, 0, false
 	meta.ProtocolDataSHA256, meta.StreamDataSHA256 = "", ""
 	meta.SessionCount, meta.StreamCount, meta.StreamChunkCount, meta.StreamDataSize, meta.StreamsIndexed = 0, 0, 0, 0, false
@@ -220,6 +221,9 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 	options := []pcaputil.CaptureOption{
 		pcaputil.WithContext(replayCtx),
 		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: !config.protocols, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+	}
+	if config.tlsSecrets != nil {
+		options = append(options, pcaputil.WithTLSSecrets(config.tlsSecrets))
 	}
 	if config.protocols {
 		options = append(options, pcaputil.WithOnProtocolMessage(onEvent))

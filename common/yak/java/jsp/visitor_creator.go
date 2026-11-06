@@ -1,9 +1,14 @@
 package jsp
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 
+	"github.com/yaklang/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -24,9 +29,27 @@ var transparentChoosePattern = regexp.MustCompile(`(?is)</?\s*c:choose\b[^>]*>`)
 var directiveImportPattern = regexp.MustCompile(`(?i)\bimport\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 var directiveOnlyJSPPattern = regexp.MustCompile(`(?s)<%@.*?%>|<%--.*?--%>`)
 
+// xmlDeclPattern / doctypePattern match markup that the JSP lexer only accepts
+// at the start of a document. Coremail WAP pages emit <?xml ...?> and a WML
+// doctype after tags, and the lexer then rejects the '=' inside the declaration.
+var xmlDeclPattern = regexp.MustCompile(`(?is)<\?xml\b.*?\?>`)
+var doctypePattern = regexp.MustCompile(`(?is)<!DOCTYPE\b[^>]*>`)
+
 const staticJSPFrontPlaceholder = "<yak:fragment></yak:fragment>"
 
 type VisitorCreator struct {
+}
+
+// CreateLinearJSPVisitor turns a page into Java without the JSP grammar:
+// scriptlets stay code, everything else is text. Used when the structured
+// translation does not parse as Java.
+func CreateLinearJSPVisitor(editor *memedit.MemEditor) (tl.TemplateVisitor, error) {
+	if editor == nil {
+		return nil, utils.Errorf("jsp editor is nil")
+	}
+	visitor := NewJSPVisitor()
+	visitor.Editor = editor
+	return buildLinearScriptletJSPVisitor(visitor, editor.GetSourceCode())
 }
 
 func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, error) {
@@ -46,17 +69,53 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 	}
 	ast, err := Front(src)
 	if err != nil {
-		return nil, utils.Errorf("failed to get jsp.AST: %v", err)
+		// A page the grammar cannot structure still has to become Java that
+		// java2ssa can parse: keep scriptlets as code and the rest as text.
+		return buildLinearScriptletJSPVisitor(visitor, src)
 	}
-	visitor.VisitJspDocuments(ast)
+	// A partially recovered tree can miss tokens the visitor assumes are there.
+	// Treat that like a parse failure: the page still has to reach java2ssa, and
+	// the grammar-free translator preserves every scriptlet.
+	if err := visitJspDocumentsSafely(visitor, ast); err != nil {
+		log.Warnf("[jsp] structured visit failed, using linear translation: %v", err)
+		linear := NewJSPVisitor()
+		linear.Editor = editor
+		return buildLinearScriptletJSPVisitor(linear, src)
+	}
 	appendTrailingScriptletIfNeeded(visitor, src)
 	return visitor, nil
+}
+
+func visitJspDocumentsSafely(visitor *JSPVisitor, ast jspparser.IJspDocumentsContext) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = utils.Errorf("jsp visit panic: %v", recovered)
+		}
+	}()
+	visitor.VisitJspDocuments(ast)
+	return nil
 }
 
 // TODO: This parser is on the real template2java path for JSP. If profiling
 // later shows JSP mixed static-content/template parsing has the same kind of
 // ANTLR decision explosion as PHP, consider adding a JSP-specific token-source
 // coalescing optimization here instead of treating it as test-only code.
+// maxJSPStructuredParseBytes bounds the pages that may use the LL diagnostic
+// path. The default path never runs LL.
+const maxJSPStructuredParseBytes = 64 * 1024
+
+// jspFrontLLEnabled keeps the historical SLL-then-LL parse available for
+// differential diagnostics. LL full-context recovery on the ambiguous
+// HTML/JSP grammar costs tens of seconds and hundreds of megabytes per page,
+// so it is off unless explicitly requested.
+func jspFrontLLEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("YAK_JSP_FRONT_LL"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
 func Front(code string) (jspparser.IJspDocumentsContext, error) {
 	if canBypassFullJSPFront(code) || canBypassDirectiveOnlyJSP(code) || canUseLinearScriptletJSPFastPath(code) {
 		code = staticJSPFrontPlaceholder
@@ -65,23 +124,207 @@ func Front(code string) (jspparser.IJspDocumentsContext, error) {
 		code = preprocessJavascriptHrefQuotes(code)
 		code = wrapStandaloneJSPFragment(code)
 	}
-	ast, err := antlr4util.ParseASTWithSLLFirst(
-		code,
-		jspparser.NewJSPLexer,
-		jspparser.NewJSPParser,
-		newMixedContentCoalescingTokenSource,
-		nil,
-		func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
-			return parser.JspDocuments()
-		},
-	)
+	ast, err := parseJSPDocuments(code)
 	if err != nil {
 		return nil, utils.Errorf("parse AST FrontEnd error: %v", err)
 	}
 	return ast, nil
 }
 
+func parseJSPDocuments(code string) (jspparser.IJspDocumentsContext, error) {
+	defer resetJSPRuntimeCachesIfNeeded()
+	return jspparser.WithJSPRuntimeLock(func() (jspparser.IJspDocumentsContext, error) {
+		if jspFrontLLEnabled() && len(code) <= maxJSPStructuredParseBytes {
+			return antlr4util.ParseASTWithSLLFirst(
+				code,
+				jspparser.NewJSPLexer,
+				jspparser.NewJSPParser,
+				newMixedContentCoalescingTokenSource,
+				nil,
+				func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
+					return parser.JspDocuments()
+				},
+			)
+		}
+		// SLL with bail is bounded: it aborts at the first syntax error instead of
+		// exploring full-context alternatives. A page the grammar cannot structure
+		// then goes through the scriptlet-preserving translator in
+		// VisitorCreator.Create, which is the same contract as an LL failure.
+		ast, err := parseJSPDocumentsSLL(code)
+		if err == nil {
+			return ast, nil
+		}
+		// Bail stops at the first error; a page with one bad tag still has
+		// structure worth keeping. Recovering SLL stays bounded (no full-context
+		// exploration) and returns the partial tree the visitor can walk. Its
+		// cost grows with the amount of malformed content, so it is limited to
+		// pages that measured in the millisecond range; larger pages go straight
+		// to the grammar-free translator.
+		if len(code) <= maxJSPStructuredParseBytes {
+			if recovered, rerr := parseJSPDocumentsRecovering(code); rerr == nil {
+				return recovered, nil
+			}
+		}
+		return nil, err
+	})
+}
+
+// parseJSPDocumentsRecovering runs SLL with the default recovery strategy so a
+// partially valid page still yields a tree. Errors are not reported: the tree is
+// the product here, and VisitorCreator.Create falls back to the grammar-free
+// translator when generation from it fails.
+func parseJSPDocumentsRecovering(code string) (ast jspparser.IJspDocumentsContext, parseErr error) {
+	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(code))
+	lexer.RemoveErrorListeners()
+	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	tokens.SetTokenSource(newMixedContentCoalescingTokenSource(lexer))
+	parser := jspparser.NewJSPParser(tokens)
+	defer antlr4util.DetachParserATNSimulatorCaches(parser)
+	defer antlr4util.DetachLexerTokenSource(lexer)
+	parser.RemoveErrorListeners()
+	parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			ast = nil
+			parseErr = fmt.Errorf("recovering SLL parse failed: %v", recovered)
+		}
+	}()
+	ast = parser.JspDocuments()
+	if ast == nil {
+		return nil, fmt.Errorf("recovering SLL parse produced no tree")
+	}
+	return ast, nil
+}
+
+// jspRuntimeParseCount triggers a periodic rebuild of the shared lexer/parser
+// DFA tables. Prediction only adds states to them, so a scan of thousands of
+// pages would otherwise keep every state it ever explored.
+var jspRuntimeParseCount atomic.Int64
+
+const jspRuntimeResetEvery = 256
+
+func resetJSPRuntimeCachesIfNeeded() {
+	if jspRuntimeParseCount.Add(1)%jspRuntimeResetEvery == 0 {
+		jspparser.ResetJSPRuntimeCaches()
+	}
+}
+
+// parseJSPDocumentsSLL avoids LL full-context recovery. Those pages use the
+// grammar-free translator in VisitorCreator.Create when their syntax needs
+// recovery. The caller holds the shared-DFA read lock.
+func parseJSPDocumentsSLL(code string) (ast jspparser.IJspDocumentsContext, parseErr error) {
+	var messages []string
+	listener := antlr4util.NewErrorListener(antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, _ *memedit.Position) {
+		if len(messages) < 8 {
+			messages = append(messages, fmt.Sprintf("line %d:%d %s", start.GetLine(), start.GetColumn(), msg))
+		}
+	}))
+	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(code))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(listener)
+	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	tokens.SetTokenSource(newMixedContentCoalescingTokenSource(lexer))
+	parser := jspparser.NewJSPParser(tokens)
+	defer antlr4util.DetachParserATNSimulatorCaches(parser)
+	defer antlr4util.DetachLexerTokenSource(lexer)
+	parser.RemoveErrorListeners()
+	parser.AddErrorListener(listener)
+	parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+	parser.SetErrorHandler(antlr4util.NewBailErrorStrategy())
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			switch recovered.(type) {
+			case *antlr.ParseCancellationException:
+				parseErr = fmt.Errorf("SLL parse cancelled: %s", strings.Join(messages, "; "))
+			default:
+				if s, ok := recovered.(string); ok && s == "implement me" {
+					parseErr = fmt.Errorf("SLL parse cancelled: %s", strings.Join(messages, "; "))
+					return
+				}
+				panic(recovered)
+			}
+		}
+	}()
+	ast = parser.JspDocuments()
+	if len(messages) > 0 {
+		return nil, fmt.Errorf("SLL syntax errors: %s", strings.Join(messages, "; "))
+	}
+	return ast, nil
+}
+
+// stripJSPScriptComments removes <%-- ... --%> before lexing. The comment
+// rule only exists in the default lexer mode. Once a quoted "<" or a nested
+// tag leaves the lexer in TAG mode, <%-- becomes a scriptlet and the comment
+// body is emitted as Java ("-- text --"), which does not parse.
+func stripJSPScriptComments(src string) string {
+	if !strings.Contains(src, "<%--") {
+		return src
+	}
+	var b strings.Builder
+	b.Grow(len(src))
+	i := 0
+	for i < len(src) {
+		if strings.HasPrefix(src[i:], "<%--") {
+			end := strings.Index(src[i+4:], "--%>")
+			if end < 0 {
+				b.WriteString(src[i:])
+				break
+			}
+			b.WriteByte(' ')
+			i += 4 + end + len("--%>")
+			continue
+		}
+		b.WriteByte(src[i])
+		i++
+	}
+	return b.String()
+}
+
+// stripJSPIncludeDirectives removes <%@ include ... %> before lexing. The
+// lexer skip rule is only active in the default mode. Inside a tag or a
+// script the same directive becomes a scriptlet body "@ include file=..."
+// and the generated Java does not parse. Includes are not expanded either
+// way; this matches the lexer rule when that rule does match.
+func stripJSPIncludeDirectives(src string) string {
+	if !strings.Contains(src, "<%@") {
+		return src
+	}
+	var b strings.Builder
+	b.Grow(len(src))
+	i := 0
+	for i < len(src) {
+		if strings.HasPrefix(src[i:], "<%@") {
+			j := i + 3
+			for j < len(src) && (src[j] == ' ' || src[j] == '\t' || src[j] == '\n' || src[j] == '\r') {
+				j++
+			}
+			if strings.HasPrefix(src[j:], "include") {
+				end := strings.Index(src[i:], "%>")
+				if end < 0 {
+					b.WriteString(src[i:])
+					break
+				}
+				b.WriteByte(' ')
+				i += end + 2
+				continue
+			}
+		}
+		b.WriteByte(src[i])
+		i++
+	}
+	return b.String()
+}
+
 func preprocessMalformedJSPHTML(src string) string {
+	src = stripJSPScriptComments(src)
+	src = stripJSPIncludeDirectives(src)
+	if strings.Contains(src, "<?xml") || strings.Contains(src, "<?XML") {
+		src = xmlDeclPattern.ReplaceAllString(src, "")
+	}
+	if strings.Contains(src, "<!DOCTYPE") || strings.Contains(src, "<!doctype") {
+		src = doctypePattern.ReplaceAllString(src, "")
+	}
 	if strings.Contains(src, "<%=") {
 		src = unclosedTagExpressionLinePattern.ReplaceAllString(src, `$1>$2$3`)
 	}
@@ -267,12 +510,12 @@ func buildLinearScriptletJSPVisitor(visitor *JSPVisitor, src string) (*JSPVisito
 				visitor.EmitOutput(expr)
 			}
 		case strings.HasPrefix(body, "!"):
-			code := strings.TrimSpace(body[1:])
+			code := normalizeJSPEmbeddedJava(strings.TrimSpace(body[1:]))
 			if code != "" {
 				visitor.EmitDeclarationCode(code)
 			}
 		default:
-			code := strings.TrimSpace(body)
+			code := normalizeJSPEmbeddedJava(strings.TrimSpace(body))
 			if code != "" {
 				visitor.EmitPureCode(code)
 			}

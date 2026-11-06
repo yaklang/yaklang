@@ -731,6 +731,17 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 		}
 
 		SideEffectsReturn[variable] = ser
+		variableName := ""
+		if variable != nil {
+			variableName = variable.GetName()
+		}
+		f.SideEffectReturnSites = append(f.SideEffectReturnSites, FunctionSideEffectSite{
+			Name:         ser.Name,
+			VerboseName:  ser.VerboseName,
+			Modify:       ser.Modify,
+			Kind:         ser.Kind,
+			VariableName: variableName,
+		})
 	}
 	f.SideEffects = nil
 	f.SideEffectsReturn = append(f.SideEffectsReturn, SideEffectsReturn)

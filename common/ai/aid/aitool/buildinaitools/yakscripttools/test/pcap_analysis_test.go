@@ -435,6 +435,59 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.Nil(t, retried.Error)
 		require.Len(t, retried.Items, 1)
 	})
+	t.Run("tls_keylog_import_and_query", func(t *testing.T) {
+		fixtureRoot := filepath.Join("..", "..", "..", "..", "..", "..", "..", "testdata", "enterprise-traffic-analysis", "https-keylog-dridex")
+		capturePath, err := trafficfixture.Materialize(filepath.Join(fixtureRoot, "capture.pcap"), t.TempDir())
+		require.NoError(t, err)
+		keyLogPath, err := trafficfixture.Materialize(filepath.Join(fixtureRoot, "capture.keys"), t.TempDir())
+		require.NoError(t, err)
+
+		autoImported := invoke("query_pcapdb", map[string]any{
+			"pcapfile":        capturePath,
+			"query_type":      "protocols",
+			"protocol":        "http",
+			"tls_keylog_file": keyLogPath,
+			"limit":           200,
+		}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		require.Nil(t, autoImported.Error)
+		keyLogDatasetID := autoImported.DatasetID
+
+		loadedKeyLog := object(invoke("load_pcapfile", map[string]any{
+			"pcapfile":        capturePath,
+			"tls_keylog_file": keyLogPath,
+		}))
+		require.Equal(t, "ready", loadedKeyLog["state"])
+		require.Equal(t, true, loadedKeyLog["tls_keylog_applied"])
+		require.Equal(t, keyLogDatasetID, loadedKeyLog["dataset_id"])
+
+		meta := object(invoke("query_pcapdb", map[string]any{
+			"id":         keyLogDatasetID,
+			"query_type": "metadata",
+		}))
+		require.Equal(t, true, meta["tls_keylog_applied"])
+
+		httpPage := invoke("query_pcapdb", map[string]any{
+			"id":         keyLogDatasetID,
+			"query_type": "protocols",
+			"protocol":   "http",
+			"limit":      200,
+		}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
+		require.Nil(t, httpPage.Error)
+		var foundDownload, foundPost bool
+		for _, message := range httpPage.Items {
+			foundDownload = foundDownload || strings.Contains(message.Summary, "GET /invest_20.dll")
+			foundPost = foundPost || strings.Contains(message.Summary, "POST /docs.php")
+		}
+		require.True(t, foundDownload)
+		require.True(t, foundPost)
+
+		_, err = execute("query_pcapdb", map[string]any{
+			"id":              keyLogDatasetID,
+			"query_type":      "metadata",
+			"tls_keylog_file": keyLogPath,
+		})
+		require.ErrorContains(t, err, "tls_keylog_file requires pcapfile")
+	})
 	t.Run("errors_never_become_empty_success", func(t *testing.T) {
 		page := object(query("details", map[string]any{"record_id": 99999}))
 		require.Equal(t, "not_found", page["error"].(map[string]any)["code"])

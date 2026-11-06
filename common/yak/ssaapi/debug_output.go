@@ -60,7 +60,32 @@ func SetupDebugDir(debugDir string, redirectSSADB bool) (cleanup DebugOutputClea
 // Postgres SSA IR database so the scan job can reuse the compiled program, so
 // callers should pass redirectSSADB=false for platform compile/scan jobs.
 // Standalone CLI scans typically pass redirectSSADB=true.
-func StartDebugOutput(debugDir string, redirectSSADB bool) (DebugOutputCleanup, error) {
+// DebugOutputOptions tunes optional collectors wired by StartDebugOutput.
+type DebugOutputOptions struct {
+	// SkipDBStats keeps pprof from opening the SSA database.
+	SkipDBStats bool
+}
+
+// DebugOutputOption mutates DebugOutputOptions.
+type DebugOutputOption func(*DebugOutputOptions)
+
+// WithoutDebugDBStats disables every database touch inside debug output.
+func WithoutDebugDBStats() DebugOutputOption {
+	return func(o *DebugOutputOptions) { o.SkipDBStats = true }
+}
+
+func newDebugOutputOptions(opts []DebugOutputOption) *DebugOutputOptions {
+	o := &DebugOutputOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(o)
+		}
+	}
+	return o
+}
+
+func StartDebugOutput(debugDir string, redirectSSADB bool, opts ...DebugOutputOption) (DebugOutputCleanup, error) {
+	options := newDebugOutputOptions(opts)
 	if debugDir == "" {
 		return noopDebugCleanup, nil
 	}
@@ -95,7 +120,11 @@ func StartDebugOutput(debugDir string, redirectSSADB bool) (DebugOutputCleanup, 
 	}
 
 	// Start pprof collector (periodic CPU/heap/goroutine snapshots).
-	cleanup, err := StartPprofCollector(debugDir)
+	pprofOpts := make([]PprofCollectorOption, 0, 1)
+	if options.SkipDBStats {
+		pprofOpts = append(pprofOpts, WithoutPprofDBStats())
+	}
+	cleanup, err := StartPprofCollector(debugDir, pprofOpts...)
 	if err != nil {
 		log.Warnf("[debug] start pprof collector failed: %v, continuing without pprof", err)
 		if logFile != nil {

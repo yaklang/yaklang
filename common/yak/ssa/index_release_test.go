@@ -49,7 +49,7 @@ func TestReleaseSettledDropsResidentMembershipOnly(t *testing.T) {
 	require.NotEmpty(t, programName)
 	indexBefore := store.indexSaved.Count()
 	offsetBefore := store.offsetSaved.Count()
-	residentBefore := store.residentKeys.Count()
+	residentBefore := len(store.residentKeys)
 	require.Greater(t, indexBefore, 0)
 	require.Greater(t, offsetBefore, 0)
 	require.Greater(t, residentBefore, 0)
@@ -58,7 +58,7 @@ func TestReleaseSettledDropsResidentMembershipOnly(t *testing.T) {
 
 	released := store.ReleaseSettled(programName)
 	require.Greater(t, released, 0)
-	require.Zero(t, store.residentKeys.Count(), "the resident membership of a released batch is redundant")
+	require.Empty(t, store.residentKeys, "the resident membership of a released batch is redundant")
 	require.Equal(t, indexBefore, store.indexSaved.Count(), "index dedup keys must survive a release")
 	require.Equal(t, offsetBefore, store.offsetSaved.Count(), "offset dedup keys must survive a release")
 

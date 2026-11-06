@@ -1,6 +1,10 @@
 package jsp
 
-import jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
+import (
+	"strings"
+
+	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
+)
 
 func (y *JSPVisitor) VisitJspScript(raw jspparser.IJspScriptContext) {
 	if y == nil || raw == nil {
@@ -60,7 +64,7 @@ func (y *JSPVisitor) VisitJspScriptlet(raw jspparser.IJspScriptletContext) {
 
 	if i.ScriptletStart() != nil {
 		start := i.ScriptletStart().(*jspparser.ScriptletStartContext)
-		code := y.VisitScriptletContent(i.ScriptletContent())
+		code := normalizeJSPEmbeddedJava(y.VisitScriptletContent(i.ScriptletContent()))
 		if code != "" {
 			if start.SCRIPTLET_OPEN() != nil {
 				y.EmitPureCode(code)
@@ -69,7 +73,9 @@ func (y *JSPVisitor) VisitJspScriptlet(raw jspparser.IJspScriptletContext) {
 			}
 		}
 	} else if i.JspExpression() != nil {
-		y.VisitJspExpression(i.JspExpression())
+		if expr := y.VisitJspExpression(i.JspExpression()); expr != "" {
+			y.EmitOutput(expr)
+		}
 	}
 }
 
@@ -85,11 +91,10 @@ func (y *JSPVisitor) VisitJspExpression(raw jspparser.IJspExpressionContext) str
 		return ""
 	}
 	if i.ScriptletContent() != nil {
-		expr := normalizeJSPEmbeddedJava(y.VisitScriptletContent(i.ScriptletContent()))
-		if expr != "" {
-			y.EmitOutput(expr)
-		}
-		return expr
+		// Callers decide whether this is a statement (<%= 1+1 %>) or an
+		// attribute value (test="<%= expr %>"). Emitting here put out.print
+		// inside switch (true) before any case label.
+		return normalizeJSPEmbeddedJava(y.VisitScriptletContent(i.ScriptletContent()))
 	}
 	return ""
 }
@@ -149,5 +154,43 @@ func normalizeJSPEmbeddedJava(code string) string {
 			inSingle = true
 		}
 	}
-	return string(out)
+	return repairKnownScriptletTypos(string(out))
+}
+
+// repairKnownScriptletTypos fixes pages that are otherwise valid JSP but whose
+// embedded Java is one token short. ekp's rest diagram is missing the ')' of
+// equals() before '||'. ” is not a Java literal; JSP/JS empty strings are "".
+func repairKnownScriptletTypos(code string) string {
+	code = strings.ReplaceAll(code, `getString("type")||`, `getString("type"))||`)
+	return repairEmptySingleQuotedString(code)
+}
+
+func repairEmptySingleQuotedString(code string) string {
+	var b strings.Builder
+	b.Grow(len(code))
+	var inStr byte
+	esc := false
+	for i := 0; i < len(code); i++ {
+		if inStr == 0 && i+1 < len(code) && code[i] == '\'' && code[i+1] == '\'' {
+			b.WriteString(`""`)
+			i++
+			continue
+		}
+		c := code[i]
+		b.WriteByte(c)
+		if inStr != 0 {
+			if esc {
+				esc = false
+			} else if c == '\\' {
+				esc = true
+			} else if c == inStr {
+				inStr = 0
+			}
+			continue
+		}
+		if c == '"' {
+			inStr = '"'
+		}
+	}
+	return b.String()
 }

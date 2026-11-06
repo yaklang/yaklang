@@ -3,7 +3,7 @@ desc(
 	language: "java"
 	title: "Detect Java Generic Exception Catching"
 	title_zh: "检测Java泛型异常捕获"
-	type: "Code Vulnerability"
+	type: audit
 	severity: "low"
 	risk: "error-handling"
 	cwe: "CWE-396"

@@ -170,9 +170,10 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 				for k, v := range params {
 					switch ret := v.(type) {
 					case bool:
-						if ret {
-							args = append(args, "--"+k)
-						}
+						// Pass false too. "Set the switch to false" and "leave the
+						// switch alone" must not look the same to the script: a
+						// plugin whose declared default is true would keep it.
+						args = append(args, "--"+k, fmt.Sprintf("%v", ret))
 					default:
 						args = append(args, "--"+k, nativeYakPluginArgString(ret))
 					}

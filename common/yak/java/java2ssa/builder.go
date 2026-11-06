@@ -75,25 +75,37 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	return nil
 }
 
-func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, jarRecursiveParse bool) fi.FileSystem {
-	if fs == nil || !jarRecursiveParse {
+// WrapWithPreprocessedFS gives the compile a tree it can read as Java source:
+// archives become enterable directories and their class entries are presented
+// under .java names. expandArchive is the caller's decision to allow that
+// expansion at all; the incremental sequence turns it off so archive members
+// stay out of the walk.
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, expandArchive bool) fi.FileSystem {
+	if fs == nil || !expandArchive {
 		return fs
 	}
-	if _, ok := fs.(*javaclassparser.ExpandedZipFS); ok {
+	if expanded, ok := fs.(*javaclassparser.ExpandedZipFS); ok {
+		// SSA parses the rendered text. Keep a unique original member when javac
+		// cannot recompile that spelling, instead of replacing the class with a
+		// failure comment.
+		expanded.SetRetainUnprovedSource(true)
 		return fs
 	}
 
-	wrapped := javaclassparser.MaybeWrapExpandedArchiveFS(fs, jarRecursiveParse)
+	wrapped := javaclassparser.MaybeWrapExpandedArchiveFS(fs, expandArchive)
+	if expanded, ok := wrapped.(*javaclassparser.ExpandedZipFS); ok {
+		expanded.SetRetainUnprovedSource(true)
+	}
 	if wrapped == fs {
 		return fs
 	}
-	// Jar/zip roots from parseFSFromInfo may already be UnifiedFS(.class -> .java).
-	if _, ok := fs.(*filesys.UnifiedFS); !ok {
-		wrapped = filesys.NewUnifiedFS(wrapped,
-			filesys.WithUnifiedFsExtMap(".class", ".java"),
-		)
+	// A caller that already presents class entries as source keeps its own view.
+	if _, ok := fs.(*filesys.UnifiedFS); ok {
+		return wrapped
 	}
-	return wrapped
+	return filesys.NewUnifiedFS(wrapped,
+		filesys.WithUnifiedFsExtMap(".class", ".java"),
+	)
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
@@ -161,13 +173,24 @@ func (b *singleFileBuilder) forkForLazyBuild() *singleFileBuilder {
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
+	src = preprocessJavaUnicodeEscapes(src)
+	src = preprocessJavaRecordPatternSwitchCases(src)
+	src = normalizeDecompiledJava(src)
+	return parseFrontend(src, caches...)
+}
+
+// FrontendRaw checks generated Java without repairing decompiler output. Only
+// Java's Unicode-escape translation is applied. Preparation/verification must
+// not hide an upstream malformed signature or control-flow structure.
+func FrontendRaw(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
+	return parseFrontend(preprocessJavaUnicodeEscapes(src), caches...)
+}
+
+func parseFrontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
 	var cache *ssa.AntlrCache
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
-	src = preprocessJavaUnicodeEscapes(src)
-	src = preprocessJavaRecordPatternSwitchCases(src)
-	src = normalizeDecompiledJava(src)
 	lexicalErrors := antlr4util.NewErrorListener()
 	ast, err := antlr4util.ParseASTWithSLLFirst(
 		src,

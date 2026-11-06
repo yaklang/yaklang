@@ -20,28 +20,29 @@ import (
 )
 
 type packetSummary struct {
-	TransportView        *packetTransportView    `json:"transport_view,omitempty"`
-	PhysicalSource       string                  `json:"physical_source,omitempty"`
-	PhysicalDestination  string                  `json:"physical_destination,omitempty"`
-	TCPFlowID            uint64                  `json:"tcp_flow_id,omitempty"`
-	TCPFlowDomain        *pcaputil.CaptureDomain `json:"tcp_flow_domain,omitempty"`
-	TCPFlowState         string                  `json:"tcp_flow_state,omitempty"`
-	MessageSource        string                  `json:"message_source,omitempty"`
-	MessageDestination   string                  `json:"message_destination,omitempty"`
-	MessageTransport     string                  `json:"message_transport,omitempty"`
-	MessageDomain        *pcaputil.CaptureDomain `json:"message_domain,omitempty"`
-	CaptureDomain        pcaputil.CaptureDomain  `json:"capture_domain"`
-	PDUs                 []map[string]any        `json:"pdus,omitempty"`
-	PublishedPDUs        []map[string]any        `json:"published_pdus,omitempty"`
-	PublishedPDUScope    string                  `json:"published_pdu_scope,omitempty"`
-	PDUObservationScope  string                  `json:"pdu_scope,omitempty"`
-	ProtocolStack        []string                `json:"protocol_stack,omitempty"`
-	ConnectionProtocol   string                  `json:"connection_protocol,omitempty"`
-	ConnectionStack      []string                `json:"connection_stack,omitempty"`
-	ConnectionEvidence   string                  `json:"connection_evidence,omitempty"`
-	ConnectionDiagnostic string                  `json:"connection_diagnostic,omitempty"`
-	Visibility           string                  `json:"visibility,omitempty"`
-	ProtocolStatus       string                  `json:"protocol_status,omitempty"`
+	FieldValues          *pcaputil.DisplayFieldSnapshot `json:"field_values,omitempty"`
+	TransportView        *packetTransportView           `json:"transport_view,omitempty"`
+	PhysicalSource       string                         `json:"physical_source,omitempty"`
+	PhysicalDestination  string                         `json:"physical_destination,omitempty"`
+	TCPFlowID            uint64                         `json:"tcp_flow_id,omitempty"`
+	TCPFlowDomain        *pcaputil.CaptureDomain        `json:"tcp_flow_domain,omitempty"`
+	TCPFlowState         string                         `json:"tcp_flow_state,omitempty"`
+	MessageSource        string                         `json:"message_source,omitempty"`
+	MessageDestination   string                         `json:"message_destination,omitempty"`
+	MessageTransport     string                         `json:"message_transport,omitempty"`
+	MessageDomain        *pcaputil.CaptureDomain        `json:"message_domain,omitempty"`
+	CaptureDomain        pcaputil.CaptureDomain         `json:"capture_domain"`
+	PDUs                 []map[string]any               `json:"pdus,omitempty"`
+	PublishedPDUs        []map[string]any               `json:"published_pdus,omitempty"`
+	PublishedPDUScope    string                         `json:"published_pdu_scope,omitempty"`
+	PDUObservationScope  string                         `json:"pdu_scope,omitempty"`
+	ProtocolStack        []string                       `json:"protocol_stack,omitempty"`
+	ConnectionProtocol   string                         `json:"connection_protocol,omitempty"`
+	ConnectionStack      []string                       `json:"connection_stack,omitempty"`
+	ConnectionEvidence   string                         `json:"connection_evidence,omitempty"`
+	ConnectionDiagnostic string                         `json:"connection_diagnostic,omitempty"`
+	Visibility           string                         `json:"visibility,omitempty"`
+	ProtocolStatus       string                         `json:"protocol_status,omitempty"`
 	packetProtocol       string
 	packetInfo           string
 	connectionAnnotated  bool

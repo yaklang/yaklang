@@ -766,6 +766,10 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			})
 		}
 
+		if compressionMode && len(calls) != 1 {
+			return utils.Errorf("compress_context must be called exactly once in compression mode, got %d calls", len(calls))
+		}
+
 		// Normalize all deltas before action-specific verification. An adjustment
 		// may be independent or appear anywhere in a provider's tool-call batch;
 		// its presence lets an answer in that batch avoid premature auto-finish.

@@ -2,7 +2,9 @@ package runner
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -36,9 +38,9 @@ func DetectVersion(optBinary string) (*VersionInfo, error) {
 		optBinary = "opt"
 	}
 
-	resolvedPath, err := exec.LookPath(optBinary)
+	resolvedPath, err := resolveLLVMToolBinary(optBinary)
 	if err != nil {
-		return nil, fmt.Errorf("llvm detect: %q not found in PATH: %w", optBinary, err)
+		return nil, err
 	}
 
 	cmd := exec.Command(resolvedPath, "--version")
@@ -58,6 +60,39 @@ func DetectVersion(optBinary string) (*VersionInfo, error) {
 	}
 
 	return info, nil
+}
+
+// versionedLLVMInstallDirs lists the well-known per-version install prefixes
+// that distributions and the official apt.llvm.org packages use. Ubuntu's
+// llvm-18-dev installs `opt` under /usr/lib/llvm-18/bin, which is not on PATH
+// for a plain runner, so a PATH-only lookup reports a missing toolchain even
+// though it is installed.
+var versionedLLVMInstallDirs = []string{
+	"/usr/lib/llvm-18/bin",
+	"/usr/lib/llvm-17/bin",
+	"/usr/lib/llvm-16/bin",
+	"/usr/local/opt/llvm/bin",
+}
+
+// resolveLLVMToolBinary finds an LLVM tool binary. A bare name is looked up
+// on PATH first; when that fails and the name carries no directory, the
+// versioned LLVM install prefixes are probed so an installed-but-not-exported
+// toolchain still resolves.
+func resolveLLVMToolBinary(optBinary string) (string, error) {
+	if resolved, err := exec.LookPath(optBinary); err == nil {
+		return resolved, nil
+	} else if strings.ContainsRune(optBinary, '/') {
+		return "", fmt.Errorf("llvm detect: %q not found: %w", optBinary, err)
+	}
+
+	for _, dir := range versionedLLVMInstallDirs {
+		candidate := filepath.Join(dir, optBinary)
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("llvm detect: %q not found in PATH or %s", optBinary, strings.Join(versionedLLVMInstallDirs, ", "))
 }
 
 var versionRegex = regexp.MustCompile(`LLVM version (\d+)\.(\d+)\.(\d+)`)

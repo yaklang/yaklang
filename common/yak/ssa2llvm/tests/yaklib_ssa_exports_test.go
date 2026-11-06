@@ -560,15 +560,26 @@ cli.check()
 result = {"target": target, "languages": languages, "compile_immediately": compile_immediately, "jar_recursive_parse": jarRecursiveParse}
 yakit.Code(json.dumps(result))
 `
-	output := runBinaryWithEnv(t, code, "", map[string]string{
-		"YAKIT_HOME": t.TempDir(),
-	}, withArgs("--target", "/tmp/probe", "--compile-immediately", "--language", "php"))
+	args := []string{"--target", "/tmp/probe", "--compile-immediately", "--language", "php"}
+	run := func(extra ...string) string {
+		return runBinaryWithEnv(t, code, "", map[string]string{
+			"YAKIT_HOME": t.TempDir(),
+		}, withArgs(append(append([]string{}, args...), extra...)...))
+	}
+
+	// An absent optional bool keeps its declared default: jar-recursive-parse
+	// defaults to true so a programmatic compile still expands jars.
+	output := run()
 	require.Contains(t, output, `"target": "/tmp/probe"`)
 	require.Contains(t, output, `"languages": [`)
 	require.Contains(t, output, `"php"`)
 	require.Contains(t, output, `"compile_immediately": true`)
-	require.Contains(t, output, `"jar_recursive_parse": false`)
+	require.Contains(t, output, `"jar_recursive_parse": true`)
 	require.NotContains(t, output, "YakVM Code DIE")
+
+	// An explicit --flag=false must still win over that default.
+	disabled := run("--jar-recursive-parse=false")
+	require.Contains(t, disabled, `"jar_recursive_parse": false`)
 }
 
 func TestYaklibSSA_CLIStringTrimFeedsFileExists(t *testing.T) {
@@ -860,7 +871,7 @@ println("ok")
 func TestYaklibSSA_WithExcludeFileEmptySlice(t *testing.T) {
 	code := `
 yakit.AutoInitYakit()
-config, err = ssa.NewConfig(ssa.ModeAll, ssa.withProgramName("t"), ssa.withLanguage("php"), ssa.withExcludeFile([]))
+config, err = ssa.NewConfig(ssa.ModeAll, ssa.withProgramName("t"), ssa.withLanguage("php"), ssa.withExcludeFile([]...))
 if err != nil { die("err: %v", err) }
 if config == nil { die("config nil") }
 println("ok")

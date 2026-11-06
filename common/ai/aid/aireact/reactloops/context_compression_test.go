@@ -101,7 +101,52 @@ func TestContextCompressionMeasuresWholePrompt(t *testing.T) {
 	require.Contains(t, result.Prompt, "接近 1000 tokens")
 }
 
-func TestContextCompressionPropagatesPromptBuildError(t *testing.T) {
+func TestContextCompressionSkipsModeWhenTimelineHasNoCompressibleContent(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(6000))
+	loop := makeSchemaStabilityTestLoop(cfg)
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	invoker := &compressionPromptInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), timeline: cfg.Timeline}
+	invoker.SetConfig(cfg)
+	loop.invoker = invoker
+	capture := captureActivityStatus(loop)
+
+	input := loop.captureLoopPromptBuildInput("no-compressible-input", "", strings.Repeat("frozen context ", 9000), nil, "", &LoopActionHandlerOperator{})
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression is unavailable for this turn"))
+}
+
+func TestContextCompressionGuideErrorsFallbackToNormalMode(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(6000))
+	cfg.Timeline.PushText(cfg.AcquireId(), "compressible history")
+	loop := makeSchemaStabilityTestLoop(cfg)
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	invoker := &compressionPromptInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), timeline: cfg.Timeline}
+	invoker.SetConfig(cfg)
+	loop.invoker = invoker
+	invalidThroughID := int64(-1)
+	loop.lastFittingTimelineThroughID = &invalidThroughID
+	capture := captureActivityStatus(loop)
+
+	input := loop.captureLoopPromptBuildInput("guide-error", "", "", nil, "", &LoopActionHandlerOperator{})
+	input.overflowCompression = true
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression is unavailable for this turn"))
+}
+
+func TestContextCompressionPromptTokenLimitUsesConfiguredLimitPlusHeadroom(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(40*1024))
+	loop := makeSchemaStabilityTestLoop(cfg)
+	require.EqualValues(t, 240*1024, loop.contextCompressionPromptTokenLimit())
+}
+
+func TestContextCompressionPromptBuildErrorFallsBackToNormalMode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true),
@@ -115,10 +160,13 @@ func TestContextCompressionPropagatesPromptBuildError(t *testing.T) {
 	}
 	invoker.SetConfig(cfg)
 	loop.invoker = invoker
+	capture := captureActivityStatus(loop)
 
 	input := loop.captureLoopPromptBuildInput("build-error", "", strings.Repeat("TASK_CONTEXT ", 9000), nil, "", &LoopActionHandlerOperator{})
-	_, err := loop.generateLoopPromptFromInput(input)
-	require.ErrorIs(t, err, buildErr)
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "assembling the compression prompt"))
 }
 
 func TestContextCompressionActionFailsOnCancelledTask(t *testing.T) {
@@ -168,7 +216,11 @@ func contextCompressionTestResponse(t *testing.T, c aicommon.AICallerConfigIf, r
 
 func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	for _, native := range []bool{false, true} {
-		for _, invalid := range []string{"wrong_action", "missing_action", "todo_delta", "retire_type"} {
+		invalidCases := []string{"wrong_action", "missing_action"}
+		if native {
+			invalidCases = append(invalidCases, "multiple_calls")
+		}
+		for _, invalid := range invalidCases {
 			t.Run(fmt.Sprintf("native=%v/%s", native, invalid), func(t *testing.T) {
 				ctx := context.Background()
 				qualityCalls, otherCalls := 0, 0
@@ -185,21 +237,20 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 						require.Equal(t, aicommon.CallerLabelContextCompress, req.GetCallerLabel())
 						params := map[string]any{"summary": summary, "retain_timeline": "3-8,12,20-26,37,41-45", "retire_skill_names": []string{}, "retire_evidence_ids": []string{}}
 						name := aicommon.ContextCompressionAction
+						multiple := false
 						if qualityCalls == 1 {
 							switch invalid {
 							case "wrong_action":
 								name = "unsafe_action"
 							case "missing_action":
 								name = ""
-							case "todo_delta":
-								params["todo_delta"] = map[string]any{"add": []any{map[string]any{"id": "bad", "text": "must not apply"}}}
-							case "retire_type":
-								params["retire_skill_names"] = "not-an-array"
+							case "multiple_calls":
+								multiple = true
 							}
 						} else {
 							require.Contains(t, req.GetPrompt(), "# 重试纠正")
 						}
-						return contextCompressionTestResponse(t, c, req, name, params, false), nil
+						return contextCompressionTestResponse(t, c, req, name, params, multiple), nil
 					}))
 				for _, id := range []int64{3, 8, 10, 12, 20, 26, 37, 41, 45} {
 					historyText[id] = uuid.NewString()
@@ -236,21 +287,180 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	}
 }
 
-func TestContextCompressionHandlerParsesSelection(t *testing.T) {
+func TestContextCompressionRuntimeReadAndApplyFailuresWarnWithoutFailingTask(t *testing.T) {
+	for _, test := range []struct {
+		name                 string
+		throughID            *int64
+		itemIDs              []int64
+		summary              string
+		expectedWarningStage string
+	}{
+		{
+			name: "candidate read failure", throughID: func() *int64 { id := int64(-1); return &id }(),
+			summary: "summary", expectedWarningStage: "reading timeline candidates",
+		},
+		{
+			name: "apply sees unobserved history", itemIDs: []int64{},
+			summary: "", expectedWarningStage: "committing the timeline compression result",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
+				aicommon.WithDisableCreateDBRuntime(true))
+			history := uuid.NewString()
+			cfg.Timeline.PushText(12, "%s", history)
+			loop := makeSchemaStabilityTestLoop(cfg)
+			capture := captureActivityStatus(loop)
+			action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{
+				"summary": test.summary, "retain_timeline": "", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
+			})
+			op := NewActionHandlerOperator(nil)
+			op.requestTimelineThroughID = test.throughID
+			op.requestTimelineItemIDs = test.itemIDs
+
+			handleCompressContext(loop, action, op)
+			terminated, err := op.IsTerminated()
+			require.NoError(t, err)
+			require.False(t, terminated)
+			require.Nil(t, op.contextCompressionError)
+			require.True(t, capture.waitStream(contextCompressionWarningNodeID, test.expectedWarningStage))
+			require.Contains(t, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).PromptText(), history,
+				"failed compression must leave the timeline unchanged")
+		})
+	}
+}
+
+func TestContextCompressionCommitsWhenSummaryIsUsable(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		params aitool.InvokeParams
+	}{
+		{name: "summary only", params: aitool.InvokeParams{"summary": "summary"}},
+		{name: "non ordinary retain id", params: aitool.InvokeParams{"summary": "summary", "retain_timeline": "4498"}},
+		{name: "malformed retain and retire values", params: aitool.InvokeParams{
+			"summary": "summary", "retain_timeline": "12-abc,4498",
+			"retire_skill_names": "not-an-array", "retire_evidence_ids": map[string]any{"invalid": true},
+			"memory_entities": "invalid",
+		}},
+		{name: "structured summary and todo delta", params: aitool.InvokeParams{
+			"summary": []any{"summary part one", "summary part two"},
+			"todo_delta": map[string]any{"add": []any{
+				map[string]any{"id": "bad", "text": "must not apply"},
+			}},
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
+			cfg.Timeline.PushText(12, "history")
+			loop := makeSchemaStabilityTestLoop(cfg)
+			action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, test.params)
+			require.NoError(t, loop.verifyContextCompressionAction(action), "only a missing summary is structural")
+			_, hasTodoDelta := action.LookupCanonicalParam("todo_delta")
+			require.False(t, hasTodoDelta, "compression must ignore todo_delta")
+
+			op := NewActionHandlerOperator(nil)
+			handleCompressContext(loop, action, op)
+			terminated, err := op.IsTerminated()
+			require.NoError(t, err)
+			require.False(t, terminated)
+			require.NoError(t, op.contextCompressionError)
+			view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
+			require.Contains(t, view.Frozen, "summary")
+			require.NotContains(t, view.Frozen, "history")
+		})
+	}
+}
+
+func TestContextCompressionWithoutSummaryStillRequestsCorrection(t *testing.T) {
 	ctx := context.Background()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
 	cfg.Timeline.PushText(12, "history")
 	loop := makeSchemaStabilityTestLoop(cfg)
+	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{"retain_timeline": "12"})
+	require.ErrorContains(t, loop.verifyContextCompressionAction(action), "requires summary")
+
+	op := NewActionHandlerOperator(nil)
+	handleCompressContext(loop, action, op)
+	_, err := op.IsTerminated()
+	require.NoError(t, err)
+	require.ErrorContains(t, op.contextCompressionError, "summary 不能为空")
+}
+
+func TestParseContextCompressionRetainedIDsIntersectsOrdinaryCandidates(t *testing.T) {
+	candidates := []aicommon.TimelineCompressionCandidate{
+		{ID: 12, PromptText: "twelve"},
+		{ID: 20, PromptText: "twenty"},
+		{ID: 30, PromptText: "thirty"},
+		{ID: 4498, PromptText: "protected", Kind: aicommon.TimelinePromotedKindUserInput},
+	}
+	for _, test := range []struct {
+		name string
+		text string
+		want []int64
+	}{
+		{name: "protected single id", text: "4498", want: nil},
+		{name: "range endpoints need not be ordinary", text: "10-21,4498", want: []int64{12, 20}},
+		{name: "ordinary single ids", text: "12,30", want: []int64{12, 30}},
+		{name: "malformed segments are ignored", text: "12-abc,broken,30", want: []int64{30}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := parseContextCompressionRetainedIDs(test.text, candidates)
+			require.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestContextCompressionSummaryOverAdvisoryLimitWarnsAndCommits(t *testing.T) {
+	ctx := context.Background()
+	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
+	retiredHistory := uuid.NewString()
+	cfg.Timeline.PushText(12, "%s", retiredHistory)
+	loop := makeSchemaStabilityTestLoop(cfg)
+	summary := strings.TrimSpace(strings.Repeat("long summary ", aicommon.TimelineCompressionMaxSummaryTokens+1))
 	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{
-		"summary": "summary", "retain_timeline": "99", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
+		"summary": summary, "retain_timeline": "", "retire_skill_names": []any{}, "retire_evidence_ids": []any{},
 	})
-	require.NoError(t, loop.verifyContextCompressionAction(action), "verification only checks action compliance")
+	require.Greater(t, aicommon.MeasureTokens(summary), aicommon.TimelineCompressionMaxSummaryTokens)
+
+	capture := captureActivityStatus(loop)
 	op := NewActionHandlerOperator(nil)
 	handleCompressContext(loop, action, op)
 	terminated, err := op.IsTerminated()
 	require.NoError(t, err)
-	require.False(t, terminated, "an invalid selection must be correctable without ending the task")
-	require.ErrorContains(t, op.contextCompressionError, "retain_timeline")
+	require.False(t, terminated)
+	require.NoError(t, op.contextCompressionError)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression exceeded the advisory limit"))
+	loop.GetEmitter().WaitForStream()
+	capture.mu.Lock()
+	allNormalStreams := true
+	for _, event := range capture.events {
+		if event.NodeId == contextCompressionWarningNodeID && event.IsStream && event.IsSystem {
+			allNormalStreams = false
+		}
+	}
+	capture.mu.Unlock()
+	require.True(t, allNormalStreams, "context compression warning must use a normal user-visible stream")
+	serialized, err := aicommon.MarshalTimeline(cfg.Timeline)
+	require.NoError(t, err)
+	require.Contains(t, serialized, summary)
+	view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
+	require.NotContains(t, view.Frozen, retiredHistory)
+}
+
+func TestContextCompressionWarningUsesDedicatedNodeAndEnglishBody(t *testing.T) {
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithLanguage("zh"),
+	)
+	loop := makeSchemaStabilityTestLoop(cfg)
+	capture := captureActivityStatus(loop)
+	loop.emitContextCompressionAdvisoryLimit(70_000, 65_536)
+	require.Equal(t, "context_compression_warning", contextCompressionWarningNodeID)
+	require.True(t, capture.waitStream(contextCompressionWarningNodeID, "Context compression exceeded the advisory limit"))
+	loop.GetEmitter().WaitForStream()
 }
 
 func TestContextCompressionExamplesSupportScatteredRanges(t *testing.T) {

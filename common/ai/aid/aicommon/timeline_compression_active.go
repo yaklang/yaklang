@@ -59,7 +59,8 @@ func (m *Timeline) compressionItemIDsLocked(throughID ...int64) []int64 {
 }
 
 // RenderCompressionGuide reads the current timeline and returns the dynamic
-// compression guide. It does not reserve or retain a snapshot.
+// compression guide. An empty guide means there is nothing compressible.
+// It does not reserve or retain a snapshot.
 func (m *Timeline) RenderCompressionGuide(options TimelineCompressionOptions) (string, error) {
 	if m == nil {
 		return "", nil
@@ -78,8 +79,9 @@ func (m *Timeline) RenderCompressionGuide(options TimelineCompressionOptions) (s
 	if err != nil {
 		return "", err
 	}
-	if err := prepareCompressionSnapshot(snapshot); err != nil && len(snapshot.ExactItemIDs) == 0 {
-		return "", err
+	prepareCompressionSnapshot(snapshot)
+	if !snapshot.hasCompressionInput() {
+		return "", nil
 	}
 	return renderCompressionGuide(snapshot, options), nil
 }

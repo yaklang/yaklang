@@ -332,3 +332,46 @@ func TestPeekStringSliceDoesNotRegisterMetadata(t *testing.T) {
 
 	assert.Len(t, app.extraParams, registeredBefore)
 }
+
+// A bool flag keeps its declared default when the caller passes no argv at all.
+// Programmatic plugin execution relies on this: the SSA auto-detect plugin
+// declares jar-recursive-parse default true, and ignoring the default disabled
+// jar expansion for every CLI compile of a webapp.
+func TestCliBoolHonorsDefaultWithoutArgv(t *testing.T) {
+	testCliParam(t, nil, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.True(app.Bool("enabled-by-default", app.SetDefault(true)))
+		test.False(app.Bool("disabled-by-default", app.SetDefault(false)))
+		test.False(app.Bool("no-default"))
+		check()
+	})
+}
+
+// An explicitly passed flag still wins over the declared default.
+func TestCliBoolFlagOverridesDefault(t *testing.T) {
+	testCliParam(t, []string{"--enabled"}, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.True(app.Bool("enabled", app.SetDefault(false)))
+		check()
+	})
+}
+
+// A required boolean flag has no implicit default: the caller must say so.
+// The SyntaxFlow searcher declares "fuzz" required with default true, and a
+// caller that omits it asks for an exact search, not a fuzzy one.
+func TestCliBoolRequiredFlagIgnoresDefault(t *testing.T) {
+	testCliParam(t, []string{"--required-present"}, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.False(app.Bool("required-default-true", app.SetRequired(true), app.SetDefault(true)))
+		test.True(app.Bool("required-present", app.SetRequired(true), app.SetDefault(true)))
+		check()
+	})
+}
+
+// --flag=false is a single argument. The exact-name lookup cannot see it, so
+// the explicit value must be parsed before the declared default applies.
+func TestCliBoolParsesExplicitValue(t *testing.T) {
+	testCliParam(t, []string{"--enabled=false", "--default-true=false", "--enabled-true=true"}, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.False(app.Bool("enabled", app.SetDefault(true)))
+		test.False(app.Bool("default-true", app.SetDefault(true)))
+		test.True(app.Bool("enabled-true", app.SetDefault(false)))
+		check()
+	})
+}

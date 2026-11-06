@@ -26,6 +26,13 @@ const (
 	Version uint64 = 1
 )
 
+// YaklibExportCallableMarker is the closure fn value for a yaklib export
+// used as a first-class function value (e.g. f = poc.ReplaceHTTPPacketHeader;
+// f(...)). Real function pointers are never this small; the runtime
+// intercepts it and dispatches through the yaklib table using the closure's
+// freeValues (pkg, method).
+const YaklibExportCallableMarker uint64 = 1
+
 const (
 	KindCallable uint64 = 1
 	KindDispatch uint64 = 2
@@ -38,25 +45,45 @@ const (
 	MakeSliceSymbol    = "yak_runtime_make_slice"
 
 	// C-archive symbols exported by runtime_go (keep in sync with //export names).
-	InternalPrintIntSymbol      = "yak_internal_print_int"
-	InternalMallocSymbol        = "yak_internal_malloc"
-	RuntimeToCStringSymbol      = "yak_runtime_to_cstring"
-	HostReleaseHandleSymbol     = "yak_host_release_handle"
-	InternalReleaseShadowSymbol = "yak_internal_release_shadow"
-	RuntimeNewShadowSymbol      = "yak_runtime_new_shadow"
-	RuntimeGetFieldSymbol       = "yak_runtime_get_field"
-	RuntimeSetFieldSymbol       = "yak_runtime_set_field"
-	RuntimeDumpSymbol           = "yak_runtime_dump"
-	RuntimeDumpHandleSymbol     = "yak_runtime_dump_handle"
-	RuntimeGCSymbol             = "yak_runtime_gc"
-	RuntimeWaitAsyncSymbol      = "yak_runtime_wait_async"
-	RuntimeLoadPanicValueSymbol = "yak_runtime_load_panic_value"
-	RuntimeInvokeVMSymbol       = "yak_runtime_invoke_vm"
-	RuntimeTestAdd1CtxSymbol    = "yak_runtime_test_add1_ctx"
+	InternalPrintIntSymbol            = "yak_internal_print_int"
+	InternalMallocSymbol              = "yak_internal_malloc"
+	RuntimeToCStringSymbol            = "yak_runtime_to_cstring"
+	HostReleaseHandleSymbol           = "yak_host_release_handle"
+	InternalReleaseShadowSymbol       = "yak_internal_release_shadow"
+	RuntimeNewShadowSymbol            = "yak_runtime_new_shadow"
+	RuntimeGetFieldSymbol             = "yak_runtime_get_field"
+	RuntimeGetModuleSymbol            = "yak_runtime_get_module"
+	RuntimeSetFieldSymbol             = "yak_runtime_set_field"
+	RuntimeDumpSymbol                 = "yak_runtime_dump"
+	RuntimeDumpHandleSymbol           = "yak_runtime_dump_handle"
+	RuntimeGCSymbol                   = "yak_runtime_gc"
+	RuntimeWaitAsyncSymbol            = "yak_runtime_wait_async"
+	RuntimeUseYakitDatabaseSymbol     = "yak_runtime_use_yakit_database"
+	RuntimeLoadPanicValueSymbol       = "yak_runtime_load_panic_value"
+	RuntimeInvokeVMSymbol             = "yak_runtime_invoke_vm"
+	RuntimeTestAdd1CtxSymbol          = "yak_runtime_test_add1_ctx"
+	RuntimeConcatSymbol               = "yak_runtime_concat"
+	RuntimeSprintfSymbol              = "yak_runtime_sprintf"
+	RuntimeReadClosureFreeValueSymbol = "yak_runtime_read_closure_free_value"
+	RuntimeStringSliceSymbol          = "yak_runtime_string_slice"
+	RuntimeSliceSliceSymbol           = "yak_runtime_slice_slice"
+	RuntimeDropErrorSymbol            = "yak_runtime_drop_error"
+	RuntimeToIntSymbol                = "yak_runtime_to_int"
+	RuntimeToFloatSymbol              = "yak_runtime_to_float"
+	RuntimeToStringSymbol             = "yak_runtime_to_string"
+	RuntimeStringToBytesSymbol        = "yak_runtime_string_to_bytes"
+	RuntimeBoolToStringSymbol         = "yak_runtime_bool_to_string"
+	RuntimeIsTrueSymbol               = "yak_runtime_is_true"
+	RuntimeParseIntSymbol             = "yak_runtime_parse_int"
+	RuntimeParseFloatSymbol           = "yak_runtime_parse_float"
+	RuntimeFuzztagSymbol              = "yak_runtime_fuzztag"
+	RuntimeFloatBinopSymbol           = "yak_runtime_float_binop"
+	RuntimeGetClosureFreeSlotSymbol   = "yak_runtime_get_closure_free_slot"
 
 	// Compiler renames clashing user main/@main (not part of linkprep manifest).
 	InternalAtMainSymbol = "yak_internal_atmain"
 	InternalMainSymbol   = "yak_internal_main"
+	UserSymbolPrefix     = "yak_user_"
 )
 
 const (
@@ -64,6 +91,11 @@ const (
 	FlagPanicTaggedPointer uint64 = 1 << 1
 	FlagFieldBool          uint64 = 1 << 2
 	FlagFieldString        uint64 = 1 << 3
+	FlagEllipsis           uint64 = 1 << 4
+	// FlagFieldNil marks a yak_runtime_set_field store of yak nil. The ABI
+	// word is 0, the same bits as integer 0, so the container keeps a real
+	// nil and get_field hands back a nil shadow. It is a field flag only.
+	FlagFieldNil uint64 = 1 << 5
 )
 
 const (
@@ -137,6 +169,23 @@ const (
 
 	// Assert: args are (cond, msg). The runtime panics if cond is false.
 	IDAssert FuncID = 28
+
+	// Channel send for `ch <- v`.
+	IDRuntimeChanSend FuncID = 29
+
+	// Channel creation for `make(chan T, n)`.
+	IDRuntimeMakeChan FuncID = 30
+
+	// Wait for every goroutine started by `go func` to finish: the runtime
+	// side of the yak builtin waitAllAsyncCallFinish(). The generated main
+	// wrapper already waits once after the entry function returns, but a
+	// script may also call the builtin explicitly to synchronise mid-run.
+	IDRuntimeWaitAsync FuncID = 31
+
+	// Yak select. The frontend emits one call to "$yak:select$" whose
+	// arguments are the flattened cases (direction, channel, send value).
+	// The result is a 3-tuple (index, received value, ok).
+	IDRuntimeSelect FuncID = 32
 )
 
 type SliceElemKind int64

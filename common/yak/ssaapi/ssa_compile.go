@@ -235,13 +235,49 @@ func (c *Config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 	return nil
 }
 
+// swapLanguageFs gives the frontend the filesystem it will read.
+//
+// Expansion of archives belongs to the frontend; the incremental sequence
+// forbids it (disableArchiveExpansion) because its diff needs a stable walk
+// identity for every entry. When the caller turned jar parsing off, an archive
+// is an opaque binary the frontend cannot read, so it is removed from the tree
+// afterwards: the walk and the frontend both see a tree without archives.
 func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
-	if c.LanguageBuilder != nil {
-		// jar/zip 等归档展开由语言预处理负责；参与增量序列的编译
-		// （基础全量 + 差量）禁止展开（disableArchiveExpansion），普通
-		// 全量编译遵循用户的 jar_recursive_parse 设置。
-		jarRecursiveParse := !c.disableArchiveExpansion && c.GetCodeSourceJarRecursiveParse()
-		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, jarRecursiveParse)
+	if c == nil || c.LanguageBuilder == nil {
+		return fs
+	}
+	expandArchive := !c.disableArchiveExpansion && c.GetCodeSourceJarRecursiveParse()
+	fs = c.LanguageBuilder.WrapWithPreprocessedFS(fs, expandArchive)
+	if !c.disableArchiveExpansion && !c.GetCodeSourceJarRecursiveParse() {
+		fs = hideArchiveFiles(fs)
 	}
 	return fs
+}
+
+// wrapPreparedSources puts the prepared view in front of fs, so the scan, the
+// unit planning and the AST build all read the same produced sources instead of
+// producing them again. It is a no-op when the frontend has no preparation
+// step or the tree needed none.
+func (c *Config) wrapPreparedSources(fs fi.FileSystem) fi.FileSystem {
+	if c == nil || c.preparedSources == nil {
+		return fs
+	}
+	return c.preparedSources.Wrap(fs)
+}
+
+// ensureLanguageBuilder maps an already decided language onto its frontend.
+// Which language a project is in is decided once, by the project inspector
+// ("SSA 项目探测"); this method only looks up the frontend for that decision and
+// never guesses a language of its own.
+func (c *Config) ensureLanguageBuilder() {
+	if c == nil || c.LanguageBuilder != nil {
+		return
+	}
+	language := c.GetLanguage()
+	if language == "" {
+		return
+	}
+	if create, ok := LanguageBuilderCreater[language]; ok && create != nil {
+		c.LanguageBuilder = create()
+	}
 }

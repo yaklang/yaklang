@@ -232,7 +232,7 @@ func applySSAPost(ctx *core.Context) error {
 				if !ok || candidate == nil {
 					continue
 				}
-				if !isSupportedCallretInvokeCall(ctx, candidate) {
+				if !callretCanRewriteCall(candidate) {
 					continue
 				}
 
@@ -480,11 +480,8 @@ func getBasicBlock(fn *ssa.Function, id int64) (*ssa.BasicBlock, bool) {
 	return b, ok && b != nil
 }
 
-func isSupportedCallretInvokeCall(ctx *core.Context, call *ssa.Call) bool {
+func callretCanRewriteCall(call *ssa.Call) bool {
 	if call == nil {
-		return false
-	}
-	if ctx == nil || ctx.InstructionTag(call.GetId()) != tagInternalCall {
 		return false
 	}
 	if call.Async || call.Unpack || call.IsDropError || call.IsEllipsis {
@@ -499,13 +496,40 @@ func resolveCallretTargetFunction(ctx *core.Context, program *ssa.Program, call 
 	}
 	callerFn := call.GetFunc()
 	resolved, ok := callframe.ResolveDirectCallee(program, callerFn, call)
-	if !ok || resolved == nil {
+	if ok && resolved != nil {
+		if fn, ok := internal[resolved.GetId()]; ok && fn != nil {
+			return fn, true
+		}
+	}
+	// Normal lowering leaves a call indirect when the callee is a free-value
+	// parameter whose default is a closure from an ancestor: the closure object
+	// carries the captures. callret merges that function and turns its captures
+	// into stack traffic, so the call is a direct edge. Missing it deletes the
+	// callee while the call still expects a closure, and the result is zero.
+	return mergedCalleeFromFreeValue(callerFn, call, internal)
+}
+
+func mergedCalleeFromFreeValue(callerFn *ssa.Function, call *ssa.Call, internal map[int64]*ssa.Function) (*ssa.Function, bool) {
+	if callerFn == nil || call == nil {
 		return nil, false
 	}
-	if fn, ok := internal[resolved.GetId()]; ok && fn != nil {
-		return fn, true
+	calleeVal, ok := callerFn.GetValueById(call.Method)
+	if !ok || calleeVal == nil {
+		return nil, false
 	}
-	return nil, false
+	param, ok := ssa.ToParameter(calleeVal)
+	if !ok || param == nil || param.GetDefault() == nil {
+		return nil, false
+	}
+	fn, ok := ssa.ToFunction(param.GetDefault())
+	if !ok || fn == nil || fn.IsExtern() {
+		return nil, false
+	}
+	merged, ok := internal[fn.GetId()]
+	if !ok || merged == nil {
+		return nil, false
+	}
+	return merged, true
 }
 
 func rewriteFunctionInputs(ctx *core.Context, builder *ssa.FunctionBuilder, fn *ssa.Function, vsPopTarget ssa.Value) error {

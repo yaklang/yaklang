@@ -491,13 +491,67 @@ func (c *CliApp) _cliFromString(name string, opts ...SetCliExtraParam) (string, 
 func (c *CliApp) Bool(name string, opts ...SetCliExtraParam) bool {
 	p := c._getExtraParams(name, opts...)
 	p._type = "bool"
+	// setRequired means the caller decides; a missing required flag must not
+	// silently take the declared default. The SyntaxFlow searcher relies on it:
+	// "fuzz" is required with default true, and a caller that omits it asks for
+	// an exact search, not a fuzzy one.
+	required := p.required
 	p.required = false
 
 	index := p.foundArgsIndex()
 	if index < 0 {
-		return false // c.GetDefaultValue(false).(bool)
+		// --flag=true / --flag=false is a single argument, so the exact-name
+		// lookup above cannot see it. Parse the explicit value before falling
+		// back to the declared default, otherwise "--flag=false" would read as
+		// "flag absent" and pick up a default of true.
+		if value, ok := p.findExplicitBoolValue(); ok {
+			return value
+		}
+		// An optional boolean flag with an explicit default keeps that default
+		// when the flag is absent. Plugins executed programmatically have no argv
+		// at all: "SSA 项目探测" declares jar-recursive-parse default true, and
+		// ignoring it silently disabled jar expansion for every CLI compile.
+		if p.defaultValue != nil && !required {
+			return utils.InterfaceToBoolean(p.defaultValue)
+		}
+		return false
+	}
+	// --flag followed by a true/false literal carries a value: the AI tool layer
+	// passes parameters as "--key value" pairs, so the bare flag is present but
+	// the value sits in the next argument.
+	if value, ok := p.boolLiteralAt(index); ok {
+		return value
 	}
 	return true
+}
+
+// boolLiteralAt reads an explicit true/false argument that follows the flag.
+func (param *cliExtraParams) boolLiteralAt(index int) (bool, bool) {
+	args := param.cliApp.GetArgs()
+	if index < 0 || index+1 >= len(args) {
+		return false, false
+	}
+	switch strings.ToLower(strings.TrimSpace(args[index+1])) {
+	case "true":
+		return true, true
+	case "false":
+		return false, true
+	}
+	return false, false
+}
+
+// findExplicitBoolValue resolves the --flag=value form for this parameter.
+func (param *cliExtraParams) findExplicitBoolValue() (bool, bool) {
+	for _, arg := range param.cliApp.GetArgs() {
+		for _, opt := range param.params {
+			prefix := opt + "="
+			if !strings.HasPrefix(arg, prefix) {
+				continue
+			}
+			return utils.InterfaceToBoolean(strings.TrimPrefix(arg, prefix)), true
+		}
+	}
+	return false, false
 }
 
 // Have 获取对应名称的命令行参数，并将其转换为 bool 类型返回

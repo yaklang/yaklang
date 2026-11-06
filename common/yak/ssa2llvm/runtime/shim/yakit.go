@@ -41,6 +41,22 @@ func YakitText(text string) {
 	_, _ = fmt.Fprintf(os.Stderr, "[text] %s\n", text)
 }
 
+func YakitOutput(value interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, "[yakit][output] %v\n", value)
+}
+
+func YakitGetHomeTempDir() string {
+	dir, err := os.MkdirTemp("", "yakit-tmp-*")
+	if err != nil {
+		return os.TempDir()
+	}
+	return dir
+}
+
+func YakitStatusCard(kind string, content interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, "[yakit][status-card][%s] %v\n", kind, content)
+}
+
 func yakitStderrLog(level, format string, items ...interface{}) {
 	msg := format
 	if len(items) > 0 {
@@ -60,4 +76,7 @@ var YakitExports = map[string]interface{}{
 	"SetProgress":   YakitSetProgress,
 	"SetProgressEx": YakitSetProgressEx,
 	"AutoInitYakit": AutoInitYakit,
+	"Output":       YakitOutput,
+	"GetHomeTempDir": YakitGetHomeTempDir,
+	"StatusCard":   YakitStatusCard,
 }

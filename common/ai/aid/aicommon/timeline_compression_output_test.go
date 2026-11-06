@@ -99,6 +99,35 @@ func TestCompressionApplyPreservesNewPromotedEntries(t *testing.T) {
 	require.Equal(t, view, RenderTimelineFrozenOpen(copy))
 }
 
+func TestCompressionApplyIgnoresInvalidSelectionIDs(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	retainedText := uuid.NewString()
+	retiredText := uuid.NewString()
+	evidenceText := uuid.NewString()
+	tl.PushText(1, "%s", retainedText)
+	tl.PushText(2, "%s", retiredText)
+	require.True(t, tl.PushPromotable(3, TimelinePromotedKindEvidence, TimelinePromotedTargetSemiDynamic1,
+		"unobserved-evidence", TimelinePromotedOperationUpsert,
+		fmt.Sprintf(`{"id":"unobserved-evidence","content":%q}`, evidenceText)))
+	throughID := int64(3)
+
+	result, err := tl.ApplyCompressionSelection(&TimelineCompressionSelection{
+		ThroughID:              &throughID,
+		ObservedIDs:            []int64{1, 2},
+		Summary:                "retained the verified record and removed superseded history",
+		RetainedIDs:            []int64{1, 1, 999, 3},
+		RetiredPromotedEntries: []int64{3, 999},
+	}, "")
+	require.NoError(t, err)
+	require.Equal(t, []int64{1}, result.RetainedIDs)
+	require.Equal(t, []int64{2}, result.RetiredIDs)
+
+	view := RenderTimelineFrozenOpen(tl)
+	require.Contains(t, view.PromptText(), retainedText)
+	require.NotContains(t, view.PromptText(), retiredText)
+	require.Contains(t, view.PromptText(), evidenceText, "an unobserved promoted item must remain")
+}
+
 func TestCompressionApplyPreservesReservedResultIDs(t *testing.T) {
 	tl := NewTimeline(nil, nil)
 	tl.PushText(10, "old-first-record")
