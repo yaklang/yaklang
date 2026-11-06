@@ -2,11 +2,12 @@ package aicommon
 
 import (
 	"context"
-
-	"github.com/stretchr/testify/require"
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func TestClarificationSharedBudgetAndRolePolicy(t *testing.T) {
@@ -60,12 +61,31 @@ func TestQuestionRuntimePolicyRejectsBeforeEmission(t *testing.T) {
 }
 
 func TestGoalClarificationBoundarySurvivesRuntimeHandoff(t *testing.T) {
-	parent := NewTestConfig(context.Background(), WithEnableGoalMode(true))
-	child := NewTestConfig(context.Background(), ConvertConfigToOptionsWithoutHotPatch(parent)...)
-	require.False(t, child.EnableGoalMode, "nested runtime must not inherit the goal completion gate")
-	child.SetClarificationPolicy(func() (bool, bool, int64) { return true, true, 3 })
-	require.ErrorContains(t, child.CheckClarificationAllowed("plan", true), "blocking")
-	require.NoError(t, child.CheckClarificationAllowed("plan", false))
+	resolver := func(deviceID, browserRef string) (httpctx.BrowserInstance, error) {
+		return httpctx.BrowserInstance{Manager: "ytray", InstanceID: deviceID, Badge: browserRef, ColorizeHTTPFlow: true}, nil
+	}
+	parent := NewTestConfig(context.Background(), WithEnableGoalMode(true), WithBrowserHTTPFlowIdentityResolver(resolver))
+	for _, test := range []struct {
+		name    string
+		convert func(*Config) []ConfigOption
+	}{
+		{name: "with hotpatch", convert: ConvertConfigToOptions},
+		{name: "without hotpatch", convert: ConvertConfigToOptionsWithoutHotPatch},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			child := NewTestConfig(context.Background(), test.convert(parent)...)
+			require.False(t, child.EnableGoalMode, "nested runtime must not inherit the goal completion gate")
+			child.SetClarificationPolicy(func() (bool, bool, int64) { return true, true, 3 })
+			require.ErrorContains(t, child.CheckClarificationAllowed("plan", true), "blocking")
+			require.NoError(t, child.CheckClarificationAllowed("plan", false))
+
+			inheritedResolver := child.GetBrowserHTTPFlowIdentityResolver()
+			require.NotNil(t, inheritedResolver, "preserving the goal boundary must also retain browser routing")
+			identity, err := inheritedResolver("device-a", "A")
+			require.NoError(t, err)
+			require.Equal(t, httpctx.BrowserInstance{Manager: "ytray", InstanceID: "device-a", Badge: "A", ColorizeHTTPFlow: true}, identity)
+		})
+	}
 }
 
 func TestClarificationPendingLimitRefundsUnemittedRequest(t *testing.T) {
