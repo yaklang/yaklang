@@ -150,25 +150,11 @@ func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]string, error) {
 }
 
 func GetEffectOnEdgeByFromNodeId(db *gorm.DB, id string) []string {
-	if db == nil {
-		db = GetDB()
-	}
-	var effectOns []string
-	db.Model(&AuditEdge{}).
-		Where(" from_node = ? AND edge_type = ? ", id, EdgeType_EffectsOn).
-		Pluck("to_node", &effectOns)
-	return effectOns
+	return nativeAuditEdgeTargets(db, id, EdgeType_EffectsOn)
 }
 
 func GetDependEdgeOnByFromNodeId(db *gorm.DB, id string) []string {
-	if db == nil {
-		db = GetDB()
-	}
-	var dependOns []string
-	db.Model(&AuditEdge{}).
-		Where("from_node =? AND edge_type = ? ", id, EdgeType_DependsOn).
-		Pluck("to_node", &dependOns)
-	return dependOns
+	return nativeAuditEdgeTargets(db, id, EdgeType_DependsOn)
 }
 
 func GetDataFlowEdgeByToNodeId(db *gorm.DB, fromId uint) []string {
@@ -183,14 +169,7 @@ func GetDataFlowEdgeByToNodeId(db *gorm.DB, fromId uint) []string {
 }
 
 func GetPredecessorEdgeByFromID(db *gorm.DB, fromId string) []*AuditEdge {
-	if db == nil {
-		db = GetDB()
-	}
-	var edges []*AuditEdge
-	db.Model(&AuditEdge{}).
-		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_Predecessor).
-		Scan(&edges)
-	return edges
+	return nativePredecessorEdges(db, fromId)
 }
 
 func GetAuditNodeById(db *gorm.DB, id string) (*AuditNode, error) {
