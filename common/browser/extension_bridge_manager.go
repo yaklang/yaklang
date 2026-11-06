@@ -154,6 +154,8 @@ type ExtensionBridgeManagerSnapshot struct {
 }
 
 type ExtensionBridgeManager struct {
+	mitmMu           sync.Mutex
+	mitmRuntimes     map[string]*extensionMITMRuntime
 	mu               sync.RWMutex
 	engineInstanceID string
 	store            ExtensionBridgeIdentityStore
@@ -235,7 +237,14 @@ func loadOrCreateExtensionBridgeIdentity(store ExtensionBridgeIdentityStore) (*e
 }
 
 func (m *ExtensionBridgeManager) Start(port int) error {
-	server, err := newManagedExtensionBridgeServer(port, m)
+	var server *ExtensionBridgeServer
+	var err error
+	for _, candidate := range extensionBridgeCandidatePorts(port) {
+		server, err = newManagedExtensionBridgeServer(candidate, m)
+		if err == nil || !retryableExtensionBridgeListenError(err) {
+			break
+		}
+	}
 	m.mu.Lock()
 	previous := m.server
 	if err != nil {
@@ -255,6 +264,7 @@ func (m *ExtensionBridgeManager) Start(port int) error {
 }
 
 func (m *ExtensionBridgeManager) Close() error {
+	m.closeMITMIngresses()
 	m.mu.Lock()
 	server := m.server
 	m.server = nil

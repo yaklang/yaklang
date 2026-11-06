@@ -266,7 +266,8 @@ type Config struct {
 	inheritedToolManager         bool
 
 	// browserSessionTracker records browser ids opened by yak tools for session cleanup.
-	browserSessionTracker BrowserSessionTracker
+	browserSessionTracker           BrowserSessionTracker
+	browserHTTPFlowIdentityResolver BrowserHTTPFlowIdentityResolver
 
 	// tool config
 	DisableToolUse               bool
@@ -4356,6 +4357,9 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	}
 
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
+	if i.browserHTTPFlowIdentityResolver != nil {
+		opts = append(opts, WithBrowserHTTPFlowIdentityResolver(i.browserHTTPFlowIdentityResolver))
+	}
 
 	// aiCallback
 	if i.AiServerName != "" {

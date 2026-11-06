@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/ai/aiforge/browsercrypto"
 	"github.com/yaklang/yaklang/common/browser"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -53,6 +54,42 @@ func (b serverBrowserExtensionBridge) Connections() []browser.ExtensionBridgeCon
 		return nil
 	}
 	return b.server.browserBridge.Snapshot().Connections
+}
+
+func (b serverBrowserExtensionBridge) resolveHTTPFlowIdentity(deviceID, browserRef string) (httpctx.BrowserInstance, error) {
+	deviceID, _, err := browsertools.ResolveBrowserDevice(b, deviceID, browserRef)
+	if err != nil {
+		return httpctx.BrowserInstance{}, err
+	}
+	connections := b.Connections()
+	for _, connection := range connections {
+		if connection.DeviceID == deviceID {
+			identity := connection.BrowserInstance()
+			identity.ColorizeHTTPFlow = multipleOnlineBrowserInstances(connections)
+			return identity, nil
+		}
+	}
+	return httpctx.BrowserInstance{}, errors.New("the selected browser instance disconnected")
+}
+
+func multipleOnlineBrowserInstances(connections []browser.ExtensionBridgeConnection) bool {
+	instances := make(map[string]struct{})
+	for _, connection := range connections {
+		if connection.DeviceID == "" {
+			continue
+		}
+		key := "device:" + connection.DeviceID
+		if connection.ManagedInstance != nil && connection.ManagedInstance.InstanceID != "" {
+			key = connection.ManagedInstance.Manager + ":" + connection.ManagedInstance.InstanceID
+		} else if connection.InstallationID != "" {
+			key = "installation:" + connection.InstallationID
+		}
+		instances[key] = struct{}{}
+		if len(instances) >= 2 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) buildBrowserAgentTools() ([]*aitool.Tool, error) {

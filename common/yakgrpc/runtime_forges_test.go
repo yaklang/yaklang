@@ -8,8 +8,38 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/ai/aiforge/browsercrypto"
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestMultipleOnlineBrowserInstancesForAgentHTTPFlowColor(t *testing.T) {
+	a := browser.ExtensionBridgeConnection{DeviceID: "device-a", InstallationID: "install-a",
+		ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-a", Badge: "A"}}
+	b := browser.ExtensionBridgeConnection{DeviceID: "device-b", InstallationID: "install-b",
+		ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-b", Badge: "B"}}
+	duplicate := a
+	duplicate.DeviceID = "reconnected-device-a"
+	for _, test := range []struct {
+		name        string
+		connections []browser.ExtensionBridgeConnection
+		want        bool
+	}{
+		{"none", nil, false},
+		{"one", []browser.ExtensionBridgeConnection{a}, false},
+		{"same-instance-reconnected", []browser.ExtensionBridgeConnection{a, duplicate}, false},
+		{"two", []browser.ExtensionBridgeConnection{a, b}, true},
+		{"back-to-one", []browser.ExtensionBridgeConnection{b}, false},
+		{"invalid-device-does-not-count", []browser.ExtensionBridgeConnection{a, {}}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.want, multipleOnlineBrowserInstances(test.connections))
+			for _, connection := range test.connections {
+				require.False(t, connection.BrowserInstance().ColorizeHTTPFlow,
+					"ordinary Bridge/MITM identities must not opt into Agent colors")
+			}
+		})
+	}
+}
 
 func TestServerRuntimeForgeRegistrationIsGenericAndServerScoped(t *testing.T) {
 	server := &Server{

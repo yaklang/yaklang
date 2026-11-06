@@ -675,6 +675,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 
 	link(req, ctx, p)
 	defer unlink(req, p)
+	applyBrowserInstance(req, ctx)
 
 	// set plugin context
 	httpctx.SetPluginContext(req, consts.NewPluginContext())

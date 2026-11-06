@@ -574,7 +574,7 @@ var startGRPCServerCommand = cli.Command{
 		cli.IntFlag{
 			Name:  "browser-extension-bridge-port",
 			Value: 64333,
-			Usage: "浏览器插件本机 Bridge 端口",
+			Usage: "浏览器插件本机 Bridge 首选端口；端口占用或无权限时自动避让",
 		},
 		cli.BoolFlag{
 			Name:  "disable-browser-extension-bridge",

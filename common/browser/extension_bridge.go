@@ -37,6 +37,7 @@ const (
 )
 
 var extensionBridgeEngineCapabilities = []string{
+	"yakit.mitm.ingress",
 	"yakit.web_fuzzer.open",
 	"yakit.poc.generate",
 	"yakit.browser_request.prepare_analysis",
@@ -228,6 +229,7 @@ func newExtensionBridgeServer(port int, token string, manager *ExtensionBridgeMa
 	mux.HandleFunc(extensionBridgePath, bridge.handleWebSocket)
 	if manager != nil {
 		mux.HandleFunc(extensionBridgePairingPath, bridge.handlePairingWebSocket)
+		mux.HandleFunc(extensionBridgeDiscoveryPath, bridge.handleDiscoveryWebSocket)
 	}
 	bridge.server = &http.Server{
 		Handler:           mux,
@@ -465,6 +467,9 @@ func (s *ExtensionBridgeServer) Close() error {
 func (s *ExtensionBridgeServer) disconnectInstallation(installationID string) {
 	if s == nil || strings.TrimSpace(installationID) == "" {
 		return
+	}
+	if s.manager != nil {
+		s.manager.releaseMITMInstallation(installationID)
 	}
 	s.clientMu.Lock()
 	clients := make([]*websocket.Conn, 0, 1)

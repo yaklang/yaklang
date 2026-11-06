@@ -328,6 +328,10 @@ func (a *ToolCaller) invoke(
 
 	ctx, cancel := context.WithCancel(baseCtx)
 	defer cancel()
+	ctx, err = bindBrowserHTTPFlowContext(ctx, c, tool.Name, params)
+	if err != nil {
+		return nil, err
+	}
 
 	newToolCallRes := func() *aitool.ToolResult {
 		return &aitool.ToolResult{

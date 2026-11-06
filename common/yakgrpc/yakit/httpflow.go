@@ -75,6 +75,10 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 		r.Tags = append(r.Tags, HTTPFlowTagWebFuzzer)
 		tags = r.Tags
 	}
+	if identity, ok := httpctx.GetBrowserInstance(r.RequestInstance); ok {
+		r.Tags = AppendBrowserInstanceHTTPFlowTags(r.Tags, identity)
+		tags = r.Tags
+	}
 	if r.HiddenIndex == "" {
 		r.HiddenIndex = uuid.NewString()
 		hiddenIndex = r.HiddenIndex
