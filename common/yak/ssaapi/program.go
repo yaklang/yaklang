@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"sort"
+	"sync"
 	goatomic "sync/atomic"
 	"time"
 
@@ -50,6 +51,11 @@ type Program struct {
 	// *Value graph ops (GetCalled / GetUsers) can filter without sfvm.Config.
 	structBound      *structBound
 	structScanActive bool
+
+	// structBoundCache keeps one immutable path filter per compile unit.
+	// A struct query used to rebuild the unit's file-path set for every rule,
+	// which made the same map live once per concurrent query.
+	structBoundCache sync.Map
 }
 
 // resetInterRuleStateCacheThreshold is the default nodeId2ValueCache entry
