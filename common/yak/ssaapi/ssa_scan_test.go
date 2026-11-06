@@ -55,7 +55,7 @@ func TestScanProjectFiles(t *testing.T) {
 		require.GreaterOrEqual(t, len(result.Folders), 1)
 	})
 
-	t.Run("With Entry Files", func(t *testing.T) {
+	t.Run("Retain sources for preprocessing", func(t *testing.T) {
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName:     "test_prog",
 			ProgramPath:     "src",
@@ -63,16 +63,19 @@ func TestScanProjectFiles(t *testing.T) {
 			ExcludeFunc:     newExcludeFunc(nil, "", true),
 			CheckLanguage:   checkLanguage,
 			CheckPreHandler: checkLanguage,
-			EntryFiles:      []string{"./src/main.go"},
 			Context:         context.Background(),
 		})
 		require.NoError(t, err)
-		require.Equal(t, []string{"src/main.go"}, result.HandlerFiles)
-		require.Equal(t, []string{"src/main.go"}, result.PreHandlerFiles)
+		expectedFiles := []string{"src/main.go", "src/utils.go"}
+		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
+		require.ElementsMatch(t, expectedFiles, result.PreHandlerFiles)
+		require.Equal(t, len(expectedFiles), result.HandlerTotal)
+		require.Equal(t, len(expectedFiles), result.PreHandlerTotal)
+		require.Equal(t, map[string]struct{}{"src/main.go": {}, "src/utils.go": {}}, result.PreHandlerFileSet)
 	})
 
 	t.Run("With Exclude", func(t *testing.T) {
-		excludeFunc := newExcludeFunc([]string{"src/vendor/"}, "", true)
+		excludeFunc := newExcludeFunc([]string{"src/utils.go"}, "", true)
 
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName:     "test_prog",
@@ -80,15 +83,18 @@ func TestScanProjectFiles(t *testing.T) {
 			FileSystem:      fs,
 			ExcludeFunc:     excludeFunc,
 			CheckLanguage:   checkLanguage,
-			CheckPreHandler: nil,
+			CheckPreHandler: checkLanguage,
 			Context:         context.Background(),
 		})
 		require.NoError(t, err)
 
-		// Expected files: default excludes still skip generated/test roots; explicit exclude skips vendor.
-		expectedFiles := []string{"src/main.go", "src/utils.go"}
+		// An explicit exclude removes the file from both scan lists.
+		expectedFiles := []string{"src/main.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
-		require.Equal(t, 2, result.HandlerTotal)
+		require.ElementsMatch(t, expectedFiles, result.PreHandlerFiles)
+		require.Equal(t, 1, result.HandlerTotal)
+		require.Equal(t, 1, result.PreHandlerTotal)
+		require.Equal(t, map[string]struct{}{"src/main.go": {}}, result.PreHandlerFileSet)
 	})
 
 	t.Run("Check PreHandler", func(t *testing.T) {

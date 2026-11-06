@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memorybudget"
 	"io/fs"
 	"os"
-	"path"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -591,13 +590,7 @@ type ScanConfig struct {
 	ExcludeFunc     func(string) bool
 	CheckLanguage   func(string) error
 	CheckPreHandler func(string) error
-	EntryFiles      []string
 	Context         context.Context
-}
-
-func normalizeCompileEntryFile(name string) string {
-	name = strings.ReplaceAll(name, `\`, "/")
-	return strings.TrimPrefix(path.Clean(name), "./")
 }
 
 // skipCompileDir reports whether a directory is pruned (SkipDir) during a
@@ -619,7 +612,9 @@ func skipCompileFile(exclude ssaconfig.CompileExcludeFunc, path string, info fs.
 	return exclude != nil && exclude(path)
 }
 
-// ScanProjectFiles scans the project directory and returns the files to be processed
+// ScanProjectFiles scans the project directory and returns the files to be processed.
+// Entry files select frontend roots, not scan inputs; retain non-entry files
+// for preprocessing and source lookup.
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
 		HandlerFiles:      make([]string, 0),
@@ -628,12 +623,6 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 		Folders:           make([][]string, 0),
 	}
 	exclude := cfg.ExcludeFunc
-	entryFiles := make(map[string]struct{}, len(cfg.EntryFiles))
-	for _, file := range cfg.EntryFiles {
-		if file != "" {
-			entryFiles[normalizeCompileEntryFile(file)] = struct{}{}
-		}
-	}
 
 	err := filesys.Recursive(cfg.ProgramPath,
 		filesys.WithFileSystem(cfg.FileSystem),
@@ -657,11 +646,6 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 			}
 			if exclude != nil && exclude(path) {
 				return nil
-			}
-			if len(entryFiles) > 0 {
-				if _, ok := entryFiles[normalizeCompileEntryFile(path)]; !ok {
-					return nil
-				}
 			}
 			if cfg.CheckLanguage != nil && cfg.CheckLanguage(path) == nil {
 				result.HandlerTotal++
