@@ -43,6 +43,17 @@ func TestPCREUngreedyAndRawBytesOptions(t *testing.T) {
 	}
 }
 
+func TestLegacyCharacterClassRange(t *testing.T) {
+	matches, err := mustMatcher(t, `/^[\d\w-_]+$/`).Match([]byte("a-1_"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("legacy class escape followed by a range hyphen must stay matchable: matches=%v err=%v", matches, err)
+	}
+	ranges, err := mustMatcher(t, `/^[a-z]+$/`).Match([]byte("abc"))
+	if err != nil || len(ranges) != 1 {
+		t.Fatalf("real character ranges must remain unchanged: matches=%v err=%v", ranges, err)
+	}
+}
+
 func TestExtendedOption(t *testing.T) {
 	matches, err := mustMatcher(t, `/a  b # ignored comment/x`).Match([]byte("ab"))
 	if err != nil || len(matches) != 1 {

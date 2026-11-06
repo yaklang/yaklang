@@ -101,6 +101,7 @@ func ParsePCREStr(pattern string) (*PCRE, error) {
 	if trailing := trailingBackslashCount(pcre.expr); trailing%2 == 1 {
 		pcre.expr = pcre.expr[:len(pcre.expr)-1]
 	}
+	pcre.expr = normalizeLegacyCharacterClassRanges(pcre.expr)
 	// The matching backend is 8-bit PCRE2. Go's regexp/syntax rejects
 	// PCRE constructs such as lookarounds, so use it only for anchor analysis
 	// and let Matcher validate the complete pattern.
