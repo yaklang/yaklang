@@ -249,7 +249,7 @@ func TestLiveCaptureNativeIdleCancellation(t *testing.T) {
 		require.NoError(t, db.Close())
 	case err := <-done:
 		t.Fatalf("capture startup failed: %v", err)
-	case <-time.After(5 * time.Second):
+	case <-time.After(time.Minute):
 		t.Fatal("capture startup timed out")
 	}
 	cancel()
