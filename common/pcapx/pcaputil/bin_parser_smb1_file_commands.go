@@ -407,6 +407,7 @@ func (f *binFlow) consumeSMB1FileCommand(dir int, e *ProtocolEvent) (resultErr e
 			fields["Association Status"] = "response command, UID or TID has no matching observed request"
 		}
 	}
+	smb1AttachContext(fields, tx.command)
 	e.Session = fields
 	e.semanticFields, e.semanticSession = cloneSession(fields), cloneSession(fields)
 	return nil

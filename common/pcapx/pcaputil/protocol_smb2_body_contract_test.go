@@ -253,8 +253,15 @@ func TestSMB2RelatedLiteralAndContextHaveSeparateSources(t *testing.T) {
 		require.Equal(t, uint64(0x1122334455667788), key.sessionID)
 		require.Equal(t, uint32(0xaabbccdd), key.treeID)
 	}
-	_, err = smb2Walk(third, 64)
-	require.Error(t, err, "context cannot cross a Direct TCP PDU boundary")
+	// A related command alone in a new PDU has no predecessor to inherit
+	// from. The literal IDs stay literal and no effective context is invented.
+	isolated, err := smb2Walk(third, 64)
+	require.NoError(t, err)
+	require.Equal(t, "no predecessor in captured compound", isolated[0]["Related Context Status"])
+	require.NotContains(t, isolated[0], "Effective Session ID")
+	require.NotContains(t, isolated[0], "Effective Tree ID")
+	require.Equal(t, uint64(0xffffffffffffffff), isolated[0]["Session ID"])
+	require.Equal(t, uint32(0xffffffff), isolated[0]["Tree ID"])
 }
 
 func TestSMB2HeaderUnionAndOwnedLiteralRanges(t *testing.T) {

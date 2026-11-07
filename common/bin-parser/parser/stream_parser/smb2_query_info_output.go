@@ -98,25 +98,66 @@ func decodeSMB2QueryInfoOutput(wire []byte, infoType, infoClass uint8) ([]tlsCer
 }
 
 func smb2FileStreamFields(wire []byte, info map[string]any) ([]tlsCertificateField, map[string]any, error) {
-	// MS-FSCC 2.4.40. One entry whose NextEntryOffset is zero and whose name fills the buffer.
+	// MS-FSCC 2.4.40. Entries are chained by NextEntryOffset; the last one is
+	// zero. Each entry owns its UTF-16 stream name.
 	if len(wire) < 24 {
 		return nil, nil, fmt.Errorf("FileStreamInformation: truncated fixed prefix")
 	}
-	next := binary.LittleEndian.Uint32(wire[0:4])
-	nameLen := int(binary.LittleEndian.Uint32(wire[4:8]))
-	if next != 0 || nameLen != len(wire)-24 || nameLen%2 != 0 {
-		return nil, nil, fmt.Errorf("FileStreamInformation: entry does not fill this output")
+	const maxEntries = 4096
+	var fields []tlsCertificateField
+	var streams []map[string]any
+	at := 0
+	for {
+		if len(streams) >= maxEntries {
+			return nil, nil, fmt.Errorf("FileStreamInformation: entry count exceeds bounded profile")
+		}
+		if len(wire)-at < 24 {
+			return nil, nil, fmt.Errorf("FileStreamInformation: truncated entry prefix")
+		}
+		next := int(binary.LittleEndian.Uint32(wire[at : at+4]))
+		nameLen := int(binary.LittleEndian.Uint32(wire[at+4 : at+8]))
+		if nameLen%2 != 0 || nameLen > len(wire)-(at+24) {
+			return nil, nil, fmt.Errorf("FileStreamInformation: stream name leaves this output")
+		}
+		text, err := DecodeCIFSUTF16(wire[at+24 : at+24+nameLen])
+		if err != nil {
+			return nil, nil, err
+		}
+		prefix := fmt.Sprintf("Stream %d ", len(streams)+1)
+		entry := map[string]any{
+			"Stream Name":     text,
+			"Stream Size":     int64(binary.LittleEndian.Uint64(wire[at+8 : at+16])),
+			"Allocation Size": int64(binary.LittleEndian.Uint64(wire[at+16 : at+24])),
+			"Wire Field Ranges": map[string]any{
+				"Stream Name":        []any{uint64(at + 24), uint64(at + 24 + nameLen)},
+				"Stream Size":        []any{uint64(at + 8), uint64(at + 16)},
+				"Allocation Size":    []any{uint64(at + 16), uint64(at + 24)},
+				"Next Entry Offset":  []any{uint64(at), uint64(at + 4)},
+				"Stream Name Length": []any{uint64(at + 4), uint64(at + 8)},
+			},
+		}
+		streams = append(streams, entry)
+		fields = append(fields,
+			tlsCertificateLeaf(prefix+"Next Entry Offset", "uint32", at, at+4),
+			tlsCertificateLeaf(prefix+"Stream Name Length", "uint32", at+4, at+8),
+			tlsCertificateLeaf(prefix+"Stream Size", "int64", at+8, at+16),
+			tlsCertificateLeaf(prefix+"Stream Allocation Size", "int64", at+16, at+24),
+			tlsCertificateLeaf(prefix+"Stream Name Raw Bytes", "raw", at+24, at+24+nameLen),
+		)
+		if next == 0 {
+			break
+		}
+		if next < 24 || next > len(wire)-at || next%8 != 0 {
+			return nil, nil, fmt.Errorf("FileStreamInformation: NextEntryOffset leaves this output")
+		}
+		at += next
 	}
-	text, err := DecodeCIFSUTF16(wire[24:])
-	if err != nil {
-		return nil, nil, err
+	info["Stream Count"] = len(streams)
+	info["Streams"] = streams
+	if len(streams) == 1 {
+		info["Stream Name"] = streams[0]["Stream Name"]
 	}
-	info["Stream Name"] = text
-	return []tlsCertificateField{
-		tlsCertificateLeaf("Next Entry Offset", "uint32", 0, 4), tlsCertificateLeaf("Stream Name Length", "uint32", 4, 8),
-		tlsCertificateLeaf("Stream Size", "int64", 8, 16), tlsCertificateLeaf("Stream Allocation Size", "int64", 16, 24),
-		tlsCertificateLeaf("Stream Name Raw Bytes", "raw", 24, len(wire)),
-	}, info, nil
+	return fields, info, nil
 }
 
 func smb2FsVolumeFields(wire []byte, info map[string]any) ([]tlsCertificateField, map[string]any, error) {
@@ -319,6 +360,13 @@ func smb2ACLFields(wire []byte, name string, info map[string]any) ([]tlsCertific
 	}
 	size := int(binary.LittleEndian.Uint16(wire[2:4]))
 	aces := int(binary.LittleEndian.Uint16(wire[4:6]))
+	declaredACEs := aces
+	if aces > 4096 {
+		// A bounded DACL can declare up to 65535 four-byte ACEs. Walk only the
+		// first 4096 and publish the truncation instead of allocating ~65k
+		// projected fields for one record.
+		aces = 4096
+	}
 	if size < 8 || size > len(wire) {
 		return nil, 0, "opaque: ACL size leaves this buffer"
 	}
@@ -359,6 +407,11 @@ func smb2ACLFields(wire []byte, name string, info map[string]any) ([]tlsCertific
 	}
 	if aces == 0 && size != 8 {
 		return nil, 0, "opaque: empty ACL size is not 8"
+	}
+	if declaredACEs > aces {
+		info[name+" Ace Count Declared"] = declaredACEs
+		info[name+" Ace Count Parsed"] = aces
+		info[name+" Truncated"] = "declared ACE count exceeds 4096-entry bounded profile"
 	}
 	return fields, size, ""
 }

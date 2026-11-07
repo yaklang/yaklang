@@ -227,8 +227,10 @@ func TestSMBStateMatrixFragmentBudgetAndDisplay(t *testing.T) {
 	closePDU := smb2Close(9, 1, 1, bytes.Repeat([]byte{0xff}, 16))
 	binary.LittleEndian.PutUint32(closePDU[4+16:4+20], smb2FlagRelated)
 	refused := session.Feed(0, time.Unix(3, 0), closePDU)
-	require.NotNil(t, refused.Err)
-	require.Contains(t, refused.Err.Error(), "no predecessor")
+	require.Nil(t, refused.Err)
+	require.Len(t, refused.Events, 1)
+	require.Equal(t, "no predecessor in captured compound", refused.Events[0].Session["Related Context Status"])
+	require.NotContains(t, refused.Events[0].Session, "Effective Session ID")
 
 	tight, err := NewProtocolSession(ParserBudget{MaxFrameBytes: len(pdu) - 1})
 	require.NoError(t, err)

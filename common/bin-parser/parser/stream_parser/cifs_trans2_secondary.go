@@ -378,6 +378,10 @@ func cifsApplyQueryRecord(body map[string]any, ranges map[string]any, level uint
 
 func cifsCommandName(command byte) string {
 	switch command {
+	case 0x72:
+		return "SMB_COM_NEGOTIATE"
+	case 0x73:
+		return "SMB_COM_SESSION_SETUP_ANDX"
 	case 0x75:
 		return "SMB_COM_TREE_CONNECT_ANDX"
 	case 0x06:

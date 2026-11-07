@@ -48,7 +48,24 @@ Package:
       isResp = (flags & 0x1) != 0
       if cmd == 0 {
         if isResp {
-          this.ProcessByType("Negotiate Response")
+          status = getNodeResult("Status").Value
+          if status != 0 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("Negotiate Response")
+          }
         } else {
           this.ProcessByType("Negotiate Request")
         }
@@ -76,47 +93,214 @@ Package:
         }
       }
       if cmd == 2 {
-        this.ProcessByType("Logoff")
+        status = 0
+        if isResp { status = getNodeResult("Status").Value }
+        if isResp && status != 0 && status != 0x103 {
+          if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+            end = this.GetMaxLength()
+            next = int(getNodeResult("NextCommand").Value)
+            if next != 0 {
+              if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+              end = next
+            }
+            if end <= 64 { panic("smb2 error: missing body") }
+            errorBody = this.GetSubNode("Error Body")
+            errorBody.SetMaxLength(end - 64)
+            errorBody.Process()
+          } else {
+            this.ProcessSubNode("Error Body")
+          }
+        } else {
+          this.ProcessByType("Logoff")
+        }
       }
       if cmd == 3 {
         if isResp {
-          this.ProcessByType("Tree Connect Response")
+          status = getNodeResult("Status").Value
+          if status != 0 && status != 0x103 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("Tree Connect Response")
+          }
         } else {
           this.ProcessByType("Tree Connect Request")
         }
       }
       if cmd == 4 {
-        this.ProcessByType("Tree Disconnect")
+        status = 0
+        if isResp { status = getNodeResult("Status").Value }
+        if isResp && status != 0 && status != 0x103 {
+          if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+            end = this.GetMaxLength()
+            next = int(getNodeResult("NextCommand").Value)
+            if next != 0 {
+              if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+              end = next
+            }
+            if end <= 64 { panic("smb2 error: missing body") }
+            errorBody = this.GetSubNode("Error Body")
+            errorBody.SetMaxLength(end - 64)
+            errorBody.Process()
+          } else {
+            this.ProcessSubNode("Error Body")
+          }
+        } else {
+          this.ProcessByType("Tree Disconnect")
+        }
       }
       if cmd == 5 {
         if isResp {
-          this.ProcessByType("Create Response")
+          status = getNodeResult("Status").Value
+          if status != 0 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("Create Response")
+          }
         } else {
           this.ProcessByType("Create Request")
         }
       }
       if cmd == 6 {
-        this.ProcessByType("Close")
+        if isResp {
+          status = getNodeResult("Status").Value
+          if status != 0 && status != 0x103 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("Close Response")
+          }
+        } else {
+          this.ProcessByType("Close")
+        }
       }
       if cmd == 8 {
         if isResp {
-          this.ProcessByType("Read Response")
+          status = getNodeResult("Status").Value
+          if status != 0 && status != 0x103 && status != 0x80000005 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("Read Response")
+          }
         } else {
           this.ProcessByType("Read Request")
         }
       }
       if cmd == 9 {
         if isResp {
-          this.ProcessByType("Write Response")
+          status = getNodeResult("Status").Value
+          if status != 0 && status != 0x103 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("Write Response")
+          }
         } else {
           this.ProcessByType("Write Request")
         }
       }
       if cmd == 11 {
-        this.ProcessByType("IOCTL")
+        if isResp {
+          status = getNodeResult("Status").Value
+          if status != 0 && status != 0x103 && status != 0x80000005 {
+            if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+              end = this.GetMaxLength()
+              next = int(getNodeResult("NextCommand").Value)
+              if next != 0 {
+                if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+                end = next
+              }
+              if end <= 64 { panic("smb2 error: missing body") }
+              this.GetSubNode("Error Body").SetMaxLength(end - 64)
+              this.ProcessSubNode("Error Body")
+            } else {
+              this.ProcessSubNode("Error Body")
+            }
+          } else {
+            this.ProcessByType("IOCTL Response")
+          }
+        } else {
+          this.ProcessByType("IOCTL")
+        }
       }
       if cmd == 13 {
-        this.ProcessByType("Echo")
+        status = 0
+        if isResp { status = getNodeResult("Status").Value }
+        if isResp && status != 0 && status != 0x103 {
+          if this.HasMaxLength() && this.GetMaxLength("bit") % 8 == 0 {
+            end = this.GetMaxLength()
+            next = int(getNodeResult("NextCommand").Value)
+            if next != 0 {
+              if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 error: invalid compound boundary") }
+              end = next
+            }
+            if end <= 64 { panic("smb2 error: missing body") }
+            errorBody = this.GetSubNode("Error Body")
+            errorBody.SetMaxLength(end - 64)
+            errorBody.Process()
+          } else {
+            this.ProcessSubNode("Error Body")
+          }
+        } else {
+          this.ProcessByType("Echo")
+        }
       }
       if cmd == 16 {
         if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("smb2 query info: explicit command boundary required") }
@@ -163,6 +347,10 @@ Package:
         err = parseSMB2QueryInfoBody((flags & 1) != 0, status)
         if err != nil { panic(err) }
     Session Setup Error:
+      operator: |
+        err = parseSMB2ErrorBody()
+        if err != nil { panic(err) }
+    Error Body:
       operator: |
         err = parseSMB2ErrorBody()
         if err != nil { panic(err) }
@@ -464,6 +652,28 @@ Close:
   Flags: uint16
   Reserved: uint32
   FileId: raw,16
+Close Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("CreationTime")
+    this.ProcessSubNode("LastAccessTime")
+    this.ProcessSubNode("LastWriteTime")
+    this.ProcessSubNode("ChangeTime")
+    this.ProcessSubNode("AllocationSize")
+    this.ProcessSubNode("EndofFile")
+    this.ProcessSubNode("FileAttributes")
+  StructureSize: uint16
+  Flags: uint16
+  Reserved: uint32
+  CreationTime: raw,8
+  LastAccessTime: raw,8
+  LastWriteTime: raw,8
+  ChangeTime: raw,8
+  AllocationSize: uint64
+  EndofFile: uint64
+  FileAttributes: uint32
 Read Request:
   operator: |
     this.ProcessSubNode("StructureSize")
@@ -580,6 +790,28 @@ IOCTL:
   OutputOffset: uint32
   OutputCount: uint32
   MaxOutputResponse: uint32
+  Flags: uint32
+  Reserved2: uint32
+IOCTL Response:
+  operator: |
+    this.ProcessSubNode("StructureSize")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("CtlCode")
+    this.ProcessSubNode("FileId")
+    this.ProcessSubNode("InputOffset")
+    this.ProcessSubNode("InputCount")
+    this.ProcessSubNode("OutputOffset")
+    this.ProcessSubNode("OutputCount")
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Reserved2")
+  StructureSize: uint16
+  Reserved: uint16
+  CtlCode: uint32
+  FileId: raw,16
+  InputOffset: uint32
+  InputCount: uint32
+  OutputOffset: uint32
+  OutputCount: uint32
   Flags: uint32
   Reserved2: uint32
 Echo:

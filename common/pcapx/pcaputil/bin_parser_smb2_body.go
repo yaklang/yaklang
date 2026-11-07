@@ -167,7 +167,7 @@ func smb2NegotiateFields(info map[string]any, pdu []byte, response bool, max int
 			return fmt.Errorf("smb2: incomplete or empty negotiate dialect list")
 		}
 		if count > max {
-			return protocolError(ErrResourceExceeded, "SMB2 dialect count exceeds collection budget")
+			return smb2CollectionLimit("SMB2 dialect count exceeds collection budget")
 		}
 		smb2Literal(body, "Dialect Count", 66, 68, uint16(count))
 		dialects := make([]uint16, count)
@@ -234,7 +234,7 @@ func smb2NegotiateFields(info map[string]any, pdu []byte, response bool, max int
 
 func smb2NegotiateContextFields(body map[string]any, pdu []byte, count int, at uint64, minimum, max, securityOffset, securityLength int) error {
 	if count > max {
-		return protocolError(ErrResourceExceeded, "SMB2 negotiate context count exceeds collection budget")
+		return smb2CollectionLimit("SMB2 negotiate context count exceeds collection budget")
 	}
 	if count != 0 && (at < uint64(minimum) || at%8 != 0 || at > uint64(len(pdu))) {
 		return fmt.Errorf("smb2: invalid negotiate context offset")
@@ -344,7 +344,7 @@ func smb2CreateContextFields(body map[string]any, pdu []byte, pairOffset, minimu
 	var contexts []map[string]any
 	for {
 		if len(contexts) >= max {
-			return protocolError(ErrResourceExceeded, "SMB2 CREATE context count exceeds collection budget")
+			return smb2CollectionLimit("SMB2 CREATE context count exceeds collection budget")
 		}
 		if end-at < 16 {
 			return fmt.Errorf("smb2: truncated CREATE context header")
@@ -655,18 +655,22 @@ func smb2SessionSetupFields(info map[string]any, pdu []byte, response bool) erro
 
 // MS-SMB2 2.2.30. CANCEL is a 4-byte request and has no response. It names the
 // MessageId to cancel and does not itself retire that outstanding request.
-func smb2CancelFields(info map[string]any, pdu []byte, response bool) error {
+// A non-final compound command is padded to the 8-byte NextCommand boundary.
+func smb2CancelFields(info map[string]any, pdu []byte, response, padded bool) error {
 	if response {
 		return fmt.Errorf("smb2: CANCEL has no response")
 	}
-	if len(pdu) != smb2HeaderSize+4 {
-		return fmt.Errorf("smb2: CANCEL request must be exactly 4 bytes")
+	if len(pdu) < smb2HeaderSize+4 || !padded && len(pdu) != smb2HeaderSize+4 {
+		return fmt.Errorf("smb2: CANCEL request requires a complete 4-byte body")
 	}
 	body, err := smb2Body(pdu, 4, 4)
 	if err != nil {
 		return err
 	}
 	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	if len(pdu) > smb2HeaderSize+4 {
+		smb2Literal(body, "Padding", 68, len(pdu), bytes.Clone(pdu[68:]))
+	}
 	info["Body"] = body
 	return nil
 }
@@ -682,6 +686,186 @@ func smb2SmallCommandFields(info map[string]any, pdu []byte, response bool) erro
 		return err
 	}
 	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	info["Body"] = body
+	return nil
+}
+
+// MS-SMB2 2.2.24/2.2.25 FLUSH: a fixed 4-byte body in both directions.
+func smb2FlushFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(7, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	body, err := smb2Body(pdu, 4, 4)
+	if err != nil {
+		return err
+	}
+	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	smb2Literal(body, "Reserved2", 68, 70, binary.LittleEndian.Uint16(pdu[68:70]))
+	info["Body"] = body
+	return nil
+}
+
+// MS-SMB2 2.2.28/2.2.29 ECHO: a fixed 4-byte body in both directions.
+func smb2EchoFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(13, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	body, err := smb2Body(pdu, 4, 4)
+	if err != nil {
+		return err
+	}
+	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	smb2Literal(body, "Reserved2", 68, 70, binary.LittleEndian.Uint16(pdu[68:70]))
+	info["Body"] = body
+	return nil
+}
+
+// MS-SMB2 2.2.26/2.2.27 LOCK: a request carries LockCount fixed-size lock
+// elements; the response is the 4-byte small body.
+func smb2LockFields(info map[string]any, pdu []byte, response bool, max int) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(10, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if response {
+		return smb2SmallCommandFields(info, pdu, response)
+	}
+	body, err := smb2Body(pdu, 48, 48)
+	if err != nil {
+		return err
+	}
+	count := int(binary.LittleEndian.Uint16(pdu[66:68]))
+	if count == 0 {
+		return fmt.Errorf("smb2: LOCK requires at least one lock element")
+	}
+	if count > max {
+		return smb2CollectionLimit("SMB2 LOCK count exceeds collection budget")
+	}
+	if len(pdu) < 64+48+24*(count-1) {
+		return fmt.Errorf("smb2: LOCK body does not cover %d lock elements", count)
+	}
+	smb2Literal(body, "Lock Count", 66, 68, uint16(count))
+	smb2Literal(body, "Lock Sequence", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+	fid := hex.EncodeToString(pdu[72:88])
+	smb2Literal(body, "FileId", 72, 88, fid)
+	smb2Literal(info, "FileId", 72, 88, fid)
+	locks := make([]map[string]any, count)
+	for i := 0; i < count; i++ {
+		at := 88 + 24*i
+		entry := map[string]any{}
+		smb2Literal(entry, "Offset", at, at+8, binary.LittleEndian.Uint64(pdu[at:at+8]))
+		smb2Literal(entry, "Length", at+8, at+16, binary.LittleEndian.Uint64(pdu[at+8:at+16]))
+		smb2Literal(entry, "Flags", at+16, at+20, binary.LittleEndian.Uint32(pdu[at+16:at+20]))
+		smb2Literal(entry, "Reserved", at+20, at+24, binary.LittleEndian.Uint32(pdu[at+20:at+24]))
+		locks[i] = entry
+	}
+	body["Locks"], info["Locks"] = locks, locks
+	info["Body"] = body
+	return nil
+}
+
+// MS-SMB2 2.2.35/2.2.36 CHANGE_NOTIFY: a 32-byte request and a 9-byte
+// response whose output buffer starts at OutputBufferOffset.
+func smb2ChangeNotifyFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(15, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if !response {
+		body, err := smb2Body(pdu, 32, 32)
+		if err != nil {
+			return err
+		}
+		smb2Literal(body, "Flags", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+		smb2Literal(body, "Output Buffer Length", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+		fid := hex.EncodeToString(pdu[72:88])
+		smb2Literal(body, "FileId", 72, 88, fid)
+		smb2Literal(info, "FileId", 72, 88, fid)
+		smb2Literal(body, "Completion Filter", 88, 92, binary.LittleEndian.Uint32(pdu[88:92]))
+		smb2Literal(body, "Reserved", 92, 96, binary.LittleEndian.Uint32(pdu[92:96]))
+		info["Body"] = body
+		return nil
+	}
+	body, err := smb2Body(pdu, 8, 9)
+	if err != nil {
+		return err
+	}
+	offset := int(binary.LittleEndian.Uint16(pdu[66:68]))
+	length := int(binary.LittleEndian.Uint32(pdu[68:72]))
+	smb2Literal(body, "Output Buffer Offset", 66, 68, uint16(offset))
+	smb2Literal(body, "Output Buffer Length", 68, 72, uint32(length))
+	if length != 0 {
+		buffer, err := smb2Buffer(pdu, offset, length, 72)
+		if err != nil {
+			return fmt.Errorf("smb2: CHANGE_NOTIFY output buffer outside command")
+		}
+		smb2Literal(body, "Output Buffer", offset, offset+length, bytes.Clone(buffer))
+		info["Output Buffer"] = bytes.Clone(buffer)
+	}
+	info["Body"] = body
+	return nil
+}
+
+// MS-SMB2 2.2.39/2.2.40 SET_INFO: a 32-byte request selector/buffer header and
+// a 2-byte response.
+func smb2SetInfoFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(17, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if response {
+		body, err := smb2Body(pdu, 2, 2)
+		if err != nil {
+			return err
+		}
+		info["Body"] = body
+		return nil
+	}
+	body, err := smb2Body(pdu, 32, 33)
+	if err != nil {
+		return err
+	}
+	smb2Literal(body, "Info Type", 66, 67, pdu[66])
+	smb2Literal(body, "File Info Class", 67, 68, pdu[67])
+	bufferLength := binary.LittleEndian.Uint32(pdu[68:72])
+	bufferOffset := binary.LittleEndian.Uint16(pdu[72:74])
+	smb2Literal(body, "Buffer Length", 68, 72, bufferLength)
+	smb2Literal(body, "Buffer Offset", 72, 74, bufferOffset)
+	smb2Literal(body, "Reserved", 74, 76, binary.LittleEndian.Uint16(pdu[74:76]))
+	smb2Literal(body, "Additional Information", 76, 80, binary.LittleEndian.Uint32(pdu[76:80]))
+	fid := hex.EncodeToString(pdu[80:96])
+	smb2Literal(body, "FileId", 80, 96, fid)
+	smb2Literal(info, "FileId", 80, 96, fid)
+	if bufferLength != 0 {
+		buffer, err := smb2Buffer(pdu, int(bufferOffset), int(bufferLength), 96)
+		if err != nil {
+			return fmt.Errorf("smb2: SET_INFO buffer outside command")
+		}
+		smb2Literal(body, "Buffer", int(bufferOffset), int(bufferOffset)+int(bufferLength), bytes.Clone(buffer))
+		info["Buffer"] = bytes.Clone(buffer)
+	}
+	info["Body"] = body
+	return nil
+}
+
+// MS-SMB2 2.2.31/2.2.32 OPLOCK_BREAK: a fixed 24-byte body in both directions.
+func smb2OplockBreakFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(18, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	body, err := smb2Body(pdu, 24, 24)
+	if err != nil {
+		return err
+	}
+	smb2Literal(body, "Oplock Level", 66, 67, pdu[66])
+	smb2Literal(body, "Reserved", 67, 68, pdu[67])
+	smb2Literal(body, "Reserved2", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+	fid := hex.EncodeToString(pdu[72:88])
+	smb2Literal(body, "FileId", 72, 88, fid)
+	smb2Literal(info, "FileId", 72, 88, fid)
 	info["Body"] = body
 	return nil
 }
@@ -1045,7 +1229,7 @@ func smb2DecodeNetworkInterfaces(raw []byte, max int) ([]map[string]any, error) 
 	var out []map[string]any
 	for at := 0; ; {
 		if len(out) >= max {
-			return nil, protocolError(ErrResourceExceeded, "SMB2 network interface count exceeds collection budget")
+			return nil, smb2CollectionLimit("SMB2 network interface count exceeds collection budget")
 		}
 		if len(raw)-at < 152 {
 			return nil, fmt.Errorf("smb2: truncated network interface")
@@ -1091,7 +1275,7 @@ func smb2DecodeDFSReferralV3(raw []byte, max int) (map[string]any, bool, error) 
 	count := int(binary.LittleEndian.Uint16(raw[2:4]))
 	if count <= 0 || count > max {
 		if count > max && max > 0 {
-			return nil, false, protocolError(ErrResourceExceeded, "SMB2 DFS referral count exceeds collection budget")
+			return nil, false, smb2CollectionLimit("SMB2 DFS referral count exceeds collection budget")
 		}
 		return nil, false, nil
 	}
@@ -1134,9 +1318,15 @@ func smb2DecodeDFSReferralV3(raw []byte, max int) (map[string]any, bool, error) 
 			if item.off == 0 {
 				continue
 			}
+			// A path cannot point into the fixed 18-byte entry itself.
+			if at+item.off < at+18 {
+				log.Debugf("smb2: DFS referral left opaque; %s offset points into the entry header", item.name)
+				return nil, false, nil
+			}
 			text, lo, hi, err := smb2UTF16Z(raw, at+item.off)
 			if err != nil {
-				return nil, false, err
+				log.Debugf("smb2: DFS referral left opaque; %s is not a bounded UTF-16 string: %v", item.name, err)
+				return nil, false, nil
 			}
 			smb2Literal(entry, item.name, lo, hi, text)
 		}
@@ -1157,7 +1347,7 @@ func smb2DecodeDFSReferralV1(raw []byte, max int) (map[string]any, bool, error) 
 	count := int(binary.LittleEndian.Uint16(raw[2:4]))
 	if count <= 0 || count > max {
 		if count > max && max > 0 {
-			return nil, false, protocolError(ErrResourceExceeded, "SMB2 DFS referral count exceeds collection budget")
+			return nil, false, smb2CollectionLimit("SMB2 DFS referral count exceeds collection budget")
 		}
 		return nil, false, nil
 	}
@@ -1176,20 +1366,21 @@ func smb2DecodeDFSReferralV1(raw []byte, max int) (map[string]any, bool, error) 
 		}
 		at += size
 	}
-	if at != len(raw) {
-		return nil, false, nil
-	}
 	info := map[string]any{}
 	smb2Literal(info, "Path Consumed", 0, 2, binary.LittleEndian.Uint16(raw[0:2]))
 	smb2Literal(info, "Number Of Referrals", 2, 4, uint16(count))
 	smb2Literal(info, "Referral Header Flags", 4, 8, binary.LittleEndian.Uint32(raw[4:8]))
+	if at < len(raw) {
+		// MS-DFSC 2.2.4 allows trailing padding after the referral entries.
+		smb2Literal(info, "Referral Padding", at, len(raw), bytes.Clone(raw[at:]))
+	}
 	entries := make([]map[string]any, count)
 	at = 8
 	for i := 0; i < count; i++ {
 		size := int(binary.LittleEndian.Uint16(raw[at+2 : at+4]))
 		text, lo, hi, err := smb2UTF16Z(raw, at+6)
 		if err != nil {
-			return nil, false, err
+			return nil, false, nil
 		}
 		entry := map[string]any{}
 		smb2Literal(entry, "Version", at, at+2, uint16(1))
@@ -1257,7 +1448,7 @@ func smb2DecodeDFSReferralFixed(raw []byte, max int, version uint16, fixed int, 
 	count := int(binary.LittleEndian.Uint16(raw[2:4]))
 	if count <= 0 || count > max {
 		if count > max && max > 0 {
-			return nil, false, protocolError(ErrResourceExceeded, "SMB2 DFS referral count exceeds collection budget")
+			return nil, false, smb2CollectionLimit("SMB2 DFS referral count exceeds collection budget")
 		}
 		return nil, false, nil
 	}
@@ -1385,7 +1576,7 @@ func smb2DecodeFileIdBothEntries(raw []byte, max int) ([]map[string]any, error) 
 	var out []map[string]any
 	for at := 0; at < len(raw); {
 		if len(out) >= max {
-			return nil, protocolError(ErrResourceExceeded, "SMB2 directory entry count exceeds collection budget")
+			return nil, smb2CollectionLimit("SMB2 directory entry count exceeds collection budget")
 		}
 		if len(raw)-at < 104 {
 			return nil, fmt.Errorf("smb2: truncated directory entry")

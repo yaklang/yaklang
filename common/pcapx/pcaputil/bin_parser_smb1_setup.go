@@ -166,6 +166,9 @@ func (s *smb1SetupState) clone() *smb1SetupState {
 
 func (f *binFlow) consumeSMB1Setup(dir int, e *ProtocolEvent) (resultErr error) {
 	response := e.Entry == "CIFSDirectTCPSessionSetupExtendedResponse"
+	if response && len(e.Raw) == 39 && e.Raw[36] == 0 && binary.LittleEndian.Uint16(e.Raw[37:39]) == 0 {
+		return f.consumeSMB1EmptyError(dir, e)
+	}
 	e.nativeSessionMessage = true
 	e.Profile, e.Completeness = "cifs-session-setup-extended-request", "message"
 	if response {
@@ -185,6 +188,7 @@ func (f *binFlow) consumeSMB1Setup(dir int, e *ProtocolEvent) (resultErr error) 
 		}
 		return smb1ResourceRefusal(err)
 	}
+	smb1AttachContext(fields, 0x73)
 	if f.smb2 == nil {
 		return sessionContext("CIFS setup: carrier unavailable")
 	}

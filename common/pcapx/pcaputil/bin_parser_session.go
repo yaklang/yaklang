@@ -873,7 +873,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "smb":
-		if isSMB1FileEntry(e.Entry) {
+		if e.Entry == "SMB1UnselectedCommand" {
+			err = f.consumeSMB1UnselectedCommand(dir, e)
+		} else if isSMB1FileEntry(e.Entry) {
 			err = f.consumeSMB1FileCommand(dir, e)
 		} else if isSMB1SetupEntry(e.Entry) {
 			err = f.consumeSMB1Setup(dir, e)

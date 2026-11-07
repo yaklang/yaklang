@@ -69,24 +69,33 @@ func (b *smb1Trans2Buffer) retained() int64 {
 }
 
 func (b *smb1Trans2Buffer) admit(body map[string]any) (string, error) {
+	if err := b.reconcileTotals(body); err != nil {
+		return "", err
+	}
 	param, _ := body["Parameters"].([]byte)
 	data, _ := body["Data"].([]byte)
-	pStatus, err := b.add(true, int(smb1MapUint16(body["Parameter Displacement"])), param)
+	// Apply both halves to a trial buffer. A conflicting parameter block must
+	// not leave its data half committed when the record is reported as a
+	// conflict.
+	trial := b.clone()
+	pStatus, err := trial.add(true, int(smb1MapUint16(body["Parameter Displacement"])), param)
 	if err != nil {
 		return "", err
 	}
-	dStatus, err := b.add(false, int(smb1MapUint16(body["Data Displacement"])), data)
+	dStatus, err := trial.add(false, int(smb1MapUint16(body["Data Displacement"])), data)
 	if err != nil {
 		return "", err
 	}
-	switch {
-	case pStatus == "overlap conflict" || dStatus == "overlap conflict":
+	if pStatus == "overlap conflict" || dStatus == "overlap conflict" {
 		log.Debugf("smb1: TRANSACTION2 secondary overlapped a different byte")
 		return "overlap conflict", nil
-	case pStatus == "hole" || dStatus == "hole":
+	}
+	*b = *trial
+	if pStatus == "hole" || dStatus == "hole" {
 		log.Debugf("smb1: TRANSACTION2 secondary left a hole in the logical buffer")
 		return "hole", nil
-	case b.covered(true) && b.covered(false):
+	}
+	if b.covered(true) && b.covered(false) {
 		if b.publications == 0 {
 			b.publications = 1
 			b.paramsOut = smb1Materialize(b.params, b.totalP)
@@ -94,11 +103,46 @@ func (b *smb1Trans2Buffer) admit(body map[string]any) (string, error) {
 			return "complete", nil
 		}
 		return "retransmit", nil
-	case pStatus == "retransmit" && dStatus == "retransmit":
-		return "retransmit", nil
-	default:
-		return "incomplete", nil
 	}
+	// A fully covered chunk is not a retransmit of the logical buffer when the
+	// declared totals are still incomplete.
+	return "incomplete", nil
+}
+
+// MS-CIFS 2.2.4.47.1: a secondary may restate a total that is less than or
+// equal to the primary's. A larger total or a total reduced after publication
+// is inconsistent with the observed transaction.
+func (b *smb1Trans2Buffer) reconcileTotals(body map[string]any) error {
+	for _, item := range []struct {
+		key   string
+		total *int
+		spans []smb1Trans2Span
+	}{
+		{"Total Parameter Count", &b.totalP, b.params},
+		{"Total Data Count", &b.totalD, b.data},
+	} {
+		raw, ok := body[item.key]
+		if !ok {
+			continue
+		}
+		next := int(smb1MapUint16(raw))
+		if next > *item.total {
+			return fmt.Errorf("CIFS TRANSACTION2: secondary %s exceeds the primary total", item.key)
+		}
+		if next == *item.total {
+			continue
+		}
+		if b.publications != 0 {
+			return fmt.Errorf("CIFS TRANSACTION2: secondary %s reduced after publication", item.key)
+		}
+		for _, span := range item.spans {
+			if span.at+len(span.b) > next {
+				return fmt.Errorf("CIFS TRANSACTION2: existing bytes exceed the reduced %s", item.key)
+			}
+		}
+		*item.total = next
+	}
+	return nil
 }
 
 func (b *smb1Trans2Buffer) add(param bool, at int, chunk []byte) (string, error) {
@@ -255,8 +299,14 @@ func (f *binFlow) admitSMB1Trans2Secondary(tx *smb1LegacyTxn, fields map[string]
 		fields["Reassembly Publication"] = "first complete observation"
 		f.publishSMB1Trans2(fields, pending)
 	case "retransmit":
+		if pending.trans2.publications == 0 {
+			fields["Reassembly Publication"] = "retransmit ignored; no complete observation yet"
+			break
+		}
 		fields["Reassembly Publication"] = "retransmit; logical buffer unchanged"
 		f.publishSMB1Trans2(fields, pending)
+	case "overlap conflict", "hole", "incomplete":
+		fields["Reassembly Publication"] = "no publication; logical buffer is not complete"
 	}
 	ledger.pending[tx.key] = pending
 	return nil

@@ -92,6 +92,19 @@ func (s *smb1LegacyState) clone() *smb1LegacyState {
 	return n
 }
 
+func smb1EvictionCandidate(s *smb1LegacyState) (smb1SetupKey, bool) {
+	if s == nil {
+		return smb1SetupKey{}, false
+	}
+	for key, owner := range s.owners {
+		switch owner.phase {
+		case smb1LegacyCompleted, smb1LegacyAmbiguous, smb1LegacyOrphan:
+			return key, true
+		}
+	}
+	return smb1SetupKey{}, false
+}
+
 type smb1LegacyTxn struct {
 	f                                                               *binFlow
 	previous                                                        *binSMB2
@@ -157,8 +170,18 @@ func (f *binFlow) beginSMB1Legacy(dir int, e *ProtocolEvent, fields map[string]a
 	if s != nil {
 		priorOwner, exists = s.owners[tx.key]
 	}
+	evicted := smb1SetupKey{}
+	haveEviction := false
 	if !exists && owners >= f.a.budget.MaxCollectionElements {
-		return nil, protocolError(ErrResourceExceeded, "CIFS: shared operation identity collection exceeded")
+		// A long-lived capture accumulates completed identity owners. Retire a
+		// completed/ambiguous/orphan entry instead of ending the whole flow at
+		// the collection budget. Outstanding pending owners are never evicted.
+		if candidate, ok := smb1EvictionCandidate(s); ok {
+			evicted, haveEviction = candidate, true
+			owners--
+		} else {
+			return nil, protocolError(ErrResourceExceeded, "CIFS: shared operation identity collection exceeded")
+		}
 	}
 	setup := f.smb2.smb1Setup
 	sp, ss, sc, su := 0, 0, 0, 0
@@ -200,6 +223,11 @@ func (f *binFlow) beginSMB1Legacy(dir int, e *ProtocolEvent, fields map[string]a
 	}
 	working := *f.smb2
 	working.smb1Legacy = s.clone()
+	if haveEviction {
+		delete(working.smb1Legacy.owners, evicted)
+		delete(working.smb1Legacy.pending, evicted)
+		fields["Identity Collection Status"] = "evicted a completed/ambiguous owner at the collection budget"
+	}
 	f.smb2 = &working
 	tx.tracked = true
 	ledger := working.smb1Legacy
