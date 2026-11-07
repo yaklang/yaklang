@@ -13,16 +13,38 @@ type memberCallReadVisitKey struct {
 	wantFunction bool
 }
 
-// memberCallReadVisitSet is the recursion guard for phi member reads.
+// memberCallReadVisitSet is the recursion guard for phi member reads and the
+// result cache for one top-level read.
 //
 // Member reads nest only as deep as the phi chain in front of them, so a small
 // inline stack beats allocating a map on every top-level read. The overflow map
 // is only created if a pathological chain goes past the inline capacity, which
 // keeps the guard allocation-free on the common path while staying unbounded-safe.
+//
+// The guard alone only stops a key from repeating on the active path. A phi DAG
+// that reconverges (a branch merges two nodes that share a source) then expands
+// every shared node once per path, which is exponential in the nesting depth.
+// Minified bundles with hundreds of merged object members turned one member read
+// into 16381 emitted phis at depth 12. results therefore reuses the value a
+// node already produced inside this read: the read is pure (it emits instructions
+// but never rewrites member tables), so the same key resolves to the same value.
 type memberCallReadVisitSet struct {
 	keys     [memberCallReadVisitStackDepth]memberCallReadVisitKey
 	length   int
 	overflow map[memberCallReadVisitKey]struct{}
+
+	// results holds completed per-node results of this read. Entries reached
+	// while a cycle fallback was used are not recorded: their value depends on
+	// the active path and would be wrong for a later path.
+	results    [memberCallReadVisitStackDepth]memberCallReadResult
+	resultLen  int
+	resultOver map[memberCallReadVisitKey]Value
+	fallbacks  int
+}
+
+type memberCallReadResult struct {
+	key   memberCallReadVisitKey
+	value Value
 }
 
 const memberCallReadVisitStackDepth = 8
@@ -117,6 +139,32 @@ func (s *memberCallReadVisitSet) pop(k memberCallReadVisitKey, inOverflow bool) 
 	}
 }
 
+// lookup returns a value this read already produced for k.
+func (s *memberCallReadVisitSet) lookup(k memberCallReadVisitKey) (Value, bool) {
+	for i := 0; i < s.resultLen; i++ {
+		if s.results[i].key == k {
+			return s.results[i].value, true
+		}
+	}
+	if s.resultOver != nil {
+		value, ok := s.resultOver[k]
+		return value, ok
+	}
+	return nil, false
+}
+
+func (s *memberCallReadVisitSet) remember(k memberCallReadVisitKey, value Value) {
+	if s.resultLen < memberCallReadVisitStackDepth {
+		s.results[s.resultLen] = memberCallReadResult{key: k, value: value}
+		s.resultLen++
+		return
+	}
+	if s.resultOver == nil {
+		s.resultOver = make(map[memberCallReadVisitKey]Value, memberCallReadVisitStackDepth)
+	}
+	s.resultOver[k] = value
+}
+
 // ReadMemberCallMethodOrValue read member call method or value depends on type
 func (b *FunctionBuilder) ReadMemberCallMethodOrValue(object, key Value) Value {
 	res := checkCanMemberCallExist(object, key, false)
@@ -185,59 +233,74 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 			keyID:        key.GetId(),
 			wantFunction: wantFunction,
 		}
+		if cached, ok := visited.lookup(vk); ok {
+			return cached
+		}
 		if visited.contains(vk) {
+			visited.fallbacks++
 			return b.getFieldValue(objectt, key, wantFunction)
 		}
+		fallbacks := visited.fallbacks
 		inOverflow := visited.push(vk)
 		defer visited.pop(vk, inOverflow)
 
 		res := checkCanMemberCallExist(objectt, key, wantFunction)
-		if ret := b.PeekValueInThisFunction(res.name); ret != nil {
-			return ret
+		value := b.readPhiMemberValue(objectt, phi, res, key, wantFunction, visited)
+		if visited.fallbacks == fallbacks {
+			visited.remember(vk, value)
 		}
-
-		edgeValues := make(Values, 0, len(phi.Edge))
-		for _, edgeID := range phi.Edge {
-			edgeValue, ok := objectt.GetValueById(edgeID)
-			if !ok || edgeValue == nil {
-				continue
-			}
-			edgeRes := checkCanMemberCallExist(edgeValue, key, wantFunction)
-			if !edgeRes.exist {
-				continue
-			}
-			memberValue := b.readMemberCallValueExWithVisited(edgeValue, key, wantFunction, visited)
-			if memberValue != nil {
-				edgeValues = append(edgeValues, memberValue)
-			}
-		}
-		if len(edgeValues) > 1 {
-			seen := make(map[phiEdgeIdentity]struct{}, len(edgeValues))
-			deduped := make(Values, 0, len(edgeValues))
-			for _, edgeValue := range edgeValues {
-				identity := phiEdgeDedupeIdentity(edgeValue)
-				if _, ok := seen[identity]; ok {
-					continue
-				}
-				seen[identity] = struct{}{}
-				deduped = append(deduped, edgeValue)
-			}
-			edgeValues = deduped
-		}
-		if len(edgeValues) == 0 {
-			return b.getFieldValue(objectt, key, wantFunction)
-		}
-		if len(edgeValues) == 1 {
-			// A single resolved edge value would drop the phi's own dataflow
-			// sources; defer to the pre-existing field lookup so topdef
-			// analysis keeps walking the object edges.
-			return b.getFieldValue(objectt, key, wantFunction)
-		}
-		return b.EmitPhi(res.name, edgeValues)
+		return value
 	}
 
 	// normal member call
 	return b.getFieldValue(objectt, key, wantFunction)
+}
+
+// readPhiMemberValue resolves one phi member read. The caller has already
+// deduplicated this node for the current read and holds its active-path guard.
+func (b *FunctionBuilder) readPhiMemberValue(objectt Value, phi *Phi, res checkMemberResult, key Value, wantFunction bool, visited *memberCallReadVisitSet) Value {
+	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
+		return ret
+	}
+
+	edgeValues := make(Values, 0, len(phi.Edge))
+	for _, edgeID := range phi.Edge {
+		edgeValue, ok := objectt.GetValueById(edgeID)
+		if !ok || edgeValue == nil {
+			continue
+		}
+		edgeRes := checkCanMemberCallExist(edgeValue, key, wantFunction)
+		if !edgeRes.exist {
+			continue
+		}
+		memberValue := b.readMemberCallValueExWithVisited(edgeValue, key, wantFunction, visited)
+		if memberValue != nil {
+			edgeValues = append(edgeValues, memberValue)
+		}
+	}
+	if len(edgeValues) > 1 {
+		seen := make(map[phiEdgeIdentity]struct{}, len(edgeValues))
+		deduped := make(Values, 0, len(edgeValues))
+		for _, edgeValue := range edgeValues {
+			identity := phiEdgeDedupeIdentity(edgeValue)
+			if _, ok := seen[identity]; ok {
+				continue
+			}
+			seen[identity] = struct{}{}
+			deduped = append(deduped, edgeValue)
+		}
+		edgeValues = deduped
+	}
+	if len(edgeValues) == 0 {
+		return b.getFieldValue(objectt, key, wantFunction)
+	}
+	if len(edgeValues) == 1 {
+		// A single resolved edge value would drop the phi's own dataflow
+		// sources; defer to the pre-existing field lookup so topdef
+		// analysis keeps walking the object edges.
+		return b.getFieldValue(objectt, key, wantFunction)
+	}
+	return b.EmitPhi(res.name, edgeValues)
 }
 
 // create member call variable
