@@ -295,15 +295,23 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
 	} else if !memoryOnly {
-		if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
+		// Raise the SQLite page cache before the cleanup and relax durability
+		// for the delete. Both are restored before the compile inserts run. Pin
+		// the pool first: SQLite PRAGMAs are per-connection.
+		restoreConn := ssadb.BeginSQLiteSingleConn(ssadb.GetDB())
+		consts.TuneSQLiteBulkWrite(ssadb.GetDB())
+		restoreDurability := ssadb.BeginSQLiteBulkDelete(ssadb.GetDB())
+		err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile())
+		restoreDurability()
+		restoreConn()
+		if err != nil {
 			return nil, err
 		}
 	}
 
 	var suspendErr error
-	// Raise the SQLite page cache before the bulk inserts. The size-based tuner
-	// below only sees the file as it is now, which is near zero for a fresh
-	// project database that is about to receive millions of IR rows.
+	// A fresh database is near zero bytes, so the size-based tuner would keep
+	// the default cache while the compile writes several gigabytes into it.
 	consts.TuneSQLiteBulkWrite(ssadb.GetDB())
 	suspendedIndexes, suspendErr = ssadb.SuspendSecondaryIndexes(ssadb.GetDB())
 	if suspendErr != nil {
