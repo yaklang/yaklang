@@ -408,16 +408,18 @@ func TestSMB2AuditCrossCuttingCases(t *testing.T) {
 			info, err := state.consumeFrom(1, response, 64)
 			require.NoError(t, err)
 			body := info["Body"].(map[string]any)
-			require.Contains(t, body["Directory Entry Status"], "not selected")
-			require.NotContains(t, body, "Directory Entries")
-			require.NotContains(t, body, "File Name")
+			require.Contains(t, body["Directory Entry Status"], "generic prefix")
+			require.Contains(t, body["Directory Entry Status"], "FileFullDirectoryInformation")
+			entries, ok := body["Directory Entries"].([]map[string]any)
+			require.True(t, ok)
+			require.Equal(t, "Z", entries[0]["File Name"])
 			control := &binSMB2{client: 0}
 			_, err = control.consumeFrom(0, smb2QueryDirectory(21, 0x11, 7, 37, bytes.Repeat([]byte{0x7a}, 16)), 64)
 			require.NoError(t, err)
 			decoded, err := control.consumeFrom(1, response, 64)
 			require.NoError(t, err)
-			entries := decoded["Body"].(map[string]any)["Directory Entries"].([]map[string]any)
-			require.Equal(t, "Z", entries[0]["File Name"])
+			decodedEntries := decoded["Body"].(map[string]any)["Directory Entries"].([]map[string]any)
+			require.Equal(t, "Z", decodedEntries[0]["File Name"])
 		}},
 		{"collection-budget-one-short", func(t *testing.T) {
 			wire := smb2NegotiateReq(0x02ff, 0x0300, 0x0302, 0x02fe)[4:]

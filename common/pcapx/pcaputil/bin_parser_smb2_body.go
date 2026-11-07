@@ -1129,7 +1129,7 @@ func smb2OpaqueIOCTLBuffer(body map[string]any, pdu []byte, name string, offset,
 	return nil
 }
 
-func smb2QueryDirectoryFields(info map[string]any, pdu []byte, response bool) error {
+func smb2QueryDirectoryFields(info map[string]any, pdu []byte, response bool, max int) error {
 	status, _ := info["Status"].(uint32)
 	if smb2StatusUsesErrorBody(14, status, response) {
 		return smb2ErrorFields(info, pdu)
@@ -1174,7 +1174,7 @@ func smb2QueryDirectoryFields(info map[string]any, pdu []byte, response bool) er
 	smb2Literal(body, "Output Buffer Offset", 66, 68, uint16(outputOffset))
 	smb2Literal(body, "Output Buffer Length", 68, 72, uint32(outputLength))
 	if outputLength == 0 {
-		body["Directory Entry Status"] = "opaque: empty output; entry chain not present"
+		body["Directory Entry Status"] = "decoded: empty output; entry chain not present"
 		return nil
 	}
 	raw, err := smb2Buffer(pdu, outputOffset, outputLength, 72)
@@ -1182,10 +1182,18 @@ func smb2QueryDirectoryFields(info map[string]any, pdu []byte, response bool) er
 		return fmt.Errorf("smb2: QUERY_DIRECTORY output outside command")
 	}
 	smb2Literal(body, "Output Buffer", outputOffset, outputOffset+outputLength, bytes.Clone(raw))
-	// The information class lives on the matched request. This response does
-	// not repeat it, so the entry chain stays opaque instead of guessing.
-	body["Directory Entry Status"] = "opaque: directory entry chain requires the matched request class"
-	log.Debugf("smb2: QUERY_DIRECTORY output left opaque; entry chain is not selected without a proven class")
+	// The information class lives on the matched request and this response does
+	// not repeat it. Decode the class-independent prefix and name chain now; a
+	// later matched request refines the class-specific tail when it is present.
+	entries, entryStatus, err := smb2DecodeDirectoryEntries(raw, 0, max, outputOffset)
+	if err != nil {
+		body["Directory Entry Status"] = "opaque: " + err.Error()
+		body["Directory Decode Error"] = err.Error()
+		log.Debugf("smb2: QUERY_DIRECTORY output left opaque; %s", err.Error())
+		return nil
+	}
+	body["Directory Entries"] = entries
+	body["Directory Entry Status"] = "decoded: " + entryStatus
 	return nil
 }
 
@@ -1549,11 +1557,6 @@ func smb2DecodeMatchedDirectory(command map[string]any, class uint8, max int) {
 	if !ok {
 		return
 	}
-	if class != smb2FileIdBothDirectoryInformation {
-		body["Directory Entry Status"] = "opaque: directory information class is not selected"
-		log.Debugf("smb2: QUERY_DIRECTORY class %d left opaque; FileIdBothDirectoryInformation is the selected chain", class)
-		return
-	}
 	output, _ := body["Output Buffer"].([]byte)
 	ranges, _ := body["Wire Field Ranges"].(map[string]any)
 	span, _ := ranges["Output Buffer"].([]any)
@@ -1567,18 +1570,44 @@ func smb2DecodeMatchedDirectory(command map[string]any, class uint8, max int) {
 		body["Directory Entry Status"] = "opaque: directory output source range inconsistent"
 		return
 	}
-	entries, err := smb2DecodeFileIdBothEntries(output, max)
-	if err != nil {
-		command["Directory Decode Error"] = err.Error()
-		body["Directory Entry Status"] = "opaque: directory entry chain is incomplete or walks outside the output buffer"
-		log.Debugf("smb2: QUERY_DIRECTORY FileIdBoth chain refused: %s", err.Error())
+	if class == smb2FileIdBothDirectoryInformation {
+		entries, err := smb2DecodeFileIdBothEntries(output, max)
+		if err != nil {
+			command["Directory Decode Error"] = err.Error()
+			if _, generic := body["Directory Entries"]; generic {
+				body["Directory Entry Status"] = "decoded: generic prefix; class-specific FileIdBothDirectoryInformation chain refused: " + err.Error()
+			} else {
+				body["Directory Entry Status"] = "opaque: " + err.Error()
+			}
+			log.Debugf("smb2: QUERY_DIRECTORY FileIdBoth chain refused: %s", err.Error())
+			return
+		}
+		for _, entry := range entries {
+			smb2OffsetRanges(entry, int(lo))
+		}
+		body["Directory Entries"] = entries
+		body["Directory Entry Status"] = "decoded: FileIdBothDirectoryInformation from matched request"
 		return
 	}
-	for _, entry := range entries {
-		smb2OffsetRanges(entry, int(lo))
+	switch class {
+	case 1, 2, 3, 12, 38:
+		entries, status, err := smb2DecodeDirectoryEntries(output, class, max, int(lo))
+		if err != nil {
+			command["Directory Decode Error"] = err.Error()
+			if _, generic := body["Directory Entries"]; generic {
+				body["Directory Entry Status"] = "decoded: generic prefix; class-specific " + smb2DirectoryClassName(class) + " chain refused: " + err.Error()
+			} else {
+				body["Directory Entry Status"] = "opaque: " + err.Error()
+			}
+			log.Debugf("smb2: QUERY_DIRECTORY class %d chain refused: %s", class, err.Error())
+			return
+		}
+		body["Directory Entries"] = entries
+		body["Directory Entry Status"] = "decoded: " + status + " from matched request"
+	default:
+		body["Directory Entry Status"] = "opaque: directory information class is not selected"
+		log.Debugf("smb2: QUERY_DIRECTORY class %d left opaque; no selected class-specific chain", class)
 	}
-	body["Directory Entries"] = entries
-	body["Directory Entry Status"] = "decoded: FileIdBothDirectoryInformation from matched request"
 }
 
 func smb2DecodeFileIdBothEntries(raw []byte, max int) ([]map[string]any, error) {

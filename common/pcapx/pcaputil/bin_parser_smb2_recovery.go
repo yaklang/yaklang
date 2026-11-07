@@ -114,6 +114,7 @@ func smb2RecoverBodyRecord(raw []byte, max int, err error) map[string]any {
 		}
 		command := smb2CommandHeader(h[:end-at])
 		smb2OffsetRanges(command, at)
+		smb2AttachContext(command)
 		commands = append(commands, command)
 		bodies = append(bodies, [2]int{at + 64, end})
 		if next == 0 {
@@ -144,6 +145,7 @@ func smb2RecoverBodyRecord(raw []byte, max int, err error) map[string]any {
 	info["State Updated"] = false
 	info["Validated Envelope"] = "Direct TCP length and complete SMB2 fixed-header chain"
 	smb2AttachContext(info)
+	smb2AttachCompoundContext(info)
 	return info
 }
 

@@ -70,8 +70,9 @@ func TestSMB2QueryDirectoryFileIdBothChain(t *testing.T) {
 	alone, err := (&binSMB2{}).consume(response, 64)
 	require.NoError(t, err)
 	directory := smb2NamedCommand(alone, "QUERY_DIRECTORY")
-	require.Equal(t, "opaque: directory entry chain requires the matched request class", directory["Body"].(map[string]any)["Directory Entry Status"])
-	require.NotContains(t, directory["Body"], "Directory Entries")
+	generic := directory["Body"].(map[string]any)
+	require.Contains(t, generic["Directory Entry Status"], "decoded:")
+	require.NotEmpty(t, generic["Directory Entries"])
 
 	request := smb2DirectoryRequestMatching(response)
 	state := &binSMB2{client: 0}
@@ -109,21 +110,23 @@ func TestSMB2QueryDirectoryFileIdBothChain(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSMB2QueryDirectoryClassOtherThanFileIdBothStaysOpaque(t *testing.T) {
+func TestSMB2QueryDirectoryUnselectedClassKeepsGenericEntries(t *testing.T) {
 	response := smb2LayoutFixture(t, "query-directory-fileidboth-response.bin")
 	request := smb2DirectoryRequestMatching(response)
-	request[70] = 38
+	request[70] = 99 // not a selected directory information class
 	state := &binSMB2{client: 0}
 	_, err := state.consumeFrom(0, request, 64)
 	require.NoError(t, err)
 	matched, err := state.consumeFrom(1, response, 64)
 	require.NoError(t, err)
-	body := smb2NamedCommand(matched, "QUERY_DIRECTORY")["Body"].(map[string]any)
-	require.Equal(t, byte(38), smb2NamedCommand(matched, "QUERY_DIRECTORY")["Request File Information Class"])
+	command := smb2NamedCommand(matched, "QUERY_DIRECTORY")
+	body := command["Body"].(map[string]any)
+	require.Equal(t, byte(99), command["Request File Information Class"])
 	require.Contains(t, body["Directory Entry Status"], "not selected")
-	require.NotContains(t, body, "Directory Entries")
-	require.NotContains(t, body, "File Name")
-	require.NotContains(t, body, "Next Entry Offset")
+	entries, ok := body["Directory Entries"].([]map[string]any)
+	require.True(t, ok)
+	require.NotEmpty(t, entries)
+	require.NotEmpty(t, entries[0]["File Name"])
 }
 
 func TestSMB2QueryDirectoryNoMoreFilesIsError(t *testing.T) {
@@ -175,7 +178,11 @@ func TestSMB2QueryDirectoryDoesNotCrossVLAN(t *testing.T) {
 	require.Len(t, events, 3)
 	foreign := smb2NamedCommand(events[1].Session, "QUERY_DIRECTORY")
 	require.Equal(t, "missing-or-ambiguous-request", foreign["Association Status"])
-	require.NotContains(t, foreign["Body"], "Directory Entries")
+	// The class-independent chain is decoded from this response's own bytes;
+	// no request context (class, MID or file context) crosses the VLAN.
+	require.Contains(t, foreign["Body"].(map[string]any)["Directory Entry Status"], "decoded:")
+	require.NotContains(t, foreign["Body"], "Request File Information Class")
+	require.NotContains(t, foreign["Body"], "Request Message ID")
 	local := smb2NamedCommand(events[2].Session, "QUERY_DIRECTORY")
 	require.Equal(t, "matched", local["Association Status"])
 	require.Contains(t, local["Body"].(map[string]any)["Directory Entry Status"], "decoded: FileIdBothDirectoryInformation")

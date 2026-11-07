@@ -243,7 +243,7 @@ func TestSMB2LayoutFixturesKeepWidthSignednessAndRanges(t *testing.T) {
 		smb2LayoutSpan(t, query, "Output Buffer Length", 96, 100)
 		output := smb2LayoutBody(t, "query-directory-response.bin")
 		require.Equal(t, []byte{9, 8, 7, 6}, output["Output Buffer"])
-		require.Equal(t, "opaque: directory entry chain requires the matched request class", output["Directory Entry Status"])
+		require.Contains(t, output["Directory Entry Status"], "opaque: truncated directory entry")
 		smb2LayoutSpan(t, output, "Output Buffer", 76, 80)
 	})
 }

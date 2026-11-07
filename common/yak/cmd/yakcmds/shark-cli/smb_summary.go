@@ -58,6 +58,53 @@ func smbSummaryInteger(value any) (string, bool) {
 	return "", false
 }
 
+// smbCompoundSummary describes every command in one SMB2 compound PDU. The
+// top-level event otherwise describes only commands[0].
+func smbCompoundSummary(e *pcaputil.ProtocolEvent) (string, bool) {
+	if e == nil || e.Session["Compound"] != true {
+		return "", false
+	}
+	var commands []map[string]any
+	switch value := e.Session["Commands"].(type) {
+	case []map[string]any:
+		commands = value
+	case []any:
+		for _, item := range value {
+			if command, ok := item.(map[string]any); ok {
+				commands = append(commands, command)
+			}
+		}
+	}
+	if len(commands) == 0 {
+		return "", false
+	}
+	names := make([]string, 0, len(commands))
+	for _, command := range commands {
+		if name, _ := command["Packet Name"].(string); name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return "", false
+	}
+	summary := fmt.Sprintf("SMB2 compound · %d commands · %s", len(commands), strings.Join(names, ", "))
+	var behaviors []string
+	switch value := e.Session["Observed Behaviors"].(type) {
+	case []string:
+		behaviors = value
+	case []any:
+		for _, item := range value {
+			if behavior, ok := item.(string); ok {
+				behaviors = append(behaviors, behavior)
+			}
+		}
+	}
+	if len(behaviors) > 0 {
+		summary += " · " + strings.Join(behaviors, ",")
+	}
+	return safeText(summary), true
+}
+
 // smbCommandSummary is the list line for a single decoded SMB2 command.
 // Cached connection dialect is not substituted for this packet's own fields.
 func smbCommandSummary(e *pcaputil.ProtocolEvent) (string, bool) {

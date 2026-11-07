@@ -58,6 +58,16 @@ func ParseStructured(data []byte, rule string, keys ...string) (map[string]any, 
 					return map[string]any{"fields": value, "metadata": nil}, nil
 				}
 			}
+		case "application-layer.smb2":
+			if len(keys) == 1 && keys[0] == "SMB2" {
+				value, ok, err := captureSMB2Structured(data)
+				if err != nil {
+					return nil, err
+				}
+				if ok {
+					return map[string]any{"fields": value, "metadata": nil}, nil
+				}
+			}
 		}
 	}
 	if len(keys) == 1 && base.ParserRegistration("default") == defaultParserRegistration {

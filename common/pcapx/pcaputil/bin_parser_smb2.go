@@ -459,6 +459,7 @@ func (s *binSMB2) consumeFrom(dir int, raw []byte, max int) (map[string]any, err
 		info["Compound Count"] = len(cmds)
 		info["Command Names"] = names
 		info["Commands"] = cmds
+		smb2AttachCompoundContext(info)
 	}
 	return info, nil
 }
@@ -976,7 +977,7 @@ func smb2CommandFields(info map[string]any, pdu []byte, resp bool, max int, padd
 	case 13:
 		return smb2EchoFields(info, pdu, resp)
 	case 14:
-		return smb2QueryDirectoryFields(info, pdu, resp)
+		return smb2QueryDirectoryFields(info, pdu, resp, max)
 	case 15:
 		return smb2ChangeNotifyFields(info, pdu, resp)
 	case 16:

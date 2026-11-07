@@ -596,6 +596,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := smbCompoundSummary(e); ok {
+		return summary
+	}
 	if summary, ok := smbQueryInfoSummary(e); ok {
 		return summary
 	}

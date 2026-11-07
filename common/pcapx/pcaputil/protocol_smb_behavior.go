@@ -541,3 +541,35 @@ func smb1AttachContext(fields map[string]any, command byte) {
 		fields["Resource"] = resource
 	}
 }
+
+// smb2AttachCompoundContext aggregates every command's operation, resource and
+// behavior labels onto the compound event. The top-level fields otherwise
+// describe only commands[0].
+func smb2AttachCompoundContext(info map[string]any) {
+	commands, ok := info["Commands"].([]map[string]any)
+	if !ok || len(commands) == 0 {
+		return
+	}
+	var operations, behaviors, resources []string
+	if current, ok := info["Observed Behaviors"].([]string); ok {
+		behaviors = append(behaviors, current...)
+	}
+	for _, command := range commands {
+		if operation, ok := command["Operation"].(string); ok && operation != "" {
+			operations = append(operations, operation)
+		}
+		if current, ok := command["Observed Behaviors"].([]string); ok {
+			behaviors = append(behaviors, current...)
+		}
+		if resource, ok := command["Resource"].(string); ok && resource != "" {
+			resources = append(resources, resource)
+		}
+	}
+	info["Compound Operations"] = smbDedupStrings(operations)
+	info["Observed Behaviors"] = smbDedupStrings(behaviors)
+	if len(resources) > 0 {
+		info["Compound Resources"] = smbDedupStrings(resources)
+	}
+	info["Operation"] = "compound"
+	info["Operation Category"] = "compound"
+}
