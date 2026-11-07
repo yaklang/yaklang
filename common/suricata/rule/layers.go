@@ -11,7 +11,7 @@ type ICMPLayerRule struct {
 }
 
 type IPLayerRule struct {
-	TTL int
+	TTL *numrange.NumRange
 	/*
 		IP Option	Description
 		rr	Record Route
@@ -28,16 +28,19 @@ type IPLayerRule struct {
 	IPOpts     string
 	Sameip     bool
 	IPProto    string
-	Id         int
+	Id         *numrange.NumRange
 	Geoip      string
 	FragBits   string
-	FragOffset string
-	Tos        string
+	FragOffset *numrange.NumRange
+	Tos        *numrange.NumRange
 }
 
 type DNSRule struct {
 	OpcodeNegative bool
+	OpcodeSet      bool
 	Opcode         int
+	RCode          *numrange.NumRange
+	RRType         *numrange.NumRange
 }
 
 type HTTPConfig struct {

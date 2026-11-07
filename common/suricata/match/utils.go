@@ -18,7 +18,7 @@ func bytesIndexAll(s []byte, sep []byte, nocase bool) []data.Matched {
 	if nocase {
 		cmp = bytes.EqualFold
 	} else {
-		cmp = bytes.EqualFold
+		cmp = bytes.Equal
 	}
 
 	var indexes []data.Matched

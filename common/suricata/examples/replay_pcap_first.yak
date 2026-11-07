@@ -1,0 +1,31 @@
+// 典型 2：已经有 pcapx 调用时，把 engine 作为一个 CaptureOption 绑定进去。
+//
+// 运行：
+//   yak common/suricata/examples/replay_pcap_first.yak \
+//     --rules common/suricata/examples/testdata/http.rules \
+//     -r /tmp/pcap_analysis.pcap
+cli.SetDoc("用 pcapx.OpenPcapFile + pcapx.pcap_suricata(engine) 回放 pcap。")
+rulesPath = cli.String("rules", cli.setRequired(true), cli.setHelp("规则文件或目录（递归 .rules）"))
+pcapPath = cli.String("read,r", cli.setRequired(true), cli.setHelp("pcap / pcapng 路径"))
+cli.check()
+
+loaded = suricata.LoadStatefulRules(rulesPath)~
+if len(loaded.Rules) == 0 { die("没有可执行的 stateful 规则") }
+
+alerts = []
+engine = suricata.NewStatefulEngine(
+    loaded.Rules,
+    suricata.engineOnAlert(func(alert) { alerts = append(alerts, alert) }),
+)~
+defer engine.Close()
+
+// pcapx 侧只多一个 pcap_suricata(engine) option，不需要 session/adapter。
+pcapx.OpenPcapFile(pcapPath, pcapx.pcap_suricata(engine))~
+
+stats = engine.Stats()
+printf("[DONE] alerts=%d packets=%d join_misses=%d\n",
+    len(alerts), stats.Capture.PhysicalPackets, stats.Capture.JoinMisses)
+for _, alert = range alerts {
+    printf("[ALERT] sid=%d view=%s %s -> %s\n",
+        alert.SID, alert.View, alert.Source, alert.Destination)
+}

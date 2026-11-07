@@ -1,0 +1,2 @@
+alert tcp any any -> any any (msg:"request sets http_get"; flow:established,to_server,only_stream; content:"GET /pcap-skill-proof"; flowbits:set,http_get; flowbits:noalert; sid:9500011; rev:1;)
+alert tcp any any -> any any (msg:"response after request"; flow:established,to_client,only_stream; content:"200 OK"; flowbits:isset,http_get; sid:9500012; rev:1;)

@@ -1,0 +1,91 @@
+// Stateful Suricata over live capture or a pcap/pcapng replay.
+//
+// Rule compatibility is fail-closed per rule: rules that M1 cannot execute
+// (for example byte_test) are reported and skipped, while every returned rule
+// is guaranteed to compile. Loading an ET corpus therefore keeps its supported
+// subset instead of rejecting the whole file.
+//
+// Examples:
+//   yak common/suricata/examples/stateful_pcap.yak \
+//       --rules /tmp/emerging-scan.rules -r /tmp/capture.pcap --json
+//   yak common/suricata/examples/stateful_pcap.yak \
+//       --rules /tmp/rules -i en0 -f "tcp port 80" --duration 30
+cli.SetDoc("用 yak 抓包/回放，并把流量送入有状态 Suricata 规则引擎。")
+rulesPath = cli.String("rules", cli.setRequired(true), cli.setHelp("规则文件或目录（递归加载 .rules）"))
+input = cli.String("read,r", cli.setHelp("回放 pcap / pcapng 文件"))
+iface = cli.String("interface,i", cli.setHelp("实时抓包网卡，例如 en0"))
+bpf = cli.String("filter,f", cli.setHelp("BPF 捕获过滤，例如 tcp port 80"))
+duration = cli.Float("duration", cli.setDefault(0), cli.setHelp("实时抓包秒数，0 表示直到 Ctrl-C"))
+asJSON = cli.Bool("json", cli.setDefault(false), cli.setHelp("每条告警输出一行 JSON"))
+cli.check()
+
+if input == "" && iface == "" { die("请选择 -r 文件或 -i 网卡") }
+if input != "" && iface != "" { die("-r 和 -i 请选择一个") }
+
+loaded = suricata.LoadStatefulRules(rulesPath)~
+rules, rejected = loaded.Rules, loaded.Rejected
+for _, skipped = range rejected {
+    printf("[SKIP] sid=%d gid=%d msg=%q reason=%s\n",
+        skipped.SID, skipped.GID, skipped.Message, skipped.Reason)
+}
+if len(rules) == 0 { die("没有可执行的 stateful 规则") }
+printf("[LOAD] executable=%d rejected=%d\n", len(rules), len(rejected))
+
+engine = suricata.NewStatefulEngine(
+    rules,
+    suricata.engineOnAlert(func(alert) {
+        if asJSON {
+            println(json.dumps({
+                "sid": alert.SID, "gid": alert.GID, "rev": alert.Rev,
+                "message": alert.Message, "class_type": alert.ClassType,
+                "action": alert.Action, "protocol": alert.Protocol,
+                "view": alert.View, "direction": alert.Direction,
+                "source": alert.Source, "source_port": alert.SourcePort,
+                "destination": alert.Destination, "destination_port": alert.DestinationPort,
+                "packets": alert.PacketNumbers,
+                "flow_id": alert.FlowID, "tcp_flow_id": alert.TCPFlowID,
+                "transaction_id": alert.TransactionID, "summary": alert.Summary,
+            }))
+            return
+        }
+        printf("[ALERT] sid=%d %s %s:%d -> %s:%d view=%s packets=%v\n",
+            alert.SID, alert.Message, alert.Source, alert.SourcePort,
+            alert.Destination, alert.DestinationPort, alert.View, alert.PacketNumbers)
+    }),
+    suricata.engineOnDiagnostic(func(diagnostic) {
+        printf("[DIAG] kind=%s sid=%d %s\n", diagnostic.Kind, diagnostic.SID, diagnostic.Message)
+    }),
+    suricata.engineEpoch(1),
+    suricata.engineLimits({
+        "maxFlows": 65536,
+        "maxStreamBytes": 8 * 1024 * 1024,
+        "maxTotalStreamBytes": 256 * 1024 * 1024,
+    }),
+)~
+defer engine.Close()
+
+options = []
+if bpf != "" { options = append(options, pcapx.pcap_bpfFilter(bpf)) }
+if duration > 0 && iface != "" {
+    ctx, stop = pcapx.CaptureContext(duration)~
+    defer stop()
+    options = append(options, pcapx.pcap_context(ctx))
+}
+
+// 引擎自己拥有唯一的 capture 绑定，不需要 session/adapter。
+if input != "" {
+    engine.OpenPcapFile(input, options...)~
+} else {
+    engine.StartSniff(iface, options...)~
+}
+
+// 也可以反向绑定到已有的 pcap 调用：
+// pcapx.OpenPcapFile(input, pcapx.pcap_suricata(engine), pcapx.pcap_bpfFilter(bpf))~
+
+stats = engine.Stats()
+printf("[DONE] events=%d packets=%d streams=%d alerts=%d diagnostics=%d active_flows=%d join_misses=%d\n",
+    stats.Events, stats.Capture.PhysicalPackets, stats.StreamEvents, stats.Alerts,
+    stats.Diagnostics, stats.ActiveFlows, stats.Capture.JoinMisses)
+
+// 无状态规则也可以直接匹配单帧，不需要走 pcap：
+// matched, err = engine.MatchRaw(raw)

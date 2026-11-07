@@ -56,6 +56,17 @@ type Config struct {
 	Vars map[string]*scope
 }
 
+// Clone returns an independent variable table. Scopes are immutable after they
+// are installed, so they can be shared safely between parse configurations.
+func (c *Config) Clone() *Config {
+	cloned := NewConfig()
+	if c == nil {
+		return cloned
+	}
+	cloned.Vars = maps.Clone(c.Vars)
+	return cloned
+}
+
 func (c *Config) RandPortVar(varName string) int {
 	val := c.Vars[varName]
 	if val == nil {

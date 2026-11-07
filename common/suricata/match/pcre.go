@@ -1,48 +1,79 @@
 package match
 
 import (
-	regexp2 "github.com/VillanCh/go-pcre2-lite/regexp2"
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/suricata/data"
 	"github.com/yaklang/yaklang/common/suricata/rule"
-	"time"
+	"golang.org/x/exp/slices"
 )
 
-func init() {
-	regexp2.DefaultMatchTimeout = time.Millisecond * 100
-}
-
-func newPCREMatch(r *rule.ContentRule) matchHandler {
+func newPCREMatch(r *rule.ContentRule) (matchHandler, error) {
 	matcher, err := r.PCREParsed.Matcher()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("compile pcre %q: %w", r.PCRE, err)
 	}
 	return func(c *matchContext) error {
 		var indexes []data.Matched
-		buffer := c.GetBuffer(r.PCREParsed.Modifier())
-
-		if r.PCREParsed.IgnoreEndNewline() {
-			if buffer[len(buffer)-1] == '\n' {
-				buffer = buffer[:len(buffer)-1]
-			}
+		buffer := c.GetBuffer(r.Modifier)
+		if (r.PCREParsed.RawBytes() || r.RawBytes) && c.PK != nil {
+			buffer = c.PK.Data()
 		}
-		allPrevMatchs, existed := c.GetPrevMatched(r.PCREParsed.Modifier())
+		if r.DotPrefix {
+			buffer = dotPrefixBuffer(buffer)
+		}
+
+		jumpPosition, hasJump := c.takeJumpCursor(r.Modifier)
+
+		baseOffset := 0
+		allPrevMatches, existed := c.GetPrevMatched(r.Modifier)
 		if existed && r.PCREParsed.Relative() {
-			preMatch := allPrevMatchs[0]
-			buffer = buffer[preMatch.Pos+preMatch.Len:]
+			if !c.Must(len(allPrevMatches) > 0) {
+				return nil
+			}
+			prevMatch := allPrevMatches[0]
+			baseOffset = prevMatch.Pos + prevMatch.Len
+			if !c.Must(baseOffset >= 0 && baseOffset <= len(buffer)) {
+				return nil
+			}
+			buffer = buffer[baseOffset:]
 		}
 
-		indexes = matcher.Match(buffer)
+		indexes, err = matcher.Match(buffer)
+		if err != nil {
+			c.Reject()
+			return fmt.Errorf("match pcre %q: %w", r.PCRE, err)
+		}
+		if hasJump {
+			indexes = slices.DeleteFunc(indexes, func(match data.Matched) bool {
+				absolute := match.Pos + baseOffset
+				if r.PCREParsed.StartsWith() {
+					return absolute != jumpPosition
+				}
+				return absolute < jumpPosition
+			})
+		}
+		if r.PCREParsed.StartsWith() && !hasJump {
+			indexes = slices.DeleteFunc(indexes, func(match data.Matched) bool {
+				return match.Pos != 0
+			})
+		}
+		if r.Negative {
+			if len(indexes) > 0 {
+				c.Reject()
+			}
+			return nil
+		}
 		if !c.Must(len(indexes) > 0) {
 			return nil
 		}
-
-		if r.PCREParsed.StartsWith() {
-			if !c.Must(indexes[0].Pos == 0) {
-				return nil
+		if baseOffset != 0 {
+			for i := range indexes {
+				indexes[i].Pos += baseOffset
 			}
 		}
 
-		c.SetPrevMatched(r.PCREParsed.Modifier(), indexes)
+		c.SetPrevMatched(r.Modifier, indexes)
 		return nil
-	}
+	}, nil
 }

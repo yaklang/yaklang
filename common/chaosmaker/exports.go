@@ -140,6 +140,15 @@ var (
 		"NewSuricataMatcherGroup": NewSuricataMatcherGroup,
 		"groupCallback":           GroupOnMatchedCallback,
 
+		"NewStatefulEngine":  NewStatefulEngine,
+		"LoadSuricataRules":  LoadSuricataRules,
+		"LoadStatefulRules":  LoadStatefulRules,
+		"engineOnAlert":      engineOnAlert,
+		"engineOnDiagnostic": engineOnDiagnostic,
+		"engineEpoch":        engineEpoch,
+		"engineLimits":       engineLimits,
+		"engineStateLimits":  engineStateLimits,
+
 		"NewSuricataMatcher":           NewSuricataMatcher,
 		"ParseSuricata":                ParseSuricata,
 		"YieldRules":                   yieldRules,
@@ -175,6 +184,7 @@ func ParseSuricata(raw string, envs ...string) ([]*surirule.Rule, error) {
 
 // NewSuricataMatcher 基于单条 Suricata 规则创建一个流量匹配器，用于判断数据包是否命中该规则
 // 在 yak 中通过 suricata.NewSuricataMatcher 调用
+// 兼容接口：新代码应使用 suricata.NewStatefulEngine，它包含完整的 matcher 能力并支持状态规则。
 // 参数:
 //   - r: 单条 Suricata 规则对象(通常来自 suricata.ParseSuricata)
 //
@@ -194,6 +204,7 @@ func NewSuricataMatcher(r *surirule.Rule) *match.Matcher {
 
 // NewSuricataMatcherGroup 创建一个 Suricata 规则匹配器组，可批量加载规则并对数据包进行匹配
 // 在 yak 中通过 suricata.NewSuricataMatcherGroup 调用
+// 兼容接口：新代码应使用 suricata.NewStatefulEngine，它包含完整的 matcher 能力并支持状态规则。
 // 参数:
 //   - opt: 可选配置项，如 suricata.groupCallback 设置命中回调
 //

@@ -42,8 +42,8 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 
 	if a.Env != "" && a.Config != nil {
 		if !a.Config.HasVar(a.Env) {
-			log.Warnf("suricata env %s not found, fallback to any", a.Env)
-			return true
+			log.Warnf("suricata env %s not found", a.Env)
+			return false
 		}
 		return a.Config.MatchVar(a.Env, i)
 	}
@@ -58,20 +58,6 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 		if n.Match(i) {
 			return true
 		}
-	}
-
-	if a.IPv4CIDR != "" {
-		if a.hostFilter == nil {
-			a.hostFilter = utils.NewHostsFilter()
-		}
-		a.hostFilter.AddCIDR(a.IPv4CIDR)
-	}
-
-	if a.IPv6CIDR != "" {
-		if a.hostFilter == nil {
-			a.hostFilter = utils.NewHostsFilter()
-		}
-		a.hostFilter.AddCIDR(a.IPv6CIDR)
 	}
 
 	if a.hostFilter != nil {
@@ -91,6 +77,26 @@ func (a *AddressRule) parseSubRules() {
 			a.negativeRules = append(a.negativeRules, n)
 		} else {
 			a.positiveRules = append(a.positiveRules, n)
+		}
+	}
+}
+
+// Prepare materializes all matcher state before a Rule is shared by matchers.
+func (a *AddressRule) Prepare() {
+	if a == nil {
+		return
+	}
+	a.parseSubRules()
+	for _, sub := range a.SubRules {
+		sub.Prepare()
+	}
+	if a.hostFilter == nil && (a.IPv4CIDR != "" || a.IPv6CIDR != "") {
+		a.hostFilter = utils.NewHostsFilter()
+		if a.IPv4CIDR != "" {
+			a.hostFilter.AddCIDR(a.IPv4CIDR)
+		}
+		if a.IPv6CIDR != "" {
+			a.hostFilter.AddCIDR(a.IPv6CIDR)
 		}
 	}
 }
@@ -202,7 +208,7 @@ func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) (addr *Addres
 	addr = &AddressRule{Config: v.Config}
 	defer func() {
 		if addr != nil {
-			addr.parseSubRules()
+			addr.Prepare()
 		}
 	}()
 	if i.Any() != nil {
@@ -223,9 +229,6 @@ func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) (addr *Addres
 		return addr
 	case i.Environment_var() != nil:
 		addr.Env = strings.Trim(trim(i.Environment_var().GetText()), "${}")
-		if addr.Env == "EXTERNAL_NET" {
-			addr.Any = true
-		}
 		return addr
 	case len(i.AllAddress()) > 0:
 		var subs []*AddressRule

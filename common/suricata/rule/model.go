@@ -2,14 +2,15 @@ package rule
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
+	"github.com/yaklang/yaklang/common/suricata/data/numrange"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -21,6 +22,7 @@ type Rule struct {
 	MessageChinese     string       `json:"message_chinese"`
 	Action             string       `json:"action"`
 	Protocol           string       `json:"protocol"`
+	Direction          string       `json:"direction"`
 	SourceAddress      *AddressRule `json:"source_address"`
 	DestinationAddress *AddressRule `json:"destination_address"`
 	SourcePort         *PortRule    `json:"source_port"`
@@ -55,6 +57,10 @@ type Rule struct {
 	Confidence         string `json:"confidence"`
 	ReviewedAt         string `json:"reviewed_at"`
 	CVE                string `json:"cve"`
+
+	// StateOptions preserves stateful options in source order. Legacy fields in
+	// ContentRuleConfig and ContentRule remain populated for compatibility.
+	StateOptions []StateOption `json:"state_options,omitempty"`
 }
 
 func (r *Rule) AIDecoration(opts ...aispec.AIConfigOption) {
@@ -89,10 +95,40 @@ Poor Reputation 翻译为"恶意"。Observed 翻译为 "检测到"。 "CINS Acti
 	}
 }
 
+type TagRule struct {
+	Kind  string `json:"kind"`
+	Count int    `json:"count"`
+	Unit  string `json:"unit"`
+}
+
+// AppLayerEvent is one app-layer-event predicate. Suricata evaluates the event
+// flag produced by the application parser for the current transaction.
+type AppLayerEvent struct {
+	Name    string `json:"name"`
+	Negated bool   `json:"negated,omitempty"`
+}
+
+// ASN1Rule models the Suricata asn1 keyword. Checks are combined with OR
+// semantics: matching any enabled malformed-encoding condition satisfies the
+// keyword.
+type ASN1Rule struct {
+	Raw               string `json:"raw"`
+	OversizeLength    *uint32
+	AbsoluteOffset    *uint16
+	RelativeOffset    *int
+	BitstringOverflow bool
+	DoubleOverflow    bool
+}
+
 type ContentRuleConfig struct {
 	Flow *FlowRule
+	Tag  *TagRule
 
 	Thresholding *ThresholdingConfig
+	StreamSize   *StateMetricRule
+	FlowAge      *StateMetricRule
+	FlowPkts     *StateMetricRule
+	FlowBytes    *StateMetricRule
 
 	/* DNS Config*/
 	DNS *DNSRule
@@ -115,6 +151,13 @@ type ContentRuleConfig struct {
 	/* TLS */
 	TLSConfig *TLSRule
 
+	/* Application-layer protocol/event predicates */
+	AppLayerProtocol        string
+	AppLayerProtocolNegated bool
+	AppLayerEvents          []AppLayerEvent
+	FTPBounce               bool
+	ASN1                    *ASN1Rule
+
 	/* Payload Match */
 	ContentRules []*ContentRule
 
@@ -124,9 +167,67 @@ type ContentRuleConfig struct {
 }
 
 type FlowRule struct {
-	ToClient    bool
-	Established bool
-	ToServer    bool
+	ToClient       bool
+	Established    bool
+	ToServer       bool
+	NotEstablished bool
+	Stateless      bool
+	OnlyStream     bool
+	NoStream       bool
+	Tokens         []string
+}
+
+type StateOption struct {
+	Keyword   string              `json:"keyword"`
+	Raw       string              `json:"raw,omitempty"`
+	Flow      *FlowRule           `json:"flow,omitempty"`
+	FlowBits  *FlowBitsOption     `json:"flowbits,omitempty"`
+	FlowInt   *StateValueOption   `json:"flowint,omitempty"`
+	XBits     *StateValueOption   `json:"xbits,omitempty"`
+	Threshold *ThresholdingConfig `json:"threshold,omitempty"`
+	Metric    *StateMetricRule    `json:"metric,omitempty"`
+	NoAlert   bool                `json:"noalert,omitempty"`
+}
+
+type FlowBitsOperation string
+
+const (
+	FlowBitsSet      FlowBitsOperation = "set"
+	FlowBitsUnset    FlowBitsOperation = "unset"
+	FlowBitsToggle   FlowBitsOperation = "toggle"
+	FlowBitsIsSet    FlowBitsOperation = "isset"
+	FlowBitsIsNotSet FlowBitsOperation = "isnotset"
+	FlowBitsNoAlert  FlowBitsOperation = "noalert"
+)
+
+type FlowBitsOption struct {
+	Raw       string            `json:"raw"`
+	Operation FlowBitsOperation `json:"operation"`
+	Name      string            `json:"name,omitempty"`
+}
+
+// StateValueOption preserves the complete option while exposing the fields
+// shared by flowint and xbits.
+type StateValueOption struct {
+	Raw       string   `json:"raw"`
+	Operation string   `json:"operation,omitempty"`
+	Name      string   `json:"name,omitempty"`
+	Track     string   `json:"track,omitempty"`
+	Expire    *int     `json:"expire,omitempty"`
+	Arguments []string `json:"arguments,omitempty"`
+}
+
+// StateMetricRule models stream_size and flow.age/flow.pkts/flow.bytes. Some
+// keywords do not use Direction, in which case it remains empty.
+type StateMetricRule struct {
+	Raw       string             `json:"raw"`
+	Direction string             `json:"direction,omitempty"`
+	Range     *numrange.NumRange `json:"range"`
+}
+
+type ByteOp struct {
+	Kind string `json:"kind"`
+	Raw  string `json:"raw"`
 }
 
 type ContentRule struct {
@@ -134,24 +235,36 @@ type ContentRule struct {
 	Content  []byte
 
 	// payload config
-	Nocase     bool // case insensitive
-	Depth      *int
-	Offset     *int
-	StartsWith bool
-	EndsWith   bool
-	Distance   *int
-	Within     *int
+	Nocase      bool // case insensitive
+	Depth       *int
+	Offset      *int
+	StartsWith  bool
+	EndsWith    bool
+	Distance    *int
+	Within      *int
+	DepthVar    string
+	OffsetVar   string
+	DistanceVar string
+	WithinVar   string
+	// DotPrefix applies the Suricata dotprefix transform to the selected
+	// sticky buffer before this content match.
+	DotPrefix bool
 	// no effect
 	RawBytes bool
 	IsDataAt string
 	BSize    string
 	DSize    string
-	// won't support
-	ByteTest string
+	// ByteTests preserves every byte_test in source order. ByteTest keeps the
+	// last value for compatibility with older callers.
+	ByteTests []string
+	ByteTest  string
 	// won't support
 	ByteMath string
-	// won't support
-	ByteJump string
+	// ByteJumps preserves every byte_jump in source order.
+	ByteJumps []string
+	ByteJump  string
+	// ByteOps preserves byte_test/byte_jump order when they are interleaved.
+	ByteOps []ByteOp
 	// won't support
 	ByteExtract string
 	// won't support

@@ -128,8 +128,16 @@ mode UNTIL_SEP_MODE;
     NonQuotedString: UntilSettingDataChar+;
 
 mode MODE_STRING;
-    fragment ModeStringChar: ~[\n\r"] | '\\"';
-    ModeString: ModeStringChar+;
+    // Backslash runs must be consumed in pairs so an even run leaves the
+    // closing quote unescaped. A single backslash escapes the following
+    // character (including a quote); any other character is literal.
+    ModeString
+        : ( '\\\\'
+          | '\\"'
+          | '\\' ~[\n\r"]
+          | ~[\n\r"\\]
+          )+
+        ;
     ModeStringEnd: '"' -> popMode;
 
 ANY: .;
