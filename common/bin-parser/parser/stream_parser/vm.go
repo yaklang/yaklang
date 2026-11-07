@@ -3,9 +3,11 @@ package stream_parser
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"hash/crc32"
 	"reflect"
+	"unicode/utf16"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
@@ -42,6 +44,8 @@ type YakNode struct {
 	TryProcessSubNode func(name string) (any, map[string]any)
 	ProcessByType     func(datas ...any) any
 	TryProcessByType  func(datas ...string) (any, map[string]any)
+	Tell              func() uint64
+	Skip              func(count uint64, name string)
 	AddInfo           func(key string, v any)
 	GetInfo           func(key string) any
 }
@@ -75,6 +79,21 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	}
 	yakNode.ProcessSubNode = func(name string) any {
 		return yakNode.GetSubNode(name).Process()
+	}
+	// Tell reports the byte position already consumed from this SMB2/node
+	// header. SkipTo advances to an absolute wire offset by consuming the
+	// intervening bytes as an owned padding node. Both are forward-only so a
+	// declared buffer cannot rewind and reinterpret already-decoded bytes.
+	yakNode.Tell = func() uint64 {
+		return yakNode.Length()
+	}
+	yakNode.Skip = func(count uint64, name string) {
+		if count == 0 {
+			return
+		}
+		skipped := yakNode.NewUnknownNode(name)
+		skipped.SetMaxLength(count)
+		skipped.Process()
 	}
 	yakNode.TryProcessSubNode = func(name string) (result any, response map[string]any) {
 		typeNode := yakNode.GetSubNode(name)
@@ -379,6 +398,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 		this = ConvertToYakNode(invocation.node, invocation.operator)
 	}
 	return map[string]interface{}{
+		"decodeUTF16LE": func(data any) string {
+			return decodeUTF16LEValue(data, false)
+		},
+		"decodeUTF16LEZ": func(data any) string {
+			return decodeUTF16LEValue(data, true)
+		},
 		"parseMemcachedFields": func(profile string) error {
 			if invocation.bridgeResult != nil {
 				return invocation.bridgeResult.deliver()
@@ -486,6 +511,42 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 				return fmt.Errorf("cifs-delete: generation is unsupported")
 			}
 			return parseCIFSDelete(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSNTCreateAndX": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-nt-create-andx: generation is unsupported")
+			}
+			return parseCIFSNTCreateAndX(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSWriteAndX": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-write-andx: generation is unsupported")
+			}
+			return parseCIFSWriteAndX(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSSetInformation2": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-set-information2: generation is unsupported")
+			}
+			return parseCIFSSetInformation2(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSQueryInformation2": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-query-information2: generation is unsupported")
+			}
+			return parseCIFSQueryInformation2(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSTransaction2": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-transaction2: generation is unsupported")
+			}
+			return parseCIFSTransaction2(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSTransaction2Secondary": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-transaction2-secondary: generation is unsupported")
+			}
+			return parseCIFSTransaction2Secondary(invocation.node, invocation.operator)
 		},
 		"parseCIFSSessionSetup": func(response bool) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
@@ -942,6 +1003,29 @@ func ExecParser(node *base.Node) (res any, err error) {
 	}
 	return returnV, nil
 }
+func decodeUTF16LEValue(raw any, stripNUL bool) string {
+	var b []byte
+	switch value := raw.(type) {
+	case []byte:
+		b = value
+	case string:
+		b = []byte(value)
+	default:
+		panic(fmt.Sprintf("decodeUTF16LE: expected raw bytes, got %T", raw))
+	}
+	if len(b)%2 != 0 {
+		panic("decodeUTF16LE: odd UTF-16LE byte length")
+	}
+	if stripNUL && len(b) >= 2 && b[len(b)-2] == 0 && b[len(b)-1] == 0 {
+		b = b[:len(b)-2]
+	}
+	units := make([]uint16, len(b)/2)
+	for i := range units {
+		units[i] = binary.LittleEndian.Uint16(b[i*2:])
+	}
+	return string(utf16.Decode(units))
+}
+
 func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -989,6 +1073,12 @@ func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 				panic(err)
 			}
 			return value
+		},
+		"decodeUTF16LE": func(data any) string {
+			return decodeUTF16LEValue(data, false)
+		},
+		"decodeUTF16LEZ": func(data any) string {
+			return decodeUTF16LEValue(data, true)
 		},
 		"data":           res,
 		"newStructValue": newStructValueAny,

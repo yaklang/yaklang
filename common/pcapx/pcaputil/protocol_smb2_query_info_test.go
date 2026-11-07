@@ -275,7 +275,7 @@ func TestSMB2QueryInfoSelectorAssociationAndReuse(t *testing.T) {
 	require.Equal(t, "matched", info["Association Status"], "a complete lost-session ERROR retains the existing unique-MID fallback")
 	require.Equal(t, true, info["Error Response"])
 	require.Empty(t, state.pending)
-	require.LessOrEqual(t, unsafe.Sizeof(smb2Pending{}), uintptr(160), "pending reservation must cover the retained selector")
+	require.LessOrEqual(t, unsafe.Sizeof(smb2Pending{}), uintptr(176), "pending reservation must cover the retained selector, observed target and directory class")
 }
 
 func TestSMB2QueryInfoCompoundCommandBounds(t *testing.T) {

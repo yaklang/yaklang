@@ -2447,7 +2447,6 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		copy(tcBody[8:], path)
 		raw := append(smb2SyncHeader(3, 0, 4), tcBody...)
 		req := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Tree Connect Request")
-		require.Equal(t, path, bytesVal(t, req.Child("Path")))
 		require.Equal(t, `\\srv\share`, strings.ReplaceAll(strVal(t, req.Child("Path")), "\x00", ""))
 		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 445, raw))
 		require.Equal(t, `\\srv\share`, strings.ReplaceAll(strVal(t, mustChild(t, eth, "IP", "TCP", "SMB2", "Tree Connect Request").Child("Path")), "\x00", ""))

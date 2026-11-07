@@ -17,6 +17,21 @@ type smb2BodyDecodeError struct {
 func (e *smb2BodyDecodeError) Error() string { return e.cause.Error() }
 func (e *smb2BodyDecodeError) Unwrap() error { return e.cause }
 
+// A declared collection (dialects, contexts, locks, directory entries, network
+// interfaces, DFS referrals) that exceeds the caller's element budget is a
+// property of this one record. Unlike a body-size or session-state limit, it
+// may be rendered as a headers-only diagnostic and the flow can continue.
+type smb2CollectionLimitError struct {
+	cause error
+}
+
+func (e *smb2CollectionLimitError) Error() string { return e.cause.Error() }
+func (e *smb2CollectionLimitError) Unwrap() error { return e.cause }
+
+func smb2CollectionLimit(format string, args ...any) error {
+	return &smb2CollectionLimitError{cause: protocolError(ErrResourceExceeded, format, args...)}
+}
+
 // The caller has independently checked the complete 64-byte fixed header.
 func smb2CommandHeader(pdu []byte) map[string]any {
 	cmd := binary.LittleEndian.Uint16(pdu[12:14])
@@ -48,10 +63,16 @@ func smb2RecoverBodyRecord(raw []byte, max int, err error) map[string]any {
 	if !errors.As(err, &bodyError) || max <= 0 || len(raw) < 68 || raw[0] != 0 || smb2DirectLength(raw)+4 != len(raw) {
 		return nil
 	}
-	var typed *ProtocolError
-	if errors.As(err, &typed) && typed.Kind != ErrMalformedMessage && typed.Kind != ErrUnsupportedFeature && typed.Kind != ErrUnsupportedVersion {
-		return nil // Resource, state and context failures are not body recovery.
+	var collection *smb2CollectionLimitError
+	if !errors.As(err, &collection) {
+		var typed *ProtocolError
+		if errors.As(err, &typed) && typed.Kind != ErrMalformedMessage && typed.Kind != ErrUnsupportedFeature && typed.Kind != ErrUnsupportedVersion {
+			return nil
+		}
 	}
+	// A declared-collection overflow is a property of this record, not of the
+	// session state. State reservation and body-size limits are raised outside
+	// this marker and remain session-fatal.
 	var commands []map[string]any
 	var bodies [][2]int
 	var firstResponse, relatedStyle bool
@@ -93,6 +114,7 @@ func smb2RecoverBodyRecord(raw []byte, max int, err error) map[string]any {
 		}
 		command := smb2CommandHeader(h[:end-at])
 		smb2OffsetRanges(command, at)
+		smb2AttachContext(command)
 		commands = append(commands, command)
 		bodies = append(bodies, [2]int{at + 64, end})
 		if next == 0 {
@@ -122,6 +144,8 @@ func smb2RecoverBodyRecord(raw []byte, max int, err error) map[string]any {
 	info["Failed Command Index"] = bodyError.command
 	info["State Updated"] = false
 	info["Validated Envelope"] = "Direct TCP length and complete SMB2 fixed-header chain"
+	smb2AttachContext(info)
+	smb2AttachCompoundContext(info)
 	return info
 }
 

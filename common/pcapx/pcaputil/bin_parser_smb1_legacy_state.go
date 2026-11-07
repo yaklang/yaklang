@@ -24,6 +24,11 @@ type smb1OperationPending struct {
 	command       byte
 	uid, tid      uint16
 	path, service string
+	// TRANSACTION2 setup and information level come from the request words
+	// and parameter block. They are not inferred from the response shape.
+	setup, level       uint16
+	hasSetup, hasLevel bool
+	trans2             *smb1Trans2Buffer
 }
 
 type smb1LegacyState struct {
@@ -47,6 +52,9 @@ func (s *smb1LegacyState) stringBytes() int64 {
 	if s != nil {
 		for _, p := range s.pending {
 			n += smb1OwnedStringBound(p.hash) + smb1OwnedStringBound(p.path) + smb1OwnedStringBound(p.service)
+			if p.trans2 != nil {
+				n += p.trans2.retained()
+			}
 		}
 	}
 	return n
@@ -74,6 +82,9 @@ func (s *smb1LegacyState) clone() *smb1LegacyState {
 			n.owners[k] = v
 		}
 		for k, v := range s.pending {
+			if v.trans2 != nil {
+				v.trans2 = v.trans2.clone()
+			}
 			n.pending[k] = v
 		}
 		n.allocated = [2]int{len(n.owners), len(n.pending)}
@@ -81,14 +92,27 @@ func (s *smb1LegacyState) clone() *smb1LegacyState {
 	return n
 }
 
+func smb1EvictionCandidate(s *smb1LegacyState) (smb1SetupKey, bool) {
+	if s == nil {
+		return smb1SetupKey{}, false
+	}
+	for key, owner := range s.owners {
+		switch owner.phase {
+		case smb1LegacyCompleted, smb1LegacyAmbiguous, smb1LegacyOrphan:
+			return key, true
+		}
+	}
+	return smb1SetupKey{}, false
+}
+
 type smb1LegacyTxn struct {
-	f                                                    *binFlow
-	previous                                             *binSMB2
-	key                                                  smb1SetupKey
-	command                                              byte
-	response, allowed, refused, tracked, refusalEligible bool
-	reason                                               string
-	e                                                    *ProtocolEvent
+	f                                                               *binFlow
+	previous                                                        *binSMB2
+	key                                                             smb1SetupKey
+	command                                                         byte
+	response, allowed, refused, tracked, refusalEligible, secondary bool
+	reason                                                          string
+	e                                                               *ProtocolEvent
 }
 
 // The caller already decoded its complete selected canonical profile. Reserve
@@ -146,8 +170,18 @@ func (f *binFlow) beginSMB1Legacy(dir int, e *ProtocolEvent, fields map[string]a
 	if s != nil {
 		priorOwner, exists = s.owners[tx.key]
 	}
+	evicted := smb1SetupKey{}
+	haveEviction := false
 	if !exists && owners >= f.a.budget.MaxCollectionElements {
-		return nil, protocolError(ErrResourceExceeded, "CIFS: shared operation identity collection exceeded")
+		// A long-lived capture accumulates completed identity owners. Retire a
+		// completed/ambiguous/orphan entry instead of ending the whole flow at
+		// the collection budget. Outstanding pending owners are never evicted.
+		if candidate, ok := smb1EvictionCandidate(s); ok {
+			evicted, haveEviction = candidate, true
+			owners--
+		} else {
+			return nil, protocolError(ErrResourceExceeded, "CIFS: shared operation identity collection exceeded")
+		}
 	}
 	setup := f.smb2.smb1Setup
 	sp, ss, sc, su := 0, 0, 0, 0
@@ -189,12 +223,27 @@ func (f *binFlow) beginSMB1Legacy(dir int, e *ProtocolEvent, fields map[string]a
 	}
 	working := *f.smb2
 	working.smb1Legacy = s.clone()
+	if haveEviction {
+		delete(working.smb1Legacy.owners, evicted)
+		delete(working.smb1Legacy.pending, evicted)
+		fields["Identity Collection Status"] = "evicted a completed/ambiguous owner at the collection budget"
+	}
 	f.smb2 = &working
 	tx.tracked = true
 	ledger := working.smb1Legacy
 	owner, exists := ledger.owners[tx.key]
 	if !response {
-		if exists {
+		if exists && command == 0x33 && owner.command == 0x32 && owner.phase == smb1LegacyPending {
+			if p, ok := ledger.pending[tx.key]; ok && p.command == 0x32 && p.uid == uid && p.tid == tid && p.trans2 != nil {
+				tx.allowed = true
+				tx.secondary = true
+			} else {
+				tx.retireOwner(owner)
+				owner.phase = smb1LegacyAmbiguous
+				ledger.owners[tx.key] = owner
+				tx.reason = "PID/MID operation group is ambiguous; passive association unavailable"
+			}
+		} else if exists {
 			tx.retireOwner(owner)
 			owner.phase = smb1LegacyAmbiguous
 			ledger.owners[tx.key] = owner

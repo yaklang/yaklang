@@ -253,8 +253,15 @@ func TestSMB2RelatedLiteralAndContextHaveSeparateSources(t *testing.T) {
 		require.Equal(t, uint64(0x1122334455667788), key.sessionID)
 		require.Equal(t, uint32(0xaabbccdd), key.treeID)
 	}
-	_, err = smb2Walk(third, 64)
-	require.Error(t, err, "context cannot cross a Direct TCP PDU boundary")
+	// A related command alone in a new PDU has no predecessor to inherit
+	// from. The literal IDs stay literal and no effective context is invented.
+	isolated, err := smb2Walk(third, 64)
+	require.NoError(t, err)
+	require.Equal(t, "no predecessor in captured compound", isolated[0]["Related Context Status"])
+	require.NotContains(t, isolated[0], "Effective Session ID")
+	require.NotContains(t, isolated[0], "Effective Tree ID")
+	require.Equal(t, uint64(0xffffffffffffffff), isolated[0]["Session ID"])
+	require.Equal(t, uint32(0xffffffff), isolated[0]["Tree ID"])
 }
 
 func TestSMB2HeaderUnionAndOwnedLiteralRanges(t *testing.T) {
@@ -383,4 +390,211 @@ func TestSMB2ProbeRequiresFixedHeaderBeyondGenericWindow(t *testing.T) {
 	require.Nil(t, last.Err)
 	require.Len(t, last.Events, 1)
 	require.Equal(t, "NEGOTIATE", last.Events[0].Session["Packet Name"])
+}
+
+func smb2AppendCreateContext(smb []byte, pair int, name string, data []byte) []byte {
+	at := len(smb)
+	if at%8 != 0 {
+		smb = append(smb, make([]byte, 8-at%8)...)
+		at = len(smb)
+	}
+	nameOff := 16
+	dataOff := nameOff + len(name)
+	if len(data) != 0 {
+		if dataOff%8 != 0 {
+			dataOff += 8 - dataOff%8
+		}
+	} else {
+		dataOff = 0
+	}
+	entry := make([]byte, 16)
+	binary.LittleEndian.PutUint16(entry[4:6], uint16(nameOff))
+	binary.LittleEndian.PutUint16(entry[6:8], uint16(len(name)))
+	if len(data) != 0 {
+		binary.LittleEndian.PutUint16(entry[10:12], uint16(dataOff))
+		binary.LittleEndian.PutUint32(entry[12:16], uint32(len(data)))
+		entry = append(entry, make([]byte, dataOff+len(data)-16)...)
+		copy(entry[nameOff:], name)
+		copy(entry[dataOff:], data)
+	} else {
+		entry = append(entry, make([]byte, nameOff+len(name)-16)...)
+		copy(entry[nameOff:], name)
+	}
+	smb = append(smb, entry...)
+	binary.LittleEndian.PutUint32(smb[pair:pair+4], uint32(at))
+	binary.LittleEndian.PutUint32(smb[pair+4:pair+8], uint32(len(entry)))
+	return smb
+}
+
+func TestSMB2ObservedCreateContextPayloads(t *testing.T) {
+	// Constructed from MS-SMB2 2.2.13.2. Tags are the ones counted in the capture inventory.
+	fid := bytes.Repeat([]byte{0x11}, 16)
+	mx := make([]byte, 8)
+	binary.LittleEndian.PutUint32(mx[4:8], 7)
+	qfid := make([]byte, 32)
+	binary.LittleEndian.PutUint64(qfid[0:8], 9)
+	binary.LittleEndian.PutUint64(qfid[8:16], 3)
+	lease := make([]byte, 32)
+	copy(lease[:16], bytes.Repeat([]byte{0x22}, 16))
+	binary.LittleEndian.PutUint32(lease[16:20], 1)
+	leaseV2 := append(lease, make([]byte, 20)...)
+	binary.LittleEndian.PutUint16(leaseV2[48:50], 4)
+	dhResp := make([]byte, 8)
+	binary.LittleEndian.PutUint32(dhResp[0:4], 1000)
+	binary.LittleEndian.PutUint32(dhResp[4:8], 2)
+	response := smb2CreateResp(1, 0x11, 1, fid)[4:]
+	response = smb2AppendCreateContext(response, 144, "MxAc", mx)
+	commands, err := smb2Walk(response, 64)
+	require.NoError(t, err)
+	got := commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, uint32(7), got["Maximal Access"])
+	require.Equal(t, mx, got["Data"])
+	short := smb2AppendCreateContext(smb2CreateResp(1, 0x11, 1, fid)[4:], 144, "MxAc", mx[:7])
+	commands, err = smb2Walk(short, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.NotContains(t, got, "Maximal Access")
+	require.Contains(t, got["Data Status"], "opaque")
+
+	response = smb2AppendCreateContext(smb2CreateResp(2, 0x11, 1, fid)[4:], 144, "QFid", qfid)
+	commands, err = smb2Walk(response, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, uint64(9), got["Disk File Id"])
+	require.Equal(t, uint64(3), got["Volume Id"])
+	request := smb2AppendCreateContext(smb2Create(2, 0x11, 1, "a.txt")[4:], 112, "QFid", nil)
+	commands, err = smb2Walk(request, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, "request has no QFid buffer", got["Data Status"])
+	require.NotContains(t, got, "Disk File Id")
+
+	response = smb2AppendCreateContext(smb2CreateResp(3, 0x11, 1, fid)[4:], 144, "RqLs", lease)
+	commands, err = smb2Walk(response, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, uint32(1), got["Lease State"])
+	require.NotContains(t, got, "Epoch")
+	response = smb2AppendCreateContext(smb2CreateResp(3, 0x11, 1, fid)[4:], 144, "RqLs", leaseV2)
+	commands, err = smb2Walk(response, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, uint16(4), got["Epoch"])
+	response = smb2AppendCreateContext(smb2CreateResp(3, 0x11, 1, fid)[4:], 144, "RqLs", lease[:31])
+	commands, err = smb2Walk(response, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.NotContains(t, got, "Lease Key")
+	require.Contains(t, got["Data Status"], "opaque")
+
+	response = smb2AppendCreateContext(smb2CreateResp(4, 0x11, 1, fid)[4:], 144, "DH2Q", dhResp)
+	commands, err = smb2Walk(response, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, uint32(1000), got["Timeout"])
+	require.Equal(t, uint32(2), got["Flags"])
+	dhReq := make([]byte, 32)
+	binary.LittleEndian.PutUint32(dhReq[0:4], 50)
+	copy(dhReq[16:], bytes.Repeat([]byte{0x44}, 16))
+	request = smb2AppendCreateContext(smb2Create(4, 0x11, 1, "b.txt")[4:], 112, "DH2Q", dhReq)
+	commands, err = smb2Walk(request, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, bytes.Repeat([]byte{0x44}, 16), got["Create Guid"])
+	request = smb2AppendCreateContext(smb2Create(4, 0x11, 1, "b.txt")[4:], 112, "DH2Q", dhReq[:31])
+	commands, err = smb2Walk(request, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.NotContains(t, got, "Create Guid")
+	require.Contains(t, got["Data Status"], "opaque")
+
+	response = smb2AppendCreateContext(smb2CreateResp(5, 0x11, 1, fid)[4:], 144, "AAPL", []byte{1, 2, 3, 4})
+	commands, err = smb2Walk(response, 64)
+	require.NoError(t, err)
+	got = commands[0]["Body"].(map[string]any)["Create Contexts"].([]map[string]any)[0]
+	require.Equal(t, []byte{1, 2, 3, 4}, got["Data"])
+	require.Contains(t, got["Data Status"], "not a selected layout")
+}
+
+func TestSMB2NegotiateContextTypedPayloads(t *testing.T) {
+	// MS-SMB2 2.2.3.1.1 through 2.2.3.1.4. Constructed; the corpus did not carry these bytes.
+	preauth := make([]byte, 4+2+4)
+	binary.LittleEndian.PutUint16(preauth[0:2], 1)
+	binary.LittleEndian.PutUint16(preauth[2:4], 4)
+	binary.LittleEndian.PutUint16(preauth[4:6], 1)
+	copy(preauth[6:], []byte{9, 8, 7, 6})
+	enc := []byte{1, 0, 2, 0}
+	comp := make([]byte, 10)
+	binary.LittleEndian.PutUint16(comp[0:2], 1)
+	binary.LittleEndian.PutUint16(comp[8:10], 1)
+	net := []byte{'s', 0, 'r', 0, 'v', 0}
+	walk := func(kind uint16, payload []byte) map[string]any {
+		t.Helper()
+		response := append(smb2NegotiateResp(0x0311)[4:], make([]byte, 8+len(payload)+8)...)
+		binary.LittleEndian.PutUint16(response[70:72], 1)
+		binary.LittleEndian.PutUint32(response[124:128], 128)
+		binary.LittleEndian.PutUint16(response[128:130], kind)
+		binary.LittleEndian.PutUint16(response[130:132], uint16(len(payload)))
+		copy(response[136:], payload)
+		commands, err := smb2Walk(response, 64)
+		require.NoError(t, err)
+		return commands[0]["Body"].(map[string]any)["Negotiate Contexts"].([]map[string]any)[0]
+	}
+	got := walk(1, preauth)
+	require.Equal(t, uint16(1), got["Hash Algorithm Count"])
+	require.Equal(t, []byte{9, 8, 7, 6}, got["Salt"])
+	got = walk(1, preauth[:3])
+	require.NotContains(t, got, "Hash Algorithm Count")
+	require.Contains(t, got["Data Status"], "opaque")
+	got = walk(2, enc)
+	require.Equal(t, uint16(1), got["Cipher Count"])
+	require.Equal(t, []byte{2, 0}, got["Ciphers"])
+	got = walk(2, []byte{1, 0, 2})
+	require.NotContains(t, got, "Ciphers")
+	require.Contains(t, got["Data Status"], "opaque")
+	got = walk(3, comp)
+	require.Equal(t, uint16(1), got["Compression Algorithm Count"])
+	require.Equal(t, []byte{1, 0}, got["Compression Algorithms"])
+	got = walk(3, comp[:7])
+	require.NotContains(t, got, "Flags")
+	require.Contains(t, got["Data Status"], "opaque")
+	got = walk(5, net)
+	require.Equal(t, "srv", got["Net Name"])
+	got = walk(5, net[:5])
+	require.NotContains(t, got, "Net Name")
+	require.Contains(t, got["Data Status"], "opaque")
+	got = walk(99, []byte{1, 2})
+	require.Equal(t, []byte{1, 2}, got["Data"])
+	require.Contains(t, got["Data Status"], "not a selected layout")
+}
+
+func TestSMB2ChannelDescriptorStaysOpaque(t *testing.T) {
+	// MS-SMB2 2.2.31.1 is a fixed RDMA descriptor, but M2-04.14 keeps it as a
+	// separate profile. It must not be published as the read or write bytes.
+	fid := bytes.Repeat([]byte{1}, 16)
+	info := bytes.Repeat([]byte{0xab}, 16)
+	read := append(smb2Read(1, 1, 1, fid, 4)[4:], info...)
+	binary.LittleEndian.PutUint32(read[100:104], 1)
+	binary.LittleEndian.PutUint16(read[108:110], uint16(len(read)-16))
+	binary.LittleEndian.PutUint16(read[110:112], 16)
+	commands, err := smb2Walk(read, 64)
+	require.NoError(t, err)
+	body := commands[0]["Body"].(map[string]any)
+	require.Equal(t, info, body["Read Channel Info"])
+	require.Contains(t, body["Read Channel Info Status"], "opaque")
+	require.NotContains(t, body, "Data")
+
+	file := []byte{9}
+	write := smb2Write(1, 1, 1, fid, file)[4:]
+	off := len(write)
+	write = append(write, info...)
+	binary.LittleEndian.PutUint32(write[96:100], 2)
+	binary.LittleEndian.PutUint16(write[104:106], uint16(off))
+	binary.LittleEndian.PutUint16(write[106:108], 16)
+	commands, err = smb2Walk(write, 64)
+	require.NoError(t, err)
+	body = commands[0]["Body"].(map[string]any)
+	require.Equal(t, file, body["Data"])
+	require.Equal(t, info, body["Write Channel Info"])
+	require.Contains(t, body["Write Channel Info Status"], "opaque")
 }

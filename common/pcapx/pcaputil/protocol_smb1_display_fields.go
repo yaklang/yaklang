@@ -112,6 +112,10 @@ func smb1DisplayBindings() []displayFieldBinding {
 	}{
 		{"smb.pwlen", "Password Length", 16}, {"smb.connect.flags", "Flags", 16}, {"smb.connect.support", "Optional Support", 16},
 		{"smb.search.attribute", "Search Attributes", 16}, {"smb.buffer_format", "Buffer Format", 8},
+		{"smb.fid", "FID", 16}, {"smb.create_date", "CreateDate", 16},
+		{"smb.file_data_size", "FileDataSize", 32}, {"smb.file_alloc_size", "FileAllocationSize", 32},
+		{"smb.file_attrs", "FileAttributes", 16}, {"smb.info_level", "Information Level", 16},
+		{"smb.trans2.setup", "Setup", 16}, {"smb.ea_error_offset", "Ea Error Offset", 16},
 	} {
 		add(field.name, field.key, "Body", DisplayUnsigned, field.bits)
 	}

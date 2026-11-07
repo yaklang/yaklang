@@ -43,6 +43,59 @@ Package:
     operator: |
       err = parseCIFSDelete(true)
       if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.64.1/.2 ordinary WC24/WC34 NT_CREATE_ANDX.
+  # Terminal AndX only. Name Length excludes the UTF-16 NUL.
+  CIFSDirectTCPNTCreateAndXRequest:
+    operator: |
+      err = parseCIFSNTCreateAndX(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPNTCreateAndXResponse:
+    operator: |
+      err = parseCIFSNTCreateAndX(true)
+      if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.43.1/.2 and MS-SMB 2.2.4.3 high-count slots.
+  # Data Offset is relative to the SMB header. Offset low/high stay separate.
+  CIFSDirectTCPWriteAndXRequest:
+    operator: |
+      err = parseCIFSWriteAndX(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPWriteAndXResponse:
+    operator: |
+      err = parseCIFSWriteAndX(true)
+      if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.30.1/.2 and 2.2.4.31.1/.2. No AndX and no SMB_STRING.
+  # Success responses only; Unicode/OEM does not change these words.
+  CIFSDirectTCPSetInformation2Request:
+    operator: |
+      err = parseCIFSSetInformation2(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPSetInformation2Response:
+    operator: |
+      err = parseCIFSSetInformation2(true)
+      if err != nil { panic(err) }
+  CIFSDirectTCPQueryInformation2Request:
+    operator: |
+      err = parseCIFSQueryInformation2(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPQueryInformation2Response:
+    operator: |
+      err = parseCIFSQueryInformation2(true)
+      if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.46.1/.2. Zero counts do not read offsets. Short or
+  # displaced counts are not rebuilt from TRANSACTION2_SECONDARY.
+  CIFSDirectTCPTransaction2Request:
+    operator: |
+      err = parseCIFSTransaction2(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPTransaction2Response:
+    operator: |
+      err = parseCIFSTransaction2(true)
+      if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.47.1. WordCount 9, no response, no name byte.
+  CIFSDirectTCPTransaction2SecondaryRequest:
+    operator: |
+      err = parseCIFSTransaction2Secondary()
+      if err != nil { panic(err) }
   CIFSDirectTCPCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }

@@ -58,6 +58,129 @@ func smbSummaryInteger(value any) (string, bool) {
 	return "", false
 }
 
+// smbCompoundSummary describes every command in one SMB2 compound PDU. The
+// top-level event otherwise describes only commands[0].
+func smbCompoundSummary(e *pcaputil.ProtocolEvent) (string, bool) {
+	if e == nil || e.Session["Compound"] != true {
+		return "", false
+	}
+	var commands []map[string]any
+	switch value := e.Session["Commands"].(type) {
+	case []map[string]any:
+		commands = value
+	case []any:
+		for _, item := range value {
+			if command, ok := item.(map[string]any); ok {
+				commands = append(commands, command)
+			}
+		}
+	}
+	if len(commands) == 0 {
+		return "", false
+	}
+	names := make([]string, 0, len(commands))
+	for _, command := range commands {
+		if name, _ := command["Packet Name"].(string); name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return "", false
+	}
+	summary := fmt.Sprintf("SMB2 compound · %d commands · %s", len(commands), strings.Join(names, ", "))
+	var behaviors []string
+	switch value := e.Session["Observed Behaviors"].(type) {
+	case []string:
+		behaviors = value
+	case []any:
+		for _, item := range value {
+			if behavior, ok := item.(string); ok {
+				behaviors = append(behaviors, behavior)
+			}
+		}
+	}
+	if len(behaviors) > 0 {
+		summary += " · " + strings.Join(behaviors, ",")
+	}
+	return safeText(summary), true
+}
+
+// smbCommandSummary is the list line for a single decoded SMB2 command.
+// Cached connection dialect is not substituted for this packet's own fields.
+func smbCommandSummary(e *pcaputil.ProtocolEvent) (string, bool) {
+	if e == nil || e.Error != "" || e.Status != "decoded" && e.Status != "deferred" || !smbSummaryOwnedRecord(e) {
+		return "", false
+	}
+	v := eventValues(e)
+	if v["Compound"] == true {
+		return "", false
+	}
+	name, _ := v["Packet Name"].(string)
+	if name == "" || name == "QUERY_INFO" {
+		return "", false
+	}
+	h, _ := v["Header"].(map[string]any)
+	role := "request"
+	if v["Response"] == true {
+		role = "response"
+	}
+	parts := []string{"SMB2", name, role}
+	body, _ := v["Body"].(map[string]any)
+	switch name {
+	case "NEGOTIATE":
+		if role == "response" {
+			if _, ok := body["Dialect"]; ok {
+				parts = append(parts, fmt.Sprintf("dialect=0x%04x", number(body["Dialect"])))
+			}
+		} else if n, ok := smbSummaryInteger(body["Dialect Count"]); ok {
+			parts = append(parts, "dialects="+n)
+		}
+	case "TREE_CONNECT":
+		if path, ok := body["Path"].(string); ok && path != "" {
+			parts = append(parts, path)
+		} else if share, ok := smbSummaryInteger(body["Share Type"]); ok {
+			parts = append(parts, "shareType="+share)
+		}
+	case "READ":
+		if n, ok := smbSummaryInteger(body["Length"]); ok && role == "request" {
+			parts = append(parts, "len="+n)
+		}
+		if n, ok := smbSummaryInteger(body["Data Length"]); ok && role == "response" {
+			parts = append(parts, "data="+n)
+		}
+	case "WRITE":
+		if n, ok := smbSummaryInteger(body["Length"]); ok && role == "request" {
+			parts = append(parts, "len="+n)
+		}
+		if n, ok := smbSummaryInteger(body["Count"]); ok && role == "response" {
+			parts = append(parts, "count="+n)
+		}
+	case "SESSION_SETUP":
+		if auth, ok := v["Authentication"].(map[string]any); ok {
+			if mechanism, ok := auth["Mechanism"].(map[string]any); ok {
+				if name, ok := mechanism["Message Name"].(string); ok && name != "" {
+					parts = append(parts, name)
+				}
+			}
+		}
+	case "CREATE":
+		if file, ok := body["File Name"].(string); ok && file != "" {
+			parts = append(parts, file)
+		}
+	case "LOGOFF", "TREE_DISCONNECT":
+		if v["Error Response"] == true {
+			parts = append(parts, "error")
+		}
+	}
+	if status, ok := smbSummaryInteger(h["Status"]); ok && role == "response" && status != "0" {
+		parts = append(parts, "status="+status)
+	}
+	if mid, ok := smbSummaryInteger(h["Message ID"]); ok {
+		parts = append(parts, "MID="+mid)
+	}
+	return safeText(strings.Join(parts, " · ")), true
+}
+
 func smbQueryInfoSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 	if e == nil || e.Error != "" || e.Status != "decoded" && e.Status != "deferred" || !smbSummaryOwnedRecord(e) {
 		return "", false
@@ -93,21 +216,60 @@ func smbQueryInfoSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 		if !ok {
 			return "", false
 		}
-		keys := []struct{ key, label string }{{"EA Size", "EA size"}}
-		if profile == "FileStandardInformation" {
-			keys = []struct{ key, label string }{{"End Of File", "EOF"}, {"Allocation Size", "allocation"}, {"Number Of Links", "links"}}
-		}
-		for _, field := range keys {
-			value, ok := smbSummaryInteger(fields[field.key])
+		switch profile {
+		case "FileEaInformation":
+			value, ok := smbSummaryInteger(fields["EA Size"])
 			if !ok {
 				return "", false
 			}
-			parts = append(parts, field.label+"="+value)
-		}
-		if profile == "FileStandardInformation" {
+			parts = append(parts, "EA size="+value)
+		case "FileStandardInformation":
+			for _, field := range []struct{ key, label string }{{"End Of File", "EOF"}, {"Allocation Size", "allocation"}, {"Number Of Links", "links"}} {
+				value, ok := smbSummaryInteger(fields[field.key])
+				if !ok {
+					return "", false
+				}
+				parts = append(parts, field.label+"="+value)
+			}
 			if directory, ok := fields["Directory State"].(bool); ok {
 				parts = append(parts, fmt.Sprintf("directory=%t", directory))
 			}
+		case "FileNetworkOpenInformation":
+			value, ok := smbSummaryInteger(fields["End Of File"])
+			if !ok {
+				return "", false
+			}
+			parts = append(parts, "EOF="+value)
+		case "FileStreamInformation":
+			name, ok := fields["Stream Name"].(string)
+			if !ok || name == "" {
+				return "", false
+			}
+			parts = append(parts, "stream="+name)
+		case "FileFsVolumeInformation":
+			label, ok := fields["Volume Label"].(string)
+			if !ok || label == "" {
+				return "", false
+			}
+			parts = append(parts, "volume="+label)
+		case "FileFsAttributeInformation":
+			name, ok := fields["File System Name"].(string)
+			if !ok || name == "" {
+				return "", false
+			}
+			parts = append(parts, "fs="+name)
+		case "SecurityDescriptor":
+			revision, ok := smbSummaryInteger(fields["Revision"])
+			if !ok || fields["Security Body Status"] == nil || fields["Identity Verified"] == true {
+				return "", false
+			}
+			if owner, ok := fields["Owner SID"].(string); ok && owner != "" {
+				parts = append(parts, "revision="+revision, "owner="+owner)
+			} else {
+				parts = append(parts, "revision="+revision, "opaque SID/ACL")
+			}
+		default:
+			return "", false
 		}
 		if v["Output Content Partial"] == true {
 			parts = append(parts, "partial output")

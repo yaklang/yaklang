@@ -228,13 +228,18 @@ func TestSMB2CompoundStateIsReservedBeforeRetention(t *testing.T) {
 	require.Zero(t, parser.buffered.Load())
 }
 
-func TestSMB2CompoundDoesNotMixRequestStylesOrRoles(t *testing.T) {
+func TestSMB2CompoundKeepsMixedStyleFramingAndRejectsMixedRoles(t *testing.T) {
 	fid := bytes.Repeat([]byte{1}, 16)
 	wire := smb2CompoundWire(smb2Close(1, 17, 7, fid), smb2Close(2, 17, 7, fid), smb2Close(3, 17, 7, fid))
-	// Three 88-byte commands; the third cannot start a second style in one PDU.
+	// Three 88-byte commands; the third starts a new style in the same PDU.
+	// MS-SMB2 3.2.4.1.4 makes that a request-level failure, not a framing error.
 	binary.LittleEndian.PutUint32(wire[4+176+16:4+176+20], 0)
-	_, err := (&binSMB2{}).consumeFrom(0, wire, 64)
-	require.Error(t, err)
+	info, err := (&binSMB2{}).consumeFrom(0, wire, 64)
+	require.NoError(t, err)
+	commands := info["Commands"].([]map[string]any)
+	require.Equal(t, "related/unrelated mixed; new chain", commands[2]["Compound Style Transition"])
+	require.NotContains(t, commands[2], "Effective Session ID")
+	// Mixing requests and responses in one compound is still a framing error.
 	_, err = (&binSMB2{}).consumeFrom(0, smb2CompoundWire(smb2Close(1, 17, 7, fid), smb2CloseResp(2, 17, 7, nil)), 64)
 	require.Error(t, err)
 }

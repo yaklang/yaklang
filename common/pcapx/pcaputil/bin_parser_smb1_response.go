@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 func smb1ResourceRefusal(err error) error {
@@ -16,6 +18,156 @@ func smb1ResourceRefusal(err error) error {
 		return &owned
 	}
 	return err
+}
+
+// SMB_COM_NEGOTIATE and SMB_COM_SESSION_SETUP_ANDX failures use the common
+// MS-CIFS 2.2.3.2 WC0/BC0 error layout. It is a complete, framed reply: publish
+// the header and status, commit no session state, and keep the flow alive so a
+// later retry or command in the same TCP generation is still observable.
+func (f *binFlow) consumeSMB1EmptyError(dir int, e *ProtocolEvent) error {
+	fields, err := stream_parser.DecodeCIFSEmptyError(e.Raw)
+	if err != nil {
+		return protocolError(ErrMalformedMessage, "CIFS error reply: %s", err)
+	}
+	if e.ID == 0 {
+		e.ID = f.a.ids.Add(1)
+	}
+	fields["Error Scope"] = "message"
+	fields["Context Eligibility"] = "complete WC0/BC0 error layout; no session, tree or file state committed"
+	fields["Association Status"] = "error reply observed; no matched request committed"
+	smb1AttachContext(fields, e.Raw[8])
+	e.nativeSessionMessage = true
+	e.Profile, e.Completeness = "cifs-error-layout", "message"
+	e.Session = fields
+	e.semanticSession = cloneSession(fields)
+	e.semanticFields = cloneSession(fields)
+	return nil
+}
+
+// An SMB1 command whose body profile is not selected is still exactly framed by
+// Direct TCP Length and WordCount/ByteCount. Keep it as an unsupported
+// observation with its header and opaque body instead of stopping the stream.
+func (f *binFlow) consumeSMB1UnselectedCommand(dir int, e *ProtocolEvent) error {
+	if len(e.Raw) < 39 {
+		return protocolError(ErrMalformedMessage, "CIFS: truncated SMB1 record")
+	}
+	wc := e.Raw[36]
+	fixed := 39 + 2*int(wc)
+	if fixed > len(e.Raw) || int(binary.LittleEndian.Uint16(e.Raw[fixed-2:fixed])) != len(e.Raw)-fixed {
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		fields := map[string]any{
+			"Header":      smb1RawHeader(e.Raw),
+			"Packet Name": smb1CommandName(e.Raw[8]), "Command Name": smb1CommandName(e.Raw[8]),
+			"Response":          e.Raw[13]&0x80 != 0,
+			"Profile Status":    "WordCount/ByteCount exceed the complete Direct TCP record",
+			"Body Decode Error": "CIFS: WordCount/ByteCount exceed complete record",
+			"Error Scope":       "message",
+			"State Updated":     false,
+		}
+		e.nativeSessionMessage = true
+		e.Profile, e.Completeness = "cifs-unselected-command-diagnostic", "headers"
+		e.Session = fields
+		e.semanticSession = cloneSession(fields)
+		e.semanticFields = cloneSession(fields)
+		return protocolError(ErrMalformedMessage, "CIFS: WordCount/ByteCount exceed complete record")
+	}
+	if e.ID == 0 {
+		e.ID = f.a.ids.Add(1)
+	}
+	body := map[string]any{
+		"Word Count":  wc,
+		"Byte Count":  binary.LittleEndian.Uint16(e.Raw[fixed-2 : fixed]),
+		"Opaque Body": bytes.Clone(e.Raw[fixed:]),
+		"Wire Field Ranges": map[string]any{
+			"Word Count":  []any{uint64(36), uint64(37)},
+			"Byte Count":  []any{uint64(fixed - 2), uint64(fixed)},
+			"Opaque Body": []any{uint64(fixed), uint64(len(e.Raw))},
+		},
+	}
+	fields := map[string]any{
+		"Header": smb1RawHeader(e.Raw), "Body": body,
+		"Packet Name": smb1CommandName(e.Raw[8]), "Command Name": smb1CommandName(e.Raw[8]),
+		"Response":            e.Raw[13]&0x80 != 0,
+		"Unselected Command":  true,
+		"Profile Status":      "no selected native body profile; Direct TCP Length and the WC/BC envelope are complete",
+		"Error Scope":         "message",
+		"Context Eligibility": "unassociated observation; no session, tree or file state committed",
+	}
+	e.nativeSessionMessage = true
+	e.Profile, e.Completeness = "cifs-unselected-command", "message"
+	smb1AttachContext(fields, e.Raw[8])
+	e.Session = fields
+	e.semanticSession = cloneSession(fields)
+	e.semanticFields = cloneSession(fields)
+	return nil
+}
+
+func smb1RawHeader(raw []byte) map[string]any {
+	header := map[string]any{
+		"Protocol ID": binary.LittleEndian.Uint32(raw[4:8]), "Command": raw[8],
+		"Status": binary.LittleEndian.Uint32(raw[9:13]), "Flags": raw[13],
+		"Flags 2": binary.LittleEndian.Uint16(raw[14:16]), "PID High": binary.LittleEndian.Uint16(raw[16:18]),
+		"Security Features": bytes.Clone(raw[18:26]), "Reserved": binary.LittleEndian.Uint16(raw[26:28]),
+		"Tree ID": binary.LittleEndian.Uint16(raw[28:30]), "Process ID Low": binary.LittleEndian.Uint16(raw[30:32]),
+		"User ID": binary.LittleEndian.Uint16(raw[32:34]), "Multiplex ID": binary.LittleEndian.Uint16(raw[34:36]),
+		"Wire Field Ranges": map[string]any{
+			"Protocol ID": []any{uint64(4), uint64(8)}, "Command": []any{uint64(8), uint64(9)},
+			"Status": []any{uint64(9), uint64(13)}, "Flags": []any{uint64(13), uint64(14)},
+			"Flags 2": []any{uint64(14), uint64(16)}, "PID High": []any{uint64(16), uint64(18)},
+			"Security Features": []any{uint64(18), uint64(26)}, "Reserved": []any{uint64(26), uint64(28)},
+			"Tree ID": []any{uint64(28), uint64(30)}, "Process ID Low": []any{uint64(30), uint64(32)},
+			"User ID": []any{uint64(32), uint64(34)}, "Multiplex ID": []any{uint64(34), uint64(36)},
+		},
+	}
+	return header
+}
+
+func smb1CommandName(command byte) string {
+	switch command {
+	case 0x00:
+		return "SMB_COM_CREATE"
+	case 0x04:
+		return "SMB_COM_CLOSE"
+	case 0x06:
+		return "SMB_COM_DELETE"
+	case 0x0e:
+		return "SMB_COM_LOCKING_ANDX"
+	case 0x22:
+		return "SMB_COM_SET_INFORMATION2"
+	case 0x23:
+		return "SMB_COM_QUERY_INFORMATION2"
+	case 0x25:
+		return "SMB_COM_TRANSACTION"
+	case 0x2e:
+		return "SMB_COM_READ_ANDX"
+	case 0x2f:
+		return "SMB_COM_WRITE_ANDX"
+	case 0x32:
+		return "SMB_COM_TRANSACTION2"
+	case 0x33:
+		return "SMB_COM_TRANSACTION2_SECONDARY"
+	case 0x72:
+		return "SMB_COM_NEGOTIATE"
+	case 0x73:
+		return "SMB_COM_SESSION_SETUP_ANDX"
+	case 0x74:
+		return "SMB_COM_LOGOFF_ANDX"
+	case 0x75:
+		return "SMB_COM_TREE_CONNECT_ANDX"
+	case 0x81:
+		return "SMB_COM_SEARCH"
+	case 0x82:
+		return "SMB_COM_FIND"
+	case 0xa0:
+		return "SMB_COM_NT_TRANSACT"
+	case 0xa1:
+		return "SMB_COM_NT_TRANSACT_SECONDARY"
+	case 0xa2:
+		return "SMB_COM_NT_CREATE_ANDX"
+	}
+	return fmt.Sprintf("SMB_COM_0x%02X", command)
 }
 
 // The complete WC17 extended-security response has a 73-byte Direct TCP/SMB
@@ -109,6 +261,9 @@ func smb1NegotiateIdentity(fields map[string]any) (uint32, uint16, error) {
 
 func (f *binFlow) consumeSMB1Negotiate(dir int, e *ProtocolEvent) (resultErr error) {
 	response := e.Entry == "CIFSDirectTCPNegotiateExtendedResponse"
+	if response && len(e.Raw) == 39 && e.Raw[36] == 0 && binary.LittleEndian.Uint16(e.Raw[37:39]) == 0 {
+		return f.consumeSMB1EmptyError(dir, e)
+	}
 	// Retain refusal authority before invoking the bounded codec. Caller edits
 	// must not turn a resource refusal into a successful generic raw decode.
 	e.nativeSessionMessage = true
@@ -129,6 +284,7 @@ func (f *binFlow) consumeSMB1Negotiate(dir int, e *ProtocolEvent) (resultErr err
 		}
 		return err
 	}
+	smb1AttachContext(fields, 0x72)
 	pid, mid, err := smb1NegotiateIdentity(fields)
 	if err != nil {
 		return err

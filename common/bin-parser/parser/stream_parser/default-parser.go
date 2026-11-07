@@ -45,7 +45,7 @@ const (
 	CfgLengthCacheMap      = "length-cache-map"
 )
 
-var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw"}
+var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw", "utf16le", "utf16lez"}
 
 const (
 	ParserMode    = "parser"

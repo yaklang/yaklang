@@ -596,8 +596,17 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := smbCompoundSummary(e); ok {
+		return summary
+	}
 	if summary, ok := smbQueryInfoSummary(e); ok {
 		return summary
+	}
+	if summary, ok := smbCommandSummary(e); ok {
+		return summary
+	}
+	if smbBodyDiagnostic(e) {
+		return smbRefusedRecordSummary(e)
 	}
 	if e.Protocol == "ospf" && e.Profile == "ospfv2-bounded-control" {
 		v := eventValues(e)
@@ -1104,6 +1113,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		*p = packetPresentation{networkRefused: true, protocol: "PPPoE", summary: safeText(view.Summary), status: view.Status, visibility: visibility, scope: "PPPoE fixed header observed; child identity not admitted", evidence: "native owned PPPoE header; fragment, transport and application state not admitted", nativeHeaders: names, nativeDomain: view.Domain, priority: 1000}
 		return
 	}
+	// A coalesced frame can carry one accepted SMB2 record and one refused
+	// body. Preserve both outcomes whichever callback order arrives.
+	if smbBodyDiagnostic(e) && p.smbRefusedRecordSummary == "" {
+		p.smbRefusedRecordSummary = clipText(smbRefusedRecordSummary(e), 384)
+	}
+	if e.Protocol == "smb2" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && smbSummaryOwnedRecord(e) && p.smbDecodedRecordSummary == "" {
+		p.smbDecodedRecordSummary = clipText(applicationEventSummary(e), 384)
+	}
 	if validRSVPControlObservation(e) {
 		p.protocol, p.priority, p.status, p.visibility = "RSVP", 20, e.Status, "message"
 		p.evidence = "declared IP next-header46 and byte-bound RSVP observation; grammar status is separate"
@@ -1512,6 +1529,17 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	}
 	if isHTTPObservationProfile(e) {
 		p.diagnostic = "HTTP observation · context or owned source unavailable"
+		return
+	}
+	if smbBodyDiagnostic(e) {
+		p.addLayer("SMB2")
+		rank := eventPriority(e)
+		if rank >= p.priority {
+			p.protocol, p.priority, p.status, p.visibility = "SMB2", rank, e.Status, "opaque-body"
+			p.scope = "complete SMB2 record; command body not decoded"
+			p.summary = smbRefusedRecordSummary(e)
+			p.evidence = "Direct TCP length and SMB2 fixed-header chain; body refused"
+		}
 		return
 	}
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
