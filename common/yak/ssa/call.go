@@ -342,6 +342,7 @@ func (c *Call) handlerReturnType() {
 					ret := NewStructType()
 					ret.FieldTypes = retType.FieldTypes[:len(retType.FieldTypes)-1]
 					ret.Keys = retType.Keys[:len(retType.Keys)-1]
+					ret.rebuildKeyIndex()
 					ret.KeyTyp = retType.KeyTyp
 					ret.Combination = true
 					ret.Len = len(ret.FieldTypes)

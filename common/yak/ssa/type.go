@@ -1308,11 +1308,23 @@ func (s *ObjectType) AddField(key Value, field Type) {
 	s.keymap[keyText] = len(s.Keys) - 1
 }
 
+// getFieldIndexByKeyText returns the field index for a key text.
+//
+// AddField keeps keymap complete, so it is authoritative: a miss means the key
+// was never added and answering it must not scan the stored keys. The scan is
+// quadratic while a literal grows (every insert re-read the whole key list and
+// formatted each key text with strconv); one 291k byte array literal in
+// dotCMS ace-builds held a CPU window for minutes. Keep the scan only as a
+// one-time rebuild for a type whose keys were stored without an index.
 func (s *ObjectType) getFieldIndexByKeyText(keyText string) (int, bool) {
 	if s == nil {
 		return -1, false
 	}
-	if index, ok := s.keymap[keyText]; ok && index >= 0 && index < len(s.FieldTypes) {
+	if s.keymap != nil {
+		index, ok := s.keymap[keyText]
+		if !ok || index < 0 || index >= len(s.FieldTypes) {
+			return -1, false
+		}
 		return index, true
 	}
 	index := slices.IndexFunc(s.Keys, func(v Value) bool {
@@ -1321,11 +1333,27 @@ func (s *ObjectType) getFieldIndexByKeyText(keyText string) (int, bool) {
 	if index == -1 || index >= len(s.FieldTypes) {
 		return -1, false
 	}
-	if s.keymap == nil {
-		s.keymap = make(map[string]int)
-	}
-	s.keymap[keyText] = index
+	s.rebuildKeyIndex()
 	return index, true
+}
+
+// rebuildKeyIndex recreates keymap from the stored keys. Callers use it after
+// replacing Keys wholesale; AddField keeps the map up to date by itself.
+func (s *ObjectType) rebuildKeyIndex() {
+	if s == nil {
+		return
+	}
+	keymap := make(map[string]int, len(s.Keys))
+	for index, key := range s.Keys {
+		if utils.IsNil(key) || index >= len(s.FieldTypes) {
+			continue
+		}
+		text := key.String()
+		if _, exists := keymap[text]; !exists {
+			keymap[text] = index
+		}
+	}
+	s.keymap = keymap
 }
 
 // return (field-type, key-type)
