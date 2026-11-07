@@ -10,7 +10,7 @@ import (
 // transaction early. The primary total is not authoritative when reduced.
 func TestSMB1Transaction2SecondaryMayReduceTotal(t *testing.T) {
 	primaryWords := smb1Words(uint16(12), uint16(0), uint16(16), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
-	primaryData := append([]byte{0, 0, 0, 0x07, 0x01, 0, 0, 0, 0})
+	primaryData := []byte{0, 0, 0, 0x07, 0x01, 0, 0, 0, 0}
 	primary := smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 7, primaryWords, primaryData)
 	secondaryWords := smb1Words(uint16(10), uint16(0), uint16(4), uint16(56), uint16(6), uint16(0), uint16(0), uint16(0), uint16(0xffff))
 	secondaryData := []byte{0, 0, 0, 0x61, 0x62, 0x63, 0x64}
