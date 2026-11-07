@@ -177,6 +177,24 @@ func (yakNode *operatorNode) ProcessByType(datas ...any) any {
 	target.Name = nodeName
 	return convertOperatorNode(target, operator).Process()
 }
+
+// Tell reports the byte position consumed so far. SkipTo advances to an
+// absolute forward wire offset by consuming the intervening bytes as an owned
+// padding node. Both are forward-only; a declared buffer cannot rewind and
+// reinterpret bytes that were already decoded.
+func (yakNode *operatorNode) Tell() uint64 {
+	return yakNode.Length()
+}
+
+func (yakNode *operatorNode) Skip(count uint64, name string) {
+	if count == 0 {
+		return
+	}
+	skipped := yakNode.NewUnknownNode(name)
+	skipped.SetMaxLength(count)
+	skipped.Process()
+}
+
 func (yakNode *operatorNode) SetChildren(nodes []*operatorNode) {
 	yakNode.origin.Children = nil
 	for _, node := range nodes {

@@ -57,6 +57,8 @@ func (p *parseExecution) parseTerminal(node *base.Node) error {
 				typeName = "bytes"
 			case "bytes":
 				typeName = "raw"
+			case "utf16le", "utf16lez":
+				typeName = "raw"
 			}
 			buf, err := data.ReadBits(length)
 			if err != nil {

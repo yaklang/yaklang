@@ -16,9 +16,16 @@ func smb2EchoRequest(mid, sid uint64, tid uint32) []byte {
 }
 
 func smb2FlushRequest(mid, sid uint64, tid uint32) []byte {
+	body := make([]byte, 24)
+	binary.LittleEndian.PutUint16(body[0:], 24)
+	binary.LittleEndian.PutUint32(body[4:], 0)
+	return smb2TCP(append(smb2Hdr(7, 0, mid, sid, tid), body...))
+}
+
+func smb2FlushResponse(mid, sid uint64, tid uint32) []byte {
 	body := make([]byte, 4)
 	binary.LittleEndian.PutUint16(body[0:], 4)
-	return smb2TCP(append(smb2Hdr(7, 0, mid, sid, tid), body...))
+	return smb2TCP(append(smb2Hdr(7, 1, mid, sid, tid), body...))
 }
 
 func smb2LockRequest(mid, sid uint64, tid uint32, fid []byte) []byte {
@@ -111,7 +118,8 @@ func TestSMB2RemainingCommandBodiesAreBounded(t *testing.T) {
 		wire []byte
 		want string
 	}{
-		{"flush", smb2FlushRequest(1, 0x11, 1)[4:], "FLUSH"},
+		{"flush-request", smb2FlushRequest(1, 0x11, 1)[4:], "FLUSH"},
+		{"flush-response", smb2FlushResponse(1, 0x11, 1)[4:], "FLUSH"},
 		{"echo", smb2EchoRequest(1, 0x11, 1)[4:], "ECHO"},
 		{"lock", smb2LockRequest(1, 0x11, 1, fid)[4:], "LOCK"},
 		{"set-info", smb2SetInfoRequest(1, 0x11, 1, fid, []byte{1, 2, 3, 4})[4:], "SET_INFO"},

@@ -35,7 +35,9 @@ func TestSMB2CloseResponseUsesResponseLayout(t *testing.T) {
 }
 
 func TestSMB2IOCTLResponseUsesResponseLayout(t *testing.T) {
-	body := make([]byte, 48)
+	// Fixed body 48 bytes; OutputOffset 120 means eight padding bytes after it,
+	// followed by the eight-byte output buffer.
+	body := make([]byte, 48+8+8)
 	binary.LittleEndian.PutUint16(body[0:], 49)
 	binary.LittleEndian.PutUint32(body[4:], 0x00060194)
 	copy(body[8:24], []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
@@ -43,22 +45,14 @@ func TestSMB2IOCTLResponseUsesResponseLayout(t *testing.T) {
 	binary.LittleEndian.PutUint32(body[28:], 0)
 	binary.LittleEndian.PutUint32(body[32:], 120)
 	binary.LittleEndian.PutUint32(body[36:], 8)
+	copy(body[56:], []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xf0, 0x11, 0x22})
 	raw := append(smb2SyncHeader(11, 0x00000001, 1), body...)
-	reader := &smb2BoundedReader{Reader: bytes.NewReader(raw), bits: uint64(len(raw)) * 8}
-	node, err := parser.ParseBinary(reader, "application-layer.smb2", "SMB2")
-	require.NoError(t, err)
-	value, err := node.Result()
-	require.NoError(t, err)
-	var names []string
-	for _, child := range value.Children() {
-		names = append(names, child.Name)
-	}
-	t.Logf("children=%v", names)
-	response := mustChild(t, value, "IOCTL Response")
+	response := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "IOCTL Response")
 	require.Equal(t, uint64(49), uintVal(t, response.Child("StructureSize")))
 	require.Equal(t, uint64(0x00060194), uintVal(t, response.Child("CtlCode")))
 	require.Equal(t, uint64(120), uintVal(t, response.Child("OutputOffset")))
 	require.Equal(t, uint64(8), uintVal(t, response.Child("OutputCount")))
+	require.Equal(t, []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xf0, 0x11, 0x22}, bytesVal(t, response.Child("Output Buffer")))
 	require.Nil(t, response.Child("MaxInputResponse"), "a response has no request-side MaxInputResponse")
 }
 

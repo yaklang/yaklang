@@ -26,7 +26,7 @@ func TestSMB2TreeConnectCreateReadWriteClose(t *testing.T) {
 	smb := parseRule(t, raw, "application-layer.smb2", "SMB2")
 	req := mustChild(t, smb, "Tree Connect Request")
 	require.Equal(t, uint64(9), uintVal(t, req.Child("StructureSize")))
-	require.Equal(t, path, bytesVal(t, req.Child("Path")))
+	require.Equal(t, `\\srv\share`, req.Child("Path").Value, "UTF-16LE path is decoded")
 
 	tcr := make([]byte, 16)
 	binary.LittleEndian.PutUint16(tcr[0:], 16)
@@ -47,7 +47,7 @@ func TestSMB2TreeConnectCreateReadWriteClose(t *testing.T) {
 	raw = append(smb2SyncHeader(5, 0, 5), cr...)
 	creq := mustChild(t, parseRule(t, raw, "application-layer.smb2", "SMB2"), "Create Request")
 	require.Equal(t, uint64(57), uintVal(t, creq.Child("StructureSize")))
-	require.Equal(t, name, bytesVal(t, creq.Child("Name")))
+	require.Equal(t, "file.txt", creq.Child("Name").Value, "UTF-16LE name is decoded")
 	require.Equal(t, uint64(1), uintVal(t, creq.Child("CreateDisposition")))
 
 	fid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}

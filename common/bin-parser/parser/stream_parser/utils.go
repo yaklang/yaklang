@@ -2,6 +2,7 @@ package stream_parser
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
@@ -12,6 +13,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 )
 
 func newListNodeValue(node *base.Node, children ...*base.NodeValue) *base.NodeValue {
@@ -948,6 +950,8 @@ func getNodeResultWithSource(node *base.Node, isByte bool, settings base.ResultS
 		switch typ {
 		case "string":
 			return string(window), nil
+		case "utf16le", "utf16lez":
+			return decodeUTF16LEWindow(window, typ == "utf16lez")
 		case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "bytes":
 			return ConvertToVar(window, uint64(len(window)), endian, typ), nil
 		}
@@ -981,6 +985,9 @@ func getNodeResultWithSource(node *base.Node, isByte bool, settings base.ResultS
 		if settings.Type == "string" {
 			return string(buf), nil
 		}
+		if settings.Type == "utf16le" || settings.Type == "utf16lez" {
+			return decodeUTF16LEWindow(buf, settings.Type == "utf16lez")
+		}
 		_ = endian
 		typeName := settings.Type
 		bitLength := resPoint[1] - resPoint[0]
@@ -1004,6 +1011,20 @@ func getNodeResultWithSource(node *base.Node, isByte bool, settings base.ResultS
 		return ConvertToVar(buf, uint64(len(buf)), endian, typeName), nil
 	}
 }
+func decodeUTF16LEWindow(window []byte, stripNUL bool) (string, error) {
+	if len(window)%2 != 0 {
+		return "", fmt.Errorf("UTF-16LE field has an odd byte length %d", len(window))
+	}
+	if stripNUL && len(window) >= 2 && window[len(window)-2] == 0 && window[len(window)-1] == 0 {
+		window = window[:len(window)-2]
+	}
+	units := make([]uint16, len(window)/2)
+	for i := range units {
+		units[i] = binary.LittleEndian.Uint16(window[i*2:])
+	}
+	return string(utf16.Decode(units)), nil
+}
+
 func getNodeValue(node *base.Node) (any, error) {
 	return getNodeResult(node, false)
 }

@@ -696,12 +696,24 @@ func smb2FlushFields(info map[string]any, pdu []byte, response bool) error {
 	if smb2StatusUsesErrorBody(7, status, response) {
 		return smb2ErrorFields(info, pdu)
 	}
-	body, err := smb2Body(pdu, 4, 4)
+	if response {
+		body, err := smb2Body(pdu, 4, 4)
+		if err != nil {
+			return err
+		}
+		smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+		info["Body"] = body
+		return nil
+	}
+	body, err := smb2Body(pdu, 24, 24)
 	if err != nil {
 		return err
 	}
 	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
-	smb2Literal(body, "Reserved2", 68, 70, binary.LittleEndian.Uint16(pdu[68:70]))
+	smb2Literal(body, "Reserved2", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+	fid := hex.EncodeToString(pdu[72:88])
+	smb2Literal(body, "FileId", 72, 88, fid)
+	smb2Literal(info, "FileId", 72, 88, fid)
 	info["Body"] = body
 	return nil
 }
