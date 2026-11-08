@@ -44,7 +44,7 @@ func TestGoalAcceptanceUsesAuxiliaryConfig(t *testing.T) {
 					require.Equal(t, "liteforge[goal-acceptance-review]", req.GetCallerLabel())
 					require.Equal(t, "goal-review-context", req.GetContext().Value(contextKey{}))
 					require.Contains(t, req.GetPrompt(), criteria)
-					require.Contains(t, req.GetPrompt(), "(no timeline content available)")
+					require.Contains(t, req.GetPrompt(), "（暂无时间线内容）")
 					var options aispec.AIConfig
 					for _, option := range req.GetExtraSpecOpts() {
 						option(&options)
