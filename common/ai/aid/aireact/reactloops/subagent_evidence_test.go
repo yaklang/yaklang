@@ -272,6 +272,39 @@ func TestDispatchSubAgents_ExplicitEvidenceUsesCommonParentJournal(t *testing.T)
 	}
 }
 
+func TestBackgroundSubAgents_FocusedLoopKeepsEvidenceChannel(t *testing.T) {
+	parent, task := backgroundSubAgentFixture(t, 1)
+	child := newEvidenceChild(t)
+	builder := managedLoopBuilder(func(p *PreparedSubAgent) (*ReActLoop, error) {
+		focus := ConvertReActLoopFactoryToActionFactory("evidence-focus", func(_ aicommon.AIInvokeRuntime, _ ...ReActLoopOption) (*ReActLoop, error) {
+			return child.builder(p)
+		})
+		action, err := focus(p.Invoker)
+		if err != nil {
+			return nil, err
+		}
+		outer := NewMinimalReActLoop(p.Invoker.GetConfig(), p.Invoker)
+		WithInitTask(func(loop *ReActLoop, task aicommon.AIStatefulTask, op *InitTaskOperator) {
+			action.ActionHandler(loop, nil, NewActionHandlerOperator(task))
+			op.Done()
+		})(outer)
+		return outer, nil
+	})
+	_, err := parent.SubmitSubAgents(task, []SubAgentJob{{Identifier: "focused", Goal: "investigate in a focused loop"}}, SubAgentOptions{LoopBuilder: builder}, "focused")
+	require.NoError(t, err)
+	focused := child.await(t)
+	require.True(t, focused.IsSubAgent(), "same-task focus handoffs must preserve child identity")
+	child.save(t, "focused-fact", "FINDING_FROM_FOCUSED_CHILD")
+	observation, err := parent.GetSubAgentManager().Wait(task.GetContext(), nil, time.Second, 0, 0)
+	require.NoError(t, err)
+	require.Equal(t, "evidence_available", observation.Reason)
+	require.False(t, observation.Jobs[0].terminal())
+	require.NotEmpty(t, parent.SubAgentFinishBlockReason())
+	view := parent.GetConfig().GetSessionEvidenceRendered()
+	require.Contains(t, view, "FINDING_FROM_FOCUSED_CHILD")
+	require.NotContains(t, view, "CHILD_PRIVATE_EVIDENCE")
+}
+
 func TestBackgroundSubAgents_EvidenceSurvivesNormalPromptCompressionFallback(t *testing.T) {
 	parent, task := backgroundSubAgentFixture(t, 1)
 	child := newEvidenceChild(t)
