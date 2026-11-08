@@ -595,6 +595,24 @@ func (o *OrderedMap[T, V]) GetMap() map[T]V {
 	return o.m
 }
 
+// SnapshotMap returns a copy of the map. Use it when the caller iterates the
+// result while other goroutines may add entries: GetMap exposes the internal
+// map and ranging it during a Set is a concurrent map read and write.
+func (o *OrderedMap[T, V]) SnapshotMap() map[T]V {
+	if o == nil {
+		return nil
+	}
+	o.init()
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	snapshot := make(map[T]V, len(o.m))
+	for key, value := range o.m {
+		snapshot[key] = value
+	}
+	return snapshot
+}
+
 func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
 	if o == nil {
 		return nil
