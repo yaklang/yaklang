@@ -1,0 +1,252 @@
+// 真实 DS 4.1 F：两路调查、依赖复核、主线验收。模型回答和工具动作均不模拟。
+// 复用配置中的 provider；请求认证只保留在内存，不写入采样文件。
+// AISMOKING_OUTPUT 为新采样目录；AISMOKING_SUBAGENT_WORKDIR 为专用夹具目录。
+// AISMOKING_SUBAGENT_MODE=multi/default；两次对照须使用同一夹具路径和 seed。
+include "common/ai/aismoking/live/memory_capture.inc"
+root = os.Getenv("AISMOKING_OUTPUT")
+work = os.Getenv("AISMOKING_SUBAGENT_WORKDIR")
+mode = os.Getenv("AISMOKING_SUBAGENT_MODE")
+variant = os.Getenv("AISMOKING_VARIANT")
+if mode == "" { mode = "multi" }
+if variant == "" { variant = "current" }
+assert root != "" && work != "" && mode in ["default","multi"]
+assert !file.IsExisted(file.Join(root,"result.json")), "Use a fresh capture directory"
+assert !file.IsExisted(file.Join(root,"metadata.json")), "Do not overwrite a partial earlier run"
+file.MkdirAll(root)~
+work = str.ReplaceAll(file.Abs(work),"\\","/")
+assert !file.IsExisted(work) || file.IsExisted(file.Join(work,".subagent-evidence-fixture")), "Use a dedicated fresh fixture directory"
+for dir in ["input/billing","input/access","input/receipts","output"] { file.MkdirAll(file.Join(work,dir))~ }
+file.Save(file.Join(work,".subagent-evidence-fixture"),"Synthetic subagent evidence smoke fixture\n")~
+assert !file.IsExisted(file.Join(work,"output/audit.json")), "Archive previous fixture outputs first"
+seed = os.Getenv("AISMOKING_SUBAGENT_SEED")
+if seed == "" { seed = "subagent-evidence-20261108" }
+nonce = codec.Md5(seed)[:12]
+billingRevision = "BILLING-" + nonce
+accessRevision = "ACCESS-" + nonce
+privateBilling = "RAW_ONLY_BILLING-" + nonce
+privateAccess = "RAW_ONLY_ACCESS-" + nonce
+file.SaveJson(file.Join(work,"input/billing/manifest.json"),{
+    "source_revision":billingRevision,"parts":12,"catalog":{"Widget":10,"Gadget":7},
+    "rules":"按 part-01 到 part-12 顺序；订单号去重只计首次；paid 计实收、refunded 计退款，金额为数量乘单价；pending 和未知 SKU 排除金额，异常仍需列出。",
+    "debug_only_marker":privateBilling,"debug_note":"调试标记不属于业务证据，不要共享。"})~
+file.SaveJson(file.Join(work,"input/access/manifest.json"),{
+    "source_revision":accessRevision,"parts":12,
+    "policy":"analyst 仅允许 corp 来源的 view；former 已离职，所有 allow 均违规；svc 允许 public 来源的 api-read。decision=deny 是已阻止事件，不能算成功越权。",
+    "debug_only_marker":privateAccess,"debug_note":"调试标记不属于业务证据，不要共享。"})~
+pendingOrders,unauthorized,denied = [],[],[]
+for i=1;i<=12;i++ {
+    csv = sprintf("order_id,sku,quantity,unit_price,status\nA%02d,Widget,%d,10,paid\nB%02d,Gadget,2,7,paid\nR%02d,Widget,1,10,refunded\nP%02d,Gadget,3,7,pending\n",i,i,i,i,i)
+    if i==4 { csv += "A01,Widget,1,10,paid\n" }
+    if i==6 { csv += "X06,Unknown,1,99,paid\n" }
+    file.Save(file.Join(work,sprintf("input/billing/part-%02d.csv",i)),csv)~
+    csv = sprintf("event_id,user,source,scope,decision\nA%02d,analyst,corp,view,allow\nB%02d,former,corp,view,allow\nC%02d,analyst,public,view,deny\nD%02d,svc,public,api-read,allow\n",i,i,i,i)
+    file.Save(file.Join(work,sprintf("input/access/part-%02d.csv",i)),csv)~
+    pendingOrders=append(pendingOrders,sprintf("P%02d",i))
+    unauthorized=append(unauthorized,sprintf("B%02d",i))
+    denied=append(denied,sprintf("C%02d",i))
+}
+for id,value in {
+    "R01":{"submission":"accepted","receipt":{"status":"succeeded","receipt_id":"EXECUTED-R01","dry_run":false}},
+    "R02":{"submission":"accepted","receipt":nil},
+    "R03":{"submission":"accepted","receipt":{"status":"failed","receipt_id":"FAILED-R03","dry_run":false}},
+    "R04":{"submission":"accepted","receipt":{"status":"succeeded","receipt_id":"DRYRUN-R04","dry_run":true}}
+} { value.job_id=id; file.SaveJson(file.Join(work,"input/receipts",id+".json"),value)~ }
+file.Save(file.Join(work,"input/overview.md"),"# 两路调查与依赖复核\n账务和权限是独立来源，各有 manifest.json 与 12 个分片。先完成两路调查，再核验四份修复回执。只有非演练 succeeded 回执证明业务执行；accepted 仅代表受理。此次范围仅审计，不执行修复。所有未完成业务必须明确列出，不能把审计交付写成修复全部完成。\n")~
+task = sprintf(`完成一次跨源审计，工作目录为 %s。只读 input，产物写入 output；只使用本地文件工具，不访问业务网络、不执行修复命令。请使用子智能体承担深入调查，主智能体维护主线、衔接依赖、验收和汇总。
+先读 input/overview.md。账务 input/billing 与权限 input/access 相互独立，各有 manifest 和 12 个 CSV 分片，必须核验完整材料；分别交付 output/billing.json 与 output/access.json，顶层保留 source_revision、parts（12项逐分片统计）和异常标识。发现能影响主线的已确认结论时及时保存可共享证据，附 source_revision 与来源；再继续剩余核验，不必等整份报告完成才共享。调试标记不属于业务证据。
+拿到两份调查结果后，再核验 input/receipts 的四份回执，交付 output/receipts.json。该依赖复核也可以委派为后续阶段，不能在前置调查交付前凭空填结论。区分受理、执行、失败与演练。
+最后生成 output/audit.json 与中文 output/audit.md，验收三份中间交付与原始范围，给出结论、证据、产物路径及未完成业务的恢复条件。不要把阶段结束或 accepted 写成整体业务已完成。
+audit.json 必须包含以下顶层字段：billing_source_revision、access_source_revision、billing_raw_rows、billing_unique_orders、paid_total、refund_total、net_total、duplicate_ids、unknown_sku_ids、pending_order_ids、access_raw_events、unauthorized_success_ids、denied_event_ids、executed_job_ids、pending_job_ids、failed_job_ids、business_remediation_complete。异常和回执数组仅保存标识；business_remediation_complete 表示修复业务是否全部完成，不表示审计报告是否交付。`,work)
+file.Save(file.Join(root,"task.txt"),task)~
+model = "deepseek-v4.1-flash"
+seedPacket = nil
+providerInfo = {}
+_,probeErr = ai.IntelligentChat("只回答 OK。",ai.model(model),ai.thinkingLevel("low"),ai.timeout(45),
+    ai.modelInfoCallback(func(provider,resolved) { providerInfo.provider=provider; providerInfo.model=resolved }),
+    ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { seedPacket=packet }),
+    func(c) { c.Context=context.Seconds(55); c.DisableProviderFallback=true })
+assert probeErr==nil && seedPacket!=nil,"Configured DS 4.1 F provider unavailable"
+file.SaveJson(file.Join(root,"metadata.json"),{"variant":variant,"mode":mode,"model":model,"provider":providerInfo,"work":work,"batches_per_investigation":12,"connectivity_probe_excluded":true,"task_explicitly_requests_delegation":true})~
+runCtx = context.Seconds(1200)
+started = time.Now()
+mu = sync.NewMutex()
+requests,events = [],[]
+requestRows,facts = {},{}
+parentConfig,parentRuntimeID = nil,""
+port = os.GetRandomAvailableTCPPort()
+base = "http://"+str.HostPort("127.0.0.1",port)
+go httpserver.Serve("127.0.0.1",port,httpserver.context(runCtx),httpserver.handler(func(w,req) {
+    if req.URL.Path=="/ready" { w.Write("ready"); return }
+    parts = str.Split(str.TrimPrefix(req.URL.Path,"/"),"/")
+    id = parts[1]
+    body = json.loads(string(io.ReadAll(req.Body)~))
+    body.stream_options={"include_usage":true}
+    prompt=""
+    for message in body.messages { if message.content!=nil { prompt+=string(message.content)+"\n" } }
+    mu.Lock()
+    row=requestRows[id]
+    row.request_model=body.model
+    row.root_prompt_billing_revision=billingRevision in prompt
+    row.root_prompt_access_revision=accessRevision in prompt
+    row.private_billing_in_prompt=privateBilling in prompt
+    row.private_access_in_prompt=privateAccess in prompt
+    row.evidence_available_feedback="evidence_available" in prompt
+    row.declared_actions=[]
+    for tool in body.tools { row.declared_actions=append(row.declared_actions,tool["function"].name) }
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    mu.Unlock()
+    file.SaveJson(file.Join(root,sprintf("request-%03d.json",row.seq)),body)~
+    began=time.Now()
+    response,_,relayErr=poc.HTTP(seedPacket,poc.https(true),poc.replaceBody([]byte(json.dumps(body)),false),poc.timeout(150),poc.retryTimes(0),poc.redirectTimes(0),poc.save(false))
+    if relayErr!=nil {
+        mu.Lock(); row.error="Provider transport failed"; row.completed=true; file.SaveJson(file.Join(root,"requests.json"),requests)~; mu.Unlock()
+        w.WriteHeader(502); w.Write("Provider transport failed"); return
+    }
+    split=str.SplitN(string(response),"\r\n\r\n",2)
+    header,raw=split[0],split[1]
+    if "transfer-encoding: chunked" in str.ToLower(header) { raw=string(codec.DecodeChunked([]byte(raw))~) }
+    decoded=memoryDecodeResponse(raw)
+    usage=nil
+    for line in str.Split(raw,"\n") {
+        if !str.HasPrefix(str.TrimSpace(line),"data:") { continue }
+        payload=str.TrimSpace(str.TrimPrefix(str.TrimSpace(line),"data:"))
+        frame,frameErr=json.New(payload)
+        if frameErr==nil && "usage" in frame.Value() && frame.Value().usage!=nil { usage=frame.Value().usage }
+    }
+    if str.HasPrefix(str.TrimSpace(raw),"{") { frame,frameErr=json.New(raw); if frameErr==nil && "usage" in frame.Value() { usage=frame.Value().usage } }
+    mu.Lock()
+    row.usage,row.completed,row.seconds=usage,true,time.Since(began).Seconds()
+    row.completed_seconds=time.Since(started).Seconds()
+    row.tool_calls,row.finish_reason,row.parse_errors=decoded.tool_calls,decoded.finish_reason,decoded.parse_errors
+    row.status=str.Split(header,"\r\n")[0]
+    file.SaveJson(file.Join(root,"requests.json"),requests)~
+    mu.Unlock()
+    file.SaveJson(file.Join(root,sprintf("response-%03d.json",row.seq)),decoded)~
+    file.Save(file.Join(root,sprintf("response-%03d.sse",row.seq)),raw)~
+    printf("SUBAGENT_LIVE_CALL seq=%d role=%s caller=%s seconds=%.2f\n",row.seq,row.role,row.caller,row.seconds)
+    w.Header().Set("Content-Type","text/event-stream")
+    w.WriteHeader(parseInt(str.Split(row.status," ")[1])); w.Write(raw)~
+}))
+for i=0;i<100;i++ { _,err=http.Get(base+"/ready"); if err==nil { break }; time.Sleep(0.02) }
+modelCall=func(config,request) {
+    runtimeID=config.GetRuntimeId()
+    mu.Lock()
+    if parentRuntimeID=="" && str.HasPrefix(request.GetCallerLabel(),"react-loop:") { parentRuntimeID=runtimeID }
+    role="child"
+    if runtimeID==parentRuntimeID { role="parent" }
+    seq=len(requests)+1
+    row={"seq":seq,"runtime_id":runtimeID,"role":role,"caller":request.GetCallerLabel(),"started_seconds":time.Since(started).Seconds(),"completed":false,"usage":nil}
+    requests=append(requests,row); requestRows[string(seq)]=row
+    mu.Unlock()
+    if role=="parent" && parentConfig!=nil { row.parent_evidence_at_start=parentConfig.GetSessionEvidenceRendered() }
+    response=config.NewAIResponse()
+    go func() {
+        defer response.Close()
+        options=[ai.type("openai"),ai.model(model),ai.apiKey("local-diagnostic-relay"),ai.baseURL(base+"/relay/"+string(seq)+"/v1/chat/completions"),ai.noHttps(true),ai.timeout(180),ai.thinkingLevel("low"),
+            ai.onStream(func(reader) { response.EmitOutputStream(reader) }),ai.onReasonStream(func(reader) { response.EmitReasonStream(reader) }),
+            ai.rawHTTPRequestResponseCallback(func(packet,header,body,usage) { response.SetUsageInfo(usage) }),
+            func(c) { c.Context=request.GetContext(); c.DisableProviderFallback=true; c.FunctionCallRetryTimes=1 }]
+        options=append(options,request.GetExtraSpecOpts()...)
+        if request.IsToolCallArgumentsStreamEnabled() { options=append(options,func(c) { c.ToolCallArgumentsStreamHandler=func(reader) { response.EmitOutputStream(reader) } }) }
+        _,err=ai.Chat(request.GetPrompt(),options...)
+        if err!=nil { response.SetError(err) }
+    }()
+    return response,nil
+}
+runErr=aim.InvokeReAct(task,aim.sessionID("live-evidence-"+variant+"-"+mode+"-"+randstr(10)),aim.context(runCtx),aim.timeout(1180),aim.workdir(work),
+    aim.aiCallback(modelCall),aim.speedPriorityAICallback(modelCall),aim.qualityPriorityAICallback(modelCall),
+    aim.reviewPolicy("yolo"),aim.allowUserInteract(false),aim.maxIteration(80),aim.disableMCPServers(true),aim.disableAIForge(true),
+    aim.includeToolNames("read_file","find_file","grep","write_file"),
+    aim.configOptions(aiagent.functionCallMode(true),aiagent.aiCallback(modelCall),func(c) {
+        if parentConfig==nil { parentConfig=c }
+        c.EnableDispatchSubReactAgents=true; c.PreferDispatchSubReactAgents=mode=="multi"; c.MaxSubAgents=2
+        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableIntentRecognition,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        c.SetConfig("disable_session_title_generation",true)
+        c.GetTimeline().SetTimelineBucketByteSize(-1)
+        return nil
+    }),func(c) { c.Stateless=true },aim.onEvent(func(op,e) {
+        typ,node=string(e.Type),e.NodeId
+        if typ in ["stream","stream_start","stream_end"] { return }
+        mu.Lock()
+        events=append(events,{"type":typ,"node":node,"task_id":e.TaskId,"task_uuid":e.TaskUUID,"content":string(e.Content),"seconds":time.Since(started).Seconds()})
+        if typ in ["tool_call_start","tool_call_param","tool_call_done","tool_call_error","tool_call_cancel"] {
+            fact=json.loads(string(e.Content)); id=fact.call_tool_id
+            if id!=nil && id!="" {
+                if !(id in facts) { facts[id]={"id":id,"task_id":e.TaskId,"task_uuid":e.TaskUUID,"done":false} }
+                if typ=="tool_call_start" { facts[id].tool=fact.tool.name }
+                if typ=="tool_call_param" { facts[id].params=fact.params }
+                if typ=="tool_call_done" { facts[id].done=true }
+                if typ in ["tool_call_error","tool_call_cancel"] { facts[id].error=fact }
+            }
+        }
+        file.SaveJson(file.Join(root,"events.json"),events)~
+        file.SaveJson(file.Join(root,"tool-facts.json"),facts)~
+        mu.Unlock()
+    }))
+checks=[]
+expected={"billing_source_revision":billingRevision,"access_source_revision":accessRevision,"billing_raw_rows":50,"billing_unique_orders":49,"paid_total":948,"refund_total":120,"net_total":828,"duplicate_ids":["A01"],"unknown_sku_ids":["X06"],"pending_order_ids":pendingOrders,"access_raw_events":48,"unauthorized_success_ids":unauthorized,"denied_event_ids":denied,"executed_job_ids":["R01"],"pending_job_ids":["R02","R04"],"failed_job_ids":["R03"],"business_remediation_complete":false}
+raw,readErr=file.ReadFile(file.Join(work,"output/audit.json"))
+if readErr!=nil { checks=append(checks,"audit.json missing") } else {
+    file.Save(file.Join(root,"audit.json"),raw)~
+    parsed,parseErr=json.New(string(raw))
+    if parseErr!=nil { checks=append(checks,"audit.json invalid") } else {
+        audit=parsed.Value()
+        for name,value in expected {
+            // 演练可独立分类，也可归入待正式执行；两者都不能算已执行。
+            if name=="pending_job_ids" && json.dumps(audit.pending_job_ids)==json.dumps(["R02"]) && json.dumps(audit.dry_run_job_ids)==json.dumps(["R04"]) { continue }
+            if name in ["duplicate_ids","unknown_sku_ids","pending_order_ids","unauthorized_success_ids","denied_event_ids","executed_job_ids","pending_job_ids","failed_job_ids"] {
+                if !str.HasPrefix(json.dumps(audit[name]),"[") || len(audit[name])!=len(value) { checks=append(checks,name) } else {
+                    for wanted in value { if !(wanted in audit[name]) { checks=append(checks,name+":"+wanted) } }
+                }
+            } else if json.dumps(audit[name])!=json.dumps(value) { checks=append(checks,name) }
+        }
+    }
+}
+for name in ["billing.json","access.json","receipts.json","audit.md"] {
+    data,err=file.ReadFile(file.Join(work,"output",name))
+    if err!=nil || len(data)==0 { checks=append(checks,name+" missing") }
+    if err==nil { file.Save(file.Join(root,name),data)~ }
+    if err==nil && str.HasSuffix(name,".json") {
+        parsed,err=json.New(string(data))
+        if err!=nil { checks=append(checks,name+" invalid JSON") } else if name in ["billing.json","access.json"] {
+            detail=parsed.Value()
+            revision=billingRevision
+            if name=="access.json" { revision=accessRevision }
+            if detail.source_revision!=revision { checks=append(checks,name+" source_revision") }
+            if detail.parts==nil || len(detail.parts)!=12 { checks=append(checks,name+" parts") }
+        }
+    }
+}
+groups={}
+dispatches,dispatchJobs,parentFinish,missingUsage=0,0,false,0
+for row in requests {
+    groupName="helper"
+    if str.HasPrefix(row.caller,"react-loop:") { groupName=row.role }
+    if !(groupName in groups) { groups[groupName]={"calls":0,"input_tokens":0,"output_tokens":0} }
+    group=groups[groupName]; group.calls++
+    if row.usage==nil { missingUsage++ } else { group.input_tokens+=int(row.usage.prompt_tokens); group.output_tokens+=int(row.usage.completion_tokens) }
+    for call in row.tool_calls {
+        if row.role=="parent" && call.name=="finish" { parentFinish=true }
+        if row.role=="parent" && call.name=="dispatch_sub_react_agents" {
+            dispatches++
+            args,argErr=json.New(call.arguments)
+            if argErr==nil { dispatchJobs+=len(args.Value().dispatches) }
+        }
+    }
+}
+total=0
+for name,group in groups { group.total_tokens=group.input_tokens+group.output_tokens; total+=group.total_tokens }
+file.SaveJson(file.Join(root,"expected.json"),expected)~
+file.SaveJson(file.Join(root,"requests.json"),requests)~
+file.SaveJson(file.Join(root,"events.json"),events)~
+file.SaveJson(file.Join(root,"tool-facts.json"),facts)~
+if parentConfig!=nil {
+    file.Save(file.Join(root,"parent-timeline.txt"),parentConfig.GetTimeline().Dump())~
+    file.Save(file.Join(root,"parent-evidence.txt"),parentConfig.GetSessionEvidenceRendered())~
+}
+result={"variant":variant,"mode":mode,"model":model,"seconds":time.Since(started).Seconds(),"runtime_error":sprintf("%v",runErr),"business_passed":runErr==nil && len(checks)==0 && parentFinish,"delegation_exercised":dispatchJobs>0,"failed_checks":checks,"parent_finish":parentFinish,"dispatch_calls":dispatches,"dispatch_jobs":dispatchJobs,"groups":groups,"total_tokens":total,"missing_usage":missingUsage}
+file.SaveJson(file.Join(root,"result.json"),result)~
+println("SUBAGENT_LIVE_RESULT ",json.dumps(result))
+assert result.business_passed && result.delegation_exercised,"Live sub-agent audit failed; preserve and inspect the captured result"
+println("AISMOKING_PASS subagent_evidence")

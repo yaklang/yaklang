@@ -1,0 +1,245 @@
+{
+  "date": "2026-11-08",
+  "model": "deepseek-v4.1-flash",
+  "baseline_commit": "15d16cf92874805a9578c9b0aa8a743512c39ecc",
+  "feature_commit": "f6bdbd51248748d8f804b0648628927e34ce5b48",
+  "feature_binary_commit": "9d00ded45f03e1826029ba78582d9c18b6e7058f",
+  "feature_binary_production_code_equivalent": true,
+  "method": {
+    "samples_per_variant": 1,
+    "mode": "multi",
+    "native_function_call": true,
+    "all_roles_use_same_model": true,
+    "provider_fallback_disabled": true,
+    "connectivity_probes_excluded": true,
+    "no_model_responses_mocked": true,
+    "task_explicitly_requests_delegation": true,
+    "same_task_sha256": "1a45c326d31a8d42b3fa08745b0736ce57d5904f914005b781da560bfa47f0ca",
+    "identical_input_files": 31,
+    "input_manifest_sha256": "b269a40f1f5b482e29b587c2ec8412bdcc4b47ebeab4844003277eee9c85169f",
+    "max_active_subagents": 2,
+    "max_iterations": 80,
+    "timeout_seconds": 1200,
+    "tool_catalog": "Default runtime catalog retained; includeToolNames preloads file tools, not a whitelist. Actual Bash and file-tool choices are captured.",
+    "token_definition": "provider prompt_tokens + completion_tokens, including cached prompt tokens; not a price estimate"
+  },
+  "scenario": {
+    "billing_partitions": 12,
+    "billing_rows": 50,
+    "access_partitions": 12,
+    "access_events": 48,
+    "remediation_receipts": 4,
+    "expected_outputs": [
+      "billing.json",
+      "access.json",
+      "receipts.json",
+      "audit.json",
+      "audit.md"
+    ],
+    "expected_net_total": 828,
+    "accepted_is_not_executed": true,
+    "dry_run_is_not_execution": true
+  },
+  "baseline": {
+    "semantic_acceptance_passed": true,
+    "original_smoke_passed": false,
+    "original_failed_checks": [
+      "pending_job_ids"
+    ],
+    "duration_seconds": 324.688,
+    "model_requests": 90,
+    "request_models": [
+      "deepseek-v4.1-flash"
+    ],
+    "response_models": [
+      "deepseek-v4.1-flash"
+    ],
+    "missing_usage": 0,
+    "first_dispatch_parent_decision": 4,
+    "first_dispatch_response_seconds": 35.367,
+    "dispatch_batches": 1,
+    "dispatch_jobs": 2,
+    "context_modes": [
+      "task_only",
+      "task_only"
+    ],
+    "dependent_phase_dispatches": 0,
+    "groups": {
+      "parent": {
+        "calls": 17,
+        "input_tokens": 1017800,
+        "output_tokens": 15919,
+        "provider_seconds": 112.113,
+        "total_tokens": 1033719
+      },
+      "helper": {
+        "calls": 51,
+        "input_tokens": 1128419,
+        "output_tokens": 17431,
+        "provider_seconds": 186.382,
+        "total_tokens": 1145850
+      },
+      "child": {
+        "calls": 22,
+        "input_tokens": 1075056,
+        "output_tokens": 17392,
+        "provider_seconds": 125.966,
+        "total_tokens": 1092448
+      }
+    },
+    "total_tokens": 3272017,
+    "tool_invocations": {
+      "parent": {
+        "read_file": 3,
+        "bash": 9,
+        "write_file": 4
+      },
+      "child": {
+        "bash": 13,
+        "read_file": 2,
+        "write_file": 2
+      }
+    },
+    "helper_callers": {
+      "liteforge[tool-call-reason]": 28,
+      "liteforge[sub_react_agent_goal_elaboration]": 2,
+      "verification": 20,
+      "liteforge[perception]": 1
+    },
+    "child_save_evidence_calls": 0,
+    "evidence_visible_before_child_finish": 0,
+    "early_evidence": [],
+    "longest_request": {
+      "seq": 48,
+      "caller": "verification",
+      "role": "child",
+      "seconds": 41.0943302,
+      "prompt_tokens": 42210,
+      "completion_tokens": 5653
+    },
+    "parent_finish": true,
+    "business_remediation_complete": false
+  },
+  "current": {
+    "semantic_acceptance_passed": true,
+    "original_smoke_passed": true,
+    "original_failed_checks": [],
+    "duration_seconds": 419.694,
+    "model_requests": 68,
+    "request_models": [
+      "deepseek-v4.1-flash"
+    ],
+    "response_models": [
+      "deepseek-v4.1-flash"
+    ],
+    "missing_usage": 0,
+    "first_dispatch_parent_decision": 4,
+    "first_dispatch_response_seconds": 23.123,
+    "dispatch_batches": 1,
+    "dispatch_jobs": 2,
+    "context_modes": [
+      "fork",
+      "fork"
+    ],
+    "dependent_phase_dispatches": 0,
+    "groups": {
+      "parent": {
+        "calls": 24,
+        "input_tokens": 1592674,
+        "output_tokens": 13893,
+        "provider_seconds": 115.818,
+        "total_tokens": 1606567
+      },
+      "helper": {
+        "calls": 27,
+        "input_tokens": 665803,
+        "output_tokens": 48771,
+        "provider_seconds": 270.412,
+        "total_tokens": 714574
+      },
+      "child": {
+        "calls": 17,
+        "input_tokens": 994122,
+        "output_tokens": 14382,
+        "provider_seconds": 95.318,
+        "total_tokens": 1008504
+      }
+    },
+    "total_tokens": 3329645,
+    "tool_invocations": {
+      "parent": {
+        "read_file": 8,
+        "write_file": 4,
+        "bash": 7,
+        "tree": 1
+      },
+      "child": {
+        "bash": 7,
+        "write_file": 3,
+        "read_file": 1
+      }
+    },
+    "helper_callers": {
+      "liteforge[sub_react_agent_goal_elaboration]": 2,
+      "liteforge[tool-call-reason]": 13,
+      "verification": 11,
+      "liteforge[perception]": 1
+    },
+    "child_save_evidence_calls": 2,
+    "evidence_visible_before_child_finish": 2,
+    "early_evidence": [
+      {
+        "id": "access_investigation_result",
+        "save_response_seq": 23,
+        "parent_first_prompt_seq": 28,
+        "child_finish_response_seq": 31,
+        "parent_first_prompt_seconds": 85.7332958,
+        "child_completed_seconds": 95.5992392,
+        "advance_before_finish_response_seconds": 8.753,
+        "advance_before_completed_seconds": 9.866,
+        "prior_parent_save_same_content": false
+      },
+      {
+        "id": "billing_audit_result",
+        "save_response_seq": 42,
+        "parent_first_prompt_seq": 43,
+        "child_finish_response_seq": 46,
+        "parent_first_prompt_seconds": 299.418061,
+        "child_completed_seconds": 312.425815,
+        "advance_before_finish_response_seconds": 12.27,
+        "advance_before_completed_seconds": 13.008,
+        "prior_parent_save_same_content": false
+      }
+    ],
+    "longest_request": {
+      "seq": 32,
+      "caller": "verification",
+      "role": "child",
+      "seconds": 173.7067796,
+      "prompt_tokens": 51872,
+      "completion_tokens": 39300
+    },
+    "parent_finish": true,
+    "business_remediation_complete": false
+  },
+  "change": {
+    "model_requests": -22,
+    "total_tokens": 57628,
+    "total_tokens_percent": 1.76,
+    "parent_tokens": 572848,
+    "parent_tokens_percent": 55.42,
+    "child_tokens": -83944,
+    "helper_tokens": -431276,
+    "duration_percent": 29.26
+  },
+  "limitations": [
+    "One sequential pair, not a statistical quality or latency claim; warm caches and model trajectories differ.",
+    "Both tasks explicitly ask for subagents in Multi-Agent mode; autonomous delegation in default mode is not measured.",
+    "Both revisions dispatched two fork children on the fourth parent decision; neither delegated the dependent receipt stage.",
+    "Baseline had no child save_evidence action. This run proves new early delivery, not an old-publication success/failure rate.",
+    "Initial strict grading classified dry-run only as pending; baseline correctly used a separate dry_run_job_ids array. Original result retained; both outputs are evaluated under the same semantic rule.",
+    "Raw-only markers occur in parent prompts because the parent itself read the manifests; they cannot establish child-trace leakage in this case.",
+    "A 173.7s auxiliary verification response is a latency outlier; do not attribute the whole duration difference to evidence notification.",
+    "No overall token saving or stronger completion quality is established by this pair."
+  ]
+}
