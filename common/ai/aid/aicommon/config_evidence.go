@@ -9,7 +9,7 @@ import (
 // Serialize saves from shared configs through the session lock. Timeline never
 // calls back into SessionPromptState. Persist the journal and its business mirror
 // together, so a restart cannot restore an older journal over a successful save.
-func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) {
+func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) bool {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
 	timeline := s.evidenceTimeline
@@ -17,14 +17,16 @@ func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) {
 		timeline = c.GetTimeline()
 		s.evidenceTimeline = timeline
 	}
-	if _, err := timeline.applyEvidenceOperations(ops, s.evidenceJSON, c.AcquireId); err != nil {
+	_, changed, err := timeline.applyEvidenceOperationsWithChange(ops, s.evidenceJSON, c.AcquireId)
+	if err != nil {
 		s.m.Unlock()
 		log.Warnf("journal session evidence: %v", err)
-		return
+		return false
 	}
 	c.persistEvidenceTimelineLocked(s, timeline)
 	s.m.Unlock()
 	c.SyncSessionEvidenceTimeline()
+	return changed
 }
 
 // The journal is authoritative once migrated, including an empty state after

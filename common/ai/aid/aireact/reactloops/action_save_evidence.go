@@ -17,21 +17,34 @@ const saveEvidenceOperationLoopVar = "save_evidence_operation"
 // It validates, applies, and reads the Session Evidence Store back before
 // reporting success.
 func SaveSessionEvidence(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, error) {
+	op, _, err := saveSessionEvidenceWithChange(cfg, evidenceID, content)
+	return op, err
+}
+
+func saveSessionEvidenceWithChange(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, bool, error) {
 	if cfg == nil {
-		return aicommon.EvidenceOperation{}, utils.Error("session configuration is unavailable")
+		return aicommon.EvidenceOperation{}, false, utils.Error("session configuration is unavailable")
 	}
 	evidenceOp, err := aicommon.BuildSessionEvidenceUpsert(evidenceID, content)
 	if err != nil {
-		return aicommon.EvidenceOperation{}, err
+		return aicommon.EvidenceOperation{}, false, err
 	}
-	cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
+	var changed bool
+	if recorder, ok := cfg.(*aicommon.Config); ok {
+		changed = recorder.ApplySessionEvidenceOpsWithChange([]aicommon.EvidenceOperation{evidenceOp})
+	} else {
+		// Preserve custom caller adapters' ApplySessionEvidenceOps contract.
+		before := cfg.GetSessionEvidenceRendered()
+		cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
+		changed = cfg.GetSessionEvidenceRendered() != before
+	}
 
 	rendered := cfg.GetSessionEvidenceRendered()
 	idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
 	if !strings.Contains(rendered, idMarker) || !strings.Contains(rendered, evidenceOp.Content) {
-		return aicommon.EvidenceOperation{}, utils.Errorf("Session Evidence Store did not contain id=%q after apply", evidenceOp.ID)
+		return aicommon.EvidenceOperation{}, false, utils.Errorf("Session Evidence Store did not contain id=%q after apply", evidenceOp.ID)
 	}
-	return evidenceOp, nil
+	return evidenceOp, changed, nil
 }
 
 // loopAction_SaveEvidence is a core action rather than a registry extension.
@@ -40,6 +53,7 @@ func SaveSessionEvidence(cfg aicommon.AICallerConfigIf, evidenceID, content stri
 var loopAction_SaveEvidence = &LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE,
 	Description: "Persist a concise, reusable finding directly into the shared Session Evidence Store, then continue the task. " +
+		"In a sub-agent, explicitly saving also publishes this finding to the parent evidence journal and notifies a waiting parent when the content changes. Private tool output and other child evidence are not automatically shared. " +
 		"Use it for confirmed facts, discriminating negative results, or state changes that later work should rely on. " +
 		"Saving is idempotent: reuse evidence_id to update the same finding; when omitted, the system derives a stable ID from the content.",
 	Options: []aitool.ToolOption{
@@ -87,6 +101,12 @@ var loopAction_SaveEvidence = &LoopAction{
 		if err != nil {
 			operator.Fail(utils.Wrap(err, "save_evidence failed"))
 			return
+		}
+		if loop.saveEvidencePublisher != nil {
+			if err := loop.saveEvidencePublisher(evidenceOp); err != nil {
+				operator.Fail(utils.Wrap(err, "publish evidence to parent failed"))
+				return
+			}
 		}
 
 		idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)

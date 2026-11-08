@@ -123,36 +123,6 @@ func configureInvestigator(child, parent *reactloops.ReActLoop) {
 	reactloops.WithPersistentContextProvider(func(_ *reactloops.ReActLoop, _ string) (string, error) {
 		return "你是调查子 Agent。仅在指定范围读取、搜索，使用 save_evidence 保存明确共享的证据，交付来源和结论；不可修改计划、执行业务命令或派发其他 Agent。", nil
 	})(child)
-	action, err := child.GetActionHandler("save_evidence")
-	if err != nil {
-		return
-	}
-	wrapped := *action
-	wrapped.FunctionCallAction = nil
-	wrapped.ActionHandler = func(l *reactloops.ReActLoop, a *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-		action.ActionHandler(l, a, op)
-		if done, _ := op.IsTerminated(); done {
-			return
-		}
-		id, content := a.GetString("evidence_id"), a.GetString("evidence_content")
-		if content == "" {
-			content = a.GetInvokeParams("next_action").GetString("evidence_content")
-		}
-		if id == "" {
-			id = a.GetInvokeParams("next_action").GetString("evidence_id")
-		}
-		before := parent.GetConfig().GetSessionEvidenceRendered()
-		if _, err := reactloops.SaveSessionEvidence(parent.GetConfig(), id, content); err != nil {
-			op.Fail(err)
-			return
-		}
-		if parent.GetConfig().GetSessionEvidenceRendered() != before {
-			if m := parent.GetSubAgentManager(); m != nil {
-				m.NotifyDiscovery()
-			}
-		}
-	}
-	reactloops.WithOverrideLoopAction(&wrapped)(child)
 }
 
 func waitForExploration(ctx context.Context, l *reactloops.ReActLoop) error {

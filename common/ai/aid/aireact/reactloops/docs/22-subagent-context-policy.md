@@ -29,6 +29,8 @@
 | 已报告漏洞去重清单 | 共享 | 共享 |
 | task取消与退出门禁 | 受父生命周期约束 | 相同 |
 
+两种上下文模式都允许反向显式发布：子 Agent 调用 `save_evidence` 时，只有本次选择保存的证据操作会写入父 evidence journal，并沿父 Timeline 的正常冻结边界提升。`task_only` 仍不会因此获得父历史或实时父证据。普通子 evidence mutation 和完整 Timeline 保持隔离；完成报告不再是子 Agent 向父共享关键发现的唯一时点。
+
 task_only是“不自动注入父会话事实”，不是文件系统沙箱或绝对空上下文。宿主自定义提示和普通provider依然有权提供上下文；子任务也仍可使用获准工具读取任务书指定的材料。必要的用户约束、输入路径、验收条件必须写入goal/result_contract。框架不能推断自然语言任务书是否已经包含所有必要事实。
 
 旧内部`SubAgentOptions.TimelineMode=Clean`且job未指定context_mode时，继续表示“只清Timeline”。审计与内部搜索的调用语义保持兼容，不把它悄悄改成task_only。

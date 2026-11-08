@@ -2,11 +2,11 @@ package aicommon
 
 import (
 	"fmt"
-	"time"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
+	"time"
 
 	"sync/atomic"
 )
@@ -251,14 +251,21 @@ func (c *Config) GetExecutionPolicy() string {
 		return ""
 	}
 	lines := make([]string, 0, 4)
+	if c.EnableDispatchSubReactAgents && !c.GetPreferDispatchSubReactAgents() {
+		lines = append(lines,
+			"- Agent mode: keep ownership of the main workstream and proactively delegate execution-heavy phases or promising exploration paths through dispatch_sub_react_agents. For nontrivial cross-source investigation, multi-step validation or a long execution chain, delegate a bounded child goal early once the necessary inputs are known; do not complete the detailed investigation yourself before delegating. One child may execute a complete sequential phase; parallel tasks are not required. Continue necessary mainline work, coordinate dependencies, review evidence and synthesize results.",
+			"- Give each child the required inputs, user constraints, a clear scope and result_contract with deliverables, evidence, unresolved questions and blockers. For exploration, specify the hypothesis and stopping conditions. Only independent, non-conflicting jobs belong in one batch; review prerequisite results before dispatching dependent later phases. Respect explicit user restrictions; simple answers and tiny single-step tasks do not require delegation.",
+			"- Dispatch receipts are acceptance, not completion. Use bounded wait_sub_react_agents when no useful local work remains, then review the delivered results. After each phase, audit the overall user goal and remaining TODOs before continuing delegation or requesting finish; do not treat phase completion as whole-task completion.",
+		)
+	}
 	if c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
-			"- 【MUST】Multi-agent mode is ENABLED. For ANY task containing 2+ mostly-independent workstreams, you MUST make dispatch_sub_react_agents your FIRST move — do not start with serial tool calls. This is a mandatory strategy, not a suggestion; only fall back to serial execution when you can justify that the task is genuinely sequential or a single sub-goal.",
-			"- 【MUST】Dispatch is strictly for parallelizing INDEPENDENT workstreams. You MUST NOT use it to offload a single sequential task you should do yourself, and you MUST NOT dump every imaginable subtask into one call to avoid thinking. Before batching, you MUST verify each subtask is mutually independent.",
-			"- 【MUST】If subtask B depends on subtask A's result, you MUST NOT batch them together. Do A first (dispatch it or do it yourself), wait for its result to land in the timeline, then dispatch B in a LATER iteration. Only zero-dependency subtasks may share one dispatch.",
-			"- When dispatching, write a crisp, self-contained goal for each sub agent and use result_contract to define the expected output shape whenever possible.",
+			"- 【MUST】Multi-agent mode is ENABLED. Act as the primary coordinator: decompose the user goal, delegate detailed execution, manage dependencies, review evidence and synthesize results. For tasks requiring multiple tool steps, cross-source checks, investigation or substantial deliverables, you MUST make dispatch_sub_react_agents your FIRST move after only indispensable prerequisite lookup. A single sequential phase is eligible; parallel work is not required. Delegate reading and processing full source datasets, detailed investigation and artifact production to children; limit your own execution to minimal scoping, coordination, integration and targeted acceptance checks. Simple answers, tiny single-step tasks and explicit user restrictions remain exceptions.",
+			"- 【MUST】Delegate complete multi-step phases and promising exploration paths, not just isolated tool calls. Keep the main objective and required TODOs under your ownership. Give exploration children a concrete hypothesis, scope, evidence requirements and stopping conditions; use their findings to select the next phase rather than launching every imaginable branch or repeating their execution yourself.",
+			"- 【MUST】If subtask B depends on subtask A's result, you MUST NOT batch them together. Dispatch A, review its actual result, then dispatch B in a LATER iteration with the required evidence. Only mutually independent, non-conflicting jobs may share one dispatch; sequential steps inside a single child task are allowed.",
+			"- When dispatching, write a crisp, self-contained goal and result_contract for each sub agent, including required inputs, user constraints, deliverables, acceptance evidence, unresolved questions and blockers. Review the returned work against the original goal before accepting it or delegating the next phase; a completed child or phase is not proof that the whole user task is complete.",
 			"- Choose context_mode per child: fork (default) for work needing prior investigation; task_only for self-contained searches or independent reviews. task_only omits parent history, evidence and input attachments, so include required facts, constraints and file paths in goal. Neither mode changes host authority or cancellation scope.",
-			"- Dispatch returns accepted job IDs immediately, not completed results. Continue useful independent work while children run. When no useful local work remains, use wait_sub_react_agents (default 30 seconds), inspect the returned progress, and decide again. A wait timeout never cancels child execution. Results arrive in a subsequent model input; finish requires all jobs settled and their results received. Use cancel_sub_react_agents to abandon unwanted work explicitly.",
+			"- Dispatch returns accepted job IDs immediately, not completed results. Continue useful coordination or acceptance work while children run. When no useful local work remains, use wait_sub_react_agents (default 30 seconds), inspect the returned progress, and decide again. A wait timeout never cancels child execution. Results arrive in a subsequent model input; finish requires all jobs settled, their results received, and the overall user goal audited for remaining work. Use cancel_sub_react_agents to abandon unwanted work explicitly.",
 		)
 	}
 	if c.GetEnableGoalMode() {
@@ -286,7 +293,7 @@ func (c *Config) GetExecutionPolicy() string {
 	}
 	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
 		lines = append(lines,
-			"- Both modes are active: dispatch sub-agents for parallelizable work, then keep verifying their results or synthesizing outputs until the completion gate opens; do not idle after dispatch or attempt to satisfy the gate by closing unfinished TODOs.",
+			"- Both modes are active: delegate executable phases and exploration paths, then keep reviewing evidence, resolving dependencies and synthesizing outputs until the completion gate opens; do not idle after dispatch or attempt to satisfy the gate by closing unfinished TODOs.",
 		)
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))

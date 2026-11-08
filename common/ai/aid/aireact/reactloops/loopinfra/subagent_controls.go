@@ -84,12 +84,12 @@ func subAgentControlAction(name, description string) *reactloops.LoopAction {
 				if err != nil {
 					break
 				}
-				zh := fmt.Sprintf("正在等待 %d 个子任务的结果（最多 %g 秒，有结果将提前返回）。", len(observed), float64(timeout)/1000)
-				reactloops.EmitStatusI18n(loop, zh, "Waiting for sub-task results; new results return early",
+				zh := fmt.Sprintf("正在等待 %d 个子任务的结果或共享证据（最多 %g 秒，有新发现将提前返回）。", len(observed), float64(timeout)/1000)
+				reactloops.EmitStatusI18n(loop, zh, "Waiting for sub-task results or shared evidence; new discoveries return early",
 					aicommon.WithStatusCode("subagent.waiting"), aicommon.WithStatusState(aicommon.StatusStateWaiting))
 				waitLog = startSubAgentWaitLog(loop, zh)
 				defer waitLog.Close()
-				observation, waitErr := manager.Wait(op.GetTask().GetContext(), ids, time.Duration(timeout)*time.Millisecond, loop.SubAgentModelSeenRevision())
+				observation, waitErr := manager.Wait(op.GetTask().GetContext(), ids, time.Duration(timeout)*time.Millisecond, loop.SubAgentModelSeenRevision(), loop.SubAgentModelSeenEvidenceRevision())
 				result, err = observation, waitErr
 				if observation != nil {
 					observed = observation.Jobs
@@ -107,6 +107,10 @@ func subAgentControlAction(name, description string) *reactloops.LoopAction {
 				raw, _ := json.Marshal(result)
 				op.Feedback(string(raw))
 				zh, en, settled := subAgentObservationSummary(observed)
+				if observation, ok := result.(*reactloops.SubAgentObservation); ok && observation.Reason == "evidence_available" {
+					zh = "子任务已向主任务保存新证据，可据此继续协调。" + zh
+					en = "New sub-task evidence is saved in the parent task; continue coordination. " + en
+				}
 				if observation, ok := result.(*reactloops.SubAgentObservation); ok && observation.TimedOut {
 					zh = "本次等待已到时，子任务继续执行。" + zh
 					en = "The observation deadline elapsed; child tasks continue. " + en
@@ -180,6 +184,6 @@ func startSubAgentWaitLog(loop *reactloops.ReActLoop, message string) io.WriteCl
 var loopAction_InspectSubAgents = subAgentControlAction(reactloops.SubAgentInspectAction,
 	"Inspect queued, running and terminal jobs without waiting. Reports actual recent event activity and saved result references, not a guessed completion percentage. Prefer independent work over repeated unchanged polling.")
 var loopAction_WaitSubAgents = subAgentControlAction(reactloops.SubAgentWaitAction,
-	"Wait for new terminal sub-agent results, at most 30 seconds by default. Returns early on completion or parent cancellation. A timeout returns current progress and leaves child execution running. Use when no useful independent work remains, then decide again.")
+	"Wait for new terminal sub-agent results or explicit save_evidence discoveries, at most 30 seconds by default. Returns early when selected children publish new evidence, complete, or the parent is cancelled. A timeout returns current progress and leaves child execution running. Use when no useful coordination or acceptance work remains, then decide again.")
 var loopAction_CancelSubAgents = subAgentControlAction(reactloops.SubAgentCancelAction,
 	"Request cancellation of selected child jobs. Running jobs remain cancelling until their workers stop; queued jobs will not execute. Inspect or wait for the terminal result before finishing.")

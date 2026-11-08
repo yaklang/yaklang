@@ -295,11 +295,15 @@ type ReActLoop struct {
 	subAgentShutdown         sync.Once
 	// Parent-loop-thread-only delivery/decision cursors.
 	subAgentModelSeen         uint64
+	subAgentEvidenceSeen      uint64
 	subAgentCommitted         uint64
 	subAgentAnswerSeen        uint64
 	subAgentControlRounds     int
 	subAgentControlIterations int
 	subAgentControlRevision   uint64
+	// Only the explicit save_evidence action invokes this publisher. Private
+	// evidence mutations and child Timeline entries retain their isolation.
+	saveEvidencePublisher func(aicommon.EvidenceOperation) error
 
 	// functionCallMode selects per-action function-call schema tags when
 	// generateLoopPrompt assembles the prompt. Provider projection and response
