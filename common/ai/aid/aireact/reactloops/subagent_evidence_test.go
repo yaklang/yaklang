@@ -125,6 +125,7 @@ func TestBackgroundSubAgents_ExplicitEvidenceSharesOnlySelectedFindings(t *testi
 			receipt, err := parent.SubmitSubAgents(task, []SubAgentJob{{Identifier: "investigator", Goal: "investigate", ContextMode: mode}}, SubAgentOptions{LoopBuilder: managedLoopBuilder(child.builder)}, "selected")
 			require.NoError(t, err)
 			childLoop := child.await(t)
+			require.True(t, childLoop.IsSubAgent(), "custom child builders use the common sub-agent identity and evidence channel")
 			_, err = SaveSessionEvidence(cfg, "parent", "NEW_PARENT_FACT")
 			require.NoError(t, err)
 			_, err = SaveSessionEvidence(cfg, "unrelated", "UNRELATED_PARENT_FACT")

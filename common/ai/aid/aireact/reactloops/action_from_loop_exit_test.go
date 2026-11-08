@@ -36,7 +36,7 @@ func TestLoopActionHandoffWaitsForOwnedChildrenAndUnseenResults(t *testing.T) {
 	jobs := awaitBackgroundTerminal(t, parent.GetSubAgentManager(), nil)
 	op = invoke()
 	require.True(t, op.IsContinued())
-	require.Contains(t, op.GetFeedback().String(), "Read the next iteration")
+	require.Contains(t, op.GetFeedback().String(), "先读取下一轮结果")
 	require.Zero(t, invocations, "an undelivered child result must also block the same-task handoff")
 	require.NoError(t, task.GetContext().Err())
 	parent.subAgentModelSeen = jobs[0].ResultRevision

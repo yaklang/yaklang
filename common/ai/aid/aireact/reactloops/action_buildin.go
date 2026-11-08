@@ -35,15 +35,15 @@ func buildExitBlockedByTodoMessage(actionName string, items []aicommon.Verificat
 }
 
 func buildFinishBlockedByGoalModeMessage() string {
-	return "goal mode's host-side completion gate is not open yet. Do not retry finish or clear unfinished TODOs to satisfy it. Continue the most valuable evidence-producing work, and use directly_answer only for a necessary progress update."
+	return "目标模式的宿主完成门禁尚未开放。不要反复请求 finish 或清空未完成待办来过关；继续最有价值的验证与执行，仅在必要时用 directly_answer 汇报进度。"
 }
 
 func buildFinishBlockedByDeadlineMessage(remaining time.Duration) string {
-	return fmt.Sprintf("goal mode time window is still active (%s remaining). Do not retry finish. Continue the most valuable evidence-producing work; explore deeper angles, verify earlier results, or address remaining TODOs.", remaining.Round(time.Second))
+	return fmt.Sprintf("目标时间窗尚未结束，剩余 %d 秒。不要反复请求 finish；继续深入探索、验证已有结果或处理剩余待办。", remaining.Round(time.Second)/time.Second)
 }
 
 func buildFinishBlockedByAcceptanceMessage(reason string) string {
-	return fmt.Sprintf("goal mode acceptance criteria are not satisfied yet: %s. Do not retry finish or clear unfinished TODOs to bypass this. Address the gaps above with concrete tool actions and evidence, then attempt finish again.", reason)
+	return fmt.Sprintf("目标验收标准尚未满足：%s。不要反复请求 finish 或清空未完成待办来绕过验收；用具体工具操作和证据补齐缺口后再申请结束。", reason)
 }
 
 var loopAction_Finish = &LoopAction{

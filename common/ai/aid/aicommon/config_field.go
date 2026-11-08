@@ -253,47 +253,46 @@ func (c *Config) GetExecutionPolicy() string {
 	lines := make([]string, 0, 4)
 	if c.EnableDispatchSubReactAgents && !c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
-			"- Agent mode: keep ownership of the main workstream and proactively delegate execution-heavy phases or promising exploration paths through dispatch_sub_react_agents. For nontrivial cross-source investigation, multi-step validation or a long execution chain, delegate a bounded child goal early once the necessary inputs are known; do not complete the detailed investigation yourself before delegating. One child may execute a complete sequential phase; parallel tasks are not required. Continue necessary mainline work, coordinate dependencies, review evidence and synthesize results.",
-			"- Give each child the required inputs, user constraints, a clear scope and result_contract with deliverables, evidence, unresolved questions and blockers. For exploration, specify the hypothesis and stopping conditions. Only independent, non-conflicting jobs belong in one batch; review prerequisite results before dispatching dependent later phases. Respect explicit user restrictions; simple answers and tiny single-step tasks do not require delegation.",
-			"- Dispatch receipts are acceptance, not completion. Use bounded wait_sub_react_agents when no useful local work remains, then review the delivered results. After each phase, audit the overall user goal and remaining TODOs before continuing delegation or requesting finish; do not treat phase completion as whole-task completion.",
+			"- 默认模式：维护总目标和主线；复杂长链路、跨源验证和有依据的探索分支，尽早通过 dispatch_sub_react_agents 委派。一个子任务可完成含顺序步骤的阶段，无须凑并行任务。简单问答和微小单步任务直接处理，遵守用户的委派限制。",
+			"- 派发时写清输入、约束、范围、交付和验收要求（result_contract）；探索另给假设和停止条件。同批任务须独立且无冲突；有依赖则先验收前序，再派发后序。",
+			"- 主智能体负责协调、验收和汇总，也可推进必要主线工作。受理不等于完成；无可推进工作时用 wait_sub_react_agents 等待。阶段结束后核对总目标和剩余待办，再决定下一阶段或 finish。",
 		)
 	}
 	if c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
-			"- 【MUST】Multi-agent mode is ENABLED. Act as the primary coordinator: decompose the user goal, delegate detailed execution, manage dependencies, review evidence and synthesize results. For tasks requiring multiple tool steps, cross-source checks, investigation or substantial deliverables, you MUST make dispatch_sub_react_agents your FIRST move after only indispensable prerequisite lookup. A single sequential phase is eligible; parallel work is not required. Delegate reading and processing full source datasets, detailed investigation and artifact production to children; limit your own execution to minimal scoping, coordination, integration and targeted acceptance checks. Simple answers, tiny single-step tasks and explicit user restrictions remain exceptions.",
-			"- 【MUST】Delegate complete multi-step phases and promising exploration paths, not just isolated tool calls. Keep the main objective and required TODOs under your ownership. Give exploration children a concrete hypothesis, scope, evidence requirements and stopping conditions; use their findings to select the next phase rather than launching every imaginable branch or repeating their execution yourself.",
-			"- 【MUST】If subtask B depends on subtask A's result, you MUST NOT batch them together. Dispatch A, review its actual result, then dispatch B in a LATER iteration with the required evidence. Only mutually independent, non-conflicting jobs may share one dispatch; sequential steps inside a single child task are allowed.",
-			"- When dispatching, write a crisp, self-contained goal and result_contract for each sub agent, including required inputs, user constraints, deliverables, acceptance evidence, unresolved questions and blockers. Review the returned work against the original goal before accepting it or delegating the next phase; a completed child or phase is not proof that the whole user task is complete.",
-			"- Choose context_mode per child: fork (default) for work needing prior investigation; task_only for self-contained searches or independent reviews. task_only omits parent history, evidence and input attachments, so include required facts, constraints and file paths in goal. Neither mode changes host authority or cancellation scope.",
-			"- Dispatch returns accepted job IDs immediately, not completed results. Continue useful coordination or acceptance work while children run. When no useful local work remains, use wait_sub_react_agents (default 30 seconds), inspect the returned progress, and decide again. A wait timeout never cancels child execution. Results arrive in a subsequent model input; finish requires all jobs settled, their results received, and the overall user goal audited for remaining work. Use cancel_sub_react_agents to abandon unwanted work explicitly.",
+			"- 【强制】多智能体模式：主智能体以拆解、协调、验收和汇总为主。复杂多步任务在必要摸底后，首先通过 dispatch_sub_react_agents 委派完整阶段或探索分支，资料处理、深入调查和产出制作交给子智能体。单个顺序阶段也可委派；简单问答、微小单步任务及用户禁止委派时除外。",
+			"- 子任务说明须包含输入、约束、范围、交付、证据、未确认项和阻塞条件（result_contract）；探索另给假设和停止条件。主智能体维护主线待办，根据真实发现选择后续工作，避免重复执行已委派的细节。",
+			"- 【强制】同批任务须独立且无冲突。若后序依赖前序，先派发并验收前序，再携带真实结果派发后序；子任务内部允许顺序执行。",
+			"- context_mode 默认 fork，继承派发时的上下文快照；独立检索或审查可用 task_only，但须在 goal 中写全事实、约束和文件路径，因为它不继承父对话、证据和输入附件。两者均不改变宿主权限和取消范围。",
+			"- 受理不等于完成。子任务执行时继续协调和验收；无可推进工作时用 wait_sub_react_agents 有界等待，默认 30 秒，超时不取消子任务。全部子任务结束、结果已接收且总目标无遗漏后才可 finish；放弃任务须显式 cancel_sub_react_agents。",
 		)
 	}
 	if c.GetEnableGoalMode() {
 		lines = append(lines,
-			"- Goal mode is enabled: finish is controlled by a host-side completion gate. Keep producing evidence-backed progress while finish is unavailable; decide from the task state rather than the gate.",
-			"- Before the finish gate opens, only emit progress updates via directly_answer when necessary; keep pushing execution forward instead of wrapping up early or administratively clearing TODOs.",
+			"- 目标模式：finish 由宿主完成门禁控制；根据真实任务状态持续推进，用具体证据支撑进展。",
+			"- 门禁开放前，仅在必要时用 directly_answer 汇报进度；不要反复请求 finish，也不要清空未完成待办来过关。",
 		)
 		if c.GetGoalDurationSeconds() != 0 {
 			if c.GetGoalDurationSeconds() == -1 {
 				lines = append(lines,
-					"- Goal time window: NEVER-ENDING. finish will never be auto-accepted by the time gate; keep working until the acceptance criteria are met (if set) or the user stops the session.",
+					"- 目标时间窗：无限。时间门禁不会自动放行 finish；持续推进，直至满足已设置的验收标准或用户停止会话。",
 				)
 			} else {
 				lines = append(lines,
-					fmt.Sprintf("- Goal time window: %d seconds. finish is blocked until the time window elapses; use the time to explore deeper, verify results, and address edge cases.", c.GetGoalDurationSeconds()),
+					fmt.Sprintf("- 目标时间窗：%d 秒。到期前不能 finish；继续深入探索、验证结果和补齐边界情况。", c.GetGoalDurationSeconds()),
 				)
 			}
 		}
 		if criteria := c.GetGoalAcceptanceCriteria(); criteria != "" {
 			lines = append(lines,
-				fmt.Sprintf("- Goal acceptance criteria: %s", criteria),
-				"- After the time window (if set) passes, finish still requires the acceptance criteria to be satisfied. The system will review your work against the criteria before allowing finish.",
+				fmt.Sprintf("- 目标验收标准：%s", criteria),
+				"- 达到时间要求后，仍须通过验收审查才能 finish。",
 			)
 		}
 	}
 	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
 		lines = append(lines,
-			"- Both modes are active: delegate executable phases and exploration paths, then keep reviewing evidence, resolving dependencies and synthesizing outputs until the completion gate opens; do not idle after dispatch or attempt to satisfy the gate by closing unfinished TODOs.",
+			"- 多智能体与目标模式同时启用：持续委派、协调和验收，直至完成门禁开放；派发后不能停工，也不能靠清空待办收口。",
 		)
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))

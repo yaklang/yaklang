@@ -29,14 +29,14 @@ func TestConfigExecutionPolicy(t *testing.T) {
 	)
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "dispatch_sub_react_agents")
-	require.Contains(t, text, "host-side completion gate")
+	require.Contains(t, text, "宿主完成门禁")
 	require.NotContains(t, text, "iteration 6")
 	require.NotContains(t, text, "Current iteration")
 	require.NotContains(t, text, "minimum iteration")
 }
 
 // TestConfigExecutionPolicy_MultiAgentDirective asserts the multi-agent
-// ExecutionPolicy line is written as a mandatory directive (MUST / 【强制】)
+// ExecutionPolicy line is written as a mandatory directive (【强制】)
 // so the parent coordinates substantial work, including sequential phases.
 func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	cfg := aicommon.NewConfig(
@@ -44,12 +44,12 @@ func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 		aicommon.WithEnableMultiAgentMode(true),
 	)
 	text := cfg.GetExecutionPolicy()
-	require.Contains(t, text, "MUST make dispatch_sub_react_agents your FIRST move")
-	require.Contains(t, text, "primary coordinator")
-	require.Contains(t, text, "A single sequential phase is eligible")
-	require.Contains(t, text, "MUST NOT batch them together")
+	require.Contains(t, text, "首先通过 dispatch_sub_react_agents 委派")
+	require.Contains(t, text, "主智能体以拆解、协调、验收和汇总为主")
+	require.Contains(t, text, "单个顺序阶段也可委派")
+	require.Contains(t, text, "同批任务须独立且无冲突")
 	require.NotContains(t, text, "MaxSubAgents")
-	require.NotContains(t, text, "Goal mode")
+	require.NotContains(t, text, "目标模式")
 }
 
 // TestConfigExecutionPolicy_CombinedModes verifies that when both modes are
@@ -63,8 +63,8 @@ func TestConfigExecutionPolicy_CombinedModes(t *testing.T) {
 		aicommon.WithGoalMinIterations(6),
 	)
 	text := cfg.GetExecutionPolicy()
-	require.Contains(t, text, "Both modes are active")
-	require.Contains(t, text, "completion gate opens")
+	require.Contains(t, text, "多智能体与目标模式同时启用")
+	require.Contains(t, text, "完成门禁开放")
 	require.NotContains(t, text, "iteration 6")
 	require.NotContains(t, text, "minimum iteration")
 }

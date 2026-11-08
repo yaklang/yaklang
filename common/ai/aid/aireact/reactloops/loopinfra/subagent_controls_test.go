@@ -84,7 +84,7 @@ func TestBackgroundDispatchActions_ActualLoop(t *testing.T) {
 				aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					body := ""
 					var step int32
-					if strings.Contains(req.GetPrompt(), "You are preparing a task brief") {
+					if strings.Contains(req.GetPrompt(), "你负责为子智能体编写任务书。") {
 						body = `{"@action":"object","goal":"inspect payment log","result_contract":"return evidence"}`
 					} else {
 						step = requests.Add(1)

@@ -52,19 +52,18 @@ func saveSessionEvidenceWithChange(cfg aicommon.AICallerConfigIf, evidenceID, co
 // including default loops, plan-execution task loops, and infrastructure loops.
 var loopAction_SaveEvidence = &LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_SAVE_EVIDENCE,
-	Description: "Persist a concise, reusable finding directly into the shared Session Evidence Store, then continue the task. " +
-		"In a sub-agent, explicitly saving also publishes this finding to the parent evidence journal and notifies a waiting parent when the content changes. Private tool output and other child evidence are not automatically shared. " +
-		"Use it for confirmed facts, discriminating negative results, or state changes that later work should rely on. " +
-		"Saving is idempotent: reuse evidence_id to update the same finding; when omitted, the system derives a stable ID from the content.",
+	Description: "直接保存简明、可复用的已确认事实、排除结果或状态变化，然后继续任务。" +
+		"子智能体显式保存的证据也会进入父证据日志，内容变化时可提前唤醒父智能体；原始工具输出和其他私有证据不自动共享。" +
+		"复用 evidence_id 可更新同一发现；省略时按内容生成稳定标识，相同内容重试不新增证据增量。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"evidence_id",
-			aitool.WithParam_Description("Optional stable semantic ID (1-128 characters: letters, digits, dot, underscore, colon, or hyphen). Reuse it to update the same finding."),
+			aitool.WithParam_Description("可选的稳定语义标识，1 至 128 个字母、数字、点、下划线、冒号或连字符；更新同一发现时复用。"),
 		),
 		aitool.WithStringParam(
 			"evidence_content",
 			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("Concise reusable evidence: what was tested or observed, how it was confirmed, the concrete result, and why it matters. This content is written directly to Session Evidence."),
+			aitool.WithParam_Description("可复用的具体证据：验证对象与方式、实际观测、确认结果及其意义；内容会直接写入会话证据。"),
 		),
 	},
 	StreamFields: []*LoopStreamField{
@@ -102,7 +101,7 @@ var loopAction_SaveEvidence = &LoopAction{
 			operator.Fail(utils.Wrap(err, "save_evidence failed"))
 			return
 		}
-		if loop.saveEvidencePublisher != nil {
+		if loop.IsSubAgent() && loop.saveEvidencePublisher != nil {
 			if err := loop.saveEvidencePublisher(evidenceOp); err != nil {
 				operator.Fail(utils.Wrap(err, "publish evidence to parent failed"))
 				return
@@ -110,8 +109,8 @@ var loopAction_SaveEvidence = &LoopAction{
 		}
 
 		idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
-		loop.GetInvoker().AddToTimeline("session_evidence_saved", fmt.Sprintf("%s saved; evidence content is recorded in the timeline delta.", idMarker))
-		operator.Feedback(fmt.Sprintf("Session evidence saved as %s; continue with the remaining task.", idMarker))
+		loop.GetInvoker().AddToTimeline("session_evidence_saved", fmt.Sprintf("%s 已保存，证据正文已记录到时间线增量。", idMarker))
+		operator.Feedback(fmt.Sprintf("会话证据 %s 已保存，请继续剩余任务。", idMarker))
 		operator.Continue()
 	},
 }

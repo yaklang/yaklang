@@ -143,24 +143,21 @@ func (r *ReActLoop) CheckGoalAcceptanceCriteria(ctx context.Context) *GoalAccept
 			// Gather and bound the evidence only when the task is scheduled.
 			timelineDiff := r.GetTimelineDiffWithoutUpdate()
 			if strings.TrimSpace(timelineDiff) == "" {
-				timelineDiff = "(no timeline content available)"
+				timelineDiff = "（暂无时间线内容）"
 			}
 			const maxTimelineChars = 8000
 			if len(timelineDiff) > maxTimelineChars {
-				timelineDiff = timelineDiff[:maxTimelineChars] + "\n... (truncated)"
+				timelineDiff = timelineDiff[:maxTimelineChars] + "\n……（已截断）"
 			}
-			return fmt.Sprintf(`You are a strict acceptance reviewer. Determine whether the work done so far satisfies the acceptance criteria.
+			return fmt.Sprintf(`请严格审查现有工作是否满足验收标准。
 
-## Acceptance Criteria
+验收标准：
 %s
 
-## Work Done (Timeline Summary)
+工作证据（时间线摘要）：
 %s
 
-## Task
-Review the timeline evidence against the acceptance criteria. If ALL criteria are satisfied, set "passed" to true. If any criterion is not met, set "passed" to false and explain exactly what is missing or incomplete in "reason".
-
-Be rigorous: only pass when there is concrete evidence in the timeline that each criterion is satisfied. Do not infer completion from absence of information.`, criteria, timelineDiff)
+逐项核对证据，只有全部标准都有具体证据支持时才令 passed=true；任一项缺失或未完成时令 passed=false，并在 reason 中说明缺口。不能因缺少信息就推定已完成。`, criteria, timelineDiff)
 		},
 		func(action *aicommon.Action) {
 			params := action.GetParams()
@@ -172,10 +169,10 @@ Be rigorous: only pass when there is concrete evidence in the timeline that each
 		}),
 		aicommon.WithAuxiliaryOutputs(
 			aitool.WithBoolParam("passed",
-				aitool.WithParam_Description("true if all acceptance criteria are satisfied"),
+				aitool.WithParam_Description("全部验收标准均有证据证明满足时为 true。"),
 			),
 			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("when passed=false, explain what is missing or incomplete; leave empty when passed=true"),
+				aitool.WithParam_Description("未通过时说明缺失或未完成内容，通过时留空。"),
 			),
 		),
 	)
