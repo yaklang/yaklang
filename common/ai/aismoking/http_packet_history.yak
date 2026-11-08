@@ -53,11 +53,6 @@ smokeHandler=func(w,body) {
     if "SMOKE_CALLER:liteforge[perception]" in prompt {
         smokeAnswer(w,false,"perception",{"summary":"HTTP 历史及文件证据已核验。","topics":["HTTP"],"keywords":["CSRF"],"changed":true,"confidence":1});return
     }
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"三工具与文件搜索均通过。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~;return
-    }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     assert "项目与 HTTP 历史" in prompt && "db.ListYakProjects" in prompt, "built-in skill must auto-load"
     for name in plan { assert name in prompt, "missing default tool "+name }

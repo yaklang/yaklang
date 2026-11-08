@@ -35,9 +35,6 @@ smokeHandler = func(w,body) {
         smokeFrame(w,{"content":"压缩记忆通知和保存已验证。"},"stop")
         w.Write("data: [DONE]\n\n")~; return
     }
-    if "SMOKE_CALLER:verification" in prompt {
-        smokeAnswer(w,native,"verify-satisfaction",{"user_satisfied":false,"reasoning":"继续结束验证任务。","evidence":[]}); return
-    }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     loopCalls++
     assert !("aimemory-timeline-v1/" in prompt), "storage receipts leaked into model context"

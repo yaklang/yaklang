@@ -82,11 +82,6 @@ smokeHandler=func(w,body) {
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"MCP 管理验证"});return }
     if "SMOKE_CALLER:directly-answer" in prompt { smokeAnswer(w,false,"directly_answer",{"answer_payload":"MCP 注册、分页发现、调用与删除已通过验证。"});return }
     if "SMOKE_CALLER:liteforge[perception]" in prompt { smokeAnswer(w,false,"perception",{"summary":"MCP 验证完成。","topics":["MCP"],"keywords":["MCP"],"changed":true,"confidence":1});return }
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"真实数据库与远端 MCP 调用已核验。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~;return
-    }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     assert "管理 MCP" in prompt && "manage_mcp_server" in prompt, "system skill must auto-load the MCP entry point"
     assert !("query_mcp_servers" in prompt), "redundant MCP server action must be absent"

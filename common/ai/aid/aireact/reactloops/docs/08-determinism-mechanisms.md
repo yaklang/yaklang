@@ -105,6 +105,20 @@ go test ./common/ai/aid/aireact -run '^TestVerificationTokenReplay$' -count=1 -v
 
 `TestDefaultLoopDoesNotAutomaticallyVerifySatisfaction` 另以禁止核验的 callback 覆盖 native/文本协议、scalar/batch/工具派生 action、开放 TODO 后请求 finish，以及旧周期配置 0/20，共 16 组。它检查六个真实本地文件操作、超过旧 token 门的上下文增长、零核验调用及工具活动钩子；finish 的已有 TODO、Goal、子代理保护测试继续保留。
 
+## 8.8 真实模型冒烟：没有普遍的 token 降幅
+
+继续用真实 `deepseek-v4.1-flash` 自主决策，对比 `9d21a5b183` 与移除自动核验后的 `b5c66c252e` 二进制，直接运行已有 `live/model_cache.yak` 的 runtime 场景和 `live/tool_system_longrun.yak`，没有固定主模型动作、强制 interval=0 或初始化核验快照。服务端 usage 汇总见 [live-smoke-20261108.json](../../testdata/verification_token_replay/live-smoke-20261108.json)。不计 provider 探测和 embedding 用量。
+
+| 场景 | 修改前总 token | 修改后总 token | 修改前/后的自动核验次数 |
+|------|---------------:|---------------:|----------------------:|
+| 六文件对账，第 1 次 | 378,887 | 423,698 | 0 / 0 |
+| 六文件对账，第 2 次 | 374,392 | 397,121 | 0 / 0 |
+| 12 批 ERP 长程对账 | 2,199,660 | 2,113,476 | 0 / 0 |
+
+四次六文件任务都真实读取六份文件各一次、答出 273 并正常结束。两次 ERP 任务都完成了 51 个工具操作，包括临时 HTTP 503 后重试；但两侧都未通过压缩次数/记忆收尾验收，修改后样本另有 unique_orders 统计错误，因此长程样本不能计为业务成功或效果改善。
+
+这六次运行在旧版也没有自动核验：**直接可归因于删除核验的节省为 0**。总 token 的上下波动包含主模型输出、额外辅助请求和行动安排差异，不能把 ERP 样本少的 86,184 token 当作改动收益。此前 warm 回放节省的 1,346,681 token 仅描述旧机制已经触发时的可取消开销，不是默认长任务的普遍节省。现有样本也不支持“移除后任务效果更好”的结论。
+
 ## 相关源码
 
 - [soft_todo_checkpoint.go](../soft_todo_checkpoint.go)

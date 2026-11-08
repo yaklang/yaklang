@@ -22,9 +22,6 @@ smokeHandler = func(w, body) {
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
         smokeAnswer(w, false, "session-title-generator", {"session_title":"重试协议验证"}); return
     }
-    if "SMOKE_CALLER:verification" in prompt {
-        smokeAnswer(w, false, "verify-satisfaction", {"user_satisfied":true,"reasoning":"本地协议验证完成","evidence":[]}); return
-    }
     assert native == selectedNative, "retry changed the selected protocol"
     step++
     if step == 1 { firstRequest = body }

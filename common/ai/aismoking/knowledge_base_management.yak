@@ -82,11 +82,6 @@ smokeHandler=func(w,body) {
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"知识库管理验证"});return }
     if "SMOKE_CALLER:directly-answer" in prompt { smokeAnswer(w,false,"directly_answer",{"answer_payload":"知识库管理、文件构建、预算查询和清理均已核验。"});return }
     if "SMOKE_CALLER:liteforge[perception]" in prompt { smokeAnswer(w,false,"perception",{"summary":"知识库验证完成。","topics":["知识库"],"keywords":["knowledge"],"changed":true,"confidence":1});return }
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"知识库实际操作已核验。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~;return
-    }
     assert ("SMOKE_CALLER:react-loop:" + focusName) in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     assert "管理知识库" in prompt && "manage_knowledge_base" in prompt && "query_knowledge_base" in prompt && "token_limit" in prompt && "all=true" in prompt, "system skill must index both knowledge tools and explicit all scope"
     if knowledgeFocus {

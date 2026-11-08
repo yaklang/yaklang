@@ -132,7 +132,7 @@ func (r *ReActLoop) lastObservedActivityNano() int64 {
 // 实现要点:
 //   - 在 stuckThreshold (默认 10min) ~ hardAbortThreshold (默认 30min) 区间内
 //     仅写 log + timeline, 是观察者. 这一段保持原有 "不主动 abort" 的语义,
-//     给 verification watchdog (2min) 留出自救窗口.
+//     给长耗时操作留出完成窗口。
 //   - 一旦 gap >= hardAbortThreshold, heartbeat 视为已经无法靠异步机制自救,
 //     主动调用 task.Cancel() 把主循环踢出来. 这是兜底的兜底, 用来应对像
 //     fingerprint goroutine 永久阻塞这种 "主循环死锁但 watchdog 看着活" 的

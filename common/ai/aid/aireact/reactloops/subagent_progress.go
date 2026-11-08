@@ -8,10 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
-// SubAgentHandle 持有单个子 Agent 的运行期引用, 供 stall heartbeat /
-// verification watchdog 等监控机制读取 "子 Agent 是否有进展".
+// SubAgentHandle 持有单个子 Agent 的运行期引用，供 stall heartbeat
+// 读取 "子 Agent 是否有进展"。
 //
-// 字段在读侧 (heartbeat goroutine / watchdog) 可能被并发访问, 写侧仅
+// 字段在读侧 (heartbeat goroutine) 可能被并发访问, 写侧仅
 // 在 dispatch action handler 线程中操作, 因此用一个 mutex 保护即可.
 //
 // 关键词: SubAgentHandle, 子 Agent 进度追踪, stall heartbeat 旁路

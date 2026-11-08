@@ -28,12 +28,6 @@ event = func(e) {
 smokeHandler = func(w,body) {
     native = len(body.tools)>0
     prompt = smokePrompt(body)
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"交付调查结果并结束本次子任务。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~
-        return
-    }
     if "SMOKE_CALLER:directly-answer" in prompt {
         w.Header().Set("Content-Type","text/event-stream")
         smokeFrame(w,{"content":"调查完成；真实来源已确认，证据 exploration.source。"},"stop")

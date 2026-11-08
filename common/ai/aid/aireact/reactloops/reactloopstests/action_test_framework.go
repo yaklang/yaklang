@@ -68,13 +68,8 @@ func NewActionTestFrameworkEx(
 
 			rsp := i.NewAIResponse()
 
-			// Check if this is a verification prompt
-			prompt := req.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-				// Return verification response
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully"}`))
-				rsp.Close()
-				return rsp, nil
+			if req.GetCallerLabel() == "verification" {
+				return nil, fmt.Errorf("unexpected automatic satisfaction verification")
 			}
 
 			// For the first call, extract the action from the test request

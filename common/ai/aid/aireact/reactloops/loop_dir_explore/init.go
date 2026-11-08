@@ -59,8 +59,7 @@ func generateExploreReport(
 			}
 			return false
 		}),
-		// This child assembles existing notes; it does not need exploratory
-		// perception or a second verification watchdog on the shared runtime.
+		// This child assembles existing notes without exploratory perception.
 		reactloops.WithDisableLoopPerception(true),
 		loop_report_generating.WithInternalReportOutput(),
 		reactloops.WithInitTask(func(innerLoop *reactloops.ReActLoop, task aicommon.AIStatefulTask, innerOp *reactloops.InitTaskOperator) {

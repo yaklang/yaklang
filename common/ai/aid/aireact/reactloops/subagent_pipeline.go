@@ -231,8 +231,8 @@ func executeSubAgents(
 		ctx = parentTask.GetContext()
 	}
 
-	// ensure ProgressRegistry on parent loop（若提供），使 stall heartbeat /
-	// verification watchdog 能观察子 Agent 活动。与 runtime 一起从上槽注册。
+	// ensure ProgressRegistry on parent loop（若提供），使 stall heartbeat
+	// 能观察子 Agent 活动。与 runtime 一起从上槽注册。
 	var registry *ProgressRegistry
 	if opts.ParentLoop != nil {
 		registry = ensureSubAgentProgressRegistry(opts.ParentLoop)
@@ -933,8 +933,8 @@ type SubAgentOptions struct {
 	// （如 dispatch）。
 	InheritEmitter bool
 
-	// ParentLoop 是父 loop，用于挂载 ProgressRegistry 使 stall heartbeat /
-	// verification watchdog 能观察子 Agent 活动。可为 nil（跳过注册，但会
+	// ParentLoop 是父 loop，用于挂载 ProgressRegistry，使 stall heartbeat
+	// 能观察子 Agent 活动。可为 nil（跳过注册，但会
 	// 丧失 stall heartbeat 旁路保护）。
 	ParentLoop *ReActLoop
 }
@@ -994,7 +994,7 @@ func normalizeSubAgentConcurrency(concurrency, jobCount int) int {
 // ─────────────────────────────────────────────────────────────────────
 
 // ensureSubAgentProgressRegistry 返回父 loop 已有的 ProgressRegistry，若未设置
-// 则创建并安装一个。使 stall heartbeat / verification watchdog 能观察子 Agent 活动。
+// 则创建并安装一个，使 stall heartbeat 能观察子 Agent 活动。
 func ensureSubAgentProgressRegistry(parentLoop *ReActLoop) *ProgressRegistry {
 	if parentLoop == nil {
 		return nil

@@ -127,12 +127,9 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			switch {
-			case aicommon.IsVerifySatisfactionPrompt(prompt):
+			case request.GetCallerLabel() == "verification":
 				atomic.AddInt32(&satisfactionChecks, 1)
-				if got := atomic.LoadInt32(&finished); got != 2 {
-					return nil, fmt.Errorf("satisfaction ran before batch join: finished=%d", got)
-				}
-				return respond(config, `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"both independent calls completed"}`)
+				return nil, fmt.Errorf("unexpected automatic satisfaction verification after tool batch")
 
 			case aicommon.IsPrimaryDecisionPrompt(prompt):
 				decision := atomic.AddInt32(&primaryDecisions, 1)
@@ -201,7 +198,7 @@ func TestReActLoop_DirectToolBatchPrimaryDecisionConcurrentOrderedE2E(t *testing
 	require.Equal(t, int32(2), atomic.LoadInt32(&finished))
 	require.Equal(t, int32(2), atomic.LoadInt32(&maxActive), "both callbacks must overlap")
 	require.Equal(t, int32(2), atomic.LoadInt32(&primaryDecisions), "batch followed by one finish")
-	require.Positive(t, atomic.LoadInt32(&satisfactionChecks))
+	require.Zero(t, atomic.LoadInt32(&satisfactionChecks), "tool batches must not schedule satisfaction verification")
 
 	completionMu.Lock()
 	completionSnapshot := append([]string(nil), completionOrder...)
@@ -346,12 +343,9 @@ func TestReActLoop_RequireSchemasThenDirectBatchConcurrentOrderedE2E(t *testing.
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			switch {
-			case aicommon.IsVerifySatisfactionPrompt(prompt):
+			case request.GetCallerLabel() == "verification":
 				atomic.AddInt32(&satisfactionChecks, 1)
-				if joinErr := assertJoinedAndCommitted("satisfaction verification"); joinErr != nil {
-					return nil, joinErr
-				}
-				return respond(config, `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"both generated calls completed"}`)
+				return nil, fmt.Errorf("unexpected automatic satisfaction verification after schema loading and tool batch")
 
 			case aicommon.IsToolParamGenPromptForTool(prompt, firstToolName), aicommon.IsToolParamGenPromptForTool(prompt, secondToolName):
 				atomic.AddInt32(&paramStarted, 1)
@@ -411,7 +405,7 @@ func TestReActLoop_RequireSchemasThenDirectBatchConcurrentOrderedE2E(t *testing.
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackFinished))
 	require.Equal(t, int32(2), atomic.LoadInt32(&callbackMaxActive), "both plugin callbacks must overlap")
 	require.Equal(t, int32(3), atomic.LoadInt32(&primaryDecisions), "load schemas, direct batch, finish")
-	require.Positive(t, atomic.LoadInt32(&satisfactionChecks))
+	require.Zero(t, atomic.LoadInt32(&satisfactionChecks), "schema loading and tool batches must not schedule satisfaction verification")
 
 	observedParamsMu.Lock()
 	observedParamsSnapshot := make(map[string]string, len(observedParams))

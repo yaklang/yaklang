@@ -44,11 +44,6 @@ smokeHandler=func(w,body) {
         smokeFrame(w,{"content":"已核验历史原文与报告偏好，继续工作。"},"stop")
         w.Write("data: [DONE]\n\n")~;return
     }
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"查询结果已验证。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~;return
-    }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     if !operator.GetCurrentLoop().GetSkillsContextManager().IsSkillLoaded("yaklang-system") {
         assert "yaklang-system" in prompt, "system Skill must be discoverable before loading"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,13 +34,6 @@ func mockedToolCalling3(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, to
 		return nil, fmt.Errorf("unexpected retired tool parameter-generation request")
 	}
 
-	if isVerifySatisfactionPrompt(prompt) {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "abc-mocked-reason"}`))
-		rsp.Close()
-		return rsp, nil
-	}
-
 	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
@@ -59,6 +53,7 @@ func TestReAct_ToolUse_MultiCalls(t *testing.T) {
 	out := make(chan *ypb.AIOutputEvent, 10)
 
 	toolCalled := false
+	var verificationCalls atomic.Int32
 	sleepTool, err := aitool.New(
 		"sleep",
 		aitool.WithNumberParam("seconds"),
@@ -79,6 +74,10 @@ func TestReAct_ToolUse_MultiCalls(t *testing.T) {
 
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if r.GetCallerLabel() == "verification" {
+				verificationCalls.Add(1)
+				return nil, fmt.Errorf("unexpected automatic satisfaction verification")
+			}
 			return mockedToolCalling3(i, r, "sleep")
 		}),
 		aicommon.WithEventInputChan(in),
@@ -178,8 +177,11 @@ LOOP:
 	if strings.Contains(tl, `when review`) {
 		t.Fatal("auto-continue review must not pollute the timeline")
 	}
-	if !utils.MatchAllOfSubString(tl, `Reasoning:`, "mocked-reason") {
-		t.Fatal("timeline does not contain reasoning")
+	if verificationCalls.Load() != 0 {
+		t.Fatal("repeated tool calls must not trigger satisfaction verification")
+	}
+	if !utils.MatchAllOfSubString(tl, "sleep", "done") {
+		t.Fatal("timeline must retain the actual tool result")
 	}
 	fmt.Println("--------------------------------------")
 }

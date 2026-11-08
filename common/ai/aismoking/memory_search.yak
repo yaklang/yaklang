@@ -24,11 +24,6 @@ func callMemory(w,native) {
 }
 smokeHandler = func(w,body) {
     native, prompt = len(body.tools)>0, smokePrompt(body)
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"继续提交搜索依据。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~; return
-    }
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
         name = "session-title-generator"
         if native { name = body.tools[0]["function"].name }

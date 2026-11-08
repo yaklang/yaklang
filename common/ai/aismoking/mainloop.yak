@@ -9,12 +9,6 @@ query = "默认主循环读取 mainloop-source.txt，保存会话 evidence，再
 smokeHandler = func(w,body) {
     native = len(body.tools)>0
     prompt = smokePrompt(body)
-    if "SMOKE_CALLER:verification" in prompt {
-        w.Header().Set("Content-Type","text/event-stream")
-        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"已核对来源，继续提交完整结果。","evidence":[]}`},"stop")
-        w.Write("data: [DONE]\n\n")~
-        return
-    }
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {
         name = "session-title-generator"
         if native { name = body.tools[0]["function"].name }

@@ -8,11 +8,6 @@ step,config,mainHashes = 0,nil,[]
 smokeHandler = func(w,body) {
  native = len(body.tools)>0
  prompt = smokePrompt(body)
- if "SMOKE_CALLER:verification" in prompt {
-  w.Header().Set("Content-Type","text/event-stream")
-  smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"继续完成证据与回答。","evidence":[]}`},"stop")
-  w.Write("data: [DONE]\n\n")~;return
- }
  if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt {name="session-title-generator";if native {name=body.tools[0]["function"].name};smokeAnswer(w,native,name,{"session_title":"参数分组验证"});return}
  if "SMOKE_CALLER:directly-answer" in prompt {w.Header().Set("Content-Type","text/event-stream");smokeFrame(w,{"content":"两份实际来源已核对，参数分组与证据保存通过。"},"stop");w.Write("data: [DONE]\n\n")~;return}
  assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt,"Unexpected auxiliary parameter-generation request"

@@ -252,7 +252,7 @@ type ReActLoop struct {
 	perception *perceptionController
 
 	// subAgentProgressRegistry 跟踪当前由 dispatch_sub_react_agents 下发
-	// 的活跃子 Agent, 供 stall heartbeat / verification watchdog 读取子 Agent
+	// 的活跃子 Agent, 供 stall heartbeat 读取子 Agent
 	// 进度, 避免主循环在等待子 Agent 时被误判为卡死. 该字段由 dispatch
 	// action handler 在下发子 Agent 时创建和注册, 在子 Agent 结束时注销.
 	// 指针本身只在 dispatch handler 入口赋值一次 (主循环线程, 同步), 之后不再

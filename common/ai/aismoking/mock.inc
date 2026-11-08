@@ -63,6 +63,7 @@ go httpserver.Serve("127.0.0.1", smokePort, httpserver.context(smokeCtx), httpse
         assert seq < smokeRequestLimit, "mock provider did not converge"
         // Credentials/headers are never included in samples.
         file.SaveJson(file.Join(smokeRoot, sprintf("request-%03d.json", seq)), body)~
+        assert !("SMOKE_CALLER:verification" in smokePrompt(body)), "Unexpected automatic satisfaction verification; default and general-purpose loops must not schedule it"
         smokeHandler(w, body)
     } catch err {
         println("MOCK FAILURE: ",err)

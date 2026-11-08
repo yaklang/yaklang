@@ -9,7 +9,6 @@ smokeHandler=func(w,body){
     if "SMOKE_CALLER:timeline-compress" in prompt { smokeAnswer(w,false,"timeline-summary",{"summary":"已按附加库名完成预算内查询。","ratain_timeline_item_range":"","memory_entities":[]});return }
     if "SMOKE_CALLER:liteforge[analyze-report-intent]" in prompt { smokeAnswer(w,native,"analyze-report-intent",{"is_modify":false,"target_file":file.Join(callerCase.root,"report.md"),"analysis_reason":"创建本次隔离验证报告。"});return }
     if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"知识调用方验证"});return }
-    if "SMOKE_CALLER:verification" in prompt { smokeAnswer(w,false,"verify-satisfaction",{"user_satisfied":true,"reasoning":"已执行真实知识查询。","evidence":[]});return }
     if "SMOKE_CALLER:directly-answer" in prompt { smokeAnswer(w,false,"directly_answer",{"answer_payload":facts});return }
     assert ("SMOKE_CALLER:react-loop:"+callerCase.focus) in prompt, "unexpected caller or silent routing"
     for legacy in ["\"knowledge_enhance_answer\"","\"search_knowledge\"","\"search_knowledge_infosec\""] { assert !(legacy in prompt+json.dumps(body.tools)), "legacy action schema remains visible" }

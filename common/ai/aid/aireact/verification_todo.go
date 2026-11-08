@@ -14,7 +14,3 @@ func (r *ReAct) RenderVerificationTodoSnapshot() string {
 	}
 	return rendered
 }
-
-func (r *ReAct) RenderVerificationTodoMarkdownSnapshot(_ *aicommon.VerifySatisfactionResult) string {
-	return r.RenderVerificationTodoSnapshot()
-}
