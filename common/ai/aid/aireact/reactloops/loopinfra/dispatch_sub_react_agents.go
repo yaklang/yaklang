@@ -49,7 +49,7 @@ func handleDispatchSubReactAgents(
 		ElaborateGoals: true,
 	}, fmt.Sprintf("%s:%d", parentTask.GetUUID(), loop.GetCurrentIterationIndex()))
 	if err != nil {
-		operator.Feedback("Sub-agent submission rejected: " + err.Error())
+		operator.Feedback("子任务派发被拒绝：" + err.Error())
 		operator.Continue()
 		return
 	}
@@ -62,46 +62,42 @@ func handleDispatchSubReactAgents(
 	reactloops.EmitStatusI18n(loop, summary,
 		fmt.Sprintf("Dispatched %d background tasks; continuing other work.", len(receipt.Jobs)),
 		aicommon.WithStatusCode("subagent.dispatched"))
-	operator.Feedback(string(raw) + "\nAccepted, not completed. Continue useful coordination and acceptance work. If nothing useful remains, wait_sub_react_agents defaults to 30s; an observation timeout does not cancel workers. Results arrive in a later model input.")
+	operator.Feedback(string(raw) + "\n任务已受理，尚未完成。继续协调和验收；无可推进工作时用 wait_sub_react_agents 等待，默认 30 秒，超时不取消子任务。后续模型输入会自动包含结果；新共享证据也可提前唤醒等待。")
 	operator.Continue()
 }
 
 var loopAction_DispatchSubReactAgents = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DISPATCH_SUB_REACT_AGENTS,
-	Description: "Delegate one or more bounded tasks to sub ReAct agents for deep multi-step execution, a phase of a sequential workflow, exploration paths, or independent parallel work. Prefer delegation for substantial execution so the parent can maintain the main objective, coordinate dependencies and review results. Choose context_mode per job: fork (default) inherits a submission-time history snapshot; task_only starts from the explicit task brief without parent conversation, evidence or input attachments. " +
-		"Use fork when prior investigation is needed; use task_only for self-contained searches or independent reviews, including required constraints, inputs and file paths in goal. Both modes keep host instructions, capabilities, shared risk deduplication and cancellation scope. " +
-		"This action returns accepted job IDs immediately; continue useful coordination and acceptance work while children run. " +
-		"Use inspect_sub_react_agents for progress, wait_sub_react_agents for a bounded wait (default 30 seconds), or cancel_sub_react_agents. New results enter the next model input automatically. " +
-		"Children should use save_evidence to publish decision-relevant discoveries to the parent evidence journal while still working; new shared evidence can return a waiting parent early. Private traces are not merged. " +
-		"Sub agents cannot dispatch more sub agents, open plans, or be subject to goal-mode limits.\n" +
-		"PHASE DELEGATION: a single child may execute a complete phase with sequential steps. Review its result before dispatching a dependent later phase. Multiple parallel tasks are not required.\n" +
-		"EXPLORATION: delegate promising investigation paths with concrete hypotheses, authorized scope, evidence requirements and stopping conditions. The parent maintains the main line, compares findings and selects follow-up work; do not launch every speculative branch or duplicate delegated execution.\n" +
-		"DEPENDENCY RULE: every sub agent in ONE dispatch MUST be mutually independent and non-conflicting — none may depend on another's input or result. If B depends on A's result, do NOT batch them: dispatch A now, review its result, then in a LATER loop iteration dispatch B with the actual prerequisite evidence. Sequential steps within one child are allowed.\n" +
-		"GOAL QUALITY: give each sub agent a crisp, self-contained goal and result_contract including required inputs, user constraints, deliverables, evidence references, unresolved questions and blockers. The parent reviews the result against the overall user goal before accepting it, continuing delegation, or requesting finish.",
+	Description: "将范围明确的执行阶段、探索分支或独立工作交给子智能体深入处理，主智能体维护总目标、衔接依赖并验收结果。" +
+		"单个子任务可顺序执行多步，无须凑并行任务；同批任务必须独立且无冲突。后序依赖前序时，先派发并验收前序，再用真实结果派发后序。" +
+		"任务书须写清输入、约束、范围、交付、证据、未确认项和阻塞；探索另给假设和停止条件，避免重复执行或无依据地扩展分支。" +
+		"context_mode 默认 fork，继承派发时的上下文快照；task_only 仅使用显式任务书，不继承父对话、证据或输入附件，须在 goal 中补齐必要事实、约束和路径。两者均保留宿主权限、能力、风险去重和取消范围。" +
+		"派发只返回受理标识。继续协调和验收；用 inspect_sub_react_agents 查看进度，wait_sub_react_agents 有界等待（默认 30 秒），cancel_sub_react_agents 显式取消。结果自动进入后续模型输入，等待超时不取消子任务。" +
+		"子智能体应及时用 save_evidence 共享影响主线的发现，写入父证据日志并提前唤醒等待；私有执行轨迹不合并。阶段交付后核对总目标和剩余待办，再继续派发或 finish。" +
+		"子智能体不能再次派发、开启计划，也不受目标模式门禁约束。",
 	Options: []aitool.ToolOption{
 		aitool.WithStructArrayParam("dispatches",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("One or more delegated jobs. A single job may contain a multi-step sequential phase or bounded exploration path. Each item has its own context_mode and independent timeline, and returns one structured result back to the parent. " +
-					"All jobs in one dispatch MUST be mutually independent and non-conflicting — none may depend on another job's input or result. Dependent phases must be split across separate loop iterations: dispatch the prerequisite, review its result, then dispatch the next phase using that result."),
+				aitool.WithParam_Description("一个或多个子任务，各自拥有上下文模式和独立时间线，并返回结构化结果。单项可含顺序多步；同批须独立且无冲突，有依赖的阶段须分批派发并先验收前序。"),
 			},
 			nil,
 			aitool.WithStringParam("context_mode",
 				aitool.WithParam_EnumString(reactloops.SubAgentContextFork, reactloops.SubAgentContextTaskOnly),
-				aitool.WithParam_Description("Default fork: inherit the history snapshot captured at dispatch, never later parent updates. task_only: no parent conversation/evidence/input attachments, plan partitions or automatic memory recall; provide all necessary task facts and constraints in goal. Resource permissions and host policy are unchanged.")),
+				aitool.WithParam_Description("默认 fork：继承派发时的历史快照，不含之后的父更新。task_only：不继承父对话、证据、输入附件、计划分区或自动记忆召回，须在 goal 中写全任务事实和约束。两者均不改变资源权限和宿主策略。")),
 			aitool.WithStringParam("identifier",
-				aitool.WithParam_Description("Optional stable label for this sub agent. Auto-generated from array index when omitted."),
+				aitool.WithParam_Description("可选的稳定子任务标识，省略时按数组位置生成。"),
 			),
 			aitool.WithStringParam("goal",
 				aitool.WithParam_Required(true),
-				aitool.WithParam_Description("Self-contained execution phase or exploration goal, required inputs, user constraints and scope. Sequential steps within this task are allowed. Goal elaboration runs in the background and must preserve this scope."),
+				aitool.WithParam_Description("独立可执行的阶段或探索目标，含必要输入、用户约束和范围；内部允许顺序多步。后台补全任务书时不得扩大范围。"),
 			),
-			aitool.WithStringParam("result_contract", aitool.WithParam_Description("Deliverables, evidence references, acceptance criteria, unresolved questions and blockers for the parent's review.")),
+			aitool.WithStringParam("result_contract", aitool.WithParam_Description("交付内容、证据引用、验收标准、未确认项和阻塞条件，供主智能体验收。")),
 			aitool.WithStringParam("task_name",
-				aitool.WithParam_Description("Short, human-readable name for this sub agent's task, shown as the task title in the UI and timeline. Falls back to identifier, then goal when omitted. Prefer a concise noun phrase here rather than reusing the full goal sentence."),
+				aitool.WithParam_Description("界面和时间线展示的简短任务名；省略时依次使用 identifier、goal。不要重复整段目标。"),
 			),
 			aitool.WithStringParam("loop_name",
-				aitool.WithParam_Description(fmt.Sprintf("Target ReAct loop name. Defaults to %q.", schema.AI_REACT_LOOP_NAME_DEFAULT)),
+				aitool.WithParam_Description(fmt.Sprintf("目标循环名称，默认为 %q。", schema.AI_REACT_LOOP_NAME_DEFAULT)),
 			),
 		),
 	},

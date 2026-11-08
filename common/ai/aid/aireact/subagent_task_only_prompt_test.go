@@ -71,7 +71,7 @@ func TestSubAgentContextMode_RealRuntimeAndGoalElaboration(t *testing.T) {
 					prompt := req.GetPrompt()
 					body := `{"@action":"finish"}`
 					mu.Lock()
-					if strings.Contains(prompt, "You are preparing a task brief") {
+					if strings.Contains(prompt, "你负责为子智能体编写任务书。") {
 						elaborationPrompts = append(elaborationPrompts, prompt)
 						body = `{"@action":"sub_react_agent_goal_elaboration","goal":"EXPLICIT_CHILD_GOAL","result_contract":"EXPLICIT_RESULT_CONTRACT"}`
 					} else {
@@ -118,7 +118,7 @@ func TestSubAgentContextMode_RealRuntimeAndGoalElaboration(t *testing.T) {
 			elaborationCount, runtimeCount := len(elaborationPrompts), len(runtimePrompts)
 			mu.Unlock()
 			require.Equal(t, 1, elaborationCount)
-			require.Contains(t, elaboration, "OS/Arch: "+goruntime.GOOS+"/"+goruntime.GOARCH)
+			require.Contains(t, elaboration, "系统/架构："+goruntime.GOOS+"/"+goruntime.GOARCH)
 			require.Equal(t, 1, runtimeCount)
 			for _, prompt := range []string{elaboration, runtime} {
 				require.Contains(t, prompt, "EXPLICIT_CHILD_GOAL")

@@ -14,10 +14,10 @@ import (
 
 func subAgentControlAction(name, description string) *reactloops.LoopAction {
 	options := []aitool.ToolOption{
-		aitool.WithStringArrayParam("job_ids", aitool.WithParam_Description("IDs from the dispatch receipt. Omit to select all jobs owned by this parent. Unknown IDs are errors.")),
+		aitool.WithStringArrayParam("job_ids", aitool.WithParam_Description("派发回执中的任务标识；省略时选择当前父任务的全部子任务，未知标识会报错。")),
 	}
 	if name == reactloops.SubAgentWaitAction {
-		options = append(options, aitool.WithIntegerParam("timeout_ms", aitool.WithParam_Description(fmt.Sprintf("Observation deadline in milliseconds, 0..%d (10 minutes); default 30000. Does not cancel the child task.", reactloops.SubAgentMaxWaitTimeout.Milliseconds()))))
+		options = append(options, aitool.WithIntegerParam("timeout_ms", aitool.WithParam_Description(fmt.Sprintf("本次等待上限，单位毫秒，范围 0 至 %d，默认 30000；超时不取消子任务。", reactloops.SubAgentMaxWaitTimeout.Milliseconds()))))
 	}
 	return &reactloops.LoopAction{
 		ActionType: name, Description: description, Options: options,
@@ -53,7 +53,7 @@ func subAgentControlAction(name, description string) *reactloops.LoopAction {
 		ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			manager := loop.GetSubAgentManager()
 			if manager == nil {
-				op.Feedback("No sub-agents have been dispatched by this parent.")
+				op.Feedback("当前父任务尚未派发子任务。")
 				op.Continue()
 				return
 			}
@@ -182,8 +182,8 @@ func startSubAgentWaitLog(loop *reactloops.ReActLoop, message string) io.WriteCl
 }
 
 var loopAction_InspectSubAgents = subAgentControlAction(reactloops.SubAgentInspectAction,
-	"Inspect queued, running and terminal jobs without waiting. Reports actual recent event activity and saved result references, not a guessed completion percentage. Prefer independent work over repeated unchanged polling.")
+	"立即查看子任务的排队、执行和终态，返回实际活动及已保存结果引用。无新进展时避免反复查询，优先推进可执行的协调工作。")
 var loopAction_WaitSubAgents = subAgentControlAction(reactloops.SubAgentWaitAction,
-	"Wait for new terminal sub-agent results or explicit save_evidence discoveries, at most 30 seconds by default. Returns early when selected children publish new evidence, complete, or the parent is cancelled. A timeout returns current progress and leaves child execution running. Use when no useful coordination or acceptance work remains, then decide again.")
+	"等待子任务结果或显式 save_evidence 新发现，默认最多 30 秒；所选任务共享新证据、完成或父任务取消时提前返回。超时只返回当前进展，子任务继续执行。无可推进的协调或验收工作时使用，返回后再决定下一步。")
 var loopAction_CancelSubAgents = subAgentControlAction(reactloops.SubAgentCancelAction,
-	"Request cancellation of selected child jobs. Running jobs remain cancelling until their workers stop; queued jobs will not execute. Inspect or wait for the terminal result before finishing.")
+	"请求取消所选子任务。排队任务不再执行，运行任务停止前保持取消中；确认终态并接收结果后再结束主任务。")

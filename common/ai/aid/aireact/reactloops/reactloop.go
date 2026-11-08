@@ -1004,8 +1004,8 @@ func (r *ReActLoop) GetInt(k string) int {
 
 // SubAgentDepthLoopVar is the loop variable recording how deep the current
 // ReAct loop is in the sub-agent dispatch tree. The top-level loop leaves it
-// unset (depth 0); every forked sub agent sets it to 1 (see
-// loopinfra.buildSubReactLoopOptions). It is read by IsSubAgent and the
+// unset (depth 0); the common child pipeline sets it even for custom builders.
+// It is read by IsSubAgent, evidence publication and the
 // goal-mode gate to ensure top-level-only strategies never apply to sub agents.
 const SubAgentDepthLoopVar = "sub_agent_depth"
 
