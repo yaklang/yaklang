@@ -88,10 +88,6 @@ allowSkillViewOffset func() bool
 
 | 字段 | 类型 | 作用 |
 |------|------|------|
-| `periodicVerificationInterval` | `int` | 周期性验证的迭代间隔 |
-| `verificationRuntimeSnapshot` | `*VerificationRuntimeSnapshot` | 上次验证的快照（用于节流） |
-| `verificationMutex` | `*sync.Mutex` | 保护快照 |
-| `verificationWatchdogTimer` | `*time.Timer` | 看门狗，长期无验证活动则强制触发 |
 | `currentTodoProgress` | `map[string]*currentTodoProgress` | 各 task scope 的 CURRENT TODO 连续有效迭代计数 |
 | `perception` | `*perceptionController` | 感知层控制器（可被 `WithDisableLoopPerception` 关闭） |
 
@@ -104,7 +100,7 @@ allowSkillViewOffset func() bool
 | `memorySizeLimit` | `int` | 记忆池大小上限（字节） |
 | `currentMemories` | `*omap.OrderedMap[string, *MemoryEntity]` | 当前记忆池 |
 | `memoryTriage` | `aicommon.MemoryTriage` | 记忆检索器 |
-| `historySatisfactionReasons` | `[]*satisfactionRecord` | 验证满意度历史 |
+| `historySatisfactionReasons` | `[]*SatisfactionRecord` | 显式业务核验历史 |
 | `actionHistory` | `[]*ActionRecord` | 已执行的 action 列表（用于自旋检测） |
 | `actionHistoryMutex` | `*sync.Mutex` | 保护 actionHistory |
 | `currentIterationIndex` | `int` | 当前迭代序号 |
@@ -155,7 +151,7 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 flowchart TD
     A["1. 准备阶段<br/>SetCurrentTask + ensureLoopDirectory"] --> B
     B["2. InitHandler 阶段<br/>(可早退或约束首轮)"] --> C
-    C["3. 验证看门狗 + 记忆装载<br/>startVerificationWatchdog +<br/>fastLoadSearchMemoryWithoutAI"] --> D
+    C["3. 工具活动跟踪 + 记忆装载<br/>SetToolActivityHooks +<br/>fastLoadSearchMemoryWithoutAI"] --> D
     D["4. 主循环 LOOP:<br/>iteration 1..maxIter"] --> E["5. 收尾<br/>defer recover/abort/complete"]
 ```
 

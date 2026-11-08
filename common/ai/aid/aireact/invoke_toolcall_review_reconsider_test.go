@@ -93,7 +93,7 @@ func TestToolReviewReturnsToOwningLoopBothProtocols(t *testing.T) {
 						}, original, replacement)
 					require.NoError(t, aicommon.WithEnableFunctionCallMode(native)(react.config))
 					react.config.Timeline.SetTimelineBucketByteSize(-1)
-					opts := []reactloops.ReActLoopOption{reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4)}
+					opts := []reactloops.ReActLoopOption{reactloops.WithFunctionCallMode(native), reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4)}
 					var loop *reactloops.ReActLoop
 					var err error
 					if worker {

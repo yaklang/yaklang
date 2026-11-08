@@ -418,7 +418,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 	}
 	preset = append(preset,
 		reactloops.WithDisableLoopPerception(true),
-		reactloops.WithDisablePeriodicVerification(true),
 	)
 	preset = append(preset,
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {

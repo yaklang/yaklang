@@ -21,15 +21,15 @@ var (
 	// loopStallStuckThreshold 是 "无推进就视为卡死" 的阈值. 一旦距离上一次
 	// iteration 推进超过这个时长, 写一条 [LOOP_STALL_DETECTED] timeline +
 	// dump goroutine stack 到日志. 默认 10 分钟, 仍早于硬抢断阈值 (30min)
-	// 给出信号, 同时远大于 verification watchdog (2min) 周期, 避免误报.
+	// 给出卡顿信号；活跃工具和近期子代理进展会抑制误报。
 	loopStallStuckThreshold = 10 * time.Minute
 
 	// loopStallHardAbortThreshold 是 "硬抢断" 阈值. 一旦主循环超过这个时长仍
-	// 无推进, heartbeat 协程视为已经无法靠 watchdog/验证 等异步机制自救, 主动
+	// 无推进且没有活跃工具或近期子代理进展时，heartbeat 协程主动
 	// 调用 task.Cancel() 把主循环踢出来, 让 ReAct 走 abort 流程.
 	//
-	// 默认 30 分钟, 显著大于 stuckThreshold (10min) 与 verification watchdog
-	// 周期 (2min) 及单次 AI/工具调用的常见耗时, 避免误伤. 若 <= 0 则表示
+	// 默认 30 分钟, 显著大于 stuckThreshold (10min) 和常见的 AI/工具
+	// 调用耗时，避免误伤。若 <= 0 则表示
 	// 禁用硬抢断, 保持纯观察行为.
 	//
 	// 关键词: 硬卡死阈值, task.Cancel, 主循环抢断兜底, hard abort
@@ -266,7 +266,7 @@ func (r *ReActLoop) reportLoopStall(task aicommon.AIStatefulTask, gap time.Durat
 //
 // task.Cancel 之后, ReActLoop.Execute 内所有 <-task.GetContext().Done() 的
 // select 分支都会触发, finishIterationLoopWithError 会被调用, task 走 abort
-// 流程. verification watchdog 协程因 task.IsFinished() 自然停止. 这一连串清理
+// 流程，退出时清理子代理、工具活动钩子及其他本轮资源。这一连串清理
 // 在现有架构中已经成立, 不需要本函数额外接线.
 //
 // 关键词: hardAbortLoopStall, [LOOP_STALL_HARD_ABORT], task.Cancel,

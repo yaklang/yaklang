@@ -78,12 +78,12 @@ func TestExecuteSubAgents_AppliesExtraLoopOpts(t *testing.T) {
 		LoopName:   testLoopName,
 	}}, SubAgentOptions{
 		TimelineMode:  SubAgentTimelineClean,
-		ExtraLoopOpts: []ReActLoopOption{WithDisablePeriodicVerification(true)},
+		ExtraLoopOpts: []ReActLoopOption{WithMaxIterations(23)},
 	})
 	require.Len(t, results, 1)
 	require.NotNil(t, results[0])
 	require.NoError(t, results[0].ExecErr)
 	require.NotNil(t, results[0].SubLoop)
-	require.True(t, results[0].SubLoop.DisablePeriodicVerification,
+	require.Equal(t, 23, results[0].SubLoop.GetMaxIterations(),
 		"ExtraLoopOpts must be applied to the built loop before execution")
 }

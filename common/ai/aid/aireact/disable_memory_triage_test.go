@@ -38,7 +38,6 @@ func TestDisableMemoryTriage_InstallsNoOp(t *testing.T) {
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableDynamicPlanning(true),
-		aicommon.WithPeriodicVerificationInterval(0),
 		aicommon.WithDisableIncreaseIteration(true),
 		// The key option under test:
 		aicommon.WithDisableMemoryTriage(true),
@@ -168,7 +167,6 @@ func TestDisableMemoryTriage_OverridesExplicitMemoryTriage(t *testing.T) {
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableDynamicPlanning(true),
-		aicommon.WithPeriodicVerificationInterval(0),
 		aicommon.WithDisableIncreaseIteration(true),
 		// Explicitly provide a mock memory triage...
 		aicommon.WithMemoryTriage(mockMT),

@@ -38,7 +38,7 @@ func TestExecuteWithExistedTask_PanicReturnsErrorAndPreservesTerminalStatus(t *t
 				WithFunctionCallMode(false),
 				WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false), WithAllowUserInteract(false),
 				WithRegisterLoopAction("require_tool", "unused tool routing", nil, nil, nil),
-				WithDisableLoopPerception(true), WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true),
+				WithDisableLoopPerception(true), WithDisableIncreaseIteration(true),
 				WithRegisterLoopAction("panic_action", "exercise failure cleanup", nil, nil,
 					func(loop *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) {
 						if scenario == "active_child" {

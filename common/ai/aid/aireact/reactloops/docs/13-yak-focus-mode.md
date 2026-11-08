@@ -78,7 +78,6 @@ Boot 与 Run 双相执行：
 | Yak 常量 | Go 选项 | 类型 |
 |---|---|---|
 | `__MAX_ITERATIONS__` | `WithMaxIterations` | int |
-| `__PERIODIC_VERIFICATION_INTERVAL__` | `WithPeriodicVerificationInterval` | int |
 | `__MEMORY_SIZE_LIMIT__` | `WithMemorySizeLimit` | int |
 | `__NO_END_LOADING_STATUS__` | `WithNoEndLoadingStatus` | bool |
 | `__USE_SPEED_PRIORITY_AI__` | `WithUseSpeedPriorityAICallback` | bool |

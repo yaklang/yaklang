@@ -78,7 +78,6 @@ func buildSingleFindingVerifyLoop(
 	}
 	preset = append(preset,
 		reactloops.WithDisableLoopPerception(true),
-		reactloops.WithDisablePeriodicVerification(true),
 	)
 	// frozen-block 分区经由子代理自己的 config 注入（aicommon 既有机制，
 	// PromptMaterials 组装时与 config producer 汇合），不新增 loop 层字段。

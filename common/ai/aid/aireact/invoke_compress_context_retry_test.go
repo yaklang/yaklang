@@ -99,7 +99,7 @@ func TestReAct_CompressContextSelectionRetry(t *testing.T) {
 					react.config.Timeline.PushText(react.config.AcquireId(), "%s %s", marker, padding)
 				}
 				loop, err := reactloops.NewReActLoop("compression-selection-retry", react,
-					reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+					reactloops.WithFunctionCallMode(native),
 					reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(2))
 				require.NoError(t, err)
 				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

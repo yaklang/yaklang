@@ -137,7 +137,7 @@ func TestAsyncGUISubagentIsolationReplay(t *testing.T) {
 					return nil, err
 				}
 				opts := reactloops.BasicAICommonConfigOption(cfg)
-				opts = append(opts, reactloops.WithFunctionCallMode(native), reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true))
+				opts = append(opts, reactloops.WithFunctionCallMode(native), reactloops.WithDisableLoopPerception(true))
 				var err error
 				loop, err = reactloops.CreateLoopByName("default", p.Invoker, opts...)
 				return loop, err

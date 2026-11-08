@@ -103,7 +103,6 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 				reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 				reactloops.WithRegisterLoopAction("require_tool", "unused tool route", nil, nil, nil),
 				reactloops.WithUseSpeedPriorityAICallback(true),
-				reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithMaxIterations(1),
 				reactloops.WithAITagField("BODY", "body"),
 				reactloops.WithRegisterLoopAction("accept", "accept the result", nil,

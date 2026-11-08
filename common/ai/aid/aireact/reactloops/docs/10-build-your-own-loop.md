@@ -139,7 +139,6 @@ func init() {
                 reactloops.WithInitTask(buildInitTask(invoker)),
                 BuildOnPostIterationHook(invoker),
 
-                reactloops.WithPeriodicVerificationInterval(3),
             }
             preset = append(preset, opts...)
             return reactloops.NewReActLoop(LoopLogAnalyzeName, invoker, preset...)
@@ -608,7 +607,6 @@ yak test ./common/ai/aid/aireact/reactloops/loop_log_analyze/...
 ### 确定性
 
 - [ ] 长链路任务为 TODO 维护唯一 current，使 25 轮软检查点能够按任务焦点工作
-- [ ] `WithPeriodicVerificationInterval` 设了合理间隔
 - [ ] `WithMaxIterations` 设置上限（默认 100，可以调小）
 
 ### 测试

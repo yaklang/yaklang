@@ -87,7 +87,7 @@ func TestReAct_CompressContextPreservesActionConstraints(t *testing.T) {
 					}))
 				require.NoError(t, err)
 				loop, err := reactloops.NewReActLoop("compression-constraints", react,
-					reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+					reactloops.WithFunctionCallMode(native),
 					reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(5),
 					reactloops.WithInitTask(func(_ *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 						if source == "init" {

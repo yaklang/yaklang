@@ -30,9 +30,6 @@ func CollectFocusModeStaticOptions(caller *FocusModeYakHookCaller) []ReActLoopOp
 	if v, ok := caller.GetInt(FocusDunder_MemorySizeLimit); ok && v > 0 {
 		opts = append(opts, WithMemorySizeLimit(v))
 	}
-	if v, ok := caller.GetInt(FocusDunder_PeriodicVerificationInterval); ok && v >= 0 {
-		opts = append(opts, WithPeriodicVerificationInterval(v))
-	}
 	// ---- 静态布尔开关，仅当 dunder 显式声明时才覆盖默认值 ----
 	if b, ok := caller.GetBool(FocusDunder_AllowRAG); ok {
 		opts = append(opts, WithAllowRAG(b))

@@ -69,9 +69,7 @@ func WithLoopPromptGenerator(generator ReActLoopCoreGenerateCode) ReActLoopOptio
 func WithPeriodicVerificationInterval(interval int) ReActLoopOption
 ```
 
-设置周期性验证的迭代间隔。默认值由 `BasicAICommonConfigOption` 从 config 读取。
-
-更短的间隔 → 更频繁验证 → 成本高、更早发现偏离。
+已弃用，仅保留源码兼容，调用没有运行时效果。自动满意度验证及对应 watchdog 已移除；`WithDisablePeriodicVerification` 同样为兼容空操作。
 
 ## 2.2 Prompt 构造
 
@@ -418,7 +416,6 @@ func BasicAICommonConfigOption(c *aicommon.Config) []ReActLoopOption {
     return []ReActLoopOption{
         WithMemoryTriage(c.MemoryTriage),
         WithMemoryPool(c.MemoryPool),
-        WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
         WithMemorySizeLimit(int(c.MemoryPoolSize)),
     }
 }

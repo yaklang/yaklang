@@ -155,7 +155,6 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				errMsg := fmt.Sprintf("Tool '%s' protocol did not complete: %s. Please correct the invocation or try a different approach.", tool.GetName(), result.Error)
 				invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)
 				// Continue to allow AI to try another approach
-				// Note: We still proceed to verify user satisfaction to give AI context
 			} else {
 				// Lifecycle completion is deliberately neutral. The execution result in
 				// the ToolResult/Timeline determines command, HTTP, or task effects.
@@ -164,24 +163,6 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 					fmt.Sprintf("tool '%s' returned a result envelope; inspect execution_result before judging the effect", tool.GetName()),
 				)
 			}
-
-			task := loop.GetCurrentTask()
-			if task == nil {
-				operator.Continue()
-				return
-			}
-
-			verifyResult, triggered, err := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, tool.GetName())
-			if err != nil {
-				operator.Fail(err)
-				return
-			}
-			// verification 现在是纯观测调用, 不再决定退出. satisfied 仅作为
-			// 观测信号沉淀 (MaybeVerifyUserSatisfaction 内部已落 timeline /
-			// satisfaction record), 退出唯一由 AI 主动 finish action 决定.
-			// 关键词: verification 不退, 退出只走 finished, 纯观测角色
-			_ = verifyResult
-			_ = triggered
 
 			// Continue to next action
 			operator.Continue()

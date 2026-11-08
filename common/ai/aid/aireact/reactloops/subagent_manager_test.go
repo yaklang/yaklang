@@ -222,7 +222,7 @@ func TestBackgroundSubAgents_ParentContinuesAndFinishSeesInFlightResult(t *testi
 		WithFunctionCallMode(false), // This scheduler test deliberately mocks text actions.
 		WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false), WithAllowUserInteract(false),
 		WithRegisterLoopAction("require_tool", "unused", nil, nil, nil),
-		WithDisableLoopPerception(true), WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true),
+		WithDisableLoopPerception(true), WithDisableIncreaseIteration(true),
 		WithRegisterLoopAction("dispatch_test", "dispatch", nil, nil, func(l *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) {
 			_, err := l.SubmitSubAgents(op.GetTask(), []SubAgentJob{{Identifier: "payment", Goal: "payment"}},
 				SubAgentOptions{TimelineMode: SubAgentTimelineFork, LoopBuilder: blockingSubAgentBuilder(started, release, "PAYMENT_EVIDENCE")}, "integration")

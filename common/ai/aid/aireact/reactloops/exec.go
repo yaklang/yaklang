@@ -487,40 +487,14 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}
 
-	// 工具 in-flight 必须始终挂到 config hook 上, 即使本 loop 关闭了
-	// periodic verification: stall heartbeat 靠它判断"长 grep 还在跑",
-	// 不能跟 verification watchdog 绑死.
-	var clearWatchdogToolHooks func()
+	// Tool activity is tracked independently of model-based progress reviews.
+	// The stall heartbeat must recognize long-running synchronous tools.
 	if inv := r.GetInvoker(); inv != nil {
 		if cfg, ok := inv.GetConfig().(*aicommon.Config); ok {
-			cfg.SetVerificationWatchdogToolBlockingHooks(
-				func() {
-					r.BeginToolActivity()
-					if !r.DisablePeriodicVerification {
-						r.BeginVerificationWatchdogToolSuppression()
-					}
-				},
-				func() {
-					if !r.DisablePeriodicVerification {
-						r.EndVerificationWatchdogToolSuppression()
-					}
-					r.EndToolActivity()
-				},
-			)
-			clearWatchdogToolHooks = func() {
-				cfg.SetVerificationWatchdogToolBlockingHooks(nil, nil)
-			}
+			cfg.SetToolActivityHooks(r.BeginToolActivity, r.EndToolActivity)
+			defer cfg.SetToolActivityHooks(nil, nil)
 		}
 	}
-	if !r.DisablePeriodicVerification {
-		r.startVerificationWatchdog(task)
-	}
-	defer func() {
-		if clearWatchdogToolHooks != nil {
-			clearWatchdogToolHooks()
-		}
-		r.stopVerificationWatchdogForTask(task)
-	}()
 
 	done := utils.NewOnce()
 	abort := func(err error) {
@@ -621,9 +595,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, task.GetOriginUserInput())
 	}
 
-	// 启动主循环卡死兜底观察 goroutine: 周期性比对 lastIterationTickAt,
-	// 长时间无推进就 emit timeline + dump goroutine stack. 不会主动 abort
-	// 任务, 只是给外部观察者 (人 / 测试 / 监控) 一个明确信号. 关键词:
+	// Start independent stall monitoring: report prolonged inactivity and
+	// cancel the task at the hard-abort threshold. Active tools and recent
+	// sub-agent progress suppress false alarms. This makes no AI requests.
 	// startStallHeartbeat, post-action 卡死兜底观察
 	stopStallHeartbeat := r.startStallHeartbeat(task.GetContext(), task)
 	defer stopStallHeartbeat()

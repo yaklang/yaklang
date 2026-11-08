@@ -110,7 +110,7 @@ func TestDirExploreOutputLifecycle(t *testing.T) {
 			loop, err := BuildDirExploreLoop(inv,
 				reactloops.WithVar("target_path", workdir), reactloops.WithVar("output_report_path", reportPath),
 				reactloops.WithFunctionCallMode(false), reactloops.WithDisableLoopPerception(true),
-				reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(8),
+				reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(8),
 			)
 			require.NoError(t, err)
 			task := aicommon.NewStatefulTaskBase("explore-task", "帮我探索这个项目", ctx, cfg.GetEmitter(), true)

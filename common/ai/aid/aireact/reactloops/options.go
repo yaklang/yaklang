@@ -587,26 +587,16 @@ func WithDisableLoopPerception(disable ...bool) ReActLoopOption {
 	}
 }
 
-// WithDisablePeriodicVerification disables periodic verification checkpoints for this loop instance.
-func WithDisablePeriodicVerification(disable ...bool) ReActLoopOption {
-	return func(r *ReActLoop) {
-		if len(disable) > 0 && !disable[0] {
-			return
-		}
-		r.DisablePeriodicVerification = true
-	}
+// WithDisablePeriodicVerification is retained for source compatibility.
+// Deprecated: ReAct loops no longer perform automatic satisfaction checks.
+func WithDisablePeriodicVerification(_ ...bool) ReActLoopOption {
+	return func(*ReActLoop) {}
 }
 
-// WithPeriodicVerificationInterval sets the  iteration interval used by
-// loop-level periodic checkpoint behaviors
-// auto-verification.
-func WithPeriodicVerificationInterval(interval int) ReActLoopOption {
-	return func(r *ReActLoop) {
-		if r == nil {
-			return
-		}
-		r.periodicVerificationInterval = interval
-	}
+// WithPeriodicVerificationInterval is retained for source compatibility.
+// Deprecated: automatic satisfaction checks and their watchdog were removed.
+func WithPeriodicVerificationInterval(_ int) ReActLoopOption {
+	return func(*ReActLoop) {}
 }
 
 // WithToolCallIntervalReviewExtraPrompt injects extra instructions into the prompt
@@ -628,7 +618,6 @@ func BasicAICommonConfigOption(c *aicommon.Config) []ReActLoopOption {
 	basicOptions := []ReActLoopOption{
 		WithMemoryTriage(c.MemoryTriage),
 		WithMemoryPool(c.MemoryPool),
-		WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
 		WithMemorySizeLimit(int(c.MemoryPoolSize)),
 	}
 	return basicOptions

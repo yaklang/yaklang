@@ -56,8 +56,8 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	}
 
 	if r.config != nil {
-		r.config.RunVerificationWatchdogToolBlockingStart()
-		defer r.config.RunVerificationWatchdogToolBlockingEnd()
+		r.config.RunToolActivityStart()
+		defer r.config.RunToolActivityEnd()
 	}
 	statsSource := aicommon.StatsSourceToolDirect
 	// The runtime owns the execution classification; caller options cannot override it.
@@ -275,8 +275,8 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 	}
 
 	if r.config != nil {
-		r.config.RunVerificationWatchdogToolBlockingStart()
-		defer r.config.RunVerificationWatchdogToolBlockingEnd()
+		r.config.RunToolActivityStart()
+		defer r.config.RunToolActivityEnd()
 	}
 
 	var taskIndex string

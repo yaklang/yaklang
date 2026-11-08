@@ -672,7 +672,7 @@ func TestToolBatchActionHandler_UsesBatchRuntimeOnce(t *testing.T) {
 	assert.Contains(t, op.GetFeedback().String(), "execution_unknown=2")
 	assert.Contains(t, invoker.getTimelineString(), "TOOL_BATCH_RESULT")
 	assert.Equal(t, 2, op.GetExecutedToolCallCount())
-	assert.Equal(t, 1, invoker.verifyCalls)
+	assert.Zero(t, invoker.verifyCalls)
 }
 
 func TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution(t *testing.T) {
@@ -730,8 +730,8 @@ func TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution(t *testin
 		handleToolBatchActionResult(loop, context.Background(), invoker, request, result, nil, op)
 
 		require.Equal(t, 1, op.GetExecutedToolCallCount())
-		require.Equal(t, 1, invoker.verifyCalls,
-			"a settled failed ToolResult is still high-value objective feedback")
+		require.Zero(t, invoker.verifyCalls,
+			"failed tool results remain feedback without an automatic satisfaction call")
 		require.True(t, op.IsContinued())
 	})
 

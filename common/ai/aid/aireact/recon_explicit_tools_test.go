@@ -85,7 +85,7 @@ func TestReconPreloadsAndExplicitlyCallsSixToolsBothProtocols(t *testing.T) {
 				}))
 			require.NoError(t, err)
 			react.config.Timeline.SetTimelineBucketByteSize(-1)
-			loop, err := reactloops.CreateLoopByName("infosec_recon", react, reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true))
+			loop, err := reactloops.CreateLoopByName("infosec_recon", react, reactloops.WithDisableLoopPerception(true))
 			require.NoError(t, err)
 			for _, name := range []string{"save_evidence", "load_capability"} {
 				_, err = loop.GetActionHandler(name)

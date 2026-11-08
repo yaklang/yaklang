@@ -48,7 +48,7 @@ func TestReAct_OverflowCompressionUsesLastFittingBoundary(t *testing.T) {
 	require.NoError(t, err)
 	react.config.Timeline.PushText(react.config.AcquireId(), "%s", kept)
 	loop, err := reactloops.NewReActLoop("overflow-fitting-boundary", react,
-		reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true),
+		reactloops.WithDisableLoopPerception(true),
 		reactloops.WithMaxIterations(4),
 		reactloops.WithRegisterLoopAction("probe", "record one later timeline item", nil, nil,
 			func(_ *reactloops.ReActLoop, _ *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {

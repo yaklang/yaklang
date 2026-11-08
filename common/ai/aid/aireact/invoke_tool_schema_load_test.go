@@ -140,7 +140,7 @@ func TestMainLoopLoadSchemasThenDirectExecution(t *testing.T) {
 				require.NoError(t, err)
 				react.config.Timeline.SetTimelineBucketByteSize(-1)
 				loop, err := reactloops.CreateLoopByName("default", react,
-					reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(8))
+					reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(8))
 				require.NoError(t, err)
 				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 				defer cancel()

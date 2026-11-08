@@ -98,7 +98,7 @@ func TestReActLoopToolCallActionIsolationE2E(t *testing.T) {
 			)
 			require.NoError(t, err)
 			loop, err := reactloops.NewReActLoop("tool-call-action-isolation", react,
-				reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+				reactloops.WithFunctionCallMode(native),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4),
 			)
 			require.NoError(t, err)

@@ -25,7 +25,6 @@ func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOptio
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowAIForge(false), reactloops.WithAllowToolCall(true),
 		reactloops.WithPersistentInstruction(workerInstruction),
 		reactloops.WithReactiveDataBuilder(func(_ *reactloops.ReActLoop, b *bytes.Buffer, _ string) (string, error) { return b.String(), nil }),
-		reactloops.WithDisablePeriodicVerification(true),
 		reactloops.WithDisableLoopPerception(true),
 		reactloops.WithActionFilter(func(a *reactloops.LoopAction) bool {
 			switch a.ActionType {

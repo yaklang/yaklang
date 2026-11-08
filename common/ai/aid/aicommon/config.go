@@ -34,11 +34,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// DefaultPeriodicVerificationInterval 是 verification iter 门的基础节拍.
-// 当前基础节拍为 20 iter；verification_gate.go 另有 token 门冷静期和
-// 首次提前门 (iter=3)。详见
-// reactloops/docs/16-verification-frequency-experiment.md.
-// 关键词: DefaultPeriodicVerificationInterval 20, iter 门基础节拍, verification 节流
+// DefaultPeriodicVerificationInterval is a legacy configuration default.
+// Deprecated: retained for config/source compatibility; automatic verification is removed.
 const DefaultPeriodicVerificationInterval = 20
 const DefaultGoalMinIterations = 6
 const GoalModeIterationBuffer = 2
@@ -343,8 +340,9 @@ type Config struct {
 	FrozenBlockPartitionProducer *FrozenBlockPartitionProducer
 
 	// result processer
-	GenerateReport               bool
-	MaxTaskContinue              int64
+	GenerateReport  bool
+	MaxTaskContinue int64
+	// Deprecated: retained for serialized configuration compatibility; not used by ReAct.
 	PeriodicVerificationInterval int64
 
 	// other
@@ -371,11 +369,9 @@ type Config struct {
 	ToolComposeConcurrency            int           // Legacy shared concurrency option, still used by fast-context grep (default 2)
 	PlanExecTaskConcurrency           int           // Max concurrent executable tasks per PE DAG stage (default 1)
 
-	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
-	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
-	// verification watchdog timer does not fire while the ReAct thread is blocked in a tool.
-	verificationWatchdogToolBlockingStart func()
-	verificationWatchdogToolBlockingEnd   func()
+	// Tool activity hooks let independent stall monitoring recognize blocking work.
+	toolActivityStart func()
+	toolActivityEnd   func()
 
 	// iteration limit
 	MaxIterationCount        int64
@@ -1184,11 +1180,11 @@ func (c *Config) SetUserUsageCallback(cb func(*aispec.ChatUsage)) {
 	c.userUsageCallback = cb
 }
 
-// SetVerificationWatchdogToolBlockingHooks registers callbacks invoked immediately
+// SetToolActivityHooks registers callbacks invoked immediately
 // before and after synchronous blocking tool execution in the ReAct invoker.
-// Pass nil for both to clear. Used by reactloops to pause the verification watchdog
-// while a tool holds the ReAct thread.
-func (c *Config) SetVerificationWatchdogToolBlockingHooks(start, end func()) {
+// Pass nil for both to clear. Used by the stall heartbeat to distinguish active
+// tools from an idle loop; no model-based verification is involved.
+func (c *Config) SetToolActivityHooks(start, end func()) {
 	if c == nil {
 		return
 	}
@@ -1197,12 +1193,12 @@ func (c *Config) SetVerificationWatchdogToolBlockingHooks(start, end func()) {
 	}
 	c.m.Lock()
 	defer c.m.Unlock()
-	c.verificationWatchdogToolBlockingStart = start
-	c.verificationWatchdogToolBlockingEnd = end
+	c.toolActivityStart = start
+	c.toolActivityEnd = end
 }
 
-// RunVerificationWatchdogToolBlockingStart runs the registered start hook if any.
-func (c *Config) RunVerificationWatchdogToolBlockingStart() {
+// RunToolActivityStart runs the registered start hook if any.
+func (c *Config) RunToolActivityStart() {
 	if c == nil {
 		return
 	}
@@ -1210,15 +1206,15 @@ func (c *Config) RunVerificationWatchdogToolBlockingStart() {
 		return
 	}
 	c.m.Lock()
-	fn := c.verificationWatchdogToolBlockingStart
+	fn := c.toolActivityStart
 	c.m.Unlock()
 	if fn != nil {
 		fn()
 	}
 }
 
-// RunVerificationWatchdogToolBlockingEnd runs the registered end hook if any.
-func (c *Config) RunVerificationWatchdogToolBlockingEnd() {
+// RunToolActivityEnd runs the registered end hook if any.
+func (c *Config) RunToolActivityEnd() {
 	if c == nil {
 		return
 	}
@@ -1226,7 +1222,7 @@ func (c *Config) RunVerificationWatchdogToolBlockingEnd() {
 		return
 	}
 	c.m.Lock()
-	fn := c.verificationWatchdogToolBlockingEnd
+	fn := c.toolActivityEnd
 	c.m.Unlock()
 	if fn != nil {
 		fn()
@@ -3266,6 +3262,8 @@ func WithMaxTaskContinue(n int64) ConfigOption {
 	}
 }
 
+// WithPeriodicVerificationInterval retains legacy serialized configuration values.
+// Deprecated: ReAct no longer schedules automatic satisfaction verification.
 func WithPeriodicVerificationInterval(n int64) ConfigOption {
 	return func(c *Config) error {
 		if n < 0 {

@@ -109,7 +109,7 @@ func TestReportOutputFilterPreservesAITagEdits(t *testing.T) {
 				opts := []reactloops.ReActLoopOption{
 					reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
 					reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
-					reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
+					reactloops.WithDisableLoopPerception(true),
 					reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(len(steps) + 1),
 					reactloops.WithInitTask(func(l *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 						l.Set("report_filename", reportPath)
@@ -223,7 +223,7 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			opts := []reactloops.ReActLoopOption{
 				reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
-				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
+				reactloops.WithDisableLoopPerception(true),
 				reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(5),
 				reactloops.WithInitTask(func(l *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 					l.Set("report_filename", reportPath)

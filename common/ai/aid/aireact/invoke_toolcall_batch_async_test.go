@@ -69,7 +69,6 @@ func TestDirectToolBatchAsyncIntegration(t *testing.T) {
 				reactloops.WithFunctionCallMode(protocol == "native"), reactloops.WithFunctionCallActionVariants(),
 				reactloops.WithAllowAIForge(false), reactloops.WithAllowRAG(false), reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowUserInteract(false), reactloops.WithDisableLoopPerception(true),
-				reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithToolInvokeGuard(func(_ string, params aitool.InvokeParams) (bool, string) {
 					return params.GetInt("id") != 9, "owner rejected job_9"
 				}))

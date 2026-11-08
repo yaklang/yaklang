@@ -186,7 +186,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	)
 	if transErr != nil {
 		// Verification is an observation, not a completion gate. A task may
-		// legitimately finish while an asynchronous watchdog verification is in
+		// legitimately finish while a verification request is in
 		// flight. Treat that lifecycle cancellation as a quiet shutdown instead
 		// of surfacing it as malformed model output after transaction retries.
 		if ctx.Err() != nil || errors.Is(transErr, context.Canceled) {

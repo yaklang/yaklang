@@ -62,7 +62,6 @@ func generateExploreReport(
 		// This child assembles existing notes; it does not need exploratory
 		// perception or a second verification watchdog on the shared runtime.
 		reactloops.WithDisableLoopPerception(true),
-		reactloops.WithDisablePeriodicVerification(true),
 		loop_report_generating.WithInternalReportOutput(),
 		reactloops.WithInitTask(func(innerLoop *reactloops.ReActLoop, task aicommon.AIStatefulTask, innerOp *reactloops.InitTaskOperator) {
 			innerLoop.Set("report_filename", reportPath)

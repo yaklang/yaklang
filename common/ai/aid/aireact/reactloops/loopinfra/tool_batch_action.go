@@ -611,30 +611,8 @@ func handleToolBatchActionResult(
 	invoker.AddToTimeline("[TOOL_BATCH_RESULT]", summary)
 	operator.Feedback(summary)
 	emitToolCallGroupResultStatus(loop, request, outcomes)
-	toolNames := make([]string, 0, len(request.Calls))
-	for _, call := range request.Calls {
-		toolNames = append(toolNames, call.ToolName)
-	}
-	justExecutedTool := executedToolCallCount > 0
-	if justExecutedTool {
+	if executedToolCallCount > 0 {
 		operator.MarkToolExecuted(executedToolCallCount)
-	}
-
-	task := loop.GetCurrentTask()
-	// Satisfaction is meaningful only after at least one callback actually
-	// settled. A syntactically valid batch that was wholly rejected at admission
-	// must remain visible in history/feedback, but must not pretend work happened.
-	if task == nil || !justExecutedTool {
-		operator.Continue()
-		return
-	}
-	verifyResult, triggered, verifyErr := loop.MaybeVerifyUserSatisfaction(ctx, task.GetUserInput(), true, strings.Join(toolNames, ","))
-	if verifyErr != nil {
-		operator.Fail(verifyErr)
-		return
-	}
-	if triggered && verifyResult != nil && !verifyResult.Satisfied {
-		operator.Feedback(fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning))
 	}
 	operator.Continue()
 }

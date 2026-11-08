@@ -172,7 +172,7 @@ func TestReportSessionProtocolHTTP(t *testing.T) {
 				loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, react,
 					reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
 					reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
-					reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
+					reactloops.WithDisableLoopPerception(true),
 					reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(8),
 					reactloops.WithInitTask(func(l *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 						l.Set("report_filename", reportPath)

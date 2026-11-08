@@ -97,7 +97,7 @@ func TestReAct_MustUseHidesAsyncManagement(t *testing.T) {
 					}))
 				require.NoError(t, err)
 				loop, err := reactloops.NewReActLoop("must-use-hides-async", react,
-					reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+					reactloops.WithFunctionCallMode(native),
 					reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4),
 					reactloops.WithInitTask(func(_ *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 						switch source {

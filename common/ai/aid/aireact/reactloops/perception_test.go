@@ -80,7 +80,7 @@ func TestTriggerPerceptionUpdatesSummaryAndTopics(t *testing.T) {
 
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-state-test"
-	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
+	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
 	loop.actionHistoryMutex = new(sync.Mutex)

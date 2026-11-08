@@ -1,0 +1,145 @@
+{
+  "baseline_commit": "9d21a5b1834d36cf440e8e68883cb8b91aa88749",
+  "batches_executed": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "batches_required": 24,
+  "limitations": "Primary actions are scripted, not autonomous DeepSeek decisions. Main-prompt token counts are local estimates. Warm profile explicitly models a preceding watchdog-established baseline; cold replay has no two-minute idle window. Cached tokens are not converted to money.",
+  "method": "fixed primary action replay; real default loop/tool/prompt/verifier paths; DeepSeek satisfaction requests metered by provider",
+  "model": "deepseek-v4.1-flash",
+  "passed": true,
+  "primary_decisions": 25,
+  "primary_prompt_tokens_each_local_estimate": [
+    22863,
+    33044,
+    43227,
+    53412,
+    63757,
+    73885,
+    84076,
+    94427,
+    104561,
+    114928,
+    125072,
+    135458,
+    145602,
+    155990,
+    166136,
+    176523,
+    186672,
+    197061,
+    207212,
+    217603,
+    227756,
+    238149,
+    248304,
+    258839,
+    269003
+  ],
+  "primary_prompt_tokens_local_estimate": 3643560,
+  "profile": "warm",
+  "provider": "aibalance",
+  "requests": [
+    {
+      "prompt_tokens": 52552,
+      "completion_tokens": 70,
+      "total_tokens": 52622,
+      "seconds": 2.9651772,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 77372,
+      "completion_tokens": 69,
+      "total_tokens": 77441,
+      "seconds": 2.4215969,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 93956,
+      "completion_tokens": 72,
+      "total_tokens": 94028,
+      "seconds": 2.2150727,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 110526,
+      "completion_tokens": 85,
+      "total_tokens": 110611,
+      "seconds": 2.4485403,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 127118,
+      "completion_tokens": 72,
+      "total_tokens": 127190,
+      "seconds": 2.4218447,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 143708,
+      "completion_tokens": 73,
+      "total_tokens": 143781,
+      "seconds": 2.6720689,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 160280,
+      "completion_tokens": 81,
+      "total_tokens": 160361,
+      "seconds": 2.6009064,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 176862,
+      "completion_tokens": 75,
+      "total_tokens": 176937,
+      "seconds": 2.9951103999999997,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 193444,
+      "completion_tokens": 75,
+      "total_tokens": 193519,
+      "seconds": 3.243851,
+      "satisfied": false
+    },
+    {
+      "prompt_tokens": 210024,
+      "completion_tokens": 167,
+      "total_tokens": 210191,
+      "seconds": 3.5227251,
+      "satisfied": false
+    }
+  ],
+  "seconds": 31.8812221,
+  "thinking": "none",
+  "variant": "baseline",
+  "verification_calls": 10,
+  "verification_completion_tokens": 839,
+  "verification_prompt_tokens": 1345842,
+  "verification_total_tokens": 1346681,
+  "warm_baseline_seeded": true
+}

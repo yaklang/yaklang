@@ -299,7 +299,6 @@ func TestPR5128_SpeedLoop_LifecycleAcrossRounds(t *testing.T) {
 		reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 		reactloops.WithUseSpeedPriorityAICallback(true),
-		reactloops.WithDisablePeriodicVerification(true),
 		reactloops.WithMaxIterations(2),
 		reactloops.WithRegisterLoopAction("require_tool", "unused tool route", nil, nil, nil),
 		reactloops.WithRegisterLoopAction("accept", "accept result", nil, nil,

@@ -188,7 +188,7 @@ func TestBackgroundDispatchActions_ActualLoop(t *testing.T) {
 				}),
 				reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
-				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true),
+				reactloops.WithDisableLoopPerception(true), reactloops.WithDisableIncreaseIteration(true),
 				reactloops.WithRegisterLoopAction("read_deployment", "read independent deployment config", nil, nil,
 					func(_ *reactloops.ReActLoop, _ *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 						select {

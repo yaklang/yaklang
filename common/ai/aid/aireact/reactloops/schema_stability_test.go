@@ -25,7 +25,6 @@ func makeSchemaStabilityTestLoop(cfg aicommon.AICallerConfigIf) *ReActLoop {
 	loop := &ReActLoop{
 		config:                     cfg,
 		emitter:                    cfg.GetEmitter(),
-		verificationMutex:          new(sync.Mutex),
 		taskMutex:                  new(sync.Mutex),
 		vars:                       omap.NewEmptyOrderedMap[string, any](),
 		actions:                    omap.NewEmptyOrderedMap[string, *LoopAction](),

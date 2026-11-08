@@ -18,7 +18,6 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableDynamicPlanning(true),
-		aicommon.WithPeriodicVerificationInterval(0),
 		aicommon.WithDisableIncreaseIteration(true),
 	}
 	basicOption = append(basicOption, opts...)

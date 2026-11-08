@@ -64,7 +64,7 @@ func TestDirExploreNativeReportDelegation(t *testing.T) {
 	inv := &nativeExploreRuntime{&exploreOutputRuntime{mock.NewMockInvoker(ctx)}}
 	inv.SetConfig(cfg)
 	loop, err := BuildDirExploreLoop(inv, reactloops.WithVar("target_path", workdir), reactloops.WithVar("output_report_path", reportPath),
-		reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(8))
+		reactloops.WithDisableLoopPerception(true), reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(8))
 	require.NoError(t, err)
 	defer loop.Release()
 	task := aicommon.NewStatefulTaskBase("explore-native", "Explore fixture", ctx, cfg.GetEmitter(), true)

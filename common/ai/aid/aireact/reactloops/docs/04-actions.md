@@ -137,7 +137,7 @@ func init() {
 
 阅读 [loopinfra/](../loopinfra) 下的 action 时，会发现一些一致模式：
 
-1. **结尾几乎都调 `MaybeVerifyUserSatisfaction`**：通用工具 action 在执行成功后会触发节流验证，避免无意义的重复。参考 [loopinfra/tool_call_common.go](../loopinfra/tool_call_common.go) 的 `handleToolCallResult`。
+1. **工具结果交回下一轮决策**：通用工具 action 完成后记录结果并继续循环，不再自动调用满意度验证。参考 [loopinfra/tool_call_common.go](../loopinfra/tool_call_common.go) 的 `handleToolCallResult`。
 2. **可恢复失败写普通反馈并继续**：如 [action_from_tool.go](../action_from_tool.go) 的工具失败处理，把错误交给下一轮主决策选择替代工具。
 3. **emit 文件而不仅是事件**：长输出（如知识增强答案、规划文档）通过 `EmitFileArtifactWithExt` 落盘，前端可下载。
 
@@ -161,7 +161,7 @@ func WithRegisterLoopActionFromTool(tool *aitool.Tool) ReActLoopOption
 
 - Verifier 调 `tool.ValidateParams(params)` 做 schema 校验。校验失败会 `AddToTimeline("[PARAMETER_VALIDATION_ERROR]", ...)`，让 AI 看见错误并重试。
 - Handler 内部容错处理：工具失败**不会**调 `operator.Fail`，而是写入 `Feedback` / timeline 后 `Continue`，让下一轮选择别的方案。
-- Handler 末尾调 `MaybeVerifyUserSatisfaction`：如果验证返回 `Satisfied=true` 直接 `operator.Exit()`。
+- Handler 末尾继续循环；工具结果不触发满意度验证。模型通过 `finish` 提出结束请求，仍需通过 TODO、Goal 和子代理检查。
 - 多种参数提取格式兼容：handler 同时支持 `{"@action":"tool", "params":{...}}`（标准） / `{"@action":"tool", x:1, y:2}`（拍平）等多种 LLM 输出。
 
 **示例**：

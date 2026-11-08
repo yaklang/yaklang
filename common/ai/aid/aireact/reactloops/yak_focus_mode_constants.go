@@ -62,10 +62,6 @@ const (
 	// FocusDunder_MemorySizeLimit 内存上限（字节），对应 WithMemorySizeLimit。
 	FocusDunder_MemorySizeLimit = "__MEMORY_SIZE_LIMIT__"
 
-	// FocusDunder_PeriodicVerificationInterval 周期性 verification 触发间隔，
-	// 对应 WithPeriodicVerificationInterval。
-	FocusDunder_PeriodicVerificationInterval = "__PERIODIC_VERIFICATION_INTERVAL__"
-
 	// FocusDunder_AllowRAG / AIForge / PlanAndExec / ToolCall / UserInteract 静态开关。
 	// 对应 WithAllowRAG / WithAllowAIForge / WithAllowPlanAndExec /
 	// WithAllowToolCall / WithAllowUserInteract。

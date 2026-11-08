@@ -120,7 +120,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				loop, err = NewReActLoop("observation-compression", invoker,
 					WithFunctionCallMode(native), WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false),
 					WithAllowPlanAndExec(false), WithAllowUserInteract(false), WithDisableLoopPerception(true),
-					WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true), WithMaxIterations(2),
+					WithDisableIncreaseIteration(true), WithMaxIterations(2),
 					WithRegisterLoopAction("require_tool", "unused routing", nil, nil, nil),
 					WithRegisterLoopAction("observation_done", "finish observation test", nil, nil,
 						func(_ *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) { op.Exit() }))

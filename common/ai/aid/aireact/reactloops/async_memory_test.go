@@ -78,7 +78,6 @@ func TestAsyncMemoryDoesNotBlockIterationsAndReachesLaterPrompt(t *testing.T) {
 			loop.RecallMemoryForIntent(task, "test_intent")
 		}),
 		WithDisableLoopPerception(true),
-		WithDisablePeriodicVerification(true),
 		WithDisableIncreaseIteration(true),
 		WithRegisterLoopAction("advance", "advance the test", nil, nil,
 			func(_ *ReActLoop, _ *aicommon.Action, op *LoopActionHandlerOperator) {

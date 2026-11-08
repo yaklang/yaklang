@@ -1,3 +1,5 @@
+> 历史实验：自动满意度核验及其 watchdog 已移除。本文保留旧方案的测量记录，不描述当前默认行为。
+
 # 16. Verification 触发频率仿真实验 / Verification Frequency Experiment
 
 > 回到 [README](../README.md) | 上一章: [15-perception-frequency-experiment.md](15-perception-frequency-experiment.md)

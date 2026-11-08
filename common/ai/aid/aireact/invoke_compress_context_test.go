@@ -117,7 +117,7 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 			tl.PushText(react.config.AcquireId(), "%s", keptHistory)
 
 			loop, err := reactloops.NewReActLoop("compress-context", react,
-				reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+				reactloops.WithFunctionCallMode(native),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4))
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -242,7 +242,7 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 				react.config.Timeline.PushText(id, "%s", marker+" "+strings.Repeat(uuid.NewString()+" ", 400))
 			}
 			loop, err := reactloops.NewReActLoop("compress-context-overflow", react,
-				reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+				reactloops.WithFunctionCallMode(native),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4))
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)

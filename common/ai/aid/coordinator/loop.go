@@ -128,7 +128,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 	}
 	preset = append(preset, actionOptions()...)
 	preset = append(preset, opts...)
-	preset = append(preset, reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true))
+	preset = append(preset, reactloops.WithDisableLoopPerception(true))
 	loop, err := reactloops.NewReActLoop(Name, r, preset...)
 	if err != nil {
 		return nil, err

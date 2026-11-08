@@ -53,7 +53,7 @@ func TestMUSTPASS_GreetingAnswersOnceWithoutMemoryRecall(t *testing.T) {
 				reactloops.WithAllowRAG(false), reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowUserInteract(false), reactloops.WithMemoryTriage(memory),
-				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
+				reactloops.WithDisableLoopPerception(true),
 			)
 			require.NoError(t, err)
 			task := aicommon.NewStatefulTaskBase("hello", "你好？", ctx, inv.GetConfig().GetEmitter())

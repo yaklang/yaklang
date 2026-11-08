@@ -144,8 +144,6 @@ func (h *SubAgentHandle) markFinished(err error) {
 // 主要消费者:
 //   - startStallHeartbeat: 当主循环因等待子 Agent 而不推进时,
 //     检查 registry 中是否有活跃子 Agent 仍有进度, 避免误报卡死.
-//   - triggerVerificationWatchdog: 当有活跃子 Agent 时, 跳过自动验证,
-//     避免在子 Agent 运行期间误判任务已完成.
 //   - wait_sub_react_agents action: 阻塞等待指定子 Agent 的 done channel.
 //
 // 关键词: ProgressRegistry, 子 Agent 进度注册表, stall heartbeat 旁路

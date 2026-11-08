@@ -285,7 +285,6 @@ func TestReActSessionRuntimeCreatesOnceAttachesAndGatesReservedInput(t *testing.
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableDynamicPlanning(true),
-		aicommon.WithPeriodicVerificationInterval(0),
 		aicommon.WithDisableIncreaseIteration(true),
 	}
 	const sessionID = "runtime-create-once"

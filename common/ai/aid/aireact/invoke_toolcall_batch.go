@@ -587,8 +587,8 @@ func (r *ReAct) ExecuteToolCallGroup(
 	}()
 
 	if r.config != nil {
-		r.config.RunVerificationWatchdogToolBlockingStart()
-		defer r.config.RunVerificationWatchdogToolBlockingEnd()
+		r.config.RunToolActivityStart()
+		defer r.config.RunToolActivityEnd()
 	}
 
 	var wg sync.WaitGroup

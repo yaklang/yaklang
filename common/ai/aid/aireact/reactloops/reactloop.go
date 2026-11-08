@@ -174,19 +174,6 @@ type ReActLoop struct {
 	modelThinkingBuf   bytes.Buffer
 	modelThinkingMutex sync.Mutex
 
-	// verificationRuntimeSnapshot stores the last verification gate baseline so
-	// generic auto-verification can compare the current loop state against the
-	// previous accepted checkpoint.
-	periodicVerificationInterval int // when == 0 , trigger every iteration;
-	DisablePeriodicVerification  bool
-	verificationRuntimeSnapshot  *VerificationRuntimeSnapshot
-	verificationMutex            *sync.Mutex
-	verificationWatchdogTimer    *time.Timer
-	// verificationWatchdogToolSuppressionDepth counts nested synchronous tool calls
-	// that block the ReAct thread; while >0 the verification watchdog must not fire
-	// or reschedule (see verification_gate.go).
-	verificationWatchdogToolSuppressionDepth int
-
 	// timeline differ for tracking changes during task execution
 	timelineDiffer        *aicommon.TimelineDiffer
 	currentIterationIndex int
@@ -203,9 +190,9 @@ type ReActLoop struct {
 	// lastIterationTickAt 记录主循环最近一次推进 (iterationCount++) 的
 	// 单调时间戳, 单位 unix nanoseconds. 仅由主循环线程写, stall heartbeat
 	// goroutine 与外部观察方原子读, 故用 atomic.Int64 即可. 心跳协程依此
-	// 判断"我还在动吗?", 90s 无变更则 emit [LOOP_STALL_DETECTED] timeline
-	// + dump goroutine stack 用于事后分析, 但绝不主动中止主循环 — 这是
-	// 兜底观察而非抢断.
+	// 判断迭代是否推进；超过卡顿阈值时 emit [LOOP_STALL_DETECTED] timeline
+	// 并 dump goroutine stack；超过硬阈值时取消任务。活跃工具和近期子代理
+	// 活动由独立 stall heartbeat 判断，避免误报。
 	// 关键词: lastIterationTickAt, 主循环心跳, [LOOP_STALL_DETECTED]
 	lastIterationTickAt atomic.Int64
 
@@ -219,14 +206,6 @@ type ReActLoop struct {
 	// 跳过报警和硬抢断 (工具还在跑 ≠ 主循环死锁).
 	// 关键词: toolActivityInflight, 长工具调用不误杀
 	toolActivityInflight atomic.Int32
-
-	// verificationInFlight 标记 verification AI 调用是否正在飞行中, 用于
-	// 让 watchdog 在不持锁的情况下感知 "上一次还没回来". 与 verificationMutex
-	// 解耦后, watchdog 即便正赶上 verification 卡死也能立刻拿到这个原子
-	// 状态, 写一条 [ASYNC_VERIFICATION_WATCHDOG_BUSY] 痕迹后返回, 而不会
-	// 跟着一起阻塞.
-	// 关键词: verificationInFlight, watchdog 解锁, atomic.Bool
-	verificationInFlight atomic.Bool
 
 	// observationInflight 跟踪异步 prompt observation 构建 goroutine 数量,
 	// 供测试 best-effort 等待 (WaitForInflightObservation). 生产路径不会主动
@@ -381,14 +360,7 @@ func (r *ReActLoop) WaitForInflightObservation() {
 	r.observationInflight.Wait()
 }
 
-func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
-	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &SatisfactionRecord{
-		Satisfactory: satisfactory,
-		Reason:       reason,
-	})
-}
-
-// PushSatisfactionRecordWithCompletedTaskIndex records verification output;
+// PushSatisfactionRecordWithCompletedTaskIndex records explicit business verification output;
 // TODO maintenance remains exclusively in normal ReAct action todo_delta.
 func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, evidence string, evidenceOps ...[]aicommon.EvidenceOperation) {
 	record := &SatisfactionRecord{
@@ -403,15 +375,7 @@ func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bo
 	r.historySatisfactionReasons = append(r.historySatisfactionReasons, record)
 }
 
-func (r *ReActLoop) GetLastSatisfactionRecord() (bool, string) {
-	if len(r.historySatisfactionReasons) == 0 {
-		return false, ""
-	}
-	lastRecord := r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
-	return lastRecord.Satisfactory, lastRecord.Reason
-}
-
-// GetLastSatisfactionRecordFull 获取最后一次满意度记录的完整结构，包括已完成的任务索引和下一步行动计划
+// GetLastSatisfactionRecordFull 获取最后一次显式业务核验的完整记录，包括任务索引和证据。
 // 返回 nil 表示没有记录
 func (r *ReActLoop) GetLastSatisfactionRecordFull() *SatisfactionRecord {
 	if len(r.historySatisfactionReasons) == 0 {
@@ -422,10 +386,6 @@ func (r *ReActLoop) GetLastSatisfactionRecordFull() *SatisfactionRecord {
 
 func (r *ReActLoop) GetMaxIterations() int {
 	return r.maxIterations
-}
-
-func (r *ReActLoop) GetPeriodicVerificationInterval() int {
-	return r.periodicVerificationInterval
 }
 
 func (r *ReActLoop) AllowPlanAndExec() func() bool {
@@ -623,16 +583,14 @@ func (r *ReActLoop) GetBaseFrameContext() map[string]any {
 // It sets up config, invoker, and emitter but skips full action registration.
 func NewMinimalReActLoop(cfg aicommon.AICallerConfigIf, invoker aicommon.AIInvokeRuntime) *ReActLoop {
 	return &ReActLoop{
-		config:                       cfg,
-		invoker:                      invoker,
-		emitter:                      cfg.GetEmitter(),
-		periodicVerificationInterval: 0, // 测试默认: 禁用节流, 每次 iter 都 fire
-		verificationMutex:            new(sync.Mutex),
-		vars:                         omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:                    new(sync.Mutex),
-		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
-		actionHistory:                make([]*ActionRecord, 0),
-		actionHistoryMutex:           new(sync.Mutex),
+		config:                     cfg,
+		invoker:                    invoker,
+		emitter:                    cfg.GetEmitter(),
+		vars:                       omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                  new(sync.Mutex),
+		historySatisfactionReasons: make([]*SatisfactionRecord, 0),
+		actionHistory:              make([]*ActionRecord, 0),
+		actionHistoryMutex:         new(sync.Mutex),
 	}
 }
 
@@ -680,29 +638,27 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	r := &ReActLoop{
 		useFunctionCallActionVariants: true,
 
-		invoker:                      invoker,
-		loopName:                     name,
-		config:                       config,
-		emitter:                      config.GetEmitter(),
-		maxIterations:                100,
-		periodicVerificationInterval: 0,
-		verificationMutex:            new(sync.Mutex),
-		actions:                      omap.NewEmptyOrderedMap[string, *LoopAction](),
-		loopActions:                  omap.NewEmptyOrderedMap[string, LoopActionFactory](),
-		streamFields:                 omap.NewEmptyOrderedMap[string, *LoopStreamField](),
-		aiTagFields:                  omap.NewEmptyOrderedMap[string, *LoopAITagField](),
-		vars:                         omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:                    new(sync.Mutex),
-		currentMemories:              omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
-		memorySizeLimit:              10 * 1024,
-		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
-		actionHistory:                make([]*ActionRecord, 0),
-		actionHistoryMutex:           new(sync.Mutex),
-		currentIterationIndex:        0,
-		effectiveIterationCount:      0,
-		currentTodoProgress:          make(map[string]*currentTodoProgress),
-		extraCapabilities:            NewExtraCapabilitiesManager(),
-		perception:                   newPerceptionController(perceptionDefaultIterationInterval),
+		invoker:                    invoker,
+		loopName:                   name,
+		config:                     config,
+		emitter:                    config.GetEmitter(),
+		maxIterations:              100,
+		actions:                    omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:                omap.NewEmptyOrderedMap[string, LoopActionFactory](),
+		streamFields:               omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:                omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:                       omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                  new(sync.Mutex),
+		currentMemories:            omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
+		memorySizeLimit:            10 * 1024,
+		historySatisfactionReasons: make([]*SatisfactionRecord, 0),
+		actionHistory:              make([]*ActionRecord, 0),
+		actionHistoryMutex:         new(sync.Mutex),
+		currentIterationIndex:      0,
+		effectiveIterationCount:    0,
+		currentTodoProgress:        make(map[string]*currentTodoProgress),
+		extraCapabilities:          NewExtraCapabilitiesManager(),
+		perception:                 newPerceptionController(perceptionDefaultIterationInterval),
 	}
 
 	for _, action := range []*LoopAction{
@@ -1000,9 +956,6 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 		return
 	}
 	t.Finish(err)
-	if t.IsFinished() {
-		r.stopVerificationWatchdogForTask(t)
-	}
 	if r.onAsyncTaskFinished != nil {
 		r.onAsyncTaskFinished(t)
 	}

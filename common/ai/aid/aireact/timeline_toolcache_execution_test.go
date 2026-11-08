@@ -81,7 +81,7 @@ func TestTimelineToolCacheExecutionBothProtocols(t *testing.T) {
 			require.NoError(t, err)
 			react.config.Timeline.SetTimelineBucketByteSize(-1)
 			loop, err := reactloops.NewReActLoop("cache-execution", react,
-				reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
+				reactloops.WithFunctionCallMode(native),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(4))
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

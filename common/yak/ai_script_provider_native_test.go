@@ -51,7 +51,7 @@ func TestYakScriptProviderAgentProtocols(t *testing.T) {
 			loop, err := reactloops.NewReActLoop("script-provider-protocol", invoker, reactloops.WithFunctionCallMode(native),
 				reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
-				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true),
+				reactloops.WithDisableLoopPerception(true), reactloops.WithDisableIncreaseIteration(true),
 				reactloops.WithRegisterLoopAction("require_tool", "unused routing", nil, nil, nil),
 				reactloops.WithRegisterLoopAction("accept_script", "Finish the test", nil, nil,
 					func(_ *reactloops.ReActLoop, _ *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {

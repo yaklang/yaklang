@@ -69,7 +69,6 @@ func testForgePromptMarkers(t *testing.T, steps int, native bool) {
 		aicommon.WithDisablePerception(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithGenerateReport(false),
-		aicommon.WithPeriodicVerificationInterval(0),
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
