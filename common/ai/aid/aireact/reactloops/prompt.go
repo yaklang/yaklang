@@ -308,10 +308,11 @@ type loopPromptBuildInput struct {
 	operator          *LoopActionHandlerOperator
 
 	// Captured exactly once per iteration: these reads mutate loop state.
-	subAgentInput    string
-	subAgentRevision uint64
-	todoCheckpoint   string
-	actionSchemas    *loopPromptActionSchemas
+	subAgentInput            string
+	subAgentRevision         uint64
+	subAgentEvidenceRevision uint64
+	todoCheckpoint           string
+	actionSchemas            *loopPromptActionSchemas
 	// overflowCompression asks this rebuild to compress only through the last
 	// provider-accepted timeline boundary.
 	overflowCompression bool
@@ -333,17 +334,21 @@ func (r *ReActLoop) captureLoopPromptBuildInput(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) *loopPromptBuildInput {
+	// Publication writes the parent evidence journal before advancing this
+	// cursor. Capture before projection so only model-visible saves are acked.
+	evidenceRevision := r.subAgentSharedEvidenceRevision()
 	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
 	return &loopPromptBuildInput{
-		nonce:             nonce,
-		userInput:         userInput,
-		frozenUserContext: frozenUserContext,
-		frozenPartitions:  frozenPartitions,
-		memory:            memory,
-		operator:          operator,
-		subAgentInput:     subAgentInput,
-		subAgentRevision:  subAgentRevision,
-		todoCheckpoint:    r.consumeTodoCheckpoint(),
+		nonce:                    nonce,
+		userInput:                userInput,
+		frozenUserContext:        frozenUserContext,
+		frozenPartitions:         frozenPartitions,
+		memory:                   memory,
+		operator:                 operator,
+		subAgentInput:            subAgentInput,
+		subAgentRevision:         subAgentRevision,
+		subAgentEvidenceRevision: evidenceRevision,
+		todoCheckpoint:           r.consumeTodoCheckpoint(),
 	}
 }
 
@@ -373,7 +378,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	}
 	nonce, frozenUserContext := input.nonce, input.frozenUserContext
 	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
-	subAgentInput, subAgentRevision := input.subAgentInput, input.subAgentRevision
+	subAgentInput := input.subAgentInput
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
 		tools = []*aitool.Tool{}
@@ -568,14 +573,14 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if guideErr != nil || strings.TrimSpace(guide) == "" {
 			r.recordContextCompressionFailure("rendering the compression guide", guideErr)
 			r.emitContextCompressionUnavailable(promptTokens, limit, guideErr)
-			return normalResult, nil
+			return r.commitSubAgentPromptAssembly(input, normalResult), nil
 		}
 		instructions, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
 			map[string]any{"FunctionCallMode": r.functionCallMode})
 		if err != nil {
 			r.recordContextCompressionFailure("rendering the compression instructions", err)
 			r.emitContextCompressionRuntimeWarning("rendering the compression instructions", err)
-			return normalResult, nil
+			return r.commitSubAgentPromptAssembly(input, normalResult), nil
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(instructions) + "\n\n" + guide
@@ -583,7 +588,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if err != nil {
 			r.recordContextCompressionFailure("assembling the compression prompt", err)
 			r.emitContextCompressionRuntimeWarning("assembling the compression prompt", err)
-			return normalResult, nil
+			return r.commitSubAgentPromptAssembly(input, normalResult), nil
 		}
 		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
 		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))
@@ -594,9 +599,16 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			)
 		}
 	}
-	r.commitSubAgentPrompt(subAgentRevision)
-	r.subAgentModelSeen = subAgentRevision
-	return result, nil
+	return r.commitSubAgentPromptAssembly(input, result), nil
+}
+
+func (r *ReActLoop) commitSubAgentPromptAssembly(input *loopPromptBuildInput, result *LoopPromptAssemblyResult) *LoopPromptAssemblyResult {
+	r.commitSubAgentPrompt(input.subAgentRevision)
+	r.subAgentModelSeen = input.subAgentRevision
+	if result.Mode != aicommon.LoopPromptModeCompressContext {
+		r.subAgentEvidenceSeen = input.subAgentEvidenceRevision
+	}
+	return result
 }
 
 // syncRecentToolParamAITagFields 给当前 react loop 的 aiTagFields 注册

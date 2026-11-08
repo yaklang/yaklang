@@ -46,6 +46,9 @@ type SubAgentSnapshot struct {
 	Error           string     `json:"error,omitempty"`
 	ResultRevision  uint64     `json:"result_revision,omitempty"`
 	CleanupPending  bool       `json:"cleanup_pending,omitempty"`
+
+	EvidenceRevision uint64 `json:"evidence_revision,omitempty"`
+	LastEvidenceID   string `json:"last_evidence_id,omitempty"`
 }
 
 func (s SubAgentSnapshot) terminal() bool {
@@ -91,6 +94,8 @@ type SubAgentManager struct {
 	evidenceRevision     uint64
 	notificationRevision uint64
 	wg                   sync.WaitGroup
+
+	sharedEvidenceRevision uint64
 }
 
 func newSubAgentManager(ctx context.Context, concurrency int) *SubAgentManager {
@@ -328,6 +333,39 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 		}
 		m.mu.Unlock()
 	}
+	opts.evidenceSink = func(op aicommon.EvidenceOperation) error {
+		m.mu.Lock()
+		accept := !m.closed && m.ctx.Err() == nil && ctx.Err() == nil &&
+			!entry.snapshot.terminal() && entry.snapshot.State != "cancelling"
+		m.mu.Unlock()
+		if !accept {
+			return fmt.Errorf("parent no longer accepts evidence from sub-agent %s", entry.snapshot.ID)
+		}
+		// Use the same journal as a parent save_evidence action. Never merge a
+		// child's evidence snapshot or hold the manager lock during persistence.
+		cfg := p.parentConfig
+		if cfg == nil {
+			return fmt.Errorf("parent evidence journal is unavailable")
+		}
+		_, changed, err := saveSessionEvidenceWithChange(cfg, op.ID, op.Content)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if m.closed || m.ctx.Err() != nil || entry.snapshot.terminal() || entry.snapshot.State == "cancelling" {
+			return nil
+		}
+		m.sharedEvidenceRevision++
+		entry.snapshot.EvidenceRevision = m.sharedEvidenceRevision
+		entry.snapshot.LastEvidenceID = op.ID
+		entry.snapshot.LastActivityAt = time.Now()
+		m.notifyDiscoveryLocked()
+		return nil
+	}
 	configure := opts.ConfigureLoop
 	opts.ConfigureLoop = func(child *ReActLoop) {
 		if configure != nil {
@@ -424,6 +462,10 @@ func (m *SubAgentManager) NotifyDiscovery() {
 	if m.closed {
 		return
 	}
+	m.notifyDiscoveryLocked()
+}
+
+func (m *SubAgentManager) notifyDiscoveryLocked() {
 	m.notificationRevision++
 	m.evidenceRevision++
 	close(m.changed)
@@ -466,12 +508,18 @@ func (m *SubAgentManager) Inspect(ids []string) ([]SubAgentSnapshot, error) {
 
 // Wait never derives the worker context from its timer. Capturing changed and
 // reading the snapshot under one lock prevents the completion/subscription race.
-func (m *SubAgentManager) Wait(ctx context.Context, ids []string, timeout time.Duration, seen uint64) (*SubAgentObservation, error) {
+func (m *SubAgentManager) Wait(ctx context.Context, ids []string, timeout time.Duration, seen uint64, evidenceSeen ...uint64) (*SubAgentObservation, error) {
 	if timeout < 0 || timeout > SubAgentMaxWaitTimeout {
 		return nil, fmt.Errorf("timeout_ms must be between 0 and %d", SubAgentMaxWaitTimeout.Milliseconds())
 	}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
+	m.mu.Lock()
+	seenEvidence := m.sharedEvidenceRevision
+	m.mu.Unlock()
+	if len(evidenceSeen) > 0 {
+		seenEvidence = evidenceSeen[0]
+	}
 	for {
 		m.mu.Lock()
 		jobs, err := m.snapshotsLocked(ids)
@@ -480,13 +528,17 @@ func (m *SubAgentManager) Wait(ctx context.Context, ids []string, timeout time.D
 		if err != nil {
 			return nil, err
 		}
-		allTerminal, unseen := true, false
+		allTerminal, unseen, newEvidence := true, false, false
 		for _, job := range jobs {
 			allTerminal = allTerminal && job.terminal()
 			unseen = unseen || job.ResultRevision > seen
+			newEvidence = newEvidence || job.EvidenceRevision > seenEvidence
 		}
 		if unseen {
 			return &SubAgentObservation{Reason: "results_available", Jobs: jobs}, nil
+		}
+		if newEvidence {
+			return &SubAgentObservation{Reason: "evidence_available", Jobs: jobs}, nil
 		}
 		if allTerminal {
 			return &SubAgentObservation{Reason: "all_terminal", Jobs: jobs}, nil
@@ -621,6 +673,17 @@ func (r *ReActLoop) tryFinishSubAgents() string {
 }
 
 func (r *ReActLoop) SubAgentModelSeenRevision() uint64 { return r.subAgentModelSeen }
+
+func (r *ReActLoop) SubAgentModelSeenEvidenceRevision() uint64 { return r.subAgentEvidenceSeen }
+
+func (r *ReActLoop) subAgentSharedEvidenceRevision() uint64 {
+	if m := r.GetSubAgentManager(); m != nil {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return m.sharedEvidenceRevision
+	}
+	return 0
+}
 
 // prepareSubAgentPrompt runs exclusively on the parent thread. The returned
 // payload is appended to the actual assembled prompt, outside history trimming.

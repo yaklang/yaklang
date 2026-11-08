@@ -37,7 +37,7 @@ func TestConfigExecutionPolicy(t *testing.T) {
 
 // TestConfigExecutionPolicy_MultiAgentDirective asserts the multi-agent
 // ExecutionPolicy line is written as a mandatory directive (MUST / 【强制】)
-// so the model treats dispatch as a required first move, not a weak hint.
+// so the parent coordinates substantial work, including sequential phases.
 func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	cfg := aicommon.NewConfig(
 		context.Background(),
@@ -45,7 +45,9 @@ func TestConfigExecutionPolicy_MultiAgentDirective(t *testing.T) {
 	)
 	text := cfg.GetExecutionPolicy()
 	require.Contains(t, text, "MUST make dispatch_sub_react_agents your FIRST move")
-	require.Contains(t, text, "MUST NOT use it to offload")
+	require.Contains(t, text, "primary coordinator")
+	require.Contains(t, text, "A single sequential phase is eligible")
+	require.Contains(t, text, "MUST NOT batch them together")
 	require.NotContains(t, text, "MaxSubAgents")
 	require.NotContains(t, text, "Goal mode")
 }

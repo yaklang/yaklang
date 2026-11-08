@@ -12,6 +12,10 @@
 
 30秒是一次观察期限，不是子任务的执行期限。不会自动每30秒调用模型，也不会因观察超时取消子任务。
 
+子 Agent 可以在完成前显式调用 `save_evidence` 分享会影响主线决策的发现。该动作将同一个规范化 evidence ID 和内容保存到父证据 journal，并在内容改变时通知父任务；`wait_sub_react_agents` 会以 `evidence_available` 提前返回，子任务继续执行。父下一轮沿现有 Timeline delta / 冻结提升读取证据，不额外生成一份正文通知，也不启动独立 AI 评审。相同证据重试不增加父 journal；父收到过的证据不会反复唤醒等待。
+
+这条反向通道只由显式 `save_evidence` 触发。子分支的普通工具结果、自动 evidence mutation、私有 Timeline 和 TODO 不整体合并。同步内部子任务沿相同保存路径发布；PLAN 调查也复用此通道，不再单独包装 `save_evidence`。
+
 ## 用一个完整案例理解改动
 
 这里的ReAct是“模型选择动作 → 程序执行动作 → 把结果交给模型 → 再选择”的循环；父Agent是接收用户任务的运行体，子Agent是有独立任务身份和历史的另一个循环。timeline是模型执行历史，emitter是给客户端发送事件的通道，两者用途不同。
@@ -49,7 +53,7 @@
 1. loopinfra的派发handler解析任务书，调用ReActLoop.SubmitSubAgents。
 2. 父线程冻结timeline、配置值、独立SessionPromptState和结果目录。能力管理器等原有共享资源保持既有权限边界；排队子任务启动时只继承共享工具管理器的当前策略，不回写派发时的旧策略。
 3. 当前loop拥有SubAgentManager；多轮、多次派发共享配额。worker拿到名额之后创建子运行体、扩写目标并执行子ReActLoop。
-4. worker只更新自己的历史和manager快照。它不写父operator、vars或父timeline，不根据正在变化的父迭代号生成产物路径。
+4. worker的普通执行轨迹只更新自己的历史和manager快照；显式`save_evidence`通过线程安全的父证据journal发布选中的发现。它不写父operator或vars，不MergeBack私有timeline，也不根据正在变化的父迭代号生成产物路径。
 5. 子结果原文先写入固定目录，再提交终态、结果版本并通知等待者。取消确认与活跃监控注销在该worker收尾时完成。
 6. 父generateLoopPrompt取出未投递结果，最多8项，放进ReactiveData动态分区；模型提示组装完成后才写父timeline，避免首次投递出现两份正文。
 7. 父记录本轮模型输入覆盖的结果版本。finish既检查活跃子任务，也检查最新结果是否已进入产生该动作的模型输入。

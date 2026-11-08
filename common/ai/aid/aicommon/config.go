@@ -3711,20 +3711,28 @@ func (c *Config) GetSessionEvidenceRendered() string {
 }
 
 func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
+	c.ApplySessionEvidenceOpsWithChange(ops)
+}
+
+// ApplySessionEvidenceOpsWithChange reports an atomic business-content change;
+// timestamp-only retries do not notify consumers or grow the evidence journal.
+// The existing AICallerConfigIf write API remains unchanged.
+func (c *Config) ApplySessionEvidenceOpsWithChange(ops []EvidenceOperation) bool {
 	if c == nil || len(ops) == 0 {
-		return
+		return false
 	}
 	if c.GetTimeline() == nil {
 		state := c.GetSessionPromptState()
 		state.m.Lock()
 		defer state.m.Unlock()
 		store := UnmarshalEvidenceStore(state.evidenceJSON)
+		before := store.Render()
 		store.ApplyOperations(ops)
 		store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
 		state.evidenceJSON = store.Marshal()
-		return
+		return store.Render() != before
 	}
-	c.applyEvidenceToTimeline(ops)
+	return c.applyEvidenceToTimeline(ops)
 }
 
 // GetVerificationTodoRendered returns the rendered TODO snapshot for the
