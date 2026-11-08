@@ -54,6 +54,12 @@ func ConvertReActLoopFactoryToActionFactory(
 					operator.Fail(err.Error())
 					return
 				}
+				// A focus handoff continues the same child task. Preserve its
+				// identity and parent evidence channel across the new loop.
+				if oldLoop.IsSubAgent() {
+					loop.Set(SubAgentDepthLoopVar, oldLoop.GetInt(SubAgentDepthLoopVar))
+					loop.saveEvidencePublisher = oldLoop.saveEvidencePublisher
+				}
 				emitter := oldLoop.GetEmitter()
 				invoker := oldLoop.GetInvoker()
 				msg := fmt.Sprintf(
