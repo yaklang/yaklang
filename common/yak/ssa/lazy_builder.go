@@ -136,7 +136,7 @@ func (p *Program) drainLazyBuilders() {
 
 func (p *Program) LazyBuild() {
 	p.drainLazyBuilders()
-	for _, f := range p.fixImportCallback {
+	for _, f := range p.snapshotFixImportCallbacks() {
 		f()
 	}
 	function := p.GetFunction(string(MainFunctionName), "")
@@ -255,7 +255,7 @@ func drainProgramLazy(p *Program) {
 		return
 	}
 	p.drainLazyBuilders()
-	for _, f := range p.fixImportCallback {
+	for _, f := range p.snapshotFixImportCallbacks() {
 		f()
 	}
 }

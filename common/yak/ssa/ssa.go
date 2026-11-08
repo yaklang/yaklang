@@ -383,7 +383,11 @@ type Program struct {
 	ProcessInfof func(string, ...any)
 
 	// extern lib
-	cacheExternInstance     map[string]Value // lib and value
+	cacheExternInstance map[string]Value // lib and value
+	// externTypeMu guards externType. Type creation is lazy and recursive, so
+	// each map access takes the lock separately; never hold it across
+	// handlerType.
+	externTypeMu            sync.RWMutex
 	externType              map[string]Type
 	externMethodBuilder     MethodBuilder
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
@@ -391,7 +395,10 @@ type Program struct {
 	ExternSideEffect        map[string][]uint
 	ExternLib               map[string]map[string]any
 
-	PkgName           string
+	PkgName string
+	// fixImportMu guards fixImportCallback. Import functions append from
+	// prehandler goroutines while lazy builds run the callbacks.
+	fixImportMu       sync.RWMutex
 	fixImportCallback []func()
 
 	// Project Config
