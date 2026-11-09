@@ -152,7 +152,12 @@ func (b *SnapshotBuffer) Flush() error {
 }
 
 // reportFlushMinInterval bounds how often an intermediate snapshot may be
-// published. Overridable in tests; 0 disables the throttle.
-var reportFlushMinIntervalValue = 30 * time.Second
+// published. A snapshot is the whole document (408MB on javacms-core), and
+// MarshalIndent allocates about 3.5x its size, so publishing one every 30s
+// still cost 55GB of allocation and 15GB of writes on a 19-minute scan. Stage
+// boundaries and the final Save() always publish a complete document, so a
+// two-minute interval keeps the crash-resilience guarantee at a fraction of
+// the cost. Overridable in tests; 0 disables the throttle.
+var reportFlushMinIntervalValue = 2 * time.Minute
 
 func reportFlushMinInterval() time.Duration { return reportFlushMinIntervalValue }
