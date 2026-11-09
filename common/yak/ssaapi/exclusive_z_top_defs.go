@@ -148,6 +148,18 @@ func isPackageLevelObject(obj ssa.Value) bool {
 	return fn != nil && fn.IsMain()
 }
 
+// isDeclarationDefaultMember reports whether a member was materialised by the
+// package initializer when the field was declared. Such a member is a const
+// with no source range: it does not come from an assignment in the source. An
+// explicit write, even of a const value, keeps the range of its expression and
+// counts as a real definition.
+func isDeclarationDefaultMember(member ssa.Value) bool {
+	if utils.IsNil(member) || !ssa.IsConstInst(member) {
+		return false
+	}
+	return member.GetRange() == nil
+}
+
 // crossFunctionMemberTopDefs reports the writers of the same field when the
 // read reads a package-level object, plus whether the read value is itself the
 // field's declaration default.
@@ -191,13 +203,13 @@ func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...Operation
 		log.Debugf("member %q has %d writers, skip cross-function widening", ssa.GetKeyString(key), len(members))
 		return nil, false
 	}
-	// The oldest member of a package-level field is the value the package
+	// The oldest member of a package-level field may be the value the package
 	// initializer materialises when the field is declared. It stands for "not
-	// written yet", so it is not a definition once a real writer exists. A
-	// field that is only ever declared keeps a single member and never reaches
-	// this point.
+	// written yet", so it is not a definition once a real writer exists. The
+	// initializer value has no source range; a const written by an assignment
+	// keeps the range of that expression and stays a real definition.
 	defaultMember := members[len(members)-1]
-	readIsDefault = !utils.IsNil(defaultMember) && defaultMember.GetId() == raw.GetId()
+	readIsDefault = !utils.IsNil(defaultMember) && defaultMember.GetId() == raw.GetId() && isDeclarationDefaultMember(defaultMember)
 	ownFunction := raw.GetFunc()
 	newestPerFunction := make(map[int64]struct{}, 4)
 	for _, member := range members {
@@ -207,7 +219,7 @@ func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...Operation
 		if member.GetId() == raw.GetId() {
 			continue
 		}
-		if !utils.IsNil(defaultMember) && member.GetId() == defaultMember.GetId() && ssa.IsConstInst(member) {
+		if isDeclarationDefaultMember(member) {
 			continue
 		}
 		// A write inside the reading function either already sits in the read's
