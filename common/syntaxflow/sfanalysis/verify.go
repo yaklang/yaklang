@@ -39,8 +39,16 @@ func WithStrictEmbeddedVerify() Option {
 	}
 }
 
+// EvaluateVerifyFilesystemWithFrame verifies a rule against its embedded
+// fixtures. This is the artifact gate: a rule that ships at high/critical must
+// prove a near-miss stays clean, so the severity requirement is applied here
+// and not in the editor's quality score (Analyze), where an untested draft
+// rule still gets the documented "missing fixtures" deduction instead of
+// failing outright.
 func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame, opts ...Option) error {
-	return runEmbeddedVerifyWithFrame(frame, newConfig(opts...)).Error
+	cfg := newConfig(opts...)
+	applyHighSeverityVerifyDefaults(frame, &cfg)
+	return runEmbeddedVerifyWithFrame(frame, cfg).Error
 }
 
 // applyModeAwareVerifyDefaults forces POS+NEG checks for source/struct rules.
@@ -126,7 +134,6 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 		return report
 	}
 	applyModeAwareVerifyDefaults(frame, &cfg)
-	applyHighSeverityVerifyDefaults(frame, &cfg)
 
 	// Source-mode rules: verify on raw files via sfpattern (no SSA compile).
 	if sfvm.FrameIsSourceMode(frame) {
