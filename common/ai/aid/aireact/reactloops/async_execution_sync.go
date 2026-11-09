@@ -14,58 +14,81 @@ const AsyncExecutionSyncNodeID = "async_execution"
 // one still owns an active execution slot until its cleanup reaches a terminal
 // state.
 type AsyncExecutionSnapshot struct {
-	Revision     uint64                     `json:"revision"`
-	TaskID       string                     `json:"task_id,omitempty"`
-	LoopName     string                     `json:"loop_name,omitempty"`
-	RunningCount int                        `json:"running_count"`
-	UpdatedAt    int64                      `json:"updated_at"`
-	Executions   []asyncexecmanager.Summary `json:"executions"`
-	Execution    *asyncexecmanager.Summary  `json:"execution,omitempty"`
-	Error        string                     `json:"error,omitempty"`
+	Revision      uint64                     `json:"revision"`
+	SessionID     string                     `json:"session_id,omitempty"`
+	CurrentTaskID string                     `json:"current_task_id,omitempty"`
+	RunningCount  int                        `json:"running_count"`
+	UpdatedAt     int64                      `json:"updated_at"`
+	Executions    []asyncexecmanager.Summary `json:"executions"`
+	Execution     *asyncexecmanager.Summary  `json:"execution,omitempty"`
+	Error         string                     `json:"error,omitempty"`
+}
+
+// BuildAsyncExecutionSnapshot builds the shared metadata-only wire payload.
+func BuildAsyncExecutionSnapshot(overview asyncexecmanager.Overview, sessionID, currentTaskID string) AsyncExecutionSnapshot {
+	executions := overview.Executions
+	if executions == nil {
+		executions = make([]asyncexecmanager.Summary, 0)
+	}
+	return AsyncExecutionSnapshot{
+		Revision:      overview.Revision,
+		SessionID:     sessionID,
+		CurrentTaskID: currentTaskID,
+		RunningCount:  overview.RunningCount(),
+		UpdatedAt:     time.Now().UnixMilli(),
+		Executions:    executions,
+	}
 }
 
 // AsyncExecutionSnapshot returns a metadata-only view of this loop's manager.
-// It never creates a manager or samples resource output.
+// Session-scoped invoker providers are delegated to so task-local snapshots do
+// not hide work started in an earlier turn.
 func (r *ReActLoop) AsyncExecutionSnapshot() AsyncExecutionSnapshot {
 	if r == nil {
-		return AsyncExecutionSnapshot{
-			UpdatedAt:  time.Now().UnixMilli(),
-			Executions: make([]asyncexecmanager.Summary, 0),
-		}
+		return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
+	}
+	if provider, ok := r.invoker.(interface {
+		AsyncExecutionSnapshot() AsyncExecutionSnapshot
+	}); ok {
+		return provider.AsyncExecutionSnapshot()
 	}
 	manager := r.PeekAsyncExecutionManager()
 	if manager == nil {
-		return r.asyncExecutionSnapshotFromOverview(asyncexecmanager.Overview{})
+		return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, r.persistentSessionID(), r.currentTaskID())
 	}
-	return r.asyncExecutionSnapshotFromOverview(manager.Overview())
+	return BuildAsyncExecutionSnapshot(manager.Overview(), r.persistentSessionID(), r.currentTaskID())
 }
 
-func (r *ReActLoop) asyncExecutionSnapshotFromOverview(overview asyncexecmanager.Overview) AsyncExecutionSnapshot {
-	snapshot := AsyncExecutionSnapshot{
-		Revision:     overview.Revision,
-		RunningCount: overview.RunningCount(),
-		UpdatedAt:    time.Now().UnixMilli(),
-		Executions:   overview.Executions,
+func (r *ReActLoop) persistentSessionID() string {
+	if r == nil || r.config == nil {
+		return ""
 	}
+	if provider, ok := r.config.(interface{ GetPersistentSessionID() string }); ok {
+		return provider.GetPersistentSessionID()
+	}
+	return ""
+}
+
+func (r *ReActLoop) currentTaskID() string {
 	if r == nil {
-		snapshot.Executions = make([]asyncexecmanager.Summary, 0)
-		return snapshot
+		return ""
 	}
 	if task := r.GetCurrentTask(); task != nil {
-		snapshot.TaskID = task.GetId()
+		return task.GetId()
 	}
-	snapshot.LoopName = r.GetLoopName()
-	if snapshot.Executions == nil {
-		snapshot.Executions = make([]asyncexecmanager.Summary, 0)
-	}
-	return snapshot
+	return ""
 }
 
 // PeekAsyncExecutionManager returns the existing manager without changing lazy
-// manager creation semantics.
+// manager creation semantics or task lifetime.
 func (r *ReActLoop) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
 	if r == nil {
 		return nil
+	}
+	if provider, ok := r.invoker.(interface {
+		PeekAsyncExecutionManager() *asyncexecmanager.Manager
+	}); ok {
+		return provider.PeekAsyncExecutionManager()
 	}
 	r.onReleaseMutex.Lock()
 	defer r.onReleaseMutex.Unlock()
@@ -73,8 +96,7 @@ func (r *ReActLoop) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
 }
 
 // StopAsyncExecution requests cancellation of one execution owned by this
-// loop. A stopping state is not terminal; callers should consume the next
-// pushed snapshots until cleanup finishes.
+// loop or its session-scoped invoker. A stopping state is not terminal.
 func (r *ReActLoop) StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error) {
 	manager := r.PeekAsyncExecutionManager()
 	if manager == nil {
@@ -83,8 +105,14 @@ func (r *ReActLoop) StopAsyncExecution(executeID string) (asyncexecmanager.Summa
 	return manager.Stop(executeID)
 }
 
-func (r *ReActLoop) watchAsyncExecutionManager(ctx context.Context, manager *asyncexecmanager.Manager) {
-	if r == nil || manager == nil {
+// WatchAsyncExecutionManager publishes every coalesced manager revision using
+// the snapshot-before-wait sequence required to avoid lost lifecycle updates.
+func WatchAsyncExecutionManager(
+	ctx context.Context,
+	manager *asyncexecmanager.Manager,
+	emit func(asyncexecmanager.Overview),
+) {
+	if manager == nil || emit == nil {
 		return
 	}
 	var (
@@ -92,16 +120,13 @@ func (r *ReActLoop) watchAsyncExecutionManager(ctx context.Context, manager *asy
 		emitted      bool
 	)
 	for {
-		// Capture the next signal before sampling state. Any transition after the
-		// sample closes this channel; any transition before it leaves the channel
-		// already closed, so neither case can be lost.
 		changed := manager.ChangeSignal()
 		overview := manager.Overview()
 		if !emitted || overview.Revision != lastRevision {
-			// The lazy manager starts with an empty revision zero state. Keep it
-			// internal, but publish any lifecycle state or a later closed snapshot.
+			// Keep the lazy manager's empty revision zero internal. Any lifecycle
+			// change, including close without executions, is still published.
 			if overview.Revision != 0 || len(overview.Executions) != 0 {
-				r.emitAsyncExecutionSnapshot(overview)
+				emit(overview)
 				lastRevision = overview.Revision
 				emitted = true
 			}
@@ -113,20 +138,11 @@ func (r *ReActLoop) watchAsyncExecutionManager(ctx context.Context, manager *asy
 		case <-changed:
 			continue
 		case <-ctx.Done():
-			// Close is propagated asynchronously from the owner context. Publish
-			// the latest retained state before the task-local emitter is torn down.
 			latest := manager.Overview()
 			if !emitted || latest.Revision != lastRevision {
-				r.emitAsyncExecutionSnapshot(latest)
+				emit(latest)
 			}
 			return
 		}
 	}
-}
-
-func (r *ReActLoop) emitAsyncExecutionSnapshot(overview asyncexecmanager.Overview) {
-	if r == nil || r.GetEmitter() == nil {
-		return
-	}
-	_, _ = r.GetEmitter().EmitStructured(AsyncExecutionSyncNodeID, r.asyncExecutionSnapshotFromOverview(overview))
 }

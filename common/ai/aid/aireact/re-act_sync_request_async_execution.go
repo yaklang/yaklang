@@ -12,11 +12,10 @@ import (
 )
 
 // HandleSyncTypeAsyncExecutionEvent returns a metadata-only snapshot of the
-// current loop's background tool executions. It deliberately does not create a
+// session's background tool executions. It deliberately does not create a
 // manager when none exists.
 func (r *ReAct) HandleSyncTypeAsyncExecutionEvent(event *ypb.AIInputEvent) error {
-	loop := r.GetCurrentLoop()
-	snapshot := loop.AsyncExecutionSnapshot()
+	snapshot := r.AsyncExecutionSnapshot()
 	_, err := r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, reactloops.AsyncExecutionSyncNodeID, snapshot, syncIDOf(event))
 	return err
 }
@@ -26,8 +25,7 @@ func (r *ReAct) HandleSyncTypeAsyncExecutionEvent(event *ypb.AIInputEvent) error
 // until its resource and cleanup return; later push events carry the terminal
 // state and updated running_count.
 func (r *ReAct) HandleSyncTypeStopAsyncExecutionEvent(event *ypb.AIInputEvent) error {
-	loop := r.GetCurrentLoop()
-	snapshot := loop.AsyncExecutionSnapshot()
+	snapshot := r.AsyncExecutionSnapshot()
 	fail := func(err error) error {
 		snapshot.Error = err.Error()
 		_, emitErr := r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, reactloops.AsyncExecutionSyncNodeID, snapshot, syncIDOf(event))
@@ -46,11 +44,8 @@ func (r *ReAct) HandleSyncTypeStopAsyncExecutionEvent(event *ypb.AIInputEvent) e
 	if params.ExecuteID == "" {
 		return fail(errors.New("execute_id is required"))
 	}
-	if loop == nil {
-		return fail(errors.New("no active ReAct loop for async execution"))
-	}
-	summary, err := loop.StopAsyncExecution(params.ExecuteID)
-	snapshot = loop.AsyncExecutionSnapshot()
+	summary, err := r.StopAsyncExecution(params.ExecuteID)
+	snapshot = r.AsyncExecutionSnapshot()
 	if err != nil {
 		snapshot.Error = err.Error()
 	} else {

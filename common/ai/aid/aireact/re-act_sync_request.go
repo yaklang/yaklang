@@ -319,6 +319,7 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 		currentTask.SetUserCancelled()
 		// 调用任务的 Cancel 方法，这会取消任务的 context
 		currentTask.Cancel(fmt.Sprintf("jump_queue: cancelled to allow task %s to run first; do NOT re-dispatch or retry this cancelled sub agent", targetTaskId))
+		r.StopAsyncExecutionsForTask(currentTask.GetId())
 
 		// 设置任务状态为 Aborted（插队场景设 Aborted 而非 Skipped）
 		currentTask.SetStatus(aicommon.AITaskState_Aborted)
@@ -347,6 +348,7 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 }
 
 func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent) {
+	r.StopAsyncExecutionsForTask(task.GetId())
 	if task.IsAsyncMode() {
 		task.SetAsyncDeferCallback(func(err error) {
 			// 发送任务取消事件

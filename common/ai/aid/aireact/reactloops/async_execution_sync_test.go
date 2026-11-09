@@ -73,8 +73,7 @@ func TestAsyncExecutionLifecyclePushEvents(t *testing.T) {
 		return snapshot.RunningCount == 1 && len(snapshot.Executions) == 1 &&
 			snapshot.Executions[0].State == asyncexecmanager.StateRunning
 	})
-	require.Equal(t, task.GetId(), running.TaskID)
-	require.Equal(t, loop.GetLoopName(), running.LoopName)
+	require.Equal(t, task.GetId(), running.CurrentTaskID)
 	require.NotZero(t, running.Revision)
 	require.NotZero(t, running.UpdatedAt)
 

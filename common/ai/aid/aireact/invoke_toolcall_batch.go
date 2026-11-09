@@ -734,18 +734,27 @@ func (r *ReAct) ExecuteToolCallGroup(
 					result.Outcomes[i].Err = resourceErr
 					return
 				}
+				releaseAdmission, allowed := r.BeginAsyncExecutionAdmission()
+				if !allowed {
+					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
+					result.Outcomes[i].Err = asyncexecmanager.ErrClosed
+					return
+				}
 				receipt, startErr := manager.Start(asyncexecmanager.Request{ID: executionID, Resource: resource,
 					Metadata: asyncexecmanager.Metadata{Name: work.call.ToolName, Attributes: map[string]string{
 						"task_id": task.GetId(), "loop": loop.GetLoopName(), "batch_id": work.batchID,
 						"call_index": fmt.Sprint(i), "identifier": work.call.Identifier, "call_id": work.call.ExecutionCallID,
 					}}})
 				if startErr != nil {
+					releaseAdmission()
 					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 					result.Outcomes[i].Err = startErr
 					return
 				}
 				result.Outcomes[i].Stage = aicommon.ToolCallStageSubmitted
 				result.Outcomes[i].ExecuteID = receipt.ID
+				r.TrackAsyncExecutionTask(task, receipt.ID)
+				releaseAdmission()
 				// No background worker may mutate the returned outcome or retain an
 				// action operator. The original caller supplies all observations.
 				releaseForeground()

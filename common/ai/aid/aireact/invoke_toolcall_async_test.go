@@ -141,17 +141,99 @@ func TestReActLoopStartAsyncToolCall(t *testing.T) {
 	require.Contains(t, cfg.Timeline.Dump(), "original owner query")
 	require.Empty(t, decoy.GetAllToolCallResults())
 
-	t.Log("4. Release stops an actual async call and rejects later loop submissions")
+	t.Log("4. Loop release preserves the session-owned call but rejects later submissions from that loop")
 	receipt, err = loop.StartAsyncToolCall(tool.Name, aitool.InvokeParams{"value": "cancel"}, aicommon.WithToolCaller_Reason("cancel test"))
 	require.NoError(t, err)
 	await(started["cancel"])
 	loop.Release()
+	liveSummary, err := manager.Get(receipt.ID)
+	require.NoError(t, err)
+	require.Equal(t, asyncexecmanager.StateRunning, liveSummary.State)
+	_, err = loop.StartAsyncToolCall(tool.Name, aitool.InvokeParams{"value": "unused"})
+	require.ErrorIs(t, err, asyncexecmanager.ErrClosed)
+
+	_, err = manager.Stop(receipt.ID)
+	require.NoError(t, err)
 	cancelled, err := manager.Wait(ctx, receipt.ID)
 	require.NoError(t, err)
 	require.Equal(t, asyncexecmanager.StateCancelled, cancelled.State)
 	snapshot, err = manager.Inspect(ctx, receipt.ID)
 	require.NoError(t, err)
 	require.Contains(t, snapshot.Observation.Stdout, "cleaned")
-	_, err = loop.StartAsyncToolCall(tool.Name, aitool.InvokeParams{"value": "unused"})
-	require.ErrorIs(t, err, asyncexecmanager.ErrClosed)
+}
+
+func TestReActAsyncToolResultSurvivesTaskLoopBoundary(t *testing.T) {
+	sessionCtx, cancelSession := context.WithCancel(context.Background())
+	defer cancelSession()
+	finish := make(chan struct{})
+	var finishOnce sync.Once
+	releaseFinish := func() { finishOnce.Do(func() { close(finish) }) }
+	defer releaseFinish()
+	started := make(chan struct{})
+	tool, err := aitool.New("cross_turn_result_fixture",
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithNoRuntimeCallback(func(ctx context.Context, _ aitool.InvokeParams, stdout, _ io.Writer) (any, error) {
+			_, _ = fmt.Fprintln(stdout, "working")
+			close(started)
+			select {
+			case <-finish:
+				return map[string]any{"status": "cross-turn-complete"}, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}),
+	)
+	require.NoError(t, err)
+	cfg := aicommon.NewConfig(sessionCtx,
+		aicommon.WithTools(tool),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithDisableToolCallerIntervalReview(true),
+		aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return nil, errors.New("this test must not invoke AI")
+		}),
+	)
+	runtime := &ReAct{config: cfg, Emitter: cfg.Emitter}
+	firstLoop := reactloops.NewMinimalReActLoop(cfg, runtime)
+	owner := aicommon.NewStatefulTaskBase("cross-turn-owner", "start and return later", sessionCtx, cfg.Emitter, true)
+	firstLoop.SetCurrentTask(owner)
+	manager, err := firstLoop.GetAsyncExecutionManager()
+	require.NoError(t, err)
+
+	receipt, err := firstLoop.StartAsyncToolCall(
+		tool.Name,
+		aitool.InvokeParams{},
+		aicommon.WithToolCaller_Reason("cross-turn result test"),
+	)
+	require.NoError(t, err)
+	select {
+	case <-started:
+	case <-sessionCtx.Done():
+		t.Fatal("tool did not start")
+	}
+	owner.Finish(nil)
+	firstLoop.Release()
+	live, err := manager.Get(receipt.ID)
+	require.NoError(t, err)
+	require.Equal(t, asyncexecmanager.StateRunning, live.State)
+
+	releaseFinish()
+	completed, err := manager.Wait(sessionCtx, receipt.ID)
+	require.NoError(t, err)
+	require.Equal(t, asyncexecmanager.StateCompleted, completed.State)
+	require.Len(t, owner.GetAllToolCallResults(), 1)
+	require.Contains(t, fmt.Sprint(owner.GetAllToolCallResults()[0].Data), "cross-turn-complete")
+	require.Contains(t, cfg.Timeline.Dump(), "cross-turn-complete")
+
+	secondLoop := reactloops.NewMinimalReActLoop(cfg, runtime)
+	secondTask := aicommon.NewStatefulTaskBase("cross-turn-follow-up", "check result", sessionCtx, cfg.Emitter, true)
+	secondLoop.SetCurrentTask(secondTask)
+	t.Cleanup(secondLoop.Release)
+	retained, err := secondLoop.GetAsyncExecutionManager()
+	require.NoError(t, err)
+	require.Same(t, manager, retained)
 }

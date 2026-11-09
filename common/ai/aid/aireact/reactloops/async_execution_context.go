@@ -24,15 +24,14 @@ type asyncExecutionContextEntry struct {
 	Error          string                 `yaml:"error,omitempty"`
 }
 
-// renderAsyncExecutionContext samples only this loop's existing manager.
+// renderAsyncExecutionContext samples the loop's task- or session-scoped
+// manager without creating one.
 // Rendering never creates a manager, invokes an inspector, or retains outputs.
 func (r *ReActLoop) renderAsyncExecutionContext(nonce string) string {
 	if r == nil {
 		return ""
 	}
-	r.onReleaseMutex.Lock()
-	manager := r.asyncExecutionManager
-	r.onReleaseMutex.Unlock()
+	manager := r.PeekAsyncExecutionManager()
 	if manager == nil {
 		return ""
 	}
@@ -84,7 +83,7 @@ func (r *ReActLoop) renderAsyncExecutionContext(nonce string) string {
 			break
 		}
 	}
-	header := fmt.Sprintf("<|ASYNC_EXECUTIONS_%s|>\n当前循环的异步执行状态（只读快照）。\n"+
+	header := fmt.Sprintf("<|ASYNC_EXECUTIONS_%s|>\n当前 ReAct 会话的异步执行状态（只读快照）。\n"+
 		"直接选择顶层 action manage_async_execution_runtime：list 查看列表，inspect 读取输出和结果，wait 等待结束，stop/stop_all 请求停止。它不是 directly_call_tool 的目标。\n", nonce)
 	footer := fmt.Sprintf("\n<|ASYNC_EXECUTIONS_END_%s|>", nonce)
 	for {

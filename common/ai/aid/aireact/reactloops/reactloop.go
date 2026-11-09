@@ -126,8 +126,9 @@ type ReActLoop struct {
 	uiComponentsMu sync.Mutex
 	uiComponents   *uiComponentView
 
-	// Lazily bound to the owning task; guarded by onReleaseMutex.
-	// Direct calls and individual batch children can dispatch asynchronously.
+	// Task-scoped fallback for standalone loops whose invoker does not provide a
+	// session-scoped manager. Production ReAct loops delegate to ReAct so
+	// executions can cross task boundaries. Guarded by onReleaseMutex.
 	asyncExecutionManager      *asyncexecmanager.Manager
 	asyncDirectAnswer          chan struct{}
 	asyncDirectAnswerRequested bool

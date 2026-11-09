@@ -12,12 +12,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// GetAsyncExecutionManager binds one manager to the current task on first use.
-// Later calls reuse it even if currentTask changes. Release closes admission and
-// requests cancellation; the retained manager remains available for inspection.
+// GetAsyncExecutionManager delegates to a session-scoped invoker when
+// available. Standalone loops retain the task-scoped fallback used by tests and
+// non-ReAct runtimes.
 func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
 	if r == nil {
 		return nil, errors.New("re-act loop is nil")
+	}
+	if provider, ok := r.invoker.(aicommon.AsyncExecutionManagerProvider); ok {
+		released := r.asyncAdmissionClosed()
+		if released && provider.PeekAsyncExecutionManager() == nil {
+			return nil, asyncexecmanager.ErrClosed
+		}
+		return provider.GetAsyncExecutionManager()
 	}
 	task := r.GetCurrentTask()
 	r.onReleaseMutex.Lock()
@@ -42,22 +49,28 @@ func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error
 	r.asyncExecutionManager = manager
 	taskContext := task.GetContext()
 	r.onReleaseMutex.Unlock()
-	go r.watchAsyncExecutionManager(taskContext, manager)
+	go WatchAsyncExecutionManager(taskContext, manager, func(overview asyncexecmanager.Overview) {
+		if r.GetEmitter() != nil {
+			_, _ = r.GetEmitter().EmitStructured(
+				AsyncExecutionSyncNodeID,
+				BuildAsyncExecutionSnapshot(overview, r.persistentSessionID(), r.currentTaskID()),
+			)
+		}
+	})
 	return manager, nil
 }
 
 // StartAsyncToolCall prepares the caller through the runtime and submits it to
-// this loop's manager. It returns an execution receipt, never a tool result.
-// The explicit owner task is fixed before preparation or background execution.
+// the loop or session manager. It returns an execution receipt, never a tool
+// result. The source task is fixed for review and result attribution.
 func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, opts ...aicommon.ToolCallerOption) (asyncexecmanager.Summary, error) {
+	_, sessionOwned := r.invoker.(aicommon.AsyncExecutionManagerProvider)
 	manager, err := r.GetAsyncExecutionManager()
 	if err != nil {
 		return asyncexecmanager.Summary{}, err
 	}
-	r.onReleaseMutex.Lock()
-	released := r.released
-	r.onReleaseMutex.Unlock()
-	if released {
+	admissionClosed := r.asyncAdmissionClosed()
+	if admissionClosed {
 		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
 	}
 	runtime, ok := r.invoker.(aicommon.AsyncToolCallRuntime)
@@ -82,13 +95,19 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		return asyncexecmanager.Summary{}, errors.New("async tool preparation must provide cancellation")
 	}
 	r.onReleaseMutex.Lock()
-	if r.released {
-		r.onReleaseMutex.Unlock()
+	admissionClosed = r.asyncAdmissionClosedLocked()
+	if !sessionOwned {
+		r.onRelease = append(r.onRelease, cancel)
+	}
+	r.onReleaseMutex.Unlock()
+	if provider, ok := r.invoker.(aicommon.AsyncDirectAnswerProvider); ok &&
+		provider.AsyncDirectAnswerRequested() {
+		admissionClosed = true
+	}
+	if admissionClosed {
 		cancel()
 		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
 	}
-	r.onRelease = append(r.onRelease, cancel)
-	r.onReleaseMutex.Unlock()
 	attributes := map[string]string{"task_id": task.GetId(), "loop": r.GetLoopName()}
 	if identity, ok := resource.(interface {
 		CallToolID() string
@@ -97,12 +116,39 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		attributes["call_tool_id"] = identity.CallToolID()
 		attributes["result_id"] = fmt.Sprint(identity.ResultID())
 	}
+	if provider, ok := r.invoker.(aicommon.AsyncDirectAnswerProvider); ok {
+		releaseAdmission, allowed := provider.BeginAsyncExecutionAdmission()
+		if !allowed {
+			cancel()
+			return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
+		}
+		defer releaseAdmission()
+	}
 	receipt, err := manager.Start(asyncexecmanager.Request{
 		ID: executionID, Resource: resource,
 		Metadata: asyncexecmanager.Metadata{Name: name, Attributes: attributes},
 	})
 	if err != nil {
 		cancel()
+		return receipt, err
+	}
+	if tracker, ok := r.invoker.(aicommon.AsyncExecutionTaskTracker); ok {
+		tracker.TrackAsyncExecutionTask(task, receipt.ID)
 	}
 	return receipt, err
+}
+
+func (r *ReActLoop) asyncAdmissionClosed() bool {
+	r.onReleaseMutex.Lock()
+	closed := r.asyncAdmissionClosedLocked()
+	r.onReleaseMutex.Unlock()
+	if provider, ok := r.invoker.(aicommon.AsyncDirectAnswerProvider); ok &&
+		provider.AsyncDirectAnswerRequested() {
+		return true
+	}
+	return closed
+}
+
+func (r *ReActLoop) asyncAdmissionClosedLocked() bool {
+	return r.released || r.asyncDirectAnswerRequested
 }

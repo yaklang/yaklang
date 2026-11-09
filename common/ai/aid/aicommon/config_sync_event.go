@@ -31,7 +31,7 @@ const (
 	SYNC_TYPE_PERCEPTION                  = "perception_sync"
 	SYNC_TYPE_SESSION_SNAPSHOT            = "session_snapshot_sync"
 	SYNC_TYPE_TASK_SNAPSHOT               = "task_snapshot_sync"
-	// SYNC_TYPE_ASYNC_EXECUTION returns the current loop's background tool
+	// SYNC_TYPE_ASYNC_EXECUTION returns the ReAct session's background tool
 	// executions. The same payload is pushed as structured node "async_execution"
 	// whenever an execution lifecycle changes.
 	SYNC_TYPE_ASYNC_EXECUTION = "async_execution_sync"
