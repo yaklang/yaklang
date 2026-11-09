@@ -12,19 +12,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// GetAsyncExecutionManager delegates to a session-scoped invoker when
-// available. Standalone loops retain the task-scoped fallback used by tests and
-// non-ReAct runtimes.
+// GetAsyncExecutionManager delegates to the runtime contract. A loop without an
+// invoker retains a task-scoped fallback for isolated loop tests.
 func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
 	if r == nil {
 		return nil, errors.New("re-act loop is nil")
 	}
-	if provider, ok := r.invoker.(aicommon.AsyncExecutionManagerProvider); ok {
+	if !utils.IsNil(r.invoker) {
 		released := r.asyncAdmissionClosed()
-		if released && provider.PeekAsyncExecutionManager() == nil {
+		if released && r.invoker.PeekAsyncExecutionManager() == nil {
 			return nil, asyncexecmanager.ErrClosed
 		}
-		return provider.GetAsyncExecutionManager()
+		return r.invoker.GetAsyncExecutionManager()
 	}
 	task := r.GetCurrentTask()
 	r.onReleaseMutex.Lock()
@@ -64,7 +63,7 @@ func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error
 // the loop or session manager. It returns an execution receipt, never a tool
 // result. The source task is fixed for review and result attribution.
 func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, opts ...aicommon.ToolCallerOption) (asyncexecmanager.Summary, error) {
-	_, sessionOwned := r.invoker.(aicommon.AsyncExecutionManagerProvider)
+	sessionOwned := !utils.IsNil(r.invoker)
 	manager, err := r.GetAsyncExecutionManager()
 	if err != nil {
 		return asyncexecmanager.Summary{}, err
@@ -73,8 +72,7 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 	if admissionClosed {
 		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
 	}
-	runtime, ok := r.invoker.(aicommon.AsyncToolCallRuntime)
-	if !ok || utils.IsNil(runtime) {
+	if utils.IsNil(r.invoker) {
 		return asyncexecmanager.Summary{}, errors.New("runtime does not support async tool calls")
 	}
 	task := r.GetCurrentTask()
@@ -84,7 +82,7 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 	}
 	executionID := "exec-" + ksuid.New().String()
 	opts = append(opts, aicommon.WithToolCaller_AsyncExecutionID(executionID))
-	resource, cancel, err := runtime.PrepareAsyncToolCall(task, name, params, opts...)
+	resource, cancel, err := r.invoker.PrepareAsyncToolCall(task, name, params, opts...)
 	if err != nil {
 		if cancel != nil {
 			cancel()
@@ -100,8 +98,7 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		r.onRelease = append(r.onRelease, cancel)
 	}
 	r.onReleaseMutex.Unlock()
-	if provider, ok := r.invoker.(aicommon.AsyncDirectAnswerProvider); ok &&
-		provider.AsyncDirectAnswerRequested() {
+	if sessionOwned && r.invoker.AsyncDirectAnswerRequested() {
 		admissionClosed = true
 	}
 	if admissionClosed {
@@ -116,8 +113,8 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		attributes["call_tool_id"] = identity.CallToolID()
 		attributes["result_id"] = fmt.Sprint(identity.ResultID())
 	}
-	if provider, ok := r.invoker.(aicommon.AsyncDirectAnswerProvider); ok {
-		releaseAdmission, allowed := provider.BeginAsyncExecutionAdmission()
+	if sessionOwned {
+		releaseAdmission, allowed := r.invoker.BeginAsyncExecutionAdmission()
 		if !allowed {
 			cancel()
 			return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
@@ -132,8 +129,8 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		cancel()
 		return receipt, err
 	}
-	if tracker, ok := r.invoker.(aicommon.AsyncExecutionTaskTracker); ok {
-		tracker.TrackAsyncExecutionTask(task, receipt.ID)
+	if sessionOwned {
+		r.invoker.TrackAsyncExecutionTask(task, receipt.ID)
 	}
 	return receipt, err
 }
@@ -142,8 +139,7 @@ func (r *ReActLoop) asyncAdmissionClosed() bool {
 	r.onReleaseMutex.Lock()
 	closed := r.asyncAdmissionClosedLocked()
 	r.onReleaseMutex.Unlock()
-	if provider, ok := r.invoker.(aicommon.AsyncDirectAnswerProvider); ok &&
-		provider.AsyncDirectAnswerRequested() {
+	if !utils.IsNil(r.invoker) && r.invoker.AsyncDirectAnswerRequested() {
 		return true
 	}
 	return closed

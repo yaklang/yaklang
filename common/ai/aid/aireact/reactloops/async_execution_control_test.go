@@ -3,10 +3,12 @@ package reactloops
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 )
 
 type asyncReviewTimelineInvoker struct {
@@ -36,6 +38,9 @@ func TestAsyncDirectAnswerSignalWritesTimelineOnce(t *testing.T) {
 
 	loop.RequestAsyncDirectAnswer()
 	loop.RequestAsyncDirectAnswer()
+	_, err := loop.GetAsyncExecutionManager()
+	require.ErrorIs(t, err, asyncexecmanager.ErrClosed, "review stop must close async admission before manager creation")
+
 	beforeItems := timelineFromConfig(cfg).GetIdToTimelineItem().Len()
 	require.True(t, loop.handleAsyncDirectAnswerSignal())
 	require.False(t, loop.handleAsyncDirectAnswerSignal(), "one review request must only be consumed once")
@@ -48,6 +53,11 @@ func TestAsyncDirectAnswerSignalWritesTimelineOnce(t *testing.T) {
 	require.Contains(t, serialized, "用户在后台工具调用审批中要求直接回答")
 	require.Contains(t, serialized, "下一步使用 directly_answer")
 
-	_, err = loop.GetAsyncExecutionManager()
-	require.Error(t, err, "review stop must close later async admission even before manager creation")
+	manager, err := loop.GetAsyncExecutionManager()
+	require.NoError(t, err, "acknowledging direct answer must reopen session admission")
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
+		defer cleanupCancel()
+		require.NoError(t, manager.Shutdown(cleanupCtx))
+	})
 }

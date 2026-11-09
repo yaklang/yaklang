@@ -1,5 +1,7 @@
 package reactloops
 
+import "github.com/yaklang/yaklang/common/utils"
+
 const asyncDirectAnswerTimelineInstruction = `用户在后台工具调用审批中要求直接回答。
 
 不要继续调用业务工具，也不要继续等待或执行后台任务。请依据当前 Timeline 中已经获得的信息，下一步使用 directly_answer 回答用户；已经取消或尚未完成的工作需要明确说明。`
@@ -8,10 +10,8 @@ const asyncDirectAnswerTimelineInstruction = `用户在后台工具调用审批�
 // loop-local fallback. A background review cannot generate a concurrent answer
 // or exit another ReAct session.
 func (r *ReActLoop) AsyncDirectAnswerSignal() <-chan struct{} {
-	if provider, ok := r.invoker.(interface {
-		AsyncDirectAnswerSignal() <-chan struct{}
-	}); ok {
-		return provider.AsyncDirectAnswerSignal()
+	if !utils.IsNil(r.invoker) {
+		return r.invoker.AsyncDirectAnswerSignal()
 	}
 	r.onReleaseMutex.Lock()
 	defer r.onReleaseMutex.Unlock()
@@ -21,10 +21,8 @@ func (r *ReActLoop) AsyncDirectAnswerSignal() <-chan struct{} {
 	return r.asyncDirectAnswer
 }
 func (r *ReActLoop) RequestAsyncDirectAnswer() {
-	if provider, ok := r.invoker.(interface {
-		RequestAsyncDirectAnswer()
-	}); ok {
-		provider.RequestAsyncDirectAnswer()
+	if !utils.IsNil(r.invoker) {
+		r.invoker.RequestAsyncDirectAnswer()
 		return
 	}
 	r.onReleaseMutex.Lock()
@@ -50,10 +48,8 @@ func (r *ReActLoop) handleAsyncDirectAnswerSignal() bool {
 	if r == nil {
 		return false
 	}
-	if provider, ok := r.invoker.(interface {
-		ConsumeAsyncDirectAnswer() bool
-	}); ok {
-		if !provider.ConsumeAsyncDirectAnswer() {
+	if !utils.IsNil(r.invoker) {
+		if !r.invoker.ConsumeAsyncDirectAnswer() {
 			return false
 		}
 		r.StopSubAgentsForUser()

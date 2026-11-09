@@ -30,6 +30,8 @@ func TestAsyncDirectAnswerCrossesTaskLoopBoundary(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("released loop request did not wake the next task loop")
 	}
+	_, err = react.GetAsyncExecutionManager()
+	require.ErrorIs(t, err, asyncexecmanager.ErrClosed)
 	_, err = second.GetAsyncExecutionManager()
 	require.ErrorIs(t, err, asyncexecmanager.ErrClosed)
 	require.True(t, react.ConsumeAsyncDirectAnswer())

@@ -152,12 +152,22 @@ func TestAsyncExecutionAutoContext(t *testing.T) {
 	require.Equal(t, 1, strings.Count(escaped, "<|ASYNC_EXECUTIONS_END_escaped|>"))
 	require.Contains(t, first, "executions:\n  - execute_id: \"capture\"\n    name: \"抓取流量\"\n    state: running\n")
 
-	t.Log("3. Another task becoming current does not share either loop's resources")
-	child := NewMinimalReActLoop(cfg, invoker)
+	t.Log("3. Invoker identity owns the execution scope across task loops")
+	sibling := NewMinimalReActLoop(cfg, invoker)
+	defer sibling.Release()
+	sibling.SetCurrentTask(mock.NewMockStatefulTask(ctx, "sibling", "same session work"))
+	siblingManager, err := sibling.GetAsyncExecutionManager()
+	require.NoError(t, err)
+	require.Same(t, manager, siblingManager, "loops using one runtime must share its session manager")
+
+	childInvoker := mock.NewMockInvoker(ctx)
+	childInvoker.SetConfig(cfg)
+	child := NewMinimalReActLoop(cfg, childInvoker)
 	defer child.Release()
 	child.SetCurrentTask(mock.NewMockStatefulTask(ctx, "child", "independent child work"))
 	childManager, err := child.GetAsyncExecutionManager()
 	require.NoError(t, err)
+	require.NotSame(t, manager, childManager, "loops using different runtimes must have isolated managers")
 	childResource, err := asyncexecmanager.NewResource(func(context.Context) error { return nil },
 		func(context.Context) (asyncexecmanager.Observation, error) {
 			return asyncexecmanager.Observation{}, nil

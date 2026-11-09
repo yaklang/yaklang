@@ -156,16 +156,15 @@ Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
 ToolCaller 已实现 Inspector；工具提交入口和管理 action 已接入，directly_call_tool 的
 单调用异步标记和批量每项 async 均已生效，同一批次可混合同步和异步执行。
-ReAct 实现 `AsyncExecutionManagerProvider` 并持有 session-scoped Manager。
-ReActLoop 的 `GetAsyncExecutionManager()` 优先委托给 invoker；多个 task 创建的
-loop 在同一个 ReAct 会话内拿到同一 Manager。Loop Release 不再关闭 session
+Async execution 是 `AIInvokeRuntime` 的显式能力。ReAct 实现这些方法并持有
+session-scoped Manager；ReActLoop 直接委托给 invoker，多个 task 创建的 loop
+在同一个 ReAct 会话内拿到同一 Manager。Loop Release 不再关闭 session
 Manager，因此本轮的 task 正常结束后，下一轮仍可查询、等待或停止旧 execution。
-只有独立使用且 invoker 不提供 session Manager 的 loop，才保留 task-scoped
-fallback，并由该 fallback loop 的 Release 关闭。
+只有未绑定 invoker 的独立 loop 才保留 task-scoped fallback，并由该 fallback
+loop 的 Release 关闭。
 工具调用使用 `loop.StartAsyncToolCall(name, params, options...)`，不需要手动创建
-caller 或 resource。它通过可选的 AsyncToolCallRuntime 准备工具，再注册到 loop
-的 Manager；不支持该扩展的 runtime 会明确返回错误，不改动 AIInvokeRuntime 的
-公共接口。工具查找、owner 的守卫/参数修正、原审查与执行链路都会保留。
+caller 或 resource。它通过 `AIInvokeRuntime.PrepareAsyncToolCall` 准备工具，再
+注册到 Manager。工具查找、owner 的守卫/参数修正、原审查与执行链路都会保留。
 准备阶段可能等待 MCP 工具就绪；提交成功后返回 pending 回执，不等待工具结果。
 完成时结果写入准备时捕获的 owner task 和 timeline；Inspector 与任务结果使用同一
 个预先分配的 result ID。后台执行不重新读取 runtime 的 current task，也不因原 task

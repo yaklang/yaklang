@@ -11,12 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-var (
-	_ aicommon.AsyncExecutionManagerProvider = (*ReAct)(nil)
-	_ aicommon.AsyncExecutionTaskTracker     = (*ReAct)(nil)
-	_ aicommon.AsyncDirectAnswerProvider     = (*ReAct)(nil)
-)
-
 const asyncExecutionShutdownTimeout = 5 * time.Second
 
 // GetAsyncExecutionManager lazily creates the one manager owned by this ReAct
@@ -31,6 +25,10 @@ func (r *ReAct) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
 		manager := r.asyncExecutionManager
 		r.asyncExecutionMu.Unlock()
 		return manager, nil
+	}
+	if r.AsyncDirectAnswerRequested() {
+		r.asyncExecutionMu.Unlock()
+		return nil, asyncexecmanager.ErrClosed
 	}
 	ctx := r.config.GetContext()
 	if ctx == nil {
@@ -74,7 +72,7 @@ func (r *ReAct) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
 
 // AsyncExecutionSnapshot returns the session-scoped metadata view consumed by
 // push events and sync responses.
-func (r *ReAct) AsyncExecutionSnapshot() reactloops.AsyncExecutionSnapshot {
+func (r *ReAct) AsyncExecutionSnapshot() aicommon.AsyncExecutionSnapshot {
 	if r == nil {
 		return reactloops.BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
 	}

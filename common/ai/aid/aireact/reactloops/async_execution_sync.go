@@ -2,42 +2,19 @@ package reactloops
 
 import (
 	"context"
-	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const AsyncExecutionSyncNodeID = "async_execution"
 
-// AsyncExecutionSnapshot is shared by push events and explicit sync queries.
-// RunningCount includes pending, running and stopping executions because each
-// one still owns an active execution slot until its cleanup reaches a terminal
-// state.
-type AsyncExecutionSnapshot struct {
-	Revision      uint64                     `json:"revision"`
-	SessionID     string                     `json:"session_id,omitempty"`
-	CurrentTaskID string                     `json:"current_task_id,omitempty"`
-	RunningCount  int                        `json:"running_count"`
-	UpdatedAt     int64                      `json:"updated_at"`
-	Executions    []asyncexecmanager.Summary `json:"executions"`
-	Execution     *asyncexecmanager.Summary  `json:"execution,omitempty"`
-	Error         string                     `json:"error,omitempty"`
-}
+type AsyncExecutionSnapshot = aicommon.AsyncExecutionSnapshot
 
 // BuildAsyncExecutionSnapshot builds the shared metadata-only wire payload.
 func BuildAsyncExecutionSnapshot(overview asyncexecmanager.Overview, sessionID, currentTaskID string) AsyncExecutionSnapshot {
-	executions := overview.Executions
-	if executions == nil {
-		executions = make([]asyncexecmanager.Summary, 0)
-	}
-	return AsyncExecutionSnapshot{
-		Revision:      overview.Revision,
-		SessionID:     sessionID,
-		CurrentTaskID: currentTaskID,
-		RunningCount:  overview.RunningCount(),
-		UpdatedAt:     time.Now().UnixMilli(),
-		Executions:    executions,
-	}
+	return aicommon.BuildAsyncExecutionSnapshot(overview, sessionID, currentTaskID)
 }
 
 // AsyncExecutionSnapshot returns a metadata-only view of this loop's manager.
@@ -47,10 +24,8 @@ func (r *ReActLoop) AsyncExecutionSnapshot() AsyncExecutionSnapshot {
 	if r == nil {
 		return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
 	}
-	if provider, ok := r.invoker.(interface {
-		AsyncExecutionSnapshot() AsyncExecutionSnapshot
-	}); ok {
-		return provider.AsyncExecutionSnapshot()
+	if !utils.IsNil(r.invoker) {
+		return r.invoker.AsyncExecutionSnapshot()
 	}
 	manager := r.PeekAsyncExecutionManager()
 	if manager == nil {
@@ -85,10 +60,8 @@ func (r *ReActLoop) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
 	if r == nil {
 		return nil
 	}
-	if provider, ok := r.invoker.(interface {
-		PeekAsyncExecutionManager() *asyncexecmanager.Manager
-	}); ok {
-		return provider.PeekAsyncExecutionManager()
+	if !utils.IsNil(r.invoker) {
+		return r.invoker.PeekAsyncExecutionManager()
 	}
 	r.onReleaseMutex.Lock()
 	defer r.onReleaseMutex.Unlock()
