@@ -141,19 +141,32 @@ func (r *Report) AddRisks(risk ...*Risk) {
 	if r.Risks == nil {
 		r.Risks = make(map[string]*Risk)
 	}
+	added := 0
 	for _, risk := range risk {
+		if risk == nil {
+			continue
+		}
 		// set program from risk if not set in report
 		// TODO:不同program的risk能放在一个报告吗？
 		if r.ProgramName == "" && risk.GetProgramName() != "" {
 			r.ProgramName = risk.GetProgramName()
 		}
 
-		r.Risks[risk.GetHash()] = risk
+		hash := risk.GetHash()
+		if _, exists := r.Risks[hash]; !exists {
+			added++
+		}
+		r.Risks[hash] = risk
 	}
-	r.sinceFlush++
+	// Count findings, not add calls. A scan can re-add the same hash on every
+	// update; counting those calls triggered a full-document marshal every 500
+	// updates (77GB of JSON on the ab8 core scan) even though the document did
+	// not grow.
+	r.sinceFlush += added
 	flush := r.shouldFlushLocked()
+	writes := r.writer != nil
 	r.mu.Unlock()
-	if flush {
+	if flush && writes {
 		// Serializing the document is cheap compared to the write; the write
 		// itself happens on the flusher so a long scan does not stall.
 		if data, err := r.snapshotJSON(); err != nil {
@@ -202,6 +215,7 @@ func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 		return nil
 	}
 	r.mu.Lock()
+	before := len(r.Risks)
 	switch item.Mode {
 	case schema.RiskUpdateDelete:
 		r.dropRiskLocked(item.OldHash)
@@ -211,9 +225,15 @@ func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 		}
 		r.addSchemaRiskLocked(item.Risk)
 	}
+	// Only document growth warrants another snapshot. Duplicate and in-place
+	// update events must not serialize the whole report.
+	if added := len(r.Risks) - before; added > 0 {
+		r.sinceFlush += added
+	}
 	flush := r.shouldFlushLocked()
+	writes := r.writer != nil
 	r.mu.Unlock()
-	if flush {
+	if flush && writes {
 		if data, err := r.snapshotJSON(); err != nil {
 			log.Errorf("serialize report snapshot failed: %v", err)
 		} else {
@@ -253,7 +273,6 @@ func (r *Report) addSchemaRiskLocked(ssarisk *schema.SSARisk) {
 		rule.AddRisk(risk)
 	}
 	r.RiskNums = len(r.Risks)
-	r.sinceFlush++
 }
 
 // dropRiskLocked removes a replaced finding from the map and from the file and
