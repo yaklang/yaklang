@@ -223,7 +223,9 @@ type auditEdgeTargetRow struct {
 
 // LoadAuditEdgeTargetsByResultID loads every live edge of one audit result in
 // a single query. GORM keeps the bind variables and the soft-delete predicate
-// explicit; the projection avoids materializing the wide AuditEdge model.
+// explicit; the projection avoids materializing the wide AuditEdge model. The
+// GORM query callback records the op stats, so this function does not call
+// RecordDBRead itself.
 //
 // The caller caches the result because report generation visits many nodes of
 // the same result. NULL columns are mapped to zero values, matching the
@@ -237,13 +239,11 @@ func LoadAuditEdgeTargetsByResultID(db *gorm.DB, resultID uint) ([]AuditEdgeTarg
 	}
 
 	var rows []auditEdgeTargetRow
-	started := time.Now()
 	err := db.Table(TableAuditEdges).
 		Select("from_node, to_node, edge_type, analysis_step, analysis_label").
 		Where("result_id = ?", resultID).
 		Where("deleted_at IS NULL").
 		Find(&rows).Error
-	RecordDBRead(time.Since(started), err != nil)
 	if err != nil {
 		return nil, err
 	}

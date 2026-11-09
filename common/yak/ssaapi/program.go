@@ -63,8 +63,6 @@ type Program struct {
 	auditEdgeMu       sync.Mutex
 	auditEdgeResultID uint
 	auditEdgeSnapshot *auditEdgeSnapshot
-	auditEdgeChecked  bool
-	auditEdgeLegacy   bool
 }
 
 // resetInterRuleStateCacheThreshold is the default nodeId2ValueCache entry

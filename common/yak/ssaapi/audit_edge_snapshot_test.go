@@ -52,4 +52,5 @@ func TestAuditEdgeSnapshotEmptyIsNotAuthoritative(t *testing.T) {
 	emptyPreds, ok := empty.predecessorsFor("a")
 	require.True(t, ok)
 	require.Empty(t, emptyPreds)
+	require.Equal(t, 0, empty.total)
 }
