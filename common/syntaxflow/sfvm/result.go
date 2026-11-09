@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -31,21 +30,6 @@ type SFFrameResult struct {
 	SymbolTable      *omap.OrderedMap[string, Values]
 	UnNameValue      Values
 	AlertSymbolTable *utils.SafeMap[Values]
-
-	// dataflowResults owns cached raw GetTopDefs/GetBottomUses results for this
-	// rule execution (one SFFrameResult is created per frame exec). ssaapi uses
-	// it to reuse one descent across repeated `#->` / `<-?` opcodes that differ
-	// only in their post-descent include/exclude filters (e.g. the servlet XSS
-	// rule evaluates `$sink#->` twice). Values are opaque any here to keep sfvm
-	// free of an ssaapi dependency; the key includes the input value identity
-	// and the descent-affecting options.
-	dataflowResults     sync.Map
-	dataflowResultCount atomic.Int64
-	// dataflowDescentReuse is true when this frame's rule has more than one
-	// dataflow opcode, i.e. caching a descent can pay off. It lives on the
-	// result (not Config) because sub-rule frames share the parent Config but
-	// have independent result/cache lifetimes.
-	dataflowDescentReuse atomic.Bool
 
 	// symbolIDCache memoizes symbol-name -> {value count, id set}. SyntaxFlow
 	// symbols are append-merged, so an unchanged count means the id set is
@@ -84,54 +68,6 @@ func (s *SFFrameResult) SetSymbolIDSet(name string, count int, ids map[int64]str
 		return
 	}
 	s.symbolIDCache.Store(name, symbolIDCacheEntry{count: count, ids: ids})
-}
-
-// SetDataflowDescentReuse records whether repeated descents may reuse cached
-// raw results for this frame execution.
-func (s *SFFrameResult) SetDataflowDescentReuse(v bool) {
-	if s != nil {
-		s.dataflowDescentReuse.Store(v)
-	}
-}
-
-// DataflowDescentReuse reports whether this frame execution may reuse repeated
-// dataflow descents.
-func (s *SFFrameResult) DataflowDescentReuse() bool {
-	return s != nil && s.dataflowDescentReuse.Load()
-}
-
-// maxDataflowResultCacheEntries bounds retained descent results when a rule
-// has multiple dataflow opcodes but their inputs do not line up. Hitting the
-// cap only disables further caching for the rest of the rule execution.
-const maxDataflowResultCacheEntries = 200000
-
-// TakeDataflowResult removes and returns a cached raw dataflow descent result.
-// Taking (rather than loading) releases the retained value as soon as the
-// repeated opcode consumes it.
-func (s *SFFrameResult) TakeDataflowResult(key string) (any, bool) {
-	if s == nil || key == "" {
-		return nil, false
-	}
-	value, ok := s.dataflowResults.LoadAndDelete(key)
-	if ok {
-		s.dataflowResultCount.Add(-1)
-	}
-	return value, ok
-}
-
-// SetDataflowResult stores a raw dataflow descent result for the lifetime of
-// this frame execution. Flush creates a new SFFrameResult, so the cache never
-// outlives one rule run.
-func (s *SFFrameResult) SetDataflowResult(key string, value any) {
-	if s == nil || key == "" {
-		return
-	}
-	if s.dataflowResultCount.Load() >= maxDataflowResultCacheEntries {
-		return
-	}
-	if _, loaded := s.dataflowResults.LoadOrStore(key, value); !loaded {
-		s.dataflowResultCount.Add(1)
-	}
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {

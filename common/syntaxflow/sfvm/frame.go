@@ -366,17 +366,6 @@ func (s *SFFrame) exec(feedValue Values) (ret error) {
 	// clear
 	s.Flush()
 
-	// Descent reuse is only worth its retained memory when the rule actually
-	// contains more than one dataflow opcode. A single `#->` rule must not cache
-	// every input's raw top-def set until the rule ends.
-	dataflowOpcodes := 0
-	for _, code := range s.Codes {
-		if code.OpCode == OpGetTopDefs || code.OpCode == OpGetBottomUsers {
-			dataflowOpcodes++
-		}
-	}
-	s.result.SetDataflowDescentReuse(dataflowOpcodes > 1)
-
 	start := time.Now()
 	defer func() {
 		if err := recover(); err != nil {
