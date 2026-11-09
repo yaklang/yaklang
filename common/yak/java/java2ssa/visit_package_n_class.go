@@ -426,8 +426,9 @@ func (y *singleFileBuilder) VisitClassOrInterfaceType(raw javaparser.IClassOrInt
 			// A deferred explicit import can reach this fallback before its
 			// package is bound. It must not also acquire the importing package's
 			// guessed identity merely because that package compiled first.
-			names := make([]string, 0, len(typ.GetFullTypeNames()))
-			for _, name := range typ.GetFullTypeNames() {
+			current := typ.GetFullTypeNames()
+			names := make([]string, 0, len(current))
+			for _, name := range current {
 				if name != fallback {
 					names = append(names, name)
 				}
