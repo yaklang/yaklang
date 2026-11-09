@@ -18,21 +18,22 @@ func TestReport_AddRisksCountsOnlyNewFindings(t *testing.T) {
 		report.AddRisks(same)
 	}
 	require.Len(t, report.Risks, 1)
-	require.Equal(t, 1, report.sinceFlush, "only the first add is a new finding")
+	require.Zero(t, report.flushedRisks, "no snapshot: the document holds one finding")
 
-	// A replacement risk under the same hash does not grow the document.
+	// Replacing the body under the same hash does not grow the document.
 	for i := 0; i < reportFlushEvery; i++ {
 		report.AddRisks(&Risk{Hash: "same", Title: fmt.Sprintf("body-%d", i)})
 	}
-	require.Equal(t, 1, report.sinceFlush)
+	require.Len(t, report.Risks, 1)
+	require.Zero(t, report.flushedRisks)
 
-	// Unique findings still reach the snapshot threshold and reset it.
+	// Unique findings still reach the snapshot threshold and reset the baseline.
 	threshold := NewReport(IRifyReportType)
 	for i := 0; i < reportFlushEvery; i++ {
 		threshold.AddRisks(&Risk{Hash: fmt.Sprintf("unique-%d", i)})
 	}
 	require.Len(t, threshold.Risks, reportFlushEvery)
-	require.Zero(t, threshold.sinceFlush)
+	require.Equal(t, reportFlushEvery, threshold.flushedRisks)
 }
 
 // The same rule applies to risk updates: only growth in the document counts.
@@ -46,10 +47,10 @@ func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
 		require.NoError(t, report.ApplyRiskUpdate(item))
 	}
 	require.Len(t, report.Risks, 1)
-	require.Equal(t, 1, report.sinceFlush)
+	require.Zero(t, report.flushedRisks)
 
-	// Replacing a risk under a new hash keeps the count unchanged and must not
-	// masquerade as a newly collected finding.
+	// Replacing a risk under a new hash keeps the document the same size, so
+	// it must not masquerade as newly collected findings.
 	replacement := schema.RiskUpdateItem{
 		Mode:    schema.RiskUpdateUpdate,
 		OldHash: "one",
@@ -57,7 +58,7 @@ func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
 	}
 	require.NoError(t, report.ApplyRiskUpdate(replacement))
 	require.Len(t, report.Risks, 1)
-	require.Equal(t, 1, report.sinceFlush)
+	require.Zero(t, report.flushedRisks)
 
 	threshold := NewReport(IRifyReportType)
 	for i := 0; i < reportFlushEvery; i++ {
@@ -67,5 +68,37 @@ func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
 		}))
 	}
 	require.Len(t, threshold.Risks, reportFlushEvery)
-	require.Zero(t, threshold.sinceFlush)
+	require.Equal(t, reportFlushEvery, threshold.flushedRisks)
+}
+
+// A create/delete churn that keeps the document size steady must not publish
+// another snapshot: the scan rewrites one feature many times, and each rewrite
+// used to serialize the whole 408MB document.
+func TestReport_RewriteChurnDoesNotFlush(t *testing.T) {
+	report := NewReport(IRifyReportType)
+	for i := 0; i < reportFlushEvery; i++ {
+		require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
+			Mode: schema.RiskUpdateCreate,
+			Risk: &schema.SSARisk{Hash: fmt.Sprintf("hash-0-%d", i), Title: "base", RiskType: "demo"},
+		}))
+	}
+	require.Equal(t, reportFlushEvery, report.flushedRisks)
+
+	// Rewrite every finding under a new hash: document size is unchanged.
+	for round := 0; round < 3; round++ {
+		for i := 0; i < reportFlushEvery; i++ {
+			require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
+				Mode:    schema.RiskUpdateUpdate,
+				OldHash: fmt.Sprintf("hash-%d-%d", round, i),
+				Risk: &schema.SSARisk{
+					Hash:     fmt.Sprintf("hash-%d-%d", round+1, i),
+					Title:    "rewritten",
+					RiskType: "demo",
+				},
+			}))
+		}
+	}
+	require.Len(t, report.Risks, reportFlushEvery)
+	require.Equal(t, reportFlushEvery, report.flushedRisks,
+		"rewrites must not move the snapshot baseline")
 }
