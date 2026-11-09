@@ -16,14 +16,60 @@ import (
 // `*<getCallee> & $filter` (optionally `<self>`/spacing variants we do not
 // claim). This pattern is monotone: once a path contains a call whose callee is
 // in $filter, adding more path values cannot make the exclude stop matching.
-// That property is what makes branch pruning sound; any other exclude text
-// disables pruning and keeps the full path enumeration.
+// That property is what makes branch pruning sound. The same shape with a
+// trailing `as $alias` or repeated `& $sym` is classified by dataflowFilterShape
+// and also enables pruning; any other exclude text keeps the full path
+// enumeration.
+//
+// The two regexes are the allocation-free pre-check for the common builtin
+// shapes; dataflowFilterShape covers everything else.
 var simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
 
 // simpleDataflowInclude matches the common `* & $source` / `<self> & $source`
-// include shape (also accepted by fastPathMatch). Only this shape gets the
-// include reachability prefilter; anything else keeps the full path walk.
+// include shape (also accepted by fastPathMatch). These shapes and the
+// AST-classified variants get the include reachability prefilter; anything else
+// keeps the full path walk.
 var simpleDataflowInclude = regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
+
+// dataflowFilterShapeCache memoizes dataflowFilterShape for texts the regexes
+// miss. Classification runs per sfCheck (one per sink) and fastPathMatch runs
+// per enumerated path, so parsing there would cost more than the sub-query it
+// replaces; instead each unique text is parsed at most once per process.
+var dataflowFilterShapeCache sync.Map // string -> dataflowFilterShapeEntry
+
+type dataflowFilterShapeEntry struct {
+	shape sf.DataflowFilterShape
+	ok    bool
+}
+
+// dataflowFilterShape classifies a dataflow include/exclude sub-rule. The
+// regexes handle the common builtin shapes; shapes they miss (a trailing
+// `as $alias`, repeated `& $sym`) are parsed once as a SyntaxFlow AST and
+// cached, because the parser alone costs about as much as compiling the
+// sub-rule it saves.
+func dataflowFilterShape(text string) (sf.DataflowFilterShape, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return sf.DataflowFilterShape{}, false
+	}
+	if m := simpleDataflowInclude.FindStringSubmatch(text); len(m) == 2 {
+		kind := sf.DataflowFilterShapeAny
+		if strings.HasPrefix(text, "<self>") {
+			kind = sf.DataflowFilterShapeSelf
+		}
+		return sf.DataflowFilterShape{Kind: kind, Symbol: m[1]}, true
+	}
+	if m := simpleGetCalleeExclude.FindStringSubmatch(text); len(m) == 2 {
+		return sf.DataflowFilterShape{Kind: sf.DataflowFilterShapeCallee, Symbol: m[1]}, true
+	}
+	if cached, ok := dataflowFilterShapeCache.Load(text); ok {
+		entry := cached.(dataflowFilterShapeEntry)
+		return entry.shape, entry.ok
+	}
+	shape, ok := sf.ParseDataflowFilterShape(text)
+	dataflowFilterShapeCache.Store(text, dataflowFilterShapeEntry{shape: shape, ok: ok})
+	return shape, ok
+}
 
 type sfCheck struct {
 	contextResult *sf.SFFrameResult
@@ -205,7 +251,7 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 			c.matchItem = append(c.matchItem, checkItem)
 			if item.Key == sf.RecursiveConfig_Exclude {
 				c.excludeItems = append(c.excludeItems, checkItem)
-				if !simpleGetCalleeExclude.MatchString(strings.TrimSpace(item.Value)) {
+				if shape, ok := dataflowFilterShape(item.Value); !ok || shape.Kind != sf.DataflowFilterShapeCallee {
 					c.excludePrunable = false
 				}
 			}
@@ -229,22 +275,31 @@ func (c *sfCheck) isSimpleFastPathItem(item *sf.RecursiveConfigItem) bool {
 	if c == nil || item == nil {
 		return false
 	}
+	shape, ok := dataflowFilterShape(item.Value)
+	if !ok {
+		return false
+	}
 	switch item.Key {
 	case sf.RecursiveConfig_Include:
-		sym, ok := simpleIncludeSymbol(item.Value)
-		return ok && len(c.fastMatchSymbolIDs(sym)) > 0
+		if shape.Kind != sf.DataflowFilterShapeAny && shape.Kind != sf.DataflowFilterShapeSelf {
+			return false
+		}
 	case sf.RecursiveConfig_Exclude:
-		sym, ok := simpleGetCalleeExcludeSymbol(item.Value)
-		return ok && len(c.fastMatchSymbolIDs(sym)) > 0
+		// Only the monotone `*<getCallee> & $sym` exclude is safe to prune on;
+		// an include-style exclude stays on the full query.
+		if shape.Kind != sf.DataflowFilterShapeCallee {
+			return false
+		}
 	default:
 		return false
 	}
+	return len(c.fastMatchSymbolIDs(shape.Symbol)) > 0
 }
 
 // compiledFrame returns a compiled *sf.SFFrame for the given sub-rule text,
 // memoized within this sfCheck. dataflow(include=/exclude=) sub-rules are
 // appended once per native-call sfCheck but the SAME text (e.g.
-// `* & $params as $__next__`) is recompiled across every rule in a scan —
+// `*?{opcode: call} as $__next__`) is recompiled across every rule in a scan —
 // driving regexp compile to ~10GB on large projects. Memoizing per-sfCheck
 // (a) dedupes when the same text is appended more than once, and
 // (b) bounds the VM's `s.frames` slice (vm.go Compile appends without limit).
@@ -392,12 +447,13 @@ func (r *sfCheck) check(
 	}
 }
 
-// fastPathMatch short-circuits the most common dataflow include/exclude
-// sub-rules (`* & $source`, `<self> & $source`, and their $sink variants) by
-// checking path-node ids against the already-bound symbol set. This avoids a
-// full SyntaxFlow sub-query per enumerated path, which dominated the heavy
-// log-forging / path-traversal rules. Returns ok=false for anything it cannot
-// prove equivalent, so semantics always fall back to the full query.
+// fastPathMatch short-circuits the common dataflow include/exclude sub-rules
+// (`* & $source`, `<self> & $source`, `*<getCallee> & $filter` and their
+// `as $alias` forms) by checking path-node ids against the already-bound symbol
+// set. This avoids a full SyntaxFlow sub-query per enumerated path, which
+// dominated the heavy log-forging / path-traversal rules. Returns ok=false for
+// anything it cannot prove equivalent, so semantics always fall back to the
+// full query.
 func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 	if r == nil || item == nil || item.Value == "" {
 		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
@@ -405,20 +461,20 @@ func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 	}
 	text := strings.TrimSpace(item.Value)
 
-	// `* & $symbol` / `<self> & $symbol`: path intersects the symbol's ids.
-	if sym, ok := simpleIncludeSymbol(text); ok {
-		if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
-			matched := pathContainsAnyID(path, ids)
-			atomic.AddInt64(&fastPathMatchCounter.hit, 1)
-			return matched, true
-		}
-	}
-	// `*<getCallee> & $symbol`: a call on the path has a callee in the symbol.
-	if sym, ok := simpleGetCalleeExcludeSymbol(text); ok {
-		if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
-			matched := pathCalleeMatchesAnyID(path, ids)
-			atomic.AddInt64(&fastPathMatchCounter.hit, 1)
-			return matched, true
+	if shape, ok := dataflowFilterShape(text); ok {
+		if ids := r.fastMatchSymbolIDs(shape.Symbol); len(ids) > 0 {
+			switch shape.Kind {
+			case sf.DataflowFilterShapeAny, sf.DataflowFilterShapeSelf:
+				// `* & $symbol` / `<self> & $symbol`: path intersects the
+				// symbol's ids.
+				atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+				return pathContainsAnyID(path, ids), true
+			case sf.DataflowFilterShapeCallee:
+				// `*<getCallee> & $symbol`: a call on the path has a callee in
+				// the symbol.
+				atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+				return pathCalleeMatchesAnyID(path, ids), true
+			}
 		}
 	}
 
@@ -427,22 +483,6 @@ func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 		log.Infof("fast-path fallback text: %q", text)
 	}
 	return false, false
-}
-
-func simpleIncludeSymbol(text string) (string, bool) {
-	m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(text))
-	if len(m) != 2 {
-		return "", false
-	}
-	return m[1], true
-}
-
-func simpleGetCalleeExcludeSymbol(text string) (string, bool) {
-	m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(text))
-	if len(m) != 2 {
-		return "", false
-	}
-	return m[1], true
 }
 
 func pathContainsAnyID(path sf.Values, ids map[int64]struct{}) bool {
@@ -506,9 +546,9 @@ func (r *sfCheck) CheckExcludeNode(node *Value) bool {
 
 // SimpleIncludeSourceIDs returns the union of the bound value ids referenced
 // by every `* & $symbol` include item. ok=false when there is no include, any
-// include has a shape we cannot prove (aliases, combinations, other patterns),
-// or a referenced symbol is unbound/empty. The reachability prefilter is only
-// an optimization; the full path check remains authoritative.
+// include has a shape we cannot prove (combinations, other patterns), or a
+// referenced symbol is unbound/empty. The reachability prefilter is only an
+// optimization; the full path check remains authoritative.
 func (r *sfCheck) SimpleIncludeSourceIDs() (map[int64]struct{}, bool) {
 	if r == nil {
 		return nil, false
@@ -520,11 +560,11 @@ func (r *sfCheck) SimpleIncludeSourceIDs() (map[int64]struct{}, bool) {
 			continue
 		}
 		found = true
-		m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(item.Value))
-		if len(m) != 2 {
+		shape, ok := dataflowFilterShape(item.Value)
+		if !ok || (shape.Kind != sf.DataflowFilterShapeAny && shape.Kind != sf.DataflowFilterShapeSelf) {
 			return nil, false
 		}
-		symbolIDs := r.fastMatchSymbolIDs(m[1])
+		symbolIDs := r.fastMatchSymbolIDs(shape.Symbol)
 		if len(symbolIDs) == 0 {
 			return nil, false
 		}
@@ -545,12 +585,12 @@ func (r *sfCheck) prepareExcludePruneIDs() bool {
 	r.excludePruneOnce.Do(func() {
 		ids := make(map[int64]struct{})
 		for _, item := range r.excludeItems {
-			m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(item.Value))
-			if len(m) != 2 {
+			shape, ok := dataflowFilterShape(item.Value)
+			if !ok || shape.Kind != sf.DataflowFilterShapeCallee {
 				r.excludePrunable = false
 				return
 			}
-			for id := range r.fastMatchSymbolIDs(m[1]) {
+			for id := range r.fastMatchSymbolIDs(shape.Symbol) {
 				ids[id] = struct{}{}
 			}
 		}

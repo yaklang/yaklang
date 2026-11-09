@@ -114,12 +114,33 @@ func TestSimpleIncludeSourceIDs(t *testing.T) {
 	require.True(t, check.CheckMatch(sf.Values{source}))
 	require.False(t, check.CheckMatch(sf.Values{fastMatchTestValue(t, prog, 99)}))
 
-	complexCheck := CreateCheck(result, config)
-	complexCheck.AppendItems(&sf.RecursiveConfigItem{
+	aliasCheck := CreateCheck(result, config)
+	aliasCheck.AppendItems(&sf.RecursiveConfigItem{
 		Key:            string(sf.RecursiveConfig_Include),
 		Value:          "* & $source as $alias",
 		SyntaxFlowRule: true,
 	})
+	aliasIDs, ok := aliasCheck.SimpleIncludeSourceIDs()
+	require.True(t, ok, "a trailing alias does not change the include predicate")
+	require.Contains(t, aliasIDs, source.GetId())
+	require.Nil(t, aliasCheck.matchItem[0].frame, "an aliased simple include must not compile a sub-rule frame")
+
+	repeatedCheck := CreateCheck(result, config)
+	repeatedCheck.AppendItems(&sf.RecursiveConfigItem{
+		Key:            string(sf.RecursiveConfig_Include),
+		Value:          "* & $source & $source",
+		SyntaxFlowRule: true,
+	})
+	require.Nil(t, repeatedCheck.matchItem[0].frame, "repeated intersections of one symbol are idempotent")
+	require.True(t, repeatedCheck.CheckMatch(sf.Values{source}))
+	require.False(t, repeatedCheck.CheckMatch(sf.Values{fastMatchTestValue(t, prog, 98)}))
+
+	complexCheck := CreateCheck(result, config)
+	complexCheck.AppendItems(&sf.RecursiveConfigItem{
+		Key:            string(sf.RecursiveConfig_Include),
+		Value:          "* & $source & $other",
+		SyntaxFlowRule: true,
+	})
 	_, ok = complexCheck.SimpleIncludeSourceIDs()
-	require.False(t, ok, "include shapes with aliases must disable the prefilter")
+	require.False(t, ok, "intersections of different symbols must disable the prefilter")
 }
