@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -149,3 +150,9 @@ func (b *SnapshotBuffer) Flush() error {
 	_, err := b.dst.Write(data)
 	return err
 }
+
+// reportFlushMinInterval bounds how often an intermediate snapshot may be
+// published. Overridable in tests; 0 disables the throttle.
+var reportFlushMinIntervalValue = 30 * time.Second
+
+func reportFlushMinInterval() time.Duration { return reportFlushMinIntervalValue }

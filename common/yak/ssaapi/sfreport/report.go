@@ -18,13 +18,15 @@ type Report struct {
 	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
 	// It must not be serialized into JSON.
 	fileByHash map[string]*File `json:"-"`
-	// flushedRisks is len(Risks) when the last snapshot was published.
-	// Growth is measured from this baseline, not accumulated per call: the
-	// scan rewrites findings (delete + create under a new hash) far more often
-	// than the document grows, and a per-call counter made those rewrites
-	// trigger another full-document marshal. On the javacms-core scan that
-	// produced ~77GB of JSON allocation for a 408MB document.
-	flushedRisks int `json:"-"`
+	// flushedRisks is len(Risks) when the last snapshot was published, and
+	// lastFlush is when it happened. Growth is measured from this baseline,
+	// not accumulated per call: the scan rewrites findings (delete + create
+	// under a new hash) far more often than the document grows, and a per-call
+	// counter made those rewrites trigger another full-document marshal. On the
+	// javacms-core scan that produced ~77GB of JSON allocation for a single
+	// 408MB document.
+	flushedRisks int       `json:"-"`
+	lastFlush    time.Time `json:"-"`
 	// flusher writes intermediate snapshots in the background so a long scan
 	// does not stall on the report file. A final Save() drains and stops it.
 	flusher *reportFlusher `json:"-"`
@@ -202,7 +204,17 @@ func (r *Report) shouldFlushLocked() bool {
 	if len(r.Risks)-r.flushedRisks < reportFlushEvery {
 		return false
 	}
+	// A scan rewrites findings far faster than the document grows, so the
+	// counter alone still publishes hundreds of 408MB documents per run.
+	// Snapshots are a crash-resilience aid, not a live feed: one per interval
+	// is enough, and the final Save() always writes the complete document.
+	if interval := reportFlushMinInterval(); interval > 0 && !r.lastFlush.IsZero() {
+		if time.Since(r.lastFlush) < interval {
+			return false
+		}
+	}
 	r.flushedRisks = len(r.Risks)
+	r.lastFlush = time.Now()
 	return true
 }
 
