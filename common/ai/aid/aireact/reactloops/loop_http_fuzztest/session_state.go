@@ -2,20 +2,15 @@ package loop_http_fuzztest
 
 import (
 	"encoding/json"
-	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const loopHTTPFuzzSessionContextMarker = "[HTTP_FUZZ_SESSION_CONTEXT]"
+const loopHTTPFuzzTimelineContextMarker = "[HTTP_FUZZ_TIMELINE_CONTEXT]"
 
 type loopHTTPFuzzSessionContext struct {
 	Version                   int                        `json:"version"`
@@ -113,8 +108,7 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 }
 
 func persistLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string) {
-	cfg := getLoopPersistentConfig(loop)
-	if cfg == nil || cfg.GetDB() == nil || cfg.PersistentSessionId == "" {
+	if loop == nil || loop.GetInvoker() == nil {
 		return
 	}
 	ctx := captureLoopHTTPFuzzSessionContext(loop, source)
@@ -128,50 +122,12 @@ func persistLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 		return
 	}
 	payload := string(payloadBytes)
-
-	if lastCtx, ok := extractLatestLoopHTTPFuzzSessionContext(cfg.GetUserInputHistory()); ok {
-		if sameLoopHTTPFuzzSessionContext(lastCtx, ctx) {
-			return
-		}
-	}
-
-	record := loopHTTPFuzzSessionContextMarker + " " + payload
-	quotedHistory, err := cfg.AppendUserInputHistory(record, time.Now())
-	if err != nil {
-		log.Warnf("http_fuzztest: append session context history failed: %v", err)
-		return
-	}
-	if err := yakit.UpdateAIAgentRuntimeUserInput(cfg.GetDB(), cfg.GetRuntimeId(), quotedHistory); err != nil {
-		log.Warnf("http_fuzztest: persist session context history failed: %v", err)
-	}
-
-	if loop != nil && loop.GetInvoker() != nil {
-		currentSummary := ctx.CurrentRequestSummary
-		if currentSummary == "" {
-			currentSummary = ctx.OriginalRequestSummary
-		}
+	previousCtx, hadPreviousCtx := loadLatestLoopHTTPFuzzSessionContext(loop)
+	if !hadPreviousCtx || !sameLoopHTTPFuzzSessionContext(previousCtx, ctx) {
 		loop.GetInvoker().AddToTimeline(
 			"http_fuzztest_session_context",
-			fmt.Sprintf("Persisted HTTP fuzz session context (%s): %s", source, utils.ShrinkTextBlock(currentSummary, 200)),
+			loopHTTPFuzzTimelineContextMarker+" "+payload,
 		)
-	}
-	persistLoopHTTPFuzzTimeline(cfg)
-}
-
-func persistLoopHTTPFuzzTimeline(cfg *aicommon.Config) {
-	if cfg == nil || cfg.GetDB() == nil || cfg.PersistentSessionId == "" || cfg.Timeline == nil {
-		return
-	}
-	if cfg.Timeline.IsBranchTimeline() {
-		return
-	}
-	timelineRaw, err := aicommon.MarshalTimeline(cfg.Timeline)
-	if err != nil {
-		log.Warnf("http_fuzztest: marshal timeline failed: %v", err)
-		return
-	}
-	if err := yakit.UpdateAIAgentRuntimeTimeline(cfg.GetDB(), cfg.GetRuntimeId(), strconv.Quote(timelineRaw)); err != nil {
-		log.Warnf("http_fuzztest: persist timeline failed: %v", err)
 	}
 }
 
@@ -238,37 +194,48 @@ func loadLatestLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop) (*loopHTTP
 	if cfg == nil {
 		return nil, false
 	}
-	if ctx, ok := extractLatestLoopHTTPFuzzSessionContext(cfg.GetUserInputHistory()); ok {
-		return ctx, true
-	}
-	if cfg.GetDB() == nil || cfg.PersistentSessionId == "" {
-		return nil, false
-	}
-	runtime, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(cfg.GetDB(), cfg.PersistentSessionId)
-	if err != nil || runtime == nil {
-		return nil, false
-	}
-	return extractLatestLoopHTTPFuzzSessionContext(runtime.GetUserInputHistory())
+	return extractLatestLoopHTTPFuzzSessionContextFromTimeline(cfg.GetTimeline())
 }
 
-func extractLatestLoopHTTPFuzzSessionContext(history []schema.AIAgentUserInputRecord) (*loopHTTPFuzzSessionContext, bool) {
-	for i := len(history) - 1; i >= 0; i-- {
-		input := strings.TrimSpace(history[i].UserInput)
-		if !strings.HasPrefix(input, loopHTTPFuzzSessionContextMarker) {
+func extractLatestLoopHTTPFuzzSessionContextFromTimeline(timeline *aicommon.Timeline) (*loopHTTPFuzzSessionContext, bool) {
+	if timeline == nil {
+		return nil, false
+	}
+	ids := timeline.GetTimelineItemIDs()
+	for i := len(ids) - 1; i >= 0; i-- {
+		item, ok := timeline.GetIdToTimelineItem().Get(ids[i])
+		if !ok || item == nil {
 			continue
 		}
-		payload := strings.TrimSpace(strings.TrimPrefix(input, loopHTTPFuzzSessionContextMarker))
-		if payload == "" {
+		text, ok := item.GetValue().(*aicommon.TextTimelineItem)
+		if !ok || text == nil {
 			continue
 		}
-		var ctx loopHTTPFuzzSessionContext
-		if err := json.Unmarshal([]byte(payload), &ctx); err != nil {
-			log.Warnf("http_fuzztest: unmarshal session context failed: %v", err)
-			continue
+		for _, body := range []string{text.PromptText, text.Text} {
+			idx := strings.Index(body, loopHTTPFuzzTimelineContextMarker)
+			if idx < 0 {
+				continue
+			}
+			payload := strings.TrimSpace(body[idx+len(loopHTTPFuzzTimelineContextMarker):])
+			if ctx, ok := decodeLoopHTTPFuzzSessionContext(payload); ok {
+				return ctx, true
+			}
 		}
-		return &ctx, true
 	}
 	return nil, false
+}
+
+func decodeLoopHTTPFuzzSessionContext(payload string) (*loopHTTPFuzzSessionContext, bool) {
+	payload = strings.TrimSpace(payload)
+	if payload == "" {
+		return nil, false
+	}
+	var ctx loopHTTPFuzzSessionContext
+	if err := json.Unmarshal([]byte(payload), &ctx); err != nil {
+		log.Warnf("http_fuzztest: unmarshal session context failed: %v", err)
+		return nil, false
+	}
+	return &ctx, true
 }
 
 func sameLoopHTTPFuzzSessionContext(left, right *loopHTTPFuzzSessionContext) bool {
