@@ -18,9 +18,13 @@ type Report struct {
 	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
 	// It must not be serialized into JSON.
 	fileByHash map[string]*File `json:"-"`
-	// sinceFlush counts findings added since the last snapshot. A long scan
-	// publishes intermediate snapshots instead of writing only at the end.
-	sinceFlush int `json:"-"`
+	// flushedRisks is len(Risks) when the last snapshot was published.
+	// Growth is measured from this baseline, not accumulated per call: the
+	// scan rewrites findings (delete + create under a new hash) far more often
+	// than the document grows, and a per-call counter made those rewrites
+	// trigger another full-document marshal. On the javacms-core scan that
+	// produced ~77GB of JSON allocation for a 408MB document.
+	flushedRisks int `json:"-"`
 	// flusher writes intermediate snapshots in the background so a long scan
 	// does not stall on the report file. A final Save() drains and stops it.
 	flusher *reportFlusher `json:"-"`
@@ -141,7 +145,6 @@ func (r *Report) AddRisks(risk ...*Risk) {
 	if r.Risks == nil {
 		r.Risks = make(map[string]*Risk)
 	}
-	added := 0
 	for _, risk := range risk {
 		if risk == nil {
 			continue
@@ -152,17 +155,8 @@ func (r *Report) AddRisks(risk ...*Risk) {
 			r.ProgramName = risk.GetProgramName()
 		}
 
-		hash := risk.GetHash()
-		if _, exists := r.Risks[hash]; !exists {
-			added++
-		}
-		r.Risks[hash] = risk
+		r.Risks[risk.GetHash()] = risk
 	}
-	// Count findings, not add calls. A scan can re-add the same hash on every
-	// update; counting those calls triggered a full-document marshal every 500
-	// updates (77GB of JSON on the ab8 core scan) even though the document did
-	// not grow.
-	r.sinceFlush += added
 	flush := r.shouldFlushLocked()
 	writes := r.writer != nil
 	r.mu.Unlock()
@@ -195,16 +189,20 @@ func (r *Report) currentFlusher() *reportFlusher {
 	return r.flusher
 }
 
-// shouldFlushLocked reports whether enough findings accumulated for another
+// shouldFlushLocked reports whether the document grew enough for another
 // snapshot. The caller releases the lock before writing it.
+//
+// The baseline is the last snapshot's size, so replacing findings (the scan
+// deletes and re-creates the same feature under a new hash) never triggers a
+// marshal: only a net gain of reportFlushEvery findings does.
 func (r *Report) shouldFlushLocked() bool {
 	if r == nil || reportFlushEvery <= 0 {
 		return false
 	}
-	if r.sinceFlush < reportFlushEvery {
+	if len(r.Risks)-r.flushedRisks < reportFlushEvery {
 		return false
 	}
-	r.sinceFlush = 0
+	r.flushedRisks = len(r.Risks)
 	return true
 }
 
@@ -215,7 +213,6 @@ func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 		return nil
 	}
 	r.mu.Lock()
-	before := len(r.Risks)
 	switch item.Mode {
 	case schema.RiskUpdateDelete:
 		r.dropRiskLocked(item.OldHash)
@@ -224,11 +221,6 @@ func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 			r.dropRiskLocked(item.OldHash)
 		}
 		r.addSchemaRiskLocked(item.Risk)
-	}
-	// Only document growth warrants another snapshot. Duplicate and in-place
-	// update events must not serialize the whole report.
-	if added := len(r.Risks) - before; added > 0 {
-		r.sinceFlush += added
 	}
 	flush := r.shouldFlushLocked()
 	writes := r.writer != nil
