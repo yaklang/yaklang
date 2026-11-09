@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -20,99 +19,72 @@ type DeepFirstPath[K comparable, T, U any] struct {
 	getKey   func(T) K
 	getValue func(T) U
 
-	// value result
-	res [][]U
-
-	// visit, when set, receives every completed path. Returning false stops the
-	// whole walk immediately (used by dataflow filtering to stop at the first
-	// accepted path instead of materializing every path).
+	// visit receives every completed path. Returning false stops the whole walk
+	// immediately (used by dataflow filtering to stop at the first accepted path
+	// instead of materializing every path).
 	visit func([]U) bool
 	// prune, when set, is asked about every child before descending into it.
 	// Returning true drops that child subtree. A node whose children are all
 	// pruned is NOT emitted as a leaf: the node had outgoing edges, so the
 	// original walk would not have ended there.
-	prune   func(T) bool
-	stopped bool
+	prune func(T) bool
 
 	// deep first search stack
 	current *omap.OrderedMap[K, U]
 	ctx     context.Context
 }
 
-func (d *DeepFirstPath[K, T, U]) emit() bool {
-	path := d.current.Values()
-	if d.visit != nil {
-		return d.visit(path)
-	}
-	d.res = append(d.res, path)
-	return true
-}
-
-// deepFirst returns false only when the visitor asked to stop.
+// deepFirst returns false only when the walk must stop, either because the
+// visitor declined the last path or because ctx was cancelled.
 func (d *DeepFirstPath[K, T, U]) deepFirst(node T, target ...T) bool {
 	select {
 	case <-d.ctx.Done():
-		log.Infof("deep first search timeout")
 		return false
 	default:
 	}
 
 	key := d.getKey(node)
-	value := d.getValue(node)
-
 	if d.current.Have(key) {
-		// log.Infof("node %v already in current skip", node)
 		return true
 	}
-	d.current.PushKey(key, value)
+	d.current.PushKey(key, d.getValue(node))
 	defer d.current.Pop()
 
-	// log.Infof("node %v add to current path: %v", node, d.current.Keys())
 	nextNodes := d.next(node)
-	nextNodes = lo.UniqBy(nextNodes, d.getKey)
-	// log.Infof("next node :%v", nextNodes)
+	if len(nextNodes) > 1 {
+		nextNodes = lo.UniqBy(nextNodes, d.getKey)
+	}
+
 	if len(target) > 0 {
-		// if have target, check if current node is target
+		// A target node ends the path even when it has outgoing edges.
 		if slices.ContainsFunc(target, func(t T) bool {
 			return d.getKey(t) == key
 		}) {
-			// if current node is target, add to result
-			ok := d.emit()
-			if !ok {
-				d.stopped = true
-			}
-			return ok
+			return d.visit(d.current.Values())
 		}
-	} else {
-		// if not target, check if current node is end
-		if len(nextNodes) == 0 {
-			// the end
-			ok := d.emit()
-			if !ok {
-				d.stopped = true
-			}
-			return ok
-		}
+	} else if len(nextNodes) == 0 {
+		return d.visit(d.current.Values())
 	}
 
 	if d.prune != nil {
-		filtered := make([]T, 0, len(nextNodes))
+		// nextNodes comes from next (or lo.UniqBy), so compacting it in place
+		// does not alias caller state.
+		kept := nextNodes[:0]
 		for _, next := range nextNodes {
 			if !d.prune(next) {
-				filtered = append(filtered, next)
+				kept = append(kept, next)
 			}
 		}
-		if len(filtered) == 0 {
+		if len(kept) == 0 {
 			// Every outgoing branch was pruned. This is not a real leaf, so do
 			// not emit a shortened path that the original walk never produced.
 			return true
 		}
-		nextNodes = filtered
+		nextNodes = kept
 	}
 
 	if len(nextNodes) == 1 {
-		prev := nextNodes[0]
-		return d.deepFirst(prev, target...)
+		return d.deepFirst(nextNodes[0], target...)
 	}
 
 	for _, next := range nextNodes {
@@ -131,17 +103,12 @@ func GraphPathEx[K comparable, T, U any](
 	getValue func(T) U,
 	target ...T,
 ) [][]U {
-
-	df := &DeepFirstPath[K, T, U]{
-		ctx:      ctx,
-		res:      make([][]U, 0),
-		current:  omap.NewEmptyOrderedMap[K, U](),
-		next:     next,
-		getKey:   getKey,
-		getValue: getValue,
-	}
-	df.deepFirst(node, target...)
-	return df.res
+	res := make([][]U, 0)
+	WalkGraphPathEx(ctx, node, next, getKey, getValue, nil, func(path []U) bool {
+		res = append(res, path)
+		return true
+	}, target...)
+	return res
 }
 
 // WalkGraphPathEx is the streaming form of [GraphPathEx]. visit is called with
@@ -168,8 +135,7 @@ func WalkGraphPathEx[K comparable, T, U any](
 		prune:    prune,
 		visit:    visit,
 	}
-	complete := df.deepFirst(node, target...)
-	return complete && !df.stopped
+	return df.deepFirst(node, target...)
 }
 
 // index by K type, and return path with T type
