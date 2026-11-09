@@ -1160,7 +1160,7 @@ func (v *Value) GetCallee() *Value {
 func (v *Value) GetPredecessors() []*PredecessorValue {
 	if len(v.Predecessors) == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			stepEdges := ssadb.GetPredecessorTargetsByFromID(ssadb.GetDB(), auditNode.NodeID)
+			stepEdges := v.loadPredecessorTargets(auditNode)
 			preds := make([]*PredecessorValue, 0, len(stepEdges))
 			for _, edge := range stepEdges {
 				p := v.NewValueFromAuditNode(edge.ToNode)
@@ -1183,7 +1183,7 @@ func (v *Value) GetPredecessors() []*PredecessorValue {
 func (v *Value) GetDependOn() Values {
 	if v.DependOn == nil || v.DependOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(ssadb.GetDB(), auditNode.NodeID)
+			nodeIds := v.loadDependOnTargets(auditNode)
 			if v.DependOn == nil {
 				v.DependOn = utils.NewSafeMapWithKey[int64, *Value]()
 			}
@@ -1201,7 +1201,7 @@ func (v *Value) GetDependOn() Values {
 func (v *Value) GetEffectOn() Values {
 	if v.EffectOn == nil || v.EffectOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(ssadb.GetDB(), auditNode.NodeID)
+			nodeIds := v.loadEffectOnTargets(auditNode)
 			if v.EffectOn == nil {
 				v.EffectOn = utils.NewSafeMapWithKey[int64, *Value]()
 			}
@@ -1214,6 +1214,48 @@ func (v *Value) GetEffectOn() Values {
 		}
 	}
 	return v.safeMapToValues(v.EffectOn)
+}
+
+func (v *Value) loadPredecessorTargets(auditNode *ssadb.AuditNode) []ssadb.AuditPredecessor {
+	if auditNode == nil {
+		return nil
+	}
+	if v != nil && v.ParentProgram != nil {
+		if snapshot := v.ParentProgram.getAuditEdgeSnapshot(auditNode.ResultId); snapshot != nil {
+			if targets, ok := snapshot.predecessorsFor(auditNode.NodeID); ok {
+				return targets
+			}
+		}
+	}
+	return ssadb.GetPredecessorTargetsByFromID(ssadb.GetDB(), auditNode.NodeID)
+}
+
+func (v *Value) loadDependOnTargets(auditNode *ssadb.AuditNode) []string {
+	if auditNode == nil {
+		return nil
+	}
+	if v != nil && v.ParentProgram != nil {
+		if snapshot := v.ParentProgram.getAuditEdgeSnapshot(auditNode.ResultId); snapshot != nil {
+			if targets, ok := snapshot.dependsOnFor(auditNode.NodeID); ok {
+				return targets
+			}
+		}
+	}
+	return ssadb.GetDependEdgeOnByFromNodeId(ssadb.GetDB(), auditNode.NodeID)
+}
+
+func (v *Value) loadEffectOnTargets(auditNode *ssadb.AuditNode) []string {
+	if auditNode == nil {
+		return nil
+	}
+	if v != nil && v.ParentProgram != nil {
+		if snapshot := v.ParentProgram.getAuditEdgeSnapshot(auditNode.ResultId); snapshot != nil {
+			if targets, ok := snapshot.effectsOnFor(auditNode.NodeID); ok {
+				return targets
+			}
+		}
+	}
+	return ssadb.GetEffectOnEdgeByFromNodeId(ssadb.GetDB(), auditNode.NodeID)
 }
 
 func (v *Value) safeMapToValues(safeMap *utils.SafeMapWithKey[int64, *Value]) Values {

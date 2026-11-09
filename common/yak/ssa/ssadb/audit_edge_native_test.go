@@ -133,3 +133,96 @@ func TestNativePredecessorTargetsProjection(t *testing.T) {
 	require.Equal(t, int64(7), targets[0].Step)
 	require.Equal(t, "bottom-use", targets[0].Label)
 }
+
+func TestLoadAuditEdgeTargetsByResultID(t *testing.T) {
+	db := newAuditEdgeTestDB(t)
+	from := "01HZZZZZZZZZZZZZZZZZZZZZZZ"
+
+	require.NoError(t, db.Create(&AuditEdge{
+		ResultId:      7,
+		FromNode:      from,
+		ToNode:        "pred-target",
+		EdgeType:      EdgeType_Predecessor,
+		AnalysisStep:  3,
+		AnalysisLabel: "call",
+	}).Error)
+	require.NoError(t, db.Create(&AuditEdge{
+		ResultId: 7,
+		FromNode: from,
+		ToNode:   "depend-target",
+		EdgeType: EdgeType_DependsOn,
+	}).Error)
+	require.NoError(t, db.Create(&AuditEdge{
+		ResultId: 7,
+		FromNode: from,
+		ToNode:   "effect-target",
+		EdgeType: EdgeType_EffectsOn,
+	}).Error)
+	// A different result must not leak into the snapshot.
+	require.NoError(t, db.Create(&AuditEdge{
+		ResultId: 8,
+		FromNode: from,
+		ToNode:   "other-result",
+		EdgeType: EdgeType_Predecessor,
+	}).Error)
+	// A soft-deleted edge must be excluded.
+	deleted := &AuditEdge{
+		ResultId: 7,
+		FromNode: from,
+		ToNode:   "deleted-target",
+		EdgeType: EdgeType_DependsOn,
+	}
+	require.NoError(t, db.Create(deleted).Error)
+	require.NoError(t, db.Delete(deleted).Error)
+
+	targets, err := LoadAuditEdgeTargetsByResultID(db, 7)
+	require.NoError(t, err)
+	require.Len(t, targets, 3)
+
+	byType := make(map[AuditEdgeType][]AuditEdgeTarget, 3)
+	for _, target := range targets {
+		byType[target.EdgeType] = append(byType[target.EdgeType], target)
+	}
+	require.Len(t, byType[EdgeType_Predecessor], 1)
+	require.Equal(t, "pred-target", byType[EdgeType_Predecessor][0].ToNode)
+	require.Equal(t, int64(3), byType[EdgeType_Predecessor][0].AnalysisStep)
+	require.Equal(t, "call", byType[EdgeType_Predecessor][0].AnalysisLabel)
+	require.Len(t, byType[EdgeType_DependsOn], 1)
+	require.Equal(t, "depend-target", byType[EdgeType_DependsOn][0].ToNode)
+	require.Len(t, byType[EdgeType_EffectsOn], 1)
+	require.Equal(t, "effect-target", byType[EdgeType_EffectsOn][0].ToNode)
+}
+
+func TestLoadAuditEdgeTargetsByResultIDNullableColumns(t *testing.T) {
+	db := newAuditEdgeTestDB(t)
+	edge := &AuditEdge{
+		ResultId:      9,
+		FromNode:      "01HZZZZZZZZZZZZZZZZZZZZZZZ",
+		ToNode:        "nullable-target",
+		EdgeType:      EdgeType_Predecessor,
+		AnalysisStep:  9,
+		AnalysisLabel: "placeholder",
+	}
+	require.NoError(t, db.Create(edge).Error)
+	require.NoError(t, db.Exec(
+		`UPDATE "`+TableAuditEdges+`" SET analysis_step = NULL, analysis_label = NULL WHERE id = ?`,
+		edge.ID,
+	).Error)
+
+	targets, err := LoadAuditEdgeTargetsByResultID(db, 9)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+	require.Zero(t, targets[0].AnalysisStep)
+	require.Empty(t, targets[0].AnalysisLabel)
+}
+
+func TestLoadAuditEdgeTargetsByResultIDEmptyInput(t *testing.T) {
+	db := newAuditEdgeTestDB(t)
+	targets, err := LoadAuditEdgeTargetsByResultID(db, 0)
+	require.NoError(t, err)
+	require.Nil(t, targets)
+
+	targets, err = LoadAuditEdgeTargetsByResultID(db, 404)
+	require.NoError(t, err)
+	require.Empty(t, targets)
+}

@@ -201,3 +201,65 @@ func nativePredecessorTargets(db *gorm.DB, fromID string) []AuditPredecessor {
 func GetPredecessorTargetsByFromID(db *gorm.DB, fromID string) []AuditPredecessor {
 	return nativePredecessorTargets(db, fromID)
 }
+
+// AuditEdgeTarget is the narrow projection used when a whole audit result is
+// loaded at once. The dataflow report walks one result's graph and would
+// otherwise issue one predecessor/depend/effect query per node.
+type AuditEdgeTarget struct {
+	FromNode      string
+	ToNode        string
+	EdgeType      AuditEdgeType
+	AnalysisStep  int64
+	AnalysisLabel string
+}
+
+type auditEdgeTargetRow struct {
+	FromNode      sql.NullString
+	ToNode        sql.NullString
+	EdgeType      sql.NullString
+	AnalysisStep  sql.NullInt64
+	AnalysisLabel sql.NullString
+}
+
+// LoadAuditEdgeTargetsByResultID loads every live edge of one audit result in
+// a single query. GORM keeps the bind variables and the soft-delete predicate
+// explicit; the projection avoids materializing the wide AuditEdge model.
+//
+// The caller caches the result because report generation visits many nodes of
+// the same result. NULL columns are mapped to zero values, matching the
+// per-node native readers.
+func LoadAuditEdgeTargetsByResultID(db *gorm.DB, resultID uint) ([]AuditEdgeTarget, error) {
+	if db == nil {
+		db = GetDB()
+	}
+	if db == nil || resultID == 0 {
+		return nil, nil
+	}
+
+	var rows []auditEdgeTargetRow
+	started := time.Now()
+	err := db.Table(TableAuditEdges).
+		Select("from_node, to_node, edge_type, analysis_step, analysis_label").
+		Where("result_id = ?", resultID).
+		Where("deleted_at IS NULL").
+		Find(&rows).Error
+	RecordDBRead(time.Since(started), err != nil)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]AuditEdgeTarget, 0, len(rows))
+	for _, row := range rows {
+		if !row.FromNode.Valid || !row.ToNode.Valid {
+			continue
+		}
+		out = append(out, AuditEdgeTarget{
+			FromNode:      row.FromNode.String,
+			ToNode:        row.ToNode.String,
+			EdgeType:      AuditEdgeType(row.EdgeType.String),
+			AnalysisStep:  row.AnalysisStep.Int64,
+			AnalysisLabel: row.AnalysisLabel.String,
+		})
+	}
+	return out, nil
+}
