@@ -3,6 +3,7 @@ package sfreport
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
@@ -12,6 +13,7 @@ import (
 // finding. A scan can deliver the same risk through many update events; the
 // old call counter then rewrote the whole document every 500 events.
 func TestReport_AddRisksCountsOnlyNewFindings(t *testing.T) {
+	disableFlushThrottle(t)
 	report := NewReport(IRifyReportType)
 	same := &Risk{Hash: "same", Title: "same"}
 	for i := 0; i < 5*reportFlushEvery; i++ {
@@ -38,6 +40,7 @@ func TestReport_AddRisksCountsOnlyNewFindings(t *testing.T) {
 
 // The same rule applies to risk updates: only growth in the document counts.
 func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
+	disableFlushThrottle(t)
 	report := NewReport(IRifyReportType)
 	item := schema.RiskUpdateItem{
 		Mode: schema.RiskUpdateCreate,
@@ -75,6 +78,7 @@ func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
 // another snapshot: the scan rewrites one feature many times, and each rewrite
 // used to serialize the whole 408MB document.
 func TestReport_RewriteChurnDoesNotFlush(t *testing.T) {
+	disableFlushThrottle(t)
 	report := NewReport(IRifyReportType)
 	for i := 0; i < reportFlushEvery; i++ {
 		require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
@@ -101,4 +105,37 @@ func TestReport_RewriteChurnDoesNotFlush(t *testing.T) {
 	require.Len(t, report.Risks, reportFlushEvery)
 	require.Equal(t, reportFlushEvery, report.flushedRisks,
 		"rewrites must not move the snapshot baseline")
+}
+
+// disableFlushThrottle keeps the count-based assertions independent of wall
+// time. A separate test covers the throttle itself.
+func disableFlushThrottle(t *testing.T) {
+	t.Helper()
+	prev := reportFlushMinIntervalValue
+	reportFlushMinIntervalValue = 0
+	t.Cleanup(func() { reportFlushMinIntervalValue = prev })
+}
+
+// Snapshots are crash resilience, not a live feed: after one publish, the next
+// threshold crossing must wait for the interval.
+func TestReport_FlushThrottleHonoursInterval(t *testing.T) {
+	report := NewReport(IRifyReportType)
+	for i := 0; i < reportFlushEvery; i++ {
+		report.AddRisks(&Risk{Hash: fmt.Sprintf("first-%d", i)})
+	}
+	require.Equal(t, reportFlushEvery, report.flushedRisks)
+	require.False(t, report.lastFlush.IsZero())
+
+	// Another full threshold within the interval must not publish.
+	for i := 0; i < reportFlushEvery; i++ {
+		report.AddRisks(&Risk{Hash: fmt.Sprintf("second-%d", i)})
+	}
+	require.Equal(t, reportFlushEvery, report.flushedRisks, "throttled snapshot")
+
+	// Once the interval elapsed, the accumulated growth publishes.
+	report.mu.Lock()
+	report.lastFlush = time.Now().Add(-2 * reportFlushMinIntervalValue)
+	report.mu.Unlock()
+	report.AddRisks(&Risk{Hash: "third"})
+	require.Equal(t, 2*reportFlushEvery+1, report.flushedRisks)
 }
