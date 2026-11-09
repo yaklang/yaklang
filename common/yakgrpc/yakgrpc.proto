@@ -10596,7 +10596,6 @@ message KnowledgeBaseFilter {
   string Keyword = 3;
   repeated string Types = 4;
   repeated string Tags = 5;
-  repeated string SerialVersionIDs = 6;
 }
 
 message QueryKnowledgeBaseRequest {

@@ -75,9 +75,6 @@ func FilterKnowledgeBaseByQuery(db *gorm.DB, filter *ypb.KnowledgeBaseFilter) *g
 	if tags := normalizeKnowledgeBaseFilterStrings(filter.GetTags()); len(tags) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "tags", tags)
 	}
-	if serialVersionIDs := normalizeKnowledgeBaseFilterStrings(filter.GetSerialVersionIDs()); len(serialVersionIDs) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "serial_version_uid", serialVersionIDs)
-	}
 	return db
 }
 
