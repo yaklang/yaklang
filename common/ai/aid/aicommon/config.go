@@ -316,6 +316,11 @@ type Config struct {
 	*/
 	// timeline
 	Timeline                  *Timeline
+	TimelineBroadcaster       *TimelineBroadcaster
+	timelineBindingMu         sync.Mutex
+	timelineBindingReady      bool
+	disableTimelineBroadcast  bool
+	timelineBroadcastLease    *timelineBroadcastLease
 	TimelineContentSizeLimit  int // in tokens
 	TimelineTotalContentLimit int // in tokens
 
@@ -750,6 +755,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.applySingleModelModeDefaults()
 	}
 
+	config.initializeTimelineBroadcast()
 	return config
 }
 
@@ -3432,10 +3438,7 @@ func (c *Config) applyTimelineContentSizeLimit(limit int) {
 
 func WithTimeline(t *Timeline) ConfigOption {
 	return func(c *Config) error {
-		c.m.Lock()
-		defer c.m.Unlock()
-		c.Timeline = t
-		return nil
+		return c.SetTimeline(t)
 	}
 }
 
@@ -4263,7 +4266,10 @@ func (c *Config) restorePersistentSession() {
 		log.Infof("reassigned timeline IDs, last assigned ID: %d", lastID)
 	}
 
-	c.Timeline = timelineInstance
+	if err := c.SetTimeline(timelineInstance); err != nil {
+		log.Warnf("bind restored timeline: %v", err)
+		return
+	}
 
 	// Restore WorkDir from previous runtime so that Session Artifacts persist across restarts
 	if runtime.WorkDir != "" {
@@ -4373,6 +4379,9 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	}
 
 	opts := make([]ConfigOption, 0)
+	if i.TimelineBroadcaster != nil {
+		opts = append(opts, WithTimelineBroadcaster(i.TimelineBroadcaster))
+	}
 	if len(i.PersistentMemory) > 0 {
 		opts = append(opts, WithAppendPersistentContext(i.PersistentMemory...))
 	}

@@ -23,7 +23,8 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	opts = append([]aicommon.ConfigOption{aicommon.WithEnableFunctionCallMode(false)}, opts...)
 	// One-shot calls have no event loop, skills, task lifecycle or memory triage.
 	opts = append(append([]aicommon.ConfigOption{}, opts...), aicommon.WithContext(ctx),
-		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage())
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithDisableTimelineBroadcast(true))
 	if r.Emitter != nil {
 		opts = append(opts, aicommon.WithEmitter(r.Emitter))
 	}
@@ -31,9 +32,9 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	// A one-shot reader must not rebind the parent's live compression state.
 	opts = append(opts, func(cfg *aicommon.Config) error {
 		if r.DisableTimeline {
-			cfg.Timeline = nil
+			return cfg.SetTimeline(nil)
 		} else if cfg.Timeline != nil {
-			cfg.Timeline = cfg.Timeline.CopyReducibleTimelineWithMemory()
+			return cfg.SetTimeline(cfg.Timeline.CopyReducibleTimelineWithMemory())
 		}
 		return nil
 	})

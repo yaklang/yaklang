@@ -21,8 +21,11 @@ import (
 )
 
 type Timeline struct {
-	persistMu sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
-	mu        sync.RWMutex
+	persistMu           sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
+	mu                  sync.RWMutex
+	timelineID          string // runtime identity, excluded from snapshots
+	timelineBroadcaster *TimelineBroadcaster
+	broadcastReceipts   map[int64]string // runtime delivery ledger, retained across compression/rollback
 	// Runtime observers have independent locks and never enter persistence or prompts.
 	itemInputCallbacks      timelineCallbackRegistry[TimelineItemInputEvent]
 	freezeCallbacks         timelineCallbackRegistry[TimelineFreezeResult]
@@ -221,6 +224,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	tl := &Timeline{
+		timelineID:            uuid.NewString(),
 		config:                m.config,
 		idToTs:                m.idToTs.Copy(),
 		tsToTimelineItem:      m.tsToTimelineItem.Copy(),
@@ -329,6 +333,7 @@ func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 
 func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 	tl := &Timeline{
+		timelineID:           uuid.NewString(),
 		extraMetaInfo:        extraMetaInfo,
 		ai:                   ai,
 		tsToTimelineItem:     omap.NewOrderedMap(map[int64]*TimelineItem{}),
@@ -464,6 +469,12 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem, notifications *[]func()) {
+	m.insertTimelineItemLocked(ts, id, item, notifications)
+	m.emitTimelineItemAsync(item)
+}
+
+// Broadcast uses the same commit path but emits one session-level UI event.
+func (m *Timeline) insertTimelineItemLocked(ts int64, id int64, item *TimelineItem, notifications *[]func()) {
 	if item.historyID == "" {
 		item.historyID = uuid.NewString()
 	}
@@ -471,11 +482,16 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem, noti
 	m.OrderInsertId(id, item)
 	m.OrderInsertTs(ts, item)
 
-	m.emitTimelineItemAsync(item)
 	m.collectItemInputCallbackLocked(notifications, item)
 }
 
 func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
+	if m.config != nil {
+		emitTimelineItemAsync(m.config.GetEmitter(), item)
+	}
+}
+
+func emitTimelineItemAsync(emitter *Emitter, item *TimelineItem) {
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
 	// writes to an unbuffered channel that hasn't been consumed yet
 	//
@@ -485,8 +501,7 @@ func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
 	// 闭后仍可能被触发. 即便 Emitter.emit 自身已 defer recover, 这里再加一
 	// 层 recover 形成 belt-and-suspenders, 杜绝因 channel 关闭引起的进程退出.
 	_, evidence := timelineEvidenceDisplay(item)
-	if (!isPromotableTimelineItem(item) || evidence) && m.config != nil && m.config.GetEmitter() != nil {
-		emitter := m.config.GetEmitter()
+	if (!isPromotableTimelineItem(item) || evidence) && emitter != nil {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {

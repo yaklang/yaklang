@@ -103,6 +103,15 @@ func (m *Timeline) ReassignIDs(generator func() int64) int64 {
 		newIDToTS.Set(next, ts)
 	}
 	m.idToTimelineItem, m.tsToTimelineItem, m.idToTs = newIDs, newTS, newIDToTS
+	if m.broadcastReceipts != nil {
+		receipts := make(map[int64]string)
+		for id, receipt := range m.broadcastReceipts {
+			if next, ok := remap[id]; ok {
+				receipts[next] = receipt
+			}
+		}
+		m.broadcastReceipts = receipts
+	}
 	if m.compressedHead != nil {
 		m.compressedHead.CoveredEndItemID = remap[m.compressedHead.CoveredEndItemID]
 	}

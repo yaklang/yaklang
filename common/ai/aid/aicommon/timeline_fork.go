@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -14,6 +15,8 @@ type TimelineFork struct {
 	TaskName  string
 	BaseMaxID int64
 	CreatedAt time.Time
+
+	broadcastLease *timelineBroadcastLease
 }
 
 type TimelineMergeResult struct {
@@ -25,6 +28,20 @@ type TimelineMergeResult struct {
 func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfigIf, ai AICaller) (*TimelineFork, error) {
 	if m == nil {
 		return nil, nil
+	}
+	b := m.getTimelineBroadcaster()
+	var ctx context.Context
+	if cfg, ok := config.(*Config); ok && cfg != nil {
+		cfg.timelineBindingMu.Lock()
+		if b == nil {
+			b = cfg.TimelineBroadcaster
+		}
+		ctx = cfg.Ctx
+		cfg.timelineBindingMu.Unlock()
+	}
+	if b != nil {
+		b.mu.Lock()
+		defer b.mu.Unlock()
 	}
 
 	raw, err := MarshalTimeline(m)
@@ -42,18 +59,35 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	m.mu.RLock()
 	branch.sessionMemory = m.sessionMemory
 	branch.trajectoryConfig = m.trajectoryConfig
+	branch.broadcastReceipts = cloneTimelineBroadcastReceipts(m.broadcastReceipts)
 	m.mu.RUnlock()
-	branch.SoftBindConfig(config, ai)
 	branch.markBranchTimeline(true)
+	branch.SoftBindConfig(config, ai)
+	var lease *timelineBroadcastLease
+	if b != nil {
+		lease, err = b.subscribeLocked(branch, ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &TimelineFork{
-		Parent:    m,
-		Branch:    branch,
-		TaskIndex: taskIndex,
-		TaskName:  taskName,
-		BaseMaxID: baseMaxID,
-		CreatedAt: time.Now(),
+		Parent:         m,
+		Branch:         branch,
+		TaskIndex:      taskIndex,
+		TaskName:       taskName,
+		BaseMaxID:      baseMaxID,
+		CreatedAt:      time.Now(),
+		broadcastLease: lease,
 	}, nil
+}
+
+// Release ends the fork handle's reservation. A child Config can still retain
+// its own subscription until it is released or its context ends.
+func (f *TimelineFork) Release() {
+	if f != nil {
+		f.broadcastLease.release()
+	}
 }
 
 // MergeBack 把分支 timeline 中新增的条目合并回父 timeline。
@@ -78,6 +112,8 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	var activeItems []activeSnapshot
 	var compressedHead *TimelineCompressedHead
 	f.Branch.mu.RLock()
+	branchReceipts := cloneTimelineBroadcastReceipts(f.Branch.broadcastReceipts)
+	branchMaxID := f.Branch.getMaxIDLocked()
 	for _, id := range f.Branch.idToTimelineItem.Keys() {
 		if id <= f.BaseMaxID {
 			continue
@@ -124,6 +160,9 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	// copies must neither collide nor replay stale evidence over a newer mutation.
 	mergedItems := activeItems[:0]
 	for _, active := range activeItems {
+		if receipt := branchReceipts[active.id]; receipt != "" && receipt == active.item.historyID && parent.broadcastReceipts[active.id] == receipt {
+			continue // Already delivered, even if the parent compressed/retired it.
+		}
 		if op, ok := active.item.value.(*PromotableTimelineItem); ok && op.Kind == TimelinePromotedKindEvidence {
 			if existing, ok := parent.idToTimelineItem.Get(active.id); ok {
 				if prior, ok := existing.value.(*PromotableTimelineItem); ok && *prior == *op {
@@ -134,6 +173,24 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		mergedItems = append(mergedItems, active)
 	}
 	activeItems = mergedItems
+	if compressedHead != nil {
+		id := compressedHead.CoveredEndItemID
+		if receipt := branchReceipts[id]; receipt != "" && parent.broadcastReceipts[id] == receipt {
+			// Coverage ends at a shared broadcast. Its ID remains reserved in
+			// the parent; the imported summary is a separate observation.
+			if parent.config == nil {
+				return nil, utils.Errorf("timeline fork merge: summary needs an ID provider")
+			}
+			for {
+				id = parent.config.AcquireId()
+				if id <= parent.getMaxIDLocked() || id <= branchMaxID {
+					continue
+				}
+				break
+			}
+			compressedHead.CoveredEndItemID = id
+		}
+	}
 	for _, active := range activeItems {
 		if compressedHead != nil && active.id == compressedHead.CoveredEndItemID {
 			return nil, utils.Errorf("timeline fork merge: summary id %d collides with active branch entry", active.id)
@@ -165,8 +222,8 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	}
 
 	if compressedHead != nil {
-		// CoveredEndItemID references the last compressed item in the branch; it was
-		// allocated by the shared global ID provider and must not be remapped here.
+		// Preserve branch coverage IDs unless a shared broadcast reserved that
+		// ID in the parent, in which case a fresh summary ID was allocated above.
 		coveredID := compressedHead.CoveredEndItemID
 		// A branch summary is a new observation, not a replacement for the
 		// parent's current head (which may include work unknown to this fork).

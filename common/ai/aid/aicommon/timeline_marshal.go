@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/google/uuid"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/log"
 
@@ -129,6 +131,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 
 	// 恢复 Timeline 结构体
 	timeline := &Timeline{
+		timelineID:            uuid.NewString(),
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
 		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),

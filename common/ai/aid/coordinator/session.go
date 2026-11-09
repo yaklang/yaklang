@@ -471,6 +471,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 		return result, err
 	}
 	if fork != nil {
+		defer fork.Release()
 		opts = append(opts, aicommon.WithTimeline(fork.Branch))
 		s.mu.Lock()
 		if s.workerTimelines == nil {
@@ -503,6 +504,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 		return result, err
 	}
 	cfg := runtime.GetConfig().(*aicommon.Config)
+	defer cfg.ReleaseTimelineSubscription()
 	cfg.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(cfg.GetRuntimeId(), s.GetDB())
 	task.SetEmitter(cfg.GetEmitter())
 	runtime.SetCurrentTask(task)
