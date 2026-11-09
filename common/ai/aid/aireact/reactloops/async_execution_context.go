@@ -31,11 +31,8 @@ func (r *ReActLoop) renderAsyncExecutionContext(nonce string) string {
 	if r == nil {
 		return ""
 	}
-	manager := r.PeekAsyncExecutionManager()
-	if manager == nil {
-		return ""
-	}
-	entries := manager.List()
+	snapshot := r.AsyncExecutionSnapshot()
+	entries := snapshot.Executions
 	if len(entries) == 0 {
 		return ""
 	}

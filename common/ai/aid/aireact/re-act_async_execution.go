@@ -59,9 +59,9 @@ func (r *ReAct) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
 	return manager, nil
 }
 
-// PeekAsyncExecutionManager returns the existing session manager without
+// existingAsyncExecutionManager returns the existing session manager without
 // creating one.
-func (r *ReAct) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
+func (r *ReAct) existingAsyncExecutionManager() *asyncexecmanager.Manager {
 	if r == nil {
 		return nil
 	}
@@ -70,13 +70,17 @@ func (r *ReAct) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
 	return r.asyncExecutionManager
 }
 
+func (r *ReAct) HasAsyncExecutionManager() bool {
+	return r.existingAsyncExecutionManager() != nil
+}
+
 // AsyncExecutionSnapshot returns the session-scoped metadata view consumed by
 // push events and sync responses.
 func (r *ReAct) AsyncExecutionSnapshot() aicommon.AsyncExecutionSnapshot {
 	if r == nil {
 		return reactloops.BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
 	}
-	manager := r.PeekAsyncExecutionManager()
+	manager := r.existingAsyncExecutionManager()
 	if manager == nil {
 		sessionID := ""
 		if r.config != nil {
@@ -88,7 +92,7 @@ func (r *ReAct) AsyncExecutionSnapshot() aicommon.AsyncExecutionSnapshot {
 }
 
 func (r *ReAct) StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error) {
-	manager := r.PeekAsyncExecutionManager()
+	manager := r.existingAsyncExecutionManager()
 	if manager == nil {
 		return asyncexecmanager.Summary{}, asyncexecmanager.ErrNotFound
 	}
@@ -140,7 +144,7 @@ func (r *ReAct) RequestAsyncDirectAnswer() {
 	r.asyncDirectRequested = true
 	close(r.asyncDirectAnswer)
 	r.asyncDirectAnswerMu.Unlock()
-	if manager := r.PeekAsyncExecutionManager(); manager != nil {
+	if manager := r.existingAsyncExecutionManager(); manager != nil {
 		manager.StopAll()
 	}
 }
@@ -177,7 +181,7 @@ func (r *ReAct) ConsumeAsyncDirectAnswer() bool {
 // attributed to a user-cancelled task. Natural task completion does not call
 // this method, so intended cross-turn work remains alive.
 func (r *ReAct) StopAsyncExecutionsForTask(taskID string) []asyncexecmanager.Summary {
-	manager := r.PeekAsyncExecutionManager()
+	manager := r.existingAsyncExecutionManager()
 	if manager == nil || taskID == "" {
 		return nil
 	}

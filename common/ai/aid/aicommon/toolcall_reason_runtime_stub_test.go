@@ -145,12 +145,14 @@ func (r *reasonTestRuntime) GetAsyncExecutionManager() (*asyncexecmanager.Manage
 	return nil, errors.New("reason test runtime does not own async executions")
 }
 
-func (r *reasonTestRuntime) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
-	return nil
-}
+func (r *reasonTestRuntime) HasAsyncExecutionManager() bool { return false }
 
 func (r *reasonTestRuntime) AsyncExecutionSnapshot() AsyncExecutionSnapshot {
 	return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
+}
+
+func (r *reasonTestRuntime) StopAsyncExecution(string) (asyncexecmanager.Summary, error) {
+	return asyncexecmanager.Summary{}, errors.New("reason test runtime does not own async executions")
 }
 
 func (r *reasonTestRuntime) TrackAsyncExecutionTask(AIStatefulTask, string) {}

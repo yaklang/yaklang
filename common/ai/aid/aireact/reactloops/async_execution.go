@@ -20,7 +20,7 @@ func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error
 	}
 	if !utils.IsNil(r.invoker) {
 		released := r.asyncAdmissionClosed()
-		if released && r.invoker.PeekAsyncExecutionManager() == nil {
+		if released && !r.invoker.HasAsyncExecutionManager() {
 			return nil, asyncexecmanager.ErrClosed
 		}
 		return r.invoker.GetAsyncExecutionManager()

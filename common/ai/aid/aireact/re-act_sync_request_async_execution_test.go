@@ -41,7 +41,7 @@ func TestAsyncExecutionSyncQueryAndManualStop(t *testing.T) {
 	require.Equal(t, 0, empty.RunningCount)
 	require.Empty(t, empty.Executions)
 	require.NotNil(t, empty.Executions, "the wire payload must use [] rather than null")
-	require.Nil(t, loop.PeekAsyncExecutionManager(), "query must not create a manager")
+	require.False(t, loop.HasAsyncExecutionManager(), "query must not create a manager")
 
 	manager, err := loop.GetAsyncExecutionManager()
 	require.NoError(t, err)

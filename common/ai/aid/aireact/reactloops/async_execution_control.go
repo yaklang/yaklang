@@ -36,7 +36,7 @@ func (r *ReActLoop) RequestAsyncDirectAnswer() {
 	r.asyncDirectAnswerRequested = true
 	close(r.asyncDirectAnswer)
 	r.onReleaseMutex.Unlock()
-	manager := r.PeekAsyncExecutionManager()
+	manager := r.existingAsyncExecutionManager()
 	if manager != nil {
 		manager.StopAll()
 	}
@@ -67,7 +67,7 @@ func (r *ReActLoop) handleAsyncDirectAnswerSignal() bool {
 	r.onReleaseMutex.Unlock()
 
 	r.StopSubAgentsForUser()
-	manager := r.PeekAsyncExecutionManager()
+	manager := r.existingAsyncExecutionManager()
 	if manager != nil {
 		manager.StopAll()
 	}

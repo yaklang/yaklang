@@ -412,8 +412,9 @@ type AIInvokeRuntime interface {
 	// one ReAct session. Managers and direct-answer signals therefore survive
 	// individual task loops and are shared by every loop using this runtime.
 	GetAsyncExecutionManager() (*asyncexecmanager.Manager, error)
-	PeekAsyncExecutionManager() *asyncexecmanager.Manager
+	HasAsyncExecutionManager() bool
 	AsyncExecutionSnapshot() AsyncExecutionSnapshot
+	StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error)
 	TrackAsyncExecutionTask(task AIStatefulTask, executeID string)
 	PrepareAsyncToolCall(
 		task AIStatefulTask, name string, params aitool.InvokeParams, opts ...ToolCallerOption,

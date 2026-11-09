@@ -717,13 +717,17 @@ func (m *MockInvoker) GetAsyncExecutionManager() (*asyncexecmanager.Manager, err
 	return manager, nil
 }
 
-func (m *MockInvoker) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
+func (m *MockInvoker) existingAsyncExecutionManager() *asyncexecmanager.Manager {
 	if m == nil {
 		return nil
 	}
 	m.asyncExecutionMu.Lock()
 	defer m.asyncExecutionMu.Unlock()
 	return m.asyncExecutionManager
+}
+
+func (m *MockInvoker) HasAsyncExecutionManager() bool {
+	return m.existingAsyncExecutionManager() != nil
 }
 
 func (m *MockInvoker) AsyncExecutionSnapshot() aicommon.AsyncExecutionSnapshot {
@@ -734,11 +738,19 @@ func (m *MockInvoker) AsyncExecutionSnapshot() aicommon.AsyncExecutionSnapshot {
 	if provider, ok := m.GetConfig().(interface{ GetPersistentSessionID() string }); ok {
 		sessionID = provider.GetPersistentSessionID()
 	}
-	manager := m.PeekAsyncExecutionManager()
+	manager := m.existingAsyncExecutionManager()
 	if manager == nil {
 		return aicommon.BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, sessionID, m.GetCurrentTaskId())
 	}
 	return aicommon.BuildAsyncExecutionSnapshot(manager.Overview(), sessionID, m.GetCurrentTaskId())
+}
+
+func (m *MockInvoker) StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error) {
+	manager := m.existingAsyncExecutionManager()
+	if manager == nil {
+		return asyncexecmanager.Summary{}, asyncexecmanager.ErrNotFound
+	}
+	return manager.Stop(executeID)
 }
 
 func (m *MockInvoker) TrackAsyncExecutionTask(task aicommon.AIStatefulTask, executeID string) {
@@ -749,7 +761,7 @@ func (m *MockInvoker) TrackAsyncExecutionTask(task aicommon.AIStatefulTask, exec
 		if task.GetStatus() == aicommon.AITaskState_Completed {
 			return
 		}
-		manager := m.PeekAsyncExecutionManager()
+		manager := m.existingAsyncExecutionManager()
 		if manager != nil {
 			_, _ = manager.Stop(executeID)
 		}
@@ -783,7 +795,7 @@ func (m *MockInvoker) RequestAsyncDirectAnswer() {
 	m.asyncDirectRequested = true
 	close(m.asyncDirectAnswer)
 	m.asyncDirectAnswerMu.Unlock()
-	if manager := m.PeekAsyncExecutionManager(); manager != nil {
+	if manager := m.existingAsyncExecutionManager(); manager != nil {
 		manager.StopAll()
 	}
 }

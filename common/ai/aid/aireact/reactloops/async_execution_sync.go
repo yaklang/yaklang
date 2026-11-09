@@ -27,7 +27,7 @@ func (r *ReActLoop) AsyncExecutionSnapshot() AsyncExecutionSnapshot {
 	if !utils.IsNil(r.invoker) {
 		return r.invoker.AsyncExecutionSnapshot()
 	}
-	manager := r.PeekAsyncExecutionManager()
+	manager := r.existingAsyncExecutionManager()
 	if manager == nil {
 		return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, r.persistentSessionID(), r.currentTaskID())
 	}
@@ -54,14 +54,23 @@ func (r *ReActLoop) currentTaskID() string {
 	return ""
 }
 
-// PeekAsyncExecutionManager returns the existing manager without changing lazy
-// manager creation semantics or task lifetime.
-func (r *ReActLoop) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
+// HasAsyncExecutionManager reports whether the runtime already owns a manager.
+// It never changes lazy creation semantics.
+func (r *ReActLoop) HasAsyncExecutionManager() bool {
 	if r == nil {
-		return nil
+		return false
 	}
 	if !utils.IsNil(r.invoker) {
-		return r.invoker.PeekAsyncExecutionManager()
+		return r.invoker.HasAsyncExecutionManager()
+	}
+	return r.existingAsyncExecutionManager() != nil
+}
+
+// existingAsyncExecutionManager exposes the standalone fallback manager to package
+// internals without changing lazy creation semantics or task lifetime.
+func (r *ReActLoop) existingAsyncExecutionManager() *asyncexecmanager.Manager {
+	if r == nil {
+		return nil
 	}
 	r.onReleaseMutex.Lock()
 	defer r.onReleaseMutex.Unlock()
@@ -71,7 +80,10 @@ func (r *ReActLoop) PeekAsyncExecutionManager() *asyncexecmanager.Manager {
 // StopAsyncExecution requests cancellation of one execution owned by this
 // loop or its session-scoped invoker. A stopping state is not terminal.
 func (r *ReActLoop) StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error) {
-	manager := r.PeekAsyncExecutionManager()
+	if r != nil && !utils.IsNil(r.invoker) {
+		return r.invoker.StopAsyncExecution(executeID)
+	}
+	manager := r.existingAsyncExecutionManager()
 	if manager == nil {
 		return asyncexecmanager.Summary{}, asyncexecmanager.ErrNotFound
 	}
