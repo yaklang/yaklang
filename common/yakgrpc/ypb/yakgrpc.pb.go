@@ -79413,15 +79413,14 @@ func (x *QueryAIToolResponse) GetTotal() int64 {
 }
 
 type KnowledgeBaseFilter struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	IDs              []int64                `protobuf:"varint,1,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
-	Names            []string               `protobuf:"bytes,2,rep,name=Names,proto3" json:"Names,omitempty"`
-	Keyword          string                 `protobuf:"bytes,3,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
-	Types            []string               `protobuf:"bytes,4,rep,name=Types,proto3" json:"Types,omitempty"`
-	Tags             []string               `protobuf:"bytes,5,rep,name=Tags,proto3" json:"Tags,omitempty"`
-	SerialVersionIDs []string               `protobuf:"bytes,6,rep,name=SerialVersionIDs,proto3" json:"SerialVersionIDs,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IDs           []int64                `protobuf:"varint,1,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
+	Names         []string               `protobuf:"bytes,2,rep,name=Names,proto3" json:"Names,omitempty"`
+	Keyword       string                 `protobuf:"bytes,3,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
+	Types         []string               `protobuf:"bytes,4,rep,name=Types,proto3" json:"Types,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=Tags,proto3" json:"Tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *KnowledgeBaseFilter) Reset() {
@@ -79485,13 +79484,6 @@ func (x *KnowledgeBaseFilter) GetTypes() []string {
 func (x *KnowledgeBaseFilter) GetTags() []string {
 	if x != nil {
 		return x.Tags
-	}
-	return nil
-}
-
-func (x *KnowledgeBaseFilter) GetSerialVersionIDs() []string {
-	if x != nil {
-		return x.SerialVersionIDs
 	}
 	return nil
 }
@@ -86585,14 +86577,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x1f\n" +
 	"\x04Data\x18\x02 \x03(\v2\v.ypb.AIToolR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xad\x01\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x81\x01\n" +
 	"\x13KnowledgeBaseFilter\x12\x10\n" +
 	"\x03IDs\x18\x01 \x03(\x03R\x03IDs\x12\x14\n" +
 	"\x05Names\x18\x02 \x03(\tR\x05Names\x12\x18\n" +
 	"\aKeyword\x18\x03 \x01(\tR\aKeyword\x12\x14\n" +
 	"\x05Types\x18\x04 \x03(\tR\x05Types\x12\x12\n" +
-	"\x04Tags\x18\x05 \x03(\tR\x04Tags\x12*\n" +
-	"\x10SerialVersionIDs\x18\x06 \x03(\tR\x10SerialVersionIDs\"z\n" +
+	"\x04Tags\x18\x05 \x03(\tR\x04Tags\"z\n" +
 	"\x19QueryKnowledgeBaseRequest\x120\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x18.ypb.KnowledgeBaseFilterR\x06Filter\x12+\n" +
 	"\n" +
