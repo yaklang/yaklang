@@ -31,7 +31,13 @@ const (
 	SYNC_TYPE_PERCEPTION                  = "perception_sync"
 	SYNC_TYPE_SESSION_SNAPSHOT            = "session_snapshot_sync"
 	SYNC_TYPE_TASK_SNAPSHOT               = "task_snapshot_sync"
-	SYNC_TYPE_CLOSE_BROWSER               = "close_browser_sync"
+	// SYNC_TYPE_ASYNC_EXECUTION returns the current loop's background tool
+	// executions. The same payload is pushed as structured node "async_execution"
+	// whenever an execution lifecycle changes.
+	SYNC_TYPE_ASYNC_EXECUTION = "async_execution_sync"
+	// SYNC_TYPE_STOP_ASYNC_EXECUTION requests cancellation by execute_id.
+	SYNC_TYPE_STOP_ASYNC_EXECUTION = "stop_async_execution_sync"
+	SYNC_TYPE_CLOSE_BROWSER        = "close_browser_sync"
 	// SYNC_TYPE_LOAD_SKILL 是用户显式指定加载 SKILL 的 sync 事件.
 	// 客户端发 AIInputEvent{IsSyncMessage:true, SyncType:"load_skill_sync",
 	// SyncJsonInput: `{"skill_names":["x","y"]}`}, 服务端把正文加载进 Timeline

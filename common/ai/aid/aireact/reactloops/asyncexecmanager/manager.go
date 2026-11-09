@@ -22,6 +22,7 @@ type Manager struct {
 	entries        map[string]*execution
 	order          []string
 	active         int
+	revision       uint64
 	closed         bool
 	changed        chan struct{}
 	stopOwnerWatch func() bool
@@ -175,6 +176,33 @@ func (m *Manager) List() []Summary {
 	return items
 }
 
+// Overview returns one coherent lifecycle snapshot without inspecting any
+// resource. Revision advances whenever the manager's execution state changes,
+// allowing clients to discard an older query response delivered after a newer
+// push event.
+func (m *Manager) Overview() Overview {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	executions := make([]Summary, 0, len(m.order))
+	for _, id := range m.order {
+		executions = append(executions, cloneSummary(m.entries[id].summary))
+	}
+	return Overview{
+		Revision:   m.revision,
+		Executions: executions,
+	}
+}
+
+// ChangeSignal returns a channel that is closed on the next lifecycle change.
+// Callers should take the signal before taking an Overview, then wait on it.
+// This snapshot-before-wait sequence lets missed intermediate states coalesce
+// without losing the latest state.
+func (m *Manager) ChangeSignal() <-chan struct{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.changed
+}
+
 func (m *Manager) Get(id string) (Summary, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -325,6 +353,7 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 }
 
 func (m *Manager) notifyLocked() {
+	m.revision++
 	close(m.changed)
 	m.changed = make(chan struct{})
 }

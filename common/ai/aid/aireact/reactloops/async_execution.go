@@ -21,21 +21,28 @@ func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error
 	}
 	task := r.GetCurrentTask()
 	r.onReleaseMutex.Lock()
-	defer r.onReleaseMutex.Unlock()
 	if r.asyncExecutionManager != nil {
-		return r.asyncExecutionManager, nil
+		manager := r.asyncExecutionManager
+		r.onReleaseMutex.Unlock()
+		return manager, nil
 	}
 	if r.released || r.asyncDirectAnswerRequested {
+		r.onReleaseMutex.Unlock()
 		return nil, asyncexecmanager.ErrClosed
 	}
 	if utils.IsNil(task) {
+		r.onReleaseMutex.Unlock()
 		return nil, errors.New("async execution requires an owning task")
 	}
 	manager, err := asyncexecmanager.New(task.GetContext(), asyncexecmanager.Config{})
 	if err != nil {
+		r.onReleaseMutex.Unlock()
 		return nil, err
 	}
 	r.asyncExecutionManager = manager
+	taskContext := task.GetContext()
+	r.onReleaseMutex.Unlock()
+	go r.watchAsyncExecutionManager(taskContext, manager)
 	return manager, nil
 }
 

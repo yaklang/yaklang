@@ -310,6 +310,50 @@ mock 模型通过真实文本/native 解析链路执行全部 OP，验证禁用�
 action、AutoContext 和 UI 使用同一个 owner
 Manager 的状态与 Inspector，UI 的持续刷新另由展示层实现。
 
+## 前端同步协议
+
+ReActLoop 会在 Manager 的 execution 生命周期变化时主动推送
+`structured` 事件，`NodeId` 固定为 `async_execution`。主动查询使用
+`AIInputEvent{IsSyncMessage:true, SyncType:"async_execution_sync"}`，返回同一种
+payload 并保留请求的 `SyncID`。两种 payload 都只读取 Manager 元信息，不调用
+Inspector，也不复制 stdout、stderr 或结果。
+
+```json
+{
+  "revision": 4,
+  "task_id": "react-task",
+  "loop_name": "default",
+  "running_count": 1,
+  "updated_at": 1760000000000,
+  "executions": [
+    {
+      "execute_id": "exec-...",
+      "metadata": {"name": "capture", "attributes": {"task_id": "react-task"}},
+      "state": "running",
+      "created_at": "2026-11-09T12:00:00Z",
+      "started_at": "2026-11-09T12:00:00Z",
+      "revision": 2
+    }
+  ]
+}
+```
+
+`running_count` 统计 pending、running 和 stopping；这些状态仍占用执行名额，只有
+completed、failed、cancelled、timed_out 才减数。`revision` 在单个 Manager 内
+单调递增，前端可用它丢弃晚到的旧查询结果。终态 execution 暂时保留在
+`executions` 中，便于刷新结果卡片；数量上限由 Manager 配置控制。
+
+手动停止使用 `SyncType:"stop_async_execution_sync"`：
+
+```json
+{"execute_id":"exec-..."}
+```
+
+成功响应与查询 payload 相同，并额外携带 `execution`，状态通常为 `stopping`。
+停止请求不代表清理已经结束；前端应继续消费后续 `async_execution` 推送，直到该
+execution 进入终态。缺少 `execute_id`、Manager 不存在或 ID 不存在时，响应通过
+`error` 返回错误，仍保持同一个 `SyncID` 和快照结构。
+
 ## AI 上下文展示
 
 每轮主循环构造 prompt 时，读取该 loop 已有 Manager 的 List，将只读摘要放入

@@ -60,6 +60,49 @@ func awaitSignal(t *testing.T, signal <-chan struct{}) {
 	}
 }
 
+func TestOverviewTracksRevisionAndRunningCount(t *testing.T) {
+	m := newTestManager(t, context.Background(), Config{})
+	initial := m.Overview()
+	if initial.Revision != 0 || initial.RunningCount() != 0 || len(initial.Executions) != 0 {
+		t.Fatalf("unexpected initial overview: %+v", initial)
+	}
+
+	changed := m.ChangeSignal()
+	receipt, err := m.Start(Request{ID: "overview", Resource: &testResource{
+		observer: inspectorFunc(quietInspector),
+		run: func(ctx context.Context) error {
+			<-ctx.Done()
+			return ctx.Err()
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	awaitSignal(t, changed)
+	active := m.Overview()
+	if active.Revision <= initial.Revision || active.RunningCount() != 1 {
+		t.Fatalf("active overview: %+v", active)
+	}
+
+	changed = m.ChangeSignal()
+	_, _ = m.Stop(receipt.ID)
+	awaitSignal(t, changed)
+	stopping := m.Overview()
+	if stopping.Revision <= active.Revision || stopping.RunningCount() != 1 ||
+		stopping.Executions[0].State != StateStopping {
+		t.Fatalf("stopping overview: %+v", stopping)
+	}
+
+	changed = m.ChangeSignal()
+	final := waitExecution(t, m, receipt.ID)
+	awaitSignal(t, changed)
+	terminal := m.Overview()
+	if final.State != StateCancelled || terminal.Revision <= stopping.Revision ||
+		terminal.RunningCount() != 0 || terminal.Executions[0].State != StateCancelled {
+		t.Fatalf("terminal overview: %+v, final=%+v", terminal, final)
+	}
+}
+
 func TestInspectorIsLiveAndNotSampledByManager(t *testing.T) {
 	m := newTestManager(t, context.Background(), Config{})
 	started, release := make(chan struct{}), make(chan struct{})
