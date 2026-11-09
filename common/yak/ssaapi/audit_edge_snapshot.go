@@ -41,9 +41,9 @@ func buildAuditEdgeSnapshot(edges []ssadb.AuditEdgeTarget) *auditEdgeSnapshot {
 	return snapshot
 }
 
-// predecessorsFor returns the predecessor edges for nodeID. The second result
-// is false when no snapshot is authoritative (empty result or nil snapshot),
-// so the caller can fall back to the per-node reader for legacy rows.
+// predecessorsFor returns the predecessor edges recorded for nodeID. A nil
+// snapshot means no result-scoped view is available; the caller then keeps the
+// per-node reader.
 func (s *auditEdgeSnapshot) predecessorsFor(nodeID string) ([]ssadb.AuditPredecessor, bool) {
 	if s == nil {
 		return nil, false
@@ -68,6 +68,12 @@ func (s *auditEdgeSnapshot) effectsOnFor(nodeID string) ([]string, bool) {
 // getAuditEdgeSnapshot keeps one result snapshot per Program. Report
 // generation processes one result at a time, so a single slot bounds memory
 // without a per-result cache that could grow with the number of rules.
+//
+// Nodes and edges are stamped with the same ResultId by the writer, so a
+// result-scoped read sees exactly the edges the per-node reader would return
+// for that result's nodes. An empty result means the graph was not persisted
+// under this id (older writers stamped result_id = 0); return nil so the
+// caller keeps the per-node reader instead of reporting "no edges".
 func (p *Program) getAuditEdgeSnapshot(resultID uint) *auditEdgeSnapshot {
 	if p == nil || resultID == 0 {
 		return nil
@@ -77,23 +83,28 @@ func (p *Program) getAuditEdgeSnapshot(resultID uint) *auditEdgeSnapshot {
 	if p.auditEdgeResultID == resultID && p.auditEdgeSnapshot != nil {
 		return p.auditEdgeSnapshot
 	}
-	if !p.auditEdgeChecked {
-		p.auditEdgeChecked = true
-		p.auditEdgeLegacy = ssadb.HasAuditEdgesWithoutResult(ssadb.GetDB())
-	}
-	if p.auditEdgeLegacy {
-		// Legacy rows may carry result_id = 0 while their nodes claim a real
-		// result. A result-scoped query would silently drop them, so keep the
-		// per-node reader for this program.
-		return nil
-	}
 	edges, err := ssadb.LoadAuditEdgeTargetsByResultID(ssadb.GetDB(), resultID)
 	if err != nil {
 		log.Errorf("load audit edges for result %d failed: %v", resultID, err)
+		return nil
+	}
+	if len(edges) == 0 {
 		return nil
 	}
 	snapshot := buildAuditEdgeSnapshot(edges)
 	p.auditEdgeResultID = resultID
 	p.auditEdgeSnapshot = snapshot
 	return snapshot
+}
+
+// resetAuditEdgeSnapshot drops the cached result snapshot. It is used when the
+// program's result set changes.
+func (p *Program) resetAuditEdgeSnapshot() {
+	if p == nil {
+		return
+	}
+	p.auditEdgeMu.Lock()
+	p.auditEdgeResultID = 0
+	p.auditEdgeSnapshot = nil
+	p.auditEdgeMu.Unlock()
 }
