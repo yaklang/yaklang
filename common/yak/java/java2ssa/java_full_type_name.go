@@ -154,10 +154,10 @@ func (y *singleFileBuilder) MergeFullTypeNameForType(allTypName []string, typ ss
 	if typ == nil {
 		return ssa.CreateAnyType()
 	}
+	// AddFullTypeName deduplicates, so a membership check per name would only
+	// add a Snapshot (a full copy of up to 200 names) per loop iteration.
 	for _, typStr := range allTypName {
-		if !utils.ContainsAll[string](typ.GetFullTypeNames(), typStr) {
-			typ.AddFullTypeName(typStr)
-		}
+		typ.AddFullTypeName(typStr)
 	}
 	return typ
 }
