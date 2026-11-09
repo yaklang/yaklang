@@ -73,7 +73,9 @@ Region（虚拟地址 + 文件偏移 + 长度）
 | `PE` | `pe` | 机器字段、可选头子系统 | PE32 与 PE32+ |
 | `MachO` | `macho` | CPU 字段；OS 暂为 unknown | 只接受 thin Mach-O |
 
-格式层只读头部和节表，不反汇编，不执行输入，也不判断文件是否可信。
+ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。PE 与 Mach-O 的导入导出尚未接入。
+
+格式层只读头部、节表和符号表，不反汇编，不执行输入，也不判断文件是否可信。
 
 `Check` 解析完整头部并返回 `core.CheckResult`；`Load` 构建 Artifact。`Match` 只看魔数，用于候选选择。
 
@@ -97,7 +99,7 @@ Region（虚拟地址 + 文件偏移 + 长度）
 5. 将当前区域封装为一个 Function，Function 内保存基本块。
 6. 为没有控制转移的块补一个到下一块的 `jump`；区域末尾补 `trap` 和 `block-falls-off-region` 诊断。
 
-解码器从 `ParseRequest.Reader` 的分段 ByteReader 中增量读取，不接收整段 `[]byte`。`Parse` 与 `Disassemble` 都使用同一套解码器和诊断；前者构建 Function，后者输出地址、机器字节和 GNU 语法助记符。
+解码器从 `ParseRequest.Reader` 的分段 ByteReader 中增量读取，不接收整段 `[]byte`。`Parse` 与 `Disassemble` 都使用同一套解码器和诊断；前者构建 Function，后者输出地址、机器字节和可切换的 AT&T/Intel 语法助记符。
 
 已覆盖的指令族：
 
@@ -111,8 +113,9 @@ Region（虚拟地址 + 文件偏移 + 长度）
 
 表示约定：
 
-- 通用寄存器在 LowIR 中是显式 `read-register` / `write-register`。部分寄存器使用原名称，例如 `al`、`eax`、`rax`；转换到 YakSSA 时按别名合并为带位宽类型的变量，不插入 Phi。
+- 通用寄存器在 LowIR 中是显式 `read_register` / `write_register`。部分寄存器使用原名称，例如 `al`、`eax`、`rax`；转换到 YakSSA 时按别名合并为带位宽类型的变量。普通分支汇合沿用变量；循环头插入 loop-carried Phi。
 - `rflags` 是伪寄存器。算术、逻辑、比较和测试指令写入它；`Jcc`、`SETcc` 和 `CMOVcc` 从它读取。`JCXZ`、`JECXZ` 和 `JRCXZ` 例外，它们直接比较 `cx`、`ecx` 或 `rcx`。
+- 多字节 NOP（`0f 1f`）的 ModRM/SIB 只编码指令长度，CPU 不访问内存。汇编文本统一显示为 `nop`，机器字节保留原始长度，LowIR 是 `nop`。
 - 内存地址是 `pointer` 值。基址寄存器先转换为指针，索引和位移作为整数偏移相加。
 - RIP 相对地址在解码时计算为 `下一条指令地址 + 位移`。
 - 段覆盖保留为 `x86.segment.<name>` 内建操作，不假定段基址为零。
@@ -140,7 +143,7 @@ Region（虚拟地址 + 文件偏移 + 长度）
 
 ## Target 与 Image
 
-`core.Target` 描述 OS、Architecture、地址位数、字节序、ABI、机器标识和执行模式。`core.Image` 描述对象类型、基址、入口和节表。二者都是具体结构。
+`core.Target` 描述 OS、Architecture、地址位数、字节序、ABI、机器标识和执行模式。`core.Image` 描述对象类型、基址、入口、节表和符号。二者都是具体结构。
 
 节记录同时保留文件范围和虚拟范围：
 
@@ -163,7 +166,7 @@ PE 的入口和节地址由 ImageBase 加 RVA 得到；ELF 与 Mach-O 的地址�
 
 `Disassembler` 是 parser 的可选能力，通过 `Artifact.Disassemble` 调用；没有该能力的 parser 返回 `ErrNoDisassembler`。
 
-`lowir2ssa` 把值、算术、比较和控制流转换成 YakSSA，把寄存器提升为带位宽类型的变量，把内存、调用和未支持操作保留为 `reify.*` 调用。默认删除 stack canary。`ssa2source` 只渲染已有 YakSSA 程序。两者都是独立包，不参与 loader 与 parser 的分派。
+`lowir2ssa` 把值、算术、比较和控制流转换成 YakSSA，把通用寄存器和内存槽提升为带位宽类型的变量。只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。默认删除 stack canary 和栈帧。转换后 `core/ssapass` 应用 C 函数定义并重写字符串参数。`ssa2source` 只渲染已有 YakSSA 程序。这些包都是独立包，不参与 loader 与 parser 的分派。
 
 详细映射见 [SSA 文档](ssa.md)。
 

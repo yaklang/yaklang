@@ -27,14 +27,19 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 
 | 模式 | 输出 | 状态 |
 | --- | --- | --- |
-| `asm` | 地址、机器字节、GNU 语法汇编 | 已实现，默认 |
-| `lowir` | 块、值、操作、目标和效果 | 已实现 |
-| `ssair` | YakSSA 文本 | 已实现 |
-| `source` | 伪源码 | 已实现 |
+| `1asm` / `asm` | 地址、机器字节和汇编；`--asm-syntax att|intel` | 已实现，默认 |
+| `2lowir` / `lowir` | 块、值、操作、目标和效果 | 已实现 |
+| `3ssair` / `ssair` | 带类型、对齐 `=` 的 YakSSA 文本 | 已实现 |
+| `4source` / `source` | 伪源码 | 已实现 |
+| `all` | 同一次解码输出四段，分隔为 `===== 1asm =====` 等 | 已实现 |
 
 `lift` 的转换选项：
 
 - `--keep-stack-canary`：保留 stack-protector 代码。默认删除。只影响 `ssair` 和 `source`。
+- `--keep-stack-frame`：保留栈帧建立与销毁。默认删除。删除后不重写 rbp 相对地址。
+- `--asm-syntax intel|att`：汇编语法，默认 `intel`；`att` 输出 GNU/AT&T 语法。
+- `--func NAME`：反编译一个已恢复函数；不能和 `--address/--size` 同用。
+- `--address` 也接受函数符号名（`sum_points` 或 `0xsum_points`）。
 
 `lift` 的区域选择：
 
@@ -49,11 +54,14 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" parsers --json
 "$OUT/bin/reify" inspect --json /bin/true
 "$OUT/bin/reify" check /bin/true
-"$OUT/bin/reify" lift --mode asm --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode lowir --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode ssair --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode source --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --json --mode lowir /bin/true
+"$OUT/bin/reify" lift --mode 1asm --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 2lowir --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 3ssair --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 4source --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 1asm --asm-syntax intel --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 4source --func main /bin/true
+"$OUT/bin/reify" lift --mode all --func main /bin/true
+"$OUT/bin/reify" lift --json --mode 2lowir /bin/true
 ```
 
 ## loaders 与 parsers
@@ -162,9 +170,9 @@ Region: address=0x2590 size=48
 Instructions: 14
 Diagnostics: 0
 0x2590  f3 0f 1e fa               endbr64
-0x2594  31 ed                     xor %ebp,%ebp
-0x2596  49 89 d1                  mov %rdx,%r9
-0x2599  5e                        pop %rsi
+0x2594  31 ed                     xor ebp, ebp
+0x2596  49 89 d1                  mov r9, rdx
+0x2599  5e                        pop rsi
 ...
 ```
 
@@ -180,11 +188,19 @@ JSON 结构：
 }
 ```
 
-空的 `diagnostics` 字段会省略。汇编由 parser 的可选 `Disassembler` 能力生成。没有该能力的架构返回 `ErrNoDisassembler`。
+空的 `diagnostics` 字段会省略。汇编由 parser 的可选 `Disassembler` 能力生成。`--asm-syntax att` 输出 GNU/AT&T 语法；没有该能力的架构返回 `ErrNoDisassembler`。
+
+边界恢复按优先级合并：符号表、`.eh_frame`、`init/fini_array`、PLT、入口、直接/ GOT call 目标、尾部扫描。报告头会打印：
+
+```text
+Boundaries: symbol=13 eh_frame=8 init_array=2 plt=5 entry=1 call_target=0 scan=0 duplicates=10
+```
+
+`3ssair` / `4source` 的每个函数头带 `; boundary: symbol` 或 `// boundary: eh_frame`。
 
 ### lowir
 
-`--mode lowir` 输出区域统计和 LowIR 文本：
+`--mode 2lowir` 输出区域统计和 LowIR 文本：
 
 ```text
 Scope: amd64 LowIR
@@ -198,7 +214,7 @@ target: unknown/amd64 (64-bit, little-endian)
 function f1 @ 0x2590
 block b1 @ 0x2590
   0x2590  intrinsic @x86.endbr64
-  0x2594  v1:i32 = read-register %ebp [read-register]
+  0x2594  v1:i32 = read_register %ebp [read_register]
   ...
 Note [block-falls-off-region]: block at 0x25b6 reaches the end of the decoded region
 ```
@@ -249,22 +265,23 @@ JSON 结构：
 
 ### ssair
 
-`--mode ssair` 先构建 LowIR，再调用 `lowir2ssa.Convert`，最后输出 YakSSA 文本：
+`--mode 3ssair` 先构建 LowIR，再调用 `lowir2ssa.Convert`，最后输出 YakSSA 文本：
 
 ```text
 Scope: amd64 SSair
-Region: address=0x2590 size=48
+Region: address=0x401136 size=24
 Functions: 1
-Diagnostics: 1
-sub_0x2590
-type: () -> any
-entry-0: (<nil condition>)
-	<any> t6 = call <any> reify.intrinsic.x86.endbr64 () binding[] member[]
-	<i32> t8 = type-case[i32] <any> t7
-	<i32> t9 = type-case[i32] <any> t7
-	<i32> t10 = <i32> t8 xor <i32> t9
-	<i64> t11 = type-case[i64] <i32> t10
-	<i64> t14 = call <any> reify.intrinsic.x86.flags.xor (<i32> t8, <i32> t9, <i32> t10) binding[] member[]
+Diagnostics: 0
+main
+type: () -> null
+entry_0: (<nil condition>)
+	<i64>    t4  = <i64> 8
+	<i64>    t5  = <i64> t3 sub <i64> 8
+	<string> t6  = <string> x86.flags.sub
+	<i64>    t7  = type_cast[i64] <string> x86.flags.sub
+	<i32>    t8  = <i32> 4202500
+	<i64>    t9  = type_cast[i64] <i32> 4202500
+	<any>    t12 = call <any> puts (<i64> t9) binding[] member[]
 	...
 ```
 
@@ -274,39 +291,37 @@ JSON 增加 `ssair` 字段，并保留 `ir` 与 `diagnostics`：
 {
   "scope": "amd64-ssair",
   "mode": "ssair",
-  "region": {"address": 9616, "offset": 9616, "size": 48},
-  "ssair": "sub_0x2590\ntype: () -> any\n...",
+  "region": {"address": 4198710, "offset": 4406, "size": 24},
+  "ssair": "main\ntype: () -> null\n...",
   "ir": {"target": {}, "functions": []},
   "diagnostics": []
 }
 ```
 
+### all
+
+`--mode all` 复用一次解码，按固定顺序输出四段；JSON 同时填充 `assembly`、`ir`、`ssair`、`source` 和 `boundary_stats`。
+
 ### source
 
-`--mode source` 在同一个 YakSSA 程序上调用 `ssa2source.Render`：
+`--mode 4source` 在同一个 YakSSA 程序上调用 `ssa2source.Render`：
 
 ```text
 Scope: amd64 source
-Region: address=0x2590 size=48
+Region: address=0x401136 size=24
 Functions: 1
-Diagnostics: 1
-function sub_0x2590() {
-entry-0:
-  rbp = undefined;
-  rsp = undefined;
-  v6 = reify.intrinsic.x86.endbr64();
-  v8 = cast(i32, rbp);
-  v9 = cast(i32, rbp);
-  v10 = v8 ^ v9;
-  rbp = cast(i64, v10);
-  rflags = reify.intrinsic.x86.flags.xor(v8, v9, v10);
-  ...
+Diagnostics: 0
+function main() {
+    puts("hello, reify");
+    return 0x0;
 }
 ```
 
-JSON 增加 `source` 字段。伪源码不是可编译源码，也不还原语言级类型和控制结构。
+JSON 增加 `source` 字段。伪源码不是可编译源码，也不还原语言级类型。控制结构还原为 `if`/`else` 和 `while`；循环 Phi 展开为循环前赋值和 back-edge 前赋值。源码不出现块标签、`goto` 或 `phi`。
 
-数值类型保留位宽：`i8`、`i16`、`i32`、`i64`、`ptr64`、`i1`。部分寄存器由类型区分。转换不插入 Phi；寄存器读取最近一次赋值。
+数值类型保留位宽：`i8`、`i16`、`i32`、`i64`、`ptr64`、`i1`。部分寄存器由类型区分。普通汇合不插 Phi；循环头插入 loop-carried Phi，再由 source 展开。
+
+源码中的常量默认是十六进制。可打印字符串地址和符号地址会追加注释。函数名和调用目标来自 ELF 符号表、PLT 与 GOT 重定位；没有符号时保留 `sub_0x<地址>`。
 
 转换规则和诊断码见 [SSA 文档](ssa.md)。
 
@@ -318,14 +333,14 @@ JSON 增加 `source` 字段。伪源码不是可编译源码，也不还原语�
 common/yak/reify/scripts/lift-all.sh -o /mnt/data/scan-outputs/reify-lift /bin/true
 ```
 
-输出目录由 `-o` 指定，默认 `./reify-out`。用 `-a ADDRESS -s SIZE` 只拆一个映像地址区间，例如单个函数。文件名取自输入文件名：
+输出根由 `-o` 指定，默认 `./reify-out`。无 `-a/-s` 时写入 `<root>/all`；用 `-a ADDRESS -s SIZE` 只拆一个映像地址区间，例如单个函数，写入指定的 `-o` 目录。用 `-x intel|att` 切换汇编语法，默认 Intel。
 
 | 文件 | 内容 |
 | --- | --- |
-| `<name>.asm.txt` | 汇编 |
-| `<name>.lowir.txt` | LowIR |
-| `<name>.ssair.txt` | YakSSA |
-| `<name>.source.txt` | 伪源码 |
+| `<name>.1asm.txt` | 汇编 |
+| `<name>.2lowir.txt` | LowIR |
+| `<name>.3ssair.txt` | 带类型 YakSSA |
+| `<name>.4source.txt` | 伪源码 |
 | `version` | 版本、提交哈希、分支、时间、输入路径、SHA-256 与区间 |
 
 任一模式失败时，脚本把错误写入对应文件，继续其余模式，最后返回 1。

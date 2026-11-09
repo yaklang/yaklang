@@ -16,7 +16,11 @@ func FormatLowIR(ir *LowIR) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "target: %s/%s (%d-bit, %s-endian)\n", ir.Target.OS, ir.Target.Architecture, ir.Target.Bits, ir.Target.ByteOrder)
 	for _, function := range ir.Functions {
-		fmt.Fprintf(&b, "function f%d @ 0x%x\n", function.ID, function.Address)
+		if function.Name != "" {
+			fmt.Fprintf(&b, "function %s @ 0x%x\n", function.Name, function.Address)
+		} else {
+			fmt.Fprintf(&b, "function f%d @ 0x%x\n", function.ID, function.Address)
+		}
 		for _, block := range function.Blocks {
 			fmt.Fprintf(&b, "block b%d @ 0x%x\n", block.ID, block.Address)
 			for _, instruction := range block.Instructions {
@@ -106,15 +110,16 @@ func formatEffects(effects Effect) string {
 		flag Effect
 		name string
 	}{
-		{EffectReadMemory, "read-memory"},
-		{EffectWriteMemory, "write-memory"},
-		{EffectReadRegister, "read-register"},
-		{EffectWriteRegister, "write-register"},
+		{EffectReadMemory, "read_memory"},
+		{EffectWriteMemory, "write_memory"},
+		{EffectReadRegister, "read_register"},
+		{EffectWriteRegister, "write_register"},
 		{EffectCall, "call"},
-		{EffectMayTrap, "may-trap"},
+		{EffectMayTrap, "may_trap"},
 		{EffectVolatile, "volatile"},
 		{EffectAtomic, "atomic"},
 		{EffectUnknown, "unknown"},
+		{EffectFrameRestore, "frame_restore"},
 	}
 	var parts []string
 	var known Effect

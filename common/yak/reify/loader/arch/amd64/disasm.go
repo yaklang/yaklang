@@ -34,22 +34,34 @@ func (Parser) Disassemble(ctx context.Context, request core.ParseRequest) (*core
 	// Report lift diagnostics in both modes so a region cannot look clean only
 	// because the caller asked for text.
 	_ = liftAMD64(request.Target, blocks, blockIDs, diagnostics)
-	var text strings.Builder
-	for _, instruction := range decoded {
-		fmt.Fprintf(&text, "0x%x  %-24s  %s\n", instruction.address, formatInstructionBytes(instruction.raw), instruction.text())
-	}
 	return &core.Disassembly{
-		Text:         text.String(),
+		Text:         renderAMD64Assembly(decoded, request.Syntax),
 		Instructions: len(decoded),
 		Diagnostics:  diagnostics.finish(),
 	}, nil
 }
 
-func (i amd64Instruction) text() string {
+func renderAMD64Assembly(decoded []amd64Instruction, syntax core.AsmSyntax) string {
+	var text strings.Builder
+	for _, instruction := range decoded {
+		fmt.Fprintf(&text, "0x%x  %-24s  %s\n", instruction.address, formatInstructionBytes(instruction.raw), instruction.text(syntax))
+	}
+	return text.String()
+}
+
+func (i amd64Instruction) text(syntax core.AsmSyntax) string {
 	if i.endbr != "" {
 		return i.endbr
 	}
-	return x86asm.GNUSyntax(i.inst, i.address, nil)
+	// Multi-byte NOP padding encodes its length in the ModRM/SIB bytes. The CPU
+	// does not read that memory, so printing "nopw %cs:(...)" is misleading.
+	if i.inst.Op == x86asm.NOP {
+		return "nop"
+	}
+	if syntax == core.AsmSyntaxATT {
+		return x86asm.GNUSyntax(i.inst, i.address, nil)
+	}
+	return x86asm.IntelSyntax(i.inst, i.address, nil)
 }
 
 func formatInstructionBytes(raw []byte) string {

@@ -49,7 +49,7 @@ func TestFormatLowIR(t *testing.T) {
 		"function f1 @ 0x1000",
 		"block b1 @ 0x1000",
 		"v1:i64 = constant 0x10",
-		"v2:i64 = read-register %rax [read-register]",
+		"v2:i64 = read_register %rax [read_register]",
 		"v3:i64 = add v1, v2",
 		"jump -> b2",
 	} {
@@ -64,7 +64,7 @@ func TestFormatLowIR(t *testing.T) {
 
 func TestFormatEffectsPreservesUnknownBits(t *testing.T) {
 	got := formatEffects(EffectReadMemory | Effect(1<<20))
-	if !strings.Contains(got, "read-memory") || !strings.Contains(got, "0x100000") {
+	if !strings.Contains(got, "read_memory") || !strings.Contains(got, "0x100000") {
 		t.Fatalf("effects = %q", got)
 	}
 }

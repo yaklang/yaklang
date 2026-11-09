@@ -25,13 +25,30 @@ type Parser interface {
 // use its relative Bytes/ReadAt methods and must not close it. The reader owns
 // byte-order handling, so parsers do not interpret Target.ByteOrder.
 type ParseRequest struct {
-	Target  Target
-	Address uint64
-	Reader  *ByteReader
+	Target       Target
+	Address      uint64
+	Reader       *ByteReader
+	Syntax       AsmSyntax
+	WithAssembly bool
+}
+
+// AsmSyntax selects the textual assembly dialect. The empty value uses the
+// parser default (Intel for AMD64).
+type AsmSyntax string
+
+const (
+	AsmSyntaxATT   AsmSyntax = "att"
+	AsmSyntaxIntel AsmSyntax = "intel"
+)
+
+// DisassembleOptions controls optional disassembly rendering.
+type DisassembleOptions struct {
+	Syntax AsmSyntax
 }
 
 type ParseResult struct {
 	IR          *LowIR
+	Assembly    string
 	Diagnostics []Diagnostic
 }
 

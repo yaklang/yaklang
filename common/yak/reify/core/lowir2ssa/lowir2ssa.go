@@ -1,9 +1,9 @@
 // Package lowir2ssa converts Reify LowIR into a YakSSA program.
 //
-// Pure values become typed SSA values. General-purpose registers become typed
-// variables: a read uses the current value, a write redefines it, and no Phi is
-// inserted. Memory accesses, calls, intrinsics and unsupported operations stay
-// explicit as calls to reserved "reify." pseudo-functions.
+// Pure values become typed SSA values. General-purpose registers and memory
+// slots become typed variables: a read uses the current value, a write
+// redefines it, and no Phi is inserted. Only a LowIR call instruction produces
+// an SSA Call. Intrinsics and unknown values become opaque typed values.
 package lowir2ssa
 
 import (
@@ -29,6 +29,7 @@ type Result struct {
 type Options struct {
 	ProgramName     string
 	KeepStackCanary bool
+	KeepStackFrame  bool
 }
 
 // Option customizes conversion.
@@ -53,6 +54,20 @@ func WithKeepStackCanary() Option {
 func WithStackCanaryRemoval(remove bool) Option {
 	return func(options *Options) {
 		options.KeepStackCanary = !remove
+	}
+}
+
+// WithKeepStackFrame keeps frame setup and teardown. The default removes it.
+func WithKeepStackFrame() Option {
+	return func(options *Options) {
+		options.KeepStackFrame = true
+	}
+}
+
+// WithStackFrameRemoval enables or disables the stack-frame pass.
+func WithStackFrameRemoval(remove bool) Option {
+	return func(options *Options) {
+		options.KeepStackFrame = !remove
 	}
 }
 
@@ -86,6 +101,15 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 		if !settings.KeepStackCanary {
 			RemoveStackCanary(&function)
 		}
+		duplicateReturnBlocks(&function)
+		if !settings.KeepStackFrame {
+			function.FrameRemoved = RemoveStackFrame(&function) > 0
+			function.FrameCleanup = true
+		} else {
+			function.FrameKept = true
+		}
+		foldReturnTails(&function)
+		reorderReversePostorder(&function)
 		if err := converter.convertFunction(function); err != nil {
 			return nil, err
 		}
@@ -105,26 +129,25 @@ func (Builder) BuildSSAIR(ctx context.Context, ir *core.LowIR) (*ssa.Program, er
 	return result.Program, nil
 }
 
-// Text renders the converted program with YakSSA's disassembler. Conversion
-// scaffolding lives in functions named with the reserved "reify." prefix; Text
-// omits them.
+// Text renders the converted program with YakSSA's disassembler. Extern call
+// targets and conversion scaffolding are omitted.
 func Text(program *ssa.Program) string {
 	if program == nil {
 		return ""
 	}
 	var text strings.Builder
 	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
-		if function == nil || isPseudoFunction(function) {
+		if function == nil || isSyntheticFunction(function) {
 			return true
 		}
-		text.WriteString(function.DisAsm(ssa.DisAsmDefault))
+		text.WriteString(FormatSSAIR(function))
 		return true
 	})
 	return text.String()
 }
 
-func isPseudoFunction(function *ssa.Function) bool {
-	return strings.HasPrefix(function.GetName(), "reify.")
+func isSyntheticFunction(function *ssa.Function) bool {
+	return strings.HasPrefix(function.GetName(), "reify.") || function.IsExtern()
 }
 
 type converter struct {
@@ -136,15 +159,46 @@ type converter struct {
 	entry       *ssa.BasicBlock
 	blocks      map[core.BlockID]*ssa.BasicBlock
 	values      map[core.ValueID]ssa.Value
+	defs        map[core.ValueID]core.Instruction
 	variables   map[string]*ssa.Variable
+	memory      map[string]*ssa.Variable
+	memoryNames map[string]string
+	memoryIndex int
+	functions   map[string]*ssa.Function
+	flags       map[core.ValueID]flagInfo
+	arguments   map[string]bool
+	loopHeaders map[core.BlockID]bool
+	loopPhis    map[core.BlockID]map[string]*ssa.Phi
+	loopPhiDone map[int64]bool
+	headerStore map[core.BlockID]map[string]bool
+	loopCarried map[core.BlockID]map[string]bool
+	current     core.BlockID
 	types       map[core.ValueType]ssa.Type
-	pseudo      map[string]ssa.Value
 	undefined   map[string]ssa.Value
 }
 
 func (c *converter) convertFunction(function core.Function) error {
 	name := functionName(function)
 	ssaFunction := c.program.NewFunction(name)
+	metadata := ""
+	if function.Boundary != "" {
+		metadata = "boundary: " + string(function.Boundary)
+	}
+	if function.FrameRemoved || function.FrameCleanup {
+		if metadata != "" {
+			metadata += ";"
+		}
+		metadata += "frame-cleanup"
+	}
+	if function.FrameKept {
+		if metadata != "" {
+			metadata += ";"
+		}
+		metadata += "frame-kept"
+	}
+	if metadata != "" {
+		ssaFunction.SetVerboseName(metadata)
+	}
 	builder := ssaFunction.GetOrCreateBuilder()
 	if builder == nil {
 		return fmt.Errorf("lowir2ssa: cannot create builder for %s", name)
@@ -154,9 +208,19 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.entry = builder.CurrentBlock
 	c.blocks = make(map[core.BlockID]*ssa.BasicBlock, len(function.Blocks))
 	c.values = make(map[core.ValueID]ssa.Value)
+	c.defs = make(map[core.ValueID]core.Instruction)
 	c.variables = make(map[string]*ssa.Variable)
+	c.memory = make(map[string]*ssa.Variable)
+	c.memoryNames = make(map[string]string)
+	c.functions = make(map[string]*ssa.Function)
+	c.flags = make(map[core.ValueID]flagInfo)
+	c.arguments = make(map[string]bool)
+	c.loopHeaders = make(map[core.BlockID]bool)
+	c.loopPhis = make(map[core.BlockID]map[string]*ssa.Phi)
+	c.loopPhiDone = make(map[int64]bool)
+	c.headerStore = make(map[core.BlockID]map[string]bool)
+	c.loopCarried = make(map[core.BlockID]map[string]bool)
 	c.types = make(map[core.ValueType]ssa.Type)
-	c.pseudo = make(map[string]ssa.Value)
 	c.undefined = make(map[string]ssa.Value)
 
 	for index, block := range function.Blocks {
@@ -173,6 +237,16 @@ func (c *converter) convertFunction(function core.Function) error {
 		c.blocks[block.ID] = ssaBlock
 	}
 	for _, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			for _, result := range instruction.Results {
+				c.defs[result.ID] = instruction
+			}
+		}
+	}
+	c.markLoopHeaders(function)
+	c.collectLoopCarried(function)
+	c.bindParameters()
+	for _, block := range function.Blocks {
 		if err := c.convertBlock(block); err != nil {
 			return err
 		}
@@ -181,18 +255,120 @@ func (c *converter) convertFunction(function core.Function) error {
 	return nil
 }
 
+func (c *converter) markLoopHeaders(function core.Function) {
+	order := make(map[core.BlockID]int, len(function.Blocks))
+	for index, block := range function.Blocks {
+		order[block.ID] = index
+	}
+	for index, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			if instruction.Kind != core.OpJump && instruction.Kind != core.OpBranch {
+				continue
+			}
+			for _, target := range instruction.Targets {
+				if position, ok := order[target]; ok && position <= index {
+					c.loopHeaders[target] = true
+				}
+			}
+		}
+	}
+}
+
+func (c *converter) collectLoopCarried(function core.Function) {
+	order := make(map[core.BlockID]int, len(function.Blocks))
+	for index, block := range function.Blocks {
+		order[block.ID] = index
+	}
+	for header, position := range order {
+		if !c.loopHeaders[header] {
+			continue
+		}
+		last := position
+		for index, block := range function.Blocks {
+			if index <= position {
+				continue
+			}
+			for _, instruction := range block.Instructions {
+				for _, target := range instruction.Targets {
+					if target == header && index > last {
+						last = index
+					}
+				}
+			}
+		}
+		if last <= position {
+			continue
+		}
+		loaded := make(map[string]bool)
+		stored := make(map[string]bool)
+		for index := position; index <= last; index++ {
+			for _, instruction := range function.Blocks[index].Instructions {
+				switch instruction.Kind {
+				case core.OpLoad:
+					if len(instruction.Operands) > 0 {
+						loaded[valueKey(c.defs, instruction.Operands[0].Value)] = true
+					}
+				case core.OpStore:
+					if len(instruction.Operands) > 0 {
+						stored[valueKey(c.defs, instruction.Operands[0].Value)] = true
+					}
+				}
+			}
+		}
+		keys := make(map[string]bool)
+		for key := range loaded {
+			if stored[key] {
+				keys[key] = true
+			}
+		}
+		if len(keys) > 0 {
+			c.loopCarried[header] = keys
+		}
+	}
+}
+
+func (c *converter) prepareLoopPhis(blockID core.BlockID) {
+	for key := range c.loopCarried[blockID] {
+		c.loopPhi("mem:"+key, c.memoryVariable(c.memoryName(key)))
+	}
+}
+
+func (c *converter) bindParameters() {
+	c.builder.CurrentBlock = c.entry
+	for _, name := range []string{"rsp", "rbp"} {
+		parameter := ssa.NewParam("entry_"+name, false, c.builder)
+		if parameter == nil {
+			continue
+		}
+		parameter.SetType(c.typeFor(integerType(64)))
+		c.assignRegister(name, parameter)
+	}
+	for index, name := range []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"} {
+		parameter := ssa.NewParam(fmt.Sprintf("arg%d", index), false, c.builder)
+		if parameter == nil {
+			continue
+		}
+		parameter.FormalParameterIndex = index
+		c.function.Params = append(c.function.Params, parameter.GetId())
+		c.assignRegister(name, parameter)
+	}
+}
+
 func (c *converter) convertBlock(block core.Block) error {
 	ssaBlock, ok := c.blocks[block.ID]
 	if !ok {
 		return fmt.Errorf("lowir2ssa: block b%d is missing", block.ID)
 	}
+	c.current = block.ID
 	c.builder.CurrentBlock = ssaBlock
+	c.prepareLoopPhis(block.ID)
 	for _, instruction := range block.Instructions {
 		if err := c.ctx.Err(); err != nil {
 			return err
 		}
 		c.convertInstruction(instruction)
 	}
+	c.fillLoopCarried(block)
 	// A malformed or truncated LowIR block may have no terminator. Preserve a
 	// complete CFG by closing it with an empty return; terminated blocks ignore
 	// this call.
@@ -207,7 +383,7 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpCopy:
 		value := c.operandValue(firstOperand(instruction.Operands))
 		if value == nil {
-			c.setResult(instruction, c.call("reify.copy", nil))
+			c.setResult(instruction, c.opaqueValue("copy", instruction))
 			return
 		}
 		c.setResult(instruction, c.coerceType(value, instruction.Results))
@@ -218,7 +394,7 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 			c.setResult(instruction, values[0])
 		}
 	case core.OpSelect:
-		c.setResult(instruction, c.call("reify.select", c.operandValues(instruction.Operands)))
+		c.setResult(instruction, c.opaqueValue("select", instruction))
 	case core.OpAdd:
 		c.emitBinary(instruction, ssa.OpAdd)
 	case core.OpSub:
@@ -250,29 +426,34 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpWriteRegister:
 		c.emitRegisterWrite(instruction)
 	case core.OpLoad:
-		c.setResult(instruction, c.call("reify.load", c.operandValues(instruction.Operands)))
+		c.emitLoad(instruction)
 	case core.OpStore:
-		c.call("reify.store", c.operandValues(instruction.Operands))
+		c.emitStore(instruction)
 	case core.OpCall:
 		c.emitCall(instruction)
 	case core.OpIntrinsic:
 		c.emitIntrinsic(instruction)
 	case core.OpZeroExtend, core.OpSignExtend, core.OpTruncate:
-		c.setResult(instruction, c.call("reify."+string(instruction.Kind), c.operandValues(instruction.Operands)))
+		c.emitWidthCast(instruction)
 	case core.OpJump:
 		c.emitJump(instruction)
 	case core.OpBranch:
 		c.emitBranch(instruction)
 	case core.OpReturn:
-		c.builder.EmitReturn(c.operandValues(instruction.Operands))
+		values := c.operandValues(instruction.Operands)
+		if len(values) == 0 {
+			if value := c.currentRegister("rax"); value != nil {
+				values = append(values, value)
+			}
+		}
+		c.builder.EmitReturn(values)
 	case core.OpTrap:
-		c.call("reify.trap", c.operandValues(instruction.Operands))
-		c.builder.EmitReturn(nil)
+		c.emitTrap(instruction)
 	case core.OpNop:
-		c.call("reify.nop", nil)
+		// NOP has no SSA effect.
 	default:
-		c.addDiagnostic("lowir2ssa-unsupported-op", fmt.Sprintf("operation %q was preserved as an opaque call", instruction.Kind))
-		c.setResult(instruction, c.call("reify.op_"+string(instruction.Kind), c.operandValues(instruction.Operands)))
+		c.addDiagnostic("lowir2ssa-unsupported-op", fmt.Sprintf("operation %q was preserved as an opaque value", instruction.Kind))
+		c.setResult(instruction, c.opaqueValue(string(instruction.Kind), instruction))
 	}
 }
 
@@ -280,7 +461,7 @@ func (c *converter) emitBinary(instruction core.Instruction, op ssa.BinaryOpcode
 	values := c.operandValues(instruction.Operands)
 	if len(values) < 2 {
 		c.addDiagnostic("lowir2ssa-missing-operand", fmt.Sprintf("operation %q at 0x%x has %d operands", instruction.Kind, instruction.Address, len(values)))
-		c.setResult(instruction, c.call("reify."+string(instruction.Kind), values))
+		c.setResult(instruction, c.opaqueValue(string(instruction.Kind), instruction))
 		return
 	}
 	c.setResult(instruction, c.builder.EmitBinOp(op, values[0], values[1]))
@@ -290,7 +471,7 @@ func (c *converter) emitUnary(instruction core.Instruction, op ssa.UnaryOpcode) 
 	values := c.operandValues(instruction.Operands)
 	if len(values) == 0 {
 		c.addDiagnostic("lowir2ssa-missing-operand", fmt.Sprintf("operation %q at 0x%x has no operand", instruction.Kind, instruction.Address))
-		c.setResult(instruction, c.call("reify."+string(instruction.Kind), nil))
+		c.setResult(instruction, c.opaqueValue(string(instruction.Kind), instruction))
 		return
 	}
 	c.setResult(instruction, c.builder.EmitUnOp(op, values[0]))
@@ -300,12 +481,19 @@ func (c *converter) emitRegisterRead(instruction core.Instruction) {
 	operand := firstOperand(instruction.Operands)
 	view := registerViewFor(operand.Name, operand.Type.Bits)
 	if view.canonical == "" {
-		c.setResult(instruction, c.call("reify.read-register", nil))
+		c.setResult(instruction, c.opaqueValue("read_register", instruction))
 		return
+	}
+	if c.loopHeaders[c.current] {
+		key := "reg:" + view.canonical
+		if phi := c.loopPhi(key, c.registerVariable(view.canonical)); phi != nil {
+			c.setResult(instruction, phi)
+			return
+		}
 	}
 	value := c.registerValue(view)
 	if value == nil {
-		c.setResult(instruction, c.call("reify.read-register", nil))
+		c.setResult(instruction, c.opaqueValue("read_register", instruction))
 		return
 	}
 	if view.narrow() {
@@ -316,7 +504,7 @@ func (c *converter) emitRegisterRead(instruction core.Instruction) {
 
 func (c *converter) emitRegisterWrite(instruction core.Instruction) {
 	if len(instruction.Operands) < 2 {
-		c.call("reify.write-register", c.operandValues(instruction.Operands))
+		c.addDiagnostic("lowir2ssa-missing-operand", fmt.Sprintf("write_register at 0x%x has no value", instruction.Address))
 		return
 	}
 	operand := instruction.Operands[0]
@@ -326,7 +514,6 @@ func (c *converter) emitRegisterWrite(instruction core.Instruction) {
 	}
 	view := registerViewFor(operand.Name, operand.Type.Bits)
 	if view.canonical == "" {
-		c.call("reify.write-register", c.operandValues(instruction.Operands))
 		return
 	}
 	value = c.widenRegister(value, view)
@@ -355,6 +542,10 @@ func (c *converter) emitRegisterWrite(instruction core.Instruction) {
 	}
 	if err := variable.Assign(value); err != nil {
 		c.addDiagnostic("lowir2ssa-assignment", fmt.Sprintf("cannot assign %s: %v", view.canonical, err))
+	}
+	c.markHeaderStore("reg:" + view.canonical)
+	if argumentRegister(view.canonical) {
+		c.arguments[view.canonical] = true
 	}
 }
 
@@ -393,6 +584,28 @@ func (c *converter) registerVariable(name string) *ssa.Variable {
 	}
 	c.variables[name] = variable
 	return variable
+}
+
+func (c *converter) currentRegister(name string) ssa.Value {
+	variable := c.registerVariable(name)
+	if variable == nil {
+		return nil
+	}
+	return variable.GetValue()
+}
+
+func (c *converter) assignRegister(name string, value ssa.Value) {
+	if value == nil || value.IsUndefined() {
+		return
+	}
+	view := registerViewFor(name, 64)
+	variable := c.registerVariable(view.canonical)
+	if variable == nil {
+		return
+	}
+	if err := variable.Assign(value); err != nil {
+		c.addDiagnostic("lowir2ssa-assignment", fmt.Sprintf("cannot assign %s: %v", view.canonical, err))
+	}
 }
 
 func (c *converter) registerValue(view registerView) ssa.Value {
@@ -449,39 +662,443 @@ func (c *converter) castType(value ssa.Value, typ ssa.Type) ssa.Value {
 
 func (c *converter) constantLiteral(value uint64) ssa.Value {
 	if value <= math.MaxInt64 {
-		return c.builder.EmitConstInst(int64(value))
+		return c.newConstant(int64(value), c.typeFor(integerType(64)))
 	}
-	return c.builder.EmitConstInst(value)
+	return c.newConstant(value, c.typeFor(integerType(64)))
+}
+
+func (c *converter) newConstant(value any, typ ssa.Type) *ssa.ConstInst {
+	constant := c.builder.EmitConstInst(value)
+	if typ != nil {
+		constant.SetType(typ)
+	}
+	return constant
 }
 
 func (c *converter) emitCall(instruction core.Instruction) {
 	if len(instruction.Operands) == 0 {
-		c.setResult(instruction, c.call("reify.call", nil))
+		c.addDiagnostic("lowir2ssa-missing-operand", fmt.Sprintf("call at 0x%x has no target", instruction.Address))
 		return
 	}
+	var target ssa.Value
 	operand := instruction.Operands[0]
 	switch operand.Kind {
 	case core.OperandConstant:
-		c.setResult(instruction, c.call(fmt.Sprintf("reify.call_0x%x", literalUint64(operand.Literal)), nil))
+		target = c.externFunction(fmt.Sprintf("sub_0x%x", literalUint64(operand.Literal)))
 	case core.OperandSymbol:
-		c.setResult(instruction, c.call("reify.call_"+operand.Name, nil))
+		target = c.externFunction(operand.Name)
 	default:
-		c.setResult(instruction, c.call("reify.call", []ssa.Value{c.operandValue(operand)}))
+		target = c.operandValue(operand)
+	}
+	if target == nil {
+		return
+	}
+	args := c.operandValues(instruction.Operands[1:])
+	args = append(args, c.captureArguments()...)
+	call := c.builder.EmitCall(c.builder.NewCall(target, args))
+	if instruction.Variadic && call != nil {
+		call.SetVerboseName("variadic")
+	}
+	c.setResult(instruction, call)
+	// System V AMD64 returns integer and pointer values in rax.
+	c.assignRegister("rax", call)
+}
+
+// captureArguments reads the System V AMD64 integer argument registers that
+// were written since the previous call. Registers above the highest written
+// slot are omitted; missing lower slots become undefined arguments.
+func (c *converter) captureArguments() []ssa.Value {
+	names := []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+	last := -1
+	for index, name := range names {
+		if c.arguments[name] {
+			last = index
+		}
+	}
+	if last < 0 {
+		return nil
+	}
+	args := make([]ssa.Value, 0, last+1)
+	for index := 0; index <= last; index++ {
+		name := names[index]
+		args = append(args, c.registerValue(registerViewFor(name, 64)))
+		c.arguments[name] = false
+	}
+	return args
+}
+
+func argumentRegister(name string) bool {
+	switch name {
+	case "rdi", "rsi", "rdx", "rcx", "r8", "r9":
+		return true
+	default:
+		return false
 	}
 }
 
+// externFunction supplies a target for a direct call. The stub has no body and
+// is skipped by text renderers; the call instruction itself is a real Call.
+func (c *converter) externFunction(name string) ssa.Value {
+	if name == "" {
+		name = "unknown_call"
+	}
+	if function, ok := c.functions[name]; ok {
+		return function
+	}
+	if existing, ok := c.program.Funcs.Get(name); ok {
+		c.functions[name] = existing
+		return existing
+	}
+	function := c.program.NewFunction(name)
+	function.SetExtern(true)
+	c.functions[name] = function
+	return function
+}
+
+type flagInfo struct {
+	name     string
+	operands []core.ValueID
+}
+
 func (c *converter) emitIntrinsic(instruction core.Instruction) {
-	if len(instruction.Operands) == 0 {
-		c.setResult(instruction, c.call("reify.intrinsic", nil))
+	if len(instruction.Results) == 0 {
 		return
 	}
-	name := "reify.intrinsic"
-	operands := instruction.Operands
-	if operands[0].Kind == core.OperandSymbol {
-		name = "reify.intrinsic." + operands[0].Name
-		operands = operands[1:]
+	name := "intrinsic"
+	if len(instruction.Operands) > 0 && instruction.Operands[0].Kind == core.OperandSymbol {
+		name = instruction.Operands[0].Name
 	}
-	c.setResult(instruction, c.call(name, c.operandValues(operands)))
+	if strings.HasPrefix(name, "x86.flags.") {
+		info := flagInfo{name: strings.TrimPrefix(name, "x86.flags.")}
+		for _, operand := range instruction.Operands[1:] {
+			if operand.Kind == core.OperandValue {
+				info.operands = append(info.operands, operand.Value)
+			}
+		}
+		c.flags[instruction.Results[0].ID] = info
+		marker := c.opaqueValue(name, instruction)
+		c.setResult(instruction, marker)
+		if marker != nil {
+			c.flags[core.ValueID(marker.GetId())] = info
+		}
+		return
+	}
+	if strings.HasPrefix(name, "x86.cond.") {
+		if condition := c.conditionValue(name, instruction); condition != nil {
+			c.setResult(instruction, condition)
+			return
+		}
+	}
+	c.setResult(instruction, c.opaqueValue(name, instruction))
+}
+
+func (c *converter) conditionValue(symbol string, instruction core.Instruction) ssa.Value {
+	cc := strings.TrimPrefix(symbol, "x86.cond.")
+	if cc == "" || len(instruction.Operands) < 2 || instruction.Operands[1].Kind != core.OperandValue {
+		return nil
+	}
+	flags := c.operandValue(instruction.Operands[1])
+	if flags == nil {
+		return nil
+	}
+	info, ok := c.flags[core.ValueID(flags.GetId())]
+	if !ok {
+		return nil
+	}
+	switch info.name {
+	case "cmp":
+		if len(info.operands) < 2 {
+			return nil
+		}
+		return c.compareCondition(cc, info.operands[0], info.operands[1])
+	case "test":
+		if len(info.operands) < 2 {
+			return nil
+		}
+		left := c.values[info.operands[0]]
+		right := c.values[info.operands[1]]
+		if left == nil || right == nil {
+			return nil
+		}
+		subject := c.builder.EmitBinOp(ssa.OpAnd, left, right)
+		return c.zeroCondition(cc, subject)
+	default:
+		if len(info.operands) == 0 {
+			return nil
+		}
+		subject := c.values[info.operands[len(info.operands)-1]]
+		if subject == nil {
+			return nil
+		}
+		return c.zeroCondition(cc, subject)
+	}
+}
+
+func (c *converter) compareCondition(cc string, leftID, rightID core.ValueID) ssa.Value {
+	left := c.values[leftID]
+	right := c.values[rightID]
+	if left == nil || right == nil {
+		return nil
+	}
+	var op ssa.BinaryOpcode
+	switch cc {
+	case "e", "z":
+		op = ssa.OpEq
+	case "ne", "nz":
+		op = ssa.OpNotEq
+	case "l", "b", "c":
+		op = ssa.OpLt
+	case "le", "be":
+		op = ssa.OpLtEq
+	case "g", "a":
+		op = ssa.OpGt
+	case "ge", "ae":
+		op = ssa.OpGtEq
+	default:
+		return nil
+	}
+	return c.builder.EmitBinOp(op, left, right)
+}
+
+func (c *converter) zeroCondition(cc string, subject ssa.Value) ssa.Value {
+	if subject == nil {
+		return nil
+	}
+	zero := c.newConstant(int64(0), c.typeFor(integerType(64)))
+	switch cc {
+	case "e", "z":
+		return c.builder.EmitBinOp(ssa.OpEq, subject, zero)
+	case "ne", "nz":
+		return c.builder.EmitBinOp(ssa.OpNotEq, subject, zero)
+	case "l", "b", "c":
+		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
+	case "le", "be":
+		return c.builder.EmitBinOp(ssa.OpLtEq, subject, zero)
+	case "g", "a":
+		return c.builder.EmitBinOp(ssa.OpGt, subject, zero)
+	case "ge", "ae":
+		return c.builder.EmitBinOp(ssa.OpGtEq, subject, zero)
+	case "s":
+		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
+	case "ns":
+		less := c.builder.EmitBinOp(ssa.OpLt, subject, zero)
+		return c.builder.EmitUnOp(ssa.OpNot, less)
+	default:
+		return nil
+	}
+}
+
+// opaqueValue represents a value whose exact semantics are not modeled. It is a
+// tagged constant cast to the result type, not a call, so the marker stays
+// visible in both YakSSA and source text.
+func (c *converter) opaqueValue(name string, instruction core.Instruction) ssa.Value {
+	if name == "" {
+		name = "opaque"
+	}
+	marker := c.newConstant(name, ssa.CreateStringType())
+	if len(instruction.Results) > 0 {
+		return c.castType(marker, c.typeFor(instruction.Results[0].Type))
+	}
+	return marker
+}
+
+func (c *converter) emitWidthCast(instruction core.Instruction) {
+	value := c.operandValue(firstOperand(instruction.Operands))
+	if value == nil || len(instruction.Results) == 0 {
+		return
+	}
+	c.setResult(instruction, c.castType(value, c.typeFor(instruction.Results[0].Type)))
+}
+
+func (c *converter) emitTrap(instruction core.Instruction) {
+	message := "trap"
+	if len(instruction.Operands) > 0 && instruction.Operands[0].Kind == core.OperandSymbol {
+		message = instruction.Operands[0].Name
+	}
+	c.builder.EmitPanic(c.builder.EmitConstInst(message))
+	c.builder.EmitReturn(nil)
+}
+
+func (c *converter) emitLoad(instruction core.Instruction) {
+	if len(instruction.Operands) == 0 {
+		return
+	}
+	key := valueKey(c.defs, instruction.Operands[0].Value)
+	name := c.memoryName(key)
+	variable := c.memoryVariable(name)
+	if variable == nil {
+		return
+	}
+	if c.loopHeaders[c.current] && c.loopCarried[c.current][key] {
+		prefixed := "mem:" + key
+		if phi := c.loopPhi(prefixed, variable); phi != nil {
+			c.setResult(instruction, phi)
+			return
+		}
+	}
+	if value := variable.GetValue(); value != nil {
+		c.setResult(instruction, value)
+		return
+	}
+	c.setResult(instruction, c.loadMarker(instruction, instruction.Operands[0].Value))
+}
+
+func (c *converter) emitStore(instruction core.Instruction) {
+	if len(instruction.Operands) < 2 {
+		return
+	}
+	key := valueKey(c.defs, instruction.Operands[0].Value)
+	variable := c.memoryVariable(c.memoryName(key))
+	if variable == nil {
+		return
+	}
+	value := c.operandValue(instruction.Operands[1])
+	if value == nil || value.IsUndefined() {
+		return
+	}
+	if err := variable.Assign(value); err != nil {
+		c.addDiagnostic("lowir2ssa-assignment", fmt.Sprintf("cannot assign %s: %v", variable.GetName(), err))
+	}
+	c.markHeaderStore("mem:" + key)
+}
+
+func (c *converter) loadMarker(instruction core.Instruction, addressID core.ValueID) ssa.Value {
+	address := c.values[addressID]
+	markerText := "load:unknown"
+	if address != nil {
+		markerText = fmt.Sprintf("load:%d", address.GetId())
+	}
+	marker := c.newConstant(markerText, ssa.CreateStringType())
+	if len(instruction.Results) == 0 {
+		return marker
+	}
+	value := c.castType(marker, c.typeFor(instruction.Results[0].Type))
+	if user, ok := value.(ssa.User); ok && address != nil && value != address {
+		address.AddUser(user)
+	}
+	return value
+}
+
+func (c *converter) markHeaderStore(key string) {
+	if !c.loopHeaders[c.current] {
+		return
+	}
+	if c.headerStore[c.current] == nil {
+		c.headerStore[c.current] = make(map[string]bool)
+	}
+	c.headerStore[c.current][key] = true
+}
+
+func (c *converter) loopPhi(key string, variable *ssa.Variable) *ssa.Phi {
+	if c.headerStore[c.current] != nil && c.headerStore[c.current][key] {
+		return nil
+	}
+	if existing := c.loopPhis[c.current]; existing != nil {
+		if phi := existing[key]; phi != nil {
+			return phi
+		}
+	}
+	var current ssa.Value
+	if variable != nil {
+		current = variable.GetValue()
+	}
+	phi := ssa.NewPhi(c.builder.CurrentBlock, key)
+	if current != nil {
+		phi.Edge = []int64{current.GetId()}
+		phi.SetType(current.GetType())
+		current.AddUser(phi)
+	}
+	c.builder.CurrentBlock.Phis = append(c.builder.CurrentBlock.Phis, phi.GetId())
+	c.program.SetVirtualRegister(phi)
+	if variable != nil {
+		_ = variable.Assign(phi)
+	}
+	if c.loopPhis[c.current] == nil {
+		c.loopPhis[c.current] = make(map[string]*ssa.Phi)
+	}
+	c.loopPhis[c.current][key] = phi
+	return phi
+}
+
+func (c *converter) fillLoopCarried(block core.Block) {
+	for _, instruction := range block.Instructions {
+		if instruction.Kind != core.OpJump && instruction.Kind != core.OpBranch {
+			continue
+		}
+		for _, target := range instruction.Targets {
+			if !c.loopHeaders[target] {
+				continue
+			}
+			for key, phi := range c.loopPhis[target] {
+				if c.loopPhiDone[phi.GetId()] {
+					continue
+				}
+				value := c.variableByKey(key)
+				if value == nil || value.GetId() == phi.GetId() {
+					c.loopPhiDone[phi.GetId()] = true
+					continue
+				}
+				phi.Edge = append(phi.Edge, value.GetId())
+				value.AddUser(phi)
+				phi.GetProgram().SetVirtualRegister(phi)
+				if variable := c.variableFor(key); variable != nil {
+					_ = variable.Assign(phi)
+				}
+				c.loopPhiDone[phi.GetId()] = true
+			}
+		}
+	}
+}
+
+func (c *converter) variableFor(key string) *ssa.Variable {
+	switch {
+	case strings.HasPrefix(key, "reg:"):
+		return c.variables[strings.TrimPrefix(key, "reg:")]
+	case strings.HasPrefix(key, "mem:"):
+		raw := strings.TrimPrefix(key, "mem:")
+		if name, ok := c.memoryNames[raw]; ok {
+			raw = name
+		}
+		return c.memory[raw]
+	}
+	return nil
+}
+
+func (c *converter) variableByKey(key string) ssa.Value {
+	if variable := c.variableFor(key); variable != nil {
+		return variable.GetValue()
+	}
+	return nil
+}
+
+func (c *converter) memoryName(key string) string {
+	if name, ok := c.memoryNames[key]; ok {
+		return name
+	}
+	name := ""
+	if strings.HasPrefix(key, "const:") {
+		name = "mem_" + strings.TrimPrefix(key, "const:")
+	} else {
+		c.memoryIndex++
+		name = fmt.Sprintf("mem_%d", c.memoryIndex)
+	}
+	c.memoryNames[key] = name
+	return name
+}
+
+func (c *converter) memoryVariable(name string) *ssa.Variable {
+	if variable, ok := c.memory[name]; ok {
+		return variable
+	}
+	current := c.builder.CurrentBlock
+	c.builder.CurrentBlock = c.entry
+	variable := c.builder.CreateVariable(name)
+	c.builder.CurrentBlock = current
+	if variable == nil {
+		return nil
+	}
+	c.memory[name] = variable
+	return variable
 }
 
 func (c *converter) emitJump(instruction core.Instruction) {
@@ -491,15 +1108,13 @@ func (c *converter) emitJump(instruction core.Instruction) {
 			return
 		}
 	}
-	// A jump with an operand is indirect. It has no static successor, so the
-	// target value is preserved as a pseudo-call instead of a CFG edge.
+	// An indirect jump has no static successor. End the block without inventing
+	// a call or a fake target.
 	if len(instruction.Operands) > 0 {
-		c.call("reify.jump", c.operandValues(instruction.Operands))
 		c.builder.EmitReturn(nil)
 		return
 	}
 	c.addDiagnostic("lowir2ssa-incomplete-jump", fmt.Sprintf("jump at 0x%x has no resolved target", instruction.Address))
-	c.call("reify.jump", nil)
 	c.builder.EmitReturn(nil)
 }
 
@@ -508,14 +1123,12 @@ func (c *converter) emitBranch(instruction core.Instruction) {
 	targets := c.targetBlocks(instruction.Targets)
 	if condition == nil {
 		c.addDiagnostic("lowir2ssa-missing-condition", fmt.Sprintf("branch at 0x%x has no condition", instruction.Address))
-		c.call("reify.branch", nil)
 		c.builder.EmitReturn(nil)
 		return
 	}
 	switch len(targets) {
 	case 0:
 		c.addDiagnostic("lowir2ssa-incomplete-branch", fmt.Sprintf("branch at 0x%x has no resolved targets", instruction.Address))
-		c.call("reify.branch", []ssa.Value{condition})
 		c.builder.EmitReturn(nil)
 	case 1:
 		c.addDiagnostic("lowir2ssa-incomplete-branch", fmt.Sprintf("branch at 0x%x has only one resolved target", instruction.Address))
@@ -531,6 +1144,7 @@ func (c *converter) emitIf(condition ssa.Value, trueBlock, falseBlock *ssa.Basic
 		return
 	}
 	ifInstruction.Cond = condition.GetId()
+	condition.AddUser(ifInstruction)
 	ifInstruction.True = trueBlock.GetId()
 	c.builder.CurrentBlock.AddSucc(trueBlock)
 	if falseBlock != nil {
@@ -592,13 +1206,7 @@ func (c *converter) constValue(operand core.Operand) ssa.Value {
 		return c.builder.EmitConstInst("0x" + hex.EncodeToString(operand.Literal))
 	}
 	value := literalUint64(operand.Literal)
-	constant := c.constantLiteral(value)
-	if constant != nil {
-		if typ := c.typeFor(operand.Type); typ != nil {
-			constant.SetType(typ)
-		}
-	}
-	return constant
+	return c.newConstant(value, c.typeFor(operand.Type))
 }
 
 // coerceType keeps a copy typed as its LowIR result. A copy between different
@@ -645,21 +1253,6 @@ func (c *converter) typeFor(valueType core.ValueType) ssa.Type {
 	}
 	c.types[valueType] = typ
 	return typ
-}
-
-func (c *converter) call(name string, args []ssa.Value) ssa.Value {
-	target := c.pseudoFunction(name)
-	call := c.builder.NewCall(target, args)
-	return c.builder.EmitCall(call)
-}
-
-func (c *converter) pseudoFunction(name string) ssa.Value {
-	if target, ok := c.pseudo[name]; ok {
-		return target
-	}
-	target := c.program.NewFunction(name)
-	c.pseudo[name] = target
-	return target
 }
 
 func (c *converter) setResult(instruction core.Instruction, value ssa.Value) {
@@ -823,6 +1416,9 @@ func generalRegisterShift(name string) uint16 {
 }
 
 func functionName(function core.Function) string {
+	if function.Name != "" {
+		return function.Name
+	}
 	if function.Address != 0 {
 		return fmt.Sprintf("sub_0x%x", function.Address)
 	}

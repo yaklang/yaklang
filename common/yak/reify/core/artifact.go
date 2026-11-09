@@ -1,10 +1,13 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"math"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Origin struct {
@@ -28,9 +31,10 @@ type Artifact struct {
 	Image       *Image       `json:"image,omitempty"`
 	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
 
-	Reader *ByteReader `json:"-"`
-	Loader Loader      `json:"-"`
-	Parser Parser      `json:"-"`
+	Reader         *ByteReader `json:"-"`
+	Loader         Loader      `json:"-"`
+	Parser         Parser      `json:"-"`
+	AssemblySyntax AsmSyntax   `json:"-"`
 }
 
 var (
@@ -95,10 +99,32 @@ func (a *Artifact) EntryRegion(size uint64) (Region, error) {
 	return a.RegionAt(entry, size)
 }
 
-// Parse decodes one region with the artifact's architecture parser. The parser
-// receives a borrowed, region-bounded ByteReader. It rejects a parser result
-// that has no LowIR, no functions, or a different target.
+// Parse decodes a region with the artifact's architecture parser. ELF images
+// with recovered boundaries are decoded one function at a time; a region
+// without boundaries remains one function. The returned LowIR may therefore
+// contain multiple functions.
 func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, error) {
+	return a.parseWithAssembly(ctx, region, false)
+}
+
+// ParseWithAssembly is Parse plus the parser's textual assembly, so an "all"
+// view needs only one machine-code decode.
+func (a *Artifact) ParseWithAssembly(ctx context.Context, region Region) (*ParseResult, error) {
+	return a.parseWithAssembly(ctx, region, true)
+}
+
+// ParseExact decodes exactly one requested region. It is used by --address and
+// --func, where the caller has already selected one function.
+func (a *Artifact) ParseExact(ctx context.Context, region Region) (*ParseResult, error) {
+	return a.parseExact(ctx, region, false)
+}
+
+// ParseExactWithAssembly is ParseExact plus assembly text.
+func (a *Artifact) ParseExactWithAssembly(ctx context.Context, region Region) (*ParseResult, error) {
+	return a.parseExact(ctx, region, true)
+}
+
+func (a *Artifact) parseExact(ctx context.Context, region Region, withAssembly bool) (*ParseResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -108,17 +134,86 @@ func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, erro
 	if a.Parser == nil {
 		return nil, fmt.Errorf("%w: %s", ErrNoParser, a.Target.Architecture)
 	}
-	reader, err := a.regionReader(region)
+	if err := a.Parser.Check(a.Target); err != nil {
+		return nil, fmt.Errorf("parser %s: %w", a.Parser.Name(), err)
+	}
+	boundary := FunctionBoundary{Address: region.Address, Size: region.Size, Source: BoundaryScan}
+	for _, candidate := range a.Image.Functions {
+		if candidate.Address == region.Address {
+			boundary = candidate
+			break
+		}
+	}
+	result, err := a.parseFunction(ctx, region, boundary, 1, withAssembly)
 	if err != nil {
 		return nil, err
+	}
+	a.annotateSymbols(result.IR)
+	fillFunctionNames(result.IR)
+	return result, nil
+}
+
+func (a *Artifact) parseWithAssembly(ctx context.Context, region Region, withAssembly bool) (*ParseResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if a == nil || a.Reader == nil {
+		return nil, fmt.Errorf("artifact has no reader")
+	}
+	if a.Parser == nil {
+		return nil, fmt.Errorf("%w: %s", ErrNoParser, a.Target.Architecture)
 	}
 	if err := a.Parser.Check(a.Target); err != nil {
 		return nil, fmt.Errorf("parser %s: %w", a.Parser.Name(), err)
 	}
+	boundaries := a.FunctionBoundaries(region)
+	if len(boundaries) > 0 && boundaries[0].Address != region.Address {
+		boundaries = nil
+	}
+	if len(boundaries) == 1 && boundaries[0].Address == region.Address && boundaries[0].Size < region.Size {
+		boundaries[0].Size = region.Size
+	}
+	if len(boundaries) == 0 {
+		boundary := FunctionBoundary{Address: region.Address, Size: region.Size, Source: BoundaryScan}
+		result, err := a.parseFunction(ctx, region, boundary, 1, withAssembly)
+		if err != nil {
+			return nil, err
+		}
+		a.annotateSymbols(result.IR)
+		fillFunctionNames(result.IR)
+		return result, nil
+	}
+	merged := &LowIR{Target: a.Target}
+	diagnostics := make([]Diagnostic, 0)
+	for index, boundary := range boundaries {
+		subregion, err := a.functionRegion(region, boundary)
+		if err != nil {
+			return nil, err
+		}
+		result, err := a.parseFunction(ctx, subregion, boundary, index+1, withAssembly)
+		if err != nil {
+			return nil, err
+		}
+		merged.Functions = append(merged.Functions, result.IR.Functions...)
+		merged.Assembly += result.Assembly
+		diagnostics = append(diagnostics, result.Diagnostics...)
+	}
+	a.annotateSymbols(merged)
+	fillFunctionNames(merged)
+	return &ParseResult{IR: merged, Assembly: merged.Assembly, Diagnostics: diagnostics}, nil
+}
+
+func (a *Artifact) parseFunction(ctx context.Context, region Region, boundary FunctionBoundary, id int, withAssembly bool) (*ParseResult, error) {
+	reader, err := a.regionReader(region)
+	if err != nil {
+		return nil, err
+	}
 	result, err := a.Parser.Parse(ctx, ParseRequest{
-		Target:  a.Target,
-		Address: region.Address,
-		Reader:  reader,
+		Target:       a.Target,
+		Address:      region.Address,
+		Reader:       reader,
+		Syntax:       a.AssemblySyntax,
+		WithAssembly: withAssembly,
 	})
 	if err != nil {
 		return nil, err
@@ -132,12 +227,177 @@ func (a *Artifact) Parse(ctx context.Context, region Region) (*ParseResult, erro
 	if len(result.IR.Functions) == 0 {
 		return nil, fmt.Errorf("parser %s returned no functions", a.Parser.Name())
 	}
+	for functionIndex := range result.IR.Functions {
+		function := &result.IR.Functions[functionIndex]
+		function.ID = FunctionID(id + functionIndex)
+		function.Address = region.Address
+		function.Size = region.Size
+		function.Boundary = boundary.Source
+		if boundary.Name != "" {
+			function.Name = boundary.Name
+		}
+	}
 	return result, nil
+}
+
+func fillFunctionNames(ir *LowIR) {
+	if ir == nil {
+		return
+	}
+	for index := range ir.Functions {
+		if ir.Functions[index].Name == "" {
+			ir.Functions[index].Name = fmt.Sprintf("sub_0x%x", ir.Functions[index].Address)
+		}
+	}
+}
+
+// ParseAll decodes every recovered function in the image. Sections that are
+// not executable have no boundaries and are not parsed.
+func (a *Artifact) ParseAll(ctx context.Context) (*ParseResult, error) {
+	return a.parseAll(ctx, false)
+}
+
+// ParseAllWithAssembly parses every recovered function and collects its
+// assembly in the same decode.
+func (a *Artifact) ParseAllWithAssembly(ctx context.Context) (*ParseResult, error) {
+	return a.parseAll(ctx, true)
+}
+
+func (a *Artifact) parseAll(ctx context.Context, withAssembly bool) (*ParseResult, error) {
+	if a == nil || a.Image == nil {
+		return nil, fmt.Errorf("artifact has no image")
+	}
+	boundaries := make([]FunctionBoundary, 0, len(a.Image.Functions))
+	for _, function := range a.Image.Functions {
+		boundaries = append(boundaries, function)
+	}
+	if len(boundaries) == 0 {
+		for _, section := range a.Image.Sections {
+			if section.Name != ".text" || section.FileSize == 0 {
+				continue
+			}
+			region, err := a.RegionAt(section.VirtualAddress, section.FileSize)
+			if err != nil {
+				return nil, err
+			}
+			return a.Parse(ctx, region)
+		}
+		return nil, fmt.Errorf("artifact has no executable functions")
+	}
+	merged := &LowIR{Target: a.Target}
+	diagnostics := make([]Diagnostic, 0)
+	for index, boundary := range boundaries {
+		region, err := a.RegionAt(boundary.Address, boundary.Size)
+		if err != nil {
+			return nil, err
+		}
+		result, err := a.parseFunction(ctx, region, boundary, index+1, withAssembly)
+		if err != nil {
+			return nil, err
+		}
+		merged.Functions = append(merged.Functions, result.IR.Functions...)
+		merged.Assembly += result.Assembly
+		diagnostics = append(diagnostics, result.Diagnostics...)
+	}
+	a.annotateSymbols(merged)
+	fillFunctionNames(merged)
+	return &ParseResult{IR: merged, Assembly: merged.Assembly, Diagnostics: diagnostics}, nil
+}
+
+// AllFunctionBoundaries returns every recovered function in the image.
+func (a *Artifact) AllFunctionBoundaries() []FunctionBoundary {
+	if a == nil || a.Image == nil {
+		return nil
+	}
+	return append([]FunctionBoundary(nil), a.Image.Functions...)
+}
+
+// FunctionBoundaries returns discovered function starts inside region. Sizes
+// are resolved from the next boundary when discovery could not prove one.
+func (a *Artifact) FunctionBoundaries(region Region) []FunctionBoundary {
+	if a == nil || a.Image == nil || len(a.Image.Functions) == 0 || region.Size == 0 {
+		return nil
+	}
+	end := region.Address + region.Size
+	if end < region.Address {
+		return nil
+	}
+	result := make([]FunctionBoundary, 0)
+	for _, function := range a.Image.Functions {
+		if function.Address < region.Address || function.Address >= end {
+			continue
+		}
+		size := function.Size
+		if size == 0 || size > end-function.Address {
+			size = end - function.Address
+		}
+		function.Size = size
+		result = append(result, function)
+	}
+	return result
+}
+
+// FunctionByName resolves a symbol name to a recovered function body.
+func (a *Artifact) FunctionByName(name string) (FunctionBoundary, error) {
+	if a == nil || a.Image == nil {
+		return FunctionBoundary{}, fmt.Errorf("function %q: artifact has no symbols", name)
+	}
+	for _, symbol := range a.Image.Symbols {
+		if symbol.Name != name {
+			continue
+		}
+		if symbol.Kind != SymbolFunction {
+			return FunctionBoundary{}, fmt.Errorf("symbol %q is not a function", name)
+		}
+		if symbol.Imported || symbol.Address == 0 {
+			return FunctionBoundary{}, fmt.Errorf("function %q has no local body", name)
+		}
+		for _, function := range a.Image.Functions {
+			if function.Address == symbol.Address {
+				function.Name = symbol.Name
+				if function.Size == 0 {
+					for _, candidate := range a.Image.Functions {
+						if candidate.Address > function.Address && (function.Size == 0 || candidate.Address-function.Address < function.Size) {
+							function.Size = candidate.Address - function.Address
+						}
+					}
+				}
+				if function.Size == 0 {
+					return FunctionBoundary{}, fmt.Errorf("function %q has an empty range", name)
+				}
+				return function, nil
+			}
+		}
+		if symbol.Size == 0 {
+			return FunctionBoundary{}, fmt.Errorf("function %q has an empty range", name)
+		}
+		return FunctionBoundary{Address: symbol.Address, Size: symbol.Size, Name: name, Source: BoundarySymbol}, nil
+	}
+	return FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
+}
+
+func (a *Artifact) functionRegion(region Region, boundary FunctionBoundary) (Region, error) {
+	size := boundary.Size
+	if size == 0 {
+		size = region.Address + region.Size - boundary.Address
+	}
+	if size == 0 {
+		return Region{}, fmt.Errorf("function at 0x%x has an empty range", boundary.Address)
+	}
+	if end := boundary.Address + size; end < boundary.Address || end > region.Address+region.Size {
+		size = region.Address + region.Size - boundary.Address
+	}
+	return a.RegionAt(boundary.Address, size)
 }
 
 // Disassemble renders one region as text through an optional parser capability.
 // It does not build LowIR.
 func (a *Artifact) Disassemble(ctx context.Context, region Region) (*Disassembly, error) {
+	return a.DisassembleWithOptions(ctx, region, DisassembleOptions{})
+}
+
+// DisassembleWithOptions renders one region with explicit rendering options.
+func (a *Artifact) DisassembleWithOptions(ctx context.Context, region Region, options DisassembleOptions) (*Disassembly, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -162,6 +422,7 @@ func (a *Artifact) Disassemble(ctx context.Context, region Region) (*Disassembly
 		Target:  a.Target,
 		Address: region.Address,
 		Reader:  reader,
+		Syntax:  options.Syntax,
 	})
 	if err != nil {
 		return nil, err
@@ -170,6 +431,44 @@ func (a *Artifact) Disassemble(ctx context.Context, region Region) (*Disassembly
 		return nil, fmt.Errorf("parser %s returned no disassembly", a.Parser.Name())
 	}
 	return result, nil
+}
+
+// StringAt returns a NUL-terminated printable string that starts at an image
+// address. It reads at most max bytes from the file-backed part of the section.
+func (a *Artifact) StringAt(address, max uint64) (string, bool) {
+	if a == nil || a.Reader == nil || a.Image == nil {
+		return "", false
+	}
+	section, ok := a.Image.SectionAt(address)
+	if !ok || section.VirtualAddress == 0 {
+		return "", false
+	}
+	delta := address - section.VirtualAddress
+	if delta >= section.FileSize {
+		return "", false
+	}
+	size := section.FileSize - delta
+	if max > 0 && size > max {
+		size = max
+	}
+	data, err := a.Reader.Bytes(section.FileOffset+delta, size)
+	if err != nil {
+		return "", false
+	}
+	end := bytes.IndexByte(data, 0)
+	if end <= 0 {
+		return "", false
+	}
+	data = data[:end]
+	if !utf8.Valid(data) {
+		return "", false
+	}
+	for _, r := range string(data) {
+		if !unicode.IsPrint(r) && r != '\n' && r != '\r' && r != '\t' {
+			return "", false
+		}
+	}
+	return string(data), true
 }
 
 func (a *Artifact) regionReader(region Region) (*ByteReader, error) {

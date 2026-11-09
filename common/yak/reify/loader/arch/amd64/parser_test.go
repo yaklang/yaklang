@@ -162,6 +162,55 @@ func TestAMD64Disassembles(t *testing.T) {
 	}
 }
 
+func TestAMD64DisassemblesIntelSyntax(t *testing.T) {
+	request := amd64Request(t, 0x1200, []byte{0x48, 0x89, 0xe5, 0xc3})
+	request.Syntax = core.AsmSyntaxIntel
+	result, err := (Parser{}).Disassemble(context.Background(), request)
+	if err != nil {
+		t.Fatalf("disassemble: %v", err)
+	}
+	for _, fragment := range []string{"mov rbp, rsp", "ret"} {
+		if !strings.Contains(result.Text, fragment) {
+			t.Fatalf("Intel disassembly lacks %q: %s", fragment, result.Text)
+		}
+	}
+	if strings.Contains(result.Text, "%rsp") {
+		t.Fatalf("Intel disassembly kept AT&T registers: %s", result.Text)
+	}
+}
+
+func TestAMD64MultiByteNOPRendersAsNOP(t *testing.T) {
+	code := []byte{
+		0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00, // nopw %cs:0x0(%rax,%rax,1)
+		0xc3,
+	}
+	disassembly, err := (Parser{}).Disassemble(context.Background(), amd64Request(t, 0x1100, code))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if disassembly.Instructions != 2 {
+		t.Fatalf("instructions = %d", disassembly.Instructions)
+	}
+	for _, fragment := range []string{"66 2e 0f 1f 84 00 00 00 00 00", "nop", "ret"} {
+		if !strings.Contains(disassembly.Text, fragment) {
+			t.Fatalf("assembly lacks %q: %s", fragment, disassembly.Text)
+		}
+	}
+	for _, forbidden := range []string{"%cs:", "(%rax"} {
+		if strings.Contains(disassembly.Text, forbidden) {
+			t.Fatalf("assembly keeps a fake memory operand %q: %s", forbidden, disassembly.Text)
+		}
+	}
+
+	result := parseAMD64At(t, 0x1100, code)
+	if _, ok := findInstruction(result.IR, core.OpNop, nil); !ok {
+		t.Fatal("multi-byte NOP was not lifted to nop")
+	}
+	if _, ok := findInstruction(result.IR, core.OpLoad, nil); ok {
+		t.Fatal("multi-byte NOP was lifted as a memory read")
+	}
+}
+
 func TestAMD64DisassembleRejectsEmptyAndCancellation(t *testing.T) {
 	if _, err := (Parser{}).Disassemble(context.Background(), core.ParseRequest{Target: amd64Target()}); err == nil {
 		t.Fatal("empty code accepted")

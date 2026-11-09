@@ -86,7 +86,7 @@ func TestStackCanaryRemovedByDefault(t *testing.T) {
 			t.Fatalf("canary code survived (%q):\n%s", forbidden, text)
 		}
 	}
-	if !strings.Contains(text, "jump") {
+	if !strings.Contains(text, "ret") {
 		t.Fatalf("check branch was not redirected:\n%s", text)
 	}
 }
@@ -100,8 +100,8 @@ func TestStackCanaryKeptWhenRequested(t *testing.T) {
 	if !strings.Contains(text, "x86.segment.fs") {
 		t.Fatalf("stack canary was removed despite the option:\n%s", text)
 	}
-	if !strings.Contains(text, "x86.cond.e") {
-		t.Fatalf("canary check was removed despite the option:\n%s", text)
+	if !strings.Contains(text, " eq ") {
+		t.Fatalf("canary condition was removed despite the option:\n%s", text)
 	}
 }
 

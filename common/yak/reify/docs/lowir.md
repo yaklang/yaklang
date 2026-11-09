@@ -34,7 +34,7 @@ type Instruction struct {
 }
 ```
 
-一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64 parser 对一个 `ParseRequest` 区域产出一个 Function；后续可以通过符号、调用目标或异常表扩展函数发现，不要求一个区域等于整个文件。
+一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64 parser 对一个 `ParseRequest` 区域产出一个 Function；后续可以通过符号、调用目标或异常表扩展函数发现，不要求一个区域等于整个文件。`Artifact.Parse` 会用 Image 符号给 Function 命名，并把可解析的直接调用和 GOT 间接调用改成符号目标。
 
 `Instruction.Kind` 是统一的指令种类。它不使用接口方法，也不包装原始 ISA 指令；操作数、结果、控制目标和效果都在同一结构上表达。
 
@@ -81,7 +81,7 @@ type ValueType struct {
 | 操作族 | Opcode | 约束 |
 | --- | --- | --- |
 | 值与合并 | `constant`、`copy`、`phi`、`select` | 类型、定义和前驱关系一致 |
-| 寄存器 | `read-register`、`write-register` | 明确寄存器与宽度 |
+| 寄存器 | `read_register`、`write_register` | 明确寄存器与宽度 |
 | 内存 | `load`、`store` | 地址、值类型和效果完整 |
 | 算术 | `add`、`sub`、`mul`、`udiv`、`sdiv`、`neg` | 按位宽解释，除法保留异常效果 |
 | 位运算 | `and`、`or`、`xor`、`not`、`shl`、`lshr`、`ashr` | 移位数与位宽规则明确 |
@@ -120,7 +120,7 @@ type ValueType struct {
 
 AMD64 parser 使用以下约定：
 
-- 通用寄存器通过 `read-register` 和 `write-register` 读写，名称保留机器宽度，例如 `al`、`eax`、`rax`。
+- 通用寄存器通过 `read_register` 和 `write_register` 读写，名称保留机器宽度，例如 `al`、`eax`、`rax`。
 - `rflags` 是伪寄存器。算术、逻辑、比较和测试指令写它；`Jcc`、`SETcc` 和 `CMOVcc` 读它。`JCXZ`、`JECXZ` 和 `JRCXZ` 直接比较计数寄存器，不读 `rflags`。
 - 条件值由 `x86.cond.<cc>` 产生，输入是 `rflags`，结果是一位整数。
 - 标志更新由 `x86.flags.<op>` 表示，输入是参与运算的值，结果写回 `rflags`。
@@ -135,12 +135,12 @@ type Effect uint32
 
 | 位 | 含义 |
 | --- | --- |
-| `read-memory` | 读取内存 |
-| `write-memory` | 写入内存 |
-| `read-register` | 读取寄存器 |
-| `write-register` | 写入寄存器 |
+| `read_memory` | 读取内存 |
+| `write_memory` | 写入内存 |
+| `read_register` | 读取寄存器 |
+| `write_register` | 写入寄存器 |
 | `call` | 可能调用外部代码 |
-| `may-trap` | 可能产生机器异常 |
+| `may_trap` | 可能产生机器异常 |
 | `volatile` | 访问不可消除或重排 |
 | `atomic` | 具有原子语义 |
 | `unknown` | 行为未完整建模 |
@@ -164,10 +164,10 @@ target: unknown/amd64 (64-bit, little-endian)
 function f1 @ 0x2590
 block b1 @ 0x2590
   0x2590  intrinsic @x86.endbr64
-  0x2594  v1:i32 = read-register %ebp [read-register]
-  0x2594  v2:i32 = read-register %ebp [read-register]
+  0x2594  v1:i32 = read_register %ebp [read_register]
+  0x2594  v2:i32 = read_register %ebp [read_register]
   0x2594  v3:i32 = xor v1, v2
-  0x2594  write-register %ebp, v3 [write-register]
+  0x2594  write_register %ebp, v3 [write_register]
   ...
 ```
 
@@ -181,7 +181,7 @@ LowIR 聚焦机器精度与执行效果；YakSSA 面向更高层程序关系与�
 
 - 值、算术、比较和宽度转换进入 YakSSA 值。
 - 通用寄存器提升为带位宽类型的变量；不插入 Phi。
-- 内存、调用、intrinsic 和未支持操作保留为 `reify.*` 调用。
+- 内存槽提升为变量；只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。
 - 控制流转换成 `jump`、`if` 和 `return`。
 
 转换不做内存 SSA、语言级类型恢复和调用图恢复，并提供可选的 stack canary 删除。映射与诊断见 [SSA 文档](ssa.md)。

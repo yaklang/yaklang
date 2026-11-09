@@ -121,10 +121,13 @@ type Image struct {
     Base       uint64
     Entry      *uint64
     Sections   []Section
+    Symbols    []Symbol
 }
 ```
 
-`EntryPoint` 的布尔返回值区分“地址为零”和“没有入口信息”。`SectionAt` 返回包含地址的节。
+`EntryPoint` 的布尔返回值区分“地址为零”和“没有入口信息”。`SectionAt` 返回包含地址的节。`SymbolAt` 先匹配精确地址，再匹配带大小的符号范围。`Artifact.StringAt` 读取文件中的 NUL 结尾可打印字符串。
+
+`Symbol` 记录名称、地址、大小、种类、是否导入和来源库。ELF loader 从 `.dynsym`、`.symtab` 和重定位表填充；PLT 与 GOT 地址都映射到导入符号名。PE 与 Mach-O 暂为空。
 
 Section 的 `FileSize == 0` 表示零填充。`Flags` 保留格式原义，不做跨格式归一化。
 
@@ -169,7 +172,7 @@ type Disassembly struct {
 }
 ```
 
-`Disassembly.Text` 一行一条指令，格式由架构 parser 决定。AMD64 使用 GNU 语法。
+`Disassembly.Text` 一行一条指令，格式由架构 parser 决定。AMD64 默认使用 Intel 语法，`DisassembleOptions.Syntax` 可切换 GNU/AT&T。
 
 ## 架构实现状态
 
@@ -182,7 +185,7 @@ type Disassembly struct {
 - `Available() == true`。
 - `Check` 要求 64 位和 `ArchAMD64`；不检查 Target 的字节序。
 - `Parse` 用 `x86asm` 解码，构建 Function 与基本块，并输出 LowIR。
-- `Disassemble` 复用解码结果，输出地址、机器字节和 GNU 语法汇编。
+- `Disassemble` / `DisassembleWithOptions` 复用解码结果，输出地址、机器字节和 AT&T/Intel 汇编。
 - 支持的指令族和限制见[架构文档](architecture.md#amd64)。
 
 其余九个架构仍是骨架：
@@ -217,12 +220,13 @@ type SourceRenderer interface {
 
 两个契约都有实现：
 
-- [core/lowir2ssa](../core/lowir2ssa)：`Convert` 返回 `Result{Program, Diagnostics}`；`Builder` 满足 `SSAIRBuilder`；`Text` 输出 YakSSA 文本；`WithKeepStackCanary` 保留 stack-protector 代码。
+- [core/lowir2ssa](../core/lowir2ssa)：`Convert` 返回 `Result{Program, Diagnostics}`；`Builder` 满足 `SSAIRBuilder`；`Text` 输出 YakSSA 文本；`WithKeepStackCanary`、`WithKeepStackFrame` 保留对应 pass 的输入。
+- [core/ssapass](../core/ssapass)：`ApplyFunctionDefine` 应用 C 签名，`RedefineTypeValue` 替换字符串参数。
 - [core/ssa2source](../core/ssa2source)：`Render` 输出伪源码；`Renderer` 满足 `SourceRenderer`。
 
 LowIR 的文本形式由 `core.FormatLowIR` 提供，不属于 parser 契约。它保留函数、块、值、操作、目标和效果，JSON 仍是机器可读形式。
 
-转换把通用寄存器提升为带位宽类型的变量，不插入 Phi。内存、调用、intrinsic 和未支持操作保留为 `reify.*` 调用。转换不做语言级类型恢复和内存 SSA。默认删除 stack canary；`WithKeepStackCanary` 可保留。完整映射和诊断见 [SSA 文档](ssa.md)。
+转换把通用寄存器和内存槽提升为带位宽类型的变量。普通分支汇合沿用变量；循环头插入 loop-carried Phi。只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。转换不做语言级类型恢复和内存 SSA。默认删除 stack canary；`WithKeepStackCanary` 可保留。完整映射和诊断见 [SSA 文档](ssa.md)。
 
 `rewriter` 包已删除。需要变换时直接对 `*ssa.Program` 编写 Pass。
 

@@ -8,15 +8,22 @@ package core
 // implicit mutable SSA values.
 type LowIR struct {
 	Target    Target     `json:"target"`
+	Assembly  string     `json:"assembly,omitempty"`
 	Functions []Function `json:"functions"`
 }
 
 // Function is one decoded unit. Address is its entry address. The current
 // parsers create one function for each ParseRequest region.
 type Function struct {
-	ID      FunctionID `json:"id"`
-	Address uint64     `json:"address"`
-	Blocks  []Block    `json:"blocks"`
+	ID           FunctionID     `json:"id"`
+	Name         string         `json:"name,omitempty"`
+	Address      uint64         `json:"address"`
+	Size         uint64         `json:"size,omitempty"`
+	Boundary     BoundarySource `json:"boundary,omitempty"`
+	FrameRemoved bool           `json:"frame_removed,omitempty"`
+	FrameCleanup bool           `json:"frame_cleanup,omitempty"`
+	FrameKept    bool           `json:"frame_kept,omitempty"`
+	Blocks       []Block        `json:"blocks"`
 }
 
 // Block contains ordered operations and ends in a control-transfer operation.
@@ -40,6 +47,7 @@ type Instruction struct {
 	Results  []Value   `json:"results,omitempty"`
 	Targets  []BlockID `json:"targets,omitempty"`
 	Effects  Effect    `json:"effects,omitempty"`
+	Variadic bool      `json:"variadic,omitempty"`
 	Address  uint64    `json:"address"`
 }
 
@@ -51,8 +59,8 @@ const (
 	OpPhi           Opcode = "phi"
 	OpSelect        Opcode = "select"
 	OpNop           Opcode = "nop"
-	OpReadRegister  Opcode = "read-register"
-	OpWriteRegister Opcode = "write-register"
+	OpReadRegister  Opcode = "read_register"
+	OpWriteRegister Opcode = "write_register"
 	OpLoad          Opcode = "load"
 	OpStore         Opcode = "store"
 	OpAdd           Opcode = "add"
@@ -136,4 +144,5 @@ const (
 	EffectVolatile      Effect = 1 << 6
 	EffectAtomic        Effect = 1 << 7
 	EffectUnknown       Effect = 1 << 8
+	EffectFrameRestore  Effect = 1 << 9
 )

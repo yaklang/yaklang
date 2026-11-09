@@ -45,7 +45,9 @@ common/yak/reify/
 │   ├── stage.go           # SSAIRBuilder、SourceRenderer 契约
 │   ├── lowir.go           # LowIR、Function、Block、Instruction、Value、Operand
 │   ├── lowir_text.go      # LowIR 文本渲染
-│   ├── lowir2ssa/         # LowIR → YakSSA
+│   ├── lowir2ssa/         # LowIR → YakSSA；canary 与栈帧 pass
+│   ├── funcdefs/          # C 函数签名（c.go）
+│   ├── ssapass/           # SSA 类型与字符串 pass
 │   ├── ssa2source/        # YakSSA → 伪源码
 │   └── validate.go        # Target、Image、Artifact 校验
 ├── loader/
@@ -76,15 +78,18 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" parsers
 "$OUT/bin/reify" inspect --json /bin/true
 "$OUT/bin/reify" check /bin/true
-"$OUT/bin/reify" lift --mode asm --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode lowir --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode ssair --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode source --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode source --keep-stack-canary /bin/true
-"$OUT/bin/reify" lift --json --mode lowir /bin/true
+"$OUT/bin/reify" lift --mode 1asm --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 2lowir --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 3ssair --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 4source --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 1asm --asm-syntax intel --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode 4source --keep-stack-canary /bin/true
+"$OUT/bin/reify" lift --mode all --func main /bin/ls
+"$OUT/bin/reify" lift --mode 4source --address 0xmain --size 0x40 /bin/ls
+"$OUT/bin/reify" lift --json --mode 2lowir /bin/true
 ```
 
-`lift` 默认解码 `.text` 节，默认输出汇编。`--mode` 选择 `asm`、`lowir`、`ssair` 或 `source`。用 `--address` 和 `--size` 可以限定一个连续代码区域。两个参数必须同时给出。
+`lift` 默认解码 `.text` 节，默认输出 `1asm`。`--mode` 选择 `1asm`、`2lowir`、`3ssair`、`4source` 或 `all`，也接受旧名 `asm`、`lowir`、`ssair`、`source`。默认使用 Intel 语法；`--asm-syntax att` 切换 GNU/AT&T。用 `--address` 和 `--size` 可以限定一个连续代码区域。两个参数必须同时给出。
 
 `ssair` 先执行 LowIR 转换，再输出 YakSSA 文本。`source` 在 `ssair` 之后输出伪源码。两者都不是可编译源码。
 
@@ -94,7 +99,9 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 common/yak/reify/scripts/lift-all.sh -o /mnt/data/scan-outputs/reify-lift /bin/true
 ```
 
-脚本生成 `<name>.asm.txt`、`<name>.lowir.txt`、`<name>.ssair.txt`、`<name>.source.txt` 和 `version`。`version` 记录版本、提交哈希和输入摘要。
+脚本按 `1asm`、`2lowir`、`3ssair`、`4source` 顺序生成 `<name>.1asm.txt`、`<name>.2lowir.txt`、`<name>.3ssair.txt`、`<name>.4source.txt` 和 `version`。无 `-a/-s` 时输出到 `<output>/all`。`version` 记录版本、提交哈希和输入摘要。
+
+示例程序在 `examples/`：`hello.c` 是最小入口；`linked_list.c` 含结构体、成员访问、循环、条件、函数调用、malloc 和 free；`control_flow.c` 用 `classify` 与 `accumulate` 演示 if/else 与 for。
 
 代码中的调用链：
 
@@ -115,13 +122,19 @@ result, err := artifact.Parse(ctx, entry)
 ## 当前能力
 
 - ELF、PE 和 thin Mach-O 的头部、目标平台、入口与节元数据。
+- ELF 导入导出：`.dynsym`、`.symtab`、`.rela.plt`/`.rela.dyn`，映射 PLT 与 GOT 地址到符号名。
+- 调用目标与函数名解析：`puts`、`__libc_start_main`、`main`；无符号时保留 `sub_0x<地址>`。
+- C 函数定义表：返回类型、参数类型和可变参数。
+- SSA pass：`apply-function-define` 设置调用类型，`infer-types` 传播指针类型并渲染 `NULL`，`redefine-type-value` 把字符串参数换成字符串常量。
+- 源码常量默认十六进制；字符串地址和符号地址带注释。
 - 按 Format 选择 loader，按 Architecture 选择 parser。
 - AMD64 解码器：通用寄存器、内存访问、算术与逻辑、比较与条件跳转、调用与返回、栈操作、部分 SSE 移动与按位操作。
-- AMD64 汇编文本：按地址、机器字节和 GNU 语法输出。
+- AMD64 汇编文本：按地址、机器字节输出；`--asm-syntax att|intel` 切换语法。
 - AMD64 LowIR：一个代码区域提升为一个 Function，包含基本块、值、操作、目标与效果。
-- LowIR → YakSSA：值、算术、比较和控制流进入 YakSSA；通用寄存器提升为带位宽类型的变量；内存、调用和 intrinsic 保留为 `reify.*` 调用。
-- 内置 stack canary 检测，默认删除；`--keep-stack-canary` 保留。
-- YakSSA → 伪源码：按函数和块输出赋值、调用、跳转和返回。
+- LowIR → YakSSA：值、算术、比较和控制流进入 YakSSA；通用寄存器和内存槽提升为带位宽类型的变量；只有汇编 `call` 生成 YakSSA `Call`。
+- 内置 stack canary 与标准栈帧检测，默认删除；`--keep-stack-canary`、`--keep-stack-frame` 保留。
+- ELF 函数边界恢复：符号表、`.eh_frame`、`init/fini_array`、PLT、入口、递归下降和尾部扫描；边界来源写入 `3ssair`/`4source` 函数头。
+- YakSSA → 伪源码：重构 `if`/`else` 和 `while`；展开循环 Phi；不输出块标签、`goto` 或 `phi`。
 - 命令行只读检查，不执行输入。
 
 ## 当前边界
@@ -130,8 +143,9 @@ result, err := artifact.Parse(ctx, entry)
 - AMD64 使用线性扫描，不依赖符号表恢复函数边界。一个 `ParseRequest` 区域当前产出一个 Function。`.text` 中的数据或填充也可能被当作指令。
 - 未支持的 AMD64 指令保留为 `intrinsic`，并产生 `unsupported-instruction` 诊断。它们不会改变已支持的语义，也不会被静默丢弃。
 - 解码在区域末尾截断时返回部分 LowIR，并产生 `decode-error` 诊断。
-- LowIR 到 YakSSA 的转换不做 Phi、内存 SSA、语言级类型恢复和调用图恢复。伪源码不还原控制结构。
-- 一个 LowIR Function 对应一个 YakSSA Function；跨函数关系尚未建立。
+- LowIR 到 YakSSA 的转换在循环头插入 loop-carried Phi；普通分支汇合沿用变量。不做内存 SSA、语言级类型恢复和调用图恢复。
+- 一个解析区域可以恢复多个 Function；边界来源和统计保存在 `Image.Functions` / `Image.BoundaryStats`。
+- 内部函数调用按被调函数实际读取的寄存器裁剪 arity；已知 C 签名优先。
 - 汇编与 LowIR 报告相同诊断；`unsupported-instruction` 是提升阶段的限制，不是解码失败。
 - Fat Mach-O、Java、Python 与 VM 字节码尚未接入。
 - 标准库 `debug/*` 解析器不是对抗性输入沙箱。

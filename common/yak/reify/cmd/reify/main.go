@@ -16,7 +16,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa"
 	"github.com/yaklang/yaklang/common/yak/reify/core/ssa2source"
+	"github.com/yaklang/yaklang/common/yak/reify/core/ssapass"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func main() {
@@ -33,7 +35,7 @@ Usage:
   reify parsers [--json]
   reify inspect [--json] <file>
   reify check [--json] <file>
-  reify lift [--json] [--keep-stack-canary] [--mode asm|lowir|ssair|source] [--section NAME | --address ADDRESS --size SIZE] <file>
+  reify lift [--json] [--keep-stack-canary] [--keep-stack-frame] [--asm-syntax intel|att] [--func NAME] [--mode 1asm|2lowir|3ssair|4source|all] [--section NAME | --address ADDRESS --size SIZE] <file>
   reify help
 
 Commands:
@@ -41,7 +43,7 @@ Commands:
   parsers  List parsers registered by architecture.
   inspect  Load headers and display the artifact, target and sections.
   check    Validate headers and report the selected loader and parser.
-  lift     Decode a code region; --mode selects asm, lowir, ssair or source.
+  lift     Decode a code region; --mode selects 1asm, 2lowir, 3ssair, 4source or all.
 
 Scope: file headers, target platforms, section metadata, AMD64 assembly,
 LowIR, YakSSA and source-like text.
@@ -62,15 +64,16 @@ type checkReport struct {
 }
 
 type liftReport struct {
-	Scope        string            `json:"scope"`
-	Mode         string            `json:"mode"`
-	Region       core.Region       `json:"region"`
-	Assembly     string            `json:"assembly,omitempty"`
-	Instructions int               `json:"instructions,omitempty"`
-	IR           *core.LowIR       `json:"ir,omitempty"`
-	SSAIR        string            `json:"ssair,omitempty"`
-	Source       string            `json:"source,omitempty"`
-	Diagnostics  []core.Diagnostic `json:"diagnostics,omitempty"`
+	Scope         string              `json:"scope"`
+	Mode          string              `json:"mode"`
+	Region        core.Region         `json:"region"`
+	Assembly      string              `json:"assembly,omitempty"`
+	Instructions  int                 `json:"instructions,omitempty"`
+	IR            *core.LowIR         `json:"ir,omitempty"`
+	SSAIR         string              `json:"ssair,omitempty"`
+	Source        string              `json:"source,omitempty"`
+	Diagnostics   []core.Diagnostic   `json:"diagnostics,omitempty"`
+	BoundaryStats *core.BoundaryStats `json:"boundary_stats,omitempty"`
 }
 
 type liftMode string
@@ -80,14 +83,34 @@ const (
 	liftModeLowIR  liftMode = "lowir"
 	liftModeSSAIR  liftMode = "ssair"
 	liftModeSource liftMode = "source"
+	liftModeAll    liftMode = "all"
 )
 
 func parseLiftMode(raw string) (liftMode, error) {
-	switch liftMode(raw) {
-	case liftModeASM, liftModeLowIR, liftModeSSAIR, liftModeSource:
-		return liftMode(raw), nil
+	switch raw {
+	case "1asm", "asm":
+		return liftModeASM, nil
+	case "2lowir", "lowir":
+		return liftModeLowIR, nil
+	case "3ssair", "ssair":
+		return liftModeSSAIR, nil
+	case "4source", "source":
+		return liftModeSource, nil
+	case "all":
+		return liftModeAll, nil
 	default:
-		return "", fmt.Errorf("unknown lift mode %q (want asm, lowir, ssair or source)", raw)
+		return "", fmt.Errorf("unknown lift mode %q (want 1asm, 2lowir, 3ssair, 4source or all)", raw)
+	}
+}
+
+func parseAsmSyntax(raw string) (core.AsmSyntax, error) {
+	switch raw {
+	case "", "intel":
+		return core.AsmSyntaxIntel, nil
+	case "att", "gnu":
+		return core.AsmSyntaxATT, nil
+	default:
+		return "", fmt.Errorf("unknown assembly syntax %q (want att or intel)", raw)
 	}
 }
 
@@ -114,6 +137,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		valueFlags["section"] = true
 		valueFlags["address"] = true
 		valueFlags["size"] = true
+		valueFlags["asm-syntax"] = true
+		valueFlags["func"] = true
 	}
 	positional, err := splitCLIArgs(args[1:], valueFlags)
 	if err != nil {
@@ -136,7 +161,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	section := ".text"
 	mode := liftModeASM
 	keepStackCanary := false
-	var addressText, sizeText string
+	keepStackFrame := false
+	asmSyntax := core.AsmSyntaxIntel
+	var addressText, sizeText, funcName string
 	if command == "lift" {
 		rawMode := app.String("mode", app.SetDefault("asm"))
 		parsedMode, modeErr := parseLiftMode(rawMode)
@@ -149,24 +176,22 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		section = app.String("section", app.SetDefault(".text"))
 		addressText = app.String("address")
 		sizeText = app.String("size")
+		funcName = app.String("func")
 		keepStackCanary = app.Bool("keep-stack-canary")
-	}
-	address, size := uint64(0), uint64(0)
-	if addressText != "" {
-		parsed, parseErr := strconv.ParseUint(addressText, 0, 64)
-		if parseErr != nil {
-			fmt.Fprintf(stderr, "reify: invalid --address %q\n", addressText)
+		keepStackFrame = app.Bool("keep-stack-frame")
+		rawSyntax := app.String("asm-syntax", app.SetDefault("intel"))
+		parsedSyntax, syntaxErr := parseAsmSyntax(rawSyntax)
+		if syntaxErr != nil {
+			fmt.Fprintf(stderr, "reify: %v\n", syntaxErr)
+			printCommandUsage(stderr, command)
 			return 2
 		}
-		address = parsed
+		asmSyntax = parsedSyntax
 	}
-	if sizeText != "" {
-		parsed, parseErr := strconv.ParseUint(sizeText, 0, 64)
-		if parseErr != nil {
-			fmt.Fprintf(stderr, "reify: invalid --size %q\n", sizeText)
-			return 2
-		}
-		size = parsed
+	if funcName != "" && (addressText != "" || sizeText != "") {
+		fmt.Fprintln(stderr, "reify: --func cannot be combined with --address or --size")
+		printCommandUsage(stderr, command)
+		return 2
 	}
 
 	catalog := loader.Default
@@ -205,13 +230,104 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return reportError(err, stderr)
 		}
 		defer func() { _ = artifact.Close() }()
-		region, err := liftRegion(artifact, section, address, size)
+		allFunctions := command == "lift" && addressText == "" && sizeText == "" && funcName == "" && !hasSectionFlag(args[1:])
+		multiFunctions := command == "lift" && addressText == "" && funcName == "" && hasSectionFlag(args[1:])
+		region, err := resolveLiftRegion(artifact, section, addressText, sizeText, funcName)
 		if err != nil {
 			return reportError(err, stderr)
 		}
+		if allFunctions {
+			if summary, ok := allFunctionRegion(artifact); ok {
+				region = summary
+			}
+		}
+		if mode == liftModeAll {
+			artifact.AssemblySyntax = asmSyntax
+		}
 		switch mode {
+		case liftModeAll:
+			result, err := parseLowIRWithAssembly(ctx, artifact, region, allFunctions, multiFunctions)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			var convertOptions []lowir2ssa.Option
+			if keepStackCanary {
+				convertOptions = append(convertOptions, lowir2ssa.WithKeepStackCanary())
+			}
+			if keepStackFrame {
+				convertOptions = append(convertOptions, lowir2ssa.WithKeepStackFrame())
+			}
+			converted, err := lowir2ssa.Convert(ctx, result.IR, convertOptions...)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			ssapass.ApplyFunctionDefine(converted.Program)
+			ssapass.InferTypes(converted.Program)
+			ssapass.TrimInternalCalls(converted.Program)
+			ssapass.MarkVoidReturns(converted.Program)
+			ssapass.RefineReturnTypes(converted.Program)
+			ssapass.SimplifyPartialWrites(converted.Program)
+			ssapass.RedefineTypeValue(converted.Program, ssapass.WithStringAt(func(address uint64) (string, bool) {
+				return artifact.StringAt(address, 128)
+			}))
+			annotateAddressComments(converted.Program, artifact)
+			diagnostics := append([]core.Diagnostic{}, result.Diagnostics...)
+			diagnostics = append(diagnostics, converted.Diagnostics...)
+			if allFunctions || multiFunctions {
+				diagnostics = filterCrossFunctionDiagnostics(diagnostics)
+			}
+			ssair := lowir2ssa.Text(converted.Program)
+			source, err := ssa2source.Render(ctx, converted.Program)
+			if err != nil {
+				return reportError(err, stderr)
+			}
+			stats := boundaryStats(artifact)
+			if asJSON {
+				return reportError(writeJSON(stdout, liftReport{
+					Scope:         "amd64-all",
+					Mode:          string(mode),
+					Region:        region,
+					Assembly:      result.Assembly,
+					IR:            result.IR,
+					SSAIR:         ssair,
+					Source:        source,
+					Diagnostics:   diagnostics,
+					BoundaryStats: stats,
+				}), stderr)
+			}
+			var text bytes.Buffer
+			fmt.Fprintf(&text, "Scope: amd64 all\n")
+			fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", region.Address, region.Size)
+			functionCount := len(result.IR.Functions)
+			if mode == liftModeSource {
+				functionCount = countSourceFunctions(result.IR)
+			}
+			fmt.Fprintf(&text, "Functions: %d\n", functionCount)
+			fmt.Fprintf(&text, "Diagnostics: %d\n", len(diagnostics))
+			if stats != nil {
+				fmt.Fprintf(&text, "Boundaries: symbol=%d eh_frame=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
+					stats.Symbol, stats.EHFrame, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
+			}
+			fmt.Fprintf(&text, "===== 1asm =====\n%s", result.Assembly)
+			if result.Assembly != "" && !strings.HasSuffix(result.Assembly, "\n") {
+				text.WriteByte('\n')
+			}
+			fmt.Fprintf(&text, "===== 2lowir =====\n%s", core.FormatLowIR(result.IR))
+			fmt.Fprintf(&text, "===== 3ssair =====\n%s", ssair)
+			fmt.Fprintf(&text, "===== 4source =====\n%s", source)
+			for _, diagnostic := range diagnostics {
+				fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
+			}
+			_, err = io.Copy(stdout, &text)
+			return reportError(err, stderr)
 		case liftModeASM:
-			disassembly, err := artifact.Disassemble(ctx, region)
+			var disassembly *core.Disassembly
+			var err error
+			if allFunctions {
+				disassembly, err = disassembleAllFunctions(ctx, artifact, core.DisassembleOptions{Syntax: asmSyntax})
+			} else {
+				disassembly, err = artifact.DisassembleWithOptions(ctx, region, core.DisassembleOptions{Syntax: asmSyntax})
+			}
 			if err != nil {
 				return reportError(err, stderr)
 			}
@@ -237,17 +353,21 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			_, err = io.Copy(stdout, &text)
 			return reportError(err, stderr)
 		case liftModeLowIR:
-			result, err := artifact.Parse(ctx, region)
+			result, err := parseLowIR(ctx, artifact, region, allFunctions, multiFunctions)
 			if err != nil {
 				return reportError(err, stderr)
 			}
+			if allFunctions || multiFunctions {
+				result.Diagnostics = filterCrossFunctionDiagnostics(result.Diagnostics)
+			}
 			if asJSON {
 				return reportError(writeJSON(stdout, liftReport{
-					Scope:       "amd64-lowir",
-					Mode:        string(mode),
-					Region:      region,
-					IR:          result.IR,
-					Diagnostics: result.Diagnostics,
+					Scope:         "amd64-lowir",
+					Mode:          string(mode),
+					Region:        region,
+					IR:            result.IR,
+					Diagnostics:   result.Diagnostics,
+					BoundaryStats: boundaryStats(artifact),
 				}), stderr)
 			}
 			var text bytes.Buffer
@@ -258,6 +378,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(&text, "Instructions: %d\n", countInstructions(result.IR))
 			fmt.Fprintf(&text, "Values: %d\n", countValues(result.IR))
 			fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
+			if stats := boundaryStats(artifact); stats != nil {
+				fmt.Fprintf(&text, "Boundaries: symbol=%d eh_frame=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
+					stats.Symbol, stats.EHFrame, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
+			}
 			text.WriteString(core.FormatLowIR(result.IR))
 			for _, diagnostic := range result.Diagnostics {
 				fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
@@ -265,7 +389,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			_, err = io.Copy(stdout, &text)
 			return reportError(err, stderr)
 		case liftModeSSAIR, liftModeSource:
-			result, err := artifact.Parse(ctx, region)
+			result, err := parseLowIR(ctx, artifact, region, allFunctions, multiFunctions)
 			if err != nil {
 				return reportError(err, stderr)
 			}
@@ -273,12 +397,28 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			if keepStackCanary {
 				convertOptions = append(convertOptions, lowir2ssa.WithKeepStackCanary())
 			}
+			if keepStackFrame {
+				convertOptions = append(convertOptions, lowir2ssa.WithKeepStackFrame())
+			}
 			converted, err := lowir2ssa.Convert(ctx, result.IR, convertOptions...)
 			if err != nil {
 				return reportError(err, stderr)
 			}
+			ssapass.ApplyFunctionDefine(converted.Program)
+			ssapass.InferTypes(converted.Program)
+			ssapass.TrimInternalCalls(converted.Program)
+			ssapass.MarkVoidReturns(converted.Program)
+			ssapass.RefineReturnTypes(converted.Program)
+			ssapass.SimplifyPartialWrites(converted.Program)
+			ssapass.RedefineTypeValue(converted.Program, ssapass.WithStringAt(func(address uint64) (string, bool) {
+				return artifact.StringAt(address, 128)
+			}))
+			annotateAddressComments(converted.Program, artifact)
 			diagnostics := append([]core.Diagnostic{}, result.Diagnostics...)
 			diagnostics = append(diagnostics, converted.Diagnostics...)
+			if allFunctions || multiFunctions {
+				diagnostics = filterCrossFunctionDiagnostics(diagnostics)
+			}
 			var body string
 			if mode == liftModeSSAIR {
 				body = lowir2ssa.Text(converted.Program)
@@ -290,11 +430,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			}
 			if asJSON {
 				report := liftReport{
-					Scope:       "amd64-" + string(mode),
-					Mode:        string(mode),
-					Region:      region,
-					IR:          result.IR,
-					Diagnostics: diagnostics,
+					Scope:         "amd64-" + string(mode),
+					Mode:          string(mode),
+					Region:        region,
+					IR:            result.IR,
+					Diagnostics:   diagnostics,
+					BoundaryStats: boundaryStats(artifact),
 				}
 				if mode == liftModeSSAIR {
 					report.SSAIR = body
@@ -310,8 +451,16 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(&text, "Scope: amd64 source\n")
 			}
 			fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", region.Address, region.Size)
-			fmt.Fprintf(&text, "Functions: %d\n", len(result.IR.Functions))
+			functionCount := len(result.IR.Functions)
+			if mode == liftModeSource {
+				functionCount = countSourceFunctions(result.IR)
+			}
+			fmt.Fprintf(&text, "Functions: %d\n", functionCount)
 			fmt.Fprintf(&text, "Diagnostics: %d\n", len(diagnostics))
+			if stats := boundaryStats(artifact); stats != nil {
+				fmt.Fprintf(&text, "Boundaries: symbol=%d eh_frame=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
+					stats.Symbol, stats.EHFrame, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
+			}
 			text.WriteString(body)
 			for _, diagnostic := range diagnostics {
 				fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
@@ -392,7 +541,7 @@ func splitCLIArgs(args []string, valueFlags map[string]bool) ([]string, error) {
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		switch {
-		case arg == "--json", arg == "--keep-stack-canary":
+		case arg == "--json", arg == "--keep-stack-canary", arg == "--keep-stack-frame":
 			continue
 		case strings.HasPrefix(arg, "--"):
 			name := strings.TrimPrefix(arg, "--")
@@ -423,7 +572,79 @@ func printCommandUsage(w io.Writer, command string) {
 	case "inspect", "check":
 		fmt.Fprintf(w, "Usage: reify %s [--json] <file>\n", command)
 	case "lift":
-		fmt.Fprint(w, "Usage: reify lift [--json] [--keep-stack-canary] [--mode asm|lowir|ssair|source] [--section NAME | --address ADDRESS --size SIZE] <file>\n")
+		fmt.Fprint(w, "Usage: reify lift [--json] [--keep-stack-canary] [--keep-stack-frame] [--asm-syntax intel|att] [--func NAME] [--mode 1asm|2lowir|3ssair|4source|all] [--section NAME | --address ADDRESS --size SIZE] <file>\n")
+	}
+}
+
+// annotateAddressComments attaches a string or symbol comment to constants that
+// name a file-backed address. The source renderer prints the comment after the
+// hexadecimal value.
+func annotateAddressComments(program *ssa.Program, artifact *core.Artifact) {
+	if program == nil || artifact == nil || artifact.Image == nil {
+		return
+	}
+	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
+		if function == nil || function.IsExtern() {
+			return true
+		}
+		for _, blockID := range function.Blocks {
+			block, ok := function.GetBasicBlockByID(blockID)
+			if !ok || block == nil {
+				continue
+			}
+			instructionIDs := make([]int64, 0, len(block.Insts)+len(block.Phis))
+			instructionIDs = append(instructionIDs, block.Insts...)
+			instructionIDs = append(instructionIDs, block.Phis...)
+			for _, instructionID := range instructionIDs {
+				instruction, ok := function.GetInstructionById(instructionID)
+				if !ok || instruction == nil {
+					continue
+				}
+				node, ok := ssa.ToNode(instruction)
+				if !ok || node == nil {
+					continue
+				}
+				for _, value := range node.GetValues() {
+					constant, ok := ssa.ToConstInst(value)
+					if !ok || constant == nil || constant.GetVerboseName() != "" {
+						continue
+					}
+					address, ok := constantAddress(constant)
+					if !ok {
+						continue
+					}
+					if text, ok := artifact.StringAt(address, 128); ok {
+						constant.SetVerboseName(fmt.Sprintf("/* %q */", text))
+						continue
+					}
+					if symbol, ok := artifact.Image.SymbolAt(address); ok && symbol.Name != "" {
+						constant.SetVerboseName("/* " + symbol.Name + " */")
+					}
+				}
+			}
+		}
+		return true
+	})
+}
+
+func constantAddress(constant *ssa.ConstInst) (uint64, bool) {
+	switch value := constant.GetRawValue().(type) {
+	case int64:
+		if value < 0 {
+			return 0, false
+		}
+		return uint64(value), true
+	case uint64:
+		return value, true
+	case int:
+		if value < 0 {
+			return 0, false
+		}
+		return uint64(value), true
+	case uint32:
+		return uint64(value), true
+	default:
+		return 0, false
 	}
 }
 
@@ -474,6 +695,157 @@ func reportError(err error, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "reify: %v\n", err)
 	return 1
+}
+
+func filterCrossFunctionDiagnostics(diagnostics []core.Diagnostic) []core.Diagnostic {
+	filtered := make([]core.Diagnostic, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		switch diagnostic.Code {
+		case "branch-target-outside-region", "lowir2ssa-incomplete-branch":
+			continue
+		default:
+			filtered = append(filtered, diagnostic)
+		}
+	}
+	return filtered
+}
+
+func disassembleAllFunctions(ctx context.Context, artifact *core.Artifact, options core.DisassembleOptions) (*core.Disassembly, error) {
+	var text bytes.Buffer
+	total := 0
+	diagnostics := make([]core.Diagnostic, 0)
+	for _, boundary := range artifact.AllFunctionBoundaries() {
+		region, err := artifact.RegionAt(boundary.Address, boundary.Size)
+		if err != nil {
+			diagnostics = append(diagnostics, core.Diagnostic{Code: "boundary-region", Message: err.Error()})
+			continue
+		}
+		disassembly, err := artifact.DisassembleWithOptions(ctx, region, options)
+		if err != nil {
+			return nil, fmt.Errorf("%s at 0x%x: %w", boundary.Name, boundary.Address, err)
+		}
+		text.WriteString(disassembly.Text)
+		total += disassembly.Instructions
+		diagnostics = append(diagnostics, filterCrossFunctionDiagnostics(disassembly.Diagnostics)...)
+	}
+	if total == 0 {
+		return nil, fmt.Errorf("no instructions recovered from function boundaries")
+	}
+	return &core.Disassembly{Text: text.String(), Instructions: total, Diagnostics: diagnostics}, nil
+}
+
+func parseLowIR(ctx context.Context, artifact *core.Artifact, region core.Region, all, multi bool) (*core.ParseResult, error) {
+	if all {
+		return artifact.ParseAll(ctx)
+	}
+	if multi {
+		return artifact.Parse(ctx, region)
+	}
+	return artifact.ParseExact(ctx, region)
+}
+
+func parseLowIRWithAssembly(ctx context.Context, artifact *core.Artifact, region core.Region, all, multi bool) (*core.ParseResult, error) {
+	if all {
+		return artifact.ParseAllWithAssembly(ctx)
+	}
+	if multi {
+		return artifact.ParseWithAssembly(ctx, region)
+	}
+	return artifact.ParseExactWithAssembly(ctx, region)
+}
+
+func countSourceFunctions(ir *core.LowIR) int {
+	if ir == nil {
+		return 0
+	}
+	total := 0
+	for _, function := range ir.Functions {
+		if function.Boundary == core.BoundaryPLT {
+			continue
+		}
+		total++
+	}
+	return total
+}
+
+func boundaryStats(artifact *core.Artifact) *core.BoundaryStats {
+	if artifact == nil || artifact.Image == nil {
+		return nil
+	}
+	stats := artifact.Image.BoundaryStats
+	if stats.Symbol == 0 && stats.EHFrame == 0 && stats.InitArray == 0 && stats.PLT == 0 && stats.Entry == 0 && stats.Call == 0 && stats.Scan == 0 {
+		return nil
+	}
+	return &stats
+}
+
+func allFunctionRegion(artifact *core.Artifact) (core.Region, bool) {
+	if artifact == nil || artifact.Image == nil || len(artifact.Image.Functions) == 0 {
+		return core.Region{}, false
+	}
+	start := artifact.Image.Functions[0].Address
+	end := start
+	for _, function := range artifact.Image.Functions {
+		if function.Address < start {
+			start = function.Address
+		}
+		if functionEnd := function.Address + function.Size; functionEnd > end {
+			end = functionEnd
+		}
+	}
+	if end <= start {
+		return core.Region{}, false
+	}
+	return core.Region{Address: start, Size: end - start}, true
+}
+
+func hasSectionFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--section" {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveLiftRegion(artifact *core.Artifact, section, addressText, sizeText, funcName string) (core.Region, error) {
+	if funcName != "" {
+		function, err := artifact.FunctionByName(funcName)
+		if err != nil {
+			return core.Region{}, err
+		}
+		return artifact.RegionAt(function.Address, function.Size)
+	}
+	if addressText == "" {
+		if sizeText != "" {
+			return core.Region{}, fmt.Errorf("lift: --size requires --address or --func")
+		}
+		return liftRegion(artifact, section, 0, 0)
+	}
+	address, addressErr := strconv.ParseUint(addressText, 0, 64)
+	if addressErr != nil {
+		name := strings.TrimPrefix(addressText, "0x")
+		function, err := artifact.FunctionByName(name)
+		if err != nil {
+			return core.Region{}, err
+		}
+		if sizeText == "" {
+			return core.Region{}, fmt.Errorf("lift: --address requires --size")
+		}
+		size, err := strconv.ParseUint(sizeText, 0, 64)
+		if err != nil {
+			return core.Region{}, fmt.Errorf("invalid --size %q", sizeText)
+		}
+		return artifact.RegionAt(function.Address, size)
+	}
+	if sizeText == "" {
+		return core.Region{}, fmt.Errorf("lift: --address requires --size")
+	}
+	size, sizeErr := strconv.ParseUint(sizeText, 0, 64)
+	if sizeErr != nil {
+		return core.Region{}, fmt.Errorf("invalid --size %q", sizeText)
+	}
+	return artifact.RegionAt(address, size)
 }
 
 func liftRegion(artifact *core.Artifact, section string, address, size uint64) (core.Region, error) {

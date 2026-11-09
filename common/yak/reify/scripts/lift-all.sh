@@ -4,23 +4,25 @@ set -euo pipefail
 
 usage() {
 	cat <<'EOF'
-Usage: lift-all.sh [-o OUTPUT_DIR] [-a ADDRESS -s SIZE] <file>
+Usage: lift-all.sh [-o OUTPUT_DIR] [-x att|intel] [-a ADDRESS -s SIZE] <file>
 
-Runs `reify lift` for asm, lowir, ssair and source, and writes one text file
-per mode. The input file name prefixes every output.
+Runs `reify lift` in the fixed order 1asm, 2lowir, 3ssair, 4source and writes
+one text file per mode. The input file name prefixes every output. Without
+-a/-s, output goes to <output>/all.
 
 Options:
-  -o OUTPUT_DIR   Output directory (default: ./reify-out)
+  -o OUTPUT_DIR   Output root (default: ./reify-out)
+  -x SYNTAX       Assembly syntax: intel (default) or att
   -a ADDRESS      Lift one region starting at an image address
   -s SIZE         Region size in bytes; required with -a
   -h              Show this help
 
 Files written:
-  <output>/version               version, commit hash and input metadata
-  <output>/<name>.asm.txt        disassembly text
-  <output>/<name>.lowir.txt      LowIR text
-  <output>/<name>.ssair.txt      YakSSA text
-  <output>/<name>.source.txt     source-like text
+  <output>/version                   version, commit hash and input metadata
+  <output>/<name>.1asm.txt           disassembly text
+  <output>/<name>.2lowir.txt         LowIR text
+  <output>/<name>.3ssair.txt         YakSSA text
+  <output>/<name>.4source.txt        source-like text
 
 Requires go and git. Runs from the repository root, so relative Go package
 paths resolve. Exits 1 if any mode fails; failed modes keep diagnostics in
@@ -34,11 +36,13 @@ fail() {
 }
 
 output_dir="./reify-out"
+syntax="intel"
 address=""
 size=""
-while getopts ":o:a:s:h" option; do
+while getopts ":o:x:a:s:h" option; do
 	case "$option" in
 	o) output_dir=$OPTARG ;;
+	x) syntax=$OPTARG ;;
 	a) address=$OPTARG ;;
 	s) size=$OPTARG ;;
 	h)
@@ -67,6 +71,18 @@ fi
 if { [ -n "$address" ] && [ -z "$size" ]; } || { [ -z "$address" ] && [ -n "$size" ]; }; then
 	fail "options -a and -s must be used together"
 fi
+case "$syntax" in
+att|intel) ;;
+*) fail "assembly syntax must be att or intel: $syntax" ;;
+esac
+if [ -n "$address" ]; then
+	if [[ ! "$address" =~ ^(0x[0-9a-fA-F]+|[0-9]+)$ ]]; then
+		fail "invalid address: $address"
+	fi
+	if [[ ! "$size" =~ ^(0x[0-9a-fA-F]+|[0-9]+)$ ]]; then
+		fail "invalid size: $size"
+	fi
+fi
 
 input=$1
 [ -e "$input" ] || fail "input does not exist: $input"
@@ -86,6 +102,10 @@ input_abs=$(cd "$(dirname "$input")" && pwd)/$(basename "$input")
 base=$(basename "$input")
 mkdir -p "$output_dir"
 output_dir=$(cd "$output_dir" && pwd)
+if [ -z "$address" ] && [ "$(basename "$output_dir")" != "all" ]; then
+	output_dir="$output_dir/all"
+	mkdir -p "$output_dir"
+fi
 
 version=$(git -C "$repo_root" describe --tags --always --dirty 2>/dev/null || echo unknown)
 commit=$(git -C "$repo_root" rev-parse HEAD 2>/dev/null || echo unknown)
@@ -105,15 +125,18 @@ digest=$(sha256sum "$input_abs" | awk '{print $1}')
 	else
 		printf 'region: .text\n'
 	fi
-	printf 'modes: asm lowir ssair source\n'
+	printf 'modes: 1asm 2lowir 3ssair 4source\n'
 } >"$output_dir/version"
 
 failed=0
-for mode in asm lowir ssair source; do
-	target="$output_dir/$base.$mode.txt"
-	stderr_file="$output_dir/.$base.$mode.stderr"
-	printf 'lift-all: %s -> %s\n' "$mode" "$target" >&2
-	args=(lift --mode "$mode")
+for label in 1asm 2lowir 3ssair 4source; do
+	target="$output_dir/$base.$label.txt"
+	stderr_file="$output_dir/.$base.$label.stderr"
+	printf 'lift-all: %s -> %s\n' "$label" "$target" >&2
+	args=(lift --mode "$label")
+	if [ "$label" = "1asm" ]; then
+		args+=(--asm-syntax "$syntax")
+	fi
 	if [ -n "$address" ]; then
 		args+=(--address "$address" --size "$size")
 	fi
@@ -126,7 +149,7 @@ for mode in asm lowir ssair source; do
 	fi
 	failed=1
 	{
-		printf 'reify lift --mode %s failed with exit %d\n' "$mode" "$status"
+		printf 'reify lift --mode %s failed with exit %d\n' "$label" "$status"
 		cat "$stderr_file"
 	} >>"$target"
 	rm "$stderr_file"

@@ -44,11 +44,15 @@ LowIR (Function → Block → Instruction)
 | `and`、`or`、`xor`、`shl`、`lshr`、`ashr` | `EmitBinOp` |
 | `eq`、`ult`、`slt` | `EmitBinOp`（`eq`、`lt`） |
 | `neg`、`not` | `EmitUnOp` |
-| `phi` | 折为变量赋值（产生诊断） |
-| `select` | `reify.select` 调用 |
-| `zext`、`sext`、`trunc` | `reify.zext` 等调用 |
+| `phi` | LowIR 显式 Phi 折为变量；循环头自动生成 Phi |
+| `select` | 类型化标记值 |
+| `zext`、`sext`、`trunc` | `TypeCast` |
+| `load` | 内存变量读取 |
+| `store` | 内存变量赋值 |
+| `call` | `Call`（唯一生成调用的操作） |
+| `intrinsic` | 类型化标记值 |
 | `jump` / `branch` / `return` | `EmitJump` / `EmitIf` / `EmitReturn` |
-| `trap` | `reify.trap` 调用，随后 `return` |
+| `trap` | `EmitPanic`，随后 `return` |
 
 `operand` 的映射：
 
@@ -73,13 +77,14 @@ LowIR (Function → Block → Instruction)
 
 ## 寄存器
 
-通用寄存器变成 YakSSA 变量，不再是 `reify.read-register` 调用。不插入 Phi。
+通用寄存器变成 YakSSA 变量。普通分支汇合不插 Phi；循环头插入 loop-carried Phi。
 
 | LowIR | YakSSA |
 | --- | --- |
-| `read-register` | 读取变量当前值；宽度不足时截断 |
-| `write-register` | 给变量赋新值；32 位写零扩展，8/16 位写合并高位 |
-| 控制流汇合 | 沿用最近一次赋值，不建 Phi |
+| `read_register` | 读取变量当前值；宽度不足时截断 |
+| `write_register` | 给变量赋新值；32 位写零扩展，8/16 位写合并高位 |
+| 普通汇合 | 沿用最近一次赋值 |
+| 循环头 | 插入 Phi 并回填 back-edge 值 |
 
 别名按 64 位规范寄存器合并：
 
@@ -92,70 +97,190 @@ LowIR (Function → Block → Instruction)
 | `rflags` | `eflags`、`flags` |
 | `xmm0` 到 `xmm15` | 读写整个 128 位值 |
 
-读取窄寄存器用类型转换表达截断，例如 `eax` 读成 `cast(i32, rax)`。部分寄存器写按位合并。例如写 `ah` 会保留 `rax` 的其他 56 位：
+读取窄寄存器用 C 风格类型转换表达截断，例如 `eax` 读成 `(uint32_t)rax`。部分寄存器写按位合并。例如写 `ah` 会保留 `rax` 的其他 56 位：
 
 ```text
-cleared = rax and-not 0xff00
+cleared = old and-not 0xff00
 inserted = (value shl 8) and 0xff00
-rax = cleared or inserted
+merged = cleared or inserted
 ```
 
-变量形式不区分路径。汇合块读取最近一次写入的值，不做 Phi 合并，也不做路径敏感分析。这是有意的取舍：输出更接近源代码，但不是严格 SSA。
+普通汇合块读取最近一次写入的值，不做路径敏感分析。循环头例外：转换器按逆后序先输出循环头，再输出循环体，建立 loop-carried Phi，并在 back-edge 输出后补齐第二个操作数。
 
 `rflags` 是变量，但标志语义仍由内建操作表达：`x86.flags.<op>` 产生新标志值，`x86.cond.<cc>` 读取标志值并产生条件。
 
 ## 内存与调用
 
-内存、调用和不能直接映射的操作保留为对 `reify.*` 伪函数的调用：
+调用是唯一生成 YakSSA `Call` 的操作：
 
-| LowIR | YakSSA 调用 |
-| --- | --- |
-| `load` | `reify.load(address)` |
-| `store` | `reify.store(address, value)` |
-| `call` | `reify.call(target)` 或 `reify.call_0x<地址>` |
-| `intrinsic` | 按符号名调用，例如 `reify.intrinsic.x86.flags.add` |
-| `select` | `reify.select(condition, true, false)` |
-| `zext`、`sext`、`trunc` | `reify.zext` 等调用 |
+- 直接调用：目标是 `sub_0x<地址>` extern 桩。桩没有函数体，文本输出跳过它。
+- 间接调用：目标是计算出的值。
+- 符号调用：目标是同名 extern 函数。
+- 参数：读取自上一次 call 之后写入的 `rdi`、`rsi`、`rdx`、`rcx`、`r8`、`r9`，按最高写入槽位截断。缺少的低槽传入未定义值。栈参数尚未恢复。
 
-`reify.*` 不是真实函数。它们是共享的伪函数，用来给 YakSSA 一个可分析的调用点。所有伪函数使用保留前缀 `reify.`，文本输出会跳过它们的函数体。
+内存不生成调用：
+
+- `store`：按地址表达式分组的变量赋值。内部变量按地址分组，源码统一显示为 `v<id>`。
+- `load`：读取同一变量。没有已写入值时返回携带地址值 ID 的 load 标记；SSAIR 写作 `load(t<id>)`，source 渲染成 `*(type *)(address)`，例如 `*(uint32_t *)(v60)`。
+- 地址表达式按结构比较。不做别名分析。
+
+其他操作不生成调用：
+
+- `intrinsic`：类型化标记值，例如 `(uint64_t)0 /* x86.flags.add */`。
+- `select`：标记值 `select`。
+- 未支持操作：标记值 `<kind>`，并产生 `lowir2ssa-unsupported-op` 诊断。
+- `trap`：`panic` 后 `return`。
+- `nop`：不产生指令。
 
 因此：
 
-- 寄存器已提升为变量；汇合处不插 Phi。
-- 内存没有提升为 SSA 状态，`load`/`store` 的地址是普通值，不做别名分析。
-- 不推断函数签名。`call` 只保留目标值。
-- 未支持操作变成 `reify.op_<kind>` 调用，并产生 `lowir2ssa-unsupported-op` 诊断。
+- 寄存器与内存槽都是变量；普通汇合不插 Phi，循环头插入 loop-carried Phi。
+- 只有汇编 `call` 对应 YakSSA `Call`。
+- 不推断函数签名。间接调用只保留目标值。
+- 未建模的 intrinsic 保留为可见标记，不伪装成调用。
+
+## 函数定义
+
+[core/funcdefs](../core/funcdefs) 保存 C 函数签名，每个语言一个文件，当前是 [c.go](../core/funcdefs/c.go)。
+
+```go
+type Definition struct {
+    Name     string
+    Params   []Param
+    Return   Type
+    Variadic bool
+}
+```
+
+类型覆盖 `void`、`int`、`uint`、`size_t`、`pointer`、`string`、`struct` 和 `float`。没有签名的函数保持 LowIR 推断类型。
+
+## SSA passes
+
+转换后按顺序执行两个 pass：
+
+1. `apply-function-define`：匹配 extern 调用目标，设置调用返回类型和已知参数类型。
+2. `redefine-type-value`：把字符串参数地址替换为字符串常量。可变参数在地址可解析为字符串时也替换。
+
+完整管线：
+
+```text
+LowIR
+  ├─ remove-canary
+  └─ remove-stackframe
+  ▼
+YakSSA
+  ├─ apply-function-define
+  └─ redefine-type-value
+  ▼
+source
+```
+
+`ssapass.RedefineTypeValue` 需要地址到字符串的读取函数，CLI 传入 `Artifact.StringAt`。
+
+### 循环 Phi
+
+`for` 循环示例：
+
+```text
+b3_1:
+  v30 = phi(0x0, v67)
+  v31 = phi(0x0, v60)
+  v39 = v30 <= 0x4
+  if (v39) goto b4_3; else goto b2_2
+b2_2:
+  v55 = classify(v30 * 0x4)
+  v60 = v31 + v55
+  v67 = v30 + 0x1
+  goto b3_1
+b4_3:
+  return v31
+```
+
+循环头先建立 Phi，循环体使用 Phi；back-edge 输出后把 `v67` 和 `v60` 追加为第二个操作数。这是 YakSSA 文本的结构。`ssa2source` 会继续把 Phi 展开成变量赋值。
 
 ## 控制流
 
 - `jump` 只在目标块存在时连边。目标缺失时产生 `lowir2ssa-incomplete-jump`，并补 `return`。
 - `branch` 需要条件和两个目标。目标不足时产生 `lowir2ssa-incomplete-branch`；只有一个目标时仍生成 `If`，另一侧为空。
 - 每个块都以终止指令结束。块没有终止指令时补一个空 `return`，保证 CFG 完整。
+- 跳到无环 return-only 尾部的 `jump` 改成显式 `return rax`，避免共享 epilogue 覆盖分支返回值。
 - `Function.Finish()` 在转换结束时调用，填充入口块、退出块和返回类型。
+
+### 控制结构还原
+
+`ssa2source` 先按逆后序排列基本块，再用支配树识别自然循环，用后支配树选择 `if` 的汇合点。循环头的 Phi 在源码层展开为循环前赋值和 back-edge 前赋值，因此源码不出现 `goto` 或 `phi`。
+
+这套结构只处理可约简 CFG。实现参考 Ghidra 的 `CollapseStructure` / `BlockWhileDo`；remill 的 `ControlFlowStructuring` 只分类指令流，不负责反编译结构化。
 
 ## 文本形式
 
-`lowir2ssa.Text` 直接使用 `ssa.Function.DisAsm(ssa.DisAsmDefault)`。它与 `ssa2source` 都跳过 `reify.*` 伪函数，只显示真实转换结果。
+`lowir2ssa.Text` 输出带类型的 YakSSA 文本：每个赋值写成 `<type> t<id> = ...`，同一函数的 `=` 按最宽左列对齐。块名使用下划线，例如 `entry_0`、`b3_1`。它与 `ssa2source` 都跳过 extern 调用目标桩，只显示真实转换结果。
 
-`ssa2source.Render` 生成伪源码，保留 SSA 名字、块标签和调用：
+`ssa2source.Render` 生成伪源码。它把 CFG 重构为 `if`/`else` 和 `while`，不输出块标签、`goto` 或 `phi`。循环头的 Phi 展开为循环前赋值和 back-edge 前赋值：
 
-```text
-function sub_0x2590() {
-entry-0:
-  rbp = undefined;
-  rsp = undefined;
-  v6 = reify.intrinsic.x86.endbr64();
-  v8 = cast(i32, rbp);
-  v9 = cast(i32, rbp);
-  v10 = v8 ^ v9;
-  rbp = cast(i64, v10);
-  v14 = reify.intrinsic.x86.flags.xor(v8, v9, v10);
-  v20 = reify.load(rsp);
-  ...
+```c
+function accumulate() {
+    v30 = 0x0;
+    v31 = 0x0;
+    while (v30 <= 0x4) {
+      v55 = classify(v30 * 0x4);
+      v60 = v31 + v55;
+      v67 = v30 + 0x1;
+      v30 = v67;
+      v31 = v60;
+    }
+    return v31;
 }
 ```
 
-伪源码不是可编译源码，也不还原语言级类型和控制结构。它只把 SSA 图压平成易于对照机器指令的文本。
+`call` 的返回值写入 `rax`。`return` 没有显式值时返回当前 `rax`。
+
+### 类型推导
+
+`ssa2source` 折叠冗余类型转换和恒等运算：`x ^ x`/`x - x` 为 `0x0`，`x & x`/`x | x` 为 `x`，乘一、加零、移位零消去。`0x0` 在指针上下文仍输出 `NULL`。
+
+`ssapass.InferTypes` 在函数定义 pass 之后运行：
+
+- `malloc`、`calloc`、`realloc` 的返回值标记为 `ptr64`。
+- `free`、`memset`、`strncpy` 等指针参数把实参标记为 `ptr64`。
+- 指针加减、`Phi`、内部函数返回值和 `Return` 传播指针类型。
+- 指针比较中的常量 `0` 标成指针，source 输出 `NULL`。
+- 内部函数调用根据被调函数实际读取的参数寄存器裁剪 arity；已知 C 签名优先。
+
+函数入口的 `rsp`/`rbp` 建模为 `entry_rsp`/`entry_rbp`，不再使用 `undefined` 哨兵。`remove-stack-frame` 后无 user 的纯值不输出；仍被使用的 `undefined` 带 `/* undefined source */`。
+
+推导只处理指针，不猜结构体布局，也不做完整的内存 SSA。
+
+类型转换输出 C 风格转换：`i8`/`i16`/`i32`/`i64` 对应 `uint8_t`/`uint16_t`/`uint32_t`/`uint64_t`，`ptr` 对应 `void *`，`i1` 对应 `bool`。常量上的类型转换直接折叠，不生成临时定义。未建模的 intrinsic 输出 `0x0 /* x86.flags.add */`。
+
+源码变量统一使用 `v<id>`，不暴露寄存器名或内存槽名。常量和类型转换结果在使用处内联。
+
+source 只在值有 SSA user 时输出 `v<id> =`。没有 user 的调用直接输出 `puts(...);`；纯值和类型转换只在被使用时内联。SSA 本身仍保留常量、转换和调用结果。
+
+常量默认十六进制。字符串、布尔和浮点按各自类型显示。常量地址命中可打印字符串时追加 `/* "..." */`；命中符号时追加 `/* 名称 */`。
+
+伪源码不是可编译源码，也不还原语言级类型。控制结构只还原可约简的 `if`/`else` 和 `while`；不可约 CFG 可能丢失路径。源码不出现块标签、`goto` 或 `phi`。
+
+## Stack frame
+
+`lowir2ssa` 默认删除标准栈帧：
+
+- 函数开头保存的 callee-saved 寄存器：`push rbp`、`push rbx`、`push r12` 到 `r15`
+- `mov rbp, rsp`
+- `sub rsp, N` 与 `and rsp, N` 分配/对齐
+- `leave`
+- 结尾的 callee-saved `pop`
+- 配对的 `add rsp, N`
+
+检测按机器指令地址分组，允许前几条无关指令穿插。默认删除，调用方可以保留：
+
+```go
+result, err := lowir2ssa.Convert(ctx, ir, lowir2ssa.WithKeepStackFrame())
+```
+
+命令行对应 `--keep-stack-frame`。
+
+栈帧删除不重写 rbp 相对地址。删除后，`rbp - 8` 这类局部变量地址会失去基址；需要保留正确寻址时使用 `--keep-stack-frame`。
 
 ## Stack canary
 
@@ -195,7 +320,7 @@ result, err := lowir2ssa.Convert(ctx, ir, lowir2ssa.WithKeepStackCanary())
 ## 限制
 
 - 一个 LowIR Function 对应一个 YakSSA Function。跨函数调用图尚未恢复。
-- 寄存器已提升为变量；汇合处不插 Phi，也不区分路径。
+- 寄存器已提升为变量；普通汇合不插 Phi。循环头使用 Phi。
 - 类型只保留位宽，不做语言级类型恢复。
 - 内存未提升为 SSA 状态。
 - 部分寄存器按位合并，未模拟标志位的部分写规则。

@@ -15,6 +15,7 @@ type amd64Lifter struct {
 	nextValue    core.ValueID
 	values       map[core.ValueID]core.ValueType
 	instructions []core.Instruction
+	variadic     bool
 }
 
 type amd64Place struct {
@@ -60,7 +61,28 @@ func liftAMD64(target core.Target, blocks []amd64Block, blockIDs map[uint64]core
 	return ir
 }
 
+func amd64VariadicSetup(ins amd64Instruction) bool {
+	args := amd64Args(ins)
+	if len(args) != 2 {
+		return false
+	}
+	destination, ok := args[0].(x86asm.Reg)
+	if !ok || (destination != x86asm.AL && destination != x86asm.EAX && destination != x86asm.RAX) {
+		return false
+	}
+	if source, ok := args[1].(x86asm.Reg); ok {
+		return source == destination && ins.inst.Op == x86asm.XOR
+	}
+	if source, ok := args[1].(x86asm.Imm); ok {
+		return source >= 0 && source <= 8
+	}
+	return false
+}
+
 func (l *amd64Lifter) lift(ins amd64Instruction) {
+	if amd64VariadicSetup(ins) {
+		l.variadic = true
+	}
 	if ins.endbr != "" {
 		l.emit(core.OpIntrinsic, []core.Operand{amd64Symbol("x86." + ins.endbr)}, nil, nil, core.EffectNone, ins.address)
 		return
@@ -686,7 +708,15 @@ func (l *amd64Lifter) branch(ins amd64Instruction) {
 
 func (l *amd64Lifter) call(ins amd64Instruction) {
 	if target, ok := amd64DirectTarget(ins); ok {
-		l.emit(core.OpCall, []core.Operand{amd64Pointer(target)}, nil, nil, core.EffectCall|core.EffectMayTrap|core.EffectUnknown, ins.address)
+		instruction := core.Instruction{
+			Kind:     core.OpCall,
+			Operands: []core.Operand{amd64Pointer(target)},
+			Effects:  core.EffectCall | core.EffectMayTrap | core.EffectUnknown,
+			Variadic: l.variadic,
+			Address:  ins.address,
+		}
+		l.variadic = false
+		l.instructions = append(l.instructions, instruction)
 		return
 	}
 	args := amd64Args(ins)
@@ -700,7 +730,15 @@ func (l *amd64Lifter) call(ins amd64Instruction) {
 		return
 	}
 	value = l.pointerFrom(ins.address, value)
-	l.emit(core.OpCall, []core.Operand{l.value(value)}, nil, nil, core.EffectCall|core.EffectMayTrap|core.EffectUnknown, ins.address)
+	instruction := core.Instruction{
+		Kind:     core.OpCall,
+		Operands: []core.Operand{l.value(value)},
+		Effects:  core.EffectCall | core.EffectMayTrap | core.EffectUnknown,
+		Variadic: l.variadic,
+		Address:  ins.address,
+	}
+	l.variadic = false
+	l.instructions = append(l.instructions, instruction)
 }
 
 func (l *amd64Lifter) setCondition(ins amd64Instruction) {

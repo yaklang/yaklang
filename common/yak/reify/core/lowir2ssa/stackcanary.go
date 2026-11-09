@@ -1,7 +1,6 @@
 package lowir2ssa
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -33,7 +32,7 @@ type instructionRef struct {
 
 type canaryState struct {
 	function *core.Function
-	defs     map[core.ValueID]instructionRef
+	defs     map[core.ValueID]core.Instruction
 	aliases  map[core.ValueID]core.ValueID
 	removed  map[instructionRef]bool
 	rewrites map[instructionRef]core.BlockID
@@ -49,7 +48,7 @@ type canaryState struct {
 func newCanaryState(function *core.Function) *canaryState {
 	return &canaryState{
 		function:  function,
-		defs:      make(map[core.ValueID]instructionRef),
+		defs:      make(map[core.ValueID]core.Instruction),
 		aliases:   make(map[core.ValueID]core.ValueID),
 		removed:   make(map[instructionRef]bool),
 		rewrites:  make(map[instructionRef]core.BlockID),
@@ -64,9 +63,9 @@ func newCanaryState(function *core.Function) *canaryState {
 
 func (s *canaryState) scan() bool {
 	for blockIndex := range s.function.Blocks {
-		for index, instruction := range s.function.Blocks[blockIndex].Instructions {
+		for _, instruction := range s.function.Blocks[blockIndex].Instructions {
 			for _, result := range instruction.Results {
-				s.defs[result.ID] = instructionRef{block: blockIndex, index: index}
+				s.defs[result.ID] = instruction
 			}
 		}
 	}
@@ -315,11 +314,8 @@ func (s *canaryState) isCanaryCompare(instruction core.Instruction) bool {
 }
 
 func (s *canaryState) isLoadResult(id core.ValueID) bool {
-	ref, ok := s.defs[id]
-	if !ok {
-		return false
-	}
-	return s.function.Blocks[ref.block].Instructions[ref.index].Kind == core.OpLoad
+	instruction, ok := s.defs[id]
+	return ok && instruction.Kind == core.OpLoad
 }
 
 func (s *canaryState) singleUserIntrinsic(blockIndex, index int, value core.ValueID, prefix string) (core.Instruction, instructionRef, bool) {
@@ -577,11 +573,10 @@ func (s *canaryState) trace(id core.ValueID) core.ValueID {
 
 func (s *canaryState) constant(id core.ValueID) uint64 {
 	for depth := 0; depth < 32; depth++ {
-		ref, ok := s.defs[id]
+		instruction, ok := s.defs[id]
 		if !ok {
 			return 0
 		}
-		instruction := s.function.Blocks[ref.block].Instructions[ref.index]
 		switch instruction.Kind {
 		case core.OpConstant:
 			if len(instruction.Operands) == 0 {
@@ -601,57 +596,7 @@ func (s *canaryState) constant(id core.ValueID) uint64 {
 }
 
 func (s *canaryState) addressKey(id core.ValueID) string {
-	return s.addressKeyDepth(id, 0, make(map[core.ValueID]bool))
-}
-
-func (s *canaryState) addressKeyDepth(id core.ValueID, depth int, visiting map[core.ValueID]bool) string {
-	if depth > 16 || visiting[id] {
-		return fmt.Sprintf("v%d", id)
-	}
-	ref, ok := s.defs[id]
-	if !ok {
-		return fmt.Sprintf("v%d", id)
-	}
-	instruction := s.function.Blocks[ref.block].Instructions[ref.index]
-	visiting[id] = true
-	defer delete(visiting, id)
-	switch instruction.Kind {
-	case core.OpConstant:
-		if len(instruction.Operands) == 0 {
-			return ""
-		}
-		return fmt.Sprintf("const:%x", literalUint64(instruction.Operands[0].Literal))
-	case core.OpCopy:
-		if len(instruction.Operands) == 0 {
-			return ""
-		}
-		return s.addressKeyDepth(instruction.Operands[0].Value, depth+1, visiting)
-	case core.OpAdd:
-		if len(instruction.Operands) < 2 {
-			return ""
-		}
-		return fmt.Sprintf("add(%s,%s)",
-			s.addressKeyDepth(instruction.Operands[0].Value, depth+1, visiting),
-			s.addressKeyDepth(instruction.Operands[1].Value, depth+1, visiting))
-	case core.OpReadRegister:
-		if len(instruction.Operands) == 0 {
-			return ""
-		}
-		return "reg:" + instruction.Operands[0].Name
-	case core.OpIntrinsic:
-		if len(instruction.Operands) == 0 {
-			return ""
-		}
-		key := "intrinsic:" + instruction.Operands[0].Name
-		for _, operand := range instruction.Operands[1:] {
-			if operand.Kind == core.OperandValue {
-				key += "(" + s.addressKeyDepth(operand.Value, depth+1, visiting) + ")"
-			}
-		}
-		return key
-	default:
-		return fmt.Sprintf("v%d", id)
-	}
+	return valueKey(s.defs, id)
 }
 
 func (s *canaryState) usersOf(blockIndex, index int, value core.ValueID, kind core.Opcode) []core.Instruction {

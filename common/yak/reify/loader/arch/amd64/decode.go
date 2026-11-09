@@ -33,7 +33,7 @@ func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, e
 		return nil, fmt.Errorf("amd64: empty code region")
 	}
 	diagnostics := &amd64Diagnostics{}
-	decoded, err := decodeAMD64(ctx, request, diagnostics, false)
+	decoded, err := decodeAMD64(ctx, request, diagnostics, request.WithAssembly)
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +45,14 @@ func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, e
 		return nil, fmt.Errorf("%s", message)
 	}
 	blocks, blockIDs := buildAMD64Blocks(decoded, diagnostics)
-	return &core.ParseResult{
+	result := &core.ParseResult{
 		IR:          liftAMD64(request.Target, blocks, blockIDs, diagnostics),
 		Diagnostics: diagnostics.finish(),
-	}, nil
+	}
+	if request.WithAssembly {
+		result.Assembly = renderAMD64Assembly(decoded, request.Syntax)
+	}
+	return result, nil
 }
 
 func decodeAMD64(ctx context.Context, request core.ParseRequest, diagnostics *amd64Diagnostics, keepRaw bool) ([]amd64Instruction, error) {
