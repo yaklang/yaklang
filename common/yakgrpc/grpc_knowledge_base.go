@@ -71,22 +71,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 	// 转换为protobuf格式
 	pbKnowledgeBases := make([]*ypb.KnowledgeBaseInfo, len(knowledgeBases))
 	for i, kb := range knowledgeBases {
-		isImported := kb.SerialVersionUID != ""
-		if !isImported {
-			collectionInfo, _ := yakit.GetRAGCollectionInfoByName(db, kb.KnowledgeBaseName)
-			isImported = collectionInfo != nil && collectionInfo.SerialVersionUID != ""
-		}
-		pbKnowledgeBases[i] = &ypb.KnowledgeBaseInfo{
-			ID:                       int64(kb.ID),
-			KnowledgeBaseName:        kb.KnowledgeBaseName,
-			IsImported:               isImported,
-			KnowledgeBaseDescription: kb.KnowledgeBaseDescription,
-			KnowledgeBaseType:        kb.KnowledgeBaseType,
-			Tags:                     utils.StringSplitAndStrip(kb.Tags, ","),
-			CreatedFromUI:            kb.CreatedFromUI,
-			IsDefault:                kb.IsDefault,
-			SerialVersionID:          kb.SerialVersionUID,
-		}
+		pbKnowledgeBases[i] = knowledgeBaseInfoToGRPC(db, kb)
 	}
 
 	return &ypb.GetKnowledgeBaseResponse{
