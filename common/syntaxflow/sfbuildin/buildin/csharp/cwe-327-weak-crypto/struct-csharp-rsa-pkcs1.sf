@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# RSA PKCS1 padding"
-	title_zh: "结构扫描：C# RSA PKCS1 填充"
+	title: "结构匹配：C# RSA PKCS1 padding"
+	title_zh: "结构匹配：C# RSA PKCS1 填充"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-csharp-rsa-pkcs1"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -42,7 +42,7 @@ NEG
 
 RSAEncryptionPadding.Pkcs1 as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: C# RSA PKCS1 padding",
 	title_zh: "结构扫描：C# RSA PKCS1 填充",
 	message: "结构扫描：C# RSA PKCS1 填充",

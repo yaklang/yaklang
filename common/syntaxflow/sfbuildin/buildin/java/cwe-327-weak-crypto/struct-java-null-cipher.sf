@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java NullCipher"
-	title_zh: "结构扫描：Java NullCipher"
+	title: "结构匹配：Java NullCipher"
+	title_zh: "结构匹配：Java NullCipher"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-java-null-cipher"
 	risk: "insecure-cryptography"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 NullCipher() as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Java NullCipher",
 	title_zh: "结构扫描：Java NullCipher",
 	message: "结构扫描：Java NullCipher",

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# Response.Write"
-	title_zh: "结构扫描：C# Response.Write"
+	title: "结构匹配：C# Response.Write"
+	title_zh: "结构匹配：C# Response.Write"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-csharp-response-write"
 	risk: "xss"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 Response.Write as $call
 Response.Write(* as $s) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: C# Response.Write",
 	title_zh: "结构扫描：C# Response.Write",
 	message: "结构扫描：C# Response.Write",

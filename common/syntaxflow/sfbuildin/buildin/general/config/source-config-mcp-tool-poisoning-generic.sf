@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 MCP 工具投毒"
+	title: "源码匹配：检测到 MCP 工具投毒"
 	title_zh: "检测到 MCP 工具投毒",
 	type: vuln
-	level: critical
+	level: "middle"
 	rule_id: "source-config-mcp-tool-poisoning-generic"
 	risk: "tool-poisoning"
 	desc: <<<DESC
@@ -49,7 +49,7 @@ ${*.py}.pattern_regex(/"""[^"]*do not tell the user[^"]*"""/) as $p6
 ${*.py}.pattern_regex(/"""[^"]*ignore previous instructions[^"]*"""/) as $p7
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 as $hit
 alert $hit for {
-	level: "critical",
+	level: "middle",
 	title: "检测到 MCP 工具投毒",
 	title_zh: "检测到 MCP 工具投毒",
 	message: "检测到 MCP 工具投毒",

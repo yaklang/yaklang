@@ -2,7 +2,7 @@ desc(
 	title: "C#/.NET outbound HTTP request sinks (lib)"
 	title_zh: "出站 HTTP 请求入口（C#/.NET 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: csharp
 	lib: "csharp-http-request-sink"
 	risk: "ssrf"

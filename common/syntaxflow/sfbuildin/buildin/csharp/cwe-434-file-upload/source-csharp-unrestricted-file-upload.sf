@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# 不受限制的文件上传"
-	title_zh: "检测 C# 不受限制的文件上传"
+	title: "源码匹配：检测 C# 不受限制的文件上传"
+	title_zh: "源码匹配：检测 C# 不受限制的文件上传"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-csharp-unrestricted-file-upload"
 	risk: "file-upload"
 	cwe: "CWE-434"
@@ -60,7 +60,7 @@ NEG
 )
 ${*.cs}.pattern_regex(/(Path\.Combine\s*\([^)]*,\s*(file|uploaded)\.?(FileName|OriginalFileName))|\.SaveAs\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 C# 不受限制的文件上传",
 	title_zh: "检测 C# 不受限制的文件上传",
 	message: "检测 C# 不受限制的文件上传",

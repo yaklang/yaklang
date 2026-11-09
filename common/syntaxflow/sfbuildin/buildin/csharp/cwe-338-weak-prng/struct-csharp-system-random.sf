@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# System.Random"
-	title_zh: "结构扫描：C# System.Random"
+	title: "结构匹配：C# System.Random"
+	title_zh: "结构匹配：C# System.Random"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-csharp-system-random"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 Random() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: C# System.Random",
 	title_zh: "结构扫描：C# System.Random",
 	message: "结构扫描：C# System.Random",

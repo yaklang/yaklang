@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python jsonpickle.decode"
-	title_zh: "结构扫描：Python jsonpickle.decode"
+	title: "结构匹配：Python jsonpickle.decode"
+	title_zh: "结构匹配：Python jsonpickle.decode"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-jsonpickle"
 	risk: "deserialization"
 	desc: <<<DESC

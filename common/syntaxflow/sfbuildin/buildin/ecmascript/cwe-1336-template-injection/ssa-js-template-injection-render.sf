@@ -1,0 +1,167 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 模板注入：用户输入作为模板渲染"
+	title_zh: "数据流：Node.js 模板注入：用户输入作为模板渲染"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-template-injection-render"
+	risk: "template-injection"
+	cwe: "CWE-1336"
+	desc: <<<DESC
+### 规则说明
+用户可控数据作为模板内容传入 `ejs.render` 等模板渲染接口，模板表达式会被服务端执行。
+
+### 风险类型
+template-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+模板内容固定，用户输入只作为渲染数据传入；避免把请求参数当模板。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /page?name=
+let ejs;
+try { ejs = require("ejs"); } catch (err) { ejs = null; }
+
+function page(req, res) {
+  const tpl = String(req.query.tpl || ""); // wb:source id=src
+  res.send(ejs.render(tpl, { name: "demo" })); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = page(req, res);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	"safefile://app-safe.js": <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /page?name=
+let ejs;
+try { ejs = require("ejs"); } catch (err) { ejs = null; }
+
+function page(req, res) {
+  const name = String(req.query.name || ""); // wb:source id=src
+  res.send(ejs.renderFile("views/page.ejs", { name })); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = page(req, res);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)
+
+<include('js-param')> as $params;
+
+*.render(*<slice(index=0)> as $arg)
+*.compile(*<slice(index=0)> as $arg)?{<self><getCallee>?{have: /(?i)(handlebars|pug|ejs|template)/}} as $templateArg
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Node.js 模板注入：用户输入作为模板渲染",
+	title_zh: "Node.js 模板注入：用户输入作为模板渲染",
+	risk: "template-injection",
+}

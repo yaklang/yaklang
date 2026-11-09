@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "检测 Java Cookie setSecure(false)"
-	title_zh: "检测 Java Cookie setSecure(false)"
+	title: "源码匹配：检测 Java Cookie setSecure(false)"
+	title_zh: "源码匹配：检测 Java Cookie setSecure(false)"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-java-cookie-secure-false"
 	risk: "cookie-security"
 	desc: <<<DESC
@@ -45,7 +45,7 @@ NEG
 
 ${*.java}.pattern_regex(/setSecure\s*\(\s*false\s*\)/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Java Cookie setSecure(false)",
 	title_zh: "检测 Java Cookie setSecure(false)",
 	message: "检测 Java Cookie setSecure(false)",

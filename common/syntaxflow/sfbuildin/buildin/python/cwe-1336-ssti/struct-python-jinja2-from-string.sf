@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python jinja2 from_string"
-	title_zh: "结构扫描：Python jinja2 from_string"
+	title: "结构匹配：Python jinja2 from_string"
+	title_zh: "结构匹配：Python jinja2 from_string"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-python-jinja2-from-string"
 	risk: "ssti"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 jinja2.Template(* as $src) as $call
 from_string(* as $src) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Jinja2 Template from string",
 	title_zh: "Jinja2 字符串模板",
 	message: "结构扫描：Python jinja2 from_string",

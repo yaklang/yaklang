@@ -1,0 +1,422 @@
+desc(
+	risk: "sql-injection"
+	title: "数据流：Check Java SQL String Append Query"
+	type: audit
+	level: ""
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+该规则旨在检测Java代码中通过`StringBuilder`或`StringBuffer`等类拼接SQL查询字符串的模式。当应用程序直接将用户输入或其他不可信的数据拼接到SQL语句中时，如果输入没有经过适当的过滤或参数化处理，就可能导致SQL注入漏洞。攻击者可以通过构造恶意输入来改变SQL语句的执行逻辑，从而绕过身份验证、窃取敏感数据、甚至破坏数据库。
+2. **触发场景**
+以下代码示例展示了常见的字符串拼接导致SQL注入的场景：
+```java
+StringBuilder sqlString = new StringBuilder();
+sqlString.append("SELECT * FROM users WHERE username = '").append(userInput).append("'");
+// 执行拼接后的SQL语句
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sqlString.toString());
+```
+如果`userInput`是攻击者可控的，例如用户登录时输入的用户名，攻击者可以输入 `' OR '1'='1` 来绕过密码验证，或者输入 `' OR '1'='1'; DROP TABLE users; --` 来删除用户表。本规则特指检测`StringBuilder`或`StringBuffer`的`append`方法用于拼接SQL语句，并进一步通过启发式判断（如检查是否包含`WHERE`关键字）来提高准确性。
+3. **潜在影响**
+- **数据泄露**: 攻击者可以读取数据库中的任意敏感数据。
+- **数据篡改**: 攻击者可以修改或删除数据库中的数据。
+- **权限绕过**: 攻击者可以绕过应用程序的认证或授权机制。
+- **拒绝服务**: 攻击者可以通过执行耗费资源的查询或操作导致数据库性能下降甚至崩溃。
+- **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
+DESC
+	rule_id: "b86d3bfb-98d4-437d-bf7b-d5c43e012425"
+	title_zh: "数据流：检测Java SQL字符串拼接查询"
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询（PreparedStatement）
+强烈建议使用Java的`PreparedStatement`对象来执行SQL查询。`PreparedStatement`通过将SQL语句模板与参数值分离，可以有效地防止SQL注入。数据库驱动程序会负责将参数值安全地绑定到SQL语句中，而不是直接拼接到字符串中。
+```java
+// 修复代码示例 (使用 PreparedStatement)
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?"; // 使用问号作为参数占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+// 根据参数类型设置参数值，setInt会自动处理类型转换和转义
+pstmt.setInt(1, Integer.parseInt(userInput));
+try (ResultSet rs = pstmt.executeQuery()) {
+// 处理查询结果
+}
+}
+```
+#### 2. 使用ORM（对象关系映射）框架
+使用成熟的ORM框架，如Hibernate、MyBatis等，可以显著降低SQL注入的风险。ORM框架通常内置了参数化查询的支持，开发者可以直接操作对象，而由框架负责生成安全的SQL语句。
+```java
+// MyBatis 示例 (Mapper XML 文件)
+<select id="getUserById" resultType="User">
+SELECT * FROM users WHERE id = #{userId}  <!-- MyBatis的安全参数占位符 -->
+</select>
+```
+```java
+// 调用代码 (避免手动拼接) 
+// UserMapper 是 MyBatis 生成的接口
+User user = userMapper.getUserById(Integer.parseInt(userInput));
+```
+#### 3. 输入验证与过滤 (作为辅助手段)
+虽然参数化查询是首选的防御方法，但对用户输入进行严格的验证和过滤也是重要的安全实践。根据预期的输入类型，校验输入的格式、长度和内容。例如，如果期望一个数字，则只接受数字输入并进行类型转换。如果需要接受字符串，则对特殊字符进行过滤或转义，但这通常不如参数化查询可靠。
+```java
+// 示例：简单检查输入是否为数字
+String userInput = request.getParameter("id");
+if (!userInput.matches("\\d+")) {
+// 输入不是数字，拒绝请求或抛出异常
+throw new IllegalArgumentException("Invalid input: ID must be a number.");
+}
+int id = Integer.parseInt(userInput);
+// 接下来使用参数化查询
+```
+#### 4. 代码审查和安全培训
+开发团队应定期进行代码安全审查，特别关注涉及数据库操作的代码段。同时，为开发人员提供SQL Injection等常见Web安全漏洞的培训，提高其安全编码意识。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+)
+
+
+*sql*.append(*<slice(start=1)> as $params);
+check $params;
+
+$params?{!opcode: const}#{
+    hook: `*?{opcode: const && have: 'WHERE'}<show> as $flag`,
+}->
+alert $flag for {
+	level: "low",
+	title: "Java SQL String Append Query Was Detected",
+	title_zh: "检测到Java SQL字符串拼接查询",
+	name: "flag",
+	message: "检测到Java SQL字符串拼接查询行为，可能存在SQL注入风险，建议排查过滤机制的有效性。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询（PreparedStatement）
+强烈建议使用Java的`PreparedStatement`对象来执行SQL查询。`PreparedStatement`通过将SQL语句模板与参数值分离，可以有效地防止SQL注入。数据库驱动程序会负责将参数值安全地绑定到SQL语句中，而不是直接拼接到字符串中。
+```java
+// 修复代码示例 (使用 PreparedStatement)
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?"; // 使用问号作为参数占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+// 根据参数类型设置参数值，setInt会自动处理类型转换和转义
+pstmt.setInt(1, Integer.parseInt(userInput));
+try (ResultSet rs = pstmt.executeQuery()) {
+// 处理查询结果
+}
+}
+```
+#### 2. 使用ORM（对象关系映射）框架
+使用成熟的ORM框架，如Hibernate、MyBatis等，可以显著降低SQL注入的风险。ORM框架通常内置了参数化查询的支持，开发者可以直接操作对象，而由框架负责生成安全的SQL语句。
+```java
+// MyBatis 示例 (Mapper XML 文件)
+<select id="getUserById" resultType="User">
+SELECT * FROM users WHERE id = #{userId}  <!-- MyBatis的安全参数占位符 -->
+</select>
+```
+```java
+// 调用代码 (避免手动拼接)
+// UserMapper 是 MyBatis 生成的接口
+User user = userMapper.getUserById(Integer.parseInt(userInput));
+```
+#### 3. 输入验证与过滤 (作为辅助手段)
+虽然参数化查询是首选的防御方法，但对用户输入进行严格的验证和过滤也是重要的安全实践。根据预期的输入类型，校验输入的格式、长度和内容。例如，如果期望一个数字，则只接受数字输入并进行类型转换。如果需要接受字符串，则对特殊字符进行过滤或转义，但这通常不如参数化查询可靠。
+```java
+// 示例：简单检查输入是否为数字
+String userInput = request.getParameter("id");
+if (!userInput.matches("\d+")) {
+// 输入不是数字，拒绝请求或抛出异常
+throw new IllegalArgumentException("Invalid input: ID must be a number.");
+}
+int id = Integer.parseInt(userInput);
+// 接下来使用参数化查询
+```
+#### 4. 代码审查和安全培训
+开发团队应定期进行代码安全审查，特别关注涉及数据库操作的代码段。同时，为开发人员提供SQL Injection等常见Web安全漏洞的培训，提高其安全编码意识。
+SOLUTION
+	risk: "sql-injection",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+该规则旨在检测Java代码中通过`StringBuilder`或`StringBuffer`等类拼接SQL查询字符串的模式。当应用程序直接将用户输入或其他不可信的数据拼接到SQL语句中时，如果输入没有经过适当的过滤或参数化处理，就可能导致SQL注入漏洞。攻击者可以通过构造恶意输入来改变SQL语句的执行逻辑，从而绕过身份验证、窃取敏感数据、甚至破坏数据库。
+2. **触发场景**
+以下代码示例展示了常见的字符串拼接导致SQL注入的场景：
+```java
+StringBuilder sqlString = new StringBuilder();
+sqlString.append("SELECT * FROM users WHERE username = '").append(userInput).append("'");
+// 执行拼接后的SQL语句
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sqlString.toString());
+```
+如果`userInput`是攻击者可控的，例如用户登录时输入的用户名，攻击者可以输入 `' OR '1'='1` 来绕过密码验证，或者输入 `' OR '1'='1'; DROP TABLE users; --` 来删除用户表。本规则特指检测`StringBuilder`或`StringBuffer`的`append`方法用于拼接SQL语句，并进一步通过启发式判断（如检查是否包含`WHERE`关键字）来提高准确性。
+3. **潜在影响**
+- **数据泄露**: 攻击者可以读取数据库中的任意敏感数据。
+- **数据篡改**: 攻击者可以修改或删除数据库中的数据。
+- **权限绕过**: 攻击者可以绕过应用程序的认证或授权机制。
+- **拒绝服务**: 攻击者可以通过执行耗费资源的查询或操作导致数据库性能下降甚至崩溃。
+- **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
+DESC
+}
+
+
+
+desc(
+	lang: java
+	'file://risk.java': <<<TEXT
+package com.ruoyi.common.datascope.aspect;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+import com.ruoyi.common.core.context.SecurityContextHolder;
+import com.ruoyi.common.core.text.Convert;
+import com.ruoyi.common.core.utils.StringUtils;
+import com.ruoyi.common.core.web.domain.BaseEntity;
+import com.ruoyi.common.datascope.annotation.DataScope;
+import com.ruoyi.common.security.utils.SecurityUtils;
+import com.ruoyi.system.api.domain.SysRole;
+import com.ruoyi.system.api.domain.SysUser;
+import com.ruoyi.system.api.model.LoginUser;
+
+@Aspect
+@Component
+public class DataScopeAspect
+{
+    /**
+     * 全部数据权限
+     */
+    public static final String DATA_SCOPE_ALL = "1";
+
+    /**
+     * 自定数据权限
+     */
+    public static final String DATA_SCOPE_CUSTOM = "2";
+
+    /**
+     * 部门数据权限
+     */
+    public static final String DATA_SCOPE_DEPT = "3";
+
+    /**
+     * 部门及以下数据权限
+     */
+    public static final String DATA_SCOPE_DEPT_AND_CHILD = "4";
+
+    /**
+     * 仅本人数据权限
+     */
+    public static final String DATA_SCOPE_SELF = "5";
+
+    /**
+     * 数据权限过滤关键字
+     */
+    public static final String DATA_SCOPE = "dataScope";
+
+    @Before("@annotation(controllerDataScope)")
+    public void doBefore(JoinPoint point, DataScope controllerDataScope) throws Throwable
+    {
+        clearDataScope(point);
+        handleDataScope(point, controllerDataScope);
+    }
+
+    protected void handleDataScope(final JoinPoint joinPoint, DataScope controllerDataScope)
+    {
+        // 获取当前的用户
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        if (StringUtils.isNotNull(loginUser))
+        {
+            SysUser currentUser = loginUser.getSysUser();
+            // 如果是超级管理员，则不过滤数据
+            if (StringUtils.isNotNull(currentUser) && !currentUser.isAdmin())
+            {
+                String permission = StringUtils.defaultIfEmpty(controllerDataScope.permission(), SecurityContextHolder.getPermission());
+                dataScopeFilter(joinPoint, currentUser, controllerDataScope.deptAlias(),
+                        controllerDataScope.userAlias(), permission);
+            }
+        }
+    }
+
+    /**
+     * 数据范围过滤
+     *
+     * @param joinPoint 切点
+     * @param user 用户
+     * @param deptAlias 部门别名
+     * @param userAlias 用户别名
+     * @param permission 权限字符
+     */
+    public static void dataScopeFilter(JoinPoint joinPoint, SysUser user, String deptAlias, String userAlias, String permission)
+    {
+        StringBuilder sqlString = new StringBuilder();
+        List<String> conditions = new ArrayList<String>();
+        List<String> scopeCustomIds = new ArrayList<String>();
+        user.getRoles().forEach(role -> {
+            if (DATA_SCOPE_CUSTOM.equals(role.getDataScope()) && StringUtils.containsAny(role.getPermissions(), Convert.toStrArray(permission)))
+            {
+                scopeCustomIds.add(Convert.toStr(role.getRoleId()));
+            }
+        });
+
+        for (SysRole role : user.getRoles())
+        {
+            String dataScope = role.getDataScope();
+            if (conditions.contains(dataScope))
+            {
+                continue;
+            }
+            if (!StringUtils.containsAny(role.getPermissions(), Convert.toStrArray(permission)))
+            {
+                continue;
+            }
+            if (DATA_SCOPE_ALL.equals(dataScope))
+            {
+                sqlString = new StringBuilder();
+                conditions.add(dataScope);
+                break;
+            }
+            else if (DATA_SCOPE_CUSTOM.equals(dataScope))
+            {
+                if (scopeCustomIds.size() > 1)
+                {
+                    // 多个自定数据权限使用in查询，避免多次拼接。
+                    sqlString.append(StringUtils.format(" OR {}.dept_id IN ( SELECT dept_id FROM sys_role_dept WHERE role_id in ({}) ) ", deptAlias, String.join(",", scopeCustomIds)));
+                }
+                else
+                {
+                    sqlString.append(StringUtils.format(" OR {}.dept_id IN ( SELECT dept_id FROM sys_role_dept WHERE role_id = {} ) ", deptAlias, role.getRoleId()));
+                }
+            }
+            else if (DATA_SCOPE_DEPT.equals(dataScope))
+            {
+                sqlString.append(StringUtils.format(" OR {}.dept_id = {} ", deptAlias, user.getDeptId()));
+            }
+            else if (DATA_SCOPE_DEPT_AND_CHILD.equals(dataScope))
+            {
+                sqlString.append(StringUtils.format(" OR {}.dept_id IN ( SELECT dept_id FROM sys_dept WHERE dept_id = {} or find_in_set( {} , ancestors ) )", deptAlias, user.getDeptId(), user.getDeptId()));
+            }
+            else if (DATA_SCOPE_SELF.equals(dataScope))
+            {
+                if (StringUtils.isNotBlank(userAlias))
+                {
+                    sqlString.append(StringUtils.format(" OR {}.user_id = {} ", userAlias, user.getUserId()));
+                }
+                else
+                {
+                    // 数据权限为仅本人且没有userAlias别名不查询任何数据
+                    sqlString.append(StringUtils.format(" OR {}.dept_id = 0 ", deptAlias));
+                }
+            }
+            conditions.add(dataScope);
+        }
+
+        // 角色都不包含传递过来的权限字符，这个时候sqlString也会为空，所以要限制一下,不查询任何数据
+        if (StringUtils.isEmpty(conditions))
+        {
+            sqlString.append(StringUtils.format(" OR {}.dept_id = 0 ", deptAlias));
+        }
+
+        if (StringUtils.isNotBlank(sqlString.toString()))
+        {
+            Object params = joinPoint.getArgs()[0];
+            if (StringUtils.isNotNull(params) && params instanceof BaseEntity)
+            {
+                BaseEntity baseEntity = (BaseEntity) params;
+                baseEntity.getParams().put(DATA_SCOPE, " AND (" + sqlString.substring(4) + ")");
+            }
+        }
+    }
+
+    /**
+     * 拼接权限sql前先清空params.dataScope参数防止注入
+     */
+    private void clearDataScope(final JoinPoint joinPoint)
+    {
+        Object params = joinPoint.getArgs()[0];
+        if (StringUtils.isNotNull(params) && params instanceof BaseEntity)
+        {
+            BaseEntity baseEntity = (BaseEntity) params;
+            baseEntity.getParams().put(DATA_SCOPE, "");
+        }
+    }
+}
+TEXT
+	"safefile://SafePreparedStatement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatement {
+
+    public static void main(String[] args) {
+        String userId = "123"; // 模拟用户输入
+        String username = "john_doe"; // 模拟用户输入
+
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "")) {
+            // 1. 使用PreparedStatement防止SQL注入
+            String sqlSelect = "SELECT * FROM users WHERE id = ? AND username = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sqlSelect)) {
+                pstmt.setInt(1, Integer.parseInt(userId)); // 整数类型直接设置
+                pstmt.setString(2, username); // 字符串类型直接设置
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    System.out.println("Query result for prepared statement:");
+                    while (rs.next()) {
+                        System.out.println("ID: " + rs.getInt("id") + ", Name: " + rs.getString("username"));
+                    }
+                }
+            }
+
+            // 2. 更新操作也使用PreparedStatement
+            String sqlUpdate = "UPDATE users SET email = ? WHERE id = ?";
+            String newEmail = "new.email@example.com";
+            try (PreparedStatement pstmtUpdate = connection.prepareStatement(sqlUpdate)) {
+                pstmtUpdate.setString(1, newEmail);
+                pstmtUpdate.setInt(2, Integer.parseInt(userId));
+                int affectedRows = pstmtUpdate.executeUpdate();
+                System.out.println("Affected rows for update: " + affectedRows);
+            }
+            
+            // 3. 插入操作也使用PreparedStatement
+            String sqlInsert = "INSERT INTO users (id, username, email) VALUES (?, ?, ?)";
+            int newId = 456;
+            String newUsername = "jane_doe";
+            String janeEmail = "jane.doe@example.com";
+            try (PreparedStatement pstmtInsert = connection.prepareStatement(sqlInsert)) {
+                pstmtInsert.setInt(1, newId);
+                pstmtInsert.setString(2, newUsername);
+                pstmtInsert.setString(3, janeEmail);
+                int affectedRows = pstmtInsert.executeUpdate();
+                System.out.println("Affected rows for insert: " + affectedRows);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid user ID format: " + e.getMessage());
+        }
+    }
+
+    // 辅助方法，用于模拟数据库连接和表创建
+    static {
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb;INIT=RUNSCRIPT FROM 'classpath:init.sql'", "sa", "")) {
+            // Database is initialized via init.sql
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://init.sql": <<<CODE
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255)
+);
+
+INSERT INTO users (id, username, email) VALUES (123, 'john_doe', 'john.doe@example.com');
+INSERT INTO users (id, username, email) VALUES (789, 'alice', 'alice@example.com');
+
+CODE
+)

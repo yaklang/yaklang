@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java System.load"
-	title_zh: "结构扫描：Java System.load"
+	title: "结构匹配：Java System.load"
+	title_zh: "结构匹配：Java System.load"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-system-load"
 	risk: "dynamic-code-loading"
 	desc: <<<DESC

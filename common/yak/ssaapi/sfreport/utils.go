@@ -2,6 +2,7 @@ package sfreport
 
 import (
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -53,11 +54,31 @@ func ToReportSeverityLevel(level schema.SyntaxFlowSeverity) string {
 	}
 }
 
-func GetValueByRisk(ssarisk *schema.SSARisk) (*ssaapi.Value, error) {
-	// get result
+// ResultForRisk resolves the syntaxflow result behind one risk. A memory scan
+// keeps the result in-process and never assigns a row id, so ResultUUID is the
+// only handle; a database result still loads by id.
+func ResultForRisk(ssarisk *schema.SSARisk) (*ssaapi.SyntaxFlowResult, error) {
+	if ssarisk == nil {
+		return nil, utils.Error("risk is nil")
+	}
+	if result := ssaapi.CreateResultFromUUID(ssarisk.ResultUUID); result != nil {
+		return result, nil
+	}
+	if ssarisk.ResultID == 0 {
+		return nil, utils.Errorf("risk %s has no result id and no live result", ssarisk.Hash)
+	}
 	result, err := ssaapi.LoadResultByID(uint(ssarisk.ResultID))
 	if err != nil {
 		log.Errorf("load result by id %d error: %v", ssarisk.ResultID, err)
+		return nil, err
+	}
+	return result, nil
+}
+
+func GetValueByRisk(ssarisk *schema.SSARisk) (*ssaapi.Value, error) {
+	// get result
+	result, err := ResultForRisk(ssarisk)
+	if err != nil {
 		return nil, err
 	}
 

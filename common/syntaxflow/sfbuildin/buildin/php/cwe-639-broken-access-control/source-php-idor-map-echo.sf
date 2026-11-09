@@ -1,0 +1,77 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码匹配：PHP IDOR: request key echoed from map"
+	title_zh: "源码匹配：PHP 越权：请求键直接回显记录"
+	type: vuln
+	level: "middle"
+	risk: "access-control"
+	cwe: "CWE-639"
+	desc: <<<DESC
+请求参数作为数组下标，取出的记录直接输出，没有校验记录归属。
+
+### 检测方式
+源码正则匹配 `echo $map[$key];`。
+DESC
+	solution: <<<SOLUTION
+- 取出记录后校验 `owner` 是否等于当前用户。
+- 不匹配时返回 404。
+SOLUTION
+	alert_min: 1
+	rule_id: "520413e0-28cd-40e1-b0bb-951670d7bb64"
+)
+${*.php}.pattern_regex(/echo\s+\$\w+\[\$\w+\]\s*;/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "PHP IDOR: request key echoed from map",
+	title_zh: "PHP 越权：请求键直接回显记录",
+	risk: "access-control",
+}
+
+desc(
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+$orderId = $_GET['order_id'] ?? ''; // wb:source id=src
+echo $orders[$orderId]; // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+$orderId = $_GET['order_id'] ?? ''; // wb:source id=src
+$found = $orders[$orderId] ?? null;
+if ($found === null || $found['owner'] !== ($_SESSION['user_id'] ?? '')) {
+    http_response_code(404);
+    exit;
+}
+echo $found['body']; // wb:sink id=sink
+NEG
+)

@@ -4,53 +4,75 @@ desc(
 	title: "数据流：Python redirect 使用请求数据"
 	title_zh: "数据流：Python redirect 使用请求数据"
 	type: vuln
-	level: middle
+	level: ""
 	rule_id: "ssa-python-redirect-request"
 	risk: "open-redirect"
 	cwe: "CWE-601"
 	desc: <<<DESC
-### 规则说明
-Flask 的 `redirect` 和 Django 的 `HttpResponseRedirect` 如果直接使用请求里的地址，攻击者可以把参数换成外部网站。用户会从可信域名被带到钓鱼站点。
-
-### 风险类型
-open-redirect
-
-### 影响
-开放重定向常被用来做钓鱼，也会帮助绕过只检查来源域名的校验。跳转地址如果再写入会话，影响会留到后面的请求。
+重定向目标来自请求参数。攻击者可以把用户带到外部站点。
 
 ### 检测方式
-这条规则使用 ssa 模式，只保留非常量、且不是当前函数参数的实参。常量字符串不告警。实参如果只是函数形参，也不会命中。
-匹配名为 `redirect` 的调用，而且实参不是常量，也不是形参。`HttpResponseRedirect` 不在这条数据流规则里。常量地址不告警。
-同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
-
-### 参考
-- [CWE-601：重定向到不受信任站点](https://cwe.mitre.org/data/definitions/601.html)
-
+请求来源流入 `redirect`。目标经过 `startswith` 校验，或者在重定向前被重新赋值（phi）时跳过。
 DESC
 	solution: <<<SOLUTION
-### 修复建议
-- 只允许站内相对路径，拒绝带协议和主机的地址。
-- Django 用 `url_has_allowed_host_and_scheme` 校验主机和协议。
-- 不要把用户提供的完整 URL 直接传给 `redirect` 或 `HttpResponseRedirect`。
-
+- 只允许站内相对路径。
+- 校验目标以 `/` 开头且不以 `//` 开头。
 SOLUTION
 	alert_min: 1
-	"file://bad.py": <<<POS
-def bad(redirect, request):
-    return redirect(request.args.get("next"))
-
-POS
-	"safefile://ok.py": <<<NEG
-def ok(redirect):
-    return redirect("/home")
-
-NEG
 )
-redirect(*?{!opcode: const && !opcode: param} as $dyn) as $call
-alert $dyn for {
+request.* as $src
+redirect(* as $arg)
+$arg?{!have: /phi\(/}?{!(<self><getUsers()>?{opcode: undefined && <name>?{have: /(?i)startswith/}})}?{<self> #{include: `* & $src`}->} as $hit
+alert $hit for {
 	level: "middle",
 	title: "数据流：Python redirect 使用请求数据",
 	title_zh: "数据流：Python redirect 使用请求数据",
-	message: "数据流：Python redirect 使用请求数据",
 	risk: "open-redirect",
 }
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+from flask import Flask, redirect, request
+
+app = Flask(__name__)
+
+@app.route("/next")
+def next_url():
+    target = request.args.get("next", "/")  # wb:source id=src
+    return redirect(target)  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+from flask import Flask, redirect, request
+
+app = Flask(__name__)
+
+@app.route("/next")
+def next_url():
+    target = request.args.get("next", "/")  # wb:source id=src
+    if not target.startswith("/") or target.startswith("//"):
+        target = "/"
+    return redirect(target)  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

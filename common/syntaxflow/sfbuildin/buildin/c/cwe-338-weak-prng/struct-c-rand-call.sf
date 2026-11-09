@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "c"
-	title: "结构扫描：C rand 弱随机数"
-	title_zh: "结构扫描：C rand 弱随机数"
+	title: "结构匹配：C rand 弱随机数"
+	title_zh: "结构匹配：C rand 弱随机数"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "struct-c-rand-call"
 	risk: "weak-randomness"
 	cwe: "CWE-338"

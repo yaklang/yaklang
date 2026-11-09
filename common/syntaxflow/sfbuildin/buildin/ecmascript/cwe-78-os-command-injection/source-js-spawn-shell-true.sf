@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript spawn shell true"
-	title_zh: "检测 JavaScript spawn shell true"
+	title: "源码匹配：检测 JavaScript spawn shell true"
+	title_zh: "源码匹配：检测 JavaScript spawn shell true"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-js-spawn-shell-true"
 	risk: "command-injection"
 	desc: <<<DESC
@@ -37,9 +37,9 @@ function r(c) { spawn("ls", [c], { shell: false }); }
 NEG
 )
 
-${*.js}.pattern_regex(/shell\s*:\s*true/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/shell\s*:\s*true/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript spawn shell true",
 	title_zh: "检测 JavaScript spawn shell true",
 	message: "检测 JavaScript spawn shell true",

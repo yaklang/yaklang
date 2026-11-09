@@ -1,0 +1,85 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：Vector search without tenant filter"
+	title_zh: "源码匹配：向量检索未带租户过滤"
+	type: vuln
+	level: "middle"
+	risk: "access-control"
+	cwe: "CWE-284"
+	desc: <<<DESC
+向量检索只传查询文本，没有 `tenant_filter`，可能召回其他租户的文档。
+
+### 检测方式
+源码正则匹配没有 `tenant_filter` 的 `vector_db.search` 调用。
+DESC
+	solution: <<<SOLUTION
+- 检索必须带租户过滤条件。
+- 在数据层强制租户隔离。
+SOLUTION
+	alert_min: 1
+	rule_id: "4fb8800d-2e78-447d-b2c8-0c5d862310a5"
+)
+${*.py}.pattern_regex(/vector_db\.search\s*\((?!.*tenant_filter)[^)]*\)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Vector search without tenant filter",
+	title_zh: "向量检索未带租户过滤",
+	risk: "access-control",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /search?q=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/search")
+def search():
+    query = request.args.get("q", "")  # wb:source id=src
+    return vector_db.search(query, top_k=5)  # wb:sink id=sink
+
+class vector_db:
+    @staticmethod
+    def search(query, top_k, tenant_filter=None):
+        return []
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /search?q=
+import os
+from flask import Flask, request, session
+
+app = Flask(__name__)
+
+@app.route("/search")
+def search():
+    query = request.args.get("q", "")  # wb:source id=src
+    tenant = session["tenant_id"]
+    return vector_db.search(query, top_k=5, tenant_filter={"tenant_id": tenant})  # wb:sink id=sink
+
+class vector_db:
+    @staticmethod
+    def search(query, top_k, tenant_filter=None):
+        return []
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

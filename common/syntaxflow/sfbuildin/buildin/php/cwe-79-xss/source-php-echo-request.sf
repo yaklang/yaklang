@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP 回显请求参数"
-	title_zh: "检测 PHP 回显请求参数"
+	title: "源码匹配：检测 PHP 回显请求参数"
+	title_zh: "源码匹配：检测 PHP 回显请求参数"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-php-echo-request"
 	risk: "xss"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.php}.pattern_regex(/(echo|print)\s+\$_(GET|POST|REQUEST|COOKIE)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 PHP 回显请求参数",
 	title_zh: "检测 PHP 回显请求参数",
 	message: "检测 PHP 回显请求参数",

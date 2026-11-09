@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java ScriptEngine.eval"
-	title_zh: "结构扫描：Java ScriptEngine.eval 调用"
+	title: "结构匹配：Java ScriptEngine.eval"
+	title_zh: "结构匹配：Java ScriptEngine.eval 调用"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-script-engine-eval"
 	risk: "code-injection"
 	desc: <<<DESC

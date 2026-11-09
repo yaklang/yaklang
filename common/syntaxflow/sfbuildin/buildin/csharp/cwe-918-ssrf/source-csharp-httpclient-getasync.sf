@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# HttpClient.GetAsync"
-	title_zh: "检测 C# HttpClient.GetAsync"
+	title: "源码匹配：检测 C# HttpClient.GetAsync"
+	title_zh: "源码匹配：检测 C# HttpClient.GetAsync"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-csharp-httpclient-getasync"
 	risk: "ssrf"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.cs}.pattern_regex(/GetAsync\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 C# HttpClient.GetAsync",
 	title_zh: "检测 C# HttpClient.GetAsync",
 	message: "检测 C# HttpClient.GetAsync",

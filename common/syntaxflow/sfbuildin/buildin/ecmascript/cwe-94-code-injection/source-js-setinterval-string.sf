@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript setInterval 字符串"
-	title_zh: "检测 JavaScript setInterval 字符串"
+	title: "源码匹配：检测 JavaScript setInterval 字符串"
+	title_zh: "源码匹配：检测 JavaScript setInterval 字符串"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-js-setinterval-string"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -35,9 +35,9 @@ function r() { setInterval(function () {}, 1000); }
 NEG
 )
 
-${*.js}.pattern_regex(/setInterval\s*\(\s*['\"]/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/setInterval\s*\(\s*['\"]/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript setInterval 字符串",
 	title_zh: "检测 JavaScript setInterval 字符串",
 	message: "检测 JavaScript setInterval 字符串",

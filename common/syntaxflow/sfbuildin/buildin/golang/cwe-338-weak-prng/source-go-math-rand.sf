@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go math/rand 安全用途"
-	title_zh: "检测 Go math/rand 安全用途"
+	title: "源码匹配：检测 Go math/rand 安全用途"
+	title_zh: "源码匹配：检测 Go math/rand 安全用途"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-go-math-rand"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -48,7 +48,7 @@ NEG
 
 ${*.go}.pattern_regex(/(?i)(token|session|secret|password|passwd|apikey|otp|captcha|csrf|nonce)[^\n]{0,120}\brand\.(Int|Intn|Uint32|Read)\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Go math/rand 安全用途",
 	title_zh: "检测 Go math/rand 安全用途",
 	message: "检测 Go math/rand 安全用途",

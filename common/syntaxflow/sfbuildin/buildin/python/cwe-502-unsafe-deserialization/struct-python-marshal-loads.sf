@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python marshal.loads"
-	title_zh: "结构扫描：Python marshal.loads"
+	title: "结构匹配：Python marshal.loads"
+	title_zh: "结构匹配：Python marshal.loads"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-marshal-loads"
 	risk: "deserialization"
 	desc: <<<DESC

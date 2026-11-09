@@ -2,7 +2,7 @@ desc(
 	title: "C SQL execution sinks (lib)"
 	title_zh: "SQL 执行入口（C 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: c
 	lib: "c-sql-sink"
 	risk: "sql-injection"

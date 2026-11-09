@@ -1,0 +1,72 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python OS Command Injection: User Input in Shell Command"
+	title_zh: "数据流：Python OS 命令注入：用户输入进入 Shell 命令"
+	type: vuln
+	level: ""
+	rule_id: "ssa-python-command-injection"
+	risk: "command-injection"
+	cwe: "CWE-78"
+	desc: <<<DESC
+### 漏洞描述
+请求参数拼接进 `os.system`、`os.popen` 的 shell 命令文本。攻击者可追加 `;`、`|`、`$()` 执行任意命令。
+
+### 检测方式
+跟踪 Flask/Django 请求参数到 `os.system`、`os.popen` 的实参。使用参数列表的 `subprocess` 调用不在本规则范围。
+
+### 风险类型
+command-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免 shell 解释器，改用参数列表：
+
+```python
+subprocess.run(["ping", "-c", "1", host], check=False)
+```
+
+必须使用 shell 时，用 `shlex.quote()` 转义每个参数，并对输入做白名单校验。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78: Improper Neutralization of Special Elements used in an OS Command](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+)
+
+request.args.get(* as $src)
+request.form.get(* as $src)
+request.values.get(* as $src)
+request.GET.get(* as $src)
+request.POST.get(* as $src)
+
+os.system(* as $arg)
+os.popen(* as $arg)
+$arg?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Python OS Command Injection: User Input in Shell Command",
+	title_zh: "Python OS 命令注入：用户输入进入 Shell 命令",
+	risk: "command-injection",
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_command.py': <<<UNSAFE
+import os
+from flask import request
+
+def ping():
+    host = request.args.get("host", "")
+    os.system("ping -c 1 " + host)
+UNSAFE
+	'safefile://safe_command.py': <<<SAFE
+def run() -> str:
+    return "ok"
+SAFE
+)

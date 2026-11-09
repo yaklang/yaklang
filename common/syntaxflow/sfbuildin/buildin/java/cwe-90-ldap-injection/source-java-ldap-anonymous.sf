@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "检测 Java LDAP 匿名绑定"
-	title_zh: "检测 Java LDAP 匿名绑定"
+	title: "源码匹配：检测 Java LDAP 匿名绑定"
+	title_zh: "源码匹配：检测 Java LDAP 匿名绑定"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-java-ldap-anonymous"
 	risk: "ldap-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.java}.pattern_regex(/SECURITY_AUTHENTICATION/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Java LDAP 匿名绑定",
 	title_zh: "检测 Java LDAP 匿名绑定",
 	message: "检测 Java LDAP 匿名绑定",

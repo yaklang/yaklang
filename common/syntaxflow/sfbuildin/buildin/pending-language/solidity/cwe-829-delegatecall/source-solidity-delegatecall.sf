@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "solidity"
-	title: "源码扫描：Solidity delegatecall"
-	title_zh: "源码扫描：Solidity delegatecall"
+	title: "源码匹配：Solidity delegatecall"
+	title_zh: "源码匹配：Solidity delegatecall"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-solidity-delegatecall"
 	risk: "code-injection"
 	cwe: "CWE-829"
@@ -46,7 +46,7 @@ NEG
 )
 ${*.sol}.pattern_regex(/\.delegatecall\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Solidity delegatecall",
 	title_zh: "源码扫描：Solidity delegatecall",
 	message: "源码扫描：Solidity delegatecall",

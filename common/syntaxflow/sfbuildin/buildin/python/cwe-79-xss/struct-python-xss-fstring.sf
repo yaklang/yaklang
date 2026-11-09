@@ -1,0 +1,80 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "结构匹配：Python XSS: f-string HTML without escaping"
+	title_zh: "结构匹配：Python XSS：f-string 拼 HTML 未转义"
+	type: vuln
+	level: "middle"
+	risk: "xss"
+	cwe: "CWE-79"
+	desc: <<<DESC
+### 规则说明
+f-string 把请求参数拼进 HTML 标签后直接返回。参数里如果带 `<script>`，浏览器会执行。
+
+### 检测方式
+匹配同时包含 HTML 标签和 `{...}` 占位符的字符串常量，并要求它被 `return` 使用。占位符里出现 `escape(` 视为已转义。
+
+### 参考
+- [CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+DESC
+	solution: <<<SOLUTION
+- 用 `html.escape` 或模板引擎自动转义。
+- 不要拼接原始请求参数。
+SOLUTION
+	alert_min: 1
+	rule_id: "af8f2ca0-0cf3-418c-8bf6-d59a1c80e767"
+)
+*?{opcode: const}?{have: /<[a-zA-Z][^>]*>.*\{[A-Za-z_]/}?{!have: /\{[^}]*escape\(/} as $tpl
+$tpl?{<getUsers()>?{opcode: return}} as $hit
+alert $hit for {
+	level: "middle",
+	title: "Python XSS: f-string HTML without escaping",
+	title_zh: "Python XSS：f-string 拼 HTML 未转义",
+	risk: "xss",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/hello")
+def hello():
+    name = request.args.get("name", "")  # wb:source id=src
+    return f"<h1>{name}</h1>"  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+from html import escape
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/hello")
+def hello():
+    name = request.args.get("name", "")  # wb:source id=src
+    return f"<h1>{escape(name)}</h1>"  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

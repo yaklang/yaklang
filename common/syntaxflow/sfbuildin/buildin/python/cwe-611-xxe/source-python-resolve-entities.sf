@@ -1,0 +1,72 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：Python XML parser resolves external entities"
+	title_zh: "源码匹配：Python XML 解析器启用外部实体"
+	type: vuln
+	level: "high"
+	risk: "xxe"
+	cwe: "CWE-611"
+	desc: <<<DESC
+`resolve_entities=True` 允许 XML 引用外部实体，可能导致文件读取或 SSRF。
+
+### 检测方式
+源码正则匹配显式开启外部实体的解析器参数。
+DESC
+	solution: <<<SOLUTION
+- 设置 `resolve_entities=False` 和 `no_network=True`。
+- 使用 `defusedxml` 解析不可信 XML。
+SOLUTION
+	alert_min: 1
+	rule_id: "52d82bb3-9388-44fc-b9f2-4d97ccbef0cb"
+)
+${*.py}.pattern_regex(/\bresolve_entities\s*=\s*True\b/) as $hit
+alert $hit for {
+	level: "high",
+	title: "Python XML parser resolves external entities",
+	title_zh: "Python XML 解析器启用外部实体",
+	risk: "xxe",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://bench_unsafe.py': <<<UNSAFE
+from lxml import etree
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/xml", methods=["POST"])
+def xml():
+    parser = etree.XMLParser(resolve_entities=True, no_network=False)
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+UNSAFE
+	'safefile://bench_safe.py': <<<SAFE
+from lxml import etree
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/xml", methods=["POST"])
+def xml():
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, dtd_validation=False)
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+SAFE
+)

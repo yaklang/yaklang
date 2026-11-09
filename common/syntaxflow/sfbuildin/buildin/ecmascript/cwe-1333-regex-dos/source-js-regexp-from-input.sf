@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "源码扫描：JavaScript 用外部字符串构造 RegExp"
-	title_zh: "源码扫描：JavaScript 用外部字符串构造 RegExp"
+	title: "源码匹配：JavaScript 用外部字符串构造 RegExp"
+	title_zh: "源码匹配：JavaScript 用外部字符串构造 RegExp"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-js-regexp-from-input"
 	risk: "regex-dos"
 	cwe: "CWE-1333"
@@ -43,7 +43,7 @@ function ok() { return new RegExp("^[a-z]+$"); }
 
 NEG
 )
-${*.js}.pattern_regex(/new\s+RegExp\s*\(\s*[a-zA-Z]/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/new\s+RegExp\s*\(\s*[a-zA-Z]/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "源码扫描：JavaScript 用外部字符串构造 RegExp",

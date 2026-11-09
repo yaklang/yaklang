@@ -2,7 +2,7 @@ desc(
 	title: "C#/.NET user input sources (lib)"
 	title_zh: "用户输入源（C#/.NET 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: csharp
 	lib: "csharp-user-input"
 	risk: "input-validation"

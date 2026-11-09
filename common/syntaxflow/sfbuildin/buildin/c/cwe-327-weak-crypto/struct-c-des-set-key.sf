@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "c"
-	title: "结构扫描：C DES_set_key"
-	title_zh: "结构扫描：C DES_set_key"
+	title: "结构匹配：C DES_set_key"
+	title_zh: "结构匹配：C DES_set_key"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-c-des-set-key"
 	risk: "weak-cryptographic-algorithm"
 	cwe: "CWE-327"
@@ -48,7 +48,7 @@ NEG
 DES_set_key as $call
 DES_set_key(* as $arg) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "结构扫描：C DES_set_key",
 	title_zh: "结构扫描：C DES_set_key",
 	message: "结构扫描：C DES_set_key",

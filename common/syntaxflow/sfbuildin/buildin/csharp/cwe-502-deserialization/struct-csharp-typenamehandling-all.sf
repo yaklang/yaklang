@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# TypeNameHandling.All"
-	title_zh: "结构扫描：C# TypeNameHandling.All"
+	title: "结构匹配：C# TypeNameHandling.All"
+	title_zh: "结构匹配：C# TypeNameHandling.All"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-csharp-typenamehandling-all"
 	risk: "deserialization"
 	desc: <<<DESC

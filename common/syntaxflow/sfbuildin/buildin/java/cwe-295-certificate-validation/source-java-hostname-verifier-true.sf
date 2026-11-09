@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "检测 Java HostnameVerifier 恒返回 true"
-	title_zh: "检测 Java HostnameVerifier 恒返回 true"
+	title: "源码匹配：检测 Java HostnameVerifier 恒返回 true"
+	title_zh: "源码匹配：检测 Java HostnameVerifier 恒返回 true"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-java-hostname-verifier-true"
 	risk: "certificate-validation"
 	desc: <<<DESC
@@ -37,11 +37,18 @@ class TlsSafe {
   }
 }
 NEG
+	"safefile://TlsCompare.java": <<<NEG
+class TlsCompare {
+  javax.net.ssl.HostnameVerifier v = (h, s) -> h.equals(s.getPeerHost());
+}
+NEG
 )
 
-${*.java}.pattern_regex(/HostnameVerifier/) as $hit
+${*.java}.pattern_regex(/(?s)HostnameVerifier.{0,400}?(?:return\s+true\s*;|->\s*true)/) as $hit
+${*.java}.pattern_regex(/(?s)->\s*true\s*;?[^;]{0,200}?HostnameVerifier/) as $hit2
+$hit + $hit2 as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Java HostnameVerifier 恒返回 true",
 	title_zh: "检测 Java HostnameVerifier 恒返回 true",
 	message: "检测 Java HostnameVerifier 恒返回 true",

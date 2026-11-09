@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Poetry 缺少求解器最低发布时限"
+	title: "源码匹配：检测到 Poetry 缺少求解器最低发布时限"
 	title_zh: "检测到 Poetry 缺少求解器最低发布时限",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-poetry-missing-solver-min-release-age"
 	risk: "security-misconfiguration"
 	desc: <<<DESC

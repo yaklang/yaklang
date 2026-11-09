@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang File Read ioutil Methods"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-file-read-ioutil'
 	desc: <<<DESC
 ### 规则目的

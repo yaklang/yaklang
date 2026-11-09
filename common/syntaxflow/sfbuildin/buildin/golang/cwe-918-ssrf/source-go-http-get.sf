@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go http.Get"
-	title_zh: "检测 Go http.Get"
+	title: "源码匹配：检测 Go http.Get"
+	title_zh: "源码匹配：检测 Go http.Get"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-go-http-get"
 	risk: "ssrf"
 	desc: <<<DESC
@@ -46,7 +46,7 @@ ${*.go}.pattern_regex(/\/\/[^\n]*|\/\*[\s\S]*?\*\//) as $cm
 $dq + $rq + $cm as $quoted
 $raw not_inside $quoted as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Go http.Get",
 	title_zh: "检测 Go http.Get",
 	message: "检测 Go http.Get",

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到已废弃的 Moment.js"
-	title_zh: "检测到已废弃的 Moment.js"
+	title: "源码匹配：检测到已废弃的 Moment.js"
+	title_zh: "源码匹配：检测到已废弃的 Moment.js"
 	type: audit
-	level: low
+	level: "middle"
 	rule_id: "source-best-practice-moment-deprecated"
 	risk: "best-practice"
 	desc: <<<DESC
@@ -33,11 +33,11 @@ import 'date-fns'
 NEG
 )
 
-${*.ts}.pattern_regex(/(?:import\s+'moment')/) as $p0
-${*.js}.pattern_regex(/(?:import\s+'moment')/) as $p1
+${/\.(ts|tsx|mts|cts)$/}.pattern_regex(/(?:import\s+'moment')/) as $p0
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/(?:import\s+'moment')/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
-	level: "low",
+	level: "middle",
 	title: "检测到已废弃的 Moment.js",
 	title_zh: "检测到已废弃的 Moment.js",
 	message: "检测到已废弃的 Moment.js",

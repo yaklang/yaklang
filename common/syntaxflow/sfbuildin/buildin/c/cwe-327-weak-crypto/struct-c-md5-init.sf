@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "c"
-	title: "结构扫描：C MD5_Init"
-	title_zh: "结构扫描：C MD5_Init"
+	title: "结构匹配：C MD5_Init"
+	title_zh: "结构匹配：C MD5_Init"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-c-md5-init"
 	risk: "weak-cryptographic-algorithm"
 	cwe: "CWE-327"
@@ -48,7 +48,7 @@ NEG
 MD5_Init as $call
 MD5_Init(* as $arg) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "结构扫描：C MD5_Init",
 	title_zh: "结构扫描：C MD5_Init",
 	message: "结构扫描：C MD5_Init",

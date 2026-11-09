@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP File Read Functions"
 	type: audit
-	level: info
+	level: ""
 	lib: 'php-file-read'
 	desc: <<<DESC
 ### 规则描述

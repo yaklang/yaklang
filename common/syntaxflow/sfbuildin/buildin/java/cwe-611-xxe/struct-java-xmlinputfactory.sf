@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java XMLInputFactory newInstance"
-	title_zh: "结构扫描：Java XMLInputFactory 默认实例"
+	title: "结构匹配：Java XMLInputFactory newInstance"
+	title_zh: "结构匹配：Java XMLInputFactory 默认实例"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-xmlinputfactory"
 	risk: "xxe"
 	desc: <<<DESC

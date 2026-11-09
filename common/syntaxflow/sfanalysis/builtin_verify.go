@@ -43,8 +43,8 @@ func BuiltinRuleRoot(t testing.TB) string {
 
 // RunBuiltinRuleVerify walks builtin .sf files and checks each matching rule
 // through EvaluateVerifyFilesystemWithFrame. source/struct always require
-// embedded POS/NEG; SSA keeps historical non-strict behavior unless the caller
-// passed WithStrictEmbeddedVerify via EvaluateVerifyFilesystemWithFrame.
+// embedded POS/NEG, and any rule that can emit high/critical gets the same
+// treatment through applyHighSeverityVerifyDefaults.
 func RunBuiltinRuleVerify(t *testing.T, filter BuiltinVerifyFilter) {
 	t.Helper()
 	root := BuiltinRuleRoot(t)

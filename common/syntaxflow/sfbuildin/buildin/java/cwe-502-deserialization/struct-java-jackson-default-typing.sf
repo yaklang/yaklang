@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Jackson enableDefaultTyping"
-	title_zh: "结构扫描：Jackson enableDefaultTyping"
+	title: "结构匹配：Jackson enableDefaultTyping"
+	title_zh: "结构匹配：Jackson enableDefaultTyping"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-jackson-default-typing"
 	risk: "deserialization"
 	desc: <<<DESC

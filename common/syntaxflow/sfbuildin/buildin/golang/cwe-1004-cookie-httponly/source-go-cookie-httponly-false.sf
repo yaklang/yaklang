@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go Cookie HttpOnly 关闭"
-	title_zh: "检测 Go Cookie HttpOnly 关闭"
+	title: "源码匹配：检测 Go Cookie HttpOnly 关闭"
+	title_zh: "源码匹配：检测 Go Cookie HttpOnly 关闭"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-go-cookie-httponly-false"
 	risk: "cookie-security"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.go}.pattern_regex(/HttpOnly\s*:\s*false/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Go Cookie HttpOnly 关闭",
 	title_zh: "检测 Go Cookie HttpOnly 关闭",
 	message: "检测 Go Cookie HttpOnly 关闭",

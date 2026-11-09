@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "scala"
-	title: "源码扫描：Scala Play Cookie 关闭 secure"
-	title_zh: "源码扫描：Scala Play Cookie 关闭 secure"
+	title: "源码匹配：Scala Play Cookie 关闭 secure"
+	title_zh: "源码匹配：Scala Play Cookie 关闭 secure"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-scala-play-cookie"
 	risk: "cookie-security"
 	cwe: "CWE-614"

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "c"
-	title: "源码扫描：C 反射 Origin 的 CORS 头"
-	title_zh: "源码扫描：C 反射 Origin 的 CORS 头"
+	title: "源码匹配：C 反射 Origin 的 CORS 头"
+	title_zh: "源码匹配：C 反射 Origin 的 CORS 头"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-c-cors-origin"
 	risk: "cors"
 	cwe: "CWE-942"
@@ -52,7 +52,7 @@ void ok(void) {
 
 NEG
 )
-${*.c}.pattern_regex(/(sprintf|strcat|snprintf)\s*\([^)]*Access-Control-Allow-Origin[^%]*%s|Access-Control-Allow-Origin:\s*\*/) as $hit
+${/\.(c|h)$/}.pattern_regex(/(sprintf|strcat|snprintf)\s*\([^)]*Access-Control-Allow-Origin[^%]*%s|Access-Control-Allow-Origin:\s*\*/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "源码扫描：C 反射 Origin 的 CORS 头",

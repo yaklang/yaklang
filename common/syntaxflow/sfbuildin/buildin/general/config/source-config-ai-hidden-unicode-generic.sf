@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 AI 配置文件包含隐藏 Unicode 字符"
+	title: "源码匹配：检测到 AI 配置文件包含隐藏 Unicode 字符"
 	title_zh: "检测到 AI 配置文件包含隐藏 Unicode 字符",
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-config-ai-hidden-unicode-generic"
 	risk: "unicode-direction-control"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ ${*CLAUDE.md}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\
 ${*AGENTS.md}.pattern_regex(/[\x{200B}\x{200C}\x{200D}\x{2063}\x{FEFF}\x{202A}-\x{202E}]/) as $p5
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到 AI 配置文件包含隐藏 Unicode 字符",
 	title_zh: "检测到 AI 配置文件包含隐藏 Unicode 字符",
 	message: "检测到 AI 配置文件包含隐藏 Unicode 字符",

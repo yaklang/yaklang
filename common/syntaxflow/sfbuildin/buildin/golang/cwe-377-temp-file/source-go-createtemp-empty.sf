@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "源码扫描：Go CreateTemp 空目录"
-	title_zh: "源码扫描：Go CreateTemp 空目录"
+	title: "源码匹配：Go CreateTemp 空目录"
+	title_zh: "源码匹配：Go CreateTemp 空目录"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-go-createtemp-empty"
 	risk: "security-misconfiguration"
 	cwe: "CWE-377"

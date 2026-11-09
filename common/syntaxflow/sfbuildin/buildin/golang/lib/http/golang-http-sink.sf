@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang HTTP Sink"
 	type: audit
-	level: info
+	level: ""
 	lib: "golang-http-sink"
 	desc: <<<DESC
 ### 规则描述

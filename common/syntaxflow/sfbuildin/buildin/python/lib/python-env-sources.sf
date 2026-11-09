@@ -2,7 +2,7 @@ desc(
 	title: "Python environment variable sources (lib)"
 	title_zh: "环境变量读取（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-env-sources"
 	risk: "configuration-information-exposure"
 	desc: <<<DESC

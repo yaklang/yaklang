@@ -1,7 +1,7 @@
 desc(
 	title: "Find C User Input Functions"
 	type: audit
-	level: info
+	level: ""
 	lib: 'c-user-input'
 	desc: <<<DESC
 ### 1.规则目的

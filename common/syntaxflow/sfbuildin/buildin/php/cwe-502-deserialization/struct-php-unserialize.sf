@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP unserialize"
-	title_zh: "结构扫描：PHP unserialize"
+	title: "结构匹配：PHP unserialize"
+	title_zh: "结构匹配：PHP unserialize"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-php-unserialize"
 	risk: "deserialization"
 	desc: <<<DESC

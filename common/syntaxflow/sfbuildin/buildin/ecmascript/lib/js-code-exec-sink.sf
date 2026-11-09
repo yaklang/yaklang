@@ -80,7 +80,8 @@ setInterval(* as $sink)
 setImmediate(* as $sink)
 
 // ============================================================
-// 3. Template engine sinks (Server-Side Template Injection)
+// 3. Template engine sinks that evaluate the template as code.
+// EJS is covered by the CWE-1336 template-injection rule.
 // ============================================================
 
 // Pug (formerly Jade)
@@ -92,10 +93,6 @@ pug.renderFile(* as $sink)
 jade.compile(* as $sink)
 jade.render(* as $sink)
 jade.renderFile(* as $sink)
-
-// EJS
-ejs.render(* as $sink)
-ejs.renderFile(* as $sink)
 
 // Handlebars - compile(template) is dangerous when template is user-controlled
 Handlebars.compile(* as $sink)
@@ -129,15 +126,9 @@ new vm.Script(* as $sink)
 // vm2 (commonly used as sandbox, but proven bypassable)
 // Note: *.run() is too broad; target specific vm2 patterns via dataflow in rules
 
-// ============================================================
-// 5. Child process / shell execution (leads to RCE via code→cmd injection)
-// ============================================================
-exec(* as $sink)
-execSync(* as $sink)
-spawn(* as $sink)
-spawnSync(* as $sink)
-execFile(* as $sink)
-execFileSync(* as $sink)
+// Process execution is a command-injection sink, not a code sink:
+// CWE-78 rules cover exec/execFile/spawn. Keeping them here reports the
+// same call twice (CWE-94 and CWE-78).
 
 // ============================================================
 // 6. DOM-based sinks (client-side code injection / XSS)

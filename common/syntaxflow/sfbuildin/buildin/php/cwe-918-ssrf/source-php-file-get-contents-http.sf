@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP file_get_contents URL"
-	title_zh: "检测 PHP file_get_contents URL"
+	title: "源码匹配：检测 PHP file_get_contents URL"
+	title_zh: "源码匹配：检测 PHP file_get_contents URL"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-php-file-get-contents-http"
 	risk: "ssrf"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.php}.pattern_regex(/file_get_contents\s*\(\s*['\"]https?:\/\//) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 PHP file_get_contents URL",
 	title_zh: "检测 PHP file_get_contents URL",
 	message: "检测 PHP file_get_contents URL",

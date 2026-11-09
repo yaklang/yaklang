@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "源码扫描：C# Cookie SameSite=None"
-	title_zh: "源码扫描：C# Cookie SameSite=None"
+	title: "源码匹配：C# Cookie SameSite=None"
+	title_zh: "源码匹配：C# Cookie SameSite=None"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-csharp-samesite-none"
 	risk: "cookie-security"
 	cwe: "CWE-1275"

@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang OS Exec Command Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-os-exec'
 	desc: <<<DESC
 ### 漏洞描述

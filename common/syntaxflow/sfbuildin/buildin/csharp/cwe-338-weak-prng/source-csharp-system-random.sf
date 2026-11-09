@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# System.Random"
-	title_zh: "检测 C# System.Random"
+	title: "源码匹配：检测 C# System.Random"
+	title_zh: "源码匹配：检测 C# System.Random"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-csharp-system-random"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.cs}.pattern_regex(/new\s+Random\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 C# System.Random",
 	title_zh: "检测 C# System.Random",
 	message: "检测 C# System.Random",

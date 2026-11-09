@@ -1,0 +1,613 @@
+desc(
+	title: "数据流：Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params"
+	title_zh: "数据流：检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数"
+	type: vuln
+	level: ""
+	risk: "sql-injection"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   在MyBatis/iBatis的XML Mapper文件中，`$`符号用于进行文本替换，直接将用户输入的值拼接进SQL语句。如果应用程序没有对用户输入进行严格的过滤或参数化处理，攻击者可以构造恶意的输入来篡改原始SQL语句的逻辑，从而导致 SQL 注入漏洞。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+
+2. **触发场景**
+   当MyBatis/iBatis XML Mapper中使用了`${...}`语法，并且这个参数的值来源于Spring框架的控制器或其他用户可控的输入点时，就会触发这个漏洞。攻击者可以通过控制输入参数来注入恶意的SQL代码。
+
+   在提供的示例代码中，`UserMapper.xml` 文件中的 `updateUser` mapper使用了 `${id}` 语法：
+   ```xml
+   <update id="updateUser">
+       UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+   </update>
+   ```
+   以及 `UseMapper.xml` 中的 `findByUserNameVuln02` 和 `findByUserNameVuln03` methods:
+   ```xml
+   <select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+       select * from users where username like '%${_parameter}%'
+   </select>
+
+   <select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+       select * from users
+       <if test="order != null">
+           order by ${order} asc
+       </if>
+   </select>
+   ```
+   如果对应的Spring Controller方法直接接收用户输入的`id`、`username`或`sort`参数，并将其传递给这些Mapper方法，则存在SQL注入风险。
+
+3. **潜在影响**
+    - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+    - 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
+	rule_id: "5323c275-713f-4b22-a1cc-d22db1655fb2"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用参数化查询（使用`#{...}`语法）
+避免在MyBatis/iBatis XML Mapper或注解中使用`${...}`语法，而是使用`#{...}`语法。`#{...}`语法会使用PreparedStatement进行参数绑定，从而有效地防止SQL注入。
+
+**修复代码示例：**
+
+将MyBatis/iBatis XML Mapper中的`${id}`、`${_parameter}`或`${order}`替换为`#{id}`、`#{username}`或`#{order}`。例如：
+
+原代码 (UserMapper.xml):
+```xml
+<update id="updateUser">
+    UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+</update>
+
+<select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+    select * from users where username like '%${_parameter}%'
+</select>
+
+<select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+    select * from users
+    <if test="order != null">
+        order by ${order} asc
+    </if>
+</select>
+```
+
+修复后的代码 (UserMapper.xml):
+```xml
+<update id="updateUser">
+    UPDATE User SET name=#{name}, email=#{email} WHERE id=#{id}
+</update>
+
+<select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+    select * from users where username like CONCAT('%', #{username}, '%')
+</select>
+
+<select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+    select * from users
+    <if test="order != null">
+        order by #{order} asc  <!-- 注意：Order By 字段通常无法直接参数化，需要额外的安全校验 -->
+    </if>
+</select>
+```
+
+对于`ORDER BY`等需要根据用户输入动态确定字段的场景，直接使用`#{...}`可能无法满足需求。此时需要对用户输入的字段名进行严格的白名单过滤，只允许预定义的合法字段名。不要直接将用户输入的字段名拼接进SQL语句。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+[MyBatis 3 Documentation](https://mybatis.net/mybatis-3/sqlmap-xml.html)
+REFERENCE
+)
+
+<include('java-spring-mvc-param')> as $source;
+<include("java-common-filter")>() as $filter
+<mybatisSink> as $sink
+
+alert $sink for {
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	level: "low",
+	solution: <<<SOLUTION
+检测到Java MyBatis/iBatis XML Mapper 不安全(${...})参数，请检测是否安全的使用
+SOLUTION
+}
+
+$sink#{
+    until: `* &  $source`,
+}-> as $result
+$result?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $all
+
+$all<dataflow(
+    include=`* & $filter`
+)> as $mid
+
+alert $mid for {
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	level: "middle",
+	message: "发现Mybatis SQL注入，但是数据流中有过滤函数。",
+}
+
+$all - $mid as $high
+
+alert $high for {
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	level: "middle",
+	message: "发现Mybatis SQL注入，并且数据流中没有过滤函数。",
+}
+desc(
+	language: java
+	alert_num:2
+	'file://Controller.java': <<<TEXT
+package com.mycompany.myapp;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/users")
+public class UserController {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUser(@PathVariable Long id) {
+        User user = userMapper.getUser(id);
+        return user != null ? ResponseEntity.ok(user) : ResponseEntity.notFound().build();
+    }
+
+    @PostMapping
+    public ResponseEntity<User> insertUser(@RequestBody User user) {
+        userMapper.insertUser(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
+        user.setId(id); // 确保更新的用户 ID 是正确的
+        userMapper.updateUser(user);
+        return ResponseEntity.ok(user);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        userMapper.deleteUser(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers() {
+        List<User> users = userMapper.getAllUsers();
+        return ResponseEntity.ok(users);
+    }
+}
+TEXT
+	'file://UserMapper.java': <<<TEXT
+package com.mycompany.myapp;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+    User getUser(@Param("id") Long id);
+
+    void insertUser(User user);
+
+    void updateUser(User user);
+
+    void deleteUser(@Param("id") Long id);
+
+    List<User> getAllUsers(); // 可选，获取所有用户
+}
+TEXT
+	'file://sqlmap.xml': <<<TEXT
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+</mapper>
+TEXT
+	"safefile://SafeUserMapper.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id} 
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=#{id} 
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+
+    <select id="findByUserNameVuln02" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE username LIKE CONCAT('%', #{username}, '%') 
+    </select>
+
+    <select id="findByUserNameVuln03" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users
+        <if test="order != null">
+            ORDER BY #{orderField} ASC 
+        </if>
+    </select>
+
+    <select id="searchUsersByName" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE name = #{name}
+    </select>
+
+</mapper>
+CODE
+	"safefile://SafeUserService.java": <<<CODE
+package com.mycompany.myapp;
+
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public User getUserById(Long id) {
+        return userMapper.getUser(id);
+    }
+
+    public void addNewUser(User user) {
+        userMapper.insertUser(user);
+    }
+
+    public void updateUserRecord(User user) {
+        userMapper.updateUser(user);
+    }
+
+    public void removeUser(Long id) {
+        userMapper.deleteUser(id);
+    }
+
+    public List<User> getAllUsers() {
+        return userMapper.getAllUsers();
+    }
+
+    public List<User> findUsersByUsername(String username) {
+        // 使用参数化查询，或在Service层进行安全的SQL构建
+        return userMapper.findByUserNameVuln02(username);
+    }
+
+    public List<User> findUsersOrderedBy(String orderField) {
+        // 对于ORDER BY等敏感字段，进行白名单校验
+        if (!isValidOrderField(orderField)) {
+            throw new IllegalArgumentException("Invalid order field: " + orderField);
+        }
+        // 在MyBatis中，如果ORDER BY需要动态字段，通常需要白名单验证后拼接或使用When/Choose
+        // 这里假设已经通过安全机制处理了orderField
+        return userMapper.findByUserNameVuln03(orderField);
+    }
+
+    private boolean isValidOrderField(String field) {
+        // 假设只有这些字段可以用于排序
+        return field.equals("id") || field.equals("name") || field.equals("email");
+    }
+}
+CODE
+)
+
+desc(
+	lang:java
+	alert_low:1
+	"file://SQLI.java": <<<TEXT
+    package org.joychou.controller;
+
+    import org.joychou.mapper.UserMapper;
+    import org.joychou.dao.User;
+    import org.joychou.security.SecurityUtil;
+    import org.slf4j.Logger;
+    import org.slf4j.LoggerFactory;
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.web.bind.annotation.*;
+
+    import javax.annotation.Resource;
+    import java.sql.*;
+    import java.util.List;
+
+
+    @SuppressWarnings("Duplicates")
+    @RestController
+    @RequestMapping("/sqli")
+    public class SQLI {
+        private static final Logger logger = LoggerFactory.getLogger(SQLI.class);
+
+        // com.mysql.jdbc.Driver is deprecated. Change to com.mysql.cj.jdbc.Driver.
+        private static final String driver = "com.mysql.cj.jdbc.Driver";
+
+        @Value("${spring.datasource.url}")
+        private String url;
+
+        @Value("${spring.datasource.username}")
+        private String user;
+
+        @Value("${spring.datasource.password}")
+        private String password;
+
+        @Resource
+        private UserMapper userMapper;
+
+        @GetMapping("/mybatis/vuln02")
+        public List<User> mybatisVuln02(@RequestParam("username") String username) {
+            return userMapper.findByUserNameVuln02(username);
+        }
+
+        @GetMapping("/mybatis/orderby/vuln03")
+        public List<User> mybatisVuln03(@RequestParam("sort") String sort) {
+            return userMapper.findByUserNameVuln03(sort);
+        }
+
+        @GetMapping("/mybatis/orderby/sec04")
+        public List<User> mybatisOrderBySec04(@RequestParam("sort") String sort) {
+            return userMapper.findByUserNameVuln03(SecurityUtil.sqlFilter(sort));
+        }
+    }
+TEXT
+	"file://UserMapper.java":<<<TEXT
+    package org.joychou.mapper;
+
+    import org.apache.ibatis.annotations.Mapper;
+    import org.apache.ibatis.annotations.Param;
+    import org.apache.ibatis.annotations.Select;
+    import org.joychou.dao.User;
+
+    import java.util.List;
+
+    @Mapper
+    public interface UserMapper {
+
+        @Select("select * from users where username = #{username}")
+        User findByUserName(@Param("username") String username);
+
+        @Select("select * from users where username = '${username}'")
+        List<User> findByUserNameVuln01(@Param("username") String username);
+
+        List<User> findByUserNameVuln02(String username);
+        List<User> findByUserNameVuln03(@Param("order") String order);
+
+        User findById(Integer id);
+
+        User OrderByUsername();
+
+    }
+TEXT
+	"file://UseMapper.xml":<<<TEXT
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+    <mapper namespace="org.joychou.mapper.UserMapper">
+
+        <resultMap type="org.joychou.dao.User" id="User">
+            <id column="id" property="id" javaType="java.lang.Integer" jdbcType="NUMERIC"/>
+            <id column="username" property="username" javaType="java.lang.String" jdbcType="VARCHAR"/>
+            <id column="password" property="password" javaType="java.lang.String" jdbcType="VARCHAR"/>
+        </resultMap>
+
+        <!--<select id="findByUserName" resultMap="User">-->
+    	    <!--select * from users where username = #{username}-->
+        <!--</select>-->
+
+        <select id="findByUserNameVuln02" parameterType="String" resultMap="User">
+            select * from users where username like '%${_parameter}%'
+        </select>
+
+        <select id="findByUserNameVuln03" parameterType="String" resultMap="User">
+            select * from users
+            <if test="order != null">
+                order by ${order} asc
+            </if>
+        </select>
+
+        <select id="findById" resultMap="User">
+            select * from users where id = #{id}
+        </select>
+
+
+        <select id="OrderByUsername" resultMap="User">
+            select * from users order by id asc limit 1
+        </select>
+    </mapper>
+TEXT
+	"safefile://SafeUserMapper.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id} 
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=#{id} 
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+
+    <select id="findByUserNameVuln02" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE username LIKE CONCAT('%', #{username}, '%') 
+    </select>
+
+    <select id="findByUserNameVuln03" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users
+        <if test="order != null">
+            ORDER BY #{orderField} ASC 
+        </if>
+    </select>
+
+    <select id="searchUsersByName" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE name = #{name}
+    </select>
+
+</mapper>
+CODE
+	"safefile://SafeUserService.java": <<<CODE
+package com.mycompany.myapp;
+
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public User getUserById(Long id) {
+        return userMapper.getUser(id);
+    }
+
+    public void addNewUser(User user) {
+        userMapper.insertUser(user);
+    }
+
+    public void updateUserRecord(User user) {
+        userMapper.updateUser(user);
+    }
+
+    public void removeUser(Long id) {
+        userMapper.deleteUser(id);
+    }
+
+    public List<User> getAllUsers() {
+        return userMapper.getAllUsers();
+    }
+
+    public List<User> findUsersByUsername(String username) {
+        // 使用参数化查询，或在Service层进行安全的SQL构建
+        return userMapper.findByUserNameVuln02(username);
+    }
+
+    public List<User> findUsersOrderedBy(String orderField) {
+        // 对于ORDER BY等敏感字段，进行白名单校验
+        if (!isValidOrderField(orderField)) {
+            throw new IllegalArgumentException("Invalid order field: " + orderField);
+        }
+        // 在MyBatis中，如果ORDER BY需要动态字段，通常需要白名单验证后拼接或使用When/Choose
+        // 这里假设已经通过安全机制处理了orderField
+        return userMapper.findByUserNameVuln03(orderField);
+    }
+
+    private boolean isValidOrderField(String field) {
+        // 假设只有这些字段可以用于排序
+        return field.equals("id") || field.equals("name") || field.equals("email");
+    }
+}
+CODE
+)
+
+desc(
+	language: java
+	alert_num:1
+	'file://UserMapper.java': <<<TEXT
+package com.mycompany.myapp;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+    User getUser(@Param("id") Long id);
+
+    void insertUser(User user);
+
+    void updateUser(User user);
+
+    void deleteUser(@Param("id") Long id);
+
+    List<User> getAllUsers(); // 可选，获取所有用户
+}
+TEXT
+	'file://sqlmap.xml': <<<TEXT
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+</mapper>
+TEXT
+)

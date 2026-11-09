@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python Django csrf_exempt"
-	title_zh: "检测 Python Django csrf_exempt"
+	title: "源码匹配：检测 Python Django csrf_exempt"
+	title_zh: "源码匹配：检测 Python Django csrf_exempt"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-python-django-csrf-exempt"
 	risk: "csrf"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.py}.pattern_regex(/csrf_exempt/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Python Django csrf_exempt",
 	title_zh: "检测 Python Django csrf_exempt",
 	message: "检测 Python Django csrf_exempt",

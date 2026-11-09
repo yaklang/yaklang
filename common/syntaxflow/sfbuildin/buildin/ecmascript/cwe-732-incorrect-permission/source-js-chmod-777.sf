@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript chmod 777"
-	title_zh: "检测 JavaScript chmod 777"
+	title: "源码匹配：检测 JavaScript chmod 777"
+	title_zh: "源码匹配：检测 JavaScript chmod 777"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-js-chmod-777"
 	risk: "access-control"
 	desc: <<<DESC
@@ -37,9 +37,9 @@ function w(p) { fs.chmodSync(p, 0o600); }
 NEG
 )
 
-${*.js}.pattern_regex(/0o777|0777/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/0o777|0777/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 JavaScript chmod 777",
 	title_zh: "检测 JavaScript chmod 777",
 	message: "检测 JavaScript chmod 777",

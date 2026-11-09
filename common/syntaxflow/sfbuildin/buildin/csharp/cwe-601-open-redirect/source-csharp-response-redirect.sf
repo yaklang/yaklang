@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# Response.Redirect"
-	title_zh: "检测 C# Response.Redirect"
+	title: "源码匹配：检测 C# Response.Redirect"
+	title_zh: "源码匹配：检测 C# Response.Redirect"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-csharp-response-redirect"
 	risk: "open-redirect"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.cs}.pattern_regex(/Response\.Redirect\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 C# Response.Redirect",
 	title_zh: "检测 C# Response.Redirect",
 	message: "检测 C# Response.Redirect",

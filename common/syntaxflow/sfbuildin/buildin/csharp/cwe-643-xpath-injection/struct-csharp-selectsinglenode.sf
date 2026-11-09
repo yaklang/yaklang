@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# SelectSingleNode"
-	title_zh: "结构扫描：C# SelectSingleNode"
+	title: "结构匹配：C# SelectSingleNode"
+	title_zh: "结构匹配：C# SelectSingleNode"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-csharp-selectsinglenode"
 	risk: "xpath-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 SelectSingleNode as $call
 SelectSingleNode(* as $x) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: C# SelectSingleNode",
 	title_zh: "结构扫描：C# SelectSingleNode",
 	message: "结构扫描：C# SelectSingleNode",

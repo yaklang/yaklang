@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到命令中未加引号的命令替换"
+	title: "源码匹配：检测到命令中未加引号的命令替换"
 	title_zh: "检测到命令中未加引号的命令替换",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-unquoted-command-substitution-in-command"
 	risk: "unsafe-shell-expansion"
 	desc: <<<DESC

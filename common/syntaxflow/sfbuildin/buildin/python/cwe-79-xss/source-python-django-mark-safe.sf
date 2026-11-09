@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python Django mark_safe"
-	title_zh: "检测 Python Django mark_safe"
+	title: "源码匹配：检测 Python Django mark_safe"
+	title_zh: "源码匹配：检测 Python Django mark_safe"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-python-django-mark-safe"
 	risk: "xss"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.py}.pattern_regex(/mark_safe\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Python Django mark_safe",
 	title_zh: "检测 Python Django mark_safe",
 	message: "检测 Python Django mark_safe",

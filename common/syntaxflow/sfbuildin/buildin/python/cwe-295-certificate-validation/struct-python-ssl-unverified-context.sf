@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python ssl unverified context"
-	title_zh: "结构扫描：Python ssl 未校验上下文"
+	title: "结构匹配：Python ssl unverified context"
+	title_zh: "结构匹配：Python ssl 未校验上下文"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-ssl-unverified-context"
 	risk: "certificate-validation"
 	desc: <<<DESC

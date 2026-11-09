@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java ObjectInputStream"
-	title_zh: "结构扫描：Java ObjectInputStream 反序列化"
+	title: "结构匹配：Java ObjectInputStream"
+	title_zh: "结构匹配：Java ObjectInputStream 反序列化"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-objectinputstream"
 	risk: "deserialization"
 	desc: <<<DESC

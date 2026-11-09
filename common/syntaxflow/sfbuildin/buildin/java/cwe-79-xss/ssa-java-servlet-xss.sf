@@ -1,0 +1,481 @@
+desc(
+	title: "Check Java Servlet XSS Vulnerability"
+	title_zh: "检测Java Servlet XSS漏洞"
+	type:vuln
+	level: "middle"
+	risk:"xss"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如HTML转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
+
+2. **触发场景**
+- 从请求参数、请求头、Cookie等获取用户输入。
+- 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
+- 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
+
+// 存在漏洞的代码示例:
+```java
+// 示例1: 直接输出请求参数
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+}
+
+// 示例2: 在JS中输出请求参数
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+}
+```
+
+3. **潜在影响**
+- **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
+- **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
+- **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
+- **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
+- **客户端重定向:** 将用户重定向到恶意网站。
+- **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
+DESC
+	rule_id: "91441632-5409-4bfe-8c54-cb49e21c870d"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 对用户输入进行严格的上下文相关的转义
+根据输出内容的上下文（HTML元素内容、HTML属性、JavaScript、CSS、URL等），使用相应的转义函数对用户输入进行处理，使其不再被浏览器误解析为代码。
+*   **HTML上下文转义:** 使用HTML实体编码，例如将`<`转义为`&lt;`，`>`转义为`&gt;`，`"`转义为`&quot;`，`'`转义为`&#x27;`，`&`转义为`&amp;`等。可以使用OWASP出品的[OWASP Java Encoder Project](https://github.com/OWASP/java-encoder)这样的安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行HTML转义
+import org.owasp.encoder.Encode;
+// ...
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+    String safeName = Encode.forHtml(name);
+    out.println("<h1>Welcome, " + safeName + "!</h1>");
+}
+```
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(')`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+    String safeData = Encode.forJavaScriptString(data);
+    out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+}
+```
+
+#### 2. 使用安全的模板引擎
+许多现代的Web模板引擎（如Thymeleaf, FreeMarker等）默认对输出进行HTML转义，可以有效防止XSS漏洞。优先考虑使用这些模板引擎来生成动态HTML内容而非手动拼接字符串。
+
+#### 3. 设置HTTP Header
+- **Content-Security-Policy (CSP):** 配置CSP策略，限制浏览器加载和执行脚本、样式等资源的来源，可以减轻XSS攻击的影响。
+- **X-XSS-Protection:** 这是一个HTTP响应头，用于开启浏览器内置的XSS过滤器。虽然不能完全依赖，但可以作为额外的防护措施（注意在现代浏览器中CSP已是更推荐的方式）。
+
+#### 4. 输入验证与过滤 (作为辅助手段)
+虽然不能完全依赖输入过滤来防止XSS，但对输入进行合法性验证和过滤（例如，移除或禁用潜在有害的字符和标签）可以作为防御的辅助手段。
+
+#### 5. 审查已有的代码
+对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')](https://cwe.mitre.org/data/definitions/79.html)
+REFERENCE
+)
+
+<include('java-servlet-param')> as $source;
+<include('java-escape-method')> as $filter
+
+// Match the HttpServletResponse writer. The receiver variable name is
+// arbitrary (resp, response, r, ...) and SSA renames it to
+// parameter[N], so matching by name never works. Instead, filter by the
+// callee's type name: <getCallee><typeName> returns the declared type of
+// the receiver (e.g. "HttpServletResponse"), which is stable regardless
+// of the variable name the source code used.
+*.getWriter()?{<getCallee><typeName>?{have:'HttpServletResponse'}} as $out;
+$out.print(,* as $printSink);
+$out.println(,* as $printlnSink);
+$out.write(,* as $writeSink);
+$printSink + $printlnSink + $writeSink as $sink
+check $sink;
+
+$sink#{
+    include:` * & $source`,
+    exclude:` *<getCallee> & $filter`
+}-> as $mid;
+alert $mid for {
+	title: "Java Servlet XSS Vulnerability Was Detected",
+	title_zh: "检测到Java Servlet XSS漏洞",
+	level: "middle",
+	type: "vuln",
+	message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对用户输入进行严格的上下文相关的转义
+根据输出内容的上下文（HTML元素内容、HTML属性、JavaScript、CSS、URL等），使用相应的转义函数对用户输入进行处理，使其不再被浏览器误解析为代码。
+*   **HTML上下文转义:** 使用HTML实体编码，例如将`<`转义为`&lt;`，`>`转义为`&gt;`，`"`转义为`&quot;`，`'`转义为`&#x27;`，`&`转义为`&amp;`等。可以使用OWASP出品的[OWASP Java Encoder Project](https://github.com/OWASP/java-encoder)这样的安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行HTML转义
+import org.owasp.encoder.Encode;
+// ...
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+    String safeName = Encode.forHtml(name);
+    out.println("<h1>Welcome, " + safeName + "!</h1>");
+}
+```
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+    String safeData = Encode.forJavaScriptString(data);
+    out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+}
+```
+#### 2. 使用安全的模板引擎
+许多现代的Web模板引擎（如Thymeleaf, FreeMarker等）默认对输出进行HTML转义，可以有效防止XSS漏洞。优先考虑使用这些模板引擎来生成动态HTML内容而非手动拼接字符串。
+#### 3. 设置HTTP Header
+- **Content-Security-Policy (CSP):** 配置CSP策略，限制浏览器加载和执行脚本、样式等资源的来源，可以减轻XSS攻击的影响。
+- **X-XSS-Protection:** 这是一个HTTP响应头，用于开启浏览器内置的XSS过滤器。虽然不能完全依赖，但可以作为额外的防护措施（注意在现代浏览器中CSP已是更推荐的方式）。
+#### 4. 输入验证与过滤 (作为辅助手段)
+虽然不能完全依赖输入过滤来防止XSS，但对输入进行合法性验证和过滤（例如，移除或禁用潜在有害的字符和标签）可以作为防御的辅助手段。
+#### 5. 审查已有的代码
+对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
+SOLUTION
+	risk: "xss",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如 HTML 转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
+2. **触发场景**
+- 从请求参数、请求头、Cookie等获取用户输入。
+- 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
+- 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
+// 存在漏洞的代码示例:
+```java
+// 示例1: 直接输出请求参数
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+}
+// 示例2: 在JS中输出请求参数
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+}
+```
+3. **潜在影响**
+- **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
+- **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
+- **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
+- **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
+- **客户端重定向:** 将用户重定向到恶意网站。
+- **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
+DESC
+	name: "mid",
+}
+
+
+$sink#{
+    include:`* & $source`,
+}-> as $all;
+$all - $mid as $low;
+
+alert $low for {
+	message: "发现Java Servlet的XSS漏洞,并且数据流中使用了转义方法。",
+	title: "Java Servlet XSS Vulnerability Was Detected",
+	title_zh: "检测到Java Servlet XSS漏洞",
+	level: "low",
+	type: "vuln",
+	name: "low",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对用户输入进行严格的上下文相关的转义
+根据输出内容的上下文（HTML元素内容、HTML属性、JavaScript、CSS、URL等），使用相应的转义函数对用户输入进行处理，使其不再被浏览器误解析为代码。
+*   **HTML上下文转义:** 使用HTML实体编码，例如将`<`转义为`&lt;`，`>`转义为`&gt;`，`"`转义为`&quot;`，`'`转义为`&#x27;`，`&`转义为`&amp;`等。可以使用OWASP出品的[OWASP Java Encoder Project](https://github.com/OWASP/java-encoder)这样的安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行HTML转义
+import org.owasp.encoder.Encode;
+// ...
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    // 对name进行HTML转义，确保即使包含恶意HTML标签也不会被执行
+    String safeName = Encode.forHtml(name);
+    out.println("<h1>Welcome, " + safeName + "!</h1>");
+}
+```
+*   **JavaScript上下文转义:** 如果用户输入要嵌入到JavaScript代码中，需要进行JavaScript字符串转义，例如将单引号`(`)`、双引号`(")`、反斜杠`\`、换行符`\n`、回车符`\r`等特殊字符转义为`\'`、`\"`、`\\`、`\n`、`\r`。同样推荐使用安全编码库。
+```java
+// 修复代码示例：使用OWASP Java Encoder进行JavaScript转义
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    // 对data进行JavaScript转义，确保嵌入到JS字符串中不会改变代码结构
+    String safeData = Encode.forJavaScriptString(data);
+    out.println("<script>var userInput = \"" + safeData + "\"; eval(userInput);</script>");
+}
+```
+#### 2. 使用安全的模板引擎
+许多现代的Web模板引擎（如Thymeleaf, FreeMarker等）默认对输出进行HTML转义，可以有效防止XSS漏洞。优先考虑使用这些模板引擎来生成动态HTML内容而非手动拼接字符串。
+#### 3. 设置HTTP Header
+- **Content-Security-Policy (CSP):** 配置CSP策略，限制浏览器加载和执行脚本、样式等资源的来源，可以减轻XSS攻击的影响。
+- **X-XSS-Protection:** 这是一个HTTP响应头，用于开启浏览器内置的XSS过滤器。虽然不能完全依赖，但可以作为额外的防护措施（注意在现代浏览器中CSP已是更推荐的方式）。
+#### 4. 输入验证与过滤 (作为辅助手段)
+虽然不能完全依赖输入过滤来防止XSS，但对输入进行合法性验证和过滤（例如，移除或禁用潜在有害的字符和标签）可以作为防御的辅助手段。
+#### 5. 审查已有的代码
+对现有的Java Servlet代码进行安全审计，查找所有获取用户输入并输出到响应的地方（例如调用`request.getParameter`后紧接着调用`response.getWriter().print`等），确保所有输出都经过了适当的转义处理。
+SOLUTION
+	risk: "xss",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+跨站脚本（XSS）漏洞发生在Web应用程序将不可信的用户输入直接或间接输出到网页中，而未进行适当的过滤或转义时。攻击者可以向应用程序注入恶意脚本，当其他用户访问包含恶意脚本的页面时，浏览器会执行这些脚本。在Java Servlet中，如果通过`HttpServletResponse`的`getWriter()`获取的`PrintWriter`对象未经安全处理（如 HTML 转义）就输出用户通过`HttpServletRequest`获取的参数，就会引入XSS风险。
+2. **触发场景**
+- 从请求参数、请求头、Cookie等获取用户输入。
+- 将获取到的用户输入直接或拼接到HTML、JavaScript、CSS等内容中，通过`response.getWriter().print()`、`.println()`、`.write()`或`.append()`等方法输出到客户端浏览器。
+- 用户输入的恶意内容被浏览器解析并执行，例如注入`<script>`标签、事件处理器等。
+// 存在漏洞的代码示例:
+```java
+// 示例1: 直接输出请求参数
+protected void doGet(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String name = request.getParameter("name");
+    out.println("<h1>Welcome, " + name + "!</h1>"); // 未对name进行转义
+}
+// 示例2: 在JS中输出请求参数
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws IOException {
+    response.setContentType("text/html");
+    PrintWriter out = response.getWriter();
+    String data = request.getParameter("data");
+    out.println("<script>var userInput = '" + data + "'; eval(userInput);</script>"); // 将data嵌入到JS字符串中并执行，未转义
+}
+```
+3. **潜在影响**
+- **会话劫持:** 攻击者可以通过窃取用户的Cookie信息，冒充用户身份进行操作。
+- **信息泄露:** 攻击者可以获取用户的敏感信息，如账号密码、银行卡号等。
+- **网页篡改:** 攻击者可以修改网页内容，进行钓鱼或传播恶意信息。
+- **植入恶意软件:** 攻击者可能诱导用户下载并安装恶意软件。
+- **客户端重定向:** 将用户重定向到恶意网站。
+- **进一步攻击:** XSS可能是攻击链中的一环，用于绕过CSRF防护、配合其他漏洞发起更复杂的攻击。
+DESC
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://XssServlet.java': <<<POS
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class XssServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        response.getWriter().println(request.getParameter("name"));
+    }
+}
+POS
+	'safefile://WbSastJavaXssSafe.java': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+
+public class WbSastJavaXssSafe {
+    public void hello(WbReq req, WbResp resp) throws Exception {
+        String name = req.getParameter("name"); // wb:source id=src
+        String safe = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+        resp.getWriter().write("<h1>" + safe + "</h1>"); // wb:sink id=sink
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/health", WbSastJavaXssSafe::wbHealth);
+        server.createContext("/", WbSastJavaXssSafe::wbHandle);
+        server.start();
+    }
+
+    static void wbHealth(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "ok".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
+    static java.util.Map<String, String> wbQuery(String raw) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null || raw.isEmpty()) return out;
+        for (String pair : raw.split("&")) {
+            int cut = pair.indexOf('=');
+            String key = cut < 0 ? pair : pair.substring(0, cut);
+            String value = cut < 0 ? "" : pair.substring(cut + 1);
+            out.put(java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8), java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return out;
+    }
+
+    static void wbHandle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] raw = exchange.getRequestBody().readAllBytes();
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, String> query = wbQuery(exchange.getRequestURI().getRawQuery());
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (type != null && type.contains("application/x-www-form-urlencoded")) query.putAll(wbQuery(body));
+        boolean sent = false;
+        try {
+            WbSastJavaXssSafe app = new WbSastJavaXssSafe();
+            Object result = null;
+            WbResp resp = null;
+            for (java.lang.reflect.Method method : WbSastJavaXssSafe.class.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers()) || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                if (method.getName().startsWith("wb")) continue;
+                Object[] values = new Object[method.getParameterCount()];
+                boolean ready = true;
+                for (int i = 0; i < values.length; i++) {
+                    Class<?> kind = method.getParameterTypes()[i];
+                    if (kind.getSimpleName().equals("WbReq")) values[i] = new WbReq(exchange, body, query);
+                    else if (kind.getSimpleName().equals("WbResp")) { resp = new WbResp(exchange); values[i] = resp; }
+                    else if (kind == String.class) values[i] = wbFirst(query);
+                    else if ("java.sql.Connection".equals(kind.getName())) {
+                        try { values[i] = java.sql.DriverManager.getConnection(System.getenv().getOrDefault("JDBC_URL", "jdbc:sqlite::memory:")); }
+                        catch (Exception err) { ready = false; result = err; }
+                    } else if ("javax.naming.directory.DirContext".equals(kind.getName())) {
+                        values[i] = java.lang.reflect.Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind}, (proxy, called, calledArgs) -> null);
+                    } else if (java.util.Map.class.isAssignableFrom(kind)) values[i] = wbOrders();
+                    else if ("freemarker.template.Configuration".equals(kind.getName())) {
+                        Object version = kind.getField("VERSION_2_3_32").get(null);
+                        values[i] = kind.getConstructor(Class.forName("freemarker.template.Version")).newInstance(version);
+                    } else {
+                        Object obj = kind.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : kind.getFields()) {
+                            String value = query.get(field.getName());
+                            if (value != null && field.getType() == String.class) field.set(obj, value);
+                        }
+                        values[i] = obj;
+                    }
+                    if (!ready) break;
+                }
+                if (!ready) continue;
+                result = method.invoke(app, values);
+            }
+            byte[] payload;
+            int status = 200;
+            if (resp != null && resp.redirect) { status = resp.status; payload = new byte[0]; }
+            else if (resp != null && resp.writer.getBuffer().length() > 0) payload = resp.writer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            else payload = (result == null ? "ok" : String.valueOf(result)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            sent = true;
+            exchange.getResponseBody().write(payload);
+        } catch (Exception err) {
+            if (!sent) {
+                byte[] payload = String.valueOf(err).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(500, payload.length);
+                exchange.getResponseBody().write(payload);
+            }
+        } finally {
+            exchange.close();
+        }
+    }
+
+    static String wbFirst(java.util.Map<String, String> query) {
+        for (String key : new String[]{"url", "password", "q", "name", "host", "uid"}) {
+            if (query.get(key) != null) return query.get(key);
+        }
+        return query.isEmpty() ? "" : query.values().iterator().next();
+    }
+
+    static Object wbOrders() {
+        try {
+            Class<?> record = Class.forName(WbSastJavaXssSafe.class.getName() + "$Record");
+            Object first = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(first, "user-1");
+            record.getField("body").set(first, "alice");
+            Object second = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(second, "user-2");
+            record.getField("body").set(second, "bob");
+            return java.util.Map.of("1", first, "2", second);
+        } catch (Exception err) {
+            return java.util.Map.of("1", "alice", "2", "bob");
+        }
+    }
+
+    static final class WbReq {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final String body;
+        final java.util.Map<String, String> query;
+        WbReq(com.sun.net.httpserver.HttpExchange exchange, String body, java.util.Map<String, String> query) {
+            this.exchange = exchange;
+            this.body = body;
+            this.query = query;
+        }
+        String getParameter(String name) { return query.get(name); }
+        java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        java.io.BufferedReader getReader() { return new java.io.BufferedReader(new java.io.StringReader(body)); }
+        String getHeader(String name) { return exchange.getRequestHeaders().getFirst(name); }
+        WbSession getSession() { return new WbSession(exchange); }
+    }
+
+    static final class WbResp {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final java.io.StringWriter writer = new java.io.StringWriter();
+        int status = 200;
+        boolean redirect;
+        WbResp(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        java.io.Writer getWriter() { return writer; }
+        void sendRedirect(String target) { redirect = true; status = 302; exchange.getResponseHeaders().set("Location", target); }
+        void setHeader(String key, String value) { if (value != null) exchange.getResponseHeaders().set(key, value); }
+        void addCookie(WbCookie cookie) { exchange.getResponseHeaders().add("Set-Cookie", cookie.name + "=" + cookie.value); }
+    }
+
+    static final class WbCookie {
+        final String name;
+        final String value;
+        WbCookie(String name, String value) { this.name = name; this.value = value; }
+        void setHttpOnly(boolean value) {}
+        void setSecure(boolean value) {}
+    }
+
+    static final class WbSession {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        WbSession(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        Object getAttribute(String name) {
+            String user = exchange.getRequestHeaders().getFirst("X-User");
+            return user == null || user.isEmpty() ? "user-1" : user;
+        }
+    }
+
+}
+NEG
+)

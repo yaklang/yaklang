@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python xml.etree parse"
-	title_zh: "结构扫描：Python xml.etree 解析"
+	title: "结构匹配：Python xml.etree parse"
+	title_zh: "结构匹配：Python xml.etree 解析"
 	type: vuln
-	level: medium
+	level: "high"
 	rule_id: "struct-python-xml-etree"
 	risk: "xxe"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 ET.parse as $call
 ET.parse(* as $f) as $call
 alert $call for {
-	level: "medium",
+	level: "high",
 	title: "Struct scan: Python xml.etree parse",
 	title_zh: "结构扫描：Python xml.etree 解析",
 	message: "结构扫描：Python xml.etree 解析",

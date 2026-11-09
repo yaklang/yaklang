@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go ssh InsecureIgnoreHostKey"
-	title_zh: "结构扫描：Go SSH 忽略主机密钥"
+	title: "结构匹配：Go ssh InsecureIgnoreHostKey"
+	title_zh: "结构匹配：Go SSH 忽略主机密钥"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-go-ssh-insecure-ignore"
 	risk: "certificate-validation"
 	desc: <<<DESC

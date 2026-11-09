@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# SqlCommand"
-	title_zh: "结构扫描：C# SqlCommand"
+	title: "结构匹配：C# SqlCommand"
+	title_zh: "结构匹配：C# SqlCommand"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-csharp-sqlcommand"
 	risk: "sql-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 SqlCommand as $call
 SqlCommand(* as $q) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: C# SqlCommand",
 	title_zh: "结构扫描：C# SqlCommand",
 	message: "结构扫描：C# SqlCommand",

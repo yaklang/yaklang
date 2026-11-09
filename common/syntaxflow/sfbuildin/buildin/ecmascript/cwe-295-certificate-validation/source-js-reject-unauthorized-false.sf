@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript 关闭 TLS 校验"
-	title_zh: "检测 JavaScript 关闭 TLS 校验"
+	title: "源码匹配：检测 JavaScript 关闭 TLS 校验"
+	title_zh: "源码匹配：检测 JavaScript 关闭 TLS 校验"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-js-reject-unauthorized-false"
 	risk: "certificate-validation"
 	desc: <<<DESC
@@ -35,7 +35,7 @@ function c() { return { rejectUnauthorized: true }; }
 NEG
 )
 
-${*.js}.pattern_regex(/rejectUnauthorized\s*:\s*false/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/rejectUnauthorized\s*:\s*false/) as $hit
 alert $hit for {
 	level: "high",
 	title: "检测 JavaScript 关闭 TLS 校验",

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python os.popen"
-	title_zh: "结构扫描：Python os.popen 调用"
+	title: "结构匹配：Python os.popen"
+	title_zh: "结构匹配：Python os.popen 调用"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-os-popen"
 	risk: "command-injection"
 	desc: <<<DESC

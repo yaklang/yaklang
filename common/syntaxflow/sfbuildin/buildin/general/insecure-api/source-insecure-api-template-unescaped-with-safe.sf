@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到模板使用 safe 未转义"
+	title: "源码匹配：检测到模板使用 safe 未转义"
 	title_zh: "检测到模板使用 safe 未转义",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-template-unescaped-with-safe"
 	risk: "xss"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ just regular code
 NEG
 )
 
-${*.html}.pattern_regex(/{{.*?\|\s*safe(\s*}})?/) as $p0
+${/\.(html|htm)$/}.pattern_regex(/{{.*?\|\s*safe(\s*}})?/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",

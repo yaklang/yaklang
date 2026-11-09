@@ -84,9 +84,10 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk,
 	}
 
 	var irSourceHashes []string
-	// Generate data flow paths if available
+	// Generate data flow paths if available. A memory scan has no result row,
+	// so a live result is addressed by ResultUUID instead of ResultID.
 	if r.ReportType == IRifyFullReportType || r.config.showDataflowPath {
-		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
+		if (ssarisk.ResultID != 0 || ssarisk.ResultUUID != "") && ssarisk.Variable != "" {
 			var err error
 			var dataFlowPath *DataFlowPath
 			dataFlowPath, irSourceHashes, err = GenerateDataFlowAnalysis(ssarisk, false, value...)

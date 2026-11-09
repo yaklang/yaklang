@@ -1,0 +1,80 @@
+desc(
+	mode: "ssa"
+	language: "ts"
+	title: "数据流：TypeScript Path Traversal: User Input Used as File Path"
+	title_zh: "数据流：TypeScript 路径穿越：用户输入作为文件路径"
+	type: vuln
+	level: ""
+	rule_id: "ssa-ts-path-traversal"
+	risk: "path-traversal"
+	cwe: "CWE-22"
+	desc: <<<DESC
+### 漏洞描述
+函数参数进入 `readFileSync` 等文件读取 API 的路径，且未经过规范化与根目录限制。攻击者可用 `../` 读取任意文件。
+
+### 检测方式
+跟踪函数参数到文件读取 API 的第一个参数。路径经过 `resolve`、`realpath`、`abspath` 处理时跳过。
+
+### 风险类型
+path-traversal
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用 `path.resolve` 规范化路径，再确认结果位于允许的根目录内：
+
+```ts
+const root = path.resolve("/var/data");
+const target = path.resolve(root, name);
+if (target !== root && !target.startsWith(root + path.sep)) throw new Error("denied");
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	alert_min: 1
+)
+
+*?{opcode: param} as $src
+
+readFileSync(* as $arg)
+readFile(* as $arg)
+$arg?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->}?{!(<self> #{include: <<<CODE
+*?{opcode: call && (<self><getCallee>?{have: /(?i)(resolve|realpath|abspath)/})} as $__next__
+CODE
+}->)} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "TypeScript Path Traversal: User Input Used as File Path",
+	title_zh: "TypeScript 路径穿越：用户输入作为文件路径",
+	risk: "path-traversal",
+}
+
+desc(
+	lang: ts
+	alert_high: 1
+	'file://unsafe_path.ts': <<<UNSAFE
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+export function read(name: string): string {
+  return readFileSync(path.join("/var/data", name), "utf8");
+}
+UNSAFE
+	'safefile://safe_path.ts': <<<SAFE
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+export function read(name: string): string {
+  const root = path.resolve("/var/data");
+  const target = path.resolve(root, name);
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new Error("denied");
+  }
+  return readFileSync(target, "utf8");
+}
+SAFE
+)

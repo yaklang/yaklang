@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Python 3.6 不兼容的 SSL 用法"
-	title_zh: "检测到 Python 3.6 不兼容的 SSL 用法"
+	title: "源码匹配：检测到 Python 3.6 不兼容的 SSL 用法"
+	title_zh: "源码匹配：检测到 Python 3.6 不兼容的 SSL 用法"
 	type: compatibility
-	level: high
+	level: "middle"
 	rule_id: "source-compatibility-python36-compatibility-ssl"
 	risk: "code-style"
 	desc: <<<DESC
@@ -35,7 +35,7 @@ NEG
 
 ${*.py}.pattern_regex(/(?:ssl\.get_ciphers\(\))/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到 Python 3.6 不兼容的 SSL 用法",
 	title_zh: "检测到 Python 3.6 不兼容的 SSL 用法",
 	message: "检测到 Python 3.6 不兼容的 SSL 用法",

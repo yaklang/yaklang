@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java OGNL getValue"
-	title_zh: "结构扫描：Java OGNL getValue"
+	title: "结构匹配：Java OGNL getValue"
+	title_zh: "结构匹配：Java OGNL getValue"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-ognl-getvalue"
 	risk: "el-injection"
 	desc: <<<DESC

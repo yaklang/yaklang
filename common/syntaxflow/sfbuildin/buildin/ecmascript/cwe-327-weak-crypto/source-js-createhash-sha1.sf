@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript createHash SHA1"
-	title_zh: "检测 JavaScript createHash SHA1"
+	title: "源码匹配：检测 JavaScript createHash SHA1"
+	title_zh: "源码匹配：检测 JavaScript createHash SHA1"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-js-createhash-sha1"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -36,9 +36,9 @@ function d(x) { return x; }
 NEG
 )
 
-${*.js}.pattern_regex(/createHash\s*\(\s*['"]sha1['"]\s*\)/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/createHash\s*\(\s*['"]sha1['"]\s*\)/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 JavaScript createHash SHA1",
 	title_zh: "检测 JavaScript createHash SHA1",
 	message: "检测 JavaScript createHash SHA1",

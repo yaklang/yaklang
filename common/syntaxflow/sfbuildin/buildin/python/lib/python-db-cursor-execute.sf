@@ -2,7 +2,7 @@ desc(
 	title: "Python DB cursor execute APIs (lib)"
 	title_zh: "数据库游标执行（execute 系列）（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-db-cursor-execute"
 	risk: "sql-injection"
 	desc: <<<DESC

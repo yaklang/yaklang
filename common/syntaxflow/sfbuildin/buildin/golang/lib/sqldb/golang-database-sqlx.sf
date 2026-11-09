@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang Sqlx Library Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-database-sqlx'
 	desc: <<<DESC
 ### 漏洞描述

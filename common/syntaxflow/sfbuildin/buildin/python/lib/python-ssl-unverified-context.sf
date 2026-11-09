@@ -2,7 +2,7 @@ desc(
 	title: "Python SSL unverified context (lib)"
 	title_zh: "SSL 跳过证书校验（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-ssl-unverified-context"
 	risk: "man-in-the-middle"
 	desc: <<<DESC

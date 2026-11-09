@@ -2,7 +2,7 @@ desc(
 	title: "Python OS / subprocess command execution sinks (lib)"
 	title_zh: "操作系统命令执行入口（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-command-exec-sinks"
 	risk: "command-injection"
 	desc: <<<DESC
@@ -19,11 +19,6 @@ REFERENCE
 
 os.system as $output
 os.popen as $output
-subprocess.Popen as $output
-subprocess.call as $output
-subprocess.run as $output
-subprocess.check_output as $output
-subprocess.check_call as $output
 
 alert $output for {
 	title: "Python command execution API",

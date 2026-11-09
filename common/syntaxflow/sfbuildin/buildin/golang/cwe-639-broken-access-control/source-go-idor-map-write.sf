@@ -1,0 +1,112 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码匹配：Go IDOR: request key written from map"
+	title_zh: "源码匹配：Go 越权：请求键直接回显记录"
+	type: vuln
+	level: "middle"
+	risk: "access-control"
+	cwe: "CWE-639"
+	desc: <<<DESC
+请求参数作为 map 键，取出的记录直接写入响应，没有校验归属。
+
+### 检测方式
+源码正则匹配 `w.Write([]byte(map[key]))`。
+DESC
+	solution: <<<SOLUTION
+- 取出记录后校验 `Owner` 是否等于当前用户。
+- 不匹配时返回 404。
+SOLUTION
+	alert_min: 1
+	rule_id: "e9c1eb06-0637-4c0d-a481-9478225c7ccf"
+)
+${*.go}.pattern_regex(/\.Write\(\[\]byte\(\w+\[\w+\]\)\)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Go IDOR: request key written from map",
+	title_zh: "Go 越权：请求键直接回显记录",
+	risk: "access-control",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+import (
+	"net/http"
+	"os"
+)
+func order(w http.ResponseWriter, r *http.Request, orders map[string]string) {
+	orderID := r.URL.Query().Get("order_id") // wb:source id=src
+	w.Write([]byte(orders[orderID])) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	orders := map[string]string{"1": "alice", "2": "bob"}
+	mux.HandleFunc("/order", func(w http.ResponseWriter, r *http.Request) {
+		order(w, r, orders)
+	})
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+import (
+	"net/http"
+	"os"
+	"context"
+)
+type record struct {
+	Owner string
+	Body  string
+}
+
+func order(w http.ResponseWriter, r *http.Request, orders map[string]record) {
+	orderID := r.URL.Query().Get("order_id") // wb:source id=src
+	found, ok := orders[orderID]
+	user, _ := r.Context().Value("user").(string)
+	if !ok || found.Owner != user {
+		http.NotFound(w, r)
+		return
+	}
+	w.Write([]byte(found.Body)) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	orders := map[string]record{
+		"1": {Owner: "user-1", Body: "alice"},
+		"2": {Owner: "user-2", Body: "bob"},
+	}
+	mux.HandleFunc("/order", func(w http.ResponseWriter, r *http.Request) {
+		user := r.Header.Get("X-User")
+		if user == "" {
+			user = "user-1"
+		}
+		r = r.WithContext(context.WithValue(r.Context(), "user", user))
+		order(w, r, orders)
+	})
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

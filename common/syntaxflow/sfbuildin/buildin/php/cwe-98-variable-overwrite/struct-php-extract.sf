@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP extract"
-	title_zh: "结构扫描：PHP extract"
+	title: "结构匹配：PHP extract"
+	title_zh: "结构匹配：PHP extract"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-php-extract"
 	risk: "variable-overwrite"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 extract(* as $arr) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "PHP extract()",
 	title_zh: "PHP extract()",
 	message: "结构扫描：PHP extract",

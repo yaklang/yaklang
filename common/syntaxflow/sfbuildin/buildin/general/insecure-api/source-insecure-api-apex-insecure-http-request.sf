@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Apex 明文 HTTP 请求"
+	title: "源码匹配：检测到 Apex 明文 HTTP 请求"
 	title_zh: "检测到 Apex 明文 HTTP 请求",
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-insecure-api-apex-insecure-http-request"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ ${*.cls}.pattern_regex(/\*.*/) as $glob
 $t not_inside $comment as $a
 $a not_inside $glob as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到 Apex 明文 HTTP 请求",
 	title_zh: "检测到 Apex 明文 HTTP 请求",
 	message: "检测到 Apex 明文 HTTP 请求",

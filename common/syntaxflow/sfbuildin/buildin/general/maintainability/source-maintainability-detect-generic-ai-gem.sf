@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Gemini AI API 使用"
-	title_zh: "检测到 Gemini AI API 使用"
+	title: "源码匹配：检测到 Gemini AI API 使用"
+	title_zh: "源码匹配：检测到 Gemini AI API 使用"
 	type: maintainability
-	level: low
+	level: "middle"
 	rule_id: "source-maintainability-detect-generic-ai-gem"
 	risk: "code-style"
 	desc: <<<DESC
@@ -25,17 +25,17 @@ DESC
 确认该 AI 使用是否符合团队规范与安全策略，按需替换或保留。
 SOLUTION
 	alert_min: 1
-	"file://pos.txt": <<<POS
+	"file://pos.js": <<<POS
 google/generative-ai
 POS
-	"safefile://pos.txt": <<<NEG
+	"safefile://pos.js": <<<NEG
 hello world
 NEG
 )
 
-${*}.pattern_regex(/(?:google\/generative\-ai)|(?:GoogleGenerativeAI)/) as $hit
+${/\.(js|jsx|ts|tsx|mjs|cjs|py|go|java|kt|rb|php|rs|cs|swift|scala|vue|svelte)$/}.pattern_regex(/(?:google\/generative\-ai)|(?:GoogleGenerativeAI)/) as $hit
 alert $hit for {
-	level: "low",
+	level: "middle",
 	title: "检测到 Gemini AI API 使用",
 	title_zh: "检测到 Gemini AI API 使用",
 	message: "检测到 Gemini AI API 使用",

@@ -1,0 +1,48 @@
+desc(
+	title: "数据流：越权 IDOR：资源按 id 查询需复核归属校验",
+	title_zh: "越权 IDOR：资源按 id 查询需复核归属校验",
+	risk: "authorization-bypass"
+	type: audit
+	level: "middle"
+	rule_id: "java-idor-user-controlled-key"
+	cwe: "CWE-639"
+	desc: <<<DESC
+资源查询(findById/getById/selectById)需人工复核是否校验对象归属(owner == 当前身份)。
+本规则枚举所有按 id 查询的调用点，无法自动判定 id 是否来自客户端输入，
+因为多层 VO→service→dao 传递超出了当前数据流追踪深度。
+DESC
+	solution: <<<SOLUTION
+资源访问前校验对象归属(owner == 当前身份)。
+SOLUTION
+	alert_min: 1
+	"file://J.java": <<<POS
+class J {
+  void bad(Long id) {
+    Object o = dao.findById(id);
+  }
+}
+
+POS
+	"safefile://S.java": <<<NEG
+class S {
+  void ok() {
+    Object o = dao.queryList();
+  }
+}
+
+NEG
+)
+
+// 资源查询方法，枚举所有按 id 查询的调用点供人工复核
+.findById(* as $id) as $query;
+.getById(* as $id) as $query;
+.selectById(* as $id) as $query;
+
+$id #-> as $source;
+
+check $query then "idor query" else "no idor";
+
+alert $query for {
+	message: "资源按 id 查询，人工复核是否校验归属（IDOR）",
+	level: "middle",
+}

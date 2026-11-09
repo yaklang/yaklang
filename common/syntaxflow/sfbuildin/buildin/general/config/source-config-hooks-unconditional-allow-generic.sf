@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Hooks 配置无条件放行"
+	title: "源码匹配：检测到 Hooks 配置无条件放行"
 	title_zh: "检测到 Hooks 配置无条件放行",
 	type: vuln
-	level: critical
+	level: "middle"
 	rule_id: "source-config-hooks-unconditional-allow-generic"
 	risk: "authorization-bypass"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ ${*.bash}.pattern_regex(/permissionDecision.*allow/) as $p1
 ${*.py}.pattern_regex(/permissionDecision.*allow/) as $p2
 $p0 + $p1 + $p2 as $hit
 alert $hit for {
-	level: "critical",
+	level: "middle",
 	title: "检测到 Hooks 配置无条件放行",
 	title_zh: "检测到 Hooks 配置无条件放行",
 	message: "检测到 Hooks 配置无条件放行",

@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang FTP Library Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-ftp-sink'
 	desc: <<<DESC
 ### 1. 规则目的

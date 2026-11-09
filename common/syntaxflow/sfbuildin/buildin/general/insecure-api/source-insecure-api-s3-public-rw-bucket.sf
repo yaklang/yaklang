@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 S3 存储桶公开读写"
-	title_zh: "检测到 S3 存储桶公开读写"
+	title: "源码匹配：检测到 S3 存储桶公开读写"
+	title_zh: "源码匹配：检测到 S3 存储桶公开读写"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-insecure-api-s3-public-rw-bucket"
 	risk: "access-control"
 	desc: <<<DESC

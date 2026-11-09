@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "检测 Java XXE disallow-doctype-decl=false"
-	title_zh: "检测 Java XXE disallow-doctype-decl=false"
+	title: "源码匹配：检测 Java XXE disallow-doctype-decl=false"
+	title_zh: "源码匹配：检测 Java XXE disallow-doctype-decl=false"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-java-xxe-doctype-false"
 	risk: "xxe"
 	desc: <<<DESC

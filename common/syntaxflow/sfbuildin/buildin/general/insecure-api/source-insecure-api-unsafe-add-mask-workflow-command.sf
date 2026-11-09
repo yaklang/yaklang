@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到不安全的 add-mask 工作流命令"
+	title: "源码匹配：检测到不安全的 add-mask 工作流命令"
 	title_zh: "检测到不安全的 add-mask 工作流命令",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-unsafe-add-mask-workflow-command"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ just regular code
 NEG
 )
 
-${*.yml}.pattern_regex(/::add-mask::/) as $p0
+${/\.ya?ml$/}.pattern_regex(/::add-mask::/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",

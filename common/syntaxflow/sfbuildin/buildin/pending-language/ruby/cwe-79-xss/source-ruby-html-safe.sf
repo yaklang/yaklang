@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "ruby"
-	title: "源码扫描：Ruby html_safe / raw"
-	title_zh: "源码扫描：Ruby html_safe / raw"
+	title: "源码匹配：Ruby html_safe / raw"
+	title_zh: "源码匹配：Ruby html_safe / raw"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-ruby-html-safe"
 	risk: "xss"
 	cwe: "CWE-79"
@@ -46,7 +46,7 @@ NEG
 )
 ${*.rb}.pattern_regex(/\.html_safe|raw\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Ruby html_safe / raw",
 	title_zh: "源码扫描：Ruby html_safe / raw",
 	message: "源码扫描：Ruby html_safe / raw",

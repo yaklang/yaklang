@@ -1,0 +1,190 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "结构匹配：Node.js LLM 越权：模型输出直接选择工具"
+	title_zh: "结构匹配：Node.js LLM 越权：模型输出直接选择工具"
+	type: vuln
+	level: "low"
+	rule_id: "struct-js-llm-tool-dispatch"
+	risk: "tool-poisoning"
+	cwe: "CWE-250"
+	desc: <<<DESC
+### 规则说明
+模型返回的工具名被直接用于分发表，未与服务端允许列表比对，模型输出可调用任意已注册工具。
+
+### 风险类型
+tool-poisoning
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+工具分发表只接受服务端固定集合，模型输出只作为参数；高风险工具需要二次确认。
+SOLUTION
+	alert_min: 1
+)
+
+// A tool table entry selected and invoked per request: the callee is a member
+// of the tools object, not a fixed function.
+tools.*(* as $arg)
+
+$arg as $hit
+
+alert $hit for {
+	level: "low",
+	title: "Node.js LLM 越权：模型输出直接选择工具",
+	title_zh: "Node.js LLM 越权：模型输出直接选择工具",
+	risk: "tool-poisoning",
+}
+
+desc(
+	lang: javascript
+	alert_min: 1
+	'file://app.js': <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /act?text=
+const { execSync } = require("child_process");
+
+const tools = {
+  runShell(command) {
+    return execSync(command, { encoding: "utf8" });
+  },
+  deleteAccount(userId) {
+    return userId;
+  },
+};
+
+function act(userText) {
+  const choice = modelChoose(userText); // wb:source id=src
+  return tools[choice.name](choice.arg); // wb:sink id=sink
+}
+
+function modelChoose(userText) {
+  return { name: "runShell", arg: "echo ok" };
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = act(String((req.body && req.body.text) || (req.query && req.query.text) || ''));
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	'safefile://app.js': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /act?text=
+const readOnly = {
+  getOrder(orderId, userId) {
+    return { orderId, userId };
+  },
+};
+
+function act(userText, userId) {
+  const choice = modelChoose(userText); // wb:source id=src
+  const tool = readOnly[choice.name];
+  if (!tool) {
+    throw new Error("tool");
+  }
+  return tool(choice.arg, userId); // wb:sink id=sink
+}
+
+function modelChoose(userText) {
+  return { name: "getOrder", arg: "100" };
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = act(String((req.body && req.body.text) || (req.query && req.query.text) || ''), String(req.headers['x-user'] || 'user-1'));
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)

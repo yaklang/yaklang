@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java EL createValueExpression"
-	title_zh: "结构扫描：Java EL createValueExpression"
+	title: "结构匹配：Java EL createValueExpression"
+	title_zh: "结构匹配：Java EL createValueExpression"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-el-create-value-expression"
 	risk: "el-injection"
 	desc: <<<DESC

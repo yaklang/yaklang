@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Visualforce API 版本低于 55"
+	title: "源码匹配：检测到 Visualforce API 版本低于 55"
 	title_zh: "检测到 Visualforce API 版本低于 55",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-config-visualforce-page-api-version"
 	risk: "security-misconfiguration"
 	desc: <<<DESC

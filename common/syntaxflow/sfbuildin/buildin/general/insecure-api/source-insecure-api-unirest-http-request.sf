@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Unirest 明文 HTTP 请求"
-	title_zh: "检测到 Unirest 明文 HTTP 请求"
+	title: "源码匹配：检测到 Unirest 明文 HTTP 请求"
+	title_zh: "源码匹配：检测到 Unirest 明文 HTTP 请求"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-unirest-http-request"
 	risk: "cleartext-transmission"
 	desc: <<<DESC

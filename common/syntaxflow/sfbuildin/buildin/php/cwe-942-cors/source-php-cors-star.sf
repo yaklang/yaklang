@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP CORS 通配 Origin"
-	title_zh: "检测 PHP CORS 通配 Origin"
+	title: "源码匹配：检测 PHP CORS 通配 Origin"
+	title_zh: "源码匹配：检测 PHP CORS 通配 Origin"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-php-cors-star"
 	risk: "cors"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.php}.pattern_regex(/Access-Control-Allow-Origin/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 PHP CORS 通配 Origin",
 	title_zh: "检测 PHP CORS 通配 Origin",
 	message: "检测 PHP CORS 通配 Origin",

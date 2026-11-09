@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# MD5.Create"
-	title_zh: "结构扫描：C# MD5.Create"
+	title: "结构匹配：C# MD5.Create"
+	title_zh: "结构匹配：C# MD5.Create"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-csharp-md5-create"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 MD5.Create as $call
 MD5.Create() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: C# MD5.Create",
 	title_zh: "结构扫描：C# MD5.Create",
 	message: "结构扫描：C# MD5.Create",

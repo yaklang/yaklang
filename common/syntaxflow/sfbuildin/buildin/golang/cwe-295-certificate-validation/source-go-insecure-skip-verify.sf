@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go TLS 跳过证书校验"
+	title: "源码匹配：检测 Go TLS 跳过证书校验"
 	title_zh: "检测 Go TLS 跳过证书校验",
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-go-insecure-skip-verify"
 	risk: "certificate-validation"
 	desc: <<<DESC

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP ldap_bind"
-	title_zh: "结构扫描：PHP ldap_bind"
+	title: "结构匹配：PHP ldap_bind"
+	title_zh: "结构匹配：PHP ldap_bind"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-php-ldap-bind"
 	risk: "ldap-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ldap_bind(* as $c) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: PHP ldap_bind",
 	title_zh: "结构扫描：PHP ldap_bind",
 	message: "结构扫描：PHP ldap_bind",

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript postMessage 通配源"
-	title_zh: "检测 JavaScript postMessage 通配源"
+	title: "源码匹配：检测 JavaScript postMessage 通配源"
+	title_zh: "源码匹配：检测 JavaScript postMessage 通配源"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-js-postmessage-wildcard"
 	risk: "xss"
 	desc: <<<DESC
@@ -35,9 +35,9 @@ function s(w, m) { w.postMessage(m, "https://app.example"); }
 NEG
 )
 
-${*.js}.pattern_regex(/postMessage\s*\([^)]*,\s*['\"]\*['\"]/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/postMessage\s*\([^)]*,\s*['\"]\*['\"]/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 JavaScript postMessage 通配源",
 	title_zh: "检测 JavaScript postMessage 通配源",
 	message: "检测 JavaScript postMessage 通配源",

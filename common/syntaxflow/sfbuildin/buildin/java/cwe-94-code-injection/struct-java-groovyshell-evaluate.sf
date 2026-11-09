@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java GroovyShell.evaluate"
-	title_zh: "结构扫描：Java GroovyShell.evaluate"
+	title: "结构匹配：Java GroovyShell.evaluate"
+	title_zh: "结构匹配：Java GroovyShell.evaluate"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-groovyshell-evaluate"
 	risk: "groovy-code-execution"
 	desc: <<<DESC

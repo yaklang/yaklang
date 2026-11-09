@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到不安全的伪随机数生成"
-	title_zh: "检测到不安全的伪随机数生成"
+	title: "源码匹配：检测到不安全的伪随机数生成"
+	title_zh: "源码匹配：检测到不安全的伪随机数生成"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-detect-pseudoRandomBytes"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -36,8 +36,8 @@ crypto.randomBytes
 NEG
 )
 
-${*.js}.pattern_regex(/(?:crypto\.pseudoRandomBytes)/) as $p0
-${*.ts}.pattern_regex(/(?:crypto\.pseudoRandomBytes)/) as $p1
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/(?:crypto\.pseudoRandomBytes)/) as $p0
+${/\.(ts|tsx|mts|cts)$/}.pattern_regex(/(?:crypto\.pseudoRandomBytes)/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",

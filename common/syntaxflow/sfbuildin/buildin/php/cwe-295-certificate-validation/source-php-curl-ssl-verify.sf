@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP 关闭 SSL 校验"
-	title_zh: "检测 PHP 关闭 SSL 校验"
+	title: "源码匹配：检测 PHP 关闭 SSL 校验"
+	title_zh: "源码匹配：检测 PHP 关闭 SSL 校验"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-php-curl-ssl-verify"
 	risk: "certificate-validation"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ function c($ch) { echo "ok"; }
 NEG
 )
 
-${*.php}.pattern_regex(/CURLOPT_SSL_VERIFYPEER/) as $hit
+${*.php}.pattern_regex(/(?i)(CURLOPT_SSL_VERIFYPEER\s*,\s*(false|0\b)|CURLOPT_SSL_VERIFYHOST\s*,\s*(0\b|false))/ ) as $hit
 alert $hit for {
 	level: "high",
 	title: "检测 PHP 关闭 SSL 校验",

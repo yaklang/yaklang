@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "solidity"
-	title: "源码扫描：Solidity tx.origin 鉴权"
-	title_zh: "源码扫描：Solidity tx.origin 鉴权"
+	title: "源码匹配：Solidity tx.origin 鉴权"
+	title_zh: "源码匹配：Solidity tx.origin 鉴权"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-solidity-tx-origin"
 	risk: "access-control"
 	cwe: "CWE-477"
@@ -46,7 +46,7 @@ NEG
 )
 ${*.sol}.pattern_regex(/tx\.origin/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Solidity tx.origin 鉴权",
 	title_zh: "源码扫描：Solidity tx.origin 鉴权",
 	message: "源码扫描：Solidity tx.origin 鉴权",

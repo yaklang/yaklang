@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java AES/ECB Cipher"
-	title_zh: "结构扫描：Java AES/ECB 模式"
+	title: "结构匹配：Java AES/ECB Cipher"
+	title_zh: "结构匹配：Java AES/ECB 模式"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-aes-ecb"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ NEG
 
 Cipher.getInstance(*?{have: "ECB"}) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "AES ECB Mode",
 	title_zh: "AES ECB 模式",
 	message: "结构扫描：Java AES/ECB 模式",

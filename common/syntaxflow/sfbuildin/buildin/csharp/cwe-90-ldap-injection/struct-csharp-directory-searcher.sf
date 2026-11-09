@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# DirectorySearcher"
-	title_zh: "结构扫描：C# DirectorySearcher"
+	title: "结构匹配：C# DirectorySearcher"
+	title_zh: "结构匹配：C# DirectorySearcher"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-csharp-directory-searcher"
 	risk: "ldap-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 DirectorySearcher as $call
 DirectorySearcher() as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: C# DirectorySearcher",
 	title_zh: "结构扫描：C# DirectorySearcher",
 	message: "结构扫描：C# DirectorySearcher",

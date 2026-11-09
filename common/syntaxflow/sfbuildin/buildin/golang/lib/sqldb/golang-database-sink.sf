@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang Database Sink"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-database-sink'
 	desc: <<<DESC
 ### 漏洞描述

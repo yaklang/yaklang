@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java java.net.Socket"
-	title_zh: "结构扫描：Java 明文 Socket"
+	title: "结构匹配：Java java.net.Socket"
+	title_zh: "结构匹配：Java 明文 Socket"
 	type: vuln
-	level: medium
+	level: "low"
 	rule_id: "struct-java-plain-socket"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 Socket(* as $h) as $call
 alert $call for {
-	level: "medium",
+	level: "low",
 	title: "Struct scan: Java java.net.Socket",
 	title_zh: "结构扫描：Java 明文 Socket",
 	message: "结构扫描：Java 明文 Socket",

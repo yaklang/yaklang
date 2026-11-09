@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go template.HTML"
-	title_zh: "结构扫描：Go template.HTML"
+	title: "结构匹配：Go template.HTML"
+	title_zh: "结构匹配：Go template.HTML"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-go-template-html"
 	risk: "xss"
 	desc: <<<DESC
@@ -45,7 +45,7 @@ NEG
 
 template.HTML(* as $html) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "template.HTML",
 	title_zh: "template.HTML",
 	message: "结构扫描：Go template.HTML",

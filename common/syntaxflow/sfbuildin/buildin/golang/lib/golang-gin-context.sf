@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang gin-context Package Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-gin-context'
 	desc: <<<DESC
 ### 漏洞描述

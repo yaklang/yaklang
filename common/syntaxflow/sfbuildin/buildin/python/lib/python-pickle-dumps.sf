@@ -2,7 +2,7 @@ desc(
 	title: "Python pickle.dumps (lib)"
 	title_zh: "pickle 序列化（dumps）（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-pickle-dumps"
 	risk: "deserialization-flow"
 	desc: <<<DESC

@@ -1,0 +1,487 @@
+desc(
+	title: "数据流：Check Java Path Traversal Vulnerability"
+	title_zh: "数据流：检测Java路径穿越漏洞"
+	type: vuln
+	risk: "path-traversal"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+路径 Traversal（也称为目录遍历）漏洞允许攻击者通过操纵文件路径参数，访问或执行服务器上受限目录之外的任意文件。在 Java 应用程序中，当应用程序直接使用用户提供的文件名或路径片段构建文件操作路径，且未对用户输入进行充分验证或清理时（例如去除 `../` 或其他目录遍历符），攻击者即可构造包含 `../` 等特殊字符的输入，向上遍历目录结构，访问位于应用程序根目录之外的文件，如配置文件、源代码、敏感数据文件甚至系统文件（如 `/etc/passwd`）。
+2. **触发场景**
+以下代码示例未对用户输入的 `fileName` 进行充分验证，直接将其拼接在基本路径后创建文件对象并进行读取，存在路径穿越风险：
+```java
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+public class InsecureFileReaderServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String fileName = request.getParameter("file");
+String filePath = "path/to/safe/directory/" + fileName; // 未对fileName进行检查或清理
+File file = new File(filePath);
+// ... 后续文件读取操作
+}
+}
+```
+攻击者可以通过构造 `fileName` 为 `../../../../etc/passwd` 来尝试读取系统密码文件。
+3. **潜在影响**
+- **信息泄露**: 攻击者可以读取任意敏感文件，包括配置文件、源代码、用户上传文件、私钥等。
+- **文件篡改或删除**: 如果应用程序允许写入或删除文件，攻击者可能利用此漏洞修改或删除服务器上的关键文件，导致拒绝服务或进一步入侵。
+- **远程代码执行（RCE）**: 在某些情况下，如果攻击者能够上传或修改可执行文件并诱导服务器执行，可能导致远程代码执行。
+- **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
+DESC
+	rule_id: "7b798768-13e1-4dcd-8ab5-99a6f9635605"
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证和清理用户输入
+在将用户输入用于构建文件路径之前，必须进行严格的验证和清理，移除目录穿越字符（如 `../`）。可以使用正则表达式或特定的安全库函数。
+```java
+// 修复代码示例 (简单清理示例，更健壮的清理需要考虑多种编码和操作系统差异)
+String fileName = request.getParameter("file");
+if (fileName != null) {
+// 移除 '../' 和 '..\\' 等目录穿越字符
+fileName = fileName.replace("../", "").replace("..\\", "");
+// 还可以进一步限制文件名只能包含字母、数字和特定安全字符
+if (!fileName.matches("^[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+$")) {
+response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid file name.");
+return;
+}
+}
+String filePath = "path/to/safe/directory/" + fileName;
+```
+#### 2. 使用标准库方法验证规范路径
+在文件操作前，获取文件的规范路径（Canonical Path），并检查该规范路径是否位于预期的安全目录下。这是更推荐和健壮的方法。
+```java
+// 修复代码示例 (使用 Canonical Path 验证)
+private static final String BASE_DIR = "/usr/local/apache-tomcat/webapps/ROOT/safe_directory/";
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String requestedFile = request.getParameter("file");
+// 构建潜在的完整路径
+File file = new File(BASE_DIR, requestedFile);
+// 获取文件的规范路径，此方法会解析并消除目录穿透符
+String canonicalRequestedPath = file.getCanonicalPath();
+String canonicalBaseDirPath = new File(BASE_DIR).getCanonicalPath();
+// 检查文件的规范路径是否以安全目录的规范路径开头
+if (!canonicalRequestedPath.startsWith(canonicalBaseDirPath)) {
+response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+return;
+}
+// ... 后续的文件读取操作，现在可以安全地使用 file 对象
+if (!file.exists()) {
+response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
+return;
+}
+// ... 安全的文件操作
+}
+```
+#### 3. 限制文件访问范围
+配置应用程序或 Web 服务器，限制其只能访问特定的目录，或者使用沙箱机制隔离文件操作。
+#### 4. 使用白名单验证
+如果可能，不要接受用户输入的完整文件名或路径，而是让用户选择预定义的安全文件列表中的文件（白名单方式）。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+<include('java-spring-mvc-param')> as $source;
+<include('java-servlet-param')> as $source;
+<include('java-write-filename-sink')> as  $sink;
+<include('java-read-filename-sink')> as  $sink;
+
+$source as $sourceCfg;
+$sink?{<cfgGuards()>?{!opcode: return}} as $data
+
+$data #{
+    include:`* & $source`,
+    exclude:`* ?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
+    exclude:`* ?{<cfgGuards(opcode: return)>}`,
+}-> as $path;
+
+$path?{*<cfgDominates(target: "$sourceCfg")>?{have: "true"}} as $high;
+
+$sink #{
+    include:`<self> & $source`,
+}->as $low;
+
+
+alert $high for {
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+路径 Traversal（也称为目录遍历）漏洞允许攻击者通过操纵文件路径参数，访问或执行服务器上受限目录之外的任意文件。在 Java 应用程序中，当应用程序直接使用用户提供的文件名或路径片段构建文件操作路径，且未对用户输入进行充分验证或清理时（例如去除 `../` 或其他目录遍历符），攻击者即可构造包含 `../` 等特殊字符的输入，向上遍历目录结构，访问位于应用程序根目录之外的文件，如配置文件、源代码、敏感数据文件甚至系统文件（如 `/etc/passwd`）。
+2. **触发场景**
+以下代码示例未对用户输入的 `fileName` 进行充分验证，直接将其拼接在基本路径后创建文件对象并进行读取，存在路径穿越风险：
+```java
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+public class InsecureFileReaderServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String fileName = request.getParameter("file");
+String filePath = "path/to/safe/directory/" + fileName; // 未对fileName进行检查或清理
+File file = new File(filePath);
+// ... 后续文件读取操作
+}
+}
+```
+攻击者可以通过构造 `fileName` 为 `../../../../etc/passwd` 来尝试读取系统密码文件。
+3. **潜在影响**
+- **信息泄露**: 攻击者可以读取任意敏感文件，包括配置文件、源代码、用户上传文件、私钥等。
+- **文件篡改或删除**: 如果应用程序允许写入或删除文件，攻击者可能利用此漏洞修改或删除服务器上的关键文件，导致拒绝服务或进一步入侵。
+- **远程代码执行（RCE）**: 在某些情况下，如果攻击者能够上传或修改可执行文件并诱导服务器执行，可能导致远程代码执行。
+- **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
+DESC
+	level: "middle",
+	type: "vuln",
+	message: "Java代码中发现路径穿越漏洞，并且数据流中间没有进行任何过滤。",
+	title: "Java Path Traversal Vulnerability Was Detected",
+	title_zh: "检测到Java路径穿越漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证和清理用户输入
+在将用户输入用于构建文件路径之前，必须进行严格的验证和清理，移除目录穿越字符（如 `../`）。可以使用正则表达式或特定的安全库函数。
+```java
+// 修复代码示例 (简单清理示例，更健壮的清理需要考虑多种编码和操作系统差异)
+String fileName = request.getParameter("file");
+if (fileName != null) {
+// 移除 '../' 和 '..\\' 等目录穿越字符
+fileName = fileName.replace("../", "").replace("..\\", "");
+// 还可以进一步限制文件名只能包含字母、数字和特定安全字符
+if (!fileName.matches("^[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+$")) {
+response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid file name.");
+return;
+}
+}
+String filePath = "path/to/safe/directory/" + fileName;
+```
+#### 2. 使用标准库方法验证规范路径
+在文件操作前，获取文件的规范路径（Canonical Path），并检查该规范路径是否位于预期的安全目录下。这是更推荐和健壮的方法。
+```java
+// 修复代码示例 (使用 Canonical Path 验证)
+private static final String BASE_DIR = "/usr/local/apache-tomcat/webapps/ROOT/safe_directory/";
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String requestedFile = request.getParameter("file");
+// 构建潜在的完整路径
+File file = new File(BASE_DIR, requestedFile);
+// 获取文件的规范路径，此方法会解析并消除目录穿透符
+String canonicalRequestedPath = file.getCanonicalPath();
+String canonicalBaseDirPath = new File(BASE_DIR).getCanonicalPath();
+// 检查文件的规范路径是否以安全目录的规范路径开头
+if (!canonicalRequestedPath.startsWith(canonicalBaseDirPath)) {
+response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+return;
+}
+// ... 后续的文件读取操作，现在可以安全地使用 file 对象
+if (!file.exists()) {
+response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
+return;
+}
+// ... 安全的文件操作
+}
+```
+#### 3. 限制文件访问范围
+配置应用程序或 Web 服务器，限制其只能访问特定的目录，或者使用沙箱机制隔离文件操作。
+#### 4. 使用白名单验证
+如果可能，不要接受用户输入的完整文件名或路径，而是让用户选择预定义的安全文件列表中的文件（白名单方式）。
+SOLUTION
+	risk: "path-traversal",
+	name: "high",
+}
+
+
+$sink #{
+    include:`<self> & $source`,
+}->as $result;
+
+$result - $high as $low;
+alert $low for {
+	title: "Java Path Traversal Vulnerability Was Detected",
+	title_zh: "检测到Java路径穿越漏洞",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+路径 Traversal（也称为目录遍历）漏洞允许攻击者通过操纵文件路径参数，访问或执行服务器上受限目录之外的任意文件。在 Java 应用程序中，当应用程序直接使用用户提供的文件名或路径片段构建文件操作路径，且未对用户输入进行充分验证或清理时（例如去除 `../` 或其他目录遍历符），攻击者即可构造包含 `../` 等特殊字符的输入，向上遍历目录结构，访问位于应用程序根目录之外的文件，如配置文件、源代码、敏感数据文件甚至系统文件（如 `/etc/passwd`）。
+2. **触发场景**
+以下代码示例未对用户输入的 `fileName` 进行充分验证，直接将其拼接在基本路径后创建文件对象并进行读取，存在路径穿越风险：
+```java
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStream;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+public class InsecureFileReaderServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String fileName = request.getParameter("file");
+String filePath = "path/to/safe/directory/" + fileName; // 未对fileName进行检查或清理
+File file = new File(filePath);
+// ... 后续文件读取操作
+}
+}
+```
+攻击者可以通过构造 `fileName` 为 `../../../../etc/passwd` 来尝试读取系统密码文件。
+3. **潜在影响**
+- **信息泄露**: 攻击者可以读取任意敏感文件，包括配置文件、源代码、用户上传文件、私钥等。
+- **文件篡改或删除**: 如果应用程序允许写入或删除文件，攻击者可能利用此漏洞修改或删除服务器上的关键文件，导致拒绝服务或进一步入侵。
+- **远程代码执行（RCE）**: 在某些情况下，如果攻击者能够上传或修改可执行文件并诱导服务器执行，可能导致远程代码执行。
+- **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
+DESC
+	level: "low",
+	type: "vuln",
+	message: "Java代码中可能存在路径穿越漏洞。",
+	name: "low",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证和清理用户输入
+在将用户输入用于构建文件路径之前，必须进行严格的验证和清理，移除目录穿越字符（如 `../`）。可以使用正则表达式或特定的安全库函数。
+```java
+// 修复代码示例 (简单清理示例，更健壮的清理需要考虑多种编码和操作系统差异)
+String fileName = request.getParameter("file");
+if (fileName != null) {
+// 移除 '../' 和 '..\\' 等目录穿越字符
+fileName = fileName.replace("../", "").replace("..\\", "");
+// 还可以进一步限制文件名只能包含字母、数字和特定安全字符
+if (!fileName.matches("^[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+$")) {
+response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid file name.");
+return;
+}
+}
+String filePath = "path/to/safe/directory/" + fileName;
+```
+#### 2. 使用标准库方法验证规范路径
+在文件操作前，获取文件的规范路径（Canonical Path），并检查该规范路径是否位于预期的安全目录下。这是更推荐和健壮的方法。
+```java
+// 修复代码示例 (使用 Canonical Path 验证)
+private static final String BASE_DIR = "/usr/local/apache-tomcat/webapps/ROOT/safe_directory/";
+protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+String requestedFile = request.getParameter("file");
+// 构建潜在的完整路径
+File file = new File(BASE_DIR, requestedFile);
+// 获取文件的规范路径，此方法会解析并消除目录穿透符
+String canonicalRequestedPath = file.getCanonicalPath();
+String canonicalBaseDirPath = new File(BASE_DIR).getCanonicalPath();
+// 检查文件的规范路径是否以安全目录的规范路径开头
+if (!canonicalRequestedPath.startsWith(canonicalBaseDirPath)) {
+response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+return;
+}
+// ... 后续的文件读取操作，现在可以安全地使用 file 对象
+if (!file.exists()) {
+response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
+return;
+}
+// ... 安全的文件操作
+}
+```
+#### 3. 限制文件访问范围
+配置应用程序或 Web 服务器，限制其只能访问特定的目录，或者使用沙箱机制隔离文件操作。
+#### 4. 使用白名单验证
+如果可能，不要接受用户输入的完整文件名或路径，而是让用户选择预定义的安全文件列表中的文件（白名单方式）。
+SOLUTION
+	risk: "path-traversal",
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://WbSastJavaPathtraversalVulnerable.java': <<<POS
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+public class PathTravel {
+    @GetMapping("/read")
+    public byte[] read(@RequestParam String name) throws Exception {
+        return Files.readAllBytes(Paths.get("/data/" + name));
+    }
+}
+POS
+	'safefile://WbSastJavaPathtraversalSafe.java': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file?name=
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class WbSastJavaPathtraversalSafe {
+    public String read(WbReq req) throws Exception {
+        String name = req.getParameter("name"); // wb:source id=src
+        Path root = Path.of("/var/data").toAbsolutePath().normalize();
+        Path target = root.resolve(name).normalize();
+        if (!target.startsWith(root)) {
+            throw new SecurityException("path");
+        }
+        return Files.readString(target); // wb:sink id=sink
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/health", WbSastJavaPathtraversalSafe::wbHealth);
+        server.createContext("/", WbSastJavaPathtraversalSafe::wbHandle);
+        server.start();
+    }
+
+    static void wbHealth(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "ok".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
+    static java.util.Map<String, String> wbQuery(String raw) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null || raw.isEmpty()) return out;
+        for (String pair : raw.split("&")) {
+            int cut = pair.indexOf('=');
+            String key = cut < 0 ? pair : pair.substring(0, cut);
+            String value = cut < 0 ? "" : pair.substring(cut + 1);
+            out.put(java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8), java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return out;
+    }
+
+    static void wbHandle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] raw = exchange.getRequestBody().readAllBytes();
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, String> query = wbQuery(exchange.getRequestURI().getRawQuery());
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (type != null && type.contains("application/x-www-form-urlencoded")) query.putAll(wbQuery(body));
+        boolean sent = false;
+        try {
+            WbSastJavaPathtraversalSafe app = new WbSastJavaPathtraversalSafe();
+            Object result = null;
+            WbResp resp = null;
+            for (java.lang.reflect.Method method : WbSastJavaPathtraversalSafe.class.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers()) || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                if (method.getName().startsWith("wb")) continue;
+                Object[] values = new Object[method.getParameterCount()];
+                boolean ready = true;
+                for (int i = 0; i < values.length; i++) {
+                    Class<?> kind = method.getParameterTypes()[i];
+                    if (kind.getSimpleName().equals("WbReq")) values[i] = new WbReq(exchange, body, query);
+                    else if (kind.getSimpleName().equals("WbResp")) { resp = new WbResp(exchange); values[i] = resp; }
+                    else if (kind == String.class) values[i] = wbFirst(query);
+                    else if ("java.sql.Connection".equals(kind.getName())) {
+                        try { values[i] = java.sql.DriverManager.getConnection(System.getenv().getOrDefault("JDBC_URL", "jdbc:sqlite::memory:")); }
+                        catch (Exception err) { ready = false; result = err; }
+                    } else if ("javax.naming.directory.DirContext".equals(kind.getName())) {
+                        values[i] = java.lang.reflect.Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind}, (proxy, called, calledArgs) -> null);
+                    } else if (java.util.Map.class.isAssignableFrom(kind)) values[i] = wbOrders();
+                    else if ("freemarker.template.Configuration".equals(kind.getName())) {
+                        Object version = kind.getField("VERSION_2_3_32").get(null);
+                        values[i] = kind.getConstructor(Class.forName("freemarker.template.Version")).newInstance(version);
+                    } else {
+                        Object obj = kind.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : kind.getFields()) {
+                            String value = query.get(field.getName());
+                            if (value != null && field.getType() == String.class) field.set(obj, value);
+                        }
+                        values[i] = obj;
+                    }
+                    if (!ready) break;
+                }
+                if (!ready) continue;
+                result = method.invoke(app, values);
+            }
+            byte[] payload;
+            int status = 200;
+            if (resp != null && resp.redirect) { status = resp.status; payload = new byte[0]; }
+            else if (resp != null && resp.writer.getBuffer().length() > 0) payload = resp.writer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            else payload = (result == null ? "ok" : String.valueOf(result)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            sent = true;
+            exchange.getResponseBody().write(payload);
+        } catch (Exception err) {
+            if (!sent) {
+                byte[] payload = String.valueOf(err).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(500, payload.length);
+                exchange.getResponseBody().write(payload);
+            }
+        } finally {
+            exchange.close();
+        }
+    }
+
+    static String wbFirst(java.util.Map<String, String> query) {
+        for (String key : new String[]{"url", "password", "q", "name", "host", "uid"}) {
+            if (query.get(key) != null) return query.get(key);
+        }
+        return query.isEmpty() ? "" : query.values().iterator().next();
+    }
+
+    static Object wbOrders() {
+        try {
+            Class<?> record = Class.forName(WbSastJavaPathtraversalSafe.class.getName() + "$Record");
+            Object first = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(first, "user-1");
+            record.getField("body").set(first, "alice");
+            Object second = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(second, "user-2");
+            record.getField("body").set(second, "bob");
+            return java.util.Map.of("1", first, "2", second);
+        } catch (Exception err) {
+            return java.util.Map.of("1", "alice", "2", "bob");
+        }
+    }
+
+    static final class WbReq {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final String body;
+        final java.util.Map<String, String> query;
+        WbReq(com.sun.net.httpserver.HttpExchange exchange, String body, java.util.Map<String, String> query) {
+            this.exchange = exchange;
+            this.body = body;
+            this.query = query;
+        }
+        String getParameter(String name) { return query.get(name); }
+        java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        java.io.BufferedReader getReader() { return new java.io.BufferedReader(new java.io.StringReader(body)); }
+        String getHeader(String name) { return exchange.getRequestHeaders().getFirst(name); }
+        WbSession getSession() { return new WbSession(exchange); }
+    }
+
+    static final class WbResp {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final java.io.StringWriter writer = new java.io.StringWriter();
+        int status = 200;
+        boolean redirect;
+        WbResp(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        java.io.Writer getWriter() { return writer; }
+        void sendRedirect(String target) { redirect = true; status = 302; exchange.getResponseHeaders().set("Location", target); }
+        void setHeader(String key, String value) { if (value != null) exchange.getResponseHeaders().set(key, value); }
+        void addCookie(WbCookie cookie) { exchange.getResponseHeaders().add("Set-Cookie", cookie.name + "=" + cookie.value); }
+    }
+
+    static final class WbCookie {
+        final String name;
+        final String value;
+        WbCookie(String name, String value) { this.name = name; this.value = value; }
+        void setHttpOnly(boolean value) {}
+        void setSecure(boolean value) {}
+    }
+
+    static final class WbSession {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        WbSession(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        Object getAttribute(String name) {
+            String user = exchange.getRequestHeaders().getFirst("X-User");
+            return user == null || user.isEmpty() ? "user-1" : user;
+        }
+    }
+
+}
+NEG
+)

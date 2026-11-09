@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go 导入 net/http/pprof"
-	title_zh: "检测 Go 导入 net/http/pprof"
+	title: "源码匹配：检测 Go 导入 net/http/pprof"
+	title_zh: "源码匹配：检测 Go 导入 net/http/pprof"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-go-pprof-import"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -50,7 +50,7 @@ NEG
 // comma. Only an import spec is an actual pprof registration.
 ${*.go}.pattern_regex(/(?m)^[ \t]*(?:import[ \t]+)?(?:_[ \t]+|[A-Za-z_][A-Za-z0-9_]*[ \t]+)?\"net\/http\/pprof\"[ \t]*\r?$/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Go 导入 net/http/pprof",
 	title_zh: "检测 Go 导入 net/http/pprof",
 	message: "检测 Go 导入 net/http/pprof",

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP create_function"
-	title_zh: "结构扫描：PHP create_function"
+	title: "结构匹配：PHP create_function"
+	title_zh: "结构匹配：PHP create_function"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-php-create-function"
 	risk: "code-injection"
 	desc: <<<DESC

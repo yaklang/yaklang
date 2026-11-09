@@ -2,7 +2,7 @@ desc(
 	title: "C#/.NET XML parser sinks (lib)"
 	title_zh: "XML 解析入口（C#/.NET 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: csharp
 	lib: "csharp-xml-sink"
 	risk: "xxe"

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Apex 类未显式声明共享级别"
+	title: "源码匹配：检测到 Apex 类未显式声明共享级别"
 	title_zh: "检测到 Apex 类未显式声明共享级别",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-apex-specify-sharing-level"
 	risk: "access-control"
 	desc: <<<DESC

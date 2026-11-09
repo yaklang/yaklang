@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# XmlTextReader"
-	title_zh: "结构扫描：C# XmlTextReader"
+	title: "结构匹配：C# XmlTextReader"
+	title_zh: "结构匹配：C# XmlTextReader"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-csharp-xmltextreader"
 	risk: "xxe"
 	desc: <<<DESC

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "源码扫描：JavaScript sax ondoctype"
-	title_zh: "源码扫描：JavaScript sax ondoctype"
+	title: "源码匹配：JavaScript sax ondoctype"
+	title_zh: "源码匹配：JavaScript sax ondoctype"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-js-sax-ondoctype"
 	risk: "xxe"
 	cwe: "CWE-611"
@@ -43,7 +43,7 @@ function ok(xml) { return xml.length; }
 
 NEG
 )
-${*.js}.pattern_regex(/\.ondoctype\s*=/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/\.ondoctype\s*=/) as $hit
 alert $hit for {
 	level: "high",
 	title: "源码扫描：JavaScript sax ondoctype",

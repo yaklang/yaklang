@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP mt_rand"
-	title_zh: "结构扫描：PHP mt_rand"
+	title: "结构匹配：PHP mt_rand"
+	title_zh: "结构匹配：PHP mt_rand"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-php-mt-rand"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 mt_rand() as $call
 mt_rand(* as $a) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: PHP mt_rand",
 	title_zh: "结构扫描：PHP mt_rand",
 	message: "结构扫描：PHP mt_rand",

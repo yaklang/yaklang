@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 OCaml 弱哈希 Digest 使用"
-	title_zh: "检测到 OCaml 弱哈希 Digest 使用"
+	title: "源码匹配：检测到 OCaml 弱哈希 Digest 使用"
+	title_zh: "源码匹配：检测到 OCaml 弱哈希 Digest 使用"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-ocamllint-digest"
 	risk: "weak-hash"
 	desc: <<<DESC

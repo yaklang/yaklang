@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java setTrustAllHosts true"
-	title_zh: "结构扫描：Java setTrustAllHosts true"
+	title: "结构匹配：Java setTrustAllHosts true"
+	title_zh: "结构匹配：Java setTrustAllHosts true"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-trust-all-hosts"
 	risk: "certificate-validation"
 	desc: <<<DESC

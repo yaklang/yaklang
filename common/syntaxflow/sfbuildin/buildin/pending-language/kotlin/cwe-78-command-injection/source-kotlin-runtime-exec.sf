@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "kotlin"
-	title: "源码扫描：Kotlin Runtime.exec"
-	title_zh: "源码扫描：Kotlin Runtime.exec"
+	title: "源码匹配：Kotlin Runtime.exec"
+	title_zh: "源码匹配：Kotlin Runtime.exec"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-kotlin-runtime-exec"
 	risk: "command-injection"
 	cwe: "CWE-78"
@@ -46,7 +46,7 @@ NEG
 )
 ${*.kt}.pattern_regex(/Runtime\.getRuntime\(\)\.exec\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Kotlin Runtime.exec",
 	title_zh: "源码扫描：Kotlin Runtime.exec",
 	message: "源码扫描：Kotlin Runtime.exec",

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java MD5 MessageDigest"
-	title_zh: "结构扫描：Java MD5 MessageDigest"
+	title: "结构匹配：Java MD5 MessageDigest"
+	title_zh: "结构匹配：Java MD5 MessageDigest"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-md5"
 	risk: "weak-cryptography"
 	desc: <<<DESC
@@ -33,7 +33,7 @@ NEG
 
 MessageDigest.getInstance(*?{have: "MD5"}) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Weak MD5 Digest",
 	title_zh: "弱哈希 MD5",
 	message: "MessageDigest MD5 Call detected",

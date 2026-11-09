@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 OpenAI AI 使用"
-	title_zh: "检测到 OpenAI AI 使用"
+	title: "源码匹配：检测到 OpenAI AI 使用"
+	title_zh: "源码匹配：检测到 OpenAI AI 使用"
 	type: maintainability
-	level: low
+	level: "middle"
 	rule_id: "source-maintainability-detect-generic-ai-oai"
 	risk: "code-style"
 	desc: <<<DESC
@@ -46,7 +46,7 @@ NEG
 
 ${/\.(go|py|java|js|jsx|ts|tsx|rb|php|cs|kt|scala)$/}.pattern_regex(/(?:from\s+openai\s+import|\bopenai\.|OpenAI\s*\(|new\s+OpenAI\b)/) as $hit
 alert $hit for {
-	level: "low",
+	level: "middle",
 	title: "检测到 OpenAI AI 使用",
 	title_zh: "检测到 OpenAI AI 使用",
 	message: "检测到 OpenAI AI 使用",

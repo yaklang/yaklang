@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# SoapFormatter or LosFormatter"
-	title_zh: "结构扫描：C# SoapFormatter 或 LosFormatter"
+	title: "结构匹配：C# SoapFormatter or LosFormatter"
+	title_zh: "结构匹配：C# SoapFormatter 或 LosFormatter"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-csharp-soap-los-formatter"
 	risk: "deserialization"
 	desc: <<<DESC

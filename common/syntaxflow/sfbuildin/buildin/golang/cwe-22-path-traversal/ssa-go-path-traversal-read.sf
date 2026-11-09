@@ -1,0 +1,103 @@
+desc(
+	mode: "ssa"
+	language: "golang"
+	title: "数据流：Go path traversal: request parameter in file path"
+	title_zh: "数据流：Go 路径穿越：请求参数进入文件路径"
+	type: vuln
+	level: ""
+	risk: "path-traversal"
+	cwe: "CWE-22"
+	desc: <<<DESC
+请求参数和固定目录 `filepath.Join` 后直接读取。`../` 可以逃出目录。
+
+### 检测方式
+`Get` 来源流入 `os.ReadFile`；路径经过 `filepath.Clean` 时跳过。
+DESC
+	solution: <<<SOLUTION
+- 用 `filepath.Clean` 规范化后校验 `strings.HasPrefix(target, root+separator)`。
+- 只允许白名单文件名。
+SOLUTION
+	alert_min: 1
+	rule_id: "cf914a21-475f-4840-98af-65d845cbdef9"
+)
+*.Get(* as $src)
+os.ReadFile(* as $arg)
+$arg?{<self> #{include: `* & $src`, exclude: `*?{opcode: call && <self><getCallee><name>?{have: /(?i)Clean/}}`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Go path traversal: request parameter in file path",
+	title_zh: "Go 路径穿越：请求参数进入文件路径",
+	risk: "path-traversal",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file?name=
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+func readFile(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name") // wb:source id=src
+	target := filepath.Join("/var/data", name)
+	data, _ := os.ReadFile(target) // wb:sink id=sink
+	w.Write(data)
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/file", readFile)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file?name=
+import (
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func readFile(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name") // wb:source id=src
+	root := filepath.Clean("/var/data")
+	target := filepath.Clean(filepath.Join(root, name))
+	prefix := root + string(os.PathSeparator)
+	if target != root && !strings.HasPrefix(target, prefix) {
+		http.NotFound(w, r)
+		return
+	}
+	data, _ := os.ReadFile(target) // wb:sink id=sink
+	w.Write(data)
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/file", readFile)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

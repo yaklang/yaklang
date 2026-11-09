@@ -2,7 +2,7 @@ desc(
 	title: "Python base64 decode (lib)"
 	title_zh: "Base64 解码（b64decode）（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-base64-decode"
 	risk: "deserialization-flow"
 	desc: <<<DESC

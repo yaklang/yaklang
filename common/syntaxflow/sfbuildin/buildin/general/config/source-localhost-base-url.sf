@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 baseURL 配置为 localhost"
+	title: "源码匹配：检测到 baseURL 配置为 localhost"
 	title_zh: "检测到 baseURL 配置为 localhost",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-localhost-base-url"
 	risk: "best-practice"
 	desc: <<<DESC

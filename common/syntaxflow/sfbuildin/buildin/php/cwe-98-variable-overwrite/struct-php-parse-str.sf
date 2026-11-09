@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP parse_str"
-	title_zh: "结构扫描：PHP parse_str"
+	title: "结构匹配：PHP parse_str"
+	title_zh: "结构匹配：PHP parse_str"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-php-parse-str"
 	risk: "variable-overwrite"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 parse_str(* as $s) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: PHP parse_str",
 	title_zh: "结构扫描：PHP parse_str",
 	message: "结构扫描：PHP parse_str",

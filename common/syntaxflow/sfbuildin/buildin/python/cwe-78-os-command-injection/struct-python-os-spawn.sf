@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python os.spawn"
-	title_zh: "结构扫描：Python os.spawn"
+	title: "结构匹配：Python os.spawn"
+	title_zh: "结构匹配：Python os.spawn"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-os-spawn"
 	risk: "command-injection"
 	desc: <<<DESC

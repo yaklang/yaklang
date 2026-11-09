@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到使用 v-html"
+	title: "源码匹配：检测到使用 v-html"
 	title_zh: "检测到使用 v-html",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-avoid-v-html"
 	risk: "xss"
 	desc: <<<DESC

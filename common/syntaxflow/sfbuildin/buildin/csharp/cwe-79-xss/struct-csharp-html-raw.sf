@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# Html.Raw"
-	title_zh: "结构扫描：C# Html.Raw"
+	title: "结构匹配：C# Html.Raw"
+	title_zh: "结构匹配：C# Html.Raw"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-csharp-html-raw"
 	risk: "xss"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 Html.Raw as $call
 Html.Raw(* as $s) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: C# Html.Raw",
 	title_zh: "结构扫描：C# Html.Raw",
 	message: "结构扫描：C# Html.Raw",

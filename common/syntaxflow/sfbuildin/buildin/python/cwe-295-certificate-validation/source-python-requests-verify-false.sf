@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python requests verify=False"
-	title_zh: "检测 Python requests verify=False"
+	title: "源码匹配：检测 Python requests verify=False"
+	title_zh: "源码匹配：检测 Python requests verify=False"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-python-requests-verify-false"
 	risk: "certificate-validation"
 	desc: <<<DESC

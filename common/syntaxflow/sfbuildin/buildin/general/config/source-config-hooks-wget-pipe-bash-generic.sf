@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Hooks 配置使用 wget 管道执行"
+	title: "源码匹配：检测到 Hooks 配置使用 wget 管道执行"
 	title_zh: "检测到 Hooks 配置使用 wget 管道执行",
 	type: vuln
-	level: critical
+	level: "high"
 	rule_id: "source-config-hooks-wget-pipe-bash-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ ${*.sh}.pattern_regex(/(curl|wget)\s+.*\|\s*(bash|sh|zsh)\b/) as $p0
 ${*.bash}.pattern_regex(/(curl|wget)\s+.*\|\s*(bash|sh|zsh)\b/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
-	level: "critical",
+	level: "high",
 	title: "检测到 Hooks 配置使用 wget 管道执行",
 	title_zh: "检测到 Hooks 配置使用 wget 管道执行",
 	message: "检测到 Hooks 配置使用 wget 管道执行",

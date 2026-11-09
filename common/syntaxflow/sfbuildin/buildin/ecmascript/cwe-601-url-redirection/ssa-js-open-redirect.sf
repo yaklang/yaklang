@@ -1,0 +1,54 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 开放重定向：用户输入作为跳转目标"
+	title_zh: "数据流：Node.js 开放重定向：用户输入作为跳转目标"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-open-redirect"
+	risk: "open-redirect"
+	cwe: "CWE-601"
+	desc: <<<DESC
+### 规则说明
+用户可控数据直接作为 `res.redirect` 的目标；仅按前缀过滤的 phi 目标仍可被构造为外部地址。
+
+### 风险类型
+open-redirect
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+跳转目标使用服务端映射表（如 `home` → `/home`），不要直接使用请求参数。
+SOLUTION
+	alert_min: 1
+	'file://app.js': <<<POS
+function go(req, res) {
+  res.redirect(req.query.next);
+}
+module.exports = go;
+POS
+	'safefile://app-safe.js': <<<NEG
+function go(req, res) {
+  res.redirect("/home");
+}
+module.exports = go;
+NEG
+)
+
+<include('js-param')> as $params;
+/(?i)(startsWith|endsWith|includes|has|test|match|indexOf|equals|parse|resolve)/ as $guards;
+
+res.redirect(* as $arg)
+res.location(* as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{!opcode: phi} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js 开放重定向：用户输入作为跳转目标",
+	title_zh: "Node.js 开放重定向：用户输入作为跳转目标",
+	risk: "open-redirect",
+}

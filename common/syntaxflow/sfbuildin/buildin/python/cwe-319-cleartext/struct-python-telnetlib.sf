@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python telnetlib"
-	title_zh: "结构扫描：Python telnetlib"
+	title: "结构匹配：Python telnetlib"
+	title_zh: "结构匹配：Python telnetlib"
 	type: vuln
-	level: high
+	level: "low"
 	rule_id: "struct-python-telnetlib"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 telnetlib.Telnet as $call
 telnetlib.Telnet(* as $h) as $call
 alert $call for {
-	level: "high",
+	level: "low",
 	title: "Struct scan: Python telnetlib",
 	title_zh: "结构扫描：Python telnetlib",
 	message: "结构扫描：Python telnetlib",

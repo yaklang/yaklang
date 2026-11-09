@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP preg_replace /e 修饰符"
-	title_zh: "检测 PHP preg_replace /e 修饰符"
+	title: "源码匹配：检测 PHP preg_replace /e 修饰符"
+	title_zh: "源码匹配：检测 PHP preg_replace /e 修饰符"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-php-preg-replace-e"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.php}.pattern_regex(/preg_replace\s*\(\s*['"][^'"]*e['"]/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 PHP preg_replace /e 修饰符",
 	title_zh: "检测 PHP preg_replace /e 修饰符",
 	message: "检测 PHP preg_replace /e 修饰符",

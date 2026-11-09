@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# 证书回调"
-	title_zh: "检测 C# 证书回调"
+	title: "源码匹配：检测 C# 证书回调"
+	title_zh: "源码匹配：检测 C# 证书回调"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-csharp-ssl-callback"
 	risk: "certificate-validation"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.cs}.pattern_regex(/ServerCertificateValidationCallback/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 C# 证书回调",
 	title_zh: "检测 C# 证书回调",
 	message: "检测 C# 证书回调",

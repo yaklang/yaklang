@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang Database Pop Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-database-pop'
 	desc: <<<DESC
 ### 漏洞描述

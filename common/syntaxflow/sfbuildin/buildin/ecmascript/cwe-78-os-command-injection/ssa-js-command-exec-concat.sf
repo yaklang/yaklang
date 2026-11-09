@@ -1,0 +1,174 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 命令执行：用户输入拼接到 exec"
+	title_zh: "数据流：Node.js 命令执行：用户输入拼接到 exec"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-command-exec-concat"
+	risk: "command-injection"
+	cwe: "CWE-78"
+	desc: <<<DESC
+### 规则说明
+用户可控数据拼接进 `child_process.exec`/`execSync`/`execFileSync` 的命令字符串。`execFile` 以数组传参，不经过 shell，因此不检测。
+
+### 风险类型
+command-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 `execFile`/`spawn` 并以数组传递参数；必须拼接时使用 `shell-quote` 等库转义，并对参数做白名单校验。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /ping?host=
+const { exec } = require("child_process");
+
+function ping(req) {
+  const host = String(req.query.host || ""); // wb:source id=src
+  exec("ping -c 1 " + host); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = ping(req);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	"safefile://app-safe.js": <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /ping?host=
+const { execFile } = require("child_process");
+
+function ping(req) {
+  const host = String(req.query.host || ""); // wb:source id=src
+  if (!/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(host)) {
+    throw new Error("bad host");
+  }
+  execFile("ping", ["-c", "1", host]); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = ping(req);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)
+
+<include('js-param')> as $params;
+/(?i)(escape|sanitize|quote|validate|shellescape)/ as $sanitizers;
+
+*.exec(*<slice(index=0)> as $arg)
+*.execSync(*<slice(index=0)> as $arg)
+*.execFileSync(*<slice(index=0)> as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{<self> #{
+    include: <<<CODE
+*?{opcode: add} as $__next__
+CODE,
+}->}?{!(<getUsers()>?{opcode: call && (<self><getCallee> & $sanitizers)})} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Node.js 命令执行：用户输入拼接到 exec",
+	title_zh: "Node.js 命令执行：用户输入拼接到 exec",
+	risk: "command-injection",
+}

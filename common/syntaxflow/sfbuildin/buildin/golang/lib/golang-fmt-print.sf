@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang fmt Print Method"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-fmt-print'
 	desc: <<<DESC
 ### 规则目的
