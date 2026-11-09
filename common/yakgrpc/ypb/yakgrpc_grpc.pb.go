@@ -592,6 +592,7 @@ const (
 	Yak_StartMcpServer_FullMethodName                             = "/ypb.Yak/StartMcpServer"
 	Yak_GetToolSetList_FullMethodName                             = "/ypb.Yak/GetToolSetList"
 	Yak_GetAIToolList_FullMethodName                              = "/ypb.Yak/GetAIToolList"
+	Yak_QueryAITool_FullMethodName                                = "/ypb.Yak/QueryAITool"
 	Yak_DeleteAITool_FullMethodName                               = "/ypb.Yak/DeleteAITool"
 	Yak_SaveAITool_FullMethodName                                 = "/ypb.Yak/SaveAITool"
 	Yak_SaveAIToolV2_FullMethodName                               = "/ypb.Yak/SaveAIToolV2"
@@ -629,6 +630,7 @@ const (
 	Yak_PluginTrace_FullMethodName                                = "/ypb.Yak/PluginTrace"
 	Yak_GetKnowledgeBaseNameList_FullMethodName                   = "/ypb.Yak/GetKnowledgeBaseNameList"
 	Yak_GetKnowledgeBase_FullMethodName                           = "/ypb.Yak/GetKnowledgeBase"
+	Yak_QueryKnowledgeBase_FullMethodName                         = "/ypb.Yak/QueryKnowledgeBase"
 	Yak_GetKnowledgeBaseTypeList_FullMethodName                   = "/ypb.Yak/GetKnowledgeBaseTypeList"
 	Yak_DeleteKnowledgeBase_FullMethodName                        = "/ypb.Yak/DeleteKnowledgeBase"
 	Yak_CreateKnowledgeBase_FullMethodName                        = "/ypb.Yak/CreateKnowledgeBase"
@@ -1421,6 +1423,7 @@ type YakClient interface {
 	StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error)
 	GetToolSetList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetToolSetListResponse, error)
 	GetAIToolList(ctx context.Context, in *GetAIToolListRequest, opts ...grpc.CallOption) (*GetAIToolListResponse, error)
+	QueryAITool(ctx context.Context, in *QueryAIToolRequest, opts ...grpc.CallOption) (*QueryAIToolResponse, error)
 	DeleteAITool(ctx context.Context, in *DeleteAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	SaveAIToolV2(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*SaveAIToolV2Response, error)
@@ -1462,6 +1465,7 @@ type YakClient interface {
 	// Knowledge Base
 	GetKnowledgeBaseNameList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseNameListResponse, error)
 	GetKnowledgeBase(ctx context.Context, in *GetKnowledgeBaseRequest, opts ...grpc.CallOption) (*GetKnowledgeBaseResponse, error)
+	QueryKnowledgeBase(ctx context.Context, in *QueryKnowledgeBaseRequest, opts ...grpc.CallOption) (*QueryKnowledgeBaseResponse, error)
 	GetKnowledgeBaseTypeList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseTypeListResponse, error)
 	DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
@@ -8124,6 +8128,16 @@ func (c *yakClient) GetAIToolList(ctx context.Context, in *GetAIToolListRequest,
 	return out, nil
 }
 
+func (c *yakClient) QueryAITool(ctx context.Context, in *QueryAIToolRequest, opts ...grpc.CallOption) (*QueryAIToolResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAIToolResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAITool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) DeleteAITool(ctx context.Context, in *DeleteAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
@@ -8563,6 +8577,16 @@ func (c *yakClient) GetKnowledgeBase(ctx context.Context, in *GetKnowledgeBaseRe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetKnowledgeBaseResponse)
 	err := c.cc.Invoke(ctx, Yak_GetKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryKnowledgeBase(ctx context.Context, in *QueryKnowledgeBaseRequest, opts ...grpc.CallOption) (*QueryKnowledgeBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryKnowledgeBaseResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryKnowledgeBase_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9965,6 +9989,7 @@ type YakServer interface {
 	StartMcpServer(*StartMcpServerRequest, grpc.ServerStreamingServer[StartMcpServerResponse]) error
 	GetToolSetList(context.Context, *Empty) (*GetToolSetListResponse, error)
 	GetAIToolList(context.Context, *GetAIToolListRequest) (*GetAIToolListResponse, error)
+	QueryAITool(context.Context, *QueryAIToolRequest) (*QueryAIToolResponse, error)
 	DeleteAITool(context.Context, *DeleteAIToolRequest) (*DbOperateMessage, error)
 	SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error)
 	SaveAIToolV2(context.Context, *SaveAIToolRequest) (*SaveAIToolV2Response, error)
@@ -10006,6 +10031,7 @@ type YakServer interface {
 	// Knowledge Base
 	GetKnowledgeBaseNameList(context.Context, *Empty) (*GetKnowledgeBaseNameListResponse, error)
 	GetKnowledgeBase(context.Context, *GetKnowledgeBaseRequest) (*GetKnowledgeBaseResponse, error)
+	QueryKnowledgeBase(context.Context, *QueryKnowledgeBaseRequest) (*QueryKnowledgeBaseResponse, error)
 	GetKnowledgeBaseTypeList(context.Context, *Empty) (*GetKnowledgeBaseTypeListResponse, error)
 	DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*GeneralResponse, error)
 	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*GeneralResponse, error)
@@ -11817,6 +11843,9 @@ func (UnimplementedYakServer) GetToolSetList(context.Context, *Empty) (*GetToolS
 func (UnimplementedYakServer) GetAIToolList(context.Context, *GetAIToolListRequest) (*GetAIToolListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAIToolList not implemented")
 }
+func (UnimplementedYakServer) QueryAITool(context.Context, *QueryAIToolRequest) (*QueryAIToolResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAITool not implemented")
+}
 func (UnimplementedYakServer) DeleteAITool(context.Context, *DeleteAIToolRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAITool not implemented")
 }
@@ -11927,6 +11956,9 @@ func (UnimplementedYakServer) GetKnowledgeBaseNameList(context.Context, *Empty) 
 }
 func (UnimplementedYakServer) GetKnowledgeBase(context.Context, *GetKnowledgeBaseRequest) (*GetKnowledgeBaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) QueryKnowledgeBase(context.Context, *QueryKnowledgeBaseRequest) (*QueryKnowledgeBaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryKnowledgeBase not implemented")
 }
 func (UnimplementedYakServer) GetKnowledgeBaseTypeList(context.Context, *Empty) (*GetKnowledgeBaseTypeListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBaseTypeList not implemented")
@@ -21642,6 +21674,24 @@ func _Yak_GetAIToolList_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryAITool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAIToolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAITool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAITool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAITool(ctx, req.(*QueryAIToolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_DeleteAITool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteAIToolRequest)
 	if err := dec(in); err != nil {
@@ -22237,6 +22287,24 @@ func _Yak_GetKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).GetKnowledgeBase(ctx, req.(*GetKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryKnowledgeBase(ctx, req.(*QueryKnowledgeBaseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -25070,6 +25138,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_GetAIToolList_Handler,
 		},
 		{
+			MethodName: "QueryAITool",
+			Handler:    _Yak_QueryAITool_Handler,
+		},
+		{
 			MethodName: "DeleteAITool",
 			Handler:    _Yak_DeleteAITool_Handler,
 		},
@@ -25180,6 +25252,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetKnowledgeBase",
 			Handler:    _Yak_GetKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "QueryKnowledgeBase",
+			Handler:    _Yak_QueryKnowledgeBase_Handler,
 		},
 		{
 			MethodName: "GetKnowledgeBaseTypeList",

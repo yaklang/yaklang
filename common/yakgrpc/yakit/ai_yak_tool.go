@@ -96,10 +96,13 @@ func FilterAIYakTool(db *gorm.DB, filter *ypb.AIToolFilter) *gorm.DB {
 	if filter == nil {
 		return db
 	}
-	db = bizhelper.ExactQueryString(db, "name", filter.GetToolName())
-	db = bizhelper.ExactQueryStringArrayOr(db, "name", filter.GetToolNames())
-	if filter.GetID() > 0 {
-		db = bizhelper.ExactQueryInt64(db, "id", filter.GetID())
+	ids := normalizeAIYakToolFilterIDs(filter)
+	if len(ids) > 0 {
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
+	}
+	names := normalizeAIYakToolFilterNames(filter)
+	if len(names) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "name", names)
 	}
 	if filter.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"name", "verbose_name", "verbose_name_zh", "keywords", "description", "path"}, filter.GetKeyword(), false)
