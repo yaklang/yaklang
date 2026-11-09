@@ -1,0 +1,70 @@
+desc(
+	mode: "ssa"
+	language: "ts"
+	title: "数据流：TypeScript Command Injection: User Input in Shell Command"
+	title_zh: "数据流：TypeScript 命令注入：用户输入进入 Shell 命令"
+	type: vuln
+	level: ""
+	rule_id: "ssa-ts-command-injection"
+	risk: "command-injection"
+	cwe: "CWE-78"
+	desc: <<<DESC
+### 漏洞描述
+函数参数拼接进 shell 命令文本后再由 `exec` 等 API 执行。攻击者可追加 `;`、`|`、`$()` 执行任意命令。
+
+### 检测方式
+定位命令文本常量（如 `ping`），沿使用边找到字符串拼接结果，并确认拼接结果可达函数参数。`execFile` 等参数数组调用不告警。
+
+### 风险类型
+command-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用参数数组 API，避免 shell 解释器：
+
+```ts
+execFile("ping", ["-c", "1", host]);
+```
+
+必须拼接时用白名单校验参数，禁止把原始输入交给 `exec`。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+)
+
+*?{opcode: param} as $src
+
+*?{have: /(?i)(ping|nslookup|dig|curl|wget|sh|bash)\b/} as $const
+$const<getUsers()>?{opcode: add} as $cmd
+$cmd?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "TypeScript Command Injection: User Input in Shell Command",
+	title_zh: "TypeScript 命令注入：用户输入进入 Shell 命令",
+	risk: "command-injection",
+}
+
+desc(
+	lang: ts
+	alert_high: 1
+	'file://unsafe_command.ts': <<<UNSAFE
+import { exec } from "node:child_process";
+
+export function ping(host: string): void {
+  exec("ping -c 1 " + host);
+}
+UNSAFE
+	'safefile://safe_command.ts': <<<SAFE
+import { execFile } from "node:child_process";
+
+export function ping(host: string): void {
+  execFile("ping", ["-c", "1", host]);
+}
+SAFE
+)

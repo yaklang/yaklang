@@ -162,8 +162,8 @@ func MarshalMinimalDataFlowPath(p *DataFlowPath) ([]byte, error) {
 }
 
 func GenerateDataFlowAnalysis(risk *schema.SSARisk, minimal bool, values ...*ssaapi.Value) (*DataFlowPath, []string, error) {
-	if risk.ResultID == 0 || risk.Variable == "" {
-		return nil, nil, utils.Errorf("risk has no valid result ID or variable")
+	if risk == nil || risk.Variable == "" || (risk.ResultID == 0 && risk.ResultUUID == "") {
+		return nil, nil, utils.Errorf("risk has no valid result handle or variable")
 	}
 
 	var value *ssaapi.Value

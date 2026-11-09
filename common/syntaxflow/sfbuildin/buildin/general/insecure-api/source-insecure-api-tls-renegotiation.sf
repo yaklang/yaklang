@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到不安全的 TLS 重协商"
-	title_zh: "检测到不安全的 TLS 重协商"
+	title: "源码匹配：检测到不安全的 TLS 重协商"
+	title_zh: "源码匹配：检测到不安全的 TLS 重协商"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-tls-renegotiation"
 	risk: "insecure-tls"
 	desc: <<<DESC

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java RSA PKCS1Padding"
-	title_zh: "结构扫描：Java RSA PKCS1Padding"
+	title: "结构匹配：Java RSA PKCS1Padding"
+	title_zh: "结构匹配：Java RSA PKCS1Padding"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "struct-java-rsa-pkcs1"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC

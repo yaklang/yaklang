@@ -1,0 +1,79 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：Python IDOR: request key returned from map"
+	title_zh: "源码匹配：Python 越权：请求键直接返回记录"
+	type: vuln
+	level: "middle"
+	risk: "access-control"
+	cwe: "CWE-639"
+	desc: <<<DESC
+请求参数作为全局字典下标，取出的记录直接返回，没有校验归属。
+
+### 检测方式
+源码正则匹配 `return GLOBAL_MAP[key]`。
+DESC
+	solution: <<<SOLUTION
+- 取出记录后校验 `owner` 是否等于当前用户。
+- 不匹配时返回 404。
+SOLUTION
+	alert_min: 1
+	rule_id: "022f3dab-b65c-447f-8bca-a7949344fa22"
+)
+${*.py}.pattern_regex(/return\s+[A-Z][A-Z0-9_]*\[[^\]]+\](?!\s*\()/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Python IDOR: request key returned from map",
+	title_zh: "Python 越权：请求键直接返回记录",
+	risk: "access-control",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+import os
+from flask import Flask, request, session
+
+app = Flask(__name__)
+ORDERS = {}
+
+@app.route("/order")
+def order():
+    order_id = request.args.get("order_id", "")  # wb:source id=src
+    return ORDERS[order_id]  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+from flask import Flask, abort, request, session
+
+app = Flask(__name__)
+ORDERS = {}
+
+@app.route("/order")
+def order():
+    order_id = request.args.get("order_id", "")  # wb:source id=src
+    found = ORDERS.get(order_id)
+    if found is None or found["owner"] != session.get("user_id"):
+        abort(404)
+    return found  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

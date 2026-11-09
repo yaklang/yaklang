@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java SHA-1 MessageDigest"
-	title_zh: "结构扫描：Java SHA-1 消息摘要"
+	title: "结构匹配：Java SHA-1 MessageDigest"
+	title_zh: "结构匹配：Java SHA-1 消息摘要"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-sha1"
 	risk: "weak-cryptography"
 	desc: <<<DESC
@@ -45,7 +45,7 @@ NEG
 MessageDigest.getInstance(*?{have: "SHA-1"}) as $call
 MessageDigest.getInstance(*?{have: "SHA1"}) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Weak SHA-1 Digest",
 	title_zh: "弱哈希 SHA-1",
 	message: "结构扫描：Java SHA-1 消息摘要",

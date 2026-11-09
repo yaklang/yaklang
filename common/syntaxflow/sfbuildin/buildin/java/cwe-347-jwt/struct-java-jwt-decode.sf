@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java JWT.decode without verify"
-	title_zh: "结构扫描：Java JWT.decode 未校验"
+	title: "结构匹配：Java JWT.decode without verify"
+	title_zh: "结构匹配：Java JWT.decode 未校验"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-jwt-decode"
 	risk: "improper-authentication"
 	desc: <<<DESC

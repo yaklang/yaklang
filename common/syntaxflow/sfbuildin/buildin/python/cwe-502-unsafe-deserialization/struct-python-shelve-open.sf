@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python shelve.open"
-	title_zh: "结构扫描：Python shelve.open"
+	title: "结构匹配：Python shelve.open"
+	title_zh: "结构匹配：Python shelve.open"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-shelve-open"
 	risk: "deserialization"
 	desc: <<<DESC

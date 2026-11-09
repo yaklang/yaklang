@@ -10,7 +10,7 @@ import (
 )
 
 func TestSAXParserRuleMultipleFeatureCalls(t *testing.T) {
-	rule, err := os.ReadFile("../../../../syntaxflow/sfbuildin/buildin/java/cwe-611-xxe/java-saxparser-factory-unsafe.sf")
+	rule, err := os.ReadFile("../../../../syntaxflow/sfbuildin/buildin/java/cwe-611-xxe/struct-java-saxparser-factory-unsafe.sf")
 	require.NoError(t, err)
 	prog, err := ssaapi.Parse(`import javax.xml.parsers.SAXParserFactory;
 class Parser {

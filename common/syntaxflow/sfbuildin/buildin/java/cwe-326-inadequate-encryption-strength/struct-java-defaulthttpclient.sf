@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java DefaultHttpClient"
-	title_zh: "结构扫描：Java DefaultHttpClient"
+	title: "结构匹配：Java DefaultHttpClient"
+	title_zh: "结构匹配：Java DefaultHttpClient"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-defaulthttpclient"
 	risk: "insecure-tls"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 DefaultHttpClient() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Java DefaultHttpClient",
 	title_zh: "结构扫描：Java DefaultHttpClient",
 	message: "结构扫描：Java DefaultHttpClient",

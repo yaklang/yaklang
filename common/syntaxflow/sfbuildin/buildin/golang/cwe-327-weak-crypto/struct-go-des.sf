@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go crypto/des"
-	title_zh: "结构扫描：Go crypto/des"
+	title: "结构匹配：Go crypto/des"
+	title_zh: "结构匹配：Go crypto/des"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-go-des"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 des.NewCipher as $call
 des.NewCipher(* as $k) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Go crypto/des",
 	title_zh: "结构扫描：Go crypto/des",
 	message: "结构扫描：Go crypto/des",

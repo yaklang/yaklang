@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java XMLDecoder"
-	title_zh: "结构扫描：Java XMLDecoder 反序列化"
+	title: "结构匹配：Java XMLDecoder"
+	title_zh: "结构匹配：Java XMLDecoder 反序列化"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-xmldecoder"
 	risk: "deserialization"
 	desc: <<<DESC

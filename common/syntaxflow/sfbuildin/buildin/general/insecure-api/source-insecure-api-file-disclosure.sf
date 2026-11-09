@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到静态文件泄露配置"
-	title_zh: "检测到静态文件泄露配置"
+	title: "源码匹配：检测到静态文件泄露配置"
+	title_zh: "源码匹配：检测到静态文件泄露配置"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-insecure-api-file-disclosure"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.rb}.pattern_regex(/(?:config\.serve_static_assets\s+=\s+true)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到静态文件泄露配置",
 	title_zh: "检测到静态文件泄露配置",
 	message: "检测到静态文件泄露配置",

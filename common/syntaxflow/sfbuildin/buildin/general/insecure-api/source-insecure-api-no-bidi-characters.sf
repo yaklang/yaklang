@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到双向控制字符"
+	title: "源码匹配：检测到双向控制字符"
 	title_zh: "检测到双向控制字符",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-no-bidi-characters"
 	risk: "unicode-direction-control"
 	desc: <<<DESC

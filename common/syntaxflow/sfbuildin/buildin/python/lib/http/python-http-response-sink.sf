@@ -2,7 +2,7 @@ desc(
 	title: "Python HTTP response construction (lib)"
 	title_zh: "HTTP 响应构造（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-http-response-sink"
 	risk: "xss-information-exposure"
 	desc: <<<DESC

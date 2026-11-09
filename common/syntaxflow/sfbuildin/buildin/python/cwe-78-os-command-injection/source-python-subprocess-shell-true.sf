@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python subprocess shell=True"
-	title_zh: "检测 Python subprocess shell=True"
+	title: "源码匹配：检测 Python subprocess shell=True"
+	title_zh: "源码匹配：检测 Python subprocess shell=True"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-python-subprocess-shell-true"
 	risk: "command-injection"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.py}.pattern_regex(/shell\s*=\s*True/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Python subprocess shell=True",
 	title_zh: "检测 Python subprocess shell=True",
 	message: "检测 Python subprocess shell=True",

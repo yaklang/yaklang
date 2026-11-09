@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang File Read Sink"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-file-read-sink'
 	desc: <<<DESC
 ### 漏洞描述

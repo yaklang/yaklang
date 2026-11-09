@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python asyncio create_subprocess_shell"
-	title_zh: "结构扫描：Python asyncio 子进程 shell"
+	title: "结构匹配：Python asyncio create_subprocess_shell"
+	title_zh: "结构匹配：Python asyncio 子进程 shell"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-asyncio-shell"
 	risk: "command-injection"
 	desc: <<<DESC

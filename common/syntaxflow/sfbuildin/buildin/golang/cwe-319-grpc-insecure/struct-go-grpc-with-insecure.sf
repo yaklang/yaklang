@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "结构扫描：Go grpc.WithInsecure"
-	title_zh: "结构扫描：Go grpc.WithInsecure"
+	title: "结构匹配：Go grpc.WithInsecure"
+	title_zh: "结构匹配：Go grpc.WithInsecure"
 	type: vuln
-	level: high
+	level: "low"
 	rule_id: "struct-go-grpc-with-insecure"
 	risk: "cleartext-transmission"
 	cwe: "CWE-319"
@@ -49,7 +49,7 @@ NEG
 )
 grpc.WithInsecure() as $call
 alert $call for {
-	level: "high",
+	level: "low",
 	title: "结构扫描：Go grpc.WithInsecure",
 	title_zh: "结构扫描：Go grpc.WithInsecure",
 	message: "结构扫描：Go grpc.WithInsecure",

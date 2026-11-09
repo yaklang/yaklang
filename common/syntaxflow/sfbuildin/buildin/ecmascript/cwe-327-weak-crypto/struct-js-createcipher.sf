@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "javascript"
-	title: "Struct scan: JavaScript crypto.createCipher"
-	title_zh: "结构扫描：JavaScript crypto.createCipher"
+	title: "结构匹配：JavaScript crypto.createCipher"
+	title_zh: "结构匹配：JavaScript crypto.createCipher"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-js-createcipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 crypto.createCipher(* as $a) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: JavaScript crypto.createCipher",
 	title_zh: "结构扫描：JavaScript crypto.createCipher",
 	message: "结构扫描：JavaScript crypto.createCipher",

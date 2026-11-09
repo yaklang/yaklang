@@ -1,0 +1,75 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码匹配：Check PHP Open Redirect Vulnerability"
+	title_zh: "源码匹配：检测PHP未验证重定向漏洞"
+	type: vuln
+	level: "middle"
+	rule_id: "source-php-open-redirect"
+	risk: "open-redirect"
+	cwe: "CWE-601"
+	desc: <<<DESC
+请求参数直接作为 `Location` 跳转目标时，攻击者可以把用户带到外部站点。
+
+### 检测方式
+源码正则匹配“请求参数赋值后直接拼进 Location 头”的写法。赋值和 `header` 之间出现 `if`、`str_starts_with`、`strncmp`、`parse_url` 或 `in_array` 时视为已校验。
+DESC
+	solution: <<<SOLUTION
+- 只允许站内相对路径。
+- 校验目标以 `/` 开头且不以 `//` 开头。
+SOLUTION
+	alert_min: 1
+)
+${*.php}.pattern_regex(/(?i)\$(\w+)\s*=\s*\$_(GET|POST|REQUEST)\s*\[[^\]]+\][^;]*;(?:(?!\bif\b|str_starts_with|strncmp|parse_url|in_array)[\s\S])*?header\s*\(\s*['"]Location:\s*['"]?\s*\.\s*\$\1/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Check PHP Open Redirect Vulnerability",
+	title_zh: "检测PHP未验证重定向漏洞",
+	risk: "open-redirect",
+}
+
+desc(
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+$target = $_GET['next'] ?? '/'; // wb:source id=src
+header('Location: ' . $target); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+$target = $_GET['next'] ?? '/'; // wb:source id=src
+if ($target === '' || $target[0] !== '/' || str_starts_with($target, '//')) {
+    $target = '/';
+}
+header('Location: ' . $target); // wb:sink id=sink
+NEG
+)

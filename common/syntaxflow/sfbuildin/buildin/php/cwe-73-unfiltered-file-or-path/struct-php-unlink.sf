@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP unlink"
-	title_zh: "结构扫描：PHP unlink"
+	title: "结构匹配：PHP unlink"
+	title_zh: "结构匹配：PHP unlink"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-php-unlink"
 	risk: "arbitrary-file-delete"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 unlink(* as $p) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: PHP unlink",
 	title_zh: "结构扫描：PHP unlink",
 	message: "结构扫描：PHP unlink",

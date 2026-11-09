@@ -1,0 +1,66 @@
+
+_GET.* as $p1
+_POST.* as $p2
+_REQUEST.* as $p3
+$p1 + $p2 + $p3 as $raw
+
+file_get_contents(* as $arg)
+$arg?{opcode: add}?{<self> #{include: `* & $raw`, exclude: `* <getCallee>?{have: /(?i)realpath/}`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "PHP Path Traversal: Request Input in File Path",
+	title_zh: "PHP 路径穿越：请求参数进入文件路径",
+	message: "请求参数被拼接到文件路径后读取，缺少路径规范化或前缀校验。",
+	risk: "path-traversal",
+}
+
+desc(
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file?name=
+$name = $_GET['name'] ?? ''; // wb:source id=src
+echo file_get_contents('/var/data/' . $name); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file?name=
+$name = $_GET['name'] ?? ''; // wb:source id=src
+$root = realpath('/var/data');
+$target = realpath($root . '/' . $name);
+$prefix = $root . DIRECTORY_SEPARATOR;
+if ($target === false || ($target !== $root && strncmp($target, $prefix, strlen($prefix)) !== 0)) {
+    http_response_code(404);
+    exit;
+}
+echo file_get_contents($target); // wb:sink id=sink
+NEG
+	rule_id: "6704547f-92a2-412b-b3c9-735bf14ed763"
+)

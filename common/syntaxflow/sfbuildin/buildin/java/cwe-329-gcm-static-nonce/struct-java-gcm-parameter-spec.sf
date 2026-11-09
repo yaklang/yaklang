@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "结构扫描：Java 固定 GCM nonce"
-	title_zh: "结构扫描：Java 固定 GCM nonce"
+	title: "结构匹配：Java 固定 GCM nonce"
+	title_zh: "结构匹配：Java 固定 GCM nonce"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-java-gcm-parameter-spec"
 	risk: "weak-cryptographic-algorithm"
 	cwe: "CWE-329"
@@ -48,7 +48,7 @@ NEG
 GCMParameterSpec as $call
 GCMParameterSpec(* as $arg) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "结构扫描：Java 固定 GCM nonce",
 	title_zh: "结构扫描：Java 固定 GCM nonce",
 	message: "结构扫描：Java 固定 GCM nonce",

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "c"
-	title: "源码扫描：C 明文传输与明文存储"
-	title_zh: "源码扫描：C 明文传输与明文存储"
+	title: "源码匹配：C 明文传输与明文存储"
+	title_zh: "源码匹配：C 明文传输与明文存储"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-c-cleartext-transmission"
 	risk: "cleartext-transmission"
 	cwe: "CWE-319"
@@ -51,7 +51,7 @@ void ok(void) {
 
 NEG
 )
-${*.c}.pattern_regex(/"(http|ftp|telnet):\/\/[^"]*"/) as $hit
+${/\.(c|h)$/}.pattern_regex(/"(http|ftp|telnet):\/\/[^"]*"/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "源码扫描：C 明文传输与明文存储",

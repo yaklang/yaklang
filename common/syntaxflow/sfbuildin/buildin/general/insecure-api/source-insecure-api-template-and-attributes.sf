@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到模板与属性未转义"
+	title: "源码匹配：检测到模板与属性未转义"
 	title_zh: "检测到模板与属性未转义",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-template-and-attributes"
 	risk: "xss"
 	desc: <<<DESC

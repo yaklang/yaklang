@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python exec Call"
-	title_zh: "结构扫描：Python exec 调用"
+	title: "结构匹配：Python exec Call"
+	title_zh: "结构匹配：Python exec 调用"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-exec"
 	risk: "code-injection"
 	desc: <<<DESC

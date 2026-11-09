@@ -134,9 +134,9 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 		result = results[0]
 	} else {
 		var err error
-		result, err = ssaapi.LoadResultByID(uint(ssarisk.ResultID))
+		result, err = ResultForRisk(ssarisk)
 		if err != nil {
-			log.Errorf("load result by id %d error: %v", ssarisk.ResultID, err)
+			log.Errorf("load result for risk %s error: %v", ssarisk.Hash, err)
 			return
 		}
 	}

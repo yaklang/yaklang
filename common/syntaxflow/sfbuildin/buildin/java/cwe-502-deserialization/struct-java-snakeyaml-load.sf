@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java SnakeYAML load"
-	title_zh: "结构扫描：Java SnakeYAML load"
+	title: "结构匹配：Java SnakeYAML load"
+	title_zh: "结构匹配：Java SnakeYAML load"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-java-snakeyaml-load"
 	risk: "deserialization"
 	desc: <<<DESC

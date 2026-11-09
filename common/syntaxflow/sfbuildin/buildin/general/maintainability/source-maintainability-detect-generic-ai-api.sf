@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 AI API 调用"
-	title_zh: "检测到 AI API 调用"
+	title: "源码匹配：检测到 AI API 调用"
+	title_zh: "源码匹配：检测到 AI API 调用"
 	type: maintainability
-	level: low
+	level: "middle"
 	rule_id: "source-maintainability-detect-generic-ai-api"
 	risk: "code-style"
 	desc: <<<DESC
@@ -42,7 +42,7 @@ ${/\.(go|py|java|js|jsx|ts|tsx|rb|php|cs|kt|scala)$/}.pattern_regex(/(?:https?:\
 ${/\.(go|py|java|js|jsx|ts|tsx|rb|php|cs|kt|scala)$/}.pattern_regex(/["'`][^"'`\n]*\/chat\/completions["'`]/) as $api_path
 $api_host + $api_path as $hit
 alert $hit for {
-	level: "low",
+	level: "middle",
 	title: "检测到 AI API 调用",
 	title_zh: "检测到 AI API 调用",
 	message: "检测到 AI API 调用",

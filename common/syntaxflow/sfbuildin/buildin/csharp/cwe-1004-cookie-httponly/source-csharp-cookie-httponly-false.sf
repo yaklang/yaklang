@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# Cookie HttpOnly 关闭"
-	title_zh: "检测 C# Cookie HttpOnly 关闭"
+	title: "源码匹配：检测 C# Cookie HttpOnly 关闭"
+	title_zh: "源码匹配：检测 C# Cookie HttpOnly 关闭"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-csharp-cookie-httponly-false"
 	risk: "cookie-security"
 	cwe: "CWE-1004"
@@ -56,7 +56,7 @@ NEG
 )
 ${*.cs}.pattern_regex(/HttpOnly\s*=\s*false/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 C# Cookie HttpOnly 关闭",
 	title_zh: "检测 C# Cookie HttpOnly 关闭",
 	message: "检测 C# Cookie HttpOnly 关闭",

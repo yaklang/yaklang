@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "检测 JavaScript document.write"
-	title_zh: "检测 JavaScript document.write"
+	title: "源码匹配：检测 JavaScript document.write"
+	title_zh: "源码匹配：检测 JavaScript document.write"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-js-document-write"
 	risk: "xss"
 	desc: <<<DESC
@@ -35,7 +35,7 @@ function show(html) { document.body.textContent = html; }
 NEG
 )
 
-${*.js}.pattern_regex(/document\.write(ln)?\s*\(/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/document\.write(ln)?\s*\(/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 JavaScript document.write",

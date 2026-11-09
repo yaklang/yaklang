@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "c"
-	title: "源码扫描：C TLS 证书校验被禁用"
-	title_zh: "源码扫描：C TLS 证书校验被禁用"
+	title: "源码匹配：C TLS 证书校验被禁用"
+	title_zh: "源码匹配：C TLS 证书校验被禁用"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-c-tls-verify-none"
 	risk: "certificate-validation"
 	cwe: "CWE-295"
@@ -53,7 +53,7 @@ void ok(void) {
 
 NEG
 )
-${*.c}.pattern_regex(/SSL_VERIFY_NONE|CURLOPT_SSL_VERIFY(PEER|HOST)\s*,\s*\(?0/) as $hit
+${/\.(c|h)$/}.pattern_regex(/SSL_VERIFY_NONE|CURLOPT_SSL_VERIFY(PEER|HOST)\s*,\s*\(?0/) as $hit
 alert $hit for {
 	level: "high",
 	title: "源码扫描：C TLS 证书校验被禁用",

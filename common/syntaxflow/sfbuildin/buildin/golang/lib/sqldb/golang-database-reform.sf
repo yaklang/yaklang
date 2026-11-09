@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang Database Reform Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-database-reform'
 	desc: <<<DESC
 ### 漏洞描述

@@ -2,7 +2,7 @@ desc(
 	title: "Python dynamic import (lib)"
 	title_zh: "动态导入（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-dynamic-import"
 	risk: "dynamic-code-loading"
 	desc: <<<DESC

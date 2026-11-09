@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# JWT 签名校验缺失"
-	title_zh: "检测 C# JWT 签名校验缺失"
+	title: "源码匹配：检测 C# JWT 签名校验缺失"
+	title_zh: "源码匹配：检测 C# JWT 签名校验缺失"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-csharp-jwt-no-signature-validation"
 	risk: "improper-authentication"
 	cwe: "CWE-345"

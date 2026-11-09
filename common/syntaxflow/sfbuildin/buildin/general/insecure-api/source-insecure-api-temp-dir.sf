@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 std::env::temp_dir 使用"
-	title_zh: "检测到 std::env::temp_dir 使用"
+	title: "源码匹配：检测到 std::env::temp_dir 使用"
+	title_zh: "源码匹配：检测到 std::env::temp_dir 使用"
 	type: vuln
-	level: low
+	level: "middle"
 	rule_id: "source-insecure-api-temp-dir"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.rs}.pattern_regex(/(?:std::env::temp_dir\(\))/) as $hit
 alert $hit for {
-	level: "low",
+	level: "middle",
 	title: "检测到 std::env::temp_dir 使用",
 	title_zh: "检测到 std::env::temp_dir 使用",
 	message: "检测到 std::env::temp_dir 使用",

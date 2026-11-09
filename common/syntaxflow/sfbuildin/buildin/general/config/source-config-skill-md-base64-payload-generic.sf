@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Skill 文档包含 Base64 载荷"
+	title: "源码匹配：检测到 Skill 文档包含 Base64 载荷"
 	title_zh: "检测到 Skill 文档包含 Base64 载荷",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-config-skill-md-base64-payload-generic"
 	risk: "encoded-payload-execution"
 	desc: <<<DESC

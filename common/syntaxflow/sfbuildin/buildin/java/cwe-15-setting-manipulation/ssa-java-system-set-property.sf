@@ -4,7 +4,7 @@ desc(
 	title: "数据流：Java System.setProperty 接受外部值"
 	title_zh: "数据流：Java System.setProperty 接受外部值"
 	type: vuln
-	level: low
+	level: ""
 	rule_id: "ssa-java-system-set-property"
 	risk: "security-misconfiguration"
 	cwe: "CWE-15"

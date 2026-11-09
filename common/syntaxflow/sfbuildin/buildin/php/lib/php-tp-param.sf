@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP ThinkPHP Param Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'php-tp-all-extern-variable-param-source'
 	desc: <<<DESC
 ### 1. 规则目的

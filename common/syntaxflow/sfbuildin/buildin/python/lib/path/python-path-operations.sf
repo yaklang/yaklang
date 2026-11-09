@@ -2,7 +2,7 @@ desc(
 	title: "Python path and filesystem operations (lib)"
 	title_zh: "路径与文件系统操作（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-path-operations"
 	risk: "path-traversal"
 	desc: <<<DESC

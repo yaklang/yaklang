@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang Gin HTTP Handler"
 	type: audit
-	level: info
+	level: ""
 	lib: "golang-http-gin"
 	desc: <<<DESC
 ### 漏洞描述

@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP assert"
-	title_zh: "结构扫描：PHP assert 调用"
+	title: "结构匹配：PHP assert"
+	title_zh: "结构匹配：PHP assert 调用"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-php-assert"
 	risk: "code-injection"
 	desc: <<<DESC

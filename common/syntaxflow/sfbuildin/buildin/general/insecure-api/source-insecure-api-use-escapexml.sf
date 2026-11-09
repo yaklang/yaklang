@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到使用 escapeXml"
+	title: "源码匹配：检测到使用 escapeXml"
 	title_zh: "检测到使用 escapeXml",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-use-escapexml"
 	risk: "xss"
 	desc: <<<DESC

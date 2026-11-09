@@ -2,7 +2,7 @@ desc(
 	title: "C OS command execution sinks (lib)"
 	title_zh: "操作系统命令执行入口（C 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: c
 	lib: "c-command-exec-sink"
 	risk: "command-injection"

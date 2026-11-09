@@ -1,0 +1,80 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：Python sensitive value logged"
+	title_zh: "源码匹配：Python 日志记录敏感信息"
+	type: vuln
+	level: "middle"
+	risk: "information-exposure"
+	cwe: "CWE-532"
+	desc: <<<DESC
+日志行里出现密码、口令、令牌等敏感字段名，敏感值会进入日志系统。
+
+### 检测方式
+源码正则匹配 `logger.*` 调用行中的敏感字段名。
+DESC
+	solution: <<<SOLUTION
+- 不要记录口令、令牌、卡号等敏感值。
+- 只记录用户 id 等非敏感标识。
+SOLUTION
+	alert_min: 1
+	rule_id: "d693b0c7-5401-4c6e-bdea-077b0f8c911c"
+)
+${*.py}.pattern_regex(/(?i)(logger|logging)\.\w+\([^\n]*\b(password|passwd|secret|token|ssn)\b/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Python sensitive value logged",
+	title_zh: "Python 日志记录敏感信息",
+	risk: "information-exposure",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?password=
+import logging
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+logger = logging.getLogger("auth")
+
+@app.route("/login", methods=["POST"])
+def login():
+    password = request.form.get("password", "")  # wb:source id=src
+    logger.info("login failed password=%s", password)  # wb:sink id=sink
+    return "denied"
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?password=
+import logging
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+logger = logging.getLogger("auth")
+
+@app.route("/login", methods=["POST"])
+def login():
+    user = request.form.get("user", "")  # wb:source id=src
+    logger.info("login failed user=%s", user)  # wb:sink id=sink
+    return "denied"
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

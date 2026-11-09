@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Claude 设置环境变量 URL 覆盖"
+	title: "源码匹配：检测到 Claude 设置环境变量 URL 覆盖"
 	title_zh: "检测到 Claude 设置环境变量 URL 覆盖",
 	type: vuln
-	level: critical
+	level: "middle"
 	rule_id: "source-config-claude-settings-env-url-override-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
@@ -51,7 +51,7 @@ ${/.*\/\.claude\/.*/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_URL)\s*"?\s
 ${/.*\/[^\/]*\.settings\.json/}.pattern_regex(/(ANTHROPIC_BASE_URL|OPENAI_BASE_URL)\s*"?\s*[=:]\s*"?\s*\S+/) as $p3
 $p0 + $p1 + $p2 + $p3 as $hit
 alert $hit for {
-	level: "critical",
+	level: "middle",
 	title: "检测到 Claude 设置环境变量 URL 覆盖",
 	title_zh: "检测到 Claude 设置环境变量 URL 覆盖",
 	message: "检测到 Claude 设置环境变量 URL 覆盖",

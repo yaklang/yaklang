@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 SSH 忽略主机密钥校验"
-	title_zh: "检测到 SSH 忽略主机密钥校验"
+	title: "源码匹配：检测到 SSH 忽略主机密钥校验"
+	title_zh: "源码匹配：检测到 SSH 忽略主机密钥校验"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-avoid-ssh-insecure-ignore-host-key"
 	risk: "certificate-validation"
 	desc: <<<DESC

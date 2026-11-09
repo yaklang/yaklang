@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到不安全的 WebSocket 连接"
+	title: "源码匹配：检测到不安全的 WebSocket 连接"
 	title_zh: "检测到不安全的 WebSocket 连接",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-detect-insecure-websocket"
 	risk: "cleartext-transmission"
 	desc: <<<DESC

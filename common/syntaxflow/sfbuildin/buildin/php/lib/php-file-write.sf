@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP File Write Methods"
 	type: audit
-	level: info
+	level: ""
 	lib: 'php-file-write'
 	desc: <<<DESC
 ### 规则描述

@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang File Read bufio"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-file-read-bufio'
 	desc: <<<DESC
 ### 规则描述

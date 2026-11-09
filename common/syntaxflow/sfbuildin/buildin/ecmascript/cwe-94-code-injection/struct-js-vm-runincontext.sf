@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "javascript"
-	title: "Struct scan: JavaScript vm.runInContext"
-	title_zh: "结构扫描：JavaScript vm.runInContext"
+	title: "结构匹配：JavaScript vm.runInContext"
+	title_zh: "结构匹配：JavaScript vm.runInContext"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-js-vm-runincontext"
 	risk: "code-injection"
 	desc: <<<DESC

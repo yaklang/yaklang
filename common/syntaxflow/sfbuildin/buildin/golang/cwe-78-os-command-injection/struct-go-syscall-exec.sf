@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go syscall.Exec"
-	title_zh: "结构扫描：Go syscall.Exec"
+	title: "结构匹配：Go syscall.Exec"
+	title_zh: "结构匹配：Go syscall.Exec"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-go-syscall-exec"
 	risk: "command-injection"
 	desc: <<<DESC

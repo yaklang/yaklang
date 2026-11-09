@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Golang net/http Handlers"
 	type: audit
-	level: info
+	level: ""
 	lib: "golang-http-net"
 	desc: <<<DESC
 ### 规则目的

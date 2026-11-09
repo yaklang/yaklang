@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java RC2 Cipher"
-	title_zh: "结构扫描：Java RC2 加密"
+	title: "结构匹配：Java RC2 Cipher"
+	title_zh: "结构匹配：Java RC2 加密"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-java-rc2-cipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 Cipher.getInstance(*?{have: "RC2"}) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Java RC2 Cipher",
 	title_zh: "结构扫描：Java RC2 加密",
 	message: "结构扫描：Java RC2 加密",

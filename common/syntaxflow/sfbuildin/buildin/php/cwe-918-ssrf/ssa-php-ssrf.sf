@@ -1,0 +1,68 @@
+
+_GET.* as $p1
+_POST.* as $p2
+_REQUEST.* as $p3
+$p1 + $p2 + $p3 as $raw
+
+file_get_contents(* as $arg)
+curl_init(* as $arg)
+$arg?{!opcode: add}?{!(<self><getUsers()>?{opcode: eq})}?{!(<self><getUsers()>?{opcode: neq})}?{!(<self><getCallee>?{have: /(?i)realpath/})}?{!(<self><getUsers()>?{opcode: call && (<self><getCallee>?{have: /(?i)(parse_url|filter_var|realpath)/})})}?{<self> #{include: `* & $raw`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "PHP SSRF: Request Input Used as Request URL",
+	title_zh: "PHP SSRF：请求参数作为请求 URL",
+	message: "请求参数直接作为请求 URL，缺少协议与主机白名单校验。",
+	risk: "ssrf",
+}
+
+desc(
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch?url=
+$url = $_GET['url'] ?? ''; // wb:source id=src
+echo file_get_contents($url); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch?url=
+$url = $_GET['url'] ?? ''; // wb:source id=src
+$parts = parse_url($url);
+if (($parts['scheme'] ?? '') !== 'https' || ($parts['host'] ?? '') !== 'api.example.internal') {
+    http_response_code(400);
+    exit;
+}
+$handle = curl_init($url);
+curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($handle, CURLOPT_FOLLOWLOCATION, false);
+echo curl_exec($handle); // wb:sink id=sink
+NEG
+	rule_id: "1943387c-171d-413b-ba24-434bdebf0327"
+)

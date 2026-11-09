@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "源码扫描：Python csv.writer 未转义公式"
-	title_zh: "源码扫描：Python csv.writer 未转义公式"
+	title: "源码匹配：Python csv.writer 未转义公式"
+	title_zh: "源码匹配：Python csv.writer 未转义公式"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-python-csv-writer"
 	risk: "formula-injection"
 	cwe: "CWE-1236"

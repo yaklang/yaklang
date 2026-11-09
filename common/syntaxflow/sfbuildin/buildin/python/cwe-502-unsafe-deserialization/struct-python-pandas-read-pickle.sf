@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python pandas read_pickle"
-	title_zh: "结构扫描：Python pandas.read_pickle"
+	title: "结构匹配：Python pandas read_pickle"
+	title_zh: "结构匹配：Python pandas.read_pickle"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-pandas-read-pickle"
 	risk: "deserialization"
 	desc: <<<DESC

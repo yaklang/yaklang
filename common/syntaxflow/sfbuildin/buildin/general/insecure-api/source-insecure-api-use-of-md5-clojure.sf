@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "Clojure 中使用 MD5"
-	title_zh: "Clojure 中使用 MD5"
+	title: "源码匹配：Clojure 中使用 MD5"
+	title_zh: "源码匹配：Clojure 中使用 MD5"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-use-of-md5-clojure"
 	risk: "weak-hash"
 	desc: <<<DESC

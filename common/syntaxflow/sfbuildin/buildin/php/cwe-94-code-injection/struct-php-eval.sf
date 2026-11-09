@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP eval"
-	title_zh: "结构扫描：PHP eval 调用"
+	title: "结构匹配：PHP eval"
+	title_zh: "结构匹配：PHP eval 调用"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-php-eval"
 	risk: "code-injection"
 	desc: <<<DESC

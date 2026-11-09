@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密"
+	title: "源码匹配：检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密"
 	title_zh: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-aws-fsx-lustre-filesystem-encrypted-with-cmk"
 	risk: "security-misconfiguration"
 	desc: <<<DESC

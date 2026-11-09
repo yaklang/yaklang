@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到代码包含双向控制字符"
+	title: "源码匹配：检测到代码包含双向控制字符"
 	title_zh: "检测到代码包含双向控制字符",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-contains-bidirectional-characters"
 	risk: "unicode-direction-control"
 	desc: <<<DESC
@@ -28,15 +28,15 @@ DESC
 移除隐藏的 Unicode 双向控制字符，并使用可显示隐藏字符的编辑器审查源码。
 SOLUTION
 	alert_min: 1
-	"file://pos.sample": <<<POS
+	"file://pos.c": <<<POS
 allow = "admin‮evil"
 POS
-	"safefile://neg.sample": <<<NEG
+	"safefile://neg.c": <<<NEG
 allow = "admin-evil"
 NEG
 )
 
-${*}.pattern_regex(/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/) as $hit
+${/\.(c|h|cc|cpp|cxx|hpp|cs|java|kt|kts|go|rs|py|rb|php|js|jsx|ts|tsx|mjs|cjs|vue|svelte|swift|scala|lua|pl|pm|sh|bash|zsh|ps1|sql|m|mm)$/}.pattern_regex(/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到代码包含双向控制字符",

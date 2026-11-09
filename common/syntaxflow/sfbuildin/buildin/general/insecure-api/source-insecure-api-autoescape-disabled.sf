@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到自动转义被禁用"
+	title: "源码匹配：检测到自动转义被禁用"
 	title_zh: "检测到自动转义被禁用",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-autoescape-disabled"
 	risk: "xss"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ POS
 NEG
 )
 
-${*.html}.pattern_regex(/(?i)\bescape\s*=\s*["']?false["']?/) as $p0
+${/\.(html|htm)$/}.pattern_regex(/(?i)\bescape\s*=\s*["']?false["']?/) as $p0
 ${*.xhtml}.pattern_regex(/(?i)\bescape\s*=\s*["']?false["']?/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {

@@ -2,7 +2,7 @@ desc(
 	title: "Python random module usage (lib)"
 	title_zh: "标准库 random 伪随机（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-weak-random"
 	risk: "weak-randomness"
 	desc: <<<DESC

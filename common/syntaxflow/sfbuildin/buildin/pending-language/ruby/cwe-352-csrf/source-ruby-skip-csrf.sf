@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "ruby"
-	title: "源码扫描：Ruby 跳过 authenticity token"
-	title_zh: "源码扫描：Ruby 跳过 authenticity token"
+	title: "源码匹配：Ruby 跳过 authenticity token"
+	title_zh: "源码匹配：Ruby 跳过 authenticity token"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-ruby-skip-csrf"
 	risk: "csrf"
 	cwe: "CWE-352"
@@ -46,7 +46,7 @@ NEG
 )
 ${*.rb}.pattern_regex(/skip_before_action\s+:verify_authenticity_token/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Ruby 跳过 authenticity token",
 	title_zh: "源码扫描：Ruby 跳过 authenticity token",
 	message: "源码扫描：Ruby 跳过 authenticity token",

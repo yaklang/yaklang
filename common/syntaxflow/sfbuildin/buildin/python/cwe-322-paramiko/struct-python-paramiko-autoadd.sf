@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python paramiko AutoAddPolicy"
-	title_zh: "结构扫描：Python paramiko AutoAddPolicy"
+	title: "结构匹配：Python paramiko AutoAddPolicy"
+	title_zh: "结构匹配：Python paramiko AutoAddPolicy"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-python-paramiko-autoadd"
 	risk: "certificate-validation"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 AutoAddPolicy as $call
 AutoAddPolicy() as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Python paramiko AutoAddPolicy",
 	title_zh: "结构扫描：Python paramiko AutoAddPolicy",
 	message: "结构扫描：Python paramiko AutoAddPolicy",

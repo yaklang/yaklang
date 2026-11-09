@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "javascript"
-	title: "Struct scan: React dangerouslySetInnerHTML"
-	title_zh: "结构扫描：React dangerouslySetInnerHTML"
+	title: "结构匹配：React dangerouslySetInnerHTML"
+	title_zh: "结构匹配：React dangerouslySetInnerHTML"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-js-dangerously-set-innerhtml"
 	risk: "xss"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ NEG
 
 dangerouslySetInnerHTML as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: React dangerouslySetInnerHTML",
 	title_zh: "结构扫描：React dangerouslySetInnerHTML",
 	message: "结构扫描：React dangerouslySetInnerHTML",

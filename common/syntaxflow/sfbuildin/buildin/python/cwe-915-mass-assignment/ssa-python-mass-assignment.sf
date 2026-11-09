@@ -1,0 +1,83 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python mass assignment from request body"
+	title_zh: "数据流：Python 批量赋值：请求体直接更新对象"
+	type: vuln
+	level: ""
+	risk: "mass-assignment"
+	cwe: "CWE-915"
+	desc: <<<DESC
+请求体字段直接传给 `update()`，攻击者可以改写不该改的字段。
+
+### 检测方式
+请求来源流入 `update` 调用。
+DESC
+	solution: <<<SOLUTION
+- 用白名单逐字段赋值。
+- 不要把请求体整包传给 `update`。
+SOLUTION
+	alert_min: 1
+	rule_id: "6dad1845-3f01-42af-800a-4c8ca80f099a"
+)
+*?{opcode: undefined}?{have: /(?i)request|json/} as $p
+update(* as $arg)
+$arg?{<self> #{include: `* & $p`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Python mass assignment from request body",
+	title_zh: "Python 批量赋值：请求体直接更新对象",
+	risk: "mass-assignment",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /profile
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/profile", methods=["POST"])
+def profile():
+    fields = request.get_json(force=True)  # wb:source id=src
+    user = {"name": "demo", "is_admin": False}
+    user.update(fields)  # wb:sink id=sink
+    return user
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /profile
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+ALLOWED = {"name", "locale"}
+
+@app.route("/profile", methods=["POST"])
+def profile():
+    fields = request.get_json(force=True)  # wb:source id=src
+    user = {"name": "demo", "is_admin": False}
+    for key, value in fields.items():
+        if key in ALLOWED:
+            user[key] = value
+    return user  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

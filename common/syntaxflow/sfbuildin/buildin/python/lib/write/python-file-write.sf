@@ -2,7 +2,7 @@ desc(
 	title: "Python file write operations (lib)"
 	title_zh: "文件写入操作（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-file-write"
 	risk: "arbitrary-file-write"
 	desc: <<<DESC

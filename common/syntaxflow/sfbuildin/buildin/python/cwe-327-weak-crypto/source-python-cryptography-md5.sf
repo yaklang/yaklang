@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python cryptography MD5"
-	title_zh: "检测 Python cryptography MD5"
+	title: "源码匹配：检测 Python cryptography MD5"
+	title_zh: "源码匹配：检测 Python cryptography MD5"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-python-cryptography-md5"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.py}.pattern_regex(/hashes\.MD5\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Python cryptography MD5",
 	title_zh: "检测 Python cryptography MD5",
 	message: "检测 Python cryptography MD5",

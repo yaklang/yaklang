@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到不可移植的 /tmp 路径"
-	title_zh: "检测到不可移植的 /tmp 路径"
+	title: "源码匹配：检测到不可移植的 /tmp 路径"
+	title_zh: "源码匹配：检测到不可移植的 /tmp 路径"
 	type: portability
-	level: middle
+	level: "middle"
 	rule_id: "source-portability-not-portable-tmp-string"
 	risk: "code-style"
 	desc: <<<DESC

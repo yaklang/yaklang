@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP ftp_connect"
-	title_zh: "结构扫描：PHP ftp_connect"
+	title: "结构匹配：PHP ftp_connect"
+	title_zh: "结构匹配：PHP ftp_connect"
 	type: vuln
-	level: medium
+	level: "low"
 	rule_id: "struct-php-ftp-connect"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ftp_connect(* as $h) as $call
 alert $call for {
-	level: "medium",
+	level: "low",
 	title: "Struct scan: PHP ftp_connect",
 	title_zh: "结构扫描：PHP ftp_connect",
 	message: "结构扫描：PHP ftp_connect",

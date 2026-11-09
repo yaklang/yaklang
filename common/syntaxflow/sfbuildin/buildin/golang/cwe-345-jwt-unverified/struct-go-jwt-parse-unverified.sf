@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "结构扫描：Go JWT ParseUnverified"
-	title_zh: "结构扫描：Go JWT ParseUnverified"
+	title: "结构匹配：Go JWT ParseUnverified"
+	title_zh: "结构匹配：Go JWT ParseUnverified"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-go-jwt-parse-unverified"
 	risk: "improper-authentication"
 	cwe: "CWE-345"

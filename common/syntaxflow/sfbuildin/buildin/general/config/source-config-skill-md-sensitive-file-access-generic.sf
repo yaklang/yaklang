@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Skill 文档访问敏感文件"
+	title: "源码匹配：检测到 Skill 文档访问敏感文件"
 	title_zh: "检测到 Skill 文档访问敏感文件",
 	type: vuln
-	level: critical
+	level: "middle"
 	rule_id: "source-config-skill-md-sensitive-file-access-generic"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -61,7 +61,7 @@ ${*skill.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch|grep)\s
 ${*skill.md}.pattern_regex(/(?i)(?:read|cat|load|parse|open|access|fetch)\s+(?:browser\s+)?cookies?\s+(?:from|in)\s+(?:Chrome|Firefox|Safari|Edge|~\/Library\/Application Support\/(?:Google\/Chrome|Firefox))/) as $p15
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 + $p13 + $p14 + $p15 as $hit
 alert $hit for {
-	level: "critical",
+	level: "middle",
 	title: "检测到 Skill 文档访问敏感文件",
 	title_zh: "检测到 Skill 文档访问敏感文件",
 	message: "检测到 Skill 文档访问敏感文件",

@@ -58,6 +58,47 @@ func applyModeAwareVerifyDefaults(frame *sfvm.SFFrame, cfg *config) {
 	}
 }
 
+// applyHighSeverityVerifyDefaults requires POS+NEG evidence for every rule that
+// can emit high/critical. Without it a broad regex or sink-only query can ship
+// at high severity with no fixture that demonstrates a near-miss stays clean.
+// Library rules are sink/helper definitions and run through their importers.
+func applyHighSeverityVerifyDefaults(frame *sfvm.SFFrame, cfg *config) {
+	if frame == nil || cfg == nil || !requiresHighSeverityEvidence(frame.GetRule()) {
+		return
+	}
+	cfg.requirePositive = true
+	cfg.requireNegative = true
+	cfg.verifyNegative = true
+	cfg.strictAlertHigh = true
+}
+
+func requiresHighSeverityEvidence(rule *schema.SyntaxFlowRule) bool {
+	if rule == nil || rule.AllowIncluded {
+		return false
+	}
+	if isHighSeverity(rule.Severity) {
+		return true
+	}
+	for _, info := range rule.AlertDesc {
+		if info == nil || info.OnlyMsg {
+			continue
+		}
+		if isHighSeverity(info.Severity) {
+			return true
+		}
+	}
+	return false
+}
+
+func isHighSeverity(sev schema.SyntaxFlowSeverity) bool {
+	switch schema.ValidSeverityType(sev) {
+	case schema.SFR_SEVERITY_HIGH, schema.SFR_SEVERITY_CRITICAL:
+		return true
+	default:
+		return false
+	}
+}
+
 // EvaluateVerifyFilesystemWithRule compiles rule content and checks embedded
 // POS/NEG filesystems. Dispatch is by desc(mode): source uses sfpattern,
 // struct compiles with WithStructRule, SSA runs full IR query. source/struct
@@ -85,6 +126,7 @@ func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerify
 		return report
 	}
 	applyModeAwareVerifyDefaults(frame, &cfg)
+	applyHighSeverityVerifyDefaults(frame, &cfg)
 
 	// Source-mode rules: verify on raw files via sfpattern (no SSA compile).
 	if sfvm.FrameIsSourceMode(frame) {

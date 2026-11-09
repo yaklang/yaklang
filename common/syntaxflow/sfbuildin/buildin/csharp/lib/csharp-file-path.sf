@@ -2,7 +2,7 @@ desc(
 	title: "C#/.NET file path operation sinks (lib)"
 	title_zh: "文件路径操作入口（C#/.NET 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: csharp
 	lib: "csharp-file-path"
 	risk: "path-traversal"

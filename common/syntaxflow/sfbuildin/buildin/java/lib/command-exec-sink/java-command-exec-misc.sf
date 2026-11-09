@@ -106,7 +106,7 @@ $ztExecParam as $output;
 alert $output for {
 	title: "Detect Java Thirdparty CommandLine Executing Sink",
 	title_zh: "查找Java第三方库命令执行Sink",
-	level: "mid",
+	level: "middle",
 	message: "检测到Java代码中通过第三方库（如Apache Commons Exec、Picocli等）可能存在命令执行漏洞，需进一步审计确认。",
 	solution: <<<SOLUTION
 ### 修复建议

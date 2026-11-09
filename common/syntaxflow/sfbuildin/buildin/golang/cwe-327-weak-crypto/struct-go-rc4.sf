@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go crypto/rc4"
-	title_zh: "结构扫描：Go crypto/rc4"
+	title: "结构匹配：Go crypto/rc4"
+	title_zh: "结构匹配：Go crypto/rc4"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-go-rc4"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 rc4.NewCipher as $call
 rc4.NewCipher(* as $k) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Go crypto/rc4",
 	title_zh: "结构扫描：Go crypto/rc4",
 	message: "结构扫描：Go crypto/rc4",

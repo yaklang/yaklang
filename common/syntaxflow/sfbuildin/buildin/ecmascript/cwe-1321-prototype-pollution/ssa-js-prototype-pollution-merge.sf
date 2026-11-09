@@ -1,0 +1,193 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 原型污染：用户对象递归合并"
+	title_zh: "数据流：Node.js 原型污染：用户对象递归合并"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-prototype-pollution-merge"
+	risk: "input-validation"
+	cwe: "CWE-1321"
+	desc: <<<DESC
+### 规则说明
+请求体对象被递归合并进目标对象，攻击者可用 `__proto__` 键污染对象原型。
+
+### 风险类型
+input-validation
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+过滤 `__proto__`/`constructor`/`prototype` 键，使用 `Object.create(null)` 或 `Map`，并升级存在漏洞的合并库。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /merge
+function merge(dst, src) {
+  for (const key of Object.keys(src)) {
+    if (src[key] && typeof src[key] === "object") {
+      dst[key] = dst[key] || {};
+      merge(dst[key], src[key]);
+    } else {
+      dst[key] = src[key]; // wb:sink id=sink
+    }
+  }
+  return dst;
+}
+
+function update(req) {
+  const body = req.body; // wb:source id=src
+  return merge({}, body);
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = update(req);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	"safefile://app-safe.js": <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /merge
+const blocked = new Set(["__proto__", "constructor", "prototype"]);
+
+function merge(dst, src) {
+  for (const key of Object.keys(src)) {
+    if (blocked.has(key)) {
+      continue;
+    }
+    if (src[key] && typeof src[key] === "object") {
+      dst[key] = dst[key] || {};
+      merge(dst[key], src[key]);
+    } else {
+      dst[key] = src[key];
+    }
+  }
+  return dst; // wb:sink id=sink
+}
+
+function update(req) {
+  const body = req.body; // wb:source id=src
+  return merge(Object.create(null), body);
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = update(req);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)
+
+req.body as $bodysrc
+req.body.* as $bodysrc
+
+// The loop key of Object.keys(src) is the only value that reaches the
+// dynamic write dst[key] = src[key]. A blocklist guard turns that key into a
+// has() call operand; without the guard the key stays unvalidated.
+*.*?{have: /^Undefined-key/} as $key
+
+$key?{<self> #{
+    include: <<<CODE
+* & $bodysrc as $__next__
+CODE,
+}->}?{!(<getUsers()>?{opcode: call && <getCallee>?{have: /(?i)(has|includes|indexOf|equals|isProto|blocked)/}})} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Node.js 原型污染：用户对象递归合并",
+	title_zh: "Node.js 原型污染：用户对象递归合并",
+	risk: "input-validation",
+}

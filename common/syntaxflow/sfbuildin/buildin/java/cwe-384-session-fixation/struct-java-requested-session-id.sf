@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "结构扫描：Java 使用客户端会话 ID"
-	title_zh: "结构扫描：Java 使用客户端会话 ID"
+	title: "结构匹配：Java 使用客户端会话 ID"
+	title_zh: "结构匹配：Java 使用客户端会话 ID"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-java-requested-session-id"
 	risk: "session-fixation"
 	cwe: "CWE-384"
@@ -47,7 +47,7 @@ NEG
 getRequestedSessionId as $call
 getRequestedSessionId(* as $arg) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "结构扫描：Java 使用客户端会话 ID",
 	title_zh: "结构扫描：Java 使用客户端会话 ID",
 	message: "结构扫描：Java 使用客户端会话 ID",

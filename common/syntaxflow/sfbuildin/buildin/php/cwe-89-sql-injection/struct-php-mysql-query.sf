@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP mysql_query"
-	title_zh: "结构扫描：PHP mysql_query"
+	title: "结构匹配：PHP mysql_query"
+	title_zh: "结构匹配：PHP mysql_query"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "struct-php-mysql-query"
 	risk: "sql-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 mysql_query(* as $q) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: PHP mysql_query",
 	title_zh: "结构扫描：PHP mysql_query",
 	message: "结构扫描：PHP mysql_query",

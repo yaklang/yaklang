@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到未使用 defusedxmlrpc"
-	title_zh: "检测到未使用 defusedxmlrpc"
+	title: "源码匹配：检测到未使用 defusedxmlrpc"
+	title_zh: "源码匹配：检测到未使用 defusedxmlrpc"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-insecure-api-use-defused-xmlrpc"
 	risk: "xxe"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.py}.pattern_regex(/(?:import\s+xmlrpclib)|(?:import\s+SimpleXMLRPCServer)|(?:import\s+xmlrpc)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到未使用 defusedxmlrpc",
 	title_zh: "检测到未使用 defusedxmlrpc",
 	message: "检测到未使用 defusedxmlrpc",

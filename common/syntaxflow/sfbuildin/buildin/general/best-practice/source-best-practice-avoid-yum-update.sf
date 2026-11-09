@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Dockerfile 中使用 yum update"
-	title_zh: "检测到 Dockerfile 中使用 yum update"
+	title: "源码匹配：检测到 Dockerfile 中使用 yum update"
+	title_zh: "源码匹配：检测到 Dockerfile 中使用 yum update"
 	type: audit
-	level: low
+	level: "middle"
 	rule_id: "source-best-practice-avoid-yum-update"
 	risk: "best-practice"
 	desc: <<<DESC
@@ -35,7 +35,7 @@ NEG
 
 ${Dockerfile}.pattern_regex(/(?:yum\s+update)/) as $hit
 alert $hit for {
-	level: "low",
+	level: "middle",
 	title: "检测到 Dockerfile 中使用 yum update",
 	title_zh: "检测到 Dockerfile 中使用 yum update",
 	message: "检测到 Dockerfile 中使用 yum update",

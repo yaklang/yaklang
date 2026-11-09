@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python cryptography modes.ECB"
-	title_zh: "结构扫描：Python cryptography ECB"
+	title: "结构匹配：Python cryptography modes.ECB"
+	title_zh: "结构匹配：Python cryptography ECB"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-python-cryptography-ecb"
 	risk: "weak-cryptography"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 modes.ECB as $call
 modes.ECB(* as $k) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Python cryptography modes.ECB",
 	title_zh: "结构扫描：Python cryptography ECB",
 	message: "结构扫描：Python cryptography ECB",

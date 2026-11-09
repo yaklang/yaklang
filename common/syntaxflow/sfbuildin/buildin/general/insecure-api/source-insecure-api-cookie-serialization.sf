@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到不安全的 Cookie 序列化"
-	title_zh: "检测到不安全的 Cookie 序列化"
+	title: "源码匹配：检测到不安全的 Cookie 序列化"
+	title_zh: "源码匹配：检测到不安全的 Cookie 序列化"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-insecure-api-cookie-serialization"
 	risk: "deserialization"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.rb}.pattern_regex(/(?:Rails\.application\.config\.action_dispatch\.cookies_serializer\s+=\s+:marshal)|(?:Rails\.application\.config\.action_dispatch\.cookies_serializer\s+=\s+:hybrid)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到不安全的 Cookie 序列化",
 	title_zh: "检测到不安全的 Cookie 序列化",
 	message: "检测到不安全的 Cookie 序列化",

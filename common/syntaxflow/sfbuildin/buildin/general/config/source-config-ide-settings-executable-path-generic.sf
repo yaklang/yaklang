@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 IDE 设置可执行文件路径"
+	title: "源码匹配：检测到 IDE 设置可执行文件路径"
 	title_zh: "检测到 IDE 设置可执行文件路径",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-config-ide-settings-executable-path-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC

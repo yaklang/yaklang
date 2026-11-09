@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 Claude 设置绕过权限检查"
+	title: "源码匹配：检测到 Claude 设置绕过权限检查"
 	title_zh: "检测到 Claude 设置绕过权限检查",
 	type: vuln
-	level: critical
+	level: "high"
 	rule_id: "source-config-claude-settings-bypass-permissions-generic"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
@@ -50,7 +50,7 @@ ${/.*\/[^\/]*\.settings\.json/}.pattern_regex(/"allowUnsandboxedCommands"\s*:\s*
 ${/.*\/[^\/]*\.settings\.json/}.pattern_regex(/"enableWeakerNestedSandbox"\s*:\s*true/) as $p8
 $p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 as $hit
 alert $hit for {
-	level: "critical",
+	level: "high",
 	title: "检测到 Claude 设置绕过权限检查",
 	title_zh: "检测到 Claude 设置绕过权限检查",
 	message: "检测到 Claude 设置绕过权限检查",

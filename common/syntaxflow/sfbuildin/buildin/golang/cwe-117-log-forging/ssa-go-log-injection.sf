@@ -1,0 +1,94 @@
+desc(
+	mode: "ssa"
+	language: "golang"
+	title: "数据流：Go log injection via request data"
+	title_zh: "数据流：Go 日志注入：请求数据写入日志"
+	type: vuln
+	level: ""
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+请求数据写入日志。换行可以伪造日志行。
+
+### 检测方式
+`FormValue`/`Get` 来源流入 `log.Printf`；路径上出现 `ReplaceAll`/`Replace` 时跳过。
+DESC
+	solution: <<<SOLUTION
+- 删除输入里的 `\r` 和 `\n`。
+- 记录固定事件名。
+SOLUTION
+	alert_min: 1
+	rule_id: "ab28df7c-c941-49cd-9a0e-eeaa17ada85e"
+)
+*.FormValue(* as $src)
+log.Printf(* as $arg)
+$arg?{<self> #{include: `* & $src`, exclude: `*?{opcode: call && <self><getCallee><name>?{have: /(?i)(ReplaceAll|Replace)/}}`}->}?{!(<self><getUsers()>?{have: /(?i)failed/})} as $hit
+alert $hit for {
+	level: "middle",
+	title: "Go log injection via request data",
+	title_zh: "Go 日志注入：请求数据写入日志",
+	risk: "log-forging",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?user=
+import (
+	"log"
+	"net/http"
+	"os"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+	user := r.FormValue("user") // wb:source id=src
+	log.Printf("login user=%s", user) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/login", login)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?user=
+import (
+	"log"
+	"net/http"
+	"strings"
+	"os"
+)
+
+func login(w http.ResponseWriter, r *http.Request) {
+	user := r.FormValue("user") // wb:source id=src
+	clean := strings.ReplaceAll(strings.ReplaceAll(user, "\n", ""), "\r", "")
+	log.Printf("login user=%s", clean) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/login", login)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "javascript"
-	title: "源码扫描：JavaScript libxmljs noent"
-	title_zh: "源码扫描：JavaScript libxmljs noent"
+	title: "源码匹配：JavaScript libxmljs noent"
+	title_zh: "源码匹配：JavaScript libxmljs noent"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "source-js-libxml-noent"
 	risk: "xxe"
 	cwe: "CWE-611"
@@ -43,7 +43,7 @@ function ok(libxml, xml) { return libxml.parseXml(xml, { noent: false }); }
 
 NEG
 )
-${*.js}.pattern_regex(/noent\s*:\s*true/) as $hit
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/noent\s*:\s*true/) as $hit
 alert $hit for {
 	level: "high",
 	title: "源码扫描：JavaScript libxmljs noent",

@@ -1,0 +1,46 @@
+desc(
+	mode: "struct"
+	language: "python"
+	title: "结构匹配：检测 Python Django raw SQL"
+	title_zh: "结构匹配：检测 Python Django raw SQL"
+	type: vuln
+	level: "middle"
+	rule_id: "source-python-django-raw"
+	risk: "sql-injection"
+	desc: <<<DESC
+### 规则说明
+检测到 Manager.raw 或 extra 调用点。调用参数是否可控需要后续数据流规则判断。
+
+### 风险类型
+sql-injection
+
+### 影响
+该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+
+### 检测方式
+结构模式匹配调用点，不做数据流分析。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 ORM 或参数化 raw。
+SOLUTION
+	alert_min: 1
+	"file://q.py": <<<POS
+def q(Model, s):
+    return Model.objects.raw(s)
+POS
+	"safefile://s.py": <<<NEG
+def q(Model):
+    return Model.objects.all()
+NEG
+)
+
+*.raw(* as $sql) as $hit
+*.extra(* as $sql) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测 Python Django raw SQL",
+	title_zh: "检测 Python Django raw SQL",
+	message: "检测 Python Django raw SQL",
+	risk: "sql-injection",
+}

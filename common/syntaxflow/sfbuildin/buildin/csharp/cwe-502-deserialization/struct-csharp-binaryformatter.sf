@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# BinaryFormatter.Deserialize"
-	title_zh: "结构扫描：C# BinaryFormatter.Deserialize"
+	title: "结构匹配：C# BinaryFormatter.Deserialize"
+	title_zh: "结构匹配：C# BinaryFormatter.Deserialize"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-csharp-binaryformatter"
 	risk: "deserialization"
 	desc: <<<DESC

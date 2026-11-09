@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "c"
-	title: "源码扫描：C libxml2 外部实体加载"
-	title_zh: "源码扫描：C libxml2 外部实体加载"
+	title: "源码匹配：C libxml2 外部实体加载"
+	title_zh: "源码匹配：C libxml2 外部实体加载"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-c-libxml2-xxe"
 	risk: "xxe"
 	cwe: "CWE-611"
@@ -50,9 +50,9 @@ xmlDocPtr ok(const char *buf, int len) {
 
 NEG
 )
-${*.c}.pattern_regex(/XML_PARSE_DTDLOAD/) as $hit
+${/\.(c|h)$/}.pattern_regex(/XML_PARSE_DTDLOAD/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：C libxml2 外部实体加载",
 	title_zh: "源码扫描：C libxml2 外部实体加载",
 	message: "源码扫描：C libxml2 外部实体加载",

@@ -116,11 +116,37 @@ func setResultToCache(kind ssaconfig.SFResultSaveKind, res *SyntaxFlowResult) {
 	}
 }
 
+// liveResults holds results that may never get a database row. A report export
+// only sees the risk row, so it resolves the alert value through ResultUUID.
+// The TTL matches the saved-result cache: a scan publishes a risk while the
+// producing result is still fresh.
+var liveResults = utils.NewTTLCache[*SyntaxFlowResult](10 * time.Minute)
+
+func registerLiveResult(res *SyntaxFlowResult) {
+	if res == nil || res.resultUUID == "" {
+		return
+	}
+	liveResults.Set(res.resultUUID, res)
+}
+
+// CreateResultFromUUID returns an in-process result by its UUID. Database
+// results are resolvable this way too while their cache entry is alive.
+func CreateResultFromUUID(id string) *SyntaxFlowResult {
+	if id == "" {
+		return nil
+	}
+	if res, ok := liveResults.Get(id); ok {
+		return res
+	}
+	return nil
+}
+
 func CreateResultFromQuery(res *sfvm.SFFrameResult, config *ssaconfig.Config) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.setMemoryResult(res)
 	ret.rule = res.GetRule()
 	ret.Config = config
+	registerLiveResult(ret)
 	return ret
 }
 
@@ -129,6 +155,7 @@ func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowRes
 	ret.program = prog
 	ret.setMemoryResult(res)
 	ret.rule = res.GetRule()
+	registerLiveResult(ret)
 	return ret
 }
 

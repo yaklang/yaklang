@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP phpinfo"
-	title_zh: "检测 PHP phpinfo"
+	title: "源码匹配：检测 PHP phpinfo"
+	title_zh: "源码匹配：检测 PHP phpinfo"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-php-phpinfo"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.php}.pattern_regex(/(?m)(?<![\w>])phpinfo\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 PHP phpinfo",
 	title_zh: "检测 PHP phpinfo",
 	message: "检测 PHP phpinfo",

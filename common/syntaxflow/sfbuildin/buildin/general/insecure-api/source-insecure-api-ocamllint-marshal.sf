@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 OCaml Marshal 反序列化"
-	title_zh: "检测到 OCaml Marshal 反序列化"
+	title: "源码匹配：检测到 OCaml Marshal 反序列化"
+	title_zh: "源码匹配：检测到 OCaml Marshal 反序列化"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-ocamllint-marshal"
 	risk: "deserialization"
 	desc: <<<DESC

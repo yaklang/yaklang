@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到 JavaScript 调试器残留"
-	title_zh: "检测到 JavaScript 调试器残留"
+	title: "源码匹配：检测到 JavaScript 调试器残留"
+	title_zh: "源码匹配：检测到 JavaScript 调试器残留"
 	type: audit
-	level: middle
+	level: "middle"
 	rule_id: "source-best-practice-javascript-debugger"
 	risk: "best-practice"
 	desc: <<<DESC
@@ -33,8 +33,8 @@ console.log
 NEG
 )
 
-${*.js}.pattern_regex(/(?:debugger;)/) as $p0
-${*.ts}.pattern_regex(/(?:debugger;)/) as $p1
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/(?:debugger;)/) as $p0
+${/\.(ts|tsx|mts|cts)$/}.pattern_regex(/(?:debugger;)/) as $p1
 $p0 + $p1 as $hit
 alert $hit for {
 	level: "middle",

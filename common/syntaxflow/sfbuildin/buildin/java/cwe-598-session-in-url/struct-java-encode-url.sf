@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java encodeURL session rewriting"
-	title_zh: "结构扫描：Java encodeURL 会话重写"
+	title: "结构匹配：Java encodeURL session rewriting"
+	title_zh: "结构匹配：Java encodeURL 会话重写"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-encode-url"
 	risk: "session-hijacking"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 encodeURL(* as $u) as $call
 encodeRedirectURL(* as $u) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Java encodeURL session rewriting",
 	title_zh: "结构扫描：Java encodeURL 会话重写",
 	message: "结构扫描：Java encodeURL 会话重写",

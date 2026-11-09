@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP mb_ereg_replace eval"
-	title_zh: "结构扫描：PHP mb_ereg_replace"
+	title: "结构匹配：PHP mb_ereg_replace eval"
+	title_zh: "结构匹配：PHP mb_ereg_replace"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-php-mb-ereg-replace"
 	risk: "code-injection"
 	desc: <<<DESC

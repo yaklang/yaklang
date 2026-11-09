@@ -2,7 +2,7 @@ desc(
 	title: "C#/.NET SQL command sinks (lib)"
 	title_zh: "SQL 执行入口（C#/.NET 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: csharp
 	lib: "csharp-sql-sink"
 	risk: "sql-injection"

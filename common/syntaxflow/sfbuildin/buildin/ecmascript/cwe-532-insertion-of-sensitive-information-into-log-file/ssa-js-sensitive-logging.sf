@@ -1,0 +1,55 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 日志泄露敏感凭据"
+	title_zh: "数据流：Node.js 日志泄露敏感凭据"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-sensitive-logging"
+	risk: "information-exposure"
+	cwe: "CWE-532"
+	desc: <<<DESC
+### 规则说明
+密码、密钥或令牌等敏感字段被拼接进日志输出。
+
+### 风险类型
+information-exposure
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+日志中只记录用户标识等非敏感字段；确需记录时先脱敏。
+SOLUTION
+	alert_min: 1
+	'file://app.js': <<<POS
+function auth(req) {
+  console.log("token=" + req.body.token);
+}
+module.exports = auth;
+POS
+	'safefile://app-safe.js': <<<NEG
+function auth(req) {
+  console.log("auth checked");
+}
+module.exports = auth;
+NEG
+)
+
+<include('js-param')> as $params;
+
+console.log(*<slice(index=0)> as $arg)
+console.error(*<slice(index=0)> as $arg)
+console.warn(*<slice(index=0)> as $arg)
+console.info(*<slice(index=0)> as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{<self>?{have: /(?i)(password|passwd|secret|token|api[_-]?key)/}} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js 日志泄露敏感凭据",
+	title_zh: "Node.js 日志泄露敏感凭据",
+	risk: "information-exposure",
+}

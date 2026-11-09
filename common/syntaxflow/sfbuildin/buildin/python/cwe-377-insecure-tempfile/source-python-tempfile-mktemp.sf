@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python tempfile.mktemp"
-	title_zh: "检测 Python tempfile.mktemp"
+	title: "源码匹配：检测 Python tempfile.mktemp"
+	title_zh: "源码匹配：检测 Python tempfile.mktemp"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-python-tempfile-mktemp"
 	risk: "symlink-toctou"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.py}.pattern_regex(/tempfile\.mktemp\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Python tempfile.mktemp",
 	title_zh: "检测 Python tempfile.mktemp",
 	message: "检测 Python tempfile.mktemp",

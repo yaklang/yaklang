@@ -1,0 +1,77 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码匹配：PHP template injection: request template evaluated"
+	title_zh: "源码匹配：PHP 模板注入：请求模板被 eval 执行"
+	type: vuln
+	level: "middle"
+	risk: "template-injection"
+	cwe: "CWE-1336"
+	desc: <<<DESC
+请求参数作为模板内容交给 `eval` 执行，攻击者可以注入 PHP 代码。
+
+### 检测方式
+源码正则匹配 `eval('?>' . $template)` 形态。
+DESC
+	solution: <<<SOLUTION
+- 模板只允许来自白名单文件。
+- 不要对用户内容使用 `eval`。
+SOLUTION
+	alert_min: 1
+	rule_id: "6abaa09d-6164-4852-9823-d8def6faa3de"
+)
+${*.php}.pattern_regex(/eval\(\s*['"]\?>['"]\s*\./) as $hit
+alert $hit for {
+	level: "middle",
+	title: "PHP template injection: request template evaluated",
+	title_zh: "PHP 模板注入：请求模板被 eval 执行",
+	risk: "template-injection",
+}
+
+desc(
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /page
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /page?name=
+$tpl = $_POST['tpl'] ?? ''; // wb:source id=src
+eval('?>' . $tpl); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /page
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /page?name=
+$tpl = $_POST['tpl'] ?? ''; // wb:source id=src
+$allowed = ['home' => 'home.php', 'help' => 'help.php'];
+if (!isset($allowed[$tpl])) {
+    http_response_code(400);
+    exit;
+}
+include $allowed[$tpl]; // wb:sink id=sink
+NEG
+)

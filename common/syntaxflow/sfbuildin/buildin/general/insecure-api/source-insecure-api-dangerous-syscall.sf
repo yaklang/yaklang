@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "general"
-	title: "检测到危险的 syscall 调用"
-	title_zh: "检测到危险的 syscall 调用"
+	title: "源码匹配：检测到危险的 syscall 调用"
+	title_zh: "源码匹配：检测到危险的 syscall 调用"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-insecure-api-dangerous-syscall"
 	risk: "unsafe-implementation"
 	desc: <<<DESC
