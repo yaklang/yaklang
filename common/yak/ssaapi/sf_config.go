@@ -12,63 +12,125 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// simpleGetCalleeExclude matches the dataflow exclude shape
-// `*<getCallee> & $filter` (optionally `<self>`/spacing variants we do not
-// claim). This pattern is monotone: once a path contains a call whose callee is
-// in $filter, adding more path values cannot make the exclude stop matching.
-// That property is what makes branch pruning sound. The same shape with a
-// trailing `as $alias` or repeated `& $sym` is classified by dataflowFilterShape
-// and also enables pruning; any other exclude text keeps the full path
-// enumeration.
-//
-// The two regexes are the allocation-free pre-check for the common builtin
-// shapes; dataflowFilterShape covers everything else.
-var simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
+// dataflowFilterKind identifies include/exclude sub-rules that are provably
+// equivalent to a membership test on one already-bound symbol, so the dataflow
+// fast path can skip compiling the sub-rule and evaluate it from an id set.
+type dataflowFilterKind uint8
 
-// simpleDataflowInclude matches the common `* & $source` / `<self> & $source`
-// include shape (also accepted by fastPathMatch). These shapes and the
-// AST-classified variants get the include reachability prefilter; anything else
-// keeps the full path walk.
-var simpleDataflowInclude = regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
+const (
+	dataflowFilterUnknown dataflowFilterKind = iota
+	// dataflowFilterAny is `* & $sym`: the path contains a value bound to $sym.
+	// Repeated `& $sym` items are idempotent and fold into this shape.
+	dataflowFilterAny
+	// dataflowFilterSelf is `<self> & $sym`: `<self>` is identity over the
+	// input values, so on a dataflow path it carries the same membership
+	// meaning as dataflowFilterAny.
+	dataflowFilterSelf
+	// dataflowFilterCallee is `*<getCallee> & $sym`: a call on the path has a
+	// callee bound to $sym. This shape is monotone, which is what makes branch
+	// pruning sound: once a path contains such a call, longer paths still do.
+	dataflowFilterCallee
+)
 
-// dataflowFilterShapeCache memoizes dataflowFilterShape for texts the regexes
-// miss. Classification runs per sfCheck (one per sink) and fastPathMatch runs
-// per enumerated path, so parsing there would cost more than the sub-query it
-// replaces; instead each unique text is parsed at most once per process.
+type dataflowFilterPlan struct {
+	kind   dataflowFilterKind
+	symbol string
+}
+
+var (
+	// simpleDataflowInclude matches the subject and first symbol of
+	// `* & $sym` / `<self> & $sym`. The tail is validated separately so a
+	// trailing `as $alias` or repeated `& $sym` can be accepted.
+	simpleDataflowInclude = regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)`)
+	// simpleGetCalleeExclude is the same for `*<getCallee> & $sym`.
+	simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)`)
+	// simpleDataflowFilterAlias is the optional `as $alias` tail. It only names
+	// the sub-rule result; include/exclude is evaluated on whether the result is
+	// non-empty, so the alias does not change semantics.
+	simpleDataflowFilterAlias = regexp.MustCompile(`^as\s+\$[A-Za-z_][A-Za-z0-9_]*$`)
+)
+
+// dataflowFilterShapeCache memoizes dataflowFilterShape. Classification runs per
+// sfCheck (one per sink) and fastPathMatch runs per enumerated path, so the
+// cached lookup keeps the hot path to a single map access. Negative entries are
+// cached too, so complex sub-rules are not re-matched on every path.
 var dataflowFilterShapeCache sync.Map // string -> dataflowFilterShapeEntry
 
 type dataflowFilterShapeEntry struct {
-	shape sf.DataflowFilterShape
-	ok    bool
+	plan dataflowFilterPlan
+	ok   bool
 }
 
 // dataflowFilterShape classifies a dataflow include/exclude sub-rule. The
-// regexes handle the common builtin shapes; shapes they miss (a trailing
-// `as $alias`, repeated `& $sym`) are parsed once as a SyntaxFlow AST and
-// cached, because the parser alone costs about as much as compiling the
-// sub-rule it saves.
-func dataflowFilterShape(text string) (sf.DataflowFilterShape, bool) {
+// accepted shapes are exactly those whose include/exclude predicate is a
+// membership test on one bound symbol, so callers may evaluate them from a
+// symbol id set and, for the monotone Callee exclude, prune path branches.
+func dataflowFilterShape(text string) (dataflowFilterPlan, bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return sf.DataflowFilterShape{}, false
-	}
-	if m := simpleDataflowInclude.FindStringSubmatch(text); len(m) == 2 {
-		kind := sf.DataflowFilterShapeAny
-		if strings.HasPrefix(text, "<self>") {
-			kind = sf.DataflowFilterShapeSelf
-		}
-		return sf.DataflowFilterShape{Kind: kind, Symbol: m[1]}, true
-	}
-	if m := simpleGetCalleeExclude.FindStringSubmatch(text); len(m) == 2 {
-		return sf.DataflowFilterShape{Kind: sf.DataflowFilterShapeCallee, Symbol: m[1]}, true
+		return dataflowFilterPlan{}, false
 	}
 	if cached, ok := dataflowFilterShapeCache.Load(text); ok {
 		entry := cached.(dataflowFilterShapeEntry)
-		return entry.shape, entry.ok
+		return entry.plan, entry.ok
 	}
-	shape, ok := sf.ParseDataflowFilterShape(text)
-	dataflowFilterShapeCache.Store(text, dataflowFilterShapeEntry{shape: shape, ok: ok})
-	return shape, ok
+	plan, ok := parseDataflowFilterShape(text)
+	dataflowFilterShapeCache.Store(text, dataflowFilterShapeEntry{plan: plan, ok: ok})
+	return plan, ok
+}
+
+func parseDataflowFilterShape(text string) (dataflowFilterPlan, bool) {
+	if loc := simpleDataflowInclude.FindStringSubmatchIndex(text); loc != nil {
+		sym := text[loc[2]:loc[3]]
+		kind := dataflowFilterAny
+		if strings.HasPrefix(text, "<self>") {
+			kind = dataflowFilterSelf
+		}
+		if matchDataflowFilterTail(text[loc[1]:], sym) {
+			return dataflowFilterPlan{kind: kind, symbol: sym}, true
+		}
+	}
+	if loc := simpleGetCalleeExclude.FindStringSubmatchIndex(text); loc != nil {
+		sym := text[loc[2]:loc[3]]
+		if matchDataflowFilterTail(text[loc[1]:], sym) {
+			return dataflowFilterPlan{kind: dataflowFilterCallee, symbol: sym}, true
+		}
+	}
+	return dataflowFilterPlan{}, false
+}
+
+// matchDataflowFilterTail accepts only more `& $sym` items for the same symbol
+// plus an optional trailing `as $alias`. Anything else keeps the full sub-query.
+func matchDataflowFilterTail(tail, sym string) bool {
+	for {
+		tail = strings.TrimSpace(tail)
+		if tail == "" {
+			return true
+		}
+		if simpleDataflowFilterAlias.MatchString(tail) {
+			return true
+		}
+		if !strings.HasPrefix(tail, "&") {
+			return false
+		}
+		tail = strings.TrimSpace(tail[1:])
+		if !strings.HasPrefix(tail, "$") {
+			return false
+		}
+		tail = tail[1:]
+		end := 0
+		for end < len(tail) && isDataflowFilterIdentByte(tail[end]) {
+			end++
+		}
+		if end == 0 || tail[:end] != sym {
+			return false
+		}
+		tail = tail[end:]
+	}
+}
+
+func isDataflowFilterIdentByte(b byte) bool {
+	return b == '_' || b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
 }
 
 type sfCheck struct {
@@ -251,7 +313,7 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 			c.matchItem = append(c.matchItem, checkItem)
 			if item.Key == sf.RecursiveConfig_Exclude {
 				c.excludeItems = append(c.excludeItems, checkItem)
-				if shape, ok := dataflowFilterShape(item.Value); !ok || shape.Kind != sf.DataflowFilterShapeCallee {
+				if shape, ok := dataflowFilterShape(item.Value); !ok || shape.kind != dataflowFilterCallee {
 					c.excludePrunable = false
 				}
 			}
@@ -281,19 +343,19 @@ func (c *sfCheck) isSimpleFastPathItem(item *sf.RecursiveConfigItem) bool {
 	}
 	switch item.Key {
 	case sf.RecursiveConfig_Include:
-		if shape.Kind != sf.DataflowFilterShapeAny && shape.Kind != sf.DataflowFilterShapeSelf {
+		if shape.kind != dataflowFilterAny && shape.kind != dataflowFilterSelf {
 			return false
 		}
 	case sf.RecursiveConfig_Exclude:
 		// Only the monotone `*<getCallee> & $sym` exclude is safe to prune on;
 		// an include-style exclude stays on the full query.
-		if shape.Kind != sf.DataflowFilterShapeCallee {
+		if shape.kind != dataflowFilterCallee {
 			return false
 		}
 	default:
 		return false
 	}
-	return len(c.fastMatchSymbolIDs(shape.Symbol)) > 0
+	return len(c.fastMatchSymbolIDs(shape.symbol)) > 0
 }
 
 // compiledFrame returns a compiled *sf.SFFrame for the given sub-rule text,
@@ -462,14 +524,14 @@ func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
 	text := strings.TrimSpace(item.Value)
 
 	if shape, ok := dataflowFilterShape(text); ok {
-		if ids := r.fastMatchSymbolIDs(shape.Symbol); len(ids) > 0 {
-			switch shape.Kind {
-			case sf.DataflowFilterShapeAny, sf.DataflowFilterShapeSelf:
+		if ids := r.fastMatchSymbolIDs(shape.symbol); len(ids) > 0 {
+			switch shape.kind {
+			case dataflowFilterAny, dataflowFilterSelf:
 				// `* & $symbol` / `<self> & $symbol`: path intersects the
 				// symbol's ids.
 				atomic.AddInt64(&fastPathMatchCounter.hit, 1)
 				return pathContainsAnyID(path, ids), true
-			case sf.DataflowFilterShapeCallee:
+			case dataflowFilterCallee:
 				// `*<getCallee> & $symbol`: a call on the path has a callee in
 				// the symbol.
 				atomic.AddInt64(&fastPathMatchCounter.hit, 1)
@@ -561,10 +623,10 @@ func (r *sfCheck) SimpleIncludeSourceIDs() (map[int64]struct{}, bool) {
 		}
 		found = true
 		shape, ok := dataflowFilterShape(item.Value)
-		if !ok || (shape.Kind != sf.DataflowFilterShapeAny && shape.Kind != sf.DataflowFilterShapeSelf) {
+		if !ok || (shape.kind != dataflowFilterAny && shape.kind != dataflowFilterSelf) {
 			return nil, false
 		}
-		symbolIDs := r.fastMatchSymbolIDs(shape.Symbol)
+		symbolIDs := r.fastMatchSymbolIDs(shape.symbol)
 		if len(symbolIDs) == 0 {
 			return nil, false
 		}
@@ -586,11 +648,11 @@ func (r *sfCheck) prepareExcludePruneIDs() bool {
 		ids := make(map[int64]struct{})
 		for _, item := range r.excludeItems {
 			shape, ok := dataflowFilterShape(item.Value)
-			if !ok || shape.Kind != sf.DataflowFilterShapeCallee {
+			if !ok || shape.kind != dataflowFilterCallee {
 				r.excludePrunable = false
 				return
 			}
-			for id := range r.fastMatchSymbolIDs(shape.Symbol) {
+			for id := range r.fastMatchSymbolIDs(shape.symbol) {
 				ids[id] = struct{}{}
 			}
 		}
