@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -21,9 +23,28 @@ import (
 
 // MCP's set_mitm_filter uses this unary RPC, independently of the MITM stream.
 func TestGRPCMUSTPASS_MITM_Filter_UnaryLiveUpdate(t *testing.T) {
+	testMITMFilterLiveUpdate(t, false)
+}
+
+func TestGRPCMUSTPASS_MITM_Filter_MCPLiveUpdate(t *testing.T) {
+	testMITMFilterLiveUpdate(t, true)
+}
+
+func testMITMFilterLiveUpdate(t *testing.T, viaMCP bool) {
 	for _, version := range []string{"v1", "v2"} {
 		t.Run(version, func(t *testing.T) {
 			client := isolateMITMTestSideEffects(t)
+			var mcpServer *mcp.MCPServer
+			if viaMCP {
+				var err error
+				mcpServer, err = mcp.NewMCPServer(mcp.WithEnableMITMToolSet())
+				require.NoError(t, err)
+				// Use MCP's production local-client path, not the client holding
+				// the MITM stream. These are separate gRPC servers in one process,
+				// sharing the project connection bound by the isolation helper.
+				require.NoError(t, mcpServer.BindLocalGRPCClient())
+				t.Cleanup(func() { mcpServer.Close() })
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -38,8 +59,19 @@ func TestGRPCMUSTPASS_MITM_Filter_UnaryLiveUpdate(t *testing.T) {
 			var expected *ypb.MITMFilterData
 			setFilter := func(data *ypb.MITMFilterData) {
 				t.Helper()
-				_, err := client.SetMITMFilter(ctx, &ypb.SetMITMFilterRequest{FilterData: data})
-				require.NoError(t, err)
+				if viaMCP {
+					encoded, err := json.Marshal(data)
+					require.NoError(t, err)
+					var filterData map[string]any
+					require.NoError(t, json.Unmarshal(encoded, &filterData))
+					result, err := mcp.CallBuiltinTool(mcpServer, ctx, "set_mitm_filter", map[string]any{"filterData": filterData})
+					require.NoError(t, err)
+					require.NotNil(t, result)
+					require.False(t, result.IsError)
+				} else {
+					_, err := client.SetMITMFilter(ctx, &ypb.SetMITMFilterRequest{FilterData: data})
+					require.NoError(t, err)
+				}
 				expected = data
 			}
 			setFilter(&ypb.MITMFilterData{})
