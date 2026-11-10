@@ -35,9 +35,20 @@ func TestDefaultCompileExcludePatterns(t *testing.T) {
 	// Aggregated language-specific defaults: file globs.
 	require.Contains(t, patterns, "**/*_test.go")
 	require.Contains(t, patterns, "**/*.min.js")
+	require.Contains(t, patterns, "**/*.css")
+	require.Contains(t, patterns, "*.css")
 	require.Contains(t, patterns, "**/gradle/wrapper/**")
 	require.Contains(t, patterns, "**/composer.lock")
 	require.Contains(t, patterns, "**/*.nupkg")
+
+	// Documentation trees are excluded whole; documentation entry files are
+	// matched by name in IsDocumentationFilePath instead of a *.md glob, so
+	// SKILL.md and other markdown keep reaching the rules that read them.
+	require.Contains(t, patterns, "docs/**")
+	require.Contains(t, patterns, "**/docs/**")
+	require.Contains(t, patterns, "doc/**")
+	require.Contains(t, patterns, "**/documentation/**")
+	require.NotContains(t, patterns, "**/*.md")
 
 	// Root forms are generated for every nested glob: gobwas glob's "**/x"
 	// never matches a root-level "x", so the root form must exist too.
@@ -79,6 +90,44 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		require.True(t, exclude("test_main.py"))
 		require.True(t, exclude("app.min.js"))
 		require.False(t, exclude("main.go"))
+	})
+
+	t.Run("stylesheets and lockfiles stay out, scripts stay in", func(t *testing.T) {
+		exclude := BuildCompileExcludeFunc(nil, "", true)
+		for _, asset := range []string{
+			"assets/app.css", "app.min.css", "dist/bundle.css",
+			"package-lock.json", "web/package-lock.json", "yarn.lock",
+		} {
+			require.True(t, exclude(asset), "non-source asset must be excluded: %s", asset)
+		}
+		// Every script extension a rule filters on must stay in the pool, and
+		// package.json is still read by the npm dependency rule.
+		for _, src := range []string{"src/app.mjs", "src/app.cjs", "src/app.js", "package.json"} {
+			require.False(t, exclude(src), "script or manifest must stay in the pool: %s", src)
+		}
+	})
+
+	t.Run("documentation entry files never enter the scan pool", func(t *testing.T) {
+		exclude := BuildCompileExcludeFunc(nil, "", true)
+		for _, doc := range []string{
+			"README.md", "readme", "README_zh.md", "README-1.2.md",
+			"docs/CHANGELOG.md", "CHANGELOG.txt", "CHANGES", "HISTORY.md",
+			"CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md",
+			"LICENSE", "LICENCE.txt", "COPYING", "NOTICE.md",
+			"AUTHORS", "package/README.markdown", "guide/README.rst",
+		} {
+			require.True(t, exclude(doc), "documentation file must be excluded: %s", doc)
+		}
+		// Only the listed names with a prose suffix are dropped: source files
+		// that share a word, and documentation rules' own targets, stay in.
+		for _, src := range []string{
+			"src/security.go", "src/license.java", "src/readme.py",
+			"SKILL.md", "notes.md", "docs.md", "readme.md5",
+		} {
+			require.False(t, exclude(src), "source file must stay in the pool: %s", src)
+		}
+		// The escape hatch still wins over the built-in documentation policy.
+		require.False(t, BuildCompileExcludeFunc(nil, "", false)("README.md"))
 	})
 
 	t.Run("aggregated test directories and fixtures", func(t *testing.T) {

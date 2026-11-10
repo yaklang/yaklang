@@ -36,6 +36,10 @@ var DefaultCompileExcludeDirNames = []string{
 	".nuxt",
 	"coverage",
 	"node_modules",
+	// documentation trees: prose and generated API pages, never runnable code
+	"doc",
+	"docs",
+	"documentation",
 	// Python environments (note: plain "env" is deliberately not excluded —
 	// it is a common application source directory name)
 	".tox",
@@ -78,7 +82,6 @@ var DefaultCompileExcludeDirNames = []string{
 var DefaultCompileExcludeGlobs = []string{
 	".github/**",
 	".mvn/**",
-	"docs/**",
 	"eclipse/**",
 	"**/Vendor/**",
 	"Vendor/**",
@@ -101,6 +104,10 @@ var DefaultCompileExcludeGlobs = []string{
 	"**/.DS_Store",
 	"Thumbs.db",
 	"**/Thumbs.db",
+	// Documentation entry files are excluded by name in
+	// IsDocumentationFilePath (README, CHANGELOG, LICENSE, ...), applied by
+	// BuildCompileExcludeFunc together with these globs. Only those names are
+	// dropped: SKILL.md and notes.md must still reach the rules that read them.
 	// test archives and Maven integration tests (name-based, language-agnostic).
 	// Patterns are written as both root and nested forms because gobwas glob
 	// requires "**/" to be followed by a separator: **/x does not match "x".
@@ -140,11 +147,13 @@ var DefaultCompileExcludeGlobs = []string{
 	"**/go.mod",
 	"go.sum",
 	"**/go.sum",
-	// JS/TS
+	// JS/TS. Stylesheets are dropped whole (minified and bundled ones included):
+	// no builtin rule reads a .css file. Scripts keep every extension a rule
+	// filters on (.js, .jsx, .mjs, .cjs, .ts, .tsx); only minified/bundled
+	// output is excluded by name.
 	"**/*.min.js",
-	"**/*.min.css",
 	"**/*.bundle.js",
-	"**/*.bundle.css",
+	"**/*.css",
 	"package-lock.json",
 	"**/package-lock.json",
 	"yarn.lock",
@@ -253,6 +262,79 @@ func IsDefaultCompileExcludeDirName(name string) bool {
 	return false
 }
 
+// documentationFileBaseNames are documentation entry points: prose files that
+// describe a project instead of running in it. They are dropped from every
+// project walk by IsDocumentationFilePath.
+var documentationFileBaseNames = []string{
+	"readme",
+	"changelog",
+	"changes",
+	"history",
+	"news",
+	"contributing",
+	"code_of_conduct",
+	"security",
+	"support",
+	"authors",
+	"contributors",
+	"notice",
+	"license",
+	"licence",
+	"copying",
+	"copyright",
+	"install",
+	"upgrading",
+	"maintainers",
+}
+
+// documentationFileExtensions are the suffixes a documentation entry point may
+// carry. Only prose formats are listed, so a source file that happens to share
+// a word with a document name (security.go, license.java) stays in the pool.
+var documentationFileExtensions = map[string]bool{
+	"":          true,
+	".md":       true,
+	".markdown": true,
+	".mdx":      true,
+	".rst":      true,
+	".txt":      true,
+	".adoc":     true,
+}
+
+// IsDocumentationFilePath reports whether path is a documentation entry point
+// such as README.md, CHANGELOG-1.2.txt or CONTRIBUTING.rst.
+//
+// These files describe code, they never run in it, yet a README snippet like
+// `password = "..."` matches a hardcoded-credential rule and license or
+// contributor lists match config-shape patterns. Matching is by base name, so
+// documentation trees are covered too (docs/README.md). Only the listed names
+// with a prose suffix are dropped: SKILL.md, notes.md and every file inside a
+// non-documentation directory still reach the rules that read them.
+func IsDocumentationFilePath(path string) bool {
+	path = normalizeCompileExcludePath(path)
+	if path == "" {
+		return false
+	}
+	base := filepath.Base(path)
+	if base == "" || base == "." || base == "/" {
+		return false
+	}
+	lower := strings.ToLower(base)
+	for _, name := range documentationFileBaseNames {
+		if !strings.HasPrefix(lower, name) {
+			continue
+		}
+		rest := lower[len(name):]
+		if rest == "" {
+			return true
+		}
+		switch rest[0] {
+		case '.', '-', '_':
+			return documentationFileExtensions[filepath.Ext(lower)]
+		}
+	}
+	return false
+}
+
 // BuildCompileExcludeFunc merges userPatterns with DefaultCompileExcludePatterns()
 // unless includeDefaults is false. When includeDefaults is false, only userPatterns
 // are compiled; this is the escape hatch for callers (tests, embedders) that need
@@ -308,6 +390,9 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 	}
 
 	return func(path string) bool {
+		if includeDefaults && IsDocumentationFilePath(path) {
+			return true
+		}
 		path = normalizeCompileExcludePath(path)
 		for _, g := range compiled {
 			if g.Match(path) {

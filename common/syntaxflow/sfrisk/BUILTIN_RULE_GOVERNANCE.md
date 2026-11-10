@@ -74,12 +74,18 @@ marker.
 
 | Filter | Use it for |
 | --- | --- |
-| `${*}` | credential and token shapes only, because a secret can sit in `.env`, `.json`, `.yaml`, `.md` or a log |
+| `${*}` | credential and token shapes only, because a secret can sit in `.env`, `.json`, `.yaml` or a log |
 | `${*.py}` / `${/\.(js|mjs|cjs)$/}` | code and config patterns; name every extension the pattern can appear in |
 | `${/^(?:Dockerfile(?:\.[\w.-]+)?|[\w.-]+\.dockerfile)$/}` | tool-specific files |
 
+Documentation never reaches a rule: the project walk (compile and live source
+stage) drops documentation directories (`doc`, `docs`, `documentation`) and
+documentation entry files (`README*`, `CHANGELOG*`, `LICENSE*`, `CONTRIBUTING*`,
+and the rest of the list in `ssaconfig.IsDocumentationFilePath`). Ordinary
+markdown stays in the pool, so document rules that target `SKILL.md` still work.
+
 Do not use `${*}` for API-shape or code-shape matches: it reports the same line from
-README files and license text. Do not keep a single-extension filter when sibling
+config, logs and license text. Do not keep a single-extension filter when sibling
 extensions carry the same syntax (`*.js` misses `.mjs`, `.cjs` and `.jsx`; `*.c`
 misses headers; `*.yml` misses `.yaml`).
 
