@@ -356,6 +356,7 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 		Sections:          nil,
 		TimelineThroughID: &timeline.TimelineThroughID,
 		TimelineItemIDs:   timeline.TimelineItemIDs,
+		Images:            timeline.TimelineImages,
 	}, nil
 }
 

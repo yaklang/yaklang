@@ -338,6 +338,7 @@ type LoopPromptAssemblyResult struct {
 	// Captured with the rendered Timeline; compression must not consume later writes.
 	TimelineThroughID *int64
 	TimelineItemIDs   []int64
+	Images            []PromptImage
 }
 
 // ExecutePlanInput carries an approved plan generated outside Coordinator plan loop.

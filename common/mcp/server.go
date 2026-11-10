@@ -31,6 +31,7 @@ type MCPServer struct {
 	sseMu sync.Mutex
 
 	bridgeClientClosers []io.Closer
+	screenshotResources sync.Map
 }
 
 func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
@@ -42,6 +43,7 @@ func NewMCPServer(opts ...McpServerOption) (*MCPServer, error) {
 			server.WithPromptCapabilities(true),
 		),
 	}
+	s.server.AddResourceTemplate(mcp.NewResourceTemplate("yakit-screenshot://{id}", "Captured screenshots"), s.readScreenshotResource)
 	// tools and resources
 	cfg := NewMCPServerConfig()
 	for _, opt := range opts {

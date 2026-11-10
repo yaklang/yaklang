@@ -948,14 +948,18 @@ case "screenshot":
         operationError("failed to create temp file: %v", tmpErr)
         return
     }
-    file.Save(tmpFile, imgData)
+    file.Save(tmpFile, imgData)~
     yakit.Info("screenshot saved to %v (%v bytes)", tmpFile, len(imgData))
 
-    // 同时输出 base64
-    b64, b64Err = page.ScreenshotBase64()
-    if b64Err == nil {
-        yakit.Info("screenshot base64 (first 100 chars): %v...", b64[:min(100, len(b64))])
-    }
+    // Return the same capture through the typed media channel. Never take a
+    // second screenshot or send image bytes through observation logs.
+    RESULT = aiagent.ImageResult(imgData, "image/png", {
+        "operation": "screenshot",
+        "operation_status": "completed",
+        "retryable": false,
+        "session": session,
+        "path": tmpFile,
+    })~
 
 case "eval":
     if js == "" {

@@ -61,7 +61,7 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	if !ok {
 		return false
 	}
-	measured := int64(aicommon.MeasureTokens(prompt))
+	measured := int64(r.completeInputTokens(prompt))
 	limit := config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
 	if limit <= 0 {
 		return false

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
@@ -45,8 +46,69 @@ func handleScreenshot(s *MCPServer) server.ToolHandlerFunc {
 		if err != nil {
 			return nil, err
 		}
-		return screenshotToolResult(result, options)
+		toolResult, err := screenshotToolResult(result, options)
+		if err != nil {
+			return nil, err
+		}
+		for i, content := range toolResult.Content {
+			text, ok := content.(mcp.TextContent)
+			if !ok {
+				continue
+			}
+			var metadata map[string]any
+			if json.Unmarshal([]byte(text.Text), &metadata) != nil || metadata["delivery"] != "file" {
+				continue
+			}
+			path, _ := metadata["path"].(string)
+			img, err := aimedia.FromFile(ctx, path)
+			if err != nil {
+				return nil, err
+			}
+			now := time.Now()
+			count := 0
+			s.screenshotResources.Range(func(key, value any) bool {
+				entry := value.(screenshotResource)
+				if now.After(entry.Expires) {
+					s.screenshotResources.Delete(key)
+				} else {
+					count++
+				}
+				return true
+			})
+			if count >= 256 {
+				return nil, fmt.Errorf("too many retained screenshot resources; expired handles are cleared after ten minutes")
+			}
+			uri := "yakit-screenshot://" + uuid.NewString()
+			s.screenshotResources.Store(uri, screenshotResource{Image: img, Expires: now.Add(10 * time.Minute)})
+			metadata["resourceUri"] = uri
+			raw, _ := json.Marshal(metadata)
+			text.Text = string(raw)
+			toolResult.Content[i] = text
+		}
+		return toolResult, nil
 	}
+}
+
+type screenshotResource struct {
+	Image   *aimedia.Image
+	Expires time.Time
+}
+
+func (s *MCPServer) readScreenshotResource(ctx context.Context, request mcp.ReadResourceRequest) ([]interface{}, error) {
+	value, ok := s.screenshotResources.Load(request.Params.URI)
+	if !ok {
+		return nil, fmt.Errorf("screenshot resource is not available")
+	}
+	entry := value.(screenshotResource)
+	if time.Now().After(entry.Expires) {
+		s.screenshotResources.Delete(request.Params.URI)
+		return nil, fmt.Errorf("screenshot resource expired")
+	}
+	raw, err := entry.Image.Bytes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []interface{}{mcp.BlobResourceContents{ResourceContents: mcp.ResourceContents{URI: request.Params.URI, MIMEType: entry.Image.MIMEType}, Blob: base64.StdEncoding.EncodeToString(raw)}}, nil
 }
 
 func decodeScreenshotOptions(arguments map[string]any) (screenshotOptions, error) {

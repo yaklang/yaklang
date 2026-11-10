@@ -655,6 +655,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
+	requestOpts = append(requestOpts, r.imageRequestOptions()...)
 
 	postHandler := func(resp *aicommon.AIResponse) error {
 		r.clearCallsExecutionValues(acceptedCalls)
@@ -850,6 +851,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
 		return nil, failedLoopStopReason(descriptor, transactionErr), descriptor, transactionErr
 	}
+	r.recordImageUsage(acceptedResp)
 	if len(acceptedCalls) == 0 || acceptedResp == nil {
 		err := utils.Error("function-call transaction returned no accepted calls")
 		descriptor.setError(err)
@@ -963,6 +965,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
+	requestOpts = append(requestOpts, r.imageRequestOptions()...)
 	var acceptedResp *aicommon.AIResponse
 
 	postHandler := func(resp *aicommon.AIResponse) (err error) {
@@ -1274,6 +1277,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		log.Errorf("AI transaction failed: %v", transactionErr)
 		return nil, nil, transactionErr
 	}
+	r.recordImageUsage(acceptedResp)
 
 	if ctxCanceled.IsSet() {
 		r.UserStatus(

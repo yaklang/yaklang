@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/gorm"
@@ -451,6 +452,9 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 			stderr.Write([]byte(errMsg))
 			return nil, utils.Errorf(errMsg)
 		}
+		if result == nil {
+			return nil, fmt.Errorf("MCP tool %s returned no result", toolName)
+		}
 
 		// 处理结果
 		if result.IsError {
@@ -458,26 +462,22 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 			if errMsg == "" {
 				errMsg = "tool execution failed"
 			}
-			log.Errorf("mcp tool %s execution error: %s, content: %#v", toolName, errMsg, result.Content)
+			log.Errorf("mcp tool %s execution error: %s", toolName, errMsg)
 			stderr.Write([]byte(errMsg))
 			return nil, utils.Errorf(errMsg)
 		}
 
-		// 提取结果内容
-		var resultContent string
-		for _, content := range result.Content {
-			switch c := content.(type) {
-			case mcp.TextContent:
-				resultContent += c.Text
-			case mcp.ImageContent:
-				resultContent += fmt.Sprintf("[Image: %s]", c.MIMEType)
-			default:
-				if text := firstMCPTextFromContent([]any{c}); text != "" {
-					resultContent += text
-				} else {
-					resultContent += fmt.Sprintf("%v", c)
-				}
-			}
+		source := aimedia.Source{Kind: "mcp", ToolName: toolName, ServerName: serverName, ObservedAt: time.Now()}
+		if runtimeConfig != nil {
+			source.ToolCallID = runtimeConfig.RuntimeID
+		}
+		contents, err := resolveMCPImageResources(ctx, mcpClient, result.Content)
+		if err != nil {
+			return nil, err
+		}
+		value, resultContent, err := convertMCPToolContent(ctx, contents, source)
+		if err != nil {
+			return nil, err
 		}
 
 		// 输出到 stdout
@@ -485,7 +485,7 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 			stdout.Write([]byte(resultContent))
 		}
 
-		return resultContent, nil
+		return value, nil
 	}
 }
 

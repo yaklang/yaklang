@@ -943,6 +943,7 @@ service Yak {
 
   // AI Task
   rpc StartAIReAct(stream AIInputEvent) returns(stream AIOutputEvent);
+  rpc ReadAIImage(AIImageRequest) returns(AIImageResponse);
   rpc StartAITask(stream AIInputEvent) returns(stream AIOutputEvent);
   rpc QueryAITask(AITaskQueryRequest) returns (AITaskQueryResponse);
   rpc DeleteAITask(AITaskDeleteRequest) returns (DbOperateMessage);
@@ -2366,6 +2367,7 @@ message AIStartParams {
   optional bool NetworkDebug = 52;
   // Connection-local, build-generated component catalog and interaction capabilities.
   string ClientUI = 53;
+	AIImageInputConfig ImageInput = 54;
 }
 
 message AIExecutionStrategy {
@@ -9609,6 +9611,9 @@ message AIModelConfig {
   // 是否已对 xhigh/max 做过探测。false=未探测（首次操作下拉框时触发）；
   // true=已探测（ProbedExtendedEfforts 即最终结果，不再重复探测）。
   bool EffortProbed = 7;
+  // Unset means unknown, not false. Auto mode uses separate vision for unknown models.
+  optional bool SupportsImageInput = 8;
+  string ImageTokenEstimator = 9; // conservative (default), patch32, tile512
 }
 
 message AIGlobalConfig {
@@ -10573,4 +10578,30 @@ message HTTPPreviewResourceResponse {
   string URL = 1;
   string MimeType = 2;
   bytes Data = 3;
+}
+
+// Session image policy. Zero limits use bounded server defaults.
+message AIImageInputConfig {
+  string Mode = 1; // auto (default), native, describe
+  optional bool MainModelSupportsImages = 2; // override for custom callbacks
+  // Legacy compatibility only; image retention now follows Timeline.
+  int64 MaxActiveImages = 3;
+  int64 VisualTokenLimit = 4;
+  int64 MaxLongEdge = 5;
+  int64 OutputReserveTokens = 6;
+  int64 MaxRequestBytes = 7;
+}
+
+message AIImageRequest {
+  string SessionID = 1;
+  string ImageID = 2; // resource ID or content ID, scoped to this session
+  string Variant = 3; // thumbnail (default), original; model is a legacy overview alias
+  string Scope = 4; // optional child-agent namespace, owned by SessionID
+}
+message AIImageResponse {
+  bytes Data = 1;
+  string MIMEType = 2;
+  int64 Width = 3;
+  int64 Height = 4;
+  string ImageID = 5;
 }

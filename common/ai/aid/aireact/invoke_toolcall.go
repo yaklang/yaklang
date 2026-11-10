@@ -246,6 +246,7 @@ func (r *ReAct) finalizeToolCallResult(currentTask aicommon.AIStatefulTask, resu
 		currentTask.PushToolCallResult(result)
 		// Store the result in memory
 		r.config.Timeline.PushToolResult(result)
+		r.observeToolImageResult(currentTask, result)
 		// Emit the result
 		r.EmitInfo("Tool execution completed: %s", result.Name)
 	}

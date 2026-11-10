@@ -731,7 +731,7 @@ LOOP:
 			r.promptMode = assembled.Mode
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
-			tokens := aicommon.MeasureTokens(prompt)
+			tokens := r.completeInputTokens(prompt)
 			if r.promptMode == aicommon.LoopPromptModeCompressContext {
 				r.noteCompressionStatus()
 			}
@@ -765,6 +765,10 @@ LOOP:
 			if transactionErr == nil {
 				r.noteFittingTimelineThroughID(assembled.TimelineThroughID)
 				break
+			}
+			if attempt < retryMax && r.fallbackImageRoute(transactionErr) {
+				r.clearCallsExecutionValues(loopCalls)
+				continue
 			}
 			if !aicommon.IsPromptTooLong(transactionErr) || buildInput.overflowCompression {
 				break
@@ -876,7 +880,7 @@ LOOP:
 			continue LOOP
 		}
 		if r.promptMode == aicommon.LoopPromptModeCompressContext {
-			lastCompressionTokens = aicommon.MeasureTokens(prompt)
+			lastCompressionTokens = r.completeInputTokens(prompt)
 		} else {
 			lastCompressionTokens = 0
 		}

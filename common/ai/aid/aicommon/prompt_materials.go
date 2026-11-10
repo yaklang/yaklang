@@ -183,6 +183,7 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 type TimelineFrozenOpenBlocks struct {
 	ThroughID                int64
 	ItemIDs                  []int64
+	Images                   []PromptImage
 	Frozen                   string
 	Open                     string
 	SkillsContext            string
@@ -328,6 +329,7 @@ func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptio
 	return TimelineFrozenOpenBlocks{
 		ThroughID:                through,
 		ItemIDs:                  itemIDs,
+		Images:                   timelineBlockImages(promptBlocks),
 		Frozen:                   promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                     promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
 		SkillsContext:            renderPromotedSkillContent(promoted),
@@ -341,6 +343,7 @@ func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptio
 type PromptFrozenOpenMaterials struct {
 	TimelineThroughID          int64
 	TimelineItemIDs            []int64
+	TimelineImages             []PromptImage
 	TimelineFrozen             string
 	TimelineOpen               string
 	SkillsContext              string
@@ -377,6 +380,7 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 	return PromptFrozenOpenMaterials{
 		TimelineThroughID:          timelineBlocks.ThroughID,
 		TimelineItemIDs:            timelineBlocks.ItemIDs,
+		TimelineImages:             timelineBlocks.Images,
 		TimelineFrozen:             timelineBlocks.Frozen,
 		TimelineOpen:               timelineBlocks.Open,
 		SkillsContext:              timelineBlocks.SkillsContext,

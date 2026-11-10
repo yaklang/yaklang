@@ -15,11 +15,13 @@ import (
 )
 
 type AIModelConfigEntry struct {
-	Type        string            `json:"type" yaml:"type"`
-	APIKey      string            `json:"api_key" yaml:"api_key"`
-	Domain      string            `json:"domain" yaml:"domain"`
-	Model       string            `json:"model" yaml:"model"`
-	ExtraParams map[string]string `json:"extra_params,omitempty" yaml:"extra_params,omitempty"`
+	SupportsImageInput  *bool             `json:"supports_image_input,omitempty" yaml:"supports_image_input,omitempty"`
+	ImageTokenEstimator string            `json:"image_token_estimator,omitempty" yaml:"image_token_estimator,omitempty"`
+	Type                string            `json:"type" yaml:"type"`
+	APIKey              string            `json:"api_key" yaml:"api_key"`
+	Domain              string            `json:"domain" yaml:"domain"`
+	Model               string            `json:"model" yaml:"model"`
+	ExtraParams         map[string]string `json:"extra_params,omitempty" yaml:"extra_params,omitempty"`
 }
 
 type TieredAIConfigFile struct {
@@ -64,9 +66,11 @@ func ConfigEntryToModelConfig(entry AIModelConfigEntry) *ypb.AIModelConfig {
 		extras = append(extras, &ypb.KVPair{Key: k, Value: v})
 	}
 	return &ypb.AIModelConfig{
-		Provider:    provider,
-		ModelName:   entry.Model,
-		ExtraParams: extras,
+		SupportsImageInput:  entry.SupportsImageInput,
+		ImageTokenEstimator: entry.ImageTokenEstimator,
+		Provider:            provider,
+		ModelName:           entry.Model,
+		ExtraParams:         extras,
 	}
 }
 

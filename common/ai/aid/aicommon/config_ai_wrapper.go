@@ -154,6 +154,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.DebugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", aiprojection.RedactNonce(request.GetPrompt()))
 		}
+		if err := request.CheckImageBudget(); err != nil {
+			return nil, err
+		}
 		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
 		maxAttempts := int(c.AiAutoRetry)

@@ -1,6 +1,7 @@
 package aiengine
 
 var Exports = map[string]interface{}{
+	"imageInputMode": WithImageInputMode,
 	// invoke re-act
 	"InvokeReAct":      InvokeReAct,
 	"InvokeReActAsync": InvokeReActAsync,
