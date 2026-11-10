@@ -315,14 +315,14 @@ type Config struct {
 		AI Memory :     General Memory = Timeline + Triage + Other Context
 	*/
 	// timeline
-	Timeline                  *Timeline
-	TimelineBroadcaster       *TimelineBroadcaster
-	timelineBindingMu         sync.Mutex
-	timelineBindingReady      bool
-	disableTimelineBroadcast  bool
-	timelineBroadcastLease    *timelineBroadcastLease
-	TimelineContentSizeLimit  int // in tokens
-	TimelineTotalContentLimit int // in tokens
+	Timeline                      *Timeline
+	TimelineBroadcaster           *TimelineBroadcaster
+	timelineBindingMu             sync.Mutex
+	timelineBindingReady          bool
+	timelineBroadcastSubscription uint64
+	disableTimelineBroadcast      bool
+	TimelineContentSizeLimit      int // in tokens
+	TimelineTotalContentLimit     int // in tokens
 
 	// triage
 	MemoryTriage        MemoryTriage
@@ -4266,10 +4266,7 @@ func (c *Config) restorePersistentSession() {
 		log.Infof("reassigned timeline IDs, last assigned ID: %d", lastID)
 	}
 
-	if err := c.SetTimeline(timelineInstance); err != nil {
-		log.Warnf("bind restored timeline: %v", err)
-		return
-	}
+	c.Timeline = timelineInstance
 
 	// Restore WorkDir from previous runtime so that Session Artifacts persist across restarts
 	if runtime.WorkDir != "" {

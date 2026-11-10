@@ -75,8 +75,10 @@ func (h *TimelineHandle) Release() {
 		if h.fork != nil {
 			afterID = h.fork.BaseMaxID
 		}
-		if err := h.parent.ArchiveMemoryBranch(h.branch, afterID); err != nil {
-			log.Warnf("archive sub-agent memory source failed: %v", err)
+		if h.parent != nil {
+			if err := h.parent.ArchiveMemoryBranch(h.branch, afterID); err != nil {
+				log.Warnf("archive sub-agent memory source failed: %v", err)
+			}
 		}
 	})
 }
@@ -99,7 +101,10 @@ func buildTimelineHandle(
 		if err != nil {
 			return nil, err
 		}
-		return &TimelineHandle{parent: parentTimeline, taskID: subTaskID, mode: SubAgentTimelineClean, branch: branch, releaseBroadcast: release}, nil
+		return &TimelineHandle{
+			parent: parentTimeline, taskID: subTaskID, mode: SubAgentTimelineClean,
+			branch: branch, releaseBroadcast: release,
+		}, nil
 	default: // SubAgentTimelineFork
 		if parentTimeline == nil {
 			return nil, utils.Error("fork timeline mode requires parent timeline")

@@ -22,6 +22,7 @@ type TimelineItem struct {
 	historyID string
 	deleted   bool
 	createdAt time.Time
+	broadcast bool
 
 	value TimelineItemValue // *aitool.ToolResult
 }
