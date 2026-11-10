@@ -3,29 +3,33 @@ package ssaapi
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/graph"
 )
 
+// GetDataflowPath collects every dataflow path. Prefer
+// [Value.WalkDataflowPathWithContext] when the caller can stop at the first
+// accepted path: this form materializes all of them.
 func (v *Value) GetDataflowPath(end ...*Value) []Values {
-	return v.GetDataflowPathWithContext(context.Background(), end...)
-}
-
-// GetDataflowPathWithContext is like [GetDataflowPath] but the DFS respects ctx:
-// when ctx is cancelled the path enumeration bails early (see graph.GraphPathEx /
-// DeepFirstPath.deepFirst). This is what lets the per-rule wall-clock budget
-// (syntaxflow_scan/runtime.go Query -> QueryWithContext -> sfvm.Config.ctx) reach
-// the heavy path enumeration that dataflow(include=...) triggers on large
-// projects. Without this, GraphPathWithKey used context.Background() and the
-// per-rule deadline never fired — heavy rules ran for hours.
-func (v *Value) GetDataflowPathWithContext(ctx context.Context, end ...*Value) []Values {
 	var paths []Values
-	v.walkDataflowPathWithContext(ctx, nil, nil, func(path Values) bool {
+	v.WalkDataflowPathWithContext(context.Background(), func(path Values) bool {
 		paths = append(paths, path)
 		return true
 	}, end...)
 	return paths
 }
+
+// GetDataflowPathWithContext has no caller since the dataflow engine switched
+// to streaming (dataFlowFilter -> walkDataflowPathWithContext directly).
+// Commented out rather than deleted as requested.
+//
+// func (v *Value) GetDataflowPathWithContext(ctx context.Context, end ...*Value) []Values {
+// 	var paths []Values
+// 	v.walkDataflowPathWithContext(ctx, nil, nil, func(path Values) bool {
+// 		paths = append(paths, path)
+// 		return true
+// 	}, false, end...)
+// 	return paths
+// }
 
 // WalkDataflowPathWithContext is the streaming form of
 // [GetDataflowPathWithContext]. visit receives each dataflow path (effect ->
@@ -33,7 +37,7 @@ func (v *Value) GetDataflowPathWithContext(ctx context.Context, end ...*Value) [
 // immediately. This lets dataflow(include/exclude) stop at the first accepted
 // path instead of materializing every effect×depend combination.
 func (v *Value) WalkDataflowPathWithContext(ctx context.Context, visit func(Values) bool, end ...*Value) bool {
-	return v.walkDataflowPathWithContext(ctx, nil, nil, visit, end...)
+	return v.walkDataflowPathWithContext(ctx, nil, nil, visit, false, end...)
 }
 
 // WalkDataflowPathWithEdgeFilterWithContext is the edge-filtered streaming
@@ -44,17 +48,20 @@ func (v *Value) WalkDataflowPathWithEdgeFilterWithContext(
 	visit func(Values) bool,
 	end ...*Value,
 ) bool {
-	return v.walkDataflowPathWithContext(ctx, edgeFilter, nil, visit, end...)
+	return v.walkDataflowPathWithContext(ctx, edgeFilter, nil, visit, false, end...)
 }
 
 // walkDataflowPathWithContext streams effect×depend paths without building the
 // cross product. prune, when non-nil, drops a branch subtree during DFS (used
-// by dataflow exclude pruning).
+// by dataflow exclude pruning). reusePath promises that visit does not retain
+// the Values slice it receives, which lets the effect×depend combination reuse
+// one buffer instead of allocating a path per pair.
 func (v *Value) walkDataflowPathWithContext(
 	ctx context.Context,
 	edgeFilter func(from, to *Value) bool,
 	prune func(*Value) bool,
 	visit func(Values) bool,
+	reusePath bool,
 	end ...*Value,
 ) bool {
 	if v == nil {
@@ -85,22 +92,58 @@ func (v *Value) walkDataflowPathWithContext(
 	}
 
 	dependCount := 0
-	completed := v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, func(depend Values) bool {
-		dependCount++
-		if len(effectPaths) == 0 {
-			return visit(v.makeDataflowPath(Values{}, depend))
-		}
-		for _, effect := range effectPaths {
-			if !visit(v.makeDataflowPath(effect, depend)) {
-				return false
+	var dependVisit func(Values) bool
+	if reusePath {
+		// Effect paths are retained, so only the combination is reused here.
+		buf := make(Values, 0, 16)
+		dependVisit = func(depend Values) bool {
+			dependCount++
+			if len(effectPaths) == 0 {
+				buf = append(buf[:0], v)
+				buf = append(buf, depend...)
+				return visit(buf)
 			}
+			for _, effect := range effectPaths {
+				buf = append(buf[:0], effect...)
+				buf = append(buf, v)
+				buf = append(buf, depend...)
+				if !visit(buf) {
+					return false
+				}
+			}
+			return true
 		}
-		return true
-	}, dependNext, end...)
+	} else {
+		dependVisit = func(depend Values) bool {
+			dependCount++
+			if len(effectPaths) == 0 {
+				return visit(v.makeDataflowPath(Values{}, depend))
+			}
+			for _, effect := range effectPaths {
+				if !visit(v.makeDataflowPath(effect, depend)) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+
+	completed := v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, dependVisit, dependNext, end...)
 	if !completed {
 		return false
 	}
 	if dependCount == 0 && !dependHadChildren {
+		if reusePath {
+			buf := make(Values, 0, 16)
+			for _, effect := range effectPaths {
+				buf = append(buf[:0], effect...)
+				buf = append(buf, v)
+				if !visit(buf) {
+					return false
+				}
+			}
+			return true
+		}
 		for _, effect := range effectPaths {
 			if !visit(v.makeDataflowPath(effect, Values{})) {
 				return false
@@ -187,7 +230,7 @@ func (v *Value) GetDataflowPathWithEdgeFilterWithContext(ctx context.Context, ed
 	v.walkDataflowPathWithContext(ctx, edgeFilter, nil, func(path Values) bool {
 		paths = append(paths, path)
 		return true
-	}, end...)
+	}, false, end...)
 	return paths
 }
 
@@ -241,7 +284,9 @@ func (this *Value) walkPathWithDirectionWithContext(
 		},
 		prune,
 		func(path []*Value) bool {
-			path = utils.RemoveSliceItem(path, this)
+			// The DFS pushes the start value first, so dropping it is a reslice
+			// rather than a search-and-shift over the path.
+			path = path[1:]
 			if len(end) == 0 {
 				return visit(path)
 			}

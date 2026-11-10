@@ -70,3 +70,52 @@ func TestWalkGraphPathExPrunedChildrenAreNotALeaf(t *testing.T) {
 	require.True(t, complete)
 	require.Empty(t, paths, "a node whose children were all pruned must not be emitted as a shortened leaf")
 }
+
+// next is allowed to return a slice the caller still owns (dot graphs expose
+// node adjacency directly), so dedup and pruning must never compact it in place.
+func TestWalkGraphPathExLeavesNextSliceIntact(t *testing.T) {
+	nextWith := func(children []int) func(int) []int {
+		return func(n int) []int {
+			if n == 1 {
+				return children
+			}
+			return nil
+		}
+	}
+
+	t.Run("dedup", func(t *testing.T) {
+		children := []int{2, 2, 3}
+		var got [][]int
+		complete := WalkGraphPathEx[int, int, int](
+			context.Background(), 1, nextWith(children),
+			func(n int) int { return n },
+			func(n int) int { return n },
+			nil,
+			func(path []int) bool {
+				got = append(got, append([]int(nil), path...))
+				return true
+			},
+		)
+		require.True(t, complete)
+		require.Equal(t, [][]int{{1, 2}, {1, 3}}, got)
+		require.Equal(t, []int{2, 2, 3}, children)
+	})
+
+	t.Run("prune", func(t *testing.T) {
+		children := []int{2, 3}
+		var got [][]int
+		complete := WalkGraphPathEx[int, int, int](
+			context.Background(), 1, nextWith(children),
+			func(n int) int { return n },
+			func(n int) int { return n },
+			func(n int) bool { return n == 3 },
+			func(path []int) bool {
+				got = append(got, append([]int(nil), path...))
+				return true
+			},
+		)
+		require.True(t, complete)
+		require.Equal(t, [][]int{{1, 2}}, got)
+		require.Equal(t, []int{2, 3}, children)
+	})
+}
