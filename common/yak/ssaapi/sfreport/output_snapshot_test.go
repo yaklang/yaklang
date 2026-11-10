@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,10 @@ func TestWriteReportSnapshot_FileIsReplacedAtomically(t *testing.T) {
 	require.NoError(t, err)
 	defer file.Close()
 
-	require.NoError(t, writeReportSnapshot(file, []byte(`{"risks":1}`)))
+	require.NoError(t, writeReportSnapshot(file, func(out io.Writer) error {
+		_, err := out.Write([]byte(`{"risks":1}`))
+		return err
+	}))
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -40,8 +44,14 @@ func TestWriteReportSnapshot_FileIsReplacedAtomically(t *testing.T) {
 // the replace-instead-of-append contract.
 func TestWriteReportSnapshot_BufferIsRewound(t *testing.T) {
 	buf := &SnapshotBuffer{}
-	require.NoError(t, writeReportSnapshot(buf, []byte("first")))
-	require.NoError(t, writeReportSnapshot(buf, []byte("second")))
+	require.NoError(t, writeReportSnapshot(buf, func(out io.Writer) error {
+		_, err := out.Write([]byte("first"))
+		return err
+	}))
+	require.NoError(t, writeReportSnapshot(buf, func(out io.Writer) error {
+		_, err := out.Write([]byte("second"))
+		return err
+	}))
 	require.Equal(t, "second", buf.buf.String())
 	require.True(t, strings.HasPrefix(buf.buf.String(), "second"))
 }

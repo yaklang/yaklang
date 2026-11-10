@@ -11,37 +11,63 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// reportFlushEvery is how many findings a report collects before it rewrites
-// its snapshot. Writing every finding would be quadratic; writing only at the
-// end would leave nothing on disk when a long scan is interrupted.
+// reportFlushEvery is how many findings the SARIF report collects before it
+// rewrites its snapshot. The IRify report decides from its own change flag
+// instead: it writes a whole document, so it never measures by events.
 const reportFlushEvery = 500
+
+// reportSnapshotFunc writes one complete report document to a destination.
+//
+// A document is never assembled in memory: the writer receives it in pieces.
+// That is what keeps a 408MB snapshot from costing 408MB of resident memory
+// (plus the marshal's own scratch space) on every checkpoint.
+type reportSnapshotFunc func(io.Writer) error
+
+// writeReportSnapshotBytes publishes an already encoded report document.
+func writeReportSnapshotBytes(w io.Writer, data []byte) error {
+	return writeReportSnapshot(w, func(out io.Writer) error {
+		_, err := out.Write(data)
+		return err
+	})
+}
 
 // writeReportSnapshot publishes one complete report document.
 //
 // A file destination is replaced atomically: the snapshot goes to a temporary
 // file in the same directory, is synced, and then renamed over the target, so
-// a reader never sees a half-written document. Other destinations are rewound
-// and overwritten (see rewindReportOutput).
-func writeReportSnapshot(w io.Writer, data []byte) error {
+// a reader never sees a half-written document and a failed snapshot leaves the
+// previous one intact. Other destinations are rewound and overwritten (see
+// rewindReportOutput).
+func writeReportSnapshot(w io.Writer, produce reportSnapshotFunc) error {
 	if w == nil {
 		return nil
 	}
 	if named, ok := w.(interface{ Name() string }); ok {
 		if path := named.Name(); path != "" && path != "/dev/stdout" && path != "stdout" {
 			if _, err := os.Stat(filepath.Dir(path)); err == nil {
-				return writeFileSnapshot(path, data)
+				return writeFileSnapshot(path, produce)
 			}
 		}
 	}
 	if err := rewindReportOutput(w); err != nil {
 		return err
 	}
-	_, err := w.Write(data)
-	return err
+	if err := produce(w); err != nil {
+		// A half-written document must never be published: drop it so the
+		// destination keeps whatever complete snapshot it had before.
+		if resetErr := rewindReportOutput(w); resetErr != nil {
+			return utils.Wrapf(err, "reset partial report snapshot: %v", resetErr)
+		}
+		return err
+	}
+	return nil
 }
 
-// writeFileSnapshot writes data next to path and renames it in place.
-func writeFileSnapshot(path string, data []byte) error {
+// writeFileSnapshot streams the document next to path and renames it in place.
+//
+// The stream is synced before the rename, and the temporary file is removed on
+// any failure, so path always holds a complete document.
+func writeFileSnapshot(path string, produce reportSnapshotFunc) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
 	if err != nil {
@@ -49,7 +75,7 @@ func writeFileSnapshot(path string, data []byte) error {
 	}
 	tmpName := tmp.Name()
 	defer os.Remove(tmpName)
-	if _, err := tmp.Write(data); err != nil {
+	if err := produce(tmp); err != nil {
 		tmp.Close()
 		return utils.Wrapf(err, "write report snapshot failed")
 	}

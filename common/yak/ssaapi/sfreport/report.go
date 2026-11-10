@@ -18,18 +18,24 @@ type Report struct {
 	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
 	// It must not be serialized into JSON.
 	fileByHash map[string]*File `json:"-"`
-	// flushedRisks is len(Risks) when the last snapshot was published, and
-	// lastFlush is when it happened. Growth is measured from this baseline,
-	// not accumulated per call: the scan rewrites findings (delete + create
-	// under a new hash) far more often than the document grows, and a per-call
-	// counter made those rewrites trigger another full-document marshal. On the
-	// javacms-core scan that produced ~77GB of JSON allocation for a single
-	// 408MB document.
-	flushedRisks int       `json:"-"`
-	lastFlush    time.Time `json:"-"`
+	// dirty marks that the findings changed since the last snapshot. Snapshots
+	// are crash resilience, not a live feed, so they are published at most once
+	// per interval; the flag keeps an unchanged document from being rewritten.
+	//
+	// A per-call counter cannot express this: the scan replaces a finding
+	// (delete + create under a new hash) far more often than the document
+	// grows, so counting events republished whole documents for edits that
+	// never changed their size.
+	dirty     bool      `json:"-"`
+	lastFlush time.Time `json:"-"`
 	// flusher writes intermediate snapshots in the background so a long scan
 	// does not stall on the report file. A final Save() drains and stops it.
-	flusher *reportFlusher `json:"-"`
+	//
+	// It is guarded by its own lock: a snapshot holds the report's read lock
+	// while it streams, so sharing that lock would make the scan wait for a
+	// disk write just to look the writer up.
+	flusherMu sync.Mutex     `json:"-"`
+	flusher   *reportFlusher `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -158,26 +164,24 @@ func (r *Report) AddRisks(risk ...*Risk) {
 		}
 
 		r.Risks[risk.GetHash()] = risk
+		r.dirty = true
 	}
-	flush := r.shouldFlushLocked()
-	writes := r.writer != nil
+	// Only a report that has a destination can publish a snapshot; a writer is
+	// set before the scan starts, so this also keeps the change flag accurate.
+	flush := r.writer != nil && r.shouldFlushLocked()
 	r.mu.Unlock()
-	if flush && writes {
-		// Serializing the document is cheap compared to the write; the write
-		// itself happens on the flusher so a long scan does not stall.
-		if data, err := r.snapshotJSON(); err != nil {
-			log.Errorf("serialize report snapshot failed: %v", err)
-		} else {
-			r.flusherFor().submit(data)
-		}
+	if flush {
+		// The worker streams the document straight to the destination, so a
+		// checkpoint neither assembles it in memory nor writes it twice.
+		r.flusherFor().submit(r.writeJSONSnapshot)
 	}
 }
 
 // flusherFor returns the background writer of this report, creating it on
 // first use.
 func (r *Report) flusherFor() *reportFlusher {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.flusherMu.Lock()
+	defer r.flusherMu.Unlock()
 	if r.flusher == nil {
 		r.flusher = newReportFlusher(r.writer)
 	}
@@ -186,34 +190,30 @@ func (r *Report) flusherFor() *reportFlusher {
 
 // currentFlusher returns the background writer without creating one.
 func (r *Report) currentFlusher() *reportFlusher {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.flusherMu.Lock()
+	defer r.flusherMu.Unlock()
 	return r.flusher
 }
 
-// shouldFlushLocked reports whether the document grew enough for another
-// snapshot. The caller releases the lock before writing it.
+// shouldFlushLocked reports whether the document changed since the last
+// snapshot and may be published again. The caller releases the lock before
+// writing it.
 //
-// The baseline is the last snapshot's size, so replacing findings (the scan
-// deletes and re-creates the same feature under a new hash) never triggers a
-// marshal: only a net gain of reportFlushEvery findings does.
+// A snapshot is crash resilience, not a live feed: the interval bounds how
+// often a whole document is written, and the dirty flag keeps an unchanged
+// document from being rewritten. Counting findings instead republished the
+// document for every rewrite the scan made (delete + create under a new hash),
+// which is far more often than the document actually changed.
 func (r *Report) shouldFlushLocked() bool {
-	if r == nil || reportFlushEvery <= 0 {
+	if r == nil || !r.dirty {
 		return false
 	}
-	if len(r.Risks)-r.flushedRisks < reportFlushEvery {
-		return false
-	}
-	// A scan rewrites findings far faster than the document grows, so the
-	// counter alone still publishes hundreds of 408MB documents per run.
-	// Snapshots are a crash-resilience aid, not a live feed: one per interval
-	// is enough, and the final Save() always writes the complete document.
 	if interval := reportFlushMinInterval(); interval > 0 && !r.lastFlush.IsZero() {
 		if time.Since(r.lastFlush) < interval {
 			return false
 		}
 	}
-	r.flushedRisks = len(r.Risks)
+	r.dirty = false
 	r.lastFlush = time.Now()
 	return true
 }
@@ -234,15 +234,13 @@ func (r *Report) ApplyRiskUpdate(item schema.RiskUpdateItem) error {
 		}
 		r.addSchemaRiskLocked(item.Risk)
 	}
-	flush := r.shouldFlushLocked()
-	writes := r.writer != nil
+	// Whether a finding was created, replaced or dropped, the document on disk
+	// no longer describes the report.
+	r.dirty = true
+	flush := r.writer != nil && r.shouldFlushLocked()
 	r.mu.Unlock()
-	if flush && writes {
-		if data, err := r.snapshotJSON(); err != nil {
-			log.Errorf("serialize report snapshot failed: %v", err)
-		} else {
-			r.flusherFor().submit(data)
-		}
+	if flush {
+		r.flusherFor().submit(r.writeJSONSnapshot)
 	}
 	return nil
 }
