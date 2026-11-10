@@ -165,6 +165,9 @@ func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 	}
 
 	if c.InputEventManager != nil {
+		if c.InputEventManager.dispatchInteractiveInput(event) {
+			return nil
+		}
 		c.InputEventManager.CallMirrorOfAIInputEvent(event)
 		defer c.InputEventManager.CallAfterInputEvent(event)
 	}
@@ -202,11 +205,13 @@ func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 }
 
 type AIInputEventProcessor struct {
-	syncCallback      map[string]func(event *ypb.AIInputEvent) error
-	freeInputCallback func(event *ypb.AIInputEvent) error
-	mirrorCallback    map[string]func(event *ypb.AIInputEvent)
-	afterCallback     map[string]func(event *ypb.AIInputEvent)
-	mu                sync.Mutex
+	syncCallback          map[string]func(event *ypb.AIInputEvent) error
+	freeInputCallback     func(event *ypb.AIInputEvent) error
+	mirrorCallback        map[string]func(event *ypb.AIInputEvent)
+	afterCallback         map[string]func(event *ypb.AIInputEvent)
+	interactiveRoutes     map[string]func(*ypb.AIInputEvent) bool
+	retiredInteractiveIDs map[string]struct{}
+	mu                    sync.Mutex
 }
 
 func NewAIInputEventProcessor() *AIInputEventProcessor {
@@ -269,6 +274,45 @@ func (p *AIInputEventProcessor) processEvent(event *ypb.AIInputEvent) error {
 		}
 	}
 	return nil
+}
+
+// RouteInteractiveInput consumes replies before the parent's normal mirror
+// and scheduler observe them. The route must not re-enter the processor.
+func (p *AIInputEventProcessor) RouteInteractiveInput(id string, route func(*ypb.AIInputEvent) bool) func(...string) {
+	p.mu.Lock()
+	if p.interactiveRoutes == nil {
+		p.interactiveRoutes = make(map[string]func(*ypb.AIInputEvent) bool)
+	}
+	p.interactiveRoutes[id] = route
+	p.mu.Unlock()
+	return func(retiredIDs ...string) {
+		p.mu.Lock()
+		delete(p.interactiveRoutes, id)
+		if len(retiredIDs) > 0 && p.retiredInteractiveIDs == nil {
+			p.retiredInteractiveIDs = make(map[string]struct{}, len(retiredIDs))
+		}
+		for _, endpointID := range retiredIDs {
+			p.retiredInteractiveIDs[endpointID] = struct{}{}
+		}
+		p.mu.Unlock()
+	}
+}
+
+func (p *AIInputEventProcessor) dispatchInteractiveInput(event *ypb.AIInputEvent) bool {
+	if !event.GetIsInteractiveMessage() || event.GetInteractiveId() == "" {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if _, retired := p.retiredInteractiveIDs[event.GetInteractiveId()]; retired {
+		return true
+	}
+	for _, route := range p.interactiveRoutes {
+		if route(event) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *AIInputEventProcessor) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {

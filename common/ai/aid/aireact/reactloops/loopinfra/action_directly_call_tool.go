@@ -497,11 +497,11 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			handleToolCallResult(loop, ctx, invoker, toolName, nil, false, err, operator)
 			return
 		}
-		defaultAsync := false
+		defaultAsync, requireForeground := false, false
 		if tool, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolName); err == nil && tool != nil {
-			defaultAsync = tool.DefaultAsync
+			defaultAsync, requireForeground = tool.DefaultAsync, tool.RequireForeground
 		}
-		async := directToolActionAsync(action, defaultAsync)
+		async := !requireForeground && directToolActionAsync(action, defaultAsync)
 		loop.SetActionExecutionValue(action, actionStateDirectToolAsync, async)
 		if async {
 			params, _, _, err := prepare(action, toolName)

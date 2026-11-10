@@ -40,6 +40,13 @@ func (f *ForgeBlueprint) newExecution(ctx context.Context, query string, opts []
 	e := &ForgeExecution{blueprint: f, query: query, result: ForgeResult{Forge: f}}
 
 	opts = append(append([]aicommon.ConfigOption{}, opts...), coordinator.WithResultDelivery(e.deliver))
+	bindings, err := f.prepareSubForges(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(bindings) > 0 {
+		opts = append(opts, coordinator.WithSubForgeTools(bindings))
+	}
 	s, err := coordinator.NewForgeSession(ctx, query, opts...)
 	if err != nil {
 		return nil, err

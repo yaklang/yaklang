@@ -53,6 +53,7 @@ type ForgeBlueprint struct {
 	ParameterRuleYaklangCode string
 
 	ToolKeywords []string
+	subForges    []subForgeBinding
 }
 
 func NewForgeBlueprint(name string, opts ...Option) *ForgeBlueprint {

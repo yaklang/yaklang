@@ -11,6 +11,14 @@ import (
 )
 
 func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool {
+	tool, _ := ConvertCliParameterToToolChecked(toolName, prog)
+	return tool
+}
+
+// ConvertCliParameterToToolChecked reports malformed explicit parameter schemas
+// so a caller can reject declarations that cannot safely be offered to a model.
+func ConvertCliParameterToToolChecked(toolName string, prog *ssaapi.Program) (*mcp.Tool, error) {
+	var schemaErr error
 	properties := make(map[string]any)
 	description := ""
 	requiredProperties := make([]string, 0)
@@ -104,7 +112,11 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 		case "cli.setJsonSchema":
 			schema := make(map[string]any)
 			err := json.Unmarshal([]byte(arg1), &schema)
-			if err == nil {
+			if err != nil || schema == nil {
+				if schemaErr == nil {
+					schemaErr = fmt.Errorf("cli.setJsonSchema requires a valid JSON object")
+				}
+			} else {
 				// A union schema without a top-level type intentionally replaces the
 				// primitive type inferred from cli.String/cli.Int. Keeping both would
 				// turn `oneOf: [string, object]` into `type: string AND oneOf`, causing
@@ -217,5 +229,5 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 	}
 	tool.InputSchema.Properties = orderedProps
 
-	return tool
+	return tool, schemaErr
 }
