@@ -30,6 +30,11 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	if m == nil {
 		return nil, nil
 	}
+	broadcaster := m.timelineBroadcaster(config)
+	if broadcaster != nil {
+		endFork := broadcaster.beginFork()
+		defer endFork()
+	}
 
 	raw, err := MarshalTimeline(m)
 	if err != nil {
@@ -50,7 +55,6 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	branch.SoftBindConfig(config, ai)
 	branch.markBranchTimeline(true)
 
-	broadcaster := m.timelineBroadcaster(config)
 	fork := &TimelineFork{
 		Parent:      m,
 		Branch:      branch,

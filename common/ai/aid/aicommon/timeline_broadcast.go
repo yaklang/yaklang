@@ -15,13 +15,18 @@ import (
 // TimelineBroadcaster fans one immutable Timeline item out to live timelines
 // which belong to the same agent session.
 type TimelineBroadcaster struct {
-	mu          sync.RWMutex
-	nextID      uint64
-	subscribers map[uint64]func(*TimelineItem) error
+	mu              sync.RWMutex
+	changed         *sync.Cond
+	nextID          uint64
+	activePublishes int
+	forkInProgress  bool
+	subscribers     map[uint64]func(*TimelineItem) error
 }
 
 func NewTimelineBroadcaster() *TimelineBroadcaster {
-	return &TimelineBroadcaster{subscribers: make(map[uint64]func(*TimelineItem) error)}
+	b := &TimelineBroadcaster{subscribers: make(map[uint64]func(*TimelineItem) error)}
+	b.changed = sync.NewCond(&b.mu)
+	return b
 }
 
 // Broadcast sends item to the subscribers which existed when Broadcast began.
@@ -36,14 +41,22 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 		return err
 	}
 
-	b.mu.RLock()
+	b.mu.Lock()
+	b.waitForForkLocked()
+	b.activePublishes++
 	ids := make([]uint64, 0, len(b.subscribers))
 	callbacks := make(map[uint64]func(*TimelineItem) error, len(b.subscribers))
 	for id, callback := range b.subscribers {
 		ids = append(ids, id)
 		callbacks[id] = callback
 	}
-	b.mu.RUnlock()
+	b.mu.Unlock()
+	defer func() {
+		b.mu.Lock()
+		b.activePublishes--
+		b.changed.Broadcast()
+		b.mu.Unlock()
+	}()
 
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	var failures []error
@@ -53,6 +66,42 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 		}
 	}
 	return errors.Join(failures...)
+}
+
+func (b *TimelineBroadcaster) waitForForkLocked() {
+	if b.changed == nil {
+		b.changed = sync.NewCond(&b.mu)
+	}
+	for b.forkInProgress {
+		b.changed.Wait()
+	}
+}
+
+// beginFork prevents a publication from landing between the parent snapshot
+// and child subscription. Publications which already started finish first.
+func (b *TimelineBroadcaster) beginFork() func() {
+	if b == nil {
+		return func() {}
+	}
+	b.mu.Lock()
+	if b.changed == nil {
+		b.changed = sync.NewCond(&b.mu)
+	}
+	for b.forkInProgress || b.activePublishes > 0 {
+		b.changed.Wait()
+	}
+	b.forkInProgress = true
+	b.mu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			b.mu.Lock()
+			b.forkInProgress = false
+			b.changed.Broadcast()
+			b.mu.Unlock()
+		})
+	}
 }
 
 // Subscribe registers a callback and returns the token used by Unsubscribe.

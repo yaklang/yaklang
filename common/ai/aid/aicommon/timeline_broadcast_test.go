@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -134,6 +135,48 @@ func TestTimelineBroadcastDoesNotMutateHistoricalItem(t *testing.T) {
 	branchHistoryID := fork.Branch.idToTimelineItem.Values()[0].historyID
 	fork.Branch.mu.RUnlock()
 	require.Equal(t, parentHistoryID, branchHistoryID)
+}
+
+func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
+	config := newTimelineBroadcastConfig(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	subscription := config.TimelineBroadcaster.Subscribe(func(*TimelineItem) error {
+		close(started)
+		<-release
+		return nil
+	})
+	t.Cleanup(func() { config.TimelineBroadcaster.Unsubscribe(subscription) })
+
+	broadcastDone := make(chan error, 1)
+	go func() {
+		broadcastDone <- config.BroadcastTimelineText("broadcast during fork")
+	}()
+	<-started
+
+	type forkResult struct {
+		fork *TimelineFork
+		err  error
+	}
+	forkDone := make(chan forkResult, 1)
+	go func() {
+		fork, err := config.Timeline.ForkForTask("task", "task", config, config)
+		forkDone <- forkResult{fork: fork, err: err}
+	}()
+
+	select {
+	case <-forkDone:
+		t.Fatal("fork completed while a publication was still in flight")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+	require.NoError(t, <-broadcastDone)
+	result := <-forkDone
+	require.NoError(t, result.err)
+	require.NotNil(t, result.fork)
+	t.Cleanup(result.fork.Release)
+	require.Contains(t, result.fork.Branch.Dump(), "broadcast during fork")
 }
 
 func TestConfigSetTimelineMovesBroadcastSubscription(t *testing.T) {
