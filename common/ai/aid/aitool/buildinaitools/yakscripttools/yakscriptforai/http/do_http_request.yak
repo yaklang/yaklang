@@ -465,12 +465,26 @@ filterReason = func(status, size) {
 
 // Expand all variants before sending; per-row maps prevent concurrent workers
 // from overwriting values belonging to another request.
+formatFuzzTagRenderFailure = func(renderErr) {
+    errorText = string(renderErr)
+    lowerErrorText = str.ToLower(errorText)
+    message = sprintf("FuzzTag render failed before sending: %v. max-requests=%d; no request was sent. ", renderErr, maxRequests)
+    if str.Contains(errorText, "exceeds request limit") {
+        return message + "Recovery: reduce the FuzzTag combinations or increase max-requests (allowed range 1..500), then retry."
+    }
+    if str.Contains(lowerErrorText, "context canceled") || str.Contains(lowerErrorText, "context deadline exceeded") {
+        return message + "Recovery: the request context is no longer active; retry only from a live task context."
+    }
+    return message + "Recovery: fix the malformed/unknown FuzzTag or missing variable shown above, or set fuzztag=false to send the template literally."
+}
 requestItems = []
 if packet != "" {
     packets = [packet]
     if fuzztag {
         packets, renderErr = fuzz.RenderHTTPTemplate(packet, variables, maxRequests, requestCtx)
-        if renderErr != nil { die(sprintf("FuzzTag render failed before sending: %v", renderErr)) }
+        if renderErr != nil {
+            die(formatFuzzTagRenderFailure(renderErr))
+        }
     }
     for _, renderedPacket := range packets {
         requestItems.Push({"packet":renderedPacket, "method":method, "body":body, "content_type":contentType})
@@ -490,7 +504,9 @@ if packet != "" {
     rows = [fields]
     if fuzztag {
         rows, renderErr = fuzz.RenderHTTPFields(fields, variables, maxRequests, requestCtx)
-        if renderErr != nil { die(sprintf("FuzzTag render failed before sending: %v", renderErr)) }
+        if renderErr != nil {
+            die(formatFuzzTagRenderFailure(renderErr))
+        }
     }
     for _, row := range rows {
         maps = []
@@ -507,6 +523,9 @@ if packet != "" {
             "body":row[3], "content_type":row[4], "query_params":row[5], "post_params":row[6],
             "legacy_query":maps[0], "query":maps[1], "legacy_form":maps[2], "form":maps[3]})
     }
+}
+if len(requestItems) == 0 {
+    die(sprintf("no HTTP request variants were produced before sending (fuzztag=%v, max-requests=%d); no request was sent. Recovery: verify url/packet and FuzzTag variables, or disable fuzztag to send the template literally.", fuzztag, maxRequests))
 }
 batchMode = len(requestItems) > 1
 

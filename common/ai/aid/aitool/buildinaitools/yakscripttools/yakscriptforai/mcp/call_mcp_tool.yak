@@ -20,9 +20,15 @@ params = cli.Json("arguments", cli.setDefault("{}"), cli.setJsonSchema(`{"type":
 timeout = cli.Float("timeout", cli.setDefault(30), cli.setHelp("单次请求超时秒数，>0 且 <=3600"))
 if str.TrimSpace(serverName) == "" || str.TrimSpace(toolName) == "" { die("server_name and remote_tool are required") }
 if json.dumps(params) == "null" { die("arguments must be a JSON object") }
+if timeout <= 0 || timeout > 3600 { die("timeout must be greater than 0 and no more than 3600 seconds") }
 cli.check()
-client = mcp.Connect(serverName, mcp.timeout(timeout))~
+client, connectErr = mcp.Connect(serverName, mcp.timeout(timeout))
+if connectErr != nil {
+    die(sprintf("failed to connect MCP server %q (timeout=%vs): %v. Recovery: run manage_mcp_server(op=list) to verify the exact name and enabled state, then check that the configured endpoint or command is reachable.", serverName, timeout, connectErr))
+}
 defer client.Close()
 result, err = client.CallTool(toolName, params)
 if result != nil { println(json.dumps(result)) }
-if err != nil { die(err) }
+if err != nil {
+    die(sprintf("MCP tool %q on server %q failed: %v. Recovery: inspect the remote error content above, correct arguments against the query_mcp_tools inputSchema, and retry only if the operation is safe to repeat.", toolName, serverName, err))
+}

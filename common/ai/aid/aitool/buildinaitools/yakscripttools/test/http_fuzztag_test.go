@@ -85,10 +85,13 @@ func TestDoHTTPRequestFuzztagPacketAndLiteralModes(t *testing.T) {
 func TestDoHTTPRequestFuzztagRejectsInvalidBeforeSending(t *testing.T) {
 	server, received := fuzztagHTTPServer(t)
 	for _, template := range []string{"{{base64({{unknown()}})}}", "{{params(missing)}}", "{{unclosed"} {
-		_, err := getDoHTTPRequestTool(t).InvokeWithParams(aitool.InvokeParams{
+		result, err := getDoHTTPRequestTool(t).InvokeWithParams(aitool.InvokeParams{
 			"url": server.URL, "query": map[string]any{"value": template}, "fuzztag": true,
 		})
 		require.Error(t, err, template)
+		require.NotNil(t, result)
+		require.Contains(t, result.Error, "fix the malformed/unknown FuzzTag or missing variable")
+		require.NotContains(t, result.Error, "increase max-requests")
 	}
 	require.Len(t, received, 0)
 }
@@ -270,8 +273,12 @@ func TestDoHTTPRequestFuzztagLimitAndCancellationSendNothing(t *testing.T) {
 		{"packet": "GET /{{int(1-10)}} HTTP/1.1\r\nHost: " + strings.TrimPrefix(server.URL, "http://") + "\r\n\r\n", "fuzztag": true, "max-requests": 9},
 		{"url": server.URL + "/{{int(1-2)}}", "query": map[string]any{"value": "{{list(a|b)}}"}, "fuzztag": true, "max-requests": 3},
 	} {
-		_, err := getDoHTTPRequestTool(t).InvokeWithParams(params)
+		result, err := getDoHTTPRequestTool(t).InvokeWithParams(params)
 		require.Error(t, err)
+		require.NotNil(t, result)
+		require.Contains(t, result.Error, "max-requests=")
+		require.Contains(t, result.Error, "no request was sent")
+		require.Contains(t, result.Error, "Recovery:")
 		require.Len(t, received, 0)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

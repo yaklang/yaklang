@@ -40,6 +40,33 @@ func getDoHTTPRequestTool(t *testing.T) *aitool.Tool {
 	return tools[0]
 }
 
+func TestDoHTTPRequestRejectsEmptyFuzzTagExpansionBeforeIndexing(t *testing.T) {
+	content, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/http/do_http_request.yak")
+	assert.NilError(t, err)
+	const renderFields = "rows, renderErr = fuzz.RenderHTTPFields(fields, variables, maxRequests, requestCtx)"
+	assert.Assert(t, strings.Contains(string(content), renderFields), "render call marker changed; update this regression test")
+	mutated := strings.Replace(string(content), renderFields, "rows, renderErr = [], nil", 1)
+	metadata := yakscripttools.LoadYakScriptToAiTools(doHTTPRequestToolName, mutated)
+	assert.Assert(t, metadata != nil, "mutated tool must remain parseable")
+	tools := yakscripttools.ConvertTools([]*schema.AIYakTool{metadata})
+	assert.Equal(t, len(tools), 1)
+
+	result, err := tools[0].InvokeWithParams(aitool.InvokeParams{
+		"url":       "http://127.0.0.1/",
+		"fuzztag":   true,
+		"timeout":   1,
+		"verbose":   false,
+		"https":     "no",
+		"method":    http.MethodGet,
+		"max-retry": 0,
+	})
+	assert.Assert(t, err != nil, "empty render result must stop before indexing requestItems")
+	assert.Assert(t, result != nil)
+	assert.Assert(t, strings.Contains(result.Error, "no HTTP request variants were produced before sending"), result.Error)
+	assert.Assert(t, strings.Contains(result.Error, "no request was sent"), result.Error)
+	assert.Assert(t, !strings.Contains(result.Error, "slice call error"), result.Error)
+}
+
 func TestDoHTTPRequestUsageExplainsExperimentAndRecovery(t *testing.T) {
 	usage := getDoHTTPRequestTool(t).Usage
 	assert.Assert(t, strings.Contains(usage, "先留正常基线"))
