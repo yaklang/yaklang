@@ -45,7 +45,7 @@ start_pcap_capture 接受 interface、bpf、snaplen、promisc 和可选 duration
 
 使用现有 stop、wait、inspect。异步 Resource 已经等待 callback 清理完成，直接复用，不新增 JoinOnCancel 等工具元数据。
 
-停止顺序为：停止输入、排空解析、提交剩余记录、释放设备和 writer。原库保留。所属任务结束同样会取消抓包，不承诺跨任务驻留。
+停止顺序为：停止输入、排空解析、提交剩余记录、释放设备和 writer。原库保留。PR 5419 将后台执行提升到 ReAct 会话级后，普通 task 完成或 loop 释放不会取消抓包；启动 task 被取消、abort 或 skip 时会停止对应的后台执行，ReAct 会话结束时统一停止全部执行。该能力不跨新 ReAct 会话或进程重启恢复。
 
 ## 3. Go 层改动
 
