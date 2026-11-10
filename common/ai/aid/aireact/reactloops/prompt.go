@@ -92,6 +92,9 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 	// build in code
 	values := r.GetAllActions()
 	disableActionList := []string{}
+	if c := aicommon.ImageConfigFrom(r.config); c == nil || !c.HasImageResources() {
+		disableActionList = append(disableActionList, "inspect_image", "analyze_image", "list_images")
+	}
 	if disallowExit {
 		disableActionList = append(disableActionList, loopAction_Finish.ActionType)
 	}
@@ -540,6 +543,31 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if result.TimelineItemIDs == nil {
 			result.TimelineItemIDs = fallbackItemIDs
 		}
+		ctx := r.config.GetContext()
+		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
+			ctx = task.GetContext()
+		}
+		images, err := r.prepareImages(ctx, result.Images)
+		if err != nil {
+			return nil, err
+		}
+		r.imagePrompt = images
+		if images != nil {
+			// Append a request-local manifest without re-reading Timeline. Text
+			// and attachments therefore retain the same assembly snapshot.
+			result.Prompt += images.caption
+			if r.functionCallMode {
+				raw, _ := json.Marshal(r.lastNativeTools)
+				images.toolTokens = int64(aicommon.MeasureTokens(string(raw)))
+				images.toolBytes = int64(len(raw))
+			}
+			if result.Mode == aicommon.LoopPromptModeCompressContext {
+				images.inputLimit = aicommon.TimelineCompressionMaxInputTokens
+			}
+			if int64(len(result.Prompt))+images.imageBytes+images.toolBytes > images.maxBytes {
+				return nil, fmt.Errorf("complete image request exceeds byte budget; use image crops or a smaller overview")
+			}
+		}
 		return result, nil
 	}
 	// 先缓存已经成功生成的普通 Prompt；后续压缩任一步失败时直接返回它。
@@ -550,12 +578,15 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		return nil, err
 	}
 	result := normalResult
-	promptTokens := int64(aicommon.MeasureTokens(result.Prompt))
-
+	promptTokens := r.imagePrompt.totalTokens(normalResult.Prompt)
+	visualOverflow := false
+	if c := aicommon.ImageConfigFrom(r.config); c != nil && r.imagePrompt != nil {
+		visualOverflow = r.imagePrompt.imageTokens > c.GetImageInputConfig().VisualTokenLimit
+	}
 	// overflowCompression is a provider signal and may use the last fitting
 	// timeline boundary; an ordinary over-limit prompt keeps the full history.
 	if timeline := timelineFromConfig(r.config); timeline != nil &&
-		(input.overflowCompression || promptTokens > limit) {
+		(input.overflowCompression || promptTokens > limit || visualOverflow) {
 		ctx := r.config.GetContext()
 		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
 			ctx = task.GetContext()
@@ -591,7 +622,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			return r.commitSubAgentPromptAssembly(input, normalResult), nil
 		}
 		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
-		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))
+		compressionPromptTokens := r.imagePrompt.totalTokens(result.Prompt)
 		if compressionPromptTokens > compressionPromptLimit {
 			log.Warnf(
 				"context-compression prompt exceeds advisory input budget: actual=%d limit=%d; continuing",

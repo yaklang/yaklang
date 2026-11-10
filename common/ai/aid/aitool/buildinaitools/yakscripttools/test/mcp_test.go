@@ -3,7 +3,10 @@ package test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -29,6 +32,12 @@ func TestMCPYakTools(t *testing.T) {
 	defer profile.Close()
 	require.NoError(t, profile.AutoMigrate(&schema.MCPServer{}, &schema.MCPServerToolConfig{}, &schema.MCPClientToolConfig{}).Error)
 	remote := server.NewMCPServer("tool-fixture", "1")
+	var pngBytes bytes.Buffer
+	require.NoError(t, png.Encode(&pngBytes, image.NewRGBA(image.Rect(0, 0, 9, 7))))
+	encodedImage := base64.StdEncoding.EncodeToString(pngBytes.Bytes())
+	remote.AddTool(mcp.NewTool("capture"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return mcp.NewToolResultImage("screen capture", encodedImage, "image/png"), nil
+	})
 	remote.AddTool(mcp.NewTool("echo", mcp.WithString("message", mcp.Required())), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return mcp.NewToolResultText(req.Params.Arguments["message"].(string)), nil
 	})
@@ -99,6 +108,11 @@ func TestMCPYakTools(t *testing.T) {
 	_, err = execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "echo", "arguments": map[string]any{"message": "blocked"}})
 	require.Error(t, err)
 	require.NotContains(t, invoke("query_mcp_tools", map[string]any{"server_name": "fixture"}), `"name":"echo"`)
+	capture, err := execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "capture"})
+	require.NoError(t, err)
+	require.Len(t, capture.Images, 1)
+	require.NotContains(t, capture.Stdout, encodedImage)
+	require.Equal(t, 9, capture.Images[0].Width)
 	failed, err := execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "failure"})
 	require.Error(t, err)
 	require.Contains(t, string(failed.Stdout), "EXPECTED_REMOTE_FAILURE")

@@ -139,7 +139,11 @@ func newTierAIModelCallback(tier consts.ModelTier, modes ...bool) (AICallbackTyp
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 	return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
-		config, err := resolveTierModelConfig(tier, single)
+		config := request.GetImageModel()
+		var err error
+		if config == nil {
+			config, err = resolveTierModelConfig(tier, single)
+		}
 		if err != nil {
 			return nil, err
 		}

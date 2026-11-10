@@ -114,9 +114,11 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 	// promptMode is the prompt mode of the current iteration. It is set when the
 	// prompt is built and stays until the next prompt replaces it.
-	promptMode aicommon.LoopPromptMode
-	requestTimelineThroughID    *int64
-	requestTimelineItemIDs      []int64
+	promptMode               aicommon.LoopPromptMode
+	requestTimelineThroughID *int64
+	requestTimelineItemIDs   []int64
+	imagePrompt              *imagePromptSnapshot
+	imageRejectedModel       string
 	// lastFittingTimelineThroughID is the boundary of the latest prompt the
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64
@@ -720,7 +722,13 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_SaveEvidence,
 		loopAction_CompressContext,
 		loopAction_ManageAsyncExecutionRuntime,
+		loopAction_InspectImage,
+		loopAction_AnalyzeImage,
+		loopAction_ListImages,
 	} {
+		if (action == loopAction_InspectImage || action == loopAction_AnalyzeImage || action == loopAction_ListImages) && aicommon.ImageConfigFrom(config) == nil {
+			continue
+		}
 		r.actions.Set(action.ActionType, withNativeActionDescription(action))
 	}
 
