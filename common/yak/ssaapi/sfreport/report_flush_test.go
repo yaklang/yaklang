@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -9,51 +10,33 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// Re-adding a hash that is already in the report must not count as a new
-// finding. A scan can deliver the same risk through many update events; the
-// old call counter then rewrote the whole document every 500 events.
-func TestReport_AddRisksCountsOnlyNewFindings(t *testing.T) {
+// A snapshot is published only when the document changed. Re-adding the same
+// finding leaves the document identical, so it must not schedule a new one.
+func TestReport_SnapshotWaitsForAChange(t *testing.T) {
 	disableFlushThrottle(t)
-	report := NewReport(IRifyReportType)
+	report := newWritableReport(t)
 	same := &Risk{Hash: "same", Title: "same"}
 	for i := 0; i < 5*reportFlushEvery; i++ {
 		report.AddRisks(same)
 	}
 	require.Len(t, report.Risks, 1)
-	require.Zero(t, report.flushedRisks, "no snapshot: the document holds one finding")
-
-	// Replacing the body under the same hash does not grow the document.
-	for i := 0; i < reportFlushEvery; i++ {
-		report.AddRisks(&Risk{Hash: "same", Title: fmt.Sprintf("body-%d", i)})
-	}
-	require.Len(t, report.Risks, 1)
-	require.Zero(t, report.flushedRisks)
-
-	// Unique findings still reach the snapshot threshold and reset the baseline.
-	threshold := NewReport(IRifyReportType)
-	for i := 0; i < reportFlushEvery; i++ {
-		threshold.AddRisks(&Risk{Hash: fmt.Sprintf("unique-%d", i)})
-	}
-	require.Len(t, threshold.Risks, reportFlushEvery)
-	require.Equal(t, reportFlushEvery, threshold.flushedRisks)
+	require.False(t, report.dirty, "one snapshot covers the only finding")
+	require.False(t, report.lastFlush.IsZero())
 }
 
-// The same rule applies to risk updates: only growth in the document counts.
-func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
+// The same rule applies to risk updates: one snapshot per change, not one per
+// event, and a delete is a change too.
+func TestReport_SnapshotsFollowCreatesUpdatesAndDeletes(t *testing.T) {
 	disableFlushThrottle(t)
-	report := NewReport(IRifyReportType)
-	item := schema.RiskUpdateItem{
+	report := newWritableReport(t)
+	create := schema.RiskUpdateItem{
 		Mode: schema.RiskUpdateCreate,
 		Risk: &schema.SSARisk{Hash: "one", Title: "one", RiskType: "demo"},
 	}
-	for i := 0; i < 5*reportFlushEvery; i++ {
-		require.NoError(t, report.ApplyRiskUpdate(item))
-	}
+	require.NoError(t, report.ApplyRiskUpdate(create))
 	require.Len(t, report.Risks, 1)
-	require.Zero(t, report.flushedRisks)
+	require.False(t, report.dirty)
 
-	// Replacing a risk under a new hash keeps the document the same size, so
-	// it must not masquerade as newly collected findings.
 	replacement := schema.RiskUpdateItem{
 		Mode:    schema.RiskUpdateUpdate,
 		OldHash: "one",
@@ -61,34 +44,34 @@ func TestReport_ApplyRiskUpdateCountsOnlyNewFindings(t *testing.T) {
 	}
 	require.NoError(t, report.ApplyRiskUpdate(replacement))
 	require.Len(t, report.Risks, 1)
-	require.Zero(t, report.flushedRisks)
+	require.False(t, report.dirty, "the replacement is already in the snapshot")
 
-	threshold := NewReport(IRifyReportType)
-	for i := 0; i < reportFlushEvery; i++ {
-		require.NoError(t, threshold.ApplyRiskUpdate(schema.RiskUpdateItem{
-			Mode: schema.RiskUpdateCreate,
-			Risk: &schema.SSARisk{Hash: fmt.Sprintf("new-%d", i), Title: "new", RiskType: "demo"},
-		}))
-	}
-	require.Len(t, threshold.Risks, reportFlushEvery)
-	require.Equal(t, reportFlushEvery, threshold.flushedRisks)
+	// A delete changes the document as well: the snapshot no longer matches.
+	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
+		Mode:    schema.RiskUpdateDelete,
+		OldHash: "two",
+	}))
+	require.Empty(t, report.Risks)
+	require.False(t, report.dirty)
 }
 
-// A create/delete churn that keeps the document size steady must not publish
-// another snapshot: the scan rewrites one feature many times, and each rewrite
-// used to serialize the whole 408MB document.
-func TestReport_RewriteChurnDoesNotFlush(t *testing.T) {
-	disableFlushThrottle(t)
-	report := NewReport(IRifyReportType)
+// Findings arrive continuously during a scan, so the interval is what bounds
+// how often the whole document is written. Everything that happens inside one
+// interval collapses into a single snapshot.
+func TestReport_RewriteChurnPublishesAtMostOncePerInterval(t *testing.T) {
+	report := newWritableReport(t)
 	for i := 0; i < reportFlushEvery; i++ {
 		require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
 			Mode: schema.RiskUpdateCreate,
 			Risk: &schema.SSARisk{Hash: fmt.Sprintf("hash-0-%d", i), Title: "base", RiskType: "demo"},
 		}))
 	}
-	require.Equal(t, reportFlushEvery, report.flushedRisks)
+	require.True(t, report.dirty, "findings added inside the interval wait for it")
+	firstSnapshot := report.lastFlush
+	require.False(t, firstSnapshot.IsZero(), "the first change publishes at once")
 
-	// Rewrite every finding under a new hash: document size is unchanged.
+	// Rewrite every finding under a new hash: the document size is unchanged,
+	// but its content is not, so one snapshot is due - not one per rewrite.
 	for round := 0; round < 3; round++ {
 		for i := 0; i < reportFlushEvery; i++ {
 			require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
@@ -103,12 +86,39 @@ func TestReport_RewriteChurnDoesNotFlush(t *testing.T) {
 		}
 	}
 	require.Len(t, report.Risks, reportFlushEvery)
-	require.Equal(t, reportFlushEvery, report.flushedRisks,
-		"rewrites must not move the snapshot baseline")
+	require.Equal(t, firstSnapshot, report.lastFlush,
+		"the document changed, but the interval has not elapsed")
+	require.True(t, report.dirty, "the on-disk snapshot is stale")
+
+	// Once the interval elapsed, the accumulated change publishes one snapshot.
+	report.mu.Lock()
+	report.lastFlush = time.Now().Add(-2 * reportFlushMinIntervalValue)
+	report.mu.Unlock()
+	require.NoError(t, report.ApplyRiskUpdate(schema.RiskUpdateItem{
+		Mode: schema.RiskUpdateCreate,
+		Risk: &schema.SSARisk{Hash: "trigger", Title: "trigger", RiskType: "demo"},
+	}))
+	require.False(t, report.dirty)
+	require.True(t, report.lastFlush.After(firstSnapshot))
 }
 
-// disableFlushThrottle keeps the count-based assertions independent of wall
-// time. A separate test covers the throttle itself.
+// newWritableReport returns a report with a destination, which is what makes a
+// snapshot possible at all: a report that is never saved has nowhere to
+// publish and keeps its change flag set.
+func newWritableReport(t *testing.T) *Report {
+	t.Helper()
+	report := NewReport(IRifyReportType)
+	require.NoError(t, report.SetWriter(new(bytes.Buffer)))
+	t.Cleanup(func() {
+		if flusher := report.currentFlusher(); flusher != nil {
+			flusher.stopAndWait()
+		}
+	})
+	return report
+}
+
+// disableFlushThrottle keeps the change tracking independent of wall time. A
+// separate test covers the throttle itself.
 func disableFlushThrottle(t *testing.T) {
 	t.Helper()
 	prev := reportFlushMinIntervalValue
@@ -117,25 +127,27 @@ func disableFlushThrottle(t *testing.T) {
 }
 
 // Snapshots are crash resilience, not a live feed: after one publish, the next
-// threshold crossing must wait for the interval.
+// change must wait for the interval.
 func TestReport_FlushThrottleHonoursInterval(t *testing.T) {
-	report := NewReport(IRifyReportType)
-	for i := 0; i < reportFlushEvery; i++ {
-		report.AddRisks(&Risk{Hash: fmt.Sprintf("first-%d", i)})
-	}
-	require.Equal(t, reportFlushEvery, report.flushedRisks)
+	prev := reportFlushMinIntervalValue
+	reportFlushMinIntervalValue = 2 * time.Minute
+	t.Cleanup(func() { reportFlushMinIntervalValue = prev })
+
+	report := newWritableReport(t)
+
+	report.AddRisks(&Risk{Hash: "first"})
+	require.False(t, report.dirty)
 	require.False(t, report.lastFlush.IsZero())
 
-	// Another full threshold within the interval must not publish.
-	for i := 0; i < reportFlushEvery; i++ {
-		report.AddRisks(&Risk{Hash: fmt.Sprintf("second-%d", i)})
-	}
-	require.Equal(t, reportFlushEvery, report.flushedRisks, "throttled snapshot")
+	// A change inside the interval must not publish.
+	report.AddRisks(&Risk{Hash: "second"})
+	require.True(t, report.dirty, "throttled snapshot")
 
-	// Once the interval elapsed, the accumulated growth publishes.
+	// Once the interval elapsed, the change publishes.
 	report.mu.Lock()
 	report.lastFlush = time.Now().Add(-2 * reportFlushMinIntervalValue)
 	report.mu.Unlock()
 	report.AddRisks(&Risk{Hash: "third"})
-	require.Equal(t, 2*reportFlushEvery+1, report.flushedRisks)
+	require.False(t, report.dirty)
+	require.Len(t, report.Risks, 3)
 }
