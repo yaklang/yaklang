@@ -52,7 +52,12 @@ type SourceScanStats struct {
 	Bytes         int64
 	Hits          int
 	FallbackFiles int
-	Lookups       int64
+	// DegradedPatterns counts (file, pattern) pairs skipped because PCRE2
+	// exceeded its backtracking match or depth budget. The file still
+	// publishes every other pattern's hits; the skipped pair contributes no
+	// hits rather than aborting the scan.
+	DegradedPatterns int
+	Lookups          int64
 }
 
 // NewSourceScanPlan collects every named OpFileFilterReg, not just the first
@@ -530,11 +535,19 @@ func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scrat
 				return nil, false, err
 			}
 			var locatedHits []byteIndex
-			locatedHits, err = locateContent(locator, content, r.plan.patterns[id].captures)
-			fileHits[id] = ownSpans(content, locatedHits)
-			if err != nil {
-				return nil, false, fmt.Errorf("source pre-scan %s pattern %d: %w", path, id, err)
+			locatedHits, locateErr = locateContent(locator, content, r.plan.patterns[id].captures)
+			if locateErr != nil {
+				// One pattern exhausting PCRE2's budget is a property of that
+				// pattern on this file, not of the scan. Skipping it keeps the
+				// other patterns' hits; failing here used to abort the whole
+				// project scan after every rule had already finished.
+				if minirehs.IsExecutionLimit(locateErr) {
+					r.recordDegraded(path, id, locateErr)
+					continue
+				}
+				return nil, false, fmt.Errorf("source pre-scan %s pattern %d: %w", path, id, locateErr)
 			}
+			fileHits[id] = ownSpans(content, locatedHits)
 		}
 		return fileHits, true, nil
 	}
@@ -554,6 +567,16 @@ func ownSpans(content string, spans []byteIndex) []storedSpan {
 		out[i] = ownSpan(content, span.Start, span.End)
 	}
 	return out
+}
+
+// recordDegraded keeps the degradation observable without failing the scan.
+// The pattern keeps its hits on other files; this file simply contributes none
+// for it.
+func (r *SourceScanRuntime) recordDegraded(path string, pattern int, err error) {
+	r.mu.Lock()
+	r.stats.DegradedPatterns++
+	r.mu.Unlock()
+	log.Warnf("source pre-scan: skip %s pattern %d: %v", path, pattern, err)
 }
 
 func (r *SourceScanRuntime) publish(path string, size int, fileHits [][]storedSpan, fallback bool) {

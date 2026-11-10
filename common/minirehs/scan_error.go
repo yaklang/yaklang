@@ -67,6 +67,25 @@ func verifierScanError(cp *compiledPattern, err error) error {
 		Category: category, NativeCode: nativeCode, Incomplete: true, Err: err}
 }
 
+// IsExecutionLimit reports whether err means the backend gave up on a subject
+// because it exceeded its backtracking match or depth budget. The pattern could
+// not be evaluated on that subject, but that says nothing about other patterns
+// or other files; callers aggregating many patterns per file may skip this one
+// instead of failing the whole scan.
+func IsExecutionLimit(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, pcrelite.ErrMatchLimit) || errors.Is(err, pcrelite.ErrDepthLimit) {
+		return true
+	}
+	var scanErr *ScanError
+	if errors.As(err, &scanErr) {
+		return scanErr.Category == "match_limit" || scanErr.Category == "depth_limit"
+	}
+	return false
+}
+
 func (e *ScanError) Error() string {
 	context := e.Stage
 	if e.HasRule {
