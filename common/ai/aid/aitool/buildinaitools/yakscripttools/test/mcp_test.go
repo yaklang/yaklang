@@ -102,6 +102,8 @@ func TestMCPYakTools(t *testing.T) {
 	failed, err := execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "failure"})
 	require.Error(t, err)
 	require.Contains(t, string(failed.Stdout), "EXPECTED_REMOTE_FAILURE")
+	require.Contains(t, err.Error(), `MCP tool "failure" on server "fixture" failed`)
+	require.Contains(t, err.Error(), "Recovery:")
 	for _, tc := range []struct {
 		name   string
 		params map[string]any
@@ -124,6 +126,9 @@ func TestMCPYakTools(t *testing.T) {
 	var count int
 	require.NoError(t, profile.Model(&schema.MCPServerToolConfig{}).Where("server_name = ?", "fixture").Count(&count).Error)
 	require.Zero(t, count)
-	_, err = execute("query_mcp_tools", map[string]any{"server_name": "fixture"})
+	missingResult, err := execute("query_mcp_tools", map[string]any{"server_name": "fixture"})
 	require.Error(t, err)
+	require.NotNil(t, missingResult)
+	require.Contains(t, err.Error(), `failed to connect MCP server "fixture"`)
+	require.Contains(t, err.Error(), "manage_mcp_server(op=list)")
 }
