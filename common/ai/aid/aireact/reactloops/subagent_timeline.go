@@ -17,13 +17,13 @@ import (
 // 子 Agent 的 timeline 一旦 merge 回父，隔离语义彻底失效，父将看到子的全部
 // 中间条目——这是 sub agent 不变量所禁止的。
 type TimelineHandle struct {
-	parent           *aicommon.Timeline
-	released         sync.Once
-	taskID           string // allocated once, shared by fork metadata, runtime and dispatch receipt
-	mode             SubAgentTimelineMode
-	fork             *aicommon.TimelineFork // Fork 模式非 nil，Clean 模式为 nil
-	branch           *aicommon.Timeline     // 子实际使用的 timeline（Fork.Branch 或 Clean 新建）
-	releaseBroadcast func()
+	parent             *aicommon.Timeline
+	released           sync.Once
+	taskID             string // allocated once, shared by fork metadata, runtime and dispatch receipt
+	mode               SubAgentTimelineMode
+	fork               *aicommon.TimelineFork // Fork 模式非 nil，Clean 模式为 nil
+	branch             *aicommon.Timeline     // 子实际使用的 timeline（Fork.Branch 或 Clean 新建）
+	unregisterTimeline func()
 }
 
 // Timeline 返回子 invoker 应使用的 timeline。
@@ -68,8 +68,8 @@ func (h *TimelineHandle) Release() {
 		if h.fork != nil {
 			h.fork.Release()
 		}
-		if h.releaseBroadcast != nil {
-			h.releaseBroadcast()
+		if h.unregisterTimeline != nil {
+			h.unregisterTimeline()
 		}
 		afterID := int64(0)
 		if h.fork != nil {
@@ -97,13 +97,13 @@ func buildTimelineHandle(
 	case SubAgentTimelineClean:
 		branch := aicommon.NewPrivateTimeline(parentCfg, nil)
 		branch.SoftBindConfig(parentCfg, parentCfg)
-		release, err := parentCfg.SubscribeTimeline(branch)
+		unregister, err := parentCfg.RegisterTimeline(branch)
 		if err != nil {
 			return nil, err
 		}
 		return &TimelineHandle{
 			parent: parentTimeline, taskID: subTaskID, mode: SubAgentTimelineClean,
-			branch: branch, releaseBroadcast: release,
+			branch: branch, unregisterTimeline: unregister,
 		}, nil
 	default: // SubAgentTimelineFork
 		if parentTimeline == nil {
@@ -239,7 +239,7 @@ func buildSubAgentRuntime(
 
 	release = func() {
 		if cfg, ok := childInvoker.GetConfig().(*aicommon.Config); ok {
-			cfg.ReleaseTimelineSubscription()
+			cfg.UnregisterTimeline()
 		}
 		if jobCancel != nil {
 			jobCancel()
@@ -506,7 +506,7 @@ func PrepareForkedSubAgent(
 
 	release := func() {
 		if cfg, ok := childInvoker.GetConfig().(*aicommon.Config); ok {
-			cfg.ReleaseTimelineSubscription()
+			cfg.UnregisterTimeline()
 		}
 		fork.Release()
 		jobCancel()
@@ -530,7 +530,7 @@ type forkedChild struct {
 func (c *forkedChild) release() {
 	if c != nil && c.invoker != nil {
 		if cfg, ok := c.invoker.GetConfig().(*aicommon.Config); ok {
-			cfg.ReleaseTimelineSubscription()
+			cfg.UnregisterTimeline()
 		}
 	}
 	if c != nil && c.fork != nil {

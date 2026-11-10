@@ -19,18 +19,18 @@ type TimelineBroadcaster struct {
 	changed         *sync.Cond
 	activePublishes int
 	forkInProgress  bool
-	subscribers     map[string]func(*TimelineItem) error
+	registrations   map[string]func(*TimelineItem) error
 }
 
 func NewTimelineBroadcaster() *TimelineBroadcaster {
-	b := &TimelineBroadcaster{subscribers: make(map[string]func(*TimelineItem) error)}
+	b := &TimelineBroadcaster{registrations: make(map[string]func(*TimelineItem) error)}
 	b.changed = sync.NewCond(&b.mu)
 	return b
 }
 
-// Broadcast sends item to the subscribers which existed when Broadcast began.
-// Subscribers run after the registry lock is released, so a callback may
-// safely subscribe, unsubscribe or publish another item.
+// Broadcast sends item to the callbacks registered when Broadcast began.
+// Callbacks run after the registration lock is released, so they may safely
+// register, unregister or publish another item.
 func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 	if b == nil {
 		return fmt.Errorf("timeline broadcaster is nil")
@@ -43,9 +43,9 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 	b.mu.Lock()
 	b.waitForForkLocked()
 	b.activePublishes++
-	ids := make([]string, 0, len(b.subscribers))
-	callbacks := make(map[string]func(*TimelineItem) error, len(b.subscribers))
-	for id, callback := range b.subscribers {
+	ids := make([]string, 0, len(b.registrations))
+	callbacks := make(map[string]func(*TimelineItem) error, len(b.registrations))
+	for id, callback := range b.registrations {
 		ids = append(ids, id)
 		callbacks[id] = callback
 	}
@@ -61,7 +61,7 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 	var failures []error
 	for _, id := range ids {
 		if err := callbacks[id](canonical); err != nil {
-			failures = append(failures, fmt.Errorf("timeline subscriber %q: %w", id, err))
+			failures = append(failures, fmt.Errorf("timeline registration %q: %w", id, err))
 		}
 	}
 	return errors.Join(failures...)
@@ -77,7 +77,7 @@ func (b *TimelineBroadcaster) waitForForkLocked() {
 }
 
 // beginFork prevents a publication from landing between the parent snapshot
-// and child subscription. Publications which already started finish first.
+// and child registration. Publications which already started finish first.
 func (b *TimelineBroadcaster) beginFork() func() {
 	if b == nil {
 		return func() {}
@@ -103,26 +103,26 @@ func (b *TimelineBroadcaster) beginFork() func() {
 	}
 }
 
-// Subscribe registers or replaces one stable subscriber key.
-func (b *TimelineBroadcaster) Subscribe(id string, callback func(*TimelineItem) error) {
+// Register adds or replaces one stable callback registration.
+func (b *TimelineBroadcaster) Register(id string, callback func(*TimelineItem) error) {
 	if b == nil || id == "" || callback == nil {
 		return
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.subscribers == nil {
-		b.subscribers = make(map[string]func(*TimelineItem) error)
+	if b.registrations == nil {
+		b.registrations = make(map[string]func(*TimelineItem) error)
 	}
-	b.subscribers[id] = callback
+	b.registrations[id] = callback
 }
 
-// Unsubscribe removes one callback. Unknown or empty keys are ignored.
-func (b *TimelineBroadcaster) Unsubscribe(id string) {
+// Unregister removes one callback. Unknown or empty keys are ignored.
+func (b *TimelineBroadcaster) Unregister(id string) {
 	if b == nil || id == "" {
 		return
 	}
 	b.mu.Lock()
-	delete(b.subscribers, id)
+	delete(b.registrations, id)
 	b.mu.Unlock()
 }
 
@@ -168,8 +168,8 @@ func normalizeTimelineBroadcastItem(item *TimelineItem) (*TimelineItem, error) {
 	return &canonical, nil
 }
 
-// appendBroadcastItem is the Timeline-side subscriber. Each timeline owns its
-// copy, validates the item and commits it through the normal index path.
+// appendBroadcastItem is a registered Timeline callback. Each Timeline owns
+// its copy, validates the item and commits it through the normal index path.
 func (m *Timeline) appendBroadcastItem(item *TimelineItem) error {
 	if m == nil || item == nil || item.value == nil {
 		return fmt.Errorf("timeline and item are required")

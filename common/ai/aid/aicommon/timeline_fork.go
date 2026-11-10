@@ -63,7 +63,7 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 		broadcaster: broadcaster,
 	}
 	if broadcaster != nil {
-		broadcaster.Subscribe("fork:"+branch.GetTimelineID(), branch.appendBroadcastItem)
+		broadcaster.Register("fork:"+branch.GetTimelineID(), branch.appendBroadcastItem)
 	}
 	return fork, nil
 }
@@ -90,14 +90,14 @@ func (f *TimelineFork) Release() {
 	if f == nil {
 		return
 	}
-	f.unsubscribeBroadcast()
+	f.unregisterBroadcast()
 }
 
-func (f *TimelineFork) unsubscribeBroadcast() {
+func (f *TimelineFork) unregisterBroadcast() {
 	if f == nil || f.broadcaster == nil || f.Branch == nil {
 		return
 	}
-	f.broadcaster.Unsubscribe("fork:" + f.Branch.GetTimelineID())
+	f.broadcaster.Unregister("fork:" + f.Branch.GetTimelineID())
 }
 
 // MergeBack 把分支 timeline 中新增的条目合并回父 timeline。
@@ -112,7 +112,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	if f == nil || f.Parent == nil || f.Branch == nil {
 		return nil, nil
 	}
-	f.unsubscribeBroadcast()
+	f.unregisterBroadcast()
 
 	type activeSnapshot struct {
 		id   int64

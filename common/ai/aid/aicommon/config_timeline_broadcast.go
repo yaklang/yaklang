@@ -39,21 +39,6 @@ func (c *Config) setTimelineBroadcaster(b *TimelineBroadcaster) {
 	c.m.Unlock()
 }
 
-func (c *Config) setTimelineForBroadcast(timeline *Timeline) *TimelineBroadcaster {
-	if c == nil {
-		return nil
-	}
-	if c.m == nil {
-		c.Timeline = timeline
-		return c.TimelineBroadcaster
-	}
-	c.m.Lock()
-	c.Timeline = timeline
-	broadcaster := c.TimelineBroadcaster
-	c.m.Unlock()
-	return broadcaster
-}
-
 func configTimelineBroadcastID(c *Config) string {
 	return fmt.Sprintf("config:%p", c)
 }
@@ -68,41 +53,50 @@ func (c *Config) initializeTimelineBroadcast() {
 		c.setTimelineBroadcaster(broadcaster)
 	}
 	if timeline != nil {
-		broadcaster.Subscribe(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
+		broadcaster.Register(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
 	}
 }
 
 // SetTimeline switches this Config to another Timeline. The broadcaster
-// replaces this Config's previous callback because the subscription key is
+// replaces this Config's previous callback because the registration key is
 // stable for the Config lifetime.
 func (c *Config) SetTimeline(timeline *Timeline) error {
 	if c == nil {
 		return fmt.Errorf("config is nil")
 	}
-	broadcaster := c.setTimelineForBroadcast(timeline)
+	var broadcaster *TimelineBroadcaster
+	if c.m == nil {
+		c.Timeline = timeline
+		broadcaster = c.TimelineBroadcaster
+	} else {
+		c.m.Lock()
+		c.Timeline = timeline
+		broadcaster = c.TimelineBroadcaster
+		c.m.Unlock()
+	}
 	if broadcaster == nil {
 		return nil
 	}
 	if timeline == nil {
-		broadcaster.Unsubscribe(configTimelineBroadcastID(c))
+		broadcaster.Unregister(configTimelineBroadcastID(c))
 		return nil
 	}
-	broadcaster.Subscribe(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
+	broadcaster.Register(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
 	return nil
 }
 
-// ReleaseTimelineSubscription removes this Config's Timeline callback.
-func (c *Config) ReleaseTimelineSubscription() {
+// UnregisterTimeline removes this Config's Timeline callback.
+func (c *Config) UnregisterTimeline() {
 	if c == nil {
 		return
 	}
 	_, broadcaster := c.timelineBroadcastState()
-	broadcaster.Unsubscribe(configTimelineBroadcastID(c))
+	broadcaster.Unregister(configTimelineBroadcastID(c))
 }
 
-// SubscribeTimeline registers a Timeline owned outside this Config, such as a
+// RegisterTimeline registers a Timeline owned outside this Config, such as a
 // clean task-only branch. The returned function is idempotent.
-func (c *Config) SubscribeTimeline(timeline *Timeline) (func(), error) {
+func (c *Config) RegisterTimeline(timeline *Timeline) (func(), error) {
 	if c == nil || timeline == nil {
 		return nil, fmt.Errorf("config and timeline are required")
 	}
@@ -111,8 +105,8 @@ func (c *Config) SubscribeTimeline(timeline *Timeline) (func(), error) {
 		return nil, fmt.Errorf("config has no timeline broadcaster")
 	}
 	key := "timeline:" + timeline.GetTimelineID()
-	broadcaster.Subscribe(key, timeline.appendBroadcastItem)
-	return func() { broadcaster.Unsubscribe(key) }, nil
+	broadcaster.Register(key, timeline.appendBroadcastItem)
+	return func() { broadcaster.Unregister(key) }, nil
 }
 
 // BroadcastTimelineItem publishes one Timeline item to every live Timeline in

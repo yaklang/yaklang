@@ -52,9 +52,9 @@ func TestTimelineBroadcastReachesParentForkAndTaskOnlyTimeline(t *testing.T) {
 
 	clean := NewPrivateTimeline(parent, nil)
 	clean.SoftBindConfig(parent, parent)
-	releaseClean, err := parent.SubscribeTimeline(clean)
+	unregisterClean, err := parent.RegisterTimeline(clean)
 	require.NoError(t, err)
-	t.Cleanup(releaseClean)
+	t.Cleanup(unregisterClean)
 
 	require.Empty(t, clean.GetTimelineItemIDs(), "task-only timelines start clean")
 
@@ -69,7 +69,7 @@ func TestTimelineBroadcastReachesParentForkAndTaskOnlyTimeline(t *testing.T) {
 	require.Zero(t, timelineItemIDContaining(unrelated.Timeline, "shared update"))
 }
 
-func TestTimelineBroadcastUnsubscribesOnReleaseAndMerge(t *testing.T) {
+func TestTimelineBroadcastUnregistersOnReleaseAndMerge(t *testing.T) {
 	parent := newTimelineBroadcastConfig(t)
 	releasedFork, err := parent.Timeline.ForkForTask("released", "released", parent, parent)
 	require.NoError(t, err)
@@ -98,10 +98,10 @@ func TestTimelineBroadcastUnsubscribesOnReleaseAndMerge(t *testing.T) {
 	require.False(t, mergedHasItem)
 }
 
-func TestTimelineBroadcasterSubscribeAndUnsubscribe(t *testing.T) {
+func TestTimelineBroadcasterRegisterAndUnregister(t *testing.T) {
 	broadcaster := NewTimelineBroadcaster()
 	var received int64
-	broadcaster.Subscribe("test", func(item *TimelineItem) error {
+	broadcaster.Register("test", func(item *TimelineItem) error {
 		received = item.GetID()
 		return nil
 	})
@@ -109,7 +109,7 @@ func TestTimelineBroadcasterSubscribeAndUnsubscribe(t *testing.T) {
 	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{ID: 7, Text: "event"})))
 	require.Equal(t, int64(7), received)
 
-	broadcaster.Unsubscribe("test")
+	broadcaster.Unregister("test")
 	received = 0
 	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{ID: 8, Text: "ignored"})))
 	require.Zero(t, received)
@@ -141,12 +141,12 @@ func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	config.TimelineBroadcaster.Subscribe("test", func(*TimelineItem) error {
+	config.TimelineBroadcaster.Register("test", func(*TimelineItem) error {
 		close(started)
 		<-release
 		return nil
 	})
-	t.Cleanup(func() { config.TimelineBroadcaster.Unsubscribe("test") })
+	t.Cleanup(func() { config.TimelineBroadcaster.Unregister("test") })
 
 	broadcastDone := make(chan error, 1)
 	go func() {
@@ -179,7 +179,7 @@ func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 	require.Contains(t, result.fork.Branch.Dump(), "broadcast during fork")
 }
 
-func TestConfigSetTimelineMovesBroadcastSubscription(t *testing.T) {
+func TestConfigSetTimelineMovesBroadcastRegistration(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	previous := config.Timeline
 	peerTimeline := NewTimeline(config, nil)
@@ -189,7 +189,7 @@ func TestConfigSetTimelineMovesBroadcastSubscription(t *testing.T) {
 		WithTimeline(peerTimeline),
 		WithDisableAutoSkills(true),
 	)
-	t.Cleanup(peer.ReleaseTimelineSubscription)
+	t.Cleanup(peer.UnregisterTimeline)
 	next := NewTimeline(config, nil)
 	require.NoError(t, config.SetTimeline(next))
 
