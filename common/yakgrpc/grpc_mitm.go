@@ -123,6 +123,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	var mServer *crep.MITMServer
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
+	var streamSendMu sync.Mutex
 	mitmSendResp := func(rsp *ypb.MITMResponse) (sendError error) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -132,6 +133,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 
+		streamSendMu.Lock()
+		defer streamSendMu.Unlock()
 		sendError = stream.Send(safeUTF8MITMResp(rsp))
 		return
 	}
@@ -288,10 +291,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置过滤器
 	*/
-	var (
-		filterManager       = GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
-		hijackFilterManager = GetMITMHijackFilterManager(s.GetProjectDatabase())
-	)
+	filterManager, unregisterFilter := newActiveMITMFilter(s.GetProjectDatabase(), s.GetProfileDatabase())
+	defer unregisterFilter()
+	hijackFilterManager := GetMITMHijackFilterManager(s.GetProjectDatabase())
 
 	/*
 		设置内容替换模块，通过正则驱动
@@ -322,7 +324,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	recoverFilterAndReplacerSend := func() {
 		mitmSendRespLogged(&ypb.MITMResponse{
 			JustFilter:          true,
-			FilterData:          filterManager.Data,
+			FilterData:          filterManager.GetData(),
 			JustContentReplacer: true,
 			Replacers:           replacer.GetRules(),
 		})
@@ -384,6 +386,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		cacheDebounce()
 	}
+
+	filterManager.setOnUpdate(mitmPluginCaller.ResetFilter)
+	go func() {
+		for {
+			select {
+			case <-streamCtx.Done():
+				return
+			case <-filterManager.changed:
+				recoverFilterAndReplacerSend()
+			}
+		}
+	}()
 
 	controller := &hijackTaskController{
 		taskStatusMap:  make(map[string]*taskStatus),
@@ -470,10 +484,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			if reqInstance.GetSetResetFilter() {
-				filterManager.Recover()
+				if err := filterManager.Update(defaultMITMFilterData); err != nil {
+					log.Errorf("reset mitm filter failed: %s", err)
+					continue
+				}
 				mitmSendRespLogged(&ypb.MITMResponse{
 					JustFilter: true,
-					FilterData: filterManager.Data,
+					FilterData: filterManager.GetData(),
 				})
 				clearPluginHTTPFlowCache()
 				continue
@@ -653,8 +670,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 更新过滤器
 			if reqInstance.UpdateFilter {
 				clearPluginHTTPFlowCache()
-				filterManager.Update(reqInstance.FilterData)
-				filterManager.Save()
+				if err := filterManager.Update(reqInstance.FilterData); err != nil {
+					log.Errorf("update mitm filter failed: %s", err)
+					continue
+				}
 				recoverFilterAndReplacerSend()
 				continue
 			}
@@ -817,7 +836,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				mitmSendRespLogged(feedbackRspIns)
 				mitmSendRespLogged(&ypb.MITMResponse{
 					JustFilter:          true,
-					FilterData:          filterManager.Data,
+					FilterData:          filterManager.GetData(),
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 				})
@@ -1135,7 +1154,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		u, _ := url.Parse(urlStr)
 		extName = lowhttp.GetPathSuffix(u.EscapedPath())
 
-		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
+		if !filterManager.Load().IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
 		}
@@ -1210,7 +1229,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					IsHttps:             httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS,
 					Url:                 urlStr,
 					Id:                  id,
-					FilterData:          filterManager.Data,
+					FilterData:          filterManager.GetData(),
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					IsWebsocket:         true,
@@ -1287,7 +1306,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		var urlPath string
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
-			ret := !filterManager.IsMIMEPassed(t)
+			ret := !filterManager.Load().IsMIMEPassed(t)
 			// 这里仅做“强路径”的提前过滤：避免影响普通 JS（弱路径由后续镜像阶段结合更多信号判定）。
 			if isJavaScriptMIME(t) && isBundledJavaScriptStrongPath(strings.ToLower(urlPath)) {
 				ret = true
@@ -1349,7 +1368,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 过滤
-		if !filterManager.IsPassed(method, hostname, urlStr, extName) {
+		if !filterManager.Load().IsPassed(method, hostname, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req
 		}
@@ -1507,7 +1526,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					IsHttps:             isHttpsVal,
 					Url:                 urlStr,
 					Id:                  id,
-					FilterData:          filterManager.Data,
+					FilterData:          filterManager.GetData(),
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
