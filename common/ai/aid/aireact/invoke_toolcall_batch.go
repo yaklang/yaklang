@@ -406,8 +406,10 @@ func (r *ReAct) ExecuteToolCallGroup(
 	hasAsync := false
 	for i := range request.Calls {
 		call := &request.Calls[i]
-		if !call.Async && !call.AsyncSpecified {
-			if tool, err := r.config.GetAiToolManager().GetToolByName(call.ToolName); err == nil && tool != nil {
+		if tool, err := r.config.GetAiToolManager().GetToolByName(call.ToolName); err == nil && tool != nil {
+			if tool.RequireForeground {
+				call.Async = false
+			} else if !call.Async && !call.AsyncSpecified {
 				call.Async = tool.DefaultAsync
 			}
 		}

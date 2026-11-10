@@ -277,6 +277,16 @@ func (a *ToolCaller) invoke(
 				)
 			}
 		}
+		if tool.RejectInterruptedReplay {
+			stored := aiddb.AiCheckPointGetRequestParams(ret)
+			if stored.GetString("tool_name") != tool.Name ||
+				string(utils.Jsonify(stored.GetObject("param"))) != string(utils.Jsonify(params)) {
+				return nil, fmt.Errorf("tool checkpoint identity mismatch for %q", tool.Name)
+			}
+			if !ret.Finished && stored.GetBool("callback_started") {
+				return nil, fmt.Errorf("tool %q was interrupted after starting; its outcome is unknown", tool.Name)
+			}
+		}
 		if ret.Finished {
 			a.checkpointReplayed = true
 			res := aiddb.AiCheckPointGetToolResult(ret)
@@ -300,6 +310,11 @@ func (a *ToolCaller) invoke(
 		checkpointRequest["batch_id"] = a.batchID
 		checkpointRequest["call_index"] = a.batchIndex
 		checkpointRequest["call_tool_id"] = a.callToolId
+	}
+	if tool.RejectInterruptedReplay {
+		// Preserve the business request before runtime metadata and defaults
+		// mutate the invocation map.
+		checkpointRequest["param"] = cloneEndpointParams(params)
 	}
 	err := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest)
 	if err != nil {
@@ -528,6 +543,12 @@ func (a *ToolCaller) invoke(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if tool.RejectInterruptedReplay {
+		checkpointRequest["callback_started"] = true
+		if err := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest); err != nil {
+			return nil, err
+		}
+	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
@@ -538,7 +559,7 @@ func (a *ToolCaller) invoke(
 		aitool.WithCancelCallback(toolCallCancel),
 		aitool.WithRuntimeConfig(runtimeCfg),
 		aitool.WithOutputCapture(false),
-		aitool.WithWaitForCallbackOnCancel(a.waitForCallbackOnCancel),
+		aitool.WithWaitForCallbackOnCancel(a.waitForCallbackOnCancel || tool.RequireForeground),
 	)
 	invokeCancelled := errors.Is(execErr, context.Canceled) ||
 		errors.Is(execErr, context.DeadlineExceeded) ||

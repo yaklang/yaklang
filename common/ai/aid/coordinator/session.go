@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +35,8 @@ type Session struct {
 	parentTaskID           string
 	planningOnly           bool
 	delivery               ResultDelivery
+	subForgeTools          []SubForgeTool
+	subForgeActive         atomic.Bool
 	externalLifecycle      bool
 	detached               bool
 	startTaskID            string
@@ -82,8 +85,11 @@ func NewSession(ctx context.Context, query string, opts ...aicommon.ConfigOption
 	}
 	s := &Session{Config: cfg, invoker: runtime, query: query, cancel: cancel, detached: cfg.EnableDetachedPlan, opened: map[string]bool{}, closed: map[string]bool{}, tasks: map[string]*aicommon.AIStatefulTaskBase{}}
 	for _, option := range cfg.OtherOption {
-		if d, ok := option.(deliveryOption); ok {
-			s.delivery = d.handler
+		switch option := option.(type) {
+		case deliveryOption:
+			s.delivery = option.handler
+		case subForgeToolsOption:
+			s.subForgeTools = option
 		}
 	}
 	cfg.Guardian.SetOutputEmitter(cfg.Id, cfg.EventHandler)
@@ -182,11 +188,15 @@ func fromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 			input.SafeFeed(e)
 		})
 	}
-	parent.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
-		if e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
-			s.notifyUserInput(e)
-		}
-	})
+	// A sub-Forge owns a private endpoint route. Observing every parent
+	// reply here would inject unrelated user revisions into its coordinator.
+	if !IsSubForgeContext(ctx) {
+		parent.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
+			if e.IsInteractiveMessage || e.SyncType == aicommon.SYNC_TYPE_USER_INTERVENTION {
+				s.notifyUserInput(e)
+			}
+		})
+	}
 	s.cleanup = func() {
 		if !forge {
 			parent.InputEventManager.UnregisterMirrorOfAIInputEvent(key)
@@ -496,6 +506,15 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 		e.TaskId = task.GetId()
 		return e
 	})))
+	var subForgeDescriptions []string
+	if len(s.subForgeTools) > 0 && !s.IsToolUseDisabled() {
+		manager, descriptions, err := s.subForgeWorkerManager(task)
+		if err != nil {
+			return result, err
+		}
+		subForgeDescriptions = descriptions
+		opts = append(opts, aicommon.WithInheritedAiToolManager(manager))
+	}
 	opts = append(opts, NativeOptions()...)
 	runtime, err := aicommon.AIRuntimeInvokerGetter(ctx, opts...)
 	if err != nil {
@@ -528,6 +547,9 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 		role, err := utils.RenderTemplate(workerInstruction, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled()})
 		if err != nil {
 			return "", err
+		}
+		if len(subForgeDescriptions) > 0 {
+			role += "\n[DECLARED_SUB_FORGES]\nCall the appropriate sub-Forge as a tool if needed, then use its result and continue the task.\n" + strings.Join(subForgeDescriptions, "\n")
 		}
 		return role + "\n[CURRENT_EXECUTION]\n" + string(brief) + "\n本次任务书已冻结；基于直接前置的已验收结果执行并验证。历史初步结果仅供背景参考。", nil
 	})(loop)

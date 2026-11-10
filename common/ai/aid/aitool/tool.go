@@ -76,6 +76,10 @@ type Tool struct {
 	*mcp.Tool
 	// DefaultAsync is scheduling metadata, never a business input parameter.
 	DefaultAsync bool `json:"default_async,omitempty"`
+	// RequireForeground keeps a tool inside the calling task's execution and input scope.
+	RequireForeground bool `json:"-"`
+	// RejectInterruptedReplay prevents automatic re-execution after an unknown outcome.
+	RejectInterruptedReplay bool `json:"-"`
 	// A list of keywords for tool indexing and searching.
 	Keywords      []string `json:"keywords,omitempty"`
 	VerboseName   string   `json:"verbose_name,omitempty"`    // English string（事件/列表同名字段保持 string）

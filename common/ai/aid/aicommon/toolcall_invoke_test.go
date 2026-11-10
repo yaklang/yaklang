@@ -289,3 +289,41 @@ func waitForYakitCountValue(t *testing.T, ch <-chan *schema.AiOutputEvent, event
 		}
 	}
 }
+
+func TestResilienceSubForgeCheckpointReplay(t *testing.T) {
+	setupToolCallInvokeTestProjectDB(t)
+	tc, _ := newToolCallerForCountTest(t, "sub-forge-checkpoint-"+ksuid.New().String())
+	invocations := 0
+	tool, err := aitool.New("sub_forge_mock", aitool.WithStringParam("query"),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			invocations++
+			return "child result", nil
+		}))
+	require.NoError(t, err)
+	tool.RejectInterruptedReplay = true
+	params := aitool.InvokeParams{"query": "inventory"}
+	run := func() (*aitool.ToolResult, error) {
+		return tc.invoke(tool, cloneToolBatchTestParams(params), func(any) {}, func(any) {},
+			&toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{})
+	}
+	tc.checkpointSeq = 8090
+	cp := tc.config.CreateToolCallCheckpoint(tc.checkpointSeq)
+	require.NoError(t, tc.config.SubmitCheckpointRequest(cp, map[string]any{"tool_name": tool.Name, "param": params, "callback_started": true}))
+	result, err := run()
+	require.ErrorContains(t, err, "outcome is unknown")
+	require.Nil(t, result)
+	require.Zero(t, invocations)
+
+	tc.checkpointSeq++
+	result, err = run()
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	replayed, err := run()
+	require.NoError(t, err)
+	require.True(t, replayed.Success)
+	require.Equal(t, 1, invocations)
+	params["query"] = "different request"
+	_, err = run()
+	require.ErrorContains(t, err, "identity mismatch")
+	require.Equal(t, 1, invocations)
+}
