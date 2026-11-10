@@ -2,11 +2,14 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 var mitmFilterDataItemToolOptions = []mcp.ToolOption{
@@ -68,10 +71,16 @@ func init() {
 
 		WithTool(mcp.NewTool("set_mitm_filter",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Replace MITM capture filter and apply immediately to running proxies in the current project; use filterData and get_mitm_filter first to preserve existing rules"),
+				mcp.WithDescription("Update MITM capture filter; prefer filterData struct, legacy flat *Hostname/*Suffix fields still supported"),
 			}, mitmSetFilterToolOptions...)...,
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.SetMITMFilterRequest) (any, error) {
-			return s.grpcClient.SetMITMFilter(ctx, req)
+			err := s.updateMITMV2(ctx, &ypb.MITMV2Request{UpdateFilter: true, FilterData: req.GetFilterData()}, func(rsp *ypb.MITMV2Response) bool {
+				return rsp.GetJustFilter() && proto.Equal(req.GetFilterData(), rsp.GetFilterData())
+			}, func(ctx context.Context) error {
+				_, err := s.grpcClient.SetMITMFilter(ctx, req)
+				return err
+			})
+			return &ypb.SetMITMFilterResponse{}, err
 		}, "failed to set mitm filter")),
 
 		WithTool(mcp.NewTool("query_mitm_replacer_rules",
@@ -93,7 +102,12 @@ func init() {
 				mcp.Description("MITM content replacers"),
 			}, mitmContentReplacerToolOptions...),
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.MITMContentReplacers) (any, error) {
-			_, err := s.grpcClient.SetCurrentRules(ctx, req)
+			err := s.updateMITMV2(ctx, &ypb.MITMV2Request{SetContentReplacers: true, Replacers: req.GetRules()}, func(rsp *ypb.MITMV2Response) bool {
+				return rsp.GetJustContentReplacer()
+			}, func(ctx context.Context) error {
+				_, err := s.grpcClient.SetCurrentRules(ctx, req)
+				return err
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -125,33 +139,54 @@ func handleStartMITMV2(s *MCPServer) server.ToolHandlerFunc {
 		if err := decodeYakRequest(request.Params.Arguments, &req); err != nil {
 			return nil, err
 		}
+		ctx, timeoutCancel := context.WithTimeout(ctx, 30*time.Second)
+		defer timeoutCancel()
+		// Starting and updating share ordering, so a new session cannot miss
+		// an update between loading saved configuration and joining the owner.
+		release, err := s.acquireMITMControl(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		summary := map[string]any{
 			"host": req.GetHost(),
 			"port": req.GetPort(),
 		}
-		bgCtx := context.Background()
+		bgCtx, cancel := context.WithCancel(context.Background())
 		stream, err := s.grpcClient.MITMV2(bgCtx)
 		if err != nil {
+			cancel()
 			return nil, utils.Wrap(err, "failed to start mitm v2")
 		}
-		if err := stream.Send(&req); err != nil {
+		session := &mitmV2Session{stream: stream, cancel: cancel, ready: make(chan struct{}), done: make(chan struct{})}
+		session.onClose = func() {
+			s.mitmMu.Lock()
+			delete(s.mitmSessions, session)
+			s.mitmMu.Unlock()
+		}
+		s.mitmMu.Lock()
+		if s.mitmClosed {
+			s.mitmMu.Unlock()
+			cancel()
+			return nil, fmt.Errorf("MCP server is closed")
+		}
+		if s.mitmSessions == nil {
+			s.mitmSessions = make(map[*mitmV2Session]struct{})
+		}
+		s.mitmSessions[session] = struct{}{}
+		s.mitmMu.Unlock()
+		storeBackgroundStreamStatus("start_mitm_v2", summary)
+		go session.receive()
+		if err := session.send(ctx, &req); err != nil {
 			return nil, utils.Wrap(err, "failed to send mitm v2 request")
 		}
-		storeBackgroundStreamStatus("start_mitm_v2", summary)
-		go func() {
-			for {
-				rsp, err := stream.Recv()
-				if err != nil {
-					return
-				}
-				if rsp != nil && rsp.HaveMessage && rsp.Message != nil {
-					content := handleExecMessage(string(rsp.Message.Message))
-					if content != "" {
-						appendBackgroundStreamLog("start_mitm_v2", content)
-					}
-				}
-			}
-		}()
+		if err := session.waitReady(ctx); err != nil {
+			session.stop(err)
+			return nil, utils.Wrap(err, "failed to start mitm v2")
+		}
 		return NewCommonCallToolResult(map[string]any{
 			"status":  "started",
 			"name":    "start_mitm_v2",

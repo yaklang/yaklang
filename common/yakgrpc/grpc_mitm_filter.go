@@ -10,9 +10,12 @@ import (
 )
 
 func (s *Server) SetMITMFilter(ctx context.Context, req *ypb.SetMITMFilterRequest) (*ypb.SetMITMFilterResponse, error) {
-	if _, err := saveMITMFilter(s.GetProjectDatabase(), req.GetFilterData(), nil); err != nil {
-		return nil, err
-	}
+	projectDB, profileDB := s.GetProjectDatabase(), s.GetProfileDatabase()
+	filterManager := GetMITMFilterManager(projectDB, profileDB)
+	filterManager.Update(req.GetFilterData())
+	// force save to project DB
+	filterManager.db = projectDB
+	filterManager.Save()
 	return &ypb.SetMITMFilterResponse{}, nil
 }
 
@@ -24,11 +27,11 @@ func (s *Server) GetMITMFilter(ctx context.Context, req *ypb.Empty) (*ypb.SetMIT
 }
 
 func (s *Server) ResetMITMFilter(ctx context.Context, req *ypb.Empty) (*ypb.SetMITMFilterRequest, error) {
-	data, err := saveMITMFilter(s.GetProjectDatabase(), defaultMITMFilterData, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &ypb.SetMITMFilterRequest{FilterData: data}, nil
+	filterManager := GetMITMFilterManager(s.GetProjectDatabase(), s.GetProfileDatabase())
+	filterManager.Recover()
+	return &ypb.SetMITMFilterRequest{
+		FilterData: filterManager.Data,
+	}, nil
 }
 
 func (s *Server) SetMITMHijackFilter(ctx context.Context, req *ypb.SetMITMFilterRequest) (*ypb.SetMITMFilterResponse, error) {
