@@ -94,13 +94,10 @@ type sfCheck struct {
 
 type checkItem struct {
 	*sf.RecursiveConfigItem
+	// frame is nil for a simple include/exclude that fastPathMatch can always
+	// evaluate from symbol ids. Such an item never runs the sub-query/clearup
+	// path, so check() treats a nil frame as "no fallback available".
 	frame *sf.SFFrame
-	// fastPathOnly marks a simple include/exclude that fastPathMatch can always
-	// evaluate from symbol ids. Such an item needs no compiled frame and never
-	// runs the sub-query/clearup path, so it also needs no symbol snapshot. On a
-	// large project the same two dataflow filters are otherwise recompiled for
-	// every sink (tens of thousands of times).
-	fastPathOnly bool
 	// matchCache memoizes per-node until/hook match results (keyed by SSA
 	// node ID) so the same node is not re-queried via a full SF sub-query
 	// when it appears in multiple descent paths. CheckUntil is the hot
@@ -203,7 +200,6 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		checkItem := &checkItem{
 			RecursiveConfigItem: item,
 			frame:               frame,
-			fastPathOnly:        fastPathOnly,
 		}
 		switch item.Key {
 		case sf.RecursiveConfig_Include, sf.RecursiveConfig_Exclude:
