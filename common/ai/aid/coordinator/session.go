@@ -323,6 +323,15 @@ func (s *Session) restore() error {
 	if err := resetCoordinatorRecovery(progress.State, s.startTaskID); err != nil {
 		return err
 	}
+	if len(s.subForgeTools) > 0 {
+		// A restored worker has a new attempt ID. Leave old checkpoints
+		// untouched and use their logical invocation identity for replay.
+		lastSeq, err := yakit.MaxCheckpointSequence(s.GetDB(), s.GetRuntimeId())
+		if err != nil {
+			return fmt.Errorf("restore checkpoint sequence: %w", err)
+		}
+		s.SeqIdProvider.AdvanceTo(max(lastSeq, s.Timeline.GetMaxID()))
+	}
 	if progress.State.Phase == PhaseExec {
 		s.detached = false
 	}

@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+// ErrInvocationNotStarted marks a callback rejection before execution began.
+var ErrInvocationNotStarted = errors.New("tool invocation did not start")
 
 // combinedBuffer is a thread-safe buffer that captures stdout and stderr
 // writes in real-time order, preserving the actual interleaving of output.
@@ -158,11 +162,14 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	var err error
 	select {
 	case <-ctx.Done():
+		err = ctx.Err()
 		if config != nil && config.waitForCallbackOnCancel {
 			// Preserve writer ownership until callback work and cleanup really end.
-			// The cancelled result remains a cancellation, even if the callback
-			// returned a value while unwinding.
-			<-finished
+			// A known rejection before execution is safe to retry after cancellation.
+			callback := <-finished
+			if errors.Is(callback.err, ErrInvocationNotStarted) {
+				err = errors.Join(err, callback.err)
+			}
 		}
 		// Do not read callback-owned buffers or result variables while a
 		// non-cooperative callback may still be unwinding. Context-aware tools
@@ -173,7 +180,6 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 			Stderr:         "",
 			CombinedOutput: "",
 		}
-		err = ctx.Err()
 		if cancelCallback != nil {
 			var callbackErr error
 			execResult, callbackErr = cancelCallback(execResult, err)

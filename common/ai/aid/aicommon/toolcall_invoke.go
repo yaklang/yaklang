@@ -288,6 +288,7 @@ func (a *ToolCaller) invoke(
 			stored := aiddb.AiCheckPointGetRequestParams(ret)
 			if stored.GetString("tool_name") != tool.Name ||
 				stored.GetString("replay_task_id") != replayTaskID ||
+				stored.GetString("replay_attempt_id") != replayAttemptID ||
 				string(utils.Jsonify(stored.GetObject("param"))) != string(utils.Jsonify(params)) {
 				return nil, fmt.Errorf("tool checkpoint identity mismatch for %q", tool.Name)
 			}
@@ -614,7 +615,17 @@ func (a *ToolCaller) invoke(
 			}
 		}
 	}
-	if execResult != nil && !invokeCancelled {
+	if tool.RejectInterruptedReplay && errors.Is(execErr, aitool.ErrInvocationNotStarted) {
+		if ctx.Err() != nil && !errors.Is(execErr, ctx.Err()) {
+			execErr = errors.Join(ctx.Err(), execErr)
+		}
+		// Admission rejected this request before the child started. Leave
+		// the request retryable even if another worker later re-dispatches it.
+		delete(checkpointRequest, "callback_started")
+		if checkpointErr := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest); checkpointErr != nil {
+			execErr = errors.Join(execErr, checkpointErr)
+		}
+	} else if execResult != nil && !invokeCancelled {
 		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
 			// The callback has already produced a result envelope. Checkpoint
 			// persistence is an infrastructure observation and must not rewrite
