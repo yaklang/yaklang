@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -20,14 +21,15 @@ import (
 // achieved. Consumers must inspect Data (normally ToolExecutionResult.Result)
 // for execution semantics.
 type ToolResult struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Param       any    `json:"param"`
-	Success     bool   `json:"success"`
-	Data        any    `json:"data,omitempty"`
-	Error       string `json:"error,omitempty"`
-	ToolCallID  string `json:"call_tool_id,omitempty"` // 用于标识调用的工具ID，通常是一个唯一标识符
+	ID          int64            `json:"id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Param       any              `json:"param"`
+	Success     bool             `json:"success"`
+	Data        any              `json:"data,omitempty"`
+	Error       string           `json:"error,omitempty"`
+	ToolCallID  string           `json:"call_tool_id,omitempty"` // 用于标识调用的工具ID，通常是一个唯一标识符
+	Images      []*aimedia.Image `json:"images,omitempty"`
 
 	// shrink_similar_result 表示相似缩略信息，是相似度过高的工具调用引发的压缩。
 	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`
@@ -199,6 +201,9 @@ func (t *ToolResult) dumpTimelineResult(writer io.Writer) {
 	}
 
 	_, _ = writer.Write(buf.Bytes())
+	if len(t.Images) > 0 {
+		fmt.Fprintf(writer, "images: %s\n", utils.Jsonify(t.Images))
+	}
 }
 
 func (t *ToolResult) GetShrinkResult() string {
@@ -276,6 +281,7 @@ func (t *ToolResult) Dump() string {
 		ProtocolCompleted bool                `json:"protocol_completed"`
 		ProtocolError     string              `json:"protocol_error,omitempty"`
 		ToolCallID        string              `json:"call_tool_id,omitempty"`
+		Images            []*aimedia.Image    `json:"images,omitempty"`
 	}
 
 	view := dumpView{
@@ -288,6 +294,7 @@ func (t *ToolResult) Dump() string {
 		ProtocolCompleted: t.Success,
 		ProtocolError:     t.Error,
 		ToolCallID:        t.ToolCallID,
+		Images:            t.Images,
 	}
 	view.ExecutionStatus, _ = t.GetExecutionStatus()
 	if execution, ok := t.Data.(*ToolExecutionResult); ok {

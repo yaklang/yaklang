@@ -555,6 +555,7 @@ const (
 	Yak_ImportNote_FullMethodName                                 = "/ypb.Yak/ImportNote"
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
 	Yak_StartAIReAct_FullMethodName                               = "/ypb.Yak/StartAIReAct"
+	Yak_ReadAIImage_FullMethodName                                = "/ypb.Yak/ReadAIImage"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
 	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
@@ -1379,6 +1380,7 @@ type YakClient interface {
 	ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error)
 	// AI Task
 	StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
+	ReadAIImage(ctx context.Context, in *AIImageRequest, opts ...grpc.CallOption) (*AIImageResponse, error)
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
 	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -7721,6 +7723,16 @@ func (c *yakClient) StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAIReActClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent]
 
+func (c *yakClient) ReadAIImage(ctx context.Context, in *AIImageRequest, opts ...grpc.CallOption) (*AIImageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIImageResponse)
+	err := c.cc.Invoke(ctx, Yak_ReadAIImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_StartAITask_FullMethodName, cOpts...)
@@ -9923,6 +9935,7 @@ type YakServer interface {
 	ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error
 	// AI Task
 	StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
+	ReadAIImage(context.Context, *AIImageRequest) (*AIImageResponse, error)
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
 	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
@@ -11705,6 +11718,9 @@ func (UnimplementedYakServer) ExportNote(*ExportNoteRequest, grpc.ServerStreamin
 }
 func (UnimplementedYakServer) StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAIReAct not implemented")
+}
+func (UnimplementedYakServer) ReadAIImage(context.Context, *AIImageRequest) (*AIImageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadAIImage not implemented")
 }
 func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITask not implemented")
@@ -21019,6 +21035,24 @@ func _Yak_StartAIReAct_Handler(srv interface{}, stream grpc.ServerStream) error 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAIReActServer = grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]
 
+func _Yak_ReadAIImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ReadAIImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ReadAIImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ReadAIImage(ctx, req.(*AIImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_StartAITask_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITask(&grpc.GenericServerStream[AIInputEvent, AIOutputEvent]{ServerStream: stream})
 }
@@ -24940,6 +24974,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchNoteContent",
 			Handler:    _Yak_SearchNoteContent_Handler,
+		},
+		{
+			MethodName: "ReadAIImage",
+			Handler:    _Yak_ReadAIImage_Handler,
 		},
 		{
 			MethodName: "QueryAITask",

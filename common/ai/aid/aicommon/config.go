@@ -175,6 +175,7 @@ type Config struct {
 	SessionSource      string
 	SessionTitle       string
 	SessionPromptState *SessionPromptState
+	ImageInput         *ypb.AIImageInputConfig
 
 	// memory triage id
 	MemoryTriageId string
@@ -4400,6 +4401,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
+	opts = append(opts, WithImageInput(i.GetImageInputConfig()))
 
 	// Keep the policy with the shared manager: NewConfig applies this flag
 	// to the manager, so a child default must not reopen parent MCP access.

@@ -3,7 +3,7 @@ __VERBOSE_NAME__ = "Call MCP Tool"
 __VERBOSE_NAME_ZH__ = "调用 MCP 工具"
 __KEYWORDS__ = "mcp,call,remote,tool,调用,远程,工具"
 __USAGE__ = <<<USAGE
-先用 query_mcp_tools 获取工具名和 inputSchema。server_name 是注册表精确名称，remote_tool 是远端裸名称，arguments 是符合 inputSchema 的 JSON 对象。stdout 保留 MCP content 数组。isError=true 会使本次调用失败，同时输出远端错误内容；不要把远端工具失败当作成功。每次连接执行后关闭，添加后无需重启。timeout 控制单次请求秒数，默认 30。
+先用 query_mcp_tools 获取工具名和 inputSchema。server_name 是注册表精确名称，remote_tool 是远端裸名称，arguments 是符合 inputSchema 的 JSON 对象。stdout 保留文本结果和图片元数据，图片通过独立媒体通道返回，不输出 base64。isError=true 会使本次调用失败，同时输出远端错误内容；不要把远端工具失败当作成功。每次连接执行后关闭，添加后无需重启。timeout 控制单次请求秒数，默认 30。
 [[- if .FunctionCallMode -]]
 ```json
 {"server_name":"local-demo","remote_tool":"echo","arguments":{"message":"hello"}}
@@ -23,6 +23,12 @@ if json.dumps(params) == "null" { die("arguments must be a JSON object") }
 cli.check()
 client = mcp.Connect(serverName, mcp.timeout(timeout))~
 defer client.Close()
+RESULT = nil
 result, err = client.CallTool(toolName, params)
-if result != nil { println(json.dumps(result)) }
+if result != nil {
+    parsed, parseErr = aiagent.MCPResult(client, serverName, result)
+    if parseErr != nil { println(parseErr); die(parseErr) }
+    println(json.dumps(parsed))
+    RESULT = parsed
+}
 if err != nil { die(err) }

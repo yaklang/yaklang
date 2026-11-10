@@ -171,6 +171,8 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				IsOnline:              model.GetIsOnline(),
 				ProbedExtendedEfforts: cloneStringSlice(model.GetProbedExtendedEfforts()),
 				EffortProbed:          model.GetEffortProbed(),
+				SupportsImageInput:    cloneImageSupport(model.SupportsImageInput),
+				ImageTokenEstimator:   model.GetImageTokenEstimator(),
 			})
 		}
 		return result
@@ -248,6 +250,8 @@ func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 			ExtraParams:           cloneKVPairs(model.GetExtraParams()),
 			ProbedExtendedEfforts: cloneStringSlice(model.GetProbedExtendedEfforts()),
 			EffortProbed:          model.GetEffortProbed(),
+			SupportsImageInput:    cloneImageSupport(model.SupportsImageInput),
+			ImageTokenEstimator:   model.GetImageTokenEstimator(),
 		})
 	}
 	return cloned
@@ -266,6 +270,14 @@ func validateModelConfigs(models []*ypb.AIModelConfig) error {
 		}
 	}
 	return nil
+}
+
+func cloneImageSupport(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	v := *value
+	return &v
 }
 
 func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb.AIModelConfig) *ypb.ThirdPartyApplicationConfig {

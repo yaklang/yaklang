@@ -847,6 +847,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 		}
 		task.PushToolCallResult(outcome.Result)
 		r.config.Timeline.PushToolResult(outcome.Result)
+		r.observeToolImageResult(task, outcome.Result)
 		r.EmitInfo("Tool batch child invocation settled: %s", outcome.Result.Name)
 	}
 	if err := ctx.Err(); err != nil {

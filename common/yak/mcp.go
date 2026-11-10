@@ -2,8 +2,11 @@ package yak
 
 import (
 	"context"
+	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcpclient"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 )
@@ -36,4 +39,28 @@ func bindMCPToEngine(engine *antlr4yak.Engine, ctx context.Context, runtime *ait
 		},
 	}
 	engine.SetVars(map[string]any{"mcp": exports})
+	agentExports := map[string]any{}
+	if original, ok := engine.Var("aiagent").(map[string]any); ok {
+		for key, value := range original {
+			agentExports[key] = value
+		}
+	}
+	agentExports["MCPResult"] = func(client *mcpclient.Client, server string, result *mcp.CallToolResult) (any, error) {
+		source := aimedia.Source{Kind: "mcp", ServerName: server, ObservedAt: time.Now()}
+		if runtime != nil {
+			source.ToolCallID = runtime.RuntimeID
+		}
+		return aitool.MCPToolMediaResult(ctx, mcpResourceAdapter{client}, result, source)
+	}
+	engine.SetVars(map[string]any{"aiagent": agentExports})
+}
+
+type mcpResourceAdapter struct{ client *mcpclient.Client }
+
+func (a mcpResourceAdapter) ReadResource(_ context.Context, request mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	return a.client.ReadResource(request.Params.URI)
+}
+
+func mcpResult(client *mcpclient.Client, server string, result *mcp.CallToolResult) (any, error) {
+	return aitool.MCPToolMediaResult(context.Background(), mcpResourceAdapter{client}, result, aimedia.Source{Kind: "mcp", ServerName: server, ObservedAt: time.Now()})
 }

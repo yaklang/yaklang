@@ -2,10 +2,13 @@ package aicommon
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 type ImageData struct {
@@ -22,6 +25,8 @@ type AIRequest struct {
 	saveCheckpointCallback func(CheckpointCommitHandler)
 	onAcquireSeq           func(int64)
 	imageDataList          []*ImageData
+	imageModelConfig       *ypb.AIModelConfig
+	imageBudget            *ImageRequestBudget
 	modelTier              string
 	callerLabel            string
 	ctx                    context.Context
@@ -106,6 +111,44 @@ func (a *AIRequest) GetImageList() []*ImageData {
 		return nil
 	}
 	return a.imageDataList
+}
+
+// A pinned image model keeps capability checks, estimates and provider routing
+// on the same configuration even if the global tier is hot-patched mid-call.
+func WithAIRequest_ImageModel(config *ypb.AIModelConfig) AIRequestOption {
+	return func(req *AIRequest) {
+		if config != nil {
+			req.imageModelConfig = proto.Clone(config).(*ypb.AIModelConfig)
+		}
+	}
+}
+func (a *AIRequest) GetImageModel() *ypb.AIModelConfig { return a.imageModelConfig }
+
+type ImageRequestBudget struct {
+	InputLimit    int64
+	NonTextTokens int64
+	OutputReserve int64
+	MediaBytes    int64
+	MaxBytes      int64
+}
+
+func WithAIRequest_ImageBudget(budget ImageRequestBudget) AIRequestOption {
+	return func(req *AIRequest) { v := budget; req.imageBudget = &v }
+}
+
+func (a *AIRequest) CheckImageBudget() error {
+	if a.imageBudget == nil {
+		return nil
+	}
+	b := a.imageBudget
+	tokens := int64(MeasureTokens(a.prompt)) + b.NonTextTokens
+	if tokens+b.OutputReserve > b.InputLimit {
+		return &aispec.PromptOverflowError{PromptOverflowEvidence: aispec.PromptOverflowEvidence{Source: aispec.PromptOverflowSourceCallback, MaxContextTokens: b.InputLimit, InputTokens: tokens, RequestTokens: tokens + b.OutputReserve, Message: "complete image request exceeds context budget"}}
+	}
+	if int64(len(a.prompt))+b.MediaBytes > b.MaxBytes {
+		return fmt.Errorf("%w: complete image request exceeds byte budget", aispec.ErrRequestSizeLimit)
+	}
+	return nil
 }
 
 func (a *AIRequest) GetTaskIndex() string {

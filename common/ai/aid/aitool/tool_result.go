@@ -8,6 +8,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -41,8 +42,9 @@ type ToolExecutionResult struct {
 	Stderr string `json:"stderr"`
 	// CombinedOutput 是 stdout + stderr 的合并输出，按时间顺序交错。
 	// 截断保存时只针对 CombinedOutput 做一次，不再分别处理 stdout/stderr。
-	CombinedOutput string      `json:"combined_output"`
-	Result         interface{} `json:"result"`
+	CombinedOutput string           `json:"combined_output"`
+	Result         interface{}      `json:"result"`
+	Images         []*aimedia.Image `json:"images,omitempty"`
 }
 
 // ToJSON 将执行结果转换为JSON字符串
@@ -75,6 +77,11 @@ func (r *ToolExecutionResult) GetJSONSchema() map[string]interface{} {
 			},
 			"result": map[string]interface{}{
 				"description": "工具提供的结构化执行语义；调用方应据此判断命令退出码、HTTP 状态或任务效果",
+			},
+			"images": map[string]interface{}{
+				"type":        "array",
+				"description": "图片资源引用与来源元数据；原始图片不进入文本结果，模型图片输入由运行时单独构造",
+				"items":       map[string]interface{}{"type": "object"},
 			},
 		},
 		"required": []string{"stdout", "stderr", "combined_output", "result"},
@@ -183,11 +190,16 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		}
 	case callback := <-finished:
 		err = callback.err
+		value, images := callback.value, []*aimedia.Image(nil)
+		if err == nil {
+			value, images, err = splitToolMedia(ctx, callback.value)
+		}
 		execResult = &ToolExecutionResult{
 			Stdout:         stdoutBuf.String(),
 			Stderr:         stderrBuf.String(),
 			CombinedOutput: combinedBuf.String(),
-			Result:         callback.value,
+			Result:         value,
+			Images:         images,
 		}
 	}
 	return execResult, err

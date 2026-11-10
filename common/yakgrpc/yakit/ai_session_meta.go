@@ -241,6 +241,9 @@ func MergeCachedAISessionStartParams(cached, request *ypb.AIStartParams) *ypb.AI
 	merged := proto.Clone(cached).(*ypb.AIStartParams)
 	// Capabilities describe this connection, never the client that saved the session.
 	merged.ClientUI = request.GetClientUI()
+	if request.ImageInput != nil {
+		merged.ImageInput = proto.Clone(request.ImageInput).(*ypb.AIImageInputConfig)
+	}
 	merged.SingleModelMode = cached.GetSingleModelMode() || request.GetSingleModelMode()
 	if request.NetworkDebug != nil {
 		value := request.GetNetworkDebug()
@@ -267,6 +270,9 @@ func OverlayAISessionStartParams(base, patch *ypb.AIStartParams) *ypb.AIStartPar
 	}
 
 	next := proto.Clone(base).(*ypb.AIStartParams)
+	if patch.ImageInput != nil {
+		next.ImageInput = proto.Clone(patch.ImageInput).(*ypb.AIImageInputConfig)
+	}
 	if patch.NetworkDebug != nil {
 		value := patch.GetNetworkDebug()
 		next.NetworkDebug = &value

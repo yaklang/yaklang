@@ -264,6 +264,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		Sections:          sections,
 		TimelineThroughID: &base.TimelineThroughID,
 		TimelineItemIDs:   base.TimelineItemIDs,
+		Images:            base.TimelineImages,
 	}, nil
 }
 
@@ -290,7 +291,9 @@ func (pm *PromptManager) projectLightweightLoopMaterials(
 	}
 	lightBase := *base
 	lightBase.FrozenPartitions = nil
-	lightBase.TimelineOpen += "\n" + pm.react.config.GetTimeline().DumpRecentOrdinaryForPrompt(lightweightLoopRecentTimelineTokens, input.IncludeLatestModelReplay)
+	recent := pm.react.config.GetTimeline().DumpRecentOrdinaryWithImages(lightweightLoopRecentTimelineTokens, input.IncludeLatestModelReplay)
+	lightBase.TimelineOpen += "\n" + recent.Text
+	lightBase.TimelineImages = append(append([]aicommon.PromptImage(nil), base.TimelineImages...), recent.Images...)
 	lightBase.ShowForgeInventory = false
 	lightBase.AIForgeList = ""
 	lightBase.TopTools = aicommon.SelectToolsByTokenBudget(lightBase.TopTools, 2048, 0)

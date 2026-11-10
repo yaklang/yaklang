@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -34,6 +35,9 @@ type SessionPromptState struct {
 	// current session/workdir. It is intentionally in-memory only; persistent
 	// restore can add serialization later without changing the prompt API.
 	sessionArtifactsState *SessionArtifactsRenderState
+	imageCatalog          *aimedia.Catalog
+	inheritedImageCatalog *aimedia.Catalog
+	imageNamespace        string
 
 	// reportedRiskStore is the session-level "已报告漏洞清单" accumulator.
 	// Each time a risk is emitted via cybersecurity-risk (or any risk-emitting
@@ -83,6 +87,7 @@ func (s *SessionPromptState) forkForSubAgent(inheritConversation bool) *SessionP
 	defer s.m.Unlock()
 
 	forked := &SessionPromptState{}
+	forked.imageNamespace = newImageNamespace()
 	// Share the thread-safe reporting ledger even before the first report.
 	// A copied nil pointer would allow parent/children to create separate stores.
 	forked.reportedRiskStore = s.getOrCreateReportedRiskStore()
@@ -92,6 +97,10 @@ func (s *SessionPromptState) forkForSubAgent(inheritConversation bool) *SessionP
 	forked.uiSession = s.uiSession
 	if !inheritConversation {
 		return forked
+	}
+	forked.inheritedImageCatalog = s.imageCatalog
+	if forked.inheritedImageCatalog == nil {
+		forked.inheritedImageCatalog = s.inheritedImageCatalog
 	}
 
 	if len(s.UserInputHistory) > 0 {

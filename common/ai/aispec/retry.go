@@ -204,6 +204,9 @@ func chatWithGlobalRetry(client AIClient, prompt string, wait func(context.Conte
 		if !consts.IsAIRetryForeverEnabled() {
 			return "", err
 		}
+		if IsUnrecoverableInput(err) {
+			return "", err
+		}
 		if original.ModelRequestStatus != nil {
 			original.ModelRequestStatus(fmt.Sprintf("模型调用失败，全局无限重试已开启；%.1f 秒后进行第 %d 次尝试，可随时停止任务", delay.Seconds(), attempt+1))
 		}

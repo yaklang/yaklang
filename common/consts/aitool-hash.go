@@ -5,4 +5,4 @@ package consts
 // ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
 // This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
 // These tools include AI-powered analysis engines and machine learning models for security testing.
-const ExistedBuildInAIToolEmbedFSHash string = "cbe85b9185a2165849e6107f119939ad4ecc35ffb7581e0cf7f610f17465edc3"
+const ExistedBuildInAIToolEmbedFSHash string = "0d1d64b210b57e7a37effba2a68c824fc4cefc768a5d83bf9bce3a480259689f"

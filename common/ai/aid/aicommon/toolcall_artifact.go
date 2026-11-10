@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
@@ -178,6 +180,7 @@ type toolCallArtifactManifest struct {
 	Params     any                          `json:"params"`
 	CreatedAt  time.Time                    `json:"created_at"`
 	Files      map[string]artifactFileStats `json:"files"`
+	Images     []*aimedia.Image             `json:"images,omitempty"`
 }
 
 type toolCallArtifactBundle struct {
@@ -521,8 +524,9 @@ func normalizeToolResultData(toolResult *aitool.ToolResult, combined, resultText
 	if toolResult == nil {
 		return
 	}
-	// Data is the sole prompt representation after tool completion. Historical
-	// shrink fields must not bypass it during Timeline rendering.
+	// Data is the canonical textual representation after tool completion;
+	// image references live separately. Historical shrink fields must not
+	// bypass the canonical text during Timeline rendering.
 	toolResult.ShrinkResult = ""
 	toolResult.ShrinkSimilarResult = ""
 	if ytoken.TokenCountExceeds(toolResult.CallExpectations, toolResultHintReserve/2) {
@@ -639,6 +643,40 @@ func (b *toolCallArtifactBundle) finalize(
 		b.markFinalized()
 		return nil
 	}
+	hadImages := len(toolResult.Images) > 0
+	imageFailure := func(err error) error {
+		if !hadImages {
+			return nil // Preserve the existing text-only artifact failure semantics.
+		}
+		wrapped := fmt.Errorf("failed to preserve tool images: %w", err)
+		toolResult.Success = false
+		toolResult.Error = wrapped.Error()
+		toolResult.Images = nil
+		if execution, ok := toolResult.Data.(*aitool.ToolExecutionResult); ok {
+			execution.Images = nil
+		}
+		if _, ok := toolResult.Data.(string); ok {
+			enforceCanonicalToolResultLimit(toolResult)
+		}
+		return wrapped
+	}
+	var imagePersistErr error
+	if len(toolResult.Images) > 0 {
+		if err := b.persistImages(t, tool, callToolID, toolResult); err != nil {
+			imagePersistErr = imageFailure(err)
+		}
+		if len(toolResult.Images) > 0 {
+			if config := ImageConfigFrom(t.config); config != nil {
+				ctx := t.ctx
+				if ctx == nil {
+					ctx = config.GetContext()
+				}
+				if err := config.RegisterToolImages(ctx, t.task, toolResult); err != nil {
+					imagePersistErr = imageFailure(err)
+				}
+			}
+		}
+	}
 	b.closeStreams()
 	combined, legacyStdout, legacyStderr, rawResult, legacy := legacyExecutionParts(toolResult.Data)
 	if combined == "" {
@@ -686,11 +724,11 @@ func (b *toolCallArtifactBundle) finalize(
 		// fully recoverable.
 		normalizeToolResultData(toolResult, combined, resultText, hint)
 		log.Warnf("tool artifact persistence failed for oversized result: %v", persistErr)
-		return nil
+		return imageFailure(persistErr)
 	}
 	if persistErr != nil {
 		log.Warnf("tool artifact persistence failed for bounded result: %v", persistErr)
-		return nil
+		return imageFailure(persistErr)
 	}
 
 	files := map[string]artifactFileStats{
@@ -709,6 +747,7 @@ func (b *toolCallArtifactBundle) finalize(
 		Params:     params,
 		CreatedAt:  time.Now(),
 		Files:      files,
+		Images:     toolResult.Images,
 	}
 	manifestData, err := json.MarshalIndent(manifest, "", "  ")
 	if err == nil {
@@ -720,14 +759,14 @@ func (b *toolCallArtifactBundle) finalize(
 		// advertises files that no longer exist.
 		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
 		log.Warnf("tool artifact manifest persistence failed: %v", err)
-		return nil
+		return imageFailure(err)
 	}
 
 	report := b.renderReport(tool, identifier, params, toolResult)
 	if err := os.WriteFile(b.reportPath, []byte(report), 0o644); err != nil {
 		normalizeToolResultData(toolResult, combined, resultText, toolArtifactHint(nil, err))
 		log.Warnf("tool artifact report persistence failed: %v", err)
-		return nil
+		return imageFailure(err)
 	}
 	// Only a complete manifest/report bundle is durable. Any earlier error keeps
 	// finalized=false so ToolCaller's deferred rollback removes the partial tree.
@@ -736,6 +775,54 @@ func (b *toolCallArtifactBundle) finalize(
 	t.emitter.EmitPinFilename(b.reportPath)
 	t.emitter.EmitPinFilename(b.dir)
 	log.Infof("saved tool call artifact bundle to: %s", b.dir)
+	return imagePersistErr
+}
+
+func (b *toolCallArtifactBundle) persistImages(t *ToolCaller, tool *aitool.Tool, callID string, result *aitool.ToolResult) error {
+	if b.prepare != nil {
+		return b.prepare
+	}
+	if b.dir == "" {
+		return fmt.Errorf("image artifact directory is unavailable")
+	}
+	store, err := aimedia.NewStore(filepath.Join(b.dir, "images"))
+	if err != nil {
+		return err
+	}
+	refs := make([]*aimedia.Image, 0, len(result.Images))
+	ctx := t.ctx
+	if ctx == nil && t.config != nil {
+		ctx = t.config.GetContext()
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for _, img := range result.Images {
+		if img == nil {
+			return fmt.Errorf("tool image is nil")
+		}
+		owned := *img
+		if owned.Source.Kind == "" {
+			owned.Source.Kind = "tool"
+		}
+		owned.Source.ToolName = tool.Name
+		owned.Source.ToolCallID = callID
+		if t.task != nil {
+			owned.Source.TaskIndex = t.task.GetIndex()
+		}
+		if owned.Source.ObservedAt.IsZero() {
+			owned.Source.ObservedAt = time.Now()
+		}
+		ref, err := store.Save(ctx, &owned)
+		if err != nil {
+			return err
+		}
+		refs = append(refs, ref)
+	}
+	result.Images = refs
+	if execution, ok := result.Data.(*aitool.ToolExecutionResult); ok {
+		execution.Images = refs
+	}
 	return nil
 }
 
