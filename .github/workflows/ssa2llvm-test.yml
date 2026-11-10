@@ -10,26 +10,17 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-22.04
+    # The embedded LLVM 18.1.3 archives reference glibc 2.38+ symbols
+    # (__isoc23_*, arc4random). Noble ships glibc 2.39; jammy's 2.35 cannot link
+    # them, and falling back to the distro LLVM would reintroduce the system
+    # dependency this workflow is meant to avoid.
+    runs-on: ubuntu-24.04
     # Hard ceiling for one run: queue wait, toolchain install, CLI build and the
     # test step all count. Queue alone has varied from 5m to 17m, and shared
     # runners have died silently around the 100m mark, so the goal is to keep
     # the whole job well below that. The three test groups below bound
     # themselves at 40m + 40m + 55m; this cap only stops a runaway job.
     timeout-minutes: 150
-
-    env:
-      # go-llvm vendors the LLVM 18.1.3 static archives inside the module, but
-      # not the LLVM C/C++ headers (the module zip has none). install_deps
-      # adds the official apt.llvm.org repo for jammy; point cgo at the
-      # versioned headers so the distro default (LLVM 14) cannot shadow them.
-      CGO_CFLAGS: -I/usr/lib/llvm-18/include
-      CGO_CXXFLAGS: -I/usr/lib/llvm-18/include
-      # go-llvm's bundled LLVM 18.1.3 static archives were built against a
-      # newer glibc (they reference __isoc23_*/arc4random, absent on Ubuntu
-      # 22.04's glibc 2.35). Put the system LLVM 18.1.8 lib dir first so the
-      # link uses the distro-compatible archives.
-      CGO_LDFLAGS: -L/usr/lib/llvm-18/lib
 
     steps:
     - name: Check out code
@@ -48,7 +39,7 @@ jobs:
         cache: false
       id: go
 
-    - name: Install LLVM dependencies
+    - name: Install build dependencies
       run: |
         sudo bash common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh
 
