@@ -243,6 +243,9 @@ type LoopPromptMode uint8
 const (
 	LoopPromptModeNormal LoopPromptMode = iota
 	LoopPromptModeCompressContext
+	// LoopPromptModeGoalAcceptance is a loop-state marker. Its prompt uses the
+	// normal dynamic section; the acceptance instruction is carried by Timeline.
+	LoopPromptModeGoalAcceptance
 )
 
 type LoopPromptAssemblyInput struct {

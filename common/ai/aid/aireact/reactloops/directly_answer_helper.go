@@ -103,7 +103,11 @@ func noteDirectlyAnswerDeliveredWithoutTodoDelta(loop *ReActLoop, action *aicomm
 // inquiries. No extra model round is useful when the answer was delivered and
 // neither todo_delta nor the current task TODO history indicates work.
 func ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop *ReActLoop, action *aicommon.Action) bool {
-	return action != nil && !directlyAnswerHasTodoDelta(loop, action) && loop.isSimpleQueryWithoutWork() && loop.SubAgentFinishBlockReason() == ""
+	return action != nil &&
+		!loop.isGoalAcceptanceMode() &&
+		!directlyAnswerHasTodoDelta(loop, action) &&
+		loop.isSimpleQueryWithoutWork() &&
+		loop.SubAgentFinishBlockReason() == ""
 }
 
 // Share the trivial-turn boundary between automatic recall and completion.
