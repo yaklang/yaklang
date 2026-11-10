@@ -31,43 +31,54 @@ type SFFrameResult struct {
 	UnNameValue      Values
 	AlertSymbolTable *utils.SafeMap[Values]
 
-	// symbolIDCache memoizes symbol-name -> {value count, id set}. SyntaxFlow
-	// symbols are append-merged, so an unchanged count means the id set is
-	// unchanged. Without this, every per-sink dataflow filter re-walked the
-	// entire $source/$filter symbol table resolving GetId (the hot path on
-	// 52k-sink rules). The entry is rebuilt when the count grows.
-	symbolIDCache sync.Map
+	// symbolIDCache memoizes symbol-name -> id set for the dataflow filter fast
+	// path. It belongs on the result, not on sfCheck: a dataflow opcode creates
+	// one sfCheck per source, so a per-check cache only deduped paths within a
+	// single source and re-walked the whole $source/$filter symbol table once per
+	// source (52k times on large projects). The same SFFrameResult is shared by
+	// every source of one rule execution, so the set is built once there.
+	//
+	// It is cleared whenever this result's symbol table gains values
+	// (MergeByResultLocked), so a set can never outlive the symbol state it was
+	// built from.
+	symbolIDMu    sync.RWMutex
+	symbolIDCache map[string]map[int64]struct{}
 }
 
-type symbolIDCacheEntry struct {
-	count int
-	ids   map[int64]struct{}
-}
-
-// GetSymbolIDSet returns a cached id set for name when it was built for the
-// current symbol value count.
-func (s *SFFrameResult) GetSymbolIDSet(name string, count int) (map[int64]struct{}, bool) {
+// GetOrBuildSymbolIDs returns the cached id set for name, building and caching
+// it via build on a miss. A nil/empty build result is not cached: an unbound
+// symbol must stay observable so a later binding still disables the fast path.
+// Lookup, build and store hold the same lock, so a concurrent ClearSymbolIDs
+// can never leave a set built from a pre-clear symbol snapshot in the cache.
+func (s *SFFrameResult) GetOrBuildSymbolIDs(name string, build func() map[int64]struct{}) map[int64]struct{} {
 	if s == nil || name == "" {
-		return nil, false
+		return nil
 	}
-	raw, ok := s.symbolIDCache.Load(name)
-	if !ok {
-		return nil, false
+	s.symbolIDMu.Lock()
+	defer s.symbolIDMu.Unlock()
+	if ids, ok := s.symbolIDCache[name]; ok {
+		return ids
 	}
-	entry, ok := raw.(symbolIDCacheEntry)
-	if !ok || entry.count != count {
-		return nil, false
+	ids := build()
+	if len(ids) == 0 {
+		return nil
 	}
-	return entry.ids, true
+	if s.symbolIDCache == nil {
+		s.symbolIDCache = make(map[string]map[int64]struct{}, 4)
+	}
+	s.symbolIDCache[name] = ids
+	return ids
 }
 
-// SetSymbolIDSet stores an id set for name/count for the rest of this frame
-// execution.
-func (s *SFFrameResult) SetSymbolIDSet(name string, count int, ids map[int64]struct{}) {
-	if s == nil || name == "" {
+// ClearSymbolIDs drops every cached id set. Callers that mutate the symbol table
+// must do this so the fast path never evaluates against a stale symbol state.
+func (s *SFFrameResult) ClearSymbolIDs() {
+	if s == nil {
 		return
 	}
-	s.symbolIDCache.Store(name, symbolIDCacheEntry{count: count, ids: ids})
+	s.symbolIDMu.Lock()
+	s.symbolIDCache = nil
+	s.symbolIDMu.Unlock()
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
@@ -121,6 +132,8 @@ func (s *SFFrameResult) MergeByResultLocked(result *SFFrameResult) {
 		}
 		return true
 	})
+	// The symbol table just changed, so any cached id set may be stale.
+	s.ClearSymbolIDs()
 	result.AlertSymbolTable.ForEach(func(key string, value Values) bool {
 		if existing, ok := s.AlertSymbolTable.Get(key); ok {
 			s.AlertSymbolTable.Set(key, MergeValues(existing, value))
