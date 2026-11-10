@@ -618,9 +618,6 @@ func (s *SFFrame) output(resultName string, operator Values) error {
 	} else {
 		originValue, _ := s.GetSymbolTable().Get(resultName)
 		s.GetSymbolTable().Set(resultName, MergeValues(operator, originValue))
-		// Binding a symbol invalidates cached fast-path id sets (a rule may
-		// rebind $source/$filter between two dataflow opcodes).
-		s.result.ClearSymbolIDs()
 	}
 	if s.config != nil {
 		for _, callback := range s.config.onResultCapturedCallbacks {

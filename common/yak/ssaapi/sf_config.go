@@ -12,125 +12,33 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// dataflowFilterKind identifies include/exclude sub-rules that are provably
-// equivalent to a membership test on one already-bound symbol, so the dataflow
-// fast path can skip compiling the sub-rule and evaluate it from an id set.
-type dataflowFilterKind uint8
-
-const (
-	dataflowFilterUnknown dataflowFilterKind = iota
-	// dataflowFilterAny is `* & $sym`: the path contains a value bound to $sym.
-	// Repeated `& $sym` items are idempotent and fold into this shape.
-	dataflowFilterAny
-	// dataflowFilterSelf is `<self> & $sym`: `<self>` is identity over the
-	// input values, so on a dataflow path it carries the same membership
-	// meaning as dataflowFilterAny.
-	dataflowFilterSelf
-	// dataflowFilterCallee is `*<getCallee> & $sym`: a call on the path has a
-	// callee bound to $sym. This shape is monotone, which is what makes branch
-	// pruning sound: once a path contains such a call, longer paths still do.
-	dataflowFilterCallee
-)
-
-type dataflowFilterPlan struct {
-	kind   dataflowFilterKind
-	symbol string
-}
-
 var (
-	// simpleDataflowInclude matches the subject and first symbol of
-	// `* & $sym` / `<self> & $sym`. The tail is validated separately so a
-	// trailing `as $alias` or repeated `& $sym` can be accepted.
-	simpleDataflowInclude = regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)`)
-	// simpleGetCalleeExclude is the same for `*<getCallee> & $sym`.
-	simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)`)
-	// simpleDataflowFilterAlias is the optional `as $alias` tail. It only names
-	// the sub-rule result; include/exclude is evaluated on whether the result is
-	// non-empty, so the alias does not change semantics.
-	simpleDataflowFilterAlias = regexp.MustCompile(`^as\s+\$[A-Za-z_][A-Za-z0-9_]*$`)
+	// simpleGetCalleeExclude matches the dataflow exclude shape
+	// `*<getCallee> & $filter`. This pattern is monotone: once a path contains a
+	// call whose callee is in $filter, adding more path values cannot make the
+	// exclude stop matching. That property is what makes branch pruning sound;
+	// any other exclude text disables pruning and keeps the full path enumeration.
+	simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
+	// simpleDataflowInclude matches the common `* & $source` / `<self> & $source`
+	// include shape (also accepted by fastPathMatch). Only this shape gets the
+	// include reachability prefilter; anything else keeps the full path walk.
+	simpleDataflowInclude = regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
 )
 
-// dataflowFilterShapeCache memoizes dataflowFilterShape. Classification runs per
-// sfCheck (one per sink) and fastPathMatch runs per enumerated path, so the
-// cached lookup keeps the hot path to a single map access. Negative entries are
-// cached too, so complex sub-rules are not re-matched on every path.
-var dataflowFilterShapeCache sync.Map // string -> dataflowFilterShapeEntry
-
-type dataflowFilterShapeEntry struct {
-	plan dataflowFilterPlan
-	ok   bool
+func simpleIncludeSymbol(text string) (string, bool) {
+	m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(text))
+	if len(m) != 2 {
+		return "", false
+	}
+	return m[1], true
 }
 
-// dataflowFilterShape classifies a dataflow include/exclude sub-rule. The
-// accepted shapes are exactly those whose include/exclude predicate is a
-// membership test on one bound symbol, so callers may evaluate them from a
-// symbol id set and, for the monotone Callee exclude, prune path branches.
-func dataflowFilterShape(text string) (dataflowFilterPlan, bool) {
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return dataflowFilterPlan{}, false
+func simpleGetCalleeExcludeSymbol(text string) (string, bool) {
+	m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(text))
+	if len(m) != 2 {
+		return "", false
 	}
-	if cached, ok := dataflowFilterShapeCache.Load(text); ok {
-		entry := cached.(dataflowFilterShapeEntry)
-		return entry.plan, entry.ok
-	}
-	plan, ok := parseDataflowFilterShape(text)
-	dataflowFilterShapeCache.Store(text, dataflowFilterShapeEntry{plan: plan, ok: ok})
-	return plan, ok
-}
-
-func parseDataflowFilterShape(text string) (dataflowFilterPlan, bool) {
-	if loc := simpleDataflowInclude.FindStringSubmatchIndex(text); loc != nil {
-		sym := text[loc[2]:loc[3]]
-		kind := dataflowFilterAny
-		if strings.HasPrefix(text, "<self>") {
-			kind = dataflowFilterSelf
-		}
-		if matchDataflowFilterTail(text[loc[1]:], sym) {
-			return dataflowFilterPlan{kind: kind, symbol: sym}, true
-		}
-	}
-	if loc := simpleGetCalleeExclude.FindStringSubmatchIndex(text); loc != nil {
-		sym := text[loc[2]:loc[3]]
-		if matchDataflowFilterTail(text[loc[1]:], sym) {
-			return dataflowFilterPlan{kind: dataflowFilterCallee, symbol: sym}, true
-		}
-	}
-	return dataflowFilterPlan{}, false
-}
-
-// matchDataflowFilterTail accepts only more `& $sym` items for the same symbol
-// plus an optional trailing `as $alias`. Anything else keeps the full sub-query.
-func matchDataflowFilterTail(tail, sym string) bool {
-	for {
-		tail = strings.TrimSpace(tail)
-		if tail == "" {
-			return true
-		}
-		if simpleDataflowFilterAlias.MatchString(tail) {
-			return true
-		}
-		if !strings.HasPrefix(tail, "&") {
-			return false
-		}
-		tail = strings.TrimSpace(tail[1:])
-		if !strings.HasPrefix(tail, "$") {
-			return false
-		}
-		tail = tail[1:]
-		end := 0
-		for end < len(tail) && isDataflowFilterIdentByte(tail[end]) {
-			end++
-		}
-		if end == 0 || tail[:end] != sym {
-			return false
-		}
-		tail = tail[end:]
-	}
-}
-
-func isDataflowFilterIdentByte(b byte) bool {
-	return b == '_' || b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
+	return m[1], true
 }
 
 type sfCheck struct {
@@ -173,12 +81,10 @@ type sfCheck struct {
 	originalSnapshot     *sf.SymbolSnapshot
 	originalSnapshotOnce sync.Once
 
-	// Dataflow filter id sets live on contextResult (shared by every source of
-	// one rule execution) and are pinned on the checkItem, so the per-path
-	// check is a field read. A per-sfCheck memo used to sit here, but a
-	// dataflow opcode creates one sfCheck per source: it only deduped paths
-	// within a single source and re-walked the whole symbol table once per
-	// source (52k times on large projects).
+	// fastMatchMu guards fastMatchIDs, which memoizes symbol -> id set for the
+	// simple `* & $source` / `<self> & $source` fast path.
+	fastMatchMu  sync.Mutex
+	fastMatchIDs map[string]map[int64]struct{}
 
 	// excludeItems is the exclude-only subset of matchItem. excludePrunable is
 	// true only when every exclude uses the monotone `*<getCallee> & $symbol`
@@ -189,12 +95,6 @@ type sfCheck struct {
 	excludePruneOnce  sync.Once
 	excludePruneIDs   map[int64]struct{}
 	excludePruneReady bool
-
-	// needSymbolSnapshot is set when at least one item must run the full
-	// sub-query/clearup path. Fast-path-only checks skip TakeSymbolSnapshot,
-	// which otherwise copies the (large) $source/$filter symbol table once per
-	// dataflow filter on every sink.
-	needSymbolSnapshot bool
 }
 
 type checkItem struct {
@@ -206,15 +106,6 @@ type checkItem struct {
 	// large project the same two dataflow filters are otherwise recompiled for
 	// every sink (tens of thousands of times).
 	fastPathOnly bool
-	// fastPlan/fastIDs are the shape and bound id set resolved once at
-	// AppendItems, so the per-path check is a field read: no regexp, no shape
-	// cache lookup, and no symbol-table walk. Only set for fastPathOnly items.
-	fastPlan dataflowFilterPlan
-	fastIDs  map[int64]struct{}
-	// fastResolved records that AppendItems already attempted the one-shot
-	// resolution, so a failed attempt (complex shape or unbound symbol) is not
-	// retried on every path.
-	fastResolved bool
 	// matchCache memoizes per-node until/hook match results (keyed by SSA
 	// node ID) so the same node is not re-queried via a full SF sub-query
 	// when it appears in multiple descent paths. CheckUntil is the hot
@@ -298,12 +189,7 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		if item == nil {
 			continue
 		}
-		plan, ids, ok := c.simpleFastPathSpec(item)
-		// fastPathMatch evaluates any item whose text is a simple filter shape,
-		// so it must be resolved for until/hook too. Skipping compilation is
-		// only safe for include/exclude, which are the shapes proven equivalent
-		// when evaluated from symbol ids alone.
-		fastPathOnly := ok && skippableFastPathItem(item.Key, plan)
+		fastPathOnly := c.isSimpleFastPathItem(item)
 		var frame *sf.SFFrame
 		if !fastPathOnly {
 			var err error
@@ -323,19 +209,13 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 			RecursiveConfigItem: item,
 			frame:               frame,
 			fastPathOnly:        fastPathOnly,
-			fastPlan:            plan,
-			fastIDs:             ids,
-			// Resolution is attempted once per item, exactly like the old
-			// per-check memo (a symbol unbound at dataflow start stays on the
-			// full-query path for this rule execution).
-			fastResolved: true,
 		}
 		switch item.Key {
 		case sf.RecursiveConfig_Include, sf.RecursiveConfig_Exclude:
 			c.matchItem = append(c.matchItem, checkItem)
 			if item.Key == sf.RecursiveConfig_Exclude {
 				c.excludeItems = append(c.excludeItems, checkItem)
-				if !ok || plan.kind != dataflowFilterCallee {
+				if !simpleGetCalleeExclude.MatchString(strings.TrimSpace(item.Value)) {
 					c.excludePrunable = false
 				}
 			}
@@ -345,45 +225,29 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 		// A non-fast item can run check()/clearup(), which needs the parent
 		// snapshot. Fast-path-only items never do, so skip the (large) copy.
 		if !fastPathOnly {
-			c.needSymbolSnapshot = true
 			c.ensureOriginalSnapshot()
 		}
 	}
 }
 
-// skippableFastPathItem reports whether an item of this key is proven
-// equivalent when evaluated from symbol ids alone, so its sub-rule neither needs
-// compiling nor a parent symbol snapshot.
-func skippableFastPathItem(key string, plan dataflowFilterPlan) bool {
-	switch key {
+// isSimpleFastPathItem reports whether Appending this item can skip compilation
+// entirely: the text is one of the simple include/exclude forms fastPathMatch
+// evaluates from a bound symbol id set. The symbol must already be bound;
+// otherwise the full query stays authoritative.
+func (c *sfCheck) isSimpleFastPathItem(item *sf.RecursiveConfigItem) bool {
+	if c == nil || item == nil {
+		return false
+	}
+	switch item.Key {
 	case sf.RecursiveConfig_Include:
-		return plan.kind == dataflowFilterAny || plan.kind == dataflowFilterSelf
+		sym, ok := simpleIncludeSymbol(item.Value)
+		return ok && len(c.fastMatchSymbolIDs(sym)) > 0
 	case sf.RecursiveConfig_Exclude:
-		// Only the monotone `*<getCallee> & $sym` exclude is safe to skip;
-		// an include-style exclude stays on the full query.
-		return plan.kind == dataflowFilterCallee
+		sym, ok := simpleGetCalleeExcludeSymbol(item.Value)
+		return ok && len(c.fastMatchSymbolIDs(sym)) > 0
 	default:
 		return false
 	}
-}
-
-// simpleFastPathSpec resolves an item's filter text to the simple shape and its
-// bound id set once, at AppendItems. Returning the ids here keeps fastPathMatch
-// off the regexp, the shape cache and the symbol table per path. The symbol must
-// already be bound; otherwise the full sub-query stays authoritative.
-func (c *sfCheck) simpleFastPathSpec(item *sf.RecursiveConfigItem) (dataflowFilterPlan, map[int64]struct{}, bool) {
-	if c == nil || item == nil {
-		return dataflowFilterPlan{}, nil, false
-	}
-	shape, ok := dataflowFilterShape(item.Value)
-	if !ok {
-		return dataflowFilterPlan{}, nil, false
-	}
-	ids := c.symbolIDs(shape.symbol)
-	if len(ids) == 0 {
-		return dataflowFilterPlan{}, nil, false
-	}
-	return shape, ids, true
 }
 
 // compiledFrame returns a compiled *sf.SFFrame for the given sub-rule text,
@@ -537,47 +401,40 @@ func (r *sfCheck) check(
 	}
 }
 
-// fastPathMatch short-circuits the common dataflow include/exclude sub-rules
-// (`* & $source`, `<self> & $source`, `*<getCallee> & $filter` and their
-// `as $alias` forms) by checking path-node ids against the already-bound symbol
-// set. This avoids a full SyntaxFlow sub-query per enumerated path, which
-// dominated the heavy log-forging / path-traversal rules. Returns ok=false for
-// anything it cannot prove equivalent, so semantics always fall back to the
-// full query.
+// fastPathMatch short-circuits the most common dataflow include/exclude
+// sub-rules (`* & $source`, `<self> & $source`, and their $sink variants) by
+// checking path-node ids against the already-bound symbol set. This avoids a
+// full SyntaxFlow sub-query per enumerated path, which dominated the heavy
+// log-forging / path-traversal rules. Returns ok=false for anything it cannot
+// prove equivalent, so semantics always fall back to the full query.
 func (r *sfCheck) fastPathMatch(item *checkItem, path sf.Values) (bool, bool) {
-	if item == nil {
+	if r == nil || item == nil || item.Value == "" {
 		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
 		return false, false
 	}
-	plan, ids := item.fastPlan, item.fastIDs
-	if !item.fastResolved {
-		// Items built outside AppendItems (tests, future callers) have no
-		// pre-resolved spec; resolve once here and remember the failure so a
-		// complex/unbound item is not re-classified on every path. The item is
-		// only ever used by one sfCheck, which walks its paths serially.
-		if p, i, ok := r.simpleFastPathSpec(item.RecursiveConfigItem); ok {
-			plan, ids = p, i
+	text := strings.TrimSpace(item.Value)
+
+	// `* & $symbol` / `<self> & $symbol`: path intersects the symbol's ids.
+	if sym, ok := simpleIncludeSymbol(text); ok {
+		if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
+			matched := pathContainsAnyID(path, ids)
+			atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+			return matched, true
 		}
-		item.fastPlan, item.fastIDs, item.fastResolved = plan, ids, true
 	}
-	if len(ids) == 0 {
-		atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
-		if os.Getenv("YAK_SSA_FAST_MATCH_DEBUG") != "" && atomic.AddInt64(&fastPathFallbackLogCount, 1) <= 20 {
-			log.Infof("fast-path fallback text: %q", item.Value)
+	// `*<getCallee> & $symbol`: a call on the path has a callee in the symbol.
+	if sym, ok := simpleGetCalleeExcludeSymbol(text); ok {
+		if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
+			matched := pathCalleeMatchesAnyID(path, ids)
+			atomic.AddInt64(&fastPathMatchCounter.hit, 1)
+			return matched, true
 		}
-		return false, false
 	}
-	atomic.AddInt64(&fastPathMatchCounter.hit, 1)
-	switch plan.kind {
-	case dataflowFilterAny, dataflowFilterSelf:
-		// `* & $symbol` / `<self> & $symbol`: path intersects the symbol's ids.
-		return pathContainsAnyID(path, ids), true
-	case dataflowFilterCallee:
-		// `*<getCallee> & $symbol`: a call on the path has a callee in the
-		// symbol.
-		return pathCalleeMatchesAnyID(path, ids), true
-	}
+
 	atomic.AddInt64(&fastPathMatchCounter.fallback, 1)
+	if os.Getenv("YAK_SSA_FAST_MATCH_DEBUG") != "" && atomic.AddInt64(&fastPathFallbackLogCount, 1) <= 20 {
+		log.Infof("fast-path fallback text: %q", text)
+	}
 	return false, false
 }
 
@@ -642,9 +499,9 @@ func (r *sfCheck) CheckExcludeNode(node *Value) bool {
 
 // SimpleIncludeSourceIDs returns the union of the bound value ids referenced
 // by every `* & $symbol` include item. ok=false when there is no include, any
-// include has a shape we cannot prove (combinations, other patterns), or a
-// referenced symbol is unbound/empty. The reachability prefilter is only an
-// optimization; the full path check remains authoritative.
+// include has a shape we cannot prove (aliases, combinations, other patterns),
+// or a referenced symbol is unbound/empty. The reachability prefilter is only
+// an optimization; the full path check remains authoritative.
 func (r *sfCheck) SimpleIncludeSourceIDs() (map[int64]struct{}, bool) {
 	if r == nil {
 		return nil, false
@@ -656,10 +513,15 @@ func (r *sfCheck) SimpleIncludeSourceIDs() (map[int64]struct{}, bool) {
 			continue
 		}
 		found = true
-		if !item.fastPathOnly || (item.fastPlan.kind != dataflowFilterAny && item.fastPlan.kind != dataflowFilterSelf) {
+		m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(item.Value))
+		if len(m) != 2 {
 			return nil, false
 		}
-		for id := range item.fastIDs {
+		symbolIDs := r.fastMatchSymbolIDs(m[1])
+		if len(symbolIDs) == 0 {
+			return nil, false
+		}
+		for id := range symbolIDs {
 			ids[id] = struct{}{}
 		}
 	}
@@ -676,11 +538,12 @@ func (r *sfCheck) prepareExcludePruneIDs() bool {
 	r.excludePruneOnce.Do(func() {
 		ids := make(map[int64]struct{})
 		for _, item := range r.excludeItems {
-			if !item.fastPathOnly || item.fastPlan.kind != dataflowFilterCallee {
+			m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(item.Value))
+			if len(m) != 2 {
 				r.excludePrunable = false
 				return
 			}
-			for id := range item.fastIDs {
+			for id := range r.fastMatchSymbolIDs(m[1]) {
 				ids[id] = struct{}{}
 			}
 		}
@@ -693,30 +556,33 @@ func (r *sfCheck) prepareExcludePruneIDs() bool {
 	return r.excludePruneReady
 }
 
-// symbolIDs resolves name to its bound SSA value ids, once per rule execution.
-// The cache lives on contextResult (the one SFFrameResult shared by every source
-// of a dataflow opcode): the fast-path symbols are bound before the opcode and
-// not mutated by it, so every per-source sfCheck can reuse the same set instead
-// of re-walking the symbol table once per source.
-func (r *sfCheck) symbolIDs(name string) map[int64]struct{} {
+func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
 	if r == nil || r.contextResult == nil || name == "" {
 		return nil
 	}
-	return r.contextResult.GetOrBuildSymbolIDs(name, func() map[int64]struct{} {
-		vals, ok := r.contextResult.SymbolTable.Get(name)
-		if !ok || len(vals) == 0 {
-			return nil
-		}
-		set := make(map[int64]struct{}, len(vals))
-		for _, op := range vals {
-			if id, ok := op.(interface{ GetId() int64 }); ok {
-				if id.GetId() > 0 {
-					set[id.GetId()] = struct{}{}
-				}
+	r.fastMatchMu.Lock()
+	defer r.fastMatchMu.Unlock()
+	if r.fastMatchIDs == nil {
+		r.fastMatchIDs = make(map[string]map[int64]struct{})
+	}
+	if set, ok := r.fastMatchIDs[name]; ok {
+		return set
+	}
+	vals, ok := r.contextResult.SymbolTable.Get(name)
+	if !ok {
+		r.fastMatchIDs[name] = nil
+		return nil
+	}
+	set := make(map[int64]struct{}, len(vals))
+	for _, op := range vals {
+		if id, ok := op.(interface{ GetId() int64 }); ok {
+			if id.GetId() > 0 {
+				set[id.GetId()] = struct{}{}
 			}
 		}
-		return set
-	})
+	}
+	r.fastMatchIDs[name] = set
+	return set
 }
 
 // extractCheckNodeId builds a cache key from the path values.
