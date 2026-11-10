@@ -24,7 +24,7 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 	// One-shot calls have no event loop, skills, task lifecycle or memory triage.
 	opts = append(append([]aicommon.ConfigOption{}, opts...), aicommon.WithContext(ctx),
 		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage(),
-		aicommon.WithDisableTimelineBroadcast(true))
+		aicommon.WithTimelineBroadcaster(aicommon.NewTimelineBroadcaster()))
 	if r.Emitter != nil {
 		opts = append(opts, aicommon.WithEmitter(r.Emitter))
 	}

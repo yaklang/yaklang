@@ -101,7 +101,7 @@ func TestTimelineBroadcastUnsubscribesOnReleaseAndMerge(t *testing.T) {
 func TestTimelineBroadcasterSubscribeAndUnsubscribe(t *testing.T) {
 	broadcaster := NewTimelineBroadcaster()
 	var received int64
-	id := broadcaster.Subscribe(func(item *TimelineItem) error {
+	broadcaster.Subscribe("test", func(item *TimelineItem) error {
 		received = item.GetID()
 		return nil
 	})
@@ -109,7 +109,7 @@ func TestTimelineBroadcasterSubscribeAndUnsubscribe(t *testing.T) {
 	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{ID: 7, Text: "event"})))
 	require.Equal(t, int64(7), received)
 
-	broadcaster.Unsubscribe(id)
+	broadcaster.Unsubscribe("test")
 	received = 0
 	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{ID: 8, Text: "ignored"})))
 	require.Zero(t, received)
@@ -141,12 +141,12 @@ func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	subscription := config.TimelineBroadcaster.Subscribe(func(*TimelineItem) error {
+	config.TimelineBroadcaster.Subscribe("test", func(*TimelineItem) error {
 		close(started)
 		<-release
 		return nil
 	})
-	t.Cleanup(func() { config.TimelineBroadcaster.Unsubscribe(subscription) })
+	t.Cleanup(func() { config.TimelineBroadcaster.Unsubscribe("test") })
 
 	broadcastDone := make(chan error, 1)
 	go func() {
@@ -182,11 +182,20 @@ func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 func TestConfigSetTimelineMovesBroadcastSubscription(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	previous := config.Timeline
+	peerTimeline := NewTimeline(config, nil)
+	peer := NewConfig(context.Background(),
+		WithID(config.Id),
+		WithTimelineBroadcaster(config.TimelineBroadcaster),
+		WithTimeline(peerTimeline),
+		WithDisableAutoSkills(true),
+	)
+	t.Cleanup(peer.ReleaseTimelineSubscription)
 	next := NewTimeline(config, nil)
 	require.NoError(t, config.SetTimeline(next))
 
 	require.NoError(t, config.BroadcastTimelineText("after switch"))
 
 	require.NotZero(t, timelineItemIDContaining(next, "after switch"))
+	require.NotZero(t, timelineItemIDContaining(peerTimeline, "after switch"))
 	require.Zero(t, timelineItemIDContaining(previous, "after switch"))
 }

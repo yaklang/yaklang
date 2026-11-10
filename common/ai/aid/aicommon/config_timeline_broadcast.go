@@ -1,122 +1,118 @@
 package aicommon
 
-import (
-	"fmt"
-	"sync"
-)
+import "fmt"
 
-// WithTimelineBroadcaster makes this Config join another Config's session
-// broadcast group. Child configs normally inherit it through
-// ConvertConfigToOptions.
+// WithTimelineBroadcaster makes this Config join another session's broadcast
+// group. Child configs normally inherit it through ConvertConfigToOptions.
 func WithTimelineBroadcaster(b *TimelineBroadcaster) ConfigOption {
 	return func(c *Config) error {
 		if b == nil {
 			return fmt.Errorf("timeline broadcaster is nil")
 		}
-		c.timelineBindingMu.Lock()
-		defer c.timelineBindingMu.Unlock()
-		if c.timelineBindingReady {
-			return fmt.Errorf("timeline broadcaster must be configured during construction")
-		}
-		c.TimelineBroadcaster = b
+		c.setTimelineBroadcaster(b)
 		return nil
 	}
 }
 
-// WithDisableTimelineBroadcast keeps helper timelines out of the session group.
-func WithDisableTimelineBroadcast(disable bool) ConfigOption {
-	return func(c *Config) error {
-		c.timelineBindingMu.Lock()
-		defer c.timelineBindingMu.Unlock()
-		c.disableTimelineBroadcast = disable
-		if c.timelineBindingReady {
-			c.TimelineBroadcaster.Unsubscribe(c.timelineBroadcastSubscription)
-			c.timelineBroadcastSubscription = 0
-			if !disable {
-				c.subscribeTimelineLocked(c.Timeline)
-			}
-		}
+func (c *Config) timelineBroadcastState() (*Timeline, *TimelineBroadcaster) {
+	if c == nil {
+		return nil, nil
+	}
+	if c.m == nil {
+		return c.Timeline, c.TimelineBroadcaster
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	return c.Timeline, c.TimelineBroadcaster
+}
+
+func (c *Config) setTimelineBroadcaster(b *TimelineBroadcaster) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.TimelineBroadcaster = b
+		return
+	}
+	c.m.Lock()
+	c.TimelineBroadcaster = b
+	c.m.Unlock()
+}
+
+func (c *Config) setTimelineForBroadcast(timeline *Timeline) *TimelineBroadcaster {
+	if c == nil {
 		return nil
 	}
+	if c.m == nil {
+		c.Timeline = timeline
+		return c.TimelineBroadcaster
+	}
+	c.m.Lock()
+	c.Timeline = timeline
+	broadcaster := c.TimelineBroadcaster
+	c.m.Unlock()
+	return broadcaster
+}
+
+func configTimelineBroadcastID(c *Config) string {
+	return fmt.Sprintf("config:%p", c)
 }
 
 func (c *Config) initializeTimelineBroadcast() {
 	if c == nil {
 		return
 	}
-	c.timelineBindingMu.Lock()
-	defer c.timelineBindingMu.Unlock()
-	if c.TimelineBroadcaster == nil {
-		c.TimelineBroadcaster = NewTimelineBroadcaster()
+	timeline, broadcaster := c.timelineBroadcastState()
+	if broadcaster == nil {
+		broadcaster = NewTimelineBroadcaster()
+		c.setTimelineBroadcaster(broadcaster)
 	}
-	c.timelineBindingReady = true
-	c.subscribeTimelineLocked(c.Timeline)
+	if timeline != nil {
+		broadcaster.Subscribe(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
+	}
 }
 
-// SetTimeline switches this Config to another Timeline and moves its own
-// subscription with it. Fork-owned subscriptions are managed by TimelineFork.
+// SetTimeline switches this Config to another Timeline. The broadcaster
+// replaces this Config's previous callback because the subscription key is
+// stable for the Config lifetime.
 func (c *Config) SetTimeline(timeline *Timeline) error {
 	if c == nil {
 		return fmt.Errorf("config is nil")
 	}
-	c.timelineBindingMu.Lock()
-	defer c.timelineBindingMu.Unlock()
-
-	oldBroadcaster := c.TimelineBroadcaster
-	oldSubscription := c.timelineBroadcastSubscription
-	c.m.Lock()
-	c.Timeline = timeline
-	c.m.Unlock()
-	if !c.timelineBindingReady {
+	broadcaster := c.setTimelineForBroadcast(timeline)
+	if broadcaster == nil {
 		return nil
 	}
-	oldBroadcaster.Unsubscribe(oldSubscription)
-	c.timelineBroadcastSubscription = 0
-	c.subscribeTimelineLocked(timeline)
+	if timeline == nil {
+		broadcaster.Unsubscribe(configTimelineBroadcastID(c))
+		return nil
+	}
+	broadcaster.Subscribe(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
 	return nil
 }
 
-func (c *Config) subscribeTimelineLocked(timeline *Timeline) {
-	if timeline == nil || c.disableTimelineBroadcast {
-		return
-	}
-	if c.TimelineBroadcaster == nil {
-		c.TimelineBroadcaster = NewTimelineBroadcaster()
-	}
-	c.timelineBroadcastSubscription = c.TimelineBroadcaster.Subscribe(timeline.appendBroadcastItem)
-}
-
-// ReleaseTimelineSubscription removes this Config's own Timeline subscription.
+// ReleaseTimelineSubscription removes this Config's Timeline callback.
 func (c *Config) ReleaseTimelineSubscription() {
 	if c == nil {
 		return
 	}
-	c.timelineBindingMu.Lock()
-	c.TimelineBroadcaster.Unsubscribe(c.timelineBroadcastSubscription)
-	c.timelineBroadcastSubscription = 0
-	c.timelineBindingMu.Unlock()
+	_, broadcaster := c.timelineBroadcastState()
+	broadcaster.Unsubscribe(configTimelineBroadcastID(c))
 }
 
-// SubscribeTimeline registers a Timeline which is owned outside this Config,
-// such as a clean task-only branch. The returned function is idempotent.
+// SubscribeTimeline registers a Timeline owned outside this Config, such as a
+// clean task-only branch. The returned function is idempotent.
 func (c *Config) SubscribeTimeline(timeline *Timeline) (func(), error) {
 	if c == nil || timeline == nil {
 		return nil, fmt.Errorf("config and timeline are required")
 	}
-	c.timelineBindingMu.Lock()
-	b := c.TimelineBroadcaster
-	c.timelineBindingMu.Unlock()
-	if b == nil {
+	_, broadcaster := c.timelineBroadcastState()
+	if broadcaster == nil {
 		return nil, fmt.Errorf("config has no timeline broadcaster")
 	}
-	id := b.Subscribe(timeline.appendBroadcastItem)
-	if id == 0 {
-		return nil, fmt.Errorf("subscribe timeline broadcast failed")
-	}
-	var once sync.Once
-	return func() {
-		once.Do(func() { b.Unsubscribe(id) })
-	}, nil
+	key := "timeline:" + timeline.GetTimelineID()
+	broadcaster.Subscribe(key, timeline.appendBroadcastItem)
+	return func() { broadcaster.Unsubscribe(key) }, nil
 }
 
 // BroadcastTimelineItem publishes one Timeline item to every live Timeline in
@@ -128,13 +124,11 @@ func (c *Config) BroadcastTimelineItem(item *TimelineItem) error {
 	if c.Ctx != nil && c.Ctx.Err() != nil {
 		return c.Ctx.Err()
 	}
-	c.timelineBindingMu.Lock()
-	b := c.TimelineBroadcaster
-	c.timelineBindingMu.Unlock()
-	if b == nil {
+	_, broadcaster := c.timelineBroadcastState()
+	if broadcaster == nil {
 		return fmt.Errorf("config has no timeline broadcaster")
 	}
-	if err := b.Broadcast(item); err != nil {
+	if err := broadcaster.Broadcast(item); err != nil {
 		return err
 	}
 	emitTimelineItemAsync(c.GetEmitter(), item)

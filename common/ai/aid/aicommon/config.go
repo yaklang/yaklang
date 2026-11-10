@@ -315,14 +315,10 @@ type Config struct {
 		AI Memory :     General Memory = Timeline + Triage + Other Context
 	*/
 	// timeline
-	Timeline                      *Timeline
-	TimelineBroadcaster           *TimelineBroadcaster
-	timelineBindingMu             sync.Mutex
-	timelineBindingReady          bool
-	timelineBroadcastSubscription uint64
-	disableTimelineBroadcast      bool
-	TimelineContentSizeLimit      int // in tokens
-	TimelineTotalContentLimit     int // in tokens
+	Timeline                  *Timeline
+	TimelineBroadcaster       *TimelineBroadcaster
+	TimelineContentSizeLimit  int // in tokens
+	TimelineTotalContentLimit int // in tokens
 
 	// triage
 	MemoryTriage        MemoryTriage
@@ -3438,7 +3434,10 @@ func (c *Config) applyTimelineContentSizeLimit(limit int) {
 
 func WithTimeline(t *Timeline) ConfigOption {
 	return func(c *Config) error {
-		return c.SetTimeline(t)
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.Timeline = t
+		return nil
 	}
 }
 

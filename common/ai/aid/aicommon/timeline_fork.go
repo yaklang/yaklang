@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,8 +15,7 @@ type TimelineFork struct {
 	BaseMaxID int64
 	CreatedAt time.Time
 
-	broadcaster           *TimelineBroadcaster
-	broadcastSubscription atomic.Uint64
+	broadcaster *TimelineBroadcaster
 }
 
 type TimelineMergeResult struct {
@@ -65,19 +63,14 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 		broadcaster: broadcaster,
 	}
 	if broadcaster != nil {
-		fork.broadcastSubscription.Store(broadcaster.Subscribe(branch.appendBroadcastItem))
+		broadcaster.Subscribe("fork:"+branch.GetTimelineID(), branch.appendBroadcastItem)
 	}
 	return fork, nil
 }
 
 func (m *Timeline) timelineBroadcaster(config AICallerConfigIf) *TimelineBroadcaster {
 	if cfg, ok := config.(*Config); ok && cfg != nil {
-		cfg.timelineBindingMu.Lock()
-		var broadcaster *TimelineBroadcaster
-		if !cfg.disableTimelineBroadcast {
-			broadcaster = cfg.TimelineBroadcaster
-		}
-		cfg.timelineBindingMu.Unlock()
+		_, broadcaster := cfg.timelineBroadcastState()
 		if broadcaster != nil {
 			return broadcaster
 		}
@@ -86,12 +79,7 @@ func (m *Timeline) timelineBroadcaster(config AICallerConfigIf) *TimelineBroadca
 	owner := m.config
 	m.mu.RUnlock()
 	if cfg, ok := owner.(*Config); ok && cfg != nil {
-		cfg.timelineBindingMu.Lock()
-		var broadcaster *TimelineBroadcaster
-		if !cfg.disableTimelineBroadcast {
-			broadcaster = cfg.TimelineBroadcaster
-		}
-		cfg.timelineBindingMu.Unlock()
+		_, broadcaster := cfg.timelineBroadcastState()
 		return broadcaster
 	}
 	return nil
@@ -106,10 +94,10 @@ func (f *TimelineFork) Release() {
 }
 
 func (f *TimelineFork) unsubscribeBroadcast() {
-	if f == nil || f.broadcaster == nil {
+	if f == nil || f.broadcaster == nil || f.Branch == nil {
 		return
 	}
-	f.broadcaster.Unsubscribe(f.broadcastSubscription.Swap(0))
+	f.broadcaster.Unsubscribe("fork:" + f.Branch.GetTimelineID())
 }
 
 // MergeBack 把分支 timeline 中新增的条目合并回父 timeline。

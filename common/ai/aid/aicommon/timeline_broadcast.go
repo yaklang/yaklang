@@ -17,14 +17,13 @@ import (
 type TimelineBroadcaster struct {
 	mu              sync.RWMutex
 	changed         *sync.Cond
-	nextID          uint64
 	activePublishes int
 	forkInProgress  bool
-	subscribers     map[uint64]func(*TimelineItem) error
+	subscribers     map[string]func(*TimelineItem) error
 }
 
 func NewTimelineBroadcaster() *TimelineBroadcaster {
-	b := &TimelineBroadcaster{subscribers: make(map[uint64]func(*TimelineItem) error)}
+	b := &TimelineBroadcaster{subscribers: make(map[string]func(*TimelineItem) error)}
 	b.changed = sync.NewCond(&b.mu)
 	return b
 }
@@ -44,8 +43,8 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 	b.mu.Lock()
 	b.waitForForkLocked()
 	b.activePublishes++
-	ids := make([]uint64, 0, len(b.subscribers))
-	callbacks := make(map[uint64]func(*TimelineItem) error, len(b.subscribers))
+	ids := make([]string, 0, len(b.subscribers))
+	callbacks := make(map[string]func(*TimelineItem) error, len(b.subscribers))
 	for id, callback := range b.subscribers {
 		ids = append(ids, id)
 		callbacks[id] = callback
@@ -58,11 +57,11 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 		b.mu.Unlock()
 	}()
 
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	sort.Strings(ids)
 	var failures []error
 	for _, id := range ids {
 		if err := callbacks[id](canonical); err != nil {
-			failures = append(failures, fmt.Errorf("timeline subscriber %d: %w", id, err))
+			failures = append(failures, fmt.Errorf("timeline subscriber %q: %w", id, err))
 		}
 	}
 	return errors.Join(failures...)
@@ -104,30 +103,41 @@ func (b *TimelineBroadcaster) beginFork() func() {
 	}
 }
 
-// Subscribe registers a callback and returns the token used by Unsubscribe.
-func (b *TimelineBroadcaster) Subscribe(callback func(*TimelineItem) error) uint64 {
-	if b == nil || callback == nil {
-		return 0
+// Subscribe registers or replaces one stable subscriber key.
+func (b *TimelineBroadcaster) Subscribe(id string, callback func(*TimelineItem) error) {
+	if b == nil || id == "" || callback == nil {
+		return
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.subscribers == nil {
-		b.subscribers = make(map[uint64]func(*TimelineItem) error)
+		b.subscribers = make(map[string]func(*TimelineItem) error)
 	}
-	b.nextID++
-	id := b.nextID
 	b.subscribers[id] = callback
-	return id
 }
 
-// Unsubscribe removes one callback. Unknown or zero tokens are ignored.
-func (b *TimelineBroadcaster) Unsubscribe(id uint64) {
-	if b == nil || id == 0 {
+// Unsubscribe removes one callback. Unknown or empty keys are ignored.
+func (b *TimelineBroadcaster) Unsubscribe(id string) {
+	if b == nil || id == "" {
 		return
 	}
 	b.mu.Lock()
 	delete(b.subscribers, id)
 	b.mu.Unlock()
+}
+
+// GetTimelineID identifies this runtime Timeline container. The ID is local to
+// this process and is not persisted or inherited by fork snapshots/read views.
+func (m *Timeline) GetTimelineID() string {
+	if m == nil {
+		return ""
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.timelineID == "" {
+		m.timelineID = uuid.NewString()
+	}
+	return m.timelineID
 }
 
 // NewTimelineItem creates a detached item for an explicit session broadcast.
