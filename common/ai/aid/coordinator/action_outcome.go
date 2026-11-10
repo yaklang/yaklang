@@ -69,7 +69,7 @@ func recordActionOutcome(loop *reactloops.ReActLoop, a *aicommon.Action, op *rea
 	digest := sha256.Sum256([]byte(key))
 	id := fmt.Sprintf("coordinator.%s.%x", name, digest[:16])
 	content := "协调动作历史观测（实时状态以 PLAN STATUS 为准）：\n" + string(data)
-	if _, err := reactloops.SaveSessionEvidence(loop.GetConfig(), id, content); err != nil {
+	if _, _, err := reactloops.BroadcastSessionEvidence(loop.GetConfig(), id, content); err != nil {
 		op.Fail(fmt.Errorf("%s 已处理，但 session 动作观测保存失败：%w；请核对状态，勿盲目重试", name, err))
 		return false
 	}

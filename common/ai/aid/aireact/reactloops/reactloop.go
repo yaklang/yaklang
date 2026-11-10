@@ -301,9 +301,9 @@ type ReActLoop struct {
 	subAgentControlRounds     int
 	subAgentControlIterations int
 	subAgentControlRevision   uint64
-	// Only the explicit save_evidence action invokes this publisher. Private
-	// evidence mutations and child Timeline entries retain their isolation.
-	saveEvidencePublisher func(aicommon.EvidenceOperation) error
+	// Only the explicit save_evidence broadcast invokes this observer. It
+	// advances parent coordination revisions without carrying evidence data.
+	evidenceBroadcastObserver func(aicommon.EvidenceOperation) error
 
 	// functionCallMode selects per-action function-call schema tags when
 	// generateLoopPrompt assembles the prompt. Provider projection and response

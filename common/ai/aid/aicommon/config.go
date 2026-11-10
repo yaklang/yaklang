@@ -752,6 +752,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	}
 
 	config.initializeTimelineBroadcast()
+	config.initializeEvidenceBroadcastObserver()
 	return config
 }
 

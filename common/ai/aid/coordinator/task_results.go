@@ -42,7 +42,7 @@ func persistTaskResults(cfg aicommon.AICallerConfigIf, results map[string]taskRe
 			published[id] = hash
 			continue
 		}
-		if _, err := reactloops.SaveSessionEvidence(cfg, id, content); err != nil {
+		if _, _, err := reactloops.BroadcastSessionEvidence(cfg, id, content); err != nil {
 			return err
 		}
 		published[id] = hash

@@ -239,7 +239,7 @@ func TestBackgroundSubAgents_ClosedOwnerRejectsLateEvidence(t *testing.T) {
 	_, err := parent.SubmitSubAgents(task, []SubAgentJob{{Identifier: "cancelled", Goal: "investigate"}}, SubAgentOptions{LoopBuilder: managedLoopBuilder(child.builder)}, "close")
 	require.NoError(t, err)
 	childLoop := child.await(t)
-	publisher := childLoop.saveEvidencePublisher
+	publisher := childLoop.evidenceBroadcastObserver
 	require.NotNil(t, publisher)
 	parent.shutdownSubAgents()
 	err = publisher(aicommon.EvidenceOperation{ID: "late", Content: "MUST_NOT_REACH_CLOSED_PARENT"})

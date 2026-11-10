@@ -110,3 +110,16 @@ func (c *Config) persistEvidenceTimelineLocked(s *SessionPromptState, timeline *
 		log.Warnf("persist session evidence and timeline failed: %v", err)
 	}
 }
+
+func (c *Config) persistBroadcastEvidence(timeline *Timeline) {
+	if c == nil || timeline == nil {
+		return
+	}
+	state := c.GetSessionPromptState()
+	state.m.Lock()
+	if state.evidenceTimeline == nil {
+		state.evidenceTimeline = timeline
+	}
+	c.persistEvidenceTimelineLocked(state, timeline)
+	state.m.Unlock()
+}

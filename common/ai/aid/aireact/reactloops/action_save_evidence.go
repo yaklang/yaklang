@@ -12,13 +12,42 @@ import (
 
 const saveEvidenceOperationLoopVar = "save_evidence_operation"
 
-// SaveSessionEvidence is the shared handler-level write path used by both the
-// core save_evidence action and compatibility actions in higher-level loops.
-// It validates, applies, and reads the Session Evidence Store back before
-// reporting success.
+// SaveSessionEvidence is the local handler-level write path for custom adapters
+// and non-broadcast callers. The core save_evidence action uses
+// BroadcastSessionEvidence.
 func SaveSessionEvidence(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, error) {
 	op, _, err := saveSessionEvidenceWithChange(cfg, evidenceID, content)
 	return op, err
+}
+
+// BroadcastSessionEvidence is the explicit session-sharing write path. The
+// source and every registered Timeline apply their own local mutation.
+func BroadcastSessionEvidence(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, bool, error) {
+	if cfg == nil {
+		return aicommon.EvidenceOperation{}, false, utils.Error("session configuration is unavailable")
+	}
+	op, err := aicommon.BuildSessionEvidenceUpsert(evidenceID, content)
+	if err != nil {
+		return aicommon.EvidenceOperation{}, false, err
+	}
+	concrete, ok := cfg.(*aicommon.Config)
+	if !ok {
+		op, err := SaveSessionEvidence(cfg, evidenceID, content)
+		return op, err == nil, err
+	}
+	ops, changed, err := concrete.BroadcastSessionEvidenceOps([]aicommon.EvidenceOperation{op})
+	if err != nil {
+		return aicommon.EvidenceOperation{}, false, err
+	}
+	if len(ops) > 0 {
+		op = ops[0]
+	}
+	rendered := cfg.GetSessionEvidenceRendered()
+	idMarker := fmt.Sprintf("[id: %s]", op.ID)
+	if !strings.Contains(rendered, idMarker) || !strings.Contains(rendered, op.Content) {
+		return aicommon.EvidenceOperation{}, false, utils.Errorf("broadcast evidence %q was not applied", op.ID)
+	}
+	return op, changed, nil
 }
 
 func saveSessionEvidenceWithChange(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, bool, error) {
@@ -96,13 +125,13 @@ var loopAction_SaveEvidence = &LoopAction{
 			return
 		}
 
-		evidenceOp, err := SaveSessionEvidence(loop.GetConfig(), evidenceOp.ID, evidenceOp.Content)
+		evidenceOp, changed, err := BroadcastSessionEvidence(loop.GetConfig(), evidenceOp.ID, evidenceOp.Content)
 		if err != nil {
 			operator.Fail(utils.Wrap(err, "save_evidence failed"))
 			return
 		}
-		if loop.IsSubAgent() && loop.saveEvidencePublisher != nil {
-			if err := loop.saveEvidencePublisher(evidenceOp); err != nil {
+		if changed && loop.IsSubAgent() && loop.evidenceBroadcastObserver != nil {
+			if err := loop.evidenceBroadcastObserver(evidenceOp); err != nil {
 				operator.Fail(utils.Wrap(err, "publish evidence to parent failed"))
 				return
 			}

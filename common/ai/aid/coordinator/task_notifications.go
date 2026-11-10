@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -194,8 +195,9 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 	return nil
 }
 
-// Compare this normalized finding, not the whole shared store: another worker's
-// concurrent save must not turn an identical finding into a false discovery.
+// The worker's save_evidence action has already broadcast the finding. This
+// callback only wakes the planner after confirming the parent Timeline applied
+// the exact normalized change.
 func (s *Session) saveTaskDiscovery(a Attempt, id, content string) error {
 	op, err := aicommon.BuildSessionEvidenceUpsert(id, content)
 	if err != nil {
@@ -213,12 +215,9 @@ func (s *Session) saveTaskDiscovery(a Attempt, id, content string) error {
 	store := aicommon.UnmarshalEvidenceStore(s.GetSessionPromptState().GetSessionEvidence())
 	for _, item := range store.Items {
 		if item.ID == op.ID && item.Content == op.Content {
+			s.controller.taskDiscovered(a.Task.ID, a.ID, op.ID)
 			return nil
 		}
 	}
-	if _, err := reactloops.SaveSessionEvidence(s.Config, op.ID, op.Content); err != nil {
-		return err
-	}
-	s.controller.taskDiscovered(a.Task.ID, a.ID, op.ID)
-	return nil
+	return fmt.Errorf("broadcast evidence %q was not visible in the parent journal", op.ID)
 }
