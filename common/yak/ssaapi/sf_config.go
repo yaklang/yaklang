@@ -492,40 +492,6 @@ func (r *sfCheck) CheckExcludeNode(node *Value) bool {
 	return ok
 }
 
-// SimpleIncludeSourceIDs returns the union of the bound value ids referenced
-// by every `* & $symbol` include item. ok=false when there is no include, any
-// include has a shape we cannot prove (aliases, combinations, other patterns),
-// or a referenced symbol is unbound/empty. The reachability prefilter is only
-// an optimization; the full path check remains authoritative.
-func (r *sfCheck) SimpleIncludeSourceIDs() (map[int64]struct{}, bool) {
-	if r == nil {
-		return nil, false
-	}
-	ids := make(map[int64]struct{})
-	found := false
-	for _, item := range r.matchItem {
-		if item == nil || item.Key != string(sf.RecursiveConfig_Include) {
-			continue
-		}
-		found = true
-		m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(item.Value))
-		if len(m) != 2 {
-			return nil, false
-		}
-		symbolIDs := r.fastMatchSymbolIDs(m[1])
-		if len(symbolIDs) == 0 {
-			return nil, false
-		}
-		for id := range symbolIDs {
-			ids[id] = struct{}{}
-		}
-	}
-	if !found || len(ids) == 0 {
-		return nil, false
-	}
-	return ids, true
-}
-
 // prepareExcludePruneIDs resolves the exclude filter symbol(s) once. Any
 // unresolved/empty symbol leaves pruning disabled (the full query is still
 // authoritative; this is only an optional branch cut).

@@ -664,17 +664,6 @@ func dataFlowFilter(
 		prune = pathCheck.CheckExcludeNode
 	}
 
-	// Include reachability prefilter: for simple `* & $symbol` includes, a
-	// candidate whose effect/depend component cannot reach any bound symbol
-	// value cannot produce a matching path. Reachability is linear in the saved
-	// edge graph, while path enumeration can be exponential; this skips the
-	// latter entirely for disconnected candidates. Unknown/complex includes
-	// leave includeReach nil.
-	var includeReach *dataflowIncludeReach
-	if sourceIDs, ok := pathCheck.SimpleIncludeSourceIDs(); ok {
-		includeReach = newDataflowIncludeReach(pathCtx, sourceIDs)
-	}
-
 	// walkPaths streams paths and reports false as soon as the current source is
 	// accepted, so the old eager effect×depend product is never materialized. A
 	// heavy dataflow(include=...) rule only needs the existence of one accepted
@@ -734,9 +723,6 @@ func dataFlowFilter(
 		if prune != nil && prune(v) {
 			continue
 		}
-		if includeReach != nil && !includeReach.CanReach(v) {
-			continue
-		}
 		flag := false
 		walkPaths(v, func(path Values) bool {
 			if checkMatch(path) {
@@ -750,138 +736,4 @@ func dataFlowFilter(
 		}
 	}
 	return ret
-}
-
-// dataflowIncludeReach pre-filters top-def candidates for simple
-// `* & $symbol` includes. A path emitted by GetDataflowPath is a V shape:
-// EffectOn* <-> center <-> DependOn*. If none of the center's effect/depend
-// reachable values is a symbol value, no enumerated path can satisfy the
-// include, so walking that candidate's paths is pointless.
-//
-// states memoizes per Value instance (uid; pointer fallback) whether it can
-// reach a source. When a BFS succeeds we may safely over-mark visited nodes as
-// reachable (it only disables future pruning). When it exhausts the reachable
-// set without a source, every visited node is provably unreachable: a path
-// from any visited node to a source would also be a path from the start.
-type dataflowIncludeReach struct {
-	sourceIDs map[int64]struct{}
-	states    map[dataflowReachKey]uint8
-	ctx       context.Context
-	steps     int
-}
-
-type dataflowReachKey struct {
-	uid int64
-	ptr *Value
-}
-
-const (
-	includeReachUnknown uint8 = iota
-	includeReachNo
-	includeReachYes
-)
-
-func newDataflowIncludeReach(ctx context.Context, sourceIDs map[int64]struct{}) *dataflowIncludeReach {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return &dataflowIncludeReach{
-		sourceIDs: sourceIDs,
-		states:    make(map[dataflowReachKey]uint8),
-		ctx:       ctx,
-	}
-}
-
-func dataflowReachKeyFor(v *Value) dataflowReachKey {
-	if uid := v.GetUID(); uid != 0 {
-		return dataflowReachKey{uid: uid}
-	}
-	return dataflowReachKey{ptr: v}
-}
-
-func (r *dataflowIncludeReach) markVisited(visited map[dataflowReachKey]struct{}, state uint8) {
-	for key := range visited {
-		if state == includeReachYes && r.states[key] == includeReachNo {
-			continue
-		}
-		r.states[key] = state
-	}
-}
-
-// CanReach reports whether any source is reachable from v through the saved
-// EffectOn/DependOn graph (including v itself). It returns true on uncertainty
-// (nil state, cancelled ctx) so the caller never skips a potentially valid
-// candidate.
-func (r *dataflowIncludeReach) CanReach(v *Value) bool {
-	if r == nil || v == nil {
-		return true
-	}
-	if _, ok := r.sourceIDs[v.GetId()]; ok {
-		r.states[dataflowReachKeyFor(v)] = includeReachYes
-		return true
-	}
-	startKey := dataflowReachKeyFor(v)
-	switch r.states[startKey] {
-	case includeReachYes:
-		return true
-	case includeReachNo:
-		return false
-	}
-
-	visited := map[dataflowReachKey]struct{}{startKey: {}}
-	queue := []*Value{v}
-	hit := false
-	for len(queue) > 0 {
-		node := queue[0]
-		queue = queue[1:]
-		r.steps++
-		if r.steps%4096 == 0 {
-			select {
-			case <-r.ctx.Done():
-				return true
-			default:
-			}
-		}
-		if node == nil {
-			continue
-		}
-		if node != v {
-			if _, ok := r.sourceIDs[node.GetId()]; ok {
-				hit = true
-				break
-			}
-			switch r.states[dataflowReachKeyFor(node)] {
-			case includeReachYes:
-				hit = true
-			case includeReachNo:
-				continue
-			}
-			if hit {
-				break
-			}
-		}
-		enqueue := func(child *Value) {
-			if child == nil {
-				return
-			}
-			key := dataflowReachKeyFor(child)
-			if _, ok := visited[key]; ok {
-				return
-			}
-			visited[key] = struct{}{}
-			queue = append(queue, child)
-		}
-		for _, child := range node.GetEffectOn() {
-			enqueue(child)
-		}
-		for _, child := range node.GetDependOn() {
-			enqueue(child)
-		}
-	}
-	if hit {
-		r.markVisited(visited, includeReachYes)
-		return true
-	}
-	r.markVisited(visited, includeReachNo)
-	return false
 }

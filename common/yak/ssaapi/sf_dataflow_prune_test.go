@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -71,27 +70,6 @@ class C {
 	require.False(t, unsupported.ExcludePrunable(), "non-monotone/unknown exclude shapes must keep the full walk")
 }
 
-func TestDataflowIncludeReachPrefilter(t *testing.T) {
-	prog := NewTmpProgram("sf-dataflow-include-reach")
-
-	source := fastMatchTestValue(t, prog, 1)
-	near := fastMatchTestValue(t, prog, 2)
-	far := fastMatchTestValue(t, prog, 3)
-	disconnected := fastMatchTestValue(t, prog, 4)
-
-	// Path enumeration from near follows EffectOn and reaches source.
-	near.AppendDependOn(source)
-	// far depends on near: DependOn reaches near, whose EffectOn reaches source.
-	far.AppendDependOn(near)
-
-	reach := newDataflowIncludeReach(context.Background(), map[int64]struct{}{source.GetId(): {}})
-	require.True(t, reach.CanReach(source), "the source itself satisfies the include")
-	require.True(t, reach.CanReach(near))
-	require.True(t, reach.CanReach(far))
-	require.False(t, reach.CanReach(disconnected))
-	require.False(t, reach.CanReach(disconnected), "a failed component must be memoized as unreachable")
-}
-
 func TestSimpleIncludeSourceIDs(t *testing.T) {
 	prog := NewTmpProgram("sf-dataflow-simple-include")
 	source := fastMatchTestValue(t, prog, 7)
@@ -106,9 +84,6 @@ func TestSimpleIncludeSourceIDs(t *testing.T) {
 		Value:          "* & $source",
 		SyntaxFlowRule: true,
 	})
-	ids, ok := check.SimpleIncludeSourceIDs()
-	require.True(t, ok)
-	require.Contains(t, ids, source.GetId())
 	require.Len(t, check.matchItem, 1)
 	require.Nil(t, check.matchItem[0].frame, "a simple include must not compile a sub-rule frame")
 	require.True(t, check.CheckMatch(sf.Values{source}))
@@ -120,6 +95,5 @@ func TestSimpleIncludeSourceIDs(t *testing.T) {
 		Value:          "* & $source as $alias",
 		SyntaxFlowRule: true,
 	})
-	_, ok = complexCheck.SimpleIncludeSourceIDs()
-	require.False(t, ok, "include shapes with aliases must disable the prefilter")
+	require.NotNil(t, complexCheck.matchItem[0].frame, "include shapes with aliases must keep the full sub-query")
 }
