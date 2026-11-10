@@ -7,6 +7,10 @@ replace github.com/yaklang/yaklang v0.0.0 => ./
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.2
 
+// Local go-llvm branch feat/c-api-wrappers: expose the FFI helpers ssa2llvm
+// needs so callers stop using cgo directly.
+replace github.com/yaklang/go-llvm => /home/wlz/Developer/work/go-llvm
+
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49

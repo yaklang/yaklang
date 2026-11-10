@@ -1,31 +1,14 @@
 package compiler
 
-/*
-#include <llvm-c/Core.h>
-*/
-import "C"
-
 import (
 	"fmt"
-	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func llvmBasicBlockTerminator(bb llvm.BasicBlock) llvm.Value {
-	if bb.IsNil() {
-		return llvm.Value{}
-	}
-	cbb := (C.LLVMBasicBlockRef)(unsafe.Pointer(bb.C))
-	res := C.LLVMGetBasicBlockTerminator(cbb)
-	var out llvm.Value
-	*(*unsafe.Pointer)(unsafe.Pointer(&out)) = unsafe.Pointer(res)
-	return out
-}
-
 func (c *Compiler) blockHasTerminator(bb llvm.BasicBlock) bool {
-	return !llvmBasicBlockTerminator(bb).IsNil()
+	return !bb.Terminator().IsNil()
 }
 
 // ssaBlockEntry is the LLVM block created for an SSA block. Splits rebind

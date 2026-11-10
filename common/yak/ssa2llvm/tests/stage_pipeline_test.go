@@ -93,7 +93,7 @@ func stageProbePost(ctx *obfuscation.Context) error {
 }
 
 func stageProbeLLVM(ctx *obfuscation.Context) error {
-	if ctx == nil || ctx.LLVM.C == nil {
+	if ctx == nil || ctx.LLVM.IsNil() {
 		return nil
 	}
 	ir := ctx.LLVM.String()

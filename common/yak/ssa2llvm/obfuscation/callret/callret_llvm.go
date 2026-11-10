@@ -1,14 +1,7 @@
 package callret
 
-/*
-#include <llvm-c/Core.h>
-#include <stdlib.h>
-*/
-import "C"
-
 import (
 	"fmt"
-	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/core"
@@ -33,14 +26,14 @@ type stackState struct {
 
 func applyLLVM(ctx *core.Context) error {
 	module := ctx.LLVM
-	if module.C == nil {
+	if module.IsNil() {
 		return nil
 	}
 
 	builder := module.NewBuilder()
 	defer builder.Dispose()
 
-	stateByFunc := make(map[uintptr]*stackState)
+	stateByFunc := make(map[string]*stackState)
 
 	// SSA stage rewrites call/return into four tiny helper calls. LLVM lowers
 	// those helpers into explicit stack mutations so the final IR/asm no longer
@@ -49,26 +42,27 @@ func applyLLVM(ctx *core.Context) error {
 		for block := function.FirstBasicBlock(); !block.IsNil(); block = block.NextBasicBlock() {
 			for inst := block.FirstInstruction(); !inst.IsNil(); {
 				next := inst.NextInstruction()
-				if !isCallInst(inst) {
+				if !inst.IsCallInst() {
 					inst = next
 					continue
 				}
 
-				callee := calledValue(inst)
+				callee := inst.CalledValue()
 				name := callee.Name()
 				if name != intrinsicVSPush && name != intrinsicVSPop && name != intrinsicCSPush && name != intrinsicCSPop {
 					inst = next
 					continue
 				}
 
-				state, ok := stateByFunc[uintptr(unsafe.Pointer(function.C))]
+				funcName := function.Name()
+				state, ok := stateByFunc[funcName]
 				if !ok {
 					created, err := ensureStackState(module, builder, function)
 					if err != nil {
 						return err
 					}
 					state = created
-					stateByFunc[uintptr(unsafe.Pointer(function.C))] = state
+					stateByFunc[funcName] = state
 				}
 
 				switch name {
@@ -96,20 +90,15 @@ func applyLLVM(ctx *core.Context) error {
 }
 
 func deleteIntrinsicIfDead(module llvm.Module, name string) {
-	if module.C == nil || name == "" {
+	if module.IsNil() || name == "" {
 		return
 	}
 
 	fn := module.NamedFunction(name)
-	if fn.IsNil() {
+	if fn.IsNil() || fn.HasUses() {
 		return
 	}
-
-	cv := (C.LLVMValueRef)(unsafe.Pointer(fn.C))
-	if C.LLVMGetFirstUse(cv) != nil {
-		return
-	}
-	C.LLVMDeleteFunction(cv)
+	fn.DeleteFunction()
 }
 
 func ensureStackState(module llvm.Module, builder llvm.Builder, function llvm.Value) (*stackState, error) {
@@ -130,15 +119,15 @@ func ensureStackState(module llvm.Module, builder llvm.Builder, function llvm.Va
 	zero := llvm.ConstInt(i64, 0, false)
 	one := llvm.ConstInt(i64, 1, false)
 
-	vsSp := buildAlloca(builder, i64, "obf_vs_sp")
-	csSp := buildAlloca(builder, i64, "obf_cs_sp")
+	vsSp := builder.CreateAlloca(i64, "obf_vs_sp")
+	csSp := builder.CreateAlloca(i64, "obf_cs_sp")
 	builder.CreateStore(zero, vsSp)
 	builder.CreateStore(zero, csSp)
 
 	vsCount := llvm.ConstInt(i64, defaultValueStackSize, false)
 	csCount := llvm.ConstInt(i64, defaultCallStackSize, false)
-	vsData := buildArrayAlloca(builder, i64, vsCount, "obf_vs")
-	csData := buildArrayAlloca(builder, i64, csCount, "obf_cs")
+	vsData := builder.CreateArrayAlloca(i64, vsCount, "obf_vs")
+	csData := builder.CreateArrayAlloca(i64, csCount, "obf_cs")
 
 	return &stackState{
 		i64:    i64,
@@ -184,47 +173,4 @@ func lowerPop(builder llvm.Builder, call llvm.Value, data, sp llvm.Value, st *st
 
 	call.ReplaceAllUsesWith(value)
 	call.EraseFromParent()
-}
-
-func isCallInst(inst llvm.Value) bool {
-	if inst.IsNil() {
-		return false
-	}
-	cv := (C.LLVMValueRef)(unsafe.Pointer(inst.C))
-	return C.LLVMGetInstructionOpcode(cv) == C.LLVMCall
-}
-
-func calledValue(inst llvm.Value) llvm.Value {
-	if inst.IsNil() {
-		return llvm.Value{}
-	}
-	cv := (C.LLVMValueRef)(unsafe.Pointer(inst.C))
-	return valueFromC(C.LLVMGetCalledValue(cv))
-}
-
-func buildAlloca(b llvm.Builder, t llvm.Type, name string) llvm.Value {
-	cname := C.CString(name)
-	defer C.free(unsafe.Pointer(cname))
-
-	cb := (C.LLVMBuilderRef)(unsafe.Pointer(b.C))
-	ct := (C.LLVMTypeRef)(unsafe.Pointer(t.C))
-	res := C.LLVMBuildAlloca(cb, ct, cname)
-	return valueFromC(res)
-}
-
-func buildArrayAlloca(b llvm.Builder, elem llvm.Type, count llvm.Value, name string) llvm.Value {
-	cname := C.CString(name)
-	defer C.free(unsafe.Pointer(cname))
-
-	cb := (C.LLVMBuilderRef)(unsafe.Pointer(b.C))
-	ce := (C.LLVMTypeRef)(unsafe.Pointer(elem.C))
-	cc := (C.LLVMValueRef)(unsafe.Pointer(count.C))
-	res := C.LLVMBuildArrayAlloca(cb, ce, cc, cname)
-	return valueFromC(res)
-}
-
-func valueFromC(v C.LLVMValueRef) llvm.Value {
-	var ret llvm.Value
-	*(*unsafe.Pointer)(unsafe.Pointer(&ret)) = unsafe.Pointer(v)
-	return ret
 }

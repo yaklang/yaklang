@@ -18,11 +18,11 @@ func TestInstructionParentBlockDynamicTypeCheck(t *testing.T) {
 	b.SetInsertPointAtEnd(entry)
 	sum := b.CreateAdd(fn.Param(0), llvm.ConstInt(i64, 1, false), "sum")
 	for name, v := range map[string]llvm.Value{"nil": {}, "constant": llvm.ConstInt(i64, 1, false), "argument": fn.Param(0), "function": fn} {
-		if got := instructionParentBlock(v); !got.IsNil() {
+		if got := v.InstructionParent(); !got.IsNil() {
 			t.Fatalf("%s has unexpected instruction parent", name)
 		}
 	}
-	if got := instructionParentBlock(sum); got.IsNil() || got.C != entry.C {
+	if got := sum.InstructionParent(); got.IsNil() || !got.SameAs(entry) {
 		t.Fatal("instruction parent missing")
 	}
 }

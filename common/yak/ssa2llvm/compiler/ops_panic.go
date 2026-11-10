@@ -248,7 +248,7 @@ func (c *Compiler) ensureExceptionSlot(id int64) llvm.Value {
 	} else {
 		c.Builder.SetInsertPointBefore(first)
 	}
-	slot := buildAlloca(c.Builder, c.LLVMCtx.Int64Type(), fmt.Sprintf("yak_exc_slot_%d", id))
+	slot := c.Builder.CreateAlloca(c.LLVMCtx.Int64Type(), fmt.Sprintf("yak_exc_slot_%d", id))
 	c.Builder.CreateStore(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), slot)
 	c.function.exceptionSlots[id] = slot
 	if !restoreBB.IsNil() {

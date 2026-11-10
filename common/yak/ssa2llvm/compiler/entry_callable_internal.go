@@ -68,7 +68,7 @@ func (c *Compiler) capturedFunctionStillCompiled(captured ssa.Value) bool {
 func (c *Compiler) materializeEntryCallable(entry, mainFn llvm.Value, block llvm.BasicBlock, invokeCtx llvm.Value) (llvm.Value, error) {
 	var selected *ssa.Function
 	c.Program.EachFunction(func(fn *ssa.Function) {
-		if compiled, ok := c.Funcs[fn.GetId()]; ok && compiled.C == entry.C {
+		if compiled, ok := c.Funcs[fn.GetId()]; ok && compiled.SameAs(entry) {
 			selected = fn
 		}
 	})

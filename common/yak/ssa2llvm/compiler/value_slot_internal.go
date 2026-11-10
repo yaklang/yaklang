@@ -1,64 +1,17 @@
 package compiler
 
-/*
-#include <llvm-c/Core.h>
-#include <stdlib.h>
-*/
-import "C"
-
 import (
 	"fmt"
-	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func buildAlloca(b llvm.Builder, t llvm.Type, name string) llvm.Value {
-	cname := C.CString(name)
-	defer C.free(unsafe.Pointer(cname))
-
-	cb := (C.LLVMBuilderRef)(unsafe.Pointer(b.C))
-	ct := (C.LLVMTypeRef)(unsafe.Pointer(t.C))
-	res := C.LLVMBuildAlloca(cb, ct, cname)
-	var out llvm.Value
-	*(*unsafe.Pointer)(unsafe.Pointer(&out)) = unsafe.Pointer(res)
-	return out
-}
-
 func (c *Compiler) currentInsertBlock() llvm.BasicBlock {
 	if c == nil {
 		return llvm.BasicBlock{}
 	}
-	cb := (C.LLVMBuilderRef)(unsafe.Pointer(c.Builder.C))
-	res := C.LLVMGetInsertBlock(cb)
-	var out llvm.BasicBlock
-	*(*unsafe.Pointer)(unsafe.Pointer(&out)) = unsafe.Pointer(res)
-	return out
-}
-
-func asCValue(v llvm.Value) C.LLVMValueRef {
-	return (C.LLVMValueRef)(unsafe.Pointer(v.C))
-}
-
-func instructionParentBlock(v llvm.Value) llvm.BasicBlock {
-	if v.IsNil() {
-		return llvm.BasicBlock{}
-	}
-	// Use a dynamic type check, not LLVMInstructionValueKind: a newer
-	// llvm-c header may assign a different enum value than libLLVM-18.
-	// LLVMGetInstructionParent itself requires an Instruction and must not
-	// be called on constants or function arguments.
-	if C.LLVMIsAInstruction(asCValue(v)) == nil {
-		return llvm.BasicBlock{}
-	}
-	bb := C.LLVMGetInstructionParent(asCValue(v))
-	if bb == nil {
-		return llvm.BasicBlock{}
-	}
-	var out llvm.BasicBlock
-	*(*unsafe.Pointer)(unsafe.Pointer(&out)) = unsafe.Pointer(bb)
-	return out
+	return c.Builder.InsertBlock()
 }
 
 // setInsertPointAfterValue moves the builder to just after an instruction so a
@@ -68,17 +21,17 @@ func (c *Compiler) setInsertPointAfterValue(v llvm.Value) bool {
 	if c == nil {
 		return false
 	}
-	bb := instructionParentBlock(v)
+	bb := v.InstructionParent()
 	if bb.IsNil() {
 		return false
 	}
 	if c.function != nil && !c.function.llvmFn.IsNil() {
 		parent := bb.Parent()
-		if parent.IsNil() || parent.C != c.function.llvmFn.C {
+		if parent.IsNil() || !parent.SameAs(c.function.llvmFn) {
 			return false
 		}
 	}
-	if C.LLVMIsATerminatorInst(asCValue(v)) != nil {
+	if v.IsATerminatorInst() {
 		c.Builder.SetInsertPointBefore(v)
 	} else if next := v.NextInstruction(); next.IsNil() {
 		c.Builder.SetInsertPointAtEnd(bb)
@@ -169,7 +122,7 @@ func (c *Compiler) ensureValueSlot(id int64) llvm.Value {
 	}
 
 	name := fmt.Sprintf("yak_slot_%d", id)
-	slot := buildAlloca(c.Builder, c.LLVMCtx.Int64Type(), name)
+	slot := c.Builder.CreateAlloca(c.LLVMCtx.Int64Type(), name)
 	c.function.valueSlots[id] = slot
 
 	if !restoreBB.IsNil() {
@@ -265,7 +218,7 @@ func (c *Compiler) ensureRedirectedClosureAlloca(id int64) llvm.Value {
 		c.Builder.SetInsertPointBefore(first)
 	}
 	name := fmt.Sprintf("yak_redir_closure_alloca_%d", id)
-	slot := buildAlloca(c.Builder, c.LLVMCtx.Int64Type(), name)
+	slot := c.Builder.CreateAlloca(c.LLVMCtx.Int64Type(), name)
 	c.function.redirectedClosureAllocas[id] = slot
 	if !restoreBB.IsNil() {
 		if c.blockHasTerminator(restoreBB) {
@@ -326,12 +279,5 @@ func (c *Compiler) isSSAValueStored(id int64) bool {
 }
 
 func llvmIsZeroValue(v llvm.Value) bool {
-	if v.IsNil() {
-		return true
-	}
-	rv := (C.LLVMValueRef)(unsafe.Pointer(v.C))
-	if rv == nil {
-		return true
-	}
-	return C.LLVMIsNull(rv) != 0
+	return v.IsNil() || v.IsNullPointer()
 }
