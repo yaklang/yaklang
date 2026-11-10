@@ -2294,8 +2294,8 @@
   {
     "rule_id": "source-config-spring-datasource-password",
     "rule_name": "检测配置中的 Spring 数据源密码",
-    "hash": "63f4027939739d7c9493e3c3f1b4a1d3cb20b1471f0ca2d896fdd43ef0608ccc",
-    "version": "20261022.0001"
+    "hash": "43948e51f59febb0d24b9e365ad878866dfccf93d0dfccaa766f74fe27196293",
+    "version": "20261110.0001"
   },
   {
     "rule_id": "source-gha-workflow-env-secret",
