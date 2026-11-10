@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"fmt"
-	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -1108,7 +1107,7 @@ func (c *Compiler) gatherLLVMPredecessors(target llvm.BasicBlock) []llvm.BasicBl
 
 func (c *Compiler) blockIDForLLVM(target llvm.BasicBlock) int64 {
 	for id, bb := range c.Blocks {
-		if bb.C == target.C {
+		if bb.SameAs(target) {
 			return id
 		}
 	}
@@ -1120,12 +1119,12 @@ func (c *Compiler) terminatorJumpsTo(from, target llvm.BasicBlock) bool {
 	if term.IsNil() || target.IsNil() {
 		return false
 	}
-	targetPtr := unsafe.Pointer(target.C)
+	targetValue := target.AsValue()
 	matches := func(op llvm.Value) bool {
 		if op.IsNil() {
 			return false
 		}
-		return unsafe.Pointer(op.C) == targetPtr
+		return op.SameAs(targetValue)
 	}
 	switch term.NumOperands() {
 	case 1:

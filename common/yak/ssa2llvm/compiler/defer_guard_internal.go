@@ -55,7 +55,7 @@ func (c *Compiler) prepareDeferGuards(fn *ssa.Function) error {
 	c.function.deferArmAtStart = make(map[int64][]int64)
 	c.function.deferArmAfter = make(map[int64][]int64)
 	for _, item := range armed {
-		slot := buildAlloca(c.Builder, i64, fmt.Sprintf("defer_arm_%d", item.id))
+		slot := c.Builder.CreateAlloca(i64, fmt.Sprintf("defer_arm_%d", item.id))
 		c.Builder.CreateStore(zero, slot)
 		c.function.deferGuardSlots[item.id] = slot
 		if item.after == 0 {

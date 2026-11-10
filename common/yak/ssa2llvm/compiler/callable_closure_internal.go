@@ -752,7 +752,7 @@ func (c *Compiler) rememberCapturedCell(name string, ptr llvm.Value) {
 	i64Ptr := llvm.PointerType(c.LLVMCtx.Int64Type(), 0)
 	var slot llvm.Value
 	if err := c.withEntryInsertPoint(fn, func() error {
-		slot = buildAlloca(c.Builder, i64Ptr, "yak_captured_cell_slot")
+		slot = c.Builder.CreateAlloca(i64Ptr, "yak_captured_cell_slot")
 		c.Builder.CreateStore(llvm.ConstPointerNull(i64Ptr), slot)
 		return nil
 	}); err != nil || slot.IsNil() {

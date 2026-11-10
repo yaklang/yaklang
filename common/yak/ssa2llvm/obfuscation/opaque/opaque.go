@@ -1,13 +1,7 @@
 package opaque
 
-/*
-#include <llvm-c/Core.h>
-*/
-import "C"
-
 import (
 	"fmt"
-	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/core"
@@ -31,7 +25,7 @@ func (opaquePredicateObfuscator) Apply(ctx *core.Context) error {
 		return nil
 	}
 	module := ctx.LLVM
-	if module.C == nil {
+	if module.IsNil() {
 		return nil
 	}
 
@@ -78,7 +72,7 @@ func insertOpaquePredicates(module llvm.Module, builder llvm.Builder, function l
 		}
 
 		// Only transform unconditional branches.
-		if !isUnconditionalBr(term) {
+		if !term.IsUnconditionalBr() {
 			continue
 		}
 
@@ -89,13 +83,13 @@ func insertOpaquePredicates(module llvm.Module, builder llvm.Builder, function l
 		}
 
 		target := term.Operand(0)
-		targetBB := valueAsBasicBlock(target)
+		targetBB := target.AsBasicBlock()
 
 		// Create a bogus block that is never reached.
 		bogusName := fmt.Sprintf("opaque_bogus_%d", blockIndex)
 		bogusBlock := llvmCtx.AddBasicBlock(function, bogusName)
 		builder.SetInsertPointAtEnd(bogusBlock)
-		buildUnreachable(builder)
+		builder.CreateUnreachable()
 
 		// Replace the unconditional branch with an opaque conditional.
 		builder.SetInsertPointBefore(term)
@@ -104,7 +98,7 @@ func insertOpaquePredicates(module llvm.Module, builder llvm.Builder, function l
 		cond := builder.CreateICmp(llvm.IntSGE, squared, zero, "opaque_cond")
 		builder.CreateCondBr(cond, targetBB, bogusBlock)
 
-		eraseInstruction(term)
+		term.EraseFromParent()
 	}
 }
 
@@ -114,37 +108,4 @@ func lastInstruction(block llvm.BasicBlock) llvm.Value {
 		last = inst
 	}
 	return last
-}
-
-func isUnconditionalBr(inst llvm.Value) bool {
-	if inst.IsNil() {
-		return false
-	}
-	cv := (C.LLVMValueRef)(unsafe.Pointer(inst.C))
-	if C.LLVMGetInstructionOpcode(cv) != C.LLVMBr {
-		return false
-	}
-	// Unconditional branch has exactly 1 operand; conditional has 3.
-	return inst.NumOperands() == 1
-}
-
-func eraseInstruction(inst llvm.Value) {
-	if inst.IsNil() {
-		return
-	}
-	cv := (C.LLVMValueRef)(unsafe.Pointer(inst.C))
-	C.LLVMInstructionEraseFromParent(cv)
-}
-
-func buildUnreachable(builder llvm.Builder) {
-	cb := (C.LLVMBuilderRef)(unsafe.Pointer(builder.C))
-	C.LLVMBuildUnreachable(cb)
-}
-
-func valueAsBasicBlock(v llvm.Value) llvm.BasicBlock {
-	cv := (C.LLVMValueRef)(unsafe.Pointer(v.C))
-	bb := C.LLVMValueAsBasicBlock(cv)
-	var ret llvm.BasicBlock
-	*(*unsafe.Pointer)(unsafe.Pointer(&ret)) = unsafe.Pointer(bb)
-	return ret
 }

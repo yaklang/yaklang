@@ -35,7 +35,7 @@ func (xorLLVMObfuscator) Apply(ctx *core.Context) error {
 		return nil
 	}
 	module := ctx.LLVM
-	if module.C == nil {
+	if module.IsNil() {
 		return nil
 	}
 
