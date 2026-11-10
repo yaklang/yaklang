@@ -113,6 +113,30 @@ func TestExecuteToolCallGroup_RejectsScalarRequest(t *testing.T) {
 	require.ErrorContains(t, execErr, "at least 2")
 }
 
+func TestSubForgeParallelBatchAdmitsOnlyOne(t *testing.T) {
+	var invoked int32
+	tool, err := aitool.New("sub_forge_batch", aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			atomic.AddInt32(&invoked, 1)
+			return "executed", nil
+		}))
+	require.NoError(t, err)
+	tool.RequireForeground = true
+	tool.RejectInterruptedReplay = true
+	react := newBatchTestReAct(t, tool, nil)
+	result, err := react.ExecuteToolCallGroup(context.Background(), react.config.DefaultTask, &aicommon.ToolCallGroupRequest{
+		Calls: []aicommon.ToolCallGroupCall{
+			{ToolName: tool.Name, Reason: "first invocation", Params: aitool.InvokeParams{}},
+			{ToolName: tool.Name, Reason: "concurrent invocation", Params: aitool.InvokeParams{}},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int32(1), atomic.LoadInt32(&invoked))
+	require.Equal(t, aicommon.ToolCallStageDone, result.Outcomes[0].Stage)
+	require.Equal(t, aicommon.ToolCallStageValidationFailed, result.Outcomes[1].Stage)
+	require.ErrorContains(t, result.Outcomes[1].Err, "only one sub-Forge")
+}
+
 func TestExecuteToolCallGroup_DirectBoundedConcurrencyAndOrderedCommit(t *testing.T) {
 	var active int32
 	var maxActive int32

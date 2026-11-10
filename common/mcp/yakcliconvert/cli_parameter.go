@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -192,6 +193,20 @@ func ConvertCliParameterToToolChecked(toolName string, prog *ssaapi.Program) (*m
 					if err := json.Unmarshal([]byte(raw), &objectDefault); err == nil {
 						field["default"] = objectDefault
 					}
+				}
+			}
+
+			// CLI list defaults use textual separators, while the tool supplies
+			// an array. Keep host, port and URL expressions for the caller.
+			if raw, ok := field["default"].(string); ok && field["type"] == "array" {
+				if items, ok := field["items"].(map[string]any); ok && items["type"] == "string" {
+					values := []string{}
+					if funcName == "cli.LineDict" {
+						values = append(values, utils.ParseStringToLines(raw)...)
+					} else {
+						values = append(values, utils.PrettifyListFromStringSplited(raw, ",")...)
+					}
+					field["default"] = values
 				}
 			}
 

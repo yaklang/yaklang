@@ -132,8 +132,16 @@ func subForgeSchema(name, description, cli string) (*mcp.Tool, error) {
 	if err := compiler.AddResource("sub-forge.json", schema); err != nil {
 		return nil, err
 	}
-	if _, err := compiler.Compile("sub-forge.json"); err != nil {
+	compiled, err := compiler.Compile("sub-forge.json")
+	if err != nil {
 		return nil, fmt.Errorf("invalid tool schema: %w", err)
+	}
+	for name, property := range compiled.Properties {
+		if property.Default != nil {
+			if err := property.Validate(*property.Default); err != nil {
+				return nil, fmt.Errorf("invalid default for %q: %w", name, err)
+			}
+		}
 	}
 	return tool, nil
 }

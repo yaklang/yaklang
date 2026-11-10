@@ -12,6 +12,7 @@ func TestSubForgeDeclarationsAndArguments(t *testing.T) {
 	child := NewForgeBlueprint("child", WithOriginYaklangCliCode(`
 		cli.String("query", cli.setRequired(true))
 		cli.Int("limit", cli.setDefault(3))
+		cli.StringSlice("targets", cli.setDefault("one,two"))
 		cli.String("mode", cli.setSelectOption("Quick", "quick"), cli.setSelectOption("Thorough", "thorough"))
 	`))
 	parent := NewForgeBlueprint("parent", WithSubForge("inspect", "Inspect a reference", child))
@@ -22,7 +23,7 @@ func TestSubForgeDeclarationsAndArguments(t *testing.T) {
 	query, args, err := subForgeArguments(tools[0].Schema, aitool.InvokeParams{"query": "ref", "mode": "quick"})
 	require.NoError(t, err)
 	require.Equal(t, "ref", query)
-	require.ElementsMatch(t, []Parameter{{"query", "ref"}, {"limit", "3"}, {"mode", "quick"}}, args)
+	require.ElementsMatch(t, []Parameter{{"query", "ref"}, {"limit", "3"}, {"mode", "quick"}, {"targets", `["one","two"]`}}, args)
 	for _, params := range []aitool.InvokeParams{
 		{"limit": 5}, {"query": "ref", "limit": "5"}, {"query": "ref", "mode": "undefined"}, {"query": "ref", "other": 1},
 	} {

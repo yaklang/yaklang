@@ -460,6 +460,9 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	opts := aicommon.ConvertConfigToOptionsWithoutHotPatch(s.Config)
+	if IsSubForgeContext(ctx) {
+		opts = append(opts, aicommon.SubForgeExecutionPolicy(s.Config)...)
+	}
 	opts = append(opts, aicommon.WithEnhanceKnowledgeManager(s.EnhanceKnowledgeManager.ForkForSubAgent()))
 	if a.Plan != nil {
 		state := s.GetSessionPromptState().ForkForSubAgent()
