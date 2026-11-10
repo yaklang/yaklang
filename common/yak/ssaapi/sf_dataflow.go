@@ -515,9 +515,9 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 	// paths now honor the rule ctx:
 	//   - getTopDefs/getBottomUses (DataFlowWithSFConfig, line ~414
 	//     WithExclusiveContext) -> AnalyzeContext.check() ctx.Done() (analyze_context.go).
-	//   - the dataflow path enumeration here (dataFlowFilter -> enumeratePaths ->
-	//     GetDataflowPathWithContext -> getPathWithDirectionWithContext ->
-	//     graph.GraphPathEx, which checks ctx.Done() at every DFS node). The old
+	//   - the dataflow path enumeration here (dataFlowFilter ->
+	//     walkDataflowPathWithContext -> walkPathWithDirectionWithContext ->
+	//     graph.WalkGraphPathEx, which checks ctx.Done() at every DFS node). The old
 	//     GraphPathWithKey used context.Background(), so the deadline never fired
 	//     here — that was the real reason heavy rules ran for hours even after the
 	//     per-rule timeout was added.
@@ -680,6 +680,10 @@ func dataFlowFilter(
 	// heavy dataflow(include=...) rule only needs the existence of one accepted
 	// path per source; enumerating and allocating every path first was pure
 	// overhead (and could explode combinatorially on large projects).
+	//
+	// reusePath is safe here because checkMatch copies the path into the
+	// sub-query input before returning, so the walker may reuse one buffer for
+	// the whole effect×depend product instead of allocating a path per pair.
 	var walkPaths func(v *Value, visit func(Values) bool) bool
 	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
 		memo := make(map[int64]*CfgCtxValue)
@@ -695,16 +699,16 @@ func dataFlowFilter(
 		}
 		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit, FromSFVMValues(end)...)
+				return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit, true, FromSFVMValues(end)...)
 			}
-			return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit)
+			return v.walkDataflowPathWithContext(pathCtx, edgeFilter, prune, visit, true)
 		}
 	} else {
 		walkPaths = func(v *Value, visit func(Values) bool) bool {
 			if end != nil {
-				return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit, FromSFVMValues(end)...)
+				return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit, true, FromSFVMValues(end)...)
 			}
-			return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit)
+			return v.walkDataflowPathWithContext(pathCtx, nil, prune, visit, true)
 		}
 	}
 
