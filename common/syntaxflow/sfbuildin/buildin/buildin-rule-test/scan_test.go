@@ -25,9 +25,9 @@ import (
 
 func TestTomcatFalsePositiveRuleFixes(t *testing.T) {
 	files := []string{
-		filepath.Join("..", "general", "cwe-798-hardcoded-credentials", "source-general-hardcode-credentials.sf"),
-		filepath.Join("..", "java", "cwe-259-use-of-hard-coded-password", "struct-java-weak-passwords-in-code.sf"),
-		filepath.Join("..", "java", "cwe-89-sql-injection", "ssa-java-execute-query-string-add-out-of-control.sf"),
+		filepath.Join("..", "general", "cwe-798-hardcoded-credentials", "general-hardcode-credentials.sf"),
+		filepath.Join("..", "java", "cwe-259-use-of-hard-coded-password", "java-weak-passwords-in-code.sf"),
+		filepath.Join("..", "java", "cwe-89-sql-injection", "java-execute-query-string-add-out-of-control.sf"),
 	}
 	for _, f := range files {
 		f := f
@@ -44,10 +44,10 @@ func TestGoWeakCryptoFalsePositiveRuleFixes(t *testing.T) {
 	files := []string{
 		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-md5-sum.sf"),
 		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-sha1.sf"),
-		filepath.Join("..", "golang", "cwe-327-weak-crypto", "struct-go-des.sf"),
-		filepath.Join("..", "golang", "cwe-327-weak-crypto", "struct-go-rc4.sf"),
-		filepath.Join("..", "golang", "cwe-327-weak-encryption", "struct-golang-weak-hash-md5-sha1.sf"),
-		filepath.Join("..", "golang", "cwe-327-weak-encryption", "struct-golang-weak-encryption-cbc.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "go-des.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "go-rc4.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-encryption", "golang-weak-hash-md5-sha1.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-encryption", "golang-weak-encryption-cbc.sf"),
 	}
 	for _, f := range files {
 		f := f
