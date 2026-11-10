@@ -143,16 +143,17 @@ func TestCalculateFileSystemDiff_FallbackWithoutLanguage(t *testing.T) {
 	newFS := filesys.NewVirtualFs()
 	newFS.AddFile("src/Main.java", "public class Main {}")
 	newFS.AddFile("libs/dependency.jar", "PK\x03\x04raw")
-	newFS.AddFile("README.md", "docs")
+	newFS.AddFile("notes.txt", "plain text")
 
 	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, diffFS)
 	require.Empty(t, fileHashMap["libs/dependency.jar"], "raw archive leaked into diff")
-	// no language → no whitelist: non-archive noise (README.md) keeps the
-	// legacy added-then-rejected behavior, only archives are blacklisted
-	require.Equal(t, 1, fileHashMap["README.md"])
-	require.Equal(t, map[string]bool{"README.md": true}, diffWalkPaths(t, diffFS))
+	// no language → no whitelist: non-archive noise (notes.txt) keeps the
+	// legacy added-then-rejected behavior, only archives and the built-in
+	// excludes (markdown among them) are dropped.
+	require.Equal(t, 1, fileHashMap["notes.txt"])
+	require.Equal(t, map[string]bool{"notes.txt": true}, diffWalkPaths(t, diffFS))
 }
 
 // assertWalkPaths returns the set of paths a plain Recursive walk visits on
