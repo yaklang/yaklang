@@ -12,68 +12,37 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// GetAsyncExecutionManager delegates to the runtime contract. A loop without an
-// invoker retains a task-scoped fallback for isolated loop tests.
+// GetAsyncExecutionManager returns the manager owned by the loop's ReAct runtime.
+// The loop never owns or creates a manager itself.
 func (r *ReActLoop) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
 	if r == nil {
 		return nil, errors.New("re-act loop is nil")
 	}
-	if !utils.IsNil(r.invoker) {
-		released := r.asyncAdmissionClosed()
-		if released && !r.invoker.HasAsyncExecutionManager() {
-			return nil, asyncexecmanager.ErrClosed
-		}
-		return r.invoker.GetAsyncExecutionManager()
+	if utils.IsNil(r.invoker) {
+		return nil, errors.New("async execution requires an AI invoke runtime")
 	}
-	task := r.GetCurrentTask()
-	r.onReleaseMutex.Lock()
-	if r.asyncExecutionManager != nil {
-		manager := r.asyncExecutionManager
-		r.onReleaseMutex.Unlock()
-		return manager, nil
-	}
-	if r.released || r.asyncDirectAnswerRequested {
-		r.onReleaseMutex.Unlock()
+	released := r.asyncAdmissionClosed()
+	if released && !r.invoker.HasAsyncExecutionManager() {
 		return nil, asyncexecmanager.ErrClosed
 	}
-	if utils.IsNil(task) {
-		r.onReleaseMutex.Unlock()
-		return nil, errors.New("async execution requires an owning task")
-	}
-	manager, err := asyncexecmanager.New(task.GetContext(), asyncexecmanager.Config{})
-	if err != nil {
-		r.onReleaseMutex.Unlock()
-		return nil, err
-	}
-	r.asyncExecutionManager = manager
-	taskContext := task.GetContext()
-	r.onReleaseMutex.Unlock()
-	go WatchAsyncExecutionManager(taskContext, manager, func(overview asyncexecmanager.Overview) {
-		if r.GetEmitter() != nil {
-			_, _ = r.GetEmitter().EmitStructured(
-				AsyncExecutionSyncNodeID,
-				BuildAsyncExecutionSnapshot(overview, r.persistentSessionID(), r.currentTaskID()),
-			)
-		}
-	})
-	return manager, nil
+	return r.invoker.GetAsyncExecutionManager()
 }
 
 // StartAsyncToolCall prepares the caller through the runtime and submits it to
-// the loop or session manager. It returns an execution receipt, never a tool
-// result. The source task is fixed for review and result attribution.
+// the session manager. It returns an execution receipt, never a tool result.
+// The source task is fixed for review and result attribution.
 func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, opts ...aicommon.ToolCallerOption) (asyncexecmanager.Summary, error) {
-	sessionOwned := !utils.IsNil(r.invoker)
 	manager, err := r.GetAsyncExecutionManager()
 	if err != nil {
 		return asyncexecmanager.Summary{}, err
 	}
+	invoker := r.invoker
+	if utils.IsNil(invoker) {
+		return asyncexecmanager.Summary{}, errors.New("async execution requires an AI invoke runtime")
+	}
 	admissionClosed := r.asyncAdmissionClosed()
 	if admissionClosed {
 		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
-	}
-	if utils.IsNil(r.invoker) {
-		return asyncexecmanager.Summary{}, errors.New("runtime does not support async tool calls")
 	}
 	task := r.GetCurrentTask()
 	name = strings.TrimSpace(name)
@@ -82,7 +51,7 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 	}
 	executionID := "exec-" + ksuid.New().String()
 	opts = append(opts, aicommon.WithToolCaller_AsyncExecutionID(executionID))
-	resource, cancel, err := r.invoker.PrepareAsyncToolCall(task, name, params, opts...)
+	resource, cancel, err := invoker.PrepareAsyncToolCall(task, name, params, opts...)
 	if err != nil {
 		if cancel != nil {
 			cancel()
@@ -93,12 +62,9 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		return asyncexecmanager.Summary{}, errors.New("async tool preparation must provide cancellation")
 	}
 	r.onReleaseMutex.Lock()
-	admissionClosed = r.asyncAdmissionClosedLocked()
-	if !sessionOwned {
-		r.onRelease = append(r.onRelease, cancel)
-	}
+	admissionClosed = r.released
 	r.onReleaseMutex.Unlock()
-	if sessionOwned && r.invoker.AsyncDirectAnswerRequested() {
+	if invoker.AsyncDirectAnswerRequested() {
 		admissionClosed = true
 	}
 	if admissionClosed {
@@ -113,14 +79,12 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		attributes["call_tool_id"] = identity.CallToolID()
 		attributes["result_id"] = fmt.Sprint(identity.ResultID())
 	}
-	if sessionOwned {
-		releaseAdmission, allowed := r.invoker.BeginAsyncExecutionAdmission()
-		if !allowed {
-			cancel()
-			return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
-		}
-		defer releaseAdmission()
+	releaseAdmission, allowed := invoker.BeginAsyncExecutionAdmission()
+	if !allowed {
+		cancel()
+		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
 	}
+	defer releaseAdmission()
 	receipt, err := manager.Start(asyncexecmanager.Request{
 		ID: executionID, Resource: resource,
 		Metadata: asyncexecmanager.Metadata{Name: name, Attributes: attributes},
@@ -129,22 +93,16 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 		cancel()
 		return receipt, err
 	}
-	if sessionOwned {
-		r.invoker.TrackAsyncExecutionTask(task, receipt.ID)
-	}
+	invoker.TrackAsyncExecutionTask(task, receipt.ID)
 	return receipt, err
 }
 
 func (r *ReActLoop) asyncAdmissionClosed() bool {
 	r.onReleaseMutex.Lock()
-	closed := r.asyncAdmissionClosedLocked()
+	closed := r.released
 	r.onReleaseMutex.Unlock()
 	if !utils.IsNil(r.invoker) && r.invoker.AsyncDirectAnswerRequested() {
 		return true
 	}
 	return closed
-}
-
-func (r *ReActLoop) asyncAdmissionClosedLocked() bool {
-	return r.released || r.asyncDirectAnswerRequested
 }

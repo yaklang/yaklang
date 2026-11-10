@@ -17,21 +17,16 @@ func BuildAsyncExecutionSnapshot(overview asyncexecmanager.Overview, sessionID, 
 	return aicommon.BuildAsyncExecutionSnapshot(overview, sessionID, currentTaskID)
 }
 
-// AsyncExecutionSnapshot returns a metadata-only view of this loop's manager.
-// Session-scoped invoker providers are delegated to so task-local snapshots do
-// not hide work started in an earlier turn.
+// AsyncExecutionSnapshot returns the session manager snapshot from this loop's
+// runtime. The loop itself never owns manager state.
 func (r *ReActLoop) AsyncExecutionSnapshot() AsyncExecutionSnapshot {
 	if r == nil {
 		return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
 	}
-	if !utils.IsNil(r.invoker) {
-		return r.invoker.AsyncExecutionSnapshot()
-	}
-	manager := r.existingAsyncExecutionManager()
-	if manager == nil {
+	if utils.IsNil(r.invoker) {
 		return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, r.persistentSessionID(), r.currentTaskID())
 	}
-	return BuildAsyncExecutionSnapshot(manager.Overview(), r.persistentSessionID(), r.currentTaskID())
+	return r.invoker.AsyncExecutionSnapshot()
 }
 
 func (r *ReActLoop) persistentSessionID() string {
@@ -54,40 +49,22 @@ func (r *ReActLoop) currentTaskID() string {
 	return ""
 }
 
-// HasAsyncExecutionManager reports whether the runtime already owns a manager.
-// It never changes lazy creation semantics.
+// HasAsyncExecutionManager reports whether the loop's runtime already owns a
+// manager. It never creates one.
 func (r *ReActLoop) HasAsyncExecutionManager() bool {
-	if r == nil {
+	if r == nil || utils.IsNil(r.invoker) {
 		return false
 	}
-	if !utils.IsNil(r.invoker) {
-		return r.invoker.HasAsyncExecutionManager()
-	}
-	return r.existingAsyncExecutionManager() != nil
+	return r.invoker.HasAsyncExecutionManager()
 }
 
-// existingAsyncExecutionManager exposes the standalone fallback manager to package
-// internals without changing lazy creation semantics or task lifetime.
-func (r *ReActLoop) existingAsyncExecutionManager() *asyncexecmanager.Manager {
-	if r == nil {
-		return nil
-	}
-	r.onReleaseMutex.Lock()
-	defer r.onReleaseMutex.Unlock()
-	return r.asyncExecutionManager
-}
-
-// StopAsyncExecution requests cancellation of one execution owned by this
-// loop or its session-scoped invoker. A stopping state is not terminal.
+// StopAsyncExecution requests cancellation of one execution owned by the loop's
+// runtime. A stopping state is not terminal.
 func (r *ReActLoop) StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error) {
 	if r != nil && !utils.IsNil(r.invoker) {
 		return r.invoker.StopAsyncExecution(executeID)
 	}
-	manager := r.existingAsyncExecutionManager()
-	if manager == nil {
-		return asyncexecmanager.Summary{}, asyncexecmanager.ErrNotFound
-	}
-	return manager.Stop(executeID)
+	return asyncexecmanager.Summary{}, asyncexecmanager.ErrNotFound
 }
 
 // WatchAsyncExecutionManager publishes every coalesced manager revision using

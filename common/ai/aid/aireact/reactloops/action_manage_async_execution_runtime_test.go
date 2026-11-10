@@ -64,7 +64,7 @@ func TestManageAsyncExecutionRuntime(t *testing.T) {
 			narrow := NewActionHandlerOperator(task)
 			narrow.RemoveNextAction(name)
 			require.Contains(t, loop.getFilteredActions(false, narrow), handler, "management survives disable narrowing")
-			require.Nil(t, loop.asyncExecutionManager, "registration and rendering must not create a manager")
+			require.False(t, loop.HasAsyncExecutionManager(), "registration and rendering must not create a manager")
 
 			run := func(params aitool.InvokeParams) map[string]json.RawMessage {
 				t.Helper()

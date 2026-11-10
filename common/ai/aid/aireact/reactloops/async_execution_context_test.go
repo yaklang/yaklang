@@ -60,7 +60,7 @@ func TestAsyncExecutionAutoContext(t *testing.T) {
 	}
 	t.Log("1. Rendering an empty loop does not create its manager")
 	require.NotContains(t, generate("empty"), "ASYNC_EXECUTIONS")
-	require.Nil(t, loop.asyncExecutionManager)
+	require.False(t, loop.HasAsyncExecutionManager())
 	manager, err := loop.GetAsyncExecutionManager()
 	require.NoError(t, err)
 	require.NotContains(t, generate("registered_empty"), "ASYNC_EXECUTIONS")

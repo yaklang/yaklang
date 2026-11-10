@@ -12,7 +12,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
@@ -125,14 +124,6 @@ type ReActLoop struct {
 	// Task-local model projection. Never persist full UI definitions in history.
 	uiComponentsMu sync.Mutex
 	uiComponents   *uiComponentView
-
-	// Task-scoped fallback for standalone loops whose invoker does not provide a
-	// session-scoped manager. Production ReAct loops delegate to ReAct so
-	// executions can cross task boundaries. Guarded by onReleaseMutex.
-	asyncExecutionManager      *asyncexecmanager.Manager
-	asyncDirectAnswer          chan struct{}
-	asyncDirectAnswerRequested bool
-	asyncDirectAnswerHandled   bool
 
 	// memory management
 	memorySizeLimit        int
@@ -357,12 +348,8 @@ func (r *ReActLoop) Release() {
 		return
 	}
 	r.released = true
-	manager := r.asyncExecutionManager
 	hooks := append([]func(){}, r.onRelease...)
 	r.onReleaseMutex.Unlock()
-	if manager != nil {
-		manager.Close()
-	}
 	defer func() {
 		r.actionExecutionMu.Lock()
 		defer r.actionExecutionMu.Unlock()

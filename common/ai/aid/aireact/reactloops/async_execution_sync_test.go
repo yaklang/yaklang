@@ -2,21 +2,19 @@ package reactloops
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestAsyncExecutionLifecyclePushEvents(t *testing.T) {
+func TestAsyncExecutionSnapshotDelegatesToRuntime(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	events := make(chan *schema.AiOutputEvent, 32)
 	cfg := aicommon.NewConfig(ctx,
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithWorkdir(t.TempDir()),
@@ -24,20 +22,27 @@ func TestAsyncExecutionLifecyclePushEvents(t *testing.T) {
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithNoOpMemoryTriage(),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			events <- event
-		}),
 		aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return nil, errors.New("async execution sync test must not invoke AI")
 		}),
 	)
-	loop := NewMinimalReActLoop(cfg, nil)
+	invoker := mock.NewMockInvoker(ctx)
+	invoker.SetConfig(cfg)
+	loop := NewMinimalReActLoop(cfg, invoker)
 	task := aicommon.NewStatefulTaskBase("async-sync-task", "run background tool", ctx, cfg.GetEmitter(), true)
 	loop.SetCurrentTask(task)
 	t.Cleanup(loop.Release)
 
+	withoutRuntime := NewMinimalReActLoop(cfg, nil)
+	t.Cleanup(withoutRuntime.Release)
+	require.False(t, withoutRuntime.HasAsyncExecutionManager())
+	require.Empty(t, withoutRuntime.AsyncExecutionSnapshot().Executions)
+	_, err := withoutRuntime.GetAsyncExecutionManager()
+	require.ErrorContains(t, err, "requires an AI invoke runtime")
+
 	manager, err := loop.GetAsyncExecutionManager()
 	require.NoError(t, err)
+	require.True(t, loop.HasAsyncExecutionManager())
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
 		defer cleanupCancel()
@@ -69,51 +74,29 @@ func TestAsyncExecutionLifecyclePushEvents(t *testing.T) {
 		t.Fatal("background resource did not start")
 	}
 
-	running := waitAsyncExecutionPush(t, events, func(snapshot AsyncExecutionSnapshot) bool {
-		return snapshot.RunningCount == 1 && len(snapshot.Executions) == 1 &&
-			snapshot.Executions[0].State == asyncexecmanager.StateRunning
-	})
+	running := loop.AsyncExecutionSnapshot()
+	require.Equal(t, 1, running.RunningCount)
+	require.Len(t, running.Executions, 1)
+	require.Equal(t, asyncexecmanager.StateRunning, running.Executions[0].State)
 	require.Equal(t, task.GetId(), running.CurrentTaskID)
 	require.NotZero(t, running.Revision)
 	require.NotZero(t, running.UpdatedAt)
 
 	_, err = manager.Stop(receipt.ID)
 	require.NoError(t, err)
-	stopping := waitAsyncExecutionPush(t, events, func(snapshot AsyncExecutionSnapshot) bool {
-		return snapshot.RunningCount == 1 && len(snapshot.Executions) == 1 &&
-			snapshot.Executions[0].State == asyncexecmanager.StateStopping
-	})
+	stopping := loop.AsyncExecutionSnapshot()
+	require.Equal(t, 1, stopping.RunningCount)
+	require.Len(t, stopping.Executions, 1)
+	require.Equal(t, asyncexecmanager.StateStopping, stopping.Executions[0].State)
 	require.Greater(t, stopping.Revision, running.Revision)
 
 	close(releaseCleanup)
 	final, err := manager.Wait(ctx, receipt.ID)
 	require.NoError(t, err)
 	require.Equal(t, asyncexecmanager.StateCancelled, final.State)
-	terminal := waitAsyncExecutionPush(t, events, func(snapshot AsyncExecutionSnapshot) bool {
-		return snapshot.RunningCount == 0 && len(snapshot.Executions) == 1 &&
-			snapshot.Executions[0].State == asyncexecmanager.StateCancelled
-	})
+	terminal := loop.AsyncExecutionSnapshot()
+	require.Zero(t, terminal.RunningCount)
+	require.Len(t, terminal.Executions, 1)
+	require.Equal(t, asyncexecmanager.StateCancelled, terminal.Executions[0].State)
 	require.Greater(t, terminal.Revision, stopping.Revision)
-}
-
-func waitAsyncExecutionPush(t *testing.T, events <-chan *schema.AiOutputEvent, match func(AsyncExecutionSnapshot) bool) AsyncExecutionSnapshot {
-	t.Helper()
-	timeout := time.NewTimer(3 * time.Second)
-	defer timeout.Stop()
-	for {
-		select {
-		case event := <-events:
-			if event == nil || event.IsSync || event.Type != schema.EVENT_TYPE_STRUCTURED ||
-				event.NodeId != AsyncExecutionSyncNodeID {
-				continue
-			}
-			var snapshot AsyncExecutionSnapshot
-			require.NoError(t, json.Unmarshal(event.Content, &snapshot))
-			if match(snapshot) {
-				return snapshot
-			}
-		case <-timeout.C:
-			t.Fatal("timed out waiting for async execution push event")
-		}
-	}
 }

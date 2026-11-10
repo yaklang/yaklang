@@ -12,12 +12,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// One real call: acquire the loop's shared manager, observe the original caller,
-// then Release the loop and observe cancellation plus the final cleanup output.
+// One real call: acquire the runtime-owned manager through the loop, observe the
+// original caller, then release the loop without cancelling session-owned work.
 func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 	owner, cancelOwner := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelOwner()
@@ -29,13 +30,17 @@ func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 			return nil, errors.New("this integration test must not invoke AI")
 		}),
 	)
-	loop := NewMinimalReActLoop(cfg, nil)
+	invoker := mock.NewMockInvoker(owner)
+	invoker.SetConfig(cfg)
+	loop := NewMinimalReActLoop(cfg, invoker)
 	defer loop.Release()
-	_, err := loop.GetAsyncExecutionManager()
-	require.Error(t, err, "an owning task is required before creating the manager")
+	withoutRuntime := NewMinimalReActLoop(cfg, nil)
+	_, err := withoutRuntime.GetAsyncExecutionManager()
+	require.ErrorContains(t, err, "requires an AI invoke runtime")
+	withoutRuntime.Release()
 	loop.SetCurrentTask(cfg.DefaultTask)
 
-	t.Log("1. Concurrent access initializes exactly one manager for this loop")
+	t.Log("1. Concurrent access returns exactly one manager from the runtime")
 	var managers [8]*asyncexecmanager.Manager
 	var errs [8]error
 	var wg sync.WaitGroup
@@ -107,10 +112,17 @@ func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, direct, live.Observation)
 
-	t.Log("3. Release cancels the tool, closes admission and retains final observations")
+	t.Log("3. Release leaves the runtime-owned tool alive until the manager stops it")
 	loop.Release()
 	loop.Release()
 	require.NoError(t, owner.Err(), "Release must not cancel the owning task itself")
+	select {
+	case <-cancelled:
+		t.Fatal("loop Release cancelled the runtime-owned execution")
+	case <-time.After(30 * time.Millisecond):
+	}
+	_, err = manager.Stop(receipt.ID)
+	require.NoError(t, err)
 	select {
 	case <-cancelled:
 	case <-owner.Done():
@@ -135,11 +147,4 @@ func TestReActLoopAsyncExecutionToolCallerIntegration(t *testing.T) {
 	retained, err := loop.GetAsyncExecutionManager()
 	require.NoError(t, err)
 	require.Same(t, manager, retained)
-	_, err = retained.Start(asyncexecmanager.Request{Resource: resource})
-	require.ErrorIs(t, err, asyncexecmanager.ErrClosed)
-	unused := NewMinimalReActLoop(cfg, nil)
-	unused.SetCurrentTask(cfg.DefaultTask)
-	unused.Release()
-	_, err = unused.GetAsyncExecutionManager()
-	require.ErrorIs(t, err, asyncexecmanager.ErrClosed, "a released loop must not create a new manager")
 }

@@ -163,8 +163,8 @@ Async execution 是 `AIInvokeRuntime` 的显式能力。ReAct 实现这些方法
 session-scoped Manager；ReActLoop 直接委托给 invoker，多个 task 创建的 loop
 在同一个 ReAct 会话内拿到同一 Manager。Loop Release 不再关闭 session
 Manager，因此本轮的 task 正常结束后，下一轮仍可查询、等待或停止旧 execution。
-只有未绑定 invoker 的独立 loop 才保留 task-scoped fallback，并由该 fallback
-loop 的 Release 关闭。
+ReActLoop 不持有 Manager，也不提供 task-scoped fallback；没有绑定 invoker 的
+loop 无法使用异步执行能力。
 工具调用使用 `loop.StartAsyncToolCall(name, params, options...)`，不需要手动创建
 caller 或 resource。它通过 `AIInvokeRuntime.PrepareAsyncToolCall` 准备工具，再
 注册到 Manager。工具查找、owner 的守卫/参数修正、原审查与执行链路都会保留。
@@ -176,7 +176,7 @@ caller 或 resource。它通过 `AIInvokeRuntime.PrepareAsyncToolCall` 准备工
 ```go
 receipt, err := loop.StartAsyncToolCall(toolName, params,
     aicommon.WithToolCaller_Reason("本次调用目的"))
-// 检查 err 后，用 receipt.ID 在 loop 的 Manager 中 Inspect / Wait / Stop。
+// 检查 err 后，用 receipt.ID 在 loop 委托的 session Manager 中 Inspect / Wait / Stop。
 ```
 
 完整链路见 [入口综合测试](../../invoke_toolcall_async_test.go)：从工具名开始调用，
