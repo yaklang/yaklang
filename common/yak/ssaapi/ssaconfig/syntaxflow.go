@@ -24,12 +24,6 @@ const (
 // guard on that project.
 const DefaultScanRuleWorkLimit int64 = 50_000
 
-// DefaultScanRuleTimeout is the default per-rule wall-clock budget for every
-// scan entry point. It is a loose backstop: a pathological rule is bailed at
-// the deadline instead of hanging the whole scan, while normal slow rules keep
-// enough time to finish. Explicit 0 still disables the budget.
-const DefaultScanRuleTimeout = 4 * time.Hour
-
 type SyntaxFlowConfig struct {
 	Memory         bool             `json:"memory"`
 	ResultSaveKind SFResultSaveKind `json:"result_save_kind"`
@@ -170,18 +164,11 @@ func (c *Config) GetScanConcurrency() uint32 {
 	return c.SyntaxFlowScan.Concurrency
 }
 
-// GetScanRuleTimeout returns the per-rule wall-clock budget. A scan config
-// that never configured a budget gets DefaultScanRuleTimeout, so library,
-// gRPC and product entry points are protected without each caller passing it.
-// An explicitly configured 0 still means no budget.
+// GetScanRuleTimeout returns the per-rule wall-clock budget. 0 means no
+// wall-clock budget (the work limit is then the only bound). An explicitly
+// configured value is returned unchanged.
 func (c *Config) GetScanRuleTimeout() time.Duration {
-	if c == nil {
-		return 0
-	}
-	if c.SyntaxFlowScan == nil {
-		if c.Mode&ModeSyntaxFlowScanManager != 0 {
-			return DefaultScanRuleTimeout
-		}
+	if c == nil || c.SyntaxFlowScan == nil {
 		return 0
 	}
 	return c.SyntaxFlowScan.RuleTimeout

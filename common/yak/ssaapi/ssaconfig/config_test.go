@@ -359,7 +359,8 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Empty(t, config.Language)
 		require.Equal(t, uint32(DefaultCPUConcurrency()), config.Concurrency,
 			"scan concurrency must follow DefaultCPUConcurrency (max(1, GOMAXPROCS-1)), not a fixed constant")
-		require.Equal(t, DefaultScanRuleTimeout, config.RuleTimeout)
+		require.Zero(t, config.RuleTimeout,
+			"no wall-clock default; --rule-work-limit is the default guard")
 		require.Equal(t, DefaultScanRuleWorkLimit, config.RuleWorkLimit)
 	})
 
