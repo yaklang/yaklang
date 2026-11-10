@@ -68,7 +68,7 @@ func init() {
 
 		WithTool(mcp.NewTool("set_mitm_filter",
 			append([]mcp.ToolOption{
-				mcp.WithDescription("Update MITM capture filter; prefer filterData struct, legacy flat *Hostname/*Suffix fields still supported"),
+				mcp.WithDescription("Replace MITM capture filter and apply immediately to running proxies in the current project; use filterData and get_mitm_filter first to preserve existing rules"),
 			}, mitmSetFilterToolOptions...)...,
 		), unaryToolHandler(func(ctx context.Context, s *MCPServer, req *ypb.SetMITMFilterRequest) (any, error) {
 			return s.grpcClient.SetMITMFilter(ctx, req)
