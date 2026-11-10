@@ -10,9 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// reportedRisksTokenBudget is the maximum token budget for the rendered
-// "已报告漏洞清单" block. When the budget is exceeded, the oldest entries
-// are evicted first — same strategy as sessionEvidenceTokenBudget.
+// reportedRisksTokenBudget bounds only the legacy store view. Immutable
+// Timeline reports are never trimmed or evicted by this display budget.
 const reportedRisksTokenBudget = 4000
 
 // ReportedRiskItem is a compact, serializable summary of a single risk that
@@ -29,8 +28,8 @@ type ReportedRiskItem struct {
 	CreatedUnix int64  `json:"created_unix"`
 }
 
-// ReportedRiskStore is the session-level accumulator for reported risk
-// summaries. It is serialized to JSON in SessionPromptState.
+// ReportedRiskStore is the running session's shared deduplication ledger.
+// Prompt content comes from immutable Timeline entries, not this store.
 type ReportedRiskStore struct {
 	mu    sync.Mutex
 	Items []ReportedRiskItem `json:"items"`
@@ -104,6 +103,17 @@ func (s *ReportedRiskStore) AppendFromRisk(risk *schema.Risk) bool {
 	if s == nil || risk == nil {
 		return false
 	}
+	item := reportedRiskItemFromRisk(risk)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.hasRiskLocked(item.ID) {
+		return false
+	}
+	s.Items = append(s.Items, item)
+	return true
+}
+
+func reportedRiskItemFromRisk(risk *schema.Risk) ReportedRiskItem {
 	target := normalizeRiskTargetForSummary(risk.Url, risk.Host, risk.Port)
 	riskType := strings.TrimSpace(risk.RiskType)
 	parameter := strings.TrimSpace(risk.Parameter)
@@ -112,14 +122,7 @@ func (s *ReportedRiskStore) AppendFromRisk(risk *schema.Risk) bool {
 
 	id := computeReportedRiskID(target, riskType, parameter)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, item := range s.Items {
-		if item.ID == id {
-			return false // duplicate, skip
-		}
-	}
-	s.Items = append(s.Items, ReportedRiskItem{
+	return ReportedRiskItem{
 		ID:          id,
 		Severity:    severity,
 		RiskType:    riskType,
@@ -127,12 +130,20 @@ func (s *ReportedRiskStore) AppendFromRisk(risk *schema.Risk) bool {
 		Parameter:   parameter,
 		Title:       title,
 		CreatedUnix: time.Now().Unix(),
-	})
-	return true
+	}
 }
 
-// Render produces the markdown block injected into the timeline-open prompt
-// section. The output includes a header with dedup instructions followed by
+func (s *ReportedRiskStore) hasRiskLocked(id string) bool {
+	for _, item := range s.Items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// Render provides a legacy bounded view; prompt assembly never calls it.
+// The output includes a header with dedup instructions followed by
 // one line per risk. When the token budget is exceeded, the oldest items are
 // silently dropped from the rendered output (but remain in the store).
 func (s *ReportedRiskStore) Render() string {

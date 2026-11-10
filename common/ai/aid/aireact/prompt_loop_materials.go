@@ -734,6 +734,7 @@ func (pm *PromptManager) buildSemiDynamic1Observation(
 			aicommon.PromptSectionRoleSemiDynamic1, false, materials.PlanDefinition,
 		),
 		aicommon.NewPromptSectionObservation("section.semi_dynamic_1.evidence", "Session Evidence", aicommon.PromptSectionRoleSemiDynamic1, true, materials.SessionEvidenceSemiDynamic),
+		aicommon.NewPromptSectionObservation("section.semi_dynamic_1.reported_risks", "Reported Risks", aicommon.PromptSectionRoleSemiDynamic1, true, materials.PromotedReportedRisks),
 		aicommon.NewPromptSectionObservation("section.semi_dynamic_1.current_report", "CURRENT REPORT", aicommon.PromptSectionRoleSemiDynamic1, false, materials.CurrentReport),
 	}
 	section.Children = filterIncludedPromptSections(children)

@@ -36,6 +36,8 @@ type PromptMaterials struct {
 	PromotedRecentTools string
 	// PromotedUserInputHistory contains exact user inputs from frozen Timeline records.
 	PromotedUserInputHistory string
+	// PromotedReportedRisks contains immutable reporting facts from frozen Timeline entries.
+	PromotedReportedRisks string
 	// PlanDocument contains the confirmed plan document rendered in main-loop SemiDynamic1.
 	PlanDocument string
 	// PlanDefinition is the current task tree and executable DAG,
@@ -85,14 +87,6 @@ type PromptMaterials struct {
 	// Legacy helper prompts use this bounded history; main loops use Timeline.
 	UserHistory       string
 	FrozenUserContext string
-
-	// ReportedRisks is the rendered "已报告漏洞清单" block injected at the
-	// very end of the timeline-open prompt section (after PlanContext).
-	// It lists all risks reported via cybersecurity-risk during this
-	// session, so the model can avoid duplicate reports.
-	//
-	// 关键词: ReportedRisks, 已报告漏洞清单, timeline-open 末尾, 去重
-	ReportedRisks string
 }
 
 // SemiDynamicData 供 caller-specific semi-dynamic 模板消费。
@@ -109,6 +103,7 @@ func (m *PromptMaterials) SemiDynamicData() map[string]any {
 		"PlanDefinition":             m.PlanDefinition,
 		"CurrentReport":              m.CurrentReport,
 		"SessionEvidenceSemiDynamic": m.SessionEvidenceSemiDynamic,
+		"PromotedReportedRisks":      m.PromotedReportedRisks,
 		"PlanHelp":                   m.PlanHelp,
 		"OriginalUserInput":          m.OriginalUserInput,
 		"StableInstruction":          m.StableInstruction,
@@ -176,7 +171,6 @@ func (m *PromptMaterials) TimelineOpenData() map[string]any {
 		"UserHistory":            m.UserHistory,
 		"CurrentTime":            m.CurrentTime,
 		"PlanContext":            m.FrozenUserContext,
-		"ReportedRisks":          m.ReportedRisks,
 	}
 }
 
@@ -188,6 +182,7 @@ type TimelineFrozenOpenBlocks struct {
 	SkillsContext            string
 	PromotedRecentTools      string
 	PromotedUserInputHistory string
+	PromotedReportedRisks    string
 	FrozenTimeUnix           int64
 	EvidenceSemiDynamic      string
 }
@@ -198,7 +193,7 @@ type TimelineFrozenOpenBlocks struct {
 func (b TimelineFrozenOpenBlocks) PromptText() string {
 	var parts []string
 	for _, text := range []string{b.Frozen, b.SkillsContext, b.PromotedRecentTools,
-		b.PromotedUserInputHistory, b.EvidenceSemiDynamic, b.Open} {
+		b.PromotedUserInputHistory, b.EvidenceSemiDynamic, b.PromotedReportedRisks, b.Open} {
 		if text != "" {
 			parts = append(parts, text)
 		}
@@ -333,6 +328,7 @@ func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptio
 		SkillsContext:            renderPromotedSkillContent(promoted),
 		PromotedRecentTools:      recentTools,
 		PromotedUserInputHistory: userInputHistory,
+		PromotedReportedRisks:    renderPromotedReportedRisks(promoted),
 		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rawBlocks),
 		EvidenceSemiDynamic:      timeline.projectEvidenceLocked(),
 	}
@@ -346,13 +342,10 @@ type PromptFrozenOpenMaterials struct {
 	SkillsContext              string
 	PromotedRecentTools        string
 	PromotedUserInputHistory   string
+	PromotedReportedRisks      string
 	TimelineFrozenTimeUnix     int64
 	FrozenPartitions           []FrozenBlockPartition
 	SessionEvidenceSemiDynamic string
-
-	// ReportedRisks is the rendered "已报告漏洞清单" block for the
-	// timeline-open section. Populated from SessionPromptState.
-	ReportedRisks string
 }
 
 func BuildPromptFrozenOpenMaterials(config *Config, openNonce ...string) PromptFrozenOpenMaterials {
@@ -373,7 +366,6 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 		return PromptFrozenOpenMaterials{}
 	}
 	timelineBlocks := RenderTimelineFrozenOpenWithOptions(config.GetTimeline(), options)
-	reportedRisks := config.GetSessionPromptState().GetReportedRisksRendered()
 	return PromptFrozenOpenMaterials{
 		TimelineThroughID:          timelineBlocks.ThroughID,
 		TimelineItemIDs:            timelineBlocks.ItemIDs,
@@ -382,10 +374,10 @@ func BuildPromptFrozenOpenMaterialsWithOptions(config *Config, options TimelineP
 		SkillsContext:              timelineBlocks.SkillsContext,
 		PromotedRecentTools:        timelineBlocks.PromotedRecentTools,
 		PromotedUserInputHistory:   timelineBlocks.PromotedUserInputHistory,
+		PromotedReportedRisks:      timelineBlocks.PromotedReportedRisks,
 		TimelineFrozenTimeUnix:     timelineBlocks.FrozenTimeUnix,
 		FrozenPartitions:           FrozenBlockPartitionsFromConfig(config),
 		SessionEvidenceSemiDynamic: timelineBlocks.EvidenceSemiDynamic,
-		ReportedRisks:              reportedRisks,
 	}
 }
 
@@ -398,10 +390,10 @@ func ApplyPromptFrozenOpenMaterials(materials *PromptMaterials, frozenOpen Promp
 	materials.SkillsContext = frozenOpen.SkillsContext
 	materials.PromotedRecentTools = frozenOpen.PromotedRecentTools
 	materials.PromotedUserInputHistory = frozenOpen.PromotedUserInputHistory
+	materials.PromotedReportedRisks = frozenOpen.PromotedReportedRisks
 	materials.TimelineFrozenTimeUnix = frozenOpen.TimelineFrozenTimeUnix
 	materials.FrozenPartitions = append([]FrozenBlockPartition(nil), NormalizeFrozenBlockPartitions(frozenOpen.FrozenPartitions)...)
 	materials.SessionEvidenceSemiDynamic = frozenOpen.SessionEvidenceSemiDynamic
-	materials.ReportedRisks = frozenOpen.ReportedRisks
 }
 
 func timelineFrozenTimeUnixFromRenderable(blocks TimelineRenderableBlocks) int64 {

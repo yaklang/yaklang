@@ -30,19 +30,10 @@ type SessionPromptState struct {
 	// restore can add serialization later without changing the prompt API.
 	sessionArtifactsState *SessionArtifactsRenderState
 
-	// reportedRiskStore is the session-level "已报告漏洞清单" accumulator.
-	// Each time a risk is emitted via cybersecurity-risk (or any risk-emitting
-	// tool), the FeedBacker callback calls AppendReportedRisk to append a
-	// compact summary. The rendered block is injected into the timeline-open
-	// prompt section (after PlanContext) so the model sees a machine-readable
-	// list of already-reported vulnerabilities and avoids duplicate calls to
-	// cybersecurity-risk.
-	//
-	// This store is **shared** across parent and sub-agents via ForkForSubAgent
-	// (pointer aliasing, not copy). Both parent and child see the same list, and
-	// a risk reported by a sub-agent is immediately visible to the parent.
-	//
-	// 关键词: reportedRiskStore, ReportedRiskStore, 已报告漏洞清单, 去重, 共享
+	// reportedRiskStore is shared across parent and sub-agents for runtime
+	// deduplication only. Config.AppendReportedRisk broadcasts immutable Timeline
+	// entries; prompt assembly never renders this store or replays it into a
+	// clean timeline. Session restore does not rebuild it from Timeline history.
 	reportedRiskStore *ReportedRiskStore
 	uiSession         *UISession
 }
@@ -411,8 +402,8 @@ func (s *SessionPromptState) GetReportedRisks() string {
 	return s.reportedRiskStore.Marshal()
 }
 
-// SetReportedRisks replaces the in-memory reported-risks state with the given
-// JSON payload. Used during session restore from DB.
+// SetReportedRisks explicitly imports a legacy runtime ledger. Timeline restore
+// does not call it, and importing the ledger never creates Timeline entries.
 func (s *SessionPromptState) SetReportedRisks(json string) {
 	if s == nil {
 		return
@@ -426,10 +417,10 @@ func (s *SessionPromptState) SetReportedRisks(json string) {
 // appends it to the reported-risks store if it is not a duplicate (same
 // target + type + parameter). Returns true if a new entry was added.
 //
-// Called from toolcall_invoke.go FeedBacker callback whenever a json-risk
-// message is emitted by a tool (e.g. cybersecurity-risk). The store is
-// shared across parent and sub-agents, so a risk reported by any agent
-// is visible to all.
+// This legacy ledger-only operation does not publish Timeline entries.
+// Production tool feedback calls Config.AppendReportedRisk, which reserves the
+// ledger entry, broadcasts the Timeline item and rolls the reservation back on
+// failure.
 func (s *SessionPromptState) AppendReportedRisk(risk *schema.Risk) bool {
 	if s == nil || risk == nil {
 		return false
@@ -440,10 +431,7 @@ func (s *SessionPromptState) AppendReportedRisk(risk *schema.Risk) bool {
 	return store.AppendFromRisk(risk)
 }
 
-// GetReportedRisksRendered returns the markdown block ready for prompt
-// injection into the timeline-open section. Returns empty string when no
-// risks have been reported yet, so the prompt template naturally skips the
-// block.
+// GetReportedRisksRendered is a legacy store view, not used in prompt assembly.
 func (s *SessionPromptState) GetReportedRisksRendered() string {
 	if s == nil {
 		return ""

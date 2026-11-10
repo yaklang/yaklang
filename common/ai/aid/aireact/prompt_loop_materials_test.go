@@ -466,6 +466,7 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 		PromotedRecentTools:        "<|CACHE_TOOL_CALL_[current-nonce]|>\npromoted cache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
 		PromotedUserInputHistory:   "# Session User Input History\nexact user input body",
 		SessionEvidenceSemiDynamic: "# Session Evidence\nverified evidence body",
+		PromotedReportedRisks:      "[reported_risk]:\nreported finding",
 		Schema:                     `{"type":"object","properties":{"@action":{"type":"string"}}}`,
 		TaskInstruction:            "follow task rules",
 		OutputExample:              "example output",
@@ -483,15 +484,17 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	evidenceIdx := strings.Index(rendered, "verified evidence body")
 	require.Greater(t, userInputIdx, promotedIdx)
 	require.Greater(t, evidenceIdx, userInputIdx)
+	require.Greater(t, strings.Index(rendered, "reported finding"), evidenceIdx)
 	observation := react.promptManager.buildSemiDynamic1Observation(materials, rendered)
 	children := map[string]*aicommon.PromptSectionObservation{}
 	for _, child := range observation.Children {
 		children[child.Key] = child
 	}
 	for key, content := range map[string]string{
-		"section.semi_dynamic_1.recent_tools": materials.PromotedRecentTools,
-		"section.semi_dynamic_1.user_history": materials.PromotedUserInputHistory,
-		"section.semi_dynamic_1.evidence":     materials.SessionEvidenceSemiDynamic,
+		"section.semi_dynamic_1.recent_tools":   materials.PromotedRecentTools,
+		"section.semi_dynamic_1.user_history":   materials.PromotedUserInputHistory,
+		"section.semi_dynamic_1.evidence":       materials.SessionEvidenceSemiDynamic,
+		"section.semi_dynamic_1.reported_risks": materials.PromotedReportedRisks,
 	} {
 		require.Contains(t, children, key)
 		require.Equal(t, content, children[key].Content)
