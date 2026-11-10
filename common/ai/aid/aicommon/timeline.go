@@ -21,9 +21,10 @@ import (
 )
 
 type Timeline struct {
-	persistMu  sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
-	mu         sync.RWMutex
-	timelineID string // runtime identity; never persisted or copied
+	persistMu         sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
+	mu                sync.RWMutex
+	timelineID        string              // runtime identity; never persisted or copied
+	broadcastReceipts map[string]struct{} // runtime-only; never persisted or copied
 	// Runtime observers have independent locks and never enter persistence or prompts.
 	itemInputCallbacks      timelineCallbackRegistry[TimelineItemInputEvent]
 	freezeCallbacks         timelineCallbackRegistry[TimelineFreezeResult]

@@ -41,6 +41,19 @@ func timelineItemIDContaining(timeline *Timeline, text string) int64 {
 	return id
 }
 
+func timelineItemCountContaining(timeline *Timeline, text string) int {
+	count := 0
+	timeline.mu.RLock()
+	timeline.idToTimelineItem.ForEach(func(_ int64, item *TimelineItem) bool {
+		if item != nil && strings.Contains(item.String(), text) {
+			count++
+		}
+		return true
+	})
+	timeline.mu.RUnlock()
+	return count
+}
+
 func TestTimelineBroadcastReachesParentForkAndTaskOnlyTimeline(t *testing.T) {
 	parent := newTimelineBroadcastConfig(t)
 	unrelated := newTimelineBroadcastConfig(t)
@@ -60,11 +73,17 @@ func TestTimelineBroadcastReachesParentForkAndTaskOnlyTimeline(t *testing.T) {
 
 	require.NoError(t, parent.BroadcastTimelineText("shared update"))
 
-	sharedID := timelineItemIDContaining(parent.Timeline, "shared update")
-	require.NotZero(t, sharedID)
-	requireTimelineText(t, parent.Timeline, sharedID, "shared update")
-	requireTimelineText(t, fork.Branch, sharedID, "shared update")
-	requireTimelineText(t, clean, sharedID, "shared update")
+	parentID := timelineItemIDContaining(parent.Timeline, "shared update")
+	forkID := timelineItemIDContaining(fork.Branch, "shared update")
+	cleanID := timelineItemIDContaining(clean, "shared update")
+	require.NotZero(t, parentID)
+	require.NotZero(t, forkID)
+	require.NotZero(t, cleanID)
+	require.NotEqual(t, parentID, forkID)
+	require.NotEqual(t, parentID, cleanID)
+	requireTimelineText(t, parent.Timeline, parentID, "shared update")
+	requireTimelineText(t, fork.Branch, forkID, "shared update")
+	requireTimelineText(t, clean, cleanID, "shared update")
 	require.NotContains(t, clean.Dump(), "history before fork")
 	require.Zero(t, timelineItemIDContaining(unrelated.Timeline, "shared update"))
 }
@@ -84,49 +103,45 @@ func TestTimelineBroadcastUnregistersOnReleaseAndMerge(t *testing.T) {
 
 	require.NoError(t, parent.BroadcastTimelineText("after forks ended"))
 
-	id := timelineItemIDContaining(parent.Timeline, "after forks ended")
-	require.NotZero(t, id)
-
-	releasedFork.Branch.mu.RLock()
-	_, releasedHasItem := releasedFork.Branch.idToTimelineItem.Get(id)
-	releasedFork.Branch.mu.RUnlock()
-	require.False(t, releasedHasItem)
-
-	mergedFork.Branch.mu.RLock()
-	_, mergedHasItem := mergedFork.Branch.idToTimelineItem.Get(id)
-	mergedFork.Branch.mu.RUnlock()
-	require.False(t, mergedHasItem)
+	require.NotZero(t, timelineItemIDContaining(parent.Timeline, "after forks ended"))
+	require.Zero(t, timelineItemCountContaining(releasedFork.Branch, "after forks ended"))
+	require.Zero(t, timelineItemCountContaining(mergedFork.Branch, "after forks ended"))
 }
 
 func TestTimelineBroadcasterRegisterAndUnregister(t *testing.T) {
 	broadcaster := NewTimelineBroadcaster()
-	var received int64
+	received := int64(-1)
 	broadcaster.Register("test", func(item *TimelineItem) error {
 		received = item.GetID()
 		return nil
 	})
 
-	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{ID: 7, Text: "event"})))
-	require.Equal(t, int64(7), received)
+	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{Text: "event"})))
+	require.Zero(t, received)
 
 	broadcaster.Unregister("test")
-	received = 0
-	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{ID: 8, Text: "ignored"})))
-	require.Zero(t, received)
+	received = -1
+	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{Text: "ignored"})))
+	require.Equal(t, int64(-1), received)
 }
 
-func TestTimelineBroadcastDoesNotMutateHistoricalItem(t *testing.T) {
+func TestTimelineBroadcastAssignsLocalIDsAndDeduplicatesByHistory(t *testing.T) {
 	parent := newTimelineBroadcastConfig(t)
 	fork, err := parent.Timeline.ForkForTask("task", "task", parent, parent)
 	require.NoError(t, err)
 	t.Cleanup(fork.Release)
 
-	item := NewTimelineItem(&TextTimelineItem{ID: parent.AcquireId(), Text: "immutable fact"})
+	item := NewTimelineItem(&TextTimelineItem{Text: "immutable fact"})
 	require.NoError(t, parent.BroadcastTimelineItem(item))
 	require.NoError(t, parent.BroadcastTimelineItem(item))
 
-	requireTimelineText(t, parent.Timeline, item.GetID(), "immutable fact")
-	requireTimelineText(t, fork.Branch, item.GetID(), "immutable fact")
+	parentID := timelineItemIDContaining(parent.Timeline, "immutable fact")
+	branchID := timelineItemIDContaining(fork.Branch, "immutable fact")
+	require.NotZero(t, parentID)
+	require.NotZero(t, branchID)
+	require.NotEqual(t, parentID, branchID)
+	require.Equal(t, 1, timelineItemCountContaining(parent.Timeline, "immutable fact"))
+	require.Equal(t, 1, timelineItemCountContaining(fork.Branch, "immutable fact"))
 
 	parent.Timeline.mu.RLock()
 	parentHistoryID := parent.Timeline.idToTimelineItem.Values()[0].historyID
@@ -135,6 +150,13 @@ func TestTimelineBroadcastDoesNotMutateHistoricalItem(t *testing.T) {
 	branchHistoryID := fork.Branch.idToTimelineItem.Values()[0].historyID
 	fork.Branch.mu.RUnlock()
 	require.Equal(t, parentHistoryID, branchHistoryID)
+}
+
+func TestTimelineBroadcastRejectsNonEmptyItemID(t *testing.T) {
+	config := newTimelineBroadcastConfig(t)
+	err := config.BroadcastTimelineItem(NewTimelineItem(&TextTimelineItem{ID: 7, Text: "invalid"}))
+	require.ErrorContains(t, err, "item ID must be empty")
+	require.Zero(t, timelineItemCountContaining(config.Timeline, "invalid"))
 }
 
 func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {

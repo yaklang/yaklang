@@ -81,6 +81,7 @@ func (c *Config) SetTimeline(timeline *Timeline) error {
 		broadcaster.Unregister(configTimelineBroadcastID(c))
 		return nil
 	}
+	timeline.SoftBindConfig(c, c)
 	broadcaster.Register(configTimelineBroadcastID(c), timeline.appendBroadcastItem)
 	return nil
 }
@@ -134,5 +135,5 @@ func (c *Config) BroadcastTimelineText(text string) error {
 	if c == nil {
 		return fmt.Errorf("config is nil")
 	}
-	return c.BroadcastTimelineItem(NewTimelineItem(&TextTimelineItem{ID: c.AcquireId(), Text: text}))
+	return c.BroadcastTimelineItem(NewTimelineItem(&TextTimelineItem{Text: text}))
 }

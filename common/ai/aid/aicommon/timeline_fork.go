@@ -169,9 +169,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	// copies must neither collide nor replay stale evidence over a newer mutation.
 	mergedItems := activeItems[:0]
 	for _, active := range activeItems {
-		if existing, ok := parent.idToTimelineItem.Get(active.id); ok &&
-			active.item.broadcast && existing != nil && existing.broadcast &&
-			existing.historyID == active.item.historyID {
+		if _, delivered := parent.broadcastReceipts[active.item.historyID]; delivered {
 			continue // Already delivered to the parent by a session broadcast.
 		}
 		if op, ok := active.item.value.(*PromotableTimelineItem); ok && op.Kind == TimelinePromotedKindEvidence {
@@ -203,7 +201,6 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		}
 		nextTS = ts + 1
 		copy := *active.item
-		copy.broadcast = false
 		copy.createdAt = time.Unix(0, ts*int64(time.Millisecond))
 		active.item = &copy
 		parent.idToTimelineItem.OrderInsert(active.id, active.item, lessInt64)

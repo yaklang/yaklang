@@ -154,8 +154,11 @@ func normalizeTimelineBroadcastItem(item *TimelineItem) (*TimelineItem, error) {
 	default:
 		return nil, fmt.Errorf("unsupported timeline broadcast item %T", item.value)
 	}
-	if item.GetID() <= 0 || item.deleted {
-		return nil, fmt.Errorf("timeline broadcast requires a live item with a positive ID")
+	if item.GetID() != 0 {
+		return nil, fmt.Errorf("timeline broadcast item ID must be empty, got %d", item.GetID())
+	}
+	if item.deleted {
+		return nil, fmt.Errorf("timeline broadcast item must be live")
 	}
 	raw, err := json.Marshal(item)
 	if err != nil {
@@ -178,19 +181,43 @@ func (m *Timeline) appendBroadcastItem(item *TimelineItem) error {
 	if err != nil {
 		return err
 	}
-	copy.broadcast = true
+
+	m.mu.RLock()
+	_, alreadyCommitted := m.broadcastReceipts[copy.historyID]
+	config := m.config
+	m.mu.RUnlock()
+	if alreadyCommitted {
+		return nil
+	}
+	if config == nil {
+		return fmt.Errorf("timeline has no config for broadcast ID allocation")
+	}
 
 	m.mu.Lock()
 	var notifications []func()
 	defer m.unlockAndNotifyTimeline(&notifications)
 
-	id := copy.GetID()
-	if existing, ok := m.idToTimelineItem.Get(id); ok {
-		if existing == nil || existing.historyID != copy.historyID {
-			return fmt.Errorf("timeline item ID %d already belongs to another value", id)
-		}
+	if _, ok := m.broadcastReceipts[copy.historyID]; ok {
 		return nil
 	}
+	var id int64
+	for {
+		id = config.AcquireId()
+		if id <= 0 {
+			return fmt.Errorf("timeline ID provider returned non-positive ID %d", id)
+		}
+		if !m.idToTimelineItem.Have(id) {
+			break
+		}
+	}
+	copy, err = timelineBroadcastItemWithID(copy, id)
+	if err != nil {
+		return err
+	}
+	if m.broadcastReceipts == nil {
+		m.broadcastReceipts = make(map[string]struct{})
+	}
+	m.broadcastReceipts[copy.historyID] = struct{}{}
 
 	ts := copy.createdAt.UnixMilli()
 	if ts <= 0 {
@@ -205,4 +232,32 @@ func (m *Timeline) appendBroadcastItem(item *TimelineItem) error {
 	m.OrderInsertTs(ts, copy)
 	m.collectItemInputCallbackLocked(&notifications, copy)
 	return nil
+}
+
+func timelineBroadcastItemWithID(item *TimelineItem, id int64) (*TimelineItem, error) {
+	if item == nil || item.value == nil || id <= 0 {
+		return nil, fmt.Errorf("timeline broadcast item and positive ID are required")
+	}
+	copy := *item
+	switch value := item.value.(type) {
+	case *TextTimelineItem:
+		cloned := *value
+		cloned.ID = id
+		copy.value = &cloned
+	case *UserInteraction:
+		cloned := *value
+		cloned.ID = id
+		copy.value = &cloned
+	case *aitool.ToolResult:
+		cloned := *value
+		cloned.ID = id
+		copy.value = &cloned
+	case *PromotableTimelineItem:
+		cloned := *value
+		cloned.ID = id
+		copy.value = &cloned
+	default:
+		return nil, fmt.Errorf("unsupported timeline broadcast item %T", item.value)
+	}
+	return &copy, nil
 }
