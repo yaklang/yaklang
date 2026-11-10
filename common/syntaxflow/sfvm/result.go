@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -30,55 +29,6 @@ type SFFrameResult struct {
 	SymbolTable      *omap.OrderedMap[string, Values]
 	UnNameValue      Values
 	AlertSymbolTable *utils.SafeMap[Values]
-
-	// symbolIDCache memoizes symbol-name -> id set for the dataflow filter fast
-	// path. It belongs on the result, not on sfCheck: a dataflow opcode creates
-	// one sfCheck per source, so a per-check cache only deduped paths within a
-	// single source and re-walked the whole $source/$filter symbol table once per
-	// source (52k times on large projects). The same SFFrameResult is shared by
-	// every source of one rule execution, so the set is built once there.
-	//
-	// It is cleared whenever this result's symbol table gains values
-	// (MergeByResultLocked), so a set can never outlive the symbol state it was
-	// built from.
-	symbolIDMu    sync.RWMutex
-	symbolIDCache map[string]map[int64]struct{}
-}
-
-// GetOrBuildSymbolIDs returns the cached id set for name, building and caching
-// it via build on a miss. A nil/empty build result is not cached: an unbound
-// symbol must stay observable so a later binding still disables the fast path.
-// Lookup, build and store hold the same lock, so a concurrent ClearSymbolIDs
-// can never leave a set built from a pre-clear symbol snapshot in the cache.
-func (s *SFFrameResult) GetOrBuildSymbolIDs(name string, build func() map[int64]struct{}) map[int64]struct{} {
-	if s == nil || name == "" {
-		return nil
-	}
-	s.symbolIDMu.Lock()
-	defer s.symbolIDMu.Unlock()
-	if ids, ok := s.symbolIDCache[name]; ok {
-		return ids
-	}
-	ids := build()
-	if len(ids) == 0 {
-		return nil
-	}
-	if s.symbolIDCache == nil {
-		s.symbolIDCache = make(map[string]map[int64]struct{}, 4)
-	}
-	s.symbolIDCache[name] = ids
-	return ids
-}
-
-// ClearSymbolIDs drops every cached id set. Callers that mutate the symbol table
-// must do this so the fast path never evaluates against a stale symbol state.
-func (s *SFFrameResult) ClearSymbolIDs() {
-	if s == nil {
-		return
-	}
-	s.symbolIDMu.Lock()
-	s.symbolIDCache = nil
-	s.symbolIDMu.Unlock()
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
@@ -132,8 +82,6 @@ func (s *SFFrameResult) MergeByResultLocked(result *SFFrameResult) {
 		}
 		return true
 	})
-	// The symbol table just changed, so any cached id set may be stale.
-	s.ClearSymbolIDs()
 	result.AlertSymbolTable.ForEach(func(key string, value Values) bool {
 		if existing, ok := s.AlertSymbolTable.Get(key); ok {
 			s.AlertSymbolTable.Set(key, MergeValues(existing, value))
