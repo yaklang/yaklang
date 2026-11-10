@@ -383,7 +383,7 @@ type Config struct {
 	EnableGoalMode           bool
 	GoalMinIterations        int64
 	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
-	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables LLM review gate
+	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables one main-model review turn
 	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
 	DisableIncreaseIteration bool
 
