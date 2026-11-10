@@ -237,6 +237,9 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 
 	if cb := cfg.resCallback; cb != nil {
 		result, cbErr := cb(execResult)
+		if result != nil && cbErr == nil {
+			result.Images = execResult.Images
+		}
 		return result, cbErr
 	}
 
@@ -246,6 +249,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		Param:       params,
 		Success:     true,
 		Data:        execResult,
+		Images:      execResult.Images,
 	}, nil
 }
 

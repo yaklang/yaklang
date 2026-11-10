@@ -603,7 +603,7 @@ func resolvePreferredTier(config *aispec.AIConfig) (ModelTier, bool) {
 	if config.PreferredTier != "" {
 		return ModelTier(config.PreferredTier), true
 	}
-	if len(config.Images) > 0 {
+	if len(config.Images) > 0 && !config.PreserveImageModel {
 		return TierVision, true
 	}
 	return "", false

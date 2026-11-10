@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -264,12 +265,20 @@ type TextTimelineItem struct {
 	// output. PromptText is consumed only by the prompt projection pass, allowing
 	// internal protocol markers to reach the message rewriter without leaking into
 	// the user-facing timeline. Empty keeps the historical behavior.
-	PromptText          string `json:"prompt_text,omitempty"`
-	ShrinkResult        string `json:"shrink_result,omitempty"`
-	ShrinkSimilarResult string `json:"shrink_similar_result,omitempty"`
+	PromptText          string           `json:"prompt_text,omitempty"`
+	ShrinkResult        string           `json:"shrink_result,omitempty"`
+	ShrinkSimilarResult string           `json:"shrink_similar_result,omitempty"`
+	Images              []*aimedia.Image `json:"images,omitempty"`
+	// ImageObservationKey deduplicates ingestion/replay, not image content.
+	// New questions about the same pixels produce new ordinary observations.
+	ImageObservationKey string `json:"image_observation_key,omitempty"`
 }
 
 func (t *TextTimelineItem) String() string {
+	if len(t.Images) > 0 {
+		raw, _ := json.Marshal(t.Images)
+		return t.Text + "\nimages: " + string(raw)
+	}
 	return t.Text
 }
 
