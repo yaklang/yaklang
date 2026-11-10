@@ -52,6 +52,9 @@ func (p *PromotableTimelineItem) OpenPromptText() string {
 	if p != nil && p.Kind == TimelinePromotedKindEvidence {
 		return timelineEvidenceDeltaPrompt(p)
 	}
+	if p != nil && p.Kind == TimelinePromotedKindReportedRisk {
+		return timelineReportedRiskPrompt(p)
+	}
 	if p == nil {
 		return ""
 	}

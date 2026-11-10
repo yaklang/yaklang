@@ -444,29 +444,29 @@ func TestSessionPromptState_ForkForSubAgent_SharesInitiallyEmptyReportedRisks(t 
 }
 
 // ---------------------------------------------------------------------------
-// Prompt injection: ReportedRisks appears in timeline-open section, at end
+// Prompt injection: immutable reports appear at their Timeline positions
 // ---------------------------------------------------------------------------
 
-func TestReportedRisks_PromptPlacement_AtTimelineOpenEnd(t *testing.T) {
-	cfg := NewConfig(context.Background())
-	cfg.GetSessionPromptState().AppendReportedRisk(&schema.Risk{
+func TestReportedRisks_PromptPlacement_ThroughTimeline(t *testing.T) {
+	cfg := newTimelineBroadcastConfig(t)
+	require.True(t, cfg.AppendReportedRisk(&schema.Risk{
 		Url:       "https://example.com/login",
 		RiskType:  "sqli",
 		Parameter: "username",
 		Title:     "登录接口 SQL 注入",
 		Severity:  "high",
-	})
+	}))
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(cfg, "ns-risk")
-	require.NotEmpty(t, frozenOpen.ReportedRisks)
-	require.Contains(t, frozenOpen.ReportedRisks, "sqli")
+	require.Contains(t, frozenOpen.TimelineOpen, "sqli")
+	require.Empty(t, frozenOpen.PromotedReportedRisks)
 
 	materials := &PromptMaterials{
 		TaskInstruction: "instruction",
 		Schema:          `{"type":"object"}`,
 	}
 	ApplyPromptFrozenOpenMaterials(materials, frozenOpen)
-	require.NotEmpty(t, materials.ReportedRisks)
+	require.Contains(t, materials.TimelineOpen, "sqli")
 
 	prompt, err := NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
 		materials,
@@ -478,7 +478,8 @@ func TestReportedRisks_PromptPlacement_AtTimelineOpenEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	// ReportedRisks content should appear in the prompt.
-	require.Contains(t, prompt, "## 已报告漏洞清单")
+	require.Contains(t, prompt, "[reported_risk]")
+	require.NotContains(t, prompt, "## 已报告漏洞清单")
 	require.Contains(t, prompt, "sqli")
 	require.Contains(t, prompt, "example.com/login")
 
@@ -492,15 +493,15 @@ func TestReportedRisks_PromptPlacement_AtTimelineOpenEnd(t *testing.T) {
 	for _, ch := range timelineOpenChunks {
 		tlOpenContent += ch.Content
 	}
-	require.Contains(t, tlOpenContent, "## 已报告漏洞清单")
+	require.Contains(t, tlOpenContent, "[reported_risk]")
 	require.Contains(t, tlOpenContent, "sqli")
 }
 
 func TestReportedRisks_PromptPlacement_EmptyWhenNoRisks(t *testing.T) {
-	cfg := NewConfig(context.Background())
+	cfg := newTimelineBroadcastConfig(t)
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(cfg, "ns-empty")
-	require.Empty(t, frozenOpen.ReportedRisks)
+	require.Empty(t, frozenOpen.PromotedReportedRisks)
 
 	materials := &PromptMaterials{
 		TaskInstruction: "instruction",

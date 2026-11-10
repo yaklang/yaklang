@@ -196,6 +196,9 @@ func (m *Timeline) captureCompressionSnapshotThroughLocked(throughID int64) (sna
 				// User input is reference material: counted, never deletable.
 				snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
 				snapshot.UserContexts = append(snapshot.UserContexts, timelineCompressionUserContext{id, id <= snapshot.FrozenThroughID, control.Payload})
+			case control.Kind == TimelinePromotedKindReportedRisk:
+				snapshot.ExactItemIDs = append(snapshot.ExactItemIDs, id)
+				snapshot.ExactText += "\n" + control.OpenPromptText()
 			case isCompressionPromotedItem(control):
 				// One snapshot entry per original item: upsert/reuse/delete are
 				// all listed with their own IDs and complete text.

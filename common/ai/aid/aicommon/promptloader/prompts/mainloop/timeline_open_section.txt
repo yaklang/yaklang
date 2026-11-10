@@ -26,5 +26,3 @@ TODO LIST 是当前任务的只读状态快照；执行和写入规则见 High S
 {{ .CurrentTime }}{{ end }}
 
 {{ if .PlanContext }}{{ .PlanContext }}{{ end }}
-{{ if .ReportedRisks }}
-{{ .ReportedRisks }}{{ end }}

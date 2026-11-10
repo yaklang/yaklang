@@ -219,7 +219,7 @@ func (m *Timeline) promptBlocksLocked(excludeToolCache bool, onlyUserInput bool,
 				op = timelinePromotionForItem(item)
 			}
 			if onlyUserInput && (op == nil || (op.Kind != TimelinePromotedKindUserInput &&
-				op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindSkillContent)) {
+				op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindSkillContent && op.Kind != TimelinePromotedKindReportedRisk)) {
 				continue
 			}
 			if op != nil {
@@ -231,7 +231,7 @@ func (m *Timeline) promptBlocksLocked(excludeToolCache bool, onlyUserInput bool,
 					continue
 				}
 				if op.Kind != TimelinePromotedKindEvidence && op.Kind != TimelinePromotedKindRecentTool &&
-					op.Kind != TimelinePromotedKindUserInput && op.Kind != TimelinePromotedKindSkillContent {
+					op.Kind != TimelinePromotedKindUserInput && op.Kind != TimelinePromotedKindSkillContent && op.Kind != TimelinePromotedKindReportedRisk {
 					continue
 				}
 				// A detached prompt view preserves the journal, reducer exclusion and UI audit.
