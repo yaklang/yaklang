@@ -14,9 +14,10 @@ case records deterministic rule/PCAP hashes and verifies how many rules
 Suricata loaded. Snort was only used for the common rule subset; dialect
 rejections were recorded as execution failures instead of zero alerts.
 
-## Confirmed issue: DNS response exposes the request-only `dns.query` buffer
+## Resolved issue: DNS response exposed the request-only `dns.query` buffer
 
-Severity: medium. Type: false positive and alert-count inflation.
+Severity: medium. Type: false positive and alert-count inflation. Status: fixed by
+this branch; the tables below preserve the pre-fix audit baseline.
 
 Yaklang matches a `dns.query` rule against the Question section of a DNS
 response. Official Suricata treats `dns.query` as a request-direction sticky
@@ -62,19 +63,23 @@ That PCAP contains two queries and two responses for `www.github.com`. With SID
 | Yaklang | 4 |
 | Suricata | 2 |
 
-This doubles the alert count for a normal query rule. The likely implementation
-boundary is the UDP pseudo-flow direction policy in
+This doubled the alert count for a normal query rule. The implementation
+boundary was the UDP pseudo-flow direction policy in
 `common/suricata/engine/udp.go` together with DNS buffer selection in
 `common/suricata/match/dns.go`.
 
-Suggested follow-up fix:
+The fix derives the semantic UDP client direction from the DNS QR bit when the
+decoded DNS layer belongs to the current UDP payload. It preserves the numeric
+packet `Direction` and first-observed endpoints, rejects the whole match when a
+response is evaluated against the request-only query buffer, and keeps the
+existing first-packet fallback for non-DNS UDP. It also accepts the Suricata 8
+`dns.query.name` spelling and rejects its combination with `flow:to_client` at
+compile time.
 
-1. Derive DNS direction from QR and well-known port evidence before falling back
-   to first-packet direction.
-2. Expose `dns.query` only for query transactions; add a separate response
-   buffer for response RRs.
-3. Add both generated controls and the pinned nDPI count test as regression
-   tests.
+After the fix, all 14 generated cases agree with Suricata 8.0.8, including alert
+counts and rule-load counts. Both generated DNS controls now produce zero
+alerts in both engines. The pinned nDPI capture produces two Yaklang alerts,
+matching Suricata's two query alerts instead of the pre-fix count of four.
 
 ## Cases without a Yaklang/Suricata difference
 
@@ -114,8 +119,8 @@ go run ./common/suricata/cmd/suricata-diff \
   -work-dir /tmp/yak-suricata-audit > /tmp/yak-suricata-audit.json
 ```
 
-The expected command exit is 1 because the two confirmed DNS cases differ.
-Inspect them with:
+The expected command exit is 0 after the fix. To inspect any future difference,
+use:
 
 ```sh
 jq '.[] | select(.comparison.equal == false)' /tmp/yak-suricata-audit.json

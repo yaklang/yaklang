@@ -19,6 +19,24 @@ func TestDotPrefixDNSTransform(t *testing.T) {
 	require.False(t, plain.MatchPackage(buildDNSQueryPacket(t, "minergate.com")), "without dotprefix the apex domain has no leading dot")
 }
 
+func TestDNSQueryBufferRejectsResponses(t *testing.T) {
+	positive := compileTestRule(t, `alert dns any any -> any any (dns.query; content:"example.com"; sid:10;)`)
+	negative := compileTestRule(t, `alert dns any any -> any any (dns.query; content:!"blocked.example"; sid:11;)`)
+	empty := compileTestRule(t, `alert dns any any -> any any (dns.query; bsize:0; sid:12;)`)
+	negativePCRE := compileTestRule(t, `alert dns any any -> any any (dns.query; pcre:!"/blocked/"; sid:13;)`)
+	noData := compileTestRule(t, `alert dns any any -> any any (dns.query; isdataat:!0; sid:14;)`)
+
+	query := buildDNSPacket(t, "example.com", false)
+	response := buildDNSPacket(t, "example.com", true)
+	require.True(t, positive.MatchPackage(query))
+	require.True(t, negative.MatchPackage(query))
+	require.False(t, positive.MatchPackage(response))
+	require.False(t, negative.MatchPackage(response), "an unavailable request buffer must not satisfy negative content")
+	require.False(t, empty.MatchPackage(response), "an unavailable request buffer is not a valid empty buffer")
+	require.False(t, negativePCRE.MatchPackage(response), "an unavailable request buffer must not satisfy negative PCRE")
+	require.False(t, noData.MatchPackage(response), "an unavailable request buffer must not satisfy negated isdataat")
+}
+
 func TestNegativeContentSemantics(t *testing.T) {
 	packet := buildTCPPacket(t, []byte("hello world"))
 	allowed := compileTestRule(t, `alert tcp any any -> any any (content:"hello"; content:!"evil"; sid:1;)`)
@@ -275,6 +293,11 @@ func buildICMPv6Packet(t *testing.T, payload []byte) gopacket.Packet {
 
 func buildDNSQueryPacket(t *testing.T, name string) gopacket.Packet {
 	t.Helper()
+	return buildDNSPacket(t, name, false)
+}
+
+func buildDNSPacket(t *testing.T, name string, response bool) gopacket.Packet {
+	t.Helper()
 	eth := &layers.Ethernet{
 		SrcMAC:       []byte{0, 1, 2, 3, 4, 5},
 		DstMAC:       []byte{6, 7, 8, 9, 10, 11},
@@ -292,6 +315,7 @@ func buildDNSQueryPacket(t *testing.T, name string) gopacket.Packet {
 	require.NoError(t, udp.SetNetworkLayerForChecksum(ip))
 	dns := &layers.DNS{
 		ID:        1,
+		QR:        response,
 		RD:        true,
 		Questions: []layers.DNSQuestion{{Name: []byte(name), Type: layers.DNSTypeA, Class: layers.DNSClassIN}},
 	}
