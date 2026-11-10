@@ -106,7 +106,7 @@ func (m *scanManager) prepareSourceRuntimes() (map[ssaapi.SyntaxFlowQueryInstanc
 		for target, runtime := range runtimes {
 			runtime.Close()
 			stats := runtime.Stats()
-			log.Infof("source pre-scan %s: patterns=%d searches=%d workers=%d files=%d bytes=%d raw_hits=%d cached_searches=%d fallback_files=%d", target.GetProgramName(), stats.Patterns, stats.Searches, stats.Workers, stats.Files, stats.Bytes, stats.Hits, stats.Lookups, stats.FallbackFiles)
+			log.Infof("source pre-scan %s: patterns=%d searches=%d workers=%d files=%d bytes=%d raw_hits=%d cached_searches=%d fallback_files=%d degraded_patterns=%d", target.GetProgramName(), stats.Patterns, stats.Searches, stats.Workers, stats.Files, stats.Bytes, stats.Hits, stats.Lookups, stats.FallbackFiles, stats.DegradedPatterns)
 		}
 		if err := plan.Close(); err != nil {
 			log.Warnf("close source pre-scan: %v", err)
