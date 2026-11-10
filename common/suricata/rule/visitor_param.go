@@ -227,7 +227,7 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.HTTPConnection
 	case "http_response_line", "http.response_line":
 		return modifier.HTTPResponseLine
-	case "dns_query", "dns.query":
+	case "dns_query", "dns.query", "dns.query.name":
 		return modifier.DNSQuery
 	case "http_header", "http.header":
 		return modifier.HTTPHeader

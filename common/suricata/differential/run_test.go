@@ -1,10 +1,26 @@
 package differential
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
+
+func TestYaklangDNSQueryCountOnPinnedCapture(t *testing.T) {
+	const fixture = "../../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-dns.pcap"
+	pcapPath, err := trafficfixture.Materialize(fixture, t.TempDir())
+	require.NoError(t, err)
+
+	rulesPath := filepath.Join(t.TempDir(), "dns.rules")
+	require.NoError(t, os.WriteFile(rulesPath, []byte(`alert dns any any -> any any (dns.query.name; content:"www.github.com"; sid:9902001; rev:1;)`), 0o600))
+
+	result := RunYaklang(rulesPath, pcapPath)
+	require.Empty(t, result.Error)
+	require.Equal(t, []Alert{{GID: 1, SID: 9902001, Rev: 1, Count: 2}}, result.Alerts)
+}
 
 func TestCompareResults(t *testing.T) {
 	results := []Result{
