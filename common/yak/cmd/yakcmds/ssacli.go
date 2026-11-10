@@ -1537,13 +1537,12 @@ Exports structured report (sarif/irify).`,
 
 		cli.DurationFlag{
 			Name:  "rule-timeout",
-			Usage: "per-rule wall-clock budget (e.g. 5m, 4h); a pathological rule is bailed at the budget instead of hanging the scan. default 4h (loose backstop so slow rules surface real perf bugs, not masked); 0 disables",
-			Value: ssaconfig.DefaultScanRuleTimeout,
+			Usage: "per-rule wall-clock budget (e.g. 5m, 4h); a pathological rule is bailed at the budget instead of hanging the scan. default 0 (disabled; --rule-work-limit is the default guard); set a value to also cap wall-clock time",
 		},
 
 		cli.Int64Flag{
 			Name:  "rule-work-limit",
-			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 50000 (validated on dotCMS/core: default-concurrency scan finishes in ~2m with ~4GB peak RSS); 0 disables (only --rule-timeout applies)",
+			Usage: "per-rule total-work budget: max fanout elements (per <typeName>/<getReturns>/.../dataflow source/descent node) one rule may process across all opcodes; a heavy rule is bailed at the budget (partial results) instead of accumulating an unbounded edge graph that OOMs on large projects. default 50000 (validated on dotCMS/core: default-concurrency scan finishes in ~2m with ~4GB peak RSS); 0 disables (only --rule-timeout, if set, applies)",
 			Value: ssaconfig.DefaultScanRuleWorkLimit,
 		},
 
@@ -1735,7 +1734,7 @@ Exports structured report (sarif/irify).`,
 			)
 		}
 
-		// Per-rule wall-clock budget (default 4h via the flag Value). Bounds
+		// Per-rule wall-clock budget (off unless explicitly set). Bounds
 		// pathological heavy rules — e.g. dataflow(include=...) matching tens of
 		// thousands of sources on a large project — so they are bailed at the
 		// budget instead of hanging the scan. --rule-timeout 0 disables.

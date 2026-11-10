@@ -8,11 +8,12 @@ import (
 )
 
 func TestScanRuleBudgetDefaults(t *testing.T) {
-	// A scan config that never configured budgets must still be protected.
+	// The work limit is still defaulted; the wall-clock timeout is off unless
+	// explicitly configured.
 	cfg, err := New(ModeSyntaxFlowScan)
 	require.NoError(t, err)
 	require.Nil(t, cfg.SyntaxFlowScan, "New stays lazy")
-	require.Equal(t, DefaultScanRuleTimeout, cfg.GetScanRuleTimeout())
+	require.Equal(t, time.Duration(0), cfg.GetScanRuleTimeout())
 	require.Equal(t, DefaultScanRuleWorkLimit, cfg.GetScanRuleWorkLimit())
 
 	// Explicit 0 remains the documented escape hatch.
