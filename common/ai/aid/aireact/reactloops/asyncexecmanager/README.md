@@ -146,10 +146,13 @@ Stop 返回 stopping 只表示已发出取消请求；确认退出需继续 Wait
 返回可用的生命周期元信息。元信息和观察结果分别采样，不保证是同一个原子时刻。
 Summary.Revision 仅描述生命周期变更，不可用于判断 stdout/result 是否发生变化。
 
-默认最多同时运行 4 个执行，保留 128 条记录。容量耗尽返回 ErrCapacity，不排队。
-终态记录仍计入 MaxExecutions，ID 在该 Manager 内不能复用；当前没有自动淘汰或
-Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，达到上限时给调用方
-明确反馈。Metadata 只保存名字和来源标识，不放输出，也不承担授权职责。
+默认最多同时运行 4 个执行，最多保留 128 条记录。MaxActiveExecutions 只限制
+pending、running、stopping，只有它会使提交返回 ErrCapacity。
+MaxRetainedExecutions 限制 active 记录与终态记录的总数，但不会拒绝新提交：总数
+已满时，Manager 会淘汰最早结束的终态记录来腾出位置，pending、running、stopping
+永远不会被淘汰。为保证这两个限制不冲突，MaxRetainedExecutions 必须大于或等于
+MaxActiveExecutions。ID 只在保留记录范围内保持唯一，被淘汰记录的 ID 可以再次使用。
+Metadata 只保存名字和来源标识，不放输出，也不承担授权职责。
 
 ## 工具调用接入位置
 

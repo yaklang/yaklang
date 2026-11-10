@@ -67,17 +67,22 @@ func TestOverviewTracksRevisionAndRunningCount(t *testing.T) {
 		t.Fatalf("unexpected initial overview: %+v", initial)
 	}
 
+	started := make(chan struct{})
+	releaseCleanup := make(chan struct{})
 	changed := m.ChangeSignal()
 	receipt, err := m.Start(Request{ID: "overview", Resource: &testResource{
 		observer: inspectorFunc(quietInspector),
 		run: func(ctx context.Context) error {
+			close(started)
 			<-ctx.Done()
+			<-releaseCleanup
 			return ctx.Err()
 		},
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	awaitSignal(t, started)
 	awaitSignal(t, changed)
 	active := m.Overview()
 	if active.Revision <= initial.Revision || active.RunningCount() != 1 {
@@ -94,6 +99,7 @@ func TestOverviewTracksRevisionAndRunningCount(t *testing.T) {
 	}
 
 	changed = m.ChangeSignal()
+	close(releaseCleanup)
 	final := waitExecution(t, m, receipt.ID)
 	awaitSignal(t, changed)
 	terminal := m.Overview()
@@ -203,7 +209,7 @@ func TestWaitTimeoutDoesNotStopExecution(t *testing.T) {
 }
 
 func TestStopRetainsCapacityUntilResourceCleanupReturns(t *testing.T) {
-	m := newTestManager(t, context.Background(), Config{MaxConcurrent: 1})
+	m := newTestManager(t, context.Background(), Config{MaxActiveExecutions: 1})
 	started, cancelled, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	defer close(cleanup)
 	_, err := m.Start(Request{ID: "cleanup", Resource: &testResource{
@@ -334,7 +340,7 @@ func TestInspectionDoesNotHoldManagerLock(t *testing.T) {
 }
 
 func TestMetadataCopiesAndAdmissionErrors(t *testing.T) {
-	m := newTestManager(t, context.Background(), Config{MaxExecutions: 1})
+	m := newTestManager(t, context.Background(), Config{MaxActiveExecutions: 1, MaxRetainedExecutions: 1})
 	attributes := map[string]string{"task_id": "original"}
 	resource := &testResource{observer: inspectorFunc(quietInspector), run: func(context.Context) error { return nil }}
 	receipt, err := m.Start(Request{ID: "copy", Metadata: Metadata{Attributes: attributes}, Resource: resource})
@@ -353,8 +359,13 @@ func TestMetadataCopiesAndAdmissionErrors(t *testing.T) {
 	if _, err := m.Start(Request{ID: "copy", Resource: resource}); !errors.Is(err, ErrDuplicateID) {
 		t.Fatalf("duplicate: %v", err)
 	}
-	if _, err := m.Start(Request{Resource: resource}); !errors.Is(err, ErrCapacity) {
-		t.Fatalf("record limit: %v", err)
+	replacement, err := m.Start(Request{ID: "replacement", Resource: resource})
+	if err != nil {
+		t.Fatalf("terminal record eviction: %v", err)
+	}
+	waitExecution(t, m, replacement.ID)
+	if _, err := m.Get("copy"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("oldest terminal record was not evicted: %v", err)
 	}
 	if _, err := m.Get("missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("get missing: %v", err)
@@ -364,6 +375,145 @@ func TestMetadataCopiesAndAdmissionErrors(t *testing.T) {
 	}
 	if _, err := m.Inspect(context.Background(), "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("inspect missing: %v", err)
+	}
+}
+
+func TestTotalRecordLimitEvictsTerminalWithoutRejectingAdmission(t *testing.T) {
+	m := newTestManager(t, context.Background(), Config{
+		MaxActiveExecutions:   2,
+		MaxRetainedExecutions: 3,
+	})
+	quick := func(id string) {
+		t.Helper()
+		if _, err := m.Start(Request{ID: id, Resource: &testResource{
+			observer: inspectorFunc(quietInspector),
+			run:      func(context.Context) error { return nil },
+		}}); err != nil {
+			t.Fatalf("start %s: %v", id, err)
+		}
+		waitExecution(t, m, id)
+	}
+
+	quick("oldest")
+	quick("recent")
+	startBlocking := func(id string) {
+		t.Helper()
+		started := make(chan struct{})
+		if _, err := m.Start(Request{ID: id, Resource: &testResource{
+			observer: inspectorFunc(quietInspector),
+			run: func(ctx context.Context) error {
+				close(started)
+				<-ctx.Done()
+				return ctx.Err()
+			},
+		}}); err != nil {
+			t.Fatalf("start %s: %v", id, err)
+		}
+		awaitSignal(t, started)
+	}
+
+	startBlocking("active")
+	for _, id := range []string{"oldest", "recent", "active"} {
+		if _, err := m.Get(id); err != nil {
+			t.Fatalf("record %s disappeared before total capacity required eviction: %v", id, err)
+		}
+	}
+
+	startBlocking("second-active")
+	if _, err := m.Get("oldest"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("oldest terminal record was not evicted at total capacity: %v", err)
+	}
+	for _, id := range []string{"recent", "active", "second-active"} {
+		if _, err := m.Get(id); err != nil {
+			t.Fatalf("record %s was evicted before older terminal history: %v", id, err)
+		}
+	}
+
+	if _, err := m.Start(Request{ID: "blocked", Resource: &testResource{
+		observer: inspectorFunc(quietInspector),
+		run:      func(context.Context) error { return nil },
+	}}); !errors.Is(err, ErrCapacity) {
+		t.Fatalf("only MaxActiveExecutions should reject admission: %v", err)
+	}
+
+	if _, err := m.Stop("active"); err != nil {
+		t.Fatalf("stop active execution: %v", err)
+	}
+	waitExecution(t, m, "active")
+	startBlocking("replacement")
+	if _, err := m.Get("recent"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("oldest remaining terminal record was not evicted for replacement: %v", err)
+	}
+	for _, id := range []string{"active", "second-active", "replacement"} {
+		if _, err := m.Get(id); err != nil {
+			t.Fatalf("record %s was unexpectedly evicted: %v", id, err)
+		}
+	}
+}
+
+func TestInspectSurvivesTerminalRecordEviction(t *testing.T) {
+	m := newTestManager(t, context.Background(), Config{MaxActiveExecutions: 1, MaxRetainedExecutions: 1})
+	inspectStarted := make(chan struct{})
+	allowInspect := make(chan struct{})
+	allowRun := make(chan struct{})
+	if _, err := m.Start(Request{ID: "observed", Resource: &testResource{
+		observer: inspectorFunc(func(context.Context) (Observation, error) {
+			close(inspectStarted)
+			<-allowInspect
+			return Observation{Stdout: "retained observation"}, nil
+		}),
+		run: func(context.Context) error {
+			<-allowRun
+			return nil
+		},
+	}}); err != nil {
+		t.Fatalf("start observed execution: %v", err)
+	}
+	observed, err := m.execution("observed")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type inspectResult struct {
+		snapshot Snapshot
+		err      error
+	}
+	result := make(chan inspectResult, 1)
+	go func() {
+		snapshot, err := m.Inspect(context.Background(), "observed")
+		result <- inspectResult{snapshot: snapshot, err: err}
+	}()
+	awaitSignal(t, inspectStarted)
+
+	close(allowRun)
+	awaitSignal(t, observed.done)
+	if _, err := m.Start(Request{ID: "replacement", Resource: &testResource{
+		observer: inspectorFunc(quietInspector),
+		run:      func(context.Context) error { return nil },
+	}}); err != nil {
+		t.Fatalf("replace terminal record: %v", err)
+	}
+	waitExecution(t, m, "replacement")
+	if _, err := m.Get("observed"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("observed record was not evicted: %v", err)
+	}
+
+	close(allowInspect)
+	inspected := <-result
+	if inspected.err != nil {
+		t.Fatalf("in-flight inspect failed after eviction: %v", inspected.err)
+	}
+	if inspected.snapshot.ID != "observed" || inspected.snapshot.Observation.Stdout != "retained observation" {
+		t.Fatalf("in-flight inspection lost its execution: %+v", inspected.snapshot)
+	}
+}
+
+func TestRecordLimitMustCoverConcurrency(t *testing.T) {
+	if _, err := New(context.Background(), Config{
+		MaxActiveExecutions:   2,
+		MaxRetainedExecutions: 1,
+	}); err == nil {
+		t.Fatal("expected invalid MaxRetainedExecutions/MaxActiveExecutions combination")
 	}
 }
 
@@ -401,7 +551,7 @@ func TestInvalidResourcesAndCancelledOwner(t *testing.T) {
 	if _, err := New(nil, Config{}); err == nil {
 		t.Fatal("accepted nil owner")
 	}
-	if _, err := New(context.Background(), Config{MaxConcurrent: -1}); err == nil {
+	if _, err := New(context.Background(), Config{MaxActiveExecutions: -1}); err == nil {
 		t.Fatal("accepted invalid limits")
 	}
 	m := newTestManager(t, context.Background(), Config{})
@@ -423,7 +573,7 @@ func TestInvalidResourcesAndCancelledOwner(t *testing.T) {
 }
 
 func TestConcurrentControlAndObservation(t *testing.T) {
-	m := newTestManager(t, context.Background(), Config{MaxConcurrent: 16})
+	m := newTestManager(t, context.Background(), Config{MaxActiveExecutions: 16})
 	for i := 0; i < 8; i++ {
 		_, err := m.Start(Request{Resource: &testResource{observer: inspectorFunc(quietInspector), run: func(ctx context.Context) error {
 			<-ctx.Done()
