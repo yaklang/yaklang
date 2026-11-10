@@ -89,7 +89,7 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		return nil, fmt.Errorf("tool execution is disabled")
 	}
 	if !s.subForgeActive.CompareAndSwap(false, true) {
-		return nil, fmt.Errorf("another sub-Forge is already running")
+		return nil, aicommon.ErrSubForgeBusy
 	}
 	// Release admission immediately if setup fails. Once started, only the
 	// child goroutine can release it, even if its caller has timed out.

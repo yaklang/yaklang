@@ -1,5 +1,14 @@
 package aicommon
 
+import (
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+)
+
+// ErrSubForgeBusy means the child never acquired the execution slot.
+var ErrSubForgeBusy = fmt.Errorf("another sub-Forge is already running: %w", aitool.ErrInvocationNotStarted)
+
 // SubForgeExecutionPolicy copies the caller's model and execution policy
 // without its prompts, timeline, tools, user input or preset plan.
 func SubForgeExecutionPolicy(parent *Config) []ConfigOption {

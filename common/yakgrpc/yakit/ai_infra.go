@@ -58,6 +58,14 @@ func GetToolCallCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*sch
 	return &checkpoint, true
 }
 
+// MaxCheckpointSequence returns the high-water mark across checkpoint types.
+func MaxCheckpointSequence(db *gorm.DB, coordinatorID string) (int64, error) {
+	var seq int64
+	err := db.Model(&schema.AiCheckpoint{}).Where("coordinator_uuid = ?", coordinatorID).
+		Select("COALESCE(MAX(seq), 0)").Row().Scan(&seq)
+	return seq, err
+}
+
 // ListToolCallCheckpoints returns the newest calls first for recovery within
 // one coordinator. Each caller still checks the logical task and arguments.
 func ListToolCallCheckpoints(db *gorm.DB, coordinatorID string) ([]schema.AiCheckpoint, error) {

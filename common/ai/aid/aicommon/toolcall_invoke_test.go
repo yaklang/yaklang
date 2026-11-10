@@ -396,3 +396,52 @@ func TestResilienceSubForgeCheckpointAcrossWorkerAttempts(t *testing.T) {
 	require.True(t, result.Success)
 	require.Equal(t, 4, callbacks)
 }
+
+func TestResilienceSubForgeCheckpointRetriesBusyAdmission(t *testing.T) {
+	setupToolCallInvokeTestProjectDB(t)
+	tc, _ := newToolCallerForCountTest(t, "sub-forge-busy-"+ksuid.New().String())
+	busy := true
+	var cancelWhileBusy context.CancelFunc
+	callbacks := 0
+	tool, err := aitool.New("sub_forge_retry_busy", aitool.WithStringParam("query"),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			if busy {
+				if cancelWhileBusy != nil {
+					cancelWhileBusy()
+				}
+				return nil, ErrSubForgeBusy
+			}
+			callbacks++
+			return "child result", nil
+		}))
+	require.NoError(t, err)
+	tool.RejectInterruptedReplay = true
+	tool.RequireForeground = true
+	run := func() (*aitool.ToolResult, error) {
+		tc.task = NewStatefulTaskBase("persistent-task", "worker", tc.ctx, tc.emitter, true)
+		return tc.invoke(tool, aitool.InvokeParams{"query": "same request"}, func(any) {}, func(any) {},
+			&toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{})
+	}
+
+	_, err = run()
+	require.ErrorIs(t, err, ErrSubForgeBusy)
+	require.Zero(t, callbacks)
+
+	originalCtx := tc.ctx
+	tc.ctx, cancelWhileBusy = context.WithCancel(originalCtx)
+	_, err = run()
+	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, ErrSubForgeBusy)
+	require.Zero(t, callbacks)
+
+	tc.ctx = originalCtx
+	busy = false
+	result, err := run()
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, 1, callbacks)
+	result, err = run()
+	require.NoError(t, err)
+	require.Contains(t, result.String(), "child result")
+	require.Equal(t, 1, callbacks)
+}
