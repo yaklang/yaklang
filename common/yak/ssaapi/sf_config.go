@@ -81,11 +81,6 @@ type sfCheck struct {
 	originalSnapshot     *sf.SymbolSnapshot
 	originalSnapshotOnce sync.Once
 
-	// fastMatchMu guards fastMatchIDs, which memoizes symbol -> id set for the
-	// simple `* & $source` / `<self> & $source` fast path.
-	fastMatchMu  sync.Mutex
-	fastMatchIDs map[string]map[int64]struct{}
-
 	// excludeItems is the exclude-only subset of matchItem. excludePrunable is
 	// true only when every exclude uses the monotone `*<getCallee> & $symbol`
 	// shape; then a call node whose callee is in that symbol's value set rejects
@@ -560,29 +555,21 @@ func (r *sfCheck) fastMatchSymbolIDs(name string) map[int64]struct{} {
 	if r == nil || r.contextResult == nil || name == "" {
 		return nil
 	}
-	r.fastMatchMu.Lock()
-	defer r.fastMatchMu.Unlock()
-	if r.fastMatchIDs == nil {
-		r.fastMatchIDs = make(map[string]map[int64]struct{})
-	}
-	if set, ok := r.fastMatchIDs[name]; ok {
-		return set
-	}
-	vals, ok := r.contextResult.SymbolTable.Get(name)
-	if !ok {
-		r.fastMatchIDs[name] = nil
-		return nil
-	}
-	set := make(map[int64]struct{}, len(vals))
-	for _, op := range vals {
-		if id, ok := op.(interface{ GetId() int64 }); ok {
-			if id.GetId() > 0 {
-				set[id.GetId()] = struct{}{}
+	return r.contextResult.GetOrBuildSymbolIDs(name, func() map[int64]struct{} {
+		vals, ok := r.contextResult.SymbolTable.Get(name)
+		if !ok || len(vals) == 0 {
+			return nil
+		}
+		set := make(map[int64]struct{}, len(vals))
+		for _, op := range vals {
+			if id, ok := op.(interface{ GetId() int64 }); ok {
+				if id.GetId() > 0 {
+					set[id.GetId()] = struct{}{}
+				}
 			}
 		}
-	}
-	r.fastMatchIDs[name] = set
-	return set
+		return set
+	})
 }
 
 // extractCheckNodeId builds a cache key from the path values.
