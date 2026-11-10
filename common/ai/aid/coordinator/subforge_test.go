@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestSubForgeScopeAndLifecycle(t *testing.T) {
@@ -100,4 +101,153 @@ func TestSubForgeDeadlineAndFailure(t *testing.T) {
 	}
 	_, err = session.invokeSubForge(childCtx, task, "timeout", binding, nil)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestSubForgeTimeoutKeepsSlotUntilCallbackSettles(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	session := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()))}
+	task := aicommon.NewStatefulTaskBase("task", "query", ctx, session.GetEmitter(), true)
+	entered, release := make(chan struct{}), make(chan struct{})
+	defer close(release)
+	binding := SubForgeTool{Run: func(_ context.Context, _ aitool.InvokeParams, _ []*aitool.Tool, _ ...aicommon.ConfigOption) (any, error) {
+		close(entered)
+		<-release
+		return "settled", nil
+	}}
+	callCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	finished := make(chan error, 1)
+	go func() {
+		_, err := session.invokeSubForge(callCtx, task, "blocking", binding, nil)
+		finished <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("child did not enter callback")
+	}
+	stop()
+	select {
+	case err := <-finished:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("caller remained blocked behind child callback")
+	}
+	_, err := session.invokeSubForge(ctx, task, "another", binding, nil)
+	require.ErrorContains(t, err, "already running")
+}
+
+func TestSubForgeOverridesAttachedSessionOptions(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	parent := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithAgreeAIScoreLowMid(0.1, 0.2),
+		aicommon.WithToolBatchMaxCalls(2), aicommon.WithToolBatchInvokeConcurrency(1),
+		aicommon.WithAllowRequireForUserInteract(true),
+		aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
+	require.True(t, parent.UIQuestionsEnabled())
+	session := &Session{Config: parent}
+	task := aicommon.NewStatefulTaskBase("task", "query", ctx, parent.GetEmitter(), true)
+	priorWorkdir := t.TempDir()
+	binding := SubForgeTool{Run: func(ctx context.Context, _ aitool.InvokeParams, _ []*aitool.Tool, opts ...aicommon.ConfigOption) (any, error) {
+		childOptions := []aicommon.ConfigOption{
+			aicommon.WithPersistentSessionId("previous-session"),
+			aicommon.WithWorkdir(priorWorkdir),
+			aicommon.WithTimeline(parent.Timeline),
+			aicommon.WithSessionPromptState(parent.GetSessionPromptState()),
+		}
+		return aicommon.NewConfig(ctx, append(childOptions, opts...)...), nil
+	}}
+	out, err := session.invokeSubForge(ctx, task, "isolate", binding, nil)
+	require.NoError(t, err)
+	child := out.(*aicommon.Config)
+	require.Empty(t, child.PersistentSessionId)
+	require.True(t, parent.UIQuestionsEnabled())
+	require.False(t, child.UIQuestionsEnabled())
+	require.NotSame(t, parent.Timeline, child.Timeline)
+	require.NotEqual(t, priorWorkdir, child.Workdir)
+	require.Equal(t, 0.1, child.AgreeAIScoreLow)
+	require.Equal(t, 0.2, child.AgreeAIScoreMiddle)
+	require.Equal(t, 2, child.GetConfigInt(aicommon.ConfigKeyToolBatchMaxCalls))
+	require.Equal(t, 1, child.GetConfigInt(aicommon.ConfigKeyToolBatchInvokeConcurrency))
+}
+
+func TestSubForgeCancelReleasesPendingReview(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	events := make(chan *schema.AiOutputEvent, 16)
+	unblockHandler := make(chan struct{})
+	defer func() {
+		select {
+		case <-unblockHandler:
+		default:
+			close(unblockHandler)
+		}
+	}()
+	parent := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event.GetInteractiveId() == "child-review" {
+				events <- event
+				if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+					<-unblockHandler
+				}
+			}
+		}))
+	session := &Session{Config: parent}
+	task := aicommon.NewStatefulTaskBase("task", "query", ctx, parent.GetEmitter(), true)
+	allowRelease := make(chan struct{})
+	defer func() {
+		select {
+		case <-allowRelease:
+		default:
+			close(allowRelease)
+		}
+	}()
+	childReleased := make(chan struct{})
+	binding := SubForgeTool{Run: func(ctx context.Context, _ aitool.InvokeParams, _ []*aitool.Tool, opts ...aicommon.ConfigOption) (any, error) {
+		child := aicommon.NewConfig(ctx, opts...)
+		_, err := child.GetEmitter().EmitInteractiveJSON("child-review", schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE,
+			"review-require", map[string]any{"id": "child-review"})
+		if err != nil {
+			return nil, err
+		}
+		<-allowRelease
+		child.ReleaseInteractiveEvent("child-review", nil)
+		close(childReleased)
+		return nil, ctx.Err()
+	}}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := session.invokeSubForge(ctx, task, "call", binding, nil)
+		finished <- err
+	}()
+	readEvent := func() *schema.AiOutputEvent {
+		t.Helper()
+		select {
+		case event := <-events:
+			return event
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for a child event")
+			return nil
+		}
+	}
+	require.Equal(t, schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, readEvent().Type)
+	cancel()
+	select {
+	case err := <-finished:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("child cancellation did not reach the caller")
+	}
+	close(unblockHandler)
+	release := readEvent()
+	require.Equal(t, schema.EVENT_TYPE_REVIEW_RELEASE, release.Type)
+	require.Equal(t, "call", release.CallToolID)
+	close(allowRelease)
+	select {
+	case <-childReleased:
+	case <-time.After(time.Second):
+		t.Fatal("child did not release its endpoint")
+	}
+	require.Empty(t, events, "the child must not emit a second release after cleanup")
 }

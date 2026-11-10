@@ -494,6 +494,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 	// Resolve and preflight every child before emitting cards or callbacks.
 	// Calls in a batch are declared mutually independent, so one rejected child
 	// remains visible in its own outcome without cancelling valid siblings.
+	hasSingleInvocationTool := false
 	for i := range request.Calls {
 		if err := ctx.Err(); err != nil {
 			return result, err
@@ -565,6 +566,13 @@ func (r *ReAct) ExecuteToolCallGroup(
 					validationErrors,
 				)
 			}
+		}
+		if tool.RequireForeground && tool.RejectInterruptedReplay && result.Outcomes[i].Err == nil {
+			if hasSingleInvocationTool {
+				result.Outcomes[i].Stage = aicommon.ToolCallStageValidationFailed
+				result.Outcomes[i].Err = fmt.Errorf("only one sub-Forge can be called in a parallel tool batch")
+			}
+			hasSingleInvocationTool = true
 		}
 		works[i] = work
 	}

@@ -327,3 +327,72 @@ func TestResilienceSubForgeCheckpointReplay(t *testing.T) {
 	require.ErrorContains(t, err, "identity mismatch")
 	require.Equal(t, 1, invocations)
 }
+
+func TestResilienceSubForgeCheckpointAcrossWorkerAttempts(t *testing.T) {
+	setupToolCallInvokeTestProjectDB(t)
+	tc, _ := newToolCallerForCountTest(t, "sub-forge-attempt-"+ksuid.New().String())
+	callbacks := 0
+	tool, err := aitool.New("sub_forge_recover", aitool.WithStringParam("query"),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			callbacks++
+			return fmt.Sprintf("child result %d", callbacks), nil
+		}))
+	require.NoError(t, err)
+	tool.RejectInterruptedReplay = true
+	newTask := func(id string) *AIStatefulTaskBase {
+		return NewStatefulTaskBase(id, "worker", tc.ctx, tc.emitter, true)
+	}
+	run := func(query string) (*aitool.ToolResult, error) {
+		return tc.invoke(tool, aitool.InvokeParams{"query": query}, func(any) {}, func(any) {},
+			&toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{})
+	}
+
+	first := newTask("persistent-task")
+	tc.task = first
+	result, err := run("completed")
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, 1, callbacks)
+	result, err = run("completed")
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, 2, callbacks)
+
+	cp := tc.config.CreateToolCallCheckpoint(9011)
+	require.NoError(t, tc.config.SubmitCheckpointRequest(cp, map[string]any{
+		"tool_name": tool.Name, "param": aitool.InvokeParams{"query": "interrupted"},
+		"callback_started": true, "replay_task_id": first.GetId(), "replay_attempt_id": first.GetUUID(),
+	}))
+	cp = tc.config.CreateToolCallCheckpoint(9012)
+	require.NoError(t, tc.config.SubmitCheckpointRequest(cp, map[string]any{
+		"tool_name": tool.Name, "param": aitool.InvokeParams{"query": "completed"},
+		"callback_started": true, "replay_task_id": first.GetId(), "replay_attempt_id": first.GetUUID(),
+		"replay_ordinal": 3,
+	}))
+	next := newTask(first.GetId())
+	tc.task = next
+	require.NotEqual(t, first.GetUUID(), next.GetUUID())
+	_, err = run("interrupted")
+	require.ErrorContains(t, err, "unknown outcome")
+	for ordinal := 1; ordinal <= 2; ordinal++ {
+		replayed, err := run("completed")
+		require.NoError(t, err)
+		require.True(t, replayed.Success)
+		require.Contains(t, replayed.String(), fmt.Sprintf("child result %d", ordinal))
+	}
+	require.Equal(t, 2, callbacks)
+	_, err = run("completed")
+	require.ErrorContains(t, err, "unknown outcome")
+	require.Equal(t, 2, callbacks)
+	require.NoError(t, tc.config.GetDB().Delete(cp).Error)
+	result, err = run("completed")
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Contains(t, result.String(), "child result 3")
+
+	tc.task = newTask("different-task")
+	result, err = run("completed")
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, 4, callbacks)
+}

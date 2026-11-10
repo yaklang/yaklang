@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -90,7 +91,14 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	if !s.subForgeActive.CompareAndSwap(false, true) {
 		return nil, fmt.Errorf("another sub-Forge is already running")
 	}
-	defer s.subForgeActive.Store(false)
+	// Release admission immediately if setup fails. Once started, only the
+	// child goroutine can release it, even if its caller has timed out.
+	started := false
+	defer func() {
+		if !started {
+			s.subForgeActive.Store(false)
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(context.WithValue(ctx, subForgeContextKey{}, true), subForgeTimeout)
 	defer cancel()
@@ -115,49 +123,129 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		_, known := endpoints.Load(endpoint)
 		return known
 	})
+	forward := func(event *schema.AiOutputEvent) {
+		forwarded := *event
+		forwarded.CoordinatorId = id
+		forwarded.TaskId = task.GetId()
+		forwarded.TaskUUID = task.GetUUID()
+		forwarded.CallToolID = callID
+		if s.EventHandler != nil {
+			s.EventHandler(&forwarded)
+		}
+	}
+	var eventMu, deliveryMu sync.Mutex
+	pending := make(map[string]struct{})
+	closed := false
 	defer func() {
+		eventMu.Lock()
+		closed = true
+		eventMu.Unlock()
 		var retiredIDs []string
 		endpoints.Range(func(key, _ any) bool {
 			retiredIDs = append(retiredIDs, key.(string))
 			return true
 		})
 		unregister(retiredIDs...)
+		if len(pending) > 0 {
+			// A caller-owned event handler can block. Serialize these releases
+			// with prior deliveries without making cancellation wait for it.
+			go func() {
+				deliveryMu.Lock()
+				defer deliveryMu.Unlock()
+				defer func() {
+					if failure := recover(); failure != nil {
+						log.Errorf("sub-Forge review release handler panicked: %v", failure)
+					}
+				}()
+				for endpoint := range pending {
+					content, _ := json.Marshal(map[string]any{"id": endpoint, "params": nil})
+					forward(&schema.AiOutputEvent{
+						Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
+					})
+				}
+			}()
+		}
 	}()
 
 	childCtx := WithForgeParent(ctx, s.invoker, task, id)
 	manager := buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(allowed...))
-	opts := append(aicommon.SubForgeExecutionPolicy(s.Config),
+	opts := []aicommon.ConfigOption{
+		aicommon.WithPersistentSessionId(""),
+		aicommon.WithSessionPromptState(aicommon.NewSessionPromptState()),
+		aicommon.WithTimeline(nil),
+	}
+	opts = append(opts, aicommon.SubForgeExecutionPolicy(s.Config)...)
+	opts = append(opts,
 		aicommon.WithInheritedAiToolManager(manager),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithClientUI(""), // The Yak entry routes ordinary review endpoints.
 		aicommon.WithEnableToolManagerAISearch(false),
 		aicommon.WithEnableSubagentsInPlan(false),
+		aicommon.WithDisableCreateDBRuntime(s.DisableCreateDBRuntime),
 		aicommon.WithWorkdir(filepath.Join(s.GetOrCreateWorkDir(), "artifacts", "sub-forges", id)),
 		aicommon.WithEventInputChanx(input),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			if endpoint := event.GetInteractiveId(); endpoint != "" {
-				if event.Type == schema.EVENT_TYPE_REVIEW_RELEASE {
-					endpoints.Store(endpoint, false)
-				} else {
-					endpoints.LoadOrStore(endpoint, true)
+			deliveryMu.Lock()
+			defer deliveryMu.Unlock()
+			eventMu.Lock()
+			if closed {
+				eventMu.Unlock()
+				return
+			}
+			endpoint := event.GetInteractiveId()
+			if event.Type == schema.EVENT_TYPE_REVIEW_RELEASE {
+				if _, exists := pending[endpoint]; !exists {
+					eventMu.Unlock()
+					return
+				}
+				delete(pending, endpoint)
+				endpoints.Store(endpoint, false)
+			} else {
+				if ctx.Err() != nil {
+					eventMu.Unlock()
+					return
+				}
+				if endpoint != "" {
+					if _, known := endpoints.LoadOrStore(endpoint, true); !known {
+						pending[endpoint] = struct{}{}
+					}
 				}
 			}
-			forwarded := *event
-			forwarded.CoordinatorId = id
-			forwarded.TaskId = task.GetId()
-			forwarded.TaskUUID = task.GetUUID()
-			forwarded.CallToolID = callID
-			if s.EventHandler != nil {
-				s.EventHandler(&forwarded)
-			}
+			eventMu.Unlock()
+			forward(event)
 		}),
 	)
-	result, err := binding.Run(childCtx, params, allowed, opts...)
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
+
+	type childResult struct {
+		value any
+		err   error
 	}
-	return result, err
+	done := make(chan childResult, 1)
+	started = true
+	go func() {
+		var result childResult
+		defer func() {
+			if failure := recover(); failure != nil {
+				result.err = fmt.Errorf("sub-Forge execution panicked: %v", failure)
+			}
+			s.subForgeActive.Store(false)
+			done <- result
+		}()
+		if result.err = childCtx.Err(); result.err != nil {
+			return
+		}
+		result.value, result.err = binding.Run(childCtx, params, allowed, opts...)
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-done:
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return result.value, result.err
+	}
 }
 
 func (s *Session) subForgeAllowedTools(declared []*aitool.Tool) ([]*aitool.Tool, error) {

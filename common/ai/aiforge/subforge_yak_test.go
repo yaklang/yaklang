@@ -84,6 +84,7 @@ func TestSubForgeYakExecution(t *testing.T) {
 								"directly_call_tool_name":   "sub_forge_inventory",
 								"directly_call_tool_params": map[string]any{"query": "inventory-ref"},
 								"directly_call_reason":      "Inspect the inventory through the bound specialist.",
+								"async_directly_call_tool":  true, // Sub-Forge calls still wait for the result.
 							})
 						}
 						if step == 1 {

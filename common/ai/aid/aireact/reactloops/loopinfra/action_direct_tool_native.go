@@ -81,7 +81,7 @@ func verifyNativeDirectTool(loop *reactloops.ReActLoop, action *aicommon.Action)
 	reactloops.MaybeWarnBashBeforeEdit(loop, name)
 	loop.SetActionExecutionValue(action, "directly_call_tool_name", name)
 	loop.SetActionExecutionValue(action, actionStateNativeDirectParams, params)
-	loop.SetActionExecutionValue(action, actionStateDirectToolAsync, directToolActionAsync(action, tool.DefaultAsync))
+	loop.SetActionExecutionValue(action, actionStateDirectToolAsync, !tool.RequireForeground && directToolActionAsync(action, tool.DefaultAsync))
 	return nil
 }
 

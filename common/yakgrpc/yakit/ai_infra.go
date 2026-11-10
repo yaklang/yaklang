@@ -58,6 +58,15 @@ func GetToolCallCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*sch
 	return &checkpoint, true
 }
 
+// ListToolCallCheckpoints returns the newest calls first for recovery within
+// one coordinator. Each caller still checks the logical task and arguments.
+func ListToolCallCheckpoints(db *gorm.DB, coordinatorID string) ([]schema.AiCheckpoint, error) {
+	var checkpoints []schema.AiCheckpoint
+	err := db.Where("coordinator_uuid = ? AND type = ?", coordinatorID, schema.AiCheckpointType_ToolCall).
+		Order("id DESC").Find(&checkpoints).Error
+	return checkpoints, err
+}
+
 func GetReviewCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*schema.AiCheckpoint, bool) {
 	var checkpoint schema.AiCheckpoint
 	if err := db.Where("coordinator_uuid = ? AND seq = ?", coordinatorUuid, seq).First(&checkpoint).Error; err != nil {

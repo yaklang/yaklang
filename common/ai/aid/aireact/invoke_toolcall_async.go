@@ -27,6 +27,9 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 	if err != nil {
 		return nil, nil, err
 	}
+	if tool.RequireForeground {
+		return nil, nil, utils.Errorf("tool %q requires foreground execution", name)
+	}
 	if ownerLoop, _ := task.GetReActLoop().(*reactloops.ReActLoop); ownerLoop != nil {
 		if allow, message := reactloops.CheckToolInvokeGuard(ownerLoop, name, params); !allow {
 			return nil, nil, utils.Error(message)
