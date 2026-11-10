@@ -461,9 +461,8 @@ func (a *ToolCaller) invoke(
 			risk, _ := handleRiskMessage(result)
 			if risk != nil {
 				e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
-				// Append a compact summary to the session-level reported-risks
-				// store so the model sees a "已报告漏洞清单" in every subsequent
-				// prompt and avoids duplicate cybersecurity-risk calls.
+				// Broadcast an immutable reporting fact to the session's live
+				// timelines so later decisions can avoid duplicate reports.
 				a.config.AppendReportedRisk(risk)
 			}
 			httpFlow, _ := handleHTTPFlowMessage(result)

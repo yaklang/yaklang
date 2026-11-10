@@ -4043,16 +4043,14 @@ func (c *Config) SetBrowserSessionTracker(tracker BrowserSessionTracker) {
 }
 
 // AppendReportedRisk adds a compact summary of the given risk to the
-// session-level reported-risks store, deduplicating by target + type +
-// parameter. Called from the toolcall_invoke.go FeedBacker callback.
+// session-level ledger and broadcasts an immutable Timeline entry, deduplicating
+// by target + type + parameter. Called from toolcall_invoke.go FeedBacker.
 func (c *Config) AppendReportedRisk(risk *schema.Risk) bool {
-	if c == nil {
-		return false
-	}
-	return c.GetSessionPromptState().AppendReportedRisk(risk)
+	return c.appendReportedRiskToTimeline(risk)
 }
 
-// GetReportedRisksRendered returns the markdown block for prompt injection.
+// GetReportedRisksRendered is a legacy view of the runtime deduplication store.
+// Prompt assembly reads reported-risk Timeline entries instead.
 func (c *Config) GetReportedRisksRendered() string {
 	if c == nil {
 		return ""
@@ -4068,7 +4066,8 @@ func (c *Config) GetReportedRisks() string {
 	return c.GetSessionPromptState().GetReportedRisks()
 }
 
-// SetReportedRisks restores the reported-risks state from DB-persisted JSON.
+// SetReportedRisks explicitly imports legacy runtime ledger JSON without
+// changing Timeline history. It is not used by session restore.
 func (c *Config) SetReportedRisks(json string) {
 	if c == nil {
 		return

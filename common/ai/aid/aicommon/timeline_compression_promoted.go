@@ -16,6 +16,9 @@ func isCompressionPromotedItem(op *PromotableTimelineItem) bool {
 	if op == nil || op.TargetSection != TimelinePromotedTargetSemiDynamic1 {
 		return false
 	}
+	if op.Kind == TimelinePromotedKindReportedRisk {
+		return false // Immutable reporting facts are exact, never AI-retirable.
+	}
 	switch op.Operation {
 	case TimelinePromotedOperationUpsert:
 		if op.Kind == TimelinePromotedKindEvidence && !validCompressionEvidence(op) {
