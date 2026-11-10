@@ -451,3 +451,51 @@ alert $hit
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "withProgramName")
 }
+
+// TestStructRulesForUnitFiltersByUnitLanguage covers the compile-time struct
+// scan: a project can mix languages, and the scan config language is empty for
+// an auto-detected project, so the unit language decides which rules run.
+func TestStructRulesForUnitFiltersByUnitLanguage(t *testing.T) {
+	javaRule := &schema.SyntaxFlowRule{RuleName: "java-rule", Language: ssaconfig.JAVA}
+	phpRule := &schema.SyntaxFlowRule{RuleName: "php-rule", Language: ssaconfig.PHP}
+	generalRule := &schema.SyntaxFlowRule{RuleName: "general-rule", Language: ssaconfig.General}
+	unknownRule := &schema.SyntaxFlowRule{RuleName: "unknown-rule"}
+	s := &structScanState{rules: []*schema.SyntaxFlowRule{javaRule, phpRule, generalRule, unknownRule}}
+
+	javaUnit := &ssa.CompileUnit{Key: "java:a", Language: ssaconfig.JAVA}
+	require.ElementsMatch(t, []*schema.SyntaxFlowRule{javaRule, generalRule, unknownRule},
+		s.rulesForUnit(javaUnit, "", false))
+	s.language = ssaconfig.PHP
+	require.ElementsMatch(t, []*schema.SyntaxFlowRule{phpRule, generalRule, unknownRule},
+		s.rulesForUnit(&ssa.CompileUnit{Key: "dir:."}, "", false),
+		"a unit and program without a language fall back to the compile language")
+	s.language = ""
+	require.ElementsMatch(t, []*schema.SyntaxFlowRule{javaRule, generalRule, unknownRule},
+		s.rulesForUnit(javaUnit, ssaconfig.PHP, false), "the unit language wins over the config language")
+
+	unitWithoutLanguage := &ssa.CompileUnit{Key: "library:x"}
+	require.ElementsMatch(t, []*schema.SyntaxFlowRule{phpRule, generalRule, unknownRule},
+		s.rulesForUnit(unitWithoutLanguage, ssaconfig.PHP, false), "a unit without a language falls back to the program language")
+	require.Len(t, s.rulesForUnit(unitWithoutLanguage, "", false), 4,
+		"an unknown program language keeps every rule")
+
+	require.Len(t, s.rulesForUnit(javaUnit, "", true), 4, "ignore-language keeps every rule")
+}
+
+// TestStructScanLanguageFallsBackToBuilder covers an auto-detected project:
+// BaseInfo.Language stays empty and only the chosen frontend knows the language.
+func TestStructScanLanguageFallsBackToBuilder(t *testing.T) {
+	cfg := &Config{}
+	sc, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+	cfg.Config = sc
+	require.Empty(t, cfg.structScanLanguage(), "no language and no builder means unknown")
+
+	cfg.LanguageBuilder = LanguageBuilderCreater[ssaconfig.PHP]()
+	require.Equal(t, ssaconfig.PHP, cfg.structScanLanguage(),
+		"the frontend chosen by auto-detection decides the struct rule language")
+
+	require.NoError(t, ssaconfig.WithProjectLanguage(ssaconfig.JAVA)(cfg.Config))
+	require.Equal(t, ssaconfig.JAVA, cfg.structScanLanguage(),
+		"an explicit project language wins over the builder")
+}

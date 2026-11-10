@@ -51,20 +51,22 @@ it to `struct` (or drop it when an equivalent struct rule already exists).
 
 ## Naming
 
-`desc(mode)` is the single source of truth for the file name, the title and the
-verification path.
+`desc(mode)` is the single source of truth for the verification path. The file
+name says what the rule looks for, not how it runs.
 
 | Element | Rule | Example |
 | --- | --- | --- |
-| File name | `<mode>-<name>.sf`; the prefix must equal `desc(mode)` | `struct-python-eval.sf`, `ssa-go-path-traversal-read.sf` |
-| `title` | starts with the mode marker `源码匹配：`, `结构匹配：`, `数据流：` | `数据流：Go 路径穿越：请求参数拼接文件路径` |
-| `title_zh` | same marker and the same wording as `title` | `数据流：Go 路径穿越：请求参数拼接文件路径` |
+| File name | `<language>-<behavior>.sf` | `python-eval.sf`, `go-path-traversal-read.sf` |
+| File name (mode collision) | when a `source` and a `struct` rule share the same language and behavior, keep the mode prefix on both files of that directory | `source-js-eval.sf`, `struct-js-eval.sf` |
+| `title` / `title_zh` | the rule's own wording; a new rule does not add a mode marker | `Go 路径穿越：请求参数拼接文件路径` |
 | `level` | one of `critical`, `high`, `middle`, `low`, `info`; quoted; never `mid`/`medium`/`warning` | `level: "middle"` |
 | CWE directory | lowercase `cwe-<id>-<slug>` | `cwe-295-certificate-validation` |
 
-Renaming a rule or changing its `mode` means renaming the file and rewriting both
-title fields in the same commit. `TestBuiltinRuleTitlesAreUnique` rejects
-duplicate titles, so keep the wording unique after stripping the marker.
+Changing a rule's `mode` does not rename its file unless the directory also holds a
+rule of the other mode with the same behavior. `TestBuiltinRuleTitlesAreUnique`
+rejects duplicate titles, so keep the wording unique. Existing titles are kept as
+they are even when they still carry an old `源码匹配：` / `结构匹配：` / `数据流：`
+marker.
 
 ## File filters
 

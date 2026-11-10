@@ -15,7 +15,7 @@ import (
 // iteration has the same source position, so the result must keep one risk
 // row for that position instead of one row per unrolled call.
 func TestRiskDedupeBySourcePosition(t *testing.T) {
-	rule, err := os.ReadFile("../../../../syntaxflow/sfbuildin/buildin/python/cwe-94-code-injection/struct-python-exec.sf")
+	rule, err := os.ReadFile("../../../../syntaxflow/sfbuildin/buildin/python/cwe-94-code-injection/python-exec.sf")
 	require.NoError(t, err)
 
 	vfs := filesys.NewVirtualFs()
