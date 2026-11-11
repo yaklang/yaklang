@@ -1546,7 +1546,8 @@ type YakClient interface {
 	// filesystem. Returned paths are engine paths and can be used by file
 	// Fuzztags in both local and remote-engine modes.
 	UploadToTemporaryFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse], error)
-	// AI session resource snapshot query.
+	// Query resources attached by the latest input and the distinct resources
+	// attached throughout an AI session.
 	GetAISessionCurrentResources(ctx context.Context, in *GetAISessionCurrentResourcesRequest, opts ...grpc.CallOption) (*GetAISessionCurrentResourcesResponse, error)
 }
 
@@ -10112,7 +10113,8 @@ type YakServer interface {
 	// filesystem. Returned paths are engine paths and can be used by file
 	// Fuzztags in both local and remote-engine modes.
 	UploadToTemporaryFile(grpc.ClientStreamingServer[UploadToTemporaryFileRequest, UploadToTemporaryFileResponse]) error
-	// AI session resource snapshot query.
+	// Query resources attached by the latest input and the distinct resources
+	// attached throughout an AI session.
 	GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error)
 	mustEmbedUnimplementedYakServer()
 }

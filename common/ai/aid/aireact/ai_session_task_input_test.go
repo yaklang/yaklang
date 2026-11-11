@@ -22,7 +22,7 @@ func findAISessionTaskResource(resources []yakit.AISessionTaskResource, typ, key
 	return nil
 }
 
-func TestBuildAISessionTaskInputParamsCapturesEffectiveResources(t *testing.T) {
+func TestBuildAISessionTaskInputParamsCapturesInputResources(t *testing.T) {
 	react := &ReAct{config: &aicommon.Config{
 		Ctx:                 context.Background(),
 		PersistentSessionId: "session-task-input",
@@ -57,32 +57,24 @@ func TestBuildAISessionTaskInputParamsCapturesEffectiveResources(t *testing.T) {
 	require.Equal(t, "schedule", first.InputSource)
 	require.Equal(t, "schedule-uuid", first.ScheduleUUID)
 	require.Equal(t, "code_security_audit", first.FocusModeLoop)
-	require.Equal(t, []string{"/tmp/workspace"}, first.AttachedFilePaths)
 
 	fileResource := findAISessionTaskResource(
-		first.ExplicitResources, aicommon.CONTEXT_PROVIDER_TYPE_FILE, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/workspace",
+		first.Resources, aicommon.CONTEXT_PROVIDER_TYPE_FILE, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/workspace",
 	)
 	require.NotNil(t, fileResource)
-	require.Equal(t, yakit.AISessionTaskResourceScopeSession, fileResource.Scope)
 	require.NotNil(t, findAISessionTaskResource(
-		first.ExplicitResources, aicommon.AttachedResourceTypeBrowser, aicommon.AttachedResourceKeyBrowserDevice, browser.Value,
+		first.Resources, aicommon.AttachedResourceTypeBrowser, aicommon.AttachedResourceKeyBrowserDevice, browser.Value,
 	))
 	require.NotNil(t, findAISessionTaskResource(
-		first.ExplicitResources, aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, "selection",
+		first.Resources, aicommon.AttachedResourceTypeSelected, aicommon.AttachedResourceKeyContent, "selection",
 	))
-	require.Nil(t, findAISessionTaskResource(first.ExplicitResources, aicommon.USER_FREE_INPUT_UUID, "", "input-uuid"))
+	require.Nil(t, findAISessionTaskResource(first.Resources, aicommon.USER_FREE_INPUT_UUID, "", "input-uuid"))
 
 	followUpEvent := &ypb.AIInputEvent{FreeInput: "continue"}
 	followUpTask := react.buildReTaskFromEvent(followUpEvent)
 	followUp := buildAISessionTaskInputParams("session-task-input", followUpTask, followUpEvent)
 	require.NotNil(t, followUp)
-	inheritedBrowser := findAISessionTaskResource(
-		followUp.EffectiveResources, aicommon.AttachedResourceTypeBrowser, aicommon.AttachedResourceKeyBrowserDevice, browser.Value,
-	)
-	require.NotNil(t, inheritedBrowser)
-	require.Equal(t, yakit.AISessionTaskResourceScopeSession, inheritedBrowser.Scope)
-	require.Equal(t, yakit.AISessionTaskResourceSourceInherited, inheritedBrowser.Source)
-	require.Empty(t, followUp.ExplicitResources)
+	require.Empty(t, followUp.Resources)
 }
 
 func TestEnqueueReTaskPersistsAISessionTaskInput(t *testing.T) {
@@ -130,6 +122,7 @@ func TestEnqueueReTaskPersistsAISessionTaskInput(t *testing.T) {
 	current, err := yakit.GetAISessionCurrentResources(db, sessionID)
 	require.NoError(t, err)
 	require.NotNil(t, current)
+	require.Equal(t, "input-uuid", current.UserInputUUID)
 	require.NotNil(t, findAISessionTaskResource(
 		current.TaskResources, aicommon.CONTEXT_PROVIDER_TYPE_FILE, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/workspace",
 	))

@@ -78975,9 +78975,9 @@ type AISessionTaskResourceInfo struct {
 	Type  string                 `protobuf:"bytes,1,opt,name=Type,proto3" json:"Type,omitempty"`
 	Key   string                 `protobuf:"bytes,2,opt,name=Key,proto3" json:"Key,omitempty"`
 	Value string                 `protobuf:"bytes,3,opt,name=Value,proto3" json:"Value,omitempty"`
-	// turn: current task only; session: retained across tasks in the session.
+	// Deprecated: retained for wire compatibility and not populated.
 	Scope string `protobuf:"bytes,4,opt,name=Scope,proto3" json:"Scope,omitempty"`
-	// attached_resource_info / attached_file_path / inherited
+	// Deprecated: retained for wire compatibility and not populated.
 	Source        string `protobuf:"bytes,5,opt,name=Source,proto3" json:"Source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -79097,9 +79097,10 @@ type GetAISessionCurrentResourcesResponse struct {
 	SessionID     string                 `protobuf:"bytes,1,opt,name=SessionID,proto3" json:"SessionID,omitempty"`
 	TaskID        string                 `protobuf:"bytes,2,opt,name=TaskID,proto3" json:"TaskID,omitempty"`
 	UserInputUUID string                 `protobuf:"bytes,3,opt,name=UserInputUUID,proto3" json:"UserInputUUID,omitempty"`
-	// Resources explicitly attached to or inherited by the latest task.
+	// Resources attached by the latest input.
 	TaskResources []*AISessionTaskResourceInfo `protobuf:"bytes,4,rep,name=TaskResources,proto3" json:"TaskResources,omitempty"`
-	// Session-scoped resources reconstructed from task input history.
+	// Distinct resources attached by inputs in this session. Resources from newer
+	// inputs come first; order within each input is preserved.
 	SessionResources []*AISessionTaskResourceInfo `protobuf:"bytes,5,rep,name=SessionResources,proto3" json:"SessionResources,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
