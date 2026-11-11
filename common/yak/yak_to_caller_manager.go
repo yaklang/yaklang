@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"strings"
@@ -38,8 +39,10 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/sshguard"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
@@ -50,6 +53,33 @@ import (
 )
 
 func init() {
+	yaklang.ImportGuardedSSHExport("hook", func(contextForInvocation func() context.Context) any {
+		exports := maps.Clone(HooksExports)
+		exports["NewManager"] = func() *YakToCallerManager {
+			caller := NewYakToCallerManager()
+			caller.managedSSHContext = contextForInvocation()
+			return caller
+		}
+		exports["NewMixPluginCaller"] = func() (*MixPluginCaller, error) {
+			caller, err := NewMixPluginCaller()
+			if err == nil {
+				caller.callers.managedSSHContext = contextForInvocation()
+			}
+			return caller, err
+		}
+		exports["NewMixPluginCallerWithFilter"] = func(webFilter filter.Filterable) (*MixPluginCaller, error) {
+			caller, err := NewMixPluginCallerWithFilter(webFilter)
+			if err == nil {
+				caller.callers.managedSSHContext = contextForInvocation()
+			}
+			return caller, err
+		}
+		exports["CallYakitPluginFunc"] = func(_, _ string) (any, error) {
+			return nil, errors.New("cross-plugin calls through the shared engine are unavailable in managed SSH runtimes")
+		}
+		return exports
+	})
+
 	lock := new(sync.Mutex)
 	mutate.InitCodecCaller(func(name string, s interface{}) (string, error) {
 		lock.Lock()
@@ -316,6 +346,7 @@ type YakToCallerManager struct {
 	loadTimeout        time.Duration
 	callTimeout        time.Duration
 	ctx                context.Context
+	managedSSHContext  context.Context
 	runtimeId          string
 	proxy              string
 	vulFilter          filter.Filterable
@@ -513,6 +544,9 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	}
 	if finalCtx == nil {
 		finalCtx = y.getDefaultContext()
+	}
+	if y.managedSSHContext != nil && !sshguard.SameScope(y.managedSSHContext, finalCtx) {
+		finalCtx = y.managedSSHContext
 	}
 
 	canFunc, ok := finalCtx.Value("cancel").(context.CancelFunc)

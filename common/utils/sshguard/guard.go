@@ -28,12 +28,29 @@ type guardKey struct{}
 type guardBinding struct{ guard Guard }
 
 func WithGuard(ctx context.Context, guard Guard) context.Context {
-	return context.WithValue(ctx, guardKey{}, guardBinding{guard})
+	return context.WithValue(ctx, guardKey{}, &guardBinding{guard})
 }
 
 func FromContext(ctx context.Context) (Guard, bool) {
-	binding, ok := ctx.Value(guardKey{}).(guardBinding)
-	return binding.guard, ok
+	binding := scope(ctx)
+	if binding == nil {
+		return nil, false
+	}
+	return binding.guard, true
+}
+
+// SameScope checks whether two contexts were derived from the same host binding.
+func SameScope(a, b context.Context) bool {
+	left := scope(a)
+	return left != nil && left == scope(b)
+}
+
+func scope(ctx context.Context) *guardBinding {
+	if ctx == nil {
+		return nil
+	}
+	binding, _ := ctx.Value(guardKey{}).(*guardBinding)
+	return binding
 }
 
 type invocationKey struct{}

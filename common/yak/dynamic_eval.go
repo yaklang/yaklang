@@ -334,18 +334,18 @@ func loadingVariableFrom(ctx context.Context, path string, exportsName string, o
 }
 
 func init() {
-	bindImport := func(ctx context.Context) any {
+	bindImport := func(contextForInvocation func() context.Context) any {
 		return func(file, name string) (any, error) {
-			return importVarFromFile(ctx, file, name)
+			return importVarFromFile(contextForInvocation(), file, name)
 		}
 	}
 	yaklang.ImportGuardedSSHExport("import", bindImport)
-	yaklang.ImportGuardedSSHExport("dyn", func(ctx context.Context) any {
+	yaklang.ImportGuardedSSHExport("dyn", func(contextForInvocation func() context.Context) any {
 		return map[string]any{
-			"Eval":   func(source any) error { return quickEvalWithContext(ctx, source) },
-			"Import": bindImport(ctx),
+			"Eval":   func(source any) error { return quickEvalWithContext(contextForInvocation(), source) },
+			"Import": bindImport(contextForInvocation),
 			"LoadVarFromFile": func(path, name string, opts ...yakEvalConfigOpt) ([]*yakVariable, error) {
-				return loadingVariableFrom(ctx, path, name, opts...)
+				return loadingVariableFrom(contextForInvocation(), path, name, opts...)
 			},
 			"IsYakFunc": yaklib.IsYakFunction,
 			"params":    setYakEvalParams,

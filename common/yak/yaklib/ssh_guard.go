@@ -11,18 +11,25 @@ import (
 )
 
 type sshCommandBinding struct {
-	ctx       context.Context
-	authorize sshguard.Guard
+	ctx               context.Context
+	invocationContext func() context.Context
+	authorize         sshguard.Guard
 }
 
 // SSHExportsForContext supplies session-owned connectors to an engine without
 // changing the shared export table used by standalone scripts.
 func SSHExportsForContext(ctx context.Context) map[string]interface{} {
+	return SSHExportsForInvocationContext(ctx, nil)
+}
+
+// SSHExportsForInvocationContext keeps the authorization binding on the
+// connector and resolves the context of the Yak frame that actually calls Run.
+func SSHExportsForInvocationContext(ctx context.Context, invocationContext func() context.Context) map[string]interface{} {
 	guard, required := sshguard.FromContext(ctx)
 	if !required {
 		return nil
 	}
-	binding := &sshCommandBinding{ctx: ctx, authorize: guard}
+	binding := &sshCommandBinding{ctx: ctx, invocationContext: invocationContext, authorize: guard}
 	bind := func(client *SSHClient, err error) (*SSHClient, error) {
 		if err == nil {
 			client.guard = binding
@@ -64,6 +71,12 @@ func (b *sshAuditBuffer) Write(data []byte) (int, error) {
 
 func (s *SSHClient) runGuarded(command string) (string, error) {
 	ctx := s.guard.ctx
+	if s.guard.invocationContext != nil {
+		ctx = s.guard.invocationContext()
+		if !sshguard.SameScope(s.guard.ctx, ctx) {
+			return "", errors.New("SSH command has no managed invocation context")
+		}
+	}
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}

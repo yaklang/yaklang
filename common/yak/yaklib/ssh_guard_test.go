@@ -15,6 +15,22 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+func TestSSHGuardRejectsUnrelatedOrCancelledInvocation(t *testing.T) {
+	ctx := sshguard.WithGuard(context.Background(), nil)
+	frame := context.Background()
+	client := &SSHClient{guard: &sshCommandBinding{
+		ctx: ctx, invocationContext: func() context.Context { return frame },
+	}}
+	_, err := client.Run("id")
+	require.ErrorContains(t, err, "no managed invocation context")
+
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	frame = cancelled
+	_, err = client.Run("id")
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func TestSSHGuardAuthorizesEntireRequestBeforeExec(t *testing.T) {
 	addr, commands := sshGuardTestServer(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

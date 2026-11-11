@@ -2,6 +2,7 @@ package yaklang
 
 import (
 	"context"
+	"maps"
 	"os"
 	"reflect"
 
@@ -69,11 +70,35 @@ func NewSandbox(vars map[string]interface{}) *antlr4yak.Engine {
 }
 
 func NewAntlrEngine() *antlr4yak.Engine {
+	return newAntlrEngine(nil)
+}
+
+func newAntlrEngine(ctx context.Context) *antlr4yak.Engine {
 	engine := antlr4yak.New()
 	if os.Getenv("STATIC_CHECK") == "strict" {
 		engine.EnableStrictMode()
 	}
-	engine.ImportLibs(yaklangLibs)
+	libs := yaklangLibs
+	if _, required := sshguard.FromContext(ctx); required {
+		libs = maps.Clone(libs)
+		currentContext := func() context.Context {
+			if frame := engine.GetVM().CurrentFM(); frame != nil {
+				return frame.GetContext()
+			}
+			return nil
+		}
+		libs["ssh"] = yaklib.SSHExportsForInvocationContext(ctx, currentContext)
+		scopeContext := func() context.Context {
+			if invocation := currentContext(); sshguard.SameScope(ctx, invocation) {
+				return invocation
+			}
+			return ctx
+		}
+		for name, bind := range guardedExports {
+			libs[name] = bind(scopeContext)
+		}
+	}
+	engine.ImportLibs(libs)
 	engine.OverrideRuntimeGlobalVariables(map[string]any{
 		"yakit": map[string]interface{}{
 			"AutoInitYakit": engineAutoInitYakitOverride(engine),
@@ -105,21 +130,12 @@ func New() *antlr4yak.Engine {
 
 // guardedExports stores library factories registered at initialization. The
 // authorization policy itself is always owned by the supplied context.
-var guardedExports = map[string]func(context.Context) any{}
+var guardedExports = map[string]func(func() context.Context) any{}
 
-func ImportGuardedSSHExport(name string, bind func(context.Context) any) {
+func ImportGuardedSSHExport(name string, bind func(func() context.Context) any) {
 	guardedExports[name] = bind
 }
 
 func NewWithContext(ctx context.Context) *antlr4yak.Engine {
-	engine := New()
-	if _, required := sshguard.FromContext(ctx); !required {
-		return engine
-	}
-	vars := map[string]any{"ssh": yaklib.SSHExportsForContext(ctx)}
-	for name, bind := range guardedExports {
-		vars[name] = bind(ctx)
-	}
-	engine.SetVars(vars)
-	return engine
+	return newAntlrEngine(ctx)
 }
