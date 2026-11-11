@@ -195,6 +195,44 @@ func TestTimelineBroadcastValidatesBatchBeforeDispatch(t *testing.T) {
 	require.Zero(t, timelineItemCountContaining(config.Timeline, "must stay absent"))
 }
 
+func TestTimelineBroadcastChecksEvidenceAgainstEachTimeline(t *testing.T) {
+	parent := newTimelineBroadcastConfig(t)
+	seed, err := BuildSessionEvidenceUpsert("shared-fact", "FIRST")
+	require.NoError(t, err)
+	require.True(t, parent.ApplySessionEvidenceOpsWithChange([]EvidenceOperation{seed}))
+
+	fork, err := parent.Timeline.ForkForTask("evidence", "evidence", parent, parent)
+	require.NoError(t, err)
+	t.Cleanup(fork.Release)
+
+	clean := NewPrivateTimeline(parent, nil)
+	clean.SoftBindConfig(parent, parent)
+	unregisterClean, err := parent.RegisterTimeline(clean)
+	require.NoError(t, err)
+	t.Cleanup(unregisterClean)
+
+	parentMax, forkMax := parent.Timeline.GetMaxID(), fork.Branch.GetMaxID()
+	same, err := evidenceOpToItem(seed)
+	require.NoError(t, err)
+	require.NoError(t, parent.BroadcastTimelineItem(same))
+	require.Equal(t, parentMax, parent.Timeline.GetMaxID())
+	require.Equal(t, forkMax, fork.Branch.GetMaxID())
+	cleanStore, found := clean.evidenceStore()
+	require.True(t, found)
+	require.Contains(t, cleanStore.Render(), "FIRST")
+
+	updated, err := BuildSessionEvidenceUpsert("shared-fact", "SECOND")
+	require.NoError(t, err)
+	updatedItem, err := evidenceOpToItem(updated)
+	require.NoError(t, err)
+	require.NoError(t, parent.BroadcastTimelineItem(updatedItem))
+	for _, timeline := range []*Timeline{parent.Timeline, fork.Branch, clean} {
+		store, found := timeline.evidenceStore()
+		require.True(t, found)
+		require.Contains(t, store.Render(), "SECOND")
+	}
+}
+
 func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	started := make(chan struct{})

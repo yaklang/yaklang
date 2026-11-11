@@ -105,13 +105,13 @@ func itemToEvidenceOp(item *TimelineItem) (EvidenceOperation, error) {
 	}
 }
 
-// isEvidenceOpNeeded 判断操作是否会改变当前 Timeline 的证据状态。
-// 该方法只做判断，不写入 Timeline。
-func (m *Timeline) isEvidenceOpNeeded(op EvidenceOperation) bool {
+// isEvidenceOpNeededLocked 判断操作是否会改变当前 Timeline 的证据状态。
+// 调用方必须持有 Timeline 写锁，该方法只做判断，不写入 Timeline。
+func (m *Timeline) isEvidenceOpNeededLocked(op EvidenceOperation) bool {
 	if m == nil {
 		return false
 	}
-	store, _ := m.evidenceStore()
+	store, _ := m.evidenceStoreLocked()
 	normalized, ok := normalizeEvidenceOp(op)
 	return ok && opChangesStore(store, normalized)
 }

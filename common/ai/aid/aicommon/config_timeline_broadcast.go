@@ -126,9 +126,6 @@ func (c *Config) BroadcastTimelineItem(items ...*TimelineItem) error {
 	if err := broadcaster.Broadcast(items...); err != nil {
 		return err
 	}
-	for _, item := range items {
-		emitTimelineItemAsync(c.GetEmitter(), item)
-	}
 	return nil
 }
 

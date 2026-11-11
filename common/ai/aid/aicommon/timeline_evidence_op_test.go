@@ -96,20 +96,25 @@ func TestItemToEvidenceOp(t *testing.T) {
 
 func TestIsEvidenceOpNeeded(t *testing.T) {
 	timeline := newEvidenceOpTestTimeline(t, EvidenceItem{ID: "saved-fact", Content: "first"})
+	needed := func(op EvidenceOperation) bool {
+		timeline.mu.RLock()
+		defer timeline.mu.RUnlock()
+		return timeline.isEvidenceOpNeededLocked(op)
+	}
 
-	require.False(t, timeline.isEvidenceOpNeeded(EvidenceOperation{
+	require.False(t, needed(EvidenceOperation{
 		ID: "saved-fact", Op: "add", Content: "first",
 	}))
-	require.True(t, timeline.isEvidenceOpNeeded(EvidenceOperation{
+	require.True(t, needed(EvidenceOperation{
 		ID: "saved-fact", Op: "update", Content: "second",
 	}))
-	require.True(t, timeline.isEvidenceOpNeeded(EvidenceOperation{
+	require.True(t, needed(EvidenceOperation{
 		ID: "saved-fact", Op: "delete",
 	}))
-	require.False(t, timeline.isEvidenceOpNeeded(EvidenceOperation{
+	require.False(t, needed(EvidenceOperation{
 		ID: "missing-fact", Op: "delete",
 	}))
-	require.True(t, timeline.isEvidenceOpNeeded(EvidenceOperation{
+	require.True(t, needed(EvidenceOperation{
 		ID: "new-fact", Op: "upsert", Content: "new",
 	}))
 }

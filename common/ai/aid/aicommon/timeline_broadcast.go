@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // TimelineBroadcaster fans one or more immutable Timeline items out to live
@@ -187,8 +188,8 @@ func normalizeTimelineBroadcastItems(items ...*TimelineItem) ([]*TimelineItem, e
 	return normalized, nil
 }
 
-// appendBroadcastItem is a registered Timeline callback. Each Timeline owns
-// its copies, validates the batch and commits it through the normal index path.
+// appendBroadcastItem 是注册到广播器的 Timeline 回调。
+// 它先检查哪些 item 可以添加，再统一写入并记录广播回执。
 func (m *Timeline) appendBroadcastItem(items ...*TimelineItem) error {
 	if m == nil {
 		return fmt.Errorf("timeline is required")
@@ -197,69 +198,100 @@ func (m *Timeline) appendBroadcastItem(items ...*TimelineItem) error {
 	if err != nil {
 		return err
 	}
-	m.mu.RLock()
-	config := m.config
-	m.mu.RUnlock()
-	if config == nil {
-		return fmt.Errorf("timeline has no config for broadcast ID allocation")
-	}
 
 	m.mu.Lock()
 	var notifications []func()
 	defer m.unlockAndNotifyTimeline(&notifications)
 
-	type pendingItem struct {
-		item *TimelineItem
-		id   int64
+	checked := m.checkBroadcastItemsLocked(canonical)
+	if err := m.commitBroadcastItemsLocked(checked, &notifications); err != nil {
+		return err
 	}
-	pending := make([]pendingItem, 0, len(canonical))
-	seen := make(map[string]struct{}, len(canonical))
-	for _, item := range canonical {
+	return nil
+}
+
+// checkBroadcastItemsLocked 过滤已接收、批内重复和无意义的 evidence item。
+// 调用方必须持有 Timeline 写锁。
+func (m *Timeline) checkBroadcastItemsLocked(items []*TimelineItem) []*TimelineItem {
+	checked := make([]*TimelineItem, 0, len(items))
+	seenHistory := make(map[string]struct{}, len(items))
+	for _, item := range items {
 		if _, ok := m.broadcastReceipts[item.historyID]; ok {
 			continue
 		}
-		if _, ok := seen[item.historyID]; ok {
+		if _, ok := seenHistory[item.historyID]; ok {
 			continue
 		}
-		var id int64
-		for {
-			id = config.AcquireId()
-			if id <= 0 {
-				return fmt.Errorf("timeline ID provider returned non-positive ID %d", id)
+		if promoted, ok := item.value.(*PromotableTimelineItem); ok &&
+			promoted != nil && promoted.Kind == TimelinePromotedKindEvidence {
+			evidenceOp, err := itemToEvidenceOp(item)
+			if err != nil {
+				log.Errorf("timeline broadcast skipped invalid evidence item %q: %v", item.historyID, err)
+				continue
 			}
-			if !m.idToTimelineItem.Have(id) {
-				break
+			if !m.isEvidenceOpNeededLocked(evidenceOp) {
+				continue
 			}
+		}
+		seenHistory[item.historyID] = struct{}{}
+		checked = append(checked, item)
+	}
+	return checked
+}
+
+// commitBroadcastItemsLocked 为检查通过的 item 分配本地 ID 并写入 Timeline。
+// 待写入项会先全部完成 ID 分配，避免中途失败时批次只写入一部分。
+func (m *Timeline) commitBroadcastItemsLocked(items []*TimelineItem, notifications *[]func()) error {
+	if len(items) == 0 {
+		return nil
+	}
+	config := m.config
+	if config == nil {
+		return fmt.Errorf("timeline has no config for broadcast ID allocation")
+	}
+
+	type preparedItem struct {
+		item *TimelineItem
+		id   int64
+	}
+	prepared := make([]preparedItem, 0, len(items))
+	for _, item := range items {
+		// ID provider 单调递增且保证唯一；出现碰撞说明 Timeline 状态异常。
+		id := config.AcquireId()
+		if id <= 0 {
+			return fmt.Errorf("timeline ID provider returned non-positive ID %d", id)
+		}
+		if m.idToTimelineItem.Have(id) {
+			log.Errorf("timeline broadcast skipped item %q: ID %d already exists", item.historyID, id)
+			continue
 		}
 		item, err := timelineBroadcastItemWithID(item, id)
 		if err != nil {
 			return err
 		}
-		seen[item.historyID] = struct{}{}
-		pending = append(pending, pendingItem{item: item, id: id})
+		prepared = append(prepared, preparedItem{item: item, id: id})
 	}
 
 	if m.broadcastReceipts == nil {
 		m.broadcastReceipts = make(map[string]struct{})
 	}
+
 	var lastTS int64
-	for _, pendingItem := range pending {
-		item := pendingItem.item
+	for _, entry := range prepared {
+		item := entry.item
 		m.broadcastReceipts[item.historyID] = struct{}{}
 
-		ts := item.createdAt.UnixMilli()
-		if ts <= 0 {
-			ts = time.Now().UnixMilli()
-		}
+		// 使用接收 Timeline 的当前时间，并保证批内时间戳严格递增。
+		ts := time.Now().UnixMilli()
 		for m.tsToTimelineItem.Have(ts) || ts <= lastTS {
 			ts++
 		}
 		lastTS = ts
-		m.idToTs.Set(pendingItem.id, ts)
-		m.invalidateFreezeFromLocked(pendingItem.id)
-		m.OrderInsertId(pendingItem.id, item)
+		m.idToTs.Set(entry.id, ts)
+		m.invalidateFreezeFromLocked(entry.id)
+		m.OrderInsertId(entry.id, item)
 		m.OrderInsertTs(ts, item)
-		m.collectItemInputCallbackLocked(&notifications, item)
+		m.collectItemInputCallbackLocked(notifications, item)
 	}
 	return nil
 }
