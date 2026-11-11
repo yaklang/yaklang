@@ -13,6 +13,7 @@ type YakitPluginContext struct {
 	yakit.YakitPluginInfo
 	Proxy                     string
 	Ctx                       context.Context
+	hookLifetime              context.Context
 	CliApp                    *cli.CliApp
 	Cancel                    context.CancelFunc
 	vulFilter                 filter.Filterable

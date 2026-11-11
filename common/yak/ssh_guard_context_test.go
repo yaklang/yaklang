@@ -13,9 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/sshguard"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestSSHGuardFollowsDynamicImports(t *testing.T) {
@@ -96,6 +98,73 @@ func TestManagedSSHHookPassesInvocationCancellation(t *testing.T) {
 		require.Equal(t, []any{context.Canceled}, result)
 	case <-time.After(5 * time.Second):
 		t.Fatal("managed hook did not receive cancellation")
+	}
+}
+
+func TestManagedSSHHookLoadHonorsCallerCancellation(t *testing.T) {
+	host := sshguard.WithGuard(context.Background(), nil)
+	manager := NewYakToCallerManager()
+	manager.managedSSHContext = func() context.Context { return host }
+	request, cancel := context.WithCancel(context.Background())
+	cancel()
+	entered := false
+	setup := func(*antlr4yak.Engine) error {
+		entered = true
+		return nil
+	}
+	const code = "handle = func() {}"
+	require.ErrorIs(t, manager.Set(request, code, nil, setup, "handle"), context.Canceled)
+	require.ErrorIs(t, manager.Add(request, &schema.YakScript{ScriptName: "fixture"}, nil, code, setup, "handle"), context.Canceled)
+	require.False(t, entered)
+}
+
+func TestManagedSSHHookRemoveCancelsAuthorization(t *testing.T) {
+	entered := make(chan context.Context, 1)
+	cancelled := make(chan error, 1)
+	host := sshguard.WithGuard(context.Background(), func(ctx context.Context, _ sshguard.Command) (func(sshguard.Result), error) {
+		entered <- ctx
+		<-ctx.Done()
+		cancelled <- ctx.Err()
+		return nil, ctx.Err()
+	})
+	manager := NewYakToCallerManager()
+	manager.SetDividedContext(true)
+	manager.managedSSHContext = func() context.Context { return host }
+	lifetime, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, manager.Add(lifetime, &schema.YakScript{ScriptName: "fixture"}, nil,
+		"handle = func() { requestAuthorization() }", func(engine *antlr4yak.Engine) error {
+			engine.SetVars(map[string]any{"requestAuthorization": func() {
+				ctx := engine.GetVM().CurrentFM().NativeCallContext()
+				guard, _ := sshguard.FromContext(ctx)
+				if guard != nil {
+					_, _ = guard(ctx, sshguard.Command{Command: "id"})
+				}
+			}})
+			return nil
+		}, "handle"))
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		manager.CallByNameSync("handle")
+	}()
+	select {
+	case invocation := <-entered:
+		require.True(t, sshguard.SameScope(host, invocation))
+	case <-time.After(5 * time.Second):
+		t.Fatal("hook did not reach the managed guard")
+	}
+	manager.Remove(&ypb.RemoveHookParams{RemoveHookID: []string{"fixture"}})
+	select {
+	case err := <-cancelled:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("removing the hook did not cancel its managed authorization")
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("hook did not return after removal")
 	}
 }
 

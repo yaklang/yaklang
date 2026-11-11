@@ -39,7 +39,6 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/sshguard"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -538,6 +537,27 @@ func (y *YakToCallerManager) SetForYakit(
 	}, hooks...)
 }
 
+// bindHookLifetime takes values from the host invocation and observes both
+// cancellation sources. A caller-supplied context cannot change the binding.
+func bindHookLifetime(host, lifetime context.Context) (context.Context, context.CancelFunc) {
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if deadline, ok := lifetime.Deadline(); ok {
+		ctx, cancel = context.WithDeadline(host, deadline)
+	} else {
+		ctx, cancel = context.WithCancel(host)
+	}
+	if lifetime.Err() != nil {
+		cancel()
+		return ctx, cancel
+	}
+	stop := context.AfterFunc(lifetime, cancel)
+	return ctx, func() {
+		stop()
+		cancel()
+	}
+}
+
 func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *YakitPluginContext {
 	var finalCtx context.Context
 	if len(ctx) > 0 {
@@ -546,10 +566,10 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	if finalCtx == nil {
 		finalCtx = y.getDefaultContext()
 	}
+	var lifetime context.Context
 	if y.managedSSHContext != nil {
-		if managedCtx := y.managedSSHContext(); !sshguard.SameScope(managedCtx, finalCtx) {
-			finalCtx = managedCtx
-		}
+		lifetime = finalCtx
+		finalCtx = y.managedSSHContext()
 	}
 
 	canFunc, ok := finalCtx.Value("cancel").(context.CancelFunc)
@@ -559,6 +579,7 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	}
 
 	pluginContext := CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithVulFilter(y.getVulFilter()).WithContextCancel(canFunc)
+	pluginContext.hookLifetime = lifetime
 	if y.aiRuntimeClient != nil {
 		pluginContext.WithYakitClient(y.aiRuntimeClient).WithRiskSaveHandler(y.aiRuntimeRiskSaveHandler)
 	}
@@ -1015,14 +1036,9 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 		runtimeCtx = y.getDefaultContext()
 	}
 	if y.managedSSHContext != nil {
-		if runtimeCtx.Err() != nil {
-			return nil
-		}
-		managedCtx, cancel := context.WithCancel(y.managedSSHContext())
+		var cancel context.CancelFunc
+		runtimeCtx, cancel = bindHookLifetime(y.managedSSHContext(), runtimeCtx)
 		defer cancel()
-		stop := context.AfterFunc(runtimeCtx, cancel)
-		defer stop()
-		runtimeCtx = managedCtx
 	}
 
 	if y.table == nil {
@@ -1345,7 +1361,16 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 		scriptName = script.ScriptName
 	}
 
-	loadCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.loadTimeout)
+	loadParent := pluginContext.Ctx
+	if pluginContext.hookLifetime != nil {
+		var release context.CancelFunc
+		loadParent, release = bindHookLifetime(loadParent, pluginContext.hookLifetime)
+		defer release()
+		if err := loadParent.Err(); err != nil {
+			return nil, err
+		}
+	}
+	loadCtx, cancel := context.WithTimeout(loadParent, y.loadTimeout)
 	defer cancel()
 	executeParams := map[string]interface{}{
 		"ROOT_CONTEXT": loadCtx,
@@ -1382,6 +1407,14 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 
 		nIns := ins
 		invoke := func(callCtx context.Context, callback func(*yakvm.Frame), args ...any) any {
+			if pluginContext.hookLifetime != nil {
+				var release context.CancelFunc
+				callCtx, release = bindHookLifetime(callCtx, pluginContext.hookLifetime)
+				defer release()
+				if callCtx.Err() != nil {
+					return nil
+				}
+			}
 			subCtx, cancel := context.WithTimeout(callCtx, y.callTimeout)
 			defer cancel()
 			if callArgHook, ok := callArgumentHooks[funcName]; ok {
