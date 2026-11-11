@@ -511,7 +511,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			return
 		}
 		if review.DirectlyAnswer {
-			handleDirectToolReviewAnswer(loop, ctx, invoker, operator)
+			requestDirectAnswerAfterToolReview(loop, invoker, operator)
 			return
 		}
 		if async {

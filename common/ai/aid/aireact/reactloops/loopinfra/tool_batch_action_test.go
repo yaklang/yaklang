@@ -724,9 +724,9 @@ func TestToolBatchActionHandler_ZeroInvokeDoesNotVerifyOrMarkExecution(t *testin
 
 		require.Zero(t, op.GetExecutedToolCallCount())
 		require.Zero(t, invoker.verifyCalls)
-		terminated, err := op.IsTerminated()
-		require.True(t, terminated)
-		require.NoError(t, err)
+		require.True(t, op.IsContinued())
+		require.True(t, invoker.AsyncDirectAnswerRequested(),
+			"the normal primary loop must deliver the answer")
 	})
 
 	t.Run("failed callback still is execution", func(t *testing.T) {
