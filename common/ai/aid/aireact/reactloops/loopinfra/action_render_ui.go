@@ -11,7 +11,7 @@ import (
 
 var renderUIAction = &reactloops.LoopAction{
 	ActionType:  "render_ui",
-	Description: "Display structured data only; no forms or user-input submission. Render a small UI block using definitions from load_ui_components. Follow UI_COMPONENT_DEFINITIONS, use stable IDs and a meaningful text fallback. Returns immediately; diagnostics allow one correction with the same IDs.",
+	Description: "Present comparisons, trends or inspectable findings proactively when useful, before the closing answer. Display real data only; no forms or submission. Use load_ui_components definitions, stable IDs and a meaningful text fallback. Returns immediately; diagnostics allow one correction with the same IDs.",
 	Options: []aitool.ToolOption{aitool.WithRawParam("ui", map[string]any{
 		"type": "object", "required": []string{"id", "catalogVersion", "fallback", "root", "nodes"},
 		"properties": map[string]any{
