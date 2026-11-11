@@ -109,6 +109,12 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		} {
 			require.True(t, exclude(p), "test tree must be pruned: %s", p)
 		}
+		// Case folding covers DIRECTORY segments only. Lowering the file globs
+		// too made "**/*Test.php" match "test.php" and dropped a real source
+		// file, which broke TestBlueprintVirtual in the PHP suite.
+		for _, p := range []string{"test.php", "test2.php", "Test.java", "Tests.java"} {
+			require.False(t, exclude(p), "file names must keep their case: %s", p)
+		}
 		// Production paths that merely contain a test word stay in the pool.
 		for _, p := range []string{
 			"src/contest/a.go", "src/attestation/a.go",
