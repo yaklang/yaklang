@@ -1,0 +1,59 @@
+package yakgrpc
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+)
+
+func TestAIModelContextBeforeSession(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	identity := &ypb.GetAIModelContextRequest{Provider: "test", Model: "same-name"}
+	initial, err := client.GetAIModelContext(ctx, identity)
+	require.NoError(t, err)
+	require.EqualValues(t, 500*1024, initial.ContextTokens)
+	require.EqualValues(t, 500*1024, initial.ThresholdTokens)
+	require.EqualValues(t, 100*1024, initial.MinimumThresholdTokens)
+	for _, tokens := range []int64{-1, 0, 100*1024 - 1} {
+		_, err := client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Provider: identity.Provider, Model: identity.Model, ThresholdTokens: tokens})
+		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
+		unchanged, err := client.GetAIModelContext(ctx, identity)
+		require.NoError(t, err)
+		require.Equal(t, initial.String(), unchanged.String())
+	}
+	for _, tokens := range []int64{100 * 1024, 600 * 1024} {
+		saved, err := client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Provider: identity.Provider, Model: identity.Model, ThresholdTokens: tokens})
+		require.NoError(t, err)
+		require.EqualValues(t, tokens, saved.ThresholdTokens)
+		require.EqualValues(t, 500*1024, saved.ContextTokens, "a manual threshold does not change capacity")
+		require.Equal(t, "manual", saved.Source)
+		require.Equal(t, tokens, yakit.GetAIModelContext(server.GetProfileDatabase(), identity.Provider, identity.Model).ThresholdTokens)
+	}
+	for _, other := range []*ypb.GetAIModelContextRequest{{Provider: "other", Model: identity.Model}, {Provider: identity.Provider, Model: "other"}} {
+		value, err := client.GetAIModelContext(ctx, other)
+		require.NoError(t, err)
+		require.EqualValues(t, 500*1024, value.ThresholdTokens)
+	}
+	require.NoError(t, yakit.SaveAIModelContext(server.GetProfileDatabase(), "small", "small", yakit.AIModelContext{
+		ContextTokens: 64 * 1024, ThresholdTokens: 51 * 1024, Source: "learned",
+	}))
+	small, err := client.GetAIModelContext(ctx, &ypb.GetAIModelContextRequest{Provider: "small", Model: "small"})
+	require.NoError(t, err)
+	require.True(t, small.TooSmall)
+	require.EqualValues(t, 51*1024, small.ThresholdTokens, "learned budgets remain visible before a new session")
+	for _, invalid := range []*ypb.GetAIModelContextRequest{{}, {Provider: "test", Model: " "}, {Model: "test"}} {
+		_, err := client.GetAIModelContext(ctx, invalid)
+		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
+		_, err = client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Provider: invalid.Provider, Model: invalid.Model, ThresholdTokens: 200 * 1024})
+		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
+	}
+}

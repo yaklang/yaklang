@@ -1,0 +1,42 @@
+package yakgrpc
+
+import (
+	"context"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+)
+
+func (s *Server) GetAIModelContext(_ context.Context, req *ypb.GetAIModelContextRequest) (*ypb.AIModelContextResponse, error) {
+	provider, model := strings.TrimSpace(req.GetProvider()), strings.TrimSpace(req.GetModel())
+	if provider == "" || model == "" {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "provider and model are required")
+	}
+	value := yakit.GetAIModelContext(s.GetProfileDatabase(), provider, model)
+	return &ypb.AIModelContextResponse{
+		Provider: provider, Model: model,
+		ContextTokens: value.ContextTokens, ThresholdTokens: value.ThresholdTokens, Source: value.Source,
+		MinimumThresholdTokens: yakit.MinimumAIModelContextTokens,
+		TooSmall:               value.ContextTokens < yakit.MinimumAIModelContextTokens,
+	}, nil
+}
+
+func (s *Server) SetAIModelContext(ctx context.Context, req *ypb.SetAIModelContextRequest) (*ypb.AIModelContextResponse, error) {
+	identity := &ypb.GetAIModelContextRequest{Provider: req.GetProvider(), Model: req.GetModel()}
+	current, err := s.GetAIModelContext(ctx, identity)
+	if err != nil {
+		return nil, err
+	}
+	if req.GetThresholdTokens() < yakit.MinimumAIModelContextTokens {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "上下文压缩阈值不能低于 100K (102400 tokens)")
+	}
+	if err := yakit.SaveAIModelContext(s.GetProfileDatabase(), current.Provider, current.Model, yakit.AIModelContext{
+		ContextTokens: current.ContextTokens, ThresholdTokens: req.GetThresholdTokens(), Source: "manual",
+	}); err != nil {
+		return nil, err
+	}
+	return s.GetAIModelContext(ctx, identity)
+}

@@ -80987,6 +80987,210 @@ func (x *ProbeModelVisionResponse) GetImageToolCallingStatus() string {
 	return ""
 }
 
+type GetAIModelContextRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Provider      string                 `protobuf:"bytes,1,opt,name=Provider,proto3" json:"Provider,omitempty"`
+	Model         string                 `protobuf:"bytes,2,opt,name=Model,proto3" json:"Model,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAIModelContextRequest) Reset() {
+	*x = GetAIModelContextRequest{}
+	mi := &file_yakgrpc_proto_msgTypes[1102]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAIModelContextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAIModelContextRequest) ProtoMessage() {}
+
+func (x *GetAIModelContextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[1102]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAIModelContextRequest.ProtoReflect.Descriptor instead.
+func (*GetAIModelContextRequest) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{1102}
+}
+
+func (x *GetAIModelContextRequest) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *GetAIModelContextRequest) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+type SetAIModelContextRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Provider        string                 `protobuf:"bytes,1,opt,name=Provider,proto3" json:"Provider,omitempty"`
+	Model           string                 `protobuf:"bytes,2,opt,name=Model,proto3" json:"Model,omitempty"`
+	ThresholdTokens int64                  `protobuf:"varint,3,opt,name=ThresholdTokens,proto3" json:"ThresholdTokens,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SetAIModelContextRequest) Reset() {
+	*x = SetAIModelContextRequest{}
+	mi := &file_yakgrpc_proto_msgTypes[1103]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetAIModelContextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetAIModelContextRequest) ProtoMessage() {}
+
+func (x *SetAIModelContextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[1103]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetAIModelContextRequest.ProtoReflect.Descriptor instead.
+func (*SetAIModelContextRequest) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{1103}
+}
+
+func (x *SetAIModelContextRequest) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *SetAIModelContextRequest) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *SetAIModelContextRequest) GetThresholdTokens() int64 {
+	if x != nil {
+		return x.ThresholdTokens
+	}
+	return 0
+}
+
+type AIModelContextResponse struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Provider               string                 `protobuf:"bytes,1,opt,name=Provider,proto3" json:"Provider,omitempty"`
+	Model                  string                 `protobuf:"bytes,2,opt,name=Model,proto3" json:"Model,omitempty"`
+	ContextTokens          int64                  `protobuf:"varint,3,opt,name=ContextTokens,proto3" json:"ContextTokens,omitempty"`
+	ThresholdTokens        int64                  `protobuf:"varint,4,opt,name=ThresholdTokens,proto3" json:"ThresholdTokens,omitempty"`
+	Source                 string                 `protobuf:"bytes,5,opt,name=Source,proto3" json:"Source,omitempty"`
+	MinimumThresholdTokens int64                  `protobuf:"varint,6,opt,name=MinimumThresholdTokens,proto3" json:"MinimumThresholdTokens,omitempty"`
+	TooSmall               bool                   `protobuf:"varint,7,opt,name=TooSmall,proto3" json:"TooSmall,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *AIModelContextResponse) Reset() {
+	*x = AIModelContextResponse{}
+	mi := &file_yakgrpc_proto_msgTypes[1104]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AIModelContextResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AIModelContextResponse) ProtoMessage() {}
+
+func (x *AIModelContextResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_yakgrpc_proto_msgTypes[1104]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AIModelContextResponse.ProtoReflect.Descriptor instead.
+func (*AIModelContextResponse) Descriptor() ([]byte, []int) {
+	return file_yakgrpc_proto_rawDescGZIP(), []int{1104}
+}
+
+func (x *AIModelContextResponse) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *AIModelContextResponse) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AIModelContextResponse) GetContextTokens() int64 {
+	if x != nil {
+		return x.ContextTokens
+	}
+	return 0
+}
+
+func (x *AIModelContextResponse) GetThresholdTokens() int64 {
+	if x != nil {
+		return x.ThresholdTokens
+	}
+	return 0
+}
+
+func (x *AIModelContextResponse) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *AIModelContextResponse) GetMinimumThresholdTokens() int64 {
+	if x != nil {
+		return x.MinimumThresholdTokens
+	}
+	return 0
+}
+
+func (x *AIModelContextResponse) GetTooSmall() bool {
+	if x != nil {
+		return x.TooSmall
+	}
+	return false
+}
+
 var File_yakgrpc_proto protoreflect.FileDescriptor
 
 const file_yakgrpc_proto_rawDesc = "" +
@@ -88117,7 +88321,22 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x10ImageInputStatus\x18\x03 \x01(\tR\x10ImageInputStatus\x126\n" +
 	"\x16ImageToolCallingStatus\x18\x04 \x01(\tR\x16ImageToolCallingStatusB\x15\n" +
 	"\x13_SupportsImageInputB\x1b\n" +
-	"\x19_SupportsImageToolCalling*5\n" +
+	"\x19_SupportsImageToolCalling\"L\n" +
+	"\x18GetAIModelContextRequest\x12\x1a\n" +
+	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
+	"\x05Model\x18\x02 \x01(\tR\x05Model\"v\n" +
+	"\x18SetAIModelContextRequest\x12\x1a\n" +
+	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
+	"\x05Model\x18\x02 \x01(\tR\x05Model\x12(\n" +
+	"\x0fThresholdTokens\x18\x03 \x01(\x03R\x0fThresholdTokens\"\x86\x02\n" +
+	"\x16AIModelContextResponse\x12\x1a\n" +
+	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
+	"\x05Model\x18\x02 \x01(\tR\x05Model\x12$\n" +
+	"\rContextTokens\x18\x03 \x01(\x03R\rContextTokens\x12(\n" +
+	"\x0fThresholdTokens\x18\x04 \x01(\x03R\x0fThresholdTokens\x12\x16\n" +
+	"\x06Source\x18\x05 \x01(\tR\x06Source\x126\n" +
+	"\x16MinimumThresholdTokens\x18\x06 \x01(\x03R\x16MinimumThresholdTokens\x12\x1a\n" +
+	"\bTooSmall\x18\a \x01(\bR\bTooSmall*5\n" +
 	"\tShellType\x12\f\n" +
 	"\bBehinder\x10\x00\x12\f\n" +
 	"\bGodzilla\x10\x01\x12\f\n" +
@@ -88169,7 +88388,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1aAI_GOAL_TIME_ACTION_EXTEND\x10\x01\x12$\n" +
 	" AI_GOAL_TIME_ACTION_SET_DEADLINE\x10\x02\x12\x1f\n" +
 	"\x1bAI_GOAL_TIME_ACTION_DISABLE\x10\x03\x12$\n" +
-	" AI_GOAL_TIME_ACTION_NEVER_ENDING\x10\x042\x98\x94\x03\n" +
+	" AI_GOAL_TIME_ACTION_NEVER_ENDING\x10\x042\xba\x95\x03\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -89080,7 +89299,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1bSetContextMenuActionBinding\x12'.ypb.SetContextMenuActionBindingRequest\x1a\x16.ypb.ContextMenuAction\x12_\n" +
 	"\x18ExecuteContextMenuAction\x12$.ypb.ExecuteContextMenuActionRequest\x1a\x1b.ypb.ContextMenuActionEvent0\x01\x12`\n" +
 	"\x15UploadToTemporaryFile\x12!.ypb.UploadToTemporaryFileRequest\x1a\".ypb.UploadToTemporaryFileResponse(\x01\x12s\n" +
-	"\x1cGetAISessionCurrentResources\x12(.ypb.GetAISessionCurrentResourcesRequest\x1a).ypb.GetAISessionCurrentResourcesResponseB\aZ\x05/;ypbb\x06proto3"
+	"\x1cGetAISessionCurrentResources\x12(.ypb.GetAISessionCurrentResourcesRequest\x1a).ypb.GetAISessionCurrentResourcesResponse\x12O\n" +
+	"\x11GetAIModelContext\x12\x1d.ypb.GetAIModelContextRequest\x1a\x1b.ypb.AIModelContextResponse\x12O\n" +
+	"\x11SetAIModelContext\x12\x1d.ypb.SetAIModelContextRequest\x1a\x1b.ypb.AIModelContextResponseB\aZ\x05/;ypbb\x06proto3"
 
 var (
 	file_yakgrpc_proto_rawDescOnce sync.Once
@@ -89095,7 +89316,7 @@ func file_yakgrpc_proto_rawDescGZIP() []byte {
 }
 
 var file_yakgrpc_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_yakgrpc_proto_msgTypes = make([]protoimpl.MessageInfo, 1112)
+var file_yakgrpc_proto_msgTypes = make([]protoimpl.MessageInfo, 1115)
 var file_yakgrpc_proto_goTypes = []any{
 	(ShellType)(0),                                            // 0: ypb.ShellType
 	(ShellScript)(0),                                          // 1: ypb.ShellScript
@@ -90208,16 +90429,19 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*AIGoalTimePatch)(nil),                                   // 1108: ypb.AIGoalTimePatch
 	(*ProbeModelVisionRequest)(nil),                           // 1109: ypb.ProbeModelVisionRequest
 	(*ProbeModelVisionResponse)(nil),                          // 1110: ypb.ProbeModelVisionResponse
-	nil,                                                       // 1111: ypb.StartIMOnboardingRequest.OptionsEntry
-	nil,                                                       // 1112: ypb.ExtractDataToFileRequest.DataEntry
-	nil,                                                       // 1113: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
-	nil,                                                       // 1114: ypb.WebShell.HeadersEntry
-	nil,                                                       // 1115: ypb.WebShell.PostsEntry
-	nil,                                                       // 1116: ypb.UpdateWebShellRequest.HeadersEntry
-	nil,                                                       // 1117: ypb.UpdateWebShellRequest.PostsEntry
-	nil,                                                       // 1118: ypb.SyntaxFlowRule.AlertMsgEntry
-	nil,                                                       // 1119: ypb.AlertMessage.ExtraEntry
-	nil,                                                       // 1120: ypb.SyntaxFlowRuleInput.AlertMsgEntry
+	(*GetAIModelContextRequest)(nil),                          // 1111: ypb.GetAIModelContextRequest
+	(*SetAIModelContextRequest)(nil),                          // 1112: ypb.SetAIModelContextRequest
+	(*AIModelContextResponse)(nil),                            // 1113: ypb.AIModelContextResponse
+	nil,                                                       // 1114: ypb.StartIMOnboardingRequest.OptionsEntry
+	nil,                                                       // 1115: ypb.ExtractDataToFileRequest.DataEntry
+	nil,                                                       // 1116: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
+	nil,                                                       // 1117: ypb.WebShell.HeadersEntry
+	nil,                                                       // 1118: ypb.WebShell.PostsEntry
+	nil,                                                       // 1119: ypb.UpdateWebShellRequest.HeadersEntry
+	nil,                                                       // 1120: ypb.UpdateWebShellRequest.PostsEntry
+	nil,                                                       // 1121: ypb.SyntaxFlowRule.AlertMsgEntry
+	nil,                                                       // 1122: ypb.AlertMessage.ExtraEntry
+	nil,                                                       // 1123: ypb.SyntaxFlowRuleInput.AlertMsgEntry
 }
 var file_yakgrpc_proto_depIdxs = []int32{
 	788,  // 0: ypb.ExecBatchYakScriptRequest.ExtraParams:type_name -> ypb.ExecParamItem
@@ -90229,7 +90453,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	19,   // 6: ypb.SaveIMBotResponse.Bot:type_name -> ypb.IMBotConfig
 	19,   // 7: ypb.ListIMBotResponse.Bots:type_name -> ypb.IMBotConfig
 	19,   // 8: ypb.TestIMBotRequest.Bot:type_name -> ypb.IMBotConfig
-	1111, // 9: ypb.StartIMOnboardingRequest.Options:type_name -> ypb.StartIMOnboardingRequest.OptionsEntry
+	1114, // 9: ypb.StartIMOnboardingRequest.Options:type_name -> ypb.StartIMOnboardingRequest.OptionsEntry
 	19,   // 10: ypb.IMOnboardingEvent.Bot:type_name -> ypb.IMBotConfig
 	30,   // 11: ypb.StartIMControlRequest.PlatformConfigs:type_name -> ypb.IMControlRuntimeConfig
 	37,   // 12: ypb.IMControlStateEvent.State:type_name -> ypb.IMControlState
@@ -90494,7 +90718,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	653,  // 271: ypb.QueryYakScriptByNamesResponse.Data:type_name -> ypb.YakScript
 	653,  // 272: ypb.QueryYakScriptByIsCoreResponse.Data:type_name -> ypb.YakScript
 	459,  // 273: ypb.YakScriptRiskTypeListResponse.Data:type_name -> ypb.RiskTypeLists
-	1112, // 274: ypb.ExtractDataToFileRequest.Data:type_name -> ypb.ExtractDataToFileRequest.DataEntry
+	1115, // 274: ypb.ExtractDataToFileRequest.Data:type_name -> ypb.ExtractDataToFileRequest.DataEntry
 	776,  // 275: ypb.MITMContentReplacers.Rules:type_name -> ypb.MITMContentReplacer
 	649,  // 276: ypb.ExecYakitPluginsByYakScriptFilterRequest.Filter:type_name -> ypb.QueryYakScriptRequest
 	788,  // 277: ypb.ExecYakitPluginsByYakScriptFilterRequest.ExtraParams:type_name -> ypb.ExecParamItem
@@ -90508,7 +90732,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	485,  // 285: ypb.RiskTableStats.RiskLevelStats:type_name -> ypb.Fields
 	484,  // 286: ypb.Fields.Values:type_name -> ypb.FieldName
 	486,  // 287: ypb.YsoOptionsWithVerbose.Options:type_name -> ypb.YsoOption
-	1113, // 288: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptions:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
+	1116, // 288: ypb.YsoClassGeneraterOptionsWithVerbose.BindOptions:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose.BindOptionsEntry
 	489,  // 289: ypb.YsoClassOptionsResponseWithVerbose.Options:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose
 	491,  // 290: ypb.YsoClassOptionsResponse.Options:type_name -> ypb.YsoClassGeneraterOptions
 	489,  // 291: ypb.YsoOptionsRequerstWithVerbose.Options:type_name -> ypb.YsoClassGeneraterOptionsWithVerbose
@@ -90520,8 +90744,8 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	506,  // 297: ypb.HistoryHTTPFuzzerTasksResponse.Data:type_name -> ypb.HistoryHTTPFuzzerTaskDetail
 	729,  // 298: ypb.HistoryHTTPFuzzerTasksResponse.Pagination:type_name -> ypb.Paging
 	729,  // 299: ypb.QueryHistoryHTTPFuzzerTaskExParams.Pagination:type_name -> ypb.Paging
-	1114, // 300: ypb.WebShell.Headers:type_name -> ypb.WebShell.HeadersEntry
-	1115, // 301: ypb.WebShell.Posts:type_name -> ypb.WebShell.PostsEntry
+	1117, // 300: ypb.WebShell.Headers:type_name -> ypb.WebShell.HeadersEntry
+	1118, // 301: ypb.WebShell.Posts:type_name -> ypb.WebShell.PostsEntry
 	515,  // 302: ypb.WebShell.ShellOptions:type_name -> ypb.ShellOptions
 	2,    // 303: ypb.ShellGenerate.EncMode:type_name -> ypb.EncMode
 	1,    // 304: ypb.ShellGenerate.Script:type_name -> ypb.ShellScript
@@ -90529,8 +90753,8 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	729,  // 306: ypb.QueryWebShellsResponse.Pagination:type_name -> ypb.Paging
 	513,  // 307: ypb.QueryWebShellsResponse.Data:type_name -> ypb.WebShell
 	515,  // 308: ypb.UpdateWebShellRequest.ShellOptions:type_name -> ypb.ShellOptions
-	1116, // 309: ypb.UpdateWebShellRequest.Headers:type_name -> ypb.UpdateWebShellRequest.HeadersEntry
-	1117, // 310: ypb.UpdateWebShellRequest.Posts:type_name -> ypb.UpdateWebShellRequest.PostsEntry
+	1119, // 309: ypb.UpdateWebShellRequest.Headers:type_name -> ypb.UpdateWebShellRequest.HeadersEntry
+	1120, // 310: ypb.UpdateWebShellRequest.Posts:type_name -> ypb.UpdateWebShellRequest.PostsEntry
 	526,  // 311: ypb.QueryDNSLogByTokenResponse.Events:type_name -> ypb.DNSLogEvent
 	530,  // 312: ypb.AvailableLocalAddrResponse.Interfaces:type_name -> ypb.NetInterface
 	553,  // 313: ypb.ConfigGlobalReverseParams.ConnectParams:type_name -> ypb.GetTunnelServerExternalIPParams
@@ -90742,9 +90966,9 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	848,  // 519: ypb.ExportFingerprintRequest.Filter:type_name -> ypb.FingerprintFilter
 	729,  // 520: ypb.QuerySyntaxFlowRuleRequest.Pagination:type_name -> ypb.Paging
 	867,  // 521: ypb.QuerySyntaxFlowRuleRequest.Filter:type_name -> ypb.SyntaxFlowRuleFilter
-	1118, // 522: ypb.SyntaxFlowRule.AlertMsg:type_name -> ypb.SyntaxFlowRule.AlertMsgEntry
-	1119, // 523: ypb.AlertMessage.Extra:type_name -> ypb.AlertMessage.ExtraEntry
-	1120, // 524: ypb.SyntaxFlowRuleInput.AlertMsg:type_name -> ypb.SyntaxFlowRuleInput.AlertMsgEntry
+	1121, // 522: ypb.SyntaxFlowRule.AlertMsg:type_name -> ypb.SyntaxFlowRule.AlertMsgEntry
+	1122, // 523: ypb.AlertMessage.Extra:type_name -> ypb.AlertMessage.ExtraEntry
+	1123, // 524: ypb.SyntaxFlowRuleInput.AlertMsg:type_name -> ypb.SyntaxFlowRuleInput.AlertMsgEntry
 	869,  // 525: ypb.SSARiskDiffRequest.BaseLine:type_name -> ypb.SSARiskDiffItem
 	869,  // 526: ypb.SSARiskDiffRequest.Compare:type_name -> ypb.SSARiskDiffItem
 	925,  // 527: ypb.SSARiskDiffResponse.BaseRisk:type_name -> ypb.SSARisk
@@ -91631,680 +91855,684 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	1088, // 1408: ypb.Yak.ExecuteContextMenuAction:input_type -> ypb.ExecuteContextMenuActionRequest
 	1091, // 1409: ypb.Yak.UploadToTemporaryFile:input_type -> ypb.UploadToTemporaryFileRequest
 	1096, // 1410: ypb.Yak.GetAISessionCurrentResources:input_type -> ypb.GetAISessionCurrentResourcesRequest
-	10,   // 1411: ypb.Yak.Version:output_type -> ypb.VersionResponse
-	11,   // 1412: ypb.Yak.YakVersionAtLeast:output_type -> ypb.GeneralResponse
-	783,  // 1413: ypb.Yak.Echo:output_type -> ypb.EchoResposne
-	785,  // 1414: ypb.Yak.Handshake:output_type -> ypb.HandshakeResponse
-	18,   // 1415: ypb.Yak.VerifySystemCertificate:output_type -> ypb.VerifySystemCertificateResponse
-	11,   // 1416: ypb.Yak.InstallMITMCertificate:output_type -> ypb.GeneralResponse
-	778,  // 1417: ypb.Yak.MITM:output_type -> ypb.MITMResponse
-	770,  // 1418: ypb.Yak.SetMITMFilter:output_type -> ypb.SetMITMFilterResponse
-	769,  // 1419: ypb.Yak.GetMITMFilter:output_type -> ypb.SetMITMFilterRequest
-	769,  // 1420: ypb.Yak.ResetMITMFilter:output_type -> ypb.SetMITMFilterRequest
-	483,  // 1421: ypb.Yak.DownloadMITMCert:output_type -> ypb.MITMCert
-	483,  // 1422: ypb.Yak.DownloadMITMGMCert:output_type -> ypb.MITMCert
-	1024, // 1423: ypb.Yak.WatchProcessConnection:output_type -> ypb.WatchProcessResponse
-	1026, // 1424: ypb.Yak.MITMV2:output_type -> ypb.MITMV2Response
-	1080, // 1425: ypb.Yak.GetMITMDiagnostics:output_type -> ypb.GetMITMDiagnosticsResponse
-	787,  // 1426: ypb.Yak.OpenPort:output_type -> ypb.Output
-	790,  // 1427: ypb.Yak.Exec:output_type -> ypb.ExecResult
-	694,  // 1428: ypb.Yak.QueryExecHistory:output_type -> ypb.ExecHistoryRecordResponse
-	9,    // 1429: ypb.Yak.RemoveExecHistory:output_type -> ypb.Empty
-	9,    // 1430: ypb.Yak.SavePluginExecutionHistory:output_type -> ypb.Empty
-	697,  // 1431: ypb.Yak.GetPluginExecutionUsageRanking:output_type -> ypb.PluginExecutionUsageRankingResponse
-	9,    // 1432: ypb.Yak.LoadNucleiTemplates:output_type -> ypb.Empty
-	790,  // 1433: ypb.Yak.AutoUpdateYakModule:output_type -> ypb.ExecResult
-	790,  // 1434: ypb.Yak.ExecYakScript:output_type -> ypb.ExecResult
-	14,   // 1435: ypb.Yak.ExecBatchYakScript:output_type -> ypb.ExecBatchYakScriptResult
-	431,  // 1436: ypb.Yak.GetExecBatchYakScriptUnfinishedTask:output_type -> ypb.GetExecBatchYakScriptUnfinishedTaskResponse
-	13,   // 1437: ypb.Yak.GetExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
-	13,   // 1438: ypb.Yak.PopExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
-	14,   // 1439: ypb.Yak.RecoverExecBatchYakScriptUnfinishedTask:output_type -> ypb.ExecBatchYakScriptResult
-	651,  // 1440: ypb.Yak.QueryYakScript:output_type -> ypb.QueryYakScriptResponse
-	653,  // 1441: ypb.Yak.QueryYakScriptByYakScriptName:output_type -> ypb.YakScript
-	653,  // 1442: ypb.Yak.SaveYakScript:output_type -> ypb.YakScript
-	9,    // 1443: ypb.Yak.DeleteYakScript:output_type -> ypb.Empty
-	653,  // 1444: ypb.Yak.GetYakScriptById:output_type -> ypb.YakScript
-	653,  // 1445: ypb.Yak.GetYakScriptByName:output_type -> ypb.YakScript
-	653,  // 1446: ypb.Yak.GetYakScriptByOnlineID:output_type -> ypb.YakScript
-	9,    // 1447: ypb.Yak.IgnoreYakScript:output_type -> ypb.Empty
-	9,    // 1448: ypb.Yak.UnIgnoreYakScript:output_type -> ypb.Empty
-	589,  // 1449: ypb.Yak.ExportYakScript:output_type -> ypb.ExportYakScriptResponse
-	790,  // 1450: ypb.Yak.ExportYakScriptStream:output_type -> ypb.ExecResult
-	790,  // 1451: ypb.Yak.ImportYakScriptStream:output_type -> ypb.ExecResult
-	790,  // 1452: ypb.Yak.ExecutePacketYakScript:output_type -> ypb.ExecResult
-	14,   // 1453: ypb.Yak.ExecuteBatchPacketYakScript:output_type -> ypb.ExecBatchYakScriptResult
-	447,  // 1454: ypb.Yak.GetYakScriptTags:output_type -> ypb.GetYakScriptTagsResponse
-	450,  // 1455: ypb.Yak.QueryYakScriptLocalAndUser:output_type -> ypb.QueryYakScriptLocalAndUserResponse
-	450,  // 1456: ypb.Yak.QueryYakScriptByOnlineGroup:output_type -> ypb.QueryYakScriptLocalAndUserResponse
-	450,  // 1457: ypb.Yak.QueryYakScriptLocalAll:output_type -> ypb.QueryYakScriptLocalAndUserResponse
-	454,  // 1458: ypb.Yak.QueryYakScriptByNames:output_type -> ypb.QueryYakScriptByNamesResponse
-	455,  // 1459: ypb.Yak.QueryYakScriptByIsCore:output_type -> ypb.QueryYakScriptByIsCoreResponse
-	457,  // 1460: ypb.Yak.QueryYakScriptRiskDetailByCWE:output_type -> ypb.QueryYakScriptRiskDetailByCWEResponse
-	458,  // 1461: ypb.Yak.YakScriptRiskTypeList:output_type -> ypb.YakScriptRiskTypeListResponse
-	653,  // 1462: ypb.Yak.SaveNewYakScript:output_type -> ypb.YakScript
-	657,  // 1463: ypb.Yak.SaveYakScriptToOnline:output_type -> ypb.SaveYakScriptToOnlineResponse
-	660,  // 1464: ypb.Yak.ExportLocalYakScript:output_type -> ypb.ExportLocalYakScriptResponse
-	661,  // 1465: ypb.Yak.ExportLocalYakScriptStream:output_type -> ypb.ExportYakScriptLocalResponse
-	663,  // 1466: ypb.Yak.ImportYakScript:output_type -> ypb.ImportYakScriptResult
-	9,    // 1467: ypb.Yak.SetYakScriptSkipUpdate:output_type -> ypb.Empty
-	665,  // 1468: ypb.Yak.QueryYakScriptSkipUpdate:output_type -> ypb.QueryYakScriptSkipUpdateResponse
-	667,  // 1469: ypb.Yak.QueryYakScriptGroup:output_type -> ypb.QueryYakScriptGroupResponse
-	9,    // 1470: ypb.Yak.SaveYakScriptGroup:output_type -> ypb.Empty
-	9,    // 1471: ypb.Yak.RenameYakScriptGroup:output_type -> ypb.Empty
-	9,    // 1472: ypb.Yak.DeleteYakScriptGroup:output_type -> ypb.Empty
-	672,  // 1473: ypb.Yak.GetYakScriptGroup:output_type -> ypb.GetYakScriptGroupResponse
-	9,    // 1474: ypb.Yak.ResetYakScriptGroup:output_type -> ypb.Empty
-	9,    // 1475: ypb.Yak.SetGroup:output_type -> ypb.Empty
-	756,  // 1476: ypb.Yak.GetHTTPFlowByHash:output_type -> ypb.HTTPFlow
-	756,  // 1477: ypb.Yak.GetHTTPFlowById:output_type -> ypb.HTTPFlow
-	759,  // 1478: ypb.Yak.GetHTTPFlowBodyById:output_type -> ypb.GetHTTPFlowBodyByIdResponse
-	755,  // 1479: ypb.Yak.GetHTTPFlowByIds:output_type -> ypb.HTTPFlows
-	760,  // 1480: ypb.Yak.QueryHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
-	9,    // 1481: ypb.Yak.DeleteHTTPFlows:output_type -> ypb.Empty
-	9,    // 1482: ypb.Yak.SetTagForHTTPFlow:output_type -> ypb.Empty
-	753,  // 1483: ypb.Yak.QueryHTTPFlowsIds:output_type -> ypb.QueryHTTPFlowsIdsResponse
-	762,  // 1484: ypb.Yak.HTTPFlowsFieldGroup:output_type -> ypb.HTTPFlowsFieldGroupResponse
-	764,  // 1485: ypb.Yak.HTTPFlowsShare:output_type -> ypb.HTTPFlowsShareResponse
-	9,    // 1486: ypb.Yak.HTTPFlowsExtract:output_type -> ypb.Empty
-	795,  // 1487: ypb.Yak.GetHTTPFlowBare:output_type -> ypb.HTTPFlowBareResponse
-	760,  // 1488: ypb.Yak.ExportHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
-	9,    // 1489: ypb.Yak.HTTPFlowsToOnline:output_type -> ypb.Empty
-	750,  // 1490: ypb.Yak.QueryHTTPFlowsProcessNames:output_type -> ypb.QueryHTTPFlowsProcessNamesResponse
-	738,  // 1491: ypb.Yak.HTTPFlowsToOnlineBatch:output_type -> ypb.HTTPFlowsToOnlineBatchResponse
-	740,  // 1492: ypb.Yak.HTTPFlowsFromOnline:output_type -> ypb.HTTPFlowsFromOnlineProgress
-	742,  // 1493: ypb.Yak.BatchSetHTTPFlowIssueFields:output_type -> ypb.BatchSetHTTPFlowIssueFieldsResponse
-	746,  // 1494: ypb.Yak.AnalyzeHTTPFlow:output_type -> ypb.AnalyzeHTTPFlowResponse
-	724,  // 1495: ypb.Yak.ExtractUrl:output_type -> ypb.ExtractedUrl
-	506,  // 1496: ypb.Yak.GetHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTaskDetail
-	508,  // 1497: ypb.Yak.QueryHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTasks
-	509,  // 1498: ypb.Yak.QueryHistoryHTTPFuzzerTaskEx:output_type -> ypb.HistoryHTTPFuzzerTasksResponse
-	9,    // 1499: ypb.Yak.DeleteHistoryHTTPFuzzerTask:output_type -> ypb.Empty
-	1099, // 1500: ypb.Yak.FetchHTTPPreviewResource:output_type -> ypb.HTTPPreviewResourceResponse
-	726,  // 1501: ypb.Yak.HTTPFuzzer:output_type -> ypb.FuzzerResponse
-	725,  // 1502: ypb.Yak.HTTPFuzzerSequence:output_type -> ypb.FuzzerSequenceResponse
-	718,  // 1503: ypb.Yak.HTTPFuzzerGroup:output_type -> ypb.GroupHTTPFuzzerResponse
-	713,  // 1504: ypb.Yak.PreloadHTTPFuzzerParams:output_type -> ypb.PreloadHTTPFuzzerParamsResponse
-	706,  // 1505: ypb.Yak.RenderVariables:output_type -> ypb.RenderVariablesResponse
-	708,  // 1506: ypb.Yak.MatchHTTPResponse:output_type -> ypb.MatchHTTPResponseResult
-	710,  // 1507: ypb.Yak.ExtractHTTPResponse:output_type -> ypb.ExtractHTTPResponseResult
-	726,  // 1508: ypb.Yak.RedirectRequest:output_type -> ypb.FuzzerResponse
-	564,  // 1509: ypb.Yak.HTTPRequestMutate:output_type -> ypb.MutateResult
-	564,  // 1510: ypb.Yak.HTTPResponseMutate:output_type -> ypb.MutateResult
-	441,  // 1511: ypb.Yak.FixUploadPacket:output_type -> ypb.FixUploadPacketResponse
-	442,  // 1512: ypb.Yak.IsMultipartFormDataRequest:output_type -> ypb.IsMultipartFormDataRequestResult
-	371,  // 1513: ypb.Yak.GenerateExtractRule:output_type -> ypb.GenerateExtractRuleResponse
-	359,  // 1514: ypb.Yak.ExtractData:output_type -> ypb.ExtractDataResponse
-	797,  // 1515: ypb.Yak.ImportHTTPFuzzerTaskFromYaml:output_type -> ypb.ImportHTTPFuzzerTaskFromYamlResponse
-	799,  // 1516: ypb.Yak.ExportHTTPFuzzerTaskToYaml:output_type -> ypb.ExportHTTPFuzzerTaskToYamlResponse
-	801,  // 1517: ypb.Yak.RenderHTTPFuzzerPacket:output_type -> ypb.RenderHTTPFuzzerPacketResponse
-	9,    // 1518: ypb.Yak.SaveFuzzerLabel:output_type -> ypb.Empty
-	361,  // 1519: ypb.Yak.QueryFuzzerLabel:output_type -> ypb.QueryFuzzerLabelResponse
-	9,    // 1520: ypb.Yak.DeleteFuzzerLabel:output_type -> ypb.Empty
-	845,  // 1521: ypb.Yak.SaveFuzzerConfig:output_type -> ypb.DbOperateMessage
-	366,  // 1522: ypb.Yak.QueryFuzzerConfig:output_type -> ypb.QueryFuzzerConfigResponse
-	845,  // 1523: ypb.Yak.DeleteFuzzerConfig:output_type -> ypb.DbOperateMessage
-	374,  // 1524: ypb.Yak.QueryHTTPFuzzerResponseByTaskId:output_type -> ypb.QueryHTTPFuzzerResponseByTaskIdResponse
-	378,  // 1525: ypb.Yak.CreateWebsocketFuzzer:output_type -> ypb.ClientWebsocketResponse
-	767,  // 1526: ypb.Yak.QueryWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.WebsocketFlows
-	9,    // 1527: ypb.Yak.DeleteWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.Empty
-	9,    // 1528: ypb.Yak.DeleteWebsocketFlowAll:output_type -> ypb.Empty
-	756,  // 1529: ypb.Yak.ConvertFuzzerResponseToHTTPFlow:output_type -> ypb.HTTPFlow
-	700,  // 1530: ypb.Yak.StringFuzzer:output_type -> ypb.StringFuzzerResponse
-	703,  // 1531: ypb.Yak.HTTPRequestAnalyzer:output_type -> ypb.HTTPRequestAnalysis
-	9,    // 1532: ypb.Yak.CreateSnippet:output_type -> ypb.Empty
-	9,    // 1533: ypb.Yak.UpdateSnippet:output_type -> ypb.Empty
-	9,    // 1534: ypb.Yak.DeleteSnippets:output_type -> ypb.Empty
-	681,  // 1535: ypb.Yak.QuerySnippets:output_type -> ypb.SnippetsResponse
-	689,  // 1536: ypb.Yak.Codec:output_type -> ypb.CodecResponse
-	689,  // 1537: ypb.Yak.NewCodec:output_type -> ypb.CodecResponse
-	690,  // 1538: ypb.Yak.GetAllCodecMethods:output_type -> ypb.CodecMethods
-	9,    // 1539: ypb.Yak.SaveCodecFlow:output_type -> ypb.Empty
-	9,    // 1540: ypb.Yak.UpdateCodecFlow:output_type -> ypb.Empty
-	9,    // 1541: ypb.Yak.DeleteCodecFlow:output_type -> ypb.Empty
-	688,  // 1542: ypb.Yak.GetAllCodecFlow:output_type -> ypb.GetCodecFlowResponse
-	253,  // 1543: ypb.Yak.PacketPrettifyHelper:output_type -> ypb.PacketPrettifyHelperResponse
-	644,  // 1544: ypb.Yak.QueryPayload:output_type -> ypb.QueryPayloadResponse
-	642,  // 1545: ypb.Yak.QueryPayloadFromFile:output_type -> ypb.QueryPayloadFromFileResponse
-	9,    // 1546: ypb.Yak.DeletePayloadByFolder:output_type -> ypb.Empty
-	9,    // 1547: ypb.Yak.DeletePayloadByGroup:output_type -> ypb.Empty
-	9,    // 1548: ypb.Yak.DeletePayload:output_type -> ypb.Empty
-	9,    // 1549: ypb.Yak.SavePayload:output_type -> ypb.Empty
-	398,  // 1550: ypb.Yak.SavePayloadStream:output_type -> ypb.SavePayloadProgress
-	398,  // 1551: ypb.Yak.SavePayloadToFileStream:output_type -> ypb.SavePayloadProgress
-	398,  // 1552: ypb.Yak.SaveLargePayloadToFileStream:output_type -> ypb.SavePayloadProgress
-	9,    // 1553: ypb.Yak.RenamePayloadFolder:output_type -> ypb.Empty
-	9,    // 1554: ypb.Yak.RenamePayloadGroup:output_type -> ypb.Empty
-	9,    // 1555: ypb.Yak.UpdatePayload:output_type -> ypb.Empty
-	9,    // 1556: ypb.Yak.UpdatePayloadToFile:output_type -> ypb.Empty
-	9,    // 1557: ypb.Yak.BackUpOrCopyPayloads:output_type -> ypb.Empty
-	633,  // 1558: ypb.Yak.GetAllPayloadGroup:output_type -> ypb.GetAllPayloadGroupResponse
-	9,    // 1559: ypb.Yak.UpdateAllPayloadGroup:output_type -> ypb.Empty
-	647,  // 1560: ypb.Yak.GetAllPayload:output_type -> ypb.GetAllPayloadResponse
-	648,  // 1561: ypb.Yak.GetAllPayloadFromFile:output_type -> ypb.GetAllPayloadFromFileResponse
-	647,  // 1562: ypb.Yak.ExportAllPayload:output_type -> ypb.GetAllPayloadResponse
-	647,  // 1563: ypb.Yak.ExportAllPayloadFromFile:output_type -> ypb.GetAllPayloadResponse
-	9,    // 1564: ypb.Yak.CreatePayloadFolder:output_type -> ypb.Empty
-	398,  // 1565: ypb.Yak.RemoveDuplicatePayloads:output_type -> ypb.SavePayloadProgress
-	398,  // 1566: ypb.Yak.CoverPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
-	398,  // 1567: ypb.Yak.ConvertPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
-	398,  // 1568: ypb.Yak.MigratePayloads:output_type -> ypb.SavePayloadProgress
-	647,  // 1569: ypb.Yak.ExportPayloadBatch:output_type -> ypb.GetAllPayloadResponse
-	402,  // 1570: ypb.Yak.UploadPayloadToOnline:output_type -> ypb.DownloadProgress
-	402,  // 1571: ypb.Yak.DownloadPayload:output_type -> ypb.DownloadProgress
-	647,  // 1572: ypb.Yak.ExportPayloadDBAndFile:output_type -> ypb.GetAllPayloadResponse
-	625,  // 1573: ypb.Yak.GetYakitCompletionRaw:output_type -> ypb.YakitCompletionRawResponse
-	629,  // 1574: ypb.Yak.GetYakVMBuildInMethodCompletion:output_type -> ypb.GetYakVMBuildInMethodCompletionResponse
-	397,  // 1575: ypb.Yak.StaticAnalyzeError:output_type -> ypb.StaticAnalyzeErrorResponse
-	395,  // 1576: ypb.Yak.YaklangCompileAndFormat:output_type -> ypb.YaklangCompileAndFormatResponse
-	386,  // 1577: ypb.Yak.YaklangLanguageSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
-	387,  // 1578: ypb.Yak.YaklangLanguageFind:output_type -> ypb.YaklangLanguageFindResponse
-	386,  // 1579: ypb.Yak.FuzzTagSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
-	388,  // 1580: ypb.Yak.YaklangInspectInformation:output_type -> ypb.YaklangInspectInformationResponse
-	391,  // 1581: ypb.Yak.YaklangGetCliCodeFromDatabase:output_type -> ypb.YaklangGetCliCodeFromDatabaseResponse
-	787,  // 1582: ypb.Yak.YaklangTerminal:output_type -> ypb.Output
-	790,  // 1583: ypb.Yak.PortScan:output_type -> ypb.ExecResult
-	616,  // 1584: ypb.Yak.ViewPortScanCode:output_type -> ypb.SimpleScript
-	790,  // 1585: ypb.Yak.SimpleDetect:output_type -> ypb.ExecResult
-	9,    // 1586: ypb.Yak.SaveCancelSimpleDetect:output_type -> ypb.Empty
-	790,  // 1587: ypb.Yak.SimpleDetectCreatReport:output_type -> ypb.ExecResult
-	437,  // 1588: ypb.Yak.QuerySimpleDetectUnfinishedTask:output_type -> ypb.QueryUnfinishedTaskResponse
-	618,  // 1589: ypb.Yak.GetSimpleDetectRecordRequestById:output_type -> ypb.RecordPortScanRequest
-	9,    // 1590: ypb.Yak.DeleteSimpleDetectUnfinishedTask:output_type -> ypb.Empty
-	790,  // 1591: ypb.Yak.RecoverSimpleDetectTask:output_type -> ypb.ExecResult
-	432,  // 1592: ypb.Yak.GetSimpleDetectUnfinishedTask:output_type -> ypb.GetSimpleDetectUnfinishedTaskResponse
-	618,  // 1593: ypb.Yak.GetSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
-	618,  // 1594: ypb.Yak.PopSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
-	790,  // 1595: ypb.Yak.RecoverSimpleDetectUnfinishedTask:output_type -> ypb.ExecResult
-	623,  // 1596: ypb.Yak.QueryPorts:output_type -> ypb.QueryPortsResponse
-	9,    // 1597: ypb.Yak.DeletePorts:output_type -> ypb.Empty
-	567,  // 1598: ypb.Yak.QueryHosts:output_type -> ypb.QueryHostsResponse
-	9,    // 1599: ypb.Yak.DeleteHosts:output_type -> ypb.Empty
-	570,  // 1600: ypb.Yak.QueryDomains:output_type -> ypb.QueryDomainsResponse
-	9,    // 1601: ypb.Yak.DeleteDomains:output_type -> ypb.Empty
-	572,  // 1602: ypb.Yak.QueryPortsGroup:output_type -> ypb.QueryPortsGroupResponse
-	9,    // 1603: ypb.Yak.UpdateFromYakitResource:output_type -> ypb.Empty
-	9,    // 1604: ypb.Yak.UpdateFromGithub:output_type -> ypb.Empty
-	9,    // 1605: ypb.Yak.AddToMenu:output_type -> ypb.Empty
-	9,    // 1606: ypb.Yak.RemoveFromMenu:output_type -> ypb.Empty
-	9,    // 1607: ypb.Yak.YakScriptIsInMenu:output_type -> ypb.Empty
-	599,  // 1608: ypb.Yak.GetAllMenuItem:output_type -> ypb.MenuByGroup
-	9,    // 1609: ypb.Yak.DeleteAllMenuItem:output_type -> ypb.Empty
-	9,    // 1610: ypb.Yak.ImportMenuItem:output_type -> ypb.Empty
-	606,  // 1611: ypb.Yak.ExportMenuItem:output_type -> ypb.ExportMenuItemResult
-	595,  // 1612: ypb.Yak.GetMenuItemById:output_type -> ypb.MenuItem
-	593,  // 1613: ypb.Yak.QueryGroupsByYakScriptId:output_type -> ypb.GroupNames
-	9,    // 1614: ypb.Yak.AddMenus:output_type -> ypb.Empty
-	599,  // 1615: ypb.Yak.QueryAllMenuItem:output_type -> ypb.MenuByGroup
-	9,    // 1616: ypb.Yak.DeleteAllMenu:output_type -> ypb.Empty
-	9,    // 1617: ypb.Yak.AddToNavigation:output_type -> ypb.Empty
-	611,  // 1618: ypb.Yak.GetAllNavigationItem:output_type -> ypb.GetAllNavigationItemResponse
-	9,    // 1619: ypb.Yak.DeleteAllNavigation:output_type -> ypb.Empty
-	9,    // 1620: ypb.Yak.AddOneNavigation:output_type -> ypb.Empty
-	593,  // 1621: ypb.Yak.QueryNavigationGroups:output_type -> ypb.GroupNames
-	9,    // 1622: ypb.Yak.SaveMarkdownDocument:output_type -> ypb.Empty
-	590,  // 1623: ypb.Yak.GetMarkdownDocument:output_type -> ypb.GetMarkdownDocumentResponse
-	9,    // 1624: ypb.Yak.DeleteMarkdownDocument:output_type -> ypb.Empty
-	790,  // 1625: ypb.Yak.StartBasicCrawler:output_type -> ypb.ExecResult
-	616,  // 1626: ypb.Yak.ViewBasicCrawlerCode:output_type -> ypb.SimpleScript
-	581,  // 1627: ypb.Yak.GenerateWebsiteTree:output_type -> ypb.GenerateWebsiteTreeResponse
-	580,  // 1628: ypb.Yak.QueryYakScriptExecResult:output_type -> ypb.QueryYakScriptExecResultResponse
-	578,  // 1629: ypb.Yak.QueryYakScriptNameInExecResult:output_type -> ypb.YakScriptNames
-	9,    // 1630: ypb.Yak.DeleteYakScriptExecResult:output_type -> ypb.Empty
-	9,    // 1631: ypb.Yak.DeleteYakScriptExec:output_type -> ypb.Empty
-	790,  // 1632: ypb.Yak.StartBrute:output_type -> ypb.ExecResult
-	560,  // 1633: ypb.Yak.GetAvailableBruteTypes:output_type -> ypb.GetAvailableBruteTypesResponse
-	554,  // 1634: ypb.Yak.GetTunnelServerExternalIP:output_type -> ypb.GetTunnelServerExternalIPResponse
-	552,  // 1635: ypb.Yak.VerifyTunnelServerDomain:output_type -> ypb.VerifyTunnelServerDomainResponse
-	790,  // 1636: ypb.Yak.StartFacades:output_type -> ypb.ExecResult
-	790,  // 1637: ypb.Yak.StartFacadesWithYsoObject:output_type -> ypb.ExecResult
-	9,    // 1638: ypb.Yak.ApplyClassToFacades:output_type -> ypb.Empty
-	500,  // 1639: ypb.Yak.BytesToBase64:output_type -> ypb.BytesToBase64Response
-	9,    // 1640: ypb.Yak.ConfigGlobalReverse:output_type -> ypb.Empty
-	529,  // 1641: ypb.Yak.AvailableLocalAddr:output_type -> ypb.AvailableLocalAddrResponse
-	528,  // 1642: ypb.Yak.GetGlobalReverseServer:output_type -> ypb.GetGlobalReverseServerResponse
-	537,  // 1643: ypb.Yak.QueryRisks:output_type -> ypb.QueryRisksResponse
-	535,  // 1644: ypb.Yak.QueryRisk:output_type -> ypb.Risk
-	9,    // 1645: ypb.Yak.DeleteRisk:output_type -> ypb.Empty
-	485,  // 1646: ypb.Yak.QueryAvailableRiskType:output_type -> ypb.Fields
-	485,  // 1647: ypb.Yak.QueryAvailableRiskLevel:output_type -> ypb.Fields
-	482,  // 1648: ypb.Yak.QueryRiskTableStats:output_type -> ypb.RiskTableStats
-	9,    // 1649: ypb.Yak.ResetRiskTableStats:output_type -> ypb.Empty
-	485,  // 1650: ypb.Yak.QueryAvailableTarget:output_type -> ypb.Fields
-	539,  // 1651: ypb.Yak.QueryNewRisk:output_type -> ypb.QueryNewRiskResponse
-	9,    // 1652: ypb.Yak.NewRiskRead:output_type -> ypb.Empty
-	9,    // 1653: ypb.Yak.UploadRiskToOnline:output_type -> ypb.Empty
-	9,    // 1654: ypb.Yak.SetTagForRisk:output_type -> ypb.Empty
-	540,  // 1655: ypb.Yak.QueryRiskTags:output_type -> ypb.QueryRiskTagsResponse
-	541,  // 1656: ypb.Yak.RiskFieldGroup:output_type -> ypb.RiskFieldGroupResponse
-	9,    // 1657: ypb.Yak.RiskFeedbackToOnline:output_type -> ypb.Empty
-	548,  // 1658: ypb.Yak.RisksFromOnline:output_type -> ypb.RisksFromOnlineProgress
-	550,  // 1659: ypb.Yak.BatchSetRiskTags:output_type -> ypb.BatchSetRiskTagsResponse
-	472,  // 1660: ypb.Yak.QueryReports:output_type -> ypb.QueryReportsResponse
-	474,  // 1661: ypb.Yak.QueryReport:output_type -> ypb.Report
-	9,    // 1662: ypb.Yak.DeleteReport:output_type -> ypb.Empty
-	485,  // 1663: ypb.Yak.QueryAvailableReportFrom:output_type -> ypb.Fields
-	9,    // 1664: ypb.Yak.DownloadReport:output_type -> ypb.Empty
-	487,  // 1665: ypb.Yak.GetAllYsoGadgetOptions:output_type -> ypb.YsoOptionsWithVerbose
-	487,  // 1666: ypb.Yak.GetAllYsoClassOptions:output_type -> ypb.YsoOptionsWithVerbose
-	490,  // 1667: ypb.Yak.GetAllYsoClassGeneraterOptions:output_type -> ypb.YsoClassOptionsResponseWithVerbose
-	497,  // 1668: ypb.Yak.GenerateYsoCode:output_type -> ypb.YsoCodeResponse
-	498,  // 1669: ypb.Yak.GenerateYsoBytes:output_type -> ypb.YsoBytesResponse
-	496,  // 1670: ypb.Yak.YsoDump:output_type -> ypb.YsoDumpResponse
-	513,  // 1671: ypb.Yak.CreateWebShell:output_type -> ypb.WebShell
-	9,    // 1672: ypb.Yak.DeleteWebShell:output_type -> ypb.Empty
-	513,  // 1673: ypb.Yak.UpdateWebShell:output_type -> ypb.WebShell
-	519,  // 1674: ypb.Yak.QueryWebShells:output_type -> ypb.QueryWebShellsResponse
-	517,  // 1675: ypb.Yak.Ping:output_type -> ypb.WebShellResponse
-	517,  // 1676: ypb.Yak.GetBasicInfo:output_type -> ypb.WebShellResponse
-	517,  // 1677: ypb.Yak.GenerateWebShell:output_type -> ypb.WebShellResponse
-	9,    // 1678: ypb.Yak.SetYakBridgeLogServer:output_type -> ypb.Empty
-	522,  // 1679: ypb.Yak.GetCurrentYakBridgeLogServer:output_type -> ypb.YakDNSLogBridgeAddr
-	527,  // 1680: ypb.Yak.RequireDNSLogDomain:output_type -> ypb.DNSLogRootDomain
-	527,  // 1681: ypb.Yak.RequireDNSLogDomainByScript:output_type -> ypb.DNSLogRootDomain
-	525,  // 1682: ypb.Yak.QueryDNSLogByToken:output_type -> ypb.QueryDNSLogByTokenResponse
-	525,  // 1683: ypb.Yak.QueryDNSLogTokenByScript:output_type -> ypb.QueryDNSLogByTokenResponse
-	477,  // 1684: ypb.Yak.RequireICMPRandomLength:output_type -> ypb.RequireICMPRandomLengthResponse
-	502,  // 1685: ypb.Yak.QueryICMPTrigger:output_type -> ypb.QueryICMPTriggerResponse
-	480,  // 1686: ypb.Yak.RequireRandomPortToken:output_type -> ypb.RandomPortInfo
-	478,  // 1687: ypb.Yak.QueryRandomPortTrigger:output_type -> ypb.RandomPortTriggerNotification
-	503,  // 1688: ypb.Yak.QuerySupportedDnsLogPlatforms:output_type -> ypb.QuerySupportedDnsLogPlatformsResponse
-	485,  // 1689: ypb.Yak.GetAvailableYakScriptTags:output_type -> ypb.Fields
-	9,    // 1690: ypb.Yak.ForceUpdateAvailableYakScriptTags:output_type -> ypb.Empty
-	790,  // 1691: ypb.Yak.ExecYakitPluginsByYakScriptFilter:output_type -> ypb.ExecResult
-	469,  // 1692: ypb.Yak.GenerateYakCodeByPacket:output_type -> ypb.GenerateYakCodeByPacketResponse
-	468,  // 1693: ypb.Yak.GenerateCSRFPocByPacket:output_type -> ypb.GenerateCSRFPocByPacketResponse
-	464,  // 1694: ypb.Yak.ExportMITMReplacerRules:output_type -> ypb.ExportMITMReplacerRulesResponse
-	9,    // 1695: ypb.Yak.ImportMITMReplacerRules:output_type -> ypb.Empty
-	462,  // 1696: ypb.Yak.GetCurrentRules:output_type -> ypb.MITMContentReplacers
-	9,    // 1697: ypb.Yak.SetCurrentRules:output_type -> ypb.Empty
-	1030, // 1698: ypb.Yak.QueryMITMReplacerRules:output_type -> ypb.QueryMITMReplacerRulesResponse
-	845,  // 1699: ypb.Yak.DeduplicateMITMReplacerRules:output_type -> ypb.DbOperateMessage
-	805,  // 1700: ypb.Yak.GenerateURL:output_type -> ypb.GenerateURLResponse
-	446,  // 1701: ypb.Yak.ExtractDataToFile:output_type -> ypb.ExtractDataToFileResult
-	445,  // 1702: ypb.Yak.AutoDecode:output_type -> ypb.AutoDecodeResponse
-	426,  // 1703: ypb.Yak.GetSystemProxy:output_type -> ypb.GetSystemProxyResult
-	9,    // 1704: ypb.Yak.SetSystemProxy:output_type -> ypb.Empty
-	422,  // 1705: ypb.Yak.GetKey:output_type -> ypb.GetKeyResult
-	9,    // 1706: ypb.Yak.SetKey:output_type -> ypb.Empty
-	9,    // 1707: ypb.Yak.DelKey:output_type -> ypb.Empty
-	424,  // 1708: ypb.Yak.GetAllProcessEnvKey:output_type -> ypb.GetProcessEnvKeyResult
-	9,    // 1709: ypb.Yak.SetProcessEnvKey:output_type -> ypb.Empty
-	422,  // 1710: ypb.Yak.GetProjectKey:output_type -> ypb.GetKeyResult
-	9,    // 1711: ypb.Yak.SetProjectKey:output_type -> ypb.Empty
-	419,  // 1712: ypb.Yak.GetOnlineProfile:output_type -> ypb.OnlineProfile
-	9,    // 1713: ypb.Yak.SetOnlineProfile:output_type -> ypb.Empty
-	9,    // 1714: ypb.Yak.DownloadOnlinePluginById:output_type -> ypb.Empty
-	9,    // 1715: ypb.Yak.DownloadOnlinePluginByIds:output_type -> ypb.Empty
-	406,  // 1716: ypb.Yak.DownloadOnlinePluginAll:output_type -> ypb.DownloadOnlinePluginProgress
-	9,    // 1717: ypb.Yak.DeletePluginByUserID:output_type -> ypb.Empty
-	9,    // 1718: ypb.Yak.DeleteAllLocalPlugins:output_type -> ypb.Empty
-	675,  // 1719: ypb.Yak.GetYakScriptTagsAndType:output_type -> ypb.GetYakScriptTagsAndTypeResponse
-	9,    // 1720: ypb.Yak.DeleteLocalPluginsByWhere:output_type -> ypb.Empty
-	413,  // 1721: ypb.Yak.DownloadOnlinePluginByScriptNames:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
-	406,  // 1722: ypb.Yak.DownloadOnlinePlugins:output_type -> ypb.DownloadOnlinePluginProgress
-	9,    // 1723: ypb.Yak.DownloadOnlinePluginBatch:output_type -> ypb.Empty
-	413,  // 1724: ypb.Yak.DownloadOnlinePluginByPluginName:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
-	653,  // 1725: ypb.Yak.DownloadOnlinePluginByUUID:output_type -> ypb.YakScript
-	417,  // 1726: ypb.Yak.QueryOnlinePlugins:output_type -> ypb.QueryOnlinePluginsResponse
-	790,  // 1727: ypb.Yak.ExecPacketScan:output_type -> ypb.ExecResult
-	379,  // 1728: ypb.Yak.GetEngineDefaultProxy:output_type -> ypb.DefaultProxyResult
-	9,    // 1729: ypb.Yak.SetEngineDefaultProxy:output_type -> ypb.Empty
-	372,  // 1730: ypb.Yak.GetMachineID:output_type -> ypb.GetMachineIDResponse
-	791,  // 1731: ypb.Yak.GetLicense:output_type -> ypb.GetLicenseResponse
-	9,    // 1732: ypb.Yak.CheckLicense:output_type -> ypb.Empty
-	358,  // 1733: ypb.Yak.GetRequestBodyByHTTPFlowID:output_type -> ypb.Bytes
-	358,  // 1734: ypb.Yak.GetResponseBodyByHTTPFlowID:output_type -> ypb.Bytes
-	358,  // 1735: ypb.Yak.GetHTTPPacketBody:output_type -> ypb.Bytes
-	357,  // 1736: ypb.Yak.EncodeHTTPPacketContent:output_type -> ypb.EncodeHTTPPacketContentResponse
-	353,  // 1737: ypb.Yak.RegisterFacadesHTTP:output_type -> ypb.RegisterFacadesHTTPResponse
-	9,    // 1738: ypb.Yak.ResetAndInvalidUserData:output_type -> ypb.Empty
-	350,  // 1739: ypb.Yak.CreateYaklangShell:output_type -> ypb.YaklangShellResponse
-	790,  // 1740: ypb.Yak.AttachCombinedOutput:output_type -> ypb.ExecResult
-	333,  // 1741: ypb.Yak.IsPrivilegedForNetRaw:output_type -> ypb.IsPrivilegedForNetRawResponse
-	9,    // 1742: ypb.Yak.PromotePermissionForUserPcap:output_type -> ypb.Empty
-	9,    // 1743: ypb.Yak.SetCurrentProject:output_type -> ypb.Empty
-	339,  // 1744: ypb.Yak.GetCurrentProject:output_type -> ypb.ProjectDescription
-	339,  // 1745: ypb.Yak.GetCurrentProjectEx:output_type -> ypb.ProjectDescription
-	340,  // 1746: ypb.Yak.GetProjects:output_type -> ypb.GetProjectsResponse
-	337,  // 1747: ypb.Yak.NewProject:output_type -> ypb.NewProjectResponse
-	337,  // 1748: ypb.Yak.UpdateProject:output_type -> ypb.NewProjectResponse
-	9,    // 1749: ypb.Yak.IsProjectNameValid:output_type -> ypb.Empty
-	9,    // 1750: ypb.Yak.RemoveProject:output_type -> ypb.Empty
-	9,    // 1751: ypb.Yak.DeleteProject:output_type -> ypb.Empty
-	339,  // 1752: ypb.Yak.GetDefaultProject:output_type -> ypb.ProjectDescription
-	339,  // 1753: ypb.Yak.GetDefaultProjectEx:output_type -> ypb.ProjectDescription
-	339,  // 1754: ypb.Yak.QueryProjectDetail:output_type -> ypb.ProjectDescription
-	339,  // 1755: ypb.Yak.GetTemporaryProject:output_type -> ypb.ProjectDescription
-	339,  // 1756: ypb.Yak.GetTemporaryProjectEx:output_type -> ypb.ProjectDescription
-	331,  // 1757: ypb.Yak.ExportProject:output_type -> ypb.ProjectIOProgress
-	331,  // 1758: ypb.Yak.ImportProject:output_type -> ypb.ProjectIOProgress
-	9,    // 1759: ypb.Yak.MigrateLegacyDatabase:output_type -> ypb.Empty
-	319,  // 1760: ypb.Yak.QueryMITMRuleExtractedData:output_type -> ypb.QueryMITMRuleExtractedDataResponse
-	329,  // 1761: ypb.Yak.QueryMITMExtractedAggregate:output_type -> ypb.QueryMITMExtractedAggregateResponse
-	323,  // 1762: ypb.Yak.ExportMITMRuleExtractedData:output_type -> ypb.ExportMITMRuleExtractedDataResponse
-	9,    // 1763: ypb.Yak.DeleteMITMRuleExtractedData:output_type -> ypb.Empty
-	326,  // 1764: ypb.Yak.DeduplicateMITMRuleExtractedData:output_type -> ypb.DeduplicateMITMRuleExtractedDataResponse
-	9,    // 1765: ypb.Yak.ImportChaosMakerRules:output_type -> ypb.Empty
-	310,  // 1766: ypb.Yak.QueryChaosMakerRule:output_type -> ypb.QueryChaosMakerRuleResponse
-	9,    // 1767: ypb.Yak.DeleteChaosMakerRuleByID:output_type -> ypb.Empty
-	790,  // 1768: ypb.Yak.ExecuteChaosMakerRule:output_type -> ypb.ExecResult
-	307,  // 1769: ypb.Yak.IsRemoteAddrAvailable:output_type -> ypb.IsRemoteAddrAvailableResponse
-	307,  // 1770: ypb.Yak.ConnectVulinboxAgent:output_type -> ypb.IsRemoteAddrAvailableResponse
-	273,  // 1771: ypb.Yak.GetRegisteredVulinboxAgent:output_type -> ypb.GetRegisteredAgentResponse
-	9,    // 1772: ypb.Yak.DisconnectVulinboxAgent:output_type -> ypb.Empty
-	316,  // 1773: ypb.Yak.IsCVEDatabaseReady:output_type -> ypb.IsCVEDatabaseReadyResponse
-	790,  // 1774: ypb.Yak.UpdateCVEDatabase:output_type -> ypb.ExecResult
-	790,  // 1775: ypb.Yak.ExportsProfileDatabase:output_type -> ypb.ExecResult
-	790,  // 1776: ypb.Yak.ImportsProfileDatabase:output_type -> ypb.ExecResult
-	301,  // 1777: ypb.Yak.QueryCVE:output_type -> ypb.QueryCVEResponse
-	299,  // 1778: ypb.Yak.GetCVE:output_type -> ypb.CVEDetailEx
-	303,  // 1779: ypb.Yak.SaveTextToTemporalFile:output_type -> ypb.SaveTextToTemporalFileResponse
-	295,  // 1780: ypb.Yak.IsScrecorderReady:output_type -> ypb.IsScrecorderReadyResponse
-	790,  // 1781: ypb.Yak.InstallScrecorder:output_type -> ypb.ExecResult
-	790,  // 1782: ypb.Yak.StartScrecorder:output_type -> ypb.ExecResult
-	291,  // 1783: ypb.Yak.QueryScreenRecorders:output_type -> ypb.QueryScreenRecorderResponse
-	9,    // 1784: ypb.Yak.DeleteScreenRecorders:output_type -> ypb.Empty
-	9,    // 1785: ypb.Yak.UploadScreenRecorders:output_type -> ypb.Empty
-	286,  // 1786: ypb.Yak.GetOneScreenRecorders:output_type -> ypb.ScreenRecorder
-	9,    // 1787: ypb.Yak.UpdateScreenRecorders:output_type -> ypb.Empty
-	278,  // 1788: ypb.Yak.IsVulinboxReady:output_type -> ypb.IsVulinboxReadyResponse
-	790,  // 1789: ypb.Yak.InstallVulinbox:output_type -> ypb.ExecResult
-	790,  // 1790: ypb.Yak.StartVulinbox:output_type -> ypb.ExecResult
-	790,  // 1791: ypb.Yak.GenQualityInspectionReport:output_type -> ypb.ExecResult
-	284,  // 1792: ypb.Yak.HTTPRequestBuilder:output_type -> ypb.HTTPRequestBuilderResponse
-	790,  // 1793: ypb.Yak.DebugPlugin:output_type -> ypb.ExecResult
-	276,  // 1794: ypb.Yak.SmokingEvaluatePlugin:output_type -> ypb.SmokingEvaluatePluginResponse
-	803,  // 1795: ypb.Yak.SmokingEvaluatePluginBatch:output_type -> ypb.SmokingEvaluatePluginBatchResponse
-	793,  // 1796: ypb.Yak.GetSystemDefaultDnsServers:output_type -> ypb.DefaultDnsServerResponse
-	270,  // 1797: ypb.Yak.DiagnoseNetwork:output_type -> ypb.DiagnoseNetworkResponse
-	270,  // 1798: ypb.Yak.DiagnoseNetworkDNS:output_type -> ypb.DiagnoseNetworkResponse
-	810,  // 1799: ypb.Yak.TraceRoute:output_type -> ypb.TraceRouteResponse
-	259,  // 1800: ypb.Yak.GetGlobalNetworkConfig:output_type -> ypb.GlobalNetworkConfig
-	9,    // 1801: ypb.Yak.SetGlobalNetworkConfig:output_type -> ypb.Empty
-	9,    // 1802: ypb.Yak.ResetGlobalNetworkConfig:output_type -> ypb.Empty
-	265,  // 1803: ypb.Yak.GetGlobalProxyRulesConfig:output_type -> ypb.GlobalProxyRulesConfig
-	9,    // 1804: ypb.Yak.SetGlobalProxyRulesConfig:output_type -> ypb.Empty
-	263,  // 1805: ypb.Yak.CheckProxyAlive:output_type -> ypb.CheckProxyAliveResponse
-	258,  // 1806: ypb.Yak.ValidP12PassWord:output_type -> ypb.ValidP12PassWordResponse
-	251,  // 1807: ypb.Yak.RequestYakURL:output_type -> ypb.RequestYakURLResponse
-	1094, // 1808: ypb.Yak.ExecuteBrowserExtensionTask:output_type -> ypb.BrowserExtensionTaskEvent
-	828,  // 1809: ypb.Yak.ReadFile:output_type -> ypb.ReadFileResponse
-	829,  // 1810: ypb.Yak.GetCHeadersDir:output_type -> ypb.GetCHeadersDirResponse
-	831,  // 1811: ypb.Yak.ListCHeaders:output_type -> ypb.ListCHeadersResponse
-	834,  // 1812: ypb.Yak.ListCHeaderEntries:output_type -> ypb.ListCHeaderEntriesResponse
-	11,   // 1813: ypb.Yak.ImportCHeaderPack:output_type -> ypb.GeneralResponse
-	11,   // 1814: ypb.Yak.DeleteCHeaderPack:output_type -> ypb.GeneralResponse
-	838,  // 1815: ypb.Yak.PreviewCHeaderFile:output_type -> ypb.PreviewCHeaderFileResponse
-	840,  // 1816: ypb.Yak.DownloadOfficialCHeaders:output_type -> ypb.DownloadOfficialCHeadersResponse
-	235,  // 1817: ypb.Yak.GetPcapMetadata:output_type -> ypb.PcapMetadata
-	247,  // 1818: ypb.Yak.PcapX:output_type -> ypb.PcapXResponse
-	239,  // 1819: ypb.Yak.QueryTrafficSession:output_type -> ypb.QueryTrafficSessionResponse
-	241,  // 1820: ypb.Yak.QueryTrafficPacket:output_type -> ypb.QueryTrafficPacketResponse
-	243,  // 1821: ypb.Yak.QueryTrafficTCPReassembled:output_type -> ypb.QueryTrafficTCPReassembledResponse
-	808,  // 1822: ypb.Yak.ParseTraffic:output_type -> ypb.ParseTrafficResponse
-	233,  // 1823: ypb.Yak.DuplexConnection:output_type -> ypb.DuplexConnectionResponse
-	227,  // 1824: ypb.Yak.HybridScan:output_type -> ypb.HybridScanResponse
-	224,  // 1825: ypb.Yak.QueryHybridScanTask:output_type -> ypb.QueryHybridScanTaskResponse
-	9,    // 1826: ypb.Yak.DeleteHybridScanTask:output_type -> ypb.Empty
-	220,  // 1827: ypb.Yak.GetSpaceEngineStatus:output_type -> ypb.SpaceEngineStatus
-	220,  // 1828: ypb.Yak.GetSpaceEngineAccountStatus:output_type -> ypb.SpaceEngineStatus
-	220,  // 1829: ypb.Yak.GetSpaceEngineAccountStatusV2:output_type -> ypb.SpaceEngineStatus
-	790,  // 1830: ypb.Yak.FetchPortAssetFromSpaceEngine:output_type -> ypb.ExecResult
-	812,  // 1831: ypb.Yak.EvaluateExpression:output_type -> ypb.EvaluateExpressionResponse
-	814,  // 1832: ypb.Yak.EvaluateMultiExpression:output_type -> ypb.EvaluateMultiExpressionResponse
-	817,  // 1833: ypb.Yak.GetThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
-	11,   // 1834: ypb.Yak.CheckHahValidAiConfig:output_type -> ypb.GeneralResponse
-	997,  // 1835: ypb.Yak.ListAiModel:output_type -> ypb.ListAiModelResponse
-	999,  // 1836: ypb.Yak.AIConfigHealthCheck:output_type -> ypb.AIConfigHealthCheckResponse
-	1001, // 1837: ypb.Yak.ProbeReasoningEffort:output_type -> ypb.ProbeReasoningEffortResponse
-	1110, // 1838: ypb.Yak.ProbeModelVision:output_type -> ypb.ProbeModelVisionResponse
-	1011, // 1839: ypb.Yak.GetAIGlobalConfig:output_type -> ypb.AIGlobalConfig
-	9,    // 1840: ypb.Yak.SetAIGlobalConfig:output_type -> ypb.Empty
-	1006, // 1841: ypb.Yak.ListAIProviders:output_type -> ypb.ListAIProvidersResponse
-	1005, // 1842: ypb.Yak.QueryAIProvider:output_type -> ypb.QueryAIProvidersResponse
-	1008, // 1843: ypb.Yak.UpsertAIProvider:output_type -> ypb.UpsertAIProviderResponse
-	9,    // 1844: ypb.Yak.DeleteAIProvider:output_type -> ypb.Empty
-	817,  // 1845: ypb.Yak.GetAIThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
-	819,  // 1846: ypb.Yak.GetApiKeyByOnline:output_type -> ypb.GetApiKeyByOnlineResponse
-	9,    // 1847: ypb.Yak.UpdateApiKey:output_type -> ypb.Empty
-	822,  // 1848: ypb.Yak.GetFingerprint:output_type -> ypb.GetFingerprintResponse
-	824,  // 1849: ypb.Yak.AddFingerprint:output_type -> ypb.AddFingerprintResponse
-	826,  // 1850: ypb.Yak.ModifyFingerprint:output_type -> ypb.ModifyFingerprintResponse
-	850,  // 1851: ypb.Yak.QueryFingerprint:output_type -> ypb.QueryFingerprintResponse
-	845,  // 1852: ypb.Yak.DeleteFingerprint:output_type -> ypb.DbOperateMessage
-	845,  // 1853: ypb.Yak.UpdateFingerprint:output_type -> ypb.DbOperateMessage
-	845,  // 1854: ypb.Yak.CreateFingerprint:output_type -> ypb.DbOperateMessage
-	845,  // 1855: ypb.Yak.RecoverBuiltinFingerprint:output_type -> ypb.DbOperateMessage
-	845,  // 1856: ypb.Yak.CreateFingerprintGroup:output_type -> ypb.DbOperateMessage
-	855,  // 1857: ypb.Yak.GetAllFingerprintGroup:output_type -> ypb.FingerprintGroups
-	845,  // 1858: ypb.Yak.RenameFingerprintGroup:output_type -> ypb.DbOperateMessage
-	845,  // 1859: ypb.Yak.DeleteFingerprintGroup:output_type -> ypb.DbOperateMessage
-	845,  // 1860: ypb.Yak.BatchUpdateFingerprintToGroup:output_type -> ypb.DbOperateMessage
-	855,  // 1861: ypb.Yak.GetFingerprintGroupSetByFilter:output_type -> ypb.FingerprintGroups
-	862,  // 1862: ypb.Yak.ExportFingerprint:output_type -> ypb.DataTransferProgress
-	862,  // 1863: ypb.Yak.ImportFingerprint:output_type -> ypb.DataTransferProgress
-	842,  // 1864: ypb.Yak.GetReverseShellProgramList:output_type -> ypb.GetReverseShellProgramListResponse
-	844,  // 1865: ypb.Yak.GenerateReverseShellCommand:output_type -> ypb.GenerateReverseShellCommandResponse
-	882,  // 1866: ypb.Yak.QuerySyntaxFlowRule:output_type -> ypb.QuerySyntaxFlowRuleResponse
-	845,  // 1867: ypb.Yak.CreateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
-	879,  // 1868: ypb.Yak.CreateSyntaxFlowRuleEx:output_type -> ypb.CreateSyntaxFlowRuleResponse
-	845,  // 1869: ypb.Yak.UpdateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
-	881,  // 1870: ypb.Yak.UpdateSyntaxFlowRuleEx:output_type -> ypb.UpdateSyntaxFlowRuleResponse
-	845,  // 1871: ypb.Yak.DeleteSyntaxFlowRule:output_type -> ypb.DbOperateMessage
-	885,  // 1872: ypb.Yak.CheckSyntaxFlowRuleUpdate:output_type -> ypb.CheckSyntaxFlowRuleUpdateResponse
-	887,  // 1873: ypb.Yak.ApplySyntaxFlowRuleUpdate:output_type -> ypb.ApplySyntaxFlowRuleUpdateResponse
-	891,  // 1874: ypb.Yak.QuerySyntaxFlowRuleGroup:output_type -> ypb.QuerySyntaxFlowRuleGroupResponse
-	845,  // 1875: ypb.Yak.DeleteSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
-	845,  // 1876: ypb.Yak.CreateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
-	845,  // 1877: ypb.Yak.UpdateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
-	845,  // 1878: ypb.Yak.UpdateSyntaxFlowRuleAndGroup:output_type -> ypb.DbOperateMessage
-	896,  // 1879: ypb.Yak.QuerySyntaxFlowSameGroup:output_type -> ypb.QuerySyntaxFlowSameGroupResponse
-	899,  // 1880: ypb.Yak.SyntaxFlowRuleToOnline:output_type -> ypb.SyntaxFlowRuleOnlineProgress
-	899,  // 1881: ypb.Yak.DownloadSyntaxFlowRule:output_type -> ypb.SyntaxFlowRuleOnlineProgress
-	907,  // 1882: ypb.Yak.SyntaxFlowScan:output_type -> ypb.SyntaxFlowScanResponse
-	904,  // 1883: ypb.Yak.QuerySyntaxFlowScanTask:output_type -> ypb.QuerySyntaxFlowScanTaskResponse
-	845,  // 1884: ypb.Yak.DeleteSyntaxFlowScanTask:output_type -> ypb.DbOperateMessage
-	911,  // 1885: ypb.Yak.QuerySyntaxFlowResult:output_type -> ypb.QuerySyntaxFlowResultResponse
-	914,  // 1886: ypb.Yak.DeleteSyntaxFlowResult:output_type -> ypb.DeleteSyntaxFlowResultResponse
-	877,  // 1887: ypb.Yak.QuerySSAPrograms:output_type -> ypb.QuerySSAProgramResponse
-	845,  // 1888: ypb.Yak.UpdateSSAProgram:output_type -> ypb.DbOperateMessage
-	845,  // 1889: ypb.Yak.DeleteSSAPrograms:output_type -> ypb.DbOperateMessage
-	928,  // 1890: ypb.Yak.QuerySSARisks:output_type -> ypb.QuerySSARisksResponse
-	930,  // 1891: ypb.Yak.QueryNewSSARisks:output_type -> ypb.QueryNewSSARisksResponse
-	845,  // 1892: ypb.Yak.DeleteSSARisks:output_type -> ypb.DbOperateMessage
-	845,  // 1893: ypb.Yak.UpdateSSARiskTags:output_type -> ypb.DbOperateMessage
-	934,  // 1894: ypb.Yak.GetSSARiskFieldGroup:output_type -> ypb.SSARiskFieldGroupResponse
-	934,  // 1895: ypb.Yak.GetSSARiskFieldGroupEx:output_type -> ypb.SSARiskFieldGroupResponse
-	936,  // 1896: ypb.Yak.NewSSARiskRead:output_type -> ypb.NewSSARiskReadResponse
-	938,  // 1897: ypb.Yak.ExportSSARisk:output_type -> ypb.ExportSSARiskResponse
-	940,  // 1898: ypb.Yak.ImportSSARisk:output_type -> ypb.ImportSSARiskResponse
-	871,  // 1899: ypb.Yak.SSARiskDiff:output_type -> ypb.SSARiskDiffResponse
-	945,  // 1900: ypb.Yak.CreateSSARiskDisposals:output_type -> ypb.CreateSSARiskDisposalsResponse
-	947,  // 1901: ypb.Yak.QuerySSARiskDisposals:output_type -> ypb.QuerySSARiskDisposalsResponse
-	949,  // 1902: ypb.Yak.UpdateSSARiskDisposals:output_type -> ypb.UpdateSSARiskDisposalsResponse
-	951,  // 1903: ypb.Yak.DeleteSSARiskDisposals:output_type -> ypb.DeleteSSARiskDisposalsResponse
-	953,  // 1904: ypb.Yak.GetSSARiskDisposal:output_type -> ypb.GetSSARiskDisposalResponse
-	9,    // 1905: ypb.Yak.SSARiskFeedbackToOnline:output_type -> ypb.Empty
-	1036, // 1906: ypb.Yak.GenerateSSAReport:output_type -> ypb.GenerateSSAReportResponse
-	1043, // 1907: ypb.Yak.CreateSSAProject:output_type -> ypb.CreateSSAProjectResponse
-	1045, // 1908: ypb.Yak.UpdateSSAProject:output_type -> ypb.UpdateSSAProjectResponse
-	1047, // 1909: ypb.Yak.DeleteSSAProject:output_type -> ypb.DeleteSSAProjectResponse
-	1049, // 1910: ypb.Yak.QuerySSAProject:output_type -> ypb.QuerySSAProjectResponse
-	1051, // 1911: ypb.Yak.MigrateSSAProject:output_type -> ypb.MigrateSSAProjectResponse
-	1058, // 1912: ypb.Yak.GetSSAWorkbenchDashboard:output_type -> ypb.GetSSAWorkbenchDashboardResponse
-	916,  // 1913: ypb.Yak.GetAllPluginEnv:output_type -> ypb.PluginEnvData
-	916,  // 1914: ypb.Yak.QueryPluginEnv:output_type -> ypb.PluginEnvData
-	9,    // 1915: ypb.Yak.CreatePluginEnv:output_type -> ypb.Empty
-	9,    // 1916: ypb.Yak.SetPluginEnv:output_type -> ypb.Empty
-	9,    // 1917: ypb.Yak.DeletePluginEnv:output_type -> ypb.Empty
-	919,  // 1918: ypb.Yak.GetAllFuzztagInfo:output_type -> ypb.GetAllFuzztagInfoResponse
-	923,  // 1919: ypb.Yak.GenerateFuzztag:output_type -> ypb.GenerateFuzztagResponse
-	956,  // 1920: ypb.Yak.ExportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
-	956,  // 1921: ypb.Yak.ImportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
-	961,  // 1922: ypb.Yak.CreateHotPatchTemplate:output_type -> ypb.CreateHotPatchTemplateResponse
-	962,  // 1923: ypb.Yak.DeleteHotPatchTemplate:output_type -> ypb.DeleteHotPatchTemplateResponse
-	963,  // 1924: ypb.Yak.UpdateHotPatchTemplate:output_type -> ypb.UpdateHotPatchTemplateResponse
-	964,  // 1925: ypb.Yak.QueryHotPatchTemplate:output_type -> ypb.QueryHotPatchTemplateResponse
-	966,  // 1926: ypb.Yak.QueryHotPatchTemplateList:output_type -> ypb.QueryHotPatchTemplateListResponse
-	967,  // 1927: ypb.Yak.GetHotPatchTemplateTags:output_type -> ypb.GetHotPatchTemplateTagsResponse
-	969,  // 1928: ypb.Yak.GetGlobalHotPatchConfig:output_type -> ypb.GlobalHotPatchConfig
-	969,  // 1929: ypb.Yak.SetGlobalHotPatchConfig:output_type -> ypb.GlobalHotPatchConfig
-	969,  // 1930: ypb.Yak.ResetGlobalHotPatchConfig:output_type -> ypb.GlobalHotPatchConfig
-	972,  // 1931: ypb.Yak.GroupTableColumn:output_type -> ypb.GroupTableColumnResponse
-	9,    // 1932: ypb.Yak.UploadHotPatchTemplateToOnline:output_type -> ypb.Empty
-	9,    // 1933: ypb.Yak.DownloadHotPatchTemplate:output_type -> ypb.Empty
-	790,  // 1934: ypb.Yak.ExportHotPatchTemplateStream:output_type -> ypb.ExecResult
-	790,  // 1935: ypb.Yak.ImportHotPatchTemplateStream:output_type -> ypb.ExecResult
-	770,  // 1936: ypb.Yak.SetMITMHijackFilter:output_type -> ypb.SetMITMFilterResponse
-	769,  // 1937: ypb.Yak.GetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
-	769,  // 1938: ypb.Yak.ResetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
-	978,  // 1939: ypb.Yak.ExportHTTPFlowStream:output_type -> ypb.ExportHTTPFlowStreamResponse
-	980,  // 1940: ypb.Yak.ImportHTTPFlowStream:output_type -> ypb.ImportHTTPFlowStreamResponse
-	985,  // 1941: ypb.Yak.CreateNote:output_type -> ypb.CreateNoteResponse
-	845,  // 1942: ypb.Yak.UpdateNote:output_type -> ypb.DbOperateMessage
-	845,  // 1943: ypb.Yak.DeleteNote:output_type -> ypb.DbOperateMessage
-	989,  // 1944: ypb.Yak.QueryNote:output_type -> ypb.QueryNoteResponse
-	991,  // 1945: ypb.Yak.SearchNoteContent:output_type -> ypb.SearchNoteContentResponse
-	993,  // 1946: ypb.Yak.ImportNote:output_type -> ypb.ImportNoteResponse
-	995,  // 1947: ypb.Yak.ExportNote:output_type -> ypb.ExportNoteResponse
-	150,  // 1948: ypb.Yak.StartAIReAct:output_type -> ypb.AIOutputEvent
-	1102, // 1949: ypb.Yak.ReadAIImage:output_type -> ypb.AIImageResponse
-	150,  // 1950: ypb.Yak.StartAITask:output_type -> ypb.AIOutputEvent
-	165,  // 1951: ypb.Yak.QueryAITask:output_type -> ypb.AITaskQueryResponse
-	845,  // 1952: ypb.Yak.DeleteAITask:output_type -> ypb.DbOperateMessage
-	162,  // 1953: ypb.Yak.QueryAIEvent:output_type -> ypb.AIEventQueryResponse
-	845,  // 1954: ypb.Yak.DeleteAIEvent:output_type -> ypb.DbOperateMessage
-	173,  // 1955: ypb.Yak.QueryAISession:output_type -> ypb.QueryAISessionResponse
-	845,  // 1956: ypb.Yak.UpdateAISessionTitle:output_type -> ypb.DbOperateMessage
-	845,  // 1957: ypb.Yak.UpdateAISessionIMMeta:output_type -> ypb.DbOperateMessage
-	845,  // 1958: ypb.Yak.DeleteAISession:output_type -> ypb.DbOperateMessage
-	168,  // 1959: ypb.Yak.GetRandomAIMaterials:output_type -> ypb.GetRandomAIMaterialsResponse
-	204,  // 1960: ypb.Yak.ExportAILogs:output_type -> ypb.ExportAILogsResponse
-	181,  // 1961: ypb.Yak.CreateAIReActSchedule:output_type -> ypb.AIReActSchedule
-	181,  // 1962: ypb.Yak.UpdateAIReActSchedule:output_type -> ypb.AIReActSchedule
-	845,  // 1963: ypb.Yak.DeleteAIReActSchedule:output_type -> ypb.DbOperateMessage
-	181,  // 1964: ypb.Yak.GetAIReActSchedule:output_type -> ypb.AIReActSchedule
-	188,  // 1965: ypb.Yak.QueryAIReActSchedules:output_type -> ypb.QueryAIReActSchedulesResponse
-	181,  // 1966: ypb.Yak.SetAIReActScheduleEnabled:output_type -> ypb.AIReActSchedule
-	191,  // 1967: ypb.Yak.PreviewAIReActScheduleTimes:output_type -> ypb.PreviewAIReActScheduleTimesResponse
-	9,    // 1968: ypb.Yak.RunAIReActScheduleNow:output_type -> ypb.Empty
-	9,    // 1969: ypb.Yak.CreateAIMemoryEntity:output_type -> ypb.Empty
-	845,  // 1970: ypb.Yak.UpdateAIMemoryEntity:output_type -> ypb.DbOperateMessage
-	845,  // 1971: ypb.Yak.DeleteAIMemoryEntity:output_type -> ypb.DbOperateMessage
-	208,  // 1972: ypb.Yak.GetAIMemoryEntity:output_type -> ypb.AIMemoryEntity
-	211,  // 1973: ypb.Yak.QueryAIMemoryEntity:output_type -> ypb.QueryAIMemoryEntityResponse
-	215,  // 1974: ypb.Yak.CountAIMemoryEntityTags:output_type -> ypb.CountAIMemoryEntityTagsResponse
-	150,  // 1975: ypb.Yak.StartAITriage:output_type -> ypb.AIOutputEvent
-	845,  // 1976: ypb.Yak.CreateAIForge:output_type -> ypb.DbOperateMessage
-	845,  // 1977: ypb.Yak.UpdateAIForge:output_type -> ypb.DbOperateMessage
-	845,  // 1978: ypb.Yak.DeleteAIForge:output_type -> ypb.DbOperateMessage
-	196,  // 1979: ypb.Yak.QueryAIForge:output_type -> ypb.QueryAIForgeResponse
-	194,  // 1980: ypb.Yak.GetAIForge:output_type -> ypb.AIForge
-	47,   // 1981: ypb.Yak.ExportAIForge:output_type -> ypb.GeneralProgress
-	47,   // 1982: ypb.Yak.ImportAIForge:output_type -> ypb.GeneralProgress
-	202,  // 1983: ypb.Yak.QueryAIFocus:output_type -> ypb.QueryAIFocusResponse
-	217,  // 1984: ypb.Yak.StartMcpServer:output_type -> ypb.StartMcpServerResponse
-	133,  // 1985: ypb.Yak.GetToolSetList:output_type -> ypb.GetToolSetListResponse
-	146,  // 1986: ypb.Yak.GetAIToolList:output_type -> ypb.GetAIToolListResponse
-	1104, // 1987: ypb.Yak.QueryAITool:output_type -> ypb.QueryAIToolResponse
-	845,  // 1988: ypb.Yak.DeleteAITool:output_type -> ypb.DbOperateMessage
-	845,  // 1989: ypb.Yak.SaveAITool:output_type -> ypb.DbOperateMessage
-	139,  // 1990: ypb.Yak.SaveAIToolV2:output_type -> ypb.SaveAIToolV2Response
-	845,  // 1991: ypb.Yak.UpdateAITool:output_type -> ypb.DbOperateMessage
-	143,  // 1992: ypb.Yak.ToggleAIToolFavorite:output_type -> ypb.ToggleAIToolFavoriteResponse
-	137,  // 1993: ypb.Yak.AIToolGenerateMetadata:output_type -> ypb.AIToolGenerateMetadataResponse
-	47,   // 1994: ypb.Yak.ExportAITool:output_type -> ypb.GeneralProgress
-	47,   // 1995: ypb.Yak.ImportAITool:output_type -> ypb.GeneralProgress
-	1012, // 1996: ypb.Yak.IsLlamaServerReady:output_type -> ypb.IsLlamaServerReadyResponse
-	1014, // 1997: ypb.Yak.IsLocalModelReady:output_type -> ypb.IsLocalModelReadyResponse
-	790,  // 1998: ypb.Yak.InstallLlamaServer:output_type -> ypb.ExecResult
-	790,  // 1999: ypb.Yak.StartLocalModel:output_type -> ypb.ExecResult
-	11,   // 2000: ypb.Yak.StopLocalModel:output_type -> ypb.GeneralResponse
-	790,  // 2001: ypb.Yak.DownloadLocalModel:output_type -> ypb.ExecResult
-	1019, // 2002: ypb.Yak.GetSupportedLocalModels:output_type -> ypb.GetSupportedLocalModelsResponse
-	11,   // 2003: ypb.Yak.AddLocalModel:output_type -> ypb.GeneralResponse
-	11,   // 2004: ypb.Yak.DeleteLocalModel:output_type -> ypb.GeneralResponse
-	11,   // 2005: ypb.Yak.UpdateLocalModel:output_type -> ypb.GeneralResponse
-	81,   // 2006: ypb.Yak.GetAllStartedLocalModels:output_type -> ypb.GetAllStartedLocalModelsResponse
-	11,   // 2007: ypb.Yak.ClearAllModels:output_type -> ypb.GeneralResponse
-	131,  // 2008: ypb.Yak.IsSearchVectorDatabaseReady:output_type -> ypb.IsSearchVectorDatabaseReadyResponse
-	790,  // 2009: ypb.Yak.InitSearchVectorDatabase:output_type -> ypb.ExecResult
-	129,  // 2010: ypb.Yak.GetAllVectorStoreCollections:output_type -> ypb.GetAllVectorStoreCollectionsResponse
-	128,  // 2011: ypb.Yak.GetAllVectorStoreCollectionsWithFilter:output_type -> ypb.GetAllVectorStoreCollectionsWithFilterResponse
-	11,   // 2012: ypb.Yak.DeleteSearchVectorDatabase:output_type -> ypb.GeneralResponse
-	11,   // 2013: ypb.Yak.UpdateVectorStoreCollection:output_type -> ypb.GeneralResponse
-	123,  // 2014: ypb.Yak.ListVectorStoreEntries:output_type -> ypb.ListVectorStoreEntriesResponse
-	11,   // 2015: ypb.Yak.CreateVectorStoreEntry:output_type -> ypb.GeneralResponse
-	125,  // 2016: ypb.Yak.GetDocumentByVectorStoreEntryID:output_type -> ypb.GetDocumentByVectorStoreEntryIDResponse
-	89,   // 2017: ypb.Yak.ListThirdPartyBinary:output_type -> ypb.ListThirdPartyBinaryResponse
-	790,  // 2018: ypb.Yak.InstallThirdPartyBinary:output_type -> ypb.ExecResult
-	11,   // 2019: ypb.Yak.UninstallThirdPartyBinary:output_type -> ypb.GeneralResponse
-	93,   // 2020: ypb.Yak.IsThirdPartyBinaryReady:output_type -> ypb.IsThirdPartyBinaryReadyResponse
-	790,  // 2021: ypb.Yak.StartThirdPartyBinary:output_type -> ypb.ExecResult
-	1033, // 2022: ypb.Yak.PluginTrace:output_type -> ypb.PluginTraceResponse
-	99,   // 2023: ypb.Yak.GetKnowledgeBaseNameList:output_type -> ypb.GetKnowledgeBaseNameListResponse
-	104,  // 2024: ypb.Yak.GetKnowledgeBase:output_type -> ypb.GetKnowledgeBaseResponse
-	1107, // 2025: ypb.Yak.QueryKnowledgeBase:output_type -> ypb.QueryKnowledgeBaseResponse
-	101,  // 2026: ypb.Yak.GetKnowledgeBaseTypeList:output_type -> ypb.GetKnowledgeBaseTypeListResponse
-	11,   // 2027: ypb.Yak.DeleteKnowledgeBase:output_type -> ypb.GeneralResponse
-	11,   // 2028: ypb.Yak.CreateKnowledgeBase:output_type -> ypb.GeneralResponse
-	44,   // 2029: ypb.Yak.CreateKnowledgeBaseV2:output_type -> ypb.CreateKnowledgeBaseV2Response
-	11,   // 2030: ypb.Yak.UpdateKnowledgeBase:output_type -> ypb.GeneralResponse
-	11,   // 2031: ypb.Yak.DeleteKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
-	11,   // 2032: ypb.Yak.CreateKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
-	11,   // 2033: ypb.Yak.UpdateKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
-	112,  // 2034: ypb.Yak.SearchKnowledgeBaseEntry:output_type -> ypb.SearchKnowledgeBaseEntryResponse
-	111,  // 2035: ypb.Yak.QueryKnowledgeBaseByAI:output_type -> ypb.QueryKnowledgeBaseByAIResponse
-	11,   // 2036: ypb.Yak.BuildVectorIndexForKnowledgeBase:output_type -> ypb.GeneralResponse
-	11,   // 2037: ypb.Yak.BuildVectorIndexForKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
-	96,   // 2038: ypb.Yak.GenerateQuestionIndexForKnowledgeBase:output_type -> ypb.GenerateQuestionIndexForKnowledgeBaseResponse
-	65,   // 2039: ypb.Yak.ListEntityRepository:output_type -> ypb.ListEntityRepositoryResponse
-	69,   // 2040: ypb.Yak.QueryEntity:output_type -> ypb.QueryEntityResponse
-	845,  // 2041: ypb.Yak.CreateEntity:output_type -> ypb.DbOperateMessage
-	845,  // 2042: ypb.Yak.UpdateEntity:output_type -> ypb.DbOperateMessage
-	845,  // 2043: ypb.Yak.DeleteEntity:output_type -> ypb.DbOperateMessage
-	74,   // 2044: ypb.Yak.QueryRelationship:output_type -> ypb.QueryRelationshipResponse
-	845,  // 2045: ypb.Yak.CreateRelationship:output_type -> ypb.DbOperateMessage
-	845,  // 2046: ypb.Yak.UpdateRelationship:output_type -> ypb.DbOperateMessage
-	845,  // 2047: ypb.Yak.DeleteRelationship:output_type -> ypb.DbOperateMessage
-	77,   // 2048: ypb.Yak.QuerySubERM:output_type -> ypb.QuerySubERMResponse
-	79,   // 2049: ypb.Yak.GenerateERMDot:output_type -> ypb.GenerateERMDotResponse
-	47,   // 2050: ypb.Yak.ExportKnowledgeBase:output_type -> ypb.GeneralProgress
-	47,   // 2051: ypb.Yak.ImportKnowledgeBase:output_type -> ypb.GeneralProgress
-	11,   // 2052: ypb.Yak.AddMCPServer:output_type -> ypb.GeneralResponse
-	11,   // 2053: ypb.Yak.DeleteMCPServer:output_type -> ypb.GeneralResponse
-	11,   // 2054: ypb.Yak.UpdateMCPServer:output_type -> ypb.GeneralResponse
-	58,   // 2055: ypb.Yak.GetAllMCPServers:output_type -> ypb.GetAllMCPServersResponse
-	11,   // 2056: ypb.Yak.UpdateMCPServerToolConfig:output_type -> ypb.GeneralResponse
-	61,   // 2057: ypb.Yak.GetMCPToolList:output_type -> ypb.GetMCPToolListResponse
-	59,   // 2058: ypb.Yak.GetMCPToolDetail:output_type -> ypb.MCPClientToolConfig
-	11,   // 2059: ypb.Yak.SetMCPToolEnabled:output_type -> ypb.GeneralResponse
-	1069, // 2060: ypb.Yak.QueryMCPToolCallHistory:output_type -> ypb.QueryMCPToolCallHistoryResponse
-	1067, // 2061: ypb.Yak.GetMCPToolCallHistoryDetail:output_type -> ypb.MCPToolCallHistory
-	9,    // 2062: ypb.Yak.DeleteMCPToolCallHistory:output_type -> ypb.Empty
-	49,   // 2063: ypb.Yak.RAGCollectionSearch:output_type -> ypb.RAGCollectionSearchResponse
-	790,  // 2064: ypb.Yak.DownloadRAGs:output_type -> ypb.ExecResult
-	21,   // 2065: ypb.Yak.SaveIMBot:output_type -> ypb.SaveIMBotResponse
-	23,   // 2066: ypb.Yak.ListIMBots:output_type -> ypb.ListIMBotResponse
-	25,   // 2067: ypb.Yak.DeleteIMBot:output_type -> ypb.DeleteIMBotResponse
-	27,   // 2068: ypb.Yak.TestIMBot:output_type -> ypb.TestIMBotResponse
-	29,   // 2069: ypb.Yak.StartIMOnboarding:output_type -> ypb.IMOnboardingEvent
-	32,   // 2070: ypb.Yak.StartIMControl:output_type -> ypb.StartIMControlResponse
-	34,   // 2071: ypb.Yak.StopIMControl:output_type -> ypb.StopIMControlResponse
-	36,   // 2072: ypb.Yak.SubscribeIMControlState:output_type -> ypb.IMControlStateEvent
-	41,   // 2073: ypb.Yak.UpdateIMControlConfig:output_type -> ypb.UpdateIMControlConfigResponse
-	1065, // 2074: ypb.Yak.SubscribeHTTPFlows:output_type -> ypb.HTTPFlowLiveEvent
-	1073, // 2075: ypb.Yak.GetAIReActRecommendedSkills:output_type -> ypb.GetAIReActRecommendedSkillsResponse
-	1072, // 2076: ypb.Yak.UpdateAIReActRecommendedSkill:output_type -> ypb.AIReActRecommendedSkill
-	1072, // 2077: ypb.Yak.ResetAIReActRecommendedSkill:output_type -> ypb.AIReActRecommendedSkill
-	1085, // 2078: ypb.Yak.QueryContextMenuActions:output_type -> ypb.QueryContextMenuActionsResponse
-	1086, // 2079: ypb.Yak.SetContextMenuActionBinding:output_type -> ypb.ContextMenuAction
-	1090, // 2080: ypb.Yak.ExecuteContextMenuAction:output_type -> ypb.ContextMenuActionEvent
-	1092, // 2081: ypb.Yak.UploadToTemporaryFile:output_type -> ypb.UploadToTemporaryFileResponse
-	1097, // 2082: ypb.Yak.GetAISessionCurrentResources:output_type -> ypb.GetAISessionCurrentResourcesResponse
-	1411, // [1411:2083] is the sub-list for method output_type
-	739,  // [739:1411] is the sub-list for method input_type
+	1111, // 1411: ypb.Yak.GetAIModelContext:input_type -> ypb.GetAIModelContextRequest
+	1112, // 1412: ypb.Yak.SetAIModelContext:input_type -> ypb.SetAIModelContextRequest
+	10,   // 1413: ypb.Yak.Version:output_type -> ypb.VersionResponse
+	11,   // 1414: ypb.Yak.YakVersionAtLeast:output_type -> ypb.GeneralResponse
+	783,  // 1415: ypb.Yak.Echo:output_type -> ypb.EchoResposne
+	785,  // 1416: ypb.Yak.Handshake:output_type -> ypb.HandshakeResponse
+	18,   // 1417: ypb.Yak.VerifySystemCertificate:output_type -> ypb.VerifySystemCertificateResponse
+	11,   // 1418: ypb.Yak.InstallMITMCertificate:output_type -> ypb.GeneralResponse
+	778,  // 1419: ypb.Yak.MITM:output_type -> ypb.MITMResponse
+	770,  // 1420: ypb.Yak.SetMITMFilter:output_type -> ypb.SetMITMFilterResponse
+	769,  // 1421: ypb.Yak.GetMITMFilter:output_type -> ypb.SetMITMFilterRequest
+	769,  // 1422: ypb.Yak.ResetMITMFilter:output_type -> ypb.SetMITMFilterRequest
+	483,  // 1423: ypb.Yak.DownloadMITMCert:output_type -> ypb.MITMCert
+	483,  // 1424: ypb.Yak.DownloadMITMGMCert:output_type -> ypb.MITMCert
+	1024, // 1425: ypb.Yak.WatchProcessConnection:output_type -> ypb.WatchProcessResponse
+	1026, // 1426: ypb.Yak.MITMV2:output_type -> ypb.MITMV2Response
+	1080, // 1427: ypb.Yak.GetMITMDiagnostics:output_type -> ypb.GetMITMDiagnosticsResponse
+	787,  // 1428: ypb.Yak.OpenPort:output_type -> ypb.Output
+	790,  // 1429: ypb.Yak.Exec:output_type -> ypb.ExecResult
+	694,  // 1430: ypb.Yak.QueryExecHistory:output_type -> ypb.ExecHistoryRecordResponse
+	9,    // 1431: ypb.Yak.RemoveExecHistory:output_type -> ypb.Empty
+	9,    // 1432: ypb.Yak.SavePluginExecutionHistory:output_type -> ypb.Empty
+	697,  // 1433: ypb.Yak.GetPluginExecutionUsageRanking:output_type -> ypb.PluginExecutionUsageRankingResponse
+	9,    // 1434: ypb.Yak.LoadNucleiTemplates:output_type -> ypb.Empty
+	790,  // 1435: ypb.Yak.AutoUpdateYakModule:output_type -> ypb.ExecResult
+	790,  // 1436: ypb.Yak.ExecYakScript:output_type -> ypb.ExecResult
+	14,   // 1437: ypb.Yak.ExecBatchYakScript:output_type -> ypb.ExecBatchYakScriptResult
+	431,  // 1438: ypb.Yak.GetExecBatchYakScriptUnfinishedTask:output_type -> ypb.GetExecBatchYakScriptUnfinishedTaskResponse
+	13,   // 1439: ypb.Yak.GetExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
+	13,   // 1440: ypb.Yak.PopExecBatchYakScriptUnfinishedTaskByUid:output_type -> ypb.ExecBatchYakScriptRequest
+	14,   // 1441: ypb.Yak.RecoverExecBatchYakScriptUnfinishedTask:output_type -> ypb.ExecBatchYakScriptResult
+	651,  // 1442: ypb.Yak.QueryYakScript:output_type -> ypb.QueryYakScriptResponse
+	653,  // 1443: ypb.Yak.QueryYakScriptByYakScriptName:output_type -> ypb.YakScript
+	653,  // 1444: ypb.Yak.SaveYakScript:output_type -> ypb.YakScript
+	9,    // 1445: ypb.Yak.DeleteYakScript:output_type -> ypb.Empty
+	653,  // 1446: ypb.Yak.GetYakScriptById:output_type -> ypb.YakScript
+	653,  // 1447: ypb.Yak.GetYakScriptByName:output_type -> ypb.YakScript
+	653,  // 1448: ypb.Yak.GetYakScriptByOnlineID:output_type -> ypb.YakScript
+	9,    // 1449: ypb.Yak.IgnoreYakScript:output_type -> ypb.Empty
+	9,    // 1450: ypb.Yak.UnIgnoreYakScript:output_type -> ypb.Empty
+	589,  // 1451: ypb.Yak.ExportYakScript:output_type -> ypb.ExportYakScriptResponse
+	790,  // 1452: ypb.Yak.ExportYakScriptStream:output_type -> ypb.ExecResult
+	790,  // 1453: ypb.Yak.ImportYakScriptStream:output_type -> ypb.ExecResult
+	790,  // 1454: ypb.Yak.ExecutePacketYakScript:output_type -> ypb.ExecResult
+	14,   // 1455: ypb.Yak.ExecuteBatchPacketYakScript:output_type -> ypb.ExecBatchYakScriptResult
+	447,  // 1456: ypb.Yak.GetYakScriptTags:output_type -> ypb.GetYakScriptTagsResponse
+	450,  // 1457: ypb.Yak.QueryYakScriptLocalAndUser:output_type -> ypb.QueryYakScriptLocalAndUserResponse
+	450,  // 1458: ypb.Yak.QueryYakScriptByOnlineGroup:output_type -> ypb.QueryYakScriptLocalAndUserResponse
+	450,  // 1459: ypb.Yak.QueryYakScriptLocalAll:output_type -> ypb.QueryYakScriptLocalAndUserResponse
+	454,  // 1460: ypb.Yak.QueryYakScriptByNames:output_type -> ypb.QueryYakScriptByNamesResponse
+	455,  // 1461: ypb.Yak.QueryYakScriptByIsCore:output_type -> ypb.QueryYakScriptByIsCoreResponse
+	457,  // 1462: ypb.Yak.QueryYakScriptRiskDetailByCWE:output_type -> ypb.QueryYakScriptRiskDetailByCWEResponse
+	458,  // 1463: ypb.Yak.YakScriptRiskTypeList:output_type -> ypb.YakScriptRiskTypeListResponse
+	653,  // 1464: ypb.Yak.SaveNewYakScript:output_type -> ypb.YakScript
+	657,  // 1465: ypb.Yak.SaveYakScriptToOnline:output_type -> ypb.SaveYakScriptToOnlineResponse
+	660,  // 1466: ypb.Yak.ExportLocalYakScript:output_type -> ypb.ExportLocalYakScriptResponse
+	661,  // 1467: ypb.Yak.ExportLocalYakScriptStream:output_type -> ypb.ExportYakScriptLocalResponse
+	663,  // 1468: ypb.Yak.ImportYakScript:output_type -> ypb.ImportYakScriptResult
+	9,    // 1469: ypb.Yak.SetYakScriptSkipUpdate:output_type -> ypb.Empty
+	665,  // 1470: ypb.Yak.QueryYakScriptSkipUpdate:output_type -> ypb.QueryYakScriptSkipUpdateResponse
+	667,  // 1471: ypb.Yak.QueryYakScriptGroup:output_type -> ypb.QueryYakScriptGroupResponse
+	9,    // 1472: ypb.Yak.SaveYakScriptGroup:output_type -> ypb.Empty
+	9,    // 1473: ypb.Yak.RenameYakScriptGroup:output_type -> ypb.Empty
+	9,    // 1474: ypb.Yak.DeleteYakScriptGroup:output_type -> ypb.Empty
+	672,  // 1475: ypb.Yak.GetYakScriptGroup:output_type -> ypb.GetYakScriptGroupResponse
+	9,    // 1476: ypb.Yak.ResetYakScriptGroup:output_type -> ypb.Empty
+	9,    // 1477: ypb.Yak.SetGroup:output_type -> ypb.Empty
+	756,  // 1478: ypb.Yak.GetHTTPFlowByHash:output_type -> ypb.HTTPFlow
+	756,  // 1479: ypb.Yak.GetHTTPFlowById:output_type -> ypb.HTTPFlow
+	759,  // 1480: ypb.Yak.GetHTTPFlowBodyById:output_type -> ypb.GetHTTPFlowBodyByIdResponse
+	755,  // 1481: ypb.Yak.GetHTTPFlowByIds:output_type -> ypb.HTTPFlows
+	760,  // 1482: ypb.Yak.QueryHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
+	9,    // 1483: ypb.Yak.DeleteHTTPFlows:output_type -> ypb.Empty
+	9,    // 1484: ypb.Yak.SetTagForHTTPFlow:output_type -> ypb.Empty
+	753,  // 1485: ypb.Yak.QueryHTTPFlowsIds:output_type -> ypb.QueryHTTPFlowsIdsResponse
+	762,  // 1486: ypb.Yak.HTTPFlowsFieldGroup:output_type -> ypb.HTTPFlowsFieldGroupResponse
+	764,  // 1487: ypb.Yak.HTTPFlowsShare:output_type -> ypb.HTTPFlowsShareResponse
+	9,    // 1488: ypb.Yak.HTTPFlowsExtract:output_type -> ypb.Empty
+	795,  // 1489: ypb.Yak.GetHTTPFlowBare:output_type -> ypb.HTTPFlowBareResponse
+	760,  // 1490: ypb.Yak.ExportHTTPFlows:output_type -> ypb.QueryHTTPFlowResponse
+	9,    // 1491: ypb.Yak.HTTPFlowsToOnline:output_type -> ypb.Empty
+	750,  // 1492: ypb.Yak.QueryHTTPFlowsProcessNames:output_type -> ypb.QueryHTTPFlowsProcessNamesResponse
+	738,  // 1493: ypb.Yak.HTTPFlowsToOnlineBatch:output_type -> ypb.HTTPFlowsToOnlineBatchResponse
+	740,  // 1494: ypb.Yak.HTTPFlowsFromOnline:output_type -> ypb.HTTPFlowsFromOnlineProgress
+	742,  // 1495: ypb.Yak.BatchSetHTTPFlowIssueFields:output_type -> ypb.BatchSetHTTPFlowIssueFieldsResponse
+	746,  // 1496: ypb.Yak.AnalyzeHTTPFlow:output_type -> ypb.AnalyzeHTTPFlowResponse
+	724,  // 1497: ypb.Yak.ExtractUrl:output_type -> ypb.ExtractedUrl
+	506,  // 1498: ypb.Yak.GetHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTaskDetail
+	508,  // 1499: ypb.Yak.QueryHistoryHTTPFuzzerTask:output_type -> ypb.HistoryHTTPFuzzerTasks
+	509,  // 1500: ypb.Yak.QueryHistoryHTTPFuzzerTaskEx:output_type -> ypb.HistoryHTTPFuzzerTasksResponse
+	9,    // 1501: ypb.Yak.DeleteHistoryHTTPFuzzerTask:output_type -> ypb.Empty
+	1099, // 1502: ypb.Yak.FetchHTTPPreviewResource:output_type -> ypb.HTTPPreviewResourceResponse
+	726,  // 1503: ypb.Yak.HTTPFuzzer:output_type -> ypb.FuzzerResponse
+	725,  // 1504: ypb.Yak.HTTPFuzzerSequence:output_type -> ypb.FuzzerSequenceResponse
+	718,  // 1505: ypb.Yak.HTTPFuzzerGroup:output_type -> ypb.GroupHTTPFuzzerResponse
+	713,  // 1506: ypb.Yak.PreloadHTTPFuzzerParams:output_type -> ypb.PreloadHTTPFuzzerParamsResponse
+	706,  // 1507: ypb.Yak.RenderVariables:output_type -> ypb.RenderVariablesResponse
+	708,  // 1508: ypb.Yak.MatchHTTPResponse:output_type -> ypb.MatchHTTPResponseResult
+	710,  // 1509: ypb.Yak.ExtractHTTPResponse:output_type -> ypb.ExtractHTTPResponseResult
+	726,  // 1510: ypb.Yak.RedirectRequest:output_type -> ypb.FuzzerResponse
+	564,  // 1511: ypb.Yak.HTTPRequestMutate:output_type -> ypb.MutateResult
+	564,  // 1512: ypb.Yak.HTTPResponseMutate:output_type -> ypb.MutateResult
+	441,  // 1513: ypb.Yak.FixUploadPacket:output_type -> ypb.FixUploadPacketResponse
+	442,  // 1514: ypb.Yak.IsMultipartFormDataRequest:output_type -> ypb.IsMultipartFormDataRequestResult
+	371,  // 1515: ypb.Yak.GenerateExtractRule:output_type -> ypb.GenerateExtractRuleResponse
+	359,  // 1516: ypb.Yak.ExtractData:output_type -> ypb.ExtractDataResponse
+	797,  // 1517: ypb.Yak.ImportHTTPFuzzerTaskFromYaml:output_type -> ypb.ImportHTTPFuzzerTaskFromYamlResponse
+	799,  // 1518: ypb.Yak.ExportHTTPFuzzerTaskToYaml:output_type -> ypb.ExportHTTPFuzzerTaskToYamlResponse
+	801,  // 1519: ypb.Yak.RenderHTTPFuzzerPacket:output_type -> ypb.RenderHTTPFuzzerPacketResponse
+	9,    // 1520: ypb.Yak.SaveFuzzerLabel:output_type -> ypb.Empty
+	361,  // 1521: ypb.Yak.QueryFuzzerLabel:output_type -> ypb.QueryFuzzerLabelResponse
+	9,    // 1522: ypb.Yak.DeleteFuzzerLabel:output_type -> ypb.Empty
+	845,  // 1523: ypb.Yak.SaveFuzzerConfig:output_type -> ypb.DbOperateMessage
+	366,  // 1524: ypb.Yak.QueryFuzzerConfig:output_type -> ypb.QueryFuzzerConfigResponse
+	845,  // 1525: ypb.Yak.DeleteFuzzerConfig:output_type -> ypb.DbOperateMessage
+	374,  // 1526: ypb.Yak.QueryHTTPFuzzerResponseByTaskId:output_type -> ypb.QueryHTTPFuzzerResponseByTaskIdResponse
+	378,  // 1527: ypb.Yak.CreateWebsocketFuzzer:output_type -> ypb.ClientWebsocketResponse
+	767,  // 1528: ypb.Yak.QueryWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.WebsocketFlows
+	9,    // 1529: ypb.Yak.DeleteWebsocketFlowByHTTPFlowWebsocketHash:output_type -> ypb.Empty
+	9,    // 1530: ypb.Yak.DeleteWebsocketFlowAll:output_type -> ypb.Empty
+	756,  // 1531: ypb.Yak.ConvertFuzzerResponseToHTTPFlow:output_type -> ypb.HTTPFlow
+	700,  // 1532: ypb.Yak.StringFuzzer:output_type -> ypb.StringFuzzerResponse
+	703,  // 1533: ypb.Yak.HTTPRequestAnalyzer:output_type -> ypb.HTTPRequestAnalysis
+	9,    // 1534: ypb.Yak.CreateSnippet:output_type -> ypb.Empty
+	9,    // 1535: ypb.Yak.UpdateSnippet:output_type -> ypb.Empty
+	9,    // 1536: ypb.Yak.DeleteSnippets:output_type -> ypb.Empty
+	681,  // 1537: ypb.Yak.QuerySnippets:output_type -> ypb.SnippetsResponse
+	689,  // 1538: ypb.Yak.Codec:output_type -> ypb.CodecResponse
+	689,  // 1539: ypb.Yak.NewCodec:output_type -> ypb.CodecResponse
+	690,  // 1540: ypb.Yak.GetAllCodecMethods:output_type -> ypb.CodecMethods
+	9,    // 1541: ypb.Yak.SaveCodecFlow:output_type -> ypb.Empty
+	9,    // 1542: ypb.Yak.UpdateCodecFlow:output_type -> ypb.Empty
+	9,    // 1543: ypb.Yak.DeleteCodecFlow:output_type -> ypb.Empty
+	688,  // 1544: ypb.Yak.GetAllCodecFlow:output_type -> ypb.GetCodecFlowResponse
+	253,  // 1545: ypb.Yak.PacketPrettifyHelper:output_type -> ypb.PacketPrettifyHelperResponse
+	644,  // 1546: ypb.Yak.QueryPayload:output_type -> ypb.QueryPayloadResponse
+	642,  // 1547: ypb.Yak.QueryPayloadFromFile:output_type -> ypb.QueryPayloadFromFileResponse
+	9,    // 1548: ypb.Yak.DeletePayloadByFolder:output_type -> ypb.Empty
+	9,    // 1549: ypb.Yak.DeletePayloadByGroup:output_type -> ypb.Empty
+	9,    // 1550: ypb.Yak.DeletePayload:output_type -> ypb.Empty
+	9,    // 1551: ypb.Yak.SavePayload:output_type -> ypb.Empty
+	398,  // 1552: ypb.Yak.SavePayloadStream:output_type -> ypb.SavePayloadProgress
+	398,  // 1553: ypb.Yak.SavePayloadToFileStream:output_type -> ypb.SavePayloadProgress
+	398,  // 1554: ypb.Yak.SaveLargePayloadToFileStream:output_type -> ypb.SavePayloadProgress
+	9,    // 1555: ypb.Yak.RenamePayloadFolder:output_type -> ypb.Empty
+	9,    // 1556: ypb.Yak.RenamePayloadGroup:output_type -> ypb.Empty
+	9,    // 1557: ypb.Yak.UpdatePayload:output_type -> ypb.Empty
+	9,    // 1558: ypb.Yak.UpdatePayloadToFile:output_type -> ypb.Empty
+	9,    // 1559: ypb.Yak.BackUpOrCopyPayloads:output_type -> ypb.Empty
+	633,  // 1560: ypb.Yak.GetAllPayloadGroup:output_type -> ypb.GetAllPayloadGroupResponse
+	9,    // 1561: ypb.Yak.UpdateAllPayloadGroup:output_type -> ypb.Empty
+	647,  // 1562: ypb.Yak.GetAllPayload:output_type -> ypb.GetAllPayloadResponse
+	648,  // 1563: ypb.Yak.GetAllPayloadFromFile:output_type -> ypb.GetAllPayloadFromFileResponse
+	647,  // 1564: ypb.Yak.ExportAllPayload:output_type -> ypb.GetAllPayloadResponse
+	647,  // 1565: ypb.Yak.ExportAllPayloadFromFile:output_type -> ypb.GetAllPayloadResponse
+	9,    // 1566: ypb.Yak.CreatePayloadFolder:output_type -> ypb.Empty
+	398,  // 1567: ypb.Yak.RemoveDuplicatePayloads:output_type -> ypb.SavePayloadProgress
+	398,  // 1568: ypb.Yak.CoverPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
+	398,  // 1569: ypb.Yak.ConvertPayloadGroupToDatabase:output_type -> ypb.SavePayloadProgress
+	398,  // 1570: ypb.Yak.MigratePayloads:output_type -> ypb.SavePayloadProgress
+	647,  // 1571: ypb.Yak.ExportPayloadBatch:output_type -> ypb.GetAllPayloadResponse
+	402,  // 1572: ypb.Yak.UploadPayloadToOnline:output_type -> ypb.DownloadProgress
+	402,  // 1573: ypb.Yak.DownloadPayload:output_type -> ypb.DownloadProgress
+	647,  // 1574: ypb.Yak.ExportPayloadDBAndFile:output_type -> ypb.GetAllPayloadResponse
+	625,  // 1575: ypb.Yak.GetYakitCompletionRaw:output_type -> ypb.YakitCompletionRawResponse
+	629,  // 1576: ypb.Yak.GetYakVMBuildInMethodCompletion:output_type -> ypb.GetYakVMBuildInMethodCompletionResponse
+	397,  // 1577: ypb.Yak.StaticAnalyzeError:output_type -> ypb.StaticAnalyzeErrorResponse
+	395,  // 1578: ypb.Yak.YaklangCompileAndFormat:output_type -> ypb.YaklangCompileAndFormatResponse
+	386,  // 1579: ypb.Yak.YaklangLanguageSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
+	387,  // 1580: ypb.Yak.YaklangLanguageFind:output_type -> ypb.YaklangLanguageFindResponse
+	386,  // 1581: ypb.Yak.FuzzTagSuggestion:output_type -> ypb.YaklangLanguageSuggestionResponse
+	388,  // 1582: ypb.Yak.YaklangInspectInformation:output_type -> ypb.YaklangInspectInformationResponse
+	391,  // 1583: ypb.Yak.YaklangGetCliCodeFromDatabase:output_type -> ypb.YaklangGetCliCodeFromDatabaseResponse
+	787,  // 1584: ypb.Yak.YaklangTerminal:output_type -> ypb.Output
+	790,  // 1585: ypb.Yak.PortScan:output_type -> ypb.ExecResult
+	616,  // 1586: ypb.Yak.ViewPortScanCode:output_type -> ypb.SimpleScript
+	790,  // 1587: ypb.Yak.SimpleDetect:output_type -> ypb.ExecResult
+	9,    // 1588: ypb.Yak.SaveCancelSimpleDetect:output_type -> ypb.Empty
+	790,  // 1589: ypb.Yak.SimpleDetectCreatReport:output_type -> ypb.ExecResult
+	437,  // 1590: ypb.Yak.QuerySimpleDetectUnfinishedTask:output_type -> ypb.QueryUnfinishedTaskResponse
+	618,  // 1591: ypb.Yak.GetSimpleDetectRecordRequestById:output_type -> ypb.RecordPortScanRequest
+	9,    // 1592: ypb.Yak.DeleteSimpleDetectUnfinishedTask:output_type -> ypb.Empty
+	790,  // 1593: ypb.Yak.RecoverSimpleDetectTask:output_type -> ypb.ExecResult
+	432,  // 1594: ypb.Yak.GetSimpleDetectUnfinishedTask:output_type -> ypb.GetSimpleDetectUnfinishedTaskResponse
+	618,  // 1595: ypb.Yak.GetSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
+	618,  // 1596: ypb.Yak.PopSimpleDetectUnfinishedTaskByUid:output_type -> ypb.RecordPortScanRequest
+	790,  // 1597: ypb.Yak.RecoverSimpleDetectUnfinishedTask:output_type -> ypb.ExecResult
+	623,  // 1598: ypb.Yak.QueryPorts:output_type -> ypb.QueryPortsResponse
+	9,    // 1599: ypb.Yak.DeletePorts:output_type -> ypb.Empty
+	567,  // 1600: ypb.Yak.QueryHosts:output_type -> ypb.QueryHostsResponse
+	9,    // 1601: ypb.Yak.DeleteHosts:output_type -> ypb.Empty
+	570,  // 1602: ypb.Yak.QueryDomains:output_type -> ypb.QueryDomainsResponse
+	9,    // 1603: ypb.Yak.DeleteDomains:output_type -> ypb.Empty
+	572,  // 1604: ypb.Yak.QueryPortsGroup:output_type -> ypb.QueryPortsGroupResponse
+	9,    // 1605: ypb.Yak.UpdateFromYakitResource:output_type -> ypb.Empty
+	9,    // 1606: ypb.Yak.UpdateFromGithub:output_type -> ypb.Empty
+	9,    // 1607: ypb.Yak.AddToMenu:output_type -> ypb.Empty
+	9,    // 1608: ypb.Yak.RemoveFromMenu:output_type -> ypb.Empty
+	9,    // 1609: ypb.Yak.YakScriptIsInMenu:output_type -> ypb.Empty
+	599,  // 1610: ypb.Yak.GetAllMenuItem:output_type -> ypb.MenuByGroup
+	9,    // 1611: ypb.Yak.DeleteAllMenuItem:output_type -> ypb.Empty
+	9,    // 1612: ypb.Yak.ImportMenuItem:output_type -> ypb.Empty
+	606,  // 1613: ypb.Yak.ExportMenuItem:output_type -> ypb.ExportMenuItemResult
+	595,  // 1614: ypb.Yak.GetMenuItemById:output_type -> ypb.MenuItem
+	593,  // 1615: ypb.Yak.QueryGroupsByYakScriptId:output_type -> ypb.GroupNames
+	9,    // 1616: ypb.Yak.AddMenus:output_type -> ypb.Empty
+	599,  // 1617: ypb.Yak.QueryAllMenuItem:output_type -> ypb.MenuByGroup
+	9,    // 1618: ypb.Yak.DeleteAllMenu:output_type -> ypb.Empty
+	9,    // 1619: ypb.Yak.AddToNavigation:output_type -> ypb.Empty
+	611,  // 1620: ypb.Yak.GetAllNavigationItem:output_type -> ypb.GetAllNavigationItemResponse
+	9,    // 1621: ypb.Yak.DeleteAllNavigation:output_type -> ypb.Empty
+	9,    // 1622: ypb.Yak.AddOneNavigation:output_type -> ypb.Empty
+	593,  // 1623: ypb.Yak.QueryNavigationGroups:output_type -> ypb.GroupNames
+	9,    // 1624: ypb.Yak.SaveMarkdownDocument:output_type -> ypb.Empty
+	590,  // 1625: ypb.Yak.GetMarkdownDocument:output_type -> ypb.GetMarkdownDocumentResponse
+	9,    // 1626: ypb.Yak.DeleteMarkdownDocument:output_type -> ypb.Empty
+	790,  // 1627: ypb.Yak.StartBasicCrawler:output_type -> ypb.ExecResult
+	616,  // 1628: ypb.Yak.ViewBasicCrawlerCode:output_type -> ypb.SimpleScript
+	581,  // 1629: ypb.Yak.GenerateWebsiteTree:output_type -> ypb.GenerateWebsiteTreeResponse
+	580,  // 1630: ypb.Yak.QueryYakScriptExecResult:output_type -> ypb.QueryYakScriptExecResultResponse
+	578,  // 1631: ypb.Yak.QueryYakScriptNameInExecResult:output_type -> ypb.YakScriptNames
+	9,    // 1632: ypb.Yak.DeleteYakScriptExecResult:output_type -> ypb.Empty
+	9,    // 1633: ypb.Yak.DeleteYakScriptExec:output_type -> ypb.Empty
+	790,  // 1634: ypb.Yak.StartBrute:output_type -> ypb.ExecResult
+	560,  // 1635: ypb.Yak.GetAvailableBruteTypes:output_type -> ypb.GetAvailableBruteTypesResponse
+	554,  // 1636: ypb.Yak.GetTunnelServerExternalIP:output_type -> ypb.GetTunnelServerExternalIPResponse
+	552,  // 1637: ypb.Yak.VerifyTunnelServerDomain:output_type -> ypb.VerifyTunnelServerDomainResponse
+	790,  // 1638: ypb.Yak.StartFacades:output_type -> ypb.ExecResult
+	790,  // 1639: ypb.Yak.StartFacadesWithYsoObject:output_type -> ypb.ExecResult
+	9,    // 1640: ypb.Yak.ApplyClassToFacades:output_type -> ypb.Empty
+	500,  // 1641: ypb.Yak.BytesToBase64:output_type -> ypb.BytesToBase64Response
+	9,    // 1642: ypb.Yak.ConfigGlobalReverse:output_type -> ypb.Empty
+	529,  // 1643: ypb.Yak.AvailableLocalAddr:output_type -> ypb.AvailableLocalAddrResponse
+	528,  // 1644: ypb.Yak.GetGlobalReverseServer:output_type -> ypb.GetGlobalReverseServerResponse
+	537,  // 1645: ypb.Yak.QueryRisks:output_type -> ypb.QueryRisksResponse
+	535,  // 1646: ypb.Yak.QueryRisk:output_type -> ypb.Risk
+	9,    // 1647: ypb.Yak.DeleteRisk:output_type -> ypb.Empty
+	485,  // 1648: ypb.Yak.QueryAvailableRiskType:output_type -> ypb.Fields
+	485,  // 1649: ypb.Yak.QueryAvailableRiskLevel:output_type -> ypb.Fields
+	482,  // 1650: ypb.Yak.QueryRiskTableStats:output_type -> ypb.RiskTableStats
+	9,    // 1651: ypb.Yak.ResetRiskTableStats:output_type -> ypb.Empty
+	485,  // 1652: ypb.Yak.QueryAvailableTarget:output_type -> ypb.Fields
+	539,  // 1653: ypb.Yak.QueryNewRisk:output_type -> ypb.QueryNewRiskResponse
+	9,    // 1654: ypb.Yak.NewRiskRead:output_type -> ypb.Empty
+	9,    // 1655: ypb.Yak.UploadRiskToOnline:output_type -> ypb.Empty
+	9,    // 1656: ypb.Yak.SetTagForRisk:output_type -> ypb.Empty
+	540,  // 1657: ypb.Yak.QueryRiskTags:output_type -> ypb.QueryRiskTagsResponse
+	541,  // 1658: ypb.Yak.RiskFieldGroup:output_type -> ypb.RiskFieldGroupResponse
+	9,    // 1659: ypb.Yak.RiskFeedbackToOnline:output_type -> ypb.Empty
+	548,  // 1660: ypb.Yak.RisksFromOnline:output_type -> ypb.RisksFromOnlineProgress
+	550,  // 1661: ypb.Yak.BatchSetRiskTags:output_type -> ypb.BatchSetRiskTagsResponse
+	472,  // 1662: ypb.Yak.QueryReports:output_type -> ypb.QueryReportsResponse
+	474,  // 1663: ypb.Yak.QueryReport:output_type -> ypb.Report
+	9,    // 1664: ypb.Yak.DeleteReport:output_type -> ypb.Empty
+	485,  // 1665: ypb.Yak.QueryAvailableReportFrom:output_type -> ypb.Fields
+	9,    // 1666: ypb.Yak.DownloadReport:output_type -> ypb.Empty
+	487,  // 1667: ypb.Yak.GetAllYsoGadgetOptions:output_type -> ypb.YsoOptionsWithVerbose
+	487,  // 1668: ypb.Yak.GetAllYsoClassOptions:output_type -> ypb.YsoOptionsWithVerbose
+	490,  // 1669: ypb.Yak.GetAllYsoClassGeneraterOptions:output_type -> ypb.YsoClassOptionsResponseWithVerbose
+	497,  // 1670: ypb.Yak.GenerateYsoCode:output_type -> ypb.YsoCodeResponse
+	498,  // 1671: ypb.Yak.GenerateYsoBytes:output_type -> ypb.YsoBytesResponse
+	496,  // 1672: ypb.Yak.YsoDump:output_type -> ypb.YsoDumpResponse
+	513,  // 1673: ypb.Yak.CreateWebShell:output_type -> ypb.WebShell
+	9,    // 1674: ypb.Yak.DeleteWebShell:output_type -> ypb.Empty
+	513,  // 1675: ypb.Yak.UpdateWebShell:output_type -> ypb.WebShell
+	519,  // 1676: ypb.Yak.QueryWebShells:output_type -> ypb.QueryWebShellsResponse
+	517,  // 1677: ypb.Yak.Ping:output_type -> ypb.WebShellResponse
+	517,  // 1678: ypb.Yak.GetBasicInfo:output_type -> ypb.WebShellResponse
+	517,  // 1679: ypb.Yak.GenerateWebShell:output_type -> ypb.WebShellResponse
+	9,    // 1680: ypb.Yak.SetYakBridgeLogServer:output_type -> ypb.Empty
+	522,  // 1681: ypb.Yak.GetCurrentYakBridgeLogServer:output_type -> ypb.YakDNSLogBridgeAddr
+	527,  // 1682: ypb.Yak.RequireDNSLogDomain:output_type -> ypb.DNSLogRootDomain
+	527,  // 1683: ypb.Yak.RequireDNSLogDomainByScript:output_type -> ypb.DNSLogRootDomain
+	525,  // 1684: ypb.Yak.QueryDNSLogByToken:output_type -> ypb.QueryDNSLogByTokenResponse
+	525,  // 1685: ypb.Yak.QueryDNSLogTokenByScript:output_type -> ypb.QueryDNSLogByTokenResponse
+	477,  // 1686: ypb.Yak.RequireICMPRandomLength:output_type -> ypb.RequireICMPRandomLengthResponse
+	502,  // 1687: ypb.Yak.QueryICMPTrigger:output_type -> ypb.QueryICMPTriggerResponse
+	480,  // 1688: ypb.Yak.RequireRandomPortToken:output_type -> ypb.RandomPortInfo
+	478,  // 1689: ypb.Yak.QueryRandomPortTrigger:output_type -> ypb.RandomPortTriggerNotification
+	503,  // 1690: ypb.Yak.QuerySupportedDnsLogPlatforms:output_type -> ypb.QuerySupportedDnsLogPlatformsResponse
+	485,  // 1691: ypb.Yak.GetAvailableYakScriptTags:output_type -> ypb.Fields
+	9,    // 1692: ypb.Yak.ForceUpdateAvailableYakScriptTags:output_type -> ypb.Empty
+	790,  // 1693: ypb.Yak.ExecYakitPluginsByYakScriptFilter:output_type -> ypb.ExecResult
+	469,  // 1694: ypb.Yak.GenerateYakCodeByPacket:output_type -> ypb.GenerateYakCodeByPacketResponse
+	468,  // 1695: ypb.Yak.GenerateCSRFPocByPacket:output_type -> ypb.GenerateCSRFPocByPacketResponse
+	464,  // 1696: ypb.Yak.ExportMITMReplacerRules:output_type -> ypb.ExportMITMReplacerRulesResponse
+	9,    // 1697: ypb.Yak.ImportMITMReplacerRules:output_type -> ypb.Empty
+	462,  // 1698: ypb.Yak.GetCurrentRules:output_type -> ypb.MITMContentReplacers
+	9,    // 1699: ypb.Yak.SetCurrentRules:output_type -> ypb.Empty
+	1030, // 1700: ypb.Yak.QueryMITMReplacerRules:output_type -> ypb.QueryMITMReplacerRulesResponse
+	845,  // 1701: ypb.Yak.DeduplicateMITMReplacerRules:output_type -> ypb.DbOperateMessage
+	805,  // 1702: ypb.Yak.GenerateURL:output_type -> ypb.GenerateURLResponse
+	446,  // 1703: ypb.Yak.ExtractDataToFile:output_type -> ypb.ExtractDataToFileResult
+	445,  // 1704: ypb.Yak.AutoDecode:output_type -> ypb.AutoDecodeResponse
+	426,  // 1705: ypb.Yak.GetSystemProxy:output_type -> ypb.GetSystemProxyResult
+	9,    // 1706: ypb.Yak.SetSystemProxy:output_type -> ypb.Empty
+	422,  // 1707: ypb.Yak.GetKey:output_type -> ypb.GetKeyResult
+	9,    // 1708: ypb.Yak.SetKey:output_type -> ypb.Empty
+	9,    // 1709: ypb.Yak.DelKey:output_type -> ypb.Empty
+	424,  // 1710: ypb.Yak.GetAllProcessEnvKey:output_type -> ypb.GetProcessEnvKeyResult
+	9,    // 1711: ypb.Yak.SetProcessEnvKey:output_type -> ypb.Empty
+	422,  // 1712: ypb.Yak.GetProjectKey:output_type -> ypb.GetKeyResult
+	9,    // 1713: ypb.Yak.SetProjectKey:output_type -> ypb.Empty
+	419,  // 1714: ypb.Yak.GetOnlineProfile:output_type -> ypb.OnlineProfile
+	9,    // 1715: ypb.Yak.SetOnlineProfile:output_type -> ypb.Empty
+	9,    // 1716: ypb.Yak.DownloadOnlinePluginById:output_type -> ypb.Empty
+	9,    // 1717: ypb.Yak.DownloadOnlinePluginByIds:output_type -> ypb.Empty
+	406,  // 1718: ypb.Yak.DownloadOnlinePluginAll:output_type -> ypb.DownloadOnlinePluginProgress
+	9,    // 1719: ypb.Yak.DeletePluginByUserID:output_type -> ypb.Empty
+	9,    // 1720: ypb.Yak.DeleteAllLocalPlugins:output_type -> ypb.Empty
+	675,  // 1721: ypb.Yak.GetYakScriptTagsAndType:output_type -> ypb.GetYakScriptTagsAndTypeResponse
+	9,    // 1722: ypb.Yak.DeleteLocalPluginsByWhere:output_type -> ypb.Empty
+	413,  // 1723: ypb.Yak.DownloadOnlinePluginByScriptNames:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
+	406,  // 1724: ypb.Yak.DownloadOnlinePlugins:output_type -> ypb.DownloadOnlinePluginProgress
+	9,    // 1725: ypb.Yak.DownloadOnlinePluginBatch:output_type -> ypb.Empty
+	413,  // 1726: ypb.Yak.DownloadOnlinePluginByPluginName:output_type -> ypb.DownloadOnlinePluginByScriptNamesResponse
+	653,  // 1727: ypb.Yak.DownloadOnlinePluginByUUID:output_type -> ypb.YakScript
+	417,  // 1728: ypb.Yak.QueryOnlinePlugins:output_type -> ypb.QueryOnlinePluginsResponse
+	790,  // 1729: ypb.Yak.ExecPacketScan:output_type -> ypb.ExecResult
+	379,  // 1730: ypb.Yak.GetEngineDefaultProxy:output_type -> ypb.DefaultProxyResult
+	9,    // 1731: ypb.Yak.SetEngineDefaultProxy:output_type -> ypb.Empty
+	372,  // 1732: ypb.Yak.GetMachineID:output_type -> ypb.GetMachineIDResponse
+	791,  // 1733: ypb.Yak.GetLicense:output_type -> ypb.GetLicenseResponse
+	9,    // 1734: ypb.Yak.CheckLicense:output_type -> ypb.Empty
+	358,  // 1735: ypb.Yak.GetRequestBodyByHTTPFlowID:output_type -> ypb.Bytes
+	358,  // 1736: ypb.Yak.GetResponseBodyByHTTPFlowID:output_type -> ypb.Bytes
+	358,  // 1737: ypb.Yak.GetHTTPPacketBody:output_type -> ypb.Bytes
+	357,  // 1738: ypb.Yak.EncodeHTTPPacketContent:output_type -> ypb.EncodeHTTPPacketContentResponse
+	353,  // 1739: ypb.Yak.RegisterFacadesHTTP:output_type -> ypb.RegisterFacadesHTTPResponse
+	9,    // 1740: ypb.Yak.ResetAndInvalidUserData:output_type -> ypb.Empty
+	350,  // 1741: ypb.Yak.CreateYaklangShell:output_type -> ypb.YaklangShellResponse
+	790,  // 1742: ypb.Yak.AttachCombinedOutput:output_type -> ypb.ExecResult
+	333,  // 1743: ypb.Yak.IsPrivilegedForNetRaw:output_type -> ypb.IsPrivilegedForNetRawResponse
+	9,    // 1744: ypb.Yak.PromotePermissionForUserPcap:output_type -> ypb.Empty
+	9,    // 1745: ypb.Yak.SetCurrentProject:output_type -> ypb.Empty
+	339,  // 1746: ypb.Yak.GetCurrentProject:output_type -> ypb.ProjectDescription
+	339,  // 1747: ypb.Yak.GetCurrentProjectEx:output_type -> ypb.ProjectDescription
+	340,  // 1748: ypb.Yak.GetProjects:output_type -> ypb.GetProjectsResponse
+	337,  // 1749: ypb.Yak.NewProject:output_type -> ypb.NewProjectResponse
+	337,  // 1750: ypb.Yak.UpdateProject:output_type -> ypb.NewProjectResponse
+	9,    // 1751: ypb.Yak.IsProjectNameValid:output_type -> ypb.Empty
+	9,    // 1752: ypb.Yak.RemoveProject:output_type -> ypb.Empty
+	9,    // 1753: ypb.Yak.DeleteProject:output_type -> ypb.Empty
+	339,  // 1754: ypb.Yak.GetDefaultProject:output_type -> ypb.ProjectDescription
+	339,  // 1755: ypb.Yak.GetDefaultProjectEx:output_type -> ypb.ProjectDescription
+	339,  // 1756: ypb.Yak.QueryProjectDetail:output_type -> ypb.ProjectDescription
+	339,  // 1757: ypb.Yak.GetTemporaryProject:output_type -> ypb.ProjectDescription
+	339,  // 1758: ypb.Yak.GetTemporaryProjectEx:output_type -> ypb.ProjectDescription
+	331,  // 1759: ypb.Yak.ExportProject:output_type -> ypb.ProjectIOProgress
+	331,  // 1760: ypb.Yak.ImportProject:output_type -> ypb.ProjectIOProgress
+	9,    // 1761: ypb.Yak.MigrateLegacyDatabase:output_type -> ypb.Empty
+	319,  // 1762: ypb.Yak.QueryMITMRuleExtractedData:output_type -> ypb.QueryMITMRuleExtractedDataResponse
+	329,  // 1763: ypb.Yak.QueryMITMExtractedAggregate:output_type -> ypb.QueryMITMExtractedAggregateResponse
+	323,  // 1764: ypb.Yak.ExportMITMRuleExtractedData:output_type -> ypb.ExportMITMRuleExtractedDataResponse
+	9,    // 1765: ypb.Yak.DeleteMITMRuleExtractedData:output_type -> ypb.Empty
+	326,  // 1766: ypb.Yak.DeduplicateMITMRuleExtractedData:output_type -> ypb.DeduplicateMITMRuleExtractedDataResponse
+	9,    // 1767: ypb.Yak.ImportChaosMakerRules:output_type -> ypb.Empty
+	310,  // 1768: ypb.Yak.QueryChaosMakerRule:output_type -> ypb.QueryChaosMakerRuleResponse
+	9,    // 1769: ypb.Yak.DeleteChaosMakerRuleByID:output_type -> ypb.Empty
+	790,  // 1770: ypb.Yak.ExecuteChaosMakerRule:output_type -> ypb.ExecResult
+	307,  // 1771: ypb.Yak.IsRemoteAddrAvailable:output_type -> ypb.IsRemoteAddrAvailableResponse
+	307,  // 1772: ypb.Yak.ConnectVulinboxAgent:output_type -> ypb.IsRemoteAddrAvailableResponse
+	273,  // 1773: ypb.Yak.GetRegisteredVulinboxAgent:output_type -> ypb.GetRegisteredAgentResponse
+	9,    // 1774: ypb.Yak.DisconnectVulinboxAgent:output_type -> ypb.Empty
+	316,  // 1775: ypb.Yak.IsCVEDatabaseReady:output_type -> ypb.IsCVEDatabaseReadyResponse
+	790,  // 1776: ypb.Yak.UpdateCVEDatabase:output_type -> ypb.ExecResult
+	790,  // 1777: ypb.Yak.ExportsProfileDatabase:output_type -> ypb.ExecResult
+	790,  // 1778: ypb.Yak.ImportsProfileDatabase:output_type -> ypb.ExecResult
+	301,  // 1779: ypb.Yak.QueryCVE:output_type -> ypb.QueryCVEResponse
+	299,  // 1780: ypb.Yak.GetCVE:output_type -> ypb.CVEDetailEx
+	303,  // 1781: ypb.Yak.SaveTextToTemporalFile:output_type -> ypb.SaveTextToTemporalFileResponse
+	295,  // 1782: ypb.Yak.IsScrecorderReady:output_type -> ypb.IsScrecorderReadyResponse
+	790,  // 1783: ypb.Yak.InstallScrecorder:output_type -> ypb.ExecResult
+	790,  // 1784: ypb.Yak.StartScrecorder:output_type -> ypb.ExecResult
+	291,  // 1785: ypb.Yak.QueryScreenRecorders:output_type -> ypb.QueryScreenRecorderResponse
+	9,    // 1786: ypb.Yak.DeleteScreenRecorders:output_type -> ypb.Empty
+	9,    // 1787: ypb.Yak.UploadScreenRecorders:output_type -> ypb.Empty
+	286,  // 1788: ypb.Yak.GetOneScreenRecorders:output_type -> ypb.ScreenRecorder
+	9,    // 1789: ypb.Yak.UpdateScreenRecorders:output_type -> ypb.Empty
+	278,  // 1790: ypb.Yak.IsVulinboxReady:output_type -> ypb.IsVulinboxReadyResponse
+	790,  // 1791: ypb.Yak.InstallVulinbox:output_type -> ypb.ExecResult
+	790,  // 1792: ypb.Yak.StartVulinbox:output_type -> ypb.ExecResult
+	790,  // 1793: ypb.Yak.GenQualityInspectionReport:output_type -> ypb.ExecResult
+	284,  // 1794: ypb.Yak.HTTPRequestBuilder:output_type -> ypb.HTTPRequestBuilderResponse
+	790,  // 1795: ypb.Yak.DebugPlugin:output_type -> ypb.ExecResult
+	276,  // 1796: ypb.Yak.SmokingEvaluatePlugin:output_type -> ypb.SmokingEvaluatePluginResponse
+	803,  // 1797: ypb.Yak.SmokingEvaluatePluginBatch:output_type -> ypb.SmokingEvaluatePluginBatchResponse
+	793,  // 1798: ypb.Yak.GetSystemDefaultDnsServers:output_type -> ypb.DefaultDnsServerResponse
+	270,  // 1799: ypb.Yak.DiagnoseNetwork:output_type -> ypb.DiagnoseNetworkResponse
+	270,  // 1800: ypb.Yak.DiagnoseNetworkDNS:output_type -> ypb.DiagnoseNetworkResponse
+	810,  // 1801: ypb.Yak.TraceRoute:output_type -> ypb.TraceRouteResponse
+	259,  // 1802: ypb.Yak.GetGlobalNetworkConfig:output_type -> ypb.GlobalNetworkConfig
+	9,    // 1803: ypb.Yak.SetGlobalNetworkConfig:output_type -> ypb.Empty
+	9,    // 1804: ypb.Yak.ResetGlobalNetworkConfig:output_type -> ypb.Empty
+	265,  // 1805: ypb.Yak.GetGlobalProxyRulesConfig:output_type -> ypb.GlobalProxyRulesConfig
+	9,    // 1806: ypb.Yak.SetGlobalProxyRulesConfig:output_type -> ypb.Empty
+	263,  // 1807: ypb.Yak.CheckProxyAlive:output_type -> ypb.CheckProxyAliveResponse
+	258,  // 1808: ypb.Yak.ValidP12PassWord:output_type -> ypb.ValidP12PassWordResponse
+	251,  // 1809: ypb.Yak.RequestYakURL:output_type -> ypb.RequestYakURLResponse
+	1094, // 1810: ypb.Yak.ExecuteBrowserExtensionTask:output_type -> ypb.BrowserExtensionTaskEvent
+	828,  // 1811: ypb.Yak.ReadFile:output_type -> ypb.ReadFileResponse
+	829,  // 1812: ypb.Yak.GetCHeadersDir:output_type -> ypb.GetCHeadersDirResponse
+	831,  // 1813: ypb.Yak.ListCHeaders:output_type -> ypb.ListCHeadersResponse
+	834,  // 1814: ypb.Yak.ListCHeaderEntries:output_type -> ypb.ListCHeaderEntriesResponse
+	11,   // 1815: ypb.Yak.ImportCHeaderPack:output_type -> ypb.GeneralResponse
+	11,   // 1816: ypb.Yak.DeleteCHeaderPack:output_type -> ypb.GeneralResponse
+	838,  // 1817: ypb.Yak.PreviewCHeaderFile:output_type -> ypb.PreviewCHeaderFileResponse
+	840,  // 1818: ypb.Yak.DownloadOfficialCHeaders:output_type -> ypb.DownloadOfficialCHeadersResponse
+	235,  // 1819: ypb.Yak.GetPcapMetadata:output_type -> ypb.PcapMetadata
+	247,  // 1820: ypb.Yak.PcapX:output_type -> ypb.PcapXResponse
+	239,  // 1821: ypb.Yak.QueryTrafficSession:output_type -> ypb.QueryTrafficSessionResponse
+	241,  // 1822: ypb.Yak.QueryTrafficPacket:output_type -> ypb.QueryTrafficPacketResponse
+	243,  // 1823: ypb.Yak.QueryTrafficTCPReassembled:output_type -> ypb.QueryTrafficTCPReassembledResponse
+	808,  // 1824: ypb.Yak.ParseTraffic:output_type -> ypb.ParseTrafficResponse
+	233,  // 1825: ypb.Yak.DuplexConnection:output_type -> ypb.DuplexConnectionResponse
+	227,  // 1826: ypb.Yak.HybridScan:output_type -> ypb.HybridScanResponse
+	224,  // 1827: ypb.Yak.QueryHybridScanTask:output_type -> ypb.QueryHybridScanTaskResponse
+	9,    // 1828: ypb.Yak.DeleteHybridScanTask:output_type -> ypb.Empty
+	220,  // 1829: ypb.Yak.GetSpaceEngineStatus:output_type -> ypb.SpaceEngineStatus
+	220,  // 1830: ypb.Yak.GetSpaceEngineAccountStatus:output_type -> ypb.SpaceEngineStatus
+	220,  // 1831: ypb.Yak.GetSpaceEngineAccountStatusV2:output_type -> ypb.SpaceEngineStatus
+	790,  // 1832: ypb.Yak.FetchPortAssetFromSpaceEngine:output_type -> ypb.ExecResult
+	812,  // 1833: ypb.Yak.EvaluateExpression:output_type -> ypb.EvaluateExpressionResponse
+	814,  // 1834: ypb.Yak.EvaluateMultiExpression:output_type -> ypb.EvaluateMultiExpressionResponse
+	817,  // 1835: ypb.Yak.GetThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
+	11,   // 1836: ypb.Yak.CheckHahValidAiConfig:output_type -> ypb.GeneralResponse
+	997,  // 1837: ypb.Yak.ListAiModel:output_type -> ypb.ListAiModelResponse
+	999,  // 1838: ypb.Yak.AIConfigHealthCheck:output_type -> ypb.AIConfigHealthCheckResponse
+	1001, // 1839: ypb.Yak.ProbeReasoningEffort:output_type -> ypb.ProbeReasoningEffortResponse
+	1110, // 1840: ypb.Yak.ProbeModelVision:output_type -> ypb.ProbeModelVisionResponse
+	1011, // 1841: ypb.Yak.GetAIGlobalConfig:output_type -> ypb.AIGlobalConfig
+	9,    // 1842: ypb.Yak.SetAIGlobalConfig:output_type -> ypb.Empty
+	1006, // 1843: ypb.Yak.ListAIProviders:output_type -> ypb.ListAIProvidersResponse
+	1005, // 1844: ypb.Yak.QueryAIProvider:output_type -> ypb.QueryAIProvidersResponse
+	1008, // 1845: ypb.Yak.UpsertAIProvider:output_type -> ypb.UpsertAIProviderResponse
+	9,    // 1846: ypb.Yak.DeleteAIProvider:output_type -> ypb.Empty
+	817,  // 1847: ypb.Yak.GetAIThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
+	819,  // 1848: ypb.Yak.GetApiKeyByOnline:output_type -> ypb.GetApiKeyByOnlineResponse
+	9,    // 1849: ypb.Yak.UpdateApiKey:output_type -> ypb.Empty
+	822,  // 1850: ypb.Yak.GetFingerprint:output_type -> ypb.GetFingerprintResponse
+	824,  // 1851: ypb.Yak.AddFingerprint:output_type -> ypb.AddFingerprintResponse
+	826,  // 1852: ypb.Yak.ModifyFingerprint:output_type -> ypb.ModifyFingerprintResponse
+	850,  // 1853: ypb.Yak.QueryFingerprint:output_type -> ypb.QueryFingerprintResponse
+	845,  // 1854: ypb.Yak.DeleteFingerprint:output_type -> ypb.DbOperateMessage
+	845,  // 1855: ypb.Yak.UpdateFingerprint:output_type -> ypb.DbOperateMessage
+	845,  // 1856: ypb.Yak.CreateFingerprint:output_type -> ypb.DbOperateMessage
+	845,  // 1857: ypb.Yak.RecoverBuiltinFingerprint:output_type -> ypb.DbOperateMessage
+	845,  // 1858: ypb.Yak.CreateFingerprintGroup:output_type -> ypb.DbOperateMessage
+	855,  // 1859: ypb.Yak.GetAllFingerprintGroup:output_type -> ypb.FingerprintGroups
+	845,  // 1860: ypb.Yak.RenameFingerprintGroup:output_type -> ypb.DbOperateMessage
+	845,  // 1861: ypb.Yak.DeleteFingerprintGroup:output_type -> ypb.DbOperateMessage
+	845,  // 1862: ypb.Yak.BatchUpdateFingerprintToGroup:output_type -> ypb.DbOperateMessage
+	855,  // 1863: ypb.Yak.GetFingerprintGroupSetByFilter:output_type -> ypb.FingerprintGroups
+	862,  // 1864: ypb.Yak.ExportFingerprint:output_type -> ypb.DataTransferProgress
+	862,  // 1865: ypb.Yak.ImportFingerprint:output_type -> ypb.DataTransferProgress
+	842,  // 1866: ypb.Yak.GetReverseShellProgramList:output_type -> ypb.GetReverseShellProgramListResponse
+	844,  // 1867: ypb.Yak.GenerateReverseShellCommand:output_type -> ypb.GenerateReverseShellCommandResponse
+	882,  // 1868: ypb.Yak.QuerySyntaxFlowRule:output_type -> ypb.QuerySyntaxFlowRuleResponse
+	845,  // 1869: ypb.Yak.CreateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
+	879,  // 1870: ypb.Yak.CreateSyntaxFlowRuleEx:output_type -> ypb.CreateSyntaxFlowRuleResponse
+	845,  // 1871: ypb.Yak.UpdateSyntaxFlowRule:output_type -> ypb.DbOperateMessage
+	881,  // 1872: ypb.Yak.UpdateSyntaxFlowRuleEx:output_type -> ypb.UpdateSyntaxFlowRuleResponse
+	845,  // 1873: ypb.Yak.DeleteSyntaxFlowRule:output_type -> ypb.DbOperateMessage
+	885,  // 1874: ypb.Yak.CheckSyntaxFlowRuleUpdate:output_type -> ypb.CheckSyntaxFlowRuleUpdateResponse
+	887,  // 1875: ypb.Yak.ApplySyntaxFlowRuleUpdate:output_type -> ypb.ApplySyntaxFlowRuleUpdateResponse
+	891,  // 1876: ypb.Yak.QuerySyntaxFlowRuleGroup:output_type -> ypb.QuerySyntaxFlowRuleGroupResponse
+	845,  // 1877: ypb.Yak.DeleteSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
+	845,  // 1878: ypb.Yak.CreateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
+	845,  // 1879: ypb.Yak.UpdateSyntaxFlowRuleGroup:output_type -> ypb.DbOperateMessage
+	845,  // 1880: ypb.Yak.UpdateSyntaxFlowRuleAndGroup:output_type -> ypb.DbOperateMessage
+	896,  // 1881: ypb.Yak.QuerySyntaxFlowSameGroup:output_type -> ypb.QuerySyntaxFlowSameGroupResponse
+	899,  // 1882: ypb.Yak.SyntaxFlowRuleToOnline:output_type -> ypb.SyntaxFlowRuleOnlineProgress
+	899,  // 1883: ypb.Yak.DownloadSyntaxFlowRule:output_type -> ypb.SyntaxFlowRuleOnlineProgress
+	907,  // 1884: ypb.Yak.SyntaxFlowScan:output_type -> ypb.SyntaxFlowScanResponse
+	904,  // 1885: ypb.Yak.QuerySyntaxFlowScanTask:output_type -> ypb.QuerySyntaxFlowScanTaskResponse
+	845,  // 1886: ypb.Yak.DeleteSyntaxFlowScanTask:output_type -> ypb.DbOperateMessage
+	911,  // 1887: ypb.Yak.QuerySyntaxFlowResult:output_type -> ypb.QuerySyntaxFlowResultResponse
+	914,  // 1888: ypb.Yak.DeleteSyntaxFlowResult:output_type -> ypb.DeleteSyntaxFlowResultResponse
+	877,  // 1889: ypb.Yak.QuerySSAPrograms:output_type -> ypb.QuerySSAProgramResponse
+	845,  // 1890: ypb.Yak.UpdateSSAProgram:output_type -> ypb.DbOperateMessage
+	845,  // 1891: ypb.Yak.DeleteSSAPrograms:output_type -> ypb.DbOperateMessage
+	928,  // 1892: ypb.Yak.QuerySSARisks:output_type -> ypb.QuerySSARisksResponse
+	930,  // 1893: ypb.Yak.QueryNewSSARisks:output_type -> ypb.QueryNewSSARisksResponse
+	845,  // 1894: ypb.Yak.DeleteSSARisks:output_type -> ypb.DbOperateMessage
+	845,  // 1895: ypb.Yak.UpdateSSARiskTags:output_type -> ypb.DbOperateMessage
+	934,  // 1896: ypb.Yak.GetSSARiskFieldGroup:output_type -> ypb.SSARiskFieldGroupResponse
+	934,  // 1897: ypb.Yak.GetSSARiskFieldGroupEx:output_type -> ypb.SSARiskFieldGroupResponse
+	936,  // 1898: ypb.Yak.NewSSARiskRead:output_type -> ypb.NewSSARiskReadResponse
+	938,  // 1899: ypb.Yak.ExportSSARisk:output_type -> ypb.ExportSSARiskResponse
+	940,  // 1900: ypb.Yak.ImportSSARisk:output_type -> ypb.ImportSSARiskResponse
+	871,  // 1901: ypb.Yak.SSARiskDiff:output_type -> ypb.SSARiskDiffResponse
+	945,  // 1902: ypb.Yak.CreateSSARiskDisposals:output_type -> ypb.CreateSSARiskDisposalsResponse
+	947,  // 1903: ypb.Yak.QuerySSARiskDisposals:output_type -> ypb.QuerySSARiskDisposalsResponse
+	949,  // 1904: ypb.Yak.UpdateSSARiskDisposals:output_type -> ypb.UpdateSSARiskDisposalsResponse
+	951,  // 1905: ypb.Yak.DeleteSSARiskDisposals:output_type -> ypb.DeleteSSARiskDisposalsResponse
+	953,  // 1906: ypb.Yak.GetSSARiskDisposal:output_type -> ypb.GetSSARiskDisposalResponse
+	9,    // 1907: ypb.Yak.SSARiskFeedbackToOnline:output_type -> ypb.Empty
+	1036, // 1908: ypb.Yak.GenerateSSAReport:output_type -> ypb.GenerateSSAReportResponse
+	1043, // 1909: ypb.Yak.CreateSSAProject:output_type -> ypb.CreateSSAProjectResponse
+	1045, // 1910: ypb.Yak.UpdateSSAProject:output_type -> ypb.UpdateSSAProjectResponse
+	1047, // 1911: ypb.Yak.DeleteSSAProject:output_type -> ypb.DeleteSSAProjectResponse
+	1049, // 1912: ypb.Yak.QuerySSAProject:output_type -> ypb.QuerySSAProjectResponse
+	1051, // 1913: ypb.Yak.MigrateSSAProject:output_type -> ypb.MigrateSSAProjectResponse
+	1058, // 1914: ypb.Yak.GetSSAWorkbenchDashboard:output_type -> ypb.GetSSAWorkbenchDashboardResponse
+	916,  // 1915: ypb.Yak.GetAllPluginEnv:output_type -> ypb.PluginEnvData
+	916,  // 1916: ypb.Yak.QueryPluginEnv:output_type -> ypb.PluginEnvData
+	9,    // 1917: ypb.Yak.CreatePluginEnv:output_type -> ypb.Empty
+	9,    // 1918: ypb.Yak.SetPluginEnv:output_type -> ypb.Empty
+	9,    // 1919: ypb.Yak.DeletePluginEnv:output_type -> ypb.Empty
+	919,  // 1920: ypb.Yak.GetAllFuzztagInfo:output_type -> ypb.GetAllFuzztagInfoResponse
+	923,  // 1921: ypb.Yak.GenerateFuzztag:output_type -> ypb.GenerateFuzztagResponse
+	956,  // 1922: ypb.Yak.ExportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
+	956,  // 1923: ypb.Yak.ImportSyntaxFlows:output_type -> ypb.SyntaxflowsProgress
+	961,  // 1924: ypb.Yak.CreateHotPatchTemplate:output_type -> ypb.CreateHotPatchTemplateResponse
+	962,  // 1925: ypb.Yak.DeleteHotPatchTemplate:output_type -> ypb.DeleteHotPatchTemplateResponse
+	963,  // 1926: ypb.Yak.UpdateHotPatchTemplate:output_type -> ypb.UpdateHotPatchTemplateResponse
+	964,  // 1927: ypb.Yak.QueryHotPatchTemplate:output_type -> ypb.QueryHotPatchTemplateResponse
+	966,  // 1928: ypb.Yak.QueryHotPatchTemplateList:output_type -> ypb.QueryHotPatchTemplateListResponse
+	967,  // 1929: ypb.Yak.GetHotPatchTemplateTags:output_type -> ypb.GetHotPatchTemplateTagsResponse
+	969,  // 1930: ypb.Yak.GetGlobalHotPatchConfig:output_type -> ypb.GlobalHotPatchConfig
+	969,  // 1931: ypb.Yak.SetGlobalHotPatchConfig:output_type -> ypb.GlobalHotPatchConfig
+	969,  // 1932: ypb.Yak.ResetGlobalHotPatchConfig:output_type -> ypb.GlobalHotPatchConfig
+	972,  // 1933: ypb.Yak.GroupTableColumn:output_type -> ypb.GroupTableColumnResponse
+	9,    // 1934: ypb.Yak.UploadHotPatchTemplateToOnline:output_type -> ypb.Empty
+	9,    // 1935: ypb.Yak.DownloadHotPatchTemplate:output_type -> ypb.Empty
+	790,  // 1936: ypb.Yak.ExportHotPatchTemplateStream:output_type -> ypb.ExecResult
+	790,  // 1937: ypb.Yak.ImportHotPatchTemplateStream:output_type -> ypb.ExecResult
+	770,  // 1938: ypb.Yak.SetMITMHijackFilter:output_type -> ypb.SetMITMFilterResponse
+	769,  // 1939: ypb.Yak.GetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
+	769,  // 1940: ypb.Yak.ResetMITMHijackFilter:output_type -> ypb.SetMITMFilterRequest
+	978,  // 1941: ypb.Yak.ExportHTTPFlowStream:output_type -> ypb.ExportHTTPFlowStreamResponse
+	980,  // 1942: ypb.Yak.ImportHTTPFlowStream:output_type -> ypb.ImportHTTPFlowStreamResponse
+	985,  // 1943: ypb.Yak.CreateNote:output_type -> ypb.CreateNoteResponse
+	845,  // 1944: ypb.Yak.UpdateNote:output_type -> ypb.DbOperateMessage
+	845,  // 1945: ypb.Yak.DeleteNote:output_type -> ypb.DbOperateMessage
+	989,  // 1946: ypb.Yak.QueryNote:output_type -> ypb.QueryNoteResponse
+	991,  // 1947: ypb.Yak.SearchNoteContent:output_type -> ypb.SearchNoteContentResponse
+	993,  // 1948: ypb.Yak.ImportNote:output_type -> ypb.ImportNoteResponse
+	995,  // 1949: ypb.Yak.ExportNote:output_type -> ypb.ExportNoteResponse
+	150,  // 1950: ypb.Yak.StartAIReAct:output_type -> ypb.AIOutputEvent
+	1102, // 1951: ypb.Yak.ReadAIImage:output_type -> ypb.AIImageResponse
+	150,  // 1952: ypb.Yak.StartAITask:output_type -> ypb.AIOutputEvent
+	165,  // 1953: ypb.Yak.QueryAITask:output_type -> ypb.AITaskQueryResponse
+	845,  // 1954: ypb.Yak.DeleteAITask:output_type -> ypb.DbOperateMessage
+	162,  // 1955: ypb.Yak.QueryAIEvent:output_type -> ypb.AIEventQueryResponse
+	845,  // 1956: ypb.Yak.DeleteAIEvent:output_type -> ypb.DbOperateMessage
+	173,  // 1957: ypb.Yak.QueryAISession:output_type -> ypb.QueryAISessionResponse
+	845,  // 1958: ypb.Yak.UpdateAISessionTitle:output_type -> ypb.DbOperateMessage
+	845,  // 1959: ypb.Yak.UpdateAISessionIMMeta:output_type -> ypb.DbOperateMessage
+	845,  // 1960: ypb.Yak.DeleteAISession:output_type -> ypb.DbOperateMessage
+	168,  // 1961: ypb.Yak.GetRandomAIMaterials:output_type -> ypb.GetRandomAIMaterialsResponse
+	204,  // 1962: ypb.Yak.ExportAILogs:output_type -> ypb.ExportAILogsResponse
+	181,  // 1963: ypb.Yak.CreateAIReActSchedule:output_type -> ypb.AIReActSchedule
+	181,  // 1964: ypb.Yak.UpdateAIReActSchedule:output_type -> ypb.AIReActSchedule
+	845,  // 1965: ypb.Yak.DeleteAIReActSchedule:output_type -> ypb.DbOperateMessage
+	181,  // 1966: ypb.Yak.GetAIReActSchedule:output_type -> ypb.AIReActSchedule
+	188,  // 1967: ypb.Yak.QueryAIReActSchedules:output_type -> ypb.QueryAIReActSchedulesResponse
+	181,  // 1968: ypb.Yak.SetAIReActScheduleEnabled:output_type -> ypb.AIReActSchedule
+	191,  // 1969: ypb.Yak.PreviewAIReActScheduleTimes:output_type -> ypb.PreviewAIReActScheduleTimesResponse
+	9,    // 1970: ypb.Yak.RunAIReActScheduleNow:output_type -> ypb.Empty
+	9,    // 1971: ypb.Yak.CreateAIMemoryEntity:output_type -> ypb.Empty
+	845,  // 1972: ypb.Yak.UpdateAIMemoryEntity:output_type -> ypb.DbOperateMessage
+	845,  // 1973: ypb.Yak.DeleteAIMemoryEntity:output_type -> ypb.DbOperateMessage
+	208,  // 1974: ypb.Yak.GetAIMemoryEntity:output_type -> ypb.AIMemoryEntity
+	211,  // 1975: ypb.Yak.QueryAIMemoryEntity:output_type -> ypb.QueryAIMemoryEntityResponse
+	215,  // 1976: ypb.Yak.CountAIMemoryEntityTags:output_type -> ypb.CountAIMemoryEntityTagsResponse
+	150,  // 1977: ypb.Yak.StartAITriage:output_type -> ypb.AIOutputEvent
+	845,  // 1978: ypb.Yak.CreateAIForge:output_type -> ypb.DbOperateMessage
+	845,  // 1979: ypb.Yak.UpdateAIForge:output_type -> ypb.DbOperateMessage
+	845,  // 1980: ypb.Yak.DeleteAIForge:output_type -> ypb.DbOperateMessage
+	196,  // 1981: ypb.Yak.QueryAIForge:output_type -> ypb.QueryAIForgeResponse
+	194,  // 1982: ypb.Yak.GetAIForge:output_type -> ypb.AIForge
+	47,   // 1983: ypb.Yak.ExportAIForge:output_type -> ypb.GeneralProgress
+	47,   // 1984: ypb.Yak.ImportAIForge:output_type -> ypb.GeneralProgress
+	202,  // 1985: ypb.Yak.QueryAIFocus:output_type -> ypb.QueryAIFocusResponse
+	217,  // 1986: ypb.Yak.StartMcpServer:output_type -> ypb.StartMcpServerResponse
+	133,  // 1987: ypb.Yak.GetToolSetList:output_type -> ypb.GetToolSetListResponse
+	146,  // 1988: ypb.Yak.GetAIToolList:output_type -> ypb.GetAIToolListResponse
+	1104, // 1989: ypb.Yak.QueryAITool:output_type -> ypb.QueryAIToolResponse
+	845,  // 1990: ypb.Yak.DeleteAITool:output_type -> ypb.DbOperateMessage
+	845,  // 1991: ypb.Yak.SaveAITool:output_type -> ypb.DbOperateMessage
+	139,  // 1992: ypb.Yak.SaveAIToolV2:output_type -> ypb.SaveAIToolV2Response
+	845,  // 1993: ypb.Yak.UpdateAITool:output_type -> ypb.DbOperateMessage
+	143,  // 1994: ypb.Yak.ToggleAIToolFavorite:output_type -> ypb.ToggleAIToolFavoriteResponse
+	137,  // 1995: ypb.Yak.AIToolGenerateMetadata:output_type -> ypb.AIToolGenerateMetadataResponse
+	47,   // 1996: ypb.Yak.ExportAITool:output_type -> ypb.GeneralProgress
+	47,   // 1997: ypb.Yak.ImportAITool:output_type -> ypb.GeneralProgress
+	1012, // 1998: ypb.Yak.IsLlamaServerReady:output_type -> ypb.IsLlamaServerReadyResponse
+	1014, // 1999: ypb.Yak.IsLocalModelReady:output_type -> ypb.IsLocalModelReadyResponse
+	790,  // 2000: ypb.Yak.InstallLlamaServer:output_type -> ypb.ExecResult
+	790,  // 2001: ypb.Yak.StartLocalModel:output_type -> ypb.ExecResult
+	11,   // 2002: ypb.Yak.StopLocalModel:output_type -> ypb.GeneralResponse
+	790,  // 2003: ypb.Yak.DownloadLocalModel:output_type -> ypb.ExecResult
+	1019, // 2004: ypb.Yak.GetSupportedLocalModels:output_type -> ypb.GetSupportedLocalModelsResponse
+	11,   // 2005: ypb.Yak.AddLocalModel:output_type -> ypb.GeneralResponse
+	11,   // 2006: ypb.Yak.DeleteLocalModel:output_type -> ypb.GeneralResponse
+	11,   // 2007: ypb.Yak.UpdateLocalModel:output_type -> ypb.GeneralResponse
+	81,   // 2008: ypb.Yak.GetAllStartedLocalModels:output_type -> ypb.GetAllStartedLocalModelsResponse
+	11,   // 2009: ypb.Yak.ClearAllModels:output_type -> ypb.GeneralResponse
+	131,  // 2010: ypb.Yak.IsSearchVectorDatabaseReady:output_type -> ypb.IsSearchVectorDatabaseReadyResponse
+	790,  // 2011: ypb.Yak.InitSearchVectorDatabase:output_type -> ypb.ExecResult
+	129,  // 2012: ypb.Yak.GetAllVectorStoreCollections:output_type -> ypb.GetAllVectorStoreCollectionsResponse
+	128,  // 2013: ypb.Yak.GetAllVectorStoreCollectionsWithFilter:output_type -> ypb.GetAllVectorStoreCollectionsWithFilterResponse
+	11,   // 2014: ypb.Yak.DeleteSearchVectorDatabase:output_type -> ypb.GeneralResponse
+	11,   // 2015: ypb.Yak.UpdateVectorStoreCollection:output_type -> ypb.GeneralResponse
+	123,  // 2016: ypb.Yak.ListVectorStoreEntries:output_type -> ypb.ListVectorStoreEntriesResponse
+	11,   // 2017: ypb.Yak.CreateVectorStoreEntry:output_type -> ypb.GeneralResponse
+	125,  // 2018: ypb.Yak.GetDocumentByVectorStoreEntryID:output_type -> ypb.GetDocumentByVectorStoreEntryIDResponse
+	89,   // 2019: ypb.Yak.ListThirdPartyBinary:output_type -> ypb.ListThirdPartyBinaryResponse
+	790,  // 2020: ypb.Yak.InstallThirdPartyBinary:output_type -> ypb.ExecResult
+	11,   // 2021: ypb.Yak.UninstallThirdPartyBinary:output_type -> ypb.GeneralResponse
+	93,   // 2022: ypb.Yak.IsThirdPartyBinaryReady:output_type -> ypb.IsThirdPartyBinaryReadyResponse
+	790,  // 2023: ypb.Yak.StartThirdPartyBinary:output_type -> ypb.ExecResult
+	1033, // 2024: ypb.Yak.PluginTrace:output_type -> ypb.PluginTraceResponse
+	99,   // 2025: ypb.Yak.GetKnowledgeBaseNameList:output_type -> ypb.GetKnowledgeBaseNameListResponse
+	104,  // 2026: ypb.Yak.GetKnowledgeBase:output_type -> ypb.GetKnowledgeBaseResponse
+	1107, // 2027: ypb.Yak.QueryKnowledgeBase:output_type -> ypb.QueryKnowledgeBaseResponse
+	101,  // 2028: ypb.Yak.GetKnowledgeBaseTypeList:output_type -> ypb.GetKnowledgeBaseTypeListResponse
+	11,   // 2029: ypb.Yak.DeleteKnowledgeBase:output_type -> ypb.GeneralResponse
+	11,   // 2030: ypb.Yak.CreateKnowledgeBase:output_type -> ypb.GeneralResponse
+	44,   // 2031: ypb.Yak.CreateKnowledgeBaseV2:output_type -> ypb.CreateKnowledgeBaseV2Response
+	11,   // 2032: ypb.Yak.UpdateKnowledgeBase:output_type -> ypb.GeneralResponse
+	11,   // 2033: ypb.Yak.DeleteKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
+	11,   // 2034: ypb.Yak.CreateKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
+	11,   // 2035: ypb.Yak.UpdateKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
+	112,  // 2036: ypb.Yak.SearchKnowledgeBaseEntry:output_type -> ypb.SearchKnowledgeBaseEntryResponse
+	111,  // 2037: ypb.Yak.QueryKnowledgeBaseByAI:output_type -> ypb.QueryKnowledgeBaseByAIResponse
+	11,   // 2038: ypb.Yak.BuildVectorIndexForKnowledgeBase:output_type -> ypb.GeneralResponse
+	11,   // 2039: ypb.Yak.BuildVectorIndexForKnowledgeBaseEntry:output_type -> ypb.GeneralResponse
+	96,   // 2040: ypb.Yak.GenerateQuestionIndexForKnowledgeBase:output_type -> ypb.GenerateQuestionIndexForKnowledgeBaseResponse
+	65,   // 2041: ypb.Yak.ListEntityRepository:output_type -> ypb.ListEntityRepositoryResponse
+	69,   // 2042: ypb.Yak.QueryEntity:output_type -> ypb.QueryEntityResponse
+	845,  // 2043: ypb.Yak.CreateEntity:output_type -> ypb.DbOperateMessage
+	845,  // 2044: ypb.Yak.UpdateEntity:output_type -> ypb.DbOperateMessage
+	845,  // 2045: ypb.Yak.DeleteEntity:output_type -> ypb.DbOperateMessage
+	74,   // 2046: ypb.Yak.QueryRelationship:output_type -> ypb.QueryRelationshipResponse
+	845,  // 2047: ypb.Yak.CreateRelationship:output_type -> ypb.DbOperateMessage
+	845,  // 2048: ypb.Yak.UpdateRelationship:output_type -> ypb.DbOperateMessage
+	845,  // 2049: ypb.Yak.DeleteRelationship:output_type -> ypb.DbOperateMessage
+	77,   // 2050: ypb.Yak.QuerySubERM:output_type -> ypb.QuerySubERMResponse
+	79,   // 2051: ypb.Yak.GenerateERMDot:output_type -> ypb.GenerateERMDotResponse
+	47,   // 2052: ypb.Yak.ExportKnowledgeBase:output_type -> ypb.GeneralProgress
+	47,   // 2053: ypb.Yak.ImportKnowledgeBase:output_type -> ypb.GeneralProgress
+	11,   // 2054: ypb.Yak.AddMCPServer:output_type -> ypb.GeneralResponse
+	11,   // 2055: ypb.Yak.DeleteMCPServer:output_type -> ypb.GeneralResponse
+	11,   // 2056: ypb.Yak.UpdateMCPServer:output_type -> ypb.GeneralResponse
+	58,   // 2057: ypb.Yak.GetAllMCPServers:output_type -> ypb.GetAllMCPServersResponse
+	11,   // 2058: ypb.Yak.UpdateMCPServerToolConfig:output_type -> ypb.GeneralResponse
+	61,   // 2059: ypb.Yak.GetMCPToolList:output_type -> ypb.GetMCPToolListResponse
+	59,   // 2060: ypb.Yak.GetMCPToolDetail:output_type -> ypb.MCPClientToolConfig
+	11,   // 2061: ypb.Yak.SetMCPToolEnabled:output_type -> ypb.GeneralResponse
+	1069, // 2062: ypb.Yak.QueryMCPToolCallHistory:output_type -> ypb.QueryMCPToolCallHistoryResponse
+	1067, // 2063: ypb.Yak.GetMCPToolCallHistoryDetail:output_type -> ypb.MCPToolCallHistory
+	9,    // 2064: ypb.Yak.DeleteMCPToolCallHistory:output_type -> ypb.Empty
+	49,   // 2065: ypb.Yak.RAGCollectionSearch:output_type -> ypb.RAGCollectionSearchResponse
+	790,  // 2066: ypb.Yak.DownloadRAGs:output_type -> ypb.ExecResult
+	21,   // 2067: ypb.Yak.SaveIMBot:output_type -> ypb.SaveIMBotResponse
+	23,   // 2068: ypb.Yak.ListIMBots:output_type -> ypb.ListIMBotResponse
+	25,   // 2069: ypb.Yak.DeleteIMBot:output_type -> ypb.DeleteIMBotResponse
+	27,   // 2070: ypb.Yak.TestIMBot:output_type -> ypb.TestIMBotResponse
+	29,   // 2071: ypb.Yak.StartIMOnboarding:output_type -> ypb.IMOnboardingEvent
+	32,   // 2072: ypb.Yak.StartIMControl:output_type -> ypb.StartIMControlResponse
+	34,   // 2073: ypb.Yak.StopIMControl:output_type -> ypb.StopIMControlResponse
+	36,   // 2074: ypb.Yak.SubscribeIMControlState:output_type -> ypb.IMControlStateEvent
+	41,   // 2075: ypb.Yak.UpdateIMControlConfig:output_type -> ypb.UpdateIMControlConfigResponse
+	1065, // 2076: ypb.Yak.SubscribeHTTPFlows:output_type -> ypb.HTTPFlowLiveEvent
+	1073, // 2077: ypb.Yak.GetAIReActRecommendedSkills:output_type -> ypb.GetAIReActRecommendedSkillsResponse
+	1072, // 2078: ypb.Yak.UpdateAIReActRecommendedSkill:output_type -> ypb.AIReActRecommendedSkill
+	1072, // 2079: ypb.Yak.ResetAIReActRecommendedSkill:output_type -> ypb.AIReActRecommendedSkill
+	1085, // 2080: ypb.Yak.QueryContextMenuActions:output_type -> ypb.QueryContextMenuActionsResponse
+	1086, // 2081: ypb.Yak.SetContextMenuActionBinding:output_type -> ypb.ContextMenuAction
+	1090, // 2082: ypb.Yak.ExecuteContextMenuAction:output_type -> ypb.ContextMenuActionEvent
+	1092, // 2083: ypb.Yak.UploadToTemporaryFile:output_type -> ypb.UploadToTemporaryFileResponse
+	1097, // 2084: ypb.Yak.GetAISessionCurrentResources:output_type -> ypb.GetAISessionCurrentResourcesResponse
+	1113, // 2085: ypb.Yak.GetAIModelContext:output_type -> ypb.AIModelContextResponse
+	1113, // 2086: ypb.Yak.SetAIModelContext:output_type -> ypb.AIModelContextResponse
+	1413, // [1413:2087] is the sub-list for method output_type
+	739,  // [739:1413] is the sub-list for method input_type
 	739,  // [739:739] is the sub-list for extension type_name
 	739,  // [739:739] is the sub-list for extension extendee
 	0,    // [0:739] is the sub-list for field type_name
@@ -92327,7 +92555,7 @@ func file_yakgrpc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_yakgrpc_proto_rawDesc), len(file_yakgrpc_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   1112,
+			NumMessages:   1115,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
