@@ -24,6 +24,8 @@ func writeLiveSourceTree(t *testing.T, dir string) {
 	write("internal/testdata/fixture.go", "package fixture\n")
 	write("generated/consts.go", "package generated\n")
 	write("README.md", "# demo\n\npassword = \"hunter2\"\n")
+	write("assets/demo.mp4", "binary")
+	write("docs/spec.docx", "binary")
 	write("internal/notes.md", "# notes\n")
 }
 
@@ -56,6 +58,8 @@ func TestAttachLiveSourceTarget_AppliesDefaultCompileExcludes(t *testing.T) {
 		"documentation entry files must never reach a source rule")
 	require.Contains(t, files, "internal/notes.md",
 		"only documentation entry names are dropped; ordinary markdown stays")
+	require.NotContains(t, files, "assets/demo.mp4", "media never enters the source stage")
+	require.NotContains(t, files, "docs/spec.docx", "office documents never enter the source stage")
 }
 
 func TestAttachLiveSourceTarget_UserExcludePatternsApply(t *testing.T) {
