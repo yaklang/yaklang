@@ -1136,7 +1136,8 @@ service Yak {
   // Fuzztags in both local and remote-engine modes.
   rpc UploadToTemporaryFile(stream UploadToTemporaryFileRequest) returns (UploadToTemporaryFileResponse);
 
-  // AI session resource snapshot query.
+  // Query resources attached by the latest input and the distinct resources
+  // attached throughout an AI session.
   rpc GetAISessionCurrentResources(GetAISessionCurrentResourcesRequest) returns (GetAISessionCurrentResourcesResponse);
 }
 
@@ -10545,9 +10546,9 @@ message AISessionTaskResourceInfo {
   string Type = 1;
   string Key = 2;
   string Value = 3;
-  // turn: current task only; session: retained across tasks in the session.
+  // Deprecated: retained for wire compatibility and not populated.
   string Scope = 4;
-  // attached_resource_info / attached_file_path / inherited
+  // Deprecated: retained for wire compatibility and not populated.
   string Source = 5;
 }
 
@@ -10559,9 +10560,10 @@ message GetAISessionCurrentResourcesResponse {
   string SessionID = 1;
   string TaskID = 2;
   string UserInputUUID = 3;
-  // Resources explicitly attached to or inherited by the latest task.
+  // Resources attached by the latest input.
   repeated AISessionTaskResourceInfo TaskResources = 4;
-  // Session-scoped resources reconstructed from task input history.
+  // Distinct resources attached by inputs in this session. Resources from newer
+  // inputs come first; order within each input is preserved.
   repeated AISessionTaskResourceInfo SessionResources = 5;
 }
 
