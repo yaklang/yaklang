@@ -1136,6 +1136,10 @@ service Yak {
 
   // AI session resource snapshot query.
   rpc GetAISessionCurrentResources(GetAISessionCurrentResourcesRequest) returns (GetAISessionCurrentResourcesResponse);
+  // Model-specific compression budgets, available before a session starts.
+  rpc GetAIModelContext(GetAIModelContextRequest) returns (AIModelContextResponse);
+  rpc SetAIModelContext(SetAIModelContextRequest) returns (AIModelContextResponse);
+
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
@@ -10573,4 +10577,25 @@ message HTTPPreviewResourceResponse {
   string URL = 1;
   string MimeType = 2;
   bytes Data = 3;
+}
+
+message GetAIModelContextRequest {
+  string Provider = 1;
+  string Model = 2;
+}
+
+message SetAIModelContextRequest {
+  string Provider = 1;
+  string Model = 2;
+  int64 ThresholdTokens = 3;
+}
+
+message AIModelContextResponse {
+  string Provider = 1;
+  string Model = 2;
+  int64 ContextTokens = 3;
+  int64 ThresholdTokens = 4;
+  string Source = 5;
+  int64 MinimumThresholdTokens = 6;
+  bool TooSmall = 7;
 }
