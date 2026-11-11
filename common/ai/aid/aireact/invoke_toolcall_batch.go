@@ -729,9 +729,23 @@ func (r *ReAct) ExecuteToolCallGroup(
 				result.Outcomes[i].Err = callerErr
 				return
 			}
+			review, reviewErr := caller.ReviewToolCall(work.tool, work.params)
+			if reviewErr != nil {
+				result.Outcomes[i].Stage = toolBatchStageForError(reviewErr)
+				result.Outcomes[i].Err = reviewErr
+				return
+			}
+			if review.DirectlyAnswer {
+				result.Outcomes[i].DirectlyAnswer = true
+				result.Outcomes[i].Stage = aicommon.ToolCallStageCancelled
+				barrier.arrive(i, true)
+				cancelWorkers()
+				caller.Cancel()
+				return
+			}
 			if work.call.Async {
 				defer caller.Cancel()
-				resource, resourceErr := caller.NewAsyncResource(work.tool, work.params,
+				resource, resourceErr := caller.NewReviewedAsyncResource(review,
 					func(toolResult *aitool.ToolResult, directlyAnswer bool, callErr error) {
 						if directlyAnswer {
 							barrier.arrive(i, true)
@@ -746,6 +760,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 				}
 				releaseAdmission, allowed := r.BeginAsyncExecutionAdmission()
 				if !allowed {
+					review.Abort(asyncexecmanager.ErrClosed)
 					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 					result.Outcomes[i].Err = asyncexecmanager.ErrClosed
 					return
@@ -757,6 +772,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 					}}})
 				if startErr != nil {
 					releaseAdmission()
+					review.Abort(startErr)
 					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 					result.Outcomes[i].Err = startErr
 					return
@@ -785,7 +801,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 					return
 				}
 				execution.Start(func() (*aitool.ToolResult, bool, error) {
-					return caller.CallToolWithExistedParams(work.tool, work.params)
+					return review.Execute()
 				})
 				toolResult, directlyAnswer, callErr = execution.Wait()
 				var receipt *aicommon.ToolCallDetached
@@ -797,7 +813,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 					return
 				}
 			} else {
-				toolResult, directlyAnswer, callErr = caller.CallToolWithExistedParams(work.tool, work.params)
+				toolResult, directlyAnswer, callErr = review.Execute()
 			}
 
 			outcome := &result.Outcomes[i]

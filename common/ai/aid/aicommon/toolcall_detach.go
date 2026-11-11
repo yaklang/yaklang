@@ -74,7 +74,7 @@ func NewToolCallExecution(caller *ToolCaller, register func(asyncexecmanager.Res
 	}
 	caller.m.Lock()
 	defer caller.m.Unlock()
-	if caller.asyncResourceBound || !caller.startTime.IsZero() {
+	if caller.asyncResourceBound || caller.executionStarted {
 		return nil, errors.New("tool caller is already in use")
 	}
 	caller.asyncResourceBound = true

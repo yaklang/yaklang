@@ -97,6 +97,85 @@ func (r *ReActLoop) StartAsyncToolCall(name string, params aitool.InvokeParams, 
 	return receipt, err
 }
 
+type reviewedAsyncToolPreparer interface {
+	PrepareReviewedAsyncToolCall(task aicommon.AIStatefulTask, review *aicommon.ToolCallReviewResult) (asyncexecmanager.Resource, func(), error)
+}
+
+// StartReviewedAsyncToolCall submits an already reviewed proposal. Review must
+// complete before this method creates a Manager execution.
+func (r *ReActLoop) StartReviewedAsyncToolCall(review *aicommon.ToolCallReviewResult) (asyncexecmanager.Summary, error) {
+	if r == nil || utils.IsNil(r.invoker) {
+		return asyncexecmanager.Summary{}, errors.New("async execution requires an AI invoke runtime")
+	}
+	task := r.GetCurrentTask()
+	if utils.IsNil(task) || review == nil || review.Tool == nil || review.Params == nil {
+		return asyncexecmanager.Summary{}, errors.New("async tool call requires an owner and approved review")
+	}
+	preparer, ok := r.invoker.(reviewedAsyncToolPreparer)
+	if !ok {
+		return asyncexecmanager.Summary{}, errors.New("runtime does not expose approved async tool preparation")
+	}
+	manager, err := r.GetAsyncExecutionManager()
+	if err != nil {
+		return asyncexecmanager.Summary{}, err
+	}
+	if r.asyncAdmissionClosed() || r.invoker.AsyncDirectAnswerRequested() {
+		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
+	}
+
+	executionID := "exec-" + ksuid.New().String()
+	review.BindAsyncExecutionID(executionID)
+	resource, cancel, err := preparer.PrepareReviewedAsyncToolCall(task, review)
+	if err != nil {
+		if cancel != nil {
+			cancel()
+		}
+		return asyncexecmanager.Summary{}, err
+	}
+	if cancel == nil {
+		review.Abort(errors.New("async tool preparation returned no cancellation handle"))
+		return asyncexecmanager.Summary{}, errors.New("async tool preparation must provide cancellation")
+	}
+	if ctx := task.GetContext(); ctx != nil {
+		if err := ctx.Err(); err != nil {
+			cancel()
+			review.Abort(err)
+			return asyncexecmanager.Summary{}, err
+		}
+	}
+	if r.asyncAdmissionClosed() {
+		cancel()
+		review.Abort(asyncexecmanager.ErrClosed)
+		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
+	}
+	releaseAdmission, allowed := r.invoker.BeginAsyncExecutionAdmission()
+	if !allowed {
+		cancel()
+		review.Abort(asyncexecmanager.ErrClosed)
+		return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
+	}
+	defer releaseAdmission()
+
+	attributes := map[string]string{"task_id": task.GetId(), "loop": r.GetLoopName()}
+	if identity, ok := resource.(interface {
+		CallToolID() string
+		ResultID() int64
+	}); ok {
+		attributes["call_tool_id"] = identity.CallToolID()
+		attributes["result_id"] = fmt.Sprint(identity.ResultID())
+	}
+	receipt, err := manager.Start(asyncexecmanager.Request{
+		ID: executionID, Resource: resource,
+		Metadata: asyncexecmanager.Metadata{Name: review.Tool.Name, Attributes: attributes},
+	})
+	if err != nil {
+		review.Abort(err)
+		return receipt, err
+	}
+	r.invoker.TrackAsyncExecutionTask(task, receipt.ID)
+	return receipt, nil
+}
+
 func (r *ReActLoop) asyncAdmissionClosed() bool {
 	r.onReleaseMutex.Lock()
 	closed := r.released

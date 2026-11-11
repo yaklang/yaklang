@@ -65,9 +65,8 @@ func recordSuccessfulToolCache(loop *reactloops.ReActLoop, name string, result *
 // resolveToolCallReason extracts the human-readable reason for a tool call from
 // the action: it prefers the action-specific reason field (e.g. tool_call_reason)
 // and falls back to human_readable_thought when the AI omitted the dedicated
-// reason field. Native direct calls use this helper; text directly_call_tool reads its reason inside
-// aicommon.ToolCaller.DirectlyCallTool (so the card is emitted before the reason
-// streams in).
+// reason field. Both direct-call handlers resolve it before starting the
+// blocking review so the approval card and execution use the same reason.
 func resolveToolCallReason(action *aicommon.Action, reasonKey string) string {
 	if action == nil {
 		return ""
@@ -76,6 +75,23 @@ func resolveToolCallReason(action *aicommon.Action, reasonKey string) string {
 		return r
 	}
 	return strings.TrimSpace(action.GetString("human_readable_thought"))
+}
+
+func handleDirectToolReviewAnswer(
+	loop *reactloops.ReActLoop,
+	ctx context.Context,
+	invoker aicommon.AIInvokeRuntime,
+	operator *reactloops.LoopActionHandlerOperator,
+) {
+	loop.StopSubAgentsForUser()
+	answer, err := invoker.DirectlyAnswer(ctx,
+		"在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题。一般这种情况出现在用户认为这个任务不应该使用工具或者工具无法满足需求的情况下。", nil)
+	if err != nil {
+		operator.Fail(utils.Error("DirectlyAnswer fail, reason: " + err.Error()))
+		return
+	}
+	invoker.AddToTimeline("directly-answer", answer)
+	operator.ExitForUser()
 }
 
 // handleToolCallResult handles the shared direct-call execution result boundary.
@@ -143,15 +159,7 @@ func handleToolCallResult(
 	}
 
 	if directly {
-		loop.StopSubAgentsForUser()
-		answer, answerErr := invoker.DirectlyAnswer(ctx,
-			"在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题。一般这种情况出现在用户认为这个任务不应该使用工具或者工具无法满足需求的情况下。", nil)
-		if answerErr != nil {
-			operator.Fail(utils.Error("DirectlyAnswer fail, reason: " + answerErr.Error()))
-			return
-		}
-		invoker.AddToTimeline("directly-answer", answer)
-		operator.ExitForUser()
+		handleDirectToolReviewAnswer(loop, ctx, invoker, operator)
 		return
 	}
 

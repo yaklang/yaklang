@@ -580,20 +580,28 @@ func (i *executingToolScalarTestInvoker) invokeTool(
 	return result, false, err
 }
 
-func (i *executingToolScalarTestInvoker) DirectlyCallTool(
+func (i *executingToolScalarTestInvoker) ReviewDirectToolCall(
 	ctx context.Context,
 	name string,
 	action *aicommon.Action,
 	prepare aicommon.DirectlyCallPrepareFunc,
-) (*aitool.ToolResult, bool, error) {
+	_ ...aicommon.ToolCallerOption,
+) (*aicommon.ToolCallReviewResult, error) {
 	params, fallback, tool, err := prepare(action, name)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if fallback {
-		return nil, false, &aicommon.ToolCallRetryError{ToolName: name, Reason: "invalid explicit arguments"}
+		return nil, &aicommon.ToolCallRetryError{ToolName: name, Reason: "invalid explicit arguments"}
 	}
-	return i.invokeTool(ctx, name, tool, params)
+	return &aicommon.ToolCallReviewResult{Tool: tool, Params: params}, nil
+}
+
+func (i *executingToolScalarTestInvoker) ExecuteReviewedToolCall(
+	ctx context.Context,
+	review *aicommon.ToolCallReviewResult,
+) (*aitool.ToolResult, bool, error) {
+	return i.invokeTool(ctx, review.Tool.Name, review.Tool, review.Params)
 }
 
 func (i *executingToolBatchTestInvoker) ExecuteToolCallGroup(
