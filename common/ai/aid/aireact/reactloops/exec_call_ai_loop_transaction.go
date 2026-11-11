@@ -182,6 +182,17 @@ func (d *LoopResultDescriptor) finishFromResponse(resp *aicommon.AIResponse, cal
 	d.finish(resp, resp.GetPlainOutput(), resp.GetPlainReason(), calls)
 }
 
+// Identity is needed by context calibration before the asynchronously captured
+// response body is complete. Never infer it from the session's current model.
+func (d *LoopResultDescriptor) setModelIdentity(resp *aicommon.AIResponse) {
+	if d == nil || resp == nil {
+		return
+	}
+	d.mu.Lock()
+	d.snapshot.Provider, d.snapshot.Model = resp.GetProviderName(), resp.GetModelName()
+	d.mu.Unlock()
+}
+
 func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason string, calls []*aispec.ToolCall) {
 	if d == nil {
 		return
@@ -827,7 +838,9 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		return nil
 	}
 	var transactionErr error
-	if r.useSpeedPriorityAI {
+	if compressionMode {
+		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallQualityPriorityAI, postHandler, requestOpts...)
+	} else if r.useSpeedPriorityAI {
 		r.config.ScheduleAuxiliaryTask(activeTaskCtx, fmt.Sprintf("react-loop:%s", r.loopName),
 			func() string { return prompt },
 			func(*aicommon.Action) {},
@@ -1335,6 +1348,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		)
 	}
 	if acceptedResp != nil {
+		descriptor.setModelIdentity(acceptedResp)
 		go func() {
 			action.WaitStream(activeTaskCtx)
 			descriptor.finishFromResponse(acceptedResp, nil)

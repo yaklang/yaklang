@@ -634,6 +634,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	needSummary := utils.NewBool(false)
 	lastCompressionTokens := 0
+	overflowFailures := 0
 LOOP:
 	for {
 		if r.handleAsyncDirectAnswerSignal() {
@@ -717,6 +718,9 @@ LOOP:
 			lastPromptTokens int
 		)
 		retryMax := r.promptOverflowRetryMax()
+		// Keep an overall rejection budget across successful maintenance calls.
+		// Only an accepted normal turn demonstrates recovery of the task.
+		overflowRetryBudget := (retryMax + 1) * (retryMax + 1)
 		for attempt := 0; ; attempt++ {
 			var promptErr error
 			assembled, promptErr = r.generateLoopPromptFromInput(buildInput)
@@ -732,6 +736,9 @@ LOOP:
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
 			tokens := aicommon.MeasureTokens(prompt)
+			if config, ok := r.config.(*aicommon.Config); ok {
+				config.EmitModelContext(int64(tokens))
+			}
 			if r.promptMode == aicommon.LoopPromptModeCompressContext {
 				r.noteCompressionStatus()
 			}
@@ -763,20 +770,37 @@ LOOP:
 			}
 			streamWg.Wait()
 			if transactionErr == nil {
+				if err := task.GetContext().Err(); err != nil {
+					transactionErr = err
+					break
+				}
+				if config, ok := r.config.(*aicommon.Config); ok {
+					identity := resultDescriptor.Snapshot()
+					if identity.Model != "" {
+						config.ConfirmPromptContextSuccess(identity.Provider, identity.Model, int64(tokens))
+						if r.promptMode == aicommon.LoopPromptModeNormal {
+							config.UpdateAIModelInfo(identity.Provider, identity.Model)
+						}
+						config.EmitModelContextFor(identity.Provider, identity.Model, int64(tokens))
+					} else if config.AiModelName == "" {
+						config.ConfirmPromptContextSuccess(config.AiServerName, "", int64(tokens))
+					}
+				}
 				r.noteFittingTimelineThroughID(assembled.TimelineThroughID)
 				break
 			}
-			if !aicommon.IsPromptTooLong(transactionErr) || buildInput.overflowCompression {
+			if !aicommon.IsPromptTooLong(transactionErr) {
 				break
 			}
-			if r.lastFittingTimelineThroughID != nil {
-				buildInput.overflowCompression = true
-				log.Warnf("prompt overflow detected; compressing through the last fitting timeline boundary")
-				continue
-			}
-			if attempt >= retryMax || !r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt) {
+			// Record every overflow, including the last-fitting-boundary path.
+			// Merely rebuilding a compression prompt must not persist a limit.
+			r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt)
+			overflowFailures++
+			if attempt >= retryMax || overflowFailures >= overflowRetryBudget {
 				break
 			}
+			buildInput.overflowCompression = true
+			r.narrowOverflowCompressionBoundary(assembled.TimelineThroughID)
 			log.Warnf("prompt overflow detected; rebuilding the context (retry %d/%d)", attempt+1, retryMax)
 		}
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
@@ -828,12 +852,22 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, turnErr)
 				return turnErr
 			}
+			if aicommon.IsPromptTooLong(turnErr) {
+				if overflowFailures >= overflowRetryBudget {
+					r.emitContextCompressionWarning("上下文压缩重试后仍超过模型容量，请切换到支持更长上下文的模型。")
+					r.finishIterationLoopWithError(iterationCount, task, turnErr)
+					return turnErr
+				}
+			}
 			phase, action := "execute_ai_output", "<model-response>"
 			if transactionErr != nil {
 				phase, action = "request_ai", "<ai-request>"
 			}
 			r.recordRecoverableTurnError(iterationCount, phase, action, turnErr)
 			continue LOOP
+		}
+		if r.promptMode == aicommon.LoopPromptModeNormal && !compressionOnly {
+			overflowFailures = 0
 		}
 
 		// 文本协议校验通过后，再记录本轮 reasoning 和 decision。

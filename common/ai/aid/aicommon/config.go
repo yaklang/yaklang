@@ -50,8 +50,8 @@ const DefaultMaxSubAgentConcurrency = 5
 const AbsoluteMaxSubAgentConcurrency = 20
 
 // DefaultTimelineContentSizeLimit 是运行时上下文的服务端默认压缩阈值，单位是 token。
-// RuntimeContextSizeLimit <= 0 时使用该值，避免零值把带有 Skill、Evidence 的时间线提前压小。
-const DefaultTimelineContentSizeLimit = 300 * 1024
+// 未知模型使用该值；RuntimeContextSizeLimit == 0 时优先恢复当前模型的持久化阈值。
+const DefaultTimelineContentSizeLimit = int(yakit.DefaultAIModelContextTokens)
 
 type ConfigOption func(*Config) error
 

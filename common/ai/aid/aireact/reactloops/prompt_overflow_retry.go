@@ -1,7 +1,11 @@
 package reactloops
 
 import (
+	"fmt"
+	"sort"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // defaultPromptOverflowRetryMax mirrors the aicommon default for configs that do
@@ -19,8 +23,8 @@ func (r *ReActLoop) promptOverflowRetryMax() int {
 }
 
 // syncPromptOverflowTimelineLimit applies the per-model dynamic threshold before
-// the pre-prompt compression measures. It only ever lowers the limit: a session
-// that already had to compress must not silently go back to the full window.
+// the pre-prompt compression measures, including restored model settings and
+// model switches. The configured session limit remains separate.
 func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -35,7 +39,7 @@ func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 		return
 	}
 	effective := config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
-	if effective <= 0 || effective >= base {
+	if effective <= 0 {
 		return
 	}
 	timeline.SetTimelineContentLimit(effective)
@@ -52,6 +56,30 @@ func (r *ReActLoop) noteFittingTimelineThroughID(id *int64) {
 	r.lastFittingTimelineThroughID = &copied
 }
 
+// Shrink the prefix sent for compression, preserving the newer timeline entries
+// for subsequent turns. This also recovers when the first request is too large
+// and no successful timeline boundary exists yet.
+func (r *ReActLoop) narrowOverflowCompressionBoundary(rejectedThroughID *int64) {
+	if r.lastFittingTimelineThroughID != nil && rejectedThroughID != nil && *r.lastFittingTimelineThroughID < *rejectedThroughID {
+		return
+	}
+	timeline := timelineFromConfig(r.config)
+	if timeline == nil {
+		return
+	}
+	var through []int64
+	if rejectedThroughID != nil {
+		through = []int64{*rejectedThroughID}
+	}
+	candidates, err := timeline.CompressionCandidates(through...)
+	if err != nil || len(candidates) < 2 {
+		return
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].ID < candidates[j].ID })
+	id := candidates[(len(candidates)-1)/2].ID
+	r.lastFittingTimelineThroughID = &id
+}
+
 func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prompt string) bool {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -61,8 +89,27 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	if !ok {
 		return false
 	}
+	if evidence.Provider == "" {
+		evidence.Provider = config.AiServerName
+	}
+	if evidence.Model == "" {
+		evidence.Model = config.AiModelName
+	}
+	if r.promptMode == aicommon.LoopPromptModeNormal && evidence.Model != "" {
+		// A gateway fallback or a Speed loop can use a different model than the
+		// initially configured quality model. Rebuild against the failed model.
+		config.UpdateAIModelInfo(evidence.Provider, evidence.Model)
+	}
 	measured := int64(aicommon.MeasureTokens(prompt))
 	limit := config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
+	capacity := evidence.MaxContextTokens
+	if capacity <= 0 {
+		capacity = limit
+	}
+	if capacity > 0 && capacity < yakit.MinimumAIModelContextTokens {
+		r.emitContextCompressionWarning(fmt.Sprintf("模型上下文过小（%d tokens，小于 100K），请切换到支持更长上下文的模型。", capacity))
+	}
+	config.EmitModelContextFor(evidence.Provider, evidence.Model, measured)
 	if limit <= 0 {
 		return false
 	}

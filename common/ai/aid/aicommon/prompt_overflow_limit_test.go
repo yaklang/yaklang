@@ -4,13 +4,92 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestPromptContextLearnsOnlyAfterMatchingSuccess(t *testing.T) {
+	model := "context-test-" + uuid.NewString()
+	cfg := newConfig(context.Background())
+	cfg.AiServerName, cfg.AiModelName = "test", model
+	db := consts.GetGormProfileDatabase()
+	require.Equal(t, "default", yakit.GetAIModelContext(db, "test", model).Source)
+	cfg.RecordPromptOverflow("test", model, 180000, &aispec.PromptOverflowEvidence{MaxContextTokens: 128000})
+	require.True(t, cfg.ModelContextStatus(180000).Pending)
+	require.Equal(t, "default", yakit.GetAIModelContext(db, "test", model).Source)
+	cfg.ConfirmPromptContextSuccess("test", "different-model")
+	require.Equal(t, "default", yakit.GetAIModelContext(db, "test", model).Source)
+	cfg.ConfirmPromptContextSuccess("test", model)
+	require.Equal(t, yakit.AIModelContext{ContextTokens: 128000, ThresholdTokens: 102400, Source: "learned"}, yakit.GetAIModelContext(db, "test", model))
+	require.False(t, cfg.ModelContextStatus(90000).Pending)
+	fresh := newConfig(context.Background())
+	require.EqualValues(t, 102400, fresh.EffectiveTimelineTokenLimit("test", model, int64(DefaultTimelineContentSizeLimit)))
+	require.EqualValues(t, DefaultTimelineContentSizeLimit, fresh.EffectiveTimelineTokenLimit("test", model+"-other", int64(DefaultTimelineContentSizeLimit)))
+}
+
+func TestPromptContextWarnsBelow100K(t *testing.T) {
+	cfg := newConfig(context.Background())
+	cfg.AiServerName, cfg.AiModelName = "test", uuid.NewString()
+	cfg.RecordPromptOverflow(cfg.AiServerName, cfg.AiModelName, 180000, &aispec.PromptOverflowEvidence{MaxContextTokens: 64000})
+	require.True(t, cfg.ModelContextStatus(180000).TooSmall)
+}
+
+func TestPromptContextUnknownMaximumUsesSuccessfulRequest(t *testing.T) {
+	cfg := newConfig(context.Background())
+	cfg.AiServerName, cfg.AiModelName = "test", uuid.NewString()
+	cfg.RecordPromptOverflow(cfg.AiServerName, cfg.AiModelName, 200000, nil)
+	require.EqualValues(t, 120000, cfg.ModelContextStatus(0).ThresholdTokens)
+	cfg.ConfirmPromptContextSuccess(cfg.AiServerName, cfg.AiModelName, 150000)
+	require.EqualValues(t, 150000, cfg.ModelContextStatus(0).ThresholdTokens)
+	require.EqualValues(t, 150000, cfg.ModelContextStatus(0).ContextTokens)
+}
+
+func TestPromptContextLearnsCapacityWithSmallerManualThreshold(t *testing.T) {
+	cfg := newConfig(context.Background())
+	cfg.AiServerName, cfg.AiModelName = "test", uuid.NewString()
+	require.NoError(t, WithTimelineContentLimit(100000)(cfg))
+	require.Zero(t, cfg.RecordPromptOverflow(cfg.AiServerName, cfg.AiModelName, 180000, &aispec.PromptOverflowEvidence{MaxContextTokens: 128000}))
+	cfg.ConfirmPromptContextSuccess(cfg.AiServerName, cfg.AiModelName, 80000)
+	status := cfg.ModelContextStatus(0)
+	require.EqualValues(t, 128000, status.ContextTokens)
+	require.EqualValues(t, 100000, status.ThresholdTokens)
+}
+
+func TestPromptContextManualHotpatchIsModelScoped(t *testing.T) {
+	cfg := newConfig(context.Background())
+	model := uuid.NewString()
+	cfg.AiServerName, cfg.AiModelName = "test", model
+	cfg.RecordPromptOverflow("test", model, 180000, &aispec.PromptOverflowEvidence{MaxContextTokens: 128000})
+	for _, option := range cfg.ProcessHotPatchMessage(&ypb.AIInputEvent{
+		IsConfigHotpatch: true, HotpatchType: HotPatchType_RuntimeContextSizeLimit,
+		Params: &ypb.AIStartParams{AIService: "test", AIModelName: model, RuntimeContextSizeLimit: 600 * 1024},
+	}) {
+		require.NoError(t, option(cfg))
+	}
+	status := cfg.ModelContextStatus(0)
+	require.EqualValues(t, 600*1024, status.ThresholdTokens)
+	require.Equal(t, "manual", status.Source)
+	require.False(t, status.Pending)
+	fresh := newConfig(context.Background())
+	require.EqualValues(t, 600*1024, fresh.EffectiveTimelineTokenLimit("test", model, fresh.GetTimelineContentSizeLimit()))
+	require.EqualValues(t, 500*1024, fresh.EffectiveTimelineTokenLimit("test", model+"-other", fresh.GetTimelineContentSizeLimit()))
+	cfg.UpdateAIModelInfo("test", model+"-other")
+	require.EqualValues(t, 500*1024, cfg.ModelContextStatus(0).ThresholdTokens, "switching models must not reuse a dragged threshold")
+	params, changed := mergeHotpatchSessionStartParams(&ypb.AIStartParams{RuntimeContextSizeLimit: 300 * 1024}, &ypb.AIInputEvent{
+		HotpatchType: HotPatchType_RuntimeContextSizeLimit,
+		Params:       &ypb.AIStartParams{AIService: "test", AIModelName: model, RuntimeContextSizeLimit: 600 * 1024},
+	})
+	require.True(t, changed)
+	require.Zero(t, params.GetRuntimeContextSizeLimit(), "restored sessions must resolve the selected model's saved setting")
+}
 
 func TestRecordPromptOverflowUsesReportedMaximum(t *testing.T) {
 	cfg := newConfig(context.Background())
-	require.EqualValues(t, 300*1024, cfg.GetTimelineContentSizeLimit())
+	require.EqualValues(t, 500*1024, cfg.GetTimelineContentSizeLimit())
 
 	limit := cfg.RecordPromptOverflow("openai", "gpt-4o", 150000, &aispec.PromptOverflowEvidence{MaxContextTokens: 128000})
 	require.EqualValues(t, 102400, limit, "80%% of the reported maximum")
@@ -59,14 +138,13 @@ func TestResetPromptOverflowLimit(t *testing.T) {
 		cfg.EffectiveTimelineTokenLimit("openai", "gpt-4o", cfg.GetTimelineContentSizeLimit()))
 }
 
-// The same model behind another gateway keeps the reduced window; a different
-// model must fall back to the configured threshold.
-func TestEffectiveTimelineTokenLimitMatchesByModel(t *testing.T) {
+// A provider alias is not proof that it has the same effective context capacity.
+func TestEffectiveTimelineTokenLimitIsolatesProviderAndModel(t *testing.T) {
 	cfg := newConfig(context.Background())
 	base := cfg.GetTimelineContentSizeLimit()
 	require.NotZero(t, cfg.RecordPromptOverflow("aibalance", "gpt-4o", 0, &aispec.PromptOverflowEvidence{MaxContextTokens: 64000}))
-	require.EqualValues(t, 51200, cfg.EffectiveTimelineTokenLimit("openai", "gpt-4o", base),
-		"the same model name keeps the dynamic limit")
+	require.EqualValues(t, base, cfg.EffectiveTimelineTokenLimit("openai", "gpt-4o", base),
+		"same model names at different providers must not share evidence")
 	require.EqualValues(t, base, cfg.EffectiveTimelineTokenLimit("openai", "gpt-5", base))
 	require.EqualValues(t, base, cfg.EffectiveTimelineTokenLimit("", "", base))
 }

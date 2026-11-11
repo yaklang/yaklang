@@ -129,16 +129,6 @@ var (
 	}
 )
 
-// runtimeContextSizeLimitFromHotpatch maps the hotpatch field onto the config's
-// token threshold. Non-positive values mean "use the server default", matching
-// AIStartParams.RuntimeContextSizeLimit. The deprecated timeline field is not read.
-func runtimeContextSizeLimitFromHotpatch(raw int64) int {
-	if raw <= 0 {
-		return DefaultTimelineContentSizeLimit
-	}
-	return int(raw)
-}
-
 func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	if !e.IsConfigHotpatch {
 		return nil
@@ -253,9 +243,51 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	}
 
 	if e.HotpatchType == HotPatchType_RuntimeContextSizeLimit {
-		// <=0 restores the server default. The deprecated TimelineContentSizeLimit
-		// is intentionally ignored: a frontend still sends that old non-zero default.
-		aiOption = append(aiOption, WithTimelineContentLimit(runtimeContextSizeLimitFromHotpatch(hotPatchParams.GetRuntimeContextSizeLimit())))
+		raw := hotPatchParams.GetRuntimeContextSizeLimit()
+		provider, model := hotPatchParams.GetAIService(), hotPatchParams.GetAIModelName()
+		aiOption = append(aiOption, func(config *Config) error {
+			if err := yakit.ValidateAIModelContextThreshold(raw); err != nil {
+				status := config.ModelContextStatus(0)
+				status.Error = err.Error()
+				config.emitModelContextStatus(status)
+				return err
+			}
+			provider, model := provider, model
+			config.m.Lock()
+			currentProvider, currentModel := config.AiServerName, config.AiModelName
+			config.m.Unlock()
+			if model == "" {
+				provider, model = currentProvider, currentModel
+			}
+			previous := config.ModelContextStatusFor(provider, model, 0).ThresholdTokens
+			value := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model)
+			if raw > 0 && model != "" {
+				// Setting a threshold does not prove a larger model capacity.
+				value.ThresholdTokens, value.Source = raw, "manual"
+				if err := yakit.SaveAIModelContext(consts.GetGormProfileDatabase(), provider, model, value); err != nil {
+					return err
+				}
+			}
+			config.resetModelPromptOverflowLimit(provider, model)
+			if provider != currentProvider || model != currentModel {
+				return nil
+			}
+			base := DefaultTimelineContentSizeLimit
+			// Compatibility for older clients that adjust before a model is identified.
+			if model == "" && raw > 0 {
+				base = int(raw)
+			}
+			if err := WithTimelineContentLimit(base)(config); err != nil {
+				return err
+			}
+			status := config.ModelContextStatusFor(provider, model, 0)
+			if timeline := config.GetTimeline(); timeline != nil {
+				timeline.SetTimelineContentLimit(status.ThresholdTokens)
+			}
+			status.Change = newModelContextChange("manual", previous, status.ThresholdTokens)
+			config.emitModelContextStatus(status)
+			return nil
+		})
 	}
 
 	if e.HotpatchType == HotPatchType_ExecutionStrategy {
@@ -347,14 +379,15 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 		}
 		next.Strategy = proto.Clone(incoming).(*ypb.AIExecutionStrategy)
 	case HotPatchType_RuntimeContextSizeLimit:
-		// Persist the raw value, including 0. A positive value is an explicit
-		// threshold; <=0 means the next start keeps the server default instead
-		// of replaying the previous explicit limit.
 		limit := p.GetRuntimeContextSizeLimit()
-		if limit < 0 {
-			limit = 0
+		if yakit.ValidateAIModelContextThreshold(limit) != nil {
+			return base, false
 		}
 		next.RuntimeContextSizeLimit = limit
+		if p.GetAIModelName() != "" {
+			next.RuntimeContextSizeLimit = 0
+		}
+
 	default:
 		return base, false
 	}
@@ -431,6 +464,21 @@ func (c *Config) PersistSessionStartParamsFromHotpatch(e *ypb.AIInputEvent) {
 	}
 	if isTaskScopedCapabilityHotpatch(e) {
 		return
+	}
+	if e.HotpatchType == HotPatchType_RuntimeContextSizeLimit {
+		if yakit.ValidateAIModelContextThreshold(e.Params.GetRuntimeContextSizeLimit()) != nil {
+			return
+		}
+		c.m.Lock()
+		provider, model := c.AiServerName, c.AiModelName
+		c.m.Unlock()
+		if e.Params.GetAIModelName() == "" && model != "" {
+			e = proto.Clone(e).(*ypb.AIInputEvent)
+			if e.Params == nil {
+				e.Params = &ypb.AIStartParams{}
+			}
+			e.Params.AIService, e.Params.AIModelName = provider, model
+		}
 	}
 	sessionID := strings.TrimSpace(c.PersistentSessionId)
 	if sessionID == "" || c.GetDB() == nil {
