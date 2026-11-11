@@ -29,7 +29,7 @@ func TestDetectPromptOverflow(t *testing.T) {
 		{"openai/responses", 400, `{"error":{"type":"invalid_request_error","message":"Your input exceeds the context window of this model."}}`, "", "", 0, 0, 0},
 		{"deepseek", 400, `{"error":{"code":"invalid_request_error","message":"This model's maximum context length is 65536 tokens. However, you requested 87731 tokens (85507 in the messages, 2224 in the completion). Please reduce the length of the messages or completion."}}`, "", "invalid_request_error", 65536, 85507, 87731},
 		{"anthropic", 400, `{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 214315 tokens > 204798 maximum"}}`, "", "", 204798, 214315, 0},
-		{"anthropic/budget", 400, `{"error":{"message":"input length and max_tokens exceed context limit: 200000"}}`, "", "", 0, 0, 0},
+		{"anthropic/budget", 400, `{"error":{"message":"input length and max_tokens exceed context limit: 200000"}}`, "", "", 200000, 0, 0},
 		{"glm/chinese", 400, `{"error":{"code":"1261","message":"Prompt 超长"}}`, "", "1261", 0, 0, 0},
 		{"glm/english", 400, `{"error":{"code":1261,"message":"Prompt is too long"}}`, "", "1261", 0, 0, 0},
 		{"chinese/input", 400, `{"error":{"message":"输入超长"}}`, "", "", 0, 0, 0},

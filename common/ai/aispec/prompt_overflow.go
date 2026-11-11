@@ -173,14 +173,15 @@ var promptOverflowPatterns = []struct {
 }
 
 var (
-	promptOverflowMaxTokens = regexp.MustCompile(`(?i)maximum context (?:length|window)(?:\s+(?:is|of))?\s*[:=]?\s*([0-9][0-9,]*)\s*tokens?`)
-	promptOverflowRequested = regexp.MustCompile(`(?i)(?:you requested|requested a total of)\s+([0-9][0-9,]*)\s*tokens?`)
-	promptOverflowInput     = regexp.MustCompile(`(?i)(?:messages resulted in|prompt is too long:|input(?: length)?(?: is|:))\s*([0-9][0-9,]*)\s*tokens?`)
-	promptOverflowMessages  = regexp.MustCompile(`(?i)([0-9][0-9,]*)\s+(?:tokens?\s+)?in the messages`)
-	promptOverflowCompare   = regexp.MustCompile(`(?i)([0-9][0-9,]*)\s*tokens?\s*>\s*([0-9][0-9,]*)\s*maximum`)
-	promptOverflowNegative  = regexp.MustCompile(`(?i)rate[_ -]?limit|insufficient[_ ]quota|quota[_ ](?:exceeded|exhausted)|invalid[_ ]api[_ -]?key|unauthorized|permission[_ ](?:denied|error)|authentication[_ ](?:failed|error)|content[_ -]?filter|content[_ ]policy|safety[_ ](?:violation|error)|余额不足|额度(?:不足|耗尽)|频率限制|审核(?:拒绝|不通过)`)
-	promptOverflowBadParam  = regexp.MustCompile(`(?i)\bmax_(?:completion_)?tokens\b.{0,40}(?:is too large|is invalid|invalid value|must be|must not|out of range)|(?:invalid|unsupported)\s+(?:value for\s+)?['"]?max_(?:completion_)?tokens\b`)
-	promptOverflowSecrets   = regexp.MustCompile(`(?i)\bsk-[a-z0-9_-]+|\bbearer\s+[^\s"\\]+|(?:api[_-]?key|access[_-]?token|password|secret)\s*[:=]\s*["']?[^\s"',;}{\\]+`)
+	promptOverflowMaxTokens     = regexp.MustCompile(`(?i)maximum context (?:length|window)(?:\s+(?:is|of))?\s*[:=]?\s*([0-9][0-9,]*)\s*tokens?`)
+	promptOverflowContextBudget = regexp.MustCompile(`(?i)exceed(?:s|ed)?\s+(?:the\s+)?context limit\s*[:=]\s*([0-9][0-9,]*)`)
+	promptOverflowRequested     = regexp.MustCompile(`(?i)(?:you requested|requested a total of)\s+([0-9][0-9,]*)\s*tokens?`)
+	promptOverflowInput         = regexp.MustCompile(`(?i)(?:messages resulted in|prompt is too long:|input(?: length)?(?: is|:))\s*([0-9][0-9,]*)\s*tokens?`)
+	promptOverflowMessages      = regexp.MustCompile(`(?i)([0-9][0-9,]*)\s+(?:tokens?\s+)?in the messages`)
+	promptOverflowCompare       = regexp.MustCompile(`(?i)([0-9][0-9,]*)\s*tokens?\s*>\s*([0-9][0-9,]*)\s*maximum`)
+	promptOverflowNegative      = regexp.MustCompile(`(?i)rate[_ -]?limit|insufficient[_ ]quota|quota[_ ](?:exceeded|exhausted)|invalid[_ ]api[_ -]?key|unauthorized|permission[_ ](?:denied|error)|authentication[_ ](?:failed|error)|content[_ -]?filter|content[_ ]policy|safety[_ ](?:violation|error)|余额不足|额度(?:不足|耗尽)|频率限制|审核(?:拒绝|不通过)`)
+	promptOverflowBadParam      = regexp.MustCompile(`(?i)\bmax_(?:completion_)?tokens\b.{0,40}(?:is too large|is invalid|invalid value|must be|must not|out of range)|(?:invalid|unsupported)\s+(?:value for\s+)?['"]?max_(?:completion_)?tokens\b`)
+	promptOverflowSecrets       = regexp.MustCompile(`(?i)\bsk-[a-z0-9_-]+|\bbearer\s+[^\s"\\]+|(?:api[_-]?key|access[_-]?token|password|secret)\s*[:=]\s*["']?[^\s"',;}{\\]+`)
 )
 
 func promptOverflowTokenCount(s string) int64 {
@@ -199,6 +200,9 @@ func promptOverflowExtractTokens(ev *PromptOverflowEvidence, message string) {
 		return 0
 	}
 	ev.MaxContextTokens = extract(promptOverflowMaxTokens)
+	if ev.MaxContextTokens == 0 {
+		ev.MaxContextTokens = extract(promptOverflowContextBudget)
+	}
 	ev.RequestTokens = extract(promptOverflowRequested)
 	ev.InputTokens = extract(promptOverflowInput)
 	if ev.InputTokens == 0 {
