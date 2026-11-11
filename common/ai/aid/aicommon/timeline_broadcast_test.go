@@ -110,19 +110,24 @@ func TestTimelineBroadcastUnregistersOnReleaseAndMerge(t *testing.T) {
 
 func TestTimelineBroadcasterRegisterAndUnregister(t *testing.T) {
 	broadcaster := NewTimelineBroadcaster()
-	received := int64(-1)
-	broadcaster.Register("test", func(item *TimelineItem) error {
-		received = item.GetID()
+	var received []int64
+	broadcaster.Register("test", func(items ...*TimelineItem) error {
+		for _, item := range items {
+			received = append(received, item.GetID())
+		}
 		return nil
 	})
 
-	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{Text: "event"})))
-	require.Zero(t, received)
+	require.NoError(t, broadcaster.Broadcast(
+		NewTimelineItem(&TextTimelineItem{Text: "event-1"}),
+		NewTimelineItem(&TextTimelineItem{Text: "event-2"}),
+	))
+	require.Equal(t, []int64{0, 0}, received)
 
 	broadcaster.Unregister("test")
-	received = -1
+	received = nil
 	require.NoError(t, broadcaster.Broadcast(NewTimelineItem(&TextTimelineItem{Text: "ignored"})))
-	require.Equal(t, int64(-1), received)
+	require.Empty(t, received)
 }
 
 func TestTimelineBroadcastAssignsLocalIDsAndDeduplicatesByHistory(t *testing.T) {
@@ -159,11 +164,42 @@ func TestTimelineBroadcastRejectsNonEmptyItemID(t *testing.T) {
 	require.Zero(t, timelineItemCountContaining(config.Timeline, "invalid"))
 }
 
+func TestTimelineBroadcastBatchAssignsLocalIDs(t *testing.T) {
+	config := newTimelineBroadcastConfig(t)
+	fork, err := config.Timeline.ForkForTask("batch", "batch", config, config)
+	require.NoError(t, err)
+	t.Cleanup(fork.Release)
+
+	first := NewTimelineItem(&TextTimelineItem{Text: "batch first"})
+	second := NewTimelineItem(&TextTimelineItem{Text: "batch second"})
+	require.NoError(t, config.BroadcastTimelineItem(first, second))
+
+	for _, timeline := range []*Timeline{config.Timeline, fork.Branch} {
+		require.NotZero(t, timelineItemIDContaining(timeline, "batch first"))
+		require.NotZero(t, timelineItemIDContaining(timeline, "batch second"))
+	}
+	require.NotEqual(
+		t,
+		timelineItemIDContaining(config.Timeline, "batch first"),
+		timelineItemIDContaining(fork.Branch, "batch first"),
+	)
+}
+
+func TestTimelineBroadcastValidatesBatchBeforeDispatch(t *testing.T) {
+	config := newTimelineBroadcastConfig(t)
+	valid := NewTimelineItem(&TextTimelineItem{Text: "must stay absent"})
+	invalid := NewTimelineItem(&TextTimelineItem{ID: 9, Text: "invalid"})
+
+	err := config.BroadcastTimelineItem(valid, invalid)
+	require.ErrorContains(t, err, "item 1")
+	require.Zero(t, timelineItemCountContaining(config.Timeline, "must stay absent"))
+}
+
 func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	config.TimelineBroadcaster.Register("test", func(*TimelineItem) error {
+	config.TimelineBroadcaster.Register("test", func(...*TimelineItem) error {
 		close(started)
 		<-release
 		return nil

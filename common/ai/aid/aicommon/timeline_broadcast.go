@@ -12,30 +12,31 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
-// TimelineBroadcaster fans one immutable Timeline item out to live timelines
-// which belong to the same agent session.
+// TimelineBroadcaster fans one or more immutable Timeline items out to live
+// timelines which belong to the same agent session.
 type TimelineBroadcaster struct {
 	mu              sync.RWMutex
 	changed         *sync.Cond
 	activePublishes int
 	forkInProgress  bool
-	registrations   map[string]func(*TimelineItem) error
+	registrations   map[string]func(...*TimelineItem) error
 }
 
 func NewTimelineBroadcaster() *TimelineBroadcaster {
-	b := &TimelineBroadcaster{registrations: make(map[string]func(*TimelineItem) error)}
+	b := &TimelineBroadcaster{registrations: make(map[string]func(...*TimelineItem) error)}
 	b.changed = sync.NewCond(&b.mu)
 	return b
 }
 
-// Broadcast sends item to the callbacks registered when Broadcast began.
+// Broadcast sends a group of items to the callbacks registered when Broadcast
+// began. The whole group is validated before any callback is invoked.
 // Callbacks run after the registration lock is released, so they may safely
 // register, unregister or publish another item.
-func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
+func (b *TimelineBroadcaster) Broadcast(items ...*TimelineItem) error {
 	if b == nil {
 		return fmt.Errorf("timeline broadcaster is nil")
 	}
-	canonical, err := normalizeTimelineBroadcastItem(item)
+	canonical, err := normalizeTimelineBroadcastItems(items...)
 	if err != nil {
 		return err
 	}
@@ -44,7 +45,7 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 	b.waitForForkLocked()
 	b.activePublishes++
 	ids := make([]string, 0, len(b.registrations))
-	callbacks := make(map[string]func(*TimelineItem) error, len(b.registrations))
+	callbacks := make(map[string]func(...*TimelineItem) error, len(b.registrations))
 	for id, callback := range b.registrations {
 		ids = append(ids, id)
 		callbacks[id] = callback
@@ -60,7 +61,7 @@ func (b *TimelineBroadcaster) Broadcast(item *TimelineItem) error {
 	sort.Strings(ids)
 	var failures []error
 	for _, id := range ids {
-		if err := callbacks[id](canonical); err != nil {
+		if err := callbacks[id](canonical...); err != nil {
 			failures = append(failures, fmt.Errorf("timeline registration %q: %w", id, err))
 		}
 	}
@@ -104,14 +105,14 @@ func (b *TimelineBroadcaster) beginFork() func() {
 }
 
 // Register adds or replaces one stable callback registration.
-func (b *TimelineBroadcaster) Register(id string, callback func(*TimelineItem) error) {
+func (b *TimelineBroadcaster) Register(id string, callback func(...*TimelineItem) error) {
 	if b == nil || id == "" || callback == nil {
 		return
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.registrations == nil {
-		b.registrations = make(map[string]func(*TimelineItem) error)
+		b.registrations = make(map[string]func(...*TimelineItem) error)
 	}
 	b.registrations[id] = callback
 }
@@ -171,24 +172,34 @@ func normalizeTimelineBroadcastItem(item *TimelineItem) (*TimelineItem, error) {
 	return &canonical, nil
 }
 
-// appendBroadcastItem is a registered Timeline callback. Each Timeline owns
-// its copy, validates the item and commits it through the normal index path.
-func (m *Timeline) appendBroadcastItem(item *TimelineItem) error {
-	if m == nil || item == nil || item.value == nil {
-		return fmt.Errorf("timeline and item are required")
+func normalizeTimelineBroadcastItems(items ...*TimelineItem) ([]*TimelineItem, error) {
+	if len(items) == 0 {
+		return nil, fmt.Errorf("timeline broadcast requires at least one item")
 	}
-	copy, err := normalizeTimelineBroadcastItem(item)
+	normalized := make([]*TimelineItem, 0, len(items))
+	for index, item := range items {
+		canonical, err := normalizeTimelineBroadcastItem(item)
+		if err != nil {
+			return nil, fmt.Errorf("timeline broadcast item %d: %w", index, err)
+		}
+		normalized = append(normalized, canonical)
+	}
+	return normalized, nil
+}
+
+// appendBroadcastItem is a registered Timeline callback. Each Timeline owns
+// its copies, validates the batch and commits it through the normal index path.
+func (m *Timeline) appendBroadcastItem(items ...*TimelineItem) error {
+	if m == nil {
+		return fmt.Errorf("timeline is required")
+	}
+	canonical, err := normalizeTimelineBroadcastItems(items...)
 	if err != nil {
 		return err
 	}
-
 	m.mu.RLock()
-	_, alreadyCommitted := m.broadcastReceipts[copy.historyID]
 	config := m.config
 	m.mu.RUnlock()
-	if alreadyCommitted {
-		return nil
-	}
 	if config == nil {
 		return fmt.Errorf("timeline has no config for broadcast ID allocation")
 	}
@@ -197,40 +208,59 @@ func (m *Timeline) appendBroadcastItem(item *TimelineItem) error {
 	var notifications []func()
 	defer m.unlockAndNotifyTimeline(&notifications)
 
-	if _, ok := m.broadcastReceipts[copy.historyID]; ok {
-		return nil
+	type pendingItem struct {
+		item *TimelineItem
+		id   int64
 	}
-	var id int64
-	for {
-		id = config.AcquireId()
-		if id <= 0 {
-			return fmt.Errorf("timeline ID provider returned non-positive ID %d", id)
+	pending := make([]pendingItem, 0, len(canonical))
+	seen := make(map[string]struct{}, len(canonical))
+	for _, item := range canonical {
+		if _, ok := m.broadcastReceipts[item.historyID]; ok {
+			continue
 		}
-		if !m.idToTimelineItem.Have(id) {
-			break
+		if _, ok := seen[item.historyID]; ok {
+			continue
 		}
+		var id int64
+		for {
+			id = config.AcquireId()
+			if id <= 0 {
+				return fmt.Errorf("timeline ID provider returned non-positive ID %d", id)
+			}
+			if !m.idToTimelineItem.Have(id) {
+				break
+			}
+		}
+		item, err := timelineBroadcastItemWithID(item, id)
+		if err != nil {
+			return err
+		}
+		seen[item.historyID] = struct{}{}
+		pending = append(pending, pendingItem{item: item, id: id})
 	}
-	copy, err = timelineBroadcastItemWithID(copy, id)
-	if err != nil {
-		return err
-	}
+
 	if m.broadcastReceipts == nil {
 		m.broadcastReceipts = make(map[string]struct{})
 	}
-	m.broadcastReceipts[copy.historyID] = struct{}{}
+	var lastTS int64
+	for _, pendingItem := range pending {
+		item := pendingItem.item
+		m.broadcastReceipts[item.historyID] = struct{}{}
 
-	ts := copy.createdAt.UnixMilli()
-	if ts <= 0 {
-		ts = time.Now().UnixMilli()
+		ts := item.createdAt.UnixMilli()
+		if ts <= 0 {
+			ts = time.Now().UnixMilli()
+		}
+		for m.tsToTimelineItem.Have(ts) || ts <= lastTS {
+			ts++
+		}
+		lastTS = ts
+		m.idToTs.Set(pendingItem.id, ts)
+		m.invalidateFreezeFromLocked(pendingItem.id)
+		m.OrderInsertId(pendingItem.id, item)
+		m.OrderInsertTs(ts, item)
+		m.collectItemInputCallbackLocked(&notifications, item)
 	}
-	for m.tsToTimelineItem.Have(ts) {
-		ts++
-	}
-	m.idToTs.Set(id, ts)
-	m.invalidateFreezeFromLocked(id)
-	m.OrderInsertId(id, copy)
-	m.OrderInsertTs(ts, copy)
-	m.collectItemInputCallbackLocked(&notifications, copy)
 	return nil
 }
 

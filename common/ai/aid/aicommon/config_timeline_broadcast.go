@@ -110,9 +110,9 @@ func (c *Config) RegisterTimeline(timeline *Timeline) (func(), error) {
 	return func() { broadcaster.Unregister(key) }, nil
 }
 
-// BroadcastTimelineItem publishes one Timeline item to every live Timeline in
-// this Config's session.
-func (c *Config) BroadcastTimelineItem(item *TimelineItem) error {
+// BroadcastTimelineItem publishes one or more Timeline items to every live
+// Timeline in this Config's session.
+func (c *Config) BroadcastTimelineItem(items ...*TimelineItem) error {
 	if c == nil {
 		return fmt.Errorf("config is nil")
 	}
@@ -123,10 +123,12 @@ func (c *Config) BroadcastTimelineItem(item *TimelineItem) error {
 	if broadcaster == nil {
 		return fmt.Errorf("config has no timeline broadcaster")
 	}
-	if err := broadcaster.Broadcast(item); err != nil {
+	if err := broadcaster.Broadcast(items...); err != nil {
 		return err
 	}
-	emitTimelineItemAsync(c.GetEmitter(), item)
+	for _, item := range items {
+		emitTimelineItemAsync(c.GetEmitter(), item)
+	}
 	return nil
 }
 
