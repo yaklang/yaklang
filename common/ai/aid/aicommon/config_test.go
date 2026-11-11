@@ -72,6 +72,21 @@ func TestGetLastIDFromConfigOptions(t *testing.T) {
 	require.Equal(t, lastID, id)
 }
 
+func TestResilienceForgeIDOptionKeepsCapturedRuntime(t *testing.T) {
+	parent := WithID("parent-runtime")
+	child := WithID("child-runtime")
+
+	id, ok := GetLastIDFromConfigOptions(parent)
+	require.True(t, ok)
+	require.Equal(t, "parent-runtime", id)
+	id, ok = GetLastIDFromConfigOptions(child, nil, parent)
+	require.True(t, ok)
+	require.Equal(t, "parent-runtime", id)
+	id, ok = GetLastIDFromConfigOptions(parent, child)
+	require.True(t, ok)
+	require.Equal(t, "child-runtime", id)
+}
+
 func TestGetLastIDFromConfigOptions_NoID(t *testing.T) {
 	id, ok := GetLastIDFromConfigOptions(
 		WithAIServiceName("test-service"),

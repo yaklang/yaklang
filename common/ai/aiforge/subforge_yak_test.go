@@ -253,6 +253,7 @@ retried = aiagent.NewExecutor(
     options...,
 )~
 defer retried.Close()
+assert retried.GetConfig().GetRuntimeId() == parentID
 retried.SetRecoveryStartTaskID(original["task_id"])
 die(retried.Run())
 VERIFY_SUB_FORGE(retried)
