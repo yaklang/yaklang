@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -15,7 +14,7 @@ import (
 // Database row identity and timestamps are assigned by GORM, not the compiler.
 func irCodePersistenceFingerprint(ir *ssadb.IrCode) ([sha256.Size]byte, error) {
 	snapshot := *ir
-	snapshot.Model = gorm.Model{}
+	snapshot.Model = ssadb.Model{}
 	// Match the actual write hook before JSON's invalid-UTF-8 replacement.
 	// Copy the string slice so normalization cannot mutate the source record.
 	snapshot.Variable = slices.Clone(ir.Variable)
