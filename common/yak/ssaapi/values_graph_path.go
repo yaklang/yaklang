@@ -56,6 +56,23 @@ func (v *Value) WalkDataflowPathWithEdgeFilterWithContext(
 // by dataflow exclude pruning). reusePath promises that visit does not retain
 // the Values slice it receives, which lets the effect×depend combination reuse
 // one buffer instead of allocating a path per pair.
+// dataflowEffectNext / dataflowDependNext are package-level so a per-source
+// walk does not allocate two closures.
+func dataflowEffectNext(node *Value) Values { return node.GetEffectOn() }
+func dataflowDependNext(node *Value) Values { return node.GetDependOn() }
+
+// ctxAllows keeps the effect×depend combine loop cancellable: the DFS checks
+// ctx at every node, but one depend path can fan out over thousands of effect
+// paths without returning to the DFS.
+func ctxAllows(ctx context.Context, i int) bool {
+	return i&1023 != 0 || ctx.Err() == nil
+}
+
+// walkDataflowPathWithContext streams effect×depend paths without building the
+// cross product. prune, when non-nil, drops a branch subtree during DFS (used
+// by dataflow exclude pruning). reusePath promises that visit does not retain
+// the Values slice it receives, which lets the effect×depend combination reuse
+// one buffer instead of allocating a path per pair.
 func (v *Value) walkDataflowPathWithContext(
 	ctx context.Context,
 	edgeFilter func(from, to *Value) bool,
@@ -68,22 +85,24 @@ func (v *Value) walkDataflowPathWithContext(
 		return true
 	}
 
-	effectNext := func(node *Value) Values { return node.GetEffectOn() }
-	dependNext := func(node *Value) Values { return node.GetDependOn() }
-
 	// A direction that originally had outgoing edges but produced no path was
 	// fully pruned. The old enumerator would have produced paths through those
 	// edges (all rejected), so the "other direction only" fallback below must
 	// stay disabled; otherwise pruning would invent a shorter path that never
 	// existed.
-	effectHadChildren := v.walkDirectionHasChildren(edgeFilter, effectNext, end...)
-	dependHadChildren := v.walkDirectionHasChildren(edgeFilter, dependNext, end...)
+	effectHadChildren := v.walkDirectionHasChildren(edgeFilter, dataflowEffectNext, end...)
+	dependHadChildren := v.walkDirectionHasChildren(edgeFilter, dataflowDependNext, end...)
 
 	var effectPaths []Values
-	if !v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, func(path Values) bool {
+	if len(end) == 0 && !effectHadChildren {
+		// No end targets and no effect branch: the walk completes with exactly
+		// one empty path, because the adapter drops the start value. Skip the
+		// DFS setup and represent that path directly.
+		effectPaths = []Values{nil}
+	} else if !v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, func(path Values) bool {
 		effectPaths = append(effectPaths, path)
 		return true
-	}, effectNext, end...) {
+	}, dataflowEffectNext, end...) {
 		return false
 	}
 	if len(effectPaths) == 0 && effectHadChildren {
@@ -103,7 +122,10 @@ func (v *Value) walkDataflowPathWithContext(
 				buf = append(buf, depend...)
 				return visit(buf)
 			}
-			for _, effect := range effectPaths {
+			for i, effect := range effectPaths {
+				if !ctxAllows(ctx, i) {
+					return false
+				}
 				buf = append(buf[:0], effect...)
 				buf = append(buf, v)
 				buf = append(buf, depend...)
@@ -119,7 +141,10 @@ func (v *Value) walkDataflowPathWithContext(
 			if len(effectPaths) == 0 {
 				return visit(v.makeDataflowPath(Values{}, depend))
 			}
-			for _, effect := range effectPaths {
+			for i, effect := range effectPaths {
+				if !ctxAllows(ctx, i) {
+					return false
+				}
 				if !visit(v.makeDataflowPath(effect, depend)) {
 					return false
 				}
@@ -128,14 +153,21 @@ func (v *Value) walkDataflowPathWithContext(
 		}
 	}
 
-	completed := v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, dependVisit, dependNext, end...)
+	if len(end) == 0 && !dependHadChildren {
+		// Same as the effect side: the depend walk would emit one empty path.
+		return dependVisit(nil)
+	}
+	completed := v.walkPathWithDirectionWithContext(ctx, edgeFilter, prune, dependVisit, dataflowDependNext, end...)
 	if !completed {
 		return false
 	}
 	if dependCount == 0 && !dependHadChildren {
 		if reusePath {
 			buf := make(Values, 0, 16)
-			for _, effect := range effectPaths {
+			for i, effect := range effectPaths {
+				if !ctxAllows(ctx, i) {
+					return false
+				}
 				buf = append(buf[:0], effect...)
 				buf = append(buf, v)
 				if !visit(buf) {
@@ -144,7 +176,10 @@ func (v *Value) walkDataflowPathWithContext(
 			}
 			return true
 		}
-		for _, effect := range effectPaths {
+		for i, effect := range effectPaths {
+			if !ctxAllows(ctx, i) {
+				return false
+			}
 			if !visit(v.makeDataflowPath(effect, Values{})) {
 				return false
 			}
