@@ -21,7 +21,10 @@ func InsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) error {
 	// Native multi-row INSERT avoids gorm's per-row field reflection. The
 	// helper returns handled=false for dialects that keep the GORM path.
 	if handled, err := nativeInsertIrCodes(db, items, batchSize); handled {
-		return err
+		if err != nil {
+			return err
+		}
+		return saveIrConsts(db, items)
 	}
 	// The batched insert bypasses the GORM create callbacks, so record it
 	// here or db-stats silently loses every bulk IR write.
@@ -34,7 +37,7 @@ func InsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) error {
 	for program, rows := range irCodeRowsByProgram(items) {
 		irCodeWriteCounterFor(program).insertRows.Add(int64(rows))
 	}
-	return nil
+	return saveIrConsts(db, items)
 }
 
 // irCodeWriteCounter counts one program's IR code writes. A process can host

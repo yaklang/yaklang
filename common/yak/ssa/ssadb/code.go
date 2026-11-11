@@ -32,10 +32,17 @@ type IrCode struct {
 	OpcodeOperator string `json:"opcode_operator"`
 
 	// basic info
-	Name              string `json:"name"`
-	VerboseName       string `json:"verbose_name"`
-	ShortVerboseName  string `json:"short_verbose_name"`
-	String            string `json:"string" gorm:"type:text"`
+	Name             string `json:"name"`
+	VerboseName      string `json:"verbose_name"`
+	ShortVerboseName string `json:"short_verbose_name"`
+	String           string `json:"string" gorm:"type:text"`
+	// ConstText carries one ConstType=normal const's rendered value to
+	// ir_consts_v1 in the same flush. It is never a column on ir_codes: long
+	// const texts live only in the const table, and String keeps the short
+	// ones so a persisted member key still resolves without a second read.
+	// A plain string: one pointer per const instruction would allocate once
+	// per row and keep nothing extra alive.
+	ConstText         string `json:"-" gorm:"-"`
 	ReadableName      string `json:"readable_name" gorm:"type:text"`
 	ReadableNameShort string `json:"readable_name_short"`
 	// any IrCode in one block inner one  function
@@ -165,6 +172,12 @@ func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 // host-parameter ceiling.
 const irCodeBatchChunk = 500
 
+// IrCodeInlineConstStringLimit is the longest const text still duplicated into
+// ir_codes.string. Longer texts (96% of the const payload) live only in
+// ir_consts_v1; String stays for short ones because a persisted member key is
+// resolved from that column without a second read.
+const IrCodeInlineConstStringLimit = 512
+
 // SaveIrCodeBatch writes IR snapshots as batched in-place upserts on
 // (program_name, code_id) via gorm SaveInBatches (native upsert or DM MERGE).
 // Updating in place keeps row ids and their secondary-index entries
@@ -187,6 +200,9 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	}
 	if err := db.New().SaveInBatches(deduped, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)
+	}
+	if err := saveIrConsts(db, deduped); err != nil {
+		return fmt.Errorf("upsert IR consts: %w", err)
 	}
 	for program, rows := range irCodeRowsByProgram(deduped) {
 		counter := irCodeWriteCounterFor(program)

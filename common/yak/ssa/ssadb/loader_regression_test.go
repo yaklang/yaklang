@@ -20,7 +20,7 @@ func setupA2LoaderDB(t *testing.T) *gorm.DB {
 	dir := t.TempDir()
 	db, err := gorm.Open("sqlite3", filepath.Join(dir, "a2.db"))
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrCode{}).Error)
+	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrConst{}).Error)
 	sqlDB := db.DB()
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
@@ -169,7 +169,7 @@ func setupA3ConstDB(t *testing.T) *gorm.DB {
 	dir := t.TempDir()
 	db, err := consts.CreateSSAProjectDatabaseRaw(filepath.Join(dir, "a3.db"))
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrCode{}).Error)
+	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrConst{}).Error)
 	sqlDB := db.DB()
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
@@ -191,10 +191,12 @@ func setupA3ConstDB(t *testing.T) *gorm.DB {
 func TestSearchVariableConstType_A3_UsesNativeIDQuery(t *testing.T) {
 	db := setupA3ConstDB(t)
 	prog := "a3-const-prog"
-	require.NoError(t, db.Create(&IrCode{CodeID: 1, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "abc"}).Error)
-	require.NoError(t, db.Create(&IrCode{CodeID: 2, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "xyz"}).Error)
-	require.NoError(t, db.Create(&IrCode{CodeID: 3, ProgramName: prog, Opcode: 3, ConstType: "normal", String: "abc"}).Error)
-	require.NoError(t, db.Create(&IrCode{CodeID: 4, ProgramName: prog, Opcode: 5, ConstType: "placeholder", String: "abc"}).Error)
+	require.NoError(t, InsertIrCodes(db, []*IrCode{
+		{CodeID: 1, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "abc"},
+		{CodeID: 2, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "xyz"},
+		{CodeID: 3, ProgramName: prog, Opcode: 3, ConstType: "normal", String: "abc"},
+		{CodeID: 4, ProgramName: prog, Opcode: 5, ConstType: "placeholder", String: "abc"},
+	}, 10))
 	deleteCache(prog)
 
 	before := NativeConstTypeIDQueries()
@@ -214,10 +216,12 @@ func TestSearchVariableConstType_A3_UsesNativeIDQuery(t *testing.T) {
 func TestSearchVariableConstType_A3_Equivalence(t *testing.T) {
 	db := setupA3ConstDB(t)
 	prog := "a3-const-regexp-prog"
-	require.NoError(t, db.Create(&IrCode{CodeID: 1, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "user_input"}).Error)
-	require.NoError(t, db.Create(&IrCode{CodeID: 2, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "userid"}).Error)
-	require.NoError(t, db.Create(&IrCode{CodeID: 3, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "other"}).Error)
-	require.NoError(t, db.Create(&IrCode{CodeID: 4, ProgramName: prog, Opcode: 5, ConstType: "placeholder", String: "user_input"}).Error)
+	require.NoError(t, InsertIrCodes(db, []*IrCode{
+		{CodeID: 1, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "user_input"},
+		{CodeID: 2, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "userid"},
+		{CodeID: 3, ProgramName: prog, Opcode: 5, ConstType: "normal", String: "other"},
+		{CodeID: 4, ProgramName: prog, Opcode: 5, ConstType: "placeholder", String: "user_input"},
+	}, 10))
 	deleteCache(prog)
 
 	ch := SearchVariableWithExcludeFiles(db, context.Background(), prog, NewNameCache(prog, false), RegexpCompare, ConstType, `user.*`, nil)

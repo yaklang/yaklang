@@ -382,6 +382,14 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 	}
 	ctx, cancel := context.WithTimeout(parent, nativeQueryTimeout())
 	defer cancel()
+	// Const text lives in ir_consts_v1. A database written before that table
+	// only has ir_codes.string, and keeps the legacy covering-index query.
+	if irConstTableHasProgram(ctx, db, progName) {
+		ids, query, err := nativeGetConstIDsFromIrConsts(ctx, db, progName, compareMode, value)
+		RecordDBRead(time.Since(started), err != nil)
+		logNativeSQL(query, time.Since(started), err)
+		return ids, err
+	}
 	hint, err := constLookupIndexHint(ctx, db)
 	if err != nil {
 		query := bindSQLPlaceholdersDB(db, `SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=? LIMIT 1`)
@@ -437,6 +445,44 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 	RecordDBRead(time.Since(started), false)
 	logNativeSQL(q, time.Since(started), nil)
 	return ids, nil
+}
+
+// nativeGetConstIDsFromIrConsts answers a ConstType search from the const
+// table. Exact lookups seek (program_name, const_hash) and verify the text; a
+// pattern has no range constraint, so it reads the narrow table in row order
+// instead of dragging ir_codes' wide rows. SQLite would otherwise pick the hash
+// index and add one row lookup per const.
+func nativeGetConstIDsFromIrConsts(ctx context.Context, db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, string, error) {
+	query := `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND "string" REGEXP ?`
+	args := []interface{}{progName, value}
+	if compareMode == ExactCompare {
+		query = `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND const_hash = ? AND "string" = ?`
+		args = []interface{}{progName, IrConstHash(value), value}
+	} else {
+		switch db.Dialect().GetName() {
+		case "postgres", "postgresql", "cloudsqlpostgres":
+			query = `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND "string" ~ ?`
+		default:
+			if isSQLiteDB(db) {
+				query = `SELECT code_id FROM "` + TableIrConsts + `" NOT INDEXED WHERE program_name = ? AND "string" REGEXP ?`
+			}
+		}
+	}
+	query = bindSQLPlaceholdersDB(db, query)
+	rows, err := nativeQueryContextDB(db, ctx, query, args...)
+	if err != nil {
+		return nil, query, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, query, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, query, rows.Err()
 }
 
 func nativeContextErr(err error) bool {

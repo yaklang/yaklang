@@ -14,6 +14,7 @@ import (
 // indexes are left in place because the insert path depends on them.
 var secondaryIndexTables = []string{
 	TableIrCodes,
+	TableIrConsts,
 	TableIrOffsets,
 	TableIrIndices,
 	TableIrNamePool,

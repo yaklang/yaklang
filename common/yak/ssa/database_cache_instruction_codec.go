@@ -329,7 +329,16 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if inst.GetOpcode() == SSAOpcodeConstInst {
 		if constInst, ok := ToConstInst(inst); ok {
 			ir.ConstType = string(constInst.ConstType)
-			ir.String = constInst.String()
+			text := constInst.String()
+			if constInst.ConstType == ConstTypeNormal {
+				// The const table is the only place long const text is stored;
+				// ir_codes.string keeps the short values a persisted member key
+				// is resolved from.
+				ir.ConstText = text
+			}
+			if len(text) <= ssadb.IrCodeInlineConstStringLimit {
+				ir.String = text
+			}
 		}
 	}
 }

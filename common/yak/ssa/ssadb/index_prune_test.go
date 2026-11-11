@@ -24,7 +24,8 @@ func TestNewIRDatabaseOmitsRedundantIndexes(t *testing.T) {
 	for _, kept := range []struct{ table, index string }{
 		{TableIrCodes, "ux_ir_codes_program_code"},
 		{TableIrCodes, "idx_ir_codes_program_opcode"},
-		{TableIrCodes, irCodeConstLookupIndex},
+		{TableIrConsts, irConstLookupIndex},
+		{TableIrConsts, irConstProgramCodeIndex},
 		{TableIrTypes, irTypeUniqueIndex},
 		{TableIrOffsets, "ux_ir_offsets_program_value_file_range"},
 		{TableIrIndices, "idx_ir_indices_program_value"},
@@ -82,9 +83,9 @@ func TestIRQueryPlansUseRetainedIndexes(t *testing.T) {
 			index: []string{"idx_ir_codes_program_opcode"},
 		},
 		{
-			name:  "ir_codes const lookup",
-			query: `SELECT code_id FROM "ir_codes" WHERE program_name = 'p0' AND opcode = 5 AND const_type = 'normal' AND "string" = 'v7' AND deleted_at IS NULL`,
-			index: []string{irCodeConstLookupIndex},
+			name:  "ir_consts exact lookup",
+			query: fmt.Sprintf(`SELECT code_id FROM "`+TableIrConsts+`" WHERE program_name = 'p0' AND const_hash = %d AND "string" = 'v7'`, IrConstHash("v7")),
+			index: []string{irConstLookupIndex},
 		},
 		{
 			name:  "ir types by program and type id",
@@ -170,7 +171,7 @@ func seedIRRows(t *testing.T, db *gorm.DB, rows int) {
 		})
 		names = append(names, &IrNamePool{ProgramName: program, NameID: int64(i + 1), Name: fmt.Sprintf("v%d", i+1)})
 	}
-	require.NoError(t, db.CreateInBatches(codes, 500).Error)
+	require.NoError(t, InsertIrCodes(db, codes, 500))
 	require.NoError(t, SaveIrTypeBatch(db, types))
 	require.NoError(t, db.CreateInBatches(offsets, 500).Error)
 	require.NoError(t, db.CreateInBatches(indices, 500).Error)

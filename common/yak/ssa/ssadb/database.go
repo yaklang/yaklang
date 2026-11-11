@@ -16,6 +16,7 @@ import (
 var SSAProjectTables = []any{
 	// instruction
 	&IrCode{},
+	&IrConst{},
 	&IrIndex{},
 	&IrNamePool{},
 	// source code
@@ -134,7 +135,7 @@ func patchIrCodeIndex(db *gorm.DB) {
 	// persist pipeline. This is a hard database invariant.
 	ensureUniqueIrCodesProgramCodeIndex(db)
 	ensureUniqueIrOffsetsIndex(db)
-	ensureConstLookupIndex(db)
+	ensureIrConstIndexes(db)
 
 	// Supported SQLite and PostgreSQL databases shed these redundant indexes
 	// without rewriting rows. Other dialects keep their legacy indexes until a
@@ -143,34 +144,15 @@ func patchIrCodeIndex(db *gorm.DB) {
 
 }
 
-// irCodeConstLookupIndex is the covering lookup for ConstType searches.
-// Equality seeks (program_name, string). A regexp uses the program_name
-// prefix and filters strings in the index, instead of reading every wide
-// ir_codes row. The WHERE matches constLookupSQL's literals; a bound
-// opcode or const_type parameter makes SQLite ignore this index.
+// irCodeConstLookupIndex is the legacy covering lookup for ConstType searches.
+// New databases write const text to ir_consts_v1 and never create this index;
+// it survives only on databases written before the const table, where the
+// legacy fallback query still uses it. Creating it again is intentionally not
+// done: the partial predicate it needs is satisfied by short consts only, and
+// a rebuilt index would be dead weight during every compile. The WHERE clause
+// in constLookupSQL matches these literals; a bound opcode or const_type
+// parameter makes SQLite ignore this index.
 const irCodeConstLookupIndex = "idx_ir_codes_const_lookup"
-
-func ensureConstLookupIndex(db *gorm.DB) {
-	if db == nil || db.Dialect() == nil || !db.HasTable(TableIrCodes) {
-		return
-	}
-	if hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex) {
-		return
-	}
-	switch db.Dialect().GetName() {
-	case "sqlite3", "sqlite", "postgres", "postgresql", "cloudsqlpostgres":
-	default:
-		log.Debugf("skip const lookup index on dialect %s", db.Dialect().GetName())
-		return
-	}
-	query := fmt.Sprintf(
-		`CREATE INDEX IF NOT EXISTS "%s" ON "%s" ("program_name", "string", "code_id") WHERE opcode = %d AND const_type = '%s' AND deleted_at IS NULL`,
-		irCodeConstLookupIndex, TableIrCodes, irCodeConstOpcode, irCodeConstTypeNormal,
-	)
-	if err := db.Exec(query).Error; err != nil {
-		log.Warnf("failed to add index %s: %v", irCodeConstLookupIndex, err)
-	}
-}
 
 // hasNamedIndex asks the dialect whether an index exists. db.New() clears a
 // program_name row scope while keeping the current connection.
@@ -377,6 +359,7 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 	deleteCache(program)
 	return errors.Join(
 		deleteProgramRows(db, TableIrCodes, "program_name = ?", program),
+		deleteProgramRows(db, TableIrConsts, "program_name = ?", program),
 		deleteProgramRows(db, TableIrIndices, "program_name = ?", program),
 		deleteProgramRows(db, TableIrNamePool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
