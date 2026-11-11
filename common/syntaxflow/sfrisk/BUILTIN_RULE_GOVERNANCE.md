@@ -84,6 +84,12 @@ documentation entry files (`README*`, `CHANGELOG*`, `LICENSE*`, `CONTRIBUTING*`,
 and the rest of the list in `ssaconfig.IsDocumentationFilePath`). Ordinary
 markdown stays in the pool, so document rules that target `SKILL.md` still work.
 
+`${*}` means code and configuration, not manifests. A blanket filter skips
+dependency manifests (`package.json`, `pom.xml`, `Cargo.toml`, `*.csproj`, and
+the rest of `sfpattern`'s manifest list): a `password` key in `package.json`
+names a dependency, it is not a credential finding. A rule that really reads a
+manifest lists it (`${*package.json}`), and that filter still matches.
+
 Do not use `${*}` for API-shape or code-shape matches: it reports the same line from
 config, logs and license text. Do not keep a single-extension filter when sibling
 extensions carry the same syntax (`*.js` misses `.mjs`, `.cjs` and `.jsx`; `*.c`

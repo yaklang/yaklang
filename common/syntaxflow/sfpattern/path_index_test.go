@@ -15,6 +15,7 @@ func TestPathIndexAgreesWithLegacyMatcher(t *testing.T) {
 	paths := []string{
 		"a.php", "dir/a.php", "src/a.go", "src/nested/a.go", "file.txt",
 		"foo.js", "foo.ts", "aXb", "a+b", "*.*", "noext", `dir\a.php`,
+		"package.json", "web/package.json", "pom.xml",
 	}
 	for _, expr := range exprs {
 		legacy := compilePathMatcher(expr)

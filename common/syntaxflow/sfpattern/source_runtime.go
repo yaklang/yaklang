@@ -748,8 +748,13 @@ func (r *SourceScanRuntime) Matcher(ctx context.Context) sfvm.FileFilterFunc {
 			root.SetSourceHits(cacheKey, hits)
 		}
 		if len(hits) == 0 {
-			matchedFile := false
+			// A blanket filter matches by definition; it only skips manifests,
+			// and a manifest-only store is not a broken filter.
+			matchedFile := search.path == "*" || search.path == "*.*"
 			for _, path := range r.store.Paths() {
+				if matchedFile {
+					break
+				}
 				if search.matchPath(path) {
 					matchedFile = true
 					break
