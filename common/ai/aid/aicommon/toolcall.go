@@ -3,9 +3,7 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,9 +17,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"gopkg.in/yaml.v3"
 )
 
@@ -192,6 +189,98 @@ type ToolCaller struct {
 	inspectionError         error
 	waitForCallbackOnCancel bool
 	asyncResourceBound      bool // guarded by m; one resource owns this caller
+	executionStarted        bool // guarded by m; invocation has started
+
+	terminalOnce sync.Once
+}
+
+// ToolCallReviewResult is the approved, fully prepared proposal. Execution
+// accepts only this value and never performs another review.
+type ToolCallReviewResult struct {
+	Tool                  *aitool.Tool
+	Params                aitool.InvokeParams
+	DestinationIdentifier string
+	DirectlyAnswer        bool
+
+	caller *ToolCaller
+}
+
+func (r *ToolCallReviewResult) ToolCaller() *ToolCaller {
+	if r == nil {
+		return nil
+	}
+	return r.caller
+}
+
+func (r *ToolCallReviewResult) CallToolID() string {
+	if r == nil || r.caller == nil {
+		return ""
+	}
+	return r.caller.CallToolID()
+}
+
+func (r *ToolCallReviewResult) ResultID() int64 {
+	if r == nil || r.caller == nil {
+		return 0
+	}
+	return r.caller.ResultID()
+}
+
+func (r *ToolCallReviewResult) Execute() (*aitool.ToolResult, bool, error) {
+	if r == nil || r.caller == nil {
+		return nil, false, fmt.Errorf("an approved tool review is required")
+	}
+	return r.caller.ExecuteReviewedToolCall(r)
+}
+
+func (r *ToolCallReviewResult) Abort(err error) {
+	if r == nil || r.caller == nil {
+		return
+	}
+	r.caller.finishToolCallError(err)
+	r.caller.Cancel()
+}
+
+func (r *ToolCallReviewResult) Cancel() {
+	if r == nil || r.caller == nil {
+		return
+	}
+	r.caller.Cancel()
+}
+
+func (r *ToolCallReviewResult) BindAsyncExecutionID(executeID string) {
+	if r == nil || r.caller == nil || executeID == "" {
+		return
+	}
+	WithToolCaller_AsyncExecutionID(executeID)(r.caller)
+}
+
+func (r *ToolCallReviewResult) NewAsyncResource(onResult ...func(*aitool.ToolResult, bool, error)) (asyncexecmanager.Resource, error) {
+	if r == nil || r.caller == nil {
+		return nil, fmt.Errorf("an approved tool review is required")
+	}
+	return r.caller.NewReviewedAsyncResource(r, onResult...)
+}
+
+func (t *ToolCaller) finalizeToolCall(result *aitool.ToolResult) {
+	if t == nil {
+		return
+	}
+	t.terminalOnce.Do(func() {
+		if t.emitter != nil {
+			summaryResult := result
+			if summaryResult == nil {
+				summaryResult = &aitool.ToolResult{}
+			}
+			t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, summaryResult))
+		}
+		if t.callToolId != "" {
+			if useful, err := yakit.UsefulRuntimeId(consts.GetGormProjectDatabase(), t.callToolId); err == nil && useful {
+				t.config.AppendRelatedRuntimeID(t.callToolId)
+			}
+		}
+		t.publishInspectionResult(result)
+	})
 }
 
 // ToolCallerGate bounds one phase of a tool call. The returned release
@@ -605,10 +694,8 @@ func (t *ToolCaller) GetIntervalReviewDuration() time.Duration {
 }
 
 // emitStart emits the tool-call START event (the loading card) exactly once,
-// guarded by t.start (sync.Once). It only emits the start event; reason
-// emission and liteforge generation are handled in one place by
-// CallToolWithExistedParams (via emitReason / generateReasonIfNeeded), so both
-// all explicit tool-call entry points share the same reason logic.
+// guarded by t.start (sync.Once). It only emits the start event; ReviewToolCall
+// owns reason emission and liteforge generation for every explicit-call flow.
 func (t *ToolCaller) emitStart(tool *aitool.Tool) {
 	t.m.Lock()
 	defer t.m.Unlock()
@@ -718,31 +805,29 @@ func (t *ToolCaller) generateReasonIfNeeded(tool *aitool.Tool, params aitool.Inv
 // A rejected proposal returns reason/retry to the owning loop; it never generates arguments.
 type DirectlyCallPrepareFunc func(action *Action, toolName string) (finalParams aitool.InvokeParams, retryRequired bool, tool *aitool.Tool, err error)
 
-// DirectlyCallTool handles the "card already created" flow for a
-// directly_call_tool action: it emits the tool-call card (loading) FIRST, then
-// reads the reason and params from the streaming action (blocking per-field until
-// they arrive), then invokes the tool. Because Action is an async streaming
-// structure, the card appears immediately and reason/params stream in afterwards
-// — card creation is never blocked on reason/params parsing.
+// ReviewDirectToolCall handles the directly_call_tool approval phase. It emits
+// the loading card first, reads reason and explicit parameters from the
+// streaming action, and blocks until the review decision is final. It never
+// invokes the tool.
 //
 // A rejected prepare proposal returns a retry error without generating arguments or executing.
-func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+func (t *ToolCaller) ReviewDirectToolCall(nominalTool *aitool.Tool, action *Action, prepare DirectlyCallPrepareFunc) (*ToolCallReviewResult, error) {
 	if t.emitter == nil {
 		emitter := t.config.GetEmitter()
 		if emitter == nil {
-			return nil, false, fmt.Errorf("no emitter found in ToolCaller")
+			return nil, fmt.Errorf("no emitter found in ToolCaller")
 		}
 		t.emitter = emitter
 	}
 
-	// 1. emit start card first (loading). sync.Once guards the later CallToolWithExistedParams.
+	// 1. emit start card first (loading). sync.Once guards the later ReviewToolCall.
 	//    Only the start event is emitted here; reason is handled in the single
-	//    reason-handling point inside CallToolWithExistedParams, shared by both
+	//    reason-handling point inside ReviewToolCall, shared by both
 	//    explicit tool-call entries.
 	t.start.Do(func() { t.emitStart(nominalTool) })
 
 	// 2. stash the action's reason (if any) into t.reason so the unified
-	//    reason handler in CallToolWithExistedParams can emit it. We do NOT emit
+	//    reason handler in ReviewToolCall can emit it. We do NOT emit
 	//    here — that path is the single source of truth for reason events.
 	if action != nil && strings.TrimSpace(t.reason) == "" {
 		reason := action.GetString("directly_call_reason")
@@ -766,7 +851,7 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 		fp, fb, tool, err = prepare(action, nominalTool.Name)
 		t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_RUNNING)
 		if err != nil {
-			// close the card on prepare error (we never reach CallToolWithExistedParams' defers)
+			// close the card on prepare error (ReviewToolCall is never entered)
 			t.done.Do(func() {
 				t.m.Lock()
 				defer t.m.Unlock()
@@ -776,7 +861,8 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 					t.onCallToolEnd(t.callToolId)
 				}
 			})
-			return nil, false, err
+			t.finalizeToolCall(nil)
+			return nil, err
 		}
 		finalParams = fp
 		retryRequired = fb
@@ -791,12 +877,25 @@ func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, 
 				t.onCallToolEnd(t.callToolId)
 			}
 		})
-		return nil, false, err
+		t.finalizeToolCall(nil)
+		return nil, err
 	}
 	if finalParams == nil {
 		finalParams = make(aitool.InvokeParams)
 	}
-	return t.CallToolWithExistedParams(tool, finalParams)
+	if tool == nil {
+		tool = nominalTool
+	}
+	return t.ReviewToolCall(tool, finalParams)
+}
+
+// DirectlyCallTool preserves the legacy combined helper.
+func (t *ToolCaller) DirectlyCallTool(nominalTool *aitool.Tool, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+	review, err := t.ReviewDirectToolCall(nominalTool, action, prepare)
+	if err != nil {
+		return nil, false, err
+	}
+	return t.ExecuteReviewedToolCall(review)
 }
 
 // EmitReason emits (or updates) the human-readable reason for this tool call on
@@ -875,502 +974,18 @@ func SanitizeTaskName(name string) string {
 	return str
 }
 
-// CallToolWithExistedParams validates, reviews and executes an explicit parameter
-// object. It never asks an auxiliary model to create or repair tool arguments.
+// CallToolWithExistedParams is kept for callers that still use the combined
+// explicit-parameter entry point. New code should call ReviewToolCall and then
+// ExecuteReviewedToolCall so approval always completes before execution starts.
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
-	defer func() { t.publishInspectionResult(result) }()
-	// Metadata extraction, parameter augmentation and plugins must not mutate
-	// the caller's payload. Preserve nil so missing explicit arguments still fail.
-	if invokeParams != nil {
-		invokeParams = cloneEndpointParams(invokeParams)
-	}
-	if t.emitter == nil {
-		emitter := t.config.GetEmitter()
-		if emitter == nil {
-			return nil, false, fmt.Errorf("no emitter found in ToolCaller")
-		}
-		t.emitter = emitter
-	}
-
-	callToolId := t.callToolId
-	defer func() {
-		if useful, err := yakit.UsefulRuntimeId(consts.GetGormProjectDatabase(), callToolId); err == nil && useful {
-			t.config.AppendRelatedRuntimeID(callToolId)
-		}
-	}()
-
-	toolResult := &aitool.ToolResult{}
-	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
-
-	t.start.Do(func() { t.emitStart(tool) })
-
-	// === unified reason handling (single source of truth) ===
-	// All explicit tool-call paths converge here. Priority:
-	//   1. preset reason (WithToolCaller_Reason) or action-stashed reason
-	//   2. liteforge-generated reason (at most once per tool call)
-	// Emit the concrete reason if present, otherwise generate one.
-	if strings.TrimSpace(t.reason) != "" {
-		t.emitReason(t.reason)
-	} else {
-		t.generateReasonIfNeeded(tool, nil)
-	}
-
-	t.emitter.EmitInfo("start explicit tool[%v] call in task: %v", tool.Name, t.task.GetName())
-	// pluginInvokeStartTime: 纯插件执行起点（从真正进入 t.invoke 前开始计时）。
-	// 该时间不会包含 参数校验、人工 review 等前置阶段。
-	var pluginInvokeStartTime time.Time
-	// pluginInvokeDuration: 纯插件执行耗时缓存。
-	// 由 t.invoke 返回后写入，done/cancel/error 的 once 回调仅读取；访问时统一受 t.m 保护。
-	var pluginInvokeDuration time.Duration
-	getPurePluginDuration := func(endTime time.Time) time.Duration {
-		if pluginInvokeStartTime.IsZero() {
-			return 0
-		}
-		if pluginInvokeDuration > 0 {
-			return pluginInvokeDuration
-		}
-		if endTime.IsZero() {
-			endTime = time.Now()
-		}
-		if endTime.Before(pluginInvokeStartTime) {
-			return 0
-		}
-		return endTime.Sub(pluginInvokeStartTime)
-	}
-
-	handleDone := func() {
-		t.done.Do(func() {
-			t.m.Lock()
-			defer t.m.Unlock()
-			endTime := time.Now() // Record end time
-			t.emitter.EmitToolCallStatus(t.callToolId, schema.TOOL_CALL_STATUS_DONE)
-			t.emitter.EmitToolCallDone(callToolId, endTime, t.startTime, getPurePluginDuration(endTime))
-			if t.onCallToolEnd != nil {
-				t.onCallToolEnd(callToolId)
-			}
-		})
-	}
-
-	handleUserCancel := func(reason any) {
-		t.done.Do(func() {
-			t.m.Lock()
-			defer t.m.Unlock()
-			endTime := time.Now() // Record end time
-			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("%s by reason: %v", schema.TOOL_CALL_STATUS_CANCELLED, reason))
-			t.emitter.EmitToolCallUserCancel(callToolId, endTime, t.startTime, getPurePluginDuration(endTime))
-
-			if t.onCallToolEnd != nil {
-				t.onCallToolEnd(callToolId)
-			}
-		})
-	}
-
-	handleError := func(err any) {
-		t.done.Do(func() {
-			t.m.Lock()
-			defer t.m.Unlock()
-			endTime := time.Now() // Record end time
-			t.emitter.EmitToolCallError(callToolId, err, endTime, t.startTime, getPurePluginDuration(endTime))
-
-			if t.onCallToolEnd != nil {
-				t.onCallToolEnd(callToolId)
-			}
-		})
-	}
-
-	var (
-		_ = handleDone
-		_ = handleUserCancel
-		_ = handleError
-	)
-
-	defer handleDone()
-
-	var destinationIdentifier string
-	if id, ok := invokeParams[ReservedKeyIdentifier]; ok {
-		destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
-		delete(invokeParams, ReservedKeyIdentifier)
-	}
-	if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
-		t.callExpectations = utils.InterfaceToString(ce)
-		delete(invokeParams, ReservedKeyCallExpectations)
-	}
-	if destinationIdentifier != "" {
-		t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
-	}
-	t.emitter.EmitInfo("use explicit params for tool[%v]: %v", tool.Name, invokeParams)
-	if t.destinationIdentifier != "" {
-		destinationIdentifier = t.destinationIdentifier
-	}
-	if invokeParams == nil {
-		err := &ToolCallRetryError{ToolName: tool.Name, Reason: "explicit parameters are missing; use an object, including {} for a parameterless tool"}
-		handleError(err)
-		return nil, false, err
-	}
-	if t.paramAugmentForTool != nil {
-		invokeParams = t.paramAugmentForTool(tool, invokeParams)
-	} else if t.paramAugment != nil {
-		invokeParams = t.paramAugment(invokeParams)
-	}
-	if allow, feedback := CheckAttachedBrowserToolRoute(t.task, tool.Name); !allow {
-		handleError(feedback)
-		return nil, false, utils.Error(feedback)
-	}
-	invokeParams, err = BindAttachedBrowserToolParams(t.task, tool.Name, invokeParams)
+	review, err := t.ReviewToolCall(tool, invokeParams)
 	if err != nil {
-		handleError(err)
 		return nil, false, err
 	}
-	if err := toolCallerContextErr(t.ctx); err != nil {
-		handleError(err)
-		return nil, false, err
+	if review.DirectlyAnswer {
+		return nil, true, nil
 	}
-
-	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
-	epm := t.config.GetEndpointManager()
-	config := t.config
-	// DANGER: NoNeedUserReview
-	if tool.NoNeedUserReview {
-		t.emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
-	} else {
-		releaseReview := func() {}
-		if t.reviewGate != nil {
-			var gateErr error
-			releaseReview, gateErr = t.reviewGate(t.ctx)
-			releaseReview = idempotentToolCallerRelease(releaseReview)
-			if gateErr != nil {
-				handleError(gateErr)
-				return nil, false, gateErr
-			}
-			if gateErr = toolCallerContextErr(t.ctx); gateErr != nil {
-				releaseReview()
-				handleError(gateErr)
-				return nil, false, gateErr
-			}
-		}
-		defer releaseReview()
-		t.emitter.EmitInfo("start to require review for tool use: %v", tool.Name)
-		reviewCheckpointSeq := t.reviewCheckpointSeq
-		t.reviewCheckpointSeq = 0
-		ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, reviewCheckpointSeq)
-		ep.SetDefaultSuggestionContinue()
-		reqs := map[string]any{
-			"id":               ep.GetId(),
-			"selectors":        ToolUseReviewSuggestions,
-			"tool":             tool.Name,
-			"tool_description": tool.Description,
-			"params":           invokeParams,
-			"reason":           t.reason,
-		}
-		if t.batchID != "" {
-			reqs["batch_id"] = t.batchID
-			reqs["call_index"] = t.batchIndex
-			reqs["call_tool_id"] = t.callToolId
-		}
-		ep.SetReviewMaterials(reqs)
-		reviewCheckpoint := ep.GetCheckpoint()
-		if reviewCheckpoint.RequestQuotedJson != "" {
-			stored := aiddb.AiCheckPointGetRequestParams(reviewCheckpoint)
-			storedParams := stored.GetObject("params")
-			identityMismatch := stored.GetString("tool") != tool.Name ||
-				string(utils.Jsonify(storedParams)) != string(utils.Jsonify(invokeParams))
-			if t.batchID != "" {
-				storedIndex, hasStoredIndex := stored["call_index"]
-				identityMismatch = identityMismatch ||
-					stored.GetString("batch_id") != t.batchID ||
-					!hasStoredIndex ||
-					utils.InterfaceToInt(storedIndex) != t.batchIndex ||
-					stored.GetString("call_tool_id") != t.callToolId
-			}
-			if identityMismatch {
-				reviewErr := utils.Errorf(
-					"tool review checkpoint identity mismatch: batch=%s index=%d call=%s tool=%s params=%s; stored batch=%s index=%d call=%s tool=%s params=%s",
-					t.batchID,
-					t.batchIndex,
-					t.callToolId,
-					tool.Name,
-					utils.Jsonify(invokeParams),
-					stored.GetString("batch_id"),
-					utils.InterfaceToInt(stored["call_index"]),
-					stored.GetString("call_tool_id"),
-					stored.GetString("tool"),
-					utils.Jsonify(storedParams),
-				)
-				handleError(reviewErr)
-				return nil, false, reviewErr
-			}
-		} else if reviewCheckpoint.Finished {
-			reviewErr := utils.Errorf(
-				"finished tool review checkpoint has no request identity: seq=%d",
-				reviewCheckpoint.Seq,
-			)
-			handleError(reviewErr)
-			return nil, false, reviewErr
-		}
-
-		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
-
-		var params aitool.InvokeParams
-		reviewReplayed := reviewCheckpoint.Finished
-		if reviewReplayed {
-			// A finished review checkpoint is an immutable manual decision. A
-			// fresh runtime applies it without emitting a duplicate card or
-			// waiting for another response.
-			params = aiddb.AiCheckPointGetResponseParams(reviewCheckpoint)
-		} else {
-			if err := t.config.SubmitCheckpointRequest(reviewCheckpoint, reqs); err != nil {
-				handleError(err)
-				return nil, false, err
-			}
-			t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
-
-			// wait for agree
-			config.DoWaitAgree(t.ctx, ep)
-			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
-				releaseReview()
-				// The worker can stop while its enclosing session stays alive.
-				// Close the visible card so the next pending review can proceed.
-				t.emitter.EmitInteractiveRelease(ep.GetId(), nil)
-				handleError(waitErr)
-				return nil, false, waitErr
-			}
-			reviewDecidedAt := time.Now()
-			params = ep.GetParams()
-			t.emitter.EmitInteractiveRelease(ep.GetId(), params)
-			config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-			if !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
-				config.CallAfterReview(
-					ep.GetSeq(),
-					reviewQuestion,
-					params,
-				)
-			}
-			if params != nil {
-				if err := t.config.SubmitCheckpointResponse(reviewCheckpoint, params); err != nil {
-					releaseReview()
-					handleError(err)
-					return nil, false, err
-				}
-			}
-		}
-		// Only the pending approval endpoint is serialized. Apply the decision
-		// outside the gate so explicit manual-edit proposals can
-		// acquire the same gate without deadlocking.
-		releaseReview()
-		if params == nil {
-			t.emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
-			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
-			return nil, false, fmt.Errorf("tool use [%v] review params is nil", tool.Name)
-		}
-		var overrideResult *aitool.ToolResult
-		var next HandleToolUseNext
-		tool, invokeParams, overrideResult, next, err = t.review(
-			tool, invokeParams, params, handleUserCancel,
-		)
-		if err != nil {
-			var reconsider *ToolReviewReconsiderError
-			if !errors.As(err, &reconsider) {
-				t.emitter.EmitError("error handling tool use review: %v", err)
-				handleError(fmt.Sprintf("error handling tool use review: %v", err))
-			}
-			return nil, false, err
-		}
-
-		switch next {
-		case HandleToolUseNext_Override:
-			return overrideResult, false, nil
-		case HandleToolUseNext_DirectlyAnswer:
-			return nil, true, nil
-		case HandleToolUseNext_Default:
-		default:
-			return nil, false, utils.Errorf("unknown handle tool use next action: %v", next)
-		}
-	}
-
-	// Batch callers stop here until every sibling has either reached the same
-	// boundary or terminated. Keep this before pipe/artifact allocation so a
-	// direct-answer decision leaves no per-tool filesystem side effects.
-	releaseInvoke := func() {}
-	if t.beforeInvoke != nil {
-		var hookErr error
-		releaseInvoke, hookErr = t.beforeInvoke(t.ctx, tool, invokeParams)
-		releaseInvoke = idempotentToolCallerRelease(releaseInvoke)
-		if hookErr != nil {
-			handleError(hookErr)
-			return nil, false, hookErr
-		}
-		if hookErr = toolCallerContextErr(t.ctx); hookErr != nil {
-			releaseInvoke()
-			handleError(hookErr)
-			return nil, false, hookErr
-		}
-	}
-	defer releaseInvoke()
-	if ctxErr := toolCallerContextErr(t.ctx); ctxErr != nil {
-		handleError(ctxErr)
-		return nil, false, ctxErr
-	}
-
-	stdoutReader, stdoutWriter := utils.NewPipe()
-	defer stdoutWriter.Close()
-	stderrReader, stderrWriter := utils.NewPipe()
-	defer stderrWriter.Close()
-
-	// Create buffers to capture stdout and stderr for interval review and file saving.
-	stdoutBuffer := &toolOutputBuffer{}
-	stderrBuffer := &toolOutputBuffer{}
-	t.bindInspectionOutput(stdoutBuffer, stderrBuffer)
-
-	artifactBundle := t.newToolCallArtifactBundle(tool, callToolId, destinationIdentifier)
-	// finalize marks successful and ordinary failed calls as durable bundles.
-	// Cancellation deliberately skips finalize/checkpointing, so roll back the
-	// still-open streams and partial directory on every unfinished exit path.
-	defer artifactBundle.discardIfUnfinished()
-
-	// Use MultiWriter to write to both the pipe (for streaming) and the buffers (for file saving)
-	stdoutUIWriter := newBoundedToolUIWriter(stdoutWriter)
-	stderrUIWriter := newBoundedToolUIWriter(stderrWriter)
-	stdoutMultiWriter := io.MultiWriter(artifactBundle.Writer(artifactStdout), stdoutUIWriter, stdoutBuffer)
-	stderrMultiWriter := io.MultiWriter(artifactBundle.Writer(artifactStderr), stderrUIWriter, stderrBuffer)
-
-	waitToolStdFlush := t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
-
-	// Refresh MCP tools from the manager immediately before invoke. Parameter generation
-	// may take several seconds; background loadMCPServers can replace stubs with live
-	// tools while the AI is still drafting params.
-	if buildinaitools.IsMCPToolName(tool.Name) {
-		if mgr := t.config.GetAiToolManager(); mgr != nil {
-			waitCtx := t.ctx
-			if waitCtx == nil {
-				waitCtx = t.config.GetContext()
-			}
-			liveTool, waitErr := buildinaitools.WaitForMCPLiveTool(
-				waitCtx, mgr, tool.Name,
-				buildinaitools.MCPToolInitWaitTimeout,
-				buildinaitools.MCPToolInitPollInterval,
-				func(elapsed time.Duration) {
-					t.emitter.EmitInfo(
-						"MCP tool %q still connecting (elapsed %v), waiting for remote server before invoke...",
-						tool.Name, elapsed.Round(time.Second),
-					)
-				},
-			)
-			if waitErr != nil {
-				return nil, false, waitErr
-			}
-			if liveTool != nil {
-				tool = liveTool
-			}
-		}
-	}
-
-	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
-	t.emitter.EmitToolCallStatus(callToolId, schema.TOOL_CALL_STATUS_RUNNING)
-	if ctxErr := toolCallerContextErr(t.ctx); ctxErr != nil {
-		handleError(ctxErr)
-		return nil, false, ctxErr
-	}
-	t.m.Lock()
-	// Measure pure plugin execution time from real invoke start to invoke return.
-	pluginInvokeStartTime = time.Now()
-	pluginInvokeDuration = 0
-	t.m.Unlock()
-
-	t.emitter.EmitToolCallParam(callToolId, invokeParams)
-	if ctxErr := toolCallerContextErr(t.ctx); ctxErr != nil {
-		handleError(ctxErr)
-		return nil, false, ctxErr
-	}
-	// Watchers/review can request cancellation while the callback is still
-	// cleaning up. Defer terminal UI events until both output streams are flushed.
-	var outcomeMu sync.Mutex
-	var cancellationReason, invocationError any
-	toolResult, err = t.invoke(
-		tool, invokeParams,
-		func(reason any) {
-			outcomeMu.Lock()
-			cancellationReason = reason
-			outcomeMu.Unlock()
-		},
-		func(err any) {
-			outcomeMu.Lock()
-			invocationError = err
-			outcomeMu.Unlock()
-		},
-		stdoutMultiWriter, stderrMultiWriter,
-		stdoutBuffer, stderrBuffer,
-		func(result *aitool.ToolResult) error {
-			return artifactBundle.finalize(t, tool, callToolId, destinationIdentifier, invokeParams, result)
-		},
-	)
-	t.m.Lock()
-	if !pluginInvokeStartTime.IsZero() && pluginInvokeDuration <= 0 {
-		pluginInvokeDuration = time.Since(pluginInvokeStartTime)
-	}
-	t.m.Unlock()
-	if err != nil {
-		if toolResult == nil {
-			toolResult = &aitool.ToolResult{
-				Param:       invokeParams,
-				Name:        tool.Name,
-				Description: tool.Description,
-				ToolCallID:  callToolId,
-			}
-		}
-		if toolResult.Error == "" {
-			toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", tool.Name, err)
-		}
-		toolResult.Success = false
-		enforceCanonicalToolResultLimit(toolResult)
-	}
-	if toolResult != nil {
-		toolResult.OmitParamsInTimeline = t.omitResultParamsInTimeline
-		if t.resultID > 0 {
-			toolResult.ID = t.resultID
-		}
-	}
-
-	// Close pipe writers to signal end of tool output. This triggers ThrottledCopy's
-	// final flush of any remaining buffered data. The deferred Close calls are still
-	// safe (bufpipe Close is idempotent).
-	if finishErr := stdoutUIWriter.Finish(); finishErr != nil {
-		log.Warnf("failed to flush bounded stdout tail: %v", finishErr)
-	}
-	if finishErr := stderrUIWriter.Finish(); finishErr != nil {
-		log.Warnf("failed to flush bounded stderr tail: %v", finishErr)
-	}
-	stdoutWriter.Close()
-	stderrWriter.Close()
-
-	// Wait for ThrottledCopy goroutines to finish flushing all remaining buffered data.
-	// This ensures all tool stdout/stderr stream events have been sent via gRPC before
-	// we emit the tool result event, preserving correct event ordering.
-	waitToolStdFlush()
-
-	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
-	if toolResult != nil && toolResult.Data != nil {
-		t.emitter.EmitToolCallResult(callToolId, toolResult.Data)
-	}
-
-	outcomeMu.Lock()
-	cancelReason, reportedError := cancellationReason, invocationError
-	outcomeMu.Unlock()
-	if cancelReason != nil || errors.Is(err, context.Canceled) {
-		if cancelReason == nil {
-			cancelReason = err
-		}
-		handleUserCancel(cancelReason)
-	} else if err != nil {
-		handleError(err)
-	} else if reportedError != nil {
-		handleError(reportedError)
-	}
-
-	if !t.checkpointReplayed && (t.ctx == nil || t.ctx.Err() == nil) {
-		NotifySessionSnapshotToolCall(t.config, toolResult, t.statsSource)
-	}
-
-	return toolResult, false, nil
+	return t.ExecuteReviewedToolCall(review)
 }
 
 const fastNoopContinueReviewThreshold = 500 * time.Millisecond
