@@ -454,6 +454,30 @@ var redundantIRIndexes = []struct{ table, index string }{
 	{TableIrIndices, "idx_ir_indices_v1_version_id"},      // read, never filtered
 	{TableIrNamePool, "idx_ir_name_pool_v1_program_name"}, // idx_ir_name_pool_program_name_name prefix
 	{TableIrNamePool, "idx_ir_name_pool_v1_name"},         // name lookups bind program_name too
+	// deleted_at is NULL on every IR row (the IR tables are never soft
+	// deleted), and every IR query binds program_name first, so these
+	// B-trees have no selectivity and are never chosen. They come from
+	// gorm.Model's `sql:"index"` tag, which IRModel drops.
+	{TableIrCodes, "idx_ir_codes_deleted_at"},
+	{TableIrOffsets, "idx_ir_offsets_deleted_at"},
+	{TableIrIndices, "idx_ir_indices_v1_deleted_at"},
+	{TableIrTypes, "idx_ir_types_v2_deleted_at"},
+	// GetScope is the only scope_name reader and it is dead code
+	// (GetScopeFromIrScopeName returns "not implemented").
+	{TableIrIndices, "idx_ir_indices_v1_scope_name"},
+	// applyMatchCondition builds an OR over variable_id/class_id/field_id,
+	// but yieldFromIrIndex always adds program_name, so the planner uses
+	// idx_ir_indices_program_value for every production query.
+	{TableIrIndices, "idx_ir_indices_v1_variable_id"},
+	{TableIrIndices, "idx_ir_indices_v1_class_id"},
+	{TableIrIndices, "idx_ir_indices_v1_field_id"},
+	// offsetVariableQuery adds a unary "+" to variable_name on purpose: the
+	// index makes SQLite pick a scan of every instruction named "this"
+	// (about 40ms per lookup instead of 20us through the value prefix).
+	{TableIrOffsets, "idx_ir_offsets_variable_name"},
+	// GetValueBeforeEndOffset is the only end_offset reader; with the
+	// file_hash index present SQLite picks file_hash (4ms against 77ms).
+	{TableIrOffsets, "idx_ir_offsets_end_offset"},
 }
 
 func pruneRedundantIRIndexes(db *gorm.DB) {

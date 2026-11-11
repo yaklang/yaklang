@@ -14,17 +14,17 @@ const irIndexBatchChunk = 1000
 
 // IrIndex is the database model for index entries (normalized with IDs).
 type IrIndex struct {
-	gorm.Model
+	Model
 
 	ProgramName string `json:"program_name" gorm:"not null"`
 	ValueID     int64  `json:"value_id" gorm:"not null"`
 
-	VariableID *int64 `json:"variable_id" gorm:"index"`
-	ClassID    *int64 `json:"class_id" gorm:"index"`
-	FieldID    *int64 `json:"field_id" gorm:"index"`
+	VariableID *int64 `json:"variable_id"`
+	ClassID    *int64 `json:"class_id"`
+	FieldID    *int64 `json:"field_id"`
 
 	// scope
-	ScopeName string `json:"scope_name" gorm:"index"`
+	ScopeName string `json:"scope_name"`
 
 	// for object-key-member search
 	// owner id + field id -> member

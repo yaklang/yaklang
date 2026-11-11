@@ -19,7 +19,7 @@ const irTypeBatchChunk = 1000
 // That is what removed the id-to-payload indirection of the previous schema
 // without keeping a mapping table.
 type IrType struct {
-	gorm.Model
+	Model
 	TypeId           uint64 `json:"type_id" gorm:"not null"`
 	Kind             int    `json:"kind"`
 	ProgramName      string `json:"program_name" gorm:"not null"`

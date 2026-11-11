@@ -18,15 +18,15 @@ const irOffsetBatchChunk = 1000
 var ErrSourceRangeAbsent = errors.New("source range is absent")
 
 type IrOffset struct {
-	gorm.Model
+	Model
 
 	ProgramName string `json:"program_name"`
 	// offset
 	FileHash    string `json:"file_hash" gorm:"index"`
 	StartOffset int64  `json:"start_offset"`
-	EndOffset   int64  `json:"end_offset" gorm:"index"`
+	EndOffset   int64  `json:"end_offset"`
 	//variable
-	VariableName string `json:"variable_name" gorm:"index"` // this id set when have variable
+	VariableName string `json:"variable_name"` // this id set when have variable
 	// value
 	ValueID int64 `json:"value_id"` // this id will set
 }

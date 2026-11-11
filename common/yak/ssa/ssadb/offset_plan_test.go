@@ -46,22 +46,24 @@ func TestOffsetVariableLookupKeepsFilteredIDOrder(t *testing.T) {
 	require.NotContains(t, plan, "idx_ir_offsets_variable_name")
 	require.NotContains(t, plan, "SCAN "+TableIrOffsets)
 
-	// Adding ORDER BY id makes SQLite walk the deleted_at index instead, so
-	// production sorts in memory and never emits ORDER BY.
+	// The model no longer declares a deleted_at index, so ORDER BY id cannot
+	// divert the plan to one; production still sorts in memory and never emits
+	// ORDER BY, which keeps the plan on the value prefix either way.
 	ordered := sqliteQueryPlan(t, db, query+" ORDER BY id", args...)
-	require.NotContains(t, ordered, "ux_ir_offsets_program_value_file_range")
 	require.NotContains(t, ordered, "SCAN "+TableIrOffsets)
 }
 
-// A production database can reopen with the variable-name index created after
-// the composite key. Without statistics, SQLite can then choose the name index
-// for every instruction named "this", even without ORDER BY. Keep the lookup
-// bounded by the program/value prefix regardless of index creation order.
+// A legacy database can still carry the variable-name index, created after the
+// composite key by an older binary. Without statistics, SQLite can then choose
+// the name index for every instruction named "this", even without ORDER BY.
+// Keep the lookup bounded by the program/value prefix regardless of which
+// indexes the database has.
 func TestOffsetVariableLookupKeepsValueIndexAfterIndexRecreation(t *testing.T) {
 	db := setupA2LoaderDB(t)
 	require.NoError(t, db.AutoMigrate(&IrOffset{}).Error)
 	ensureUniqueIrOffsetsIndex(db)
-	require.NoError(t, db.Exec(`DROP INDEX idx_ir_offsets_variable_name`).Error)
+	// The model no longer declares this index; create it to replay the legacy
+	// schema that the redundant-index prune removes on open.
 	require.NoError(t, db.Exec(`CREATE INDEX idx_ir_offsets_variable_name ON ir_offsets(variable_name)`).Error)
 
 	rows := make([]*IrOffset, 4096)

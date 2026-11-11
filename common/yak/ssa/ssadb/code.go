@@ -13,7 +13,7 @@ import (
 )
 
 type IrCode struct {
-	gorm.Model
+	Model
 	CodeID int64 `json:"code_id"`
 
 	ProgramName string `json:"program_name"`
