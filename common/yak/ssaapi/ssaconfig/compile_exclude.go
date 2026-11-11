@@ -56,16 +56,35 @@ var DefaultCompileExcludeDirNames = []string{
 	"target",
 	// C/C++ build machinery
 	"CMakeFiles",
-	// test code / fixtures (aggregated across languages)
+	// test code and fixtures (aggregated across languages). Directory names are
+	// matched case-insensitively, so Test/, Tests/ and TEST/ prune too: the
+	// camel-case spelling is the common C#/.NET shape, and a test tree that
+	// slips into the pool only produces false positives (fixture credentials,
+	// sample payloads).
 	"TestResults",
+	"__mocks__",
 	"__tests__",
+	"e2e",
 	"fixtures",
+	"integration-test",
+	"integration-tests",
+	"mocks",
+	"spec",
+	"specs",
 	"test",
+	"test-cases",
 	"test-classes",
 	"test-fixtures",
+	"test-utils",
+	"testcase",
+	"testcases",
 	"testdata",
 	"testing",
 	"tests",
+	"testutil",
+	"testutils",
+	"unittest",
+	"unittests",
 	// yak tooling
 	"yakit-projects",
 }
@@ -348,6 +367,28 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 	}
 	basePath = normalizeCompileExcludePath(basePath)
 
+	// Built-in directory names are matched case-insensitively: a test tree
+	// spelled Tests/ or Test/ (the C#/.NET and some Java layouts) must prune
+	// exactly like test/. User patterns stay case-sensitive; only the merged
+	// defaults get a lowercase twin matcher.
+	var defaultGlobs []glob.Glob
+	if includeDefaults {
+		seenDefault := make(map[string]bool)
+		for _, pattern := range DefaultCompileExcludePatterns() {
+			lower := strings.ToLower(normalizeCompileExcludePath(pattern))
+			if lower == "" || seenDefault[lower] {
+				continue
+			}
+			seenDefault[lower] = true
+			g, err := glob.Compile(lower)
+			if err != nil {
+				log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, lower)
+				continue
+			}
+			defaultGlobs = append(defaultGlobs, g)
+		}
+	}
+
 	addPattern := func(pattern string) {
 		pattern = normalizeCompileExcludePath(pattern)
 		if pattern == "" {
@@ -394,6 +435,12 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 			return true
 		}
 		path = normalizeCompileExcludePath(path)
+		lowerPath := strings.ToLower(path)
+		for _, g := range defaultGlobs {
+			if g.Match(lowerPath) {
+				return true
+			}
+		}
 		for _, g := range compiled {
 			if g.Match(path) {
 				return true

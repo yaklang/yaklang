@@ -92,6 +92,30 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		require.False(t, exclude("main.go"))
 	})
 
+	t.Run("test trees prune regardless of case and spelling", func(t *testing.T) {
+		exclude := BuildCompileExcludeFunc(nil, "", true)
+		for _, p := range []string{
+			"Tests/A.cs", "TEST/A.java", "src/Test/resources/a.json",
+			"TestData/x.json", "src/test/java/A.java",
+			"unittests/a.py", "integration-tests/a.go", "test-utils/a.go",
+			"testcases/a.json", "spec/a.js", "specs/a.js", "e2e/a.ts",
+			"__mocks__/api.js", "mocks/a.js",
+		} {
+			require.True(t, exclude(p), "test tree must be pruned: %s", p)
+		}
+		// Production paths that merely contain a test word stay in the pool.
+		for _, p := range []string{
+			"src/contest/a.go", "src/attestation/a.go",
+			"src/specification/a.go", "src/testing.go", "src/mockserver/a.go",
+		} {
+			require.False(t, exclude(p), "production path must stay: %s", p)
+		}
+		// User patterns keep their own case sensitivity.
+		userExclude := BuildCompileExcludeFunc([]string{"GeneratedSources/**"}, "", true)
+		require.True(t, userExclude("GeneratedSources/a.go"))
+		require.False(t, userExclude("generatedsources/a.go"))
+	})
+
 	t.Run("stylesheets and lockfiles stay out, scripts stay in", func(t *testing.T) {
 		exclude := BuildCompileExcludeFunc(nil, "", true)
 		for _, asset := range []string{
