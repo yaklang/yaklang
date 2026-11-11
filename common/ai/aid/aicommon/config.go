@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -55,25 +54,22 @@ const DefaultTimelineContentSizeLimit = 300 * 1024
 
 type ConfigOption func(*Config) error
 
-var configOptionIDRegistry sync.Map
+var configIDOptionCode = reflect.ValueOf(configIDOption("").apply).Pointer()
 
 const ConfigKeyToolCallIntervalReviewExtraPrompt = "tool_call_interval_review_extra_prompt"
 
-type configIDOptionMeta struct {
-	id  string
-	key uintptr
-}
+type configIDOption string
 
-func (o *configIDOptionMeta) apply(c *Config) error {
+func (id configIDOption) apply(c *Config) error {
 	if c.m == nil {
 		c.m = &sync.Mutex{}
 	}
 	c.m.Lock()
 	defer c.m.Unlock()
-	c.Id = o.id
+	c.Id = string(id)
 	// Also update Emitter's id to keep them in sync
 	if c.Emitter != nil {
-		c.Emitter.SetId(o.id)
+		c.Emitter.SetId(c.Id)
 	}
 	return nil
 }
@@ -86,8 +82,12 @@ func GetLastIDFromConfigOptions(opts ...ConfigOption) (string, bool) {
 		if opt == nil {
 			continue
 		}
-		if id, ok := configOptionIDRegistry.Load(reflect.ValueOf(opt).Pointer()); ok {
-			return id.(string), true
+		if reflect.ValueOf(opt).Pointer() == configIDOptionCode {
+			// The code pointer identifies WithID's method, not its receiver.
+			// Read this option's captured ID by applying only that known setter.
+			var probe Config
+			_ = opt(&probe)
+			return probe.Id, true
 		}
 	}
 	return "", false
@@ -853,14 +853,7 @@ func newConfig(ctx context.Context) *Config {
 
 // WithID sets the runtime id for the config.
 func WithID(id string) ConfigOption {
-	meta := &configIDOptionMeta{id: id}
-	opt := ConfigOption(meta.apply)
-	meta.key = reflect.ValueOf(opt).Pointer()
-	configOptionIDRegistry.Store(meta.key, id)
-	runtime.SetFinalizer(meta, func(m *configIDOptionMeta) {
-		configOptionIDRegistry.Delete(m.key)
-	})
-	return opt
+	return configIDOption(id).apply
 }
 
 // WithContext sets the context (and optional cancel) for the config.
