@@ -17,10 +17,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedToolCalling2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+func mockedToolCalling2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, reviewDirectAnswerDelivered *bool) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
+		if strings.Contains(prompt, "用户在后台工具调用审批中要求直接回答") {
+			if reviewDirectAnswerDelivered != nil && *reviewDirectAnswerDelivered {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			} else {
+				if reviewDirectAnswerDelivered != nil {
+					*reviewDirectAnswerDelivered = true
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after user rejects the reviewed tool"}`))
+			}
+			rsp.Close()
+			return rsp, nil
+		}
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_tool_params": { "seconds": 0.1 },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
@@ -80,9 +92,10 @@ func TestReAct_ToolUse_Reject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var reviewDirectAnswerDelivered bool
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCalling2(i, r, "sleep")
+			return mockedToolCalling2(i, r, "sleep", &reviewDirectAnswerDelivered)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
