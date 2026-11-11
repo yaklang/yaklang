@@ -170,6 +170,9 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 		if done, _ := op.IsTerminated(); done {
 			return
 		}
+		if l.GetConfig().GetSessionEvidenceRendered() == before {
+			return
+		}
 		if callback, ok := l.GetVariable("coordinator_discovery_callback").(func(string, string) error); ok {
 			id, content := a.GetString("evidence_id"), a.GetString("evidence_content")
 			if id == "" {
@@ -181,7 +184,7 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 			if err := callback(id, content); err != nil {
 				op.Fail(err)
 			}
-		} else if l.GetConfig().GetSessionEvidenceRendered() != before {
+		} else {
 			switch callback := l.GetVariable("coordinator_discovery_callback").(type) {
 			case func(...string):
 				callback(a.GetString("evidence_id"))
@@ -198,7 +201,7 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 // The worker's save_evidence action has already broadcast the finding. This
 // callback only wakes the planner after confirming the parent Timeline applied
 // the exact normalized change.
-func (s *Session) saveTaskDiscovery(a Attempt, id, content string) error {
+func (s *Session) notifyTaskDiscovery(a Attempt, id, content string) error {
 	op, err := aicommon.BuildSessionEvidenceUpsert(id, content)
 	if err != nil {
 		return err

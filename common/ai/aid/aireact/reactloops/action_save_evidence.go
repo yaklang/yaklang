@@ -16,8 +16,26 @@ const saveEvidenceOperationLoopVar = "save_evidence_operation"
 // and non-broadcast callers. The core save_evidence action uses
 // BroadcastSessionEvidence.
 func SaveSessionEvidence(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, error) {
-	op, _, err := saveSessionEvidenceWithChange(cfg, evidenceID, content)
-	return op, err
+	if cfg == nil {
+		return aicommon.EvidenceOperation{}, utils.Error("session configuration is unavailable")
+	}
+	op, err := aicommon.BuildSessionEvidenceUpsert(evidenceID, content)
+	if err != nil {
+		return aicommon.EvidenceOperation{}, err
+	}
+	if recorder, ok := cfg.(*aicommon.Config); ok {
+		recorder.ApplySessionEvidenceOpsWithChange([]aicommon.EvidenceOperation{op})
+	} else {
+		// Preserve custom caller adapters' ApplySessionEvidenceOps contract.
+		cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{op})
+	}
+
+	rendered := cfg.GetSessionEvidenceRendered()
+	idMarker := fmt.Sprintf("[id: %s]", op.ID)
+	if !strings.Contains(rendered, idMarker) || !strings.Contains(rendered, op.Content) {
+		return aicommon.EvidenceOperation{}, utils.Errorf("Session Evidence Store did not contain id=%q after apply", op.ID)
+	}
+	return op, nil
 }
 
 // BroadcastSessionEvidence is the explicit session-sharing write path. The
@@ -48,32 +66,6 @@ func BroadcastSessionEvidence(cfg aicommon.AICallerConfigIf, evidenceID, content
 		return aicommon.EvidenceOperation{}, false, utils.Errorf("broadcast evidence %q was not applied", op.ID)
 	}
 	return op, changed, nil
-}
-
-func saveSessionEvidenceWithChange(cfg aicommon.AICallerConfigIf, evidenceID, content string) (aicommon.EvidenceOperation, bool, error) {
-	if cfg == nil {
-		return aicommon.EvidenceOperation{}, false, utils.Error("session configuration is unavailable")
-	}
-	evidenceOp, err := aicommon.BuildSessionEvidenceUpsert(evidenceID, content)
-	if err != nil {
-		return aicommon.EvidenceOperation{}, false, err
-	}
-	var changed bool
-	if recorder, ok := cfg.(*aicommon.Config); ok {
-		changed = recorder.ApplySessionEvidenceOpsWithChange([]aicommon.EvidenceOperation{evidenceOp})
-	} else {
-		// Preserve custom caller adapters' ApplySessionEvidenceOps contract.
-		before := cfg.GetSessionEvidenceRendered()
-		cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
-		changed = cfg.GetSessionEvidenceRendered() != before
-	}
-
-	rendered := cfg.GetSessionEvidenceRendered()
-	idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
-	if !strings.Contains(rendered, idMarker) || !strings.Contains(rendered, evidenceOp.Content) {
-		return aicommon.EvidenceOperation{}, false, utils.Errorf("Session Evidence Store did not contain id=%q after apply", evidenceOp.ID)
-	}
-	return evidenceOp, changed, nil
 }
 
 // loopAction_SaveEvidence is a core action rather than a registry extension.

@@ -76,9 +76,9 @@ func (c *Config) sessionEvidenceTimeline() *Timeline {
 	return timeline
 }
 
-// SyncSessionEvidenceTimeline imports the session journal into a task's local
-// Timeline before compression. Original IDs preserve ordering, deduplication
-// and exact promotion; rendering itself remains read-only.
+// SyncSessionEvidenceTimeline preserves the local fork -> MergeBack path for
+// callers that still use private ApplySessionEvidenceOps. Explicit broadcast
+// evidence does not call this compatibility path.
 func (c *Config) SyncSessionEvidenceTimeline() {
 	local, session := c.GetTimeline(), c.sessionEvidenceTimeline()
 	if local != nil && session != nil && local != session {

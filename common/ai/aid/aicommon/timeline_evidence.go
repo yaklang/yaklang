@@ -9,9 +9,8 @@ import (
 
 const TimelinePromotedKindEvidence = "session-evidence"
 
-// Task branches project the same session journal, including tombstones, rather
-// than rebuilding evidence from an inherited business snapshot. Only exact
-// evidence entries are imported; ordinary task history stays in its own branch.
+// Legacy private-local evidence follows fork snapshots into MergeBack. This
+// compatibility path is separate from explicit session evidence broadcasts.
 func (m *Timeline) importSessionEvidence(session *Timeline) {
 	if m == nil || session == nil || m == session {
 		return
