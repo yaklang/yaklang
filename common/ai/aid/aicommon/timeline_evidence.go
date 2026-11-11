@@ -10,54 +10,6 @@ import (
 
 const TimelinePromotedKindEvidence = "session-evidence"
 
-// evidenceOpToItem 把证据业务操作转换为独立的 Timeline item。
-// item 的数字 ID 保持为空，由各个 Timeline 接收后自行分配。
-func evidenceOpToItem(operation EvidenceOperation) (*TimelineItem, error) {
-	targetSection := TimelinePromotedTargetSemiDynamic1
-	key := strings.TrimSpace(operation.ID)
-	switch strings.ToLower(strings.TrimSpace(operation.Op)) {
-	case "add", "update", "upsert":
-		normalized, err := BuildSessionEvidenceUpsert(key, operation.Content)
-		if err != nil {
-			return nil, err
-		}
-		now := time.Now().Unix()
-		payload, err := json.Marshal(EvidenceItem{
-			ID:          normalized.ID,
-			Content:     normalized.Content,
-			CreatedUnix: now,
-			UpdatedUnix: now,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("encode session evidence %q: %w", normalized.ID, err)
-		}
-		return NewTimelineItem(&PromotableTimelineItem{
-			Kind:          TimelinePromotedKindEvidence,
-			TargetSection: targetSection,
-			Key:           normalized.ID,
-			Operation:     TimelinePromotedOperationUpsert,
-			Payload:       string(payload),
-			PayloadHash:   promotedPayloadHash(string(payload)),
-		}), nil
-	case "delete":
-		if !sessionEvidenceIDPattern.MatchString(key) {
-			return nil, fmt.Errorf("invalid session evidence id %q", operation.ID)
-		}
-		if strings.TrimSpace(operation.Content) != "" {
-			return nil, fmt.Errorf("session evidence delete %q must not carry content", key)
-		}
-		return NewTimelineItem(&PromotableTimelineItem{
-			Kind:          TimelinePromotedKindEvidence,
-			TargetSection: targetSection,
-			Key:           key,
-			Operation:     TimelinePromotedOperationDelete,
-			PayloadHash:   promotedPayloadHash(""),
-		}), nil
-	default:
-		return nil, fmt.Errorf("unsupported session evidence operation %q", operation.Op)
-	}
-}
-
 // itemToEvidenceOp 把证据 Timeline item 还原为 EvidenceStore 可消费的操作。
 // EvidenceStore 用 add 表示幂等更新，delete 保持显式删除语义。
 func itemToEvidenceOp(item *TimelineItem) (EvidenceOperation, error) {
@@ -114,25 +66,6 @@ func (m *Timeline) isEvidenceOpNeededLocked(op EvidenceOperation) bool {
 	store, _ := m.evidenceStoreLocked()
 	normalized, ok := normalizeEvidenceOp(op)
 	return ok && opChangesStore(store, normalized)
-}
-
-// filterEvidenceOps 按顺序过滤无效或不会改变证据状态的操作。
-// 返回新切片，保留仍有效操作的内容和顺序。
-func (m *Timeline) filterEvidenceOps(ops []EvidenceOperation) []EvidenceOperation {
-	filtered := make([]EvidenceOperation, 0, len(ops))
-	if m == nil || len(ops) == 0 {
-		return filtered
-	}
-	store, _ := m.evidenceStore()
-	for _, op := range ops {
-		normalized, ok := normalizeEvidenceOp(op)
-		if !ok || !opChangesStore(store, normalized) {
-			continue
-		}
-		filtered = append(filtered, op)
-		store.ApplyOperations([]EvidenceOperation{normalized})
-	}
-	return filtered
 }
 
 // normalizeEvidenceOp 统一证据操作的 ID 和操作名；无效操作返回 false。

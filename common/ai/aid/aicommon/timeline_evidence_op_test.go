@@ -1,10 +1,35 @@
 package aicommon
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func newEvidenceTestItem(t *testing.T, id, content string) *TimelineItem {
+	t.Helper()
+	payload, err := json.Marshal(EvidenceItem{ID: id, Content: content})
+	require.NoError(t, err)
+	return NewTimelineItem(&PromotableTimelineItem{
+		Kind:          TimelinePromotedKindEvidence,
+		TargetSection: TimelinePromotedTargetSemiDynamic1,
+		Key:           id,
+		Operation:     TimelinePromotedOperationUpsert,
+		Payload:       string(payload),
+		PayloadHash:   promotedPayloadHash(string(payload)),
+	})
+}
+
+func newEvidenceDeleteItem(id string) *TimelineItem {
+	return NewTimelineItem(&PromotableTimelineItem{
+		Kind:          TimelinePromotedKindEvidence,
+		TargetSection: TimelinePromotedTargetSemiDynamic1,
+		Key:           id,
+		Operation:     TimelinePromotedOperationDelete,
+		PayloadHash:   promotedPayloadHash(""),
+	})
+}
 
 func newEvidenceOpTestTimeline(t *testing.T, items ...EvidenceItem) *Timeline {
 	t.Helper()
@@ -23,66 +48,20 @@ func newEvidenceOpTestTimeline(t *testing.T, items ...EvidenceItem) *Timeline {
 	return timeline
 }
 
-func TestEvidenceOpToItem(t *testing.T) {
-	t.Run("upsert", func(t *testing.T) {
-		op, err := BuildSessionEvidenceUpsert("", "  confirmed result  ")
-		require.NoError(t, err)
-
-		item, err := evidenceOpToItem(op)
-		require.NoError(t, err)
-		require.Zero(t, item.GetID())
-
-		promoted, ok := item.value.(*PromotableTimelineItem)
-		require.True(t, ok)
-		require.Zero(t, promoted.ID)
-		require.Equal(t, TimelinePromotedKindEvidence, promoted.Kind)
-		require.Equal(t, TimelinePromotedTargetSemiDynamic1, promoted.TargetSection)
-		require.Equal(t, TimelinePromotedOperationUpsert, promoted.Operation)
-		require.Equal(t, op.ID, promoted.Key)
-		require.Equal(t, promotedPayloadHash(promoted.Payload), promoted.PayloadHash)
-	})
-
-	t.Run("delete", func(t *testing.T) {
-		item, err := evidenceOpToItem(EvidenceOperation{ID: "saved-fact", Op: "delete"})
-		require.NoError(t, err)
-		require.Zero(t, item.GetID())
-
-		promoted, ok := item.value.(*PromotableTimelineItem)
-		require.True(t, ok)
-		require.Equal(t, TimelinePromotedOperationDelete, promoted.Operation)
-		require.Equal(t, "saved-fact", promoted.Key)
-		require.Empty(t, promoted.Payload)
-	})
-
-	t.Run("invalid", func(t *testing.T) {
-		_, err := evidenceOpToItem(EvidenceOperation{ID: "bad id", Op: "upsert", Content: "content"})
-		require.Error(t, err)
-		_, err = evidenceOpToItem(EvidenceOperation{ID: "saved-fact", Op: "delete", Content: "unexpected"})
-		require.Error(t, err)
-		_, err = evidenceOpToItem(EvidenceOperation{ID: "saved-fact", Op: "unknown"})
-		require.Error(t, err)
-	})
-}
-
 func TestItemToEvidenceOp(t *testing.T) {
-	original, err := BuildSessionEvidenceUpsert("saved-fact", "confirmed content")
-	require.NoError(t, err)
-	item, err := evidenceOpToItem(original)
-	require.NoError(t, err)
+	item := newEvidenceTestItem(t, "saved-fact", "confirmed content")
 
 	op, err := itemToEvidenceOp(item)
 	require.NoError(t, err)
 	require.Equal(t, EvidenceOperation{
-		ID:      original.ID,
+		ID:      "saved-fact",
 		Op:      "add",
-		Content: original.Content,
+		Content: "confirmed content",
 	}, op)
 
-	deleteItem, err := evidenceOpToItem(EvidenceOperation{ID: original.ID, Op: "delete"})
+	op, err = itemToEvidenceOp(newEvidenceDeleteItem("saved-fact"))
 	require.NoError(t, err)
-	op, err = itemToEvidenceOp(deleteItem)
-	require.NoError(t, err)
-	require.Equal(t, EvidenceOperation{ID: original.ID, Op: "delete"}, op)
+	require.Equal(t, EvidenceOperation{ID: "saved-fact", Op: "delete"}, op)
 
 	_, err = itemToEvidenceOp(NewTimelineItem(&TextTimelineItem{Text: "not evidence"}))
 	require.Error(t, err)
@@ -117,27 +96,6 @@ func TestIsEvidenceOpNeeded(t *testing.T) {
 	require.True(t, needed(EvidenceOperation{
 		ID: "new-fact", Op: "upsert", Content: "new",
 	}))
-}
-
-func TestFilterEvidenceOps(t *testing.T) {
-	timeline := newEvidenceOpTestTimeline(t, EvidenceItem{ID: "existing", Content: "A"})
-	ops := []EvidenceOperation{
-		{ID: "existing", Op: "add", Content: "A"},
-		{ID: "new", Op: "add", Content: "B"},
-		{ID: "new", Op: "upsert", Content: "B"},
-		{ID: "missing", Op: "delete"},
-		{ID: "new", Op: "delete"},
-		{ID: "new", Op: "delete"},
-		{ID: "existing", Op: "update", Content: "C"},
-		{ID: "existing", Op: "unknown", Content: "D"},
-	}
-
-	filtered := timeline.filterEvidenceOps(ops)
-	require.Equal(t, []EvidenceOperation{
-		{ID: "new", Op: "add", Content: "B"},
-		{ID: "new", Op: "delete"},
-		{ID: "existing", Op: "update", Content: "C"},
-	}, filtered)
 }
 
 func TestNormalizeEvidenceOpAndChangesStore(t *testing.T) {

@@ -212,9 +212,7 @@ func TestTimelineBroadcastChecksEvidenceAgainstEachTimeline(t *testing.T) {
 	t.Cleanup(unregisterClean)
 
 	parentMax, forkMax := parent.Timeline.GetMaxID(), fork.Branch.GetMaxID()
-	same, err := evidenceOpToItem(seed)
-	require.NoError(t, err)
-	require.NoError(t, parent.BroadcastTimelineItem(same))
+	require.NoError(t, parent.BroadcastTimelineItem(newEvidenceTestItem(t, seed.ID, seed.Content)))
 	require.Equal(t, parentMax, parent.Timeline.GetMaxID())
 	require.Equal(t, forkMax, fork.Branch.GetMaxID())
 	cleanStore, found := clean.evidenceStore()
@@ -223,9 +221,7 @@ func TestTimelineBroadcastChecksEvidenceAgainstEachTimeline(t *testing.T) {
 
 	updated, err := BuildSessionEvidenceUpsert("shared-fact", "SECOND")
 	require.NoError(t, err)
-	updatedItem, err := evidenceOpToItem(updated)
-	require.NoError(t, err)
-	require.NoError(t, parent.BroadcastTimelineItem(updatedItem))
+	require.NoError(t, parent.BroadcastTimelineItem(newEvidenceTestItem(t, updated.ID, updated.Content)))
 	for _, timeline := range []*Timeline{parent.Timeline, fork.Branch, clean} {
 		store, found := timeline.evidenceStore()
 		require.True(t, found)
