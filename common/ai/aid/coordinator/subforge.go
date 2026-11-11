@@ -81,7 +81,7 @@ func (s *Session) subForgeWorkerManager(task aicommon.AIStatefulTask) (*buildina
 	return manager, descriptions, nil
 }
 
-func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTask, callID string, binding SubForgeTool, params aitool.InvokeParams) (any, error) {
+func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTask, callID string, binding SubForgeTool, params aitool.InvokeParams) (_ any, retErr error) {
 	if IsSubForgeContext(ctx) || IsSubForgeContext(s.GetContext()) {
 		return nil, fmt.Errorf("sub-Forge nesting is limited to one level")
 	}
@@ -110,6 +110,18 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		return nil, err
 	}
 	id := uuid.NewString()
+	tree := subForgeTaskTree{
+		ParentCoordinatorID: s.GetRuntimeId(),
+		ParentTaskID:        task.GetId(),
+		ParentTaskUUID:      task.GetUUID(),
+		CallToolID:          callID,
+		ChildCoordinatorID:  id,
+		Revision:            1,
+		Status:              "running",
+	}
+	if binding.Schema != nil {
+		tree.ToolName = binding.Schema.Name
+	}
 	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	var endpoints sync.Map
 	unregister := s.InputEventManager.RouteInteractiveInput(id, func(event *ypb.AIInputEvent) bool {
@@ -139,6 +151,9 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	defer func() {
 		eventMu.Lock()
 		closed = true
+		tree.Revision++
+		tree.Status = subForgeTreeStatus(retErr)
+		terminal := tree
 		eventMu.Unlock()
 		var retiredIDs []string
 		endpoints.Range(func(key, _ any) bool {
@@ -147,8 +162,7 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		})
 		unregister(retiredIDs...)
 		if len(pending) > 0 {
-			// A caller-owned event handler can block. Serialize these releases
-			// with prior deliveries without making cancellation wait for it.
+			// Keep legacy review release delivery serialized with child events.
 			go func() {
 				deliveryMu.Lock()
 				defer deliveryMu.Unlock()
@@ -164,6 +178,17 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 					})
 				}
 			}()
+		}
+		// Persist the terminal snapshot even if an earlier progress callback
+		// is blocked. Its revision orders it against any in-flight progress.
+		delivered := make(chan struct{})
+		go func() {
+			defer close(delivered)
+			s.emitSubForgeTaskTree(terminal)
+		}()
+		select {
+		case <-delivered:
+		case <-ctx.Done():
 		}
 	}()
 
@@ -212,7 +237,12 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 					}
 				}
 			}
+			changed := tree.observePlan(event)
+			update := tree
 			eventMu.Unlock()
+			if changed {
+				s.emitSubForgeTaskTree(update)
+			}
 			forward(event)
 		}),
 	)
@@ -223,6 +253,7 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	}
 	done := make(chan childResult, 1)
 	started = true
+	initial := tree
 	go func() {
 		var result childResult
 		defer func() {
@@ -232,6 +263,7 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 			s.subForgeActive.Store(false)
 			done <- result
 		}()
+		s.emitSubForgeTaskTree(initial)
 		if result.err = childCtx.Err(); result.err != nil {
 			return
 		}

@@ -23,7 +23,13 @@ func TestSubForgeScopeAndLifecycle(t *testing.T) {
 	manager := buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool { return []*aitool.Tool{allowed} },
 		buildinaitools.WithEnabledTools([]string{allowed.Name}),
 		buildinaitools.WithSearchToolEnabled(false), buildinaitools.WithForgeSearchToolEnabled(false))
-	session := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithAiToolManager(manager))}
+	treeEvents := make(chan *schema.AiOutputEvent, 4)
+	session := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithAiToolManager(manager),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE {
+				treeEvents <- event
+			}
+		}))}
 	task := aicommon.NewStatefulTaskBase("parent-task", "inspect", ctx, session.GetEmitter(), true)
 	entered := make(chan struct{})
 	finished := make(chan error, 1)
@@ -71,6 +77,11 @@ func TestSubForgeScopeAndLifecycle(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("child did not stop")
 	}
+	start, end := readSubForgeTree(t, treeEvents), readSubForgeTree(t, treeEvents)
+	require.Equal(t, "running", start.Status)
+	require.Equal(t, "cancelled", end.Status)
+	require.Equal(t, start.ChildCoordinatorID, end.ChildCoordinatorID)
+	require.Empty(t, treeEvents)
 }
 
 func TestSubForgeDeadlineAndFailure(t *testing.T) {
