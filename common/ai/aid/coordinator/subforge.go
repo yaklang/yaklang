@@ -3,6 +3,7 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -93,17 +94,18 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	}
 	// Release admission immediately if setup fails. Once started, only the
 	// child goroutine can release it, even if its caller has timed out.
-	started := false
+	dispatched := false
+	releaseSlot := sync.OnceFunc(func() { s.subForgeActive.Store(false) })
 	defer func() {
-		if !started {
-			s.subForgeActive.Store(false)
+		if !dispatched {
+			releaseSlot()
 		}
 	}()
 
 	ctx, cancel := context.WithTimeout(context.WithValue(ctx, subForgeContextKey{}, true), subForgeTimeout)
 	defer cancel()
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, errors.Join(err, aitool.ErrInvocationNotStarted)
 	}
 	allowed, err := s.subForgeAllowedTools(binding.Tools)
 	if err != nil {
@@ -148,6 +150,18 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	var eventMu, deliveryMu sync.Mutex
 	pending := make(map[string]struct{})
 	closed := false
+	childStarted := false
+	interrupted := func(err error) error {
+		eventMu.Lock()
+		started := childStarted
+		eventMu.Unlock()
+		if !started {
+			// The child checks this same context under eventMu before starting.
+			releaseSlot()
+			return errors.Join(err, aitool.ErrInvocationNotStarted)
+		}
+		return err
+	}
 	defer func() {
 		eventMu.Lock()
 		closed = true
@@ -252,7 +266,7 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		err   error
 	}
 	done := make(chan childResult, 1)
-	started = true
+	dispatched = true
 	initial := tree
 	go func() {
 		var result childResult
@@ -260,21 +274,25 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 			if failure := recover(); failure != nil {
 				result.err = fmt.Errorf("sub-Forge execution panicked: %v", failure)
 			}
-			s.subForgeActive.Store(false)
+			releaseSlot()
 			done <- result
 		}()
 		s.emitSubForgeTaskTree(initial)
-		if result.err = childCtx.Err(); result.err != nil {
+		eventMu.Lock()
+		result.err = childCtx.Err()
+		childStarted = result.err == nil
+		eventMu.Unlock()
+		if result.err != nil {
 			return
 		}
 		result.value, result.err = binding.Run(childCtx, params, allowed, opts...)
 	}()
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, interrupted(ctx.Err())
 	case result := <-done:
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
+		if err := ctx.Err(); err != nil {
+			return nil, interrupted(err)
 		}
 		return result.value, result.err
 	}
