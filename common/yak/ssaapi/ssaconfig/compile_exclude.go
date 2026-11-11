@@ -421,25 +421,19 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 	}
 	basePath = normalizeCompileExcludePath(basePath)
 
-	// Built-in directory names are matched case-insensitively: a test tree
+	// Built-in DIRECTORY names are matched case-insensitively: a test tree
 	// spelled Tests/ or Test/ (the C#/.NET and some Java layouts) must prune
-	// exactly like test/. User patterns stay case-sensitive; only the merged
-	// defaults get a lowercase twin matcher.
-	var defaultGlobs []glob.Glob
+	// exactly like test/. Only directory segments take part — lowering the
+	// file globs as well was wrong, because "**/*Test.php" then matched
+	// "test.php". User patterns stay case-sensitive.
+	defaultDirNames := make(map[string]bool, len(DefaultCompileExcludeDirNames))
 	if includeDefaults {
-		seenDefault := make(map[string]bool)
-		for _, pattern := range DefaultCompileExcludePatterns() {
-			lower := strings.ToLower(normalizeCompileExcludePath(pattern))
-			if lower == "" || seenDefault[lower] {
+		for _, name := range DefaultCompileExcludeDirNames {
+			lower := strings.ToLower(strings.TrimSpace(name))
+			if lower == "" {
 				continue
 			}
-			seenDefault[lower] = true
-			g, err := glob.Compile(lower)
-			if err != nil {
-				log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, lower)
-				continue
-			}
-			defaultGlobs = append(defaultGlobs, g)
+			defaultDirNames[lower] = true
 		}
 	}
 
@@ -489,11 +483,8 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 			return true
 		}
 		path = normalizeCompileExcludePath(path)
-		lowerPath := strings.ToLower(path)
-		for _, g := range defaultGlobs {
-			if g.Match(lowerPath) {
-				return true
-			}
+		if hasExcludedDirSegment(path, defaultDirNames) {
+			return true
 		}
 		for _, g := range compiled {
 			if g.Match(path) {
@@ -501,6 +492,28 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 			}
 		}
 		return false
+	}
+}
+
+// hasExcludedDirSegment reports whether any directory segment of path is one
+// of the built-in excluded directory names, compared case-insensitively.
+func hasExcludedDirSegment(path string, names map[string]bool) bool {
+	if len(names) == 0 || path == "" {
+		return false
+	}
+	for {
+		slash := strings.IndexByte(path, '/')
+		if slash < 0 {
+			// The last segment is a file name for a file match and a directory
+			// name for the directory walk's SkipDir check; the directory walk
+			// also matches it through the compiled globs, so a trailing segment
+			// is checked here too.
+			return names[strings.ToLower(path)]
+		}
+		if names[strings.ToLower(path[:slash])] {
+			return true
+		}
+		path = path[slash+1:]
 	}
 }
 
