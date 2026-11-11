@@ -430,17 +430,3 @@ func (s *SessionPromptState) AppendReportedRisk(risk *schema.Risk) bool {
 	s.m.Unlock()
 	return store.AppendFromRisk(risk)
 }
-
-// GetReportedRisksRendered is a legacy store view, not used in prompt assembly.
-func (s *SessionPromptState) GetReportedRisksRendered() string {
-	if s == nil {
-		return ""
-	}
-	s.m.RLock()
-	store := s.reportedRiskStore
-	s.m.RUnlock()
-	if store == nil {
-		return ""
-	}
-	return store.Render()
-}

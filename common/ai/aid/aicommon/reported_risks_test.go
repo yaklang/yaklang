@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -154,95 +155,6 @@ func TestUnmarshalReportedRiskStore_EmptyAndInvalid(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ReportedRiskStore: render
-// ---------------------------------------------------------------------------
-
-func TestReportedRiskStore_RenderEmpty(t *testing.T) {
-	store := NewReportedRiskStore()
-	require.Empty(t, store.Render())
-}
-
-func TestReportedRiskStore_RenderContainsHeader(t *testing.T) {
-	store := NewReportedRiskStore()
-	store.AppendFromRisk(&schema.Risk{
-		Url:       "https://example.com/login",
-		RiskType:  "sqli",
-		Parameter: "username",
-		Title:     "登录接口 SQL 注入",
-		Severity:  "high",
-	})
-
-	rendered := store.Render()
-	require.Contains(t, rendered, "## 已报告漏洞清单")
-	require.Contains(t, rendered, "不要重复上报")
-	require.Contains(t, rendered, "cybersecurity-risk")
-}
-
-func TestReportedRiskStore_RenderFormatOneLinePerRisk(t *testing.T) {
-	store := NewReportedRiskStore()
-	store.AppendFromRisk(&schema.Risk{
-		Url:       "https://example.com/login",
-		RiskType:  "sqli",
-		Parameter: "username",
-		Title:     "登录接口 SQL 注入",
-		Severity:  "high",
-	})
-	store.AppendFromRisk(&schema.Risk{
-		Url:       "https://example.com/.env",
-		RiskType:  "info-exposure",
-		Parameter: "",
-		Title:     ".env 文件敏感信息泄露",
-		Severity:  "middle",
-	})
-
-	rendered := store.Render()
-	lines := strings.Split(strings.TrimSpace(rendered), "\n")
-
-	// Find the risk lines (they contain " @ ").
-	var riskLines []string
-	for _, line := range lines {
-		if strings.Contains(line, " @ ") {
-			riskLines = append(riskLines, line)
-		}
-	}
-	require.Len(t, riskLines, 2)
-
-	// Newest first.
-	require.Contains(t, riskLines[0], "info-exposure")
-	require.Contains(t, riskLines[0], "example.com/.env")
-	require.Contains(t, riskLines[0], "(-)")
-
-	require.Contains(t, riskLines[1], "sqli")
-	require.Contains(t, riskLines[1], "example.com/login")
-	require.Contains(t, riskLines[1], "(username)")
-	require.Contains(t, riskLines[1], "登录接口 SQL 注入")
-}
-
-func TestReportedRiskStore_RenderTruncatesLongTitle(t *testing.T) {
-	store := NewReportedRiskStore()
-	longTitle := strings.Repeat("超长漏洞标题", 10) // 60 runes
-	store.AppendFromRisk(&schema.Risk{
-		Url:      "https://example.com/x",
-		RiskType: "sqli",
-		Title:    longTitle,
-		Severity: "high",
-	})
-
-	rendered := store.Render()
-	require.Contains(t, rendered, "...")
-	// The truncated title should not exceed 40 runes + "..."
-	for _, line := range strings.Split(rendered, "\n") {
-		if strings.Contains(line, " @ ") {
-			idx := strings.Index(line, " — ")
-			if idx >= 0 {
-				title := line[idx+len(" — "):]
-				require.LessOrEqual(t, len([]rune(title)), 43) // 40 + "..."
-			}
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // normalizeRiskTargetForSummary
 // ---------------------------------------------------------------------------
 
@@ -301,7 +213,7 @@ func TestComputeReportedRiskID_Deterministic(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SessionPromptState: AppendReportedRisk + GetReportedRisksRendered
+// SessionPromptState: AppendReportedRisk
 // ---------------------------------------------------------------------------
 
 func TestSessionPromptState_AppendReportedRisk(t *testing.T) {
@@ -327,22 +239,15 @@ func TestSessionPromptState_AppendReportedRisk(t *testing.T) {
 	})
 	require.False(t, added)
 
-	// Rendered output should contain exactly one risk line.
-	rendered := s.GetReportedRisksRendered()
-	require.Contains(t, rendered, "sqli")
-	require.Contains(t, rendered, "example.com/login")
-	require.Contains(t, rendered, "(username)")
+	require.JSONEq(t, `{"items":[{"id":"`+computeReportedRiskID("example.com/login", "sqli", "username")+
+		`","severity":"high","risk_type":"sqli","target":"example.com/login","parameter":"username","title":"SQL 注入","created_unix":`+
+		fmt.Sprint(s.reportedRiskStore.Items[0].CreatedUnix)+`}]}`, s.GetReportedRisks())
 }
 
 func TestSessionPromptState_AppendReportedRisk_Nil(t *testing.T) {
 	s := NewSessionPromptState()
 	require.False(t, s.AppendReportedRisk(nil))
-	require.Empty(t, s.GetReportedRisksRendered())
-}
-
-func TestSessionPromptState_GetReportedRisksRendered_Empty(t *testing.T) {
-	s := NewSessionPromptState()
-	require.Empty(t, s.GetReportedRisksRendered())
+	require.Empty(t, UnmarshalReportedRiskStore(s.GetReportedRisks()).Items)
 }
 
 // ---------------------------------------------------------------------------
@@ -365,9 +270,7 @@ func TestSessionPromptState_ReportedRisksPersistence(t *testing.T) {
 	// Restore into a new state.
 	s2 := NewSessionPromptState()
 	s2.SetReportedRisks(jsonStr)
-	rendered := s2.GetReportedRisksRendered()
-	require.Contains(t, rendered, "sqli")
-	require.Contains(t, rendered, "example.com/login")
+	require.JSONEq(t, jsonStr, s2.GetReportedRisks())
 }
 
 // ---------------------------------------------------------------------------
@@ -386,10 +289,9 @@ func TestSessionPromptState_ForkForSubAgent_SharesReportedRisks(t *testing.T) {
 
 	child := parent.ForkForSubAgent()
 
-	// Child sees parent's risk.
-	rendered := child.GetReportedRisksRendered()
-	require.Contains(t, rendered, "sqli")
-	require.Contains(t, rendered, "example.com/login")
+	// Child shares the parent's risk ledger.
+	require.Contains(t, child.GetReportedRisks(), "sqli")
+	require.Contains(t, child.GetReportedRisks(), "example.com/login")
 
 	// Child adds its own risk.
 	added := child.AppendReportedRisk(&schema.Risk{
@@ -402,13 +304,11 @@ func TestSessionPromptState_ForkForSubAgent_SharesReportedRisks(t *testing.T) {
 	require.True(t, added)
 
 	// Parent immediately sees the child's new risk — shared store, not copy.
-	parentRendered := parent.GetReportedRisksRendered()
-	require.Contains(t, parentRendered, "xss", "parent should see child's risk (shared store)")
+	require.Contains(t, parent.GetReportedRisks(), "xss", "parent should see child's risk (shared store)")
 
 	// Child still sees both.
-	childRendered := child.GetReportedRisksRendered()
-	require.Contains(t, childRendered, "sqli")
-	require.Contains(t, childRendered, "xss")
+	require.Contains(t, child.GetReportedRisks(), "sqli")
+	require.Contains(t, child.GetReportedRisks(), "xss")
 
 	// Child deduplicates against parent's risks.
 	dup := child.AppendReportedRisk(&schema.Risk{
@@ -428,8 +328,7 @@ func TestSessionPromptState_ForkForSubAgent_SharesReportedRisks(t *testing.T) {
 		Title:     "RCE",
 		Severity:  "high",
 	})
-	childRendered2 := child.GetReportedRisksRendered()
-	require.Contains(t, childRendered2, "rce", "child should see parent's new risk (shared store)")
+	require.Contains(t, child.GetReportedRisks(), "rce", "child should see parent's new risk (shared store)")
 }
 
 func TestSessionPromptState_ForkForSubAgent_SharesInitiallyEmptyReportedRisks(t *testing.T) {
@@ -438,8 +337,8 @@ func TestSessionPromptState_ForkForSubAgent_SharesInitiallyEmptyReportedRisks(t 
 	sibling := parent.ForkForSubAgent()
 	risk := &schema.Risk{Url: "https://example.com/child-first", RiskType: "xss", Parameter: "q", Title: "child-first", Severity: "high"}
 	require.True(t, child.AppendReportedRisk(risk))
-	require.Contains(t, parent.GetReportedRisksRendered(), "child-first")
-	require.Contains(t, sibling.GetReportedRisksRendered(), "child-first")
+	require.Contains(t, parent.GetReportedRisks(), "child-first")
+	require.Contains(t, sibling.GetReportedRisks(), "child-first")
 	require.False(t, sibling.AppendReportedRisk(risk), "deduplication must work even when the first risk comes from a child")
 }
 
@@ -478,7 +377,7 @@ func TestReportedRisks_PromptPlacement_ThroughTimeline(t *testing.T) {
 	require.NoError(t, err)
 
 	// ReportedRisks content should appear in the prompt.
-	require.Contains(t, prompt, "[reported_risk]")
+	require.Contains(t, prompt, "## 已上报风险（Reported Risks）")
 	require.NotContains(t, prompt, "## 已报告漏洞清单")
 	require.Contains(t, prompt, "sqli")
 	require.Contains(t, prompt, "example.com/login")
@@ -493,7 +392,7 @@ func TestReportedRisks_PromptPlacement_ThroughTimeline(t *testing.T) {
 	for _, ch := range timelineOpenChunks {
 		tlOpenContent += ch.Content
 	}
-	require.Contains(t, tlOpenContent, "[reported_risk]")
+	require.Contains(t, tlOpenContent, "## 已上报风险（Reported Risks）")
 	require.Contains(t, tlOpenContent, "sqli")
 }
 
@@ -529,7 +428,6 @@ func TestConfig_ReportedRisksMethods(t *testing.T) {
 	cfg := NewConfig(context.Background())
 
 	// Initially empty.
-	require.Empty(t, cfg.GetReportedRisksRendered())
 	require.Empty(t, cfg.GetReportedRisks())
 
 	// Append a risk.
@@ -542,15 +440,14 @@ func TestConfig_ReportedRisksMethods(t *testing.T) {
 	})
 	require.True(t, added)
 
-	rendered := cfg.GetReportedRisksRendered()
-	require.Contains(t, rendered, "sqli")
+	require.Contains(t, cfg.GetReportedRisks(), "sqli")
 	require.NotEmpty(t, cfg.GetReportedRisks())
 
 	// Restore from JSON.
 	jsonStr := cfg.GetReportedRisks()
 	cfg2 := NewConfig(context.Background())
 	cfg2.SetReportedRisks(jsonStr)
-	require.Contains(t, cfg2.GetReportedRisksRendered(), "sqli")
+	require.Contains(t, cfg2.GetReportedRisks(), "sqli")
 }
 
 // ---------------------------------------------------------------------------
