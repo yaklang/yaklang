@@ -48,8 +48,16 @@ func execDBSaveFunc(db *gorm.DB, f DbExecFunc) error {
 func execDBSaveBatch(db *gorm.DB, batch []DbExecFunc) {
 	// Sequential autocommit per item: coalesce scheduling without holding one SQLite write
 	// transaction across the whole batch (avoids database is locked under MaxOpenConns(1)).
+	dbSaveTakenUnfinished.Store(int64(len(batch)))
 	for _, f := range batch {
-		if err := execDBSaveFunc(db, f); err != nil {
+		var err error
+		if db != nil {
+			err = execDBSaveFunc(db, f)
+		} else {
+			err = f(nil)
+		}
+		dbSaveTakenUnfinished.Add(-1)
+		if err != nil {
 			log.Errorf("Throttle sql exec failed: %s", err)
 		}
 	}

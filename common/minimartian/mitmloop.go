@@ -675,6 +675,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 
 	link(req, ctx, p)
 	defer unlink(req, p)
+	httpctx.SetMITMConnectionID(req, session.ID())
 	applyBrowserInstance(req, ctx)
 
 	// set plugin context
@@ -874,6 +875,12 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 	}
 	session := ctx.Session()
 	brw := session.brw
+	// Request modifiers can complete the request themselves, as with a
+	// failed WebSocket upgrade. Bind the lifetime before they observe it.
+	requestCtx, cancelRequest := context.WithCancel(req.Context())
+	defer cancelRequest()
+	*req = *req.WithContext(requestCtx)
+
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		log.Errorf("mitm: error modifying request: %v", err)
 		proxyutil.Warning(req.Header, err)
@@ -883,7 +890,7 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		return nil
 	}
 
-	stopWatchingDownstream := bindHTTPRequestToDownstream(req, conn, brw.Reader)
+	stopWatchingDownstream := watchHTTPDownstreamDisconnect(conn, brw.Reader, cancelRequest)
 	defer stopWatchingDownstream()
 	res, err := p.doHTTPRequest(ctx, req)
 	if (err != nil && err != io.EOF) || res == nil {
@@ -1025,16 +1032,13 @@ func isExpectedDownstreamWriteError(err error) bool {
 
 const downstreamDisconnectPollInterval = 100 * time.Millisecond
 
-// bindHTTPRequestToDownstream cancels the request context when the client
+// watchHTTPDownstreamDisconnect cancels the request context when the client
 // connection closes while the proxy is waiting for the upstream response.
 // Peek observes the connection without consuming a pipelined request byte.
-func bindHTTPRequestToDownstream(req *http.Request, conn net.Conn, reader *bufio.Reader) func() {
-	if req == nil || conn == nil || reader == nil {
+func watchHTTPDownstreamDisconnect(conn net.Conn, reader *bufio.Reader, cancelRequest context.CancelFunc) func() {
+	if conn == nil || reader == nil {
 		return func() {}
 	}
-
-	requestCtx, cancelRequest := context.WithCancel(req.Context())
-	*req = *req.WithContext(requestCtx)
 
 	stop := make(chan struct{})
 	done := make(chan struct{})
@@ -1116,7 +1120,6 @@ func bindHTTPRequestToDownstream(req *http.Request, conn net.Conn, reader *bufio
 			deadlineMu.Lock()
 			_ = conn.SetReadDeadline(time.Time{})
 			deadlineMu.Unlock()
-			cancelRequest()
 		})
 	}
 }

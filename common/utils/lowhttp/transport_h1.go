@@ -43,6 +43,7 @@ func newH1Transport(pool *LowHttpConnPool) transport {
 }
 
 func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
+	tr.attempt = tr.observer.BeginAttempt("HTTP/1.1")
 	requestPacket := tr.packet
 	connPool := tr.connPool
 	if connPool == nil {
@@ -58,8 +59,9 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 
 	if conn == nil {
 		if withConnPool {
-			conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.dialOpts...)
+			conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.connectTimeout, tr.attempt, tr.dialOpts...)
 		} else {
+			tr.attempt.Phase(httpctx.UpstreamDial)
 			conn, err = dialXWithContext(ctx, tr.originAddr, tr.dialOpts...)
 		}
 	}
@@ -79,6 +81,8 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		if err != nil {
 			return nil, err
 		}
+		tr.attempt = tr.observer.BeginAttempt("HTTP/1.1")
+		tr.attempt.Phase(httpctx.UpstreamDial)
 		conn, err = t.tryLegacyProxy(ctx, tr)
 		if err != nil {
 			return nil, err
@@ -163,6 +167,7 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
 
+	tr.attempt.Phase(httpctx.UpstreamSend)
 	resc := make(chan responseInfo, 1)
 	pc.reqCh <- requestAndResponseCh{
 		reqPacket:   requestPacket,
@@ -170,8 +175,9 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 		reqInstance: reqIns,
 		option:      option,
 		writeErrCh:  writeErrCh,
+		observer:    tr.attempt,
 	}
-	pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option}
+	pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option, observer: tr.attempt}
 
 	var rawBytes []byte
 	var firstResponse *http.Response
@@ -253,6 +259,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		httpctx.SetBareRequestBytes(reqIns, requestPacket)
 	}
 	currentRPS.Add(1)
+	tr.attempt.Phase(httpctx.UpstreamSend)
 
 	if option.EnableRandomChunked {
 		chunkSender, err := option.GetOrCreateChunkSender()
@@ -369,6 +376,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	}
 
 	// Read response
+	tr.attempt.Phase(httpctx.UpstreamFirstByte)
 	serverTimeStart := time.Now()
 	_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
 	firstByte, err := httpResponseReader.Peek(1)
@@ -384,6 +392,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	}
 
 	tr.traceInfo.ServerTime = time.Since(serverTimeStart)
+	tr.attempt.Phase(httpctx.UpstreamRead)
 
 	var firstResponse *http.Response
 	if option.DiscardIntermediateResponseBody {

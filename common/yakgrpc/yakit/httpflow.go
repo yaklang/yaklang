@@ -902,7 +902,24 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 	return nil
 }
 
-func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
+func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) error {
+	return insertHTTPFlow(db, i, nil)
+}
+
+func InsertHTTPFlowObserved(db *gorm.DB, i *schema.HTTPFlow, observe HTTPFlowWriteObserver) error {
+	observe.notify(HTTPFlowWriteSubmitting, 0, nil)
+	return insertHTTPFlow(db, i, observe)
+}
+
+func insertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow, observe HTTPFlowWriteObserver) (fErr error) {
+	committed := false
+	if observe != nil {
+		defer func() {
+			if !committed {
+				observe.notify(HTTPFlowWriteFinished, 0, fErr)
+			}
+		}()
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
@@ -932,9 +949,12 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	if i.PathSuffix == "" && i.Path != "" {
 		i.PathSuffix = lowhttp.GetPathSuffix(i.Path)
 	}
+	observe.notify(HTTPFlowWriteStarted, 0, nil)
 	if db = createHTTPFlowRecord(db, i); db.Error != nil {
-		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
+		return utils.Errorf("insert HTTPFlow failed: %w", db.Error)
 	}
+	committed = true
+	observe.notify(HTTPFlowWriteFinished, i.ID, nil)
 	if timing := i.RuntimeTiming; timing != nil {
 		timing.PersistedAtUnixMs = time.Now().UnixMilli()
 		RecordHTTPFlowPersisted(i)
@@ -998,10 +1018,19 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 }
 
 func SaveHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) error {
+	return saveHTTPFlow(db, i, nil)
+}
+
+func saveHTTPFlow(db *gorm.DB, i *schema.HTTPFlow, observe HTTPFlowWriteObserver) error {
 	defer releaseHTTPFlowPersistResources(i)
-	if db := db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
-		return db.Error
+	observe.notify(HTTPFlowWriteSubmitting, 0, nil)
+	observe.notify(HTTPFlowWriteStarted, 0, nil)
+	result := db.Model(&schema.HTTPFlow{}).Save(i)
+	if result.Error != nil {
+		observe.notify(HTTPFlowWriteFinished, 0, result.Error)
+		return result.Error
 	}
+	observe.notify(HTTPFlowWriteFinished, i.ID, nil)
 	callHTTPFlowAfterSaveHandlers(i)
 
 	return nil
@@ -1065,14 +1094,19 @@ func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
 }
 
 func InsertHTTPFlowEx(i *schema.HTTPFlow, forceSync bool, finishHandler ...func()) error {
+	return InsertHTTPFlowExObserved(i, forceSync, nil, finishHandler...)
+}
+
+func InsertHTTPFlowExObserved(i *schema.HTTPFlow, forceSync bool, observe HTTPFlowWriteObserver, finishHandler ...func()) error {
 	binding := consts.CaptureProjectDatabaseBinding()
 	if i != nil && i.RuntimeTiming != nil {
 		i.RuntimeTiming.PersistEnqueuedAtUnixMs = time.Now().UnixMilli()
 		i.RuntimeTiming.DatabaseIdentity = HTTPFlowDatabaseIdentity(binding.Path)
 		i.RuntimeTiming.ProjectGeneration = binding.Generation
 	}
-	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() || forceSync {
-		err := InsertHTTPFlow(binding.Database, i)
+	observe.notify(HTTPFlowWriteSubmitting, 0, nil)
+	write := func(db *gorm.DB) error {
+		err := insertHTTPFlow(db, i, observe)
 		if err != nil {
 			cleanupDiscardedHTTPFlowRequestResources(i)
 			return err
@@ -1081,23 +1115,21 @@ func InsertHTTPFlowEx(i *schema.HTTPFlow, forceSync bool, finishHandler ...func(
 			h()
 		}
 		return nil
-	} else {
-		err := enqueueDBSaveTo(binding.Database, func(db *gorm.DB) error {
-			err := InsertHTTPFlow(db, i)
-			if err != nil {
-				cleanupDiscardedHTTPFlowRequestResources(i)
-				return err
-			}
-			for _, h := range finishHandler {
-				h()
-			}
-			return nil
-		})
-		if err != nil {
-			cleanupDiscardedHTTPFlowRequestResources(i)
-		}
+	}
+	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() || forceSync {
+		return write(binding.Database)
+	}
+	if observe == nil {
+		return enqueueDBSaveTo(binding.Database, write)
+	}
+	if binding.Database == nil {
+		err := utils.Error("cannot execute async database save without a project database")
+		observe.notify(HTTPFlowWriteFinished, 0, err)
+		cleanupDiscardedHTTPFlowRequestResources(i)
 		return err
 	}
+	enqueueObservedHTTPFlowWrite(DBSaveAsyncChannel, bindDBSaveFunc(binding.Database, write), observe)
+	return nil
 }
 
 func CreateOrUpdateHTTPFlowExg(hash string, i *schema.HTTPFlow) error {

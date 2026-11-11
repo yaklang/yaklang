@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func startMITMProxyForWebsocketTest(t *testing.T, ctx context.Context, opts ...MITMConfig) string {
@@ -90,8 +91,13 @@ func TestMITMWebsocketHotPatchPassthroughStillUpgrades(t *testing.T) {
 	defer cancel()
 
 	host, port := utils.DebugMockEchoWs("passthrough")
+	var sawUpstreamResponse atomic.Bool
 	proxyAddr := startMITMProxyForWebsocketTest(t, ctx,
 		MITM_SetHTTPRequestHijackRaw(func(_ bool, _ *http.Request, raw []byte) []byte {
+			return raw
+		}),
+		MITM_SetHTTPResponseHijackRaw(func(_ bool, req *http.Request, rsp *http.Response, raw []byte, _ string) []byte {
+			sawUpstreamResponse.Store(rsp.StatusCode == http.StatusSwitchingProtocols && httpctx.GetUpstreamRoundTripSucceeded(req))
 			return raw
 		}),
 	)
@@ -103,6 +109,7 @@ func TestMITMWebsocketHotPatchPassthroughStillUpgrades(t *testing.T) {
 	)
 	require.NoError(t, err)
 	defer client.Close()
+	require.True(t, sawUpstreamResponse.Load(), "WebSocket upgrade response must count as an upstream response")
 }
 
 func TestMITMWebsocketHotPatchModifiesUpgradeRequest(t *testing.T) {

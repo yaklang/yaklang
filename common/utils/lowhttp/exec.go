@@ -903,6 +903,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	tr := &transportRequest{
 		option:         option,
 		reqIns:         reqIns,
+		observer:       httpctx.GetUpstreamObserver(reqIns),
 		packet:         requestPacket,
 		dialOpts:       dialopts,
 		cacheKey:       cacheKey,
@@ -912,6 +913,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		traceInfo:      traceInfo,
 		originAddr:     originAddr,
 		timeout:        timeout,
+		connectTimeout: connectTimeout,
 	}
 
 	// Select initial transport based on protocol flags.

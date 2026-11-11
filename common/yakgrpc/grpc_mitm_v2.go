@@ -416,6 +416,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 	pipelineTracker := newMITMPipelineTracker(ksuid.New().String())
+	s.mitmDiagnostics.Store(pipelineTracker.sessionID, pipelineTracker)
+	releaseDiagnostics := func() {
+		s.mitmDiagnostics.Delete(pipelineTracker.sessionID)
+		pipelineTracker.close()
+	}
+	stopDiagnosticsCleanup := context.AfterFunc(streamCtx, releaseDiagnostics)
+	defer func() {
+		if stopDiagnosticsCleanup() {
+			releaseDiagnostics()
+		}
+	}()
 
 	log.Infof("start to create mitm server instance for %v", addr)
 
@@ -917,7 +928,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) (hijackRsp []byte) {
-		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req))
+		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req), rspInstance.StatusCode)
 		pluginCtx := httpctx.GetPluginContext(req)
 		urlStr := httpctx.GetRequestURL(req)
 
@@ -1593,12 +1604,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						FlowBuiltAtUnixMs:     time.Now().UnixMilli(),
 					}
 					pipelineTracker.flowBuilt()
-					pipelineTracker.persistEnqueued(flow)
 					persisted := false
 					for i := 0; i < 3; i++ {
 						startCreateFlow = time.Now()
 						// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
-						insertErr := yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+						insertErr := yakit.InsertHTTPFlowObserved(s.GetProjectDatabase(), flow, pipelineTracker.writeObserver(originReqIns))
 						log.Debugf("insert http flow %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
 						if insertErr != nil {
 							log.Errorf("create / save httpflow from mirror error: %s", insertErr)
@@ -1608,7 +1618,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						persisted = true
 						break
 					}
-					pipelineTracker.persistFinished(flow, persisted)
 					if !persisted {
 						yakit.CleanupPreparedLargeHTTPFlowRequest(originReqIns)
 					}
@@ -1702,14 +1711,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		if httpctx.IsFiltered(req) {
 			return nil, nil
 		}
-		return yakit.NewHTTPFlowStreamRecorder(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes, sizeThreshold)
+		return yakit.NewHTTPFlowStreamRecorderObserved(s.GetProjectDatabase(), isHTTPS, req, rsp, headerBytes, sizeThreshold, func() yakit.HTTPFlowWriteObserver {
+			return pipelineTracker.writeObserver(req)
+		})
 	})
 
 	handleMirrorResponse := func(isHttps bool, reqUrl string, req *http.Request, rsp *http.Response, remoteAddr string) {
 		responseMirrorAtUnixMs := time.Now().UnixMilli()
 		// Filtered responses skip the response-hijack callback, so mirror is also
 		// the fallback terminal point for their upstream stage.
-		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req))
+		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req), rsp.StatusCode)
 		pipelineTracker.responseMirrored(req)
 		defer pipelineTracker.responseProcessingFinished(req)
 		addCounter()
@@ -1931,9 +1942,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		hijackedFlowMutex := new(sync.Mutex)
 		isDroppedSaveFlow := utils.NewBool(false)
-		flow.AfterPersistCleanups = append(flow.AfterPersistCleanups, func(saved *schema.HTTPFlow) {
-			pipelineTracker.persistFinished(saved, saved != nil && saved.ID > 0)
-		})
 		afterPersistCleanups := append([]func(*schema.HTTPFlow){}, flow.AfterPersistCleanups...)
 
 		pluginCh := make(chan struct{})
@@ -2025,7 +2033,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			// A hijackSaveHTTPFlow plugin may replace the public flow model. Keep
 			// process-local diagnostics owned by the engine and out of plugin data.
 			flow.RuntimeTiming = runtimeTiming
-			pipelineTracker.persistEnqueued(flow)
 			// 额外添加用户手动设置的标签，确保其优先级最高
 			userTags := httpctx.GetFlowTags(req)
 			if len(userTags) > 0 {
@@ -2039,12 +2046,14 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			tags := flow.Tags
 			var err error
 			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
-				err = recorder.Finalize(flow)
+				err = recorder.FinalizeObserved(flow, func() yakit.HTTPFlowWriteObserver {
+					return pipelineTracker.writeObserver(req)
+				})
 				if err == nil {
 					saveBarePacketHandler(flow.ID)
 				}
 			} else {
-				err = yakit.InsertHTTPFlowEx(flow, false, func() {
+				err = yakit.InsertHTTPFlowExObserved(flow, false, pipelineTracker.writeObserver(req), func() {
 					saveBarePacketHandler(flow.ID)
 				})
 			}
@@ -2185,9 +2194,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	recoverFilterAndReplacerSend()
 
 	sendPipelineStats := func() {
-		sendLogged(&ypb.MITMV2Response{
-			PipelineStats: pipelineTracker.snapshot(len(yakit.DBSaveAsyncChannel), cap(yakit.DBSaveAsyncChannel)),
-		})
+		stats := pipelineTracker.snapshot(len(yakit.DBSaveAsyncChannel), cap(yakit.DBSaveAsyncChannel), yakit.DBSaveTakenUnfinished())
+		if stats != nil {
+			sendLogged(&ypb.MITMV2Response{PipelineStats: stats})
+		}
 	}
 	sendPipelineStats()
 	go func() {

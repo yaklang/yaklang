@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -120,6 +121,13 @@ var (
 type DbExecFunc func(db *gorm.DB) error
 
 var DBSaveAsyncChannel = make(chan DbExecFunc, 40960)
+var dbSaveTakenUnfinished atomic.Int64
+
+// DBSaveTakenUnfinished includes the currently executing task and the remainder
+// of the batch already removed from the shared channel.
+func DBSaveTakenUnfinished() int64 {
+	return dbSaveTakenUnfinished.Load()
+}
 
 func init() {
 	throttle := utils.NewThrottle(2)
@@ -128,15 +136,7 @@ func init() {
 		for f := range queue {
 			db := consts.GetGormProjectDatabase()
 			batch := drainDBSaveBatch(queue, f)
-			if db != nil {
-				execDBSaveBatch(db, batch)
-			} else {
-				for _, item := range batch {
-					if err := item(nil); err != nil {
-						log.Errorf("Throttle sql exec failed: %s", err)
-					}
-				}
-			}
+			execDBSaveBatch(db, batch)
 
 			count += uint64(len(batch))
 			if count%1000 == 0 {

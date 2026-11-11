@@ -69,6 +69,8 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	res, err := p.execLowhttp(ctx, req)
 	if err == nil && res != nil {
 		httpctx.SetUpstreamRoundTripSucceeded(req, true)
+	} else if err != nil {
+		httpctx.GetUpstreamObserver(req).Notify(httpctx.UpstreamEvent{Phase: httpctx.UpstreamFailed, Err: err})
 	}
 	return res, err
 }
@@ -410,6 +412,7 @@ func (p *Proxy) makeStreamResponseCallback(
 		// filtered/chunked paths preserve the original no-cancel behavior.
 		var cancelOnWriteFail context.CancelFunc
 		if kind == streamKindSSE {
+			httpctx.GetUpstreamObserver(req).Phase(httpctx.UpstreamStreaming)
 			cancelOnWriteFail = cancelUpstream
 		}
 
