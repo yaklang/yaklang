@@ -2305,39 +2305,21 @@
   },
   {
     "rule_id": "source-detected-artifactory-password",
-    "rule_name": "检测到 Artifactory 密码",
-    "hash": "f2d2eb335bf75abb290d8e709f3af509479ca8bb8c92afb77742413445e799c6",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-facebook-access-token",
-    "rule_name": "检测 Facebook 访问令牌",
-    "hash": "1ba52e264d939ffb155a4ea17b09e251116fed62a15b22f9f98887958b074234",
-    "version": "20261109.0002"
+    "rule_name": "检测到 JFrog Artifactory 凭据",
+    "hash": "4ac4b8ec15f63f0c7cd250fb3a8349ddfaa1dd4fb63f61d5d9ddd5bf6d6879ba",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secret-github-pat",
-    "rule_name": "检测 GitHub 个人访问令牌",
-    "hash": "08ff845c4e2f5c16a35cc1c363edfdc610d14325b13b2ac5cb79f95c4641c69a",
-    "version": "20261109.0002"
+    "rule_name": "检测到 GitHub 凭据",
+    "hash": "410e916c9fe86f34cc5f4324e1b0d931eec515cf7aea1a08c1b470ed40d281c3",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secret-gitlab-pat",
-    "rule_name": "检测 GitLab 个人访问令牌",
-    "hash": "0a6f0043374a8d2a4af4548b747076d5c61cb39c8fa6787ede273832ff56774c",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-google-api-key",
-    "rule_name": "检测 Google API 密钥",
-    "hash": "acbd6757072f7bcddf14aed2037ebb37e80bbc58e0d35d966972667c1746a439",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-heroku-api-key",
-    "rule_name": "检测 Heroku API 密钥",
-    "hash": "72d0992b6be475406b5d6a704afd7c83a4c883cc26842834a21bc38ddc3fd6d9",
-    "version": "20261109.0002"
+    "rule_name": "检测到 GitLab 凭据",
+    "hash": "b8ebf40423d3a3f7f76c35cb28d17a78835155e47f94feafa2e849386d9ac72c",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secret-jdbc-inline",
@@ -2346,22 +2328,10 @@
     "version": "20261109.0002"
   },
   {
-    "rule_id": "source-secret-jwt-literal",
-    "rule_name": "检测硬编码 JWT",
-    "hash": "9b4caea049f633fbdf5f8151ca6c809b1bbc4e32a77623eabcaa9c5de7d3a30d",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-mailgun-api-key",
-    "rule_name": "检测 Mailgun API 密钥",
-    "hash": "d8053643cf087deac276a8920ab65963d6fd77a193bb3e76f1aba837d25bc085",
-    "version": "20261109.0002"
-  },
-  {
     "rule_id": "source-secret-npm-token",
-    "rule_name": "检测 npm 访问令牌",
-    "hash": "f8f2d4b4faa7051a4195f5d198e5fe1914e4d41b401aa69f31a3fdf857a1b033",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Npm 凭据",
+    "hash": "99e4e466fdf786475eadcd081e67ddc0b6f918a15dc4e0313878b03f7282875b",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secret-password-assignment",
@@ -2370,46 +2340,10 @@
     "version": "20261109.0002"
   },
   {
-    "rule_id": "source-secret-pem-private-key",
-    "rule_name": "检测 PEM 私钥块",
-    "hash": "be94fd87ae64f24d530ba5ba0c8f78fc95b2b7d7514648d93da3e18207ab9a26",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-private-key-block",
-    "rule_name": "检测私钥 PEM 块",
-    "hash": "f331241df096e5c063a71a489f241ff33879b87fe32a1e550f6d54b807520077",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-sendgrid-api-key",
-    "rule_name": "检测 SendGrid API 密钥",
-    "hash": "dc74f58d8351082504e0115260d08578782b35ebd9c4ebff370e49d3eaf71bf7",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-slack-webhook",
-    "rule_name": "检测 Slack 入站 Webhook",
-    "hash": "ed2ed8d4034a62afcf88609da43716cac1ec2672822d12ffa40f9bb23864914a",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-slack",
-    "rule_name": "检测 Slack 令牌或 Webhook",
-    "hash": "f41089e7863e82df668f976ae0d1b1604a06e0c4918ff676e1e3643a3b895735",
-    "version": "20261109.0002"
-  },
-  {
     "rule_id": "source-secret-stripe",
-    "rule_name": "检测 Stripe API 密钥",
-    "hash": "ddb50d9dbb7c4826926c9b229e012d783038ac8ff1880c46d45d907c7c324721",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secret-twilio-api-key",
-    "rule_name": "检测 Twilio 风格 API 密钥",
-    "hash": "0686c84e144f201ef2c7d888fb9155526720194dd83ab7331512416eb52b5d1b",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Stripe 凭据",
+    "hash": "d2c0130869c6db8c1895c5541b4abff0b226f0329084a21359f7ec2dd8498e20",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-adafruit-api-key",
@@ -2419,15 +2353,9 @@
   },
   {
     "rule_id": "source-secrets-adobe-client-id",
-    "rule_name": "检测到 Adobe 客户端 ID",
-    "hash": "8f04906b6a4837c6189d96ba9830ef215b9b635f93a73ddf7e05c1995f53c140",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-adobe-client-secret",
-    "rule_name": "检测到 Adobe 客户端密钥",
-    "hash": "e5bb0f6c4cdc86e69676b833e2586be9575c88b86312468228811e0ed8a8c38c",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Adobe 凭据",
+    "hash": "cfa7da83b095b58265c74eff8e72e7aa2453a7e322dec4fa8da834a364160f55",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-age-secret-key",
@@ -2449,27 +2377,15 @@
   },
   {
     "rule_id": "source-secrets-alibaba-access-key-id",
-    "rule_name": "检测到阿里云访问密钥 ID",
-    "hash": "fd59bae40ee38f656f1d7e87b0643a9d812c491b0fb12d4351cafbe212ebd5d8",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-alibaba-secret-key",
-    "rule_name": "检测到阿里云密钥",
-    "hash": "7fc8c8a20ff2ac7094c6047b68504167bd2c72ffff4d45adf124230124428ae2",
-    "version": "20261109.0002"
+    "rule_name": "检测到阿里云凭据",
+    "hash": "dc903c38d49d02a3790b375f06dd158e52ff4f452a2866436c2c7a6b904535cd",
+    "version": "20261112.0001"
   },
   {
     "rule_id": "source-secrets-asana-client-id",
-    "rule_name": "检测到 Asana 客户端 ID",
-    "hash": "512bd0b31f873e749c27d609ba6a29f76385385664d33ca32dff13b4780c5182",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-asana-client-secret",
-    "rule_name": "检测到 Asana 客户端密钥",
-    "hash": "5919931110dd985f5b096d1b56a286bc326a6b98095929ec6d12a2dea2fa0b1f",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Asana 凭据",
+    "hash": "363576260b63da0db7340726cd252eff739e4f09d238c7a00b5c15663e185ef8",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-atlassian-api-token",
@@ -2491,26 +2407,14 @@
   },
   {
     "rule_id": "source-secrets-bitbucket-client-id",
-    "rule_name": "检测到 Bitbucket 客户端 ID",
-    "hash": "7ffbc8f9d73a0b0f68db9f99129eaf4cf9abcbefc5a4d7002d52f6a4f5784275",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-bitbucket-client-secret",
-    "rule_name": "检测到 Bitbucket 客户端密钥",
-    "hash": "ccd1dbcf75a62c602574f53030f78159a9c3e0d80debecf4995cb4be3ff53f67",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Bitbucket 凭据",
+    "hash": "2b32396ed6118423ee0e0213f30be50f373def1dccb1ac40eace08fc74adbcec",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-bittrex-access-key",
     "rule_name": "检测到 Bittrex 访问密钥",
     "hash": "5e85ca3ee7ed21e94844b7e4a1d6eed33df29462ff0731f25d707ad8ccb58821",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-bittrex-secret-key",
-    "rule_name": "检测到 Bittrex 密钥",
-    "hash": "505d411c8ac44946cab78be1c891e0aca37c5adc63b031b95593f6695a246eb2",
     "version": "20261109.0002"
   },
   {
@@ -2521,21 +2425,9 @@
   },
   {
     "rule_id": "source-secrets-cloudflare-api-key",
-    "rule_name": "检测到 Cloudflare API 密钥",
-    "hash": "1cb13f75e052bbf72a22f93c2182b5ac8a8dbe7a32051545407a15bec4551176",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-cloudflare-global-api-key",
-    "rule_name": "检测到 Cloudflare 全局 API 密钥",
-    "hash": "0fd6b0eecb56e2ffb90c588f490682d8e49c7ea52d4f95794b83d43cb174b65b",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-cloudflare-origin-ca-key",
-    "rule_name": "检测到 Cloudflare 源站 CA 密钥",
-    "hash": "1867b23907295b099bb7490cd5924aabab6305aaaec0cdc496f632d301940246",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Cloudflare 凭据",
+    "hash": "0f319e999d20d8652320c4dd5cfab831e41a2417dd6a035b1881a5bbe4497004",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-codecov-access-token",
@@ -2551,15 +2443,9 @@
   },
   {
     "rule_id": "source-secrets-confluent-access-token",
-    "rule_name": "检测到 Confluent 访问令牌",
-    "hash": "22ab9d5a3b3da8e89393d1647ff531424d70f14a997298659072a32adaed0f5c",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-confluent-secret-key",
-    "rule_name": "检测到 Confluent 密钥",
-    "hash": "ed676b7dd60f95ea7ae7fa5b38f296f608fec822d9a4accc6197d3cd83e8115e",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Confluent 凭据",
+    "hash": "d52c9fa517b4cb7bdfca8d208b777acbbe40671c88bcd1adb5b74670d4202ee7",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-contentful-delivery-api-token",
@@ -2587,21 +2473,9 @@
   },
   {
     "rule_id": "source-secrets-detected-amazon-mws-auth-token",
-    "rule_name": "检测到 Amazon MWS 认证令牌",
-    "hash": "ae11126f0cff1898afdc101871cfe9110c13be209b24a967dcf33ea38830bbb4",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-artifactory-token",
-    "rule_name": "检测到 Artifactory 令牌",
-    "hash": "a64422b03549611a6f80a6e5d4fb6fa530c0bf0bc6b9a10723c5746ff47c5e53",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-aws-appsync-graphql-key",
-    "rule_name": "检测到 AWS AppSync GraphQL 密钥",
-    "hash": "a343d25d018fd44f2e21f3061b3349ad290df8eefb7fc1faffb09173e29cf7f4",
-    "version": "20261109.0002"
+    "rule_name": "检测到 AWS 凭据",
+    "hash": "5928f6d58c91415d8e59d8b3aa6ee40fe20650859154914368b99f13de1d2132",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-bcrypt-hash",
@@ -2617,51 +2491,21 @@
   },
   {
     "rule_id": "source-secrets-detected-facebook-access-token",
-    "rule_name": "检测到疑似 Facebook 访问令牌",
-    "hash": "e00dd5f8bce4f6c3a00d30cb586cbe93da45d6c3efae43267522343cc4b2c839",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-facebook-oauth",
-    "rule_name": "检测到 Facebook OAuth",
-    "hash": "6996ae0c4fd256c25ab8a3f88cab8a6f3647b50d5c359290bfe2110f133e0d49",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Facebook 凭据",
+    "hash": "705fbd1721271970cd4f3ae00d1a3fbf68b2131bd1698c538bb9fcd98277b0f3",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-google-api-key",
-    "rule_name": "检测到 Google API 密钥",
-    "hash": "bced4f8b74cfd6fb245c1f4449972fc50506c6288897157b8e9202a370521548",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-google-cloud-api-key",
-    "rule_name": "检测到 Google Cloud API 密钥",
-    "hash": "771f8da8218ce7c42b58d6c082af7baba6305febb60c1077064175818cc159eb",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-google-gcm-service-account",
-    "rule_name": "检测到 Google GCM 服务账号",
-    "hash": "90f77ac6b501f440dafb20014feb2a6eded78c95283a871a50b6a6ed36312e96",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-google-oauth-access-token",
-    "rule_name": "检测到 Google OAuth 访问令牌",
-    "hash": "803847ebf4512a584526d63220f805e94c860e625bfece10a67ddae821c05350",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-google-oauth-url",
-    "rule_name": "检测到 Google OAuth URL",
-    "hash": "cb89bee4e9902c20096cf29ade33212d9a30270f36c040e52618714651f904ed",
-    "version": "20261109.0001"
+    "rule_name": "检测到 Google 凭据",
+    "hash": "a23998e3e2787277bbe2e3b54b3c22b3c6467cf60df46046d0496e4439ac0115",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-heroku-api-key",
-    "rule_name": "检测到疑似 Heroku API 密钥",
-    "hash": "afc23b3d9340c71d8bbd35d075f3da7262713c9b776296e98f48d90c03ad2091",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Heroku 凭据",
+    "hash": "3ad9dd67d9812fdb1fa5eaf90031b117428e68a3c281fda9f5df7b83ca97b134",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-hockeyapp",
@@ -2671,9 +2515,9 @@
   },
   {
     "rule_id": "source-secrets-detected-jwt-token",
-    "rule_name": "检测到 JWT 令牌",
-    "hash": "c891079055e595ed9f4d28e4a19aaacfeafc9797aa3f81d338bfe4c56f735f1a",
-    "version": "20261109.0002"
+    "rule_name": "检测到 JWT 凭据",
+    "hash": "0c5a06f3dd10f8b5b8fcf954b0f0e28a837cca840faef9c9605be57a2824e355",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-kolide-api-key",
@@ -2683,15 +2527,15 @@
   },
   {
     "rule_id": "source-secrets-detected-mailchimp-api-key",
-    "rule_name": "检测到 Mailchimp API 密钥",
-    "hash": "e5952f084778d72d29bb5a97a611b9feb24f75c2397689899a47057a8a1fabe3",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Mailchimp 凭据",
+    "hash": "b565aa082fc79d854d884988ed987d0b77894f26d3560034e804463647cb8d9c",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-mailgun-api-key",
-    "rule_name": "检测到 Mailgun API 密钥",
-    "hash": "31502359fc4e3c078bd330c7119421dbfe19b5fa0660f904fbb9cae71e42b18a",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Mailgun 凭据",
+    "hash": "507903eff4209aaa015404295d59f1aabddfef49d16e39f25b2aee2dfc64cfa1",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-onfido-live-api-token",
@@ -2701,9 +2545,9 @@
   },
   {
     "rule_id": "source-secrets-detected-outlook-team",
-    "rule_name": "检测到 Outlook Team",
-    "hash": "2afe73f20321f7f431e91df1ded3696f8daca0e65dec5ae1b199762f9d73789a",
-    "version": "20261109.0001"
+    "rule_name": "检测到 Microsoft Teams 凭据",
+    "hash": "77bf21f1a844a1d37f160ebb62aaefabb67db645a5c7b1d5fac52e13e3da2ba1",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-paypal-braintree-access-token",
@@ -2713,9 +2557,9 @@
   },
   {
     "rule_id": "source-secrets-detected-pgp-private-key-block",
-    "rule_name": "检测到 PGP 私钥块",
-    "hash": "22d605ca6c300d7cc858b5db84c849471ee8b73789c277c6b31743074614b956",
-    "version": "20261109.0002"
+    "rule_name": "检测到私钥材料凭据",
+    "hash": "caa795770b7ba110f1d10577b4dfa4915700cdd6584ad42f8f23f7ee923ec113",
+    "version": "20261112.0001"
   },
   {
     "rule_id": "source-secrets-detected-picatic-api-key",
@@ -2731,21 +2575,21 @@
   },
   {
     "rule_id": "source-secrets-detected-sendgrid-api-key",
-    "rule_name": "检测到 SendGrid API 密钥",
-    "hash": "496182f81e3578b6cb5ce43786c4d8c278e97a10370a125108e748e7058a9920",
-    "version": "20261109.0002"
+    "rule_name": "检测到 SendGrid 凭据",
+    "hash": "a81d33475e5c1d62d9ff72b1cd12486517bc5f213d3db32a05a9a793d9390f25",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-slack-token",
-    "rule_name": "检测到 Slack 令牌",
-    "hash": "d222c2900bff72bab63a8b0ad9cfcb8a7d11631732952632cb0626a252a42fdc",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Slack 凭据",
+    "hash": "2e65b3b1ff4eff4c81ad6bee78fb48fd830aa2f2aa3d771c41bfd19c441184bb",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-snyk-api-key",
-    "rule_name": "检测到 Snyk API 密钥",
-    "hash": "749d2035bfed6e919e7675586c52f80bd13316c27bffee9e99207d2d903f2e4a",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Snyk 凭据",
+    "hash": "798a1c6976715d62ae3b051fa0d6922c871a09a28ae82818e644ac590ceb5545",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-softlayer-api-key",
@@ -2761,15 +2605,9 @@
   },
   {
     "rule_id": "source-secrets-detected-square-access-token",
-    "rule_name": "检测到 Square 访问令牌",
-    "hash": "0d54dad31911c5b82f043fa482602740f8f1b7cc1f471c83137c38047a86037a",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-square-oauth-secret",
-    "rule_name": "检测到 Square OAuth 密钥",
-    "hash": "7945c6f376623bbb2f21fe163f152c838e028587d33b50d76d86dd51d9afd071",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Square 凭据",
+    "hash": "c2d434e96cab57ee0a6244d9af34b81b7a19819704fe07aa83a8cad8bc82fd7a",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-ssh-password",
@@ -2778,64 +2616,28 @@
     "version": "20261109.0002"
   },
   {
-    "rule_id": "source-secrets-detected-stripe-api-key",
-    "rule_name": "检测到 Stripe API 密钥",
-    "hash": "cb1a92974baab60815a380069db29d07f50a0548473498ed354152cf10e0a79a",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-detected-stripe-restricted-api-key",
-    "rule_name": "检测到 Stripe 受限 API 密钥",
-    "hash": "49c2eb7894806de48754894a0abcdb9298b37d2d2bca285bfdc434fb33dfad1e",
-    "version": "20261109.0002"
-  },
-  {
     "rule_id": "source-secrets-detected-telegram-bot-api-key",
-    "rule_name": "检测到 Telegram 机器人 API 密钥",
-    "hash": "03c474a63bc0344d4f2a041d2dc3fb017887c02e76931534672a1cc687adeb17",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Telegram 机器人凭据",
+    "hash": "73081626755999908f1b358e82afe23a3574321255df7c28ffa701ad42907642",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-detected-twilio-api-key",
-    "rule_name": "检测到 Twilio API 密钥",
-    "hash": "c950ed31bed195f338e2514aca816e2e57ea644d0769cdb6b963a7c5cb577d5f",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Twilio 凭据",
+    "hash": "159d3a05a5b1cdcf2af850ec3271a4dc2506be8f38f3e426872f2daec3b55fde",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-digitalocean-access-token",
-    "rule_name": "检测到 DigitalOcean 访问令牌",
-    "hash": "7d10f9a22eb83c05c57c3e6db781613462d6302c43143e7c000d6e7fc5c0dc3b",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-digitalocean-pat",
-    "rule_name": "检测到 DigitalOcean 个人访问令牌",
-    "hash": "f37eb5a52ff9fdfe3f8be3a8aa066713fd1a97019c5cfc6c72ed59f778df553c",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-digitalocean-refresh-token",
-    "rule_name": "检测到 DigitalOcean 刷新令牌",
-    "hash": "0d628cb1e2f77936102732a7d111d25e3b2c655b2a3fc2042666f5103acbfde4",
-    "version": "20261109.0002"
+    "rule_name": "检测到 DigitalOcean 凭据",
+    "hash": "b6a7b2827d5ce3a39058f66c8d91191f9f601d0b367fc91db2444b41e93fa81f",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-discord-api-token",
-    "rule_name": "检测到 Discord API 令牌",
-    "hash": "8a816621d864f33688a8eed9dcda15e566ecabdc0dfca5922b67379a950d784f",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-discord-client-id",
-    "rule_name": "检测到 Discord 客户端 ID",
-    "hash": "4f8c01a4df3acc10c8b693b34f7b6aa36540a48c053e78dd477554db11b65545",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-discord-client-secret",
-    "rule_name": "检测到 Discord 客户端密钥",
-    "hash": "508b2f405fb86d4ac4f829ccda0f6bcbad65c20707ad267312e87bafedb1e5d7",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Discord 凭据",
+    "hash": "47a119def214eafb1cb735c72fb7d7730b5633662935153db221f5e50e6d4343",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-doppler-api-token",
@@ -2851,21 +2653,9 @@
   },
   {
     "rule_id": "source-secrets-dropbox-api-token",
-    "rule_name": "检测到 Dropbox API 令牌",
-    "hash": "07b39f386239205701a95586b45818c5160123c01f47b7691cdda1b998344e11",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-dropbox-long-lived-api-token",
-    "rule_name": "检测到 Dropbox 长期 API 令牌",
-    "hash": "57a31c640ec077e1d1313e3e40190a5f1d8ad8ea4d42b4386e1884f2bb8201ec",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-dropbox-short-lived-api-token",
-    "rule_name": "检测到 Dropbox 短期 API 令牌",
-    "hash": "440f3598fca437d7e56225b25cb19a965d379a5d6187e54b6526465a8e876042",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Dropbox 凭据",
+    "hash": "fcad9d73b161cc9e2f04397cbeb30748e3aa9f46d74fdcf83aa28e958248f541",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-duffel-api-token",
@@ -2881,44 +2671,14 @@
   },
   {
     "rule_id": "source-secrets-easypost-api-token",
-    "rule_name": "检测到 EasyPost API 令牌",
-    "hash": "cbffb10f9b80fc7e606cf64fed5328ab61653eaf340547b8d74d9628d770f36d",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-easypost-test-api-token",
-    "rule_name": "检测到 EasyPost 测试 API 令牌",
-    "hash": "02610d7791cd137353bf9a9af0094f4ff2ca45c6581362bc29ad84692f10e7e6",
-    "version": "20261109.0002"
+    "rule_name": "检测到 EasyPost 凭据",
+    "hash": "de40788c425d0ad32659f58a8df582e3427fa376097ae60bcd15928cfafa58d8",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-etsy-access-token",
     "rule_name": "检测到 Etsy 访问令牌",
     "hash": "acd9c4ca41c3247655ab896240cbf905cfa08d763b4e386fb703eced3d9d1d37",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-facebook-access-token",
-    "rule_name": "检测到 Facebook 访问令牌",
-    "hash": "d9220ff5ade7822ea1330368c5344b7b6688b77c225ef0c8fb601b16d7cbb1db",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-facebook-page-access-token",
-    "rule_name": "检测到 Facebook 主页访问令牌",
-    "hash": "35313788a9e4fb7a8076e2e55967570989acbcbd02bfb72dcb53a3807cee2a98",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-facebook-secret",
-    "rule_name": "检测到 Facebook 密钥",
-    "hash": "95265475f9657d3f17a731533e32cc03f7203ea804ef3f46906e43588e7a2cac",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-facebook",
-    "rule_name": "检测到 Facebook",
-    "hash": "1aa9cbee3028d8c496337414777161cd49fd124df9278493f723435bba786f43",
     "version": "20261109.0002"
   },
   {
@@ -2929,15 +2689,9 @@
   },
   {
     "rule_id": "source-secrets-finicity-api-token",
-    "rule_name": "检测到 Finicity API 令牌",
-    "hash": "83dafdd0007cd19e401c63c8e7237fccd77ed0319298a4605e6b42b4cabe8494",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-finicity-client-secret",
-    "rule_name": "检测到 Finicity 客户端密钥",
-    "hash": "fb9e8699f4f6fb50fec7d4b81e30430a62ed529c71725d9b7c735fd62708421a",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Finicity 凭据",
+    "hash": "b0aecf935fdc42d8e8c89ec5f7713c36b4ff11118530ef1611ac57330649dd19",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-finnhub-access-token",
@@ -2953,21 +2707,9 @@
   },
   {
     "rule_id": "source-secrets-flutterwave-encryption-key",
-    "rule_name": "检测到 Flutterwave 加密密钥",
-    "hash": "114a69704a326b3db37219f69e78e6899c08a856fbbe228dbfe13003ac9d3250",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-flutterwave-public-key",
-    "rule_name": "检测到 Flutterwave 公钥",
-    "hash": "5b13cef0d8e0b13f672cb4a16c9fc2f8156fa0774e585ca6a697cff07bca4b75",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-flutterwave-secret-key",
-    "rule_name": "检测到 Flutterwave 密钥",
-    "hash": "bc82291d900cdd8978c80dcd75a18ee6cb129c4b6f07a6a0ee35b573372d8602",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Flutterwave 凭据",
+    "hash": "e313c84f9158687e4a98d94ab5e934df4bcae12c94c89daff90ceb674a4792e6",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-frameio-api-token",
@@ -2979,60 +2721,6 @@
     "rule_id": "source-secrets-freshbooks-access-token",
     "rule_name": "检测到 FreshBooks 访问令牌",
     "hash": "db02a6cb05d58329a31ee61639f34b89b19ebfd3cf80fb1705a5202368d95e32",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-gcp-api-key",
-    "rule_name": "检测到 GCP API 密钥",
-    "hash": "15853918b5803bd961f40b02e9aa619a77ea75fb10e49d0187559a64180870b6",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-github-app-token",
-    "rule_name": "检测到 GitHub 应用令牌",
-    "hash": "e52bbdb9359bcbb655549998081ff92c64d2f626c5d12952daff24615c9518d0",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-github-fine-grained-pat",
-    "rule_name": "检测到 GitHub 细粒度个人访问令牌",
-    "hash": "fbb6c78575db89ff40bbf830667c7d7a7458e20b9e4143d312c3919eea46b2f2",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-github-oauth",
-    "rule_name": "检测到 GitHub OAuth",
-    "hash": "33b8a16ac23381ad808d7d3335be91e5faca6e84cf225e7e9197c1c5d3cae2a1",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-github-pat",
-    "rule_name": "检测到 GitHub 个人访问令牌",
-    "hash": "c44587eb238b5930e98e5d2e2a0502717e58043759c4c043eee2bc32077e6f8c",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-github-refresh-token",
-    "rule_name": "检测到 GitHub 刷新令牌",
-    "hash": "30cc675ad703bd9260c63665c3ee070c774069063b42d83d7d84d47e6da4d342",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-gitlab-pat",
-    "rule_name": "检测到 GitLab 个人访问令牌",
-    "hash": "93b9692129288e47704e3d199afa14c7b89c08a634483371957a3c63e4c0447c",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-gitlab-ptt",
-    "rule_name": "检测到 GitLab PTT",
-    "hash": "fd71949b9d5a3f886deedeac1e637c198c573b21b08a526cf5de37b20763e890",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-gitlab-rrt",
-    "rule_name": "检测到 GitLab RRT",
-    "hash": "39fce757d70e41a47391748cca487ef480858e287f3820c36d3ea09245cc72ad",
     "version": "20261109.0002"
   },
   {
@@ -3049,21 +2737,9 @@
   },
   {
     "rule_id": "source-secrets-grafana-api-key",
-    "rule_name": "检测到 Grafana API 密钥",
-    "hash": "ca50a9cf5ada7014a74c16f354de47582530c2bd7969f905a138424b278c52d2",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-grafana-cloud-api-token",
-    "rule_name": "检测到 Grafana Cloud API 令牌",
-    "hash": "3659e35be9a38eb0d92c8c5cbd989dfd81b7a978711c6ab786f1f57d7f4f851b",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-grafana-service-account-token",
-    "rule_name": "检测到 Grafana 服务账号令牌",
-    "hash": "a988a3019e062bcd342d7282c58ad883641ca01fd9ccbda2b607fe86bad1b61f",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Grafana 凭据",
+    "hash": "4c49e8434e2836dbb4d78000eabcf08e7044b7987b49d56e24f5bb571033ea5f",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-harness-api-key",
@@ -3073,21 +2749,9 @@
   },
   {
     "rule_id": "source-secrets-hashicorp-tf-api-token",
-    "rule_name": "检测到 HashiCorp Terraform API 令牌",
-    "hash": "dca04c823834a208488fa7f38e9fcef795a0402aee1d6924b9ec082bc056a486",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-hashicorp-tf-password",
-    "rule_name": "检测到 HashiCorp Terraform 密码",
-    "hash": "b4c2871127bc3bae22bdaee8d2a52ed944e1247bf67965aee023aaf6d71894c9",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-heroku-api-key",
-    "rule_name": "检测到 Heroku API 密钥",
-    "hash": "5bef185b6dfe279da908c361c416871579ff67f011328b23c8334896d893c059",
-    "version": "20261109.0002"
+    "rule_name": "检测到 HashiCorp Terraform 凭据",
+    "hash": "6851bc5d9ca47decab5180d2fad023744643d503790c2f2fe6e301cc95eb0fde",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-hubspot-api-key",
@@ -3114,30 +2778,6 @@
     "version": "20261109.0002"
   },
   {
-    "rule_id": "source-secrets-jfrog-api-key",
-    "rule_name": "检测到 JFrog API 密钥",
-    "hash": "c10b7d2bc1a8503623f6818da4d08b2133ec23ec686252ebee39b960c8b907ee",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-jfrog-identity-token",
-    "rule_name": "检测到 JFrog 身份令牌",
-    "hash": "c6b25b9279b6d57c054d92fad4af3c03ef792746e8fa2fbfa1f2f2543e7df146",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-jwt-base64",
-    "rule_name": "检测到 Base64 编码的 JWT",
-    "hash": "5c6c78fe64ddaec073d8a6ca016da0508c20eca90ac16109c2837b510b2dbd8d",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-jwt",
-    "rule_name": "检测到 JWT",
-    "hash": "0d5f1c36d95b553fda5ecc38ff63967ee9cee9fbf2945a61a7f12959df642fcd",
-    "version": "20261109.0002"
-  },
-  {
     "rule_id": "source-secrets-kraken-access-token",
     "rule_name": "检测到 Kraken 访问令牌",
     "hash": "31e3d63a59237331119a3eadfbd10423268b8f166e50a66e93c9f57c38c7add3",
@@ -3145,15 +2785,9 @@
   },
   {
     "rule_id": "source-secrets-kucoin-access-token",
-    "rule_name": "检测到 KuCoin 访问令牌",
-    "hash": "357798649a3470cbeebd6ceb78f3f1ff82f0e12c39abd8c0497acaee2a4c7762",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-kucoin-secret-key",
-    "rule_name": "检测到 KuCoin 密钥",
-    "hash": "58ac907112206333151dcb6e33601cf6d06e6b63a220e6aaf70ba658054531b9",
-    "version": "20261109.0002"
+    "rule_name": "检测到 KuCoin 凭据",
+    "hash": "7c0c4104172986335d925e30c9da40743b22d709adea42a4c8c968421e39ed04",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-launchdarkly-access-token",
@@ -3163,63 +2797,21 @@
   },
   {
     "rule_id": "source-secrets-linear-api-key",
-    "rule_name": "检测到 Linear API 密钥",
-    "hash": "55c78259ebf55ce9c7cc18797aa2614808c828da9c7b813fc48b4aac384d3ce0",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-linear-client-secret",
-    "rule_name": "检测到 Linear 客户端密钥",
-    "hash": "ee14376c9ee59b4b191c484e11e83417076bbc4ac280c1da158cd33fc0fea3a4",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Linear 凭据",
+    "hash": "fce4ffe546100fac8a229dc568ee46b33854899f0731c18704795a0356baa14b",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-linkedin-client-id",
-    "rule_name": "检测到 LinkedIn 客户端 ID",
-    "hash": "e87b2ec7ea68074cfd30d119078f2b12d1596b9d0aec251ae5111c45b3edbe1f",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-linkedin-client-secret",
-    "rule_name": "检测到 LinkedIn 客户端密钥",
-    "hash": "9d420b9c127bd3cb20c3d15652e1dbb23bf83c9d78cb67b8f4b4bc29e950896c",
-    "version": "20261109.0002"
+    "rule_name": "检测到 LinkedIn 凭据",
+    "hash": "c66e3a3a07e7e1754021e5073377cd080d0e31919e102026d3e5877dfc56533c",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-lob-api-key",
-    "rule_name": "检测到 Lob API 密钥",
-    "hash": "45dfaa499826528ba61355c9f7c3a0febb5b6deb5c5225cf0a5f3b9e75c67abb",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-lob-pub-api-key",
-    "rule_name": "检测到 Lob 公钥 API 密钥",
-    "hash": "588ad305e0493293d8bb1daff3640d670f6f6782607af5c20cb95a847547a380",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-mailchimp-api-key",
-    "rule_name": "检测 Mailchimp API 密钥",
-    "hash": "ee7f0eec164fd2bd7744df57f5a95b88dc57bf6bca5b3ccf52d53417465bc30c",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-mailgun-private-api-token",
-    "rule_name": "检测到 Mailgun 私有 API 令牌",
-    "hash": "45f46389f59eedc53d40289c26654603d631c669ad5e5d8c8ed86395fd5e40a0",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-mailgun-pub-key",
-    "rule_name": "检测到 Mailgun 公钥",
-    "hash": "a1ca4fea6cdd0aa60afd9502936de56f59825fcbef74de37c60d71822f8d1629",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-mailgun-signing-key",
-    "rule_name": "检测到 Mailgun 签名密钥",
-    "hash": "b510e82f837aaa745eccfca4eb9047092c1988554e6835f1cb2d009e7d11f397",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Lob 凭据",
+    "hash": "56c9bb8f70078b11a762a3eb3bc7a9c428f14e37260804593a1204f2c22704a9",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-mapbox-api-token",
@@ -3235,21 +2827,9 @@
   },
   {
     "rule_id": "source-secrets-messagebird-api-token",
-    "rule_name": "检测到 MessageBird API 令牌",
-    "hash": "df2f22c2a15f33911718fdd01ee11e4504cf6d0133a0d8322a6090aa21743212",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-messagebird-client-id",
-    "rule_name": "检测到 MessageBird 客户端 ID",
-    "hash": "6526a9c3e53d6b42381488335ec5fbbd7624cf714e4f1183d1714c0849ddb76f",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-microsoft-teams-webhook",
-    "rule_name": "检测到 Microsoft Teams Webhook",
-    "hash": "c5b17a47182343880a89cc0cb6ed9ddb3969e701f71b6a0c20ced214748a83a6",
-    "version": "20261109.0002"
+    "rule_name": "检测到 MessageBird 凭据",
+    "hash": "9d3aca4952ab0441f329e490b845395447d9dffea2df5b14a5e8653507f86216",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-netlify-access-token",
@@ -3259,33 +2839,9 @@
   },
   {
     "rule_id": "source-secrets-new-relic-browser-api-token",
-    "rule_name": "检测到 New Relic 浏览器 API 令牌",
-    "hash": "8d3af2a4fc1a2c833b7a9da95ec9a05de8ddc90cb478d3a9508ae1750dfca92f",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-new-relic-insert-key",
-    "rule_name": "检测到 New Relic 插入密钥",
-    "hash": "85dfc463a0377189c9e23ad28baab8d7a71ae36a7eb660c5896f37cb97e65a8f",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-new-relic-user-api-id",
-    "rule_name": "检测到 New Relic 用户 API ID",
-    "hash": "bdb239ef358db527d099da9abbd6d1aa81fc1165e27dd723f44910e7c3905148",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-new-relic-user-api-key",
-    "rule_name": "检测到 New Relic 用户 API 密钥",
-    "hash": "ecd1494ba8937ac56aeef220f3ae0b927cbfc97ef33357dd5702c500360f2f95",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-npm-access-token",
-    "rule_name": "检测到 Npm 访问令牌",
-    "hash": "ed8f714eda7db882205ccb6d7323f76d8feab6581a6531207a35cd23b01720a7",
-    "version": "20261109.0002"
+    "rule_name": "检测到 New Relic 凭据",
+    "hash": "16174a8ed8c0057c1f6676274f8262ecdc9205bf5901e1ec03f17fdcb940d1e5",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-nytimes-access-token",
@@ -3307,39 +2863,15 @@
   },
   {
     "rule_id": "source-secrets-plaid-api-token",
-    "rule_name": "检测到 Plaid API 令牌",
-    "hash": "43cd542d1420464adb2bbc8506a64b8f611b2b6a99f5a0ee62a6a2507ced6e3a",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-plaid-client-id",
-    "rule_name": "检测到 Plaid 客户端 ID",
-    "hash": "21df627338e03b89f89cf1fa06b16e1d40a45767db3896e2e151bd46c838f4dd",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-plaid-secret-key",
-    "rule_name": "检测到 Plaid 密钥",
-    "hash": "7bb435a108664a2cbdd168ca7e82e29110db26510828ecdc863bf2a3d21f8d36",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Plaid 凭据",
+    "hash": "5ff45148e8f4e70e4b49b21f9e7be33ac2feaab7fc7f8995856c4957620b5c74",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-planetscale-api-token",
-    "rule_name": "检测到 PlanetScale API 令牌",
-    "hash": "077ed67bc2cda5d88e050cfc47aac66587d5510624d0852538c880283f91c393",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-planetscale-oauth-token",
-    "rule_name": "检测到 PlanetScale OAuth 令牌",
-    "hash": "692ac93e7b089730c0a6d0978583cc6c62f686d3565fe3d4fd6e9675b13677bf",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-planetscale-password",
-    "rule_name": "检测到 PlanetScale 密码",
-    "hash": "f13357ea78e6631434af8c99b788e62b681f7e4ff44df78b96974ce2f9b757e9",
-    "version": "20261109.0002"
+    "rule_name": "检测到 PlanetScale 凭据",
+    "hash": "632f96a2f87b6f4f043e15624ead6855f10ad5148b4c0430ffbe94599126d8c0",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-postman-api-token",
@@ -3351,12 +2883,6 @@
     "rule_id": "source-secrets-prefect-api-token",
     "rule_name": "检测到 Prefect API 令牌",
     "hash": "006093e829cb2a9395757f69919db260ca84f8197895bfedb63d7d00a20e4b75",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-private-key",
-    "rule_name": "检测到私钥",
-    "hash": "a0b4231744e91429258135e47ba930a6b38f8e7935e263742cb86c1f79d3da72",
     "version": "20261109.0002"
   },
   {
@@ -3397,21 +2923,9 @@
   },
   {
     "rule_id": "source-secrets-sendbird-access-id",
-    "rule_name": "检测到 Sendbird 访问 ID",
-    "hash": "2914bc270e614841ed73f0a391eed3e2fd6c925b38afeffbefe078407e031194",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-sendbird-access-token",
-    "rule_name": "检测到 Sendbird 访问令牌",
-    "hash": "6650e8e39747cfe62bf3498a72b83522929b1605191381d3878aef3ca615d993",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-sendgrid-api-token",
-    "rule_name": "检测到 SendGrid API 令牌",
-    "hash": "b2545b7d2d4212e653e714c6d15ba69007e050624628c675f2b136f1f75f62da",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Sendbird 凭据",
+    "hash": "2ac59fb6ba7bca078d23b52c7fe50fa94da50abcad0c08da310ab31beb9bb2ee",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-sendinblue-api-token",
@@ -3433,105 +2947,15 @@
   },
   {
     "rule_id": "source-secrets-shopify-access-token",
-    "rule_name": "检测到 Shopify 访问令牌",
-    "hash": "3408e234978d9b7876e695a787d4ac5099b390860d5fa9aa3c3585d2ac833f79",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-shopify-custom-access-token",
-    "rule_name": "检测到 Shopify 自定义访问令牌",
-    "hash": "08756de576b1fe9db7898c1187aa49fe8ca2f9c299c74a18b9e805cdff185d5d",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-shopify-private-app-access-token",
-    "rule_name": "检测到 Shopify 私有应用访问令牌",
-    "hash": "90f3c7f385faafdabc77e852a913904637148d4b5e2948c4b42e201e4f86bfc7",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-shopify-shared-secret",
-    "rule_name": "检测到 Shopify 共享密钥",
-    "hash": "92dd248620d1d6347af8ccb6b72a4f6fe1599833f498e6290c050ad0a9f92d62",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Shopify 凭据",
+    "hash": "25501cae2e52d6cb76c9bc419e8297c15e823baef45f17457c5cac4ebd110569",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-sidekiq-secret",
-    "rule_name": "检测到 Sidekiq 密钥",
-    "hash": "df526a333ce869125dfa9e532e9796c5c0f1303cb4fa3d10e00f0eebc3d096bb",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-sidekiq-sensitive-url",
-    "rule_name": "检测到 Sidekiq 敏感 URL",
-    "hash": "adbdc9ebf2deceaabc3862bb7b764f72b69987b94214bc14392a9ed57c65d4c2",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-app-token",
-    "rule_name": "检测到 Slack 应用令牌",
-    "hash": "7b0aeec87b42e5d6eab3428abdbd31288527c100403dcdc9eff84d720131b558",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-bot-token",
-    "rule_name": "检测到 Slack 机器人令牌",
-    "hash": "203dea801fed7663962f6973d9f91a6e734c5ce98fb4b58bdcdf00d1e6c072a4",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-config-access-token",
-    "rule_name": "检测到 Slack 配置访问令牌",
-    "hash": "b177d66cb08e3b90ca829bffe8e217acbdbdab6f3d9f3c9ae2c72038b71d8b01",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-config-refresh-token",
-    "rule_name": "检测到 Slack 配置刷新令牌",
-    "hash": "dc466c2fdbfabe3789802742309bb782be4c5944ea18d715848187575f3975d9",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-legacy-bot-token",
-    "rule_name": "检测到 Slack 旧版机器人令牌",
-    "hash": "3c026015834060778a7cc5ebef71aec2d343f491050cb437aede2b878ae6dbbc",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-legacy-token",
-    "rule_name": "检测到 Slack 旧版令牌",
-    "hash": "a39c4cc77a32503518255300a97ec03854d722cf58c7c964cc887dcf0d1bb555",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-legacy-workspace-token",
-    "rule_name": "检测到 Slack 旧版工作区令牌",
-    "hash": "cad0d1543b943a73092a05c6b9176afbfa34d0d5d881be144eaf5f8cbf3b9a29",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-user-token",
-    "rule_name": "检测到 Slack 用户令牌",
-    "hash": "91b8840696a08cc924d4a0092dbecc1d5b4c49736731d6ec2245b146625f21c7",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-slack-webhook-url",
-    "rule_name": "检测到 Slack Webhook URL",
-    "hash": "39c53b37f18cd256d6853e2c38423a4970890a15c80861a3551408e03e1888c9",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-snyk-api-token",
-    "rule_name": "检测到 Snyk API 令牌",
-    "hash": "efd7e93a69f29d275b93e585b83a444c54892ce0c63f36f420405f4f0a9ae31e",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-square-access-token",
-    "rule_name": "检测 Square 访问令牌",
-    "hash": "8a5af43c11a1a7324d7edfdcc3f360fd5d8a9a43f0a9475bf8e4944a2b78d341",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Sidekiq 凭据",
+    "hash": "a38f2ccf62fd938435a79ad787741a48d2e7c4548c5d3bcc5ee2dc7ce9c9a7c6",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-squarespace-access-token",
@@ -3540,39 +2964,15 @@
     "version": "20261109.0002"
   },
   {
-    "rule_id": "source-secrets-stripe-access-token",
-    "rule_name": "检测到 Stripe 访问令牌",
-    "hash": "3d4febccaf1fac3ff879919f3151e16b9154cef7231cc678def2fba9e7f91f98",
-    "version": "20261109.0002"
-  },
-  {
     "rule_id": "source-secrets-sumologic-access-id",
-    "rule_name": "检测到 Sumo Logic 访问 ID",
-    "hash": "20d289a0badb0badc9c29a99cee0dcdfe3993c56ea615c583651b2509dfdb363",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-sumologic-access-token",
-    "rule_name": "检测到 Sumo Logic 访问令牌",
-    "hash": "a18d89b49e576ae8cffce560ab6b88388980e44f0741e50a3ebed64f07964f78",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-telegram-bot-api-token",
-    "rule_name": "检测到 Telegram 机器人 API 令牌",
-    "hash": "8315fc3f673eb9e3e1491c9b2ffe880d2c9fadfd63e681b72cdfb1e895306f99",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Sumo Logic 凭据",
+    "hash": "29637031a0bcb572c120884e46fc22ec29ce7d36149375d64d80f1ab554151a6",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-travisci-access-token",
     "rule_name": "检测到 Travis CI 访问令牌",
     "hash": "c8a95660d142c89b2dab6ddb91c43fbc0307cbe2b4700f4b0cfc939538d7fd05",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-twilio-api-key",
-    "rule_name": "检测 Twilio API 密钥",
-    "hash": "871282a076c5dc375d738ce05336e4a25b7cce1d88b41a9bfe718b1555628f78",
     "version": "20261109.0002"
   },
   {
@@ -3583,33 +2983,9 @@
   },
   {
     "rule_id": "source-secrets-twitter-access-secret",
-    "rule_name": "检测到 Twitter 访问密钥",
-    "hash": "932c67e1348d8e9e12bec0fa0c5a420a0b9d8572e381b937a66188c527c24816",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-twitter-access-token",
-    "rule_name": "检测到 Twitter 访问令牌",
-    "hash": "1a76f67d2cab8dee000d9622deb7fb59a3d9d3272b6c7134cacb5cc0f974f270",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-twitter-api-key",
-    "rule_name": "检测到 Twitter API 密钥",
-    "hash": "bd5f51201bbaa8a014743e3769ca68a47abac66c4e347aeddf0709c76159bf68",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-twitter-api-secret",
-    "rule_name": "检测 Twitter API 密钥（Secret）",
-    "hash": "978d9f9e9fe434c45109a22c40ec42b68d5ffef8e4dcb83f90aaa24f827ce242",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-twitter-bearer-token",
-    "rule_name": "检测到 Twitter Bearer 令牌",
-    "hash": "b7ae756062856bbbed8252d9108485ec2bdf4e5bc83583b143faa8116a569c84",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Twitter 凭据",
+    "hash": "9a355bb3e19a21688252ec041158157c25254eea92fab557d64b725a9f94b6c9",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-typeform-api-token",
@@ -3619,33 +2995,15 @@
   },
   {
     "rule_id": "source-secrets-vault-batch-token",
-    "rule_name": "检测到 Vault 批处理令牌",
-    "hash": "be2995b1400d1e52a0cf58a5556498d51185730d8bf4c30885f9417723e7bf62",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-vault-service-token",
-    "rule_name": "检测到 Vault 服务令牌",
-    "hash": "b4baef74ce93598770da60035d7083ee6e997aaa7d7eee35918a9a6de07ca89d",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Vault 凭据",
+    "hash": "b85844d6fff00aee483b5bc71f03610b89a2a9eb041bb84440c994de343ecaaa",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-yandex-access-token",
-    "rule_name": "检测到 Yandex 访问令牌",
-    "hash": "64807addf15d0b48f843c12f236e76237c05156802c53af0f158722d4a1d8cfc",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-yandex-api-key",
-    "rule_name": "检测到 Yandex API 密钥",
-    "hash": "22f996bd408f243e538db77d615b06674a782ee77491c6fc136554e6955b4cb3",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-yandex-aws-access-token",
-    "rule_name": "检测到 Yandex AWS 访问令牌",
-    "hash": "224534ffb0a4154a78a918bf0aa826934c80006af042f23f56fe53893a8ed9c9",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Yandex 凭据",
+    "hash": "258ce79b981eb9356cfdb8a77e4be17027d160649d9ddbb4b4479b4c6b7da9ea",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "source-secrets-zendesk-secret-key",
@@ -4045,15 +3403,9 @@
   },
   {
     "rule_id": "source-secrets-huggingface-access-token",
-    "rule_name": "检测到 Hugging Face 访问令牌",
-    "hash": "340ce3ac73c343148d19f159fd0cd1089ca82f2cfd464993283c1c0302ba378d",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-huggingface-organization-api-token",
-    "rule_name": "检测到 Hugging Face 组织 API 令牌",
-    "hash": "f1b003b3f165b76b569a9858277e841bfe305ecc8f9424b007b3b84a4db5f41f",
-    "version": "20261109.0002"
+    "rule_name": "检测到 Hugging Face 凭据",
+    "hash": "1235e30e83fd9e97a9b9ec324a9363139da503694f37d9f46996fccba4e210e4",
+    "version": "20261112.0002"
   },
   {
     "rule_id": "08cc1b52-dff8-467e-8bf9-e8d9e15afc7b",
@@ -5914,18 +5266,6 @@
     "rule_name": "源码匹配：Scala Play Cookie 关闭 secure",
     "hash": "90c7e4ea7c69467dbc0dade674dbaa53b932f604286d7d48366610d829b45b5c",
     "version": "20261109.0001"
-  },
-  {
-    "rule_id": "source-secrets-aws-account-id",
-    "rule_name": "源码匹配：AWS 账号编号",
-    "hash": "8a774bf1a6fdd9fa753afc04d8cf55e8db51c96151f1e629abe70c3d08719d9f",
-    "version": "20261109.0002"
-  },
-  {
-    "rule_id": "source-secrets-aws-session-token",
-    "rule_name": "源码匹配：AWS_SESSION_TOKEN",
-    "hash": "1fd098591e531382c4db872ccf15715eead259cbd2fd5dbc4895da8daba7c2ae",
-    "version": "20261109.0002"
   },
   {
     "rule_id": "source-secrets-etc-shadow",
