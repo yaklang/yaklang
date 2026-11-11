@@ -75,7 +75,7 @@ func newProgramDeleteTestDB(t *testing.T, missing string) *gorm.DB {
 	db.DB().SetMaxOpenConns(1)
 	require.NoError(t, db.AutoMigrate(&IrProgram{}).Error)
 	for _, table := range []string{
-		TableIrCodes, TableIrIndices, TableIrNamePool, TableIrSources, TableIrTypes, TableIrOffsets,
+		TableIrCodes, TableIrConsts, TableIrIndices, TableIrNamePool, TableIrSources, TableIrTypes, TableIrOffsets,
 		TableAuditResults, TableAuditNodes, TableAuditEdges,
 		schema.TableSSARisks, schema.TableSyntaxFlowScanTask,
 	} {

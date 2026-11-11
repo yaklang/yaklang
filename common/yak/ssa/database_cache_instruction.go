@@ -1067,6 +1067,7 @@ func instructionRecordBytes(rec *instructionPersistRecord) int {
 		len(ir.Name) + len(ir.VerboseName) + len(ir.ShortVerboseName) +
 		len(ir.String) + len(ir.ReadableName) + len(ir.ReadableNameShort) +
 		len(ir.ExtraInformation)
+	n += len(ir.ConstText)
 	if n < 1 {
 		n = 1
 	}
