@@ -73,6 +73,39 @@ func TestItemToEvidenceOp(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewEvidenceTimelineItem(t *testing.T) {
+	item, err := newEvidenceTimelineItem(EvidenceOperation{
+		ID:      "saved-fact",
+		Op:      "update",
+		Content: "confirmed content",
+	})
+	require.NoError(t, err)
+	require.Zero(t, item.GetID())
+	require.NotEmpty(t, item.historyID)
+	require.False(t, item.createdAt.IsZero())
+
+	promoted, ok := item.value.(*PromotableTimelineItem)
+	require.True(t, ok)
+	require.Zero(t, promoted.ID)
+	require.Equal(t, TimelinePromotedKindEvidence, promoted.Kind)
+	require.Equal(t, TimelinePromotedTargetSemiDynamic1, promoted.TargetSection)
+	require.Equal(t, "saved-fact", promoted.Key)
+	require.Equal(t, TimelinePromotedOperationUpsert, promoted.Operation)
+
+	op, err := itemToEvidenceOp(item)
+	require.NoError(t, err)
+	require.Equal(t, EvidenceOperation{ID: "saved-fact", Op: "add", Content: "confirmed content"}, op)
+
+	item, err = newEvidenceTimelineItem(EvidenceOperation{ID: "saved-fact", Op: "delete"})
+	require.NoError(t, err)
+	promoted = item.value.(*PromotableTimelineItem)
+	require.Equal(t, TimelinePromotedOperationDelete, promoted.Operation)
+	require.Empty(t, promoted.Payload)
+
+	_, err = newEvidenceTimelineItem(EvidenceOperation{ID: "", Op: "bad"})
+	require.Error(t, err)
+}
+
 func TestIsEvidenceOpNeeded(t *testing.T) {
 	timeline := newEvidenceOpTestTimeline(t, EvidenceItem{ID: "saved-fact", Content: "first"})
 	needed := func(op EvidenceOperation) bool {
@@ -112,4 +145,33 @@ func TestNormalizeEvidenceOpAndChangesStore(t *testing.T) {
 	require.True(t, opChangesStore(store, normalized))
 	require.True(t, opChangesStore(store, EvidenceOperation{ID: "fact", Op: "delete"}))
 	require.False(t, opChangesStore(store, EvidenceOperation{ID: "missing", Op: "delete"}))
+}
+
+func TestApplyEvidenceOperationsUsesChangeCheck(t *testing.T) {
+	timeline := newEvidenceOpTestTimeline(t, EvidenceItem{ID: "existing", Content: "same"})
+	nextID := int64(1)
+	acquireID := func() int64 {
+		nextID++
+		return nextID
+	}
+
+	store, changed, err := timeline.applyEvidenceOperationsWithChange([]EvidenceOperation{
+		{ID: "existing", Op: "add", Content: "same"},
+		{ID: "missing", Op: "delete"},
+		{ID: "existing", Op: "update", Content: "updated"},
+		{ID: "new", Op: "add", Content: "new"},
+	}, "", acquireID)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Contains(t, store.Render(), "updated")
+	require.Contains(t, store.Render(), "new")
+	require.Equal(t, 3, timeline.idToTimelineItem.Len())
+
+	_, changed, err = timeline.applyEvidenceOperationsWithChange([]EvidenceOperation{
+		{ID: "existing", Op: "add", Content: "updated"},
+		{ID: "new", Op: "add", Content: "new"},
+	}, "", acquireID)
+	require.NoError(t, err)
+	require.False(t, changed)
+	require.Equal(t, 3, timeline.idToTimelineItem.Len())
 }

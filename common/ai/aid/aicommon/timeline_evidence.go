@@ -57,6 +57,35 @@ func itemToEvidenceOp(item *TimelineItem) (EvidenceOperation, error) {
 	}
 }
 
+// newEvidenceTimelineItem 把 evidence 操作转换为可广播的 Timeline item。
+// 广播 item 不携带 Timeline 本地 ID，ID 由每个接收 Timeline 自行分配。
+func newEvidenceTimelineItem(op EvidenceOperation) (*TimelineItem, error) {
+	normalized, ok := normalizeEvidenceOp(op)
+	if !ok {
+		return nil, fmt.Errorf("invalid session evidence operation")
+	}
+
+	operation := TimelinePromotedOperationUpsert
+	payload := ""
+	if normalized.Op == "delete" {
+		operation = TimelinePromotedOperationDelete
+	} else {
+		raw, err := json.Marshal(EvidenceItem{ID: normalized.ID, Content: normalized.Content})
+		if err != nil {
+			return nil, fmt.Errorf("marshal session evidence %q: %w", normalized.ID, err)
+		}
+		payload = string(raw)
+	}
+	return NewTimelineItem(&PromotableTimelineItem{
+		Kind:          TimelinePromotedKindEvidence,
+		TargetSection: TimelinePromotedTargetSemiDynamic1,
+		Key:           normalized.ID,
+		Operation:     operation,
+		Payload:       payload,
+		PayloadHash:   promotedPayloadHash(payload),
+	}), nil
+}
+
 // isEvidenceOpNeededLocked 判断操作是否会改变当前 Timeline 的证据状态。
 // 调用方必须持有 Timeline 写锁，该方法只做判断，不写入 Timeline。
 func (m *Timeline) isEvidenceOpNeededLocked(op EvidenceOperation) bool {
@@ -64,8 +93,14 @@ func (m *Timeline) isEvidenceOpNeededLocked(op EvidenceOperation) bool {
 		return false
 	}
 	store, _ := m.evidenceStoreLocked()
+	_, ok := normalizeEvidenceChange(store, op)
+	return ok
+}
+
+// normalizeEvidenceChange 在 store 上规范化操作并判断它是否产生实际变化。
+func normalizeEvidenceChange(store *EvidenceStore, op EvidenceOperation) (EvidenceOperation, bool) {
 	normalized, ok := normalizeEvidenceOp(op)
-	return ok && opChangesStore(store, normalized)
+	return normalized, ok && opChangesStore(store, normalized)
 }
 
 // normalizeEvidenceOp 统一证据操作的 ID 和操作名；无效操作返回 false。
@@ -250,47 +285,40 @@ func (m *Timeline) applyEvidenceOperationsWithChange(ops []EvidenceOperation, le
 	if !found {
 		store = UnmarshalEvidenceStore(legacyJSON)
 	}
-	before := store.Render()
-	store.ApplyOperations(ops)
-	store.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
-	changed := store.Render() != before
-	if err := m.replaceEvidenceLocked(store, acquireID, &notifications); err != nil {
+	ops, changed := filterEvidenceOpsLocked(store, ops)
+	if err := m.appendEvidenceOpsLocked(ops, acquireID, &notifications); err != nil {
 		return nil, false, err
+	}
+	if changed {
+		store, _ = m.evidenceStoreLocked()
 	}
 	return store, changed, nil
 }
 
-func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() int64, notifications *[]func()) error {
-	previous, _ := m.evidenceStoreLocked()
-	next := make(map[string]EvidenceItem, len(store.Items))
-	old := make(map[string]EvidenceItem, len(previous.Items))
-	for _, item := range store.Items {
-		next[item.ID] = item
-	}
-	for _, item := range previous.Items {
-		old[item.ID] = item
+// appendEvidenceOpsLocked 为已过滤的操作预先分配本地 ID，再原子写入 Timeline。
+// 调用方必须持有 Timeline 写锁。
+func (m *Timeline) appendEvidenceOpsLocked(ops []EvidenceOperation, acquireID func() int64, notifications *[]func()) error {
+	if len(ops) == 0 {
+		return nil
 	}
 	var mutations []*PromotableTimelineItem
-	appendMutation := func(key, operation, payload string) {
-		mutations = append(mutations, &PromotableTimelineItem{Kind: TimelinePromotedKindEvidence, TargetSection: TimelinePromotedTargetSemiDynamic1, Key: key, Operation: operation, Payload: payload, PayloadHash: promotedPayloadHash(payload)})
-	}
-	changed := false
-	for _, item := range previous.Items {
-		if _, ok := next[item.ID]; !ok {
-			appendMutation(item.ID, TimelinePromotedOperationDelete, "")
-			changed = true
-		}
-	}
-	for _, item := range store.Items {
-		if prior, ok := old[item.ID]; ok && prior.Content == item.Content {
+	for _, op := range ops {
+		if op.Op == "delete" {
+			mutations = append(mutations, &PromotableTimelineItem{
+				Kind: TimelinePromotedKindEvidence, TargetSection: TimelinePromotedTargetSemiDynamic1,
+				Key: op.ID, Operation: TimelinePromotedOperationDelete,
+			})
 			continue
 		}
-		payload, _ := json.Marshal(item) // EvidenceItem contains only strings and integers.
-		appendMutation(item.ID, TimelinePromotedOperationUpsert, string(payload))
-		changed = true
-	}
-	if !changed {
-		return nil
+		payload, err := json.Marshal(newEvidenceItem(op.ID, op.Content, time.Now().Unix()))
+		if err != nil {
+			return err
+		}
+		mutations = append(mutations, &PromotableTimelineItem{
+			Kind: TimelinePromotedKindEvidence, TargetSection: TimelinePromotedTargetSemiDynamic1,
+			Key: op.ID, Operation: TimelinePromotedOperationUpsert,
+			Payload: string(payload), PayloadHash: promotedPayloadHash(string(payload)),
+		})
 	}
 	ids := m.idToTimelineItem.Keys()
 	var lastID int64
@@ -323,6 +351,72 @@ func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() 
 		}
 	}
 	return nil
+}
+
+// replaceEvidenceLocked 校验完整 store 与当前 journal 的差异并原子提交。
+// 它只用于完整快照导入；运行中的 evidence 修改直接提交 operations。
+func (m *Timeline) replaceEvidenceLocked(store *EvidenceStore, acquireID func() int64, notifications *[]func()) error {
+	previous, _ := m.evidenceStoreLocked()
+	ops := make([]EvidenceOperation, 0, len(previous.Items)+len(store.Items))
+	if store != nil {
+		next := make(map[string]struct{}, len(store.Items))
+		for _, item := range store.Items {
+			next[item.ID] = struct{}{}
+			if changed := m.isEvidenceOpNeededLocked(EvidenceOperation{ID: item.ID, Op: "upsert", Content: item.Content}); changed {
+				ops = append(ops, EvidenceOperation{ID: item.ID, Op: "upsert", Content: item.Content})
+			}
+		}
+		for _, item := range previous.Items {
+			if _, kept := next[item.ID]; !kept {
+				ops = append(ops, EvidenceOperation{ID: item.ID, Op: "delete"})
+			}
+		}
+	}
+	m.evidenceInitialized = true
+	if len(ops) == 0 {
+		return nil
+	}
+	return m.appendEvidenceOpsLocked(ops, acquireID, notifications)
+}
+
+// filterEvidenceOpsLocked 依次验证操作，并返回实际需要写入 Timeline 的操作。
+// 预算淘汰也会转成 delete operation，后续仍由同一批 journal 提交。
+func filterEvidenceOpsLocked(store *EvidenceStore, ops []EvidenceOperation) ([]EvidenceOperation, bool) {
+	working := cloneEvidenceStore(store)
+	filtered := make([]EvidenceOperation, 0, len(ops))
+	for _, op := range ops {
+		normalized, needed := normalizeEvidenceChange(working, op)
+		if !needed {
+			continue
+		}
+		working.ApplyOperations([]EvidenceOperation{normalized})
+		filtered = append(filtered, normalized)
+	}
+	if len(filtered) == 0 {
+		return nil, false
+	}
+	beforeShrink := make(map[string]struct{}, len(working.Items))
+	for _, item := range working.Items {
+		beforeShrink[item.ID] = struct{}{}
+	}
+	working.ShrinkToTokenBudget(sessionEvidenceTokenBudget)
+	afterShrink := make(map[string]struct{}, len(working.Items))
+	for _, item := range working.Items {
+		afterShrink[item.ID] = struct{}{}
+	}
+	for item := range beforeShrink {
+		if _, kept := afterShrink[item]; !kept {
+			filtered = append(filtered, EvidenceOperation{ID: item, Op: "delete"})
+		}
+	}
+	return filtered, true
+}
+
+func cloneEvidenceStore(store *EvidenceStore) *EvidenceStore {
+	if store == nil {
+		return NewEvidenceStore()
+	}
+	return &EvidenceStore{Items: append([]EvidenceItem(nil), store.Items...)}
 }
 
 func (m *Timeline) projectEvidenceLocked() string {

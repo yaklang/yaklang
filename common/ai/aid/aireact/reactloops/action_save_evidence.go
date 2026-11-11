@@ -29,15 +29,9 @@ func saveSessionEvidenceWithChange(cfg aicommon.AICallerConfigIf, evidenceID, co
 	if err != nil {
 		return aicommon.EvidenceOperation{}, false, err
 	}
-	var changed bool
-	if recorder, ok := cfg.(*aicommon.Config); ok {
-		changed = recorder.ApplySessionEvidenceOpsWithChange([]aicommon.EvidenceOperation{evidenceOp})
-	} else {
-		// Preserve custom caller adapters' ApplySessionEvidenceOps contract.
-		before := cfg.GetSessionEvidenceRendered()
-		cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
-		changed = cfg.GetSessionEvidenceRendered() != before
-	}
+	before := cfg.GetSessionEvidenceRendered()
+	cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
+	changed := cfg.GetSessionEvidenceRendered() != before
 
 	rendered := cfg.GetSessionEvidenceRendered()
 	idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
@@ -96,16 +90,17 @@ var loopAction_SaveEvidence = &LoopAction{
 			return
 		}
 
-		evidenceOp, err := SaveSessionEvidence(loop.GetConfig(), evidenceOp.ID, evidenceOp.Content)
-		if err != nil {
-			operator.Fail(utils.Wrap(err, "save_evidence failed"))
-			return
-		}
+		// 暂留旧 sub-agent 通知链：先让父 Session 看到变化，再广播给其余兄弟 Timeline。
+		// 后续清理时再把这里收敛为只做通知、不再重复写 evidence。
 		if loop.IsSubAgent() && loop.saveEvidencePublisher != nil {
 			if err := loop.saveEvidencePublisher(evidenceOp); err != nil {
 				operator.Fail(utils.Wrap(err, "publish evidence to parent failed"))
 				return
 			}
+		}
+		if err := loop.GetConfig().BroadcastEvidence(evidenceOp); err != nil {
+			operator.Fail(utils.Wrap(err, "save_evidence failed"))
+			return
 		}
 
 		idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)

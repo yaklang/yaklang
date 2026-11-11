@@ -90,3 +90,72 @@ func TestSaveEvidence_DerivesStableIDAndRejectsEmptyContent(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "session evidence content is required")
 }
+
+func TestSaveEvidence_BroadcastsToForkAndTaskOnlyTimelines(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	cfg := aicommon.NewConfig(
+		ctx,
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true),
+	)
+	fork, err := cfg.Timeline.ForkForTask("save-evidence", "save evidence", cfg, cfg)
+	require.NoError(t, err)
+	t.Cleanup(fork.Release)
+
+	clean := aicommon.NewPrivateTimeline(cfg, nil)
+	clean.SoftBindConfig(cfg, cfg)
+	unregisterClean, err := cfg.RegisterTimeline(clean)
+	require.NoError(t, err)
+	t.Cleanup(unregisterClean)
+	require.Empty(t, clean.GetTimelineItemIDs())
+
+	invoker := mock.NewMockInvoker(ctx)
+	invoker.SetConfig(cfg)
+	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, invoker)
+	require.NoError(t, err)
+	task := mock.NewMockStatefulTask(ctx, "broadcast-save-evidence", "share a finding")
+	invoker.SetCurrentTask(task)
+	loop.SetCurrentTask(task)
+
+	executeSaveEvidence(t, loop, task, `{
+		"@action": "save_evidence",
+		"evidence_id": "session.shared",
+		"evidence_content": "The child and task-only timelines received this shared finding."
+	}`)
+
+	timelines := map[string]*aicommon.Timeline{
+		"parent": cfg.Timeline,
+		"fork":   fork.Branch,
+		"clean":  clean,
+	}
+	for name, timeline := range timelines {
+		raw, err := aicommon.MarshalTimeline(timeline)
+		require.NoError(t, err, name)
+		require.Contains(t, raw, "session.shared", name)
+		require.Contains(t, raw, "shared finding", name)
+	}
+
+	before := make(map[string]int64, len(timelines))
+	for name, timeline := range timelines {
+		before[name] = timeline.GetMaxID()
+	}
+	executeSaveEvidence(t, loop, task, `{
+		"@action": "save_evidence",
+		"evidence_id": "session.shared",
+		"evidence_content": "The child and task-only timelines received this shared finding."
+	}`)
+	for name, timeline := range timelines {
+		require.Equal(t, before[name], timeline.GetMaxID(), name)
+	}
+
+	executeSaveEvidence(t, loop, task, `{
+		"@action": "save_evidence",
+		"evidence_id": "session.shared",
+		"evidence_content": "The shared finding was revised once."
+	}`)
+	for name, timeline := range timelines {
+		require.Greater(t, timeline.GetMaxID(), before[name], name)
+	}
+}

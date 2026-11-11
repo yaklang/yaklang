@@ -229,6 +229,26 @@ func TestTimelineBroadcastChecksEvidenceAgainstEachTimeline(t *testing.T) {
 	}
 }
 
+func TestSessionEvidenceLocalApplyStaysOnOwningTimeline(t *testing.T) {
+	parent := newTimelineBroadcastConfig(t)
+	fork, err := parent.Timeline.ForkForTask("local-evidence", "local evidence", parent, parent)
+	require.NoError(t, err)
+	t.Cleanup(fork.Release)
+
+	require.True(t, parent.ApplySessionEvidenceOpsWithChange([]EvidenceOperation{{
+		Op:      "add",
+		ID:      "local-only",
+		Content: "this finding belongs to the parent timeline only",
+	}}))
+	parentStore, found := parent.Timeline.evidenceStore()
+	require.True(t, found)
+	require.Contains(t, parentStore.Render(), "local-only")
+
+	forkStore, found := fork.Branch.evidenceStore()
+	require.False(t, found)
+	require.NotContains(t, forkStore.Render(), "local-only")
+}
+
 func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
 	config := newTimelineBroadcastConfig(t)
 	started := make(chan struct{})

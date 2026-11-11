@@ -29,6 +29,16 @@ func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) bool {
 	return changed
 }
 
+// BroadcastEvidence 把一条 evidence 操作广播到同一 session 的所有 Timeline。
+// 广播 item 不携带本地 ID，各 Timeline 接收后自行检查并分配 ID。
+func (c *Config) BroadcastEvidence(op EvidenceOperation) error {
+	item, err := newEvidenceTimelineItem(op)
+	if err != nil {
+		return err
+	}
+	return c.BroadcastTimelineItem(item)
+}
+
 // The journal is authoritative once migrated, including an empty state after
 // rollback/deletion. Only legacy DB evidence without a journal is imported.
 // Initialization, never prompt rendering, performs this one-time migration.
