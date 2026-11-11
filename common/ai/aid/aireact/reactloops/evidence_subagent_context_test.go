@@ -76,7 +76,7 @@ func TestEvidenceSubAgents_ContextModeMixedBatch(t *testing.T) {
 			require.True(t, o.memoryDisabled)
 		}
 	}
-	require.Contains(t, cfg.GetReportedRisksRendered(), "task_only")
+	require.Contains(t, cfg.GetReportedRisks(), "task_only")
 	require.Contains(t, cfg.GetTimeline().Dump(), "PARENT_TIMELINE_SENTINEL")
 	require.Contains(t, cfg.GetSessionEvidenceRendered(), "PARENT_EVIDENCE_SENTINEL")
 	require.Equal(t, "PARENT_PLAN_SENTINEL", cfg.PlanPrompt)

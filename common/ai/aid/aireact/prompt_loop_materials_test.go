@@ -466,7 +466,7 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 		PromotedRecentTools:        "<|CACHE_TOOL_CALL_[current-nonce]|>\npromoted cache body\n<|CACHE_TOOL_CALL_END_[current-nonce]|>",
 		PromotedUserInputHistory:   "# Session User Input History\nexact user input body",
 		SessionEvidenceSemiDynamic: "# Session Evidence\nverified evidence body",
-		PromotedReportedRisks:      "[reported_risk]:\nreported finding",
+		PromotedReportedRisks:      "## 已上报风险（Reported Risks）\n\nreported finding",
 		Schema:                     `{"type":"object","properties":{"@action":{"type":"string"}}}`,
 		TaskInstruction:            "follow task rules",
 		OutputExample:              "example output",

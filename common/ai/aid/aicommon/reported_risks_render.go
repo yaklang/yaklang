@@ -10,10 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// reportedRisksTokenBudget bounds only the legacy store view. Immutable
-// Timeline reports are never trimmed or evicted by this display budget.
-const reportedRisksTokenBudget = 4000
-
 // ReportedRiskItem is a compact, serializable summary of a single risk that
 // has been persisted via cybersecurity-risk or any other risk-emitting tool.
 // It carries only the fields needed for AI dedup: target, type, parameter,
@@ -140,45 +136,6 @@ func (s *ReportedRiskStore) hasRiskLocked(id string) bool {
 		}
 	}
 	return false
-}
-
-// Render provides a legacy bounded view; prompt assembly never calls it.
-// The output includes a header with dedup instructions followed by
-// one line per risk. When the token budget is exceeded, the oldest items are
-// silently dropped from the rendered output (but remain in the store).
-func (s *ReportedRiskStore) Render() string {
-	if s == nil {
-		return ""
-	}
-	s.mu.Lock()
-	items := make([]ReportedRiskItem, len(s.Items))
-	copy(items, s.Items)
-	s.mu.Unlock()
-	if len(items) == 0 {
-		return ""
-	}
-	return renderReportedRiskItems(items)
-}
-
-// renderReportedRiskItems renders a list of risk summaries as a compact
-// markdown block, trimming to token budget by evicting oldest entries.
-func renderReportedRiskItems(items []ReportedRiskItem) string {
-	header := "## 已报告漏洞清单（不要重复上报）\n" +
-		"以下漏洞已通过 `cybersecurity-risk` 上报到风险库。同一目标 + 同一漏洞类型 + 同一触发参数 = 同一漏洞，" +
-		"不要重复调用 `cybersecurity-risk`。如需补充新证据（如不同 payload 的回显），通过 evidence 沉淀，不再次上报。\n"
-
-	// Build lines newest-first for better visibility (latest findings on top).
-	lines := make([]string, 0, len(items))
-	for i := len(items) - 1; i >= 0; i-- {
-		lines = append(lines, formatReportedRiskLine(&items[i]))
-	}
-
-	// Trim to token budget: evict from the tail (oldest, since we reversed).
-	for MeasureTokens(header+strings.Join(lines, "\n")) > reportedRisksTokenBudget && len(lines) > 1 {
-		lines = lines[:len(lines)-1]
-	}
-
-	return header + strings.Join(lines, "\n")
 }
 
 // formatReportedRiskLine renders a single risk as one compact line:

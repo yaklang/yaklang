@@ -78,7 +78,6 @@ type AICallerConfigIf interface {
 	// deduplicates in the running session. Get/Set methods are legacy ledger
 	// accessors; prompts and session restore use the Timeline's existing path.
 	AppendReportedRisk(risk *schema.Risk) bool
-	GetReportedRisksRendered() string
 	GetReportedRisks() string
 	SetReportedRisks(json string)
 }

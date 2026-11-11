@@ -4052,15 +4052,6 @@ func (c *Config) AppendReportedRisk(risk *schema.Risk) bool {
 	return c.appendReportedRiskToTimeline(risk)
 }
 
-// GetReportedRisksRendered is a legacy view of the runtime deduplication store.
-// Prompt assembly reads reported-risk Timeline entries instead.
-func (c *Config) GetReportedRisksRendered() string {
-	if c == nil {
-		return ""
-	}
-	return c.GetSessionPromptState().GetReportedRisksRendered()
-}
-
 // GetReportedRisks returns the raw JSON for DB persistence.
 func (c *Config) GetReportedRisks() string {
 	if c == nil {

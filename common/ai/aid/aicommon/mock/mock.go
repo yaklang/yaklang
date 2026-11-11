@@ -208,10 +208,6 @@ func (m *MockedAIConfig) AppendReportedRisk(risk *schema.Risk) bool {
 	return false
 }
 
-func (m *MockedAIConfig) GetReportedRisksRendered() string {
-	return ""
-}
-
 func (m *MockedAIConfig) GetReportedRisks() string {
 	return ""
 }
