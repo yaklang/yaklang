@@ -37,6 +37,12 @@ func TestDefaultCompileExcludePatterns(t *testing.T) {
 	require.Contains(t, patterns, "**/*.min.js")
 	require.Contains(t, patterns, "**/*.css")
 	require.Contains(t, patterns, "*.css")
+	// Non-code assets are dropped whole; decompilable JVM archives stay.
+	require.Contains(t, patterns, "**/*.mp4")
+	require.Contains(t, patterns, "**/*.docx")
+	require.Contains(t, patterns, "**/*.pptx")
+	require.Contains(t, patterns, "**/*.png")
+	require.Contains(t, patterns, "**/*.zip")
 	require.Contains(t, patterns, "**/gradle/wrapper/**")
 	require.Contains(t, patterns, "**/composer.lock")
 	require.Contains(t, patterns, "**/*.nupkg")
@@ -114,6 +120,20 @@ func TestBuildCompileExcludeFunc(t *testing.T) {
 		userExclude := BuildCompileExcludeFunc([]string{"GeneratedSources/**"}, "", true)
 		require.True(t, userExclude("GeneratedSources/a.go"))
 		require.False(t, userExclude("generatedsources/a.go"))
+	})
+
+	t.Run("non-code assets stay out", func(t *testing.T) {
+		exclude := BuildCompileExcludeFunc(nil, "", true)
+		for _, asset := range []string{
+			"media/demo.mp4", "docs/spec.docx", "slides/deck.pptx",
+			"assets/logo.png", "fonts/icons.woff2", "bundle/app.js.map",
+			"release/pkg.zip",
+		} {
+			require.True(t, exclude(asset), "non-code asset must be excluded: %s", asset)
+		}
+		for _, src := range []string{"lib/app.jar", "web/app.war", "src/main.go"} {
+			require.False(t, exclude(src), "code or decompilable archive must stay: %s", src)
+		}
 	})
 
 	t.Run("stylesheets and lockfiles stay out, scripts stay in", func(t *testing.T) {
