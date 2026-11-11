@@ -4,6 +4,7 @@ package yakgrpc
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"time"
 
@@ -23,9 +24,13 @@ func (s *Server) GetMITMDiagnostics(ctx context.Context, req *ypb.GetMITMDiagnos
 		return nil, grpcstatus.Error(codes.InvalidArgument, "invalid MITM trace page")
 	}
 	switch req.GetTrafficScope() {
-	case "", "all", "focus", "browser":
+	case "", "all", "focus", "browser", "capture":
 	default:
 		return nil, grpcstatus.Error(codes.InvalidArgument, "unknown MITM traffic scope")
+	}
+	if stage := req.GetStage(); stage != "" && (req.GetView() != "active" ||
+		!slices.Contains(mitmStageNames[1:mitmPipelineStageWebSocketOnline], stage)) {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "invalid MITM HTTP stage")
 	}
 	switch req.GetView() {
 	case "storage", "active", "slow", "failed", "websocket":
@@ -71,7 +76,7 @@ func (t *mitmPipelineTracker) diagnostics(req *ypb.GetMITMDiagnosticsRequest) (*
 		t.mu.Unlock()
 		sort.Slice(response.Storage, func(i, j int) bool { return response.Storage[i].AtUnixMs < response.Storage[j].AtUnixMs })
 	case "detail":
-		response.Detail = t.traceDetail(now, req.GetTraceId())
+		response.Detail = t.traceDetail(now, req.GetTraceId(), req.GetTrafficScope() == "capture")
 		t.mu.Unlock()
 		if response.Detail == nil {
 			return nil, grpcstatus.Error(codes.NotFound, "MITM trace is no longer available")
@@ -118,10 +123,19 @@ func (t *mitmPipelineTracker) diagnostics(req *ypb.GetMITMDiagnosticsRequest) (*
 
 func (t *mitmPipelineTracker) traceRows(now time.Time, req *ypb.GetMITMDiagnosticsRequest) []mitmTraceHead {
 	view := req.GetView()
+	stageFilter := req.GetStage()
+	captureOnly := req.GetTrafficScope() == "capture"
 	candidates := make(map[uint64]mitmTraceHead)
+	inScope := func(head *mitmTraceHead) bool {
+		return (!captureOnly || !head.filter.excluded()) &&
+			(req.GetConnectionId() == "" || req.GetConnectionId() == head.connectionID)
+	}
 	matches := func(tr *mitmTrace) bool {
-		if id := req.GetConnectionId(); id != "" && id != tr.head.connectionID {
+		if !inScope(&tr.head) {
 			return false
+		}
+		if stageFilter != "" {
+			return tr.head.protocol != "WebSocket" && stageFilter == mitmStageNames[tr.head.stage]
 		}
 		if view == "range" {
 			from, to := req.GetFromUnixMs(), req.GetToUnixMs()
@@ -142,20 +156,21 @@ func (t *mitmPipelineTracker) traceRows(now time.Time, req *ypb.GetMITMDiagnosti
 			tr := &state.trace
 			stage := tr.head.stage
 			online := stage == mitmPipelineStageWebSocketOnline
-			blocked := !online && stage != mitmPipelineStageStreaming && now.Sub(tr.head.stageAt) >= mitmSlowThreshold
-			if matches(tr) && (view == "range" || view == "active" && blocked || view == "websocket" && online) {
+			waiting := !online && (stageFilter != "" ||
+				stage != mitmPipelineStageStreaming && now.Sub(tr.head.stageAt) >= mitmSlowThreshold)
+			if matches(tr) && (view == "range" || view == "active" && waiting || view == "websocket" && online) {
 				candidates[tr.head.id] = tr.head
 			}
 		}
 	}
-	if view == "active" || view == "range" {
+	if stageFilter == "" && (view == "active" || view == "range") {
 		for _, write := range t.persists {
 			if write.trace == nil || write.submittedAt.IsZero() {
 				continue
 			}
 			tr := write.trace
 			// A write can still be pending after the response is finished.
-			if id := req.GetConnectionId(); id != "" && id != tr.head.connectionID {
+			if !inScope(&tr.head) {
 				continue
 			}
 			if view == "range" {
@@ -181,18 +196,23 @@ func (t *mitmPipelineTracker) traceRows(now time.Time, req *ypb.GetMITMDiagnosti
 			}
 		}
 	}
-	if view == "slow" || view == "range" {
-		addSamples(&t.slow)
-	}
-	if view == "failed" || view == "range" {
-		addSamples(&t.failed)
+	for _, samples := range []*mitmTraceSamples{&t.samples, &t.filteredSamples} {
+		if captureOnly && samples == &t.filteredSamples {
+			break
+		}
+		if view == "slow" || view == "range" {
+			addSamples(&samples.slow)
+		}
+		if view == "failed" || view == "range" {
+			addSamples(&samples.failed)
+		}
 	}
 	if view == "range" {
 		cutoff := now.Add(-mitmHistorySeconds * time.Second).UnixMilli()
 		for _, point := range t.history {
 			tr := point.trace
 			if tr != nil && point.at > cutoff && point.at >= req.GetFromUnixMs() && point.at <= req.GetToUnixMs() &&
-				(req.GetConnectionId() == "" || req.GetConnectionId() == tr.head.connectionID) {
+				inScope(&tr.head) {
 				if _, exists := candidates[tr.head.id]; !exists {
 					candidates[tr.head.id] = tr.head
 				}
@@ -206,7 +226,7 @@ func (t *mitmPipelineTracker) traceRows(now time.Time, req *ypb.GetMITMDiagnosti
 	return rows
 }
 
-func (t *mitmPipelineTracker) traceDetail(now time.Time, id uint64) *ypb.MITMTraceEntry {
+func (t *mitmPipelineTracker) traceDetail(now time.Time, id uint64, captureOnly bool) *ypb.MITMTraceEntry {
 	var trace *mitmTrace
 	var active []*ypb.MITMTraceSpan
 	var writeStage mitmPipelineStage
@@ -231,7 +251,7 @@ func (t *mitmPipelineTracker) traceDetail(now time.Time, id uint64) *ypb.MITMTra
 		}
 	}
 	if trace == nil {
-		for _, ring := range []*mitmTraceRing{&t.slow, &t.failed} {
+		for _, ring := range []*mitmTraceRing{&t.samples.slow, &t.samples.failed, &t.filteredSamples.slow, &t.filteredSamples.failed} {
 			for _, tr := range ring.samples {
 				if tr != nil && tr.head.id == id && now.Sub(tr.lastAt) < mitmHistorySeconds*time.Second {
 					trace = tr
@@ -252,7 +272,7 @@ func (t *mitmPipelineTracker) traceDetail(now time.Time, id uint64) *ypb.MITMTra
 			}
 		}
 	}
-	if trace == nil {
+	if trace == nil || captureOnly && trace.head.filter.excluded() {
 		return nil
 	}
 	head := trace.head

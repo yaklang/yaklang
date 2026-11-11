@@ -93,8 +93,10 @@ type mitmPipelineTracker struct {
 	nextWriteID uint64
 	history     [mitmHistorySeconds]mitmStoragePoint
 	metrics     [mitmMetricSeconds]mitmMetricsBucket
-	slow        mitmTraceRing
-	failed      mitmTraceRing
+	samples     mitmTraceSamples
+	// Excluded traffic has its own bounded history so it cannot displace
+	// slow and failed requests in the capture scope.
+	filteredSamples mitmTraceSamples
 }
 
 func newMITMPipelineTracker(sessionID string) *mitmPipelineTracker {
@@ -119,11 +121,11 @@ func (t *mitmPipelineTracker) close() {
 	t.persists = nil
 	clear(t.history[:])
 	clear(t.metrics[:])
-	t.slow = mitmTraceRing{}
-	t.failed = mitmTraceRing{}
+	t.samples = mitmTraceSamples{}
+	t.filteredSamples = mitmTraceSamples{}
 }
 
-func (t *mitmPipelineTracker) requestObserved(req *http.Request) {
+func (t *mitmPipelineTracker) requestObserved(req *http.Request, excludeWebSocket bool) {
 	if t == nil || req == nil {
 		return
 	}
@@ -135,8 +137,12 @@ func (t *mitmPipelineTracker) requestObserved(req *http.Request) {
 	}
 	now := t.now()
 	protocol := req.Proto
+	filter := mitmFilterPending
 	if strings.EqualFold(req.Header.Get("Upgrade"), "websocket") {
 		protocol = "WebSocket"
+		if excludeWebSocket {
+			filter = mitmFilterWebSocketExcluded
+		}
 	}
 	state := &mitmPipelineRequestState{trace: mitmTrace{head: mitmTraceHead{
 		id:             t.requestTotal.Add(1),
@@ -146,6 +152,7 @@ func (t *mitmPipelineTracker) requestObserved(req *http.Request) {
 		connectionID:   httpctx.GetMITMConnectionID(req),
 		chromeAutofill: protocol != "WebSocket" && isChromeAutofillRequest(req.Host, req.Method),
 		stage:          mitmPipelineStageRequestProcessing,
+		filter:         filter,
 		startedAt:      now,
 		stageAt:        now,
 	}}}
@@ -163,6 +170,17 @@ func (t *mitmPipelineTracker) requestObserved(req *http.Request) {
 	httpctx.SetUpstreamObserver(req, func(event httpctx.UpstreamEvent) {
 		t.upstreamEvent(req, event)
 	})
+}
+
+func (t *mitmPipelineTracker) observeFilterExclusion(req *http.Request, decision mitmFilterDecision) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if state := t.requests[req]; state != nil {
+		head := &state.trace.head
+		if decision == mitmFilterRequestExcluded || !head.filter.excluded() {
+			head.filter = decision
+		}
+	}
 }
 
 func (t *mitmPipelineTracker) requestStage(req *http.Request, stage mitmPipelineStage) {
@@ -230,13 +248,16 @@ func (t *mitmPipelineTracker) upstreamCompleted(req *http.Request, succeeded boo
 	}
 }
 
-func (t *mitmPipelineTracker) responseMirrored(req *http.Request) {
+func (t *mitmPipelineTracker) responseMirrored(req *http.Request, decision mitmFilterDecision) {
 	if t == nil || req == nil {
 		return
 	}
 	t.mu.Lock()
 	if state := t.requests[req]; state != nil {
 		t.responseMirroredTotal.Add(1)
+		if decision != mitmFilterResponseExcluded || state.trace.head.filter != mitmFilterStaticJSExcluded {
+			state.trace.head.filter = decision
+		}
 		state.trace.transition(t.now(), mitmPipelineStageResponseProcessing)
 	}
 	t.mu.Unlock()
@@ -300,7 +321,7 @@ func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int, taken 
 	now := t.now()
 	diagnostics := &ypb.MITMPipelineDiagnostics{DatabaseWriteTakenUnfinished: taken}
 	stats := &ypb.MITMPipelineStats{
-		Version:                    3,
+		Version:                    4,
 		SessionId:                  t.sessionID,
 		SessionStartedAtUnixMs:     t.startedAt.UnixMilli(),
 		GeneratedAtUnixMs:          now.UnixMilli(),
@@ -319,6 +340,7 @@ func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int, taken 
 	}
 
 	var counts, browserCounts, browserOldest, otherOldest [mitmPipelineStageCount]int64
+	var filteredCounts, inScopeOtherCounts, inScopeOtherOldest [mitmPipelineStageCount]int64
 	for _, state := range t.requests {
 		head := &state.trace.head
 		if head.stage == mitmPipelineStageWebSocketOnline {
@@ -329,15 +351,27 @@ func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int, taken 
 		age := ageMilliseconds(now, head.stageAt)
 		if head.protocol != "WebSocket" {
 			counts[head.stage]++
+			if head.filter.excluded() {
+				filteredCounts[head.stage]++
+			}
 			if head.chromeAutofill {
 				browserCounts[head.stage]++
 				updateOldestAge(&browserOldest[head.stage], age)
 			} else {
 				updateOldestAge(&otherOldest[head.stage], age)
+				if !head.filter.excluded() {
+					inScopeOtherCounts[head.stage]++
+					updateOldestAge(&inScopeOtherOldest[head.stage], age)
+				}
 			}
 		} else if !state.dispatchedAt.IsZero() {
 			diagnostics.WebSocketHandshaking++
-			updateOldestAge(&diagnostics.OldestWebSocketHandshakeAgeMs, ageMilliseconds(now, state.dispatchedAt))
+			handshakeAge := ageMilliseconds(now, state.dispatchedAt)
+			updateOldestAge(&diagnostics.OldestWebSocketHandshakeAgeMs, handshakeAge)
+			if !head.filter.excluded() {
+				diagnostics.InScopeWebSocketHandshaking++
+				updateOldestAge(&diagnostics.OldestInScopeWebSocketHandshakeAgeMs, handshakeAge)
+			}
 		}
 		switch {
 		case head.stage == mitmPipelineStageRequestProcessing:
@@ -360,6 +394,8 @@ func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int, taken 
 				Stage: mitmStageNames[stage], Count: counts[stage], OldestAgeMs: max(browserOldest[stage], otherOldest[stage]),
 				BrowserBackgroundCount: browserCounts[stage], OldestBrowserBackgroundAgeMs: browserOldest[stage],
 				OldestOtherAgeMs: otherOldest[stage],
+				FilteredCount:    filteredCounts[stage], InScopeOtherCount: inScopeOtherCounts[stage],
+				OldestInScopeOtherAgeMs: inScopeOtherOldest[stage],
 			})
 		}
 	}

@@ -18,7 +18,7 @@ func TestMITMPipelineTrackerCanceledRequestLeavesNoUpstreamWait(t *testing.T) {
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.invalid/", nil)
 	require.NoError(t, err)
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	tracker.requestDispatched(req, false)
 	require.Equal(t, int64(1), tracker.snapshot(0, 0, 0).GetUpstreamActive())
 
@@ -40,7 +40,7 @@ func TestMITMPipelineTrackerUpstreamContextCompletionPreservesResponseStage(t *t
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.invalid/", nil)
 	require.NoError(t, err)
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	tracker.requestDispatched(req, false)
 	// lowhttp temporarily installs an upstream child context on the native
 	// request. Completing that child must not remove pending response work.
@@ -49,7 +49,7 @@ func TestMITMPipelineTrackerUpstreamContextCompletionPreservesResponseStage(t *t
 	cancelUpstream()
 	tracker.upstreamCompleted(req, true, 0)
 	require.Equal(t, int64(1), tracker.snapshot(0, 0, 0).GetResponseProcessingActive())
-	tracker.responseMirrored(req)
+	tracker.responseMirrored(req, mitmFilterPassed)
 	tracker.responseProcessingFinished(req)
 	cancel()
 	stats := tracker.snapshot(0, 0, 0)
@@ -67,7 +67,7 @@ func TestMITMPipelineTrackerRequestStages(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	require.NoError(t, err)
 
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	now = now.Add(100 * time.Millisecond)
 	tracker.manualWaitStarted(req, false)
 	now = now.Add(500 * time.Millisecond)
@@ -99,7 +99,7 @@ func TestMITMPipelineTrackerRequestStages(t *testing.T) {
 	require.Equal(t, int64(250), stats.GetOldestManualAgeMs())
 
 	tracker.manualWaitFinished(req, true)
-	tracker.responseMirrored(req)
+	tracker.responseMirrored(req, mitmFilterPassed)
 	stats = tracker.snapshot(0, 40960, 0)
 	require.Equal(t, int64(1), stats.GetResponseProcessingActive())
 	tracker.responseProcessingFinished(req)
@@ -117,10 +117,10 @@ func TestMITMPipelineTrackerLocalResponseAndPersistence(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	require.NoError(t, err)
 
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	tracker.requestDispatched(req, true)
 	tracker.upstreamCompleted(req, false, 0)
-	tracker.responseMirrored(req)
+	tracker.responseMirrored(req, mitmFilterPassed)
 	tracker.responseProcessingFinished(req)
 	stats := tracker.snapshot(0, 40960, 0)
 	require.Zero(t, stats.GetDispatchTotal())
@@ -149,7 +149,7 @@ func TestMITMPipelineTrackerDoesNotCountFailedUpstreamRoundTrip(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	require.NoError(t, err)
 
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	tracker.requestDispatched(req, false)
 	tracker.upstreamCompleted(req, false, 0)
 
@@ -165,7 +165,7 @@ func TestMITMPipelineTrackerDropIsTerminal(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	require.NoError(t, err)
 
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	tracker.requestDropped(req)
 	tracker.requestDropped(req)
 	stats := tracker.snapshot(0, 40960, 0)

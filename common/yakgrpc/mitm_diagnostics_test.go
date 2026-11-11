@@ -29,7 +29,7 @@ func TestMITMDiagnosticsWriteStagesAndPeak(t *testing.T) {
 	tracker.now = func() time.Time { return now }
 	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	require.NoError(t, err)
-	tracker.requestObserved(req)
+	tracker.requestObserved(req, false)
 	tracker.requestDispatched(req, false)
 	tracker.upstreamCompleted(req, true, 200)
 	write := tracker.writeObserver(req)
@@ -120,7 +120,7 @@ func TestMITMDiagnosticsBoundsHistoryAndIgnoresLateAttemptEvents(t *testing.T) {
 	for range 2 * mitmTraceSampleLimit {
 		req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 		require.NoError(t, err)
-		tracker.requestObserved(req)
+		tracker.requestObserved(req, false)
 		tracker.requestDispatched(req, false)
 		observer := httpctx.GetUpstreamObserver(req)
 		old := observer.BeginAttempt("HTTP/2")
@@ -158,7 +158,7 @@ func TestMITMDiagnosticsBrowserScopeBeforePagination(t *testing.T) {
 	dial := func(method, host string) {
 		req, err := http.NewRequest(method, "https://"+host+"/", nil)
 		require.NoError(t, err)
-		tracker.requestObserved(req)
+		tracker.requestObserved(req, false)
 		tracker.requestDispatched(req, false)
 		httpctx.GetUpstreamObserver(req).BeginAttempt("HTTP/1.1").Phase(httpctx.UpstreamDial)
 	}
@@ -173,7 +173,7 @@ func TestMITMDiagnosticsBrowserScopeBeforePagination(t *testing.T) {
 	now = now.Add(3 * time.Second)
 
 	stats := tracker.snapshot(0, 40960, 0)
-	require.EqualValues(t, 3, stats.GetVersion())
+	require.EqualValues(t, 4, stats.GetVersion())
 	require.EqualValues(t, 28, stats.GetActiveTotal())
 	require.Len(t, stats.GetDiagnostics().GetHTTPStages(), 1)
 	stage := stats.GetDiagnostics().GetHTTPStages()[0]
@@ -190,6 +190,7 @@ func TestMITMDiagnosticsBrowserScopeBeforePagination(t *testing.T) {
 		total          int32
 	}{
 		{scope: "", service: "chrome_autofill", total: 28},
+		{scope: "capture", service: "chrome_autofill", total: 28},
 		{scope: "focus", total: 3},
 		{scope: "browser", service: "chrome_autofill", total: 25},
 	} {
@@ -205,11 +206,91 @@ func TestMITMDiagnosticsBrowserScopeBeforePagination(t *testing.T) {
 	}
 }
 
+func TestMITMDiagnosticsCaptureScopeKeepsSamplesUnderFilteredLoad(t *testing.T) {
+	tracker := newMITMPipelineTracker("capture-scope")
+	t.Cleanup(tracker.close)
+	now := time.Now()
+	tracker.now = func() time.Time { return now }
+	waiting := func(host string, decision mitmFilterDecision, phase httpctx.UpstreamPhase) *http.Request {
+		req, err := http.NewRequest(http.MethodGet, "http://"+host+"/", nil)
+		require.NoError(t, err)
+		tracker.requestObserved(req, false)
+		if decision.excluded() {
+			tracker.observeFilterExclusion(req, decision)
+		}
+		tracker.requestDispatched(req, false)
+		httpctx.GetUpstreamObserver(req).BeginAttempt("HTTP/1.1").Phase(phase)
+		return req
+	}
+	ordinary := waiting("target.invalid", mitmFilterPending, httpctx.UpstreamPoolWait)
+	now = now.Add(3 * time.Second)
+	tracker.upstreamCompleted(ordinary, true, http.StatusOK)
+	tracker.responseMirrored(ordinary, mitmFilterPassed)
+	tracker.responseProcessingFinished(ordinary)
+	excluded := make([]*http.Request, 2*mitmTraceSampleLimit)
+	for i := range excluded {
+		excluded[i] = waiting("excluded.invalid", mitmFilterRequestExcluded, httpctx.UpstreamDial)
+	}
+	now = now.Add(3 * time.Second)
+	for _, req := range excluded {
+		tracker.upstreamCompleted(req, true, http.StatusOK)
+		tracker.responseMirrored(req, mitmFilterRequestExcluded)
+		tracker.responseProcessingFinished(req)
+	}
+	retained, err := tracker.diagnostics(&ypb.GetMITMDiagnosticsRequest{View: "slow", TrafficScope: "capture"})
+	require.NoError(t, err)
+	require.Len(t, retained.GetTraces(), 1)
+	require.Equal(t, "passed", retained.GetTraces()[0].GetFilterDecision())
+	all, err := tracker.diagnostics(&ypb.GetMITMDiagnosticsRequest{View: "slow", TrafficScope: "all"})
+	require.NoError(t, err)
+	require.EqualValues(t, 1+mitmTraceSampleLimit, all.GetTotal())
+
+	for range 100 {
+		waiting("excluded.invalid", mitmFilterRequestExcluded, httpctx.UpstreamPoolWait)
+	}
+	now = now.Add(3 * time.Second)
+	waiting("target.invalid", mitmFilterPending, httpctx.UpstreamPoolWait)
+	waiting("different-stage.invalid", mitmFilterPending, httpctx.UpstreamDial)
+	captured, err := tracker.diagnostics(&ypb.GetMITMDiagnosticsRequest{
+		View: "active", Stage: "pool_wait", TrafficScope: "capture", Limit: 1,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, captured.GetTotal())
+	require.Equal(t, "target.invalid", captured.GetTraces()[0].GetHost())
+	require.Equal(t, "pending", captured.GetTraces()[0].GetFilterDecision())
+	all, err = tracker.diagnostics(&ypb.GetMITMDiagnosticsRequest{
+		View: "active", Stage: "pool_wait", TrafficScope: "all", Limit: 2,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 101, all.GetTotal())
+	require.Len(t, all.GetTraces(), 2)
+	require.Equal(t, "request_excluded", all.GetTraces()[0].GetFilterDecision())
+	_, err = tracker.diagnostics(&ypb.GetMITMDiagnosticsRequest{
+		View: "detail", TraceId: all.GetTraces()[0].GetTraceId(), TrafficScope: "capture",
+	})
+	require.Equal(t, codes.NotFound, grpcstatus.Code(err))
+	stats := tracker.snapshot(0, 40960, 0)
+	require.EqualValues(t, 102, stats.GetActiveTotal())
+	stage := stats.GetDiagnostics().GetHTTPStages()[0]
+	require.Equal(t, "pool_wait", stage.GetStage())
+	require.EqualValues(t, 101, stage.GetCount())
+	require.EqualValues(t, 100, stage.GetFilteredCount())
+	require.EqualValues(t, 1, stage.GetInScopeOtherCount())
+	require.EqualValues(t, 0, stage.GetOldestInScopeOtherAgeMs())
+}
+
 func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	client, err := NewLocalClient()
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
+	filter := GetMITMFilterManager(server.GetProjectDatabase(), server.GetProfileDatabase())
+	filter.Update(&ypb.MITMFilterData{
+		ExcludeUri:            []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"/filtered-request"}}},
+		ExcludeMIME:           []*ypb.FilterDataItem{{MatcherType: "word", Group: []string{"image/png"}}},
+		FilterBundledStaticJS: true,
+	})
+	filter.Save()
 	streamCtx, stop := context.WithCancel(ctx)
 	defer stop()
 	stream, err := client.MITMV2(streamCtx)
@@ -220,12 +301,16 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	}))
 	require.True(t, waitMITMV2Started(stream, 10*time.Second))
 	frames := make(chan *ypb.MITMPipelineStats, 16)
+	filterApplied := make(chan struct{}, 1)
 	go func() {
 		defer close(frames)
 		for {
 			frame, err := stream.Recv()
 			if err != nil {
 				return
+			}
+			if frame.GetGetCurrentHook() {
+				filterApplied <- struct{}{}
 			}
 			if stats := frame.GetPipelineStats(); stats != nil {
 				select {
@@ -256,6 +341,19 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 
 	headers, body := make(chan struct{}), make(chan struct{})
 	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/filtered-request":
+			w.WriteHeader(http.StatusTeapot)
+			return
+		case "/filtered-mime":
+			w.Header().Set("Content-Type", "image/png")
+			w.WriteHeader(http.StatusTeapot)
+			return
+		case "/_next/static/app.js":
+			w.Header().Set("Content-Type", "application/javascript")
+			w.WriteHeader(http.StatusTeapot)
+			return
+		}
 		select {
 		case <-headers:
 		case <-req.Context().Done():
@@ -297,10 +395,13 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 		})
 	}
 	waitForStage("first_byte", 2000)
-	active, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{SessionId: session, View: "active"})
+	active, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+		SessionId: session, View: "active", TrafficScope: "capture", Stage: "first_byte",
+	})
 	require.NoError(t, err)
 	require.Len(t, active.GetTraces(), 1)
 	require.Equal(t, "first_byte", active.GetTraces()[0].GetStage())
+	require.Equal(t, "pending", active.GetTraces()[0].GetFilterDecision())
 	require.NotEmpty(t, active.GetTraces()[0].GetConnectionId())
 	close(headers)
 	waitForStage("read", 0)
@@ -311,6 +412,40 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, slow.GetTraces(), 1)
 	require.NotZero(t, slow.GetTraces()[0].GetFlowId())
+	require.Equal(t, "passed", slow.GetTraces()[0].GetFilterDecision())
+
+	for _, tc := range []struct{ path, decision string }{
+		{"/filtered-request", "request_excluded"},
+		{"/filtered-mime", "response_excluded"},
+		{"/_next/static/app.js", "static_js_excluded"},
+	} {
+		resp, err := (&http.Client{Transport: transport}).Get(origin.URL + tc.path)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusTeapot, resp.StatusCode)
+		require.Eventually(t, func() bool {
+			failed, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+				SessionId: session, View: "failed", TrafficScope: "all",
+			})
+			if err != nil {
+				return false
+			}
+			for _, tr := range failed.GetTraces() {
+				if tr.GetFilterDecision() == tc.decision {
+					return tr.GetFlowId() == 0
+				}
+			}
+			return false
+		}, 3*time.Second, 20*time.Millisecond, "missing trace decision for %s", tc.path)
+	}
+	failed, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+		SessionId: session, View: "failed", TrafficScope: "capture",
+	})
+	require.NoError(t, err)
+	require.Empty(t, failed.GetTraces())
+	require.EqualValues(t, 1, waitStats(func(s *ypb.MITMPipelineStats) bool {
+		return s.GetResponseMirroredTotal() == 4
+	}).GetPersistEnqueuedTotal())
 
 	upgraded := make(chan net.Conn, 1)
 	wsOrigin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -324,21 +459,27 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	}))
 	defer wsOrigin.Close()
 	wsAddr := wsOrigin.Listener.Addr().String()
-	browser, err := net.DialTimeout("tcp", proxyAddr, time.Second)
-	require.NoError(t, err)
-	defer browser.Close()
-	require.NoError(t, browser.SetReadDeadline(time.Now().Add(5*time.Second)))
-	_, err = fmt.Fprintf(browser, "GET http://%[1]s/socket HTTP/1.1\r\nHost: %[1]s\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n", wsAddr)
-	require.NoError(t, err)
-	resp, err := http.ReadResponse(bufio.NewReader(browser), nil)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
-	select {
-	case wsConn := <-upgraded:
-		defer wsConn.Close()
-	case <-ctx.Done():
-		t.Fatal("WebSocket origin did not upgrade")
+	openSocket := func() (net.Conn, net.Conn) {
+		t.Helper()
+		browser, err := net.DialTimeout("tcp", proxyAddr, time.Second)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = browser.Close() })
+		require.NoError(t, browser.SetReadDeadline(time.Now().Add(5*time.Second)))
+		_, err = fmt.Fprintf(browser, "GET http://%[1]s/socket HTTP/1.1\r\nHost: %[1]s\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n", wsAddr)
+		require.NoError(t, err)
+		resp, err := http.ReadResponse(bufio.NewReader(browser), nil)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+		select {
+		case wsConn := <-upgraded:
+			t.Cleanup(func() { _ = wsConn.Close() })
+			return browser, wsConn
+		case <-ctx.Done():
+			t.Fatal("WebSocket origin did not upgrade")
+			return nil, nil
+		}
 	}
+	browser, originSocket := openSocket()
 	stats := waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetDiagnostics().GetWebSocketOnline() == 1 })
 	require.Zero(t, stats.GetActiveTotal())
 	require.Zero(t, stats.GetUpstreamActive())
@@ -347,9 +488,36 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	require.Len(t, online.GetTraces(), 1)
 	require.Equal(t, "WebSocket", online.GetTraces()[0].GetProtocol())
 	require.Equal(t, "websocket_online", online.GetTraces()[0].GetStage())
+	require.Equal(t, "passed", online.GetTraces()[0].GetFilterDecision())
 
 	require.NoError(t, browser.Close())
+	require.NoError(t, originSocket.Close())
 	waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetDiagnostics().GetWebSocketOnline() == 0 })
+
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{UpdateFilterWebsocket: true, FilterWebsocket: true}))
+	// The subsequent response confirms both stream messages have been processed.
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{GetCurrentHook: true}))
+	select {
+	case <-filterApplied:
+	case <-ctx.Done():
+		t.Fatal("MITM did not process the WebSocket filter update")
+	}
+	browser, originSocket = openSocket()
+	waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetDiagnostics().GetWebSocketOnline() == 1 })
+	excluded, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+		SessionId: session, View: "websocket", TrafficScope: "capture",
+	})
+	require.NoError(t, err)
+	require.Empty(t, excluded.GetTraces())
+	excluded, err = client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+		SessionId: session, View: "websocket", TrafficScope: "all",
+	})
+	require.NoError(t, err)
+	require.Len(t, excluded.GetTraces(), 1)
+	require.Equal(t, "websocket_excluded", excluded.GetTraces()[0].GetFilterDecision())
+	require.Zero(t, excluded.GetTraces()[0].GetFlowId())
+	require.NoError(t, browser.Close())
+	require.NoError(t, originSocket.Close())
 	stop()
 	require.Eventually(t, func() bool {
 		_, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{SessionId: session, View: "storage"})
@@ -361,7 +529,7 @@ func BenchmarkMITMDiagnosticsSnapshot2685(b *testing.B) {
 	tracker := newMITMPipelineTracker("benchmark")
 	for range 2685 {
 		req, _ := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
-		tracker.requestObserved(req)
+		tracker.requestObserved(req, false)
 		tracker.requestDispatched(req, false)
 		httpctx.GetUpstreamObserver(req).BeginAttempt("HTTP/1.1").Phase(httpctx.UpstreamSend)
 	}
@@ -376,7 +544,7 @@ func BenchmarkMITMDiagnosticsLifecycle(b *testing.B) {
 	req, _ := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	b.ResetTimer()
 	for range b.N {
-		tracker.requestObserved(req)
+		tracker.requestObserved(req, false)
 		tracker.requestDispatched(req, false)
 		attempt := httpctx.GetUpstreamObserver(req).BeginAttempt("HTTP/1.1")
 		attempt.Phase(httpctx.UpstreamDial)

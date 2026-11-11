@@ -78016,10 +78016,12 @@ type MITMPipelineDiagnostics struct {
 	PersistWriteSamples                uint64                 `protobuf:"varint,11,opt,name=PersistWriteSamples,proto3" json:"PersistWriteSamples,omitempty"`
 	OldestWebSocketHandshakeAgeMs      int64                  `protobuf:"varint,12,opt,name=OldestWebSocketHandshakeAgeMs,proto3" json:"OldestWebSocketHandshakeAgeMs,omitempty"`
 	// Queue wait is measured for tasks whose accepted event precedes write start.
-	PersistQueueWaitP95Ms   int64  `protobuf:"varint,13,opt,name=PersistQueueWaitP95Ms,proto3" json:"PersistQueueWaitP95Ms,omitempty"`
-	PersistQueueWaitSamples uint64 `protobuf:"varint,14,opt,name=PersistQueueWaitSamples,proto3" json:"PersistQueueWaitSamples,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	PersistQueueWaitP95Ms                int64  `protobuf:"varint,13,opt,name=PersistQueueWaitP95Ms,proto3" json:"PersistQueueWaitP95Ms,omitempty"`
+	PersistQueueWaitSamples              uint64 `protobuf:"varint,14,opt,name=PersistQueueWaitSamples,proto3" json:"PersistQueueWaitSamples,omitempty"`
+	InScopeWebSocketHandshaking          int64  `protobuf:"varint,15,opt,name=InScopeWebSocketHandshaking,proto3" json:"InScopeWebSocketHandshaking,omitempty"`
+	OldestInScopeWebSocketHandshakeAgeMs int64  `protobuf:"varint,16,opt,name=OldestInScopeWebSocketHandshakeAgeMs,proto3" json:"OldestInScopeWebSocketHandshakeAgeMs,omitempty"`
+	unknownFields                        protoimpl.UnknownFields
+	sizeCache                            protoimpl.SizeCache
 }
 
 func (x *MITMPipelineDiagnostics) Reset() {
@@ -78150,6 +78152,20 @@ func (x *MITMPipelineDiagnostics) GetPersistQueueWaitSamples() uint64 {
 	return 0
 }
 
+func (x *MITMPipelineDiagnostics) GetInScopeWebSocketHandshaking() int64 {
+	if x != nil {
+		return x.InScopeWebSocketHandshaking
+	}
+	return 0
+}
+
+func (x *MITMPipelineDiagnostics) GetOldestInScopeWebSocketHandshakeAgeMs() int64 {
+	if x != nil {
+		return x.OldestInScopeWebSocketHandshakeAgeMs
+	}
+	return 0
+}
+
 type MITMStageStats struct {
 	state                        protoimpl.MessageState `protogen:"open.v1"`
 	Stage                        string                 `protobuf:"bytes,1,opt,name=Stage,proto3" json:"Stage,omitempty"`
@@ -78158,8 +78174,12 @@ type MITMStageStats struct {
 	BrowserBackgroundCount       int64                  `protobuf:"varint,4,opt,name=BrowserBackgroundCount,proto3" json:"BrowserBackgroundCount,omitempty"`
 	OldestBrowserBackgroundAgeMs int64                  `protobuf:"varint,5,opt,name=OldestBrowserBackgroundAgeMs,proto3" json:"OldestBrowserBackgroundAgeMs,omitempty"`
 	OldestOtherAgeMs             int64                  `protobuf:"varint,6,opt,name=OldestOtherAgeMs,proto3" json:"OldestOtherAgeMs,omitempty"`
-	unknownFields                protoimpl.UnknownFields
-	sizeCache                    protoimpl.SizeCache
+	FilteredCount                int64                  `protobuf:"varint,7,opt,name=FilteredCount,proto3" json:"FilteredCount,omitempty"`
+	// Includes traffic still awaiting a filter decision. Excludes browser background traffic.
+	InScopeOtherCount       int64 `protobuf:"varint,8,opt,name=InScopeOtherCount,proto3" json:"InScopeOtherCount,omitempty"`
+	OldestInScopeOtherAgeMs int64 `protobuf:"varint,9,opt,name=OldestInScopeOtherAgeMs,proto3" json:"OldestInScopeOtherAgeMs,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *MITMStageStats) Reset() {
@@ -78234,6 +78254,27 @@ func (x *MITMStageStats) GetOldestOtherAgeMs() int64 {
 	return 0
 }
 
+func (x *MITMStageStats) GetFilteredCount() int64 {
+	if x != nil {
+		return x.FilteredCount
+	}
+	return 0
+}
+
+func (x *MITMStageStats) GetInScopeOtherCount() int64 {
+	if x != nil {
+		return x.InScopeOtherCount
+	}
+	return 0
+}
+
+func (x *MITMStageStats) GetOldestInScopeOtherAgeMs() int64 {
+	if x != nil {
+		return x.OldestInScopeOtherAgeMs
+	}
+	return 0
+}
+
 type GetMITMDiagnosticsRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=SessionId,proto3" json:"SessionId,omitempty"`
@@ -78245,8 +78286,11 @@ type GetMITMDiagnosticsRequest struct {
 	ToUnixMs     int64  `protobuf:"varint,6,opt,name=ToUnixMs,proto3" json:"ToUnixMs,omitempty"`
 	TraceId      uint64 `protobuf:"varint,7,opt,name=TraceId,proto3" json:"TraceId,omitempty"`
 	ConnectionId string `protobuf:"bytes,8,opt,name=ConnectionId,proto3" json:"ConnectionId,omitempty"`
-	// Empty or all preserves the full view. focus and browser filter before paging.
-	TrafficScope  string `protobuf:"bytes,9,opt,name=TrafficScope,proto3" json:"TrafficScope,omitempty"`
+	// capture includes undecided traffic and excludes requests rejected by the MITM filters.
+	// Empty or all includes every retained sample. focus and browser are legacy scopes.
+	TrafficScope string `protobuf:"bytes,9,opt,name=TrafficScope,proto3" json:"TrafficScope,omitempty"`
+	// For the active view, select HTTP requests currently in this stage.
+	Stage         string `protobuf:"bytes,10,opt,name=Stage,proto3" json:"Stage,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -78340,6 +78384,13 @@ func (x *GetMITMDiagnosticsRequest) GetConnectionId() string {
 func (x *GetMITMDiagnosticsRequest) GetTrafficScope() string {
 	if x != nil {
 		return x.TrafficScope
+	}
+	return ""
+}
+
+func (x *GetMITMDiagnosticsRequest) GetStage() string {
+	if x != nil {
+		return x.Stage
 	}
 	return ""
 }
@@ -78566,6 +78617,8 @@ type MITMTraceEntry struct {
 	SpansTruncated bool             `protobuf:"varint,16,opt,name=SpansTruncated,proto3" json:"SpansTruncated,omitempty"`
 	// Known browser service inferred from the destination hostname.
 	BrowserService string `protobuf:"bytes,17,opt,name=BrowserService,proto3" json:"BrowserService,omitempty"`
+	// pending, passed, request_excluded, response_excluded, static_js_excluded, or websocket_excluded.
+	FilterDecision string `protobuf:"bytes,18,opt,name=FilterDecision,proto3" json:"FilterDecision,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -78715,6 +78768,13 @@ func (x *MITMTraceEntry) GetSpansTruncated() bool {
 func (x *MITMTraceEntry) GetBrowserService() string {
 	if x != nil {
 		return x.BrowserService
+	}
+	return ""
+}
+
+func (x *MITMTraceEntry) GetFilterDecision() string {
+	if x != nil {
+		return x.FilterDecision
 	}
 	return ""
 }
@@ -86930,7 +86990,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12OldestPersistAgeMs\x18\x18 \x01(\x03R\x12OldestPersistAgeMs\x128\n" +
 	"\x17DatabaseWriteQueueDepth\x18\x19 \x01(\x03R\x17DatabaseWriteQueueDepth\x12>\n" +
 	"\x1aDatabaseWriteQueueCapacity\x18\x1a \x01(\x03R\x1aDatabaseWriteQueueCapacity\x12>\n" +
-	"\vDiagnostics\x18\x1b \x01(\v2\x1c.ypb.MITMPipelineDiagnosticsR\vDiagnostics\"\xbc\x06\n" +
+	"\vDiagnostics\x18\x1b \x01(\v2\x1c.ypb.MITMPipelineDiagnosticsR\vDiagnostics\"\xd2\a\n" +
 	"\x17MITMPipelineDiagnostics\x123\n" +
 	"\n" +
 	"HTTPStages\x18\x01 \x03(\v2\x13.ypb.MITMStageStatsR\n" +
@@ -86948,14 +87008,19 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13PersistWriteSamples\x18\v \x01(\x04R\x13PersistWriteSamples\x12D\n" +
 	"\x1dOldestWebSocketHandshakeAgeMs\x18\f \x01(\x03R\x1dOldestWebSocketHandshakeAgeMs\x124\n" +
 	"\x15PersistQueueWaitP95Ms\x18\r \x01(\x03R\x15PersistQueueWaitP95Ms\x128\n" +
-	"\x17PersistQueueWaitSamples\x18\x0e \x01(\x04R\x17PersistQueueWaitSamples\"\x86\x02\n" +
+	"\x17PersistQueueWaitSamples\x18\x0e \x01(\x04R\x17PersistQueueWaitSamples\x12@\n" +
+	"\x1bInScopeWebSocketHandshaking\x18\x0f \x01(\x03R\x1bInScopeWebSocketHandshaking\x12R\n" +
+	"$OldestInScopeWebSocketHandshakeAgeMs\x18\x10 \x01(\x03R$OldestInScopeWebSocketHandshakeAgeMs\"\x94\x03\n" +
 	"\x0eMITMStageStats\x12\x14\n" +
 	"\x05Stage\x18\x01 \x01(\tR\x05Stage\x12\x14\n" +
 	"\x05Count\x18\x02 \x01(\x03R\x05Count\x12 \n" +
 	"\vOldestAgeMs\x18\x03 \x01(\x03R\vOldestAgeMs\x126\n" +
 	"\x16BrowserBackgroundCount\x18\x04 \x01(\x03R\x16BrowserBackgroundCount\x12B\n" +
 	"\x1cOldestBrowserBackgroundAgeMs\x18\x05 \x01(\x03R\x1cOldestBrowserBackgroundAgeMs\x12*\n" +
-	"\x10OldestOtherAgeMs\x18\x06 \x01(\x03R\x10OldestOtherAgeMs\"\x99\x02\n" +
+	"\x10OldestOtherAgeMs\x18\x06 \x01(\x03R\x10OldestOtherAgeMs\x12$\n" +
+	"\rFilteredCount\x18\a \x01(\x03R\rFilteredCount\x12,\n" +
+	"\x11InScopeOtherCount\x18\b \x01(\x03R\x11InScopeOtherCount\x128\n" +
+	"\x17OldestInScopeOtherAgeMs\x18\t \x01(\x03R\x17OldestInScopeOtherAgeMs\"\xaf\x02\n" +
 	"\x19GetMITMDiagnosticsRequest\x12\x1c\n" +
 	"\tSessionId\x18\x01 \x01(\tR\tSessionId\x12\x12\n" +
 	"\x04View\x18\x02 \x01(\tR\x04View\x12\x16\n" +
@@ -86967,7 +87032,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bToUnixMs\x18\x06 \x01(\x03R\bToUnixMs\x12\x18\n" +
 	"\aTraceId\x18\a \x01(\x04R\aTraceId\x12\"\n" +
 	"\fConnectionId\x18\b \x01(\tR\fConnectionId\x12\"\n" +
-	"\fTrafficScope\x18\t \x01(\tR\fTrafficScope\"\xc2\x02\n" +
+	"\fTrafficScope\x18\t \x01(\tR\fTrafficScope\x12\x14\n" +
+	"\x05Stage\x18\n" +
+	" \x01(\tR\x05Stage\"\xc2\x02\n" +
 	"\x1aGetMITMDiagnosticsResponse\x12\x1c\n" +
 	"\tSessionId\x18\x01 \x01(\tR\tSessionId\x12,\n" +
 	"\x11GeneratedAtUnixMs\x18\x02 \x01(\x03R\x11GeneratedAtUnixMs\x120\n" +
@@ -86985,7 +87052,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14PersistEnqueuedTotal\x18\x06 \x01(\x04R\x14PersistEnqueuedTotal\x12&\n" +
 	"\x0ePersistedTotal\x18\a \x01(\x04R\x0ePersistedTotal\x12.\n" +
 	"\x12PersistFailedTotal\x18\b \x01(\x04R\x12PersistFailedTotal\x12&\n" +
-	"\x0ePersistBlocked\x18\t \x01(\x03R\x0ePersistBlocked\"\xae\x04\n" +
+	"\x0ePersistBlocked\x18\t \x01(\x03R\x0ePersistBlocked\"\xd6\x04\n" +
 	"\x0eMITMTraceEntry\x12\x18\n" +
 	"\aTraceId\x18\x01 \x01(\x04R\aTraceId\x12\x12\n" +
 	"\x04Host\x18\x02 \x01(\tR\x04Host\x12\x16\n" +
@@ -87006,7 +87073,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tErrorCode\x18\x0e \x01(\tR\tErrorCode\x12(\n" +
 	"\x05Spans\x18\x0f \x03(\v2\x12.ypb.MITMTraceSpanR\x05Spans\x12&\n" +
 	"\x0eSpansTruncated\x18\x10 \x01(\bR\x0eSpansTruncated\x12&\n" +
-	"\x0eBrowserService\x18\x11 \x01(\tR\x0eBrowserService\"\xb1\x01\n" +
+	"\x0eBrowserService\x18\x11 \x01(\tR\x0eBrowserService\x12&\n" +
+	"\x0eFilterDecision\x18\x12 \x01(\tR\x0eFilterDecision\"\xb1\x01\n" +
 	"\rMITMTraceSpan\x12\x14\n" +
 	"\x05Stage\x18\x01 \x01(\tR\x05Stage\x12(\n" +
 	"\x0fStartedAtUnixMs\x18\x02 \x01(\x03R\x0fStartedAtUnixMs\x12*\n" +

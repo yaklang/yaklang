@@ -93,8 +93,10 @@ func (t *mitmPipelineTracker) summarizeMetrics(now time.Time, d *ypb.MITMPipelin
 	d.PersistWriteP95Ms, d.PersistWriteSamples = write.p95()
 	d.PersistQueueWaitP95Ms, d.PersistQueueWaitSamples = queue.p95()
 	cutoff := now.Add(-mitmHistorySeconds * time.Second)
-	t.slow.expire(cutoff, mitmTraceSlow)
-	t.failed.expire(cutoff, mitmTraceFailed)
+	for _, samples := range []*mitmTraceSamples{&t.samples, &t.filteredSamples} {
+		samples.slow.expire(cutoff, mitmTraceSlow)
+		samples.failed.expire(cutoff, mitmTraceFailed)
+	}
 }
 
 type mitmPersistState struct {

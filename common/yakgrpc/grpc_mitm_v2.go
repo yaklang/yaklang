@@ -1267,7 +1267,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) (hijackReq []byte) {
-		pipelineTracker.requestObserved(originReqIns)
+		pipelineTracker.requestObserved(originReqIns, filterWebSocket.IsSet())
 		defer func() {
 			if hijackReq == nil || httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 				pipelineTracker.requestDropped(originReqIns)
@@ -1294,11 +1294,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		var urlPath string
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
+			decision := mitmFilterResponseExcluded
 			// 这里仅做“强路径”的提前过滤：避免影响普通 JS（弱路径由后续镜像阶段结合更多信号判定）。
 			if filterBundledStaticJS.IsSet() && isJavaScriptMIME(t) && isBundledJavaScriptStrongPath(strings.ToLower(urlPath)) {
 				ret = true
+				decision = mitmFilterStaticJSExcluded
 			}
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
+			if ret {
+				pipelineTracker.observeFilterExclusion(originReqIns, decision)
+			}
 			return ret
 		})
 
@@ -1340,6 +1345,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		// 过滤
 		if !filterManager.IsPassed(method, hostname, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
+			pipelineTracker.observeFilterExclusion(originReqIns, mitmFilterRequestExcluded)
 			return req
 		}
 
@@ -1483,6 +1489,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool { // update callback set resp filter feedback
 			ret := !filterManager.IsMIMEPassed(t)
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
+			if ret {
+				pipelineTracker.observeFilterExclusion(originReqIns, mitmFilterResponseExcluded)
+			}
 			if ret && httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
 				hijackListFeedback(Hijack_List_Delete, taskInfo)
 				hijackManger.unRegister(task.taskID)
@@ -1720,8 +1729,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		responseMirrorAtUnixMs := time.Now().UnixMilli()
 		// Filtered responses skip the response-hijack callback, so mirror is also
 		// the fallback terminal point for their upstream stage.
-		pipelineTracker.upstreamCompleted(req, httpctx.GetUpstreamRoundTripSucceeded(req), rsp.StatusCode)
-		pipelineTracker.responseMirrored(req)
+		upstreamSucceeded := httpctx.GetUpstreamRoundTripSucceeded(req)
+		pipelineTracker.upstreamCompleted(req, upstreamSucceeded, rsp.StatusCode)
 		defer pipelineTracker.responseProcessingFinished(req)
 		addCounter()
 
@@ -1731,7 +1740,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		isRequestModified := httpctx.GetRequestIsModified(req)
 		isResponseModified := httpctx.GetResponseIsModified(req)
 		isResponseDropped := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped)
-		isFiltered := isFilteredByResponse || isFilteredByRequest || (filterWebSocket.IsSet() && httpctx.GetIsWebWebsocketRequest(req))
+		isFilteredByWebSocket := filterWebSocket.IsSet() && httpctx.GetIsWebWebsocketRequest(req)
+		isFiltered := isFilteredByResponse || isFilteredByRequest || isFilteredByWebSocket
 		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 		isModified := isRequestModified || isResponseModified
 
@@ -1751,6 +1761,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		// 默认过滤 chunk/static JS（避免误伤：综合 path/mime/缓存头/少量 body 特征判定）
+		isFilteredByStaticJS := false
 		if filterBundledStaticJS.IsSet() && rsp != nil {
 			urlPath := ""
 			if req != nil && req.URL != nil {
@@ -1780,8 +1791,24 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
 				isFilteredByResponse = true
 				isFiltered = true
+				isFilteredByStaticJS = true
 			}
 		}
+
+		filterDecision := mitmFilterPending
+		switch {
+		case isFilteredByRequest:
+			filterDecision = mitmFilterRequestExcluded
+		case isFilteredByWebSocket:
+			filterDecision = mitmFilterWebSocketExcluded
+		case isFilteredByStaticJS:
+			filterDecision = mitmFilterStaticJSExcluded
+		case isFilteredByResponse:
+			filterDecision = mitmFilterResponseExcluded
+		case upstreamSucceeded || httpctx.GetShouldMockResponse(req):
+			filterDecision = mitmFilterPassed
+		}
+		pipelineTracker.responseMirrored(req, filterDecision)
 
 		// 内置敏感信息检测(TrafficGuard): 在过滤判定之前无条件扫描(不受任何过滤策略影响)。
 		// 命中敏感信息、且本应被过滤的流量, 改以"插件流量"(source_type=scan + FromPlugin)形式保存到插件输出,

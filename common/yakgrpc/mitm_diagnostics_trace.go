@@ -19,11 +19,36 @@ import (
 const mitmSlowThreshold = 2 * time.Second
 const mitmTraceSampleLimit = 128
 
+type mitmFilterDecision uint8
+
+const (
+	mitmFilterPending mitmFilterDecision = iota
+	mitmFilterPassed
+	mitmFilterRequestExcluded
+	mitmFilterResponseExcluded
+	mitmFilterStaticJSExcluded
+	mitmFilterWebSocketExcluded
+)
+
+var mitmFilterDecisionNames = [...]string{
+	mitmFilterPending:           "pending",
+	mitmFilterPassed:            "passed",
+	mitmFilterRequestExcluded:   "request_excluded",
+	mitmFilterResponseExcluded:  "response_excluded",
+	mitmFilterStaticJSExcluded:  "static_js_excluded",
+	mitmFilterWebSocketExcluded: "websocket_excluded",
+}
+
+func (d mitmFilterDecision) excluded() bool {
+	return d >= mitmFilterRequestExcluded
+}
+
 type mitmTraceHead struct {
 	id, flowID                  uint64
 	host, method, protocol      string
 	connectionID                string
 	stage                       mitmPipelineStage
+	filter                      mitmFilterDecision
 	chromeAutofill              bool
 	outcome, errorCode          string
 	statusCode                  int32
@@ -115,6 +140,10 @@ func (t *mitmPipelineTracker) upstreamEvent(req *http.Request, event httpctx.Ups
 	if event.Phase == httpctx.UpstreamAttempt {
 		tr.endStage(now)
 		head.stage, head.stageAt = mitmPipelineStageUpstream, now
+		// Response filtering belongs to the attempt that supplied the headers.
+		if head.filter == mitmFilterResponseExcluded || head.filter == mitmFilterStaticJSExcluded {
+			head.filter = mitmFilterPending
+		}
 		head.attempts++
 		head.protocol = event.Protocol
 		state.lastAttemptID = event.AttemptID
@@ -234,6 +263,11 @@ type mitmTraceRing struct {
 	next    int
 }
 
+type mitmTraceSamples struct {
+	slow   mitmTraceRing
+	failed mitmTraceRing
+}
+
 func (r *mitmTraceRing) add(tr *mitmTrace, flag uint8) {
 	if tr.kept&flag != 0 {
 		return
@@ -256,12 +290,16 @@ func (r *mitmTraceRing) expire(before time.Time, flag uint8) {
 }
 
 func (t *mitmPipelineTracker) retainTrace(tr *mitmTrace) {
+	samples := &t.samples
+	if tr.head.filter.excluded() {
+		samples = &t.filteredSamples
+	}
 	if tr.slow {
-		t.slow.add(tr, mitmTraceSlow)
+		samples.slow.add(tr, mitmTraceSlow)
 	}
 	switch tr.head.outcome {
 	case "failed", "canceled", "http_error", "dropped", "persist_failed":
-		t.failed.add(tr, mitmTraceFailed)
+		samples.failed.add(tr, mitmTraceFailed)
 	}
 }
 
@@ -279,6 +317,7 @@ func (h mitmTraceHead) toProto() *ypb.MITMTraceEntry {
 		Stage: mitmStageNames[h.stage], Outcome: h.outcome, ErrorCode: h.errorCode,
 		StartedAtUnixMs: h.startedAt.UnixMilli(), StageAtUnixMs: h.stageAt.UnixMilli(),
 		FinishedAtUnixMs: unixMsOrZero(h.endedAt), Attempts: h.attempts, StatusCode: h.statusCode,
+		FilterDecision: mitmFilterDecisionNames[h.filter],
 	}
 	if h.chromeAutofill {
 		entry.BrowserService = "chrome_autofill"
