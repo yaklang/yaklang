@@ -83,7 +83,7 @@ func newAntlrEngine(ctx context.Context) *antlr4yak.Engine {
 		libs = maps.Clone(libs)
 		currentContext := func() context.Context {
 			if frame := engine.GetVM().CurrentFM(); frame != nil {
-				return frame.GetContext()
+				return frame.NativeCallContext()
 			}
 			return nil
 		}

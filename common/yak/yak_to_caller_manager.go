@@ -57,20 +57,20 @@ func init() {
 		exports := maps.Clone(HooksExports)
 		exports["NewManager"] = func() *YakToCallerManager {
 			caller := NewYakToCallerManager()
-			caller.managedSSHContext = contextForInvocation()
+			caller.managedSSHContext = contextForInvocation
 			return caller
 		}
 		exports["NewMixPluginCaller"] = func() (*MixPluginCaller, error) {
 			caller, err := NewMixPluginCaller()
 			if err == nil {
-				caller.callers.managedSSHContext = contextForInvocation()
+				caller.callers.managedSSHContext = contextForInvocation
 			}
 			return caller, err
 		}
 		exports["NewMixPluginCallerWithFilter"] = func(webFilter filter.Filterable) (*MixPluginCaller, error) {
 			caller, err := NewMixPluginCallerWithFilter(webFilter)
 			if err == nil {
-				caller.callers.managedSSHContext = contextForInvocation()
+				caller.callers.managedSSHContext = contextForInvocation
 			}
 			return caller, err
 		}
@@ -323,7 +323,8 @@ func WithCallConfigItemFuncs(itemFuncs ...func() interface{}) CallOpt {
 }
 
 type YakFunctionCaller struct {
-	Handler func(callback func(*yakvm.Frame), args ...any) any
+	Handler         func(callback func(*yakvm.Frame), args ...any) any
+	callWithContext func(context.Context, func(*yakvm.Frame), ...any) any
 }
 
 type Caller struct {
@@ -346,7 +347,7 @@ type YakToCallerManager struct {
 	loadTimeout        time.Duration
 	callTimeout        time.Duration
 	ctx                context.Context
-	managedSSHContext  context.Context
+	managedSSHContext  func() context.Context
 	runtimeId          string
 	proxy              string
 	vulFilter          filter.Filterable
@@ -545,8 +546,10 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	if finalCtx == nil {
 		finalCtx = y.getDefaultContext()
 	}
-	if y.managedSSHContext != nil && !sshguard.SameScope(y.managedSSHContext, finalCtx) {
-		finalCtx = y.managedSSHContext
+	if y.managedSSHContext != nil {
+		if managedCtx := y.managedSSHContext(); !sshguard.SameScope(managedCtx, finalCtx) {
+			finalCtx = managedCtx
+		}
 	}
 
 	canFunc, ok := finalCtx.Value("cancel").(context.CancelFunc)
@@ -1011,6 +1014,16 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 	if runtimeCtx == nil {
 		runtimeCtx = y.getDefaultContext()
 	}
+	if y.managedSSHContext != nil {
+		if runtimeCtx.Err() != nil {
+			return nil
+		}
+		managedCtx, cancel := context.WithCancel(y.managedSSHContext())
+		defer cancel()
+		stop := context.AfterFunc(runtimeCtx, cancel)
+		defer stop()
+		runtimeCtx = managedCtx
+	}
 
 	if y.table == nil {
 		y.table = new(sync.Map)
@@ -1054,6 +1067,7 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 	}
 
 	call := func(pluginRuntimeID string, i *Caller) any {
+		callCtx := runtimeCtx
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("call failed: \n%v\n, stack: %v", err, utils.ErrorStack(err))
@@ -1070,11 +1084,11 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 			var trace *PluginExecutionTrace
 			if y.enableTracing {
 				// 为每次调用创建新的跟踪记录
-				trace = y.executionTracker.CreateTrace(i.Id, name, runtimeCtx)
+				trace = y.executionTracker.CreateTrace(i.Id, name, callCtx)
 				// 开始执行
 				y.executionTracker.StartExecution(trace.TraceID, items)
 				// 使用跟踪的上下文替换原始上下文
-				runtimeCtx = trace.RuntimeCtx
+				callCtx = trace.RuntimeCtx
 				log.Debugf("创建新的插件执行跟踪: 插件[%s], Hook[%s], TraceID[%s]", i.Id, name, trace.TraceID)
 			}
 
@@ -1112,8 +1126,8 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 
 				// 检查是否被取消
 				select {
-				case <-runtimeCtx.Done():
-					execErr = runtimeCtx.Err()
+				case <-callCtx.Done():
+					execErr = callCtx.Err()
 					if trace != nil {
 						y.executionTracker.UpdateTraceStatus(trace.TraceID, PluginStatusCancelled, nil, execErr)
 					}
@@ -1121,11 +1135,15 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 				default:
 				}
 
-				result = i.Core.Handler(
-					func(frame *yakvm.Frame) {
-						frame.GlobalVariables = frame.GlobalVariables.Deep1Clone()
-						frame.GlobalVariables.Store(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID, pluginRuntimeID)
-					}, items...)
+				bindFrame := func(frame *yakvm.Frame) {
+					frame.GlobalVariables = frame.GlobalVariables.Deep1Clone()
+					frame.GlobalVariables.Store(consts.PLUGIN_CONTEXT_KEY_RUNTIME_ID, pluginRuntimeID)
+				}
+				if y.managedSSHContext != nil && i.Core.callWithContext != nil {
+					result = i.Core.callWithContext(callCtx, bindFrame, items...)
+				} else {
+					result = i.Core.Handler(bindFrame, items...)
+				}
 			}()
 
 			// 更新跟踪状态
@@ -1363,67 +1381,71 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 		numIn := f.GetNumIn()
 
 		nIns := ins
+		invoke := func(callCtx context.Context, callback func(*yakvm.Frame), args ...any) any {
+			subCtx, cancel := context.WithTimeout(callCtx, y.callTimeout)
+			defer cancel()
+			if callArgHook, ok := callArgumentHooks[funcName]; ok {
+				args = callArgHook(funcName, numIn, args)
+			}
+
+			type callResult struct {
+				value any
+				err   error
+			}
+			// The caller may return as soon as subCtx is canceled. Keep one
+			// buffered result slot so the VM goroutine can still publish its
+			// terminal state and exit instead of leaking forever on a channel send.
+			resultCh := make(chan callResult, 1)
+			go func() {
+				result := callResult{}
+				defer func() {
+					printStack := false
+					if err := recover(); err != nil {
+						fmtErr := utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
+						y.Err = fmtErr
+						result.err = fmtErr
+						printStack = os.Getenv("YAK_IN_TERMINAL_MODE") == ""
+					}
+					resultCh <- result
+					// Publish the terminal result before potentially expensive
+					// diagnostics so cancellation and timeout callers are never
+					// held up by stack formatting.
+					if printStack {
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				result.value, result.err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
+			}()
+
+			select {
+			case result := <-resultCh:
+				//if err != nil && !errors.Is(err, context.Canceled) {
+				//	log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
+				//}
+				if result.err != nil {
+					// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
+					panic(result.err)
+				}
+				return result.value
+			case <-subCtx.Done():
+				err := subCtx.Err()
+				if errors.Is(err, context.DeadlineExceeded) {
+					log.Errorf("call %s YakFunction timeout after %v seconds", scriptName, y.callTimeout)
+				} else if errors.Is(err, context.Canceled) {
+
+				} else {
+					log.Errorf("call %s YakFunction done by unknown error: %v", scriptName, err)
+				}
+				// 重要：抛出超时或取消错误
+				panic(err)
+			}
+			return nil
+		}
 		fTable[funcName] = &YakFunctionCaller{
 			Handler: func(callback func(*yakvm.Frame), args ...any) any {
-				subCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
-				defer cancel()
-				if callArgHook, ok := callArgumentHooks[funcName]; ok {
-					args = callArgHook(funcName, numIn, args)
-				}
-
-				type callResult struct {
-					value any
-					err   error
-				}
-				// The caller may return as soon as subCtx is canceled. Keep one
-				// buffered result slot so the VM goroutine can still publish its
-				// terminal state and exit instead of leaking forever on a channel send.
-				resultCh := make(chan callResult, 1)
-				go func() {
-					result := callResult{}
-					defer func() {
-						printStack := false
-						if err := recover(); err != nil {
-							fmtErr := utils.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, scriptName, err)
-							y.Err = fmtErr
-							result.err = fmtErr
-							printStack = os.Getenv("YAK_IN_TERMINAL_MODE") == ""
-						}
-						resultCh <- result
-						// Publish the terminal result before potentially expensive
-						// diagnostics so cancellation and timeout callers are never
-						// held up by stack formatting.
-						if printStack {
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-					}()
-					result.value, result.err = nIns.CallYakFunctionNativeWithFrameCallback(subCtx, callback, f, args...)
-				}()
-
-				select {
-				case result := <-resultCh:
-					//if err != nil && !errors.Is(err, context.Canceled) {
-					//	log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
-					//}
-					if result.err != nil {
-						// 重要：抛出错误而不是返回nil，这样Call方法就能捕获到错误
-						panic(result.err)
-					}
-					return result.value
-				case <-subCtx.Done():
-					err := subCtx.Err()
-					if errors.Is(err, context.DeadlineExceeded) {
-						log.Errorf("call %s YakFunction timeout after %v seconds", scriptName, y.callTimeout)
-					} else if errors.Is(err, context.Canceled) {
-
-					} else {
-						log.Errorf("call %s YakFunction done by unknown error: %v", scriptName, err)
-					}
-					// 重要：抛出超时或取消错误
-					panic(err)
-				}
-				return nil
+				return invoke(pluginContext.Ctx, callback, args...)
 			},
+			callWithContext: invoke,
 		}
 
 	}

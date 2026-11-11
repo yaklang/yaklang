@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -13,16 +14,35 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/sshguard"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func init() {
-	aicommon.RegisterForgeYakEngineCallbackWithContext(func(ctx context.Context, name string, input any, opts ...any) (any, error) {
-		return ExecuteForge(name, input, append([]any{WithContext(ctx)}, opts...)...)
+	aicommon.RegisterForgeYakEngineCallbackWithContext(executeForgeWithContext)
+	yaklang.ImportGuardedSSHExport("aiagent", func(currentContext func() context.Context) any {
+		exports := maps.Clone(AIAgentExport)
+		exports["ExecuteForge"] = func(name string, input any, opts ...any) (any, error) {
+			return executeForgeWithContext(currentContext(), name, input, opts...)
+		}
+		return exports
 	})
+}
+
+func executeForgeWithContext(ctx context.Context, name string, input any, opts ...any) (any, error) {
+	if _, managed := sshguard.FromContext(ctx); managed {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		// Options supplied by a Yak caller must not replace the host context.
+		options := append(append([]any(nil), opts...), WithContext(ctx))
+		return ExecuteForge(name, input, options...)
+	}
+	return ExecuteForge(name, input, append([]any{WithContext(ctx)}, opts...)...)
 }
 
 var HOOK_AI_FORGE = "forgeHandle"
