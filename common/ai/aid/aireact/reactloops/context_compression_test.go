@@ -257,7 +257,8 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 					cfg.Timeline.PushText(id, "%s", historyText[id])
 				}
 				loop := makeSchemaStabilityTestLoop(cfg)
-				loop.functionCallMode, loop.useSpeedPriorityAI = native, false
+				// Compression stays on Quality even when the surrounding loop uses Speed.
+				loop.functionCallMode, loop.useSpeedPriorityAI = native, true
 				loop.invoker = mock.NewMockInvoker(ctx)
 				loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
 				loop.actions.Set("unsafe_action", &LoopAction{ActionType: "unsafe_action", ActionHandler: func(*ReActLoop, *aicommon.Action, *LoopActionHandlerOperator) { t.Error("wrong action executed") }})
