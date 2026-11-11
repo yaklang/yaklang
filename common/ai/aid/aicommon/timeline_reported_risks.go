@@ -12,6 +12,8 @@ import (
 
 const TimelinePromotedKindReportedRisk = "reported-risk"
 
+const reportedRiskPromptTitle = "## 已上报风险（Reported Risks）"
+
 func newReportedRiskTimelineItem(risk ReportedRiskItem) (*TimelineItem, error) {
 	payload, err := json.Marshal(risk)
 	if err != nil {
@@ -78,7 +80,8 @@ func timelineReportedRiskPrompt(op *PromotableTimelineItem) string {
 	if json.Unmarshal([]byte(op.Payload), &risk) != nil || risk.ID == "" {
 		return ""
 	}
-	return fmt.Sprintf("[reported_risk]:\n%s\n此漏洞已上报到风险库，不要重复调用 `cybersecurity-risk`；补充证据请写入 evidence。", formatReportedRiskLine(&risk))
+	return fmt.Sprintf("%s\n\n%s\n\n此风险已上报到风险库，不要重复调用 `cybersecurity-risk`；补充证据请写入 evidence。",
+		reportedRiskPromptTitle, formatReportedRiskLine(&risk))
 }
 
 // Frozen reports retain their original order and complete individual prompt
@@ -96,12 +99,15 @@ func renderPromotedReportedRisks(state *TimelinePromotedState) string {
 	sort.Slice(entries, func(i, j int) bool { return entries[i].SourceItemID < entries[j].SourceItemID })
 	var parts []string
 	for _, entry := range entries {
-		text := timelineReportedRiskPrompt(&PromotableTimelineItem{
-			Kind: entry.Kind, Operation: TimelinePromotedOperationUpsert, Payload: entry.Payload,
-		})
-		if text != "" {
-			parts = append(parts, text)
+		var risk ReportedRiskItem
+		if json.Unmarshal([]byte(entry.Payload), &risk) != nil || risk.ID == "" {
+			continue
 		}
+		parts = append(parts, "- "+formatReportedRiskLine(&risk))
 	}
-	return strings.Join(parts, "\n\n")
+	if len(parts) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s\n\n以下风险已上报到风险库，不要重复调用 `cybersecurity-risk`；补充证据请写入 evidence。\n\n%s",
+		reportedRiskPromptTitle, strings.Join(parts, "\n\n"))
 }
