@@ -154,3 +154,52 @@ func readSubForgeTree(t *testing.T, events <-chan *schema.AiOutputEvent) subForg
 		return subForgeTaskTree{}
 	}
 }
+
+func TestResilienceSubForgeTaskTreeCancellationBeforeStart(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	blocked := make(chan struct{})
+	release := make(chan struct{})
+	defer close(release)
+	cfg := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE &&
+				event.GetContentJSONPath("$.call_tool_id") == "first" &&
+				event.GetContentJSONPath("$.revision") == "1" {
+				close(blocked)
+				<-release
+			}
+		}))
+	session := &Session{Config: cfg}
+	task := aicommon.NewStatefulTaskBase("task", "query", ctx, cfg.GetEmitter(), true)
+	started := make(chan struct{}, 2)
+	binding := SubForgeTool{Schema: mcp.NewTool("sub_forge_inspect"), Run: func(context.Context, aitool.InvokeParams, []*aitool.Tool, ...aicommon.ConfigOption) (any, error) {
+		started <- struct{}{}
+		return "child result", nil
+	}}
+	callCtx, cancelCall := context.WithCancel(ctx)
+	defer cancelCall()
+	finished := make(chan error, 1)
+	go func() {
+		_, err := session.invokeSubForge(callCtx, task, "first", binding, nil)
+		finished <- err
+	}()
+	select {
+	case <-blocked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("initial snapshot did not reach the event handler")
+	}
+	cancelCall()
+	select {
+	case err := <-finished:
+		require.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, aitool.ErrInvocationNotStarted)
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancellation waited for the event handler")
+	}
+	require.Empty(t, started)
+	result, err := session.invokeSubForge(ctx, task, "retry", binding, nil)
+	require.NoError(t, err)
+	require.Equal(t, "child result", result)
+	require.Len(t, started, 1)
+}
