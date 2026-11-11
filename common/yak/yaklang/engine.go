@@ -1,9 +1,11 @@
 package yaklang
 
 import (
+	"context"
 	"os"
 	"reflect"
 
+	"github.com/yaklang/yaklang/common/utils/sshguard"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
@@ -99,4 +101,25 @@ func engineAutoInitYakitOverride(engine *antlr4yak.Engine) func() {
 }
 func New() *antlr4yak.Engine {
 	return NewAntlrEngine()
+}
+
+// guardedExports stores library factories registered at initialization. The
+// authorization policy itself is always owned by the supplied context.
+var guardedExports = map[string]func(context.Context) any{}
+
+func ImportGuardedSSHExport(name string, bind func(context.Context) any) {
+	guardedExports[name] = bind
+}
+
+func NewWithContext(ctx context.Context) *antlr4yak.Engine {
+	engine := New()
+	if _, required := sshguard.FromContext(ctx); !required {
+		return engine
+	}
+	vars := map[string]any{"ssh": yaklib.SSHExportsForContext(ctx)}
+	for name, bind := range guardedExports {
+		vars[name] = bind(ctx)
+	}
+	engine.SetVars(vars)
+	return engine
 }

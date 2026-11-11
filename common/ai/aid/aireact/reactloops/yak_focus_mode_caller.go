@@ -95,7 +95,7 @@ func NewFocusModeYakHookCaller(
 
 	rootCtx, cancel := context.WithCancel(cfg.parentCtx)
 
-	engine := yaklang.New()
+	engine := yaklang.NewWithContext(rootCtx)
 	if engine == nil {
 		cancel()
 		return nil, utils.Error("yak focus mode caller: failed to create yak engine")

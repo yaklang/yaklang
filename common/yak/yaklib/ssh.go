@@ -149,11 +149,17 @@ func WithSSHTimeout(timeout float64) SSHOption {
 
 // SSHClient wraps utils.SSHClient with script-friendly methods
 type SSHClient struct {
-	client *utils.SSHClient
+	client   *utils.SSHClient
+	target   string
+	username string
+	guard    *sshCommandBinding
 }
 
 // Run executes a single command on the remote server
 func (s *SSHClient) Run(command string) (string, error) {
+	if s.guard != nil {
+		return s.runGuarded(command)
+	}
 	script := s.client.Cmd(command)
 	output, err := script.Output()
 	if err != nil {
@@ -260,7 +266,7 @@ func SSHConnect(host string, opts ...SSHOption) (*SSHClient, error) {
 		return nil, err
 	}
 
-	return &SSHClient{client: client}, nil
+	return &SSHClient{client: client, target: addr, username: config.Username}, nil
 }
 
 // ConnectWithKey 使用私钥认证连接到 SSH 服务器，返回 SSH 客户端
@@ -295,7 +301,7 @@ func SSHConnectWithKey(host, username, keyPath string) (*SSHClient, error) {
 		return nil, err
 	}
 
-	return &SSHClient{client: client}, nil
+	return &SSHClient{client: client, target: addr, username: username}, nil
 }
 
 // ConnectWithPasswd 使用密码认证连接到 SSH 服务器，返回 SSH 客户端
@@ -330,5 +336,5 @@ func SSHConnectWithPasswd(host, username, password string) (*SSHClient, error) {
 		return nil, err
 	}
 
-	return &SSHClient{client: client}, nil
+	return &SSHClient{client: client, target: addr, username: username}, nil
 }

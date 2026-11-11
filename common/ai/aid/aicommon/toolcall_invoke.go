@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/sshguard"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -528,6 +529,11 @@ func (a *ToolCaller) invoke(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	var taskID string
+	if a.task != nil {
+		taskID = a.task.GetIndex()
+	}
+	ctx = sshguard.WithInvocation(ctx, a.callToolId, taskID)
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),

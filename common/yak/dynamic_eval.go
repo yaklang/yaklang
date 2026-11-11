@@ -46,11 +46,15 @@ var EvalExports = map[string]interface{}{
 // assert err == nil, "valid code should evaluate without error"
 // ```
 func QuickEvalWithoutContext(i interface{}) error {
+	return quickEvalWithContext(context.Background(), i)
+}
+
+func quickEvalWithContext(ctx context.Context, i interface{}) error {
 	switch ret := i.(type) {
 	case []byte:
-		return NewScriptEngine(1).Execute(string(ret))
+		return NewScriptEngine(1).ExecuteWithContext(ctx, string(ret))
 	case string:
-		return NewScriptEngine(1).Execute(ret)
+		return NewScriptEngine(1).ExecuteWithContext(ctx, ret)
 	default:
 		return utils.Errorf("invalid eval params... need string / []byte")
 	}
@@ -112,8 +116,12 @@ func (y *yakVariable) Callable() bool {
 }
 
 func ImportVarFromYakFile(path string, exportsName string) (interface{}, error) {
-	engine := yaklang.New()
-	if err := engine.RunFile(context.Background(), path); err != nil {
+	return importVarFromYakFile(context.Background(), path, exportsName)
+}
+
+func importVarFromYakFile(ctx context.Context, path string, exportsName string) (interface{}, error) {
+	engine := yaklang.NewWithContext(ctx)
+	if err := engine.RunFile(ctx, path); err != nil {
 		return nil, utils.Errorf("load file \"%s\" failed: %s", path, err)
 	}
 	v, ok := engine.GetVar(exportsName)
@@ -153,6 +161,10 @@ func ImportVarFromScript(engine *antlr4yak.Engine, script string, exportsName st
 // v, err = dyn.Import("./mod", "Exports")
 // ```
 func ImportVarFromFile(file string, exportsName string) (interface{}, error) {
+	return importVarFromFile(context.Background(), file, exportsName)
+}
+
+func importVarFromFile(ctx context.Context, file string, exportsName string) (interface{}, error) {
 	var absFile string
 	yakFile := utils.GetFirstExistedFile(file, fmt.Sprintf("%v.yak", file))
 	if yakFile == "" {
@@ -172,7 +184,7 @@ func ImportVarFromFile(file string, exportsName string) (interface{}, error) {
 			return nil, utils.Errorf("fetch abs path[%s] failed: %v", yakFile, err)
 		}
 	}
-	return ImportVarFromYakFile(absFile, exportsName)
+	return importVarFromYakFile(ctx, absFile, exportsName)
 }
 
 // LoadVarFromFile 从指定文件或目录中批量加载脚本，并提取每个脚本中名为 exportsName 的变量
@@ -191,6 +203,10 @@ func ImportVarFromFile(file string, exportsName string) (interface{}, error) {
 // vars, err = dyn.LoadVarFromFile("./mods", "Exports", dyn.recursive(true))
 // ```
 func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigOpt) ([]*yakVariable, error) {
+	return loadingVariableFrom(context.Background(), path, exportsName, opts...)
+}
+
+func loadingVariableFrom(ctx context.Context, path string, exportsName string, opts ...yakEvalConfigOpt) ([]*yakVariable, error) {
 	if path == "" {
 		path = "."
 	}
@@ -291,7 +307,7 @@ func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigO
 			_ = json.Unmarshal(raw, &mergedParams)
 		}
 
-		engine, err := NewScriptEngine(1).ExecuteEx(string(readFile), mergedParams)
+		engine, err := NewScriptEngine(1).ExecuteExWithContext(ctx, string(readFile), mergedParams)
 		if err != nil {
 			return nil, utils.Errorf("execute file %s code failed: %s", fileName, err.Error())
 		}
@@ -315,4 +331,25 @@ func LoadingVariableFrom(path string, exportsName string, opts ...yakEvalConfigO
 		log.Error("no variable found")
 	}
 	return vars, nil
+}
+
+func init() {
+	bindImport := func(ctx context.Context) any {
+		return func(file, name string) (any, error) {
+			return importVarFromFile(ctx, file, name)
+		}
+	}
+	yaklang.ImportGuardedSSHExport("import", bindImport)
+	yaklang.ImportGuardedSSHExport("dyn", func(ctx context.Context) any {
+		return map[string]any{
+			"Eval":   func(source any) error { return quickEvalWithContext(ctx, source) },
+			"Import": bindImport(ctx),
+			"LoadVarFromFile": func(path, name string, opts ...yakEvalConfigOpt) ([]*yakVariable, error) {
+				return loadingVariableFrom(ctx, path, name, opts...)
+			},
+			"IsYakFunc": yaklib.IsYakFunction,
+			"params":    setYakEvalParams,
+			"recursive": setYakBatchImportRecursiveParams,
+		}
+	})
 }

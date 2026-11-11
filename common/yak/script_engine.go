@@ -603,7 +603,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	}()
 
 	// log.Infof("recv code: %v", code)
-	engine := yaklang.New()
+	engine := yaklang.NewWithContext(ctx)
 
 	setCurrentCoreEngine(engine)
 	defer func() {

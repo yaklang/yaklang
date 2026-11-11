@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -86,6 +87,12 @@ func GetYakFocusModeBundle(name string) (*FocusModeBundle, bool) {
 //
 // 关键词: register yak focus mode, boot phase metadata, run phase factory
 func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
+	return RegisterYakFocusModeFromBundleWithContext(context.Background(), bundle)
+}
+
+// RegisterYakFocusModeFromBundleWithContext supplies the trusted host context
+// to the metadata evaluator. Runtime callers derive their own session context.
+func RegisterYakFocusModeFromBundleWithContext(ctx context.Context, bundle *FocusModeBundle) error {
 	if bundle == nil {
 		return utils.Error("yak focus mode: bundle is nil")
 	}
@@ -112,6 +119,7 @@ func RegisterYakFocusModeFromBundle(bundle *FocusModeBundle) error {
 		bundle.EntryFile,
 		bundleCode,
 		WithFocusModeCallerCallTimeout(bootCallTimeout),
+		WithFocusModeCallerParentContext(ctx),
 		WithFocusModeCallerVars(map[string]any{serverFocusRuntimeGlobal: nil}),
 	)
 	if err != nil {

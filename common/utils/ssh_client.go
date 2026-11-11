@@ -106,6 +106,11 @@ func (c *SSHClient) Close() error {
 	return c.client.Close()
 }
 
+// RemoteAddr is the peer of the established SSH connection.
+func (c *SSHClient) RemoteAddr() net.Addr {
+	return c.client.RemoteAddr()
+}
+
 // Cmd create a command on client
 func (c *SSHClient) Cmd(cmd string) *SSHRemoteScript {
 	return &SSHRemoteScript{
