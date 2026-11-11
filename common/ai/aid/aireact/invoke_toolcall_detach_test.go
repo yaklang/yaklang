@@ -445,13 +445,11 @@ func TestAsyncDirectAnswerTargetsOwningReActSession(t *testing.T) {
 	other := reactloops.NewMinimalReActLoop(otherConfig, otherRuntime)
 	defer other.Release()
 	other.SetCurrentTask(aicommon.NewStatefulTaskBase("other", "other owner", ctx, otherConfig.Emitter, true))
-	receipt, err := loop.StartAsyncToolCall(tool.Name, aitool.InvokeParams{}, aicommon.WithToolCaller_Reason("review ownership"))
-	require.NoError(t, err)
+	_, err = loop.StartAsyncToolCall(tool.Name, aitool.InvokeParams{}, aicommon.WithToolCaller_Reason("review ownership"))
+	require.ErrorIs(t, err, aicommon.ErrToolReviewDirectAnswer)
 	manager, err := loop.GetAsyncExecutionManager()
 	require.NoError(t, err)
-	summary, err := manager.Wait(ctx, receipt.ID)
-	require.NoError(t, err)
-	require.Equal(t, asyncexecmanager.StateCancelled, summary.State)
+	require.Empty(t, manager.List(), "direct answer must be decided before Manager admission")
 	detachAwait(t, ctx, loop.AsyncDirectAnswerSignal())
 	select {
 	case <-other.AsyncDirectAnswerSignal():
