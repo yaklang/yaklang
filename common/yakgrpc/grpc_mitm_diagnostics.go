@@ -22,6 +22,11 @@ func (s *Server) GetMITMDiagnostics(ctx context.Context, req *ypb.GetMITMDiagnos
 	if req.GetOffset() < 0 || req.GetLimit() < 0 || req.GetLimit() > 32 {
 		return nil, grpcstatus.Error(codes.InvalidArgument, "invalid MITM trace page")
 	}
+	switch req.GetTrafficScope() {
+	case "", "all", "focus", "browser":
+	default:
+		return nil, grpcstatus.Error(codes.InvalidArgument, "unknown MITM traffic scope")
+	}
 	switch req.GetView() {
 	case "storage", "active", "slow", "failed", "websocket":
 	case "detail":
@@ -56,7 +61,11 @@ func (t *mitmPipelineTracker) diagnostics(req *ypb.GetMITMDiagnosticsRequest) (*
 		cutoff := now.Add(-mitmHistorySeconds * time.Second).UnixMilli()
 		for _, p := range t.history {
 			if p.at > cutoff && p.at <= now.UnixMilli() {
-				response.Storage = append(response.Storage, &ypb.MITMStorageSample{AtUnixMs: p.at, PersistPending: p.pending})
+				response.Storage = append(response.Storage, &ypb.MITMStorageSample{
+					AtUnixMs: p.at, PersistPending: p.pending, PersistBlocked: p.blocked,
+					RequestTotal: p.requests, DispatchTotal: p.dispatched, UpstreamCompletedTotal: p.upstreamCompleted,
+					PersistEnqueuedTotal: p.submitted, PersistedTotal: p.persisted, PersistFailedTotal: p.persistFailed,
+				})
 			}
 		}
 		t.mu.Unlock()
@@ -70,6 +79,19 @@ func (t *mitmPipelineTracker) diagnostics(req *ypb.GetMITMDiagnosticsRequest) (*
 	default:
 		rows := t.traceRows(now, req)
 		t.mu.Unlock()
+		filtered := rows[:0]
+		scope := req.GetTrafficScope()
+		for _, row := range rows {
+			background := row.chromeAutofill
+			if background {
+				response.BrowserBackgroundTotal++
+			}
+			if (scope == "focus" && background) || (scope == "browser" && !background) {
+				continue
+			}
+			filtered = append(filtered, row)
+		}
+		rows = filtered
 		sort.Slice(rows, func(i, j int) bool {
 			a, b := rows[i], rows[j]
 			if req.GetView() == "active" || req.GetView() == "websocket" {

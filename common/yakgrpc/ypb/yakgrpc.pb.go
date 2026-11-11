@@ -78151,12 +78151,15 @@ func (x *MITMPipelineDiagnostics) GetPersistQueueWaitSamples() uint64 {
 }
 
 type MITMStageStats struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Stage         string                 `protobuf:"bytes,1,opt,name=Stage,proto3" json:"Stage,omitempty"`
-	Count         int64                  `protobuf:"varint,2,opt,name=Count,proto3" json:"Count,omitempty"`
-	OldestAgeMs   int64                  `protobuf:"varint,3,opt,name=OldestAgeMs,proto3" json:"OldestAgeMs,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                        protoimpl.MessageState `protogen:"open.v1"`
+	Stage                        string                 `protobuf:"bytes,1,opt,name=Stage,proto3" json:"Stage,omitempty"`
+	Count                        int64                  `protobuf:"varint,2,opt,name=Count,proto3" json:"Count,omitempty"`
+	OldestAgeMs                  int64                  `protobuf:"varint,3,opt,name=OldestAgeMs,proto3" json:"OldestAgeMs,omitempty"`
+	BrowserBackgroundCount       int64                  `protobuf:"varint,4,opt,name=BrowserBackgroundCount,proto3" json:"BrowserBackgroundCount,omitempty"`
+	OldestBrowserBackgroundAgeMs int64                  `protobuf:"varint,5,opt,name=OldestBrowserBackgroundAgeMs,proto3" json:"OldestBrowserBackgroundAgeMs,omitempty"`
+	OldestOtherAgeMs             int64                  `protobuf:"varint,6,opt,name=OldestOtherAgeMs,proto3" json:"OldestOtherAgeMs,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *MITMStageStats) Reset() {
@@ -78210,17 +78213,40 @@ func (x *MITMStageStats) GetOldestAgeMs() int64 {
 	return 0
 }
 
+func (x *MITMStageStats) GetBrowserBackgroundCount() int64 {
+	if x != nil {
+		return x.BrowserBackgroundCount
+	}
+	return 0
+}
+
+func (x *MITMStageStats) GetOldestBrowserBackgroundAgeMs() int64 {
+	if x != nil {
+		return x.OldestBrowserBackgroundAgeMs
+	}
+	return 0
+}
+
+func (x *MITMStageStats) GetOldestOtherAgeMs() int64 {
+	if x != nil {
+		return x.OldestOtherAgeMs
+	}
+	return 0
+}
+
 type GetMITMDiagnosticsRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SessionId string                 `protobuf:"bytes,1,opt,name=SessionId,proto3" json:"SessionId,omitempty"`
 	// storage, active, slow, failed, websocket, range, or detail.
-	View          string `protobuf:"bytes,2,opt,name=View,proto3" json:"View,omitempty"`
-	Offset        int32  `protobuf:"varint,3,opt,name=Offset,proto3" json:"Offset,omitempty"`
-	Limit         int32  `protobuf:"varint,4,opt,name=Limit,proto3" json:"Limit,omitempty"`
-	FromUnixMs    int64  `protobuf:"varint,5,opt,name=FromUnixMs,proto3" json:"FromUnixMs,omitempty"`
-	ToUnixMs      int64  `protobuf:"varint,6,opt,name=ToUnixMs,proto3" json:"ToUnixMs,omitempty"`
-	TraceId       uint64 `protobuf:"varint,7,opt,name=TraceId,proto3" json:"TraceId,omitempty"`
-	ConnectionId  string `protobuf:"bytes,8,opt,name=ConnectionId,proto3" json:"ConnectionId,omitempty"`
+	View         string `protobuf:"bytes,2,opt,name=View,proto3" json:"View,omitempty"`
+	Offset       int32  `protobuf:"varint,3,opt,name=Offset,proto3" json:"Offset,omitempty"`
+	Limit        int32  `protobuf:"varint,4,opt,name=Limit,proto3" json:"Limit,omitempty"`
+	FromUnixMs   int64  `protobuf:"varint,5,opt,name=FromUnixMs,proto3" json:"FromUnixMs,omitempty"`
+	ToUnixMs     int64  `protobuf:"varint,6,opt,name=ToUnixMs,proto3" json:"ToUnixMs,omitempty"`
+	TraceId      uint64 `protobuf:"varint,7,opt,name=TraceId,proto3" json:"TraceId,omitempty"`
+	ConnectionId string `protobuf:"bytes,8,opt,name=ConnectionId,proto3" json:"ConnectionId,omitempty"`
+	// Empty or all preserves the full view. focus and browser filter before paging.
+	TrafficScope  string `protobuf:"bytes,9,opt,name=TrafficScope,proto3" json:"TrafficScope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -78311,16 +78337,24 @@ func (x *GetMITMDiagnosticsRequest) GetConnectionId() string {
 	return ""
 }
 
+func (x *GetMITMDiagnosticsRequest) GetTrafficScope() string {
+	if x != nil {
+		return x.TrafficScope
+	}
+	return ""
+}
+
 type GetMITMDiagnosticsResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	SessionId         string                 `protobuf:"bytes,1,opt,name=SessionId,proto3" json:"SessionId,omitempty"`
-	GeneratedAtUnixMs int64                  `protobuf:"varint,2,opt,name=GeneratedAtUnixMs,proto3" json:"GeneratedAtUnixMs,omitempty"`
-	Storage           []*MITMStorageSample   `protobuf:"bytes,3,rep,name=Storage,proto3" json:"Storage,omitempty"`
-	Traces            []*MITMTraceEntry      `protobuf:"bytes,4,rep,name=Traces,proto3" json:"Traces,omitempty"`
-	Total             int32                  `protobuf:"varint,5,opt,name=Total,proto3" json:"Total,omitempty"`
-	Detail            *MITMTraceEntry        `protobuf:"bytes,6,opt,name=Detail,proto3" json:"Detail,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	SessionId              string                 `protobuf:"bytes,1,opt,name=SessionId,proto3" json:"SessionId,omitempty"`
+	GeneratedAtUnixMs      int64                  `protobuf:"varint,2,opt,name=GeneratedAtUnixMs,proto3" json:"GeneratedAtUnixMs,omitempty"`
+	Storage                []*MITMStorageSample   `protobuf:"bytes,3,rep,name=Storage,proto3" json:"Storage,omitempty"`
+	Traces                 []*MITMTraceEntry      `protobuf:"bytes,4,rep,name=Traces,proto3" json:"Traces,omitempty"`
+	Total                  int32                  `protobuf:"varint,5,opt,name=Total,proto3" json:"Total,omitempty"`
+	Detail                 *MITMTraceEntry        `protobuf:"bytes,6,opt,name=Detail,proto3" json:"Detail,omitempty"`
+	BrowserBackgroundTotal int32                  `protobuf:"varint,7,opt,name=BrowserBackgroundTotal,proto3" json:"BrowserBackgroundTotal,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *GetMITMDiagnosticsResponse) Reset() {
@@ -78395,12 +78429,26 @@ func (x *GetMITMDiagnosticsResponse) GetDetail() *MITMTraceEntry {
 	return nil
 }
 
+func (x *GetMITMDiagnosticsResponse) GetBrowserBackgroundTotal() int32 {
+	if x != nil {
+		return x.BrowserBackgroundTotal
+	}
+	return 0
+}
+
 type MITMStorageSample struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AtUnixMs       int64                  `protobuf:"varint,1,opt,name=AtUnixMs,proto3" json:"AtUnixMs,omitempty"`
-	PersistPending int64                  `protobuf:"varint,2,opt,name=PersistPending,proto3" json:"PersistPending,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	AtUnixMs               int64                  `protobuf:"varint,1,opt,name=AtUnixMs,proto3" json:"AtUnixMs,omitempty"`
+	PersistPending         int64                  `protobuf:"varint,2,opt,name=PersistPending,proto3" json:"PersistPending,omitempty"`
+	RequestTotal           uint64                 `protobuf:"varint,3,opt,name=RequestTotal,proto3" json:"RequestTotal,omitempty"`
+	DispatchTotal          uint64                 `protobuf:"varint,4,opt,name=DispatchTotal,proto3" json:"DispatchTotal,omitempty"`
+	UpstreamCompletedTotal uint64                 `protobuf:"varint,5,opt,name=UpstreamCompletedTotal,proto3" json:"UpstreamCompletedTotal,omitempty"`
+	PersistEnqueuedTotal   uint64                 `protobuf:"varint,6,opt,name=PersistEnqueuedTotal,proto3" json:"PersistEnqueuedTotal,omitempty"`
+	PersistedTotal         uint64                 `protobuf:"varint,7,opt,name=PersistedTotal,proto3" json:"PersistedTotal,omitempty"`
+	PersistFailedTotal     uint64                 `protobuf:"varint,8,opt,name=PersistFailedTotal,proto3" json:"PersistFailedTotal,omitempty"`
+	PersistBlocked         int64                  `protobuf:"varint,9,opt,name=PersistBlocked,proto3" json:"PersistBlocked,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *MITMStorageSample) Reset() {
@@ -78447,6 +78495,55 @@ func (x *MITMStorageSample) GetPersistPending() int64 {
 	return 0
 }
 
+func (x *MITMStorageSample) GetRequestTotal() uint64 {
+	if x != nil {
+		return x.RequestTotal
+	}
+	return 0
+}
+
+func (x *MITMStorageSample) GetDispatchTotal() uint64 {
+	if x != nil {
+		return x.DispatchTotal
+	}
+	return 0
+}
+
+func (x *MITMStorageSample) GetUpstreamCompletedTotal() uint64 {
+	if x != nil {
+		return x.UpstreamCompletedTotal
+	}
+	return 0
+}
+
+func (x *MITMStorageSample) GetPersistEnqueuedTotal() uint64 {
+	if x != nil {
+		return x.PersistEnqueuedTotal
+	}
+	return 0
+}
+
+func (x *MITMStorageSample) GetPersistedTotal() uint64 {
+	if x != nil {
+		return x.PersistedTotal
+	}
+	return 0
+}
+
+func (x *MITMStorageSample) GetPersistFailedTotal() uint64 {
+	if x != nil {
+		return x.PersistFailedTotal
+	}
+	return 0
+}
+
+func (x *MITMStorageSample) GetPersistBlocked() int64 {
+	if x != nil {
+		return x.PersistBlocked
+	}
+	return 0
+}
+
 type MITMTraceEntry struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	TraceId  uint64                 `protobuf:"varint,1,opt,name=TraceId,proto3" json:"TraceId,omitempty"`
@@ -78467,6 +78564,8 @@ type MITMTraceEntry struct {
 	ErrorCode      string           `protobuf:"bytes,14,opt,name=ErrorCode,proto3" json:"ErrorCode,omitempty"`
 	Spans          []*MITMTraceSpan `protobuf:"bytes,15,rep,name=Spans,proto3" json:"Spans,omitempty"`
 	SpansTruncated bool             `protobuf:"varint,16,opt,name=SpansTruncated,proto3" json:"SpansTruncated,omitempty"`
+	// Known browser service inferred from the destination hostname.
+	BrowserService string `protobuf:"bytes,17,opt,name=BrowserService,proto3" json:"BrowserService,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -78611,6 +78710,13 @@ func (x *MITMTraceEntry) GetSpansTruncated() bool {
 		return x.SpansTruncated
 	}
 	return false
+}
+
+func (x *MITMTraceEntry) GetBrowserService() string {
+	if x != nil {
+		return x.BrowserService
+	}
+	return ""
 }
 
 type MITMTraceSpan struct {
@@ -86842,11 +86948,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13PersistWriteSamples\x18\v \x01(\x04R\x13PersistWriteSamples\x12D\n" +
 	"\x1dOldestWebSocketHandshakeAgeMs\x18\f \x01(\x03R\x1dOldestWebSocketHandshakeAgeMs\x124\n" +
 	"\x15PersistQueueWaitP95Ms\x18\r \x01(\x03R\x15PersistQueueWaitP95Ms\x128\n" +
-	"\x17PersistQueueWaitSamples\x18\x0e \x01(\x04R\x17PersistQueueWaitSamples\"^\n" +
+	"\x17PersistQueueWaitSamples\x18\x0e \x01(\x04R\x17PersistQueueWaitSamples\"\x86\x02\n" +
 	"\x0eMITMStageStats\x12\x14\n" +
 	"\x05Stage\x18\x01 \x01(\tR\x05Stage\x12\x14\n" +
 	"\x05Count\x18\x02 \x01(\x03R\x05Count\x12 \n" +
-	"\vOldestAgeMs\x18\x03 \x01(\x03R\vOldestAgeMs\"\xf5\x01\n" +
+	"\vOldestAgeMs\x18\x03 \x01(\x03R\vOldestAgeMs\x126\n" +
+	"\x16BrowserBackgroundCount\x18\x04 \x01(\x03R\x16BrowserBackgroundCount\x12B\n" +
+	"\x1cOldestBrowserBackgroundAgeMs\x18\x05 \x01(\x03R\x1cOldestBrowserBackgroundAgeMs\x12*\n" +
+	"\x10OldestOtherAgeMs\x18\x06 \x01(\x03R\x10OldestOtherAgeMs\"\x99\x02\n" +
 	"\x19GetMITMDiagnosticsRequest\x12\x1c\n" +
 	"\tSessionId\x18\x01 \x01(\tR\tSessionId\x12\x12\n" +
 	"\x04View\x18\x02 \x01(\tR\x04View\x12\x16\n" +
@@ -86857,17 +86966,26 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"FromUnixMs\x12\x1a\n" +
 	"\bToUnixMs\x18\x06 \x01(\x03R\bToUnixMs\x12\x18\n" +
 	"\aTraceId\x18\a \x01(\x04R\aTraceId\x12\"\n" +
-	"\fConnectionId\x18\b \x01(\tR\fConnectionId\"\x8a\x02\n" +
+	"\fConnectionId\x18\b \x01(\tR\fConnectionId\x12\"\n" +
+	"\fTrafficScope\x18\t \x01(\tR\fTrafficScope\"\xc2\x02\n" +
 	"\x1aGetMITMDiagnosticsResponse\x12\x1c\n" +
 	"\tSessionId\x18\x01 \x01(\tR\tSessionId\x12,\n" +
 	"\x11GeneratedAtUnixMs\x18\x02 \x01(\x03R\x11GeneratedAtUnixMs\x120\n" +
 	"\aStorage\x18\x03 \x03(\v2\x16.ypb.MITMStorageSampleR\aStorage\x12+\n" +
 	"\x06Traces\x18\x04 \x03(\v2\x13.ypb.MITMTraceEntryR\x06Traces\x12\x14\n" +
 	"\x05Total\x18\x05 \x01(\x05R\x05Total\x12+\n" +
-	"\x06Detail\x18\x06 \x01(\v2\x13.ypb.MITMTraceEntryR\x06Detail\"W\n" +
+	"\x06Detail\x18\x06 \x01(\v2\x13.ypb.MITMTraceEntryR\x06Detail\x126\n" +
+	"\x16BrowserBackgroundTotal\x18\a \x01(\x05R\x16BrowserBackgroundTotal\"\x8d\x03\n" +
 	"\x11MITMStorageSample\x12\x1a\n" +
 	"\bAtUnixMs\x18\x01 \x01(\x03R\bAtUnixMs\x12&\n" +
-	"\x0ePersistPending\x18\x02 \x01(\x03R\x0ePersistPending\"\x86\x04\n" +
+	"\x0ePersistPending\x18\x02 \x01(\x03R\x0ePersistPending\x12\"\n" +
+	"\fRequestTotal\x18\x03 \x01(\x04R\fRequestTotal\x12$\n" +
+	"\rDispatchTotal\x18\x04 \x01(\x04R\rDispatchTotal\x126\n" +
+	"\x16UpstreamCompletedTotal\x18\x05 \x01(\x04R\x16UpstreamCompletedTotal\x122\n" +
+	"\x14PersistEnqueuedTotal\x18\x06 \x01(\x04R\x14PersistEnqueuedTotal\x12&\n" +
+	"\x0ePersistedTotal\x18\a \x01(\x04R\x0ePersistedTotal\x12.\n" +
+	"\x12PersistFailedTotal\x18\b \x01(\x04R\x12PersistFailedTotal\x12&\n" +
+	"\x0ePersistBlocked\x18\t \x01(\x03R\x0ePersistBlocked\"\xae\x04\n" +
 	"\x0eMITMTraceEntry\x12\x18\n" +
 	"\aTraceId\x18\x01 \x01(\x04R\aTraceId\x12\x12\n" +
 	"\x04Host\x18\x02 \x01(\tR\x04Host\x12\x16\n" +
@@ -86887,7 +87005,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bAttempts\x18\r \x01(\rR\bAttempts\x12\x1c\n" +
 	"\tErrorCode\x18\x0e \x01(\tR\tErrorCode\x12(\n" +
 	"\x05Spans\x18\x0f \x03(\v2\x12.ypb.MITMTraceSpanR\x05Spans\x12&\n" +
-	"\x0eSpansTruncated\x18\x10 \x01(\bR\x0eSpansTruncated\"\xb1\x01\n" +
+	"\x0eSpansTruncated\x18\x10 \x01(\bR\x0eSpansTruncated\x12&\n" +
+	"\x0eBrowserService\x18\x11 \x01(\tR\x0eBrowserService\"\xb1\x01\n" +
 	"\rMITMTraceSpan\x12\x14\n" +
 	"\x05Stage\x18\x01 \x01(\tR\x05Stage\x12(\n" +
 	"\x0fStartedAtUnixMs\x18\x02 \x01(\x03R\x0fStartedAtUnixMs\x12*\n" +

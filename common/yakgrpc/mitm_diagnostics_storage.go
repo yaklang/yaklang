@@ -18,8 +18,10 @@ const (
 )
 
 type mitmStoragePoint struct {
-	at, pending int64
-	trace       *mitmTrace
+	at, pending, blocked                    int64
+	requests, dispatched, upstreamCompleted uint64
+	submitted, persisted, persistFailed     uint64
+	trace                                   *mitmTrace
 }
 
 type mitmLatencyHistogram [mitmHistogramBins]uint64

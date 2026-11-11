@@ -24,6 +24,7 @@ type mitmTraceHead struct {
 	host, method, protocol      string
 	connectionID                string
 	stage                       mitmPipelineStage
+	chromeAutofill              bool
 	outcome, errorCode          string
 	statusCode                  int32
 	startedAt, stageAt, endedAt time.Time
@@ -52,6 +53,15 @@ func traceLabel(value string, max int) string {
 		value = value[:max]
 	}
 	return strings.Clone(strings.ToValidUTF8(value, "�"))
+}
+
+// Match the known Chromium Autofill endpoint. The hostname alone does not identify the client.
+func isChromeAutofillRequest(host, method string) bool {
+	if method != http.MethodGet && method != http.MethodPost {
+		return false
+	}
+	name, _, _ := strings.Cut(host, ":")
+	return strings.EqualFold(strings.TrimSuffix(name, "."), "content-autofill.googleapis.com")
 }
 
 func (tr *mitmTrace) span(stage mitmPipelineStage, start, end time.Time, attempt uint32, protocol string) {
@@ -263,13 +273,17 @@ func unixMsOrZero(ts time.Time) int64 {
 }
 
 func (h mitmTraceHead) toProto() *ypb.MITMTraceEntry {
-	return &ypb.MITMTraceEntry{
+	entry := &ypb.MITMTraceEntry{
 		TraceId: h.id, FlowId: h.flowID, Host: h.host, Method: h.method,
 		Protocol: h.protocol, ConnectionId: h.connectionID,
 		Stage: mitmStageNames[h.stage], Outcome: h.outcome, ErrorCode: h.errorCode,
 		StartedAtUnixMs: h.startedAt.UnixMilli(), StageAtUnixMs: h.stageAt.UnixMilli(),
 		FinishedAtUnixMs: unixMsOrZero(h.endedAt), Attempts: h.attempts, StatusCode: h.statusCode,
 	}
+	if h.chromeAutofill {
+		entry.BrowserService = "chrome_autofill"
+	}
+	return entry
 }
 
 func (s mitmTraceSpan) toProto() *ypb.MITMTraceSpan {

@@ -25,7 +25,7 @@ import (
 
 func TestMITMDiagnosticsWriteStagesAndPeak(t *testing.T) {
 	tracker := newMITMPipelineTracker("storage")
-	now := time.Now().Truncate(time.Millisecond)
+	now := time.Now().Truncate(time.Second)
 	tracker.now = func() time.Time { return now }
 	req, err := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
 	require.NoError(t, err)
@@ -71,6 +71,24 @@ func TestMITMDiagnosticsWriteStagesAndPeak(t *testing.T) {
 	require.Contains(t, phases, "persist_blocked")
 	require.Contains(t, phases, "persist_queued")
 	require.Contains(t, phases, "persist_write")
+
+	now = now.Add(time.Second)
+	tracker.snapshot(0, 40960, 0)
+	history, err := tracker.diagnostics(&ypb.GetMITMDiagnosticsRequest{View: "storage"})
+	require.NoError(t, err)
+	require.Len(t, history.GetStorage(), 2)
+	peak, drained := history.GetStorage()[0], history.GetStorage()[1]
+	require.Equal(t, peakAt, peak.GetAtUnixMs())
+	require.EqualValues(t, 1, peak.GetPersistPending())
+	require.EqualValues(t, 1, peak.GetPersistBlocked())
+	require.EqualValues(t, 1, peak.GetRequestTotal())
+	require.EqualValues(t, 1, peak.GetDispatchTotal())
+	require.EqualValues(t, 1, peak.GetUpstreamCompletedTotal())
+	require.EqualValues(t, 1, peak.GetPersistEnqueuedTotal())
+	require.Zero(t, peak.GetPersistedTotal())
+	require.Zero(t, drained.GetPersistPending())
+	require.Zero(t, drained.GetPersistBlocked())
+	require.EqualValues(t, 1, drained.GetPersistedTotal())
 
 	now = now.Add(181 * time.Second)
 	stats = tracker.snapshot(0, 40960, 0)
@@ -129,6 +147,61 @@ func TestMITMDiagnosticsBoundsHistoryAndIgnoresLateAttemptEvents(t *testing.T) {
 	require.NotEmpty(t, detail.GetDetail().GetSpans())
 	for _, span := range detail.GetDetail().GetSpans() {
 		require.NotEqual(t, "read", span.GetStage())
+	}
+}
+
+func TestMITMDiagnosticsBrowserScopeBeforePagination(t *testing.T) {
+	tracker := newMITMPipelineTracker("browser-scope")
+	t.Cleanup(tracker.close)
+	now := time.Now()
+	tracker.now = func() time.Time { return now }
+	dial := func(method, host string) {
+		req, err := http.NewRequest(method, "https://"+host+"/", nil)
+		require.NoError(t, err)
+		tracker.requestObserved(req)
+		tracker.requestDispatched(req, false)
+		httpctx.GetUpstreamObserver(req).BeginAttempt("HTTP/1.1").Phase(httpctx.UpstreamDial)
+	}
+	for range 24 {
+		dial(http.MethodGet, "CONTENT-AUTOFILL.googleapis.com.:443")
+	}
+	dial(http.MethodPost, "content-autofill.googleapis.com")
+	now = now.Add(4 * time.Second)
+	dial(http.MethodGet, "content-autofill.googleapis.com.example.invalid")
+	dial(http.MethodGet, "other.googleapis.com")
+	dial(http.MethodPut, "content-autofill.googleapis.com")
+	now = now.Add(3 * time.Second)
+
+	stats := tracker.snapshot(0, 40960, 0)
+	require.EqualValues(t, 3, stats.GetVersion())
+	require.EqualValues(t, 28, stats.GetActiveTotal())
+	require.Len(t, stats.GetDiagnostics().GetHTTPStages(), 1)
+	stage := stats.GetDiagnostics().GetHTTPStages()[0]
+	require.Equal(t, "dial", stage.GetStage())
+	require.EqualValues(t, 28, stage.GetCount())
+	require.EqualValues(t, 25, stage.GetBrowserBackgroundCount())
+	require.EqualValues(t, 7000, stage.GetOldestAgeMs())
+	require.EqualValues(t, 7000, stage.GetOldestBrowserBackgroundAgeMs())
+	require.EqualValues(t, 3000, stage.GetOldestOtherAgeMs())
+
+	query := &ypb.GetMITMDiagnosticsRequest{View: "active", Limit: 2}
+	for _, tc := range []struct {
+		scope, service string
+		total          int32
+	}{
+		{scope: "", service: "chrome_autofill", total: 28},
+		{scope: "focus", total: 3},
+		{scope: "browser", service: "chrome_autofill", total: 25},
+	} {
+		query.TrafficScope = tc.scope
+		rows, err := tracker.diagnostics(query)
+		require.NoError(t, err)
+		require.Equal(t, tc.total, rows.GetTotal())
+		require.EqualValues(t, 25, rows.GetBrowserBackgroundTotal())
+		require.Len(t, rows.GetTraces(), 2)
+		for _, row := range rows.GetTraces() {
+			require.Equal(t, tc.service, row.GetBrowserService())
+		}
 	}
 }
 
