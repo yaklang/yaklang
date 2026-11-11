@@ -35,11 +35,17 @@ type sourcePattern struct {
 	captures bool // legacy single-pattern searches also expose capture ranges
 }
 
+func isBlanketPath(expr string) bool {
+	return expr == "*" || expr == "*.*"
+}
+
 type sourceSearch struct {
 	path      string
 	positive  []int
 	negative  []int
 	matchPath func(string) bool
+	// lang is the file ceiling of a blanket search ("" means no ceiling).
+	lang string
 }
 
 // SourceScanStats describes the work shared by all rules on one source snapshot.
@@ -66,16 +72,33 @@ type SourceScanStats struct {
 func NewSourceScanPlan(frames []*sfvm.SFFrame) (*SourceScanPlan, error) {
 	p := &SourceScanPlan{searches: make(map[string]sourceSearch)}
 	ids := make(map[sourcePattern]int)
+	// One search key can be shared by rules of different languages. When that
+	// happens the ceiling must widen, never narrow: a shared search keeps the
+	// no-ceiling behavior of the general rule.
+	seenLanguage := make(map[string]string)
+	languageConflict := make(map[string]bool)
 	for _, frame := range frames {
 		if !sfvm.FrameIsSourceMode(frame) {
 			continue
+		}
+		language := ""
+		if rule := frame.GetRule(); rule != nil {
+			language = normalizeSourceLanguage(string(rule.Language))
 		}
 		for _, code := range frame.Codes {
 			if code.OpCode != sfvm.OpFileFilterReg || code.UnaryStr == "" {
 				continue
 			}
 			key := directSearchKey(code.UnaryStr, code.FileFilterMethodItem, code.Values)
-			if _, ok := p.searches[key]; ok {
+			if existing, ok := p.searches[key]; ok {
+				if isBlanketPath(code.UnaryStr) && !languageConflict[key] {
+					if seen := seenLanguage[key]; seen != language {
+						languageConflict[key] = true
+						existing.lang = ""
+						existing.matchPath = compilePathMatcher(existing.path)
+						p.searches[key] = existing
+					}
+				}
 				continue
 			}
 			positive, negative := code.Values, []string(nil)
@@ -115,10 +138,19 @@ func NewSourceScanPlan(frames []*sfvm.SFFrame) (*SourceScanPlan, error) {
 				}
 				return out
 			}
-			p.searches[key] = sourceSearch{
+			search := sourceSearch{
 				path: code.UnaryStr, positive: add(positive), negative: add(negative),
 				matchPath: compilePathMatcher(code.UnaryStr),
 			}
+			if isBlanketPath(code.UnaryStr) && language != "" {
+				search.lang = language
+				base := search.matchPath
+				search.matchPath = func(path string) bool {
+					return base(path) && languageAllowsPath(language, path)
+				}
+			}
+			seenLanguage[key] = language
+			p.searches[key] = search
 		}
 	}
 	if len(p.patterns) == 0 {

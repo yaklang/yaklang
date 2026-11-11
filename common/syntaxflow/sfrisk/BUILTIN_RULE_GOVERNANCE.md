@@ -84,6 +84,11 @@ documentation entry files (`README*`, `CHANGELOG*`, `LICENSE*`, `CONTRIBUTING*`,
 and the rest of the list in `ssaconfig.IsDocumentationFilePath`). Ordinary
 markdown stays in the pool, so document rules that target `SKILL.md` still work.
 
+`${*}` also respects the rule language: a `language: python` rule with a blanket
+filter reads python files only (the table lives in `sfpattern`), so one language
+can never report another language's code. A rule that names its own extensions
+keeps them unchanged, and `language: general` keeps the whole pool.
+
 `${*}` means code and configuration, not manifests. A blanket filter skips
 dependency manifests (`package.json`, `pom.xml`, `Cargo.toml`, `*.csproj`, and
 the rest of `sfpattern`'s manifest list): a `password` key in `package.json`
