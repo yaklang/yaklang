@@ -488,15 +488,7 @@ func handleToolBatchActionResult(
 		return
 	}
 	if result.DirectlyAnswer {
-		loop.StopSubAgentsForUser()
-		answer, answerErr := invoker.DirectlyAnswer(ctx,
-			"在并发工具调用审批中，用户中断了该批次并要求直接回答。不要继续执行该批次中的其他工具。", nil)
-		if answerErr != nil {
-			operator.Fail(utils.Wrap(answerErr, "DirectlyAnswer after tool batch"))
-			return
-		}
-		invoker.AddToTimeline("directly-answer", answer)
-		operator.ExitForUser()
+		requestDirectAnswerAfterToolReview(loop, invoker, operator)
 		return
 	}
 
