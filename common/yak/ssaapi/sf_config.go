@@ -12,33 +12,20 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var (
-	// simpleGetCalleeExclude matches the dataflow exclude shape
-	// `*<getCallee> & $filter`. This pattern is monotone: once a path contains a
-	// call whose callee is in $filter, adding more path values cannot make the
-	// exclude stop matching. That property is what makes branch pruning sound;
-	// any other exclude text disables pruning and keeps the full path enumeration.
-	simpleGetCalleeExclude = regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
-	// simpleDataflowInclude matches the common `* & $source` / `<self> & $source`
-	// include shape (also accepted by fastPathMatch). Only this shape gets the
-	// include reachability prefilter; anything else keeps the full path walk.
-	simpleDataflowInclude = regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)
-)
-
-func simpleIncludeSymbol(text string) (string, bool) {
-	m := simpleDataflowInclude.FindStringSubmatch(strings.TrimSpace(text))
-	if len(m) != 2 {
-		return "", false
-	}
-	return m[1], true
-}
-
-func simpleGetCalleeExcludeSymbol(text string) (string, bool) {
-	m := simpleGetCalleeExclude.FindStringSubmatch(strings.TrimSpace(text))
-	if len(m) != 2 {
-		return "", false
-	}
-	return m[1], true
+// dataflowFilterShapes lists the sub-rule texts fastPathMatch can evaluate
+// directly from a symbol id set, in the order resolveFastPath checks them. Any
+// other text keeps the full sub-query as the authority (fastPathNone).
+var dataflowFilterShapes = []struct {
+	kind fastPathKind
+	re   *regexp.Regexp
+}{
+	// `* & $source` / `<self> & $source`: the path intersects the symbol's ids.
+	{fastPathInclude, regexp.MustCompile(`^\s*(?:\*|<self>)\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)},
+	// `*<getCallee> & $filter` is monotone: once a path contains a call whose
+	// callee is in $filter, adding more path values cannot make the exclude stop
+	// matching. That property is what makes branch pruning sound; any other
+	// exclude text disables pruning and keeps the full path enumeration.
+	{fastPathExcludeCallee, regexp.MustCompile(`^\s*\*\s*<getCallee>\s*&\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*$`)},
 }
 
 // fastPathKind is the simple dataflow filter shape resolved once per checkItem.
@@ -134,16 +121,15 @@ func (item *checkItem) resolveFastPath(r *sfCheck) {
 		if r == nil || r.contextResult == nil {
 			return
 		}
-		if sym, ok := simpleIncludeSymbol(item.Value); ok {
-			if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
-				item.fastKind, item.fastIDs = fastPathInclude, ids
+		for _, shape := range dataflowFilterShapes {
+			m := shape.re.FindStringSubmatch(item.Value)
+			if len(m) != 2 {
+				continue
+			}
+			if ids := r.fastMatchSymbolIDs(m[1]); len(ids) > 0 {
+				item.fastKind, item.fastIDs = shape.kind, ids
 			}
 			return
-		}
-		if sym, ok := simpleGetCalleeExcludeSymbol(item.Value); ok {
-			if ids := r.fastMatchSymbolIDs(sym); len(ids) > 0 {
-				item.fastKind, item.fastIDs = fastPathExcludeCallee, ids
-			}
 		}
 	})
 }
