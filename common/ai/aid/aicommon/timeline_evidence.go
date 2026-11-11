@@ -4,10 +4,173 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
 const TimelinePromotedKindEvidence = "session-evidence"
+
+// evidenceOpToItem 把证据业务操作转换为独立的 Timeline item。
+// item 的数字 ID 保持为空，由各个 Timeline 接收后自行分配。
+func evidenceOpToItem(operation EvidenceOperation) (*TimelineItem, error) {
+	targetSection := TimelinePromotedTargetSemiDynamic1
+	key := strings.TrimSpace(operation.ID)
+	switch strings.ToLower(strings.TrimSpace(operation.Op)) {
+	case "add", "update", "upsert":
+		normalized, err := BuildSessionEvidenceUpsert(key, operation.Content)
+		if err != nil {
+			return nil, err
+		}
+		now := time.Now().Unix()
+		payload, err := json.Marshal(EvidenceItem{
+			ID:          normalized.ID,
+			Content:     normalized.Content,
+			CreatedUnix: now,
+			UpdatedUnix: now,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("encode session evidence %q: %w", normalized.ID, err)
+		}
+		return NewTimelineItem(&PromotableTimelineItem{
+			Kind:          TimelinePromotedKindEvidence,
+			TargetSection: targetSection,
+			Key:           normalized.ID,
+			Operation:     TimelinePromotedOperationUpsert,
+			Payload:       string(payload),
+			PayloadHash:   promotedPayloadHash(string(payload)),
+		}), nil
+	case "delete":
+		if !sessionEvidenceIDPattern.MatchString(key) {
+			return nil, fmt.Errorf("invalid session evidence id %q", operation.ID)
+		}
+		if strings.TrimSpace(operation.Content) != "" {
+			return nil, fmt.Errorf("session evidence delete %q must not carry content", key)
+		}
+		return NewTimelineItem(&PromotableTimelineItem{
+			Kind:          TimelinePromotedKindEvidence,
+			TargetSection: targetSection,
+			Key:           key,
+			Operation:     TimelinePromotedOperationDelete,
+			PayloadHash:   promotedPayloadHash(""),
+		}), nil
+	default:
+		return nil, fmt.Errorf("unsupported session evidence operation %q", operation.Op)
+	}
+}
+
+// itemToEvidenceOp 把证据 Timeline item 还原为 EvidenceStore 可消费的操作。
+// EvidenceStore 用 add 表示幂等更新，delete 保持显式删除语义。
+func itemToEvidenceOp(item *TimelineItem) (EvidenceOperation, error) {
+	if item == nil || item.value == nil {
+		return EvidenceOperation{}, fmt.Errorf("session evidence Timeline item is required")
+	}
+	if item.deleted {
+		return EvidenceOperation{}, fmt.Errorf("session evidence Timeline item must be live")
+	}
+	promoted, ok := item.value.(*PromotableTimelineItem)
+	if !ok || promoted == nil || promoted.Kind != TimelinePromotedKindEvidence {
+		return EvidenceOperation{}, fmt.Errorf("Timeline item %T is not session evidence", item.value)
+	}
+	if promoted.TargetSection != TimelinePromotedTargetSemiDynamic1 {
+		return EvidenceOperation{}, fmt.Errorf("unsupported evidence target section %q", promoted.TargetSection)
+	}
+	key := strings.TrimSpace(promoted.Key)
+	if key != promoted.Key || !sessionEvidenceIDPattern.MatchString(key) {
+		return EvidenceOperation{}, fmt.Errorf("invalid session evidence id %q", promoted.Key)
+	}
+	if promoted.PayloadHash != "" && promoted.PayloadHash != promotedPayloadHash(promoted.Payload) {
+		return EvidenceOperation{}, fmt.Errorf("session evidence %q payload hash does not match", key)
+	}
+
+	switch promoted.Operation {
+	case TimelinePromotedOperationDelete:
+		if promoted.Payload != "" {
+			return EvidenceOperation{}, fmt.Errorf("session evidence delete %q must not carry a payload", key)
+		}
+		return EvidenceOperation{ID: key, Op: "delete"}, nil
+	case TimelinePromotedOperationUpsert:
+		var evidence EvidenceItem
+		if err := json.Unmarshal([]byte(promoted.Payload), &evidence); err != nil {
+			return EvidenceOperation{}, fmt.Errorf("decode session evidence %q: %w", key, err)
+		}
+		if evidence.ID != key {
+			return EvidenceOperation{}, fmt.Errorf("session evidence payload id %q does not match key %q", evidence.ID, key)
+		}
+		if strings.TrimSpace(evidence.Content) == "" {
+			return EvidenceOperation{}, fmt.Errorf("session evidence %q content is required", key)
+		}
+		return EvidenceOperation{ID: key, Op: "add", Content: evidence.Content}, nil
+	default:
+		return EvidenceOperation{}, fmt.Errorf("unsupported session evidence operation %q", promoted.Operation)
+	}
+}
+
+// isEvidenceOpNeeded 判断操作是否会改变当前 Timeline 的证据状态。
+// 该方法只做判断，不写入 Timeline。
+func (m *Timeline) isEvidenceOpNeeded(op EvidenceOperation) bool {
+	if m == nil {
+		return false
+	}
+	store, _ := m.evidenceStore()
+	normalized, ok := normalizeEvidenceOp(op)
+	return ok && opChangesStore(store, normalized)
+}
+
+// filterEvidenceOps 按顺序过滤无效或不会改变证据状态的操作。
+// 返回新切片，保留仍有效操作的内容和顺序。
+func (m *Timeline) filterEvidenceOps(ops []EvidenceOperation) []EvidenceOperation {
+	filtered := make([]EvidenceOperation, 0, len(ops))
+	if m == nil || len(ops) == 0 {
+		return filtered
+	}
+	store, _ := m.evidenceStore()
+	for _, op := range ops {
+		normalized, ok := normalizeEvidenceOp(op)
+		if !ok || !opChangesStore(store, normalized) {
+			continue
+		}
+		filtered = append(filtered, op)
+		store.ApplyOperations([]EvidenceOperation{normalized})
+	}
+	return filtered
+}
+
+// normalizeEvidenceOp 统一证据操作的 ID 和操作名；无效操作返回 false。
+func normalizeEvidenceOp(op EvidenceOperation) (EvidenceOperation, bool) {
+	id := strings.TrimSpace(op.ID)
+	switch strings.ToLower(strings.TrimSpace(op.Op)) {
+	case "add", "update", "upsert":
+		normalized, err := BuildSessionEvidenceUpsert(id, op.Content)
+		if err != nil {
+			return EvidenceOperation{}, false
+		}
+		return normalized, true
+	case "delete":
+		if !sessionEvidenceIDPattern.MatchString(id) {
+			return EvidenceOperation{}, false
+		}
+		return EvidenceOperation{ID: id, Op: "delete"}, true
+	default:
+		return EvidenceOperation{}, false
+	}
+}
+
+// opChangesStore 判断规范化后的操作是否会改变给定证据集合。
+func opChangesStore(store *EvidenceStore, op EvidenceOperation) bool {
+	if store == nil {
+		return false
+	}
+	for _, item := range store.Items {
+		if item.ID != op.ID {
+			continue
+		}
+		if op.Op == "delete" {
+			return true
+		}
+		return item.Content != op.Content
+	}
+	return op.Op != "delete"
+}
 
 // Task branches project the same session journal, including tombstones, rather
 // than rebuilding evidence from an inherited business snapshot. Only exact
