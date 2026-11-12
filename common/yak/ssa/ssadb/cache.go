@@ -161,7 +161,7 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 
 		// 更新缓存
 		neighbors := lo.Values(itemsToCache)
-		fillIrConstValues(db, progName, neighbors)
+		warmIrConstValues(db, progName, neighbors)
 		for id, item := range itemsToCache {
 			cache.Set(id, item)
 		}

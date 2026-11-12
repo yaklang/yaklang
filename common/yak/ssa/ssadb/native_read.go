@@ -136,7 +136,7 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		t := deletedAt.Time
 		ir.DeletedAt = &t
 	}
-	fillIrConstValues(db, ir.ProgramName, []*IrCode{ir})
+	warmIrConstValues(db, ir.ProgramName, []*IrCode{ir})
 	return ir, nil
 }
 
@@ -262,7 +262,7 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 		RecordDBRead(time.Since(started), false)
 		logNativeSQL(q, time.Since(started), nil)
 	}
-	fillIrConstValues(db, progName, out)
+	warmIrConstValues(db, progName, out)
 	return out, nil
 }
 

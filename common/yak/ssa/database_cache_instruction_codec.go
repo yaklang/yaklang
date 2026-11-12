@@ -330,17 +330,36 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		if constInst, ok := ToConstInst(inst); ok {
 			ir.ConstType = string(constInst.ConstType)
 			text := constInst.String()
+			// A normal const's text lives once, in ir_const_pool_v1, and the
+			// row keeps only the pool id. ProgramName was set above, so the
+			// pool row lands under the name this row will carry. A batch that
+			// later rewrites ProgramName re-interns under the new name.
 			if constInst.ConstType == ConstTypeNormal {
-				// Interning waits for the flush: the batch may still rewrite
-				// ProgramName, and the pool row must land under the final name.
-				ir.ConstText = text
-				ir.ConstKind = int64(irConstKindOf(constInst.Const))
+				if kind := irConstKindOf(constInst.Const); kind != ssadb.IrConstKindNil {
+					// An empty string is a real value: the kind tags it, so it
+					// must reach the pool like any other text.
+					ir.ConstID = ssadb.InternIrConst(ir.ProgramName, kind, text)
+				}
 			}
 			if len(text) <= ssadb.IrCodeInlineConstStringLimit {
 				ir.String = text
 			}
 		}
 	}
+}
+
+// irCodeConstText returns the rendered text and type tag a normal const has to
+// intern into the pool. ok is false for every other instruction, including a
+// placeholder const, whose text is a member-call key that is never searched.
+func irCodeConstText(inst Instruction) (kind ssadb.IrConstKind, text string, ok bool) {
+	if utils.IsNil(inst) || inst.GetOpcode() != SSAOpcodeConstInst {
+		return 0, "", false
+	}
+	constInst, ok := ToConstInst(inst)
+	if !ok || constInst.ConstType != ConstTypeNormal {
+		return 0, "", false
+	}
+	return irConstKindOf(constInst.Const), constInst.String(), true
 }
 
 // irConstKindOf is the pool's type tag for a const value. The pool keeps the

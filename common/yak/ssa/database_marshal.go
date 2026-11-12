@@ -478,17 +478,25 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 	case *Jump:
 		ret.To = utils.MapGetInt64(params, "jump_to")
 	case *ConstInst:
-		value := ir.ConstValue
-		if value == nil && ir.ConstID != 0 {
-			value = ssadb.GetIrConstValue(nil, ir.ProgramName, ir.ConstID)
-		}
-		if value != nil {
-			raw := value.Raw()
-			c := newConstByMap(raw)
-			if c == nil {
-				c = newConstCreate(raw)
+		// A normal const's text lives once in the pool; the row carries only
+		// const_id. GetIrConstValue answers from the program's short-const
+		// cache, so this is a map lookup unless the value is long.
+		if ir.ConstID != 0 {
+			if value := ssadb.GetIrConstValue(nil, ir.ProgramName, ir.ConstID); value != nil {
+				raw := value.Raw()
+				c := newConstByMap(raw)
+				if c == nil {
+					c = newConstCreate(raw)
+				}
+				ret.Const = c
+			} else {
+				i := params["const_value"]
+				c := newConstByMap(i)
+				if c == nil {
+					c = newConstCreate(i)
+				}
+				ret.Const = c
 			}
-			ret.Const = c
 		} else {
 			i := params["const_value"]
 			c := newConstByMap(i)
