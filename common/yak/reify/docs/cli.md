@@ -1,6 +1,6 @@
 # 命令行
 
-入口：[cmd/reify/main.go](../cmd/reify/main.go)。命令用于查看注册项、加载元数据、检查头部，以及按阶段渲染 AMD64 代码区域。
+入口：[cmd/reify/main.go](../cmd/reify/main.go)。命令用于查看注册项、加载元数据、检查头部，以及按阶段渲染 AMD64 或 ARM64 代码区域。
 
 ## 构建
 
@@ -20,7 +20,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 | `parsers` | `--json` 可选 | 按 Architecture 注册的 parser 与解码器状态 |
 | `inspect` | `<file>`，`--json` 可选 | Artifact、Target、Image、节和诊断 |
 | `check` | `<file>`，`--json` 可选 | 头部检查、loader 和 parser 选择 |
-| `lift` | `<file>`，`--mode`、`--json` 可选 | AMD64 汇编、LowIR、YakSSA 或伪源码 |
+| `lift` | `<file>`，`--mode`、`--json` 可选 | 汇编、LowIR、YakSSA 或伪源码 |
 | `help` | 无 | 用法 |
 
 `lift` 的 `--mode`：
@@ -72,7 +72,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 ```json
 [
   {"kind": "elf", "name": "ELF", "description": "ELF images; the target OS comes from the ELF OS ABI"},
-  {"kind": "macho", "name": "Mach-O", "description": "thin Mach-O images; entry points are not recovered"},
+  {"kind": "macho", "name": "Mach-O", "description": "Mach-O images; universal slices are selected by architecture"},
   {"kind": "pe", "name": "PE", "description": "PE images; the target OS comes from the PE subsystem"}
 ]
 ```
@@ -81,13 +81,14 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 
 ```json
 [
-  {"kind": "386", "name": "386", "available": false},
+  {"kind": "386", "name": "386", "available": true},
   {"kind": "amd64", "name": "amd64", "available": true},
-  {"kind": "arm", "name": "arm", "available": false}
+  {"kind": "arm", "name": "arm", "available": true},
+  {"kind": "arm64", "name": "arm64", "available": true}
 ]
 ```
 
-AMD64 有解码器；其他架构仍是注册骨架。
+AMD64、386、ARM64 与 ARM 有解码器；其他架构仍是注册骨架。
 
 ## inspect
 
@@ -369,10 +370,10 @@ common/yak/reify/scripts/lift-all.sh -o /tmp/hello-main -a "$main_addr" -s "$mai
 
 - ELF：OS 来自 OS ABI，架构来自机器字段与类别，字节序来自数据编码。
 - PE：OS 来自子系统，地址由 ImageBase 加 RVA 得到；固件子系统为 unknown。
-- Mach-O：OS 暂为 unknown，入口不恢复，诊断 `entry-point-unavailable`。
+- Mach-O：OS 为 `darwin`；入口来自 `LC_MAIN`，缺失时产生诊断 `entry-point-unavailable`；universal 文件先选切片，并产生诊断 `fat-slice-selected`。
 - 缺少入口字段时不输出 `entry_point`；这不表示文件没有入口。
 - 入口和节地址是映像地址，不是 ASLR 后的运行时地址。
-- `lift` 只解释 AMD64。其他架构的 `lowir` 返回 `ErrDecoderUnavailable`，`asm` 返回 `ErrNoDisassembler`。
+- `lift` 解释 AMD64、386、ARM64 与 ARM。其余架构的 `lowir` 返回 `ErrDecoderUnavailable`，`asm` 返回 `ErrNoDisassembler`。
 - `ssair` 和 `source` 依赖 LowIR，因此也只对已实现解码器的架构有效。
 
 ## 返回码
@@ -398,7 +399,7 @@ export TMPDIR="$RUN/tmp"
 scripts/ssa-test.sh -count=1 ./common/yak/reify/...
 ```
 
-测试覆盖 ByteReader、Image/Artifact 校验、区域映射、三个格式 loader、Catalog 注册与分派、parser 目标校验、AMD64 解码、汇编渲染与 LowIR 提升，以及 CLI 的 lift 模式。
+测试覆盖 ByteReader、Image/Artifact 校验、区域映射、三个格式 loader、Catalog 注册与分派、parser 目标校验、AMD64/386/ARM64/ARM 解码、汇编渲染与 LowIR 提升，以及 CLI 的 lift 模式。
 
 ## 参考资料
 

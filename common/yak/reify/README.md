@@ -13,7 +13,7 @@ Reify 是 Yaklang 的程序表示接入框架。它把文件格式、目标平�
 | 字节序 | `core.ByteOrder` | ByteReader 的读取模式 |
 | 指令操作 | `core.Opcode` | LowIR 指令的 Kind |
 
-Loader 和 Parser 使用两条独立的分派路径。ELF、PE、Mach-O 各自有 loader；AMD64 已有解码器，其余架构仍是注册骨架。操作系统、ABI 和执行模式属于 Target，随请求传给 parser。
+Loader 和 Parser 使用两条独立的分派路径。ELF、PE、Mach-O 各自有独立 loader 包；AMD64、386、ARM64 与 ARM 已有解码器，其余架构仍是注册骨架。操作系统、ABI 和执行模式属于 Target，随请求传给 parser。
 
 ```text
 path ── os.File ── ByteReader ── Format ── Loader ── Artifact
@@ -122,7 +122,9 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 
 ## 当前能力
 
-- ELF、PE 和 thin Mach-O 的头部、目标平台、入口与节元数据。
+- ELF、PE 和 Mach-O 的头部、目标平台、入口与节元数据。
+- Mach-O 同时接受 thin 与 universal（fat）文件；fat 文件按 ARM64、AMD64、首个切片的顺序选择一个切片，并产生 `fat-slice-selected` 诊断。
+- PE 解析导出表、导入表与 `.pdata` 异常目录；Mach-O 解析 `LC_MAIN`、`LC_FUNCTION_STARTS` 与符号表。
 - ELF 导入导出：`.dynsym`、`.symtab`、`.rela.plt`/`.rela.dyn`，映射 PLT 与 GOT 地址到符号名。
 - 调用目标与函数名解析：`puts`、`__libc_start_main`、`main`；无符号时保留 `sub_0x<地址>`。
 - C 函数定义表：返回类型、参数类型和可变参数。
@@ -130,17 +132,21 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 - 源码常量默认十六进制；字符串地址和符号地址带注释。
 - 按 Format 选择 loader，按 Architecture 选择 parser。
 - AMD64 解码器：通用寄存器、内存访问、算术与逻辑、比较与条件跳转、调用与返回、栈操作、部分 SSE 移动与按位操作。
+- 386 解码器：与 AMD64 共用同一套 x86 解码与提升实现（`loader/arch/internal/x86`），差异只在默认位宽、寄存器名（`eax`/`esp`/`eflags`）与栈槽宽度（4 字节）。
+- ARM 解码器（32 位 ARM 模式）：整数算术与逻辑、移位、乘法、位域、条件执行、加载存储三种寻址、PUSH/POP/LDM/STM、分支与调用；Thumb 模式未实现，`Check` 明确拒绝。
+- ARM64 解码器：整数算术与逻辑、位域、条件选择、条件比较、加载/存储（含前后索引）、分支与调用、指针认证（PAC）编码、SIMD 与浮点保留为不透明向量操作。
 - AMD64 汇编文本：按地址、机器字节输出；`--asm-syntax att|intel` 切换语法。
 - AMD64 LowIR：一个代码区域提升为一个 Function，包含基本块、值、操作、目标与效果。
 - LowIR → YakSSA：值、算术、比较和控制流进入 YakSSA；通用寄存器和内存槽提升为带位宽类型的变量；只有汇编 `call` 生成 YakSSA `Call`。
 - 内置 stack canary 与标准栈帧检测，默认删除；可用 `--lowir-pass` 自定义 pass 列表。
 - ELF 函数边界恢复：符号表、`.eh_frame`、`init/fini_array`、PLT、入口、递归下降和尾部扫描；边界来源写入 `ssair`/`source` 函数头。
+- PE 与 Mach-O 的函数边界来自格式元数据（`LC_FUNCTION_STARTS`、导出表、`.pdata`）、符号表与直接调用目标；`.eh_frame` 解析在 AMD64 与 ARM64 之间共用。
 - YakSSA → 伪源码：重构 `if`/`else` 和 `while`；展开循环 Phi；不输出块标签、`goto` 或 `phi`。
 - 命令行只读检查，不执行输入。
 
 ## 当前边界
 
-- 除 AMD64 外的架构 parser 只有注册骨架，`Parse` 返回 `ErrDecoderUnavailable`。
+- 除 AMD64、386、ARM64 与 ARM 外的架构 parser 只有注册骨架，`Parse` 返回 `ErrDecoderUnavailable`。
 - AMD64 使用线性扫描，不依赖符号表恢复函数边界。一个 `ParseRequest` 区域当前产出一个 Function。`.text` 中的数据或填充也可能被当作指令。
 - 未支持的 AMD64 指令保留为 `intrinsic`，并产生 `unsupported-instruction` 诊断。它们不会改变已支持的语义，也不会被静默丢弃。
 - 解码在区域末尾截断时返回部分 LowIR，并产生 `decode-error` 诊断。
@@ -148,7 +154,8 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 - 一个解析区域可以恢复多个 Function；边界来源和统计由 `asm2lowir.Result` 返回。
 - 内部函数调用按被调函数实际读取的寄存器裁剪 arity；已知 C 签名优先。
 - 汇编与 LowIR 报告相同诊断；`unsupported-instruction` 是提升阶段的限制，不是解码失败。
-- Fat Mach-O、Java、Python 与 VM 字节码尚未接入。
+- Java、Python 与 VM 字节码尚未接入。
+- ARM64 的 SIMD 与浮点通道语义未建模，只保留寄存器级数据流。
 - 标准库 `debug/*` 解析器不是对抗性输入沙箱。
 
 ## 文档
@@ -158,3 +165,4 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 - [LowIR](docs/lowir.md)：具体表示、操作约束与效果。
 - [SSA](docs/ssa.md)：LowIR 到 YakSSA、伪源码和限制。
 - [命令](docs/cli.md)：命令、JSON、返回码与验证范围。
+- [设计](docs/design.md)：算法、边界与取舍。

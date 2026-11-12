@@ -126,7 +126,7 @@ type Image struct {
 
 `EntryPoint` 的布尔返回值区分“地址为零”和“没有入口信息”。`SectionAt` 返回包含地址的节。`SymbolAt` 先匹配精确地址，再匹配带大小的符号范围。`Artifact.StringAt` 读取文件中的 NUL 结尾可打印字符串。
 
-`Symbol` 记录名称、地址、大小、种类、是否导入和来源库。ELF loader 从 `.dynsym`、`.symtab` 和重定位表填充；PLT 与 GOT 地址都映射到导入符号名。PE 与 Mach-O 暂为空。
+`Symbol` 记录名称、地址、大小、种类、是否导入和来源库。ELF loader 从 `.dynsym`、`.symtab` 和重定位表填充；PLT 与 GOT 地址都映射到导入符号名。PE loader 从导出表、导入表与 `.pdata` 填充，Mach-O loader 从符号表、导入符号与 `LC_FUNCTION_STARTS` 填充。
 
 Section 的 `FileSize == 0` 表示零填充。`Flags` 保留格式原义，不做跨格式归一化。
 
@@ -187,7 +187,28 @@ type Disassembly struct {
 - `Disassemble` / `DisassembleWithOptions` 复用解码结果，输出地址、机器字节和 AT&T/Intel 汇编。
 - 支持的指令族和限制见[架构文档](architecture.md#amd64)。
 
-其余九个架构仍是骨架：
+`ARM64` 的实现位于 [loader/arch/arm64](../loader/arch/arm64)，也是独立包：
+
+- `Available() == true`。
+- `Check` 要求 64 位和 `ArchARM64`；`Mode` 只接受空值或 `arm64`。
+- `Parse` 用 `arm64asm` 解码，并额外识别 `golang.org/x/arch` 未覆盖的指针认证编码。
+- `Disassemble` 输出地址、机器字节和 GNU 语法汇编。
+- 支持的指令族和限制见[架构文档](architecture.md#arm64)。
+
+`386` 的实现位于 [loader/arch/x86](../loader/arch/x86)，是共享 x86 实现的薄封装：
+
+- `Available() == true`。
+- `Check` 要求 32 位和 `Arch386`。
+- 解码、提升与边界发现来自 `loader/arch/internal/x86`，与 AMD64 使用同一份代码。
+
+`ARM` 的实现位于 [loader/arch/arm](../loader/arch/arm)：
+
+- `Available() == true`。
+- `Check` 要求 32 位、`ArchARM`，`Mode` 只接受空值或 `arm`；`thumb` 明确拒绝。
+- `Parse` 用 `armasm` 的 ARM 模式解码。
+- 支持的指令族和限制见[架构文档](architecture.md#arm)。
+
+其余六个架构仍是骨架：
 
 - `Available() == false`。
 - `Check` 校验 Target 的架构、位数与执行模式。
