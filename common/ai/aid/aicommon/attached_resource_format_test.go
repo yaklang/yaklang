@@ -70,13 +70,13 @@ func TestParseAttachedResourceDataByType(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &AttachedAIToolResourceData{}, resource)
 	require.Equal(t, CONTEXT_PROVIDER_TYPE_AITOOL, resource.Type())
-	require.Equal(t, "tool-name", resource.(*AttachedAIToolResourceData).Raw)
+	require.Equal(t, "tool-name", resource.(*AttachedAIToolResourceData).Name)
 
 	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AIFORGE, CONTEXT_PROVIDER_KEY_NAME, "forge-name"))
 	require.NoError(t, err)
 	require.IsType(t, &AttachedAIForgeResourceData{}, resource)
 	require.Equal(t, CONTEXT_PROVIDER_TYPE_AIFORGE, resource.Type())
-	require.Equal(t, "forge-name", resource.(*AttachedAIForgeResourceData).Raw)
+	require.Equal(t, "forge-name", resource.(*AttachedAIForgeResourceData).Name)
 
 	resource, err = ParseAttachedResourceData(NewAttachedResource("unknown_type", "custom_key", "hello"))
 	require.NoError(t, err)
@@ -87,46 +87,46 @@ func TestParseAttachedResourceDataByType(t *testing.T) {
 
 func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
 	resource := &AttachedHTTPFlowResourceData{}
-	err := resource.Unmarshal(`[1,2,2,3]`)
+	err := resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[1,2,2,3]`))
 	require.NoError(t, err)
 	require.Equal(t, []int64{1, 2, 3}, resource.IDs)
 
 	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(`{"ids":[4,5]}`)
+	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[4,5]}`))
 	require.NoError(t, err)
 	require.Equal(t, []int64{4, 5}, resource.IDs)
 
 	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(`{"ids":["7895","7894","7896"]}`)
+	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":["7895","7894","7896"]}`))
 	require.NoError(t, err)
 	require.Equal(t, []int64{7895, 7894, 7896}, resource.IDs)
 
 	// Test single number
 	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(`21`)
+	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `21`))
 	require.NoError(t, err)
 	require.Equal(t, []int64{21}, resource.IDs)
 
 	// Test single number string
 	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(`"42"`)
+	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"42"`))
 	require.NoError(t, err)
 	require.Equal(t, []int64{42}, resource.IDs)
 
 	// Test single number string with whitespace
 	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(`"  99  "`)
+	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"  99  "`))
 	require.NoError(t, err)
 	require.Equal(t, []int64{99}, resource.IDs)
 
-	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`not-json`)
+	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
 	require.Error(t, err)
 
-	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`[]`)
+	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[]`))
 	require.Error(t, err)
 
 	// Test invalid single string
-	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(`"not-a-number"`)
+	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"not-a-number"`))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid http flow id string")
 }
@@ -208,7 +208,7 @@ func TestAttachedHTTPFlowResourceDataFromDB(t *testing.T) {
 	require.Error(t, err)
 
 	missingResource := &AttachedHTTPFlowResourceData{}
-	err = missingResource.Unmarshal(`{"ids":[999999999]}`)
+	err = missingResource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[999999999]}`))
 	require.NoError(t, err)
 	require.Contains(t, missingResource.renderSummary(db), "Load Errors")
 

@@ -11,7 +11,7 @@ type AttachedResourceData interface {
 	ToAttachData(loop ReActLoopIF) string
 	Type() string
 	BindLoopData(loop ReActLoopIF) error
-	Unmarshal(raw string) error
+	Unmarshal(resource *AttachedResource) error
 }
 
 type AttachedResourceDataFactory func() AttachedResourceData
@@ -46,8 +46,7 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 
 	if data.HasType(AttachedResourceTypeFile) && data.HasKey(CONTEXT_PROVIDER_KEY_FILE_CONTENT) {
 		resource := &AttachedFileContentResourceData{}
-		resource.Key = data.Key
-		return resource, resource.Unmarshal(data.Value)
+		return resource, resource.Unmarshal(data)
 	}
 
 	attachedResourceDataFactories.RLock()
@@ -55,7 +54,7 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 	attachedResourceDataFactories.RUnlock()
 	if factory == nil {
 		resource := NewDefaultAttachedResourceData(data.Type, data.Key)
-		if err := resource.Unmarshal(data.Value); err != nil {
+		if err := resource.Unmarshal(data); err != nil {
 			return nil, err
 		}
 		return resource, nil
@@ -65,10 +64,7 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 	if resource == nil {
 		return nil, utils.Errorf("attached resource factory returned nil for type: %s", strings.TrimSpace(data.Type))
 	}
-	if knowledge, ok := resource.(*AttachedKnowledgeBaseResourceData); ok {
-		knowledge.Key = data.Key
-	}
-	if err := resource.Unmarshal(data.Value); err != nil {
+	if err := resource.Unmarshal(data); err != nil {
 		return nil, err
 	}
 	return resource, nil
