@@ -19,6 +19,7 @@ import (
 	riscv64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/riscv64"
 	s390ximpl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/s390x"
 	x86impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/x86"
+	x8616impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/x86_16"
 )
 
 var ErrDecoderUnavailable = errors.New("instruction decoder is not implemented")
@@ -30,7 +31,7 @@ func All() []core.Parser {
 		riscv64impl.Parser{}, riscv32impl.Parser{},
 		ppc64impl.Parser{}, ppcimpl.Parser{},
 		mips64impl.Parser{}, mipsimpl.Parser{},
-		s390ximpl.Parser{}, loong64impl.Parser{},
+		s390ximpl.Parser{}, loong64impl.Parser{}, x8616impl.Parser{},
 	}
 }
 

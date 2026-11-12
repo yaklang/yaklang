@@ -52,8 +52,18 @@ func TestCLIListsLoadersAndParsers(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &loaders); err != nil {
 		t.Fatal(err)
 	}
-	if len(loaders) != 3 || loaders[0].Kind != core.FormatELF || loaders[1].Kind != core.FormatMachO || loaders[2].Kind != core.FormatPE {
+	if len(loaders) != 6 {
 		t.Fatalf("unexpected loaders: %+v", loaders)
+	}
+	seen := map[core.Format]bool{}
+	for _, loader := range loaders {
+		seen[loader.Kind] = true
+	}
+	for _, kind := range []core.Format{core.FormatArchive, core.FormatCOFF, core.FormatELF,
+		core.FormatMachO, core.FormatMZ, core.FormatPE} {
+		if !seen[kind] {
+			t.Fatalf("loader %s not listed: %+v", kind, loaders)
+		}
 	}
 	if code, out, _ := runCLI("loaders"); code != 0 || !strings.Contains(out, "ELF") {
 		t.Fatalf("text loaders: %d %q", code, out)
@@ -66,7 +76,7 @@ func TestCLIListsLoadersAndParsers(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &parsers); err != nil {
 		t.Fatal(err)
 	}
-	if len(parsers) != 12 || parsers[0].Kind != core.Arch386 {
+	if len(parsers) != 13 || parsers[0].Kind != core.Arch386 {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {

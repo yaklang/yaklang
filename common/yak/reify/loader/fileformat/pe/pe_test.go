@@ -32,6 +32,8 @@ type fixtureOptions struct {
 	exports bool
 	unwind  bool
 	imports bool
+	// managed fills the CLI header directory, which marks a .NET assembly.
+	managed bool
 }
 
 const (
@@ -66,6 +68,9 @@ func fixture(t *testing.T, options fixtureOptions) []byte {
 	optional.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXPORT] = pe.DataDirectory{VirtualAddress: fixtureExportRVA, Size: fixtureExportSize}
 	optional.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_IMPORT] = pe.DataDirectory{VirtualAddress: fixtureImportRVA, Size: fixtureImportSize}
 	optional.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXCEPTION] = pe.DataDirectory{VirtualAddress: fixturePdataRVA, Size: fixturePdataSize}
+	if options.managed {
+		optional.DataDirectory[14] = pe.DataDirectory{VirtualAddress: fixturePdataRVA, Size: 0x48}
+	}
 	sections := []pe.SectionHeader32{}
 	addSection := func(name string, virtualSize, virtualAddress, rawSize, rawOffset uint32, characteristics uint32) {
 		header := pe.SectionHeader32{
@@ -144,9 +149,38 @@ func writeImports(t *testing.T, raw, data []byte) {
 	_ = raw
 }
 
+// TestLoadRejectsManagedAssembly checks that a .NET assembly is refused instead
+// of decoded as machine code. The CLI header directory marks the IL payload.
+func TestLoadRejectsManagedAssembly(t *testing.T) {
+	raw := fixture(t, fixtureOptions{managed: true})
+	_, err := (Loader{}).Load(context.Background(), newReader(t, raw))
+	if err == nil {
+		t.Fatal("managed assembly accepted")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte(".NET")) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestLoadAcceptsNativeImage checks the guard does not reject a native image.
+func TestLoadAcceptsNativeImage(t *testing.T) {
+	raw := fixture(t, fixtureOptions{unwind: true})
+	if _, err := (Loader{}).Load(context.Background(), newReader(t, raw)); err != nil {
+		t.Fatalf("native image rejected: %v", err)
+	}
+}
+
 func TestMatch(t *testing.T) {
-	if !(Loader{}).Match([]byte("MZ\x90\x00")) {
-		t.Fatal("PE magic was not matched")
+	// The DOS stub records the signature offset at 0x3c, so a bare MZ prefix
+	// cannot decide between PE and a plain MS-DOS executable.
+	stub := make([]byte, 0x100)
+	copy(stub, "MZ")
+	binary.LittleEndian.PutUint32(stub[0x3c:], 0x80)
+	if !(Loader{}).Match(stub) {
+		t.Fatal("PE stub was not matched")
+	}
+	if (Loader{}).Match([]byte("MZ\x90\x00")) {
+		t.Fatal("an MZ executable without a signature offset was claimed as PE")
 	}
 	if (Loader{}).Match([]byte{0x7f, 'E', 'L', 'F'}) {
 		t.Fatal("ELF input was claimed as PE")

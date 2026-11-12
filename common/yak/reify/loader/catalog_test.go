@@ -66,6 +66,11 @@ func minimalMachO(t *testing.T) []byte {
 	return buffer.Bytes()
 }
 
+func checkFixtureAs(t *testing.T, catalog *Catalog, name string, raw []byte, format core.Format) (*CheckResult, error) {
+	t.Helper()
+	return catalog.CheckAs(context.Background(), name, bytes.NewReader(raw), int64(len(raw)), format)
+}
+
 func openFixture(t *testing.T, catalog *Catalog, name string, raw []byte) (*core.Artifact, error) {
 	t.Helper()
 	return catalog.Open(context.Background(), name, bytes.NewReader(raw), int64(len(raw)))
@@ -74,11 +79,17 @@ func openFixture(t *testing.T, catalog *Catalog, name string, raw []byte) (*core
 func TestDefaultCatalog(t *testing.T) {
 	catalog := Default
 	loaders := catalog.Loaders()
-	if len(loaders) != 3 || loaders[0].Kind != core.FormatELF || loaders[1].Kind != core.FormatMachO || loaders[2].Kind != core.FormatPE {
+	if len(loaders) != 6 {
 		t.Fatalf("unexpected loaders: %+v", loaders)
 	}
+	for _, kind := range []core.Format{core.FormatArchive, core.FormatCOFF, core.FormatELF,
+		core.FormatMachO, core.FormatMZ, core.FormatPE} {
+		if _, ok := catalog.Loader(kind); !ok {
+			t.Fatalf("loader %s not registered", kind)
+		}
+	}
 	parsers := catalog.Parsers()
-	if len(parsers) != 12 || parsers[0].Kind != core.Arch386 {
+	if len(parsers) != 13 || parsers[0].Kind != core.Arch386 {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {
@@ -241,6 +252,31 @@ func TestCatalogRejectsUnsupportedInput(t *testing.T) {
 	}
 	if _, err := openFixture(t, Default, "broken.elf", []byte{0x7f, 'E', 'L', 'F'}); err == nil || errors.Is(err, ErrUnsupportedFormat) {
 		t.Fatalf("truncated ELF should fail in the loader, got %v", err)
+	}
+}
+
+// TestCatalogForcedFormat checks the escape hatch for a format that carries no
+// magic. A COM image is a bare code blob, so the loader cannot be detected and
+// the caller must name it; naming a format that is not registered is an error.
+func TestCatalogForcedFormat(t *testing.T) {
+	if _, ok := Default.ParseFormat("mz"); !ok {
+		t.Fatal("mz is not a registered format")
+	}
+	if _, ok := Default.ParseFormat("nonesuch"); ok {
+		t.Fatal("unknown format accepted")
+	}
+	if _, err := openFixture(t, Default, "code.com", []byte{0xb8, 0x00, 0x4c, 0xcd, 0x21}); !errors.Is(err, ErrUnsupportedFormat) {
+		t.Fatalf("a bare code blob should need a forced format, got %v", err)
+	}
+	checked, err := checkFixtureAs(t, Default, "code.com", []byte{0xb8, 0x00, 0x4c, 0xcd, 0x21}, core.FormatMZ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked.Target.Architecture != core.Arch8086 || checked.Target.Bits != 16 {
+		t.Fatalf("unexpected target: %+v", checked.Target)
+	}
+	if _, err := checkFixtureAs(t, Default, "code.com", []byte{0xb8}, core.FormatMachO); err == nil {
+		t.Fatal("a forced format must still validate the input")
 	}
 }
 

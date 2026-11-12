@@ -69,11 +69,17 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 		target.Mode = armMode(file)
 	}
 	image := &core.Image{ObjectType: file.Type.String(), Sections: make([]core.Section, 0, len(file.Sections))}
+	// A relocatable object carries no assigned addresses; the sections are laid
+	// out from this base so each range stays distinct.
+	relocatableBase := uint64(0)
 	if file.Entry != 0 {
 		entry := file.Entry
 		image.Entry = &entry
 	}
-	for _, section := range file.Sections {
+	// sectionBases maps a section header index to the address the layout
+	// assigned. The image skips SHT_NULL sections, so the indices differ.
+	sectionBases := make(map[elf.SectionIndex]uint64, len(file.Sections))
+	for index, section := range file.Sections {
 		if section.Type == elf.SHT_NULL {
 			continue
 		}
@@ -81,16 +87,28 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 		if section.Type == elf.SHT_NOBITS {
 			fileSize = 0
 		}
+		address := section.Addr
+		if file.Type == elf.ET_REL && address == 0 {
+			// A relocatable object has no assigned addresses: the linker places
+			// each section. The loader lays the sections out in file order so
+			// their ranges stay distinct, which is what the boundary scanner
+			// needs to tell a code region from a data region.
+			address = relocatableBase
+			relocatableBase += (section.Size + 0xf) &^ 0xf
+		}
+		sectionBases[elf.SectionIndex(index)] = address
 		image.Sections = append(image.Sections, core.Section{
 			Name:           section.Name,
 			FileOffset:     section.Offset,
 			FileSize:       fileSize,
-			VirtualAddress: section.Addr,
+			VirtualAddress: address,
 			MemorySize:     section.Size,
 			Flags:          uint64(section.Flags),
 		})
 	}
-	parseELFSymbols(file, image)
+	// A relocatable symbol value is relative to its section, so the loader adds
+	// the section base that the layout above assigned.
+	parseELFSymbols(file, image, sectionBases, file.Type == elf.ET_REL)
 	return image, target, parseELFHints(file, image), nil, nil
 }
 
@@ -99,7 +117,9 @@ type elfRelocation struct {
 	symIndex uint32
 }
 
-func parseELFSymbols(file *elf.File, image *core.Image) {
+// parseELFSymbols reads the static symbol table. When relocatable is true the
+// symbol values are section-relative and need the section base.
+func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionIndex]uint64, relocatable bool) {
 	seen := make(map[string]bool)
 	add := func(symbol sym.Symbol) {
 		if symbol.Name == "" {
@@ -122,12 +142,21 @@ func parseELFSymbols(file *elf.File, image *core.Image) {
 				add(sym.Symbol{Name: symbol.Name, Kind: elfSymbolKind(symbol), Imported: true, Library: symbol.Library})
 				continue
 			}
-			if symbol.Value == 0 {
+			if symbol.Value == 0 && !relocatable {
+				// A zero value in a linked image names the section start, which
+				// the symbol table also records as the section symbol.
 				continue
+			}
+			address := symbol.Value
+			if relocatable {
+				// A relocatable value is relative to its section, and zero is a
+				// legitimate offset: the first function of a section starts at
+				// zero.
+				address = bases[symbol.Section] + symbol.Value
 			}
 			add(sym.Symbol{
 				Name:    symbol.Name,
-				Address: symbol.Value,
+				Address: address,
 				Size:    symbol.Size,
 				Kind:    elfSymbolKind(symbol),
 				Library: symbol.Library,

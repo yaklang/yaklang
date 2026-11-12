@@ -13,9 +13,12 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	coffloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/coff"
 	elfloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/elf"
 	macholoader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/macho"
+	mzloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/mz"
 	peloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/pe"
+	unixarloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/unixar"
 )
 
 func newFixtureReader(t *testing.T, raw []byte) *core.ByteReader {
@@ -254,6 +257,23 @@ func TestFormatLoaderContext(t *testing.T) {
 	}
 }
 
+// pePrefix builds the shortest prefix the PE loader accepts: an MZ stub that
+// names a signature offset inside the file.
+func pePrefix() []byte {
+	prefix := make([]byte, 0x100)
+	copy(prefix, "MZ")
+	binary.LittleEndian.PutUint32(prefix[0x3c:], 0x80)
+	return prefix
+}
+
+// coffPrefix builds the shortest prefix the COFF loader accepts.
+func coffPrefix() []byte {
+	prefix := make([]byte, 20)
+	binary.LittleEndian.PutUint16(prefix[0:], 0x8664)
+	binary.LittleEndian.PutUint16(prefix[2:], 1)
+	return prefix
+}
+
 func TestFormatLoaderMatch(t *testing.T) {
 	for _, tc := range []struct {
 		loader core.Loader
@@ -261,11 +281,16 @@ func TestFormatLoaderMatch(t *testing.T) {
 		want   bool
 	}{
 		{elfloader.Loader{}, []byte{0x7f, 'E', 'L', 'F'}, true},
-		{peloader.Loader{}, []byte("MZ"), true},
+		// A bare MZ prefix is ambiguous: PE needs the stub to name a signature.
+		{peloader.Loader{}, pePrefix(), true},
+		{mzloader.Loader{}, []byte("MZ"), true},
+		{peloader.Loader{}, []byte("MZ"), false},
 		{macholoader.Loader{}, []byte{0xcf, 0xfa, 0xed, 0xfe}, true},
 		{elfloader.Loader{}, []byte("MZ"), false},
 		{peloader.Loader{}, []byte("plain"), false},
 		{macholoader.Loader{}, []byte{0xca, 0xfe, 0xba, 0xbe}, false},
+		{coffloader.Loader{}, coffPrefix(), true},
+		{unixarloader.Loader{}, []byte("!<arch>\n"), true},
 	} {
 		if got := tc.loader.Match(tc.prefix); got != tc.want {
 			t.Fatalf("%s.Match(%x) = %v, want %v", tc.loader.Name(), tc.prefix, got, tc.want)
