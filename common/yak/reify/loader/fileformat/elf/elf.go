@@ -3,6 +3,7 @@ package elf
 import (
 	"context"
 	"debug/elf"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -257,6 +258,15 @@ func elfPLTAddress(file *elf.File, index int) (uint64, bool) {
 	// on x86 and ARM64, twelve on 32-bit ARM, which keeps a four-byte literal.
 	stride := uint64(16)
 	if file.Machine == elf.EM_ARM {
+		// The ARM PLT is not uniform: the linker inserts a four-byte Thumb
+		// trampoline where an import is only reachable through one. Reading the
+		// stub addresses out of the section is exact, a fixed stride is not.
+		if entries := armPLTEntries(file); entries != nil {
+			if index < len(entries) {
+				return entries[index], true
+			}
+			return 0, false
+		}
 		stride = 12
 	}
 	if section := file.Section(".plt.sec"); section != nil && section.Addr != 0 {
@@ -271,6 +281,52 @@ func elfPLTAddress(file *elf.File, index int) (uint64, bool) {
 		return section.Addr + (uint64(index)+header)*stride, true
 	}
 	return 0, false
+}
+
+// armPLTEntries returns the address of every ARM PLT stub in relocation order.
+// The relocation order matches the section order.
+func armPLTEntries(file *elf.File) []uint64 {
+	section := file.Section(".plt")
+	if section == nil || section.Addr == 0 {
+		return nil
+	}
+	data, err := section.Data()
+	if err != nil {
+		return nil
+	}
+	offsets := armPLTStubOffsets(data)
+	entries := make([]uint64, 0, len(offsets))
+	for _, offset := range offsets {
+		entries = append(entries, section.Addr+offset)
+	}
+	return entries
+}
+
+// armPLTStubOffsets returns the byte offset of every ARM PLT stub in one .plt
+// payload. A stub is three instructions: add ip, pc, #0; add ip, ip, #imm;
+// ldr pc, [ip, #imm]. The immediate in the second instruction is the distance to
+// the GOT, so the match ignores the immediate fields.
+func armPLTStubOffsets(data []byte) []uint64 {
+	const (
+		addIPPC    = 0xe28fc000 // add ip, pc, #imm
+		addIPIP    = 0xe28cc000 // add ip, ip, #imm
+		loadPCPop  = 0xe5bcf000 // ldr pc, [ip, #imm]
+		opcodeMask = 0xfffff000
+	)
+	var offsets []uint64
+	for offset := 0; offset+12 <= len(data); offset += 4 {
+		if binary.LittleEndian.Uint32(data[offset:])&opcodeMask != addIPPC {
+			continue
+		}
+		if binary.LittleEndian.Uint32(data[offset+4:])&opcodeMask != addIPIP {
+			continue
+		}
+		if binary.LittleEndian.Uint32(data[offset+8:])&opcodeMask != loadPCPop {
+			continue
+		}
+		offsets = append(offsets, uint64(offset))
+	}
+	return offsets
 }
 
 func elfSymbolKind(symbol elf.Symbol) sym.SymbolKind {

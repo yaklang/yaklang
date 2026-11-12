@@ -127,10 +127,21 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 			WithAssembly: config.WithAssembly,
 		})
 		if err != nil {
-			return nil, err
+			// One undecodable function must not discard the whole image. Real
+			// binaries interleave literal pools, jump tables and padding with
+			// code, and a boundary can land on data.
+			result.Diagnostics = append(result.Diagnostics, core.Diagnostic{
+				Code:    "function-parse-error",
+				Message: fmt.Sprintf("function at 0x%x could not be decoded: %v", boundary.Address, err),
+			})
+			continue
 		}
 		if parsed == nil || parsed.IR == nil {
-			return nil, fmt.Errorf("parser %s returned no LowIR", artifact.Parser.Name())
+			result.Diagnostics = append(result.Diagnostics, core.Diagnostic{
+				Code:    "function-empty",
+				Message: fmt.Sprintf("parser %s returned no LowIR for 0x%x", artifact.Parser.Name(), boundary.Address),
+			})
+			continue
 		}
 		for functionIndex := range parsed.IR.Functions {
 			function := &parsed.IR.Functions[functionIndex]
@@ -149,6 +160,9 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 	}
 	annotateSymbols(artifact, result.IR)
 	fillFunctionNames(result.IR)
+	if len(result.IR.Functions) == 0 {
+		return nil, fmt.Errorf("no instructions recovered from function boundaries")
+	}
 	if len(boundaries) > 1 {
 		result.Diagnostics = filterCrossFunctionDiagnostics(result.Diagnostics)
 	}
