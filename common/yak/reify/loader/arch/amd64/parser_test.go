@@ -417,8 +417,10 @@ func TestAMD64IndexedMemoryStore(t *testing.T) {
 }
 
 func TestAMD64UnsupportedInstructionIsExplicit(t *testing.T) {
-	result := parseAMD64At(t, 0x4000, []byte{0x0f, 0x58, 0xc1, 0xc3})
-	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "x86.addps"); !ok {
+	// CRC32 has no data-flow model yet, so it must stay visible and reported
+	// rather than dropped. SSE arithmetic and x87 are covered elsewhere.
+	result := parseAMD64At(t, 0x4000, []byte{0xf2, 0x0f, 0x38, 0xf1, 0xc1, 0xc3})
+	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "x86.crc32"); !ok {
 		t.Fatal("unsupported instruction was dropped")
 	}
 	if diagnosticCount(result, "unsupported-instruction") != 1 {
@@ -451,7 +453,7 @@ func TestAMD64NewlyLiftedInstructions(t *testing.T) {
 }
 
 func TestAMD64DisassembleReportsLiftDiagnostics(t *testing.T) {
-	code := []byte{0x0f, 0x58, 0xc1, 0xc3}
+	code := []byte{0xf2, 0x0f, 0x38, 0xf1, 0xc1, 0xc3}
 	parsed := parseAMD64At(t, 0x4000, code)
 	disassembly, err := (Parser{}).Disassemble(context.Background(), amd64Request(t, 0x4000, code))
 	if err != nil {
