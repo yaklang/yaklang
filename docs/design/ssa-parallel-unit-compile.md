@@ -23,7 +23,10 @@ barrier.
    or starve behind later files. Prefetching for the next batch can overlap the
    previous batch's semantic scan and persistence.
 2. Declaration PreHandler is serial inside one unit and concurrent across
-   units in a batch. Each Java package gets its own builder that inherits
+   units in a batch. Frontends opt in explicitly through
+   `ConcurrentUnitPreHandler` (C, PHP) or implicitly by supporting concurrent
+   body builds (Java, Python, JS/TS, Go); any other frontend keeps a single
+   pre-handler worker. Each Java package gets its own builder that inherits
    application build support. Application-owned resource units stay on one
    worker. Editor recording uses the builder's program stack. Import names
    are recorded locally during the skeleton pass; linking into other

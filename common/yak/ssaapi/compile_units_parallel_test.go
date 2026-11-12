@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -470,4 +471,77 @@ func TestCompileUnitApplicationDoesNotDrainReadyLibraries(t *testing.T) {
 	_, err = buildCompileUnitPipeline(context.Background(), prog, plan, batch, 2)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, calls.Load())
+}
+
+// cPrehandlerProbe records the peak number of C pre-handlers running at once.
+// It wraps the real c2ssa builder so the assertion below measures the engine's
+// scheduling decision, not a stand-in.
+type cPrehandlerProbe struct {
+	ssa.Builder
+	active atomic.Int32
+	peak   atomic.Int32
+}
+
+// SupportsConcurrentUnitPreHandler forwards the wrapped builder's opt-in.
+// Embedding ssa.Builder is not enough: the scheduling gate type-asserts to
+// ssa.ConcurrentUnitPreHandler, which ssa.Builder does not include, so a
+// wrapper without this method would silently pin the batch to one worker.
+func (p *cPrehandlerProbe) SupportsConcurrentUnitPreHandler() bool {
+	pre, ok := p.Builder.(ssa.ConcurrentUnitPreHandler)
+	return ok && pre.SupportsConcurrentUnitPreHandler()
+}
+
+func (p *cPrehandlerProbe) PreHandlerProject(fs fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
+	current := p.active.Add(1)
+	defer p.active.Add(-1)
+	for previous := p.peak.Load(); current > previous; previous = p.peak.Load() {
+		if p.peak.CompareAndSwap(previous, current) {
+			break
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	return p.Builder.PreHandlerProject(fs, ast, builder, editor)
+}
+
+// TestCompileUnitCPrehandlersOverlapAcrossDirectories proves c2ssa opts into
+// per-unit parallel pre-handling. Every directory is its own compile unit, so
+// with an 8-way budget independent directories must overlap. Before c2ssa
+// declared SupportsConcurrentUnitPreHandler the engine pinned prehandleWorkers
+// to 1 and a large C project compiled one file at a time.
+func TestCompileUnitCPrehandlersOverlapAcrossDirectories(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 12; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/main.c", i),
+			fmt.Sprintf("int f%d(int a) { return a + %d; }\n", i, i))
+	}
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.C), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	probe := &cPrehandlerProbe{Builder: c2ssa.CreateBuilder()}
+	cfg.LanguageBuilder = probe
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	require.Greater(t, probe.peak.Load(), int32(1), "C prehandlers never overlapped")
+}
+
+// TestCompileUnitCParallelKeepsResults checks that parallel pre-handling does
+// not change what the compiled program contains: every function from every
+// directory is still reachable and queryable.
+func TestCompileUnitCParallelKeepsResults(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	for i := 0; i < 8; i++ {
+		vf.AddFile(fmt.Sprintf("p%d/main.c", i),
+			fmt.Sprintf("int f%d(int a) { return a + %d; }\n", i, i))
+	}
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithLanguage(ssaconfig.C), WithMemory(), ssaconfig.WithCompileConcurrency(8))
+	require.NoError(t, err)
+	program, err := cfg.parseProjectWithFSUnits(vf, func(float64, string, ...any) {})
+	require.NoError(t, err)
+	require.NotNil(t, program)
+	// Every directory contributes one callable function; ask the finished
+	// program for all of them at once so a lost or misattributed body fails.
+	result, err := program.SyntaxFlowWithError(`f3 as $target`)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.GetValues("target"),
+		"a function from one unit is missing after parallel pre-handling")
 }

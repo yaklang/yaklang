@@ -54,17 +54,24 @@ func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor,
 	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
+// SupportsConcurrentUnitPreHandler opts C into per-unit parallel pre-handling.
+// Each compile unit owns one library Program (directory-backed by the default
+// partitioner) and its own FunctionBuilder, so the whole-tree build below does
+// not share a builder between workers. Shared state reached through this path
+// is already guarded: the editor stack takes editorStackMu, SetExtraFile takes
+// metaMu, blueprint members take blueprintMemberMap.mu, and the source store
+// takes sourceStore.mu.
+func (*SSABuilder) SupportsConcurrentUnitPreHandler() bool { return true }
+
 func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
 		return nil
 	}
-	if prog.ExtraFile == nil {
-		prog.ExtraFile = make(map[string]string)
+	if err := prog.Build(ast, editor, functionBuilder); err != nil {
+		return err
 	}
-	prog.Build(ast, editor, functionBuilder)
-	prog.GetIncludeFiles()
 	return nil
 }
 
