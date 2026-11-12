@@ -76,9 +76,9 @@ func TestPromptContextManualHotpatchIsModelScoped(t *testing.T) {
 	require.False(t, status.Pending)
 	fresh := newConfig(context.Background())
 	require.EqualValues(t, 600*1024, fresh.EffectiveTimelineTokenLimit("test", model, fresh.GetTimelineContentSizeLimit()))
-	require.EqualValues(t, 500*1024, fresh.EffectiveTimelineTokenLimit("test", model+"-other", fresh.GetTimelineContentSizeLimit()))
+	require.EqualValues(t, 500*1000, fresh.EffectiveTimelineTokenLimit("test", model+"-other", fresh.GetTimelineContentSizeLimit()))
 	cfg.UpdateAIModelInfo("test", model+"-other")
-	require.EqualValues(t, 500*1024, cfg.ModelContextStatus(0).ThresholdTokens, "switching models must not reuse a dragged threshold")
+	require.EqualValues(t, 500*1000, cfg.ModelContextStatus(0).ThresholdTokens, "switching models must not reuse a dragged threshold")
 	params, changed := mergeHotpatchSessionStartParams(&ypb.AIStartParams{RuntimeContextSizeLimit: 300 * 1024}, &ypb.AIInputEvent{
 		HotpatchType: HotPatchType_RuntimeContextSizeLimit,
 		Params:       &ypb.AIStartParams{AIService: "test", AIModelName: model, RuntimeContextSizeLimit: 600 * 1024},
@@ -89,7 +89,7 @@ func TestPromptContextManualHotpatchIsModelScoped(t *testing.T) {
 
 func TestRecordPromptOverflowUsesReportedMaximum(t *testing.T) {
 	cfg := newConfig(context.Background())
-	require.EqualValues(t, 500*1024, cfg.GetTimelineContentSizeLimit())
+	require.EqualValues(t, 500*1000, cfg.GetTimelineContentSizeLimit())
 
 	limit := cfg.RecordPromptOverflow("openai", "gpt-4o", 150000, &aispec.PromptOverflowEvidence{MaxContextTokens: 128000})
 	require.EqualValues(t, 102400, limit, "80%% of the reported maximum")

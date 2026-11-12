@@ -12,8 +12,10 @@ import (
 	"github.com/yaklang/gorm"
 )
 
-const DefaultAIModelContextTokens int64 = 500 * 1024
-const MinimumAIModelContextTokens int64 = 100 * 1024
+// Token display units are decimal. Persisted values are integer token counts,
+// including budgets saved by versions that displayed K using a factor of 1024.
+const DefaultAIModelContextTokens int64 = 500 * 1000
+const MinimumAIModelContextTokens int64 = 100 * 1000
 
 // AIModelContext is local model metadata, never sent as a provider API parameter.
 // Unknown models start with an optimistic window; learned values are only saved
@@ -40,7 +42,7 @@ func ValidateAIModelContextThreshold(tokens int64) error {
 
 // Match the slider's stable upper bound; user input must never expand its own range.
 func AIModelContextMaximumThreshold(value AIModelContext) int64 {
-	const step int64 = 1000 * 1024
+	const step int64 = 1000 * 1000
 	largest := max(step, value.ContextTokens, value.ThresholdTokens)
 	return ((largest-1)/step + 1) * step
 }
