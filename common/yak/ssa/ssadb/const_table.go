@@ -267,13 +267,20 @@ func flushIrConstPools(db *gorm.DB, items []*IrCode) error {
 			continue
 		}
 		text := item.ConstText
-		if text == "" {
+		kind := IrConstKind(item.ConstKind)
+		if kind == IrConstKindNil {
+			// A row built without the codec (tests, an in-tree caller) carries
+			// only the short text column, and an empty value there is
+			// indistinguishable from "no value".
 			text = item.String
+			if text == "" {
+				continue
+			}
 		}
-		if text == "" {
-			continue
-		}
-		item.ConstID = InternIrConst(item.ProgramName, IrConstKind(item.ConstKind), text)
+		// An empty string constant is a real value: the codec tags it with
+		// IrConstKindString, so it must reach the pool like any other text.
+		// Dropping it here makes restore turn "" into nil.
+		item.ConstID = InternIrConst(item.ProgramName, kind, text)
 	}
 	programs := make(map[string]struct{}, 1)
 	for _, item := range items {
