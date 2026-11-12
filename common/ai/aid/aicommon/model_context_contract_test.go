@@ -86,6 +86,7 @@ func TestModelContextContractLateProbeCannotOverwriteManualEdit(t *testing.T) {
 	status := first.ModelContextStatusFor("test", model, 0)
 	require.Equal(t, "manual", status.Source)
 	require.False(t, status.Pending)
+	require.Nil(t, status.Change, "a superseded probe must not report an automatic adjustment")
 	require.EqualValues(t, 300*1024, status.ThresholdTokens)
 	legacy := newConfig(context.Background())
 	require.NoError(t, WithTimelineContentLimit(128*1024)(legacy))
@@ -95,6 +96,62 @@ func TestModelContextContractLateProbeCannotOverwriteManualEdit(t *testing.T) {
 	first.RecordPromptOverflow("test", model, 200000, &aispec.PromptOverflowEvidence{MaxContextTokens: 128000})
 	first.ConfirmPromptContextSuccess("test", model, 90000)
 	require.EqualValues(t, 102400, first.ModelContextStatusFor("test", model, 0).ThresholdTokens)
+}
+
+func TestModelContextContractRecoveryExplainsOriginalSettingAndPersistsSuccess(t *testing.T) {
+	cfg := newConfig(context.Background())
+	model := uuid.NewString()
+	cfg.UpdateAIModelInfo("test", model)
+	for _, option := range cfg.ProcessHotPatchMessage(modelContextPatch("test", model, 500*1024)) {
+		require.NoError(t, option(cfg))
+	}
+	db := consts.GetGormProfileDatabase()
+	// Two rejected attempts must not publish an unverified model setting.
+	for _, maximum := range []int64{375 * 1024, 250 * 1024} {
+		require.NotZero(t, cfg.RecordPromptOverflow("test", model, 400*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: maximum}))
+		require.True(t, cfg.ModelContextStatus(0).Pending)
+		require.EqualValues(t, 500*1024, yakit.GetAIModelContext(db, "test", model).ThresholdTokens)
+	}
+	cfg.ConfirmPromptContextSuccess("test", model, 150*1024)
+	confirmed := cfg.ModelContextStatus(150 * 1024)
+	require.False(t, confirmed.Pending)
+	require.Equal(t, "confirmed", confirmed.Change.Reason)
+	require.EqualValues(t, 500*1024, confirmed.Change.PreviousThresholdTokens, "explain the original setting, not just the last retry")
+	require.EqualValues(t, 200*1024, confirmed.Change.ThresholdTokens)
+	cfg.ConfirmPromptContextSuccess("test", model, 160*1024)
+	require.Equal(t, confirmed.Change.ID, cfg.ModelContextStatus(0).Change.ID, "later successful requests must not announce recovery again")
+	fresh := newConfig(context.Background())
+	fresh.UpdateAIModelInfo("test", model)
+	require.EqualValues(t, 200*1024, fresh.ModelContextStatus(0).ThresholdTokens)
+	require.Equal(t, "learned", fresh.ModelContextStatus(0).Source)
+	require.EqualValues(t, 500*1024, fresh.ModelContextStatusFor("test", model+"-other", 0).ThresholdTokens)
+	// An explicit new setting starts a new attempt, and may be learned again.
+	for _, option := range fresh.ProcessHotPatchMessage(modelContextPatch("test", model, 500*1024)) {
+		require.NoError(t, option(fresh))
+	}
+	require.EqualValues(t, 500*1024, fresh.ModelContextStatus(0).ThresholdTokens)
+	require.NotZero(t, fresh.RecordPromptOverflow("test", model, 300*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: 250 * 1024}))
+	fresh.ConfirmPromptContextSuccess("test", model, 150*1024)
+	require.EqualValues(t, 500*1024, fresh.ModelContextStatus(0).Change.PreviousThresholdTokens)
+	require.EqualValues(t, 200*1024, fresh.ModelContextStatus(0).ThresholdTokens)
+	require.NotEqual(t, confirmed.Change.ID, fresh.ModelContextStatus(0).Change.ID)
+}
+
+func TestModelContextContractManualEditStartsANewRecoveryOrigin(t *testing.T) {
+	cfg := newConfig(context.Background())
+	model := uuid.NewString()
+	cfg.UpdateAIModelInfo("test", model)
+	cfg.RecordPromptOverflow("test", model, 400*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: 375 * 1024})
+	for _, option := range cfg.ProcessHotPatchMessage(modelContextPatch("test", model, 600*1024)) {
+		require.NoError(t, option(cfg))
+	}
+	cfg.ConfirmPromptContextSuccess("test", model, 150*1024)
+	require.EqualValues(t, 600*1024, cfg.ModelContextStatus(0).ThresholdTokens)
+	require.Nil(t, cfg.ModelContextStatus(0).Change)
+	cfg.RecordPromptOverflow("test", model, 400*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: 250 * 1024})
+	cfg.ConfirmPromptContextSuccess("test", model, 150*1024)
+	require.EqualValues(t, 600*1024, cfg.ModelContextStatus(0).Change.PreviousThresholdTokens)
+	require.EqualValues(t, 200*1024, cfg.ModelContextStatus(0).ThresholdTokens)
 }
 
 func TestModelContextContractZeroFollowsSavedModelAcrossSessions(t *testing.T) {
@@ -151,4 +208,45 @@ func TestModelContextContractEmitsPendingAndConfirmedChanges(t *testing.T) {
 	require.Equal(t, "confirmed", events[2].Change.Reason)
 	require.NotEqual(t, events[1].Change.ID, events[2].Change.ID)
 	require.Equal(t, events[2].Change.ID, events[3].Change.ID, "periodic updates must not repeat notifications")
+}
+
+func TestModelContextContractDisabledAutoAdjustInvalidatesPendingAndPersists(t *testing.T) {
+	cfg := newConfig(context.Background())
+	model := uuid.NewString()
+	cfg.UpdateAIModelInfo("test", model)
+	require.NotZero(t, cfg.RecordPromptOverflow("test", model, 400*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: 250 * 1024}))
+	disabled := true
+	patch := modelContextPatch("test", model, 0)
+	patch.Params.DisableContextAutoAdjust = &disabled
+	for _, option := range cfg.ProcessHotPatchMessage(patch) {
+		require.NoError(t, option(cfg))
+	}
+	require.True(t, cfg.ModelContextStatus(0).DisableAutoAdjust)
+	require.EqualValues(t, 500*1024, cfg.ModelContextStatus(0).ThresholdTokens)
+	require.False(t, cfg.ModelContextStatus(0).Pending)
+	cfg.ConfirmPromptContextSuccess("test", model, 150*1024)
+	require.Nil(t, cfg.ModelContextStatus(0).Change, "late success must not announce or persist a disabled recovery")
+	require.Zero(t, cfg.RecordPromptOverflow("test", model, 400*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: 250 * 1024}))
+	fresh := newConfig(context.Background())
+	require.True(t, fresh.ModelContextStatusFor("test", model, 0).DisableAutoAdjust)
+	require.False(t, fresh.ModelContextStatusFor("other", model, 0).DisableAutoAdjust)
+	for _, option := range cfg.ProcessHotPatchMessage(modelContextPatch("test", model, 600*1024)) {
+		require.NoError(t, option(cfg))
+	}
+	require.True(t, cfg.ModelContextStatus(0).DisableAutoAdjust)
+	before := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), "test", model)
+	for _, option := range cfg.ProcessHotPatchMessage(modelContextPatch("test", model, 1000*1024+1)) {
+		require.Error(t, option(cfg))
+	}
+	require.Equal(t, before, yakit.GetAIModelContext(consts.GetGormProfileDatabase(), "test", model))
+	_, changed := mergeHotpatchSessionStartParams(&ypb.AIStartParams{RuntimeContextSizeLimit: 600 * 1024}, modelContextPatch("test", model, 1000*1024+1))
+	require.False(t, changed, "an above-maximum edit must not change restored session settings")
+	disabled = false
+	for _, option := range cfg.ProcessHotPatchMessage(patch) {
+		require.NoError(t, option(cfg))
+	}
+	require.False(t, cfg.ModelContextStatus(0).DisableAutoAdjust)
+	require.NotZero(t, cfg.RecordPromptOverflow("test", model, 400*1024, &aispec.PromptOverflowEvidence{MaxContextTokens: 250 * 1024}))
+	cfg.ConfirmPromptContextSuccess("test", model, 150*1024)
+	require.EqualValues(t, 200*1024, cfg.ModelContextStatus(0).ThresholdTokens)
 }

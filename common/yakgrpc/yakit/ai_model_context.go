@@ -19,10 +19,11 @@ const MinimumAIModelContextTokens int64 = 100 * 1024
 // Unknown models start with an optimistic window; learned values are only saved
 // after the provider accepts a smaller request.
 type AIModelContext struct {
-	ContextTokens   int64  `json:"context_tokens"`
-	ThresholdTokens int64  `json:"threshold_tokens"`
-	Source          string `json:"source"` // default, learned, manual
-	ManualRevision  string `json:"manual_revision,omitempty"`
+	ContextTokens     int64  `json:"context_tokens"`
+	ThresholdTokens   int64  `json:"threshold_tokens"`
+	Source            string `json:"source"` // default, learned, manual
+	DisableAutoAdjust bool   `json:"disable_auto_adjust"`
+	ManualRevision    string `json:"manual_revision,omitempty"`
 }
 
 var aiModelContextMu sync.Mutex
@@ -35,6 +36,42 @@ func ValidateAIModelContextThreshold(tokens int64) error {
 		return fmt.Errorf("上下文压缩阈值不能低于 100K (%d tokens)", MinimumAIModelContextTokens)
 	}
 	return nil
+}
+
+// Match the slider's stable upper bound; user input must never expand its own range.
+func AIModelContextMaximumThreshold(value AIModelContext) int64 {
+	const step int64 = 1000 * 1024
+	largest := max(step, value.ContextTokens, value.ThresholdTokens)
+	return ((largest-1)/step + 1) * step
+}
+
+// SetAIModelContextSettings applies a user edit atomically. A mode-only edit preserves
+// the threshold, including a learned value below the manual input floor.
+func SetAIModelContextSettings(db *gorm.DB, provider, model string, threshold int64, disabled *bool) error {
+	aiModelContextMu.Lock()
+	defer aiModelContextMu.Unlock()
+	if db == nil || strings.TrimSpace(model) == "" {
+		return fmt.Errorf("model context requires a database and model identity")
+	}
+	value := GetAIModelContext(db, provider, model)
+	if threshold != 0 || disabled == nil {
+		if threshold < MinimumAIModelContextTokens {
+			return fmt.Errorf("上下文压缩阈值不能低于 100K (%d tokens)", MinimumAIModelContextTokens)
+		}
+		if threshold > AIModelContextMaximumThreshold(value) {
+			return fmt.Errorf("上下文压缩阈值不能超过滑条上限 (%d tokens)", AIModelContextMaximumThreshold(value))
+		}
+		value.ThresholdTokens, value.Source = threshold, "manual"
+	}
+	if disabled != nil {
+		value.DisableAutoAdjust = *disabled
+	}
+	value.ManualRevision = uuid.NewString()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return SetKey(db, aiModelContextKey(provider, model), string(raw))
 }
 
 func aiModelContextKey(provider, model string) string {
@@ -62,6 +99,11 @@ func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContex
 		return fmt.Errorf("invalid model context budget")
 	}
 	if value.Source == "manual" {
+		previous := GetAIModelContext(db, provider, model)
+		if value.ThresholdTokens > AIModelContextMaximumThreshold(previous) {
+			return fmt.Errorf("上下文压缩阈值不能超过滑条上限 (%d tokens)", AIModelContextMaximumThreshold(previous))
+		}
+		value.DisableAutoAdjust = previous.DisableAutoAdjust
 		if err := ValidateAIModelContextThreshold(value.ThresholdTokens); err != nil {
 			return err
 		}
@@ -74,7 +116,7 @@ func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContex
 	}
 	if value.Source == "learned" {
 		previous := GetAIModelContext(db, provider, model)
-		if previous.ManualRevision != value.ManualRevision {
+		if previous.DisableAutoAdjust || previous.ManualRevision != value.ManualRevision {
 			return ErrAIModelContextChanged
 		}
 		if previous.Source != "default" {

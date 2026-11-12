@@ -260,14 +260,16 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 				provider, model = currentProvider, currentModel
 			}
 			previous := config.ModelContextStatusFor(provider, model, 0).ThresholdTokens
-			value := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model)
-			if raw > 0 && model != "" {
-				// Setting a threshold does not prove a larger model capacity.
-				value.ThresholdTokens, value.Source = raw, "manual"
-				if err := yakit.SaveAIModelContext(consts.GetGormProfileDatabase(), provider, model, value); err != nil {
+			if (raw > 0 || hotPatchParams.DisableContextAutoAdjust != nil) && model != "" {
+				if err := yakit.SetAIModelContextSettings(consts.GetGormProfileDatabase(), provider, model, raw,
+					hotPatchParams.DisableContextAutoAdjust); err != nil {
+					status := config.ModelContextStatusFor(provider, model, 0)
+					status.Error = err.Error()
+					config.emitModelContextStatus(status)
 					return err
 				}
 			}
+
 			config.resetModelPromptOverflowLimit(provider, model)
 			if provider != currentProvider || model != currentModel {
 				return nil
@@ -382,6 +384,12 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 		limit := p.GetRuntimeContextSizeLimit()
 		if yakit.ValidateAIModelContextThreshold(limit) != nil {
 			return base, false
+		}
+		if limit > 0 && p.GetAIModelName() != "" {
+			value := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), p.GetAIService(), p.GetAIModelName())
+			if limit > yakit.AIModelContextMaximumThreshold(value) {
+				return base, false
+			}
 		}
 		next.RuntimeContextSizeLimit = limit
 		if p.GetAIModelName() != "" {

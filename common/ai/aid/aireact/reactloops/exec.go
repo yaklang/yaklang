@@ -792,6 +792,12 @@ LOOP:
 			if !aicommon.IsPromptTooLong(transactionErr) {
 				break
 			}
+			if r.promptOverflowAutoAdjustDisabled(transactionErr) {
+				err := fmt.Errorf("上下文超过模型可接受的范围，自动调整已关闭，任务已停止。请降低压缩阈值或开启自动调整：%w", transactionErr)
+				r.emitContextCompressionWarning(err.Error())
+				r.finishIterationLoopWithError(iterationCount, task, err)
+				return err
+			}
 			// Record every overflow, including the last-fitting-boundary path.
 			// Merely rebuilding a compression prompt must not persist a limit.
 			r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt)

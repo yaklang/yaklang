@@ -32,6 +32,8 @@ type promptOverflowProbe struct {
 	reportedMaximum bool
 	pending         bool
 	change          *ModelContextChange
+	// Keep the user-visible starting point across multiple compress-and-retry rounds.
+	originalThresholdTokens int64
 }
 
 type ModelContextChange struct {
@@ -67,6 +69,9 @@ func (c *Config) RecordPromptOverflow(provider, model string, measuredPromptToke
 		return 0
 	}
 	saved := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model)
+	if saved.DisableAutoAdjust {
+		return 0
+	}
 	base := c.EffectiveTimelineTokenLimit(provider, model, c.GetTimelineContentSizeLimit())
 	target = max(target, min(promptOverflowMinDynamicLimit, base))
 	tightened := target < base
@@ -91,9 +96,14 @@ func (c *Config) RecordPromptOverflow(provider, model string, measuredPromptToke
 	if reported {
 		capacity = ev.MaxContextTokens
 	}
+	original := base
+	if old != nil && old.pending && old.ManualRevision == saved.ManualRevision {
+		original = old.originalThresholdTokens
+	}
 	state.models[key] = &promptOverflowProbe{
 		AIModelContext:  yakit.AIModelContext{ContextTokens: capacity, ThresholdTokens: target, Source: "learned", ManualRevision: saved.ManualRevision},
 		reportedMaximum: reported, pending: true, change: newModelContextChange("overflow", base, target),
+		originalThresholdTokens: original,
 	}
 	if !tightened {
 		return 0
@@ -153,7 +163,7 @@ func (c *Config) ConfirmPromptContextSuccess(provider, model string, acceptedPro
 	if probe == nil || !probe.pending {
 		return
 	}
-	previous := probe.ThresholdTokens
+	previous := probe.originalThresholdTokens
 	if !probe.reportedMaximum && len(acceptedPromptTokens) > 0 {
 		probe.ThresholdTokens = max(probe.ThresholdTokens, acceptedPromptTokens[0])
 		probe.ContextTokens = probe.ThresholdTokens

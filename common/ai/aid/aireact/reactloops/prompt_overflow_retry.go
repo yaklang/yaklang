@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -119,4 +120,23 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	}
 	timeline.SetTimelineContentLimit(limit)
 	return true
+}
+
+// Resolve the model that actually rejected the request, including gateway fallbacks.
+func (r *ReActLoop) promptOverflowAutoAdjustDisabled(overflowErr error) bool {
+	config, ok := r.config.(*aicommon.Config)
+	if !ok || config == nil {
+		return false
+	}
+	evidence, ok := aicommon.PromptOverflowEvidenceFrom(overflowErr)
+	if !ok {
+		return false
+	}
+	if evidence.Provider == "" {
+		evidence.Provider = config.AiServerName
+	}
+	if evidence.Model == "" {
+		evidence.Model = config.AiModelName
+	}
+	return yakit.GetAIModelContext(consts.GetGormProfileDatabase(), evidence.Provider, evidence.Model).DisableAutoAdjust
 }

@@ -21,6 +21,7 @@ func (s *Server) GetAIModelContext(_ context.Context, req *ypb.GetAIModelContext
 		ContextTokens: value.ContextTokens, ThresholdTokens: value.ThresholdTokens, Source: value.Source,
 		MinimumThresholdTokens: yakit.MinimumAIModelContextTokens,
 		TooSmall:               value.ContextTokens < yakit.MinimumAIModelContextTokens,
+		DisableAutoAdjust:      value.DisableAutoAdjust,
 	}, nil
 }
 
@@ -30,13 +31,10 @@ func (s *Server) SetAIModelContext(ctx context.Context, req *ypb.SetAIModelConte
 	if err != nil {
 		return nil, err
 	}
-	if req.GetThresholdTokens() < yakit.MinimumAIModelContextTokens {
-		return nil, grpcstatus.Error(codes.InvalidArgument, "上下文压缩阈值不能低于 100K (102400 tokens)")
+	if err := yakit.SetAIModelContextSettings(s.GetProfileDatabase(), current.Provider, current.Model,
+		req.GetThresholdTokens(), req.DisableAutoAdjust); err != nil {
+		return nil, grpcstatus.Error(codes.InvalidArgument, err.Error())
 	}
-	if err := yakit.SaveAIModelContext(s.GetProfileDatabase(), current.Provider, current.Model, yakit.AIModelContext{
-		ContextTokens: current.ContextTokens, ThresholdTokens: req.GetThresholdTokens(), Source: "manual",
-	}); err != nil {
-		return nil, err
-	}
+
 	return s.GetAIModelContext(ctx, identity)
 }

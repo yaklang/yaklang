@@ -11025,6 +11025,8 @@ type AIStartParams struct {
 	// >0 时覆盖服务端默认阈值；<=0（含前端不传）时使用服务端默认值，保证携带运行时
 	// 上下文的时间线不会被过早压缩。
 	RuntimeContextSizeLimit int64 `protobuf:"varint,51,opt,name=RuntimeContextSizeLimit,proto3" json:"RuntimeContextSizeLimit,omitempty"`
+	// Model-scoped hotpatch only; absent preserves the saved automatic adjustment preference.
+	DisableContextAutoAdjust *bool `protobuf:"varint,54,opt,name=DisableContextAutoAdjust,proto3,oneof" json:"DisableContextAutoAdjust,omitempty"`
 	// 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题
 	UserInteractLimit int64 `protobuf:"varint,30,opt,name=UserInteractLimit,proto3" json:"UserInteractLimit,omitempty"`
 	// timeline sessionID  用于多轮对话保持上下文
@@ -11317,6 +11319,13 @@ func (x *AIStartParams) GetRuntimeContextSizeLimit() int64 {
 		return x.RuntimeContextSizeLimit
 	}
 	return 0
+}
+
+func (x *AIStartParams) GetDisableContextAutoAdjust() bool {
+	if x != nil && x.DisableContextAutoAdjust != nil {
+		return *x.DisableContextAutoAdjust
+	}
+	return false
 }
 
 func (x *AIStartParams) GetUserInteractLimit() int64 {
@@ -79349,8 +79358,10 @@ type SetAIModelContextRequest struct {
 	Provider        string                 `protobuf:"bytes,1,opt,name=Provider,proto3" json:"Provider,omitempty"`
 	Model           string                 `protobuf:"bytes,2,opt,name=Model,proto3" json:"Model,omitempty"`
 	ThresholdTokens int64                  `protobuf:"varint,3,opt,name=ThresholdTokens,proto3" json:"ThresholdTokens,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Presence allows switching modes without changing a learned threshold below the manual floor.
+	DisableAutoAdjust *bool `protobuf:"varint,4,opt,name=DisableAutoAdjust,proto3,oneof" json:"DisableAutoAdjust,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SetAIModelContextRequest) Reset() {
@@ -79404,6 +79415,13 @@ func (x *SetAIModelContextRequest) GetThresholdTokens() int64 {
 	return 0
 }
 
+func (x *SetAIModelContextRequest) GetDisableAutoAdjust() bool {
+	if x != nil && x.DisableAutoAdjust != nil {
+		return *x.DisableAutoAdjust
+	}
+	return false
+}
+
 type AIModelContextResponse struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Provider               string                 `protobuf:"bytes,1,opt,name=Provider,proto3" json:"Provider,omitempty"`
@@ -79413,6 +79431,7 @@ type AIModelContextResponse struct {
 	Source                 string                 `protobuf:"bytes,5,opt,name=Source,proto3" json:"Source,omitempty"`
 	MinimumThresholdTokens int64                  `protobuf:"varint,6,opt,name=MinimumThresholdTokens,proto3" json:"MinimumThresholdTokens,omitempty"`
 	TooSmall               bool                   `protobuf:"varint,7,opt,name=TooSmall,proto3" json:"TooSmall,omitempty"`
+	DisableAutoAdjust      bool                   `protobuf:"varint,8,opt,name=DisableAutoAdjust,proto3" json:"DisableAutoAdjust,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -79492,6 +79511,13 @@ func (x *AIModelContextResponse) GetMinimumThresholdTokens() int64 {
 func (x *AIModelContextResponse) GetTooSmall() bool {
 	if x != nil {
 		return x.TooSmall
+	}
+	return false
+}
+
+func (x *AIModelContextResponse) GetDisableAutoAdjust() bool {
+	if x != nil {
+		return x.DisableAutoAdjust
 	}
 	return false
 }
@@ -80393,7 +80419,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xf7\x12\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xd5\x13\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -80428,7 +80454,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11ReActMaxIteration\x18\x1b \x01(\x03R\x11ReActMaxIteration\x12,\n" +
 	"\x11TimelineItemLimit\x18\x1c \x01(\x03R\x11TimelineItemLimit\x12:\n" +
 	"\x18TimelineContentSizeLimit\x18\x1d \x01(\x03R\x18TimelineContentSizeLimit\x128\n" +
-	"\x17RuntimeContextSizeLimit\x183 \x01(\x03R\x17RuntimeContextSizeLimit\x12,\n" +
+	"\x17RuntimeContextSizeLimit\x183 \x01(\x03R\x17RuntimeContextSizeLimit\x12?\n" +
+	"\x18DisableContextAutoAdjust\x186 \x01(\bH\x00R\x18DisableContextAutoAdjust\x88\x01\x01\x12,\n" +
 	"\x11UserInteractLimit\x18\x1e \x01(\x03R\x11UserInteractLimit\x12,\n" +
 	"\x11TimelineSessionID\x18\x1f \x01(\tR\x11TimelineSessionID\x12*\n" +
 	"\x10AICallTokenLimit\x18\" \x01(\x03R\x10AICallTokenLimit\x12*\n" +
@@ -80448,8 +80475,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\x120\n" +
 	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\x12(\n" +
 	"\x0fSingleModelMode\x182 \x01(\bR\x0fSingleModelMode\x12'\n" +
-	"\fNetworkDebug\x184 \x01(\bH\x00R\fNetworkDebug\x88\x01\x01\x12\x1a\n" +
-	"\bClientUI\x185 \x01(\tR\bClientUIB\x0f\n" +
+	"\fNetworkDebug\x184 \x01(\bH\x01R\fNetworkDebug\x88\x01\x01\x12\x1a\n" +
+	"\bClientUI\x185 \x01(\tR\bClientUIB\x1b\n" +
+	"\x19_DisableContextAutoAdjustB\x0f\n" +
 	"\r_NetworkDebug\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
@@ -86464,11 +86492,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Data\x18\x03 \x01(\fR\x04Data\"L\n" +
 	"\x18GetAIModelContextRequest\x12\x1a\n" +
 	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
-	"\x05Model\x18\x02 \x01(\tR\x05Model\"v\n" +
+	"\x05Model\x18\x02 \x01(\tR\x05Model\"\xbf\x01\n" +
 	"\x18SetAIModelContextRequest\x12\x1a\n" +
 	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
 	"\x05Model\x18\x02 \x01(\tR\x05Model\x12(\n" +
-	"\x0fThresholdTokens\x18\x03 \x01(\x03R\x0fThresholdTokens\"\x86\x02\n" +
+	"\x0fThresholdTokens\x18\x03 \x01(\x03R\x0fThresholdTokens\x121\n" +
+	"\x11DisableAutoAdjust\x18\x04 \x01(\bH\x00R\x11DisableAutoAdjust\x88\x01\x01B\x14\n" +
+	"\x12_DisableAutoAdjust\"\xb4\x02\n" +
 	"\x16AIModelContextResponse\x12\x1a\n" +
 	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
 	"\x05Model\x18\x02 \x01(\tR\x05Model\x12$\n" +
@@ -86476,7 +86506,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fThresholdTokens\x18\x04 \x01(\x03R\x0fThresholdTokens\x12\x16\n" +
 	"\x06Source\x18\x05 \x01(\tR\x06Source\x126\n" +
 	"\x16MinimumThresholdTokens\x18\x06 \x01(\x03R\x16MinimumThresholdTokens\x12\x1a\n" +
-	"\bTooSmall\x18\a \x01(\bR\bTooSmall*5\n" +
+	"\bTooSmall\x18\a \x01(\bR\bTooSmall\x12,\n" +
+	"\x11DisableAutoAdjust\x18\b \x01(\bR\x11DisableAutoAdjust*5\n" +
 	"\tShellType\x12\f\n" +
 	"\bBehinder\x10\x00\x12\f\n" +
 	"\bGodzilla\x10\x01\x12\f\n" +
@@ -90628,6 +90659,7 @@ func file_yakgrpc_proto_init() {
 	file_yakgrpc_proto_msgTypes[148].OneofWrappers = []any{}
 	file_yakgrpc_proto_msgTypes[259].OneofWrappers = []any{}
 	file_yakgrpc_proto_msgTypes[724].OneofWrappers = []any{}
+	file_yakgrpc_proto_msgTypes[1085].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

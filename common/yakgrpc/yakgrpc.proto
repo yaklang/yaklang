@@ -2312,6 +2312,8 @@ message AIStartParams {
   // >0 时覆盖服务端默认阈值；<=0（含前端不传）时使用服务端默认值，保证携带运行时
   // 上下文的时间线不会被过早压缩。
   int64 RuntimeContextSizeLimit = 51;
+  // Model-scoped hotpatch only; absent preserves the saved automatic adjustment preference.
+  optional bool DisableContextAutoAdjust = 54;
 
   // 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题
   int64 UserInteractLimit = 30;
@@ -10588,6 +10590,8 @@ message SetAIModelContextRequest {
   string Provider = 1;
   string Model = 2;
   int64 ThresholdTokens = 3;
+  // Presence allows switching modes without changing a learned threshold below the manual floor.
+  optional bool DisableAutoAdjust = 4;
 }
 
 message AIModelContextResponse {
@@ -10598,4 +10602,5 @@ message AIModelContextResponse {
   string Source = 5;
   int64 MinimumThresholdTokens = 6;
   bool TooSmall = 7;
+  bool DisableAutoAdjust = 8;
 }
