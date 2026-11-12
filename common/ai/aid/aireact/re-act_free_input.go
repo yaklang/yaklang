@@ -1,7 +1,6 @@
 package aireact
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -15,43 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-// installTaskInlineAttachmentProvider owns only the running queue task's inline
-// snapshot. Installing it at dequeue (not input arrival) prevents queued inputs
-// and nested task-pointer changes from replacing the active Focus context.
-func installTaskInlineAttachmentProvider(manager *aicommon.ContextProviderManager, task aicommon.AIStatefulTask) func() {
-	if manager == nil || task == nil {
-		return func() {}
-	}
-	var providers []aicommon.ContextProvider
-	for _, resource := range task.GetAttachedDatas() {
-		if resource == nil || resource.Type != aicommon.CONTEXT_PROVIDER_TYPE_FILE ||
-			resource.Key != aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT || resource.Value == "" {
-			continue
-		}
-		providers = append(providers, aicommon.FileContentContextProvider(resource.Value, task.GetUserInput()))
-	}
-	if len(providers) == 0 {
-		return manager.BeginTaskContext("", nil)
-	}
-	// A private key avoids overwriting a caller's provider or a file-path key.
-	// Cleanup removes only the provider created for this execution scope.
-	providerKey := "free-input-inline-file-attachments-" + ksuid.New().String()
-	return manager.BeginTaskContext(providerKey, func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
-		var result bytes.Buffer
-		for index, provider := range providers {
-			content, err := provider(config, emitter, key)
-			if err != nil {
-				return "", fmt.Errorf("render inline attachment %d: %w", index+1, err)
-			}
-			if index > 0 {
-				result.WriteByte('\n')
-			}
-			result.WriteString(content)
-		}
-		return result.String(), nil
-	})
-}
 
 func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	if event.GetUserInteraction() != "" {
@@ -98,24 +60,6 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	userInput := event.FreeInput
 	if userInput == "" || strings.TrimSpace(userInput) == "" {
 		return utils.Errorf("user input cannot be empty")
-	}
-	for _, path := range event.AttachedFilePath {
-		r.config.ContextProviderManager.Unregister(path)
-		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
-	}
-	for _, resource := range event.AttachedResourceInfo {
-		// Type=code is writable delivery — never register as @/reference AutoContext.
-		if resource.GetType() == aicommon.AttachedResourceTypeCode {
-			continue
-		}
-		if resource.GetType() == aicommon.CONTEXT_PROVIDER_TYPE_FILE &&
-			resource.GetKey() == aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH {
-			path := strings.TrimSpace(resource.GetValue())
-			if path != "" {
-				r.config.ContextProviderManager.Unregister(path)
-				r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
-			}
-		}
 	}
 
 	if r.config.DebugEvent {
@@ -265,14 +209,15 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 }
 
 func (r *ReAct) enqueueReTaskWithID(event *ypb.AIInputEvent) (string, error) {
-	task := r.buildReTaskFromEvent(event)
+	resources, control := normalizeInputAttachments(event)
+	task := r.buildReTaskFromEvent(event, resources, control)
 	if task == nil {
 		return "", fmt.Errorf("failed to build task from event")
 	}
 	// 任务不相关，进入排队状态
 	task.SetFocusMode(event.GetFocusModeLoop())
 	task.SetStatus(aicommon.AITaskState_Queueing)
-	taskInput := r.buildSessionTaskInput(task, event)
+	taskInput := r.buildSessionTaskInput(task, resources)
 	log.Infof("Task enqueue started processing: %s", task.GetId())
 	err := r.taskQueue.Append(task)
 	if err != nil {
@@ -286,9 +231,91 @@ func (r *ReAct) enqueueReTaskWithID(event *ypb.AIInputEvent) (string, error) {
 	return task.GetId(), nil
 }
 
-func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefulTask {
+type scheduledTaskInputControl struct {
+	uuid        string
+	name        string
+	scheduledAt string
+	trigger     string
+}
+
+type taskInputControl struct {
+	userInputUUID string
+	inputSource   string
+	schedule      *scheduledTaskInputControl
+}
+
+func normalizeInputAttachments(event *ypb.AIInputEvent) ([]*aicommon.AttachedResource, *taskInputControl) {
+	var resources = make([]*aicommon.AttachedResource, 0)
+	control := &taskInputControl{schedule: &scheduledTaskInputControl{}}
+	if event == nil {
+		return resources, control
+	}
+
+	seen := make(map[string]struct{})
+	appendResource := func(resource *aicommon.AttachedResource) {
+		if resource == nil {
+			return
+		}
+		key := resource.NormalizedType() + "\x00" + strings.TrimSpace(resource.Key) + "\x00" + strings.TrimSpace(resource.Value)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		resources = append(resources, resource)
+	}
+
+	for _, path := range event.GetAttachedFilePath() {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		appendResource(aicommon.NewAttachedResource(
+			aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+			aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH,
+			path,
+		))
+	}
+
+	for _, resource := range event.GetAttachedResourceInfo() {
+		if resource == nil {
+			continue
+		}
+		switch resource.GetType() {
+		case aicommon.USER_FREE_INPUT_UUID:
+			control.userInputUUID = resource.GetValue()
+			continue
+		case aicommon.USER_INPUT_SOURCE:
+			if resource.GetKey() == aicommon.USER_INPUT_SOURCE_KEY {
+				control.inputSource = resource.GetValue()
+				continue
+			}
+		case aicommon.USER_INPUT_SCHEDULE_CONTEXT:
+			switch resource.GetKey() {
+			case aicommon.USER_INPUT_SCHEDULE_UUID:
+				control.schedule.uuid = resource.GetValue()
+			case aicommon.USER_INPUT_SCHEDULE_NAME:
+				control.schedule.name = resource.GetValue()
+			case aicommon.USER_INPUT_SCHEDULED_AT:
+				control.schedule.scheduledAt = resource.GetValue()
+			case aicommon.USER_INPUT_SCHEDULE_TRIGGER:
+				control.schedule.trigger = resource.GetValue()
+			}
+			continue
+		}
+		appendResource(aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue()))
+	}
+	return resources, control
+}
+
+func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent, resources []*aicommon.AttachedResource, control *taskInputControl) aicommon.AIStatefulTask {
 	if event == nil {
 		return nil
+	}
+	if control == nil {
+		control = &taskInputControl{schedule: &scheduledTaskInputControl{}}
+	}
+	if control.schedule == nil {
+		control.schedule = &scheduledTaskInputControl{}
 	}
 	freeInput := event.FreeInput
 	// 创建基于aireact.Task的任务（初始状态为created）
@@ -309,34 +336,16 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefu
 
 	var attachedDatas []*aicommon.AttachedResource
 	var attachedBrowsers []*aicommon.AttachedResource
-	if len(event.AttachedResourceInfo) > 0 {
-		for _, resource := range event.AttachedResourceInfo {
-			if resource.GetType() == aicommon.USER_FREE_INPUT_UUID {
-				task.SetUserInputUUID(resource.GetValue())
-				continue
-			}
-			if resource.GetType() == aicommon.USER_INPUT_SOURCE && resource.GetKey() == aicommon.USER_INPUT_SOURCE_KEY {
-				task.SetInputSource(resource.GetValue())
-				continue
-			}
-			if resource.GetType() == aicommon.USER_INPUT_SCHEDULE_CONTEXT {
-				switch resource.GetKey() {
-				case aicommon.USER_INPUT_SCHEDULE_UUID:
-					task.SetScheduleUUID(resource.GetValue())
-				case aicommon.USER_INPUT_SCHEDULE_NAME:
-					task.SetScheduleName(resource.GetValue())
-				case aicommon.USER_INPUT_SCHEDULED_AT:
-					task.SetScheduledAt(resource.GetValue())
-				case aicommon.USER_INPUT_SCHEDULE_TRIGGER:
-					task.SetScheduleTrigger(resource.GetValue())
-				}
-				continue
-			}
-			attached := aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue())
-			attachedDatas = append(attachedDatas, attached)
-			if attached.HasType(aicommon.AttachedResourceTypeBrowser) {
-				attachedBrowsers = append(attachedBrowsers, attached)
-			}
+	task.SetUserInputUUID(control.userInputUUID)
+	task.SetInputSource(control.inputSource)
+	task.SetScheduleUUID(control.schedule.uuid)
+	task.SetScheduleName(control.schedule.name)
+	task.SetScheduledAt(control.schedule.scheduledAt)
+	task.SetScheduleTrigger(control.schedule.trigger)
+	for _, attached := range resources {
+		attachedDatas = append(attachedDatas, attached)
+		if attached.HasType(aicommon.AttachedResourceTypeBrowser) {
+			attachedBrowsers = append(attachedBrowsers, attached)
 		}
 	}
 

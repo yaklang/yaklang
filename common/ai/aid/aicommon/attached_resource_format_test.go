@@ -66,6 +66,18 @@ func TestParseAttachedResourceDataByType(t *testing.T) {
 	require.Equal(t, CONTEXT_PROVIDER_KEY_NAME, resource.(*AttachedKnowledgeBaseResourceData).Key)
 	require.Contains(t, resource.ToAttachData(nil), "```\nkb\n```", "knowledge selections must remain visible as user context")
 
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AITOOL, CONTEXT_PROVIDER_KEY_NAME, "tool-name"))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedAIToolResourceData{}, resource)
+	require.Equal(t, CONTEXT_PROVIDER_TYPE_AITOOL, resource.Type())
+	require.Equal(t, "tool-name", resource.(*AttachedAIToolResourceData).Raw)
+
+	resource, err = ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AIFORGE, CONTEXT_PROVIDER_KEY_NAME, "forge-name"))
+	require.NoError(t, err)
+	require.IsType(t, &AttachedAIForgeResourceData{}, resource)
+	require.Equal(t, CONTEXT_PROVIDER_TYPE_AIFORGE, resource.Type())
+	require.Equal(t, "forge-name", resource.(*AttachedAIForgeResourceData).Raw)
+
 	resource, err = ParseAttachedResourceData(NewAttachedResource("unknown_type", "custom_key", "hello"))
 	require.NoError(t, err)
 	require.IsType(t, &DefaultAttachedResourceData{}, resource)
