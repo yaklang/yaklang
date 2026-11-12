@@ -72,7 +72,7 @@ func discoverBoundaries(reader *core.ByteReader, hints core.BoundaryHints, image
 }
 
 func (s *boundaryScanner) add(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority) bool {
-	if address == 0 || address%2 != 0 || s.regionFor(address) == nil {
+	if address%2 != 0 || s.regionFor(address) == nil {
 		return false
 	}
 	// s390x instructions are at least two bytes wide; a smaller range is a
@@ -124,7 +124,7 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 
 func (s *boundaryScanner) addSymbols() {
 	for _, symbol := range s.image.Symbols {
-		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
+		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported {
 			continue
 		}
 		s.add(symbol.Address, symbol.Size, symbol.Name, core.BoundarySymbol, prioritySymbol)

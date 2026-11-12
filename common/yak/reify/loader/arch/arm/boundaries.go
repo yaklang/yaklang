@@ -91,7 +91,7 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 	// An odd address marks Thumb code; the instruction stream itself starts at
 	// the aligned address.
 	address &^= 1
-	if address == 0 || s.regionFor(address) == nil {
+	if s.regionFor(address) == nil {
 		return false
 	}
 	// ELF also carries marker symbols such as go:textfipsstart whose size is
@@ -144,7 +144,7 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 
 func (s *boundaryScanner) addSymbols() {
 	for _, symbol := range s.image.Symbols {
-		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
+		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported {
 			continue
 		}
 		// ARM ELF marks Thumb code by setting the low bit of st_value, and the

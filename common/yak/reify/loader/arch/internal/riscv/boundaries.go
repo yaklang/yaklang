@@ -74,7 +74,7 @@ func discoverBoundaries(profile Profile, reader *core.ByteReader, hints core.Bou
 }
 
 func (s *boundaryScanner) add(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority) bool {
-	if address == 0 || address%2 != 0 || s.regionFor(address) == nil {
+	if address%2 != 0 || s.regionFor(address) == nil {
 		return false
 	}
 	// RISC-V instructions are at least two bytes wide; a smaller range is a
@@ -126,7 +126,7 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 
 func (s *boundaryScanner) addSymbols() {
 	for _, symbol := range s.image.Symbols {
-		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
+		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported {
 			continue
 		}
 		// RISC-V ELF marks compressed instructions by setting the low bit.
