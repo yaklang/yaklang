@@ -357,9 +357,12 @@ func DeleteProgramIrCode(db *gorm.DB, program string) error {
 
 func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 	deleteCache(program)
+	DropIrConstPool(program)
+	DropIrConstValueCache(program)
 	return errors.Join(
 		deleteProgramRows(db, TableIrCodes, "program_name = ?", program),
-		deleteProgramRows(db, TableIrConsts, "program_name = ?", program),
+		deleteOptionalProgramRows(db, TableIrConsts, "program_name = ?", program),
+		deleteOptionalProgramRows(db, TableIrConstPool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrIndices, "program_name = ?", program),
 		deleteProgramRows(db, TableIrNamePool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
@@ -392,6 +395,18 @@ func validateProgramDeletion(db *gorm.DB, program string) error {
 		return errors.New("SSA IR program name is required")
 	}
 	return nil
+}
+
+// deleteOptionalProgramRows drops rows from a table that a database written by
+// an older build may not have: the legacy const table is absent on new
+// databases, and the const pool is absent on every database written before
+// it. A missing table is not a failed delete.
+func deleteOptionalProgramRows(db *gorm.DB, table, condition string, args ...any) error {
+	err := deleteProgramRows(db, table, condition, args...)
+	if err != nil && strings.Contains(err.Error(), "no such table") {
+		return nil
+	}
+	return err
 }
 
 func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error {

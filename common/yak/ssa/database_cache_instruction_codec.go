@@ -331,15 +331,35 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 			ir.ConstType = string(constInst.ConstType)
 			text := constInst.String()
 			if constInst.ConstType == ConstTypeNormal {
-				// The const table is the only place long const text is stored;
-				// ir_codes.string keeps the short values a persisted member key
-				// is resolved from.
+				// Interning waits for the flush: the batch may still rewrite
+				// ProgramName, and the pool row must land under the final name.
 				ir.ConstText = text
+				ir.ConstKind = int64(irConstKindOf(constInst.Const))
 			}
 			if len(text) <= ssadb.IrCodeInlineConstStringLimit {
 				ir.String = text
 			}
 		}
+	}
+}
+
+// irConstKindOf is the pool's type tag for a const value. The pool keeps the
+// rendered text only, and restore needs to know what to parse it back into.
+func irConstKindOf(c *Const) ssadb.IrConstKind {
+	if c == nil {
+		return ssadb.IrConstKindNil
+	}
+	switch c.value.(type) {
+	case nil:
+		return ssadb.IrConstKindNil
+	case bool:
+		return ssadb.IrConstKindBool
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return ssadb.IrConstKindInt64
+	case float32, float64:
+		return ssadb.IrConstKindFloat
+	default:
+		return ssadb.IrConstKindString
 	}
 }
 

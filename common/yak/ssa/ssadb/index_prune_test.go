@@ -24,8 +24,8 @@ func TestNewIRDatabaseOmitsRedundantIndexes(t *testing.T) {
 	for _, kept := range []struct{ table, index string }{
 		{TableIrCodes, "ux_ir_codes_program_code"},
 		{TableIrCodes, "idx_ir_codes_program_opcode"},
-		{TableIrConsts, irConstLookupIndex},
-		{TableIrConsts, irConstProgramCodeIndex},
+		{TableIrConstPool, irConstPoolProgramIDIndex},
+		{TableIrCodes, irCodeConstIDIndex},
 		{TableIrTypes, irTypeUniqueIndex},
 		{TableIrOffsets, "ux_ir_offsets_program_value_file_range"},
 		{TableIrIndices, "idx_ir_indices_program_value"},
@@ -83,9 +83,11 @@ func TestIRQueryPlansUseRetainedIndexes(t *testing.T) {
 			index: []string{"idx_ir_codes_program_opcode"},
 		},
 		{
-			name:  "ir_consts exact lookup",
-			query: fmt.Sprintf(`SELECT code_id FROM "`+TableIrConsts+`" WHERE program_name = 'p0' AND const_hash = %d AND "string" = 'v7'`, IrConstHash("v7")),
-			index: []string{irConstLookupIndex},
+			name: "const pool exact lookup",
+			query: fmt.Sprintf(`SELECT c.code_id FROM "`+TableIrConstPool+`" p JOIN "`+TableIrCodes+`" c`+
+				` ON c.program_name = p.program_name AND c.const_id = p.const_id`+
+				` WHERE p.program_name = 'p0' AND c.const_id <> 0 AND c.deleted_at IS NULL AND p.const_id = %d`, IrConstHash("v7")),
+			index: []string{irConstPoolProgramIDIndex, irCodeConstIDIndex},
 		},
 		{
 			name:  "ir types by program and type id",

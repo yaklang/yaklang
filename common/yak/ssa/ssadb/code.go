@@ -36,15 +36,23 @@ type IrCode struct {
 	VerboseName      string `json:"verbose_name"`
 	ShortVerboseName string `json:"short_verbose_name"`
 	String           string `json:"string" gorm:"type:text"`
-	// ConstText carries one ConstType=normal const's rendered value to
-	// ir_consts_v1 in the same flush. It is never a column on ir_codes: long
-	// const texts live only in the const table, and String keeps the short
-	// ones so a persisted member key still resolves without a second read.
-	// A plain string: one pointer per const instruction would allocate once
-	// per row and keep nothing extra alive.
-	ConstText         string `json:"-" gorm:"-"`
-	ReadableName      string `json:"readable_name" gorm:"type:text"`
-	ReadableNameShort string `json:"readable_name_short"`
+	// ConstID is the pool id of a ConstType=normal const: a 64-bit hash of the
+	// rendered text in ir_const_pool_v1. Placeholder consts are member-call
+	// keys, are never searched, and leave it zero.
+	ConstID int64 `json:"const_id"`
+	// ConstText and ConstKind carry the value to the pool writer in the same
+	// flush. They are transient: the text is stored once in the pool, never on
+	// ir_codes. Interning happens at flush time, not at marshal time, because
+	// the batch may still rewrite ProgramName (a library instruction keeps the
+	// application's program name) and the pool row must land under the name the
+	// IR row ends up with.
+	ConstText string `json:"-" gorm:"-"`
+	ConstKind int64  `json:"-" gorm:"-"`
+	// ConstValue is filled by the IR readers from the pool and never written
+	// back.
+	ConstValue        *IrConstValue `json:"-" gorm:"-"`
+	ReadableName      string        `json:"readable_name" gorm:"type:text"`
+	ReadableNameShort string        `json:"readable_name_short"`
 	// any IrCode in one block inner one  function
 	CurrentBlock    int64 `json:"current_block"`
 	CurrentFunction int64 `json:"current_function"`
@@ -198,11 +206,11 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if len(deduped) == 0 {
 		return nil
 	}
+	if err := flushIrConstPools(db, deduped); err != nil {
+		return fmt.Errorf("upsert IR consts: %w", err)
+	}
 	if err := db.New().SaveInBatches(deduped, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)
-	}
-	if err := saveIrConsts(db, deduped); err != nil {
-		return fmt.Errorf("upsert IR consts: %w", err)
 	}
 	for program, rows := range irCodeRowsByProgram(deduped) {
 		counter := irCodeWriteCounterFor(program)
