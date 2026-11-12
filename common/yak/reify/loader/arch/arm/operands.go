@@ -266,7 +266,9 @@ func (l *lifter) compare(ins instruction) {
 
 func (l *lifter) shift(ins instruction) {
 	args := args(ins)
-	if len(args) != 3 {
+	// The ARM encoding is a three-operand form (destination, value, count). The
+	// Thumb register form writes back to the shifted register and has two.
+	if len(args) != 3 && len(args) != 2 {
 		l.unsupported(ins)
 		return
 	}
@@ -278,6 +280,14 @@ func (l *lifter) shift(ins instruction) {
 	value, ok := l.source(ins, args[1], 32)
 	if !ok {
 		l.unsupported(ins)
+		return
+	}
+	if len(args) == 2 {
+		// Thumb: the shift count is the low byte of the source register.
+		result := l.operation(ins, core.OpIntrinsic, []core.Operand{
+			symbolOperand("arm." + lower(baseOp(ins.inst.Op).String())), l.value(value),
+		}, 32, core.EffectNone)
+		l.writeRegister(ins.address, destination, 32, result)
 		return
 	}
 	count, ok := l.source(ins, args[2], 32)

@@ -47,12 +47,17 @@ func renderAssembly(decoded []instruction) string {
 		case mnemonic == "":
 			mnemonic = strings.TrimSpace(armasm.GNUSyntax(ins.inst))
 		}
-		fmt.Fprintf(&text, "0x%x  %-32s  %s\n", ins.address, formatInstruction(ins.raw), mnemonic)
+		fmt.Fprintf(&text, "0x%x  %-20s  %s\n", ins.address, formatInstruction(ins.raw, ins.size), mnemonic)
 	}
 	return text.String()
 }
 
-func formatInstruction(raw uint32) string {
+// formatInstruction prints the encoded bytes. A Thumb instruction is either one
+// halfword or two, so the raw word holds one or two of them.
+func formatInstruction(raw uint32, size int) string {
+	if size == 2 {
+		return fmt.Sprintf("%02x %02x", byte(raw), byte(raw>>8))
+	}
 	return fmt.Sprintf("%02x %02x %02x %02x",
 		byte(raw), byte(raw>>8), byte(raw>>16), byte(raw>>24))
 }

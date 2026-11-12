@@ -77,13 +77,15 @@ func TestARMAvailableAndChecksTarget(t *testing.T) {
 	if err := parser.Check(targetARM()); err != nil {
 		t.Fatalf("arm target rejected: %v", err)
 	}
-	if err := parser.Check(core.Target{Architecture: core.ArchARM, Bits: 32, Mode: "arm"}); err != nil {
-		t.Fatalf("arm mode rejected: %v", err)
+	for _, mode := range []string{"", "arm", "thumb", "thumb2"} {
+		if err := parser.Check(core.Target{Architecture: core.ArchARM, Bits: 32, Mode: mode}); err != nil {
+			t.Fatalf("mode %q rejected: %v", mode, err)
+		}
 	}
 	for _, target := range []core.Target{
 		{Architecture: core.ArchARM64, Bits: 64},
 		{Architecture: core.ArchARM, Bits: 64},
-		{Architecture: core.ArchARM, Bits: 32, Mode: "thumb"},
+		{Architecture: core.ArchARM, Bits: 32, Mode: "arm64"},
 	} {
 		if err := parser.Check(target); err == nil {
 			t.Fatalf("%+v accepted", target)

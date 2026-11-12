@@ -63,6 +63,14 @@ func (l *lifter) lift(ins instruction) {
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("arm.data")}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return
 	}
+	if ins.compare != nil {
+		l.compareAndBranch(ins)
+		return
+	}
+	if ins.opaque != "" {
+		l.opaqueInstruction(ins)
+		return
+	}
 	if ins.systemRegister != nil {
 		l.systemRegisterTransfer(ins)
 		return
@@ -161,6 +169,62 @@ func (l *lifter) lift(ins instruction) {
 		}
 		l.unsupported(ins)
 	}
+}
+
+// compareAndBranch lifts CBZ and CBNZ: read the register, compare it with zero,
+// then branch.
+func (l *lifter) compareAndBranch(ins instruction) {
+	register := registerText(ins.compare.register)
+	value := l.readRegister(ins.address, register, 32)
+	zero := l.constant(ins.address, 0, 32)
+	kind := core.OpSub
+	if ins.compare.mnemonic == "cbnz" {
+		kind = core.OpSub
+	}
+	flags := l.operation(ins, kind, []core.Operand{l.value(value), l.value(zero)}, 32, core.EffectNone)
+	condition := "eq"
+	if ins.compare.mnemonic == "cbnz" {
+		condition = "ne"
+	}
+	conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
+		symbolOperand("arm.cond." + condition), l.value(flags),
+	}, 1, core.EffectReadRegister)
+	targets := make([]core.BlockID, 0, 2)
+	if ins.compare.target >= 0 {
+		target := ins.address + 4 + uint64(ins.compare.target)
+		if block, ok := l.blockIDs[target]; ok {
+			targets = append(targets, block)
+		}
+	}
+	next := ins.address + uint64(ins.size)
+	if block, ok := l.blockIDs[next]; ok && !containsBlock(targets, block) {
+		targets = append(targets, block)
+	}
+	effects := core.EffectNone
+	if len(targets) == 0 {
+		effects = core.EffectUnknown
+	}
+	l.emit(core.OpBranch, []core.Operand{l.value(conditionValue)}, nil, targets, effects, ins.address)
+}
+
+// opaqueInstruction lifts a Thumb form the armasm opcode set cannot express.
+func (l *lifter) opaqueInstruction(ins instruction) {
+	operands := []core.Operand{symbolOperand("arm." + ins.opaque)}
+	effects := core.EffectReadRegister
+	for index, arg := range ins.opaqueArgs {
+		name, _, ok := argRegister(arg)
+		if !ok {
+			continue
+		}
+		if index == 0 {
+			value := l.newValue(core.TypeInteger, 32)
+			operands = append(operands, core.Operand{Kind: core.OperandRegister, Type: value.Type, Name: name})
+			l.emit(core.OpIntrinsic, operands, []core.Value{value}, nil, effects|core.EffectWriteRegister|core.EffectUnknown, ins.address)
+			return
+		}
+		operands = append(operands, core.Operand{Kind: core.OperandRegister, Type: core.ValueType{Kind: core.TypeInteger, Bits: 32}, Name: name})
+	}
+	l.emit(core.OpIntrinsic, operands, nil, nil, effects|core.EffectUnknown, ins.address)
 }
 
 // systemRegisterTransfer lifts one MRC or MCR. A read writes the general
