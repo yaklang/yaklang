@@ -200,7 +200,6 @@ func (p *IrConstPool) Intern(kind IrConstKind, text string) int64 {
 	id := IrConstHash(text)
 	p.mu.Lock()
 	if _, ok := p.seen[id]; !ok {
-		p.seen[id] = struct{}{}
 		p.pending = append(p.pending, &IrConst{
 			ProgramName: p.program,
 			ConstID:     id,
@@ -216,6 +215,11 @@ func (p *IrConstPool) Intern(kind IrConstKind, text string) int64 {
 // Flush writes the values interned since the previous flush inside the
 // caller's transaction, so a pool row exists before any IR row can reference
 // it.
+//
+// A value joins the interned set only after its row is written. Marking it at
+// Intern time would lose the row when the surrounding transaction rolls back:
+// the batch is retried, intern sees the value as already known, and the IR row
+// ends up pointing at a pool row that was never committed.
 func (p *IrConstPool) Flush(db *gorm.DB) error {
 	if p == nil || db == nil {
 		return nil
@@ -235,6 +239,11 @@ func (p *IrConstPool) Flush(db *gorm.DB) error {
 		p.mu.Unlock()
 		return err
 	}
+	p.mu.Lock()
+	for _, row := range rows {
+		p.seen[row.ConstID] = struct{}{}
+	}
+	p.mu.Unlock()
 	return nil
 }
 
