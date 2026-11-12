@@ -1315,6 +1315,15 @@ func (s *ObjectType) getFieldIndexByKeyText(keyText string) (int, bool) {
 	if index, ok := s.keymap[keyText]; ok && index >= 0 && index < len(s.FieldTypes) {
 		return index, true
 	}
+	// AddField indexes every key it appends and rejects duplicates, so keymap has
+	// one entry per Keys entry. A complete keymap therefore proves the field is
+	// absent, and the scan below exists only for types whose Keys were assigned
+	// directly (Call error-drop builds a shorter struct type). Scanning anyway
+	// formats every existing key value, which made building a large initializer
+	// list quadratic: a 200k-element C array spent hours here.
+	if len(s.keymap) == len(s.Keys) {
+		return -1, false
+	}
 	index := slices.IndexFunc(s.Keys, func(v Value) bool {
 		return !utils.IsNil(v) && v.String() == keyText
 	})
