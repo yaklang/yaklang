@@ -249,6 +249,40 @@ func (p *BrowserPage) Evaluate(js string) (interface{}, error) {
 	return result.Value.Val(), nil
 }
 
+// SetViewport applies a real CDP device-metrics override. This avoids relying
+// on desktop Chrome's minimum window width, which can silently turn a requested
+// 390px mobile check into a 500px viewport.
+func (p *BrowserPage) SetViewport(width, height int, deviceScaleFactor float64, mobile bool) error {
+	if p == nil || p.page == nil {
+		return fmt.Errorf("set viewport: empty page")
+	}
+	if width <= 0 || height <= 0 {
+		return fmt.Errorf("set viewport: width and height must be positive, got %dx%d", width, height)
+	}
+	if deviceScaleFactor <= 0 {
+		deviceScaleFactor = 1
+	}
+	scale := 1.0
+	screenWidth, screenHeight := width, height
+	return (&proto.EmulationSetDeviceMetricsOverride{
+		Width:             width,
+		Height:            height,
+		DeviceScaleFactor: deviceScaleFactor,
+		Mobile:            mobile,
+		Scale:             &scale,
+		ScreenWidth:       &screenWidth,
+		ScreenHeight:      &screenHeight,
+	}).Call(p.page.Timeout(p.timeout))
+}
+
+// ClearViewport removes a previously configured device-metrics override.
+func (p *BrowserPage) ClearViewport() error {
+	if p == nil || p.page == nil {
+		return fmt.Errorf("clear viewport: empty page")
+	}
+	return proto.EmulationClearDeviceMetricsOverride{}.Call(p.page)
+}
+
 func (p *BrowserPage) HTML() (string, error) {
 	return p.page.HTML()
 }

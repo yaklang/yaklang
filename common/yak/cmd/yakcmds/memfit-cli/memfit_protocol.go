@@ -42,6 +42,11 @@ type memfitStartConfig struct {
 	Timeout       int    `json:"timeout_seconds,omitempty"`
 	SessionID     string `json:"session_id,omitempty"`
 	Debug         bool   `json:"debug,omitempty"`
+	AgentName     string `json:"agent_name,omitempty"`
+	AgentTitle    string `json:"agent_title,omitempty"`
+	AgentDesc     string `json:"agent_description,omitempty"`
+	Focus         string `json:"focus,omitempty"`
+	DumpDir       string `json:"dump_dir,omitempty"`
 }
 
 type memfitInput struct {

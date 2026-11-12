@@ -130,8 +130,32 @@ excludeExtRaw := cli.String("exclude-ext", cli.setHelp("comma-separated list of 
 includeExtRaw := cli.String("include-ext", cli.setHelp("comma-separated list of file extensions to include (whitelist, e.g. '.go,.js,.py')"), cli.setDefault(""))
 cli.check()
 
+RESULT = nil
+
 // Parse output mode
 filesOnlyMode = str.ToLower(str.TrimSpace(outputModeRaw)) in ["files_with_matches", "files", "files-with-matches"]
+patternModeLower = str.ToLower(str.TrimSpace(matchMode))
+isSubstrMode = patternModeLower in ["substr", "isubstr", "isubstring"]
+
+if isSubstrMode {
+    regexHints = []
+    if str.Contains(pattern, "|") { regexHints = append(regexHints, "|") }
+    if str.Contains(pattern, ".*") { regexHints = append(regexHints, ".*") }
+    if str.Contains(pattern, ".+") { regexHints = append(regexHints, ".+") }
+    if str.Contains(pattern, "\\d") || str.Contains(pattern, "\\w") || str.Contains(pattern, "\\s") {
+        regexHints = append(regexHints, "backslash character class")
+    }
+    if str.HasPrefix(pattern, "^") || str.HasSuffix(pattern, "$") {
+        regexHints = append(regexHints, "anchor")
+    }
+    if len(regexHints) > 0 {
+        yakit.Warn(
+            "pattern-mode=%v treats the pattern as literal text. Detected regex-like token(s): %v. " +
+            "Matching semantics were not changed; use pattern-mode=regexp if alternation or regex was intended.",
+            matchMode, str.Join(regexHints, ", "),
+        )
+    }
+}
 
 // Apply mode-specific default limit
 if maxResult <= 0 {
@@ -246,14 +270,18 @@ for p in pathList {
 }
 
 if len(validPaths) == 0 {
-    yakit.Info("no valid file or directory found")
+    message = "no valid file or directory found"
+    yakit.Error("%v", message)
+    RESULT = {"operation":"grep","operation_status":"error","error":message,"path":pathName,"pattern":pattern,"pattern_mode":matchMode}
     return
 }
 
 multipleFiles := len(validPaths) > 1
 
 if pattern == "" {
-    yakit.Info("grep target not right")
+    message = "grep pattern is empty"
+    yakit.Error("%v", message)
+    RESULT = {"operation":"grep","operation_status":"error","error":message,"path":pathName,"pattern":pattern,"pattern_mode":matchMode}
     return
 }
 
@@ -772,34 +800,22 @@ if !filesOnlyMode && contextBuffer <= 0 {
 if filesOnlyMode {
     // ── files_with_matches mode output ──
     if len(fileMatchResults) > 0 {
-        yakit.Info("=== Grep Files Summary: %d files matched (pattern: %s) ===", len(fileMatchResults), pattern)
         showCount = min(len(fileMatchResults), maxStdoutResults)
+        resultLines = [sprintf("=== Grep Files: %d files matched (pattern: %s) ===", len(fileMatchResults), pattern)]
         for i := 0; i < showCount; i++ {
             entry = fileMatchResults[i]
-            yakit.Info("[file %d] %s (%d matches)", i+1, entry["file"], entry["count"])
+            resultLines = append(resultLines, sprintf("[file %d] %s (%d matches)", i+1, entry["file"], entry["count"]))
         }
         if len(fileMatchResults) > maxStdoutResults {
-            yakit.Info("... (%d more files not shown, use offset to paginate)", len(fileMatchResults) - maxStdoutResults)
+            resultLines = append(resultLines, sprintf("... (%d more files not shown, use offset to paginate)", len(fileMatchResults) - maxStdoutResults))
         }
         if fileMatchTotalScanned > len(fileMatchResults) + offsetResultCount {
-            yakit.Info("(total files with matches: at least %d, showing %d after offset %d)", fileMatchTotalScanned, len(fileMatchResults), offsetResultCount)
+            resultLines = append(resultLines, sprintf("(total files with matches: at least %d, showing %d after offset %d)", fileMatchTotalScanned, len(fileMatchResults), offsetResultCount))
         }
-        yakit.Info("=== End of Grep Files ===")
-
-        println(sprintf("=== Grep Files: %d files matched (pattern: %s) ===", len(fileMatchResults), pattern))
-        for i := 0; i < showCount; i++ {
-            entry = fileMatchResults[i]
-            println(sprintf("[file %d] %s (%d matches)", i+1, entry["file"], entry["count"]))
-        }
-        if len(fileMatchResults) > maxStdoutResults {
-            println(sprintf("... (%d more files not shown, use offset to paginate)", len(fileMatchResults) - maxStdoutResults))
-        }
-        if fileMatchTotalScanned > len(fileMatchResults) + offsetResultCount {
-            println(sprintf("(total files with matches: at least %d, showing %d after offset %d)", fileMatchTotalScanned, len(fileMatchResults), offsetResultCount))
-        }
-        println("=== End of Grep Files ===")
+        resultLines = append(resultLines, "=== End of Grep Files ===")
+        RESULT = str.Join(resultLines, "\n")
     } else {
-        println(sprintf("No files matched for pattern: %s", pattern))
+        RESULT = sprintf("No files matched for pattern: %s", pattern)
     }
 
     // Send structured results to yakit UI via IPC
@@ -814,37 +830,27 @@ if filesOnlyMode {
     }
 } else {
     // ── content mode output (original behavior) ──
-    // print findRes summary to yakit.Info (batched, not per-match)
     if len(findRes) > 0 {
         showCount = min(len(findRes), maxStdoutResults)
-        summaryText = sprintf("=== Grep Results Summary: %d matches ===", len(findRes))
+        resultLines = [sprintf("=== Grep Results: %d matches (pattern: %s) ===", len(findRes), pattern)]
         for i := 0; i < showCount; i++ {
-            summaryText += sprintf("\n[match %d] %s", i+1, findRes[i])
+            resultLines = append(resultLines, sprintf("[match %d] %s", i+1, findRes[i]))
         }
         if len(findRes) > maxStdoutResults {
-            summaryText += sprintf("\n... (%d more matches not shown)", len(findRes) - maxStdoutResults)
+            resultLines = append(resultLines, sprintf("... (%d more matches not shown, use offset to paginate)", len(findRes) - maxStdoutResults))
         }
-        summaryText += "\n=== End of Grep Results ==="
-        yakit.Info("%s", summaryText)
-
-        // Write results to stdout (captured by AI tool framework)
-        // Cap output to maxStdoutResults to keep tool result size manageable
-        println(sprintf("=== Grep Results: %d matches (pattern: %s) ===", len(findRes), pattern))
-        for i := 0; i < showCount; i++ {
-            println(sprintf("[match %d] %s", i+1, findRes[i]))
-        }
-        if len(findRes) > maxStdoutResults {
-            println(sprintf("... (%d more matches not shown, use offset to paginate)", len(findRes) - maxStdoutResults))
-        }
-        println("=== End of Grep Results ===")
+        resultLines = append(resultLines, "=== End of Grep Results ===")
+        RESULT = str.Join(resultLines, "\n")
     } else if count > offsetResultCount {
         shownCount = min(count - offsetResultCount, maxResult)
-        yakit.Info("matches were found but no context text was collected; reporting summary only")
-        println(sprintf("=== Grep Results: %d matches (pattern: %s) ===", shownCount, pattern))
-        println(sprintf("Matched %d results. Use context-buffer > 0 if you need surrounding text excerpts.", shownCount))
-        println("=== End of Grep Results ===")
+        RESULT = sprintf(
+            "=== Grep Results: %d matches (pattern: %s) ===\n" +
+            "Matched %d results. Use context-buffer > 0 if you need surrounding text excerpts.\n" +
+            "=== End of Grep Results ===",
+            shownCount, pattern, shownCount,
+        )
     } else {
-        println(sprintf("No matches found for pattern: %s", pattern))
+        RESULT = sprintf("No matches found for pattern: %s", pattern)
     }
 
     // Send structured results to yakit UI via IPC.

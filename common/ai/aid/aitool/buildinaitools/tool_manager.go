@@ -24,6 +24,15 @@ import (
 
 const defaultRecentToolCacheMaxTokens = 30 * 1024
 
+// ToolDisclosurePolicy shapes only the default prompt/UI tool inventory. It is
+// not an authority boundary: tools outside this policy remain enabled,
+// searchable, and callable through require_tool/directly_call_tool.
+type ToolDisclosurePolicy struct {
+	Names     []string
+	Prefixes  []string
+	Exclusive bool
+}
+
 // RecentToolEntry records a recently used tool for directly_call_tool action.
 type RecentToolEntry struct {
 	Name          string `json:"name"`
@@ -64,6 +73,8 @@ type AiToolManager struct {
 	recentToolsCache []*RecentToolEntry
 	recentToolsMu    sync.Mutex
 	maxCacheTokens   int
+
+	defaultDisclosure ToolDisclosurePolicy
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
@@ -73,6 +84,33 @@ type ToolManagerOption func(*AiToolManager)
 // values use the default. One oversized newest entry is retained for progress.
 func WithRecentToolCacheMaxTokens(tokens int) ToolManagerOption {
 	return func(m *AiToolManager) { m.maxCacheTokens = tokens }
+}
+
+// WithDefaultToolDisclosure configures which tools are shown by default. It
+// never changes the enabled tool set or lookup/search behavior.
+func WithDefaultToolDisclosure(policy ToolDisclosurePolicy) ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.defaultDisclosure = cloneToolDisclosurePolicy(policy)
+	}
+}
+
+// GetDefaultToolDisclosure returns a copy of the manager's default disclosure
+// policy for prompt and capability-inventory builders.
+func (m *AiToolManager) GetDefaultToolDisclosure() ToolDisclosurePolicy {
+	if m == nil {
+		return ToolDisclosurePolicy{}
+	}
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	return cloneToolDisclosurePolicy(m.defaultDisclosure)
+}
+
+func cloneToolDisclosurePolicy(policy ToolDisclosurePolicy) ToolDisclosurePolicy {
+	return ToolDisclosurePolicy{
+		Names:     append([]string(nil), policy.Names...),
+		Prefixes:  append([]string(nil), policy.Prefixes...),
+		Exclusive: policy.Exclusive,
+	}
 }
 
 // WithAIToolsSearcher 设置搜索器
@@ -243,6 +281,7 @@ func (m *AiToolManager) ForkForSession() *AiToolManager {
 		enableAllTools:        m.enableAllTools,
 		restrictToTools:       m.restrictToTools,
 		maxCacheTokens:        m.maxCacheTokens,
+		defaultDisclosure:     cloneToolDisclosurePolicy(m.defaultDisclosure),
 	}
 	fork.disallowMCPServers.Store(m.disallowMCPServers.Load())
 	for name, enabled := range m.toolEnabled {
@@ -334,7 +373,6 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 	if m.onlyTools != nil {
 		return m.safeToolsGetter(), nil
 	}
-
 	var enabledTools []*aitool.Tool
 	for _, tool := range m.safeToolsGetter() {
 		if m.enableAllTools || m.toolEnabled[tool.Name] {
@@ -434,6 +472,18 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 		return nil, fmt.Errorf("tool [%v] is outside the restricted tool set", name)
 	}
 
+	// Profiles may compose a small enabled set from the shared builtin catalog.
+	// Capability discovery must still be able to activate a matching existing
+	// tool without looking it up as a different DB/plugin implementation.
+	if !m.enableAllTools && len(m.toolEnabled) > 0 {
+		for _, tool := range m.safeToolsGetter() {
+			if tool.Name == name {
+				m.EnableTool(name)
+				return tool, nil
+			}
+		}
+	}
+
 	db := consts.GetGormProfileDatabase()
 
 	// 从 ai_yak_tools 数据库中查找工具
@@ -505,6 +555,25 @@ func (m *AiToolManager) DisableTool(name string) {
 		m.disableTools = make(map[string]struct{})
 	}
 	m.disableTools[name] = struct{}{}
+}
+
+// ActivateTool enables an existing catalog tool outside the profile's default
+// composition. It never creates or replaces a tool implementation.
+func (m *AiToolManager) ActivateTool(name string) error {
+	if m == nil {
+		return fmt.Errorf("tool manager is nil")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("tool name is empty")
+	}
+	for _, tool := range m.safeToolsGetter() {
+		if tool.Name == name {
+			m.EnableTool(name)
+			return nil
+		}
+	}
+	return fmt.Errorf("tool %q is not present in the catalog", name)
 }
 
 func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {

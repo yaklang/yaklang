@@ -32,6 +32,20 @@ func BuildInventorySkillsFromLoaderWithEstimator(
 	loadedNames map[string]struct{},
 	tokenEstimator func(string) int,
 ) []CapabilityInventoryNamedItem {
+	return buildInventorySkillsFromLoader(
+		loader,
+		loadedNames,
+		nil,
+		tokenEstimator,
+	)
+}
+
+func buildInventorySkillsFromLoader(
+	loader aiskillloader.SkillLoader,
+	loadedNames map[string]struct{},
+	defaultNames []string,
+	tokenEstimator func(string) int,
+) []CapabilityInventoryNamedItem {
 	if loader == nil || !loader.HasSkills() {
 		return nil
 	}
@@ -39,7 +53,8 @@ func BuildInventorySkillsFromLoaderWithEstimator(
 		loadedNames = map[string]struct{}{}
 	}
 
-	registryListed, _ := aiskillloader.SelectSkillMetasForPromptRegistry(loader.AllSkillMetas(), tokenEstimator)
+	registryMetas := selectDefaultSkillMetasForInventory(loader.AllSkillMetas(), defaultNames)
+	registryListed, _ := aiskillloader.SelectSkillMetasForPromptRegistry(registryMetas, tokenEstimator)
 
 	byName := make(map[string]CapabilityInventoryNamedItem)
 	for _, meta := range registryListed {
@@ -74,6 +89,34 @@ func BuildInventorySkillsFromLoaderWithEstimator(
 	return result
 }
 
+func selectDefaultSkillMetasForInventory(
+	metas []*aiskillloader.SkillMeta,
+	names []string,
+) []*aiskillloader.SkillMeta {
+	if len(names) == 0 {
+		return metas
+	}
+	byName := make(map[string]*aiskillloader.SkillMeta, len(metas))
+	for _, meta := range metas {
+		if meta != nil && strings.TrimSpace(meta.Name) != "" {
+			byName[meta.Name] = meta
+		}
+	}
+	result := make([]*aiskillloader.SkillMeta, 0, len(names))
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			continue
+		}
+		if meta := byName[name]; meta != nil {
+			seen[name] = true
+			result = append(result, meta)
+		}
+	}
+	return result
+}
+
 func lookupSkillMeta(loader aiskillloader.SkillLoader, name string) (*aiskillloader.SkillMeta, error) {
 	if lookup, ok := loader.(aiskillloader.SkillMetaLookup); ok {
 		return lookup.GetSkillMeta(name)
@@ -92,7 +135,12 @@ func BuildInventorySkillsFromManager(mgr *aiskillloader.SkillsContextManager) []
 	if mgr == nil {
 		return nil
 	}
-	items := BuildInventorySkillsFromLoaderWithEstimator(mgr.GetLoader(), nil, mgr.TokenEstimator())
+	items := buildInventorySkillsFromLoader(
+		mgr.GetLoader(),
+		nil,
+		mgr.GetDefaultSkillNames(),
+		mgr.TokenEstimator(),
+	)
 	index := make(map[string]int, len(items))
 	for i, item := range items {
 		index[item.Name] = i

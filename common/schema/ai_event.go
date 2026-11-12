@@ -108,6 +108,7 @@ const (
 	AI_REACT_LOOP_NAME_INFOSEC_RECON       = "infosec_recon"
 	AI_REACT_LOOP_NAME_AI_SKILL_AUDIT      = "ai_skill_audit"
 	AI_REACT_LOOP_NAME_FAST_CONTEXT        = "fast_context"
+	AI_REACT_LOOP_NAME_CODING              = "coding"
 )
 
 const (

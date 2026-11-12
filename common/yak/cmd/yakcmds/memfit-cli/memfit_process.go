@@ -10,14 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/subprocess"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 type memfitProcessClient struct {
 	mp       *subprocess.ManagedProcess
 	stdin    io.WriteCloser
 	protocol *memfitProtocolWriter
+	trace    *memfitTrace
 
 	events chan memfitEnvelope
 	logs   chan string
@@ -47,6 +48,15 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 	if err != nil {
 		return nil, utils.Wrap(err, "resolve yak executable for memfit worker")
 	}
+	trace, err := newMemfitTrace(config.DumpDir, config.APIKey)
+	if err != nil {
+		return nil, err
+	}
+	trace.recordJSONL(memfitTraceLifecycleFile, "parent_started", map[string]any{
+		"executable": executable,
+		"workdir":    config.Workdir,
+		"focus":      config.Focus,
+	})
 
 	// Create an io.Pipe for stdin so we can write protocol messages to the child.
 	stdinReader, stdinWriter := io.Pipe()
@@ -57,6 +67,7 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 		events:   make(chan memfitEnvelope, 512),
 		logs:     make(chan string, 256),
 		secret:   config.APIKey,
+		trace:    trace,
 	}
 
 	mp, err := subprocess.Launch(ctx, &subprocess.LaunchConfig{
@@ -90,13 +101,14 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 				case envelope := <-client.events:
 					switch envelope.Type {
 					case "ready":
+						trace.recordJSONL(memfitTraceLifecycleFile, "worker_ready", nil)
 						return nil
 					case "error":
 						status, _ := decodeMemfitPayload[memfitStatus](envelope)
 						return utils.Errorf("memfit worker initialization failed: %s%s", status.Message, client.formattedLogTail())
 					}
 				case <-p.Done():
-					return utils.Errorf("memfit worker exited during initialization: %v%s", p.WaitError(), client.formattedLogTail())
+					return utils.Errorf("%s worker exited during initialization: %v%s", memfitDisplayName(config), p.WaitError(), client.formattedLogTail())
 				case <-ctx.Done():
 					return ctx.Err()
 				case <-timer.C:
@@ -105,15 +117,19 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 			}
 		},
 		GracefulShutdown: func(p *subprocess.ManagedProcess) error {
-			_ = client.protocol.send("shutdown", fmt.Sprintf("shutdown-%d", memfitNowMillis()), nil)
+			shutdownID := fmt.Sprintf("shutdown-%d", memfitNowMillis())
+			trace.recordProtocol("parent_to_worker", "shutdown", shutdownID, nil)
+			_ = client.protocol.send("shutdown", shutdownID, nil)
 			_ = stdinWriter.Close()
 			return nil
 		},
 	})
 	if err != nil {
+		trace.Close()
 		return nil, err
 	}
 	client.mp = mp
+	trace.recordJSONL(memfitTraceLifecycleFile, "worker_process_started", map[string]any{"pid": mp.PID()})
 	return client, nil
 }
 
@@ -126,9 +142,11 @@ func (c *memfitProcessClient) readProtocol(reader io.Reader, done <-chan struct{
 		line := append([]byte(nil), scanner.Bytes()...)
 		envelope, err := decodeMemfitEnvelope(line)
 		if err != nil {
+			c.trace.recordLine(memfitTraceWorkerLogFile, "stdout: "+string(line))
 			c.recordLog("stdout: " + string(line))
 			continue
 		}
+		c.trace.recordProtocol("worker_to_parent", envelope.Type, envelope.ID, envelope.Data)
 		select {
 		case c.events <- envelope:
 		case <-done:
@@ -146,7 +164,9 @@ func (c *memfitProcessClient) readLogs(reader io.Reader, prefix string) {
 	}
 	scanner := newMemfitFrameScanner(reader)
 	for scanner.Scan() {
-		c.recordLog(prefix + scanner.Text())
+		line := prefix + scanner.Text()
+		c.trace.recordLine(memfitTraceWorkerLogFile, line)
+		c.recordLog(line)
 	}
 	if err := scanner.Err(); err != nil {
 		c.recordLog(prefix + "log read error: " + err.Error())
@@ -196,6 +216,7 @@ func (c *memfitProcessClient) formattedLogTail() string {
 }
 
 func (c *memfitProcessClient) send(typ, id string, payload any) error {
+	c.trace.recordProtocol("parent_to_worker", typ, id, payload)
 	select {
 	case <-c.mp.Done():
 		return utils.Errorf("memfit worker is not running: %v", c.mp.WaitError())
@@ -206,4 +227,9 @@ func (c *memfitProcessClient) send(typ, id string, payload any) error {
 
 func (c *memfitProcessClient) WaitError() error { return c.mp.WaitError() }
 
-func (c *memfitProcessClient) Close() { c.mp.Close() }
+func (c *memfitProcessClient) Close() {
+	if c.mp != nil {
+		c.mp.Close()
+	}
+	c.trace.Close()
+}

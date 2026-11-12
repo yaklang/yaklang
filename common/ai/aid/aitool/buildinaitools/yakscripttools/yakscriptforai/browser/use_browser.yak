@@ -89,6 +89,7 @@ Required:
                       Info:       "get"
                       Wait:       "wait"
                       Capture:    "screenshot"
+                      Responsive: "viewport_check"
                       Script:     "eval"
                       Tab:        "tab_list", "tab_new", "tab_switch", "tab_close"
 
@@ -112,6 +113,20 @@ Optional:
   tab-index (string)  Tab index for tab_switch/tab_close
   exe-path  (string)  Chrome/Chromium executable path. Defaults to yakit "global-chrome-path" config.
                      When set, this path is used instead of auto-detecting Chrome on the system.
+  viewport-width  (int)  Required for op=viewport_check; real CDP viewport width.
+  viewport-height (int)  Required for op=viewport_check; real CDP viewport height.
+  device-scale-factor (float) Device scale factor for viewport_check, default 1.
+  mobile          (bool)  Emulate mobile viewport semantics for viewport_check, default false.
+                     For an exact responsive CSS check, keep mobile=false: Chrome may expand
+                     the mobile layout viewport to accommodate wide content.
+  capture-screenshot (bool) Save a screenshot for viewport_check, default true.
+
+## Responsive verification
+  op=viewport_check applies Emulation.setDeviceMetricsOverride, waits for media queries,
+  and returns the actual innerWidth/innerHeight, horizontal overflow evidence,
+  visible-element count, console errors, runtime errors and unhandled rejections.
+  Do NOT validate mobile layout with browser window-size flags; desktop Chrome may
+  enforce a larger minimum width. Use viewport_check when exact 390px checks matter.
 
 [[- if .FunctionCallMode -]]
 多行业务参数放入 JSON 字符串，换行、引号和反斜杠正确转义；不要输出外置正文。
@@ -472,6 +487,11 @@ waitType = cli.String("wait-type", cli.setRequired(false), cli.setHelp("wait con
 waitValue = cli.String("wait-value", cli.setRequired(false), cli.setHelp("wait condition value"))
 tabIndex = cli.String("tab-index", cli.setRequired(false), cli.setHelp("tab index for tab_switch/tab_close"))
 exePath = cli.String("exe-path", cli.setRequired(false), cli.setHelp("Chrome/Chromium executable path. Defaults to the yakit-configured global-chrome-path."))
+viewportWidth = cli.Int("viewport-width", cli.setDefault(0), cli.setHelp("real CDP viewport width for viewport_check"))
+viewportHeight = cli.Int("viewport-height", cli.setDefault(0), cli.setHelp("real CDP viewport height for viewport_check"))
+deviceScaleFactor = cli.Float("device-scale-factor", cli.setDefault(1.0), cli.setHelp("device scale factor for viewport_check"))
+mobileViewport = cli.Bool("mobile", cli.setDefault(false), cli.setHelp("emulate mobile viewport semantics for viewport_check"))
+captureScreenshot = cli.Bool("capture-screenshot", cli.setDefault(true), cli.setHelp("save a screenshot for viewport_check"))
 
 cli.check()
 
@@ -957,6 +977,63 @@ case "screenshot":
         yakit.Info("screenshot base64 (first 100 chars): %v...", b64[:min(100, len(b64))])
     }
 
+case "viewport_check":
+    if viewportWidth <= 0 || viewportHeight <= 0 {
+        operationError("op=viewport_check requires positive --viewport-width and --viewport-height")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.SetViewport(viewportWidth, viewportHeight, deviceScaleFactor, mobileViewport)
+    if err != nil {
+        operationError("failed to apply CDP viewport override: %v", err)
+        return
+    }
+    sleep(0.2)
+    diagnostics, diagErr = page.ViewportDiagnostics()
+    if diagErr != nil {
+        operationError("viewport diagnostics failed: %v", diagErr)
+        return
+    }
+    diagnosticsJSON = json.dumps(diagnostics)
+    diagnosticsMap = json.loads(diagnosticsJSON)
+    actualWidth = diagnosticsMap["inner_width"]
+    actualHeight = diagnosticsMap["inner_height"]
+
+    RESULT["requested_viewport"] = {"width": viewportWidth, "height": viewportHeight, "device_scale_factor": deviceScaleFactor, "mobile": mobileViewport}
+    RESULT["viewport"] = diagnosticsMap
+    RESULT["viewport_matches_request"] = actualWidth == viewportWidth && actualHeight == viewportHeight
+    RESULT["horizontal_overflow"] = diagnosticsMap["overflow_x"]
+    RESULT["console_error_count"] = len(diagnosticsMap["console_errors"])
+    RESULT["runtime_error_count"] = len(diagnosticsMap["runtime_errors"])
+
+    if captureScreenshot {
+        imgData, screenshotErr = page.Screenshot()
+        if screenshotErr != nil {
+            operationError("viewport was measured but screenshot failed: %v", screenshotErr)
+            return
+        }
+        tmpFile, tmpErr = file.TempFileName("browser_viewport_*.png")
+        if tmpErr != nil {
+            operationError("viewport was measured but screenshot temp file failed: %v", tmpErr)
+            return
+        }
+        file.Save(tmpFile, imgData)
+        RESULT["screenshot"] = tmpFile
+        RESULT["screenshot_bytes"] = len(imgData)
+    }
+
+    if actualWidth != viewportWidth || actualHeight != viewportHeight {
+        operationError("CDP viewport mismatch: requested %vx%v, actual %vx%v", viewportWidth, viewportHeight, actualWidth, actualHeight)
+        return
+    }
+    yakit.Info("viewport verified: requested=%vx%v actual=%vx%v overflowX=%v visibleElements=%v consoleErrors=%v runtimeErrors=%v",
+        viewportWidth, viewportHeight, actualWidth, actualHeight,
+        diagnosticsMap["overflow_x"], diagnosticsMap["visible_elements"],
+        len(diagnosticsMap["console_errors"]), len(diagnosticsMap["runtime_errors"]))
+
 case "eval":
     if js == "" {
         operationError("op=eval requires --js parameter (JavaScript code)")
@@ -1272,5 +1349,5 @@ case "press":
     yakit.Info("press %v done", value)
 
 default:
-    operationError("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close, drag, setfiles, hover, select, check, uncheck, scrollintoview, press, handle_dialog", op)
+    operationError("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, viewport_check, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close, drag, setfiles, hover, select, check, uncheck, scrollintoview, press, handle_dialog", op)
 }

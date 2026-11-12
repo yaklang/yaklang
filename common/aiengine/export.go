@@ -51,6 +51,7 @@ var Exports = map[string]interface{}{
 	"manualMode":                WithManualMode,
 	"aiReviewMode":              WithAIReviewMode,
 	"aiCallback":                WithAICallback,
+	"aiCallTraceHook":           WithAICallTraceHook,
 	"qualityPriorityAICallback": WithQualityPriorityAICallback,
 	"speedPriorityAICallback":   WithSpeedPriorityAICallback,
 	"aiConfig":                  WithAIConfig,

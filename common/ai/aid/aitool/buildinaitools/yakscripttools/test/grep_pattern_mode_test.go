@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -33,9 +34,12 @@ func runGrep(t *testing.T, params aitool.InvokeParams) string {
 	grepTool := getGrepToolFromEmbed(t)
 	stdout := bytes.NewBuffer(nil)
 	stderr := bytes.NewBuffer(nil)
-	_, err := grepTool.Callback(context.Background(), params, nil, stdout, stderr)
+	result, err := grepTool.Callback(context.Background(), params, nil, stdout, stderr)
 	if err != nil {
 		t.Fatalf("grep tool execution failed: %v", err)
+	}
+	if result != nil {
+		return fmt.Sprintf("%v\n%s", result, stdout.String())
 	}
 	return stdout.String()
 }
@@ -198,6 +202,85 @@ this has db.Exec( which is different
 		t.Fatalf("expected the matched line to contain the literal pattern, got:\n%s", stdoutStr)
 	}
 	t.Log("OK: substr mode treats pattern as literal, unaffected by regexp default")
+}
+
+func TestGrepTool_SubstrModeWarnsWhenRegexAlternationIsLiteral(t *testing.T) {
+	content := `.card { animation: card-in 0.5s; }
+.card { animation: card-fill-mode 0.5s; }
+`
+	tmpPath := createTempFileWithContent(t, "grep_substr_regex_hint_*.css", content)
+
+	output := runGrep(t, aitool.InvokeParams{
+		"path":         tmpPath,
+		"pattern":      "card-in 0.5s|animation: card-in",
+		"pattern-mode": "substr",
+	})
+	require.True(t, strings.Contains(output, "No matches found"), output)
+	require.Contains(t, output, "pattern-mode=substr treats the pattern as literal text")
+	require.Contains(t, output, "pattern-mode=regexp")
+}
+
+func TestGrepTool_SubstrLiteralPipeStillUsesLiteralSemantics(t *testing.T) {
+	content := "left|right\nleft or right\n"
+	tmpPath := createTempFileWithContent(t, "grep_substr_literal_pipe_*.txt", content)
+
+	output := runGrep(t, aitool.InvokeParams{
+		"path":         tmpPath,
+		"pattern":      "left|right",
+		"pattern-mode": "substr",
+	})
+	require.Contains(t, output, "1 matches")
+	require.Contains(t, output, "left|right")
+	require.Contains(t, output, "Matching semantics were not changed")
+}
+
+func TestGrepTool_RegexAlternationWorksWhenRequested(t *testing.T) {
+	content := "alpha-marker\nbeta-marker\n"
+	tmpPath := createTempFileWithContent(t, "grep_regex_alternation_*.txt", content)
+
+	output := runGrep(t, aitool.InvokeParams{
+		"path":         tmpPath,
+		"pattern":      "alpha-marker|beta-marker",
+		"pattern-mode": "regexp",
+	})
+	require.Contains(t, output, "2 matches")
+	require.NotContains(t, output, "treats the pattern as literal text")
+}
+
+func TestGrepTool_ResultsAreSemanticAndNotDuplicatedInObservations(t *testing.T) {
+	content := "prefix needle-731 suffix\nother line\nneedle-999\n"
+	tmpPath := createTempFileWithContent(t, "grep_single_result_channel_*.txt", content)
+	grepTool := getGrepToolFromEmbed(t)
+
+	result, err := grepTool.InvokeWithParams(aitool.InvokeParams{
+		"path":    tmpPath,
+		"pattern": `needle-[0-9]+`,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.Success)
+
+	execution, ok := result.Data.(*aitool.ToolExecutionResult)
+	require.True(t, ok)
+	rendered := result.String()
+	require.Equal(t, 1, strings.Count(rendered, "needle-731"), rendered)
+	require.Contains(t, execution.Result.(string), "=== Grep Results:")
+	require.NotContains(t, execution.CombinedOutput, "=== Grep Results:")
+
+	status, _ := result.GetExecutionStatus()
+	require.Equal(t, aitool.ToolExecutionStatusSucceeded, status)
+}
+
+func TestGrepTool_InvalidPathReturnsExplicitFailure(t *testing.T) {
+	grepTool := getGrepToolFromEmbed(t)
+	result, err := grepTool.InvokeWithParams(aitool.InvokeParams{
+		"path":    "/definitely/not/a/real/path/for-grep",
+		"pattern": "anything",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	status, _ := result.GetExecutionStatus()
+	require.Equal(t, aitool.ToolExecutionStatusFailed, status)
 }
 
 // TestGrepTool_IsubstrModeStillCaseInsensitive verifies that isubstr mode remains

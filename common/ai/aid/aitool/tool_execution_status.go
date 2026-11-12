@@ -1,6 +1,7 @@
 package aitool
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -18,12 +19,17 @@ const (
 	ToolExecutionStatusFailed    ToolExecutionStatus = "failed"
 )
 
-// GetExecutionStatus classifies only explicit, machine-readable outcome
-// fields. Arbitrary tool results (including HTTP status codes) stay unknown so
-// the task verifier can decide whether the observed result satisfies the goal.
+// GetExecutionStatus classifies tool execution, not task satisfaction. A
+// protocol-complete callback defaults to succeeded, while explicit machine
+// fields such as timeout, transport failure, unaccepted exit code or
+// operation_status can override that verdict. Callers still inspect the result
+// to decide whether the returned observation satisfies the user's goal.
 func (t *ToolResult) GetExecutionStatus() (ToolExecutionStatus, string) {
-	if t == nil || !t.Success {
+	if t == nil {
 		return ToolExecutionStatusUnknown, ""
+	}
+	if !t.Success {
+		return ToolExecutionStatusFailed, ""
 	}
 
 	result := t.Data
@@ -35,6 +41,14 @@ func (t *ToolResult) GetExecutionStatus() (ToolExecutionStatus, string) {
 		result = value.Result
 	case ToolExecutionResult:
 		result = value.Result
+	case string:
+		if strings.HasPrefix(value, "OBSERVATIONS:\n") || strings.HasPrefix(value, "COMBINED OUTPUT:\n") {
+			if strings.Contains(value, "[error]") {
+				return ToolExecutionStatusFailed, "observation contains an error log"
+			}
+			return ToolExecutionStatusUnknown, ""
+		}
+		result = canonicalExecutionResult(value)
 	default:
 		if envelope := utils.InterfaceToGeneralMap(t.Data); len(envelope) > 0 {
 			if semanticResult, ok := envelope["result"]; ok {
@@ -45,6 +59,9 @@ func (t *ToolResult) GetExecutionStatus() (ToolExecutionStatus, string) {
 
 	fields := utils.InterfaceToGeneralMap(result)
 	if len(fields) == 0 {
+		if text := strings.TrimSpace(utils.InterfaceToString(result)); text != "" {
+			return ToolExecutionStatusSucceeded, ""
+		}
 		return ToolExecutionStatusUnknown, ""
 	}
 
@@ -77,7 +94,39 @@ func (t *ToolResult) GetExecutionStatus() (ToolExecutionStatus, string) {
 			return ToolExecutionStatusSucceeded, executionStatusDetail(fields, "operation", "operation_status", "session")
 		}
 	}
-	return ToolExecutionStatusUnknown, ""
+	return ToolExecutionStatusSucceeded, ""
+}
+
+// canonicalExecutionResult extracts the semantic RESULT section from the
+// normalized Timeline envelope. The artifact layer intentionally replaces Data
+// with this envelope, so status inspection must decode it rather than losing
+// the original structured result (for example bash exit_code_accepted).
+func canonicalExecutionResult(data string) any {
+	const resultMarker = "RESULT:\n"
+	if !strings.HasPrefix(data, resultMarker) {
+		return data
+	}
+	body := data[len(resultMarker):]
+	end := len(body)
+	// Section markers are appended after the result. Search from the right so
+	// file text that itself contains "OBSERVATIONS:" or "ARTIFACT:" does not
+	// truncate the semantic result before the real framework sections.
+	for _, marker := range []string{"\n\nARTIFACT:\n", "\n\nHINT:\n", "\n\nOBSERVATIONS:\n"} {
+		if idx := strings.LastIndex(body, marker); idx >= 0 && idx < end {
+			end = idx
+		}
+	}
+	body = strings.TrimSpace(body[:end])
+	if body == "" {
+		return nil
+	}
+	if strings.HasPrefix(body, "{") || strings.HasPrefix(body, "[") {
+		var decoded any
+		if err := json.Unmarshal([]byte(body), &decoded); err == nil {
+			return decoded
+		}
+	}
+	return body
 }
 
 func explicitBool(value any) (bool, bool) {

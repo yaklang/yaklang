@@ -39,9 +39,15 @@ func getReadFileTool(t *testing.T) *aitool.Tool {
 func execReadFileTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) (stdout string, stderr string) {
 	t.Helper()
 	w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	_, err := tool.Callback(context.Background(), params, nil, w1, w2)
+	result, err := tool.Callback(context.Background(), params, nil, w1, w2)
 	if err != nil {
 		t.Logf("tool execution error (may be expected): %v", err)
+	}
+	// Production read_file exposes file content through the semantic RESULT
+	// channel and reserves stdout for observations. Most tests in this file
+	// assert what the agent ultimately sees, so combine both channels here.
+	if result != nil {
+		return fmt.Sprintf("%v\n%s", result, w1.String()), w2.String()
 	}
 	return w1.String(), w2.String()
 }
@@ -182,6 +188,61 @@ func TestReadFile_ChunkMode(t *testing.T) {
 	// chunk mode must NOT use the old Go-quoted %#v format
 	assert.Assert(t, !strings.Contains(stdout, `\n`),
 		"chunk output must not contain Go-escaped \\n sequences (was using %%#v format)")
+}
+
+func TestReadFile_ContentAppearsOnceAcrossSemanticResultAndObservations(t *testing.T) {
+	tool := getReadFileTool(t)
+	marker := "UNIQUE_READ_FILE_BODY_7f4d1c"
+	var content strings.Builder
+	for i := 0; i < 300; i++ {
+		fmt.Fprintf(&content, "<div data-line=\"%d\">%s</div>\n", i+1, marker)
+	}
+	path := filepath.Join(t.TempDir(), "large.html")
+	assert.NilError(t, os.WriteFile(path, []byte(content.String()), 0o644))
+
+	result, err := tool.InvokeWithParams(aitool.InvokeParams{
+		"file":  path,
+		"mode":  "lines",
+		"lines": 300,
+	})
+	assert.NilError(t, err)
+	assert.Assert(t, result != nil)
+	assert.Assert(t, result.Success)
+
+	rendered := result.String()
+	firstLine := fmt.Sprintf("  1 | <div data-line=\"1\">%s</div>", marker)
+	assert.Equal(t, 1, strings.Count(rendered, firstLine),
+		"read_file content must appear exactly once across result and observations")
+	assert.Assert(t, strings.Contains(rendered, "execution_result:"),
+		"numbered file content should be the semantic execution result")
+	assert.Assert(t, strings.Contains(rendered, "observations:"),
+		"observations should retain byte and line statistics")
+	assert.Assert(t, !strings.Contains(rendered, "[info]   1 |"),
+		"read_file must not repeat the numbered body as an info log")
+}
+
+func TestReadFile_ErrorsExposeFailureStatus(t *testing.T) {
+	tool := getReadFileTool(t)
+
+	t.Run("missing file", func(t *testing.T) {
+		result, err := tool.InvokeWithParams(aitool.InvokeParams{
+			"file": "/definitely/missing/read-file.fixture",
+		})
+		assert.NilError(t, err)
+		status, _ := result.GetExecutionStatus()
+		assert.Equal(t, aitool.ToolExecutionStatusFailed, status)
+	})
+
+	t.Run("invalid mode", func(t *testing.T) {
+		path := buildReadTestFile(t, 1)
+		result, err := tool.InvokeWithParams(aitool.InvokeParams{
+			"file": path,
+			"mode": "invalid",
+		})
+		assert.NilError(t, err)
+		status, _ := result.GetExecutionStatus()
+		assert.Equal(t, aitool.ToolExecutionStatusFailed, status)
+	})
 }
 
 // TestReadFile_LargeLineCount verifies that requesting more lines than defaultLineHardCap (400)

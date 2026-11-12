@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
 // inventoryPriorityToolNames 是 Tool Inventory 展示优先级名单, 与 capability_inventory fixed 段对齐.
@@ -138,12 +139,25 @@ func PrioritizeToolsForInventory(tools []*aitool.Tool, maxCount int, extraPriori
 }
 
 func BuildToolInventoryData(tools []*aitool.Tool, topToolsCount int, scenarioWhitelist ...string) ToolInventoryData {
+	return BuildToolInventoryDataWithPolicy(tools, topToolsCount, buildinaitools.ToolDisclosurePolicy{}, scenarioWhitelist...)
+}
+
+// BuildToolInventoryDataWithPolicy applies a profile-level default disclosure
+// policy after visibility filtering. Non-exclusive policies only reorder tools.
+// Exclusive policies narrow the default display, while VisibleTools and dynamic
+// capability discovery continue to include the full filtered set.
+func BuildToolInventoryDataWithPolicy(
+	tools []*aitool.Tool,
+	topToolsCount int,
+	policy buildinaitools.ToolDisclosurePolicy,
+	scenarioWhitelist ...string,
+) ToolInventoryData {
 	tools = FilterToolsByVisibility(tools, scenarioWhitelist)
 	if len(tools) == 0 {
 		return ToolInventoryData{}
 	}
 
-	candidate := PrioritizeToolsForInventory(tools, topToolsCount, scenarioWhitelist...)
+	candidate := prioritizeToolsByDisclosure(tools, topToolsCount, policy, scenarioWhitelist...)
 	display := SelectToolsByTokenBudget(candidate, ToolInventoryTokenBudget, ToolInventoryMinCount)
 	more := len(tools) - len(display)
 	if more < 0 {
@@ -161,6 +175,58 @@ func BuildToolInventoryData(tools []*aitool.Tool, topToolsCount int, scenarioWhi
 	}
 }
 
+func prioritizeToolsByDisclosure(
+	tools []*aitool.Tool,
+	maxCount int,
+	policy buildinaitools.ToolDisclosurePolicy,
+	scenarioWhitelist ...string,
+) []*aitool.Tool {
+	if len(policy.Names) == 0 && len(policy.Prefixes) == 0 {
+		return PrioritizeToolsForInventory(tools, maxCount, scenarioWhitelist...)
+	}
+
+	byName := make(map[string]*aitool.Tool, len(tools))
+	for _, tool := range tools {
+		if tool != nil && tool.Name != "" {
+			byName[tool.Name] = tool
+		}
+	}
+
+	selected := make([]*aitool.Tool, 0, min(maxCount, len(tools)))
+	used := make(map[string]bool, len(tools))
+	appendTool := func(tool *aitool.Tool) {
+		if tool == nil || used[tool.Name] || len(selected) >= maxCount {
+			return
+		}
+		used[tool.Name] = true
+		selected = append(selected, tool)
+	}
+	for _, name := range policy.Names {
+		appendTool(byName[strings.TrimSpace(name)])
+	}
+	for _, prefix := range policy.Prefixes {
+		prefix = strings.TrimSpace(prefix)
+		if prefix == "" {
+			continue
+		}
+		for _, tool := range tools {
+			if strings.HasPrefix(tool.Name, prefix) {
+				appendTool(tool)
+			}
+		}
+	}
+	if policy.Exclusive {
+		if len(selected) == 0 {
+			return PrioritizeToolsForInventory(tools, maxCount, scenarioWhitelist...)
+		}
+		return selected
+	}
+	for _, tool := range tools {
+		appendTool(tool)
+	}
+	return selected
+}
+
 func BuildToolInventoryDataFromConfig(config *Config, scenarioWhitelist ...string) (ToolInventoryData, error) {
 	if config == nil {
 		return ToolInventoryData{}, nil
@@ -173,7 +239,12 @@ func BuildToolInventoryDataFromConfig(config *Config, scenarioWhitelist ...strin
 	if err != nil {
 		return ToolInventoryData{}, err
 	}
-	return BuildToolInventoryData(tools, resolveToolInventoryTopCount(config), scenarioWhitelist...), nil
+	return BuildToolInventoryDataWithPolicy(
+		tools,
+		resolveToolInventoryTopCount(config),
+		toolMgr.GetDefaultToolDisclosure(),
+		scenarioWhitelist...,
+	), nil
 }
 
 func ApplyToolInventoryData(materials *PromptMaterials, data ToolInventoryData) {

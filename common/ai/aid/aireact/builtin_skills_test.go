@@ -27,6 +27,7 @@ var allBuiltinSkills = []struct {
 	keywords []string
 }{
 	{"security-engineering", "skills/security-engineering/SKILL.md", []string{"授权边界", "证据优先", "可复现", "蓝队", "code-review", "pentest-task-design"}},
+	{"coding-workflow", "skills/coding-workflow/SKILL.md", []string{"编程工作流", "AGENTS.md", "MCP", "search_capabilities", "diff"}},
 	{"code-review", "skills/code-review/SKILL.md", []string{"grep", "CWE-89", "CWE-77", "CWE-79"}},
 	{"recon-planning", "skills/recon-planning/SKILL.md", []string{"Recon", "攻击面", "眼前的先测完", "子 Agent", "活站"}},
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "Phase", "cybersecurity-risk"}},

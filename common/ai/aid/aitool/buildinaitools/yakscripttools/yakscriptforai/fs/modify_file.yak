@@ -4,7 +4,7 @@ __VERBOSE_NAME_ZH__ = "文件修改"
 __KEYWORDS__ = "file modify,文件修改,文件编辑,file editing,content modification,行编辑,line editing,字符串替换,string replacement,文件处理,text processing,insert content,replace content,add comments,增加注释,代码注释,edit existing file,修改现有文件,incremental edit,增量编辑"
 
 __USAGE__ = <<<USAGE_BLOCK
-增量修改已有文件，避免为局部变更完整覆写。`file` 为现有文件路径，line-number 为行号（从 1 开始），content 为插入或替换的正文。mode 默认 replace，替换指定行；insert 在指定行后插入。行号超过文件总行数时追加到末尾。
+增量修改已有文件，避免为局部变更完整覆写。`file` 为现有文件路径，content 为写入正文。mode 默认 replace，按 line-number 替换单行；insert 在指定行后插入；replace-range 用 line-number/end-line 替换多行；append 显式追加；patch 按 old-content 做唯一上下文替换，避免行号漂移。越界行号直接失败，不再隐式追加。可选 expected-sha256 防止覆盖并发修改。
 
 先读取并确认行号，修改后读取相关片段验证。调用示例：
 [[- if .FunctionCallMode -]]
@@ -14,7 +14,9 @@ arguments 示例：
 {
   "file": "/absolute/path/app.py",
   "line-number": 12,
-  "mode": "insert",
+  "mode": "replace-range",
+  "line-number": 12,
+  "end-line": 14,
   "content": "# 说明用途\n# 保留现有行为"
 }
 ```
@@ -28,7 +30,9 @@ JSON 提交路径、行号和模式，多行 content 使用本次 nonce 的 AITA
   "directly_call_tool_params": {
     "file": "/absolute/path/app.py",
     "line-number": 12,
-    "mode": "insert"
+    "mode": "replace-range",
+    "line-number": 12,
+    "end-line": 14
   }
 }
 ```
@@ -46,15 +50,22 @@ USAGE_BLOCK
 1. 支持在指定行号位置修改文件内容
    - line-number: 指定要修改的行号（从1开始）
    - content: 要插入或替换的内容字符串
-   - mode: 修改模式，'insert'（插入）或 'replace'（替换）
+   - mode: replace、insert、replace-range、append 或 patch
 
 2. 修改模式说明：
    - insert: 在指定行号后插入新内容，原内容向下移动
    - replace: 替换指定行的内容
+   - replace-range: 用 line-number 到 end-line 的闭区间替换为多行 content
+   - append: 显式在文件末尾追加，不读取也不借用越界行号
+   - patch: 用 old-content 精确定位上下文；默认要求唯一匹配，否则拒绝写入
 
 3. 参数说明：
    --file: 要修改的文件路径 (必需)
-   --line-number: 要修改的行号，从1开始计数 (必需)
+   --line-number: 要修改的行号，从1开始计数（append/patch 可省略）
+   --end-line: replace-range 的结束行号
+   --old-content: patch 模式要替换的原始上下文
+   --occurrence: 多处匹配时显式选择第 N 处（从1开始；默认只接受唯一匹配）
+   --expected-sha256: 读取时的文件 sha256，防止覆盖并发修改
    --content: 要插入或替换的内容字符串 (必需)
    --mode: 修改模式，'insert' 或 'replace'，默认 'replace' (可选)
 
@@ -65,17 +76,21 @@ USAGE_BLOCK
 2. 替换第3行的内容：
    yak modify_file.yak --file test.txt --line-number 3 --content "替换后的行内容" --mode replace
 
-3. 替换第10行的内容（默认模式）：
+3. 替换第10到12行的内容：
+    yak modify_file.yak --file test.txt --line-number 10 --end-line 12 --mode replace-range --content "新的多行内容"
+
+4. 替换第10行的内容（默认模式）：
    yak modify_file.yak --file test.txt --line-number 10 --content "新的内容"
 
-4. 在函数上方插入多行注释块：
+5. 在函数上方插入多行注释块：
     yak modify_file.yak --file app.py --line-number 20 --mode insert --content "# 说明: 这里处理输入\n# 保持输出结构稳定"
 
 注意事项：
 - 行号从1开始计数，第一行是第1行
-- 如果指定的行号超出文件行数，会在文件末尾添加内容
+- 指定行号超出文件行数会失败；追加必须显式使用 mode=append
 - insert模式会在指定行后插入内容
 - replace模式会完全替换指定行的内容
+- patch模式默认要求 old-content 唯一匹配，冲突时拒绝修改
 - 支持多行内容的插入和替换
 - 优先用于已有文件的局部修改，避免使用 write_file 全量覆写整个文件
 - 修改操作会直接保存到原文件，请谨慎使用
@@ -84,154 +99,287 @@ USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
-// 解析命令行参数
 filename := cli.String("file", cli.setRequired(true), cli.setHelp("target file path you want to modify"))
-lineNumber := cli.Int("line-number", cli.setRequired(true), cli.setHelp("line number to modify (starting from 1)"))
-content := cli.String("content", cli.setRequired(true), cli.setHelp("content string to insert or replace"))
-mode := cli.String("mode", cli.setDefault("replace"), cli.setHelp("modify mode: 'insert' or 'replace' (default: replace)"))
+lineNumber := cli.Int("line-number", cli.setDefault(0), cli.setHelp("line number to modify (starting from 1; optional for append/patch)"))
+endLine := cli.Int("end-line", cli.setDefault(0), cli.setHelp("last line for replace-range (inclusive)"))
+content := cli.String("content", cli.setRequired(true), cli.setHelp("replacement or insertion content"))
+oldContent := cli.String("old-content", cli.setDefault(""), cli.setHelp("exact original context required by patch mode"))
+mode := str.ToLower(str.TrimSpace(cli.String("mode", cli.setDefault("replace"), cli.setHelp("replace, insert, replace-range, append or patch"))))
+occurrence := cli.Int("occurrence", cli.setDefault(0), cli.setHelp("1-based match to patch when old-content is not unique; 0 requires a unique match"))
+expectedSHA256 := str.ToLower(str.TrimSpace(cli.String("expected-sha256", cli.setDefault(""), cli.setHelp("expected sha256 of the current file; rejects stale edits"))))
 
 cli.check()
 
-yakit.Info("Modifying file: %v at line %v, mode: %v", filename, lineNumber, mode)
+RESULT = nil
+changed = false
+changeSummary = ""
+affectedStart = 0
+affectedLineCount = 0
+modifiedContent = ""
 
-// 检查文件是否存在
+fail = (message) => {
+    yakit.Error("%v", message)
+    RESULT = {
+        "operation": "modify_file",
+        "operation_status": "error",
+        "file": filename,
+        "mode": mode,
+        "error": message,
+    }
+}
+
+validModes = ["replace", "insert", "replace-range", "range-replace", "append", "patch", "replace-context"]
+if !(mode in validModes) {
+    fail(sprintf("invalid mode %q; use replace, insert, replace-range, append or patch", mode))
+    return
+}
+
 if !file.IsExisted(filename) {
-    yakit.Error("File %v does not exist", filename)
+    fail(sprintf("file %v does not exist", filename))
     return
 }
 
-// 验证参数
-if lineNumber < 1 {
-    yakit.Error("line-number must be >= 1, got %v", lineNumber)
-    return
-}
-
-if mode != "insert" && mode != "replace" {
-    yakit.Error("mode must be 'insert' or 'replace', got %v", mode)
-    return
-}
-
-// 读取文件内容
 fileContent, err := file.ReadFile(filename)
 if err != nil {
-    yakit.Error("Failed to read file %v: %v", filename, err)
+    fail(sprintf("failed to read file %v: %v", filename, err))
+    return
+}
+originalContent := string(fileContent)
+originalSize := len(fileContent)
+
+if expectedSHA256 != "" {
+    actualSHA256 = str.ToLower(codec.Sha256(originalContent))
+    if actualSHA256 != expectedSHA256 {
+        fail(sprintf("file changed since it was read: expected-sha256=%v actual-sha256=%v", expectedSHA256, actualSHA256))
+        return
+    }
+}
+
+editor := memeditor.New(originalContent)
+totalLines := editor.GetLineCount()
+yakit.Info("Modifying file: %v; mode=%v, lines=%v, bytes=%v", filename, mode, totalLines, originalSize)
+
+contentLineCount = len(str.Split(content, "\n"))
+if str.HasSuffix(content, "\n") && contentLineCount > 1 {
+    contentLineCount--
+}
+if contentLineCount < 1 {
+    contentLineCount = 1
+}
+
+if mode == "append" {
+    modifiedContent = originalContent
+    if modifiedContent != "" && !str.HasSuffix(modifiedContent, "\n") {
+        modifiedContent += "\n"
+    }
+    modifiedContent += content
+    editor = memeditor.New(modifiedContent)
+    // Yak's len(string) counts runes, while memeditor offsets and line
+    // mappings are byte-oriented. Use the byte representation for append
+    // positioning so UTF-8 files do not land in the middle of a character.
+    originalBytes := []byte(originalContent)
+    appendRuneOffset, offsetOK := editor.ByteOffsetToRuneIndex(len(originalBytes))
+    if !offsetOK {
+        fail("failed to map append byte offset to text position")
+        return
+    }
+    pos := editor.GetPositionByOffset(appendRuneOffset)
+    affectedStart = pos.GetLine()
+    if originalContent != "" && !str.HasSuffix(originalContent, "\n") {
+        affectedStart++
+    }
+    affectedLineCount = contentLineCount
+    changeSummary = "appended content at end of file"
+} else if mode == "patch" || mode == "replace-context" {
+    mode = "patch"
+    if oldContent == "" {
+        fail("patch mode requires a non-empty old-content")
+        return
+    }
+    matches = str.Count(originalContent, oldContent)
+    if matches == 0 {
+        fail("old-content was not found; read the latest file and provide a larger exact context")
+        return
+    }
+    if occurrence <= 0 {
+        if matches > 1 {
+            fail(sprintf("old-content matched %v times; provide more context or an explicit 1-based occurrence", matches))
+            return
+        }
+        occurrence = 1
+    }
+    if occurrence > matches {
+        fail(sprintf("occurrence %v is out of range; old-content matched %v times", occurrence, matches))
+        return
+    }
+    // str.Index returns a BYTE offset, while ordinary string slicing uses
+    // rune indexes. Keep both search and replacement on []byte so files with
+    // Chinese, emoji or other UTF-8 text cannot shift the patch location.
+    originalBytes := []byte(originalContent)
+    oldBytes := []byte(oldContent)
+    searchFrom = 0
+    matchStartByte := -1
+    seen = 0
+    for searchFrom <= len(originalBytes)-len(oldBytes) {
+        rel := str.Index(string(originalBytes[searchFrom:]), oldContent)
+        if rel < 0 {
+            break
+        }
+        absoluteByte := searchFrom + rel
+        seen++
+        if seen == occurrence {
+            matchStartByte = absoluteByte
+            break
+        }
+        searchFrom = absoluteByte + len(oldBytes)
+    }
+    if matchStartByte < 0 {
+        fail("failed to resolve old-content match offset")
+        return
+    }
+    matchEndByte := matchStartByte + len(oldBytes)
+    if matchEndByte > len(originalBytes) ||
+        string(originalBytes[matchStartByte:matchEndByte]) != oldContent {
+        fail("context match verification failed; file was not modified")
+        return
+    }
+    modifiedBytes := make([]byte, 0, len(originalBytes)-len(oldBytes)+len(content))
+    modifiedBytes = append(modifiedBytes, originalBytes[:matchStartByte]...)
+    modifiedBytes = append(modifiedBytes, []byte(content)...)
+    modifiedBytes = append(modifiedBytes, originalBytes[matchEndByte:]...)
+    modifiedContent = string(modifiedBytes)
+    editor = memeditor.New(modifiedContent)
+    matchRuneOffset, offsetOK := editor.ByteOffsetToRuneIndex(matchStartByte)
+    if !offsetOK {
+        fail("failed to map patch byte offset to text position")
+        return
+    }
+    affectedStart = editor.GetPositionByOffset(matchRuneOffset).GetLine()
+    affectedLineCount = contentLineCount
+    changeSummary = sprintf("replaced unique context match %v of %v", occurrence, matches)
+} else {
+    if lineNumber < 1 {
+        fail(sprintf("%v mode requires line-number >= 1", mode))
+        return
+    }
+    if lineNumber > totalLines {
+        fail(sprintf("line-number %v exceeds file line count %v; use mode=append explicitly", lineNumber, totalLines))
+        return
+    }
+    if mode == "replace" {
+        startOffset, startErr := editor.GetStartOffsetByLine(lineNumber)
+        endOffset, endErr := editor.GetEndOffsetByLine(lineNumber)
+        if startErr != nil || endErr != nil {
+            fail(sprintf("failed to resolve line %v: %v %v", lineNumber, startErr, endErr))
+            return
+        }
+        err = editor.UpdateTextByRange(editor.GetRangeOffset(startOffset, endOffset), content)
+        if err != nil {
+            fail(sprintf("failed to replace line %v: %v", lineNumber, err))
+            return
+        }
+        affectedStart = lineNumber
+        affectedLineCount = contentLineCount
+        changeSummary = sprintf("replaced line %v", lineNumber)
+    } else if mode == "insert" {
+        endOffset, endErr := editor.GetEndOffsetByLine(lineNumber)
+        if endErr != nil {
+            fail(sprintf("failed to resolve line %v end offset: %v", lineNumber, endErr))
+            return
+        }
+        err = editor.UpdateTextByRange(editor.GetRangeOffset(endOffset, endOffset), "\n" + content)
+        if err != nil {
+            fail(sprintf("failed to insert after line %v: %v", lineNumber, err))
+            return
+        }
+        affectedStart = lineNumber + 1
+        affectedLineCount = contentLineCount
+        changeSummary = sprintf("inserted content after line %v", lineNumber)
+    } else {
+        mode = "replace-range"
+        if endLine <= 0 {
+            endLine = lineNumber
+        }
+        if endLine < lineNumber {
+            fail(sprintf("end-line %v must be >= line-number %v", endLine, lineNumber))
+            return
+        }
+        if endLine > totalLines {
+            fail(sprintf("end-line %v exceeds file line count %v", endLine, totalLines))
+            return
+        }
+        startOffset, startErr := editor.GetStartOffsetByLine(lineNumber)
+        endOffset, endErr := editor.GetEndOffsetByLine(endLine)
+        if startErr != nil || endErr != nil {
+            fail(sprintf("failed to resolve line range %v-%v: %v %v", lineNumber, endLine, startErr, endErr))
+            return
+        }
+        err = editor.UpdateTextByRange(editor.GetRangeOffset(startOffset, endOffset), content)
+        if err != nil {
+            fail(sprintf("failed to replace line range %v-%v: %v", lineNumber, endLine, err))
+            return
+        }
+        affectedStart = lineNumber
+        affectedLineCount = contentLineCount
+        changeSummary = sprintf("replaced line range %v-%v", lineNumber, endLine)
+    }
+    modifiedContent = editor.GetSourceCode()
+}
+
+if modifiedContent == originalContent {
+    yakit.Warn("modification produced no content changes")
+    RESULT = sprintf("operation: modify_file\noperation_status: completed\nfile: %v\nmode: %v\nchanged: false\nsummary: %v", filename, mode, changeSummary)
     return
 }
 
-originalSize := len(fileContent)
-yakit.Info("Original file size: %v bytes", originalSize)
-
-// 使用 memeditor 创建编辑器
-editor := memeditor.New(string(fileContent))
-totalLines := editor.GetLineCount()
-
-yakit.Info("File has %v lines", totalLines)
-
-// 根据修改模式创建范围
-if lineNumber > totalLines {
-    // 如果行号超出文件范围，在文件末尾添加内容
-    if mode == "insert" {
-        // 获取最后一行末尾的位置作为插入点
-        lastLineStart, err := editor.GetStartOffsetByLine(totalLines)
-        if err != nil {
-            yakit.Error("Failed to get last line offset: %v", err)
-            return
-        }
-        lastLineText, err := editor.GetLine(totalLines)
-        if err != nil {
-            yakit.Error("Failed to get last line text: %v", err)
-            return
-        }
-        insertOffset := lastLineStart + len(lastLineText)
-        rangeToModify := editor.GetRangeOffset(insertOffset, insertOffset)
-        newContent := "\n" + content
-        err = editor.UpdateTextByRange(rangeToModify, newContent)
-        if err != nil {
-            yakit.Error("Failed to append content: %v", err)
-            return
-        }
-        yakit.Info("Line number %v exceeds file lines (%v), appending content at end", lineNumber, totalLines)
-    } else {
-        // replace 模式：直接在文件末尾添加
-        lastLineStart, err := editor.GetStartOffsetByLine(totalLines)
-        if err != nil {
-            yakit.Error("Failed to get last line offset: %v", err)
-            return
-        }
-        lastLineText, err := editor.GetLine(totalLines)
-        if err != nil {
-            yakit.Error("Failed to get last line text: %v", err)
-            return
-        }
-        insertOffset := lastLineStart + len(lastLineText)
-        rangeToModify := editor.GetRangeOffset(insertOffset, insertOffset)
-        newContent := "\n" + content
-        err = editor.UpdateTextByRange(rangeToModify, newContent)
-        if err != nil {
-            yakit.Error("Failed to append content: %v", err)
-            return
-        }
-        yakit.Info("Line number %v exceeds file lines (%v), appending content at end", lineNumber, totalLines)
-    }
-} else {
-    // 行号在有效范围内
-    if mode == "insert" {
-        // 在指定行后插入内容
-        // 获取指定行的结束位置
-        lineEndOffset, err := editor.GetEndOffsetByLine(lineNumber)
-        if err != nil {
-            yakit.Error("Failed to get line %v end offset: %v", lineNumber, err)
-            return
-        }
-        // 创建插入范围（0长度）
-        rangeToModify := editor.GetRangeOffset(lineEndOffset, lineEndOffset)
-        newContent := "\n" + content
-        err = editor.UpdateTextByRange(rangeToModify, newContent)
-        if err != nil {
-            yakit.Error("Failed to insert content after line %v: %v", lineNumber, err)
-            return
-        }
-        yakit.Info("Inserted content after line %v", lineNumber)
-    } else { // replace mode
-        // 替换指定行的内容
-        lineStartOffset, err := editor.GetStartOffsetByLine(lineNumber)
-        if err != nil {
-            yakit.Error("Failed to get line %v start offset: %v", lineNumber, err)
-            return
-        }
-        lineEndOffset, err := editor.GetEndOffsetByLine(lineNumber)
-        if err != nil {
-            yakit.Error("Failed to get line %v end offset: %v", lineNumber, err)
-            return
-        }
-        // 创建替换范围（整行）
-        rangeToModify := editor.GetRangeOffset(lineStartOffset, lineEndOffset)
-        err = editor.UpdateTextByRange(rangeToModify, content)
-        if err != nil {
-            yakit.Error("Failed to replace content at line %v: %v", lineNumber, err)
-            return
-        }
-        yakit.Info("Replaced content at line %v", lineNumber)
-    }
+diffText, diffErr := diff.Diff(originalContent, modifiedContent)
+if diffErr != nil {
+    fail(sprintf("failed to generate diff: %v", diffErr))
+    return
 }
 
-// 获取修改后的内容
-modifiedContent := editor.GetSourceCode()
-
-// 保存修改后的文件
 err = file.Save(filename, modifiedContent)
 if err != nil {
-    yakit.Error("Failed to save modified file %v: %v", filename, err)
+    fail(sprintf("failed to save modified file %v: %v", filename, err))
     return
 }
 
-// 获取修改后的文件信息
-info, err := file.Stat(filename)
-if err != nil {
-    yakit.Warn("File modified successfully but failed to get file info: %v", err)
+verifiedContent, verifyErr := file.ReadFile(filename)
+if verifyErr != nil {
+    fail(sprintf("file was saved but could not be read back for verification: %v", verifyErr))
+    return
+}
+
+verifiedLines := str.Split(string(verifiedContent), "\n")
+snippetStart = affectedStart
+if snippetStart < 1 {
+    snippetStart = 1
+}
+snippetEnd = snippetStart + affectedLineCount - 1
+if snippetEnd > len(verifiedLines) {
+    snippetEnd = len(verifiedLines)
+}
+snippet = []
+for i := snippetStart; i <= snippetEnd; i++ {
+    snippet = append(snippet, sprintf("%5d | %v", i, verifiedLines[i-1]))
+}
+
+info, statErr := file.Stat(filename)
+if statErr != nil {
+    yakit.Warn("file modified successfully but stat failed: %v", statErr)
 } else {
-    yakit.Info("File modified successfully. New size: %v bytes", info.Size())
+    yakit.Info("File modified successfully: %v bytes -> %v bytes", originalSize, info.Size())
     yakit.File(filename, yakit.fileWriteAction(len(modifiedContent), "modify", modifiedContent))
 }
 
-yakit.Info("File %v modified successfully", filename)
+RESULT = sprintf(
+    "operation: modify_file\n" +
+    "operation_status: completed\n" +
+    "file: %v\n" +
+    "mode: %v\n" +
+    "changed: true\n" +
+    "summary: %v\n\n" +
+    "DIFF:\n%v\n\n" +
+    "VERIFIED CONTENT:\n%v",
+    filename, mode, changeSummary, diffText, str.Join(snippet, "\n"),
+)

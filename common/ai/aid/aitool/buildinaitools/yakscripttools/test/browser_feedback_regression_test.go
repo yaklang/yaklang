@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 )
 
 func TestBrowserFeedbackOperationStatusLive(t *testing.T) {
@@ -59,12 +60,17 @@ func TestBrowserFeedbackOperationStatusLive(t *testing.T) {
 // startup speed. Keep the live integration above, and deterministically exercise
 // the production script's recovery path for alert, confirm, and prompt.
 type feedbackFixturePage struct {
-	dialog     *browser.JavaScriptDialog
-	accepted   bool
-	prompt     string
-	snapshots  int
-	waits      int
-	waitBudget []float64
+	dialog              *browser.JavaScriptDialog
+	accepted            bool
+	prompt              string
+	snapshots           int
+	waits               int
+	waitBudget          []float64
+	viewportWidth       int
+	viewportHeight      int
+	viewportScale       float64
+	viewportMobile      bool
+	viewportDiagnostics *browser.ViewportDiagnostics
 }
 
 func (p *feedbackFixturePage) GetPendingDialog() (*browser.JavaScriptDialog, bool) {
@@ -89,6 +95,19 @@ func (p *feedbackFixturePage) WaitFunction(js string, budget ...float64) error {
 	p.waits++
 	p.waitBudget = budget
 	return nil
+}
+func (p *feedbackFixturePage) SetViewport(width, height int, scale float64, mobile bool) error {
+	p.viewportWidth, p.viewportHeight, p.viewportScale, p.viewportMobile = width, height, scale, mobile
+	return nil
+}
+func (p *feedbackFixturePage) ViewportDiagnostics() (*browser.ViewportDiagnostics, error) {
+	if p.viewportDiagnostics == nil {
+		return nil, fmt.Errorf("missing viewport diagnostics fixture")
+	}
+	return p.viewportDiagnostics, nil
+}
+func (p *feedbackFixturePage) Screenshot() ([]byte, error) {
+	return []byte("fixture-png"), nil
 }
 
 type feedbackFixtureBrowser struct{ page *feedbackFixturePage }
@@ -180,4 +199,61 @@ func TestBrowserOpenPlainTextDoesNotWaitForInteractiveElements(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBrowserViewportCheckReturnsRealMetricsAndErrors(t *testing.T) {
+	page := &feedbackFixturePage{
+		viewportDiagnostics: &browser.ViewportDiagnostics{
+			InnerWidth:               390,
+			InnerHeight:              844,
+			ClientWidth:              390,
+			ClientHeight:             844,
+			ScrollWidth:              700,
+			BodyScrollWidth:          700,
+			OverflowX:                true,
+			HorizontalOverflowPixels: 310,
+			VisibleElements:          8,
+			ConsoleErrors:            []string{"console-boom"},
+			RuntimeErrors:            []string{"runtime-boom"},
+		},
+	}
+	instance := &feedbackFixtureBrowser{page: page}
+	exports := map[string]any{}
+	for key, value := range browser.Exports {
+		exports[key] = value
+	}
+	exports["Open"] = func(...browser.BrowserOption) (*feedbackFixtureBrowser, error) { return instance, nil }
+	exports["Get"] = func(...browser.BrowserOption) (*feedbackFixtureBrowser, error) { return instance, nil }
+
+	result, _ := executeFixtureScript(
+		t,
+		"yakscriptforai/browser/use_browser.yak",
+		aitool.InvokeParams{
+			"op":                 "viewport_check",
+			"session":            "viewport-fixture",
+			"viewport-width":     390,
+			"viewport-height":    844,
+			"capture-screenshot": false,
+		},
+		map[string]any{
+			"browser": exports,
+			"sleep":   func(float64) {},
+		},
+	)
+	data := utils.InterfaceToGeneralMap(result)
+	require.Equal(t, "completed", data["operation_status"])
+	require.Equal(t, true, data["viewport_matches_request"])
+	require.Equal(t, true, data["horizontal_overflow"])
+	require.Equal(t, 390, page.viewportWidth)
+	require.Equal(t, 844, page.viewportHeight)
+	require.Equal(t, 1.0, page.viewportScale)
+	require.False(t, page.viewportMobile)
+
+	viewport, ok := data["viewport"].(*orderedmap.OrderedMap)
+	require.True(t, ok)
+	viewportMap := viewport.ToStringMap()
+	require.Equal(t, 390, utils.InterfaceToInt(viewportMap["inner_width"]))
+	require.Equal(t, 310, utils.InterfaceToInt(viewportMap["horizontal_overflow_pixels"]))
+	require.Equal(t, 1, utils.InterfaceToInt(data["console_error_count"]))
+	require.Equal(t, 1, utils.InterfaceToInt(data["runtime_error_count"]))
 }

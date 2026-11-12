@@ -63,7 +63,7 @@ func runMemfitPlain(ctx context.Context, client memfitClient, config memfitStart
 				}
 				if config.Debug {
 					if description := describeMemfitEvent(event); description != "" {
-						fmt.Fprintf(os.Stderr, "\n[memfit] %s\n", description)
+						fmt.Fprintf(os.Stderr, "\n[%s] %s\n", memfitDisplayName(config), description)
 					}
 				}
 			case "error":
@@ -80,7 +80,7 @@ func runMemfitPlain(ctx context.Context, client memfitClient, config memfitStart
 				}
 				status, _ := decodeMemfitPayload[memfitStatus](envelope)
 				if status.Status == "failed" || status.Status == "aborted" {
-					return utils.Errorf("memfit task %s", status.Status)
+					return utils.Errorf("%s task %s", memfitDisplayName(config), status.Status)
 				}
 				return nil
 			}
@@ -90,7 +90,7 @@ func runMemfitPlain(ctx context.Context, client memfitClient, config memfitStart
 			}
 		case <-client.Done():
 			if err := client.WaitError(); err != nil {
-				return utils.Errorf("memfit worker exited: %v%s", err, client.formattedLogTail())
+				return utils.Errorf("%s worker exited: %v%s", memfitDisplayName(config), err, client.formattedLogTail())
 			}
 			return nil
 		case <-ctx.Done():
@@ -353,7 +353,7 @@ func runMemfitTUI(ctx context.Context, client memfitClient, config memfitStartCo
 		case <-client.Done():
 			ui.clearLiveFrame()
 			if err := client.WaitError(); err != nil {
-				return utils.Errorf("memfit worker exited: %v%s", err, client.formattedLogTail())
+				return utils.Errorf("%s worker exited: %v%s", memfitDisplayName(ui.config), err, client.formattedLogTail())
 			}
 			return nil
 		case <-ctx.Done():
@@ -363,6 +363,11 @@ func runMemfitTUI(ctx context.Context, client memfitClient, config memfitStartCo
 }
 
 func (ui *memfitTUI) printHeader() {
+	displayName := memfitDisplayName(ui.config)
+	description := strings.TrimSpace(ui.config.AgentDesc)
+	if description == "" {
+		description = "local isolated agent"
+	}
 	model := "Yaklang configured model"
 	if ui.config.Model != "" {
 		model = ui.config.Model
@@ -370,7 +375,7 @@ func (ui *memfitTUI) printHeader() {
 		model = ui.config.AIType
 	}
 	if ui.width < 48 {
-		fmt.Fprintf(os.Stdout, "%s memfit · %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆"), strings.ToUpper(ui.config.ReviewPolicy))
+		fmt.Fprintf(os.Stdout, "%s %s · %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆"), displayName, strings.ToUpper(ui.config.ReviewPolicy))
 		hint := "Enter send · @ files · / commands"
 		if ui.width < 34 {
 			hint = "Enter send · ^C stop"
@@ -382,7 +387,7 @@ func (ui *memfitTUI) printHeader() {
 		fmt.Fprint(os.Stdout, "\r\n")
 		return
 	}
-	fmt.Fprintf(os.Stdout, "%s  %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆ memfit"), ui.paint(memfitColorDim, "local isolated agent"))
+	fmt.Fprintf(os.Stdout, "%s  %s\r\n", ui.paint(memfitColorBold+memfitColorCyan, "◆ "+displayName), ui.paint(memfitColorDim, description))
 	detail := fmt.Sprintf("%s · %s · %s", model, strings.ToUpper(ui.config.ReviewPolicy), compactMemfitPath(ui.config.Workdir, maxInt(18, ui.width/3)))
 	fmt.Fprintf(os.Stdout, "%s\r\n", ui.paint(memfitColorDim, truncateMemfitCells(detail, ui.width-1)))
 	hint := "Enter send · @ files · / commands · Ctrl+C stop"

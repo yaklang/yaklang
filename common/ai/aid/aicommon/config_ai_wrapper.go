@@ -123,6 +123,36 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if i == nil {
 			return nil, utils.Error("AI callback is not set, please configure AI service first")
 		}
+		traceHook := c.getAICallTraceHook()
+		traceStarted := time.Now()
+		defer func() {
+			if traceHook == nil || request == nil {
+				return
+			}
+			record := AICallTraceRecord{
+				Timestamp:   traceStarted,
+				DurationMS:  time.Since(traceStarted).Milliseconds(),
+				Tier:        string(tier),
+				Sequence:    request.GetSeqId(),
+				CallerLabel: request.GetCallerLabel(),
+				TaskIndex:   request.GetTaskIndex(),
+				Prompt:      request.GetPrompt(),
+			}
+			if rsp != nil {
+				record.Provider = rsp.GetProviderName()
+				record.Model = rsp.GetModelName()
+				record.ThinkingLevel = rsp.GetThinkingLevel()
+				record.HTTPStatusCode = rsp.GetHTTPStatusCode()
+				record.Output = rsp.GetPlainOutput()
+				record.Reason = rsp.GetPlainReason()
+				record.RawHTTPResponse = rsp.GetRawHTTPResponseDump()
+				record.Usage = rsp.GetUsageInfo()
+			}
+			if err != nil {
+				record.Error = err.Error()
+			}
+			emitAICallTrace(traceHook, record)
+		}()
 
 		defer func() {
 			// set rsp start time

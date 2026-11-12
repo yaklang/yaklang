@@ -10,6 +10,8 @@ import (
 
 func TestMemfitCommandContract(t *testing.T) {
 	require.Equal(t, "memfit", Command.Name)
+	require.Equal(t, "memfit-code", CodingCommand.Name)
+	require.Equal(t, []string{"code-agent"}, CodingCommand.Aliases)
 	require.Equal(t, "memfit-worker", WorkerCommand.Name)
 	require.True(t, WorkerCommand.Hidden)
 
@@ -23,8 +25,11 @@ func TestMemfitCommandContract(t *testing.T) {
 	require.Contains(t, flags, "base-url")
 	require.Contains(t, flags, "print")
 	require.Contains(t, flags, "plain")
+	require.Contains(t, flags, "dump-dir")
 
 	review, ok := flags["review"].(cli.StringFlag)
 	require.True(t, ok)
 	require.Equal(t, "yolo", review.Value)
+
+	require.Equal(t, "coding", codingMemfitProfile.Focus)
 }

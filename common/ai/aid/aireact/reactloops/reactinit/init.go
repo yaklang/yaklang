@@ -4,6 +4,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/attached_resource_handlers"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ai_skill_audit"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_coding"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_dir_explore"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_fast_context"

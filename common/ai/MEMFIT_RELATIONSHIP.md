@@ -158,6 +158,7 @@ flowchart TB
 | **加一个新的 yak focus mode（用户级）** | 在 `~/yakit-projects/ai-focus/<name>/<name>.ai-focus.yak` 写文件 → 等 5s → UI 自动出现 |
 | **加一个新的 yak focus mode（内置，所有用户都有）** | `common/ai/aid/aireact/reactloops/reactloops_yak/focus_modes/<name>/<name>.ai-focus.yak` → embed.FS 自动打包 |
 | **加一个新的 Go 实现的 focus mode** | 新建 `common/ai/aid/aireact/reactloops/loop_<name>/init.go` → 在 [reactinit/init.go](aid/aireact/reactloops/reactinit/init.go) 加空白 import → 见 [docs/10-build-your-own-loop.md](aid/aireact/reactloops/docs/10-build-your-own-loop.md) |
+| **新增 coding-only CLI 分发** | `loop_coding` 固定 focus，只调整默认工具/Skill 披露并保留全部动态能力；CLI 入口为 `yak memfit-code`（别名 `yak code-agent`），见 [memfit-cli/README.md](../yak/cmd/yakcmds/memfit-cli/README.md) |
 | **加一个新 RPC** | 改 `ypb.proto` → server 实现在 `common/yakgrpc/grpc_ai_xxx.go` → yakit `handlers/ai-agent.js` 加 IPC → renderer `grpc.ts` 加封装 |
 | **加一个新 RAG 集合 / 知识入口** | `common/ai/rag/` 加导出 + `grpc_rag_collection.go` 加 RPC |
 | **加一个新工具（yak 脚本形式）** | `aid/aitool/buildinaitools/yakscripttools/yakscriptforai/<name>/<name>.yak` → embed |

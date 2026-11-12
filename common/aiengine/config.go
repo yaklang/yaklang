@@ -25,6 +25,7 @@ type AIEngineConfig struct {
 	AICallback                aicommon.AICallbackType
 	QualityPriorityAICallback aicommon.AICallbackType
 	SpeedPriorityAICallback   aicommon.AICallbackType
+	AICallTraceHook           aicommon.AICallTraceHook
 
 	// UserUsageCallback 是用户脚本通过 ai.usageCallback(...) 注册的 token usage 回调.
 	// 由 WithAIConfig 从 aispec.AIConfigOption 列表中探测出来, 经 buildReActOptions
@@ -890,6 +891,14 @@ func WithAIReviewMode() AIEngineConfigOption {
 func WithAICallback(callback aicommon.AICallbackType) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.AICallback = callback
+	}
+}
+
+// WithAICallTraceHook records normalized AI requests and responses when the
+// caller explicitly enables diagnostic tracing.
+func WithAICallTraceHook(hook aicommon.AICallTraceHook) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AICallTraceHook = hook
 	}
 }
 
