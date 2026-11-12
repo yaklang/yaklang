@@ -60,6 +60,26 @@ func NewHookFS(underlying fi.FileSystem) *HookFS {
 	}
 }
 
+// RawReader is implemented by filesystems that can return a file's original
+// bytes without applying read hooks.
+type RawReader interface {
+	ReadFileRaw(name string) ([]byte, error)
+}
+
+// ReadFileRaw reads name without read hooks when fs supports it, and falls back
+// to ReadFile otherwise. Dependency scanners use it because they only need the
+// textual #include/#import lines: running a full preprocessing hook for every
+// file is orders of magnitude more expensive than reading the source.
+func ReadFileRaw(filesystem fi.FileSystem, name string) ([]byte, error) {
+	if filesystem == nil {
+		return nil, fs.ErrNotExist
+	}
+	if raw, ok := filesystem.(RawReader); ok {
+		return raw.ReadFileRaw(name)
+	}
+	return filesystem.ReadFile(name)
+}
+
 // AddReadHook 注册一个 read hook。
 func (f *HookFS) AddReadHook(hook *ReadHook) {
 	if hook == nil {
@@ -156,6 +176,21 @@ func (f *HookFS) ReadFile(name string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// ReadFileRaw reads the underlying file without running read hooks. Path
+// mapping and skip matching still apply, so callers see the same file layout
+// as ReadFile. Use it when the original bytes matter, such as dependency
+// scanning for #include directives.
+func (f *HookFS) ReadFileRaw(name string) ([]byte, error) {
+	if f.skipped(name) {
+		return nil, fs.ErrNotExist
+	}
+	mapped, err := f.mapPath(name)
+	if err != nil {
+		return nil, err
+	}
+	return f.underlying.ReadFile(mapped)
 }
 
 // ------- Hook Matchers & Helpers -------

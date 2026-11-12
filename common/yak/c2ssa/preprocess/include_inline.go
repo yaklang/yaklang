@@ -17,8 +17,10 @@ type tuExpandCtx struct {
 }
 
 func (tu *tuProcessor) run(src string) string {
-	// One clone of the base tables; env and expandEnv share / derive from it.
-	localTables := tu.base.Clone()
+	// tu.base is built per translation unit by PreprocessTU and nothing else
+	// holds it, so the TU can mutate it directly. Cloning it here copied the
+	// whole macro table (three map passes) only to be mutated immediately.
+	localTables := tu.base
 	env := &MacroEnvironment{tables: localTables}
 	cond := NewConditionalStack(env, tu.defs)
 	var commentState macroScanState
@@ -37,14 +39,6 @@ func (tu *tuProcessor) run(src string) string {
 	out := strings.Join(outLines, "\n")
 	// Single collapse at end (logical lines already joined; macro bodies may reintroduce \\n).
 	return CollapsePreprocessorContinuations(out)
-}
-
-func (ctx *tuExpandCtx) syncExpandEnv() {
-	// Rebuild the expander's internal tables from the (possibly mutated) local
-	// exported tables. exportToMacroTables produces a fresh internal map pair, so
-	// expandEnv.tables and localTables hold independent map instances after this
-	// call; subsequent #define/#undef must update localTables and call this again.
-	ctx.expandEnv.setTables(exportToMacroTables(ctx.localTables))
 }
 
 func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
@@ -68,9 +62,7 @@ func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
 
 		switch DirectiveName(line) {
 		case "define":
-			if ApplyDefineLine(line, &ctx.localTables, true) {
-				// localTables mutated; resync the expander's internal tables.
-				ctx.syncExpandEnv()
+			if applyDefineLineIncremental(line, &ctx.localTables, ctx.expandEnv) {
 				continue
 			}
 			if ctx.collectOnly > 0 {
@@ -78,11 +70,8 @@ func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
 			}
 			outLines = append(outLines, line)
 		case "undef":
-			macro := ppFirstIdent(DirectiveRest(line))
-			if macro != "" {
-				delete(ctx.localTables.Function, macro)
-				delete(ctx.localTables.Object, macro)
-				ctx.syncExpandEnv()
+			if macro := ppFirstIdent(DirectiveRest(line)); macro != "" {
+				undefineMacroIncremental(macro, &ctx.localTables, ctx.expandEnv)
 			}
 			if ctx.collectOnly > 0 {
 				continue
