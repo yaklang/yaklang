@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Check Java Servlet XSS Vulnerability"
 	title_zh: "检测Java Servlet XSS漏洞"
 	type:vuln

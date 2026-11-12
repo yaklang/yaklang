@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Cookie HTTPOnly Flag Missing"
 	title_zh: "数据流：检测Golang Cookie HTTPOnly标志缺失"
 	type: audit

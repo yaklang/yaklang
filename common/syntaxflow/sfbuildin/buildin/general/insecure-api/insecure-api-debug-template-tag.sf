@@ -32,10 +32,12 @@ SOLUTION
 {% debug %}
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.html": <<<NEG
+<html>
+<body>
+{# debug is documented here, not enabled #}
+</body>
+</html>
 NEG
 )
 

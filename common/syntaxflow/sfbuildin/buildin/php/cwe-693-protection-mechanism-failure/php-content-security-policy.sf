@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "csp-misconfiguration"
 	title:"数据流：Content Security Policy (CSP) Security Assessment"
 	title_zh:"内容安全策略 (CSP) 安全评估",

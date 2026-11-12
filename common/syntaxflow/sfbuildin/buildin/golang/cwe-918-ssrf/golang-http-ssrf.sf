@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Golang SSRF HTTP Vulnerability"
 	title_zh: "数据流：检测Golang HTTP SSRF漏洞"
 	type: audit

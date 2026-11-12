@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python pickle.dumps (lib)"
 	title_zh: "pickle 序列化（dumps）（Python 库规则）"
 	type: audit

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java Spring SPEL Parser表达式注入漏洞"
 	title: "数据流：Check Java Spring SPEL Parser Injection"
 	type: vuln

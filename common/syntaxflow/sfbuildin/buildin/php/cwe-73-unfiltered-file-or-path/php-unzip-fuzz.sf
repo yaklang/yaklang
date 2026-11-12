@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Audit PHP File Unzip Security Risks"
 	title_zh: "数据流：审计PHP文件解压安全风险"
 	level: ""

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：SCA: 检测Java Spring Boot Devtools使用"
 	title: "数据流：SCA: Check Java Spring Boot Devtools Usage"
 	risk:"sca"

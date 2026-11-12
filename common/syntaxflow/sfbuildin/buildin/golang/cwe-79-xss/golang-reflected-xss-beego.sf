@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Reflected XSS Vulnerability in Beego"
 	title_zh: "数据流：检测Golang在Beego框架中的反射型跨站脚本攻击漏洞"
 	type: vuln

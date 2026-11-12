@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java CRLF注入漏洞"
 	title: "数据流：Detect Java CRLF Injection Vulnerability"
 	cwe: 93

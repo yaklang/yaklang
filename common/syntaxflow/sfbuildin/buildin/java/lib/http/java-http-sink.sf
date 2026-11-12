@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Find HTTP Sink in Java (Multiple Libraries)"
 	type: audit
 	lib: "java-http-sink"

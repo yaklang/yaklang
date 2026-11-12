@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Audit PHP ThinkPHP Authentication Bypass"
 	title_zh: "数据流：审计PHP ThinkPHP认证绕过漏洞"
 	risk: "audit-check"

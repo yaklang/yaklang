@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang SSTI Vulnerability with Sprig"
 	title_zh: "数据流：检测Golang中使用Sprig的SSTI漏洞"
 	type: vuln

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Find Java Contain Sanitizer"
 	title_zh: "查找Java含有contain方法的过滤器"
 	type: audit

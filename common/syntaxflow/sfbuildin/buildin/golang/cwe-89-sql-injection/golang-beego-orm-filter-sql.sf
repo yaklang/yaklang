@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Beego ORM Filter Injection Risk"
 	title_zh: "数据流：检测Golang Beego ORM动态过滤查询风险"
 	type: audit

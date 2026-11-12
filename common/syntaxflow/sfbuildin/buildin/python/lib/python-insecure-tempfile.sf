@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python insecure tempfile API (lib)"
 	title_zh: "不安全临时文件（mktemp）（Python 库规则）"
 	type: audit

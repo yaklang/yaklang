@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "information-exposure"
 	title: "数据流：Check Java Spring Boot Actuator Config"
 	title_zh: "数据流：检查Java Spring Boot Actuator配置"

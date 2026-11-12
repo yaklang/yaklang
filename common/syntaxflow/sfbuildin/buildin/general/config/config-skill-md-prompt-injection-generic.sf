@@ -36,10 +36,10 @@ description
  	 instructions(Glv^#p"
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/posSKILL.md": <<<NEG
+# Skill
+
+Follow the repository style guide when editing files.
 NEG
 )
 

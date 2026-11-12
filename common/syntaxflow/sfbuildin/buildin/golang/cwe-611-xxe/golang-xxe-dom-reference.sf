@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Golang XXE Malicious Document References"
 	type: audit
 	level: "low"

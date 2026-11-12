@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java Cipher使用不安全或有风险的加密算法"
 	title: "数据流：Check Java Cipher Weak Encryption Algorithm"
 	type: security

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Find Java Common Filter Methods"
 	title_zh: "查找Java过滤方法"
 	lib: "java-common-filter"

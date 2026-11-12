@@ -38,10 +38,10 @@ SOLUTION
 %}
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.html": <<<NEG
+{% autoescape on %}
+<p>{{ value }}</p>
+{% endautoescape %}
 NEG
 )
 

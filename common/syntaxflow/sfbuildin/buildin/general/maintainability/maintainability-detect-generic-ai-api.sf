@@ -30,11 +30,10 @@ package main
 
 const endpoint = "https://api.openai.com/v1/chat/completions"
 POS
-	"safefile://neg.txt": <<<NEG
-https://example.com
-白名单域名（官方 API，不作为漏洞）：api.openai.com、api.anthropic.com
-Whitelisted hosts: api.openai.com is an official API endpoint.
-<td class="api.openai.com">documentation link</td>
+	"safefile://neg/pos.go": <<<NEG
+package main
+
+const endpoint = "https://api.example.com/v1/models"
 NEG
 )
 

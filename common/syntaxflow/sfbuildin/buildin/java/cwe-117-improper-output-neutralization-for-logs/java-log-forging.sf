@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java 日志伪造攻击"
 	title: "数据流：Check Java Log Forging Attack"
 	type:security

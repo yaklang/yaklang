@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java Springboot File Download Vulnerability"
 	type: vuln
 	level: "middle"

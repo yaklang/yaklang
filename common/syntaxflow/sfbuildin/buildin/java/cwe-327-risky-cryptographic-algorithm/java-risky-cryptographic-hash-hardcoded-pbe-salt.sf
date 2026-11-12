@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Java Risky Hardcoded PBE Salt"
 	title_zh: "数据流：检测Java 哈希算法使用硬编码的PBE盐值"
 	type: security

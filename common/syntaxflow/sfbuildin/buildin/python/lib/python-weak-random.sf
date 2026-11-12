@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python random module usage (lib)"
 	title_zh: "标准库 random 伪随机（Python 库规则）"
 	type: audit

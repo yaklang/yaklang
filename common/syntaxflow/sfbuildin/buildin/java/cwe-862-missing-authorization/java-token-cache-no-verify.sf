@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Token 直接作缓存 Key 查询，无签名/归属校验",
 	title_zh: "Token 直接作缓存 Key 查询，无校验",
 	risk: "authorization-bypass"

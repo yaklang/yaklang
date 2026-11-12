@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check PHP Unvalidated FTP Parameter"
 	title_zh: "数据流：检测PHP未验证FTP参数"
 	level: "low"

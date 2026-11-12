@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Goldmark Attribute Or Title Rendering XSS"
 	title_zh: "数据流：检测Goldmark属性或标题渲染中的XSS风险"
 	type: audit

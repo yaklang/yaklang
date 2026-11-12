@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Spring MVC任意文件上传漏洞"
 	title: "数据流：Check Java Spring MVC Arbitrary File Upload Vulnerability"
 	risk:"file-upload"

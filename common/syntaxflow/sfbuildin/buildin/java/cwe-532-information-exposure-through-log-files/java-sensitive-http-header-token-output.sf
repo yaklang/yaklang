@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Sensitive HTTP Header Token Output"
 	title_zh: "数据流：检测敏感HTTP头令牌输出"
 	type: vuln

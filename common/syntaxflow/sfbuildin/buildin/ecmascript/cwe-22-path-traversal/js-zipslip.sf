@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Arbitrary File Access During Archive Extraction (Zip Slip)"
 	title_zh: "数据流：压缩包解压时未验证文件路径导致目录穿越（Zip Slip）"
 	type: vuln

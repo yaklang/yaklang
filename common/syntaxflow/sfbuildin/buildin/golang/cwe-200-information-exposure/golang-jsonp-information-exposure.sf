@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang JSON Information Exposure Vulnerability"
 	title_zh: "数据流：检测Golang JSON信息泄露漏洞"
 	type: audit

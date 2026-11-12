@@ -32,10 +32,12 @@ SOLUTION
 "decision"#8<l8v"<6F"block"
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.sh": <<<NEG
+#!/bin/bash
+# stop hook that checks the session state first
+if [ -f "$STATE_FILE" ]; then
+  exit 0
+fi
 NEG
 )
 

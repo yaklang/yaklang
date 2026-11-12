@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "sca"
 	title: "数据流：Check Java FastJson Vulnerability"
 	title_zh: "数据流：检测Java FastJson依赖漏洞"

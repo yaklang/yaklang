@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java SQL Statement Concatenation Vulnerability"
 	title_zh: "数据流：检测 Java SQL 语句拼接漏洞"
 	risk: "sql-injection"

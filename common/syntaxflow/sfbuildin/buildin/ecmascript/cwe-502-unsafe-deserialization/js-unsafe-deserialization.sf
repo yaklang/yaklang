@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Deserialization of User-Controlled Data"
 	title_zh: "数据流：用户可控数据流入不安全反序列化函数"
 	type: vuln

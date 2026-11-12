@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET LDAP Injection via DirectorySearcher.Filter"
 	title_zh: "数据流：检测 C#/.NET DirectorySearcher.Filter LDAP 注入"
 	type: vuln

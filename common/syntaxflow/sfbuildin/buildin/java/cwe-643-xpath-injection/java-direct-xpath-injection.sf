@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java XPath Injection Vulnerability"
 	title_zh: "数据流：检测Java XPath注入漏洞"
 	type: vuln

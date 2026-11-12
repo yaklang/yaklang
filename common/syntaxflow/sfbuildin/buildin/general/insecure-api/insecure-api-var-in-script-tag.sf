@@ -34,10 +34,8 @@ script
 =OWeYuLbIXW4eo
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.pug": <<<NEG
+<script type="application/json">{"ok":true}</script>
 NEG
 )
 

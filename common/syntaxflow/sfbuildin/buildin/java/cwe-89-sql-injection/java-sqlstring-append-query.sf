@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "sql-injection"
 	title: "数据流：Check Java SQL String Append Query"
 	type: audit

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Java SQL Injection Vulnerability"
 	type: audit
 	severity: "middle"

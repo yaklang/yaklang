@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Filepath Join With External Parameters"
 	title_zh: "数据流：检测Golang外部参数参与的文件路径拼接"
 	type: audit

@@ -32,10 +32,8 @@ SOLUTION
 update
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.cls": <<<NEG
+INSERT INTO audit_log (id) VALUES (1);
 NEG
 )
 

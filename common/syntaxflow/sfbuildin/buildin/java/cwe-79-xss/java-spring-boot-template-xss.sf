@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java Spring Boot's Template Engine XSS Vulnerability"
 	title_zh: "数据流：检测Java Spring Boot框架模板引擎XSS漏洞"
 	type: vuln

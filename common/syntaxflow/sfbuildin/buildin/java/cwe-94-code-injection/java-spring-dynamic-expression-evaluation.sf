@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Dynamic Spring Expression Evaluation"
 	title_zh: "数据流：检测Java动态Spring表达式求值"
 	type: vuln

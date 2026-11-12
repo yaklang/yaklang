@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "C#/.NET insecure deserialization sinks (lib)"
 	title_zh: "不安全反序列化入口（C#/.NET 库规则）"
 	type: audit

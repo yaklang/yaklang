@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET OS Command Injection via Process.Start"
 	title_zh: "数据流：检测 C#/.NET Process.Start 命令注入"
 	type: vuln

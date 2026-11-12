@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Spring控制器中未调用的SSTI漏洞"
 	title: "数据流：Check Java SSTI in Spring Controller Without Call"
 	type: vuln

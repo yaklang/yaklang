@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python DB cursor execute APIs (lib)"
 	title_zh: "数据库游标执行（execute 系列）（Python 库规则）"
 	type: audit

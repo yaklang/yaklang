@@ -1,5 +1,6 @@
 
 desc(
+	mode: "ssa"
 	title: "数据流：Check PHP Unfiltered Directory Reading Vulnerability"
 	title_zh: "数据流：检测PHP未过滤目录读取漏洞"
 	risk: "audit-check"

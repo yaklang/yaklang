@@ -32,10 +32,10 @@ SOLUTION
 ‪
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.sol": <<<NEG
+// plain ASCII comment, no direction control characters
+contract Safe {
+}
 NEG
 )
 

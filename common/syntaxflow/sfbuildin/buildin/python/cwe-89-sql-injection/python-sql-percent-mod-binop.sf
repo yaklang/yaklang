@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Python SQL Injection via Percent-Format String Concatenation"
 	title_zh: "数据流：检测Python基于百分号格式化的SQL注入漏洞"
 	type: audit

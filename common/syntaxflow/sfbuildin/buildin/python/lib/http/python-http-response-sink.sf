@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python HTTP response construction (lib)"
 	title_zh: "HTTP 响应构造（Python 库规则）"
 	type: audit

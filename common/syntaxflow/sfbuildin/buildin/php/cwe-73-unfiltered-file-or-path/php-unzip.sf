@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check PHP File Extraction Vulnerability"
 	title_zh: "数据流：检测PHP文件解压漏洞"
 	type: vul

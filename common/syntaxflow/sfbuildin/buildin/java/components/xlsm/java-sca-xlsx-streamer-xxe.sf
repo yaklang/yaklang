@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：SCA: 检测Java xlsx-streamer依赖漏洞"
 	title: "数据流：SCA: Check Java xlsx-streamer Vulnerability"
 	type: vuln

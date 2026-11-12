@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET Open Redirect via Response.Redirect"
 	title_zh: "数据流：检测 C#/.NET Response.Redirect 开放重定向"
 	type: vuln

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "deserialization"
 	title_zh: "数据流：检测Java SnakeYAML反序列化漏洞"
 	title: "数据流：Check Java SnakeYAML Unserialization Vulnerability"

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "groovy-code-execution"
 	title_zh: "数据流：检测Java Servlet Groovy Shell代码注入漏洞"
 	title: "数据流：Check Java Servlet Groovy Shell Code Injection Vulnerability"

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "JavaScript SQL / NoSQL Query Execution Sinks"
 	title_zh: "JavaScript SQL/NoSQL 查询执行 Sink 函数"
 	type: audit

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang FTP Information Exposure"
 	type: audit
 	level: ""

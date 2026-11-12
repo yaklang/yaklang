@@ -32,10 +32,10 @@ SOLUTION
 "KO8p*terminal.integrated.shell.Ka6aaaar":	 "./
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/settings.json": <<<NEG
+{
+  "python.pythonPath": "/usr/bin/python3"
+}
 NEG
 )
 

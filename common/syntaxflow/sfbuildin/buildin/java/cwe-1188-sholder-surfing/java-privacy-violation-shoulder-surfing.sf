@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java Privacy Violation - Shoulder Surfing"
 	title_zh: "数据流：检查Java隐私泄露 - 肩窥"
 	type:security

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java EE XSS Vulnerability"
 	title_zh: "数据流：检测Java EE的XSS漏洞"
 	type: vuln
