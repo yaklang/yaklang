@@ -82,6 +82,8 @@ const (
 	ArchMIPS64  Architecture = "mips64"
 	ArchPPC     Architecture = "ppc"
 	ArchPPC64   Architecture = "ppc64"
+	ArchS390X   Architecture = "s390x"
+	ArchLOONG64 Architecture = "loong64"
 )
 
 type ByteOrder string

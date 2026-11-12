@@ -374,6 +374,8 @@ func elfArchitecture(machine elf.Machine, bits int) core.Architecture {
 		return core.ArchPPC
 	case elf.EM_PPC64:
 		return core.ArchPPC64
+	case elf.EM_S390:
+		return core.ArchS390X
 	default:
 		return core.ArchUnknown
 	}

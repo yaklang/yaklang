@@ -14,8 +14,8 @@ func target(arch core.Architecture, bits int, order core.ByteOrder, mode string)
 
 func TestAllArchitectures(t *testing.T) {
 	parsers := All()
-	if len(parsers) != 10 {
-		t.Fatalf("wanted 10 parsers, got %d", len(parsers))
+	if len(parsers) != 11 {
+		t.Fatalf("wanted 11 parsers, got %d", len(parsers))
 	}
 	seen := map[core.Architecture]bool{}
 	for _, parser := range parsers {
