@@ -2,16 +2,17 @@
 
 ## 数据归属与单位
 
-所有数值以 token 计，UI 的 1K = 1024 tokens。`provider + model` 共同确定模型身份；不同供应商的同名模型、质量模型与轻量模型互相隔离。数据保存在 profile 数据库独立的 `ai-model-context:*` 元数据中，不改动路由配置或 API 参数。
+所有数值以 token 计，UI 的 1K = 1,000 tokens，1M = 1,000,000 tokens。`provider + model` 共同确定模型身份；不同供应商的同名模型、质量模型与轻量模型互相隔离。数据保存在 profile 数据库独立的 `ai-model-context:*` 元数据中，不改动路由配置或 API 参数。
 
-- 未知模型：容量与压缩阈值均为 500K。
+- 未知模型：容量与压缩阈值均为 500K（500,000 tokens）。
+- 升级单位换算时不迁移或缩放已存储的整数 token 数；旧手动阈值、已学习阈值及会话恢复参数保留原值。例如旧的 512,000 tokens 现在显示 512K，只有主动恢复默认才改成 500,000。
 - 已知模型：新会话、恢复会话使用该模型保存的阈值。前端启动参数传 `RuntimeContextSizeLimit=0`，不再从全局设置复制 500K 或其他数值。
 - 容量是模型的能力证据；阈值是压缩触发点。用户将阈值设成 600K 不证明模型容量达到 600K。
 - 旧客户端显式传入非零启动阈值仅作为未知模型的兼容初始预算；一旦存在模型记录，该记录优先于旧会话上限。新 UI 在会话运行时使用带模型身份的热更新；会话开始前通过 `GetAIModelContext` / `SetAIModelContext` 读取、保存同一份模型元数据。SDK 内部 `WithTimelineContentLimit` 的小预算不属于用户输入。
 
 ## 手动边界
 
-全局手动下限为 `100 * 1024` tokens。存储 API、运行时热更新、会话启动入口均验证下限；负数及 `(0,100K)` 被拒绝。0 是“跟随模型记录”的控制值，不是 0 token，也不清空已学习容量。被拒绝的热更新不改运行时、模型元数据或恢复参数，并发送包含 `error` 的当前状态。
+全局手动下限为 `100 * 1000` tokens。存储 API、运行时热更新、会话启动入口均验证下限；负数及 `(0,100K)` 被拒绝。0 是“跟随模型记录”的控制值，不是 0 token，也不清空已学习容量。被拒绝的热更新不改运行时、模型元数据或恢复参数，并发送包含 `error` 的当前状态。
 
 UI 只在拖动结束时提交，指针拖动和键盘操作都不能提交低于 100K 的数值。服务端发现真实容量不足 100K 时可以自动使用更小阈值并告警，不能为通过手动输入校验而伪造容量。手动输入和滑条使用相同上限（当前默认右端为 1M），回车或失焦提交均不能越过该上限；接口、运行时热更新及手动持久化路径也拒绝越界，不允许一次非法设置扩大自己的上限。超过 500K 允许保存；超过 750K 时 UI 显示不含具体边界数值的“过大上下文”提示，并保持面板高度不变。
 
@@ -48,11 +49,12 @@ UI 只在拖动结束时提交，指针拖动和键盘操作都不能提交低�
 
 | 行为 | 回归测试 |
 | --- | --- |
+| 十进制 500K 默认值、100K 下限、1M 上限；旧手动/已学习记录不缩放、不取整 | `TestAIModelContextDecimalUnitsPreserveStoredTokens` |
 | 关闭时首次超限即停止，仅一次模型调用、零压缩重试，阈值不变 | `TestReAct_DisabledAutoAdjustStopsOnFirstOverflow` |
 | 手动上下限、开关独立持久化、非法组合编辑无副作用 | `TestAIModelContextManualBoundsAndAutoAdjustPreference` |
 | 模式热更新使旧探测失效、阈值修改保留开关、重新开启恢复 | `TestModelContextContractDisabledAutoAdjustInvalidatesPendingAndPersists` |
 | 无会话开关开/关、显式 false 的 gRPC 往返 | `TestAIModelContextAutoAdjustSwitchBeforeSession` |
-| 无会话查询与保存、100K 下限、600K、模型隔离、已学习小容量告警 | `yakgrpc/TestAIModelContextBeforeSession` |
+| 无会话查询与保存、100K/1M 边界、非整 K 精确输入、模型隔离、100K 小容量告警边界 | `yakgrpc/TestAIModelContextBeforeSession` |
 | 启动入口拒绝非法阈值 | `sessionruntime/TestModelContextContractRejectsInvalidSessionStart` |
 | 100K 边界、600K 可保存、失败无状态副作用 | `TestModelContextContractManualFloorCannotBeBypassed` |
 | 两个供应商同名模型分别 pending/确认 | `TestModelContextContractIndependentPendingModels` |
