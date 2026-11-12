@@ -397,6 +397,25 @@ func (l *lifter) load(ins instruction) {
 		return
 	}
 	bits := l.destinationWidth(ins, args[0])
+	if ins.inst.Op == arm64asm.LDPSW {
+		// LDPSW loads two sign-extended words into 64-bit registers.
+		if len(args) != 3 {
+			l.unsupported(ins)
+			return
+		}
+		firstName, _, ok := argRegister(args[0])
+		if !ok {
+			l.unsupported(ins)
+			return
+		}
+		secondName, _, ok := argRegister(args[1])
+		if !ok {
+			l.unsupported(ins)
+			return
+		}
+		l.loadPairSigned(ins, args[2], firstName, secondName)
+		return
+	}
 	if ins.inst.Op == arm64asm.LDP {
 		if len(args) != 3 {
 			l.unsupported(ins)
@@ -430,6 +449,13 @@ func (l *lifter) load(ins instruction) {
 		bits = loadWidth(ins.inst.Op)
 	}
 	pointer := l.memoryOperand(ins, args[1])
+	if pointer == 0 {
+		// A literal-pool load addresses memory through the program counter:
+		// LDR <Wt|Xt>, <label>. The target is an absolute image address.
+		if offset, ok := pcRelative(args[1]); ok {
+			pointer = l.pointerConstant(ins.address, ins.address+uint64(offset))
+		}
+	}
 	if pointer == 0 {
 		l.unsupported(ins)
 		return
@@ -708,4 +734,63 @@ func containsBlock(blocks []core.BlockID, target core.BlockID) bool {
 		}
 	}
 	return false
+}
+
+// exclusiveStore lifts STXR and STLXR. The status register receives the outcome
+// of the exclusive monitor; the monitor itself is not modeled, so the store is
+// emitted with an explicit status write.
+func (l *lifter) exclusiveStore(ins instruction) {
+	arguments := args(ins)
+	if len(arguments) != 3 {
+		l.unsupported(ins)
+		return
+	}
+	statusName, statusBits, ok := argRegister(arguments[0])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	valueBits := uint16(32)
+	if _, bits, ok := argRegister(arguments[1]); ok {
+		valueBits = bits
+	}
+	value, ok := l.source(ins, arguments[1], valueBits)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	pointer := l.memoryOperand(ins, arguments[2])
+	if pointer == 0 {
+		l.unsupported(ins)
+		return
+	}
+	l.storeValue(ins.address, pointer, value)
+	// The monitor succeeds unless another core intervened, which is not
+	// visible statically; the outcome is left as an opaque zero-or-one value.
+	outcome := l.operation(ins, core.OpIntrinsic, []core.Operand{
+		symbolOperand("arm64.exclusive.monitor"),
+	}, statusBits, core.EffectAtomic|core.EffectUnknown)
+	l.writeRegister(ins.address, statusName, statusBits, outcome)
+	l.postUpdate(ins, arguments[2])
+}
+
+// loadPairSigned lifts LDPSW: two 32-bit loads, each sign-extended to 64 bits.
+func (l *lifter) loadPairSigned(ins instruction, operand arm64asm.Arg, firstName, secondName string) {
+	base, displacement, mode, ok := memoryAddress(operand)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	pointer := l.addressFromBase(ins, base, displacement)
+	first := l.loadValue(ins.address, pointer, 32)
+	first = l.operation(ins, core.OpSignExtend, []core.Operand{l.value(first)}, 64, core.EffectNone)
+	l.writeRegister(ins.address, firstName, 64, first)
+	if mode == arm64asm.AddrPostIndex {
+		pointer = l.addressFromBase(ins, base, 0)
+	}
+	offset := l.constant(ins.address, 4, 64)
+	second := l.loadValue(ins.address, l.addAddress(ins, pointer, offset), 32)
+	second = l.operation(ins, core.OpSignExtend, []core.Operand{l.value(second)}, 64, core.EffectNone)
+	l.writeRegister(ins.address, secondName, 64, second)
+	l.postUpdate(ins, operand)
 }

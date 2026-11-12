@@ -50,6 +50,8 @@ func renderAssembly(decoded []instruction) string {
 		switch {
 		case ins.undefined:
 			mnemonic = fmt.Sprintf("udf #%#x", ins.immediate)
+		case ins.pstate, ins.lse:
+			// Already rendered by the local decoder.
 		case mnemonic == "":
 			mnemonic = strings.TrimSpace(arm64asm.GNUSyntax(ins.inst))
 		}
