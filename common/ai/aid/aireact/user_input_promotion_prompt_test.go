@@ -23,11 +23,6 @@ func TestUserInputAttachmentQueryStaysOutOfMainDynamic(t *testing.T) {
 	require.NoError(t, err)
 	react.config.GetTimeline().SetTimelineBucketByteSize(-1)
 	react.config.ContextProviderManager.RegisterTracedContent("file", aicommon.FileContextProvider(path, query))
-	task := aicommon.NewStatefulTaskBase("attachment-task", query, react.config.GetContext(), react.config.GetEmitter())
-	task.SetAttachedDatas([]*aicommon.AttachedResource{{
-		Type: aicommon.CONTEXT_PROVIDER_TYPE_FILE, Key: aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT, Value: "INLINE_ATTACHMENT_CONTENT",
-	}})
-	t.Cleanup(installTaskInlineAttachmentProvider(react.config.ContextProviderManager, task))
 	_, err = react.config.AppendUserInputHistory(query, time.Now())
 	require.NoError(t, err)
 	for _, frozen := range []bool{false, true} {
@@ -51,7 +46,6 @@ func TestUserInputAttachmentQueryStaysOutOfMainDynamic(t *testing.T) {
 				if !lightweight {
 					require.Contains(t, dynamic, fileBody, "attachment content must not be filtered by text matching")
 					require.Contains(t, dynamic, path)
-					require.Contains(t, dynamic, "INLINE_ATTACHMENT_CONTENT")
 				}
 			}
 		}

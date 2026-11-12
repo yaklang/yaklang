@@ -46,6 +46,7 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 
 	if data.HasType(AttachedResourceTypeFile) && data.HasKey(CONTEXT_PROVIDER_KEY_FILE_CONTENT) {
 		resource := &AttachedFileContentResourceData{}
+		resource.Key = data.Key
 		return resource, resource.Unmarshal(data.Value)
 	}
 

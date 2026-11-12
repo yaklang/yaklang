@@ -12,6 +12,7 @@ import (
 // AttachedFileContentResourceData holds literal text, never a filesystem path.
 // Large inputs retain their exact bytes in AI space for on-demand reading.
 type AttachedFileContentResourceData struct {
+	Key      string
 	content  string
 	once     sync.Once
 	rendered string
@@ -80,7 +81,7 @@ func (d *AttachedFileContentResourceData) render(emitter *Emitter) (string, erro
 				_, _ = emitter.EmitPinFilename(file.Name())
 			}
 		}
-		d.rendered = fmt.Sprintf("## Attached File Content\n\nFile Size: %d bytes\n\n%s--- File Content ---\n%s\n--- End of File Content ---\n", len(d.content), note, preview)
+		d.rendered = fmt.Sprintf("## Attached File Content\n\n- Resource Type: file\n- Resource Key: %s\n- File Size: %d bytes\n\n%s--- File Content ---\n%s\n--- End of File Content ---\n", d.Key, len(d.content), note, preview)
 	})
 	return d.rendered, d.err
 }

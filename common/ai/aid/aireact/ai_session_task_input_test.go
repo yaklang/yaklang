@@ -45,10 +45,11 @@ func TestBuildAISessionTaskInputParamsCapturesInputResources(t *testing.T) {
 			{Type: aicommon.USER_INPUT_SCHEDULE_CONTEXT, Key: aicommon.USER_INPUT_SCHEDULE_UUID, Value: "schedule-uuid"},
 		},
 	}
-	firstTask := react.buildReTaskFromEvent(firstEvent)
+	firstResources, firstControl := normalizeInputAttachments(firstEvent)
+	firstTask := react.buildReTaskFromEvent(firstEvent, firstResources, firstControl)
 	require.NotNil(t, firstTask)
 	firstTask.SetFocusMode(firstEvent.GetFocusModeLoop())
-	first := buildAISessionTaskInputParams("session-task-input", firstTask, firstEvent)
+	first := buildAISessionTaskInputParams("session-task-input", firstTask, firstResources)
 	require.NotNil(t, first)
 	require.Equal(t, "session-task-input", first.SessionID)
 	require.Equal(t, firstTask.GetId(), first.TaskID)
@@ -71,8 +72,9 @@ func TestBuildAISessionTaskInputParamsCapturesInputResources(t *testing.T) {
 	require.Nil(t, findAISessionTaskResource(first.Resources, aicommon.USER_FREE_INPUT_UUID, "", "input-uuid"))
 
 	followUpEvent := &ypb.AIInputEvent{FreeInput: "continue"}
-	followUpTask := react.buildReTaskFromEvent(followUpEvent)
-	followUp := buildAISessionTaskInputParams("session-task-input", followUpTask, followUpEvent)
+	followUpResources, followUpControl := normalizeInputAttachments(followUpEvent)
+	followUpTask := react.buildReTaskFromEvent(followUpEvent, followUpResources, followUpControl)
+	followUp := buildAISessionTaskInputParams("session-task-input", followUpTask, followUpResources)
 	require.NotNil(t, followUp)
 	require.Empty(t, followUp.Resources)
 }
