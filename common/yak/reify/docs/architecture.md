@@ -65,15 +65,15 @@ Region（虚拟地址 + 文件偏移 + 长度）
 
 ## 格式层
 
-`loader/fileformat` 为 PE 和 Mach-O 提供类型；ELF 实现在 `loader/fileformat/elf`：
+`loader/fileformat` 汇总三种格式；每种格式各有一个独立包：
 
 | Loader | Format | 目标平台来源 | 说明 |
 | --- | --- | --- | --- |
 | `ELF` | `elf` | ELF OS ABI、机器字段、类别 | 支持 32/64 位和大端 |
-| `PE` | `pe` | 机器字段、可选头子系统 | PE32 与 PE32+ |
-| `MachO` | `macho` | CPU 字段；OS 暂为 unknown | 只接受 thin Mach-O |
+| `pe.Loader` | `pe` | 机器字段、可选头子系统 | PE32 与 PE32+；导出表、导入表、`.pdata` |
+| `macho.Loader` | `macho` | CPU 字段 | thin 与 universal；`LC_MAIN`、`LC_FUNCTION_STARTS`、符号表 |
 
-ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。PE 与 Mach-O 的导入导出尚未接入。
+ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。PE 读取导出表、导入表与 `.pdata` 异常目录。Mach-O 读取 `LC_MAIN`、`LC_FUNCTION_STARTS`、符号表与导入符号，并在 universal 文件中选择一个切片。
 
 格式层只读头部、节表和符号表，不反汇编，不执行输入，也不判断文件是否可信。
 
@@ -83,8 +83,11 @@ ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT �
 
 | 架构 | 状态 | 解码器 |
 | --- | --- | --- |
-| AMD64 | 已实现 | `golang.org/x/arch/x86/x86asm` |
-| 386、ARM、ARM64、RISCV32、RISCV64、MIPS、MIPS64、PPC、PPC64 | 注册骨架 | 未实现 |
+| AMD64 | 已实现 | `golang.org/x/arch/x86/x86asm`（64 位模式） |
+| 386 | 已实现 | 同一套 x86 解码器（32 位模式），实现在 `loader/arch/internal/x86` |
+| ARM64 | 已实现 | `golang.org/x/arch/arm64/arm64asm`，外加 PAC 编码解码 |
+| ARM | 已实现 | `golang.org/x/arch/arm/armasm`，ARM 模式 |
+| RISCV32、RISCV64、MIPS、MIPS64、PPC、PPC64 | 注册骨架 | 未实现 |
 
 ### AMD64
 
@@ -130,9 +133,99 @@ ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT �
 - `LOCK` 前缀会保留诊断，但原子顺序没有建模。
 - 不执行输入，不做动态验证。
 
+### 386 与共享 x86 实现
+
+`loader/arch/internal/x86` 保存 x86 解码、块构造、提升与边界发现的唯一实现。`loader/arch/amd64` 与 `loader/arch/x86` 都只是薄封装：前者传入 `Profile64`，后者传入 `Profile32`。
+
+`Profile` 只描述两种模式的差异：
+
+| 字段 | AMD64 | 386 |
+| --- | --- | --- |
+| `Mode` | 64 | 32 |
+| 默认位宽 | 64 | 32 |
+| 栈指针 / 帧指针 | `rsp` / `rbp` | `esp` / `ebp` |
+| 指令指针 | `rip`（支持 RIP 相对寻址） | 无 |
+| 累加器 | `rax` / `rdx` | `eax` / `edx` |
+| 标志伪寄存器 | `rflags` | `eflags` |
+| `LOOP` 计数寄存器 | `rcx` | `ecx` |
+| 栈槽宽度 | 8 字节 | 4 字节 |
+| 指针值位宽 | 64 | 32 |
+
+解码、基本块切分、条件分支、调用与跳转、`x86.flags.*` / `x86.cond.*` 的命名在两种模式下完全一致，因此 LowIR 形状一致，只有名称与位宽不同。
+
+### ARM64
+
+`loader/arch/arm64/` 是第二个独立 parser 包。流程与 AMD64 相同：线性解码、切分基本块、逐条提升、区域封装为一个 Function。区别在解码器和表示约定。
+
+处理步骤：
+
+1. 用 `arm64asm.Decode` 逐个 4 字节字解码；指针认证编码由本包按 ARM ARM 字段布局直接解码，因为 `golang.org/x/arch` 不覆盖 `+pauth`。
+2. 记录指令地址；AArch64 指令定长 4 字节，切块只需要地址集合。
+3. 在直接跳转目标、条件分支的两条后继、终止指令的下一条指令处切分基本块。
+4. 把每条指令提升为 LowIR；寄存器名统一小写，例如 `x0`、`w1`、`sp`。
+5. 为没有控制转移的块补 `jump`；区域末尾补 `trap` 与 `block-falls-off-region` 诊断。
+
+已覆盖的指令族：
+
+- 数据移动：`MOV`、`MOVZ`、`MOVN`、`MOVK`、`ADR`、`ADRP`。
+- 算术与逻辑：`ADD`/`ADDS`、`SUB`/`SUBS`、`ADC`/`ADCS`、`SBC`/`SBCS`、`AND`/`ANDS`、`BIC`、`ORR`、`ORN`、`EOR`、`EON`、`LSL`/`LSLV`、`LSR`/`LSRV`、`ASR`/`ASRV`、`MUL`、`MADD`、`MSUB`、`SDIV`、`UDIV`、`NEG`、`MVN`。
+- 位域：`SBFIZ`、`SBFX`、`UBFIZ`、`UBFX`、`BFI`、`BFXIL`、`SBFM`、`UBFM`、`BFM`。
+- 比较与条件：`CMP`、`CMN`、`TST`、`CCMP`、`CCMN`、`CSEL`、`CSINC`、`CSINV`、`CSNEG`、`CSET`、`CSETM`、`CINC`、`CINV`、`CNEG`。
+- 控制流：`B`、`B.cond`、`BL`、`BR`、`BLR`、`RET`、`CBZ`、`CBNZ`、`TBZ`、`TBNZ`。
+- 内存：`LDR`、`LDRB`、`LDRH`、`LDRSW`、`LDRSB`、`LDRSH`、`LDUR` 系列、`STR`、`STRB`、`STRH`、`STUR` 系列、`LDP`、`STP`；偏移、前索引与后索引三种寻址。
+- 指针认证：`PACIA`/`PACIB`/`AUTIA`/`AUTIB` 及 `*Z*` 变体、`RETAA`/`RETAB`、`BRAA`/`BLRAA`。
+- 未建模的 SIMD 与浮点：保留为 `arm64.<mnemonic>` 内建操作，带一个按寄存器宽度的结果。
+
+表示约定：
+
+- `nzcv` 是伪寄存器；标志由 `arm64.flags.<op>` 写，条件由 `arm64.cond.<cc>` 读。
+- 零寄存器（`wzr`/`xzr`）读取为常量 0；写入被丢弃，不产生 `write_register`。
+- 前后索引寻址同时产生访问和基址回写；`stp`/`ldp` 的第二个槽位地址是基址加 8 或 16。
+- `udf #0` 与其他 `0x0000????` 字（链接器留下的内嵌数据）提升为 `trap`，操作数是 `arm64.udf<imm>`，不产生 `decode-error`。
+
+限制：
+
+- 线性扫描不区分代码和数据；字面池与跳转表可能被解码，但会落入 `udf` 分支成为 `trap`。
+- 不支持 Thumb 或 AArch32；`Check` 拒绝非 64 位或 `Mode` 非 `arm64` 的 Target。
+- 浮点与 SIMD 的通道语义尚未建模，只保留寄存器级数据流。
+- `golang.org/x/arch` 缺少部分 ARMv8.3+ 编码；本包只补了指针认证一族，其余仍报 `decode-error`。
+
+### ARM
+
+`loader/arch/arm/` 处理 32 位 ARM（ARM 模式），用 `armasm.Decode(..., armasm.ModeARM)` 解码。Thumb 模式没有被 `golang.org/x/arch` 支持，`Check` 对 `Mode == "thumb"` 返回错误，而不是静默按 ARM 解码。
+
+处理步骤与 ARM64 相同：线性解码、按跳转目标与终止指令切块、逐条提升。
+
+已覆盖的指令族：
+
+- 数据移动：`MOV`、`MVN`、`MOVW`、`MOVT`。
+- 算术与逻辑：`ADD`/`ADC`/`SUB`/`SBC`/`RSB`/`RSC`、`AND`/`ORR`/`EOR`/`BIC`、`MUL`/`MLA`/`MLS`、`UMULL`/`UMLAL`/`SMULL`/`SMLAL`、`SDIV`/`UDIV`。
+- 移位：`LSL`、`LSR`、`ASR`、`ROR`、`RRX`。
+- 比较：`CMP`、`CMN`、`TST`、`TEQ`。
+- 位域与扩展：`UBFX`、`SBFX`、`BFC`、`BFI`、`UXTB`、`UXTH`、`SXTB`、`SXTH`、`RBIT`。
+- 控制流：`B`、`BL`、`BX`、`BLX`、`SVC`、`BKPT`。
+- 内存：`LDR`/`LDRB`/`LDRH`/`LDRSB`/`LDRSH`/`LDRD` 与 `STR` 系列，偏移、前索引、后索引三种寻址；`LDM`/`STM` 及别名 `PUSH`/`POP`。
+
+表示约定：
+
+- 寄存器名 `r0`..`r12`、`sp`(r13)、`lr`(r14)、`pc`(r15)；`cpsr` 是伪寄存器。
+- 每条指令的低四位是条件码；非 `AL` 的指令读 `arm.cond.<cc>`。条件分支写成 `branch`，两个后继都在 `Targets` 里。
+- `bx lr` 提升为 `return`；`bl` 与 `blx` 是 `call`。
+- `push`/`pop` 展开为逐个 4 字节存储和加载，并分别调整 `sp`。
+- 标志由 `arm.flags.<op>` 写，条件由 `arm.cond.<cc>` 读，二者都由 `lowir2ssa` 识别成比较谓词。
+- 未建模的协处理器、NEON 与 VFP 指令保留为 `arm.<mnemonic>` 内建操作，并产生 `unsupported-instruction`。
+- 无法解码的字保留为 `trap`（`arm.data`），同时产生 `decode-error`。
+
+限制：
+
+- 只支持 ARM 模式；Thumb 与 Thumb-2 未实现。
+- 大端 ARM（BE8/BE32）未验证；`armasm` 固定按小端读取。
+- NEON、VFP 与协处理器指令没有建模。
+- 字面池在 `.text` 中可能被当成指令，也可能以 `trap` 形式保留。
+
 ### 其他架构
 
-`loader/arch` 为其他九种 Architecture 保留单独文件，不放进 AMD64 包。它们满足：
+`loader/arch` 为其余六种 Architecture 保留单独文件，不放进已实现的四个包。它们满足：
 
 - `Available() == false`。
 - `Check` 校验架构、位数和执行模式；字节序由 ByteReader 处理。
@@ -158,7 +251,7 @@ PE 的入口和节地址由 ImageBase 加 RVA 得到；ELF 与 Mach-O 的地址�
 
 | 阶段 | 入口 | 输入 | 当前状态 |
 | --- | --- | --- | --- |
-| 汇编 | `core.Disassembler` | `ParseRequest` | AMD64 已实现 |
+| 汇编 | `core.Disassembler` | `ParseRequest` | AMD64、386、ARM64 与 ARM 已实现 |
 | LowIR | `core/asm2lowir` | `Artifact`、区域 | 已实现；含符号补名 |
 | LowIR 文本 | `lowirtext.Format` | `*core.LowIR` | 已实现 |
 | YakSSA | `core/lowir2ssa` | `*core.LowIR` | 已实现 |
@@ -204,10 +297,10 @@ PE 的入口和节地址由 ImageBase 加 RVA 得到；ELF 与 Mach-O 的地址�
 - LowIR 无法映射的操作：`lowir2ssa-unsupported-op` 诊断，保留为不透明调用。
 - YakSSA 块没有终止指令：转换补一个空 `return`。
 - 地址范围没有文件数据：`ErrRegion`。
-- AMD64 区域中出现无法解码的字节：诊断 `decode-error`；已有指令仍返回。
-- AMD64 指令没有对应提升规则：诊断 `unsupported-instruction`，并生成 `intrinsic`。
-- AMD64 块到达区域末尾：补 `trap`，诊断 `block-falls-off-region`。
-- AMD64 诊断最多保留 64 条；后续诊断折叠为一条 `diagnostics-truncated`。
+- 区域中出现无法解码的字节：诊断 `decode-error`；已有指令仍返回。
+- 指令没有对应提升规则：诊断 `unsupported-instruction`，并生成 `intrinsic`。
+- 块到达区域末尾：补 `trap`，诊断 `block-falls-off-region`。
+- 诊断最多保留 64 条；后续诊断折叠为一条 `diagnostics-truncated`。
 
 格式加载成功不等于指令解析成功。未知信息和未实现能力都显式保留，不转换成零值或默认语义。
 

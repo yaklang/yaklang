@@ -34,7 +34,7 @@ type Instruction struct {
 }
 ```
 
-一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64 parser 对一个 `ParseRequest` 区域产出一个 Function；`asm2lowir` 通过符号、调用目标和异常表把区域切成多个函数，并用 Image 符号给 Function 命名。
+一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64、386、ARM64 与 ARM parser 对一个 `ParseRequest` 区域产出一个 Function；`asm2lowir` 通过符号、调用目标和异常表把区域切成多个函数，并用 Image 符号给 Function 命名。
 
 `Instruction.Kind` 是统一的指令种类。它不使用接口方法，也不包装原始 ISA 指令；操作数、结果、控制目标和效果都在同一结构上表达。
 
@@ -126,6 +126,39 @@ AMD64 parser 使用以下约定：
 - 标志更新由 `x86.flags.<op>` 表示，输入是参与运算的值，结果写回 `rflags`。
 - 内存地址是 `pointer` 值。基址、索引、位移和段覆盖分别保留；RIP 相对地址在解码时折算为绝对地址。
 - 未覆盖的指令以 `x86.<mnemonic>` 内建操作保留，并带有 `unknown` 效果。
+
+### 386 约定
+
+386 parser 与 AMD64 共用同一套实现，约定相同，区别只有：
+
+- 寄存器名为 `eax`、`ebx`、`esp`、`ebp` 等，指针值是 32 位。
+- 标志伪寄存器是 `eflags`，栈槽是 4 字节。
+- 没有 `rip`，因此没有程序计数器相对寻址。
+
+### ARM 约定
+
+ARM parser 使用以下约定：
+
+- 寄存器名 `r0`..`r12`、`sp`、`lr`、`pc`；`cpsr` 是伪寄存器。
+- 每条 ARM 指令带条件码；条件由 `arm.cond.<cc>` 从 `cpsr` 读出，非 `AL` 的条件分支写成带两个后继的 `branch`。
+- 标志更新由 `arm.flags.<op>` 表示。
+- `push`/`pop` 展开为逐寄存器的 4 字节存储、加载和 `sp` 调整。
+- `bx lr` 提升为 `return`。
+- 协处理器、NEON 与 VFP 指令保留为 `arm.<mnemonic>` 内建操作。
+- 无法解码的字保留为 `trap`，操作数为 `arm.data`。
+
+### ARM64 约定
+
+ARM64 parser 的约定与 AMD64 平行：
+
+- 通用寄存器使用 `w0`..`w30`、`x0`..`x30`、`sp`、`wsp` 命名；`wzr`/`xzr` 读取为常量 0，写入被丢弃。
+- `nzcv` 是伪寄存器。`cmp`/`cmn`/`tst` 与 `ccmp`/`ccmn` 写它，条件分支和条件选择读它。
+- 条件值由 `arm64.cond.<cc>` 产生，输入是 `nzcv`，结果是一位整数；条件码用 ARM 名称，例如 `eq`、`lt`、`ge`。
+- 标志更新由 `arm64.flags.<op>` 表示。
+- 前后索引寻址会分别生成寻址值和基址寄存器回写。
+- 指针认证（PACIASP、PACIZA、RETAA 等）不影响数据流，记为 `nop` 并保留助记符；`RETAA`/`RETAB` 产生 `return`。
+- SIMD 与浮点指令保留为 `arm64.<mnemonic>` 内建操作，结果类型是按寄存器宽度表示的整数，并带 `unknown` 效果。
+- 零字（`udf #0`）与内嵌数据字产生 `trap`，操作数为 `arm64.udf<imm>`。
 
 ## 效果
 
