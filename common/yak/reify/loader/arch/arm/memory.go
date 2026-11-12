@@ -89,7 +89,7 @@ func (l *lifter) load(ins instruction) {
 	}
 	value := l.loadValue(ins.address, pointer, width)
 	switch baseOp(ins.inst.Op) {
-	case armasm.LDRSB, armasm.LDRSH:
+	case armasm.LDRSB, armasm.LDRSH, armasm.LDRSBT, armasm.LDRSHT:
 		value = l.operation(ins, core.OpSignExtend, []core.Operand{l.value(value)}, bits, core.EffectNone)
 	}
 	l.writeRegister(ins.address, destination, bits, value)
@@ -99,12 +99,12 @@ func (l *lifter) load(ins instruction) {
 // accessWidth returns the memory access width of a load or store opcode.
 func accessWidth(op armasm.Op) uint16 {
 	switch op {
-	case armasm.LDRB, armasm.STRB, armasm.LDRSB, armasm.LDREXB, armasm.STREXB:
+	case armasm.LDRB, armasm.STRB, armasm.LDRSB, armasm.LDREXB, armasm.STREXB,
+		armasm.LDRBT, armasm.LDRSBT, armasm.STRBT:
 		return 8
-	case armasm.LDRH, armasm.STRH, armasm.LDRSH, armasm.LDREXH, armasm.STREXH:
+	case armasm.LDRH, armasm.STRH, armasm.LDRSH, armasm.LDREXH, armasm.STREXH,
+		armasm.LDRHT, armasm.LDRSHT, armasm.STRHT:
 		return 16
-	case armasm.LDRD, armasm.STRD, armasm.LDREXD, armasm.STREXD:
-		return 64
 	default:
 		return 32
 	}
@@ -342,4 +342,63 @@ func (l *lifter) registerTransfer(ins instruction) {
 func (l *lifter) condition(ins instruction, code string) core.ValueID {
 	cpsr := l.readRegister(ins.address, "cpsr", 32)
 	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("arm.cond." + code), l.value(cpsr)}, 1, core.EffectReadRegister)
+}
+
+// loadPair lifts LDRD. armasm splits the register pair into two arguments and
+// the memory operand holds the base.
+func (l *lifter) loadPair(ins instruction) {
+	args := args(ins)
+	if len(args) != 3 {
+		l.unsupported(ins)
+		return
+	}
+	firstName, _, ok := argRegister(args[0])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	secondName, _, ok := argRegister(args[1])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	pointer, ok := l.memoryOperand(ins, args[2])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	first := l.loadValue(ins.address, pointer, 32)
+	l.writeRegister(ins.address, firstName, 32, first)
+	offset := l.constant(ins.address, 4, 32)
+	second := l.loadValue(ins.address, l.addAddress(ins, pointer, offset), 32)
+	l.writeRegister(ins.address, secondName, 32, second)
+	l.postUpdate(ins, args[2])
+}
+
+// storePair lifts STRD.
+func (l *lifter) storePair(ins instruction) {
+	args := args(ins)
+	if len(args) != 3 {
+		l.unsupported(ins)
+		return
+	}
+	first, ok := l.source(ins, args[0], 32)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	second, ok := l.source(ins, args[1], 32)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	pointer, ok := l.memoryOperand(ins, args[2])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	l.storeValue(ins.address, pointer, first)
+	offset := l.constant(ins.address, 4, 32)
+	l.storeValue(ins.address, l.addAddress(ins, pointer, offset), second)
+	l.postUpdate(ins, args[2])
 }

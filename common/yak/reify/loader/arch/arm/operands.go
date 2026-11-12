@@ -447,3 +447,157 @@ func (l *lifter) bitfield(ins instruction) {
 	}
 	l.writeRegister(ins.address, destination, 32, result)
 }
+
+// coprocessor lifts VFP, NEON and coprocessor instructions. The register file is
+// separate from the general registers, so the operation stays one intrinsic
+// with the raw operands instead of an invented data flow.
+func (l *lifter) coprocessor(ins instruction) {
+	operands := []core.Operand{symbolOperand("arm." + lower(baseOp(ins.inst.Op).String()))}
+	for index, arg := range ins.inst.Args {
+		if arg == nil {
+			break
+		}
+		if name, bits, ok := argRegister(arg); ok {
+			operands = append(operands, registerOperand(name, bits))
+			continue
+		}
+		if operand, ok := l.rawOperand(ins, index, arg); ok {
+			operands = append(operands, operand)
+		}
+	}
+	l.emit(core.OpIntrinsic, operands, nil, nil, core.EffectReadRegister|core.EffectWriteRegister|core.EffectUnknown, ins.address)
+}
+
+// saturate lifts SSAT and USAT, which clamp a shifted value into a bit range.
+func (l *lifter) saturate(ins instruction) {
+	args := args(ins)
+	if len(args) != 3 && len(args) != 4 {
+		l.unsupported(ins)
+		return
+	}
+	destination, _, ok := argRegister(args[0])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	width, ok := immediateValue(args[1])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	value, ok := l.source(ins, args[2], 32)
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	operands := []core.Operand{
+		symbolOperand("arm." + lower(baseOp(ins.inst.Op).String())),
+		l.value(value),
+		l.value(l.constant(ins.address, width, 8)),
+	}
+	result := l.operation(ins, core.OpIntrinsic, operands, 32, core.EffectNone)
+	l.writeRegister(ins.address, destination, 32, result)
+}
+
+// multiplyLongSigned lifts the halfword and dual signed multiply-accumulate
+// forms. The lane layout differs per mnemonic, so the operation keeps its name.
+func (l *lifter) multiplyLongSigned(ins instruction) {
+	arguments := args(ins)
+	if len(arguments) < 3 || len(arguments) > 4 {
+		l.unsupported(ins)
+		return
+	}
+	operation := []core.Operand{symbolOperand("arm." + lower(baseOp(ins.inst.Op).String()))}
+	effects := core.EffectNone
+	for index, arg := range arguments {
+		if index == 0 {
+			name, bits, ok := argRegister(arg)
+			if !ok {
+				l.unsupported(ins)
+				return
+			}
+			value := l.newValue(core.TypeInteger, bits)
+			operation = append(operation, core.Operand{Kind: core.OperandRegister, Type: value.Type, Name: name})
+			effects |= core.EffectWriteRegister
+			l.emit(core.OpIntrinsic, operation, []core.Value{value}, nil, effects|core.EffectReadRegister|core.EffectUnknown, ins.address)
+			continue
+		}
+		value, ok := l.source(ins, arg, 32)
+		if !ok {
+			l.unsupported(ins)
+			return
+		}
+		operation = append(operation, l.value(value))
+	}
+}
+
+// statusRegister lifts MRS and MSR, which move the CPSR or an SPSR.
+func (l *lifter) statusRegister(ins instruction) {
+	arguments := args(ins)
+	if len(arguments) != 2 {
+		l.unsupported(ins)
+		return
+	}
+	destination, bits, destinationOK := argRegister(arguments[0])
+	source, sourceBits, sourceOK := argRegister(arguments[1])
+	if !destinationOK || !sourceOK {
+		l.unsupported(ins)
+		return
+	}
+	if baseOp(ins.inst.Op) == armasm.MRS {
+		value := l.readRegister(ins.address, source, sourceBits)
+		l.writeRegister(ins.address, destination, bits, value)
+		return
+	}
+	value := l.readRegister(ins.address, source, sourceBits)
+	l.writeRegister(ins.address, destination, bits, value)
+}
+
+// exclusiveStore lifts STREX, STREXB, STREXH and STREXD. The first operand
+// receives the monitor outcome, the following one or two registers hold the
+// value, and the last operand is the address.
+func (l *lifter) exclusiveStore(ins instruction) {
+	arguments := args(ins)
+	if len(arguments) < 3 {
+		l.unsupported(ins)
+		return
+	}
+	statusName, statusBits, ok := argRegister(arguments[0])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	memoryIndex := len(arguments) - 1
+	pointer, ok := l.memoryOperand(ins, arguments[memoryIndex])
+	if !ok {
+		l.unsupported(ins)
+		return
+	}
+	width := uint16(32)
+	valueCount := memoryIndex - 1
+	if valueCount > 1 {
+		width = 32
+	}
+	offsetValue := uint64(0)
+	for index := 1; index < memoryIndex; index++ {
+		value, ok := l.source(ins, arguments[index], width)
+		if !ok {
+			l.unsupported(ins)
+			return
+		}
+		target := pointer
+		if offsetValue != 0 {
+			offset := l.constant(ins.address, offsetValue, 32)
+			target = l.addAddress(ins, pointer, offset)
+		}
+		l.storeValue(ins.address, target, value)
+		offsetValue += 4
+	}
+	outcome := l.operation(ins, core.OpIntrinsic, []core.Operand{
+		symbolOperand("arm.exclusive.monitor"),
+	}, statusBits, core.EffectAtomic|core.EffectUnknown)
+	l.writeRegister(ins.address, statusName, statusBits, outcome)
+	l.postUpdate(ins, arguments[memoryIndex])
+}
+
+// addAddress is defined in lift.go; this indirection keeps the helper local.

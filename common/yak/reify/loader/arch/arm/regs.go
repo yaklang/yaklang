@@ -23,6 +23,10 @@ func registerName(reg armasm.Reg) (string, uint16, bool) {
 		return "pc", 32, true
 	case reg >= armasm.S0 && reg <= armasm.S31:
 		return fmt.Sprintf("s%d", int(reg-armasm.S0)), 32, true
+	case reg == armasm.APSR:
+		return "cpsr", 32, true
+	case reg == armasm.APSR_nzcv:
+		return "cpsr", 32, true
 	case reg == armasm.FPSCR:
 		return "fpscr", 32, true
 	default:

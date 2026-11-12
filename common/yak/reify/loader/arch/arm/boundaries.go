@@ -390,9 +390,3 @@ func plausibleFunctionStart(inst armasm.Inst) bool {
 		return false
 	}
 }
-
-// isDataWord reports whether a word cannot be an ARM instruction. The decoder
-// rejects these, and the linker also leaves zero words between functions.
-func isDataWord(raw uint32) bool {
-	return raw&0xff000000 == 0
-}

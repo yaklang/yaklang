@@ -73,6 +73,20 @@ func (l *lifter) lift(ins instruction) {
 		l.emit(core.OpTrap, []core.Operand{symbolOperand(fmt.Sprintf("arm64.udf%#x", ins.immediate))}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return
 	}
+	if ins.pstate {
+		// A PSTATE field change is state, not data flow; keep the mnemonic.
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("arm64." + lseSymbol(ins.text)[len("arm64."):])}, nil, nil,
+			core.EffectWriteRegister|core.EffectUnknown, ins.address)
+		return
+	}
+	if ins.lse {
+		// The result register receives the previous memory value, and the
+		// source register is folded into memory. Both are visible, the atomic
+		// ordering is not modeled, so the operation stays an intrinsic.
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand(lseSymbol(ins.text))}, nil, nil,
+			core.EffectReadMemory|core.EffectWriteMemory|core.EffectAtomic|core.EffectUnknown, ins.address)
+		return
+	}
 	switch ins.inst.Op {
 	case arm64asm.NOP:
 		l.emit(core.OpNop, nil, nil, nil, core.EffectNone, ins.address)
@@ -127,13 +141,37 @@ func (l *lifter) lift(ins instruction) {
 	case arm64asm.LDR, arm64asm.LDRB, arm64asm.LDRH, arm64asm.LDRSW,
 		arm64asm.LDUR, arm64asm.LDURB, arm64asm.LDURH,
 		arm64asm.LDRSB, arm64asm.LDRSH, arm64asm.LDURSB, arm64asm.LDURSH,
+		arm64asm.LDPSW,
+		arm64asm.LDAR, arm64asm.LDARB, arm64asm.LDARH,
+		arm64asm.LDAXR, arm64asm.LDAXRB, arm64asm.LDAXRH,
 		arm64asm.LDP:
+		// The acquire forms read memory with an ordering guarantee; the
+		// ordering itself is not modeled, the data flow is identical to LDR.
 		l.load(ins)
 	case arm64asm.STR, arm64asm.STRB, arm64asm.STRH,
-		arm64asm.STUR, arm64asm.STURB, arm64asm.STURH, arm64asm.STP:
+		arm64asm.STUR, arm64asm.STURB, arm64asm.STURH,
+		arm64asm.STLR, arm64asm.STLRB, arm64asm.STLRH,
+		arm64asm.STP:
 		l.store(ins)
+	case arm64asm.STLXR, arm64asm.STLXRB, arm64asm.STLXRH,
+		arm64asm.STXR, arm64asm.STXRB, arm64asm.STXRH:
+		// The first operand receives the store outcome (0 on success), the
+		// second is the value, the third the address.
+		l.exclusiveStore(ins)
+	case arm64asm.CLZ, arm64asm.CLS:
+		l.reverse(ins)
 	case arm64asm.ADR, arm64asm.ADRP:
 		l.address(ins)
+	case arm64asm.MRS, arm64asm.MSR, arm64asm.SYS, arm64asm.SYSL,
+		arm64asm.DC, arm64asm.IC, arm64asm.AT, arm64asm.TLBI:
+		// System register access, cache maintenance and TLB maintenance. They
+		// change architectural state that is not part of the data flow model.
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("arm64." + lower(ins.inst.Op))}, nil, nil,
+			core.EffectUnknown, ins.address)
+	case arm64asm.DMB, arm64asm.DSB, arm64asm.ISB, arm64asm.PRFM, arm64asm.CLREX:
+		// Ordering, prefetch and hint instructions have no data-flow result.
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("arm64." + lower(ins.inst.Op))}, nil, nil,
+			core.EffectUnknown, ins.address)
 	case arm64asm.SVC, arm64asm.BRK, arm64asm.HLT:
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("arm64." + lower(ins.inst.Op))}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 	case arm64asm.SXTW, arm64asm.SXTB, arm64asm.SXTH, arm64asm.UXTB, arm64asm.UXTH:
@@ -154,8 +192,31 @@ func (l *lifter) lift(ins instruction) {
 	case arm64asm.ROR, arm64asm.RORV, arm64asm.EXTR:
 		l.rotate(ins)
 	default:
+		if isVectorInstruction(ins.inst) {
+			l.vectorOperation(ins)
+			return
+		}
 		l.unsupported(ins)
 	}
+}
+
+// isVectorInstruction reports whether the mnemonic belongs to the SIMD and
+// floating-point space. Those mnemonics start with LD1..LD4, ST1..ST4, or one
+// of the FP/vector prefixes, and operate on packed lanes rather than scalars.
+func isVectorInstruction(inst arm64asm.Inst) bool {
+	name := inst.Op.String()
+	if len(name) >= 3 {
+		switch name[:3] {
+		case "LD1", "LD2", "LD3", "LD4", "ST1", "ST2", "ST3", "ST4":
+			return true
+		}
+	}
+	for _, prefix := range []string{"F", "V", "DUP", "INS", "EXT", "TBL", "TBX", "ZIP", "UZP", "TRN", "CM", "ADDV", "SADDL", "UADDL", "SMULL", "UMULL", "MLA", "MLS", "MOVI", "MVNI", "BIF", "BIT", "BSL"} {
+		if len(name) >= len(prefix) && name[:len(prefix)] == prefix {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *lifter) hasVectorOperand(ins instruction) bool {

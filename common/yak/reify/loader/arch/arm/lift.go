@@ -63,6 +63,10 @@ func (l *lifter) lift(ins instruction) {
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("arm.data")}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return
 	}
+	if ins.systemRegister != nil {
+		l.systemRegisterTransfer(ins)
+		return
+	}
 	if name := ins.inst.Op.String(); strings.HasSuffix(name, ".W") || strings.HasSuffix(name, ".N") {
 		// Width hints do not change the operation.
 	}
@@ -95,15 +99,48 @@ func (l *lifter) lift(ins instruction) {
 		l.bitfield(ins)
 	case armasm.RBIT:
 		l.intrinsicValue(ins, "arm.rbit")
+	case armasm.SSAT, armasm.USAT, armasm.SSAT16, armasm.USAT16:
+		l.saturate(ins)
+	case armasm.SMLABB, armasm.SMLABT, armasm.SMLATB, armasm.SMLATT,
+		armasm.SMLAWB, armasm.SMLAWT, armasm.SMLALBB, armasm.SMLALBT,
+		armasm.SMLALTB, armasm.SMLALTT, armasm.SMLAD, armasm.SMLAD_X,
+		armasm.SMLSD, armasm.SMLSD_X, armasm.SMLALD, armasm.SMLALD_X,
+		armasm.SMLSLD, armasm.SMLSLD_X, armasm.SMMLA, armasm.SMMLS, armasm.SMMUL,
+		armasm.SMULBB, armasm.SMULBT, armasm.SMULTB, armasm.SMULTT,
+		armasm.SMULWB, armasm.SMULWT, armasm.SMUAD, armasm.SMUAD_X,
+		armasm.SMUSD, armasm.SMUSD_X:
+		l.multiplyLongSigned(ins)
+	case armasm.MRS, armasm.MSR:
+		l.statusRegister(ins)
 	case armasm.B, armasm.BL:
 		l.branchOrCall(ins)
-	case armasm.BX, armasm.BLX:
+	case armasm.BLX:
+		// BLX takes either a register or an immediate target.
+		if _, _, ok := argRegister(ins.inst.Args[0]); ok {
+			l.registerTransfer(ins)
+			return
+		}
+		l.branchOrCall(ins)
+	case armasm.BX:
 		l.registerTransfer(ins)
-	case armasm.LDR, armasm.LDRB, armasm.LDRH, armasm.LDRSB, armasm.LDRSH,
-		armasm.LDRD, armasm.LDREX, armasm.LDREXB, armasm.LDREXH, armasm.LDREXD:
+	case armasm.LDR, armasm.LDRB, armasm.LDRH, armasm.LDRSB, armasm.LDRSH:
 		l.load(ins)
-	case armasm.STR, armasm.STRB, armasm.STRH, armasm.STRD,
-		armasm.STREX, armasm.STREXB, armasm.STREXH, armasm.STREXD:
+	case armasm.LDRD:
+		l.loadPair(ins)
+	case armasm.LDREXD:
+		l.loadPair(ins)
+	case armasm.LDREX, armasm.LDREXB, armasm.LDREXH,
+		armasm.LDRT, armasm.LDRBT, armasm.LDRHT, armasm.LDRSBT, armasm.LDRSHT:
+		// Exclusive and unprivileged loads read memory like LDR; the
+		// exclusivity monitor is not modeled.
+		l.load(ins)
+	case armasm.STR, armasm.STRB, armasm.STRH:
+		l.store(ins)
+	case armasm.STRD:
+		l.storePair(ins)
+	case armasm.STREXD, armasm.STREXB, armasm.STREX, armasm.STREXH:
+		l.exclusiveStore(ins)
+	case armasm.STRT, armasm.STRBT, armasm.STRHT:
 		l.store(ins)
 	case armasm.LDM, armasm.LDMDA, armasm.LDMDB, armasm.LDMIB:
 		l.loadMultiple(ins)
@@ -113,11 +150,46 @@ func (l *lifter) lift(ins instruction) {
 		l.push(ins)
 	case armasm.POP:
 		l.pop(ins)
+	case armasm.UNDEF:
+		l.emit(core.OpTrap, []core.Operand{symbolOperand("arm.undef")}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 	case armasm.SVC, armasm.BKPT:
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("arm." + lower(base.String()))}, nil, nil, core.EffectMayTrap|core.EffectUnknown|core.EffectCall, ins.address)
 	default:
+		if isCoprocessor(ins.inst.Op) {
+			l.coprocessor(ins)
+			return
+		}
 		l.unsupported(ins)
 	}
+}
+
+// systemRegisterTransfer lifts one MRC or MCR. A read writes the general
+// register; a write reads it.
+func (l *lifter) systemRegisterTransfer(ins instruction) {
+	transfer := ins.systemRegister
+	register := fmt.Sprintf("r%d", transfer.register)
+	operands := []core.Operand{symbolOperand("arm." + transfer.mnemonic)}
+	var results []core.Value
+	effects := core.EffectUnknown
+	if transfer.read {
+		value := l.newValue(core.TypeInteger, 32)
+		results = append(results, value)
+		operands = append(operands, core.Operand{Kind: core.OperandRegister, Type: value.Type, Name: register})
+		effects |= core.EffectWriteRegister
+	} else {
+		operands = append(operands, l.value(l.readRegister(ins.address, register, 32)))
+		effects |= core.EffectReadRegister
+	}
+	l.emit(core.OpIntrinsic, operands, results, nil, effects, ins.address)
+}
+
+// isCoprocessor reports whether the mnemonic belongs to the VFP, NEON or
+// coprocessor space. armasm names those ops as a family with a data-type suffix
+// (VADD_F32, VLDR, VMOV, ...) instead of the sixteen-condition scheme the
+// scalar instructions use, so the name is the reliable test.
+func isCoprocessor(op armasm.Op) bool {
+	name := op.String()
+	return len(name) > 0 && name[0] == 'V'
 }
 
 // unsupported keeps one instruction in the IR as an intrinsic with the raw

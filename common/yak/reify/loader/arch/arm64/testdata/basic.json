@@ -97,5 +97,35 @@
       "  0x100000004  write_register %sp, v24 [write_register]",
       "  0x100000008  return [may_trap, unknown]"
     ]
+  },
+  {
+    "name": "lse atomic",
+    "address": "0x100000500",
+    "code": [
+      "85 00 e2 f8 // ldaddal x2, x5, [x4]",
+      "41 fc fb 88 // casal w27, w1, [x2]"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x100000500 @ 0x100000500",
+      "block b1 @ 0x100000500",
+      "  0x100000500  intrinsic @arm64.ldaddal [read_memory, write_memory, atomic, unknown]",
+      "  0x100000504  intrinsic @arm64.casal [read_memory, write_memory, atomic, unknown]",
+      "  0x100000508  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "pstate write",
+    "address": "0x100000600",
+    "code": [
+      "5f 41 03 d5 // msr dit, #0x1"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x100000600 @ 0x100000600",
+      "block b1 @ 0x100000600",
+      "  0x100000600  intrinsic @arm64.msr [write_register, unknown]",
+      "  0x100000604  trap @region-end [may_trap, unknown]"
+    ]
   }
 ]
