@@ -1,0 +1,8 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x3000 @ 0x3000
+block b1 @ 0x3000
+  0x3000  v1:i64 = call @helper [call]
+  0x3002  v2:i8 = constant 0xaa
+  0x3003  write_register %ah, v2 [write_register]
+  0x3004  v3:i64 = read_register %rax [read_register]
+  0x3005  return v3

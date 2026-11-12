@@ -123,9 +123,9 @@ digest=$(sha256sum "$input_abs" | awk '{print $1}')
 	if [ -n "$address" ]; then
 		printf 'region: address=%s size=%s\n' "$address" "$size"
 	else
-		printf 'region: .text\n'
+		printf 'region: all functions\n'
 	fi
-	printf 'modes: 1asm 2lowir 3ssair 4source\n'
+	printf 'modes: asm lowir ssair source\n'
 } >"$output_dir/version"
 
 failed=0
@@ -133,7 +133,8 @@ for label in 1asm 2lowir 3ssair 4source; do
 	target="$output_dir/$base.$label.txt"
 	stderr_file="$output_dir/.$base.$label.stderr"
 	printf 'lift-all: %s -> %s\n' "$label" "$target" >&2
-	args=(lift --mode "$label")
+	mode=${label#[0-9]}
+	args=(lift --mode "$mode")
 	if [ "$label" = "1asm" ]; then
 		args+=(--asm-syntax "$syntax")
 	fi

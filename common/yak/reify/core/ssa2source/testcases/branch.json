@@ -1,0 +1,29 @@
+{
+  "forbidden": [
+    "goto ",
+    "phi("
+  ],
+  "name": "branch",
+  "note": "条件分支渲染成 if/else，不出现 goto 或 phi",
+  "source": [
+    "uint64_t sub_0x2000(void) {",
+    "    if (condition) {",
+    "      return 0x1;",
+    "    } else {",
+    "      return 0x2;",
+    "    }",
+    "}"
+  ],
+  "ssair": [
+    "sub_0x2000 \u003ci1\u003e (1) condition",
+    "type: (i1) -\u003e i64",
+    "entry_0:",
+    "    If [\u003ci1\u003e t1] true -\u003e b2_1, false -\u003e b3_2",
+    "b2_1:",
+    "    \u003ci64\u003e t2 = \u003ci64\u003e 0x1",
+    "    ret \u003ci64\u003e t2",
+    "b3_2:",
+    "    \u003ci64\u003e t3 = \u003ci64\u003e 0x2",
+    "    ret \u003ci64\u003e t3"
+  ]
+}

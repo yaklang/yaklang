@@ -21,7 +21,7 @@ Reify 不使用“操作系统 × 架构”的目录矩阵。每个维度单独�
 
 `loader.Default` 是进程级只读 Catalog，构造时显式注册：
 
-- 三个 loader：`native.ELF`、`native.PE`、`native.MachO`。
+- 三个 loader：`fileformat.ELF`、`fileformat.PE`、`fileformat.MachO`。
 - 十个 parser：386、amd64、arm、arm64、riscv32、riscv64、mips、mips64、ppc、ppc64。
 
 不使用 `init()` 自动注册，不在运行时修改 `Default`。需要自定义组合时调用 `loader.NewCatalog(loaders, parsers)`；重复 Format 或重复 Architecture 在构造时报错。
@@ -65,7 +65,7 @@ Region（虚拟地址 + 文件偏移 + 长度）
 
 ## 格式层
 
-`loader/native` 为每种格式提供独立类型：
+`loader/fileformat` 为 PE 和 Mach-O 提供类型；ELF 实现在 `loader/fileformat/elf`：
 
 | Loader | Format | 目标平台来源 | 说明 |
 | --- | --- | --- | --- |
@@ -159,16 +159,23 @@ PE 的入口和节地址由 ImageBase 加 RVA 得到；ELF 与 Mach-O 的地址�
 | 阶段 | 入口 | 输入 | 当前状态 |
 | --- | --- | --- | --- |
 | 汇编 | `core.Disassembler` | `ParseRequest` | AMD64 已实现 |
-| LowIR 文本 | `core.FormatLowIR` | `*core.LowIR` | 已实现 |
+| LowIR | `core/asm2lowir` | `Artifact`、区域 | 已实现；含符号补名 |
+| LowIR 文本 | `lowirtext.Format` | `*core.LowIR` | 已实现 |
 | YakSSA | `core/lowir2ssa` | `*core.LowIR` | 已实现 |
 | YakSSA 文本 | `lowir2ssa.Text` | `*ssa.Program` | 已实现 |
 | 伪源码 | `core/ssa2source` | `*ssa.Program` | 已实现 |
 
-`Disassembler` 是 parser 的可选能力，通过 `Artifact.Disassemble` 调用；没有该能力的 parser 返回 `ErrNoDisassembler`。
+`Disassembler` 是 parser 的可选能力，通过 `asm2lowir.Disassemble` 调用；没有该能力的 parser 返回 `ErrNoDisassembler`。
 
-`lowir2ssa` 把值、算术、比较和控制流转换成 YakSSA，把通用寄存器和内存槽提升为带位宽类型的变量。只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。默认删除 stack canary 和栈帧。转换后 `core/ssapass` 应用 C 函数定义并重写字符串参数。`ssa2source` 只渲染已有 YakSSA 程序。这些包都是独立包，不参与 loader 与 parser 的分派。
+`loader/fileformat` 只解析文件头和符号表，`loader/arch` 负责指令解码、块划分和调用目标发现；`asm2lowir` 用 `BoundaryHints` 把两者串起来，并按函数边界调用 parser，得到普通 LowIR。`lowir2ssa` 先运行可选的 LowIR pass（默认删除 stack canary 和栈帧），再把值、算术、比较和控制流转换成 YakSSA，把通用寄存器和内存槽提升为带位宽类型的变量。只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。转换后 `core/ssa2source/pass` 应用 C 函数定义并重写字符串参数。`ssa2source` 只渲染已有 YakSSA 程序。这些包都是独立包，不参与 loader 与 parser 的分派。
 
 详细映射见 [SSA 文档](ssa.md)。
+
+## 后续 source 重写
+
+当前 `ssa2source` 只生成 inspection 用的伪源码，没有 AST。后续如果需要
+把结果重写成 Python、Go 等语言，应另加 `rewrite` 层，读取 source/结构，
+而不是把语言级重写塞进 `ssa2source`。该层暂未实现。
 
 ## 所有权
 

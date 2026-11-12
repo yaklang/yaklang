@@ -25,13 +25,18 @@ type amd64Place struct {
 	address core.ValueID
 }
 
-func liftAMD64(target core.Target, blocks []amd64Block, blockIDs map[uint64]core.BlockID, diagnostics *amd64Diagnostics) *core.LowIR {
+func liftAMD64Functions(target core.Target, functions []amd64Function, blockIDs map[uint64]core.BlockID, diagnostics *amd64Diagnostics) *core.LowIR {
 	ir := &core.LowIR{Target: target}
-	if len(blocks) == 0 {
-		return ir
+	for index, functionBody := range functions {
+		ir.Functions = append(ir.Functions, liftAMD64Function(target, functionBody, core.FunctionID(index+1), blockIDs, diagnostics))
 	}
+	return ir
+}
+
+func liftAMD64Function(target core.Target, functionBody amd64Function, id core.FunctionID, blockIDs map[uint64]core.BlockID, diagnostics *amd64Diagnostics) core.Function {
+	blocks := functionBody.blocks
 	function := core.Function{
-		ID:      1,
+		ID:      id,
 		Address: blocks[0].start,
 		Blocks:  make([]core.Block, 0, len(blocks)),
 	}
@@ -57,8 +62,7 @@ func liftAMD64(target core.Target, blocks []amd64Block, blockIDs map[uint64]core
 		}
 		function.Blocks = append(function.Blocks, core.Block{ID: core.BlockID(index + 1), Address: block.start, Instructions: lifter.instructions})
 	}
-	ir.Functions = append(ir.Functions, function)
-	return ir
+	return function
 }
 
 func amd64VariadicSetup(ins amd64Instruction) bool {

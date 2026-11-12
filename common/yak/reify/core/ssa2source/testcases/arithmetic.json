@@ -1,0 +1,17 @@
+{
+  "name": "arithmetic",
+  "note": "两个参数相加后返回，签名保留完整类型",
+  "source": [
+    "uint64_t sub_0x1000(uint64_t left, uint64_t right) {",
+    "    v3 = left + right;",
+    "    return v3;",
+    "}"
+  ],
+  "ssair": [
+    "sub_0x1000 \u003ci64\u003e (1) left, \u003ci64\u003e (2) right",
+    "type: (i64, i64) -\u003e i64",
+    "entry_0:",
+    "    \u003ci64\u003e t3 = \u003ci64\u003e t1 add \u003ci64\u003e t2",
+    "    ret \u003ci64\u003e t3"
+  ]
+}

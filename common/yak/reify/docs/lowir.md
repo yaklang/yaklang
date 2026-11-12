@@ -34,7 +34,7 @@ type Instruction struct {
 }
 ```
 
-一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64 parser 对一个 `ParseRequest` 区域产出一个 Function；后续可以通过符号、调用目标或异常表扩展函数发现，不要求一个区域等于整个文件。`Artifact.Parse` 会用 Image 符号给 Function 命名，并把可解析的直接调用和 GOT 间接调用改成符号目标。
+一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64 parser 对一个 `ParseRequest` 区域产出一个 Function；`asm2lowir` 通过符号、调用目标和异常表把区域切成多个函数，并用 Image 符号给 Function 命名。
 
 `Instruction.Kind` 是统一的指令种类。它不使用接口方法，也不包装原始 ISA 指令；操作数、结果、控制目标和效果都在同一结构上表达。
 
@@ -153,11 +153,11 @@ LowIR 不声称仅凭效果位完成别名分析、MemorySSA 或并发语义验�
 
 `Instruction.Address` 记录对应的机器指令地址。一个机器指令可以产生多个 LowIR 指令；同一条机器指令产生的合成操作沿用该指令地址。块尾补的 `jump` 或 `trap` 使用块边界地址。
 
-`Parse` 只输出 LowIR。汇编文本由可选的 `Disassembler` 单独渲染，不是 LowIR 的语义来源。LowIR 文本由 `core.FormatLowIR` 渲染，JSON 是机器可读形式。
+`Parse` 只输出 LowIR。汇编文本由可选的 `Disassembler` 单独渲染，不是 LowIR 的语义来源。LowIR 文本由 `lowirtext.Format` 渲染，JSON 是机器可读形式。
 
 ## 文本形式
 
-`core.FormatLowIR` 输出稳定的逐行表示，用于人工检查：
+`lowirtext.Format` 输出稳定的逐行表示，用于人工检查：
 
 ```text
 target: unknown/amd64 (64-bit, little-endian)

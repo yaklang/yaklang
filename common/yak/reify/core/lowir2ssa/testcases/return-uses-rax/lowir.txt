@@ -1,0 +1,6 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x5a00 @ 0x5a00
+block b1 @ 0x5a00
+  0x5a00  v1:i64 = constant 0x7
+  0x5a01  write_register %rax, v1 [write_register]
+  0x5a02  return

@@ -1,0 +1,15 @@
+extern helper
+sub_0x3000
+type: () -> i64
+entry_0: (<nil condition>)
+	<i64> t1 = call <any> helper () binding[] member[]
+	<i8> t2  = <i8> 170
+	<i64> t3 = <i64> 255
+	<i64> t4 = <i64> t1 and-not <i64> 255
+	<i64> t5 = <i64> 8
+	<any> t6 = <i8> 170 shl <i64> 8
+	<i64> t7 = <i64> 43520 by t6 
+	<any> t8 = <i64> 43520 and <i64> 255
+	<i64> t9 = <i64> 0 by t8 
+	<i64> t10 = <i64> t4 or <i64> 0
+	ret <i64> t10

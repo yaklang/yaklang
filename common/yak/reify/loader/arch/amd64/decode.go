@@ -25,10 +25,6 @@ type amd64Instruction struct {
 }
 
 func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, error) {
-	parser := Parser{}
-	if err := parser.Check(request.Target); err != nil {
-		return nil, err
-	}
 	if request.Reader == nil || request.Reader.Size() == 0 {
 		return nil, fmt.Errorf("amd64: empty code region")
 	}
@@ -44,9 +40,9 @@ func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, e
 		}
 		return nil, fmt.Errorf("%s", message)
 	}
-	blocks, blockIDs := buildAMD64Blocks(decoded, diagnostics)
+	functions, blockIDs := buildAMD64Functions(decoded, diagnostics)
 	result := &core.ParseResult{
-		IR:          liftAMD64(request.Target, blocks, blockIDs, diagnostics),
+		IR:          liftAMD64Functions(request.Target, functions, blockIDs, diagnostics),
 		Diagnostics: diagnostics.finish(),
 	}
 	if request.WithAssembly {
@@ -55,6 +51,8 @@ func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, e
 	return result, nil
 }
 
+// decodeAMD64 decodes one parser request. asm2lowir issues one request per
+// function boundary, so memory scales with the largest function, not the file.
 func decodeAMD64(ctx context.Context, request core.ParseRequest, diagnostics *amd64Diagnostics, keepRaw bool) ([]amd64Instruction, error) {
 	if request.Reader == nil {
 		return nil, fmt.Errorf("amd64: parse request has no reader")
@@ -114,7 +112,12 @@ func decodeAMD64One(code []byte, address uint64) (amd64Instruction, int, error) 
 	return amd64Instruction{address: address, size: inst.Len, inst: inst}, inst.Len, nil
 }
 
-func buildAMD64Blocks(decoded []amd64Instruction, diagnostics *amd64Diagnostics) ([]amd64Block, map[uint64]core.BlockID) {
+type amd64Function struct {
+	start  uint64
+	blocks []amd64Block
+}
+
+func buildAMD64Functions(decoded []amd64Instruction, diagnostics *amd64Diagnostics) ([]amd64Function, map[uint64]core.BlockID) {
 	byAddress := make(map[uint64]int, len(decoded))
 	for index, instruction := range decoded {
 		byAddress[instruction.address] = index
@@ -183,5 +186,5 @@ func buildAMD64Blocks(decoded []amd64Instruction, diagnostics *amd64Diagnostics)
 	for index := range blocks {
 		blockIDs[blocks[index].start] = core.BlockID(index + 1)
 	}
-	return blocks, blockIDs
+	return []amd64Function{{start: blocks[0].start, blocks: blocks}}, blockIDs
 }

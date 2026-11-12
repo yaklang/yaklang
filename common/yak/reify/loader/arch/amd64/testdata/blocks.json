@@ -1,0 +1,79 @@
+[
+  {
+    "address": "0x401028",
+    "code": [
+      "48 85 ff  // test rdi, rdi",
+      "74 02  // je 0x106a",
+      "31 c0  // xor eax, eax",
+      "c3  // ret"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401028 @ 0x401028",
+      "block b1 @ 0x401028",
+      "  0x401028  v1:i64 = read_register %rdi [read_register]",
+      "  0x401028  v2:i64 = read_register %rdi [read_register]",
+      "  0x401028  v3:i64 = intrinsic @x86.flags.test, v1, v2 [write_register]",
+      "  0x401028  write_register %rflags, v3 [write_register]",
+      "  0x40102b  v4:i64 = read_register %rflags [read_register]",
+      "  0x40102b  v5:i1 = intrinsic @x86.cond.e, v4 [read_register]",
+      "  0x40102b  branch v5 -> b3, b2",
+      "block b2 @ 0x40102d",
+      "  0x40102d  v6:i32 = read_register %eax [read_register]",
+      "  0x40102d  v7:i32 = read_register %eax [read_register]",
+      "  0x40102d  v8:i32 = xor v6, v7",
+      "  0x40102d  write_register %eax, v8 [write_register]",
+      "  0x40102d  v9:i64 = intrinsic @x86.flags.xor, v6, v7, v8 [write_register]",
+      "  0x40102d  write_register %rflags, v9 [write_register]",
+      "  0x40102f  jump -> b3",
+      "block b3 @ 0x40102f",
+      "  0x40102f  return [may_trap, unknown]"
+    ],
+    "name": "conditional branch",
+    "symbols": null
+  },
+  {
+    "address": "0x401018",
+    "code": [
+      "f3 0f 1e fa  // endbr64",
+      "55  // push rbp",
+      "48 89 e5  // mov rbp, rsp",
+      "48 83 ec 10  // sub rsp, 0x10",
+      "c9  // leave",
+      "c3  // ret"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401018 @ 0x401018",
+      "block b1 @ 0x401018",
+      "  0x401018  intrinsic @x86.endbr64",
+      "  0x40101c  v1:i64 = read_register %rbp [read_register]",
+      "  0x40101c  v2:i64 = read_register %rsp [read_register]",
+      "  0x40101c  v3:i64 = constant 0x8",
+      "  0x40101c  v4:i64 = sub v2, v3",
+      "  0x40101c  write_register %rsp, v4 [write_register]",
+      "  0x40101c  v5:ptr64 = copy v4",
+      "  0x40101c  store v5, v1 [write_memory]",
+      "  0x40101d  v6:i64 = read_register %rsp [read_register]",
+      "  0x40101d  write_register %rbp, v6 [write_register]",
+      "  0x401020  v7:i64 = read_register %rsp [read_register]",
+      "  0x401020  v8:i64 = constant 0x10",
+      "  0x401020  v9:i64 = sub v7, v8",
+      "  0x401020  write_register %rsp, v9 [write_register]",
+      "  0x401020  v10:i64 = intrinsic @x86.flags.sub, v7, v8, v9 [write_register]",
+      "  0x401020  write_register %rflags, v10 [write_register]",
+      "  0x401024  v11:i64 = read_register %rbp [read_register]",
+      "  0x401024  write_register %rsp, v11 [write_register]",
+      "  0x401024  v12:i64 = read_register %rsp [read_register]",
+      "  0x401024  v13:ptr64 = copy v12",
+      "  0x401024  v14:i64 = load v13 [read_memory]",
+      "  0x401024  write_register %rbp, v14 [write_register]",
+      "  0x401024  v15:i64 = constant 0x8",
+      "  0x401024  v16:i64 = add v12, v15",
+      "  0x401024  write_register %rsp, v16 [write_register]",
+      "  0x401025  return [may_trap, unknown]"
+    ],
+    "name": "function prologue",
+    "symbols": null
+  }
+]

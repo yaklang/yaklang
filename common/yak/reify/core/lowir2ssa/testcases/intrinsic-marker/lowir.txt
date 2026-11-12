@@ -1,0 +1,5 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x5000 @ 0x5000
+block b1 @ 0x5000
+  0x5000  v1:i64 = intrinsic @x86.flags.add [write_register]
+  0x5001  return v1

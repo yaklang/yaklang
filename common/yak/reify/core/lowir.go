@@ -8,7 +8,6 @@ package core
 // implicit mutable SSA values.
 type LowIR struct {
 	Target    Target     `json:"target"`
-	Assembly  string     `json:"assembly,omitempty"`
 	Functions []Function `json:"functions"`
 }
 

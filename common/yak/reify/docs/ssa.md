@@ -1,27 +1,23 @@
 # LowIR 到 YakSSA 与源码
 
-Reify 在 LowIR 之后提供两个转换包：
+Reify 提供三层表示，每层都可以挂可选的 pass：
 
 | 包 | 输入 | 输出 | 作用 |
 | --- | --- | --- | --- |
+| [core/asm2lowir](../core/asm2lowir) | `*core.Artifact`、区域 | `*core.LowIR` | 调用 arch parser，补函数名与符号 |
 | [core/lowir2ssa](../core/lowir2ssa) | `*core.LowIR` | `*ssa.Program` | 机器语义进入 YakSSA |
 | [core/ssa2source](../core/ssa2source) | `*ssa.Program` | 文本 | 可读的伪源码 |
 
-两者都是普通包，不是接口骨架。`core/stage.go` 只保留契约：
-
-```go
-type SSAIRBuilder interface {
-    BuildSSAIR(context.Context, *LowIR) (*ssa.Program, error)
-}
-
-type SourceRenderer interface {
-    RenderSource(context.Context, *ssa.Program) (string, error)
-}
-```
+`core/lowir2ssa/pass` 和 `core/ssa2source/pass` 是各自的 pass 注册表。
+`asm2lowir` 只负责解析和补符号，不做 LowIR 变形。
+[reify.go](../reify.go) 把它们串成 `Lift`，命令行只解析参数并调用它。
 
 调用链：
 
 ```text
+Artifact + Region
+  │  asm2lowir.Parse（arch parser + 符号）
+  ▼
 LowIR (Function → Block → Instruction)
   │  lowir2ssa.Convert
   ▼
@@ -141,7 +137,7 @@ merged = cleared or inserted
 
 ## 函数定义
 
-[core/funcdefs](../core/funcdefs) 保存 C 函数签名，每个语言一个文件，当前是 [c.go](../core/funcdefs/c.go)。
+[core/symbol/funcdefs](../core/symbol/funcdefs) 保存内置 C 函数签名，每个语言一个文件，当前是 [c.go](../core/symbol/funcdefs/c.go)。
 
 ```go
 type Definition struct {
@@ -175,7 +171,7 @@ YakSSA
 source
 ```
 
-`ssapass.RedefineTypeValue` 需要地址到字符串的读取函数，CLI 传入 `Artifact.StringAt`。
+`pass.RedefineTypeValue` 需要地址到字符串的读取函数，CLI 传入 `Artifact.StringAt`。
 
 ### 循环 Phi
 
@@ -239,7 +235,7 @@ function accumulate() {
 
 `ssa2source` 折叠冗余类型转换和恒等运算：`x ^ x`/`x - x` 为 `0x0`，`x & x`/`x | x` 为 `x`，乘一、加零、移位零消去。`0x0` 在指针上下文仍输出 `NULL`。
 
-`ssapass.InferTypes` 在函数定义 pass 之后运行：
+`pass.InferTypes` 在函数定义 pass 之后运行：
 
 - `malloc`、`calloc`、`realloc` 的返回值标记为 `ptr64`。
 - `free`、`memset`、`strncpy` 等指针参数把实参标记为 `ptr64`。
@@ -272,15 +268,8 @@ source 只在值有 SSA user 时输出 `v<id> =`。没有 user 的调用直接�
 - 结尾的 callee-saved `pop`
 - 配对的 `add rsp, N`
 
-检测按机器指令地址分组，允许前几条无关指令穿插。默认删除，调用方可以保留：
-
-```go
-result, err := lowir2ssa.Convert(ctx, ir, lowir2ssa.WithKeepStackFrame())
-```
-
-命令行对应 `--keep-stack-frame`。
-
-栈帧删除不重写 rbp 相对地址。删除后，`rbp - 8` 这类局部变量地址会失去基址；需要保留正确寻址时使用 `--keep-stack-frame`。
+检测按机器指令地址分组，允许前几条无关指令穿插。默认删除。栈帧删除不重写
+rbp 相对地址；需要保留时通过 pass 选项改为自定义 LowIR pass 列表。
 
 ## Stack canary
 
@@ -293,13 +282,7 @@ result, err := lowir2ssa.Convert(ctx, ir, lowir2ssa.WithKeepStackFrame())
 
 识别成功后，整段检查被删除，分支改为直接跳到成功路径，失败块在无引用时删除。死掉的地址计算由 DCE 清理。线性解码会把下一个函数并入失败块，因此检测到 `call` 后不再要求失败块有终止指令。
 
-默认删除。调用方可以选择保留：
-
-```go
-result, err := lowir2ssa.Convert(ctx, ir, lowir2ssa.WithKeepStackCanary())
-```
-
-命令行对应 `--keep-stack-canary`。
+默认删除。需要保留时通过自定义 LowIR pass 列表跳过 `remove-canary`。
 
 ## 诊断
 
@@ -330,3 +313,35 @@ result, err := lowir2ssa.Convert(ctx, ir, lowir2ssa.WithKeepStackCanary())
 `rewriter` 包已删除。需要变换时直接对 `*ssa.Program` 编写 Pass，在本包之外实现。
 
 [返回 README](../README.md)
+
+## SSAIR 文本
+
+`common/yak/ssa/ssairtext` 同时提供 SSAIR 文本的格式化和解析。
+`FormatProgram` 输出稳定文本，`Parse` 把文本读回 `*ssa.Program`；
+`lowir2ssa.FormatSSAIR` 只是转发到 `ssairtext.Format`。方言示例：
+
+```text
+sub_0x1000 <i64> (1) left, <i64> (2) right
+type: (i64, i64) -> i64
+entry_0:
+    <i64> t3 = <i64> t1 add <i64> t2
+    ret <i64> t3
+```
+
+支持函数头与参数、`type:` 行、命名块、常量、二元运算、`type_cast`、调用、
+`If`/`jump` 和 `ret`。未知形式直接报错，不做静默跳过。
+
+`ssairtext` 的测试只做文本 → 程序 → 文本的往返比较，不依赖
+`ssa2source`，因此失败能定位到格式本身。
+
+阶段测试使用 embedded JSON：
+
+```text
+common/yak/ssa/ssairtext/testdata/base.ssair  # SSAIR 文本往返
+core/lowir2ssa/testcases/*.json           # LowIR → SSAIR/source
+core/ssa2source/testcases/*.json          # SSAIR → source
+loader/arch/amd64/testdata/*.json         # 机器码 → 精确 LowIR
+```
+
+AMD64 用例的 `lowir` 是完整期望文本，不做片段匹配；
+SSAIR 用例是普通文本，不使用 JSON 转义。

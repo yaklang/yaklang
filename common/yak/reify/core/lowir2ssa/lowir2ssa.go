@@ -15,7 +15,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa/pass"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssairtext"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -25,49 +27,26 @@ type Result struct {
 	Diagnostics []core.Diagnostic
 }
 
-// Options controls conversion metadata and passes.
+// Options controls conversion and LowIR normalization.
 type Options struct {
-	ProgramName     string
-	KeepStackCanary bool
-	KeepStackFrame  bool
+	ProgramName string
+	LowIRPasses []string
 }
 
 // Option customizes conversion.
 type Option func(*Options)
 
+// WithLowIRPasses selects registered LowIR passes, in order.
+func WithLowIRPasses(names ...string) Option {
+	return func(options *Options) {
+		options.LowIRPasses = append([]string(nil), names...)
+	}
+}
+
 // WithProgramName sets the generated YakSSA program name.
 func WithProgramName(name string) Option {
 	return func(options *Options) {
 		options.ProgramName = name
-	}
-}
-
-// WithKeepStackCanary keeps recognized stack-protector code. The default
-// removes it, so the generated program only shows application logic.
-func WithKeepStackCanary() Option {
-	return func(options *Options) {
-		options.KeepStackCanary = true
-	}
-}
-
-// WithStackCanaryRemoval enables or disables the stack-canary pass.
-func WithStackCanaryRemoval(remove bool) Option {
-	return func(options *Options) {
-		options.KeepStackCanary = !remove
-	}
-}
-
-// WithKeepStackFrame keeps frame setup and teardown. The default removes it.
-func WithKeepStackFrame() Option {
-	return func(options *Options) {
-		options.KeepStackFrame = true
-	}
-}
-
-// WithStackFrameRemoval enables or disables the stack-frame pass.
-func WithStackFrameRemoval(remove bool) Option {
-	return func(options *Options) {
-		options.KeepStackFrame = !remove
 	}
 }
 
@@ -98,35 +77,20 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 			return nil, err
 		}
 		function := ir.Functions[index]
-		if !settings.KeepStackCanary {
-			RemoveStackCanary(&function)
+		names := settings.LowIRPasses
+		if len(names) == 0 {
+			names = pass.DefaultNames()
 		}
-		duplicateReturnBlocks(&function)
-		if !settings.KeepStackFrame {
-			function.FrameRemoved = RemoveStackFrame(&function) > 0
-			function.FrameCleanup = true
-		} else {
-			function.FrameKept = true
+		if err := pass.Apply(&function, names...); err != nil {
+			return nil, err
 		}
-		foldReturnTails(&function)
-		reorderReversePostorder(&function)
+		function.FrameCleanup = containsPass(names, "remove-stackframe")
+		function.FrameKept = !function.FrameCleanup
 		if err := converter.convertFunction(function); err != nil {
 			return nil, err
 		}
 	}
 	return &Result{Program: program, Diagnostics: converter.diagnostics}, nil
-}
-
-// Builder adapts Convert to the core.SSAIRBuilder contract.
-type Builder struct{}
-
-// BuildSSAIR converts LowIR to YakSSA.
-func (Builder) BuildSSAIR(ctx context.Context, ir *core.LowIR) (*ssa.Program, error) {
-	result, err := Convert(ctx, ir)
-	if err != nil {
-		return nil, err
-	}
-	return result.Program, nil
 }
 
 // Text renders the converted program with YakSSA's disassembler. Extern call
@@ -135,19 +99,7 @@ func Text(program *ssa.Program) string {
 	if program == nil {
 		return ""
 	}
-	var text strings.Builder
-	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
-		if function == nil || isSyntheticFunction(function) {
-			return true
-		}
-		text.WriteString(FormatSSAIR(function))
-		return true
-	})
-	return text.String()
-}
-
-func isSyntheticFunction(function *ssa.Function) bool {
-	return strings.HasPrefix(function.GetName(), "reify.") || function.IsExtern()
+	return ssairtext.FormatProgram(program)
 }
 
 type converter struct {
@@ -1436,4 +1388,13 @@ func literalUint64(literal []byte) uint64 {
 	var buffer [8]byte
 	copy(buffer[:], literal)
 	return binary.LittleEndian.Uint64(buffer[:])
+}
+
+func containsPass(names []string, want string) bool {
+	for _, name := range names {
+		if name == want {
+			return true
+		}
+	}
+	return false
 }

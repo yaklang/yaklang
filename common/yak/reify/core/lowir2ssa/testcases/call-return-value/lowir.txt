@@ -1,0 +1,6 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x5b00 @ 0x5b00
+block b1 @ 0x5b00
+  0x5b00  call @helper [call]
+  0x5b01  v1:i64 = read_register %rax [read_register]
+  0x5b02  return v1

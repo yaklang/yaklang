@@ -17,14 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-// Renderer adapts Render to the core.SourceRenderer contract.
-type Renderer struct{}
-
-// RenderSource renders a YakSSA program.
-func (Renderer) RenderSource(ctx context.Context, program *ssa.Program) (string, error) {
-	return Render(ctx, program)
-}
-
 // Render converts a YakSSA program into source-like text.
 func Render(ctx context.Context, program *ssa.Program) (string, error) {
 	if program == nil {
@@ -37,7 +29,7 @@ func Render(ctx context.Context, program *ssa.Program) (string, error) {
 			renderErr = err
 			return false
 		}
-		if function == nil || function.IsExtern() || strings.HasPrefix(function.GetName(), "reify.") {
+		if function == nil || function.IsExtern() {
 			return true
 		}
 		if strings.Contains(function.GetVerboseName(), "boundary: plt") {
@@ -50,7 +42,7 @@ func Render(ctx context.Context, program *ssa.Program) (string, error) {
 			renderErr = err
 			return false
 		}
-		output.WriteString(cleaned)
+		output.WriteString(renumberSource(function, cleaned))
 		output.WriteByte('\n')
 		return true
 	})
@@ -58,6 +50,55 @@ func Render(ctx context.Context, program *ssa.Program) (string, error) {
 		return "", renderErr
 	}
 	return output.String(), nil
+}
+
+var sourceValueID = regexp.MustCompile(`\bv(\d+)\b`)
+
+// renumberSource maps program-global IDs to the same per-function sequence as
+// SSAIR text: parameters, then phis and instructions in block order.
+func renumberSource(function *ssa.Function, source string) string {
+	next := int64(1)
+	ids := make(map[int64]int64)
+	add := func(id int64) {
+		if id <= 0 {
+			return
+		}
+		if _, ok := ids[id]; ok {
+			return
+		}
+		ids[id] = next
+		next++
+	}
+	for _, id := range function.Params {
+		if value, ok := function.GetValueById(id); ok && value != nil && value.HasUsers() {
+			add(id)
+		}
+	}
+	for _, blockID := range function.Blocks {
+		block, ok := function.GetBasicBlockByID(blockID)
+		if !ok || block == nil {
+			continue
+		}
+		for _, id := range block.Phis {
+			add(id)
+		}
+		for _, id := range block.Insts {
+			add(id)
+		}
+	}
+	return sourceValueID.ReplaceAllStringFunc(source, func(match string) string {
+		raw, err := strconv.ParseInt(match[1:], 10, 64)
+		if err != nil {
+			return match
+		}
+		mapped, ok := ids[raw]
+		if !ok {
+			mapped = next
+			next++
+			ids[raw] = mapped
+		}
+		return fmt.Sprintf("v%d", mapped)
+	})
 }
 
 func renderFunction(text *strings.Builder, function *ssa.Function) {

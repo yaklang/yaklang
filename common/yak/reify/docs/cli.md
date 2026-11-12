@@ -27,24 +27,25 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 
 | 模式 | 输出 | 状态 |
 | --- | --- | --- |
-| `1asm` / `asm` | 地址、机器字节和汇编；`--asm-syntax att|intel` | 已实现，默认 |
-| `2lowir` / `lowir` | 块、值、操作、目标和效果 | 已实现 |
-| `3ssair` / `ssair` | 带类型、对齐 `=` 的 YakSSA 文本 | 已实现 |
-| `4source` / `source` | 伪源码 | 已实现 |
+| `asm` | 地址、机器字节和汇编；`--asm-syntax att|intel` | 已实现，默认 |
+| `lowir` | 块、值、操作、目标和效果 | 已实现 |
+| `ssair` | 带类型、对齐 `=` 的 YakSSA 文本 | 已实现 |
+| `source` | 伪源码 | 已实现 |
 | `all` | 同一次解码输出四段，分隔为 `===== 1asm =====` 等 | 已实现 |
 
 `lift` 的转换选项：
 
-- `--keep-stack-canary`：保留 stack-protector 代码。默认删除。只影响 `ssair` 和 `source`。
-- `--keep-stack-frame`：保留栈帧建立与销毁。默认删除。删除后不重写 rbp 相对地址。
 - `--asm-syntax intel|att`：汇编语法，默认 `intel`；`att` 输出 GNU/AT&T 语法。
 - `--func NAME`：反编译一个已恢复函数；不能和 `--address/--size` 同用。
 - `--address` 也接受函数符号名（`sum_points` 或 `0xsum_points`）。
+- `--lowir-pass NAME[,NAME...]`：只运行指定的 LowIR pass，默认运行全部默认 pass（含去 canary 和栈帧）。只影响 `ssair`、`source` 和 `all`；`lowir` 输出 asm2lowir 得到的普通 LowIR。
+- `--ssa-pass NAME[,NAME...]`：只运行指定的 SSA pass，默认运行标准 pass 序列。
 
 `lift` 的区域选择：
 
-- 默认解码 `.text` 节。
-- `--section NAME` 选择其他节。
+- 无区域选项时恢复并解码全部已发现函数；`--func` 只选一个函数。
+- `--section NAME` 只解码指定节。
+- `--func NAME` 只解码指定函数。
 - `--address ADDRESS --size SIZE` 解码指定映像地址和字节数。两个参数必须同时给出。
 
 标志可以放在文件名之前或之后。输入文件只读打开，结果写入标准输出。
@@ -54,14 +55,14 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" parsers --json
 "$OUT/bin/reify" inspect --json /bin/true
 "$OUT/bin/reify" check /bin/true
-"$OUT/bin/reify" lift --mode 1asm --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode 2lowir --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode 3ssair --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode 4source --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode 1asm --asm-syntax intel --address 0x2590 --size 48 /bin/true
-"$OUT/bin/reify" lift --mode 4source --func main /bin/true
+"$OUT/bin/reify" lift --mode asm --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode lowir --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode ssair --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode source --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode asm --asm-syntax intel --address 0x2590 --size 48 /bin/true
+"$OUT/bin/reify" lift --mode source --func main /bin/true
 "$OUT/bin/reify" lift --mode all --func main /bin/true
-"$OUT/bin/reify" lift --json --mode 2lowir /bin/true
+"$OUT/bin/reify" lift --json --mode lowir /bin/true
 ```
 
 ## loaders 与 parsers
@@ -196,11 +197,11 @@ JSON 结构：
 Boundaries: symbol=13 eh_frame=8 init_array=2 plt=5 entry=1 call_target=0 scan=0 duplicates=10
 ```
 
-`3ssair` / `4source` 的每个函数头带 `; boundary: symbol` 或 `// boundary: eh_frame`。
+`ssair` / `source` 的每个函数头带 `; boundary: symbol` 或 `// boundary: eh_frame`。
 
 ### lowir
 
-`--mode 2lowir` 输出区域统计和 LowIR 文本：
+`--mode lowir` 输出区域统计和 LowIR 文本：
 
 ```text
 Scope: amd64 LowIR
@@ -265,7 +266,7 @@ JSON 结构：
 
 ### ssair
 
-`--mode 3ssair` 先构建 LowIR，再调用 `lowir2ssa.Convert`，最后输出 YakSSA 文本：
+`--mode ssair` 先构建 LowIR，再调用 `lowir2ssa.Convert`，最后输出 YakSSA 文本：
 
 ```text
 Scope: amd64 SSair
@@ -304,7 +305,7 @@ JSON 增加 `ssair` 字段，并保留 `ir` 与 `diagnostics`：
 
 ### source
 
-`--mode 4source` 在同一个 YakSSA 程序上调用 `ssa2source.Render`：
+`--mode source` 在同一个 YakSSA 程序上调用 `ssa2source.Render`：
 
 ```text
 Scope: amd64 source
@@ -345,10 +346,10 @@ common/yak/reify/scripts/lift-all.sh -o /mnt/data/scan-outputs/reify-lift /bin/t
 
 任一模式失败时，脚本把错误写入对应文件，继续其余模式，最后返回 1。
 
-示例二进制：[examples/hello.c](../examples/hello.c)。
+示例二进制：[test/examples/hello.c](../test/examples/hello.c)。
 
 ```bash
-gcc -O1 -fno-pie -no-pie -o /tmp/hello common/yak/reify/examples/hello.c
+gcc -O1 -fno-pie -no-pie -o /tmp/hello common/yak/reify/test/examples/hello.c
 main_addr=$(nm -S --defined-only /tmp/hello | awk '$4 == "main" {print "0x"$1}')
 main_size=$(nm -S --defined-only /tmp/hello | awk '$4 == "main" {print "0x"$2}')
 

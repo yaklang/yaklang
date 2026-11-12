@@ -14,7 +14,8 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
-	"github.com/yaklang/yaklang/common/yak/reify/loader/native"
+	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/fileformat"
 )
 
 func writeValue(t *testing.T, buffer *bytes.Buffer, value any) {
@@ -258,7 +259,7 @@ func TestCatalogDetectAmbiguity(t *testing.T) {
 
 func TestCatalogParserSelectionAndParse(t *testing.T) {
 	parser := &fakeParser{kind: core.ArchAMD64, usable: true}
-	catalog, err := NewCatalog([]core.Loader{native.ELF{}}, []core.Parser{parser})
+	catalog, err := NewCatalog([]core.Loader{fileformat.ELF{}}, []core.Parser{parser})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +270,7 @@ func TestCatalogParserSelectionAndParse(t *testing.T) {
 	if artifact.Parser != parser || len(artifact.Diagnostics) != 0 {
 		t.Fatalf("available parser not selected cleanly: %+v", artifact.Diagnostics)
 	}
-	result, err := artifact.Parse(context.Background(), core.Region{Address: 0x401000, Offset: 0, Size: 4})
+	result, err := asm2lowir.Parse(context.Background(), artifact, asm2lowir.WithRegion(core.Region{Address: 0x401000, Offset: 0, Size: 4}), asm2lowir.WithExact())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,6 @@
+sub_0x5000
+type: () -> i64
+entry_0: (<nil condition>)
+	<string> t1 = <string> x86.flags.add
+	<i64> t2    = type_cast[i64] <string> x86.flags.add
+	ret <i64> t2

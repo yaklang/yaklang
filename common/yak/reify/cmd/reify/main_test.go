@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/reify"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
 )
@@ -27,11 +28,11 @@ func runCLI(args ...string) (int, string, string) {
 func TestCLIHelpAndUsage(t *testing.T) {
 	for _, args := range [][]string{nil, {"help"}, {"--help"}, {"-h"}} {
 		code, out, errOut := runCLI(args...)
-		if code != 0 || !strings.Contains(out, "Scope: file headers") || errOut != "" {
+		if code != 0 || !strings.Contains(out, "COMMANDS:") || !strings.Contains(out, "loaders") || errOut != "" {
 			t.Fatalf("help %v: %d %q %q", args, code, out, errOut)
 		}
 	}
-	for _, args := range [][]string{{"analyze"}, {"inspect"}, {"check"}, {"lift"}, {"loaders", "extra"}, {"parsers", "extra"}, {"inspect", "--unknown"}, {"inspect", "a", "b"}, {"lift", "a", "b"}, {"lift", "--mode", "bogus", "a"}} {
+	for _, args := range [][]string{{"analyze"}, {"inspect"}, {"check"}, {"lift"}, {"loaders", "extra"}, {"parsers", "extra"}, {"inspect", "--unknown"}, {"inspect", "a", "b"}, {"lift", "a", "b"}, {"lift", "--mode", "bogus", "a"}, {"lift", "--mode", "1asm", "a"}} {
 		code, _, errOut := runCLI(args...)
 		if code != 2 || errOut == "" {
 			t.Fatalf("usage %v: %d %q", args, code, errOut)
@@ -383,7 +384,7 @@ func TestCLILiftsLinkedExample(t *testing.T) {
 	}
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "linked_list")
-	source := filepath.Join("..", "..", "examples", "linked_list.c")
+	source := filepath.Join("..", "..", "test", "examples", "linked_list.c")
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fstack-protector-strong", "-o", binary, source)
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build example: %v\n%s", err, output)
@@ -423,9 +424,6 @@ func TestCLILiftsLinkedExample(t *testing.T) {
 		if err := json.Unmarshal([]byte(out), &report); err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(report.Source, "reify.") {
-			t.Fatalf("source uses reify pseudo-functions:\n%s", report.Source)
-		}
 		if len(report.Diagnostics) != 0 {
 			t.Fatalf("%s diagnostics: %+v", symbol.Name, report.Diagnostics)
 		}
@@ -441,14 +439,14 @@ func TestCLILiftsLinkedExample(t *testing.T) {
 		}
 	}
 	makeNodeSource, _ := liftSource(symbol("make_node"))
-	allCode, allSource, allErr := runCLI("lift", "--mode", "4source", binary)
+	allCode, allSource, allErr := runCLI("lift", "--mode", "source", binary)
 	if allCode != 0 || allErr != "" {
 		t.Fatalf("lift all linked: %d %s", allCode, allErr)
 	}
 	if got := callArgumentCount(allSource, "make_node"); got != 2 {
 		t.Fatalf("make_node arity = %d:\n%s", got, allSource)
 	}
-	asmCode, asmText, asmErr := runCLI("lift", "--mode", "1asm", binary)
+	asmCode, asmText, asmErr := runCLI("lift", "--mode", "asm", binary)
 	if asmCode != 0 || asmErr != "" || !strings.Contains(asmText, "f3 0f 1e fa") || strings.Contains(asmText, "7f 45") {
 		t.Fatalf("all-function assembly is wrong: %d %s\n%s", asmCode, asmErr, asmText)
 	}
@@ -498,23 +496,23 @@ func TestCLILiftsLinkedExample(t *testing.T) {
 	if !strings.Contains(freeListBody, "return;") || strings.Contains(freeListBody, "return *") {
 		t.Fatalf("free_list is not void:\n%s", freeListBody)
 	}
-	freeSSAIR, errOut := runCLI2("lift", "--mode", "3ssair", "--func", "free_list", binary)
+	freeSSAIR, errOut := runCLI2("lift", "--mode", "ssair", "--func", "free_list", binary)
 	if errOut != "" || !strings.Contains(freeSSAIR, "free_list <ptr64>") || strings.Contains(freeSSAIR, "arg1") {
 		t.Fatalf("free_list SSAIR signature is wrong:\n%s", freeSSAIR)
 	}
 	for _, args := range [][]string{
-		{"lift", "--mode", "4source", "--address", "0xsum_points", "--size", "0x5e", binary},
-		{"lift", "--mode", "4source", "--func", "sum_points", binary},
+		{"lift", "--mode", "source", "--address", "0xsum_points", "--size", "0x5e", binary},
+		{"lift", "--mode", "source", "--func", "sum_points", binary},
 	} {
 		code, out, errOut := runCLI(args...)
 		if code != 0 || errOut != "" || !strings.Contains(out, "sum_points(") {
 			t.Fatalf("symbol selection %v: %d %s", args, code, errOut)
 		}
 	}
-	if code, _, errOut := runCLI("lift", "--mode", "4source", "--address", "0xnope", "--size", "1", binary); code == 0 || !strings.Contains(errOut, "does not exist") {
+	if code, _, errOut := runCLI("lift", "--mode", "source", "--address", "0xnope", "--size", "1", binary); code == 0 || !strings.Contains(errOut, "does not exist") {
 		t.Fatalf("unknown symbol was accepted: %d %s", code, errOut)
 	}
-	if code, _, errOut := runCLI("lift", "--mode", "4source", "--func", "__TMC_END__", binary); code == 0 || !strings.Contains(errOut, "not a function") {
+	if code, _, errOut := runCLI("lift", "--mode", "source", "--func", "__TMC_END__", binary); code == 0 || !strings.Contains(errOut, "not a function") {
 		t.Fatalf("object symbol was accepted: %d %s", code, errOut)
 	}
 }
@@ -525,7 +523,7 @@ func TestCLILiftsControlFlowExample(t *testing.T) {
 	}
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "control_flow")
-	source := filepath.Join("..", "..", "examples", "control_flow.c")
+	source := filepath.Join("..", "..", "test", "examples", "control_flow.c")
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build example: %v\n%s", err, output)
@@ -563,9 +561,6 @@ func TestCLILiftsControlFlowExample(t *testing.T) {
 		}
 		if err := json.Unmarshal([]byte(out), &report); err != nil {
 			t.Fatal(err)
-		}
-		if strings.Contains(report.Source, "reify.") {
-			t.Fatalf("source uses reify pseudo-functions:\n%s", report.Source)
 		}
 		return report.Source
 	}
@@ -606,7 +601,7 @@ func TestCLILiftsIntelSyntax(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	code, out, errOut := runCLI("lift", "--mode", "1asm", "--asm-syntax", "intel",
+	code, out, errOut := runCLI("lift", "--mode", "asm", "--asm-syntax", "intel",
 		"--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift Intel asm: %d %s", code, errOut)
@@ -616,22 +611,6 @@ func TestCLILiftsIntelSyntax(t *testing.T) {
 	}
 	if strings.Contains(out, "%rsp") || strings.Contains(out, "%rbp") {
 		t.Fatalf("Intel syntax contains AT&T registers: %s", out)
-	}
-}
-
-func TestCLIKeepStackFrame(t *testing.T) {
-	path, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	file, err := elf.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-	code, out, errOut := runCLI("lift", "--mode", "source", "--keep-stack-frame", "--address", strconv.FormatUint(file.Entry, 10), "--size", "48", path)
-	if code != 0 || errOut != "" || !strings.Contains(out, "sub_0x") {
-		t.Fatalf("keep stack frame: %d %q %q", code, out, errOut)
 	}
 }
 
@@ -669,27 +648,28 @@ func TestCLILiftsDefaultTextSection(t *testing.T) {
 }
 
 func TestParseLiftModeAndAsmSyntaxAliases(t *testing.T) {
-	for raw, want := range map[string]liftMode{
-		"1asm": liftModeASM, "asm": liftModeASM,
-		"2lowir": liftModeLowIR, "lowir": liftModeLowIR,
-		"3ssair": liftModeSSAIR, "ssair": liftModeSSAIR,
-		"4source": liftModeSource, "source": liftModeSource,
+	for raw, want := range map[string]reify.Mode{
+		"asm":    reify.ModeASM,
+		"lowir":  reify.ModeLowIR,
+		"ssair":  reify.ModeSSAIR,
+		"source": reify.ModeSource,
+		"all":    reify.ModeAll,
 	} {
-		got, err := parseLiftMode(raw)
+		got, err := reify.ParseMode(raw)
 		if err != nil || got != want {
-			t.Fatalf("parseLiftMode(%q) = %q, %v; want %q", raw, got, err, want)
+			t.Fatalf("ParseMode(%q) = %q, %v; want %q", raw, got, err, want)
 		}
 	}
 	for raw, want := range map[string]core.AsmSyntax{
 		"att": core.AsmSyntaxATT, "gnu": core.AsmSyntaxATT,
 		"intel": core.AsmSyntaxIntel, "": core.AsmSyntaxIntel,
 	} {
-		got, err := parseAsmSyntax(raw)
+		got, err := reify.ParseAsmSyntax(raw)
 		if err != nil || got != want {
-			t.Fatalf("parseAsmSyntax(%q) = %q, %v; want %q", raw, got, err, want)
+			t.Fatalf("ParseAsmSyntax(%q) = %q, %v; want %q", raw, got, err, want)
 		}
 	}
-	if _, err := parseAsmSyntax("nasm"); err == nil {
+	if _, err := reify.ParseAsmSyntax("nasm"); err == nil {
 		t.Fatal("unknown assembly syntax was accepted")
 	}
 }

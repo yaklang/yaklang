@@ -29,11 +29,11 @@ func (Parser) Disassemble(ctx context.Context, request core.ParseRequest) (*core
 		}
 		return nil, fmt.Errorf("%s", message)
 	}
-	blocks, blockIDs := buildAMD64Blocks(decoded, diagnostics)
+	functions, blockIDs := buildAMD64Functions(decoded, diagnostics)
 	// Assembly and LowIR are two views of the same decode-and-lift pipeline.
 	// Report lift diagnostics in both modes so a region cannot look clean only
 	// because the caller asked for text.
-	_ = liftAMD64(request.Target, blocks, blockIDs, diagnostics)
+	_ = liftAMD64Functions(request.Target, functions, blockIDs, diagnostics)
 	return &core.Disassembly{
 		Text:         renderAMD64Assembly(decoded, request.Syntax),
 		Instructions: len(decoded),

@@ -1,0 +1,5 @@
+sub_0x5a00
+type: () -> i64
+entry_0: (<nil condition>)
+	<i64> t1 = <i64> 7
+	ret <i64> 7

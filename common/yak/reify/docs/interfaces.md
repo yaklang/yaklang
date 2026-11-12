@@ -89,6 +89,7 @@ type Artifact struct {
     Target Target
     Image  *Image
     Diagnostics []Diagnostic
+    Hints  *BoundaryHints
     Reader *ByteReader
     Loader Loader
     Parser Parser
@@ -101,15 +102,13 @@ type Artifact struct {
 | --- | --- |
 | `RegionAt(address, size)` | 虚拟地址 → 文件区域 |
 | `EntryRegion(size)` | 从入口点开始的文件区域 |
-| `Parse(ctx, region)` | 用 artifact 的 parser 解析区域 |
-| `Disassemble(ctx, region)` | 用 parser 的可选能力渲染汇编文本 |
+| `RegionReader(region)` | 为区域建立有界 ByteReader |
+| `StringAt(address, max)` | 读取地址处的 C 字符串 |
 | `Close()` | 释放拥有的 source |
 
 `RegionAt` 要求整个范围落在同一个节的文件数据内。零填充区域、跨节范围和溢出地址都返回 `ErrRegion`。
 
-`Parse` 要求 Artifact 已有 parser。没有 parser 时返回 `ErrNoParser`。调用前会再次执行 `Parser.Check`；解析结果必须包含 LowIR、至少一个 Function，且 LowIR 的 Target 必须与 Artifact 一致，否则返回错误。`Parse` 把区域切成有界 ByteReader，不复制整段代码。
-
-`Disassemble` 要求 parser 实现 `core.Disassembler`。没有该能力时返回 `ErrNoDisassembler`；它不构建 LowIR。
+`Artifact` 只承载加载结果和区域映射，不执行解析。解析由 `asm2lowir.Parse` 完成：它调用 parser、切分函数并补符号。`Disassembly` 由 `asm2lowir.Disassemble` 调用 parser 的可选能力生成。
 
 ## Image 与 Section
 
@@ -200,33 +199,15 @@ type Disassembly struct {
 
 定义：[core/lowir.go](../core/lowir.go)。
 
-LowIR 是具体结构，不是接口。`ParseResult.IR` 是指向 `core.LowIR` 的指针。LowIR 包含 `Functions`；每个 Function 包含 `Blocks`；每个 Block 包含 `Instructions`。直接调用 `Parser.Parse` 时，nil 表示解析器没有产出表示；`Artifact.Parse` 要求结果非 nil、至少一个 Function，且 Target 与 Artifact 一致。
+LowIR 是具体结构，不是接口。`ParseResult.IR` 是指向 `core.LowIR` 的指针。LowIR 包含 `Functions`；每个 Function 包含 `Blocks`；每个 Block 包含 `Instructions`。直接调用 `Parser.Parse` 时，nil 表示解析器没有产出表示；`asm2lowir.Parse` 要求结果非 nil、至少一个 Function，且 Target 与 Artifact 一致。
 
 详细约束见 [LowIR 文档](lowir.md)。
 
 ## SSA 边界
 
-定义：[core/stage.go](../core/stage.go)。
+LowIR 的文本形式由 `lowirtext.Format` 提供，不属于 parser 契约。它保留函数、块、值、操作、目标和效果，JSON 仍是机器可读形式。
 
-```go
-type SSAIRBuilder interface {
-    BuildSSAIR(context.Context, *LowIR) (*ssa.Program, error)
-}
-
-type SourceRenderer interface {
-    RenderSource(context.Context, *ssa.Program) (string, error)
-}
-```
-
-两个契约都有实现：
-
-- [core/lowir2ssa](../core/lowir2ssa)：`Convert` 返回 `Result{Program, Diagnostics}`；`Builder` 满足 `SSAIRBuilder`；`Text` 输出 YakSSA 文本；`WithKeepStackCanary`、`WithKeepStackFrame` 保留对应 pass 的输入。
-- [core/ssapass](../core/ssapass)：`ApplyFunctionDefine` 应用 C 签名，`RedefineTypeValue` 替换字符串参数。
-- [core/ssa2source](../core/ssa2source)：`Render` 输出伪源码；`Renderer` 满足 `SourceRenderer`。
-
-LowIR 的文本形式由 `core.FormatLowIR` 提供，不属于 parser 契约。它保留函数、块、值、操作、目标和效果，JSON 仍是机器可读形式。
-
-转换把通用寄存器和内存槽提升为带位宽类型的变量。普通分支汇合沿用变量；循环头插入 loop-carried Phi。只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。转换不做语言级类型恢复和内存 SSA。默认删除 stack canary；`WithKeepStackCanary` 可保留。完整映射和诊断见 [SSA 文档](ssa.md)。
+转换把通用寄存器和内存槽提升为带位宽类型的变量。普通分支汇合沿用变量；循环头插入 loop-carried Phi。只有汇编 `call` 生成 YakSSA `Call`；intrinsic 保留为类型化标记。`lowir2ssa` 默认运行完整 LowIR pass 列表，包含删除 stack canary 和栈帧。完整映射和诊断见 [SSA 文档](ssa.md)。
 
 `rewriter` 包已删除。需要变换时直接对 `*ssa.Program` 编写 Pass。
 

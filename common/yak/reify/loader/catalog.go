@@ -14,7 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch"
-	"github.com/yaklang/yaklang/common/yak/reify/loader/native"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/fileformat"
 )
 
 var (
@@ -32,10 +32,7 @@ type Catalog struct {
 // Default is the process-wide catalog: one loader per native format and one
 // parser per supported architecture. Registration is explicit; no package init
 // hook mutates it later.
-var Default = mustNewCatalog(
-	[]core.Loader{native.ELF{}, native.PE{}, native.MachO{}},
-	arch.All(),
-)
+var Default = mustNewCatalog(fileformat.All(), arch.All())
 
 func mustNewCatalog(loaders []core.Loader, parsers []core.Parser) *Catalog {
 	catalog, err := NewCatalog(loaders, parsers)

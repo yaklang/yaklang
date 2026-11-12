@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"math"
-	"strings"
 	"testing"
 )
 
@@ -144,127 +143,6 @@ type stubDisassembler struct {
 func (p *stubDisassembler) Disassemble(_ context.Context, request ParseRequest) (*Disassembly, error) {
 	p.request = request
 	return p.result, p.err
-}
-
-func TestArtifactDisassemble(t *testing.T) {
-	artifact := testArtifact(t)
-	artifact.Parser = &stubParser{available: true}
-	if _, err := artifact.Disassemble(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); !errors.Is(err, ErrNoDisassembler) {
-		t.Fatalf("parser without disassembler: %v", err)
-	}
-
-	parser := &stubDisassembler{
-		stubParser: stubParser{available: true},
-		result:     &Disassembly{Text: "nop\n", Instructions: 1},
-	}
-	artifact.Parser = parser
-	result, err := artifact.Disassemble(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Text != "nop\n" || parser.request.Address != 0x1000 || parser.request.Reader == nil || parser.request.Reader.Size() != 4 {
-		t.Fatalf("bad disassembly: %+v", result)
-	}
-	code, err := parser.request.Reader.Bytes(0, 4)
-	if err != nil || !bytes.Equal(code, make([]byte, 4)) {
-		t.Fatalf("bad disassembly reader: %v %v", code, err)
-	}
-
-	parser.result = nil
-	if _, err := artifact.Disassemble(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); err == nil || !strings.Contains(err.Error(), "no disassembly") {
-		t.Fatalf("nil disassembly accepted: %v", err)
-	}
-	failure := errors.New("disassembly failed")
-	parser.err = failure
-	if _, err := artifact.Disassemble(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); !errors.Is(err, failure) {
-		t.Fatalf("disassembly error lost: %v", err)
-	}
-	parser.err = nil
-	if _, err := artifact.Disassemble(context.Background(), Region{Address: 0x1000, Offset: 99, Size: 4}); !errors.Is(err, ErrRegion) {
-		t.Fatalf("bad region accepted: %v", err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if _, err := artifact.Disassemble(ctx, Region{Address: 0x1000, Offset: 0x10, Size: 4}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("cancellation: %v", err)
-	}
-}
-
-func TestArtifactParse(t *testing.T) {
-	artifact := testArtifact(t)
-	parser := &stubParser{available: true}
-	artifact.Parser = parser
-	result, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if parser.request.Address != 0x1000 || parser.request.Reader == nil || parser.request.Reader.Size() != 4 || result.IR.Target != artifact.Target {
-		t.Fatalf("bad parse request: %+v", parser.request)
-	}
-	code, err := parser.request.Reader.Bytes(0, 4)
-	if err != nil || !bytes.Equal(code, make([]byte, 4)) {
-		t.Fatalf("bad parse reader: %v %v", code, err)
-	}
-	artifact.Parser = nil
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); !errors.Is(err, ErrNoParser) {
-		t.Fatalf("expected no-parser error, got %v", err)
-	}
-	artifact.Parser = parser
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 99, Size: 4}); !errors.Is(err, ErrRegion) {
-		t.Fatalf("expected region error, got %v", err)
-	}
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 0}); !errors.Is(err, ErrRegion) {
-		t.Fatalf("expected empty-region error, got %v", err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if _, err := artifact.Parse(ctx, Region{Address: 0x1000, Offset: 0x10, Size: 4}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("expected cancellation, got %v", err)
-	}
-	failure := errors.New("unsupported mode")
-	artifact.Parser = &stubParser{available: true, checkErr: failure}
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); !errors.Is(err, failure) {
-		t.Fatalf("parser check was skipped: %v", err)
-	}
-	artifact.Parser = &stubParser{available: true, result: &ParseResult{}}
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); err == nil || !strings.Contains(err.Error(), "no LowIR") {
-		t.Fatalf("missing LowIR accepted: %v", err)
-	}
-	artifact.Parser = &stubParser{available: true, result: &ParseResult{IR: &LowIR{Target: artifact.Target}}}
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); err == nil || !strings.Contains(err.Error(), "no functions") {
-		t.Fatalf("empty LowIR accepted: %v", err)
-	}
-	otherTarget := artifact.Target
-	otherTarget.OS = OSWindows
-	artifact.Parser = &stubParser{available: true, result: &ParseResult{IR: &LowIR{Target: otherTarget}}}
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1000, Offset: 0x10, Size: 4}); err == nil || !strings.Contains(err.Error(), "inconsistent target") {
-		t.Fatalf("inconsistent target accepted: %v", err)
-	}
-}
-
-func TestArtifactParsePassesRegionReader(t *testing.T) {
-	artifact := testArtifact(t)
-	raw := make([]byte, 100)
-	for index := range raw {
-		raw[index] = byte(index)
-	}
-	artifact.Reader = newReader(t, raw)
-	parser := &stubParser{available: true}
-	artifact.Parser = parser
-	if _, err := artifact.Parse(context.Background(), Region{Address: 0x1004, Offset: 0x14, Size: 4}); err != nil {
-		t.Fatal(err)
-	}
-	if parser.request.Address != 0x1004 || parser.request.Reader == nil || parser.request.Reader.Size() != 4 {
-		t.Fatalf("unexpected request: %+v", parser.request)
-	}
-	code, err := parser.request.Reader.Bytes(0, 4)
-	if err != nil || !bytes.Equal(code, raw[0x14:0x18]) {
-		t.Fatalf("region reader offset: %v %v", code, err)
-	}
-	buffer := make([]byte, 2)
-	if n, err := parser.request.Reader.ReadAt(buffer, 1); err != nil || n != 2 || !bytes.Equal(buffer, raw[0x15:0x17]) {
-		t.Fatalf("region reader ReadAt: %v %v %v", n, buffer, err)
-	}
 }
 
 func TestArtifactClose(t *testing.T) {

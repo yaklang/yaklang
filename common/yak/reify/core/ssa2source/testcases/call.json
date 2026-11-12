@@ -1,0 +1,18 @@
+{
+  "name": "call",
+  "note": "调用保留符号名，结果被返回",
+  "source": [
+    "uint64_t caller(void) {",
+    "    v1 = helper();",
+    "    return v1;",
+    "}"
+  ],
+  "ssair": [
+    "caller",
+    "type: () -\u003e i64",
+    "extern helper",
+    "entry_0:",
+    "    \u003ci64\u003e t1 = call \u003c() -\u003e i64\u003e helper () binding[] member[]",
+    "    ret \u003ci64\u003e t1"
+  ]
+}
