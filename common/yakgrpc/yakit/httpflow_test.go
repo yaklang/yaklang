@@ -28,6 +28,8 @@ func TestLowHTTPFlowSourceTypePreservesNamedProducer(t *testing.T) {
 	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType(""))
 	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType("webfuzzer"))
 	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType("WebFuzzer"))
+	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType("reactloop_http_fuzztest"))
+	require.Equal(t, schema.HTTPFlow_SourceType_SCAN, lowHTTPFlowSourceType(" ReactLoop_HTTP_FuzzTest "))
 }
 
 func TestCreateHTTPFlowEmptyJSONBodyPostParamsTotal(t *testing.T) {
