@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "C#/.NET OS command execution sinks (lib)"
 	title_zh: "操作系统命令执行入口（C#/.NET 库规则）"
 	type: audit

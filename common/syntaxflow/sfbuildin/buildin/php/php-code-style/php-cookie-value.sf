@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "cookie-security"
 	title:"数据流：Predictable Cookie Value (Pseudo-Random)"
 	title_zh:"可预测的Cookie值（伪随机）", 

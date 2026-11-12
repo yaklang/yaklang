@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：权限提升：角色/权限由客户端可控输入赋值",
 	title_zh: "权限提升：角色/权限由客户端可控输入赋值",
 	risk: "access-control"

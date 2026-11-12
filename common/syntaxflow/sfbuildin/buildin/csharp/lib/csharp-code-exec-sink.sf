@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "C#/.NET dynamic code execution sinks (lib)"
 	title_zh: "动态代码执行入口（C#/.NET 库规则）"
 	type: audit

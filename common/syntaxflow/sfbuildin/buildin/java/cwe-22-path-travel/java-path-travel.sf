@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java Path Traversal Vulnerability"
 	title_zh: "数据流：检测Java路径穿越漏洞"
 	type: vuln

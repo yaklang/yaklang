@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java cn.hutool.captcha验证码不受控资源消耗漏洞"
 	title: "数据流：Check Java cn.hutool.captcha Uncontrolled Resource Consumption Vulnerability"
 	type: vuln

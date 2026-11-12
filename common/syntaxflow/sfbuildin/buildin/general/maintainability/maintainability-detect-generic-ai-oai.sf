@@ -35,12 +35,10 @@ from openai import OpenAI
 
 client = OpenAI(api_key=key)
 POS
-	"safefile://neg.txt": <<<NEG
-hello world
-- 默认使用 OpenAI 兼容协议。
-The upstream service is OpenAI-compatible.
-openai: false
-- 支持 OpenAI / Anthropic / Gemini 多provider配置
+	"safefile://neg/pos.go": <<<NEG
+package main
+
+const endpoint = "https://api.example.com/v1/models"
 NEG
 )
 

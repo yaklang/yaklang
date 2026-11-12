@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Python Unsafe Deserialization Vulnerability"
 	title_zh: "数据流：检测Python不安全反序列化漏洞"
 	type: vuln

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang CORS Misconfiguration Vulnerability in gin.Context"
 	title_zh: "数据流：检测Golang CORS配置错误漏洞(gin.Context)"
 	type: vuln

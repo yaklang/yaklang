@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Golang SQL Injection in Ent"
 	type: audit
 	level: ""

@@ -34,10 +34,8 @@ SOLUTION
 =YJM(8q<%%>6;[>
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.ejs": <<<NEG
+<a href="/static/help">Help</a>
 NEG
 )
 

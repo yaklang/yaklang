@@ -68,6 +68,12 @@ rejects duplicate titles, so keep the wording unique. Existing titles are kept a
 they are even when they still carry an old `源码匹配：` / `结构匹配：` / `数据流：`
 marker.
 
+Every rule states `desc(mode)` explicitly. An omitted mode compiles as `ssa`,
+which silently sends a regex-only rule down the IR path and leaves its fixtures
+unverified. Library rules declare `mode: "ssa"`: both `ssa` and `struct` parent
+rules include them through the program path, so `ssa` is the one value that works
+for every importer.
+
 ## File filters
 
 `${...}` selects the files a `source` rule reads.
@@ -123,6 +129,29 @@ verification for every rule that can emit high/critical, and
 no fixture. A rule that cannot pass both sides is downgraded to middle until the
 fixtures and the query agree. Library rules (`AllowIncluded`) define sinks and
 are verified through their importers.
+
+### Negative fixtures
+
+A negative fixture has to be a near miss: it keeps the shape the rule looks for
+and breaks one property, so "no alert" means the query is specific rather than
+the file being irrelevant. Two failure modes are gated:
+
+| Failure | Symptom | Gate |
+| --- | --- | --- |
+| Prose placeholder | `# safe sample / no secrets here / just regular code` passes any rule | `requireNegativeIsNearMiss` |
+| Unreachable file name | the `safefile://` name fails the rule's `${...}` filter, so the negative is never examined | `requireSourceNegativeIsReachable` |
+
+The reachability gate writes the positive content into every negative file name
+and requires an alert: only a name that passes the filter can reach the query.
+Keep the negative file name aligned with the positive one (`neg/pos.vue` beside
+`pos.vue`) so both sides pass the same filter.
+
+### Library evidence
+
+A library is never evaluated on its own, so a standalone negative fixture would
+say nothing: the importers own the negative. Libraries still need a positive
+fixture that shows the sink shape they define, and every importer must have a
+negative that proves the importer does not fire on a near miss.
 
 ## Checks
 

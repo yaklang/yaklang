@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法"
 	title: "数据流：Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm"
 	risk:"weak-cryptographic-algorithm"

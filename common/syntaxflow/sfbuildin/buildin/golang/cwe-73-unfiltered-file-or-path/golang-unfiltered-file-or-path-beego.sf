@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Unfiltered File-or-Path Vulnerability"
 	title_zh: "数据流：检测Golang未过滤的文件或路径漏洞"
 	type: audit

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：JavaScript Code Injection via User-Controlled Input"
 	title_zh: "数据流：用户可控输入流入代码执行函数导致代码注入"
 	type: vuln

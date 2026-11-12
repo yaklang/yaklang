@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET Path Traversal via File and Path.Combine"
 	title_zh: "数据流：检测 C#/.NET 文件路径遍历"
 	type: vuln

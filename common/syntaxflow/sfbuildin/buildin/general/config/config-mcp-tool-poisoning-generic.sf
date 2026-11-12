@@ -32,10 +32,13 @@ SOLUTION
 """nu<IMPORTANT>at.tJ%)"""
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.py": <<<NEG
+"""Helper that reads the project description."""
+import os
+
+
+def read_description():
+    return "plain documentation text"
 NEG
 )
 

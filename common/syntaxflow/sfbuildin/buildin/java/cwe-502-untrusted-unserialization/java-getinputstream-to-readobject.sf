@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java原生反序列化漏洞"
 	title: "数据流：Check Java Native Deserialization Vulnerability"
 	type: audit

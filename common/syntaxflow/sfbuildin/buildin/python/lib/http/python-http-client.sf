@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python HTTP client calls (lib)"
 	title_zh: "HTTP 客户端外连（Python 库规则）"
 	type: audit

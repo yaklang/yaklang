@@ -219,8 +219,13 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 			QueryWithInitInputValues(queryValue),
 			QueryWithRule(rule),
 		}
+		// A struct library still needs the owning program: QueryWithStruct only
+		// records the unit bound, and the value it would synthesize is the struct
+		// target. Without the program the query has no value and the include
+		// returns "no value found", so a struct rule including a struct library
+		// would silently report nothing. Supply both.
 		if bound != nil && rule.IsStructMode() {
-			opts = append(opts, QueryWithStruct(bound.compileUnit()))
+			opts = append(opts, QueryWithProgram(parent), QueryWithStruct(bound.compileUnit()))
 		} else {
 			opts = append(opts, QueryWithProgram(parent))
 		}

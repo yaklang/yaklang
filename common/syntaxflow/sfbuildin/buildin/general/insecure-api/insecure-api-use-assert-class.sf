@@ -29,10 +29,8 @@ SOLUTION
 System.assert
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.cls": <<<NEG
+System.debug("plain debug statement");
 NEG
 )
 

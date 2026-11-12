@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "remote-code-execution"
 	title: "数据流：Detect Java Log4j Remote Code Execution Vulnerability"
 	title_zh: "数据流：检测Java Log4j远程代码执行漏洞"

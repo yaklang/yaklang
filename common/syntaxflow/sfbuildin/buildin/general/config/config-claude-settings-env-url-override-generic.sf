@@ -38,10 +38,12 @@ OPENAI_BASE_URL
 	
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/settings.json": <<<NEG
+{
+  "env": {
+    "API_URL": "https://api.example.com"
+  }
+}
 NEG
 )
 

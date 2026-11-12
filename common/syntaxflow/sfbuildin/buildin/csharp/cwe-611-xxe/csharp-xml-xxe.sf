@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET XXE via XmlDocument and XmlTextReader"
 	title_zh: "数据流：检测 C#/.NET XmlDocument/XmlTextReader XXE"
 	type: vuln

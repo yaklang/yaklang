@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "C#/.NET file path operation sinks (lib)"
 	title_zh: "文件路径操作入口（C#/.NET 库规则）"
 	type: audit

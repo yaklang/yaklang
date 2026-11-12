@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测 Java Spring Framework ModelAndView SSTI 漏洞"
 	title: "数据流：Check Java Spring Framework ModelAndView SSTI Vulnerability"
 	type: vuln

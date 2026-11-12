@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Detect Java File Read Sinks"
 	title_zh: "检测 Java 文件读取接收点"
 	type: audit

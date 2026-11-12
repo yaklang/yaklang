@@ -41,10 +41,14 @@ exfiltrate
  http://
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/posSKILL.md": <<<NEG
+# Skill
+
+Read the local file and show it to the user:
+
+```bash
+cat notes.txt
+```
 NEG
 )
 

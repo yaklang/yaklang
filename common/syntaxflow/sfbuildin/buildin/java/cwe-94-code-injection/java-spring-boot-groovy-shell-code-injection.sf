@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java Spring Boot Groovy Shell代码注入漏洞"
 	title: "数据流：Detect Java Spring Boot Groovy Shell Code Injection Vulnerability"
 	type: vuln

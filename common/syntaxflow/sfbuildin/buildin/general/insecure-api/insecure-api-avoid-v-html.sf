@@ -32,10 +32,10 @@ SOLUTION
 <_n57bE&8v-html=
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.vue": <<<NEG
+<template>
+  <div v-text="message"></div>
+</template>
 NEG
 )
 

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Audit PHP Unfiltered File or Path Operations"
 	title_zh: "数据流：审计PHP未过滤文件或路径操作"
 	risk: "audit-check"

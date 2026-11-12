@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "JavaScript/Node.js User-Controlled Input Sources"
 	title_zh: "JavaScript/Node.js 用户可控输入源"
 	type: audit

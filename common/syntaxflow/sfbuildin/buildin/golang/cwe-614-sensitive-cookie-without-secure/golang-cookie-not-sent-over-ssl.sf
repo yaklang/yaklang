@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Cookie Not Sent Over SSL Vulnerability"
 	title_zh: "数据流：检测Golang Cookie未通过SSL发送漏洞"
 	type: audit

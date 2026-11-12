@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "C#/.NET XML parser sinks (lib)"
 	title_zh: "XML 解析入口（C#/.NET 库规则）"
 	type: audit

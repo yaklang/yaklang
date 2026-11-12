@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：检测Java Velocity Evaluate服务端模板注入漏洞"
 	title: "数据流：Check Java Velocity Evaluate SSTI Vulnerability"
 	type: vuln

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Golang Sqlx SQL Injection Vulnerability"
 	type: audit
 	level: "middle"

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python OS / subprocess command execution sinks (lib)"
 	title_zh: "操作系统命令执行入口（Python 库规则）"
 	type: audit

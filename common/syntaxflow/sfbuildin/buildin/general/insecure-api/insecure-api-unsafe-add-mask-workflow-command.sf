@@ -32,10 +32,9 @@ SOLUTION
 ::add-mask::
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.yml": <<<NEG
+steps:
+  - run: echo "hello"
 NEG
 )
 

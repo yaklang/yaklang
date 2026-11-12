@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：RSA 解密 Token 作为认证（加密即认证）",
 	title_zh: "RSA 解密 Token 作为认证（加密即认证）",
 	risk: "authentication-bypass"

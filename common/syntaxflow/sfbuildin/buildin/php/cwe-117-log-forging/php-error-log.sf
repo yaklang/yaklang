@@ -12,6 +12,7 @@ alert $hit for {
 }
 
 desc(
+	mode: "ssa"
 	lang: php
 	alert_min: 1
 	'file://index.php': <<<POS

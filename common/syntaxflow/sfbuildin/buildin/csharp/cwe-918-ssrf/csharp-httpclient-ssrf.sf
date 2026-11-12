@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET SSRF via HttpClient and WebRequest"
 	title_zh: "数据流：检测 C#/.NET HttpClient/WebRequest SSRF"
 	type: vuln

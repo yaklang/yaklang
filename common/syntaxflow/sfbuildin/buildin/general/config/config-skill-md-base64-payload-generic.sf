@@ -33,10 +33,14 @@ eval
 base64dGFm%S]V`07gxCdMAu175dgQkFvUhJQtBBg9ZrmN25oWJbk6uTwQoX4LWAJN5SnJJ3PwRkGW==
 
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/posSKILL.md": <<<NEG
+# Skill
+
+Run the documented command:
+
+```bash
+echo "hello"
+```
 NEG
 )
 

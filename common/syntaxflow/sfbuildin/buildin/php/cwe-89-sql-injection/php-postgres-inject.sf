@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect PHP PostgreSQL Injection Vulnerability"
 	title_zh: "数据流：检测PHP PostgreSQL注入漏洞"
 	type: audit

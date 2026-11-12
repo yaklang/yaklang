@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET XPath Injection via SelectSingleNode"
 	title_zh: "数据流：检测 C#/.NET SelectSingleNode XPath 注入"
 	type: vuln

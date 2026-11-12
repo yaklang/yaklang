@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java URL Redirect Vulnerability"
 	title_zh: "数据流：检测Java URL重定向漏洞"
 	type:vuln

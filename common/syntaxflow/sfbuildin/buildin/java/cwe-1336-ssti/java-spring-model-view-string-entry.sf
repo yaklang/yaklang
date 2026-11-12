@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "数据流：审计 Java Spring Framework 处理 ModelAndView 时直接传入 String 参数"
 	title: "数据流：Audit Java Spring Framework ModelAndView String Parameter"
 	type: audit

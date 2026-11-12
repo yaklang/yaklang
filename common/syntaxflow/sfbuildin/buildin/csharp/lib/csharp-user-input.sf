@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "C#/.NET user input sources (lib)"
 	title_zh: "用户输入源（C#/.NET 库规则）"
 	type: audit

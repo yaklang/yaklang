@@ -37,10 +37,10 @@ $('S|
 	
 $
 POS
-	"safefile://neg.sample": <<<NEG
-# safe sample
-no secrets here
-just regular code
+	"safefile://neg/pos.sh": <<<NEG
+#!/bin/bash
+content=$(cat payload.json)
+echo "$content"
 NEG
 )
 

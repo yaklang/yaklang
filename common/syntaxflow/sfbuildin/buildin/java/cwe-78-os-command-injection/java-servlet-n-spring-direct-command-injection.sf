@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java Command Injection from Servlet and SpringMVC"
 	title_zh: "数据流：检测Java Servlet和SpringMVC中的命令注入漏洞"
 	type: vuln

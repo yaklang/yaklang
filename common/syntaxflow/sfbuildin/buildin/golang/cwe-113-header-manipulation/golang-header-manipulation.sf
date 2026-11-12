@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect Golang Header Manipulation Vulnerability"
 	title_zh: "数据流：检测Golang头部操纵漏洞"
 	type: audit

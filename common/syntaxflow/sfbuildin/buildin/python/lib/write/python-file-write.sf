@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Python file write operations (lib)"
 	title_zh: "文件写入操作（Python 库规则）"
 	type: audit

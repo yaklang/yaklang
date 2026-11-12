@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Golang CSRF Protection Disabled"
 	title_zh: "数据流：检查Golang CSRF保护是否已禁用"
 	type: audit

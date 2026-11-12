@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Detect PHP OS Command Execution Vulnerability"
 	type: audit
 	level: ""

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "JavaScript Unsafe Deserialization Sink Functions"
 	title_zh: "JavaScript 不安全反序列化 Sink 函数"
 	type: audit

@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Detect OXM Unmarshaller On Untrusted XML Source"
 	title_zh: "数据流：检测OXM Unmarshaller处理不可信XML源"
 	type: audit

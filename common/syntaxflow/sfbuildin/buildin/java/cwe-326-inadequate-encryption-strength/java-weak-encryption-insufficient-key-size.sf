@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check Java Weak Encryption - Insufficient Key Size"
 	title_zh: "数据流：检测Java弱加密 - 密钥长度不足"
 	type: security

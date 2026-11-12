@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "JavaScript Code Execution Sink Functions"
 	title_zh: "JavaScript 代码执行 Sink 函数"
 	type: audit

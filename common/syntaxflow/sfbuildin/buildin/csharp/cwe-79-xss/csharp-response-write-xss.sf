@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Check C#/.NET XSS via Response.Write"
 	title_zh: "数据流：检测 C#/.NET Response.Write 跨站脚本"
 	type: vuln

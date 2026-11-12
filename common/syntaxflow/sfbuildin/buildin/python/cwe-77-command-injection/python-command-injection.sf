@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "数据流：Python OS Command Injection via User Input"
 	title_zh: "数据流：Python 操作系统命令注入（用户输入驱动）"
 	type: audit

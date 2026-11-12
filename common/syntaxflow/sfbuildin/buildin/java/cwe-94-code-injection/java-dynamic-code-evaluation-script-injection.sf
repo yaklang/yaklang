@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	risk: "code-injection"
 	title: "数据流：Detect Java Script Injection Vulnerability in Dynamic Code Execution"
 	title_zh: "数据流：检测Java动态代码执行中的脚本注入漏洞"
