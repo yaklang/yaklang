@@ -40,7 +40,7 @@ func parseAt(t *testing.T, address uint64, code []byte) *core.ParseResult {
 		t.Fatal(err)
 	}
 	request := core.ParseRequest{Target: targetS390X(), Address: address, Reader: reader, WithAssembly: true}
-	result, err := Parse(context.Background(), Profile64(), request)
+	result, err := parse(context.Background(), request)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -75,8 +75,8 @@ func TestDecodeLengths(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			decoded, err := decodeInstructions(context.Background(), Profile64(),
-				core.ParseRequest{Target: targetS390X(), Address: 0x1000, Reader: reader}, &diagnostics{profile: Profile64()})
+			decoded, err := decodeInstructions(context.Background(),
+				core.ParseRequest{Target: targetS390X(), Address: 0x1000, Reader: reader}, &diagnostics{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -109,8 +109,8 @@ func TestBranchTargets(t *testing.T) {
 	for _, testCase := range cases {
 		code := regionBytes(t, testCase.hex)
 		reader, _ := core.NewByteReader("test", bytes.NewReader(code), int64(len(code)))
-		decoded, err := decodeInstructions(context.Background(), Profile64(),
-			core.ParseRequest{Target: targetS390X(), Address: 0x1000, Reader: reader}, &diagnostics{profile: Profile64()})
+		decoded, err := decodeInstructions(context.Background(),
+			core.ParseRequest{Target: targetS390X(), Address: 0x1000, Reader: reader}, &diagnostics{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -192,7 +192,7 @@ func TestNoUnsupportedOnRealEncodings(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := core.ParseRequest{Target: targetS390X(), Address: 0x1000, Reader: reader}
-	result, err := Parse(context.Background(), Profile64(), request)
+	result, err := parse(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,23 +224,23 @@ func TestUnknownWordBecomesData(t *testing.T) {
 
 // TestCheckRejectsWrongByteOrder checks the target validation.
 func TestCheckRejectsWrongByteOrder(t *testing.T) {
-	profile := Profile64()
-	if err := profile.Check(targetS390X()); err != nil {
+
+	if err := checkTarget(targetS390X()); err != nil {
 		t.Fatalf("valid target rejected: %v", err)
 	}
 	wrong := targetS390X()
 	wrong.ByteOrder = core.LittleEndian
-	if err := profile.Check(wrong); err == nil {
+	if err := checkTarget(wrong); err == nil {
 		t.Fatal("little-endian target accepted")
 	}
 	wrong = targetS390X()
 	wrong.Bits = 32
-	if err := profile.Check(wrong); err == nil {
+	if err := checkTarget(wrong); err == nil {
 		t.Fatal("32-bit target accepted")
 	}
 	wrong = targetS390X()
 	wrong.Mode = "thumb"
-	if err := profile.Check(wrong); err == nil {
+	if err := checkTarget(wrong); err == nil {
 		t.Fatal("execution mode accepted")
 	}
 }

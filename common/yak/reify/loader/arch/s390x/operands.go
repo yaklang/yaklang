@@ -88,7 +88,7 @@ func (l *lifter) storeSource(ins instruction) (core.ValueID, bool) {
 			return l.readRegister(ins.address, name, bits), true
 		}
 	}
-	if value, ok := l.immediateValue(ins, append([]s390xasm.Arg{nil}, args(ins.inst)...), l.profile.Bits); ok {
+	if value, ok := l.immediateValue(ins, append([]s390xasm.Arg{nil}, args(ins.inst)...), addressBits); ok {
 		return value, true
 	}
 	// A move writes a byte, halfword or word count, which stays opaque.
@@ -127,7 +127,7 @@ func signedLoad(name string) bool {
 func (l *lifter) registers(ins instruction) (core.ValueID, bool) {
 	arguments := args(ins.inst)
 	name := nameOf(ins.inst.Op)
-	bits := l.profile.Bits
+	bits := addressBits
 	if len(arguments) == 0 {
 		return 0, false
 	}

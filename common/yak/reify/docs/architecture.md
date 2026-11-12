@@ -232,7 +232,14 @@ ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT �
 - `Parse` 返回 `ErrDecoderUnavailable`，不伪造 LowIR。
 - 没有实现 `Disassembler`，所以汇编模式返回 `ErrNoDisassembler`。
 
-实现某个架构时替换该类型的 `Parse` 并让 `Available` 返回 true。接口和注册方式不变。
+- `Available() == true`。
+- `Check` 校验架构、位数和执行模式。
+- `Parse` 解码为 LowIR；`Disassemble` 输出汇编文本；`DiscoverBoundaries` 参与函数边界发现。
+- `internal` 只放被两个以上架构共用的实现：`x86` 服务 amd64、386、8086，`riscv` 服务 32/64，`ppc`、`mips` 同理，`ehframe` 与 `diag` 服务全部架构。只有一种架构使用的包直接放在 `loader/arch/<name>`，与 `arm64` 相同。
+
+S390X 与 LOONG64 各自只有一个变体，因此没有共享内核，实现直接放在各自的架构包里。S390X 的指令长度由前两 bit 决定：`0` 是 2 字节，`3` 是 6 字节，其余是 4 字节，全部大端。反汇编文本手工拼装操作数，因为库的 `String()` 会把位移渲染成带括号的内存操作数。LOONG64 定长 4 字节小端；`LU32I.D`/`LU52I.D` 提升成 mask 加 or，库把分支偏移预先左移 16 位，`branchTarget` 右移还原。
+
+8086 与 386、AMD64 共用 `loader/arch/internal/x86`。区别只在 `Profile`：16 位模式用 `sp`、`bp`、`ax`、`cx` 与 `flags`，并选择 `x86asm` 的 16 位解码模式。
 
 ## Target 与 Image
 

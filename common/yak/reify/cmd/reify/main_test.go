@@ -66,7 +66,7 @@ func TestCLIListsLoadersAndParsers(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &parsers); err != nil {
 		t.Fatal(err)
 	}
-	if len(parsers) != 11 || parsers[0].Kind != core.Arch386 {
+	if len(parsers) != 12 || parsers[0].Kind != core.Arch386 {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {

@@ -12,7 +12,6 @@ import (
 // lifter converts one function body into LowIR. Registers keep their z/Architecture
 // names (r0..r15, f0..f15, ...) because that is how the assembly refers to them.
 type lifter struct {
-	profile      Profile
 	blockIDs     map[uint64]core.BlockID
 	diagnostics  *diagnostics
 	nextValue    core.ValueID
@@ -20,22 +19,21 @@ type lifter struct {
 	instructions []core.Instruction
 }
 
-func liftFunctions(profile Profile, target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
+func liftFunctions(target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
 	ir := &core.LowIR{Target: target}
 	for index, body := range functions {
-		ir.Functions = append(ir.Functions, liftFunction(profile, body, core.FunctionID(index+1), blockIDs, diagnostics))
+		ir.Functions = append(ir.Functions, liftFunction(body, core.FunctionID(index+1), blockIDs, diagnostics))
 	}
 	return ir
 }
 
-func liftFunction(profile Profile, body function, id core.FunctionID, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) core.Function {
+func liftFunction(body function, id core.FunctionID, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) core.Function {
 	result := core.Function{
 		ID:      id,
 		Address: body.blocks[0].start,
 		Blocks:  make([]core.Block, 0, len(body.blocks)),
 	}
 	lifter := &lifter{
-		profile:     profile,
 		blockIDs:    blockIDs,
 		diagnostics: diagnostics,
 		values:      make(map[core.ValueID]core.ValueType),
@@ -154,7 +152,7 @@ func (l *lifter) emit(kind core.Opcode, operands []core.Operand, results []core.
 
 func (l *lifter) newValue(kind core.TypeKind, bits uint16) core.Value {
 	if bits == 0 {
-		bits = l.profile.Bits
+		bits = addressBits
 	}
 	l.nextValue++
 	value := core.Value{ID: l.nextValue, Type: core.ValueType{Kind: kind, Bits: bits}}
@@ -165,7 +163,7 @@ func (l *lifter) newValue(kind core.TypeKind, bits uint16) core.Value {
 func (l *lifter) value(id core.ValueID) core.Operand {
 	typ, ok := l.values[id]
 	if !ok {
-		typ = core.ValueType{Kind: core.TypeInteger, Bits: l.profile.Bits}
+		typ = core.ValueType{Kind: core.TypeInteger, Bits: addressBits}
 	}
 	return core.Operand{Kind: core.OperandValue, Type: typ, Value: id}
 }
@@ -178,7 +176,7 @@ func (l *lifter) operation(ins instruction, kind core.Opcode, operands []core.Op
 
 func (l *lifter) constant(address uint64, value uint64, bits uint16) core.ValueID {
 	if bits == 0 {
-		bits = l.profile.Bits
+		bits = addressBits
 	}
 	result := l.newValue(core.TypeInteger, bits)
 	l.emit(core.OpConstant, []core.Operand{{
@@ -190,11 +188,11 @@ func (l *lifter) constant(address uint64, value uint64, bits uint16) core.ValueI
 }
 
 func (l *lifter) pointerConstant(address, value uint64) core.ValueID {
-	result := l.newValue(core.TypePointer, l.profile.Bits)
+	result := l.newValue(core.TypePointer, addressBits)
 	l.emit(core.OpConstant, []core.Operand{{
 		Kind:    core.OperandConstant,
 		Type:    result.Type,
-		Literal: literal(value, l.profile.Bits),
+		Literal: literal(value, addressBits),
 	}}, []core.Value{result}, nil, core.EffectNone, address)
 	return result.ID
 }
@@ -242,13 +240,13 @@ func (l *lifter) pointerFrom(address uint64, value core.ValueID) core.ValueID {
 	if l.values[value].Kind == core.TypePointer {
 		return value
 	}
-	result := l.newValue(core.TypePointer, l.profile.Bits)
+	result := l.newValue(core.TypePointer, addressBits)
 	l.emit(core.OpCopy, []core.Operand{l.value(value)}, []core.Value{result}, nil, core.EffectNone, address)
 	return result.ID
 }
 
 func (l *lifter) addAddress(ins instruction, left, right core.ValueID) core.ValueID {
-	result := l.newValue(core.TypePointer, l.profile.Bits)
+	result := l.newValue(core.TypePointer, addressBits)
 	l.emit(core.OpAdd, []core.Operand{l.value(left), l.value(right)}, []core.Value{result}, nil, core.EffectNone, ins.address)
 	return result.ID
 }
@@ -259,7 +257,7 @@ func (l *lifter) addressFromBase(ins instruction, base, index string, displaceme
 	if base == "" || base == "zero" {
 		address = l.pointerConstant(ins.address, uint64(displacement))
 	} else {
-		address = l.pointerFrom(ins.address, l.readRegister(ins.address, base, l.profile.Bits))
+		address = l.pointerFrom(ins.address, l.readRegister(ins.address, base, addressBits))
 		if displacement != 0 {
 			kind := core.OpAdd
 			amount := uint64(displacement)
@@ -267,12 +265,12 @@ func (l *lifter) addressFromBase(ins instruction, base, index string, displaceme
 				kind = core.OpSub
 				amount = uint64(-displacement)
 			}
-			offset := l.constant(ins.address, amount, l.profile.Bits)
-			address = l.operation(ins, kind, []core.Operand{l.value(address), l.value(offset)}, l.profile.Bits, core.EffectNone)
+			offset := l.constant(ins.address, amount, addressBits)
+			address = l.operation(ins, kind, []core.Operand{l.value(address), l.value(offset)}, addressBits, core.EffectNone)
 		}
 	}
 	if index != "" {
-		indexValue := l.readRegister(ins.address, index, l.profile.Bits)
+		indexValue := l.readRegister(ins.address, index, addressBits)
 		address = l.addAddress(ins, address, indexValue)
 	}
 	return address
@@ -308,13 +306,13 @@ func (l *lifter) rawOperand(ins instruction, arg s390xasm.Arg) (core.Operand, bo
 		}
 		return l.value(l.readRegister(ins.address, name, bits)), true
 	case s390xasm.Sign8:
-		return l.value(l.constant(ins.address, uint64(int64(int8(value))), l.profile.Bits)), true
+		return l.value(l.constant(ins.address, uint64(int64(int8(value))), addressBits)), true
 	case s390xasm.Sign16:
-		return l.value(l.constant(ins.address, uint64(int64(int16(value))), l.profile.Bits)), true
+		return l.value(l.constant(ins.address, uint64(int64(int16(value))), addressBits)), true
 	case s390xasm.Sign32:
-		return l.value(l.constant(ins.address, uint64(int64(int32(value))), l.profile.Bits)), true
+		return l.value(l.constant(ins.address, uint64(int64(int32(value))), addressBits)), true
 	case s390xasm.Imm:
-		return l.value(l.constant(ins.address, uint64(uint32(value)), l.profile.Bits)), true
+		return l.value(l.constant(ins.address, uint64(uint32(value)), addressBits)), true
 	default:
 		return core.Operand{}, false
 	}
@@ -561,7 +559,7 @@ func (l *lifter) immediateForm(ins instruction) (core.ValueID, bool) {
 	}
 	destination, bits, ok := firstRegister(arguments)
 	if !ok {
-		bits = l.profile.Bits
+		bits = addressBits
 	}
 	switch name {
 	case "stgrl":
@@ -691,11 +689,11 @@ func (l *lifter) branchOnCount(ins instruction) (core.ValueID, bool) {
 	if !ok {
 		return 0, false
 	}
-	left, ok := l.sourceValue(ins, arguments[0], l.profile.Bits)
+	left, ok := l.sourceValue(ins, arguments[0], addressBits)
 	if !ok {
 		return 0, false
 	}
-	right, ok := l.sourceValue(ins, arguments[1], l.profile.Bits)
+	right, ok := l.sourceValue(ins, arguments[1], addressBits)
 	if !ok {
 		return 0, false
 	}
@@ -703,7 +701,7 @@ func (l *lifter) branchOnCount(ins instruction) (core.ValueID, bool) {
 	if strings.HasPrefix(name, "cl") {
 		kind = core.OpSub
 	}
-	flags := l.operation(ins, kind, []core.Operand{l.value(left), l.value(right)}, l.profile.Bits, core.EffectNone)
+	flags := l.operation(ins, kind, []core.Operand{l.value(left), l.value(right)}, addressBits, core.EffectNone)
 	mask := l.conditionMask(ins)
 	conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
 		symbolOperand("s390x.cond." + mask), l.value(flags),
@@ -748,7 +746,7 @@ func (l *lifter) opaqueRegisterForm(ins instruction) (core.ValueID, bool) {
 	operands := []core.Operand{symbolOperand("s390x." + name)}
 	for index, register := range registers {
 		if index == 0 {
-			value := l.newValue(core.TypeInteger, l.profile.Bits)
+			value := l.newValue(core.TypeInteger, addressBits)
 			operands = append(operands, core.Operand{Kind: core.OperandRegister, Type: value.Type, Name: register})
 			l.emit(core.OpIntrinsic, operands, []core.Value{value}, nil,
 				core.EffectReadRegister|core.EffectWriteRegister|core.EffectUnknown, ins.address)
@@ -759,7 +757,7 @@ func (l *lifter) opaqueRegisterForm(ins instruction) (core.ValueID, bool) {
 			for _, source := range registers[1:] {
 				l.instructions[len(l.instructions)-1].Operands = append(
 					l.instructions[len(l.instructions)-1].Operands,
-					core.Operand{Kind: core.OperandRegister, Type: core.ValueType{Kind: core.TypeInteger, Bits: l.profile.Bits}, Name: source})
+					core.Operand{Kind: core.OperandRegister, Type: core.ValueType{Kind: core.TypeInteger, Bits: addressBits}, Name: source})
 			}
 			return value.ID, true
 		}

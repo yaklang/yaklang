@@ -35,22 +35,22 @@ type function struct {
 	blocks []block
 }
 
-func parse(ctx context.Context, profile Profile, request core.ParseRequest) (*core.ParseResult, error) {
+func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, error) {
 	if request.Reader == nil || request.Reader.Size() == 0 {
-		return nil, fmt.Errorf("%s: empty code region", profile.Name)
+		return nil, fmt.Errorf("%s: empty code region", architectureName)
 	}
-	diagnostics := &diagnostics{profile: profile}
-	decoded, err := decodeInstructions(ctx, profile, request, diagnostics)
+	diagnostics := &diagnostics{}
+	decoded, err := decodeInstructions(ctx, request, diagnostics)
 	if err != nil {
 		return nil, err
 	}
 	if len(decoded) == 0 {
-		return nil, fmt.Errorf("%s: no instruction decoded at 0x%x", profile.Name, request.Address)
+		return nil, fmt.Errorf("%s: no instruction decoded at 0x%x", architectureName, request.Address)
 	}
 	end := request.Address + uint64(request.Reader.Size())
 	functions, blockIDs := buildFunctions(decoded, request.Address, end, diagnostics)
 	result := &core.ParseResult{
-		IR:          liftFunctions(profile, request.Target, functions, blockIDs, diagnostics),
+		IR:          liftFunctions(request.Target, functions, blockIDs, diagnostics),
 		Diagnostics: diagnostics.finish(),
 	}
 	if request.WithAssembly {
@@ -61,9 +61,9 @@ func parse(ctx context.Context, profile Profile, request core.ParseRequest) (*co
 
 // decodeInstructions reads one parser request. asm2lowir calls it per function
 // boundary, so memory scales with the largest function, not the file.
-func decodeInstructions(ctx context.Context, profile Profile, request core.ParseRequest, diagnostics *diagnostics) ([]instruction, error) {
+func decodeInstructions(ctx context.Context, request core.ParseRequest, diagnostics *diagnostics) ([]instruction, error) {
 	if request.Reader == nil {
-		return nil, fmt.Errorf("%s: parse request has no reader", profile.Name)
+		return nil, fmt.Errorf("%s: parse request has no reader", architectureName)
 	}
 	total := request.Reader.Size()
 	result := make([]instruction, 0, total/4)
