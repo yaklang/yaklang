@@ -92,12 +92,18 @@ var conditionNames = [...]string{
 // condition, and gives the flag-setting S variant its own block of sixteen. A
 // name suffix decides which block the opcode belongs to.
 func baseOp(op armasm.Op) armasm.Op {
-	base := op &^ 15
 	name := op.String()
-	for _, condition := range conditionNames {
-		name = strings.TrimSuffix(name, "."+strings.ToUpper(condition))
+	stripped := name
+	for _, code := range conditionNames {
+		stripped = strings.TrimSuffix(stripped, "."+strings.ToUpper(code))
 	}
-	if strings.HasSuffix(name, ".S") {
+	flagSetting := strings.HasSuffix(stripped, ".S")
+	if stripped == name && !flagSetting {
+		// The opcode has no condition or S variant, for example DMB or NOP.
+		return op
+	}
+	base := op &^ 15
+	if flagSetting {
 		base -= 16
 	}
 	return base + 14

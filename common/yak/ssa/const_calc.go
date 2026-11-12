@@ -180,10 +180,23 @@ func CalcConstBinarySide(c *ConstInst, v Value, op BinaryOpcode) Value {
 	return nil
 }
 
+// foldableShift reports whether a shift count can be folded. Go requires a
+// non-negative count, and a count of 64 or more has no single meaning across
+// the machine widths Reify handles.
+func foldableShift(count int64) bool {
+	return count >= 0 && count < 64
+}
+
 func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 	switch op {
 	case OpShl:
 		if x.IsNumber() && y.IsNumber() {
+			// A shift count outside [0, 63] cannot be folded: Go panics on a
+			// negative count and the machine masks it. Leave the operation in
+			// place instead of guessing a value.
+			if !foldableShift(y.Number()) {
+				return nil
+			}
 			return NewConst(x.Number() << y.Number())
 		}
 	case OpPow:
@@ -192,6 +205,9 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 		}
 	case OpShr:
 		if x.IsNumber() && y.IsNumber() {
+			if !foldableShift(y.Number()) {
+				return nil
+			}
 			return NewConst(x.Number() >> y.Number())
 		}
 	case OpAnd, OpLogicAnd:

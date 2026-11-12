@@ -38,10 +38,14 @@ func (s *boundaryScanner) decodeAny(address uint64) (armasm.Inst, int, bool) {
 	return inst, 4, true
 }
 
-// modeFor returns the encoding mode recorded for one address. A boundary
-// records its own mode; a range whose format records a mode overrides the
-// default; an address inside a function inherits the mode of the nearest
-// boundary at or below it.
+// modeFor returns the encoding mode one address decodes with. Only evidence
+// decides: a boundary records its own mode, and a range whose format records a
+// mode overrides it. A boundary with no mark follows the mode of the image
+// entry point.
+//
+// Looking up the nearest marked boundary instead would be wrong twice: it is
+// ambiguous when two marks bound the address, and it would let a Thumb function
+// that follows the ARM PLT inherit the PLT mode.
 func (s *boundaryScanner) modeFor(address uint64) string {
 	if entry, ok := s.entries[address]; ok && entry.Mode != "" {
 		return entry.Mode
@@ -51,21 +55,7 @@ func (s *boundaryScanner) modeFor(address uint64) string {
 			return region.Mode
 		}
 	}
-	best := uint64(0)
-	mode := ""
-	for candidate, entry := range s.entries {
-		if candidate > address || entry.Mode == "" {
-			continue
-		}
-		if candidate >= best {
-			best = candidate
-			mode = entry.Mode
-		}
-	}
-	if mode == "" {
-		return s.defaultMode
-	}
-	return mode
+	return s.defaultMode
 }
 
 // markThumbFromSymbols records the mode of every boundary that an odd symbol
@@ -139,7 +129,7 @@ func (s *boundaryScanner) walkThumbFunction(start, limit uint64) bool {
 		base := baseOp(inst.Op)
 		if base == armasm.BL || base == armasm.BLX {
 			if target, ok := thumbStaticTarget(inst, address, size); ok {
-				if _, exists := s.entries[target]; !exists {
+				if _, exists := s.entries[target]; !exists && !s.insideExisting(target) {
 					// A call target follows the encoding of the range it sits
 					// in, which is not always Thumb: a Thumb function calls the
 					// ARM PLT through the same instruction.

@@ -183,9 +183,9 @@ func (s *boundaryScanner) addInitArrays() {
 func (s *boundaryScanner) addPLT() {
 	for _, entry := range s.hints.PLTTargets {
 		// The linker writes PLT stubs in ARM mode even when the rest of the
-		// image is Thumb. On ARMv7 the stub is three instructions plus the
-		// literal that the resolver reads.
-		s.addWithMode(entry.Address, 16, entry.Name, core.BoundaryPLT, priorityPLT, "arm")
+		// image is Thumb. The ARMv7 stub is three instructions: add ip, pc;
+		// add ip, ip; ldr pc, [ip]. The literal lives in the GOT.
+		s.addWithMode(entry.Address, 12, entry.Name, core.BoundaryPLT, priorityPLT, "arm")
 	}
 }
 
@@ -276,11 +276,32 @@ func (s *boundaryScanner) walkDirectCalls() {
 			if _, exists := s.entries[target]; exists || processed[target] {
 				continue
 			}
+			if s.insideExisting(target) {
+				// A call into the middle of a known range is a decoding
+				// artifact: a Thumb BLX reaches an ARM PLT stub through an odd
+				// address, and rounding it produces an address two bytes into
+				// the stub.
+				continue
+			}
 			if s.add(target, 0, "", core.BoundaryCall, priorityCall) {
 				queue = append(queue, target)
 			}
 		}
 	}
+}
+
+// insideExisting reports whether one address falls inside a range another
+// boundary already covers.
+func (s *boundaryScanner) insideExisting(address uint64) bool {
+	for start, entry := range s.entries {
+		if entry.Size == 0 || address <= start {
+			continue
+		}
+		if address < start+entry.Size {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *boundaryScanner) walkFunction(start, limit uint64) (uint64, []uint64) {
@@ -390,8 +411,10 @@ func (s *boundaryScanner) addTailScan() {
 // reached. The scan is conservative: a candidate must follow padding or an
 // unconditional branch, because anything else is mid-function.
 func (s *boundaryScanner) scanGap(start, end uint64) {
+	// A Thumb image is mostly Thumb but carries ARM PLT stubs, so the scan step
+	// follows the region, not the image default.
 	step := uint64(4)
-	if s.defaultMode == "thumb" {
+	if s.modeFor(start) == "thumb" {
 		step = 2
 	}
 	padding := true

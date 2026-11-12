@@ -78,6 +78,13 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 	if address == 0 || address%4 != 0 || s.regionFor(address) == nil {
 		return false
 	}
+	// AArch64 instructions are four bytes wide. ELF also carries marker
+	// symbols such as go:textfipsstart whose size is one byte; a range
+	// smaller than one instruction is not a real function, so let the next
+	// boundary decide its size.
+	if size < 4 {
+		size = 0
+	}
 	switch source {
 	case core.BoundarySymbol:
 		s.stats.Symbol++
