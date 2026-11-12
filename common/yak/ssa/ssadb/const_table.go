@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,8 +80,8 @@ func (v *IrConstValue) Raw() any {
 }
 
 // IrConst is one program's constant value. ConstID is a 64-bit hash of the
-// rendered text, and the unique (program_name, const_id) index is what makes
-// the pool a deduplicating store.
+// kind and the rendered text, and the unique (program_name, const_id) index is
+// what makes the pool a deduplicating store.
 type IrConst struct {
 	ID          int64  `gorm:"primary_key" json:"id"`
 	ProgramName string `json:"program_name" gorm:"not null"`
@@ -101,12 +102,30 @@ const (
 	fnvPrime64  = 1099511628211
 )
 
-// IrConstHash is the pool key. Two different texts in one program hashing to
-// the same value would merge two constants, so the caller must not rely on it
-// as a collision-free identity: at 180k values the probability is about
-// 9e-10 per program, below the rate of unrelated restore faults.
+// IrConstHash is the legacy text-only key of the ir_consts_v1 table. It is
+// kept unchanged so databases written before the pool still resolve their
+// const_hash column. Two different texts in one program hashing to the same
+// value would merge two constants, so the caller must not rely on it as a
+// collision-free identity: at 180k values the probability is about 9e-10 per
+// program, below the rate of unrelated restore faults.
 func IrConstHash(text string) int64 {
 	h := uint64(fnvOffset64)
+	for i := 0; i < len(text); i++ {
+		h ^= uint64(text[i])
+		h *= fnvPrime64
+	}
+	return int64(h)
+}
+
+// IrConstPoolID is the pool key of one constant. The kind is part of the key
+// because the rendered text alone is ambiguous: nil, the string "nil", int 1
+// and the string "1" all render the same way, and a text-only key would make
+// one of them restore with another kind.
+func IrConstPoolID(kind IrConstKind, text string) int64 {
+	h := uint64(fnvOffset64)
+	// kind 0 is valid (nil), so bias it to keep the prefix non-zero.
+	h ^= uint64(kind) + 1
+	h *= fnvPrime64
 	for i := 0; i < len(text); i++ {
 		h ^= uint64(text[i])
 		h *= fnvPrime64
@@ -197,7 +216,7 @@ func (p *IrConstPool) Intern(kind IrConstKind, text string) int64 {
 	if p == nil {
 		return 0
 	}
-	id := IrConstHash(text)
+	id := IrConstPoolID(kind, text)
 	p.mu.Lock()
 	if _, ok := p.seen[id]; !ok {
 		p.pending = append(p.pending, &IrConst{
@@ -249,13 +268,14 @@ func (p *IrConstPool) Flush(db *gorm.DB) error {
 
 // flushIrConstPools writes the values a program's instructions interned. The
 // codec interns at marshal time, under the row's final program name, so this
-// hook only has to flush the pending rows of every program in the batch.
+// hook mostly has to flush the pending rows of every program in the batch.
 //
-// A row assembled outside the codec (tests, an in-tree caller building an
-// IrCode directly) still carries a short const text in String; it is interned
-// here so the row does not end up with const_id zero. An empty String there is
-// indistinguishable from "no text", so only the codec path can pool an empty
-// string constant.
+// A row assembled outside the codec (a caller building an IrCode directly)
+// may have no const id but still carries const_value in extra_information.
+// That raw value is the only safe source of the kind, so the fallback interns
+// from it. A row without const_value is left unpooled instead of being guessed
+// as a string: "nil" and "1" render the same for several kinds, and a wrong
+// kind restores the wrong value.
 //
 // It runs before the IR insert: a row must never point at a pool id that the
 // transaction has not written yet.
@@ -270,10 +290,15 @@ func flushIrConstPools(db *gorm.DB, items []*IrCode) error {
 		if item.Opcode != irCodeConstOpcode || item.ConstType != irCodeConstTypeNormal {
 			continue
 		}
-		if item.String == "" {
+		raw, ok := irCodeConstRawValue(item.ExtraInformation)
+		if !ok {
 			continue
 		}
-		item.ConstID = InternIrConst(item.ProgramName, IrConstKindString, item.String)
+		kind, text, ok := irConstKindAndText(raw)
+		if !ok {
+			continue
+		}
+		item.ConstID = InternIrConst(item.ProgramName, kind, text)
 	}
 	programs := make(map[string]struct{}, 1)
 	for _, item := range items {
@@ -289,6 +314,51 @@ func flushIrConstPools(db *gorm.DB, items []*IrCode) error {
 		}
 	}
 	return errorsJoin(errs)
+}
+
+// irCodeConstRawValue returns const_value from a row's extra_information.
+// ok is false when the key is absent: a null value is a real constant, so the
+// caller cannot treat a nil result as missing.
+func irCodeConstRawValue(extra string) (any, bool) {
+	if extra == "" {
+		return nil, false
+	}
+	dec := json.NewDecoder(strings.NewReader(extra))
+	dec.UseNumber()
+	var params map[string]any
+	if err := dec.Decode(&params); err != nil {
+		return nil, false
+	}
+	raw, ok := params["const_value"]
+	return raw, ok
+}
+
+// irConstKindAndText rebuilds the kind and rendered text of a raw const value.
+// The rendering matches ssa.Const.String; this package cannot import ssa, so
+// the few scalar forms are repeated here.
+func irConstKindAndText(raw any) (IrConstKind, string, bool) {
+	switch v := raw.(type) {
+	case nil:
+		return IrConstKindNil, "nil", true
+	case bool:
+		return IrConstKindBool, strconv.FormatBool(v), true
+	case string:
+		return IrConstKindString, v, true
+	case json.Number:
+		text := v.String()
+		if strings.ContainsAny(text, ".eE") {
+			return IrConstKindFloat, text, true
+		}
+		return IrConstKindInt64, text, true
+	case float64:
+		return IrConstKindFloat, strconv.FormatFloat(v, 'g', -1, 64), true
+	case int:
+		return IrConstKindInt64, strconv.Itoa(v), true
+	case int64:
+		return IrConstKindInt64, strconv.FormatInt(v, 10), true
+	default:
+		return 0, "", false
+	}
 }
 
 func errorsJoin(errs []error) error {

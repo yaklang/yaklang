@@ -335,11 +335,10 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 			// pool row lands under the name this row will carry. A batch that
 			// later rewrites ProgramName re-interns under the new name.
 			if constInst.ConstType == ConstTypeNormal {
-				if kind := irConstKindOf(constInst.Const); kind != ssadb.IrConstKindNil {
-					// An empty string is a real value: the kind tags it, so it
-					// must reach the pool like any other text.
-					ir.ConstID = ssadb.InternIrConst(ir.ProgramName, kind, text)
-				}
+				// Nil is pooled too: the kind tag is what tells restore to build
+				// nil instead of the string "nil". An empty string is a real value
+				// and takes the same path.
+				ir.ConstID = ssadb.InternIrConst(ir.ProgramName, irConstKindOf(constInst.Const), text)
 			}
 			if len(text) <= ssadb.IrCodeInlineConstStringLimit {
 				ir.String = text

@@ -23,8 +23,10 @@ func TestConstLookupUsesNarrowConstTable(t *testing.T) {
 
 	prog := "const-lookup"
 	require.NoError(t, InsertIrCodes(db, []*IrCode{
-		{CodeID: 1, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal, String: "abc"},
-		{CodeID: 2, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal, String: "user_input"},
+		{CodeID: 1, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal,
+			String: "abc", ConstID: InternIrConst(prog, IrConstKindString, "abc")},
+		{CodeID: 2, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal,
+			String: "user_input", ConstID: InternIrConst(prog, IrConstKindString, "user_input")},
 		{CodeID: 3, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: "placeholder", String: "abc"},
 		{CodeID: 4, ProgramName: prog, Opcode: 3, ConstType: irCodeConstTypeNormal, String: "abc"},
 	}, 10))
@@ -48,7 +50,8 @@ func TestConstLookupUsesNarrowConstTable(t *testing.T) {
 	// A re-saved row repoints its const id at the new text; the old pool row is
 	// inert because no ir_codes row references it any more.
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{
-		{CodeID: 1, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal, String: "renamed"},
+		{CodeID: 1, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal,
+			String: "renamed", ConstID: InternIrConst(prog, IrConstKindString, "renamed")},
 	}))
 	after, err := nativeGetIrCodeIDsByConstType(db, prog, ExactCompare, "renamed")
 	require.NoError(t, err)
@@ -61,7 +64,7 @@ func TestConstLookupUsesNarrowConstTable(t *testing.T) {
 		`SELECT c.code_id FROM "`+TableIrConstPool+`" p JOIN "`+TableIrCodes+`" c`+
 			` ON c.program_name = p.program_name AND c.const_id = p.const_id`+
 			` WHERE p.program_name = ? AND c.const_id <> 0 AND c.deleted_at IS NULL AND p.const_id = ?`,
-		prog, IrConstHash("renamed"))
+		prog, IrConstPoolID(IrConstKindString, "renamed"))
 	require.Containsf(t, exactPlan, irConstPoolProgramIDIndex, "plan=%s", exactPlan)
 	require.Containsf(t, exactPlan, irCodeConstIDIndex, "plan=%s", exactPlan)
 
