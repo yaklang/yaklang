@@ -129,6 +129,19 @@ func isPackageLevelObject(obj ssa.Value) bool {
 			}
 		}
 	}
+	// A class blueprint holds the method table, not shared mutable state. Its
+	// members are overload definitions, so widening a read to "every writer"
+	// would report every overload as a possible definition of one call site.
+	if typ := obj.GetType(); !utils.IsNil(typ) {
+		if _, ok := ssa.ToClassBluePrintType(typ); ok {
+			return false
+		}
+	}
+	// A function is created in the package entry function too, but it is a
+	// definition site, not shared mutable state.
+	if _, ok := ssa.ToFunction(obj); ok {
+		return false
+	}
 	// Package-level declarations are emitted into the package entry function,
 	// so an object created there belongs to every function of the package.
 	fn := obj.GetFunc()
@@ -185,6 +198,8 @@ func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...Operation
 	// this point.
 	defaultMember := members[len(members)-1]
 	readIsDefault = !utils.IsNil(defaultMember) && defaultMember.GetId() == raw.GetId()
+	ownFunction := raw.GetFunc()
+	newestPerFunction := make(map[int64]struct{}, 4)
 	for _, member := range members {
 		if utils.IsNil(member) {
 			continue
@@ -194,6 +209,20 @@ func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...Operation
 		}
 		if !utils.IsNil(defaultMember) && member.GetId() == defaultMember.GetId() && ssa.IsConstInst(member) {
 			continue
+		}
+		// A write inside the reading function either already sits in the read's
+		// own chain or happens after the read. Neither is a definition of this
+		// read, and following it makes the answer depend on the read's position.
+		if memberFunction := member.GetFunc(); memberFunction != nil {
+			if ownFunction != nil && memberFunction.GetId() == ownFunction.GetId() {
+				continue
+			}
+			// Members are latest-first: for one writer function only its newest
+			// write can reach the read. An earlier one is overwritten.
+			if _, ok := newestPerFunction[memberFunction.GetId()]; ok {
+				continue
+			}
+			newestPerFunction[memberFunction.GetId()] = struct{}{}
 		}
 		if traced := i.NewValue(member); traced != nil {
 			writers = append(writers, traced.getTopDefs(actx, opt...)...)
