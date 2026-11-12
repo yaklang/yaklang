@@ -22,6 +22,14 @@ type instruction struct {
 	text string
 	// systemRegister marks an MRC or MCR transfer, which armasm cannot decode.
 	systemRegister *systemRegisterTransfer
+	// compare marks CBZ and CBNZ.
+	compare *compareBranch
+	// opaque names an instruction the armasm opcode set cannot express.
+	opaque     string
+	opaqueArgs []armasm.Arg
+	// thumb marks an instruction decoded from the Thumb encoding, whose program
+	// counter is the instruction address plus four.
+	thumb bool
 	// undefined marks a UDF word or an embedded data word.
 	undefined bool
 }
@@ -78,6 +86,9 @@ func parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, e
 func decode(ctx context.Context, request core.ParseRequest, diagnostics *diagnostics) ([]instruction, error) {
 	if request.Reader == nil {
 		return nil, fmt.Errorf("arm: parse request has no reader")
+	}
+	if isThumbMode(request.Target.Mode) {
+		return decodeThumbRegion(ctx, request, diagnostics)
 	}
 	total := request.Reader.Size()
 	if total%4 != 0 {

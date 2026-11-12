@@ -31,10 +31,13 @@ func (Parser) Check(target core.Target) error {
 	if target.Bits != 32 {
 		return fmt.Errorf("arm requires 32-bit addresses, got %d", target.Bits)
 	}
-	// golang.org/x/arch/arm/armasm decodes ARM mode only; it returns
-	// errMode for Thumb. Reject the mode instead of silently misdecoding.
-	if target.Mode != "" && target.Mode != "arm" {
-		return fmt.Errorf("arm decoder supports ARM mode only, got mode %q", target.Mode)
+	// The ARM encoding comes from golang.org/x/arch/arm/armasm; the Thumb and
+	// Thumb-2 encodings are decoded locally. Any other mode is rejected rather
+	// than silently misdecoded.
+	switch target.Mode {
+	case "", "arm", "thumb", "thumb2":
+	default:
+		return fmt.Errorf("arm decoder supports arm, thumb and thumb2 modes, got %q", target.Mode)
 	}
 	return nil
 }

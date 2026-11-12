@@ -22,6 +22,10 @@ type FunctionBoundary struct {
 	Size    uint64         `json:"size,omitempty"`
 	Name    string         `json:"name,omitempty"`
 	Source  BoundarySource `json:"source"`
+	// Mode names the instruction-set execution mode this function uses. ARM
+	// carries both the ARM and the Thumb encoding in one image, so the mode is
+	// a property of the function, not of the image.
+	Mode string `json:"mode,omitempty"`
 }
 
 // BoundaryStats reports discovery counts. Duplicates is the number of
@@ -60,6 +64,17 @@ type BoundaryHints struct {
 
 	// GOTRelocs maps a GOT slot address to the address it resolves to.
 	GOTRelocs map[uint64]uint64
+
+	// ModeRegions lists address ranges whose instruction encoding the file
+	// format records. ARM images mix ARM and Thumb code, and the linker writes
+	// the PLT and .init sections in ARM mode even when .text is Thumb.
+	ModeRegions []ModeRegion
+}
+
+// ModeRegion is one address range with a fixed execution mode.
+type ModeRegion struct {
+	Region
+	Mode string
 }
 
 // PLTEntry is one PLT stub discovered by a loader.

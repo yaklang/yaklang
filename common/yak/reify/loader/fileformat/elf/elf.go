@@ -61,6 +61,12 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 		ABI:          file.OSABI.String(),
 		Machine:      file.Machine.String(),
 	}
+	if file.Machine == elf.EM_ARM {
+		// ARM images carry both encodings. The entry point and the Thumb
+		// function symbols set the low bit of the address, which is the only
+		// per-address record of the mode.
+		target.Mode = armMode(file)
+	}
 	image := &core.Image{ObjectType: file.Type.String(), Sections: make([]core.Section, 0, len(file.Sections))}
 	if file.Entry != 0 {
 		entry := file.Entry
@@ -247,11 +253,22 @@ func elfRelocations(file *elf.File, relaName, relName string) []elfRelocation {
 // elfPLTAddress maps a relocation index to its PLT stub. x86-64 reserves the
 // first .plt entry; .plt.sec, when present, has one entry per import.
 func elfPLTAddress(file *elf.File, index int) (uint64, bool) {
+	// The stub size follows the relocation the architecture uses: sixteen bytes
+	// on x86 and ARM64, twelve on 32-bit ARM, which keeps a four-byte literal.
+	stride := uint64(16)
+	if file.Machine == elf.EM_ARM {
+		stride = 12
+	}
 	if section := file.Section(".plt.sec"); section != nil && section.Addr != 0 {
-		return section.Addr + uint64(index)*16, true
+		return section.Addr + uint64(index)*stride, true
 	}
 	if section := file.Section(".plt"); section != nil && section.Addr != 0 {
-		return section.Addr + uint64(index+1)*16, true
+		header := uint64(1)
+		if file.Machine == elf.EM_ARM {
+			// The ARM PLT header occupies two stub slots on ARMv7.
+			header = 2
+		}
+		return section.Addr + (uint64(index)+header)*stride, true
 	}
 	return 0, false
 }
@@ -265,6 +282,16 @@ func elfSymbolKind(symbol elf.Symbol) sym.SymbolKind {
 	default:
 		return sym.SymbolUnknown
 	}
+}
+
+// armMode reports the mode of the image entry point. A set low bit means Thumb.
+// Images whose entry is ARM still carry Thumb functions, so the per-function
+// boundary records the mode it discovered.
+func armMode(file *elf.File) string {
+	if file.Entry%2 == 1 {
+		return "thumb"
+	}
+	return "arm"
 }
 
 func elfArchitecture(machine elf.Machine, bits int) core.Architecture {
@@ -339,6 +366,15 @@ func parseELFHints(file *elf.File, image *core.Image) *core.BoundaryHints {
 			Offset:  section.Offset,
 			Size:    section.FileSize,
 		})
+		// The ARM linker emits the PLT and the init stub in ARM mode even when
+		// the rest of the image is Thumb. Record that so the boundary scanner
+		// decodes each range with the right decoder.
+		if file.Machine == elf.EM_ARM && (section.Name == ".plt" || section.Name == ".init" || section.Name == ".plt.sec") {
+			hints.ModeRegions = append(hints.ModeRegions, core.ModeRegion{
+				Region: core.Region{Address: section.Addr, Offset: section.Offset, Size: section.FileSize},
+				Mode:   "arm",
+			})
+		}
 	}
 	if section := file.Section(".eh_frame"); section != nil && section.FileSize > 0 {
 		if data, err := section.Data(); err == nil {

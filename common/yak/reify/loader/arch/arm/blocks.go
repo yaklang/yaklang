@@ -63,7 +63,8 @@ func buildFunctions(decoded []instruction, start, end uint64, diagnostics *diagn
 }
 
 // branchTarget returns the static target of a branch. armasm reports PCRel
-// relative to the instruction address plus eight.
+// relative to the instruction address plus eight for ARM, while the Thumb
+// program counter is the instruction address plus four.
 func branchTarget(ins instruction) (uint64, bool) {
 	if len(ins.inst.Args) == 0 {
 		return 0, false
@@ -71,6 +72,9 @@ func branchTarget(ins instruction) (uint64, bool) {
 	offset, ok := pcRelative(ins.inst.Args[0])
 	if !ok {
 		return 0, false
+	}
+	if ins.thumb {
+		return ins.address + 4 + uint64(offset), true
 	}
 	return ins.address + 8 + uint64(offset), true
 }

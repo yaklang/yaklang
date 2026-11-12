@@ -114,8 +114,13 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 		if err != nil {
 			return nil, err
 		}
+		target := artifact.Target
+		if boundary.Mode != "" {
+			// The mode is per function: one ARM image mixes ARM and Thumb code.
+			target.Mode = boundary.Mode
+		}
 		parsed, err := artifact.Parser.Parse(ctx, core.ParseRequest{
-			Target:       artifact.Target,
+			Target:       target,
 			Address:      region.Address,
 			Reader:       reader,
 			Syntax:       config.Syntax,

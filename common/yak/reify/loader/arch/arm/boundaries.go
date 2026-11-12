@@ -2,7 +2,6 @@ package arm
 
 import (
 	"sort"
-	"strings"
 
 	"golang.org/x/arch/arm/armasm"
 
@@ -36,6 +35,9 @@ type boundaryScanner struct {
 	entries map[uint64]*armBoundary
 	data    map[uint64][]byte
 	stats   core.BoundaryStats
+	// defaultMode is the encoding of the image entry point. It decides the mode
+	// of every function that no symbol marks.
+	defaultMode string
 }
 
 // DiscoverBoundaries finds 32-bit ARM function starts. Format metadata, symbols,
@@ -52,15 +54,27 @@ func (Parser) DiscoverBoundaries(reader *core.ByteReader, hints core.BoundaryHin
 		entries: make(map[uint64]*armBoundary),
 		data:    make(map[uint64][]byte),
 	}
+	// The entry point records the encoding of the code the compiler emitted
+	// most of: an odd address means Thumb.
+	scanner.defaultMode = "arm"
+	if entry := image.Entry; entry != nil && *entry%2 == 1 {
+		scanner.defaultMode = "thumb"
+	}
 	scanner.addSymbols()
 	scanner.addEHFrame()
 	scanner.addFunctionStarts()
 	scanner.addInitArrays()
 	scanner.addPLT()
 	if entry := image.Entry; entry != nil {
-		scanner.add(*entry, 0, "", core.BoundaryEntry, priorityEntry)
+		mode := "arm"
+		if *entry%2 == 1 {
+			mode = "thumb"
+		}
+		scanner.addWithMode(*entry, 0, "", core.BoundaryEntry, priorityEntry, mode)
 	}
+	scanner.markThumbFromSymbols()
 	scanner.walkDirectCalls()
+	scanner.walkThumbCalls()
 	scanner.finishRanges()
 	scanner.addTailScan()
 	scanner.finishRanges()
@@ -74,13 +88,16 @@ func (Parser) DiscoverBoundaries(reader *core.ByteReader, hints core.BoundaryHin
 }
 
 func (s *boundaryScanner) add(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority) bool {
-	if address == 0 || address%4 != 0 || s.regionFor(address) == nil {
+	// An odd address marks Thumb code; the instruction stream itself starts at
+	// the aligned address.
+	address &^= 1
+	if address == 0 || s.regionFor(address) == nil {
 		return false
 	}
-	// ARM instructions are four bytes wide. ELF also carries marker symbols
-	// such as go:textfipsstart whose size is one byte; a size smaller than one
-	// instruction is not a real range, so let the next boundary decide it.
-	if size < 4 {
+	// ELF also carries marker symbols such as go:textfipsstart whose size is
+	// one byte; a size smaller than one Thumb instruction is not a real range,
+	// so let the next boundary decide it.
+	if size < 2 {
 		size = 0
 	}
 	switch source {
@@ -130,13 +147,18 @@ func (s *boundaryScanner) addSymbols() {
 		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
 			continue
 		}
-		name := symbol.Name
-		// ARM ELF marks Thumb symbols by setting the low bit of st_value.
+		// ARM ELF marks Thumb code by setting the low bit of st_value, and the
+		// mapping symbols $a, $t and $d mark the start of an ARM, Thumb or data
+		// run. Both carry the mode in the low bit.
+		mode := "arm"
 		if symbol.Address%2 == 1 {
-			name = strings.TrimPrefix(name, "$a")
+			mode = "thumb"
+		}
+		if symbol.Name == "$d" {
+			// A data run is not a function.
 			continue
 		}
-		s.add(symbol.Address, symbol.Size, name, core.BoundarySymbol, prioritySymbol)
+		s.addWithMode(symbol.Address, symbol.Size, symbol.Name, core.BoundarySymbol, prioritySymbol, mode)
 	}
 }
 
@@ -160,7 +182,10 @@ func (s *boundaryScanner) addInitArrays() {
 
 func (s *boundaryScanner) addPLT() {
 	for _, entry := range s.hints.PLTTargets {
-		s.add(entry.Address, 12, entry.Name, core.BoundaryPLT, priorityPLT)
+		// The linker writes PLT stubs in ARM mode even when the rest of the
+		// image is Thumb. On ARMv7 the stub is three instructions plus the
+		// literal that the resolver reads.
+		s.addWithMode(entry.Address, 16, entry.Name, core.BoundaryPLT, priorityPLT, "arm")
 	}
 }
 
@@ -322,10 +347,11 @@ func (s *boundaryScanner) finishRanges() {
 	sort.Slice(addresses, func(i, j int) bool { return addresses[i] < addresses[j] })
 	for _, address := range addresses {
 		entry := s.entries[address]
-		if entry.Size != 0 {
-			continue
-		}
-		if next := s.nextBoundary(address); next > address {
+		next := s.nextBoundary(address)
+		// A range never crosses the next boundary. The recursive descent can
+		// walk past a boundary it did not know about, and an overlapping range
+		// would decode the same bytes twice.
+		if next > address && (entry.Size == 0 || entry.Size > next-address) {
 			entry.Size = next - address
 		}
 	}
@@ -360,23 +386,34 @@ func (s *boundaryScanner) addTailScan() {
 	}
 }
 
+// scanGap recovers a function start that neither a symbol nor the call graph
+// reached. The scan is conservative: a candidate must follow padding or an
+// unconditional branch, because anything else is mid-function.
 func (s *boundaryScanner) scanGap(start, end uint64) {
+	step := uint64(4)
+	if s.defaultMode == "thumb" {
+		step = 2
+	}
+	padding := true
 	for address := start; address+8 <= end; {
-		inst, ok := s.decode(address)
+		inst, size, ok := s.decodeAny(address)
 		if !ok {
-			address += 4
+			padding = true
+			address += step
 			continue
 		}
 		if baseOp(inst.Op) == armasm.NOP {
-			address += 4
+			address += uint64(size)
 			continue
 		}
-		if !plausibleFunctionStart(inst) {
-			address += 4
+		if padding && plausibleFunctionStart(inst) {
+			s.addWithMode(address, 0, "", core.BoundaryScan, priorityScan, s.modeFor(address))
+			padding = false
+			address += uint64(size)
 			continue
 		}
-		s.add(address, 0, "", core.BoundaryScan, priorityScan)
-		address += 8
+		padding = baseOp(inst.Op) == armasm.B || baseOp(inst.Op) == armasm.BX
+		address += uint64(size)
 	}
 }
 

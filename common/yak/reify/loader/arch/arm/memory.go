@@ -84,6 +84,18 @@ func (l *lifter) load(ins instruction) {
 	}
 	pointer, ok := l.memoryOperand(ins, args[1])
 	if !ok {
+		// A PC-relative literal load has no base register: the address is the
+		// aligned program counter plus the immediate.
+		if offset, relative := pcRelative(args[1]); relative {
+			pointer = l.pointerConstant(ins.address, ins.address+4+uint64(offset))
+			value := l.loadValue(ins.address, pointer, width)
+			if baseOp(ins.inst.Op) == armasm.LDRSB || baseOp(ins.inst.Op) == armasm.LDRSH {
+				value = l.operation(ins, core.OpSignExtend, []core.Operand{l.value(value)}, bits, core.EffectNone)
+			}
+			l.writeRegister(ins.address, destination, bits, value)
+			l.postUpdate(ins, args[1])
+			return
+		}
 		l.unsupported(ins)
 		return
 	}
