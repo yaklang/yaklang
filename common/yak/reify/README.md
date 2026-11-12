@@ -13,7 +13,7 @@ Reify 是 Yaklang 的程序表示接入框架。它把文件格式、目标平�
 | 字节序 | `core.ByteOrder` | ByteReader 的读取模式 |
 | 指令操作 | `core.Opcode` | LowIR 指令的 Kind |
 
-Loader 和 Parser 使用两条独立的分派路径。ELF、PE、Mach-O 各自有独立 loader 包；AMD64、386、ARM64 与 ARM 已有解码器，其余架构仍是注册骨架。操作系统、ABI 和执行模式属于 Target，随请求传给 parser。
+Loader 和 Parser 使用两条独立的分派路径。ELF、PE、Mach-O、COFF、ar 与 MZ 各自有独立 loader 包；十三种架构都有解码器。操作系统、ABI 和执行模式属于 Target，随请求传给 parser。
 
 ```text
 path ── os.File ── ByteReader ── Format ── Loader ── Artifact
@@ -132,8 +132,14 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 - 源码常量默认十六进制；字符串地址和符号地址带注释。
 - 按 Format 选择 loader，按 Architecture 选择 parser。
 - AMD64 解码器：通用寄存器、内存访问、算术与逻辑、比较与条件跳转、调用与返回、栈操作、部分 SSE 移动与按位操作。
+- RISCV64/RISCV32 解码器：共享 `loader/arch/internal/riscv`，用 `riscv64asm` 解码，支持压缩指令（2 字节）；整数 ALU、加载存储、分支调用、AMO/LR/SC 原子与浮点不透明路径。
+- PPC64/PPC 解码器：共享 `loader/arch/internal/ppc`，用 `ppc64asm` 解码大端与小端；整数 ALU、旋转移位、SPR 访问、ISEL、加载存储、分支调用与向量不透明路径。
+- MIPS64/MIPS 解码器：共享 `loader/arch/internal/mips`，解码器手写在 `format.go`（MIPS32/MIPS64 主操作码表 + SPECIAL/SPECIAL2/SPECIAL3/REGIMM/CP0/CP1），大端与小端都支持。
 - 386 解码器：与 AMD64 共用同一套 x86 解码与提升实现（`loader/arch/internal/x86`），差异只在默认位宽、寄存器名（`eax`/`esp`/`eflags`）与栈槽宽度（4 字节）。
-- ARM 解码器（32 位 ARM 模式）：整数算术与逻辑、移位、乘法、位域、条件执行、加载存储三种寻址、PUSH/POP/LDM/STM、分支与调用；Thumb 模式未实现，`Check` 明确拒绝。
+- S390X 解码器：`s390xasm` 解码 2/4/6 字节变长指令（大端）；整数 ALU、三寄存器形式、加载存储、比较并分支、子程序调用与 PC 相对地址。
+- LOONG64 解码器：`loong64asm` 解码定长 4 字节指令；整数 ALU、分支调用、加载存储与 `LU32I.D`/`LU52I.D` 常数构造。
+- 8086 解码器：与 386、AMD64 共用同一套 x86 实现，选择 16 位模式与 16 位寄存器组（`sp`/`bp`/`ax`/`flags`）。
+- ARM 解码器（32 位 ARM 与 Thumb/Thumb-2）：整数算术与逻辑、移位、乘法、位域、条件执行、加载存储三种寻址、PUSH/POP/LDM/STM、分支与调用；Thumb 由手写解码器处理 16 位与 32 位编码，`IT` 块按 mask 改写条件；ARM 与 Thumb 可以混在同一个二进制里，模式由边界提示决定。
 - ARM64 解码器：整数算术与逻辑、位域、条件选择、条件比较、加载/存储（含前后索引）、分支与调用、指针认证（PAC）编码、SIMD 与浮点保留为不透明向量操作。
 - AMD64 汇编文本：按地址、机器字节输出；`--asm-syntax att|intel` 切换语法。
 - AMD64 LowIR：一个代码区域提升为一个 Function，包含基本块、值、操作、目标与效果。
@@ -146,7 +152,7 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 
 ## 当前边界
 
-- 除 AMD64、386、ARM64 与 ARM 外的架构 parser 只有注册骨架，`Parse` 返回 `ErrDecoderUnavailable`。
+- 十三种注册架构都实现了 `Parse`；`arch.All` 不再返回任何 `Available() == false` 的 parser。
 - AMD64 使用线性扫描，不依赖符号表恢复函数边界。一个 `ParseRequest` 区域当前产出一个 Function。`.text` 中的数据或填充也可能被当作指令。
 - 未支持的 AMD64 指令保留为 `intrinsic`，并产生 `unsupported-instruction` 诊断。它们不会改变已支持的语义，也不会被静默丢弃。
 - 解码在区域末尾截断时返回部分 LowIR，并产生 `decode-error` 诊断。

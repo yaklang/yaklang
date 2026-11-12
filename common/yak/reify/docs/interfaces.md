@@ -208,13 +208,13 @@ type Disassembly struct {
 - `Parse` 用 `armasm` 的 ARM 模式解码。
 - 支持的指令族和限制见[架构文档](architecture.md#arm)。
 
-其余六个架构仍是骨架：
+其余架构的实现方式相同：
 
-- `Available() == false`。
+- `Available() == true`。
 - `Check` 校验 Target 的架构、位数与执行模式。
-- `Parse` 返回 `ErrDecoderUnavailable`。
+- `Parse` 解码为 LowIR，`Disassemble` 输出汇编文本。
 
-实现某个架构时替换该类型的 `Parse`，并让 `Available` 返回 true。接口和注册方式不变。
+十三种架构都有实现；新增架构只需要提供一个 `Profile` 和薄封装。
 
 ## LowIR
 
