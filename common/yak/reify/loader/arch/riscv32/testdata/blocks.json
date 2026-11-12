@@ -1,0 +1,29 @@
+[
+  {
+    "name": "branch",
+    "address": "0x10100",
+    "code": [
+      "63 04 b5 00 // beq a0, a1, +8",
+      "13 00 00 00 // nop",
+      "67 80 00 00 // ret"
+    ],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function sub_0x10100 @ 0x10100",
+      "block b1 @ 0x10100",
+      "  0x10100  v1:i32 = read_register %x10 [read_register]",
+      "  0x10100  v2:i32 = read_register %x11 [read_register]",
+      "  0x10100  v3:i1 = eq v1, v2",
+      "  0x10100  branch v3 -> b3, b2",
+      "block b2 @ 0x10104",
+      "  0x10104  v4:i32 = constant 0x0",
+      "  0x10104  v5:i32 = constant 0x0",
+      "  0x10104  v6:i32 = add v4, v5",
+      "  0x10108  jump -> b3",
+      "block b3 @ 0x10108",
+      "  0x10108  v7:i32 = read_register %x1 [read_register]",
+      "  0x10108  v8:ptr32 = copy v7",
+      "  0x10108  return [may_trap, unknown]"
+    ]
+  }
+]
