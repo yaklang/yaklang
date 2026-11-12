@@ -96,8 +96,8 @@ var loopAction_SaveEvidence = &LoopAction{
 			return
 		}
 		changed := loop.GetConfig().GetSessionEvidenceRendered() != before
-		if changed && loop.IsSubAgent() && loop.evidenceObserver != nil {
-			if err := loop.evidenceObserver(evidenceOp); err != nil {
+		if changed && loop.IsSubAgent() && loop.notifyEvidence != nil {
+			if err := loop.notifyEvidence(evidenceOp.ID); err != nil {
 				operator.Fail(utils.Wrap(err, "notify parent of evidence discovery failed"))
 				return
 			}

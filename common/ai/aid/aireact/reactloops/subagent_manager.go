@@ -333,7 +333,7 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 		}
 		m.mu.Unlock()
 	}
-	opts.evidenceObserver = func(op aicommon.EvidenceOperation) error {
+	opts.notifyEvidence = func(evidenceID string) error {
 		m.mu.Lock()
 		accept := !m.closed && m.ctx.Err() == nil && ctx.Err() == nil &&
 			!entry.snapshot.terminal() && entry.snapshot.State != "cancelling"
@@ -348,7 +348,7 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 		}
 		m.sharedEvidenceRevision++
 		entry.snapshot.EvidenceRevision = m.sharedEvidenceRevision
-		entry.snapshot.LastEvidenceID = op.ID
+		entry.snapshot.LastEvidenceID = evidenceID
 		entry.snapshot.LastActivityAt = time.Now()
 		m.notifyDiscoveryLocked()
 		return nil

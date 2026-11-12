@@ -301,9 +301,9 @@ type ReActLoop struct {
 	subAgentControlRounds     int
 	subAgentControlIterations int
 	subAgentControlRevision   uint64
-	// save_evidence invokes this observer only after its broadcast changes the
-	// current Timeline. It wakes enclosing loops; evidence data is not copied.
-	evidenceObserver func(aicommon.EvidenceOperation) error
+	// Explicit evidence broadcast invokes this callback after the current
+	// Timeline changes. It carries only the evidence ID and never copies data.
+	notifyEvidence func(evidenceID string) error
 
 	// functionCallMode selects per-action function-call schema tags when
 	// generateLoopPrompt assembles the prompt. Provider projection and response

@@ -36,10 +36,10 @@ type PreparedSubAgent struct {
 	StartedAt time.Time
 	// runtimeErr 记录 prepare 期 timeline 构建失败的原因；此时 Invoker/Task
 	// 为 nil，阶段 2 直接按失败兜底，不再尝试构建 runtime。
-	runtimeErr       error
-	configOptions    []aicommon.ConfigOption // captured with the timeline, before queueing
-	parentEmitter    *aicommon.Emitter
-	evidenceObserver func(aicommon.EvidenceOperation) error
+	runtimeErr     error
+	configOptions  []aicommon.ConfigOption // captured with the timeline, before queueing
+	parentEmitter  *aicommon.Emitter
+	notifyEvidence func(evidenceID string) error
 }
 
 // ExecutedSubAgent 是阶段 2（执行任务）的产物：一个已执行（或执行失败）的子
@@ -107,13 +107,13 @@ func prepareSubAgents(
 	parentTimeline := parentCfg.GetTimeline()
 	// Capture the notification callback on the owner thread. Evidence itself is
 	// delivered by Timeline broadcast; this callback only wakes enclosing loops.
-	var parentObserver func(aicommon.EvidenceOperation) error
+	var parentNotify func(evidenceID string) error
 	if opts.ParentLoop != nil {
-		parentObserver = opts.ParentLoop.evidenceObserver
+		parentNotify = opts.ParentLoop.notifyEvidence
 	}
-	observeEvidence := func(op aicommon.EvidenceOperation) error {
-		if parentObserver != nil {
-			return parentObserver(op)
+	notify := func(evidenceID string) error {
+		if parentNotify != nil {
+			return parentNotify(evidenceID)
 		}
 		return nil
 	}
@@ -149,13 +149,13 @@ func prepareSubAgents(
 		}
 
 		prepared = append(prepared, &PreparedSubAgent{
-			Job:              job,
-			Timeline:         handle,
-			Release:          func() {},
-			StartedAt:        startedAt,
-			configOptions:    snapshotSubAgentConfig(parentCfg, job.ContextMode),
-			parentEmitter:    parentCfg.GetEmitter(),
-			evidenceObserver: observeEvidence,
+			Job:            job,
+			Timeline:       handle,
+			Release:        func() {},
+			StartedAt:      startedAt,
+			configOptions:  snapshotSubAgentConfig(parentCfg, job.ContextMode),
+			parentEmitter:  parentCfg.GetEmitter(),
+			notifyEvidence: notify,
 		})
 	}
 	return prepared
@@ -379,9 +379,9 @@ func executeSubAgent(prepared *PreparedSubAgent, opts SubAgentOptions) *Executed
 	if !loop.IsSubAgent() {
 		loop.Set(SubAgentDepthLoopVar, 1)
 	}
-	loop.evidenceObserver = prepared.evidenceObserver
-	if opts.evidenceObserver != nil {
-		loop.evidenceObserver = opts.evidenceObserver
+	loop.notifyEvidence = prepared.notifyEvidence
+	if opts.notifyEvidence != nil {
+		loop.notifyEvidence = opts.notifyEvidence
 	}
 	execErr := loop.ExecuteWithExistedTask(prepared.Task)
 
@@ -912,11 +912,11 @@ type SubAgentOptions struct {
 	childConfigOptions []aicommon.ConfigOption
 	parentEmitter      *aicommon.Emitter
 	// Background workers use frozen scope and callbacks, never mutable parent loop state.
-	runtimeContext   context.Context
-	taskReady        func(aicommon.AIStatefulTask)
-	observeEvent     func(*schema.AiOutputEvent)
-	resultWriter     func(id, content string) (string, error)
-	evidenceObserver func(aicommon.EvidenceOperation) error
+	runtimeContext context.Context
+	taskReady      func(aicommon.AIStatefulTask)
+	observeEvent   func(*schema.AiOutputEvent)
+	resultWriter   func(id, content string) (string, error)
+	notifyEvidence func(evidenceID string) error
 	// TimelineMode 决定子 Agent 的 timeline 容器。默认 SubAgentTimelineFork。
 	TimelineMode SubAgentTimelineMode
 
