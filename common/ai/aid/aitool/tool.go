@@ -80,6 +80,9 @@ type Tool struct {
 	RequireForeground bool `json:"-"`
 	// RejectInterruptedReplay prevents automatic re-execution after an unknown outcome.
 	RejectInterruptedReplay bool `json:"-"`
+	// ExclusiveBatchGroup admits only one call from the named group per parallel batch.
+	// An empty group imposes no batch admission constraint.
+	ExclusiveBatchGroup string `json:"-"`
 	// A list of keywords for tool indexing and searching.
 	Keywords      []string `json:"keywords,omitempty"`
 	VerboseName   string   `json:"verbose_name,omitempty"`    // English string（事件/列表同名字段保持 string）

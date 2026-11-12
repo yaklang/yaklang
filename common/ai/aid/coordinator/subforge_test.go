@@ -59,6 +59,7 @@ func TestSubForgeScopeAndLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, tool.RequireForeground)
 	require.True(t, tool.RejectInterruptedReplay)
+	require.Equal(t, "sub-Forge", tool.ExclusiveBatchGroup)
 	go func() {
 		_, err := session.invokeSubForge(ctx, task, "call", binding, nil)
 		finished <- err
