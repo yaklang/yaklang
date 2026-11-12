@@ -256,7 +256,11 @@ func normalizeInputAttachments(event *ypb.AIInputEvent) ([]*aicommon.AttachedRes
 		if resource == nil {
 			return
 		}
-		key := resource.NormalizedType() + "\x00" + strings.TrimSpace(resource.Key) + "\x00" + strings.TrimSpace(resource.Value)
+		value := strings.TrimSpace(resource.Value)
+		if resource.HasType(aicommon.AttachedResourceTypeFile) && resource.HasKey(aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT) {
+			value = resource.Value
+		}
+		key := resource.NormalizedType() + "\x00" + strings.TrimSpace(resource.Key) + "\x00" + value
 		if _, ok := seen[key]; ok {
 			return
 		}
