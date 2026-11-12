@@ -171,7 +171,7 @@ func TestConvertYPBAIStartParams_RuntimeContextSizeLimit(t *testing.T) {
 	}
 
 	serverDefault := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true)).TimelineContentSizeLimit
-	require.Equal(t, 500*1024, serverDefault, "服务端默认阈值需要覆盖运行时上下文")
+	require.Equal(t, 500*1000, serverDefault, "服务端默认阈值需要覆盖运行时上下文")
 
 	legacy := buildConfig(&ypb.AIStartParams{TimelineContentSizeLimit: 20 * 1024})
 	require.Equal(t, serverDefault, legacy.TimelineContentSizeLimit,
