@@ -123,9 +123,6 @@ func (r *ReAct) processReActFromQueue() {
 		return
 	}
 
-	cleanupInlineAttachments := installTaskInlineAttachmentProvider(r.config.ContextProviderManager, nextTask)
-	defer cleanupInlineAttachments()
-
 	r.AddRuntimeTask(nextTask)
 	r.setCurrentTask(nextTask)
 	r.persistTaskUserInput(nextTask)
