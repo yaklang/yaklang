@@ -258,7 +258,7 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 // file across prompt refreshes and inherited task contexts.
 func FileContentContextProvider(content string, userPrompt ...string) ContextProvider {
 	resource := &AttachedFileContentResourceData{}
-	_ = resource.Unmarshal(content)
+	_ = resource.Unmarshal(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_CONTENT, content))
 	return func(config AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
 		rendered, err := resource.render(emitter)
 		if err != nil {

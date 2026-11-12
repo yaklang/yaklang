@@ -28,8 +28,8 @@ func (d *AttachedHTTPFuzzRequestData) Type() string {
 	return AttachedResourceTypeHTTPFuzzRequest
 }
 
-func (d *AttachedHTTPFuzzRequestData) Unmarshal(raw string) error {
-	raw = strings.TrimSpace(raw)
+func (d *AttachedHTTPFuzzRequestData) Unmarshal(resource *AttachedResource) error {
+	raw := strings.TrimSpace(resource.Value)
 	d.Raw = raw
 	if raw == "" {
 		return utils.Error("http fuzz request packet is empty")

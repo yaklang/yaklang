@@ -32,8 +32,9 @@ func (d *AttachedCodeResourceData) Type() string {
 	return AttachedResourceTypeCode
 }
 
-func (d *AttachedCodeResourceData) Unmarshal(raw string) error {
-	path := strings.TrimSpace(raw)
+func (d *AttachedCodeResourceData) Unmarshal(resource *AttachedResource) error {
+	d.Key = resource.Key
+	path := strings.TrimSpace(resource.Value)
 	if path == "" {
 		return utils.Error("attached code path is empty")
 	}

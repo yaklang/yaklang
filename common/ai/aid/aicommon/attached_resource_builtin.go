@@ -59,8 +59,8 @@ func (d *DefaultAttachedResourceData) Type() string {
 	return d.ResourceType
 }
 
-func (d *DefaultAttachedResourceData) Unmarshal(raw string) error {
-	d.Value = strings.TrimSpace(raw)
+func (d *DefaultAttachedResourceData) Unmarshal(resource *AttachedResource) error {
+	d.Value = strings.TrimSpace(resource.Value)
 	return nil
 }
 
@@ -116,8 +116,9 @@ func (d *AttachedFileResourceData) Type() string {
 	return AttachedResourceTypeFile
 }
 
-func (d *AttachedFileResourceData) Unmarshal(raw string) error {
-	path := strings.TrimSpace(raw)
+func (d *AttachedFileResourceData) Unmarshal(resource *AttachedResource) error {
+	d.Key = resource.Key
+	path := strings.TrimSpace(resource.Value)
 	if path == "" {
 		return utils.Error("attached file path is empty")
 	}
@@ -269,13 +270,14 @@ func (d *AttachedKnowledgeBaseResourceData) Type() string {
 	return AttachedResourceTypeKnowledgeBase
 }
 
-func (d *AttachedKnowledgeBaseResourceData) Unmarshal(raw string) error {
-	value := strings.TrimSpace(raw)
+func (d *AttachedKnowledgeBaseResourceData) Unmarshal(resource *AttachedResource) error {
+	d.Key = resource.Key
+	value := strings.TrimSpace(resource.Value)
 	if value == "" {
 		return utils.Error("attached knowledge base value is empty")
 	}
-	d.Value = raw
-	return d.content.Unmarshal(raw)
+	d.Value = resource.Value
+	return d.content.Unmarshal(resource)
 }
 
 func (d *AttachedKnowledgeBaseResourceData) BindLoopData(reactloop ReActLoopIF) error {
