@@ -23,7 +23,8 @@ func TestAllArchitectures(t *testing.T) {
 			t.Fatalf("duplicate architecture %s", parser.Kind())
 		}
 		seen[parser.Kind()] = true
-		decoded := parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386
+		decoded := parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386 ||
+			parser.Kind() == core.ArchARM64
 		if parser.Available() != decoded {
 			t.Fatalf("%s reported unexpected decoder availability", parser.Kind())
 		}
@@ -87,7 +88,8 @@ func TestCheckTargetMatrix(t *testing.T) {
 
 func TestParseReportsUnavailable(t *testing.T) {
 	for _, parser := range All() {
-		if parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386 {
+		if parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386 ||
+			parser.Kind() == core.ArchARM64 {
 			continue
 		}
 		// The request must satisfy Check, otherwise the parser reports a

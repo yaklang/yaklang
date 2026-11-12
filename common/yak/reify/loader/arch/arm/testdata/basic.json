@@ -1,0 +1,120 @@
+[
+  {
+    "name": "add immediate",
+    "address": "0x8049000",
+    "code": [
+      "01 00 80 e2 // add r0, r0, #1",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8049000 @ 0x8049000",
+      "block b1 @ 0x8049000",
+      "  0x8049000  v1:i32 = read_register %r0 [read_register]",
+      "  0x8049000  v2:i32 = constant 0x1",
+      "  0x8049000  v3:i32 = add v1, v2",
+      "  0x8049000  write_register %r0, v3 [write_register]",
+      "  0x8049004  v4:i32 = read_register %lr [read_register]",
+      "  0x8049004  v5:ptr32 = copy v4",
+      "  0x8049004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov immediate",
+    "address": "0x8049010",
+    "code": [
+      "2a 00 a0 e3 // mov r0, #42",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8049010 @ 0x8049010",
+      "block b1 @ 0x8049010",
+      "  0x8049010  v1:i32 = constant 0x2a",
+      "  0x8049010  write_register %r0, v1 [write_register]",
+      "  0x8049014  v2:i32 = read_register %lr [read_register]",
+      "  0x8049014  v3:ptr32 = copy v2",
+      "  0x8049014  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load word",
+    "address": "0x8049020",
+    "code": [
+      "08 10 90 e5 // ldr r1, [r0, #8]",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8049020 @ 0x8049020",
+      "block b1 @ 0x8049020",
+      "  0x8049020  v1:i32 = read_register %r0 [read_register]",
+      "  0x8049020  v2:ptr32 = copy v1",
+      "  0x8049020  v3:i32 = constant 0x8",
+      "  0x8049020  v4:i32 = add v2, v3",
+      "  0x8049020  v5:i32 = load v4 [read_memory]",
+      "  0x8049020  write_register %r1, v5 [write_register]",
+      "  0x8049024  v6:i32 = read_register %lr [read_register]",
+      "  0x8049024  v7:ptr32 = copy v6",
+      "  0x8049024  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "push registers",
+    "address": "0x8049030",
+    "code": [
+      "02 40 2d e9 // push {r1, lr}",
+      "02 40 bd e8 // pop {r1, lr}",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8049030 @ 0x8049030",
+      "block b1 @ 0x8049030",
+      "  0x8049030  v1:i32 = read_register %sp [read_register]",
+      "  0x8049030  v2:i32 = constant 0x8",
+      "  0x8049030  v3:i32 = sub v1, v2",
+      "  0x8049030  write_register %sp, v3 [write_register]",
+      "  0x8049030  v4:i32 = read_register %r1 [read_register]",
+      "  0x8049030  store v3, v4 [write_memory]",
+      "  0x8049030  v5:i32 = constant 0x4",
+      "  0x8049030  v6:ptr32 = add v3, v5",
+      "  0x8049030  v7:i32 = read_register %lr [read_register]",
+      "  0x8049030  store v6, v7 [write_memory]",
+      "  0x8049034  v8:i32 = read_register %sp [read_register]",
+      "  0x8049034  v9:i32 = load v8 [read_memory]",
+      "  0x8049034  write_register %r1, v9 [write_register]",
+      "  0x8049034  v10:i32 = constant 0x4",
+      "  0x8049034  v11:ptr32 = add v8, v10",
+      "  0x8049034  v12:i32 = load v11 [read_memory]",
+      "  0x8049034  write_register %lr, v12 [write_register]",
+      "  0x8049034  v13:i32 = read_register %sp [read_register]",
+      "  0x8049034  v14:i32 = constant 0x8",
+      "  0x8049034  v15:i32 = add v13, v14",
+      "  0x8049034  write_register %sp, v15 [write_register]",
+      "  0x8049038  v16:i32 = read_register %lr [read_register]",
+      "  0x8049038  v17:ptr32 = copy v16",
+      "  0x8049038  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "compare immediate",
+    "address": "0x8049040",
+    "code": [
+      "01 00 50 e3 // cmp r0, #1",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8049040 @ 0x8049040",
+      "block b1 @ 0x8049040",
+      "  0x8049040  v1:i32 = read_register %r0 [read_register]",
+      "  0x8049040  v2:i32 = constant 0x1",
+      "  0x8049040  v3:i32 = intrinsic @arm.flags.cmp, v1, v2 [write_register]",
+      "  0x8049040  write_register %cpsr, v3 [write_register]",
+      "  0x8049044  v4:i32 = read_register %lr [read_register]",
+      "  0x8049044  v5:ptr32 = copy v4",
+      "  0x8049044  return [may_trap, unknown]"
+    ]
+  }
+]

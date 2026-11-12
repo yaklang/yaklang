@@ -1,6 +1,6 @@
-// Package arch provides one parser per instruction-set architecture. AMD64 and
-// 386 decode machine code into LowIR. The other architectures register the
-// dispatch contract and validate targets; their Parse reports
+// Package arch provides one parser per instruction-set architecture. AMD64,
+// 386 and ARM64 decode machine code into LowIR. The other architectures
+// register the dispatch contract and validate targets; their Parse reports
 // ErrDecoderUnavailable.
 package arch
 
@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/amd64"
+	arm64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/arm64"
 	x86impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/x86"
 )
 
@@ -18,7 +19,7 @@ var ErrDecoderUnavailable = errors.New("instruction decoder is not implemented")
 // All returns one registered parser per architecture.
 func All() []core.Parser {
 	return []core.Parser{
-		amd64.Parser{}, x86impl.Parser{}, ARM{}, ARM64{}, RISCV32{}, RISCV64{}, MIPS{}, MIPS64{}, PPC{}, PPC64{},
+		amd64.Parser{}, x86impl.Parser{}, arm64impl.Parser{}, ARM{}, RISCV32{}, RISCV64{}, MIPS{}, MIPS64{}, PPC{}, PPC64{},
 	}
 }
 

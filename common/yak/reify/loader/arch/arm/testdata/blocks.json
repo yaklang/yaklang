@@ -1,0 +1,63 @@
+[
+  {
+    "name": "conditional branch",
+    "address": "0x8050000",
+    "code": [
+      "02 00 00 1a // bne +0xc",
+      "00 00 a0 e1 // nop",
+      "00 00 a0 e1 // nop",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8050000 @ 0x8050000",
+      "block b1 @ 0x8050000",
+      "  0x8050000  v1:i32 = read_register %cpsr [read_register]",
+      "  0x8050000  v2:i1 = intrinsic @arm.cond.ne, v1 [read_register]",
+      "  0x8050000  branch v2 -> b2",
+      "block b2 @ 0x8050004",
+      "  0x8050004  v3:i32 = read_register %r0 [read_register]",
+      "  0x8050004  write_register %r0, v3 [write_register]",
+      "  0x8050008  v4:i32 = read_register %r0 [read_register]",
+      "  0x8050008  write_register %r0, v4 [write_register]",
+      "  0x805000c  v5:i32 = read_register %lr [read_register]",
+      "  0x805000c  v6:ptr32 = copy v5",
+      "  0x805000c  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "direct call",
+    "address": "0x8050010",
+    "code": [
+      "02 00 00 eb // bl +0xc",
+      "00 00 a0 e1 // nop",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8050010 @ 0x8050010",
+      "block b1 @ 0x8050010",
+      "  0x8050010  call 0x8050020 [call, may_trap, unknown]",
+      "  0x8050014  v1:i32 = read_register %r0 [read_register]",
+      "  0x8050014  write_register %r0, v1 [write_register]",
+      "  0x8050018  v2:i32 = read_register %lr [read_register]",
+      "  0x8050018  v3:ptr32 = copy v2",
+      "  0x8050018  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "return",
+    "address": "0x8050020",
+    "code": [
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x8050020 @ 0x8050020",
+      "block b1 @ 0x8050020",
+      "  0x8050020  v1:i32 = read_register %lr [read_register]",
+      "  0x8050020  v2:ptr32 = copy v1",
+      "  0x8050020  return [may_trap, unknown]"
+    ]
+  }
+]

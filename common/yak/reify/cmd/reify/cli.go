@@ -24,7 +24,7 @@ func newCLIApp(env *commandEnv) *cli.App {
 	app.Name = "reify"
 	app.HelpName = "reify"
 	app.Usage = "executable loading and program representation"
-	app.Description = "Scope: file headers, target platforms, section metadata, AMD64 assembly, LowIR, YakSSA and source-like text.\nLoaders: ELF, PE and thin Mach-O. AMD64 has an instruction decoder; other architectures are registered without decoders."
+	app.Description = "Scope: file headers, target platforms, section metadata, AMD64 and ARM64 assembly, LowIR, YakSSA and source-like text.\nLoaders: ELF, PE and thin Mach-O. AMD64 and ARM64 have instruction decoders; other architectures are registered without decoders."
 	app.Writer = env.stdout
 	app.ErrWriter = env.stderr
 	app.HideVersion = true
@@ -240,7 +240,7 @@ func (e *commandEnv) lift(c *cli.Context) error {
 	defer func() { _ = result.Close() }()
 
 	report := liftReport{
-		Scope:         scopeFor(mode),
+		Scope:         scopeFor(result, mode),
 		Mode:          string(mode),
 		Region:        result.Region,
 		Assembly:      result.Assembly,
@@ -258,32 +258,37 @@ func (e *commandEnv) lift(c *cli.Context) error {
 	return err
 }
 
-func scopeFor(mode reify.Mode) string {
+func scopeFor(result *reify.Result, mode reify.Mode) string {
+	arch := "unknown"
+	if result != nil && result.Artifact != nil {
+		arch = string(result.Artifact.Target.Architecture)
+	}
 	switch mode {
 	case reify.ModeASM:
-		return "amd64-assembly"
+		return arch + "-assembly"
 	case reify.ModeLowIR:
-		return "amd64-lowir"
+		return arch + "-lowir"
 	case reify.ModeSSAIR:
-		return "amd64-ssair"
+		return arch + "-ssair"
 	case reify.ModeSource:
-		return "amd64-source"
+		return arch + "-source"
 	default:
-		return "amd64-all"
+		return arch + "-all"
 	}
 }
 
 func liftText(result *reify.Result) io.Reader {
 	var text bytes.Buffer
+	arch := string(result.Artifact.Target.Architecture)
 	switch result.Mode {
 	case reify.ModeASM:
-		fmt.Fprintf(&text, "Scope: amd64 assembly\n")
+		fmt.Fprintf(&text, "Scope: %s assembly\n", arch)
 		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
 		fmt.Fprintf(&text, "Instructions: %d\n", result.Instructions)
 		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
 		text.WriteString(result.Assembly)
 	case reify.ModeLowIR:
-		fmt.Fprintf(&text, "Scope: amd64 LowIR\n")
+		fmt.Fprintf(&text, "Scope: %s LowIR\n", arch)
 		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
 		fmt.Fprintf(&text, "Functions: %d\n", result.Functions)
 		fmt.Fprintf(&text, "Blocks: %d\n", result.Blocks)
@@ -294,9 +299,9 @@ func liftText(result *reify.Result) io.Reader {
 		text.WriteString(lowirtext.Format(result.IR))
 	case reify.ModeSSAIR, reify.ModeSource:
 		if result.Mode == reify.ModeSSAIR {
-			fmt.Fprintf(&text, "Scope: amd64 SSair\n")
+			fmt.Fprintf(&text, "Scope: %s SSair\n", arch)
 		} else {
-			fmt.Fprintf(&text, "Scope: amd64 source\n")
+			fmt.Fprintf(&text, "Scope: %s source\n", arch)
 		}
 		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
 		fmt.Fprintf(&text, "Functions: %d\n", result.Functions)
@@ -308,7 +313,7 @@ func liftText(result *reify.Result) io.Reader {
 			text.WriteString(result.Source)
 		}
 	default:
-		fmt.Fprintf(&text, "Scope: amd64 all\n")
+		fmt.Fprintf(&text, "Scope: %s all\n", arch)
 		fmt.Fprintf(&text, "Region: address=0x%x size=%d\n", result.Region.Address, result.Region.Size)
 		fmt.Fprintf(&text, "Functions: %d\n", result.Functions)
 		fmt.Fprintf(&text, "Diagnostics: %d\n", len(result.Diagnostics))
@@ -331,6 +336,6 @@ func writeBoundaryStats(text *bytes.Buffer, stats *core.BoundaryStats) {
 	if stats == nil {
 		return
 	}
-	fmt.Fprintf(text, "Boundaries: symbol=%d eh_frame=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
-		stats.Symbol, stats.EHFrame, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
+	fmt.Fprintf(text, "Boundaries: symbol=%d eh_frame=%d function_start=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
+		stats.Symbol, stats.EHFrame, stats.FunctionStart, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
 }

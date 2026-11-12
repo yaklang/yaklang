@@ -1,0 +1,39 @@
+[
+  {
+    "name": "two symbols",
+    "address": "0x100000000",
+    "symbols": [
+      {
+        "name": "first",
+        "address": "0x100000000"
+      },
+      {
+        "name": "second",
+        "address": "0x100000008"
+      }
+    ],
+    "code": [
+      "20 04 00 91 // add x0, x1, #1",
+      "c0 03 5f d6 // ret",
+      "21 08 00 91 // add x1, x1, #2",
+      "c0 03 5f d6 // ret"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function first @ 0x100000000",
+      "block b1 @ 0x100000000",
+      "  0x100000000  v1:i64 = read_register %x1 [read_register]",
+      "  0x100000000  v2:i64 = constant 0x1",
+      "  0x100000000  v3:i64 = add v1, v2",
+      "  0x100000000  write_register %x0, v3 [write_register]",
+      "  0x100000004  return [may_trap, unknown]",
+      "function second @ 0x100000008",
+      "block b1 @ 0x100000008",
+      "  0x100000008  v1:i64 = read_register %x1 [read_register]",
+      "  0x100000008  v2:i64 = constant 0x2",
+      "  0x100000008  v3:i64 = add v1, v2",
+      "  0x100000008  write_register %x1, v3 [write_register]",
+      "  0x10000000c  return [may_trap, unknown]"
+    ]
+  }
+]

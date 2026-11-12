@@ -1,0 +1,101 @@
+[
+  {
+    "name": "add",
+    "address": "0x100000000",
+    "code": [
+      "20 04 00 91 // add x0, x1, #1",
+      "c0 03 5f d6 // ret"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x100000000 @ 0x100000000",
+      "block b1 @ 0x100000000",
+      "  0x100000000  v1:i64 = read_register %x1 [read_register]",
+      "  0x100000000  v2:i64 = constant 0x1",
+      "  0x100000000  v3:i64 = add v1, v2",
+      "  0x100000000  write_register %x0, v3 [write_register]",
+      "  0x100000004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov wide",
+    "address": "0x100000000",
+    "code": [
+      "40 05 80 d2 // mov x0, #0x2a",
+      "c0 03 5f d6 // ret"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x100000000 @ 0x100000000",
+      "block b1 @ 0x100000000",
+      "  0x100000000  v1:i64 = constant 0x2a",
+      "  0x100000000  write_register %x0, v1 [write_register]",
+      "  0x100000004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load",
+    "address": "0x100000000",
+    "code": [
+      "20 04 40 f9 // ldr x0, [x1,#8]",
+      "c0 03 5f d6 // ret"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x100000000 @ 0x100000000",
+      "block b1 @ 0x100000000",
+      "  0x100000000  v1:i64 = read_register %x1 [read_register]",
+      "  0x100000000  v2:ptr64 = copy v1",
+      "  0x100000000  v3:i64 = constant 0x8",
+      "  0x100000000  v4:i64 = add v2, v3",
+      "  0x100000000  v5:i64 = load v4 [read_memory]",
+      "  0x100000000  write_register %x0, v5 [write_register]",
+      "  0x100000004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store pair",
+    "address": "0x100000000",
+    "code": [
+      "fd 7b bf a9 // stp x29, x30, [sp,#-16]!",
+      "fd 7b c1 a8 // ldp x29, x30, [sp],#16",
+      "c0 03 5f d6 // ret"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x100000000 @ 0x100000000",
+      "block b1 @ 0x100000000",
+      "  0x100000000  v1:i64 = read_register %x29 [read_register]",
+      "  0x100000000  v2:i64 = read_register %x30 [read_register]",
+      "  0x100000000  v3:i64 = read_register %sp [read_register]",
+      "  0x100000000  v4:ptr64 = copy v3",
+      "  0x100000000  v5:i64 = constant 0x10",
+      "  0x100000000  v6:i64 = sub v4, v5",
+      "  0x100000000  store v6, v1 [write_memory]",
+      "  0x100000000  v7:i64 = constant 0x8",
+      "  0x100000000  v8:ptr64 = add v6, v7",
+      "  0x100000000  store v8, v2 [write_memory]",
+      "  0x100000000  v9:i64 = read_register %sp [read_register]",
+      "  0x100000000  v10:i64 = constant 0x10",
+      "  0x100000000  v11:i64 = sub v9, v10",
+      "  0x100000000  write_register %sp, v11 [write_register]",
+      "  0x100000004  v12:i64 = read_register %sp [read_register]",
+      "  0x100000004  v13:ptr64 = copy v12",
+      "  0x100000004  v14:i64 = constant 0x10",
+      "  0x100000004  v15:i64 = add v13, v14",
+      "  0x100000004  v16:i64 = load v15 [read_memory]",
+      "  0x100000004  write_register %x29, v16 [write_register]",
+      "  0x100000004  v17:i64 = read_register %sp [read_register]",
+      "  0x100000004  v18:ptr64 = copy v17",
+      "  0x100000004  v19:i64 = constant 0x8",
+      "  0x100000004  v20:ptr64 = add v18, v19",
+      "  0x100000004  v21:i64 = load v20 [read_memory]",
+      "  0x100000004  write_register %x30, v21 [write_register]",
+      "  0x100000004  v22:i64 = read_register %sp [read_register]",
+      "  0x100000004  v23:i64 = constant 0x10",
+      "  0x100000004  v24:i64 = add v22, v23",
+      "  0x100000004  write_register %sp, v24 [write_register]",
+      "  0x100000008  return [may_trap, unknown]"
+    ]
+  }
+]
