@@ -1,0 +1,29 @@
+[
+  {
+    "name": "branch",
+    "address": "0x10100",
+    "code": [
+      "2c 03 00 00 // cmpwi r3, 0",
+      "41 82 00 08 // beq +8",
+      "60 00 00 00 // nop",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x10100 @ 0x10100",
+      "block b1 @ 0x10100",
+      "  0x10100  v1:i32 = read_register %r3 [read_register]",
+      "  0x10100  v2:i32 = constant 0x0",
+      "  0x10100  v3:i32 = intrinsic @ppc.flags.cmpwi, v1, v2 [write_register]",
+      "  0x10100  write_register %cr0, v3 [write_register]",
+      "  0x10104  v5:i32 = read_register %cr0 [read_register]",
+      "  0x10104  v4:i1 = intrinsic @ppc.branch.bc, v5 [read_register, unknown]",
+      "  0x10104  branch v4 -> b3, b2",
+      "block b2 @ 0x10108",
+      "  0x10108  intrinsic @ppc.nop [unknown]",
+      "  0x1010c  jump -> b3",
+      "block b3 @ 0x1010c",
+      "  0x1010c  return [may_trap, unknown]"
+    ]
+  }
+]

@@ -1,0 +1,45 @@
+[
+  {
+    "name": "addi",
+    "address": "0x10000",
+    "code": [
+      "13 85 15 00 // addi a0, a1, 1",
+      "67 80 00 00 // ret"
+    ],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function sub_0x10000 @ 0x10000",
+      "block b1 @ 0x10000",
+      "  0x10000  v1:i32 = read_register %x11 [read_register]",
+      "  0x10000  v2:i32 = constant 0x1",
+      "  0x10000  v3:i32 = add v1, v2",
+      "  0x10000  write_register %x10, v3 [write_register]",
+      "  0x10004  v4:i32 = read_register %x1 [read_register]",
+      "  0x10004  v5:ptr32 = copy v4",
+      "  0x10004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load",
+    "address": "0x10020",
+    "code": [
+      "03 a5 85 00 // lw a0, 8(a1)",
+      "67 80 00 00 // ret"
+    ],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function sub_0x10020 @ 0x10020",
+      "block b1 @ 0x10020",
+      "  0x10020  v1:i32 = read_register %x11 [read_register]",
+      "  0x10020  v2:ptr32 = copy v1",
+      "  0x10020  v3:i32 = constant 0x8",
+      "  0x10020  v4:i32 = add v2, v3",
+      "  0x10020  v5:i32 = load v4 [read_memory]",
+      "  0x10020  v6:i32 = sext v5",
+      "  0x10020  write_register %x10, v6 [write_register]",
+      "  0x10024  v7:i32 = read_register %x1 [read_register]",
+      "  0x10024  v8:ptr32 = copy v7",
+      "  0x10024  return [may_trap, unknown]"
+    ]
+  }
+]

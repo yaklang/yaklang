@@ -1,0 +1,27 @@
+[
+  {
+    "name": "branch",
+    "address": "0x10100",
+    "code": [
+      "10 85 00 02 // beq a0, a1, +8",
+      "00 00 00 00 // nop",
+      "03 e0 00 08 // jr ra"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x10100 @ 0x10100",
+      "block b1 @ 0x10100",
+      "  0x10100  v1:i64 = read_register %a0 [read_register]",
+      "  0x10100  v2:i64 = read_register %a1 [read_register]",
+      "  0x10100  v3:i1 = eq v1, v2",
+      "  0x10100  branch v3 -> b3, b2",
+      "block b2 @ 0x10104",
+      "  0x10104  v4:i64 = constant 0x0",
+      "  0x10104  v5:i64 = constant 0x0",
+      "  0x10104  v6:i64 = shl v4, v5",
+      "  0x10108  jump -> b3",
+      "block b3 @ 0x10108",
+      "  0x10108  return [may_trap, unknown]"
+    ]
+  }
+]

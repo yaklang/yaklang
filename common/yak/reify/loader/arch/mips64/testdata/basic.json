@@ -1,0 +1,41 @@
+[
+  {
+    "name": "daddiu",
+    "address": "0x10000",
+    "code": [
+      "64 82 00 01 // daddiu v0, a0, 1",
+      "03 e0 00 08 // jr ra"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x10000 @ 0x10000",
+      "block b1 @ 0x10000",
+      "  0x10000  v1:i64 = read_register %a0 [read_register]",
+      "  0x10000  v2:i64 = constant 0x1",
+      "  0x10000  v3:i64 = add v1, v2",
+      "  0x10000  write_register %v0, v3 [write_register]",
+      "  0x10004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "ld",
+    "address": "0x10020",
+    "code": [
+      "dc 82 00 08 // ld v0, 8(a0)",
+      "03 e0 00 08 // jr ra"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x10020 @ 0x10020",
+      "block b1 @ 0x10020",
+      "  0x10020  v1:i64 = read_register %a0 [read_register]",
+      "  0x10020  v2:ptr64 = copy v1",
+      "  0x10020  v3:i64 = constant 0x8",
+      "  0x10020  v4:i64 = add v2, v3",
+      "  0x10020  v5:i64 = load v4 [read_memory]",
+      "  0x10020  v6:i64 = sext v5",
+      "  0x10020  write_register %v0, v6 [write_register]",
+      "  0x10024  return [may_trap, unknown]"
+    ]
+  }
+]

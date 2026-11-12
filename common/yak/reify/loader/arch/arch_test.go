@@ -23,10 +23,8 @@ func TestAllArchitectures(t *testing.T) {
 			t.Fatalf("duplicate architecture %s", parser.Kind())
 		}
 		seen[parser.Kind()] = true
-		decoded := parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386 ||
-			parser.Kind() == core.ArchARM64
-		if parser.Available() != decoded {
-			t.Fatalf("%s reported unexpected decoder availability", parser.Kind())
+		if !parser.Available() {
+			t.Fatalf("%s reported no decoder", parser.Kind())
 		}
 		if parser.Name() != string(parser.Kind()) {
 			t.Fatalf("%s name = %q", parser.Kind(), parser.Name())
@@ -68,10 +66,13 @@ func TestCheckTargetMatrix(t *testing.T) {
 		{"arm64 mode", target(core.ArchARM64, 64, core.LittleEndian, "thumb"), false},
 		{"riscv32", target(core.ArchRISCV32, 32, core.LittleEndian, ""), true},
 		{"riscv64", target(core.ArchRISCV64, 64, core.LittleEndian, ""), true},
+		{"riscv32 64-bit", target(core.ArchRISCV32, 64, core.LittleEndian, ""), false},
 		{"mips", target(core.ArchMIPS, 32, core.BigEndian, ""), true},
 		{"mips64", target(core.ArchMIPS64, 64, core.BigEndian, ""), true},
 		{"ppc", target(core.ArchPPC, 32, core.BigEndian, ""), true},
 		{"ppc64", target(core.ArchPPC64, 64, core.LittleEndian, ""), true},
+		{"mips 64-bit", target(core.ArchMIPS, 64, core.BigEndian, ""), false},
+		{"ppc64 mode", target(core.ArchPPC64, 64, core.LittleEndian, "le"), false},
 		{"wrong architecture", target(core.ArchMIPS, 64, core.BigEndian, ""), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -88,38 +89,24 @@ func TestCheckTargetMatrix(t *testing.T) {
 }
 
 func TestParseReportsUnavailable(t *testing.T) {
-	for _, parser := range All() {
-		if parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386 ||
-			parser.Kind() == core.ArchARM64 {
-			continue
-		}
-		// The request must satisfy Check, otherwise the parser reports a
-		// target mismatch instead of the missing decoder.
-		request := core.ParseRequest{
-			Target:  target(parser.Kind(), 64, core.LittleEndian, ""),
-			Address: 0x1000,
-		}
-		if _, ok := parser.(interface{ Kind() core.Architecture }); !ok {
-			continue
-		}
-		if bits := parserBits(parser.Kind()); bits != 0 {
-			request.Target.Bits = bits
-		}
-		result, err := parser.Parse(context.Background(), request)
-		if !errors.Is(err, ErrDecoderUnavailable) || result != nil {
-			t.Fatalf("%s: result=%v err=%v", parser.Kind(), result, err)
-		}
+	// Every registered parser now decodes, so the sentinel is only reachable
+	// through a synthetic parser. The check keeps the contract covered.
+	parser := unavailableParser{kind: core.ArchMIPS}
+	if _, err := parser.Parse(context.Background(), core.ParseRequest{}); !errors.Is(err, ErrDecoderUnavailable) {
+		t.Fatalf("sentinel lost: %v", err)
 	}
 }
 
-// parserBits returns the address width each skeleton validates.
-func parserBits(kind core.Architecture) int {
-	switch kind {
-	case core.ArchRISCV32, core.ArchMIPS, core.ArchPPC:
-		return 32
-	case core.ArchRISCV64, core.ArchMIPS64, core.ArchPPC64:
-		return 64
-	default:
-		return 0
-	}
+// unavailableParser stands in for a parser without a decoder so the sentinel
+// contract stays covered now that every registered parser decodes.
+type unavailableParser struct {
+	kind core.Architecture
+}
+
+func (p unavailableParser) Kind() core.Architecture { return p.kind }
+func (p unavailableParser) Name() string            { return string(p.kind) }
+func (p unavailableParser) Available() bool         { return false }
+func (p unavailableParser) Check(core.Target) error { return nil }
+func (p unavailableParser) Parse(context.Context, core.ParseRequest) (*core.ParseResult, error) {
+	return unavailable(p.kind)
 }

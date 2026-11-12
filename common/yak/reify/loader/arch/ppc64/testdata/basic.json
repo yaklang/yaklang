@@ -1,0 +1,76 @@
+[
+  {
+    "name": "addi",
+    "address": "0x10000",
+    "code": [
+      "38 64 00 01 // addi r3, r4, 1",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc64 (64-bit, big-endian)",
+      "function sub_0x10000 @ 0x10000",
+      "block b1 @ 0x10000",
+      "  0x10000  v1:i64 = read_register %r4 [read_register]",
+      "  0x10000  v2:i64 = constant 0x1",
+      "  0x10000  v3:i64 = add v1, v2",
+      "  0x10000  write_register %r3, v3 [write_register]",
+      "  0x10004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "li",
+    "address": "0x10010",
+    "code": [
+      "38 60 00 2a // li r3, 42",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc64 (64-bit, big-endian)",
+      "function sub_0x10010 @ 0x10010",
+      "block b1 @ 0x10010",
+      "  0x10010  v1:i64 = constant 0x2a",
+      "  0x10010  write_register %r3, v1 [write_register]",
+      "  0x10014  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load",
+    "address": "0x10020",
+    "code": [
+      "e8 64 00 08 // ld r3, 8(r4)",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc64 (64-bit, big-endian)",
+      "function sub_0x10020 @ 0x10020",
+      "block b1 @ 0x10020",
+      "  0x10020  v1:i64 = read_register %r4 [read_register]",
+      "  0x10020  v2:ptr64 = copy v1",
+      "  0x10020  v3:i64 = constant 0x8",
+      "  0x10020  v4:i64 = add v2, v3",
+      "  0x10020  v5:i64 = load v4 [read_memory]",
+      "  0x10020  write_register %r3, v5 [write_register]",
+      "  0x10024  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store",
+    "address": "0x10030",
+    "code": [
+      "f8 64 00 08 // std r3, 8(r4)",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc64 (64-bit, big-endian)",
+      "function sub_0x10030 @ 0x10030",
+      "block b1 @ 0x10030",
+      "  0x10030  v1:i64 = read_register %r4 [read_register]",
+      "  0x10030  v2:ptr64 = copy v1",
+      "  0x10030  v3:i64 = constant 0x8",
+      "  0x10030  v4:i64 = add v2, v3",
+      "  0x10030  v5:i64 = read_register %r3 [read_register]",
+      "  0x10030  store v4, v5 [write_memory]",
+      "  0x10034  return [may_trap, unknown]"
+    ]
+  }
+]

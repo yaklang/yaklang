@@ -1,0 +1,40 @@
+[
+  {
+    "name": "addi",
+    "address": "0x10000",
+    "code": [
+      "38 64 00 01 // addi r3, r4, 1",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x10000 @ 0x10000",
+      "block b1 @ 0x10000",
+      "  0x10000  v1:i32 = read_register %r4 [read_register]",
+      "  0x10000  v2:i32 = constant 0x1",
+      "  0x10000  v3:i32 = add v1, v2",
+      "  0x10000  write_register %r3, v3 [write_register]",
+      "  0x10004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load",
+    "address": "0x10020",
+    "code": [
+      "80 64 00 08 // lwz r3, 8(r4)",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x10020 @ 0x10020",
+      "block b1 @ 0x10020",
+      "  0x10020  v1:i32 = read_register %r4 [read_register]",
+      "  0x10020  v2:ptr32 = copy v1",
+      "  0x10020  v3:i32 = constant 0x8",
+      "  0x10020  v4:i32 = add v2, v3",
+      "  0x10020  v5:i32 = load v4 [read_memory]",
+      "  0x10020  write_register %r3, v5 [write_register]",
+      "  0x10024  return [may_trap, unknown]"
+    ]
+  }
+]
