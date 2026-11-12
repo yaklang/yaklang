@@ -101,7 +101,13 @@ REFERENCE
 
 *.ListenAndServe() as $mid;
 
-alert $mid for {
+// Handler 只做 HTTP→HTTPS 重定向的 80 端口服务器是推荐的部署方式，不算明文风险
+$mid<getCallee><getObject> #-> as $server_obj;
+$server_obj<getMemberByKey(key="Handler")> #-> as $handler;
+$handler?{have: /(?i)redirect/} as $redirect_handler;
+$mid?{!(<self><getCallee><getObject> #-><getMemberByKey(key="Handler")> #-> & $redirect_handler)} as $plain;
+
+alert $plain for {
 	type: "vuln",
 	title: "Golang HTTP Server Using Plaintext Communication Was Detected",
 	title_zh: "检测到Golang HTTP服务器使用明文通信",
@@ -196,7 +202,7 @@ import (
 func unsafeServer1() {
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/login", loginHandler)
-	
+
 	// 危险：明文 HTTP 服务器，监听所有网络接口
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -205,12 +211,12 @@ func unsafeServer1() {
 func unsafeServer2() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/data", apiHandler)
-	
+
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
 	}
-	
+
 	// 危险：仍然是明文 HTTP
 	log.Fatal(server.ListenAndServe())
 }
@@ -218,7 +224,7 @@ func unsafeServer2() {
 // 案例 3: 监听公网地址（最危险）
 func unsafeServer3() {
 	http.HandleFunc("/payment", paymentHandler)
-	
+
 	// 极度危险：明文 HTTP + 公网地址
 	// 任何人都可以拦截支付信息
 	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
@@ -228,7 +234,7 @@ func unsafeServer3() {
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// 从表单获取密码
 	password := r.FormValue("password")
-	
+
 	// 危险：密码通过明文 HTTP 传输，可以被拦截
 	if authenticate(password) {
 		http.SetCookie(w, &http.Cookie{
@@ -244,7 +250,7 @@ func paymentHandler(w http.ResponseWriter, r *http.Request) {
 	// 获取支付信息
 	cardNumber := r.FormValue("card_number")
 	cvv := r.FormValue("cvv")
-	
+
 	// 极度危险：支付信息明文传输
 	// 严重违反 PCI DSS 标准
 	processPayment(cardNumber, cvv)
@@ -280,19 +286,211 @@ UNSAFE
 	'safefile://safe_https_server.go': <<<SAFE
 package main
 
+import (
+	"crypto/tls"
+	"log"
+	"net/http"
+	"time"
+)
+
+// 方案 1: 使用 ListenAndServeTLS（最简单）
+func safeServer1() {
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/login", loginHandler)
+
+	// 安全：使用 HTTPS
+	log.Println("Starting HTTPS server on :8443")
+	log.Fatal(http.ListenAndServeTLS(
+		":8443",
+		"cert.pem",  // SSL 证书
+		"key.pem",   // 私钥
+		nil,
+	))
+}
+
+// 方案 2: 配置安全的 http.Server（推荐）
+func safeServer2() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/api/data", apiHandler)
+
+	server := &http.Server{
+		Addr:         ":8443",
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+
+		// TLS 安全配置
+		TLSConfig: &tls.Config{
+			MinVersion:               tls.VersionTLS12, // 最低 TLS 1.2
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		},
+	}
+
+	log.Println("Starting secure HTTPS server on :8443")
+	log.Fatal(server.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	// 添加安全响应头
+	w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+
+	w.Write([]byte("Welcome to secure site!"))
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	// 密码通过 HTTPS 加密传输，安全
+	password := r.FormValue("password")
+
+	if authenticate(password) {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    generateSessionToken(),
+			HttpOnly: true,
+			Secure:   true, // 只通过 HTTPS 传输
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status": "secure"}`))
+}
+
+func authenticate(password string) bool {
+	return true // 示例
+}
+
+func generateSessionToken() string {
+	return "secure_token"
+}
+
 func main() {
+	safeServer2()
 }
 SAFE
 	'safefile://safe_http_redirect_to_https.go': <<<SAFE
 package main
 
+import (
+	"crypto/tls"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+)
+
+// 方案 3: HTTP 自动重定向到 HTTPS（生产环境最佳实践）
 func main() {
+	// 配置路由
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/api/data", apiHandler)
+
+	// HTTPS 服务器（主服务）
+	httpsServer := &http.Server{
+		Addr:         ":443",
+		Handler:      addSecurityHeaders(mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+
+	// HTTP 服务器（仅用于重定向）
+	httpServer := &http.Server{
+		Addr:         ":80",
+		Handler:      http.HandlerFunc(redirectToHTTPS),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	// 启动 HTTP 重定向服务器（后台）
+	go func() {
+		log.Println("Starting HTTP redirect server on :80")
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	// 启动 HTTPS 服务器（主进程）
+	log.Println("Starting HTTPS server on :443")
+	log.Fatal(httpsServer.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+
+// HTTP 到 HTTPS 重定向
+func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
+	httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+	http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+}
+
+// 添加安全响应头中间件
+func addSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// HSTS: 强制 HTTPS
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+
+		// 其他安全头
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Secure HTTPS Connection"))
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"secure": true}`))
 }
 SAFE
 	'safefile://safe_localhost_only.go': <<<SAFE
 package main
 
+import (
+	"log"
+	"net/http"
+)
+
+// 特殊情况：如果服务器只监听本地回环地址（localhost/127.0.0.1）
+// 并且只用于本地开发或与本机其他进程通信，可以暂时使用 HTTP
+// 但仍然建议在生产环境使用 HTTPS
+
+func localhostOnlyServer() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Local development server"))
+	})
+
+	// 只监听 localhost，不对外暴露
+	// 这种情况风险较低，但仍不建议处理敏感数据
+	log.Println("Starting local HTTP server on localhost:8080")
+	log.Println("⚠️  This server is only accessible from localhost")
+	log.Println("⚠️  Do NOT use this configuration in production")
+
+	log.Fatal(http.ListenAndServe("localhost:8080", nil))
+	// 或者: log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
+}
+
 func main() {
+	localhostOnlyServer()
 }
 SAFE
 )
