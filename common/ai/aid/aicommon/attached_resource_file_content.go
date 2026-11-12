@@ -23,8 +23,9 @@ var _ AttachedResourceData = (*AttachedFileContentResourceData)(nil)
 
 func (d *AttachedFileContentResourceData) Type() string { return AttachedResourceTypeFile }
 
-func (d *AttachedFileContentResourceData) Unmarshal(raw string) error {
-	d.content = raw
+func (d *AttachedFileContentResourceData) Unmarshal(resource *AttachedResource) error {
+	d.Key = resource.Key
+	d.content = resource.Value
 	d.once = sync.Once{}
 	d.rendered, d.err = "", nil
 	return nil

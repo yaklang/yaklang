@@ -26,11 +26,11 @@ type AttachedResourceData interface {
     ToAttachData(loop ReActLoopIF) string
     Type() string
     BindLoopData(loop ReActLoopIF) error
-    Unmarshal(raw string) error
+    Unmarshal(resource *AttachedResource) error
 }
 ```
 
-- `Unmarshal(raw)`：把 `AttachedResource.Value` 转成资源结构字段。只做资源本身解析，不写 loop 状态。
+- `Unmarshal(resource)`：从完整 `AttachedResource` 中同时读取 `Type`、`Key`、`Value`，把传输资源转成结构化字段。只做资源本身解析，不写 loop 状态。
 - `Type()`：返回规范 type，作为 timeline 聚合 key 的来源。
 - `ToAttachData(loop)`：把结构化资源渲染成给模型看的 Markdown 文本。
 - `BindLoopData(loop)`：可选的通用绑定逻辑。只有资源本身天然需要写入通用 loop 状态时才使用。
@@ -91,8 +91,8 @@ func (d *AttachedExampleResourceData) Type() string {
     return AttachedResourceTypeExample
 }
 
-func (d *AttachedExampleResourceData) Unmarshal(raw string) error {
-    d.Raw = strings.TrimSpace(raw)
+func (d *AttachedExampleResourceData) Unmarshal(resource *AttachedResource) error {
+    d.Raw = strings.TrimSpace(resource.Value)
     if d.Raw == "" {
         return utils.Error("example resource is empty")
     }

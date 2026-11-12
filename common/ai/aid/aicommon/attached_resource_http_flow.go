@@ -30,8 +30,8 @@ func (d *AttachedHTTPFlowResourceData) Type() string {
 	return AttachedResourceTypeHTTPFlowID
 }
 
-func (d *AttachedHTTPFlowResourceData) Unmarshal(raw string) error {
-	raw = strings.TrimSpace(raw)
+func (d *AttachedHTTPFlowResourceData) Unmarshal(resource *AttachedResource) error {
+	raw := strings.TrimSpace(resource.Value)
 	if raw == "" {
 		return utils.Error("http flow id list is empty")
 	}

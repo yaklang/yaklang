@@ -41,8 +41,8 @@ func (d *AttachedBrowserResourceData) Type() string {
 	return AttachedResourceTypeBrowser
 }
 
-func (d *AttachedBrowserResourceData) Unmarshal(raw string) error {
-	if err := json.Unmarshal([]byte(raw), d); err != nil {
+func (d *AttachedBrowserResourceData) Unmarshal(resource *AttachedResource) error {
+	if err := json.Unmarshal([]byte(resource.Value), d); err != nil {
 		return utils.Errorf("parse attached browser instance: %v", err)
 	}
 	d.DeviceID = strings.TrimSpace(d.DeviceID)

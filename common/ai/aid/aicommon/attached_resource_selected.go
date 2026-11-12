@@ -23,14 +23,14 @@ func (d *AttachedSelectedResourceData) Type() string {
 	return AttachedResourceTypeSelected
 }
 
-func (d *AttachedSelectedResourceData) Unmarshal(raw string) error {
-	d.Raw = raw
-	if sel, ok := ParseAttachedCodeSelection(&AttachedResource{Value: raw}); ok {
+func (d *AttachedSelectedResourceData) Unmarshal(resource *AttachedResource) error {
+	d.Raw = resource.Value
+	if sel, ok := ParseAttachedCodeSelection(resource); ok {
 		d.Selected = sel
 		d.PlainText = sel.Content
 		return nil
 	}
-	d.PlainText = raw
+	d.PlainText = resource.Value
 	return nil
 }
 

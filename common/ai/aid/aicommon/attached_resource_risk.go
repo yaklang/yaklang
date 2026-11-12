@@ -27,8 +27,8 @@ func (d *AttachedRiskResourceData) Type() string {
 	return AttachedResourceTypeRisk
 }
 
-func (d *AttachedRiskResourceData) Unmarshal(raw string) error {
-	raw = strings.TrimSpace(raw)
+func (d *AttachedRiskResourceData) Unmarshal(resource *AttachedResource) error {
+	raw := strings.TrimSpace(resource.Value)
 	if raw == "" {
 		return utils.Error("attached risk IDs are empty")
 	}
