@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	elfloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/elf"
+	macholoader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/macho"
+	peloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/pe"
 )
 
 func TestFormatAndTargetDimensions(t *testing.T) {
@@ -44,16 +47,16 @@ func TestFormatAndTargetDimensions(t *testing.T) {
 		os     core.OperatingSystem
 		arch   core.Architecture
 	}{
-		{"elf amd64 linux", ELF{}, elfInput(elf.EM_X86_64, elf.ELFOSABI_LINUX), core.OSLinux, core.ArchAMD64},
-		{"elf arm64 linux", ELF{}, elfInput(elf.EM_AARCH64, elf.ELFOSABI_LINUX), core.OSLinux, core.ArchARM64},
-		{"elf arm64 freebsd", ELF{}, elfInput(elf.EM_AARCH64, elf.ELFOSABI_FREEBSD), core.OSFreeBSD, core.ArchARM64},
-		{"elf systemv unknown os", ELF{}, elfInput(elf.EM_X86_64, elf.ELFOSABI_NONE), core.OSUnknown, core.ArchAMD64},
-		{"elf unknown machine", ELF{}, elfInput(elf.Machine(0xffff), elf.ELFOSABI_NONE), core.OSUnknown, core.ArchUnknown},
-		{"pe amd64 windows", PE{}, peInput(pe.IMAGE_FILE_MACHINE_AMD64, pe.IMAGE_SUBSYSTEM_WINDOWS_CUI), core.OSWindows, core.ArchAMD64},
-		{"pe arm64 windows", PE{}, peInput(pe.IMAGE_FILE_MACHINE_ARM64, pe.IMAGE_SUBSYSTEM_WINDOWS_GUI), core.OSWindows, core.ArchARM64},
-		{"pe firmware is not windows", PE{}, peInput(pe.IMAGE_FILE_MACHINE_AMD64, pe.IMAGE_SUBSYSTEM_EFI_APPLICATION), core.OSUnknown, core.ArchAMD64},
-		{"macho amd64", MachO{}, machoInput(macho.CpuAmd64), core.OSUnknown, core.ArchAMD64},
-		{"macho arm64", MachO{}, machoInput(macho.CpuArm64), core.OSUnknown, core.ArchARM64},
+		{"elf amd64 linux", elfloader.Loader{}, elfInput(elf.EM_X86_64, elf.ELFOSABI_LINUX), core.OSLinux, core.ArchAMD64},
+		{"elf arm64 linux", elfloader.Loader{}, elfInput(elf.EM_AARCH64, elf.ELFOSABI_LINUX), core.OSLinux, core.ArchARM64},
+		{"elf arm64 freebsd", elfloader.Loader{}, elfInput(elf.EM_AARCH64, elf.ELFOSABI_FREEBSD), core.OSFreeBSD, core.ArchARM64},
+		{"elf systemv unknown os", elfloader.Loader{}, elfInput(elf.EM_X86_64, elf.ELFOSABI_NONE), core.OSUnknown, core.ArchAMD64},
+		{"elf unknown machine", elfloader.Loader{}, elfInput(elf.Machine(0xffff), elf.ELFOSABI_NONE), core.OSUnknown, core.ArchUnknown},
+		{"pe amd64 windows", peloader.Loader{}, peInput(pe.IMAGE_FILE_MACHINE_AMD64, pe.IMAGE_SUBSYSTEM_WINDOWS_CUI), core.OSWindows, core.ArchAMD64},
+		{"pe arm64 windows", peloader.Loader{}, peInput(pe.IMAGE_FILE_MACHINE_ARM64, pe.IMAGE_SUBSYSTEM_WINDOWS_GUI), core.OSWindows, core.ArchARM64},
+		{"pe firmware is not windows", peloader.Loader{}, peInput(pe.IMAGE_FILE_MACHINE_AMD64, pe.IMAGE_SUBSYSTEM_EFI_APPLICATION), core.OSUnknown, core.ArchAMD64},
+		{"macho amd64", macholoader.Loader{}, machoInput(macho.CpuAmd64), core.OSDarwin, core.ArchAMD64},
+		{"macho arm64", macholoader.Loader{}, machoInput(macho.CpuArm64), core.OSDarwin, core.ArchARM64},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,7 +83,7 @@ func TestELFArchitectureWidth(t *testing.T) {
 		{elf.EM_MIPS, 32, core.ArchMIPS},
 		{elf.EM_MIPS, 64, core.ArchMIPS64},
 	} {
-		if got := elfArchitecture(tc.machine, tc.bits); got != tc.want {
+		if got := elfloader.LoaderArchitecture(tc.machine, tc.bits); got != tc.want {
 			t.Fatalf("%s/%d: got %s, want %s", tc.machine, tc.bits, got, tc.want)
 		}
 	}

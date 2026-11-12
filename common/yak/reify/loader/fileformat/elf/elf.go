@@ -319,6 +319,12 @@ func ELFArchitecture(machine elf.Machine, bits int) core.Architecture {
 	return elfArchitecture(machine, bits)
 }
 
+// LoaderArchitecture is the exported spelling of the machine mapping; callers
+// outside the package use this one.
+func LoaderArchitecture(machine elf.Machine, bits int) core.Architecture {
+	return elfArchitecture(machine, bits)
+}
+
 // parseELFHints collects the format facts an architecture boundary discoverer
 // needs: executable ranges, .eh_frame, init/fini targets, PLT stubs and GOT
 // resolutions. It never decodes instructions.

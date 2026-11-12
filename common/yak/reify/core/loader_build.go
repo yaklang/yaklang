@@ -56,7 +56,7 @@ func FormatDescription(format Format) string {
 	case FormatPE:
 		return "PE images; the target OS comes from the PE subsystem"
 	case FormatMachO:
-		return "thin Mach-O images; entry points are not recovered"
+		return "Mach-O images; universal slices are selected by architecture"
 	default:
 		return fmt.Sprintf("%s images", format)
 	}

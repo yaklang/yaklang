@@ -13,6 +13,9 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	elfloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/elf"
+	macholoader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/macho"
+	peloader "github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/pe"
 )
 
 func newFixtureReader(t *testing.T, raw []byte) *core.ByteReader {
@@ -151,12 +154,12 @@ func TestFormatLoadersMetadata(t *testing.T) {
 		order    core.ByteOrder
 		sections int
 	}{
-		{"elf64", ELF{}, elf64Fixture(t), core.FormatELF, 64, core.LittleEndian, 3},
-		{"elf32 big endian", ELF{}, elf32BigEndianFixture(t), core.FormatELF, 32, core.BigEndian, 0},
-		{"pe32", PE{}, peFixture(t, false), core.FormatPE, 32, core.LittleEndian, 1},
-		{"pe64", PE{}, peFixture(t, true), core.FormatPE, 64, core.LittleEndian, 1},
-		{"macho64", MachO{}, macho64Fixture(t), core.FormatMachO, 64, core.LittleEndian, 2},
-		{"macho32 big endian", MachO{}, macho32BigEndianFixture(t), core.FormatMachO, 32, core.BigEndian, 0},
+		{"elf64", elfloader.Loader{}, elf64Fixture(t), core.FormatELF, 64, core.LittleEndian, 3},
+		{"elf32 big endian", elfloader.Loader{}, elf32BigEndianFixture(t), core.FormatELF, 32, core.BigEndian, 0},
+		{"pe32", peloader.Loader{}, peFixture(t, false), core.FormatPE, 32, core.LittleEndian, 1},
+		{"pe64", peloader.Loader{}, peFixture(t, true), core.FormatPE, 64, core.LittleEndian, 1},
+		{"macho64", macholoader.Loader{}, macho64Fixture(t), core.FormatMachO, 64, core.LittleEndian, 2},
+		{"macho32 big endian", macholoader.Loader{}, macho32BigEndianFixture(t), core.FormatMachO, 32, core.BigEndian, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			before := append([]byte(nil), tc.raw...)
@@ -186,7 +189,7 @@ func TestFormatLoadersMetadata(t *testing.T) {
 }
 
 func TestFormatLoaderEntryPointsAndZeroFill(t *testing.T) {
-	elfArtifact, err := loadFixture(t, ELF{}, elf64Fixture(t))
+	elfArtifact, err := loadFixture(t, elfloader.Loader{}, elf64Fixture(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,14 +199,14 @@ func TestFormatLoaderEntryPointsAndZeroFill(t *testing.T) {
 	if section := elfArtifact.Image.Sections[1]; section.FileSize != 0 || section.MemorySize != 0x1000 {
 		t.Fatalf("ELF NOBITS treated as file data: %+v", section)
 	}
-	peArtifact, err := loadFixture(t, PE{}, peFixture(t, true))
+	peArtifact, err := loadFixture(t, peloader.Loader{}, peFixture(t, true))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if entry, present := peArtifact.Image.EntryPoint(); !present || entry != 0x140001000 || peArtifact.Image.Sections[0].VirtualAddress != 0x140001000 {
 		t.Fatal("PE RVA was not translated using image base")
 	}
-	machoArtifact, err := loadFixture(t, MachO{}, macho64Fixture(t))
+	machoArtifact, err := loadFixture(t, macholoader.Loader{}, macho64Fixture(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +219,7 @@ func TestFormatLoaderEntryPointsAndZeroFill(t *testing.T) {
 }
 
 func TestFormatLoaderRejectsMalformedInput(t *testing.T) {
-	for _, loader := range []core.Loader{ELF{}, PE{}, MachO{}} {
+	for _, loader := range []core.Loader{elfloader.Loader{}, peloader.Loader{}, macholoader.Loader{}} {
 		if _, err := loadFixture(t, loader, []byte("plain text")); err == nil {
 			t.Fatalf("%s accepted plain text", loader.Name())
 		}
@@ -225,9 +228,9 @@ func TestFormatLoaderRejectsMalformedInput(t *testing.T) {
 		loader core.Loader
 		raw    []byte
 	}{
-		{ELF{}, elf64Fixture(t)[:20]},
-		{PE{}, peFixture(t, true)[:20]},
-		{MachO{}, macho64Fixture(t)[:20]},
+		{elfloader.Loader{}, elf64Fixture(t)[:20]},
+		{peloader.Loader{}, peFixture(t, true)[:20]},
+		{macholoader.Loader{}, macho64Fixture(t)[:20]},
 	} {
 		if _, err := loadFixture(t, tc.loader, tc.raw); err == nil {
 			t.Fatalf("%s accepted a truncated header", tc.loader.Name())
@@ -235,10 +238,10 @@ func TestFormatLoaderRejectsMalformedInput(t *testing.T) {
 	}
 	raw := elf64Fixture(t)
 	binary.LittleEndian.PutUint64(raw[0x100+64+24:], uint64(len(raw)+100))
-	if _, err := loadFixture(t, ELF{}, raw); err == nil || !strings.Contains(err.Error(), "beyond the input") {
+	if _, err := loadFixture(t, elfloader.Loader{}, raw); err == nil || !strings.Contains(err.Error(), "beyond the input") {
 		t.Fatalf("out-of-bounds section accepted: %v", err)
 	}
-	if _, err := peAddress(math.MaxUint64, 1); err == nil {
+	if _, err := peloader.Address(math.MaxUint64, 1); err == nil {
 		t.Fatal("overflowing PE address accepted")
 	}
 }
@@ -246,7 +249,7 @@ func TestFormatLoaderRejectsMalformedInput(t *testing.T) {
 func TestFormatLoaderContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := (ELF{}).Load(ctx, newFixtureReader(t, elf64Fixture(t))); !errors.Is(err, context.Canceled) {
+	if _, err := (elfloader.Loader{}).Load(ctx, newFixtureReader(t, elf64Fixture(t))); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected canceled context, got %v", err)
 	}
 }
@@ -257,12 +260,12 @@ func TestFormatLoaderMatch(t *testing.T) {
 		prefix []byte
 		want   bool
 	}{
-		{ELF{}, []byte{0x7f, 'E', 'L', 'F'}, true},
-		{PE{}, []byte("MZ"), true},
-		{MachO{}, []byte{0xcf, 0xfa, 0xed, 0xfe}, true},
-		{ELF{}, []byte("MZ"), false},
-		{PE{}, []byte("plain"), false},
-		{MachO{}, []byte{0xca, 0xfe, 0xba, 0xbe}, false},
+		{elfloader.Loader{}, []byte{0x7f, 'E', 'L', 'F'}, true},
+		{peloader.Loader{}, []byte("MZ"), true},
+		{macholoader.Loader{}, []byte{0xcf, 0xfa, 0xed, 0xfe}, true},
+		{elfloader.Loader{}, []byte("MZ"), false},
+		{peloader.Loader{}, []byte("plain"), false},
+		{macholoader.Loader{}, []byte{0xca, 0xfe, 0xba, 0xbe}, false},
 	} {
 		if got := tc.loader.Match(tc.prefix); got != tc.want {
 			t.Fatalf("%s.Match(%x) = %v, want %v", tc.loader.Name(), tc.prefix, got, tc.want)
