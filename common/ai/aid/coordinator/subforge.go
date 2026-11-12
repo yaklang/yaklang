@@ -11,15 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const subForgeTimeout = 10 * time.Minute
@@ -67,6 +62,7 @@ func (s *Session) subForgeWorkerManager(task aicommon.AIStatefulTask) (*buildina
 		}
 		tool.RequireForeground = true
 		tool.RejectInterruptedReplay = true
+		tool.ExclusiveBatchGroup = "sub-Forge"
 		admitted, err := manager.AppendScopedTool(tool)
 		if err != nil {
 			return nil, nil, err
@@ -111,102 +107,9 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	if err != nil {
 		return nil, err
 	}
-	id := uuid.NewString()
-	tree := subForgeTaskTree{
-		ParentCoordinatorID: s.GetRuntimeId(),
-		ParentTaskID:        task.GetId(),
-		ParentTaskUUID:      task.GetUUID(),
-		CallToolID:          callID,
-		ChildCoordinatorID:  id,
-		Revision:            1,
-		Status:              "running",
-	}
-	if binding.Schema != nil {
-		tree.ToolName = binding.Schema.Name
-	}
-	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
-	var endpoints sync.Map
-	unregister := s.InputEventManager.RouteInteractiveInput(id, func(event *ypb.AIInputEvent) bool {
-		endpoint := event.GetInteractiveId()
-		if endpoints.CompareAndSwap(endpoint, true, false) {
-			if ctx.Err() == nil {
-				input.SafeFeed(event)
-			}
-			return true
-		}
-		_, known := endpoints.Load(endpoint)
-		return known
-	})
-	forward := func(event *schema.AiOutputEvent) {
-		forwarded := *event
-		forwarded.CoordinatorId = id
-		forwarded.TaskId = task.GetId()
-		forwarded.TaskUUID = task.GetUUID()
-		forwarded.CallToolID = callID
-		if s.EventHandler != nil {
-			s.EventHandler(&forwarded)
-		}
-	}
-	var eventMu, deliveryMu sync.Mutex
-	pending := make(map[string]struct{})
-	closed := false
-	childStarted := false
-	interrupted := func(err error) error {
-		eventMu.Lock()
-		started := childStarted
-		eventMu.Unlock()
-		if !started {
-			// The child checks this same context under eventMu before starting.
-			releaseSlot()
-			return errors.Join(err, aitool.ErrInvocationNotStarted)
-		}
-		return err
-	}
-	defer func() {
-		eventMu.Lock()
-		closed = true
-		tree.Revision++
-		tree.Status = subForgeTreeStatus(retErr)
-		terminal := tree
-		eventMu.Unlock()
-		var retiredIDs []string
-		endpoints.Range(func(key, _ any) bool {
-			retiredIDs = append(retiredIDs, key.(string))
-			return true
-		})
-		unregister(retiredIDs...)
-		if len(pending) > 0 {
-			// Keep legacy review release delivery serialized with child events.
-			go func() {
-				deliveryMu.Lock()
-				defer deliveryMu.Unlock()
-				defer func() {
-					if failure := recover(); failure != nil {
-						log.Errorf("sub-Forge review release handler panicked: %v", failure)
-					}
-				}()
-				for endpoint := range pending {
-					content, _ := json.Marshal(map[string]any{"id": endpoint, "params": nil})
-					forward(&schema.AiOutputEvent{
-						Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
-					})
-				}
-			}()
-		}
-		// Persist the terminal snapshot even if an earlier progress callback
-		// is blocked. Its revision orders it against any in-flight progress.
-		delivered := make(chan struct{})
-		go func() {
-			defer close(delivered)
-			s.emitSubForgeTaskTree(terminal)
-		}()
-		select {
-		case <-delivered:
-		case <-ctx.Done():
-		}
-	}()
-
-	childCtx := WithForgeParent(ctx, s.invoker, task, id)
+	call := newSubForgeCall(ctx, s, task, callID, binding, releaseSlot)
+	defer func() { call.finish(retErr) }()
+	childCtx := WithForgeParent(ctx, s.invoker, task, call.tree.ChildCoordinatorID)
 	manager := buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(allowed...))
 	opts := []aicommon.ConfigOption{
 		aicommon.WithPersistentSessionId(""),
@@ -222,80 +125,12 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		aicommon.WithEnableToolManagerAISearch(false),
 		aicommon.WithEnableSubagentsInPlan(false),
 		aicommon.WithDisableCreateDBRuntime(s.DisableCreateDBRuntime),
-		aicommon.WithWorkdir(filepath.Join(s.GetOrCreateWorkDir(), "artifacts", "sub-forges", id)),
-		aicommon.WithEventInputChanx(input),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			deliveryMu.Lock()
-			defer deliveryMu.Unlock()
-			eventMu.Lock()
-			if closed {
-				eventMu.Unlock()
-				return
-			}
-			endpoint := event.GetInteractiveId()
-			if event.Type == schema.EVENT_TYPE_REVIEW_RELEASE {
-				if _, exists := pending[endpoint]; !exists {
-					eventMu.Unlock()
-					return
-				}
-				delete(pending, endpoint)
-				endpoints.Store(endpoint, false)
-			} else {
-				if ctx.Err() != nil {
-					eventMu.Unlock()
-					return
-				}
-				if endpoint != "" {
-					if _, known := endpoints.LoadOrStore(endpoint, true); !known {
-						pending[endpoint] = struct{}{}
-					}
-				}
-			}
-			changed := tree.observePlan(event)
-			update := tree
-			eventMu.Unlock()
-			if changed {
-				s.emitSubForgeTaskTree(update)
-			}
-			forward(event)
-		}),
+		aicommon.WithWorkdir(filepath.Join(s.GetOrCreateWorkDir(), "artifacts", "sub-forges", call.tree.ChildCoordinatorID)),
+		aicommon.WithEventInputChanx(call.input),
+		aicommon.WithEventHandler(call.handleEvent),
 	)
-
-	type childResult struct {
-		value any
-		err   error
-	}
-	done := make(chan childResult, 1)
 	dispatched = true
-	initial := tree
-	go func() {
-		var result childResult
-		defer func() {
-			if failure := recover(); failure != nil {
-				result.err = fmt.Errorf("sub-Forge execution panicked: %v", failure)
-			}
-			releaseSlot()
-			done <- result
-		}()
-		s.emitSubForgeTaskTree(initial)
-		eventMu.Lock()
-		result.err = childCtx.Err()
-		childStarted = result.err == nil
-		eventMu.Unlock()
-		if result.err != nil {
-			return
-		}
-		result.value, result.err = binding.Run(childCtx, params, allowed, opts...)
-	}()
-	select {
-	case <-ctx.Done():
-		return nil, interrupted(ctx.Err())
-	case result := <-done:
-		if err := ctx.Err(); err != nil {
-			return nil, interrupted(err)
-		}
-		return result.value, result.err
-	}
+	return call.run(childCtx, binding, params, allowed, opts...)
 }
 
 func (s *Session) subForgeAllowedTools(declared []*aitool.Tool) ([]*aitool.Tool, error) {
