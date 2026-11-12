@@ -90,17 +90,17 @@ var loopAction_SaveEvidence = &LoopAction{
 			return
 		}
 
-		// 暂留旧 sub-agent 通知链：先让父 Session 看到变化，再广播给其余兄弟 Timeline。
-		// 后续清理时再把这里收敛为只做通知、不再重复写 evidence。
-		if loop.IsSubAgent() && loop.saveEvidencePublisher != nil {
-			if err := loop.saveEvidencePublisher(evidenceOp); err != nil {
-				operator.Fail(utils.Wrap(err, "publish evidence to parent failed"))
-				return
-			}
-		}
+		before := loop.GetConfig().GetSessionEvidenceRendered()
 		if err := loop.GetConfig().BroadcastEvidence(evidenceOp); err != nil {
 			operator.Fail(utils.Wrap(err, "save_evidence failed"))
 			return
+		}
+		changed := loop.GetConfig().GetSessionEvidenceRendered() != before
+		if changed && loop.IsSubAgent() && loop.evidenceObserver != nil {
+			if err := loop.evidenceObserver(evidenceOp); err != nil {
+				operator.Fail(utils.Wrap(err, "notify parent of evidence discovery failed"))
+				return
+			}
 		}
 
 		idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)

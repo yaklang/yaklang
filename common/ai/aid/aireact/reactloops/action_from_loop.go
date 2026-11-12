@@ -58,7 +58,7 @@ func ConvertReActLoopFactoryToActionFactory(
 				// identity and parent evidence channel across the new loop.
 				if oldLoop.IsSubAgent() {
 					loop.Set(SubAgentDepthLoopVar, oldLoop.GetInt(SubAgentDepthLoopVar))
-					loop.saveEvidencePublisher = oldLoop.saveEvidencePublisher
+					loop.evidenceObserver = oldLoop.evidenceObserver
 				}
 				emitter := oldLoop.GetEmitter()
 				invoker := oldLoop.GetInvoker()

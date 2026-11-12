@@ -36,11 +36,10 @@ type PreparedSubAgent struct {
 	StartedAt time.Time
 	// runtimeErr 记录 prepare 期 timeline 构建失败的原因；此时 Invoker/Task
 	// 为 nil，阶段 2 直接按失败兜底，不再尝试构建 runtime。
-	runtimeErr    error
-	configOptions []aicommon.ConfigOption // captured with the timeline, before queueing
-	parentEmitter *aicommon.Emitter
-	parentConfig  *aicommon.Config
-	evidenceSink  func(aicommon.EvidenceOperation) error
+	runtimeErr       error
+	configOptions    []aicommon.ConfigOption // captured with the timeline, before queueing
+	parentEmitter    *aicommon.Emitter
+	evidenceObserver func(aicommon.EvidenceOperation) error
 }
 
 // ExecutedSubAgent 是阶段 2（执行任务）的产物：一个已执行（或执行失败）的子
@@ -106,25 +105,15 @@ func prepareSubAgents(
 		return nil
 	}
 	parentTimeline := parentCfg.GetTimeline()
-	parentContext := parentCfg.GetContext()
-	if parentTask != nil {
-		parentContext = parentTask.GetContext()
-	}
-	// Capture the callback on the owner thread. Internal synchronous helpers
-	// can forward an explicit finding through their enclosing sub-agent too.
-	var parentPublisher func(aicommon.EvidenceOperation) error
+	// Capture the notification callback on the owner thread. Evidence itself is
+	// delivered by Timeline broadcast; this callback only wakes enclosing loops.
+	var parentObserver func(aicommon.EvidenceOperation) error
 	if opts.ParentLoop != nil {
-		parentPublisher = opts.ParentLoop.saveEvidencePublisher
+		parentObserver = opts.ParentLoop.evidenceObserver
 	}
-	publishEvidence := func(op aicommon.EvidenceOperation) error {
-		if parentContext != nil && parentContext.Err() != nil {
-			return parentContext.Err()
-		}
-		if _, err := SaveSessionEvidence(parentCfg, op.ID, op.Content); err != nil {
-			return err
-		}
-		if parentPublisher != nil {
-			return parentPublisher(op)
+	observeEvidence := func(op aicommon.EvidenceOperation) error {
+		if parentObserver != nil {
+			return parentObserver(op)
 		}
 		return nil
 	}
@@ -160,14 +149,13 @@ func prepareSubAgents(
 		}
 
 		prepared = append(prepared, &PreparedSubAgent{
-			Job:           job,
-			Timeline:      handle,
-			Release:       func() {},
-			StartedAt:     startedAt,
-			configOptions: snapshotSubAgentConfig(parentCfg, job.ContextMode),
-			parentEmitter: parentCfg.GetEmitter(),
-			parentConfig:  parentCfg,
-			evidenceSink:  publishEvidence,
+			Job:              job,
+			Timeline:         handle,
+			Release:          func() {},
+			StartedAt:        startedAt,
+			configOptions:    snapshotSubAgentConfig(parentCfg, job.ContextMode),
+			parentEmitter:    parentCfg.GetEmitter(),
+			evidenceObserver: observeEvidence,
 		})
 	}
 	return prepared
@@ -391,9 +379,9 @@ func executeSubAgent(prepared *PreparedSubAgent, opts SubAgentOptions) *Executed
 	if !loop.IsSubAgent() {
 		loop.Set(SubAgentDepthLoopVar, 1)
 	}
-	loop.saveEvidencePublisher = prepared.evidenceSink
-	if opts.evidenceSink != nil {
-		loop.saveEvidencePublisher = opts.evidenceSink
+	loop.evidenceObserver = prepared.evidenceObserver
+	if opts.evidenceObserver != nil {
+		loop.evidenceObserver = opts.evidenceObserver
 	}
 	execErr := loop.ExecuteWithExistedTask(prepared.Task)
 
@@ -924,11 +912,11 @@ type SubAgentOptions struct {
 	childConfigOptions []aicommon.ConfigOption
 	parentEmitter      *aicommon.Emitter
 	// Background workers use frozen scope and callbacks, never mutable parent loop state.
-	runtimeContext context.Context
-	taskReady      func(aicommon.AIStatefulTask)
-	observeEvent   func(*schema.AiOutputEvent)
-	resultWriter   func(id, content string) (string, error)
-	evidenceSink   func(aicommon.EvidenceOperation) error
+	runtimeContext   context.Context
+	taskReady        func(aicommon.AIStatefulTask)
+	observeEvent     func(*schema.AiOutputEvent)
+	resultWriter     func(id, content string) (string, error)
+	evidenceObserver func(aicommon.EvidenceOperation) error
 	// TimelineMode 决定子 Agent 的 timeline 容器。默认 SubAgentTimelineFork。
 	TimelineMode SubAgentTimelineMode
 

@@ -38,7 +38,6 @@ type Session struct {
 	detached               bool
 	startTaskID            string
 	mu                     sync.Mutex
-	evidenceMu             sync.Mutex
 	last                   Snapshot
 	lastTree               json.RawMessage
 	opened, closed         map[string]bool
@@ -513,8 +512,8 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	workerOptions := append(reactloops.BasicAICommonConfigOption(cfg), func(l *reactloops.ReActLoop) {
 		// session 相同，但每次任务尝试的结果记录必须独立。
 		l.Set("coordinator_worker_attempt", workerAttemptRef{TaskID: a.Task.ID, AttemptID: a.ID})
-		l.Set("coordinator_discovery_callback", func(id, content string) error {
-			return s.saveTaskDiscovery(a, id, content)
+		l.Set("coordinator_discovery_callback", func(id string) error {
+			return s.notifyTaskDiscovery(a, id)
 		})
 	})
 	brief, _ := json.Marshal(map[string]any{"task_id": a.Task.ID, "attempt_id": a.ID, "name": a.Task.Name, "goal": a.Task.Goal, "accepted_predecessors": taskResultRecords(a.Predecessors), "unaccepted_prior_results": taskResultRecords(a.PriorResults)})
