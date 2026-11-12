@@ -47,7 +47,7 @@ func TestAttachedFileContentReadBack(t *testing.T) {
 
 func TestFileContentProviderReusesReadBackFile(t *testing.T) {
 	content := strings.Repeat("large input\n", 10000) + "TAIL"
-	provider := NewContextProvider("file", "file_content", content)
+	provider := FileContentContextProvider(content)
 	first, err := provider(nil, nil, "test")
 	require.NoError(t, err)
 	_, after, found := strings.Cut(first, "Full content saved to file: ")

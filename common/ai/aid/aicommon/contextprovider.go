@@ -7,15 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"unicode"
 
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,7 +23,6 @@ const (
 	CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE = "knowledge_base"
 	CONTEXT_PROVIDER_TYPE_AITOOL         = "aitool"
 	CONTEXT_PROVIDER_TYPE_AIFORGE        = "aiforge"
-	CONTEXT_PROVIDER_TYPE_AISKILL        = "aiskill"
 
 	CONTEXT_PROVIDER_KEY_FILE_PATH      = "file_path"
 	CONTEXT_PROVIDER_KEY_FILE_CONTENT   = "file_content"
@@ -50,12 +45,6 @@ const (
 	USER_INPUT_SCHEDULED_AT     = "scheduled_at"
 	USER_INPUT_SCHEDULE_TRIGGER = "trigger"
 )
-
-type ContextProviderEntry struct {
-	Name     string
-	Provider ContextProvider
-	Traced   bool
-}
 
 type ContextProvider func(config AICallerConfigIf, emitter *Emitter, key string) (string, error)
 
@@ -279,238 +268,8 @@ func FileContentContextProvider(content string, userPrompt ...string) ContextPro
 	}
 }
 
-// OutputFileContextProvider has been removed. It used to read each
-// verification-confirmed output file (up to 40KB) and re-inject its full body
-// into Pure Dynamic / AutoContext on every prompt build via
-// RegisterTracedContent, which flooded the dynamic segment with stale file
-// contents.
-//
-// Delivery files are now surfaced only as truncation markers inside
-// the combined output saved to the tool call report file. The marker
-// contains the file path; the file body is never re-injected into the
-// prompt and can be re-read on demand via existing file-read or
-// view-window actions.
-//
-// 关键词: OutputFileContextProvider 已废弃, 交付文件截断标记化,
-//
-//	Pure Dynamic 反污染, AutoContext 反污染
-func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		// 构建基本信息（即使出错也要包含）
-		baseInfo := fmt.Sprintf("User Prompt: %s\n============== Knowledge Base Info ==============\nName: %s\n", strings.Join(userPrompt, " "), knowledgeBaseName)
-
-		knowledgeBase, err := yakit.GetKnowledgeBaseByName(consts.GetGormProfileDatabase(), knowledgeBaseName)
-		if err != nil {
-			return baseInfo + fmt.Sprintf("[Error: failed to get knowledge base: %v]", err), utils.Errorf("failed to get knowledge base %s: %w", knowledgeBaseName, err)
-		}
-		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString(baseInfo)
-		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", knowledgeBase.KnowledgeBaseDescription))
-		infoBuffer.WriteString(fmt.Sprintf("Type: %s\n", knowledgeBase.KnowledgeBaseType))
-		infoBuffer.WriteString(fmt.Sprintf("Tags: %s\n", knowledgeBase.Tags))
-		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
-		infoBuffer.WriteString(fmt.Sprintf("查询时请指定知识库名称为: %s\n", knowledgeBaseName))
-		infoBuffer.WriteString("请基于知识库查询结果来回答用户的问题，确保答案准确且有据可依。\n")
-		infoBuffer.WriteString("在回答时，请明确引用知识库中的相关信息。\n")
-		return infoBuffer.String(), nil
-	}
-}
-
-func AIToolContextProvider(aitoolName string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		// 构建基本信息（即使出错也要包含）
-		baseInfo := fmt.Sprintf("User Prompt: %s\n============== AITool Info ==============\nName: %s\n", strings.Join(userPrompt, " "), aitoolName)
-
-		aitool, err := config.GetAiToolManager().GetToolByName(aitoolName)
-		if err != nil {
-			return baseInfo + fmt.Sprintf("[Error: failed to get aitool: %v]", err), utils.Errorf("failed to get aitool %s: %w", aitoolName, err)
-		}
-		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString(baseInfo)
-		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aitool.Description))
-		infoBuffer.WriteString(fmt.Sprintf("Schema: %s\n", aitool.ToJSONSchemaString()))
-		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
-		infoBuffer.WriteString("【重要提示】用户已指定使用此工具来完成任务。\n")
-		infoBuffer.WriteString(fmt.Sprintf("请优先调用工具 '%s' 来解决用户的问题。\n", aitool.Name))
-		infoBuffer.WriteString("在执行任务时，请根据上述工具的Schema正确传入参数。\n")
-		infoBuffer.WriteString("如果此工具无法完全满足需求，可以结合其他工具辅助完成，但应以此工具为主。\n")
-		return infoBuffer.String(), nil
-	}
-}
-
-func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		// 构建基本信息（即使出错也要包含）
-		baseInfo := fmt.Sprintf("User Prompt: %s\n============== AIForge Info ==============\nName: %s\n", strings.Join(userPrompt, " "), aiforgeName)
-
-		aiforge, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), aiforgeName)
-		if err != nil {
-			return baseInfo + fmt.Sprintf("[Error: failed to get aiforge: %v]", err), utils.Errorf("failed to get aiforge %s: %w", aiforgeName, err)
-		}
-		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString(baseInfo)
-		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aiforge.Description))
-		infoBuffer.WriteString(fmt.Sprintf("Params: %s\n", aiforge.Params))
-		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
-		infoBuffer.WriteString("【重要提示】用户已指定使用此AI蓝图(Forge)来完成任务。\n")
-		infoBuffer.WriteString(fmt.Sprintf("请优先调用AI蓝图 '%s' 来解决用户的问题。\n", aiforge.ForgeName))
-		infoBuffer.WriteString("此蓝图专门设计用于处理特定类型的任务，能够提供更专业和高效的解决方案。\n")
-		infoBuffer.WriteString("在执行时，请根据上述参数Schema正确配置蓝图参数，确保任务顺利完成。\n")
-		infoBuffer.WriteString("如果蓝图执行过程中遇到问题，请及时向用户反馈并寻求进一步指导。\n")
-		return infoBuffer.String(), nil
-	}
-}
-
-// AISkillContextProvider returns a ContextProvider that displays skill metadata.
-// It loads skill information by name and presents it to the AI for reference.
-func AISkillContextProvider(skillName string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		baseInfo := fmt.Sprintf("User Prompt: %s\n============== AI Skill Info ==============\nName: %s\n", strings.Join(userPrompt, " "), skillName)
-
-		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString(baseInfo)
-		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
-		infoBuffer.WriteString(fmt.Sprintf("The user has specified to use AI Skill '%s'.\n", skillName))
-		infoBuffer.WriteString("Use the 'loading_skills' action to load this skill into the context window.\n")
-		infoBuffer.WriteString("Once loaded, the skill's SKILL.md content and file tree will be available for reference.\n")
-		return infoBuffer.String(), nil
-	}
-}
-
-func NewContextProvider(typ string, key string, value string, userPrompt ...string) ContextProvider {
-	if typ == CONTEXT_PROVIDER_TYPE_FILE && key == CONTEXT_PROVIDER_KEY_FILE_CONTENT {
-		return FileContentContextProvider(value, userPrompt...)
-	}
-	return func(config AICallerConfigIf, emitter *Emitter, providerKey string) (string, error) {
-		// 构建基本信息（即使出错也要包含）
-		baseInfo := fmt.Sprintf("User Prompt: %s\nType: %s\nKey: %s\nValue: %s\n", strings.Join(userPrompt, " "), typ, key, value)
-
-		switch typ {
-		case AttachedResourceTypeCode:
-			// Writable delivery slot — never inject as AutoContext/@ attachment content.
-			return "", nil
-		case CONTEXT_PROVIDER_TYPE_FILE:
-			switch key {
-			case CONTEXT_PROVIDER_KEY_FILE_PATH:
-				return FileContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			default:
-				return baseInfo + fmt.Sprintf("[Error: unknown file context provider key: %s]", key), utils.Errorf("unknown file context provider key: %s (type: %s, value: %s)", key, typ, value)
-			}
-		case CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
-			switch key {
-			case CONTEXT_PROVIDER_KEY_NAME:
-				return KnowledgeBaseContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			case CONTEXT_PROVIDER_KEY_SYSTEM_FLAG:
-				return KnowledgeBaseSystemFlagContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			default:
-				return baseInfo + fmt.Sprintf("[Error: unknown knowledge base context provider key: %s]", key), utils.Errorf("unknown knowledge base context provider key: %s (type: %s, value: %s)", key, typ, value)
-			}
-		case CONTEXT_PROVIDER_TYPE_AITOOL:
-			switch key {
-			case CONTEXT_PROVIDER_KEY_NAME:
-				return AIToolContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			default:
-				return baseInfo + fmt.Sprintf("[Error: unknown aitool context provider key: %s]", key), utils.Errorf("unknown aitool context provider key: %s (type: %s, value: %s)", key, typ, value)
-			}
-		case CONTEXT_PROVIDER_TYPE_AIFORGE:
-			switch key {
-			case CONTEXT_PROVIDER_KEY_NAME:
-				return AIForgeContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			default:
-				return baseInfo + fmt.Sprintf("[Error: unknown aiforge context provider key: %s]", key), utils.Errorf("unknown aiforge context provider key: %s (type: %s, value: %s)", key, typ, value)
-			}
-		case CONTEXT_PROVIDER_TYPE_AISKILL:
-			switch key {
-			case CONTEXT_PROVIDER_KEY_NAME:
-				return AISkillContextProvider(value, userPrompt...)(config, emitter, providerKey)
-			default:
-				return baseInfo + fmt.Sprintf("[Error: unknown aiskill context provider key: %s]", key), utils.Errorf("unknown aiskill context provider key: %s (type: %s, value: %s)", key, typ, value)
-			}
-		}
-		return baseInfo + fmt.Sprintf("[Error: unknown context provider type: %s]", typ), utils.Errorf("unknown context provider type: %s (key: %s, value: %s)", typ, key, value)
-	}
-}
-
-func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		baseInfo := fmt.Sprintf("User Prompt: %s\n============== Knowledge Base Info ==============\nSystemFlag: %s\n", strings.Join(userPrompt, " "), flag)
-
-		switch flag {
-		case CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE:
-			db := consts.GetGormProfileDatabase()
-			var knowledgeBases []schema.KnowledgeBaseInfo
-			if err := db.Model(&schema.KnowledgeBaseInfo{}).Find(&knowledgeBases).Error; err != nil {
-				return baseInfo + fmt.Sprintf("[Error: failed to list knowledge bases: %v]", err), utils.Errorf("failed to list knowledge bases: %w", err)
-			}
-			if len(knowledgeBases) == 0 {
-				return baseInfo + "No knowledge base available", nil
-			}
-
-			sort.Slice(knowledgeBases, func(i, j int) bool {
-				return knowledgeBases[i].KnowledgeBaseName < knowledgeBases[j].KnowledgeBaseName
-			})
-
-			var detailBuilder strings.Builder
-			detailBuilder.WriteString(baseInfo)
-			detailBuilder.WriteString(fmt.Sprintf("Total Knowledge Bases: %d\n\n", len(knowledgeBases)))
-			for idx, kb := range knowledgeBases {
-				detailBuilder.WriteString(fmt.Sprintf("%d) Name: %s\n", idx+1, kb.KnowledgeBaseName))
-				if kb.KnowledgeBaseDescription != "" {
-					detailBuilder.WriteString(fmt.Sprintf("   Description: %s\n", kb.KnowledgeBaseDescription))
-				}
-				if kb.KnowledgeBaseType != "" {
-					detailBuilder.WriteString(fmt.Sprintf("   Type: %s\n", kb.KnowledgeBaseType))
-				}
-				if kb.Tags != "" {
-					detailBuilder.WriteString(fmt.Sprintf("   Tags: %s\n", kb.Tags))
-				}
-				detailBuilder.WriteString("\n")
-			}
-
-			content := detailBuilder.String()
-			if TokenCountExceeds(content, maxInlineKnowledgeBaseTokens) {
-				filePath := consts.TempAIFileFast("knowledge-bases-*.txt", content)
-				if emitter != nil && filePath != "" {
-					emitter.EmitPinFilename(filePath)
-				}
-
-				var previewBuilder strings.Builder
-				previewBuilder.WriteString(baseInfo)
-				previewBuilder.WriteString(fmt.Sprintf("All knowledge base info is large (%d tokens). Saved to file: %s\n", MeasureTokens(content), filePath))
-				previewBuilder.WriteString("Knowledge Base Names:\n")
-				for _, kb := range knowledgeBases {
-					previewBuilder.WriteString(fmt.Sprintf("- %s\n", kb.KnowledgeBaseName))
-				}
-				return previewBuilder.String(), nil
-			}
-
-			return content, nil
-		default:
-			return baseInfo + fmt.Sprintf("[Error: unknown system flag: %s]", flag), utils.Errorf("unknown knowledge base system flag: %s", flag)
-		}
-	}
-}
-
 // ArtifactsContextMaxTokens is the maximum size (in tokens) for the artifacts context output.
 const ArtifactsContextMaxTokens = 8 * 1024
-
-// ArtifactsContextProvider is a thin wrapper around RenderSessionArtifactsListing
-// that adds the legacy "# Session Artifacts" heading expected by older callers
-// and existing tests. New prompt code must not call it during ordinary prompt
-// construction; artifact files remain accessible through UI/download surfaces.
-//
-// Deprecated: this provider used to be registered into ContextProviderManager
-// (which routed it into Pure Dynamic / AutoContext). That registration has been
-// removed; the wrapper is kept only to preserve the existing test surface.
-//
-// 关键词: ArtifactsContextProvider 薄壳, 兼容旧 surface, 不再注册到 ContextProviderManager
-func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-	listing := RenderSessionArtifactsListing(config)
-	if listing == "" {
-		return "", nil
-	}
-	return "# Session Artifacts\n" + listing, nil
-}
 
 // formatFileSize formats a file size in human-readable form.
 func formatFileSize(size int64) string {
@@ -535,8 +294,6 @@ type ContextProviderManager struct {
 	taskProviders *omap.OrderedMap[string, ContextProvider]
 	taskScopes    int
 }
-
-const maxInlineKnowledgeBaseTokens = 2 * 1024
 
 func NewContextProviderManager() *ContextProviderManager {
 	return &ContextProviderManager{
