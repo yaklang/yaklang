@@ -78,7 +78,7 @@ func TestDefaultCatalog(t *testing.T) {
 		t.Fatalf("unexpected loaders: %+v", loaders)
 	}
 	parsers := catalog.Parsers()
-	if len(parsers) != 10 || parsers[0].Kind != core.Arch386 {
+	if len(parsers) != 11 || parsers[0].Kind != core.Arch386 {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {

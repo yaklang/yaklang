@@ -16,6 +16,7 @@ import (
 	ppc64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/ppc64"
 	riscv32impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/riscv32"
 	riscv64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/riscv64"
+	s390ximpl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/s390x"
 	x86impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/x86"
 )
 
@@ -28,6 +29,7 @@ func All() []core.Parser {
 		riscv64impl.Parser{}, riscv32impl.Parser{},
 		ppc64impl.Parser{}, ppcimpl.Parser{},
 		mips64impl.Parser{}, mipsimpl.Parser{},
+		s390ximpl.Parser{},
 	}
 }
 
