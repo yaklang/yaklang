@@ -72,8 +72,11 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 
 ```json
 [
+  {"kind": "archive", "name": "ar", "description": "Unix ar archives; members load with their own format"},
+  {"kind": "coff", "name": "COFF", "description": "Windows COFF object files"},
   {"kind": "elf", "name": "ELF", "description": "ELF images; the target OS comes from the ELF OS ABI"},
   {"kind": "macho", "name": "Mach-O", "description": "Mach-O images; universal slices are selected by architecture"},
+  {"kind": "mz", "name": "MZ", "description": "MS-DOS MZ executables and COM images"},
   {"kind": "pe", "name": "PE", "description": "PE images; the target OS comes from the PE subsystem"}
 ]
 ```
@@ -89,7 +92,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 ]
 ```
 
-AMD64、386、ARM64 与 ARM 有解码器；其他架构仍是注册骨架。
+十三种架构都有解码器。
 
 ## inspect
 
@@ -378,7 +381,7 @@ common/yak/reify/scripts/lift-all.sh -o /tmp/hello-main -a "$main_addr" -s "$mai
 - .NET 程序集：PE 目录项 14 命中时拒绝输入，报错明确写出 CLI 头部的 RVA 与 IL 负载。
 - 缺少入口字段时不输出 `entry_point`；这不表示文件没有入口。
 - 入口和节地址是映像地址，不是 ASLR 后的运行时地址。
-- `lift` 解释 AMD64、386、ARM64 与 ARM。其余架构的 `lowir` 返回 `ErrDecoderUnavailable`，`asm` 返回 `ErrNoDisassembler`。
+- `lift` 解释全部十三种注册架构。
 - `ssair` 和 `source` 依赖 LowIR，因此也只对已实现解码器的架构有效。
 
 ## 返回码
@@ -404,7 +407,7 @@ export TMPDIR="$RUN/tmp"
 scripts/ssa-test.sh -count=1 ./common/yak/reify/...
 ```
 
-测试覆盖 ByteReader、Image/Artifact 校验、区域映射、三个格式 loader、Catalog 注册与分派、parser 目标校验、AMD64/386/ARM64/ARM 解码、汇编渲染与 LowIR 提升，以及 CLI 的 lift 模式。
+测试覆盖 ByteReader、Image/Artifact 校验、区域映射、六个格式 loader、Catalog 注册与分派、parser 目标校验、十三种架构解码、汇编渲染与 LowIR 提升，以及 CLI 的 lift 模式。
 
 ## 参考资料
 

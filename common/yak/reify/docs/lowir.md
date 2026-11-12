@@ -34,7 +34,7 @@ type Instruction struct {
 }
 ```
 
-一个 Function 对应 parser 处理的一个连续代码范围。当前 AMD64、386、ARM64 与 ARM parser 对一个 `ParseRequest` 区域产出一个 Function；`asm2lowir` 通过符号、调用目标和异常表把区域切成多个函数，并用 Image 符号给 Function 命名。
+一个 Function 对应 parser 处理的一个连续代码范围。当前十三种架构的 parser 对一个 `ParseRequest` 区域产出一个 Function；`asm2lowir` 通过符号、调用目标和异常表把区域切成多个函数，并用 Image 符号给 Function 命名。
 
 `Instruction.Kind` 是统一的指令种类。它不使用接口方法，也不包装原始 ISA 指令；操作数、结果、控制目标和效果都在同一结构上表达。
 

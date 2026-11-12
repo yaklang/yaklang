@@ -21,8 +21,8 @@ Reify 不使用“操作系统 × 架构”的目录矩阵。每个维度单独�
 
 `loader.Default` 是进程级只读 Catalog，构造时显式注册：
 
-- 三个 loader：`fileformat.ELF`、`fileformat.PE`、`fileformat.MachO`。
-- 十个 parser：386、amd64、arm、arm64、riscv32、riscv64、mips、mips64、ppc、ppc64。
+- 六个 loader：`fileformat.ELF`、`fileformat.PE`、`fileformat.MachO`、`fileformat.COFF`、`fileformat.Archive`（ar）、`fileformat.MZ`。
+- 十三个 parser：386、amd64、8086、arm、arm64、riscv32、riscv64、mips、mips64、ppc、ppc64、s390x、loong64。
 
 不使用 `init()` 自动注册，不在运行时修改 `Default`。需要自定义组合时调用 `loader.NewCatalog(loaders, parsers)`；重复 Format 或重复 Architecture 在构造时报错。
 
@@ -65,13 +65,16 @@ Region（虚拟地址 + 文件偏移 + 长度）
 
 ## 格式层
 
-`loader/fileformat` 汇总三种格式；每种格式各有一个独立包：
+`loader/fileformat` 汇总六种格式；每种格式各有一个独立包：
 
 | Loader | Format | 目标平台来源 | 说明 |
 | --- | --- | --- | --- |
-| `ELF` | `elf` | ELF OS ABI、机器字段、类别 | 支持 32/64 位和大端 |
+| `ELF` | `elf` | ELF OS ABI、机器字段、类别 | 支持 32/64 位和大端；可重定位对象按文件顺序布局节 |
 | `pe.Loader` | `pe` | 机器字段、可选头子系统 | PE32 与 PE32+；导出表、导入表、`.pdata` |
 | `macho.Loader` | `macho` | CPU 字段 | thin 与 universal；`LC_MAIN`、`LC_FUNCTION_STARTS`、符号表 |
+| `coff.Loader` | `coff` | 机器字段 | COFF 对象：节表、符号表、字符串表 |
+| `unixar.Loader` | `archive` | 首个可解析成员的 Target | ar 归档：成员按各自格式解析 |
+| `mz.Loader` | `mz` | 固定 DOS/8086 | MZ 可执行；COM 需显式选择格式 |
 
 ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。PE 读取导出表、导入表与 `.pdata` 异常目录。Mach-O 读取 `LC_MAIN`、`LC_FUNCTION_STARTS`、符号表与导入符号，并在 universal 文件中选择一个切片。
 
@@ -91,9 +94,14 @@ PE 映像的目录项 14 是 COM descriptor，只有 .NET 程序集填写。命�
 | --- | --- | --- |
 | AMD64 | 已实现 | `golang.org/x/arch/x86/x86asm`（64 位模式） |
 | 386 | 已实现 | 同一套 x86 解码器（32 位模式），实现在 `loader/arch/internal/x86` |
+| 8086 | 已实现 | 同一套 x86 解码器（16 位模式），实现在 `loader/arch/internal/x86` |
 | ARM64 | 已实现 | `golang.org/x/arch/arm64/arm64asm`，外加 PAC 编码解码 |
-| ARM | 已实现 | `golang.org/x/arch/arm/armasm`，ARM 模式 |
-| RISCV32、RISCV64、MIPS、MIPS64、PPC、PPC64 | 注册骨架 | 未实现 |
+| ARM | 已实现 | `golang.org/x/arch/arm/armasm`（ARM 模式），手写 Thumb 与 Thumb-2 解码器 |
+| S390X | 已实现 | `golang.org/x/arch/s390x/s390xasm`（2/4/6 字节变长，大端） |
+| LOONG64 | 已实现 | `golang.org/x/arch/loong64/loong64asm`（定长 4 字节） |
+| RISCV64 / RISCV32 | 已实现 | `golang.org/x/arch/riscv64/riscv64asm`（含 2 字节压缩指令） |
+| PPC64 / PPC | 已实现 | `golang.org/x/arch/ppc64/ppc64asm`（大端与小端） |
+| MIPS64 / MIPS | 已实现 | 手写解码器 `loader/arch/internal/mips/format.go` |
 
 ### AMD64
 
@@ -198,7 +206,7 @@ PE 映像的目录项 14 是 COM descriptor，只有 .NET 程序集填写。命�
 
 ### ARM
 
-`loader/arch/arm/` 处理 32 位 ARM（ARM 模式），用 `armasm.Decode(..., armasm.ModeARM)` 解码。Thumb 模式没有被 `golang.org/x/arch` 支持，`Check` 对 `Mode == "thumb"` 返回错误，而不是静默按 ARM 解码。
+`loader/arch/arm/` 处理 32 位 ARM 的两种执行模式，用 `armasm.Decode(..., armasm.ModeARM)` 解码 ARM 模式，用手写解码器处理 Thumb 与 Thumb-2。`armasm` 只支持 ARM 模式，对 Thumb 返回 `unsupported execution mode`。
 
 处理步骤与 ARM64 相同：线性解码、按跳转目标与终止指令切块、逐条提升。
 
@@ -222,21 +230,31 @@ PE 映像的目录项 14 是 COM descriptor，只有 .NET 程序集填写。命�
 - 未建模的协处理器、NEON 与 VFP 指令保留为 `arm.<mnemonic>` 内建操作，并产生 `unsupported-instruction`。
 - 无法解码的字保留为 `trap`（`arm.data`），同时产生 `decode-error`。
 
+Thumb 与 Thumb-2：
+
+`thumb.go` 判断一个地址落在哪种模式，`thumb16.go` 解码 16 位编码，`thumb32.go` 解码 32 位编码。解码结果统一构造成 `armasm.Inst`，因此提升链路与 ARM 模式完全相同。
+
+- 16 位编码覆盖 `MOVS`/`ADDS`/`SUBS`/`CMP`、移位、`LDR`/`STR` 字面量与小立即数、`PUSH`/`POP`、`CBZ`/`CBNZ`、条件分支与 `BX`/`BLX`。
+- 32 位编码覆盖 `BL`、`B.W`、`MOVW`/`MOVT`、`LDR.W`/`STR.W`、数据处理（移位）与 `IT` 块。
+- `IT` 用一个状态机（mask、index、length）跟踪：块内每条指令按 mask 改写条件位，`IT` 本身提升为空操作。
+- `CBZ`/`CBNZ` 建模为 `compare` 加 `branch`，不是一个独立谓词。
+- Thumb 的 PC 相对约定是 `address + 4`，ARM 是 `address + 8`；`instruction.thumb` 标志控制目标计算。
+- 未建模的 `ORN` 与 VFP 编码走 opaque 路径，保留为具名内建操作。
+
+哪些代码是 Thumb 由边界提示决定。`BoundaryHints.ModeRegions` 给出按地址排序的区域；`FunctionBoundary.Mode` 逐函数覆盖 `Target.Mode`。判据是符号地址的最低位、`$a`/`$t`/`$d` mapping symbol、以及 ELF 入口点的奇偶。ARM 与 Thumb 可以出现在同一个二进制里（Debian armhf 的 `ls` 就是如此）。
+
 限制：
 
-- 只支持 ARM 模式；Thumb 与 Thumb-2 未实现。
 - 大端 ARM（BE8/BE32）未验证；`armasm` 固定按小端读取。
+- 少量 Thumb-2 编码（部分 VFP 与高级 SIMD）仍报 `decode-error`。
 - NEON、VFP 与协处理器指令没有建模。
 - 字面池在 `.text` 中可能被当成指令，也可能以 `trap` 形式保留。
 
 ### 其他架构
 
-`loader/arch` 为其余六种 Architecture 保留单独文件，不放进已实现的四个包。它们满足：
+`loader/arch` 现在为十三种 Architecture 各提供一个 parser 包，全部有解码器。
 
-- `Available() == false`。
-- `Check` 校验架构、位数和执行模式；字节序由 ByteReader 处理。
-- `Parse` 返回 `ErrDecoderUnavailable`，不伪造 LowIR。
-- 没有实现 `Disassembler`，所以汇编模式返回 `ErrNoDisassembler`。
+每个 parser 包都满足同一契约：
 
 - `Available() == true`。
 - `Check` 校验架构、位数和执行模式。
