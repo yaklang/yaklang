@@ -1,7 +1,6 @@
-package amd64
+package x86
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/arch/x86/x86asm"
@@ -9,26 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
 
-func amd64Register(reg x86asm.Reg) (string, uint16, bool) {
-	switch {
-	case reg >= x86asm.AL && reg <= x86asm.R15B:
-		return strings.ToLower(reg.String()), 8, true
-	case reg >= x86asm.AX && reg <= x86asm.R15W:
-		return strings.ToLower(reg.String()), 16, true
-	case reg >= x86asm.EAX && reg <= x86asm.R15L:
-		return strings.ToLower(reg.String()), 32, true
-	case reg >= x86asm.RAX && reg <= x86asm.R15:
-		return strings.ToLower(reg.String()), 64, true
-	case reg == x86asm.RIP:
-		return "rip", 64, true
-	case reg >= x86asm.X0 && reg <= x86asm.X15:
-		return fmt.Sprintf("xmm%d", int(reg-x86asm.X0)), 128, true
-	default:
-		return "", 0, false
-	}
-}
-
-func amd64GPR(reg x86asm.Reg) bool {
+func isGPR(reg x86asm.Reg) bool {
 	switch {
 	case reg >= x86asm.AL && reg <= x86asm.R15B:
 		return true
@@ -43,7 +23,7 @@ func amd64GPR(reg x86asm.Reg) bool {
 	}
 }
 
-func amd64Condition(op x86asm.Op) string {
+func conditionName(op x86asm.Op) string {
 	name := op.String()
 	switch {
 	case strings.HasPrefix(name, "CMOV"):
@@ -57,7 +37,7 @@ func amd64Condition(op x86asm.Op) string {
 	}
 }
 
-func amd64DirectTarget(ins amd64Instruction) (uint64, bool) {
+func directTarget(ins instruction) (uint64, bool) {
 	if len(ins.inst.Args) == 0 {
 		return 0, false
 	}
@@ -68,12 +48,7 @@ func amd64DirectTarget(ins amd64Instruction) (uint64, bool) {
 	return ins.address + uint64(ins.size) + uint64(int64(rel)), true
 }
 
-func amd64ConditionalJump(op x86asm.Op) bool {
-	name := op.String()
-	return strings.HasPrefix(name, "J") && name != "JMP"
-}
-
-func amd64Terminator(ins amd64Instruction) bool {
+func isTerminator(ins instruction) bool {
 	if ins.endbr != "" {
 		return false
 	}
@@ -84,11 +59,11 @@ func amd64Terminator(ins amd64Instruction) bool {
 		imm, ok := ins.inst.Args[0].(x86asm.Imm)
 		return ok && imm == 3
 	default:
-		return amd64ConditionalJump(ins.inst.Op)
+		return isConditionalJump(ins.inst.Op)
 	}
 }
 
-func amd64HasPrefix(ins amd64Instruction, prefix x86asm.Prefix) bool {
+func hasPrefix(ins instruction, prefix x86asm.Prefix) bool {
 	for _, value := range ins.inst.Prefix {
 		if value == 0 {
 			break
@@ -100,7 +75,16 @@ func amd64HasPrefix(ins amd64Instruction, prefix x86asm.Prefix) bool {
 	return false
 }
 
-func amd64ControlTransfer(kind core.Opcode) bool {
+// isConditionalJump reports whether an opcode is a conditional branch. x86asm
+// names every conditional branch with a J prefix and no other opcode shares it
+// except JMP, so the prefix is the complete test.
+func isConditionalJump(op x86asm.Op) bool {
+	name := op.String()
+	return strings.HasPrefix(name, "J") && name != "JMP"
+}
+
+// controlTransfer reports whether an opcode ends a basic block.
+func controlTransfer(kind core.Opcode) bool {
 	switch kind {
 	case core.OpJump, core.OpBranch, core.OpReturn, core.OpTrap:
 		return true

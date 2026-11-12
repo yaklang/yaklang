@@ -1,4 +1,4 @@
-package amd64
+package x86
 
 import (
 	"sort"
@@ -23,32 +23,34 @@ const (
 	priorityScan
 )
 
-type amd64Boundary struct {
+type boundary struct {
 	core.FunctionBoundary
 	priority boundaryPriority
 }
 
-type amd64BoundaryScanner struct {
+type boundaryScanner struct {
+	profile Profile
 	reader  *core.ByteReader
 	hints   core.BoundaryHints
 	image   *core.Image
-	entries map[uint64]*amd64Boundary
+	entries map[uint64]*boundary
 	data    map[uint64][]byte
 	stats   core.BoundaryStats
 }
 
-// DiscoverBoundaries finds function starts in an AMD64 image using loader
-// hints, symbols, entry, direct calls and tail scanning. It does not build
-// LowIR; asm2lowir uses the result to call Parse per function.
-func (Parser) DiscoverBoundaries(reader *core.ByteReader, hints core.BoundaryHints, image *core.Image) (core.BoundaryResult, error) {
+// discoverBoundaries finds function starts using loader hints, symbols, entry,
+// direct calls and tail scanning. It does not build LowIR; asm2lowir uses the
+// result to call Parse per function.
+func discoverBoundaries(profile Profile, reader *core.ByteReader, hints core.BoundaryHints, image *core.Image) (core.BoundaryResult, error) {
 	if reader == nil || image == nil || len(hints.ExecSections) == 0 {
 		return core.BoundaryResult{}, nil
 	}
-	scanner := &amd64BoundaryScanner{
+	scanner := &boundaryScanner{
+		profile: profile,
 		reader:  reader,
 		hints:   hints,
 		image:   image,
-		entries: make(map[uint64]*amd64Boundary),
+		entries: make(map[uint64]*boundary),
 		data:    make(map[uint64][]byte),
 	}
 	scanner.addSymbols()
@@ -72,7 +74,7 @@ func (Parser) DiscoverBoundaries(reader *core.ByteReader, hints core.BoundaryHin
 	return core.BoundaryResult{Functions: functions, Stats: scanner.stats}, nil
 }
 
-func (s *amd64BoundaryScanner) add(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority) bool {
+func (s *boundaryScanner) add(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority) bool {
 	if address == 0 || s.regionFor(address) == nil {
 		return false
 	}
@@ -111,14 +113,14 @@ func (s *amd64BoundaryScanner) add(address, size uint64, name string, source cor
 		}
 		return false
 	}
-	s.entries[address] = &amd64Boundary{
+	s.entries[address] = &boundary{
 		FunctionBoundary: core.FunctionBoundary{Address: address, Size: size, Name: name, Source: source},
 		priority:         priority,
 	}
 	return true
 }
 
-func (s *amd64BoundaryScanner) addSymbols() {
+func (s *boundaryScanner) addSymbols() {
 	for _, symbol := range s.image.Symbols {
 		if symbol.Name == "" || symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
 			continue
@@ -127,13 +129,13 @@ func (s *amd64BoundaryScanner) addSymbols() {
 	}
 }
 
-func (s *amd64BoundaryScanner) addPLT() {
+func (s *boundaryScanner) addPLT() {
 	for _, entry := range s.hints.PLTTargets {
 		s.add(entry.Address, 16, entry.Name, core.BoundaryPLT, priorityPLT)
 	}
 }
 
-func (s *amd64BoundaryScanner) addInitArrays() {
+func (s *boundaryScanner) addInitArrays() {
 	for _, address := range s.hints.InitTargets {
 		s.add(address, 0, "", core.BoundaryInitArray, priorityInitArray)
 	}
@@ -141,20 +143,20 @@ func (s *amd64BoundaryScanner) addInitArrays() {
 
 // addFunctionStarts inserts exact entries from format metadata: Mach-O
 // LC_FUNCTION_STARTS, PE export tables and PE .pdata.
-func (s *amd64BoundaryScanner) addFunctionStarts() {
+func (s *boundaryScanner) addFunctionStarts() {
 	for _, address := range s.hints.FunctionStarts {
 		s.add(address, 0, "", core.BoundaryFunctionStart, priorityFunctionStart)
 	}
 }
 
 // addEHFrame inserts one boundary per FDE range. CFI is not executed.
-func (s *amd64BoundaryScanner) addEHFrame() {
+func (s *boundaryScanner) addEHFrame() {
 	for _, entry := range ehframe.Entries(s.hints.EHFrame, s.hints.EHFrameAddr) {
 		s.add(entry.Location, entry.Range, "", core.BoundaryEHFrame, priorityEHFrame)
 	}
 }
 
-func (s *amd64BoundaryScanner) regionFor(address uint64) *core.Region {
+func (s *boundaryScanner) regionFor(address uint64) *core.Region {
 	for index := range s.hints.ExecSections {
 		region := &s.hints.ExecSections[index]
 		if address >= region.Address && address-region.Address < region.Size {
@@ -164,7 +166,7 @@ func (s *amd64BoundaryScanner) regionFor(address uint64) *core.Region {
 	return nil
 }
 
-func (s *amd64BoundaryScanner) regionData(region *core.Region) []byte {
+func (s *boundaryScanner) regionData(region *core.Region) []byte {
 	if data, ok := s.data[region.Address]; ok {
 		return data
 	}
@@ -173,7 +175,7 @@ func (s *amd64BoundaryScanner) regionData(region *core.Region) []byte {
 	return data
 }
 
-func (s *amd64BoundaryScanner) decode(address uint64) (x86asm.Inst, bool) {
+func (s *boundaryScanner) decode(address uint64) (x86asm.Inst, bool) {
 	region := s.regionFor(address)
 	if region == nil {
 		return x86asm.Inst{}, false
@@ -186,14 +188,14 @@ func (s *amd64BoundaryScanner) decode(address uint64) (x86asm.Inst, bool) {
 	if offset+4 <= uint64(len(data)) && data[offset] == 0xf3 && data[offset+1] == 0x0f && data[offset+2] == 0x1e && (data[offset+3] == 0xfa || data[offset+3] == 0xfb) {
 		return x86asm.Inst{Op: x86asm.NOP, Len: 4}, true
 	}
-	inst, err := x86asm.Decode(data[offset:], 64)
+	inst, err := x86asm.Decode(data[offset:], s.profile.Mode)
 	if err != nil || inst.Len <= 0 {
 		return x86asm.Inst{}, false
 	}
 	return inst, true
 }
 
-func (s *amd64BoundaryScanner) nextBoundary(address uint64) uint64 {
+func (s *boundaryScanner) nextBoundary(address uint64) uint64 {
 	next := uint64(0)
 	for candidate := range s.entries {
 		if candidate > address && (next == 0 || candidate < next) {
@@ -209,7 +211,7 @@ func (s *amd64BoundaryScanner) nextBoundary(address uint64) uint64 {
 	return next
 }
 
-func (s *amd64BoundaryScanner) walkDirectCalls() {
+func (s *boundaryScanner) walkDirectCalls() {
 	queue := make([]uint64, 0, len(s.entries))
 	for address := range s.entries {
 		queue = append(queue, address)
@@ -251,7 +253,7 @@ func (s *amd64BoundaryScanner) walkDirectCalls() {
 	}
 }
 
-func (s *amd64BoundaryScanner) walkFunction(start, limit uint64) (uint64, []uint64) {
+func (s *boundaryScanner) walkFunction(start, limit uint64) (uint64, []uint64) {
 	work := []uint64{start}
 	visited := make(map[uint64]bool)
 	calls := make([]uint64, 0)
@@ -325,12 +327,12 @@ func directX86Target(inst x86asm.Inst, address uint64) (uint64, bool) {
 	}
 }
 
-func (s *amd64BoundaryScanner) indirectGOTTarget(inst x86asm.Inst, address uint64) (uint64, bool) {
+func (s *boundaryScanner) indirectGOTTarget(inst x86asm.Inst, address uint64) (uint64, bool) {
 	if len(inst.Args) == 0 {
 		return 0, false
 	}
 	mem, ok := inst.Args[0].(x86asm.Mem)
-	if !ok || mem.Base != x86asm.RIP {
+	if !ok || s.profile.InstructionPointer == "" || mem.Base != x86asm.RIP {
 		return 0, false
 	}
 	got := address + uint64(inst.Len) + uint64(int64(mem.Disp))
@@ -338,16 +340,7 @@ func (s *amd64BoundaryScanner) indirectGOTTarget(inst x86asm.Inst, address uint6
 	return target, ok && target != 0
 }
 
-func isConditionalJump(op x86asm.Op) bool {
-	switch op {
-	case x86asm.JA, x86asm.JAE, x86asm.JB, x86asm.JBE, x86asm.JCXZ, x86asm.JECXZ, x86asm.JG, x86asm.JGE, x86asm.JL, x86asm.JLE, x86asm.JNE, x86asm.JNO, x86asm.JNP, x86asm.JNS, x86asm.JO, x86asm.JP, x86asm.JRCXZ, x86asm.JS:
-		return true
-	default:
-		return false
-	}
-}
-
-func (s *amd64BoundaryScanner) finishRanges() {
+func (s *boundaryScanner) finishRanges() {
 	addresses := make([]uint64, 0, len(s.entries))
 	for address := range s.entries {
 		addresses = append(addresses, address)
@@ -364,7 +357,7 @@ func (s *amd64BoundaryScanner) finishRanges() {
 	}
 }
 
-func (s *amd64BoundaryScanner) addTailScan() {
+func (s *boundaryScanner) addTailScan() {
 	covered := make([]core.FunctionBoundary, 0, len(s.entries))
 	for _, entry := range s.entries {
 		covered = append(covered, entry.FunctionBoundary)
@@ -389,7 +382,7 @@ func (s *amd64BoundaryScanner) addTailScan() {
 	}
 }
 
-func (s *amd64BoundaryScanner) scanGap(start, end uint64) {
+func (s *boundaryScanner) scanGap(start, end uint64) {
 	for address := start; address+16 <= end; {
 		region := s.regionFor(address)
 		if region == nil {

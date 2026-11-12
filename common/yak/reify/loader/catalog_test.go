@@ -82,7 +82,8 @@ func TestDefaultCatalog(t *testing.T) {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {
-		decoded := parser.Kind == core.ArchAMD64 || parser.Kind == core.ArchARM64
+		decoded := parser.Kind == core.ArchAMD64 || parser.Kind == core.Arch386 ||
+			parser.Kind == core.ArchARM64 || parser.Kind == core.ArchARM
 		if parser.Available != decoded {
 			t.Fatalf("unexpected parser availability: %+v", parser)
 		}

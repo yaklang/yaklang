@@ -86,6 +86,17 @@ func valueDefinition(ir *core.LowIR, id core.ValueID) (core.Instruction, bool) {
 	return core.Instruction{}, false
 }
 
+// controlTransfer mirrors the parser's block-terminator rule; the shared
+// implementation lives in loader/arch/internal/x86.
+func controlTransfer(kind core.Opcode) bool {
+	switch kind {
+	case core.OpJump, core.OpBranch, core.OpReturn, core.OpTrap:
+		return true
+	default:
+		return false
+	}
+}
+
 func literalUint64(t *testing.T, literal []byte) uint64 {
 	t.Helper()
 	var padded [8]byte
@@ -597,7 +608,7 @@ func validateAMD64IR(t *testing.T, ir *core.LowIR) {
 			if len(block.Instructions) == 0 {
 				t.Fatalf("empty block %d", block.ID)
 			}
-			if !amd64ControlTransfer(block.Instructions[len(block.Instructions)-1].Kind) {
+			if !controlTransfer(block.Instructions[len(block.Instructions)-1].Kind) {
 				t.Fatalf("block %d does not end in a control transfer", block.ID)
 			}
 		}

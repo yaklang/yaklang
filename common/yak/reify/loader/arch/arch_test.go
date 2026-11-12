@@ -23,7 +23,8 @@ func TestAllArchitectures(t *testing.T) {
 			t.Fatalf("duplicate architecture %s", parser.Kind())
 		}
 		seen[parser.Kind()] = true
-		if parser.Available() != (parser.Kind() == core.ArchAMD64) {
+		decoded := parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386
+		if parser.Available() != decoded {
 			t.Fatalf("%s reported unexpected decoder availability", parser.Kind())
 		}
 		if parser.Name() != string(parser.Kind()) {
@@ -56,8 +57,10 @@ func TestCheckTargetMatrix(t *testing.T) {
 		{"386", target(core.Arch386, 32, core.LittleEndian, ""), true},
 		{"386 ignores byte order", target(core.Arch386, 32, core.BigEndian, ""), true},
 		{"arm", target(core.ArchARM, 32, core.LittleEndian, ""), true},
-		{"arm thumb", target(core.ArchARM, 32, core.BigEndian, "thumb"), true},
-		{"arm mode", target(core.ArchARM, 32, core.LittleEndian, "aarch64"), false},
+		{"arm", target(core.ArchARM, 32, core.BigEndian, ""), true},
+		{"arm mode", target(core.ArchARM, 32, core.LittleEndian, "arm"), true},
+		{"arm thumb", target(core.ArchARM, 32, core.BigEndian, "thumb"), false},
+		{"arm aarch64 mode", target(core.ArchARM, 32, core.LittleEndian, "aarch64"), false},
 		{"arm 64-bit", target(core.ArchARM, 64, core.LittleEndian, ""), false},
 		{"arm64", target(core.ArchARM64, 64, core.BigEndian, ""), true},
 		{"arm64 mode", target(core.ArchARM64, 64, core.LittleEndian, "thumb"), false},
@@ -83,15 +86,37 @@ func TestCheckTargetMatrix(t *testing.T) {
 }
 
 func TestParseReportsUnavailable(t *testing.T) {
-	request := core.ParseRequest{Target: target(core.ArchAMD64, 64, core.LittleEndian, ""), Address: 0x1000}
 	for _, parser := range All() {
-		if parser.Kind() == core.ArchAMD64 {
+		if parser.Kind() == core.ArchAMD64 || parser.Kind() == core.Arch386 {
 			continue
 		}
-		request.Target.Architecture = parser.Kind()
+		// The request must satisfy Check, otherwise the parser reports a
+		// target mismatch instead of the missing decoder.
+		request := core.ParseRequest{
+			Target:  target(parser.Kind(), 64, core.LittleEndian, ""),
+			Address: 0x1000,
+		}
+		if _, ok := parser.(interface{ Kind() core.Architecture }); !ok {
+			continue
+		}
+		if bits := parserBits(parser.Kind()); bits != 0 {
+			request.Target.Bits = bits
+		}
 		result, err := parser.Parse(context.Background(), request)
 		if !errors.Is(err, ErrDecoderUnavailable) || result != nil {
 			t.Fatalf("%s: result=%v err=%v", parser.Kind(), result, err)
 		}
+	}
+}
+
+// parserBits returns the address width each skeleton validates.
+func parserBits(kind core.Architecture) int {
+	switch kind {
+	case core.ArchRISCV32, core.ArchMIPS, core.ArchPPC:
+		return 32
+	case core.ArchRISCV64, core.ArchMIPS64, core.ArchPPC64:
+		return 64
+	default:
+		return 0
 	}
 }

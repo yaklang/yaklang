@@ -2,57 +2,35 @@ package amd64
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/x86"
 )
 
-// Parser parses 64-bit x86 machine code into LowIR.
+// Parser parses 64-bit x86 machine code into LowIR. The decoder and lifter are
+// shared with the 386 parser; this package only supplies the AMD64 profile.
 type Parser struct{}
 
 var _ core.Parser = Parser{}
 var _ core.Disassembler = Parser{}
+var _ core.BoundaryDiscoverer = Parser{}
+
+func profile() x86.Profile { return x86.Profile64() }
 
 func (Parser) Kind() core.Architecture { return core.ArchAMD64 }
 func (Parser) Name() string            { return "amd64" }
 func (Parser) Available() bool         { return true }
-func (Parser) Check(target core.Target) error {
-	if target.Architecture != core.ArchAMD64 {
-		return fmt.Errorf("wanted architecture %s, got %s", core.ArchAMD64, target.Architecture)
-	}
-	if target.Bits != 64 {
-		return fmt.Errorf("amd64 requires 64-bit addresses, got %d", target.Bits)
-	}
-	if target.Mode != "" {
-		return fmt.Errorf("amd64 does not support execution mode %q", target.Mode)
-	}
-	return nil
-}
+
+func (Parser) Check(target core.Target) error { return profile().Check(target) }
+
 func (Parser) Parse(ctx context.Context, request core.ParseRequest) (*core.ParseResult, error) {
-	return parse(ctx, request)
+	return x86.Parse(ctx, profile(), request)
 }
 
-const maxAMD64Diagnostics = 64
-
-type amd64Diagnostics struct {
-	items   []core.Diagnostic
-	dropped int
+func (Parser) Disassemble(ctx context.Context, request core.ParseRequest) (*core.Disassembly, error) {
+	return x86.Disassemble(ctx, profile(), request)
 }
 
-func (d *amd64Diagnostics) add(code, message string) {
-	if len(d.items) < maxAMD64Diagnostics {
-		d.items = append(d.items, core.Diagnostic{Code: code, Message: message})
-		return
-	}
-	d.dropped++
-}
-
-func (d *amd64Diagnostics) finish() []core.Diagnostic {
-	if d.dropped == 0 {
-		return d.items
-	}
-	return append(d.items, core.Diagnostic{
-		Code:    "diagnostics-truncated",
-		Message: "further amd64 diagnostics were omitted",
-	})
+func (Parser) DiscoverBoundaries(reader *core.ByteReader, hints core.BoundaryHints, image *core.Image) (core.BoundaryResult, error) {
+	return x86.DiscoverBoundaries(profile(), reader, hints, image)
 }

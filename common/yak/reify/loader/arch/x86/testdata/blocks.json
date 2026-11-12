@@ -1,0 +1,57 @@
+[
+  {
+    "name": "conditional branch",
+    "address": "0x402000",
+    "code": [
+      "85 c0 // test eax, eax",
+      "74 02 // je +2",
+      "90 // nop",
+      "90 // nop",
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x402000 @ 0x402000",
+      "block b1 @ 0x402000",
+      "  0x402000  v1:i32 = read_register %eax [read_register]",
+      "  0x402000  v2:i32 = read_register %eax [read_register]",
+      "  0x402000  v3:i32 = intrinsic @x86.flags.test, v1, v2 [write_register]",
+      "  0x402000  write_register %eflags, v3 [write_register]",
+      "  0x402002  v4:i32 = read_register %eflags [read_register]",
+      "  0x402002  v5:i1 = intrinsic @x86.cond.e, v4 [read_register]",
+      "  0x402002  branch v5 -> b3, b2",
+      "block b2 @ 0x402004",
+      "  0x402004  nop",
+      "  0x402005  nop",
+      "  0x402006  jump -> b3",
+      "block b3 @ 0x402006",
+      "  0x402006  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "direct call",
+    "address": "0x402020",
+    "code": [
+      "e8 05 00 00 00 // call +5",
+      "90 // nop",
+      "eb 02 // jmp +2",
+      "90 // nop",
+      "90 // nop",
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x402020 @ 0x402020",
+      "block b1 @ 0x402020",
+      "  0x402020  call 0x40202a [call, may_trap, unknown]",
+      "  0x402025  nop",
+      "  0x402026  jump -> b3",
+      "block b2 @ 0x402028",
+      "  0x402028  nop",
+      "  0x402029  nop",
+      "  0x40202a  jump -> b3",
+      "block b3 @ 0x40202a",
+      "  0x40202a  return [may_trap, unknown]"
+    ]
+  }
+]
