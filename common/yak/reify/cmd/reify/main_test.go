@@ -70,7 +70,8 @@ func TestCLIListsLoadersAndParsers(t *testing.T) {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {
-		decoded := parser.Kind == core.ArchAMD64 || parser.Kind == core.Arch386
+		decoded := parser.Kind == core.ArchAMD64 || parser.Kind == core.Arch386 ||
+			parser.Kind == core.ArchARM64
 		if parser.Available != decoded {
 			t.Fatalf("unexpected parser availability: %+v", parser)
 		}

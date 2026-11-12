@@ -70,6 +70,7 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 	converter := &converter{
 		ctx:         ctx,
 		program:     program,
+		arch:        ir.Target.Architecture,
 		diagnostics: make([]core.Diagnostic, 0),
 	}
 	for index := range ir.Functions {
@@ -127,6 +128,7 @@ type converter struct {
 	current     core.BlockID
 	types       map[core.ValueType]ssa.Type
 	undefined   map[string]ssa.Value
+	arch        core.Architecture
 }
 
 func (c *converter) convertFunction(function core.Function) error {
@@ -287,7 +289,7 @@ func (c *converter) prepareLoopPhis(blockID core.BlockID) {
 
 func (c *converter) bindParameters() {
 	c.builder.CurrentBlock = c.entry
-	for _, name := range []string{"rsp", "rbp"} {
+	for _, name := range c.entryRegisters() {
 		parameter := ssa.NewParam("entry_"+name, false, c.builder)
 		if parameter == nil {
 			continue
@@ -295,7 +297,7 @@ func (c *converter) bindParameters() {
 		parameter.SetType(c.typeFor(integerType(64)))
 		c.assignRegister(name, parameter)
 	}
-	for index, name := range []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"} {
+	for index, name := range c.argumentRegisters() {
 		parameter := ssa.NewParam(fmt.Sprintf("arg%d", index), false, c.builder)
 		if parameter == nil {
 			continue
@@ -303,6 +305,50 @@ func (c *converter) bindParameters() {
 		parameter.FormalParameterIndex = index
 		c.function.Params = append(c.function.Params, parameter.GetId())
 		c.assignRegister(name, parameter)
+	}
+}
+
+// entryRegisters lists the frame registers that start with ABI-defined values.
+func (c *converter) entryRegisters() []string {
+	switch c.arch {
+	case core.ArchARM64:
+		// SP, the frame pointer (X29) and the link register (X30).
+		return []string{"sp", "x29", "x30"}
+	case core.ArchARM:
+		// SP, the frame pointer (R11) and the link register (R14).
+		return []string{"sp", "r11", "lr"}
+	case core.Arch386:
+		return []string{"esp", "ebp"}
+	default:
+		return []string{"rsp", "rbp"}
+	}
+}
+
+func (c *converter) argumentRegisters() []string {
+	switch c.arch {
+	case core.ArchARM64:
+		return []string{"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"}
+	case core.ArchARM:
+		// AAPCS passes the first four integer arguments in r0..r3.
+		return []string{"r0", "r1", "r2", "r3"}
+	case core.Arch386:
+		// cdecl passes every argument on the stack; no register holds one.
+		return nil
+	default:
+		return []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+	}
+}
+
+func (c *converter) returnRegister() string {
+	switch c.arch {
+	case core.ArchARM64:
+		return "x0"
+	case core.ArchARM:
+		return "r0"
+	case core.Arch386:
+		return "eax"
+	default:
+		return "rax"
 	}
 }
 
@@ -431,7 +477,7 @@ func (c *converter) emitUnary(instruction core.Instruction, op ssa.UnaryOpcode) 
 
 func (c *converter) emitRegisterRead(instruction core.Instruction) {
 	operand := firstOperand(instruction.Operands)
-	view := registerViewFor(operand.Name, operand.Type.Bits)
+	view := c.registerView(operand.Name, operand.Type.Bits)
 	if view.canonical == "" {
 		c.setResult(instruction, c.opaqueValue("read_register", instruction))
 		return
@@ -464,7 +510,7 @@ func (c *converter) emitRegisterWrite(instruction core.Instruction) {
 	if value == nil {
 		return
 	}
-	view := registerViewFor(operand.Name, operand.Type.Bits)
+	view := c.registerView(operand.Name, operand.Type.Bits)
 	if view.canonical == "" {
 		return
 	}
@@ -546,11 +592,50 @@ func (c *converter) currentRegister(name string) ssa.Value {
 	return variable.GetValue()
 }
 
+// registerView returns the register view for the current architecture. The
+// 32-bit ARM register names r0..r15 collide with the x86 extended registers, so
+// the architecture decides how they are interpreted.
+func (c *converter) registerView(name string, bits uint16) registerView {
+	view := registerViewFor(name, bits)
+	if c.arch != core.ArchARM {
+		return view
+	}
+	switch strings.ToLower(name) {
+	case "sp", "lr", "pc", "cpsr":
+	default:
+		if !isARMRegister(name) {
+			return view
+		}
+	}
+	// Every ARM register is one 32-bit word, including sp, lr and pc. The
+	// 64-bit names x29/x30 must not leak into ARM output.
+	view.canonical = strings.ToLower(name)
+	view.shift = 0
+	view.width = 32
+	view.canonicalBits = 32
+	return view
+}
+
+func isARMRegister(name string) bool {
+	lower := strings.ToLower(name)
+	if !strings.HasPrefix(lower, "r") {
+		return false
+	}
+	index := 0
+	for _, digit := range lower[1:] {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+		index = index*10 + int(digit-'0')
+	}
+	return index >= 0 && index <= 15
+}
+
 func (c *converter) assignRegister(name string, value ssa.Value) {
 	if value == nil || value.IsUndefined() {
 		return
 	}
-	view := registerViewFor(name, 64)
+	view := c.registerView(name, 0)
 	variable := c.registerVariable(view.canonical)
 	if variable == nil {
 		return
@@ -648,19 +733,26 @@ func (c *converter) emitCall(instruction core.Instruction) {
 	args := c.operandValues(instruction.Operands[1:])
 	args = append(args, c.captureArguments()...)
 	call := c.builder.EmitCall(c.builder.NewCall(target, args))
-	if instruction.Variadic && call != nil {
+	if call == nil {
+		// The builder refuses a call in some malformed states. Keep the
+		// instruction visible through the diagnostic instead of assigning a
+		// nil value to the return register.
+		c.addDiagnostic("lowir2ssa-call", "builder dropped a call instruction")
+		return
+	}
+	if instruction.Variadic {
 		call.SetVerboseName("variadic")
 	}
 	c.setResult(instruction, call)
-	// System V AMD64 returns integer and pointer values in rax.
-	c.assignRegister("rax", call)
+	// AMD64 returns in rax, 386 in eax, ARM64 in x0 and ARM in r0.
+	c.assignRegister(c.returnRegister(), call)
 }
 
 // captureArguments reads the System V AMD64 integer argument registers that
 // were written since the previous call. Registers above the highest written
 // slot are omitted; missing lower slots become undefined arguments.
 func (c *converter) captureArguments() []ssa.Value {
-	names := []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+	names := c.argumentRegisters()
 	last := -1
 	for index, name := range names {
 		if c.arguments[name] {
@@ -673,7 +765,7 @@ func (c *converter) captureArguments() []ssa.Value {
 	args := make([]ssa.Value, 0, last+1)
 	for index := 0; index <= last; index++ {
 		name := names[index]
-		args = append(args, c.registerValue(registerViewFor(name, 64)))
+		args = append(args, c.registerValue(c.registerView(name, 0)))
 		c.arguments[name] = false
 	}
 	return args
@@ -681,11 +773,13 @@ func (c *converter) captureArguments() []ssa.Value {
 
 func argumentRegister(name string) bool {
 	switch name {
-	case "rdi", "rsi", "rdx", "rcx", "r8", "r9":
+	case "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r0", "r1", "r2", "r3":
 		return true
-	default:
-		return false
 	}
+	if len(name) == 2 && name[0] == 'x' && name[1] >= '0' && name[1] <= '7' {
+		return true
+	}
+	return false
 }
 
 // externFunction supplies a target for a direct call. The stub has no body and
@@ -720,8 +814,8 @@ func (c *converter) emitIntrinsic(instruction core.Instruction) {
 	if len(instruction.Operands) > 0 && instruction.Operands[0].Kind == core.OperandSymbol {
 		name = instruction.Operands[0].Name
 	}
-	if strings.HasPrefix(name, "x86.flags.") {
-		info := flagInfo{name: strings.TrimPrefix(name, "x86.flags.")}
+	if flags, ok := flagSymbolName(name); ok {
+		info := flagInfo{name: flags}
 		for _, operand := range instruction.Operands[1:] {
 			if operand.Kind == core.OperandValue {
 				info.operands = append(info.operands, operand.Value)
@@ -735,8 +829,8 @@ func (c *converter) emitIntrinsic(instruction core.Instruction) {
 		}
 		return
 	}
-	if strings.HasPrefix(name, "x86.cond.") {
-		if condition := c.conditionValue(name, instruction); condition != nil {
+	if conditionCode, ok := conditionSymbolName(name); ok {
+		if condition := c.conditionValue(conditionCode, instruction); condition != nil {
 			c.setResult(instruction, condition)
 			return
 		}
@@ -744,8 +838,29 @@ func (c *converter) emitIntrinsic(instruction core.Instruction) {
 	c.setResult(instruction, c.opaqueValue(name, instruction))
 }
 
-func (c *converter) conditionValue(symbol string, instruction core.Instruction) ssa.Value {
-	cc := strings.TrimPrefix(symbol, "x86.cond.")
+// flagSymbolName returns the comparison name of an architecture flag update,
+// for example x86.flags.cmp or arm64.flags.cmp.
+func flagSymbolName(symbol string) (string, bool) {
+	for _, prefix := range []string{"x86.flags.", "arm64.flags.", "arm.flags."} {
+		if strings.HasPrefix(symbol, prefix) {
+			return strings.TrimPrefix(symbol, prefix), true
+		}
+	}
+	return "", false
+}
+
+// conditionSymbolName returns the condition code of an architecture condition
+// read, for example x86.cond.e or arm64.cond.eq.
+func conditionSymbolName(symbol string) (string, bool) {
+	for _, prefix := range []string{"x86.cond.", "arm64.cond.", "arm.cond."} {
+		if strings.HasPrefix(symbol, prefix) {
+			return strings.TrimPrefix(symbol, prefix), true
+		}
+	}
+	return "", false
+}
+
+func (c *converter) conditionValue(cc string, instruction core.Instruction) ssa.Value {
 	if cc == "" || len(instruction.Operands) < 2 || instruction.Operands[1].Kind != core.OperandValue {
 		return nil
 	}
@@ -758,12 +873,12 @@ func (c *converter) conditionValue(symbol string, instruction core.Instruction) 
 		return nil
 	}
 	switch info.name {
-	case "cmp":
+	case "cmp", "cmn":
 		if len(info.operands) < 2 {
 			return nil
 		}
 		return c.compareCondition(cc, info.operands[0], info.operands[1])
-	case "test":
+	case "test", "tst":
 		if len(info.operands) < 2 {
 			return nil
 		}
@@ -794,17 +909,17 @@ func (c *converter) compareCondition(cc string, leftID, rightID core.ValueID) ss
 	}
 	var op ssa.BinaryOpcode
 	switch cc {
-	case "e", "z":
+	case "e", "eq", "z":
 		op = ssa.OpEq
 	case "ne", "nz":
 		op = ssa.OpNotEq
-	case "l", "b", "c":
+	case "l", "lt", "b", "c", "cc", "lo":
 		op = ssa.OpLt
-	case "le", "be":
+	case "le", "be", "ls":
 		op = ssa.OpLtEq
-	case "g", "a":
+	case "g", "gt", "a", "hi":
 		op = ssa.OpGt
-	case "ge", "ae":
+	case "ge", "ae", "cs", "hs":
 		op = ssa.OpGtEq
 	default:
 		return nil
@@ -818,21 +933,21 @@ func (c *converter) zeroCondition(cc string, subject ssa.Value) ssa.Value {
 	}
 	zero := c.newConstant(int64(0), c.typeFor(integerType(64)))
 	switch cc {
-	case "e", "z":
+	case "e", "eq", "z":
 		return c.builder.EmitBinOp(ssa.OpEq, subject, zero)
 	case "ne", "nz":
 		return c.builder.EmitBinOp(ssa.OpNotEq, subject, zero)
-	case "l", "b", "c":
+	case "l", "lt", "b", "c", "cc", "lo":
 		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
-	case "le", "be":
+	case "le", "be", "ls":
 		return c.builder.EmitBinOp(ssa.OpLtEq, subject, zero)
-	case "g", "a":
+	case "g", "gt", "a", "hi":
 		return c.builder.EmitBinOp(ssa.OpGt, subject, zero)
-	case "ge", "ae":
+	case "ge", "ae", "cs", "hs":
 		return c.builder.EmitBinOp(ssa.OpGtEq, subject, zero)
-	case "s":
+	case "s", "mi":
 		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
-	case "ns":
+	case "ns", "pl":
 		less := c.builder.EmitBinOp(ssa.OpLt, subject, zero)
 		return c.builder.EmitUnOp(ssa.OpNot, less)
 	default:
@@ -1136,7 +1251,7 @@ func (c *converter) operandValue(operand core.Operand) ssa.Value {
 	case core.OperandConstant:
 		return c.constValue(operand)
 	case core.OperandRegister:
-		view := registerViewFor(operand.Name, operand.Type.Bits)
+		view := c.registerView(operand.Name, operand.Type.Bits)
 		if view.canonical == "" {
 			return c.builder.EmitConstInst(operand.Name)
 		}
@@ -1281,17 +1396,33 @@ func registerViewFor(name string, bits uint16) registerView {
 		}
 		return registerView{canonical: lower, width: width, canonicalBits: width}
 	case lower == "rflags", lower == "eflags", lower == "flags":
-		width := bits
-		if width == 0 {
-			width = 64
-		}
-		return registerView{canonical: "rflags", width: width, canonicalBits: 64}
+		// The flags pseudo register is one opaque word regardless of the
+		// machine width, so a 32-bit write must not become a partial write.
+		return registerView{canonical: "rflags", width: 64, canonicalBits: 64}
+	case lower == "cpsr":
+		return registerView{canonical: "cpsr", width: 32, canonicalBits: 32}
 	default:
 		return registerView{canonical: lower, width: bits}
 	}
 }
 
 func generalRegisterFamily(name string) (string, bool) {
+	// AArch64: Wn shares variable Xn; SP and WSP are one variable.
+	if len(name) >= 2 && (name[0] == 'w' || name[0] == 'x') {
+		if digits, ok := registerDigits(name[1:]); ok {
+			return "x" + digits, true
+		}
+	}
+	switch name {
+	case "wsp", "sp":
+		return "sp", true
+	case "wzr", "xzr":
+		return "xzr", true
+	case "fp":
+		return "x29", true
+	case "lr":
+		return "x30", true
+	}
 	switch name {
 	case "al", "ah", "ax", "eax", "rax":
 		return "rax", true
@@ -1330,7 +1461,44 @@ func generalRegisterFamily(name string) (string, bool) {
 	return "r" + digits, true
 }
 
+func registerDigits(text string) (string, bool) {
+	if text == "" {
+		return "", false
+	}
+	for _, digit := range text {
+		if digit < '0' || digit > '9' {
+			return "", false
+		}
+	}
+	return text, true
+}
+
 func generalRegisterWidth(name string) uint16 {
+	switch name {
+	case "eax", "ebx", "ecx", "edx", "esi", "edi", "esp", "ebp":
+		return 32
+	case "ax", "bx", "cx", "dx", "si", "di", "sp", "bp":
+		return 16
+	case "al", "bl", "cl", "dl", "ah", "bh", "ch", "dh":
+		return 8
+	}
+	// AArch64 W registers are the 32-bit view of an X register.
+	if len(name) >= 2 && name[0] == 'w' && name != "wsp" {
+		if _, ok := registerDigits(name[1:]); ok {
+			return 32
+		}
+	}
+	if name == "wsp" {
+		return 32
+	}
+	if name == "xzr" || name == "sp" || name[0] == 'x' {
+		if name == "xzr" || name == "sp" {
+			return 64
+		}
+		if _, ok := registerDigits(name[1:]); ok {
+			return 64
+		}
+	}
 	switch name {
 	case "ah", "bh", "ch", "dh":
 		return 8
