@@ -2,8 +2,6 @@ package ssadb
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	"github.com/yaklang/gorm"
 )
@@ -143,50 +141,7 @@ func saveIrConsts(db *gorm.DB, items []*IrCode) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	if handled, err := nativeUpsertIrConsts(db, rows); handled {
-		return err
-	}
 	return db.New().SaveInBatches(rows, irConstBatchChunk, "program_name", "code_id").Error
-}
-
-// nativeUpsertIrConsts keeps the const table in the same multi-row INSERT shape
-// as the IR rows it mirrors: gorm's batch path resolves every field by
-// reflection for every row. It returns handled=false for dialects that keep the
-// GORM path.
-func nativeUpsertIrConsts(db *gorm.DB, rows []*IrConst) (bool, error) {
-	name := ""
-	if db != nil && db.Dialect() != nil {
-		name = strings.ToLower(db.Dialect().GetName())
-	}
-	if name != "sqlite3" && name != "sqlite" && name != "postgres" && name != "postgresql" && name != "cloudsqlpostgres" {
-		return false, nil
-	}
-	const columns = `("program_name", "code_id", "const_hash", "string")`
-	rowPlaceholder := "(?,?,?,?)"
-	conflict := ` ON CONFLICT ("program_name", "code_id") DO UPDATE SET "const_hash" = excluded."const_hash", "string" = excluded."string"`
-	for start := 0; start < len(rows); start += irConstBatchChunk {
-		end := start + irConstBatchChunk
-		if end > len(rows) {
-			end = len(rows)
-		}
-		chunk := rows[start:end]
-		args := make([]interface{}, 0, len(chunk)*4)
-		for _, row := range chunk {
-			sanitizeStructStringsForPG(row)
-			args = append(args, row.ProgramName, row.CodeID, row.ConstHash, row.String)
-		}
-		values := strings.TrimSuffix(strings.Repeat(rowPlaceholder+",", len(chunk)), ",")
-		query := `INSERT INTO "` + TableIrConsts + `" ` + columns + ` VALUES ` + values + conflict
-		ctx, cancel := nativeQueryContext(context.Background())
-		started := time.Now()
-		_, err := nativeExecContextDB(db, ctx, bindSQLPlaceholdersDB(db, query), args...)
-		cancel()
-		RecordDBOp(DBOpCreate, time.Since(started), err != nil)
-		if err != nil {
-			return true, err
-		}
-	}
-	return true, nil
 }
 
 // irConstTableHasProgram tells the const lookup whether this program writes
