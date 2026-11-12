@@ -1,0 +1,229 @@
+package pe
+
+import (
+	"bytes"
+	"context"
+	"debug/pe"
+	"encoding/binary"
+	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/reify/core"
+)
+
+func writeValue(t *testing.T, buffer *bytes.Buffer, value any) {
+	t.Helper()
+	if err := binary.Write(buffer, binary.LittleEndian, value); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newReader(t *testing.T, raw []byte) *core.ByteReader {
+	t.Helper()
+	reader, err := core.NewByteReader("fixture.exe", bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reader
+}
+
+// fixture builds a PE32+ image with .text, .pdata and an export directory.
+// Layout is fixed so the export and unwind data can be written by offset.
+type fixtureOptions struct {
+	exports bool
+	unwind  bool
+	imports bool
+}
+
+const (
+	fixtureBase        = 0x140000000
+	fixtureTextRVA     = 0x1000
+	fixtureTextFile    = 0x400
+	fixtureTextSize    = 0x100
+	fixturePdataRVA    = 0x2000
+	fixturePdataFile   = 0x500
+	fixturePdataSize   = 0x40
+	fixtureExportRVA   = 0x2100
+	fixtureExportFile  = 0x600
+	fixtureExportSize  = 0x100
+	fixtureImportRVA   = 0x2200
+	fixtureImportFile  = 0x700
+	fixtureImportSize  = 0x80
+	fixtureRawSize     = 0x800
+	fixtureSectionSize = 0x2000
+)
+
+func fixture(t *testing.T, options fixtureOptions) []byte {
+	t.Helper()
+	raw := make([]byte, fixtureRawSize)
+	copy(raw, "MZ")
+	binary.LittleEndian.PutUint32(raw[0x3c:], 0x80)
+
+	optional := pe.OptionalHeader64{
+		Magic: 0x20b, ImageBase: fixtureBase, AddressOfEntryPoint: fixtureTextRVA,
+		SectionAlignment: 0x1000, FileAlignment: 0x200, SizeOfImage: 0x4000, SizeOfHeaders: 0x200,
+		Subsystem: pe.IMAGE_SUBSYSTEM_WINDOWS_CUI, NumberOfRvaAndSizes: 16,
+	}
+	optional.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXPORT] = pe.DataDirectory{VirtualAddress: fixtureExportRVA, Size: fixtureExportSize}
+	optional.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_IMPORT] = pe.DataDirectory{VirtualAddress: fixtureImportRVA, Size: fixtureImportSize}
+	optional.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXCEPTION] = pe.DataDirectory{VirtualAddress: fixturePdataRVA, Size: fixturePdataSize}
+	sections := []pe.SectionHeader32{}
+	addSection := func(name string, virtualSize, virtualAddress, rawSize, rawOffset uint32, characteristics uint32) {
+		header := pe.SectionHeader32{
+			VirtualSize: virtualSize, VirtualAddress: virtualAddress,
+			SizeOfRawData: rawSize, PointerToRawData: rawOffset, Characteristics: characteristics,
+		}
+		copy(header.Name[:], name)
+		sections = append(sections, header)
+	}
+	addSection(".text", fixtureTextSize, fixtureTextRVA, fixtureTextSize, fixtureTextFile, 0x60000020)
+	addSection(".pdata", fixturePdataSize, fixturePdataRVA, fixturePdataSize, fixturePdataFile, 0x40000040)
+	addSection(".edata", fixtureExportSize, fixtureExportRVA, fixtureExportSize, fixtureExportFile, 0x40000040)
+	addSection(".idata", fixtureImportSize, fixtureImportRVA, fixtureImportSize, fixtureImportFile, 0xC0000040)
+
+	var buffer bytes.Buffer
+	buffer.WriteString("PE\x00\x00")
+	writeValue(t, &buffer, pe.FileHeader{
+		Machine: pe.IMAGE_FILE_MACHINE_AMD64, NumberOfSections: uint16(len(sections)),
+		SizeOfOptionalHeader: uint16(binary.Size(optional)), Characteristics: 0x0022,
+	})
+	writeValue(t, &buffer, optional)
+	for _, section := range sections {
+		writeValue(t, &buffer, section)
+	}
+	copy(raw[0x80:], buffer.Bytes())
+
+	// Two RUNTIME_FUNCTION entries: 0x1000 and 0x1040.
+	binary.LittleEndian.PutUint32(raw[fixturePdataFile:], fixtureTextRVA)
+	binary.LittleEndian.PutUint32(raw[fixturePdataFile+4:], fixtureTextRVA+0x40)
+	binary.LittleEndian.PutUint32(raw[fixturePdataFile+12:], fixtureTextRVA+0x40)
+	binary.LittleEndian.PutUint32(raw[fixturePdataFile+16:], fixtureTextRVA+0x80)
+
+	if options.exports {
+		writeExports(t, raw[fixtureExportFile:])
+	}
+	if options.imports {
+		writeImports(t, raw, raw[fixtureImportFile:])
+	}
+	copy(raw[fixtureTextFile:], []byte{0x48, 0x31, 0xc0, 0xc3}) // xor rax, rax; ret
+	return raw
+}
+
+func writeExports(t *testing.T, data []byte) {
+	t.Helper()
+	// IMAGE_EXPORT_DIRECTORY is 40 bytes; the three parallel arrays follow it
+	// at data offsets 0x30, 0x34 and 0x38.
+	const (
+		nameRVA    = fixtureExportRVA + 0x40
+		functionVA = fixtureTextRVA
+	)
+	binary.LittleEndian.PutUint32(data[12:], nameRVA)               // Name
+	binary.LittleEndian.PutUint32(data[16:], 1)                     // Base
+	binary.LittleEndian.PutUint32(data[20:], 1)                     // NumberOfFunctions
+	binary.LittleEndian.PutUint32(data[24:], 1)                     // NumberOfNames
+	binary.LittleEndian.PutUint32(data[28:], fixtureExportRVA+0x30) // AddressOfFunctions
+	binary.LittleEndian.PutUint32(data[32:], fixtureExportRVA+0x34) // AddressOfNames
+	binary.LittleEndian.PutUint32(data[36:], fixtureExportRVA+0x38) // AddressOfNameOrdinals
+	binary.LittleEndian.PutUint32(data[0x30:], functionVA)
+	binary.LittleEndian.PutUint32(data[0x34:], nameRVA)
+	binary.LittleEndian.PutUint16(data[0x38:], 0)
+	copy(data[0x40:], "exported_add\x00")
+}
+
+func writeImports(t *testing.T, raw, data []byte) {
+	t.Helper()
+	// One descriptor, one thunk naming KERNEL32.dll!ExitProcess.
+	const nameRVA = fixtureImportRVA + 0x40
+	binary.LittleEndian.PutUint32(data[0:], fixtureImportRVA+0x60) // OriginalFirstThunk
+	binary.LittleEndian.PutUint32(data[12:], nameRVA)
+	binary.LittleEndian.PutUint32(data[16:], fixtureImportRVA+0x60) // FirstThunk
+	copy(data[0x40:], "KERNEL32.dll\x00")
+	// Hint/name: two-byte hint then the symbol.
+	binary.LittleEndian.PutUint16(data[0x50:], 0)
+	copy(data[0x52:], "ExitProcess\x00")
+	binary.LittleEndian.PutUint64(data[0x60:], fixtureImportRVA+0x50)
+	_ = raw
+}
+
+func TestMatch(t *testing.T) {
+	if !(Loader{}).Match([]byte("MZ\x90\x00")) {
+		t.Fatal("PE magic was not matched")
+	}
+	if (Loader{}).Match([]byte{0x7f, 'E', 'L', 'F'}) {
+		t.Fatal("ELF input was claimed as PE")
+	}
+}
+
+func TestLoadPEWithoutOptionalDirectoryData(t *testing.T) {
+	raw := fixture(t, fixtureOptions{unwind: true})
+	artifact, err := Loader{}.Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Target.OS != core.OSWindows || artifact.Target.Architecture != core.ArchAMD64 || artifact.Target.Bits != 64 {
+		t.Fatalf("unexpected target: %+v", artifact.Target)
+	}
+	if artifact.Image.Entry == nil || *artifact.Image.Entry != fixtureBase+fixtureTextRVA {
+		t.Fatalf("entry point = %v", artifact.Image.Entry)
+	}
+	if artifact.Hints == nil || len(artifact.Hints.ExecSections) != 1 {
+		t.Fatalf("missing executable hints: %+v", artifact.Hints)
+	}
+	if len(artifact.Hints.FunctionStarts) != 2 {
+		t.Fatalf("function starts = %#x", artifact.Hints.FunctionStarts)
+	}
+	if artifact.Hints.FunctionStarts[0] != fixtureBase+fixtureTextRVA || artifact.Hints.FunctionStarts[1] != fixtureBase+fixtureTextRVA+0x40 {
+		t.Fatalf("function starts = %#x", artifact.Hints.FunctionStarts)
+	}
+}
+
+func TestLoadPEExports(t *testing.T) {
+	raw := fixture(t, fixtureOptions{exports: true})
+	artifact, err := Loader{}.Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, symbol := range artifact.Image.Symbols {
+		if symbol.Name == "exported_add" && symbol.Address == fixtureBase+fixtureTextRVA {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("export not recovered: %+v", artifact.Image.Symbols)
+	}
+}
+
+func TestLoadPEImports(t *testing.T) {
+	raw := fixture(t, fixtureOptions{imports: true})
+	artifact, err := Loader{}.Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, symbol := range artifact.Image.Symbols {
+		if symbol.Imported && symbol.Name == "ExitProcess" && symbol.Library == "KERNEL32.dll" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("import not recovered: %+v", artifact.Image.Symbols)
+	}
+}
+
+func TestLoadPEMissingOptionalHeaderIsRejected(t *testing.T) {
+	raw := make([]byte, 0x80)
+	copy(raw, "MZ")
+	binary.LittleEndian.PutUint32(raw[0x3c:], 0x40)
+	if _, err := (Loader{}).Load(context.Background(), newReader(t, raw)); err == nil {
+		t.Fatal("truncated PE image was accepted")
+	}
+}
+
+func TestAddressOverflow(t *testing.T) {
+	if _, err := Address(^uint64(0), 1); err == nil {
+		t.Fatal("overflowing image base plus RVA was accepted")
+	}
+	if address, err := Address(fixtureBase, fixtureTextRVA); err != nil || address != fixtureBase+fixtureTextRVA {
+		t.Fatalf("address = %#x, %v", address, err)
+	}
+}

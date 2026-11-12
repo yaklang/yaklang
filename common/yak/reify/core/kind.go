@@ -45,8 +45,9 @@ func CheckFormat(prefix []byte) Format {
 			return FormatMachO
 		}
 	}
-	// Fat Mach-O (0xcafebabe) is not claimed: the magic is shared with Java
-	// class files, so the format needs a positive decision, not a guess.
+	// Fat Mach-O (0xcafebabe) is not claimed here: the magic is shared with
+	// Java class files. The Mach-O loader validates the fat header itself and
+	// decides, instead of guessing from four bytes.
 	return FormatUnknown
 }
 

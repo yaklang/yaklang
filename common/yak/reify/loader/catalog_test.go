@@ -15,7 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
-	"github.com/yaklang/yaklang/common/yak/reify/loader/fileformat"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/fileformat/elf"
 )
 
 func writeValue(t *testing.T, buffer *bytes.Buffer, value any) {
@@ -82,7 +82,8 @@ func TestDefaultCatalog(t *testing.T) {
 		t.Fatalf("unexpected parsers: %+v", parsers)
 	}
 	for _, parser := range parsers {
-		if parser.Available != (parser.Kind == core.ArchAMD64) {
+		decoded := parser.Kind == core.ArchAMD64 || parser.Kind == core.ArchARM64
+		if parser.Available != decoded {
 			t.Fatalf("unexpected parser availability: %+v", parser)
 		}
 	}
@@ -180,7 +181,7 @@ func TestCatalogOpenFormatAlignment(t *testing.T) {
 	}{
 		{"elf", minimalELF(t), core.FormatELF, "ELF", core.OSUnknown, core.ArchAMD64, "amd64", true, 0},
 		{"pe", minimalPE(t), core.FormatPE, "PE", core.OSWindows, core.ArchAMD64, "amd64", true, 0},
-		{"macho", minimalMachO(t), core.FormatMachO, "Mach-O", core.OSUnknown, core.ArchARM64, "arm64", false, 2},
+		{"macho", minimalMachO(t), core.FormatMachO, "Mach-O", core.OSDarwin, core.ArchARM64, "arm64", true, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			artifact, err := openFixture(t, Default, tc.name, tc.raw)
@@ -259,7 +260,7 @@ func TestCatalogDetectAmbiguity(t *testing.T) {
 
 func TestCatalogParserSelectionAndParse(t *testing.T) {
 	parser := &fakeParser{kind: core.ArchAMD64, usable: true}
-	catalog, err := NewCatalog([]core.Loader{fileformat.ELF{}}, []core.Parser{parser})
+	catalog, err := NewCatalog([]core.Loader{elf.Loader{}}, []core.Parser{parser})
 	if err != nil {
 		t.Fatal(err)
 	}
