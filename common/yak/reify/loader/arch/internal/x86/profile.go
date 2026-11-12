@@ -76,6 +76,25 @@ func Profile32() Profile {
 	}
 }
 
+// Profile16 is the 8086 profile: real mode, sixteen-bit addresses and no
+// extended registers. The MZ and COM loaders select it.
+func Profile16() Profile {
+	return Profile{
+		Kind:             core.Arch8086,
+		Name:             "8086",
+		Mode:             16,
+		Bits:             16,
+		StackPointer:     "sp",
+		StackFrame:       "bp",
+		Accumulator:      "ax",
+		AccumulatorHigh:  "dx",
+		Accumulator8:     "al",
+		Accumulator8High: "ah",
+		CountRegister:    "cx",
+		Flags:            "flags",
+	}
+}
+
 // stackSlot is the width of one pushed slot: four bytes in 32-bit mode and
 // eight in 64-bit mode.
 func (p Profile) stackSlot() uint64 { return uint64(p.Bits / 8) }

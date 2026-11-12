@@ -62,7 +62,7 @@ func (s *boundaryScanner) modeFor(address uint64) string {
 // address identifies.
 func (s *boundaryScanner) markThumbFromSymbols() {
 	for _, symbol := range s.image.Symbols {
-		if symbol.Address == 0 || symbol.Name == "" {
+		if symbol.Name == "" {
 			continue
 		}
 		address := symbol.Address &^ 1
@@ -179,7 +179,7 @@ func thumbStaticTarget(inst armasm.Inst, address uint64, size int) (uint64, bool
 // record keeps the mode of its strongest source: a symbol or a PLT stub decides
 // the mode, a scanned candidate only fills it in.
 func (s *boundaryScanner) addWithMode(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority, mode string) bool {
-	if address == 0 || s.regionFor(address) == nil {
+	if s.regionFor(address) == nil {
 		return false
 	}
 	if size < 2 {

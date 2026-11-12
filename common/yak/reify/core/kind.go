@@ -28,6 +28,9 @@ const (
 	FormatELF     Format = "elf"
 	FormatPE      Format = "pe"
 	FormatMachO   Format = "macho"
+	FormatCOFF    Format = "coff"
+	FormatArchive Format = "archive"
+	FormatMZ      Format = "mz"
 )
 
 // CheckFormat returns the Format identified by a file prefix. It checks magic
@@ -37,7 +40,13 @@ func CheckFormat(prefix []byte) Format {
 	case bytes.HasPrefix(prefix, []byte{0x7f, 'E', 'L', 'F'}):
 		return FormatELF
 	case bytes.HasPrefix(prefix, []byte{'M', 'Z'}):
-		return FormatPE
+		// An MZ header either extends into a PE image or is a plain MS-DOS
+		// executable. The probe reports the container and the loaders decide:
+		// the PE loader checks the extended header, the MZ loader takes the
+		// rest.
+		return FormatMZ
+	case bytes.HasPrefix(prefix, []byte("!<arch>\n")):
+		return FormatArchive
 	}
 	if len(prefix) >= 4 {
 		switch binary.BigEndian.Uint32(prefix[:4]) {
@@ -64,6 +73,7 @@ const (
 	OSNetBSD  OperatingSystem = "netbsd"
 	OSOpenBSD OperatingSystem = "openbsd"
 	OSSolaris OperatingSystem = "solaris"
+	OSDOS     OperatingSystem = "dos"
 )
 
 // Architecture names an instruction set. Mode carries execution-mode details
@@ -73,6 +83,7 @@ type Architecture string
 const (
 	ArchUnknown Architecture = "unknown"
 	Arch386     Architecture = "386"
+	Arch8086    Architecture = "8086"
 	ArchAMD64   Architecture = "amd64"
 	ArchARM     Architecture = "arm"
 	ArchARM64   Architecture = "arm64"
