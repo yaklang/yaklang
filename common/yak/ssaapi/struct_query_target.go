@@ -154,7 +154,6 @@ func (t *StructQueryTarget) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (s
 		return sfvm.NewEmptyValues(), nil
 	}
 	insts := t.matchOpcodes(opcodeItems.Opcodes...)
-	t.prog.prefetchErrorCatchCFG(insts)
 	return ToSFVMValues(t.allowedInsts(insts)), nil
 }
 
