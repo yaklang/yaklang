@@ -4,13 +4,14 @@ package core
 type BoundarySource string
 
 const (
-	BoundarySymbol    BoundarySource = "symbol"
-	BoundaryEHFrame   BoundarySource = "eh_frame"
-	BoundaryInitArray BoundarySource = "init_array"
-	BoundaryPLT       BoundarySource = "plt"
-	BoundaryEntry     BoundarySource = "entry"
-	BoundaryCall      BoundarySource = "call_target"
-	BoundaryScan      BoundarySource = "scan"
+	BoundarySymbol        BoundarySource = "symbol"
+	BoundaryEHFrame       BoundarySource = "eh_frame"
+	BoundaryFunctionStart BoundarySource = "function_start"
+	BoundaryInitArray     BoundarySource = "init_array"
+	BoundaryPLT           BoundarySource = "plt"
+	BoundaryEntry         BoundarySource = "entry"
+	BoundaryCall          BoundarySource = "call_target"
+	BoundaryScan          BoundarySource = "scan"
 )
 
 // FunctionBoundary is one recovered function range. Size is resolved after all
@@ -26,14 +27,15 @@ type FunctionBoundary struct {
 // BoundaryStats reports discovery counts. Duplicates is the number of
 // addresses that were reported by more than one source.
 type BoundaryStats struct {
-	Symbol     int `json:"symbol"`
-	EHFrame    int `json:"eh_frame"`
-	InitArray  int `json:"init_array"`
-	PLT        int `json:"plt"`
-	Entry      int `json:"entry"`
-	Call       int `json:"call_target"`
-	Scan       int `json:"scan"`
-	Duplicates int `json:"duplicates"`
+	Symbol        int `json:"symbol"`
+	EHFrame       int `json:"eh_frame"`
+	FunctionStart int `json:"function_start"`
+	InitArray     int `json:"init_array"`
+	PLT           int `json:"plt"`
+	Entry         int `json:"entry"`
+	Call          int `json:"call_target"`
+	Scan          int `json:"scan"`
+	Duplicates    int `json:"duplicates"`
 }
 
 // BoundaryHints carries format facts that help an architecture parser find
@@ -41,6 +43,10 @@ type BoundaryStats struct {
 type BoundaryHints struct {
 	// ExecSections lists file-backed executable ranges in image addresses.
 	ExecSections []Region
+
+	// FunctionStarts lists exact function entry addresses from format metadata
+	// (Mach-O LC_FUNCTION_STARTS, PE exports/exception data).
+	FunctionStarts []uint64
 
 	// EHFrame is the raw .eh_frame section contents and its image address.
 	EHFrame     []byte

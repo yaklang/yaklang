@@ -1,27 +1,29 @@
-package amd64
+// Package ehframe parses DWARF call-frame information into function ranges.
+// It reads CIE/FDE headers and address ranges only; it does not execute CFI
+// instructions. Both the AMD64 and the ARM64 boundary discoverers use it.
+package ehframe
 
-import (
-	"encoding/binary"
+import "encoding/binary"
 
-	"github.com/yaklang/yaklang/common/yak/reify/core"
-)
+// Entry is one FDE: a function range in image addresses.
+type Entry struct {
+	Location uint64
+	Range    uint64
+}
 
-type ehFrameCIE struct {
-	offset      int
-	codeAlign   uint64
-	dataAlign   int64
-	returnReg   uint64
+type cie struct {
 	encoding    byte
 	hasEncoding bool
 }
 
-func (s *amd64BoundaryScanner) addEHFrame() {
-	data := s.hints.EHFrame
+// Entries returns every FDE range in data. base is the image address of
+// data[0] and resolves text-relative encodings.
+func Entries(data []byte, base uint64) []Entry {
 	if len(data) == 0 {
-		return
+		return nil
 	}
-	base := s.hints.EHFrameAddr
-	cies := make(map[int]ehFrameCIE)
+	result := make([]Entry, 0, 64)
+	cies := make(map[int]cie)
 	for offset := 0; offset+4 <= len(data); {
 		length := int(binary.LittleEndian.Uint32(data[offset:]))
 		entryStart := offset
@@ -43,45 +45,41 @@ func (s *amd64BoundaryScanner) addEHFrame() {
 		id := binary.LittleEndian.Uint32(data[idOffset:])
 		entryEnd := idOffset + length
 		if id == 0 {
-			cie, ok := parseIntCIE(data, entryStart, idOffset, header)
-			if ok {
-				cies[entryStart] = cie
+			if parsed, ok := parseCIE(data, idOffset); ok {
+				cies[entryStart] = parsed
 			}
 			offset = entryEnd
 			continue
 		}
 		// In .eh_frame the CIE pointer is relative to its own field.
-		cieOffset := idOffset - int(id)
-		cie, ok := cies[cieOffset]
+		pointer, ok := cies[idOffset-int(id)]
 		if !ok {
-			cieOffset = entryStart - int(id)
-			cie, ok = cies[cieOffset]
+			pointer, ok = cies[entryStart-int(id)]
 		}
-		if !ok || !cie.hasEncoding {
+		if !ok || !pointer.hasEncoding {
 			offset = entryEnd
 			continue
 		}
 		pos := idOffset + 4
-		location, next, ok := readEHFrameEncoded(data, pos, cie.encoding, base+uint64(pos), base)
+		location, next, ok := readEncoded(data, pos, pointer.encoding, base+uint64(pos), base)
 		if !ok {
 			offset = entryEnd
 			continue
 		}
 		pos = next
-		rangeValue, _, ok := readEHFrameEncoded(data, pos, cie.encoding&0x0f, 0, base)
-		if !ok || rangeValue == 0 {
-			offset = entryEnd
-			continue
+		size, _, ok := readEncoded(data, pos, pointer.encoding&0x0f, 0, base)
+		if ok && size != 0 && location != 0 {
+			result = append(result, Entry{Location: location, Range: size})
 		}
-		s.add(location, uint64(rangeValue), "", core.BoundaryEHFrame, priorityEHFrame)
 		offset = entryEnd
 	}
+	return result
 }
 
-func parseIntCIE(data []byte, entryStart, idOffset, header int) (ehFrameCIE, bool) {
+func parseCIE(data []byte, idOffset int) (cie, bool) {
 	pos := idOffset + 4
 	if pos >= len(data) {
-		return ehFrameCIE{}, false
+		return cie{}, false
 	}
 	version := data[pos]
 	pos++
@@ -90,79 +88,75 @@ func parseIntCIE(data []byte, entryStart, idOffset, header int) (ehFrameCIE, boo
 		augEnd++
 	}
 	if augEnd >= len(data) {
-		return ehFrameCIE{}, false
+		return cie{}, false
 	}
 	augmentation := string(data[pos:augEnd])
 	pos = augEnd + 1
-	codeAlign, pos, ok := readULEB(data, pos)
-	if !ok {
-		return ehFrameCIE{}, false
+	if _, next, ok := readULEB(data, pos); ok {
+		pos = next
+	} else {
+		return cie{}, false
 	}
-	dataAlign, pos, ok := readSLEB(data, pos)
-	if !ok {
-		return ehFrameCIE{}, false
+	if _, next, ok := readSLEB(data, pos); ok {
+		pos = next
+	} else {
+		return cie{}, false
 	}
-	var returnReg uint64
 	if version == 1 {
 		if pos >= len(data) {
-			return ehFrameCIE{}, false
+			return cie{}, false
 		}
-		returnReg = uint64(data[pos])
 		pos++
-	} else {
-		returnReg, pos, ok = readULEB(data, pos)
-		if !ok {
-			return ehFrameCIE{}, false
-		}
-	}
-	cie := ehFrameCIE{offset: entryStart, codeAlign: codeAlign, dataAlign: dataAlign, returnReg: returnReg}
-	if len(augmentation) > 0 && augmentation[0] == 'z' {
-		length, next, ok := readULEB(data, pos)
-		if !ok || next+int(length) > len(data) {
-			return ehFrameCIE{}, false
-		}
+	} else if _, next, ok := readULEB(data, pos); ok {
 		pos = next
-		end := pos + int(length)
-		for index := 1; index < len(augmentation) && pos < end; index++ {
-			switch augmentation[index] {
-			case 'R':
-				if pos >= end {
-					return ehFrameCIE{}, false
-				}
-				cie.encoding = data[pos]
-				cie.hasEncoding = true
-				pos++
-			case 'P':
-				if pos >= end {
-					return ehFrameCIE{}, false
-				}
-				encoding := data[pos]
-				pos++
-				_, next, ok := readEHFrameEncoded(data, pos, encoding, 0, 0)
-				if !ok || next > end {
-					return ehFrameCIE{}, false
-				}
-				pos = next
-			case 'L':
-				pos++
-			case 'S', 'B':
-				// No payload.
-			default:
-				pos = end
+	} else {
+		return cie{}, false
+	}
+	entry := cie{}
+	if len(augmentation) == 0 || augmentation[0] != 'z' {
+		return entry, true
+	}
+	length, next, ok := readULEB(data, pos)
+	if !ok || next+int(length) > len(data) {
+		return cie{}, false
+	}
+	pos = next
+	end := pos + int(length)
+	for index := 1; index < len(augmentation) && pos < end; index++ {
+		switch augmentation[index] {
+		case 'R':
+			if pos >= end {
+				return cie{}, false
 			}
+			entry.encoding = data[pos]
+			entry.hasEncoding = true
+			pos++
+		case 'P':
+			if pos >= end {
+				return cie{}, false
+			}
+			encoding := data[pos]
+			pos++
+			if _, next, ok := readEncoded(data, pos, encoding, 0, 0); ok && next <= end {
+				pos = next
+			} else {
+				return cie{}, false
+			}
+		case 'L':
+			pos++
+		case 'S', 'B':
+			// No payload.
+		default:
+			pos = end
 		}
 	}
-	if !cie.hasEncoding {
-		cie.encoding = 0
-	}
-	return cie, true
+	return entry, true
 }
 
-func readEHFrameEncoded(data []byte, pos int, encoding byte, fieldAddress, base uint64) (uint64, int, bool) {
-	format := encoding & 0x0f
+func readEncoded(data []byte, pos int, encoding byte, fieldAddress, base uint64) (uint64, int, bool) {
 	var value uint64
-	switch format {
-	case 0x00: // absptr
+	switch encoding & 0x0f {
+	case 0x00, 0x04, 0x0c: // absptr, udata8, sdata8
 		if pos+8 > len(data) {
 			return 0, pos, false
 		}
@@ -186,13 +180,7 @@ func readEHFrameEncoded(data []byte, pos int, encoding byte, fieldAddress, base 
 		}
 		value = uint64(binary.LittleEndian.Uint32(data[pos:]))
 		pos += 4
-	case 0x04:
-		if pos+8 > len(data) {
-			return 0, pos, false
-		}
-		value = binary.LittleEndian.Uint64(data[pos:])
-		pos += 8
-	case 0x09:
+	case 0x09: // sleb128
 		raw, next, ok := readSLEB(data, pos)
 		if !ok {
 			return 0, pos, false
@@ -210,13 +198,7 @@ func readEHFrameEncoded(data []byte, pos int, encoding byte, fieldAddress, base 
 		}
 		value = uint64(int64(int32(binary.LittleEndian.Uint32(data[pos:]))))
 		pos += 4
-	case 0x0c:
-		if pos+8 > len(data) {
-			return 0, pos, false
-		}
-		value = binary.LittleEndian.Uint64(data[pos:])
-		pos += 8
-	case 0xff:
+	case 0x0f:
 		return 0, pos, true
 	default:
 		return 0, pos, false
@@ -224,11 +206,7 @@ func readEHFrameEncoded(data []byte, pos int, encoding byte, fieldAddress, base 
 	switch encoding & 0x70 {
 	case 0x10: // pcrel
 		value += fieldAddress
-	case 0x20: // textrel
-		value += base
-	case 0x30: // datarel
-		value += base
-	case 0x40: // funcrel
+	case 0x20, 0x30, 0x40: // textrel, datarel, funcrel
 		value += base
 	}
 	return value, pos, true
@@ -255,9 +233,8 @@ func readULEB(data []byte, pos int) (uint64, int, bool) {
 func readSLEB(data []byte, pos int) (int64, int, bool) {
 	var value int64
 	var shift uint
-	var current byte
 	for pos < len(data) {
-		current = data[pos]
+		current := data[pos]
 		pos++
 		value |= int64(current&0x7f) << shift
 		shift += 7

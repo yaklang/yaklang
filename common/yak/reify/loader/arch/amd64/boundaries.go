@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/ehframe"
 )
 
 type boundaryPriority int
@@ -14,6 +15,7 @@ type boundaryPriority int
 const (
 	prioritySymbol boundaryPriority = iota
 	priorityEHFrame
+	priorityFunctionStart
 	priorityInitArray
 	priorityPLT
 	priorityEntry
@@ -51,6 +53,7 @@ func (Parser) DiscoverBoundaries(reader *core.ByteReader, hints core.BoundaryHin
 	}
 	scanner.addSymbols()
 	scanner.addEHFrame()
+	scanner.addFunctionStarts()
 	scanner.addInitArrays()
 	scanner.addPLT()
 	if entry := image.Entry; entry != nil {
@@ -78,6 +81,8 @@ func (s *amd64BoundaryScanner) add(address, size uint64, name string, source cor
 		s.stats.Symbol++
 	case core.BoundaryEHFrame:
 		s.stats.EHFrame++
+	case core.BoundaryFunctionStart:
+		s.stats.FunctionStart++
 	case core.BoundaryInitArray:
 		s.stats.InitArray++
 	case core.BoundaryPLT:
@@ -131,6 +136,21 @@ func (s *amd64BoundaryScanner) addPLT() {
 func (s *amd64BoundaryScanner) addInitArrays() {
 	for _, address := range s.hints.InitTargets {
 		s.add(address, 0, "", core.BoundaryInitArray, priorityInitArray)
+	}
+}
+
+// addFunctionStarts inserts exact entries from format metadata: Mach-O
+// LC_FUNCTION_STARTS, PE export tables and PE .pdata.
+func (s *amd64BoundaryScanner) addFunctionStarts() {
+	for _, address := range s.hints.FunctionStarts {
+		s.add(address, 0, "", core.BoundaryFunctionStart, priorityFunctionStart)
+	}
+}
+
+// addEHFrame inserts one boundary per FDE range. CFI is not executed.
+func (s *amd64BoundaryScanner) addEHFrame() {
+	for _, entry := range ehframe.Entries(s.hints.EHFrame, s.hints.EHFrameAddr) {
+		s.add(entry.Location, entry.Range, "", core.BoundaryEHFrame, priorityEHFrame)
 	}
 }
 
