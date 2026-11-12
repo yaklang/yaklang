@@ -20,6 +20,7 @@ type instruction struct {
 	address uint64
 	size    int
 	inst    x86asm.Inst
+	vector  *vectorEncoding
 	endbr   string
 	raw     []byte
 }
@@ -91,6 +92,13 @@ func decodeInstructions(ctx context.Context, profile Profile, request core.Parse
 }
 
 func decodeInstruction(profile Profile, code []byte, address uint64) (instruction, int, error) {
+	if vectorPrefix(profile.Mode, code) {
+		decoded, err := decodeVector(profile.Mode, code, address)
+		if err != nil {
+			return instruction{}, 0, err
+		}
+		return decoded, decoded.size, nil
+	}
 	if len(code) >= 4 && code[0] == 0xf3 && code[1] == 0x0f && code[2] == 0x1e {
 		switch code[3] {
 		case 0xfa:

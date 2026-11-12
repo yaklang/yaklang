@@ -53,6 +53,9 @@ func (i instruction) text(profile Profile, syntax core.AsmSyntax) string {
 	if i.endbr != "" {
 		return i.endbr
 	}
+	if i.vector != nil {
+		return vectorText(i.vector)
+	}
 	// Multi-byte NOP padding encodes its length in the ModRM/SIB bytes. The CPU
 	// does not read that memory, so printing "nopw %cs:(...)" is misleading.
 	if i.inst.Op == x86asm.NOP {

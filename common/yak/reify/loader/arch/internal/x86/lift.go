@@ -92,6 +92,10 @@ func (l *lifter) lift(ins instruction) {
 		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("x86." + ins.endbr)}, nil, nil, core.EffectNone, ins.address)
 		return
 	}
+	if ins.vector != nil {
+		l.liftVector(ins)
+		return
+	}
 	if hasPrefix(ins, x86asm.PrefixLOCK) {
 		l.diagnostics.add("atomic-prefix-unmodeled", fmt.Sprintf("LOCK prefix at 0x%x is not modeled as an atomic effect", ins.address))
 	}
@@ -99,6 +103,16 @@ func (l *lifter) lift(ins instruction) {
 	case x86asm.NOP:
 		l.emit(core.OpNop, nil, nil, nil, core.EffectNone, ins.address)
 	case x86asm.MOV, x86asm.MOVAPS, x86asm.MOVUPS, x86asm.MOVDQA, x86asm.MOVDQU, x86asm.MOVAPD, x86asm.MOVUPD, x86asm.MOVD, x86asm.MOVQ:
+		// MOVSD and MOVQ are also the names of the string and MMX moves. The
+		// operand shape decides which one this is.
+		if isStringMove(ins) {
+			l.stringOperation(ins)
+			return
+		}
+		if isVectorOpcode(ins.inst) {
+			l.vectorOperation(ins)
+			return
+		}
 		l.move(ins)
 	case x86asm.MOVZX:
 		l.extend(ins, core.OpZeroExtend)
@@ -108,8 +122,42 @@ func (l *lifter) lift(ins instruction) {
 		l.lea(ins)
 	case x86asm.ADD:
 		l.binary(ins, core.OpAdd, "add")
+	case x86asm.ADC:
+		l.carryBinary(ins, core.OpAdd, "adc")
 	case x86asm.SUB:
 		l.binary(ins, core.OpSub, "sub")
+	case x86asm.SBB:
+		l.carryBinary(ins, core.OpSub, "sbb")
+	case x86asm.INC:
+		l.increment(ins, core.OpAdd, "inc")
+	case x86asm.DEC:
+		l.increment(ins, core.OpSub, "dec")
+	case x86asm.ROL:
+		l.rotate(ins, "rol")
+	case x86asm.ROR:
+		l.rotate(ins, "ror")
+	case x86asm.RCL:
+		l.rotate(ins, "rcl")
+	case x86asm.RCR:
+		l.rotate(ins, "rcr")
+	case x86asm.BSF:
+		l.bitScan(ins, "bsf")
+	case x86asm.BSR:
+		l.bitScan(ins, "bsr")
+	case x86asm.BSWAP:
+		l.byteSwap(ins)
+	case x86asm.XADD:
+		l.readModifyWrite(ins, "xadd")
+	case x86asm.CMPXCHG:
+		l.readModifyWrite(ins, "cmpxchg")
+	case x86asm.MOVSB, x86asm.MOVSW, x86asm.MOVSD, x86asm.MOVSQ,
+		x86asm.STOSB, x86asm.STOSW, x86asm.STOSQ,
+		x86asm.LODSB, x86asm.LODSW, x86asm.LODSQ,
+		x86asm.SCASB, x86asm.SCASW, x86asm.SCASQ,
+		x86asm.CMPSB, x86asm.CMPSW, x86asm.CMPSQ:
+		l.stringOperation(ins)
+	case x86asm.STOSD, x86asm.SCASD, x86asm.CMPSD:
+		l.stringOperation(ins)
 	case x86asm.AND:
 		l.binary(ins, core.OpAnd, "and")
 	case x86asm.OR:
@@ -124,6 +172,15 @@ func (l *lifter) lift(ins instruction) {
 		l.compare(ins, "test")
 	case x86asm.BT:
 		l.bitTest(ins)
+	case x86asm.BTS:
+		l.bitModify(ins, "bts")
+	case x86asm.BTR:
+		l.bitModify(ins, "btr")
+	case x86asm.BTC:
+		l.bitModify(ins, "btc")
+	case x86asm.RDTSC, x86asm.RDTSCP, x86asm.RDPMC, x86asm.CPUID:
+		l.timestamp(ins)
+	case x86asm.MFENCE, x86asm.LFENCE, x86asm.SFENCE, x86asm.PAUSE:
 	case x86asm.MUL:
 		l.multiply(ins)
 	case x86asm.DIV:
@@ -132,10 +189,6 @@ func (l *lifter) lift(ins instruction) {
 		l.divide(ins, "idiv")
 	case x86asm.PUNPCKLQDQ:
 		l.vectorIntrinsic(ins, "x86.punpcklqdq")
-	case x86asm.INC:
-		l.increment(ins, core.OpAdd, "inc")
-	case x86asm.DEC:
-		l.increment(ins, core.OpSub, "dec")
 	case x86asm.NEG:
 		l.unary(ins, core.OpNeg, "neg")
 	case x86asm.NOT:
@@ -152,10 +205,55 @@ func (l *lifter) lift(ins instruction) {
 		l.push(ins)
 	case x86asm.POP:
 		l.pop(ins)
-	case x86asm.PUSHFQ:
-		l.pushValue(ins, l.readRegister(ins.address, l.profile.Flags, l.profile.Bits))
-	case x86asm.POPFQ:
-		l.popIntoRegister(ins, l.profile.Flags, l.profile.Bits)
+	case x86asm.PUSHFQ, x86asm.PUSHF, x86asm.PUSHFD:
+		width := l.profile.Bits
+		if ins.inst.Op == x86asm.PUSHFQ {
+			width = 64
+		}
+		l.pushValue(ins, l.readRegister(ins.address, l.profile.Flags, width))
+	case x86asm.POPFQ, x86asm.POPF, x86asm.POPFD:
+		width := l.profile.Bits
+		if ins.inst.Op == x86asm.POPFQ {
+			width = 64
+		}
+		l.popIntoRegister(ins, l.profile.Flags, width)
+	case x86asm.CLD, x86asm.STD, x86asm.CLI, x86asm.STI, x86asm.CLC, x86asm.STC, x86asm.CMC:
+		// Direction, interrupt and carry control. They change no register the
+		// decompiler tracks, so the flag write stays visible as an intrinsic.
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("x86." + x86OpName(ins.inst.Op))}, nil, nil,
+			core.EffectWriteRegister|core.EffectUnknown, ins.address)
+	case x86asm.POPCNT, x86asm.LZCNT, x86asm.TZCNT:
+		l.bitCount(ins)
+	case x86asm.PUSHAD:
+		l.pushAll(ins)
+	case x86asm.POPAD:
+		l.popAll(ins)
+	case x86asm.CMPXCHG8B, x86asm.CMPXCHG16B:
+		l.compareExchange(ins)
+	case x86asm.EMMS:
+		// Empty MMX state: a no-op for the modeled registers.
+		l.emit(core.OpNop, nil, nil, nil, core.EffectNone, ins.address)
+	case x86asm.OUT, x86asm.OUTSB, x86asm.OUTSW, x86asm.OUTSD,
+		x86asm.IN, x86asm.INSB, x86asm.INSW, x86asm.INSD,
+		x86asm.XGETBV, x86asm.XSETBV, x86asm.RDRAND,
+		x86asm.LGDT, x86asm.LIDT, x86asm.SGDT, x86asm.SIDT, x86asm.LLDT,
+		x86asm.SLDT, x86asm.LTR, x86asm.STR, x86asm.LMSW, x86asm.SMSW,
+		x86asm.LAR, x86asm.LSL, x86asm.VERR, x86asm.VERW, x86asm.CLTS,
+		x86asm.INVD, x86asm.WBINVD, x86asm.SWAPGS, x86asm.SYSRET,
+		x86asm.SYSEXIT, x86asm.INVLPG:
+		// Privileged or architectural-register access: keep the mnemonic, the
+		// registers it touches stay unknown.
+		l.architectural(ins)
+	case x86asm.VZEROUPPER:
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("x86." + x86OpName(ins.inst.Op))}, nil, nil,
+			core.EffectWriteRegister|core.EffectUnknown, ins.address)
+	case x86asm.PREFETCHNTA, x86asm.PREFETCHT0, x86asm.PREFETCHT1, x86asm.PREFETCHT2,
+		x86asm.CLFLUSH:
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("x86." + x86OpName(ins.inst.Op))}, nil, nil,
+			core.EffectReadMemory|core.EffectUnknown, ins.address)
+	case x86asm.XLATB:
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("x86.xlatb")}, nil, nil,
+			core.EffectReadMemory|core.EffectUnknown, ins.address)
 	case x86asm.LEAVE:
 		l.leave(ins)
 	case x86asm.XCHG:
@@ -179,11 +277,13 @@ func (l *lifter) lift(ins instruction) {
 	case x86asm.SYSCALL, x86asm.SYSENTER:
 		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("x86." + strings.ToLower(ins.inst.Op.String()))}, nil, nil, core.EffectCall|core.EffectMayTrap|core.EffectUnknown, ins.address)
 	case x86asm.INT:
-		if immediate, ok := ins.inst.Args[0].(x86asm.Imm); ok && immediate == 3 {
-			l.trap(ins, "int3")
-		} else {
-			l.unsupported(ins)
+		// Every INT is a trap; vector 3 is the breakpoint, others are system
+		// calls or BIOS entries and carry the vector in the symbol.
+		trap := "int3"
+		if immediate, ok := ins.inst.Args[0].(x86asm.Imm); ok && immediate != 3 {
+			trap = fmt.Sprintf("int %#x", uint64(immediate))
 		}
+		l.trap(ins, trap)
 	case x86asm.UD2, x86asm.HLT:
 		l.trap(ins, strings.ToLower(ins.inst.Op.String()))
 	case x86asm.IRET, x86asm.IRETD, x86asm.IRETQ:
@@ -191,6 +291,10 @@ func (l *lifter) lift(ins instruction) {
 	default:
 		name := ins.inst.Op.String()
 		switch {
+		case isX87Opcode(ins.inst):
+			l.x87Operation(ins)
+		case isVectorOpcode(ins.inst):
+			l.vectorOperation(ins)
 		case strings.HasPrefix(name, "J") && name != "JMP":
 			l.branch(ins)
 		case strings.HasPrefix(name, "SET"):
@@ -205,6 +309,10 @@ func (l *lifter) lift(ins instruction) {
 
 func (l *lifter) move(ins instruction) {
 	args := args(ins)
+	if len(args) == 2 && (isSegmentRegister(args[0]) || isSegmentRegister(args[1])) {
+		l.segmentMove(ins, args)
+		return
+	}
 	if len(args) != 2 || !isMovable(args[0]) || !isSource(args[1]) {
 		l.unsupported(ins)
 		return
@@ -493,6 +601,30 @@ func (l *lifter) unary(ins instruction, kind core.Opcode, flag string) {
 
 func (l *lifter) imul(ins instruction) {
 	args := args(ins)
+	if len(args) == 1 {
+		// One-operand IMUL multiplies the accumulator and writes the full
+		// product to the accumulator pair, exactly like MUL but signed.
+		if !isSource(args[0]) {
+			l.unsupported(ins)
+			return
+		}
+		bits := l.argBits(ins, args[0], l.profile.Bits)
+		accumulator, high := l.profile.accumulatorNames(bits)
+		left := l.readRegister(ins.address, accumulator, bits)
+		right, ok := l.readSource(ins, args[0], bits)
+		if !ok {
+			l.unsupported(ins)
+			return
+		}
+		low := l.operation(ins, core.OpMul, []core.Operand{l.value(left), l.value(right)}, bits, core.EffectNone)
+		upper := l.operation(ins, core.OpIntrinsic, []core.Operand{
+			symbolOperand("x86.imul.hi"), l.value(left), l.value(right),
+		}, bits, core.EffectNone)
+		l.writeRegister(ins.address, accumulator, bits, low)
+		l.writeRegister(ins.address, high, bits, upper)
+		l.setFlags(ins, "imul", low, upper)
+		return
+	}
 	if len(args) != 2 && len(args) != 3 {
 		l.unsupported(ins)
 		return
