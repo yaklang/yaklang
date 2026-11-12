@@ -1067,7 +1067,11 @@ func instructionRecordBytes(rec *instructionPersistRecord) int {
 		len(ir.Name) + len(ir.VerboseName) + len(ir.ShortVerboseName) +
 		len(ir.String) + len(ir.ReadableName) + len(ir.ReadableNameShort) +
 		len(ir.ExtraInformation)
-	n += len(ir.ConstText)
+	// A normal const's text is not part of the record any more: the row
+	// carries a const_id and the pool holds the text once per distinct value.
+	if ir.ConstID != 0 {
+		n += 8
+	}
 	if n < 1 {
 		n = 1
 	}

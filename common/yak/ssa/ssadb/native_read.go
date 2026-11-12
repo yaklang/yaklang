@@ -84,7 +84,7 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		`side_effects, is_variadic, return_codes, is_external, code_blocks, enter_block, exit_block, defer_block, ` +
 		`children_function, parent_function, is_block, pred_block, succ_block, phis, has_defs, users, occulatation, ` +
 		`is_object, object_members, object_member_pairs, is_object_member, object_parent, object_key, object_owner_pairs, ` +
-		`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type ` +
+		`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type, const_id ` +
 		`FROM ` + TableIrCodes + ` `
 	q := columns + `WHERE code_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`
 	args := []any{id, progName}
@@ -116,7 +116,7 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		&ir.IsObject, &ir.ObjectMembers, &ir.ObjectMemberPairs, &ir.IsObjectMember,
 		&ir.ObjectParent, &ir.ObjectKey, &ir.ObjectOwnerPairs,
 		&ir.MaskedCodes, &ir.IsMasked, &ir.Variable, &ir.ProgramCompileHash,
-		&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
+		&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType, &ir.ConstID,
 	)
 	if err != nil {
 		logNativeSQL(bound, time.Since(started), err)
@@ -136,6 +136,7 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		t := deletedAt.Time
 		ir.DeletedAt = &t
 	}
+	fillIrConstValues(db, ir.ProgramName, []*IrCode{ir})
 	return ir, nil
 }
 
@@ -148,7 +149,7 @@ const nativeIrCodeColumns = `id, created_at, updated_at, deleted_at, code_id, pr
 	`side_effects, is_variadic, return_codes, is_external, code_blocks, enter_block, exit_block, defer_block, ` +
 	`children_function, parent_function, is_block, pred_block, succ_block, phis, has_defs, users, occulatation, ` +
 	`is_object, object_members, object_member_pairs, is_object_member, object_parent, object_key, object_owner_pairs, ` +
-	`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type`
+	`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type, const_id`
 
 // nativeIrCodeBatchChunk bounds the number of IN-list placeholders per query to
 // stay under SQLite's MAX_VARIABLE_NUMBER (250000). 1000 is far below that and
@@ -233,7 +234,7 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 				&ir.IsObject, &ir.ObjectMembers, &ir.ObjectMemberPairs, &ir.IsObjectMember,
 				&ir.ObjectParent, &ir.ObjectKey, &ir.ObjectOwnerPairs,
 				&ir.MaskedCodes, &ir.IsMasked, &ir.Variable, &ir.ProgramCompileHash,
-				&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType,
+				&ir.TypeID, &ir.Point, &ir.Pointer, &ir.ExtraInformation, &ir.ConstType, &ir.ConstID,
 			); err != nil {
 				rows.Close()
 				cancel()
@@ -261,6 +262,7 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 		RecordDBRead(time.Since(started), false)
 		logNativeSQL(q, time.Since(started), nil)
 	}
+	fillIrConstValues(db, progName, out)
 	return out, nil
 }
 
@@ -382,8 +384,16 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 	}
 	ctx, cancel := context.WithTimeout(parent, nativeQueryTimeout())
 	defer cancel()
-	// Const text lives in ir_consts_v1. A database written before that table
-	// only has ir_codes.string, and keeps the legacy covering-index query.
+	// Const text lives in ir_const_pool_v1, referenced by ir_codes.const_id.
+	// A database written before the pool keeps one row per const instruction in
+	// ir_consts_v1; one written before either keeps the text in ir_codes.string
+	// and uses the legacy covering index.
+	if irConstPoolHasProgram(ctx, db, progName) {
+		ids, query, err := nativeGetConstIDsFromPool(ctx, db, progName, compareMode, value)
+		RecordDBRead(time.Since(started), err != nil)
+		logNativeSQL(query, time.Since(started), err)
+		return ids, err
+	}
 	if irConstTableHasProgram(ctx, db, progName) {
 		ids, query, err := nativeGetConstIDsFromIrConsts(ctx, db, progName, compareMode, value)
 		RecordDBRead(time.Since(started), err != nil)
@@ -447,8 +457,55 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 	return ids, nil
 }
 
-// nativeGetConstIDsFromIrConsts answers a ConstType search from the const
-// table. Exact lookups seek (program_name, const_hash) and verify the text; a
+// nativeGetConstIDsFromPool answers a ConstType search from the const pool.
+// Exact lookups seek (program_name, const_id) and join the partial
+// (program_name, const_id) index on ir_codes; a pattern has no range
+// constraint, so it reads the narrow pool in row order and joins only the
+// candidates. Either way the wide ir_codes row is touched once per hit.
+func nativeGetConstIDsFromPool(ctx context.Context, db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, string, error) {
+	from := ` FROM "` + TableIrConstPool + `" p JOIN "` + TableIrCodes + `" c` +
+		` ON c.program_name = p.program_name AND c.const_id = p.const_id`
+	where := ` WHERE p.program_name = ? AND c.const_id <> 0 AND c.deleted_at IS NULL`
+	query := `SELECT c.code_id` + from + where + ` AND p."string" REGEXP ?`
+	args := []interface{}{progName, value}
+	if compareMode == ExactCompare {
+		query = `SELECT c.code_id` + from + where + ` AND p.const_id = ?`
+		args = []interface{}{progName, IrConstHash(value)}
+	} else {
+		// A pattern has no seek key. Written as a join, SQLite drives from
+		// ir_codes (every const instruction) and probes the pool per row. An IN
+		// subquery materializes the matching pool ids first, so the wide table
+		// is probed once per hit instead.
+		operator := "REGEXP"
+		switch db.Dialect().GetName() {
+		case "postgres", "postgresql", "cloudsqlpostgres":
+			operator = "~"
+		}
+		query = `SELECT c.code_id FROM "` + TableIrCodes + `" c` +
+			` WHERE c.program_name = ? AND c.const_id <> 0 AND c.deleted_at IS NULL` +
+			` AND c.const_id IN (SELECT const_id FROM "` + TableIrConstPool +
+			`" WHERE program_name = ? AND "string" ` + operator + ` ?)`
+		args = []interface{}{progName, progName, value}
+	}
+	query = bindSQLPlaceholdersDB(db, query)
+	rows, err := nativeQueryContextDB(db, ctx, query, args...)
+	if err != nil {
+		return nil, query, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, query, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, query, rows.Err()
+}
+
+// nativeGetConstIDsFromIrConsts answers a ConstType search from the legacy
+// const table. Exact lookups seek (program_name, const_hash) and verify the text; a
 // pattern has no range constraint, so it reads the narrow table in row order
 // instead of dragging ir_codes' wide rows. SQLite would otherwise pick the hash
 // index and add one row lookup per const.

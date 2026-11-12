@@ -323,7 +323,12 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	case *Undefined:
 		params["undefined_kind"] = ret.Kind
 	case *ConstInst:
-		params["const_value"] = ret.Const.GetRawValue()
+		// A normal const's text lives once, in ir_const_pool_v1, and the IR row
+		// references it by const_id. Placeholder consts are member-call keys,
+		// are never searched, and stay inline.
+		if ret.ConstType != ConstTypeNormal {
+			params["const_value"] = ret.Const.GetRawValue()
+		}
 		if ret.Unary != 0 {
 			params["const_unary"] = ret.Unary
 		}
@@ -473,12 +478,25 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 	case *Jump:
 		ret.To = utils.MapGetInt64(params, "jump_to")
 	case *ConstInst:
-		i := params["const_value"]
-		c := newConstByMap(i)
-		if c == nil {
-			c = newConstCreate(i)
+		value := ir.ConstValue
+		if value == nil && ir.ConstID != 0 {
+			value = ssadb.GetIrConstValue(nil, ir.ProgramName, ir.ConstID)
 		}
-		ret.Const = c
+		if value != nil {
+			raw := value.Raw()
+			c := newConstByMap(raw)
+			if c == nil {
+				c = newConstCreate(raw)
+			}
+			ret.Const = c
+		} else {
+			i := params["const_value"]
+			c := newConstByMap(i)
+			if c == nil {
+				c = newConstCreate(i)
+			}
+			ret.Const = c
+		}
 		ret.ConstType = ConstType(ir.ConstType)
 		if ret.ConstType == "" {
 			ret.ConstType = ConstTypeNormal

@@ -15,6 +15,7 @@ import (
 var secondaryIndexTables = []string{
 	TableIrCodes,
 	TableIrConsts,
+	TableIrConstPool,
 	TableIrOffsets,
 	TableIrIndices,
 	TableIrNamePool,

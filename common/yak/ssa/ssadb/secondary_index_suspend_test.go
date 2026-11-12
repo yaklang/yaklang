@@ -20,16 +20,17 @@ func TestSuspendSecondaryIndexesRestoresDefinitions(t *testing.T) {
 	// Const text is not indexed on ir_codes any more; the narrow const table
 	// carries its own indexes.
 	require.False(t, hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex))
-	require.True(t, hasNamedIndex(db, TableIrConsts, irConstLookupIndex))
+	require.True(t, hasNamedIndex(db, TableIrConstPool, irConstPoolProgramIDIndex))
+	require.True(t, hasNamedIndex(db, TableIrCodes, irCodeConstIDIndex))
 
 	ddls, err := SuspendSecondaryIndexes(db)
 	require.NoError(t, err)
 	require.NotEmpty(t, ddls)
 	require.False(t, hasNamedIndex(db, TableIrCodes, "idx_ir_codes_program_opcode"))
-	require.False(t, hasNamedIndex(db, TableIrConsts, irConstLookupIndex),
-		"the const lookup index is rebuilt with the other secondary indexes")
-	require.True(t, hasNamedIndex(db, TableIrConsts, irConstProgramCodeIndex),
-		"the const upsert conflict key stays for the insert path")
+	require.False(t, hasNamedIndex(db, TableIrCodes, irCodeConstIDIndex),
+		"the const join index is rebuilt with the other secondary indexes")
+	require.True(t, hasNamedIndex(db, TableIrConstPool, irConstPoolProgramIDIndex),
+		"the pool upsert conflict key stays for the insert path")
 	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"), "unique key stays for the insert path")
 
 	prog := t.Name()
@@ -44,7 +45,8 @@ func TestSuspendSecondaryIndexesRestoresDefinitions(t *testing.T) {
 	require.NoError(t, RestoreSecondaryIndexes(db, ddls))
 	require.True(t, hasNamedIndex(db, TableIrCodes, "idx_ir_codes_program_opcode"))
 	require.False(t, hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex))
-	require.True(t, hasNamedIndex(db, TableIrConsts, irConstLookupIndex))
+	require.True(t, hasNamedIndex(db, TableIrCodes, irCodeConstIDIndex))
+	require.True(t, hasNamedIndex(db, TableIrConstPool, irConstPoolProgramIDIndex))
 	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
 
 	ids, err := nativeGetIrCodeIDsByConstType(db, prog, ExactCompare, "abc")

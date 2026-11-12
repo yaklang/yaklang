@@ -29,7 +29,7 @@ var irCodeInsertColumns = []string{
 	"object_parent", "object_key", "object_owner_pairs",
 	"masked_codes", "is_masked", "variable",
 	"program_compile_hash", "type_id", "point", "pointer",
-	"extra_information", "const_type",
+	"extra_information", "const_type", "const_id",
 }
 
 // nativeInsertIrCodes inserts new IR rows with one multi-row INSERT per chunk.
@@ -128,7 +128,7 @@ func appendIrCodeInsertArgs(args []interface{}, item *IrCode) []interface{} {
 		item.ObjectParent, item.ObjectKey, item.ObjectOwnerPairs,
 		item.MaskedCodes, item.IsMasked, item.Variable,
 		item.ProgramCompileHash, item.TypeID, item.Point, item.Pointer,
-		item.ExtraInformation, item.ConstType,
+		item.ExtraInformation, item.ConstType, item.ConstID,
 	)
 	return args
 }
