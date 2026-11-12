@@ -23,7 +23,7 @@ func TestAIModelContextBeforeSession(t *testing.T) {
 	require.EqualValues(t, 500*1024, initial.ContextTokens)
 	require.EqualValues(t, 500*1024, initial.ThresholdTokens)
 	require.EqualValues(t, 100*1024, initial.MinimumThresholdTokens)
-	for _, tokens := range []int64{-1, 0, 100*1024 - 1} {
+	for _, tokens := range []int64{-1, 0, 100*1024 - 1, 1000*1024 + 1} {
 		_, err := client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Provider: identity.Provider, Model: identity.Model, ThresholdTokens: tokens})
 		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
 		unchanged, err := client.GetAIModelContext(ctx, identity)
@@ -56,4 +56,24 @@ func TestAIModelContextBeforeSession(t *testing.T) {
 		_, err = client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Provider: invalid.Provider, Model: invalid.Model, ThresholdTokens: 200 * 1024})
 		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
 	}
+}
+
+func TestAIModelContextAutoAdjustSwitchBeforeSession(t *testing.T) {
+	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	ctx := context.Background()
+	disabled := true
+	request := &ypb.SetAIModelContextRequest{Provider: "test", Model: "switch", DisableAutoAdjust: &disabled}
+	saved, err := client.SetAIModelContext(ctx, request)
+	require.NoError(t, err)
+	require.True(t, saved.DisableAutoAdjust)
+	require.EqualValues(t, 500*1024, saved.ThresholdTokens)
+	saved, err = client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Provider: "test", Model: "switch", ThresholdTokens: 600 * 1024})
+	require.NoError(t, err)
+	require.True(t, saved.DisableAutoAdjust)
+	disabled = false
+	saved, err = client.SetAIModelContext(ctx, request)
+	require.NoError(t, err)
+	require.False(t, saved.DisableAutoAdjust)
+	require.EqualValues(t, 600*1024, saved.ThresholdTokens)
 }
