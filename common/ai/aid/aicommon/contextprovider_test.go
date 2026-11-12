@@ -11,39 +11,45 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func TestFileContentContextProviderIsCompleteAndReadOnly(t *testing.T) {
-	// Observe only this test process's isolated AI temp directory. Inline data
-	// must not be rematerialized on every context refresh.
-	tempDir := consts.GetDefaultAISpaceDir()
-	before, err := os.ReadDir(tempDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestFileContentContextProviderPersistsAndReusesFullFile(t *testing.T) {
 	content := "Filename: synthetic.log\n" + strings.Repeat("INFO synthetic event\n", 100) + "TAIL_INLINE_ANOMALY"
 	provider := FileContentContextProvider(content, "analyze attached data")
+	var first string
 	for refresh := 0; refresh < 3; refresh++ {
 		rendered, err := provider(nil, nil, "inline-fixture")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(rendered, content) {
-			t.Errorf("refresh %d lost inline content beyond the path-provider limit", refresh)
+			t.Errorf("refresh %d lost the bounded inline preview", refresh)
 		}
 		if strings.Contains(rendered, "content truncated") {
 			t.Errorf("refresh %d incorrectly applied the file-path preview limit", refresh)
 		}
+		if refresh == 0 {
+			first = rendered
+			continue
+		}
+		if rendered != first {
+			t.Errorf("refresh %d recreated or rewrote the saved file", refresh)
+		}
 	}
-	after, err := os.ReadDir(tempDir)
+	_, after, found := strings.Cut(first, "Full content saved to file: ")
+	if !found {
+		t.Fatal("file content was not persisted")
+	}
+	path, _, _ := strings.Cut(after, "\n")
+	t.Cleanup(func() { _ = os.Remove(path) })
+	saved, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(after) != len(before) {
-		t.Errorf("inline provider created temporary files: before=%d after=%d", len(before), len(after))
+	if string(saved) != content {
+		t.Fatal("saved file did not preserve the complete literal content")
 	}
 }
 

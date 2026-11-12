@@ -13,6 +13,10 @@ type AttachedFileResourceHandler func(r aicommon.AIInvokeRuntime, loop *ReActLoo
 
 var attachedFileResourceHandlers AttachedFileResourceHandler
 
+type attachedResourceUserPinNotice interface {
+	UserPinNotice() string
+}
+
 func RegisterAttachedFileResourceHandler(handler AttachedFileResourceHandler) {
 	if handler == nil {
 		return
@@ -53,6 +57,7 @@ func RunAttachedExtraResourcesInit(
 			log.Warnf("attached extra resources: failed to bind type=%q: %v", resource.Type(), err)
 			continue
 		}
+		recordAttachedResourceUserPin(r, resource)
 		rendered := strings.TrimSpace(resource.ToAttachData(loop))
 		if rendered == "" {
 			continue
@@ -75,6 +80,30 @@ func RunAttachedExtraResourcesInit(
 		loop.UserStatus("附加资源处理完成", "Finished loading attached resources")
 	}
 	return resources
+}
+
+// recordAttachedResourceUserPin keeps the fact that a user attached a file
+// outside ordinary compression while leaving the full rendering in Timeline.
+func recordAttachedResourceUserPin(r aicommon.AIInvokeRuntime, resource aicommon.AttachedResourceData) {
+	pinned, ok := resource.(attachedResourceUserPinNotice)
+	if !ok || r == nil || r.GetConfig() == nil {
+		return
+	}
+	notice := strings.TrimSpace(pinned.UserPinNotice())
+	if notice == "" {
+		return
+	}
+	provider, ok := r.GetConfig().(interface {
+		GetTimeline() *aicommon.Timeline
+	})
+	if !ok || provider.GetTimeline() == nil {
+		return
+	}
+	taskID := ""
+	if task := r.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+	provider.GetTimeline().EnsureTaskUserInput(taskID, notice, r.GetConfig().AcquireId)
 }
 
 func attachedResourceTimelineKey(typ string) string {

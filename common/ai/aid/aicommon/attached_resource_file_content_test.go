@@ -16,9 +16,13 @@ func TestAttachedFileContentIsLiteral(t *testing.T) {
 		resource, err := ParseAttachedResourceData(NewAttachedResource("file", "file_content", content))
 		require.NoError(t, err)
 		require.IsType(t, &AttachedFileContentResourceData{}, resource)
+		fileResource := resource.(*AttachedFileContentResourceData)
 		require.NoError(t, resource.BindLoopData(nil))
+		require.NotEmpty(t, fileResource.savedPath)
+		t.Cleanup(func() { _ = os.Remove(fileResource.savedPath) })
 		rendered := resource.ToAttachData(nil)
 		require.Contains(t, rendered, "--- File Content ---\n"+content+"\n--- End")
+		require.Contains(t, rendered, "Full content saved to file: "+fileResource.savedPath)
 		require.NotContains(t, rendered, "DO_NOT_READ_THIS")
 		require.NotContains(t, rendered, "failed to stat")
 	}

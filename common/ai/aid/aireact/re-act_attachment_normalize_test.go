@@ -114,3 +114,31 @@ func TestBuildAISessionTaskInputUsesNormalizedAttachments(t *testing.T) {
 		params.Resources, aicommon.CONTEXT_PROVIDER_TYPE_FILE, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "/tmp/resource.txt",
 	))
 }
+
+func TestNormalizeInputAttachmentsKeepsDistinctLiteralFileContent(t *testing.T) {
+	event := &ypb.AIInputEvent{
+		IsFreeInput: true,
+		FreeInput:   "inspect file content",
+		AttachedResourceInfo: []*ypb.AttachedResourceInfo{
+			{
+				Type:  aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+				Key:   aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT,
+				Value: "",
+			},
+			{
+				Type:  aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+				Key:   aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT,
+				Value: " ",
+			},
+			{
+				Type:  aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+				Key:   aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT,
+				Value: "",
+			},
+		},
+	}
+	resources, _ := normalizeInputAttachments(event)
+	require.Len(t, resources, 2)
+	require.Empty(t, resources[0].Value)
+	require.Equal(t, " ", resources[1].Value)
+}

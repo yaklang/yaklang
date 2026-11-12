@@ -45,12 +45,20 @@ type AttachedResource struct {
 	Value string
 }
 
-// NonEmptyAttachedResources omits empty UI placeholders. Nonempty values are
-// retained even when malformed so the resource parser still validates them.
+// NonEmptyAttachedResources omits empty UI placeholders. File content is a
+// literal payload, so an empty value remains a valid attachment and is persisted.
+// Nonempty values are retained even when malformed so the parser validates them.
 func NonEmptyAttachedResources(resources []*AttachedResource) []*AttachedResource {
 	var result []*AttachedResource
 	for _, resource := range resources {
-		if resource != nil && strings.TrimSpace(resource.Value) != "" {
+		if resource == nil {
+			continue
+		}
+		if resource.HasType(AttachedResourceTypeFile) && resource.HasKey(CONTEXT_PROVIDER_KEY_FILE_CONTENT) {
+			result = append(result, resource)
+			continue
+		}
+		if strings.TrimSpace(resource.Value) != "" {
 			result = append(result, resource)
 		}
 	}
