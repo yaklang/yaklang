@@ -86,7 +86,7 @@ func TestIRQueryPlansUseRetainedIndexes(t *testing.T) {
 			name: "const pool exact lookup",
 			query: fmt.Sprintf(`SELECT c.code_id FROM "`+TableIrConstPool+`" p JOIN "`+TableIrCodes+`" c`+
 				` ON c.program_name = p.program_name AND c.const_id = p.const_id`+
-				` WHERE p.program_name = 'p0' AND c.const_id <> 0 AND c.deleted_at IS NULL AND p.const_id = %d`, IrConstHash("v7")),
+				` WHERE p.program_name = 'p0' AND c.const_id <> 0 AND c.deleted_at IS NULL AND p.const_id = %d`, IrConstPoolID(IrConstKindString, "v7")),
 			index: []string{irConstPoolProgramIDIndex, irCodeConstIDIndex},
 		},
 		{

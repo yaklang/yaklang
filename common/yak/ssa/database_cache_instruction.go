@@ -1047,7 +1047,7 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 				// The row moves to the application's program name, so its const
 				// pool id has to be re-interned under that name. A row that still
 				// points at the library name would read the wrong pool.
-				if kind, text, ok := irCodeConstText(linked); ok && kind != ssadb.IrConstKindNil {
+				if kind, text, ok := irCodeConstText(linked); ok {
 					linkedIr.ConstID = ssadb.InternIrConst(progName, kind, text)
 				}
 				linkedIr.ProgramName = progName

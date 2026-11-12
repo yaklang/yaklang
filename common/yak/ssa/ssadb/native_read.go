@@ -469,8 +469,16 @@ func nativeGetConstIDsFromPool(ctx context.Context, db *gorm.DB, progName string
 	query := `SELECT c.code_id` + from + where + ` AND p."string" REGEXP ?`
 	args := []interface{}{progName, value}
 	if compareMode == ExactCompare {
-		query = `SELECT c.code_id` + from + where + ` AND p.const_id = ?`
-		args = []interface{}{progName, IrConstHash(value)}
+		// The search value is text, but new pool keys also cover the kind.
+		// Probe every kind so `1` finds both int 1 and the string "1". Include
+		// the legacy text-only key so databases written before typed pool ids
+		// remain searchable until their next compile.
+		query = `SELECT c.code_id` + from + where + ` AND p.const_id IN (?,?,?,?,?,?)`
+		args = []interface{}{progName}
+		for kind := IrConstKindNil; kind <= IrConstKindString; kind++ {
+			args = append(args, IrConstPoolID(kind, value))
+		}
+		args = append(args, IrConstHash(value))
 	} else {
 		// A pattern has no seek key. Written as a join, SQLite drives from
 		// ir_codes (every const instruction) and probes the pool per row. An IN
