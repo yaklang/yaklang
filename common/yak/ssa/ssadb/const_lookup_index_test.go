@@ -171,3 +171,28 @@ func stringFromAny(v interface{}) string {
 		return fmt.Sprintf("%v", s)
 	}
 }
+
+// An empty string constant is a real value. The pool must hold it: a row left
+// with const_id = 0 restores as nil, because a normal const no longer carries
+// const_value in extra_information.
+func TestEmptyStringConstReachesPool(t *testing.T) {
+	db := setupA3ConstDB(t)
+	prog := "empty-const"
+	require.NoError(t, InsertIrCodes(db, []*IrCode{
+		{CodeID: 1, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal,
+			ConstText: "", ConstKind: int64(IrConstKindString)},
+	}, 10))
+
+	var row IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", prog, 1).First(&row).Error)
+	require.NotZero(t, row.ConstID, "an empty string const must still be pooled")
+
+	value := GetIrConstValue(db, prog, row.ConstID)
+	require.NotNil(t, value)
+	require.Equal(t, IrConstKindString, value.Kind)
+	require.Equal(t, "", value.Raw())
+
+	ids, err := nativeGetIrCodeIDsByConstType(db, prog, ExactCompare, "")
+	require.NoError(t, err)
+	require.Equal(t, []int64{1}, ids)
+}
