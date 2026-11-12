@@ -75,6 +75,12 @@ Region（虚拟地址 + 文件偏移 + 长度）
 
 ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。PE 读取导出表、导入表与 `.pdata` 异常目录。Mach-O 读取 `LC_MAIN`、`LC_FUNCTION_STARTS`、符号表与导入符号，并在 universal 文件中选择一个切片。
 
+COFF 与 MZ 共享同一个前两个字：PE 映像的 DOS stub 在 0x3c 处记录签名偏移，普通 MZ 可执行没有这个偏移。PE loader 只在偏移落在 DOS 头之后时才认领输入，因此三种格式不会互相覆盖。
+
+ar 归档没有单一地址空间。loader 为每个成员分配互不重叠的基址，把成员报告的每个地址平移该基址；文件偏移保持绝对，因为 Artifact 的 Reader 就是归档文件本身。没有成员能被任何 loader 解析时，`Check` 返回错误，而不是给出零位宽 Target。COFF 头没有魔数，靠机器字段与节数判定。
+
+PE 映像的目录项 14 是 COM descriptor，只有 .NET 程序集填写。命中时 loader 拒绝输入：托管映像在原生机器码的位置存放 IL 字节码，按 x86 解码会产出看似合法但无意义的结果。
+
 格式层只读头部、节表和符号表，不反汇编，不执行输入，也不判断文件是否可信。
 
 `Check` 解析完整头部并返回 `core.CheckResult`；`Load` 构建 Artifact。`Match` 只看魔数，用于候选选择。

@@ -18,9 +18,9 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 | --- | --- | --- |
 | `loaders` | `--json` 可选 | 按 Format 注册的 loader |
 | `parsers` | `--json` 可选 | 按 Architecture 注册的 parser 与解码器状态 |
-| `inspect` | `<file>`，`--json` 可选 | Artifact、Target、Image、节和诊断 |
-| `check` | `<file>`，`--json` 可选 | 头部检查、loader 和 parser 选择 |
-| `lift` | `<file>`，`--mode`、`--json` 可选 | 汇编、LowIR、YakSSA 或伪源码 |
+| `inspect` | `<file>`，`--json`、`--format` 可选 | Artifact、Target、Image、节和诊断 |
+| `check` | `<file>`，`--json`、`--format` 可选 | 头部检查、loader 和 parser 选择 |
+| `lift` | `<file>`，`--mode`、`--json`、`--format` 可选 | 汇编、LowIR、YakSSA 或伪源码 |
 | `help` | 无 | 用法 |
 
 `lift` 的 `--mode`：
@@ -40,6 +40,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 - `--address` 也接受函数符号名（`sum_points` 或 `0xsum_points`）。
 - `--lowir-pass NAME[,NAME...]`：只运行指定的 LowIR pass，默认运行全部默认 pass（含去 canary 和栈帧）。只影响 `ssair`、`source` 和 `all`；`lowir` 输出 asm2lowir 得到的普通 LowIR。
 - `--ssa-pass NAME[,NAME...]`：只运行指定的 SSA pass，默认运行标准 pass 序列。
+- `--format NAME`：强制使用某个 loader（`elf`、`pe`、`macho`、`coff`、`archive`、`mz`）。只在格式没有魔数时需要，例如 COM 映像。
 
 `lift` 的区域选择：
 
@@ -371,6 +372,10 @@ common/yak/reify/scripts/lift-all.sh -o /tmp/hello-main -a "$main_addr" -s "$mai
 - ELF：OS 来自 OS ABI，架构来自机器字段与类别，字节序来自数据编码。
 - PE：OS 来自子系统，地址由 ImageBase 加 RVA 得到；固件子系统为 unknown。
 - Mach-O：OS 为 `darwin`；入口来自 `LC_MAIN`，缺失时产生诊断 `entry-point-unavailable`；universal 文件先选切片，并产生诊断 `fat-slice-selected`。
+- COFF 对象：Target 来自机器字段；符号地址是节相对偏移加 loader 分配的节基址。
+- ar 归档：Target 取自首个可解析成员；每个成员各自占一段不重叠地址，节名加成员前缀（`a.o:.text`）。
+- MZ：OS 为 `dos`，架构为 8086，位数 16。COM 映像没有头部，`check`、`inspect` 与 `lift` 需要 `--format mz` 显式指定格式；自动检测无法区分裸机器码与普通二进制文件。
+- .NET 程序集：PE 目录项 14 命中时拒绝输入，报错明确写出 CLI 头部的 RVA 与 IL 负载。
 - 缺少入口字段时不输出 `entry_point`；这不表示文件没有入口。
 - 入口和节地址是映像地址，不是 ASLR 后的运行时地址。
 - `lift` 解释 AMD64、386、ARM64 与 ARM。其余架构的 `lowir` 返回 `ErrDecoderUnavailable`，`asm` 返回 `ErrNoDisassembler`。

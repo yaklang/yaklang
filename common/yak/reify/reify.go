@@ -87,6 +87,9 @@ type Config struct {
 	Address     string
 	Size        string
 	Function    string
+	// Format forces one loader. It is needed only for a format that carries no
+	// magic, such as a COM image.
+	Format string
 }
 
 // Option customizes Lift.
@@ -124,6 +127,22 @@ func WithAddress(address, size string) Option {
 // WithFunction limits decoding to one recovered function.
 func WithFunction(name string) Option { return func(config *Config) { config.Function = name } }
 
+// WithFormat forces one loader by format name. It is needed only for a format
+// that carries no magic, such as a COM image.
+func WithFormat(name string) Option { return func(config *Config) { config.Format = name } }
+
+// resolveFormat validates a forced format name against the register.
+func resolveFormat(name string) (core.Format, error) {
+	if name == "" {
+		return core.FormatUnknown, nil
+	}
+	format, ok := loader.Default.ParseFormat(name)
+	if !ok {
+		return core.FormatUnknown, fmt.Errorf("unknown format %q", name)
+	}
+	return format, nil
+}
+
 func config(options []Option) Config {
 	result := Config{Mode: ModeASM, AsmSyntax: core.AsmSyntaxIntel}
 	for _, option := range options {
@@ -139,14 +158,24 @@ func Loaders() []core.LoaderInfo { return loader.Default.Loaders() }
 func Parsers() []core.ParserInfo { return loader.Default.Parsers() }
 
 // Check validates one file header.
-func Check(ctx context.Context, path string) (*loader.CheckResult, error) {
-	return loader.Default.CheckFile(ctx, path)
+func Check(ctx context.Context, path string, options ...Option) (*loader.CheckResult, error) {
+	settings := config(options)
+	format, err := resolveFormat(settings.Format)
+	if err != nil {
+		return nil, err
+	}
+	return loader.Default.CheckFileAs(ctx, path, format)
 }
 
 // Inspect loads one file and returns the artifact plus the selected parser.
 // The caller must close the artifact.
-func Inspect(ctx context.Context, path string) (*core.Artifact, *core.ParserInfo, error) {
-	artifact, err := loader.Default.OpenFile(ctx, path)
+func Inspect(ctx context.Context, path string, options ...Option) (*core.Artifact, *core.ParserInfo, error) {
+	settings := config(options)
+	format, err := resolveFormat(settings.Format)
+	if err != nil {
+		return nil, nil, err
+	}
+	artifact, err := loader.Default.OpenFileAs(ctx, path, format)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -171,7 +200,11 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	if settings.Size != "" && settings.Address == "" {
 		return nil, fmt.Errorf("lift: --size requires --address")
 	}
-	artifact, err := loader.Default.OpenFile(ctx, path)
+	format, err := resolveFormat(settings.Format)
+	if err != nil {
+		return nil, err
+	}
+	artifact, err := loader.Default.OpenFileAs(ctx, path, format)
 	if err != nil {
 		return nil, err
 	}

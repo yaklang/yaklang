@@ -104,6 +104,20 @@ func (c *Catalog) Parser(kind core.Architecture) (core.Parser, bool) {
 	return parser, ok
 }
 
+// ParseFormat resolves a format name to a registered Format. An empty name
+// selects nothing and reports false, which keeps the automatic detection.
+func (c *Catalog) ParseFormat(name string) (core.Format, bool) {
+	if name == "" {
+		return core.FormatUnknown, false
+	}
+	for _, loader := range c.loaders {
+		if loader.Kind() == core.Format(name) {
+			return core.Format(name), true
+		}
+	}
+	return core.FormatUnknown, false
+}
+
 // CheckResult combines loader-level header facts with the parser selected for
 // the reported architecture.
 type CheckResult struct {
@@ -122,6 +136,12 @@ type CheckResult struct {
 // CheckFile validates a regular file's header and reports the selected loader
 // and parser. It does not decode instructions.
 func (c *Catalog) CheckFile(ctx context.Context, path string) (*CheckResult, error) {
+	return c.CheckFileAs(ctx, path, core.FormatUnknown)
+}
+
+// CheckFileAs validates a regular file with a forced format. An empty format
+// selects the loader from the magic bytes.
+func (c *Catalog) CheckFileAs(ctx context.Context, path string, forced core.Format) (*CheckResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -130,11 +150,16 @@ func (c *Catalog) CheckFile(ctx context.Context, path string) (*CheckResult, err
 		return nil, err
 	}
 	defer file.Close()
-	return c.Check(ctx, path, file, size)
+	return c.CheckAs(ctx, path, file, size, forced)
 }
 
 // Check validates a borrowed source. The source is not closed.
 func (c *Catalog) Check(ctx context.Context, name string, src io.ReaderAt, size int64) (*CheckResult, error) {
+	return c.CheckAs(ctx, name, src, size, core.FormatUnknown)
+}
+
+// CheckAs validates a borrowed source with a forced format.
+func (c *Catalog) CheckAs(ctx context.Context, name string, src io.ReaderAt, size int64, forced core.Format) (*CheckResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -142,7 +167,7 @@ func (c *Catalog) Check(ctx context.Context, name string, src io.ReaderAt, size 
 	if err != nil {
 		return nil, err
 	}
-	loader, err := c.detect(reader)
+	loader, err := c.detect(reader, forced)
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +196,12 @@ func (c *Catalog) Check(ctx context.Context, name string, src io.ReaderAt, size 
 // OpenFile loads a regular file and returns an artifact that owns the open
 // source. Callers must close the artifact.
 func (c *Catalog) OpenFile(ctx context.Context, path string) (*core.Artifact, error) {
+	return c.OpenFileAs(ctx, path, core.FormatUnknown)
+}
+
+// OpenFileAs loads a regular file with a forced format. An empty format selects
+// the loader from the magic bytes.
+func (c *Catalog) OpenFileAs(ctx context.Context, path string, forced core.Format) (*core.Artifact, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -178,7 +209,7 @@ func (c *Catalog) OpenFile(ctx context.Context, path string) (*core.Artifact, er
 	if err != nil {
 		return nil, err
 	}
-	artifact, err := c.Open(ctx, path, file, size)
+	artifact, err := c.OpenAs(ctx, path, file, size, forced)
 	if err != nil {
 		_ = file.Close()
 		return nil, err
@@ -191,6 +222,11 @@ func (c *Catalog) OpenFile(ctx context.Context, path string) (*core.Artifact, er
 
 // Open loads a borrowed source. The caller retains ownership of src.
 func (c *Catalog) Open(ctx context.Context, name string, src io.ReaderAt, size int64) (*core.Artifact, error) {
+	return c.OpenAs(ctx, name, src, size, core.FormatUnknown)
+}
+
+// OpenAs loads a borrowed source with a forced format.
+func (c *Catalog) OpenAs(ctx context.Context, name string, src io.ReaderAt, size int64, forced core.Format) (*core.Artifact, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -198,7 +234,7 @@ func (c *Catalog) Open(ctx context.Context, name string, src io.ReaderAt, size i
 	if err != nil {
 		return nil, err
 	}
-	loader, err := c.detect(reader)
+	loader, err := c.detect(reader, forced)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +260,22 @@ func (c *Catalog) Open(ctx context.Context, name string, src io.ReaderAt, size i
 	return artifact, nil
 }
 
-func (c *Catalog) detect(reader *core.ByteReader) (core.Loader, error) {
+// detect picks the loader for one input. A non-empty forced format skips the
+// magic check, which is the only way to name a format that carries no magic,
+// such as a COM image.
+func (c *Catalog) detect(reader *core.ByteReader, forced core.Format) (core.Loader, error) {
+	if forced != core.FormatUnknown {
+		for _, loader := range c.loaders {
+			if loader.Kind() == forced {
+				return loader, nil
+			}
+		}
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedFormat, forced)
+	}
+	return c.detectByMagic(reader)
+}
+
+func (c *Catalog) detectByMagic(reader *core.ByteReader) (core.Loader, error) {
 	probeSize := core.ProbeSize
 	if int64(probeSize) > reader.Size() {
 		probeSize = int(reader.Size())

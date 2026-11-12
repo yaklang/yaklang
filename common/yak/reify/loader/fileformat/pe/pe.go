@@ -29,10 +29,26 @@ const (
 	peArm64ExceptionEntry = 8  // RUNTIME_FUNCTION for ARM64
 )
 
-func (Loader) Kind() core.Format        { return core.FormatPE }
-func (Loader) Name() string             { return "PE" }
-func (Loader) Description() string      { return core.FormatDescription(core.FormatPE) }
-func (Loader) Match(prefix []byte) bool { return core.CheckFormat(prefix) == core.FormatPE }
+func (Loader) Kind() core.Format   { return core.FormatPE }
+func (Loader) Name() string        { return "PE" }
+func (Loader) Description() string { return core.FormatDescription(core.FormatPE) }
+func (Loader) Match(prefix []byte) bool {
+	// A PE image starts with an MZ stub and carries the PE signature at the
+	// offset the stub records. An MZ executable has the same first two bytes, so
+	// the stub header decides: the signature offset must point inside the file
+	// and past the DOS header.
+	return core.CheckFormat(prefix) == core.FormatMZ && peSignaturePlausible(prefix)
+}
+
+// peSignaturePlausible reports whether the DOS stub names a signature offset
+// that a PE image can occupy.
+func peSignaturePlausible(prefix []byte) bool {
+	if len(prefix) < 0x40 {
+		return false
+	}
+	offset := int(binary.LittleEndian.Uint32(prefix[0x3c:]))
+	return offset >= 0x40 && offset < 0x1000
+}
 
 func (Loader) Check(r *core.ByteReader) (*core.CheckResult, error) {
 	image, target, _, diagnostics, err := inspectPE(r)
@@ -85,6 +101,13 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 	}
 	target.OS = peOS(subsystem)
 	target.ABI = fmt.Sprintf("pe-subsystem-%d", subsystem)
+	if managed, ok := cliHeaderDirectory(directories); ok {
+		// A managed image stores IL bytecode where a native image stores
+		// machine code. Decoding it as native code produces valid-looking
+		// garbage, so the loader refuses instead of guessing.
+		return nil, core.Target{}, nil, nil, fmt.Errorf(
+			"PE image is a .NET assembly: the CLI header at RVA 0x%x holds IL bytecode, not machine code", managed)
+	}
 	if entryRVA != 0 {
 		entry, err := Address(image.Base, entryRVA)
 		if err != nil {
@@ -150,6 +173,20 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 		}
 	}
 	return image, target, hints, nil, nil
+}
+
+// cliHeaderDirectory reports the RVA of the CLI header directory. Directory
+// entry fourteen is the COM descriptor, which only a managed image fills.
+func cliHeaderDirectory(directories []pe.DataDirectory) (uint32, bool) {
+	const cliDirectory = 14
+	if len(directories) <= cliDirectory {
+		return 0, false
+	}
+	directory := directories[cliDirectory]
+	if directory.VirtualAddress == 0 || directory.Size == 0 {
+		return 0, false
+	}
+	return directory.VirtualAddress, true
 }
 
 func Address(base uint64, rva uint32) (uint64, error) {

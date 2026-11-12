@@ -48,14 +48,14 @@ func newCLIApp(env *commandEnv) *cli.App {
 			Name:      "inspect",
 			Usage:     "Load headers and display the artifact, target and sections",
 			ArgsUsage: "<file>",
-			Flags:     []cli.Flag{jsonFlag()},
+			Flags:     []cli.Flag{jsonFlag(), formatFlag()},
 			Action:    env.inspect,
 		},
 		{
 			Name:      "check",
 			Usage:     "Validate headers and report the selected loader and parser",
 			ArgsUsage: "<file>",
-			Flags:     []cli.Flag{jsonFlag()},
+			Flags:     []cli.Flag{jsonFlag(), formatFlag()},
 			Action:    env.check,
 		},
 		{
@@ -72,6 +72,7 @@ func newCLIApp(env *commandEnv) *cli.App {
 				cli.StringFlag{Name: "size", Usage: "Region size in bytes"},
 				cli.StringFlag{Name: "lowir-pass", Usage: "Comma-separated LowIR pass names"},
 				cli.StringFlag{Name: "ssa-pass", Usage: "Comma-separated SSA pass names"},
+				formatFlag(),
 			},
 			Action: env.lift,
 		},
@@ -80,6 +81,12 @@ func newCLIApp(env *commandEnv) *cli.App {
 		app.Commands[index].OnUsageError = usageErrorHandler
 	}
 	return app
+}
+
+// formatFlag forces one loader. A COM image has no header magic, so the format
+// cannot be detected and the caller must name it.
+func formatFlag() cli.Flag {
+	return cli.StringFlag{Name: "format", Usage: "Force one loader by format name (elf, pe, macho, coff, archive, mz)"}
 }
 
 func jsonFlag() cli.Flag {
@@ -139,7 +146,11 @@ func (e *commandEnv) inspect(c *cli.Context) error {
 	if c.NArg() != 1 {
 		return cli.NewExitError("inspect requires exactly one file", 2)
 	}
-	artifact, parser, err := reify.Inspect(e.ctx, c.Args().First())
+	var options []reify.Option
+	if c.IsSet("format") {
+		options = append(options, reify.WithFormat(c.String("format")))
+	}
+	artifact, parser, err := reify.Inspect(e.ctx, c.Args().First(), options...)
 	if err != nil {
 		return err
 	}
@@ -177,7 +188,11 @@ func (e *commandEnv) check(c *cli.Context) error {
 	if c.NArg() != 1 {
 		return cli.NewExitError("check requires exactly one file", 2)
 	}
-	result, err := reify.Check(e.ctx, c.Args().First())
+	var options []reify.Option
+	if c.IsSet("format") {
+		options = append(options, reify.WithFormat(c.String("format")))
+	}
+	result, err := reify.Check(e.ctx, c.Args().First(), options...)
 	if err != nil {
 		return err
 	}
@@ -226,6 +241,9 @@ func (e *commandEnv) lift(c *cli.Context) error {
 	}
 	if function != "" {
 		options = append(options, reify.WithFunction(function))
+	}
+	if c.IsSet("format") {
+		options = append(options, reify.WithFormat(c.String("format")))
 	}
 	if passes := splitPassNames(c.String("lowir-pass")); len(passes) > 0 {
 		options = append(options, reify.WithLowIRPasses(passes...))
