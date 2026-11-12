@@ -29,10 +29,8 @@ type Graph interface {
 type Edge struct {
 	From, To *Value
 	Kind     EdgeType
-	Msg      map[string]any
 	// Label and Step carry the predecessor metadata without allocating a map
-	// for every edge on the dataflow hot path. Msg remains for callers that
-	// still use the generic form.
+	// for every edge on the dataflow hot path.
 	Label string
 	Step  int64
 }

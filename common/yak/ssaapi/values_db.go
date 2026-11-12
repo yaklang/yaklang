@@ -256,17 +256,6 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		return err
 	}
 	label, step := edge.Label, edge.Step
-	if msg := edge.Msg; msg != nil {
-		if l, ok := msg["label"].(string); ok {
-			label = l
-		}
-		switch s := msg["step"].(type) {
-		case int:
-			step = int64(s)
-		case int64:
-			step = s
-		}
-	}
 
 	var audit *ssadb.AuditEdge
 	switch edge.Kind {

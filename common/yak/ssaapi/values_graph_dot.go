@@ -98,17 +98,6 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 	if edge.Label != "" {
 		edgeLabel = edge.Label
 	}
-	if edge.Msg != nil {
-		if label, ok := edge.Msg["label"].(string); ok {
-			edgeLabel = label
-		}
-		switch s := edge.Msg["step"].(type) {
-		case int:
-			step = int64(s)
-		case int64:
-			step = s
-		}
-	}
 	if step > 0 {
 		edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
 	}
