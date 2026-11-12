@@ -206,6 +206,28 @@ func (d *AttachedFileResourceData) IsImage() bool {
 	return d != nil && d.Kind == AttachedFileKindImage
 }
 
+// UserPinNotice describes a path attachment without repeating its contents.
+func (d *AttachedFileResourceData) UserPinNotice() string {
+	if d == nil {
+		return ""
+	}
+	path := strings.TrimSpace(d.Path)
+	if path == "" {
+		path = strings.TrimSpace(d.Key)
+	}
+	if path == "" {
+		return ""
+	}
+	switch d.Kind {
+	case AttachedFileKindDirectory:
+		return fmt.Sprintf("User pinned attached directory `%s`.", path)
+	case AttachedFileKindImage:
+		return fmt.Sprintf("User pinned attached image `%s`.", path)
+	default:
+		return fmt.Sprintf("User pinned attached file `%s`.", path)
+	}
+}
+
 func attachedFileMIMEType(path string) string {
 	mimeType := mime.TypeByExtension(filepath.Ext(path))
 	if idx := strings.Index(mimeType, ";"); idx != -1 {
