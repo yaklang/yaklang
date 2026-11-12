@@ -15,7 +15,7 @@ desc(
    #include <stdio.h>
    #include <stdlib.h>
    #include <string.h>
-   
+
    char* vulnerable_function(const char *input) {
        char *buffer = malloc(strlen(input) + 1);
        if (buffer == NULL) {
@@ -24,7 +24,7 @@ desc(
        strcpy(buffer, input);
        return buffer;
    }
-   
+
    int main() {
        char *result = vulnerable_function("test");
        if (result) {
@@ -52,7 +52,7 @@ DESC
    #include <stdio.h>
    #include <stdlib.h>
    #include <string.h>
-   
+
    char* safe_function(const char *input) {
        char *buffer = malloc(strlen(input) + 1);
        if (buffer == NULL) {
@@ -61,7 +61,7 @@ DESC
        strcpy(buffer, input);
        return buffer;
    }
-   
+
    int main() {
        char *result = safe_function("test");
        if (result) {
@@ -84,7 +84,7 @@ DESC
    ```cpp
    #include <memory>
    #include <cstring>
-   
+
    std::unique_ptr<char[]> safe_function(const char *input) {
        auto buffer = std::make_unique<char[]>(strlen(input) + 1);
        strcpy(buffer.get(), input);
@@ -98,9 +98,9 @@ SOLUTION
 REFERENCE
 )
 
-malloc?{opcode: func} as $alloc;
-calloc?{opcode: func} as $alloc;
-realloc?{opcode: func} as $alloc;
+// C 里未声明的 malloc/calloc/realloc 会被编译成 make(Pointer)，按返回值类型匹配
+*?{opcode: make} as $makes;
+$makes?{<self><string>?{have: "Pointer"}} as $alloc;
 
 free(* #-> as $safe);
 $alloc - $safe as $low
@@ -201,7 +201,7 @@ char* vulnerable_function(const char *input) {
     if (buffer == NULL) {
         return NULL;
     }
-    
+
     strcpy(buffer, input);
     return buffer;
 }
@@ -215,7 +215,26 @@ int main() {
 }
 UNSAFE
 	'safefile://safe_memory.c': <<<SAFE
-int main(void) {
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char* vulnerable_function(const char *input) {
+    char *buffer = malloc(strlen(input) + 1);
+    if (buffer == NULL) {
+        return NULL;
+    }
+
+    strcpy(buffer, input);
+    return buffer;
+}
+
+int main() {
+    char *result = vulnerable_function("test");
+    if (result) {
+        printf("Result: %s\n", result);
+    }
+    free(result);
     return 0;
 }
 SAFE

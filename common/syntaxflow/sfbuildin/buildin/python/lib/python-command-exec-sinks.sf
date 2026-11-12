@@ -20,6 +20,11 @@ REFERENCE
 
 os.system as $output
 os.popen as $output
+subprocess.Popen as $output
+subprocess.call as $output
+subprocess.run as $output
+subprocess.check_output as $output
+subprocess.check_call as $output
 
 alert $output for {
 	title: "Python command execution API",

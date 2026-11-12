@@ -111,7 +111,7 @@ DESC
    ```go
    func sanitizeXML(data []byte) []byte {
        // 移除DTD声明部分
-       re := regexp.MustCompile(`(?i)<!DOCTYPE[^>]*>`) 
+       re := regexp.MustCompile(`(?i)<!DOCTYPE[^>]*>`)
        return re.ReplaceAll(data, []byte{})
    }
    ```
@@ -129,10 +129,12 @@ xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry;
 $entry.Unmarshal(*<slice(index=0)> #-> as $sink);
 $sink & $input as $high;
 
-$decoder.Strict?{have: 'true'} as $safe;
-$decoder.Entity?{have: 'xml.HTMLEntity'} as $safe;
+// 显式关闭外部实体（Strict=true、Entity=HTMLEntity）的数据流不再受控
+$decoder.Strict?{have: 'true'} #-> as $safe;
+$decoder.Entity?{have: 'xml.HTMLEntity'} #-> as $safe;
+$high - $safe as $unguarded;
 
-alert $high for {
+alert $unguarded for {
 	type: "vuln",
 	title: "Golang XXE Vulnerability Was Detected",
 	title_zh: "检测到Golang XXE漏洞",
@@ -200,9 +202,9 @@ import (
 
 // User 定义用于演示的用户结构
 type User struct {
-	XMLName xml.Name 
-	Name    string   
-	Email   string  
+	XMLName xml.Name
+	Name    string
+	Email   string
 }
 
 // XXEHandler 处理XXE漏洞演示页面
@@ -243,25 +245,61 @@ func XXEParseHandler(c *gin.Context) {
 }
 UNSAFE
 	'safefile://safe.go': <<<SAFE
-package main
+package api
 
 import (
 	"encoding/xml"
-	"os"
+	"io/ioutil"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func parse() error {
-	file, err := os.Open("/var/data/report.xml")
+// User 定义用于演示的用户结构
+type User struct {
+	XMLName xml.Name
+	Name    string
+	Email   string
+}
+
+// XXEHandler 处理XXE漏洞演示页面
+func XXEHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title": "XXE漏洞演示",
+	})
+}
+
+// XXEParseHandler 处理XML数据解析（安全的方式）
+func XXEParseHandler(c *gin.Context) {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	decoder := xml.NewDecoder(body)
+	decoder.Strict = true
+    decoder.Entity = xml.HTMLEntity
+
 	if err != nil {
-		return err
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "读取请求数据失败: " + err.Error(),
+		})
+		return
 	}
-	defer file.Close()
-	decoder := xml.NewDecoder(file)
-	for {
-		if _, err := decoder.Token(); err != nil {
-			return nil
-		}
+
+	var user User
+	err = xml.Unmarshal(body, &user)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "XML解析失败: " + err.Error(),
+		})
+		return
 	}
+
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title":    "XXE漏洞演示",
+		"success":  "XML解析成功",
+		"username": user.Name,
+		"email":    user.Email,
+	})
 }
 SAFE
 )
