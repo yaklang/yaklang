@@ -44,7 +44,7 @@ const (
 	IrConstKindString
 )
 
-// IrConstValue is what a reader fills on an IrCode from the pool. The write
+// IrConstValue is one const text resolved from the pool. The write
 // path never sets it: a writer sets ConstID and the pool row instead.
 type IrConstValue struct {
 	Kind IrConstKind
@@ -247,11 +247,15 @@ func (p *IrConstPool) Flush(db *gorm.DB) error {
 	return nil
 }
 
-// flushIrConstPools is the write-side hook: every program in the batch flushes
-// the values its instructions interned. A row built without the compile-time
-// interning path (tests, an in-tree caller assembling IrCode directly) still
-// carries its short text in String, so the pool is filled from it instead of
-// leaving ir_codes.const_id zero.
+// flushIrConstPools writes the values a program's instructions interned. The
+// codec interns at marshal time, under the row's final program name, so this
+// hook only has to flush the pending rows of every program in the batch.
+//
+// A row assembled outside the codec (tests, an in-tree caller building an
+// IrCode directly) still carries a short const text in String; it is interned
+// here so the row does not end up with const_id zero. An empty String there is
+// indistinguishable from "no text", so only the codec path can pool an empty
+// string constant.
 //
 // It runs before the IR insert: a row must never point at a pool id that the
 // transaction has not written yet.
@@ -260,27 +264,16 @@ func flushIrConstPools(db *gorm.DB, items []*IrCode) error {
 		return nil
 	}
 	for _, item := range items {
-		if item == nil || item.ConstID != 0 {
+		if item == nil || item.ConstID != 0 || item.ProgramName == "" {
 			continue
 		}
 		if item.Opcode != irCodeConstOpcode || item.ConstType != irCodeConstTypeNormal {
 			continue
 		}
-		text := item.ConstText
-		kind := IrConstKind(item.ConstKind)
-		if kind == IrConstKindNil {
-			// A row built without the codec (tests, an in-tree caller) carries
-			// only the short text column, and an empty value there is
-			// indistinguishable from "no value".
-			text = item.String
-			if text == "" {
-				continue
-			}
+		if item.String == "" {
+			continue
 		}
-		// An empty string constant is a real value: the codec tags it with
-		// IrConstKindString, so it must reach the pool like any other text.
-		// Dropping it here makes restore turn "" into nil.
-		item.ConstID = InternIrConst(item.ProgramName, kind, text)
+		item.ConstID = InternIrConst(item.ProgramName, IrConstKindString, item.String)
 	}
 	programs := make(map[string]struct{}, 1)
 	for _, item := range items {
@@ -437,88 +430,23 @@ func GetIrConstValue(db *gorm.DB, program string, constID int64) *IrConstValue {
 	return &IrConstValue{Kind: IrConstKind(kind), Text: text}
 }
 
-// fillIrConstValues attaches the pool text to rows a reader just loaded. Short
-// values come from the per-program cache, so a restore reads each program's
-// short consts once instead of once per instruction batch.
-func fillIrConstValues(db *gorm.DB, progName string, rows []*IrCode) {
+// warmIrConstValues loads a program's short constants once, so a reader that
+// then calls GetIrConstValue for each row answers from memory. Long values stay
+// in the database: eagerly loading them would hold the whole const payload,
+// 1.3 GB on a yaklang scan, for the entire run, and a long value is referenced
+// by 0.48% of the rows, so a batch would barely dedupe anything.
+func warmIrConstValues(db *gorm.DB, progName string, rows []*IrCode) {
 	if db == nil || progName == "" || len(rows) == 0 {
 		return
 	}
 	// A program without const rows (no const instructions, or one written by
 	// an older build) must not trigger the pool preload: an unnecessary SELECT
 	// on every IR batch is a real cost, and a test counts read queries.
-	hasConstID := false
 	for _, ir := range rows {
 		if ir != nil && ir.ConstID != 0 {
-			hasConstID = true
-			break
-		}
-	}
-	if !hasConstID {
-		return
-	}
-	cache := getIrConstValueCache(progName)
-	cache.preloadShortConsts(db, progName)
-
-	ids := make([]int64, 0, len(rows))
-	seen := make(map[int64]struct{}, len(rows))
-	for _, ir := range rows {
-		if ir == nil || ir.ConstID == 0 {
-			continue
-		}
-		if value, ok := cache.get(ir.ConstID); ok {
-			ir.ConstValue = value
-			continue
-		}
-		if _, ok := seen[ir.ConstID]; ok {
-			continue
-		}
-		seen[ir.ConstID] = struct{}{}
-		ids = append(ids, ir.ConstID)
-	}
-	if len(ids) == 0 {
-		return
-	}
-	values := make(map[int64]*IrConstValue, len(ids))
-	for start := 0; start < len(ids); start += irConstBatchChunk {
-		end := start + irConstBatchChunk
-		if end > len(ids) {
-			end = len(ids)
-		}
-		chunk := ids[start:end]
-		placeholders := make([]string, len(chunk))
-		args := make([]interface{}, 0, len(chunk)+1)
-		args = append(args, progName)
-		for i, id := range chunk {
-			placeholders[i] = "?"
-			args = append(args, id)
-		}
-		query := bindSQLPlaceholdersDB(db, `SELECT const_id, kind, "string" FROM "`+TableIrConstPool+
-			`" WHERE program_name = ? AND const_id IN (`+strings.Join(placeholders, ",")+`)`)
-		sqlRows, err := db.Raw(query, args...).Rows()
-		if err != nil {
-			// A database written before the pool has no such table; the rows
-			// keep their extra_information text and the decode path uses it.
-			log.Debugf("read const pool: %v", err)
+			getIrConstValueCache(progName).preloadShortConsts(db, progName)
 			return
 		}
-		for sqlRows.Next() {
-			var id, kind int64
-			var text string
-			if err := sqlRows.Scan(&id, &kind, &text); err != nil {
-				log.Debugf("scan const pool: %v", err)
-				sqlRows.Close()
-				return
-			}
-			values[id] = &IrConstValue{Kind: IrConstKind(kind), Text: text}
-		}
-		sqlRows.Close()
-	}
-	for _, ir := range rows {
-		if ir == nil || ir.ConstID == 0 {
-			continue
-		}
-		ir.ConstValue = values[ir.ConstID]
 	}
 }
 

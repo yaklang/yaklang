@@ -180,7 +180,7 @@ func TestEmptyStringConstReachesPool(t *testing.T) {
 	prog := "empty-const"
 	require.NoError(t, InsertIrCodes(db, []*IrCode{
 		{CodeID: 1, ProgramName: prog, Opcode: irCodeConstOpcode, ConstType: irCodeConstTypeNormal,
-			ConstText: "", ConstKind: int64(IrConstKindString)},
+			ConstID: InternIrConst(prog, IrConstKindString, "")},
 	}, 10))
 
 	var row IrCode

@@ -89,7 +89,7 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 					cache.Set(ir.CodeID, ir)
 					fallback = append(fallback, ir)
 				}
-				fillIrConstValues(GetDB(), progName, fallback)
+				warmIrConstValues(GetDB(), progName, fallback)
 				for _, ir := range fallback {
 					outC.SafeFeed(ir)
 				}

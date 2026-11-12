@@ -38,21 +38,12 @@ type IrCode struct {
 	String           string `json:"string" gorm:"type:text"`
 	// ConstID is the pool id of a ConstType=normal const: a 64-bit hash of the
 	// rendered text in ir_const_pool_v1. Placeholder consts are member-call
-	// keys, are never searched, and leave it zero.
-	ConstID int64 `json:"const_id"`
-	// ConstText and ConstKind carry the value to the pool writer in the same
-	// flush. They are transient: the text is stored once in the pool, never on
-	// ir_codes. Interning happens at flush time, not at marshal time, because
-	// the batch may still rewrite ProgramName (a library instruction keeps the
-	// application's program name) and the pool row must land under the name the
-	// IR row ends up with.
-	ConstText string `json:"-" gorm:"-"`
-	ConstKind int64  `json:"-" gorm:"-"`
-	// ConstValue is filled by the IR readers from the pool and never written
-	// back.
-	ConstValue        *IrConstValue `json:"-" gorm:"-"`
-	ReadableName      string        `json:"readable_name" gorm:"type:text"`
-	ReadableNameShort string        `json:"readable_name_short"`
+	// keys, are never searched, and leave it zero. The text itself never
+	// reaches this row: the pool holds it once per distinct value, and a
+	// reader resolves the id through GetIrConstValue.
+	ConstID           int64  `json:"const_id"`
+	ReadableName      string `json:"readable_name" gorm:"type:text"`
+	ReadableNameShort string `json:"readable_name_short"`
 	// any IrCode in one block inner one  function
 	CurrentBlock    int64 `json:"current_block"`
 	CurrentFunction int64 `json:"current_function"`
