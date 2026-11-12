@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func TestNewContextProviderInlineContentIsCompleteAndReadOnly(t *testing.T) {
+func TestFileContentContextProviderIsCompleteAndReadOnly(t *testing.T) {
 	// Observe only this test process's isolated AI temp directory. Inline data
 	// must not be rematerialized on every context refresh.
 	tempDir := consts.GetDefaultAISpaceDir()
@@ -25,7 +25,7 @@ func TestNewContextProviderInlineContentIsCompleteAndReadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	content := "Filename: synthetic.log\n" + strings.Repeat("INFO synthetic event\n", 100) + "TAIL_INLINE_ANOMALY"
-	provider := NewContextProvider(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_CONTENT, content, "analyze attached data")
+	provider := FileContentContextProvider(content, "analyze attached data")
 	for refresh := 0; refresh < 3; refresh++ {
 		rendered, err := provider(nil, nil, "inline-fixture")
 		if err != nil {
@@ -47,13 +47,13 @@ func TestNewContextProviderInlineContentIsCompleteAndReadOnly(t *testing.T) {
 	}
 }
 
-func TestNewContextProviderFilePathRetainsPreviewLimit(t *testing.T) {
+func TestFileContextProviderRetainsPreviewLimit(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "reference.txt")
 	content := strings.Repeat("x", MaxFileContentSize) + "PATH_TAIL_NOT_IN_PREVIEW"
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	rendered, err := NewContextProvider(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_PATH, path)(nil, nil, "path-fixture")
+	rendered, err := FileContextProvider(path)(nil, nil, "path-fixture")
 	if err != nil {
 		t.Fatal(err)
 	}
