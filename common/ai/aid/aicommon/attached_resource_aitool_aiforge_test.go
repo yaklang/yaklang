@@ -69,8 +69,10 @@ func TestAttachedAIToolResourceDoesNotResolveVerboseName(t *testing.T) {
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
+	require.Contains(t, rendered, "User pinned an AI tool")
 	require.Contains(t, rendered, "Readable Tool")
-	require.Contains(t, rendered, "search_capabilities")
+	require.NotContains(t, rendered, "not found")
+	require.NotContains(t, rendered, "Lookup Result")
 }
 
 func TestAttachedAIToolResourceKeepsUnresolvedMark(t *testing.T) {
@@ -80,8 +82,10 @@ func TestAttachedAIToolResourceKeepsUnresolvedMark(t *testing.T) {
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
+	require.Contains(t, rendered, "User pinned an AI tool")
 	require.Contains(t, rendered, "missing-tool-display-name")
-	require.Contains(t, rendered, "search_capabilities")
+	require.NotContains(t, rendered, "not found")
+	require.NotContains(t, rendered, "Lookup Result")
 }
 
 func TestAttachedAIForgeResourceRecommendsRunnableForge(t *testing.T) {
@@ -127,8 +131,10 @@ func TestAttachedAIForgeResourceDoesNotResolveVerboseName(t *testing.T) {
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
+	require.Contains(t, rendered, "User pinned an AI forge/skill")
 	require.Contains(t, rendered, "Readable Forge")
-	require.Contains(t, rendered, "search_capabilities")
+	require.NotContains(t, rendered, "not found")
+	require.NotContains(t, rendered, "Lookup Result")
 }
 
 func TestAttachedAIForgeResourceKeepsUnresolvedMark(t *testing.T) {
@@ -138,10 +144,12 @@ func TestAttachedAIForgeResourceKeepsUnresolvedMark(t *testing.T) {
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
+	require.Contains(t, rendered, "User pinned an AI forge/skill")
 	require.Contains(t, rendered, "missing-forge-display-name")
-	require.Contains(t, rendered, "search_capabilities")
-	require.Contains(t, rendered, "AI Forge lookup failed")
-	require.Contains(t, rendered, "AI Skill lookup/load failed")
+	require.NotContains(t, rendered, "not found")
+	require.NotContains(t, rendered, "Lookup Result")
+	require.NotContains(t, rendered, "AI Forge lookup failed")
+	require.NotContains(t, rendered, "AI Skill lookup/load failed")
 }
 
 func TestAttachedAIForgeResourceLoadsSkillMD(t *testing.T) {
@@ -152,7 +160,7 @@ func TestAttachedAIForgeResourceLoadsSkillMD(t *testing.T) {
 	require.Nil(t, data.lookupErr)
 	require.True(t, loop.config.GetSkillsContextManager().IsSkillLoaded("code-review"))
 	rendered := data.ToAttachData(loop)
-	require.Contains(t, rendered, "Loaded As: Skill")
+	require.Empty(t, rendered, "loaded Skill content is already written by LoadForcedSkill")
 	timeline, err := MarshalTimeline(loop.config.GetTimeline())
 	require.NoError(t, err)
 	require.True(t, strings.Contains(string(timeline), "code-review"))

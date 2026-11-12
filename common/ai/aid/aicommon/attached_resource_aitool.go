@@ -61,19 +61,16 @@ func (d *AttachedAIToolResourceData) BindLoopData(loop ReActLoopIF) error {
 }
 
 func (d *AttachedAIToolResourceData) ToAttachData(ReActLoopIF) string {
+	if d.lookupErr != nil {
+		return fmt.Sprintf("User pinned an AI tool named `%s`.", d.Name)
+	}
+	if d.tool == nil {
+		return fmt.Sprintf("User pinned an AI tool named `%s`.", d.Name)
+	}
+
 	var b strings.Builder
 	b.WriteString("## Attached AI Tool\n\n")
 	b.WriteString(fmt.Sprintf("- Name: `%s`\n", d.Name))
-	if d.lookupErr != nil {
-		b.WriteString(fmt.Sprintf("- User Marked Name: `%s`\n", d.Name))
-		b.WriteString(fmt.Sprintf("- Lookup Result: not found (%v)\n", d.lookupErr))
-		b.WriteString("\nThe user explicitly marked this tool. It was not resolved by its stable name. Use search_capabilities to find the intended tool, ask for a corrected name if necessary, and do not silently substitute an unrelated tool.\n")
-		return strings.TrimSpace(b.String())
-	}
-	if d.tool == nil {
-		b.WriteString("- Status: unavailable: tool was not resolved\n")
-		return strings.TrimSpace(b.String())
-	}
 	if description := strings.TrimSpace(d.tool.GetDescription()); description != "" {
 		b.WriteString(fmt.Sprintf("- Description: %s\n", description))
 	}
