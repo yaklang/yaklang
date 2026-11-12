@@ -69,10 +69,9 @@ func RunAttachedExtraResourcesInit(
 			runAttachedFileResourceHandlers(r, loop, resourcesByType[typ])
 		}
 		r.AddToTimeline(timelineKey, strings.Join(sections, "\n\n---\n\n"))
-		r.AddToTimeline("import notice", fmt.Sprintf("%s has been recorded; use it when reasoning about the user's attached resources.", timelineKey))
 	}
 
-	if len(sectionsByType) > 0 {
+	if len(resources) > 0 {
 		loop.UserStatus("附加资源处理完成", "Finished loading attached resources")
 	}
 	return resources

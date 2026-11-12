@@ -20,7 +20,6 @@ type AttachedAIForgeResourceData struct {
 	Key         string
 	Name        string
 	forge       *schema.AIForge
-	skillMeta   *aiskillloader.SkillMeta
 	loadedSkill bool
 	lookupErr   error
 }
@@ -40,7 +39,6 @@ func (d *AttachedAIForgeResourceData) Unmarshal(resource *AttachedResource) erro
 
 func (d *AttachedAIForgeResourceData) BindLoopData(loop ReActLoopIF) error {
 	d.forge = nil
-	d.skillMeta = nil
 	d.loadedSkill = false
 	d.lookupErr = nil
 	if d.Key != "" && d.Key != CONTEXT_PROVIDER_KEY_NAME {
@@ -66,7 +64,6 @@ func (d *AttachedAIForgeResourceData) BindLoopData(loop ReActLoopIF) error {
 	if skillErr == nil {
 		skillErr = loadTaskSkill(config.GetSkillsContextManager(), skillMeta)
 		if skillErr == nil {
-			d.skillMeta = skillMeta
 			d.loadedSkill = true
 			return nil
 		}
@@ -137,29 +134,19 @@ func lookupTaskSkill(config *Config, name string) (*aiskillloader.SkillMeta, err
 }
 
 func (d *AttachedAIForgeResourceData) ToAttachData(ReActLoopIF) string {
+	if d.lookupErr != nil {
+		return fmt.Sprintf("User pinned an AI forge/skill named `%s`.", d.Name)
+	}
+	if d.forge == nil && !d.loadedSkill {
+		return fmt.Sprintf("User pinned an AI forge/skill named `%s`.", d.Name)
+	}
+	if d.loadedSkill {
+		return ""
+	}
+
 	var b strings.Builder
 	b.WriteString("## Attached AI Forge\n\n")
 	b.WriteString(fmt.Sprintf("- Name: `%s`\n", d.Name))
-	if d.lookupErr != nil {
-		b.WriteString(fmt.Sprintf("- User Marked Name: `%s`\n", d.Name))
-		b.WriteString(fmt.Sprintf("- Lookup Result: not found (%v)\n", d.lookupErr))
-		b.WriteString("\nThe user explicitly marked this AI Forge or Skill. It was not resolved by its stable name. Use search_capabilities to find the intended capability and do not silently substitute an unrelated one.\n")
-		return strings.TrimSpace(b.String())
-	}
-	if d.forge == nil && !d.loadedSkill {
-		b.WriteString("- Status: unavailable: neither Forge nor Skill was resolved\n")
-		return strings.TrimSpace(b.String())
-	}
-	if d.loadedSkill {
-		b.WriteString("- Loaded As: Skill (forced)\n")
-		skillName := d.Name
-		if d.skillMeta != nil && strings.TrimSpace(d.skillMeta.Name) != "" {
-			skillName = d.skillMeta.Name
-		}
-		b.WriteString(fmt.Sprintf("- Skill Name: `%s`\n", skillName))
-		b.WriteString("\nThe selected Skill has been loaded into the skill context. Use its instructions when planning and executing the task.\n")
-		return strings.TrimSpace(b.String())
-	}
 	if forgeType := strings.TrimSpace(d.forge.ForgeType); forgeType != "" {
 		b.WriteString(fmt.Sprintf("- Type: %s\n", forgeType))
 	}
