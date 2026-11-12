@@ -54,6 +54,24 @@ func timelineItemCountContaining(timeline *Timeline, text string) int {
 	return count
 }
 
+func evidenceJournalIDs(timeline *Timeline, key, operation string) []int64 {
+	if timeline == nil {
+		return nil
+	}
+	var ids []int64
+	timeline.mu.RLock()
+	timeline.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		promoted, ok := item.value.(*PromotableTimelineItem)
+		if ok && promoted != nil && promoted.Kind == TimelinePromotedKindEvidence &&
+			promoted.Key == key && promoted.Operation == operation {
+			ids = append(ids, id)
+		}
+		return true
+	})
+	timeline.mu.RUnlock()
+	return ids
+}
+
 func TestTimelineBroadcastReachesParentForkAndTaskOnlyTimeline(t *testing.T) {
 	parent := newTimelineBroadcastConfig(t)
 	unrelated := newTimelineBroadcastConfig(t)
@@ -68,7 +86,6 @@ func TestTimelineBroadcastReachesParentForkAndTaskOnlyTimeline(t *testing.T) {
 	unregisterClean, err := parent.RegisterTimeline(clean)
 	require.NoError(t, err)
 	t.Cleanup(unregisterClean)
-
 	require.Empty(t, clean.GetTimelineItemIDs(), "task-only timelines start clean")
 
 	require.NoError(t, parent.BroadcastTimelineText("shared update"))
@@ -235,18 +252,82 @@ func TestSessionEvidenceLocalApplyStaysOnOwningTimeline(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(fork.Release)
 
-	require.True(t, parent.ApplySessionEvidenceOpsWithChange([]EvidenceOperation{{
+	owned := NewPrivateTimeline(parent, nil)
+	child := newTimelineBroadcastConfig(t,
+		WithTimeline(owned),
+		WithTimelineBroadcaster(parent.TimelineBroadcaster),
+	)
+	require.Same(t, owned, child.Timeline)
+
+	require.True(t, child.ApplySessionEvidenceOpsWithChange([]EvidenceOperation{{
 		Op:      "add",
 		ID:      "local-only",
-		Content: "this finding belongs to the parent timeline only",
+		Content: "this finding belongs to the child config timeline only",
 	}}))
-	parentStore, found := parent.Timeline.evidenceStore()
+	ownedStore, found := owned.evidenceStore()
 	require.True(t, found)
-	require.Contains(t, parentStore.Render(), "local-only")
+	require.Contains(t, ownedStore.Render(), "local-only")
 
+	parentStore, found := parent.Timeline.evidenceStore()
+	require.False(t, found)
+	require.NotContains(t, parentStore.Render(), "local-only")
 	forkStore, found := fork.Branch.evidenceStore()
 	require.False(t, found)
 	require.NotContains(t, forkStore.Render(), "local-only")
+}
+
+func TestBroadcastEvidenceAppliesAndDeletesPerTimeline(t *testing.T) {
+	parent := newTimelineBroadcastConfig(t)
+	seed, err := BuildSessionEvidenceUpsert("shared-state", "seed")
+	require.NoError(t, err)
+	require.True(t, parent.ApplySessionEvidenceOpsWithChange([]EvidenceOperation{seed}))
+
+	fork, err := parent.Timeline.ForkForTask("broadcast-evidence", "broadcast evidence", parent, parent)
+	require.NoError(t, err)
+	t.Cleanup(fork.Release)
+
+	clean := NewPrivateTimeline(parent, nil)
+	clean.SoftBindConfig(parent, parent)
+	unregisterClean, err := parent.RegisterTimeline(clean)
+	require.NoError(t, err)
+	t.Cleanup(unregisterClean)
+	timelines := []*Timeline{parent.Timeline, fork.Branch, clean}
+
+	// Parent and fork already contain the seed inherited from the fork snapshot;
+	// task-only Timeline starts empty. A broadcast must let each receiver decide.
+	require.NoError(t, parent.BroadcastEvidence(seed))
+	parentMax, forkMax := parent.Timeline.GetMaxID(), fork.Branch.GetMaxID()
+	require.Len(t, evidenceJournalIDs(clean, seed.ID, TimelinePromotedOperationUpsert), 1)
+	require.Equal(t, parentMax, parent.Timeline.GetMaxID())
+	require.Equal(t, forkMax, fork.Branch.GetMaxID())
+
+	next, err := BuildSessionEvidenceUpsert("shared-state", "next")
+	require.NoError(t, err)
+	beforeUpserts := make(map[*Timeline]int, len(timelines))
+	for _, timeline := range timelines {
+		beforeUpserts[timeline] = len(evidenceJournalIDs(timeline, next.ID, TimelinePromotedOperationUpsert))
+	}
+	require.NoError(t, parent.BroadcastEvidence(next))
+	ids := make([]int64, 0, len(timelines))
+	for _, timeline := range timelines {
+		journalIDs := evidenceJournalIDs(timeline, next.ID, TimelinePromotedOperationUpsert)
+		require.Len(t, journalIDs, beforeUpserts[timeline]+1)
+		ids = append(ids, journalIDs[len(journalIDs)-1])
+		store, found := timeline.evidenceStore()
+		require.True(t, found)
+		require.Contains(t, store.Render(), "next")
+	}
+	require.NotEqual(t, ids[0], ids[1])
+	require.NotEqual(t, ids[0], ids[2])
+	require.NotEqual(t, ids[1], ids[2])
+
+	require.NoError(t, parent.BroadcastEvidence(EvidenceOperation{ID: next.ID, Op: "delete"}))
+	for _, timeline := range timelines {
+		require.Len(t, evidenceJournalIDs(timeline, next.ID, TimelinePromotedOperationDelete), 1)
+		store, found := timeline.evidenceStore()
+		require.True(t, found)
+		require.NotContains(t, store.Render(), next.ID)
+	}
 }
 
 func TestTimelineForkWaitsForInFlightBroadcast(t *testing.T) {
