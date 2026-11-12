@@ -1,4 +1,4 @@
-package amd64
+package x86
 
 import (
 	"context"
@@ -10,46 +10,46 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
 
-func (Parser) Disassemble(ctx context.Context, request core.ParseRequest) (*core.Disassembly, error) {
-	if err := (Parser{}).Check(request.Target); err != nil {
+func disassemble(ctx context.Context, profile Profile, request core.ParseRequest) (*core.Disassembly, error) {
+	if err := profile.Check(request.Target); err != nil {
 		return nil, err
 	}
 	if request.Reader == nil || request.Reader.Size() == 0 {
-		return nil, fmt.Errorf("amd64: empty code region")
+		return nil, fmt.Errorf("%s: empty code region", profile.Name)
 	}
-	diagnostics := &amd64Diagnostics{}
-	decoded, err := decodeAMD64(ctx, request, diagnostics, true)
+	diagnostics := &diagnostics{profile: profile}
+	decoded, err := decodeInstructions(ctx, profile, request, diagnostics, true)
 	if err != nil {
 		return nil, err
 	}
 	if len(decoded) == 0 {
-		message := fmt.Sprintf("amd64: no instruction decoded at 0x%x", request.Address)
+		message := fmt.Sprintf("%s: no instruction decoded at 0x%x", profile.Name, request.Address)
 		if len(diagnostics.items) > 0 {
 			message += ": " + diagnostics.items[0].Message
 		}
 		return nil, fmt.Errorf("%s", message)
 	}
-	functions, blockIDs := buildAMD64Functions(decoded, diagnostics)
+	functions, blockIDs := buildFunctions(decoded, diagnostics)
 	// Assembly and LowIR are two views of the same decode-and-lift pipeline.
 	// Report lift diagnostics in both modes so a region cannot look clean only
 	// because the caller asked for text.
-	_ = liftAMD64Functions(request.Target, functions, blockIDs, diagnostics)
+	_ = liftFunctions(profile, request.Target, functions, blockIDs, diagnostics)
 	return &core.Disassembly{
-		Text:         renderAMD64Assembly(decoded, request.Syntax),
+		Text:         renderAssembly(profile, decoded, request.Syntax),
 		Instructions: len(decoded),
 		Diagnostics:  diagnostics.finish(),
 	}, nil
 }
 
-func renderAMD64Assembly(decoded []amd64Instruction, syntax core.AsmSyntax) string {
+func renderAssembly(profile Profile, decoded []instruction, syntax core.AsmSyntax) string {
 	var text strings.Builder
 	for _, instruction := range decoded {
-		fmt.Fprintf(&text, "0x%x  %-24s  %s\n", instruction.address, formatInstructionBytes(instruction.raw), instruction.text(syntax))
+		fmt.Fprintf(&text, "0x%x  %-24s  %s\n", instruction.address, formatInstructionBytes(instruction.raw), instruction.text(profile, syntax))
 	}
 	return text.String()
 }
 
-func (i amd64Instruction) text(syntax core.AsmSyntax) string {
+func (i instruction) text(profile Profile, syntax core.AsmSyntax) string {
 	if i.endbr != "" {
 		return i.endbr
 	}

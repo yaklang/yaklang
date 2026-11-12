@@ -1,0 +1,79 @@
+[
+  {
+    "name": "add eax, ebx",
+    "address": "0x401000",
+    "code": [
+      "01 d8 // add eax, ebx",
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x401000 @ 0x401000",
+      "block b1 @ 0x401000",
+      "  0x401000  v1:i32 = read_register %eax [read_register]",
+      "  0x401000  v2:i32 = read_register %ebx [read_register]",
+      "  0x401000  v3:i32 = add v1, v2",
+      "  0x401000  write_register %eax, v3 [write_register]",
+      "  0x401000  v4:i32 = intrinsic @x86.flags.add, v1, v2, v3 [write_register]",
+      "  0x401000  write_register %eflags, v4 [write_register]",
+      "  0x401002  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load from ebx",
+    "address": "0x401010",
+    "code": [
+      "8b 43 08 // mov eax, [ebx+8]",
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x401010 @ 0x401010",
+      "block b1 @ 0x401010",
+      "  0x401010  v1:i32 = read_register %ebx [read_register]",
+      "  0x401010  v2:ptr32 = copy v1",
+      "  0x401010  v3:i64 = constant 0x8",
+      "  0x401010  v4:ptr32 = add v2, v3",
+      "  0x401010  v5:i32 = load v4 [read_memory]",
+      "  0x401010  write_register %eax, v5 [write_register]",
+      "  0x401013  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "push ebp",
+    "address": "0x401020",
+    "code": [
+      "55 // push ebp",
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x401020 @ 0x401020",
+      "block b1 @ 0x401020",
+      "  0x401020  v1:i32 = read_register %ebp [read_register]",
+      "  0x401020  v2:i32 = read_register %esp [read_register]",
+      "  0x401020  v3:i32 = constant 0x4",
+      "  0x401020  v4:i32 = sub v2, v3",
+      "  0x401020  write_register %esp, v4 [write_register]",
+      "  0x401020  v5:ptr32 = copy v4",
+      "  0x401020  store v5, v1 [write_memory]",
+      "  0x401021  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov imm32",
+    "address": "0x401030",
+    "code": [
+      "b8 2a 00 00 00 // mov eax, 0x2a",
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x401030 @ 0x401030",
+      "block b1 @ 0x401030",
+      "  0x401030  v1:i32 = constant 0x2a",
+      "  0x401030  write_register %eax, v1 [write_register]",
+      "  0x401035  return [may_trap, unknown]"
+    ]
+  }
+]
