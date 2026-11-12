@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/amd64"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/arm"
 	arm64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/arm64"
+	loong64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/loong64"
 	mipsimpl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/mips"
 	mips64impl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/mips64"
 	ppcimpl "github.com/yaklang/yaklang/common/yak/reify/loader/arch/ppc"
@@ -29,7 +30,7 @@ func All() []core.Parser {
 		riscv64impl.Parser{}, riscv32impl.Parser{},
 		ppc64impl.Parser{}, ppcimpl.Parser{},
 		mips64impl.Parser{}, mipsimpl.Parser{},
-		s390ximpl.Parser{},
+		s390ximpl.Parser{}, loong64impl.Parser{},
 	}
 }
 

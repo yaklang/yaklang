@@ -376,6 +376,8 @@ func elfArchitecture(machine elf.Machine, bits int) core.Architecture {
 		return core.ArchPPC64
 	case elf.EM_S390:
 		return core.ArchS390X
+	case elf.EM_LOONGARCH:
+		return core.ArchLOONG64
 	default:
 		return core.ArchUnknown
 	}

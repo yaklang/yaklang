@@ -1,9 +1,9 @@
-package s390x
+package loong64
 
 import (
 	"sort"
 
-	"golang.org/x/arch/s390x/s390xasm"
+	"golang.org/x/arch/loong64/loong64asm"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -23,33 +23,31 @@ const (
 	priorityScan
 )
 
-type s390xBoundary struct {
+type loong64Boundary struct {
 	core.FunctionBoundary
 	priority boundaryPriority
 }
 
 type boundaryScanner struct {
-	profile Profile
 	reader  *core.ByteReader
 	hints   core.BoundaryHints
 	image   *core.Image
-	entries map[uint64]*s390xBoundary
+	entries map[uint64]*loong64Boundary
 	data    map[uint64][]byte
 	stats   core.BoundaryStats
 }
 
-// discoverBoundaries finds s390x function starts from format metadata, symbols,
+// discoverBoundaries finds LoongArch function starts from format metadata, symbols,
 // .eh_frame, the entry point, direct calls and a prologue scan.
-func discoverBoundaries(profile Profile, reader *core.ByteReader, hints core.BoundaryHints, image *core.Image) (core.BoundaryResult, error) {
+func discoverBoundaries(reader *core.ByteReader, hints core.BoundaryHints, image *core.Image) (core.BoundaryResult, error) {
 	if reader == nil || image == nil || len(hints.ExecSections) == 0 {
 		return core.BoundaryResult{}, nil
 	}
 	scanner := &boundaryScanner{
-		profile: profile,
 		reader:  reader,
 		hints:   hints,
 		image:   image,
-		entries: make(map[uint64]*s390xBoundary),
+		entries: make(map[uint64]*loong64Boundary),
 		data:    make(map[uint64][]byte),
 	}
 	scanner.addSymbols()
@@ -74,12 +72,12 @@ func discoverBoundaries(profile Profile, reader *core.ByteReader, hints core.Bou
 }
 
 func (s *boundaryScanner) add(address, size uint64, name string, source core.BoundarySource, priority boundaryPriority) bool {
-	if address == 0 || address%2 != 0 || s.regionFor(address) == nil {
+	if address == 0 || address%4 != 0 || s.regionFor(address) == nil {
 		return false
 	}
-	// s390x instructions are at least two bytes wide; a smaller range is a
-	// marker symbol, not a function.
-	if size < 2 {
+	// LoongArch instructions are four bytes wide; a smaller range is a marker
+	// symbol, not a function.
+	if size < 4 {
 		size = 0
 	}
 	switch source {
@@ -117,7 +115,7 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 		}
 		return false
 	}
-	s.entries[address] = &s390xBoundary{
+	s.entries[address] = &loong64Boundary{
 		FunctionBoundary: core.FunctionBoundary{Address: address, Size: size, Name: name, Source: source},
 		priority:         priority,
 	}
@@ -176,25 +174,21 @@ func (s *boundaryScanner) regionData(region *core.Region) []byte {
 	return data
 }
 
-func (s *boundaryScanner) decode(address uint64) (s390xasm.Inst, int, bool) {
+func (s *boundaryScanner) decode(address uint64) (loong64asm.Inst, int, bool) {
 	region := s.regionFor(address)
 	if region == nil {
-		return s390xasm.Inst{}, 0, false
+		return loong64asm.Inst{}, 0, false
 	}
 	data := s.regionData(region)
 	offset := address - region.Address
-	if offset+2 > uint64(len(data)) {
-		return s390xasm.Inst{}, 0, false
+	if offset+4 > uint64(len(data)) {
+		return loong64asm.Inst{}, 0, false
 	}
-	end := offset + 6
-	if end > uint64(len(data)) {
-		end = uint64(len(data))
+	inst, err := loong64asm.Decode(data[offset:])
+	if err != nil {
+		return loong64asm.Inst{}, 0, false
 	}
-	inst, err := s390xasm.Decode(data[offset:end])
-	if err != nil || inst.Len <= 0 {
-		return s390xasm.Inst{}, 0, false
-	}
-	return inst, inst.Len, true
+	return inst, 4, true
 }
 
 func (s *boundaryScanner) nextBoundary(address uint64) uint64 {
@@ -281,12 +275,12 @@ func (s *boundaryScanner) walkFunction(start, limit uint64) (uint64, []uint64) {
 		name := nameOf(inst.Op)
 		switch {
 		case isCall(name):
-			if target, ok := branchTarget(inst, address, size); ok {
+			if target, ok := branchTarget(name, args(inst), address); ok {
 				calls = append(calls, target)
 			}
 			work = append(work, end)
 		case isBranch(name):
-			if target, ok := branchTarget(inst, address, size); ok && target >= start && target < limit {
+			if target, ok := branchTarget(name, args(inst), address); ok && target >= start && target < limit {
 				work = append(work, target)
 			}
 			work = append(work, end)
@@ -341,16 +335,17 @@ func (s *boundaryScanner) addTailScan() {
 	}
 }
 
-// scanGap recovers a function start that no symbol reached. A candidate must
-// follow padding or an unconditional branch, because s390x instructions are
-// variable length and a blind scan otherwise lands mid-instruction.
+// scanGap recovers a function start that no symbol reached. LoongArch
+// instructions are fixed width, so every aligned slot is a candidate; the scan
+// trusts a slot only when the decoder accepts it and the instruction can start a
+// function.
 func (s *boundaryScanner) scanGap(start, end uint64) {
 	padding := true
-	for address := start; address+6 <= end; {
+	for address := start; address+8 <= end; {
 		inst, size, ok := s.decode(address)
 		if !ok {
 			padding = true
-			address += 2
+			address += 4
 			continue
 		}
 		name := nameOf(inst.Op)
@@ -371,11 +366,11 @@ func (s *boundaryScanner) scanGap(start, end uint64) {
 }
 
 // plausibleFunctionStart accepts the prologue forms the compilers emit: a stack
-// allocation, a frame store, an address load or a literal load.
+// adjustment, a saved register or an address load.
 func plausibleFunctionStart(name string) bool {
 	switch name {
-	case "stmg", "stg", "agr", "lgr", "larl", "lay", "ahi", "aghi", "lghi",
-		"brasl", "basr", "tmll", "clgfi":
+	case "addi.d", "addi.w", "st.d", "st.w", "or", "move", "pcaddu12i",
+		"pcalau12i", "lu12i.w", "ld.d", "ld.w", "b":
 		return true
 	}
 	return false

@@ -10,21 +10,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
 
-func disassemble(ctx context.Context, profile Profile, request core.ParseRequest) (*core.Disassembly, error) {
+func disassemble(ctx context.Context, request core.ParseRequest) (*core.Disassembly, error) {
 	if request.Reader == nil || request.Reader.Size() == 0 {
-		return nil, fmt.Errorf("%s: empty code region", profile.Name)
+		return nil, fmt.Errorf("%s: empty code region", architectureName)
 	}
-	diagnostics := &diagnostics{profile: profile}
-	decoded, err := decodeInstructions(ctx, profile, request, diagnostics)
+	diagnostics := &diagnostics{}
+	decoded, err := decodeInstructions(ctx, request, diagnostics)
 	if err != nil {
 		return nil, err
 	}
 	if len(decoded) == 0 {
-		return nil, fmt.Errorf("%s: no instruction decoded at 0x%x", profile.Name, request.Address)
+		return nil, fmt.Errorf("%s: no instruction decoded at 0x%x", architectureName, request.Address)
 	}
 	end := request.Address + uint64(request.Reader.Size())
 	functions, blockIDs := buildFunctions(decoded, request.Address, end, diagnostics)
-	_ = liftFunctions(profile, request.Target, functions, blockIDs, diagnostics)
+	_ = liftFunctions(request.Target, functions, blockIDs, diagnostics)
 	return &core.Disassembly{
 		Text:         renderAssembly(decoded),
 		Instructions: len(decoded),
