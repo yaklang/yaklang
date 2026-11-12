@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -184,4 +185,45 @@ func TestReAct_CompressionSuccessCannotResetOverflowBudget(t *testing.T) {
 	budget := react.config.GetPromptOverflowRetryMax() + 1
 	require.LessOrEqual(t, normalCalls, budget*budget)
 	require.Greater(t, compressionCalls, 1, "exercise repeated successful maintenance without normal request progress")
+}
+
+func TestReAct_DisabledAutoAdjustStopsOnFirstOverflow(t *testing.T) {
+	for _, withIdentity := range []bool{true, false} {
+		t.Run(fmt.Sprint("response_identity=", withIdentity), func(t *testing.T) {
+			model := uuid.NewString()
+			disabled := true
+			db := consts.GetGormProfileDatabase()
+			require.NoError(t, yakit.SetAIModelContextSettings(db, "test", model, 500*1024, &disabled))
+			before := yakit.GetAIModelContext(db, "test", model)
+			calls, compressionCalls := 0, 0
+			react, err := NewTestReAct(
+				aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true),
+				aicommon.WithAIAutoRetry(3), aicommon.WithAITransactionAutoRetry(3),
+				aicommon.WithAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					calls++
+					if req.GetCallerLabel() == aicommon.CallerLabelContextCompress {
+						compressionCalls++
+					}
+					evidence := aispec.PromptOverflowEvidence{MaxContextTokens: 128000}
+					if withIdentity {
+						evidence.Provider, evidence.Model = "test", model
+					}
+					return nil, &aispec.PromptOverflowError{PromptOverflowEvidence: evidence}
+				}))
+			require.NoError(t, err)
+			react.config.UpdateAIModelInfo("test", model)
+			loop, err := reactloops.NewReActLoop("manual-overflow", react, reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableLoopPerception(true), reactloops.WithMaxIterations(100))
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			err = loop.Execute(uuid.NewString(), ctx, "Continue working.")
+			require.ErrorContains(t, err, "自动调整已关闭")
+			require.True(t, aicommon.IsPromptTooLong(err), "preserve the underlying provider error")
+			require.NoError(t, ctx.Err(), "overflow must stop immediately, not by timeout")
+			require.Equal(t, 1, calls, "must not retry at either the request or outer-loop level")
+			require.Zero(t, compressionCalls)
+			require.Equal(t, before, yakit.GetAIModelContext(db, "test", model))
+			require.Nil(t, react.config.ModelContextStatus(0).Change)
+		})
+	}
 }
