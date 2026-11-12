@@ -1,4 +1,4 @@
-package parser
+package ast_test
 
 import (
 	"strings"
@@ -7,7 +7,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
+	"github.com/yaklang/yaklang/common/yak/typescript/frontend/parser"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/scanner"
 )
 
@@ -19,7 +21,7 @@ func TestGetLineAndCharacterOfPositionIsNotQuadraticOnLongLines(t *testing.T) {
 	const lineBytes = 1 << 20
 	line := `var longName = "` + strings.Repeat("a", lineBytes) + `";`
 	source := line + "\nvar second = 1;\n"
-	file := ParseSourceFile("long.js", "", source, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
+	var file *ast.SourceFile = parser.ParseSourceFile("long.js", "", source, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 
 	start := time.Now()
 	const probes = 4000
@@ -42,7 +44,7 @@ func TestGetLineAndCharacterOfPositionIsNotQuadraticOnLongLines(t *testing.T) {
 // Lines with multibyte runes must keep counting runes, not bytes.
 func TestGetLineAndCharacterOfPositionCountsRunesOnMultibyteLines(t *testing.T) {
 	source := "var 名字 = \"值\";\nvar tail = 1;\n"
-	file := ParseSourceFile("unicode.js", "", source, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
+	var file *ast.SourceFile = parser.ParseSourceFile("unicode.js", "", source, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 	require.False(t, file.IsASCIILine(0), "a line with CJK identifiers is not ASCII")
 
 	for _, probe := range []string{"名字", "值", "\"值\"", "="} {
