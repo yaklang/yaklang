@@ -391,6 +391,8 @@ github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034 h1:xEjfB8k9GPDz
 github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034/go.mod h1:jBN6/F8NLkvK/H/wZMwPqwD6AofmO/vngIecz8qBkNo=
 github.com/yaklang/javajive v0.7.1-0.20261103025322-66a7a6e68cc4 h1:QnQiYQikgj6uq2LMuEmFMV78+RrBdNUwJI16snG+VaY=
 github.com/yaklang/javajive v0.7.1-0.20261103025322-66a7a6e68cc4/go.mod h1:jBN6/F8NLkvK/H/wZMwPqwD6AofmO/vngIecz8qBkNo=
+github.com/yaklang/javajive v0.8.0 h1:1fZoKGM0/sIV3CYpHtE0VsrQlPFKJqt1HmYZPY60hNM=
+github.com/yaklang/javajive v0.8.0/go.mod h1:W/Hnl/lXixDDqfGJQkXcb9FIYTMWP0SKtKvhQMrBPCU=
 github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80 h1:ZSw9udYCWovKLhUQhoNurjaEvX+HroS6il3hE3ulTC4=
 github.com/yaklang/pcap v1.0.6-0.20260710032136-5f3df87eea80/go.mod h1:JDglFyNaXnntS5KmdIVlhnZBAYFc0oEGPrmJlOI3MDg=
 github.com/yaklang/pcap v1.0.7-0.20261013042911-fa4332334a4a h1:slrwu0qOSR7hAbGpt0MDurG/ZkEPxT36MrUbiU8dEVI=
