@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -128,7 +129,17 @@ func TestResilienceSubForgeTaskTreeDeadlineWithBlockedHandler(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("child deadline waited for the event callback")
 	}
-	// The terminal snapshot reaches history even while progress is blocked.
+	// The terminal is already durable at return, without waiting for its callback.
+	var persisted []*schema.AiOutputEvent
+	require.NoError(t, consts.GetGormProjectDatabase().Where("coordinator_id = ? AND type = ?", start.ParentCoordinatorID, schema.EVENT_TYPE_SUB_FORGE_TASK_TREE).Find(&persisted).Error)
+	found := false
+	for _, row := range persisted {
+		if row.GetContentJSONPath("$.child_coordinator_id") == start.ChildCoordinatorID && row.GetContentJSONPath("$.status") == "timed_out" {
+			found = true
+		}
+	}
+	require.True(t, found, "terminal must be saved before invokeSubForge returns")
+	// The terminal callback also remains independent of the blocked progress callback.
 	end := readSubForgeTree(t, events)
 	unblock()
 	require.Equal(t, "timed_out", end.Status)
@@ -211,6 +222,8 @@ func TestSubForgeTaskTreeTracksIndividualNodeStates(t *testing.T) {
 	cfg := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 		if event.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE {
 			events <- event
+		} else if event.NodeId == "react_task_status_changed" {
+			t.Error("child retry leaked into parent event stream")
 		}
 	}))
 	parent := &Session{Config: cfg}
@@ -219,8 +232,8 @@ func TestSubForgeTaskTreeTracksIndividualNodeStates(t *testing.T) {
 	require.NoError(t, err)
 	original := string(plan.Tree)
 	binding := SubForgeTool{Schema: mcp.NewTool("inspect"), Run: func(ctx context.Context, _ aitool.InvokeParams, _ []*aitool.Tool, opts ...aicommon.ConfigOption) (any, error) {
-		child := &Session{Config: aicommon.NewConfig(ctx, opts...), tasks: map[string]*aicommon.AIStatefulTaskBase{}, opened: map[string]bool{}, closed: map[string]bool{}}
-		for i, state := range []State{Pending, Running, Accepted, Failed, Cancelled} {
+		child := &Session{Config: aicommon.NewConfig(ctx, opts...), parent: cfg, tasks: map[string]*aicommon.AIStatefulTaskBase{}, opened: map[string]bool{}, closed: map[string]bool{}}
+		for i, state := range []State{Pending, Running, Accepted, Running, Failed, Cancelled, Running} {
 			snapshot := Snapshot{Revision: uint64(i + 1), Phase: PhaseExec, Plan: plan, Attempts: map[string]Attempt{}}
 			for index, node := range plan.Tasks {
 				progress := Pending
@@ -236,7 +249,7 @@ func TestSubForgeTaskTreeTracksIndividualNodeStates(t *testing.T) {
 	_, err = parent.invokeSubForge(ctx, task, "call", binding, nil)
 	require.NoError(t, err)
 	require.Equal(t, "running", readSubForgeTree(t, events).Status)
-	for i, expected := range []string{"", "processing", "completed", "aborted", "skipped"} {
+	for i, expected := range []string{"", "processing", "completed", "processing", "aborted", "skipped", "processing"} {
 		snapshot := readSubForgeTree(t, events)
 		require.Equal(t, uint64(i+2), snapshot.Revision)
 		var tree PlanNode
