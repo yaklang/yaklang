@@ -28,18 +28,35 @@ func MCPToolMediaResult(ctx context.Context, c MCPImageResourceReader, result *m
 		}
 		return nil, fmt.Errorf("%s", text)
 	}
-	contents, err := resolveMCPImageResources(ctx, c, result.Content)
+	value, _, err := convertMCPToolResult(ctx, c, result, source)
 	if err != nil {
 		return nil, err
 	}
-	value, _, err := convertMCPToolContent(ctx, contents, source)
-	if err != nil {
-		return nil, err
-	}
-	if _, ok := value.(*MediaResult); ok {
+	if _, ok := value.(string); !ok {
 		return value, nil
 	}
 	return result, nil
+}
+
+func convertMCPToolResult(ctx context.Context, c MCPImageResourceReader, result *mcp.CallToolResult, source aimedia.Source) (any, string, error) {
+	contents, err := resolveMCPImageResources(ctx, c, result.Content)
+	if err != nil {
+		return nil, "", err
+	}
+	converted, err := convertMCPToolContent(ctx, contents, source)
+	if err != nil {
+		return nil, "", err
+	}
+	value := any(converted.text)
+	if result.StructuredContent != nil {
+		summary := *result
+		summary.Content = converted.blocks
+		value = &summary
+	}
+	if len(converted.images) != 0 {
+		value = &MediaResult{Result: value, Images: converted.images}
+	}
+	return value, converted.text, nil
 }
 
 func resolveMCPImageResources(ctx context.Context, c MCPImageResourceReader, contents []any) ([]any, error) {
@@ -130,7 +147,7 @@ func resolveMCPImageResources(ctx context.Context, c MCPImageResourceReader, con
 			if blob.URI != uri || !strings.HasPrefix(blob.MIME, "image/") || blob.Blob == "" {
 				return nil, fmt.Errorf("MCP image resource returned mismatched content")
 			}
-			out = append(out, mcp.NewImageContent(blob.Blob, blob.MIME))
+			out = append(out, fetchedMCPImage{mcp.NewImageContent(blob.Blob, blob.MIME)})
 			found = true
 		}
 		if !found {

@@ -36,7 +36,12 @@ func TestMCPYakTools(t *testing.T) {
 	require.NoError(t, png.Encode(&pngBytes, image.NewRGBA(image.Rect(0, 0, 9, 7))))
 	encodedImage := base64.StdEncoding.EncodeToString(pngBytes.Bytes())
 	remote.AddTool(mcp.NewTool("capture"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return mcp.NewToolResultImage("screen capture", encodedImage, "image/png"), nil
+		result := mcp.NewToolResultImage("screen capture", encodedImage, "image/png")
+		result.StructuredContent = json.RawMessage(`{"window_id":9007199254740993,"state_id":"screen-1","image_content_index":1}`)
+		return result, nil
+	})
+	remote.AddTool(mcp.NewTool("inspect"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{Content: []any{mcp.NewTextContent("inspect result")}, StructuredContent: json.RawMessage(`{"state_id":"text-only"}`)}, nil
 	})
 	remote.AddTool(mcp.NewTool("echo", mcp.WithString("message", mcp.Required())), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return mcp.NewToolResultText(req.Params.Arguments["message"].(string)), nil
@@ -104,6 +109,9 @@ func TestMCPYakTools(t *testing.T) {
 	message := "hello from real Yak tool\n引号\""
 	called := invoke("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "echo", "arguments": map[string]any{"message": message}})
 	require.Contains(t, called, `hello from real Yak tool\n引号\"`)
+	require.NotContains(t, called, "structuredContent")
+	inspected := invoke("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "inspect"})
+	require.Contains(t, inspected, `"structuredContent":{"state_id":"text-only"}`)
 	require.NoError(t, yakit.UpsertMCPServerToolConfig(profile, "fixture", "echo", false))
 	_, err = execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "echo", "arguments": map[string]any{"message": "blocked"}})
 	require.Error(t, err)
@@ -113,6 +121,12 @@ func TestMCPYakTools(t *testing.T) {
 	require.Len(t, capture.Images, 1)
 	require.NotContains(t, capture.Stdout, encodedImage)
 	require.Equal(t, 9, capture.Images[0].Width)
+	result := capture.Result.(*mcp.CallToolResult)
+	require.Equal(t, `{"window_id":9007199254740993,"state_id":"screen-1","image_content_index":1}`, string(result.StructuredContent))
+	require.Len(t, result.Content, 2)
+	require.Equal(t, capture.Images[0].ID, result.Content[1].(map[string]any)["image_id"])
+	require.Equal(t, 0, result.Content[1].(map[string]any)["image_index"])
+	require.NotContains(t, result.Content[1], "data")
 	failed, err := execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "failure"})
 	require.Error(t, err)
 	require.Contains(t, string(failed.Stdout), "EXPECTED_REMOTE_FAILURE")

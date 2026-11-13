@@ -471,11 +471,7 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 		if runtimeConfig != nil {
 			source.ToolCallID = runtimeConfig.RuntimeID
 		}
-		contents, err := resolveMCPImageResources(ctx, mcpClient, result.Content)
-		if err != nil {
-			return nil, err
-		}
-		value, resultContent, err := convertMCPToolContent(ctx, contents, source)
+		value, resultContent, err := convertMCPToolResult(ctx, mcpClient, result, source)
 		if err != nil {
 			return nil, err
 		}
