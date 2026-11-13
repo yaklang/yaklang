@@ -4181,6 +4181,23 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 		}
 	}
 
+	// A cancelled caller must observe its durable terminal snapshot before
+	// returning, even if a subscriber is blocked. Only delivery is detached.
+	if e.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE && e.GetContentJSONPath("$.status") != "running" {
+		go func() {
+			defer func() {
+				if failure := recover(); failure != nil {
+					log.Errorf("sub-Forge terminal handler panicked: %v", failure)
+				}
+			}()
+			c.deliverEvent(e)
+		}()
+		return
+	}
+	c.deliverEvent(e)
+}
+
+func (c *Config) deliverEvent(e *schema.AiOutputEvent) {
 	if c.Guardian != nil {
 		c.Guardian.Feed(e)
 	}

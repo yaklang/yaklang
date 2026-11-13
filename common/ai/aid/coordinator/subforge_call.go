@@ -126,12 +126,8 @@ func (c *subForgeCall) finish(err error) {
 			})
 		}()
 	}
-	delivered := make(chan struct{})
-	go func() { defer close(delivered); c.session.emitSubForgeTaskTree(terminal) }()
-	select {
-	case <-delivered:
-	case <-c.ctx.Done():
-	}
+	// Terminal snapshots are saved synchronously; Config dispatches their callbacks asynchronously.
+	c.session.emitSubForgeTaskTree(terminal)
 
 }
 
