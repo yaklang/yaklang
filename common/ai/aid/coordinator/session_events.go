@@ -142,7 +142,7 @@ func (s *Session) Changed(snapshot Snapshot) {
 			if !s.opened[n.TaskID] {
 				s.EmitStructured("system", map[string]any{"type": "push_task", "task": payload})
 				s.opened[n.TaskID] = true
-			} else if s.closed[n.TaskID] && s.parent != nil {
+			} else if s.closed[n.TaskID] && s.parent != nil && !IsSubForgeContext(s.GetContext()) {
 				s.parent.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "react_task_status_changed", map[string]any{"react_task_id": n.TaskID, "react_task_status": "processing"})
 			}
 			s.closed[n.TaskID] = false

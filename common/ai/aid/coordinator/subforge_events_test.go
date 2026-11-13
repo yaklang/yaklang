@@ -16,10 +16,14 @@ func TestSubForgeClientEventIsolation(t *testing.T) {
 	defer cancel()
 	var delivered []*schema.AiOutputEvent
 	session := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) { delivered = append(delivered, event) }))}
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event.Type != schema.EVENT_TYPE_SUB_FORGE_TASK_TREE {
+				delivered = append(delivered, event)
+			}
+		}))}
 	task := aicommon.NewStatefulTaskBase("parent-task", "query", ctx, session.GetEmitter(), true)
 	call := newSubForgeCall(ctx, session, task, "outer-call", func() {})
-	defer call.finish()
+	defer call.finish(nil)
 	for _, kind := range []schema.EventType{
 		schema.EVENT_TYPE_PLAN, schema.EVENT_TYPE_START_PLAN_AND_EXECUTION,
 		schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION,
@@ -98,11 +102,13 @@ func TestSubForgeReviewQueue(t *testing.T) {
 	var delivered []string
 	session := &Session{Config: aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			delivered = append(delivered, string(event.Type)+":"+event.GetInteractiveId())
+			if event.Type != schema.EVENT_TYPE_SUB_FORGE_TASK_TREE {
+				delivered = append(delivered, string(event.Type)+":"+event.GetInteractiveId())
+			}
 		}))}
 	task := aicommon.NewStatefulTaskBase("parent", "query", ctx, session.GetEmitter(), true)
 	call := newSubForgeCall(ctx, session, task, "call", func() {})
-	defer call.finish()
+	defer call.finish(nil)
 	emit := func(kind schema.EventType, id string) {
 		call.handleEvent(&schema.AiOutputEvent{Type: kind, IsJson: true, Content: []byte(`{"id":"` + id + `","selectors":[{"value":"continue"}]}`)})
 	}
