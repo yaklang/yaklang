@@ -15,19 +15,15 @@ import (
 // result copies. Inspector returns that caller's existing observation interface.
 type toolCallResource struct {
 	caller   *ToolCaller
-	tool     *aitool.Tool
-	params   aitool.InvokeParams
+	review   *ToolCallReviewResult
 	onResult func(*aitool.ToolResult, bool, error)
 	started  atomic.Bool
 }
 
 var _ asyncexecmanager.Resource = (*toolCallResource)(nil)
 
-// NewAsyncResource transfers an unused caller to one async execution. Configure
-// task, emitter, review and scheduling hooks before calling this method; after
-// success, do not invoke or reconfigure the caller directly. The tool definition
-// must remain immutable; JSON parameters are copied at this preparation boundary.
-// Construction neither starts a tool nor changes the legacy synchronous path.
+// NewAsyncResource is the legacy preparation helper. Review completes
+// synchronously here; execution receives only the approved result.
 // An optional result handler runs once after the original call settles, before
 // Execute returns. It is for owner task/timeline bookkeeping, not observation.
 func (t *ToolCaller) NewAsyncResource(tool *aitool.Tool, params aitool.InvokeParams, onResult ...func(*aitool.ToolResult, bool, error)) (asyncexecmanager.Resource, error) {
@@ -43,16 +39,37 @@ func (t *ToolCaller) NewAsyncResource(tool *aitool.Tool, params aitool.InvokePar
 	if len(onResult) > 1 {
 		return nil, fmt.Errorf("%w: at most one tool result handler is allowed", asyncexecmanager.ErrInvalidResource)
 	}
-	params = cloneEndpointParams(params)
+	review, err := t.ReviewToolCall(tool, params)
+	if err != nil {
+		return nil, err
+	}
+	return t.NewReviewedAsyncResource(review, onResult...)
+}
+
+// NewReviewedAsyncResource transfers an already reviewed proposal to an async
+// execution. It performs no review.
+func (t *ToolCaller) NewReviewedAsyncResource(review *ToolCallReviewResult, onResult ...func(*aitool.ToolResult, bool, error)) (asyncexecmanager.Resource, error) {
+	if t == nil || t.ctx == nil || t.cancel == nil || t.m == nil {
+		return nil, fmt.Errorf("%w: an initialized tool caller is required", asyncexecmanager.ErrInvalidResource)
+	}
+	if review == nil || review.caller != t || review.Tool == nil || review.Params == nil || review.DirectlyAnswer {
+		return nil, fmt.Errorf("%w: an approved tool review is required", asyncexecmanager.ErrInvalidResource)
+	}
+	if utils.IsNil(t.task) {
+		return nil, fmt.Errorf("%w: a tool caller task is required", asyncexecmanager.ErrInvalidResource)
+	}
+	if len(onResult) > 1 {
+		return nil, fmt.Errorf("%w: at most one tool result handler is allowed", asyncexecmanager.ErrInvalidResource)
+	}
 	t.m.Lock()
 	defer t.m.Unlock()
-	if t.asyncResourceBound || !t.startTime.IsZero() {
+	if t.asyncResourceBound || t.executionStarted {
 		return nil, fmt.Errorf("%w: tool caller is already in use", asyncexecmanager.ErrInvalidResource)
 	}
 	t.asyncResourceBound = true
 	// The resource cannot settle while plugin workers still own its writers.
 	t.waitForCallbackOnCancel = true
-	resource := &toolCallResource{caller: t, tool: tool, params: params}
+	resource := &toolCallResource{caller: t, review: review}
 	if len(onResult) == 1 {
 		resource.onResult = onResult[0]
 	}
@@ -86,7 +103,7 @@ func (r *toolCallResource) Execute(ctx context.Context) error {
 	if err := r.caller.ctx.Err(); err != nil {
 		return err
 	}
-	result, directlyAnswer, err := r.caller.CallToolWithExistedParams(r.tool, r.params)
+	result, directlyAnswer, err := r.caller.ExecuteReviewedToolCall(r.review)
 	if r.onResult != nil {
 		r.onResult(result, directlyAnswer, err)
 	}

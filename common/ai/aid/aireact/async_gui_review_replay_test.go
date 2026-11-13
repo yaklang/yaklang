@@ -21,9 +21,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// Tool-use approval can remain pending after async submission. Both a GUI
-// response and the configured approval assistant can request direct_answer.
-// Interval review is a different contract: continue/detach/cancel, not answer.
+// Tool-use approval blocks the calling loop before async submission. Both a
+// GUI response and the configured approval assistant can request direct_answer;
+// that decision cancels task-owned background work and answers exactly once.
 func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		for _, origin := range []string{"gui", "assistant"} {
@@ -31,8 +31,8 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 				defer cancel()
 				events := newGUIReplayEvents()
-				review := make(chan string, 1)
 				approve := make(chan struct{})
+				var approveOnce sync.Once
 				started, cancelled, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
 				var releaseOnce sync.Once
 				releaseCleanup := func() { releaseOnce.Do(func() { close(cleanup) }) }
@@ -60,20 +60,7 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 				var loop *reactloops.ReActLoop
 				index := 0
 				answer := "REVIEW_REQUESTED_ANSWER"
-				reviewAnswerDelivered := false
 				model := func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-					if strings.Contains(req.GetPrompt(), "用户在后台工具调用审批中要求直接回答") {
-						if reviewAnswerDelivered {
-							return guiRespond(c, req, native, guiReplayStep{"finish", aitool.InvokeParams{}})
-						}
-						reviewAnswerDelivered = true
-						answers.Add(1)
-						if err := guiAwait(ctx, cancelled); err != nil {
-							return nil, err
-						}
-						releaseCleanup()
-						return guiRespond(c, req, native, guiReplayStep{"directly_answer", aitool.InvokeParams{"answer_payload": answer}})
-					}
 					if req.GetCallerLabel() == "directly-answer" {
 						return nil, fmt.Errorf("review must use the normal primary decision prompt, not a special directly-answer call")
 					}
@@ -95,29 +82,16 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 					case 3:
 						return guiRespond(c, req, native, guiReplayStep{"directly_call_tool", aitool.InvokeParams{"directly_call_tool_name": tool.Name, "directly_call_tool_params": aitool.InvokeParams{}, "async_directly_call_tool": true, "directly_call_reason": "background approval"}})
 					case 4:
-						var reviewID string
-						select {
-						case reviewID = <-review:
-						case <-ctx.Done():
-							return nil, ctx.Err()
-						}
-						if origin == "gui" {
-							if err := runtime.SendInputEvent(&ypb.AIInputEvent{IsInteractiveMessage: true, InteractiveId: reviewID, InteractiveJSONInput: `{"suggestion":"direct_answer"}`}); err != nil {
-								return nil, err
-							}
-						} else {
-							close(approve)
-						}
-						if err := guiAwait(ctx, loop.AsyncDirectAnswerSignal()); err != nil {
+						if err := guiAwait(ctx, cancelled); err != nil {
 							return nil, err
 						}
-						// 简化后的抢占只发生在主循环顶部。当前轮先返回无副作用的
-						// 异步管理动作，下一轮再根据 Timeline 直答说明回答。
-						return guiRespond(c, req, native, guiReplayStep{"manage_async_execution_runtime", aitool.InvokeParams{"op": "list"}})
+						releaseCleanup()
+						answers.Add(1)
+						return guiRespond(c, req, native, guiReplayStep{"directly_answer", aitool.InvokeParams{"answer_payload": answer}})
 					case 5:
 						return guiRespond(c, req, native, guiReplayStep{"finish", aitool.InvokeParams{}})
 					default:
-						return nil, fmt.Errorf("continued planning after direct_answer")
+						return nil, fmt.Errorf("continued planning after blocking approval")
 					}
 				}
 				opts := []aicommon.ConfigOption{
@@ -140,9 +114,12 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 							}
 							id, _ := data["id"].(string)
 							if id != "" {
-								select {
-								case review <- id:
-								default:
+								if origin == "gui" {
+									if err := runtime.SendInputEvent(&ypb.AIInputEvent{IsInteractiveMessage: true, InteractiveId: id, InteractiveJSONInput: `{"suggestion":"direct_answer"}`}); err != nil {
+										t.Errorf("send approval response: %v", err)
+									}
+								} else {
+									approveOnce.Do(func() { close(approve) })
 								}
 							}
 						}
@@ -178,7 +155,7 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 				manager, err := loop.GetAsyncExecutionManager()
 				require.NoError(t, err)
 				entries := manager.List()
-				require.Len(t, entries, 2)
+				require.Len(t, entries, 1, "reviewed async call must not reach Manager admission")
 				for _, entry := range entries {
 					final, err := manager.Wait(ctx, entry.ID)
 					require.NoError(t, err)
@@ -217,7 +194,7 @@ func TestAsyncGUIBackgroundReviewDirectAnswer(t *testing.T) {
 				for _, count := range starts {
 					require.Equal(t, 1, count)
 				}
-				require.Equal(t, 1, bubbles, "background approval must produce only one answer bubble")
+				require.Equal(t, 1, bubbles, "blocking approval must produce only one answer bubble")
 			})
 		}
 	}

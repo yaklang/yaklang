@@ -120,9 +120,8 @@ func TestHandleToolCallResult_DirectAnswerDoesNotMarkExecution(t *testing.T) {
 	)
 
 	assert.Zero(t, op.GetExecutedToolCallCount(), "review direct_answer is user intent, not plugin execution")
-	terminated, err := op.IsTerminated()
-	require.True(t, terminated)
-	require.NoError(t, err)
+	assert.True(t, op.IsContinued())
+	assert.True(t, invoker.AsyncDirectAnswerRequested(), "the normal primary loop must deliver the answer")
 }
 
 func TestResolveToolCallReason(t *testing.T) {

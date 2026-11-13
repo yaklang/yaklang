@@ -366,7 +366,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		emitToolsPreparingStatus(loop, []string{toolName})
 
 		// Pre-card unrecoverable branch: cached tool lookup failure cannot enter the
-		// "card already created" flow, so it stays here (before invoker.DirectlyCallTool).
+		// review-card flow, so it stays here before the blocking review starts.
 		_, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolName)
 		if lookupErr != nil {
 			reportStatus(fmt.Sprintf("cached tool lookup failed for '%s': %v", toolName, lookupErr))
@@ -503,19 +503,22 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		}
 		async := !requireForeground && directToolActionAsync(action, defaultAsync)
 		loop.SetActionExecutionValue(action, actionStateDirectToolAsync, async)
-		if async {
-			params, _, _, err := prepare(action, toolName)
-			if err != nil {
-				handleToolCallResult(loop, ctx, invoker, toolName, nil, false, err, operator)
-				return
-			}
-			submitAsyncDirectTool(loop, toolName, params, operator,
-				aicommon.WithToolCaller_Reason(resolveToolCallReason(action, "directly_call_reason")),
-				aicommon.WithToolCaller_OmitResultParamsInTimeline())
+		review, reviewErr := invoker.ReviewDirectToolCall(ctx, toolName, action, prepare,
+			aicommon.WithToolCaller_Reason(resolveToolCallReason(action, "directly_call_reason")),
+			aicommon.WithToolCaller_OmitResultParamsInTimeline())
+		if reviewErr != nil {
+			handleToolCallResult(loop, ctx, invoker, toolName, nil, false, reviewErr, operator)
 			return
 		}
-		// The synchronous caller still creates one card before prepare/invocation.
-		result, directly, callErr := invoker.DirectlyCallTool(ctx, toolName, action, prepare)
+		if review.DirectlyAnswer {
+			requestDirectAnswerAfterToolReview(loop, invoker, operator)
+			return
+		}
+		if async {
+			submitReviewedAsyncDirectTool(loop, review, operator)
+			return
+		}
+		result, directly, callErr := invoker.ExecuteReviewedToolCall(ctx, review)
 		recordSuccessfulToolCache(loop, toolName, result, callErr)
 
 		handleToolCallResult(loop, ctx, invoker, toolName, result, directly, callErr, operator)

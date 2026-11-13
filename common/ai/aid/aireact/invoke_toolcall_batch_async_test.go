@@ -129,7 +129,7 @@ func TestDirectToolBatchAsyncIntegration(t *testing.T) {
 			}
 			t.Log("1. All-sync keeps the existing path, despite top-level and business async=true")
 			op := run(item(0, "instant", nil), item(1, "instant", false))
-			require.Equal(t, 2, op.GetExecutedToolCallCount())
+			require.Equal(t, 2, op.GetExecutedToolCallCount(), op.GetFeedback().String())
 			require.Contains(t, op.GetFeedback().String(), "Tool batch settled: 2 calls")
 			require.NotContains(t, op.GetFeedback().String(), "execute_id:")
 			manager, err := loop.GetAsyncExecutionManager()
@@ -252,7 +252,7 @@ func TestDirectToolBatchAsyncIntegration(t *testing.T) {
 		})
 	}
 	t.Run("async_review_barrier", func(t *testing.T) {
-		t.Log("7. Background direct_answer still cancels siblings before any callback starts")
+		t.Log("7. direct_answer is decided before Manager admission")
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		var callbacks atomic.Int32
@@ -281,13 +281,10 @@ func TestDirectToolBatchAsyncIntegration(t *testing.T) {
 			defer cancel()
 			require.NoError(t, manager.Shutdown(cleanup))
 		}()
+		require.Empty(t, manager.List())
 		for _, outcome := range result.Outcomes {
-			require.Equal(t, aicommon.ToolCallStageSubmitted, outcome.Stage)
-			require.NotEmpty(t, outcome.ExecuteID)
-			summary, err := manager.Wait(ctx, outcome.ExecuteID)
-			require.NoError(t, err)
-			require.Equal(t, asyncexecmanager.StateCancelled, summary.State)
-			require.Equal(t, aicommon.ToolCallStageSubmitted, outcome.Stage, "the returned receipt remains immutable")
+			require.Equal(t, aicommon.ToolCallStageCancelled, outcome.Stage)
+			require.Empty(t, outcome.ExecuteID)
 		}
 		require.EqualValues(t, 1, atomic.LoadInt32(&recorder.count))
 		require.Zero(t, callbacks.Load())

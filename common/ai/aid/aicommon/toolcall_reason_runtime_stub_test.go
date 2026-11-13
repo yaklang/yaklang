@@ -37,7 +37,11 @@ func (r *reasonTestRuntime) ExecuteToolRequiredAndCallWithoutRequired(ctx contex
 	return nil, false, nil
 }
 
-func (r *reasonTestRuntime) DirectlyCallTool(ctx context.Context, toolName string, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+func (r *reasonTestRuntime) ReviewDirectToolCall(ctx context.Context, toolName string, action *Action, prepare DirectlyCallPrepareFunc, opt ...ToolCallerOption) (*ToolCallReviewResult, error) {
+	return nil, nil
+}
+
+func (r *reasonTestRuntime) ExecuteReviewedToolCall(ctx context.Context, review *ToolCallReviewResult) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 

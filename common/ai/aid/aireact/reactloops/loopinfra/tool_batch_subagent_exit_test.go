@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 type toolBatchExitChildBuilder func(*reactloops.PreparedSubAgent) (*reactloops.ReActLoop, error)
@@ -21,22 +20,15 @@ func (f toolBatchExitChildBuilder) Build(p *reactloops.PreparedSubAgent) (*react
 	return f(p)
 }
 
-type toolBatchExitInvoker struct {
-	*mock.MockInvoker
-	beforeAnswer func()
-}
-
-func (i *toolBatchExitInvoker) DirectlyAnswer(context.Context, string, []*aitool.Tool, ...any) (string, error) {
-	i.beforeAnswer()
-	return "已停止工具调用，并根据已有信息回答。", nil
-}
-
-// Exercise the real parent loop: the cancellation result arrives after its
-// model input, so an ordinary Exit would be rejected by the unseen-result gate.
+// Exercise the real parent loop: direct answer is requested by approval, then
+// delivered by the normal primary decision prompt before a final finish.
 func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	var calls atomic.Int32
+	var loop *reactloops.ReActLoop
+	var cancelledBeforeAnswer bool
+	var err error
 	cfg := aicommon.NewConfig(ctx,
 		aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true),
 		aicommon.WithWorkdir(t.TempDir()),
@@ -47,6 +39,12 @@ func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 				body = `{"@action":"start_child"}`
 			case 2:
 				body = `{"@action":"batch_review"}`
+			case 3:
+				jobs, inspectErr := loop.GetSubAgentManager().Inspect(nil)
+				cancelledBeforeAnswer = inspectErr == nil && len(jobs) == 1 && jobs[0].State == "cancelled"
+				body = `{"@action":"directly_answer","answer_payload":"已停止工具调用，并根据已有信息回答。"}`
+			case 4:
+				body = `{"@action":"finish"}`
 			default:
 				return nil, fmt.Errorf("parent continued after explicit user exit")
 			}
@@ -55,7 +53,7 @@ func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 			response.Close()
 			return response, nil
 		}))
-	inv := &toolBatchExitInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
+	inv := mock.NewMockInvoker(ctx)
 	inv.SetConfig(cfg)
 	original := aicommon.AIRuntimeInvokerGetter
 	defer func() { aicommon.AIRuntimeInvokerGetter = original }()
@@ -74,13 +72,6 @@ func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 		})(child)
 		return child, nil
 	})
-	var loop *reactloops.ReActLoop
-	var cancelledBeforeAnswer bool
-	inv.beforeAnswer = func() {
-		jobs, err := loop.GetSubAgentManager().Inspect(nil)
-		cancelledBeforeAnswer = err == nil && len(jobs) == 1 && jobs[0].State == "cancelled"
-	}
-	var err error
 	loop, err = reactloops.NewReActLoop("tool-batch-user-exit", inv,
 		reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
@@ -108,7 +99,7 @@ func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, loop.Execute("tool-batch-user-exit", ctx, "Investigate using parallel workers and tools"))
 	require.True(t, cancelledBeforeAnswer, "owned work must stop before generating the user-requested answer")
-	require.EqualValues(t, 2, calls.Load(), "explicit user exit must not ask the model to continue or observe cancellation")
+	require.EqualValues(t, 4, calls.Load(), "the normal primary loop must answer before final finish")
 	jobs, err := loop.GetSubAgentManager().Inspect(nil)
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)

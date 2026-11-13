@@ -30,7 +30,8 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 	if tool.RequireForeground {
 		return nil, nil, utils.Errorf("tool %q requires foreground execution", name)
 	}
-	if ownerLoop, _ := task.GetReActLoop().(*reactloops.ReActLoop); ownerLoop != nil {
+	ownerLoop, _ := task.GetReActLoop().(*reactloops.ReActLoop)
+	if ownerLoop != nil {
 		if allow, message := reactloops.CheckToolInvokeGuard(ownerLoop, name, params); !allow {
 			return nil, nil, utils.Error(message)
 		}
@@ -44,7 +45,18 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 	if err != nil {
 		return nil, nil, err
 	}
-	resource, err := caller.NewAsyncResource(tool, params, func(result *aitool.ToolResult, directly bool, callErr error) {
+	review, err := caller.ReviewToolCall(tool, params)
+	if err != nil {
+		return nil, nil, err
+	}
+	if review.DirectlyAnswer {
+		caller.Cancel()
+		if ownerLoop != nil {
+			ownerLoop.RequestAsyncDirectAnswer()
+		}
+		return nil, nil, aicommon.ErrToolReviewDirectAnswer
+	}
+	resource, err := caller.NewReviewedAsyncResource(review, func(result *aitool.ToolResult, directly bool, callErr error) {
 		r.finishDetachedToolCall(task, result, directly, callErr)
 	})
 	if err != nil {
@@ -52,4 +64,24 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 		return nil, nil, err
 	}
 	return resource, caller.Cancel, nil
+}
+
+// PrepareReviewedAsyncToolCall transfers an approved proposal to an async
+// resource without performing another review.
+func (r *ReAct) PrepareReviewedAsyncToolCall(task aicommon.AIStatefulTask, review *aicommon.ToolCallReviewResult) (asyncexecmanager.Resource, func(), error) {
+	if r == nil || r.config == nil || utils.IsNil(task) || review == nil {
+		return nil, nil, errors.New("async tool call requires an initialized runtime, owner and approved review")
+	}
+	caller := review.ToolCaller()
+	if caller == nil {
+		return nil, nil, errors.New("approved review has no tool caller")
+	}
+	resource, err := caller.NewReviewedAsyncResource(review, func(result *aitool.ToolResult, directly bool, callErr error) {
+		r.finishDetachedToolCall(task, result, directly, callErr)
+	})
+	if err != nil {
+		review.Abort(err)
+		return nil, nil, err
+	}
+	return resource, review.Cancel, nil
 }
