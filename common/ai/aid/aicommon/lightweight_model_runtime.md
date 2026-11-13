@@ -10,7 +10,7 @@
 | `CallQualityPriorityAI` | Quality → Original；主任务推理与上下文压缩。 |
 | `CallSpeedPriorityAI` | Speed → Original；不会因为 Speed 失败自动升级到 Quality。 |
 | `ScheduleAuxiliaryTask` | 统一辅助任务调度，经 LiteForge 调用 Speed，继承上下文取消、响应校验/重试、事件与用量回调。 |
-| `WithUseSpeedPriorityAICallback` | 某些 ReAct 子循环把普通回合交给 Speed，例如意图分析。压缩回合仍交给 Quality。 |
+| `WithUseSpeedPriorityAICallback` | 某些 ReAct 子循环把普通回合交给 Speed，例如意图分析。文本压缩走 Quality，原生 Speed 循环压缩走 Speed，本 PR 保持原样。 |
 | `GetDefaultAIModelCallback` | 单独的策略入口：performance 选择 intelligent，其余策略选择 lightweight；不等于 `Config.CallAI` 的优先级规则。 |
 
 主要代码：`aitier_callback.go`、`config.go`、`config_auxiliary_scheduler.go`、`aireact/reactloops/exec_call_ai_loop_transaction.go`。
@@ -21,7 +21,7 @@
 
 `auxiliary_labels.go` 与调用点涵盖会话命名、意图关键词和能力推荐、工具调用原因/间隔检查、记忆分类和去重、知识选择与重排、短文本抽取、mini task 的 prompt 优化/TODO 草稿/摘要、目标验收，以及无法确定的上下文超限错误分类。
 
-需要区分 mini task 的 `timeline_summary` 和主 ReAct 的 `compress_context`：前者是轻量辅助任务，后者决定长期上下文保留，使用质量模型。
+需要区分 mini task 的 `timeline_summary` 和主 ReAct 的 `compress_context`：前者是轻量辅助任务，后者决定长期上下文保留，沿用各协议原有的模型路由。
 
 模糊超限错误分类只把供应商错误字段交给 Speed 判断，15 秒超时，成功判断缓存，阻止递归调用，失败不缓存。它不是在所有 API 错误发生时都盲目压缩。
 
@@ -31,11 +31,11 @@
 
 非关键辅助任务被跳过，例如标题、展示文案、部分评估、记忆分类和意图推荐。记忆、深意图、间隔检查和 RAG 增强另有入口开关。未注册为 skip 的必要辅助任务仍运行；超限分类明确保留。模式在会话构造时固定，后续全局模式变化不会偷偷改变既有会话的角色。
 
-## 压缩恢复的路由约束
+## 本 PR 的隔离边界
 
-- 原生 tool-call 的 Speed 循环在压缩模式仍走 Speed，文本模式却走 Quality。已统一两种协议；`TestContextCompressionTransactionEnforcesAction` 现在在 Speed 循环下验证两种协议均只调用 Quality，并保留结构校验/重试。
-- 原先使用会话可变模型身份确认容量，可能把 Quality 压缩成功误算到失败的轻量模型。现在使用实际成功响应身份；各 provider/model 独立 pending。集成测试明确验证其他模型成功压缩不确认原模型，直到原模型接受请求才持久化。
-- 回退网关或轻量循环与初始配置模型不同时，明确超限会更新当前恢复目标，使重建 prompt 使用失败模型的预算。
+轻量和视觉模型不读取或持久化新增的主模型阈值，也不受主模型自动调整开关控制。Speed ReAct 保留原 `300 * 1024` 默认预算和原运行时超限处理；SDK 显式设置的预算不受新 UI 的 100K 手动下限限制。单模型模式下，Speed 即使借用同一个物理模型，也不确认主模型的 pending 调整。
+
+文本压缩使用 Quality、原生 Speed 压缩使用 Speed 的原有差异保留。`TestModelContextKeepsOriginalCompressionRouting` 固定这一行为；`TestModelContextSettingOnlyControlsQualityLoop` 验证主模型设置不会变成 Speed 的新预算或持久化来源。
 
 ## 检查结果与证据范围
 

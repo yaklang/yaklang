@@ -23,7 +23,7 @@ var contextOptimizationStatusNames = []actionStatusName{
 	{"正在梳理上下文，准备继续…", "Organizing the context before continuing…"},
 }
 
-const defaultWholePromptTokenLimit int64 = int64(aicommon.DefaultTimelineContentSizeLimit)
+const defaultWholePromptTokenLimit int64 = 300 * 1024
 
 const contextCompressionPromptHeadroomTokens int64 = 200 * 1024
 
@@ -36,7 +36,7 @@ func isContextCompressionCall(call LoopCall) bool {
 }
 
 // wholePromptTokenLimit is the limit for the assembled main-loop prompt.
-// The configured timeline limit defaults to 500K; a too-large response lowers it.
+// The configured timeline limit defaults to 300k; a too-large response lowers it.
 func (r *ReActLoop) wholePromptTokenLimit() int64 {
 	if r == nil || r.config == nil {
 		return defaultWholePromptTokenLimit
@@ -48,6 +48,9 @@ func (r *ReActLoop) wholePromptTokenLimit() int64 {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
 		return base
+	}
+	if provider, model, key := r.primaryModelContext(); key != "" {
+		return config.EffectiveModelContextLimit(provider, model, base, key)
 	}
 	return config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
 }

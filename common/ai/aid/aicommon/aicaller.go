@@ -259,5 +259,19 @@ func CreateCallbackFromConfigWithExtraOpts(config *ypb.AIModelConfig, extraOpts 
 	if len(extraOpts) > 0 {
 		opts = append(opts, extraOpts...)
 	}
-	return LoadAIService(config.GetProvider().GetType(), opts...)
+	callback, err := LoadAIService(config.GetProvider().GetType(), opts...)
+	if err != nil {
+		return nil, err
+	}
+	key := aispec.ModelContextIdentity(config, extraOpts...)
+	return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
+		requestKey := key
+		if request != nil && len(request.GetExtraSpecOpts()) > 0 {
+			identityOpts := append(append([]aispec.AIConfigOption{}, extraOpts...), request.GetExtraSpecOpts()...)
+			requestKey = aispec.ModelContextIdentity(config, identityOpts...)
+		}
+		response, err := callback(caller, request)
+		response.SetModelContextKey(requestKey)
+		return response, err
+	}, nil
 }

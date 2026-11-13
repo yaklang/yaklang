@@ -1,9 +1,6 @@
 package reactloops
 
 import (
-	"fmt"
-	"sort"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -23,9 +20,8 @@ func (r *ReActLoop) promptOverflowRetryMax() int {
 	return defaultPromptOverflowRetryMax
 }
 
-// syncPromptOverflowTimelineLimit applies the per-model dynamic threshold before
-// the pre-prompt compression measures, including restored model settings and
-// model switches. The configured session limit remains separate.
+// Apply quality settings before measurement. Auxiliary loops retain their
+// original runtime-only threshold, including when they share a Config.
 func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -40,7 +36,18 @@ func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 		return
 	}
 	effective := config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
-	if effective <= 0 {
+	if provider, model, key := r.primaryModelContext(); key != "" {
+		effective = config.EffectiveModelContextLimit(provider, model, base, key)
+		if effective > 0 {
+			timeline.SetTimelineContentLimit(effective)
+		}
+		return
+	}
+	if _, _, key := config.PrimaryModelContext(); key != "" && r.useSpeedPriorityAI {
+		timeline.SetTimelineContentLimit(effective)
+		return
+	}
+	if effective <= 0 || effective >= base {
 		return
 	}
 	timeline.SetTimelineContentLimit(effective)
@@ -57,30 +64,6 @@ func (r *ReActLoop) noteFittingTimelineThroughID(id *int64) {
 	r.lastFittingTimelineThroughID = &copied
 }
 
-// Shrink the prefix sent for compression, preserving the newer timeline entries
-// for subsequent turns. This also recovers when the first request is too large
-// and no successful timeline boundary exists yet.
-func (r *ReActLoop) narrowOverflowCompressionBoundary(rejectedThroughID *int64) {
-	if r.lastFittingTimelineThroughID != nil && rejectedThroughID != nil && *r.lastFittingTimelineThroughID < *rejectedThroughID {
-		return
-	}
-	timeline := timelineFromConfig(r.config)
-	if timeline == nil {
-		return
-	}
-	var through []int64
-	if rejectedThroughID != nil {
-		through = []int64{*rejectedThroughID}
-	}
-	candidates, err := timeline.CompressionCandidates(through...)
-	if err != nil || len(candidates) < 2 {
-		return
-	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].ID < candidates[j].ID })
-	id := candidates[(len(candidates)-1)/2].ID
-	r.lastFittingTimelineThroughID = &id
-}
-
 func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prompt string) bool {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -90,27 +73,14 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	if !ok {
 		return false
 	}
-	if evidence.Provider == "" {
-		evidence.Provider = config.AiServerName
-	}
-	if evidence.Model == "" {
-		evidence.Model = config.AiModelName
-	}
-	if r.promptMode == aicommon.LoopPromptModeNormal && evidence.Model != "" {
-		// A gateway fallback or a Speed loop can use a different model than the
-		// initially configured quality model. Rebuild against the failed model.
-		config.UpdateAIModelInfo(evidence.Provider, evidence.Model)
-	}
 	measured := int64(aicommon.MeasureTokens(prompt))
-	limit := config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
-	capacity := evidence.MaxContextTokens
-	if capacity <= 0 {
-		capacity = limit
+	var limit int64
+	if provider, model, key := r.primaryModelContext(); key != "" && key == evidence.ContextKey && provider == evidence.Provider && model == evidence.Model {
+		limit = config.RecordModelContextOverflow(provider, model, measured, &evidence, key)
+		config.EmitModelContextFor(provider, model, measured, key)
+	} else {
+		limit = config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
 	}
-	if capacity > 0 && capacity < yakit.MinimumAIModelContextTokens {
-		r.emitContextCompressionWarning(fmt.Sprintf("模型上下文过小（%d tokens，小于 100K），请切换到支持更长上下文的模型。", capacity))
-	}
-	config.EmitModelContextFor(evidence.Provider, evidence.Model, measured)
 	if limit <= 0 {
 		return false
 	}
@@ -122,21 +92,19 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	return true
 }
 
-// Resolve the model that actually rejected the request, including gateway fallbacks.
-func (r *ReActLoop) promptOverflowAutoAdjustDisabled(overflowErr error) bool {
-	config, ok := r.config.(*aicommon.Config)
-	if !ok || config == nil {
-		return false
+// The new persisted setting belongs to the quality loop only. Keep auxiliary
+// Speed loops on the original runtime-only limit and retry mechanism.
+func (r *ReActLoop) primaryModelContext() (provider, model, key string) {
+	if r.useSpeedPriorityAI {
+		return
 	}
-	evidence, ok := aicommon.PromptOverflowEvidenceFrom(overflowErr)
-	if !ok {
-		return false
+	if config, ok := r.config.(*aicommon.Config); ok {
+		return config.PrimaryModelContext()
 	}
-	if evidence.Provider == "" {
-		evidence.Provider = config.AiServerName
-	}
-	if evidence.Model == "" {
-		evidence.Model = config.AiModelName
-	}
-	return yakit.GetAIModelContext(consts.GetGormProfileDatabase(), evidence.Provider, evidence.Model).DisableAutoAdjust
+	return
+}
+func (r *ReActLoop) promptOverflowAutoAdjustDisabled(err error) bool {
+	provider, model, key := r.primaryModelContext()
+	evidence, ok := aicommon.PromptOverflowEvidenceFrom(err)
+	return ok && key != "" && key == evidence.ContextKey && provider == evidence.Provider && model == evidence.Model && yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model, key).DisableAutoAdjust
 }

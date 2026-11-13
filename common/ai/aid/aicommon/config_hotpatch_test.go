@@ -505,14 +505,14 @@ func TestHotPatch_RuntimeContextSizeLimit_PersistSessionStartParams(t *testing.T
 		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
 		Params: &ypb.AIStartParams{
 			TimelineContentSizeLimit: 8 * 1024,
-			RuntimeContextSizeLimit:  128 * 1024,
+			RuntimeContextSizeLimit:  96 * 1024,
 		},
 	}, 1)
 
-	requireRuntimeContextLimit(t, c, 128*1024)
+	requireRuntimeContextLimit(t, c, 96*1024)
 	got, err := yakit.GetAISessionMetaStartParamsBySessionID(c.GetDB(), sessionID)
 	require.NoError(t, err)
-	require.EqualValues(t, 128*1024, got.GetRuntimeContextSizeLimit())
+	require.EqualValues(t, 96*1024, got.GetRuntimeContextSizeLimit())
 	require.EqualValues(t, 20*1024, got.GetTimelineContentSizeLimit(), "deprecated field is not a hotpatch target")
 	require.True(t, got.GetEnablePlan())
 	require.Equal(t, "manual", got.GetReviewPolicy())

@@ -161,6 +161,7 @@ func classifyTransactionPromptOverflow(ctx context.Context, c AICallerConfigIf, 
 	return &aispec.PromptOverflowError{
 		PromptOverflowEvidence: aispec.PromptOverflowEvidence{
 			HTTPStatus:     sample.HTTPStatus,
+			ContextKey:     rsp.GetModelContextKey(),
 			Provider:       strings.TrimSpace(rsp.GetProviderName()),
 			Model:          strings.TrimSpace(rsp.GetModelName()),
 			Code:           sample.Code,

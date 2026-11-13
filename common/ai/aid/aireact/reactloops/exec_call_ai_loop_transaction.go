@@ -62,6 +62,7 @@ type LoopFunctionCallOutputCallback func(id, functionName string, descriptionRea
 // calls and finish reason. RawResponsePreview is only the transport's preview.
 type LoopResultSnapshot struct {
 	Mode                 string
+	ContextKey           string
 	Provider             string
 	Model                string
 	ProviderFinishReason string
@@ -182,15 +183,13 @@ func (d *LoopResultDescriptor) finishFromResponse(resp *aicommon.AIResponse, cal
 	d.finish(resp, resp.GetPlainOutput(), resp.GetPlainReason(), calls)
 }
 
-// Identity is needed by context calibration before the asynchronously captured
-// response body is complete. Never infer it from the session's current model.
 func (d *LoopResultDescriptor) setModelIdentity(resp *aicommon.AIResponse) {
 	if d == nil || resp == nil {
 		return
 	}
 	d.mu.Lock()
-	d.snapshot.Provider, d.snapshot.Model = resp.GetProviderName(), resp.GetModelName()
-	d.mu.Unlock()
+	defer d.mu.Unlock()
+	d.snapshot.Provider, d.snapshot.Model, d.snapshot.ContextKey = resp.GetProviderName(), resp.GetModelName(), resp.GetModelContextKey()
 }
 
 func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason string, calls []*aispec.ToolCall) {
@@ -208,6 +207,7 @@ func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason 
 		return
 	}
 	d.output, d.reason, d.calls = output, reason, calls
+	d.snapshot.ContextKey = resp.GetModelContextKey()
 	d.snapshot.Provider = provider
 	d.snapshot.Model = model
 	d.snapshot.RawResponsePreview = rawPreview
@@ -838,9 +838,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		return nil
 	}
 	var transactionErr error
-	if compressionMode {
-		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallQualityPriorityAI, postHandler, requestOpts...)
-	} else if r.useSpeedPriorityAI {
+	if r.useSpeedPriorityAI {
 		r.config.ScheduleAuxiliaryTask(activeTaskCtx, fmt.Sprintf("react-loop:%s", r.loopName),
 			func() string { return prompt },
 			func(*aicommon.Action) {},

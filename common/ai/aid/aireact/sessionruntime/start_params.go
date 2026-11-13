@@ -49,13 +49,8 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	}
 
 	// 运行时上下文阈值: 旧字段会被前端默认值占用, 无法表达“使用服务端默认值”。
-	if i.GetRuntimeContextSizeLimit() != 0 {
-		opts = append(opts, func(c *aicommon.Config) error {
-			if err := yakit.ValidateAIModelContextThreshold(i.GetRuntimeContextSizeLimit()); err != nil {
-				return err
-			}
-			return aicommon.WithTimelineContentLimit(int(i.GetRuntimeContextSizeLimit()))(c)
-		})
+	if i.GetRuntimeContextSizeLimit() > 0 {
+		opts = append(opts, aicommon.WithTimelineContentLimit(int(i.GetRuntimeContextSizeLimit())))
 	}
 
 	opts = append(opts, aicommon.WithAllowPlanUserInteract(i.AllowPlanUserInteract), aicommon.WithPlanUserInteractMaxCount(i.PlanUserInteractMaxCount))
