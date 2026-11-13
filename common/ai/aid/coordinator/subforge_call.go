@@ -115,15 +115,12 @@ func (c *subForgeCall) finish() {
 					log.Errorf("sub-Forge review release handler panicked: %v", failure)
 				}
 			}()
-			for _, endpoint := range []string{active} {
-				content, _ := json.Marshal(map[string]any{"id": endpoint, "params": nil})
-				c.forward(&schema.AiOutputEvent{
-					Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
-				})
-			}
+			content, _ := json.Marshal(map[string]any{"id": active, "params": nil})
+			c.forward(&schema.AiOutputEvent{
+				Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
+			})
 		}()
 	}
-
 }
 
 func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
