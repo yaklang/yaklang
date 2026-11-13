@@ -30,9 +30,8 @@ func (s *Server) GetAIModelContext(_ context.Context, req *ypb.GetAIModelContext
 	value := yakit.GetAIModelContext(s.GetProfileDatabase(), provider, model, key)
 	return &ypb.AIModelContextResponse{
 		Provider: provider, Model: model, ContextKey: key,
-		ContextTokens: value.ContextTokens, ThresholdTokens: value.ThresholdTokens, Source: value.Source,
+		ThresholdTokens: value.ThresholdTokens, Source: value.Source,
 		MinimumThresholdTokens: yakit.MinimumAIModelContextTokens,
-		TooSmall:               value.ContextTokens < yakit.MinimumAIModelContextTokens,
 		DisableAutoAdjust:      value.DisableAutoAdjust,
 	}, nil
 }

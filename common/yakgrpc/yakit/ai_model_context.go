@@ -21,10 +21,9 @@ const DefaultAIModelContextTokens int64 = 500 * 1000
 const MinimumAIModelContextTokens int64 = 100 * 1000
 
 // AIModelContext is local model metadata, never sent as a provider API parameter.
-// Unknown models start with an optimistic window; learned values are only saved
-// after the provider accepts a smaller request.
+// Unconfigured models start with the default compression threshold. A reduced
+// threshold is saved only after the provider accepts a subsequent request.
 type AIModelContext struct {
-	ContextTokens     int64  `json:"context_tokens"`
 	ThresholdTokens   int64  `json:"threshold_tokens"`
 	Source            string `json:"source"` // default, learned, manual
 	DisableAutoAdjust bool   `json:"disable_auto_adjust"`
@@ -47,7 +46,7 @@ func ValidateAIModelContextThreshold(tokens int64) error {
 // Match the slider's stable upper bound; user input must never expand its own range.
 func AIModelContextMaximumThreshold(value AIModelContext) int64 {
 	const step int64 = 1000 * 1000
-	largest := max(step, value.ContextTokens, value.ThresholdTokens)
+	largest := max(step, value.ThresholdTokens)
 	return ((largest-1)/step + 1) * step
 }
 
@@ -105,12 +104,12 @@ func ValidateAIModelContextOwner(db *gorm.DB, contextKey string) error {
 }
 
 func GetAIModelContext(db *gorm.DB, provider, model string, contextKey string) AIModelContext {
-	value := AIModelContext{ContextTokens: DefaultAIModelContextTokens, ThresholdTokens: DefaultAIModelContextTokens, Source: "default"}
+	value := AIModelContext{ThresholdTokens: DefaultAIModelContextTokens, Source: "default"}
 	if db == nil || strings.TrimSpace(model) == "" {
 		return value
 	}
 	var saved AIModelContext
-	if json.Unmarshal([]byte(GetKey(db, aiModelContextKey(provider, model, contextKey))), &saved) == nil && saved.ContextTokens > 0 && saved.ThresholdTokens > 0 {
+	if json.Unmarshal([]byte(GetKey(db, aiModelContextKey(provider, model, contextKey))), &saved) == nil && saved.ThresholdTokens > 0 {
 		return saved
 	}
 	return value
@@ -124,34 +123,21 @@ func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContex
 	if err := ValidateAIModelContextOwner(db, contextKey); err != nil {
 		return err
 	}
-	if value.ContextTokens <= 0 || value.ThresholdTokens <= 0 {
+	if value.ThresholdTokens <= 0 {
 		return fmt.Errorf("invalid model context budget")
 	}
-	if value.Source == "manual" {
-		previous := GetAIModelContext(db, provider, model, contextKey)
-		if value.ThresholdTokens > AIModelContextMaximumThreshold(previous) {
-			return fmt.Errorf("上下文压缩阈值不能超过滑条上限 (%d tokens)", AIModelContextMaximumThreshold(previous))
-		}
-		value.DisableAutoAdjust = previous.DisableAutoAdjust
-		if err := ValidateAIModelContextThreshold(value.ThresholdTokens); err != nil {
-			return err
-		}
-		value.ManualRevision = uuid.NewString()
-	} else if value.Source != "learned" {
+	if value.Source != "learned" {
 		return fmt.Errorf("invalid model context source: %s", value.Source)
 	}
-	if db == nil || strings.TrimSpace(model) == "" {
-		return fmt.Errorf("model context requires a database and model identity")
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("model context requires a model identity")
 	}
-	if value.Source == "learned" {
-		previous := GetAIModelContext(db, provider, model, contextKey)
-		if previous.DisableAutoAdjust || previous.ManualRevision != value.ManualRevision {
-			return ErrAIModelContextChanged
-		}
-		if previous.Source != "default" {
-			value.ContextTokens = min(value.ContextTokens, previous.ContextTokens)
-			value.ThresholdTokens = min(value.ThresholdTokens, previous.ThresholdTokens)
-		}
+	previous := GetAIModelContext(db, provider, model, contextKey)
+	if previous.DisableAutoAdjust || previous.ManualRevision != value.ManualRevision {
+		return ErrAIModelContextChanged
+	}
+	if previous.Source != "default" {
+		value.ThresholdTokens = min(value.ThresholdTokens, previous.ThresholdTokens)
 	}
 	raw, err := json.Marshal(value)
 	if err != nil {

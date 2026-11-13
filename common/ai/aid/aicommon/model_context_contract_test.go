@@ -47,7 +47,7 @@ func applyContextPatch(t *testing.T, cfg *Config, patch *ypb.AIInputEvent) error
 }
 
 func TestModelContextContractManualBoundsAndIdentity(t *testing.T) {
-	for _, tokens := range []int64{-1, 1, 99999, 100000, 100001, 102400, 500000, 1000000, 1000001} {
+	for _, tokens := range []int64{-1, 0, 1, 99999, 100000, 100001, 102400, 500000, 1000000, 1000001} {
 		t.Run(strconv.FormatInt(tokens, 10), func(t *testing.T) {
 			cfg := newConfig(context.Background())
 			bindContext(t, cfg, contextTestModel())

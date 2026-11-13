@@ -79484,11 +79484,9 @@ type AIModelContextResponse struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	Provider               string                 `protobuf:"bytes,1,opt,name=Provider,proto3" json:"Provider,omitempty"`
 	Model                  string                 `protobuf:"bytes,2,opt,name=Model,proto3" json:"Model,omitempty"`
-	ContextTokens          int64                  `protobuf:"varint,3,opt,name=ContextTokens,proto3" json:"ContextTokens,omitempty"`
 	ThresholdTokens        int64                  `protobuf:"varint,4,opt,name=ThresholdTokens,proto3" json:"ThresholdTokens,omitempty"`
 	Source                 string                 `protobuf:"bytes,5,opt,name=Source,proto3" json:"Source,omitempty"`
 	MinimumThresholdTokens int64                  `protobuf:"varint,6,opt,name=MinimumThresholdTokens,proto3" json:"MinimumThresholdTokens,omitempty"`
-	TooSmall               bool                   `protobuf:"varint,7,opt,name=TooSmall,proto3" json:"TooSmall,omitempty"`
 	DisableAutoAdjust      bool                   `protobuf:"varint,8,opt,name=DisableAutoAdjust,proto3" json:"DisableAutoAdjust,omitempty"`
 	ContextKey             string                 `protobuf:"bytes,9,opt,name=ContextKey,proto3" json:"ContextKey,omitempty"`
 	unknownFields          protoimpl.UnknownFields
@@ -79539,13 +79537,6 @@ func (x *AIModelContextResponse) GetModel() string {
 	return ""
 }
 
-func (x *AIModelContextResponse) GetContextTokens() int64 {
-	if x != nil {
-		return x.ContextTokens
-	}
-	return 0
-}
-
 func (x *AIModelContextResponse) GetThresholdTokens() int64 {
 	if x != nil {
 		return x.ThresholdTokens
@@ -79565,13 +79556,6 @@ func (x *AIModelContextResponse) GetMinimumThresholdTokens() int64 {
 		return x.MinimumThresholdTokens
 	}
 	return 0
-}
-
-func (x *AIModelContextResponse) GetTooSmall() bool {
-	if x != nil {
-		return x.TooSmall
-	}
-	return false
 }
 
 func (x *AIModelContextResponse) GetDisableAutoAdjust() bool {
@@ -86875,19 +86859,17 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"ContextKey\x18\x06 \x01(\tR\n" +
 	"ContextKeyB\x14\n" +
-	"\x12_DisableAutoAdjust\"\xd4\x02\n" +
+	"\x12_DisableAutoAdjust\"\x9e\x02\n" +
 	"\x16AIModelContextResponse\x12\x1a\n" +
 	"\bProvider\x18\x01 \x01(\tR\bProvider\x12\x14\n" +
-	"\x05Model\x18\x02 \x01(\tR\x05Model\x12$\n" +
-	"\rContextTokens\x18\x03 \x01(\x03R\rContextTokens\x12(\n" +
+	"\x05Model\x18\x02 \x01(\tR\x05Model\x12(\n" +
 	"\x0fThresholdTokens\x18\x04 \x01(\x03R\x0fThresholdTokens\x12\x16\n" +
 	"\x06Source\x18\x05 \x01(\tR\x06Source\x126\n" +
-	"\x16MinimumThresholdTokens\x18\x06 \x01(\x03R\x16MinimumThresholdTokens\x12\x1a\n" +
-	"\bTooSmall\x18\a \x01(\bR\bTooSmall\x12,\n" +
+	"\x16MinimumThresholdTokens\x18\x06 \x01(\x03R\x16MinimumThresholdTokens\x12,\n" +
 	"\x11DisableAutoAdjust\x18\b \x01(\bR\x11DisableAutoAdjust\x12\x1e\n" +
 	"\n" +
 	"ContextKey\x18\t \x01(\tR\n" +
-	"ContextKey\"l\n" +
+	"ContextKeyJ\x04\b\x03\x10\x04J\x04\b\a\x10\b\"l\n" +
 	"\x12QueryAIToolRequest\x12)\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x11.ypb.AIToolFilterR\x06Filter\x12+\n" +
 	"\n" +

@@ -272,14 +272,12 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 				return err
 			}
 			previous := config.ModelContextStatusFor(provider, model, 0, key).ThresholdTokens
-			if (raw > 0 || hotPatchParams.DisableContextAutoAdjust != nil) && model != "" {
-				if err := yakit.SetAIModelContextSettings(consts.GetGormProfileDatabase(), provider, model, raw,
-					hotPatchParams.DisableContextAutoAdjust, key); err != nil {
-					status := config.ModelContextStatusFor(provider, model, 0, key)
-					status.Error = err.Error()
-					config.emitModelContextStatus(status)
-					return err
-				}
+			if err := yakit.SetAIModelContextSettings(consts.GetGormProfileDatabase(), provider, model, raw,
+				hotPatchParams.DisableContextAutoAdjust, key); err != nil {
+				status := config.ModelContextStatusFor(provider, model, 0, key)
+				status.Error = err.Error()
+				config.emitModelContextStatus(status)
+				return err
 			}
 
 			config.resetModelContextLimit(provider, model, key)
@@ -394,7 +392,7 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 			return next, true
 		}
 		limit := p.GetRuntimeContextSizeLimit()
-		if yakit.ValidateAIModelContextThreshold(limit) != nil {
+		if yakit.ValidateAIModelContextThreshold(limit) != nil || (limit == 0 && p.DisableContextAutoAdjust == nil) {
 			return base, false
 		}
 		if limit > 0 && p.GetAIModelName() != "" {
