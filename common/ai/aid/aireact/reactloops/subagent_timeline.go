@@ -17,12 +17,13 @@ import (
 // 子 Agent 的 timeline 一旦 merge 回父，隔离语义彻底失效，父将看到子的全部
 // 中间条目——这是 sub agent 不变量所禁止的。
 type TimelineHandle struct {
-	parent   *aicommon.Timeline
-	released sync.Once
-	taskID   string // allocated once, shared by fork metadata, runtime and dispatch receipt
-	mode     SubAgentTimelineMode
-	fork     *aicommon.TimelineFork // Fork 模式非 nil，Clean 模式为 nil
-	branch   *aicommon.Timeline     // 子实际使用的 timeline（Fork.Branch 或 Clean 新建）
+	parent             *aicommon.Timeline
+	released           sync.Once
+	taskID             string // allocated once, shared by fork metadata, runtime and dispatch receipt
+	mode               SubAgentTimelineMode
+	fork               *aicommon.TimelineFork // Fork 模式非 nil，Clean 模式为 nil
+	branch             *aicommon.Timeline     // 子实际使用的 timeline（Fork.Branch 或 Clean 新建）
+	unregisterTimeline func()
 }
 
 // Timeline 返回子 invoker 应使用的 timeline。
@@ -60,16 +61,24 @@ func (h *TimelineHandle) DiffPreview() (preview string, bytes int) {
 // Release 归档私有尾段，不发起 AI 请求；容器随后由 GC 回收。
 // Fork 模式不调用 MergeBack——分支随 fork 句柄释放。
 func (h *TimelineHandle) Release() {
-	if h == nil || h.parent == nil {
+	if h == nil {
 		return
 	}
 	h.released.Do(func() {
+		if h.fork != nil {
+			h.fork.Release()
+		}
+		if h.unregisterTimeline != nil {
+			h.unregisterTimeline()
+		}
 		afterID := int64(0)
 		if h.fork != nil {
 			afterID = h.fork.BaseMaxID
 		}
-		if err := h.parent.ArchiveMemoryBranch(h.branch, afterID); err != nil {
-			log.Warnf("archive sub-agent memory source failed: %v", err)
+		if h.parent != nil {
+			if err := h.parent.ArchiveMemoryBranch(h.branch, afterID); err != nil {
+				log.Warnf("archive sub-agent memory source failed: %v", err)
+			}
 		}
 	})
 }
@@ -87,7 +96,15 @@ func buildTimelineHandle(
 	switch mode {
 	case SubAgentTimelineClean:
 		branch := aicommon.NewPrivateTimeline(parentCfg, nil)
-		return &TimelineHandle{parent: parentTimeline, taskID: subTaskID, mode: SubAgentTimelineClean, branch: branch}, nil
+		branch.SoftBindConfig(parentCfg, parentCfg)
+		unregister, err := parentCfg.RegisterTimeline(branch)
+		if err != nil {
+			return nil, err
+		}
+		return &TimelineHandle{
+			parent: parentTimeline, taskID: subTaskID, mode: SubAgentTimelineClean,
+			branch: branch, unregisterTimeline: unregister,
+		}, nil
 	default: // SubAgentTimelineFork
 		if parentTimeline == nil {
 			return nil, utils.Error("fork timeline mode requires parent timeline")
@@ -221,6 +238,9 @@ func buildSubAgentRuntime(
 	}
 
 	release = func() {
+		if cfg, ok := childInvoker.GetConfig().(*aicommon.Config); ok {
+			cfg.UnregisterTimeline()
+		}
 		if jobCancel != nil {
 			jobCancel()
 		}
@@ -443,6 +463,7 @@ func PrepareForkedSubAgent(
 
 	childInvoker, err := buildSubAgentInvoker(parentCfg, &TimelineHandle{mode: SubAgentTimelineFork, fork: fork, branch: fork.Branch}, subTask.GetContext(), taskEmitter)
 	if err != nil {
+		fork.Release()
 		jobCancel()
 		return nil, nil, nil, nil, err
 	}
@@ -483,7 +504,14 @@ func PrepareForkedSubAgent(
 	branchMarker := "sub-react-branch-marker-" + subTaskID
 	fork.Branch.PushText(parentCfg.AcquireId(), branchMarker)
 
-	return childInvoker, subTask, fork, jobCancel, nil
+	release := func() {
+		if cfg, ok := childInvoker.GetConfig().(*aicommon.Config); ok {
+			cfg.UnregisterTimeline()
+		}
+		fork.Release()
+		jobCancel()
+	}
+	return childInvoker, subTask, fork, release, nil
 }
 
 // buildForkUserInput 拼接 fork 子 Agent 的用户输入：Goal + 可选的 ResultContract。
@@ -500,7 +528,13 @@ type forkedChild struct {
 }
 
 func (c *forkedChild) release() {
+	if c != nil && c.invoker != nil {
+		if cfg, ok := c.invoker.GetConfig().(*aicommon.Config); ok {
+			cfg.UnregisterTimeline()
+		}
+	}
 	if c != nil && c.fork != nil {
+		c.fork.Release()
 		if err := c.fork.Parent.ArchiveMemoryBranch(c.fork.Branch, c.fork.BaseMaxID); err != nil {
 			log.Warnf("archive fork memory source failed: %v", err)
 		}

@@ -47,7 +47,6 @@ func (r *ReAct) completeUserTaskMemory(task aicommon.AIStatefulTask) {
 	if !enabled || tl == nil || tl.IsBranchTimeline() {
 		return
 	}
-	r.config.SyncSessionEvidenceTimeline()
 	if !tl.NeedsMemoryFinalization() {
 		return
 	}

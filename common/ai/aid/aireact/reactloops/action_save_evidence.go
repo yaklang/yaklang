@@ -29,15 +29,9 @@ func saveSessionEvidenceWithChange(cfg aicommon.AICallerConfigIf, evidenceID, co
 	if err != nil {
 		return aicommon.EvidenceOperation{}, false, err
 	}
-	var changed bool
-	if recorder, ok := cfg.(*aicommon.Config); ok {
-		changed = recorder.ApplySessionEvidenceOpsWithChange([]aicommon.EvidenceOperation{evidenceOp})
-	} else {
-		// Preserve custom caller adapters' ApplySessionEvidenceOps contract.
-		before := cfg.GetSessionEvidenceRendered()
-		cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
-		changed = cfg.GetSessionEvidenceRendered() != before
-	}
+	before := cfg.GetSessionEvidenceRendered()
+	cfg.ApplySessionEvidenceOps([]aicommon.EvidenceOperation{evidenceOp})
+	changed := cfg.GetSessionEvidenceRendered() != before
 
 	rendered := cfg.GetSessionEvidenceRendered()
 	idMarker := fmt.Sprintf("[id: %s]", evidenceOp.ID)
@@ -96,14 +90,15 @@ var loopAction_SaveEvidence = &LoopAction{
 			return
 		}
 
-		evidenceOp, err := SaveSessionEvidence(loop.GetConfig(), evidenceOp.ID, evidenceOp.Content)
-		if err != nil {
+		before := loop.GetConfig().GetSessionEvidenceRendered()
+		if err := loop.GetConfig().BroadcastEvidence(evidenceOp); err != nil {
 			operator.Fail(utils.Wrap(err, "save_evidence failed"))
 			return
 		}
-		if loop.IsSubAgent() && loop.saveEvidencePublisher != nil {
-			if err := loop.saveEvidencePublisher(evidenceOp); err != nil {
-				operator.Fail(utils.Wrap(err, "publish evidence to parent failed"))
+		changed := loop.GetConfig().GetSessionEvidenceRendered() != before
+		if changed && loop.IsSubAgent() && loop.notifyEvidence != nil {
+			if err := loop.notifyEvidence(evidenceOp.ID); err != nil {
+				operator.Fail(utils.Wrap(err, "notify parent of evidence discovery failed"))
 				return
 			}
 		}

@@ -333,26 +333,13 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 		}
 		m.mu.Unlock()
 	}
-	opts.evidenceSink = func(op aicommon.EvidenceOperation) error {
+	opts.notifyEvidence = func(evidenceID string) error {
 		m.mu.Lock()
 		accept := !m.closed && m.ctx.Err() == nil && ctx.Err() == nil &&
 			!entry.snapshot.terminal() && entry.snapshot.State != "cancelling"
 		m.mu.Unlock()
 		if !accept {
 			return fmt.Errorf("parent no longer accepts evidence from sub-agent %s", entry.snapshot.ID)
-		}
-		// Use the same journal as a parent save_evidence action. Never merge a
-		// child's evidence snapshot or hold the manager lock during persistence.
-		cfg := p.parentConfig
-		if cfg == nil {
-			return fmt.Errorf("parent evidence journal is unavailable")
-		}
-		_, changed, err := saveSessionEvidenceWithChange(cfg, op.ID, op.Content)
-		if err != nil {
-			return err
-		}
-		if !changed {
-			return nil
 		}
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -361,7 +348,7 @@ func (m *SubAgentManager) run(entry *managedSubAgent, ctx context.Context, p *Pr
 		}
 		m.sharedEvidenceRevision++
 		entry.snapshot.EvidenceRevision = m.sharedEvidenceRevision
-		entry.snapshot.LastEvidenceID = op.ID
+		entry.snapshot.LastEvidenceID = evidenceID
 		entry.snapshot.LastActivityAt = time.Now()
 		m.notifyDiscoveryLocked()
 		return nil

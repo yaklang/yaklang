@@ -169,18 +169,18 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 		if done, _ := op.IsTerminated(); done {
 			return
 		}
-		if callback, ok := l.GetVariable("coordinator_discovery_callback").(func(string, string) error); ok {
-			id, content := a.GetString("evidence_id"), a.GetString("evidence_content")
+		if l.GetConfig().GetSessionEvidenceRendered() == before {
+			return
+		}
+		if callback, ok := l.GetVariable("coordinator_discovery_callback").(func(string) error); ok {
+			id := a.GetString("evidence_id")
 			if id == "" {
 				id = a.GetInvokeParams("next_action").GetString("evidence_id")
 			}
-			if content == "" {
-				content = a.GetInvokeParams("next_action").GetString("evidence_content")
-			}
-			if err := callback(id, content); err != nil {
+			if err := callback(id); err != nil {
 				op.Fail(err)
 			}
-		} else if l.GetConfig().GetSessionEvidenceRendered() != before {
+		} else {
 			switch callback := l.GetVariable("coordinator_discovery_callback").(type) {
 			case func(...string):
 				callback(a.GetString("evidence_id"))
@@ -194,15 +194,9 @@ func configureWorkerDiscovery(loop *reactloops.ReActLoop) error {
 	return nil
 }
 
-// Compare this normalized finding, not the whole shared store: another worker's
-// concurrent save must not turn an identical finding into a false discovery.
-func (s *Session) saveTaskDiscovery(a Attempt, id, content string) error {
-	op, err := aicommon.BuildSessionEvidenceUpsert(id, content)
-	if err != nil {
-		return err
-	}
-	s.evidenceMu.Lock()
-	defer s.evidenceMu.Unlock()
+// notifyTaskDiscovery only wakes the active planner. Evidence was already
+// delivered to the parent Timeline by BroadcastEvidence.
+func (s *Session) notifyTaskDiscovery(a Attempt, id string) error {
 	s.controller.mu.Lock()
 	current := s.controller.state.Attempts[a.Task.ID]
 	active := !s.controller.closed && current.ID == a.ID && current.State == Running
@@ -210,15 +204,6 @@ func (s *Session) saveTaskDiscovery(a Attempt, id, content string) error {
 	if !active {
 		return nil
 	}
-	store := aicommon.UnmarshalEvidenceStore(s.GetSessionPromptState().GetSessionEvidence())
-	for _, item := range store.Items {
-		if item.ID == op.ID && item.Content == op.Content {
-			return nil
-		}
-	}
-	if _, err := reactloops.SaveSessionEvidence(s.Config, op.ID, op.Content); err != nil {
-		return err
-	}
-	s.controller.taskDiscovered(a.Task.ID, a.ID, op.ID)
+	s.controller.taskDiscovered(a.Task.ID, a.ID, id)
 	return nil
 }
