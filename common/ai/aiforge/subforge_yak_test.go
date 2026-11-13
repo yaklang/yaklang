@@ -175,7 +175,11 @@ func TestSubForgeYakExecution(t *testing.T) {
 							lastChildEndpoint = endpoint
 							mu.Unlock()
 						}
-						input.SafeFeed(&ypb.AIInputEvent{IsInteractiveMessage: true, InteractiveId: endpoint, InteractiveJSONInput: `{"suggestion":"continue"}`})
+						reply := `{"suggestion":"continue"}`
+						if event.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
+							reply = `{"suggestion":"continue:"}`
+						}
+						input.SafeFeed(&ypb.AIInputEvent{IsInteractiveMessage: true, InteractiveId: endpoint, InteractiveJSONInput: reply})
 					}),
 				)
 				return nil

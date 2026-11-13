@@ -25,6 +25,7 @@ type subForgeCall struct {
 	ctx         context.Context
 	input       *chanx.UnlimitedChan[*ypb.AIInputEvent]
 	endpoints   sync.Map
+	planReviews sync.Map
 	unregister  func(...string)
 	releaseSlot func()
 
@@ -33,6 +34,8 @@ type subForgeCall struct {
 	childID      string
 	callID       string
 	pending      map[string]struct{}
+	queued       []*schema.AiOutputEvent
+	active       string
 	closed       bool
 	childStarted bool
 }
@@ -51,6 +54,13 @@ func newSubForgeCall(ctx context.Context, s *Session, task aicommon.AIStatefulTa
 
 func (c *subForgeCall) routeInput(event *ypb.AIInputEvent) bool {
 	endpoint := event.GetInteractiveId()
+	if review, ok := c.planReviews.Load(endpoint); ok {
+		var valid bool
+		event, valid = subForgePlanReviewInput(event, review.(*schema.AiOutputEvent))
+		if !valid {
+			return true
+		} // Keep the visible endpoint open for a corrected reply.
+	}
 	if c.endpoints.CompareAndSwap(endpoint, true, false) {
 		if c.ctx.Err() == nil {
 			c.input.SafeFeed(event)
@@ -87,6 +97,7 @@ func (c *subForgeCall) interrupted(err error) error {
 func (c *subForgeCall) finish() {
 	c.eventMu.Lock()
 	c.closed = true
+	active := c.active
 	c.eventMu.Unlock()
 	var retiredIDs []string
 	c.endpoints.Range(func(key, _ any) bool {
@@ -94,7 +105,7 @@ func (c *subForgeCall) finish() {
 		return true
 	})
 	c.unregister(retiredIDs...)
-	if len(c.pending) > 0 {
+	if active != "" {
 		// Keep legacy review release delivery serialized with child events.
 		go func() {
 			c.deliveryMu.Lock()
@@ -104,7 +115,7 @@ func (c *subForgeCall) finish() {
 					log.Errorf("sub-Forge review release handler panicked: %v", failure)
 				}
 			}()
-			for endpoint := range c.pending {
+			for _, endpoint := range []string{active} {
 				content, _ := json.Marshal(map[string]any{"id": endpoint, "params": nil})
 				c.forward(&schema.AiOutputEvent{
 					Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
@@ -116,8 +127,8 @@ func (c *subForgeCall) finish() {
 }
 
 func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
-	// A child is presented as one tool call. Its plans, task lifecycle, and
-	// nested tool results must not mutate the client's parent execution view.
+	original := event
+	// Internal plans and task/tool lifecycle belong to the child only.
 	event = subForgeInteractiveEvent(event)
 	if event == nil {
 		return
@@ -125,11 +136,16 @@ func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
 	c.deliveryMu.Lock()
 	defer c.deliveryMu.Unlock()
 	c.eventMu.Lock()
-	if c.closed {
+	if c.closed || c.ctx.Err() != nil {
 		c.eventMu.Unlock()
 		return
 	}
 	endpoint := event.GetInteractiveId()
+	if endpoint == "" {
+		c.eventMu.Unlock()
+		return
+	}
+	var next *schema.AiOutputEvent
 	if event.Type == schema.EVENT_TYPE_REVIEW_RELEASE {
 		if _, exists := c.pending[endpoint]; !exists {
 			c.eventMu.Unlock()
@@ -137,19 +153,41 @@ func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
 		}
 		delete(c.pending, endpoint)
 		c.endpoints.Store(endpoint, false)
-	} else {
-		if c.ctx.Err() != nil {
+		if c.active != endpoint {
 			c.eventMu.Unlock()
 			return
 		}
-		if endpoint != "" {
-			if _, known := c.endpoints.LoadOrStore(endpoint, true); !known {
-				c.pending[endpoint] = struct{}{}
+		c.active = ""
+		for len(c.queued) > 0 {
+			candidate := c.queued[0]
+			c.queued = c.queued[1:]
+			if _, exists := c.pending[candidate.GetInteractiveId()]; exists {
+				next = candidate
+				c.active = candidate.GetInteractiveId()
+				break
 			}
 		}
+	} else {
+		if _, known := c.endpoints.LoadOrStore(endpoint, true); known {
+			c.eventMu.Unlock()
+			return
+		}
+		if original.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			c.planReviews.Store(endpoint, original)
+		}
+		c.pending[endpoint] = struct{}{}
+		if c.active != "" {
+			c.queued = append(c.queued, event)
+			c.eventMu.Unlock()
+			return
+		}
+		c.active = endpoint
 	}
 	c.eventMu.Unlock()
 	c.forward(event)
+	if next != nil {
+		c.forward(next)
+	}
 }
 
 func (c *subForgeCall) run(ctx context.Context, binding SubForgeTool, params aitool.InvokeParams, allowed []*aitool.Tool, opts ...aicommon.ConfigOption) (any, error) {

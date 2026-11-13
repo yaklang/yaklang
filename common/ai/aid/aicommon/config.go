@@ -4163,13 +4163,10 @@ func (c *Config) EventFormat(e *schema.AiOutputEvent) *schema.AiOutputEvent {
 }
 
 func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
-	// Child tree snapshots also close calls cancelled with the parent session.
-	if e.Type != schema.EVENT_TYPE_SUB_FORGE_TASK_TREE {
-		select {
-		case <-c.Ctx.Done():
-			return
-		default:
-		}
+	select {
+	case <-c.Ctx.Done():
+		return
+	default:
 	}
 
 	e = c.EventFormat(e)
