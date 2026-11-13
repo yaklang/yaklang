@@ -2,9 +2,9 @@
 
 ## 主循环入口
 
-`reactloops/prompt.go` 的 `generateLoopPromptFromInput` 返回正文、成分快照和 prompt 模式。它先正常组装，再检查整份 prompt 的 token 数；默认上限为 `500 * 1024` tokens，不单独测量 Timeline。
+`reactloops/prompt.go` 的 `generateLoopPromptFromInput` 返回正文、成分快照和 prompt 模式。它先正常组装，再检查整份 prompt 的 token 数；默认上限为 `500 * 1000` tokens，不单独测量 Timeline。
 
-超过限制时，直接用同一份任务输入重建压缩 prompt：只替换动态段，加入压缩指引与候选表，返回上下文压缩模式。默认目标约为 `83.3 * 1024` tokens（上限的六分之一），触发上限保持 `500 * 1024`。冗余的工具和证据操作由 promoted 状态转移自己折叠，不再在压缩前单独扫一遍。
+超过限制时，直接用同一份任务输入重建压缩 prompt：只替换动态段，加入压缩指引与候选表，返回上下文压缩模式。默认目标约为 `83.3 * 1000` tokens（上限的六分之一），触发上限保持 `500 * 1000`。冗余的工具和证据操作由 promoted 状态转移自己折叠，不再在压缩前单独扫一遍。
 
 `exec.go` 根据返回模式调用模型，并在压缩模式外发出上下文优化状态。压缩模式只把预期 action 改为 `compress_context`；该 action 走原有执行流程，只提交已验证的选择，不再内部调用 AI。压缩响应不重复写回 Timeline；完成后下一轮重新构建 prompt，连续压缩没有有效缩小时以明确错误退出。
 
