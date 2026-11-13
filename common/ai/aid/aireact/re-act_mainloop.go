@@ -149,6 +149,7 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	}
 	restoreExecutionPolicy := r.applyTaskExecutionPolicy(task)
 	defer restoreExecutionPolicy()
+	r.prepareBrowserAttachmentForTask(task)
 
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
@@ -251,6 +252,7 @@ func (r *ReAct) processRecoveryTask(task aicommon.AIStatefulTask) {
 			r.AddToTimeline("error", fmt.Sprintf("recovery task panic: %v", err))
 		}
 	}()
+	r.activateBrowserAttachmentForResumedTask(task)
 
 	data := task.GetRecoveryData()
 	if data == nil {
