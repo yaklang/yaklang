@@ -80,16 +80,12 @@ func (c *Config) RecordModelContextOverflow(provider, model string, measuredProm
 	if old != nil && old.ManualRevision == saved.ManualRevision && old.ThresholdTokens <= target {
 		return 0
 	}
-	capacity := target
-	if reported {
-		capacity = ev.MaxContextTokens
-	}
 	original := base
 	if old != nil && old.pending && old.ManualRevision == saved.ManualRevision {
 		original = old.originalThresholdTokens
 	}
 	state.models[key] = &modelContextProbe{
-		AIModelContext: yakit.AIModelContext{ContextTokens: capacity, ThresholdTokens: target, Source: "learned", ManualRevision: saved.ManualRevision},
+		AIModelContext: yakit.AIModelContext{ThresholdTokens: target, Source: "learned", ManualRevision: saved.ManualRevision},
 		pending:        true, change: newModelContextChange("overflow", base, target),
 		originalThresholdTokens: original,
 	}
@@ -115,16 +111,6 @@ func (c *Config) EffectiveModelContextLimit(provider, model string, base int64, 
 		return c.EffectiveTimelineTokenLimit(provider, model, min(base, probe.ThresholdTokens))
 	}
 	return c.EffectiveTimelineTokenLimit(provider, model, base)
-}
-
-func (c *Config) ResetModelContextLimit() {
-	if c == nil {
-		return
-	}
-	state := &c.modelContextState
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	state.models = nil
 }
 
 func (c *Config) resetModelContextLimit(provider, model, contextKey string) {
@@ -169,7 +155,6 @@ type ModelContextStatus struct {
 	Model                  string              `json:"model"`
 	PromptTokens           int64               `json:"prompt_tokens"`
 	Pending                bool                `json:"pending"`
-	TooSmall               bool                `json:"too_small"`
 	MinimumThresholdTokens int64               `json:"minimum_threshold_tokens"`
 	Change                 *ModelContextChange `json:"change,omitempty"`
 	Error                  string              `json:"error,omitempty"`
@@ -214,11 +199,10 @@ func (c *Config) ModelContextStatusFor(provider, model string, promptTokens int6
 	if probe := state.models[modelContextProbeKey(provider, model, contextKey)]; probe != nil && probe.ManualRevision == status.ManualRevision {
 		status.Change = probe.change
 		if probe.pending {
-			status.ContextTokens, status.Pending, status.Source = probe.ContextTokens, probe.pending, "learned"
+			status.Pending, status.Source = probe.pending, "learned"
 		}
 	}
 	state.mu.RUnlock()
-	status.TooSmall = status.ContextTokens < yakit.MinimumAIModelContextTokens
 	return status
 }
 

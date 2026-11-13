@@ -108,7 +108,7 @@ func TestAIModelContextManualBoundsAndAutoAdjustPreference(t *testing.T) {
 	}
 	require.NoError(t, SetAIModelContextSettings(db, "openai", "model-a", 0, &disabled, key))
 	learned := GetAIModelContext(db, "openai", "model-a", key)
-	learned.ContextTokens, learned.ThresholdTokens, learned.Source = 64000, 51200, "learned"
+	learned.ThresholdTokens, learned.Source = 51200, "learned"
 	require.NoError(t, SaveAIModelContext(db, "openai", "model-a", learned, key))
 	require.EqualValues(t, 51200, GetAIModelContext(db, "openai", "model-a", key).ThresholdTokens)
 	disabled = true
