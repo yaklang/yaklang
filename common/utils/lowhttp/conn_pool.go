@@ -714,26 +714,21 @@ func (pc *persistConn) readLoop() {
 		// this watcher, a streaming response (SSE) blocks forever:
 		// ExtendReadDeadline disables the hard timeout and pc.ctx is derived
 		// from context.Background(), not the request context.
-		var ctxWatcherStop chan struct{}
-		if rc.option != nil && rc.option.Ctx != nil {
-			ctxWatcherStop = make(chan struct{})
-			// Capture this request's context before rc is replaced on connection
-			// reuse; the watcher may still be scheduled after stop is closed.
-			go func(requestCtx context.Context, seq uint64, stop chan struct{}) {
-				select {
-				case <-requestCtx.Done():
-					if atomic.LoadUint64(&pc.reqSeq) != seq {
-						return
-					}
-					_ = pc.conn.Close()
-				case <-stop:
-				}
-			}(rc.option.Ctx, seq, ctxWatcherStop)
+		var stopCancel func() bool
+		var cancelDone chan struct{}
+		if rc.option != nil && rc.option.Ctx != nil && rc.option.Ctx.Done() != nil {
+			cancelDone = make(chan struct{})
+			stopCancel = context.AfterFunc(rc.option.Ctx, func() {
+				_ = pc.conn.Close()
+				close(cancelDone)
+			})
 		}
 		stopCtxWatcher := func() {
-			if ctxWatcherStop != nil {
-				close(ctxWatcherStop)
-				ctxWatcherStop = nil
+			if stopCancel != nil && !stopCancel() {
+				// The callback owns the socket until it finishes closing it.
+				// Never publish a connection that is being closed.
+				<-cancelDone
+				alive = false
 			}
 		}
 
@@ -909,9 +904,10 @@ func (pc *persistConn) readLoop() {
 							options:     rc.option,
 						}
 					}
-					firstAuth = false
 					// Wait for stream handler to complete before continuing
 					waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "conn pool auth retry stream handler")
+					stopCtxWatcher()
+					firstAuth = false
 					continue
 				}
 			}

@@ -1,6 +1,7 @@
 package lowhttp
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func TestConnPoolH1AcquiresConnectionAtCapacity(t *testing.T) {
@@ -180,4 +182,94 @@ func TestConnPoolH1EvictionKeepsBufferedResponse(t *testing.T) {
 			require.Equal(t, 10*time.Millisecond, tr.traceInfo.ServerTime)
 		}()
 	}
+}
+
+type gatedCloseConn struct {
+	net.Conn
+	closing   chan struct{}
+	finish    <-chan struct{}
+	closeOnce sync.Once
+}
+
+func (c *gatedCloseConn) Close() error {
+	c.closeOnce.Do(func() {
+		close(c.closing)
+		<-c.finish
+		_ = c.Conn.Close()
+	})
+	return nil
+}
+
+func TestConnPoolH1DoesNotPublishConnectionWhileCancellationClosesIt(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	pool := NewHttpConnPool(ctx, 1, 1)
+	defer pool.Clear()
+	key := &connectKey{scheme: H1, addr: "origin.invalid:80"}
+	_, err := pool.acquireH1Conn(ctx, key, 0)
+	require.NoError(t, err)
+
+	socket, origin := net.Pipe()
+	defer socket.Close()
+	defer origin.Close()
+	finishClose := make(chan struct{})
+	releaseClose := sync.OnceFunc(func() { close(finishClose) })
+	defer releaseClose()
+	conn := &gatedCloseConn{Conn: socket, closing: make(chan struct{}), finish: finishClose}
+	connCtx, closeConn := context.WithCancel(context.Background())
+	defer closeConn()
+	pc := &persistConn{
+		ctx: connCtx, cancel: closeConn, conn: conn, p: pool, cacheKey: key,
+		reqCh: make(chan requestAndResponseCh, 1), br: bufio.NewReader(socket),
+	}
+	requestCtx, cancelRequest := context.WithCancel(ctx)
+	defer cancelRequest()
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, "http://origin.invalid/", nil)
+	require.NoError(t, err)
+	httpctx.SetResponseFinishedCallback(req, func() {
+		cancelRequest()
+		select {
+		case <-conn.closing:
+		case <-ctx.Done():
+		}
+	})
+	response := make(chan responseInfo, 1)
+	pc.reqCh <- requestAndResponseCh{
+		reqInstance: req,
+		option:      &LowhttpExecConfig{Ctx: requestCtx},
+		ch:          response,
+	}
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		pc.readLoop()
+	}()
+	require.NoError(t, origin.SetWriteDeadline(time.Now().Add(time.Second)))
+	_, err = io.WriteString(origin, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+	require.NoError(t, err)
+	select {
+	case <-conn.closing:
+	case <-ctx.Done():
+		t.Fatal("cancellation did not reach the connection")
+	}
+	waitCtx, stopWaiting := context.WithTimeout(ctx, 30*time.Millisecond)
+	defer stopWaiting()
+	idle, err := pool.acquireH1Conn(waitCtx, key, 0)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Nil(t, idle)
+	releaseClose()
+	select {
+	case result := <-response:
+		require.NoError(t, result.err)
+		require.Equal(t, http.StatusOK, result.resp.StatusCode)
+	case <-ctx.Done():
+		t.Fatal("the completed response was lost")
+	}
+	select {
+	case <-readDone:
+	case <-ctx.Done():
+		t.Fatal("the reader remained active after closing")
+	}
+	require.Empty(t, pool.idleConnMap)
+	require.Empty(t, pool.connSem)
 }
