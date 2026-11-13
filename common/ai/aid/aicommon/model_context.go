@@ -150,7 +150,7 @@ func (c *Config) ConfirmModelContextSuccess(provider, model, contextKey string) 
 	}
 	previous := probe.originalThresholdTokens
 	if err := yakit.SaveAIModelContext(consts.GetGormProfileDatabase(), provider, model, probe.AIModelContext, contextKey); err != nil {
-		if err == yakit.ErrAIModelContextChanged {
+		if err == yakit.ErrAIModelContextChanged || err == yakit.ErrAIModelContextOwnerDeleted {
 			delete(state.models, key)
 		} else {
 			log.Warnf("save learned model context: %v", err)

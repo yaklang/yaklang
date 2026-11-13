@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +28,7 @@ func TestModelContextIdentitySurvivesGatewayAndResponseTee(t *testing.T) {
 				fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"accepted\"}}]}\n\ndata: [DONE]\n\n")
 			}))
 			defer server.Close()
-			model := &ypb.AIModelConfig{ModelName: "test-model", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "test-only", BaseURL: server.URL + "/v1"}}
+			model := &ypb.AIModelConfig{ContextOwnerId: uuid.NewString(), ModelName: "test-model", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "test-only", BaseURL: server.URL + "/v1"}}
 			key := aispec.ModelContextIdentity(model)
 			callback, err := CreateCallbackFromConfig(model)
 			require.NoError(t, err)

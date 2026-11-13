@@ -71917,9 +71917,11 @@ type AIModelConfig struct {
 	ProbedExtendedEfforts []string `protobuf:"bytes,6,rep,name=ProbedExtendedEfforts,proto3" json:"ProbedExtendedEfforts,omitempty"`
 	// 是否已对 xhigh/max 做过探测。false=未探测（首次操作下拉框时触发）；
 	// true=已探测（ProbedExtendedEfforts 即最终结果，不再重复探测）。
-	EffortProbed  bool `protobuf:"varint,7,opt,name=EffortProbed,proto3" json:"EffortProbed,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	EffortProbed bool `protobuf:"varint,7,opt,name=EffortProbed,proto3" json:"EffortProbed,omitempty"`
+	// Stable owner for this configured provider entry, independent of the selected model.
+	ContextOwnerId string `protobuf:"bytes,8,opt,name=ContextOwnerId,proto3" json:"ContextOwnerId,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AIModelConfig) Reset() {
@@ -71999,6 +72001,13 @@ func (x *AIModelConfig) GetEffortProbed() bool {
 		return x.EffortProbed
 	}
 	return false
+}
+
+func (x *AIModelConfig) GetContextOwnerId() string {
+	if x != nil {
+		return x.ContextOwnerId
+	}
+	return ""
 }
 
 type AIGlobalConfig struct {
@@ -86107,7 +86116,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18UpsertAIProviderResponse\x12+\n" +
 	"\bProvider\x18\x01 \x01(\v2\x0f.ypb.AIProviderR\bProvider\")\n" +
 	"\x17DeleteAIProviderRequest\x12\x0e\n" +
-	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\xb0\x02\n" +
+	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\xd8\x02\n" +
 	"\rAIModelConfig\x12\x1e\n" +
 	"\n" +
 	"ProviderId\x18\x01 \x01(\x03R\n" +
@@ -86117,7 +86126,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\x12\x1a\n" +
 	"\bIsOnline\x18\x05 \x01(\bR\bIsOnline\x124\n" +
 	"\x15ProbedExtendedEfforts\x18\x06 \x03(\tR\x15ProbedExtendedEfforts\x12\"\n" +
-	"\fEffortProbed\x18\a \x01(\bR\fEffortProbed\"\xf8\x04\n" +
+	"\fEffortProbed\x18\a \x01(\bR\fEffortProbed\x12&\n" +
+	"\x0eContextOwnerId\x18\b \x01(\tR\x0eContextOwnerId\"\xf8\x04\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +

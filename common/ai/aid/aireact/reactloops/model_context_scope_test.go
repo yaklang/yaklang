@@ -20,6 +20,7 @@ func TestModelContextSettingOnlyControlsQualityLoop(t *testing.T) {
 	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithPrimaryModelContext(model))
 	quality, speed := makeSchemaStabilityTestLoop(cfg), makeSchemaStabilityTestLoop(cfg)
 	speed.useSpeedPriorityAI = true
+	registerModelContextTestConfig(t, model)
 	key := aispec.ModelContextIdentity(model)
 	require.EqualValues(t, 500000, quality.wholePromptTokenLimit())
 	require.EqualValues(t, 300*1024, speed.wholePromptTokenLimit())
@@ -43,6 +44,7 @@ func TestModelContextSettingOnlyControlsQualityLoop(t *testing.T) {
 func TestModelContextDisabledOnlyStopsMatchingQualityOverflow(t *testing.T) {
 	model := &ypb.AIModelConfig{ModelName: uuid.NewString(), Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", BaseURL: "https://example.test/v1", APIKey: "test-only"}}
 	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithPrimaryModelContext(model))
+	registerModelContextTestConfig(t, model)
 	key := aispec.ModelContextIdentity(model)
 	disabled := true
 	require.NoError(t, yakit.SetAIModelContextSettings(consts.GetGormProfileDatabase(), "openai", model.ModelName, 500000, &disabled, key))
@@ -113,4 +115,17 @@ func TestModelContextKeepsOriginalCompressionRouting(t *testing.T) {
 			}
 		})
 	}
+}
+
+func registerModelContextTestConfig(t *testing.T, model *ypb.AIModelConfig) {
+	t.Helper()
+	db := consts.GetGormProfileDatabase()
+	cfg, err := yakit.GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	if cfg == nil {
+		cfg = &ypb.AIGlobalConfig{}
+	}
+	cfg.IntelligentModels = append(cfg.IntelligentModels, model)
+	_, err = yakit.SetAIGlobalConfig(db, cfg)
+	require.NoError(t, err)
 }

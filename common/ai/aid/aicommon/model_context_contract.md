@@ -12,13 +12,19 @@
 
 `provider type + model name` 不足以区分两个 OpenAI 兼容服务。新增模型表单允许手填凭据和地址，`ProviderId` 又可以为空，因此也不能单独用它作为身份。
 
-后端根据有效连接配置生成 `v2:<SHA-256>` 标识：厂商类型、模型名、BaseURL/Domain、启用的 Endpoint、API 类型、账号凭据、租户/自定义请求头，以及脚本提供方的脚本配置。API Key 与请求头只参与摘要，不明文写入元数据 key 或事件。配置选择 ID、代理地址、思考强度、采样参数不参与身份。
+每条已保存的提供商配置使用内部稳定 `ContextOwnerId`（UUID）作为归属，与可选的旧 API Key 记录 `ProviderId` 分离。新增时分配，编辑或切换模型时保留；两条完全同名、同地址、同账号的配置也各自拥有归属。
 
-- 同一实际服务配置与模型跨会话共享阈值和开关。
-- 同名模型的地址、API 类型或账号不同，各自保存。
-- 更换凭据/地址后视为新配置，从 500K 开始；不会猜测两份配置是否属于同一服务。
-- 早期 PR 构建仅按类型和模型名保存的记录有歧义，不自动迁移到新标识。新记录中的整数 token 数不缩放、不取整。
-- 数据保存到 profile 数据库独立的 `ai-model-context-v2:*` 元数据，不改模型路由配置或上游 API 参数。
+后端生成 `<ContextOwnerId>:<SHA-256>` 标识。摘要包括有效厂商类型、模型名、BaseURL/Domain、启用的 Endpoint、API 类型、账号凭据、租户/自定义请求头，以及脚本提供方配置。API Key 与请求头只参与摘要，不明文写入元数据 key 或事件。代理、思考强度、采样参数不参与身份。
+
+- 同一提供商配置下的同一模型跨会话共享阈值和自动调整开关。
+- 切换 A → B → A，保留 A、B 各自的设置；重排或移动配置不删除历史模型设置。
+- 更换地址、API 类型或账号使用独立设置；之前的设置仍归原提供商配置所有。
+- 删除整条提供商配置时，在同一数据库事务内删除该归属下所有模型和连接的缓存；其它配置不受影响。
+- 删除后重新添加相同内容会分配新的归属，从默认 500K 开始。
+- 迟到的手动保存、成功响应持久化必须检查归属仍存在，并与删除操作互斥；不能重新创建已删除的缓存。
+- 数据保存在 profile 数据库的 `ai-model-context:<ContextOwnerId>:*` 元数据中。不增加数据库迁移或旧实验记录兼容逻辑，整数 token 数不缩放、不取整。
+
+配置绑定字段只用于本地设置管理，不发送为上游 API 参数，也不改变主模型、辅助模型或视觉模型的路由。
 
 无会话时 `GetAIModelContext` / `SetAIModelContext` 传完整 `Config`，后端返回 `ContextKey`。之后可传 `Provider/Model/ContextKey`；只传类型和名字会被拒绝。运行时事件返回同一标识，热更新传 `AIService/AIModelName/ModelContextKey`。配置已切换时拒绝旧标识，避免误改另一个同名模型。
 
@@ -49,11 +55,12 @@
 
 | 约束 | 测试 |
 | --- | --- |
-| 同名不同地址/账号/API/租户隔离，配置 ID 与思考强度不影响身份 | `aispec/TestModelContextIdentitySeparatesConfiguredServices` |
-| 无会话 Config/ContextKey 往返，歧义旧记录不继承，手动上下限 | `yakgrpc/TestAIModelContextConfiguredIdentityAndBounds` |
+| 同名不同地址/账号/API/租户隔离，独立配置归属隔离，思考强度不影响身份 | `aispec/TestModelContextIdentitySeparatesConfiguredServices` |
+| 无会话 Config/ContextKey 往返，已删除配置拒绝读写，手动上下限 | `yakgrpc/TestAIModelContextConfiguredIdentityAndBounds` |
+| 切换保留、删除清理、重新添加隔离、并发迟到写入不复活 | `yakit/TestAIModelContextProviderLifecycle`、`TestAIModelContextDeleteAndLateWriteAreAtomic` |
 | 运行时边界与过期配置拒绝 | `TestModelContextContractManualBoundsAndIdentity` |
 | 失败不落库、匹配成功保存、跨会话读取 | `TestModelContextContractSuccessPersistsOnlyMatchingConfiguration` |
-| 取消、手动编辑、关闭开关后的迟到成功不覆盖 | `TestModelContextContractLateSuccessAndCancellationDoNotOverwrite` |
+| 取消、手动编辑、关闭开关或删除配置后的迟到成功不覆盖 | `TestModelContextContractLateSuccessAndCancellationDoNotOverwrite` |
 | 与原运行时算法逐例比较、原 SDK 默认值 | `TestModelContextContractOriginalReductionFormula`、`TestModelContextContractEventsAndLegacyDefaults` |
 | 主模型设置不修改 Speed 默认值/存储，关闭开关只作用主模型 | `reactloops/TestModelContextSettingOnlyControlsQualityLoop`、`TestModelContextDisabledOnlyStopsMatchingQualityOverflow` |
 | 文本/原生协议压缩路由保持原有差异 | `reactloops/TestModelContextKeepsOriginalCompressionRouting` |

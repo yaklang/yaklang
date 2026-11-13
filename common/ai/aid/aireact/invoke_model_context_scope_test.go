@@ -21,6 +21,7 @@ func TestReAct_ModelContextPersistsOriginalRecoveryOnlyAfterSuccess(t *testing.T
 		for _, disabled := range []bool{false, true} {
 			t.Run(fmt.Sprintf("native=%v/disabled=%v", native, disabled), func(t *testing.T) {
 				model := &ypb.AIModelConfig{ModelName: uuid.NewString(), Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", BaseURL: "https://example.test/v1", APIKey: "test-only"}}
+				registerModelContextTestConfig(t, model)
 				key := aispec.ModelContextIdentity(model)
 				db := consts.GetGormProfileDatabase()
 				if disabled {
@@ -63,4 +64,17 @@ func TestReAct_ModelContextPersistsOriginalRecoveryOnlyAfterSuccess(t *testing.T
 			})
 		}
 	}
+}
+
+func registerModelContextTestConfig(t *testing.T, model *ypb.AIModelConfig) {
+	t.Helper()
+	db := consts.GetGormProfileDatabase()
+	cfg, err := yakit.GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	if cfg == nil {
+		cfg = &ypb.AIGlobalConfig{}
+	}
+	cfg.IntelligentModels = append(cfg.IntelligentModels, model)
+	_, err = yakit.SetAIGlobalConfig(db, cfg)
+	require.NoError(t, err)
 }
