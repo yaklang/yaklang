@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
@@ -79,6 +80,8 @@ func HasAIGlobalConfig(db *gorm.DB) bool {
 }
 
 func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
+	aiModelContextMu.Lock()
+	defer aiModelContextMu.Unlock()
 	if db == nil {
 		return nil, utils.Error("no set database")
 	}
@@ -99,6 +102,15 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 	recoverProvidersFromDeprecatedConfig(db, cfg)
 	persistMigratedAIGlobalConfig(db, cfg)
 	mergeModelVisionCapabilities(cfg, nil)
+	if ensureModelContextOwners(cfg) {
+		raw, err := json.Marshal(cfg)
+		if err != nil {
+			return nil, err
+		}
+		if err := SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(raw)); err != nil {
+			return nil, err
+		}
+	}
 	return cfg, nil
 }
 
@@ -136,8 +148,10 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig, discovered ...map[*
 	migrateAIGlobalConfigBaseURLs(cfg)
 	previous, err := GetAIGlobalConfig(db)
 	if err != nil {
-		log.Warnf("unable to recover previous model capabilities: %v", err)
+		return nil, err
 	}
+	aiModelContextMu.Lock()
+	defer aiModelContextMu.Unlock()
 	mergeModelVisionCapabilities(cfg, previous)
 	for _, capabilities := range discovered {
 		for model, supported := range capabilities {
@@ -151,11 +165,31 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig, discovered ...map[*
 		}
 	}
 
+	ensureModelContextOwners(cfg)
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, err
 	}
-	if err := SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data)); err != nil {
+	tx := db.Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	defer tx.Rollback()
+	if err := SetKey(tx, consts.AI_GLOBAL_CONFIG_KEY, string(data)); err != nil {
+		return nil, err
+	}
+	nextOwners := modelContextOwners(cfg)
+	for owner := range modelContextOwners(previous) {
+		if _, exists := nextOwners[owner]; exists {
+			continue
+		}
+		// GeneralStorage quotes its keys. Delete every model/connection setting for
+		// this provider entry in the same transaction as removing the provider.
+		if err := tx.Where("key LIKE ?", "\"ai-model-context:"+owner+":%").Unscoped().Delete(&schema.GeneralStorage{}).Error; err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
 		return nil, err
 	}
 	return cfg, nil
@@ -188,6 +222,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 			}
 			result = append(result, &ypb.AIModelConfig{
 				ProviderId:               model.GetProviderId(),
+				ContextOwnerId:           model.GetContextOwnerId(),
 				Provider:                 providerCfg,
 				ModelName:                model.GetModelName(),
 				ExtraParams:              cloneKVPairs(model.GetExtraParams()),
@@ -268,6 +303,7 @@ func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 		}
 		cloned = append(cloned, &ypb.AIModelConfig{
 			ProviderId:               model.GetProviderId(),
+			ContextOwnerId:           model.GetContextOwnerId(),
 			IsOnline:                 model.GetIsOnline(),
 			Provider:                 cloneThirdPartyConfig(model.GetProvider()),
 			ModelName:                model.GetModelName(),
@@ -637,4 +673,40 @@ func aiProviderDefaultEndpoint(providerType string) (string, string) {
 	default:
 		return "https://api.openai.com", "/v1/chat/completions"
 	}
+}
+
+func allContextModels(cfg *ypb.AIGlobalConfig) []*ypb.AIModelConfig {
+	if cfg == nil {
+		return nil
+	}
+	result := append([]*ypb.AIModelConfig{}, cfg.GetIntelligentModels()...)
+	result = append(result, cfg.GetLightweightModels()...)
+	return append(result, cfg.GetVisionModels()...)
+}
+
+func modelContextOwners(cfg *ypb.AIGlobalConfig) map[string]struct{} {
+	result := map[string]struct{}{}
+	for _, model := range allContextModels(cfg) {
+		if owner := model.GetContextOwnerId(); owner != "" {
+			result[owner] = struct{}{}
+		}
+	}
+	return result
+}
+
+func ensureModelContextOwners(cfg *ypb.AIGlobalConfig) bool {
+	seen := map[string]struct{}{}
+	changed := false
+	for _, model := range allContextModels(cfg) {
+		if model == nil {
+			continue
+		}
+		_, duplicate := seen[model.GetContextOwnerId()]
+		if _, err := uuid.Parse(model.GetContextOwnerId()); err != nil || duplicate {
+			model.ContextOwnerId = uuid.NewString()
+			changed = true
+		}
+		seen[model.GetContextOwnerId()] = struct{}{}
+	}
+	return changed
 }

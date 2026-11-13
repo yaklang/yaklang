@@ -19,8 +19,8 @@ func TestAIModelContextConfiguredIdentityAndBounds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	config := &ypb.AIModelConfig{ModelName: "same-name", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", BaseURL: "https://a.example/v1", APIKey: "test-only"}}
-	// An ambiguous record from an earlier PR build must not be assigned to this service.
-	require.NoError(t, yakit.SetAIModelContextSettings(server.GetProfileDatabase(), "openai", "same-name", 150000, nil))
+	_, err = yakit.SetAIGlobalConfig(server.GetProfileDatabase(), &ypb.AIGlobalConfig{IntelligentModels: []*ypb.AIModelConfig{config}})
+	require.NoError(t, err)
 	initial, err := client.GetAIModelContext(ctx, &ypb.GetAIModelContextRequest{Config: config})
 	require.NoError(t, err)
 	require.EqualValues(t, 500000, initial.ThresholdTokens)
@@ -68,4 +68,11 @@ func TestAIModelContextConfiguredIdentityAndBounds(t *testing.T) {
 		_, err := client.GetAIModelContext(ctx, request)
 		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
 	}
+	_, err = yakit.SetAIGlobalConfig(server.GetProfileDatabase(), &ypb.AIGlobalConfig{})
+	require.NoError(t, err)
+	_, err = client.GetAIModelContext(ctx, identity)
+	require.Equal(t, codes.NotFound, grpcstatus.Code(err))
+	_, err = client.SetAIModelContext(ctx, &ypb.SetAIModelContextRequest{Config: config, ThresholdTokens: 200000})
+	require.Equal(t, codes.NotFound, grpcstatus.Code(err))
+
 }
