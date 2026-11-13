@@ -825,6 +825,17 @@ func (s *instructionStore) Close(progress func(int)) error {
 		}
 		// All instructions persisted — safe to close without save.
 		s.writer.CloseWithoutSave()
+		// The reload memo owns a cache with two background workers. It is only
+		// needed while the store answers reads out of memory; once every row is
+		// in the database a reload goes back to the table, so close it here.
+		// CloseWithoutSave is not the only exit: a normal compile finishes
+		// through this branch, and leaving the cache open leaked two goroutines
+		// per compiled program.
+		s.residentReloadsCloseOnce.Do(func() {
+			if s.residentReloads != nil {
+				s.residentReloads.Close()
+			}
+		})
 		log.Infof("[ssa-instruction-store] program=%s Close: writer closed, persisted=%d", progName, s.persistedCount.Load())
 	case s.residentCache != nil:
 		log.Infof("[ssa-instruction-store] program=%s Close: residentCache mode, count=%d", progName, s.residentCache.Count())

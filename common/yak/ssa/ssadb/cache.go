@@ -33,10 +33,23 @@ var irCodeCaches *utils.CacheEx[*utils.CacheExWithKey[int64, *IrCode]]
 
 var programRowCacheMu sync.Mutex
 
+// programRowCacheCapacity bounds how many programs keep a child cache.
+//
+// Each child starts two background goroutines and retains that program's
+// cached IrCode/IrType rows. A test binary compiles hundreds of short-lived
+// programs, and ProgramCacheTTL (10 minutes) never expires them during a run,
+// so the live heap and the goroutine count grew for the whole process. The
+// expiry callback below closes the evicted child, so a bounded parent is what
+// actually reclaims those workers.
+const programRowCacheCapacity = 32
+
 // A parent entry owns its child cache's two background workers. Dropping a
 // pointer alone leaves those workers (and their cached rows) alive indefinitely.
 func newProgramRowCache[T any]() *utils.CacheEx[*utils.CacheExWithKey[int64, T]] {
-	parent := utils.NewCacheEx[*utils.CacheExWithKey[int64, T]](utils.WithCacheTTL(ProgramCacheTTL))
+	parent := utils.NewCacheEx[*utils.CacheExWithKey[int64, T]](
+		utils.WithCacheTTL(ProgramCacheTTL),
+		utils.WithCacheCapacity(programRowCacheCapacity),
+	)
 	parent.SetExpirationCallback(func(_ string, child *utils.CacheExWithKey[int64, T], _ utils.EvictionReason) {
 		if child != nil {
 			child.Close()
@@ -68,13 +81,26 @@ func GetIrTypeCache(progName string) *utils.CacheExWithKey[int64, *IrType] {
 	return getProgramRowCache(irTypeCaches, progName)
 }
 
+// dropProgramRowCache removes one program's child cache and stops its workers.
+//
+// A child owns two background goroutines (the flight cleanup ticker and the
+// ttlcache eviction loop). Dropping the parent's pointer alone left both
+// running for the rest of the process: a syntaxflow package run created one
+// child per compiled program and leaked 2,288 goroutines, which the GC then
+// had to scan on every cycle.
+func dropProgramRowCache[T any](parent *utils.CacheEx[*utils.CacheExWithKey[int64, T]], name string) {
+	if parent == nil {
+		return
+	}
+	if child, ok := parent.Get(name); ok && child != nil {
+		child.Close()
+	}
+	parent.Delete(name)
+}
+
 func deleteCache(progName string) {
-	if irCodeCaches != nil {
-		irCodeCaches.Delete(progName)
-	}
-	if irTypeCaches != nil {
-		irTypeCaches.Delete(progName)
-	}
+	dropProgramRowCache(irCodeCaches, progName)
+	dropProgramRowCache(irTypeCaches, progName)
 	invalidateOffsetCache(progName)
 	forgetOffsetCacheProgram(progName)
 }
