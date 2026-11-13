@@ -62,9 +62,7 @@ func (t *ToolCaller) NewAsyncResource(tool *aitool.Tool, params aitool.InvokePar
 // Cancel releases this caller's context, including an unsubmitted or pending
 // async caller. Running async resources still join callback cleanup on return.
 func (t *ToolCaller) Cancel() {
-	if t != nil && t.cancel != nil {
-		t.cancel()
-	}
+	t.cancelContext()
 }
 
 func (r *toolCallResource) Inspector() asyncexecmanager.Inspector {
@@ -78,9 +76,10 @@ func (r *toolCallResource) Execute(ctx context.Context) error {
 	if !r.started.CompareAndSwap(false, true) {
 		return errors.New("tool call resource has already executed")
 	}
-	stop := context.AfterFunc(ctx, r.caller.cancel)
+	r.caller.rebindExecutionContext(ctx)
+	stop := context.AfterFunc(ctx, r.caller.cancelContext)
 	defer stop()
-	defer r.caller.cancel()
+	defer r.caller.cancelContext()
 	if err := ctx.Err(); err != nil {
 		return err
 	}

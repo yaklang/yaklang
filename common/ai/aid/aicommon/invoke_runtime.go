@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -409,6 +410,26 @@ type AIInvokeRuntime interface {
 	EmitFileArtifactWithExt(name, ext string, data any) string
 	EmitResultAfterStream(any)
 	EmitResult(any)
+
+	// Async execution state is scoped to the runtime, which normally represents
+	// one ReAct session. Managers and direct-answer signals therefore survive
+	// individual task loops and are shared by every loop using this runtime.
+	GetAsyncExecutionManager() (*asyncexecmanager.Manager, error)
+	HasAsyncExecutionManager() bool
+	AsyncExecutionSnapshot() AsyncExecutionSnapshot
+	StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error)
+	TrackAsyncExecutionTask(task AIStatefulTask, executeID string)
+	PrepareAsyncToolCall(
+		task AIStatefulTask, name string, params aitool.InvokeParams, opts ...ToolCallerOption,
+	) (asyncexecmanager.Resource, func(), error)
+
+	AsyncDirectAnswerSignal() <-chan struct{}
+	RequestAsyncDirectAnswer()
+	AsyncDirectAnswerRequested() bool
+	ConsumeAsyncDirectAnswer() bool
+	// BeginAsyncExecutionAdmission serializes manager admission with a direct
+	// answer request. Release it after the manager accepts or rejects the run.
+	BeginAsyncExecutionAdmission() (release func(), allowed bool)
 }
 
 type AITaskInvokeRuntime interface {

@@ -45,6 +45,10 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeSessionSnapshotEvent(event)
 	case aicommon.SYNC_TYPE_TASK_SNAPSHOT:
 		return r.HandleSyncTypeTaskSnapshotEvent(event)
+	case aicommon.SYNC_TYPE_ASYNC_EXECUTION:
+		return r.HandleSyncTypeAsyncExecutionEvent(event)
+	case aicommon.SYNC_TYPE_STOP_ASYNC_EXECUTION:
+		return r.HandleSyncTypeStopAsyncExecutionEvent(event)
 	case aicommon.SYNC_TYPE_CLOSE_BROWSER:
 		return r.HandleSyncTypeCloseBrowserEvent(event)
 	case aicommon.SYNC_TYPE_LOAD_SKILL:
@@ -78,6 +82,8 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION, r.HandleSyncTypePerceptionEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT, r.HandleSyncTypeSessionSnapshotEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_TASK_SNAPSHOT, r.HandleSyncTypeTaskSnapshotEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_ASYNC_EXECUTION, r.HandleSyncTypeAsyncExecutionEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_STOP_ASYNC_EXECUTION, r.HandleSyncTypeStopAsyncExecutionEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER, r.HandleSyncTypeCloseBrowserEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL, r.HandleSyncTypeLoadSkillEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_LOADED, r.HandleSyncTypeSkillLoadedEvent)
@@ -101,6 +107,8 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PERCEPTION)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SESSION_SNAPSHOT)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_TASK_SNAPSHOT)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_ASYNC_EXECUTION)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_STOP_ASYNC_EXECUTION)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_LOADED)
@@ -311,6 +319,7 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 		currentTask.SetUserCancelled()
 		// 调用任务的 Cancel 方法，这会取消任务的 context
 		currentTask.Cancel(fmt.Sprintf("jump_queue: cancelled to allow task %s to run first; do NOT re-dispatch or retry this cancelled sub agent", targetTaskId))
+		r.StopAsyncExecutionsForTask(currentTask.GetId())
 
 		// 设置任务状态为 Aborted（插队场景设 Aborted 而非 Skipped）
 		currentTask.SetStatus(aicommon.AITaskState_Aborted)
@@ -339,6 +348,7 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 }
 
 func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent) {
+	r.StopAsyncExecutionsForTask(task.GetId())
 	if task.IsAsyncMode() {
 		task.SetAsyncDeferCallback(func(err error) {
 			// 发送任务取消事件
