@@ -4183,7 +4183,7 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 
 	// A cancelled caller must observe its durable terminal snapshot before
 	// returning, even if a subscriber is blocked. Only delivery is detached.
-	if e.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE && e.GetContentJSONPath("$.status") != "running" {
+	if e.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE && !e.IsSync && e.GetContentJSONPath("$.status") != "running" {
 		go func() {
 			defer func() {
 				if failure := recover(); failure != nil {
