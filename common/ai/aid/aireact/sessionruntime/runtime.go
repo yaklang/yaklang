@@ -570,9 +570,6 @@ func (r *reActSessionRuntime) createRuntime(
 	if err != nil {
 		return nil, utils.Errorf("resolve session cached config failed: %v", err)
 	}
-	if err := yakit.ValidateAIModelContextThreshold(resolvedStartParams.GetRuntimeContextSizeLimit()); err != nil {
-		return nil, err
-	}
 	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(r.projectDatabase(), sessionID, resolvedStartParams, time.Now()); err != nil {
 		log.Warnf("persist ai session start meta failed for %s: %v", sessionID, err)
 	}
