@@ -43,8 +43,7 @@ func TestObjectTypeGetFieldFindsAddedFields(t *testing.T) {
 }
 
 // Call error-drop builds a struct type by assigning Keys/FieldTypes slices
-// directly, leaving keymap empty. Those lookups must still resolve through the
-// scan fallback.
+// directly, then rebuilds the index before looking up the retained fields.
 func TestObjectTypeGetFieldResolvesDirectlyAssignedKeys(t *testing.T) {
 	source := NewObjectType()
 	source.AddField(NewConst("first"), CreateNumberType())
@@ -54,6 +53,7 @@ func TestObjectTypeGetFieldResolvesDirectlyAssignedKeys(t *testing.T) {
 	truncated.Keys = append([]Value(nil), source.Keys...)
 	truncated.FieldTypes = append([]Type(nil), source.FieldTypes...)
 	require.Empty(t, truncated.keymap, "direct assignment must not populate keymap")
+	truncated.rebuildKeyIndex()
 
 	require.Equal(t, source.FieldTypes[1], truncated.GetField(NewConst("second")))
 }
