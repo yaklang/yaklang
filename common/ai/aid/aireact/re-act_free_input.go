@@ -338,32 +338,20 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent, resources []*aicom
 		log.Infof("Task created: %s with input: %s", task.GetId(), event.FreeInput)
 	}
 
-	var attachedDatas []*aicommon.AttachedResource
-	var attachedBrowsers []*aicommon.AttachedResource
+	attachedDatas := make([]*aicommon.AttachedResource, 0, len(resources))
 	task.SetUserInputUUID(control.userInputUUID)
 	task.SetInputSource(control.inputSource)
 	task.SetScheduleUUID(control.schedule.uuid)
 	task.SetScheduleName(control.schedule.name)
 	task.SetScheduledAt(control.schedule.scheduledAt)
 	task.SetScheduleTrigger(control.schedule.trigger)
+	r.bindBrowserAttachmentsToTask(task, resources)
 	for _, attached := range resources {
-		attachedDatas = append(attachedDatas, attached)
 		if attached.HasType(aicommon.AttachedResourceTypeBrowser) {
-			attachedBrowsers = append(attachedBrowsers, attached)
+			continue
 		}
+		attachedDatas = append(attachedDatas, attached)
 	}
-
-	// Browser instances are conversation resources: a follow-up such as
-	// "read my profile" must keep using the explicitly selected @A instance.
-	// A later turn with browser mentions replaces the selection (and can select
-	// several instances); other attachment types remain per-turn.
-	r.attachedBrowsersMu.Lock()
-	if len(attachedBrowsers) > 0 {
-		r.attachedBrowsers = append([]*aicommon.AttachedResource(nil), attachedBrowsers...)
-	} else {
-		attachedDatas = append(attachedDatas, r.attachedBrowsers...)
-	}
-	r.attachedBrowsersMu.Unlock()
 	task.SetAttachedDatas(attachedDatas)
 	return task
 }
