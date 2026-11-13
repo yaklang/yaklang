@@ -17,44 +17,61 @@ type MCPImageResourceReader interface {
 	ReadResource(context.Context, mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error)
 }
 
+// mcpToolExecutionError carries a remote tool failure and its decoded result.
+// Transport and invocation errors have no such result.
+type mcpToolExecutionError struct {
+	message string
+	result  any
+}
+
+func (e *mcpToolExecutionError) Error() string { return e.message }
+
 func MCPToolMediaResult(ctx context.Context, c MCPImageResourceReader, result *mcp.CallToolResult, source aimedia.Source) (any, error) {
-	if result == nil {
-		return nil, fmt.Errorf("MCP tool returned no result")
-	}
-	if result.IsError {
-		text := firstMCPTextFromContent(result.Content)
-		if text == "" {
-			text = "remote MCP tool failed"
-		}
-		return nil, fmt.Errorf("%s", text)
-	}
 	value, _, err := convertMCPToolResult(ctx, c, result, source)
-	if err != nil {
-		return nil, err
+	if _, ok := value.(string); ok {
+		return result, nil
 	}
-	if _, ok := value.(string); !ok {
-		return value, nil
-	}
-	return result, nil
+	return value, err
 }
 
 func convertMCPToolResult(ctx context.Context, c MCPImageResourceReader, result *mcp.CallToolResult, source aimedia.Source) (any, string, error) {
-	contents, err := resolveMCPImageResources(ctx, c, result.Content)
-	if err != nil {
-		return nil, "", err
+	if result == nil {
+		return nil, "", fmt.Errorf("MCP tool returned no result")
 	}
-	converted, err := convertMCPToolContent(ctx, contents, source)
+	contents, err := resolveMCPImageResources(ctx, c, result.Content)
+	var converted mcpToolContent
+	if err == nil {
+		converted, err = convertMCPToolContent(ctx, contents, source)
+	}
 	if err != nil {
-		return nil, "", err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, "", ctxErr
+		}
+		if !result.IsError {
+			return nil, "", err
+		}
+		// Preserve the original failure and its structured recovery data when
+		// a screenshot cannot be decoded or a resource cannot be read.
+		for _, block := range result.Content {
+			converted.blocks = append(converted.blocks, mcp.NewTextContent(mcpTextBlock(block)))
+		}
+		converted.blocks = append(converted.blocks, mcp.NewTextContent("MCP recovery media unavailable."))
 	}
 	value := any(converted.text)
-	if result.StructuredContent != nil {
+	if result.StructuredContent != nil || result.IsError {
 		summary := *result
 		summary.Content = converted.blocks
 		value = &summary
 	}
 	if len(converted.images) != 0 {
 		value = &MediaResult{Result: value, Images: converted.images}
+	}
+	if result.IsError {
+		message := firstMCPTextFromContent(result.Content)
+		if message == "" {
+			message = "remote MCP tool failed"
+		}
+		return value, converted.text, &mcpToolExecutionError{message: message, result: value}
 	}
 	return value, converted.text, nil
 }

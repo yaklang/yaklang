@@ -49,6 +49,24 @@ func TestMCPYakTools(t *testing.T) {
 	remote.AddTool(mcp.NewTool("failure"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return mcp.NewToolResultError("EXPECTED_REMOTE_FAILURE"), nil
 	})
+	const recoveryState = `{"state_id":"latest","image_content_index":1,"task":{"checkpoint":{"id":23}},"error":{"code":"PopupChanged","execution_state":"NotStarted"}}`
+	remote.AddTool(mcp.NewTool("recover"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{
+			IsError:           true,
+			StructuredContent: json.RawMessage(recoveryState),
+			Content: []any{
+				mcp.NewTextContent("Popup closed"),
+				mcp.NewImageContent(encodedImage, "image/png"),
+				mcp.NewTextContent("resume_from 23"),
+			},
+		}, nil
+	})
+	entered := make(chan struct{}, 2)
+	remote.AddTool(mcp.NewTool("slow"), func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		entered <- struct{}{}
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
 	handler := server.NewStreamableHTTPServer(remote, "")
 	mux := http.NewServeMux()
 	handler.RegisterHandlers(mux)
@@ -129,7 +147,58 @@ func TestMCPYakTools(t *testing.T) {
 	require.NotContains(t, result.Content[1], "data")
 	failed, err := execute("call_mcp_tool", map[string]any{"server_name": "fixture", "remote_tool": "failure"})
 	require.Error(t, err)
-	require.Contains(t, string(failed.Stdout), "EXPECTED_REMOTE_FAILURE")
+	require.Contains(t, failed.Stdout, "EXPECTED_REMOTE_FAILURE")
+	invokeMCP := func(ctx context.Context, name string, params map[string]any) (*aitool.ToolResult, error) {
+		args := map[string]any{"server_name": "fixture", "remote_tool": name}
+		for key, value := range params {
+			args[key] = value
+		}
+		return tools["call_mcp_tool"].InvokeWithParams(args, aitool.WithContext(ctx),
+			aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{ProfileDatabase: profile}), aitool.WithWaitForCallbackOnCancel(true))
+	}
+	recovered, err := invokeMCP(ctx, "recover", nil)
+	require.ErrorContains(t, err, "Popup closed")
+	require.False(t, recovered.Success)
+	require.Len(t, recovered.Images, 1)
+	data, err := recovered.Images[0].Bytes(ctx)
+	require.NoError(t, err)
+	require.Equal(t, pngBytes.Bytes(), data)
+	execution := recovered.Data.(*aitool.ToolExecutionResult)
+	failure := execution.Result.(*mcp.CallToolResult)
+	require.True(t, failure.IsError)
+	require.Equal(t, recoveryState, string(failure.StructuredContent))
+	require.Equal(t, recovered.Images[0].ID, failure.Content[1].(map[string]any)["image_id"])
+	require.Contains(t, recovered.String(), "resume_from 23")
+	require.NotContains(t, execution.Stdout, encodedImage)
+	require.NotContains(t, recovered.String(), encodedImage)
+
+	timedOut, err := invokeMCP(ctx, "slow", map[string]any{"timeout": 0.25})
+	require.ErrorContains(t, err, context.DeadlineExceeded.Error())
+	require.False(t, timedOut.Success)
+	require.Nil(t, timedOut.Data)
+	require.Empty(t, timedOut.Images)
+	select {
+	case <-entered:
+	default:
+		t.Fatal("timeout test did not reach the remote tool")
+	}
+	cancelCtx, cancelCall := context.WithTimeout(ctx, 3*time.Second)
+	defer cancelCall()
+	go func() {
+		select {
+		case <-entered:
+			cancelCall()
+		case <-cancelCtx.Done():
+		}
+	}()
+	cancelled, err := invokeMCP(cancelCtx, "slow", nil)
+	require.ErrorIs(t, err, context.Canceled)
+	require.False(t, cancelled.Success)
+	require.Nil(t, cancelled.Data)
+	require.Empty(t, cancelled.Images)
+	checked, err := invokeMCP(ctx, "inspect", nil)
+	require.NoError(t, err)
+	require.True(t, checked.Success)
 	for _, tc := range []struct {
 		name   string
 		params map[string]any

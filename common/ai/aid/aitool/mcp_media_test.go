@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
@@ -224,4 +225,137 @@ func TestMCPImageResourcesAreReadFromTheOriginServer(t *testing.T) {
 	require.Equal(t, 1, envelope.Content[1].(map[string]any)["image_index"])
 	require.Equal(t, int32(1), reads.Load())
 	require.NotContains(t, result.String(), encoded)
+}
+
+func TestMCPFailurePreservesRecoveryThroughHTTP(t *testing.T) {
+	ctx := context.Background()
+	raw := mediaPNG(t)
+	encoded := base64.StdEncoding.EncodeToString(raw)
+	const state = `{"window_id":42,"state_id":"fresh","image_content_index":1,"task":{"checkpoint":{"id":23}},"error":{"code":"PopupChanged","execution_state":"NotStarted"}}`
+	remote := server.NewMCPServer("recovery-fixture", "1")
+	remote.AddTool(mcp.NewTool("recover"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{
+			IsError:           true,
+			StructuredContent: json.RawMessage(state),
+			Content: []any{
+				mcp.NewTextContent("Popup closed"),
+				mcp.NewImageContent(encoded, "image/png"),
+				mcp.NewTextContent("resume_from 23"),
+			},
+		}, nil
+	})
+	handler := server.NewStreamableHTTPServer(remote, "")
+	mux := http.NewServeMux()
+	handler.RegisterHandlers(mux)
+	httpServer := httptest.NewServer(mux)
+	defer httpServer.Close()
+	defer handler.Shutdown(ctx)
+	tools, err := LoadAIToolsFromMCPServer(ctx, &schema.MCPServer{Name: "recovery-fixture", Type: "streamable_http", URL: httpServer.URL + "/mcp"}, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 1)
+	defer tools[0].BridgeMCPClient.Close()
+	var stderr bytes.Buffer
+	result, err := tools[0].InvokeWithParams(map[string]any{}, WithStderr(&stderr), WithErrorCallback(func(err error) (*ToolResult, error) {
+		return &ToolResult{Error: err.Error(), ToolCallID: "existing-call-id"}, err
+	}))
+	require.ErrorContains(t, err, "Popup closed")
+	require.False(t, result.Success)
+	require.Equal(t, "existing-call-id", result.ToolCallID)
+	require.Len(t, result.Images, 1)
+	data, err := result.Images[0].Bytes(ctx)
+	require.NoError(t, err)
+	require.Equal(t, raw, data)
+	execution := result.Data.(*ToolExecutionResult)
+	reply := execution.Result.(*mcp.CallToolResult)
+	require.True(t, reply.IsError)
+	require.Equal(t, state, string(reply.StructuredContent))
+	require.Equal(t, result.Images[0].ID, reply.Content[1].(map[string]any)["image_id"])
+	require.Contains(t, stderr.String(), "Popup closed")
+	require.Contains(t, result.String(), "resume_from 23")
+	require.NotContains(t, result.String(), encoded)
+}
+
+func TestMCPInvalidRecoveryImagePreservesFailureData(t *testing.T) {
+	const state = `{"task":{"checkpoint":{"id":23}}}`
+	remote := &mcp.CallToolResult{
+		IsError:           true,
+		StructuredContent: json.RawMessage(state),
+		Content: []any{
+			mcp.NewTextContent("Popup closed"),
+			mcp.NewImageContent("invalid-screenshot!", "image/png"),
+			mcp.NewTextContent("resume_from 23"),
+		},
+	}
+	tool, err := New("recover", WithCallback(createToolCallback(&imageMCPClient{result: remote}, "recover", "fixture")))
+	require.NoError(t, err)
+	result, err := tool.InvokeWithParams(nil)
+	require.ErrorContains(t, err, "Popup closed")
+	require.False(t, result.Success)
+	require.Empty(t, result.Images)
+	reply := result.Data.(*ToolExecutionResult).Result.(*mcp.CallToolResult)
+	require.Equal(t, state, string(reply.StructuredContent))
+	require.Contains(t, result.String(), "resume_from 23")
+	require.Contains(t, result.String(), "MCP recovery media unavailable")
+	require.NotContains(t, result.String(), "invalid-screenshot!")
+}
+
+func TestMCPRegisteredToolTransportTimeoutAndCancellation(t *testing.T) {
+	ctx := context.Background()
+	remote := server.NewMCPServer("cancellation-fixture", "1")
+	entered := make(chan struct{}, 2)
+	remote.AddTool(mcp.NewTool("slow"), func(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		entered <- struct{}{}
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	remote.AddTool(mcp.NewTool("echo"), func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return mcp.NewToolResultText("still usable"), nil
+	})
+	handler := server.NewStreamableHTTPServer(remote, "")
+	mux := http.NewServeMux()
+	handler.RegisterHandlers(mux)
+	httpServer := httptest.NewServer(mux)
+	defer httpServer.Close()
+	defer handler.Shutdown(ctx)
+	tools, err := LoadAIToolsFromMCPServer(ctx, &schema.MCPServer{Name: "cancellation-fixture", Type: "streamable_http", URL: httpServer.URL + "/mcp"}, nil)
+	require.NoError(t, err)
+	require.Len(t, tools, 2)
+	defer tools[0].BridgeMCPClient.Close()
+	byName := make(map[string]*Tool)
+	for _, tool := range tools {
+		byName[tool.Name] = tool
+	}
+	slow := byName["mcp_cancellation-fixture_slow"]
+	deadline, cancelDeadline := context.WithTimeout(ctx, 250*time.Millisecond)
+	defer cancelDeadline()
+	result, err := slow.InvokeWithParams(nil, WithContext(deadline), WithWaitForCallbackOnCancel(true))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.False(t, result.Success)
+	require.Nil(t, result.Data)
+	require.Empty(t, result.Images)
+	select {
+	case <-entered:
+	default:
+		t.Fatal("timeout test did not reach the remote tool")
+	}
+
+	cancelCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	go func() {
+		select {
+		case <-entered:
+			cancel()
+		case <-cancelCtx.Done():
+		}
+	}()
+	result, err = slow.InvokeWithParams(nil, WithContext(cancelCtx), WithWaitForCallbackOnCancel(true))
+	require.ErrorIs(t, err, context.Canceled)
+	require.False(t, result.Success)
+	require.Nil(t, result.Data)
+	require.Empty(t, result.Images)
+
+	result, err = byName["mcp_cancellation-fixture_echo"].InvokeWithParams(nil)
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, "still usable", result.Data.(*ToolExecutionResult).Result)
 }

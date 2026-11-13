@@ -75,8 +75,8 @@ func convertMCPToolContent(ctx context.Context, content []any, source aimedia.So
 				encoded, _ := c["data"].(string)
 				mimeType, _ := c["mimeType"].(string)
 				image, imageErr = addImage(encoded, mimeType)
-			} else if first := firstMCPTextFromContent([]any{c}); first != "" {
-				text.WriteString(first)
+			} else if blockText := mcpTextBlock(c); blockText != "" {
+				text.WriteString(blockText)
 			} else {
 				fmt.Fprint(&text, c)
 			}

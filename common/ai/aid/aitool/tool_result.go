@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -191,7 +192,21 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	case callback := <-finished:
 		err = callback.err
 		value, images := callback.value, []*aimedia.Image(nil)
-		if err == nil {
+		var remoteFailure *mcpToolExecutionError
+		if failure, ok := value.(*mcpToolExecutionError); err == nil && ok {
+			err = failure // A Yak-backed MCP tool returns it through RESULT.
+		}
+		if errors.As(err, &remoteFailure) {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				value, err = nil, ctxErr
+			} else {
+				var mediaErr error
+				value, images, mediaErr = splitToolMedia(ctx, remoteFailure.result)
+				if mediaErr != nil {
+					err = errors.Join(err, mediaErr)
+				}
+			}
+		} else if err == nil {
 			value, images, err = splitToolMedia(ctx, callback.value)
 		}
 		execResult = &ToolExecutionResult{
