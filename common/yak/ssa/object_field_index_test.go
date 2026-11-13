@@ -51,6 +51,10 @@ func TestObjectTypeGetFieldResolvesDirectlyAssignedKeys(t *testing.T) {
 	source.AddField(NewConst("second"), CreateStringType())
 
 	truncated := NewStructType()
+	// NewStructType allocates an empty keymap, which is authoritative: a miss
+	// means absent. Drop it so this type really has Keys without an index, the
+	// shape Call error-drop and database restores produce.
+	truncated.keymap = nil
 	truncated.Keys = append([]Value(nil), source.Keys...)
 	truncated.FieldTypes = append([]Type(nil), source.FieldTypes...)
 	require.Empty(t, truncated.keymap, "direct assignment must not populate keymap")
