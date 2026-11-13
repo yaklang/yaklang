@@ -17,7 +17,7 @@ import (
 )
 
 // subForgeCall owns one admitted child's execution and interactive event scope.
-// eventMu protects lifecycle state and the task-tree projection. deliveryMu
+// eventMu protects lifecycle state. deliveryMu
 // serializes child callbacks; never hold eventMu while invoking a subscriber.
 type subForgeCall struct {
 	session     *Session
@@ -25,41 +25,44 @@ type subForgeCall struct {
 	ctx         context.Context
 	input       *chanx.UnlimitedChan[*ypb.AIInputEvent]
 	endpoints   sync.Map
+	planReviews sync.Map
 	unregister  func(...string)
 	releaseSlot func()
 
 	eventMu      sync.Mutex
 	deliveryMu   sync.Mutex
+	childID      string
 	tree         subForgeTaskTree
+	callID       string
 	pending      map[string]struct{}
+	queued       []*schema.AiOutputEvent
+	active       string
 	closed       bool
 	childStarted bool
 }
 
-func newSubForgeCall(ctx context.Context, s *Session, task aicommon.AIStatefulTask, callID string, binding SubForgeTool, releaseSlot func()) *subForgeCall {
+func newSubForgeCall(ctx context.Context, s *Session, task aicommon.AIStatefulTask, callID string, releaseSlot func()) *subForgeCall {
 	c := &subForgeCall{
 		session: s, task: task, ctx: ctx, releaseSlot: releaseSlot,
 		input:   chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
 		pending: make(map[string]struct{}),
-		tree: subForgeTaskTree{
-			ParentCoordinatorID: s.GetRuntimeId(),
-			ParentTaskID:        task.GetId(),
-			ParentTaskUUID:      task.GetUUID(),
-			CallToolID:          callID,
-			ChildCoordinatorID:  uuid.NewString(),
-			Revision:            1,
-			Status:              "running",
-		},
+		childID: uuid.NewString(),
+		callID:  callID,
 	}
-	if binding.Schema != nil {
-		c.tree.ToolName = binding.Schema.Name
-	}
-	c.unregister = s.InputEventManager.RouteInteractiveInput(c.tree.ChildCoordinatorID, c.routeInput)
+	c.tree = subForgeTaskTree{ParentCoordinatorID: s.GetRuntimeId(), ParentTaskID: task.GetId(), ParentTaskUUID: task.GetUUID(), CallToolID: callID, ChildCoordinatorID: c.childID, Revision: 1, Status: "running"}
+	c.unregister = s.InputEventManager.RouteInteractiveInput(c.childID, c.routeInput)
 	return c
 }
 
 func (c *subForgeCall) routeInput(event *ypb.AIInputEvent) bool {
 	endpoint := event.GetInteractiveId()
+	if review, ok := c.planReviews.Load(endpoint); ok {
+		var valid bool
+		event, valid = subForgePlanReviewInput(event, review.(*schema.AiOutputEvent))
+		if !valid {
+			return true
+		} // Keep the visible endpoint open for a corrected reply.
+	}
 	if c.endpoints.CompareAndSwap(endpoint, true, false) {
 		if c.ctx.Err() == nil {
 			c.input.SafeFeed(event)
@@ -72,10 +75,10 @@ func (c *subForgeCall) routeInput(event *ypb.AIInputEvent) bool {
 
 func (c *subForgeCall) forward(event *schema.AiOutputEvent) {
 	forwarded := *event
-	forwarded.CoordinatorId = c.tree.ChildCoordinatorID
+	forwarded.CoordinatorId = c.childID
 	forwarded.TaskId = c.task.GetId()
 	forwarded.TaskUUID = c.task.GetUUID()
-	forwarded.CallToolID = c.tree.CallToolID
+	forwarded.CallToolID = c.callID
 	if c.session.EventHandler != nil {
 		c.session.EventHandler(&forwarded)
 	}
@@ -99,6 +102,7 @@ func (c *subForgeCall) finish(err error) {
 	c.tree.Revision++
 	c.tree.Status = subForgeTreeStatus(err)
 	terminal := c.tree
+	active := c.active
 	c.eventMu.Unlock()
 	var retiredIDs []string
 	c.endpoints.Range(func(key, _ any) bool {
@@ -106,7 +110,7 @@ func (c *subForgeCall) finish(err error) {
 		return true
 	})
 	c.unregister(retiredIDs...)
-	if len(c.pending) > 0 {
+	if active != "" {
 		// Keep legacy review release delivery serialized with child events.
 		go func() {
 			c.deliveryMu.Lock()
@@ -116,36 +120,53 @@ func (c *subForgeCall) finish(err error) {
 					log.Errorf("sub-Forge review release handler panicked: %v", failure)
 				}
 			}()
-			for endpoint := range c.pending {
-				content, _ := json.Marshal(map[string]any{"id": endpoint, "params": nil})
-				c.forward(&schema.AiOutputEvent{
-					Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
-				})
-			}
+			content, _ := json.Marshal(map[string]any{"id": active, "params": nil})
+			c.forward(&schema.AiOutputEvent{
+				Type: schema.EVENT_TYPE_REVIEW_RELEASE, NodeId: "review-release", IsJson: true, Content: content,
+			})
 		}()
 	}
-	// Persist the terminal snapshot even if an earlier progress callback
-	// is blocked. Its revision orders it against any in-flight progress.
 	delivered := make(chan struct{})
-	go func() {
-		defer close(delivered)
-		c.session.emitSubForgeTaskTree(terminal)
-	}()
+	go func() { defer close(delivered); c.session.emitSubForgeTaskTree(terminal) }()
 	select {
 	case <-delivered:
 	case <-c.ctx.Done():
 	}
+
 }
 
 func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
 	c.deliveryMu.Lock()
 	defer c.deliveryMu.Unlock()
 	c.eventMu.Lock()
-	if c.closed {
+	if c.closed || c.ctx.Err() != nil {
+		c.eventMu.Unlock()
+		return
+	}
+	changed := c.tree.observePlan(event)
+	snapshot := c.tree
+	c.eventMu.Unlock()
+	if changed {
+		c.session.emitSubForgeTaskTree(snapshot)
+	}
+	original := event
+	// Only the explicit snapshot can update the client's child tree. Keep raw
+	// child lifecycle and tool results isolated from the parent execution view.
+	event = subForgeInteractiveEvent(event)
+	if event == nil {
+		return
+	}
+	c.eventMu.Lock()
+	if c.closed || c.ctx.Err() != nil {
 		c.eventMu.Unlock()
 		return
 	}
 	endpoint := event.GetInteractiveId()
+	if endpoint == "" {
+		c.eventMu.Unlock()
+		return
+	}
+	var next *schema.AiOutputEvent
 	if event.Type == schema.EVENT_TYPE_REVIEW_RELEASE {
 		if _, exists := c.pending[endpoint]; !exists {
 			c.eventMu.Unlock()
@@ -153,24 +174,41 @@ func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
 		}
 		delete(c.pending, endpoint)
 		c.endpoints.Store(endpoint, false)
-	} else {
-		if c.ctx.Err() != nil {
+		if c.active != endpoint {
 			c.eventMu.Unlock()
 			return
 		}
-		if endpoint != "" {
-			if _, known := c.endpoints.LoadOrStore(endpoint, true); !known {
-				c.pending[endpoint] = struct{}{}
+		c.active = ""
+		for len(c.queued) > 0 {
+			candidate := c.queued[0]
+			c.queued = c.queued[1:]
+			if _, exists := c.pending[candidate.GetInteractiveId()]; exists {
+				next = candidate
+				c.active = candidate.GetInteractiveId()
+				break
 			}
 		}
+	} else {
+		if _, known := c.endpoints.LoadOrStore(endpoint, true); known {
+			c.eventMu.Unlock()
+			return
+		}
+		if original.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			c.planReviews.Store(endpoint, original)
+		}
+		c.pending[endpoint] = struct{}{}
+		if c.active != "" {
+			c.queued = append(c.queued, event)
+			c.eventMu.Unlock()
+			return
+		}
+		c.active = endpoint
 	}
-	changed := c.tree.observePlan(event)
-	update := c.tree
 	c.eventMu.Unlock()
-	if changed {
-		c.session.emitSubForgeTaskTree(update)
-	}
 	c.forward(event)
+	if next != nil {
+		c.forward(next)
+	}
 }
 
 func (c *subForgeCall) run(ctx context.Context, binding SubForgeTool, params aitool.InvokeParams, allowed []*aitool.Tool, opts ...aicommon.ConfigOption) (any, error) {
