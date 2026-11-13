@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang unsafe.Pointer Usage"
-	title_zh: "检测Golang使用unsafe.Pointer"
+	mode: "ssa"
+	title: "数据流：Detect Golang unsafe.Pointer Usage"
+	title_zh: "数据流：检测Golang使用unsafe.Pointer"
 	type: audit
-	level: low
+	level: "middle"
 	risk: "unsafe-implementation"
 	desc: <<<DESC
 该规则用于审计 `unsafe.Pointer` 相关调用。`unsafe` 包可绕过 Go 类型安全与内存安全边界，
@@ -24,7 +25,7 @@ $unsafe.Slice(*, *) as $low
 
 alert $low for {
 	type: "vuln",
-	level: "low",
+	level: "middle",
 	name: "low",
 	title: "Golang unsafe Pointer Usage Detected",
 	title_zh: "检测到Golang使用unsafe内存操作",
@@ -40,7 +41,7 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_low: 1
+	alert_mid: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

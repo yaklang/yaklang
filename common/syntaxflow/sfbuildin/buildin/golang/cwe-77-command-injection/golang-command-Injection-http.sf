@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Command Injection Vulnerability in HTTP"
-	title_zh: "检测Golang HTTP命令注入漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Golang Command Injection Vulnerability in HTTP"
+	title_zh: "数据流：检测Golang HTTP命令注入漏洞"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "command-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -76,7 +77,7 @@ $sink #{
 }-> as $high;
 
 alert $high for {
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Golang Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang命令注入漏洞",
@@ -86,7 +87,6 @@ alert $high for {
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package vulinbox
 

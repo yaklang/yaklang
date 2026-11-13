@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java Spring Framework跨域白名单过于宽松"
-	title: "Check Java Spring Framework Overly Permissive Cross-Domain Whitelist"
+	mode: "struct"
+	title_zh: "结构匹配：检测Java Spring Framework跨域白名单过于宽松"
+	title: "结构匹配：Check Java Spring Framework Overly Permissive Cross-Domain Whitelist"
 	type:config
 	risk:"security-misconfiguration"
 	desc: <<<DESC

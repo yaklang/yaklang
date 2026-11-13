@@ -825,6 +825,17 @@ func (s *instructionStore) Close(progress func(int)) error {
 		}
 		// All instructions persisted — safe to close without save.
 		s.writer.CloseWithoutSave()
+		// The reload memo owns a cache with two background workers. It is only
+		// needed while the store answers reads out of memory; once every row is
+		// in the database a reload goes back to the table, so close it here.
+		// CloseWithoutSave is not the only exit: a normal compile finishes
+		// through this branch, and leaving the cache open leaked two goroutines
+		// per compiled program.
+		s.residentReloadsCloseOnce.Do(func() {
+			if s.residentReloads != nil {
+				s.residentReloads.Close()
+			}
+		})
 		log.Infof("[ssa-instruction-store] program=%s Close: writer closed, persisted=%d", progName, s.persistedCount.Load())
 	case s.residentCache != nil:
 		log.Infof("[ssa-instruction-store] program=%s Close: residentCache mode, count=%d", progName, s.residentCache.Count())
@@ -1043,7 +1054,13 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 			if err != nil || linkedIr == nil {
 				continue
 			}
-			if progName := applicationProgramName(s.program); progName != "" {
+			if progName := applicationProgramName(s.program); progName != "" && progName != linkedIr.ProgramName {
+				// The row moves to the application's program name, so its const
+				// pool id has to be re-interned under that name. A row that still
+				// points at the library name would read the wrong pool.
+				if kind, text, ok := irCodeConstText(linked); ok {
+					linkedIr.ConstID = ssadb.InternIrConst(progName, kind, text)
+				}
 				linkedIr.ProgramName = progName
 			}
 			relRecord := &instructionPersistRecord{
@@ -1067,6 +1084,11 @@ func instructionRecordBytes(rec *instructionPersistRecord) int {
 		len(ir.Name) + len(ir.VerboseName) + len(ir.ShortVerboseName) +
 		len(ir.String) + len(ir.ReadableName) + len(ir.ReadableNameShort) +
 		len(ir.ExtraInformation)
+	// A normal const's text is not part of the record any more: the row
+	// carries a const_id and the pool holds the text once per distinct value.
+	if ir.ConstID != 0 {
+		n += 8
+	}
 	if n < 1 {
 		n = 1
 	}

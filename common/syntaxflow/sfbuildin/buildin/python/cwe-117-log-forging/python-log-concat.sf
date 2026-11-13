@@ -1,0 +1,83 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python 日志拼接外部数据"
+	title_zh: "数据流：Python 日志拼接外部数据"
+	type: vuln
+	level: ""
+	rule_id: "ssa-python-log-concat"
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+请求数据写入日志。输入里的换行可以伪造日志行。
+
+### 检测方式
+请求来源流入 `logging.info` 等日志调用；路径上出现 `replace` 等净化调用时跳过。
+DESC
+	solution: <<<SOLUTION
+- 删除输入中的 `\r` 和 `\n` 后再写日志。
+- 记录固定事件名，不记录原始请求体。
+SOLUTION
+	alert_min: 1
+)
+request.* as $src
+info(* as $arg)
+$arg?{<self> #{include: `* & $src`, exclude: `*?{opcode: call && <self><getCallee><name>?{have: /(?i)replace/}}`}->}?{!(<self><getUsers()>?{have: /(?i)failed/})} as $hit
+alert $hit for {
+	level: "middle",
+	title: "数据流：Python 日志拼接外部数据",
+	title_zh: "数据流：Python 日志拼接外部数据",
+	risk: "log-forging",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?user=
+import logging
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+logger = logging.getLogger("app")
+
+@app.route("/login", methods=["POST"])
+def login():
+    user = request.form.get("user", "")  # wb:source id=src
+    logger.info("login user=%s", user)  # wb:sink id=sink
+    return "ok"
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?user=
+import logging
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+logger = logging.getLogger("app")
+
+@app.route("/login", methods=["POST"])
+def login():
+    user = request.form.get("user", "")  # wb:source id=src
+    clean = user.replace("\r", "").replace("\n", "")
+    logger.info("login user=%s", clean)  # wb:sink id=sink
+    return "ok"
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

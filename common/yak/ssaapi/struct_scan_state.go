@@ -28,6 +28,9 @@ type structScanState struct {
 	extraDirs     []string
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
+	// language is the compile language used to narrow rules before the scan
+	// starts; an empty value means the language is unknown.
+	language ssaconfig.Language
 	// ruleLoader is owned when ensureStructScan allocates it for a standalone
 	// compile. WithStructRuleLoader replaces that pointer with the product
 	// scan's preparation loader; the compile then borrows it.
@@ -138,11 +141,29 @@ func (c *Config) prepareStructScan(plan *UnitPlan) error {
 	if err := s.resolveRules(); err != nil {
 		return err
 	}
-	s.filterLanguage(c.GetLanguage(), c.GetScanIgnoreLanguage())
+	s.language = c.structScanLanguage()
+	s.filterLanguage(s.language, c.GetScanIgnoreLanguage())
 	if len(s.rules) == 0 {
 		log.Warnf("[struct_scan] no struct rules loaded")
 	}
 	return nil
+}
+
+// structScanLanguage is the compile's language for struct rule selection. An
+// auto-detected project leaves BaseInfo.Language empty and only records the
+// chosen frontend on the builder, so fall back to it; otherwise every struct
+// rule runs against the program.
+func (c *Config) structScanLanguage() ssaconfig.Language {
+	if c == nil {
+		return ""
+	}
+	if language := c.GetLanguage(); language != "" {
+		return language
+	}
+	if c.LanguageBuilder != nil {
+		return c.LanguageBuilder.GetLanguage()
+	}
+	return ""
 }
 
 // Match the normal scan manager's language selection. Unknown/mixed-language
@@ -158,6 +179,36 @@ func (s *structScanState) filterLanguage(language ssaconfig.Language, ignore boo
 		}
 	}
 	s.rules = rules
+}
+
+// rulesForUnit narrows the scan's rules to the unit's language. A project
+// compile can hold several languages (an application plus frontend-owned
+// libraries), and the scan's config language is empty for an auto-detected
+// project, so without this check every struct rule ran against every unit.
+func (s *structScanState) rulesForUnit(unit *ssa.CompileUnit, programLanguage ssaconfig.Language, ignore bool) []*schema.SyntaxFlowRule {
+	if s == nil {
+		return nil
+	}
+	language := programLanguage
+	if language == "" {
+		language = s.language
+	}
+	if unit != nil && unit.Language != "" {
+		language = unit.Language
+	}
+	if ignore || language == "" || language == ssaconfig.General {
+		return s.rules
+	}
+	rules := make([]*schema.SyntaxFlowRule, 0, len(s.rules))
+	for _, rule := range s.rules {
+		if rule == nil {
+			continue
+		}
+		if rule.Language == "" || rule.Language == ssaconfig.General || rule.Language == language {
+			rules = append(rules, rule)
+		}
+	}
+	return rules
 }
 
 func (c *Config) ensureStructScan() *structScanState {
@@ -318,7 +369,7 @@ func (s *structScanState) scanStructWithOpcodeIndex(progAPI *Program, unit *ssa.
 		target.opcodeIndex = make(map[ssa.Opcode][]ssa.Instruction)
 		target.residentIndex = index
 	}
-	for _, rule := range s.rules {
+	for _, rule := range s.rulesForUnit(unit, progAPI.GetLanguage(), progAPI.config.GetScanIgnoreLanguage()) {
 		if rule == nil {
 			continue
 		}
@@ -650,7 +701,8 @@ func (p *Program) ScanProgramStruct(opts ...ssaconfig.Option) error {
 	if err := s.resolveRules(); err != nil {
 		return err
 	}
-	s.filterLanguage(p.GetLanguage(), cfg.GetScanIgnoreLanguage())
+	s.language = p.GetLanguage()
+	s.filterLanguage(s.language, cfg.GetScanIgnoreLanguage())
 	if len(s.rules) == 0 {
 		log.Warnf("[struct_scan] no struct rules loaded for program %s", p.GetProgramName())
 		return nil

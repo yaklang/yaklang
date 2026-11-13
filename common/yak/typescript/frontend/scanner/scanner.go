@@ -2290,10 +2290,22 @@ func GetLineStarts(sourceFile ast.SourceFileLike) []core.TextPos {
 	return sourceFile.LineMap()
 }
 
+// asciiLineReporter is implemented by sources that know whether a line holds
+// only single-byte runes. Inside such a line a byte offset is also the
+// character offset, which avoids rescanning the line for every node.
+type asciiLineReporter interface {
+	IsASCIILine(line int) bool
+}
+
 func GetLineAndCharacterOfPosition(sourceFile ast.SourceFileLike, pos int) (line int, character int) {
 	lineMap := GetLineStarts(sourceFile)
 	line = ComputeLineOfPosition(lineMap, pos)
-	character = utf8.RuneCountInString(sourceFile.Text()[lineMap[line]:pos])
+	lineStart := int(lineMap[line])
+	if ascii, ok := sourceFile.(asciiLineReporter); ok && ascii.IsASCIILine(line) {
+		character = pos - lineStart
+		return
+	}
+	character = utf8.RuneCountInString(sourceFile.Text()[lineStart:pos])
 	return
 }
 

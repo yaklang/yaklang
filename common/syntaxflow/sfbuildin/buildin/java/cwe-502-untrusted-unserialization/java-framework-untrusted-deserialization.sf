@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Framework Untrusted Deserialization Patterns"
-	title_zh: "检测Java框架级不可信反序列化模式"
+	mode: "struct"
+	title: "结构匹配：Detect Framework Untrusted Deserialization Patterns"
+	title_zh: "结构匹配：检测Java框架级不可信反序列化模式"
 	type: vuln
 	risk: "deserialization"
 	desc: <<<DESC

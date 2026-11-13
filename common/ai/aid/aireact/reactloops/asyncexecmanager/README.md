@@ -107,20 +107,21 @@ Manager 会恢复执行函数、获取观察器、读取观察函数在调用 go
 
 ## 跨调用的所有权
 
-同一个任务保存同一个 Manager 成员，并用任务的 owner context 创建：
+生产 ReAct 会话保存同一个 Manager 成员，并用会话的 owner context 创建：
 
 ```go
 manager, err := asyncexecmanager.New(ownerCtx, asyncexecmanager.Config{})
 ```
 
 ownerCtx 应覆盖需要保留异步任务的全部 ReAct 轮次。若每轮创建 Manager，或绑定
-单次 action 的短期 context，下一轮就无法继续管理同一批执行。owner 取消会传播到
-所有子执行，并禁止新的提交；StopAll 只停止该 Manager 已有执行，仍允许后续提交。
+单次 task/action 的短期 context，下一轮就无法继续管理同一批执行。owner 取消会
+传播到所有子执行，并禁止新的提交；StopAll 只停止该 Manager 已有执行，仍允许
+后续提交。
 单次 Inspect / Wait 使用各自的请求 context，不改变执行的生命周期。
 
-任务释放时可先 Close 发出取消，再用独立、有超时的 context 调用 Shutdown 等待清理。
+会话结束时先 Close 发出取消，再用独立、有超时的 context 调用 Shutdown 等待清理。
 不要使用已经取消的 ownerCtx 作为等待清理的 context。Manager 是进程内结构，
-不提供重启恢复、全局 session 注册或持久化。
+不提供重启恢复或持久化；完全新建 ReAct runtime 后不会恢复旧 execution。
 
 共享浏览器/session 等公共资源的所有者应管理其生命周期。提交到这里的是本次操作
 或独立后台工作；某次执行取消不应误关闭其他任务仍在使用的共享资源。
@@ -145,33 +146,37 @@ Stop 返回 stopping 只表示已发出取消请求；确认退出需继续 Wait
 返回可用的生命周期元信息。元信息和观察结果分别采样，不保证是同一个原子时刻。
 Summary.Revision 仅描述生命周期变更，不可用于判断 stdout/result 是否发生变化。
 
-默认最多同时运行 4 个执行，保留 128 条记录。容量耗尽返回 ErrCapacity，不排队。
-终态记录仍计入 MaxExecutions，ID 在该 Manager 内不能复用；当前没有自动淘汰或
-Forget 接口。较长的 owner 生命周期需要配置适当的记录上限，达到上限时给调用方
-明确反馈。Metadata 只保存名字和来源标识，不放输出，也不承担授权职责。
+默认最多同时运行 4 个执行，最多保留 128 条记录。MaxActiveExecutions 只限制
+pending、running、stopping，只有它会使提交返回 ErrCapacity。
+MaxRetainedExecutions 限制 active 记录与终态记录的总数，但不会拒绝新提交：总数
+已满时，Manager 会淘汰最早结束的终态记录来腾出位置，pending、running、stopping
+永远不会被淘汰。为保证这两个限制不冲突，MaxRetainedExecutions 必须大于或等于
+MaxActiveExecutions。ID 只在保留记录范围内保持唯一，被淘汰记录的 ID 可以再次使用。
+Metadata 只保存名字和来源标识，不放输出，也不承担授权职责。
 
 ## 工具调用接入位置
 
 本包已实现独立核心和函数适配器。directly_call_tool 已接入异步标记的解析，
 ToolCaller 已实现 Inspector；工具提交入口和管理 action 已接入，directly_call_tool 的
 单调用异步标记和批量每项 async 均已生效，同一批次可混合同步和异步执行。
-ReActLoop 提供 `GetAsyncExecutionManager()`：首次调用必须已有 current task，
-Manager 绑定该任务 context；后续调用复用同一实例，不随 current task 切换而重建。
-Release 会在其他释放回调前 Close，取消执行并禁止新提交，但不阻塞等待清理；
-释放后仍可获取已有 Manager 来 Inspect / Wait，尚未创建 Manager 的已释放 loop
-不能再创建。需要等待所有清理完成时，显式使用有超时的独立 context 调用 Shutdown。
+Async execution 是 `AIInvokeRuntime` 的显式能力。ReAct 实现这些方法并持有
+session-scoped Manager；ReActLoop 直接委托给 invoker，多个 task 创建的 loop
+在同一个 ReAct 会话内拿到同一 Manager。Loop Release 不再关闭 session
+Manager，因此本轮的 task 正常结束后，下一轮仍可查询、等待或停止旧 execution。
+ReActLoop 不持有 Manager，也不提供 task-scoped fallback；没有绑定 invoker 的
+loop 无法使用异步执行能力。
 工具调用使用 `loop.StartAsyncToolCall(name, params, options...)`，不需要手动创建
-caller 或 resource。它通过可选的 AsyncToolCallRuntime 准备工具，再注册到 loop
-的 Manager；不支持该扩展的 runtime 会明确返回错误，不改动 AIInvokeRuntime 的
-公共接口。工具查找、owner 的守卫/参数修正、原审查与执行链路都会保留。
+caller 或 resource。它通过 `AIInvokeRuntime.PrepareAsyncToolCall` 准备工具，再
+注册到 Manager。工具查找、owner 的守卫/参数修正、原审查与执行链路都会保留。
 准备阶段可能等待 MCP 工具就绪；提交成功后返回 pending 回执，不等待工具结果。
 完成时结果写入准备时捕获的 owner task 和 timeline；Inspector 与任务结果使用同一
-个预先分配的 result ID。后台执行不重新读取 runtime 的 current task。
+个预先分配的 result ID。后台执行不重新读取 runtime 的 current task，也不因原 task
+自然完成而取消。
 
 ```go
 receipt, err := loop.StartAsyncToolCall(toolName, params,
     aicommon.WithToolCaller_Reason("本次调用目的"))
-// 检查 err 后，用 receipt.ID 在 loop 的 Manager 中 Inspect / Wait / Stop。
+// 检查 err 后，用 receipt.ID 在 loop 委托的 session Manager 中 Inspect / Wait / Stop。
 ```
 
 完整链路见 [入口综合测试](../../invoke_toolcall_async_test.go)：从工具名开始调用，
@@ -192,14 +197,16 @@ null（默认取消路径中 callback 可能仍在修改参数），运行期间
 提前配置好，资源会复用原验证、审查、执行及产物处理链路。
 资源在创建时复制 JSON 参数，工具定义应保持只读；每个 caller 只能绑定一次，
 每个资源只能执行一次。构造失败不会占用 caller；手动提交失败时调用
-`caller.Cancel()` 并丢弃该资源，不要复用为新的调用。loop 的入口会自动处理
-提交失败和 Release 时的 caller 取消。
+`caller.Cancel()` 并丢弃该资源，不要复用为新的调用。loop 入口会自动处理提交
+失败。Resource.Execute 开始前会把 caller context 从准备阶段的 task context
+重绑到 Manager 提供的 execution context，避免 task 自然结束误杀后台工具。
 
 适配器自动开启 `WithToolCaller_WaitForCallbackOnCancel` 的行为，取消时等待 callback
 退出后再关闭输出管道及清理产物。可动态转换的同步调用也使用此行为；未绑定
 异步或接管适配器的 ToolCaller 保持原来的及时返回取消行为。
 manager 的执行 context 会联动取消该 caller，执行返回后也会取消 caller 的 context；
-创建 caller 时应使用所属任务的 context，而不是单次 action 的短期 context。例如：
+准备阶段可以携带所属 task context 供 lookup 和 review 使用，但实际工具执行只在
+session Manager 的 execution context 下运行。例如：
 
 ```go
 // caller 通过现有工具调用准备流程创建；每次提交使用一个全新的 caller。
@@ -258,8 +265,9 @@ action Schema：单工具 `async_directly_call_tool` 可选 bool；批量
 
 回执只表示成功注册，不表示工具已执行或已完成；提交失败立即反馈，不降级为同步。
 异步提交不计入已完成工具次数，不触发满意度验证；后台结果仍归档到原 task/timeline，
-状态和输出通过 AutoContext / manage_async_execution_runtime 查看。loop Release 会
-请求取消自身后台执行，因此结束任务前应先 wait 确认所需执行结束。
+状态和输出通过 AutoContext / manage_async_execution_runtime 查看。task 自然完成
+和 loop Release 不会取消 session-owned execution；用户显式取消 task 时，会停止
+metadata.task_id 与该 task 匹配的后台项。会话结束仍会统一 Close/Shutdown。
 
 验证见 [单调用派发综合测试](../../../aireact/invoke_toolcall_async_action_test.go)：
 文本 root/next_action 与 native handler、默认同步、提交立即返回、真实 Inspector
@@ -279,7 +287,8 @@ action Schema：单工具 `async_directly_call_tool` 可选 bool；批量
 一项 guard 拒绝或 Manager 容量不足只报告该项失败，其他项继续，不自动降级为同步。
 后台项结束时归档到原 task/timeline，不修改已返回的批次回执；异步结果按完成时间
 归档，同步结果仍按输入顺序归档。批次 context 在全部后台执行和清理结束后释放，
-action 返回不会取消它；owner 取消或 loop Release 会取消后台项。后台审批收到
+action 返回不会取消它；用户取消 task 或会话结束会取消关联后台项，普通 loop
+Release 不会取消。后台审批收到
 direct_answer 时仍通过原屏障取消兄弟调用，避免未审批完就开始执行。
 
 验证见 [批量混合派发综合测试](../../invoke_toolcall_batch_async_test.go)：两套 handler
@@ -310,12 +319,56 @@ mock 模型通过真实文本/native 解析链路执行全部 OP，验证禁用�
 action、AutoContext 和 UI 使用同一个 owner
 Manager 的状态与 Inspector，UI 的持续刷新另由展示层实现。
 
+## 前端同步协议
+
+ReAct 会在 session Manager 的 execution 生命周期变化时主动推送
+`structured` 事件，`NodeId` 固定为 `async_execution`。主动查询使用
+`AIInputEvent{IsSyncMessage:true, SyncType:"async_execution_sync"}`，返回同一种
+payload 并保留请求的 `SyncID`。两种 payload 都只读取 Manager 元信息，不调用
+Inspector，也不复制 stdout、stderr 或结果。
+
+```json
+{
+  "revision": 4,
+  "session_id": "ai-session",
+  "current_task_id": "react-task-2",
+  "running_count": 1,
+  "updated_at": 1760000000000,
+  "executions": [
+    {
+      "execute_id": "exec-...",
+      "metadata": {"name": "capture", "attributes": {"task_id": "react-task"}},
+      "state": "running",
+      "created_at": "2026-11-09T12:00:00Z",
+      "started_at": "2026-11-09T12:00:00Z",
+      "revision": 2
+    }
+  ]
+}
+```
+
+`running_count` 统计 pending、running 和 stopping；这些状态仍占用执行名额，只有
+completed、failed、cancelled、timed_out 才减数。`revision` 在单个 Manager 内
+单调递增，前端可用它丢弃晚到的旧查询结果。终态 execution 暂时保留在
+`executions` 中，便于刷新结果卡片；数量上限由 Manager 配置控制。
+
+手动停止使用 `SyncType:"stop_async_execution_sync"`：
+
+```json
+{"execute_id":"exec-..."}
+```
+
+成功响应与查询 payload 相同，并额外携带 `execution`，状态通常为 `stopping`。
+停止请求不代表清理已经结束；前端应继续消费后续 `async_execution` 推送，直到该
+execution 进入终态。缺少 `execute_id`、Manager 不存在或 ID 不存在时，响应通过
+`error` 返回错误，仍保持同一个 `SyncID` 和快照结构。
+
 ## AI 上下文展示
 
-每轮主循环构造 prompt 时，读取该 loop 已有 Manager 的 List，将只读摘要放入
+每轮主循环构造 prompt 时，读取该 ReAct 会话已有 Manager 的 List，将只读摘要放入
 AutoContext 动态段。没有 Manager 或没有执行记录时不展示，也不会为展示创建 Manager。
-摘要通过本次 prompt 的输入显式传递，组装时不根据 runtime 可变的 current task
-重新查找 Manager；多个 loop 使用同一配置时，仍只展示各自拥有的执行。
+摘要通过本次 prompt 的输入显式传递；同一 ReAct 会话的后续 task/loop 能看到上一轮
+仍在运行的后台执行。不同 ReAct runtime 和 subagent 仍各自拥有独立 Manager。
 
 摘要使用人类可读的 YAML 风格 Dump，例如：
 
@@ -361,7 +414,7 @@ go vet ./common/ai/aid/aireact/reactloops/asyncexecmanager
 
 ## ReAct 工具的三种异步入口
 
-三种入口最终都由工具所属 ReActLoop 的 manager 管理，模型使用同一个
+三种入口最终都由工具所属 ReAct 会话的 manager 管理，模型使用同一个
 `manage_async_execution_runtime` action 的 `list / inspect / wait / stop / stop_all`。
 执行 ID 的协议字段是 `execute_id`。提交回执不代表工具完成或业务成功；`wait`
 等待执行和清理结束，读取输出和退出结果用 `inspect`。等待超时不取消工具。
@@ -417,16 +470,17 @@ interval review 是否开启，也不依赖辅助模型是否启用。
 
 后台执行成功后仍更新最近使用工具 Schema 缓存。缓存按工具定义维护；异步
 执行列表按调用实例维护，不能用最近工具缓存代替执行登记表。后台审批的
-`direct_answer` 是 owner loop 的控制信号：停止接收新后台执行、取消相关工具、
-唤醒 wait，并由主循环在 action 边界统一回答，不在后台复用旧 action operator。
+`direct_answer` 是 ReAct session 的控制信号：停止接收新后台执行、StopAll 相关
+工具并唤醒当前或下一轮主循环；请求被消费后信号会重置，后续 review 仍可再次
+使用。主循环在 action 边界统一回答，不在后台复用旧 action operator。
 
 ## 所有权和测试边界
 
-manager 是 ReActLoop 的实例字段，首次创建时绑定所属任务的 context。父 agent
-和每个 subagent 各有独立 manager；子 agent 的工具不会自动转移给父 agent。
-子 loop 退出会请求取消其工具。`Release/Close` 不等待清理；需要确认结束应在
-退出前 `wait`，或由宿主使用有界 `Shutdown`。context 取消仍是协作式取消，不能
-强制杀死不配合的 Go 回调。
+manager 是 ReAct runtime 的实例字段，绑定会话 context。父 agent 和每个 subagent
+各自创建独立 ReAct runtime，因此 manager 也相互隔离；子 agent 的工具不会自动
+转移给父 agent。普通 task/loop Release 不会取消后台工具，只有显式 stop、用户
+取消关联 task 或会话结束才终止对应执行。`Close/Shutdown` 不强制杀 goroutine；
+不配合 context 的 Go 回调仍可能让 stopping 保持到 Shutdown 超时。
 
 回归测试覆盖：文本/原生 action、默认策略与显式覆盖、同步运行中转换、真实
 Yak 引擎与 defer 清理、重复/并发 Detach、完成竞争、容量拒绝、接管后立即取消、

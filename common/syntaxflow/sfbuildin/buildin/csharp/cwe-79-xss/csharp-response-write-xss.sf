@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET XSS via Response.Write"
-	title_zh: "检测 C#/.NET Response.Write 跨站脚本"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET XSS via Response.Write"
+	title_zh: "数据流：检测 C#/.NET Response.Write 跨站脚本"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "xss"
 	desc: <<<DESC
@@ -56,7 +57,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET XSS via Response.Write",
 	title_zh: "C#/.NET Response.Write 跨站脚本",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "xss",
 	message: "检测到用户输入未经编码流入 Response.Write/Html.Raw，存在 XSS 风险。",
@@ -66,7 +67,6 @@ alert $high for {
 desc(
 	lang: csharp
 	alert_min: 1
-	alert_high: 1
 	'file://unsafe_xss.cs': <<<UNSAFE
 using System.Web;
 
@@ -80,9 +80,9 @@ UNSAFE
 	'safefile://safe_xss.cs': <<<SAFE
 using System.Web;
 
-public class Controller {
-    public void Handle(HttpResponse Response) {
-        Response.Write("ok");
+class SafeWrite {
+    static void Render(HttpResponse response) {
+        response.Write("ok");
     }
 }
 SAFE

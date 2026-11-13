@@ -1,0 +1,9 @@
+extern helper
+sub_0x4000
+type: () -> i64
+entry_0: (<nil condition>)
+	<ptr64> t1  = <ptr64> 16
+	<string> t2 = <string> load(t1)
+	<i64> t3    = type_cast[i64] <string> load(t1)
+	<i64> t4    = call <any> helper () binding[] member[]
+	ret <i64> t4

@@ -287,11 +287,14 @@ func scanRegexpHits(root *sfvm.PatternRoot, pathPattern string, patterns []strin
 type byteIndex struct{ Start, End int }
 
 func compilePathMatcher(file string) func(string) bool {
+	if file == "*" || file == "*.*" {
+		// The blanket filter means "code and configuration", never a manifest:
+		// dependency entries are not findings, and only an explicit filter such
+		// as "*package.json" asks for one.
+		return func(s string) bool { return !blanketFileExcluded(s) }
+	}
 	var matchers []func(string) bool
 	matchers = append(matchers, func(s string) bool { return s == file })
-	if file == "*" || file == "*.*" {
-		matchers = append(matchers, func(string) bool { return true })
-	}
 	if strings.Contains(file, "*") {
 		if g, err := glob.Compile(file); err == nil {
 			matchers = append(matchers, func(s string) bool {

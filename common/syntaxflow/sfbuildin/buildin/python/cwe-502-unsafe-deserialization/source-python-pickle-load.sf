@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python pickle.load"
+	title: "源码匹配：检测 Python pickle.load"
 	title_zh: "检测 Python pickle.load",
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-python-pickle-load"
 	risk: "deserialization"
 	desc: <<<DESC

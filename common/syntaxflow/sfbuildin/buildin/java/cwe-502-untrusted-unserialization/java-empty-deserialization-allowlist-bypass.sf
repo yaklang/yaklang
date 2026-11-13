@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Empty Deserialization Allowlist Bypass"
-	title_zh: "检测空反序列化白名单直接放行"
+	mode: "struct"
+	title: "结构匹配：Detect Empty Deserialization Allowlist Bypass"
+	title_zh: "结构匹配：检测空反序列化白名单直接放行"
 	type: audit
 	risk: "deserialization"
 	desc: <<<DESC

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Neo4j Filter Key Without Identifier Sanitization"
-	title_zh: "检测Neo4j过滤键缺少标识符净化"
+	mode: "struct"
+	title: "结构匹配：Detect Neo4j Filter Key Without Identifier Sanitization"
+	title_zh: "结构匹配：检测Neo4j过滤键缺少标识符净化"
 	type: audit
 	risk: "input-validation"
 	desc: <<<DESC

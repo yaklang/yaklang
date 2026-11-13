@@ -1,0 +1,72 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：LLM training data written without review"
+	title_zh: "源码匹配：LLM 训练数据未审查直接落盘"
+	type: vuln
+	level: "middle"
+	risk: "input-validation"
+	cwe: "CWE-20"
+	desc: <<<DESC
+上传的样本直接写入 `finetune`/`train`/`dataset` 文件，没有隔离或人工审查，可能污染训练数据。
+
+### 检测方式
+源码正则匹配以训练数据文件名为目标的 `open`。
+DESC
+	solution: <<<SOLUTION
+- 写入隔离目录，人工审查后再入训练集。
+- 校验样本来源和内容。
+SOLUTION
+	alert_min: 1
+	rule_id: "6f6dcd58-bcc7-4cf1-80cb-05648144edb4"
+)
+${*.py}.pattern_regex(/open\(\s*["'][^"']*(?:finetune|train|dataset)[^"']*["']/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "LLM training data written without review",
+	title_zh: "LLM 训练数据未审查直接落盘",
+	risk: "input-validation",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://bench_unsafe.py': <<<UNSAFE
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/train", methods=["POST"])
+def train():
+    with open("finetune.jsonl", "ab") as handle:
+    return "queued"
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+UNSAFE
+	'safefile://bench_safe.py': <<<SAFE
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/train", methods=["POST"])
+def train():
+    with open("quarantine.jsonl", "ab") as handle:
+        handle.write(sample + b"\n")
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+SAFE
+)

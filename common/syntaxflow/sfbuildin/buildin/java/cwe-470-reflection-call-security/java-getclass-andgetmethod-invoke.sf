@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Java Reflection Call Security Vulnerability via getClass() and getMethod()"
-	title_zh: "检测 Java 反射调用安全漏洞（getClass() 和 getMethod()）"
+	mode: "ssa"
+	title: "数据流：Detect Java Reflection Call Security Vulnerability via getClass() and getMethod()"
+	title_zh: "数据流：检测 Java 反射调用安全漏洞（getClass() 和 getMethod()）"
 	type: audit
-	severity: mid
+	severity: "middle"
 	risk: "reflection-abuse"
 	desc: <<<DESC
 ### 漏洞描述
@@ -70,7 +71,7 @@ $entry #{
     until: `*?{opcode: param}<var(params)> as $__next__`,
 }->;
 alert $params for {
-	level: "mid",
+	level: "middle",
 	message: "检测到 Java 反射调用安全漏洞（getClass() 和 getMethod()），并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 	type: "audit",
 	title: "Detect Java Reflection Call Security Vulnerability via getClass() and getMethod()",

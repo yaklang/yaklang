@@ -37,6 +37,122 @@ Values such as `Moderate`, `中等`, `Security`, and `信息` require semantic r
 they must not be converted from spelling alone. Product categories are navigation
 groups and do not replace CWE or OWASP mappings.
 
+## Mode contract
+
+| Mode | Use it for | Do not use it for |
+| --- | --- | --- |
+| `source` | A fixed-form match whose hit is itself the finding: vendor credential formats, `verify=False`, `privileged: true`, `acl = "public-read"`, compatibility hints. | API/class/method names, call points, anything that needs type resolution. |
+| `struct` | Syntax-level call/type/structure matching on the compile unit without dataflow: `ProcessBuilder(* as $cmd)`, `ObjectInputStream(* as $in)`, `eval(* as $code)`, `TypeNameHandling.All`. | Any query that needs to know where an argument came from. |
+| `ssa` | Dataflow from a request source to a sink, across functions and branches. | Sink-only matches and literal/API-shape checks; those belong to `struct`. |
+
+A call-point rule in `source` mode is a classification error even when its regex is
+specific: the scanner would report the name without resolving the symbol. Convert
+it to `struct` (or drop it when an equivalent struct rule already exists).
+
+## Naming
+
+`desc(mode)` is the single source of truth for the verification path. The file
+name says what the rule looks for, not how it runs.
+
+| Element | Rule | Example |
+| --- | --- | --- |
+| File name | `<language>-<behavior>.sf` | `python-eval.sf`, `go-path-traversal-read.sf` |
+| File name (mode collision) | when a `source` and a `struct` rule share the same language and behavior, keep the mode prefix on both files of that directory | `source-js-eval.sf`, `struct-js-eval.sf` |
+| `title` / `title_zh` | the rule's own wording; a new rule does not add a mode marker | `Go 路径穿越：请求参数拼接文件路径` |
+| `level` | one of `critical`, `high`, `middle`, `low`, `info`; quoted; never `mid`/`medium`/`warning` | `level: "middle"` |
+| CWE directory | lowercase `cwe-<id>-<slug>` | `cwe-295-certificate-validation` |
+
+Changing a rule's `mode` does not rename its file unless the directory also holds a
+rule of the other mode with the same behavior. `TestBuiltinRuleTitlesAreUnique`
+rejects duplicate titles, so keep the wording unique. Existing titles are kept as
+they are even when they still carry an old `源码匹配：` / `结构匹配：` / `数据流：`
+marker.
+
+Every rule states `desc(mode)` explicitly. An omitted mode compiles as `ssa`,
+which silently sends a regex-only rule down the IR path and leaves its fixtures
+unverified. Library rules declare `mode: "ssa"`: both `ssa` and `struct` parent
+rules include them through the program path, so `ssa` is the one value that works
+for every importer.
+
+## File filters
+
+`${...}` selects the files a `source` rule reads.
+
+| Filter | Use it for |
+| --- | --- |
+| `${*}` | credential and token shapes only, because a secret can sit in `.env`, `.json`, `.yaml` or a log |
+| `${*.py}` / `${/\.(js|mjs|cjs)$/}` | code and config patterns; name every extension the pattern can appear in |
+| `${/^(?:Dockerfile(?:\.[\w.-]+)?|[\w.-]+\.dockerfile)$/}` | tool-specific files |
+
+Documentation never reaches a rule: the project walk (compile and live source
+stage) drops documentation directories (`doc`, `docs`, `documentation`) and
+documentation entry files (`README*`, `CHANGELOG*`, `LICENSE*`, `CONTRIBUTING*`,
+and the rest of the list in `ssaconfig.IsDocumentationFilePath`). Ordinary
+markdown stays in the pool, so document rules that target `SKILL.md` still work.
+
+`${*}` also respects the rule language: a `language: python` rule with a blanket
+filter reads python files only (the table lives in `sfpattern`), so one language
+can never report another language's code. A rule that names its own extensions
+keeps them unchanged, and `language: general` keeps the whole pool.
+
+`${*}` means code and configuration, not manifests. A blanket filter skips
+dependency manifests (`package.json`, `pom.xml`, `Cargo.toml`, `*.csproj`, and
+the rest of `sfpattern`'s manifest list): a `password` key in `package.json`
+names a dependency, it is not a credential finding. A rule that really reads a
+manifest lists it (`${*package.json}`), and that filter still matches.
+
+Do not use `${*}` for API-shape or code-shape matches: it reports the same line from
+config, logs and license text. Do not keep a single-extension filter when sibling
+extensions carry the same syntax (`*.js` misses `.mjs`, `.cjs` and `.jsx`; `*.c`
+misses headers; `*.yml` misses `.yaml`).
+
+## Severity by mode
+
+Severity answers how much proof the detector carries, not how damaging the CWE
+would be if the code were reachable. Each mode uses its own scale.
+
+| Mode | `high` / `critical` | `middle` | `low` / `info` |
+| --- | --- | --- | --- |
+| `source` | live credential format, private key block, literal that disables a control (`verify=False`, `InsecureSkipVerify: true`, `privileged: true`) | fixed-form dangerous pattern without enough context (`csrf_exempt`, `debug=True`, `echo $_GET`) | compatibility hints and style checks |
+| `struct` | code/command execution, deserialization, TLS/JWT verification disabled, dynamic class/assembly loading, hardcoded key/password | injection sinks that still need attacker input (SQL, XXE, XPath, LDAP, SSRF, path, XSS), weak crypto, reflection, file operations | cookie flags, debug leftovers, CORS, hardening gaps |
+| `ssa` | proven source-to-sink flow with no guard on the path | guarded, partial, or audit-only flow; rule whose fixture does not reproduce the finding | informational traces |
+
+`type: audit` rules never carry `high`/`critical`: they flag an API or structure
+for a human reviewer and cannot prove exploitability on their own. Cap them at
+`middle` (or `low` when the pattern is only a hint) and give them a positive
+fixture only.
+
+`high` and `critical` rules must embed at least one positive fixture and one
+near-miss negative fixture. `applyHighSeverityVerifyDefaults` forces POS+NEG
+verification for every rule that can emit high/critical, and
+`TestBuiltinHighSeverityRules_HaveFixtures` fails the corpus when such a rule has
+no fixture. A rule that cannot pass both sides is downgraded to middle until the
+fixtures and the query agree. Library rules (`AllowIncluded`) define sinks and
+are verified through their importers.
+
+### Negative fixtures
+
+A negative fixture has to be a near miss: it keeps the shape the rule looks for
+and breaks one property, so "no alert" means the query is specific rather than
+the file being irrelevant. Two failure modes are gated:
+
+| Failure | Symptom | Gate |
+| --- | --- | --- |
+| Prose placeholder | `# safe sample / no secrets here / just regular code` passes any rule | `requireNegativeIsNearMiss` |
+| Unreachable file name | the `safefile://` name fails the rule's `${...}` filter, so the negative is never examined | `requireSourceNegativeIsReachable` |
+
+The reachability gate writes the positive content into every negative file name
+and requires an alert: only a name that passes the filter can reach the query.
+Keep the negative file name aligned with the positive one (`neg/pos.vue` beside
+`pos.vue`) so both sides pass the same filter.
+
+### Library evidence
+
+A library is never evaluated on its own, so a standalone negative fixture would
+say nothing: the importers own the negative. Libraries still need a positive
+fixture that shows the sink shape they define, and every importer must have a
+negative that proves the importer does not fire on a near miss.
+
 ## Checks
 
 `TestBuiltinRiskTypeTaxonomy` compiles every embedded rule and rejects unknown,

@@ -11,7 +11,11 @@ type macroCollector struct {
 // Macro expansion is include-agnostic: headers do not need to be #included to contribute macros.
 // Header contribution is cached on the project; only the TU is rescanned per call.
 func (p *CPreprocessProject) buildMacroTables(entryPath, src string) MacroTables {
-	out := p.getHeaderMacroTables().Clone()
+	// Merge the cached header table into an empty table instead of cloning it:
+	// Clone converts the whole table three times, and the result is mutated
+	// right below, so the extra copies buy nothing.
+	out := NewMacroTables()
+	out.MergeFrom(p.getHeaderMacroTables())
 	out.MergeFrom(p.collectMacrosFromSource(entryPath, src))
 	return out
 }

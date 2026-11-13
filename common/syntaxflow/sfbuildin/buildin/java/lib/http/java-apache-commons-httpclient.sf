@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Audit Java Apache Commons HttpClient Usage"
 	type: audit
 	lib: "java-apache-commons-httpclient"
@@ -94,7 +95,7 @@ $arg<getCallee()>?{<fullTypeName>?{have: /commons\.httpclient\.methods\.(Get|Pos
 alert $output for {
 	title: "Audit Java Apache Commons HttpClient Usage",
 	title_zh: "审计 Java Apache Commons HttpClient 使用",
-	level: "mid",
+	level: "middle",
 }
 
 

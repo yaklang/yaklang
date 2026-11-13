@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测 Java Spring Framework ModelAndView SSTI 漏洞"
-	title: "Check Java Spring Framework ModelAndView SSTI Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测 Java Spring Framework ModelAndView SSTI 漏洞"
+	title: "数据流：Check Java Spring Framework ModelAndView SSTI Vulnerability"
 	type: vuln
-	level: high
+	level: "middle"
 	risk:ssti
 	harm_zh: "这种漏洞可能导致服务器端模板注入(SSTI)攻击。攻击者可以通过控制ModelAndView构造函数的参数来注入恶意模板，从而执行任意代码、访问敏感数据或进行其他未授权操作。",
 	harm: "This vulnerability may lead to Server-Side Template Injection (SSTI) attacks. Attackers can inject malicious templates by controlling the parameters of the ModelAndView constructor, potentially executing arbitrary code, accessing sensitive data, or performing other unauthorized operations."
@@ -176,7 +177,7 @@ return view;
 - 进一步渗透到内部网络或提升权限。
 - 服务拒绝 (DoS)。
 DESC
-	level: "high",
+	level: "middle",
 	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
 	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
 	name: "filteredSource",

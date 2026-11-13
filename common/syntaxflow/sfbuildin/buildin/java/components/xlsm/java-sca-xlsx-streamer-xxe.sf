@@ -1,8 +1,9 @@
 desc(
-	title_zh: "SCA: 检测Java xlsx-streamer依赖漏洞"
-	title: "SCA: Check Java xlsx-streamer Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：SCA: 检测Java xlsx-streamer依赖漏洞"
+	title: "数据流：SCA: Check Java xlsx-streamer Vulnerability"
 	type: vuln
-	level: high
+	level: "middle"
 	harm_zh: "此漏洞可能导致 XML 外部实体注入（XXE）、内存溢出（OOM）或拒绝服务（DoS）攻击。如果直接使用 xlsx-streamer 库的 StreamingReader.builder().open() 方法解析来自用户的不可信输入流，且未进行安全过滤，攻击者可以构造恶意 XLSX 文件触发安全缺陷。同时，使用低于 1.2.0 的 xlsx-streamer 版本存在已知漏洞，可能被恶意文件利用。",
 	harm: "This vulnerability may lead to XXE, OOM, or DoS attacks. Directly parsing untrusted input streams with xlsx-streamer's StreamingReader.builder().open() without proper validation can allow attackers to craft malicious XLSX files to exploit security flaws. Versions below 1.2.0 also have known vulnerabilities exploitable by malicious files."
 	fix_zh: "建议在解析 XLSX 文件前对输入进行严格的类型、大小、内容校验，避免直接解析不可信数据；同时升级 xlsx-streamer 至 1.2.0 及以上版本以修复已知漏洞。",
@@ -55,7 +56,7 @@ $xssinput#{
 }->as $result
 
 alert $result for {
-	level: "mid",
+	level: "middle",
 	title: "Java xlsx-streamer Parsing Vulnerability Was Detected",
 	title_zh: "检测到Java xlsx-streamer解析漏洞",
 	message: "检测到直接使用 xlsx-streamer 解析用户输入流，可能导致 XXE、OOM 或拒绝服务等风险。",
@@ -101,7 +102,7 @@ $ver in (,1.2.0] as $vuln_xlsx;
 check $vuln_xlsx
 
 alert $vuln_xlsx for {
-	level: "high",
+	level: "middle",
 	solution: <<<SOLUTION
 ### 修复建议
 1. **升级依赖至安全版本（至少 1.2.0）：**

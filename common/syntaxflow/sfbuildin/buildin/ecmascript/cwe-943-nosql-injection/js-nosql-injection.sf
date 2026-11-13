@@ -1,0 +1,175 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js NoSQL 注入：用户可控对象流入查询"
+	title_zh: "数据流：Node.js NoSQL 注入：用户可控对象流入查询"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-nosql-injection"
+	risk: "nosql-injection"
+	cwe: "CWE-943"
+	desc: <<<DESC
+### 规则说明
+用户可控的请求对象被直接作为文档数据库查询条件传入 `find`/`findOne`/`updateOne` 等方法。攻击者可用查询操作符改变语义。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+把用户输入转换为标量（如 `String(value)`）并校验类型，或使用查询白名单；禁止把整个请求体作为查询条件。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /users?email=
+function findUser(req, db) {
+  const query = req.body; // wb:source id=src
+  return db.collection("users").find(query); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = findUser(req, db);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	"safefile://app-safe.js": <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /users?email=
+function findUser(req, db) {
+  const email = req.body && req.body.email; // wb:source id=src
+  if (typeof email !== "string") {
+    throw new Error("email");
+  }
+  return db.collection("users").find({ email }); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = findUser(req, db);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)
+
+<include('js-param')> as $params;
+/(?i)(escape|sanitize|encode|validate|typeof|instanceof)/ as $sanitizers;
+
+*.find(*<slice(index=0)> as $arg)
+*.findOne(*<slice(index=0)> as $arg)
+*.findById(*<slice(index=0)> as $arg)
+*.deleteOne(*<slice(index=0)> as $arg)
+*.deleteMany(*<slice(index=0)> as $arg)
+*.updateOne(*<slice(index=0)> as $arg)
+*.updateMany(*<slice(index=0)> as $arg)
+*.findOneAndUpdate(*<slice(index=0)> as $arg)
+*.findByIdAndUpdate(*<slice(index=0)> as $arg)
+*.countDocuments(*<slice(index=0)> as $arg)
+*.aggregate(*<slice(index=0)> as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{!(<self> #{
+    include: <<<CODE
+*?{opcode: call && (<self><getCallee> & $sanitizers)} as $__next__
+CODE,
+}->)}?{<getCfg()><cfgGuards()>.kind?{!have: "earlyReturn"}}?{<getCfg()><cfgGuards()>.kind?{!have: "earlyPanic"}} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Node.js NoSQL 注入：用户可控对象流入查询",
+	title_zh: "Node.js NoSQL 注入：用户可控对象流入查询",
+	risk: "nosql-injection",
+}

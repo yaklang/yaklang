@@ -1,6 +1,7 @@
 desc(
-	title_zh: "SCA: 检测Java Spring Boot Devtools使用"
-	title: "SCA: Check Java Spring Boot Devtools Usage"
+	mode: "ssa"
+	title_zh: "数据流：SCA: 检测Java Spring Boot Devtools使用"
+	title: "数据流：SCA: Check Java Spring Boot Devtools Usage"
 	risk:"sca"
 	reference: <<<REFERENCE
 [Spring Boot Devtools 文档](https://docs.spring.io/spring-boot/reference/using/devtools.html)

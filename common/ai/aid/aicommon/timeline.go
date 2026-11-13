@@ -21,8 +21,10 @@ import (
 )
 
 type Timeline struct {
-	persistMu sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
-	mu        sync.RWMutex
+	persistMu         sync.Mutex // serialize snapshot + DB write; older saves cannot overwrite a newer receipt
+	mu                sync.RWMutex
+	timelineID        string              // runtime identity; never persisted or copied
+	broadcastReceipts map[string]struct{} // runtime-only; never persisted or copied
 	// Runtime observers have independent locks and never enter persistence or prompts.
 	itemInputCallbacks      timelineCallbackRegistry[TimelineItemInputEvent]
 	freezeCallbacks         timelineCallbackRegistry[TimelineFreezeResult]
@@ -476,6 +478,12 @@ func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem, noti
 }
 
 func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
+	if m.config != nil {
+		emitTimelineItemAsync(m.config.GetEmitter(), item)
+	}
+}
+
+func emitTimelineItemAsync(emitter *Emitter, item *TimelineItem) {
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
 	// writes to an unbuffered channel that hasn't been consumed yet
 	//
@@ -485,8 +493,7 @@ func (m *Timeline) emitTimelineItemAsync(item *TimelineItem) {
 	// 闭后仍可能被触发. 即便 Emitter.emit 自身已 defer recover, 这里再加一
 	// 层 recover 形成 belt-and-suspenders, 杜绝因 channel 关闭引起的进程退出.
 	_, evidence := timelineEvidenceDisplay(item)
-	if (!isPromotableTimelineItem(item) || evidence) && m.config != nil && m.config.GetEmitter() != nil {
-		emitter := m.config.GetEmitter()
+	if (!isPromotableTimelineItem(item) || evidence) && emitter != nil {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {

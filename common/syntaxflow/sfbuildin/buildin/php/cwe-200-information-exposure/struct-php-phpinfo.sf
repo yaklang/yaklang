@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP phpinfo"
-	title_zh: "结构扫描：PHP phpinfo"
+	title: "结构匹配：PHP phpinfo"
+	title_zh: "结构匹配：PHP phpinfo"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-php-phpinfo"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 phpinfo as $call
 phpinfo() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: PHP phpinfo",
 	title_zh: "结构扫描：PHP phpinfo",
 	message: "结构扫描：PHP phpinfo",

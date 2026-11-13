@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java Commons BeanUtils Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java Commons BeanUtils Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -16,7 +17,7 @@ Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进
 - **系统渗透**: 作为攻击链的一部分，进一步渗透到内部网络或更高权限的系统。
 DESC
 	rule_id: "fa7f6bb4-ca33-4080-af72-5a9e56eb0993"
-	title_zh: "SCA: 检测Java Commons BeanUtils 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java Commons BeanUtils 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **升级 Apache Commons BeanUtils 版本**
@@ -84,8 +85,49 @@ Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进
 - **拒绝服务（DoS）**: 攻击者可能通过消耗系统资源导致服务不可用。
 - **系统渗透**: 作为攻击链的一部分，进一步渗透到内部网络或更高权限的系统。
 DESC
-	level: "high",
+	level: "middle",
 	cve: "CVE-2019-10086",
 	risk: "sca",
 	name: "vuln_commons_beanutils",
 }
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://pom.xml': <<<POS
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>commons-beanutils</groupId>
+            <artifactId>commons-beanutils</artifactId>
+            <version>1.9.2</version>
+        </dependency>
+    </dependencies>
+</project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>commons-beanutils</groupId>
+            <artifactId>commons-beanutils</artifactId>
+            <version>1.10.0</version>
+        </dependency>
+    </dependencies>
+</project>
+NEG
+)

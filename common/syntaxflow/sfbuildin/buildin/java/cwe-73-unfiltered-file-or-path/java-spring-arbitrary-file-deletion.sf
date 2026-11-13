@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Java Spring Boot Arbitrary File Deletion"
-	title_zh: "检测 Java Spring Boot 任意文件删除"
+	mode: "ssa"
+	title: "数据流：Detect Java Spring Boot Arbitrary File Deletion"
+	title_zh: "数据流：检测 Java Spring Boot 任意文件删除"
 	type: audit
 	risk:"arbitrary-file-delete"
 	desc: <<<DESC
@@ -66,6 +67,28 @@ SOLUTION
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
 REFERENCE
+	'file://DeleteController.java': <<<POS
+import java.io.File;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+public class DeleteController {
+    @PostMapping("/delete")
+    public void delete(MultipartFile file) {
+        new File(file.getOriginalFilename()).delete();
+    }
+}
+POS
+	'safefile://safe/SafeDeleteController.java': <<<NEG
+import java.io.File;
+
+public class SafeDeleteController {
+    public void delete() {
+        new File("/var/data/report.pdf").delete();
+    }
+}
+NEG
 )
 
 <include("java-spring-mvc-param")>  as $source;
@@ -116,7 +139,7 @@ return "Failed to delete file: " + e.getMessage();
 3. **最小权限原则**
 运行应用程序的用户或服务应仅拥有操作必要文件和目录的权限，限制其对系统关键文件的访问和删除能力。
 SOLUTION
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	message: "发现Java Spring Boot应用中的任意文件删除漏洞。",
 	name: "high",

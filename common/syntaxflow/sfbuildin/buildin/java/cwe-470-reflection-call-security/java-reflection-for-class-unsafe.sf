@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	risk: "reflection-abuse"
-	title: "Audit Java Unsafe Reflection for Class.forName"
+	title: "数据流：Audit Java Unsafe Reflection for Class.forName"
 	type: audit
-	level: low
+	level: ""
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -34,7 +35,7 @@ thread.join();
 - **拒绝服务 (DoS)**：加载不存在或恶意的类可能导致应用程序崩溃。
 DESC
 	rule_id: "ed4ad93d-071c-467f-b688-259938c261d9"
-	title_zh: "审计Java中Class.forName的不安全反射调用"
+	title_zh: "数据流：审计Java中Class.forName的不安全反射调用"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 避免使用用户输入作为 `Class.forName()` 的直接参数

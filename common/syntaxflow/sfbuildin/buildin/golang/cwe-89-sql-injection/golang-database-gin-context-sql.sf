@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang SQL Injection Vulnerability in gin.Context"
+	mode: "ssa"
+	title: "数据流：Check Golang SQL Injection Vulnerability in gin.Context"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -28,7 +29,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "137a07c6-00e9-443a-9c2c-f892782d5176"
-	title_zh: "检测Golang SQL注入漏洞gin.Context"
+	title_zh: "数据流：检测Golang SQL注入漏洞gin.Context"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -115,7 +116,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Golang SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang SQL注入漏洞",
@@ -164,7 +165,6 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

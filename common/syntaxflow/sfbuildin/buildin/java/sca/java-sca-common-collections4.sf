@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java commons-collections4 Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java commons-collections4 Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -25,7 +26,7 @@ e.printStackTrace();
 该规则的具体目的是识别项目中是否引入了存在上述反序列化漏洞的 `commons-collections4` 库版本，即版本号处于 [4.0, 4.1) 范围内的依赖项。一旦检测到，将标记为高危风险，提醒开发者及时进行版本升级。
 DESC
 	rule_id: "2e9c5be0-2c5b-44fc-8928-e16d740bb0bf"
-	title_zh: "SCA: 检测Java commons-collections4 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java commons-collections4 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 升级 commons-collections4 库版本
@@ -62,7 +63,7 @@ REFERENCE
 __dependency__.*commons*collections4.version as $ver;
 $ver in [4.0,4.1) as $vuln_commons_collections4;
 alert $vuln_commons_collections4 for {
-	level: "high",
+	level: "middle",
 	message: "SCA: commons-collections4 version 4 has an unsafe deserialization vulnerability",
 	cve: "CVE-2015-6420",
 	title: "SCA: Check Java commons-collections4 Vulnerability",
@@ -120,3 +121,44 @@ e.printStackTrace();
 DESC
 	name: "vuln_commons_collections4",
 }
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://pom.xml': <<<POS
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.0</version>
+        </dependency>
+    </dependencies>
+</project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.1</version>
+        </dependency>
+    </dependencies>
+</project>
+NEG
+)

@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang File Upload Vulnerability"
-	title_zh: "检测Golang文件上传漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Golang File Upload Vulnerability"
+	title_zh: "数据流：检测Golang文件上传漏洞"
 	type: audit
-	level: low
+	level: ""
 	risk: "file-upload"
 	desc: <<<DESC
 ### 漏洞描述

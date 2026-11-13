@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Audit Golang XML Parsing Vulnerability"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-xml-sink'
 	desc: <<<DESC
 ### 漏洞描述
@@ -84,7 +85,7 @@ $entry.NewDecoder() as $output;
 alert $output for {
 	title: "Golang XML External Entity Vulnerability Was Detected",
 	title_zh: "检测到Go语言XML外部实体漏洞",
-	level: "mid",
+	level: "middle",
 	name: "output",
 	message: "检测到Go语言XML解析器可能存在XXE漏洞，需进一步排查是否禁用了外部实体解析。",
 	solution: <<<SOLUTION

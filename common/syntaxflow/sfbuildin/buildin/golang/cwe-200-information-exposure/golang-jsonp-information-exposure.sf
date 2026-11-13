@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang JSON Information Exposure Vulnerability"
-	title_zh: "检测Golang JSON信息泄露漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Golang JSON Information Exposure Vulnerability"
+	title_zh: "数据流：检测Golang JSON信息泄露漏洞"
 	type: audit
-	level: low
+	level: ""
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述

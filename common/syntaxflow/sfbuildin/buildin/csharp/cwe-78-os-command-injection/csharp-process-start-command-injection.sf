@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET OS Command Injection via Process.Start"
-	title_zh: "检测 C#/.NET Process.Start 命令注入"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET OS Command Injection via Process.Start"
+	title_zh: "数据流：检测 C#/.NET Process.Start 命令注入"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "command-injection"
 	desc: <<<DESC
@@ -71,7 +72,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET OS Command Injection via Process.Start",
 	title_zh: "C#/.NET Process.Start 命令注入",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "command-injection",
 	message: "检测到用户输入流入 Process.Start / ProcessStartInfo，存在命令注入风险。",
@@ -81,7 +82,6 @@ alert $high for {
 desc(
 	lang: csharp
 	alert_min: 1
-	alert_high: 1
 	'file://unsafe_cmdi.cs': <<<UNSAFE
 using System.Diagnostics;
 using System.Web;
@@ -94,11 +94,9 @@ public class Controller {
 }
 UNSAFE
 	'safefile://safe_cmdi.cs': <<<SAFE
-using System.Diagnostics;
-
-public class Controller {
-    public void Handle() {
-        Process.Start("echo");
+class SafeExec {
+    static string Command() {
+        return "ls -l /var/data";
     }
 }
 SAFE

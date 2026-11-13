@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java Thread.stop"
-	title_zh: "结构扫描：Java Thread.stop"
+	title: "结构匹配：Java Thread.stop"
+	title_zh: "结构匹配：Java Thread.stop"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-thread-stop"
 	risk: "unsafe-implementation"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 Thread.stop() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Java Thread.stop",
 	title_zh: "结构扫描：Java Thread.stop",
 	message: "结构扫描：Java Thread.stop",

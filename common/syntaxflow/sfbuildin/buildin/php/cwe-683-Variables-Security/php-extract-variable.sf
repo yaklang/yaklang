@@ -1,8 +1,9 @@
 desc(
-	title: "Detect PHP Variable Overwrite Vulnerability"
-	title_zh: "检测PHP变量覆盖漏洞"
+	mode: "ssa"
+	title: "数据流：Detect PHP Variable Overwrite Vulnerability"
+	title_zh: "数据流：检测PHP变量覆盖漏洞"
 	type: audit
-	level: low
+	level: ""
 	risk: "variable-overwrite"
 	desc: <<<DESC
 ### 漏洞描述
@@ -94,7 +95,7 @@ echo $id;
 - 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
 - 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Unfiltered PHP Variable Overwrite Detected",
 	title_zh: "未过滤PHP变量覆盖",
@@ -134,7 +135,7 @@ CODE,exclude=<<<CODE
 CODE)> as $middle
 
 alert $middle for {
-	level: "mid",
+	level: "middle",
 	type: "mid",
 	title: "PHP Variable Overwrite with Missing Filter Function",
 	title_zh: "PHP变量覆盖，缺少过滤函数",
@@ -216,8 +217,7 @@ SOLUTION
 
 desc(
 	lang: php
-	alert_high: 1
-	alert_low: 1
+	alert_mid: 1
 	'file:///param.php':<<<PARAM
 <?php
 extract($_GET);

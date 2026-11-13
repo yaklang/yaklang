@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"sync"
 	"time"
@@ -150,25 +151,11 @@ func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]string, error) {
 }
 
 func GetEffectOnEdgeByFromNodeId(db *gorm.DB, id string) []string {
-	if db == nil {
-		db = GetDB()
-	}
-	var effectOns []string
-	db.Model(&AuditEdge{}).
-		Where(" from_node = ? AND edge_type = ? ", id, EdgeType_EffectsOn).
-		Pluck("to_node", &effectOns)
-	return effectOns
+	return nativeAuditEdgeTargets(db, id, EdgeType_EffectsOn)
 }
 
 func GetDependEdgeOnByFromNodeId(db *gorm.DB, id string) []string {
-	if db == nil {
-		db = GetDB()
-	}
-	var dependOns []string
-	db.Model(&AuditEdge{}).
-		Where("from_node =? AND edge_type = ? ", id, EdgeType_DependsOn).
-		Pluck("to_node", &dependOns)
-	return dependOns
+	return nativeAuditEdgeTargets(db, id, EdgeType_DependsOn)
 }
 
 func GetDataFlowEdgeByToNodeId(db *gorm.DB, fromId uint) []string {
@@ -183,38 +170,41 @@ func GetDataFlowEdgeByToNodeId(db *gorm.DB, fromId uint) []string {
 }
 
 func GetPredecessorEdgeByFromID(db *gorm.DB, fromId string) []*AuditEdge {
-	if db == nil {
-		db = GetDB()
-	}
-	var edges []*AuditEdge
-	db.Model(&AuditEdge{}).
-		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_Predecessor).
-		Scan(&edges)
-	return edges
+	return nativePredecessorEdges(db, fromId)
 }
 
 func GetAuditNodeById(db *gorm.DB, id string) (*AuditNode, error) {
 	if db == nil {
 		db = GetDB()
 	}
-	var an AuditNode
-	if err := db.Model(&AuditNode{}).Where("node_id = ?", id).First(&an).Error; err != nil {
-		return nil, err
-	} else {
-		return &an, nil
+	an, err := nativeGetAuditNodeById(db, id)
+	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
+		return an, err
 	}
+	// Keep the GORM path as a compatibility fallback for dialects whose
+	// native scan does not match the configured schema.
+	var fallback AuditNode
+	if err := db.Model(&AuditNode{}).Where("node_id = ?", id).First(&fallback).Error; err != nil {
+		return nil, err
+	}
+	return &fallback, nil
 }
 
 func GetAuditNodesByIds(db *gorm.DB, ids []string) ([]*AuditNode, error) {
 	if db == nil {
 		db = GetDB()
 	}
-	var ans []*AuditNode
-	if err := db.Model(&AuditNode{}).Where("node_id IN (?)", ids).Find(&ans).Error; err != nil {
-		return nil, err
-	} else {
+	ans, err := nativeGetAuditNodesByIds(db, ids)
+	if err == nil {
 		return ans, nil
 	}
+	// Compatibility fallback for schemas/dialects the fixed native scan does
+	// not support. The native query and GORM both apply the soft-delete scope.
+	var fallback []*AuditNode
+	if err := db.Model(&AuditNode{}).Where("node_id IN (?)", ids).Find(&fallback).Error; err != nil {
+		return nil, err
+	}
+	return fallback, nil
 }
 
 type AuditEdgeType string

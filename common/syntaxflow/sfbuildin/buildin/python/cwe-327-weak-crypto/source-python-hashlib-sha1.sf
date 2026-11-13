@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python hashlib.sha1"
-	title_zh: "检测 Python hashlib.sha1"
+	title: "源码匹配：检测 Python hashlib.sha1"
+	title_zh: "源码匹配：检测 Python hashlib.sha1"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-python-hashlib-sha1"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.py}.pattern_regex(/hashlib\.sha1\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Python hashlib.sha1",
 	title_zh: "检测 Python hashlib.sha1",
 	message: "检测 Python hashlib.sha1",

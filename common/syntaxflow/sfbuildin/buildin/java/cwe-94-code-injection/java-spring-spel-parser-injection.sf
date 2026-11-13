@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java Spring SPEL Parser表达式注入漏洞"
-	title: "Check Java Spring SPEL Parser Injection"
+	mode: "ssa"
+	title_zh: "数据流：检测Java Spring SPEL Parser表达式注入漏洞"
+	title: "数据流：Check Java Spring SPEL Parser Injection"
 	type: vuln
 	risk:"spel-injection"
 	desc: <<<DESC
@@ -276,4 +277,14 @@ public class SPELController {
 
 }
 UNSAFE
+	'safefile://safe-spel.java': <<<NEG
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+public class SafeSpel {
+    Object run() {
+        SpelExpressionParser parser = new SpelExpressionParser();
+        return parser.parseExpression("1 + 1").getValue();
+    }
+}
+NEG
 )

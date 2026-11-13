@@ -754,7 +754,9 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 
 	log.Infof("memory triage id: %s", invoker.memoryTriage.GetSessionID())
 	if cfg.Timeline == nil {
-		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
+		if err := cfg.SetTimeline(aicommon.NewTimeline(cfg, nil)); err != nil {
+			return nil, err
+		}
 	}
 	aimem.RegisterTimelineMemoryPersistence(cfg.Timeline, invoker.memoryTriage, cfg.GetContext())
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)

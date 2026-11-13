@@ -26,6 +26,7 @@ func TestKeywordCapabilityRegistry(t *testing.T) {
 		{keyword: "tls.version", status: KeywordSupported},
 		{keyword: "ja3s.hash", status: KeywordSupported},
 		{keyword: "tls.cert_expired", status: KeywordUnsupported},
+		{keyword: "dns.query.name", status: KeywordSupported},
 	}
 	for _, test := range tests {
 		test := test
@@ -62,7 +63,7 @@ func TestVisitorKeywordsHaveCapabilities(t *testing.T) {
 		"replace", "pcre", "tcp.mss", "fast_pattern", "flowbits", "noalert", "base64_decode",
 		"base64_data", "flowint", "xbits", "stream_size", "flow.age", "flow.pkts", "flow.bytes",
 		"detection_filter", "app-layer-event", "file_data", "http_uri",
-		"http.header", "dns.query", "ja3.hash", "ja3_hash", "tls.cert_subject", "ipv4.hdr", "tcp.hdr",
+		"http.header", "dns.query", "dns.query.name", "ja3.hash", "ja3_hash", "tls.cert_subject", "ipv4.hdr", "tcp.hdr",
 		"target", "dotprefix", "tls.sni", "tls_sni",
 	}
 	for _, keyword := range keywords {

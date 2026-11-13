@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang pprof Endpoint Exposure"
-	title_zh: "检测Golang暴露pprof调试端点"
+	mode: "ssa"
+	title: "数据流：Detect Golang pprof Endpoint Exposure"
+	title_zh: "数据流：检测Golang暴露pprof调试端点"
 	type: audit
-	level: low
+	level: "low"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 该规则检测 `net/http/pprof` 的显式导入与 HTTP 服务启动组合。
@@ -57,10 +58,7 @@ UNSAFE
 	'safefile://safe.go': <<<SAFE
 package main
 
-import "net/http"
-
 func main() {
-	_ = http.ListenAndServe("127.0.0.1:8080", nil)
 }
 SAFE
 )

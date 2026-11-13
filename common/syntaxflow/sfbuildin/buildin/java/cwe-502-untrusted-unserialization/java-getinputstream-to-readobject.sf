@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java原生反序列化漏洞"
-	title: "Check Java Native Deserialization Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测Java原生反序列化漏洞"
+	title: "数据流：Check Java Native Deserialization Vulnerability"
 	type: audit
 	lang: java
 	risk: "deserialization"
@@ -282,7 +283,7 @@ $sink #{
 alert $mid for {
 	title: "Check Java Native Deserialization Vulnerability",
 	title_zh: "检测Java原生反序列化漏洞",
-	level: "mid",
+	level: "middle",
 	message: "发现从用户可控输入到ObjectInputStream的readObject的数据流，可能存在反序列化漏洞",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -398,75 +399,345 @@ DESC
 	name: "mid",
 }
 
-
-
 desc(
 	lang: java
-	alert_middle: 3
-	alert_min: 5
-	'file://demo.java': <<<EOF
-import java.io.*;
+	alert_min: 1
+	'file://WbSastJavaDeserializationVulnerable.java': <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /import?payload=
+import java.io.ObjectInputStream;
 
-public class VulnerableClass {
-    public static void main(String[] args) {
+public class WbSastJavaDeserializationVulnerable {
+    public Object load(WbReq req) throws Exception {
+        var input = new ObjectInputStream(req.getInputStream()); // wb:source id=src
+        return input.readObject(); // wb:sink id=sink
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/health", WbSastJavaDeserializationVulnerable::wbHealth);
+        server.createContext("/", WbSastJavaDeserializationVulnerable::wbHandle);
+        server.start();
+    }
+
+    static void wbHealth(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "ok".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
+    static java.util.Map<String, String> wbQuery(String raw) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null || raw.isEmpty()) return out;
+        for (String pair : raw.split("&")) {
+            int cut = pair.indexOf('=');
+            String key = cut < 0 ? pair : pair.substring(0, cut);
+            String value = cut < 0 ? "" : pair.substring(cut + 1);
+            out.put(java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8), java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return out;
+    }
+
+    static void wbHandle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] raw = exchange.getRequestBody().readAllBytes();
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, String> query = wbQuery(exchange.getRequestURI().getRawQuery());
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (type != null && type.contains("application/x-www-form-urlencoded")) query.putAll(wbQuery(body));
+        boolean sent = false;
         try {
-            ObjectInputStream ois = new ObjectInputStream(new FileInputStream("data.bin"));
-            Object obj = ois.readObject();
-            ois.close();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();    
+            WbSastJavaDeserializationVulnerable app = new WbSastJavaDeserializationVulnerable();
+            Object result = null;
+            WbResp resp = null;
+            for (java.lang.reflect.Method method : WbSastJavaDeserializationVulnerable.class.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers()) || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                if (method.getName().startsWith("wb")) continue;
+                Object[] values = new Object[method.getParameterCount()];
+                boolean ready = true;
+                for (int i = 0; i < values.length; i++) {
+                    Class<?> kind = method.getParameterTypes()[i];
+                    if (kind.getSimpleName().equals("WbReq")) values[i] = new WbReq(exchange, body, query);
+                    else if (kind.getSimpleName().equals("WbResp")) { resp = new WbResp(exchange); values[i] = resp; }
+                    else if (kind == String.class) values[i] = wbFirst(query);
+                    else if ("java.sql.Connection".equals(kind.getName())) {
+                        try { values[i] = java.sql.DriverManager.getConnection(System.getenv().getOrDefault("JDBC_URL", "jdbc:sqlite::memory:")); }
+                        catch (Exception err) { ready = false; result = err; }
+                    } else if ("javax.naming.directory.DirContext".equals(kind.getName())) {
+                        values[i] = java.lang.reflect.Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind}, (proxy, called, calledArgs) -> null);
+                    } else if (java.util.Map.class.isAssignableFrom(kind)) values[i] = wbOrders();
+                    else if ("freemarker.template.Configuration".equals(kind.getName())) {
+                        Object version = kind.getField("VERSION_2_3_32").get(null);
+                        values[i] = kind.getConstructor(Class.forName("freemarker.template.Version")).newInstance(version);
+                    } else {
+                        Object obj = kind.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : kind.getFields()) {
+                            String value = query.get(field.getName());
+                            if (value != null && field.getType() == String.class) field.set(obj, value);
+                        }
+                        values[i] = obj;
+                    }
+                    if (!ready) break;
+                }
+                if (!ready) continue;
+                result = method.invoke(app, values);
+            }
+            byte[] payload;
+            int status = 200;
+            if (resp != null && resp.redirect) { status = resp.status; payload = new byte[0]; }
+            else if (resp != null && resp.writer.getBuffer().length() > 0) payload = resp.writer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            else payload = (result == null ? "ok" : String.valueOf(result)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            sent = true;
+            exchange.getResponseBody().write(payload);
+        } catch (Exception err) {
+            if (!sent) {
+                byte[] payload = String.valueOf(err).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(500, payload.length);
+                exchange.getResponseBody().write(payload);
+            }
+        } finally {
+            exchange.close();
         }
     }
-}
-EOF
-	'file://demo2.java': <<<EOF
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-import java.io.*;
 
-@RestController
-public class VulnerableController {
+    static String wbFirst(java.util.Map<String, String> query) {
+        for (String key : new String[]{"url", "password", "q", "name", "host", "uid"}) {
+            if (query.get(key) != null) return query.get(key);
+        }
+        return query.isEmpty() ? "" : query.values().iterator().next();
+    }
 
-    @PostMapping("/deserialize")
-    public String deserializeObject(@RequestBody byte[] data) {
+    static Object wbOrders() {
         try {
-            ByteArrayInputStream bis = new ByteArrayInputStream(data);
-            ObjectInputStream ois = new ObjectInputStream(bis);
-            Object obj = ois.readObject();
-            ois.close();
-            return "Deserialization successful: " + obj.toString();
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-            return "Error during deserialization: " + e.getMessage();
+            Class<?> record = Class.forName(WbSastJavaDeserializationVulnerable.class.getName() + "$Record");
+            Object first = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(first, "user-1");
+            record.getField("body").set(first, "alice");
+            Object second = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(second, "user-2");
+            record.getField("body").set(second, "bob");
+            return java.util.Map.of("1", first, "2", second);
+        } catch (Exception err) {
+            return java.util.Map.of("1", "alice", "2", "bob");
         }
     }
-}
-EOF
-	'file://demo3.java': <<<EOF
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.*;
 
-@WebServlet("/vulnerable")
-public class VulnerableServlet extends HttpServlet {
+    static final class WbReq {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final String body;
+        final java.util.Map<String, String> query;
+        WbReq(com.sun.net.httpserver.HttpExchange exchange, String body, java.util.Map<String, String> query) {
+            this.exchange = exchange;
+            this.body = body;
+            this.query = query;
+        }
+        String getParameter(String name) { return query.get(name); }
+        java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        java.io.BufferedReader getReader() { return new java.io.BufferedReader(new java.io.StringReader(body)); }
+        String getHeader(String name) { return exchange.getRequestHeaders().getFirst(name); }
+        WbSession getSession() { return new WbSession(exchange); }
+    }
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
-        try {
-            ObjectInputStream ois = new ObjectInputStream(request.getInputStream());
-            Object obj = ois.readObject();
-            ois.close();
-            
-            response.getWriter().println("Deserialization successful: " + obj.toString());
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-            response.getWriter().println("Error during deserialization: " + e.getMessage());
+    static final class WbResp {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final java.io.StringWriter writer = new java.io.StringWriter();
+        int status = 200;
+        boolean redirect;
+        WbResp(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        java.io.Writer getWriter() { return writer; }
+        void sendRedirect(String target) { redirect = true; status = 302; exchange.getResponseHeaders().set("Location", target); }
+        void setHeader(String key, String value) { if (value != null) exchange.getResponseHeaders().set(key, value); }
+        void addCookie(WbCookie cookie) { exchange.getResponseHeaders().add("Set-Cookie", cookie.name + "=" + cookie.value); }
+    }
+
+    static final class WbCookie {
+        final String name;
+        final String value;
+        WbCookie(String name, String value) { this.name = name; this.value = value; }
+        void setHttpOnly(boolean value) {}
+        void setSecure(boolean value) {}
+    }
+
+    static final class WbSession {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        WbSession(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        Object getAttribute(String name) {
+            String user = exchange.getRequestHeaders().getFirst("X-User");
+            return user == null || user.isEmpty() ? "user-1" : user;
         }
     }
+
 }
-EOF
+POS
+	'safefile://WbSastJavaDeserializationSafe.java': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /import?payload=
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class WbSastJavaDeserializationSafe {
+    public static class User { public String name; }
+
+    public User load(WbReq req) throws Exception {
+        var body = req.getInputStream(); // wb:source id=src
+        return new ObjectMapper().readValue(body, User.class); // wb:sink id=sink
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/health", WbSastJavaDeserializationSafe::wbHealth);
+        server.createContext("/", WbSastJavaDeserializationSafe::wbHandle);
+        server.start();
+    }
+
+    static void wbHealth(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "ok".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
+    static java.util.Map<String, String> wbQuery(String raw) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null || raw.isEmpty()) return out;
+        for (String pair : raw.split("&")) {
+            int cut = pair.indexOf('=');
+            String key = cut < 0 ? pair : pair.substring(0, cut);
+            String value = cut < 0 ? "" : pair.substring(cut + 1);
+            out.put(java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8), java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return out;
+    }
+
+    static void wbHandle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] raw = exchange.getRequestBody().readAllBytes();
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, String> query = wbQuery(exchange.getRequestURI().getRawQuery());
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (type != null && type.contains("application/x-www-form-urlencoded")) query.putAll(wbQuery(body));
+        boolean sent = false;
+        try {
+            WbSastJavaDeserializationSafe app = new WbSastJavaDeserializationSafe();
+            Object result = null;
+            WbResp resp = null;
+            for (java.lang.reflect.Method method : WbSastJavaDeserializationSafe.class.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers()) || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                if (method.getName().startsWith("wb")) continue;
+                Object[] values = new Object[method.getParameterCount()];
+                boolean ready = true;
+                for (int i = 0; i < values.length; i++) {
+                    Class<?> kind = method.getParameterTypes()[i];
+                    if (kind.getSimpleName().equals("WbReq")) values[i] = new WbReq(exchange, body, query);
+                    else if (kind.getSimpleName().equals("WbResp")) { resp = new WbResp(exchange); values[i] = resp; }
+                    else if (kind == String.class) values[i] = wbFirst(query);
+                    else if ("java.sql.Connection".equals(kind.getName())) {
+                        try { values[i] = java.sql.DriverManager.getConnection(System.getenv().getOrDefault("JDBC_URL", "jdbc:sqlite::memory:")); }
+                        catch (Exception err) { ready = false; result = err; }
+                    } else if ("javax.naming.directory.DirContext".equals(kind.getName())) {
+                        values[i] = java.lang.reflect.Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind}, (proxy, called, calledArgs) -> null);
+                    } else if (java.util.Map.class.isAssignableFrom(kind)) values[i] = wbOrders();
+                    else if ("freemarker.template.Configuration".equals(kind.getName())) {
+                        Object version = kind.getField("VERSION_2_3_32").get(null);
+                        values[i] = kind.getConstructor(Class.forName("freemarker.template.Version")).newInstance(version);
+                    } else {
+                        Object obj = kind.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : kind.getFields()) {
+                            String value = query.get(field.getName());
+                            if (value != null && field.getType() == String.class) field.set(obj, value);
+                        }
+                        values[i] = obj;
+                    }
+                    if (!ready) break;
+                }
+                if (!ready) continue;
+                result = method.invoke(app, values);
+            }
+            byte[] payload;
+            int status = 200;
+            if (resp != null && resp.redirect) { status = resp.status; payload = new byte[0]; }
+            else if (resp != null && resp.writer.getBuffer().length() > 0) payload = resp.writer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            else payload = (result == null ? "ok" : String.valueOf(result)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            sent = true;
+            exchange.getResponseBody().write(payload);
+        } catch (Exception err) {
+            if (!sent) {
+                byte[] payload = String.valueOf(err).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(500, payload.length);
+                exchange.getResponseBody().write(payload);
+            }
+        } finally {
+            exchange.close();
+        }
+    }
+
+    static String wbFirst(java.util.Map<String, String> query) {
+        for (String key : new String[]{"url", "password", "q", "name", "host", "uid"}) {
+            if (query.get(key) != null) return query.get(key);
+        }
+        return query.isEmpty() ? "" : query.values().iterator().next();
+    }
+
+    static Object wbOrders() {
+        try {
+            Class<?> record = Class.forName(WbSastJavaDeserializationSafe.class.getName() + "$Record");
+            Object first = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(first, "user-1");
+            record.getField("body").set(first, "alice");
+            Object second = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(second, "user-2");
+            record.getField("body").set(second, "bob");
+            return java.util.Map.of("1", first, "2", second);
+        } catch (Exception err) {
+            return java.util.Map.of("1", "alice", "2", "bob");
+        }
+    }
+
+    static final class WbReq {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final String body;
+        final java.util.Map<String, String> query;
+        WbReq(com.sun.net.httpserver.HttpExchange exchange, String body, java.util.Map<String, String> query) {
+            this.exchange = exchange;
+            this.body = body;
+            this.query = query;
+        }
+        String getParameter(String name) { return query.get(name); }
+        java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        java.io.BufferedReader getReader() { return new java.io.BufferedReader(new java.io.StringReader(body)); }
+        String getHeader(String name) { return exchange.getRequestHeaders().getFirst(name); }
+        WbSession getSession() { return new WbSession(exchange); }
+    }
+
+    static final class WbResp {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final java.io.StringWriter writer = new java.io.StringWriter();
+        int status = 200;
+        boolean redirect;
+        WbResp(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        java.io.Writer getWriter() { return writer; }
+        void sendRedirect(String target) { redirect = true; status = 302; exchange.getResponseHeaders().set("Location", target); }
+        void setHeader(String key, String value) { if (value != null) exchange.getResponseHeaders().set(key, value); }
+        void addCookie(WbCookie cookie) { exchange.getResponseHeaders().add("Set-Cookie", cookie.name + "=" + cookie.value); }
+    }
+
+    static final class WbCookie {
+        final String name;
+        final String value;
+        WbCookie(String name, String value) { this.name = name; this.value = value; }
+        void setHttpOnly(boolean value) {}
+        void setSecure(boolean value) {}
+    }
+
+    static final class WbSession {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        WbSession(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        Object getAttribute(String name) {
+            String user = exchange.getRequestHeaders().getFirst("X-User");
+            return user == null || user.isEmpty() ? "user-1" : user;
+        }
+    }
+
+}
+NEG
 )

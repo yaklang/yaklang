@@ -1,7 +1,8 @@
 desc(
-	title: "Detect C Buffer Overflow Vulnerability"
+	mode: "struct"
+	title: "结构匹配：Detect C Buffer Overflow Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "buffer-overflow"
 	desc: <<<DESC
 ### 漏洞描述
@@ -26,7 +27,7 @@ desc(
    - 导致服务拒绝（DoS）。
 DESC
 	rule_id: "364b224d-5ed5-4fe8-8edc-43f318dd7d9d"
-	title_zh: "检测C语言缓冲区溢出漏洞sizeof检查"
+	title_zh: "结构匹配：检测C语言缓冲区溢出漏洞sizeof检查"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -66,7 +67,7 @@ memcpy(*<slice(index=2)> as $sink)
 $sink?{opcode: add}?{have: sizeof} as $mid
 
 alert $mid for {
-	level: "mid",
+	level: "middle",
 	type: "vuln",
 	title: "C Buffer Overflow Vulnerability Was Detected",
 	title_zh: "检测到C语言缓冲区溢出漏洞",
@@ -112,7 +113,7 @@ memcpy(*<slice(index=2)> as $sink)
 $sink?{opcode: const} as $low
 
 alert $low for {
-	level: "low",
+	level: "middle",
 	type: "vuln",
 	title: "C Buffer Overflow Vulnerability Was Detected",
 	title_zh: "检测到C语言缓冲区溢出漏洞",

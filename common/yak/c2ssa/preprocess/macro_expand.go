@@ -35,10 +35,50 @@ func newMacroEnvFromTables(tables MacroTables) *macroEnv {
 	}
 }
 
-func (e *macroEnv) setTables(tables macroTables) {
-	e.tables = tables
-	e.objectBodyTokens = nil
-	e.functionBodyTokens = nil
+// applyFunctionMacro installs a function-like macro in place. Any cached body
+// tokens for the name are dropped, because a redefinition changes the body.
+func (e *macroEnv) applyFunctionMacro(name string, fm functionMacro) {
+	if e == nil {
+		return
+	}
+	if e.tables.function == nil {
+		e.tables.function = make(map[string]functionMacro)
+	}
+	e.tables.function[name] = fm
+	delete(e.tables.object, name)
+	e.forgetMacroTokens(name)
+}
+
+// applyObjectMacro installs an object-like macro in place.
+func (e *macroEnv) applyObjectMacro(name, body string) {
+	if e == nil {
+		return
+	}
+	if e.tables.object == nil {
+		e.tables.object = make(map[string]string)
+	}
+	e.tables.object[name] = body
+	delete(e.tables.function, name)
+	e.forgetMacroTokens(name)
+}
+
+// undefineMacro removes both forms of name in place.
+func (e *macroEnv) undefineMacro(name string) {
+	if e == nil {
+		return
+	}
+	delete(e.tables.function, name)
+	delete(e.tables.object, name)
+	e.forgetMacroTokens(name)
+}
+
+func (e *macroEnv) forgetMacroTokens(name string) {
+	if e.objectBodyTokens != nil {
+		delete(e.objectBodyTokens, name)
+	}
+	if e.functionBodyTokens != nil {
+		delete(e.functionBodyTokens, name)
+	}
 }
 
 // cloneHideSet returns a shallow copy of h (or nil if h is empty).

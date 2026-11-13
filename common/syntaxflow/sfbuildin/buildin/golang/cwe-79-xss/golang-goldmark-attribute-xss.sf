@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Goldmark Attribute Or Title Rendering XSS"
-	title_zh: "检测Goldmark属性或标题渲染中的XSS风险"
+	mode: "ssa"
+	title: "数据流：Detect Goldmark Attribute Or Title Rendering XSS"
+	title_zh: "数据流：检测Goldmark属性或标题渲染中的XSS风险"
 	type: audit
-	level: high
+	level: ""
 	risk: "xss"
 	rule_id: "89ad5372-f73b-47a7-81fe-0fd80a57532a"
 	solution: <<<SOLUTION

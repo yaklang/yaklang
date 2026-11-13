@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang OpenFile With Overly Permissive Mode"
-	title_zh: "检测Golang文件权限配置过宽（OpenFile）"
+	mode: "struct"
+	title: "结构匹配：Detect Golang OpenFile With Overly Permissive Mode"
+	title_zh: "结构匹配：检测Golang文件权限配置过宽（OpenFile）"
 	type: vuln
-	level: mid
+	level: "middle"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 该规则检测 `os.OpenFile` 第四个权限参数使用过宽模式（如 0777、0666）。
@@ -23,7 +24,7 @@ $perm?{opcode: const}?{have: /^(511|438|0777|0666)$/} as $mid
 
 alert $mid for {
 	type: "vuln",
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	title: "Golang File Permission Too Broad",
 	title_zh: "检测到文件权限配置过宽",

@@ -1,7 +1,8 @@
 desc(
-	title: "Check C Open Redirect Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C Open Redirect Vulnerability"
 	type: audit
-	level: low
+	level: ""
 	risk: "open-redirect"
 	desc: <<<DESC
 ### 漏洞描述
@@ -71,7 +72,7 @@ desc(
    - **会话劫持**: 在重定向过程中泄露敏感信息。
 DESC
 	rule_id: "e9c7f2a4-1d8b-4e3f-9a6c-2b5e8d1f4a7c"
-	title_zh: "检测C语言开放重定向漏洞"
+	title_zh: "数据流：检测C语言开放重定向漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 

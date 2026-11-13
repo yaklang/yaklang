@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Jar Security Info Loading Without Entry Content Match"
-	title_zh: "检测Jar安全信息加载缺少条目内容匹配"
+	mode: "struct"
+	title: "结构匹配：Detect Jar Security Info Loading Without Entry Content Match"
+	title_zh: "结构匹配：检测Jar安全信息加载缺少条目内容匹配"
 	type: audit
 	risk: "weak-integrity"
 	desc: <<<DESC

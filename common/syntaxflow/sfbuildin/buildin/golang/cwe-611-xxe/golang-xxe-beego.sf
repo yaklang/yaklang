@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang XML External Entity (XXE) Vulnerability in Beego Framework"
-	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞"
+	mode: "struct"
+	title: "结构匹配：Detect Golang XML External Entity (XXE) Vulnerability in Beego Framework"
+	title_zh: "结构匹配：检测Golang Beego框架中的XML外部实体(XXE)漏洞"
 	type: vuln
-	level: high
+	level: "high"
 	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述

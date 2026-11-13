@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java STAX XMLInputFactory Unsafe Use"
-	title_zh: "检测 Java STAX XMLInputFactory 不安全使用"
+	mode: "struct"
+	title: "结构匹配：Check Java STAX XMLInputFactory Unsafe Use"
+	title_zh: "结构匹配：检测 Java STAX XMLInputFactory 不安全使用"
 	type: vuln
 	risk: "xxe"
 	desc: <<<DESC
@@ -74,17 +75,7 @@ SOLUTION
 )
 
 XMLInputFactory.newInstance() as $factory;
-check $factory;
-
-$factory?{!.setProperty}...createXMLStreamReader() as $vulnCall;
-$factory...createXMLStreamReader() as $allCall;
-
-$allCall - $vulnCall as $toCheckCall;
-$factory?{.setProperty?(,*?{=="javax.xml.stream.supportDTD"},*?{==false})} as $excludeFactory;
-$factory?{.setProperty?(,*?{=="javax.xml.stream.isSupportingExternalEntities"},*?{==false})} as $excludeFactory;
-$factory?{.setProperty?(,*?{=="javax.xml.stream.isSupportingExternalEntities"},*?{==false})}  as $excludeFactory;
-$excludeFactory...createXMLStreamReader() as $excludeCall;
-$toCheckCall - $excludeCall as $vulnCall;
+$factory?{!.setProperty} as $vulnCall;
 check $vulnCall;
 
 alert $vulnCall for {
@@ -161,7 +152,7 @@ DESC
 
 desc(
 	lang: "java"
-	alert_num: 2
+	alert_num: 1
 	"file://cve_2018_15531.java": <<<UNSAFE
 import java.util.NoSuchElementException;
 import java.util.Scanner;

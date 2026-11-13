@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java Aspectjweaver Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java Aspectjweaver Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -14,7 +15,7 @@ desc(
 - **系统瘫痪或数据破坏：** 攻击者可以利用获取的权限对系统进行破坏，导致服务中断或数据丢失。
 DESC
 	rule_id: "5472c76a-afe4-4abf-b19d-dce382ff1b4a"
-	title_zh: "SCA: 检测Java Aspectjweaver 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java Aspectjweaver 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **升级 Aspectjweaver 版本**
@@ -41,6 +42,12 @@ SOLUTION
 	reference: <<<REFERENCE
 [CVE-2020-5398](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-5398)
 REFERENCE
+	'file://pom.xml': <<<POS
+<project><dependencies><dependency><groupId>org.aspectj</groupId><artifactId>aspectjweaver</artifactId><version>1.9.4</version></dependency></dependencies></project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<project><dependencies><dependency><groupId>org.aspectj</groupId><artifactId>aspectjweaver</artifactId><version>1.9.6</version></dependency></dependencies></project>
+NEG
 )
 
 __dependency__.*aspectjweaver.version as $ver;
@@ -48,7 +55,7 @@ $ver in (,1.9.5] as $vuln_aspectjweaver;
 alert $vuln_aspectjweaver for {
 	title: "SCA: Check Java Aspectjweaver Vulnerability",
 	title_zh: "SCA: 检测Java Aspectjweaver 依赖漏洞",
-	level: "mid",
+	level: "middle",
 	cve: "CVE-2020-5398",
 	message: "SCA: aspectjweaver version 1.9.5 has a reflective file download vulnerability",
 	solution: <<<SOLUTION

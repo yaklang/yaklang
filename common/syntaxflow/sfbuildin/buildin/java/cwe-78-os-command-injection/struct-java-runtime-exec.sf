@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java Runtime.exec Call"
-	title_zh: "结构扫描：Java Runtime.exec 调用"
+	title: "结构匹配：Java Runtime.exec Call"
+	title_zh: "结构匹配：Java Runtime.exec 调用"
 	type: vuln
-	level: medium
+	level: "high"
 	rule_id: "struct-java-runtime-exec"
 	risk: "command-injection"
 	desc: <<<DESC
@@ -32,7 +32,7 @@ NEG
 
 Runtime.getRuntime().exec(* as $cmd) as $call
 alert $call for {
-	level: "medium",
+	level: "high",
 	title: "Runtime.exec Call",
 	title_zh: "Runtime.exec 调用",
 	message: "Runtime.getRuntime().exec Call detected",

@@ -1,0 +1,112 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：LLM output used as SQL query"
+	title_zh: "数据流：LLM 输出直接作为 SQL 语句"
+	type: vuln
+	level: ""
+	risk: "sql-injection"
+	cwe: "CWE-1426"
+	desc: <<<DESC
+模型输出没有校验就传给 `execute()`。模型可能返回任意 SQL。
+
+### 检测方式
+`model_complete` 的返回值流入 `execute` 的 SQL 参数，且该参数不是常量。
+DESC
+	solution: <<<SOLUTION
+- 模型输出只作为参数值，不拼 SQL。
+- 用枚举白名单校验模型输出。
+SOLUTION
+	alert_min: 1
+	rule_id: "1eeaece8-8f20-4458-99bd-6b254c106aad"
+)
+model_complete(* as $out)
+execute(* as $sql)
+$sql?{!opcode: const}?{<self> #{include: `* & $out`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "LLM output used as SQL query",
+	title_zh: "LLM 输出直接作为 SQL 语句",
+	risk: "sql-injection",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /answer?question=
+def answer(cursor, question):
+    sql = model_complete(question)  # wb:source id=src
+    cursor.execute(sql)  # wb:sink id=sink
+
+def model_complete(question):
+    return question
+
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+
+@app.route("/answer", methods=["GET", "POST"])
+def wb_entry():
+    import sqlite3
+    question = request.values.get("question", "")
+    conn = sqlite3.connect(":memory:")
+    try:
+        answer(conn.cursor(), question)
+    finally:
+        conn.close()
+    return "ok"
+
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /answer?question=
+ALLOWED = {"open": "open", "closed": "closed"}
+
+def answer(cursor, question):
+    label = model_complete(question)  # wb:source id=src
+    status = ALLOWED.get(label)
+    if status is None:
+        return []
+    cursor.execute("SELECT id FROM tickets WHERE status = ?", (status,))  # wb:sink id=sink
+    return cursor.fetchall()
+
+def model_complete(question):
+    return "open"
+
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+
+@app.route("/answer", methods=["GET", "POST"])
+def wb_entry():
+    import sqlite3
+    question = request.values.get("question", "")
+    conn = sqlite3.connect(":memory:")
+    try:
+        answer(conn.cursor(), question)
+    finally:
+        conn.close()
+    return "ok"
+
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

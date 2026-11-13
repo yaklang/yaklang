@@ -85,5 +85,5 @@ func TestRuleFilterModesInfersFromTargets(t *testing.T) {
 	require.NoError(t, err)
 	cfg, err = NewConfig(WithPrograms(prog))
 	require.NoError(t, err)
-	require.Equal(t, []string{string(schema.SFR_MODE_SSA)}, ruleFilterModes(cfg))
+	require.Equal(t, []string{string(schema.SFR_MODE_STRUCT), string(schema.SFR_MODE_SSA)}, ruleFilterModes(cfg))
 }

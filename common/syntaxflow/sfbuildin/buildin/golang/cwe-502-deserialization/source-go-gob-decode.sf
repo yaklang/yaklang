@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go gob.Decode"
-	title_zh: "检测 Go gob.Decode"
+	title: "源码匹配：检测 Go gob.Decode"
+	title_zh: "源码匹配：检测 Go gob.Decode"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-go-gob-decode"
 	risk: "deserialization"
 	desc: <<<DESC
@@ -45,7 +45,7 @@ NEG
 
 ${*.go}.pattern_regex(/gob\.NewDecoder\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Go gob.Decode",
 	title_zh: "检测 Go gob.Decode",
 	message: "检测 Go gob.Decode",

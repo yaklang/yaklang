@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java AES CBC PKCS5Padding"
-	title_zh: "结构扫描：Java AES CBC PKCS5Padding"
+	title: "结构匹配：Java AES CBC PKCS5Padding"
+	title_zh: "结构匹配：Java AES CBC PKCS5Padding"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-aes-cbc-pkcs5"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 Cipher.getInstance(*?{have: "CBC"}) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Java AES CBC PKCS5Padding",
 	title_zh: "结构扫描：Java AES CBC PKCS5Padding",
 	message: "结构扫描：Java AES CBC PKCS5Padding",

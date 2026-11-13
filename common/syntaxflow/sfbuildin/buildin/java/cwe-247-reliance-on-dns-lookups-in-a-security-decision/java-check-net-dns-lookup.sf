@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java java.net.InetAddress 在安全决策中的DNS查询"
-	title: "Check Java java.net.InetAddress DNS Lookup in Security Decisions"
+	mode: "ssa"
+	title_zh: "数据流：检测Java java.net.InetAddress 在安全决策中的DNS查询"
+	title: "数据流：Check Java java.net.InetAddress DNS Lookup in Security Decisions"
 	risk:"api-abuse"
 	reference: <<<REFERENCE
 [CWE-247: Reliance on DNS Lookups in a Security Decision](https://cwe.mitre.org/data/definitions/247.html)
@@ -93,7 +94,7 @@ alert $weak for {
 	message: "发现Java java.net.InetAddress 进行DNS查询",
 	title: "Check Java java.net.InetAddress DNS Lookup",
 	title_zh: "检测Java java.net.InetAddress 进行DNS查询",
-	level: "low",
+	level: "middle",
 	name: "weak",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -206,4 +207,13 @@ desc(
 
     }
 CODE
+	'safefile://safe-dns.java': <<<NEG
+import java.net.URI;
+
+public class SafeDns {
+    String host(URI uri) {
+        return uri.getHost();
+    }
+}
+NEG
 )

@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET SQL Injection via SqlCommand"
-	title_zh: "检测 C#/.NET SqlCommand SQL 注入"
+	mode: "struct"
+	title: "结构匹配：Check C#/.NET SQL Injection via SqlCommand"
+	title_zh: "结构匹配：检测 C#/.NET SqlCommand SQL 注入"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "sql-injection"
 	desc: <<<DESC
@@ -72,7 +73,7 @@ $ct?{opcode: param} as $high
 alert $high for {
 	title: "C#/.NET SQL Injection via SqlCommand",
 	title_zh: "C#/.NET SqlCommand SQL 注入",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "sql-injection",
 	message: "检测到用户输入流入 SQL 命令构造或 CommandText，存在 SQL 注入风险。",

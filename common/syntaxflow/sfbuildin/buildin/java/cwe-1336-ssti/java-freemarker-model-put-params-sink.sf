@@ -1,8 +1,9 @@
 desc(
+	mode: "struct"
 	risk: "ssti"
-	title: "Check Java Freemarker SSTI Vulnerability"
+	title: "结构匹配：Check Java Freemarker SSTI Vulnerability"
 	type: audit
-	level: warning
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -27,7 +28,7 @@ DESC
 	reference: <<<REFERENCE
 [CWE-1336: Improper Neutralization of Special Elements used in a Template Engine](https://cwe.mitre.org/data/definitions/1336.html)
 REFERENCE
-	title_zh: "检测Java Freemarker模板注入漏洞"
+	title_zh: "结构匹配：检测Java Freemarker模板注入漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **严格过滤用户输入**
@@ -44,6 +45,16 @@ templateData.put("userInfo", cleanedInput);
 3. **避免直接在模板中处理复杂逻辑**
 将业务逻辑和数据处理放在Java代码中完成，只将需要显示的纯数据传递给模板。避免在模板中使用复杂的表达式或控制结构。
 SOLUTION
+	"safefile://SafeFreemarker.java": <<<NEG
+import freemarker.template.Template;
+import java.io.StringWriter;
+import java.util.Collections;
+class SafeFreemarker {
+  void render(Template t) throws Exception {
+    t.process(Collections.emptyMap(), new StringWriter());
+  }
+}
+NEG
 )
 
 getTemplate?{<typeName>?{have:"freemarker"}}(,*?{!opcode: const} as $sink).process(,* as $params,);
@@ -89,7 +100,7 @@ template.process(templateData, out); // 如果data包含恶意freemarker语法�
 - **服务中断**: 攻击者可以破坏或删除文件，导致服务不可用。
 - **权限提升**: 攻击者可能利用漏洞获取更高的系统权限。
 DESC
-	level: "high",
+	level: "middle",
 	message: "检测到Java Freemarker模板注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	risk: "ssti",
 	name: "sink",

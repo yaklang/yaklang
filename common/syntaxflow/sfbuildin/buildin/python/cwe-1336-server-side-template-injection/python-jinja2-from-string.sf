@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Python Jinja2 from_string SSTI Vulnerability"
-	title_zh: "检测Python Jinja2 from_string SSTI漏洞"
+	mode: "struct"
+	title: "结构匹配：Detect Python Jinja2 from_string SSTI Vulnerability"
+	title_zh: "结构匹配：检测Python Jinja2 from_string SSTI漏洞"
 	type: audit
-	level: middle
+	level: "middle"
 	risk: "ssti"
 	desc: <<<DESC
 ## 漏洞原理
@@ -60,7 +61,7 @@ DESC
 
 desc(
 	lang: python
-	alert_high: 1
+	alert_mid: 1
 	'file://unsafe_jinja2_ssti.py': <<<UNSAFE
 from jinja2 import Environment
 from flask import request

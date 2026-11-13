@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Redis Filter Value Without Query Escaping"
-	title_zh: "检测Redis过滤值缺少查询转义"
+	mode: "struct"
+	title: "结构匹配：Detect Redis Filter Value Without Query Escaping"
+	title_zh: "结构匹配：检测Redis过滤值缺少查询转义"
 	type: audit
 	risk: "input-validation"
 	desc: <<<DESC

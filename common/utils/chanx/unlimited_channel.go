@@ -29,6 +29,10 @@ func (c *UnlimitedChan[T]) SafeFeed(i T) {
 	_ = c.SafeFeedWithResult(i)
 }
 
+// chanFeedTimeout bounds how long a writer waits for a free slot before it
+// reports a stuck consumer.
+const chanFeedTimeout = 3 * time.Second
+
 func (c *UnlimitedChan[T]) SafeFeedWithResult(i T) (ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -44,11 +48,24 @@ func (c *UnlimitedChan[T]) SafeFeedWithResult(i T) (ok bool) {
 		}
 	}
 
+	// Fast path: a free slot needs no timer. Every feed used to allocate a
+	// 3 second timer that then lived in the runtime timer heap until it fired,
+	// so a core-project scan accumulated 3.1 GB of them and paid the timer
+	// heap churn on each one.
+	select {
+	case c.innerIn <- i:
+		return true
+	default:
+	}
+
+	timer := time.NewTimer(chanFeedTimeout)
+	defer timer.Stop()
+
 	if c.ctx == nil {
 		select {
 		case c.innerIn <- i:
 			return true
-		case <-time.After(3 * time.Second):
+		case <-timer.C:
 			log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
 				"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
 				len(c.innerIn), cap(c.innerIn),
@@ -62,7 +79,7 @@ func (c *UnlimitedChan[T]) SafeFeedWithResult(i T) (ok bool) {
 	select {
 	case c.innerIn <- i:
 		return true
-	case <-time.After(3 * time.Second):
+	case <-timer.C:
 		log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
 			"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
 			len(c.innerIn), cap(c.innerIn),

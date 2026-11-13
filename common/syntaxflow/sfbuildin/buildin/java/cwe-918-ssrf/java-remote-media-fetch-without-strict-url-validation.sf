@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Remote Media Fetch Without Strict URL Validation"
-	title_zh: "检测远程媒体抓取缺少严格URL校验"
+	mode: "struct"
+	title: "结构匹配：Detect Remote Media Fetch Without Strict URL Validation"
+	title_zh: "结构匹配：检测远程媒体抓取缺少严格URL校验"
 	type: audit
 	risk: "ssrf"
 	desc: <<<DESC
@@ -24,7 +25,7 @@ REFERENCE
 alert $risk for {
 	title: "Detect Remote Media Fetch Without Strict URL Validation",
 	title_zh: "检测远程媒体抓取缺少严格URL校验",
-	level: "high",
+	level: "middle",
 	message: "发现运行时媒体地址直接通过 URLConnection 取回远端内容，且未看到严格 URL 校验或集中式 fetcher，需复核 SSRF 风险。",
 	risk: "ssrf",
 	name: "risk",

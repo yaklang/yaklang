@@ -132,6 +132,80 @@ alert udp any any -> any any (msg:"udp isset"; flow:established,to_client; conte
 	require.Equal(t, 1, alerts[0].Direction)
 }
 
+func TestUDPResponseFirstDNSUsesClientDirection(t *testing.T) {
+	rules, err := rule.ParseStrictRule(`
+alert dns any any -> any any (msg:"dns to server"; flow:to_server; dns.opcode:0; sid:9700027; rev:1;)
+alert dns any any -> any any (msg:"dns to client"; flow:to_client; dns.opcode:0; sid:9700028; rev:1;)
+`)
+	require.NoError(t, err)
+	var mu sync.Mutex
+	var alerts []Alert
+	engine, err := NewStatefulEngine(rules, Config{Epoch: 19, UDPFlowTimeout: time.Minute, State: state.DefaultConfig(), OnAlert: func(alert Alert) {
+		mu.Lock()
+		alerts = append(alerts, alert)
+		mu.Unlock()
+	}})
+	require.NoError(t, err)
+	defer engine.Close()
+
+	adapter, err := NewPcapAdapter(128, func(event InspectionEvent) { engine.Handle(event) })
+	require.NoError(t, err)
+	analyzer, err := pcaputil.NewPacketAnalyzer(adapter.Options()...)
+	require.NoError(t, err)
+
+	base := time.Unix(1700006050, 0)
+	feedDNSMessage(t, analyzer, base, "10.0.0.2", "10.0.0.1", 53, 40001, "example.com", true)
+	feedDNSMessage(t, analyzer, base.Add(time.Millisecond), "10.0.0.1", "10.0.0.2", 40001, 53, "example.com", false)
+	require.NoError(t, analyzer.Close())
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, alerts, 2)
+	bySID := map[int]Alert{}
+	for _, alert := range alerts {
+		bySID[alert.Rule.Sid] = alert
+	}
+	responseAlert, ok := bySID[9700028]
+	require.True(t, ok, "response-first packet must be semantically to_client")
+	require.Equal(t, 0, responseAlert.Direction, "packet direction remains relative to the first observed endpoint")
+	queryAlert, ok := bySID[9700027]
+	require.True(t, ok, "reverse query must reuse the response-first pseudo-flow")
+	require.Equal(t, 1, queryAlert.Direction)
+}
+
+func TestUDPResponseFirstDNSFlowbitsAcrossDirections(t *testing.T) {
+	rules, err := rule.ParseStrictRule(`
+alert dns any any -> any any (msg:"dns response set"; flow:to_client; dns.opcode:0; flowbits:set,dns_response_seen; flowbits:noalert; sid:9700029; rev:1;)
+alert dns any any -> any any (msg:"dns query isset"; flow:to_server; dns.query; content:"example.com"; flowbits:isset,dns_response_seen; sid:9700030; rev:1;)
+`)
+	require.NoError(t, err)
+	var mu sync.Mutex
+	var alerts []Alert
+	engine, err := NewStatefulEngine(rules, Config{Epoch: 20, UDPFlowTimeout: time.Minute, State: state.DefaultConfig(), OnAlert: func(alert Alert) {
+		mu.Lock()
+		alerts = append(alerts, alert)
+		mu.Unlock()
+	}})
+	require.NoError(t, err)
+	defer engine.Close()
+
+	adapter, err := NewPcapAdapter(128, func(event InspectionEvent) { engine.Handle(event) })
+	require.NoError(t, err)
+	analyzer, err := pcaputil.NewPacketAnalyzer(adapter.Options()...)
+	require.NoError(t, err)
+
+	base := time.Unix(1700006075, 0)
+	feedDNSMessage(t, analyzer, base, "10.0.0.2", "10.0.0.1", 53, 40001, "example.com", true)
+	feedDNSMessage(t, analyzer, base.Add(time.Millisecond), "10.0.0.1", "10.0.0.2", 40001, 53, "example.com", false)
+	require.NoError(t, analyzer.Close())
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, alerts, 1, "response must set the bit without alerting")
+	require.Equal(t, 9700030, alerts[0].Rule.Sid)
+	require.Equal(t, 1, alerts[0].Direction)
+}
+
 func TestUDPStatefulDNSRuleMatches(t *testing.T) {
 	rules, err := rule.ParseStrictRule(`alert dns any any -> any any (msg:"dns example"; flow:to_server; dns_query; content:"example.com"; sid:9700023; rev:1;)`)
 	require.NoError(t, err)
@@ -158,6 +232,46 @@ func TestUDPStatefulDNSRuleMatches(t *testing.T) {
 	defer mu.Unlock()
 	require.Len(t, alerts, 1)
 	require.Equal(t, 9700023, alerts[0].Rule.Sid)
+	require.Equal(t, 0, alerts[0].Direction)
+}
+
+func TestUDPIdleCleanupReinfersDNSDirection(t *testing.T) {
+	rules, err := rule.ParseStrictRule(`alert dns any any -> any any (msg:"dns to client"; flow:to_client; dns.opcode:0; sid:9700033; rev:1;)`)
+	require.NoError(t, err)
+	var mu sync.Mutex
+	var alerts []Alert
+	engine, err := NewStatefulEngine(rules, Config{Epoch: 22, UDPFlowTimeout: time.Second, State: state.DefaultConfig(), OnAlert: func(alert Alert) {
+		mu.Lock()
+		alerts = append(alerts, alert)
+		mu.Unlock()
+	}})
+	require.NoError(t, err)
+	defer engine.Close()
+
+	adapter, err := NewPcapAdapter(128, func(event InspectionEvent) { engine.Handle(event) })
+	require.NoError(t, err)
+	analyzer, err := pcaputil.NewPacketAnalyzer(adapter.Options()...)
+	require.NoError(t, err)
+
+	base := time.Unix(1700006150, 0)
+	feedDNSMessage(t, analyzer, base, "10.0.0.1", "10.0.0.2", 40002, 53, "example.com", false)
+	require.NoError(t, analyzer.Close())
+	require.Equal(t, 1, engine.Stats().ActiveFlows)
+
+	engine.cleanupUDPFlows(base.Add(2 * time.Second))
+	require.Zero(t, engine.Stats().ActiveFlows)
+
+	adapter2, err := NewPcapAdapter(128, func(event InspectionEvent) { engine.Handle(event) })
+	require.NoError(t, err)
+	analyzer2, err := pcaputil.NewPacketAnalyzer(adapter2.Options()...)
+	require.NoError(t, err)
+	feedDNSMessage(t, analyzer2, base.Add(3*time.Second), "10.0.0.1", "10.0.0.2", 40002, 53, "example.com", true)
+	require.NoError(t, analyzer2.Close())
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Len(t, alerts, 1, "new generation must infer the response as to_client")
+	require.Equal(t, 9700033, alerts[0].Rule.Sid)
 	require.Equal(t, 0, alerts[0].Direction)
 }
 
@@ -198,7 +312,12 @@ func feedUDP(t *testing.T, analyzer *pcaputil.PacketAnalyzer, at time.Time, src,
 
 func feedDNSQuery(t *testing.T, analyzer *pcaputil.PacketAnalyzer, at time.Time, src, dst string, srcPort, dstPort uint16, name string) {
 	t.Helper()
-	dns := &layers.DNS{ID: 1, RD: true, Questions: []layers.DNSQuestion{{Name: []byte(name), Type: layers.DNSTypeA, Class: layers.DNSClassIN}}}
+	feedDNSMessage(t, analyzer, at, src, dst, srcPort, dstPort, name, false)
+}
+
+func feedDNSMessage(t *testing.T, analyzer *pcaputil.PacketAnalyzer, at time.Time, src, dst string, srcPort, dstPort uint16, name string, response bool) {
+	t.Helper()
+	dns := &layers.DNS{ID: 1, QR: response, RD: true, Questions: []layers.DNSQuestion{{Name: []byte(name), Type: layers.DNSTypeA, Class: layers.DNSClassIN}}}
 	raw := serializeUDP(t, src, dst, srcPort, dstPort, dns)
 	require.NoError(t, analyzer.Feed(raw, gopacket.CaptureInfo{Timestamp: at, CaptureLength: len(raw), Length: len(raw)}, layers.LinkTypeEthernet))
 }

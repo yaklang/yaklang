@@ -1,13 +1,9 @@
 package reactloops
 
 import (
-	"context"
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 func (r *ReActLoop) IsGoalModeEnabled() bool {
@@ -107,75 +103,55 @@ func (r *ReActLoop) ShouldBlockFinishByDeadline() bool {
 
 // --- Gate 3: Acceptance Criteria ---
 
-// GoalAcceptanceReviewResult holds the result of an LLM review against the
-// acceptance criteria.
-type GoalAcceptanceReviewResult struct {
-	Passed bool
-	Reason string // why it failed (empty when passed)
+// goalAcceptanceCriteria returns the configured criteria when goal acceptance
+// applies to this loop. Sub-agents and non-goal-mode loops never enter the
+// review state.
+func (r *ReActLoop) goalAcceptanceCriteria() string {
+	if r == nil || !r.IsGoalModeEnabled() {
+		return ""
+	}
+	cfg, ok := r.config.(interface{ GetGoalAcceptanceCriteria() string })
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(cfg.GetGoalAcceptanceCriteria())
 }
 
-// CheckGoalAcceptanceCriteria performs an LLM review of the current timeline
-// against the configured acceptance criteria. Returns passed=true if the
-// criteria are satisfied, or passed=false with a reason describing what is
-// missing. Returns passed=true (no-op) if the acceptance criteria gate is
-// disabled or goal mode is not enabled.
-func (r *ReActLoop) CheckGoalAcceptanceCriteria(ctx context.Context) *GoalAcceptanceReviewResult {
-	result := &GoalAcceptanceReviewResult{Passed: true}
-	if r == nil || !r.IsGoalModeEnabled() {
-		return result
+// armGoalAcceptanceReview moves a finish request that passed all host gates
+// into a one-turn main-model acceptance review. The next prompt keeps the normal
+// dynamic section; the acceptance instruction is carried by Timeline.
+func (r *ReActLoop) armGoalAcceptanceReview() bool {
+	if r == nil || r.isGoalAcceptanceMode() || r.goalAcceptanceCriteria() == "" {
+		return false
 	}
-	cfg, ok := r.config.(*aicommon.Config)
-	if !ok {
-		return result
+	r.promptMode = aicommon.LoopPromptModeGoalAcceptance
+	return true
+}
+
+func (r *ReActLoop) discardGoalAcceptanceReviewForWork() {
+	if r != nil && r.isGoalAcceptanceMode() {
+		r.promptMode = aicommon.LoopPromptModeNormal
 	}
-	criteria := strings.TrimSpace(cfg.GetGoalAcceptanceCriteria())
-	if criteria == "" {
-		return result // acceptance criteria gate disabled
+}
+
+// prepareGoalAcceptanceActionBatch reports whether a review turn chose work
+// instead of finish. The caller resets promptMode when the action batch ends.
+func (r *ReActLoop) prepareGoalAcceptanceActionBatch(calls []LoopCall) bool {
+	if r == nil || !r.isGoalAcceptanceMode() {
+		return false
 	}
-
-	if r.GetInvoker() == nil {
-		log.Warnf("goal acceptance check: invoker is nil, skipping")
-		return result
+	for _, call := range calls {
+		if call.Action != nil && call.Action.Name() == loopAction_Finish.ActionType {
+			return false
+		}
 	}
+	if r.invoker != nil {
+		r.invoker.AddToTimeline("[GOAL_ACCEPTANCE_CONTINUE]",
+			"the main model selected a work action during goal acceptance review; returning to normal mode")
+	}
+	return true
+}
 
-	cfg.ScheduleAuxiliaryTask(ctx, aicommon.CallerLabelGoalAcceptanceReview,
-		func() string {
-			// Gather and bound the evidence only when the task is scheduled.
-			timelineDiff := r.GetTimelineDiffWithoutUpdate()
-			if strings.TrimSpace(timelineDiff) == "" {
-				timelineDiff = "（暂无时间线内容）"
-			}
-			const maxTimelineChars = 8000
-			if len(timelineDiff) > maxTimelineChars {
-				timelineDiff = timelineDiff[:maxTimelineChars] + "\n……（已截断）"
-			}
-			return fmt.Sprintf(`请严格审查现有工作是否满足验收标准。
-
-验收标准：
-%s
-
-工作证据（时间线摘要）：
-%s
-
-逐项核对证据，只有全部标准都有具体证据支持时才令 passed=true；任一项缺失或未完成时令 passed=false，并在 reason 中说明缺口。不能因缺少信息就推定已完成。`, criteria, timelineDiff)
-		},
-		func(action *aicommon.Action) {
-			params := action.GetParams()
-			result.Passed = params.GetBool("passed")
-			result.Reason = strings.TrimSpace(params.GetString("reason"))
-		},
-		aicommon.WithAuxiliaryOnError(func(err error) {
-			log.Warnf("goal acceptance review failed: %v, allowing finish", err)
-		}),
-		aicommon.WithAuxiliaryOutputs(
-			aitool.WithBoolParam("passed",
-				aitool.WithParam_Description("全部验收标准均有证据证明满足时为 true。"),
-			),
-			aitool.WithStringParam("reason",
-				aitool.WithParam_Description("未通过时说明缺失或未完成内容，通过时留空。"),
-			),
-		),
-	)
-	// Errors and skipped calls leave the existing fail-open default intact.
-	return result
+func (r *ReActLoop) isGoalAcceptanceMode() bool {
+	return r != nil && r.promptMode == aicommon.LoopPromptModeGoalAcceptance
 }

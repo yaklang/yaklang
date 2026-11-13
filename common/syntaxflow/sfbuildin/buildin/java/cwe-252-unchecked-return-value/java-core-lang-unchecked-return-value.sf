@@ -1,7 +1,8 @@
 desc(
+	mode: "struct"
 	risk: "information"
-	title: "Check Java Lang Unchecked Return Value"
-	title_zh: "检测Java Lang库未检查返回值的API"
+	title: "结构匹配：Check Java Lang Unchecked Return Value"
+	title_zh: "结构匹配：检测Java Lang库未检查返回值的API"
 	type:security
 	desc: <<<DESC
 ### 规则目的
@@ -68,7 +69,7 @@ $toCheck?{<typeName>?{have:'java.lang'}}?{!<getUsers>} as $weak;
 alert $weak for {
 	title: "Check Java Lang Unchecked Return Value",
 	title_zh: "检测Java Lang库未检查返回值的API",
-	level: "info",
+	level: "middle",
 	risk: "information",
 	message: "发现Java Lang库未检查返回值的API，可能存在资源泄露或操作失败的风险。",
 	solution: <<<SOLUTION

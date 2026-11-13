@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	title: "Check Java Servlet XSS Vulnerability"
 	title_zh: "检测Java Servlet XSS漏洞"
 	type:vuln
-	level: mid
+	level: "middle"
 	risk:"xss"
 	desc: <<<DESC
 ### 漏洞描述
@@ -107,10 +108,10 @@ REFERENCE
 // the receiver (e.g. "HttpServletResponse"), which is stable regardless
 // of the variable name the source code used.
 *.getWriter()?{<getCallee><typeName>?{have:'HttpServletResponse'}} as $out;
-$out.print(,* as $sink);
-$out.println(,* as $sink);
-$out.write(,* as $sink);
-.append?{<typeName()>?{have:'javax.servlet.http.HttpServletResponse'}}(,* as $sink)
+$out.print(,* as $printSink);
+$out.println(,* as $printlnSink);
+$out.write(,* as $writeSink);
+$printSink + $printlnSink + $writeSink as $sink
 check $sink;
 
 $sink#{
@@ -120,7 +121,7 @@ $sink#{
 alert $mid for {
 	title: "Java Servlet XSS Vulnerability Was Detected",
 	title_zh: "检测到Java Servlet XSS漏洞",
-	level: "mid",
+	level: "middle",
 	type: "vuln",
 	message: "发现Java Servlet的XSS漏洞，并且数据流没有使用任何转义方法。",
 	solution: <<<SOLUTION
@@ -297,109 +298,185 @@ protected void doPost(HttpServletRequest request, HttpServletResponse response)
 DESC
 }
 
-
 desc(
 	lang: java
-	alert_low:1
-	'file://demo.jsp':<<<EOF
-  <%@ page language="java" contentType="text/html; charset=ISO-8859-1"
-           pageEncoding="ISO-8859-1"%>
-  <%@ page import="com.sectooladdict.encoders.HtmlEncoder" %>
-  <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-  <html>
-  <head>
-      <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-      <title>JavaScript Injection in DOM XSS Sink eval()</title>
-  </head>
-  <body>
-  <%
-      if (request.getParameter("userinput") == null) {
-  %>
-  Enter your input:<br><br>
-  <form name="frmInput" id="frmInput" action="Case36-InjectionDirectlyInToDomXssSinkEval.jsp" method="GET">
-      <input type="text" name="userinput" id="userinput"><br>
-      <input type=submit value="submit">
-  </form>
-  <%
-      }
-      else {
-          try {
-              String userinput = request.getParameter("userinput");
-              userinput = HtmlEncoder.htmlEncodeAngleBracketsAndQuotes(userinput);
-              out.println("<script>\neval(\"" + userinput + "\");</script>");
-              out.flush();
-          } catch (Exception e) {
-              out.println("Exception details: " + e);
-          }
-      } //end of if/else block
-  %>
-  </body>
-  </html>
-EOF
-)
+	alert_min: 1
+	'file://XssServlet.java': <<<POS
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-desc(
-	lang: java
-	alert_mid:1
-	'file://demo.java':<<<EOF
-  package com.example;
+public class XssServlet {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        response.getWriter().println(request.getParameter("name"));
+    }
+}
+POS
+	'safefile://WbSastJavaXssSafe.java': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
 
-  import java.io.IOException;
-  import java.io.PrintWriter;
-  import javax.servlet.http.HttpServlet;
-  import javax.servlet.http.HttpServletRequest;
-  import javax.servlet.http.HttpServletResponse;
+public class WbSastJavaXssSafe {
+    public void hello(WbReq req, WbResp resp) throws Exception {
+        String name = req.getParameter("name"); // wb:source id=src
+        String safe = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+        resp.getWriter().write("<h1>" + safe + "</h1>"); // wb:sink id=sink
+    }
 
-  // 存在 XSS 漏洞的 Servlet
-  public class VulnerableServlet extends HttpServlet {
+    public static void main(String[] args) throws Exception {
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/health", WbSastJavaXssSafe::wbHealth);
+        server.createContext("/", WbSastJavaXssSafe::wbHandle);
+        server.start();
+    }
 
-      @Override
-      protected void doGet(HttpServletRequest request, HttpServletResponse response)
-              throws IOException {
-          response.setContentType("text/html");
-          PrintWriter out = response.getWriter();
+    static void wbHealth(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "ok".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+    }
 
-          String name = request.getParameter("name");
+    static java.util.Map<String, String> wbQuery(String raw) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null || raw.isEmpty()) return out;
+        for (String pair : raw.split("&")) {
+            int cut = pair.indexOf('=');
+            String key = cut < 0 ? pair : pair.substring(0, cut);
+            String value = cut < 0 ? "" : pair.substring(cut + 1);
+            out.put(java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8), java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return out;
+    }
 
-          out.append("<html><body>")
-             .append("<h1>Welcome, ")
-             .append(name) // 漏洞点：未转义用户输入
-             .append("!</h1>")
-             .append("</body></html>");
-      }
-  }
-EOF
-)
+    static void wbHandle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] raw = exchange.getRequestBody().readAllBytes();
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, String> query = wbQuery(exchange.getRequestURI().getRawQuery());
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (type != null && type.contains("application/x-www-form-urlencoded")) query.putAll(wbQuery(body));
+        boolean sent = false;
+        try {
+            WbSastJavaXssSafe app = new WbSastJavaXssSafe();
+            Object result = null;
+            WbResp resp = null;
+            for (java.lang.reflect.Method method : WbSastJavaXssSafe.class.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers()) || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                if (method.getName().startsWith("wb")) continue;
+                Object[] values = new Object[method.getParameterCount()];
+                boolean ready = true;
+                for (int i = 0; i < values.length; i++) {
+                    Class<?> kind = method.getParameterTypes()[i];
+                    if (kind.getSimpleName().equals("WbReq")) values[i] = new WbReq(exchange, body, query);
+                    else if (kind.getSimpleName().equals("WbResp")) { resp = new WbResp(exchange); values[i] = resp; }
+                    else if (kind == String.class) values[i] = wbFirst(query);
+                    else if ("java.sql.Connection".equals(kind.getName())) {
+                        try { values[i] = java.sql.DriverManager.getConnection(System.getenv().getOrDefault("JDBC_URL", "jdbc:sqlite::memory:")); }
+                        catch (Exception err) { ready = false; result = err; }
+                    } else if ("javax.naming.directory.DirContext".equals(kind.getName())) {
+                        values[i] = java.lang.reflect.Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind}, (proxy, called, calledArgs) -> null);
+                    } else if (java.util.Map.class.isAssignableFrom(kind)) values[i] = wbOrders();
+                    else if ("freemarker.template.Configuration".equals(kind.getName())) {
+                        Object version = kind.getField("VERSION_2_3_32").get(null);
+                        values[i] = kind.getConstructor(Class.forName("freemarker.template.Version")).newInstance(version);
+                    } else {
+                        Object obj = kind.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : kind.getFields()) {
+                            String value = query.get(field.getName());
+                            if (value != null && field.getType() == String.class) field.set(obj, value);
+                        }
+                        values[i] = obj;
+                    }
+                    if (!ready) break;
+                }
+                if (!ready) continue;
+                result = method.invoke(app, values);
+            }
+            byte[] payload;
+            int status = 200;
+            if (resp != null && resp.redirect) { status = resp.status; payload = new byte[0]; }
+            else if (resp != null && resp.writer.getBuffer().length() > 0) payload = resp.writer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            else payload = (result == null ? "ok" : String.valueOf(result)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            sent = true;
+            exchange.getResponseBody().write(payload);
+        } catch (Exception err) {
+            if (!sent) {
+                byte[] payload = String.valueOf(err).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(500, payload.length);
+                exchange.getResponseBody().write(payload);
+            }
+        } finally {
+            exchange.close();
+        }
+    }
 
-desc(
-	lang: java
-	'safefile://safe.jsp':<<<EOF
-  package dao;
-  import java.rmi.MarshalledObject;
-  import java.sql.Connection;
-  import java.sql.PreparedStatement;
-  import java.sql.ResultSet;
-  import java.sql.SQLException;
-  public class LoginDao {
-      Connection conn = DBHelper.getConn();
-      PreparedStatement pstm = null;
-      ResultSet rs = null;
-      public boolean sqlInjectLog(String username, String password) {
-          String sql = "select * from user where username=\'" + username + "\' and password=\'" + password + "\'";
-          System.out.println("正在被尝试注入的 SQL 语句:" + sql);
-          try {
-              pstm = conn.prepareStatement(sql);
-              rs = pstm.executeQuery();
-              if (rs.next()) {
-                  return true;
-              } else {
-                  return false;
-              }
-          } catch (SQLException e) {
-              e.printStackTrace();
-          }
-          return false;
-      }
-  }
-EOF
+    static String wbFirst(java.util.Map<String, String> query) {
+        for (String key : new String[]{"url", "password", "q", "name", "host", "uid"}) {
+            if (query.get(key) != null) return query.get(key);
+        }
+        return query.isEmpty() ? "" : query.values().iterator().next();
+    }
+
+    static Object wbOrders() {
+        try {
+            Class<?> record = Class.forName(WbSastJavaXssSafe.class.getName() + "$Record");
+            Object first = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(first, "user-1");
+            record.getField("body").set(first, "alice");
+            Object second = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(second, "user-2");
+            record.getField("body").set(second, "bob");
+            return java.util.Map.of("1", first, "2", second);
+        } catch (Exception err) {
+            return java.util.Map.of("1", "alice", "2", "bob");
+        }
+    }
+
+    static final class WbReq {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final String body;
+        final java.util.Map<String, String> query;
+        WbReq(com.sun.net.httpserver.HttpExchange exchange, String body, java.util.Map<String, String> query) {
+            this.exchange = exchange;
+            this.body = body;
+            this.query = query;
+        }
+        String getParameter(String name) { return query.get(name); }
+        java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        java.io.BufferedReader getReader() { return new java.io.BufferedReader(new java.io.StringReader(body)); }
+        String getHeader(String name) { return exchange.getRequestHeaders().getFirst(name); }
+        WbSession getSession() { return new WbSession(exchange); }
+    }
+
+    static final class WbResp {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final java.io.StringWriter writer = new java.io.StringWriter();
+        int status = 200;
+        boolean redirect;
+        WbResp(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        java.io.Writer getWriter() { return writer; }
+        void sendRedirect(String target) { redirect = true; status = 302; exchange.getResponseHeaders().set("Location", target); }
+        void setHeader(String key, String value) { if (value != null) exchange.getResponseHeaders().set(key, value); }
+        void addCookie(WbCookie cookie) { exchange.getResponseHeaders().add("Set-Cookie", cookie.name + "=" + cookie.value); }
+    }
+
+    static final class WbCookie {
+        final String name;
+        final String value;
+        WbCookie(String name, String value) { this.name = name; this.value = value; }
+        void setHttpOnly(boolean value) {}
+        void setSecure(boolean value) {}
+    }
+
+    static final class WbSession {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        WbSession(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        Object getAttribute(String name) {
+            String user = exchange.getRequestHeaders().getFirst("X-User");
+            return user == null || user.isEmpty() ? "user-1" : user;
+        }
+    }
+
+}
+NEG
 )

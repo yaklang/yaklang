@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Open Redirect via Response.Redirect"
-	title_zh: "检测 C#/.NET Response.Redirect 开放重定向"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET Open Redirect via Response.Redirect"
+	title_zh: "数据流：检测 C#/.NET Response.Redirect 开放重定向"
 	type: vuln
-	level: mid
+	level: "middle"
 	language: csharp
 	risk: "open-redirect"
 	desc: <<<DESC
@@ -51,7 +52,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET Open Redirect via Redirect",
 	title_zh: "C#/.NET Redirect 开放重定向",
-	level: "mid",
+	level: "middle",
 	type: "vuln",
 	risk: "open-redirect",
 	message: "检测到用户输入流入 Redirect，存在开放重定向风险。",
@@ -72,11 +73,9 @@ public class Controller {
 }
 UNSAFE
 	'safefile://safe_redirect.cs': <<<SAFE
-using System.Web;
-
-public class Controller {
-    public void Handle(HttpResponse Response) {
-        Response.Redirect("/home");
+class SafeRedirect {
+    static string Target() {
+        return "/home";
     }
 }
 SAFE

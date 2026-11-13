@@ -54,7 +54,7 @@ func buildKeywordCapabilityRegistry() map[string]KeywordCapability {
 	add(KeywordSupported, "icmp", "", "icode", "itype", "icmp_id", "icmp_seq")
 	add(KeywordSupported, "urilen", "", "urilen")
 
-	add(KeywordSupported, "dns.query", "", "dns_query", "dns.query")
+	add(KeywordSupported, "dns.query", "", "dns_query", "dns.query", "dns.query.name")
 	add(KeywordSupported, "http.content_type", "", "http_content_type", "http.content_type")
 	add(KeywordSupported, "http.content_len", "", "http_content_len", "http.content_len")
 	add(KeywordSupported, "http.start", "", "http_start", "http.start")

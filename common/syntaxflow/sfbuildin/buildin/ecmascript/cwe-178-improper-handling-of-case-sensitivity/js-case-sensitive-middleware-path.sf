@@ -1,8 +1,9 @@
 desc(
-	title: "Case-Sensitive Middleware Path in Express.js"
-	title_zh: "Express.js 中间件使用区分大小写的正则表达式路径"
+	mode: "struct"
+	title: "结构匹配：Case-Sensitive Middleware Path in Express.js"
+	title_zh: "结构匹配：Express.js 中间件使用区分大小写的正则表达式路径"
 	type: vuln
-	level: warning
+	level: "middle"
 	risk: "authorization-bypass"
 	desc: <<<DESC
 ### 漏洞描述
@@ -181,7 +182,7 @@ $endpointArg?{opcode: const}?{have: /^\//}?{!have: /^\/.*\/[gimsuy]*$/} as $stri
 $caseSensitiveRegex<matchRegexpPath(target="$stringEndpoint")> as $bypassRisk
 
 alert $bypassRisk for {
-	level: "warning",
+	level: "middle",
 	type: "vuln",
 	title: "Case-Sensitive Middleware Path Guards a Case-Insensitive Endpoint",
 	title_zh: "区分大小写的中间件正则路径保护了大小写不敏感的端点，可被绕过",

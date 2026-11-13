@@ -43,29 +43,14 @@ func (r *Report) Save() error {
 		if flusher := r.currentFlusher(); flusher != nil {
 			flusher.stopAndWait()
 		}
-		data, err := r.snapshotJSON()
-		if err != nil {
-			return err
-		}
 		// Every save replaces the previous document instead of appending to it,
-		// and a file destination is replaced atomically.
-		return writeReportSnapshot(r.writer, data)
+		// and a file destination is replaced atomically. The document is
+		// streamed, so it never exists in memory as a whole.
+		return writeReportSnapshot(r.writer, r.writeJSONSnapshot)
 	case IRifyReactReportType:
 		return r.SaveForIRify()
 	}
 	return utils.Errorf("unsupported report format: %s", r.ReportType)
-}
-
-// snapshotJSON marshals the report as one complete document. The lock keeps a
-// concurrent finding from racing the marshal.
-func (r *Report) snapshotJSON() ([]byte, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	data, err := json.MarshalIndent(r, "", "  ")
-	if err != nil {
-		return nil, utils.Wrapf(err, "marshal report failed")
-	}
-	return data, nil
 }
 
 func (r *Report) SaveForIRify() error {
@@ -91,15 +76,7 @@ func (r *Report) SaveForIRify() error {
 }
 
 func (r *Report) PrettyWrite(w io.Writer) error {
-	jsonData, err := json.MarshalIndent(r, "", "  ")
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(jsonData)
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.writeJSONSnapshot(w)
 }
 
 func (r *Report) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
@@ -134,9 +111,9 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 		result = results[0]
 	} else {
 		var err error
-		result, err = ssaapi.LoadResultByID(uint(ssarisk.ResultID))
+		result, err = ResultForRisk(ssarisk)
 		if err != nil {
-			log.Errorf("load result by id %d error: %v", ssarisk.ResultID, err)
+			log.Errorf("load result for risk %s error: %v", ssarisk.Hash, err)
 			return
 		}
 	}

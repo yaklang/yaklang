@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Weak Hash Usage (MD5/SHA1)"
-	title_zh: "检测Golang使用弱哈希算法（MD5/SHA1）"
+	mode: "struct"
+	title: "结构匹配：Detect Golang Weak Hash Usage (MD5/SHA1)"
+	title_zh: "结构匹配：检测Golang使用弱哈希算法（MD5/SHA1）"
 	type: vuln
-	level: mid
+	level: "middle"
 	risk: "weak-hash"
 	desc: <<<DESC
 该规则检测 crypto/md5、crypto/sha1 上的 New/Sum 调用。MD5 与 SHA1 已不适用于口令、签名、
@@ -31,7 +32,7 @@ $sha1.Sum(*) as $mid
 
 alert $mid for {
 	type: "vuln",
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	title: "Golang Weak Hash Algorithm Usage Detected",
 	title_zh: "检测到Golang使用弱哈希算法",

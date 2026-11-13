@@ -1,8 +1,8 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title_zh: "审计Java 使用System.out输出流"
-	title: "Audit Java Usage of System.out Output Stream"
+	title_zh: "结构匹配：审计Java 使用System.out输出流"
+	title: "结构匹配：Audit Java Usage of System.out Output Stream"
 	risk:"code-style"
 	reference: <<<REFERENCE
 https://docs.oracle.com/javase/8/docs/api/java/io/PrintStream.html
@@ -52,7 +52,7 @@ System.out.print*() as $out;
 check $out;
 alert $out for {
 	title_zh: "检测到Java使用System.out输出流",
-	level: "info",
+	level: "low",
 	message: "检测到Java项目中使用了System.out输出流",
 	title: "Java System.out Usage Detected",
 	solution: <<<SOLUTION

@@ -1,9 +1,10 @@
 desc(
-	title: "Detect Golang Header Manipulation Vulnerability"
-	title_zh: "检测Golang头部操纵漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Golang Header Manipulation Vulnerability"
+	title_zh: "数据流：检测Golang头部操纵漏洞"
 	type: audit
-	level: high
-	risk: "xss"
+	level: "middle"
+	risk: "crlf-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -84,7 +85,7 @@ alert $high for {
 	type: "vuln",
 	title: "Golang Header Manipulation Vulnerability Was Detected",
 	title_zh: "检测到Golang头操作漏洞",
-	level: "high",
+	level: "middle",
 	message: "检测到Golang HTTP头注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -130,12 +131,11 @@ SOLUTION
    - 可能被用于跳转到恶意网站。
 DESC
 	name: "high",
-	risk: "xss",
+	risk: "crlf-injection",
 }
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package vulinbox
 

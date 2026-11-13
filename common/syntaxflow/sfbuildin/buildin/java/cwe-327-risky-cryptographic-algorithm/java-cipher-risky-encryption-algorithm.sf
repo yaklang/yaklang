@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测Java Cipher使用不安全或有风险的加密算法"
-	title: "Check Java Cipher Weak Encryption Algorithm"
+	mode: "ssa"
+	title_zh: "数据流：检测Java Cipher使用不安全或有风险的加密算法"
+	title: "数据流：Check Java Cipher Weak Encryption Algorithm"
 	type: security
-	level: low
+	level: ""
 	risk : "weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327: Use of a Broken or Risky Cryptographic Algorithm](https://cwe.mitre.org/data/definitions/327.html)

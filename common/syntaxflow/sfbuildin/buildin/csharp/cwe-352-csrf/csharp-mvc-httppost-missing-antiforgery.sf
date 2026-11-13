@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	mode: source
-	title: "Check C#/.NET MVC HttpPost Missing AntiForgery Token"
-	title_zh: "检测 C#/.NET MVC HttpPost 缺少防伪令牌"
+	title: "结构匹配：Check C#/.NET MVC HttpPost Missing AntiForgery Token"
+	title_zh: "结构匹配：检测 C#/.NET MVC HttpPost 缺少防伪令牌"
 	type: audit
-	level: mid
+	level: "middle"
 	language: csharp
 	risk: "csrf"
 	desc: <<<DESC
@@ -54,7 +55,7 @@ ${*.cs}.pattern_regex(/\[Http(Post|Put|Delete|Patch)\s*\]/) as $hit
 alert $hit for {
 	title: "C#/.NET MVC HttpPost missing antiforgery",
 	title_zh: "C#/.NET MVC HttpPost 缺少防伪令牌",
-	level: "mid",
+	level: "middle",
 	type: "audit",
 	risk: "csrf",
 	message: "检测到 HttpPost/Put/Delete/Patch 特性，请确认已启用防伪令牌校验。",

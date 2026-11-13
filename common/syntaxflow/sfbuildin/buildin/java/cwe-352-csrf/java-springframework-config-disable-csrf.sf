@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	risk: "csrf"
-	title: "Check Java Spring Framework CSRF Protection"
-	title_zh: "检查 Java Spring Framework CSRF 保护"
+	title: "结构匹配：Check Java Spring Framework CSRF Protection"
+	title_zh: "结构匹配：检查 Java Spring Framework CSRF 保护"
 	type: vuln
-	level: low
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -168,7 +169,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 - 执行敏感的业务操作（如转账、发帖、删除数据）。
 - 可能导致账户被盗、数据泄露或其他业务损失。
 DESC
-	level: "low",
+	level: "middle",
 	name: "disableCSRF",
 	message: "检测到Java Spring Framework中通过调用`.csrf().disable()`全局禁用了CSRF保护，这可能导致跨站请求伪造攻击。",
 	risk: "csrf",

@@ -1,7 +1,8 @@
 desc(
+	mode: "struct"
 	risk: "api-misuse"
-	title: "Check Java Javax Sql Rowset Unchecked Return Value"
-	title_zh: "检测Java javax.sql.rowset库未检查返回值的API"
+	title: "结构匹配：Check Java Javax Sql Rowset Unchecked Return Value"
+	title_zh: "结构匹配：检测Java javax.sql.rowset库未检查返回值的API"
 	type:security
 	desc: <<<DESC
 ### 漏洞描述
@@ -119,7 +120,7 @@ REFERENCE
 /^(supportsCrossJoin|supportsFullJoin|supportsInnerJoin|supportsLeftOuterJoin|supportsRightOuterJoin|getShowDeleted|getEscapeProcessing|isReadOnly|getAutoCommit|supportsUpdatableView|is*)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'javax.sql.rowset'}}?{!<getUsers>} as $weak;
 alert $weak for {
-	level: "info",
+	level: "middle",
 	message: "发现Java javax.sql.rowset库未检查返回值的API",
 	risk: "api-misuse",
 	title: "Check Java Javax Sql Rowset Unchecked Return Value",

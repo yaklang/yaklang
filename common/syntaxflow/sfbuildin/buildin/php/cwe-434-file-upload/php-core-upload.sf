@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	risk: "file-upload"
-	title: "Detect PHP Unsafe File Upload"
-	title_zh: "检测PHP不安全的文件上传漏洞"
+	title: "数据流：Detect PHP Unsafe File Upload"
+	title_zh: "数据流：检测PHP不安全的文件上传漏洞"
 	type: vul
 	desc: <<<DESC
 ### 漏洞描述
@@ -219,176 +220,64 @@ echo "文件上传成功！";
 - 消耗服务器资源，导致拒绝服务。
 - 与其他漏洞（如文件包含）结合，导致更严重的危害。
 DESC
-	level: "high",
+	level: "middle",
 	title: "Unsafe File Upload Without Validation",
 	name: "high",
 	message: "检测到PHP代码中存在未经验证的高危文件上传漏洞，从数据源（source）到污染汇聚点（sink）间未发现任何过滤函数信息。",
 	risk: "file-upload",
 }
-$sink<dataflow(include=<<<CODE
-* & $params as $__next__
-CODE,exclude=<<<CODE
-*?{opcode:call && <self><getCallee> & $filter} as $__next__
-CODE)> as $highAndMid
 
-$highAndMid - $high as $mid
-alert $mid for {
-	title: "Insecure File Type Detection",
-	title_zh: "不安全的文件类型检测",
-	desc: <<<DESC
-该规则用于识别PHP代码中，文件上传功能对文件类型的检测是否足够安全。通常情况下，在某些场景下可能存在部分防护机制，但仍可能被绕过的情况。例如，虽然进行了MIME类型检查，但未对文件头（Magic Number）进行校验，仍可能上传恶意文件。
-#### 示例场景
-开发者可能仅依赖客户端传递的`Content-Type`字段或简单检查文件扩展名，而未深入分析文件内容，这种情况可能导致攻击者通过伪造文件类型绕过检测。
-#### 建议：
-- 在文件类型检测过程中，应结合多种手段，如白名单、文件头分析及二次处理等。
-- 对关键文件操作（如移动、存储）增加额外的安全性检查。
-DESC
-	level: "mid",
-	name: "mid",
-	message: "检测到PHP代码中文件类型检测存在安全隐患，虽然可能存在部分防护机制，但仍需进一步审计确认。",
-	risk: "file-upload",
-}
-$sink - $high - $mid as $low
-
-alert $low for {
-	title: "Potential File Storage Path Misconfiguration",
-	title_zh: "潜在的文件存储路径配置问题",
-	desc: <<<DESC
-该规则用于审计PHP代码中，文件上传后的存储路径配置是否存在潜在风险。虽然可能已存在一些基础的过滤措施，但仍需关注存储路径的安全性，确保上传的文件不会被直接暴露在Web可访问目录中，或存储到非预期的敏感位置。
-#### 示例场景
-开发者可能将上传文件直接存储至`public/uploads`目录，而未对文件名进行清理或采用随机化策略，这可能导致攻击者通过构造特定文件名访问敏感文件。
-#### 建议：
-- 将上传文件存储至Web根目录之外，避免直接暴露于公网。
-- 使用随机化文件名以减少文件覆盖或路径操纵的风险。
-DESC
-	level: "low",
-	risk: "file-upload",
-	name: "low",
-	message: "检测到PHP代码中文件存储路径配置可能存在潜在风险，需进一步审计确认。",
-}
 desc(
-	lang: "php"
+	lang: php
 	alert_min: 1
-	"file:///upload.php": <<<TEXT
+	'file://index.php': <<<POS
 <?php
-    class UploadController {
-        public function uploadFile() {
-            $file = $_FILES['file'];
-            $uploadDir = 'public/uploads/';  // 直接存储在Web可访问目录
-
-            // 不安全的文件类型检测（仅依赖客户端MIME类型）
-            if ($file['type'] === 'image/jpeg') {
-                $targetPath = $uploadDir . $file['name'];
-                move_uploaded_file($file['tmp_name'], $targetPath); // 直接使用原始文件名
-                echo "文件上传成功！";
-            }
-        }
-    }
-TEXT
-	"file:///upload2.php": <<<TEXT
-<?php
-    class uploads{
-        public function upload(){
-            $path = $_GET["path"];
-            $file = $_GET["file"];
-            validate($validate)->check(DataHelper::objToArray($file));
-            $savename = \think\facade\Filesystem::disk('public')->putFile($path, $file);
-        }
-    }
-TEXT
-	"safefile://SafeFileUploadController.php": <<<CODE
-<?php
-
-class SafeFileUploadController
-{
-    public function uploadSecuredFile()
-    {
-        $file = $_FILES['file'];
-        $uploadDir = 'secure_uploads/'; // 上传到Web不可访问的目录
-
-        // 1. 严格校验文件是否存在且无上传错误
-        if (!isset($file['error']) || is_array($file['error'])) {
-            throw new RuntimeException('Invalid parameters.');
-        }
-        switch ($file['error']) {
-            case UPLOAD_ERR_OK:
-                break;
-            case UPLOAD_ERR_NO_FILE:
-                throw new RuntimeException('No file sent.');
-            case UPLOAD_ERR_INI_SIZE:
-            case UPLOAD_ERR_FORM_SIZE:
-                throw new RuntimeException('Exceeded filesize limit.');
-            default:
-                throw new RuntimeException('Unknown errors.');
-        }
-
-        // 2. 限制文件大小
-        if ($file['size'] > 1000000) { // 限制1MB
-            throw new RuntimeException('Exceeded filesize limit.');
-        }
-
-        // 3. 白名单校验文件类型和文件头 (使用finfo进行文件头检测)
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mimeType = $finfo->file($file['tmp_name']);
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-
-        if (!in_array($mimeType, $allowedTypes)) {
-            throw new RuntimeException('Invalid file format: ' . $mimeType . '.');
-        }
-
-        // 4. 生成安全的文件名，而不是使用原始文件名，并通过finfo获取正确的扩展名
-        $extension = '';
-        switch ($mimeType) {
-            case 'image/jpeg': $extension = 'jpg'; break;
-            case 'image/png': $extension = 'png'; break;
-            case 'image/gif': $extension = 'gif'; break;
-            case 'application/pdf': $extension = 'pdf'; break;
-            default: throw new RuntimeException('Unknown file type for extension mapping.');
-        }
-
-        $newName = sprintf('%s.%s', sha1_file($file['tmp_name']), $extension);
-        // 确保上传目录存在且有权限，或者进行创建
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        $targetPath = $uploadDir . $newName;
-
-        // 5. 移动上传的文件
-        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-            throw new RuntimeException('Failed to move uploaded file.');
-        }
-
-        echo "文件上传成功！新的文件名为: " . htmlspecialchars($newName);
-    }
-
-    // 另一个上传函数，使用框架中更安全的API（如果存在）
-    public function uploadViaFramework(\$request)
-    {
-        // 假设这是一个Laravel或其它框架的Request对象
-        if (\$request->hasFile('document')) {
-            \$file = \$request->file('document');
-
-            // 框架通常会提供更安全的文件处理方法，例如自动生成文件名和存储路径
-            // 这通常会包含MIME类型和文件头校验、文件大小限制以及文件名安全处理
-            \$path = \$file->store('documents', 'local_secure'); // 'local_secure'是一个不在web根目录的disk配置
-            echo "文件上传成功，存储路径: " . htmlspecialchars(\$path);
-        } else {
-            throw new RuntimeException('No file uploaded.');
-        }
-    }
-
-    // 仅用于演示，不处理文件上传，避开所有move_uploaded_file/putFile检测
-    public function processFormData() {
-        if (isset($_POST['data'])) {
-            // 这是一个不涉及文件上传的安全表单处理
-            $data = json_decode($_POST['data'], true);
-            echo 'Received data: ' . htmlspecialchars(json_encode($data));
-        } else {
-            echo 'No data received.';
-        }
-    }
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /upload field=f
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
 }
 
-?>
-CODE
+if (!is_dir('uploads')) {
+    mkdir('uploads', 0777, true);
+}
+$name = $_FILES['f']['name']; // wb:source id=src
+move_uploaded_file($_FILES['f']['tmp_name'], 'uploads/' . $name); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /upload field=f
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+
+if (!is_dir('uploads')) {
+    mkdir('uploads', 0777, true);
+}
+$name = $_FILES['f']['name']; // wb:source id=src
+$ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+if (!in_array($ext, ['png', 'jpg'], true)) {
+    http_response_code(400);
+    exit;
+}
+$dest = 'uploads/' . bin2hex(random_bytes(16)) . '.' . $ext;
+move_uploaded_file($_FILES['f']['tmp_name'], $dest); // wb:sink id=sink
+NEG
 )

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Filter Expression Converted To SpEL"
-	title_zh: "检测过滤表达式被转换为SpEL执行"
+	mode: "struct"
+	title: "结构匹配：Detect Filter Expression Converted To SpEL"
+	title_zh: "结构匹配：检测过滤表达式被转换为SpEL执行"
 	type: audit
 	risk: "spel-injection"
 	desc: <<<DESC

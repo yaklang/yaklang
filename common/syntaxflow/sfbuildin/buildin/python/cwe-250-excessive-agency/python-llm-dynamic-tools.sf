@@ -1,0 +1,111 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：LLM tool dispatch without allowlist"
+	title_zh: "源码匹配：LLM 工具调用缺少白名单"
+	type: vuln
+	level: "middle"
+	risk: "command-injection"
+	cwe: "CWE-250"
+	desc: <<<DESC
+模型选择工具名后直接用 `TOOLS[name](**args)` 调度，工具集里有命令执行等高风险能力。
+
+### 检测方式
+源码正则匹配对工具字典的动态下标调用。
+DESC
+	solution: <<<SOLUTION
+- 用只读工具白名单，拒绝未知工具。
+- 高风险工具要求人工确认。
+SOLUTION
+	alert_min: 1
+	rule_id: "85ec50de-bf34-417c-8547-9625d482b13b"
+)
+${*.py}.pattern_regex(/[A-Z_]*TOOLS\s*\[[^\]]+\]\s*\(\s*\*\*/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "LLM tool dispatch without allowlist",
+	title_zh: "LLM 工具调用缺少白名单",
+	risk: "command-injection",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /act?text=
+import subprocess
+
+def run_shell(command):
+    return subprocess.check_output(command, shell=True, text=True)
+
+def delete_account(user_id):
+    return user_id
+
+TOOLS = {"run_shell": run_shell, "delete_account": delete_account}
+
+def act(user_text):
+    name, args = model_choose(user_text)  # wb:source id=src
+    return TOOLS[name](**args)  # wb:sink id=sink
+
+def model_choose(user_text):
+    return "run_shell", {"command": "echo ok"}
+
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+
+@app.route("/act", methods=["GET", "POST"])
+def wb_entry():
+    text = request.values.get("text", "")
+    return str(act(text))
+
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /act?text=
+def get_order(order_id, user_id):
+    return {"order_id": order_id, "user_id": user_id}
+
+READ_ONLY = {"get_order": get_order}
+
+def act(user_text, user_id):
+    name, args = model_choose(user_text)  # wb:source id=src
+    if name not in READ_ONLY:
+        raise PermissionError(name)
+    args["user_id"] = user_id
+    return READ_ONLY[name](**args)  # wb:sink id=sink
+
+def model_choose(user_text):
+    return "get_order", {"order_id": "100"}
+
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+
+@app.route("/act", methods=["GET", "POST"])
+def wb_entry():
+    text = request.values.get("text", "")
+    user_id = request.headers.get("X-User", "user-1")
+    return str(act(text, user_id))
+
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

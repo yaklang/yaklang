@@ -77,6 +77,9 @@ func (i *fuzzFinalizeTestInvoker) AddToTimeline(entry, content string) {
 	defer i.mu.Unlock()
 	i.timelineEvents = append(i.timelineEvents, entry)
 	i.timelineRecords = append(i.timelineRecords, fuzzFinalizeTimelineRecord{entry: entry, content: content})
+	if cfg, ok := i.GetConfig().(*aicommon.Config); ok && cfg.GetTimeline() != nil {
+		cfg.GetTimeline().PushText(cfg.AcquireId(), content)
+	}
 }
 
 // DirectlyAnswer 让测试可以单独控制 AI 总结路径的成功/失败行为。

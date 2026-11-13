@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	title: "Python MD5 / SHA1 hash constructors (lib)"
 	title_zh: "弱哈希算法（MD5/SHA1/hashlib.new）（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-weak-hash"
 	risk: "weak-integrity"
 	desc: <<<DESC

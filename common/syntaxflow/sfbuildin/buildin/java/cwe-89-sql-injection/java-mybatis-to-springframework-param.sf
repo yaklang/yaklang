@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params"
-	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数"
+	mode: "ssa"
+	title: "数据流：Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params"
+	title_zh: "数据流：检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数"
 	type: vuln
-	level: middle
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -119,7 +120,7 @@ $all<dataflow(
 alert $mid for {
 	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
 	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
-	level: "mid",
+	level: "middle",
 	message: "发现Mybatis SQL注入，但是数据流中有过滤函数。",
 }
 
@@ -128,7 +129,7 @@ $all - $mid as $high
 alert $high for {
 	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
 	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
-	level: "high",
+	level: "middle",
 	message: "发现Mybatis SQL注入，并且数据流中没有过滤函数。",
 }
 desc(
@@ -336,8 +337,7 @@ CODE
 
 desc(
 	lang:java
-	alert_mid:1
-	alert_high:2
+	alert_low:1
 	"file://SQLI.java": <<<TEXT
     package org.joychou.controller;
 

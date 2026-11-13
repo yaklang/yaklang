@@ -1,0 +1,85 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python Path Traversal: User Input Used as File Path"
+	title_zh: "数据流：Python 路径穿越：用户输入作为文件路径"
+	type: vuln
+	level: ""
+	rule_id: "ssa-python-path-traversal-open"
+	risk: "path-traversal"
+	cwe: "CWE-22"
+	desc: <<<DESC
+### 漏洞描述
+请求参数进入 `open()` 的文件路径，且未经过规范化与根目录限制。攻击者可用 `../` 读取任意文件。
+
+### 检测方式
+跟踪 Flask/Django 请求参数到 `open()` 的第一个参数。路径经过 `resolve`、`realpath`、`abspath` 处理时跳过。
+
+### 风险类型
+path-traversal
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+先用 `pathlib.Path.resolve()` 规范化路径，再确认结果位于允许的根目录内：
+
+```python
+root = pathlib.Path("/var/data").resolve()
+target = (root / name).resolve()
+if target != root and root not in target.parents:
+    abort(404)
+```
+
+不要直接把请求参数传给 `open()`。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	alert_min: 1
+)
+
+request.args.get(* as $src)
+request.form.get(* as $src)
+request.values.get(* as $src)
+request.GET.get(* as $src)
+request.POST.get(* as $src)
+
+open(* as $arg)
+$arg?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->}?{!(<self> #{include: <<<CODE
+*?{opcode: call && (<self><getCallee>?{have: /(?i)(resolve|realpath|abspath)/})} as $__next__
+CODE
+}->)} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Python Path Traversal: User Input Used as File Path",
+	title_zh: "Python 路径穿越：用户输入作为文件路径",
+	risk: "path-traversal",
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_path_open.py': <<<UNSAFE
+import os
+from flask import request
+
+def read_file():
+    name = request.args.get("name", "")
+    return open(os.path.join("/var/data", name), "r").read()
+UNSAFE
+	'safefile://safe_path_open.py': <<<SAFE
+import pathlib
+from flask import abort, request
+
+def read_file():
+    name = request.args.get("name", "")
+    root = pathlib.Path("/var/data").resolve()
+    target = (root / name).resolve()
+    if target != root and root not in target.parents:
+        abort(404)
+    return target.read_text()
+SAFE
+)

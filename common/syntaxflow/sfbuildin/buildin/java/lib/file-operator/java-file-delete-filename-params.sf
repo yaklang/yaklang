@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Find Java File Delete Sinks"
 	title_zh: "查找 Java 文件删除接收点"
 	type: audit

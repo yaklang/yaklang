@@ -1,0 +1,72 @@
+desc(
+	mode: "source"
+	language: "php"
+	title: "源码匹配：PHP sensitive value written to error log"
+	title_zh: "源码匹配：PHP 敏感值写入错误日志"
+	type: vuln
+	level: "middle"
+	risk: "information-exposure"
+	cwe: "CWE-532"
+	desc: <<<DESC
+登录失败日志拼接口令字段，明文口令会进入错误日志。
+
+### 检测方式
+源码正则匹配 `error_log` 文本里出现 `password`/`token`/`secret`。
+DESC
+	solution: <<<SOLUTION
+- 日志只记录用户标识和失败原因。
+- 不要记录口令、令牌或密钥。
+SOLUTION
+	alert_min: 1
+	rule_id: "d0cbc12a-cc76-4fed-bb16-174f5b8aca08"
+)
+${*.php}.pattern_regex(/error_log\s*\([^)]*(?i:password|token|secret)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "PHP sensitive value written to error log",
+	title_zh: "PHP 敏感值写入错误日志",
+	risk: "information-exposure",
+}
+
+desc(
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?password=
+$password = $_POST['password'] ?? ''; // wb:source id=src
+error_log('login failed password=' . $password); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?password=
+$user = $_POST['user'] ?? ''; // wb:source id=src
+error_log('login failed user=' . $user); // wb:sink id=sink
+NEG
+)

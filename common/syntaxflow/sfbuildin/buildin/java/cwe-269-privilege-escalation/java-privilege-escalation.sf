@@ -1,9 +1,10 @@
 desc(
-	title: "权限提升：角色/权限由客户端可控输入赋值",
+	mode: "ssa"
+	title: "数据流：权限提升：角色/权限由客户端可控输入赋值",
 	title_zh: "权限提升：角色/权限由客户端可控输入赋值",
 	risk: "access-control"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "java-privilege-escalation"
 	desc: <<<DESC
 角色/权限字段由客户端可控输入赋值(CWE-269)，可提权。
@@ -21,12 +22,13 @@ class J {
 
 POS
 	"safefile://S.java": <<<NEG
-class S {
-  void ok() {
-    user.setRole("ROLE_USER");
-  }
-}
+import java.security.Permission;
 
+public class SafeRole {
+    public boolean allowed(Permission permission, String role) {
+        return "admin".equals(role) && permission.getName().equals("read");
+    }
+}
 NEG
 )
 
@@ -42,5 +44,5 @@ check $sink then "privilege set" else "no privilege set";
 
 alert $sink for {
 	message: "角色/权限赋值，检查来源是否客户端可控（提权）",
-	level: "high",
+	level: "middle",
 }

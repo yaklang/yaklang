@@ -1,11 +1,12 @@
 desc(
-	title: "C Use After Free and Double Free"
+	mode: "ssa"
+	title: "数据流：C Use After Free and Double Free"
 	type: audit
-	level: high
+	level: ""
 	risk: "use-after-free"
 	lang: c
 	rule_id: "a3b8c1d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
-	title_zh: "C 语言 Use-After-Free / Double-Free 检测"
+	title_zh: "数据流：C 语言 Use-After-Free / Double-Free 检测"
 	desc: <<<DESC
 ### 漏洞描述
 

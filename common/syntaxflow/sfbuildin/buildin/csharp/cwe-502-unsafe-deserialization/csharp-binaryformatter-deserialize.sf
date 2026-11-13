@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Insecure Deserialization via BinaryFormatter"
-	title_zh: "检测 C#/.NET BinaryFormatter 不安全反序列化"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET Insecure Deserialization via BinaryFormatter"
+	title_zh: "数据流：检测 C#/.NET BinaryFormatter 不安全反序列化"
 	type: vuln
-	level: high
+	level: ""
 	language: csharp
 	risk: "deserialization"
 	desc: <<<DESC

@@ -164,7 +164,9 @@ func (c *Config) GetScanConcurrency() uint32 {
 	return c.SyntaxFlowScan.Concurrency
 }
 
-// GetScanRuleTimeout returns the per-rule wall-clock budget. 0 means no budget.
+// GetScanRuleTimeout returns the per-rule wall-clock budget. 0 means no
+// wall-clock budget (the work limit is then the only bound). An explicitly
+// configured value is returned unchanged.
 func (c *Config) GetScanRuleTimeout() time.Duration {
 	if c == nil || c.SyntaxFlowScan == nil {
 		return 0
@@ -173,9 +175,17 @@ func (c *Config) GetScanRuleTimeout() time.Duration {
 }
 
 // GetScanRuleWorkLimit returns the per-rule total-work budget (max fanout
-// elements per rule). 0 means no work budget (only RuleTimeout applies).
+// elements per rule). A scan config that never configured a budget gets
+// DefaultScanRuleWorkLimit. An explicitly configured 0 still means no work
+// budget (only RuleTimeout applies).
 func (c *Config) GetScanRuleWorkLimit() int64 {
-	if c == nil || c.SyntaxFlowScan == nil {
+	if c == nil {
+		return 0
+	}
+	if c.SyntaxFlowScan == nil {
+		if c.Mode&ModeSyntaxFlowScanManager != 0 {
+			return DefaultScanRuleWorkLimit
+		}
 		return 0
 	}
 	return c.SyntaxFlowScan.RuleWorkLimit

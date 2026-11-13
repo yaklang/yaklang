@@ -38,6 +38,30 @@ alert tcp-pkt any any -> any any (msg:"tcp packet"; content:"hello"; sid:9700103
 	require.Empty(t, ValidateRule(rules[2]))
 }
 
+func TestDNSQueryNameAliasAndDirectionValidation(t *testing.T) {
+	rules, err := ParseStrictRule(`
+alert dns any any -> any any (msg:"query alias"; flow:to_server; dns.query.name; content:"example.com"; sid:9700105; rev:1;)
+alert dns any any -> any any (msg:"query conflict"; flow:to_client; dns.query.name; content:"example.com"; sid:9700106; rev:1;)
+`)
+	require.NoError(t, err)
+	require.Len(t, rules, 2)
+
+	query := rules[0]
+	require.Len(t, query.ContentRuleConfig.ContentRules, 1)
+	require.Equal(t, modifier.DNSQuery, query.ContentRuleConfig.ContentRules[0].Modifier)
+	require.Nil(t, findDiagnostic(ValidateRule(query), ValidationStageModel, "dns.query"))
+
+	capability, ok := LookupKeywordCapability("dns.query.name")
+	require.True(t, ok)
+	require.Equal(t, KeywordSupported, capability.Status)
+	require.Equal(t, "dns.query", capability.Canonical)
+
+	diagnostic := findDiagnostic(ValidateRule(rules[1]), ValidationStageModel, "dns.query")
+	require.NotNil(t, diagnostic)
+	require.Equal(t, KeywordUnsupported, diagnostic.Capability)
+	require.Contains(t, diagnostic.Reason, "flow:to_client")
+}
+
 func TestDotPrefixHTTPHostPersistence(t *testing.T) {
 	rules, err := ParseStrictRule(`alert http any any -> any any (msg:"host"; http.host; dotprefix; content:!".surveymonkey.com"; endswith; content:!"cisco.com"; endswith; sid:9700104; rev:1;)`)
 	require.NoError(t, err)

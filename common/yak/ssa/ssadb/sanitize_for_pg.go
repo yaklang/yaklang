@@ -150,6 +150,11 @@ func (i *IrNamePool) BeforeSave(tx *gorm.DB) error {
 	return nil
 }
 
+func (c *IrConst) BeforeSave(tx *gorm.DB) error {
+	sanitizeStructStringsForPG(c)
+	return nil
+}
+
 func (r *IrOffset) BeforeSave(tx *gorm.DB) error {
 	sanitizeStructStringsForPG(r)
 	return nil

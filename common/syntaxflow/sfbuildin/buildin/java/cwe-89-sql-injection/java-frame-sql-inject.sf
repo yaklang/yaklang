@@ -1,7 +1,8 @@
 desc(
-	title: "Detect Java SQL String Append Vulnerability"
+	mode: "ssa"
+	title: "数据流：Detect Java SQL String Append Vulnerability"
 	type: audit
-	level: low
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -25,7 +26,7 @@ ResultSet rs = stmt.executeQuery(sqlString.toString());
 
 DESC
 	rule_id: "e53aa369-2d16-445a-a9e9-fb2155791246"
-	title_zh: "检测Java拼接SQL字符串漏洞"
+	title_zh: "数据流：检测Java拼接SQL字符串漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用参数化查询（PreparedStatement）

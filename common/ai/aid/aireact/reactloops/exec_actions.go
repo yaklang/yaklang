@@ -175,6 +175,9 @@ func (r *ReActLoop) execCalls(
 			fmt.Errorf("action executor requires at least one call"),
 		)
 	}
+	if r.prepareGoalAcceptanceActionBatch(calls) {
+		defer r.discardGoalAcceptanceReviewForWork()
+	}
 	r.Delete(loopVarNativeTodoBatchAdjusted)
 	defer r.Delete(loopVarNativeTodoBatchAdjusted)
 	remainingAdjustments := 0
@@ -274,6 +277,7 @@ func (r *ReActLoop) execOneCall(
 		)
 	}
 	actionName := action.Name()
+	goalAcceptanceWorkAction := r.isGoalAcceptanceMode() && actionName != loopAction_Finish.ActionType
 	toolOwnsStatus := actionName == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL
 	zhRunning, enRunning := r.actionStatusText(actionName)
 	label := r.statusNameForCall(action)
@@ -450,13 +454,20 @@ func (r *ReActLoop) execOneCall(
 			result.skipPostIteration = true
 			return result
 		}
-		if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
-			r.recordCurrentTodoIteration(task)
+		if goalAcceptanceWorkAction && !op.userRequestedExit {
+			// Goal acceptance has exactly one terminator: finish. A work action
+			// completing with Exit still means "continue and return to normal
+			// mode" during the review turn.
+			r.discardGoalAcceptanceReviewForWork()
+		} else {
+			if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
+				r.recordCurrentTodoIteration(task)
+			}
+			emitLoopActionEvent(eventSink, call, "completed", strings.TrimSpace(op.GetFeedback().String()))
+			resetRecoverableLoopFailureCounters(r)
+			result.result = loopActionsExit
+			return result
 		}
-		emitLoopActionEvent(eventSink, call, "completed", strings.TrimSpace(op.GetFeedback().String()))
-		resetRecoverableLoopFailureCounters(r)
-		result.result = loopActionsExit
-		return result
 	}
 	if handler.ActionType != loopAction_Finish.ActionType && handler.ActionType != nativeAdjustTodolistActionName {
 		r.recordCurrentTodoIteration(task)

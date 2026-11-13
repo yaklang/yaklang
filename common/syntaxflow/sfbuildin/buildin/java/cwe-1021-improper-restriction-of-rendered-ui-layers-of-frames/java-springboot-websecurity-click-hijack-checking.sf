@@ -1,8 +1,9 @@
 desc(
+	mode: "struct"
 	risk: "clickjacking"
-	title: "Check Java Clickjacking Vulnerability"
+	title: "结构匹配：Check Java Clickjacking Vulnerability"
 	type: vuln
-	level: low
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -37,7 +38,7 @@ DESC
 	reference: <<<REFERENCE
 [CWE-1021: Improper Restriction of Rendered UI Layers or Frames](https://cwe.mitre.org/data/definitions/1021.html)
 REFERENCE
-	title_zh: "检测Java点击劫持漏洞"
+	title_zh: "结构匹配：检测Java点击劫持漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -174,7 +175,7 @@ return httpSecurity
 - **会话劫持:** 配合其他漏洞（如XSS）或钓鱼手段，攻击者可能劫持用户会话。
 - **绕过安全防护:** 在某些情况下，点击劫持可能被用于绕过CSRF防护。
 DESC
-	level: "low",
+	level: "middle",
 	message: "检测到Java点击劫持漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	risk: "clickjacking",
 	name: "vuln",

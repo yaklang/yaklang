@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Detect Java Command Execution Vulnerability"
 	lib: 'java-runtime-exec-sink'
 	type: audit

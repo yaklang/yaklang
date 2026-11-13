@@ -63,6 +63,22 @@ type MemEditor struct {
 	// javacms-core). Built lazily by GetRuneOffsetMap; nil'd by
 	// invalidateSourceCodeState so a pushed/edited source rebuilds it.
 	runeOffsetMap atomic.Pointer[RuneOffsetMap]
+
+	// urlCache and filePathCache memoize the joined paths. getInstructionFilePath
+	// asks for the file path once per instruction while rules run; rebuilding it
+	// with path.Join and a parts slice cost 5.3 GB of the core scan allocations.
+	// Each entry records the inputs it was built from, so a Set* call or a lazy
+	// folderPath initialization simply misses instead of returning a stale path.
+	urlCache      atomic.Pointer[editorPathCache]
+	filePathCache atomic.Pointer[editorPathCache]
+}
+
+// editorPathCache is one memoized path and the inputs that produced it.
+type editorPathCache struct {
+	program string
+	folder  string
+	name    string
+	path    string
 }
 
 // NewMemEditorByBytes reuses the provided byte slice without copying it.
@@ -238,6 +254,12 @@ func (ve *MemEditor) GetLineCount() int {
 func (ve *MemEditor) SetUrl(url string) {
 	ve.ResetSourceCodeHash()
 	ve.fileUrl = url
+	// The folder and file name are derived from the url on first read. Drop a
+	// previous derivation so the new url is what GetUrl and GetFilePath report.
+	ve.folderPath = ""
+	ve.fileName = ""
+	ve.urlCache.Store(nil)
+	ve.filePathCache.Store(nil)
 }
 
 // GetUrl 返回文件的完整URL路径，格式为 /programName/folderPath/fileName
@@ -250,17 +272,31 @@ func (ve *MemEditor) GetUrl() string {
 	}
 	// 使用内部的 folderPath（不包含 programName），而不是 GetFolderPath()（它返回包含 programName 的路径）
 	// 这样可以避免 programName 在路径中重复
-	parts := []string{"/", ve.GetProgramName()}
+	program := ve.GetProgramName()
+	name := ve.GetFilename()
+	if cached := ve.urlCache.Load(); cached != nil && cached.program == program && cached.folder == ve.folderPath && cached.name == name {
+		return cached.path
+	}
+	parts := []string{"/", program}
 	if ve.folderPath != "" {
 		parts = append(parts, ve.folderPath)
 	}
-	parts = append(parts, ve.GetFilename())
-	return path.Join(parts...)
+	parts = append(parts, name)
+	joined := path.Join(parts...)
+	ve.urlCache.Store(&editorPathCache{program: program, folder: ve.folderPath, name: name, path: joined})
+	return joined
 }
 
 // GetFilePath 返回文件的路径，格式为 /folderPath/fileName
 func (v *MemEditor) GetFilePath() string {
-	return path.Join("/", v.GetFolderPath(), v.GetFilename())
+	folder := v.GetFolderPath()
+	name := v.GetFilename()
+	if cached := v.filePathCache.Load(); cached != nil && cached.folder == folder && cached.name == name {
+		return cached.path
+	}
+	joined := path.Join("/", folder, name)
+	v.filePathCache.Store(&editorPathCache{folder: folder, name: name, path: joined})
+	return joined
 }
 
 func (ve *MemEditor) SetProgramName(programName string) {

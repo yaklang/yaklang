@@ -1,9 +1,10 @@
 desc(
-	title: "Check Java Privacy Violation - Shoulder Surfing"
-	title_zh: "检查Java隐私泄露 - 肩窥"
+	mode: "ssa"
+	title: "数据流：Check Java Privacy Violation - Shoulder Surfing"
+	title_zh: "数据流：检查Java隐私泄露 - 肩窥"
 	type:security
 	risk:"information-exposure"
-	level:low
+	level:""
 	desc: <<<DESC
 ### 漏洞描述
 

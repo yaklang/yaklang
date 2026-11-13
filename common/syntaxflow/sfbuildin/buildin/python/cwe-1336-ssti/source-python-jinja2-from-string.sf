@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python jinja2 字符串模板"
-	title_zh: "检测 Python jinja2 字符串模板"
+	title: "源码匹配：检测 Python jinja2 字符串模板"
+	title_zh: "源码匹配：检测 Python jinja2 字符串模板"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-python-jinja2-from-string"
 	risk: "ssti"
 	desc: <<<DESC

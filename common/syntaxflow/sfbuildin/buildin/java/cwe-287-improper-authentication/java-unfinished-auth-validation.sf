@@ -1,9 +1,10 @@
 desc(
-	title: "认证逻辑存在未完成的校验（TODO 校验 token/密码）",
+	mode: "ssa"
+	title: "数据流：认证逻辑存在未完成的校验（TODO 校验 token/密码）",
 	title_zh: "认证逻辑存在未完成的校验（TODO 校验 token/密码）",
 	risk: "authentication-bypass"
 	type: audit
-	level: high
+	level: "middle"
 	rule_id: "java-unfinished-auth-validation"
 	cwe: "CWE-287"
 	desc: <<<DESC
@@ -40,5 +41,5 @@ check $hit then "unfinished auth" else "none";
 
 alert $hit for {
 	message: "认证逻辑含未完成的校验(TODO 校验token/密码)，可能绕过认证",
-	level: "high",
+	level: "middle",
 }

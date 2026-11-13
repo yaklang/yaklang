@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测Java J2EE 使用DriverManager getConnection"
-	title: "Check Java J2EE Usage of DriverManager getConnection"
+	mode: "struct"
+	title_zh: "结构匹配：检测Java J2EE 使用DriverManager getConnection"
+	title: "结构匹配：Check Java J2EE Usage of DriverManager getConnection"
 	risk:"code-style"
-	level: info
+	level: "middle"
 	reference: <<<REFERENCE
 https://docs.oracle.com/javase/8/docs/api/java/sql/DriverManager.html
 REFERENCE
@@ -109,7 +110,7 @@ SOLUTION
 
 DriverManager?{<typeName>?{have:'java.sql.DriverManager'}}.getConnection() as $get;
 alert $get for {
-	level: "info",
+	level: "middle",
 	message: "检测到Java项目中使用了DriverManager.getConnection()方法",
 	title: "Unvalidated DriverManager getConnection Usage",
 	title_zh: "未验证的DriverManager getConnection使用",

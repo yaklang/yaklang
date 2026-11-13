@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang SQL Injection in Ent"
+	mode: "ssa"
+	title: "数据流：Check Golang SQL Injection in Ent"
 	type: audit
-	level: high
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -84,7 +85,7 @@ SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
 REFERENCE
-	title_zh: "检测Golang SQL 注入漏洞(ent)"
+	title_zh: "数据流：检测Golang SQL 注入漏洞(ent)"
 )
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
@@ -289,4 +290,21 @@ func main() {
 }
 
 SAFE
+	"safefile://ent_safe.go": <<<NEG
+package main
+
+import (
+	"context"
+	"net/http"
+
+	"entgo.io/ent"
+	"example.com/app/ent/user"
+)
+
+func login(w http.ResponseWriter, r *http.Request, client *ent.Client) {
+	name := r.FormValue("name")
+	users, err := client.User.Query().Where(user.Name(name)).All(context.Background())
+	_, _ = users, err
+}
+NEG
 )

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect SpEL Parsing Without Expression Length Limit"
-	title_zh: "检测SpEL解析缺少表达式长度限制"
+	mode: "struct"
+	title: "结构匹配：Detect SpEL Parsing Without Expression Length Limit"
+	title_zh: "结构匹配：检测SpEL解析缺少表达式长度限制"
 	type: audit
 	risk: "denial-of-service"
 	desc: <<<DESC
@@ -39,7 +40,7 @@ $parseParam?{<getFunc> & $unguardedFunc} as $risk;
 alert $risk for {
 	title: "Detect SpEL Parsing Without Expression Length Limit",
 	title_zh: "检测SpEL解析缺少表达式长度限制",
-	level: "middle",
+	level: "low",
 	message: "发现 SpEL 解析入口直接消费表达式字符串且缺少长度限制，可能导致拒绝服务。",
 	risk: "denial-of-service",
 	name: "risk",

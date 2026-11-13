@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/tspath"
@@ -9789,6 +9790,13 @@ type SourceFile struct {
 	lineMapMu sync.RWMutex
 	lineMap   []core.TextPos
 
+	// asciiLineMu guards asciiLines: whether a line contains only single-byte
+	// runes. Converting a byte position into a character offset otherwise
+	// rescans the line from its start for every node, which is quadratic on
+	// minified bundles whose single line is megabytes long.
+	asciiLineMu sync.Mutex
+	asciiLines  map[int]bool
+
 	// Fields set by document registry
 
 	Version int
@@ -9934,6 +9942,44 @@ func (node *SourceFile) LineMap() []core.TextPos {
 	return lineMap
 }
 
+// IsASCIILine reports whether line consists only of single-byte runes, and
+// caches the answer. Byte offsets inside such a line equal character offsets,
+// so position conversion does not need to rescan the line. A minified bundle
+// holds one line several megabytes long; rescanning it per node was quadratic.
+func (node *SourceFile) IsASCIILine(line int) bool {
+	node.asciiLineMu.Lock()
+	if ascii, ok := node.asciiLines[line]; ok {
+		node.asciiLineMu.Unlock()
+		return ascii
+	}
+	node.asciiLineMu.Unlock()
+
+	lineMap := node.LineMap()
+	if line < 0 || line >= len(lineMap) {
+		return false
+	}
+	start := int(lineMap[line])
+	end := len(node.Text())
+	if line+1 < len(lineMap) {
+		end = int(lineMap[line+1])
+	}
+	text := node.Text()
+	ascii := true
+	for index := start; index < end && index < len(text); index++ {
+		if text[index] >= utf8.RuneSelf {
+			ascii = false
+			break
+		}
+	}
+
+	node.asciiLineMu.Lock()
+	if node.asciiLines == nil {
+		node.asciiLines = make(map[int]bool)
+	}
+	node.asciiLines[line] = ascii
+	node.asciiLineMu.Unlock()
+	return ascii
+}
 func (node *SourceFile) IsBound() bool {
 	return node.isBound.Load()
 }

@@ -1,0 +1,8 @@
+uint64_t sub_0x1000(void) {
+    if (0x2d) {
+      return 0x2d;
+    } else {
+      return 0x0;
+    }
+}
+

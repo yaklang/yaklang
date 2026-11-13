@@ -420,7 +420,7 @@ func TestAlreadyAsyncDetachUsesOriginalExecutionID(t *testing.T) {
 	require.Len(t, manager.List(), 1)
 }
 
-func TestAsyncDirectAnswerTargetsOwningLoop(t *testing.T) {
+func TestAsyncDirectAnswerTargetsOwningReActSession(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var callbacks atomic.Int32
@@ -435,9 +435,16 @@ func TestAsyncDirectAnswerTargetsOwningLoop(t *testing.T) {
 	loop := reactloops.NewMinimalReActLoop(runtime.config, runtime)
 	defer loop.Release()
 	loop.SetCurrentTask(owner)
-	other := reactloops.NewMinimalReActLoop(runtime.config, runtime)
+	otherConfig := aicommon.NewConfig(ctx,
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithWorkdir(t.TempDir()),
+	)
+	otherRuntime := &ReAct{config: otherConfig, Emitter: otherConfig.Emitter}
+	other := reactloops.NewMinimalReActLoop(otherConfig, otherRuntime)
 	defer other.Release()
-	other.SetCurrentTask(aicommon.NewStatefulTaskBase("other", "other owner", ctx, runtime.Emitter, true))
+	other.SetCurrentTask(aicommon.NewStatefulTaskBase("other", "other owner", ctx, otherConfig.Emitter, true))
 	receipt, err := loop.StartAsyncToolCall(tool.Name, aitool.InvokeParams{}, aicommon.WithToolCaller_Reason("review ownership"))
 	require.NoError(t, err)
 	manager, err := loop.GetAsyncExecutionManager()

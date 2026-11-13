@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang LDAP Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check Golang LDAP Injection Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "ldap-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -39,7 +40,7 @@ desc(
 - 提供参考代码样例以指导如何使用参数化或转义机制避免注入。
 DESC
 	rule_id: "2b4b5d82-965c-4e2c-ac36-72d950f9143e"
-	title_zh: "检测Golang LDAP注入漏洞"
+	title_zh: "数据流：检测Golang LDAP注入漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -119,7 +120,7 @@ $sink.Search( * #-> as $param)
 $param & $input as $high
 
 alert $high for {
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Golang LDAP Injection Vulnerability Was Detected",
 	title_zh: "检测到Go语言LDAP注入漏洞",
@@ -206,7 +207,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

@@ -1,0 +1,84 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Unbounded LLM token budget"
+	title_zh: "数据流：LLM token 预算未设上限"
+	type: vuln
+	level: ""
+	risk: "denial-of-service"
+	cwe: "CWE-770"
+	desc: <<<DESC
+请求参数直接作为 `max_tokens`，攻击者可以请求极大预算，造成费用或资源耗尽。
+
+### 检测方式
+请求来源流入模型调用的第二个参数，且没有经过 `min`/`max` 限幅。
+DESC
+	solution: <<<SOLUTION
+- 用 `min(max(requested, 1), CAP)` 限幅。
+- 在网关层设置硬上限。
+SOLUTION
+	alert_min: 1
+	rule_id: "d48e30a8-45b9-40de-a70a-f10ff5032569"
+)
+*?{opcode: undefined}?{have: /(?i)request|json/} as $p
+client_complete(*, * as $arg)
+$arg?{!have: /(?i)min\(|max\(/}?{<self> #{include: `* & $p`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Unbounded LLM token budget",
+	title_zh: "LLM token 预算未设上限",
+	risk: "denial-of-service",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /ask?text=&max_tokens=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    max_tokens = int(request.json.get("max_tokens", 10**9))  # wb:source id=src
+    return client_complete(request.json.get("text", ""), max_tokens)  # wb:sink id=sink
+
+def client_complete(text, max_tokens):
+    return {"max_tokens": max_tokens}
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /ask?text=&max_tokens=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+CAP = 512
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    requested = int(request.json.get("max_tokens", 256))  # wb:source id=src
+    max_tokens = min(max(requested, 1), CAP)
+    return client_complete(request.json.get("text", ""), max_tokens)  # wb:sink id=sink
+
+def client_complete(text, max_tokens):
+    return {"max_tokens": max_tokens}
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

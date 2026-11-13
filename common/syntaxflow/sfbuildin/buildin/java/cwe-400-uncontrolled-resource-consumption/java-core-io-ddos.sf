@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Java Core IO Denial of Service Vulnerability"
-	title_zh: "检测Java IO库拒绝服务漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Java Core IO Denial of Service Vulnerability"
+	title_zh: "数据流：检测Java IO库拒绝服务漏洞"
 	type:vuln
 	risk:"denial-of-service"
 	desc: <<<DESC

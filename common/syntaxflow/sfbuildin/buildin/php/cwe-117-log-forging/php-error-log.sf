@@ -1,0 +1,58 @@
+
+<include('php-param')> as $raw
+
+error_log(* as $arg) as $call
+$call?{!have: /(?i)failed/}?{<self> #{include: `* & $raw`, exclude: `*?{opcode: call && <getCallee><name>?{have: /(?i)str_replace/}}`}->} as $hit
+alert $hit for {
+	level: "middle",
+	title: "数据流：PHP error_log 写入外部数据",
+	title_zh: "数据流：PHP error_log 写入外部数据",
+	message: "数据流：PHP error_log 写入外部数据",
+	risk: "log-forging",
+}
+
+desc(
+	mode: "ssa"
+	lang: php
+	alert_min: 1
+	'file://index.php': <<<POS
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?user=
+$user = $_POST['user'] ?? ''; // wb:source id=src
+error_log('login user=' . $user); // wb:sink id=sink
+POS
+	'safefile://index.php': <<<NEG
+<?php
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login
+if (PHP_SAPI === 'cli' && !isset($_SERVER['REMOTE_ADDR'])) {
+    $port = getenv('PORT') ?: '8080';
+    $cmd = escapeshellarg(PHP_BINARY) . ' -S 0.0.0.0:' . $port . ' ' . escapeshellarg(__FILE__);
+    passthru($cmd, $code);
+    exit($code);
+}
+$wbPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if ($wbPath === '/health') {
+    header('Content-Type: text/plain');
+    echo 'ok';
+    return;
+}
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /login?user=
+$user = $_POST['user'] ?? ''; // wb:source id=src
+$clean = str_replace(["\r", "\n"], '', $user);
+error_log('login user=' . $clean); // wb:sink id=sink
+NEG
+	rule_id: "949c7b18-3b2a-497b-8562-6c48552fe047"
+)

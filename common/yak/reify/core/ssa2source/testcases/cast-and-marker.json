@@ -1,0 +1,21 @@
+{
+  "forbidden": [
+    "cast(",
+    "type-case"
+  ],
+  "name": "cast-and-marker",
+  "note": "常量类型转换内联，不透明标记保留为注释",
+  "source": [
+    "uint64_t markers(void) {",
+    "    return 0x0 /* x86.flags.add */;",
+    "}"
+  ],
+  "ssair": [
+    "markers",
+    "type: () -\u003e i64",
+    "entry_0:",
+    "    \u003cstring\u003e t1 = \u003cstring\u003e \"x86.flags.add\"",
+    "    \u003ci64\u003e t2 = type_cast[i64] \u003cstring\u003e t1",
+    "    ret \u003ci64\u003e t2"
+  ]
+}

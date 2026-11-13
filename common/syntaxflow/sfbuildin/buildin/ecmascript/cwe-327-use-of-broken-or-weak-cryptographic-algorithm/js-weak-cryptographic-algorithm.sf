@@ -1,8 +1,9 @@
 desc(
-	title: "Use of a broken or weak cryptographic algorithm"
-	title_zh: "使用已破解或弱加密算法"
+	mode: "ssa"
+	title: "数据流：Use of a broken or weak cryptographic algorithm"
+	title_zh: "数据流：使用已破解或弱加密算法"
 	type: vuln
-	level: low
+	level: ""
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
 ### 漏洞描述

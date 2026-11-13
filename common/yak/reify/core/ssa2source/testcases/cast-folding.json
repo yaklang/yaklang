@@ -1,0 +1,26 @@
+{
+  "forbidden": [
+    "uint32_t)((uint64_t)",
+    "uint64_t)((uint32_t)",
+    " ^ "
+  ],
+  "name": "cast-folding",
+  "note": "重复转换被折叠，x^x 变成常量",
+  "source": [
+    "uint32_t fold(uint32_t value) {",
+    "    return (uint32_t)value;",
+    "}"
+  ],
+  "ssair": [
+    "fold \u003ci32\u003e (1) value",
+    "type: (i32) -\u003e i32",
+    "entry_0:",
+    "    \u003ci32\u003e t4 = type_cast[i32] \u003ci32\u003e t1",
+    "    \u003ci64\u003e t5 = type_cast[i64] \u003ci32\u003e t4",
+    "    \u003ci32\u003e t6 = type_cast[i32] \u003ci64\u003e t5",
+    "    \u003ci32\u003e t7 = \u003ci32\u003e t4 xor \u003ci32\u003e t4",
+    "    \u003ci32\u003e t8 = \u003ci32\u003e t4 and \u003ci32\u003e t4",
+    "    \u003ci32\u003e t9 = \u003ci32\u003e t4 mul \u003ci32\u003e 0x1",
+    "    ret \u003ci32\u003e t6"
+  ]
+}

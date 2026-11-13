@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -23,7 +24,22 @@ import (
 // path case correct: a key merged by path 1 is NOT in the original snapshot, so
 // path 2's re-bind of it is correctly seen as "new" and merged.
 type SymbolSnapshot struct {
-	keys      map[string]struct{} // named (non-empty, non-__) keys at snapshot time
+	keys map[string]struct{} // named (non-empty, non-__) keys at snapshot time
+
+	// valuesByKey keeps the value slice each named key had at snapshot time.
+	// MergeValues and Set replace the slice, they never mutate it in place, so
+	// holding the slice header is an immutable view of the snapshot (no copy of
+	// the elements).
+	//
+	// dedupKeys is built from it lazily, on the first child value that actually
+	// needs a membership test. Most dataflow include=/exclude= children bind
+	// only magic $__ vars, so take-cost is O(named keys) and the huge parent
+	// value sets are never materialized. Eagerly building the set allocated
+	// 572GB on the dotCMS core scan (57% of all allocations), and 85% of CPU
+	// went to GC while a single XSS rule never finished.
+	valuesByKey map[string]Values
+
+	dedupOnce sync.Once
 	dedupKeys map[dedupKey]struct{}
 }
 
@@ -35,8 +51,8 @@ type SymbolSnapshot struct {
 // new → the symbol merge always runs. Returning a shared instance avoids
 // allocating two maps per sfCheck on the large-project hot path.
 var emptySymbolSnapshot = &SymbolSnapshot{
-	keys:      map[string]struct{}{},
-	dedupKeys: map[dedupKey]struct{}{},
+	keys:        map[string]struct{}{},
+	valuesByKey: map[string]Values{},
 }
 
 // TakeSymbolSnapshot captures the named-symbol state of table. nil table → empty
@@ -56,17 +72,10 @@ func TakeSymbolSnapshot(table *omap.OrderedMap[string, Values]) *SymbolSnapshot 
 		}
 		if s.keys == nil {
 			s.keys = make(map[string]struct{}, table.Len())
-			s.dedupKeys = make(map[dedupKey]struct{}, table.Len())
+			s.valuesByKey = make(map[string]Values, table.Len())
 		}
 		s.keys[key] = struct{}{}
-		for _, v := range vals {
-			if utils.IsNil(v) || v.IsEmpty() {
-				continue
-			}
-			if dk, ok := valueDedupKey(v); ok {
-				s.dedupKeys[dk] = struct{}{}
-			}
-		}
+		s.valuesByKey[key] = vals
 		return true
 	})
 	if s.keys == nil {
@@ -84,6 +93,28 @@ func TakeSymbolSnapshot(table *omap.OrderedMap[string, Values]) *SymbolSnapshot 
 // the `__` prefix convention used by isMatch (sf_config.go) and sanitizeChildResult.
 func isNamedSymbol(key string) bool {
 	return key != "" && !strings.HasPrefix(key, "__")
+}
+
+// parentDedupKeys materializes the snapshot's value set once, on demand.
+func (s *SymbolSnapshot) parentDedupKeys() map[dedupKey]struct{} {
+	if s == nil {
+		return nil
+	}
+	s.dedupOnce.Do(func() {
+		dedupKeys := make(map[dedupKey]struct{})
+		for _, vals := range s.valuesByKey {
+			for _, v := range vals {
+				if utils.IsNil(v) || v.IsEmpty() {
+					continue
+				}
+				if dk, ok := valueDedupKey(v); ok {
+					dedupKeys[dk] = struct{}{}
+				}
+			}
+		}
+		s.dedupKeys = dedupKeys
+	})
+	return s.dedupKeys
 }
 
 // HasNewNamedValue reports whether result contains a named key NOT in the
@@ -138,15 +169,29 @@ func (s *SymbolSnapshot) keyOrValuesIsNew(key string, vals Values) bool {
 	if _, ok := s.keys[key]; !ok {
 		return true // new named key
 	}
+	needsDedup := false
+	for _, v := range vals {
+		if utils.IsNil(v) || v.IsEmpty() {
+			continue
+		}
+		if _, ok := valueDedupKey(v); !ok {
+			return true // can't prove seen → treat as new (safe)
+		}
+		needsDedup = true
+	}
+	if !needsDedup {
+		return false
+	}
+	dedupKeys := s.parentDedupKeys()
 	for _, v := range vals {
 		if utils.IsNil(v) || v.IsEmpty() {
 			continue
 		}
 		dk, ok := valueDedupKey(v)
 		if !ok {
-			return true // can't prove seen → treat as new (safe)
+			return true
 		}
-		if _, seen := s.dedupKeys[dk]; !seen {
+		if _, seen := dedupKeys[dk]; !seen {
 			return true // new value for an existing key
 		}
 	}

@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// reportFlusher serializes report documents in the background.
+// reportFlusher writes report documents in the background.
 //
 // Snapshots are complete documents, so a newer one supersedes an older one
 // that has not been written yet; the channel keeps only the latest. Save()
@@ -15,7 +15,7 @@ type reportFlusher struct {
 	writer io.Writer
 
 	mu      sync.Mutex
-	ch      chan []byte
+	ch      chan reportSnapshotFunc
 	stop    chan struct{}
 	wg      sync.WaitGroup
 	started bool
@@ -25,21 +25,22 @@ func newReportFlusher(writer io.Writer) *reportFlusher {
 	return &reportFlusher{writer: writer}
 }
 
-// submit hands a snapshot to the worker, replacing a pending one.
-func (f *reportFlusher) submit(data []byte) {
-	if f == nil || f.writer == nil || len(data) == 0 {
+// submit hands a snapshot to the worker, replacing a pending one. The
+// snapshot is produced by the worker, so the caller never assembles it.
+func (f *reportFlusher) submit(produce reportSnapshotFunc) {
+	if f == nil || f.writer == nil || produce == nil {
 		return
 	}
 	f.mu.Lock()
 	if !f.started {
-		f.ch = make(chan []byte, 1)
+		f.ch = make(chan reportSnapshotFunc, 1)
 		f.stop = make(chan struct{})
 		f.started = true
 		f.wg.Add(1)
 		go f.worker()
 	}
 	select {
-	case f.ch <- data:
+	case f.ch <- produce:
 	default:
 		// A snapshot is already waiting; the newest document wins.
 		select {
@@ -47,7 +48,7 @@ func (f *reportFlusher) submit(data []byte) {
 		default:
 		}
 		select {
-		case f.ch <- data:
+		case f.ch <- produce:
 		default:
 		}
 	}
@@ -63,16 +64,16 @@ func (f *reportFlusher) worker() {
 			// stop racing a submit would silently drop the newest snapshot.
 			for {
 				select {
-				case data := <-f.ch:
-					if err := writeReportSnapshot(f.writer, data); err != nil {
+				case produce := <-f.ch:
+					if err := writeReportSnapshot(f.writer, produce); err != nil {
 						log.Errorf("write report snapshot failed: %v", err)
 					}
 				default:
 					return
 				}
 			}
-		case data := <-f.ch:
-			if err := writeReportSnapshot(f.writer, data); err != nil {
+		case produce := <-f.ch:
+			if err := writeReportSnapshot(f.writer, produce); err != nil {
 				log.Errorf("write report snapshot failed: %v", err)
 			}
 		}

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Dynamic Property Path Expression Access"
-	title_zh: "检测Java动态属性路径表达式访问"
+	mode: "struct"
+	title: "结构匹配：Detect Dynamic Property Path Expression Access"
+	title_zh: "结构匹配：检测Java动态属性路径表达式访问"
 	type: vuln
 	risk: "spel-injection"
 	desc: <<<DESC

@@ -1,0 +1,173 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js SSRF：用户输入作为请求地址"
+	title_zh: "数据流：Node.js SSRF：用户输入作为请求地址"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-ssrf-request"
+	risk: "ssrf"
+	cwe: "CWE-918"
+	desc: <<<DESC
+### 规则说明
+用户可控 URL 传入 `fetch`/`axios`/`http.request` 等出站请求接口，且没有主机白名单。
+
+### 风险类型
+ssrf
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用固定主机白名单，解析 URL 后校验协议与主机，并禁止访问内网地址。
+SOLUTION
+	alert_min: 1
+	"file://app.js": <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch?url=
+const http = require("http");
+
+function fetch(req) {
+  const target = String(req.query.url || ""); // wb:source id=src
+  http.get(target, (res) => res.resume()); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = fetch(req);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	"safefile://app-safe.js": <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch?url=
+const https = require("https");
+const { URL } = require("url");
+
+function fetch(req) {
+  const target = String(req.query.url || ""); // wb:source id=src
+  const parsed = new URL(target);
+  if (parsed.protocol !== "https:" || parsed.hostname !== "api.example.internal") {
+    throw new Error("url");
+  }
+  https.get(target, (res) => res.resume()); // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = fetch(req);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)
+
+<include('js-param')> as $params;
+
+http.get(*<slice(index=0)> as $arg)
+https.get(*<slice(index=0)> as $arg)
+axios.get(*<slice(index=0)> as $arg)
+axios(*<slice(index=0)> as $arg)
+fetch(*<slice(index=0)> as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{!(<getUsers()>?{opcode: call && <getCallee>?{have: /(?i)(startsWith|includes|has|test|match|indexOf|equals|parse|resolve|protocol|hostname|URL)/}})}?{!(<getUsers()>?{opcode: eq})}?{!(<getUsers()>?{opcode: neq})}?{!(<getUsers()>?{opcode: call && <getActualParams>?{<getMembers>?{have: "rejectUnauthorized"}}})} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Node.js SSRF：用户输入作为请求地址",
+	title_zh: "Node.js SSRF：用户输入作为请求地址",
+	risk: "ssrf",
+}

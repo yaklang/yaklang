@@ -1,0 +1,63 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到命令中未加引号的变量展开"
+	title_zh: "检测到命令中未加引号的变量展开",
+	type: vuln
+	level: "middle"
+	rule_id: "source-unquoted-variable-expansion-in-command"
+	risk: "unsafe-shell-expansion"
+	desc: <<<DESC
+### 规则说明
+变量展开必须加双引号，防止按 IFS 指定的空白或分隔符拆分成多个参数。
+
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用双引号包裹变量展开；确实需要拆分时使用下划线前缀变量或显式数组。
+SOLUTION
+	alert_min: 1
+	"file://pos.bash": <<<POS
+exec YAKLANG_SF_POS_source-unquoted-variable-expansion-in-command
+exec $foo
+exec ${foo%.bar}
+exec $1
+POS
+	"safefile://neg.bash": <<<NEG
+exec "$foo"
+exec "${foo}"
+x=$foo
+PATH=$foo:$PATH bar
+echo $$
+echo $_foo
+case " ${seen_files} " in *" ${base} "*) return 0 ;; esac
+echo '$literal_dollar'
+# comment mentioning $docs is not an unquoted expansion
+NEG
+)
+
+${*.sh}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_sh
+${*.bash}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_bash
+$hit_sh + $hit_bash as $expansions
+${*.sh}.pattern_regex(/"[^"\n]*"/) as $dq_sh
+${*.bash}.pattern_regex(/"[^"\n]*"/) as $dq_bash
+${*.sh}.pattern_regex(/'[^'\n]*'/) as $sq_sh
+${*.bash}.pattern_regex(/'[^'\n]*'/) as $sq_bash
+${*.sh}.pattern_regex(/#[^\n]*/) as $cm_sh
+${*.bash}.pattern_regex(/#[^\n]*/) as $cm_bash
+$dq_sh + $dq_bash + $sq_sh + $sq_bash + $cm_sh + $cm_bash as $quoted
+$expansions not_inside $quoted as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到命令中未加引号的变量展开",
+	title_zh: "检测到命令中未加引号的变量展开",
+	message: "检测到命令中未加引号的变量展开",
+}

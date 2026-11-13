@@ -171,6 +171,80 @@ func ApplyDefineLine(line string, tables *MacroTables, strip bool) bool {
 	return false
 }
 
+// applyDefineLineIncremental applies one #define line to the exported tables and,
+// when an expander is already built, to that expander as well. Both are updated
+// in place: rebuilding the expander tables after every #define/#undef copies the
+// entire macro table, which is quadratic in a macro-heavy include closure.
+//
+// It mirrors ApplyDefineLine's semantics (a function-like define replaces an
+// object-like one and vice versa) and reports whether the line was consumed.
+func applyDefineLineIncremental(line string, tables *MacroTables, env *macroEnv) bool {
+	if tables == nil {
+		return false
+	}
+	directive, ok := macroDirectiveText(line)
+	if !ok {
+		return false
+	}
+	// parseObjectDefineSafe only trims a leading "define"; without this guard an
+	// #include or #undef line could be recorded as a macro named "include"/"undef".
+	fields := strings.Fields(directive)
+	if len(fields) == 0 || fields[0] != "define" {
+		return false
+	}
+	if name, fm, ok := parseFunctionDefineSafe(directive); ok {
+		if tables.Function == nil {
+			tables.Function = make(map[string]FunctionMacro)
+		}
+		tables.Function[name] = FunctionMacro{
+			Params:   fm.params,
+			Variadic: fm.variadic,
+			Body:     fm.body,
+		}
+		delete(tables.Object, name)
+		env.applyFunctionMacro(name, fm)
+		return true
+	}
+	if name, body, ok := parseObjectDefineSafe(directive); ok {
+		if tables.Object == nil {
+			tables.Object = make(map[string]string)
+		}
+		tables.Object[name] = body
+		delete(tables.Function, name)
+		env.applyObjectMacro(name, body)
+		return true
+	}
+	return false
+}
+
+// undefineMacroIncremental removes name from the exported tables and the
+// expander without rebuilding either.
+func undefineMacroIncremental(name string, tables *MacroTables, env *macroEnv) {
+	if name == "" {
+		return
+	}
+	if tables != nil {
+		delete(tables.Function, name)
+		delete(tables.Object, name)
+	}
+	env.undefineMacro(name)
+}
+
+func macroDirectiveText(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || !strings.HasPrefix(trimmed, "#") {
+		return "", false
+	}
+	directive := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+	if directive == "" {
+		return "", false
+	}
+	if fields := strings.Fields(directive); len(fields) == 0 {
+		return "", false
+	}
+	return directive, true
+}
+
 // ParseIncludePath extracts the path from #include "..." or #include <...>.
 func ParseIncludePath(line string) (path string, system bool, ok bool) {
 	trimmed := trimDirectiveLine(line)

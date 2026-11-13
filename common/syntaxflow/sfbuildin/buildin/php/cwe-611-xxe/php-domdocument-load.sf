@@ -1,8 +1,9 @@
 desc(
-	title: "Detect PHP DOMDocument Load XXE Vulnerability"
-	title_zh: "检测PHP DOMDocument load XXE漏洞"
+	mode: "struct"
+	title: "结构匹配：Detect PHP DOMDocument Load XXE Vulnerability"
+	title_zh: "结构匹配：检测PHP DOMDocument load XXE漏洞"
 	type: vuln
-	level: high
+	level: "high"
 	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述

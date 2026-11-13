@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java shiro-core Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java shiro-core Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -26,7 +27,7 @@ Authorization: Bearer <malicious-payload>
 - 绕过内部访问控制策略，对系统造成更严重的破坏。
 DESC
 	rule_id: "e39dd33c-1224-4b9c-b8c9-06c5a3fa6251"
-	title_zh: "SCA: 检测Java shiro-core 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java shiro-core 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 

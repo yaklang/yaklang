@@ -1,0 +1,10 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x5800 @ 0x5800
+block b1 @ 0x5800
+  0x5800  v1:i64 = constant 0x10
+  0x5801  write_register %rdi, v1 [write_register]
+  0x5802  v2:i32 = constant 0x20
+  0x5803  write_register %esi, v2 [write_register]
+  0x5804  call @helper [call]
+  0x5805  call @helper2 [call]
+  0x5806  return 0x0

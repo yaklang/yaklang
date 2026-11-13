@@ -1,8 +1,9 @@
 desc(
-	title: "Detect PHP PostgreSQL Injection Vulnerability"
-	title_zh: "检测PHP PostgreSQL注入漏洞"
+	mode: "ssa"
+	title: "数据流：Detect PHP PostgreSQL Injection Vulnerability"
+	title_zh: "数据流：检测PHP PostgreSQL注入漏洞"
 	type: audit
-	level: low
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -200,7 +201,7 @@ $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123");
 - **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
 - **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
 DESC
-	level: "high",
+	level: "middle",
 	title: "Unvalidated PostgreSQL Parameter Injection",
 	name: "high",
 	message: "检测到PHP PostgreSQL未验证参数注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
@@ -234,7 +235,7 @@ $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); //
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 - 通过注入恶意语句导致数据库崩溃或应用程序异常。
 DESC
-	level: "mid",
+	level: "middle",
 	title: "Insufficient PostgreSQL Parameter Filtering",
 	title_zh: "PostgreSQL参数过滤不充分",
 	solution: <<<SOLUTION
@@ -327,9 +328,8 @@ SOLUTION
 desc(
 	lang: 'php'
 	alert_min: 3
-	alert_high: 1
 	alert_mid: 1
-	alert_low: 1
+	alert_mid: 1
 	'file:///high.php': <<<CODE
 <?php
     $username = $_COOKIE['user'];
@@ -347,4 +347,10 @@ CODE
     $query = pg_prepare($conn, "get_user", "SELECT * FROM profiles WHERE user_id = $1");
     $result = pg_execute($conn, "get_user", array($filtered_id));
 CODE
+	"safefile://postgres-safe.php": <<<NEG
+<?php
+$conn = pg_connect('host=localhost dbname=test');
+$result = pg_query($conn, 'SELECT 1');
+pg_free_result($result);
+NEG
 )

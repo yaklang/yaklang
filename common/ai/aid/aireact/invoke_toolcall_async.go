@@ -10,8 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var _ aicommon.AsyncToolCallRuntime = (*ReAct)(nil)
-
 // PrepareAsyncToolCall reuses the existing lookup, owner guards, parameter
 // mutators and caller setup. Review and invocation remain inside Execute.
 func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, params aitool.InvokeParams, opts ...aicommon.ToolCallerOption) (asyncexecmanager.Resource, func(), error) {

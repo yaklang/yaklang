@@ -1,8 +1,9 @@
 desc(
-	title: "Disabling Electron webSecurity"
-	title_zh: "Electron webSecurity 被禁用"
+	mode: "struct"
+	title: "结构匹配：Disabling Electron webSecurity"
+	title_zh: "结构匹配：Electron webSecurity 被禁用"
 	type: vuln
-	level: warning
+	level: "middle"
 	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
@@ -114,7 +115,7 @@ $webPrefs.webSecurity as $webSecurityVal
 $webSecurityVal?{have: false} as $disabledWebSecurity
 
 alert $disabledWebSecurity for {
-	level: "warning",
+	level: "middle",
 	type: "vuln",
 	title: "Electron webSecurity Disabled",
 	title_zh: "Electron webSecurity 被设置为 false，同源策略被禁用",

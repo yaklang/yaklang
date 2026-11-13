@@ -329,8 +329,55 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if inst.GetOpcode() == SSAOpcodeConstInst {
 		if constInst, ok := ToConstInst(inst); ok {
 			ir.ConstType = string(constInst.ConstType)
-			ir.String = constInst.String()
+			text := constInst.String()
+			// A normal const's text lives once, in ir_const_pool_v1, and the
+			// row keeps only the pool id. ProgramName was set above, so the
+			// pool row lands under the name this row will carry. A batch that
+			// later rewrites ProgramName re-interns under the new name.
+			if constInst.ConstType == ConstTypeNormal {
+				// Nil is pooled too: the kind tag is what tells restore to build
+				// nil instead of the string "nil". An empty string is a real value
+				// and takes the same path.
+				ir.ConstID = ssadb.InternIrConst(ir.ProgramName, irConstKindOf(constInst.Const), text)
+			}
+			if len(text) <= ssadb.IrCodeInlineConstStringLimit {
+				ir.String = text
+			}
 		}
+	}
+}
+
+// irCodeConstText returns the rendered text and type tag a normal const has to
+// intern into the pool. ok is false for every other instruction, including a
+// placeholder const, whose text is a member-call key that is never searched.
+func irCodeConstText(inst Instruction) (kind ssadb.IrConstKind, text string, ok bool) {
+	if utils.IsNil(inst) || inst.GetOpcode() != SSAOpcodeConstInst {
+		return 0, "", false
+	}
+	constInst, ok := ToConstInst(inst)
+	if !ok || constInst.ConstType != ConstTypeNormal {
+		return 0, "", false
+	}
+	return irConstKindOf(constInst.Const), constInst.String(), true
+}
+
+// irConstKindOf is the pool's type tag for a const value. The pool keeps the
+// rendered text only, and restore needs to know what to parse it back into.
+func irConstKindOf(c *Const) ssadb.IrConstKind {
+	if c == nil {
+		return ssadb.IrConstKindNil
+	}
+	switch c.value.(type) {
+	case nil:
+		return ssadb.IrConstKindNil
+	case bool:
+		return ssadb.IrConstKindBool
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return ssadb.IrConstKindInt64
+	case float32, float64:
+		return ssadb.IrConstKindFloat
+	default:
+		return ssadb.IrConstKindString
 	}
 }
 

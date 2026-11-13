@@ -42,10 +42,6 @@ func buildFinishBlockedByDeadlineMessage(remaining time.Duration) string {
 	return fmt.Sprintf("目标时间窗尚未结束，剩余 %d 秒。不要反复请求 finish；继续深入探索、验证已有结果或处理剩余待办。", remaining.Round(time.Second)/time.Second)
 }
 
-func buildFinishBlockedByAcceptanceMessage(reason string) string {
-	return fmt.Sprintf("目标验收标准尚未满足：%s。不要反复请求 finish 或清空未完成待办来绕过验收；用具体工具操作和证据补齐缺口后再申请结束。", reason)
-}
-
 var loopAction_Finish = &LoopAction{
 	ActionType:        "finish",
 	NativeDescription: "Finish the current task only after the evidence and TODO completion checks pass. If TODO state must change, complete adjust_todolist before finish, in this batch or an earlier one. Never close or defer TODOs merely to pass finish.",
@@ -64,6 +60,14 @@ var loopAction_Finish = &LoopAction{
 		if reason := loop.SubAgentFinishBlockReason(); reason != "" {
 			operator.Feedback(reason)
 			operator.Continue()
+			return
+		}
+		if loop.isGoalAcceptanceMode() {
+			if loop.invoker != nil {
+				loop.invoker.AddToTimeline("[GOAL_ACCEPTANCE_CONFIRMED]",
+					"the main model confirmed that the configured acceptance criteria are satisfied")
+			}
+			operator.Exit()
 			return
 		}
 		if loop.ShouldBlockFinishAtIteration(loop.GetCurrentIterationIndex()) {
@@ -89,14 +93,6 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
-		// Gate 3: Acceptance criteria — LLM review of work quality.
-		if review := loop.CheckGoalAcceptanceCriteria(loop.GetCurrentTask().GetContext()); review != nil && !review.Passed {
-			msg := buildFinishBlockedByAcceptanceMessage(review.Reason)
-			loop.invoker.AddToTimeline("[GOAL_MODE_ACCEPTANCE_BLOCKED]", msg)
-			operator.Feedback(msg)
-			operator.Continue()
-			return
-		}
 		// Only a finish request with remaining work needs a TODO checkpoint.
 		// Empty tasks must not spend another model turn confirming termination.
 		if items := aicommon.GetBlockingVerificationTodoItems(loop.GetConfig(), loop.GetCurrentTask()); len(items) > 0 {
@@ -104,6 +100,20 @@ var loopAction_Finish = &LoopAction{
 			loop.requestFinishTodoCheckpoint()
 			loop.invoker.AddToTimeline("[FINISH_BLOCKED_BY_TODO]", msg)
 			operator.Feedback(msg)
+			operator.Continue()
+			return
+		}
+		// Gate 3: Acceptance criteria — after every host hard gate passes, ask the
+		// main model for one dedicated acceptance decision using the same context.
+		if loop.armGoalAcceptanceReview() {
+			msg := fmt.Sprintf(`【必须执行 Goal 验收】再次调用 finish 前，必须依据当前上下文中已有的目标、计划、工具调用和真实结果，逐项核对以下验收标准：
+
+%s
+
+只有每一条标准都有具体证据支持时，才能再次选择 finish 结束任务。任一标准缺失证据、尚未验证、结果矛盾或仍被阻塞时，必须选择实际工作 action 补齐缺口；不要用文字说明、TODO 状态变更或再次 finish 代替执行。`, loop.goalAcceptanceCriteria())
+			if loop.invoker != nil {
+				loop.invoker.AddToTimeline("[GOAL_ACCEPTANCE_REVIEW]", msg)
+			}
 			operator.Continue()
 			return
 		}

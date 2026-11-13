@@ -107,21 +107,23 @@ func TestServer_GetAISessionCurrentResources(t *testing.T) {
 	sessionID := "session-current-resources-" + uuid.NewString()
 	fileResource := yakit.AISessionTaskResource{
 		Type: "file", Key: "file_path", Value: "/tmp/workspace",
-		Scope: yakit.AISessionTaskResourceScopeSession, Source: yakit.AISessionTaskResourceSourceAttachedFilePath,
 	}
 	browserResource := yakit.AISessionTaskResource{
 		Type: "browser", Key: "browser_device", Value: `{"deviceId":"device-a"}`,
-		Scope: yakit.AISessionTaskResourceScopeSession, Source: yakit.AISessionTaskResourceSourceAttachedResourceInfo,
 	}
 	require.NoError(t, yakit.SaveAISessionTaskInput(db, &yakit.SaveAISessionTaskInputParams{
-		SessionID:          sessionID,
-		TaskID:             "task-current-resources",
-		TaskUUID:           uuid.NewString(),
-		UserInputUUID:      "input-current-resources",
-		UserInput:          "inspect",
-		AttachedFilePaths:  []string{fileResource.Value},
-		ExplicitResources:  []yakit.AISessionTaskResource{fileResource, browserResource},
-		EffectiveResources: []yakit.AISessionTaskResource{fileResource, browserResource},
+		SessionID:     sessionID,
+		TaskID:        "task-current-resources-1",
+		TaskUUID:      uuid.NewString(),
+		UserInputUUID: "input-current-resources-1",
+		Resources:     []yakit.AISessionTaskResource{fileResource},
+	}))
+	require.NoError(t, yakit.SaveAISessionTaskInput(db, &yakit.SaveAISessionTaskInputParams{
+		SessionID:     sessionID,
+		TaskID:        "task-current-resources-2",
+		TaskUUID:      uuid.NewString(),
+		UserInputUUID: "input-current-resources-2",
+		Resources:     []yakit.AISessionTaskResource{browserResource},
 	}))
 
 	server := &Server{projectDatabase: db}
@@ -130,13 +132,15 @@ func TestServer_GetAISessionCurrentResources(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, sessionID, response.GetSessionID())
-	require.Equal(t, "task-current-resources", response.GetTaskID())
-	require.Equal(t, "input-current-resources", response.GetUserInputUUID())
-	require.Len(t, response.GetTaskResources(), 2)
-	require.Equal(t, "file", response.GetTaskResources()[0].GetType())
-	require.Equal(t, yakit.AISessionTaskResourceScopeSession, response.GetTaskResources()[0].GetScope())
-	require.Equal(t, yakit.AISessionTaskResourceSourceAttachedFilePath, response.GetTaskResources()[0].GetSource())
+	require.Equal(t, "task-current-resources-2", response.GetTaskID())
+	require.Equal(t, "input-current-resources-2", response.GetUserInputUUID())
+	require.Len(t, response.GetTaskResources(), 1)
+	require.Equal(t, "browser", response.GetTaskResources()[0].GetType())
+	require.Empty(t, response.GetTaskResources()[0].GetScope())
+	require.Empty(t, response.GetTaskResources()[0].GetSource())
 	require.Len(t, response.GetSessionResources(), 2)
+	require.Equal(t, "browser", response.GetSessionResources()[0].GetType())
+	require.Equal(t, "file", response.GetSessionResources()[1].GetType())
 
 	missing, err := server.GetAISessionCurrentResources(context.Background(), &ypb.GetAISessionCurrentResourcesRequest{
 		SessionID: "missing-" + uuid.NewString(),

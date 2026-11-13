@@ -1,6 +1,7 @@
 desc(
-	title: "Audit URL Component Validation Logic"
-	title_zh: "审计URL组件校验逻辑"
+	mode: "ssa"
+	title: "数据流：Audit URL Component Validation Logic"
+	title_zh: "数据流：审计URL组件校验逻辑"
 	type: audit
 	risk: "open-redirect"
 	desc: <<<DESC
@@ -68,4 +69,13 @@ class UrlComponentValidator {
     }
 }
 CODE
+	'safefile://safe-url.java': <<<NEG
+import java.net.URLEncoder;
+
+public class SafeUrl {
+    String encode(String v) throws Exception {
+        return URLEncoder.encode(v, "UTF-8");
+    }
+}
+NEG
 )

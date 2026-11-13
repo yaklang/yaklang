@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	title: "Python user input sources (lib)"
 	title_zh: "用户输入源（Python 库规则）"
 	type: audit
-	level: info
+	level: ""
 	lib: "python-user-input"
 	risk: "input-validation"
 	desc: <<<DESC

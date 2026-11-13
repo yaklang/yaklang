@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -306,6 +307,15 @@ func riskFeatureText(value *Value) string {
 // the value's analysis caches by then.
 func (r *SyntaxFlowResult) auditSaver(value *Value, variable string, index int, risk *schema.SSARisk) func(*gorm.DB) error {
 	if r == nil || value == nil || risk == nil {
+		return nil
+	}
+	// Memory-only scans stream risks to the reporter and never register the
+	// database audit handler. Building the graph here would allocate hundreds
+	// of millions of AuditNodes and then drop every row. Database-backed
+	// results still take the full path.
+	saveKind := r.GetResultSaveKind()
+	if saveKind == ssaconfig.SFResultSaveMemory ||
+		(saveKind == ssaconfig.SFResultSaveDatabase && r.IsNoSaveRisk()) {
 		return nil
 	}
 	nodes, edges, sources, err := captureAuditGraph(context.Background(), value,

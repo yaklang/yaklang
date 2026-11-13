@@ -1,5 +1,6 @@
 desc(
-	title: "Check Java SAXTransformerFactory Unsafe Use (XXE)"
+	mode: "struct"
+	title: "结构匹配：Check Java SAXTransformerFactory Unsafe Use (XXE)"
 	type: vuln
 	risk:"xxe"
 	desc: <<<DESC
@@ -42,7 +43,7 @@ e.printStackTrace();
 - **端口扫描：** 攻击者可以利用外部实体访问指定的端口，判断端口的开放状态。
 DESC
 	rule_id: "e6095554-52ef-4935-abc4-f9b9774d0671"
-	title_zh: "检测 Java SAXTransformerFactory 不安全使用 (XXE)"
+	title_zh: "结构匹配：检测 Java SAXTransformerFactory 不安全使用 (XXE)"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 禁用外部实体和DOCTYPE声明

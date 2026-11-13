@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java StringBuilder 拒绝服务漏洞"
-	title: "Check Java StringBuilder Denial of Service Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测Java StringBuilder 拒绝服务漏洞"
+	title: "数据流：Check Java StringBuilder Denial of Service Vulnerability"
 	risk:"denial-of-service"
 	reference: <<<REFERENCE
 [URL](https://docs.oracle.com/javase/8/docs/api/java/lang/StringBuilder.html)
@@ -77,7 +78,7 @@ $sink#{
 alert $result for {
 	title: "Check Java StringBuilder Denial of Service Vulnerability",
 	title_zh: "检测Java StringBuilder 拒绝服务漏洞",
-	level: "mid",
+	level: "middle",
 	message: "发现Java的java.lang.StringBuilder可能存在ddos漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

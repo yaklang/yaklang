@@ -168,6 +168,33 @@ func TestReAct_PersistentSession_Evidence(t *testing.T) {
 	log.Infof("persistent session evidence test passed")
 }
 
+func TestReAct_PersistentSession_ExplicitEvidenceBroadcast(t *testing.T) {
+	pid := uuid.New().String()
+	create := func() *ReAct {
+		react, err := NewTestReAct(
+			aicommon.WithPersistentSessionId(pid),
+			aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				return nil, nil
+			}),
+		)
+		require.NoError(t, err)
+		return react
+	}
+
+	first := create()
+	op, err := aicommon.BuildSessionEvidenceUpsert(
+		"broadcast.persisted",
+		"Explicit broadcast evidence survives a runtime restart.",
+	)
+	require.NoError(t, err)
+	require.NoError(t, first.config.BroadcastEvidence(op))
+
+	second := create()
+	rendered := second.config.GetSessionEvidenceRendered()
+	require.Contains(t, rendered, "[id: "+op.ID+"]")
+	require.Contains(t, rendered, op.Content)
+}
+
 func TestEvidencePersistenceIdleRestartsPreserveFreezeAndDeletion(t *testing.T) {
 	pid := uuid.New().String()
 	create := func() *ReAct {

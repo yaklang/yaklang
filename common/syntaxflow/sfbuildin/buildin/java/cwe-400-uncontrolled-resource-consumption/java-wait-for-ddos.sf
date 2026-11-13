@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java Unsafe Process WaitFor"
-	title_zh: "检测Java不安全Process WaitFor使用"
+	mode: "struct"
+	title: "结构匹配：Check Java Unsafe Process WaitFor"
+	title_zh: "结构匹配：检测Java不安全Process WaitFor使用"
 	type:vuln
 	risk: "denial-of-service"
 	desc: <<<DESC
@@ -138,7 +139,7 @@ $process?{*-{
 }->} as $result
 
 alert $result for {
-	level: "mid",
+	level: "low",
 	message: "发现Java的Process.waitFor方法可能导致DDOS漏洞",
 	type: "vuln",
 	title: "Check Java Unsafe Process WaitFor",

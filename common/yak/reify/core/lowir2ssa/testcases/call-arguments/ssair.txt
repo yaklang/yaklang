@@ -1,0 +1,12 @@
+extern helper
+extern helper2
+sub_0x5800
+type: () -> i64
+entry_0: (<nil condition>)
+	<i64> t1 = <i64> 16
+	<i32> t2 = <i32> 32
+	<i64> t3 = type_cast[i64] <i32> 32
+	<any> t4 = call <any> helper (<i64> 16, <i64> t3) binding[] member[]
+	<any> t5 = call <any> helper2 () binding[] member[]
+	<i64> t6 = <i64> 0
+	ret <i64> 0

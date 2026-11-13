@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	risk: "ssrf"
-	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞"
-	title: "Detect Java SpringBoot SSRF Vulnerability"
+	title_zh: "数据流：检测Java SpringBoot 服务端请求伪造(SSRF)漏洞"
+	title: "数据流：Detect Java SpringBoot SSRF Vulnerability"
 	type: vuln
 	desc: <<<DESC
 ### 漏洞描述
@@ -169,7 +170,7 @@ return "Error: " + e.getMessage();
 - **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
 - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
 DESC
-	level: "mid",
+	level: "middle",
 	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
 	risk: "ssrf",
 	title: "Detect Java SpringBoot SSRF Vulnerability",
@@ -428,4 +429,11 @@ public class SsrfController {
     private CheckUserInput checkUserInput;
 }
 TEXT
+	'safefile://safe-ssrf.java': <<<NEG
+public class SafeSsrf {
+    String url() {
+        return "https://example.com/health";
+    }
+}
+NEG
 )

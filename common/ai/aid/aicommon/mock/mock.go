@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
@@ -141,6 +142,10 @@ func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
 
 func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
 	m.getEvidenceState().ApplySessionEvidenceOps(ops)
+}
+
+func (m *MockedAIConfig) BroadcastEvidence(op aicommon.EvidenceOperation) error {
+	return m.getEvidenceState().BroadcastEvidence(op)
 }
 
 func (m *MockedAIConfig) GetVerificationTodoRendered(scope aicommon.VerificationTodoScope) string {
@@ -285,6 +290,12 @@ type MockInvoker struct {
 	mu          sync.RWMutex
 	currentTask aicommon.AIStatefulTask
 	runtimeTask []aicommon.AIStatefulTask
+
+	asyncExecutionMu      sync.Mutex
+	asyncExecutionManager *asyncexecmanager.Manager
+	asyncDirectAnswerMu   sync.Mutex
+	asyncDirectAnswer     chan struct{}
+	asyncDirectRequested  bool
 }
 
 func NewMockInvoker(ctx context.Context) *MockInvoker {
@@ -674,6 +685,149 @@ func (m *MockInvoker) GetRuntimeTasks() []aicommon.AIStatefulTask {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return append([]aicommon.AIStatefulTask(nil), m.runtimeTask...)
+}
+
+func (m *MockInvoker) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
+	if m == nil {
+		return nil, fmt.Errorf("mock invoker is nil")
+	}
+	m.asyncExecutionMu.Lock()
+	if m.asyncExecutionManager != nil {
+		manager := m.asyncExecutionManager
+		m.asyncExecutionMu.Unlock()
+		return manager, nil
+	}
+	if m.AsyncDirectAnswerRequested() {
+		m.asyncExecutionMu.Unlock()
+		return nil, asyncexecmanager.ErrClosed
+	}
+	ctx := m.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	manager, err := asyncexecmanager.New(ctx, asyncexecmanager.Config{})
+	if err != nil {
+		m.asyncExecutionMu.Unlock()
+		return nil, err
+	}
+	m.asyncExecutionManager = manager
+	m.asyncExecutionMu.Unlock()
+	if ctx.Done() != nil {
+		go func() {
+			<-ctx.Done()
+			manager.Close()
+		}()
+	}
+	return manager, nil
+}
+
+func (m *MockInvoker) existingAsyncExecutionManager() *asyncexecmanager.Manager {
+	if m == nil {
+		return nil
+	}
+	m.asyncExecutionMu.Lock()
+	defer m.asyncExecutionMu.Unlock()
+	return m.asyncExecutionManager
+}
+
+func (m *MockInvoker) HasAsyncExecutionManager() bool {
+	return m.existingAsyncExecutionManager() != nil
+}
+
+func (m *MockInvoker) AsyncExecutionSnapshot() aicommon.AsyncExecutionSnapshot {
+	if m == nil {
+		return aicommon.BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
+	}
+	sessionID := ""
+	if provider, ok := m.GetConfig().(interface{ GetPersistentSessionID() string }); ok {
+		sessionID = provider.GetPersistentSessionID()
+	}
+	manager := m.existingAsyncExecutionManager()
+	if manager == nil {
+		return aicommon.BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, sessionID, m.GetCurrentTaskId())
+	}
+	return aicommon.BuildAsyncExecutionSnapshot(manager.Overview(), sessionID, m.GetCurrentTaskId())
+}
+
+func (m *MockInvoker) StopAsyncExecution(executeID string) (asyncexecmanager.Summary, error) {
+	manager := m.existingAsyncExecutionManager()
+	if manager == nil {
+		return asyncexecmanager.Summary{}, asyncexecmanager.ErrNotFound
+	}
+	return manager.Stop(executeID)
+}
+
+func (m *MockInvoker) TrackAsyncExecutionTask(task aicommon.AIStatefulTask, executeID string) {
+	if m == nil || task == nil || executeID == "" || task.GetContext() == nil {
+		return
+	}
+	context.AfterFunc(task.GetContext(), func() {
+		if task.GetStatus() == aicommon.AITaskState_Completed {
+			return
+		}
+		manager := m.existingAsyncExecutionManager()
+		if manager != nil {
+			_, _ = manager.Stop(executeID)
+		}
+	})
+}
+
+func (m *MockInvoker) PrepareAsyncToolCall(
+	aicommon.AIStatefulTask, string, aitool.InvokeParams, ...aicommon.ToolCallerOption,
+) (asyncexecmanager.Resource, func(), error) {
+	return nil, nil, fmt.Errorf("mock runtime does not prepare async tool calls")
+}
+
+func (m *MockInvoker) AsyncDirectAnswerSignal() <-chan struct{} {
+	m.asyncDirectAnswerMu.Lock()
+	defer m.asyncDirectAnswerMu.Unlock()
+	if m.asyncDirectAnswer == nil {
+		m.asyncDirectAnswer = make(chan struct{})
+	}
+	return m.asyncDirectAnswer
+}
+
+func (m *MockInvoker) RequestAsyncDirectAnswer() {
+	m.asyncDirectAnswerMu.Lock()
+	if m.asyncDirectRequested {
+		m.asyncDirectAnswerMu.Unlock()
+		return
+	}
+	if m.asyncDirectAnswer == nil {
+		m.asyncDirectAnswer = make(chan struct{})
+	}
+	m.asyncDirectRequested = true
+	close(m.asyncDirectAnswer)
+	m.asyncDirectAnswerMu.Unlock()
+	if manager := m.existingAsyncExecutionManager(); manager != nil {
+		manager.StopAll()
+	}
+}
+
+func (m *MockInvoker) AsyncDirectAnswerRequested() bool {
+	m.asyncDirectAnswerMu.Lock()
+	defer m.asyncDirectAnswerMu.Unlock()
+	return m.asyncDirectRequested
+}
+
+func (m *MockInvoker) ConsumeAsyncDirectAnswer() bool {
+	m.asyncDirectAnswerMu.Lock()
+	defer m.asyncDirectAnswerMu.Unlock()
+	if !m.asyncDirectRequested {
+		return false
+	}
+	m.asyncDirectRequested = false
+	m.asyncDirectAnswer = make(chan struct{})
+	return true
+}
+
+func (m *MockInvoker) BeginAsyncExecutionAdmission() (func(), bool) {
+	m.asyncDirectAnswerMu.Lock()
+	if m.asyncDirectRequested {
+		m.asyncDirectAnswerMu.Unlock()
+		return func() {}, false
+	}
+	return m.asyncDirectAnswerMu.Unlock, true
 }
 
 func (m *MockInvoker) scheduleAuxiliaryTask(

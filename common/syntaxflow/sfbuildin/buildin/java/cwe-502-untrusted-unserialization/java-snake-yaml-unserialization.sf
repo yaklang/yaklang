@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	risk: "deserialization"
-	title_zh: "检测Java SnakeYAML反序列化漏洞"
-	title: "Check Java SnakeYAML Unserialization Vulnerability"
+	title_zh: "数据流：检测Java SnakeYAML反序列化漏洞"
+	title: "数据流：Check Java SnakeYAML Unserialization Vulnerability"
 	type:vul
 	reference: <<<REFERENCE
 https://javadoc.io/doc/org.yaml/snakeyaml/latest/org/yaml/snakeyaml/Yaml.html
@@ -128,7 +129,7 @@ y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
 - loadAll()
 - loadAs()
 DESC
-	level: "high",
+	level: "middle",
 	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
 	name: "high",
 	risk: "deserialization",

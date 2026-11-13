@@ -1,9 +1,10 @@
 desc(
-	title: "Token 直接作缓存 Key 查询，无签名/归属校验",
+	mode: "ssa"
+	title: "数据流：Token 直接作缓存 Key 查询，无签名/归属校验",
 	title_zh: "Token 直接作缓存 Key 查询，无校验",
 	risk: "authorization-bypass"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "java-token-cache-no-verify"
 	desc: <<<DESC
 getUser 直接把 token 拼缓存 key 查询 UserBO，无签名/过期/归属校验(CWE-862)。
@@ -22,12 +23,19 @@ class J {
 
 POS
 	"safefile://S.java": <<<NEG
-class S {
-  void ok() {
-    Object o = iCache.get("static-config-key");
-  }
-}
+import java.util.Map;
 
+public class SafeTokenCache {
+    private final Map<String, String> cache;
+
+    public SafeTokenCache(Map<String, String> cache) {
+        this.cache = cache;
+    }
+
+    public String lookup(String authenticatedUserId) {
+        return cache.get(authenticatedUserId);
+    }
+}
 NEG
 )
 
@@ -40,5 +48,5 @@ check $cache then "token as cache key" else "no cache get";
 
 alert $cache for {
 	message: "token 直接作缓存 key，无签名/归属校验，可能越权",
-	level: "warning",
+	level: "middle",
 }

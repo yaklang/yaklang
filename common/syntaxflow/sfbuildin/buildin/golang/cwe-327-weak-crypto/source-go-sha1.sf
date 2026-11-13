@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "golang"
-	title: "检测 Go crypto/sha1"
-	title_zh: "检测 Go crypto/sha1"
+	title: "源码匹配：检测 Go crypto/sha1"
+	title_zh: "源码匹配：检测 Go crypto/sha1"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-go-sha1"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -47,7 +47,7 @@ NEG
 
 ${*.go}.pattern_regex(/\bsha1\.(Sum|New)\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Go crypto/sha1",
 	title_zh: "检测 Go crypto/sha1",
 	message: "检测 Go crypto/sha1",

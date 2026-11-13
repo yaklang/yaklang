@@ -1,7 +1,8 @@
 desc(
-	title: "Check Java Spring Resource Handler Location"
+	mode: "struct"
+	title: "结构匹配：Check Java Spring Resource Handler Location"
 	type: audit
-	level: low
+	level: "middle"
 	desc: <<<DESC
 ### 风险描述
 1. **风险原理**
@@ -31,7 +32,7 @@ registry.addResourceHandler("/config/**")
 该规则用于检测Spring应用中资源处理程序（ResourceHandlerRegistry）的配置，特别是关注`addResourceLocations()` 方法中指定的路径。通过静态分析查找不安全的资源映射位置，例如指向文件系统根目录、当前目录或其他包含敏感信息的目录，以识别潜在的敏感信息泄露风险。
 DESC
 	rule_id: "afdd05fc-a8f6-4e5c-9b72-d32c47ba0a7a"
-	title_zh: "检测Java Spring资源处理程序位置"
+	title_zh: "结构匹配：检测Java Spring资源处理程序位置"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 限制资源处理程序的位置
@@ -78,7 +79,7 @@ alert $swaggerVariable for {
 	desc: <<<DESC
 该规则用于检测Spring应用中Swagger相关的资源处理程序配置。Swagger通常用于生成API文档，但如果其资源路径被错误映射到敏感文件或目录，则可能导致信息泄露风险。确保Swagger的资源配置仅指向预期的静态资源目录，避免暴露任何敏感数据或内部实现细节。
 DESC
-	level: "info",
+	level: "middle",
 	message: "检测到Spring应用中Swagger相关的资源配置。确保Swagger的资源路径未指向敏感文件或目录。",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -171,7 +172,7 @@ registry.addResourceHandler("/config/**")
 ### 规则目的
 该规则用于检测Spring应用中资源处理程序（ResourceHandlerRegistry）的配置，特别是关注`addResourceLocations()` 方法中指定的路径。通过静态分析查找不安全的资源映射位置，例如指向文件系统根目录、当前目录或其他包含敏感信息的目录，以识别潜在的敏感信息泄露风险。
 DESC
-	level: "low",
+	level: "middle",
 	title: "Resource Handler Location",
 	title_zh: "资源处理程序位置",
 	message: "检测到Spring应用的ResourceHandlerRegistry配置可能存在敏感信息泄露风险，需进一步审查。",

@@ -1,6 +1,7 @@
 desc(
-	title: "Audit Implicit Request Matcher Selection"
-	title_zh: "审计隐式请求匹配器选择"
+	mode: "ssa"
+	title: "数据流：Audit Implicit Request Matcher Selection"
+	title_zh: "数据流：审计隐式请求匹配器选择"
 	type: audit
 	risk: "authorization-bypass"
 	desc: <<<DESC
@@ -76,4 +77,12 @@ class RequestMatchers {
     }
 }
 CODE
+	'safefile://safe-matcher.java': <<<NEG
+public class SafeMatcher {
+    void configure() {
+        String pattern = "/admin/**";
+        System.out.println(pattern);
+    }
+}
+NEG
 )

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect JPA Dynamic ORDER BY Sort Property Injection"
-	title_zh: "检测JPA动态ORDER BY排序属性注入"
+	mode: "struct"
+	title: "结构匹配：Detect JPA Dynamic ORDER BY Sort Property Injection"
+	title_zh: "结构匹配：检测JPA动态ORDER BY排序属性注入"
 	type: vuln
 	risk: "sql-injection"
 	desc: <<<DESC

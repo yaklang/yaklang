@@ -1,8 +1,9 @@
 desc(
-	title: "Audit C Dangerous Input Functions"
-	title_zh: "审计C语言中的危险输入函数"
+	mode: "struct"
+	title: "结构匹配：Audit C Dangerous Input Functions"
+	title_zh: "结构匹配：审计C语言中的危险输入函数"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "buffer-overflow"
 	desc: <<<DESC
 ### 漏洞描述
@@ -83,7 +84,7 @@ sscanf(*<slice(index=1)>?{have: "%s"} as $high);
 vsscanf(*<slice(index=1)>?{have: "%s"} as $high);
 
 alert $high for {
-	level: "high",
+	level: "middle",
 	risk: "buffer-overflow",
 	type: "vuln",
 	title: "C Dangerous Input Function Vulnerability Was Detected",
@@ -161,7 +162,7 @@ SOLUTION
 
 desc(
 	lang: c
-	alert_high: 1
+	alert_mid: 1
 	'file://unsafe.c': <<<UNSAFE
 #include <stdio.h>
 

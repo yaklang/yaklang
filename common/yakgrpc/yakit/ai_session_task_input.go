@@ -13,49 +13,31 @@ import (
 )
 
 const (
-	AISessionTaskResourceScopeTurn    = "turn"
-	AISessionTaskResourceScopeSession = "session"
-
-	AISessionTaskResourceSourceAttachedResourceInfo = "attached_resource_info"
-	AISessionTaskResourceSourceAttachedFilePath     = "attached_file_path"
-	AISessionTaskResourceSourceInherited            = "inherited"
-
 	defaultAISessionTaskInputPageSize = 30
 	maxAISessionTaskInputPageSize     = 200
 )
 
-const (
-	aiSessionTaskResourceTypeBrowser = "browser"
-	aiSessionTaskResourceTypeFile    = "file"
-	aiSessionTaskResourceKeyFilePath = "file_path"
-)
-
-// AISessionTaskResource is the stable, transport-friendly view stored in task
-// input snapshots. Scope describes whether the resource applies to only this
-// task or remains active for the session.
+// AISessionTaskResource is the transport-friendly representation persisted for
+// resources attached by one input.
 type AISessionTaskResource struct {
-	Type   string `json:"type"`
-	Key    string `json:"key,omitempty"`
-	Value  string `json:"value,omitempty"`
-	Scope  string `json:"scope"`
-	Source string `json:"source"`
+	Type  string `json:"type"`
+	Key   string `json:"key,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type SaveAISessionTaskInputParams struct {
-	SessionID          string
-	TaskID             string
-	TaskUUID           string
-	UserInputUUID      string
-	UserInput          string
-	InputSource        string
-	FocusModeLoop      string
-	ScheduleUUID       string
-	ScheduleName       string
-	ScheduledAt        string
-	ScheduleTrigger    string
-	AttachedFilePaths  []string
-	ExplicitResources  []AISessionTaskResource
-	EffectiveResources []AISessionTaskResource
+	SessionID       string
+	TaskID          string
+	TaskUUID        string
+	UserInputUUID   string
+	UserInput       string
+	InputSource     string
+	FocusModeLoop   string
+	ScheduleUUID    string
+	ScheduleName    string
+	ScheduledAt     string
+	ScheduleTrigger string
+	Resources       []AISessionTaskResource
 }
 
 type AISessionTaskInputFilter struct {
@@ -72,63 +54,6 @@ type AISessionCurrentResources struct {
 	UserInputUUID    string                  `json:"user_input_uuid,omitempty"`
 	TaskResources    []AISessionTaskResource `json:"task_resources"`
 	SessionResources []AISessionTaskResource `json:"session_resources"`
-}
-
-func normalizeAISessionTaskResource(resource AISessionTaskResource) (AISessionTaskResource, bool) {
-	resource.Type = strings.TrimSpace(resource.Type)
-	resource.Key = strings.TrimSpace(resource.Key)
-	resource.Scope = strings.TrimSpace(resource.Scope)
-	resource.Source = strings.TrimSpace(resource.Source)
-	if resource.Scope == "" {
-		if resource.Type == aiSessionTaskResourceTypeBrowser ||
-			(resource.Type == aiSessionTaskResourceTypeFile && resource.Key == aiSessionTaskResourceKeyFilePath) {
-			resource.Scope = AISessionTaskResourceScopeSession
-		} else {
-			resource.Scope = AISessionTaskResourceScopeTurn
-		}
-	}
-	if resource.Source == "" {
-		resource.Source = AISessionTaskResourceSourceAttachedResourceInfo
-	}
-	if resource.Type == "" && resource.Key == "" && resource.Value == "" {
-		return AISessionTaskResource{}, false
-	}
-	return resource, true
-}
-
-func normalizeAISessionTaskResources(resources []AISessionTaskResource) []AISessionTaskResource {
-	result := make([]AISessionTaskResource, 0, len(resources))
-	seen := make(map[string]struct{}, len(resources))
-	for _, resource := range resources {
-		resource, ok := normalizeAISessionTaskResource(resource)
-		if !ok {
-			continue
-		}
-		key := resource.Type + "\x00" + resource.Key + "\x00" + resource.Value
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-		result = append(result, resource)
-	}
-	return result
-}
-
-func normalizeAISessionTaskFilePaths(paths []string) []string {
-	result := make([]string, 0, len(paths))
-	seen := make(map[string]struct{}, len(paths))
-	for _, path := range paths {
-		path = strings.TrimSpace(path)
-		if path == "" {
-			continue
-		}
-		if _, exists := seen[path]; exists {
-			continue
-		}
-		seen[path] = struct{}{}
-		result = append(result, path)
-	}
-	return result
 }
 
 func marshalAISessionTaskJSON(value any) (string, error) {
@@ -148,7 +73,7 @@ func unmarshalAISessionTaskResources(raw string) ([]AISessionTaskResource, error
 	if err := json.Unmarshal([]byte(raw), &resources); err != nil {
 		return nil, err
 	}
-	return normalizeAISessionTaskResources(resources), nil
+	return resources, nil
 }
 
 // SaveAISessionTaskInput persists one task input snapshot. task_uuid is a
@@ -176,49 +101,37 @@ func SaveAISessionTaskInput(db *gorm.DB, params *SaveAISessionTaskInputParams) e
 		return utils.Error("task_uuid is empty")
 	}
 
-	filePaths, err := marshalAISessionTaskJSON(normalizeAISessionTaskFilePaths(params.AttachedFilePaths))
+	resources, err := marshalAISessionTaskJSON(params.Resources)
 	if err != nil {
-		return utils.Errorf("marshal attached file paths failed: %v", err)
-	}
-	explicit, err := marshalAISessionTaskJSON(normalizeAISessionTaskResources(params.ExplicitResources))
-	if err != nil {
-		return utils.Errorf("marshal explicit resources failed: %v", err)
-	}
-	effective, err := marshalAISessionTaskJSON(normalizeAISessionTaskResources(params.EffectiveResources))
-	if err != nil {
-		return utils.Errorf("marshal effective resources failed: %v", err)
+		return utils.Errorf("marshal AI session task resources failed: %v", err)
 	}
 
 	record := &schema.AISessionTaskInput{
-		SessionID:          sessionID,
-		TaskID:             taskID,
-		TaskUUID:           taskUUID,
-		UserInputUUID:      strings.TrimSpace(params.UserInputUUID),
-		UserInput:          params.UserInput,
-		InputSource:        strings.TrimSpace(params.InputSource),
-		FocusModeLoop:      strings.TrimSpace(params.FocusModeLoop),
-		ScheduleUUID:       strings.TrimSpace(params.ScheduleUUID),
-		ScheduleName:       strings.TrimSpace(params.ScheduleName),
-		ScheduledAt:        strings.TrimSpace(params.ScheduledAt),
-		ScheduleTrigger:    strings.TrimSpace(params.ScheduleTrigger),
-		AttachedFilePaths:  filePaths,
-		ExplicitResources:  explicit,
-		EffectiveResources: effective,
+		SessionID:       sessionID,
+		TaskID:          taskID,
+		TaskUUID:        taskUUID,
+		UserInputUUID:   strings.TrimSpace(params.UserInputUUID),
+		UserInput:       params.UserInput,
+		InputSource:     strings.TrimSpace(params.InputSource),
+		FocusModeLoop:   strings.TrimSpace(params.FocusModeLoop),
+		ScheduleUUID:    strings.TrimSpace(params.ScheduleUUID),
+		ScheduleName:    strings.TrimSpace(params.ScheduleName),
+		ScheduledAt:     strings.TrimSpace(params.ScheduledAt),
+		ScheduleTrigger: strings.TrimSpace(params.ScheduleTrigger),
+		Resources:       resources,
 	}
 	updates := map[string]any{
-		"session_id":          record.SessionID,
-		"task_id":             record.TaskID,
-		"user_input_uuid":     record.UserInputUUID,
-		"user_input":          record.UserInput,
-		"input_source":        record.InputSource,
-		"focus_mode_loop":     record.FocusModeLoop,
-		"schedule_uuid":       record.ScheduleUUID,
-		"schedule_name":       record.ScheduleName,
-		"scheduled_at":        record.ScheduledAt,
-		"schedule_trigger":    record.ScheduleTrigger,
-		"attached_file_paths": record.AttachedFilePaths,
-		"explicit_resources":  record.ExplicitResources,
-		"effective_resources": record.EffectiveResources,
+		"session_id":       record.SessionID,
+		"task_id":          record.TaskID,
+		"user_input_uuid":  record.UserInputUUID,
+		"user_input":       record.UserInput,
+		"input_source":     record.InputSource,
+		"focus_mode_loop":  record.FocusModeLoop,
+		"schedule_uuid":    record.ScheduleUUID,
+		"schedule_name":    record.ScheduleName,
+		"scheduled_at":     record.ScheduledAt,
+		"schedule_trigger": record.ScheduleTrigger,
+		"resources":        record.Resources,
 	}
 	query := bizhelper.ExactQueryString(db.Model(&schema.AISessionTaskInput{}), "task_uuid", taskUUID)
 	if result := query.Assign(updates).FirstOrCreate(record); result.Error != nil {
@@ -342,61 +255,35 @@ func GetAISessionTaskInputByTaskUUID(db *gorm.DB, taskUUID string) (*schema.AISe
 	return &record, nil
 }
 
-func mergeAISessionTaskResource(resources []AISessionTaskResource, resource AISessionTaskResource) []AISessionTaskResource {
-	key := resource.Type + "\x00" + resource.Key + "\x00" + resource.Value
-	for _, existing := range resources {
-		existingKey := existing.Type + "\x00" + existing.Key + "\x00" + existing.Value
-		if existingKey == key {
-			return resources
-		}
-	}
-	return append(resources, resource)
-}
-
-func removeAISessionTaskResourcesByType(resources []AISessionTaskResource, resourceType string) []AISessionTaskResource {
-	result := make([]AISessionTaskResource, 0, len(resources))
-	for _, resource := range resources {
-		if resource.Type == resourceType {
-			continue
-		}
-		result = append(result, resource)
-	}
-	return result
-}
-
-func replayAISessionResources(records []*schema.AISessionTaskInput) ([]AISessionTaskResource, error) {
-	active := make([]AISessionTaskResource, 0)
-	for _, record := range records {
+func collectAISessionResourceHistory(records []*schema.AISessionTaskInput) ([]AISessionTaskResource, error) {
+	resources := make([]AISessionTaskResource, 0)
+	seen := make(map[string]struct{})
+	// Walk inputs newest to oldest while preserving resource order within each
+	// input.
+	for i := len(records) - 1; i >= 0; i-- {
+		record := records[i]
 		if record == nil {
 			continue
 		}
-		explicit, err := unmarshalAISessionTaskResources(record.ExplicitResources)
+		recordResources, err := unmarshalAISessionTaskResources(record.Resources)
 		if err != nil {
-			return nil, utils.Errorf("unmarshal explicit resources for task %s failed: %v", record.TaskUUID, err)
+			return nil, utils.Errorf("unmarshal resources for task %s failed: %v", record.TaskUUID, err)
 		}
-		replaceBrowsers := false
-		for _, resource := range explicit {
-			if resource.Scope == AISessionTaskResourceScopeSession && resource.Type == aiSessionTaskResourceTypeBrowser {
-				replaceBrowsers = true
-				break
-			}
-		}
-		if replaceBrowsers {
-			active = removeAISessionTaskResourcesByType(active, aiSessionTaskResourceTypeBrowser)
-		}
-		for _, resource := range explicit {
-			if resource.Scope != AISessionTaskResourceScopeSession {
+		for _, resource := range recordResources {
+			key := resource.Type + "\x00" + resource.Key + "\x00" + resource.Value
+			if _, exists := seen[key]; exists {
 				continue
 			}
-			active = mergeAISessionTaskResource(active, resource)
+			seen[key] = struct{}{}
+			resources = append(resources, resource)
 		}
 	}
-	return active, nil
+	return resources, nil
 }
 
-// GetAISessionCurrentResources returns the latest task's effective resources
-// plus the session-scoped resources reconstructed from explicit task input
-// snapshots. No cross-table query is required.
+// GetAISessionCurrentResources returns the resources attached by the latest
+// input and the distinct resources attached across the session's input history.
+// Resources from newer inputs come first; order within an input is preserved.
 func GetAISessionCurrentResources(db *gorm.DB, sessionID string) (*AISessionCurrentResources, error) {
 	if db == nil {
 		return nil, utils.Error("database is nil")
@@ -411,7 +298,7 @@ func GetAISessionCurrentResources(db *gorm.DB, sessionID string) (*AISessionCurr
 
 	var records []*schema.AISessionTaskInput
 	query := db.Model(&schema.AISessionTaskInput{}).
-		Select("id, session_id, task_id, task_uuid, user_input_uuid, explicit_resources, effective_resources")
+		Select("id, session_id, task_id, task_uuid, user_input_uuid, resources")
 	query = bizhelper.ExactQueryString(query, "session_id", sessionID)
 	query = bizhelper.QueryOrder(query, "id", "asc")
 	if err := query.Find(&records).Error; err != nil {
@@ -421,14 +308,14 @@ func GetAISessionCurrentResources(db *gorm.DB, sessionID string) (*AISessionCurr
 		return nil, nil
 	}
 
-	sessionResources, err := replayAISessionResources(records)
+	sessionResources, err := collectAISessionResourceHistory(records)
 	if err != nil {
 		return nil, err
 	}
 	latest := records[len(records)-1]
-	taskResources, err := unmarshalAISessionTaskResources(latest.EffectiveResources)
+	taskResources, err := unmarshalAISessionTaskResources(latest.Resources)
 	if err != nil {
-		return nil, utils.Errorf("unmarshal effective resources for task %s failed: %v", latest.TaskUUID, err)
+		return nil, utils.Errorf("unmarshal resources for task %s failed: %v", latest.TaskUUID, err)
 	}
 	return &AISessionCurrentResources{
 		SessionID:        latest.SessionID,

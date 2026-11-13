@@ -14,6 +14,8 @@ import (
 // indexes are left in place because the insert path depends on them.
 var secondaryIndexTables = []string{
 	TableIrCodes,
+	TableIrConsts,
+	TableIrConstPool,
 	TableIrOffsets,
 	TableIrIndices,
 	TableIrNamePool,
@@ -130,6 +132,12 @@ func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 			continue
 		}
 		if _, err := conn.ExecContext(ctx, ddl); err != nil {
+			// Two compiles share this database and both replay the index set they
+			// suspended. The index already being present is the state this call
+			// asks for, so it is success, not an error.
+			if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+				continue
+			}
 			return fmt.Errorf("restore index %q: %w", ddl, err)
 		}
 	}

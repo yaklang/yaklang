@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到使用 JSTL 转义"
+	title_zh: "检测到使用 JSTL 转义",
+	type: vuln
+	level: "middle"
+	rule_id: "source-insecure-api-use-jstl-escaping"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+检测到 JSP 标签中的表达式语言片段未转义输出。表达式中的数据若可被外部控制，则构成 XSS 漏洞。
+
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-116
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 JSTL 标签库的 out 标签转义表达式输出。
+SOLUTION
+	alert_min: 1
+	"file://pos.jsp": <<<POS
+<input value="${param.foo}" />
+POS
+	"safefile://neg.jsp": <<<NEG
+<c:out value="${param.foo}" />
+<button onClick="applyPermissionChanges('${id}')">go</button>
+<a href="javascript:viewUser(\'${userId}\');">u</a>
+<%=LanguageUtil.get(pageContext, "msg", "${owners}")%>
+NEG
+)
+
+${*.jsp}.pattern_regex_not(/<(?![A-Za-z0-9]+:out)[^>\n]*\$\{[^}\n]*\}[^>\n]*>/, /'\$\{[^}\n]*\}'/, /\\'\$\{[^}\n]*\}\\'/, /javascript:[^>\n]*\$\{/, /<%[=!]?[^%]*\$\{/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到使用 JSTL 转义",
+	title_zh: "检测到使用 JSTL 转义",
+	message: "检测到使用 JSTL 转义",
+}

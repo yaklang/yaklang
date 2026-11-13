@@ -1,0 +1,84 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python SSRF: User Input Used as Request URL"
+	title_zh: "数据流：Python SSRF：用户输入作为请求 URL"
+	type: vuln
+	level: ""
+	rule_id: "ssa-python-ssrf-request"
+	risk: "ssrf"
+	cwe: "CWE-918"
+	desc: <<<DESC
+### 漏洞描述
+请求参数直接作为 `requests` 或 `urllib` 的目标 URL。攻击者可访问内网服务、云元数据地址。
+
+### 检测方式
+跟踪 Flask/Django 请求参数到 `requests.get/post/request`、`urllib.request.urlopen` 的实参。URL 经过 `urlparse` 等解析校验时跳过。
+
+### 风险类型
+ssrf
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+解析 URL 后校验 scheme 与 hostname，只允许白名单目标：
+
+```python
+parsed = urllib.parse.urlparse(url)
+if parsed.scheme != "https" or parsed.hostname not in ALLOWED_HOSTS:
+    abort(400)
+```
+
+同时禁止重定向（`allow_redirects=False`），并在网络层限制可访问网段。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+	alert_min: 1
+)
+
+request.args.get(* as $src)
+request.form.get(* as $src)
+request.values.get(* as $src)
+request.GET.get(* as $src)
+request.POST.get(* as $src)
+
+requests.get(* as $arg)
+requests.post(* as $arg)
+requests.request(* as $arg)
+urllib.request.urlopen(* as $arg)
+$arg?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->}?{!(<self><getUsers()>?{opcode: call && (<self><getCallee>?{have: /(?i)(urlparse|parse_qs|validators)/})})}?{!(<self><getUsers()>?{opcode: eq})}?{!(<self><getUsers()>?{opcode: neq})} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Python SSRF: User Input Used as Request URL",
+	title_zh: "Python SSRF：用户输入作为请求 URL",
+	risk: "ssrf",
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_ssrf.py': <<<UNSAFE
+import requests
+from flask import request
+
+def fetch():
+    url = request.args.get("url", "")
+    return requests.get(url, timeout=3).text
+UNSAFE
+	'safefile://safe_ssrf.py': <<<SAFE
+from urllib.parse import urlparse
+import requests
+from flask import abort, request
+
+def fetch():
+    url = request.args.get("url", "")
+    host = urlparse(url).hostname
+    if urlparse(url).scheme != "https" or host != "api.example.internal":
+        abort(400)
+    return requests.get(url, timeout=3, allow_redirects=False).text
+SAFE
+)

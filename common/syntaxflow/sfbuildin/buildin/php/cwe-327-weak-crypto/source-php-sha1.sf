@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "php"
-	title: "检测 PHP sha1"
-	title_zh: "检测 PHP sha1"
+	title: "源码匹配：检测 PHP sha1"
+	title_zh: "源码匹配：检测 PHP sha1"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-php-sha1"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.php}.pattern_regex(/(?m)(?<![\w>])sha1\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 PHP sha1",
 	title_zh: "检测 PHP sha1",
 	message: "检测 PHP sha1",

@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	risk: "certificate-validation"
-	title: "Detect Golang Insecure Certificate Validation"
-	title_zh: "检测Golang不安全的证书验证"
+	title: "结构匹配：Detect Golang Insecure Certificate Validation"
+	title_zh: "结构匹配：检测Golang不安全的证书验证"
 	type: vuln
-	level: high
+	level: "high"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -187,7 +188,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe_insecure_skip_verify.go': <<<UNSAFE
 package main
 

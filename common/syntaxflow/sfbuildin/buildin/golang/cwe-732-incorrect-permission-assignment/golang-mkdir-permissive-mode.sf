@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Mkdir With Overly Permissive Mode"
-	title_zh: "检测Golang创建目录权限过宽"
+	mode: "struct"
+	title: "结构匹配：Detect Golang Mkdir With Overly Permissive Mode"
+	title_zh: "结构匹配：检测Golang创建目录权限过宽"
 	type: vuln
-	level: mid
+	level: "middle"
 	risk: "security-misconfiguration"
 	desc: <<<DESC
 该规则检测 `os.Mkdir`/`os.MkdirAll` 使用过宽权限（如 0777、0775）。
@@ -24,7 +25,7 @@ $mode?{opcode: const}?{have: /^(511|509|0777|0775)$/} as $mid
 
 alert $mid for {
 	type: "vuln",
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	title: "Golang Directory Permission Too Broad",
 	title_zh: "检测到目录权限配置过宽",

@@ -1,0 +1,48 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到不安全的 add-mask 工作流命令"
+	title_zh: "检测到不安全的 add-mask 工作流命令",
+	type: vuln
+	level: "middle"
+	rule_id: "source-insecure-api-unsafe-add-mask-workflow-command"
+	risk: "information-exposure"
+	desc: <<<DESC
+### 规则说明
+GitHub Actions 提供 add-mask 工作流命令来屏蔽日志中的敏感数据。如果不使用 add-mask，或工作流命令被停止，敏感数据会泄露到工作流日志；攻击者可复制工作流并注入 stop-commands 载荷使屏蔽失效。
+
+### 风险类型
+敏感信息泄露（information-exposure）
+
+### 影响
+应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-200
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+对敏感数据使用 add-mask 屏蔽，审计工作流命令处理，避免不受信任分支修改工作流。
+SOLUTION
+	alert_min: 1
+	"file://pos.yml": <<<POS
+::add-mask::
+
+POS
+	"safefile://neg/pos.yml": <<<NEG
+steps:
+  - run: echo "hello"
+NEG
+)
+
+${/\.ya?ml$/}.pattern_regex(/::add-mask::/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到不安全的 add-mask 工作流命令",
+	title_zh: "检测到不安全的 add-mask 工作流命令",
+	message: "检测到不安全的 add-mask 工作流命令",
+}

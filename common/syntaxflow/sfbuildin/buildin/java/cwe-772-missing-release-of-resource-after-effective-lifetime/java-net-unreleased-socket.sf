@@ -1,6 +1,8 @@
 desc(
-	title_zh: "检测Java Socket资源未释放"
-	title: "Check Java Socket Unreleased Resource"
+	level: "low"
+	mode: "struct"
+	title_zh: "结构匹配：检测Java Socket资源未释放"
+	title: "结构匹配：Check Java Socket Unreleased Resource"
 	risk:"resource-leak"
 	reference: <<<REFERENCE
 [CWE-772](https://cwe.mitre.org/data/definitions/772.html)

@@ -1,0 +1,6 @@
+extern helper
+sub_0x5b00
+type: () -> i64
+entry_0: (<nil condition>)
+	<i64> t1 = call <any> helper () binding[] member[]
+	ret <i64> t1

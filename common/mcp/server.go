@@ -30,6 +30,11 @@ type MCPServer struct {
 
 	sseMu sync.Mutex
 
+	mitmMu       sync.Mutex
+	mitmControl  chan struct{}
+	mitmSessions map[*mitmV2Session]struct{}
+	mitmClosed   bool
+
 	bridgeClientClosers []io.Closer
 }
 
@@ -229,6 +234,7 @@ func (s *MCPServer) closeBridgeClients() {
 }
 
 func (s *MCPServer) Close(ctxs ...context.Context) {
+	s.closeMITMSessions()
 	s.sseMu.Lock()
 	defer s.sseMu.Unlock()
 

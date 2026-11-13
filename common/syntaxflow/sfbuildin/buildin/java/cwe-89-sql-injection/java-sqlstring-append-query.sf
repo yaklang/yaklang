@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	risk: "sql-injection"
-	title: "Check Java SQL String Append Query"
+	title: "数据流：Check Java SQL String Append Query"
 	type: audit
-	level: low
+	level: ""
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -25,7 +26,7 @@ ResultSet rs = stmt.executeQuery(sqlString.toString());
 - **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
 DESC
 	rule_id: "b86d3bfb-98d4-437d-bf7b-d5c43e012425"
-	title_zh: "检测Java SQL字符串拼接查询"
+	title_zh: "数据流：检测Java SQL字符串拼接查询"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用参数化查询（PreparedStatement）

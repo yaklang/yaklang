@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java XMLReaderFactory Unsafe Use"
-	title_zh: "检测 Java XMLReaderFactory 不安全使用"
+	mode: "struct"
+	title: "结构匹配：Check Java XMLReaderFactory Unsafe Use"
+	title_zh: "结构匹配：检测 Java XMLReaderFactory 不安全使用"
 	type: security
 	risk: "xxe"
 	reference: <<<REFERENCE

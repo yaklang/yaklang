@@ -1,0 +1,64 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 日志注入：用户输入拼接到日志"
+	title_zh: "数据流：Node.js 日志注入：用户输入拼接到日志"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-log-injection-concat"
+	risk: "log-forging"
+	cwe: "CWE-117"
+	desc: <<<DESC
+### 规则说明
+用户可控数据未经换行符净化就拼接进日志，可伪造日志行。审计失败行（failed/denied 等）不在此规则内，避免与敏感日志规则重复。
+
+### 风险类型
+log-forging
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+记录前移除 `\r`/`\n`，或使用结构化日志（JSON）并让库负责转义。
+SOLUTION
+	alert_min: 1
+	'file://app.js': <<<POS
+function login(req) {
+  console.log("login " + req.query.name);
+}
+module.exports = login;
+POS
+	'safefile://app-safe.js': <<<NEG
+function login(req) {
+  console.log("login attempt");
+}
+module.exports = login;
+NEG
+)
+
+<include('js-param')> as $params;
+/(?i)(replace|replaceAll|encodeURIComponent|escape|sanitize|strip)/ as $sanitizers;
+
+console.log(*<slice(index=0)> as $arg)
+console.error(*<slice(index=0)> as $arg)
+console.warn(*<slice(index=0)> as $arg)
+console.info(*<slice(index=0)> as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{<self> #{
+    include: <<<CODE
+*?{opcode: add} as $__next__
+CODE,
+}->}?{!(<self> #{
+    include: <<<CODE
+*?{opcode: call && (<self><getCallee> & $sanitizers)} as $__next__
+CODE,
+}->)}?{!<self>?{have: /(?i)(password|passwd|secret|token|api[_-]?key)/}}?{!<self>?{have: /(?i)(failed|failure|denied|invalid|unauthorized)/}} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js 日志注入：用户输入拼接到日志",
+	title_zh: "Node.js 日志注入：用户输入拼接到日志",
+	risk: "log-forging",
+}

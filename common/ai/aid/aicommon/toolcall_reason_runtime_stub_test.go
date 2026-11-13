@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
@@ -139,5 +140,38 @@ func (r *reasonTestRuntime) EmitFileArtifactWithExt(name, ext string, data any) 
 func (r *reasonTestRuntime) EmitResultAfterStream(any) {}
 
 func (r *reasonTestRuntime) EmitResult(any) {}
+
+func (r *reasonTestRuntime) GetAsyncExecutionManager() (*asyncexecmanager.Manager, error) {
+	return nil, errors.New("reason test runtime does not own async executions")
+}
+
+func (r *reasonTestRuntime) HasAsyncExecutionManager() bool { return false }
+
+func (r *reasonTestRuntime) AsyncExecutionSnapshot() AsyncExecutionSnapshot {
+	return BuildAsyncExecutionSnapshot(asyncexecmanager.Overview{}, "", "")
+}
+
+func (r *reasonTestRuntime) StopAsyncExecution(string) (asyncexecmanager.Summary, error) {
+	return asyncexecmanager.Summary{}, errors.New("reason test runtime does not own async executions")
+}
+
+func (r *reasonTestRuntime) TrackAsyncExecutionTask(AIStatefulTask, string) {}
+
+func (r *reasonTestRuntime) PrepareAsyncToolCall(
+	AIStatefulTask, string, aitool.InvokeParams, ...ToolCallerOption,
+) (asyncexecmanager.Resource, func(), error) {
+	return nil, nil, errors.New("reason test runtime does not prepare async tool calls")
+}
+
+func (r *reasonTestRuntime) AsyncDirectAnswerSignal() <-chan struct{} {
+	return make(chan struct{})
+}
+
+func (r *reasonTestRuntime) RequestAsyncDirectAnswer()        {}
+func (r *reasonTestRuntime) AsyncDirectAnswerRequested() bool { return false }
+func (r *reasonTestRuntime) ConsumeAsyncDirectAnswer() bool   { return false }
+func (r *reasonTestRuntime) BeginAsyncExecutionAdmission() (func(), bool) {
+	return func() {}, true
+}
 
 var _ AIInvokeRuntime = (*reasonTestRuntime)(nil)

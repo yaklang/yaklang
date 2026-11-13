@@ -179,7 +179,7 @@ func (r *SarifReport) Save() error {
 		return err
 	}
 	// A file destination is replaced atomically; other destinations are rewound.
-	return writeReportSnapshot(r.writer, buf.Bytes())
+	return writeReportSnapshotBytes(r.writer, buf.Bytes())
 }
 
 // Report exposes the accumulated document for callers that want to serialize
@@ -251,7 +251,10 @@ func (r *SarifReport) noteFlush(added int) {
 		log.Errorf("serialize sarif snapshot failed: %v", err)
 		return
 	}
-	r.flusherFor().submit(buf.Bytes())
+	r.flusherFor().submit(func(out io.Writer) error {
+		_, err := out.Write(buf.Bytes())
+		return err
+	})
 }
 
 // flusherFor returns the background writer of this report, creating it on

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect PHP Information Exposure Vulnerability"
-	title_zh: "检测PHP信息泄漏漏洞"
+	mode: "ssa"
+	title: "数据流：Detect PHP Information Exposure Vulnerability"
+	title_zh: "数据流：检测PHP信息泄漏漏洞"
 	type: vul
 	risk: "information-exposure"
 	desc: <<<DESC

@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET XXE via XmlDocument and XmlTextReader"
-	title_zh: "检测 C#/.NET XmlDocument/XmlTextReader XXE"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET XXE via XmlDocument and XmlTextReader"
+	title_zh: "数据流：检测 C#/.NET XmlDocument/XmlTextReader XXE"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "xxe"
 	desc: <<<DESC
@@ -65,7 +66,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET XXE via XML parser",
 	title_zh: "C#/.NET XML 解析 XXE",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "xxe",
 	message: "检测到用户输入流入 XML 解析器，存在 XXE 风险。",
@@ -90,10 +91,11 @@ UNSAFE
 	'safefile://safe_xxe.cs': <<<SAFE
 using System.Xml;
 
-public class Controller {
-    public void Handle() {
-        XmlDocument doc = new XmlDocument();
-        doc.LoadXml("<root/>");
+class SafeXml {
+    static XmlReader Open(string path) {
+        var settings = new XmlReaderSettings();
+        settings.DtdProcessing = DtdProcessing.Prohibit;
+        return XmlReader.Create(path, settings);
     }
 }
 SAFE

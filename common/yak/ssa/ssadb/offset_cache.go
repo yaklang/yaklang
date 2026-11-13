@@ -12,7 +12,10 @@ import (
 // entry is an immutable copy of the rows for one (program, value) pair. Empty
 // lookups are not stored, so a miss during compilation cannot hide a later
 // insert.
-const offsetReadCacheCapacity = 4096
+// 4096 slots cover ordinary dataflow reuse, but a single struct rule can
+// touch tens of thousands of catch exceptions. Keep that one preload batch
+// resident instead of evicting it immediately.
+const offsetReadCacheCapacity = 65536
 
 // offsetCacheKey binds a cached snapshot to one program and to one generation
 // of that program's offsets. Instruction ids are only unique inside a program,

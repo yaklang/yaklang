@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Newtonsoft TypeNameHandling Insecure Deserialization"
-	title_zh: "检测 C#/.NET Newtonsoft TypeNameHandling 不安全反序列化"
+	mode: "struct"
+	title: "结构匹配：Check C#/.NET Newtonsoft TypeNameHandling Insecure Deserialization"
+	title_zh: "结构匹配：检测 C#/.NET Newtonsoft TypeNameHandling 不安全反序列化"
 	type: audit
-	level: high
+	level: "high"
 	language: csharp
 	risk: "deserialization"
 	desc: <<<DESC
@@ -55,7 +56,6 @@ alert $high for {
 desc(
 	lang: csharp
 	alert_min: 1
-	alert_high: 1
 	'file://unsafe_typename.cs': <<<UNSAFE
 using Newtonsoft.Json;
 

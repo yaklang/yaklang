@@ -1,0 +1,56 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js 提示词注入：用户输入拼接进提示词"
+	title_zh: "数据流：Node.js 提示词注入：用户输入拼接进提示词"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-prompt-injection"
+	risk: "prompt-injection"
+	cwe: "CWE-1427"
+	desc: <<<DESC
+### 规则说明
+用户可控数据直接拼接进大模型提示词，缺少分隔或指令隔离。
+
+### 风险类型
+prompt-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用结构化消息与明确分隔符，把用户内容放在数据区；对输出做校验，不把用户文本当系统指令。
+SOLUTION
+	alert_min: 1
+	'file://app.js': <<<POS
+function ask(req) {
+  return clientComplete("Summarize: " + req.body.text);
+}
+module.exports = ask;
+POS
+	'safefile://app-safe.js': <<<NEG
+function ask(req, client) {
+  return client.chatComplete("Summarize the document.");
+}
+module.exports = ask;
+NEG
+)
+
+<include('js-param')> as $params;
+
+clientComplete(*<slice(index=0)> as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{<self> #{
+    include: <<<CODE
+*?{opcode: add} as $__next__
+CODE,
+}->} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js 提示词注入：用户输入拼接进提示词",
+	title_zh: "Node.js 提示词注入：用户输入拼接进提示词",
+	risk: "prompt-injection",
+}

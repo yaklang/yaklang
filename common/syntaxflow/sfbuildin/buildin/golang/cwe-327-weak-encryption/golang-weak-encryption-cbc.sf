@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	risk: "weak-cryptography"
-	title: "Detect Golang Weak Encryption Using AES-CBC Mode"
-	title_zh: "检测Golang使用AES-CBC弱加密模式"
+	title: "结构匹配：Detect Golang Weak Encryption Using AES-CBC Mode"
+	title_zh: "结构匹配：检测Golang使用AES-CBC弱加密模式"
 	type: vuln
-	level: mid
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -112,7 +113,7 @@ alert $mid for {
 	type: "vuln",
 	title: "Golang Weak Encryption Using AES-CBC Mode Detected",
 	title_zh: "检测到Golang使用AES-CBC弱加密模式",
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	message: "检测到 AES 分组经 CBC 加解密。CBC 无完整性，自有数据应改用 AES-GCM 等 AEAD；协议强制 CBC 需人工确认。",
 	solution: <<<SOLUTION

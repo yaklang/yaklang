@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Find Java Escape Method"
 	title_zh: "查找Java转义方法"
 	lib: 'java-escape-method'

@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Audit Golang User Input"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-user-input'
 	desc: <<<DESC
 ### 规则描述

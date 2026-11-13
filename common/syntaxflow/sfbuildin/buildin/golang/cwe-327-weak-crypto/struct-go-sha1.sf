@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go crypto/sha1"
-	title_zh: "结构扫描：Go crypto/sha1"
+	title: "结构匹配：Go crypto/sha1"
+	title_zh: "结构匹配：Go crypto/sha1"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-go-sha1"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ sha1.New as $call
 sha1.Sum(* as $d) as $call
 sha1.New() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Go crypto/sha1",
 	title_zh: "结构扫描：Go crypto/sha1",
 	message: "结构扫描：Go crypto/sha1",

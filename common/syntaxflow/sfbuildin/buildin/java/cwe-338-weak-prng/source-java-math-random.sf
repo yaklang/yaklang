@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "检测 Java Math.random"
-	title_zh: "检测 Java Math.random"
+	title: "源码匹配：检测 Java Math.random"
+	title_zh: "源码匹配：检测 Java Math.random"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-java-math-random"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.java}.pattern_regex(/Math\.random\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Java Math.random",
 	title_zh: "检测 Java Math.random",
 	message: "检测 Java Math.random",

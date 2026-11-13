@@ -18,7 +18,15 @@ serverName = cli.String("server_name", cli.setRequired(true), cli.setHelp("manag
 cursor = cli.String("cursor", cli.setHelp("上页 nextCursor，第一页为空"))
 timeout = cli.Float("timeout", cli.setDefault(30), cli.setHelp("单次请求超时秒数，>0 且 <=3600"))
 if str.TrimSpace(serverName) == "" { die("server_name is required") }
+if timeout <= 0 || timeout > 3600 { die("timeout must be greater than 0 and no more than 3600 seconds") }
 cli.check()
-client = mcp.Connect(serverName, mcp.timeout(timeout))~
+client, connectErr = mcp.Connect(serverName, mcp.timeout(timeout))
+if connectErr != nil {
+    die(sprintf("failed to connect MCP server %q (timeout=%vs): %v. Recovery: run manage_mcp_server(op=list) to verify the exact name and enabled state, then check that the configured endpoint or command is reachable.", serverName, timeout, connectErr))
+}
 defer client.Close()
-println(json.dumps(client.ListTools(cursor)~))
+tools, listErr = client.ListTools(cursor)
+if listErr != nil {
+    die(sprintf("connected to MCP server %q but listing tools failed (cursor=%q): %v. Recovery: retry with an empty cursor, increase timeout, or verify the server implements tools/list.", serverName, cursor, listErr))
+}
+println(json.dumps(tools))

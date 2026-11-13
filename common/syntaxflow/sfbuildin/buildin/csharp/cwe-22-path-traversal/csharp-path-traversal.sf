@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Path Traversal via File and Path.Combine"
-	title_zh: "检测 C#/.NET 文件路径遍历"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET Path Traversal via File and Path.Combine"
+	title_zh: "数据流：检测 C#/.NET 文件路径遍历"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "path-traversal"
 	desc: <<<DESC
@@ -67,7 +68,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET Path Traversal via File API",
 	title_zh: "C#/.NET 文件路径遍历",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "path-traversal",
 	message: "检测到用户输入流入文件路径 API，存在路径遍历风险。",
@@ -90,11 +91,9 @@ public class Controller {
 }
 UNSAFE
 	'safefile://safe_path.cs': <<<SAFE
-using System.IO;
-
-public class Controller {
-    public void Handle() {
-        File.ReadAllText("/data/readme.txt");
+class SafePath {
+    static string Name() {
+        return "report.txt";
     }
 }
 SAFE

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect MariaDB Filter String Without SQL Escaping"
-	title_zh: "检测MariaDB过滤字符串缺少SQL转义"
+	mode: "struct"
+	title: "结构匹配：Detect MariaDB Filter String Without SQL Escaping"
+	title_zh: "结构匹配：检测MariaDB过滤字符串缺少SQL转义"
 	type: audit
 	risk: "sql-injection"
 	desc: <<<DESC
@@ -24,7 +25,7 @@ REFERENCE
 alert $risk for {
 	title: "Detect MariaDB Filter String Without SQL Escaping",
 	title_zh: "检测MariaDB过滤字符串缺少SQL转义",
-	level: "high",
+	level: "middle",
 	message: "发现运行时字符串直接拼进 MariaDB 查询字面量且未调用 escape helper，需复核是否存在 SQL 注入。",
 	risk: "sql-injection",
 	name: "risk",

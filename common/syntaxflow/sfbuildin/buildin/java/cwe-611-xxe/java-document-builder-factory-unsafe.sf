@@ -1,6 +1,7 @@
 desc(
-	title: "Detect DocumentBuilderFactory Parsing Without XXE Hardening"
-	title_zh: "检测DocumentBuilderFactory解析缺少XXE加固"
+	mode: "struct"
+	title: "结构匹配：Detect DocumentBuilderFactory Parsing Without XXE Hardening"
+	title_zh: "结构匹配：检测DocumentBuilderFactory解析缺少XXE加固"
 	type: audit
 	risk: "xxe"
 	desc: <<<DESC

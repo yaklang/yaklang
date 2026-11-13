@@ -44,8 +44,8 @@ func TestGoWeakCryptoFalsePositiveRuleFixes(t *testing.T) {
 	files := []string{
 		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-md5-sum.sf"),
 		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-sha1.sf"),
-		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-des.sf"),
-		filepath.Join("..", "golang", "cwe-327-weak-crypto", "source-go-rc4.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "go-des.sf"),
+		filepath.Join("..", "golang", "cwe-327-weak-crypto", "go-rc4.sf"),
 		filepath.Join("..", "golang", "cwe-327-weak-encryption", "golang-weak-hash-md5-sha1.sf"),
 		filepath.Join("..", "golang", "cwe-327-weak-encryption", "golang-weak-encryption-cbc.sf"),
 	}

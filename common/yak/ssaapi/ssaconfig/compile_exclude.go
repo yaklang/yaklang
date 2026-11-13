@@ -36,6 +36,10 @@ var DefaultCompileExcludeDirNames = []string{
 	".nuxt",
 	"coverage",
 	"node_modules",
+	// documentation trees: prose and generated API pages, never runnable code
+	"doc",
+	"docs",
+	"documentation",
 	// Python environments (note: plain "env" is deliberately not excluded —
 	// it is a common application source directory name)
 	".tox",
@@ -52,16 +56,35 @@ var DefaultCompileExcludeDirNames = []string{
 	"target",
 	// C/C++ build machinery
 	"CMakeFiles",
-	// test code / fixtures (aggregated across languages)
+	// test code and fixtures (aggregated across languages). Directory names are
+	// matched case-insensitively, so Test/, Tests/ and TEST/ prune too: the
+	// camel-case spelling is the common C#/.NET shape, and a test tree that
+	// slips into the pool only produces false positives (fixture credentials,
+	// sample payloads).
 	"TestResults",
+	"__mocks__",
 	"__tests__",
+	"e2e",
 	"fixtures",
+	"integration-test",
+	"integration-tests",
+	"mocks",
+	"spec",
+	"specs",
 	"test",
+	"test-cases",
 	"test-classes",
 	"test-fixtures",
+	"test-utils",
+	"testcase",
+	"testcases",
 	"testdata",
 	"testing",
 	"tests",
+	"testutil",
+	"testutils",
+	"unittest",
+	"unittests",
 	// yak tooling
 	"yakit-projects",
 }
@@ -78,7 +101,6 @@ var DefaultCompileExcludeDirNames = []string{
 var DefaultCompileExcludeGlobs = []string{
 	".github/**",
 	".mvn/**",
-	"docs/**",
 	"eclipse/**",
 	"**/Vendor/**",
 	"Vendor/**",
@@ -96,11 +118,69 @@ var DefaultCompileExcludeGlobs = []string{
 	"**zh_en/**",
 	"**plugins/**",
 	"**PHPExcel/**",
+	// Non-code assets (all languages): media, office documents, images, fonts
+	// and source maps never carry runnable code, so scanning them only adds
+	// decode work and encoding noise. Decompilable JVM archives (jar/war/ear)
+	// stay out of this list on purpose; they are scan targets.
+	"**/*.mp4",
+	"**/*.m4v",
+	"**/*.mkv",
+	"**/*.mov",
+	"**/*.avi",
+	"**/*.wmv",
+	"**/*.flv",
+	"**/*.webm",
+	"**/*.mp3",
+	"**/*.wav",
+	"**/*.flac",
+	"**/*.aac",
+	"**/*.ogg",
+	"**/*.m4a",
+	"**/*.wma",
+	"**/*.doc",
+	"**/*.docx",
+	"**/*.xls",
+	"**/*.xlsx",
+	"**/*.ppt",
+	"**/*.pptx",
+	"**/*.pdf",
+	"**/*.odt",
+	"**/*.ods",
+	"**/*.odp",
+	"**/*.rtf",
+	"**/*.png",
+	"**/*.jpg",
+	"**/*.jpeg",
+	"**/*.gif",
+	"**/*.bmp",
+	"**/*.ico",
+	"**/*.webp",
+	"**/*.tif",
+	"**/*.tiff",
+	"**/*.psd",
+	"**/*.ttf",
+	"**/*.otf",
+	"**/*.woff",
+	"**/*.woff2",
+	"**/*.eot",
+	"**/*.map",
+	"**/*.zip",
+	"**/*.tar",
+	"**/*.tgz",
+	"**/*.gz",
+	"**/*.bz2",
+	"**/*.xz",
+	"**/*.7z",
+	"**/*.rar",
 	// OS metadata (both root-level and nested)
 	".DS_Store",
 	"**/.DS_Store",
 	"Thumbs.db",
 	"**/Thumbs.db",
+	// Documentation entry files are excluded by name in
+	// IsDocumentationFilePath (README, CHANGELOG, LICENSE, ...), applied by
+	// BuildCompileExcludeFunc together with these globs. Only those names are
+	// dropped: SKILL.md and notes.md must still reach the rules that read them.
 	// test archives and Maven integration tests (name-based, language-agnostic).
 	// Patterns are written as both root and nested forms because gobwas glob
 	// requires "**/" to be followed by a separator: **/x does not match "x".
@@ -140,11 +220,13 @@ var DefaultCompileExcludeGlobs = []string{
 	"**/go.mod",
 	"go.sum",
 	"**/go.sum",
-	// JS/TS
+	// JS/TS. Stylesheets are dropped whole (minified and bundled ones included):
+	// no builtin rule reads a .css file. Scripts keep every extension a rule
+	// filters on (.js, .jsx, .mjs, .cjs, .ts, .tsx); only minified/bundled
+	// output is excluded by name.
 	"**/*.min.js",
-	"**/*.min.css",
 	"**/*.bundle.js",
-	"**/*.bundle.css",
+	"**/*.css",
 	"package-lock.json",
 	"**/package-lock.json",
 	"yarn.lock",
@@ -253,6 +335,79 @@ func IsDefaultCompileExcludeDirName(name string) bool {
 	return false
 }
 
+// documentationFileBaseNames are documentation entry points: prose files that
+// describe a project instead of running in it. They are dropped from every
+// project walk by IsDocumentationFilePath.
+var documentationFileBaseNames = []string{
+	"readme",
+	"changelog",
+	"changes",
+	"history",
+	"news",
+	"contributing",
+	"code_of_conduct",
+	"security",
+	"support",
+	"authors",
+	"contributors",
+	"notice",
+	"license",
+	"licence",
+	"copying",
+	"copyright",
+	"install",
+	"upgrading",
+	"maintainers",
+}
+
+// documentationFileExtensions are the suffixes a documentation entry point may
+// carry. Only prose formats are listed, so a source file that happens to share
+// a word with a document name (security.go, license.java) stays in the pool.
+var documentationFileExtensions = map[string]bool{
+	"":          true,
+	".md":       true,
+	".markdown": true,
+	".mdx":      true,
+	".rst":      true,
+	".txt":      true,
+	".adoc":     true,
+}
+
+// IsDocumentationFilePath reports whether path is a documentation entry point
+// such as README.md, CHANGELOG-1.2.txt or CONTRIBUTING.rst.
+//
+// These files describe code, they never run in it, yet a README snippet like
+// `password = "..."` matches a hardcoded-credential rule and license or
+// contributor lists match config-shape patterns. Matching is by base name, so
+// documentation trees are covered too (docs/README.md). Only the listed names
+// with a prose suffix are dropped: SKILL.md, notes.md and every file inside a
+// non-documentation directory still reach the rules that read them.
+func IsDocumentationFilePath(path string) bool {
+	path = normalizeCompileExcludePath(path)
+	if path == "" {
+		return false
+	}
+	base := filepath.Base(path)
+	if base == "" || base == "." || base == "/" {
+		return false
+	}
+	lower := strings.ToLower(base)
+	for _, name := range documentationFileBaseNames {
+		if !strings.HasPrefix(lower, name) {
+			continue
+		}
+		rest := lower[len(name):]
+		if rest == "" {
+			return true
+		}
+		switch rest[0] {
+		case '.', '-', '_':
+			return documentationFileExtensions[filepath.Ext(lower)]
+		}
+	}
+	return false
+}
+
 // BuildCompileExcludeFunc merges userPatterns with DefaultCompileExcludePatterns()
 // unless includeDefaults is false. When includeDefaults is false, only userPatterns
 // are compiled; this is the escape hatch for callers (tests, embedders) that need
@@ -265,6 +420,22 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 		patterns = append(patterns, DefaultCompileExcludePatterns()...)
 	}
 	basePath = normalizeCompileExcludePath(basePath)
+
+	// Built-in DIRECTORY names are matched case-insensitively: a test tree
+	// spelled Tests/ or Test/ (the C#/.NET and some Java layouts) must prune
+	// exactly like test/. Only directory segments take part — lowering the
+	// file globs as well was wrong, because "**/*Test.php" then matched
+	// "test.php". User patterns stay case-sensitive.
+	defaultDirNames := make(map[string]bool, len(DefaultCompileExcludeDirNames))
+	if includeDefaults {
+		for _, name := range DefaultCompileExcludeDirNames {
+			lower := strings.ToLower(strings.TrimSpace(name))
+			if lower == "" {
+				continue
+			}
+			defaultDirNames[lower] = true
+		}
+	}
 
 	addPattern := func(pattern string) {
 		pattern = normalizeCompileExcludePath(pattern)
@@ -308,13 +479,41 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 	}
 
 	return func(path string) bool {
+		if includeDefaults && IsDocumentationFilePath(path) {
+			return true
+		}
 		path = normalizeCompileExcludePath(path)
+		if hasExcludedDirSegment(path, defaultDirNames) {
+			return true
+		}
 		for _, g := range compiled {
 			if g.Match(path) {
 				return true
 			}
 		}
 		return false
+	}
+}
+
+// hasExcludedDirSegment reports whether any directory segment of path is one
+// of the built-in excluded directory names, compared case-insensitively.
+func hasExcludedDirSegment(path string, names map[string]bool) bool {
+	if len(names) == 0 || path == "" {
+		return false
+	}
+	for {
+		slash := strings.IndexByte(path, '/')
+		if slash < 0 {
+			// The last segment is a file name for a file match and a directory
+			// name for the directory walk's SkipDir check; the directory walk
+			// also matches it through the compiled globs, so a trailing segment
+			// is checked here too.
+			return names[strings.ToLower(path)]
+		}
+		if names[strings.ToLower(path[:slash])] {
+			return true
+		}
+		path = path[slash+1:]
 	}
 }
 

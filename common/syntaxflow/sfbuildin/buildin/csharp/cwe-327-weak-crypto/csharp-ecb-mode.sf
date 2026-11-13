@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Insecure CipherMode.ECB"
-	title_zh: "检测 C#/.NET 不安全的 ECB 加密模式"
+	mode: "struct"
+	title: "结构匹配：Check C#/.NET Insecure CipherMode.ECB"
+	title_zh: "结构匹配：检测 C#/.NET 不安全的 ECB 加密模式"
 	type: audit
-	level: mid
+	level: "middle"
 	language: csharp
 	risk: "weak-cryptography"
 	desc: <<<DESC
@@ -46,7 +47,7 @@ CipherMode.ECB as $mid
 alert $mid for {
 	title: "C#/.NET CipherMode.ECB insecure mode",
 	title_zh: "C#/.NET CipherMode.ECB 不安全模式",
-	level: "mid",
+	level: "middle",
 	type: "audit",
 	risk: "weak-cryptography",
 	message: "检测到 ECB 模式，相同明文块会产生相同密文，请改用 AES-GCM 等认证加密。",

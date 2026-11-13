@@ -1,18 +1,105 @@
 package ssa
 
 import (
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/maps"
-	"strings"
 )
 
 type importDeclareItem struct {
 	pkgName      string
 	aliasPkgName string
+
+	// mu guards typ and val. Prehandler goroutines import into one item while
+	// queries read it, so the maps need their own lock on top of the ordered
+	// index that stores the item.
+	mu sync.RWMutex
 	// all          bool
 	typ map[string]Type
 	val map[string]Value
+}
+
+func (i *importDeclareItem) getType(name string) (Type, bool) {
+	if i == nil {
+		return nil, false
+	}
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	t, ok := i.typ[name]
+	return t, ok
+}
+
+func (i *importDeclareItem) setType(name string, t Type) {
+	if i == nil {
+		return
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.typ[name] = t
+}
+
+func (i *importDeclareItem) getValue(name string) (Value, bool) {
+	if i == nil {
+		return nil, false
+	}
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	v, ok := i.val[name]
+	return v, ok
+}
+
+func (i *importDeclareItem) setValue(name string, v Value) {
+	if i == nil {
+		return
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.val[name] = v
+}
+
+func (i *importDeclareItem) copyTypesFrom(src map[string]Type) {
+	if i == nil {
+		return
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	maps.Copy(i.typ, src)
+}
+
+func (i *importDeclareItem) copyValuesFrom(src map[string]Value) {
+	if i == nil {
+		return
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	maps.Copy(i.val, src)
+}
+
+// appendFixImportCallback registers one deferred repair. Callbacks are
+// appended by import functions on prehandler goroutines and drained later.
+func (p *Program) appendFixImportCallback(fn func()) {
+	if p == nil || fn == nil {
+		return
+	}
+	p.fixImportMu.Lock()
+	defer p.fixImportMu.Unlock()
+	p.fixImportCallback = append(p.fixImportCallback, fn)
+}
+
+// snapshotFixImportCallbacks copies the callback list so a drain never holds
+// the lock while callbacks run and import functions append more work.
+func (p *Program) snapshotFixImportCallbacks() []func() {
+	if p == nil {
+		return nil
+	}
+	p.fixImportMu.RLock()
+	defer p.fixImportMu.RUnlock()
+	callbacks := make([]func(), len(p.fixImportCallback))
+	copy(callbacks, p.fixImportCallback)
+	return callbacks
 }
 
 func readImportDecl(p *Program, get func(*importDeclareItem) bool) {
@@ -44,7 +131,7 @@ func readImportDecl(p *Program, get func(*importDeclareItem) bool) {
 func (p *Program) ReadImportType(name string) (Type, bool) {
 	var ret Type = nil
 	readImportDecl(p, func(idi *importDeclareItem) bool {
-		t, ok := idi.typ[name]
+		t, ok := idi.getType(name)
 		ret = t
 		return ok
 	})
@@ -54,10 +141,10 @@ func (p *Program) ReadImportType(name string) (Type, bool) {
 func (p *Program) TryReadImportDeclare(name string) (Type, bool) {
 	var ret Type = nil
 	readImportDecl(p, func(idi *importDeclareItem) bool {
-		t, ok := idi.typ[name]
+		t, ok := idi.getType(name)
 		ret = t
 		if ret == nil {
-			for libName := range p.importDeclares.GetMap() {
+			for libName := range p.importDeclares.SnapshotMap() {
 				lib, exist := p.GetLibrary(libName)
 				if lib != nil && exist {
 					ret, ok = lib.GetExportType(name)
@@ -81,7 +168,7 @@ func (p *Program) TryReadImportDeclare(name string) (Type, bool) {
 func (p *Program) ReadImportValue(name string) (Value, bool) {
 	var ret Value = nil
 	readImportDecl(p, func(idi *importDeclareItem) bool {
-		v, ok := idi.val[name]
+		v, ok := idi.getValue(name)
 		ret = v
 		return ok
 	})
@@ -90,20 +177,16 @@ func (p *Program) ReadImportValue(name string) (Value, bool) {
 
 func (p *Program) ReadImportTypeWithPkg(pkgName, name string) (Type, bool) {
 	if imp, ok := p.importDeclares.Get(pkgName); ok {
-		typ, ok := imp.typ[name]
-		return typ, ok
-	} else {
-		return nil, false
+		return imp.getType(name)
 	}
+	return nil, false
 }
 
 func (p *Program) ReadImportValueWithPkg(pkgName, name string) (Value, bool) {
 	if imp, ok := p.importDeclares.Get(pkgName); ok {
-		val, ok := imp.val[name]
-		return val, ok
-	} else {
-		return nil, false
+		return imp.getValue(name)
 	}
+	return nil, false
 }
 
 /// ===================================== import
@@ -124,12 +207,11 @@ func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, err
 	}
 	pkg, ok := importDecl.Get(lib.Name)
 	if !ok {
-		pkg = &importDeclareItem{
+		pkg = importDecl.GetOrSet(lib.Name, &importDeclareItem{
 			pkgName: lib.Name,
 			typ:     make(map[string]Type),
 			val:     make(map[string]Value),
-		}
-		importDecl.Set(lib.Name, pkg)
+		})
 	}
 	return pkg, nil
 }
@@ -140,9 +222,9 @@ func (p *Program) ImportTypeFromLib(lib *Program, name string, token CanStartSto
 		return err
 	}
 	importType := fakeImportType(lib, name, token)
-	pkg.typ[name] = importType
+	pkg.setType(name, importType)
 	if idx := strings.LastIndex(name, "."); idx >= 0 && idx+1 < len(name) {
-		pkg.typ[name[idx+1:]] = importType
+		pkg.setType(name[idx+1:], importType)
 	}
 	return err
 }
@@ -154,13 +236,13 @@ func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
 	}
 	for _, name := range names {
 		value := fakeImportValue(lib, name)
-		pkg.val[name] = value
-		p.fixImportCallback = append(p.fixImportCallback, func() {
+		pkg.setValue(name, value)
+		p.appendFixImportCallback(func() {
 			if real := lib.GetExportValue(name); real != nil {
 				if value != nil && value != real {
 					ReplaceAllValue(value, real)
 				}
-				pkg.val[name] = real
+				pkg.setValue(name, real)
 			}
 		})
 	}
@@ -191,26 +273,26 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 		return err
 	}
 	blueprint.Build()
-	p.fixImportCallback = append(p.fixImportCallback, func() {
+	p.appendFixImportCallback(func() {
 		//fix
 		blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
 			if len(values) > 0 {
-				pkg.val[s] = values[len(values)-1]
+				pkg.setValue(s, values[len(values)-1])
 			}
 			return true
 		})
 		for s, function := range blueprint.StaticMethod {
-			pkg.val[s] = function
+			pkg.setValue(s, function)
 		}
 	})
 	blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
 		if len(values) > 0 {
-			pkg.val[s] = values[len(values)-1]
+			pkg.setValue(s, values[len(values)-1])
 		}
 		return true
 	})
 	for s, function := range blueprint.StaticMethod {
-		pkg.val[s] = function
+		pkg.setValue(s, function)
 	}
 	return nil
 }
@@ -220,28 +302,28 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 		return err
 	}
 	build := func(blueprint *Blueprint, name string) {
-		p.fixImportCallback = append(p.fixImportCallback, func() {
+		p.appendFixImportCallback(func() {
 			blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
 				if name == s && len(values) > 0 {
-					pkg.val[s] = values[len(values)-1]
+					pkg.setValue(s, values[len(values)-1])
 				}
 				return true
 			})
 			for s, function := range blueprint.StaticMethod {
 				if name == s {
-					pkg.val[s] = function
+					pkg.setValue(s, function)
 				}
 			}
 		})
 		blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
 			if name == s && len(values) > 0 {
-				pkg.val[s] = values[len(values)-1]
+				pkg.setValue(s, values[len(values)-1])
 			}
 			return true
 		})
 		for s, function := range blueprint.StaticMethod {
 			if name == s {
-				pkg.val[s] = function
+				pkg.setValue(s, function)
 			}
 		}
 	}
@@ -261,9 +343,8 @@ func (p *Program) ImportAll(lib *Program) error {
 	if err != nil {
 		return err
 	}
-	maps.Copy(pkg.typ, lib.externType)
 	lib.initConcurrentMaps()
-	maps.Copy(pkg.val, lib.ExportValue.GetAll())
-	_ = pkg
+	pkg.copyTypesFrom(lib.snapshotExternTypes())
+	pkg.copyValuesFrom(lib.ExportValue.GetAll())
 	return nil
 }

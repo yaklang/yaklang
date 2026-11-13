@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Insecure Random Source (math/rand)"
-	title_zh: "检测Golang使用不安全随机源（math/rand）"
+	mode: "struct"
+	title: "结构匹配：Detect Golang Insecure Random Source (math/rand)"
+	title_zh: "结构匹配：检测Golang使用不安全随机源（math/rand）"
 	type: vuln
-	level: mid
+	level: "middle"
 	risk: "weak-randomness"
 	desc: <<<DESC
 该规则检测 `math/rand` 在安全相关场景中的使用。`math/rand` 为伪随机生成器，输出可预测，
@@ -29,7 +30,7 @@ $randCall<sourceCode(context=3)>?{have: /(?i)token|session|secret|password|passw
 
 alert $mid for {
 	type: "vuln",
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	title: "Golang Insecure Random Source Detected",
 	title_zh: "检测到Golang使用不安全随机源",

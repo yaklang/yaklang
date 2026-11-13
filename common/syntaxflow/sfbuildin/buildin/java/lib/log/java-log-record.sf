@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title_zh: "查找Java日志记录方法"
 	title: "Find Java Logging Method"
 	type:audit

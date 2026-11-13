@@ -12,11 +12,7 @@ import (
 func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) bool {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
-	timeline := s.evidenceTimeline
-	if timeline == nil {
-		timeline = c.GetTimeline()
-		s.evidenceTimeline = timeline
-	}
+	timeline := c.GetTimeline()
 	_, changed, err := timeline.applyEvidenceOperationsWithChange(ops, s.evidenceJSON, c.AcquireId)
 	if err != nil {
 		s.m.Unlock()
@@ -25,21 +21,36 @@ func (c *Config) applyEvidenceToTimeline(ops []EvidenceOperation) bool {
 	}
 	c.persistEvidenceTimelineLocked(s, timeline)
 	s.m.Unlock()
-	c.SyncSessionEvidenceTimeline()
 	return changed
 }
 
-// The journal is authoritative once migrated, including an empty state after
-// rollback/deletion. Only legacy DB evidence without a journal is imported.
-// Initialization, never prompt rendering, performs this one-time migration.
+// BroadcastEvidence 把一条 evidence 操作广播到同一 session 的所有 Timeline。
+// 广播 item 不携带本地 ID，各 Timeline 接收后自行检查并分配 ID。
+func (c *Config) BroadcastEvidence(op EvidenceOperation) error {
+	item, err := newEvidenceTimelineItem(op)
+	if err != nil {
+		return err
+	}
+	if err := c.BroadcastTimelineItem(item); err != nil {
+		return err
+	}
+	// Every Timeline assigns its own local ID. The session owner remains the
+	// persistence authority for evidence restored on the next runtime.
+	timeline := c.GetTimeline()
+	if c.PersistentSessionId != "" && c.GetDB() != nil && timeline != nil && !timeline.IsBranchTimeline() {
+		timeline.Save(c.GetDB(), c.PersistentSessionId)
+	}
+	return nil
+}
+
+// The current Timeline's journal is authoritative once migrated, including an
+// empty state after rollback/deletion. The legacy mirror is only imported when
+// this Timeline has no journal.
 func (c *Config) restoreEvidenceTimeline() {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
 	defer s.m.Unlock()
-	if s.evidenceTimeline == nil {
-		s.evidenceTimeline = c.GetTimeline()
-	}
-	timeline := s.evidenceTimeline
+	timeline := c.GetTimeline()
 	if store, found := timeline.evidenceStore(); found {
 		s.evidenceJSON = store.Marshal()
 		return
@@ -62,28 +73,7 @@ func (c *Config) FlushRestoredSessionEvidence() {
 	s := c.GetSessionPromptState()
 	s.m.Lock()
 	defer s.m.Unlock()
-	c.persistEvidenceTimelineLocked(s, s.evidenceTimeline)
-}
-
-func (c *Config) sessionEvidenceTimeline() *Timeline {
-	s := c.GetSessionPromptState()
-	s.m.RLock()
-	timeline := s.evidenceTimeline
-	s.m.RUnlock()
-	if timeline == nil {
-		return c.GetTimeline()
-	}
-	return timeline
-}
-
-// SyncSessionEvidenceTimeline imports the session journal into a task's local
-// Timeline before compression. Original IDs preserve ordering, deduplication
-// and exact promotion; rendering itself remains read-only.
-func (c *Config) SyncSessionEvidenceTimeline() {
-	local, session := c.GetTimeline(), c.sessionEvidenceTimeline()
-	if local != nil && session != nil && local != session {
-		local.importSessionEvidence(session)
-	}
+	c.persistEvidenceTimelineLocked(s, c.GetTimeline())
 }
 
 // Caller holds the session lock; the DB mirror and journal use one snapshot.

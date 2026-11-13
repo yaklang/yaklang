@@ -179,7 +179,9 @@ func (idx *pathIndex) fillAllow(file string, state *pathScanState, allowed []boo
 	}
 	for i, group := range idx.groups {
 		if group.matchAll {
-			matched[i] = true
+			// Same semantics as compilePathMatcher("*"): blanket filters skip
+			// manifests, explicit filters still reach them.
+			matched[i] = !blanketFileExcluded(file)
 		}
 	}
 	if idx.db != nil && state != nil && state.scratch != nil {

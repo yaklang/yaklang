@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "php"
-	title: "Struct scan: PHP highlight_file"
-	title_zh: "结构扫描：PHP highlight_file"
+	title: "结构匹配：PHP highlight_file"
+	title_zh: "结构匹配：PHP highlight_file"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-php-highlight-file"
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 highlight_file(* as $f) as $call
 show_source(* as $f) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: PHP highlight_file",
 	title_zh: "结构扫描：PHP highlight_file",
 	message: "结构扫描：PHP highlight_file",

@@ -1,0 +1,49 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到全局访问修饰符"
+	title_zh: "检测到全局访问修饰符",
+	type: vuln
+	level: "middle"
+	rule_id: "source-insecure-api-global-access-modifiers"
+	risk: "best-practice"
+	desc: <<<DESC
+### 规则说明
+全局类、方法与变量应避免使用（尤其在托管包中），因为全局成员一旦发布就无法删除或修改签名。
+
+### 风险类型
+最佳实践（best-practice）
+
+### 影响
+代码或配置不符合推荐实践，长期来看可能引入安全或维护风险。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-284
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+尽量避免使用 global 修饰，确认成员确实需要全局可见。
+SOLUTION
+	alert_min: 1
+	"file://pos.cls": <<<POS
+global wyVuHK9XQoiyEygHCclVZf
+
+POS
+	"safefile://neg/pos.cls": <<<NEG
+public class ExposedService {
+    public String name;
+}
+NEG
+)
+
+${*.cls}.pattern_regex_not(/global [A-Za-z0-9_]{3,}/, /\/\/(\s+([a-zA-Z]+\s+)+)[a-zA-Z]+/, /[*](\s+([a-zA-Z]+\s+)+)[a-zA-Z]+/) as $p0
+$p0 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到全局访问修饰符",
+	title_zh: "检测到全局访问修饰符",
+	message: "检测到全局访问修饰符",
+}

@@ -1,6 +1,7 @@
 desc(
-	title: "Check PHP FTP Information Exposure Vulnerability"
-	title_zh: "检测PHP FTP信息泄露漏洞"
+	mode: "ssa"
+	title: "数据流：Check PHP FTP Information Exposure Vulnerability"
+	title_zh: "数据流：检测PHP FTP信息泄露漏洞"
 	risk: "information-exposure"
 	type: vul
 	level: "low"

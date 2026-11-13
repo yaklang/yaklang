@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	risk: "information-exposure"
-	title: "Check Java Spring Boot Actuator Config"
-	title_zh: "检查Java Spring Boot Actuator配置"
+	title: "数据流：Check Java Spring Boot Actuator Config"
+	title_zh: "数据流：检查Java Spring Boot Actuator配置"
 	type:config
 	desc: <<<DESC
 ### 风险描述
@@ -179,7 +180,7 @@ http
 - 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
 - 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
 DESC
-	level: "mid",
+	level: "middle",
 	message: "Java Spring Boot Actuator配置存在安全风险,并且Spring Security默认允许所有请求访问Actuator端点。",
 	risk: "information-exposure",
 	name: "sink",

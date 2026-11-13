@@ -12,8 +12,9 @@ import (
 )
 
 // Manager is one owner scope. Retained execution records are local to this
-// manager, including StopAll; completed records remain inspectable until the
-// manager is discarded. The zero value is not usable; construct with New.
+// manager, including StopAll. Completed records remain inspectable until the
+// total-record limit requires eviction or the manager is discarded. The zero
+// value is not usable; construct with New.
 type Manager struct {
 	mu             sync.Mutex
 	ctx            context.Context
@@ -22,6 +23,7 @@ type Manager struct {
 	entries        map[string]*execution
 	order          []string
 	active         int
+	revision       uint64
 	closed         bool
 	changed        chan struct{}
 	stopOwnerWatch func() bool
@@ -31,14 +33,20 @@ func New(parent context.Context, config Config) (*Manager, error) {
 	if parent == nil {
 		return nil, errors.New("async execution owner context is required")
 	}
-	if config.MaxConcurrent < 0 || config.MaxExecutions < 0 {
+	if config.MaxActiveExecutions < 0 || config.MaxRetainedExecutions < 0 {
 		return nil, errors.New("async execution limits must not be negative")
 	}
-	if config.MaxConcurrent == 0 {
-		config.MaxConcurrent = 4
+	if config.MaxActiveExecutions == 0 {
+		config.MaxActiveExecutions = 4
 	}
-	if config.MaxExecutions == 0 {
-		config.MaxExecutions = 128
+	if config.MaxRetainedExecutions == 0 {
+		config.MaxRetainedExecutions = 128
+	}
+	if config.MaxRetainedExecutions < config.MaxActiveExecutions {
+		return nil, fmt.Errorf(
+			"async execution MaxRetainedExecutions (%d) must be >= MaxActiveExecutions (%d)",
+			config.MaxRetainedExecutions, config.MaxActiveExecutions,
+		)
 	}
 	ctx, cancel := context.WithCancelCause(parent)
 	m := &Manager{
@@ -86,8 +94,17 @@ func (m *Manager) start(request Request, adopted bool) (Summary, error) {
 	if _, exists := m.entries[id]; exists {
 		return Summary{}, ErrDuplicateID
 	}
-	if m.active >= m.config.MaxConcurrent || len(m.entries) >= m.config.MaxExecutions {
+	if m.active >= m.config.MaxActiveExecutions {
 		return Summary{}, ErrCapacity
+	}
+	// MaxRetainedExecutions is a total-record limit, not an admission failure. At
+	// this point active < MaxActiveExecutions <= MaxRetainedExecutions, so an
+	// over-limit store must contain at least one terminal record that can be
+	// evicted without rejecting the new execution.
+	for len(m.entries) >= m.config.MaxRetainedExecutions {
+		if !m.evictOldestTerminalLocked() {
+			break
+		}
 	}
 	ctx, cancel := context.WithCancelCause(m.ctx)
 	e := &execution{
@@ -104,6 +121,46 @@ func (m *Manager) start(request Request, adopted bool) (Summary, error) {
 	receipt := cloneSummary(e.summary)
 	go m.run(e)
 	return receipt, nil
+}
+
+// evictOldestTerminalLocked removes the terminal execution with the earliest
+// EndedAt. The caller must hold m.mu and at least one terminal record must exist.
+func (m *Manager) evictOldestTerminalLocked() bool {
+	evictIndex := -1
+	var oldestEnded time.Time
+	oldestEndedSet := false
+	for index, id := range m.order {
+		entry := m.entries[id]
+		if entry == nil || !entry.summary.State.IsTerminal() {
+			continue
+		}
+		if evictIndex < 0 {
+			evictIndex = index
+			if entry.summary.EndedAt != nil {
+				oldestEnded = *entry.summary.EndedAt
+				oldestEndedSet = true
+			}
+			continue
+		}
+		if entry.summary.EndedAt == nil {
+			continue
+		}
+		if !oldestEndedSet || entry.summary.EndedAt.Before(oldestEnded) {
+			evictIndex = index
+			oldestEnded = *entry.summary.EndedAt
+			oldestEndedSet = true
+		}
+	}
+	if evictIndex < 0 {
+		return false
+	}
+
+	id := m.order[evictIndex]
+	delete(m.entries, id)
+	copy(m.order[evictIndex:], m.order[evictIndex+1:])
+	m.order[len(m.order)-1] = ""
+	m.order = m.order[:len(m.order)-1]
+	return true
 }
 
 func (m *Manager) run(e *execution) {
@@ -175,6 +232,33 @@ func (m *Manager) List() []Summary {
 	return items
 }
 
+// Overview returns one coherent lifecycle snapshot without inspecting any
+// resource. Revision advances whenever the manager's execution state changes,
+// allowing clients to discard an older query response delivered after a newer
+// push event.
+func (m *Manager) Overview() Overview {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	executions := make([]Summary, 0, len(m.order))
+	for _, id := range m.order {
+		executions = append(executions, cloneSummary(m.entries[id].summary))
+	}
+	return Overview{
+		Revision:   m.revision,
+		Executions: executions,
+	}
+}
+
+// ChangeSignal returns a channel that is closed on the next lifecycle change.
+// Callers should take the signal before taking an Overview, then wait on it.
+// This snapshot-before-wait sequence lets missed intermediate states coalesce
+// without losing the latest state.
+func (m *Manager) ChangeSignal() <-chan struct{} {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.changed
+}
+
 func (m *Manager) Get(id string) (Summary, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -187,11 +271,9 @@ func (m *Manager) Get(id string) (Summary, error) {
 
 // Inspector returns the registered observer, not a manager-owned output cache.
 func (m *Manager) Inspector(id string) (Inspector, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	e, ok := m.entries[id]
-	if !ok {
-		return nil, ErrNotFound
+	e, err := m.execution(id)
+	if err != nil {
+		return nil, err
 	}
 	return e.inspector, nil
 }
@@ -203,15 +285,12 @@ func (m *Manager) Inspect(ctx context.Context, id string) (Snapshot, error) {
 	if ctx == nil {
 		return Snapshot{}, errors.New("inspection context is required")
 	}
-	inspector, err := m.Inspector(id)
+	e, err := m.execution(id)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	observation, inspectErr := inspect(ctx, inspector)
-	summary, err := m.Get(id)
-	if err != nil {
-		return Snapshot{}, err
-	}
+	observation, inspectErr := inspect(ctx, e.inspector)
+	summary := m.summaryOf(e)
 	observation.Result = append(observation.Result[:0:0], observation.Result...)
 	observation.PartialResult = append(observation.PartialResult[:0:0], observation.PartialResult...)
 	return Snapshot{Summary: summary, Observation: observation}, inspectErr
@@ -238,11 +317,26 @@ func (m *Manager) Wait(ctx context.Context, id string) (Summary, error) {
 	m.mu.Unlock()
 	select {
 	case <-done:
-		return m.Get(id)
+		return m.summaryOf(e), nil
 	case <-ctx.Done():
-		snapshot, _ := m.Get(id)
-		return snapshot, ctx.Err()
+		return m.summaryOf(e), ctx.Err()
 	}
+}
+
+func (m *Manager) execution(id string) (*execution, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, ok := m.entries[id]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return e, nil
+}
+
+func (m *Manager) summaryOf(e *execution) Summary {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return cloneSummary(e.summary)
 }
 
 // Stop is idempotent and only requests cancellation. A running resource stays
@@ -325,6 +419,7 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 }
 
 func (m *Manager) notifyLocked() {
+	m.revision++
 	close(m.changed)
 	m.changed = make(chan struct{})
 }

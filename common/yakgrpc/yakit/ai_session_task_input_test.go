@@ -23,53 +23,47 @@ func newAISessionTaskInputTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func TestAISessionTaskInputSaveQueryAndCurrentResources(t *testing.T) {
+func TestAISessionTaskInputSaveAndCurrentResources(t *testing.T) {
 	db := newAISessionTaskInputTestDB(t)
 	sessionID := "task-input-" + uuid.NewString()
 	otherSessionID := "task-input-other-" + uuid.NewString()
 
 	fileResource := AISessionTaskResource{
 		Type: "file", Key: "file_path", Value: "/tmp/workspace.txt",
-		Scope: AISessionTaskResourceScopeSession, Source: AISessionTaskResourceSourceAttachedFilePath,
 	}
 	browserA := AISessionTaskResource{
 		Type: "browser", Key: "browser_device", Value: `{"deviceId":"a"}`,
-		Scope: AISessionTaskResourceScopeSession, Source: AISessionTaskResourceSourceAttachedResourceInfo,
 	}
 	selectedFirst := AISessionTaskResource{
 		Type: "selected", Key: "content", Value: "first",
-		Scope: AISessionTaskResourceScopeTurn, Source: AISessionTaskResourceSourceAttachedResourceInfo,
 	}
 	task1UUID := "task-" + uuid.NewString()
 	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
 		SessionID: sessionID, TaskID: "task-1", TaskUUID: task1UUID,
 		UserInputUUID: "input-1", UserInput: "first task", InputSource: "ide",
-		AttachedFilePaths:  []string{fileResource.Value, " " + fileResource.Value + " "},
-		ExplicitResources:  []AISessionTaskResource{fileResource, browserA, selectedFirst},
-		EffectiveResources: []AISessionTaskResource{fileResource, browserA, selectedFirst},
+		FocusModeLoop: "code_security_audit", ScheduleUUID: "schedule-1",
+		ScheduleName: "daily", ScheduledAt: "2026-11-11T10:00:00+08:00",
+		ScheduleTrigger: "cron",
+		Resources:       []AISessionTaskResource{fileResource, browserA, selectedFirst},
 	}))
 
 	selectedSecond := AISessionTaskResource{
 		Type: "selected", Key: "content", Value: "second",
-		Scope: AISessionTaskResourceScopeTurn, Source: AISessionTaskResourceSourceAttachedResourceInfo,
 	}
 	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
 		SessionID: sessionID, TaskID: "task-2", TaskUUID: "task-" + uuid.NewString(),
 		UserInputUUID: "input-2", UserInput: "second task",
-		ExplicitResources:  []AISessionTaskResource{selectedSecond},
-		EffectiveResources: []AISessionTaskResource{browserA, selectedSecond},
+		Resources: []AISessionTaskResource{selectedSecond},
 	}))
 
 	browserB := AISessionTaskResource{
 		Type: "browser", Key: "browser_device", Value: `{"deviceId":"b"}`,
-		Scope: AISessionTaskResourceScopeSession, Source: AISessionTaskResourceSourceAttachedResourceInfo,
 	}
 	task3UUID := "task-" + uuid.NewString()
 	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
 		SessionID: sessionID, TaskID: "task-3", TaskUUID: task3UUID,
 		UserInputUUID: "input-3", UserInput: "third task",
-		ExplicitResources:  []AISessionTaskResource{browserB},
-		EffectiveResources: []AISessionTaskResource{browserB},
+		Resources: []AISessionTaskResource{browserB},
 	}))
 	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
 		SessionID: otherSessionID, TaskID: "other-task", TaskUUID: "task-" + uuid.NewString(),
@@ -95,18 +89,24 @@ func TestAISessionTaskInputSaveQueryAndCurrentResources(t *testing.T) {
 	require.NotNil(t, current)
 	require.Equal(t, "task-3", current.TaskID)
 	require.Equal(t, []AISessionTaskResource{browserB}, current.TaskResources)
-	require.ElementsMatch(t, []AISessionTaskResource{fileResource, browserB}, current.SessionResources)
+	require.Equal(t, []AISessionTaskResource{
+		browserB,
+		selectedSecond,
+		fileResource,
+		browserA,
+		selectedFirst,
+	}, current.SessionResources)
 
 	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
 		SessionID: sessionID, TaskID: "task-1", TaskUUID: task1UUID,
-		UserInputUUID: "input-1", UserInput: "first task updated",
-		ExplicitResources:  []AISessionTaskResource{fileResource, browserA, selectedFirst},
-		EffectiveResources: []AISessionTaskResource{fileResource, browserA, selectedFirst},
+		UserInputUUID: "input-1", UserInput: "first task updated", InputSource: "cli",
+		Resources: []AISessionTaskResource{fileResource, browserA, selectedFirst},
 	}))
 	updated, err := GetAISessionTaskInputByTaskUUID(db, task1UUID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	require.Equal(t, "first task updated", updated.UserInput)
+	require.Equal(t, "cli", updated.InputSource)
 
 	var count int64
 	require.NoError(t, db.Model(&schema.AISessionTaskInput{}).
@@ -122,6 +122,50 @@ func TestAISessionTaskInputSaveQueryAndCurrentResources(t *testing.T) {
 	require.EqualValues(t, 1, count)
 }
 
+func TestAISessionCurrentResourcesUsesOnlyResourcesFromEachInput(t *testing.T) {
+	db := newAISessionTaskInputTestDB(t)
+	sessionID := "task-input-resource-history-" + uuid.NewString()
+	fileResource := AISessionTaskResource{
+		Type: "file", Key: "file_path", Value: "/tmp/workspace",
+	}
+
+	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
+		SessionID: sessionID,
+		TaskID:    "task-1",
+		TaskUUID:  uuid.NewString(),
+		Resources: []AISessionTaskResource{fileResource},
+	}))
+	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
+		SessionID: sessionID,
+		TaskID:    "task-2",
+		TaskUUID:  uuid.NewString(),
+	}))
+
+	current, err := GetAISessionCurrentResources(db, sessionID)
+	require.NoError(t, err)
+	require.NotNil(t, current)
+	require.Empty(t, current.TaskResources)
+	require.Equal(t, []AISessionTaskResource{fileResource}, current.SessionResources)
+}
+
+func TestAISessionCurrentResourcesDeduplicatesOnlySessionHistory(t *testing.T) {
+	db := newAISessionTaskInputTestDB(t)
+	sessionID := "task-input-deduplicate-" + uuid.NewString()
+	resource := AISessionTaskResource{Type: "browser", Key: "browser_device", Value: "device-a"}
+	require.NoError(t, SaveAISessionTaskInput(db, &SaveAISessionTaskInputParams{
+		SessionID: sessionID,
+		TaskID:    "task-1",
+		TaskUUID:  uuid.NewString(),
+		Resources: []AISessionTaskResource{resource, resource},
+	}))
+
+	current, err := GetAISessionCurrentResources(db, sessionID)
+	require.NoError(t, err)
+	require.NotNil(t, current)
+	require.Equal(t, []AISessionTaskResource{resource, resource}, current.TaskResources)
+	require.Equal(t, []AISessionTaskResource{resource}, current.SessionResources)
+}
+
 func TestAISessionTaskInputSchemaUsesNoForeignKeysOrCompositeIndexes(t *testing.T) {
 	db := newAISessionTaskInputTestDB(t)
 
@@ -132,7 +176,7 @@ func TestAISessionTaskInputSchemaUsesNoForeignKeysOrCompositeIndexes(t *testing.
 		From  string `gorm:"column:from"`
 		To    string `gorm:"column:to"`
 	}
-	require.NoError(t, db.Raw(`PRAGMA foreign_key_list("ai_session_task_inputs_v1")`).Scan(&foreignKeys).Error)
+	require.NoError(t, db.Raw(`PRAGMA foreign_key_list("ai_session_task_inputs_v2")`).Scan(&foreignKeys).Error)
 	require.Empty(t, foreignKeys)
 
 	var indexes []struct {
@@ -142,7 +186,7 @@ func TestAISessionTaskInputSchemaUsesNoForeignKeysOrCompositeIndexes(t *testing.
 		Origin  string `gorm:"column:origin"`
 		Partial int    `gorm:"column:partial"`
 	}
-	require.NoError(t, db.Raw(`PRAGMA index_list("ai_session_task_inputs_v1")`).Scan(&indexes).Error)
+	require.NoError(t, db.Raw(`PRAGMA index_list("ai_session_task_inputs_v2")`).Scan(&indexes).Error)
 	require.NotEmpty(t, indexes)
 	for _, index := range indexes {
 		var columns []struct {

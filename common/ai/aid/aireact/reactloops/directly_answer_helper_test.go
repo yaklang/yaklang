@@ -286,6 +286,9 @@ func TestSimpleQueryPreservesGoalAndTodoWork(t *testing.T) {
 	require.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action), "greeting must not bypass the goal finish gate")
 	loop.currentIterationIndex = 6
 	require.True(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action))
+	loop.promptMode = aicommon.LoopPromptModeGoalAcceptance
+	require.False(t, ShouldAutoFinishAfterSimpleQueryDirectlyAnswer(loop, action),
+		"only finish may terminate a goal-acceptance review turn")
 	cfg.enableGoalMode = false
 	cfg.active = []aicommon.VerificationTodoItem{{ID: "pending", Status: aicommon.VerificationTodoStatusPending}}
 	require.False(t, loop.isSimpleQueryWithoutWork(), "pending TODOs must retain automatic recall")

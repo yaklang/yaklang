@@ -1,0 +1,70 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到 Skill 文档包含 Base64 载荷"
+	title_zh: "检测到 Skill 文档包含 Base64 载荷",
+	type: vuln
+	level: "middle"
+	rule_id: "source-config-skill-md-base64-payload-generic"
+	risk: "encoded-payload-execution"
+	desc: <<<DESC
+### 规则说明
+SKILL.md 或 AGENT.md 指示智能体解码并执行 base64（或 hex）编码的载荷，这是一种常见的编码规避手法，用于绕过人工审查向智能体植入恶意指令。
+
+### 风险类型
+编码载荷执行（encoded-payload-execution）
+
+### 影响
+攻击者可通过编码或混淆载荷绕过过滤并执行恶意代码。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-506
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+以纯文本说明内容或移除编码载荷；重新引入前先审计解码后的值。
+SOLUTION
+	alert_min: 1
+	"file://posSKILL.md": <<<POS
+eval
+base64dGFm%S]V`07gxCdMAu175dgQkFvUhJQtBBg9ZrmN25oWJbk6uTwQoX4LWAJN5SnJJ3PwRkGW==
+
+POS
+	"safefile://neg/posSKILL.md": <<<NEG
+# Skill
+
+Run the documented command:
+
+```bash
+echo "hello"
+```
+NEG
+)
+
+${*SKILL.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p0
+${*SKILL.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p1
+${*SKILL.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p2
+${*SKILL.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p3
+${*AGENT.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p4
+${*AGENT.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p5
+${*AGENT.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p6
+${*AGENT.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p7
+${*AGENTS.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p8
+${*AGENTS.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p9
+${*AGENTS.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p10
+${*AGENTS.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p11
+${*skill.md}.pattern_regex(/(?i)(?:decode|run|execute|eval)\s+(?:this\s+|the\s+following\s+)?base64[^\n]{0,40}[A-Za-z0-9+\/]{60,}={0,2}/) as $p12
+${*skill.md}.pattern_regex(/(?i)base64\s+-d\s*<<<\s*["']?[A-Za-z0-9+\/]{60,}={0,2}/) as $p13
+${*skill.md}.pattern_regex(/(?i)echo\s+["']?[A-Za-z0-9+\/]{60,}={0,2}["']?\s*\|\s*base64\s+(?:-d|--decode)/) as $p14
+${*skill.md}.pattern_regex(/(?i)(?:decode|run|execute)\s+(?:this\s+)?hex(?:\s+payload)?[^\n]{0,40}(?:[0-9a-fA-F]{2}\s?){40,}/) as $p15
+$p0 + $p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p7 + $p8 + $p9 + $p10 + $p11 + $p12 + $p13 + $p14 + $p15 as $hit
+alert $hit for {
+	risk: "encoded-payload-execution",
+	level: "middle",
+	title: "检测到 Skill 文档包含 Base64 载荷",
+	title_zh: "检测到 Skill 文档包含 Base64 载荷",
+	message: "检测到 Skill 文档包含 Base64 载荷",
+}

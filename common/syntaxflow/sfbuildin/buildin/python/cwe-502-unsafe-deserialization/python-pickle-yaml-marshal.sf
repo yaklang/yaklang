@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Python Unsafe Deserialization Vulnerability"
-	title_zh: "检测Python不安全反序列化漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Python Unsafe Deserialization Vulnerability"
+	title_zh: "数据流：检测Python不安全反序列化漏洞"
 	type: vuln
-	level: high
+	level: "middle"
 	risk: "deserialization"
 	desc: <<<DESC
 ## 漏洞原理
@@ -48,7 +49,7 @@ $sink?( *#{until: `* & $input`}->) as $hit
 alert $hit for {
 	title: "pickle yaml.load marshal.loads",
 	title_zh: "unsafe deserialize",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "deserialization",
 	message: "对用户可达的字节或文本执行了不安全的反序列化操作（pickle/yaml/marshal）。",
@@ -57,7 +58,6 @@ alert $hit for {
 
 desc(
 	lang: python
-	alert_high: 4
 	'file://unsafe_pickle.py': <<<UNSAFE
 import pickle
 import yaml

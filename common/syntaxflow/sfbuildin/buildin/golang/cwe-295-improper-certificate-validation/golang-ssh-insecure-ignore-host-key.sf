@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang ssh.InsecureIgnoreHostKey Usage"
-	title_zh: "检测Golang使用ssh.InsecureIgnoreHostKey"
+	mode: "struct"
+	title: "结构匹配：Detect Golang ssh.InsecureIgnoreHostKey Usage"
+	title_zh: "结构匹配：检测Golang使用ssh.InsecureIgnoreHostKey"
 	type: vuln
-	level: high
+	level: "high"
 	risk: "improper-authentication"
 	desc: <<<DESC
 该规则用于检测 `golang.org/x/crypto/ssh` 中 `ssh.InsecureIgnoreHostKey()` 的使用。
@@ -41,7 +42,6 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

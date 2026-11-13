@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Message/Header Byte Deserialization"
-	title_zh: "检测消息体或头部字节驱动的反序列化"
+	mode: "ssa"
+	title: "数据流：Detect Message/Header Byte Deserialization"
+	title_zh: "数据流：检测消息体或头部字节驱动的反序列化"
 	type: vuln
 	risk: "deserialization"
 	desc: <<<DESC

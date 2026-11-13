@@ -465,7 +465,8 @@ func attachCompiledSourceTargets(config *Config) {
 }
 
 // ruleFilterModes returns the caller-set mode filter, or infers one from the
-// query targets so SSA programs never receive source/struct rules.
+// query targets. A Program is a multi-mode target, so it accepts both the SSA
+// and the struct rules; a raw source target only accepts source rules.
 func ruleFilterModes(config *Config) []string {
 	if config == nil {
 		return nil
@@ -487,7 +488,10 @@ func ruleFilterModes(config *Config) []string {
 		}
 	}
 	if len(config.Programs) > 0 {
+		// Program.Query dispatches each rule by its own mode and runs a struct
+		// rule per compile unit, so a program stage carries both modes.
 		ssa = true
+		structMode = true
 	}
 	var modes []string
 	if source {

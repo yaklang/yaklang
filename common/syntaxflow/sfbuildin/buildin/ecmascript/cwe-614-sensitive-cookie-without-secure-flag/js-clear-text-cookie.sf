@@ -1,8 +1,9 @@
 desc(
-	title: "Clear Text Transmission of Sensitive Cookie"
-	title_zh: "Cookie 未设置 Secure 标志，可能被明文传输"
+	mode: "struct"
+	title: "结构匹配：Clear Text Transmission of Sensitive Cookie"
+	title_zh: "结构匹配：Cookie 未设置 Secure 标志，可能被明文传输"
 	type: vuln
-	level: warning
+	level: "low"
 	risk: "cleartext-cookie"
 	desc: <<<DESC
 ### 漏洞描述
@@ -44,7 +45,7 @@ app.get('/login', (req, res) => {
 - **敏感信息泄露**：Cookie 中存储的用户数据被暴露
 - **违反合规要求**：PCI DSS、HIPAA 等标准要求敏感凭证必须加密传输
 DESC
-	rule_id: "f3c8b2a1-7e4d-4f92-a5b6-0c1d9e3f7a28"
+	rule_id: "struct-js-clear-text-cookie"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -97,7 +98,8 @@ REFERENCE
 //   - Template literals like `authKey=${fn()}; HttpOnly` → BinOp(add, ...)
 //
 // Strategy (verified via SSA exploration):
-//   1. Capture all setHeader() second args as $hVal
+//   1. Capture the second argument of setHeader() calls whose first
+//      argument is Set-Cookie as $cookieVal
 //   2. For STATIC values: filter ConstInst that look like cookies (contain '=')
 //      and do NOT contain the 'Secure' attribute → alert
 //   3. For DYNAMIC values (BinOp from template literals): use <string> native call
@@ -109,14 +111,18 @@ REFERENCE
 //   4. The two sub-patterns are completely INDEPENDENT — safe/unsafe for each type.
 // =====================================================================
 
-*.setHeader(* as $hName, * as $hVal)
+*.setHeader(* as $hName, * as $hVal) as $headerCall
+// Only Set-Cookie calls are cookie findings. Without this filter every
+// setHeader with a dynamic value (CORS, Location, cache headers) is reported.
+$headerCall?{<getActualParams><slice(index=0)>?{have: /(?i)^\s*set-cookie\s*$/}} as $cookieCall
+$cookieCall<getActualParams><slice(index=1)> as $cookieVal
 
 // --- Sub-pattern A1: Static const cookie strings without Secure ---
 // ?{have: /\w+=\w+/} ensures it's a cookie "name=value" pair (not "text/html" etc.)
-$hVal?{opcode: const}?{have: /\w+=\w+/}?{!have: /(?i)(^|;)\s*secure(\s|;|$)/} as $unsafeConstCookie
+$cookieVal?{opcode: const}?{have: /\w+=\w+/}?{!have: /(?i)(^|;)\s*secure(\s|;|$)/} as $unsafeConstCookie
 
 alert $unsafeConstCookie for {
-	level: "warning",
+	level: "low",
 	type: "vuln",
 	title: "Cookie Set via setHeader Without 'Secure' Attribute",
 	title_zh: "通过 setHeader 设置的静态 Cookie 字符串缺少 Secure 属性，可能被明文传输",
@@ -147,12 +153,12 @@ SOLUTION
 // the suffix becomes the rightmost operand of the outermost add() and thus
 // appears in the SSA repr. Template literals WITHOUT "; Secure" will not contain
 // the word "secure" anywhere in the SSA repr.
-$hVal?{!opcode: const} as $dynamicCookieVals
+$cookieVal?{!opcode: const} as $dynamicCookieVals
 $dynamicCookieVals<string> as $dynamicSSARepr
 $dynamicSSARepr?{!have: /(?i)secure/} as $unsafeDynamicSSARepr
 
 alert $unsafeDynamicSSARepr for {
-	level: "warning",
+	level: "low",
 	type: "vuln",
 	title: "Template Literal Cookie via setHeader Without 'Secure' Attribute",
 	title_zh: "通过 setHeader 设置的模板字符串 Cookie 缺少 Secure 属性，可能被明文传输",
@@ -186,7 +192,7 @@ $cookieOpts.secure as $secureAttr
 $secureAttr?{have: false} as $explicitSecureFalse
 
 alert $explicitSecureFalse for {
-	level: "warning",
+	level: "low",
 	type: "vuln",
 	title: "Express Cookie Set with 'secure: false'",
 	title_zh: "Express res.cookie() 明确将 secure 设置为 false，Cookie 将被明文传输",

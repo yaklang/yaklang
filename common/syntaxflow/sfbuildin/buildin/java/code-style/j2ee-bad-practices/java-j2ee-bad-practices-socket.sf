@@ -1,6 +1,7 @@
 desc(
-	title_zh: "审计Java J2EE 使用socket"
-	title: "Audit Java J2EE Usage of Socket"
+	mode: "struct"
+	title_zh: "结构匹配：审计Java J2EE 使用socket"
+	title: "结构匹配：Audit Java J2EE Usage of Socket"
 	risk:"code-style"
 	reference: <<<REFERENCE
 [CWE-20](https://cwe.mitre.org/data/definitions/20.html)
@@ -107,7 +108,7 @@ resp.getWriter().println("Connected to example.com via SSL socket.");
 - 手动管理网络资源可能导致资源泄漏、性能问题或难以维护的代码。
 - 容器无法对其行为进行有效监控或优化，违背了J2EE设计原则中的“容器托管”理念。
 DESC
-	level: "info",
+	level: "middle",
 	message: "发现Java J2EE 使用socket",
 	title: "Unvalidated Java J2EE Socket Usage",
 	title_zh: "未验证的Java J2EE套接字使用",

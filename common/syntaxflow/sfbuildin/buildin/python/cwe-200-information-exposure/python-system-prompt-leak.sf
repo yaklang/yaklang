@@ -1,0 +1,86 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：System prompt exposed in error response"
+	title_zh: "源码匹配：错误响应泄露系统提示词"
+	type: vuln
+	level: "middle"
+	risk: "information-exposure"
+	cwe: "CWE-200"
+	desc: <<<DESC
+异常处理把 `SYSTEM` 提示词放进 JSON 响应，客户端可以读到内部策略。
+
+### 检测方式
+源码正则匹配 `jsonify` 参数中出现 `SYSTEM`。
+DESC
+	solution: <<<SOLUTION
+- 错误响应只返回固定文案。
+- 不要把系统提示词写入响应或日志。
+SOLUTION
+	alert_min: 1
+	rule_id: "76f8c6a8-389a-41d0-92c4-f4965d185265"
+)
+${*.py}.pattern_regex(/jsonify\s*\([\s\S]{0,200}?\bSYSTEM\b/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "System prompt exposed in error response",
+	title_zh: "错误响应泄露系统提示词",
+	risk: "information-exposure",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /ask?text=
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+SYSTEM = "Internal policy: refund above 500 requires finance approval."
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    try:
+        return client_complete(SYSTEM)  # wb:source id=src
+    except Exception as exc:
+        return jsonify({"error": str(exc), "system": SYSTEM})  # wb:sink id=sink
+
+def client_complete(prompt):
+    raise RuntimeError("upstream")
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /ask?text=
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+SYSTEM = "Internal policy: refund above 500 requires finance approval."
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    try:
+        return {"ok": True, "body": client_complete(SYSTEM)}  # wb:source id=src
+    except Exception:
+        return jsonify({"error": "upstream unavailable"})  # wb:sink id=sink
+
+def client_complete(prompt):
+    raise RuntimeError("upstream")
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

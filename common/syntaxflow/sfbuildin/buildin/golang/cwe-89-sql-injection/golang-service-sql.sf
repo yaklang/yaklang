@@ -1,7 +1,8 @@
 desc(
-	title: "Detect Golang SQL Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Detect Golang SQL Injection Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -40,7 +41,7 @@ desc(
 
 DESC
 	rule_id: "278c2a17-1b81-49d1-a4a9-d881fba1a0e9"
-	title_zh: "检测Golang SQL注入漏洞Service"
+	title_zh: "数据流：检测Golang SQL注入漏洞Service"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -111,7 +112,7 @@ $func <getCall> #{
 }-> as $high
 
 alert $high for {
-	level: "high",
+	level: "middle",
 	risk: "sql-injection",
 	type: "vuln",
 	title: "Golang SQL Injection Vulnerability Was Detected",
@@ -180,7 +181,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

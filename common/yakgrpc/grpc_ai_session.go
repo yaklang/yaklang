@@ -92,11 +92,9 @@ func convertAISessionTaskResourceInfos(resources []yakit.AISessionTaskResource) 
 	result := make([]*ypb.AISessionTaskResourceInfo, 0, len(resources))
 	for _, resource := range resources {
 		result = append(result, &ypb.AISessionTaskResourceInfo{
-			Type:   resource.Type,
-			Key:    resource.Key,
-			Value:  resource.Value,
-			Scope:  resource.Scope,
-			Source: resource.Source,
+			Type:  resource.Type,
+			Key:   resource.Key,
+			Value: resource.Value,
 		})
 	}
 	return result

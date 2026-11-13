@@ -1,0 +1,6 @@
+uint64_t sub_0x5800(void) {
+    v4 = helper(0x10, 0x20);
+    v5 = helper2();
+    return 0x0;
+}
+
