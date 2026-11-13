@@ -5,7 +5,6 @@ package yakgrpc
 import (
 	"context"
 	"net/http"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -138,7 +137,7 @@ func (t *mitmPipelineTracker) requestObserved(req *http.Request, excludeWebSocke
 	now := t.now()
 	protocol := req.Proto
 	filter := mitmFilterPending
-	if strings.EqualFold(req.Header.Get("Upgrade"), "websocket") {
+	if httpctx.GetIsWebWebsocketRequest(req) {
 		protocol = "WebSocket"
 		if excludeWebSocket {
 			filter = mitmFilterWebSocketExcluded

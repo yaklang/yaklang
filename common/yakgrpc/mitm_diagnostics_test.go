@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -448,7 +449,12 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	}).GetPersistEnqueuedTotal())
 
 	upgraded := make(chan net.Conn, 1)
+	handshake := make(chan struct{})
+	releaseHandshake := sync.OnceFunc(func() { close(handshake) })
 	wsOrigin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/filtered-socket" {
+			<-handshake
+		}
 		conn, writer, err := w.(http.Hijacker).Hijack()
 		if err != nil {
 			return
@@ -458,28 +464,34 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 		upgraded <- conn
 	}))
 	defer wsOrigin.Close()
+	defer releaseHandshake()
 	wsAddr := wsOrigin.Listener.Addr().String()
-	openSocket := func() (net.Conn, net.Conn) {
+	sendHandshake := func(path, connectionHeader, upgradeHeader string) net.Conn {
 		t.Helper()
 		browser, err := net.DialTimeout("tcp", proxyAddr, time.Second)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = browser.Close() })
 		require.NoError(t, browser.SetReadDeadline(time.Now().Add(5*time.Second)))
-		_, err = fmt.Fprintf(browser, "GET http://%[1]s/socket HTTP/1.1\r\nHost: %[1]s\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n", wsAddr)
+		_, err = fmt.Fprintf(browser, "GET http://%[1]s%[2]s HTTP/1.1\r\nHost: %[1]s\r\n%[3]s: Upgrade\r\n%[4]s: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n", wsAddr, path, connectionHeader, upgradeHeader)
 		require.NoError(t, err)
+		return browser
+	}
+	readUpgrade := func(browser net.Conn) net.Conn {
+		t.Helper()
 		resp, err := http.ReadResponse(bufio.NewReader(browser), nil)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
 		select {
 		case wsConn := <-upgraded:
 			t.Cleanup(func() { _ = wsConn.Close() })
-			return browser, wsConn
+			return wsConn
 		case <-ctx.Done():
 			t.Fatal("WebSocket origin did not upgrade")
-			return nil, nil
+			return nil
 		}
 	}
-	browser, originSocket := openSocket()
+	browser := sendHandshake("/socket", "Connection", "Upgrade")
+	originSocket := readUpgrade(browser)
 	stats := waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetDiagnostics().GetWebSocketOnline() == 1 })
 	require.Zero(t, stats.GetActiveTotal())
 	require.Zero(t, stats.GetUpstreamActive())
@@ -502,9 +514,25 @@ func TestGRPCMUSTPASS_MITMV2_DiagnosticsHTTPAndWebSocket(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("MITM did not process the WebSocket filter update")
 	}
-	browser, originSocket = openSocket()
-	waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetDiagnostics().GetWebSocketOnline() == 1 })
+	browser = sendHandshake("/filtered-socket", "connection", "uPgRaDe")
+	handshaking := waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetOldestUpstreamAgeMs() >= 2000 })
+	require.EqualValues(t, 1, handshaking.GetDiagnostics().GetWebSocketHandshaking())
+	require.Zero(t, handshaking.GetDiagnostics().GetInScopeWebSocketHandshaking())
 	excluded, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+		SessionId: session, View: "active", TrafficScope: "capture",
+	})
+	require.NoError(t, err)
+	require.Empty(t, excluded.GetTraces())
+	all, err := client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
+		SessionId: session, View: "active", TrafficScope: "all",
+	})
+	require.NoError(t, err)
+	require.Len(t, all.GetTraces(), 1)
+	require.Equal(t, "websocket_excluded", all.GetTraces()[0].GetFilterDecision())
+	releaseHandshake()
+	originSocket = readUpgrade(browser)
+	waitStats(func(s *ypb.MITMPipelineStats) bool { return s.GetDiagnostics().GetWebSocketOnline() == 1 })
+	excluded, err = client.GetMITMDiagnostics(ctx, &ypb.GetMITMDiagnosticsRequest{
 		SessionId: session, View: "websocket", TrafficScope: "capture",
 	})
 	require.NoError(t, err)

@@ -179,45 +179,45 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 	}
 	pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option, observer: tr.attempt}
 
-	var rawBytes []byte
-	var firstResponse *http.Response
+	var response responseInfo
 	select {
-	case re := <-resc:
-		if re.err != nil && len(rawBytes) == 0 {
-			if pc.shouldRetryRequest(re.err) {
-				pc.closeConn(re.err)
-				// Signal reconnect to caller
-				return nil, &reconnectError{err: re.err}
-			}
-			return nil, re.err
-		}
-		firstResponse = re.resp
-		rawBytes = re.respBytes
-		tr.traceInfo.ServerTime = re.info.ServerTime
-		if option != nil && option.BodyStreamReaderHandler != nil {
-			if option.bodyStreamReaderHandled != nil {
-				option.bodyStreamReaderHandled.Set()
-			}
-		}
+	case response = <-resc:
 	case <-ctx.Done():
 		pc.closeConn(ctx.Err())
 		return nil, ctx.Err()
 	case <-pc.ctx.Done():
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
+		// readLoop queues the response before publishing the idle connection.
+		// A waiter can evict the socket while the previous caller is waking up.
+		select {
+		case response = <-resc:
+		default:
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			if pc.closed == nil {
+				return nil, net.ErrClosed
+			}
+			if pc.shouldRetryRequest(pc.closed) {
+				return nil, &reconnectError{err: pc.closed}
+			}
+			return nil, pc.closed
 		}
-		if pc.closed == nil {
-			return nil, utils.Error("BUG: closeCh but closed is nil")
-		}
-		if pc.shouldRetryRequest(pc.closed) {
-			return nil, &reconnectError{err: pc.closed}
-		}
-		return nil, pc.closed
 	}
 
+	if response.err != nil {
+		if pc.shouldRetryRequest(response.err) {
+			pc.closeConn(response.err)
+			return nil, &reconnectError{err: response.err}
+		}
+		return nil, response.err
+	}
+	tr.traceInfo.ServerTime = response.info.ServerTime
+	if option.BodyStreamReaderHandler != nil && option.bodyStreamReaderHandled != nil {
+		option.bodyStreamReaderHandled.Set()
+	}
 	return &transportResult{
-		rawBytes:       rawBytes,
-		firstResponse:  firstResponse,
+		rawBytes:       response.respBytes,
+		firstResponse:  response.resp,
 		multiResponses: nil,
 		remoteAddr:     conn.RemoteAddr().String(),
 		portIsOpen:     true,

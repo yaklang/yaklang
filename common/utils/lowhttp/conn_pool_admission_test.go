@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -118,4 +119,65 @@ func TestConnPoolH1SlotWaitRespectsConnectTimeout(t *testing.T) {
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.ErrorContains(t, err, "waiting for HTTP/1.1 connection slot")
 	require.Len(t, pool.connSem, 1)
+}
+
+func TestConnPoolH1EvictionKeepsBufferedResponse(t *testing.T) {
+	// Exercise both select branches when the response and closure are ready.
+	for range 32 {
+		func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			pool := NewHttpConnPool(ctx, 1, 1)
+			defer pool.Clear()
+			key := &connectKey{scheme: H1, addr: "first.invalid:80"}
+			_, err := pool.acquireH1Conn(ctx, key, 0)
+			require.NoError(t, err)
+
+			socket, peer := net.Pipe()
+			defer socket.Close()
+			defer peer.Close()
+			connCtx, closeConn := context.WithCancel(context.Background())
+			defer closeConn()
+			pc := &persistConn{
+				ctx:      connCtx,
+				cancel:   closeConn,
+				conn:     socket,
+				p:        pool,
+				cacheKey: key,
+				reqCh:    make(chan requestAndResponseCh, 1),
+				writeCh:  make(chan writeRequest),
+			}
+			tr := &transportRequest{option: &LowhttpExecConfig{}, traceInfo: &LowhttpTraceInfo{}}
+			type outcome struct {
+				response *transportResult
+				err      error
+			}
+			done := make(chan outcome, 1)
+			go func() {
+				response, err := (&h1Transport{pool: pool}).roundTripPooled(ctx, tr, pc, nil)
+				done <- outcome{response, err}
+			}()
+
+			request := <-pc.reqCh
+			// Reproduce readLoop publishing the response and then returning
+			// the connection to the pool. Keep the caller at its write handoff
+			// until admission for another origin has evicted the connection.
+			packet := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+			request.ch <- responseInfo{
+				resp: &http.Response{StatusCode: http.StatusOK}, respBytes: packet,
+				info: httpInfo{ServerTime: 10 * time.Millisecond},
+			}
+			err = pool.putIdleConn(pc)
+			_, admissionErr := pool.acquireH1Conn(ctx, &connectKey{scheme: H1, addr: "second.invalid:80"}, 0)
+			<-pc.writeCh
+			result := <-done
+			require.NoError(t, err)
+			require.NoError(t, admissionErr)
+			require.ErrorIs(t, connCtx.Err(), context.Canceled)
+			require.NoError(t, result.err)
+			require.Equal(t, http.StatusOK, result.response.firstResponse.StatusCode)
+			require.Equal(t, packet, result.response.rawBytes)
+			require.Equal(t, 10*time.Millisecond, tr.traceInfo.ServerTime)
+		}()
+	}
 }

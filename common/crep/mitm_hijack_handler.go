@@ -198,7 +198,6 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 			if !ok {
 				hashCache.Store(wshash, true)
 				httpctx.SetWebsocketRequestHash(req, wshash)
-				httpctx.SetIsWebWebsocketRequest(req)
 				m.httpFlowMirror(isHttps, req, rsp, startTs)
 			}
 		},
@@ -293,6 +292,8 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		use utils.GetHTTPHeader instead of req.Header.Get for compatible with all lowercase request header
 	*/
 	if req.Method != "CONNECT" && utils.IContains(utils.GetHTTPHeader(req.Header, "connection"), "upgrade") && utils.IContains(utils.GetHTTPHeader(req.Header, "upgrade"), "websocket") {
+		// The request callback observes the handshake before dialing upstream.
+		httpctx.SetIsWebWebsocketRequest(req)
 		return wsModifier.ModifyRequest(req)
 	}
 
