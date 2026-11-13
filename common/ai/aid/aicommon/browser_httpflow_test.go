@@ -14,10 +14,11 @@ import (
 
 func TestAttachedBrowserHTTPRequestRouting(t *testing.T) {
 	task := NewStatefulTaskBase("http-test", "compare A and B", context.Background(), nil, true)
-	task.SetAttachedDatas([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeBrowser, AttachedResourceKeyBrowserDevice, `{"deviceId":"device-a","reference":"A"}`),
-		NewAttachedResource(AttachedResourceTypeBrowser, AttachedResourceKeyBrowserDevice, `{"deviceId":"device-b","reference":"B"}`),
-	})
+	invoker := &browserAttachmentTestInvoker{bindings: []AttachedBrowserBinding{
+		{DeviceID: "device-a", Reference: "A"},
+		{DeviceID: "device-b", Reference: "B"},
+	}}
+	task.SetReActLoop(&attachedBrowserTestLoop{invoker: invoker})
 	params, err := BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{
 		"browser_ref": "@B", "device_id": "spoofed", "url": "http://example.test/user?id=1",
 	})
@@ -34,15 +35,13 @@ func TestAttachedBrowserHTTPRequestRouting(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, params)
 
-	task.SetAttachedDatas(nil)
+	invoker.bindings = nil
 	params, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"browser_ref": "B", "device_id": "spoofed"})
 	require.NoError(t, err)
 	require.NotContains(t, params, "device_id")
 	require.Equal(t, "B", params.GetString("browser_ref"))
 
-	task.SetAttachedDatas([]*AttachedResource{
-		NewAttachedResource(AttachedResourceTypeBrowser, AttachedResourceKeyBrowserDevice, `{"deviceId":"device-a","reference":"A"}`),
-	})
+	invoker.bindings = []AttachedBrowserBinding{{DeviceID: "device-a", Reference: "A"}}
 	_, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"browser_ref": "B"})
 	require.ErrorContains(t, err, "does not match an attached browser")
 	params, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{})
@@ -77,10 +76,11 @@ func TestToolCallerBindsBrowserHTTPFlowIdentity(t *testing.T) {
 			)
 			require.NoError(t, err)
 			task := NewStatefulTaskBase("http-"+badge, "compare A and B", ctx, cfg.Emitter, true)
-			task.SetAttachedDatas([]*AttachedResource{
-				NewAttachedResource(AttachedResourceTypeBrowser, AttachedResourceKeyBrowserDevice, `{"deviceId":"device-a","reference":"A"}`),
-				NewAttachedResource(AttachedResourceTypeBrowser, AttachedResourceKeyBrowserDevice, `{"deviceId":"device-b","reference":"B"}`),
-			})
+			invoker := &browserAttachmentTestInvoker{bindings: []AttachedBrowserBinding{
+				{DeviceID: "device-a", Reference: "A"},
+				{DeviceID: "device-b", Reference: "B"},
+			}}
+			task.SetReActLoop(&attachedBrowserTestLoop{invoker: invoker})
 			caller, err := NewToolCaller(ctx, WithToolCaller_AICallerConfig(cfg), WithToolCaller_Task(task),
 				WithToolCaller_Emitter(cfg.Emitter), WithToolCaller_RuntimeId("http-"+badge))
 			require.NoError(t, err)

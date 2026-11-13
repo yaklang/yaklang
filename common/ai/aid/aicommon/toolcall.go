@@ -1012,11 +1012,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 	} else if t.paramAugment != nil {
 		invokeParams = t.paramAugment(invokeParams)
 	}
-	if allow, feedback := CheckAttachedBrowserToolRoute(t.task, tool.Name); !allow {
+	if allow, feedback := checkAttachedBrowserToolRoute(t.task, t.invokeRuntime, tool.Name); !allow {
 		handleError(feedback)
 		return nil, false, utils.Error(feedback)
 	}
-	invokeParams, err = BindAttachedBrowserToolParams(t.task, tool.Name, invokeParams)
+	invokeParams, err = bindAttachedBrowserToolParams(t.task, t.invokeRuntime, tool.Name, invokeParams)
 	if err != nil {
 		handleError(err)
 		return nil, false, err

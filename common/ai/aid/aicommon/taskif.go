@@ -182,6 +182,10 @@ type AIStatefulTaskBase struct {
 	scheduleTrigger string
 	attachedDatas   []*AttachedResource
 
+	// attachedBrowserBindings is captured when a task is created. ReAct activates
+	// it at task start so a newer queued @browser cannot reroute the running task.
+	attachedBrowserBindings []AttachedBrowserBinding
+
 	focusMode         string
 	semanticLabel     string
 	taskRetrievalInfo *AITaskRetrievalInfo
@@ -877,6 +881,22 @@ func (s *AIStatefulTaskBase) SetAttachedDatas(attachedDatas []*AttachedResource)
 	s.attachedDatas = attachedDatas
 }
 
+func (s *AIStatefulTaskBase) GetAttachedBrowserBindings() []AttachedBrowserBinding {
+	if s == nil {
+		return nil
+	}
+	return append([]AttachedBrowserBinding(nil), s.attachedBrowserBindings...)
+}
+
+// SetAttachedBrowserBindings snapshots the session browser selection for this
+// task. ReAct activates the snapshot when the task starts, never during queueing.
+func (s *AIStatefulTaskBase) SetAttachedBrowserBindings(bindings []AttachedBrowserBinding) {
+	if s == nil {
+		return
+	}
+	s.attachedBrowserBindings = append([]AttachedBrowserBinding(nil), bindings...)
+}
+
 var _ AIStatefulTask = (*AIStatefulTaskBase)(nil)
 
 // NewSubTaskBase 创建一个"子任务"——从父 task 的 context 派生独立 context。
@@ -919,7 +939,15 @@ func NewSubTaskBaseWithOptions(
 		WithStatefulTaskBaseParent(parentTask),
 	}
 	baseOpts = append(baseOpts, opts...)
-	return newStatefulTaskBase(subTaskId, userInput, baseOpts...)
+	subTask := newStatefulTaskBase(subTaskId, userInput, baseOpts...)
+	if parentTask != nil {
+		if carrier, ok := parentTask.(interface {
+			GetAttachedBrowserBindings() []AttachedBrowserBinding
+		}); ok {
+			subTask.SetAttachedBrowserBindings(carrier.GetAttachedBrowserBindings())
+		}
+	}
+	return subTask
 }
 
 func NewStatefulTaskBase(
