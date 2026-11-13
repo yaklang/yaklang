@@ -49,13 +49,13 @@ func AIModelContextMaximumThreshold(value AIModelContext) int64 {
 
 // SetAIModelContextSettings applies a user edit atomically. A mode-only edit preserves
 // the threshold, including a learned value below the manual input floor.
-func SetAIModelContextSettings(db *gorm.DB, provider, model string, threshold int64, disabled *bool) error {
+func SetAIModelContextSettings(db *gorm.DB, provider, model string, threshold int64, disabled *bool, contextKey ...string) error {
 	aiModelContextMu.Lock()
 	defer aiModelContextMu.Unlock()
 	if db == nil || strings.TrimSpace(model) == "" {
 		return fmt.Errorf("model context requires a database and model identity")
 	}
-	value := GetAIModelContext(db, provider, model)
+	value := GetAIModelContext(db, provider, model, contextKey...)
 	if threshold != 0 || disabled == nil {
 		if threshold < MinimumAIModelContextTokens {
 			return fmt.Errorf("上下文压缩阈值不能低于 100K (%d tokens)", MinimumAIModelContextTokens)
@@ -73,20 +73,23 @@ func SetAIModelContextSettings(db *gorm.DB, provider, model string, threshold in
 	if err != nil {
 		return err
 	}
-	return SetKey(db, aiModelContextKey(provider, model), string(raw))
+	return SetKey(db, aiModelContextKey(provider, model, contextKey...), string(raw))
 }
 
-func aiModelContextKey(provider, model string) string {
+func aiModelContextKey(provider, model string, contextKey ...string) string {
+	if len(contextKey) > 0 && contextKey[0] != "" {
+		return fmt.Sprintf("ai-model-context-v2:%x", sha256.Sum256([]byte(contextKey[0]+"\x00"+strings.TrimSpace(provider)+"\x00"+strings.TrimSpace(model))))
+	}
 	return fmt.Sprintf("ai-model-context:%x", sha256.Sum256([]byte(strings.TrimSpace(provider)+"\x00"+strings.TrimSpace(model))))
 }
 
-func GetAIModelContext(db *gorm.DB, provider, model string) AIModelContext {
+func GetAIModelContext(db *gorm.DB, provider, model string, contextKey ...string) AIModelContext {
 	value := AIModelContext{ContextTokens: DefaultAIModelContextTokens, ThresholdTokens: DefaultAIModelContextTokens, Source: "default"}
 	if db == nil || strings.TrimSpace(model) == "" {
 		return value
 	}
 	var saved AIModelContext
-	if json.Unmarshal([]byte(GetKey(db, aiModelContextKey(provider, model))), &saved) == nil && saved.ContextTokens > 0 && saved.ThresholdTokens > 0 {
+	if json.Unmarshal([]byte(GetKey(db, aiModelContextKey(provider, model, contextKey...))), &saved) == nil && saved.ContextTokens > 0 && saved.ThresholdTokens > 0 {
 		return saved
 	}
 	return value
@@ -94,14 +97,14 @@ func GetAIModelContext(db *gorm.DB, provider, model string) AIModelContext {
 
 // SaveAIModelContext updates one model independently of the global routing
 // configuration. Concurrent successful probes may only lower a learned budget.
-func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContext) error {
+func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContext, contextKey ...string) error {
 	aiModelContextMu.Lock()
 	defer aiModelContextMu.Unlock()
 	if value.ContextTokens <= 0 || value.ThresholdTokens <= 0 {
 		return fmt.Errorf("invalid model context budget")
 	}
 	if value.Source == "manual" {
-		previous := GetAIModelContext(db, provider, model)
+		previous := GetAIModelContext(db, provider, model, contextKey...)
 		if value.ThresholdTokens > AIModelContextMaximumThreshold(previous) {
 			return fmt.Errorf("上下文压缩阈值不能超过滑条上限 (%d tokens)", AIModelContextMaximumThreshold(previous))
 		}
@@ -117,7 +120,7 @@ func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContex
 		return fmt.Errorf("model context requires a database and model identity")
 	}
 	if value.Source == "learned" {
-		previous := GetAIModelContext(db, provider, model)
+		previous := GetAIModelContext(db, provider, model, contextKey...)
 		if previous.DisableAutoAdjust || previous.ManualRevision != value.ManualRevision {
 			return ErrAIModelContextChanged
 		}
@@ -130,5 +133,5 @@ func SaveAIModelContext(db *gorm.DB, provider, model string, value AIModelContex
 	if err != nil {
 		return err
 	}
-	return SetKey(db, aiModelContextKey(provider, model), string(raw))
+	return SetKey(db, aiModelContextKey(provider, model, contextKey...), string(raw))
 }

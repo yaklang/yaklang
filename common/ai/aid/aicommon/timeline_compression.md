@@ -2,9 +2,9 @@
 
 ## 主循环入口
 
-`reactloops/prompt.go` 的 `generateLoopPromptFromInput` 返回正文、成分快照和 prompt 模式。它先正常组装，再检查整份 prompt 的 token 数；默认上限为 `500 * 1000` tokens，不单独测量 Timeline。
+`reactloops/prompt.go` 的 `generateLoopPromptFromInput` 返回正文、成分快照和 prompt 模式。它先正常组装，再检查整份 prompt 的 token 数；默认上限为 `300 * 1024` tokens，不单独测量 Timeline。
 
-超过限制时，直接用同一份任务输入重建压缩 prompt：只替换动态段，加入压缩指引与候选表，返回上下文压缩模式。默认目标约为 `83.3 * 1000` tokens（上限的六分之一），触发上限保持 `500 * 1000`。冗余的工具和证据操作由 promoted 状态转移自己折叠，不再在压缩前单独扫一遍。
+超过限制时，直接用同一份任务输入重建压缩 prompt：只替换动态段，加入压缩指引与候选表，返回上下文压缩模式。默认目标为 `50 * 1024` tokens（上限的六分之一），触发上限保持 `300 * 1024`。冗余的工具和证据操作由 promoted 状态转移自己折叠，不再在压缩前单独扫一遍。
 
 `exec.go` 根据返回模式调用模型，并在压缩模式外发出上下文优化状态。压缩模式只把预期 action 改为 `compress_context`；该 action 走原有执行流程，只提交已验证的选择，不再内部调用 AI。压缩响应不重复写回 Timeline；完成后下一轮重新构建 prompt，连续压缩没有有效缩小时以明确错误退出。
 
@@ -61,12 +61,6 @@ Push、渲染、Save、恢复和 fork/merge 都不会自行调用 AI 压缩。�
 - `reactloops/prompt_observation_publish_test.go`：主循环统一执行压缩 action、无进展退出及正常 prompt 观测数量。
 - 其余 `timeline_compression_*_test.go`：快照完整性、冻结、恢复、保存和分支合并。
 
-## 模型容量校准与运行时调整
+## 主模型可配置阈值
 
-未记录容量的模型初始按 500K tokens 处理（1K = 1024 tokens）。压缩阈值与模型容量分别记录，使用厂商类型和模型名隔离。确认上下文超限后，先在会话内收缩：提供方报告容量时，压缩阈值取其 80%；没有报告时，先取失败 prompt 估算 token 数的 60%。只有同一模型成功响应后才保存校准值；无报告容量时，以成功请求的 token 数修正初次估算，避免将已成功的固定提示词反复送去压缩。
-
-超限恢复优先压缩最近成功请求所覆盖的历史。该请求仍超限或尚无成功边界时，缩小压缩前缀，保留边界之后的记录供后续回合处理。连续无法恢复的超限受重试预算限制。模型容量小于 100K 时发出上下文过小提示。
-
-`model_context` 事件实时提供 `provider`、`model`、`prompt_tokens`、`context_tokens`、`threshold_tokens`、`source`（default/learned/manual）、`pending` 和 `too_small`。手动拖动通过 `RuntimeContextSizeLimit` 热更新提交 token 数，并携带 `AIService` / `AIModelName` 绑定所展示的模型。手动设置和成功后的校准值保存在 profile 数据库的独立模型元数据中，后续会话复用。
-
-完整的状态机、边界、事件协议与回归验收见 [模型上下文行为契约](model_context_contract.md)。
+配置质量优先模型的 ReAct 使用该具体服务/模型保存的阈值，初始为 500,000 tokens（1K = 1,000）。轻量、视觉及未绑定的 SDK 路径保留原默认值。压缩算法、时机、历史边界和调用路由不变，新增功能只保存原有自动收缩成功后的阈值。具体身份、边界、静默更新和测试见 [主模型上下文阈值行为契约](model_context_contract.md)。

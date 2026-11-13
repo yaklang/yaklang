@@ -227,10 +227,9 @@
 `RuntimeContextSizeLimit` 是运行时上下文的压缩阈值，默认 `0`，表示交给服务端使用默认值。
 启用默认配置时，启动请求的 `Params.RuntimeContextSizeLimit` 优先；请求未设置（为 `0`）
 且聊天设置的新字段为正数时，才从该设置补齐。请求与设置均未指定时使用服务端默认
-`500 * 1000` tokens。模型已有校准或手动阈值时复用模型设置。旧 `TimelineContentSizeLimit` 不转换、不回填到新字段。
-手动阈值非零时必须至少 `100 * 1000` tokens；负数与低于下限的值返回错误。运行时调整请携带 `AIService` 与 `AIModelName`，按模型保存。新前端启动时传 0。
+`300 * 1024`。旧 `TimelineContentSizeLimit` 不转换、不回填到新字段。
 
-`model_context` 事件提供模型容量、当前阈值、用量及 `minimum_threshold_tokens`；自动调整的 `change` 含唯一 `id`、`reason`（overflow/confirmed）与前后阈值。前端应同时更新阈值线、展示变更提示，按 ID 去重并对历史同步静默。详见 [行为契约](../../ai/aid/aicommon/model_context_contract.md)。
+新主模型上下文控件启动时传 0，质量优先 ReAct 按具体连接配置读取阈值，未设置时为 500,000 tokens。轻量/视觉与旧 SDK 路径不接入该设置。会话外通过 `GetAIModelContext` / `SetAIModelContext` 传 `Config` 查询/保存，后端返回 `ContextKey`；运行时调整携带 `AIService`、`AIModelName`、`ModelContextKey`。新入口手动下限为 100,000，默认滑条上限 1,000,000。`model_context` 事件同步用量和阈值，自动调整不弹通知。详见 [行为契约](../../ai/aid/aicommon/model_context_contract.md)。
 
 
 ---
