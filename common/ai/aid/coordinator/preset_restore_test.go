@@ -15,6 +15,15 @@ import (
 )
 
 func TestPlanPhaseMockerRestoreDoesNotInitializeAgain(t *testing.T) {
+	testPlanPhaseMockerRestore(t, false)
+}
+
+func TestResilienceSubForgeRestoreAdvancesCheckpointSequence(t *testing.T) {
+	testPlanPhaseMockerRestore(t, true)
+}
+
+func testPlanPhaseMockerRestore(t *testing.T, withSubForge bool) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	db, err := utils.CreateTempTestDatabaseInMemory()
@@ -27,6 +36,10 @@ func TestPlanPhaseMockerRestoreDoesNotInitializeAgain(t *testing.T) {
 		builds.Add(1)
 		return &coordinator.PlanResponse{Document: "预设文档", RootTask: &coordinator.PlanNode{Name: "检查", Goal: "调查来源", Identifier: "root", Subtasks: []*coordinator.PlanNode{{Name: "读来源", Goal: "核对来源", Identifier: "read"}}}}
 	})}
+	const lastCheckpointSeq int64 = 12000
+	if withSubForge {
+		opts = append(opts, aicommon.WithSequence(9000), coordinator.WithSubForgeTools([]coordinator.SubForgeTool{{}}))
+	}
 	for iteration := 0; iteration < 2; iteration++ {
 		var calls int
 		var s *coordinator.Session
@@ -46,6 +59,13 @@ func TestPlanPhaseMockerRestoreDoesNotInitializeAgain(t *testing.T) {
 		require.NoError(t, s.RunPlanOnly())
 		require.EqualValues(t, 1, builds.Load())
 		require.Equal(t, coordinator.PhaseExec, s.Snapshot().Phase)
+		if withSubForge && iteration == 0 {
+			cp := s.CreateToolCallCheckpoint(lastCheckpointSeq)
+			require.NoError(t, s.SubmitCheckpointRequest(cp, map[string]any{"tool_name": "sub_forge_restore", "callback_started": true}))
+		}
+		if withSubForge && iteration == 1 {
+			require.Greater(t, s.AcquireId(), lastCheckpointSeq)
+		}
 		if iteration == 1 {
 			require.Equal(t, 1, calls, "restore starts with the persisted plan, not create/submit")
 		}

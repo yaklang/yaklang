@@ -1,0 +1,90 @@
+desc(
+	mode: "ssa"
+	language: "ts"
+	title: "数据流：TypeScript XSS: request parameter in HTML template"
+	title_zh: "数据流：TypeScript XSS：请求参数拼进 HTML 模板"
+	type: vuln
+	level: ""
+	risk: "xss"
+	cwe: "CWE-79"
+	desc: <<<DESC
+模板字符串把请求参数拼进 HTML 后返回。参数里的标签会被浏览器执行。
+
+### 检测方式
+函数参数流入包含 HTML 标签的字符串拼接；路径上出现 `escape`/`encode`/`sanitize` 时跳过。
+DESC
+	solution: <<<SOLUTION
+- 用 `escapeHtml` 等函数转义。
+- 不要拼接原始请求参数。
+SOLUTION
+	alert_min: 1
+	rule_id: "88359376-3def-4abb-a1e4-bbf91d08c59b"
+)
+*?{opcode: param} as $p
+*?{opcode: binop}?{have: /<h1>/} as $arg
+$arg?{<self> #{include: `* & $p`, exclude: `*?{opcode: call && <self><getCallee><name>?{have: /(?i)(escape|encode|sanitize)/}}`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "TypeScript XSS: request parameter in HTML template",
+	title_zh: "TypeScript XSS：请求参数拼进 HTML 模板",
+	risk: "xss",
+}
+
+desc(
+	lang: typescript
+	alert_min: 1
+	'file://app.ts': <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+export function hello(name: string): string {
+  const value = name; // wb:source id=src
+  return `<h1>${value}</h1>`; // wb:sink id=sink
+}
+
+import { createServer } from "node:http";
+
+const port = Number(process.env.PORT || 8080);
+createServer((req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (url.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  try {
+  const result = hello(url.searchParams.get("name") || "");
+    res.end(result === undefined || result === null ? "ok" : String(result));
+  } catch (err) {
+    res.statusCode = 500;
+    res.end(String(err));
+  }
+}).listen(port, "0.0.0.0");
+POS
+	'safefile://app.ts': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] || ch));
+}
+
+export function hello(name: string): string {
+  const value = name; // wb:source id=src
+  return `<h1>${escapeHtml(value)}</h1>`; // wb:sink id=sink
+}
+
+import { createServer } from "node:http";
+
+const port = Number(process.env.PORT || 8080);
+createServer((req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (url.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  try {
+  const result = hello(url.searchParams.get("name") || "");
+    res.end(result === undefined || result === null ? "ok" : String(result));
+  } catch (err) {
+    res.statusCode = 500;
+    res.end(String(err));
+  }
+}).listen(port, "0.0.0.0");
+NEG
+)

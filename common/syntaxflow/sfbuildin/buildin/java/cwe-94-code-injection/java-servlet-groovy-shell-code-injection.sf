@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	risk: "groovy-code-execution"
-	title_zh: "检测Java Servlet Groovy Shell代码注入漏洞"
-	title: "Check Java Servlet Groovy Shell Code Injection Vulnerability"
+	title_zh: "数据流：检测Java Servlet Groovy Shell代码注入漏洞"
+	title: "数据流：Check Java Servlet Groovy Shell Code Injection Vulnerability"
 	type:"vuln"
 	desc: <<<DESC
 ### 漏洞描述
@@ -202,7 +203,7 @@ out.println("Please provide a script parameter.");
 - **权限提升:** 攻击者可能利用服务器上的其他漏洞或配置错误来提升权限。
 - **作为攻击跳板:** 受感染的服务器可能被用于发起对内部网络或其他外部目标的攻击。
 DESC
-	level: "high",
+	level: "middle",
 	message: "发现Java Servlet Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	name: "high",
 }
@@ -450,4 +451,18 @@ public class GroovyRunServlet extends HttpServlet {
     }
 }
 TEXT
+	"safefile://SafeGroovyServlet.java": <<<NEG
+import groovy.lang.GroovyShell;
+
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class SafeGroovyServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        GroovyShell shell = new GroovyShell();
+        shell.evaluate("1 + 1");
+    }
+}
+NEG
 )

@@ -99,10 +99,11 @@ func (g *GraphInTest) CreateEdge(edge ssaapi.Edge) error {
 		return err
 	}
 
+	label := edge.Label
 	g.edgeStr = append(g.edgeStr,
 		fmt.Sprintf("%s %v %v",
 			pathStr(edge.From.GetRange().GetText(), edge.To.GetRange().GetText()),
-			edge.Msg, edge.Kind,
+			label, edge.Kind,
 		),
 	)
 	return nil

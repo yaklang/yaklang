@@ -43,7 +43,7 @@ type Config struct {
 	// large projects drive SF opcode fanout (e.g. <typeName> over tens of
 	// thousands of matched values) where each element does MergeAnchor(Clone) +
 	// AppendPredecessor; without a structural bound the only limit is the
-	// per-rule wall-clock (--rule-timeout, default 4h), so heavy rules hang for
+	// per-rule wall-clock (--rule-timeout, off unless set), so heavy rules hang for
 	// hours. The budget is incremented per element in the hot fanout native
 	// calls (sf_native_call.go) via EnterWork(); when it exceeds Limit the rule
 	// ctx is cancelled (cancel) so the existing ctx-bail path surfaces partial

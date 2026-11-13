@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java LDAP Injection Vulnerability"
-	title_zh: "检测Java LDAP注入漏洞"
+	mode: "ssa"
+	title: "数据流：Check Java LDAP Injection Vulnerability"
+	title_zh: "数据流：检测Java LDAP注入漏洞"
 	type: vuln
 	risk: "ldap-injection"
 	desc: <<<DESC
@@ -112,7 +113,7 @@ NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchC
 - **数据篡改或删除**: 在某些配置下，攻击者可能能够执行写操作，修改或删除目录服务中的数据。
 - **拒绝服务**: 攻击者可能构造复杂的查询，导致目录服务资源耗尽，引发拒绝服务。
 DESC
-	level: "high",
+	level: "middle",
 	message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
 	title: "Java LDAP Injection Vulnerability Was Detected",
 	title_zh: "检测到Java LDAP注入漏洞",
@@ -173,7 +174,6 @@ DESC
 
 desc(
 	alert_min: 1
-	alert_high: 1
 	language: java
 	'file://LDAPInjection.java': <<<EOF
 package com.example;

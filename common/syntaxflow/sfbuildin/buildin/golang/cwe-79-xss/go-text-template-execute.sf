@@ -1,0 +1,93 @@
+desc(
+	mode: "source"
+	language: "golang"
+	title: "源码匹配：Go XSS: text/template output written to response"
+	title_zh: "源码匹配：Go XSS：text/template 渲染结果写入响应"
+	type: vuln
+	level: "middle"
+	risk: "xss"
+	cwe: "CWE-79"
+	desc: <<<DESC
+`text/template` 不做 HTML 转义。模板用常量定义，但执行时传入请求参数，响应里会出现未转义内容。
+
+### 检测方式
+源码正则要求同时出现 `"text/template"`、常量模板 `Parse("...")` 和 `.Execute(`。
+`html/template` 会自动转义，不告警。
+DESC
+	solution: <<<SOLUTION
+- 改用 `html/template`。
+- 不要用 `template.HTML` 包装用户输入。
+SOLUTION
+	alert_min: 1
+	rule_id: "220290f3-0078-4263-abba-d64cdf029b96"
+)
+${*.go}.pattern_regex(/"text\/template"[\s\S]{0,400}?\.Parse\(\s*"[^"]*"[\s\S]{0,400}?\.Execute\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "Go XSS: text/template output written to response",
+	title_zh: "Go XSS：text/template 渲染结果写入响应",
+	risk: "xss",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+import (
+	"net/http"
+	"text/template"
+	"os"
+)
+
+func hello(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name") // wb:source id=src
+	tmpl := template.Must(template.New("p").Parse("<h1>{{.}}</h1>"))
+	tmpl.Execute(w, name) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/hello", hello)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /hello?name=
+import (
+	"html/template"
+	"net/http"
+	"os"
+)
+
+func hello(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name") // wb:source id=src
+	tmpl := template.Must(template.New("p").Parse("<h1>{{.}}</h1>"))
+	tmpl.Execute(w, name) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/hello", hello)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

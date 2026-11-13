@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Sensitive HTTP Header Token Output"
-	title_zh: "检测敏感HTTP头令牌输出"
+	mode: "ssa"
+	title: "数据流：Detect Sensitive HTTP Header Token Output"
+	title_zh: "数据流：检测敏感HTTP头令牌输出"
 	type: vuln
 	risk: "information-exposure"
 	desc: <<<DESC
@@ -85,4 +86,11 @@ class AuthorizationPrinter {
     }
 }
 CODE
+	'safefile://safe-header.java': <<<NEG
+public class SafeHeader {
+    void print() {
+        System.out.println("request received");
+    }
+}
+NEG
 )

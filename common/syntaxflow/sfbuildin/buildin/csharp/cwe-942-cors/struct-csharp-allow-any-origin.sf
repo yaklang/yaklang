@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "结构扫描：C# CORS 允许任意来源"
-	title_zh: "结构扫描：C# CORS 允许任意来源"
+	title: "结构匹配：C# CORS 允许任意来源"
+	title_zh: "结构匹配：C# CORS 允许任意来源"
 	type: vuln
-	level: middle
+	level: "low"
 	rule_id: "struct-csharp-allow-any-origin"
 	risk: "cors"
 	cwe: "CWE-942"
@@ -47,7 +47,7 @@ NEG
 AllowAnyOrigin as $call
 AllowAnyOrigin(* as $arg) as $call
 alert $call for {
-	level: "middle",
+	level: "low",
 	title: "结构扫描：C# CORS 允许任意来源",
 	title_zh: "结构扫描：C# CORS 允许任意来源",
 	message: "结构扫描：C# CORS 允许任意来源",

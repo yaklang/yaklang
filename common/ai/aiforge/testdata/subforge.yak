@@ -1,0 +1,40 @@
+// Run with a configured provider and interactive terminal:
+// YAK_SUB_FORGE_CONSOLE=1 yak common/ai/aiforge/testdata/subforge.yak
+// A chooses a declared specialist, then uses its result to write the final answer.
+inventory = aiagent.CreateForge(
+    "inventory-specialist",
+    aiagent.initPrompt("Inspect the requested inventory. {{.Forge.UserParams}}"),
+    aiagent.originYaklangCliCode(`
+        cli.String("query", cli.setRequired(true), cli.setHelp("Inventory reference"))
+        cli.Int("limit", cli.setDefault(3), cli.setHelp("Maximum entries to inspect"))
+    `),
+)
+glossary = aiagent.CreateForge("glossary-specialist", aiagent.initPrompt("Explain terms in {{.Forge.UserQuery}}"))
+options = [
+    aiagent.initPrompt("Call the inventory specialist twice from the same task, then use both results to produce the inventory brief."),
+    aiagent.forgeSubForge("inventory", "Inspect an inventory reference", inventory),
+    aiagent.forgeSubForge("glossary", "Explain an unfamiliar term", glossary),
+]
+if os.Getenv("YAK_SUB_FORGE_CONSOLE") == "1" {
+    reader = bufio.NewReader(os.Stdin)~
+    options = append(options, aiagent.manualAssistantCallback(func(ctx, config) {
+        println("Review this Forge step. Type yes to approve, or press Enter to reject.")
+        response, err = reader.ReadString(10)
+        if err == nil && str.TrimSpace(response) == "yes" {
+            return {"suggestion": "continue"}, nil
+        }
+        return {"suggestion": "cancel"}, nil
+    }), aiagent.onEvent(func(event) {
+        if event.GetInteractiveId() != "" && string(event.Type) != "review_release" {
+            println(string(event.Content))
+        }
+    }))
+}
+execution = aiagent.NewExecutor(
+    "inventory-brief",
+    {"query": "Check inventory-ref and prepare a short brief using the specialist result."},
+    options...,
+)~
+defer execution.Close()
+die(execution.Run())
+println(execution.Result().Formated)

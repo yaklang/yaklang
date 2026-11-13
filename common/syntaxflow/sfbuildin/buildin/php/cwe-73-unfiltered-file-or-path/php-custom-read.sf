@@ -1,7 +1,8 @@
 
 desc(
-	title: "Check PHP Unfiltered Directory Reading Vulnerability"
-	title_zh: "检测PHP未过滤目录读取漏洞"
+	mode: "ssa"
+	title: "数据流：Check PHP Unfiltered Directory Reading Vulnerability"
+	title_zh: "数据流：检测PHP未过滤目录读取漏洞"
 	risk: "audit-check"
 	level: "low"
 	desc: <<<DESC
@@ -77,7 +78,7 @@ CODE
 alert $sink for {
 	title: "PHP Unfiltered Directory Reading Vulnerability",
 	title_zh: "PHP未过滤目录读取漏洞",
-	level: "high",
+	level: "middle",
 	solution: <<<SOLUTION
 ### 修复建议
 1. **严格过滤用户输入**

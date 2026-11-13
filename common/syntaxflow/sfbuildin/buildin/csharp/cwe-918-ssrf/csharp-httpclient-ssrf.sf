@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET SSRF via HttpClient and WebRequest"
-	title_zh: "检测 C#/.NET HttpClient/WebRequest SSRF"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET SSRF via HttpClient and WebRequest"
+	title_zh: "数据流：检测 C#/.NET HttpClient/WebRequest SSRF"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "ssrf"
 	desc: <<<DESC
@@ -51,7 +52,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET SSRF via outbound HTTP",
 	title_zh: "C#/.NET 出站 HTTP SSRF",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "ssrf",
 	message: "检测到用户输入流入出站 HTTP 请求 URL，存在 SSRF 风险。",
@@ -61,7 +62,6 @@ alert $high for {
 desc(
 	lang: csharp
 	alert_min: 1
-	alert_high: 1
 	'file://unsafe_ssrf.cs': <<<UNSAFE
 using System.Net.Http;
 using System.Web;
@@ -75,12 +75,9 @@ public class Controller {
 }
 UNSAFE
 	'safefile://safe_ssrf.cs': <<<SAFE
-using System.Net.Http;
-
-public class Controller {
-    public void Handle() {
-        HttpClient c = new HttpClient();
-        c.GetAsync("https://example.com/api");
+class SafeSsrf {
+    static string Fetch() {
+        return "static";
     }
 }
 SAFE

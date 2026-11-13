@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	title: "C sanitization and validation helpers (lib)"
 	title_zh: "净化与校验函数（C 库规则）"
 	type: audit
-	level: info
+	level: ""
 	language: c
 	lib: "c-filter"
 	risk: "input-validation"

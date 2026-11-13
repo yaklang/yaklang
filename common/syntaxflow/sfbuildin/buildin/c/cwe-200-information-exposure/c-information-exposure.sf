@@ -1,7 +1,8 @@
 desc(
-	title: "Check C Information Exposure Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C Information Exposure Vulnerability"
 	type: audit
-	level: medium
+	level: "middle"
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
@@ -48,7 +49,7 @@ desc(
    - **为进一步攻击提供信息**: 攻击者利用泄露的信息制定针对性攻击策略。
 DESC
 	rule_id: "a7f9c2e1-3b8d-4f6e-9c2a-1e5f8d3b7c9a"
-	title_zh: "检测C语言信息泄露漏洞"
+	title_zh: "数据流：检测C语言信息泄露漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -166,7 +167,7 @@ $system_info?{* #{ until: `* & $output_sink`}-> } as $medium
 $error_info?{* #{ until: `* & $output_sink`}-> } as $medium
 $db_error?{* #{ until: `* & $output_sink`}-> } as $medium
 alert $medium for {
-	level: "medium",
+	level: "middle",
 	risk: "information-exposure",
 	type: "vuln",
 	title: "C Information Exposure Vulnerability Was Detected",

@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "源码扫描：Java MongoDB 查询拼接"
-	title_zh: "源码扫描：Java MongoDB 查询拼接"
+	title: "源码匹配：Java MongoDB 查询拼接"
+	title_zh: "源码匹配：Java MongoDB 查询拼接"
 	type: vuln
-	level: high
+	level: "middle"
 	rule_id: "source-java-mongodb-nosql"
 	risk: "nosql-injection"
 	cwe: "CWE-943"
@@ -46,7 +46,7 @@ NEG
 )
 ${*.java}.pattern_regex(/BasicDBObject|Filters\.regex|\$where/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Java MongoDB 查询拼接",
 	title_zh: "源码扫描：Java MongoDB 查询拼接",
 	message: "源码扫描：Java MongoDB 查询拼接",

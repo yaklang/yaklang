@@ -4,6 +4,7 @@ package yakcmds_test
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // writeCodeScanZip builds the same kind of archive CI passes via `-t ./fs.zip`.
@@ -56,6 +58,68 @@ func TestCodeScanAcceptsZipTarget(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.FileExists(t, outputPath+".json")
+}
+
+// code-scan without --language must still detect the project language. An
+// empty language reaches the compiler as "": no builder is chosen, extra file
+// analysis is disabled, and every language-typed rule is skipped as a
+// language mismatch.
+func TestCodeScanDetectsLanguageWhenOmitted(t *testing.T) {
+	// A mixed tree is where the language decision is visible: the .ts file
+	// sorts first, so the old per-file "try every builder" fallback picked
+	// TypeScript for a Java project. Detection scores the whole tree instead.
+	dir := t.TempDir()
+	writeFile := func(name, content string) {
+		path := filepath.Join(dir, name)
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	}
+	writeFile("app/main.ts", "const x: number = 1;\nexport {};\n")
+	writeFile("pom.xml", "<project><modelVersion>4.0.0</modelVersion></project>\n")
+	for _, name := range []string{"A", "B", "C"} {
+		writeFile("zsrc/"+name+".java", "public class "+name+" {}\n")
+	}
+	writeFile("zsrc/Exec.java", `public class Exec {
+    public void run(String cmd) throws Exception {
+        Runtime.getRuntime().exec(cmd);
+    }
+}
+`)
+	outputPath := filepath.Join(t.TempDir(), "report")
+	programName := uuid.NewString()
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "code-scan",
+		"-t", dir,
+		"-p", programName,
+		"--format", "irify",
+		"-o", outputPath,
+		"--mode", "ssa",
+		"--rule-keyword", "java",
+		"--syntaxflow", `desc(mode: "ssa", language: java, title: "language detection e2e")
+Runtime.getRuntime().exec(* as $cmd) as $call;
+alert $call`,
+	})
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	raw, err := os.ReadFile(outputPath + ".json")
+	require.NoError(t, err)
+	var report struct {
+		RiskNums int `json:"RiskNums"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &report))
+	ir, err := ssadb.GetProgram(programName, ssa.Application)
+	require.NoError(t, err)
+	require.NotNil(t, ir)
+	require.Equal(t, ssaconfig.Language("java"), ir.Language,
+		"code-scan without --language must record the language the whole tree implies")
+	require.NotEmpty(t, ir.FileList,
+		"the detected language must compile the project files")
+	require.Greater(t, report.RiskNums, 0,
+		"a language-typed rule must run instead of being skipped as a language mismatch")
 }
 
 func addCommands(app *cli.App, cmds ...*cli.Command) {

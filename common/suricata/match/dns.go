@@ -15,6 +15,14 @@ func dnsParser(c *matchContext) error {
 	if !c.Must(ok) {
 		return nil
 	}
+	if dns.QR && c.Rule.ContentRuleConfig != nil {
+		for _, content := range c.Rule.ContentRuleConfig.ContentRules {
+			if content != nil && content.Modifier == modifier.DNSQuery {
+				c.Reject()
+				return nil
+			}
+		}
+	}
 
 	c.SetBufferProvider(func(mdf modifier.Modifier) []byte {
 		switch mdf {

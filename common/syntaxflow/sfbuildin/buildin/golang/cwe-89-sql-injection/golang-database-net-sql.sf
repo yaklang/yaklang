@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang SQL Injection Vulnerability in Net"
+	mode: "ssa"
+	title: "数据流：Check Golang SQL Injection Vulnerability in Net"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -37,7 +38,7 @@ fmt.Fprintf(w, "User ID: %d", userID)
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "1c99dff2-ccc4-452a-8a95-2594dd2340d8"
-	title_zh: "检测Golang SQL注入漏洞database(sql)"
+	title_zh: "数据流：检测Golang SQL注入漏洞database(sql)"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -167,7 +168,7 @@ fmt.Fprintf(w, "User ID: %d", userID)
 - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	name: "high",
 	message: "检测到Golang代码中存在SQL注入漏洞，用户输入未经过滤直接拼接到SQL查询中。",
@@ -175,7 +176,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

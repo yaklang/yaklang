@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go http.Get"
-	title_zh: "结构扫描：Go http.Get"
+	title: "结构匹配：Go http.Get"
+	title_zh: "结构匹配：Go http.Get"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-go-http-get"
 	risk: "ssrf"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 http.Get as $call
 http.Get(* as $u) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Go http.Get",
 	title_zh: "结构扫描：Go http.Get",
 	message: "结构扫描：Go http.Get",

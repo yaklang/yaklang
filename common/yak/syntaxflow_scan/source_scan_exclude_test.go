@@ -23,6 +23,10 @@ func writeLiveSourceTree(t *testing.T, dir string) {
 	write("internal/handler/handler_test.go", "package handler\n")
 	write("internal/testdata/fixture.go", "package fixture\n")
 	write("generated/consts.go", "package generated\n")
+	write("README.md", "# demo\n\npassword = \"hunter2\"\n")
+	write("assets/demo.mp4", "binary")
+	write("docs/spec.docx", "binary")
+	write("internal/notes.md", "# notes\n")
 }
 
 func liveSourceFiles(t *testing.T, cfg *Config, dir string) []string {
@@ -50,6 +54,12 @@ func TestAttachLiveSourceTarget_AppliesDefaultCompileExcludes(t *testing.T) {
 		"the source stage must drop nested *_test.go like the compile walk does")
 	require.NotContains(t, files, "internal/testdata/fixture.go",
 		"the source stage must drop testdata directories like the compile walk does")
+	require.NotContains(t, files, "README.md",
+		"documentation entry files must never reach a source rule")
+	require.Contains(t, files, "internal/notes.md",
+		"only documentation entry names are dropped; ordinary markdown stays")
+	require.NotContains(t, files, "assets/demo.mp4", "media never enters the source stage")
+	require.NotContains(t, files, "docs/spec.docx", "office documents never enter the source stage")
 }
 
 func TestAttachLiveSourceTarget_UserExcludePatternsApply(t *testing.T) {

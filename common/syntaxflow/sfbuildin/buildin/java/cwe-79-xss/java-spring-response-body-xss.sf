@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java SpringBoot RestController XSS漏洞"
-	title: "Check Java SpringBoot RestController XSS Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测Java SpringBoot RestController XSS漏洞"
+	title: "数据流：Check Java SpringBoot RestController XSS Vulnerability"
 	type: vuln
 	risk: ""
 	desc: <<<DESC
@@ -133,7 +134,7 @@ return "Your input: " + input; // 未对输入进行转义
 * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
 * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "xss",
 	name: "withoutCall",
@@ -203,7 +204,7 @@ return "Your input: " + input; // 未对输入进行转义
 * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
 * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
 DESC
-	level: "mid",
+	level: "middle",
 	type: "vuln",
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
@@ -281,7 +282,7 @@ SOLUTION
 desc(
 	lang: java
 	alert_min: 3
-	alert_low: 1
+	alert_mid: 1
 	'file://b.java': <<<UNSAFE
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;

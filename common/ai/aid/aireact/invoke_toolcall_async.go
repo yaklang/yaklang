@@ -10,8 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var _ aicommon.AsyncToolCallRuntime = (*ReAct)(nil)
-
 // PrepareAsyncToolCall reuses the existing lookup, owner guards, parameter
 // mutators and caller setup. Review and invocation remain inside Execute.
 func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, params aitool.InvokeParams, opts ...aicommon.ToolCallerOption) (asyncexecmanager.Resource, func(), error) {
@@ -28,6 +26,9 @@ func (r *ReAct) PrepareAsyncToolCall(task aicommon.AIStatefulTask, name string, 
 	tool, err := r.resolveToolForCall(ctx, name)
 	if err != nil {
 		return nil, nil, err
+	}
+	if tool.RequireForeground {
+		return nil, nil, utils.Errorf("tool %q requires foreground execution", name)
 	}
 	if ownerLoop, _ := task.GetReActLoop().(*reactloops.ReActLoop); ownerLoop != nil {
 		if allow, message := reactloops.CheckToolInvokeGuard(ownerLoop, name, params); !allow {

@@ -563,6 +563,34 @@ func (t *ToolCaller) SetEmitter(e *Emitter) {
 	t.emitter = e
 }
 
+// rebindExecutionContext transfers an unused prepared caller from its short
+// preparation context to the manager-owned execution context. Task completion
+// must not cancel a background tool after it has been admitted.
+func (t *ToolCaller) rebindExecutionContext(ctx context.Context) {
+	if t == nil || ctx == nil {
+		return
+	}
+	t.m.Lock()
+	previousCancel := t.cancel
+	t.ctx, t.cancel = context.WithCancel(ctx)
+	t.m.Unlock()
+	if previousCancel != nil {
+		previousCancel()
+	}
+}
+
+func (t *ToolCaller) cancelContext() {
+	if t == nil || t.m == nil {
+		return
+	}
+	t.m.Lock()
+	cancel := t.cancel
+	t.m.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
 func (t *ToolCaller) GetEmitter() *Emitter {
 	return t.emitter
 }
@@ -1100,6 +1128,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			config.DoWaitAgree(t.ctx, ep)
 			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
 				releaseReview()
+				// The worker can stop while its enclosing session stays alive.
+				// Close the visible card so the next pending review can proceed.
+				t.emitter.EmitInteractiveRelease(ep.GetId(), nil)
 				handleError(waitErr)
 				return nil, false, waitErr
 			}

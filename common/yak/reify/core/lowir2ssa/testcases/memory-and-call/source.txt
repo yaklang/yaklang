@@ -1,0 +1,5 @@
+uint64_t sub_0x4000(void) {
+    v4 = helper();
+    return v4;
+}
+

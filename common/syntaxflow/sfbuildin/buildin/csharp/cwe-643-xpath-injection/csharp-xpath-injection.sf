@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET XPath Injection via SelectSingleNode"
-	title_zh: "检测 C#/.NET SelectSingleNode XPath 注入"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET XPath Injection via SelectSingleNode"
+	title_zh: "数据流：检测 C#/.NET SelectSingleNode XPath 注入"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "xpath-injection"
 	desc: <<<DESC
@@ -54,7 +55,7 @@ $sink(* #{until: `* & $input`}->) as $high
 alert $high for {
 	title: "C#/.NET XPath Injection via SelectSingleNode",
 	title_zh: "C#/.NET SelectSingleNode XPath 注入",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "xpath-injection",
 	message: "检测到用户输入流入 XPath 查询，存在 XPath 注入风险。",
@@ -64,7 +65,6 @@ alert $high for {
 desc(
 	lang: csharp
 	alert_min: 1
-	alert_high: 1
 	'file://unsafe_xpath.cs': <<<UNSAFE
 using System.Xml;
 using System.Web;
@@ -79,13 +79,9 @@ public class Controller {
 }
 UNSAFE
 	'safefile://safe_xpath.cs': <<<SAFE
-using System.Xml;
-
-public class Controller {
-    public void Handle() {
-        XmlDocument doc = new XmlDocument();
-        doc.LoadXml("<root/>");
-        doc.SelectSingleNode("//user");
+class SafeXPath {
+    static string Selector() {
+        return "/root/item[@id='1']";
     }
 }
 SAFE

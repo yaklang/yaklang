@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Weak Cryptographic Algorithm"
-	title_zh: "检测 C#/.NET 弱加密或弱哈希算法"
+	mode: "struct"
+	title: "结构匹配：Check C#/.NET Weak Cryptographic Algorithm"
+	title_zh: "结构匹配：检测 C#/.NET 弱加密或弱哈希算法"
 	type: audit
-	level: mid
+	level: "middle"
 	language: csharp
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -58,7 +59,7 @@ DESCryptoServiceProvider as $mid
 alert $mid for {
 	title: "C#/.NET weak cryptographic algorithm",
 	title_zh: "C#/.NET 弱加密或弱哈希算法",
-	level: "mid",
+	level: "middle",
 	type: "audit",
 	risk: "weak-cryptographic-algorithm",
 	message: "检测到 DES/TripleDES/RC2/MD5/SHA1 等弱算法，请改用 AES-GCM 或 SHA-256 及以上。",

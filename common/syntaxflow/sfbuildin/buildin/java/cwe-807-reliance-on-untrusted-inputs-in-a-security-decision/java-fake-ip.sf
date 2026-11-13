@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	risk: "ip-spoofing"
-	title_zh: "检测Java中通过不可信请求头导致的IP伪造漏洞"
-	title: "Detect Java IP Spoofing Vulnerability via Untrusted Headers"
+	title_zh: "结构匹配：检测Java中通过不可信请求头导致的IP伪造漏洞"
+	title: "结构匹配：Detect Java IP Spoofing Vulnerability via Untrusted Headers"
 	type: vuln
-	level: middle
+	level: "middle"
 	fix_zh: "建议在获取客户端真实 IP 时，结合服务器端获取的远程地址进行比对，并在可信任的反向代理或负载均衡器处统一设置真实 IP 信息，防止攻击者直接伪造请求头。",
 	fix: <<<FIX
 修复建议：

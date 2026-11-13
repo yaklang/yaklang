@@ -1,0 +1,57 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js LLM 资源消耗：生成参数由用户控制"
+	title_zh: "数据流：Node.js LLM 资源消耗：生成参数由用户控制"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-unbounded-consumption"
+	risk: "denial-of-service"
+	cwe: "CWE-770"
+	desc: <<<DESC
+### 规则说明
+最大生成长度等参数直接来自请求，攻击者可放大模型调用成本。
+
+### 风险类型
+denial-of-service
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+在服务端设置生成参数上限，忽略或夹取客户端传入的 `max_tokens` 等值。
+SOLUTION
+	alert_min: 1
+	'file://app.js': <<<POS
+function ask(req) {
+  return clientComplete("hello", req.body.token_budget);
+}
+module.exports = ask;
+POS
+	'safefile://app-safe.js': <<<NEG
+function ask(req) {
+  return clientComplete("hello", 128);
+}
+module.exports = ask;
+NEG
+)
+
+<include('js-param')> as $params;
+/(?i)(min|max|clamp|limit)/ as $clamps;
+
+clientComplete(* as $a, * as $arg)
+
+$arg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{!(<self> #{
+    include: <<<CODE
+*?{opcode: call && <getCallee>?{have: /(?i)(min|max|clamp|limit)/}} as $__next__
+CODE,
+}->)} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js LLM 资源消耗：生成参数由用户控制",
+	title_zh: "Node.js LLM 资源消耗：生成参数由用户控制",
+	risk: "denial-of-service",
+}

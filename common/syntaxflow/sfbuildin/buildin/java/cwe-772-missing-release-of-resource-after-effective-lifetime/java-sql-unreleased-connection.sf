@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测Java java.sql Connection 资源未释放"
-	title: "Check Java java.sql Connection Unreleased Resource"
+	mode: "struct"
+	title_zh: "结构匹配：检测Java java.sql Connection 资源未释放"
+	title: "结构匹配：Check Java java.sql Connection Unreleased Resource"
 	risk:"resource-leak"
-	level:low
+	level: "middle"
 	reference: <<<REFERENCE
 [CWE-772](https://cwe.mitre.org/data/definitions/772.html)
 [Java JDBC API 文档](https://docs.oracle.com/javase/8/docs/api/java/sql/package-summary.html)

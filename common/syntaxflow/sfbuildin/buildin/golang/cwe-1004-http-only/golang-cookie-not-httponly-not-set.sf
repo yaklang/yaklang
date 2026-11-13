@@ -1,9 +1,10 @@
 desc(
-	title: "Detect Golang Cookie HTTPOnly Flag Missing"
-	title_zh: "检测Golang Cookie HTTPOnly标志缺失"
+	mode: "ssa"
+	title: "数据流：Detect Golang Cookie HTTPOnly Flag Missing"
+	title_zh: "数据流：检测Golang Cookie HTTPOnly标志缺失"
 	type: audit
-	level: high
-	risk: "xss"
+	level: "middle"
+	risk: "session-hijacking"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -149,7 +150,7 @@ SOLUTION
    - 导致敏感操作被未授权执行
    - 用户隐私数据泄露
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Golang Cookie HTTPOnly Not Set Vulnerability Was Detected",
 	title_zh: "检测到Golang Cookie未设置HTTPOnly漏洞",
@@ -160,7 +161,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package vulinbox
 

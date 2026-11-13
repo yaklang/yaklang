@@ -8,7 +8,7 @@ func (p *Program) GetTypeWithPkgName(name, pkg string) Type {
 }
 func (prog *Program) getTypeEx(name, pkg string) Type {
 	getType := func() (Type, bool) {
-		if typ, ok := prog.externType[name]; ok {
+		if typ, ok := prog.getExternType(name); ok {
 			return typ, true
 		}
 		return nil, false

@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java Path Traversal Vulnerability"
-	title_zh: "检测Java路径穿越漏洞"
+	mode: "ssa"
+	title: "数据流：Check Java Path Traversal Vulnerability"
+	title_zh: "数据流：检测Java路径穿越漏洞"
 	type: vuln
 	risk: "path-traversal"
 	desc: <<<DESC
@@ -141,7 +142,7 @@ File file = new File(filePath);
 - **远程代码执行（RCE）**: 在某些情况下，如果攻击者能够上传或修改可执行文件并诱导服务器执行，可能导致远程代码执行。
 - **进一步攻击**: 获取的敏感信息可能被用于进行更复杂的攻击，如提权、内网渗透等。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	message: "Java代码中发现路径穿越漏洞，并且数据流中间没有进行任何过滤。",
 	title: "Java Path Traversal Vulnerability Was Detected",
@@ -294,238 +295,194 @@ SOLUTION
 	risk: "path-traversal",
 }
 
-
 desc(
-	alert_high: 1
-	language: java
-	'file://PathTravel.java': <<<EOF
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.OutputStream;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+	lang: java
+	alert_min: 1
+	'file://WbSastJavaPathtraversalVulnerable.java': <<<POS
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import org.springframework.web.bind.annotation.*;
 
-public class InsecureFileReaderServlet extends HttpServlet {
-
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String fileName = request.getParameter("file");
-        String filePath = "path/to/safe/directory/" + fileName;
-
-        File file = new File(filePath);
-
-        if (file.exists() && file.isFile()) {
-            FileReader fileReader = new FileReader(file);
-            char[] buffer = new char[1024];
-            int length;
-
-            OutputStream out = response.getOutputStream();
-            while ((length = fileReader.read(buffer)) > 0) {
-                out.write(new String(buffer, 0, length).getBytes());
-            }
-            fileReader.close();
-            out.close();
-        } else {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found.");
-        }
+@RestController
+public class PathTravel {
+    @GetMapping("/read")
+    public byte[] read(@RequestParam String name) throws Exception {
+        return Files.readAllBytes(Paths.get("/data/" + name));
     }
 }
-EOF
-)
+POS
+	'safefile://WbSastJavaPathtraversalSafe.java': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /file?name=
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-desc(
-	language: java
-	alert_min:1
-	'file://unSafe.java': <<<EOF
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-
-public class SecureServlet extends HttpServlet {
-
-    private static final String BASE_DIR = "/usr/local/apache-tomcat/webapps/ROOT/safe_directory/";
-
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String requestedFile = request.getParameter("file");
-
-        String path= Util.Check(requestedFile);
-
-        File file = new File(BASE_DIR + path);
-        if (!file.getCanonicalPath().startsWith(new File(BASE_DIR).getCanonicalPath())) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
-            return;
+public class WbSastJavaPathtraversalSafe {
+    public String read(WbReq req) throws Exception {
+        String name = req.getParameter("name"); // wb:source id=src
+        Path root = Path.of("/var/data").toAbsolutePath().normalize();
+        Path target = root.resolve(name).normalize();
+        if (!target.startsWith(root)) {
+            throw new SecurityException("path");
         }
-        if (!file.exists()) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "File not found");
-            return;
+        return Files.readString(target); // wb:sink id=sink
+    }
+
+    public static void main(String[] args) throws Exception {
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("0.0.0.0", port), 0);
+        server.createContext("/health", WbSastJavaPathtraversalSafe::wbHealth);
+        server.createContext("/", WbSastJavaPathtraversalSafe::wbHandle);
+        server.start();
+    }
+
+    static void wbHealth(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "ok".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
+    static java.util.Map<String, String> wbQuery(String raw) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null || raw.isEmpty()) return out;
+        for (String pair : raw.split("&")) {
+            int cut = pair.indexOf('=');
+            String key = cut < 0 ? pair : pair.substring(0, cut);
+            String value = cut < 0 ? "" : pair.substring(cut + 1);
+            out.put(java.net.URLDecoder.decode(key, java.nio.charset.StandardCharsets.UTF_8), java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8));
         }
-        response.setContentType("text/plain");
-        try (OutputStream out = response.getOutputStream();
-             FileInputStream in = new FileInputStream(file)) {
-            byte[] buffer = new byte[4096];
-            int length;
-            while ((length = in.read(buffer)) > 0) {
-                out.write(buffer, 0, length);
+        return out;
+    }
+
+    static void wbHandle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] raw = exchange.getRequestBody().readAllBytes();
+        String body = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.Map<String, String> query = wbQuery(exchange.getRequestURI().getRawQuery());
+        String type = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (type != null && type.contains("application/x-www-form-urlencoded")) query.putAll(wbQuery(body));
+        boolean sent = false;
+        try {
+            WbSastJavaPathtraversalSafe app = new WbSastJavaPathtraversalSafe();
+            Object result = null;
+            WbResp resp = null;
+            for (java.lang.reflect.Method method : WbSastJavaPathtraversalSafe.class.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers()) || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                if (method.getName().startsWith("wb")) continue;
+                Object[] values = new Object[method.getParameterCount()];
+                boolean ready = true;
+                for (int i = 0; i < values.length; i++) {
+                    Class<?> kind = method.getParameterTypes()[i];
+                    if (kind.getSimpleName().equals("WbReq")) values[i] = new WbReq(exchange, body, query);
+                    else if (kind.getSimpleName().equals("WbResp")) { resp = new WbResp(exchange); values[i] = resp; }
+                    else if (kind == String.class) values[i] = wbFirst(query);
+                    else if ("java.sql.Connection".equals(kind.getName())) {
+                        try { values[i] = java.sql.DriverManager.getConnection(System.getenv().getOrDefault("JDBC_URL", "jdbc:sqlite::memory:")); }
+                        catch (Exception err) { ready = false; result = err; }
+                    } else if ("javax.naming.directory.DirContext".equals(kind.getName())) {
+                        values[i] = java.lang.reflect.Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind}, (proxy, called, calledArgs) -> null);
+                    } else if (java.util.Map.class.isAssignableFrom(kind)) values[i] = wbOrders();
+                    else if ("freemarker.template.Configuration".equals(kind.getName())) {
+                        Object version = kind.getField("VERSION_2_3_32").get(null);
+                        values[i] = kind.getConstructor(Class.forName("freemarker.template.Version")).newInstance(version);
+                    } else {
+                        Object obj = kind.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : kind.getFields()) {
+                            String value = query.get(field.getName());
+                            if (value != null && field.getType() == String.class) field.set(obj, value);
+                        }
+                        values[i] = obj;
+                    }
+                    if (!ready) break;
+                }
+                if (!ready) continue;
+                result = method.invoke(app, values);
             }
+            byte[] payload;
+            int status = 200;
+            if (resp != null && resp.redirect) { status = resp.status; payload = new byte[0]; }
+            else if (resp != null && resp.writer.getBuffer().length() > 0) payload = resp.writer.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            else payload = (result == null ? "ok" : String.valueOf(result)).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(status, payload.length);
+            sent = true;
+            exchange.getResponseBody().write(payload);
+        } catch (Exception err) {
+            if (!sent) {
+                byte[] payload = String.valueOf(err).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(500, payload.length);
+                exchange.getResponseBody().write(payload);
+            }
+        } finally {
+            exchange.close();
         }
     }
+
+    static String wbFirst(java.util.Map<String, String> query) {
+        for (String key : new String[]{"url", "password", "q", "name", "host", "uid"}) {
+            if (query.get(key) != null) return query.get(key);
+        }
+        return query.isEmpty() ? "" : query.values().iterator().next();
+    }
+
+    static Object wbOrders() {
+        try {
+            Class<?> record = Class.forName(WbSastJavaPathtraversalSafe.class.getName() + "$Record");
+            Object first = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(first, "user-1");
+            record.getField("body").set(first, "alice");
+            Object second = record.getDeclaredConstructor().newInstance();
+            record.getField("owner").set(second, "user-2");
+            record.getField("body").set(second, "bob");
+            return java.util.Map.of("1", first, "2", second);
+        } catch (Exception err) {
+            return java.util.Map.of("1", "alice", "2", "bob");
+        }
+    }
+
+    static final class WbReq {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final String body;
+        final java.util.Map<String, String> query;
+        WbReq(com.sun.net.httpserver.HttpExchange exchange, String body, java.util.Map<String, String> query) {
+            this.exchange = exchange;
+            this.body = body;
+            this.query = query;
+        }
+        String getParameter(String name) { return query.get(name); }
+        java.io.InputStream getInputStream() { return new java.io.ByteArrayInputStream(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        java.io.BufferedReader getReader() { return new java.io.BufferedReader(new java.io.StringReader(body)); }
+        String getHeader(String name) { return exchange.getRequestHeaders().getFirst(name); }
+        WbSession getSession() { return new WbSession(exchange); }
+    }
+
+    static final class WbResp {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        final java.io.StringWriter writer = new java.io.StringWriter();
+        int status = 200;
+        boolean redirect;
+        WbResp(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        java.io.Writer getWriter() { return writer; }
+        void sendRedirect(String target) { redirect = true; status = 302; exchange.getResponseHeaders().set("Location", target); }
+        void setHeader(String key, String value) { if (value != null) exchange.getResponseHeaders().set(key, value); }
+        void addCookie(WbCookie cookie) { exchange.getResponseHeaders().add("Set-Cookie", cookie.name + "=" + cookie.value); }
+    }
+
+    static final class WbCookie {
+        final String name;
+        final String value;
+        WbCookie(String name, String value) { this.name = name; this.value = value; }
+        void setHttpOnly(boolean value) {}
+        void setSecure(boolean value) {}
+    }
+
+    static final class WbSession {
+        final com.sun.net.httpserver.HttpExchange exchange;
+        WbSession(com.sun.net.httpserver.HttpExchange exchange) { this.exchange = exchange; }
+        Object getAttribute(String name) {
+            String user = exchange.getRequestHeaders().getFirst("X-User");
+            return user == null || user.isEmpty() ? "user-1" : user;
+        }
+    }
+
 }
-EOF
+NEG
 )
-
-desc(
-	alert_low:1
-	"file://complex1.java": <<<EOF
-    package com.ruoyi.web.controller.common;
-
-    import javax.servlet.http.HttpServletRequest;
-    import javax.servlet.http.HttpServletResponse;
-    import org.slf4j.Logger;
-    import org.slf4j.LoggerFactory;
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.stereotype.Controller;
-    import org.springframework.web.bind.annotation.GetMapping;
-    import org.springframework.web.bind.annotation.PostMapping;
-    import org.springframework.web.bind.annotation.ResponseBody;
-    import org.springframework.web.multipart.MultipartFile;
-    import com.ruoyi.common.config.Global;
-    import com.ruoyi.common.config.ServerConfig;
-    import com.ruoyi.common.constant.Constants;
-    import com.ruoyi.common.core.domain.AjaxResult;
-    import com.ruoyi.common.utils.StringUtils;
-    import com.ruoyi.common.utils.file.FileUploadUtils;
-    import com.ruoyi.common.utils.file.FileUtils;
-    import java.io.File;
-    import java.io.FileInputStream;
-    import java.io.FileNotFoundException;
-    import java.io.IOException;
-    import java.io.OutputStream;
-    import java.io.UnsupportedEncodingException;
-    import java.net.URLEncoder;
-    import javax.servlet.http.HttpServletRequest;
-
-public class FileUtils
-{
-    public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+";
-    /**
-     * 文件名称验证
-     *
-     * @param filename 文件名称
-     * @return true 正常 false 非法
-     */
-    public static boolean isValidFilename(String filename)
-    {
-        return filename.matches(FILENAME_PATTERN);
-    }
-
-     /**
-     * 输出指定文件的byte数组
-     *
-     * @param filePath 文件路径
-     * @param os 输出流
-     * @return
-     */
-    public static void writeBytes(String filePath, OutputStream os) throws IOException
-    {
-        FileInputStream fis = null;
-        try
-        {
-            File file = new File(filePath);
-            if (!file.exists())
-            {
-                throw new FileNotFoundException(filePath);
-            }
-            fis = new FileInputStream(file);
-            byte[] b = new byte[1024];
-            int length;
-            while ((length = fis.read(b)) > 0)
-            {
-                os.write(b, 0, length);
-            }
-        }
-        catch (IOException e)
-        {
-            throw e;
-        }
-        finally
-        {
-            if (os != null)
-            {
-                try
-                {
-                    os.close();
-                }
-                catch (IOException e1)
-                {
-                    e1.printStackTrace();
-                }
-            }
-            if (fis != null)
-            {
-                try
-                {
-                    fis.close();
-                }
-                catch (IOException e1)
-                {
-                    e1.printStackTrace();
-                }
-            }
-        }
-    }
-}
-
-    @Controller
-    public class CommonController
-    {
-        private static final Logger log = LoggerFactory.getLogger(CommonController.class);
-
-        @Autowired
-        private ServerConfig serverConfig;
-
-        /**
-         * 通用下载请求
-         *
-         * @param fileName 文件名称
-         * @param delete 是否删除
-         */
-        @GetMapping("common/download")
-        public void fileDownload(String fileName, Boolean delete, HttpServletResponse response, HttpServletRequest request)
-        {
-            try
-            {
-                if (!FileUtils.isValidFilename(fileName))
-                {
-                   return;
-                }
-                String realFileName = System.currentTimeMillis() + fileName.substring(fileName.indexOf("_") + 1);
-                String filePath = Global.getDownloadPath() + fileName;
-
-                response.setCharacterEncoding("utf-8");
-                response.setContentType("multipart/form-data");
-                response.setHeader("Content-Disposition",
-                        "attachment;fileName=" + FileUtils.setFileDownloadHeader(request, realFileName));
-                FileUtils.writeBytes(filePath, response.getOutputStream());
-                if (delete)
-                {
-                    FileUtils.deleteFile(filePath);
-                }
-            }
-            catch (Exception e)
-            {
-                log.error("下载文件失败", e);
-            }
-        }
-    }
-EOF
-)
-

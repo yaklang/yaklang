@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# HttpClient.GetAsync"
-	title_zh: "结构扫描：C# HttpClient.GetAsync"
+	title: "结构匹配：C# HttpClient.GetAsync"
+	title_zh: "结构匹配：C# HttpClient.GetAsync"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-csharp-httpclient-getasync"
 	risk: "ssrf"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 GetAsync as $call
 GetAsync(* as $u) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: C# HttpClient.GetAsync",
 	title_zh: "结构扫描：C# HttpClient.GetAsync",
 	message: "结构扫描：C# HttpClient.GetAsync",

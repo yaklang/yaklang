@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java c3p0 Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java c3p0 Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -24,7 +25,7 @@ c3p0InternalMethod(externalData); // 数据在c3p0内部被处理，触发漏洞
 该规则通过静态分析Java项目的依赖关系，检查c3p0库的版本是否在存在已知远程代码执行漏洞（CVE-2019-5427）的范围（0.9.5.2至0.9.5.7）内。
 DESC
 	rule_id: "f271da26-f78a-4a0d-84f0-0dc539a5f5ca"
-	title_zh: "SCA: 检测Java c3p0 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java c3p0 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 升级c3p0到安全版本
@@ -46,7 +47,7 @@ REFERENCE
 __dependency__.*c3p0.version as $ver;
 $ver in [0.9.5.2,0.9.5.7] as $vuln_c3p0;
 alert $vuln_c3p0 for {
-	level: "high",
+	level: "middle",
 	cve: "CVE-2019-5427",
 	message: "SCA: c3p0 versions between 0.9.5.2 and 0.9.5.7 have an unsafe class loading vulnerability",
 	title: "SCA: Check Java c3p0 Vulnerability",
@@ -88,3 +89,44 @@ c3p0InternalMethod(externalData); // 数据在c3p0内部被处理，触发漏洞
 该规则通过静态分析Java项目的依赖关系，检查c3p0库的版本是否在存在已知远程代码执行漏洞（CVE-2019-5427）的范围（0.9.5.2至0.9.5.7）内。
 DESC
 }
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://pom.xml': <<<POS
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>com.mchange</groupId>
+            <artifactId>c3p0</artifactId>
+            <version>0.9.5.2</version>
+        </dependency>
+    </dependencies>
+</project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>com.mchange</groupId>
+            <artifactId>c3p0</artifactId>
+            <version>0.9.5.8</version>
+        </dependency>
+    </dependencies>
+</project>
+NEG
+)

@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/samber/lo"
@@ -272,6 +273,25 @@ func (c Const) String() string {
 	}
 	if c.value == nil {
 		return "nil"
+	}
+	// Fast paths for the value kinds that dominate member keys (property names
+	// and indexes). They render exactly like fmt %v but neither reformat nor
+	// copy the value: a 1 MiB string literal used to be copied on every key
+	// comparison in ObjectType.getFieldIndexByKeyText. Do not cache the result
+	// here; see newConstCreate for why retaining every literal's text is not an
+	// option.
+	switch raw := c.value.(type) {
+	case string:
+		return raw
+	case int64:
+		return strconv.FormatInt(raw, 10)
+	case int:
+		return strconv.Itoa(raw)
+	case bool:
+		if raw {
+			return "true"
+		}
+		return "false"
 	}
 	return fmt.Sprintf("%v", c.value)
 }

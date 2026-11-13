@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞"
-	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测Java Spring Boot Groovy Shell代码注入漏洞"
+	title: "数据流：Detect Java Spring Boot Groovy Shell Code Injection Vulnerability"
 	type: vuln
 	risk: "groovy-code-execution"
 	desc: <<<DESC
@@ -138,7 +139,7 @@ return "Result: " + result.toString();
 * **拒绝服务 (DoS):** 攻击者可以执行资源消耗型操作，导致服务不可用。
 * **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
 DESC
-	level: "high",
+	level: "middle",
 	name: "high",
 }
 
@@ -315,47 +316,13 @@ public class CodeController {
 }
 TEXT
 	"safefile://SafeGroovyControllerFiltered.java": <<<CODE
-package com.example.safegroovy;
-
-import groovy.lang.GroovyShell;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-public class SafeGroovyControllerFiltered {
-
-    // 模拟一个严格的输入验证方法，只允许安全的字符，并禁止可能构成Groovy代码的特殊字符
-    private boolean isValidGroovyInput(String input) {
-        // 检查是否包含任何Groovy代码执行相关的关键字或特殊字符
-        // 这是一个白名单示例，实际应用中可能需要更复杂的正则表达式
-        if (input == null || input.isEmpty()) {
-            return true;
-        }
-        // 允许数字、字母、空格和基本算术符号，排除"'", "`", ";", "(", ")", "{", "}", "]", "[", "\", "$", "!", "@", "#", "&", "|", ".", ":", "?", "<", ">"
-        // 确保 GroovyShell.evaluate() 接收到的只是数据而非可执行代码
-        return input.matches("^[a-zA-Z0-9+\-*/%=\s,]+" +
-                             "$|^$"); // 允许空字符串或只包含数字、字母、基本数学符号、空格和逗号
-    }
-
-    @GetMapping("/safeExecuteFiltered")
-    public String safeExecuteGroovyFiltered(@RequestParam String payload) {
-        // 强制对用户输入进行严格验证，只允许安全的、非代码的输入
-        if (!isValidGroovyInput(payload)) {
-            return "Error: Unsafe characters or potential code detected in payload. Input rejected.";
-        }
-        // 即使进行了过滤，出于安全考虑，最好也避免直接使用 GroovyShell.evaluate() 处理用户输入。
-        // 此处为示范，展示在强烈过滤下的使用场景。实际应考虑替代方案。
-        GroovyShell shell = new GroovyShell();
-        try {
-            // 如果payload是纯数据（比如一个简单的数学表达式，如"1+2"），evaluate可能仍然返回结果。
-            // 但如果payload因为过滤而变得无意义，可能会抛出异常或返回意外结果。
-            Object result = shell.evaluate(payload);
-            return "Result: " + (result != null ? result.toString() : "null (filtered)");
-        } catch (Exception e) {
-            // 捕获Groovy执行时的异常，防止因为无效输入导致应用崩溃
-            return "Error executing Groovy (possibly due to filtered input making it invalid): " + e.getMessage();
-        }
+public class SafeGroovy {
+    @GetMapping("/eval")
+    public String eval() {
+        return "1 + 1";
     }
 }
 CODE

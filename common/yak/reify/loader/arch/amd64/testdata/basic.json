@@ -1,0 +1,108 @@
+[
+  {
+    "address": "0x401004",
+    "code": [
+      "48 01 d8  // add rax, rbx"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401004 @ 0x401004",
+      "block b1 @ 0x401004",
+      "  0x401004  v1:i64 = read_register %rax [read_register]",
+      "  0x401004  v2:i64 = read_register %rbx [read_register]",
+      "  0x401004  v3:i64 = add v1, v2",
+      "  0x401004  write_register %rax, v3 [write_register]",
+      "  0x401004  v4:i64 = intrinsic @x86.flags.add, v1, v2, v3 [write_register]",
+      "  0x401004  write_register %rflags, v4 [write_register]",
+      "  0x401007  trap @region-end [may_trap, unknown]"
+    ],
+    "name": "add rax, rbx",
+    "symbols": null
+  },
+  {
+    "address": "0x40100c",
+    "code": [
+      "48 8b 07  // mov rax, qword [rdi]"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x40100c @ 0x40100c",
+      "block b1 @ 0x40100c",
+      "  0x40100c  v1:i64 = read_register %rdi [read_register]",
+      "  0x40100c  v2:ptr64 = copy v1",
+      "  0x40100c  v3:i64 = load v2 [read_memory]",
+      "  0x40100c  write_register %rax, v3 [write_register]",
+      "  0x40100f  trap @region-end [may_trap, unknown]"
+    ],
+    "name": "load qword from rdi",
+    "symbols": null
+  },
+  {
+    "address": "0x401000",
+    "code": [
+      "48 89 f8  // mov rax, rdi"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401000 @ 0x401000",
+      "block b1 @ 0x401000",
+      "  0x401000  v1:i64 = read_register %rdi [read_register]",
+      "  0x401000  write_register %rax, v1 [write_register]",
+      "  0x401003  trap @region-end [may_trap, unknown]"
+    ],
+    "name": "mov rax, rdi",
+    "symbols": null
+  },
+  {
+    "address": "0x401008",
+    "code": [
+      "c3  // ret"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401008 @ 0x401008",
+      "block b1 @ 0x401008",
+      "  0x401008  return [may_trap, unknown]"
+    ],
+    "name": "ret",
+    "symbols": null
+  },
+  {
+    "address": "0x401010",
+    "code": [
+      "48 89 07  // mov qword [rdi], rax"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401010 @ 0x401010",
+      "block b1 @ 0x401010",
+      "  0x401010  v1:i64 = read_register %rdi [read_register]",
+      "  0x401010  v2:ptr64 = copy v1",
+      "  0x401010  v3:i64 = read_register %rax [read_register]",
+      "  0x401010  store v2, v3 [write_memory]",
+      "  0x401013  trap @region-end [may_trap, unknown]"
+    ],
+    "name": "store qword to rdi",
+    "symbols": null
+  },
+  {
+    "address": "0x401014",
+    "code": [
+      "48 83 ec 08  // sub rsp, 0x8"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401014 @ 0x401014",
+      "block b1 @ 0x401014",
+      "  0x401014  v1:i64 = read_register %rsp [read_register]",
+      "  0x401014  v2:i64 = constant 0x8",
+      "  0x401014  v3:i64 = sub v1, v2",
+      "  0x401014  write_register %rsp, v3 [write_register]",
+      "  0x401014  v4:i64 = intrinsic @x86.flags.sub, v1, v2, v3 [write_register]",
+      "  0x401014  write_register %rflags, v4 [write_register]",
+      "  0x401018  trap @region-end [may_trap, unknown]"
+    ],
+    "name": "sub rsp, 8",
+    "symbols": null
+  }
+]

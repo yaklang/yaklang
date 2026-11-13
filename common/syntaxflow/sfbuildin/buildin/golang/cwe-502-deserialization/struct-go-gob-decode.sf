@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go gob.Decode"
-	title_zh: "结构扫描：Go gob.Decode"
+	title: "结构匹配：Go gob.Decode"
+	title_zh: "结构匹配：Go gob.Decode"
 	type: vuln
-	level: medium
+	level: "high"
 	rule_id: "struct-go-gob-decode"
 	risk: "deserialization"
 	desc: <<<DESC
@@ -45,7 +45,7 @@ NEG
 
 gob.NewDecoder(* as $r) as $call
 alert $call for {
-	level: "medium",
+	level: "high",
 	title: "Struct scan: Go gob.Decode",
 	title_zh: "结构扫描：Go gob.Decode",
 	message: "结构扫描：Go gob.Decode",

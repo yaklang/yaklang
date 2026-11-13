@@ -1,6 +1,7 @@
 desc(
-	title: "Audit Spring PATCH Read-only Field Exposure"
-	title_zh: "审计Spring PATCH只读字段暴露"
+	mode: "ssa"
+	title: "数据流：Audit Spring PATCH Read-only Field Exposure"
+	title_zh: "数据流：审计Spring PATCH只读字段暴露"
 	type: vuln
 	risk: "variable-overwrite"
 	desc: <<<DESC
@@ -87,32 +88,18 @@ class JsonPatchPatchConverter {
 interface ObjectMapper {}
 CODE
 	'safefile://safe.java': <<<CODE
-package safe.patch;
+import org.springframework.web.bind.annotation.*;
 
-class DomainObjectReaderSafe {
-    void merge(MappedProperties mappedProperties, String fieldName) {
-        if (!mappedProperties.isWritableField(fieldName)) {
-            return;
-        }
+@RestController
+public class SafePatch {
+    static class Dto {
+        public String name;
+    }
+
+    @PatchMapping("/user")
+    public void patch(@RequestBody Dto dto) {
+        dto.name = "fixed";
     }
 }
-
-class JsonPatchHandlerSafe {
-    Object convert(ObjectMapper mapper, Object source, BindContext context) {
-        return new JsonPatchPatchConverter(mapper, context).convert(source);
-    }
-}
-
-interface MappedProperties {
-    boolean isWritableField(String fieldName);
-}
-
-class JsonPatchPatchConverter {
-    JsonPatchPatchConverter(ObjectMapper mapper, BindContext context) {}
-    Object convert(Object source) { return source; }
-}
-
-interface ObjectMapper {}
-interface BindContext {}
 CODE
 )

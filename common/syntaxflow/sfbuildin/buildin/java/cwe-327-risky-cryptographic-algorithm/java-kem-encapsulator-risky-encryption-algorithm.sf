@@ -1,6 +1,7 @@
 desc(
-	title_zh: "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法"
-	title: "Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm"
+	mode: "ssa"
+	title_zh: "数据流：检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法"
+	title: "数据流：Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm"
 	risk:"weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)

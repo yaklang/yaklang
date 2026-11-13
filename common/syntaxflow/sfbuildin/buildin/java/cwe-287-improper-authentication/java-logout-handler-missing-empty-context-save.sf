@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Logout Handler Missing Empty Context Persistence"
-	title_zh: "检测登出处理器缺少空安全上下文持久化"
+	mode: "struct"
+	title: "结构匹配：Detect Logout Handler Missing Empty Context Persistence"
+	title_zh: "结构匹配：检测登出处理器缺少空安全上下文持久化"
 	type: audit
 	risk: "improper-authentication"
 	desc: <<<DESC

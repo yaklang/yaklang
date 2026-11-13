@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET LDAP Injection via DirectorySearcher.Filter"
-	title_zh: "检测 C#/.NET DirectorySearcher.Filter LDAP 注入"
+	mode: "ssa"
+	title: "数据流：Check C#/.NET LDAP Injection via DirectorySearcher.Filter"
+	title_zh: "数据流：检测 C#/.NET DirectorySearcher.Filter LDAP 注入"
 	type: vuln
-	level: high
+	level: "middle"
 	language: csharp
 	risk: "ldap-injection"
 	desc: <<<DESC
@@ -54,7 +55,7 @@ $sink?{<self> #{until: `* & $input`}->} as $high
 alert $high for {
 	title: "C#/.NET LDAP Injection via Filter",
 	title_zh: "C#/.NET DirectorySearcher.Filter LDAP 注入",
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	risk: "ldap-injection",
 	message: "检测到用户输入流入 LDAP Filter，存在 LDAP 注入风险。",
@@ -64,7 +65,6 @@ alert $high for {
 desc(
 	lang: csharp
 	alert_min: 1
-	alert_high: 1
 	'file://unsafe_ldap.cs': <<<UNSAFE
 using System.DirectoryServices;
 using System.Web;

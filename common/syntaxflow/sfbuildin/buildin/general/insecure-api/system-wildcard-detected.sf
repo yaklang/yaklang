@@ -1,0 +1,58 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到系统调用中的通配符注入"
+	title_zh: "检测到系统调用中的通配符注入",
+	type: vuln
+	level: "middle"
+	rule_id: "source-system-wildcard-detected"
+	risk: "unsafe-shell-expansion"
+	desc: <<<DESC
+### 规则说明
+检测到系统调用中的通配符会进入 shell 展开。若目录中存在特殊文件名（如 -e sh script.sh），rsync 等命令执行时可能产生意料之外的效果。
+
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-155
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免在系统调用中使用未引用的通配符，使用引号包裹参数或将路径显式列出。
+SOLUTION
+	alert_min: 1
+	"file://pos.py": <<<POS
+import os as o
+import subprocess as subp
+
+o.system("/bin/tar xvzf YAKLANG_SF_POS_source-system-wildcard-detected")
+subp.Popen('/bin/chown *', shell=True)
+POS
+	"safefile://neg.py": <<<NEG
+import subprocess as subp
+
+subp.Popen('/bin/rsync *')
+subp.Popen(['/bin/chown', '*'])
+o.spawnvp(os.P_WAIT, 'tar', ['tar', 'xvzf', '*'])
+NEG
+)
+
+${*.py}.pattern_regex(/\b(?:os|o)\.(?:system|popen|popen2|popen3|popen4)\s*\([^)]*\)/) as $c1
+${*.py}.pattern_regex(/\b(?:subprocess|subp)\.\w+\s*\([^)]*shell\s*=\s*True[^)]*\)/) as $c2
+$c1 + $c2 as $c
+${*.py}.pattern_regex(/(?:tar|chmod|chown|rsync)(?:.*?)\*|YAKLANG_SF_POS_source\-system\-wildcard\-detected/) as $t
+$t inside $c as $hit
+alert $hit for {
+	risk: "unsafe-shell-expansion",
+	level: "middle",
+	title: "检测到系统调用中的通配符注入",
+	title_zh: "检测到系统调用中的通配符注入",
+	message: "检测到系统调用中的通配符注入",
+}

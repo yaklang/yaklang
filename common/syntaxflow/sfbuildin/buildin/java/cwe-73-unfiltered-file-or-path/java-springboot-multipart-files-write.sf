@@ -1,7 +1,8 @@
 desc(
-	title: "Check Java MultipartFile Path Traversal Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check Java MultipartFile Path Traversal Vulnerability"
 	type: audit
-	level: warning
+	level: "middle"
 	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
@@ -114,7 +115,31 @@ SOLUTION
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
 REFERENCE
-	title_zh: "检测Java MultipartFile路径穿越漏洞"
+	title_zh: "数据流：检测Java MultipartFile路径穿越漏洞"
+	'file://UploadController.java': <<<POS
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+public class UploadController {
+    @PostMapping("/upload")
+    public void upload(MultipartFile file) throws Exception {
+        Files.write(Paths.get(file.getOriginalFilename()), file.getBytes());
+    }
+}
+POS
+	'safefile://safe/SafeUploadController.java': <<<NEG
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+public class SafeUploadController {
+    public void upload() throws Exception {
+        Files.write(Paths.get("/var/data/report.txt"), "ok".getBytes());
+    }
+}
+NEG
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: MultipartFile}} as $upload;
@@ -128,7 +153,7 @@ check $inter then "Upload and Write Files directly" else "No Upload and Files.wr
 alert $inter for {
 	title: "Check Java MultipartFile Path Traversal Vulnerability",
 	title_zh: "检测Java MultipartFile路径穿越漏洞",
-	level: "warning",
+	level: "middle",
 	message: "检测到Java Spring / Spring Boot应用中存在MultipartFile文件名未经过滤直接拼接路径保存文件的风险，可能导致路径遍历攻击。",
 	solution: <<<SOLUTION
 ### 修复建议

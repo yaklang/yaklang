@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -55,25 +54,22 @@ const DefaultTimelineContentSizeLimit = 300 * 1024
 
 type ConfigOption func(*Config) error
 
-var configOptionIDRegistry sync.Map
+var configIDOptionCode = reflect.ValueOf(configIDOption("").apply).Pointer()
 
 const ConfigKeyToolCallIntervalReviewExtraPrompt = "tool_call_interval_review_extra_prompt"
 
-type configIDOptionMeta struct {
-	id  string
-	key uintptr
-}
+type configIDOption string
 
-func (o *configIDOptionMeta) apply(c *Config) error {
+func (id configIDOption) apply(c *Config) error {
 	if c.m == nil {
 		c.m = &sync.Mutex{}
 	}
 	c.m.Lock()
 	defer c.m.Unlock()
-	c.Id = o.id
+	c.Id = string(id)
 	// Also update Emitter's id to keep them in sync
 	if c.Emitter != nil {
-		c.Emitter.SetId(o.id)
+		c.Emitter.SetId(c.Id)
 	}
 	return nil
 }
@@ -86,8 +82,12 @@ func GetLastIDFromConfigOptions(opts ...ConfigOption) (string, bool) {
 		if opt == nil {
 			continue
 		}
-		if id, ok := configOptionIDRegistry.Load(reflect.ValueOf(opt).Pointer()); ok {
-			return id.(string), true
+		if reflect.ValueOf(opt).Pointer() == configIDOptionCode {
+			// The code pointer identifies WithID's method, not its receiver.
+			// Read this option's captured ID by applying only that known setter.
+			var probe Config
+			_ = opt(&probe)
+			return probe.Id, true
 		}
 	}
 	return "", false
@@ -316,6 +316,7 @@ type Config struct {
 	*/
 	// timeline
 	Timeline                  *Timeline
+	TimelineBroadcaster       *TimelineBroadcaster
 	TimelineContentSizeLimit  int // in tokens
 	TimelineTotalContentLimit int // in tokens
 
@@ -383,7 +384,7 @@ type Config struct {
 	EnableGoalMode           bool
 	GoalMinIterations        int64
 	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
-	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables LLM review gate
+	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables one main-model review turn
 	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
 	DisableIncreaseIteration bool
 
@@ -670,6 +671,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if consumptionState := config.ensureConsumptionState(); consumptionState != nil {
 		consumptionState.InitializeEffectiveSingleModelMode(config.IsSingleAIModelMode())
 	}
+	originTimeline := config.Timeline
 	// Only create new Timeline if not already set via options (e.g., WithTimeline)
 	// This ensures that when a parent coordinator passes its Timeline to a child invoker,
 	// the child uses the same Timeline instance for proper timeline diff tracking
@@ -712,14 +714,10 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.AiToolManager.SetDisallowMCPServers(config.DisallowMCPServers)
 	}
 
-	// Only the session owner restores the persistent journal. Inherited task
-	// configs already share that session; restoring again would replace their
-	// explicitly supplied Timeline branch with an older DB snapshot.
-	promptState := config.GetSessionPromptState()
-	promptState.m.RLock()
-	hasSessionTimeline := promptState.evidenceTimeline != nil
-	promptState.m.RUnlock()
-	if !config.InitStatus.IsPersistentSessionRestored() && !hasSessionTimeline {
+	// A Config constructed with an explicit Timeline owns that live runtime and
+	// must not replace it with an older row from the same persistent session.
+	// Fresh session owners still restore their checkpoint.
+	if !config.InitStatus.IsPersistentSessionRestored() && originTimeline == nil {
 		config.restorePersistentSession()
 	}
 
@@ -750,6 +748,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.applySingleModelModeDefaults()
 	}
 
+	config.initializeTimelineBroadcast()
 	return config
 }
 
@@ -854,14 +853,7 @@ func newConfig(ctx context.Context) *Config {
 
 // WithID sets the runtime id for the config.
 func WithID(id string) ConfigOption {
-	meta := &configIDOptionMeta{id: id}
-	opt := ConfigOption(meta.apply)
-	meta.key = reflect.ValueOf(opt).Pointer()
-	configOptionIDRegistry.Store(meta.key, id)
-	runtime.SetFinalizer(meta, func(m *configIDOptionMeta) {
-		configOptionIDRegistry.Delete(m.key)
-	})
-	return opt
+	return configIDOption(id).apply
 }
 
 // WithContext sets the context (and optional cancel) for the config.
@@ -3701,7 +3693,7 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 
 func (c *Config) GetSessionEvidenceRendered() string {
 	if c != nil {
-		if timeline := c.sessionEvidenceTimeline(); timeline != nil {
+		if timeline := c.GetTimeline(); timeline != nil {
 			if store, found := timeline.evidenceStore(); found {
 				return store.Render()
 			}
@@ -4373,6 +4365,9 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	}
 
 	opts := make([]ConfigOption, 0)
+	if i.TimelineBroadcaster != nil {
+		opts = append(opts, WithTimelineBroadcaster(i.TimelineBroadcaster))
+	}
 	if len(i.PersistentMemory) > 0 {
 		opts = append(opts, WithAppendPersistentContext(i.PersistentMemory...))
 	}

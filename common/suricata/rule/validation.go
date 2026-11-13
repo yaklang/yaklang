@@ -111,6 +111,18 @@ func UsesSSHBuffers(r *Rule) bool {
 	return false
 }
 
+func UsesDNSQueryBuffer(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && content.Modifier == modifier.DNSQuery {
+			return true
+		}
+	}
+	return false
+}
+
 func UsesFileData(r *Rule) bool {
 	if r == nil || r.ContentRuleConfig == nil {
 		return false
@@ -244,6 +256,9 @@ func (v *ruleValidator) validateModel() {
 	}
 	if config.Flow != nil {
 		v.add(ValidationStageModel, "flow", "parsed flow constraints require a stateful flow tracker", KeywordStatefulRequired)
+		if config.Flow.ToClient && UsesDNSQueryBuffer(v.rule) {
+			v.add(ValidationStageModel, "dns.query", "DNS query buffers conflict with flow:to_client", KeywordUnsupported)
+		}
 	}
 	if config.Thresholding != nil {
 		keyword := config.Thresholding.Keyword

@@ -19,7 +19,7 @@ func initHardcodeRule(t *testing.T) string {
 	t.Helper()
 	yakit.InitialDatabase()
 	require.NoError(t, sfbuildin.SyncEmbedRule())
-	rule, err := sfdb.GetRulePure("检测通用硬编码凭据")
+	rule, err := sfdb.GetRulePure("源码匹配：检测通用硬编码凭据")
 	require.NoError(t, err, "buildin rule '检测通用硬编码凭据' not found")
 	require.Contains(t, rule.Content, "configCredential", "buildin rule content 未包含本次新增的配置凭据逻辑")
 	return rule.Content
@@ -29,7 +29,7 @@ func initWeakPasswordRule(t *testing.T) string {
 	t.Helper()
 	yakit.InitialDatabase()
 	require.NoError(t, sfbuildin.SyncEmbedRule())
-	rule, err := sfdb.GetRulePure("检测Java硬编码弱密码漏洞")
+	rule, err := sfdb.GetRulePure("结构匹配：检测Java硬编码弱密码漏洞")
 	require.NoError(t, err, "buildin rule '检测Java硬编码弱密码漏洞' not found")
 	return rule.Content
 }

@@ -1,9 +1,10 @@
 desc(
+	mode: "ssa"
 	risk: "hardcoded-key"
-	title: "Detect Java Shiro Hardcoded Encryption Key"
-	title_zh: "检测Java Shiro硬编码加密密钥"
+	title: "数据流：Detect Java Shiro Hardcoded Encryption Key"
+	title_zh: "数据流：检测Java Shiro硬编码加密密钥"
 	type: audit
-	level: warning
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -78,7 +79,7 @@ REFERENCE
 
 setCipherKey(*<slice(index=1)> as $key);
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(, *?{opcode: const}<var(base64EncodedKey)>) } as $sink;
-alert $base64EncodedKey for {
+alert $sink for {
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -222,7 +223,7 @@ return cookieRememberMeManager;
 - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
 - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
 DESC
-	level: "mid",
+	level: "middle",
 	name: "sink",
 	message: "检测到Java Shiro硬编码加密密钥，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 	risk: "hardcoded-key",
@@ -572,4 +573,16 @@ public class ShiroConfig {
 
 }
 CODE
+	"safefile://ShiroSafeConfig.java": <<<NEG
+import org.apache.shiro.crypto.AesCipherService;
+import java.util.Base64;
+
+public class SafeShiroKey {
+    public AesCipherService service() {
+        AesCipherService service = new AesCipherService();
+        byte[] key = Base64.getDecoder().decode(System.getenv("SHIRO_CIPHER_KEY"));
+        return service;
+    }
+}
+NEG
 )

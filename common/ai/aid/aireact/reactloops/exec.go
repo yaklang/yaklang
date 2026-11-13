@@ -399,6 +399,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	}
 
 	r.SetCurrentTask(task)
+	r.promptMode = aicommon.LoopPromptModeNormal
 	r.resetIntentMemory()
 	r.ensureLoopDirectory(task)
 
@@ -728,7 +729,9 @@ LOOP:
 			}
 			prompt = assembled.Prompt
 			aicommon.RecordTaskTrajectoryPrompt(task, prompt)
-			r.promptMode = assembled.Mode
+			if assembled.Mode != aicommon.LoopPromptModeNormal || r.promptMode != aicommon.LoopPromptModeGoalAcceptance {
+				r.promptMode = assembled.Mode
+			}
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
 			tokens := aicommon.MeasureTokens(prompt)
@@ -738,7 +741,7 @@ LOOP:
 			if r.promptMode == aicommon.LoopPromptModeCompressContext && lastCompressionTokens > 0 && tokens >= lastCompressionTokens*99/100 {
 				r.emitContextCompressionNoProgress(lastCompressionTokens, tokens)
 			}
-			if r.promptMode == aicommon.LoopPromptModeNormal && transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) && tokens >= lastPromptTokens*99/100 {
+			if r.promptMode != aicommon.LoopPromptModeCompressContext && transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) && tokens >= lastPromptTokens*99/100 {
 				// 这里只结束本轮的 Prompt 重建重试，不退出主 LOOP。
 				// transactionErr 会走下面的统一恢复分支写入 Timeline，然后 continue LOOP。
 				log.Warnf(
@@ -751,7 +754,7 @@ LOOP:
 			if r.isDebugModeEnabled() {
 				r.savePromptToFile(task, iterationCount, prompt)
 			}
-			if r.promptMode == aicommon.LoopPromptModeNormal {
+			if r.promptMode != aicommon.LoopPromptModeCompressContext {
 				r.publishPromptObservation(nonce, assembled, tokens)
 			}
 			streamWg := new(sync.WaitGroup)
@@ -797,7 +800,7 @@ LOOP:
 		}
 
 		// 执行前需要判断错误的协议准备，例如 function-call 回放记录。
-		if turnErr == nil && r.promptMode == aicommon.LoopPromptModeNormal &&
+		if turnErr == nil && r.promptMode != aicommon.LoopPromptModeCompressContext &&
 			!compressionOnly && stopReason == LoopStopToolCalls {
 			if err := r.appendFunctionCallActionResponse(loopCalls, resultDescriptor); err != nil {
 				r.clearCallsExecutionValues(loopCalls)
@@ -838,7 +841,7 @@ LOOP:
 
 		// 文本协议校验通过后，再记录本轮 reasoning 和 decision。
 		// 无效输出不能被记录成已经接受的工作。
-		if r.promptMode == aicommon.LoopPromptModeNormal && !compressionOnly && stopReason != LoopStopToolCalls {
+		if r.promptMode != aicommon.LoopPromptModeCompressContext && !compressionOnly && stopReason != LoopStopToolCalls {
 			decision := r.Get("last_ai_decision_response")
 			if loopCalls[0].Action == nil {
 				decision = ""

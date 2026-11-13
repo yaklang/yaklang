@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java SAXBuilder Unsafe Use"
-	title_zh: "检测 Java SAXBuilder 非安全使用"
+	mode: "struct"
+	title: "结构匹配：Check Java SAXBuilder Unsafe Use"
+	title_zh: "结构匹配：检测 Java SAXBuilder 非安全使用"
 	type: vuln
 	risk:"xxe"
 	desc: <<<DESC
@@ -170,7 +171,7 @@ e.printStackTrace();
 - **远程代码执行**: 在特定条件下，结合其他漏洞或服务配置不当，XXE甚至可能导致远程代码执行。
 总之，SAXBuilder 未经安全配置的使用是将应用程序暴露在多种严重风险之下。
 DESC
-	level: "mid",
+	level: "high",
 	message: "SAXBuilder() Unsafe Use in Context Sink",
 	title: "Check Java SAXBuilder Unsafe Use",
 	title_zh: "检测 Java SAXBuilder 非安全使用",

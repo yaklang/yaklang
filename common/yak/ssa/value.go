@@ -364,43 +364,10 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			scope.AssignVariable(p, variable.GetValue())
 		}
 
-		type pointerTarget struct {
-			name     string
-			globalID int
-		}
-
 		// Pointers only reach a handful of targets in practice, so a slice with a
 		// linear duplicate check is cheaper than a map here -- and it keeps the
 		// emit order deterministic (a map would scramble CopyValue id allocation).
-		targets := make([]pointerTarget, 0, 4)
-		var collectTargets func(Value)
-		collectTargets = func(pointer Value) {
-			if pointer == nil {
-				return
-			}
-			if phi, ok := pointer.(*Phi); ok {
-				for _, edgeID := range phi.Edge {
-					if edgeVal, ok := b.GetValueById(edgeID); ok && edgeVal != nil {
-						collectTargets(edgeVal)
-					}
-				}
-				return
-			}
-
-			n := strings.TrimPrefix(pointer.String(), "&")
-			originName, originGlobalId := SplitName(n)
-			if originName == "" || originGlobalId == 0 {
-				return
-			}
-			for _, existing := range targets {
-				if existing.name == originName && existing.globalID == originGlobalId {
-					return
-				}
-			}
-			targets = append(targets, pointerTarget{name: originName, globalID: originGlobalId})
-		}
-
-		collectTargets(variable.GetValue())
+		targets := b.collectPointerTargets(variable.GetValue())
 		multiTarget := len(targets) > 1
 
 		getOriginCurrentValue := func(originName string, originGlobalId int) Value {
@@ -502,6 +469,65 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		// or variable assign by extern instance (extern instance but name not equal)
 		b.GetProgram().SetInstructionWithName(variable.GetName(), value)
 	}
+}
+
+type pointerTarget struct {
+	name     string
+	globalID int
+}
+
+// collectPointerTargets flattens the pointer value in front of a `*p = ...`
+// store into the set of `(name, globalID)` origin variables it may refer to.
+//
+// Pointers only reach a handful of targets in practice, so a slice with a
+// linear duplicate check is cheaper than a map here -- and it keeps the emit
+// order deterministic (a map would scramble CopyValue id allocation).
+//
+// Phi edges become cyclic as soon as an address is reassigned inside a loop
+// body (`while (...) { *p++ = x; }`): the loop-carried `@pointer` member phi
+// then references itself, directly or through a second phi. The walk therefore
+// carries an explicit visited set; without it a two-phi cycle recurses forever
+// and the resulting goroutine stack overflow aborts the whole engine process.
+func (b *FunctionBuilder) collectPointerTargets(pointer Value) []pointerTarget {
+	targets := make([]pointerTarget, 0, 4)
+	if b == nil || utils.IsNil(pointer) {
+		return targets
+	}
+
+	visitedPhi := make(map[*Phi]struct{})
+	var collect func(Value)
+	collect = func(current Value) {
+		if utils.IsNil(current) {
+			return
+		}
+		if phi, ok := current.(*Phi); ok {
+			if _, visited := visitedPhi[phi]; visited {
+				return
+			}
+			visitedPhi[phi] = struct{}{}
+			for _, edgeID := range phi.Edge {
+				if edgeVal, ok := b.GetValueById(edgeID); ok && !utils.IsNil(edgeVal) {
+					collect(edgeVal)
+				}
+			}
+			return
+		}
+
+		n := strings.TrimPrefix(current.String(), "&")
+		originName, originGlobalId := SplitName(n)
+		if originName == "" || originGlobalId == 0 {
+			return
+		}
+		for _, existing := range targets {
+			if existing.name == originName && existing.globalID == originGlobalId {
+				return
+			}
+		}
+		targets = append(targets, pointerTarget{name: originName, globalID: originGlobalId})
+	}
+
+	collect(pointer)
+	return targets
 }
 
 // ------------------- Create

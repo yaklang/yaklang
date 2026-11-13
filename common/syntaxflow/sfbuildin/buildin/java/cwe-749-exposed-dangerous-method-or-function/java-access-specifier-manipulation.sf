@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Java Reflection setAccessible Vulnerability"
-	title_zh: "检测Java反射setAccessible函数滥用漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Java Reflection setAccessible Vulnerability"
+	title_zh: "数据流：检测Java反射setAccessible函数滥用漏洞"
 	type: Vulnerability
-	severity: High
+	severity: "middle"
 	risk: "reflection-abuse"
 	desc: <<<DESC
 ### 漏洞描述
@@ -100,7 +101,7 @@ alert $target for {
 	risk: "reflection-abuse",
 	title: "Detect Java Reflection setAccessible Vulnerability",
 	title_zh: "检测Java反射setAccessible函数滥用漏洞",
-	level: "high",
+	level: "middle",
 }
 
 

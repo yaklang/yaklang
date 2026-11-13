@@ -108,3 +108,49 @@ func TestTakeSymbolSnapshot_ReuseNotRebuild(t *testing.T) {
 		t.Fatalf("named snapshots are per-call fresh instances")
 	}
 }
+
+// TestSymbolSnapshot_LazyDedupKeys pins the fix for the dotCMS core scan that
+// spent 1 hour 12 minutes in one XSS rule: TakeSymbolSnapshot eagerly copied
+// every parent value into map[dedupKey]struct{} (572GB allocated, 57% of the
+// run), while the include/exclude child results that ask HasNewNamedValue bind
+// only magic $__ vars. The dedup set must stay unmaterialized until a child
+// value actually needs a membership test.
+func TestSymbolSnapshot_LazyDedupKeys(t *testing.T) {
+	table := omap.NewEmptyOrderedMap[string, Values]()
+	vals := make(Values, 0, 1000)
+	for i := 0; i < 1000; i++ {
+		vals = append(vals, &snapshotIDValue{id: int64(i)})
+	}
+	table.Set("$source", vals)
+
+	snapshot := TakeSymbolSnapshot(table)
+	require.NotNil(t, snapshot)
+	require.Nil(t, snapshot.dedupKeys, "snapshot must not materialize parent values eagerly")
+
+	// A magic-only child never needs the parent value set.
+	magicChild := &SFFrameResult{
+		SymbolTable: snapshotTable(map[string][]int64{"__next": {1}}),
+	}
+	require.False(t, snapshot.HasNewNamedValue(magicChild))
+	require.Nil(t, snapshot.dedupKeys, "magic-only child must not materialize the dedup set")
+
+	// An unknown named key is new without any value comparison.
+	unknownKeyChild := &SFFrameResult{
+		SymbolTable: snapshotTable(map[string][]int64{"$fresh": {1}}),
+	}
+	require.True(t, snapshot.HasNewNamedValue(unknownKeyChild))
+	require.Nil(t, snapshot.dedupKeys, "new named key must not materialize the dedup set")
+
+	// An existing key with inherited values needs the comparison and is not new.
+	sameChild := &SFFrameResult{
+		SymbolTable: snapshotTable(map[string][]int64{"$source": {1, 2, 3}}),
+	}
+	require.False(t, snapshot.HasNewNamedValue(sameChild))
+	require.NotNil(t, snapshot.dedupKeys, "value comparison must materialize the dedup set once")
+
+	// A new value under the existing key is new.
+	newValueChild := &SFFrameResult{
+		SymbolTable: snapshotTable(map[string][]int64{"$source": {1, 999999}}),
+	}
+	require.True(t, snapshot.HasNewNamedValue(newValueChild))
+}

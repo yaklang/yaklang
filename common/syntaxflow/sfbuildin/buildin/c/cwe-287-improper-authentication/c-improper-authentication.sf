@@ -1,7 +1,8 @@
 desc(
-	title: "Check C Improper Authentication Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C Improper Authentication Vulnerability"
 	type: audit
-	level: mid
+	level: "middle"
 	risk: "authentication-bypass"
 	desc: <<<DESC
 ### 漏洞描述
@@ -77,7 +78,7 @@ desc(
    - **系统完整性破坏**: 攻击者可能修改系统配置或数据。
 DESC
 	rule_id: "d3f8c1e7-4b9a-4d2e-8f1c-6a7b5e9d2c4f"
-	title_zh: "检测C语言身份验证不当漏洞"
+	title_zh: "数据流：检测C语言身份验证不当漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -345,7 +346,7 @@ $user_input & $weak_hash as $low;
 
 
 alert $mid for {
-	level: "mid",
+	level: "middle",
 	risk: "improper-authentication",
 	type: "vuln",
 	title: "C Improper Authentication Vulnerability Was Detected",

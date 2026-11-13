@@ -1,6 +1,7 @@
 desc(
+	mode: "ssa"
 	risk: "cookie-security"
-	title:"Predictable Cookie Value (Pseudo-Random)"
+	title:"数据流：Predictable Cookie Value (Pseudo-Random)"
 	title_zh:"可预测的Cookie值（伪随机）", 
 	reference: <<<REFERENCE
 - **CWE-330: Use of Insufficiently Random Values** - 应用程序使用随机值或伪随机值，但其熵（随机性）不足以满足安全要求。
@@ -10,6 +11,15 @@ REFERENCE
 	rule_id: "b072f796-18df-495b-b705-68be589a0e2c"
 	cwe: "cwe-330"
 	cwe: "cwe-338"
+	'file://unsafe.php': <<<POS
+<?php
+setcookie("sid", $_GET["sid"]);
+POS
+	'safefile://safe.php': <<<NEG
+<?php
+$sid = random_bytes(16);
+setcookie("sid", $sid);
+NEG
 )
 
 setcookie(, * as $cookieValue, ) 
@@ -22,7 +32,7 @@ $cookieValueTop<dataflow(include:"*?{opcode:const,binop}")> as $high
 alert $high for {
 	title: "Predictable Cookie Value (Pseudo-Random)",
 	title_zh: "可预测的Cookie值（伪随机）",
-	level: "high",
+	level: "middle",
 	risk: "cookie-security",
 	solution: <<<SOLUTION
 SOLUTION
@@ -56,7 +66,7 @@ $cookieValueTop-$high as $mid
 alert $mid for {
 	title: "Predictable Cookie Value (Pseudo-Random)",
 	title_zh: "可预测的Cookie值（伪随机）",
-	level: "mid",
+	level: "middle",
 	risk: "cookie-security",
 	solution: <<<SOLUTION
 确保用于会话管理或其他敏感目的的Cookie值是不可预测且高熵的。

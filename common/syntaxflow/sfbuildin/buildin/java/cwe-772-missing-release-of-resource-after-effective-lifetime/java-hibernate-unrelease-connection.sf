@@ -1,6 +1,8 @@
 desc(
-	title_zh: "检测Java Hibernate 数据库Connection资源未释放"
-	title: "Check Java Hibernate Connection Unreleased Resource"
+	level: "low"
+	mode: "struct"
+	title_zh: "结构匹配：检测Java Hibernate 数据库Connection资源未释放"
+	title: "结构匹配：Check Java Hibernate Connection Unreleased Resource"
 	risk:"resource-leak"
 	reference: <<<REFERENCE
 [Hibernate ConnectionProvider 文档](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/connection/ConnectionProvider.html)

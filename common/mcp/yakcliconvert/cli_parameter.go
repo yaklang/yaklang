@@ -6,11 +6,20 @@ import (
 	"maps"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool {
+	tool, _ := ConvertCliParameterToToolChecked(toolName, prog)
+	return tool
+}
+
+// ConvertCliParameterToToolChecked reports malformed explicit parameter schemas
+// so a caller can reject declarations that cannot safely be offered to a model.
+func ConvertCliParameterToToolChecked(toolName string, prog *ssaapi.Program) (*mcp.Tool, error) {
+	var schemaErr error
 	properties := make(map[string]any)
 	description := ""
 	requiredProperties := make([]string, 0)
@@ -104,7 +113,11 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 		case "cli.setJsonSchema":
 			schema := make(map[string]any)
 			err := json.Unmarshal([]byte(arg1), &schema)
-			if err == nil {
+			if err != nil || schema == nil {
+				if schemaErr == nil {
+					schemaErr = fmt.Errorf("cli.setJsonSchema requires a valid JSON object")
+				}
+			} else {
 				// A union schema without a top-level type intentionally replaces the
 				// primitive type inferred from cli.String/cli.Int. Keeping both would
 				// turn `oneOf: [string, object]` into `type: string AND oneOf`, causing
@@ -183,6 +196,20 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 				}
 			}
 
+			// CLI list defaults use textual separators, while the tool supplies
+			// an array. Keep host, port and URL expressions for the caller.
+			if raw, ok := field["default"].(string); ok && field["type"] == "array" {
+				if items, ok := field["items"].(map[string]any); ok && items["type"] == "string" {
+					values := []string{}
+					if funcName == "cli.LineDict" {
+						values = append(values, utils.ParseStringToLines(raw)...)
+					} else {
+						values = append(values, utils.PrettifyListFromStringSplited(raw, ",")...)
+					}
+					field["default"] = values
+				}
+			}
+
 			// Remove required from property schema and add to InputSchema.required
 			if required, ok := field["required"].(bool); ok && required {
 				delete(field, "required")
@@ -217,5 +244,5 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 	}
 	tool.InputSchema.Properties = orderedProps
 
-	return tool
+	return tool, schemaErr
 }

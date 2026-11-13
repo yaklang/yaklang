@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java vaadin-server Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java vaadin-server Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -50,7 +51,13 @@ SOLUTION
 	reference: <<<REFERENCE
 [CVE-2021-37714](https://nvd.nist.gov/vuln/detail/CVE-2021-37714)
 REFERENCE
-	title_zh: "SCA: 检测Java vaadin-server依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java vaadin-server依赖漏洞"
+	'file://pom.xml': <<<POS
+<project><dependencies><dependency><groupId>com.vaadin</groupId><artifactId>vaadin-server</artifactId><version>7.7.13</version></dependency></dependencies></project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<project><dependencies><dependency><groupId>com.vaadin</groupId><artifactId>vaadin-server</artifactId><version>7.7.15</version></dependency></dependencies></project>
+NEG
 )
 
 __dependency__.*vaadin*server.version as $ver;
@@ -76,7 +83,7 @@ Layout layout = new VerticalLayout(userInputField);
 - **恶意软件传播:** 在某些情况下，攻击者可以利用XSS漏洞诱导用户下载或执行恶意软件。
 - **客户端重定向:** 将用户浏览器重定向到恶意网站。
 DESC
-	level: "mid",
+	level: "middle",
 	cve: "CVE-2021-37714",
 	message: "SCA: vaadin-server version 7.7.14 has an XSS vulnerability",
 	title: "SCA: Check Java vaadin-server Vulnerability",

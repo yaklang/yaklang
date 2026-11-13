@@ -1,7 +1,8 @@
 desc(
-	title: "Check Java Springboot File Download Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check Java Springboot File Download Vulnerability"
 	type: vuln
-	level: warning
+	level: "middle"
 	risk:"path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
@@ -68,7 +69,7 @@ SOLUTION
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
 [Spring Boot File Serving Best Practices](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-servlet-handler-mapping)
 REFERENCE
-	title_zh: "检测Java Springboot文件下载漏洞"
+	title_zh: "数据流：检测Java Springboot文件下载漏洞"
 )
 
 <include('java-spring-mvc-param')> as $params;
@@ -122,7 +123,7 @@ public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String file
 #### 3. 对用户输入进行编码
 在某些情况下，如果文件下载不是通过文件名直接进行的，而是通过其他标识符（如文件ID），则应确保用户输入的标识符经过适当的编码或验证。
 SOLUTION
-	level: "warning",
+	level: "middle",
 	title: "Java Springboot File Download Path Traversal Vulnerability Was Detected",
 	title_zh: "检测到Java Springboot文件下载路径遍历漏洞",
 	name: "sink",
@@ -159,4 +160,11 @@ public class FileDownloadController {
     }
 }
 CODE
+	'safefile://safe-download.java': <<<NEG
+public class SafeDownload {
+    String name() {
+        return "report.pdf";
+    }
+}
+NEG
 )

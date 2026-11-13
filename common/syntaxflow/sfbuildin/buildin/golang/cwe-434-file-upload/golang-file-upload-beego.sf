@@ -1,8 +1,9 @@
 desc(
-	title: "Audit Golang File Upload Authorization in Beego"
-	title_zh: "Beego中Golang文件上传授权审核"
+	mode: "ssa"
+	title: "数据流：Audit Golang File Upload Authorization in Beego"
+	title_zh: "数据流：Beego中Golang文件上传授权审核"
 	type: audit
-	level: low
+	level: ""
 	risk: "file-upload"
 	desc: <<<DESC
 ### 漏洞描述

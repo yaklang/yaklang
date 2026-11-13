@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Reflected XSS Vulnerability in gin.Context"
-	title_zh: "检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Golang Reflected XSS Vulnerability in gin.Context"
+	title_zh: "数据流：检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞"
 	type: vuln
-	level: mid
+	level: "middle"
 	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
@@ -87,7 +88,7 @@ $target.Query as $mid
 alert $mid for {
 	title: "Golang Reflected XSS Vulnerability Was Detected",
 	title_zh: "检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞",
-	level: "mid",
+	level: "middle",
 	risk: "xss",
 	type: "vuln",
 	name: "mid",

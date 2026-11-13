@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Raw Filter Converter String Serialization"
-	title_zh: "检测过滤器转换器直接序列化原始字符串"
+	mode: "struct"
+	title: "结构匹配：Detect Raw Filter Converter String Serialization"
+	title_zh: "结构匹配：检测过滤器转换器直接序列化原始字符串"
 	type: audit
 	risk: "input-validation"
 	desc: <<<DESC

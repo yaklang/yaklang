@@ -330,6 +330,40 @@ func (prog *Program) CoverReflectFunctionType(itype reflect.Type, level int) *Fu
 	return NewFunctionTypeDefine(itype.String(), params, returns, isVariadic)
 }
 
+// getExternType reads one lazy-built extern type. Type creation is recursive,
+// so the lock covers only the map access.
+func (prog *Program) getExternType(name string) (Type, bool) {
+	if prog == nil {
+		return nil, false
+	}
+	prog.externTypeMu.RLock()
+	defer prog.externTypeMu.RUnlock()
+	t, ok := prog.externType[name]
+	return t, ok
+}
+
+func (prog *Program) setExternType(name string, t Type) {
+	if prog == nil {
+		return
+	}
+	prog.externTypeMu.Lock()
+	defer prog.externTypeMu.Unlock()
+	prog.externType[name] = t
+}
+
+func (prog *Program) snapshotExternTypes() map[string]Type {
+	if prog == nil {
+		return nil
+	}
+	prog.externTypeMu.RLock()
+	defer prog.externTypeMu.RUnlock()
+	snapshot := make(map[string]Type, len(prog.externType))
+	for name, t := range prog.externType {
+		snapshot[name] = t
+	}
+	return snapshot
+}
+
 func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	Name := typ.String()
 	if Name == "[]uint8" {
@@ -343,7 +377,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 
 	_, pkgPathName := yakdoc.GetTypeNameWithPkgPath(typ)
 
-	if hijackType, ok := prog.externType[Name]; ok {
+	if hijackType, ok := prog.getExternType(Name); ok {
 		return hijackType
 	}
 
@@ -372,7 +406,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 			ret = NewMapType(prog.handlerType(typ.Key(), level), prog.handlerType(typ.Elem(), level))
 		case reflect.Struct:
 			structType := NewStructType()
-			prog.externType[Name] = structType
+			prog.setExternType(Name, structType)
 			for i := 0; i < typ.NumField(); i++ {
 				field := typ.Field(i)
 				fieldType := prog.handlerType(field.Type, level)
@@ -409,7 +443,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	}
 
 	if ret != nil {
-		prog.externType[Name] = ret
+		prog.setExternType(Name, ret)
 		if ityp, ok := ret.(*ObjectType); ok {
 			ityp.SetName(Name)
 			ityp.SetPkgPath(pkgPathName)

@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -235,4 +236,73 @@ func bindUnavailableProfileDatabase(t *testing.T) {
 	}
 	consts.BindProfileDatabase(closedProfileDB, dbPath)
 	t.Cleanup(func() { consts.BindProfileDatabase(oldProfileDB, "") })
+}
+
+// TestStructParentIncludesStructLibrary keeps the struct-in-struct include
+// working once library rules declare mode: "struct". QueryWithStruct alone
+// leaves the query without a program value, so the include would return
+// "no value found" and the parent would silently report nothing.
+func TestStructParentIncludesStructLibrary(t *testing.T) {
+	bindUnavailableProfileDatabase(t)
+
+	fs := filesys.NewVirtualFs()
+	fs.AddFile("main.go", "package main\n\nfunc main() {\n\tprintln(\"hi\")\n}\n")
+	programs, err := ParseProjectWithFS(fs, WithLanguage(ssaconfig.GO))
+	if err != nil {
+		t.Fatalf("compile test program: %v", err)
+	}
+	if len(programs) == 0 {
+		t.Fatalf("compile test program: no program")
+	}
+	program := programs[0]
+	library, err := sfdb.CheckSyntaxFlowRuleContent(`
+desc(
+	title: "snapshot-struct-lib"
+	lib: "snapshot-struct-lib"
+	mode: "struct"
+)
+println(* as $output);
+alert $output for { title: "sink", name: "output" }
+`)
+	if err != nil {
+		t.Fatalf("compile struct library: %v", err)
+	}
+	if !library.IsStructMode() {
+		t.Fatalf("library did not keep struct mode: %q", library.Mode)
+	}
+	ctx := WithTaskLocalSyntaxFlowRuleLibraries(context.Background(), map[string]*schema.SyntaxFlowRule{
+		"snapshot-struct-lib": library,
+	})
+
+	result := runStructRuleOnUnit(t, program, `
+desc(
+	title: "snapshot-struct-parent"
+	mode: "struct"
+)
+<include("snapshot-struct-lib")> as $hit;
+alert $hit for { title: "parent hit" }
+`, ctx)
+	if got := len(result.GetValues("hit")); got == 0 {
+		t.Fatalf("struct parent lost the values of its struct library")
+	}
+}
+
+// runStructRuleOnUnit executes a struct rule against the program's first
+// compile unit, which is what a struct scan does per unit.
+func runStructRuleOnUnit(t *testing.T, program *Program, content string, ctx context.Context) *SyntaxFlowResult {
+	t.Helper()
+	unit := program.Program.GetApplication().CompileUnits
+	if len(unit) == 0 {
+		t.Fatalf("program has no compile unit")
+	}
+	result, err := QuerySyntaxflow(
+		QueryWithProgram(program),
+		QueryWithStruct(unit[0]),
+		QueryWithRuleContent(content),
+		QueryWithContext(ctx),
+	)
+	if err != nil {
+		t.Fatalf("struct query: %v", err)
+	}
+	return result
 }

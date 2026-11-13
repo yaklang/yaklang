@@ -1,6 +1,7 @@
 desc(
+	mode: "ssa"
 	risk: "csp-misconfiguration"
-	title:"Content Security Policy (CSP) Security Assessment"
+	title:"数据流：Content Security Policy (CSP) Security Assessment"
 	title_zh:"内容安全策略 (CSP) 安全评估",
 	level:"info"
 	desc:<<<DESC
@@ -15,6 +16,14 @@ desc(
 强烈建议审查所有报告的问题，并根据建议的解决方案进行修复和加固，以确保您的应用享受到 CSP 提供的最大安全保护。一个精心设计的 CSP 是现代 Web 应用安全不可或缺的一部分。
 DESC
 	rule_id: "30e74fdd-c346-4db2-a124-f0b04dfd55e1"
+	'file://unsafe.php': <<<POS
+<?php
+header("Content-Security-Policy: script-src 'unsafe-inline' 'self'");
+POS
+	'safefile://safe.php': <<<NEG
+<?php
+header("X-Frame-Options: DENY");
+NEG
 )
 
 header(* as $headContent)
@@ -54,7 +63,7 @@ alert $CSP_HIGH_RISK for {
 	risk: "csp-misconfiguration",
 	title: "High Risk CSP Issues",
 	title_zh: "高风险 CSP 问题",
-	level: "high",
+	level: "middle",
 	desc: <<<DESC
 当前应用的 Content-Security-Policy (CSP) 配置存在严重漏洞，它包含了以下任一可能导致直接绕过 CSP 防御机制的高风险指令：
 - **'unsafe-inline'**: 允许执行内联脚本。恶意攻击者可以通过注入内联脚本来执行跨站脚本 (XSS) 攻击，绕过 CSP 的核心XSS保护。
@@ -108,7 +117,7 @@ alert $CSP_MEDIUM_RISK for {
 	risk: "csp-misconfiguration",
 	title: "Medium Risk CSP Issues",
 	title_zh: "中风险 CSP 问题",
-	level: "medium",
+	level: "middle",
 	desc: <<<DESC
 当前应用的 Content-Security-Policy (CSP) 配置存在中等风险漏洞，它包含了以下任一可能降低安全防护等级的指令：
 - **可预测或硬编码的 'nonce-'**: 如果 CSP 使用 'nonce-' 机制来允许特定内联脚本或样式，但其 nonce 值不是充分随机、每次请求唯一生成或被硬编码，攻击者可能预测或篡改 nonce，从而绕过其保护，注入并执行恶意脚本。虽然比 'unsafe-inline' 安全，但其有效性依赖于 nonce 的随机性。

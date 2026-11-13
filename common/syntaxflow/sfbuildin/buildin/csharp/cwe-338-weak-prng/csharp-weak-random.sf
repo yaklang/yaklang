@@ -1,8 +1,9 @@
 desc(
-	title: "Check C#/.NET Weak PRNG via System.Random"
-	title_zh: "检测 C#/.NET System.Random 弱伪随机"
+	mode: "struct"
+	title: "结构匹配：Check C#/.NET Weak PRNG via System.Random"
+	title_zh: "结构匹配：检测 C#/.NET System.Random 弱伪随机"
 	type: audit
-	level: mid
+	level: "middle"
 	language: csharp
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -58,7 +59,7 @@ Random() as $mid
 alert $mid for {
 	title: "C#/.NET System.Random weak PRNG",
 	title_zh: "C#/.NET System.Random 弱伪随机",
-	level: "mid",
+	level: "middle",
 	type: "audit",
 	risk: "weak-randomness",
 	message: "检测到 System.Random，输出可预测，不可用于密钥或令牌。",

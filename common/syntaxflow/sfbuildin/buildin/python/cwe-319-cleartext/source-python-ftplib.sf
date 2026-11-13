@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "检测 Python ftplib.FTP"
-	title_zh: "检测 Python ftplib.FTP"
+	title: "源码匹配：检测 Python ftplib.FTP"
+	title_zh: "源码匹配：检测 Python ftplib.FTP"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-python-ftplib"
 	risk: "cleartext-transmission"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 ${*.py}.pattern_regex(/ftplib\.FTP\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 Python ftplib.FTP",
 	title_zh: "检测 Python ftplib.FTP",
 	message: "检测 Python ftplib.FTP",

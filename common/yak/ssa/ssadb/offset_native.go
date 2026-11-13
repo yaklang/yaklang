@@ -72,13 +72,21 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 }
 
 // offsetVariableQuery is the single-variable lookup. It has no ORDER BY.
-// Callers sort by id. Whether SQLite uses the value_id index for ORDER BY id
-// depends on statistics; this statement does not try to force an index.
+// Callers sort by id.
+//
+// With a program name the name term carries a unary "+". That disqualifies
+// variable_name from driving an index. Names such as "this" repeat across
+// thousands of instructions, and when a database is reopened after the
+// single-column name index is created, SQLite 3.51 picks that index and walks
+// every "this" row before testing value_id (about 40ms instead of 20us on a
+// 3.4M-instruction scan database). With the term disqualified, the composite
+// (program_name, value_id) prefix drives the lookup. Unary "+" drops the
+// column's TEXT affinity, so name must stay a string; it always is.
 func offsetVariableQuery(name string, valueID int64, programName string) (string, []any) {
 	query := nativeOffsetSelect + ` WHERE deleted_at IS NULL AND variable_name = ? AND value_id = ?`
 	args := []any{name, valueID}
 	if program := strings.TrimSpace(programName); program != "" {
-		query += ` AND program_name = ?`
+		query = nativeOffsetSelect + ` WHERE deleted_at IS NULL AND +variable_name = ? AND value_id = ? AND program_name = ?`
 		args = append(args, program)
 	}
 	return query, args

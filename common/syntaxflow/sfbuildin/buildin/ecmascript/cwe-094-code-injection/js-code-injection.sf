@@ -1,8 +1,9 @@
 desc(
-	title: "JavaScript Code Injection via User-Controlled Input"
-	title_zh: "用户可控输入流入代码执行函数导致代码注入"
+	mode: "ssa"
+	title: "数据流：JavaScript Code Injection via User-Controlled Input"
+	title_zh: "数据流：用户可控输入流入代码执行函数导致代码注入"
 	type: vuln
-	level: high
+	level: "middle"
 	risk: "code-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -181,7 +182,7 @@ $midInjection - $directInjection as $mid
 // Alert HIGH: direct source → sink
 // =====================================================================
 alert $directInjection for {
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Direct Code Injection: User Input Directly Passed to Code Execution Function",
 	title_zh: "直接代码注入：用户输入直接传入代码执行函数",
@@ -207,7 +208,7 @@ SOLUTION
 // Alert MID: indirect source → sink (through intermediate ops)
 // =====================================================================
 alert $mid for {
-	level: "mid",
+	level: "middle",
 	type: "vuln",
 	title: "Indirect Code Injection: User Input Flows into Code Execution via Intermediate Operations",
 	title_zh: "间接代码注入：用户输入经中间操作后流入代码执行函数",
@@ -236,7 +237,6 @@ SOLUTION
 // Test 1: HIGH — direct eval of URL fragment (browser-side)
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_eval_location.js': <<<CODE
 // Browser-side: attacker controls the URL fragment
 var href = document.location.href;
@@ -248,7 +248,6 @@ CODE
 // Test 2: HIGH — direct eval of request query param (server-side)
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_eval_req_query.js': <<<CODE
 const express = require('express');
 const app = express();
@@ -265,7 +264,6 @@ CODE
 // with no intermediate function call, so it's classified as HIGH (directInjection).
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_pug_ssti.js': <<<CODE
 const express = require('express');
 const pug = require('pug');
@@ -288,7 +286,6 @@ CODE
 // Test 4: HIGH — vm.runInNewContext with direct req.query
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_vm_run.js': <<<CODE
 const vm = require('vm');
 const express = require('express');
@@ -328,7 +325,6 @@ CODE
 // Test 6: HIGH — new Function with req.body
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_new_function.js': <<<CODE
 const express = require('express');
 const app = express();

@@ -1,6 +1,7 @@
 desc(
-	title: "Detect SAML Response Validation Without Signature Consistency Check"
-	title_zh: "检测SAML响应校验缺少签名一致性检查"
+	mode: "struct"
+	title: "结构匹配：Detect SAML Response Validation Without Signature Consistency Check"
+	title_zh: "结构匹配：检测SAML响应校验缺少签名一致性检查"
 	type: audit
 	risk: "weak-integrity"
 	desc: <<<DESC

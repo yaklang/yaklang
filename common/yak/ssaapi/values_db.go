@@ -169,9 +169,7 @@ type DBGraph struct {
 var _ Graph = (*DBGraph)(nil)
 
 func NewDBGraph(ctx *saveValueCtx) *DBGraph {
-	return &DBGraph{
-		saveValueCtx: ctx,
-	}
+	return &DBGraph{saveValueCtx: ctx}
 }
 
 func (g *DBGraph) GetGraphKind() GraphKind {
@@ -257,38 +255,23 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		})
 		return err
 	}
-	msg := edge.Msg
+	label, step := edge.Label, edge.Step
+
+	var audit *ssadb.AuditEdge
 	switch edge.Kind {
 	case EdgeTypeDependOn:
-		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode)
-		if err := saveEdge(edge); err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
-		}
+		audit = fromNode.CreateDependsOnEdge(g.ProgramName, toNode)
 	case EdgeTypeEffectOn:
-		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode)
-		if err := saveEdge(edge); err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
-		}
+		audit = fromNode.CreateEffectsOnEdge(g.ProgramName, toNode)
 	case EdgeTypePredecessor:
-		var (
-			label string
-			step  int64
-		)
-		if msg != nil {
-			if l, ok := msg["label"].(string); ok {
-				label = l
-			}
-			if s, ok := msg["step"].(int64); ok {
-				step = s
-			}
-		}
-		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode, step, label)
-		if err := saveEdge(edge); err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
-		}
+		audit = fromNode.CreatePredecessorEdge(g.ProgramName, toNode, step, label)
+	default:
+		return nil
+	}
+	if err := saveEdge(audit); err != nil {
+		log.Errorf("save AuditEdge failed: %v", err)
 	}
 	return nil
-
 }
 
 type auditDatabase struct {
@@ -377,9 +360,9 @@ func captureAuditGraph(ctx context.Context, value *Value, opts ...SaveValueOptio
 		ctx = context.Background()
 	}
 	var mu sync.Mutex
-	var nodes []*ssadb.AuditNode
-	var edges []*ssadb.AuditEdge
-	var sources []*ssadb.IrSource
+	nodes := make([]*ssadb.AuditNode, 0, 256)
+	edges := make([]*ssadb.AuditEdge, 0, 256)
+	sources := make([]*ssadb.IrSource, 0, 16)
 	db := &auditDatabase{}
 	queue := dbcache.WithInitialBufferSize(64)
 	saveSize := dbcache.WithSaveSize(defaultSize)

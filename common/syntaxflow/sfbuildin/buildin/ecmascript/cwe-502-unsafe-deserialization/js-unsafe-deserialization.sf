@@ -1,8 +1,9 @@
 desc(
-	title: "Deserialization of User-Controlled Data"
-	title_zh: "用户可控数据流入不安全反序列化函数"
+	mode: "ssa"
+	title: "数据流：Deserialization of User-Controlled Data"
+	title_zh: "数据流：用户可控数据流入不安全反序列化函数"
 	type: vuln
-	level: high
+	level: "middle"
 	risk: "deserialization"
 	desc: <<<DESC
 ### 漏洞描述
@@ -196,7 +197,7 @@ $midDeserialization - $directDeserialization as $mid
 // Alert HIGH: direct source → dangerous deserialization sink
 // =====================================================================
 alert $directDeserialization for {
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Direct Deserialization of User-Controlled Data",
 	title_zh: "用户可控数据直接传入不安全反序列化函数",
@@ -226,7 +227,7 @@ SOLUTION
 // Alert MID: indirect source → deserialization sink
 // =====================================================================
 alert $mid for {
-	level: "mid",
+	level: "middle",
 	type: "vuln",
 	title: "Indirect Deserialization of User-Controlled Data",
 	title_zh: "用户可控数据经中间操作后流入不安全反序列化函数",
@@ -245,7 +246,6 @@ SOLUTION
 // Test 1: HIGH — jsyaml.load() with direct req.params
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_jsyaml_load_param.js': <<<CODE
 const app = require("express")(),
       jsyaml = require("js-yaml");
@@ -260,7 +260,6 @@ CODE
 // Test 2: HIGH — jsyaml.loadAll() with req.body
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_jsyaml_loadall.js': <<<CODE
 const express = require("express");
 const jsyaml = require("js-yaml");
@@ -277,7 +276,6 @@ CODE
 // Test 3: HIGH — node-serialize.unserialize() with direct req.body
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_node_serialize.js': <<<CODE
 const express = require("express");
 const serialize = require("node-serialize");
@@ -295,7 +293,6 @@ CODE
 // Test 4: HIGH — funcster.deepDeserialize() with req.body
 desc(
 	lang: "js"
-	alert_high: 1
 	'file:///unsafe_funcster.js': <<<CODE
 const express = require("express");
 const funcster = require("funcster");

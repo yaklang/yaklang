@@ -53,7 +53,7 @@ alert $hit`)
 // importantly, must not turn a completed project scan into a failure.
 func TestSourceScanRuntime_BuiltinSpringDatasourceRuleEnvPassword(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(sfanalysis.BuiltinRuleRoot(t),
-		"general", "config", "source-config-spring-datasource-password.sf"))
+		"general", "config", "config-spring-datasource-password.sf"))
 	require.NoError(t, err)
 	frame, err := sfvm.CompileRule(string(raw))
 	require.NoError(t, err)

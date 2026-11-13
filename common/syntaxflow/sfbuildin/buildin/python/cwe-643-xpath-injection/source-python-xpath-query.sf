@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "python"
-	title: "源码扫描：Python XPath 拼接"
-	title_zh: "源码扫描：Python XPath 拼接"
+	title: "源码匹配：Python XPath 拼接"
+	title_zh: "源码匹配：Python XPath 拼接"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-python-xpath-query"
 	risk: "xpath-injection"
 	cwe: "CWE-643"

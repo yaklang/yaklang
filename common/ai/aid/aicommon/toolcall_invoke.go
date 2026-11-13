@@ -247,6 +247,13 @@ func (a *ToolCaller) invoke(
 		finalizeResult = finalizeResults[0]
 	}
 
+	var replayTaskID, replayAttemptID string
+	if tool.RejectInterruptedReplay {
+		if task, ok := a.task.(AIStatefulTask); ok {
+			replayTaskID, replayAttemptID = task.GetId(), task.GetUUID()
+		}
+	}
+
 	seq := a.checkpointSeq
 	if seq <= 0 {
 		seq = c.AcquireId()
@@ -277,18 +284,20 @@ func (a *ToolCaller) invoke(
 				)
 			}
 		}
-		if ret.Finished {
-			a.checkpointReplayed = true
-			res := aiddb.AiCheckPointGetToolResult(ret)
-			if finalizeResult != nil && res != nil {
-				if err := finalizeResult(res); err != nil {
-					return res, err
-				}
-				if err := c.SubmitCheckpointResponse(ret, res); err != nil {
-					return res, err
-				}
+		if tool.RejectInterruptedReplay {
+			stored := aiddb.AiCheckPointGetRequestParams(ret)
+			if stored.GetString("tool_name") != tool.Name ||
+				stored.GetString("replay_task_id") != replayTaskID ||
+				stored.GetString("replay_attempt_id") != replayAttemptID ||
+				string(utils.Jsonify(stored.GetObject("param"))) != string(utils.Jsonify(params)) {
+				return nil, fmt.Errorf("tool checkpoint identity mismatch for %q", tool.Name)
 			}
-			return res, nil
+			if !ret.Finished && stored.GetBool("callback_started") {
+				return nil, fmt.Errorf("tool %q was interrupted after starting; its outcome is unknown", tool.Name)
+			}
+		}
+		if ret.Finished {
+			return a.replayToolCheckpoint(ret, finalizeResult)
 		}
 	}
 	toolCheckpoint := c.CreateToolCallCheckpoint(seq)
@@ -301,9 +310,36 @@ func (a *ToolCaller) invoke(
 		checkpointRequest["call_index"] = a.batchIndex
 		checkpointRequest["call_tool_id"] = a.callToolId
 	}
+	var previous *aitool.ToolResult
+	if tool.RejectInterruptedReplay {
+		ordinal, result, err := findToolCheckpointForRetry(c, tool.Name, params, replayTaskID, replayAttemptID)
+		if err != nil {
+			return nil, err
+		}
+		previous = result
+		checkpointRequest["replay_ordinal"] = ordinal
+		// Preserve the business request before runtime metadata and defaults
+		// mutate the invocation map.
+		checkpointRequest["param"] = cloneEndpointParams(params)
+		checkpointRequest["replay_task_id"] = replayTaskID
+		checkpointRequest["replay_attempt_id"] = replayAttemptID
+	}
 	err := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest)
 	if err != nil {
 		return nil, err
+	}
+
+	if previous != nil {
+		// Write the replay under the current sequence so later occurrences in
+		// this attempt can advance without changing the original checkpoint.
+		previous.ToolCallID = a.callToolId
+		a.checkpointReplayed = true
+		if finalizeResult != nil {
+			if err := finalizeResult(previous); err != nil {
+				return previous, err
+			}
+		}
+		return previous, c.SubmitCheckpointResponse(toolCheckpoint, previous)
 	}
 
 	epm := c.GetEndpointManager()
@@ -528,6 +564,12 @@ func (a *ToolCaller) invoke(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if tool.RejectInterruptedReplay {
+		checkpointRequest["callback_started"] = true
+		if err := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest); err != nil {
+			return nil, err
+		}
+	}
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
@@ -538,7 +580,7 @@ func (a *ToolCaller) invoke(
 		aitool.WithCancelCallback(toolCallCancel),
 		aitool.WithRuntimeConfig(runtimeCfg),
 		aitool.WithOutputCapture(false),
-		aitool.WithWaitForCallbackOnCancel(a.waitForCallbackOnCancel),
+		aitool.WithWaitForCallbackOnCancel(a.waitForCallbackOnCancel || tool.RequireForeground),
 	)
 	invokeCancelled := errors.Is(execErr, context.Canceled) ||
 		errors.Is(execErr, context.DeadlineExceeded) ||
@@ -573,7 +615,17 @@ func (a *ToolCaller) invoke(
 			}
 		}
 	}
-	if execResult != nil && !invokeCancelled {
+	if tool.RejectInterruptedReplay && errors.Is(execErr, aitool.ErrInvocationNotStarted) {
+		if ctx.Err() != nil && !errors.Is(execErr, ctx.Err()) {
+			execErr = errors.Join(ctx.Err(), execErr)
+		}
+		// Admission rejected this request before the child started. Leave
+		// the request retryable even if another worker later re-dispatches it.
+		delete(checkpointRequest, "callback_started")
+		if checkpointErr := c.SubmitCheckpointRequest(toolCheckpoint, checkpointRequest); checkpointErr != nil {
+			execErr = errors.Join(execErr, checkpointErr)
+		}
+	} else if execResult != nil && !invokeCancelled {
 		if checkpointErr := c.SubmitCheckpointResponse(toolCheckpoint, execResult); checkpointErr != nil {
 			// The callback has already produced a result envelope. Checkpoint
 			// persistence is an infrastructure observation and must not rewrite
@@ -606,6 +658,67 @@ func (a *ToolCaller) invoke(
 	}
 
 	return execResult, execErr
+}
+
+// findToolCheckpointForRetry locates the next occurrence of a request in a
+// logical task. The runtime sequence and worker UUID can change on recovery.
+func findToolCheckpointForRetry(c AICallerConfigIf, name string, params aitool.InvokeParams, taskID, attemptID string) (int64, *aitool.ToolResult, error) {
+	if taskID == "" {
+		return 1, nil, nil
+	}
+	checkpoints, err := yakit.ListToolCallCheckpoints(c.GetDB(), c.GetRuntimeId())
+	if err != nil {
+		return 0, nil, fmt.Errorf("read tool checkpoints before recovery: %w", err)
+	}
+	request := string(utils.Jsonify(params))
+	next := int64(1)
+	prior := make(map[int64]*schema.AiCheckpoint)
+	interrupted := make(map[int64]bool)
+	for i := range checkpoints {
+		checkpoint := &checkpoints[i]
+		stored := aiddb.AiCheckPointGetRequestParams(checkpoint)
+		if stored.GetString("replay_task_id") != taskID || stored.GetString("tool_name") != name ||
+			string(utils.Jsonify(stored.GetObject("param"))) != request {
+			continue
+		}
+		ordinal := max(1, stored.GetInt("replay_ordinal"))
+		if !checkpoint.Finished {
+			if stored.GetBool("callback_started") {
+				interrupted[ordinal] = true
+			}
+			continue
+		}
+		if stored.GetString("replay_attempt_id") == attemptID {
+			next = max(next, ordinal+1)
+		} else if prior[ordinal] == nil {
+			prior[ordinal] = checkpoint
+		}
+	}
+	if interrupted[next] {
+		return 0, nil, fmt.Errorf("tool %q has a started invocation with an unknown outcome", name)
+	}
+	if checkpoint := prior[next]; checkpoint != nil {
+		result := aiddb.AiCheckPointGetToolResult(checkpoint)
+		if result == nil {
+			return 0, nil, fmt.Errorf("tool %q has a completed checkpoint without a result", name)
+		}
+		return next, result, nil
+	}
+	return next, nil, nil
+}
+
+func (a *ToolCaller) replayToolCheckpoint(checkpoint *schema.AiCheckpoint, finalize func(*aitool.ToolResult) error) (*aitool.ToolResult, error) {
+	a.checkpointReplayed = true
+	result := aiddb.AiCheckPointGetToolResult(checkpoint)
+	if finalize != nil && result != nil {
+		if err := finalize(result); err != nil {
+			return result, err
+		}
+		if err := a.config.SubmitCheckpointResponse(checkpoint, result); err != nil {
+			return result, err
+		}
+	}
+	return result, nil
 }
 
 // submitToolRiskToPlatformSink routes a tool-emitted risk into the

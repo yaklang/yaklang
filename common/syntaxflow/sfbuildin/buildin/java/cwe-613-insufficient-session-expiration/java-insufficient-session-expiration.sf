@@ -1,9 +1,10 @@
 desc(
-	title: "会话过期不足：登出/会话超时配置审计",
+	mode: "ssa"
+	title: "数据流：会话过期不足：登出/会话超时配置审计",
 	title_zh: "会话过期不足：登出/会话超时配置审计",
 	risk: "session-security"
 	type: audit
-	level: warning
+	level: "middle"
 	rule_id: "java-insufficient-session-expiration"
 	cwe: "CWE-613"
 	desc: <<<DESC
@@ -41,5 +42,5 @@ check $sink then "session end" else "no session end";
 
 alert $sink for {
 	message: "登出/会话超时配置，检查是否真正失效服务端会话",
-	level: "warning",
+	level: "middle",
 }

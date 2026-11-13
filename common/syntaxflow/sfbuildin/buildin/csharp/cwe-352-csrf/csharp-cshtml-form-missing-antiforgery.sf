@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	mode: source
-	title: "Check C#/.NET Razor Form Missing AntiForgery Token"
-	title_zh: "检测 C#/.NET Razor 表单缺少防伪令牌"
+	title: "结构匹配：Check C#/.NET Razor Form Missing AntiForgery Token"
+	title_zh: "结构匹配：检测 C#/.NET Razor 表单缺少防伪令牌"
 	type: audit
-	level: mid
+	level: "middle"
 	language: general
 	risk: "csrf"
 	desc: <<<DESC
@@ -60,7 +61,7 @@ ${*.cshtml}.pattern_regex(/(?i)<form[\s>]/) as $hit
 alert $hit for {
 	title: "C#/.NET Razor form missing antiforgery",
 	title_zh: "C#/.NET Razor 表单缺少防伪令牌",
-	level: "mid",
+	level: "middle",
 	type: "audit",
 	risk: "csrf",
 	message: "检测到 cshtml 表单，请确认包含 AntiForgeryToken。",

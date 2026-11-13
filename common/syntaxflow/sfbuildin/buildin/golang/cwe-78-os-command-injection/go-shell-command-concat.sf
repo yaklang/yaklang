@@ -1,0 +1,96 @@
+desc(
+	mode: "struct"
+	language: "golang"
+	title: "结构匹配：Golang shell command injection"
+	title_zh: "结构匹配：Go shell 命令注入"
+	type: vuln
+	level: "high"
+	risk: "command-injection"
+	cwe: "CWE-78"
+	desc: <<<DESC
+`exec.Command("sh", "-c", ...)` 把请求参数拼进 shell 字符串。参数里的 `;`、`|` 可以执行额外命令。
+
+### 检测方式
+命令名是 `sh`/`bash`/`cmd`/`powershell`，参数里有 `-c`，命令字符串受请求数据影响。
+DESC
+	solution: <<<SOLUTION
+- 用参数列表执行命令，不要经过 shell。
+- 必须用 shell 时，对输入做白名单校验。
+SOLUTION
+	alert_min: 1
+	rule_id: "c1a6cf43-e697-443f-b7f2-26ea69b7f16c"
+)
+exec.Command(* as $shell, * as $flag, * as $cmd) as $call
+$call?{have: /(?i)["'](sh|bash|cmd|powershell|pwsh)["']/}?{have: /-c/} as $hit
+alert $hit for {
+	level: "high",
+	title: "Golang shell command injection",
+	title_zh: "Go shell 命令注入",
+	risk: "command-injection",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /ping?host=
+import (
+	"net/http"
+	"os/exec"
+	"os"
+)
+
+func ping(w http.ResponseWriter, r *http.Request) {
+	host := r.URL.Query().Get("host") // wb:source id=src
+	exec.Command("sh", "-c", "ping -c 1 "+host).Run() // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/ping", ping)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /ping?host=
+import (
+	"net/http"
+	"os/exec"
+	"regexp"
+	"os"
+)
+
+func ping(w http.ResponseWriter, r *http.Request) {
+	host := r.URL.Query().Get("host") // wb:source id=src
+	if !regexp.MustCompile(`^(?:\d{1,3}\.){3}\d{1,3}$`).MatchString(host) {
+		http.Error(w, "bad host", http.StatusBadRequest)
+		return
+	}
+	exec.Command("ping", "-c", "1", host).Run() // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/ping", ping)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

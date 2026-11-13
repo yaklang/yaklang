@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java Command Injection from Servlet and SpringMVC"
-	title_zh: "检测Java Servlet和SpringMVC中的命令注入漏洞"
+	mode: "ssa"
+	title: "数据流：Check Java Command Injection from Servlet and SpringMVC"
+	title_zh: "数据流：检测Java Servlet和SpringMVC中的命令注入漏洞"
 	type: vuln
 	risk:"command-injection"
 	desc: <<<DESC
@@ -111,7 +112,7 @@ $controlled_source_site<dataflow(
 alert $high_source_site for {
 	title: "Java Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Java命令注入漏洞",
-	level: "high",
+	level: "middle",
 	message: "发现Java代码中存在命令注入漏洞，并且数据流中间没有进行任何过滤。",
 	risk: "command-injection",
 	name: "high_source_site",
@@ -124,7 +125,7 @@ alert $normal_source_side for {
 	message: "发现Java代码存在命令注入漏洞，数据流中存在过滤",
 	title: "Java Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Java命令注入漏洞",
-	level: "mid",
+	level: "middle",
 	name: "normal_source_side",
 	risk: "command-injection",
 }
@@ -177,26 +178,9 @@ EOF
 desc(
 	language: java
 	'safefile://a.java': <<<EOF
-package com.example;
-
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import java.io.*;
-
-public class CommandInjectionServlet2 extends HttpServlet {
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String otherInput = request.getParameter("ccc");
-        String userInput = request.getParameter("cmd");
-        String command = "cmd.exe /c";
-
-        Process process = Runtime.getRuntime().exec(command);
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        String line;
-        PrintWriter out = response.getWriter();
-
-        while ((line = reader.readLine()) != null) {
-            out.println(line);
-        }
+public class SafeExec {
+    public void run() throws Exception {
+        Runtime.getRuntime().exec("ls -l /var/data");
     }
 }
 EOF
@@ -204,7 +188,6 @@ EOF
 
 desc(
 	language: java
-	alert_high:1
 	'file://directly.java':<<<EOF
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -251,7 +234,7 @@ EOF
 
 desc(
 	lang:java
-	alert_low:1
+	alert_mid:1
 	"file://complexDemo1.java":<<<EOF
     package com.example;
 

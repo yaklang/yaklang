@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang XXE Malicious Document References"
+	mode: "ssa"
+	title: "数据流：Check Golang XXE Malicious Document References"
 	type: audit
-	level: high
+	level: "low"
 	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
@@ -52,7 +53,7 @@ desc(
 
 DESC
 	rule_id: "4a6e5ac2-d5d8-4f27-9844-35b5153f5944"
-	title_zh: "检测Golang XXE恶意文档引用"
+	title_zh: "数据流：检测Golang XXE恶意文档引用"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -110,7 +111,7 @@ DESC
    ```go
    func sanitizeXML(data []byte) []byte {
        // 移除DTD声明部分
-       re := regexp.MustCompile(`(?i)<!DOCTYPE[^>]*>`) 
+       re := regexp.MustCompile(`(?i)<!DOCTYPE[^>]*>`)
        return re.ReplaceAll(data, []byte{})
    }
    ```
@@ -128,14 +129,16 @@ xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry;
 $entry.Unmarshal(*<slice(index=0)> #-> as $sink);
 $sink & $input as $high;
 
-$decoder.Strict?{have: 'true'} as $safe;
-$decoder.Entity?{have: 'xml.HTMLEntity'} as $safe;
+// 显式关闭外部实体（Strict=true、Entity=HTMLEntity）的数据流不再受控
+$decoder.Strict?{have: 'true'} #-> as $safe;
+$decoder.Entity?{have: 'xml.HTMLEntity'} #-> as $safe;
+$high - $safe as $unguarded;
 
-alert $high for {
+alert $unguarded for {
 	type: "vuln",
 	title: "Golang XXE Vulnerability Was Detected",
 	title_zh: "检测到Golang XXE漏洞",
-	level: "high",
+	level: "low",
 	risk: "xxe",
 	desc: <<<DESC
 ### 漏洞描述
@@ -186,7 +189,6 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://main.go': <<<UNSAFE
 package api
 
@@ -200,9 +202,9 @@ import (
 
 // User 定义用于演示的用户结构
 type User struct {
-	XMLName xml.Name 
-	Name    string   
-	Email   string  
+	XMLName xml.Name
+	Name    string
+	Email   string
 }
 
 // XXEHandler 处理XXE漏洞演示页面
@@ -255,9 +257,9 @@ import (
 
 // User 定义用于演示的用户结构
 type User struct {
-	XMLName xml.Name 
-	Name    string   
-	Email   string  
+	XMLName xml.Name
+	Name    string
+	Email   string
 }
 
 // XXEHandler 处理XXE漏洞演示页面

@@ -1,8 +1,9 @@
 desc(
-	title: "JWT missing secret or public key verification"
-	title_zh: "JWT 验证未使用加密密钥（None 算法绕过）"
+	mode: "struct"
+	title: "结构匹配：JWT missing secret or public key verification"
+	title_zh: "结构匹配：JWT 验证未使用加密密钥（None 算法绕过）"
 	type: vuln
-	level: warning
+	level: "high"
 	risk: "authentication-bypass"
 	desc: <<<DESC
 ### 漏洞描述
@@ -150,7 +151,7 @@ $jwtSecretArg?{opcode: const}?{have: /^""$/} as $emptyStringSecret
 $jwtSecretArg?{opcode: const}?{have: /^0$/} as $zeroSecret
 
 alert $falsySecret for {
-	level: "warning",
+	level: "high",
 	type: "vuln",
 	title: "JWT verify() called with false as secret key",
 	title_zh: "JWT verify() 使用 false 作为密钥，签名验证被禁用",
@@ -160,7 +161,7 @@ alert $falsySecret for {
 }
 
 alert $nullSecret for {
-	level: "warning",
+	level: "high",
 	type: "vuln",
 	title: "JWT verify() called with null as secret key",
 	title_zh: "JWT verify() 使用 null 作为密钥，签名验证被禁用",
@@ -170,7 +171,7 @@ alert $nullSecret for {
 }
 
 alert $undefinedSecret for {
-	level: "warning",
+	level: "high",
 	type: "vuln",
 	title: "JWT verify() called with undefined as secret key",
 	title_zh: "JWT verify() 使用 undefined 作为密钥，签名验证被禁用",
@@ -180,7 +181,7 @@ alert $undefinedSecret for {
 }
 
 alert $emptyStringSecret for {
-	level: "warning",
+	level: "high",
 	type: "vuln",
 	title: "JWT verify() called with empty string as secret key",
 	title_zh: "JWT verify() 使用空字符串作为密钥，签名验证实际无效",
@@ -190,7 +191,7 @@ alert $emptyStringSecret for {
 }
 
 alert $zeroSecret for {
-	level: "warning",
+	level: "high",
 	type: "vuln",
 	title: "JWT verify() called with 0 as secret key",
 	title_zh: "JWT verify() 使用数字 0 作为密钥，签名验证实际无效",

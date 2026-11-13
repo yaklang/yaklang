@@ -39,8 +39,16 @@ func WithStrictEmbeddedVerify() Option {
 	}
 }
 
+// EvaluateVerifyFilesystemWithFrame verifies a rule against its embedded
+// fixtures. This is the artifact gate: a rule that ships at high/critical must
+// prove a near-miss stays clean, so the severity requirement is applied here
+// and not in the editor's quality score (Analyze), where an untested draft
+// rule still gets the documented "missing fixtures" deduction instead of
+// failing outright.
 func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame, opts ...Option) error {
-	return runEmbeddedVerifyWithFrame(frame, newConfig(opts...)).Error
+	cfg := newConfig(opts...)
+	applyHighSeverityVerifyDefaults(frame, &cfg)
+	return runEmbeddedVerifyWithFrame(frame, cfg).Error
 }
 
 // applyModeAwareVerifyDefaults forces POS+NEG checks for source/struct rules.
@@ -55,6 +63,47 @@ func applyModeAwareVerifyDefaults(frame *sfvm.SFFrame, cfg *config) {
 		cfg.requireNegative = true
 		cfg.verifyNegative = true
 		cfg.strictAlertHigh = true
+	}
+}
+
+// applyHighSeverityVerifyDefaults requires POS+NEG evidence for every rule that
+// can emit high/critical. Without it a broad regex or sink-only query can ship
+// at high severity with no fixture that demonstrates a near-miss stays clean.
+// Library rules are sink/helper definitions and run through their importers.
+func applyHighSeverityVerifyDefaults(frame *sfvm.SFFrame, cfg *config) {
+	if frame == nil || cfg == nil || !requiresHighSeverityEvidence(frame.GetRule()) {
+		return
+	}
+	cfg.requirePositive = true
+	cfg.requireNegative = true
+	cfg.verifyNegative = true
+	cfg.strictAlertHigh = true
+}
+
+func requiresHighSeverityEvidence(rule *schema.SyntaxFlowRule) bool {
+	if rule == nil || rule.AllowIncluded {
+		return false
+	}
+	if isHighSeverity(rule.Severity) {
+		return true
+	}
+	for _, info := range rule.AlertDesc {
+		if info == nil || info.OnlyMsg {
+			continue
+		}
+		if isHighSeverity(info.Severity) {
+			return true
+		}
+	}
+	return false
+}
+
+func isHighSeverity(sev schema.SyntaxFlowSeverity) bool {
+	switch schema.ValidSeverityType(sev) {
+	case schema.SFR_SEVERITY_HIGH, schema.SFR_SEVERITY_CRITICAL:
+		return true
+	default:
+		return false
 	}
 }
 

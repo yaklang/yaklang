@@ -1,9 +1,10 @@
 desc(
-	title_zh: "检测Java CRLF注入漏洞"
-	title: "Detect Java CRLF Injection Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测Java CRLF注入漏洞"
+	title: "数据流：Detect Java CRLF Injection Vulnerability"
 	cwe: 93
 	type: vuln
-	level: mid
+	level: "middle"
 	risk: "crlf-injection"
 	harm_zh: "CRLF（回车换行）注入漏洞允许攻击者通过控制 HTTP 响应头的内容插入额外的响应头或响应体，从而实施 HTTP 响应分割攻击。这可能导致跨站脚本攻击（XSS）、缓存投毒、会话劫持等安全问题。",
 	harm: "CRLF (Carriage Return Line Feed) injection vulnerabilities allow attackers to inject additional HTTP headers or body content by controlling parts of the HTTP response header. This can lead to HTTP response splitting, XSS, cache poisoning, and session hijacking."
@@ -74,7 +75,7 @@ $headerContent #{
 }-> as $nocheckControledHeader
 
 alert $nocheckControledHeader for {
-	level: "mid",
+	level: "middle",
 	name: "nocheckControledHeader",
 	title: "Java CRLF Injection Vulnerability Was Detected",
 	title_zh: "检测到Java CRLF注入漏洞",

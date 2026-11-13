@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python hashlib.sha1"
-	title_zh: "结构扫描：Python hashlib.sha1"
+	title: "结构匹配：Python hashlib.sha1"
+	title_zh: "结构匹配：Python hashlib.sha1"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-python-hashlib-sha1"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -42,7 +42,7 @@ NEG
 hashlib.sha1 as $call
 hashlib.sha1(* as $d) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Python hashlib.sha1",
 	title_zh: "结构扫描：Python hashlib.sha1",
 	message: "结构扫描：Python hashlib.sha1",

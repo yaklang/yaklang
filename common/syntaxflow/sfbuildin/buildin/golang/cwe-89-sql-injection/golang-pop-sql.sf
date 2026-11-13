@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang Pop SQL Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check Golang Pop SQL Injection Vulnerability"
 	type: audit
-	level: high
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -31,7 +32,7 @@ log.Fatal(err)
 - 导致应用程序崩溃或拒绝服务。
 DESC
 	rule_id: "56f41530-4175-41ec-96ac-198315171c10"
-	title_zh: "检测Golang SQL注入漏洞(Pop)"
+	title_zh: "数据流：检测Golang SQL注入漏洞(Pop)"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议

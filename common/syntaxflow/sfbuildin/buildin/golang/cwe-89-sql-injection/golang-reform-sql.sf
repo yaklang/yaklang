@@ -1,7 +1,8 @@
 desc(
-	title: "Detect Golang Reform SQL Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Detect Golang Reform SQL Injection Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -55,7 +56,7 @@ log.Fatal(http.ListenAndServe(":8080", nil))
 * 攻击者可能利用数据库漏洞进行进一步攻击。
 DESC
 	rule_id: "b06e92a2-0ff3-40a0-966e-7f0e4fe05480"
-	title_zh: "检测Golang Reform SQL注入漏洞"
+	title_zh: "数据流：检测Golang Reform SQL注入漏洞"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -234,7 +235,7 @@ log.Fatal(http.ListenAndServe(":8080", nil))
 * 攻击者可能绕过身份验证或授权机制。
 * 攻击者可能利用数据库漏洞进行进一步攻击。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Golang Reform SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang Reform SQL注入漏洞",
@@ -245,7 +246,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 
@@ -410,4 +410,24 @@ func main() {
     log.Fatal(http.ListenAndServe(":8080", nil))
 }
 SAFE
+	"safefile://reform_safe.go": <<<NEG
+package main
+
+import (
+	"database/sql"
+	"net/http"
+
+	"github.com/AlecAivazis/reform"
+)
+
+type User struct{ Name string }
+
+func login(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	name := r.FormValue("name")
+	var users []User
+	reformDB := reform.NewDB(db, reform.Postgres)
+	_, err := reformDB.Select(&users, "SELECT * FROM users WHERE name = ?", name)
+	_ = err
+}
+NEG
 )

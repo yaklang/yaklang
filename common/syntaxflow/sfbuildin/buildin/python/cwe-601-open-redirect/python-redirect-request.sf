@@ -1,0 +1,78 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python redirect 使用请求数据"
+	title_zh: "数据流：Python redirect 使用请求数据"
+	type: vuln
+	level: ""
+	rule_id: "ssa-python-redirect-request"
+	risk: "open-redirect"
+	cwe: "CWE-601"
+	desc: <<<DESC
+重定向目标来自请求参数。攻击者可以把用户带到外部站点。
+
+### 检测方式
+请求来源流入 `redirect`。目标经过 `startswith` 校验，或者在重定向前被重新赋值（phi）时跳过。
+DESC
+	solution: <<<SOLUTION
+- 只允许站内相对路径。
+- 校验目标以 `/` 开头且不以 `//` 开头。
+SOLUTION
+	alert_min: 1
+)
+request.* as $src
+redirect(* as $arg)
+$arg?{!have: /phi\(/}?{!(<self><getUsers()>?{opcode: undefined && <name>?{have: /(?i)startswith/}})}?{<self> #{include: `* & $src`}->} as $hit
+alert $hit for {
+	level: "middle",
+	title: "数据流：Python redirect 使用请求数据",
+	title_zh: "数据流：Python redirect 使用请求数据",
+	risk: "open-redirect",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+from flask import Flask, redirect, request
+
+app = Flask(__name__)
+
+@app.route("/next")
+def next_url():
+    target = request.args.get("next", "/")  # wb:source id=src
+    return redirect(target)  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+import os
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+from flask import Flask, redirect, request
+
+app = Flask(__name__)
+
+@app.route("/next")
+def next_url():
+    target = request.args.get("next", "/")  # wb:source id=src
+    if not target.startswith("/") or target.startswith("//"):
+        target = "/"
+    return redirect(target)  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

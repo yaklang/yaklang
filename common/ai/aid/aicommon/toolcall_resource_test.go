@@ -131,3 +131,61 @@ func TestToolCallResourceWithAsyncManager(t *testing.T) {
 	require.NotEmpty(t, rejected.Error)
 	require.Equal(t, 2, callbackCount, "invalid arguments never reach the plugin callback")
 }
+
+func TestToolCallResourceRebindsPreparedCallerToExecutionContext(t *testing.T) {
+	sessionCtx, cancelSession := context.WithCancel(context.Background())
+	defer cancelSession()
+	taskCtx, cancelTask := context.WithCancel(context.Background())
+	defer cancelTask()
+	cfg := NewTestConfig(sessionCtx, WithAgreeYOLO(), WithWorkdir(t.TempDir()), WithDisableCreateDBRuntime(true))
+	task := NewStatefulTaskBase("background-task", "run after turn", taskCtx, cfg.GetEmitter(), true)
+
+	started := make(chan struct{})
+	callbackDone := make(chan error, 1)
+	tool, err := aitool.New("rebind_context_fixture",
+		aitool.WithDangerousNoNeedUserReview(true),
+		aitool.WithNoRuntimeCallback(func(ctx context.Context, _ aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			close(started)
+			<-ctx.Done()
+			callbackDone <- ctx.Err()
+			return nil, ctx.Err()
+		}),
+	)
+	require.NoError(t, err)
+	caller, err := NewToolCaller(taskCtx,
+		WithToolCaller_AICallerConfig(cfg),
+		WithToolCaller_Task(task),
+		WithToolCaller_Emitter(cfg.GetEmitter()),
+	)
+	require.NoError(t, err)
+	resource, err := caller.NewAsyncResource(tool, aitool.InvokeParams{})
+	require.NoError(t, err)
+
+	execCtx, cancelExecution := context.WithCancel(sessionCtx)
+	defer cancelExecution()
+	executeDone := make(chan error, 1)
+	go func() {
+		executeDone <- resource.Execute(execCtx)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("tool did not start")
+	}
+
+	cancelTask()
+	select {
+	case err := <-callbackDone:
+		t.Fatalf("task completion cancelled session-owned tool: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	cancelExecution()
+	select {
+	case err := <-callbackDone:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("manager-owned execution context did not cancel the tool")
+	}
+	require.ErrorIs(t, <-executeDone, context.Canceled)
+}

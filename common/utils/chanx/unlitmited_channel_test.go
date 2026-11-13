@@ -4,6 +4,9 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnlimitedChan_BasicSendReceive(t *testing.T) {
@@ -81,4 +84,32 @@ func TestUnlimitedChan_Close(t *testing.T) {
 	if ok {
 		t.Errorf("channel should be closed")
 	}
+}
+
+// Feed is on the hot path of every scan stage: a rule result, an IR batch, a
+// cache write. Each feed used to allocate a 3 second timer for its write
+// deadline, which then stayed in the runtime timer heap until it fired. One
+// dotCMS scan allocated 3.1 GB of those timers.
+func TestUnlimitedChan_FeedDoesNotAllocateTimersWhenBufferHasRoom(t *testing.T) {
+	ch := NewUnlimitedChan[int](context.Background(), 64)
+	defer ch.CloseForce()
+
+	allocs := testing.AllocsPerRun(200, func() {
+		if !ch.SafeFeedWithResult(1) {
+			t.Fatalf("feed into a channel with free capacity must succeed")
+		}
+	})
+	require.Zero(t, allocs, "feeding a free slot allocated %v objects", allocs)
+}
+
+func TestUnlimitedChan_FeedStillTimesOutWhenConsumerIsStuck(t *testing.T) {
+	in := make(chan int, 1)
+	out := make(chan int)
+	// No process goroutine: the buffer fills and the writer must report a stall
+	// instead of blocking forever.
+	ch := &UnlimitedChan[int]{innerIn: in, innerOut: out, buffer: NewRingBuffer[int](1), ctx: context.Background()}
+	in <- 1
+	start := time.Now()
+	require.False(t, ch.SafeFeedWithResult(2))
+	require.GreaterOrEqual(t, time.Since(start), chanFeedTimeout)
 }

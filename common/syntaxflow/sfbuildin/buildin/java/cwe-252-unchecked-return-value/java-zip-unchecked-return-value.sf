@@ -1,7 +1,8 @@
 desc(
+	mode: "struct"
 	risk: "api-abuse"
-	title: "Check Java Zip Unchecked Return Value"
-	title_zh: "检测Java Zip未检查返回值的API"
+	title: "结构匹配：Check Java Zip Unchecked Return Value"
+	title_zh: "结构匹配：检测Java Zip未检查返回值的API"
 	type:security
 	desc: <<<DESC
 ### 规则描述
@@ -179,7 +180,7 @@ e.printStackTrace();
 - **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
 因此，在调用这些返回对象的方法后，建议检查返回值并根据需要进行处理（例如，赋值给变量进行后续操作，或者确保资源被正确管理和释放）。
 DESC
-	level: "info",
+	level: "middle",
 	risk: "api-abuse",
 	message: "发现Java java.util.zip.ZipFile未检查返回值的API",
 	name: "weak1",
@@ -269,7 +270,7 @@ e.printStackTrace();
 *   **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
 因此，在调用这些返回对象的方法后，建议检查返回值并根据需要进行处理（例如，赋值给变量进行后续操作，或者确保资源被正确管理和释放）。
 DESC
-	level: "low",
+	level: "middle",
 	risk: "api-abuse",
 	message: "发现Java org.apache.commons.compress.archivers.zip.ZipFile未检查返回值的API",
 	title: "Check Java Zip Unchecked Return Value",

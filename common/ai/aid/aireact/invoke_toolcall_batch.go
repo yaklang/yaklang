@@ -406,8 +406,10 @@ func (r *ReAct) ExecuteToolCallGroup(
 	hasAsync := false
 	for i := range request.Calls {
 		call := &request.Calls[i]
-		if !call.Async && !call.AsyncSpecified {
-			if tool, err := r.config.GetAiToolManager().GetToolByName(call.ToolName); err == nil && tool != nil {
+		if tool, err := r.config.GetAiToolManager().GetToolByName(call.ToolName); err == nil && tool != nil {
+			if tool.RequireForeground {
+				call.Async = false
+			} else if !call.Async && !call.AsyncSpecified {
 				call.Async = tool.DefaultAsync
 			}
 		}
@@ -492,6 +494,7 @@ func (r *ReAct) ExecuteToolCallGroup(
 	// Resolve and preflight every child before emitting cards or callbacks.
 	// Calls in a batch are declared mutually independent, so one rejected child
 	// remains visible in its own outcome without cancelling valid siblings.
+	exclusiveGroups := make(map[string]bool)
 	for i := range request.Calls {
 		if err := ctx.Err(); err != nil {
 			return result, err
@@ -563,6 +566,13 @@ func (r *ReAct) ExecuteToolCallGroup(
 					validationErrors,
 				)
 			}
+		}
+		if group := tool.ExclusiveBatchGroup; group != "" && result.Outcomes[i].Err == nil {
+			if exclusiveGroups[group] {
+				result.Outcomes[i].Stage = aicommon.ToolCallStageValidationFailed
+				result.Outcomes[i].Err = fmt.Errorf("only one %s can be called in a parallel tool batch", group)
+			}
+			exclusiveGroups[group] = true
 		}
 		works[i] = work
 	}
@@ -734,18 +744,27 @@ func (r *ReAct) ExecuteToolCallGroup(
 					result.Outcomes[i].Err = resourceErr
 					return
 				}
+				releaseAdmission, allowed := r.BeginAsyncExecutionAdmission()
+				if !allowed {
+					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
+					result.Outcomes[i].Err = asyncexecmanager.ErrClosed
+					return
+				}
 				receipt, startErr := manager.Start(asyncexecmanager.Request{ID: executionID, Resource: resource,
 					Metadata: asyncexecmanager.Metadata{Name: work.call.ToolName, Attributes: map[string]string{
 						"task_id": task.GetId(), "loop": loop.GetLoopName(), "batch_id": work.batchID,
 						"call_index": fmt.Sprint(i), "identifier": work.call.Identifier, "call_id": work.call.ExecutionCallID,
 					}}})
 				if startErr != nil {
+					releaseAdmission()
 					result.Outcomes[i].Stage = aicommon.ToolCallStagePrepareFailed
 					result.Outcomes[i].Err = startErr
 					return
 				}
 				result.Outcomes[i].Stage = aicommon.ToolCallStageSubmitted
 				result.Outcomes[i].ExecuteID = receipt.ID
+				r.TrackAsyncExecutionTask(task, receipt.ID)
+				releaseAdmission()
 				// No background worker may mutate the returned outcome or retain an
 				// action operator. The original caller supplies all observations.
 				releaseForeground()

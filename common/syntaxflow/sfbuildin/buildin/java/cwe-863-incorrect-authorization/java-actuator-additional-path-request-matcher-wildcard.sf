@@ -1,6 +1,7 @@
 desc(
-	title: "Audit Actuator Additional Path Request Matcher Wildcard Coverage"
-	title_zh: "审计Actuator附加路径匹配器的通配覆盖"
+	mode: "struct"
+	title: "结构匹配：Audit Actuator Additional Path Request Matcher Wildcard Coverage"
+	title_zh: "结构匹配：审计Actuator附加路径匹配器的通配覆盖"
 	type: audit
 	risk: "authorization-bypass"
 	desc: <<<DESC

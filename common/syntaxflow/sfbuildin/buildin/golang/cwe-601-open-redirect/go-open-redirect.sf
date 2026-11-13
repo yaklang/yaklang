@@ -1,0 +1,93 @@
+desc(
+	mode: "ssa"
+	language: "golang"
+	title: "数据流：Golang open redirect"
+	title_zh: "数据流：Go 开放重定向"
+	type: vuln
+	level: ""
+	risk: "open-redirect"
+	cwe: "CWE-601"
+	desc: <<<DESC
+`http.Redirect` 的目标来自请求参数。攻击者可以把用户带到外部站点。
+
+### 检测方式
+请求来源流入 `http.Redirect` 的目标参数。目标被重新赋值（phi）时跳过。
+DESC
+	solution: <<<SOLUTION
+- 只允许站内相对路径。
+- 校验目标以 `/` 开头且不以 `//` 开头。
+SOLUTION
+	alert_min: 1
+	rule_id: "3b587d42-f300-4196-8b4c-a0982ac0ad4b"
+)
+*.Get(* as $src)
+http.Redirect(*, *, * as $arg, *)
+$arg?{!have: /phi\(/}?{<self> #{include: `* & $src`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Golang open redirect",
+	title_zh: "Go 开放重定向",
+	risk: "open-redirect",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+import (
+	"net/http"
+	"os"
+)
+func nextURL(w http.ResponseWriter, r *http.Request) {
+	target := r.URL.Query().Get("next") // wb:source id=src
+	http.Redirect(w, r, target, http.StatusFound) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/next", nextURL)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /next?next=
+import (
+	"net/http"
+	"strings"
+	"os"
+)
+
+func nextURL(w http.ResponseWriter, r *http.Request) {
+	target := r.URL.Query().Get("next") // wb:source id=src
+	if !strings.HasPrefix(target, "/") || strings.HasPrefix(target, "//") {
+		target = "/"
+	}
+	http.Redirect(w, r, target, http.StatusFound) // wb:sink id=sink
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/next", nextURL)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

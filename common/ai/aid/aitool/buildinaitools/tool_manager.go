@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -242,6 +243,7 @@ func (m *AiToolManager) ForkForSession() *AiToolManager {
 		noCacheTools:          m.noCacheTools,
 		enableAllTools:        m.enableAllTools,
 		restrictToTools:       m.restrictToTools,
+		onlyTools:             maps.Clone(m.onlyTools),
 		maxCacheTokens:        m.maxCacheTokens,
 	}
 	fork.disallowMCPServers.Store(m.disallowMCPServers.Load())
@@ -531,6 +533,26 @@ func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {
 		return append(originGetter(), extTools...)
 	}
 	return nil
+}
+
+// AppendScopedTool admits a call-scoped tool without overriding explicit
+// denials or expanding an already restricted inventory.
+func (m *AiToolManager) AppendScopedTool(tool *aitool.Tool) (bool, error) {
+	if m.onlyTools != nil {
+		return false, nil
+	}
+	if _, disabled := m.disableTools[tool.Name]; disabled {
+		return false, nil
+	}
+	if enabled, exists := m.toolEnabled[tool.Name]; (exists || m.restrictToTools) && !enabled {
+		return false, nil
+	}
+	for _, existing := range m.safeToolsGetter() {
+		if existing.Name == tool.Name {
+			return false, fmt.Errorf("scoped tool %q conflicts with an existing tool", tool.Name)
+		}
+	}
+	return true, m.AppendTools(tool)
 }
 
 // RestrictToTools confines the manager to exactly the named tools: it clears the

@@ -1,9 +1,10 @@
 desc(
-	title: "匿名访问接口 @PermitAll 白名单核对",
+	mode: "ssa"
+	title: "数据流：匿名访问接口 @PermitAll 白名单核对",
 	title_zh: "匿名访问接口 @PermitAll 白名单核对",
 	risk: "access-control"
 	type: audit
-	level: warning
+	level: "middle"
 	rule_id: "java-permitall-anonymous"
 	desc: <<<DESC
 标记 @PermitAll 的接口为匿名可访问，需人工核对白名单是否合理。
@@ -38,5 +39,5 @@ check $permitAll then "permitAll found" else "none";
 
 alert $permitAll for {
 	message: "匿名访问接口（@PermitAll），核对白名单",
-	level: "warning",
+	level: "middle",
 }

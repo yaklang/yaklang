@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Audit Golang GORM Usage"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-database-gorm'
 	desc: <<<DESC
 ### 漏洞描述

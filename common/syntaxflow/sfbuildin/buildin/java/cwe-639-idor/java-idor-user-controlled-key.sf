@@ -1,9 +1,10 @@
 desc(
-	title: "越权 IDOR：资源按 id 查询需复核归属校验",
+	mode: "ssa"
+	title: "数据流：越权 IDOR：资源按 id 查询需复核归属校验",
 	title_zh: "越权 IDOR：资源按 id 查询需复核归属校验",
 	risk: "authorization-bypass"
 	type: audit
-	level: warning
+	level: "middle"
 	rule_id: "java-idor-user-controlled-key"
 	cwe: "CWE-639"
 	desc: <<<DESC
@@ -44,5 +45,5 @@ check $query then "idor query" else "no idor";
 
 alert $query for {
 	message: "资源按 id 查询，人工复核是否校验归属（IDOR）",
-	level: "warning",
+	level: "middle",
 }

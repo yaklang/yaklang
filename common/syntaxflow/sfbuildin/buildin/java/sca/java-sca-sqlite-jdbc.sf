@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java sqlite-jdbc Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java sqlite-jdbc Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -55,7 +56,7 @@ SOLUTION
 	reference: <<<REFERENCE
 [CVE-2020-15358](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-15358)
 REFERENCE
-	title_zh: "SCA: 检测 Java sqlite-jdbc 依赖漏洞"
+	title_zh: "数据流：SCA: 检测 Java sqlite-jdbc 依赖漏洞"
 )
 
 __dependency__.*sqlite*jdbc.version as $ver;
@@ -109,8 +110,49 @@ Connection connection = DriverManager.getConnection(url);
 ```
 攻击者可以输入 `database.sqlite?journal_mode=DELETE;DROP TABLE sensitive_data;--` 到 `db` 参数中，导致连接时执行恶意的 SQL 语。
 DESC
-	level: "high",
+	level: "middle",
 	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
 	name: "vuln_sqlite_jdbc",
 	risk: "sca",
 }
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://pom.xml': <<<POS
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.36.0</version>
+        </dependency>
+    </dependencies>
+</project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.36.1</version>
+        </dependency>
+    </dependencies>
+</project>
+NEG
+)

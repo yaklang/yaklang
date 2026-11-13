@@ -84,8 +84,13 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 				ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
 					bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
 				)
+				var fallback []*IrCode
 				for ir := range ch {
 					cache.Set(ir.CodeID, ir)
+					fallback = append(fallback, ir)
+				}
+				warmIrConstValues(GetDB(), progName, fallback)
+				for _, ir := range fallback {
 					outC.SafeFeed(ir)
 				}
 				return nil

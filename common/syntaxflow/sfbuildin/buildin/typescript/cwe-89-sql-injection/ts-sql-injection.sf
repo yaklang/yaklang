@@ -1,0 +1,66 @@
+desc(
+	mode: "ssa"
+	language: "ts"
+	title: "数据流：TypeScript SQL Injection: User Input Concatenated Into Query"
+	title_zh: "数据流：TypeScript SQL 注入：用户输入拼接进查询语句"
+	type: vuln
+	level: ""
+	rule_id: "ssa-ts-sql-injection"
+	risk: "sql-injection"
+	cwe: "CWE-89"
+	desc: <<<DESC
+### 漏洞描述
+函数参数经 `+` 或模板字符串拼接进 SQL 文本。攻击者可注入 `' OR '1'='1` 改变查询语义。
+
+### 检测方式
+先定位包含 `SELECT ... FROM` 的字符串常量，再沿使用边找到字符串拼接结果，并确认拼接结果可达函数参数。参数化查询不经过字符串拼接，不告警。
+
+### 风险类型
+sql-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用参数化查询：
+
+```ts
+db.query("SELECT id, name FROM users WHERE name = ?", [name]);
+```
+
+不要用 `+` 或模板字符串把参数拼进 SQL 文本。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+	alert_min: 1
+)
+
+*?{opcode: param} as $src
+
+*?{have: /(?i)select\s+.+?\s+from/} as $const
+$const<getUsers()>?{opcode: add} as $query
+$query?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "TypeScript SQL Injection: User Input Concatenated Into Query",
+	title_zh: "TypeScript SQL 注入：用户输入拼接进查询语句",
+	risk: "sql-injection",
+}
+
+desc(
+	lang: ts
+	alert_high: 1
+	'file://unsafe_sql.ts': <<<UNSAFE
+export function users(db: any, name: string): unknown {
+  return db.query("SELECT id, name FROM users WHERE name = '" + name + "'");
+}
+UNSAFE
+	'safefile://safe_sql.ts': <<<SAFE
+export function users(db: any, name: string): unknown {
+  return db.query("SELECT id, name FROM users WHERE name = ?", [name]);
+}
+SAFE
+)

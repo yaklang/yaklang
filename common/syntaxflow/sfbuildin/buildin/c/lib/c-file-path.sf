@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Audit C File Operation Functions"
 	type: audit
-	level: info
+	level: ""
 	lib: 'c-file-path'
 	desc: <<<DESC
 ### 1.规则目的

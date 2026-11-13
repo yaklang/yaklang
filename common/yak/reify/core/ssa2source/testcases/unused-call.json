@@ -1,0 +1,23 @@
+{
+  "forbidden": [
+    "= puts();"
+  ],
+  "name": "unused-call",
+  "note": "未被使用调用不绑定返回值，直接输出调用语句",
+  "source": [
+    "uint64_t caller(void) {",
+    "    puts(\"hi\");",
+    "    return 0x0;",
+    "}"
+  ],
+  "ssair": [
+    "caller",
+    "type: () -\u003e i64",
+    "extern puts",
+    "entry_0:",
+    "    \u003cstring\u003e t1 = \u003cstring\u003e \"hi\"",
+    "    \u003cany\u003e t2 = call \u003c() -\u003e any\u003e puts (\u003cstring\u003e t1) binding[] member[]",
+    "    \u003ci64\u003e t3 = \u003ci64\u003e 0x0",
+    "    ret \u003ci64\u003e t3"
+  ]
+}

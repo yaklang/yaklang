@@ -1,0 +1,52 @@
+desc(
+	mode: "ssa"
+	language: "javascript"
+	title: "数据流：Node.js CORS：请求 Origin 直接回显"
+	title_zh: "数据流：Node.js CORS：请求 Origin 直接回显"
+	type: vuln
+	level: ""
+	rule_id: "ssa-js-cors-origin-reflection"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+响应头把请求的 `Origin` 原样写入 `Access-Control-Allow-Origin`，任意站点都可跨域读取响应。同时覆盖 `cors({ origin: true })` 配置。
+
+### 风险类型
+cors
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用固定 Origin 白名单；不要回显请求头。
+SOLUTION
+	alert_min: 1
+	'file://app.js': <<<POS
+function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin);
+}
+module.exports = handler;
+POS
+	'safefile://app-safe.js': <<<NEG
+function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "https://app.example.com");
+}
+module.exports = handler;
+NEG
+)
+
+<include('js-param')> as $params;
+
+res.setHeader("Access-Control-Allow-Origin", * as $origin)
+
+$origin?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+}->}?{!(<getUsers()>?{opcode: eq})}?{!(<getUsers()>?{opcode: neq})} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js CORS：请求 Origin 直接回显",
+	title_zh: "Node.js CORS：请求 Origin 直接回显",
+	risk: "cors",
+}

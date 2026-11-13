@@ -1,7 +1,8 @@
 desc(
+	mode: "struct"
 	risk: "api-misuse"
-	title: "Check Java IO Unchecked Return Value"
-	title_zh: "检测Java IO库未检查返回值的API"
+	title: "结构匹配：Check Java IO Unchecked Return Value"
+	title_zh: "结构匹配：检测Java IO库未检查返回值的API"
 	type:security
 	desc: <<<DESC
 ### 风险描述
@@ -88,7 +89,7 @@ alert $weak for {
 	risk: "api-misuse",
 	title: "Check Java IO Unchecked Return Value",
 	title_zh: "检测Java IO库未检查返回值的API",
-	level: "info",
+	level: "middle",
 	message: "发现Java IO库未检查返回值的API",
 	name: "weak",
 	solution: <<<SOLUTION

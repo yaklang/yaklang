@@ -1,9 +1,10 @@
 desc(
-	title: "Template Object Injection via User-Controlled Data"
-	title_zh: "用户可控对象传入模板引擎导致模板对象注入"
+	mode: "struct"
+	title: "结构匹配：Template Object Injection via User-Controlled Data"
+	title_zh: "结构匹配：用户可控对象传入模板引擎导致模板对象注入"
 	type: vuln
 	risk: "template-object-injection"
-	level: high
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -181,7 +182,7 @@ $dataArg?{<self><getCall><getCallee><getObject> & $confirmedRes} as $confirmedDa
 $confirmedDataArg & $params as $taintedRender
 
 alert $taintedRender for {
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Template Object Injection",
 	title_zh: "模板对象注入",

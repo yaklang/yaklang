@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "csharp"
-	title: "检测 C# File.ReadAllText"
-	title_zh: "检测 C# File.ReadAllText"
+	title: "源码匹配：检测 C# File.ReadAllText"
+	title_zh: "源码匹配：检测 C# File.ReadAllText"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "source-csharp-file-readalltext"
 	risk: "path-traversal"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.cs}.pattern_regex(/File\.ReadAllText\s*\(/) as $hit
 alert $hit for {
-	level: "medium",
+	level: "middle",
 	title: "检测 C# File.ReadAllText",
 	title_zh: "检测 C# File.ReadAllText",
 	message: "检测 C# File.ReadAllText",

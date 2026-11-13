@@ -1,0 +1,172 @@
+desc(
+	mode: "struct"
+	language: "javascript"
+	title: "结构匹配：Node.js 越权：用户可控 ID 直接索引对象"
+	title_zh: "结构匹配：Node.js 越权：用户可控 ID 直接索引对象"
+	type: vuln
+	level: "middle"
+	rule_id: "struct-js-idor-dynamic-index"
+	risk: "access-control"
+	cwe: "CWE-639"
+	desc: <<<DESC
+### 规则说明
+请求参数被直接用作对象下标，返回记录前没有当前用户归属校验。
+
+### 风险类型
+access-control
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+以服务端会话中的用户身份查询资源，并校验资源归属；不要信任客户端传入的对象 ID。
+SOLUTION
+	alert_min: 1
+)
+
+// A dynamic index (orders[orderID]) is a ParameterMember whose key is an
+// expression, rendered as "<any>". The phi filter drops merged values such as
+// the reassigned redirect target; this rule only looks at direct index reads.
+*.*?{have: /<any>/}?{have: /^ParameterMember/} as $member
+
+// Without an ownership check the indexed record is returned as-is. The check
+// itself is a comparison against a member named owner (found.owner !==
+// req.session.userId), which is one member access away from the index read.
+// A direct return exposes the record without an ownership step. Values that
+// are validated before the return (found.owner !== req.session.userId) are
+// one member access away from the index read.
+$member?{<getUsers()>?{opcode: return}}?{!(<getUsers()><getUsers()>?{have: /(?i)owner/})} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Node.js 越权：用户可控 ID 直接索引对象",
+	title_zh: "Node.js 越权：用户可控 ID 直接索引对象",
+	risk: "access-control",
+}
+
+desc(
+	lang: javascript
+	alert_min: 1
+	'file://app.js': <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+function order(req, orders) {
+  const orderId = String(req.query.order_id || ""); // wb:source id=src
+  return orders[orderId]; // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = order(req, orders);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+POS
+	'safefile://app.js': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /order?order_id=
+function order(req, orders) {
+  const orderId = String(req.query.order_id || ""); // wb:source id=src
+  const found = orders[orderId];
+  if (!found || found.owner !== req.session.userId) {
+    return null;
+  }
+  return found; // wb:sink id=sink
+}
+
+const wbHttp = require("http");
+const { URL: WbURL } = require("url");
+
+const db = {
+  query(sql, params) { return { sql, params: params || [] }; },
+  collection(name) { return { find(query) { return { name, query }; } }; },
+};
+const orders = { "1": "order-1", "2": { owner: "user-1", body: "order-2" } };
+
+const wbServer = wbHttp.createServer((req, res) => {
+  const wbUrl = new WbURL(req.url || "/", "http://127.0.0.1");
+  if (wbUrl.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  const chunks = [];
+  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("end", () => {
+    const raw = Buffer.concat(chunks).toString("utf8");
+    req.query = Object.fromEntries(wbUrl.searchParams);
+    const ctype = String(req.headers["content-type"] || "");
+    if (ctype.includes("json") || raw.startsWith("{") || raw.startsWith("[")) {
+      try { req.body = raw ? JSON.parse(raw) : {}; } catch (err) { req.body = raw; }
+    } else if (ctype.includes("application/x-www-form-urlencoded")) {
+      req.body = Object.fromEntries(new URLSearchParams(raw));
+    } else {
+      req.body = raw;
+    }
+    req.session = { userId: String(req.headers["x-user"] || "user-1") };
+    res.send = (body) => { if (!res.writableEnded) res.end(body == null ? "" : String(body)); };
+    res.redirect = (status, location) => {
+      if (typeof status !== "number") { location = status; status = 302; }
+      res.statusCode = status;
+      res.setHeader("Location", String(location));
+      res.end();
+    };
+    try {
+      const result = order(req, orders);
+      if (!res.writableEnded) {
+        const text = result === undefined || result === null ? "ok" : (typeof result === "string" ? result : JSON.stringify(result));
+        res.end(text);
+      }
+    } catch (err) {
+      if (!res.writableEnded) {
+        res.statusCode = 500;
+        res.end(String(err && err.stack || err));
+      }
+    }
+  });
+});
+wbServer.listen(Number(process.env.PORT || 8080), "0.0.0.0");
+module.exports = wbServer;
+NEG
+)

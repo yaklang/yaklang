@@ -2,9 +2,9 @@ package schema
 
 import "github.com/yaklang/gorm"
 
-// AISessionTaskInput stores the user input and attachment snapshot for one
-// accepted AI task. The session ID is a logical lookup key only; this table
-// deliberately has no foreign-key or association relationship with AISession.
+// AISessionTaskInput stores the resources attached by one accepted AI input.
+// The session ID is a logical lookup key only; this table deliberately has no
+// foreign-key or association relationship with AISession.
 type AISessionTaskInput struct {
 	gorm.Model
 
@@ -19,12 +19,9 @@ type AISessionTaskInput struct {
 	ScheduleName    string `json:"schedule_name" gorm:"column:schedule_name"`
 	ScheduledAt     string `json:"scheduled_at" gorm:"column:scheduled_at"`
 	ScheduleTrigger string `json:"schedule_trigger" gorm:"column:schedule_trigger"`
-
-	AttachedFilePaths  string `json:"attached_file_paths" gorm:"column:attached_file_paths;type:text"`
-	ExplicitResources  string `json:"explicit_resources" gorm:"column:explicit_resources;type:text"`
-	EffectiveResources string `json:"effective_resources" gorm:"column:effective_resources;type:text"`
+	Resources       string `json:"resources" gorm:"column:resources;type:text"`
 }
 
 func (a *AISessionTaskInput) TableName() string {
-	return "ai_session_task_inputs_v1"
+	return "ai_session_task_inputs_v2"
 }

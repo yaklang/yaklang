@@ -1,8 +1,9 @@
 desc(
-	title: "Check Python SQL Injection via Percent-Format String Concatenation"
-	title_zh: "检测Python基于百分号格式化的SQL注入漏洞"
+	mode: "ssa"
+	title: "数据流：Check Python SQL Injection via Percent-Format String Concatenation"
+	title_zh: "数据流：检测Python基于百分号格式化的SQL注入漏洞"
 	type: audit
-	level: high
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 该规则用于检测Python应用程序中通过百分号格式化（% formatting）或字符串拼接方式构建SQL语句的安全漏洞。当用户可控输入通过`%`操作符（如`"SELECT ... '%s'" % (user, pass)`）直接嵌入SQL字符串时，攻击者可构造恶意输入绕过查询逻辑，导致SQL注入（SQLi）。此类漏洞常见于使用`sqlite3`、`MySQLdb`等数据库驱动且未采用参数化查询的Web应用（如Flask、Django）。攻击者可通过注入`' OR '1'='1`等Payload篡改查询语义，造成数据泄露、未授权访问甚至数据库完全控制。规则通过追踪用户输入（`python-user-input`）与包含`%`的SQL字符串拼接点之间的数据流，识别高危Sink。

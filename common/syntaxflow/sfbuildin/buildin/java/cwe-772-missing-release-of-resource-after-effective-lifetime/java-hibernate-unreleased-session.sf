@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测Java Hibernate Session 数据库资源未释放"
-	title: "Check Java Hibernate Session Unreleased Resource"
+	mode: "struct"
+	title_zh: "结构匹配：检测Java Hibernate Session 数据库资源未释放"
+	title: "结构匹配：Check Java Hibernate Session Unreleased Resource"
 	risk:"resource-leak"
-	level:high
+	level: "middle"
 	reference: <<<REFERENCE
 [Hibernate Session API 文档 (Hibernate 2.x)](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/Session.html)
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
@@ -211,7 +212,7 @@ SOLUTION
 - 严重情况下可能导致应用程序崩溃或拒绝服务
 - 长时间运行的应用中，问题会随时间累积
 DESC
-	level: "high",
+	level: "middle",
 	message: "检测到Hibernate Session 未释放资源",
 	title: "Check Java Hibernate Session Unreleased Resource",
 	title_zh: "检测Java Hibernate Session 数据库资源未释放",

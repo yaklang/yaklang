@@ -1,0 +1,50 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到 href 属性中的变量"
+	title_zh: "检测到 href 属性中的变量",
+	type: vuln
+	level: "middle"
+	rule_id: "source-insecure-api-var-in-href"
+	risk: "xss"
+	desc: <<<DESC
+### 规则说明
+模板中检测到在 a 标签 href 属性中使用变量。攻击者可输入 javascript: URI，构成 XSS 攻击。
+
+### 风险类型
+跨站脚本（XSS）（xss）
+
+### 影响
+未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-79
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用框架安全函数生成 URL（如 Flask 的 url_for、Django 的 url 过滤器），或对链接做 URL 编码预处理。
+SOLUTION
+	alert_min: 1
+	"file://pos.ejs": <<<POS
+<a"sy[0 utL&88 ""Q<href
+		
+=YJM(8q<%%>6;[>
+
+POS
+	"safefile://neg/pos.ejs": <<<NEG
+<a href="/static/help">Help</a>
+NEG
+)
+
+${*.ejs}.pattern_regex(/<a.*href\s*=[^>]*?[^\/&=]<%.*?%>.*?>/) as $p0
+${/\.(html|htm)$/}.pattern_regex(/<a.*href\s*=[^>]*?[^\/&=]<%.*?%>.*?>/) as $p1
+$p0 + $p1 as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 href 属性中的变量",
+	title_zh: "检测到 href 属性中的变量",
+	message: "检测到 href 属性中的变量",
+}

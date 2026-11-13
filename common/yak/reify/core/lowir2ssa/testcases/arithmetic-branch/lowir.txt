@@ -1,0 +1,11 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x1000 @ 0x1000
+block b1 @ 0x1000
+  0x1000  v1:i64 = constant 0x2a
+  0x1001  v2:i64 = constant 0x3
+  0x1002  v3:i64 = add v1, v2
+  0x1003  branch v3 -> b2, b3
+block b2 @ 0x1004
+  0x1004  return v3
+block b3 @ 0x1005
+  0x1005  return 0x0

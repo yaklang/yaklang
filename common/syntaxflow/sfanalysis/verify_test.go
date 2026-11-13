@@ -33,7 +33,7 @@ alert $output;
 	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()), "alert symbol table not empty")
 }
 
-func TestEvaluateVerifyFilesystemWithRule_DefaultAllowsAlertHighOverflow(t *testing.T) {
+func TestEvaluateVerifyFilesystemWithRule_HighSeverityEnforcesAlertHigh(t *testing.T) {
 	rule := &schema.SyntaxFlowRule{Content: `
 desc(
 	language: yaklang,
@@ -41,7 +41,7 @@ desc(
 	'file://unsafe.yak': <<<EOF
 a = 1;
 EOF
-	'safe://safe.yak': <<<EOF
+	'safefile://safe.yak': <<<EOF
 b = 1;
 EOF
 )
@@ -52,7 +52,9 @@ alert $first for {level: "high"};
 alert $second for {level: "high"};
 `}
 
-	require.NoError(t, EvaluateVerifyFilesystemWithRule(rule))
+	// A rule that can emit high is strict even without WithStrictEmbeddedVerify:
+	// two high alerts contradict the declared alert_high budget.
+	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule), "alert symbol table is less than alert_high config")
 	require.ErrorContains(t, EvaluateVerifyFilesystemWithRule(rule, WithStrictEmbeddedVerify()), "alert symbol table is less than alert_high config")
 }
 

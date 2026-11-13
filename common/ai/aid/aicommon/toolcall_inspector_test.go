@@ -67,7 +67,7 @@ func TestToolCallerInspectorWithAsyncManager(t *testing.T) {
 	)
 	require.NoError(t, err)
 	cfg := NewTestConfig(owner, WithAgreeYOLO(), WithWorkdir(t.TempDir()))
-	manager, err := asyncexecmanager.New(owner, asyncexecmanager.Config{MaxConcurrent: 1})
+	manager, err := asyncexecmanager.New(owner, asyncexecmanager.Config{MaxActiveExecutions: 1})
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		cancelOwner()

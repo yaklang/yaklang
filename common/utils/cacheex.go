@@ -70,18 +70,27 @@ type flightEntry[T any] struct {
 	createdAt time.Time  // Time when the entry was created
 }
 
-// Can only close once
+// Close stops the cache's background workers. It is safe to call more than
+// once: ttlcache.Stop sends on an unbuffered channel that nothing reads after
+// the first stop, so a second call would block the caller forever. Callers
+// reach this from both an explicit close and the owning parent's eviction
+// callback, so idempotency is required, not optional.
 func (cache *CacheExWithKey[U, T]) Close() {
-	cache.cancel()
-	// close
-	cache.Cache.DeleteAll()
-	cache.Cache.Stop()
-	cache.evictionCallbackClear()
+	if cache.stopOnce == nil {
+		cache.stopOnce = &sync.Once{}
+	}
+	cache.stopOnce.Do(func() {
+		cache.cancel()
+		// close
+		cache.Cache.DeleteAll()
+		cache.Cache.Stop()
+		cache.evictionCallbackClear()
 
-	// Clean up flight entries
-	cache.flightMu.Lock()
-	cache.flightEntries = make(map[U]*flightEntry[T])
-	cache.flightMu.Unlock()
+		// Clean up flight entries
+		cache.flightMu.Lock()
+		cache.flightEntries = make(map[U]*flightEntry[T])
+		cache.flightMu.Unlock()
+	})
 }
 
 // Set is a thread-safe way to add new items to the map
@@ -319,10 +328,11 @@ func NewCacheExWithKey[U comparable, T any](opt ...cacheExOption) *CacheExWithKe
 	}
 
 	cache := &CacheExWithKey[U, T]{
-		ctx:    ctx,
-		cancel: cancel,
-		config: config,
-		ttl:    config.ttl,
+		ctx:      ctx,
+		cancel:   cancel,
+		config:   config,
+		ttl:      config.ttl,
+		stopOnce: &sync.Once{},
 	}
 	cache.reset()
 	return cache
@@ -332,6 +342,12 @@ func (c *CacheExWithKey[U, T]) reset() {
 	c.Cache = ttlcache.New[U, T](
 		ttlcache.WithCapacity[U, T](c.config.capacity),
 	)
+	// Close may run from a caller and from the owning parent's eviction
+	// callback, so it must be idempotent. Keep the guard non-nil on every
+	// construction path.
+	if c.stopOnce == nil {
+		c.stopOnce = &sync.Once{}
+	}
 
 	// Initialize single-flight fields
 	c.flightEntries = make(map[U]*flightEntry[T])

@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
@@ -76,6 +77,15 @@ type ReAct struct {
 	currentTask   aicommon.AIStatefulTask // 当前正在处理的任务
 
 	lastTask aicommon.AIStatefulTask // 上一个完成的任务
+
+	// Background tool executions belong to the ReAct session, not one queued
+	// task. This lets a tool started in one user turn remain manageable after
+	// that task and its loop have been released.
+	asyncExecutionMu      sync.Mutex
+	asyncExecutionManager *asyncexecmanager.Manager
+	asyncDirectAnswerMu   sync.Mutex
+	asyncDirectAnswer     chan struct{}
+	asyncDirectRequested  bool
 
 	// All Runtime Tasks
 	RuntimeTasks           []aicommon.AIStatefulTask
@@ -305,7 +315,9 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	if cfg.Timeline == nil {
-		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
+		if err := cfg.SetTimeline(aicommon.NewTimeline(cfg, nil)); err != nil {
+			return nil, err
+		}
 	}
 	aimem.RegisterTimelineMemoryPersistence(cfg.Timeline, react.memoryTriage, cfg.GetContext())
 	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)

@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+// ErrInvocationNotStarted marks a callback rejection before execution began.
+var ErrInvocationNotStarted = errors.New("tool invocation did not start")
 
 // combinedBuffer is a thread-safe buffer that captures stdout and stderr
 // writes in real-time order, preserving the actual interleaving of output.
@@ -133,7 +137,8 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		err   error
 	}
 	// A tool callback is allowed to have external side effects. Do not start it
-	// when its context was already cancelled before invocation.
+	// when its context was already cancelled before invocation. Preserve the
+	// known pre-start outcome so durable callers can safely retry this request.
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		execResult := &ToolExecutionResult{
 			Stdout:         "",
@@ -143,10 +148,10 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		if cancelCallback != nil {
 			execResult, callbackErr := cancelCallback(execResult, ctxErr)
 			if callbackErr != nil {
-				return execResult, callbackErr
+				return execResult, errors.Join(ctxErr, ErrInvocationNotStarted, callbackErr)
 			}
 		}
-		return execResult, ctxErr
+		return execResult, errors.Join(ctxErr, ErrInvocationNotStarted)
 	}
 	finished := make(chan callbackResult, 1)
 	go func() {
@@ -158,11 +163,14 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 	var err error
 	select {
 	case <-ctx.Done():
+		err = ctx.Err()
 		if config != nil && config.waitForCallbackOnCancel {
 			// Preserve writer ownership until callback work and cleanup really end.
-			// The cancelled result remains a cancellation, even if the callback
-			// returned a value while unwinding.
-			<-finished
+			// A known rejection before execution is safe to retry after cancellation.
+			callback := <-finished
+			if errors.Is(callback.err, ErrInvocationNotStarted) {
+				err = errors.Join(err, callback.err)
+			}
 		}
 		// Do not read callback-owned buffers or result variables while a
 		// non-cooperative callback may still be unwinding. Context-aware tools
@@ -173,7 +181,6 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 			Stderr:         "",
 			CombinedOutput: "",
 		}
-		err = ctx.Err()
 		if cancelCallback != nil {
 			var callbackErr error
 			execResult, callbackErr = cancelCallback(execResult, err)

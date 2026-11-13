@@ -1,10 +1,10 @@
 desc(
 	mode: "source"
 	language: "java"
-	title: "检测 Java RSA PKCS1Padding"
-	title_zh: "检测 Java RSA PKCS1Padding"
+	title: "源码匹配：检测 Java RSA PKCS1Padding"
+	title_zh: "源码匹配：检测 Java RSA PKCS1Padding"
 	type: vuln
-	level: middle
+	level: "middle"
 	rule_id: "source-java-rsa-pkcs1"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC

@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang XXE Read Any File"
+	mode: "struct"
+	title: "结构匹配：Check Golang XXE Read Any File"
 	type: audit
-	level: high
+	level: "high"
 	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
@@ -55,7 +56,7 @@ fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的�
 - **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
 DESC
 	rule_id: "2a752b37-c0ec-4098-813d-c0a685e36541"
-	title_zh: "检测Golang XXE任意文件读取漏洞"
+	title_zh: "结构匹配：检测Golang XXE任意文件读取漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 禁用外部实体解析 (推荐)
@@ -217,7 +218,6 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

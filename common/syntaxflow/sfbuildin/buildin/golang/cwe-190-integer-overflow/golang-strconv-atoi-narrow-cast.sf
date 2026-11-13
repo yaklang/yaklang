@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang strconv.Atoi Result Cast to int16/int32 (G109)"
-	title_zh: "检测Golang 将 strconv.Atoi 结果收窄转换为 int16/int32（G109）"
+	mode: "struct"
+	title: "结构匹配：Detect Golang strconv.Atoi Result Cast to int16/int32 (G109)"
+	title_zh: "结构匹配：检测Golang 将 strconv.Atoi 结果收窄转换为 int16/int32（G109）"
 	type: audit
-	level: mid
+	level: "middle"
 	risk: "integer-overflow"
 	desc: <<<DESC
 对应 gosec G109：`strconv.Atoi` 返回 `int`（在 Go 中与 `int` 同宽），若再转换为 `int16`/`int32` 等更窄类型，可能因溢出导致逻辑错误与安全判断被绕过（例如边界检查、权限 ID、长度字段等）。
@@ -23,7 +24,7 @@ $atoi<sourceCode(context=20)>?{have: /int16|int32/} as $mid
 
 alert $mid for {
 	type: "vuln",
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	title: "strconv.Atoi Result Narrowed to int16/int32",
 	title_zh: "strconv.Atoi 结果被收窄为 int16 或 int32",

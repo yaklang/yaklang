@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	risk: "remote-code-execution"
-	title: "Detect Java Log4j Remote Code Execution Vulnerability"
-	title_zh: "检测Java Log4j远程代码执行漏洞"
+	title: "数据流：Detect Java Log4j Remote Code Execution Vulnerability"
+	title_zh: "数据流：检测Java Log4j远程代码执行漏洞"
 	type: vuln
 	desc: <<<DESC
 ### 漏洞描述
@@ -174,7 +175,7 @@ return "Processed";
 - 进一步渗透内网。
 - 拒绝服务（DoS）。
 DESC
-	level: "high",
+	level: "middle",
 	message: "发现Java代码中存在Log4j远程代码执行漏洞，并且数据流中间没有进行任何过滤。",
 	risk: "remote-code-execution",
 	title: "Detect Java Log4j Remote Code Execution Vulnerability",

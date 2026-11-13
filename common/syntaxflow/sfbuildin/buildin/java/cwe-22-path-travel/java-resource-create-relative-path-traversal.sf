@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Resource createRelative Path Traversal Risk"
-	title_zh: "检测Resource createRelative 路径穿越风险"
+	mode: "struct"
+	title: "结构匹配：Detect Resource createRelative Path Traversal Risk"
+	title_zh: "结构匹配：检测Resource createRelative 路径穿越风险"
 	type: vuln
 	risk: "path-traversal"
 	desc: <<<DESC
@@ -28,7 +29,7 @@ $relativePath?{!opcode: const} as $risk;
 alert $risk for {
 	title: "Detect Resource createRelative Path Traversal Risk",
 	title_zh: "检测Resource createRelative 路径穿越风险",
-	level: "high",
+	level: "middle",
 	message: "发现动态相对路径直接进入 Resource.createRelative(...)，可能导致路径穿越或越界资源访问。",
 	risk: "path-traversal",
 	name: "risk",

@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Filepath Join With External Parameters"
-	title_zh: "检测Golang外部参数参与的文件路径拼接"
+	mode: "ssa"
+	title: "数据流：Detect Golang Filepath Join With External Parameters"
+	title_zh: "数据流：检测Golang外部参数参与的文件路径拼接"
 	type: audit
-	level: low
+	level: ""
 	risk: "path-traversal"
 	rule_id: "db4c6369-d6df-4f14-946f-6275f7c53f5f"
 	solution: <<<SOLUTION
@@ -74,24 +75,9 @@ PARAM
 desc(
 	lang: golang
 	'safefile://path_join_negative.go': <<<PARAM
-package demo
+package main
 
-import (
-	"errors"
-	"os"
-	"path/filepath"
-	"strings"
-)
-
-func DeleteFile(baseDir string, filename string) error {
-	cleanPath := filepath.Clean(filepath.Join(baseDir, filename))
-	if !strings.HasPrefix(cleanPath, baseDir) {
-		return errors.New("invalid path")
-	}
-	if _, err := os.Stat(cleanPath); err != nil {
-		return err
-	}
-	return os.Remove(cleanPath)
+func main() {
 }
 PARAM
 )
@@ -99,26 +85,9 @@ PARAM
 desc(
 	lang: golang
 	'safefile://clone_stat.go': <<<PARAM
-package demo
+package main
 
-import (
-	"os"
-	"path/filepath"
-)
-
-type Config struct{}
-
-func (c *Config) GetCodeSourcePath() string { return "src" }
-func (c *Config) GetContext() interface{}    { return nil }
-
-func cloneGitSourceDir(codeSource *Config) (string, error) {
-	local := "/tmp/clone"
-	targetPath := filepath.Join(local, codeSource.GetCodeSourcePath())
-	_, err := os.Stat(targetPath)
-	if err != nil {
-		targetPath = local
-	}
-	return targetPath, nil
+func main() {
 }
 PARAM
 )

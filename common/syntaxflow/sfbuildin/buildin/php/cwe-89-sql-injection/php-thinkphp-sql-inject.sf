@@ -1,6 +1,7 @@
 desc(
-	title: "Check PHP ThinkPHP SQL Injection Vulnerability"
-	title_zh: "检测PHP ThinkPHP SQL注入漏洞"
+	mode: "ssa"
+	title: "数据流：Check PHP ThinkPHP SQL Injection Vulnerability"
+	title_zh: "数据流：检测PHP ThinkPHP SQL注入漏洞"
 	risk: "audit-check"
 	level: "low"
 	desc: <<<DESC
@@ -125,7 +126,7 @@ $controledSink<dataflow(exclude:<<<CODE
 CODE)> as $controledNoNumberSink 
 
 alert $controledNoNumberSink for {
-	level: "mid",
+	level: "middle",
 	title: "检测到PHP SQL注入漏洞 数据可控",
 }
 
@@ -265,4 +266,9 @@ class User
     }
 }
 CODE
+	'safefile://safe.php': <<<NEG
+<?php
+    $name = input("name/s");
+    Db::table("users")->where("name", $name)->find();
+NEG
 )

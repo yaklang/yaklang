@@ -41,8 +41,9 @@ func (p *Program) compareOpcodeWithFileFilter(
 	includeFiles, excludeFiles []string,
 ) (sfvm.Values, []bool) {
 	ctx := opcodeItems.Context
+	insts := ssa.MatchInstructionByOpcodesWithFileFilter(ctx, p.Program, includeFiles, excludeFiles, opcodeItems.Opcodes...)
 	var res Values = lo.FilterMap(
-		ssa.MatchInstructionByOpcodesWithFileFilter(ctx, p.Program, includeFiles, excludeFiles, opcodeItems.Opcodes...),
+		insts,
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			val, err := p.NewValue(i)
 			if err != nil {

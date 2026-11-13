@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "java"
-	title: "Struct scan: Java IvParameterSpec"
-	title_zh: "结构扫描：Java IvParameterSpec"
+	title: "结构匹配：Java IvParameterSpec"
+	title_zh: "结构匹配：Java IvParameterSpec"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-java-ivparameterspec"
 	risk: "insecure-cryptography"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 IvParameterSpec(* as $iv) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Java IvParameterSpec",
 	title_zh: "结构扫描：Java IvParameterSpec",
 	message: "结构扫描：Java IvParameterSpec",

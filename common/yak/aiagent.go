@@ -305,6 +305,7 @@ var AIAgentExport = map[string]any{
 
 	// forge
 	"tools":                 aicommon.WithTools,
+	"forgeSubForge":         aiforge.WithSubForge,
 	"forgeTools":            aiforge.WithTools,
 	"initPrompt":            aiforge.WithInitializePrompt,
 	"initializePrompt":      aiforge.WithInitializePrompt, // alias for initPrompt

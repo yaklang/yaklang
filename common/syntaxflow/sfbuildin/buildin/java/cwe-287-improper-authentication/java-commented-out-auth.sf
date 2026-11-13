@@ -1,9 +1,10 @@
 desc(
-	title: "注释掉的认证/鉴权代码",
+	mode: "ssa"
+	title: "数据流：注释掉的认证/鉴权代码",
 	title_zh: "注释掉的认证/鉴权代码",
 	risk: "authentication-bypass"
 	type: audit
-	level: high
+	level: "middle"
 	rule_id: "java-commented-auth"
 	desc: <<<DESC
 源码注释中含被注释掉的认证/鉴权代码（decryptToken/BusinessError/token无效等）。
@@ -41,5 +42,5 @@ check $commentedAuth then "commented auth found" else "none";
 
 alert $commentedAuth for {
 	message: "注释掉的认证/鉴权代码",
-	level: "high",
+	level: "middle",
 }

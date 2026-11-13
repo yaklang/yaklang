@@ -1,8 +1,9 @@
 desc(
-	title: "Check PHP MySQL Injection Vulnerability"
-	title_zh: "检测PHP MySQL注入漏洞"
+	mode: "ssa"
+	title: "数据流：Check PHP MySQL Injection Vulnerability"
+	title_zh: "数据流：检测PHP MySQL注入漏洞"
 	type: audit
-	level: low
+	level: ""
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -156,7 +157,7 @@ $result = mysql_query($query);
 - **拒绝服务**: 攻击者可以通过执行大量耗时或恶意的SQL查询，导致数据库服务器负载过高，影响正常服务。
 - **操作系统命令执行**: 在某些配置不当的情况下，攻击者甚至可能通过SQL注入执行操作系统命令。
 DESC
-	level: "high",
+	level: "middle",
 	title: "Unvalidated MySQL Parameter Injection",
 	risk: "sql-injection",
 	name: "high",
@@ -223,7 +224,7 @@ $result = mysql_query($query);
 - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
 - 进一步渗透至服务器或其他系统组件。
 DESC
-	level: "mid",
+	level: "middle",
 	message: "检测到PHP MySQL参数过滤不充分的问题，从数据源（source）到污染汇聚点（sink）间存在部分过滤函数，需进一步审计确认是否存在缺陷。",
 	risk: "sql-injection",
 	name: "mid",
@@ -261,7 +262,6 @@ DESC
 }
 desc(
 	lang: php
-	alert_low: 1
 	alert_mid: 1
 	'file:///low.php': <<<CODE
 <?php

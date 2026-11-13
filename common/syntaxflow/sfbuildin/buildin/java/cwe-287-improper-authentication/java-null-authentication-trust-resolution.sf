@@ -1,6 +1,7 @@
 desc(
-	title: "Audit Null Authentication Trust Resolution"
-	title_zh: "审计空认证信任判定"
+	mode: "ssa"
+	title: "数据流：Audit Null Authentication Trust Resolution"
+	title_zh: "数据流：审计空认证信任判定"
 	type: audit
 	risk: "improper-authentication"
 	desc: <<<DESC
@@ -114,4 +115,11 @@ class AuthenticationTrustResolverImpl {
 interface Authentication {
 }
 CODE
+	'safefile://safe-auth.java': <<<NEG
+public class SafeAuth {
+    boolean check(String user) {
+        return "admin".equals(user);
+    }
+}
+NEG
 )

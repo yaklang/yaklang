@@ -1,7 +1,8 @@
 desc(
-	title: "Detect Java Path Traversal Vulnerability"
+	mode: "ssa"
+	title: "数据流：Detect Java Path Traversal Vulnerability"
 	type: vuln
-	level: low
+	level: ""
 	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
@@ -54,7 +55,23 @@ SOLUTION
 [CWE-73 Improper Neutralization of Special Elements used in an Absolute Path Traversal ('Absolute Path Traversal')](https://cwe.mitre.org/data/definitions/73.html)
 [Java File.getCanonicalPath()](https://docs.oracle.com/javase/8/docs/api/java/io/File.html#getCanonicalPath--)
 REFERENCE
-	title_zh: "检测Java路径遍历漏洞"
+	title_zh: "数据流：检测Java路径遍历漏洞"
+	'file://download.java': <<<POS
+import java.io.File;
+
+public class Download {
+    String header(String name) {
+        return new File(name).getName() + "attachment; filename=" + name;
+    }
+}
+POS
+	'safefile://safe/SafeDownload.java': <<<NEG
+public class SafeDownload {
+    String header(String name) {
+        return "inline";
+    }
+}
+NEG
 )
 
 File().get*() -{

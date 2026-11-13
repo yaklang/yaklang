@@ -1,0 +1,152 @@
+desc(
+	mode: "ssa"
+	language: "golang"
+	title: "数据流：Go zip-slip: archive entry name used as output path"
+	title_zh: "数据流：Go zip-slip：压缩包文件名作为解压路径"
+	type: vuln
+	level: ""
+	risk: "path-traversal"
+	cwe: "CWE-22"
+	desc: <<<DESC
+压缩包条目名直接和输出目录拼接后创建文件。条目名里的 `../` 可以写出目标目录。
+
+### 检测方式
+归档条目 `.Name` 流入 `os.Create`；路径经过 `filepath.Clean` 时跳过。
+DESC
+	solution: <<<SOLUTION
+- 用 `filepath.Clean` 规范化后校验前缀。
+- 拒绝绝对路径和 `..` 条目。
+SOLUTION
+	alert_min: 1
+	rule_id: "1862c448-545c-4394-9d8f-8314dbbf3b0f"
+)
+*?{have: /\.Name/} as $src
+os.Create(* as $arg)
+$arg?{<self> #{include: `* & $src`, exclude: `*?{opcode: call && <self><getCallee><name>?{have: /(?i)Clean/}}`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Go zip-slip: archive entry name used as output path",
+	title_zh: "Go zip-slip：压缩包文件名作为解压路径",
+	risk: "path-traversal",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /extract
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+	"net/http"
+	"bytes"
+	"io"
+)
+
+func extract(reader *zip.Reader, dest string) error {
+	for _, file := range reader.File {
+		name := file.Name // wb:source id=src
+		target := filepath.Join(dest, name)
+		out, err := os.Create(target) // wb:sink id=sink
+		if err != nil {
+			return err
+		}
+		out.Close()
+	}
+	return nil
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/extract", func(w http.ResponseWriter, r *http.Request) {
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err = extract(reader, os.TempDir()); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("ok"))
+	})
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /extract
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+	"strings"
+	"net/http"
+	"bytes"
+	"io"
+)
+
+func extract(reader *zip.Reader, dest string) error {
+	root := filepath.Clean(dest)
+	for _, file := range reader.File {
+		name := file.Name // wb:source id=src
+		target := filepath.Clean(filepath.Join(root, name))
+		prefix := root + string(os.PathSeparator)
+		if target != root && !strings.HasPrefix(target, prefix) {
+			continue
+		}
+		out, err := os.Create(target) // wb:sink id=sink
+		if err != nil {
+			return err
+		}
+		out.Close()
+	}
+	return nil
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/extract", func(w http.ResponseWriter, r *http.Request) {
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err = extract(reader, os.TempDir()); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("ok"))
+	})
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

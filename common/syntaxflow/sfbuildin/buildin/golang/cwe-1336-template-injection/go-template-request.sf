@@ -1,0 +1,98 @@
+desc(
+	mode: "ssa"
+	language: "golang"
+	title: "数据流：Go template injection: request text parsed as template"
+	title_zh: "数据流：Go 模板注入：请求文本被解析为模板"
+	type: vuln
+	level: ""
+	risk: "template-injection"
+	cwe: "CWE-1336"
+	desc: <<<DESC
+请求参数直接传给 `template.Parse`，模板指令可以读取任意数据或执行方法。
+
+### 检测方式
+`Get` 来源流入 `Parse` 的模板参数。
+DESC
+	solution: <<<SOLUTION
+- 用 `template.ParseFiles` 加载固定模板。
+- 用户输入只作为模板数据。
+SOLUTION
+	alert_min: 1
+	rule_id: "1137bfed-6183-4450-a6f3-826da79a4d94"
+)
+*.Get(* as $src)
+Parse(* as $arg)
+$arg?{<self> #{include: `* & $src`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Go template injection: request text parsed as template",
+	title_zh: "Go 模板注入：请求文本被解析为模板",
+	risk: "template-injection",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://main.go': <<<POS
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /page?name=
+import (
+	"net/http"
+	"text/template"
+	"os"
+)
+
+func page(w http.ResponseWriter, r *http.Request) {
+	tpl := r.URL.Query().Get("tpl") // wb:source id=src
+	compiled, err := template.New("user").Parse(tpl) // wb:sink id=sink
+	if err == nil {
+		compiled.Execute(w, nil)
+	}
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/page", page)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+POS
+	'safefile://main.go': <<<NEG
+package main
+
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /page?name=
+import (
+	"net/http"
+	"text/template"
+	"os"
+)
+
+func page(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name") // wb:source id=src
+	compiled, err := template.ParseFiles("templates/page.tmpl") // wb:sink id=sink
+	if err == nil {
+		compiled.Execute(w, name)
+	}
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("/page", page)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	http.ListenAndServe(":"+port, mux)
+}
+NEG
+)

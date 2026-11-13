@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Audit Golang File Write using ioutil"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-file-write-ioutil'
 	desc: <<<DESC
 ### 漏洞描述

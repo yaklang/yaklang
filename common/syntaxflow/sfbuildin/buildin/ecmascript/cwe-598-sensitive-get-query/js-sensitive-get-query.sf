@@ -1,9 +1,10 @@
 desc(
-	title: "Sensitive Data Read from GET Request"
-	title_zh: "GET 请求中读取敏感数据"
+	mode: "struct"
+	title: "结构匹配：Sensitive Data Read from GET Request"
+	title_zh: "结构匹配：GET 请求中读取敏感数据"
 	type: vuln
 	risk: "sensitive-query-exposure"
-	level: low
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -108,7 +109,7 @@ ctx.query.* as $allGetParams
 $allGetParams?{have: /(?i)(password|passwd|pwd|pass_phrase|passphrase|secret|token|api[_-]?key|apikey|access[_-]?key|accesskey|private[_-]?key|privatekey|auth[_-]?token|authtoken|session[_-]?token|csrf[_-]?token|client[_-]?secret|client_id|app[_-]?secret|sign[_-]?key|signkey|hmac[_-]?key|encryption[_-]?key|enc[_-]?key|salt|otp|pin_code|pincode|cvv|ssn|credit[_-]?card|bank[_-]?account)/} as $sensitiveGetParam
 
 alert $sensitiveGetParam for {
-	level: "low",
+	level: "middle",
 	type: "vuln",
 	title: "Sensitive Data Read from GET Request",
 	title_zh: "GET 请求中读取敏感数据",

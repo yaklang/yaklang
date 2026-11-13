@@ -1,6 +1,7 @@
 desc(
-	title: "Audit Authorization Filter Dispatcher Coverage"
-	title_zh: "审计授权过滤器Dispatcher覆盖"
+	mode: "ssa"
+	title: "数据流：Audit Authorization Filter Dispatcher Coverage"
+	title_zh: "数据流：审计授权过滤器Dispatcher覆盖"
 	type: audit
 	risk: "authorization-bypass"
 	desc: <<<DESC
@@ -74,4 +75,13 @@ class AuthorizationFilter {
 interface AuthorizationManager {
 }
 CODE
+	'safefile://safe-coverage.java': <<<NEG
+import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
+
+public class SafeCoverage {
+    FilterSecurityInterceptor interceptor() {
+        return new FilterSecurityInterceptor();
+    }
+}
+NEG
 )

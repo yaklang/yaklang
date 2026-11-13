@@ -1,8 +1,9 @@
 desc(
+	mode: "ssa"
 	title: "Python jwt.decode with verify_signature disabled (lib)"
 	title_zh: "JWT 关闭签名校验（Python 库规则）"
 	type: audit
-	level: high
+	level: ""
 	lib: "python-jwt-verify-signature-disabled"
 	risk: "authentication-bypass"
 	desc: <<<DESC

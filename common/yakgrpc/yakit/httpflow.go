@@ -45,7 +45,8 @@ func lowHTTPFlowSourceType(source string) string {
 		return schema.HTTPFlow_SourceType_CRAWLER
 	// WebFuzzer（含序列）发出的流量仍归到插件来源。流量分析页按 source_type=scan 查询，
 	// 同时用 [WebFuzzer] tag 区分是不是 Fuzzer 发出的。
-	case "", "scan", "port-scan", "plugin", "webfuzzer":
+	// AI Fuzz 的 History 和发包详情也使用 scan 来源查询。
+	case "", "scan", "port-scan", "plugin", "webfuzzer", "reactloop_http_fuzztest":
 		return schema.HTTPFlow_SourceType_SCAN
 	default:
 		return source
@@ -1447,7 +1448,12 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = db.Where("is_websocket = true")
 	}
 
-	db = bizhelper.ExactQueryStringArrayOr(db, "source_type", utils.PrettifyListFromStringSplited(params.SourceType, ","))
+	sourceTypes := utils.PrettifyListFromStringSplited(params.SourceType, ",")
+	// Include AI Fuzz flows saved before their source was normalized to scan.
+	if lo.Contains(sourceTypes, schema.HTTPFlow_SourceType_SCAN) {
+		sourceTypes = append(sourceTypes, "reactloop_http_fuzztest")
+	}
+	db = bizhelper.ExactQueryStringArrayOr(db, "source_type", sourceTypes)
 	// 过滤 Methods
 	if ms := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(params.GetMethods(), ",")); ms != nil {
 		db = bizhelper.ExactQueryStringArrayOr(db, "method", ms)

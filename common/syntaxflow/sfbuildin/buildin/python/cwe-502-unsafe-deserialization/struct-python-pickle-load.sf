@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python pickle.load Call"
-	title_zh: "结构扫描：Python pickle.load"
+	title: "结构匹配：Python pickle.load Call"
+	title_zh: "结构匹配：Python pickle.load"
 	type: vuln
-	level: high
+	level: "high"
 	rule_id: "struct-python-pickle-load"
 	risk: "deserialization"
 	desc: <<<DESC

@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,8 +19,14 @@ func TestReportFlusher_LatestSnapshotWins(t *testing.T) {
 	defer file.Close()
 
 	flusher := newReportFlusher(file)
-	flusher.submit([]byte(`{"snapshot":1}`))
-	flusher.submit([]byte(`{"snapshot":2}`))
+	flusher.submit(func(out io.Writer) error {
+		_, err := out.Write([]byte(`{"snapshot":1}`))
+		return err
+	})
+	flusher.submit(func(out io.Writer) error {
+		_, err := out.Write([]byte(`{"snapshot":2}`))
+		return err
+	})
 	flusher.stopAndWait()
 
 	data, err := os.ReadFile(path)

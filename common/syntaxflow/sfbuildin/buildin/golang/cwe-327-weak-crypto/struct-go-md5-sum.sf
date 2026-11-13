@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "golang"
-	title: "Struct scan: Go md5.Sum/New"
-	title_zh: "结构扫描：Go md5.Sum/New"
+	title: "结构匹配：Go md5.Sum/New"
+	title_zh: "结构匹配：Go md5.Sum/New"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-go-md5-sum"
 	risk: "weak-hash"
 	desc: <<<DESC
@@ -48,7 +48,7 @@ md5.Sum(* as $data) as $call
 md5.New as $call
 md5.New() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Go md5",
 	title_zh: "Go md5",
 	message: "结构扫描：Go md5.Sum/New",

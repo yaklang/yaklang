@@ -1,4 +1,5 @@
 desc(
+	mode: "ssa"
 	title: "Audit Java Alibaba Druid HttpClientUtils Uses"
 	type: audit
 	lib: "java-alibaba-druid-httpclientutil"
@@ -53,7 +54,7 @@ $entry./get|post/(, * as $output,);
 alert $output for {
 	title: "Audit Java Alibaba Druid HttpClientUtils Uses",
 	title_zh: "审计Java Alibaba Druid HttpClientUtils的使用",
-	level: "mid",
+	level: "middle",
 	desc: <<<DESC
 ### 1.规则目的
 该规则用于审计Java代码中Alibaba Druid框架的`HttpClientUtils`类使用情况。虽然`HttpClientUtils`类提供方便的HTTP客户端功能，但其设计可能存在一些潜在的安全风险，例如对重定向处理、证书验证等方面可能不如更成熟的HTTP客户端库（如Apache HttpClient或OkHttp）健壮。审计其使用有助于识别可能被攻击者利用的薄弱环节。

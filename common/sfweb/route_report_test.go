@@ -80,7 +80,12 @@ func TestReportFalsePositive(t *testing.T) {
 			Content:        scanFileContent,
 			Lang:           `java`,
 			ControlMessage: `start`,
-			TimeoutSecond:  15, // 将超时从默认的180秒减少到15秒
+			// The scan runs every java builtin rule (~560 queries) and each one
+			// persists its result row. When the rest of the package compiles and
+			// scans in parallel, the shared SQLite writer can stall one rule's
+			// save well past 15s even though the scan itself takes ~200ms. Keep
+			// the fail-fast budget, but leave room for that queue.
+			TimeoutSecond: 60,
 		})
 		require.NoError(t, err)
 

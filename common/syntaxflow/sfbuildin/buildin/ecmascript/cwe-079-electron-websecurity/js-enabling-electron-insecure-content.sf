@@ -1,8 +1,9 @@
 desc(
-	title: "Enabling Electron allowRunningInsecureContent"
-	title_zh: "Electron allowRunningInsecureContent 被启用"
+	mode: "struct"
+	title: "结构匹配：Enabling Electron allowRunningInsecureContent"
+	title_zh: "结构匹配：Electron allowRunningInsecureContent 被启用"
 	type: vuln
-	level: error
+	level: "middle"
 	risk: "insecure-content-loading"
 	desc: <<<DESC
 ### 漏洞描述
@@ -104,7 +105,7 @@ $webPrefs.allowRunningInsecureContent as $insecureContentVal
 $insecureContentVal?{have: true} as $enabledInsecureContent
 
 alert $enabledInsecureContent for {
-	level: "error",
+	level: "middle",
 	type: "vuln",
 	title: "Electron allowRunningInsecureContent Enabled",
 	title_zh: "Electron allowRunningInsecureContent 被设置为 true，允许执行不安全内容",

@@ -1,6 +1,7 @@
 desc(
-	title: "Audit XMLBeam Projector Unsafe XML Input"
-	title_zh: "审计XMLBeam投影器不安全XML输入"
+	mode: "struct"
+	title: "结构匹配：Audit XMLBeam Projector Unsafe XML Input"
+	title_zh: "结构匹配：审计XMLBeam投影器不安全XML输入"
 	type: audit
 	risk: "xxe"
 	desc: <<<DESC
@@ -27,7 +28,7 @@ $projector.io().stream(* as $xmlStream).read(* as $projectionType) as $xmlbeamRe
 alert $xmlbeamRead for {
 	title: "Audit XMLBeam Projector Unsafe XML Input",
 	title_zh: "审计XMLBeam投影器不安全XML输入",
-	level: "middle",
+	level: "high",
 	message: "发现 XMLBeam 投影器直接读取外部 XML 输入流，需复核底层 XML 解析安全配置是否足以防止 XXE。",
 	risk: "xxe",
 	name: "xmlbeamRead",

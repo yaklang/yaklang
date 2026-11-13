@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang Server-Side Template Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check Golang Server-Side Template Injection Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
@@ -39,7 +40,7 @@ http.ListenAndServe(":8080", nil)
 - **权限绕过:** 在某些情况下，SSTI可能被用于绕过应用程序的访问控制逻辑。
 DESC
 	rule_id: "215e8ad8-2977-4cd4-9446-d0040ffec286"
-	title_zh: "检测Golang服务器端模板注入漏洞"
+	title_zh: "数据流：检测Golang服务器端模板注入漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **避免将用户输入直接用于生成模板字符串**
@@ -124,7 +125,7 @@ http.ListenAndServe(":8080", nil)
 - **服务中断:** 攻击者可能通过注入恶意负载导致模板解析出错或资源耗尽，使服务不可用。
 - **权限绕过:** 在某些情况下，SSTI可能被用于绕过应用程序的访问控制逻辑。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "Golang Server-Side Template Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang服务器端模板注入漏洞",
@@ -166,7 +167,6 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://main.go': <<<UNSAFE
 package main
 

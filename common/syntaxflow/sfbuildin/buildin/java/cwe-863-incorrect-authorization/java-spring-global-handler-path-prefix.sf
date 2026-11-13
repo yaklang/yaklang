@@ -1,6 +1,7 @@
 desc(
-	title: "Audit Spring Global Handler Path Prefix Registration"
-	title_zh: "审计Spring全局Handler路径前缀注册"
+	mode: "ssa"
+	title: "数据流：Audit Spring Global Handler Path Prefix Registration"
+	title_zh: "数据流：审计Spring全局Handler路径前缀注册"
 	type: vuln
 	risk: "authorization-bypass"
 	desc: <<<DESC

@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang Cookie Overly Broad Path Vulnerability"
-	title_zh: "检测Golang Cookie路径过宽漏洞"
+	mode: "ssa"
+	title: "数据流：Detect Golang Cookie Overly Broad Path Vulnerability"
+	title_zh: "数据流：检测Golang Cookie路径过宽漏洞"
 	type: audit
-	level: high
+	level: ""
 	risk: "cookie-security"
 	desc: <<<DESC
 ### 漏洞描述

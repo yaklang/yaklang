@@ -1,9 +1,10 @@
 desc(
+	mode: "ssa"
 	risk: "sca"
-	title: "Check Java FastJson Vulnerability"
-	title_zh: "检测Java FastJson依赖漏洞"
+	title: "数据流：Check Java FastJson Vulnerability"
+	title_zh: "数据流：检测Java FastJson依赖漏洞"
 	type: vuln
-	level: high
+	level: "middle"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -97,7 +98,7 @@ check $vulnerable;
 
 FastJsonHttpMessageConverter()?{<getCall><getCallee><name>?{have: '.add'}} as $config;
 alert $config for {
-	level: "high",
+	level: "middle",
 	message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
 	message: "FastJson configuration class uses FastJsonHttpMessageConverter",
 	solution: <<<SOLUTION
@@ -188,7 +189,7 @@ DESC
 // 检查 FastJson 的 parseObject 方法
 JSON?{<typeName>?{have: 'alibaba'}}.parse*(,* as $dataSource) as $parseObjectCall;
 alert $parseObjectCall for {
-	level: "high",
+	level: "middle",
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法",
 	message: "FastJson uses the unsafe parseObject/parse method",
 	solution: <<<SOLUTION
@@ -285,7 +286,7 @@ CODE
 alert $reachable for {
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法(Springboot / Servlet参数可达)",
 	message: "FastJson uses the unsafe parseObject/parse method (parameter reachable)",
-	level: "high",
+	level: "middle",
 	risk: "sca",
 	desc: <<<DESC
 ### 漏洞描述

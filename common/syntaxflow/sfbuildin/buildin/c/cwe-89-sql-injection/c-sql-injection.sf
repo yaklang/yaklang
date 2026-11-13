@@ -1,7 +1,8 @@
 desc(
-	title: "Check C SQL Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C SQL Injection Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -43,7 +44,7 @@ desc(
    - 攻击者可能通过数据库提权进一步渗透系统。
 DESC
 	rule_id: "a83edb46-428e-481d-af2b-e5ac45db032e"
-	title_zh: "检测C语言SQL注入漏洞"
+	title_zh: "数据流：检测C语言SQL注入漏洞"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -122,7 +123,7 @@ $sink?{!opcode:const} as $sql_exec;
 $user_input & $sql_exec as $high;
 
 alert $high for {
-	level: "high",
+	level: "middle",
 	risk: "sql-injection",
 	type: "vuln",
 	title: "C SQL Injection Vulnerability Was Detected",

@@ -1,0 +1,77 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Python SQL Injection: User Input Concatenated Into Query"
+	title_zh: "数据流：Python SQL 注入：用户输入拼接进查询语句"
+	type: vuln
+	level: ""
+	rule_id: "ssa-python-sql-concat"
+	risk: "sql-injection"
+	cwe: "CWE-89"
+	desc: <<<DESC
+### 漏洞描述
+Web 请求参数经 `+`、f-string 等方式拼接进 SQL 文本后交给数据库执行。攻击者可注入 `' OR '1'='1` 等片段改变查询语义。
+
+### 检测方式
+先定位包含 `SELECT ... FROM` 的字符串常量，再沿其使用边找到字符串拼接结果，并确认拼接结果可达 Flask/Django 请求参数。参数化查询（`?`、`%s` 占位符 + 参数元组）不经过字符串拼接，不告警。
+
+### 风险类型
+sql-injection
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+使用 DB-API 参数化查询，把用户输入作为第二个参数传入：
+
+```python
+cursor.execute("SELECT id, name FROM users WHERE name = ?", (name,))
+```
+
+不要用 `+`、f-string 或 `%` 把请求参数拼进 SQL 文本。无法参数化的标识符（表名、列名）应使用白名单映射。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+	alert_min: 1
+)
+
+request.args.get(* as $src)
+request.form.get(* as $src)
+request.values.get(* as $src)
+request.GET.get(* as $src)
+request.POST.get(* as $src)
+request.get_json(* as $src)
+
+*?{have: /(?i)select\s+.+?\s+from/} as $const
+$const<getUsers()>?{opcode: add} as $query
+$query?{<self> #{include: <<<CODE
+* & $src as $__next__
+CODE
+}->} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Python SQL Injection: User Input Concatenated Into Query",
+	title_zh: "Python SQL 注入：用户输入拼接进查询语句",
+	risk: "sql-injection",
+}
+
+desc(
+	lang: python
+	alert_high: 1
+	'file://unsafe_sql_concat.py': <<<UNSAFE
+from flask import request
+
+def users():
+    name = request.args.get("name", "")
+    query = "SELECT id, name FROM users WHERE name = '" + name + "'"
+    return query
+UNSAFE
+	'safefile://safe_sql_concat.py': <<<SAFE
+from flask import request
+
+def users():
+    name = request.args.get("name", "")
+    query = "SELECT id, name FROM users WHERE name = ?"
+    return query, (name,)
+SAFE
+)

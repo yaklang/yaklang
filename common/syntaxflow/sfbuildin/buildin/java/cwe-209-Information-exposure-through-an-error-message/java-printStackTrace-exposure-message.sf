@@ -1,7 +1,8 @@
 desc(
+	mode: "struct"
 	risk: "information-exposure"
-	title: "Check Java Information Exposure Through PrintStackTrace"
-	title_zh: "检查Java通过PrintStackTrace泄露信息"
+	title: "结构匹配：Check Java Information Exposure Through PrintStackTrace"
+	title_zh: "结构匹配：检查Java通过PrintStackTrace泄露信息"
 	type:security
 	desc: <<<DESC
 ### 漏洞描述
@@ -70,7 +71,7 @@ REFERENCE
 .printStackTrace() as $sink
 check $sink then "发现PrintStackTrace打印异常堆栈信息"
 alert $sink for {
-	level: "low",
+	level: "middle",
 	message: "通过PrintStackTrace泄露信息",
 	risk: "information-exposure",
 	title: "Check Java Information Exposure Through PrintStackTrace",

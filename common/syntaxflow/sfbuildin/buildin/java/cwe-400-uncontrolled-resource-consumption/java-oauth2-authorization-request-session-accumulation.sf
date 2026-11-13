@@ -1,6 +1,7 @@
 desc(
-	title: "Audit OAuth2 Authorization Request Session Accumulation"
-	title_zh: "审计OAuth2授权请求会话累积"
+	mode: "struct"
+	title: "结构匹配：Audit OAuth2 Authorization Request Session Accumulation"
+	title_zh: "结构匹配：审计OAuth2授权请求会话累积"
 	type: audit
 	risk: "denial-of-service"
 	desc: <<<DESC
@@ -23,7 +24,7 @@ REFERENCE
 alert $risk for {
 	title: "Audit OAuth2 Authorization Request Session Accumulation",
 	title_zh: "审计OAuth2授权请求会话累积",
-	level: "middle",
+	level: "low",
 	message: "发现 OAuth2 授权请求按 state 持续累积到 session 中，需复核是否存在会话膨胀和拒绝服务风险。",
 	risk: "denial-of-service",
 	name: "risk",

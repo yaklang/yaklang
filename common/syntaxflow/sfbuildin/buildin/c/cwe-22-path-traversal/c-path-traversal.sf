@@ -1,7 +1,8 @@
 desc(
-	title: "Check C Path Traversal Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C Path Traversal Vulnerability"
 	type: audit
-	level: low
+	level: "middle"
 	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
@@ -27,7 +28,7 @@ desc(
    - 结合其他漏洞实现远程代码执行（如覆盖`.so`文件）。
 DESC
 	rule_id: "bcac7b40-eb5e-4cab-ae45-96a3e38c0ce4"
-	title_zh: "检测C语言路径遍历漏洞"
+	title_zh: "数据流：检测C语言路径遍历漏洞"
 	risk: "path-traversal"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -79,8 +80,14 @@ REFERENCE
 
 $file_path & $user_input as $low
 
-alert $low for {
-	level: "low",
+// 经过路径校验（is_safe_path）或规范化（realpath）和前缀比较的值不再受控
+is_safe_path(* #-> as $checked);
+realpath(* #-> as $checked);
+strncmp(* #-> as $checked);
+$low - $checked as $unguarded;
+
+alert $unguarded for {
+	level: "middle",
 	risk: "path-traversal",
 	type: "vuln",
 	title: "C Path Traversal Vulnerability Was Detected",
@@ -146,9 +153,9 @@ desc(
 
 void vulnerable_file_read(const char *filename) {
     char filepath[256];
-    
+
     sprintf(filepath, "/var/www/uploads/%s", filename);
-    
+
     FILE *file = fopen(filepath, "r");
     if (file) {
         char buffer[1024];
@@ -161,9 +168,9 @@ void vulnerable_file_read(const char *filename) {
 
 void vulnerable_file_write(const char *filename, const char *content) {
     char filepath[256];
-    
+
     sprintf(filepath, "/var/www/uploads/%s", filename);
-    
+
     FILE *file = fopen(filepath, "w");
     if (file) {
         fputs(content, file);
@@ -173,9 +180,9 @@ void vulnerable_file_write(const char *filename, const char *content) {
 
 void vulnerable_file_delete(const char *filename) {
     char filepath[256];
-    
+
     sprintf(filepath, "/var/www/uploads/%s", filename);
-    
+
     unlink(filepath);
 }
 
@@ -184,15 +191,15 @@ int main(int argc, char **argv) {
         printf("Usage: %s <filename>\n", argv[0]);
         return 1;
     }
-    
+
     vulnerable_file_read(argv[1]);
-    
+
     char *env_file = getenv("TARGET_FILE");
     if (env_file) {
         vulnerable_file_write(env_file, "test content");
         vulnerable_file_delete(env_file);
     }
-    
+
     return 0;
 }
 UNSAFE
@@ -205,26 +212,26 @@ UNSAFE
 
 int is_safe_path(const char *input_path) {
     if (!input_path) return 0;
-    
+
     if (strstr(input_path, "..") != NULL) {
         return 0;
     }
-    
+
     if (input_path[0] == '/') {
         return 0;
     }
-    
+
     const char *dangerous_chars = "\\:*?\"<>|";
     for (int i = 0; input_path[i]; i++) {
         if (strchr(dangerous_chars, input_path[i])) {
             return 0;
         }
     }
-    
+
     if (strlen(input_path) > 100) {
         return 0;
     }
-    
+
     return 1;
 }
 
@@ -233,29 +240,29 @@ void safe_file_read(const char *filename) {
         printf("Invalid filename\n");
         return;
     }
-    
+
     char filepath[512];
     char cwd[256];
-    
+
     if (getcwd(cwd, sizeof(cwd)) == NULL) {
         perror("getcwd");
         return;
     }
-    
+
     snprintf(filepath, sizeof(filepath), "%s/uploads/%s", cwd, filename);
-    
+
     char *real_path = realpath(filepath, NULL);
     if (!real_path) {
         printf("File not found\n");
         return;
     }
-    
+
     if (strncmp(real_path, cwd, strlen(cwd)) != 0) {
         printf("Access denied\n");
         free(real_path);
         return;
     }
-    
+
     FILE *file = fopen(real_path, "r");
     if (file) {
         char buffer[1024];
@@ -264,7 +271,7 @@ void safe_file_read(const char *filename) {
         }
         fclose(file);
     }
-    
+
     free(real_path);
 }
 
@@ -273,9 +280,9 @@ int main(int argc, char **argv) {
         printf("Usage: %s <filename>\n", argv[0]);
         return 1;
     }
-    
+
     safe_file_read(argv[1]);
-    
+
     return 0;
 }
 SAFE

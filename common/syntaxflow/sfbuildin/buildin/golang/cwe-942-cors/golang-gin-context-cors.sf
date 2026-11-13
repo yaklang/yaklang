@@ -1,9 +1,10 @@
 desc(
-	title: "Detect Golang CORS Misconfiguration Vulnerability in gin.Context"
-	title_zh: "检测Golang CORS配置错误漏洞(gin.Context)"
+	mode: "ssa"
+	title: "数据流：Detect Golang CORS Misconfiguration Vulnerability in gin.Context"
+	title_zh: "数据流：检测Golang CORS配置错误漏洞(gin.Context)"
 	type: vuln
-	level: high
-	risk: "ssti"
+	level: ""
+	risk: "cors"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -100,8 +101,8 @@ alert $high for {
 	type: "vuln",
 	title: "Golang CORS Misconfiguration Vulnerability Was Detected",
 	title_zh: "检测到Golang CORS配置错误漏洞",
-	level: "high",
-	risk: "ssti",
+	level: "middle",
+	risk: "cors",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -153,7 +154,7 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_mid: 1
 	'file://unsafe.go': <<<UNSAFE
 package unAuth
 

@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java commons-collections Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java commons-collections Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -25,7 +26,7 @@ Object obj = ois.readObject(); // 如果obj是恶意构造的Commons Collections
 为了避免潜在的安全风险，建议升级到不受此漏洞影响的最新版本。
 DESC
 	rule_id: "22d585c5-0182-4b2e-b137-05e30b26f2b0"
-	title_zh: "SCA: 检测Java commons-collections 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java commons-collections 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 升级 Apache Commons Collections 库版本
@@ -58,7 +59,7 @@ __dependency__.*commons*collections.version as $ver;
 $ver in (,3.2.1] as $vuln_commons_collections;
 alert $vuln_commons_collections for {
 	title_zh: "SCA: 检测Java commons-collections 依赖漏洞",
-	level: "high",
+	level: "middle",
 	cve: "CVE-2015-6420",
 	message: "SCA: commons-collections version 3.2.1 has an unsafe deserialization vulnerability",
 	title: "SCA: Check Java commons-collections Vulnerability",
@@ -109,3 +110,44 @@ Object obj = ois.readObject(); // 如果obj是恶意构造的Commons Collections
 为了避免潜在的安全风险，建议升级到不受此漏洞影响的最新版本。
 DESC
 }
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://pom.xml': <<<POS
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>commons-collections</groupId>
+            <artifactId>commons-collections</artifactId>
+            <version>3.2.1</version>
+        </dependency>
+    </dependencies>
+</project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>sca-fixture</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>commons-collections</groupId>
+            <artifactId>commons-collections</artifactId>
+            <version>3.2.2</version>
+        </dependency>
+    </dependencies>
+</project>
+NEG
+)

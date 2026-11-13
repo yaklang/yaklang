@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Audit Golang HTTP Input Points"
 	type: audit
-	level: info
+	level: ""
 	lib: "golang-http-source"
 	desc: <<<DESC
 ### 规则目的

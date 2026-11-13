@@ -1,8 +1,9 @@
 desc(
-	title: "Python OS Command Injection via User Input"
-	title_zh: "Python 操作系统命令注入（用户输入驱动）"
+	mode: "ssa"
+	title: "数据流：Python OS Command Injection via User Input"
+	title_zh: "数据流：Python 操作系统命令注入（用户输入驱动）"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "command-injection"
 	desc: <<<DESC
 检测用户可控输入在未充分净化的情况下流入 os.popen、os.system、subprocess 等命令执行入口，可导致任意系统命令执行（CWE-78）。常见于 Web 应用与脚本中将请求参数拼接到 shell 命令的场景。
@@ -22,12 +23,14 @@ REFERENCE
 <include("python-user-input")> as $input
 <include("python-command-exec-sinks")> as $sink
 
-$sink(* #{until: `* & $input`}->) as $high
+$sink(* #{until: `* & $input`}->) as $hit
+// until 在未命中来源时会返回整条链，再用 include 过滤一次，只保留真正连到用户输入的参数
+$hit?{<self> #{include: `* & $input`}->}?{!(<self> #{include: `*?{opcode: call && <self><getCallee><name>?{have: /(shlex|quote|escape)/}}`}->)} as $high
 
 alert $high for {
 	title: "Python OS Command Injection via User Input",
 	title_zh: "Python 操作系统命令注入（用户输入驱动）",
-	level: "high",
+	level: "middle",
 	type: "audit",
 	risk: "command-injection",
 	message: "检测到命令注入：用户输入未经净化即流入命令执行函数。",
@@ -36,7 +39,6 @@ alert $high for {
 
 desc(
 	lang: python
-	alert_high: 1
 	'file://unsafe_tar.py': <<<UNSAFE
 import os
 import sys

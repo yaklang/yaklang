@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"net/netip"
 	"time"
 
@@ -24,8 +25,9 @@ func canonicalUDPTuple(domain pcaputil.CaptureDomain, first, second netip.AddrPo
 }
 
 // attachUDPFlow turns a normalized UDP packet into a stable pseudo-flow. The
-// first observed endpoint pair defines client/server orientation; reverse
-// packets reuse the same FlowKey and set direction 1.
+// first observed endpoint pair defines packet direction; DNS QR identifies the
+// semantic client direction, while other UDP traffic keeps the first-packet
+// fallback. Reverse packets reuse the same FlowKey and set direction 1.
 func (e *StatefulEngine) attachUDPFlow(event InspectionEvent) InspectionEvent {
 	if event.View != ViewNormalizedPacket || event.Packet == nil || event.Flow.Key.Generation != 0 {
 		return event
@@ -75,7 +77,7 @@ func (e *StatefulEngine) attachUDPFlow(event InspectionEvent) InspectionEvent {
 		key = FlowKey{Domain: domain, Generation: e.udpGeneration.Add(1)}
 		flow = &flowRuntime{
 			transport:       uint8(layers.IPProtocolUDP),
-			clientDirection: 0,
+			clientDirection: udpClientDirection(event, udp),
 			roleConfirmed:   true,
 			udpTuple:        tuple,
 			streamCursor:    make(map[ruleDirection]int),
@@ -106,6 +108,18 @@ func (e *StatefulEngine) attachUDPFlow(event InspectionEvent) InspectionEvent {
 	event.Flow = snapshot
 	event.Direction = direction
 	return event
+}
+
+func udpClientDirection(event InspectionEvent, udp *layers.UDP) int {
+	layer := event.Packet.Layer(layers.LayerTypeDNS)
+	dns, ok := layer.(*layers.DNS)
+	if !ok || !bytes.Equal(dns.LayerContents(), udp.Payload) {
+		return 0
+	}
+	if dns.QR {
+		return 1
+	}
+	return 0
 }
 
 func eventUDPDomain(event InspectionEvent) pcaputil.CaptureDomain {

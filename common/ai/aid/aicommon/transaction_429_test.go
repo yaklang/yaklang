@@ -118,6 +118,9 @@ func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderMana
 }
 func (t *transactionTestConfig) GetSessionEvidenceRendered() string          { return "" }
 func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
+func (t *transactionTestConfig) BroadcastEvidence(EvidenceOperation) error {
+	return nil
+}
 func (t *transactionTestConfig) GetVerificationTodoRendered(_ VerificationTodoScope) string {
 	return ""
 }

@@ -1,9 +1,10 @@
 desc(
-	title: "Check Java Weak Encryption - Insufficient Key Size"
-	title_zh: "检测Java弱加密 - 密钥长度不足"
+	mode: "ssa"
+	title: "数据流：Check Java Weak Encryption - Insufficient Key Size"
+	title_zh: "数据流：检测Java弱加密 - 密钥长度不足"
 	type: security
 	risk: "weak-cryptography"
-	level: low
+	level: ""
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

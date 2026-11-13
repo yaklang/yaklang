@@ -1,0 +1,5 @@
+sub_0x9000
+type: () -> i64
+entry_0: (<nil condition>)
+	<i64> t1 = <i64> 0
+	ret <i64> 0

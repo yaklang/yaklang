@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Expression-Driven Array Construction Without Size Limit"
-	title_zh: "检测表达式驱动的数组构造缺少大小限制"
+	mode: "struct"
+	title: "结构匹配：Detect Expression-Driven Array Construction Without Size Limit"
+	title_zh: "结构匹配：检测表达式驱动的数组构造缺少大小限制"
 	type: audit
 	risk: "denial-of-service"
 	desc: <<<DESC
@@ -44,7 +45,7 @@ $arraySizeArg?{<getFunc> & $unguardedFunc} as $risk;
 alert $risk for {
 	title: "Detect Expression-Driven Array Construction Without Size Limit",
 	title_zh: "检测表达式驱动的数组构造缺少大小限制",
-	level: "middle",
+	level: "low",
 	message: "发现表达式计算出的数组维度直接进入 Array.newInstance(...)，且同一函数内缺少元素数量上限检查，可能导致拒绝服务。",
 	risk: "denial-of-service",
 	name: "risk",

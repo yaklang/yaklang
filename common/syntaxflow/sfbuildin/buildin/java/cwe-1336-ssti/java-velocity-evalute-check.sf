@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测Java Velocity Evaluate服务端模板注入漏洞"
-	title: "Check Java Velocity Evaluate SSTI Vulnerability"
+	mode: "ssa"
+	title_zh: "数据流：检测Java Velocity Evaluate服务端模板注入漏洞"
+	title: "数据流：Check Java Velocity Evaluate SSTI Vulnerability"
 	type: vuln
-	level: high
+	level: "middle"
 	risk: ssti
 	harm_zh: "模版注入、如果 Velocity.evaluate 方法的模板参数可被用户控制，将导致服务端模板注入（SSTI）漏洞。攻击者可构造恶意模板指令，在服务端执行任意代码或访问敏感数据，造成严重的安全风险。",
 	harm: "If the template parameter in Velocity.evaluate is user-controllable, it may lead to Server-Side Template Injection (SSTI) vulnerabilities. Attackers can inject malicious template directives to execute arbitrary code or access sensitive data on the server."
@@ -62,7 +63,7 @@ $template #{
 }-> as $mid
 
 alert $mid for {
-	level: "mid",
+	level: "middle",
 	name: "mid",
 	title: "Potential Java Velocity Evaluate SSTI Vulnerability Was Detected",
 	title_zh: "检测到潜在的Java Velocity Evaluate服务端模板注入漏洞",
@@ -127,7 +128,7 @@ DESC
 
 $result - $mid as $high
 alert $high for {
-	level: "high",
+	level: "middle",
 	name: "high",
 	title: "Java Velocity Evaluate SSTI Vulnerability Was Detected",
 	title_zh: "检测到Java Velocity Evaluate服务端模板注入漏洞",

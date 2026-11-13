@@ -1,8 +1,9 @@
 desc(
-	title_zh: "审计Java J2EE 标准使用线程规则"
-	title: "Audit Java J2EE Usage of Threads"
+	mode: "struct"
+	title_zh: "结构匹配：审计Java J2EE 标准使用线程规则"
+	title: "结构匹配：Audit Java J2EE Usage of Threads"
 	risk:"code-style"
-	level: info
+	level: "middle"
 	reference: <<<REFERENCE
 [Java™ Platform, Standard v8 API Specification - Class Thread](https://docs.oracle.com/javase/8/docs/api/java/lang/Thread.html)
 [Java™ Platform, Standard v8 API Specification - Class ThreadLocal](https://docs.oracle.com/javase/8/docs/api/java/lang/ThreadLocal.html)
@@ -71,7 +72,7 @@ Thread?{<typeName>?{have:'java.lang.Thread'}}.currentThread() as $thread;
 alert $thread for {
 	title: "Unmanaged Thread Usage",
 	title_zh: "未管理线程使用",
-	level: "info",
+	level: "middle",
 	message: "检测到Java项目中使用了Thread类",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -143,7 +144,7 @@ alert $threadLocal for {
 	message: "检测到Java项目中使用了ThreadLocal类",
 	title: "ThreadLocal Usage",
 	title_zh: "ThreadLocal使用",
-	level: "info",
+	level: "middle",
 	solution: <<<SOLUTION
 ### 修复建议
 在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
@@ -213,7 +214,7 @@ $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
 Thread./^(sleep|yield)$/?{<typeName>?{have:'java.lang'}} as $weak;
 alert $weak for {
 	title_zh: "废弃的线程方法",
-	level: "info",
+	level: "middle",
 	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 	title: "Deprecated Thread Methods",
 	name: "weak",

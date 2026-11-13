@@ -13,7 +13,7 @@ import (
 )
 
 type IrCode struct {
-	gorm.Model
+	Model
 	CodeID int64 `json:"code_id"`
 
 	ProgramName string `json:"program_name"`
@@ -32,10 +32,16 @@ type IrCode struct {
 	OpcodeOperator string `json:"opcode_operator"`
 
 	// basic info
-	Name              string `json:"name"`
-	VerboseName       string `json:"verbose_name"`
-	ShortVerboseName  string `json:"short_verbose_name"`
-	String            string `json:"string" gorm:"type:text"`
+	Name             string `json:"name"`
+	VerboseName      string `json:"verbose_name"`
+	ShortVerboseName string `json:"short_verbose_name"`
+	String           string `json:"string" gorm:"type:text"`
+	// ConstID is the pool id of a ConstType=normal const: a 64-bit hash of the
+	// rendered text in ir_const_pool_v1. Placeholder consts are member-call
+	// keys, are never searched, and leave it zero. The text itself never
+	// reaches this row: the pool holds it once per distinct value, and a
+	// reader resolves the id through GetIrConstValue.
+	ConstID           int64  `json:"const_id"`
 	ReadableName      string `json:"readable_name" gorm:"type:text"`
 	ReadableNameShort string `json:"readable_name_short"`
 	// any IrCode in one block inner one  function
@@ -165,6 +171,12 @@ func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 // host-parameter ceiling.
 const irCodeBatchChunk = 500
 
+// IrCodeInlineConstStringLimit is the longest const text still duplicated into
+// ir_codes.string. Longer texts (96% of the const payload) live only in
+// ir_consts_v1; String stays for short ones because a persisted member key is
+// resolved from that column without a second read.
+const IrCodeInlineConstStringLimit = 512
+
 // SaveIrCodeBatch writes IR snapshots as batched in-place upserts on
 // (program_name, code_id) via gorm SaveInBatches (native upsert or DM MERGE).
 // Updating in place keeps row ids and their secondary-index entries
@@ -184,6 +196,9 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	deduped := dedupeIrCodeConflictKeys(items)
 	if len(deduped) == 0 {
 		return nil
+	}
+	if err := flushIrConstPools(db, deduped); err != nil {
+		return fmt.Errorf("upsert IR consts: %w", err)
 	}
 	if err := db.New().SaveInBatches(deduped, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)

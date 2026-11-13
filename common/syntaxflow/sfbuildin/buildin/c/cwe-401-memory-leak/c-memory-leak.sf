@@ -1,7 +1,8 @@
 desc(
-	title: "Check C Memory Leak Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C Memory Leak Vulnerability"
 	type: audit
-	level: low
+	level: ""
 	risk: "memory-leak"
 	desc: <<<DESC
 ### 漏洞描述
@@ -14,7 +15,7 @@ desc(
    #include <stdio.h>
    #include <stdlib.h>
    #include <string.h>
-   
+
    char* vulnerable_function(const char *input) {
        char *buffer = malloc(strlen(input) + 1);
        if (buffer == NULL) {
@@ -23,7 +24,7 @@ desc(
        strcpy(buffer, input);
        return buffer;
    }
-   
+
    int main() {
        char *result = vulnerable_function("test");
        if (result) {
@@ -41,7 +42,7 @@ desc(
    - 可能被攻击者利用进行拒绝服务攻击（DoS）。
 DESC
 	rule_id: "f3464649-d789-464e-8394-82135485717e"
-	title_zh: "检测C语言内存泄漏漏洞"
+	title_zh: "数据流：检测C语言内存泄漏漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -51,7 +52,7 @@ DESC
    #include <stdio.h>
    #include <stdlib.h>
    #include <string.h>
-   
+
    char* safe_function(const char *input) {
        char *buffer = malloc(strlen(input) + 1);
        if (buffer == NULL) {
@@ -60,7 +61,7 @@ DESC
        strcpy(buffer, input);
        return buffer;
    }
-   
+
    int main() {
        char *result = safe_function("test");
        if (result) {
@@ -83,7 +84,7 @@ DESC
    ```cpp
    #include <memory>
    #include <cstring>
-   
+
    std::unique_ptr<char[]> safe_function(const char *input) {
        auto buffer = std::make_unique<char[]>(strlen(input) + 1);
        strcpy(buffer.get(), input);
@@ -97,9 +98,9 @@ SOLUTION
 REFERENCE
 )
 
-malloc?{opcode: func} as $alloc;
-calloc?{opcode: func} as $alloc;
-realloc?{opcode: func} as $alloc;
+// C 里未声明的 malloc/calloc/realloc 会被编译成 make(Pointer)，按返回值类型匹配
+*?{opcode: make} as $makes;
+$makes?{<self><string>?{have: "Pointer"}} as $alloc;
 
 free(* #-> as $safe);
 $alloc - $safe as $low
@@ -200,7 +201,7 @@ char* vulnerable_function(const char *input) {
     if (buffer == NULL) {
         return NULL;
     }
-    
+
     strcpy(buffer, input);
     return buffer;
 }
@@ -223,7 +224,7 @@ char* vulnerable_function(const char *input) {
     if (buffer == NULL) {
         return NULL;
     }
-    
+
     strcpy(buffer, input);
     return buffer;
 }

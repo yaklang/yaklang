@@ -27,6 +27,15 @@ func (p *AtomicInt64IDProvider) NewID() int64 {
 	return p.next.Add(1)
 }
 
+// AdvanceTo keeps every subsequent ID above the last persisted ID.
+func (p *AtomicInt64IDProvider) AdvanceTo(lastID int64) {
+	for current := p.next.Load(); current < lastID; current = p.next.Load() {
+		if p.next.CompareAndSwap(current, lastID) {
+			return
+		}
+	}
+}
+
 func (p *AtomicInt64IDProvider) CurrentID() int64 {
 	return p.next.Load()
 }

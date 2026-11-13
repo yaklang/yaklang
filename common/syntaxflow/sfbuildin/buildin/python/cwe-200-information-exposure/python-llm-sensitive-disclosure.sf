@@ -1,0 +1,87 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：Sensitive request fields sent to LLM"
+	title_zh: "数据流：敏感请求字段进入 LLM 提示词"
+	type: vuln
+	level: ""
+	risk: "information-exposure"
+	cwe: "CWE-200"
+	desc: <<<DESC
+请求里的 SSN、卡号、密码等字段被拼进提示词，敏感数据会离开应用边界。
+
+### 检测方式
+请求字段名包含 ssn/pan/card/password/secret，并流入 `client_complete`。
+DESC
+	solution: <<<SOLUTION
+- 发送前脱敏或删除敏感字段。
+- 只发送业务必需的信息。
+SOLUTION
+	alert_min: 1
+	rule_id: "12c921b2-7c38-48b7-8d97-09377895dac9"
+)
+*?{opcode: undefined}?{have: /(?i)ssn|pan|card/} as $s
+client_complete(* as $arg)
+$arg?{<self> #{include: `* & $s`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "Sensitive request fields sent to LLM",
+	title_zh: "敏感请求字段进入 LLM 提示词",
+	risk: "information-exposure",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /summarize?text=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/summarize", methods=["POST"])
+def summarize():
+    record = request.json  # wb:source id=src
+    prompt = "Summarize ticket. SSN %s card %s notes %s" % (record["ssn"], record["pan"], record["notes"])
+    return client_complete(prompt)  # wb:sink id=sink
+
+def client_complete(prompt):
+    return prompt
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /summarize?text=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+def redact(value):
+    return "[redacted]" if value else ""
+
+@app.route("/summarize", methods=["POST"])
+def summarize():
+    record = request.json  # wb:source id=src
+    prompt = "Summarize ticket. notes %s" % (record.get("notes", ""),)
+    return client_complete(prompt)  # wb:sink id=sink
+
+def client_complete(prompt):
+    return prompt
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

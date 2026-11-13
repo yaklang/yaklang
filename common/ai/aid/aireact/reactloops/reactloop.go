@@ -12,7 +12,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
@@ -115,9 +114,9 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 	// promptMode is the prompt mode of the current iteration. It is set when the
 	// prompt is built and stays until the next prompt replaces it.
-	promptMode               aicommon.LoopPromptMode
-	requestTimelineThroughID *int64
-	requestTimelineItemIDs   []int64
+	promptMode aicommon.LoopPromptMode
+	requestTimelineThroughID    *int64
+	requestTimelineItemIDs      []int64
 	// lastFittingTimelineThroughID is the boundary of the latest prompt the
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64
@@ -125,13 +124,6 @@ type ReActLoop struct {
 	// Task-local model projection. Never persist full UI definitions in history.
 	uiComponentsMu sync.Mutex
 	uiComponents   *uiComponentView
-
-	// Lazily bound to the owning task; guarded by onReleaseMutex.
-	// Direct calls and individual batch children can dispatch asynchronously.
-	asyncExecutionManager      *asyncexecmanager.Manager
-	asyncDirectAnswer          chan struct{}
-	asyncDirectAnswerRequested bool
-	asyncDirectAnswerHandled   bool
 
 	// memory management
 	memorySizeLimit        int
@@ -301,9 +293,9 @@ type ReActLoop struct {
 	subAgentControlRounds     int
 	subAgentControlIterations int
 	subAgentControlRevision   uint64
-	// Only the explicit save_evidence action invokes this publisher. Private
-	// evidence mutations and child Timeline entries retain their isolation.
-	saveEvidencePublisher func(aicommon.EvidenceOperation) error
+	// Explicit evidence broadcast invokes this callback after the current
+	// Timeline changes. It carries only the evidence ID and never copies data.
+	notifyEvidence func(evidenceID string) error
 
 	// functionCallMode selects per-action function-call schema tags when
 	// generateLoopPrompt assembles the prompt. Provider projection and response
@@ -360,12 +352,8 @@ func (r *ReActLoop) Release() {
 		return
 	}
 	r.released = true
-	manager := r.asyncExecutionManager
 	hooks := append([]func(){}, r.onRelease...)
 	r.onReleaseMutex.Unlock()
-	if manager != nil {
-		manager.Close()
-	}
 	defer func() {
 		r.actionExecutionMu.Lock()
 		defer r.actionExecutionMu.Unlock()

@@ -21,7 +21,6 @@ func CompleteTimelineMemory(cfg *aicommon.Config, ctx context.Context, userInput
 	if !ok {
 		return nil
 	}
-	cfg.SyncSessionEvidenceTimeline()
 	tl := cfg.Timeline
 	if !tl.NeedsMemoryFinalization() {
 		return nil

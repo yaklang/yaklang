@@ -1,8 +1,9 @@
 desc(
-	title: "Use of a weak cryptographic key"
-	title_zh: "使用密钥长度不足的加密密钥"
+	mode: "struct"
+	title: "结构匹配：Use of a weak cryptographic key"
+	title_zh: "结构匹配：使用密钥长度不足的加密密钥"
 	type: vuln
-	level: low
+	level: "middle"
 	risk: "insufficient-key-size"
 	desc: <<<DESC
 ### 漏洞描述
@@ -164,7 +165,7 @@ $dhLen?{opcode: const}?{have: /^(512|640|768|896|1024|1152|1280|1408|1536|1664|1
 // =====================================================================
 
 alert $weakModLen for {
-	level: "low",
+	level: "middle",
 	type: "vuln",
 	title: "Insufficient RSA/DSA key size: modulusLength is below 2048 bits",
 	title_zh: "RSA/DSA 密钥长度不足：modulusLength 低于 2048 位",
@@ -174,7 +175,7 @@ alert $weakModLen for {
 }
 
 alert $weakEcCurve for {
-	level: "low",
+	level: "middle",
 	type: "vuln",
 	title: "Weak elliptic curve: named curve provides insufficient security",
 	title_zh: "弱椭圆曲线：所选曲线安全位数不足",
@@ -184,7 +185,7 @@ alert $weakEcCurve for {
 }
 
 alert $weakDhLen for {
-	level: "low",
+	level: "middle",
 	type: "vuln",
 	title: "Insufficient DH prime length: below 2048 bits",
 	title_zh: "DH 素数长度不足：低于 2048 位",

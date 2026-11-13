@@ -1,6 +1,7 @@
 desc(
-	title: "Detect PHP Code Execution Vulnerability"
-	title_zh: "检测PHP代码执行漏洞"
+	mode: "ssa"
+	title: "数据流：Detect PHP Code Execution Vulnerability"
+	title_zh: "数据流：检测PHP代码执行漏洞"
 	risk: "code-execution"
 	type: vul
 	desc: <<<DESC
@@ -253,7 +254,7 @@ assert($_GET['code']);
 3. **潜在影响**
 攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 DESC
-	level: "high",
+	level: "middle",
 	title: "Unvalidated parameter injection",
 	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
 	risk: "code-execution",
@@ -342,7 +343,7 @@ assert($_GET['code']);
 3. **潜在影响**
 攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 DESC
-	level: "mid",
+	level: "middle",
 	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
 	risk: "code-execution",
 	name: "mid",
@@ -432,7 +433,6 @@ DESC
 desc(
 	lang: "php"
 	alert_min: 4
-	alert_high: 3
 	alert_low: 1
 	"file:///eval.php": <<<TEXT
 <?php
@@ -461,7 +461,7 @@ $source #{
 alert $high_risk for {
 	title: "Unvalidated parameter injection",
 	title_zh: "未验证参数注入风险",
-	level: "high",
+	level: "middle",
 }
 
 $source #{
@@ -472,7 +472,7 @@ $source #{
 alert $mid_risk for {
 	title: "Insufficient parameter filtering",
 	title_zh: "参数过滤不充分，可能存在代码执行风险",
-	level: "mid",
+	level: "middle",
 }
 
 $allRisk - $high - $mid as $low
@@ -485,7 +485,6 @@ alert $low_risk for {
 desc(
 	lang: "php"
 	alert_min: 4
-	alert_high: 3
 	alert_low: 1
 	"file:///eval.php": <<<TEXT
 <?php
@@ -505,4 +504,11 @@ TEXT
     $input = addslashes($_GET['cmd']);
     eval("echo $input;");
 TEXT
+	"safefile://function-inject-safe.php": <<<NEG
+<?php
+function run_fixed() {
+    $cmd = "ls -l /var/data";
+    exec($cmd);
+}
+NEG
 )

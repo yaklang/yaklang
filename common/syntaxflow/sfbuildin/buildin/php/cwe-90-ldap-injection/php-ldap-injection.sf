@@ -1,8 +1,9 @@
 desc(
-	title: "Check PHP LDAP Injection Vulnerability"
-	title_zh: "检测PHP LDAP注入漏洞"
+	mode: "ssa"
+	title: "数据流：Check PHP LDAP Injection Vulnerability"
+	title_zh: "数据流：检测PHP LDAP注入漏洞"
 	type: vuln
-	severity: mid
+	severity: "middle"
 	risk: 'ldap-injection'
 	desc: <<<DESC
 ### 漏洞描述
@@ -133,7 +134,7 @@ $result = ldap_search($ldapconn, $dn, $filter);
 - 绕过认证机制。
 - 在某些情况下，可能导致拒绝服务。
 DESC
-	level: "high",
+	level: "middle",
 	name: "high",
 	message: "检测到PHP LDAP无过滤直接注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	risk: "ldap-injection",
@@ -184,7 +185,7 @@ LDAP注入攻击是一种通过操纵LDAP（轻量目录访问协议）查询来
 - 绕过认证机制。
 - 在某些情况下，可能导致拒绝服务。
 DESC
-	level: "mid",
+	level: "middle",
 	type: "mid",
 	title: "Audit PHP LDAP Injection with Ineffective Filter",
 	message: "检测到PHP LDAP注入漏洞，但可能存在无效的过滤函数，需进一步审计确认。",
@@ -226,7 +227,6 @@ desc(
 	lang: php
 	alert_min: 2
 	alert_mid: 1
-	alert_high: 1
 	'file:///list3.php': <<<CODE
 <?php
     $ldapconn = ldap_connect("localhost");

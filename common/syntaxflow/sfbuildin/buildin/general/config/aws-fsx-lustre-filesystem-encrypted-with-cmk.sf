@@ -1,0 +1,59 @@
+desc(
+	mode: "source"
+	language: "general"
+	title: "源码匹配：检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密"
+	title_zh: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
+	type: vuln
+	level: "middle"
+	rule_id: "source-aws-fsx-lustre-filesystem-encrypted-with-cmk"
+	risk: "security-misconfiguration"
+	desc: <<<DESC
+### 规则说明
+FSx Lustre 文件系统应使用 KMS CMK 进行静态加密。CMK 可以让你控制加密密钥的访问与轮换。
+
+### 风险类型
+安全配置不当（security-misconfiguration）
+
+### 影响
+安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
+
+### 检测方式
+源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+
+### 参考
+- CWE-200
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+为 FSx Lustre 文件系统启用使用 KMS CMK 的静态加密，并配置密钥访问控制与自动轮换。
+SOLUTION
+	alert_min: 1
+	"file://pos.tf": <<<POS
+resource "aws_fsx_lustre_file_system" "fail" {
+  storage_capacity            = 1200
+  subnet_ids                  = [aws_subnet.test1.id]
+  deployment_type             = "PERSISTENT_1"
+  per_unit_storage_throughput = 50
+  YAKLANG_SF_POS_source-aws-fsx-lustre-filesystem-encrypted-with-cmk
+}
+POS
+	"safefile://neg.tf": <<<NEG
+resource "aws_fsx_lustre_file_system" "pass" {
+  storage_capacity            = 1200
+  subnet_ids                  = [aws_subnet.test1.id]
+  deployment_type             = "PERSISTENT_1"
+  per_unit_storage_throughput = 50
+  kms_key_id                  = aws_kms_key.test1.arn
+}
+NEG
+)
+
+${*.tf}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s\S]*?\}/) as $b
+${*.tf}.pattern_regex(/resource\s+"aws_fsx_lustre_file_system"\s+"[^"]*"\s*\{[\s\S]*?kms_key_id\s*=[\s\S]*?\}/) as $k
+$b - $k as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
+	title_zh: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
+	message: "检测到 AWS FSx Lustre 文件系统未使用 KMS CMK 加密",
+}

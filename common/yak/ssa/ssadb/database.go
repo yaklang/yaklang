@@ -16,6 +16,7 @@ import (
 var SSAProjectTables = []any{
 	// instruction
 	&IrCode{},
+	&IrConst{},
 	&IrIndex{},
 	&IrNamePool{},
 	// source code
@@ -134,7 +135,7 @@ func patchIrCodeIndex(db *gorm.DB) {
 	// persist pipeline. This is a hard database invariant.
 	ensureUniqueIrCodesProgramCodeIndex(db)
 	ensureUniqueIrOffsetsIndex(db)
-	ensureConstLookupIndex(db)
+	ensureIrConstIndexes(db)
 
 	// Supported SQLite and PostgreSQL databases shed these redundant indexes
 	// without rewriting rows. Other dialects keep their legacy indexes until a
@@ -143,34 +144,15 @@ func patchIrCodeIndex(db *gorm.DB) {
 
 }
 
-// irCodeConstLookupIndex is the covering lookup for ConstType searches.
-// Equality seeks (program_name, string). A regexp uses the program_name
-// prefix and filters strings in the index, instead of reading every wide
-// ir_codes row. The WHERE matches constLookupSQL's literals; a bound
-// opcode or const_type parameter makes SQLite ignore this index.
+// irCodeConstLookupIndex is the legacy covering lookup for ConstType searches.
+// New databases write const text to ir_consts_v1 and never create this index;
+// it survives only on databases written before the const table, where the
+// legacy fallback query still uses it. Creating it again is intentionally not
+// done: the partial predicate it needs is satisfied by short consts only, and
+// a rebuilt index would be dead weight during every compile. The WHERE clause
+// in constLookupSQL matches these literals; a bound opcode or const_type
+// parameter makes SQLite ignore this index.
 const irCodeConstLookupIndex = "idx_ir_codes_const_lookup"
-
-func ensureConstLookupIndex(db *gorm.DB) {
-	if db == nil || db.Dialect() == nil || !db.HasTable(TableIrCodes) {
-		return
-	}
-	if hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex) {
-		return
-	}
-	switch db.Dialect().GetName() {
-	case "sqlite3", "sqlite", "postgres", "postgresql", "cloudsqlpostgres":
-	default:
-		log.Debugf("skip const lookup index on dialect %s", db.Dialect().GetName())
-		return
-	}
-	query := fmt.Sprintf(
-		`CREATE INDEX IF NOT EXISTS "%s" ON "%s" ("program_name", "string", "code_id") WHERE opcode = %d AND const_type = '%s' AND deleted_at IS NULL`,
-		irCodeConstLookupIndex, TableIrCodes, irCodeConstOpcode, irCodeConstTypeNormal,
-	)
-	if err := db.Exec(query).Error; err != nil {
-		log.Warnf("failed to add index %s: %v", irCodeConstLookupIndex, err)
-	}
-}
 
 // hasNamedIndex asks the dialect whether an index exists. db.New() clears a
 // program_name row scope while keeping the current connection.
@@ -375,8 +357,12 @@ func DeleteProgramIrCode(db *gorm.DB, program string) error {
 
 func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 	deleteCache(program)
+	DropIrConstPool(program)
+	DropIrConstValueCache(program)
 	return errors.Join(
 		deleteProgramRows(db, TableIrCodes, "program_name = ?", program),
+		deleteOptionalProgramRows(db, TableIrConsts, "program_name = ?", program),
+		deleteOptionalProgramRows(db, TableIrConstPool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrIndices, "program_name = ?", program),
 		deleteProgramRows(db, TableIrNamePool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
@@ -411,6 +397,25 @@ func validateProgramDeletion(db *gorm.DB, program string) error {
 	return nil
 }
 
+// deleteOptionalProgramRows drops rows from a table that a database written by
+// an older build may not have: the legacy const table is absent on new
+// databases, and the const pool is absent on every database written before
+// it. A missing table is not a failed delete, and it is a stable condition:
+// retrying it only burns the backoff budget below.
+func deleteOptionalProgramRows(db *gorm.DB, table, condition string, args ...any) error {
+	err := deleteProgramRows(db, table, condition, args...)
+	if err != nil && isMissingTableError(err) {
+		return nil
+	}
+	return err
+}
+
+// isMissingTableError reports the stable "this schema has no such table" case.
+// It is not transient, so a retry loop must not spend its backoff on it.
+func isMissingTableError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such table")
+}
+
 func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error {
 	return retryProgramDelete(table, func() error {
 		return db.Exec("DELETE FROM "+table+" WHERE "+condition, args...).Error
@@ -424,6 +429,13 @@ func retryProgramDelete(name string, deleteFn func() error) error {
 	for attempt := 1; attempt <= programDeleteAttempts; attempt++ {
 		if err = deleteFn(); err == nil {
 			return nil
+		}
+		// A missing table will not appear on the next attempt. Returning at
+		// once keeps the caller's "optional table" handling cheap: a schema
+		// without the legacy const table used to spend 3 attempts and 150ms of
+		// backoff on every program delete.
+		if isMissingTableError(err) {
+			return fmt.Errorf("%s: %w", name, err)
 		}
 		if attempt < programDeleteAttempts {
 			time.Sleep(time.Duration(attempt) * 50 * time.Millisecond)
@@ -454,6 +466,30 @@ var redundantIRIndexes = []struct{ table, index string }{
 	{TableIrIndices, "idx_ir_indices_v1_version_id"},      // read, never filtered
 	{TableIrNamePool, "idx_ir_name_pool_v1_program_name"}, // idx_ir_name_pool_program_name_name prefix
 	{TableIrNamePool, "idx_ir_name_pool_v1_name"},         // name lookups bind program_name too
+	// deleted_at is NULL on every IR row (the IR tables are never soft
+	// deleted), and every IR query binds program_name first, so these
+	// B-trees have no selectivity and are never chosen. They come from
+	// gorm.Model's `sql:"index"` tag, which IRModel drops.
+	{TableIrCodes, "idx_ir_codes_deleted_at"},
+	{TableIrOffsets, "idx_ir_offsets_deleted_at"},
+	{TableIrIndices, "idx_ir_indices_v1_deleted_at"},
+	{TableIrTypes, "idx_ir_types_v2_deleted_at"},
+	// GetScope is the only scope_name reader and it is dead code
+	// (GetScopeFromIrScopeName returns "not implemented").
+	{TableIrIndices, "idx_ir_indices_v1_scope_name"},
+	// applyMatchCondition builds an OR over variable_id/class_id/field_id,
+	// but yieldFromIrIndex always adds program_name, so the planner uses
+	// idx_ir_indices_program_value for every production query.
+	{TableIrIndices, "idx_ir_indices_v1_variable_id"},
+	{TableIrIndices, "idx_ir_indices_v1_class_id"},
+	{TableIrIndices, "idx_ir_indices_v1_field_id"},
+	// offsetVariableQuery adds a unary "+" to variable_name on purpose: the
+	// index makes SQLite pick a scan of every instruction named "this"
+	// (about 40ms per lookup instead of 20us through the value prefix).
+	{TableIrOffsets, "idx_ir_offsets_variable_name"},
+	// GetValueBeforeEndOffset is the only end_offset reader; with the
+	// file_hash index present SQLite picks file_hash (4ms against 77ms).
+	{TableIrOffsets, "idx_ir_offsets_end_offset"},
 }
 
 func pruneRedundantIRIndexes(db *gorm.DB) {

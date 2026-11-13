@@ -1,6 +1,7 @@
 desc(
-	title: "Detect JPA LIKE Wildcard Without Escape"
-	title_zh: "检测JPA LIKE通配符未转义"
+	mode: "struct"
+	title: "结构匹配：Detect JPA LIKE Wildcard Without Escape"
+	title_zh: "结构匹配：检测JPA LIKE通配符未转义"
 	type: vuln
 	risk: "sql-injection"
 	desc: <<<DESC

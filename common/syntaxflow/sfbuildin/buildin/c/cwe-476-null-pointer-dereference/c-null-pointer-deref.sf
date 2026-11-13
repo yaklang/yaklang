@@ -1,11 +1,12 @@
 desc(
-	title: "C Null Pointer Dereference"
+	mode: "struct"
+	title: "结构匹配：C Null Pointer Dereference"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "null-dereference"
 	lang: c
 	rule_id: "c5d0e3f6-7a8b-4c9d-0e1f-2a3b4c5d6e7f"
-	title_zh: "C 语言空指针解引用检测"
+	title_zh: "结构匹配：C 语言空指针解引用检测"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -35,7 +36,7 @@ REFERENCE
 alert $npd for {
 	title: "Null Pointer Dereference",
 	title_zh: "空指针解引用",
-	level: "high",
+	level: "middle",
 	risk: "null-dereference",
 	desc: <<<DESC
 指针可能为空时仍发生 *p 或 p->member 等解引用

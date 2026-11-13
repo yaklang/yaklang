@@ -14,6 +14,8 @@ type TimelineFork struct {
 	TaskName  string
 	BaseMaxID int64
 	CreatedAt time.Time
+
+	broadcaster *TimelineBroadcaster
 }
 
 type TimelineMergeResult struct {
@@ -25,6 +27,11 @@ type TimelineMergeResult struct {
 func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfigIf, ai AICaller) (*TimelineFork, error) {
 	if m == nil {
 		return nil, nil
+	}
+	broadcaster := m.timelineBroadcaster(config)
+	if broadcaster != nil {
+		endFork := broadcaster.beginFork()
+		defer endFork()
 	}
 
 	raw, err := MarshalTimeline(m)
@@ -46,14 +53,51 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	branch.SoftBindConfig(config, ai)
 	branch.markBranchTimeline(true)
 
-	return &TimelineFork{
-		Parent:    m,
-		Branch:    branch,
-		TaskIndex: taskIndex,
-		TaskName:  taskName,
-		BaseMaxID: baseMaxID,
-		CreatedAt: time.Now(),
-	}, nil
+	fork := &TimelineFork{
+		Parent:      m,
+		Branch:      branch,
+		TaskIndex:   taskIndex,
+		TaskName:    taskName,
+		BaseMaxID:   baseMaxID,
+		CreatedAt:   time.Now(),
+		broadcaster: broadcaster,
+	}
+	if broadcaster != nil {
+		broadcaster.Register("fork:"+branch.GetTimelineID(), branch.appendBroadcastItem)
+	}
+	return fork, nil
+}
+
+func (m *Timeline) timelineBroadcaster(config AICallerConfigIf) *TimelineBroadcaster {
+	if cfg, ok := config.(*Config); ok && cfg != nil {
+		_, broadcaster := cfg.timelineBroadcastState()
+		if broadcaster != nil {
+			return broadcaster
+		}
+	}
+	m.mu.RLock()
+	owner := m.config
+	m.mu.RUnlock()
+	if cfg, ok := owner.(*Config); ok && cfg != nil {
+		_, broadcaster := cfg.timelineBroadcastState()
+		return broadcaster
+	}
+	return nil
+}
+
+// Release stops this branch from receiving further session broadcasts.
+func (f *TimelineFork) Release() {
+	if f == nil {
+		return
+	}
+	f.unregisterBroadcast()
+}
+
+func (f *TimelineFork) unregisterBroadcast() {
+	if f == nil || f.broadcaster == nil || f.Branch == nil {
+		return
+	}
+	f.broadcaster.Unregister("fork:" + f.Branch.GetTimelineID())
 }
 
 // MergeBack 把分支 timeline 中新增的条目合并回父 timeline。
@@ -68,6 +112,7 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	if f == nil || f.Parent == nil || f.Branch == nil {
 		return nil, nil
 	}
+	f.unregisterBroadcast()
 
 	type activeSnapshot struct {
 		id   int64
@@ -124,6 +169,9 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 	// copies must neither collide nor replay stale evidence over a newer mutation.
 	mergedItems := activeItems[:0]
 	for _, active := range activeItems {
+		if _, delivered := parent.broadcastReceipts[active.item.historyID]; delivered {
+			continue // Already delivered to the parent by a session broadcast.
+		}
 		if op, ok := active.item.value.(*PromotableTimelineItem); ok && op.Kind == TimelinePromotedKindEvidence {
 			if existing, ok := parent.idToTimelineItem.Get(active.id); ok {
 				if prior, ok := existing.value.(*PromotableTimelineItem); ok && *prior == *op {

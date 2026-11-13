@@ -185,19 +185,32 @@ func StripProgramNamePrefix(filePath, programName string) string {
 	if filePath == "" || programName == "" {
 		return filePath
 	}
-	trimmed := strings.TrimPrefix(filePath, "/")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) == 0 {
+	trimmed := filePath
+	if trimmed[0] == '/' {
+		trimmed = trimmed[1:]
+	}
+	// Compare the first path segment without splitting the whole path. This
+	// runs once per path filter check (59M calls on the javacms-core scan) and
+	// strings.Split allocated a slice for every call, 4.5GB of it in that run.
+	first := trimmed
+	rest := ""
+	hasRest := false
+	if i := strings.IndexByte(trimmed, '/'); i >= 0 {
+		first = trimmed[:i]
+		rest = trimmed[i+1:]
+		hasRest = true
+	}
+	matched := first == programName
+	if !matched && len(first) > len(programName) && first[len(programName)] == '(' {
+		matched = strings.HasPrefix(first, programName)
+	}
+	if !matched {
 		return filePath
 	}
-	first := parts[0]
-	if first == programName || strings.HasPrefix(first, programName+"(") {
-		if len(parts) > 1 {
-			return "/" + strings.Join(parts[1:], "/")
-		}
-		return "/"
+	if hasRest {
+		return "/" + rest
 	}
-	return filePath
+	return "/"
 }
 
 func getMachineIdFilePath() string {

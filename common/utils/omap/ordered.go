@@ -433,6 +433,17 @@ func (o *OrderedMap[T, V]) Delete(key T) {
 		return
 	}
 
+	// The DFS-style stack uses Pop/Shift, which delete the last or first key.
+	// Truncating either end preserves the old Keys() snapshot because it never
+	// writes through the old slice; only a middle delete needs a new slice.
+	if index == len(o.keyChain)-1 {
+		o.keyChain = o.keyChain[:index:index]
+		return
+	}
+	if index == 0 {
+		o.keyChain = o.keyChain[1:len(o.keyChain):len(o.keyChain)]
+		return
+	}
 	after := make([]T, len(o.keyChain)-1)
 	copy(after, o.keyChain[:index])
 	copy(after[index:], o.keyChain[index+1:])
@@ -582,6 +593,24 @@ func (o *OrderedMap[T, V]) GetMap() map[T]V {
 	}
 	o.init()
 	return o.m
+}
+
+// SnapshotMap returns a copy of the map. Use it when the caller iterates the
+// result while other goroutines may add entries: GetMap exposes the internal
+// map and ranging it during a Set is a concurrent map read and write.
+func (o *OrderedMap[T, V]) SnapshotMap() map[T]V {
+	if o == nil {
+		return nil
+	}
+	o.init()
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	snapshot := make(map[T]V, len(o.m))
+	for key, value := range o.m {
+		snapshot[key] = value
+	}
+	return snapshot
 }
 
 func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {

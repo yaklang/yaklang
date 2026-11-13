@@ -1,6 +1,7 @@
 desc(
-	title: "Check Java Spring Boot's Template Engine XSS Vulnerability"
-	title_zh: "检测Java Spring Boot框架模板引擎XSS漏洞"
+	mode: "ssa"
+	title: "数据流：Check Java Spring Boot's Template Engine XSS Vulnerability"
+	title_zh: "数据流：检测Java Spring Boot框架模板引擎XSS漏洞"
 	type: vuln
 	risk: "xss"
 	desc: <<<DESC
@@ -74,7 +75,7 @@ alert $res for {
 	type: "vuln",
 	title: "Check Java Spring Boot's Template Engine XSS Vulnerability",
 	title_zh: "检测Java Spring Boot框架模板引擎XSS漏洞",
-	level: "high",
+	level: "middle",
 	name: "res",
 	solution: <<<SOLUTION
 ### 修复建议

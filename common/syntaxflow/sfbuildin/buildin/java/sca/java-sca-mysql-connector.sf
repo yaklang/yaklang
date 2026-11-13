@@ -1,5 +1,6 @@
 desc(
-	title: "SCA: Check Java Mysql Connector Vulnerability"
+	mode: "ssa"
+	title: "数据流：SCA: Check Java Mysql Connector Vulnerability"
 	type: vuln
 	risk: sca
 	desc: <<<DESC
@@ -32,7 +33,7 @@ DESC
 	reference: <<<REFERENCE
 [CVE-2021-2471](https://nvd.nist.gov/vuln/detail/CVE-2021-2471)
 REFERENCE
-	title_zh: "SCA: 检测Java jdbc mysql-connector 依赖漏洞"
+	title_zh: "数据流：SCA: 检测Java jdbc mysql-connector 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -56,6 +57,12 @@ REFERENCE
 4. **最小化数据库权限**
    为应用使用的数据库用户仅赋予必需的最小权限，限制即使信息被泄露，攻击者能够造成的损害。
 SOLUTION
+	'file://pom.xml': <<<POS
+<project><dependencies><dependency><groupId>mysql</groupId><artifactId>mysql-connector-java</artifactId><version>8.0.25</version></dependency></dependencies></project>
+POS
+	'safefile://safe/pom.xml': <<<NEG
+<project><dependencies><dependency><groupId>mysql</groupId><artifactId>mysql-connector-java</artifactId><version>8.0.28</version></dependency></dependencies></project>
+NEG
 )
 
 __dependency__.*mysql*connector*java.version as $ver;
@@ -105,7 +112,7 @@ Class.forName("com.mysql.cj.jdbc.Driver");
 - 攻击者可能基于泄露的信息进一步进行针对性攻击，如SQL注入、未授权访问等。
 - 系统的整体安全性受到威胁。
 DESC
-	level: "mid",
+	level: "middle",
 	cve: "CVE-2021-2471",
 	message: "SCA: mysql-connector-java versions between 8.0.17 and 8.0.27 have an information disclosure vulnerability",
 	risk: "sca",

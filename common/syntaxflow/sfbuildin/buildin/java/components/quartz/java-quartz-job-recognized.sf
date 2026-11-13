@@ -1,9 +1,10 @@
 desc(
+	mode: "struct"
 	risk: "information"
-	title: "Audit Java Quartz Job Class Identification"
-	title_zh: "审计 Java Quartz Job 类识别"
+	title: "结构匹配：Audit Java Quartz Job Class Identification"
+	title_zh: "结构匹配：审计 Java Quartz Job 类识别"
 	type: audit
-	severity: mid
+	severity: "middle"
 	desc: <<<DESC
 ### 规则目的
 Quartz 是一个开源的作业调度框架，用于在 Java 应用程序中定时执行任务。此规则旨在识别 Java 应用程序中实现 `org.quartz.Job` 接口的类，这些类代表了 Quartz 框架中的具体调度任务。识别这些 Job 类的位置对于全面审计 Quartz 作业的配置、逻辑和潜在的安全风险至关重要。
@@ -103,7 +104,7 @@ $jobClass(*<show>);
 alert $jobClass for {
 	title: "Audit Java Quartz Job Class Identification",
 	title_zh: "审计 Java Quartz Job 类识别",
-	level: "mid",
+	level: "middle",
 	message: "发现 Java Quartz Job 类，建议进一步审计其任务逻辑的安全性。",
 	desc: <<<DESC
 ### 规则目的

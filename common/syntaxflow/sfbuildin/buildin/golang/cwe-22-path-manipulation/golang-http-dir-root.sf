@@ -1,8 +1,9 @@
 desc(
-	title: "Check Golang HTTP Directory Traversal Vulnerability"
-	title_zh: "检测Golang HTTP目录遍历漏洞"
+	mode: "struct"
+	title: "结构匹配：Check Golang HTTP Directory Traversal Vulnerability"
+	title_zh: "结构匹配：检测Golang HTTP目录遍历漏洞"
 	type: vuln
-	level: high
+	level: "middle"
 	risk: "access-control"
 	desc: <<<DESC
 # 漏洞描述
@@ -50,7 +51,7 @@ $path?{opcode: const}?{have: /^\/$/} as $high
 
 alert $high for {
 	type: "vuln",
-	level: "high",
+	level: "middle",
 	name: "high",
 	title: "Path Traversal via Absolute Root Directory Access",
 	title_zh: "通过绝对根目录访问导致的路径遍历漏洞",
@@ -66,7 +67,6 @@ SOLUTION
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

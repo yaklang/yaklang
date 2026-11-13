@@ -1,6 +1,7 @@
 desc(
-	title: "Detect Recursive Property-Path Parsing Without Depth Limit"
-	title_zh: "检测递归属性路径解析缺少深度限制"
+	mode: "struct"
+	title: "结构匹配：Detect Recursive Property-Path Parsing Without Depth Limit"
+	title_zh: "结构匹配：检测递归属性路径解析缺少深度限制"
 	type: audit
 	risk: "denial-of-service"
 	desc: <<<DESC
@@ -44,7 +45,7 @@ $recursiveCall?{<getFunc> & $unguardedFunc} as $risk;
 alert $risk for {
 	title: "Detect Recursive Property-Path Parsing Without Depth Limit",
 	title_zh: "检测递归属性路径解析缺少深度限制",
-	level: "middle",
+	level: "low",
 	message: "发现递归属性路径解析依赖路径拆分重试但缺少深度上限，可能导致拒绝服务。",
 	risk: "denial-of-service",
 	name: "risk",

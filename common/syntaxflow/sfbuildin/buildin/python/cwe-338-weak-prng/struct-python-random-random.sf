@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "python"
-	title: "Struct scan: Python random.random"
-	title_zh: "结构扫描：Python random.random"
+	title: "结构匹配：Python random.random"
+	title_zh: "结构匹配：Python random.random"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-python-random-random"
 	risk: "weak-randomness"
 	desc: <<<DESC
@@ -42,7 +42,7 @@ NEG
 random.random as $call
 random.random() as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: Python random.random",
 	title_zh: "结构扫描：Python random.random",
 	message: "结构扫描：Python random.random",

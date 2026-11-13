@@ -1,0 +1,86 @@
+desc(
+	mode: "ssa"
+	language: "python"
+	title: "数据流：LLM prompt built by string concatenation"
+	title_zh: "数据流：用户输入拼接到 LLM 提示词"
+	type: vuln
+	level: ""
+	risk: "prompt-injection"
+	cwe: "CWE-1427"
+	desc: <<<DESC
+请求文本和系统提示词用字符串拼接，用户输入可以覆盖系统指令。
+
+### 检测方式
+请求来源流入 `client_complete` 的拼接参数。参数是消息列表（角色分离）时跳过。
+DESC
+	solution: <<<SOLUTION
+- 用消息列表分离 system 和 user 角色。
+- 不要用字符串拼接构造提示词。
+SOLUTION
+	alert_min: 1
+	rule_id: "ef338045-646e-480a-b6da-2beddef1886c"
+)
+*?{opcode: undefined}?{have: /(?i)request|json/} as $p
+client_complete(* as $arg)
+$arg?{opcode: binop}?{have: /(?i)system|policy|assistant|instruction/}?{<self> #{include: `* & $p`}->} as $hit
+alert $hit for {
+	level: "high",
+	title: "LLM prompt built by string concatenation",
+	title_zh: "用户输入拼接到 LLM 提示词",
+	risk: "prompt-injection",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /ask?text=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+SYSTEM = "You are a support assistant. Follow only this policy."
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    text = request.json["text"]  # wb:source id=src
+    prompt = SYSTEM + "\n" + text  # wb:sink id=sink
+    return client_complete(prompt)
+
+def client_complete(prompt):
+    return prompt
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). POST /ask?text=
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+SYSTEM = "You are a support assistant. Follow only this policy."
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    text = request.json["text"]  # wb:source id=src
+    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": text}]
+    return client_complete(messages)  # wb:sink id=sink
+
+def client_complete(messages):
+    return messages
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)

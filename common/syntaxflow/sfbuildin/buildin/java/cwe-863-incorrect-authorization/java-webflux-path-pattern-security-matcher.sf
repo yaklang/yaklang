@@ -1,6 +1,7 @@
 desc(
-	title: "Audit WebFlux Path Pattern Security Matching"
-	title_zh: "审计WebFlux路径模式授权匹配"
+	mode: "ssa"
+	title: "数据流：Audit WebFlux Path Pattern Security Matching"
+	title_zh: "数据流：审计WebFlux路径模式授权匹配"
 	type: audit
 	risk: "authorization-bypass"
 	desc: <<<DESC
@@ -101,4 +102,11 @@ interface RequestPath {
     PathContainer pathWithinApplication();
 }
 CODE
+	'safefile://safe-webflux.java': <<<NEG
+public class SafeWebflux {
+    String path() {
+        return "/api/v1/status";
+    }
+}
+NEG
 )

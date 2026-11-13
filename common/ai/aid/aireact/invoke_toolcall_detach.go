@@ -39,9 +39,18 @@ func (r *ReAct) newDetachableToolCall(task aicommon.AIStatefulTask, caller *aico
 		if err != nil {
 			return asyncexecmanager.Summary{}, err
 		}
-		return manager.Adopt(asyncexecmanager.Request{Resource: resource, Metadata: asyncexecmanager.Metadata{
+		releaseAdmission, allowed := r.BeginAsyncExecutionAdmission()
+		if !allowed {
+			return asyncexecmanager.Summary{}, asyncexecmanager.ErrClosed
+		}
+		defer releaseAdmission()
+		summary, err := manager.Adopt(asyncexecmanager.Request{Resource: resource, Metadata: asyncexecmanager.Metadata{
 			Name: name, Attributes: map[string]string{"task_id": task.GetId(), "loop": loop.GetLoopName(), "call_tool_id": caller.CallToolID(), "result_id": fmt.Sprint(caller.ResultID())},
 		}})
+		if err == nil {
+			r.TrackAsyncExecutionTask(task, summary.ID)
+		}
+		return summary, err
 	}, func(result *aitool.ToolResult, directly bool, err error, detached bool) {
 		if detached {
 			r.finishDetachedToolCall(task, result, directly, err)

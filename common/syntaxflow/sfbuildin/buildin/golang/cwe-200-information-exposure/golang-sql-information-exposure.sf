@@ -1,7 +1,8 @@
 desc(
-	title: "Detect Golang SQL Information Exposure"
+	mode: "ssa"
+	title: "数据流：Detect Golang SQL Information Exposure"
 	type: audit
-	level: low
+	level: ""
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
@@ -40,7 +41,7 @@ fmt.Println("Server version:", version) // 泄露服务器版本信息
 攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻击的风险。
 DESC
 	rule_id: "a549400b-af87-4955-b792-5dbb1fcce409"
-	title_zh: "检测Golang SQL信息泄露"
+	title_zh: "数据流：检测Golang SQL信息泄露"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 避免在生产环境中执行或泄露敏感的数据库查询结果

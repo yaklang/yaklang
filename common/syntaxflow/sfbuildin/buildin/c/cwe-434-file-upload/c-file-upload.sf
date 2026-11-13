@@ -1,7 +1,8 @@
 desc(
-	title: "Check C File Upload Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check C File Upload Vulnerability"
 	type: audit
-	level: mid
+	level: "middle"
 	risk: "file-upload"
 	desc: <<<DESC
 ### 漏洞描述
@@ -102,7 +103,7 @@ desc(
    - **数据泄露**: 上传文件可能包含用于数据窃取的脚本。
 DESC
 	rule_id: "f1e8d3b7-4c9a-4f2e-8b1d-6a5c9e2f7b4d"
-	title_zh: "检测C语言文件上传漏洞"
+	title_zh: "数据流：检测C语言文件上传漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -422,7 +423,7 @@ $file_write?{* #{ until: `* & $user_input`}-> } as $mid
 $file_ops?{* #{ until: `* & $user_input`}-> } as $mid
 
 alert $mid for {
-	level: "mid",
+	level: "middle",
 	risk: "file-upload",
 	type: "vuln",
 	title: "C File Upload Vulnerability Was Detected",
@@ -544,7 +545,7 @@ SOLUTION
 }
 
 alert $medium for {
-	level: "medium",
+	level: "middle",
 	type: "vuln",
 	title: "C File Operation with User Input Was Detected",
 	title_zh: "检测到C语言文件操作使用用户输入",

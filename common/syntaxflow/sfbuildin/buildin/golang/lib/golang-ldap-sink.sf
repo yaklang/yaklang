@@ -1,7 +1,8 @@
 desc(
+	mode: "ssa"
 	title: "Find Golang LDAP Dial Sink"
 	type: audit
-	level: info
+	level: ""
 	lib: 'golang-ldap-sink'
 	desc: <<<DESC
 ### 规则描述

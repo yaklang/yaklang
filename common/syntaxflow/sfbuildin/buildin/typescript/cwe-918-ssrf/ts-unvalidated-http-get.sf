@@ -1,0 +1,94 @@
+desc(
+	mode: "source"
+	language: "ts"
+	title: "源码匹配：TypeScript SSRF: request value passed to http.get"
+	title_zh: "源码匹配：TypeScript SSRF：请求值传给 http.get"
+	type: vuln
+	level: "middle"
+	risk: "ssrf"
+	cwe: "CWE-918"
+	desc: <<<DESC
+函数把参数直接传给 `http.get`/`https.get`，函数体内没有 `new URL` 校验。攻击者可以请求内网地址。
+
+### 检测方式
+源码正则匹配函数体中含 `http.get`/`https.get` 且不含 `new URL` 的写法。
+DESC
+	solution: <<<SOLUTION
+- 用 `new URL` 取出 hostname 做白名单。
+- 禁止访问内网和回环地址。
+SOLUTION
+	alert_min: 1
+	rule_id: "865d7a9f-9f92-48ee-b792-f9709235cde8"
+)
+${/\.(ts|tsx|mts|cts)$/}.pattern_regex(/function\s+\w+\s*\([^)]*\)[^{]*\{((?!new URL)[\s\S])*?(?:http|https)\.get\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "TypeScript SSRF: request value passed to http.get",
+	title_zh: "TypeScript SSRF：请求值传给 http.get",
+	risk: "ssrf",
+}
+
+desc(
+	lang: typescript
+	alert_min: 1
+	'file://app.ts': <<<POS
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch?url=
+import http from "http";
+
+export function fetch(target: string): void {
+  const value = target; // wb:source id=src
+  http.get(value, (res) => res.resume()); // wb:sink id=sink
+}
+
+import { createServer } from "node:http";
+
+const port = Number(process.env.PORT || 8080);
+createServer((req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (url.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  try {
+  fetch(url.searchParams.get("url") || "");
+  const result = "ok";
+    res.end(result === undefined || result === null ? "ok" : String(result));
+  } catch (err) {
+    res.statusCode = 500;
+    res.end(String(err));
+  }
+}).listen(port, "0.0.0.0");
+POS
+	'safefile://app.ts': <<<NEG
+// HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /fetch?url=
+import https from "https";
+
+export function fetch(target: string): void {
+  const value = target; // wb:source id=src
+  const parsed = new URL(value);
+  if (parsed.protocol !== "https:" || parsed.hostname !== "api.example.internal") {
+    throw new Error("url");
+  }
+  https.get(value, (res) => res.resume()); // wb:sink id=sink
+}
+
+import { createServer } from "node:http";
+
+const port = Number(process.env.PORT || 8080);
+createServer((req, res) => {
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (url.pathname === "/health") {
+    res.end("ok");
+    return;
+  }
+  try {
+  fetch(url.searchParams.get("url") || "");
+  const result = "ok";
+    res.end(result === undefined || result === null ? "ok" : String(result));
+  } catch (err) {
+    res.statusCode = 500;
+    res.end(String(err));
+  }
+}).listen(port, "0.0.0.0");
+NEG
+)

@@ -1,8 +1,9 @@
 desc(
-	title: "Detect Golang CRLF Injection Vulnerability in Beego"
-	title_zh: "检测Golang Beego框架中的CRLF注入漏洞"
+	mode: "struct"
+	title: "结构匹配：Detect Golang CRLF Injection Vulnerability in Beego"
+	title_zh: "结构匹配：检测Golang Beego框架中的CRLF注入漏洞"
 	type: vuln
-	level: high
+	level: "middle"
 	risk: "crlf-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -143,7 +144,7 @@ c.Ctx.ResponseWriter.Write([]byte(""))
 - 可能导致用户会话被劫持或敏感信息泄露。
 - 通过篡改头部内容，攻击者还可以执行跨站脚本攻击（XSS）或其他更复杂的攻击链。
 DESC
-	level: "high",
+	level: "middle",
 	type: "vuln",
 	title: "CRLF Injection detected",
 	title_zh: "检测到CRLF注入",
@@ -154,7 +155,7 @@ DESC
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_mid: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

@@ -1,8 +1,9 @@
 desc(
-	title: "Insecure randomness used in security-sensitive context"
-	title_zh: "安全敏感场景中使用了不安全的伪随机数生成器"
+	mode: "ssa"
+	title: "数据流：Insecure randomness used in security-sensitive context"
+	title_zh: "数据流：安全敏感场景中使用了不安全的伪随机数生成器"
 	type: vuln
-	level: low
+	level: ""
 	risk: "weak-randomness"
 	desc: <<<DESC
 ### 漏洞描述

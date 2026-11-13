@@ -1,7 +1,8 @@
 desc(
-	title: "Check Golang GORM SQL Injection Vulnerability"
+	mode: "ssa"
+	title: "数据流：Check Golang GORM SQL Injection Vulnerability"
 	type: audit
-	level: high
+	level: "middle"
 	risk: "sql-injection"
 	desc: <<<DESC
 ### 漏洞描述
@@ -24,7 +25,7 @@ db.Raw(query).Scan(&users)
 - 绕过认证和授权机制。
 DESC
 	rule_id: "cc9054ac-2c71-4641-84dd-ba12578093b0"
-	title_zh: "检测Golang SQL注入漏洞(GORM)"
+	title_zh: "数据流：检测Golang SQL注入漏洞(GORM)"
 	risk: "sql-injection"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -134,14 +135,13 @@ db.Raw(query).Scan(&users)
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 - 绕过认证和授权机制。
 DESC
-	level: "high",
+	level: "middle",
 	message: "检测到Golang GORM SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	name: "high",
 }
 
 desc(
 	lang: golang
-	alert_high: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 

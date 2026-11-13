@@ -1,10 +1,10 @@
 desc(
 	mode: "struct"
 	language: "csharp"
-	title: "Struct scan: C# Path.Combine"
-	title_zh: "结构扫描：C# Path.Combine"
+	title: "结构匹配：C# Path.Combine"
+	title_zh: "结构匹配：C# Path.Combine"
 	type: vuln
-	level: medium
+	level: "middle"
 	rule_id: "struct-csharp-path-combine"
 	risk: "path-traversal"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 Path.Combine as $call
 Path.Combine(* as $a) as $call
 alert $call for {
-	level: "medium",
+	level: "middle",
 	title: "Struct scan: C# Path.Combine",
 	title_zh: "结构扫描：C# Path.Combine",
 	message: "结构扫描：C# Path.Combine",

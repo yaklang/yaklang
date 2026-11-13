@@ -1,8 +1,9 @@
 desc(
-	title_zh: "检测Java java.security使用不安全的哈希算法"
-	title: "Check Java java.security use of broken or risky hash algorithm"
+	mode: "ssa"
+	title_zh: "数据流：检测Java java.security使用不安全的哈希算法"
+	title: "数据流：Check Java java.security use of broken or risky hash algorithm"
 	type: security
-	level: low
+	level: ""
 	risk : "weak-cryptographic-algorithm"
 	reference: <<<REFERENCE
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)

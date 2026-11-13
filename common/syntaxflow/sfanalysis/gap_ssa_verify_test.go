@@ -11,8 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-// Dataflow rules are named ssa-*.sf. Source rules for languages without a
-// frontend are checked by the source builtin verify, not here.
+// SSA-mode dataflow rules are checked here. Source and struct rules have their
+// own verify suites, and the rule mode comes from desc(mode), never from the
+// file name.
 func TestGapSSARules_VerifyFilesystem(t *testing.T) {
 	root := BuiltinRuleRoot(t)
 	local := filesys.NewLocalFs()
@@ -21,7 +22,17 @@ func TestGapSSARules_VerifyFilesystem(t *testing.T) {
 		if info.IsDir() || !strings.HasSuffix(path, ".sf") {
 			return nil
 		}
-		if !strings.HasPrefix(info.Name(), "ssa-") {
+		raw, err := local.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(string(raw))
+		if err != nil || sfvm.FrameIsSourceMode(frame) || sfvm.FrameIsStructMode(frame) {
+			return nil
+		}
+		// Library rules are sink/source definitions with no fixtures of their
+		// own; their importers carry the evidence.
+		if rule := frame.GetRule(); rule == nil || rule.AllowIncluded {
 			return nil
 		}
 		paths = append(paths, path)

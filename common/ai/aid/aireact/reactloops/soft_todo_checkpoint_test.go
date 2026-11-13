@@ -18,6 +18,7 @@ type softCheckpointConfig struct {
 	active            []aicommon.VerificationTodoItem
 	enableGoalMode    bool
 	goalMinIterations int64
+	goalCriteria      string
 }
 
 func (c *softCheckpointConfig) ActiveVerificationTodoItemsByScope(scope aicommon.VerificationTodoScope) []aicommon.VerificationTodoItem {
@@ -30,6 +31,9 @@ func (c *softCheckpointConfig) ActiveVerificationTodoItemsByScope(scope aicommon
 }
 func (c *softCheckpointConfig) GetEnableGoalMode() bool     { return c.enableGoalMode }
 func (c *softCheckpointConfig) GetGoalMinIterations() int64 { return c.goalMinIterations }
+func (c *softCheckpointConfig) GetGoalAcceptanceCriteria() string {
+	return c.goalCriteria
+}
 
 type softCheckpointInvoker struct {
 	*mock.MockInvoker

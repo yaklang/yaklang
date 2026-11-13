@@ -1,0 +1,81 @@
+desc(
+	mode: "source"
+	language: "python"
+	title: "源码匹配：LLM output returned as factual data"
+	title_zh: "源码匹配：LLM 输出直接作为事实数据返回"
+	type: vuln
+	level: "middle"
+	risk: "input-validation"
+	cwe: "CWE-20"
+	desc: <<<DESC
+模型输出没有与权威数据源核对，直接作为余额等事实字段返回。
+
+### 检测方式
+源码正则匹配在返回字典里直接调用 `model_complete`。
+DESC
+	solution: <<<SOLUTION
+- 事实字段从权威数据库读取。
+- 模型输出只作为辅助文本。
+SOLUTION
+	alert_min: 1
+	rule_id: "de2352c6-1241-4b3e-a9fd-155051474410"
+)
+${*.py}.pattern_regex(/return\s*\{[^}]*\bmodel_complete\s*\(/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "LLM output returned as factual data",
+	title_zh: "LLM 输出直接作为事实数据返回",
+	risk: "input-validation",
+}
+
+desc(
+	lang: python
+	alert_min: 1
+	'file://app.py': <<<POS
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /balance
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/balance")
+def balance():
+    question = request.args.get("q", "")  # wb:source id=src
+    return {"balance": model_complete(question)}  # wb:sink id=sink
+
+def model_complete(question):
+    return question
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+POS
+	'safefile://app.py': <<<NEG
+# HTTP service wb:service. Listen 0.0.0.0:$PORT (default 8080). GET /balance
+import os
+from flask import Flask, request, session
+
+app = Flask(__name__)
+LEDGER = {}
+
+@app.route("/balance")
+def balance():
+    user_id = session["user_id"]  # wb:source id=src
+    amount = LEDGER.get(user_id)
+    if amount is None:
+        return {"error": "no ledger row"}, 404
+    return {"balance": amount}  # wb:sink id=sink
+
+@app.route("/health")
+def wb_health():
+    return "ok"
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
+NEG
+)
