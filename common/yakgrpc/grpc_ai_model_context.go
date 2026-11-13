@@ -2,7 +2,7 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/hex"
+	"errors"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -20,12 +20,13 @@ func (s *Server) GetAIModelContext(_ context.Context, req *ypb.GetAIModelContext
 		provider, model = cfg.GetProvider().GetType(), cfg.GetModelName()
 		key = aispec.ModelContextIdentity(cfg)
 	}
-	// A bare provider/model pair cannot safely identify two compatible services.
-	// Do not migrate ambiguous v1 records into the new configured-service identity.
-	digest, err := hex.DecodeString(strings.TrimPrefix(key, "v2:"))
-	if provider == "" || model == "" || !strings.HasPrefix(key, "v2:") || err != nil || len(digest) != 32 {
-		return nil, grpcstatus.Error(codes.InvalidArgument, "a concrete model config or context key is required")
+	if provider == "" || model == "" || aispec.ModelContextOwnerID(key) == "" {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "a saved provider configuration and model context identity are required")
 	}
+	if err := yakit.ValidateAIModelContextOwner(s.GetProfileDatabase(), key); err != nil {
+		return nil, grpcstatus.Error(codes.NotFound, err.Error())
+	}
+
 	value := yakit.GetAIModelContext(s.GetProfileDatabase(), provider, model, key)
 	return &ypb.AIModelContextResponse{
 		Provider: provider, Model: model, ContextKey: key,
@@ -44,6 +45,9 @@ func (s *Server) SetAIModelContext(ctx context.Context, req *ypb.SetAIModelConte
 	}
 	if err := yakit.SetAIModelContextSettings(s.GetProfileDatabase(), current.Provider, current.Model,
 		req.GetThresholdTokens(), req.DisableAutoAdjust, current.ContextKey); err != nil {
+		if errors.Is(err, yakit.ErrAIModelContextOwnerDeleted) {
+			return nil, grpcstatus.Error(codes.NotFound, err.Error())
+		}
 		return nil, grpcstatus.Error(codes.InvalidArgument, err.Error())
 	}
 

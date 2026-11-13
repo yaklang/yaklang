@@ -9633,6 +9633,8 @@ message AIModelConfig {
   optional bool SupportsImageInput = 8;
   string ImageTokenEstimator = 9; // conservative (default), patch32, tile512
   optional bool SupportsImageToolCalling = 10; // Unset means unknown.
+  // Stable owner for this configured provider entry, independent of the selected model.
+  string ContextOwnerId = 11;
 }
 
 message AIGlobalConfig {

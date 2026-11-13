@@ -2,10 +2,12 @@ package aispec
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -14,6 +16,9 @@ import (
 // digest; they must never appear in context events or storage keys in plaintext.
 func ModelContextIdentity(model *ypb.AIModelConfig, extraOpts ...AIConfigOption) string {
 	if model == nil || model.GetProvider() == nil {
+		return ""
+	}
+	if _, err := uuid.Parse(model.GetContextOwnerId()); err != nil {
 		return ""
 	}
 	opts := append(BuildOptionsFromConfig(model), extraOpts...)
@@ -40,5 +45,21 @@ func ModelContextIdentity(model *ypb.AIModelConfig, extraOpts ...AIConfigOption)
 	}{strings.TrimSpace(c.Type), strings.TrimSpace(c.Model), strings.TrimSpace(c.Domain),
 		strings.TrimRight(strings.TrimSpace(c.BaseURL), "/"), endpoint, apiType, c.APIKey,
 		c.Script, c.NoHttps, headers})
-	return fmt.Sprintf("v2:%x", sha256.Sum256(raw))
+	return fmt.Sprintf("%s:%x", model.GetContextOwnerId(), sha256.Sum256(raw))
+}
+
+// ModelContextOwnerID validates an opaque context identity and returns its owner.
+func ModelContextOwnerID(key string) string {
+	owner, digest, ok := strings.Cut(key, ":")
+	if !ok {
+		return ""
+	}
+	if _, err := uuid.Parse(owner); err != nil {
+		return ""
+	}
+	decoded, err := hex.DecodeString(digest)
+	if err != nil || len(decoded) != sha256.Size {
+		return ""
+	}
+	return owner
 }

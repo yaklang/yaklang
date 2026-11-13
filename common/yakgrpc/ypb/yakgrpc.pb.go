@@ -72001,8 +72001,10 @@ type AIModelConfig struct {
 	SupportsImageInput       *bool  `protobuf:"varint,8,opt,name=SupportsImageInput,proto3,oneof" json:"SupportsImageInput,omitempty"`
 	ImageTokenEstimator      string `protobuf:"bytes,9,opt,name=ImageTokenEstimator,proto3" json:"ImageTokenEstimator,omitempty"`                   // conservative (default), patch32, tile512
 	SupportsImageToolCalling *bool  `protobuf:"varint,10,opt,name=SupportsImageToolCalling,proto3,oneof" json:"SupportsImageToolCalling,omitempty"` // Unset means unknown.
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Stable owner for this configured provider entry, independent of the selected model.
+	ContextOwnerId string `protobuf:"bytes,11,opt,name=ContextOwnerId,proto3" json:"ContextOwnerId,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AIModelConfig) Reset() {
@@ -72103,6 +72105,13 @@ func (x *AIModelConfig) GetSupportsImageToolCalling() bool {
 		return *x.SupportsImageToolCalling
 	}
 	return false
+}
+
+func (x *AIModelConfig) GetContextOwnerId() string {
+	if x != nil {
+		return x.ContextOwnerId
+	}
+	return ""
 }
 
 type AIGlobalConfig struct {
@@ -87497,7 +87506,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18UpsertAIProviderResponse\x12+\n" +
 	"\bProvider\x18\x01 \x01(\v2\x0f.ypb.AIProviderR\bProvider\")\n" +
 	"\x17DeleteAIProviderRequest\x12\x0e\n" +
-	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\x8c\x04\n" +
+	"\x02Id\x18\x01 \x01(\x03R\x02Id\"\xb4\x04\n" +
 	"\rAIModelConfig\x12\x1e\n" +
 	"\n" +
 	"ProviderId\x18\x01 \x01(\x03R\n" +
@@ -87511,7 +87520,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12SupportsImageInput\x18\b \x01(\bH\x00R\x12SupportsImageInput\x88\x01\x01\x120\n" +
 	"\x13ImageTokenEstimator\x18\t \x01(\tR\x13ImageTokenEstimator\x12?\n" +
 	"\x18SupportsImageToolCalling\x18\n" +
-	" \x01(\bH\x01R\x18SupportsImageToolCalling\x88\x01\x01B\x15\n" +
+	" \x01(\bH\x01R\x18SupportsImageToolCalling\x88\x01\x01\x12&\n" +
+	"\x0eContextOwnerId\x18\v \x01(\tR\x0eContextOwnerIdB\x15\n" +
 	"\x13_SupportsImageInputB\x1b\n" +
 	"\x19_SupportsImageToolCalling\"\xf8\x04\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +

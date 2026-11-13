@@ -20,6 +20,17 @@ func contextTestModel() *ypb.AIModelConfig {
 }
 func bindContext(t *testing.T, cfg *Config, model *ypb.AIModelConfig) string {
 	t.Helper()
+	if model.GetContextOwnerId() == "" {
+		db := consts.GetGormProfileDatabase()
+		global, err := yakit.GetAIGlobalConfig(db)
+		require.NoError(t, err)
+		if global == nil {
+			global = &ypb.AIGlobalConfig{}
+		}
+		global.IntelligentModels = append(global.IntelligentModels, model)
+		_, err = yakit.SetAIGlobalConfig(db, global)
+		require.NoError(t, err)
+	}
 	require.NoError(t, WithPrimaryModelContext(model)(cfg))
 	return aispec.ModelContextIdentity(model)
 }
@@ -85,7 +96,7 @@ func TestModelContextContractSuccessPersistsOnlyMatchingConfiguration(t *testing
 }
 
 func TestModelContextContractLateSuccessAndCancellationDoNotOverwrite(t *testing.T) {
-	for _, mode := range []string{"manual", "disabled", "cancelled"} {
+	for _, mode := range []string{"manual", "disabled", "cancelled", "deleted"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -107,6 +118,19 @@ func TestModelContextContractLateSuccessAndCancellationDoNotOverwrite(t *testing
 				require.Zero(t, first.RecordModelContextOverflow("openai", model.ModelName, 300000, nil, key))
 			case "cancelled":
 				cancel()
+			case "deleted":
+				db := consts.GetGormProfileDatabase()
+				global, err := yakit.GetAIGlobalConfig(db)
+				require.NoError(t, err)
+				kept := global.IntelligentModels[:0]
+				for _, entry := range global.IntelligentModels {
+					if entry.ContextOwnerId != model.ContextOwnerId {
+						kept = append(kept, entry)
+					}
+				}
+				global.IntelligentModels = kept
+				_, err = yakit.SetAIGlobalConfig(db, global)
+				require.NoError(t, err)
 			}
 			first.ConfirmModelContextSuccess("openai", model.ModelName, key)
 			require.EqualValues(t, expected, yakit.GetAIModelContext(consts.GetGormProfileDatabase(), "openai", model.ModelName, key).ThresholdTokens)
