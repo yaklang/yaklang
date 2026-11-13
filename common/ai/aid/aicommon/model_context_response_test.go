@@ -33,10 +33,10 @@ func TestModelContextIdentitySurvivesGatewayAndResponseTee(t *testing.T) {
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			cfg := newTransactionTestConfig(ctx)
-			cfg.retryMax = 1
+			cfg := NewConfig(ctx, WithDisableAutoSkills(true), WithDisableCreateDBRuntime(true),
+				WithQualityPriorityAICallback(callback), WithAIAutoRetry(1), WithAITransactionAutoRetry(1))
 			parsed := false
-			err = CallAITransaction(cfg, "local test", func(req *AIRequest) (*AIResponse, error) { return callback(cfg, req) }, func(resp *AIResponse) error {
+			err = CallAITransaction(cfg, "local test", cfg.CallAI, func(resp *AIResponse) error {
 				parsed = true
 				require.Equal(t, key, resp.GetModelContextKey())
 				data, readErr := io.ReadAll(resp.GetOutputStreamReader("test", false, cfg.GetEmitter()))
@@ -48,6 +48,8 @@ func TestModelContextIdentitySurvivesGatewayAndResponseTee(t *testing.T) {
 				ev, ok := PromptOverflowEvidenceFrom(err)
 				require.True(t, ok)
 				require.Equal(t, key, ev.ContextKey)
+				require.Equal(t, "openai", ev.Provider)
+				require.Equal(t, "test-model", ev.Model)
 				require.False(t, parsed)
 			} else {
 				require.NoError(t, err)
