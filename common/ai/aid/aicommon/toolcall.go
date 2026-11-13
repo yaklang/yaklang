@@ -1128,6 +1128,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			config.DoWaitAgree(t.ctx, ep)
 			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
 				releaseReview()
+				// The worker can stop while its enclosing session stays alive.
+				// Close the visible card so the next pending review can proceed.
+				t.emitter.EmitInteractiveRelease(ep.GetId(), nil)
 				handleError(waitErr)
 				return nil, false, waitErr
 			}

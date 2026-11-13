@@ -233,7 +233,7 @@ func TestSubForgeCancelReleasesPendingReview(t *testing.T) {
 			return nil
 		}
 	}
-	require.Equal(t, schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE, readEvent().Type)
+	require.Equal(t, schema.EventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE), readEvent().Type)
 	cancel()
 	select {
 	case err := <-finished:
