@@ -47,7 +47,7 @@
 
 ## 前端
 
-`model_context` 提供 `provider/model/context_key/prompt_tokens/threshold_tokens/source/pending` 等状态。自动收缩、成功确认和历史回放均静默更新阈值，不弹通知；只有用户明确设置失败才提示。面板内可以查看自动调整状态，不展示估计容量。手动保存静默，拖动释放后提交，失败恢复确认值。
+`model_context` 提供 `provider/model/context_key/prompt_tokens/threshold_tokens/source/pending` 等状态。自动收缩、成功确认和历史回放均静默更新阈值，不弹通知；只有用户明确设置失败才提示。面板内可以查看自动调整状态，不保存或展示估计容量，也不因自动收缩到手动下限以下新增告警。手动保存静默，拖动释放后提交，失败恢复确认值。
 
 超过 750K 时，面板固定提示区域显示“过大的上下文可能降低模型表现，并增加延迟和费用。”，不写具体警戒数值，不改变面板尺寸。下限、K/M 换算、Drag Handle、恢复默认和默认开启的说明开关保留。
 
