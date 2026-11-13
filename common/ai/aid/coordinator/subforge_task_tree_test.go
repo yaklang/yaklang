@@ -203,3 +203,47 @@ func TestResilienceSubForgeTaskTreeCancellationBeforeStart(t *testing.T) {
 	require.Equal(t, "child result", result)
 	require.Len(t, started, 1)
 }
+
+func TestSubForgeTaskTreeTracksIndividualNodeStates(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	events := make(chan *schema.AiOutputEvent, 16)
+	cfg := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event.Type == schema.EVENT_TYPE_SUB_FORGE_TASK_TREE {
+			events <- event
+		}
+	}))
+	parent := &Session{Config: cfg}
+	task := aicommon.NewStatefulTaskBase("parent", "inspect", ctx, cfg.GetEmitter(), true)
+	plan, err := ParsePlan(`{"name":"Child","goal":"Inspect","subtasks":[{"task_id":"read","name":"Read","goal":"Read evidence"},{"task_id":"verify","name":"Verify","goal":"Verify evidence"}]}`, "Inspect", nil)
+	require.NoError(t, err)
+	original := string(plan.Tree)
+	binding := SubForgeTool{Schema: mcp.NewTool("inspect"), Run: func(ctx context.Context, _ aitool.InvokeParams, _ []*aitool.Tool, opts ...aicommon.ConfigOption) (any, error) {
+		child := &Session{Config: aicommon.NewConfig(ctx, opts...), tasks: map[string]*aicommon.AIStatefulTaskBase{}, opened: map[string]bool{}, closed: map[string]bool{}}
+		for i, state := range []State{Pending, Running, Accepted, Failed, Cancelled} {
+			snapshot := Snapshot{Revision: uint64(i + 1), Phase: PhaseExec, Plan: plan, Attempts: map[string]Attempt{}}
+			for index, node := range plan.Tasks {
+				progress := Pending
+				if index == 0 {
+					progress = state
+				}
+				snapshot.Attempts[node.ID] = Attempt{ID: 1, Task: node, State: progress}
+			}
+			child.Changed(snapshot)
+		}
+		return "done", nil
+	}}
+	_, err = parent.invokeSubForge(ctx, task, "call", binding, nil)
+	require.NoError(t, err)
+	require.Equal(t, "running", readSubForgeTree(t, events).Status)
+	for i, expected := range []string{"", "processing", "completed", "aborted", "skipped"} {
+		snapshot := readSubForgeTree(t, events)
+		require.Equal(t, uint64(i+2), snapshot.Revision)
+		var tree PlanNode
+		require.NoError(t, json.Unmarshal(snapshot.TaskTree, &tree))
+		require.Equal(t, expected, tree.Subtasks[0].Progress)
+		require.Empty(t, tree.Subtasks[1].Progress, "another node must retain its independent state")
+	}
+	require.Equal(t, "succeeded", readSubForgeTree(t, events).Status)
+	require.Equal(t, original, string(plan.Tree), "display projection must not modify the executable plan")
+}

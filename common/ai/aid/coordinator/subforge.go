@@ -107,9 +107,12 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 	if err != nil {
 		return nil, err
 	}
-	call := newSubForgeCall(ctx, s, task, callID, binding, releaseSlot)
+	call := newSubForgeCall(ctx, s, task, callID, releaseSlot)
+	if binding.Schema != nil {
+		call.tree.ToolName = binding.Schema.Name
+	}
 	defer func() { call.finish(retErr) }()
-	childCtx := WithForgeParent(ctx, s.invoker, task, call.tree.ChildCoordinatorID)
+	childCtx := WithForgeParent(ctx, s.invoker, task, call.childID)
 	manager := buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(allowed...))
 	opts := []aicommon.ConfigOption{
 		aicommon.WithPersistentSessionId(""),
@@ -125,7 +128,7 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		aicommon.WithEnableToolManagerAISearch(false),
 		aicommon.WithEnableSubagentsInPlan(false),
 		aicommon.WithDisableCreateDBRuntime(s.DisableCreateDBRuntime),
-		aicommon.WithWorkdir(filepath.Join(s.GetOrCreateWorkDir(), "artifacts", "sub-forges", call.tree.ChildCoordinatorID)),
+		aicommon.WithWorkdir(filepath.Join(s.GetOrCreateWorkDir(), "artifacts", "sub-forges", call.childID)),
 		aicommon.WithEventInputChanx(call.input),
 		aicommon.WithEventHandler(call.handleEvent),
 	)
