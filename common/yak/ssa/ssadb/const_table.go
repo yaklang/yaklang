@@ -137,7 +137,15 @@ func IrConstPoolID(kind IrConstKind, text string) int64 {
 // ConstType search joins on. The lookup is partial: only const rows carry a
 // const_id, so indexing the other 8M rows would cost more than it saves.
 func ensureIrConstIndexes(db *gorm.DB) {
-	if db == nil || db.Dialect() == nil || !db.HasTable(TableIrConstPool) {
+	if db == nil || db.Dialect() == nil {
+		return
+	}
+	if !db.HasTable(TableIrConstPool) {
+		// AutoMigrate registers IrConst, so the pool exists on every database
+		// this build opens. A missing pool means the migration did not run or
+		// failed, and skipping the indexes quietly would surface later as an
+		// unrelated "no such table" on the first const write.
+		log.Errorf("SSA const pool %q is missing after migrate: const lookups and deletes will fail", TableIrConstPool)
 		return
 	}
 	queries := []struct {

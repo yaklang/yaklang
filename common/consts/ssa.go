@@ -11,6 +11,7 @@ import (
 	_ "github.com/yaklang/gorm/dialects/mysql"
 	_ "github.com/yaklang/gorm/dialects/postgres"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/damenggorm"
@@ -154,18 +155,17 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	// SSA-IR DB may be accessed with a read-only credential (scan-only nodes).
 	// In that case, AutoMigrate would fail even if the schema already exists.
 	if !utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE)) {
-		if dialect == damenggorm.Dialect {
-			if err := schema.AutoMigrateChecked(db, schema.KEY_SCHEMA_SSA_DATABASE); err != nil {
-				_ = db.Close()
-				return nil, err
-			}
-		} else {
-			schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+		// A failed table creation must not be silent: a database opened without
+		// ir_codes or the const pool used to report success and then fail
+		// inside unrelated queries. It must not stop the process either -- a
+		// read-only or partially migrated database is still usable for the
+		// tables that do exist.
+		if err := schema.AutoMigrateChecked(db, schema.KEY_SCHEMA_SSA_DATABASE); err != nil {
+			log.Errorf("migrate SSA database %q failed, continuing with the tables that exist: %v", path, err)
 		}
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
-		if dialect == damenggorm.Dialect && db.Error != nil {
-			_ = db.Close()
-			return nil, db.Error
+		if db.Error != nil {
+			log.Errorf("patch SSA database %q failed, continuing: %v", path, db.Error)
 		}
 	}
 	configureAndOptimizeDBWithOptions(dialect, db, options)

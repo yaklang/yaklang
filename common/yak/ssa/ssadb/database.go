@@ -400,13 +400,20 @@ func validateProgramDeletion(db *gorm.DB, program string) error {
 // deleteOptionalProgramRows drops rows from a table that a database written by
 // an older build may not have: the legacy const table is absent on new
 // databases, and the const pool is absent on every database written before
-// it. A missing table is not a failed delete.
+// it. A missing table is not a failed delete, and it is a stable condition:
+// retrying it only burns the backoff budget below.
 func deleteOptionalProgramRows(db *gorm.DB, table, condition string, args ...any) error {
 	err := deleteProgramRows(db, table, condition, args...)
-	if err != nil && strings.Contains(err.Error(), "no such table") {
+	if err != nil && isMissingTableError(err) {
 		return nil
 	}
 	return err
+}
+
+// isMissingTableError reports the stable "this schema has no such table" case.
+// It is not transient, so a retry loop must not spend its backoff on it.
+func isMissingTableError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such table")
 }
 
 func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error {
@@ -422,6 +429,13 @@ func retryProgramDelete(name string, deleteFn func() error) error {
 	for attempt := 1; attempt <= programDeleteAttempts; attempt++ {
 		if err = deleteFn(); err == nil {
 			return nil
+		}
+		// A missing table will not appear on the next attempt. Returning at
+		// once keeps the caller's "optional table" handling cheap: a schema
+		// without the legacy const table used to spend 3 attempts and 150ms of
+		// backoff on every program delete.
+		if isMissingTableError(err) {
+			return fmt.Errorf("%s: %w", name, err)
 		}
 		if attempt < programDeleteAttempts {
 			time.Sleep(time.Duration(attempt) * 50 * time.Millisecond)
