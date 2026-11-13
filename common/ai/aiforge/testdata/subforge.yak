@@ -1,6 +1,58 @@
 // Run with a configured provider and interactive terminal:
 // YAK_SUB_FORGE_CONSOLE=1 yak common/ai/aiforge/testdata/subforge.yak
 // A chooses a declared specialist, then uses its result to write the final answer.
+// Use the same observer for live events and events from recovery_history.
+newTaskTreeView = () => {"plans": {}, "runs": {}}
+observeTaskTree = func(view, event) {
+    eventType = string(event.Type)
+    if eventType != "plan" && eventType != "sub_forge_task_tree" {
+        return
+    }
+    payload = json.loads(string(event.Content))
+    if eventType == "plan" {
+        previous = view["plans"][event.CoordinatorId]
+        newer = previous == nil || event.ID > previous["event_id"] || (event.ID == 0 && !event.IsSync)
+        if payload["root_task"] != nil && newer {
+            view["plans"][event.CoordinatorId] = {"event_id": event.ID, "root": payload["root_task"]}
+        }
+        return
+    }
+    id = payload["child_coordinator_id"]
+    previous = view["runs"][id]
+    if previous == nil || (previous["status"] == "running" && payload["revision"] > previous["revision"]) {
+        view["runs"][id] = payload
+    }
+}
+attachSubForgeTrees = func(view, parentID, historical) {
+    // Copy the parent plan before adding display-only branches.
+    parentPlan = view["plans"][parentID]
+    if parentPlan == nil {
+        return nil
+    }
+    root = json.loads(json.dumps(parentPlan["root"]))
+    attach = func(node) {
+        for _, run = range view["runs"] {
+            if run["parent_coordinator_id"] == parentID && run["parent_task_id"] == node["task_id"] {
+                if node["sub_forge_runs"] == nil {
+                    node["sub_forge_runs"] = {}
+                }
+                display = json.loads(json.dumps(run))
+                if historical && display["status"] == "running" {
+                    display["status"] = "unknown"
+                }
+                node["sub_forge_runs"][run["child_coordinator_id"]] = display
+            }
+        }
+        for _, child = range node["subtasks"] {
+            attach(child)
+        }
+    }
+    if root != nil {
+        attach(root)
+    }
+    return root
+}
+
 inventory = aiagent.CreateForge(
     "inventory-specialist",
     aiagent.initPrompt("Inspect the requested inventory. {{.Forge.UserParams}}"),
@@ -16,6 +68,8 @@ options = [
     aiagent.forgeSubForge("glossary", "Explain an unfamiliar term", glossary),
 ]
 if os.Getenv("YAK_SUB_FORGE_CONSOLE") == "1" {
+    view = newTaskTreeView()
+    viewLock = sync.NewMutex()
     reader = bufio.NewReader(os.Stdin)~
     options = append(options, aiagent.manualAssistantCallback(func(ctx, config) {
         println("Review this Forge step. Type yes to approve, or press Enter to reject.")
@@ -25,6 +79,9 @@ if os.Getenv("YAK_SUB_FORGE_CONSOLE") == "1" {
         }
         return {"suggestion": "cancel"}, nil
     }), aiagent.onEvent(func(event) {
+        viewLock.Lock()
+        defer viewLock.Unlock()
+        observeTaskTree(view, event)
         if event.GetInteractiveId() != "" && string(event.Type) != "review_release" {
             println(string(event.Content))
         }
@@ -38,3 +95,8 @@ execution = aiagent.NewExecutor(
 defer execution.Close()
 die(execution.Run())
 println(execution.Result().Formated)
+if os.Getenv("YAK_SUB_FORGE_CONSOLE") == "1" {
+    viewLock.Lock()
+    println(json.dumps(attachSubForgeTrees(view, execution.GetConfig().GetRuntimeId(), false)))
+    viewLock.Unlock()
+}
