@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakitenv"
@@ -114,7 +115,7 @@ func Check(db *gorm.DB, builtinNetwork any, fixtureRoots ...string) error {
 		}
 		switch key {
 		case "AI_GLOBAL_CONFIG":
-			if builtinAI == nil || !sameJSON(value, builtinAI) {
+			if builtinAI == nil || !sameBootstrapAI(value, builtinAI) {
 				return errors.New("pre-existing AI configuration was detected")
 			}
 		case "GLOBAL_NETWORK_CONFIG":
@@ -256,4 +257,37 @@ func sameJSON(raw string, expected any) bool {
 	}
 	var a, b any
 	return json.Unmarshal([]byte(raw), &a) == nil && json.Unmarshal(encoded, &b) == nil && reflect.DeepEqual(a, b)
+}
+
+// Provider ownership is generated at bootstrap and carries no user preference.
+// Ignore only valid ownership IDs at the three model-list locations; every
+// connection field, credential, model name and user setting still must match.
+func sameBootstrapAI(raw string, expected any) bool {
+	encoded, err := json.Marshal(expected)
+	if err != nil {
+		return false
+	}
+	var actual, baseline map[string]any
+	if json.Unmarshal([]byte(raw), &actual) != nil || json.Unmarshal(encoded, &baseline) != nil {
+		return false
+	}
+	for _, cfg := range []map[string]any{actual, baseline} {
+		for _, name := range []string{"IntelligentModels", "LightweightModels", "VisionModels"} {
+			models, _ := cfg[name].([]any)
+			for _, item := range models {
+				model, _ := item.(map[string]any)
+				if owner, exists := model["ContextOwnerId"]; exists {
+					text, ok := owner.(string)
+					if !ok {
+						return false
+					}
+					if _, err := uuid.Parse(text); err != nil {
+						return false
+					}
+					delete(model, "ContextOwnerId")
+				}
+			}
+		}
+	}
+	return reflect.DeepEqual(actual, baseline)
 }
