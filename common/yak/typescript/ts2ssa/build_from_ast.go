@@ -2273,7 +2273,7 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 
 	// 处理参数列表
 	var args []ssa.Value
-	if node.ArgumentList() != nil && len(node.Arguments.Nodes) > 0 {
+	if node.AsNode().ArgumentList() != nil && len(node.Arguments.Nodes) > 0 {
 		for _, argNode := range node.Arguments.Nodes {
 			argValue := b.VisitRightValueExpression(argNode)
 			if !utils.IsNil(argValue) {
@@ -4538,7 +4538,7 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 
 		// 处理函数体
 		if bodyNode != nil && bodyNode.Kind == ast.KindBlock {
-			blockNode := bodyNode.AsBlock()
+			blockNode := bodyNode.AsNode().AsBlock()
 			if blockNode.Statements != nil {
 				b.VisitStatements(blockNode.Statements)
 			}
@@ -4572,7 +4572,7 @@ func (b *builder) ProcessClassCtor(member *ast.ClassElement, class *ssa.Blueprin
 		for _, paramNode := range params.Nodes {
 			paramDecl := paramNode.AsParameterDeclaration()
 			// 检查参数是否有参数属性修饰符 (public, private, protected, readonly)
-			modifierFlags := paramDecl.ModifierFlags()
+			modifierFlags := paramDecl.AsNode().ModifierFlags()
 			if modifierFlags&ast.ModifierFlagsParameterPropertyModifier != ast.ModifierFlagsNone {
 				parameterProperties = append(parameterProperties, paramDecl)
 
