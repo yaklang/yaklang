@@ -143,6 +143,10 @@ func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperatio
 	m.getEvidenceState().ApplySessionEvidenceOps(ops)
 }
 
+func (m *MockedAIConfig) BroadcastEvidence(op aicommon.EvidenceOperation) error {
+	return m.getEvidenceState().BroadcastEvidence(op)
+}
+
 func (m *MockedAIConfig) GetVerificationTodoRendered(scope aicommon.VerificationTodoScope) string {
 	return m.TodoState.GetVerificationTodoRendered(scope)
 }

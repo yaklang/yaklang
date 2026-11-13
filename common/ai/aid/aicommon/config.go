@@ -671,6 +671,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if consumptionState := config.ensureConsumptionState(); consumptionState != nil {
 		consumptionState.InitializeEffectiveSingleModelMode(config.IsSingleAIModelMode())
 	}
+	originTimeline := config.Timeline
 	// Only create new Timeline if not already set via options (e.g., WithTimeline)
 	// This ensures that when a parent coordinator passes its Timeline to a child invoker,
 	// the child uses the same Timeline instance for proper timeline diff tracking
@@ -713,14 +714,10 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.AiToolManager.SetDisallowMCPServers(config.DisallowMCPServers)
 	}
 
-	// Only the session owner restores the persistent journal. Inherited task
-	// configs already share that session; restoring again would replace their
-	// explicitly supplied Timeline branch with an older DB snapshot.
-	promptState := config.GetSessionPromptState()
-	promptState.m.RLock()
-	hasSessionTimeline := promptState.evidenceTimeline != nil
-	promptState.m.RUnlock()
-	if !config.InitStatus.IsPersistentSessionRestored() && !hasSessionTimeline {
+	// A Config constructed with an explicit Timeline owns that live runtime and
+	// must not replace it with an older row from the same persistent session.
+	// Fresh session owners still restore their checkpoint.
+	if !config.InitStatus.IsPersistentSessionRestored() && originTimeline == nil {
 		config.restorePersistentSession()
 	}
 
@@ -3703,7 +3700,7 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 
 func (c *Config) GetSessionEvidenceRendered() string {
 	if c != nil {
-		if timeline := c.sessionEvidenceTimeline(); timeline != nil {
+		if timeline := c.GetTimeline(); timeline != nil {
 			if store, found := timeline.evidenceStore(); found {
 				return store.Render()
 			}
