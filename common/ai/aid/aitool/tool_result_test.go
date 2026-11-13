@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 )
@@ -195,8 +196,11 @@ func TestExecuteToolWithCapture_PreCancelledContextDoesNotStartCallback(t *testi
 	}
 
 	result, err := tool.ExecuteToolWithCapture(ctx, nil, config)
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("ExecuteToolWithCapture error = %v, want %v", err, context.Canceled)
+	}
+	if !errors.Is(err, ErrInvocationNotStarted) {
+		t.Fatalf("ExecuteToolWithCapture error = %v, want known pre-start rejection", err)
 	}
 	if result == nil || result.Stdout != "" || result.Stderr != "" || result.CombinedOutput != "" {
 		t.Fatalf("cancelled result = %#v, want empty captured output", result)
@@ -230,6 +234,78 @@ func TestInvokeWithParams_CancelledContextIsProtocolFailure(t *testing.T) {
 	}
 	if callbackStarted {
 		t.Fatal("callback started for a pre-cancelled invocation")
+	}
+}
+
+func TestExecuteToolWithCapture_PreStartCancellationPreservesErrors(t *testing.T) {
+	callbackErr := errors.New("cancel handler failed")
+	for _, deadline := range []bool{false, true} {
+		for _, handler := range []string{"none", "nil-error", "custom-error"} {
+			t.Run(fmt.Sprintf("deadline=%t/handler=%s", deadline, handler), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				if deadline {
+					ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+					defer cancel()
+				}
+				tool, err := New("pre_start_error", WithCallback(func(context.Context, InvokeParams, *ToolRuntimeConfig, io.Writer, io.Writer) (any, error) {
+					t.Error("callback must not start")
+					return nil, nil
+				}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				config := &ToolInvokeConfig{}
+				if handler != "none" {
+					config.cancelCallback = func(result *ToolExecutionResult, _ error) (*ToolExecutionResult, error) {
+						if handler == "custom-error" {
+							return result, callbackErr
+						}
+						return result, nil
+					}
+				}
+				_, err = tool.ExecuteToolWithCapture(ctx, nil, config)
+				if !errors.Is(err, ctx.Err()) || !errors.Is(err, ErrInvocationNotStarted) {
+					t.Fatalf("error %v lost cancellation or pre-start outcome", err)
+				}
+				if handler == "custom-error" && !errors.Is(err, callbackErr) {
+					t.Fatalf("error %v lost the cancel handler error", err)
+				}
+			})
+		}
+	}
+}
+
+func TestExecuteToolWithCapture_CancelAfterCallbackStartsIsNotRetryable(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	entered := make(chan struct{})
+	tool, err := New("started_cancel", WithCallback(func(ctx context.Context, _ InvokeParams, _ *ToolRuntimeConfig, _, _ io.Writer) (any, error) {
+		close(entered)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := tool.ExecuteToolWithCapture(ctx, nil, &ToolInvokeConfig{waitForCallbackOnCancel: true})
+		done <- err
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("callback did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) || errors.Is(err, ErrInvocationNotStarted) {
+			t.Fatalf("started callback returned an incorrect cancellation outcome: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cancelled callback did not finish")
 	}
 }
 

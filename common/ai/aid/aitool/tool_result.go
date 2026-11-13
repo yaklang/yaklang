@@ -137,7 +137,8 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		err   error
 	}
 	// A tool callback is allowed to have external side effects. Do not start it
-	// when its context was already cancelled before invocation.
+	// when its context was already cancelled before invocation. Preserve the
+	// known pre-start outcome so durable callers can safely retry this request.
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		execResult := &ToolExecutionResult{
 			Stdout:         "",
@@ -147,10 +148,10 @@ func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any
 		if cancelCallback != nil {
 			execResult, callbackErr := cancelCallback(execResult, ctxErr)
 			if callbackErr != nil {
-				return execResult, callbackErr
+				return execResult, errors.Join(ctxErr, ErrInvocationNotStarted, callbackErr)
 			}
 		}
-		return execResult, ctxErr
+		return execResult, errors.Join(ctxErr, ErrInvocationNotStarted)
 	}
 	finished := make(chan callbackResult, 1)
 	go func() {
