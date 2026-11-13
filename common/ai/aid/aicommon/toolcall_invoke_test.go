@@ -11,10 +11,12 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestHandleHTTPFlowMessage(t *testing.T) {
@@ -442,6 +444,72 @@ func TestResilienceSubForgeCheckpointRetriesBusyAdmission(t *testing.T) {
 	require.Equal(t, 1, callbacks)
 	result, err = run()
 	require.NoError(t, err)
+	require.Contains(t, result.String(), "child result")
+	require.Equal(t, 1, callbacks)
+}
+
+// Cancel at the durable start marker, before InvokeWithParams can enter the
+// callback. This exercises the cancellation window without timing or sleeps.
+type cancelAtToolStartCheckpoint struct {
+	AICallerConfigIf
+	cancel context.CancelFunc
+}
+
+func (c *cancelAtToolStartCheckpoint) SubmitCheckpointRequest(checkpoint *schema.AiCheckpoint, request any) error {
+	if err := c.AICallerConfigIf.SubmitCheckpointRequest(checkpoint, request); err != nil {
+		return err
+	}
+	if params, ok := request.(map[string]any); ok && params["callback_started"] == true && c.cancel != nil {
+		c.cancel()
+		c.cancel = nil
+	}
+	return nil
+}
+
+func TestResilienceSubForgeCheckpointRetriesCancellationBeforeCallback(t *testing.T) {
+	setupToolCallInvokeTestProjectDB(t)
+	tc, _ := newToolCallerForCountTest(t, "sub-forge-pre-cancel-"+ksuid.New().String())
+	callbacks := 0
+	tool, err := aitool.New("sub_forge_pre_cancel", aitool.WithStringParam("query"),
+		aitool.WithSimpleCallback(func(_ aitool.InvokeParams, _, _ io.Writer) (any, error) {
+			callbacks++
+			return "child result", nil
+		}))
+	require.NoError(t, err)
+	tool.RejectInterruptedReplay = true
+	tool.RequireForeground = true
+	originalCtx := tc.ctx
+	ctx, cancel := context.WithCancel(originalCtx)
+	defer cancel()
+	tc.ctx = ctx
+	tc.config = &cancelAtToolStartCheckpoint{AICallerConfigIf: tc.config, cancel: cancel}
+	tc.checkpointSeq = 9100
+	run := func() (*aitool.ToolResult, error) {
+		tc.task = NewStatefulTaskBase("persistent-task", "worker", tc.ctx, tc.emitter, true)
+		return tc.invoke(tool, aitool.InvokeParams{"query": "same request"}, func(any) {}, func(any) {},
+			&toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{}, &toolOutputBuffer{})
+	}
+
+	_, err = run()
+	require.ErrorIs(t, err, context.Canceled)
+	require.Zero(t, callbacks, "cancellation must happen before callback entry")
+	checkpoint, ok := yakit.GetToolCallCheckpoint(tc.config.GetDB(), tc.config.GetRuntimeId(), tc.checkpointSeq)
+	require.True(t, ok)
+	require.False(t, checkpoint.Finished)
+	require.False(t, aiddb.AiCheckPointGetRequestParams(checkpoint).GetBool("callback_started"), "a known pre-start cancellation must remain retryable")
+	require.ErrorIs(t, err, aitool.ErrInvocationNotStarted)
+
+	// A new worker attempt and sequence must execute once, then replay the result.
+	tc.ctx = originalCtx
+	tc.checkpointSeq++
+	result, err := run()
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, 1, callbacks)
+	tc.checkpointSeq++
+	result, err = run()
+	require.NoError(t, err)
+	require.True(t, result.Success)
 	require.Contains(t, result.String(), "child result")
 	require.Equal(t, 1, callbacks)
 }
