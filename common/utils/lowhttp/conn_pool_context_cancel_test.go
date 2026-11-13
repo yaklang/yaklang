@@ -91,7 +91,8 @@ func TestConnPoolRequestContextCancellationStopsActiveRead(t *testing.T) {
 func TestConnPoolRequestContextCancellationStopsSlotWait(t *testing.T) {
 	pool := NewHttpConnPool(context.Background(), 1, 1)
 	defer pool.Clear()
-	if err := pool.acquireConnSlot(context.Background()); err != nil {
+	key := &connectKey{scheme: H1, addr: "127.0.0.1:80"}
+	if _, err := pool.acquireH1Conn(context.Background(), key, 0); err != nil {
 		t.Fatal(err)
 	}
 	defer pool.releaseConnSlot()
@@ -99,7 +100,8 @@ func TestConnPoolRequestContextCancellationStopsSlotWait(t *testing.T) {
 	requestCtx, cancelRequest := context.WithCancel(context.Background())
 	result := make(chan error, 1)
 	go func() {
-		result <- pool.acquireConnSlot(requestCtx)
+		_, err := pool.acquireH1Conn(requestCtx, key, 0)
+		result <- err
 	}()
 	cancelRequest()
 

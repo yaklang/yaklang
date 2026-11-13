@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
 	"github.com/pkg/errors"
 )
@@ -753,7 +754,10 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		}
 	}
 
+	observer := httpctx.GetUpstreamObserver(req).BeginAttempt("WebSocket")
+
 	// 获取连接
+	observer.Phase(httpctx.UpstreamDial)
 	addr := utils.HostPort(host, port)
 	var conn net.Conn
 	dialStartedAt := time.Now()
@@ -762,16 +766,22 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		handshakeTimings.DialDuration = time.Since(dialStartedAt)
 		if err != nil {
 			reportHandshakeTimings()
-			return nil, utils.Errorf("dial tls-conn failed: %s", err)
+			return nil, fmt.Errorf("dial tls-conn failed: %w", err)
 		}
 	} else {
 		conn, err = netx.DialTCPTimeout(30*time.Second, addr, config.Proxy...)
 		handshakeTimings.DialDuration = time.Since(dialStartedAt)
 		if err != nil {
 			reportHandshakeTimings()
-			return nil, utils.Errorf("dial conn failed: %s", err)
+			return nil, fmt.Errorf("dial conn failed: %w", err)
 		}
 	}
+	transferred := false
+	defer func() {
+		if !transferred {
+			_ = conn.Close()
+		}
+	}()
 	if conn.LocalAddr() != nil {
 		handshakeTimings.LocalAddr = conn.LocalAddr().String()
 	}
@@ -782,18 +792,20 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	// 判断websocket扩展
 	requestRaw := FixHTTPRequest(packet)
 	// 发送请求
+	observer.Phase(httpctx.UpstreamSend)
 	requestWriteStartedAt := time.Now()
 	_, err = conn.Write(requestRaw)
 	handshakeTimings.RequestWriteDuration = time.Since(requestWriteStartedAt)
 	if err != nil {
 		reportHandshakeTimings()
-		return nil, utils.Errorf("write conn[ws] failed: %s", err)
+		return nil, fmt.Errorf("write conn[ws] failed: %w", err)
 	}
 
 	// 接收响应并判断
 	var responseBuffer bytes.Buffer
 	upgradeResponseHandler := config.UpgradeResponseHandler
 	bufioReader := bufio.NewReaderSize(conn, 4096)
+	observer.Phase(httpctx.UpstreamFirstByte)
 	responseReadStartedAt := time.Now()
 	var rsp *http.Response
 	for informationalResponses := 0; ; informationalResponses++ {
@@ -814,8 +826,9 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 		if upgradeResponseHandler != nil {
 			upgradeResponseHandler(nil, nil, nil, err)
 		}
-		return nil, utils.Errorf("read response failed: %s", err)
+		return nil, fmt.Errorf("read response failed: %w", err)
 	}
+	observer.Notify(httpctx.UpstreamEvent{Phase: httpctx.UpstreamRead, StatusCode: rsp.StatusCode})
 	bufferedAfterHandshake := bufioReader.Buffered()
 	responseRaw := bytes.Clone(responseBuffer.Bytes())
 	requestExtensions := make(http.Header)
@@ -835,7 +848,6 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	}
 	extensions, extensionErr := ValidateWebsocketExtensions(requestExtensions, rsp.Header)
 	if extensionErr != nil {
-		_ = conn.Close()
 		return nil, extensionErr
 	}
 	if upgradeResponseHandler != nil {
@@ -848,19 +860,16 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 			}
 			extensions, extensionErr = ValidateWebsocketExtensions(requestExtensions, rsp.Header)
 			if extensionErr != nil {
-				_ = conn.Close()
 				return nil, extensionErr
 			}
 		}
 	}
 
 	if rsp.StatusCode != 101 {
-		_ = conn.Close()
 		return nil, utils.Errorf("upgrade websocket failed(101 switch protocols failed): %s", rsp.Status)
 	}
 	if config.strictMode {
 		if err := validateWebsocketUpgradeResponse(requestRaw, rsp); err != nil {
-			_ = conn.Close()
 			return nil, err
 		}
 	}
@@ -903,6 +912,7 @@ func NewWebsocketClientByUpgradeRequest(req *http.Request, opt ...WebsocketClien
 	}
 	fr.SetWebsocketClient(client)
 	fw.SetWebsocketClient(client)
+	transferred = true
 
 	return client, nil
 }

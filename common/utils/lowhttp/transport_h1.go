@@ -43,6 +43,7 @@ func newH1Transport(pool *LowHttpConnPool) transport {
 }
 
 func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*transportResult, error) {
+	tr.attempt = tr.observer.BeginAttempt("HTTP/1.1")
 	requestPacket := tr.packet
 	connPool := tr.connPool
 	if connPool == nil {
@@ -58,8 +59,9 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 
 	if conn == nil {
 		if withConnPool {
-			conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.dialOpts...)
+			conn, err = connPool.getIdleConn(ctx, tr.cacheKey, tr.connectTimeout, tr.attempt, tr.dialOpts...)
 		} else {
+			tr.attempt.Phase(httpctx.UpstreamDial)
 			conn, err = dialXWithContext(ctx, tr.originAddr, tr.dialOpts...)
 		}
 	}
@@ -79,6 +81,8 @@ func (t *h1Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		if err != nil {
 			return nil, err
 		}
+		tr.attempt = tr.observer.BeginAttempt("HTTP/1.1")
+		tr.attempt.Phase(httpctx.UpstreamDial)
 		conn, err = t.tryLegacyProxy(ctx, tr)
 		if err != nil {
 			return nil, err
@@ -163,6 +167,7 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
 
+	tr.attempt.Phase(httpctx.UpstreamSend)
 	resc := make(chan responseInfo, 1)
 	pc.reqCh <- requestAndResponseCh{
 		reqPacket:   requestPacket,
@@ -170,48 +175,49 @@ func (t *h1Transport) roundTripPooled(ctx context.Context, tr *transportRequest,
 		reqInstance: reqIns,
 		option:      option,
 		writeErrCh:  writeErrCh,
+		observer:    tr.attempt,
 	}
-	pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option}
+	pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: reqIns, options: option, observer: tr.attempt}
 
-	var rawBytes []byte
-	var firstResponse *http.Response
+	var response responseInfo
 	select {
-	case re := <-resc:
-		if re.err != nil && len(rawBytes) == 0 {
-			if pc.shouldRetryRequest(re.err) {
-				pc.closeConn(re.err)
-				// Signal reconnect to caller
-				return nil, &reconnectError{err: re.err}
-			}
-			return nil, re.err
-		}
-		firstResponse = re.resp
-		rawBytes = re.respBytes
-		tr.traceInfo.ServerTime = re.info.ServerTime
-		if option != nil && option.BodyStreamReaderHandler != nil {
-			if option.bodyStreamReaderHandled != nil {
-				option.bodyStreamReaderHandled.Set()
-			}
-		}
+	case response = <-resc:
 	case <-ctx.Done():
 		pc.closeConn(ctx.Err())
 		return nil, ctx.Err()
 	case <-pc.ctx.Done():
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, ctxErr
+		// readLoop queues the response before publishing the idle connection.
+		// A waiter can evict the socket while the previous caller is waking up.
+		select {
+		case response = <-resc:
+		default:
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			if pc.closed == nil {
+				return nil, net.ErrClosed
+			}
+			if pc.shouldRetryRequest(pc.closed) {
+				return nil, &reconnectError{err: pc.closed}
+			}
+			return nil, pc.closed
 		}
-		if pc.closed == nil {
-			return nil, utils.Error("BUG: closeCh but closed is nil")
-		}
-		if pc.shouldRetryRequest(pc.closed) {
-			return nil, &reconnectError{err: pc.closed}
-		}
-		return nil, pc.closed
 	}
 
+	if response.err != nil {
+		if pc.shouldRetryRequest(response.err) {
+			pc.closeConn(response.err)
+			return nil, &reconnectError{err: response.err}
+		}
+		return nil, response.err
+	}
+	tr.traceInfo.ServerTime = response.info.ServerTime
+	if option.BodyStreamReaderHandler != nil && option.bodyStreamReaderHandled != nil {
+		option.bodyStreamReaderHandled.Set()
+	}
 	return &transportResult{
-		rawBytes:       rawBytes,
-		firstResponse:  firstResponse,
+		rawBytes:       response.respBytes,
+		firstResponse:  response.resp,
 		multiResponses: nil,
 		remoteAddr:     conn.RemoteAddr().String(),
 		portIsOpen:     true,
@@ -253,6 +259,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		httpctx.SetBareRequestBytes(reqIns, requestPacket)
 	}
 	currentRPS.Add(1)
+	tr.attempt.Phase(httpctx.UpstreamSend)
 
 	if option.EnableRandomChunked {
 		chunkSender, err := option.GetOrCreateChunkSender()
@@ -369,6 +376,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	}
 
 	// Read response
+	tr.attempt.Phase(httpctx.UpstreamFirstByte)
 	serverTimeStart := time.Now()
 	_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
 	firstByte, err := httpResponseReader.Peek(1)
@@ -384,6 +392,7 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 	}
 
 	tr.traceInfo.ServerTime = time.Since(serverTimeStart)
+	tr.attempt.Phase(httpctx.UpstreamRead)
 
 	var firstResponse *http.Response
 	if option.DiscardIntermediateResponseBody {

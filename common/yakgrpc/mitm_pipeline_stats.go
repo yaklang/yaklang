@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -19,22 +19,57 @@ const (
 	mitmPipelineStageRequestProcessing mitmPipelineStage = iota + 1
 	mitmPipelineStageManualRequest
 	mitmPipelineStageUpstream
+	mitmPipelineStagePoolWait
+	mitmPipelineStageDial
+	mitmPipelineStageSend
+	mitmPipelineStageFirstByte
+	mitmPipelineStageRead
+	mitmPipelineStageStreaming
 	mitmPipelineStageLocalResponse
 	mitmPipelineStageResponseProcessing
 	mitmPipelineStageManualResponse
+	mitmPipelineStageWebSocketOnline
+	mitmPipelineStagePersistSubmit
+	mitmPipelineStagePersistBlocked
+	mitmPipelineStagePersistQueued
+	mitmPipelineStagePersistWrite
+	mitmPipelineStageCount
 )
 
-type mitmPipelineRequestState struct {
-	stage       mitmPipelineStage
-	stageAt     time.Time
-	dispatched  bool
-	manualDepth int
-	stopCancel  func() bool
+var mitmStageNames = [mitmPipelineStageCount]string{
+	mitmPipelineStageRequestProcessing:  "request_processing",
+	mitmPipelineStageManualRequest:      "manual_request",
+	mitmPipelineStageUpstream:           "upstream",
+	mitmPipelineStagePoolWait:           "pool_wait",
+	mitmPipelineStageDial:               "dial",
+	mitmPipelineStageSend:               "send",
+	mitmPipelineStageFirstByte:          "first_byte",
+	mitmPipelineStageRead:               "read",
+	mitmPipelineStageStreaming:          "streaming",
+	mitmPipelineStageLocalResponse:      "local_response",
+	mitmPipelineStageResponseProcessing: "response_processing",
+	mitmPipelineStageManualResponse:     "manual_response",
+	mitmPipelineStageWebSocketOnline:    "websocket_online",
+	mitmPipelineStagePersistSubmit:      "persist_submit",
+	mitmPipelineStagePersistBlocked:     "persist_blocked",
+	mitmPipelineStagePersistQueued:      "persist_queued",
+	mitmPipelineStagePersistWrite:       "persist_write",
 }
 
-// mitmPipelineTracker owns lightweight, process-local metrics for one MITMV2
-// stream. Active maps contain only unfinished work, so long-running sessions do
-// not accumulate completed requests or flows.
+func (s mitmPipelineStage) isUpstream() bool {
+	return s >= mitmPipelineStageUpstream && s <= mitmPipelineStageStreaming
+}
+
+type mitmPipelineRequestState struct {
+	trace         mitmTrace
+	dispatchedAt  time.Time
+	upstreamDone  bool
+	stopCancel    func() bool
+	lastAttemptID uint64
+}
+
+// mitmPipelineTracker is scoped to one MITMV2 stream. Only unfinished work
+// scales with traffic. Completed samples and aggregate history have fixed limits.
 type mitmPipelineTracker struct {
 	sessionID string
 	startedAt time.Time
@@ -50,83 +85,128 @@ type mitmPipelineTracker struct {
 	persistedTotal         atomic.Uint64
 	persistFailedTotal     atomic.Uint64
 
-	mu       sync.Mutex
-	requests map[*http.Request]*mitmPipelineRequestState
-	persists map[*schema.HTTPFlow]time.Time
+	mu          sync.Mutex
+	closed      bool
+	requests    map[*http.Request]*mitmPipelineRequestState
+	persists    map[uint64]*mitmPersistState
+	nextWriteID uint64
+	history     [mitmHistorySeconds]mitmStoragePoint
+	metrics     [mitmMetricSeconds]mitmMetricsBucket
+	samples     mitmTraceSamples
+	// Excluded traffic has its own bounded history so it cannot displace
+	// slow and failed requests in the capture scope.
+	filteredSamples mitmTraceSamples
 }
 
 func newMITMPipelineTracker(sessionID string) *mitmPipelineTracker {
-	now := time.Now
 	return &mitmPipelineTracker{
 		sessionID: sessionID,
-		startedAt: now(),
-		now:       now,
+		startedAt: time.Now(),
+		now:       time.Now,
 		requests:  make(map[*http.Request]*mitmPipelineRequestState),
-		persists:  make(map[*schema.HTTPFlow]time.Time),
+		persists:  make(map[uint64]*mitmPersistState),
 	}
 }
 
-func (t *mitmPipelineTracker) requestObserved(req *http.Request) {
+func (t *mitmPipelineTracker) close() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.closed = true
+	for _, state := range t.requests {
+		state.stopCancel()
+		state.stopCancel = nil
+	}
+	t.requests = nil
+	t.persists = nil
+	clear(t.history[:])
+	clear(t.metrics[:])
+	t.samples = mitmTraceSamples{}
+	t.filteredSamples = mitmTraceSamples{}
+}
+
+func (t *mitmPipelineTracker) requestObserved(req *http.Request, excludeWebSocket bool) {
 	if t == nil || req == nil {
 		return
 	}
-	now := t.now()
+	ctx := req.Context()
 	t.mu.Lock()
-	if _, exists := t.requests[req]; !exists {
-		state := &mitmPipelineRequestState{
-			stage:   mitmPipelineStageRequestProcessing,
-			stageAt: now,
+	if t.closed || t.requests[req] != nil {
+		t.mu.Unlock()
+		return
+	}
+	now := t.now()
+	protocol := req.Proto
+	filter := mitmFilterPending
+	if httpctx.GetIsWebWebsocketRequest(req) {
+		protocol = "WebSocket"
+		if excludeWebSocket {
+			filter = mitmFilterWebSocketExcluded
 		}
-		t.requests[req] = state
-		// H2 cancellation and upstream failures may bypass response callbacks.
-		// Capture the original request context: lowhttp later replaces req's
-		// context with a child that finishes before response processing does.
-		state.stopCancel = context.AfterFunc(req.Context(), func() {
-			t.mu.Lock()
-			if t.requests[req] == state {
-				delete(t.requests, req)
-			}
-			t.mu.Unlock()
-		})
-		t.requestTotal.Add(1)
+	}
+	state := &mitmPipelineRequestState{trace: mitmTrace{head: mitmTraceHead{
+		id:             t.requestTotal.Add(1),
+		host:           traceLabel(req.Host, 255),
+		method:         traceLabel(req.Method, 24),
+		protocol:       traceLabel(protocol, 16),
+		connectionID:   httpctx.GetMITMConnectionID(req),
+		chromeAutofill: protocol != "WebSocket" && isChromeAutofillRequest(req.Host, req.Method),
+		stage:          mitmPipelineStageRequestProcessing,
+		filter:         filter,
+		startedAt:      now,
+		stageAt:        now,
+	}}}
+	t.requests[req] = state
+	// The original context outlives the child used for upstream I/O.
+	state.stopCancel = context.AfterFunc(ctx, func() {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		if t.requests[req] == state {
+			t.finishRequest(req, state, "canceled", mitmErrorCode(ctx.Err()))
+		}
+	})
+	t.mu.Unlock()
+
+	httpctx.SetUpstreamObserver(req, func(event httpctx.UpstreamEvent) {
+		t.upstreamEvent(req, event)
+	})
+}
+
+func (t *mitmPipelineTracker) observeFilterExclusion(req *http.Request, decision mitmFilterDecision) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if state := t.requests[req]; state != nil {
+		head := &state.trace.head
+		if decision == mitmFilterRequestExcluded || !head.filter.excluded() {
+			head.filter = decision
+		}
+	}
+}
+
+func (t *mitmPipelineTracker) requestStage(req *http.Request, stage mitmPipelineStage) {
+	if t == nil || req == nil {
+		return
+	}
+	t.mu.Lock()
+	if state := t.requests[req]; state != nil {
+		state.trace.transition(t.now(), stage)
 	}
 	t.mu.Unlock()
 }
 
 func (t *mitmPipelineTracker) manualWaitStarted(req *http.Request, response bool) {
-	if t == nil || req == nil {
-		return
+	stage := mitmPipelineStageManualRequest
+	if response {
+		stage = mitmPipelineStageManualResponse
 	}
-	t.mu.Lock()
-	if state := t.requests[req]; state != nil {
-		state.manualDepth++
-		if response {
-			state.stage = mitmPipelineStageManualResponse
-		} else {
-			state.stage = mitmPipelineStageManualRequest
-		}
-		state.stageAt = t.now()
-	}
-	t.mu.Unlock()
+	t.requestStage(req, stage)
 }
 
 func (t *mitmPipelineTracker) manualWaitFinished(req *http.Request, response bool) {
-	if t == nil || req == nil {
-		return
+	stage := mitmPipelineStageRequestProcessing
+	if response {
+		stage = mitmPipelineStageResponseProcessing
 	}
-	t.mu.Lock()
-	if state := t.requests[req]; state != nil {
-		if state.manualDepth > 0 {
-			state.manualDepth--
-		}
-		if response {
-			state.stage = mitmPipelineStageResponseProcessing
-		} else {
-			state.stage = mitmPipelineStageRequestProcessing
-		}
-		state.stageAt = t.now()
-	}
-	t.mu.Unlock()
+	t.requestStage(req, stage)
 }
 
 func (t *mitmPipelineTracker) requestDispatched(req *http.Request, localResponse bool) {
@@ -134,45 +214,50 @@ func (t *mitmPipelineTracker) requestDispatched(req *http.Request, localResponse
 		return
 	}
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	if state := t.requests[req]; state != nil {
-		state.stageAt = t.now()
+		now := t.now()
 		if localResponse {
-			state.stage = mitmPipelineStageLocalResponse
-		} else {
-			state.stage = mitmPipelineStageUpstream
-			if !state.dispatched {
-				state.dispatched = true
-				t.dispatchTotal.Add(1)
-			}
+			state.trace.transition(now, mitmPipelineStageLocalResponse)
+			return
+		}
+		state.trace.transition(now, mitmPipelineStageUpstream)
+		if state.dispatchedAt.IsZero() {
+			state.dispatchedAt = now
+			t.dispatchTotal.Add(1)
 		}
 	}
-	t.mu.Unlock()
 }
 
-func (t *mitmPipelineTracker) upstreamCompleted(req *http.Request, succeeded bool) {
+func (t *mitmPipelineTracker) upstreamCompleted(req *http.Request, succeeded bool, statusCode int) {
 	if t == nil || req == nil {
 		return
 	}
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	if state := t.requests[req]; state != nil {
-		if succeeded && state.dispatched && state.stage == mitmPipelineStageUpstream {
+		if succeeded && !state.dispatchedAt.IsZero() && !state.upstreamDone {
 			t.upstreamCompletedTotal.Add(1)
+			state.upstreamDone = true
 		}
-		state.stage = mitmPipelineStageResponseProcessing
-		state.stageAt = t.now()
+		if statusCode > 0 && (succeeded || state.dispatchedAt.IsZero()) {
+			state.trace.head.statusCode = int32(statusCode)
+		}
+		state.trace.transition(t.now(), mitmPipelineStageResponseProcessing)
 	}
-	t.mu.Unlock()
 }
 
-func (t *mitmPipelineTracker) responseMirrored(req *http.Request) {
+func (t *mitmPipelineTracker) responseMirrored(req *http.Request, decision mitmFilterDecision) {
 	if t == nil || req == nil {
 		return
 	}
 	t.mu.Lock()
 	if state := t.requests[req]; state != nil {
 		t.responseMirroredTotal.Add(1)
-		state.stage = mitmPipelineStageResponseProcessing
-		state.stageAt = t.now()
+		if decision != mitmFilterResponseExcluded || state.trace.head.filter != mitmFilterStaticJSExcluded {
+			state.trace.head.filter = decision
+		}
+		state.trace.transition(t.now(), mitmPipelineStageResponseProcessing)
 	}
 	t.mu.Unlock()
 }
@@ -182,11 +267,14 @@ func (t *mitmPipelineTracker) responseProcessingFinished(req *http.Request) {
 		return
 	}
 	t.mu.Lock()
-	if state := t.requests[req]; state != nil && state.stopCancel != nil {
-		state.stopCancel()
+	defer t.mu.Unlock()
+	if state := t.requests[req]; state != nil {
+		// The WebSocket mirror sees the upgrade response before the tunnel opens.
+		if state.trace.head.protocol == "WebSocket" {
+			return
+		}
+		t.finishRequest(req, state, "completed", "")
 	}
-	delete(t.requests, req)
-	t.mu.Unlock()
 }
 
 func (t *mitmPipelineTracker) requestDropped(req *http.Request) {
@@ -194,11 +282,8 @@ func (t *mitmPipelineTracker) requestDropped(req *http.Request) {
 		return
 	}
 	t.mu.Lock()
-	if state, exists := t.requests[req]; exists {
-		if state.stopCancel != nil {
-			state.stopCancel()
-		}
-		delete(t.requests, req)
+	if state := t.requests[req]; state != nil {
+		t.finishRequest(req, state, "dropped", "")
 		t.droppedTotal.Add(1)
 	}
 	t.mu.Unlock()
@@ -208,34 +293,6 @@ func (t *mitmPipelineTracker) flowBuilt() {
 	if t != nil {
 		t.flowBuiltTotal.Add(1)
 	}
-}
-
-func (t *mitmPipelineTracker) persistEnqueued(flow *schema.HTTPFlow) {
-	if t == nil || flow == nil {
-		return
-	}
-	t.mu.Lock()
-	if _, exists := t.persists[flow]; !exists {
-		t.persists[flow] = t.now()
-		t.persistEnqueuedTotal.Add(1)
-	}
-	t.mu.Unlock()
-}
-
-func (t *mitmPipelineTracker) persistFinished(flow *schema.HTTPFlow, success bool) {
-	if t == nil || flow == nil {
-		return
-	}
-	t.mu.Lock()
-	if _, exists := t.persists[flow]; exists {
-		delete(t.persists, flow)
-		if success {
-			t.persistedTotal.Add(1)
-		} else {
-			t.persistFailedTotal.Add(1)
-		}
-	}
-	t.mu.Unlock()
 }
 
 func ageMilliseconds(now, startedAt time.Time) int64 {
@@ -251,13 +308,19 @@ func updateOldestAge(current *int64, candidate int64) {
 	}
 }
 
-func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int) *ypb.MITMPipelineStats {
+func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int, taken int64) *ypb.MITMPipelineStats {
 	if t == nil {
 		return nil
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return nil
+	}
 	now := t.now()
+	diagnostics := &ypb.MITMPipelineDiagnostics{DatabaseWriteTakenUnfinished: taken}
 	stats := &ypb.MITMPipelineStats{
-		Version:                    1,
+		Version:                    4,
 		SessionId:                  t.sessionID,
 		SessionStartedAtUnixMs:     t.startedAt.UnixMilli(),
 		GeneratedAtUnixMs:          now.UnixMilli(),
@@ -272,31 +335,96 @@ func (t *mitmPipelineTracker) snapshot(dbQueueDepth, dbQueueCapacity int) *ypb.M
 		PersistFailedTotal:         t.persistFailedTotal.Load(),
 		DatabaseWriteQueueDepth:    int64(dbQueueDepth),
 		DatabaseWriteQueueCapacity: int64(dbQueueCapacity),
+		Diagnostics:                diagnostics,
 	}
 
-	t.mu.Lock()
-	stats.ActiveTotal = int64(len(t.requests))
+	var counts, browserCounts, browserOldest, otherOldest [mitmPipelineStageCount]int64
+	var filteredCounts, inScopeOtherCounts, inScopeOtherOldest [mitmPipelineStageCount]int64
 	for _, state := range t.requests {
-		age := ageMilliseconds(now, state.stageAt)
-		switch state.stage {
-		case mitmPipelineStageRequestProcessing:
+		head := &state.trace.head
+		if head.stage == mitmPipelineStageWebSocketOnline {
+			diagnostics.WebSocketOnline++
+			continue
+		}
+		stats.ActiveTotal++
+		age := ageMilliseconds(now, head.stageAt)
+		if head.protocol != "WebSocket" {
+			counts[head.stage]++
+			if head.filter.excluded() {
+				filteredCounts[head.stage]++
+			}
+			if head.chromeAutofill {
+				browserCounts[head.stage]++
+				updateOldestAge(&browserOldest[head.stage], age)
+			} else {
+				updateOldestAge(&otherOldest[head.stage], age)
+				if !head.filter.excluded() {
+					inScopeOtherCounts[head.stage]++
+					updateOldestAge(&inScopeOtherOldest[head.stage], age)
+				}
+			}
+		} else if !state.dispatchedAt.IsZero() {
+			diagnostics.WebSocketHandshaking++
+			handshakeAge := ageMilliseconds(now, state.dispatchedAt)
+			updateOldestAge(&diagnostics.OldestWebSocketHandshakeAgeMs, handshakeAge)
+			if !head.filter.excluded() {
+				diagnostics.InScopeWebSocketHandshaking++
+				updateOldestAge(&diagnostics.OldestInScopeWebSocketHandshakeAgeMs, handshakeAge)
+			}
+		}
+		switch {
+		case head.stage == mitmPipelineStageRequestProcessing:
 			stats.PreDispatchActive++
 			updateOldestAge(&stats.OldestPreDispatchAgeMs, age)
-		case mitmPipelineStageManualRequest, mitmPipelineStageManualResponse:
+		case head.stage == mitmPipelineStageManualRequest || head.stage == mitmPipelineStageManualResponse:
 			stats.ManualActive++
 			updateOldestAge(&stats.OldestManualAgeMs, age)
-		case mitmPipelineStageUpstream:
+		case head.stage.isUpstream():
 			stats.UpstreamActive++
-			updateOldestAge(&stats.OldestUpstreamAgeMs, age)
-		case mitmPipelineStageLocalResponse, mitmPipelineStageResponseProcessing:
+			updateOldestAge(&stats.OldestUpstreamAgeMs, ageMilliseconds(now, state.dispatchedAt))
+		default:
 			stats.ResponseProcessingActive++
 			updateOldestAge(&stats.OldestResponseProcessingAgeMs, age)
 		}
 	}
-	stats.PersistActive = int64(len(t.persists))
-	for _, startedAt := range t.persists {
-		updateOldestAge(&stats.OldestPersistAgeMs, ageMilliseconds(now, startedAt))
+	for stage := mitmPipelineStage(1); stage < mitmPipelineStageWebSocketOnline; stage++ {
+		if counts[stage] > 0 {
+			diagnostics.HTTPStages = append(diagnostics.HTTPStages, &ypb.MITMStageStats{
+				Stage: mitmStageNames[stage], Count: counts[stage], OldestAgeMs: max(browserOldest[stage], otherOldest[stage]),
+				BrowserBackgroundCount: browserCounts[stage], OldestBrowserBackgroundAgeMs: browserOldest[stage],
+				OldestOtherAgeMs: otherOldest[stage],
+				FilteredCount:    filteredCounts[stage], InScopeOtherCount: inScopeOtherCounts[stage],
+				OldestInScopeOtherAgeMs: inScopeOtherOldest[stage],
+			})
+		}
 	}
-	t.mu.Unlock()
+	var oldestWrite *mitmPersistState
+	for _, write := range t.persists {
+		if write.submittedAt.IsZero() {
+			continue
+		}
+		stats.PersistActive++
+		if write.trace != nil && (oldestWrite == nil || write.submittedAt.Before(oldestWrite.submittedAt)) {
+			oldestWrite = write
+		}
+		updateOldestAge(&stats.OldestPersistAgeMs, ageMilliseconds(now, write.submittedAt))
+		if !write.blockedAt.IsZero() {
+			diagnostics.PersistBlocked++
+			updateOldestAge(&diagnostics.OldestPersistBlockedAgeMs, ageMilliseconds(now, write.blockedAt))
+		}
+	}
+	point := mitmStoragePoint{
+		at: now.UnixMilli(), pending: stats.PersistActive, blocked: diagnostics.PersistBlocked,
+		requests: stats.RequestTotal, dispatched: stats.DispatchTotal, upstreamCompleted: stats.UpstreamCompletedTotal,
+		submitted: stats.PersistEnqueuedTotal, persisted: stats.PersistedTotal, persistFailed: stats.PersistFailedTotal,
+	}
+	if oldestWrite != nil {
+		point.trace = oldestWrite.trace
+	}
+	slot := &t.history[now.Unix()%mitmHistorySeconds]
+	if slot.at/1000 != now.Unix() || point.pending >= slot.pending {
+		*slot = point
+	}
+	t.summarizeMetrics(now, diagnostics)
 	return stats
 }

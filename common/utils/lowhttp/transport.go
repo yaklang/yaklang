@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 // ── Transport interface ──────────────────────────────────────────────────────
@@ -48,9 +49,12 @@ type transportRequest struct {
 	usePool        bool               // final H1 connection policy for this attempt
 	preserveLength bool               // final NoFixContentLength value after pipeline detection
 	h1Conn         net.Conn           // negotiated H1 socket handed off by H2; consumed once
-	traceInfo      *LowhttpTraceInfo  // trace info for timing
-	originAddr     string             // target host:port
-	timeout        time.Duration      // per-request timeout
+	observer       httpctx.UpstreamObserver
+	attempt        httpctx.UpstreamObserver
+	traceInfo      *LowhttpTraceInfo // trace info for timing
+	originAddr     string            // target host:port
+	timeout        time.Duration     // per-request timeout
+	connectTimeout time.Duration     // dial timeout, also bounds waiting for an H1 slot
 }
 
 // downgradeToH1 prepares a fresh H1 attempt without changing the caller's

@@ -33,6 +33,7 @@ const (
 	Yak_DownloadMITMGMCert_FullMethodName                         = "/ypb.Yak/DownloadMITMGMCert"
 	Yak_WatchProcessConnection_FullMethodName                     = "/ypb.Yak/WatchProcessConnection"
 	Yak_MITMV2_FullMethodName                                     = "/ypb.Yak/MITMV2"
+	Yak_GetMITMDiagnostics_FullMethodName                         = "/ypb.Yak/GetMITMDiagnostics"
 	Yak_OpenPort_FullMethodName                                   = "/ypb.Yak/OpenPort"
 	Yak_Exec_FullMethodName                                       = "/ypb.Yak/Exec"
 	Yak_QueryExecHistory_FullMethodName                           = "/ypb.Yak/QueryExecHistory"
@@ -712,6 +713,7 @@ type YakClient interface {
 	DownloadMITMGMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
 	WatchProcessConnection(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[WatchProcessRequest, WatchProcessResponse], error)
 	MITMV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MITMV2Request, MITMV2Response], error)
+	GetMITMDiagnostics(ctx context.Context, in *GetMITMDiagnosticsRequest, opts ...grpc.CallOption) (*GetMITMDiagnosticsResponse, error)
 	// 开启端口
 	OpenPort(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Input, Output], error)
 	// Exec
@@ -1707,6 +1709,16 @@ func (c *yakClient) MITMV2(ctx context.Context, opts ...grpc.CallOption) (grpc.B
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MITMV2Client = grpc.BidiStreamingClient[MITMV2Request, MITMV2Response]
+
+func (c *yakClient) GetMITMDiagnostics(ctx context.Context, in *GetMITMDiagnosticsRequest, opts ...grpc.CallOption) (*GetMITMDiagnosticsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMITMDiagnosticsResponse)
+	err := c.cc.Invoke(ctx, Yak_GetMITMDiagnostics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *yakClient) OpenPort(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Input, Output], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -9279,6 +9291,7 @@ type YakServer interface {
 	DownloadMITMGMCert(context.Context, *Empty) (*MITMCert, error)
 	WatchProcessConnection(grpc.BidiStreamingServer[WatchProcessRequest, WatchProcessResponse]) error
 	MITMV2(grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]) error
+	GetMITMDiagnostics(context.Context, *GetMITMDiagnosticsRequest) (*GetMITMDiagnosticsResponse, error)
 	// 开启端口
 	OpenPort(grpc.BidiStreamingServer[Input, Output]) error
 	// Exec
@@ -10167,6 +10180,9 @@ func (UnimplementedYakServer) WatchProcessConnection(grpc.BidiStreamingServer[Wa
 }
 func (UnimplementedYakServer) MITMV2(grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]) error {
 	return status.Errorf(codes.Unimplemented, "method MITMV2 not implemented")
+}
+func (UnimplementedYakServer) GetMITMDiagnostics(context.Context, *GetMITMDiagnosticsRequest) (*GetMITMDiagnosticsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMITMDiagnostics not implemented")
 }
 func (UnimplementedYakServer) OpenPort(grpc.BidiStreamingServer[Input, Output]) error {
 	return status.Errorf(codes.Unimplemented, "method OpenPort not implemented")
@@ -12372,6 +12388,24 @@ func _Yak_MITMV2_Handler(srv interface{}, stream grpc.ServerStream) error {
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MITMV2Server = grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]
+
+func _Yak_GetMITMDiagnostics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMITMDiagnosticsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetMITMDiagnostics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetMITMDiagnostics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetMITMDiagnostics(ctx, req.(*GetMITMDiagnosticsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _Yak_OpenPort_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).OpenPort(&grpc.GenericServerStream[Input, Output]{ServerStream: stream})
@@ -23306,6 +23340,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DownloadMITMGMCert",
 			Handler:    _Yak_DownloadMITMGMCert_Handler,
+		},
+		{
+			MethodName: "GetMITMDiagnostics",
+			Handler:    _Yak_GetMITMDiagnostics_Handler,
 		},
 		{
 			MethodName: "QueryExecHistory",

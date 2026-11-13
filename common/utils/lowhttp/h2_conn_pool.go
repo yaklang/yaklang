@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 )
@@ -91,6 +92,10 @@ func (p *H2ConnPool) connUsable(e *h2ConnEntry) bool {
 // GetOrCreate retrieves an existing usable H2 connection for the given key,
 // or dials a new one.  Concurrent dials for the same host are coalesced.
 func (p *H2ConnPool) GetOrCreate(ctx context.Context, key *connectKey, opts []netx.DialXOption) (*h2ConnEntry, error) {
+	return p.getOrCreateObserved(ctx, key, opts, nil)
+}
+
+func (p *H2ConnPool) getOrCreateObserved(ctx context.Context, key *connectKey, opts []netx.DialXOption, observer httpctx.UpstreamObserver) (*h2ConnEntry, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -126,6 +131,7 @@ retryH2Dial:
 	}
 	if call := p.dials[hash]; call != nil {
 		p.mu.Unlock()
+		observer.Phase(httpctx.UpstreamPoolWait)
 		select {
 		case <-call.done:
 			goto retryH2Dial
@@ -154,6 +160,7 @@ retryH2Dial:
 		p.mu.Unlock()
 	}()
 
+	observer.Phase(httpctx.UpstreamDial)
 	entry, err := p.dialH2Conn(dialCtx, key, opts)
 	if err != nil {
 		if ctxErr := requestContextError(ctx); ctxErr != nil {

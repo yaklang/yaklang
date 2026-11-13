@@ -37,6 +37,7 @@ type Server struct {
 	_abandonedDatabase  *gorm.DB
 	reverseServer       *facades.FacadeServer
 	reverseServerMu     sync.Mutex
+	mitmDiagnostics     sync.Map // session ID -> *mitmPipelineTracker
 	profileDatabase     *gorm.DB
 	projectDatabase     *gorm.DB
 	projectReadDatabase *gorm.DB

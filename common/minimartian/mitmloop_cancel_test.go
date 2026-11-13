@@ -182,7 +182,7 @@ func TestProxyDoesNotCancelUpstreamWhenDownstreamHalfClosesWrite(t *testing.T) {
 	}
 }
 
-func TestBindHTTPRequestToDownstreamPreservesBufferedPipeline(t *testing.T) {
+func TestWatchHTTPDownstreamDisconnectPreservesBufferedPipeline(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
 	defer server.Close()
@@ -199,21 +199,17 @@ func TestBindHTTPRequestToDownstreamPreservesBufferedPipeline(t *testing.T) {
 	}
 	<-writeDone
 
-	request := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
-	stopWatching := bindHTTPRequestToDownstream(request, server, reader)
+	requestCtx, cancelRequest := context.WithCancel(context.Background())
+	defer cancelRequest()
+	stopWatching := watchHTTPDownstreamDisconnect(server, reader, cancelRequest)
+	defer stopWatching()
 
 	select {
-	case <-request.Context().Done():
+	case <-requestCtx.Done():
 		t.Fatal("buffered pipelined data was treated as downstream abandonment")
 	case <-time.After(3 * downstreamDisconnectPollInterval):
 	}
 	if string(buffered) != pipelined || !strings.Contains(string(buffered), "/next") {
 		t.Fatal("pipelined request bytes changed")
-	}
-	stopWatching()
-	select {
-	case <-request.Context().Done():
-	case <-time.After(time.Second):
-		t.Fatal("stopping downstream watcher did not release request context")
 	}
 }

@@ -56,7 +56,8 @@ func (t *h2Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 	}
 
 RECONNECT:
-	entry, err := h2Pool.GetOrCreate(ctx, tr.cacheKey, tr.dialOpts)
+	observer := tr.observer.BeginAttempt("HTTP/2")
+	entry, err := h2Pool.getOrCreateObserved(ctx, tr.cacheKey, tr.dialOpts, observer)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,11 @@ RECONNECT:
 
 	currentRPS.Add(1)
 	serverStart := time.Now()
-	h2Stream.SetReadFirstFrameCallback(func() { tr.traceInfo.ServerTime = time.Since(serverStart) })
+	observer.Phase(httpctx.UpstreamSend)
+	h2Stream.SetReadFirstFrameCallback(func() {
+		tr.traceInfo.ServerTime = time.Since(serverStart)
+		observer.Phase(httpctx.UpstreamRead)
+	})
 
 	if err := h2Stream.doRequest(); err != nil && !errors.Is(err, errH2UploadAborted) {
 		h2Stream.abort()
@@ -111,6 +116,7 @@ RECONNECT:
 		return partial, err
 	}
 
+	observer.Phase(httpctx.UpstreamFirstByte)
 	timeout := tr.timeout
 	resp, responsePacket, responseStarted, err := h2Stream.waitResponse(ctx, timeout)
 	if resp.StatusCode != 0 {

@@ -5,6 +5,7 @@ package yakgrpc
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -134,4 +135,54 @@ func TestGRPCMUSTPASS_MITMV2_H2CancellationClearsPipeline(t *testing.T) {
 			}), "origin was canceled, but MITM still reports a pending upstream request")
 		})
 	}
+}
+
+func TestGRPCMUSTPASS_MITMV2_FailedWebsocketDialClearsPipeline(t *testing.T) {
+	ctx, stop := context.WithTimeout(context.Background(), 15*time.Second)
+	defer stop()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.MITMV2(ctx)
+	require.NoError(t, err)
+	port := utils.GetRandomAvailableTCPPort()
+	require.NoError(t, stream.Send(&ypb.MITMV2Request{
+		Host: "127.0.0.1", Port: uint32(port), SetAutoForward: true,
+		AutoForwardValue: true, DisableSystemProxy: true,
+	}))
+	require.True(t, waitMITMV2Started(stream, 10*time.Second))
+
+	origin, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	originAddr := origin.Addr().String()
+	require.NoError(t, origin.Close())
+
+	conn, err := net.DialTimeout("tcp", utils.HostPort("127.0.0.1", port), time.Second)
+	require.NoError(t, err)
+	defer conn.Close()
+	require.NoError(t, conn.SetDeadline(time.Now().Add(5*time.Second)))
+	_, err = fmt.Fprintf(conn, "GET http://%[1]s/ws HTTP/1.1\r\nHost: %[1]s\r\n"+
+		"Connection: Upgrade\r\nUpgrade: websocket\r\n"+
+		"Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n", originAddr)
+	require.NoError(t, err)
+	var buffer [1]byte
+	_, err = conn.Read(buffer[:])
+	require.Error(t, err)
+	if netErr, ok := err.(net.Error); ok {
+		require.False(t, netErr.Timeout(), "proxy did not finish the failed upgrade")
+	}
+
+	for frames := 0; frames < 3; {
+		response, err := stream.Recv()
+		require.NoError(t, err)
+		stats := response.GetPipelineStats()
+		if stats == nil || stats.GetDispatchTotal() == 0 {
+			continue
+		}
+		frames++
+		if stats.GetActiveTotal() == 0 {
+			require.Zero(t, stats.GetOldestUpstreamAgeMs())
+			return
+		}
+	}
+	t.Fatal("failed WebSocket upgrade still appears as an active request")
 }

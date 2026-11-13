@@ -162,7 +162,7 @@ func websocketPacketFingerprint(raw []byte) string {
 	return hash
 }
 
-func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
+func (w *WebSocketModifier) ModifyRequest(req *http.Request) (retErr error) {
 	var err error
 	tunnelID := websocketTunnelSequence.Add(1)
 	target := websocketLogTarget(req)
@@ -180,6 +180,13 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		log.Infof("websocket tunnel id=%d target=%s dropped by request hijack before upgrade", tunnelID, target)
 		return nil
 	}
+
+	observer := httpctx.GetUpstreamObserver(req)
+	defer func() {
+		if retErr != nil {
+			observer.Notify(httpctx.UpstreamEvent{Phase: httpctx.UpstreamFailed, Err: retErr})
+		}
+	}()
 
 	ctx := minimartian.NewContext(req, w.ProxyGetter())
 	if ctx == nil {
@@ -374,6 +381,9 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				rspRaw, _ = utils.DumpHTTPResponse(rsp, true)
 				downstreamUpgradeWriteErr = utils.Wrap(err, "read upstream websocket upgrade response")
 			} else {
+				// The origin returned an HTTP response even if the upgrade
+				// is subsequently rejected or dropped.
+				httpctx.SetUpstreamRoundTripSucceeded(req, true)
 				upstreamResponseRaw = bytes.Clone(rspRaw)
 				httpctx.SetBareResponseBytes(req, rspRaw)
 				manualResponseBypassed = httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest)
@@ -442,6 +452,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		if toServer != nil {
 			_ = toServer.Close()
 		}
+		observer.Phase(httpctx.WebsocketClosed)
 		log.Infof("websocket tunnel id=%d target=%s dropped by response hijack during upgrade", tunnelID, target)
 		return nil
 	}
@@ -475,6 +486,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		lowhttp.WithWebsocketAllFrameHandler(clientAllFrameCallback),
 	)
 
+	observer.Phase(httpctx.WebsocketOnline)
 	toServer.Start()
 	toClient.Start()
 
@@ -487,6 +499,11 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		closedBy = "downstream"
 		downstreamTerminalErr = toClient.TerminalError()
 	}
+	terminalErr := upstreamTerminalErr
+	if closedBy == "downstream" {
+		terminalErr = downstreamTerminalErr
+	}
+	observer.Notify(httpctx.UpstreamEvent{Phase: httpctx.WebsocketClosed, Err: terminalErr})
 	toServer.Close()
 	toClient.Close()
 
