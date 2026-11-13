@@ -1,0 +1,7 @@
+uint64_t sub_0x3000(void) {
+    v1 = helper();
+    v4 = v1 and-not 0xff;
+    v10 = v4 | 0x0;
+    return v10;
+}
+

@@ -1,0 +1,34 @@
+[
+  {
+    "address": "0x401000",
+    "code": [
+      "f3 0f 1e fa  // endbr64",
+      "e8 07 00 00 00  // call 0x401010",
+      "c3  // ret",
+      "66 90  // nop",
+      "66 90  // nop",
+      "66 90  // nop",
+      "f3 0f 1e fa  // endbr64",
+      "c3  // ret"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function func_a @ 0x401000",
+      "block b1 @ 0x401000",
+      "  0x401000  intrinsic @x86.endbr64",
+      "  0x401004  call 0x401010 [call, may_trap, unknown]",
+      "  0x401009  return [may_trap, unknown]",
+      "function sub_0x401010 @ 0x401010",
+      "block b1 @ 0x401010",
+      "  0x401010  intrinsic @x86.endbr64",
+      "  0x401014  return [may_trap, unknown]"
+    ],
+    "name": "call-target",
+    "symbols": [
+      {
+        "name": "func_a",
+        "address": "0x401000"
+      }
+    ]
+  }
+]

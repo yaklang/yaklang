@@ -1,0 +1,23 @@
+extern puts
+caller
+type: () -> i64
+entry_0: (<nil condition>)
+	<string> t1 = <string> hello
+	<any> t2    = call <any> puts (<string> hello) binding[] member[]
+	<i64> t3    = <i64> 0
+	ret <i64> 0
+sub_0x1000 <i64> (1) left, <i64> (2) right
+type: (i64, i64) -> i64
+entry_0: (<nil condition>)
+	<i64> t3 = <i64> left add <i64> right
+	ret <i64> t3
+sub_0x2000
+type: () -> i64
+entry_0: (<nil condition>)
+	<i64> t1 = <i64> 1
+	If [<i64> 1] true -> b2_1, false -> b3_2
+b2_1: <- entry_0  (<nil condition>)
+	ret <i64> 1
+b3_2: <- entry_0  (<nil condition>)
+	<i64> t2 = <i64> 2
+	ret <i64> 2

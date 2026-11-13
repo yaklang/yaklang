@@ -1,0 +1,4 @@
+uint64_t sub_0x5000(void) {
+    return 0x0 /* x86.flags.add */;
+}
+

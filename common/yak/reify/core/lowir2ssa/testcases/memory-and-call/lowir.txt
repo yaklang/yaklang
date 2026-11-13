@@ -1,0 +1,8 @@
+target: linux/amd64 (64-bit, little-endian)
+function sub_0x4000 @ 0x4000
+block b1 @ 0x4000
+  0x4000  v1:ptr64 = constant 0x10
+  0x4001  v2:i64 = load v1 [read_memory]
+  0x4002  store v1, v2 [write_memory]
+  0x4003  v3:i64 = call @helper [call, may_trap]
+  0x4004  return v3
