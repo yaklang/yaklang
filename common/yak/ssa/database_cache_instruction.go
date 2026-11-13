@@ -627,7 +627,7 @@ func (s *instructionStore) CloseWithoutSave() {
 	}
 	if s.residentReloads != nil {
 		s.residentReloadsCloseOnce.Do(s.residentReloads.Close)
-		s.residentReloads.Cache.DeleteAll()
+		s.residentReloads.DeleteAll()
 	}
 }
 

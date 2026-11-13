@@ -32,7 +32,10 @@ type CacheEx[T any] struct {
 
 // CacheExWithKey is a synchronized map of items that can auto-expire once stale
 type CacheExWithKey[U comparable, T any] struct {
-	*ttlcache.Cache[U, T]
+	// Keep ttlcache as a named field. Embedding it would promote its whole
+	// exported API onto every instantiation, and the executable's dynamic
+	// reflection keeps those wrappers alive for each type argument pair.
+	items                 *ttlcache.Cache[U, T]
 	ctx                   context.Context
 	cancel                context.CancelFunc
 	config                *cacheExConfig
@@ -82,8 +85,8 @@ func (cache *CacheExWithKey[U, T]) Close() {
 	cache.stopOnce.Do(func() {
 		cache.cancel()
 		// close
-		cache.Cache.DeleteAll()
-		cache.Cache.Stop()
+		cache.items.DeleteAll()
+		cache.items.Stop()
 		cache.evictionCallbackClear()
 
 		// Clean up flight entries
@@ -95,12 +98,12 @@ func (cache *CacheExWithKey[U, T]) Close() {
 
 // Set is a thread-safe way to add new items to the map
 func (cache *CacheExWithKey[U, T]) Set(key U, value T) {
-	cache.Cache.Set(key, value, cache.getTTL())
+	cache.items.Set(key, value, cache.getTTL())
 }
 
 // SetWithTTL is a thread-safe way to add new items to the map with individual ttl
 func (cache *CacheExWithKey[U, T]) SetWithTTL(key U, value T, ttl time.Duration) {
-	cache.Cache.Set(key, value, ttl)
+	cache.items.Set(key, value, ttl)
 }
 
 // Get is a thread-safe way to lookup items
@@ -111,9 +114,9 @@ func (cache *CacheExWithKey[U, T]) Get(key U) (value T, exists bool) {
 	skipTTLExtension := cache.skipTTLExtension
 	cache.configMu.RUnlock()
 	if skipTTLExtension {
-		item = cache.Cache.Get(key, ttlcache.WithDisableTouchOnHit[U, T]())
+		item = cache.items.Get(key, ttlcache.WithDisableTouchOnHit[U, T]())
 	} else {
-		item = cache.Cache.Get(key)
+		item = cache.items.Get(key)
 	}
 	if item == nil {
 		return
@@ -122,26 +125,36 @@ func (cache *CacheExWithKey[U, T]) Get(key U) (value T, exists bool) {
 }
 
 func (cache *CacheExWithKey[U, T]) GetAll() map[U]T {
-	return lo.MapEntries(cache.Cache.Items(), func(key U, value *ttlcache.Item[U, T]) (U, T) {
+	return lo.MapEntries(cache.items.Items(), func(key U, value *ttlcache.Item[U, T]) (U, T) {
 		return key, value.Value()
 	})
 }
 
 func (cache *CacheExWithKey[U, T]) ForEach(handler func(U, T)) {
-	cache.Cache.Range(func(item *ttlcache.Item[U, T]) bool {
+	cache.items.Range(func(item *ttlcache.Item[U, T]) bool {
 		handler(item.Key(), item.Value())
 		return true
 	})
 }
 
+// Delete removes key without reading it first.
+func (cache *CacheExWithKey[U, T]) Delete(key U) {
+	cache.items.Delete(key)
+}
+
+// DeleteAll removes every item but keeps in-flight loads.
+func (cache *CacheExWithKey[U, T]) DeleteAll() {
+	cache.items.DeleteAll()
+}
+
 func (cache *CacheExWithKey[U, T]) Remove(key U) bool {
-	_, ok := cache.Cache.GetAndDelete(key)
+	_, ok := cache.items.GetAndDelete(key)
 	return ok
 }
 
 // Count returns the number of items in the cache
 func (cache *CacheExWithKey[U, T]) Count() int {
-	return cache.Cache.Len()
+	return cache.items.Len()
 }
 
 func (cache *CacheExWithKey[U, T]) SetTTL(ttl time.Duration) {
@@ -176,7 +189,7 @@ func (cache *CacheExWithKey[U, T]) SkipTtlExtensionOnHit(value bool) {
 
 // Purge will remove all entries
 func (cache *CacheExWithKey[U, T]) Purge() {
-	cache.Cache.DeleteAll()
+	cache.items.DeleteAll()
 
 	// Also clear flight entries
 	cache.flightMu.Lock()
@@ -197,7 +210,7 @@ func (cache *CacheExWithKey[U, T]) Purge() {
 // as it will be executed by only one goroutine for a given key at a time.
 func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T, error) {
 	// First, try to get from the main cache
-	if item := c.Cache.Get(key); item != nil {
+	if item := c.items.Get(key); item != nil {
 		return item.Value(), nil
 	}
 
@@ -221,7 +234,7 @@ func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T
 
 		// If successful, store in main cache
 		if err == nil {
-			c.Cache.Set(key, data, c.getTTL())
+			c.items.Set(key, data, c.getTTL())
 		}
 
 		return data, err
@@ -256,7 +269,7 @@ func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T
 
 		// If successful, store in main cache
 		if err == nil {
-			c.Cache.Set(key, data, c.getTTL())
+			c.items.Set(key, data, c.getTTL())
 		}
 
 		return data, err
@@ -275,7 +288,7 @@ func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T
 
 	// If successful, store in main cache
 	if err == nil {
-		c.Cache.Set(key, data, c.getTTL())
+		c.items.Set(key, data, c.getTTL())
 	}
 
 	// Always clean up the flight entry after processing
@@ -339,7 +352,7 @@ func NewCacheExWithKey[U comparable, T any](opt ...cacheExOption) *CacheExWithKe
 }
 
 func (c *CacheExWithKey[U, T]) reset() {
-	c.Cache = ttlcache.New[U, T](
+	c.items = ttlcache.New[U, T](
 		ttlcache.WithCapacity[U, T](c.config.capacity),
 	)
 	// Close may run from a caller and from the owning parent's eviction
@@ -352,7 +365,7 @@ func (c *CacheExWithKey[U, T]) reset() {
 	// Initialize single-flight fields
 	c.flightEntries = make(map[U]*flightEntry[T])
 
-	c.evictionCallbackClear = c.Cache.OnEviction(func(ctx context.Context, raw_reason ttlcache.EvictionReason, i *ttlcache.Item[U, T]) {
+	c.evictionCallbackClear = c.items.OnEviction(func(ctx context.Context, raw_reason ttlcache.EvictionReason, i *ttlcache.Item[U, T]) {
 		reason := EvictionReason(raw_reason)
 		// Read the callback under the lock, then invoke it outside the lock to
 		// avoid holding configMu while user code runs (which could re-enter the cache).
@@ -368,7 +381,7 @@ func (c *CacheExWithKey[U, T]) reset() {
 		delete(c.flightEntries, i.Key())
 		c.flightMu.Unlock()
 	})
-	c.Cache.OnInsertion(func(ctx context.Context, i *ttlcache.Item[U, T]) {
+	c.items.OnInsertion(func(ctx context.Context, i *ttlcache.Item[U, T]) {
 		c.configMu.RLock()
 		newItemCallback := c.newItemCallback
 		c.configMu.RUnlock()
@@ -380,7 +393,7 @@ func (c *CacheExWithKey[U, T]) reset() {
 	// Start background cleanup for flight entries
 	go c.cleanupFlightEntries()
 
-	go c.Cache.Start()
+	go c.items.Start()
 }
 
 // cleanupFlightEntries periodically cleans up old flight entries
