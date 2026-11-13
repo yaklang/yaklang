@@ -1585,11 +1585,21 @@ type nodeData interface {
 
 // NodeDefault
 
+// nodeFields has Node's storage layout, but not its methods. Embedding Node
+// here would promote every Node accessor onto every concrete AST type. When
+// reflection keeps exported methods reachable, that creates tens of thousands
+// of otherwise unnecessary method wrappers and runtime function records.
+// Keep this a defined type, not an alias; AsNode exposes the shared Node view
+// without copying its fields or allocating another object.
+type nodeFields Node
+
 type NodeDefault struct {
-	Node
+	nodeFields
 }
 
-func (node *NodeDefault) AsNode() *Node                                     { return &node.Node }
+func (node *NodeDefault) AsNode() *Node                                     { return (*Node)(&node.nodeFields) }
+func (node *NodeDefault) Pos() int                                          { return node.Loc.Pos() }
+func (node *NodeDefault) End() int                                          { return node.Loc.End() }
 func (node *NodeDefault) ForEachChild(v Visitor) bool                       { return false }
 func (node *NodeDefault) VisitEachChild(v *NodeVisitor) *Node               { return node.AsNode() }
 func (node *NodeDefault) Clone(v *NodeFactory) *Node                        { return nil }
@@ -2361,7 +2371,7 @@ func (node *ForStatement) VisitEachChild(v *NodeVisitor) *Node {
 }
 
 func (node *ForStatement) Clone(f *NodeFactory) *Node {
-	return cloneNode(f.NewForStatement(node.Initializer, node.Expression(), node.Incrementor, node.Statement), node.AsNode(), f.hooks)
+	return cloneNode(f.NewForStatement(node.Initializer, node.AsNode().Expression(), node.Incrementor, node.Statement), node.AsNode(), f.hooks)
 }
 
 func (node *ForStatement) computeSubtreeFacts() SubtreeFacts {
@@ -3398,10 +3408,10 @@ func (node *FunctionDeclaration) Name() *DeclarationName {
 }
 
 func (node *FunctionDeclaration) computeSubtreeFacts() SubtreeFacts {
-	if node.Body == nil || node.ModifierFlags()&ModifierFlagsAmbient != 0 {
+	if node.Body == nil || node.AsNode().ModifierFlags()&ModifierFlagsAmbient != 0 {
 		return SubtreeContainsTypeScript
 	} else {
-		isAsync := node.ModifierFlags()&ModifierFlagsAsync != 0
+		isAsync := node.AsNode().ModifierFlags()&ModifierFlagsAsync != 0
 		isGenerator := node.AsteriskToken != nil
 		return propagateModifierListSubtreeFacts(node.modifiers) |
 			propagateSubtreeFacts(node.AsteriskToken) |
@@ -3923,7 +3933,7 @@ func (node *ModuleDeclaration) Name() *DeclarationName {
 }
 
 func (node *ModuleDeclaration) computeSubtreeFacts() SubtreeFacts {
-	if node.ModifierFlags()&ModifierFlagsAmbient != 0 {
+	if node.AsNode().ModifierFlags()&ModifierFlagsAmbient != 0 {
 		return SubtreeContainsTypeScript
 	} else {
 		return propagateModifierListSubtreeFacts(node.modifiers) |
@@ -5592,7 +5602,7 @@ func (node *ArrowFunction) computeSubtreeFacts() SubtreeFacts {
 		propagateNodeListSubtreeFacts(node.Parameters, propagateSubtreeFacts) |
 		propagateEraseableSyntaxSubtreeFacts(node.Type) |
 		propagateSubtreeFacts(node.Body) |
-		core.IfElse(node.ModifierFlags()&ModifierFlagsAsync != 0, SubtreeContainsES2017, SubtreeFactsNone)
+		core.IfElse(node.AsNode().ModifierFlags()&ModifierFlagsAsync != 0, SubtreeContainsES2017, SubtreeFactsNone)
 }
 
 func (node *ArrowFunction) propagateSubtreeFacts() SubtreeFacts {

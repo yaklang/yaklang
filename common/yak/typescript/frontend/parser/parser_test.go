@@ -92,7 +92,7 @@ func TestParseFile(t *testing.T) {
 	start := time.Now()
 	sf := ParseSourceFile("", "", largeJS, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 	println(time.Now().Sub(start).String())
-	printAllChildren(&sf.Node, 0)
+	printAllChildren(sf.AsNode(), 0)
 }
 
 func TestParseMalformed_FuncMissingRightParen(t *testing.T) {
@@ -126,13 +126,13 @@ func TestArrayBinding(t *testing.T) {
 	start := time.Now()
 	sf := ParseSourceFile("", "", code, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 	println(time.Now().Sub(start).String())
-	printAllChildren(&sf.Node, 0)
+	printAllChildren(sf.AsNode(), 0)
 }
 
 //func TestParseFileToDot(t *testing.T) {
 //	sf := ParseSourceFile("", "", packedJS, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 //
-//	err := ExportASTToDotFile(&sf.Node, "out.dot")
+//	err := ExportASTToDotFile(sf.AsNode(), "out.dot")
 //	if err != nil {
 //		t.Fatal(err)
 //	}
