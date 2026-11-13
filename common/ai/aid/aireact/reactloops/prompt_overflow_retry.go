@@ -2,6 +2,8 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // defaultPromptOverflowRetryMax mirrors the aicommon default for configs that do
@@ -18,9 +20,8 @@ func (r *ReActLoop) promptOverflowRetryMax() int {
 	return defaultPromptOverflowRetryMax
 }
 
-// syncPromptOverflowTimelineLimit applies the per-model dynamic threshold before
-// the pre-prompt compression measures. It only ever lowers the limit: a session
-// that already had to compress must not silently go back to the full window.
+// Apply quality settings before measurement. Auxiliary loops retain their
+// original runtime-only threshold, including when they share a Config.
 func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -35,6 +36,17 @@ func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 		return
 	}
 	effective := config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
+	if provider, model, key := r.primaryModelContext(); key != "" {
+		effective = config.EffectiveModelContextLimit(provider, model, base, key)
+		if effective > 0 {
+			timeline.SetTimelineContentLimit(effective)
+		}
+		return
+	}
+	if _, _, key := config.PrimaryModelContext(); key != "" && r.useSpeedPriorityAI {
+		timeline.SetTimelineContentLimit(effective)
+		return
+	}
 	if effective <= 0 || effective >= base {
 		return
 	}
@@ -62,7 +74,13 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 		return false
 	}
 	measured := int64(aicommon.MeasureTokens(prompt))
-	limit := config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
+	var limit int64
+	if provider, model, key := r.primaryModelContext(); key != "" && key == evidence.ContextKey && provider == evidence.Provider && model == evidence.Model {
+		limit = config.RecordModelContextOverflow(provider, model, measured, &evidence, key)
+		config.EmitModelContextFor(provider, model, measured, key)
+	} else {
+		limit = config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
+	}
 	if limit <= 0 {
 		return false
 	}
@@ -72,4 +90,21 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	}
 	timeline.SetTimelineContentLimit(limit)
 	return true
+}
+
+// The new persisted setting belongs to the quality loop only. Keep auxiliary
+// Speed loops on the original runtime-only limit and retry mechanism.
+func (r *ReActLoop) primaryModelContext() (provider, model, key string) {
+	if r.useSpeedPriorityAI {
+		return
+	}
+	if config, ok := r.config.(*aicommon.Config); ok {
+		return config.PrimaryModelContext()
+	}
+	return
+}
+func (r *ReActLoop) promptOverflowAutoAdjustDisabled(err error) bool {
+	provider, model, key := r.primaryModelContext()
+	evidence, ok := aicommon.PromptOverflowEvidenceFrom(err)
+	return ok && key != "" && key == evidence.ContextKey && provider == evidence.Provider && model == evidence.Model && yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model, key).DisableAutoAdjust
 }

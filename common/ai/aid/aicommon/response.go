@@ -68,6 +68,7 @@ type AIResponse struct {
 	providerName     string
 	modelName        string
 	modelVerboseName string
+	modelContextKey  string
 	thinkingLevel    string
 
 	firstOutputByteTime time.Time
@@ -181,7 +182,23 @@ func (a *AIResponse) GetError() error {
 	if a == nil || a.getErrorFunc == nil {
 		return nil
 	}
-	return a.getErrorFunc()
+	err := a.getErrorFunc()
+	// The transaction layer may prefer the callback error over a classified
+	// post-handler error. Preserve the configured-service identity on that path
+	// without changing classification, retryability, or the original error text.
+	if key := a.GetModelContextKey(); key != "" {
+		if evidence, ok := PromptOverflowEvidenceFrom(err); ok && evidence.ContextKey == "" {
+			evidence.ContextKey = key
+			if evidence.Provider == "" {
+				evidence.Provider = a.GetProviderName()
+			}
+			if evidence.Model == "" {
+				evidence.Model = a.GetModelName()
+			}
+			return &aispec.PromptOverflowError{PromptOverflowEvidence: evidence, Cause: err}
+		}
+	}
+	return err
 }
 
 // SetOnReasonChunk registers a callback invoked for each completed reason/thinking
@@ -303,6 +320,23 @@ func (a *AIResponse) SetModelInfo(provider, model string) {
 	a.providerName = provider
 	a.modelName = model
 	a.modelVerboseName = aispec.ModelVerboseName(model)
+}
+
+func (a *AIResponse) SetModelContextKey(key string) {
+	if a == nil {
+		return
+	}
+	a.modelInfoMu.Lock()
+	defer a.modelInfoMu.Unlock()
+	a.modelContextKey = key
+}
+func (a *AIResponse) GetModelContextKey() string {
+	if a == nil {
+		return ""
+	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
+	return a.modelContextKey
 }
 
 func (a *AIResponse) GetProviderName() string {
@@ -917,12 +951,14 @@ func TeeAIResponse(
 ) *AIResponse {
 	first := NewAIResponse(aiCaller)
 	first.SetTaskIndex(src.GetTaskIndex())
+	first.SetModelContextKey(src.GetModelContextKey())
 	first.consumptionCallback = nil
 	firstReasonReader, firstReasonWriter := utils.NewPipe()
 	firstOutputReader, firstOutputWriter := utils.NewPipe()
 
 	second := NewAIResponse(aiCaller)
 	second.SetTaskIndex(src.GetTaskIndex())
+	second.SetModelContextKey(src.GetModelContextKey())
 	secondReasonReader, secondReasonWriter := utils.NewPipe()
 	secondOutputReader, secondOutputWriter := utils.NewPipe()
 
@@ -938,6 +974,8 @@ func TeeAIResponse(
 
 	refreshFromSrc := func() {
 		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		first.SetModelContextKey(src.GetModelContextKey())
+		second.SetModelContextKey(src.GetModelContextKey())
 		second.SetModelInfo(src.GetProviderName(), src.GetModelName())
 		first.SetThinkingLevel(src.GetThinkingLevel())
 		second.SetThinkingLevel(src.GetThinkingLevel())

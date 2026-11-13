@@ -198,3 +198,25 @@ func TestBuiltinCorePluginHashesDoNotMaskUserSettings(t *testing.T) {
 	require.NoError(t, db.Create(&schema.GeneralStorage{Key: "user-setting", Value: "private-test-sentinel"}).Error)
 	require.Error(t, Check(db, nil), "builtin metadata must not permit unrelated user configuration")
 }
+
+func TestBootstrapOwnershipDoesNotMaskUserConfiguration(t *testing.T) {
+	db := testDB(t)
+	public := map[string]any{"IntelligentModels": []any{map[string]any{"ModelName": "memfit-standard-free", "Provider": map[string]any{"Type": "aibalance", "Domain": "aibalance.yaklang.com", "APIKey": "free-user"}}}}
+	row := &schema.GeneralStorage{Key: "AI_GLOBAL_CONFIG"}
+	require.NoError(t, db.Create(row).Error)
+	const owned = `{"IntelligentModels":[{"ContextOwnerId":"00000000-0000-4000-8000-000000000001","ModelName":"memfit-standard-free","Provider":{"Type":"aibalance","Domain":"aibalance.yaklang.com","APIKey":"free-user"}}]}`
+	require.NoError(t, db.Model(row).Update("value", owned).Error)
+	require.NoError(t, Check(db, BuiltinDefaults{AI: public}))
+	for _, altered := range []string{
+		strings.Replace(owned, "free-user", "private-test-sentinel", 1),
+		strings.Replace(owned, "memfit-standard-free", "user-model", 1),
+		strings.Replace(owned, "00000000-0000-4000-8000-000000000001", "invalid-owner", 1),
+		strings.Replace(owned, `{"IntelligentModels"`, `{"AIPresetPrompt":"custom","IntelligentModels"`, 1),
+	} {
+		require.NoError(t, db.Model(row).Update("value", altered).Error)
+		require.Error(t, Check(db, BuiltinDefaults{AI: public}))
+	}
+	require.NoError(t, db.Model(row).Update("value", owned).Error)
+	require.NoError(t, db.Create(&schema.GeneralStorage{Key: "ai-model-context:owner:test", Value: "saved threshold"}).Error)
+	require.Error(t, Check(db, BuiltinDefaults{AI: public}), "saved context preferences still make a database non-pristine")
+}

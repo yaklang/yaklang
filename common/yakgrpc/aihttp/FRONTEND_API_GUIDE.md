@@ -229,6 +229,9 @@
 且聊天设置的新字段为正数时，才从该设置补齐。请求与设置均未指定时使用服务端默认
 `300 * 1024`。旧 `TimelineContentSizeLimit` 不转换、不回填到新字段。
 
+新主模型上下文控件启动时传 0，质量优先 ReAct 按具体连接配置读取阈值，未设置时为 500,000 tokens。轻量/视觉与旧 SDK 路径不接入该设置。保存的提供商配置携带稳定 `ContextOwnerId`，编辑或切换模型须保留；删除整条配置会同步清理其全部模型阈值，重新添加分配新的 ID。会话外通过 `GetAIModelContext` / `SetAIModelContext` 传 `Config` 查询/保存，后端返回 `ContextKey`；运行时调整携带 `AIService`、`AIModelName`、`ModelContextKey`。新入口手动下限为 100,000，默认滑条上限 1,000,000。`model_context` 事件同步用量和阈值，自动调整不弹通知。详见 [行为契约](../../ai/aid/aicommon/model_context_contract.md)。
+
+
 ---
 
 ### `GET /setting/global`

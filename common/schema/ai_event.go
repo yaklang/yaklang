@@ -125,7 +125,8 @@ const (
 	EVENT_TYPE_PONG EventType = "pong" // ping response ping-pong is a check for alive item
 
 	// 压力值
-	EVENT_TYPE_PRESSURE EventType = "pressure" // pressure for ai context percent
+	EVENT_TYPE_PRESSURE      EventType = "pressure"      // pressure for ai context percent
+	EVENT_TYPE_MODEL_CONTEXT EventType = "model_context" // main-model usage and compression threshold, in tokens
 
 	EVENT_TYPE_AI_FIRST_BYTE_COST_MS EventType = "ai_first_byte_cost_ms" // first byte cost
 	EVENT_TYPE_AI_TOTAL_COST_MS      EventType = "ai_total_cost_ms"      // total cost

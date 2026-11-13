@@ -735,6 +735,9 @@ LOOP:
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
 			tokens := aicommon.MeasureTokens(prompt)
+			if _, _, key := r.primaryModelContext(); key != "" {
+				r.config.(*aicommon.Config).EmitModelContext(int64(tokens))
+			}
 			if r.promptMode == aicommon.LoopPromptModeCompressContext {
 				r.noteCompressionStatus()
 			}
@@ -766,8 +769,21 @@ LOOP:
 			}
 			streamWg.Wait()
 			if transactionErr == nil {
+				if provider, model, key := r.primaryModelContext(); key != "" && task.GetContext().Err() == nil && resultDescriptor != nil {
+					identity := resultDescriptor.Snapshot()
+					if identity.ContextKey == key && identity.Provider == provider && identity.Model == model {
+						config := r.config.(*aicommon.Config)
+						config.ConfirmModelContextSuccess(provider, model, key)
+						config.EmitModelContextFor(provider, model, int64(tokens), key)
+					}
+				}
 				r.noteFittingTimelineThroughID(assembled.TimelineThroughID)
 				break
+			}
+			if aicommon.IsPromptTooLong(transactionErr) && r.promptOverflowAutoAdjustDisabled(transactionErr) {
+				err := fmt.Errorf("上下文超过模型可接受的范围，自动调整已关闭，任务已停止。请降低压缩阈值或开启自动调整：%w", transactionErr)
+				r.finishIterationLoopWithError(iterationCount, task, err)
+				return err
 			}
 			if !aicommon.IsPromptTooLong(transactionErr) || buildInput.overflowCompression {
 				break

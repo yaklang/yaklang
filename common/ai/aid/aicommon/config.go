@@ -49,7 +49,7 @@ const DefaultMaxSubAgentConcurrency = 5
 const AbsoluteMaxSubAgentConcurrency = 20
 
 // DefaultTimelineContentSizeLimit 是运行时上下文的服务端默认压缩阈值，单位是 token。
-// RuntimeContextSizeLimit <= 0 时使用该值，避免零值把带有 Skill、Evidence 的时间线提前压小。
+// 保留 SDK 与辅助循环的原始默认值；质量模型的可编辑默认值独立为 500,000。
 const DefaultTimelineContentSizeLimit = 300 * 1024
 
 type ConfigOption func(*Config) error
@@ -212,9 +212,12 @@ type Config struct {
 	AICallbacks *AICallbacks
 
 	// Optional per-runtime helper implementation; the default uses the registered LiteForge.
-	LiteForgeExecutor   LiteForgeExecuteCallback
-	promptOverflowJudge promptOverflowJudgeState
-	promptOverflowLimit promptOverflowLimitState
+	LiteForgeExecutor           LiteForgeExecuteCallback
+	promptOverflowJudge         promptOverflowJudgeState
+	promptOverflowLimit         promptOverflowLimitState
+	modelContextState           modelContextState
+	modelContextSettingsEnabled bool
+	primaryModelContextConfig   *ypb.AIModelConfig
 	// promptOverflowRetryMax bounds compress-and-retry rounds per iteration
 	// after a confirmed prompt overflow. 0 disables the retry.
 	promptOverflowRetryMax int
@@ -1013,6 +1016,8 @@ func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.setAICallbacksLocked(raw)
+		c.modelContextSettingsEnabled = parent.modelContextSettingsEnabled
+		c.primaryModelContextConfig = parent.primaryModelContextConfig
 		c.m.Unlock()
 		return nil
 	}
@@ -1112,6 +1117,7 @@ func WithTieredAICallback(singleModelMode ...bool) ConfigOption {
 			return nil
 		}
 
+		c.modelContextSettingsEnabled = true
 		serviceName, modelName, err := GetIntelligentAIModelInfo(single)
 		if err != nil {
 			log.Warnf("Failed to get service and model name from tiered config: %v", err)

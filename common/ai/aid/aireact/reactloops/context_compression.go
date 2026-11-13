@@ -49,6 +49,9 @@ func (r *ReActLoop) wholePromptTokenLimit() int64 {
 	if !ok || config == nil {
 		return base
 	}
+	if provider, model, key := r.primaryModelContext(); key != "" {
+		return config.EffectiveModelContextLimit(provider, model, base, key)
+	}
 	return config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
 }
 

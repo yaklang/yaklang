@@ -62,6 +62,7 @@ type LoopFunctionCallOutputCallback func(id, functionName string, descriptionRea
 // calls and finish reason. RawResponsePreview is only the transport's preview.
 type LoopResultSnapshot struct {
 	Mode                 string
+	ContextKey           string
 	Provider             string
 	Model                string
 	ProviderFinishReason string
@@ -182,6 +183,15 @@ func (d *LoopResultDescriptor) finishFromResponse(resp *aicommon.AIResponse, cal
 	d.finish(resp, resp.GetPlainOutput(), resp.GetPlainReason(), calls)
 }
 
+func (d *LoopResultDescriptor) setModelIdentity(resp *aicommon.AIResponse) {
+	if d == nil || resp == nil {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.snapshot.Provider, d.snapshot.Model, d.snapshot.ContextKey = resp.GetProviderName(), resp.GetModelName(), resp.GetModelContextKey()
+}
+
 func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason string, calls []*aispec.ToolCall) {
 	if d == nil {
 		return
@@ -197,6 +207,7 @@ func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason 
 		return
 	}
 	d.output, d.reason, d.calls = output, reason, calls
+	d.snapshot.ContextKey = resp.GetModelContextKey()
 	d.snapshot.Provider = provider
 	d.snapshot.Model = model
 	d.snapshot.RawResponsePreview = rawPreview
@@ -1335,6 +1346,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		)
 	}
 	if acceptedResp != nil {
+		descriptor.setModelIdentity(acceptedResp)
 		go func() {
 			action.WaitStream(activeTaskCtx)
 			descriptor.finishFromResponse(acceptedResp, nil)

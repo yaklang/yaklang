@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	// make sure risk > 0
 	risk := utils.RandFloat64()
 	maxIter := rand.Intn(10) + 1                // >0
-	timelineLimit := int32(rand.Intn(2000) + 1) // >0
+	timelineLimit := int32(rand.Intn(2000) + 1) // SDK explicit small budgets remain valid
 
 	includeKeywords := []string{uuid.New().String(), uuid.New().String()}
 	aiService := uuid.NewString()
@@ -177,8 +178,13 @@ func TestConvertYPBAIStartParams_RuntimeContextSizeLimit(t *testing.T) {
 	require.Equal(t, serverDefault, legacy.TimelineContentSizeLimit,
 		"已废弃字段不能覆盖服务端默认值")
 
-	configured := buildConfig(&ypb.AIStartParams{RuntimeContextSizeLimit: 128 * 1024})
-	require.Equal(t, 128*1024, configured.TimelineContentSizeLimit)
+	// Accept the decimal 100K boundary and preserve exact historical token counts.
+	for _, tokens := range []int64{1, 1000, 99999, 100000, 100001, 102400, 128 * 1024, 500000, 1000000} {
+		t.Run(strconv.FormatInt(tokens, 10), func(t *testing.T) {
+			configured := buildConfig(&ypb.AIStartParams{RuntimeContextSizeLimit: tokens})
+			require.EqualValues(t, tokens, configured.TimelineContentSizeLimit)
+		})
+	}
 
 	empty := buildConfig(&ypb.AIStartParams{})
 	require.Equal(t, serverDefault, empty.TimelineContentSizeLimit)

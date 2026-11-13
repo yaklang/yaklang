@@ -48,6 +48,9 @@ func ClassifyPromptTooLong(rsp *AIResponse, err error) error {
 		}
 		evidence = *ev
 	}
+	if evidence.ContextKey == "" {
+		evidence.ContextKey = rsp.GetModelContextKey()
+	}
 	if evidence.Provider == "" {
 		evidence.Provider = strings.TrimSpace(rsp.GetProviderName())
 	}

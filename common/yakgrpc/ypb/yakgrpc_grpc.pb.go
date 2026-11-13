@@ -688,6 +688,8 @@ const (
 	Yak_ExecuteContextMenuAction_FullMethodName                   = "/ypb.Yak/ExecuteContextMenuAction"
 	Yak_UploadToTemporaryFile_FullMethodName                      = "/ypb.Yak/UploadToTemporaryFile"
 	Yak_GetAISessionCurrentResources_FullMethodName               = "/ypb.Yak/GetAISessionCurrentResources"
+	Yak_GetAIModelContext_FullMethodName                          = "/ypb.Yak/GetAIModelContext"
+	Yak_SetAIModelContext_FullMethodName                          = "/ypb.Yak/SetAIModelContext"
 )
 
 // YakClient is the client API for Yak service.
@@ -1549,6 +1551,9 @@ type YakClient interface {
 	// Query resources attached by the latest input and the distinct resources
 	// attached throughout an AI session.
 	GetAISessionCurrentResources(ctx context.Context, in *GetAISessionCurrentResourcesRequest, opts ...grpc.CallOption) (*GetAISessionCurrentResourcesResponse, error)
+	// Model-specific compression budgets, available before a session starts.
+	GetAIModelContext(ctx context.Context, in *GetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error)
+	SetAIModelContext(ctx context.Context, in *SetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error)
 }
 
 type yakClient struct {
@@ -9257,6 +9262,26 @@ func (c *yakClient) GetAISessionCurrentResources(ctx context.Context, in *GetAIS
 	return out, nil
 }
 
+func (c *yakClient) GetAIModelContext(ctx context.Context, in *GetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIModelContextResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAIModelContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetAIModelContext(ctx context.Context, in *SetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIModelContextResponse)
+	err := c.cc.Invoke(ctx, Yak_SetAIModelContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -10116,6 +10141,9 @@ type YakServer interface {
 	// Query resources attached by the latest input and the distinct resources
 	// attached throughout an AI session.
 	GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error)
+	// Model-specific compression budgets, available before a session starts.
+	GetAIModelContext(context.Context, *GetAIModelContextRequest) (*AIModelContextResponse, error)
+	SetAIModelContext(context.Context, *SetAIModelContextRequest) (*AIModelContextResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -12132,6 +12160,12 @@ func (UnimplementedYakServer) UploadToTemporaryFile(grpc.ClientStreamingServer[U
 }
 func (UnimplementedYakServer) GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAISessionCurrentResources not implemented")
+}
+func (UnimplementedYakServer) GetAIModelContext(context.Context, *GetAIModelContextRequest) (*AIModelContextResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIModelContext not implemented")
+}
+func (UnimplementedYakServer) SetAIModelContext(context.Context, *SetAIModelContextRequest) (*AIModelContextResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAIModelContext not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -23256,6 +23290,42 @@ func _Yak_GetAISessionCurrentResources_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAIModelContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIModelContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIModelContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIModelContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIModelContext(ctx, req.(*GetAIModelContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetAIModelContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAIModelContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetAIModelContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SetAIModelContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetAIModelContext(ctx, req.(*SetAIModelContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -25442,6 +25512,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAISessionCurrentResources",
 			Handler:    _Yak_GetAISessionCurrentResources_Handler,
+		},
+		{
+			MethodName: "GetAIModelContext",
+			Handler:    _Yak_GetAIModelContext_Handler,
+		},
+		{
+			MethodName: "SetAIModelContext",
+			Handler:    _Yak_SetAIModelContext_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
