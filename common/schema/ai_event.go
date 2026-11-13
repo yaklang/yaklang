@@ -181,7 +181,6 @@ const (
 	EVENT_TYPE_SUCCESS_REACT               EventType = "success_react_task"
 	EVENT_TYPE_END_PLAN_AND_EXECUTION      EventType = "end_plan_and_execution"
 	EVENT_TYPE_PLAN                        EventType = "plan"
-	EVENT_TYPE_SUB_FORGE_TASK_TREE         EventType = "sub_forge_task_tree"
 	EVENT_TYPE_PERMISSION_REQUIRE          EventType = "permission_require"
 	EVENT_TYPE_TASK_REVIEW_REQUIRE         EventType = "task_review_require"
 	EVENT_TYPE_PLAN_REVIEW_REQUIRE         EventType = "plan_review_require"

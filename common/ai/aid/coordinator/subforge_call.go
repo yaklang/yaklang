@@ -17,7 +17,7 @@ import (
 )
 
 // subForgeCall owns one admitted child's execution and interactive event scope.
-// eventMu protects lifecycle state and the task-tree projection. deliveryMu
+// eventMu protects lifecycle state. deliveryMu
 // serializes child callbacks; never hold eventMu while invoking a subscriber.
 type subForgeCall struct {
 	session     *Session
@@ -30,31 +30,22 @@ type subForgeCall struct {
 
 	eventMu      sync.Mutex
 	deliveryMu   sync.Mutex
-	tree         subForgeTaskTree
+	childID      string
+	callID       string
 	pending      map[string]struct{}
 	closed       bool
 	childStarted bool
 }
 
-func newSubForgeCall(ctx context.Context, s *Session, task aicommon.AIStatefulTask, callID string, binding SubForgeTool, releaseSlot func()) *subForgeCall {
+func newSubForgeCall(ctx context.Context, s *Session, task aicommon.AIStatefulTask, callID string, releaseSlot func()) *subForgeCall {
 	c := &subForgeCall{
 		session: s, task: task, ctx: ctx, releaseSlot: releaseSlot,
 		input:   chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
 		pending: make(map[string]struct{}),
-		tree: subForgeTaskTree{
-			ParentCoordinatorID: s.GetRuntimeId(),
-			ParentTaskID:        task.GetId(),
-			ParentTaskUUID:      task.GetUUID(),
-			CallToolID:          callID,
-			ChildCoordinatorID:  uuid.NewString(),
-			Revision:            1,
-			Status:              "running",
-		},
+		childID: uuid.NewString(),
+		callID:  callID,
 	}
-	if binding.Schema != nil {
-		c.tree.ToolName = binding.Schema.Name
-	}
-	c.unregister = s.InputEventManager.RouteInteractiveInput(c.tree.ChildCoordinatorID, c.routeInput)
+	c.unregister = s.InputEventManager.RouteInteractiveInput(c.childID, c.routeInput)
 	return c
 }
 
@@ -72,10 +63,10 @@ func (c *subForgeCall) routeInput(event *ypb.AIInputEvent) bool {
 
 func (c *subForgeCall) forward(event *schema.AiOutputEvent) {
 	forwarded := *event
-	forwarded.CoordinatorId = c.tree.ChildCoordinatorID
+	forwarded.CoordinatorId = c.childID
 	forwarded.TaskId = c.task.GetId()
 	forwarded.TaskUUID = c.task.GetUUID()
-	forwarded.CallToolID = c.tree.CallToolID
+	forwarded.CallToolID = c.callID
 	if c.session.EventHandler != nil {
 		c.session.EventHandler(&forwarded)
 	}
@@ -93,12 +84,9 @@ func (c *subForgeCall) interrupted(err error) error {
 	return err
 }
 
-func (c *subForgeCall) finish(err error) {
+func (c *subForgeCall) finish() {
 	c.eventMu.Lock()
 	c.closed = true
-	c.tree.Revision++
-	c.tree.Status = subForgeTreeStatus(err)
-	terminal := c.tree
 	c.eventMu.Unlock()
 	var retiredIDs []string
 	c.endpoints.Range(func(key, _ any) bool {
@@ -124,20 +112,16 @@ func (c *subForgeCall) finish(err error) {
 			}
 		}()
 	}
-	// Persist the terminal snapshot even if an earlier progress callback
-	// is blocked. Its revision orders it against any in-flight progress.
-	delivered := make(chan struct{})
-	go func() {
-		defer close(delivered)
-		c.session.emitSubForgeTaskTree(terminal)
-	}()
-	select {
-	case <-delivered:
-	case <-c.ctx.Done():
-	}
+
 }
 
 func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
+	// A child is presented as one tool call. Its plans, task lifecycle, and
+	// nested tool results must not mutate the client's parent execution view.
+	event = subForgeInteractiveEvent(event)
+	if event == nil {
+		return
+	}
 	c.deliveryMu.Lock()
 	defer c.deliveryMu.Unlock()
 	c.eventMu.Lock()
@@ -164,12 +148,7 @@ func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
 			}
 		}
 	}
-	changed := c.tree.observePlan(event)
-	update := c.tree
 	c.eventMu.Unlock()
-	if changed {
-		c.session.emitSubForgeTaskTree(update)
-	}
 	c.forward(event)
 }
 
@@ -179,7 +158,6 @@ func (c *subForgeCall) run(ctx context.Context, binding SubForgeTool, params ait
 		err   error
 	}
 	done := make(chan childResult, 1)
-	initial := c.tree
 	go func() {
 		var result childResult
 		defer func() {
@@ -189,7 +167,6 @@ func (c *subForgeCall) run(ctx context.Context, binding SubForgeTool, params ait
 			c.releaseSlot()
 			done <- result
 		}()
-		c.session.emitSubForgeTaskTree(initial)
 		c.eventMu.Lock()
 		result.err = ctx.Err()
 		c.childStarted = result.err == nil
