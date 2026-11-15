@@ -3,6 +3,10 @@ package aicommon
 import "github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
 
 var (
+	codingSystemsTemplate                           = promptloader.MustLoad("mainloop/coding/systems.txt")
+	codingHighStaticTemplate                        = promptloader.MustLoad("mainloop/coding/textstream/high_static_section.txt")
+	codingHighStaticFunctionCallTemplate            = promptloader.MustLoad("mainloop/coding/functioncall/high_static_section.txt")
+	codingMethodologyTemplate                       = promptloader.MustLoad("mainloop/coding/methodology.txt")
 	SharedPlanAndExecHighStaticTemplate             = promptloader.MustLoad("mainloop/textstream/high_static_section.txt")
 	SharedPlanAndExecHighStaticFunctionCallTemplate = promptloader.MustLoad("mainloop/functioncall/high_static_section.txt")
 	SharedFrozenBlockTemplate                       = promptloader.MustLoad("mainloop/textstream/frozen_block_section.txt")
@@ -13,7 +17,21 @@ var (
 	SharedTimelineOpenTemplate                      = promptloader.MustLoad("mainloop/timeline_open_section.txt")
 )
 
-func MainloopHighStaticTemplate(functionCallMode bool) string {
+// HighStaticData contains only static coding guidance, never paths or live Git state.
+func (m *PromptMaterials) HighStaticData() map[string]any {
+	return map[string]any{
+		"CodingMethodology": codingMethodologyTemplate,
+		"CodingSystems":     codingSystemsTemplate,
+	}
+}
+
+func MainloopHighStaticTemplate(functionCallMode, codingMode bool) string {
+	if codingMode {
+		if functionCallMode {
+			return codingHighStaticFunctionCallTemplate
+		}
+		return codingHighStaticTemplate
+	}
 	if functionCallMode {
 		return SharedPlanAndExecHighStaticFunctionCallTemplate
 	}

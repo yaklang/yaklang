@@ -81239,6 +81239,8 @@ type AICodingSession struct {
 	WorkingDirectory string                 `protobuf:"bytes,4,opt,name=WorkingDirectory,proto3" json:"WorkingDirectory,omitempty"`
 	SourceRoots      []string               `protobuf:"bytes,5,rep,name=SourceRoots,proto3" json:"SourceRoots,omitempty"`
 	WorkspaceRoots   []string               `protobuf:"bytes,6,rep,name=WorkspaceRoots,proto3" json:"WorkspaceRoots,omitempty"`
+	SessionDeletedAt int64                  `protobuf:"varint,7,opt,name=SessionDeletedAt,proto3" json:"SessionDeletedAt,omitempty"` // Unix timestamp; explicit deletion, not a missing query result.
+	SessionTitle     string                 `protobuf:"bytes,8,opt,name=SessionTitle,proto3" json:"SessionTitle,omitempty"`          // Retained title for deleted sessions.
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -81313,6 +81315,20 @@ func (x *AICodingSession) GetWorkspaceRoots() []string {
 		return x.WorkspaceRoots
 	}
 	return nil
+}
+
+func (x *AICodingSession) GetSessionDeletedAt() int64 {
+	if x != nil {
+		return x.SessionDeletedAt
+	}
+	return 0
+}
+
+func (x *AICodingSession) GetSessionTitle() string {
+	if x != nil {
+		return x.SessionTitle
+	}
+	return ""
 }
 
 type ListAICodingSessionsResponse struct {
@@ -88654,7 +88670,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"WorktreeID\x18\x01 \x01(\tR\n" +
 	"WorktreeID\x12\x12\n" +
-	"\x04Path\x18\x02 \x01(\tR\x04Path\"\xe7\x01\n" +
+	"\x04Path\x18\x02 \x01(\tR\x04Path\"\xb7\x02\n" +
 	"\x0fAICodingSession\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x01(\tR\tSessionID\x12 \n" +
 	"\vWorkspaceID\x18\x02 \x01(\tR\vWorkspaceID\x12\x1e\n" +
@@ -88663,7 +88679,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"WorktreeID\x12*\n" +
 	"\x10WorkingDirectory\x18\x04 \x01(\tR\x10WorkingDirectory\x12 \n" +
 	"\vSourceRoots\x18\x05 \x03(\tR\vSourceRoots\x12&\n" +
-	"\x0eWorkspaceRoots\x18\x06 \x03(\tR\x0eWorkspaceRoots\"H\n" +
+	"\x0eWorkspaceRoots\x18\x06 \x03(\tR\x0eWorkspaceRoots\x12*\n" +
+	"\x10SessionDeletedAt\x18\a \x01(\x03R\x10SessionDeletedAt\x12\"\n" +
+	"\fSessionTitle\x18\b \x01(\tR\fSessionTitle\"H\n" +
 	"\x1cListAICodingSessionsResponse\x12(\n" +
 	"\x04Data\x18\x01 \x03(\v2\x14.ypb.AICodingSessionR\x04Data\"f\n" +
 	"\x0eAICodingBranch\x12\x12\n" +

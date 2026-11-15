@@ -17,6 +17,25 @@ var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/
 
 var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
 
+var codingInstruction = promptloader.MustLoad("mainloop/coding/instruction.txt")
+var codingOutputExample = promptloader.MustLoad("mainloop/coding/output_example.txt")
+
+func promptOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
+	if typed, ok := cfg.(*aicommon.Config); ok && typed.CodingMode {
+		return []reactloops.ReActLoopOption{
+			reactloops.WithPersistentInstruction(codingInstruction),
+			// Coding examples must not append unrelated registered focus-mode examples.
+			reactloops.WithOutputExampleContextProvider(func(*reactloops.ReActLoop, string) (string, error) {
+				return codingOutputExample, nil
+			}),
+		}
+	}
+	return []reactloops.ReActLoopOption{
+		reactloops.WithPersistentInstruction(instruction),
+		reactloops.WithOutputExample(outputExample),
+	}
+}
+
 var reactiveDataTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/reactive_data.txt")
 
 const reActPostSummary = `
@@ -87,8 +106,6 @@ func NewLoop(name string, r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLo
 		reactloops.WithInitTask(buildInitTask(r)),
 		reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 		reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
-		reactloops.WithPersistentInstruction(instruction),
-		reactloops.WithOutputExample(outputExample),
 		buildDefaultReactiveDataBuilder(),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			if !isDone {
@@ -122,6 +139,7 @@ func NewLoop(name string, r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLo
 		}),
 	}
 
+	preset = append(preset, promptOptions(r.GetConfig())...)
 	preset = append(preset, opts...)
 	loop, err := reactloops.NewReActLoop(name, r, preset...)
 	return loop, err
@@ -152,10 +170,8 @@ func init() {
 // BaseOptions supplies shared prompt materials and iteration limits without
 // selecting a role, initialization policy, or PLAN implementation.
 func BaseOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
-	return []reactloops.ReActLoopOption{
+	return append(promptOptions(cfg),
 		reactloops.WithMaxIterations(resolveMaxIterations(cfg)),
-		reactloops.WithPersistentInstruction(instruction),
-		reactloops.WithOutputExample(outputExample),
 		buildDefaultReactiveDataBuilder(),
-	}
+	)
 }

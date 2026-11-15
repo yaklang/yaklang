@@ -618,6 +618,13 @@ func (r *reActSessionRuntime) createRuntime(
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
 	configOptions = append(configOptions, ConvertStartParamsToReActConfig(resolvedStartParams)...)
+	if resolvedStartParams.GetCodingMode() && resolvedStartParams.GetCodingWorktreeID() != "" {
+		worktree, err := yakit.GetAICodingWorktree(r.profileDB(), resolvedStartParams.GetCodingWorktreeID(), "")
+		if err != nil {
+			return nil, utils.Errorf("load coding worktree context: %v", err)
+		}
+		configOptions = append(configOptions, aicommon.WithCodingWorktreeBase(worktree.BaseRef, worktree.BaseCommit))
+	}
 	if aiconfig.IsTieredAIConfig() {
 		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}

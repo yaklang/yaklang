@@ -75,6 +75,8 @@ type PromptMaterials struct {
 	CodingWorkspaceID          string
 	CodingWorkingDirectory     string
 	CodingWorktreeID           string
+	CodingBaseRef              string
+	CodingBaseCommit           string
 	CodingWorkspaceRoots       []string
 	CodingSourceRoots          []string
 	Workspace                  bool

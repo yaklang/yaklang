@@ -120,7 +120,8 @@ func (s *Server) ListAICodingSessions(ctx context.Context, req *ypb.AICodingWork
 	result := &ypb.ListAICodingSessionsResponse{}
 	for _, item := range items {
 		result.Data = append(result.Data, &ypb.AICodingSession{SessionID: item.SessionID, WorkspaceID: item.WorkspaceID,
-			WorktreeID: item.WorktreeID, WorkingDirectory: item.WorkingDirectory, SourceRoots: item.SourceRoots, WorkspaceRoots: item.WorkspaceRoots})
+			WorktreeID: item.WorktreeID, WorkingDirectory: item.WorkingDirectory, SourceRoots: item.SourceRoots, WorkspaceRoots: item.WorkspaceRoots,
+			SessionTitle: item.SessionTitle, SessionDeletedAt: item.SessionDeletedAt})
 	}
 	return result, nil
 }

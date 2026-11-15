@@ -16,6 +16,8 @@ type AICodingWorkspace struct {
 // Stored in the profile DB so the workspace can enumerate sessions across project DBs.
 type AICodingSession struct {
 	gorm.Model
+	SessionTitle     string
+	SessionDeletedAt int64
 	SessionID        string `gorm:"unique_index;not null"`
 	WorkspaceID      string `gorm:"index;not null"`
 	WorktreeID       string `gorm:"index"`

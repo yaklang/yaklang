@@ -101,10 +101,10 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	highStaticTemplate := b.HighStaticTemplate
 	frozenBlockTemplate := b.FrozenBlockTemplate
 	semiDynamic2Template := b.SemiDynamic2Template
+	if highStaticTemplate == SharedPlanAndExecHighStaticTemplate || highStaticTemplate == SharedPlanAndExecHighStaticFunctionCallTemplate {
+		highStaticTemplate = MainloopHighStaticTemplate(materials.FunctionCallMode, materials.CodingMode)
+	}
 	if materials.FunctionCallMode {
-		if highStaticTemplate == SharedPlanAndExecHighStaticTemplate {
-			highStaticTemplate = SharedPlanAndExecHighStaticFunctionCallTemplate
-		}
 		if frozenBlockTemplate == SharedFrozenBlockTemplate {
 			frozenBlockTemplate = SharedFrozenBlockFunctionCallTemplate
 		}
@@ -113,7 +113,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 		}
 	}
 
-	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, nil)
+	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, materials.HighStaticData())
 	if err != nil {
 		return nil, err
 	}

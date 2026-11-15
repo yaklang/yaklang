@@ -236,8 +236,16 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			return nil, err
 		}
 
+		codingSessions, err := yakit.CaptureCodingSessionTitles(s.GetProfileDatabase(), projectDB, sessionIDs)
+		if err != nil {
+			return nil, err
+		}
 		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(projectDB)
 		if err != nil {
+			return nil, err
+		}
+
+		if err := yakit.MarkCodingSessionsDeleted(s.GetProfileDatabase(), codingSessions); err != nil {
 			return nil, err
 		}
 
@@ -309,8 +317,15 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		deletedMemoryCollections += memResult.DeletedMemoryCollections
 		deletedRAGCollections += memResult.DeletedRAGCollections
 
+		codingSessions, err := yakit.CaptureCodingSessionTitles(s.GetProfileDatabase(), projectDB, []string{sessionID})
+		if err != nil {
+			return nil, err
+		}
 		runtimeCount, eventCount, err := yakit.DeleteAISession(projectDB, sessionID)
 		if err != nil {
+			return nil, err
+		}
+		if err := yakit.MarkCodingSessionsDeleted(s.GetProfileDatabase(), codingSessions); err != nil {
 			return nil, err
 		}
 		deletedRuntimes += runtimeCount

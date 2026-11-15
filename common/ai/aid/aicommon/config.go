@@ -419,6 +419,8 @@ type Config struct {
 	CodingWorkspaceID      string
 	CodingWorkingDirectory string
 	CodingWorktreeID       string
+	CodingBaseRef          string
+	CodingBaseCommit       string
 	CodingWorkspaceRoots   []string
 	CodingSourceRoots      []string
 	Workdir                string
@@ -4499,6 +4501,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	}
 
 	opts = append(opts, WithCodingMode(i.CodingMode, i.CodingWorkspaceID, i.CodingWorkingDirectory), WithCodingDirectories(i.CodingWorktreeID, i.CodingSourceRoots, i.CodingWorkspaceRoots))
+	opts = append(opts, WithCodingWorktreeBase(i.CodingBaseRef, i.CodingBaseCommit))
 
 	// Misc
 	if i.PromptHook != nil {

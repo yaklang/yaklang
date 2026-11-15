@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -124,6 +125,38 @@ func ListAICodingSessions(db *gorm.DB, workspaceID string) ([]*schema.AICodingSe
 	return items, err
 }
 
+// CaptureCodingSessionTitles retains the names before the project history is removed.
+// Only explicit deletion writes a tombstone: a missing session may belong to another project DB.
+func CaptureCodingSessionTitles(profileDB, projectDB *gorm.DB, sessionIDs []string) ([]*schema.AISession, error) {
+	if profileDB == nil || !profileDB.HasTable(&schema.AICodingSession{}) || len(sessionIDs) == 0 {
+		return nil, nil
+	}
+	var bindings []*schema.AICodingSession
+	if err := profileDB.Where("session_id IN (?)", sessionIDs).Find(&bindings).Error; err != nil {
+		return nil, err
+	}
+	if len(bindings) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		ids = append(ids, binding.SessionID)
+	}
+	var sessions []*schema.AISession
+	err := projectDB.Select("session_id, title").Where("session_id IN (?)", ids).Find(&sessions).Error
+	return sessions, err
+}
+
+func MarkCodingSessionsDeleted(profileDB *gorm.DB, sessions []*schema.AISession) error {
+	for _, session := range sessions {
+		if err := profileDB.Model(&schema.AICodingSession{}).Where("session_id = ?", session.SessionID).
+			Updates(map[string]interface{}{"session_title": session.Title, "session_deleted_at": time.Now().Unix()}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ListAICodingWorktrees(db *gorm.DB, workspaceID string) ([]*schema.AICodingWorktree, error) {
 	var items []*schema.AICodingWorktree
 	err := db.Where("workspace_id = ?", workspaceID).Order("id desc").Find(&items).Error
@@ -185,6 +218,9 @@ func clearCodingBinding(params *ypb.AIStartParams) {
 }
 
 func validateCodingBinding(ctx context.Context, db *gorm.DB, binding *schema.AICodingSession) error {
+	if binding.SessionDeletedAt != 0 {
+		return fmt.Errorf("coding session has been deleted")
+	}
 	if binding.WorktreeID != "" {
 		item, err := GetAICodingWorktree(db, binding.WorktreeID, "")
 		if err != nil {

@@ -21,6 +21,7 @@ func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
 			workspaceID, directory = "", ""
 		}
 		c.CodingWorktreeID = ""
+		c.CodingBaseRef, c.CodingBaseCommit = "", ""
 		c.CodingWorkspaceRoots, c.CodingSourceRoots = nil, nil
 		if enabled {
 			c.CodingWorkspaceRoots = []string{directory}
@@ -29,6 +30,17 @@ func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
 		c.CodingMode = enabled
 		c.CodingWorkspaceID = workspaceID
 		c.CodingWorkingDirectory = directory
+		return nil
+	}
+}
+
+// WithCodingWorktreeBase carries immutable creation metadata from the managed
+// worktree record. It does not describe the current branch or HEAD.
+func WithCodingWorktreeBase(ref, commit string) ConfigOption {
+	return func(c *Config) error {
+		if c.CodingMode && c.CodingWorktreeID != "" {
+			c.CodingBaseRef, c.CodingBaseCommit = ref, commit
+		}
 		return nil
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 )
 
 func TestCodingPromptAndChildConfig(t *testing.T) {
@@ -23,17 +24,31 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			artifacts := filepath.Join(t.TempDir(), "artifacts")
 			cwd, err := os.Getwd()
 			require.NoError(t, err)
-			react, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(artifacts), aicommon.WithCodingMode(true, "workspace-a", source), aicommon.WithCodingDirectories("managed-tree", []string{"/original/project", secondary}, []string{source, secondary}))
+			react, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(artifacts), aicommon.WithCodingMode(true, "workspace-a", source), aicommon.WithCodingDirectories("managed-tree", []string{"/original/project", secondary}, []string{source, secondary}), aicommon.WithCodingWorktreeBase("origin/main", "initial-commit"))
 			require.NoError(t, err)
+			loop, err := loop_default.NewLoop("coding-prompt-test", react)
+			require.NoError(t, err)
+			require.Contains(t, loop.GetPersistentInstruction(), "# Coding 主循环")
+			require.NotContains(t, loop.GetPersistentInstruction(), "用union注入探测字段数")
+			require.Contains(t, loop.GetOutputExample(), "编程任务决策示例")
+			require.NotContains(t, loop.GetOutputExample(), "重放漏洞")
 			result, err := react.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{Nonce: "coding", FunctionCallMode: native, UserQuery: "implement a feature", Schema: `{"type":"object"}`})
 			require.NoError(t, err)
 			require.Contains(t, result.Prompt, "# Coding Agent (Experimental)")
+			require.Contains(t, result.Prompt, "# 第一部分: Coding Agent 工作方法")
+			require.Contains(t, result.Prompt, "detached HEAD")
+			require.Contains(t, result.Prompt, "不复制源目录的暂存、未暂存、未跟踪或忽略文件")
+			require.NotContains(t, result.Prompt, "不可逆动作 (删除 / 覆写 / 提交) 降级强确认")
+			require.NotContains(t, result.Prompt, "未落档的风险禁止终结")
+			require.NotContains(t, result.Prompt, "任务 / 目标已外层鉴权")
 			require.Contains(t, result.Prompt, "workspace-a")
 			require.Contains(t, result.Prompt, "working dir: "+react.config.CodingWorkingDirectory)
 			require.Contains(t, result.Prompt, "AI Artifacts dir: "+artifacts)
 			require.Contains(t, result.Prompt, "AGENTS.md")
 			require.Contains(t, result.Prompt, secondary)
 			require.Contains(t, result.Prompt, "managed-tree")
+			require.Contains(t, result.Prompt, `Creation base ref (reference only, not current branch): "origin/main"`)
+			require.Contains(t, result.Prompt, `Creation base commit (immutable, not current HEAD): "initial-commit"`)
 			require.Contains(t, result.Prompt, "其余目录仍指向原目录")
 			require.NoDirExists(t, artifacts)
 			after, err := os.Getwd()
@@ -45,6 +60,8 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			require.Equal(t, artifacts, child.Workdir)
 			require.Equal(t, react.config.CodingWorkspaceRoots, child.CodingWorkspaceRoots)
 			require.Equal(t, "managed-tree", child.CodingWorktreeID)
+			require.Equal(t, "origin/main", child.CodingBaseRef)
+			require.Equal(t, "initial-commit", child.CodingBaseCommit)
 			child.CodingWorkspaceRoots[1] = "changed"
 			require.Equal(t, secondary, react.config.CodingWorkspaceRoots[1])
 		})
@@ -59,4 +76,41 @@ func TestCodingPromptAbsentForOrdinarySession(t *testing.T) {
 	result, err := react.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{Nonce: "ordinary", UserQuery: "hello", Schema: `{"type":"object"}`})
 	require.NoError(t, err)
 	require.NotContains(t, result.Prompt, "# Coding Agent")
+	require.NotContains(t, result.Prompt, "# 第一部分: Coding Agent 工作方法")
+	require.Contains(t, result.Prompt, "# 第一部分: 工作方法论")
+}
+
+func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(map[bool]string{true: "native", false: "text"}[native], func(t *testing.T) {
+			builder := aicommon.NewDefaultPromptPrefixBuilder()
+			materials := &aicommon.PromptMaterials{CodingMode: true, FunctionCallMode: native,
+				Workspace: true, WorkingDir: "/project-one", CodingWorkingDirectory: "/project-one",
+				CodingWorkspaceID: "workspace-one", CodingWorkspaceRoots: []string{"/project-one"}}
+			first, err := builder.AssemblePromptPrefix(materials)
+			require.NoError(t, err)
+			require.Contains(t, first.HighStatic, "Coding Agent 工作方法")
+			require.Contains(t, first.HighStatic, "## 输出协议")
+			require.Contains(t, first.HighStatic, "directly_call_tool_params_group")
+			require.NotContains(t, first.HighStatic, materials.WorkingDir)
+			require.Contains(t, materials.WorkspaceContext(), "未创建托管工作树")
+			require.NotContains(t, materials.WorkspaceContext(), "detached HEAD")
+			materials.WorkingDir, materials.CodingWorkingDirectory = "/another-project", "/another-project"
+			materials.CodingWorkspaceID, materials.CodingWorktreeID = "another-workspace", "another-tree"
+			second, err := builder.AssemblePromptPrefix(materials)
+			require.NoError(t, err)
+			require.Equal(t, first.HighStatic, second.HighStatic, "paths and worktree IDs must not fragment the mode's system prefix")
+			materials.CodingMode = false
+			ordinary, err := builder.AssemblePromptPrefix(materials)
+			require.NoError(t, err)
+			require.NotEqual(t, first.HighStatic, ordinary.HighStatic)
+			require.Contains(t, ordinary.HighStatic, "未落档的风险禁止终结")
+			require.NotContains(t, ordinary.HighStatic, "Coding Agent 工作方法")
+			builder.HighStaticTemplate = "custom caller instructions"
+			materials.CodingMode = true
+			custom, err := builder.AssemblePromptPrefix(materials)
+			require.NoError(t, err)
+			require.Equal(t, "custom caller instructions", custom.HighStatic)
+		})
+	}
 }
