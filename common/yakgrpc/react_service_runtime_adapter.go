@@ -22,10 +22,10 @@ func (s *Server) getReActService() *reactservice.Service {
 	s.reActServiceMu.Lock()
 	defer s.reActServiceMu.Unlock()
 	if s.reActService == nil {
-		if s.projectDatabase != nil {
+		if s.projectDatabase != nil || s.profileDatabase != nil {
 			// Embedded servers with an explicitly injected database keep an
 			// isolated service; the normal engine Server uses the process singleton.
-			s.reActService = reactservice.New(s.GetProjectDatabase)
+			s.reActService = reactservice.New(s.GetProjectDatabase, reactservice.WithProfileDatabase(s.GetProfileDatabase))
 		} else {
 			s.reActService = reactservice.Default()
 		}

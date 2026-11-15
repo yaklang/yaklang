@@ -28,6 +28,7 @@ type Service struct {
 	mu          sync.Mutex
 
 	projectDB      func() *gorm.DB
+	profileDB      func() *gorm.DB
 	runtime        sessionruntime.ReActSessionRuntime
 	runtimeRetired bool
 	scheduler      *aireactscheduler.Scheduler
@@ -43,6 +44,11 @@ func WithRuntime(runtime sessionruntime.ReActSessionRuntime) Option {
 	}
 }
 
+// WithProfileDatabase keeps workspace lookup on the same engine profile as its RPCs.
+func WithProfileDatabase(profileDB func() *gorm.DB) Option {
+	return func(service *Service) { service.profileDB = profileDB }
+}
+
 func New(projectDB func() *gorm.DB, options ...Option) *Service {
 	service := &Service{projectDB: projectDB}
 	for _, option := range options {
@@ -55,7 +61,7 @@ func New(projectDB func() *gorm.DB, options ...Option) *Service {
 
 func (s *Service) runtimeLocked() sessionruntime.ReActSessionRuntime {
 	if s.runtime == nil {
-		s.runtime = sessionruntime.New(s.projectDB)
+		s.runtime = sessionruntime.New(s.projectDB, s.profileDB)
 		s.runtimeRetired = false
 	}
 	return s.runtime

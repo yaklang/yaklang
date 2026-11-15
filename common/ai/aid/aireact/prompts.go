@@ -70,6 +70,9 @@ type PromptManager struct {
 }
 
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
+	if react != nil && react.config != nil && react.config.CodingMode {
+		workdir = react.config.CodingWorkingDirectory
+	}
 	return &PromptManager{
 		cpm:     aicommon.NewContextProviderManager(),
 		react:   react,

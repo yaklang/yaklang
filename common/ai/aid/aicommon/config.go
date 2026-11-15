@@ -413,10 +413,16 @@ type Config struct {
 	/*
 		Meta Info
 	*/
-	Keywords  []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
-	ForgeName string   // if current config use in forge , this is the forge name
-	Workdir   string
-	Language  string // Response language preference
+	Keywords               []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
+	ForgeName              string   // if current config use in forge , this is the forge name
+	CodingMode             bool
+	CodingWorkspaceID      string
+	CodingWorkingDirectory string
+	CodingWorktreeID       string
+	CodingWorkspaceRoots   []string
+	CodingSourceRoots      []string
+	Workdir                string
+	Language               string // Response language preference
 
 	/*
 		debug config
@@ -4491,6 +4497,8 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	if i.MemoryTriage != nil {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
 	}
+
+	opts = append(opts, WithCodingMode(i.CodingMode, i.CodingWorkspaceID, i.CodingWorkingDirectory), WithCodingDirectories(i.CodingWorktreeID, i.CodingSourceRoots, i.CodingWorkspaceRoots))
 
 	// Misc
 	if i.PromptHook != nil {

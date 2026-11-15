@@ -355,6 +355,12 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil {
 		materials.ExecutionPolicy = pm.react.config.GetExecutionPolicy()
+		materials.CodingMode = pm.react.config.CodingMode
+		materials.CodingWorkspaceID = pm.react.config.CodingWorkspaceID
+		materials.CodingWorkingDirectory = pm.react.config.CodingWorkingDirectory
+		materials.CodingWorktreeID = pm.react.config.CodingWorktreeID
+		materials.CodingWorkspaceRoots = pm.react.config.CodingWorkspaceRoots
+		materials.CodingSourceRoots = pm.react.config.CodingSourceRoots
 	}
 	if input != nil {
 		materials.FunctionCallMode = input.FunctionCallMode

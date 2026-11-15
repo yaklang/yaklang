@@ -689,6 +689,15 @@ const (
 	Yak_ExecuteContextMenuAction_FullMethodName                   = "/ypb.Yak/ExecuteContextMenuAction"
 	Yak_UploadToTemporaryFile_FullMethodName                      = "/ypb.Yak/UploadToTemporaryFile"
 	Yak_GetAISessionCurrentResources_FullMethodName               = "/ypb.Yak/GetAISessionCurrentResources"
+	Yak_CreateAICodingWorkspace_FullMethodName                    = "/ypb.Yak/CreateAICodingWorkspace"
+	Yak_UpdateAICodingWorkspace_FullMethodName                    = "/ypb.Yak/UpdateAICodingWorkspace"
+	Yak_GetAICodingWorkspace_FullMethodName                       = "/ypb.Yak/GetAICodingWorkspace"
+	Yak_QueryAICodingWorkspaces_FullMethodName                    = "/ypb.Yak/QueryAICodingWorkspaces"
+	Yak_ListAICodingWorktrees_FullMethodName                      = "/ypb.Yak/ListAICodingWorktrees"
+	Yak_GetAICodingWorktree_FullMethodName                        = "/ypb.Yak/GetAICodingWorktree"
+	Yak_ListAICodingBranches_FullMethodName                       = "/ypb.Yak/ListAICodingBranches"
+	Yak_ListAICodingSessions_FullMethodName                       = "/ypb.Yak/ListAICodingSessions"
+	Yak_CreateAICodingWorktree_FullMethodName                     = "/ypb.Yak/CreateAICodingWorktree"
 )
 
 // YakClient is the client API for Yak service.
@@ -1551,6 +1560,17 @@ type YakClient interface {
 	// Query resources attached by the latest input and the distinct resources
 	// attached throughout an AI session.
 	GetAISessionCurrentResources(ctx context.Context, in *GetAISessionCurrentResourcesRequest, opts ...grpc.CallOption) (*GetAISessionCurrentResourcesResponse, error)
+	CreateAICodingWorkspace(ctx context.Context, in *CreateAICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorkspace, error)
+	UpdateAICodingWorkspace(ctx context.Context, in *UpdateAICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorkspace, error)
+	GetAICodingWorkspace(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorkspace, error)
+	QueryAICodingWorkspaces(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryAICodingWorkspacesResponse, error)
+	ListAICodingWorktrees(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingWorktreesResponse, error)
+	GetAICodingWorktree(ctx context.Context, in *GetAICodingWorktreeRequest, opts ...grpc.CallOption) (*AICodingWorktree, error)
+	ListAICodingBranches(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingBranchesResponse, error)
+	ListAICodingSessions(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingSessionsResponse, error)
+	// Deprecated: Do not use.
+	// Worktrees are now created atomically with session binding at session startup.
+	CreateAICodingWorktree(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorktree, error)
 }
 
 type yakClient struct {
@@ -9269,6 +9289,97 @@ func (c *yakClient) GetAISessionCurrentResources(ctx context.Context, in *GetAIS
 	return out, nil
 }
 
+func (c *yakClient) CreateAICodingWorkspace(ctx context.Context, in *CreateAICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorkspace, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AICodingWorkspace)
+	err := c.cc.Invoke(ctx, Yak_CreateAICodingWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateAICodingWorkspace(ctx context.Context, in *UpdateAICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorkspace, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AICodingWorkspace)
+	err := c.cc.Invoke(ctx, Yak_UpdateAICodingWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAICodingWorkspace(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorkspace, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AICodingWorkspace)
+	err := c.cc.Invoke(ctx, Yak_GetAICodingWorkspace_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryAICodingWorkspaces(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryAICodingWorkspacesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAICodingWorkspacesResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAICodingWorkspaces_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListAICodingWorktrees(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingWorktreesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAICodingWorktreesResponse)
+	err := c.cc.Invoke(ctx, Yak_ListAICodingWorktrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAICodingWorktree(ctx context.Context, in *GetAICodingWorktreeRequest, opts ...grpc.CallOption) (*AICodingWorktree, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AICodingWorktree)
+	err := c.cc.Invoke(ctx, Yak_GetAICodingWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListAICodingBranches(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingBranchesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAICodingBranchesResponse)
+	err := c.cc.Invoke(ctx, Yak_ListAICodingBranches_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListAICodingSessions(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAICodingSessionsResponse)
+	err := c.cc.Invoke(ctx, Yak_ListAICodingSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Deprecated: Do not use.
+func (c *yakClient) CreateAICodingWorktree(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*AICodingWorktree, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AICodingWorktree)
+	err := c.cc.Invoke(ctx, Yak_CreateAICodingWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -10129,6 +10240,17 @@ type YakServer interface {
 	// Query resources attached by the latest input and the distinct resources
 	// attached throughout an AI session.
 	GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error)
+	CreateAICodingWorkspace(context.Context, *CreateAICodingWorkspaceRequest) (*AICodingWorkspace, error)
+	UpdateAICodingWorkspace(context.Context, *UpdateAICodingWorkspaceRequest) (*AICodingWorkspace, error)
+	GetAICodingWorkspace(context.Context, *AICodingWorkspaceRequest) (*AICodingWorkspace, error)
+	QueryAICodingWorkspaces(context.Context, *Empty) (*QueryAICodingWorkspacesResponse, error)
+	ListAICodingWorktrees(context.Context, *AICodingWorkspaceRequest) (*ListAICodingWorktreesResponse, error)
+	GetAICodingWorktree(context.Context, *GetAICodingWorktreeRequest) (*AICodingWorktree, error)
+	ListAICodingBranches(context.Context, *AICodingWorkspaceRequest) (*ListAICodingBranchesResponse, error)
+	ListAICodingSessions(context.Context, *AICodingWorkspaceRequest) (*ListAICodingSessionsResponse, error)
+	// Deprecated: Do not use.
+	// Worktrees are now created atomically with session binding at session startup.
+	CreateAICodingWorktree(context.Context, *AICodingWorkspaceRequest) (*AICodingWorktree, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -12148,6 +12270,33 @@ func (UnimplementedYakServer) UploadToTemporaryFile(grpc.ClientStreamingServer[U
 }
 func (UnimplementedYakServer) GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAISessionCurrentResources not implemented")
+}
+func (UnimplementedYakServer) CreateAICodingWorkspace(context.Context, *CreateAICodingWorkspaceRequest) (*AICodingWorkspace, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateAICodingWorkspace not implemented")
+}
+func (UnimplementedYakServer) UpdateAICodingWorkspace(context.Context, *UpdateAICodingWorkspaceRequest) (*AICodingWorkspace, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAICodingWorkspace not implemented")
+}
+func (UnimplementedYakServer) GetAICodingWorkspace(context.Context, *AICodingWorkspaceRequest) (*AICodingWorkspace, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAICodingWorkspace not implemented")
+}
+func (UnimplementedYakServer) QueryAICodingWorkspaces(context.Context, *Empty) (*QueryAICodingWorkspacesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAICodingWorkspaces not implemented")
+}
+func (UnimplementedYakServer) ListAICodingWorktrees(context.Context, *AICodingWorkspaceRequest) (*ListAICodingWorktreesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAICodingWorktrees not implemented")
+}
+func (UnimplementedYakServer) GetAICodingWorktree(context.Context, *GetAICodingWorktreeRequest) (*AICodingWorktree, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAICodingWorktree not implemented")
+}
+func (UnimplementedYakServer) ListAICodingBranches(context.Context, *AICodingWorkspaceRequest) (*ListAICodingBranchesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAICodingBranches not implemented")
+}
+func (UnimplementedYakServer) ListAICodingSessions(context.Context, *AICodingWorkspaceRequest) (*ListAICodingSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAICodingSessions not implemented")
+}
+func (UnimplementedYakServer) CreateAICodingWorktree(context.Context, *AICodingWorkspaceRequest) (*AICodingWorktree, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateAICodingWorktree not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -23290,6 +23439,168 @@ func _Yak_GetAISessionCurrentResources_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateAICodingWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateAICodingWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateAICodingWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateAICodingWorkspace(ctx, req.(*CreateAICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateAICodingWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAICodingWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAICodingWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAICodingWorkspace(ctx, req.(*UpdateAICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAICodingWorkspace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAICodingWorkspace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAICodingWorkspace_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAICodingWorkspace(ctx, req.(*AICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryAICodingWorkspaces_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAICodingWorkspaces(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAICodingWorkspaces_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAICodingWorkspaces(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListAICodingWorktrees_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListAICodingWorktrees(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListAICodingWorktrees_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListAICodingWorktrees(ctx, req.(*AICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAICodingWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAICodingWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAICodingWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAICodingWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAICodingWorktree(ctx, req.(*GetAICodingWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListAICodingBranches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListAICodingBranches(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListAICodingBranches_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListAICodingBranches(ctx, req.(*AICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListAICodingSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListAICodingSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListAICodingSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListAICodingSessions(ctx, req.(*AICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateAICodingWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AICodingWorkspaceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateAICodingWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateAICodingWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateAICodingWorktree(ctx, req.(*AICodingWorkspaceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -25480,6 +25791,42 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAISessionCurrentResources",
 			Handler:    _Yak_GetAISessionCurrentResources_Handler,
+		},
+		{
+			MethodName: "CreateAICodingWorkspace",
+			Handler:    _Yak_CreateAICodingWorkspace_Handler,
+		},
+		{
+			MethodName: "UpdateAICodingWorkspace",
+			Handler:    _Yak_UpdateAICodingWorkspace_Handler,
+		},
+		{
+			MethodName: "GetAICodingWorkspace",
+			Handler:    _Yak_GetAICodingWorkspace_Handler,
+		},
+		{
+			MethodName: "QueryAICodingWorkspaces",
+			Handler:    _Yak_QueryAICodingWorkspaces_Handler,
+		},
+		{
+			MethodName: "ListAICodingWorktrees",
+			Handler:    _Yak_ListAICodingWorktrees_Handler,
+		},
+		{
+			MethodName: "GetAICodingWorktree",
+			Handler:    _Yak_GetAICodingWorktree_Handler,
+		},
+		{
+			MethodName: "ListAICodingBranches",
+			Handler:    _Yak_ListAICodingBranches_Handler,
+		},
+		{
+			MethodName: "ListAICodingSessions",
+			Handler:    _Yak_ListAICodingSessions_Handler,
+		},
+		{
+			MethodName: "CreateAICodingWorktree",
+			Handler:    _Yak_CreateAICodingWorktree_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
