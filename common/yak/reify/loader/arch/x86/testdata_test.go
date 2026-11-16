@@ -1,160 +1,177 @@
 package x86
 
 import (
+	"bytes"
 	"context"
 	"embed"
-	"encoding/hex"
-	"encoding/json"
-	"io/fs"
-	"strconv"
+	"encoding/binary"
+	"errors"
+	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/archtest"
 	"strings"
 	"testing"
-
-	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/reify/core"
-	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
-	"github.com/yaklang/yaklang/common/yak/reify/core/lowirtext"
-	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 )
+
+func target386() core.Target {
+	return core.Target{OS: core.OSLinux, Architecture: core.Arch386, Bits: 32, ByteOrder: core.LittleEndian}
+}
+
+func requestAt(t *testing.T, address uint64, code []byte) core.ParseRequest {
+	t.Helper()
+	reader, err := core.NewByteReader("test", bytes.NewReader(code), int64(len(code)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return core.ParseRequest{Target: target386(), Address: address, Reader: reader}
+}
+
+func parseAt(t *testing.T, address uint64, code []byte) *core.ParseResult {
+	t.Helper()
+	result, err := (Parser{}).Parse(context.Background(), requestAt(t, address, code))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	return result
+}
+
+func allBlocks(ir *core.LowIR) []core.Block {
+	var result []core.Block
+	for _, function := range ir.Functions {
+		result = append(result, function.Blocks...)
+	}
+	return result
+}
+
+func allInstructions(ir *core.LowIR) []core.Instruction {
+	var result []core.Instruction
+	for _, block := range allBlocks(ir) {
+		result = append(result, block.Instructions...)
+	}
+	return result
+}
+
+func findInstruction(ir *core.LowIR, kind core.Opcode, predicate func(core.Instruction) bool) (core.Instruction, bool) {
+	for _, instruction := range allInstructions(ir) {
+		if instruction.Kind == kind && (predicate == nil || predicate(instruction)) {
+			return instruction, true
+		}
+	}
+	return core.Instruction{}, false
+}
+
+func Test386AvailableAndChecksTarget(t *testing.T) {
+	parser := Parser{}
+	if !parser.Available() {
+		t.Fatal("386 parser reports no decoder")
+	}
+	if parser.Kind() != core.Arch386 || parser.Name() != "386" {
+		t.Fatalf("unexpected identity: %s %s", parser.Kind(), parser.Name())
+	}
+	if err := parser.Check(target386()); err != nil {
+		t.Fatalf("386 target rejected: %v", err)
+	}
+	for _, target := range []core.Target{
+		{Architecture: core.ArchAMD64, Bits: 64},
+		{Architecture: core.Arch386, Bits: 64},
+		{Architecture: core.Arch386, Bits: 32, Mode: "protected"},
+	} {
+		if err := parser.Check(target); err == nil {
+			t.Fatalf("%+v accepted", target)
+		}
+	}
+}
+
+func Test386UsesThirtyTwoBitRegistersAndStack(t *testing.T) {
+	// push ebp; mov ebp, esp; sub esp, 8; leave; ret
+	code := []byte{0x55, 0x89, 0xe5, 0x83, 0xec, 0x08, 0xc9, 0xc3}
+	result := parseAt(t, 0x401000, code)
+	names := map[string]bool{}
+	for _, instruction := range allInstructions(result.IR) {
+		if instruction.Kind != core.OpWriteRegister || len(instruction.Operands) == 0 {
+			continue
+		}
+		names[instruction.Operands[0].Name] = true
+		if instruction.Operands[0].Type.Bits != 32 {
+			t.Fatalf("write width = %d, want 32", instruction.Operands[0].Type.Bits)
+		}
+	}
+	for _, name := range []string{"esp", "ebp"} {
+		if !names[name] {
+			t.Fatalf("%s was not written: %+v", name, names)
+		}
+	}
+	if names["rsp"] || names["rbp"] {
+		t.Fatalf("64-bit register names leaked into 386 output: %+v", names)
+	}
+	// push ebp subtracts four bytes, not eight.
+	slot, ok := findInstruction(result.IR, core.OpConstant, func(instruction core.Instruction) bool {
+		if len(instruction.Operands) == 0 || instruction.Operands[0].Kind != core.OperandConstant {
+			return false
+		}
+		return binary.LittleEndian.Uint32(append(instruction.Operands[0].Literal, 0, 0, 0, 0)[:4]) == 4
+	})
+	if !ok {
+		t.Fatalf("push did not use a four-byte slot: %+v", slot)
+	}
+}
+
+func Test386ConditionalBranchUsesFlags(t *testing.T) {
+	// test eax, eax; je +2; nop; nop; ret
+	code := []byte{0x85, 0xc0, 0x74, 0x02, 0x90, 0x90, 0xc3}
+	result := parseAt(t, 0x402000, code)
+	if blocks := allBlocks(result.IR); len(blocks) != 3 {
+		t.Fatalf("wanted three blocks, got %d", len(blocks))
+	}
+	branch, ok := findInstruction(result.IR, core.OpBranch, nil)
+	if !ok || len(branch.Targets) != 2 {
+		t.Fatalf("conditional branch has no two targets: %+v", branch)
+	}
+	flags := false
+	for _, instruction := range allInstructions(result.IR) {
+		if instruction.Kind != core.OpWriteRegister || len(instruction.Operands) == 0 {
+			continue
+		}
+		if instruction.Operands[0].Name == "eflags" {
+			flags = true
+		}
+	}
+	if !flags {
+		t.Fatal("flags were not written to eflags")
+	}
+}
+
+func Test386Disassembles(t *testing.T) {
+	disassembly, err := (Parser{}).Disassemble(context.Background(), requestAt(t, 0x403000, []byte{0x55, 0xc3}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{"push ebp", "ret", "0x403000  55"} {
+		if !strings.Contains(disassembly.Text, fragment) {
+			t.Fatalf("disassembly lacks %q:\n%s", fragment, disassembly.Text)
+		}
+	}
+}
+
+func Test386ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := (Parser{}).Parse(ctx, requestAt(t, 0x404000, []byte{0xc3}))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+}
 
 //go:embed testdata
 var testdata embed.FS
 
-type fixture struct {
-	Name    string       `json:"name"`
-	Address string       `json:"address"`
-	Symbols []fixtureSym `json:"symbols"`
-	Code    []string     `json:"code"`
-	LowIR   []string     `json:"lowir"`
-}
-
-type fixtureSym struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
-}
-
+// TestFixtures runs every case in testdata. The cases carry the expectations in
+// JSON: the decoded bytes, the LowIR text, the diagnostics, and the counts the
+// frame, canary and ABI checks must produce.
 func TestFixtures(t *testing.T) {
-	err := filesys.Recursive("testdata", filesys.WithEmbedFS(testdata), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
-		if info.IsDir() || !strings.HasSuffix(info.Name(), ".json") {
-			return nil
-		}
-		data, err := testdata.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		t.Run(strings.TrimSuffix(info.Name(), ".json"), func(t *testing.T) {
-			runFixtures(t, data)
-		})
-		return nil
-	}))
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func runFixtures(t *testing.T, data []byte) {
-	t.Helper()
-	var cases []fixture
-	if err := json.Unmarshal(data, &cases); err != nil {
-		t.Fatal(err)
-	}
-	for _, tc := range cases {
-		t.Run(tc.Name, func(t *testing.T) {
-			address := parseAddress(t, tc.Address)
-			code := decodeFixtureCode(t, tc.Code)
-			reader, err := core.NewByteReader(tc.Name, strings.NewReader(string(code)), int64(len(code)))
-			if err != nil {
-				t.Fatal(err)
-			}
-			image := &core.Image{Sections: []core.Section{{
-				Name:           ".text",
-				FileOffset:     0,
-				FileSize:       uint64(len(code)),
-				VirtualAddress: address,
-				MemorySize:     uint64(len(code)),
-			}}}
-			for _, item := range tc.Symbols {
-				image.Symbols = append(image.Symbols, sym.Symbol{
-					Name:    item.Name,
-					Address: parseAddress(t, item.Address),
-					Kind:    sym.SymbolFunction,
-				})
-			}
-			artifact := &core.Artifact{
-				Origin: core.Origin{Name: tc.Name, Size: int64(len(code))},
-				Kind:   core.KindNative,
-				Format: core.FormatELF,
-				Target: core.Target{OS: core.OSLinux, Architecture: core.Arch386, Bits: 32, ByteOrder: core.LittleEndian},
-				Image:  image,
-				Reader: reader,
-				Parser: Parser{},
-				Hints:  &core.BoundaryHints{ExecSections: []core.Region{{Address: address, Size: uint64(len(code))}}},
-			}
-			options := []asm2lowir.Option{}
-			if len(tc.Symbols) > 0 {
-				options = append(options, asm2lowir.WithAll())
-			} else {
-				options = append(options,
-					asm2lowir.WithRegion(core.Region{Address: address, Size: uint64(len(code))}),
-					asm2lowir.WithExact(),
-				)
-			}
-			result, err := asm2lowir.Parse(context.Background(), artifact, options...)
-			if err != nil {
-				t.Fatal(err)
-			}
-			got := strings.TrimRight(withoutFacts(lowirtext.Format(result.IR)), "\n")
-			want := withoutFacts(strings.Join(tc.LowIR, "\n"))
-			if got != want {
-				t.Fatalf("LowIR mismatch:\n--- want ---\n%s\n--- got ---\n%s", want, got)
-			}
-		})
-	}
-}
-
-func decodeFixtureCode(t *testing.T, lines []string) []byte {
-	t.Helper()
-	var code []byte
-	for _, line := range lines {
-		bytesPart, comment, hasComment := strings.Cut(line, "//")
-		if !hasComment || strings.TrimSpace(comment) == "" {
-			t.Fatalf("line without an assembly comment: %q", line)
-		}
-		decoded, err := hex.DecodeString(strings.Join(strings.Fields(bytesPart), ""))
-		if err != nil {
-			t.Fatalf("%q: %v", line, err)
-		}
-		code = append(code, decoded...)
-	}
-	if len(code) == 0 {
-		t.Fatal("no bytes")
-	}
-	return code
-}
-
-func parseAddress(t *testing.T, text string) uint64 {
-	t.Helper()
-	if text == "" {
-		return 0
-	}
-	value, err := strconv.ParseUint(text, 0, 64)
-	if err != nil {
-		t.Fatalf("bad address %q: %v", text, err)
-	}
-	return value
-}
-
-// withoutFacts removes the architecture fact header. A fixture describes the
-// instructions one encoding produces; the facts are asserted separately, so they
-// do not have to be repeated in every fixture.
-func withoutFacts(text string) string {
-	lines := strings.Split(text, "\n")
-	kept := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if strings.HasPrefix(line, "frame: ") || strings.HasPrefix(line, "registers: ") || strings.HasPrefix(line, "canary: ") {
-			continue
-		}
-		kept = append(kept, line)
-	}
-	return strings.Join(kept, "\n")
+	archtest.Run(t, archtest.Config{
+		FS:     testdata,
+		Dir:    "testdata",
+		Parser: Parser{},
+		Target: core.Target{OS: core.OSLinux, Architecture: core.Arch386, Bits: 32, ByteOrder: core.LittleEndian},
+	})
 }

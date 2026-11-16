@@ -1,0 +1,19 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x1000",
+    "code": [
+      "55 // push rbp",
+      "48 89 e5 // mov rbp, rsp",
+      "53 // push rbx",
+      "48 83 ec 10 // sub rsp, 0x10",
+      "89 f8 // mov eax, edi",
+      "48 83 c4 10 // add rsp, 0x10",
+      "5b // pop rbx",
+      "5d // pop rbp",
+      "c3 // ret"
+    ],
+    "frame_removed": 42,
+    "params": 6
+  }
+]

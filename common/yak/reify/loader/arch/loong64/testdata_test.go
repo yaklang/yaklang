@@ -3,11 +3,11 @@ package loong64
 import (
 	"bytes"
 	"context"
-	"testing"
-
-	"golang.org/x/arch/loong64/loong64asm"
-
+	"embed"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/archtest"
+	"golang.org/x/arch/loong64/loong64asm"
+	"testing"
 )
 
 // targetLoong64 is the target of one LoongArch code region.
@@ -195,4 +195,17 @@ func TestCheckRejectsWrongByteOrder(t *testing.T) {
 			t.Fatalf("invalid target accepted: %+v", target)
 		}
 	}
+}
+
+//go:embed testdata
+var testdata embed.FS
+
+// TestFixtures runs every case in testdata.
+func TestFixtures(t *testing.T) {
+	archtest.Run(t, archtest.Config{
+		FS:     testdata,
+		Dir:    "testdata",
+		Parser: Parser{},
+		Target: core.Target{OS: core.OSLinux, Architecture: core.ArchLOONG64, Bits: 64, ByteOrder: core.LittleEndian},
+	})
 }

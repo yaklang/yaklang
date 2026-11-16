@@ -1,0 +1,21 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x100",
+    "code": [
+      "67 bd ff e8 // daddiu sp, sp, -24",
+      "ff bf 00 10 // sd ra, 16(sp)",
+      "ff be 00 08 // sd fp, 8(sp)",
+      "03 a0 f0 25 // move fp, sp",
+      "00 80 10 25 // move v0, a0",
+      "03 c0 e8 25 // move sp, fp",
+      "df be 00 08 // ld fp, 8(sp)",
+      "df bf 00 10 // ld ra, 16(sp)",
+      "67 bd 00 18 // daddiu sp, sp, 24",
+      "03 e0 00 08 // jr ra",
+      "00 00 00 00 // nop"
+    ],
+    "frame_removed": 26,
+    "params": 4
+  }
+]

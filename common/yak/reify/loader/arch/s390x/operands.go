@@ -131,6 +131,48 @@ func (l *lifter) registers(ins instruction) (core.ValueID, bool) {
 	if len(arguments) == 0 {
 		return 0, false
 	}
+	// A compare writes the condition code and nothing else.
+	if isCompareRegister(name) {
+		if len(arguments) < 2 {
+			return 0, false
+		}
+		left, ok := l.sourceValue(ins, arguments[0], addressBits)
+		if !ok {
+			return 0, false
+		}
+		right, ok := l.sourceValue(ins, arguments[len(arguments)-1], addressBits)
+		if !ok {
+			return 0, false
+		}
+		flags := l.operation(ins, core.OpIntrinsic, []core.Operand{
+			symbolOperand(core.FlagsIntrinsicPrefix + "cmp"), l.value(left), l.value(right),
+		}, 2, core.EffectNone)
+		l.writeRegister(ins.address, "cc", 2, flags)
+		return flags, true
+	}
+	// The two-register loads move one register into another. They have to be
+	// routed before the unary forms, which read the destination in place: a
+	// move that ignores its source register is worse than no lift at all.
+	if source, width, ok := moveForm(name, arguments); ok {
+		destination, destinationBits, ok := firstRegister(arguments)
+		if !ok {
+			return 0, false
+		}
+		value, ok := l.readRegisterValue(ins, source, width)
+		if !ok {
+			return 0, false
+		}
+		result := value
+		if width != 0 && width < destinationBits {
+			kind := core.OpZeroExtend
+			if signExtending(name) {
+				kind = core.OpSignExtend
+			}
+			result = l.operation(ins, kind, []core.Operand{l.value(value)}, destinationBits, core.EffectNone)
+		}
+		l.writeRegister(ins.address, destination, destinationBits, result)
+		return result, true
+	}
 	kind, isBinary := binaryOpcode(name)
 	if isBinary && len(arguments) >= 2 {
 		destination, destinationBits, ok := firstRegister(arguments)
@@ -175,8 +217,7 @@ func (l *lifter) registers(ins instruction) (core.ValueID, bool) {
 // shift-and-mask forms.
 func isUnaryForm(name string) bool {
 	switch name {
-	case "lgr", "lgfr", "llgfr", "lgbr", "llgcr", "llghr", "llgtr",
-		"lnr", "lpr", "lcr", "lcgr", "lngr", "lpgr",
+	case "lnr", "lpr", "lcr", "lcgr", "lngr", "lpgr",
 		"sllg", "srlg", "srag", "sllk", "srlk", "srak", "rll", "rllg",
 		"risbg", "rxsbg", "risbgn":
 		return true
@@ -269,4 +310,129 @@ func (l *lifter) sourceValue(ins instruction, arg s390xasm.Arg, bits uint16) (co
 	default:
 		return 0, false
 	}
+}
+
+// moveForm returns the source register of a two-register load. Only the loads
+// that copy or extend a value are listed; the negate and absolute forms are
+// arithmetic and belong to the unary path.
+func moveForm(name string, arguments []s390xasm.Arg) (string, uint16, bool) {
+	width := uint16(0)
+	switch name {
+	case "lgr", "lr", "lhr", "ldr", "lfer":
+	case "lgfr":
+		width = 32
+	case "llgfr":
+		width = 32
+	case "lgbr":
+		width = 8
+	case "llgcr":
+		width = 8
+	case "lghr":
+		width = 16
+	case "llghr", "llgtr":
+		width = 16
+	default:
+		return "", 0, false
+	}
+	if len(arguments) < 2 {
+		return "", 0, false
+	}
+	register, ok := arguments[len(arguments)-1].(s390xasm.Reg)
+	if !ok {
+		return "", 0, false
+	}
+	source, _, ok := registerName(register)
+	if !ok {
+		return "", 0, false
+	}
+	return source, width, true
+}
+
+// signExtending reports whether one extension form sign-extends. The logical
+// forms carry an extra l and zero-extend.
+func signExtending(name string) bool {
+	switch name {
+	case "lgfr", "lgbr", "lghr", "lhr":
+		return true
+	}
+	return false
+}
+
+// isCompareRegister reports whether one mnemonic compares two registers or a
+// register with memory and sets the condition code. The compare-and-branch forms
+// are handled by the branch path, which fuses the comparison with the branch.
+func isCompareRegister(name string) bool {
+	switch name {
+	case "cgr", "clgr", "cr", "clr", "cg", "clg", "cy", "cly", "c", "cl":
+		return true
+	}
+	return false
+}
+
+// shiftOpcode maps one shift mnemonic to its LowIR operation.
+func shiftOpcode(name string) (core.Opcode, bool) {
+	switch name {
+	case "sllg", "sllk", "sll":
+		return core.OpShl, true
+	case "srlg", "srlk", "srl":
+		return core.OpLShr, true
+	case "srag", "srak", "sra":
+		return core.OpAShr, true
+	}
+	return "", false
+}
+
+// shift lifts one shift form. A shift moves one register by a count, which is
+// either an immediate or a second register. The encoding carries the count in a
+// field the memory operand test also matches, so the dispatcher routes shifts
+// before it looks for a displacement.
+func (l *lifter) shift(ins instruction) (core.ValueID, bool) {
+	name := nameOf(ins.inst.Op)
+	kind, ok := shiftOpcode(name)
+	if !ok {
+		return 0, false
+	}
+	arguments := args(ins.inst)
+	if len(arguments) < 2 {
+		return 0, false
+	}
+	destination, destinationBits, ok := firstRegister(arguments)
+	if !ok {
+		return 0, false
+	}
+	// The three-operand form names a separate source; the two-operand form shifts
+	// the destination in place and keeps only the count.
+	sourceArgument := arguments[0]
+	if len(arguments) >= 3 {
+		if _, ok := arguments[2].(s390xasm.Disp20); ok {
+			sourceArgument = arguments[1]
+		}
+	}
+	source, ok := l.sourceValue(ins, sourceArgument, destinationBits)
+	if !ok {
+		return 0, false
+	}
+	count, ok := l.shiftCount(ins, arguments, destinationBits)
+	if !ok {
+		return 0, false
+	}
+	result := l.operation(ins, kind, []core.Operand{l.value(source), l.value(count)}, destinationBits, core.EffectNone)
+	l.writeRegister(ins.address, destination, destinationBits, result)
+	return result, true
+}
+
+// shiftCount returns the shift amount. The three-operand forms carry an
+// immediate; the two-operand forms take the count from the low bits of a
+// register.
+func (l *lifter) shiftCount(ins instruction, arguments []s390xasm.Arg, bits uint16) (core.ValueID, bool) {
+	if len(arguments) >= 3 {
+		// The count sits in the displacement field of the RSE format.
+		if value, ok := arguments[2].(s390xasm.Disp20); ok {
+			return l.constant(ins.address, uint64(value), bits), true
+		}
+		if value, ok := l.immediateValue(ins, arguments[2:], bits); ok {
+			return value, true
+		}
+	}
+	return l.sourceValue(ins, arguments[len(arguments)-1], bits)
 }

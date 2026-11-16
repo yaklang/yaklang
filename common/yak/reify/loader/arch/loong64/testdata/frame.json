@@ -1,0 +1,19 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x1000",
+    "code": [
+      "63 80 ff 02 // addi.d $sp, $sp, -32",
+      "61 60 c0 29 // st.d $ra, $sp, 24",
+      "76 40 c0 29 // st.d $fp, $sp, 16",
+      "76 80 c0 02 // addi.d $fp, $sp, 32",
+      "a4 00 15 00 // or $a0, $a1, $zero",
+      "61 60 c0 28 // ld.d $ra, $sp, 24",
+      "76 40 c0 28 // ld.d $fp, $sp, 16",
+      "63 80 c0 02 // addi.d $sp, $sp, 32",
+      "20 00 00 4c // jr $ra"
+    ],
+    "frame_removed": 10,
+    "params": 8
+  }
+]

@@ -3,10 +3,17 @@ package s390x
 import (
 	"bytes"
 	"context"
-	"testing"
-
+	"embed"
+	"fmt"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/archtest"
+	"testing"
 )
+
+// fmtSscanf parses one two-digit hex byte.
+func fmtSscanf(text string, value *byte) (int, error) {
+	return fmt.Sscanf(text, "%02x", value)
+}
 
 // targetS390X is the target of one s390x code region.
 func targetS390X() core.Target {
@@ -243,4 +250,17 @@ func TestCheckRejectsWrongByteOrder(t *testing.T) {
 	if err := checkTarget(wrong); err == nil {
 		t.Fatal("execution mode accepted")
 	}
+}
+
+//go:embed testdata
+var testdata embed.FS
+
+// TestFixtures runs every case in testdata.
+func TestFixtures(t *testing.T) {
+	archtest.Run(t, archtest.Config{
+		FS:     testdata,
+		Dir:    "testdata",
+		Parser: Parser{},
+		Target: core.Target{OS: core.OSLinux, Architecture: core.ArchS390X, Bits: 64, ByteOrder: core.BigEndian},
+	})
 }

@@ -37,5 +37,456 @@
       "  0x10020  write_register %v0, v6 [write_register]",
       "  0x10024  return [may_trap, unknown]"
     ]
+  },
+  {
+    "name": "add",
+    "address": "0x1000",
+    "code": [
+      "00 85 10 21 // addu $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i64 = read_register %a0 [read_register]",
+      "  0x1000  v2:i64 = read_register %a1 [read_register]",
+      "  0x1000  v3:i64 = add v1, v2",
+      "  0x1000  write_register %v0, v3 [write_register]",
+      "  0x1004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add immediate",
+    "address": "0x1100",
+    "code": [
+      "24 82 00 10 // addiu $v0, $a0, 16"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1100 @ 0x1100",
+      "block b1 @ 0x1100",
+      "  0x1100  v1:i64 = read_register %a0 [read_register]",
+      "  0x1100  v2:i64 = constant 0x10",
+      "  0x1100  v3:i64 = add v1, v2",
+      "  0x1100  write_register %v0, v3 [write_register]",
+      "  0x1104  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "subtract",
+    "address": "0x1200",
+    "code": [
+      "00 85 10 23 // subu $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1200 @ 0x1200",
+      "block b1 @ 0x1200",
+      "  0x1200  v1:i64 = read_register %a0 [read_register]",
+      "  0x1200  v2:i64 = read_register %a1 [read_register]",
+      "  0x1200  v3:i64 = sub v1, v2",
+      "  0x1200  write_register %v0, v3 [write_register]",
+      "  0x1204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "and",
+    "address": "0x1300",
+    "code": [
+      "00 85 10 24 // and $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1300 @ 0x1300",
+      "block b1 @ 0x1300",
+      "  0x1300  v1:i64 = read_register %a0 [read_register]",
+      "  0x1300  v2:i64 = read_register %a1 [read_register]",
+      "  0x1300  v3:i64 = and v1, v2",
+      "  0x1300  write_register %v0, v3 [write_register]",
+      "  0x1304  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "or",
+    "address": "0x1400",
+    "code": [
+      "00 85 10 25 // or $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1400 @ 0x1400",
+      "block b1 @ 0x1400",
+      "  0x1400  v1:i64 = read_register %a0 [read_register]",
+      "  0x1400  v2:i64 = read_register %a1 [read_register]",
+      "  0x1400  v3:i64 = or v1, v2",
+      "  0x1400  write_register %v0, v3 [write_register]",
+      "  0x1404  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "xor",
+    "address": "0x1500",
+    "code": [
+      "00 85 10 26 // xor $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1500 @ 0x1500",
+      "block b1 @ 0x1500",
+      "  0x1500  v1:i64 = read_register %a0 [read_register]",
+      "  0x1500  v2:i64 = read_register %a1 [read_register]",
+      "  0x1500  v3:i64 = xor v1, v2",
+      "  0x1500  write_register %v0, v3 [write_register]",
+      "  0x1504  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "nor",
+    "address": "0x1600",
+    "code": [
+      "00 85 10 27 // nor $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1600 @ 0x1600",
+      "block b1 @ 0x1600",
+      "  0x1600  v1:i64 = read_register %a0 [read_register]",
+      "  0x1600  v2:i64 = read_register %a1 [read_register]",
+      "  0x1600  v3:i64 = xor v1, v2",
+      "  0x1600  write_register %v0, v3 [write_register]",
+      "  0x1604  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift left",
+    "address": "0x1700",
+    "code": [
+      "00 04 10 c0 // sll $v0, $a0, 3"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1700 @ 0x1700",
+      "block b1 @ 0x1700",
+      "  0x1700  v1:i64 = read_register %a0 [read_register]",
+      "  0x1700  v2:i64 = constant 0x3",
+      "  0x1700  v3:i64 = shl v1, v2",
+      "  0x1700  write_register %v0, v3 [write_register]",
+      "  0x1704  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right logical",
+    "address": "0x1800",
+    "code": [
+      "00 04 10 82 // srl $v0, $a0, 2"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1800 @ 0x1800",
+      "block b1 @ 0x1800",
+      "  0x1800  v1:i64 = read_register %a0 [read_register]",
+      "  0x1800  v2:i64 = constant 0x2",
+      "  0x1800  v3:i64 = lshr v1, v2",
+      "  0x1800  write_register %v0, v3 [write_register]",
+      "  0x1804  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right arithmetic",
+    "address": "0x1900",
+    "code": [
+      "00 04 10 83 // sra $v0, $a0, 2"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1900 @ 0x1900",
+      "block b1 @ 0x1900",
+      "  0x1900  v1:i64 = read_register %a0 [read_register]",
+      "  0x1900  v2:i64 = constant 0x2",
+      "  0x1900  v3:i64 = ashr v1, v2",
+      "  0x1900  write_register %v0, v3 [write_register]",
+      "  0x1904  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load word",
+    "address": "0x1a00",
+    "code": [
+      "8f a2 00 08 // lw $v0, 8($sp)"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1a00 @ 0x1a00",
+      "block b1 @ 0x1a00",
+      "  0x1a00  v1:i64 = read_register %sp [read_register]",
+      "  0x1a00  v2:ptr64 = copy v1",
+      "  0x1a00  v3:i64 = constant 0x8",
+      "  0x1a00  v4:i64 = add v2, v3",
+      "  0x1a00  v5:i32 = load v4 [read_memory]",
+      "  0x1a00  v6:i64 = sext v5",
+      "  0x1a00  write_register %v0, v6 [write_register]",
+      "  0x1a04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store word",
+    "address": "0x1b00",
+    "code": [
+      "af a2 00 08 // sw $v0, 8($sp)"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1b00 @ 0x1b00",
+      "block b1 @ 0x1b00",
+      "  0x1b00  v1:i64 = read_register %sp [read_register]",
+      "  0x1b00  v2:ptr64 = copy v1",
+      "  0x1b00  v3:i64 = constant 0x8",
+      "  0x1b00  v4:i64 = add v2, v3",
+      "  0x1b00  v5:i64 = read_register %v0 [read_register]",
+      "  0x1b00  store v4, v5 [write_memory]",
+      "  0x1b04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load byte",
+    "address": "0x1c00",
+    "code": [
+      "90 82 00 01 // lbu $v0, 1($a0)"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1c00 @ 0x1c00",
+      "block b1 @ 0x1c00",
+      "  0x1c00  v1:i64 = read_register %a0 [read_register]",
+      "  0x1c00  v2:ptr64 = copy v1",
+      "  0x1c00  v3:i64 = constant 0x1",
+      "  0x1c00  v4:i64 = add v2, v3",
+      "  0x1c00  v5:i8 = load v4 [read_memory]",
+      "  0x1c00  v6:i64 = zext v5",
+      "  0x1c00  write_register %v0, v6 [write_register]",
+      "  0x1c04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store byte",
+    "address": "0x1d00",
+    "code": [
+      "a0 82 00 01 // sb $v0, 1($a0)"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1d00 @ 0x1d00",
+      "block b1 @ 0x1d00",
+      "  0x1d00  v1:i64 = read_register %a0 [read_register]",
+      "  0x1d00  v2:ptr64 = copy v1",
+      "  0x1d00  v3:i64 = constant 0x1",
+      "  0x1d00  v4:i64 = add v2, v3",
+      "  0x1d00  v5:i64 = read_register %v0 [read_register]",
+      "  0x1d00  store v4, v5 [write_memory]",
+      "  0x1d04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load upper immediate",
+    "address": "0x1e00",
+    "code": [
+      "3c 02 00 01 // lui $v0, 1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1e00 @ 0x1e00",
+      "block b1 @ 0x1e00",
+      "  0x1e00  v1:i64 = constant 0x10000",
+      "  0x1e00  write_register %v0, v1 [write_register]",
+      "  0x1e04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "set less than",
+    "address": "0x1f00",
+    "code": [
+      "00 85 10 2a // slt $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1f00 @ 0x1f00",
+      "block b1 @ 0x1f00",
+      "  0x1f00  v1:i64 = read_register %a0 [read_register]",
+      "  0x1f00  v2:i64 = read_register %a1 [read_register]",
+      "  0x1f00  v3:i64 = slt v1, v2",
+      "  0x1f00  write_register %v0, v3 [write_register]",
+      "  0x1f04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "set less than unsigned",
+    "address": "0x2000",
+    "code": [
+      "00 85 10 2b // sltu $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  v1:i64 = read_register %a0 [read_register]",
+      "  0x2000  v2:i64 = read_register %a1 [read_register]",
+      "  0x2000  v3:i64 = slt v1, v2",
+      "  0x2000  write_register %v0, v3 [write_register]",
+      "  0x2004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "multiply",
+    "address": "0x2100",
+    "code": [
+      "70 85 10 02 // mul $v0, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2100 @ 0x2100",
+      "block b1 @ 0x2100",
+      "  0x2100  v1:i64 = read_register %a0 [read_register]",
+      "  0x2100  v2:i64 = read_register %a1 [read_register]",
+      "  0x2100  v3:i64 = mul v1, v2",
+      "  0x2100  write_register %v0, v3 [write_register]",
+      "  0x2104  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "divide",
+    "address": "0x2200",
+    "code": [
+      "00 85 00 1a // div $zero, $a0, $a1"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2200 @ 0x2200",
+      "block b1 @ 0x2200",
+      "  0x2200  v1:i64 = read_register %a0 [read_register]",
+      "  0x2200  v2:i64 = read_register %a1 [read_register]",
+      "  0x2200  v3:i64 = sdiv v1, v2",
+      "  0x2200  v4:i64 = intrinsic @mips.div.hi, v1, v2",
+      "  0x2200  write_register %lo, v3 [write_register]",
+      "  0x2200  write_register %hi, v4 [write_register]",
+      "  0x2204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch",
+    "address": "0x2300",
+    "code": [
+      "10 00 00 00 00 00 00 00 // b 0"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2300 @ 0x2300",
+      "block b1 @ 0x2300",
+      "  0x2300  v1:i64 = constant 0x0",
+      "  0x2300  v2:i64 = constant 0x0",
+      "  0x2300  v3:i1 = eq v1, v2",
+      "  0x2300  branch v3 -> b1, b2",
+      "block b2 @ 0x2304",
+      "  0x2304  v4:i64 = constant 0x0",
+      "  0x2304  v5:i64 = constant 0x0",
+      "  0x2304  v6:i64 = shl v4, v5",
+      "  0x2308  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch and link",
+    "address": "0x2400",
+    "code": [
+      "04 11 00 00 00 00 00 00 // bal 0"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2400 @ 0x2400",
+      "block b1 @ 0x2400",
+      "  0x2400  v1:i64 = constant 0x0",
+      "  0x2400  v2:i64 = constant 0x0",
+      "  0x2400  v3:i1 = slt v2, v1",
+      "  0x2400  v4:i1 = not v3",
+      "  0x2400  branch v4 -> b1, b2",
+      "block b2 @ 0x2404",
+      "  0x2404  v5:i64 = constant 0x0",
+      "  0x2404  v6:i64 = constant 0x0",
+      "  0x2404  v7:i64 = shl v5, v6",
+      "  0x2408  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch equal",
+    "address": "0x2500",
+    "code": [
+      "10 85 00 04 00 00 00 00 // beq $a0, $a1, 16"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2500 @ 0x2500",
+      "block b1 @ 0x2500",
+      "  0x2500  v1:i64 = read_register %a0 [read_register]",
+      "  0x2500  v2:i64 = read_register %a1 [read_register]",
+      "  0x2500  v3:i1 = eq v1, v2",
+      "  0x2500  branch v3 -> b2",
+      "block b2 @ 0x2504",
+      "  0x2504  v4:i64 = constant 0x0",
+      "  0x2504  v5:i64 = constant 0x0",
+      "  0x2504  v6:i64 = shl v4, v5",
+      "  0x2508  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch not equal",
+    "address": "0x2600",
+    "code": [
+      "14 85 00 04 00 00 00 00 // bne $a0, $a1, 16"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2600 @ 0x2600",
+      "block b1 @ 0x2600",
+      "  0x2600  v1:i64 = read_register %a0 [read_register]",
+      "  0x2600  v2:i64 = read_register %a1 [read_register]",
+      "  0x2600  v3:i1 = eq v1, v2",
+      "  0x2600  v4:i1 = not v3",
+      "  0x2600  branch v4 -> b2",
+      "block b2 @ 0x2604",
+      "  0x2604  v5:i64 = constant 0x0",
+      "  0x2604  v6:i64 = constant 0x0",
+      "  0x2604  v7:i64 = shl v5, v6",
+      "  0x2608  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "jump register",
+    "address": "0x2700",
+    "code": [
+      "03 e0 00 08 00 00 00 00 // jr $ra"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2700 @ 0x2700",
+      "block b1 @ 0x2700",
+      "  0x2700  return [may_trap, unknown]",
+      "block b2 @ 0x2704",
+      "  0x2704  v1:i64 = constant 0x0",
+      "  0x2704  v2:i64 = constant 0x0",
+      "  0x2704  v3:i64 = shl v1, v2",
+      "  0x2708  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "break",
+    "address": "0x2800",
+    "code": [
+      "00 00 00 0d // break 0"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2800 @ 0x2800",
+      "block b1 @ 0x2800",
+      "  0x2800  intrinsic @mips.break [call, may_trap, unknown]",
+      "  0x2804  trap @region-end [may_trap, unknown]"
+    ]
   }
 ]

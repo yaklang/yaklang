@@ -1014,7 +1014,7 @@ ARM64 使用同样的来源顺序和调用图遍历，只是解码器不同。AA
 当前拆分的测试边界也很清楚：
 
 - `loader/fileformat/*_test.go` 只验证头部、节、符号和 hints。
-- `loader/arch/*/testdata/*.json` 只验证机器码到 LowIR 的精确文本。
+- `loader/arch/*/testdata/*.json` 验证机器码到 LowIR 的精确文本，以及栈帧、canary 与 ABI 的行为。
 - `core/lowir2ssa/testcases/*.json` 只验证 LowIR 到 SSAIR/源码。
 - `core/ssa2source/testcases/*.json` 只验证 SSAIR 到源码。
 
@@ -1061,12 +1061,37 @@ ARM64 使用同样的来源顺序和调用图遍历，只是解码器不同。AA
 ### 6.4 测试层次
 
 ```text
-loader/arch/amd64/testdata/*.json      机器码 → 完整 LowIR 文本（精确匹配）
+loader/arch/<arch>/testdata/*.json     机器码 → LowIR / 栈帧 / canary / ABI
 core/lowir2ssa/testcases/*.json        LowIR → SSAIR / 源码
 core/ssa2source/testcases/*.json       SSAIR → 源码
 common/yak/ssa/ssairtext/testdata      SSAIR 文本往返
 common/yak/reify/test/examples         gcc 编译真实 C 文件后跑三层
 ```
+
+每个架构目录只有一个测试文件 `testdata_test.go`，内容是调用 `loader/arch/internal/archtest`。期望值全部写在 JSON 里，一个 fixture 一个对象：
+
+| 字段 | 含义 |
+| --- | --- |
+| `name` | 用例名 |
+| `address` | 区域起始地址 |
+| `symbols` | 函数符号，给出时按符号切分函数 |
+| `code` | 每行一个十六进制串加汇编注释，例如 `55 // push rbp` |
+| `lowir` | 期望的 LowIR 文本，逐字匹配，不含事实头 |
+| `frame_removed` | `remove-stackframe` 应删掉的指令数 |
+| `canary_removed` | `remove-canary` 应删掉的指令数 |
+| `params` | 转换后应绑定的参数个数 |
+| `diagnostics` | 期望的诊断码，按顺序 |
+
+每个计数都从独立的一次解析开始，因为两个 pass 互相影响：canary 的栈槽位于帧内。
+
+`testdata/basic.json`、`blocks.json`、`functions.json` 覆盖解码；`frame.json` 覆盖栈帧与 ABI；`canary.json` 覆盖栈保护（amd64 的 `fs:0x28`、arm64 的 `tpidr_el0`）。
+
+fixture 的字节来源有两种，都可复核：
+
+- `llvm-mc` 汇编后从 ELF 对象取 `.text`（s390x、loong64、riscv、mips、powerpc、x86、arm 及其 64 位变体）。
+- 手工编码 + `objdump -D -b binary -m i8086` 逐条反汇编核对（8086：llvm-mc 的 `.code16` 不可靠，仍按 32 位编码）。
+
+每条用例的注释就是该字节串的汇编写法，所以期望值与真实汇编器或反汇编器一致。
 
 fixture 覆盖的关键形状：
 
@@ -1090,7 +1115,8 @@ fixture 覆盖的关键形状：
 3. `Parse` 只输出 LowIR；不要读文件格式。
 4. 如需文本反汇编，实现 `Disassembler`。
 5. 如需函数切分，实现 `BoundaryDiscoverer`，优先使用 `BoundaryHints`，再走调用图和扫描。
-6. 在 `arch.All()` 注册；补 `testdata/*.json` 精确 fixture。
+6. 在 `arch.All()` 注册；实现 `Facts()` 给出 frame、registers 和 canary。
+7. 补 `testdata/*.json`：`basic.json` 验证解码，`frame.json` 验证栈帧与 ABI。
 
 ### 新增文件格式
 

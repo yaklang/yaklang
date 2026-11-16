@@ -1,0 +1,16 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x1000",
+    "code": [
+      "eb bf f0 00 00 24 // stmg %r11, %r15, 0(%r15)",
+      "e3 f0 ff 60 ff 71 // lay %r15, -160(%r15)",
+      "b9 04 00 23 // lgr %r2, %r3",
+      "e3 f0 f0 a0 00 71 // lay %r15, 160(%r15)",
+      "eb be f0 08 00 04 // lmg %r11, %r14, 8(%r15)",
+      "07 fe // br %r14"
+    ],
+    "frame_removed": 12,
+    "params": 5
+  }
+]

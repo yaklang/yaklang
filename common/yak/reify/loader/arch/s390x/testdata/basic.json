@@ -1,0 +1,393 @@
+[
+  {
+    "name": "move register",
+    "address": "0x1000",
+    "code": [
+      "b9 04 00 23 // lgr %r2, %r3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i64 = read_register %r3 [read_register]",
+      "  0x1000  write_register %r2, v1 [write_register]",
+      "  0x1004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add register",
+    "address": "0x1100",
+    "code": [
+      "b9 08 00 23 // agr %r2, %r3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1100 @ 0x1100",
+      "block b1 @ 0x1100",
+      "  0x1100  v1:i64 = read_register %r2 [read_register]",
+      "  0x1100  v2:i64 = read_register %r3 [read_register]",
+      "  0x1100  v3:i64 = add v1, v2",
+      "  0x1100  write_register %r2, v3 [write_register]",
+      "  0x1104  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add immediate",
+    "address": "0x1200",
+    "code": [
+      "a7 2b 00 01 // aghi %r2, 1"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1200 @ 0x1200",
+      "block b1 @ 0x1200",
+      "  0x1200  v1:i64 = constant 0x1",
+      "  0x1200  v2:i64 = read_register %r2 [read_register]",
+      "  0x1200  v3:i64 = add v2, v1",
+      "  0x1200  write_register %r2, v3 [write_register]",
+      "  0x1204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "subtract register",
+    "address": "0x1300",
+    "code": [
+      "b9 09 00 23 // sgr %r2, %r3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1300 @ 0x1300",
+      "block b1 @ 0x1300",
+      "  0x1300  v1:i64 = read_register %r2 [read_register]",
+      "  0x1300  v2:i64 = read_register %r3 [read_register]",
+      "  0x1300  v3:i64 = sub v1, v2",
+      "  0x1300  write_register %r2, v3 [write_register]",
+      "  0x1304  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "and immediate",
+    "address": "0x1400",
+    "code": [
+      "c0 2b 00 00 00 ff // nilf %r2, 255"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1400 @ 0x1400",
+      "block b1 @ 0x1400",
+      "  0x1400  v1:i64 = constant 0xff",
+      "  0x1400  v2:i64 = read_register %r2 [read_register]",
+      "  0x1400  v3:i64 = and v2, v1",
+      "  0x1400  write_register %r2, v3 [write_register]",
+      "  0x1406  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "or immediate",
+    "address": "0x1500",
+    "code": [
+      "c0 2d 00 00 00 10 // oilf %r2, 16"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1500 @ 0x1500",
+      "block b1 @ 0x1500",
+      "  0x1500  v1:i64 = constant 0x10",
+      "  0x1500  v2:i64 = read_register %r2 [read_register]",
+      "  0x1500  v3:i64 = or v2, v1",
+      "  0x1500  write_register %r2, v3 [write_register]",
+      "  0x1506  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "exclusive or register",
+    "address": "0x1600",
+    "code": [
+      "b9 82 00 23 // xgr %r2, %r3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1600 @ 0x1600",
+      "block b1 @ 0x1600",
+      "  0x1600  v1:i64 = read_register %r2 [read_register]",
+      "  0x1600  v2:i64 = read_register %r3 [read_register]",
+      "  0x1600  v3:i64 = xor v1, v2",
+      "  0x1600  write_register %r2, v3 [write_register]",
+      "  0x1604  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift left logical",
+    "address": "0x1700",
+    "code": [
+      "eb 23 00 03 00 0d // sllg %r2, %r3, 3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1700 @ 0x1700",
+      "block b1 @ 0x1700",
+      "  0x1700  v1:i64 = read_register %r3 [read_register]",
+      "  0x1700  v2:i64 = constant 0x3",
+      "  0x1700  v3:i64 = shl v1, v2",
+      "  0x1700  write_register %r2, v3 [write_register]",
+      "  0x1706  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load doubleword",
+    "address": "0x1800",
+    "code": [
+      "e3 20 f0 10 00 04 // lg %r2, 16(%r15)"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1800 @ 0x1800",
+      "block b1 @ 0x1800",
+      "  0x1800  v1:i64 = read_register %r15 [read_register]",
+      "  0x1800  v2:ptr64 = copy v1",
+      "  0x1800  v3:i64 = constant 0x10",
+      "  0x1800  v4:i64 = add v2, v3",
+      "  0x1800  v5:i64 = load v4 [read_memory]",
+      "  0x1800  write_register %r2, v5 [write_register]",
+      "  0x1806  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store doubleword",
+    "address": "0x1900",
+    "code": [
+      "e3 20 f0 18 00 24 // stg %r2, 24(%r15)"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1900 @ 0x1900",
+      "block b1 @ 0x1900",
+      "  0x1900  v1:i64 = read_register %r15 [read_register]",
+      "  0x1900  v2:ptr64 = copy v1",
+      "  0x1900  v3:i64 = constant 0x18",
+      "  0x1900  v4:i64 = add v2, v3",
+      "  0x1900  v5:i64 = read_register %r2 [read_register]",
+      "  0x1900  store v4, v5 [write_memory]",
+      "  0x1906  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load address",
+    "address": "0x1a00",
+    "code": [
+      "c0 20 00 00 00 00 // larl %r2, 0"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1a00 @ 0x1a00",
+      "block b1 @ 0x1a00",
+      "  0x1a00  v1:ptr64 = constant 0x1a00",
+      "  0x1a00  write_register %r2, v1 [write_register]",
+      "  0x1a06  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "compare register",
+    "address": "0x1b00",
+    "code": [
+      "b9 20 00 23 // cgr %r2, %r3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1b00 @ 0x1b00",
+      "block b1 @ 0x1b00",
+      "  0x1b00  v1:i64 = read_register %r2 [read_register]",
+      "  0x1b00  v2:i64 = read_register %r3 [read_register]",
+      "  0x1b00  v3:i2 = intrinsic @flags.cmp, v1, v2",
+      "  0x1b00  write_register %cc, v3 [write_register]",
+      "  0x1b04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "compare and branch",
+    "address": "0x1c00",
+    "code": [
+      "ec 23 00 00 80 64 // cgrj %r2, %r3, 8, 0"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1c00 @ 0x1c00",
+      "block b1 @ 0x1c00",
+      "  0x1c00  v1:i64 = read_register %r2 [read_register]",
+      "  0x1c00  v2:i64 = read_register %r3 [read_register]",
+      "  0x1c00  v3:i64 = sub v1, v2",
+      "  0x1c00  v4:i1 = intrinsic @cond.e, v3 [read_register]",
+      "  0x1c00  branch v4 -\u003e b1"
+    ]
+  },
+  {
+    "name": "conditional branch",
+    "address": "0x1d00",
+    "code": [
+      "a7 84 00 00 // brc 8, 0"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1d00 @ 0x1d00",
+      "block b1 @ 0x1d00",
+      "  0x1d00  v1:i2 = read_register %cc [read_register]",
+      "  0x1d00  v2:i1 = intrinsic @cond.e, v1 [read_register]",
+      "  0x1d00  branch v2 -\u003e b1"
+    ]
+  },
+  {
+    "name": "call",
+    "address": "0x1e00",
+    "code": [
+      "c0 e5 00 00 00 00 // brasl %r14, 0"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1e00 @ 0x1e00",
+      "block b1 @ 0x1e00",
+      "  0x1e00  call 0x1e00 [call, may_trap, unknown]",
+      "  0x1e06  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "return",
+    "address": "0x1f00",
+    "code": [
+      "07 fe // br %r14"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1f00 @ 0x1f00",
+      "block b1 @ 0x1f00",
+      "  0x1f00  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "supervisor call",
+    "address": "0x2000",
+    "code": [
+      "0a 00 // svc 0"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  trap @s390x.svc [call, may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "move characters",
+    "address": "0x2100",
+    "code": [
+      "d2 03 20 00 30 00 // mvc 0(4,%r2), 0(%r3)"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2100 @ 0x2100",
+      "block b1 @ 0x2100",
+      "  0x2100  v1:ptr64 = constant 0x0",
+      "  0x2100  v2:i8 = intrinsic @s390x.mvc [unknown]",
+      "  0x2100  store v1, v2 [write_memory]",
+      "  0x2106  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "exclusive or characters",
+    "address": "0x2200",
+    "code": [
+      "d7 03 20 00 30 00 // xc 0(4,%r2), 0(%r3)"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2200 @ 0x2200",
+      "block b1 @ 0x2200",
+      "  0x2200  v1:ptr64 = constant 0x0",
+      "  0x2200  v2:i8 = intrinsic @s390x.xc [unknown]",
+      "  0x2200  store v1, v2 [write_memory]",
+      "  0x2206  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "move immediate",
+    "address": "0x2300",
+    "code": [
+      "e5 48 20 00 00 01 // mvghi 0(%r2), 1"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2300 @ 0x2300",
+      "block b1 @ 0x2300",
+      "  0x2300  v1:i64 = read_register %r2 [read_register]",
+      "  0x2300  v2:ptr64 = copy v1",
+      "  0x2300  v3:i64 = constant 0x1",
+      "  0x2300  store v2, v3 [write_memory]",
+      "  0x2306  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "multiply",
+    "address": "0x2400",
+    "code": [
+      "b9 0c 00 23 // msgr %r2, %r3"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2400 @ 0x2400",
+      "block b1 @ 0x2400",
+      "  0x2400  v1:i64 = read_register %r2 [read_register]",
+      "  0x2400  v2:i64 = read_register %r3 [read_register]",
+      "  0x2400  v3:i64 = mul v1, v2",
+      "  0x2400  write_register %r2, v3 [write_register]",
+      "  0x2404  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load float",
+    "address": "0x2500",
+    "code": [
+      "68 00 f0 00 // ld %f0, 0(%r15)"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2500 @ 0x2500",
+      "block b1 @ 0x2500",
+      "  0x2500  v1:i64 = read_register %r15 [read_register]",
+      "  0x2500  v2:ptr64 = copy v1",
+      "  0x2500  v3:i64 = load v2 [read_memory]",
+      "  0x2500  write_register %f0, v3 [write_register]",
+      "  0x2504  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add float",
+    "address": "0x2600",
+    "code": [
+      "b3 1a 00 02 // adbr %f0, %f2"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2600 @ 0x2600",
+      "block b1 @ 0x2600",
+      "  0x2600  v1:i64 = read_register %f0 [read_register]",
+      "  0x2600  v3:i64 = read_register %f2 [read_register]",
+      "  0x2600  v2:f64 = intrinsic @s390x.adbr, v2, v3 [read_register, write_register, unknown]",
+      "  0x2604  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "compare float",
+    "address": "0x2700",
+    "code": [
+      "b3 19 00 02 // cdbr %f0, %f2"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2700 @ 0x2700",
+      "block b1 @ 0x2700",
+      "  0x2700  v1:i64 = read_register %f0 [read_register]",
+      "  0x2700  v3:i64 = read_register %f2 [read_register]",
+      "  0x2700  v2:f64 = intrinsic @s390x.cdbr, v2, v3 [read_register, write_register, unknown]",
+      "  0x2704  trap @region-end [may_trap, unknown]"
+    ]
+  }
+]

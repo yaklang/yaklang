@@ -36,5 +36,408 @@
       "  0x10020  write_register %r3, v5 [write_register]",
       "  0x10024  return [may_trap, unknown]"
     ]
+  },
+  {
+    "name": "add",
+    "address": "0x1000",
+    "code": [
+      "7c 64 2a 14 // add 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i32 = read_register %r4 [read_register]",
+      "  0x1000  v2:i32 = read_register %r5 [read_register]",
+      "  0x1000  v3:i32 = add v1, v2",
+      "  0x1000  write_register %r3, v3 [write_register]",
+      "  0x1004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add immediate",
+    "address": "0x1100",
+    "code": [
+      "38 64 00 10 // addi 3, 4, 16"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1100 @ 0x1100",
+      "block b1 @ 0x1100",
+      "  0x1100  v1:i32 = read_register %r4 [read_register]",
+      "  0x1100  v2:i32 = constant 0x10",
+      "  0x1100  v3:i32 = add v1, v2",
+      "  0x1100  write_register %r3, v3 [write_register]",
+      "  0x1104  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "subtract",
+    "address": "0x1200",
+    "code": [
+      "7c 64 28 50 // subf 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1200 @ 0x1200",
+      "block b1 @ 0x1200",
+      "  0x1200  v1:i32 = read_register %r4 [read_register]",
+      "  0x1200  v2:i32 = read_register %r5 [read_register]",
+      "  0x1200  v3:i32 = sub v1, v2",
+      "  0x1200  write_register %r3, v3 [write_register]",
+      "  0x1204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "and",
+    "address": "0x1300",
+    "code": [
+      "7c 83 28 38 // and 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1300 @ 0x1300",
+      "block b1 @ 0x1300",
+      "  0x1300  v1:i32 = read_register %r4 [read_register]",
+      "  0x1300  v2:i32 = read_register %r5 [read_register]",
+      "  0x1300  v3:i32 = and v1, v2",
+      "  0x1300  write_register %r3, v3 [write_register]",
+      "  0x1304  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "or",
+    "address": "0x1400",
+    "code": [
+      "7c 83 2b 78 // or 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1400 @ 0x1400",
+      "block b1 @ 0x1400",
+      "  0x1400  v1:i32 = read_register %r4 [read_register]",
+      "  0x1400  v2:i32 = read_register %r5 [read_register]",
+      "  0x1400  v3:i32 = or v1, v2",
+      "  0x1400  write_register %r3, v3 [write_register]",
+      "  0x1404  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "xor",
+    "address": "0x1500",
+    "code": [
+      "7c 83 2a 78 // xor 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1500 @ 0x1500",
+      "block b1 @ 0x1500",
+      "  0x1500  v1:i32 = read_register %r4 [read_register]",
+      "  0x1500  v2:i32 = read_register %r5 [read_register]",
+      "  0x1500  v3:i32 = xor v1, v2",
+      "  0x1500  write_register %r3, v3 [write_register]",
+      "  0x1504  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift left",
+    "address": "0x1600",
+    "code": [
+      "54 83 18 38 // slwi 3, 4, 3"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1600 @ 0x1600",
+      "block b1 @ 0x1600",
+      "  0x1600  v1:i32 = read_register %r4 [read_register]",
+      "  0x1600  v2:i8 = constant 0x3",
+      "  0x1600  v3:i8 = constant 0x0",
+      "  0x1600  v4:i8 = constant 0x1c",
+      "  0x1600  v5:i32 = intrinsic @ppc.rlwinm, v1, v2, v3, v4",
+      "  0x1600  write_register %r3, v5 [write_register]",
+      "  0x1604  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right logical",
+    "address": "0x1700",
+    "code": [
+      "54 83 f0 be // srwi 3, 4, 2"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1700 @ 0x1700",
+      "block b1 @ 0x1700",
+      "  0x1700  v1:i32 = read_register %r4 [read_register]",
+      "  0x1700  v2:i8 = constant 0x1e",
+      "  0x1700  v3:i8 = constant 0x2",
+      "  0x1700  v4:i8 = constant 0x1f",
+      "  0x1700  v5:i32 = intrinsic @ppc.rlwinm, v1, v2, v3, v4",
+      "  0x1700  write_register %r3, v5 [write_register]",
+      "  0x1704  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right arithmetic",
+    "address": "0x1800",
+    "code": [
+      "7c 83 16 70 // srawi 3, 4, 2"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1800 @ 0x1800",
+      "block b1 @ 0x1800",
+      "  0x1800  v1:i32 = read_register %r4 [read_register]",
+      "  0x1800  v2:i32 = constant 0x2",
+      "  0x1800  v3:i32 = shl v1, v2",
+      "  0x1800  write_register %r3, v3 [write_register]",
+      "  0x1804  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load word",
+    "address": "0x1900",
+    "code": [
+      "80 61 00 08 // lwz 3, 8(1)"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1900 @ 0x1900",
+      "block b1 @ 0x1900",
+      "  0x1900  v1:i32 = read_register %r1 [read_register]",
+      "  0x1900  v2:ptr32 = copy v1",
+      "  0x1900  v3:i32 = constant 0x8",
+      "  0x1900  v4:i32 = add v2, v3",
+      "  0x1900  v5:i32 = load v4 [read_memory]",
+      "  0x1900  write_register %r3, v5 [write_register]",
+      "  0x1904  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store word",
+    "address": "0x1a00",
+    "code": [
+      "90 61 00 08 // stw 3, 8(1)"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1a00 @ 0x1a00",
+      "block b1 @ 0x1a00",
+      "  0x1a00  v1:i32 = read_register %r1 [read_register]",
+      "  0x1a00  v2:ptr32 = copy v1",
+      "  0x1a00  v3:i32 = constant 0x8",
+      "  0x1a00  v4:i32 = add v2, v3",
+      "  0x1a00  v5:i32 = read_register %r3 [read_register]",
+      "  0x1a00  store v4, v5 [write_memory]",
+      "  0x1a04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load byte",
+    "address": "0x1b00",
+    "code": [
+      "88 64 00 01 // lbz 3, 1(4)"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1b00 @ 0x1b00",
+      "block b1 @ 0x1b00",
+      "  0x1b00  v1:i32 = read_register %r4 [read_register]",
+      "  0x1b00  v2:ptr32 = copy v1",
+      "  0x1b00  v3:i32 = constant 0x1",
+      "  0x1b00  v4:i32 = add v2, v3",
+      "  0x1b00  v5:i8 = load v4 [read_memory]",
+      "  0x1b00  v6:i32 = zext v5",
+      "  0x1b00  write_register %r3, v6 [write_register]",
+      "  0x1b04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store byte",
+    "address": "0x1c00",
+    "code": [
+      "98 64 00 01 // stb 3, 1(4)"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1c00 @ 0x1c00",
+      "block b1 @ 0x1c00",
+      "  0x1c00  v1:i32 = read_register %r4 [read_register]",
+      "  0x1c00  v2:ptr32 = copy v1",
+      "  0x1c00  v3:i32 = constant 0x1",
+      "  0x1c00  v4:i32 = add v2, v3",
+      "  0x1c00  v5:i32 = read_register %r3 [read_register]",
+      "  0x1c00  store v4, v5 [write_memory]",
+      "  0x1c04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load immediate",
+    "address": "0x1d00",
+    "code": [
+      "38 60 00 10 // li 3, 16"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1d00 @ 0x1d00",
+      "block b1 @ 0x1d00",
+      "  0x1d00  v1:i32 = constant 0x10",
+      "  0x1d00  write_register %r3, v1 [write_register]",
+      "  0x1d04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "compare",
+    "address": "0x1e00",
+    "code": [
+      "7c 03 20 00 // cmpw 3, 4"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1e00 @ 0x1e00",
+      "block b1 @ 0x1e00",
+      "  0x1e00  v1:i32 = read_register %r3 [read_register]",
+      "  0x1e00  v2:i32 = read_register %r4 [read_register]",
+      "  0x1e00  v3:i32 = intrinsic @flags.cmpw, v1, v2 [write_register]",
+      "  0x1e00  write_register %cr0, v3 [write_register]",
+      "  0x1e04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "multiply",
+    "address": "0x1f00",
+    "code": [
+      "7c 64 29 d6 // mullw 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1f00 @ 0x1f00",
+      "block b1 @ 0x1f00",
+      "  0x1f00  v1:i32 = read_register %r4 [read_register]",
+      "  0x1f00  v2:i32 = read_register %r5 [read_register]",
+      "  0x1f00  v3:i32 = mul v1, v2",
+      "  0x1f00  write_register %r3, v3 [write_register]",
+      "  0x1f04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "divide",
+    "address": "0x2000",
+    "code": [
+      "7c 64 2b d6 // divw 3, 4, 5"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  v1:i32 = read_register %r4 [read_register]",
+      "  0x2000  v2:i32 = read_register %r5 [read_register]",
+      "  0x2000  v3:i32 = sdiv v1, v2",
+      "  0x2000  write_register %r3, v3 [write_register]",
+      "  0x2004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch",
+    "address": "0x2100",
+    "code": [
+      "48 00 00 00 // b 0"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2100 @ 0x2100",
+      "block b1 @ 0x2100",
+      "  0x2100  v2:i32 = read_register %cr0 [read_register]",
+      "  0x2100  v1:i1 = intrinsic @ppc.branch.b, v2 [read_register, unknown]",
+      "  0x2100  branch v1 -> b1"
+    ]
+  },
+  {
+    "name": "branch and link",
+    "address": "0x2200",
+    "code": [
+      "48 00 00 01 // bl 0"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2200 @ 0x2200",
+      "block b1 @ 0x2200",
+      "  0x2200  call 0x2200 [call, may_trap, unknown]",
+      "  0x2200  v1:i32 = constant 0x2204",
+      "  0x2200  write_register %lr, v1 [write_register]",
+      "  0x2204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch equal",
+    "address": "0x2300",
+    "code": [
+      "41 82 00 00 // bc 12, 2, work"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2300 @ 0x2300",
+      "block b1 @ 0x2300",
+      "  0x2300  v2:i32 = read_register %cr0 [read_register]",
+      "  0x2300  v1:i1 = intrinsic @ppc.branch.bc, v2 [read_register, unknown]",
+      "  0x2300  branch v1 -> b1"
+    ]
+  },
+  {
+    "name": "branch not equal",
+    "address": "0x2400",
+    "code": [
+      "40 82 00 00 // bc 4, 2, work"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2400 @ 0x2400",
+      "block b1 @ 0x2400",
+      "  0x2400  v2:i32 = read_register %cr0 [read_register]",
+      "  0x2400  v1:i1 = intrinsic @ppc.branch.bc, v2 [read_register, unknown]",
+      "  0x2400  branch v1 -> b1"
+    ]
+  },
+  {
+    "name": "branch to link register",
+    "address": "0x2500",
+    "code": [
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2500 @ 0x2500",
+      "block b1 @ 0x2500",
+      "  0x2500  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "move to link register",
+    "address": "0x2600",
+    "code": [
+      "7c 68 03 a6 // mtlr 3"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2600 @ 0x2600",
+      "block b1 @ 0x2600",
+      "  0x2600  v1:i32 = read_register %r3 [read_register]",
+      "  0x2600  write_register %lr, v1 [write_register]",
+      "  0x2604  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "trap",
+    "address": "0x2700",
+    "code": [
+      "7f e0 00 08 // trap"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x2700 @ 0x2700",
+      "block b1 @ 0x2700",
+      "  0x2700  intrinsic @ppc.tw [call, may_trap, unknown]",
+      "  0x2704  trap @region-end [may_trap, unknown]"
+    ]
   }
 ]

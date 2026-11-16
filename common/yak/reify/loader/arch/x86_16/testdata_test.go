@@ -3,9 +3,10 @@ package x86_16
 import (
 	"bytes"
 	"context"
-	"testing"
-
+	"embed"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/archtest"
+	"testing"
 )
 
 // target8086 is the target of one real-mode code region.
@@ -85,4 +86,17 @@ func TestCheckRejectsWrongTarget(t *testing.T) {
 	if err := parser.Check(wrong); err == nil {
 		t.Fatal("386 target accepted")
 	}
+}
+
+//go:embed testdata
+var testdata embed.FS
+
+// TestFixtures runs every case in testdata.
+func TestFixtures(t *testing.T) {
+	archtest.Run(t, archtest.Config{
+		FS:     testdata,
+		Dir:    "testdata",
+		Parser: Parser{},
+		Target: core.Target{OS: core.OSDOS, Architecture: core.Arch8086, Bits: 16, ByteOrder: core.LittleEndian},
+	})
 }
