@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const SessionSnapshotDocumentSchemaVersion = 3
+const SessionSnapshotDocumentSchemaVersion = 4
 
 // SessionSnapshotTaskSummary is the lightweight task index embedded in the
 // cumulative session snapshot. TaskIndex is display-only; TaskID is the stable
@@ -29,29 +29,30 @@ type SessionSnapshotTaskSummary struct {
 }
 
 type SessionTaskSnapshotAttempt struct {
-	Attempt   int                      `json:"attempt"`
-	Status    string                   `json:"status"`
-	Revision  int64                    `json:"revision"`
-	UpdatedAt int64                    `json:"updated_at"`
-	Snapshot  *SessionSnapshot         `json:"snapshot"`
-	Todo      *SessionTaskTodoSnapshot `json:"todo"`
+	Attempt   int                            `json:"attempt"`
+	Status    string                         `json:"status"`
+	Revision  int64                          `json:"revision"`
+	UpdatedAt int64                          `json:"updated_at"`
+	Snapshot  *SessionSnapshotTaskProjection `json:"snapshot"`
+	Todo      *SessionTaskTodoSnapshot       `json:"todo"`
 }
 
 // SessionTaskSnapshot is the latest materialized projection for one logical
 // task. A terminal projection is frozen and remains available after the live
 // task object has been pruned.
 type SessionTaskSnapshot struct {
-	TaskID           string                       `json:"task_id"`
-	TaskIndex        string                       `json:"task_index,omitempty"`
-	TaskName         string                       `json:"task_name,omitempty"`
-	Attempt          int                          `json:"attempt"`
-	Status           string                       `json:"status"`
-	IsFinal          bool                         `json:"is_final"`
-	Revision         int64                        `json:"revision"`
-	UpdatedAt        int64                        `json:"updated_at"`
-	Snapshot         *SessionSnapshot             `json:"snapshot"`
-	Todo             *SessionTaskTodoSnapshot     `json:"todo"`
-	PreviousAttempts []SessionTaskSnapshotAttempt `json:"previous_attempts,omitempty"`
+	TaskID           string                         `json:"task_id"`
+	TaskIndex        string                         `json:"task_index,omitempty"`
+	TaskName         string                         `json:"task_name,omitempty"`
+	IsSubAgent       bool                           `json:"is_sub_agent,omitempty"`
+	Attempt          int                            `json:"attempt"`
+	Status           string                         `json:"status"`
+	IsFinal          bool                           `json:"is_final"`
+	Revision         int64                          `json:"revision"`
+	UpdatedAt        int64                          `json:"updated_at"`
+	Snapshot         *SessionSnapshotTaskProjection `json:"snapshot"`
+	Todo             *SessionTaskTodoSnapshot       `json:"todo"`
+	PreviousAttempts []SessionTaskSnapshotAttempt   `json:"previous_attempts,omitempty"`
 }
 
 type sessionSnapshotToolAccounting struct {
@@ -119,6 +120,11 @@ func normalizeSessionSnapshotDocument(doc *SessionSnapshotDocument) {
 		doc.TodoScopes = make(map[string]*sessionSnapshotTodoScope)
 	}
 	for taskID, task := range doc.Tasks {
+		if task != nil {
+			if scope := doc.TodoScopes[taskID]; scope != nil && scope.IsSubAgent {
+				task.IsSubAgent = true
+			}
+		}
 		if task != nil && task.Attempt <= 0 {
 			task.Attempt = 1
 		}
@@ -130,6 +136,7 @@ func normalizeSessionSnapshotDocument(doc *SessionSnapshotDocument) {
 			}
 		}
 	}
+	normalizeSessionSnapshotDocumentRounds(doc)
 	if doc.Accounting.ToolCalls == nil {
 		doc.Accounting.ToolCalls = make(map[string]sessionSnapshotToolAccounting)
 	}
@@ -146,6 +153,26 @@ func normalizeSessionSnapshotDocument(doc *SessionSnapshotDocument) {
 		NormalizeSessionSnapshot(doc.Session)
 	}
 	normalizeSessionSnapshotDocumentExecutionSeconds(doc)
+}
+
+func normalizeSessionSnapshotDocumentRounds(doc *SessionSnapshotDocument) {
+	if doc == nil || doc.Session == nil {
+		return
+	}
+	totalRounds := 0
+	for _, task := range doc.Tasks {
+		if task != nil && !task.IsSubAgent {
+			totalRounds++
+		}
+	}
+	doc.Session.TotalRounds = totalRounds
+	if totalRounds == 0 {
+		doc.Session.CurrentRound = 0
+		return
+	}
+	if doc.Session.CurrentRound <= 0 || doc.Session.CurrentRound > totalRounds {
+		doc.Session.CurrentRound = totalRounds
+	}
 }
 
 func normalizeSessionSnapshotDocumentExecutionSeconds(doc *SessionSnapshotDocument) {
@@ -187,7 +214,7 @@ func normalizeSessionSnapshotDocumentExecutionSeconds(doc *SessionSnapshotDocume
 	}
 }
 
-func normalizeSessionTaskExecutionSeconds(snapshot *SessionSnapshot) {
+func normalizeSessionTaskExecutionSeconds(snapshot *SessionSnapshotTaskProjection) {
 	if snapshot == nil || snapshot.Execution == nil {
 		return
 	}
@@ -366,6 +393,38 @@ func cloneSessionSnapshot(snapshot *SessionSnapshot) *SessionSnapshot {
 	return &copied
 }
 
+func cloneSessionSnapshotTaskProjection(snapshot *SessionSnapshotTaskProjection) *SessionSnapshotTaskProjection {
+	if snapshot == nil {
+		return nil
+	}
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil
+	}
+	var copied SessionSnapshotTaskProjection
+	if err := json.Unmarshal(raw, &copied); err != nil {
+		return nil
+	}
+	NormalizeSessionSnapshotTaskProjection(&copied)
+	return &copied
+}
+
+func cloneSessionSnapshotForTask(snapshot *SessionSnapshot) *SessionSnapshotTaskProjection {
+	if snapshot == nil {
+		return nil
+	}
+	return cloneSessionSnapshotTaskProjection(&SessionSnapshotTaskProjection{
+		Revision:            snapshot.Revision,
+		UpdatedAt:           snapshot.UpdatedAt,
+		Execution:           snapshot.Execution,
+		Perception:          snapshot.Perception,
+		Capabilities:        snapshot.Capabilities,
+		BackgroundProcesses: snapshot.BackgroundProcesses,
+		Tasks:               snapshot.Tasks,
+		Todo:                snapshot.Todo,
+	})
+}
+
 func taskSnapshotIdentity(task AIStatefulTask) (id, index, name string) {
 	if task == nil {
 		return "", "", ""
@@ -398,11 +457,11 @@ func (c *Config) BeginSessionSnapshotTask(task AIStatefulTask) {
 	history := append([]SessionTaskSnapshotAttempt(nil), existing.PreviousAttempts...)
 	history = append(history, SessionTaskSnapshotAttempt{
 		Attempt: attempt, Status: existing.Status, Revision: existing.Revision,
-		UpdatedAt: existing.UpdatedAt, Snapshot: cloneSessionSnapshot(existing.Snapshot),
+		UpdatedAt: existing.UpdatedAt, Snapshot: cloneSessionSnapshotTaskProjection(existing.Snapshot),
 		Todo: cloneSessionTaskTodo(existing.Todo),
 	})
 	store.document.Tasks[taskID] = &SessionTaskSnapshot{
-		TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName,
+		TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName, IsSubAgent: existing.IsSubAgent,
 		Attempt: attempt + 1, Status: "processing", Revision: existing.Revision + 1,
 		UpdatedAt: time.Now().Unix(), PreviousAttempts: history,
 	}
@@ -565,6 +624,24 @@ func (s *sessionSnapshotDocumentStore) taskSummariesLocked() []SessionSnapshotTa
 	return result
 }
 
+func (s *sessionSnapshotDocumentStore) sessionRoundsLocked(newSessionTask bool) (current, total int) {
+	if s == nil {
+		return 0, 0
+	}
+	for _, task := range s.document.Tasks {
+		if task != nil && !task.IsSubAgent {
+			total++
+		}
+	}
+	if s.document.Session != nil && s.document.Session.CurrentRound > 0 {
+		current = s.document.Session.CurrentRound
+	}
+	if newSessionTask || current <= 0 || current > total {
+		current = total
+	}
+	return current, total
+}
+
 // MaterializeSessionSnapshot records the latest task projection, rebuilds the
 // cumulative session view, and persists the complete document on AISession.
 func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *SessionSnapshot) *SessionSnapshot {
@@ -577,8 +654,12 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 	store.ensureLoadedLocked(c)
 
 	now := time.Now().Unix()
-	if taskID, taskIndex, taskName := taskSnapshotIdentity(task); taskID != "" {
-		if existing := store.document.Tasks[taskID]; existing == nil || !existing.IsFinal {
+	taskID, taskIndex, taskName := taskSnapshotIdentity(task)
+	existingTask := store.document.Tasks[taskID]
+	isSubAgent := task != nil && task.IsSubAgent()
+	newSessionRound := taskID != "" && existingTask == nil && !isSubAgent
+	if taskID != "" {
+		if existing := existingTask; existing == nil || !existing.IsFinal {
 			revision := int64(1)
 			attempt := 1
 			var previousAttempts []SessionTaskSnapshotAttempt
@@ -594,10 +675,12 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 			if latest.Execution != nil && strings.TrimSpace(latest.Execution.Status) != "" {
 				status = strings.TrimSpace(latest.Execution.Status)
 			}
-			taskSnapshot := cloneSessionSnapshot(latest)
-			normalizeSessionTaskExecutionSeconds(taskSnapshot)
+			taskSnapshot := cloneSessionSnapshotForTask(latest)
+			if taskSnapshot != nil {
+				normalizeSessionTaskExecutionSeconds(taskSnapshot)
+			}
 			store.document.Tasks[taskID] = &SessionTaskSnapshot{
-				TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName,
+				TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName, IsSubAgent: isSubAgent,
 				Attempt: attempt, Status: status, IsFinal: isSessionSnapshotExecutionTerminal(status),
 				Revision: revision, UpdatedAt: now, Snapshot: taskSnapshot,
 				PreviousAttempts: previousAttempts,
@@ -616,6 +699,7 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 	session.UpdatedAt = now
 	session.Execution = store.buildCumulativeExecutionLocked(c, latest)
 	session.Tasks = store.taskSummariesLocked()
+	session.CurrentRound, session.TotalRounds = store.sessionRoundsLocked(newSessionRound)
 	session.BackgroundProcesses = store.backgroundProcessesLocked()
 	session.Todo = store.todoSummaryLocked()
 	NormalizeSessionSnapshot(session)

@@ -2636,12 +2636,7 @@ func WithGoalMinIterations(n int64) ConfigOption {
 // 0: time window gate is disabled (default).
 func WithGoalDurationSeconds(seconds int64) ConfigOption {
 	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.GoalDurationSeconds = seconds
-		c.m.Unlock()
+		c.setGoalDurationSeconds(seconds)
 		return nil
 	}
 }

@@ -52,6 +52,8 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.Equal(t, 1, first.Execution.ModifiedFileCount, "session count is unique modified paths")
 	require.Len(t, first.Tasks, 1)
 	require.True(t, first.Tasks[0].IsFinal)
+	require.Equal(t, 1, first.CurrentRound)
+	require.Equal(t, 1, first.TotalRounds)
 
 	cfg.SetHotpatchCurrentTaskIdResolver(func() string { return "task-2" })
 	task2 := NewStatefulTaskBase("task-2", "second", context.Background(), nil, true)
@@ -70,6 +72,8 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.Equal(t, 1, second.Execution.ToolCallSuccess)
 	require.Equal(t, 1, second.Execution.ToolCallFailed)
 	require.Len(t, second.Tasks, 2)
+	require.Equal(t, 2, second.CurrentRound)
+	require.Equal(t, 2, second.TotalRounds)
 
 	raw, err := yakit.GetAISessionMetaSnapshot(db, sessionID)
 	require.NoError(t, err)
@@ -79,6 +83,8 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.Len(t, persisted.Tasks, 2)
 	require.Equal(t, 2, persisted.Session.Execution.ToolCallTotal)
 	require.Equal(t, 5, persisted.Session.Execution.ExecutionRounds)
+	require.Equal(t, 2, persisted.Session.CurrentRound)
+	require.Equal(t, 2, persisted.Session.TotalRounds)
 
 	restored := NewConfig(context.Background(), WithPersistentSessionId(sessionID), WithDisableAutoSkills(true))
 	restoredTask := restored.GetSessionTaskSnapshot("task-1")
@@ -86,6 +92,14 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.True(t, restoredTask.IsFinal)
 	require.Equal(t, 1, restoredTask.Snapshot.Execution.ToolCallTotal)
 	require.Equal(t, 3, restoredTask.Snapshot.Execution.ExecutionRounds)
+	taskRaw, err := json.Marshal(restoredTask)
+	require.NoError(t, err)
+	require.NotContains(t, string(taskRaw), `"round"`,
+		"task snapshots must not carry a logical session round")
+	require.NotContains(t, string(taskRaw), `"current_round"`)
+	require.NotContains(t, string(taskRaw), `"total_rounds"`)
+	require.Contains(t, string(taskRaw), `"execution_rounds":3`,
+		"task snapshots retain their own execution step count")
 
 	restored.SetHotpatchCurrentTaskIdResolver(func() string { return "task-1" })
 	BeginSessionSnapshotExecutionForTask(restored, task1, startedAt.Add(5*time.Minute))
@@ -93,13 +107,22 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 		Execution: restored.BuildSessionSnapshotExecution(task1),
 	})
 	require.Equal(t, 5, retriedSession.Execution.ExecutionRounds,
-		"session rounds retain previous task attempts")
+		"session execution steps retain previous task attempts")
+	require.Equal(t, 2, retriedSession.CurrentRound,
+		"retrying an existing task does not advance the cumulative session round")
+	require.Equal(t, 2, retriedSession.TotalRounds)
 	retried := restored.GetSessionTaskSnapshot("task-1")
 	require.NotNil(t, retried)
 	require.Equal(t, 2, retried.Attempt)
 	require.False(t, retried.IsFinal)
 	require.Len(t, retried.PreviousAttempts, 1)
 	require.Equal(t, "completed", retried.PreviousAttempts[0].Status)
+	retriedRaw, err := json.Marshal(retried)
+	require.NoError(t, err)
+	require.NotContains(t, string(retriedRaw), `"round"`)
+	require.NotContains(t, string(retriedRaw), `"current_round"`)
+	require.NotContains(t, string(retriedRaw), `"total_rounds"`,
+		"previous attempts must not leak session round fields either")
 }
 
 func TestSessionSnapshotDocument_CumulativeExecutionExcludesIdleBetweenTasks(t *testing.T) {
@@ -150,7 +173,7 @@ func TestSessionSnapshotDocument_CumulativeExecutionIncludesPreviousAttempts(t *
 			TaskID:  "task-1",
 			Status:  "completed",
 			IsFinal: true,
-			Snapshot: &SessionSnapshot{Execution: &SessionSnapshotExecution{
+			Snapshot: &SessionSnapshotTaskProjection{Execution: &SessionSnapshotExecution{
 				Status:          "completed",
 				StartedAt:       100,
 				EndedAt:         200,
@@ -160,7 +183,7 @@ func TestSessionSnapshotDocument_CumulativeExecutionIncludesPreviousAttempts(t *
 				{
 					Attempt: 1,
 					Status:  "aborted",
-					Snapshot: &SessionSnapshot{Execution: &SessionSnapshotExecution{
+					Snapshot: &SessionSnapshotTaskProjection{Execution: &SessionSnapshotExecution{
 						Status:          "aborted",
 						StartedAt:       10,
 						EndedAt:         40,
@@ -195,14 +218,14 @@ func TestNormalizeSessionSnapshotDocument_RepairsLegacyExecutionSeconds(t *testi
 		Tasks: map[string]*SessionTaskSnapshot{
 			"task-1": {
 				TaskID: "task-1",
-				Snapshot: &SessionSnapshot{Execution: &SessionSnapshotExecution{
+				Snapshot: &SessionSnapshotTaskProjection{Execution: &SessionSnapshotExecution{
 					StartedAt: 100,
 					EndedAt:   220,
 				}},
 			},
 			"task-2": {
 				TaskID: "task-2",
-				Snapshot: &SessionSnapshot{Execution: &SessionSnapshotExecution{
+				Snapshot: &SessionSnapshotTaskProjection{Execution: &SessionSnapshotExecution{
 					StartedAt: 700,
 					EndedAt:   1000,
 				}},
@@ -213,6 +236,8 @@ func TestNormalizeSessionSnapshotDocument_RepairsLegacyExecutionSeconds(t *testi
 	normalizeSessionSnapshotDocument(&doc)
 
 	require.Equal(t, SessionSnapshotDocumentSchemaVersion, doc.SchemaVersion)
+	require.Equal(t, 2, doc.Session.CurrentRound)
+	require.Equal(t, 2, doc.Session.TotalRounds)
 	require.EqualValues(t, 420, doc.Session.Execution.ExecutionSeconds,
 		"12 minutes of task time must be counted instead of the 15-minute wall-clock span")
 	require.Equal(t, 7, doc.Session.Execution.ExecutionMinutes)
@@ -234,7 +259,7 @@ func TestNormalizeSessionSnapshotDocument_PreservesExecutionSecondsWithoutInterv
 		Tasks: map[string]*SessionTaskSnapshot{
 			"legacy-task": {
 				TaskID:   "legacy-task",
-				Snapshot: &SessionSnapshot{Execution: &SessionSnapshotExecution{Status: "completed"}},
+				Snapshot: &SessionSnapshotTaskProjection{Execution: &SessionSnapshotExecution{Status: "completed"}},
 			},
 		},
 	}
@@ -243,6 +268,33 @@ func TestNormalizeSessionSnapshotDocument_PreservesExecutionSecondsWithoutInterv
 
 	require.EqualValues(t, 480, doc.Session.Execution.ExecutionSeconds)
 	require.Equal(t, 8, doc.Session.Execution.ExecutionMinutes)
+}
+
+func TestNormalizeSessionSnapshotDocument_RoundsExcludeLegacySubAgents(t *testing.T) {
+	doc := SessionSnapshotDocument{
+		SchemaVersion: 3,
+		Session:       &SessionSnapshot{},
+		Tasks: map[string]*SessionTaskSnapshot{
+			"root":  {TaskID: "root"},
+			"child": {TaskID: "child"},
+		},
+		TodoScopes: map[string]*sessionSnapshotTodoScope{
+			"child": {IsSubAgent: true},
+		},
+	}
+
+	normalizeSessionSnapshotDocument(&doc)
+	require.Equal(t, 1, doc.Session.CurrentRound)
+	require.Equal(t, 1, doc.Session.TotalRounds)
+	require.True(t, doc.Tasks["child"].IsSubAgent)
+
+	raw, err := json.Marshal(doc)
+	require.NoError(t, err)
+	var restored SessionSnapshotDocument
+	require.NoError(t, json.Unmarshal(raw, &restored))
+	normalizeSessionSnapshotDocument(&restored)
+	require.Equal(t, 1, restored.Session.CurrentRound)
+	require.Equal(t, 1, restored.Session.TotalRounds)
 }
 
 func TestConvertConfigToOptions_SharesSessionSnapshotDocumentStore(t *testing.T) {
