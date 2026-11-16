@@ -3,16 +3,29 @@ package aireact
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func cloneBrowserBindings(bindings []aicommon.AttachedBrowserBinding) []aicommon.AttachedBrowserBinding {
-	if len(bindings) == 0 {
-		return nil
-	}
-	return append([]aicommon.AttachedBrowserBinding(nil), bindings...)
+type browserAttachmentState struct {
+	mu       sync.RWMutex
+	bindings []aicommon.AttachedBrowserBinding
+}
+
+// Bindings are immutable after parsing. Updates replace the entire selection;
+// readers never modify the returned slice or its elements.
+func (s *browserAttachmentState) set(bindings []aicommon.AttachedBrowserBinding) {
+	s.mu.Lock()
+	s.bindings = bindings
+	s.mu.Unlock()
+}
+
+func (s *browserAttachmentState) get() []aicommon.AttachedBrowserBinding {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.bindings
 }
 
 // parseAttachedBrowserBindings validates and deduplicates browser resources.
@@ -46,56 +59,22 @@ func parseAttachedBrowserBindings(resources []*aicommon.AttachedResource) ([]aic
 	return bindings, explicit
 }
 
-// bindBrowserAttachmentsToTask updates the latest session selection and stores
-// the effective selection on the task. Running tasks keep their own snapshot;
-// queued tasks see the selection that existed when they were created.
-func (r *ReAct) bindBrowserAttachmentsToTask(task aicommon.AIStatefulTask, resources []*aicommon.AttachedResource) {
-	if r == nil || task == nil {
+// updateBrowserAttachments only updates session state. Tasks neither own nor
+// restore browser selections.
+func (r *ReAct) updateBrowserAttachments(resources []*aicommon.AttachedResource) {
+	if r == nil {
 		return
 	}
 	bindings, explicit := parseAttachedBrowserBindings(resources)
-
-	r.browserAttachmentsMu.Lock()
 	if explicit {
-		r.selectedBrowserBindings = cloneBrowserBindings(bindings)
-	}
-	snapshot := cloneBrowserBindings(r.selectedBrowserBindings)
-	r.browserAttachmentsMu.Unlock()
-
-	setTaskBrowserBindings(task, snapshot)
-}
-
-func setTaskBrowserBindings(task aicommon.AIStatefulTask, bindings []aicommon.AttachedBrowserBinding) {
-	if carrier, ok := task.(interface {
-		SetAttachedBrowserBindings([]aicommon.AttachedBrowserBinding)
-	}); ok {
-		carrier.SetAttachedBrowserBindings(bindings)
+		r.browserAttachments.set(bindings)
 	}
 }
 
-func getTaskBrowserBindings(task aicommon.AIStatefulTask) []aicommon.AttachedBrowserBinding {
-	if carrier, ok := task.(interface {
-		GetAttachedBrowserBindings() []aicommon.AttachedBrowserBinding
-	}); ok {
-		return carrier.GetAttachedBrowserBindings()
-	}
-	return nil
-}
-
-// prepareBrowserAttachmentForTask is the single task-start integration point
-// for browser attachments. It activates the task snapshot, promotes the bridge
-// tools once per task, and appends one concise timeline introduction.
-func (r *ReAct) prepareBrowserAttachmentForTask(task aicommon.AIStatefulTask) {
-	if r == nil || task == nil {
-		return
-	}
-	if carrier, ok := task.(interface {
-		GetAttachedBrowserBindings() []aicommon.AttachedBrowserBinding
-	}); ok {
-		r.activateBrowserAttachments(carrier.GetAttachedBrowserBindings())
-	}
-
-	bindings := r.GetActiveBrowserAttachments()
+// prepareBrowserAttachmentContext reads the current session selection at task
+// startup, promotes bridge tools, and appends the necessary introduction.
+func (r *ReAct) prepareBrowserAttachmentContext() {
+	bindings := r.GetBrowserAttachments()
 	if len(bindings) == 0 {
 		return
 	}
@@ -103,37 +82,12 @@ func (r *ReAct) prepareBrowserAttachmentForTask(task aicommon.AIStatefulTask) {
 	r.AddToTimeline("attached_browser", renderAttachedBrowserIntroduction(bindings, missing))
 }
 
-// activateBrowserAttachmentForResumedTask restores the task snapshot for
-// execution paths that bypass the normal ReAct-loop startup. The attachment
-// introduction was already written before the handoff and must not be repeated.
-func (r *ReAct) activateBrowserAttachmentForResumedTask(task aicommon.AIStatefulTask) {
-	if r == nil || task == nil {
-		return
-	}
-	r.activateBrowserAttachments(getTaskBrowserBindings(task))
-	if len(r.GetActiveBrowserAttachments()) == 0 {
-		return
-	}
-	r.promoteAttachedBrowserTools()
-}
-
-func (r *ReAct) activateBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
-	if r == nil {
-		return
-	}
-	r.browserAttachmentsMu.Lock()
-	r.activeBrowserBindings = cloneBrowserBindings(bindings)
-	r.browserAttachmentsMu.Unlock()
-}
-
-// GetActiveBrowserAttachments implements aicommon.BrowserAttachmentProvider.
-func (r *ReAct) GetActiveBrowserAttachments() []aicommon.AttachedBrowserBinding {
+// GetBrowserAttachments implements aicommon.BrowserAttachmentProvider.
+func (r *ReAct) GetBrowserAttachments() []aicommon.AttachedBrowserBinding {
 	if r == nil {
 		return nil
 	}
-	r.browserAttachmentsMu.RLock()
-	defer r.browserAttachmentsMu.RUnlock()
-	return cloneBrowserBindings(r.activeBrowserBindings)
+	return r.browserAttachments.get()
 }
 
 func (r *ReAct) promoteAttachedBrowserTools() []string {

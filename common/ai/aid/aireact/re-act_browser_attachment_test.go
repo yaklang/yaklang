@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,11 +16,6 @@ func browserAttachment(deviceID, reference string) *ypb.AttachedResourceInfo {
 		Key:   aicommon.AttachedResourceKeyBrowserDevice,
 		Value: `{"deviceId":"` + deviceID + `","reference":"` + reference + `"}`,
 	}
-}
-
-func browserTaskBindings(t *testing.T, task aicommon.AIStatefulTask) []aicommon.AttachedBrowserBinding {
-	t.Helper()
-	return getTaskBrowserBindings(task)
 }
 
 func browserReferences(bindings []aicommon.AttachedBrowserBinding) []string {
@@ -51,7 +45,7 @@ func bindBrowserRouteTestRuntime(task aicommon.AIStatefulTask, runtime aicommon.
 	task.SetReActLoop(&browserRouteTestLoop{invoker: runtime})
 }
 
-func TestReActBrowserAttachmentsUseTaskSnapshots(t *testing.T) {
+func TestReActBrowserAttachmentsAreSessionState(t *testing.T) {
 	react := newBrowserAttachmentTestReAct(t)
 
 	firstEvent := &ypb.AIInputEvent{
@@ -63,10 +57,19 @@ func TestReActBrowserAttachmentsUseTaskSnapshots(t *testing.T) {
 	}
 	firstResources, firstControl := normalizeInputAttachments(firstEvent)
 	first := react.buildReTaskFromEvent(firstEvent, firstResources, firstControl)
-	require.Equal(t, []string{"A"}, browserReferences(browserTaskBindings(t, first)))
+	require.Equal(t, []string{"A"}, browserReferences(react.GetBrowserAttachments()))
 	require.Len(t, first.GetAttachedDatas(), 1, "browser resources must not enter generic task attachments")
-	require.Empty(t, react.GetActiveBrowserAttachments(), "a queued task must not change the active browser yet")
 
+	// Task initialization consumes session state, not the original attachment.
+	firstResources[0].Value = "already parsed; do not parse again"
+	react.SetCurrentTask(first)
+	react.prepareBrowserAttachmentContext()
+	bindBrowserRouteTestRuntime(first, react)
+	params, err := aicommon.BindAttachedBrowserToolParams(first, "browser.capability.call", nil)
+	require.NoError(t, err)
+	require.Equal(t, "device-a", params.GetString("device_id"))
+
+	before := len(react.config.Timeline.GetTimelineOutput())
 	secondEvent := &ypb.AIInputEvent{
 		FreeInput: "compare B",
 		AttachedResourceInfo: []*ypb.AttachedResourceInfo{
@@ -75,21 +78,31 @@ func TestReActBrowserAttachmentsUseTaskSnapshots(t *testing.T) {
 	}
 	secondResources, secondControl := normalizeInputAttachments(secondEvent)
 	second := react.buildReTaskFromEvent(secondEvent, secondResources, secondControl)
-	require.Equal(t, []string{"B"}, browserReferences(browserTaskBindings(t, second)))
+	require.Empty(t, second.GetAttachedDatas())
+	require.Equal(t, []string{"B"}, browserReferences(react.GetBrowserAttachments()))
+	require.Len(t, react.config.Timeline.GetTimelineOutput(), before,
+		"applying an attachment only updates session state, not the timeline")
 
-	react.prepareBrowserAttachmentForTask(first)
-	require.Equal(t, []string{"A"}, browserReferences(react.GetActiveBrowserAttachments()))
-	bindBrowserRouteTestRuntime(first, react)
-	params, err := aicommon.BindAttachedBrowserToolParams(first, "browser.capability.call", nil)
+	// Even an older running task uses the current session selection.
+	params, err = aicommon.BindAttachedBrowserToolParams(first, "browser.capability.call", nil)
 	require.NoError(t, err)
-	require.Equal(t, "device-a", params.GetString("device_id"))
+	require.Equal(t, "device-b", params.GetString("device_id"))
+	react.prepareBrowserAttachmentContext()
+	require.Equal(t, []string{"B"}, browserReferences(react.GetBrowserAttachments()),
+		"initializing an older task must not restore a previous browser selection")
+	output := react.config.Timeline.GetTimelineOutput()
+	require.Contains(t, output[len(output)-1].Content, "`B`")
+	require.NotContains(t, output[len(output)-1].Content, "`A`")
 
-	react.prepareBrowserAttachmentForTask(second)
-	require.Equal(t, []string{"B"}, browserReferences(react.GetActiveBrowserAttachments()))
+	react.SetCurrentTask(second)
+	react.prepareBrowserAttachmentContext()
 	bindBrowserRouteTestRuntime(second, react)
 	params, err = aicommon.BindAttachedBrowserToolParams(second, "browser.capability.call", nil)
 	require.NoError(t, err)
 	require.Equal(t, "device-b", params.GetString("device_id"))
+
+	other := newBrowserAttachmentTestReAct(t)
+	require.Empty(t, other.GetBrowserAttachments(), "browser selection belongs only to its own session")
 }
 
 func TestReActBrowserSelectionPersistsAndCanBeReplaced(t *testing.T) {
@@ -103,26 +116,30 @@ func TestReActBrowserSelectionPersistsAndCanBeReplaced(t *testing.T) {
 	}
 	firstResources, firstControl := normalizeInputAttachments(firstEvent)
 	first := react.buildReTaskFromEvent(firstEvent, firstResources, firstControl)
-	react.prepareBrowserAttachmentForTask(first)
+	react.SetCurrentTask(first)
+	react.prepareBrowserAttachmentContext()
 
 	followUpEvent := &ypb.AIInputEvent{FreeInput: "tell me my profile"}
 	followUpResources, followUpControl := normalizeInputAttachments(followUpEvent)
 	followUp := react.buildReTaskFromEvent(followUpEvent, followUpResources, followUpControl)
-	require.Equal(t, []string{"A"}, browserReferences(browserTaskBindings(t, followUp)))
-	react.prepareBrowserAttachmentForTask(followUp)
+	require.Empty(t, followUp.GetAttachedDatas())
+	require.Equal(t, []string{"A"}, browserReferences(react.GetBrowserAttachments()))
+	react.SetCurrentTask(followUp)
+	react.prepareBrowserAttachmentContext()
 
 	switchedEvent := &ypb.AIInputEvent{
 		FreeInput: "compare both accounts",
 		AttachedResourceInfo: []*ypb.AttachedResourceInfo{
 			browserAttachment("device-a", "A"),
 			browserAttachment("device-b", "B"),
+			browserAttachment("device-a", "Duplicate A"),
 		},
 	}
 	switchedResources, switchedControl := normalizeInputAttachments(switchedEvent)
 	switched := react.buildReTaskFromEvent(switchedEvent, switchedResources, switchedControl)
-	require.Equal(t, []string{"A", "B"}, browserReferences(browserTaskBindings(t, switched)))
-	react.prepareBrowserAttachmentForTask(switched)
-	require.Equal(t, []string{"A", "B"}, browserReferences(react.GetActiveBrowserAttachments()))
+	require.Equal(t, []string{"A", "B"}, browserReferences(react.GetBrowserAttachments()))
+	react.SetCurrentTask(switched)
+	react.prepareBrowserAttachmentContext()
 	bindBrowserRouteTestRuntime(switched, react)
 
 	allowed, feedback := aicommon.CheckAttachedBrowserToolRoute(switched, "browser.capability.call")
@@ -130,6 +147,13 @@ func TestReActBrowserSelectionPersistsAndCanBeReplaced(t *testing.T) {
 	params, err := aicommon.BindAttachedBrowserToolParams(switched, "browser.capability.call", aitool.InvokeParams{"browser_ref": "@B"})
 	require.NoError(t, err)
 	require.Equal(t, "device-b", params.GetString("device_id"))
+
+	child := aicommon.NewSubTaskBase(switched, "browser-child", "continue comparison", true)
+	bindBrowserRouteTestRuntime(child, react)
+	params, err = aicommon.BindAttachedBrowserToolParams(child, "browser.capability.call", aitool.InvokeParams{"browser_ref": "A"})
+	require.NoError(t, err)
+	require.Equal(t, "device-a", params.GetString("device_id"),
+		"child tasks read session state through their runtime, without inheriting browser fields")
 }
 
 func TestPrepareBrowserAttachmentPromotesToolsAndAddsTimeline(t *testing.T) {
@@ -144,11 +168,11 @@ func TestPrepareBrowserAttachmentPromotesToolsAndAddsTimeline(t *testing.T) {
 	}
 
 	task := aicommon.NewStatefulTaskBase("browser-init", "inspect A", context.Background(), react.Emitter, true)
-	task.SetAttachedBrowserBindings([]aicommon.AttachedBrowserBinding{{
+	react.browserAttachments.set([]aicommon.AttachedBrowserBinding{{
 		DeviceID: "device-a", Name: "Chrome A", Reference: "A",
 	}})
 	react.SetCurrentTask(task)
-	react.prepareBrowserAttachmentForTask(task)
+	react.prepareBrowserAttachmentContext()
 
 	for _, name := range browserToolNames {
 		require.True(t, react.config.GetAiToolManager().IsRecentlyUsedTool(name), name)
@@ -169,47 +193,24 @@ func TestPrepareBrowserAttachmentPromotesToolsAndAddsTimeline(t *testing.T) {
 func TestPrepareBrowserAttachmentReportsMissingBridgeTools(t *testing.T) {
 	react := newBrowserAttachmentTestReAct(t)
 	task := aicommon.NewStatefulTaskBase("browser-missing", "inspect A", context.Background(), react.Emitter, true)
-	task.SetAttachedBrowserBindings([]aicommon.AttachedBrowserBinding{{
+	react.browserAttachments.set([]aicommon.AttachedBrowserBinding{{
 		DeviceID: "device-a", Reference: "A",
 	}})
 	react.SetCurrentTask(task)
-	react.prepareBrowserAttachmentForTask(task)
+	react.prepareBrowserAttachmentContext()
 
 	output := react.config.Timeline.GetTimelineOutput()
 	require.NotEmpty(t, output)
-	rendered := strings.Join(func() []string {
-		parts := make([]string, 0, len(output))
-		for _, item := range output {
-			parts = append(parts, item.Content)
-		}
-		return parts
-	}(), "\n")
+	rendered := output[len(output)-1].Content
 	require.Contains(t, rendered, "Browser bridge is unavailable")
 	require.Contains(t, rendered, "browser.capability.catalog")
 	require.Contains(t, rendered, "instead of falling back to Rod")
 }
 
-func TestActivateBrowserAttachmentForResumedTaskKeepsExistingTimeline(t *testing.T) {
-	browserToolNames := aicommon.AttachedBrowserBridgeToolNames()
-	tools := make([]*aitool.Tool, 0, len(browserToolNames))
-	for _, name := range browserToolNames {
-		tools = append(tools, aitool.NewWithoutCallback(name))
-	}
-	react := newBrowserAttachmentTestReAct(t, aicommon.WithTools(tools...))
-	for _, name := range browserToolNames {
-		react.config.GetAiToolManager().DisableTool(name)
-	}
-	task := aicommon.NewStatefulTaskBase("browser-recovery", "resume", context.Background(), react.Emitter, true)
-	task.SetAttachedBrowserBindings([]aicommon.AttachedBrowserBinding{{
-		DeviceID: "device-a", Reference: "A",
-	}})
-
+func TestPrepareBrowserAttachmentWithoutSessionSelection(t *testing.T) {
+	react := newBrowserAttachmentTestReAct(t)
 	before := len(react.config.Timeline.GetTimelineOutput())
-	react.activateBrowserAttachmentForResumedTask(task)
-	require.Equal(t, before, len(react.config.Timeline.GetTimelineOutput()),
-		"resuming an already initialized task must not inject the browser introduction twice")
-	require.Equal(t, []string{"A"}, browserReferences(react.GetActiveBrowserAttachments()))
-	for _, name := range browserToolNames {
-		require.True(t, react.config.GetAiToolManager().IsRecentlyUsedTool(name), name)
-	}
+	react.prepareBrowserAttachmentContext()
+	require.Equal(t, before, len(react.config.Timeline.GetTimelineOutput()))
+	require.Empty(t, react.GetBrowserAttachments())
 }
