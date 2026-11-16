@@ -135,6 +135,7 @@ require (
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20211118161826-650dca95af54 // indirect
 	go.opentelemetry.io/otel/sdk v1.32.0 // indirect
+	mvdan.cc/sh/v3 v3.10.0
 )
 
 require (
@@ -142,7 +143,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/VillanCh/go-pcre2-lite v0.1.6
 	github.com/andybalholm/cascadia v1.1.0 // indirect
-	github.com/creack/pty v1.1.21
+	github.com/creack/pty v1.1.23
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
