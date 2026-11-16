@@ -9,7 +9,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeSelected,
-		func() AttachedResourceData { return &AttachedSelectedResourceData{} },
+		newAttachedSelectedResourceData,
 	)
 }
 
@@ -23,15 +23,19 @@ func (d *AttachedSelectedResourceData) Type() string {
 	return AttachedResourceTypeSelected
 }
 
-func (d *AttachedSelectedResourceData) Unmarshal(resource *AttachedResource) error {
-	d.Raw = resource.Value
+func (d *AttachedSelectedResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), d.Raw, d.PlainText)
+}
+
+func newAttachedSelectedResourceData(resource *AttachedResource) (AttachedResourceData, error) {
+	d := &AttachedSelectedResourceData{Raw: resource.Value}
 	if sel, ok := ParseAttachedCodeSelection(resource); ok {
 		d.Selected = sel
 		d.PlainText = sel.Content
-		return nil
+		return d, nil
 	}
 	d.PlainText = resource.Value
-	return nil
+	return d, nil
 }
 
 func (d *AttachedSelectedResourceData) BindLoopData(reactloop ReActLoopIF) error {

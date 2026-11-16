@@ -11,11 +11,21 @@ type browserAttachmentState struct {
 	bindings []aicommon.AttachedBrowserBinding
 }
 
-// Bindings are immutable after parsing. Updates replace the entire selection;
-// readers never modify the returned slice or its elements.
-func (s *browserAttachmentState) set(bindings []aicommon.AttachedBrowserBinding) {
+// Bindings are immutable after parsing. Attachments add to the session state;
+// removal is handled by an explicit session operation, never by a new resource.
+func (s *browserAttachmentState) add(bindings []aicommon.AttachedBrowserBinding) {
 	s.mu.Lock()
-	s.bindings = bindings
+	seen := make(map[string]struct{}, len(s.bindings)+len(bindings))
+	for _, binding := range s.bindings {
+		seen[binding.DeviceID] = struct{}{}
+	}
+	for _, binding := range bindings {
+		if _, exists := seen[binding.DeviceID]; exists {
+			continue
+		}
+		seen[binding.DeviceID] = struct{}{}
+		s.bindings = append(s.bindings, binding)
+	}
 	s.mu.Unlock()
 }
 
@@ -25,12 +35,12 @@ func (s *browserAttachmentState) get() []aicommon.AttachedBrowserBinding {
 	return s.bindings
 }
 
-// SetBrowserAttachments implements aicommon.BrowserAttachmentSession.
-func (r *ReAct) SetBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
+// AddBrowserAttachments implements aicommon.BrowserAttachmentSession.
+func (r *ReAct) AddBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
 	if r == nil {
 		return
 	}
-	r.browserAttachments.set(bindings)
+	r.browserAttachments.add(bindings)
 }
 
 // GetBrowserAttachments implements aicommon.BrowserAttachmentProvider.

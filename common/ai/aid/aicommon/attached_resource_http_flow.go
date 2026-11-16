@@ -15,7 +15,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeHTTPFlowID,
-		func() AttachedResourceData { return &AttachedHTTPFlowResourceData{} },
+		newAttachedHTTPFlowResourceData,
 		"httpflowid",
 		"http_flow",
 	)
@@ -30,22 +30,24 @@ func (d *AttachedHTTPFlowResourceData) Type() string {
 	return AttachedResourceTypeHTTPFlowID
 }
 
-func (d *AttachedHTTPFlowResourceData) Unmarshal(resource *AttachedResource) error {
+func (d *AttachedHTTPFlowResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), fmt.Sprint(d.IDs))
+}
+
+func newAttachedHTTPFlowResourceData(resource *AttachedResource) (AttachedResourceData, error) {
 	raw := strings.TrimSpace(resource.Value)
 	if raw == "" {
-		return utils.Error("http flow id list is empty")
+		return nil, utils.Error("http flow id list is empty")
 	}
 	ids, err := parseAttachedHTTPFlowIDsJSON(raw)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ids, err = normalizeAttachedHTTPFlowIDs(ids)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	d.Raw = raw
-	d.IDs = ids
-	return nil
+	return &AttachedHTTPFlowResourceData{Raw: raw, IDs: ids}, nil
 }
 
 func (d *AttachedHTTPFlowResourceData) BindLoopData(reactloop ReActLoopIF) error {

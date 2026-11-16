@@ -25,13 +25,13 @@ func TestNormalizeInputAttachmentsUnifiesFilePath(t *testing.T) {
 		AttachedFilePath: []string{path, path},
 	}
 	legacyResources, legacyControl := normalizeInputAttachments(legacyEvent)
-	require.Len(t, legacyResources, 1)
+	require.Len(t, legacyResources, 2)
 	require.Equal(t, aicommon.CONTEXT_PROVIDER_TYPE_FILE, legacyResources[0].Type)
 	require.Equal(t, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, legacyResources[0].Key)
 	require.Equal(t, path, legacyResources[0].Value)
 
 	legacyTask := react.buildReTaskFromEvent(legacyEvent, legacyResources, legacyControl)
-	require.Len(t, legacyTask.GetAttachedDatas(), 1)
+	require.Len(t, legacyTask.GetAttachedDatas(), 2)
 	require.Equal(t, path, legacyTask.GetAttachedDatas()[0].Value)
 
 	resourceEvent := &ypb.AIInputEvent{
@@ -138,7 +138,8 @@ func TestNormalizeInputAttachmentsKeepsDistinctLiteralFileContent(t *testing.T) 
 		},
 	}
 	resources, _ := normalizeInputAttachments(event)
-	require.Len(t, resources, 2)
+	require.Len(t, resources, 3)
 	require.Empty(t, resources[0].Value)
 	require.Equal(t, " ", resources[1].Value)
+	require.Empty(t, resources[2].Value)
 }

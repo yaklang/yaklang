@@ -11,7 +11,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeHTTPFuzzRequest,
-		func() AttachedResourceData { return &AttachedHTTPFuzzRequestData{} },
+		newAttachedHTTPFuzzRequestData,
 		"httpfuzzrequest",
 		"http_packet",
 		"httppacket",
@@ -28,15 +28,19 @@ func (d *AttachedHTTPFuzzRequestData) Type() string {
 	return AttachedResourceTypeHTTPFuzzRequest
 }
 
-func (d *AttachedHTTPFuzzRequestData) Unmarshal(resource *AttachedResource) error {
+func (d *AttachedHTTPFuzzRequestData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), fmt.Sprint(d.IsHTTPS), d.Packet)
+}
+
+func newAttachedHTTPFuzzRequestData(resource *AttachedResource) (AttachedResourceData, error) {
 	raw := strings.TrimSpace(resource.Value)
-	d.Raw = raw
 	if raw == "" {
-		return utils.Error("http fuzz request packet is empty")
+		return nil, utils.Error("http fuzz request packet is empty")
 	}
+	d := &AttachedHTTPFuzzRequestData{Raw: raw}
 	if !strings.HasPrefix(raw, "{") {
 		d.Packet = raw
-		return nil
+		return d, nil
 	}
 
 	var payload struct {
@@ -50,7 +54,7 @@ func (d *AttachedHTTPFuzzRequestData) Unmarshal(resource *AttachedResource) erro
 	}
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
 		d.Packet = raw
-		return nil
+		return d, nil
 	}
 	for _, candidate := range []string{
 		payload.HTTPFuzzRequest,
@@ -70,7 +74,7 @@ func (d *AttachedHTTPFuzzRequestData) Unmarshal(resource *AttachedResource) erro
 		d.Packet = raw
 	}
 	d.IsHTTPS = parseAttachedHTTPSFlag(raw)
-	return nil
+	return d, nil
 }
 
 func (d *AttachedHTTPFuzzRequestData) BindLoopData(reactloop ReActLoopIF) error {

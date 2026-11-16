@@ -86,47 +86,47 @@ func TestParseAttachedResourceDataByType(t *testing.T) {
 }
 
 func TestAttachedHTTPFlowIDsFromResourceJSON(t *testing.T) {
-	resource := &AttachedHTTPFlowResourceData{}
-	err := resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[1,2,2,3]`))
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[1,2,2,3]`))
 	require.NoError(t, err)
+	resource := parsed.(*AttachedHTTPFlowResourceData)
 	require.Equal(t, []int64{1, 2, 3}, resource.IDs)
 
-	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[4,5]}`))
+	parsed, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[4,5]}`))
 	require.NoError(t, err)
+	resource = parsed.(*AttachedHTTPFlowResourceData)
 	require.Equal(t, []int64{4, 5}, resource.IDs)
 
-	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":["7895","7894","7896"]}`))
+	parsed, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":["7895","7894","7896"]}`))
 	require.NoError(t, err)
+	resource = parsed.(*AttachedHTTPFlowResourceData)
 	require.Equal(t, []int64{7895, 7894, 7896}, resource.IDs)
 
 	// Test single number
-	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `21`))
+	parsed, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `21`))
 	require.NoError(t, err)
+	resource = parsed.(*AttachedHTTPFlowResourceData)
 	require.Equal(t, []int64{21}, resource.IDs)
 
 	// Test single number string
-	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"42"`))
+	parsed, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"42"`))
 	require.NoError(t, err)
+	resource = parsed.(*AttachedHTTPFlowResourceData)
 	require.Equal(t, []int64{42}, resource.IDs)
 
 	// Test single number string with whitespace
-	resource = &AttachedHTTPFlowResourceData{}
-	err = resource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"  99  "`))
+	parsed, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"  99  "`))
 	require.NoError(t, err)
+	resource = parsed.(*AttachedHTTPFlowResourceData)
 	require.Equal(t, []int64{99}, resource.IDs)
 
-	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
+	_, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
 	require.Error(t, err)
 
-	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[]`))
+	_, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `[]`))
 	require.Error(t, err)
 
 	// Test invalid single string
-	err = (&AttachedHTTPFlowResourceData{}).Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"not-a-number"`))
+	_, err = ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `"not-a-number"`))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid http flow id string")
 }
@@ -207,9 +207,9 @@ func TestAttachedHTTPFlowResourceDataFromDB(t *testing.T) {
 	_, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `not-json`))
 	require.Error(t, err)
 
-	missingResource := &AttachedHTTPFlowResourceData{}
-	err = missingResource.Unmarshal(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[999999999]}`))
+	missingParsed, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, `{"ids":[999999999]}`))
 	require.NoError(t, err)
+	missingResource := missingParsed.(*AttachedHTTPFlowResourceData)
 	require.Contains(t, missingResource.renderSummary(db), "Load Errors")
 
 	resource, err := ParseAttachedResourceData(NewAttachedResource(AttachedResourceTypeHTTPFlowID, AttachedResourceKeyID, fmt.Sprintf(`{"ids":[%d]}`, flow.ID)))
