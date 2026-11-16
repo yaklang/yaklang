@@ -167,6 +167,12 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 		result.Assembly += parsed.Assembly
 		result.Diagnostics = append(result.Diagnostics, parsed.Diagnostics...)
 	}
+	// The global pointer base is a symbol address, and only the artifact knows it.
+	if name := result.IR.Registers.GlobalPointerSymbol; name != "" && artifact.Image != nil {
+		if symbol, ok := artifact.Image.SymbolByName(name); ok {
+			result.IR.Registers.GlobalPointerAddress = symbol.Address
+		}
+	}
 	annotateSymbols(artifact, result.IR)
 	fillFunctionNames(result.IR)
 	if len(result.IR.Functions) == 0 {

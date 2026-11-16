@@ -112,18 +112,24 @@ func constantFromDefinitions(definitions map[core.ValueID]core.Instruction, id c
 }
 
 func functionSymbol(a *core.Artifact, address uint64) string {
-	symbol, ok := a.Image.SymbolAt(address)
-	if !ok || symbol.Name == "" || symbol.Kind == sym.SymbolObject {
+	if a == nil || a.Image == nil {
 		return ""
 	}
-	// A mapping symbol marks where one encoding or data run starts: $a and $t on
-	// ARM, $x and $d on RISC-V, sometimes with an ISA string appended. Its name
-	// describes the section content, not a function, so it must never become a
-	// call target.
-	if strings.HasPrefix(symbol.Name, "$") {
-		return ""
+	// Several symbols share an address: a mapping symbol marks the start of a
+	// run and the function name follows. Skip the marker and keep looking, so a
+	// RISC-V call to puts is named puts and not sub_0x<address>.
+	for _, symbol := range a.Image.Symbols {
+		if symbol.Address != address || symbol.Name == "" || symbol.Kind == sym.SymbolObject {
+			continue
+		}
+		// A mapping symbol marks where one encoding or data run starts: $a and $t
+		// on ARM, $x and $d on RISC-V, sometimes with an ISA string appended.
+		if strings.HasPrefix(symbol.Name, "$") {
+			continue
+		}
+		return symbol.Name
 	}
-	return symbol.Name
+	return ""
 }
 
 func literalValue(literal []byte) uint64 {

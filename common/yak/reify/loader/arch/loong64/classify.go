@@ -125,7 +125,15 @@ func branchTarget(name string, operands []loong64asm.Arg, address uint64) (uint6
 		if !ok {
 			continue
 		}
-		return address + uint64(int64(offset.Imm)>>16), true
+		// The decoder reports the displacement in bytes, but not for every opcode:
+		// some forms scale it by sixty-four kilobytes. A displacement whose low
+		// sixteen bits are clear is the scaled form, and a real branch of that size
+		// does not occur inside one function.
+		value := int64(offset.Imm)
+		if value != 0 && value&0xffff == 0 {
+			value >>= 16
+		}
+		return address + uint64(value), true
 	}
 	return 0, false
 }

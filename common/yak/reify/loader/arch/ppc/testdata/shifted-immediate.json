@@ -1,0 +1,20 @@
+[
+  {
+    "name": "addis shifts its immediate",
+    "address": "0x1000",
+    "code": [
+      "3c 60 00 02 // addis 3, 0, 2",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i32 = constant 0x2",
+      "  0x1000  v2:i32 = constant 0x10",
+      "  0x1000  v3:i32 = shl v1, v2",
+      "  0x1000  write_register %r3, v3 [write_register]",
+      "  0x1004  return [may_trap, unknown]"
+    ]
+  }
+]

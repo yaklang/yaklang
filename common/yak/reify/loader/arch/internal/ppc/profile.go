@@ -60,11 +60,19 @@ func (p Profile) Frame() core.FrameModel {
 
 // Registers describes register naming and the ELF ABI argument registers.
 func (p Profile) Registers() core.RegisterModel {
-	return core.RegisterModel{
-		Naming:    core.RegisterNamingPlain,
-		Width:     p.Bits,
-		Flags:     "",
-		Arguments: []string{"r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10"},
-		Return:    "r3",
+	model := core.RegisterModel{
+		Naming:              core.RegisterNamingPlain,
+		Width:               p.Bits,
+		Flags:               "",
+		Arguments:           []string{"r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10"},
+		GlobalPointer:       "r2",
+		GlobalPointerSymbol: ".TOC.",
+		Return:              "r3",
 	}
+	// ELFv2 passes the function address in r12 so the callee can compute its TOC
+	// pointer from it. The ELFv1 32-bit ABI receives the TOC in r2 instead.
+	if p.Bits == 64 {
+		model.EntryAddress = "r12"
+	}
+	return model
 }

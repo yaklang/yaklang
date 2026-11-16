@@ -58,8 +58,10 @@ func (p Profile) Registers() core.RegisterModel {
 		model.Return = "rax"
 		return model
 	}
-	// A 32-bit result is the low half of the same variable.
+	// A 32-bit result is the low half of the same variable. The cdecl
+	// convention passes every argument on the stack.
 	model.Return = "eax"
+	model.StackArguments = true
 	if p.Mode == 16 {
 		model.Return = "ax"
 	}

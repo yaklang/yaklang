@@ -183,8 +183,10 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		_ = destination
 		_ = immediate
 		return 0, false
-	case "pcaddu12i", "pcalau12i":
-		// The result is the PC-relative page address.
+	case "pcaddi", "pcaddu12i", "pcalau12i", "pcaddu18i":
+		// The PC-relative forms add a scaled immediate to the instruction
+		// address. They are how a position-independent function reaches its
+		// literal pool and its globals.
 		if len(operands) != 2 {
 			return 0, false
 		}
@@ -196,7 +198,14 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		if !ok {
 			return 0, false
 		}
-		value := l.pointerConstant(ins.address, ins.address+uint64(immediate)<<12)
+		shift := uint(2)
+		switch name {
+		case "pcaddu12i", "pcalau12i":
+			shift = 12
+		case "pcaddu18i":
+			shift = 18
+		}
+		value := l.pointerConstant(ins.address, ins.address+uint64(immediate<<shift))
 		l.writeRegister(ins.address, destination, bits, value)
 		return value, true
 	case "ori", "andi", "xori":
