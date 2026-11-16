@@ -273,6 +273,9 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	if len(settings.LowIRPasses) > 0 {
 		convertOptions = append(convertOptions, lowir2ssa.WithLowIRPasses(settings.LowIRPasses...))
 	}
+	// A load from a table of addresses names the object it points at, so the
+	// converter reads the table through the artifact.
+	convertOptions = append(convertOptions, lowir2ssa.WithPointerReader(pointerReader(artifact)))
 	converted, err := lowir2ssa.Convert(ctx, parsed.IR, convertOptions...)
 	if err != nil {
 		return nil, err
@@ -472,4 +475,54 @@ func countValues(ir *core.LowIR) int {
 		}
 	}
 	return total
+}
+
+// pointerReader reads a pointer-sized value stored at an image address. It accepts
+// a value only when it lands inside a mapped section, which keeps an ordinary
+// integer that happens to look like an address out of the result.
+func pointerReader(artifact *core.Artifact) func(uint64, uint16) (uint64, bool) {
+	return func(address uint64, size uint16) (uint64, bool) {
+		if artifact == nil || artifact.Image == nil || artifact.Reader == nil {
+			return 0, false
+		}
+		width := int(size / 8)
+		if width != 4 && width != 8 {
+			return 0, false
+		}
+		section, ok := artifact.Image.SectionAt(address)
+		if !ok || section.VirtualAddress == 0 {
+			return 0, false
+		}
+		delta := address - section.VirtualAddress
+		if delta+uint64(width) > section.FileSize {
+			return 0, false
+		}
+		data, err := artifact.Reader.Bytes(section.FileOffset+delta, uint64(width))
+		if err != nil || len(data) != width {
+			return 0, false
+		}
+		var value uint64
+		if artifact.Target.ByteOrder == core.BigEndian {
+			for _, b := range data {
+				value = value<<8 | uint64(b)
+			}
+		} else {
+			for index := len(data) - 1; index >= 0; index-- {
+				value = value<<8 | uint64(data[index])
+			}
+		}
+		if value == 0 {
+			return 0, false
+		}
+		if _, ok := artifact.Image.SectionAt(value); ok {
+			return value, true
+		}
+		// A table entry can also hold a segment base rather than an address inside
+		// a section: the table says where the image starts, and the code adds the
+		// offset of the object. A page-aligned value is such a base.
+		if value%0x1000 == 0 {
+			return value, true
+		}
+		return 0, false
+	}
 }
