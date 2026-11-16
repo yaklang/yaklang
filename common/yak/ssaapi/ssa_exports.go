@@ -204,6 +204,7 @@ var Exports = map[string]any{
 	"PHP":        ssaconfig.PHP,
 	"Java":       ssaconfig.JAVA,
 	"Python":     ssaconfig.PYTHON,
+	"Bash":       ssaconfig.BASH,
 
 	/// static analyze
 	"YaklangScriptChecking": YaklangScriptChecking,

@@ -33,7 +33,7 @@ func CreateBuilder() ssa.Builder {
 }
 
 func (*SSABuilder) GetLanguage() ssaconfig.Language {
-	return ssaconfig.Language("bash")
+	return ssaconfig.BASH
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
@@ -71,8 +71,12 @@ func (*SSABuilder) ParseAST(src string, _ *ssa.AntlrCache) (ssa.FrontAST, error)
 	return file, nil
 }
 
-// BuildFromAST is implemented together with the SSA mapping in the build step.
-func (*SSABuilder) BuildFromAST(ssa.FrontAST, *ssa.FunctionBuilder) error {
+func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder) error {
+	file, ok := raw.(*syntax.File)
+	if !ok {
+		return utils.Errorf("invalid bash AST type: %T", raw)
+	}
+	newASTBuilder(builder).buildFile(file)
 	return nil
 }
 

@@ -22,6 +22,7 @@ const (
 	TS      Language = "ts"
 	PYTHON  Language = "python"
 	CSHARP  Language = "csharp"
+	BASH    Language = "bash"
 	General Language = "general"
 )
 
@@ -45,6 +46,8 @@ func (l Language) GetFileExt() string {
 		return ".py"
 	case CSHARP:
 		return ".cs"
+	case BASH:
+		return ".sh"
 	default:
 		return ""
 	}
@@ -61,6 +64,7 @@ func GetAllSupportedLanguages() []string {
 		string(TS),
 		string(PYTHON),
 		string(CSHARP),
+		string(BASH),
 	}
 }
 
@@ -86,6 +90,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return PYTHON, nil
 	case "csharp", "c#", "cs", ".net", "dotnet":
 		return CSHARP, nil
+	case "bash", "sh", "shell":
+		return BASH, nil
 	case "general":
 		return General, nil
 	}

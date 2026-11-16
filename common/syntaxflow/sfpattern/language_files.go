@@ -30,6 +30,7 @@ var sourceLanguageExtensions = map[string][]string{
 	"scala":      {".scala", ".sc"},
 	"kubernetes": {".yaml", ".yml"},
 	"yak":        {".yak"},
+	"bash":       {".sh", ".bash"},
 }
 
 // sourceLanguageAliases maps the spellings rules use to the registry key.
@@ -61,6 +62,9 @@ var sourceLanguageAliases = map[string]string{
 	"kubernetes": "kubernetes",
 	"k8s":        "kubernetes",
 	"yak":        "yak",
+	"bash":       "bash",
+	"sh":         "bash",
+	"shell":      "bash",
 }
 
 // languageAllowsPath reports whether a source rule of the given language may
