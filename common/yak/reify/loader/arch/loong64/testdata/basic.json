@@ -1,0 +1,463 @@
+[
+  {
+    "name": "add doubleword",
+    "address": "0x1000",
+    "code": [
+      "a4 98 10 00 // add.d $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i64 = read_register %r5 [read_register]",
+      "  0x1000  v2:i64 = read_register %r6 [read_register]",
+      "  0x1000  v3:i64 = add v1, v2",
+      "  0x1000  write_register %r4, v3 [write_register]",
+      "  0x1004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add immediate",
+    "address": "0x1100",
+    "code": [
+      "a4 40 c0 02 // addi.d $a0, $a1, 16"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1100 @ 0x1100",
+      "block b1 @ 0x1100",
+      "  0x1100  v1:i64 = read_register %r5 [read_register]",
+      "  0x1100  v2:i64 = constant 0x10",
+      "  0x1100  v3:i64 = add v1, v2",
+      "  0x1100  write_register %r4, v3 [write_register]",
+      "  0x1104  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "subtract doubleword",
+    "address": "0x1200",
+    "code": [
+      "a4 98 11 00 // sub.d $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1200 @ 0x1200",
+      "block b1 @ 0x1200",
+      "  0x1200  v1:i64 = read_register %r5 [read_register]",
+      "  0x1200  v2:i64 = read_register %r6 [read_register]",
+      "  0x1200  v3:i64 = sub v1, v2",
+      "  0x1200  write_register %r4, v3 [write_register]",
+      "  0x1204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "and",
+    "address": "0x1300",
+    "code": [
+      "a4 98 14 00 // and $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1300 @ 0x1300",
+      "block b1 @ 0x1300",
+      "  0x1300  v1:i64 = read_register %r5 [read_register]",
+      "  0x1300  v2:i64 = read_register %r6 [read_register]",
+      "  0x1300  v3:i64 = and v1, v2",
+      "  0x1300  write_register %r4, v3 [write_register]",
+      "  0x1304  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "or",
+    "address": "0x1400",
+    "code": [
+      "a4 18 15 00 // or $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1400 @ 0x1400",
+      "block b1 @ 0x1400",
+      "  0x1400  v1:i64 = read_register %r5 [read_register]",
+      "  0x1400  v2:i64 = read_register %r6 [read_register]",
+      "  0x1400  v3:i64 = or v1, v2",
+      "  0x1400  write_register %r4, v3 [write_register]",
+      "  0x1404  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "xor",
+    "address": "0x1500",
+    "code": [
+      "a4 98 15 00 // xor $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1500 @ 0x1500",
+      "block b1 @ 0x1500",
+      "  0x1500  v1:i64 = read_register %r5 [read_register]",
+      "  0x1500  v2:i64 = read_register %r6 [read_register]",
+      "  0x1500  v3:i64 = xor v1, v2",
+      "  0x1500  write_register %r4, v3 [write_register]",
+      "  0x1504  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "nor",
+    "address": "0x1600",
+    "code": [
+      "a4 18 14 00 // nor $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1600 @ 0x1600",
+      "block b1 @ 0x1600",
+      "  0x1600  v1:i64 = read_register %r5 [read_register]",
+      "  0x1600  v2:i64 = read_register %r6 [read_register]",
+      "  0x1600  v3:i64 = or v1, v2",
+      "  0x1600  write_register %r4, v3 [write_register]",
+      "  0x1604  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "andn",
+    "address": "0x1700",
+    "code": [
+      "a4 98 16 00 // andn $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1700 @ 0x1700",
+      "block b1 @ 0x1700",
+      "  0x1700  v1:i64 = read_register %r5 [read_register]",
+      "  0x1700  v2:i64 = read_register %r6 [read_register]",
+      "  0x1700  v3:i64 = intrinsic v1, v2",
+      "  0x1700  write_register %r4, v3 [write_register]",
+      "  0x1704  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "orn",
+    "address": "0x1800",
+    "code": [
+      "a4 18 16 00 // orn $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1800 @ 0x1800",
+      "block b1 @ 0x1800",
+      "  0x1800  v1:i64 = read_register %r5 [read_register]",
+      "  0x1800  v2:i64 = read_register %r6 [read_register]",
+      "  0x1800  v3:i64 = intrinsic v1, v2",
+      "  0x1800  write_register %r4, v3 [write_register]",
+      "  0x1804  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift left logical",
+    "address": "0x1900",
+    "code": [
+      "a4 0c 41 00 // slli.d $a0, $a1, 3"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1900 @ 0x1900",
+      "block b1 @ 0x1900",
+      "  0x1900  v1:i64 = read_register %r5 [read_register]",
+      "  0x1900  v2:i64 = constant 0x3",
+      "  0x1900  v3:i64 = shl v1, v2",
+      "  0x1900  write_register %r4, v3 [write_register]",
+      "  0x1904  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right arithmetic",
+    "address": "0x1a00",
+    "code": [
+      "a4 08 49 00 // srai.d $a0, $a1, 2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1a00 @ 0x1a00",
+      "block b1 @ 0x1a00",
+      "  0x1a00  v1:i64 = read_register %r5 [read_register]",
+      "  0x1a00  v2:i64 = constant 0x2",
+      "  0x1a00  v3:i64 = ashr v1, v2",
+      "  0x1a00  write_register %r4, v3 [write_register]",
+      "  0x1a04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load doubleword",
+    "address": "0x1b00",
+    "code": [
+      "a4 20 c0 28 // ld.d $a0, $a1, 8"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1b00 @ 0x1b00",
+      "block b1 @ 0x1b00",
+      "  0x1b00  v1:i64 = read_register %r5 [read_register]",
+      "  0x1b00  v2:ptr64 = copy v1",
+      "  0x1b00  v3:i64 = constant 0x8",
+      "  0x1b00  v4:i64 = add v2, v3",
+      "  0x1b00  v5:i64 = load v4 [read_memory]",
+      "  0x1b00  write_register %r4, v5 [write_register]",
+      "  0x1b04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store doubleword",
+    "address": "0x1c00",
+    "code": [
+      "a4 20 c0 29 // st.d $a0, $a1, 8"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1c00 @ 0x1c00",
+      "block b1 @ 0x1c00",
+      "  0x1c00  v1:i64 = read_register %r5 [read_register]",
+      "  0x1c00  v2:ptr64 = copy v1",
+      "  0x1c00  v3:i64 = constant 0x8",
+      "  0x1c00  v4:i64 = add v2, v3",
+      "  0x1c00  v5:i64 = read_register %r4 [read_register]",
+      "  0x1c00  store v4, v5 [write_memory]",
+      "  0x1c04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load byte",
+    "address": "0x1d00",
+    "code": [
+      "a4 04 00 2a // ld.bu $a0, $a1, 1"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1d00 @ 0x1d00",
+      "block b1 @ 0x1d00",
+      "  0x1d00  v1:i64 = read_register %r5 [read_register]",
+      "  0x1d00  v2:ptr64 = copy v1",
+      "  0x1d00  v3:i64 = constant 0x1",
+      "  0x1d00  v4:i64 = add v2, v3",
+      "  0x1d00  v5:i8 = load v4 [read_memory]",
+      "  0x1d00  write_register %r4, v5 [write_register]",
+      "  0x1d04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store byte",
+    "address": "0x1e00",
+    "code": [
+      "a4 04 00 29 // st.b $a0, $a1, 1"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1e00 @ 0x1e00",
+      "block b1 @ 0x1e00",
+      "  0x1e00  v1:i64 = read_register %r5 [read_register]",
+      "  0x1e00  v2:ptr64 = copy v1",
+      "  0x1e00  v3:i64 = constant 0x1",
+      "  0x1e00  v4:i64 = add v2, v3",
+      "  0x1e00  v5:i64 = read_register %r4 [read_register]",
+      "  0x1e00  store v4, v5 [write_memory]",
+      "  0x1e04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load upper immediate",
+    "address": "0x1f00",
+    "code": [
+      "24 00 00 14 // lu12i.w $a0, 1"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1f00 @ 0x1f00",
+      "block b1 @ 0x1f00",
+      "  0x1f00  v1:i64 = constant 0x1000",
+      "  0x1f00  write_register %r4, v1 [write_register]",
+      "  0x1f04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "set less than",
+    "address": "0x2000",
+    "code": [
+      "a4 18 12 00 // slt $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  v1:i64 = read_register %r5 [read_register]",
+      "  0x2000  v2:i64 = read_register %r6 [read_register]",
+      "  0x2000  v3:i64 = slt v1, v2",
+      "  0x2000  write_register %r4, v3 [write_register]",
+      "  0x2004  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "set less than unsigned",
+    "address": "0x2100",
+    "code": [
+      "a4 98 12 00 // sltu $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2100 @ 0x2100",
+      "block b1 @ 0x2100",
+      "  0x2100  v1:i64 = read_register %r5 [read_register]",
+      "  0x2100  v2:i64 = read_register %r6 [read_register]",
+      "  0x2100  v3:i64 = slt v1, v2",
+      "  0x2100  write_register %r4, v3 [write_register]",
+      "  0x2104  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "multiply",
+    "address": "0x2200",
+    "code": [
+      "a4 98 1d 00 // mul.d $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2200 @ 0x2200",
+      "block b1 @ 0x2200",
+      "  0x2200  v1:i64 = read_register %r5 [read_register]",
+      "  0x2200  v2:i64 = read_register %r6 [read_register]",
+      "  0x2200  v3:i64 = mul v1, v2",
+      "  0x2200  write_register %r4, v3 [write_register]",
+      "  0x2204  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "divide",
+    "address": "0x2300",
+    "code": [
+      "a4 18 22 00 // div.d $a0, $a1, $a2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2300 @ 0x2300",
+      "block b1 @ 0x2300",
+      "  0x2300  v1:i64 = read_register %r5 [read_register]",
+      "  0x2300  v2:i64 = read_register %r6 [read_register]",
+      "  0x2300  v3:i64 = sdiv v1, v2",
+      "  0x2300  write_register %r4, v3 [write_register]",
+      "  0x2304  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch",
+    "address": "0x2400",
+    "code": [
+      "00 00 00 50 // b 0"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2400 @ 0x2400",
+      "block b1 @ 0x2400",
+      "  0x2400  jump -\u003e b1"
+    ]
+  },
+  {
+    "name": "branch and link",
+    "address": "0x2500",
+    "code": [
+      "00 00 00 54 // bl 0"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2500 @ 0x2500",
+      "block b1 @ 0x2500",
+      "  0x2500  call 0x2500 [call, may_trap, unknown]",
+      "  0x2504  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch equal",
+    "address": "0x2600",
+    "code": [
+      "85 10 00 58 // beq $a0, $a1, 16"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2600 @ 0x2600",
+      "block b1 @ 0x2600",
+      "  0x2600  v1:i64 = read_register %r4 [read_register]",
+      "  0x2600  v2:i64 = read_register %r5 [read_register]",
+      "  0x2600  v3:i1 = eq v1, v2",
+      "  0x2600  branch v3 -\u003e b1"
+    ]
+  },
+  {
+    "name": "branch not equal",
+    "address": "0x2700",
+    "code": [
+      "85 10 00 5c // bne $a0, $a1, 16"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2700 @ 0x2700",
+      "block b1 @ 0x2700",
+      "  0x2700  v1:i64 = read_register %r4 [read_register]",
+      "  0x2700  v2:i64 = read_register %r5 [read_register]",
+      "  0x2700  v3:i1 = eq v1, v2",
+      "  0x2700  v4:i1 = not v3",
+      "  0x2700  branch v4 -\u003e b1"
+    ]
+  },
+  {
+    "name": "jump register",
+    "address": "0x2800",
+    "code": [
+      "a1 00 00 4c // jirl $ra, $a1, 0"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2800 @ 0x2800",
+      "block b1 @ 0x2800",
+      "  0x2800  v1:i64 = read_register %r5 [read_register]",
+      "  0x2800  v2:ptr64 = copy v1",
+      "  0x2800  jump v2 [unknown]"
+    ]
+  },
+  {
+    "name": "return",
+    "address": "0x2900",
+    "code": [
+      "20 00 00 4c // jr $ra"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2900 @ 0x2900",
+      "block b1 @ 0x2900",
+      "  0x2900  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "break",
+    "address": "0x2a00",
+    "code": [
+      "00 00 2a 00 // break 0"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2a00 @ 0x2a00",
+      "block b1 @ 0x2a00",
+      "  0x2a00  trap @loong64.break [call, may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "float add",
+    "address": "0x2b00",
+    "code": [
+      "20 08 01 01 // fadd.d $fa0, $fa1, $fa2"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x2b00 @ 0x2b00",
+      "block b1 @ 0x2b00",
+      "  0x2b00  v1:i64 = intrinsic @loong64.fadd.d, %f0, %f1, %f2 [read_register, write_register, unknown]",
+      "  0x2b04  trap @region-end [may_trap, unknown]"
+    ]
+  }
+]

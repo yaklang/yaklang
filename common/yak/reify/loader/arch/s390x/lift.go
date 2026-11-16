@@ -110,6 +110,12 @@ func (l *lifter) lift(ins instruction) {
 		l.float(ins)
 		return
 	}
+	if _, ok := shiftOpcode(name); ok {
+		if value, ok := l.shift(ins); ok {
+			_ = value
+			return
+		}
+	}
 	if value, ok := l.branchOnCount(ins); ok {
 		_ = value
 		return

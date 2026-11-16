@@ -1,0 +1,574 @@
+[
+  {
+    "name": "mov ax, 0x4c00",
+    "address": "0x100",
+    "code": [
+      "b8 00 4c // mov ax, 0x4c00"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x100 @ 0x100",
+      "block b1 @ 0x100",
+      "  0x100  v1:i16 = constant 0x4c00",
+      "  0x100  write_register %ax, v1 [write_register]",
+      "  0x103  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov bx, ax",
+    "address": "0x110",
+    "code": [
+      "89 c3 // mov bx, ax"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x110 @ 0x110",
+      "block b1 @ 0x110",
+      "  0x110  v1:i16 = read_register %ax [read_register]",
+      "  0x110  write_register %bx, v1 [write_register]",
+      "  0x112  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "push bp",
+    "address": "0x120",
+    "code": [
+      "55 // push bp"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x120 @ 0x120",
+      "block b1 @ 0x120",
+      "  0x120  v1:i16 = read_register %bp [read_register]",
+      "  0x120  v2:i16 = read_register %sp [read_register]",
+      "  0x120  v3:i16 = constant 0x2",
+      "  0x120  v4:i16 = sub v2, v3",
+      "  0x120  write_register %sp, v4 [write_register]",
+      "  0x120  v5:ptr16 = copy v4",
+      "  0x120  store v5, v1 [write_memory]",
+      "  0x121  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "pop bp",
+    "address": "0x130",
+    "code": [
+      "5d // pop bp"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x130 @ 0x130",
+      "block b1 @ 0x130",
+      "  0x130  v1:i16 = read_register %sp [read_register]",
+      "  0x130  v2:ptr16 = copy v1",
+      "  0x130  v3:i16 = load v2 [read_memory]",
+      "  0x130  write_register %bp, v3 [write_register]",
+      "  0x130  v4:i16 = constant 0x2",
+      "  0x130  v5:i16 = add v1, v4",
+      "  0x130  write_register %sp, v5 [write_register]",
+      "  0x131  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov bp, sp",
+    "address": "0x140",
+    "code": [
+      "89 e5 // mov bp, sp"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x140 @ 0x140",
+      "block b1 @ 0x140",
+      "  0x140  v1:i16 = read_register %sp [read_register]",
+      "  0x140  write_register %bp, v1 [write_register]",
+      "  0x142  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "sub sp, 4",
+    "address": "0x150",
+    "code": [
+      "83 ec 04 // sub sp, 4"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x150 @ 0x150",
+      "block b1 @ 0x150",
+      "  0x150  v1:i16 = read_register %sp [read_register]",
+      "  0x150  v2:i16 = constant 0x4",
+      "  0x150  v3:i16 = sub v1, v2",
+      "  0x150  write_register %sp, v3 [write_register]",
+      "  0x150  v4:i16 = intrinsic @flags.sub, v1, v2, v3 [write_register]",
+      "  0x150  write_register %flags, v4 [write_register]",
+      "  0x153  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add sp, 4",
+    "address": "0x160",
+    "code": [
+      "83 c4 04 // add sp, 4"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x160 @ 0x160",
+      "block b1 @ 0x160",
+      "  0x160  v1:i16 = read_register %sp [read_register]",
+      "  0x160  v2:i16 = constant 0x4",
+      "  0x160  v3:i16 = add v1, v2",
+      "  0x160  write_register %sp, v3 [write_register]",
+      "  0x160  v4:i16 = intrinsic @flags.add, v1, v2, v3 [write_register]",
+      "  0x160  write_register %flags, v4 [write_register]",
+      "  0x163  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov ax, [bp+4]",
+    "address": "0x170",
+    "code": [
+      "8b 46 04 // mov ax, [bp+4]"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x170 @ 0x170",
+      "block b1 @ 0x170",
+      "  0x170  v1:i16 = read_register %bp [read_register]",
+      "  0x170  v2:ptr16 = copy v1",
+      "  0x170  v3:i64 = constant 0x4",
+      "  0x170  v4:ptr16 = add v2, v3",
+      "  0x170  v5:i16 = load v4 [read_memory]",
+      "  0x170  write_register %ax, v5 [write_register]",
+      "  0x173  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov [bp+4], ax",
+    "address": "0x180",
+    "code": [
+      "89 46 04 // mov [bp+4], ax"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x180 @ 0x180",
+      "block b1 @ 0x180",
+      "  0x180  v1:i16 = read_register %bp [read_register]",
+      "  0x180  v2:ptr16 = copy v1",
+      "  0x180  v3:i64 = constant 0x4",
+      "  0x180  v4:ptr16 = add v2, v3",
+      "  0x180  v5:i16 = read_register %ax [read_register]",
+      "  0x180  store v4, v5 [write_memory]",
+      "  0x183  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add ax, bx",
+    "address": "0x190",
+    "code": [
+      "01 d8 // add ax, bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x190 @ 0x190",
+      "block b1 @ 0x190",
+      "  0x190  v1:i16 = read_register %ax [read_register]",
+      "  0x190  v2:i16 = read_register %bx [read_register]",
+      "  0x190  v3:i16 = add v1, v2",
+      "  0x190  write_register %ax, v3 [write_register]",
+      "  0x190  v4:i16 = intrinsic @flags.add, v1, v2, v3 [write_register]",
+      "  0x190  write_register %flags, v4 [write_register]",
+      "  0x192  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "sub ax, bx",
+    "address": "0x1a0",
+    "code": [
+      "29 d8 // sub ax, bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1a0 @ 0x1a0",
+      "block b1 @ 0x1a0",
+      "  0x1a0  v1:i16 = read_register %ax [read_register]",
+      "  0x1a0  v2:i16 = read_register %bx [read_register]",
+      "  0x1a0  v3:i16 = sub v1, v2",
+      "  0x1a0  write_register %ax, v3 [write_register]",
+      "  0x1a0  v4:i16 = intrinsic @flags.sub, v1, v2, v3 [write_register]",
+      "  0x1a0  write_register %flags, v4 [write_register]",
+      "  0x1a2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "and ax, bx",
+    "address": "0x1b0",
+    "code": [
+      "21 d8 // and ax, bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1b0 @ 0x1b0",
+      "block b1 @ 0x1b0",
+      "  0x1b0  v1:i16 = read_register %ax [read_register]",
+      "  0x1b0  v2:i16 = read_register %bx [read_register]",
+      "  0x1b0  v3:i16 = and v1, v2",
+      "  0x1b0  write_register %ax, v3 [write_register]",
+      "  0x1b0  v4:i16 = intrinsic @flags.and, v1, v2, v3 [write_register]",
+      "  0x1b0  write_register %flags, v4 [write_register]",
+      "  0x1b2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "or ax, bx",
+    "address": "0x1c0",
+    "code": [
+      "09 d8 // or ax, bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1c0 @ 0x1c0",
+      "block b1 @ 0x1c0",
+      "  0x1c0  v1:i16 = read_register %ax [read_register]",
+      "  0x1c0  v2:i16 = read_register %bx [read_register]",
+      "  0x1c0  v3:i16 = or v1, v2",
+      "  0x1c0  write_register %ax, v3 [write_register]",
+      "  0x1c0  v4:i16 = intrinsic @flags.or, v1, v2, v3 [write_register]",
+      "  0x1c0  write_register %flags, v4 [write_register]",
+      "  0x1c2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "xor ax, ax",
+    "address": "0x1d0",
+    "code": [
+      "31 c0 // xor ax, ax"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1d0 @ 0x1d0",
+      "block b1 @ 0x1d0",
+      "  0x1d0  v1:i16 = read_register %ax [read_register]",
+      "  0x1d0  v2:i16 = read_register %ax [read_register]",
+      "  0x1d0  v3:i16 = xor v1, v2",
+      "  0x1d0  write_register %ax, v3 [write_register]",
+      "  0x1d0  v4:i16 = intrinsic @flags.xor, v1, v2, v3 [write_register]",
+      "  0x1d0  write_register %flags, v4 [write_register]",
+      "  0x1d2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shl ax, 1",
+    "address": "0x1e0",
+    "code": [
+      "d1 e0 // shl ax, 1"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1e0 @ 0x1e0",
+      "block b1 @ 0x1e0",
+      "  0x1e0  v1:i16 = read_register %ax [read_register]",
+      "  0x1e0  v2:i16 = constant 0x1",
+      "  0x1e0  v3:i16 = shl v1, v2",
+      "  0x1e0  write_register %ax, v3 [write_register]",
+      "  0x1e0  v4:i16 = intrinsic @flags.shl, v1, v2, v3 [write_register]",
+      "  0x1e0  write_register %flags, v4 [write_register]",
+      "  0x1e2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shr ax, 1",
+    "address": "0x1f0",
+    "code": [
+      "d1 e8 // shr ax, 1"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1f0 @ 0x1f0",
+      "block b1 @ 0x1f0",
+      "  0x1f0  v1:i16 = read_register %ax [read_register]",
+      "  0x1f0  v2:i16 = constant 0x1",
+      "  0x1f0  v3:i16 = lshr v1, v2",
+      "  0x1f0  write_register %ax, v3 [write_register]",
+      "  0x1f0  v4:i16 = intrinsic @flags.shr, v1, v2, v3 [write_register]",
+      "  0x1f0  write_register %flags, v4 [write_register]",
+      "  0x1f2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "cmp ax, bx",
+    "address": "0x200",
+    "code": [
+      "39 d8 // cmp ax, bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x200 @ 0x200",
+      "block b1 @ 0x200",
+      "  0x200  v1:i16 = read_register %ax [read_register]",
+      "  0x200  v2:i16 = read_register %bx [read_register]",
+      "  0x200  v3:i16 = intrinsic @flags.cmp, v1, v2 [write_register]",
+      "  0x200  write_register %flags, v3 [write_register]",
+      "  0x202  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "je +0x10",
+    "address": "0x210",
+    "code": [
+      "74 0e // je +0x10"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x210 @ 0x210",
+      "block b1 @ 0x210",
+      "  0x210  v1:i16 = read_register %flags [read_register]",
+      "  0x210  v2:i1 = intrinsic @cond.e, v1 [read_register]",
+      "  0x210  branch v2, 0x220 [unknown]"
+    ]
+  },
+  {
+    "name": "jne +0x10",
+    "address": "0x220",
+    "code": [
+      "75 0e // jne +0x10"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x220 @ 0x220",
+      "block b1 @ 0x220",
+      "  0x220  v1:i16 = read_register %flags [read_register]",
+      "  0x220  v2:i1 = intrinsic @cond.ne, v1 [read_register]",
+      "  0x220  branch v2, 0x230 [unknown]"
+    ]
+  },
+  {
+    "name": "jmp +0",
+    "address": "0x230",
+    "code": [
+      "eb 00 // jmp +0"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x230 @ 0x230",
+      "block b1 @ 0x230",
+      "  0x230  jump 0x232 [unknown]"
+    ]
+  },
+  {
+    "name": "call +0",
+    "address": "0x240",
+    "code": [
+      "e8 00 00 // call +0"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x240 @ 0x240",
+      "block b1 @ 0x240",
+      "  0x240  call 0x243 [call, may_trap, unknown]",
+      "  0x243  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "ret",
+    "address": "0x250",
+    "code": [
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x250 @ 0x250",
+      "block b1 @ 0x250",
+      "  0x250  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "int 0x21",
+    "address": "0x260",
+    "code": [
+      "cd 21 // int 0x21"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x260 @ 0x260",
+      "block b1 @ 0x260",
+      "  0x260  trap @x86.int 0x21 [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "inc ax",
+    "address": "0x270",
+    "code": [
+      "40 // inc ax"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x270 @ 0x270",
+      "block b1 @ 0x270",
+      "  0x270  v1:i16 = read_register %ax [read_register]",
+      "  0x270  v2:i16 = constant 0x1",
+      "  0x270  v3:i16 = add v1, v2",
+      "  0x270  write_register %ax, v3 [write_register]",
+      "  0x270  v4:i16 = intrinsic @flags.inc, v1, v2, v3 [write_register]",
+      "  0x270  write_register %flags, v4 [write_register]",
+      "  0x271  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "dec ax",
+    "address": "0x280",
+    "code": [
+      "48 // dec ax"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x280 @ 0x280",
+      "block b1 @ 0x280",
+      "  0x280  v1:i16 = read_register %ax [read_register]",
+      "  0x280  v2:i16 = constant 0x1",
+      "  0x280  v3:i16 = sub v1, v2",
+      "  0x280  write_register %ax, v3 [write_register]",
+      "  0x280  v4:i16 = intrinsic @flags.dec, v1, v2, v3 [write_register]",
+      "  0x280  write_register %flags, v4 [write_register]",
+      "  0x281  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "lea ax, [bp+4]",
+    "address": "0x290",
+    "code": [
+      "8d 46 04 // lea ax, [bp+4]"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x290 @ 0x290",
+      "block b1 @ 0x290",
+      "  0x290  v1:i16 = read_register %bp [read_register]",
+      "  0x290  v2:ptr16 = copy v1",
+      "  0x290  v3:i64 = constant 0x4",
+      "  0x290  v4:ptr16 = add v2, v3",
+      "  0x290  write_register %ax, v4 [write_register]",
+      "  0x293  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "movsb",
+    "address": "0x2a0",
+    "code": [
+      "a4 // movsb"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x2a0 @ 0x2a0",
+      "block b1 @ 0x2a0",
+      "  0x2a0  intrinsic @x86.movsb [read_memory, write_memory, unknown]",
+      "  0x2a1  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "movsw",
+    "address": "0x2b0",
+    "code": [
+      "a5 // movsw"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x2b0 @ 0x2b0",
+      "block b1 @ 0x2b0",
+      "  0x2b0  intrinsic @x86.movsw [read_memory, write_memory, unknown]",
+      "  0x2b1  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "loop +0",
+    "address": "0x2c0",
+    "code": [
+      "e2 00 // loop +0"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x2c0 @ 0x2c0",
+      "block b1 @ 0x2c0",
+      "  0x2c0  intrinsic @x86.loop, 0x2c2 [unknown]",
+      "  0x2c2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mul bx",
+    "address": "0x2d0",
+    "code": [
+      "f7 e3 // mul bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x2d0 @ 0x2d0",
+      "block b1 @ 0x2d0",
+      "  0x2d0  v1:i16 = read_register %ax [read_register]",
+      "  0x2d0  v2:i16 = read_register %bx [read_register]",
+      "  0x2d0  v3:i16 = intrinsic @x86.mul.lo, v1, v2",
+      "  0x2d0  v4:i16 = intrinsic @x86.mul.hi, v1, v2",
+      "  0x2d0  write_register %ax, v3 [write_register]",
+      "  0x2d0  write_register %dx, v4 [write_register]",
+      "  0x2d0  v5:i16 = intrinsic @flags.mul, v3, v4 [write_register]",
+      "  0x2d0  write_register %flags, v5 [write_register]",
+      "  0x2d2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "div bx",
+    "address": "0x2e0",
+    "code": [
+      "f7 f3 // div bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x2e0 @ 0x2e0",
+      "block b1 @ 0x2e0",
+      "  0x2e0  v1:i16 = read_register %ax [read_register]",
+      "  0x2e0  v2:i16 = read_register %dx [read_register]",
+      "  0x2e0  v3:i16 = read_register %bx [read_register]",
+      "  0x2e0  v4:i16 = intrinsic @x86.div.quot, v2, v1, v3 [may_trap]",
+      "  0x2e0  v5:i16 = intrinsic @x86.div.rem, v2, v1, v3 [may_trap]",
+      "  0x2e0  write_register %ax, v4 [write_register]",
+      "  0x2e0  write_register %dx, v5 [write_register]",
+      "  0x2e2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "adc ax, bx",
+    "address": "0x2f0",
+    "code": [
+      "11 d8 // adc ax, bx"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x2f0 @ 0x2f0",
+      "block b1 @ 0x2f0",
+      "  0x2f0  v1:i16 = read_register %ax [read_register]",
+      "  0x2f0  v2:i16 = read_register %bx [read_register]",
+      "  0x2f0  v3:i16 = read_register %flags [read_register]",
+      "  0x2f0  v4:i1 = intrinsic @x86.flag.cf, v3 [read_register]",
+      "  0x2f0  v5:i16 = add v1, v2, v4",
+      "  0x2f0  v6:i16 = intrinsic @flags.adc, v1, v2, v5 [write_register]",
+      "  0x2f0  write_register %flags, v6 [write_register]",
+      "  0x2f0  write_register %ax, v5 [write_register]",
+      "  0x2f2  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "neg ax",
+    "address": "0x300",
+    "code": [
+      "f7 d8 // neg ax"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x300 @ 0x300",
+      "block b1 @ 0x300",
+      "  0x300  v1:i16 = read_register %ax [read_register]",
+      "  0x300  v2:i16 = neg v1",
+      "  0x300  write_register %ax, v2 [write_register]",
+      "  0x300  v3:i16 = intrinsic @flags.neg, v1 [write_register]",
+      "  0x300  write_register %flags, v3 [write_register]",
+      "  0x302  trap @region-end [may_trap, unknown]"
+    ]
+  }
+]

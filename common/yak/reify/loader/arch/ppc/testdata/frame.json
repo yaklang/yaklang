@@ -1,0 +1,18 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x100",
+    "code": [
+      "7c 08 02 a6 // mflr r0",
+      "94 21 ff e0 // stwu r1, -32, r1",
+      "90 01 00 10 // stw r0, 16(r1)",
+      "7c 83 23 78 // mr r3, r4",
+      "38 21 00 20 // addi r1, r1, 32",
+      "80 01 00 10 // lwz r0, 16(r1)",
+      "7c 08 03 a6 // mtlr r0",
+      "4e 80 00 20 // blr"
+    ],
+    "frame_removed": 7,
+    "params": 8
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "name": "stack guard check",
+    "address": "0x1000",
+    "code": [
+      "55 // push rbp",
+      "48 89 e5 // mov rbp, rsp",
+      "48 83 ec 20 // sub rsp, 0x20",
+      "64 48 8b 04 25 28 00 00 00 // mov rax, fs:0x28",
+      "48 89 45 f8 // mov [rbp-8], rax",
+      "31 c0 // xor eax, eax",
+      "48 8b 55 f8 // mov rdx, [rbp-8]",
+      "64 48 2b 14 25 28 00 00 00 // sub rdx, fs:0x28",
+      "74 05 // je done",
+      "e8 00 00 00 00 // call __stack_chk_fail",
+      "c9 // leave",
+      "c3 // ret"
+    ],
+    "canary_removed": 30
+  }
+]

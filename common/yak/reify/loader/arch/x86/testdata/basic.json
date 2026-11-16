@@ -75,5 +75,424 @@
       "  0x401030  write_register %eax, v1 [write_register]",
       "  0x401035  return [may_trap, unknown]"
     ]
+  },
+  {
+    "name": "add",
+    "address": "0x1000",
+    "code": [
+      "01 d8 // addl %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i32 = read_register %eax [read_register]",
+      "  0x1000  v2:i32 = read_register %ebx [read_register]",
+      "  0x1000  v3:i32 = add v1, v2",
+      "  0x1000  write_register %eax, v3 [write_register]",
+      "  0x1000  v4:i32 = intrinsic @flags.add, v1, v2, v3 [write_register]",
+      "  0x1000  write_register %eflags, v4 [write_register]",
+      "  0x1002  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "add immediate",
+    "address": "0x1100",
+    "code": [
+      "83 c0 10 // addl $16, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1100 @ 0x1100",
+      "block b1 @ 0x1100",
+      "  0x1100  v1:i32 = read_register %eax [read_register]",
+      "  0x1100  v2:i32 = constant 0x10",
+      "  0x1100  v3:i32 = add v1, v2",
+      "  0x1100  write_register %eax, v3 [write_register]",
+      "  0x1100  v4:i32 = intrinsic @flags.add, v1, v2, v3 [write_register]",
+      "  0x1100  write_register %eflags, v4 [write_register]",
+      "  0x1103  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "subtract",
+    "address": "0x1200",
+    "code": [
+      "29 d8 // subl %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1200 @ 0x1200",
+      "block b1 @ 0x1200",
+      "  0x1200  v1:i32 = read_register %eax [read_register]",
+      "  0x1200  v2:i32 = read_register %ebx [read_register]",
+      "  0x1200  v3:i32 = sub v1, v2",
+      "  0x1200  write_register %eax, v3 [write_register]",
+      "  0x1200  v4:i32 = intrinsic @flags.sub, v1, v2, v3 [write_register]",
+      "  0x1200  write_register %eflags, v4 [write_register]",
+      "  0x1202  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "and",
+    "address": "0x1300",
+    "code": [
+      "21 d8 // andl %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1300 @ 0x1300",
+      "block b1 @ 0x1300",
+      "  0x1300  v1:i32 = read_register %eax [read_register]",
+      "  0x1300  v2:i32 = read_register %ebx [read_register]",
+      "  0x1300  v3:i32 = and v1, v2",
+      "  0x1300  write_register %eax, v3 [write_register]",
+      "  0x1300  v4:i32 = intrinsic @flags.and, v1, v2, v3 [write_register]",
+      "  0x1300  write_register %eflags, v4 [write_register]",
+      "  0x1302  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "or",
+    "address": "0x1400",
+    "code": [
+      "09 d8 // orl %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1400 @ 0x1400",
+      "block b1 @ 0x1400",
+      "  0x1400  v1:i32 = read_register %eax [read_register]",
+      "  0x1400  v2:i32 = read_register %ebx [read_register]",
+      "  0x1400  v3:i32 = or v1, v2",
+      "  0x1400  write_register %eax, v3 [write_register]",
+      "  0x1400  v4:i32 = intrinsic @flags.or, v1, v2, v3 [write_register]",
+      "  0x1400  write_register %eflags, v4 [write_register]",
+      "  0x1402  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "xor",
+    "address": "0x1500",
+    "code": [
+      "31 d8 // xorl %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1500 @ 0x1500",
+      "block b1 @ 0x1500",
+      "  0x1500  v1:i32 = read_register %eax [read_register]",
+      "  0x1500  v2:i32 = read_register %ebx [read_register]",
+      "  0x1500  v3:i32 = xor v1, v2",
+      "  0x1500  write_register %eax, v3 [write_register]",
+      "  0x1500  v4:i32 = intrinsic @flags.xor, v1, v2, v3 [write_register]",
+      "  0x1500  write_register %eflags, v4 [write_register]",
+      "  0x1502  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift left",
+    "address": "0x1600",
+    "code": [
+      "c1 e0 03 // shll $3, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1600 @ 0x1600",
+      "block b1 @ 0x1600",
+      "  0x1600  v1:i32 = read_register %eax [read_register]",
+      "  0x1600  v2:i32 = constant 0x3",
+      "  0x1600  v3:i32 = shl v1, v2",
+      "  0x1600  write_register %eax, v3 [write_register]",
+      "  0x1600  v4:i32 = intrinsic @flags.shl, v1, v2, v3 [write_register]",
+      "  0x1600  write_register %eflags, v4 [write_register]",
+      "  0x1603  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right logical",
+    "address": "0x1700",
+    "code": [
+      "c1 e8 02 // shrl $2, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1700 @ 0x1700",
+      "block b1 @ 0x1700",
+      "  0x1700  v1:i32 = read_register %eax [read_register]",
+      "  0x1700  v2:i32 = constant 0x2",
+      "  0x1700  v3:i32 = lshr v1, v2",
+      "  0x1700  write_register %eax, v3 [write_register]",
+      "  0x1700  v4:i32 = intrinsic @flags.shr, v1, v2, v3 [write_register]",
+      "  0x1700  write_register %eflags, v4 [write_register]",
+      "  0x1703  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "shift right arithmetic",
+    "address": "0x1800",
+    "code": [
+      "c1 f8 02 // sarl $2, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1800 @ 0x1800",
+      "block b1 @ 0x1800",
+      "  0x1800  v1:i32 = read_register %eax [read_register]",
+      "  0x1800  v2:i32 = constant 0x2",
+      "  0x1800  v3:i32 = ashr v1, v2",
+      "  0x1800  write_register %eax, v3 [write_register]",
+      "  0x1800  v4:i32 = intrinsic @flags.sar, v1, v2, v3 [write_register]",
+      "  0x1800  write_register %eflags, v4 [write_register]",
+      "  0x1803  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load",
+    "address": "0x1900",
+    "code": [
+      "8b 44 24 08 // movl 8(%esp), %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1900 @ 0x1900",
+      "block b1 @ 0x1900",
+      "  0x1900  v1:i32 = read_register %esp [read_register]",
+      "  0x1900  v2:ptr32 = copy v1",
+      "  0x1900  v3:i64 = constant 0x8",
+      "  0x1900  v4:ptr32 = add v2, v3",
+      "  0x1900  v5:i32 = load v4 [read_memory]",
+      "  0x1900  write_register %eax, v5 [write_register]",
+      "  0x1904  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "store",
+    "address": "0x1a00",
+    "code": [
+      "89 44 24 08 // movl %eax, 8(%esp)"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1a00 @ 0x1a00",
+      "block b1 @ 0x1a00",
+      "  0x1a00  v1:i32 = read_register %esp [read_register]",
+      "  0x1a00  v2:ptr32 = copy v1",
+      "  0x1a00  v3:i64 = constant 0x8",
+      "  0x1a00  v4:ptr32 = add v2, v3",
+      "  0x1a00  v5:i32 = read_register %eax [read_register]",
+      "  0x1a00  store v4, v5 [write_memory]",
+      "  0x1a04  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "move immediate",
+    "address": "0x1b00",
+    "code": [
+      "b8 10 00 00 00 // movl $16, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1b00 @ 0x1b00",
+      "block b1 @ 0x1b00",
+      "  0x1b00  v1:i32 = constant 0x10",
+      "  0x1b00  write_register %eax, v1 [write_register]",
+      "  0x1b05  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "compare",
+    "address": "0x1c00",
+    "code": [
+      "39 d8 // cmpl %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1c00 @ 0x1c00",
+      "block b1 @ 0x1c00",
+      "  0x1c00  v1:i32 = read_register %eax [read_register]",
+      "  0x1c00  v2:i32 = read_register %ebx [read_register]",
+      "  0x1c00  v3:i32 = intrinsic @flags.cmp, v1, v2 [write_register]",
+      "  0x1c00  write_register %eflags, v3 [write_register]",
+      "  0x1c02  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "branch equal",
+    "address": "0x1d00",
+    "code": [
+      "0f 84 fc ff ff ff // je 0"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1d00 @ 0x1d00",
+      "block b1 @ 0x1d00",
+      "  0x1d00  v1:i32 = read_register %eflags [read_register]",
+      "  0x1d00  v2:i1 = intrinsic @cond.e, v1 [read_register]",
+      "  0x1d00  branch v2, 0x1d02 [unknown]"
+    ]
+  },
+  {
+    "name": "branch not equal",
+    "address": "0x1e00",
+    "code": [
+      "0f 85 fc ff ff ff // jne 0"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1e00 @ 0x1e00",
+      "block b1 @ 0x1e00",
+      "  0x1e00  v1:i32 = read_register %eflags [read_register]",
+      "  0x1e00  v2:i1 = intrinsic @cond.ne, v1 [read_register]",
+      "  0x1e00  branch v2, 0x1e02 [unknown]"
+    ]
+  },
+  {
+    "name": "jump",
+    "address": "0x1f00",
+    "code": [
+      "e9 fc ff ff ff // jmp 0"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x1f00 @ 0x1f00",
+      "block b1 @ 0x1f00",
+      "  0x1f00  jump 0x1f01 [unknown]"
+    ]
+  },
+  {
+    "name": "call",
+    "address": "0x2000",
+    "code": [
+      "e8 fc ff ff ff // call 0"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  call 0x2001 [call, may_trap, unknown]",
+      "  0x2005  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "return",
+    "address": "0x2100",
+    "code": [
+      "c3 // ret"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2100 @ 0x2100",
+      "block b1 @ 0x2100",
+      "  0x2100  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "interrupt",
+    "address": "0x2200",
+    "code": [
+      "cd 80 // int $0x80"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2200 @ 0x2200",
+      "block b1 @ 0x2200",
+      "  0x2200  trap @x86.int 0x80 [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "increment",
+    "address": "0x2300",
+    "code": [
+      "40 // incl %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2300 @ 0x2300",
+      "block b1 @ 0x2300",
+      "  0x2300  v1:i32 = read_register %eax [read_register]",
+      "  0x2300  v2:i32 = constant 0x1",
+      "  0x2300  v3:i32 = add v1, v2",
+      "  0x2300  write_register %eax, v3 [write_register]",
+      "  0x2300  v4:i32 = intrinsic @flags.inc, v1, v2, v3 [write_register]",
+      "  0x2300  write_register %eflags, v4 [write_register]",
+      "  0x2301  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "decrement",
+    "address": "0x2400",
+    "code": [
+      "48 // decl %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2400 @ 0x2400",
+      "block b1 @ 0x2400",
+      "  0x2400  v1:i32 = read_register %eax [read_register]",
+      "  0x2400  v2:i32 = constant 0x1",
+      "  0x2400  v3:i32 = sub v1, v2",
+      "  0x2400  write_register %eax, v3 [write_register]",
+      "  0x2400  v4:i32 = intrinsic @flags.dec, v1, v2, v3 [write_register]",
+      "  0x2400  write_register %eflags, v4 [write_register]",
+      "  0x2401  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "multiply",
+    "address": "0x2500",
+    "code": [
+      "0f af c3 // imull %ebx, %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2500 @ 0x2500",
+      "block b1 @ 0x2500",
+      "  0x2500  v1:i32 = read_register %ebx [read_register]",
+      "  0x2500  v2:i32 = read_register %eax [read_register]",
+      "  0x2500  v3:i32 = mul v2, v1",
+      "  0x2500  write_register %eax, v3 [write_register]",
+      "  0x2500  v4:i32 = intrinsic @flags.imul, v2, v1, v3 [write_register]",
+      "  0x2500  write_register %eflags, v4 [write_register]",
+      "  0x2503  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "divide",
+    "address": "0x2600",
+    "code": [
+      "f7 fb // idivl %ebx"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2600 @ 0x2600",
+      "block b1 @ 0x2600",
+      "  0x2600  v1:i32 = read_register %eax [read_register]",
+      "  0x2600  v2:i32 = read_register %edx [read_register]",
+      "  0x2600  v3:i32 = read_register %ebx [read_register]",
+      "  0x2600  v4:i32 = intrinsic @x86.idiv.quot, v2, v1, v3 [may_trap]",
+      "  0x2600  v5:i32 = intrinsic @x86.idiv.rem, v2, v1, v3 [may_trap]",
+      "  0x2600  write_register %eax, v4 [write_register]",
+      "  0x2600  write_register %edx, v5 [write_register]",
+      "  0x2602  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "load effective address",
+    "address": "0x2700",
+    "code": [
+      "8d 44 24 08 // leal 8(%esp), %eax"
+    ],
+    "lowir": [
+      "target: linux/386 (32-bit, little-endian)",
+      "function sub_0x2700 @ 0x2700",
+      "block b1 @ 0x2700",
+      "  0x2700  v1:i32 = read_register %esp [read_register]",
+      "  0x2700  v2:ptr32 = copy v1",
+      "  0x2700  v3:i64 = constant 0x8",
+      "  0x2700  v4:ptr32 = add v2, v3",
+      "  0x2700  write_register %eax, v4 [write_register]",
+      "  0x2704  trap @region-end [may_trap, unknown]"
+    ]
   }
 ]

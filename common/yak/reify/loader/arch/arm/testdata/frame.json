@@ -1,0 +1,16 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x1000",
+    "code": [
+      "10 48 2d e9 // push {r4, r11, lr}",
+      "0d b0 a0 e1 // mov r11, sp",
+      "10 d0 4d e2 // sub sp, sp, #16",
+      "01 00 a0 e1 // mov r0, r1",
+      "10 d0 8d e2 // add sp, sp, #16",
+      "10 88 bd e8 // pop {r4, r11, pc}"
+    ],
+    "frame_removed": 39,
+    "params": 4
+  }
+]

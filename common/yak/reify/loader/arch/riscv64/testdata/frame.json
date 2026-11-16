@@ -1,0 +1,19 @@
+[
+  {
+    "name": "call frame and arguments",
+    "address": "0x1000",
+    "code": [
+      "13 01 01 fe // addi sp, sp, -32",
+      "23 3c 11 00 // sd ra, 24(sp)",
+      "23 38 81 00 // sd s0, 16(sp)",
+      "13 04 01 02 // addi s0, sp, 32",
+      "93 05 15 00 // addi a1, a0, 1",
+      "83 30 81 01 // ld ra, 24(sp)",
+      "03 34 01 01 // ld s0, 16(sp)",
+      "13 01 01 02 // addi sp, sp, 32",
+      "67 80 00 00 // ret"
+    ],
+    "frame_removed": 22,
+    "params": 8
+  }
+]
