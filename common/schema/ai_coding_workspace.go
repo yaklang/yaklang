@@ -7,7 +7,7 @@ type AICodingWorkspace struct {
 	gorm.Model
 	WorkspaceID string `gorm:"unique_index;not null"`
 	Name        string
-	RootPath    string      `gorm:"not null"` // Compatibility alias for RootPaths[0].
+	RootPath    string      `gorm:"not null"` // Primary directory, mirrored from RootPaths[0] for Git operations.
 	RootPaths   StringSlice `gorm:"type:text"`
 	IsGit       bool
 }

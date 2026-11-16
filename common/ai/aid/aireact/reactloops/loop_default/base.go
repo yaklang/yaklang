@@ -14,27 +14,20 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")
-
-var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
-
-var codingInstruction = promptloader.MustLoad("mainloop/coding/instruction.txt")
-var codingOutputExample = promptloader.MustLoad("mainloop/coding/output_example.txt")
-
 func promptOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
-	if typed, ok := cfg.(*aicommon.Config); ok && typed.AgentMode == ypb.AgentModeCoding {
-		return []reactloops.ReActLoopOption{
-			reactloops.WithPersistentInstruction(codingInstruction),
-			// Coding examples must not append unrelated registered focus-mode examples.
-			reactloops.WithOutputExampleContextProvider(func(*reactloops.ReActLoop, string) (string, error) {
-				return codingOutputExample, nil
-			}),
-		}
+	mode := ypb.AgentModeSecurity
+	if typed, ok := cfg.(*aicommon.Config); ok {
+		mode = typed.AgentMode
 	}
-	return []reactloops.ReActLoopOption{
-		reactloops.WithPersistentInstruction(instruction),
-		reactloops.WithOutputExample(outputExample),
+	prompts := aicommon.AgentPrompts(mode)
+	options := []reactloops.ReActLoopOption{reactloops.WithPersistentInstruction(prompts.DefaultInstruction)}
+	if mode == ypb.AgentModeCoding {
+		// Coding examples must not append unrelated registered focus-mode examples.
+		return append(options, reactloops.WithOutputExampleContextProvider(func(*reactloops.ReActLoop, string) (string, error) {
+			return prompts.DefaultOutputExample, nil
+		}))
 	}
+	return append(options, reactloops.WithOutputExample(prompts.DefaultOutputExample))
 }
 
 var reactiveDataTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/reactive_data.txt")

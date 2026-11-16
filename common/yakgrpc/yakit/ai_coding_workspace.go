@@ -17,22 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func migrateCodingWorkspacePaths(db *gorm.DB) error {
-	// Earlier experimental builds treated a source path as workspace identity.
-	// AutoMigrate adds RootPaths but does not remove that obsolete unique index.
-	const index = "uix_ai_coding_workspaces_root_path"
-	if db.Dialect().HasIndex("ai_coding_workspaces", index) {
-		return db.Model(&schema.AICodingWorkspace{}).RemoveIndex(index).Error
-	}
-	return nil
-}
-
-func init() {
-	RegisterPostInitDatabaseFunction(func() error {
-		return migrateCodingWorkspacePaths(consts.GetGormProfileDatabase())
-	}, "migrate-coding-workspace-paths")
-}
-
 func validateCodingWorkspace(ctx context.Context, name string, paths []string) (string, []string, bool, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > 100 {
@@ -87,9 +71,6 @@ func GetAICodingWorkspace(db *gorm.DB, id string) (*schema.AICodingWorkspace, er
 	var item schema.AICodingWorkspace
 	if err := db.Where("workspace_id = ?", id).First(&item).Error; err != nil {
 		return nil, err
-	}
-	if len(item.RootPaths) == 0 {
-		item.RootPaths = []string{item.RootPath}
 	}
 	return &item, nil
 }
@@ -201,7 +182,6 @@ func GetAICodingWorktree(db *gorm.DB, id, path string) (*schema.AICodingWorktree
 
 func applyCodingBinding(params *ypb.AIStartParams, binding *schema.AICodingSession) {
 	params.AgentMode = ypb.AgentModeCoding
-	params.CodingMode = true
 	params.CodingWorkspaceID = binding.WorkspaceID
 	params.CodingWorkingDirectory = binding.WorkingDirectory
 	params.CodingWorktreeID = binding.WorktreeID
@@ -301,7 +281,8 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 			return err
 		}
 	}
-	// Preserve mode/binding for older session metadata even without cached-config opt-in.
+	// Preserve a saved session mode even without cached-config opt-in. Coding
+	// sessions normally return above using their durable binding record.
 	if projectDB != nil && sessionID != "" {
 		meta, err := GetAISessionMetaBySessionID(projectDB, sessionID)
 		if err != nil && !gorm.IsRecordNotFoundError(err) {
@@ -313,7 +294,7 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 				return err
 			}
 			if cached != nil {
-				params.AgentMode = cached.EffectiveAgentMode()
+				params.AgentMode = cached.GetAgentMode()
 				params.CodingWorkspaceID = cached.GetCodingWorkspaceID()
 				params.CodingWorkingDirectory = cached.GetCodingWorkingDirectory()
 				params.CodingWorktreeID = cached.GetCodingWorktreeID()

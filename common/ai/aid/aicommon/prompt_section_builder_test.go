@@ -58,7 +58,7 @@ func TestSharedToolCallModePromptsUseOneConsistentBatchContract(t *testing.T) {
 	}{
 		{
 			name:           "high static",
-			prompt:         SharedPlanAndExecHighStaticFunctionCallTemplate,
+			prompt:         AgentPrompts("security").HighStatic(true),
 			singleCallRule: "简单无歧义",
 		},
 		{

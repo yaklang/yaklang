@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,8 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -27,6 +30,12 @@ import (
 // Only model responses are scripted. Session binding, Git checkout, input delivery,
 // prompt assembly, tool dispatch and the built-in write_file tool run normally.
 func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(map[bool]string{false: "textstream", true: "functioncall"}[native], func(t *testing.T) { testCodingRuntimeFreeInput(t, native) })
+	}
+}
+
+func testCodingRuntimeFreeInput(t *testing.T, native bool) {
 	t.Setenv("YAKIT_HOME", t.TempDir())
 	profile, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
@@ -62,6 +71,8 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 	toolDone := make(chan struct{}, 1)
 	modelErrors := make(chan error, 1)
 	var cfg *aicommon.Config
+	var exportOnce sync.Once
+	var exportErr error
 	connection, err := runtime.connectWithOptions(ctx, ConnectRequest{StartParams: &ypb.AIStartParams{
 		TimelineSessionID: id, AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID,
 		CodingCreateWorktree: true, DisableAISearchForge: true,
@@ -74,10 +85,11 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 		}
 		return nil
 	}, false, aicommon.WithEnhanceKnowledgeManager(manager), aicommon.WithTools(tools...),
-		aicommon.WithSingleAIModelMode(true), func(config *aicommon.Config) error { cfg = config; return nil },
+		aicommon.WithEnableFunctionCallMode(native), aicommon.WithSingleAIModelMode(true), func(config *aicommon.Config) error { cfg = config; return nil },
 		aicommon.WithAgreeYOLO(true), aicommon.WithEnablePETaskAnalyze(false),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
+			wire := aispec.NewDefaultAIConfig(request.GetExtraSpecOpts()...)
 			action := map[string]any{"@action": "finish", "human_readable_thought": "file updated"}
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
 				if cfg.AgentMode != ypb.AgentModeCoding || cfg.CodingWorktreeID == "" ||
@@ -86,7 +98,7 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 					!strings.Contains(prompt, cfg.CodingWorkingDirectory) ||
 					!strings.Contains(prompt, "Coding Agent 工作方法") ||
 					!strings.Contains(prompt, "# Coding 主循环") ||
-					!strings.Contains(prompt, "编程任务决策示例") ||
+					(!native && !strings.Contains(prompt, "编程任务决策示例")) ||
 					strings.Contains(prompt, "用union注入探测字段数") ||
 					strings.Contains(prompt, "重放漏洞的关联假设") ||
 					!strings.Contains(prompt, "detached HEAD") ||
@@ -97,6 +109,14 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 					default:
 					}
 					return nil, err
+				}
+				exportOnce.Do(func() { exportErr = exportCodingPromptExample(native, prompt, wire.Tools) })
+				if exportErr != nil {
+					select {
+					case modelErrors <- exportErr:
+					default:
+					}
+					return nil, exportErr
 				}
 				target := filepath.Join(cfg.CodingWorkingDirectory, filename)
 				data, _ := os.ReadFile(target)
@@ -112,12 +132,23 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 			} else {
 				return nil, fmt.Errorf("unexpected auxiliary model request")
 			}
+			actionName := action["@action"].(string)
+			if wire.ToolCallCallback != nil {
+				delete(action, "@action")
+			}
 			payload, err := json.Marshal(action)
 			if err != nil {
 				return nil, err
 			}
 			response := config.NewAIResponse()
-			response.EmitOutputStream(strings.NewReader(string(payload)))
+			if wire.ToolCallCallback != nil {
+				wire.ToolCallCallback([]*aispec.ToolCall{{Index: 0, ID: uuid.NewString(), Type: "function", Function: aispec.FuncReturn{Name: actionName, Arguments: string(payload)}}})
+				if wire.FinishReasonCallback != nil {
+					wire.FinishReasonCallback("tool_calls", nil)
+				}
+			} else {
+				response.EmitOutputStream(strings.NewReader(string(payload)))
+			}
 			response.Close()
 			return response, nil
 		}))
@@ -144,4 +175,32 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "user's uncommitted change\n", string(original))
 	require.NoFileExists(t, filepath.Join(secondary, filename))
+}
+
+// Optional inspection artifact, generated from the same request exercised by the
+// integration test. Normal test runs do not write outside their temporary fixtures.
+func exportCodingPromptExample(native bool, prompt string, tools []aispec.Tool) error {
+	projected := aiprojection.Project(aiprojection.ProjectionInput{Prompt: prompt, ActionTools: tools})
+	if !projected.Metadata.CacheProjected {
+		return fmt.Errorf("coding prompt did not project cache sections")
+	}
+	if native && len(projected.Tools) == 0 {
+		return fmt.Errorf("native coding prompt lost action schemas")
+	}
+	dir := os.Getenv("CODING_PROMPT_EXPORT_DIR")
+	if dir == "" {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	name := map[bool]string{false: "coding-textstream", true: "coding-functioncall"}[native]
+	if err := os.WriteFile(filepath.Join(dir, name+".txt"), []byte(aiprojection.RedactNonce(prompt)), 0600); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(projected, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, name+"-messages.json"), data, 0600)
 }

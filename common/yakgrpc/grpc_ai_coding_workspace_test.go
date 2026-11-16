@@ -21,7 +21,7 @@ func TestCodingWorkspaceRPC(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&schema.AICodingWorkspace{}, &schema.AICodingSession{}, &schema.AICodingWorktree{}).Error)
 	server := &Server{profileDatabase: db}
 	ctx := context.Background()
-	workspace, err := server.CreateAICodingWorkspace(ctx, &ypb.CreateAICodingWorkspaceRequest{Name: "project", RootPath: t.TempDir()})
+	workspace, err := server.CreateAICodingWorkspace(ctx, &ypb.CreateAICodingWorkspaceRequest{Name: "project", RootPaths: []string{t.TempDir()}})
 	require.NoError(t, err)
 	list, err := server.QueryAICodingWorkspaces(ctx, &ypb.Empty{})
 	require.NoError(t, err)
@@ -32,8 +32,6 @@ func TestCodingWorkspaceRPC(t *testing.T) {
 	require.Empty(t, trees.Data)
 	_, err = server.ListAICodingWorktrees(ctx, &ypb.AICodingWorkspaceRequest{WorkspaceID: "missing"})
 	require.Error(t, err)
-	_, err = server.CreateAICodingWorktree(ctx, &ypb.AICodingWorkspaceRequest{WorkspaceID: workspace.ID})
-	require.ErrorContains(t, err, "session startup")
 }
 
 func TestCodingManagedWorktreeRPCOwnershipAndAvailability(t *testing.T) {

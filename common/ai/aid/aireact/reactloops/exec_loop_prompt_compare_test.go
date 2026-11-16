@@ -183,7 +183,7 @@ func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 		t.Helper()
 		prompt, err := aicommon.RenderPromptTemplate(
 			"loop-prompt-compare-high-static",
-			aicommon.MainloopHighStaticTemplate(functionCallMode, "security"),
+			aicommon.AgentPrompts("security").HighStatic(functionCallMode),
 			nil,
 		)
 		require.NoError(t, err)
@@ -192,10 +192,10 @@ func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
 	textPrompt := render(false)
 	functionPrompt := render(true)
 	require.NotEqual(t, textPrompt, functionPrompt)
-	require.NotContains(t, aicommon.MainloopHighStaticTemplate(false, "security"), "FunctionCallMode")
-	require.NotContains(t, aicommon.MainloopHighStaticTemplate(true, "security"), "FunctionCallMode")
+	require.NotContains(t, aicommon.AgentPrompts("security").HighStatic(false), "FunctionCallMode")
+	require.NotContains(t, aicommon.AgentPrompts("security").HighStatic(true), "FunctionCallMode")
 	for _, functionCallMode := range []bool{false, true} {
-		template := aicommon.MainloopHighStaticTemplate(functionCallMode, "security")
+		template := aicommon.AgentPrompts("security").HighStatic(functionCallMode)
 		require.NotContains(t, template, "{{", "main High Static must contain no template conditions")
 		require.Contains(t, template, "关注 Timeline 中的用户输入")
 		rendered, err := aicommon.RenderPromptTemplate("loop-high-static-no-materials", template, nil)

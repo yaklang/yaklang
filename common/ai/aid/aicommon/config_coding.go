@@ -8,37 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// WithAgentMode selects the session persona. Unspecified mode is the security agent.
-func WithAgentMode(mode string) ConfigOption {
-	return func(c *Config) error {
-		normalized, err := ypb.NormalizeAgentMode(mode)
-		if err != nil {
-			return err
-		}
-		c.AgentMode = normalized
-		if normalized != ypb.AgentModeCoding {
-			c.CodingWorkspaceID, c.CodingWorkingDirectory, c.CodingWorktreeID = "", "", ""
-			c.CodingBaseRef, c.CodingBaseCommit = "", ""
-			c.CodingSourceRoots, c.CodingWorkspaceRoots = nil, nil
-		}
-		return nil
-	}
-}
-
-// Deprecated: use WithAgentMode and WithCodingWorkspace.
-func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
-	mode := ypb.AgentModeSecurity
-	if enabled {
-		mode = ypb.AgentModeCoding
-	}
-	return func(c *Config) error {
-		if err := WithAgentMode(mode)(c); err != nil {
-			return err
-		}
-		return WithCodingWorkspace(workspaceID, directory)(c)
-	}
-}
-
 // WithCodingWorkspace keeps source code separate from Workdir, which owns disposable artifacts.
 // Tools must use explicit absolute paths / shell working directories, never os.Chdir.
 func WithCodingWorkspace(workspaceID, directory string) ConfigOption {

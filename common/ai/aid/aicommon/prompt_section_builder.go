@@ -47,7 +47,6 @@ type PromptPrefixBuilder struct {
 func NewDefaultPromptPrefixBuilder() *PromptPrefixBuilder {
 	return &PromptPrefixBuilder{
 		HighStaticTemplateName:   "shared-high-static",
-		HighStaticTemplate:       SharedPlanAndExecHighStaticTemplate,
 		FrozenBlockTemplateName:  "shared-frozen-block",
 		FrozenBlockTemplate:      SharedFrozenBlockTemplate,
 		SemiDynamicTemplateName:  "shared-semi-dynamic-1",
@@ -96,13 +95,12 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	}
 	materials.FrozenPartitions = NormalizeFrozenBlockPartitions(materials.FrozenPartitions)
 
-	// Only the shared main-loop templates switch mode. Callers that replace a
-	// template (for example, tool-parameter generation) retain their override.
+	// An empty override selects the mode default; an explicit template belongs to the caller.
 	highStaticTemplate := b.HighStaticTemplate
 	frozenBlockTemplate := b.FrozenBlockTemplate
 	semiDynamic2Template := b.SemiDynamic2Template
-	if highStaticTemplate == SharedPlanAndExecHighStaticTemplate || highStaticTemplate == SharedPlanAndExecHighStaticFunctionCallTemplate {
-		highStaticTemplate = MainloopHighStaticTemplate(materials.FunctionCallMode, materials.AgentMode)
+	if highStaticTemplate == "" {
+		highStaticTemplate = AgentPrompts(materials.AgentMode).HighStatic(materials.FunctionCallMode)
 	}
 	if materials.FunctionCallMode {
 		if frozenBlockTemplate == SharedFrozenBlockTemplate {
@@ -113,7 +111,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 		}
 	}
 
-	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, materials.HighStaticData())
+	highStatic, err := RenderPromptTemplate(b.HighStaticTemplateName, highStaticTemplate, nil)
 	if err != nil {
 		return nil, err
 	}

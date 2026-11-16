@@ -7,16 +7,10 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
 )
 
 func codingWorkspaceProto(item *schema.AICodingWorkspace) *ypb.AICodingWorkspace {
-	roots := item.RootPaths
-	if len(roots) == 0 {
-		roots = []string{item.RootPath}
-	}
-	return &ypb.AICodingWorkspace{ID: item.WorkspaceID, Name: item.Name, RootPath: item.RootPath, RootPaths: roots, IsGit: item.IsGit}
+	return &ypb.AICodingWorkspace{ID: item.WorkspaceID, Name: item.Name, RootPath: item.RootPath, RootPaths: item.RootPaths, IsGit: item.IsGit}
 }
 
 func (s *Server) codingWorktreeProto(ctx context.Context, item *schema.AICodingWorktree) (*ypb.AICodingWorktree, error) {
@@ -43,11 +37,7 @@ func (s *Server) codingWorktreeProto(ctx context.Context, item *schema.AICodingW
 }
 
 func (s *Server) CreateAICodingWorkspace(ctx context.Context, req *ypb.CreateAICodingWorkspaceRequest) (*ypb.AICodingWorkspace, error) {
-	roots := req.GetRootPaths()
-	if len(roots) == 0 {
-		roots = []string{req.GetRootPath()}
-	}
-	item, err := yakit.CreateAICodingWorkspace(ctx, s.GetProfileDatabase(), req.GetName(), roots...)
+	item, err := yakit.CreateAICodingWorkspace(ctx, s.GetProfileDatabase(), req.GetName(), req.GetRootPaths()...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,10 +114,6 @@ func (s *Server) ListAICodingSessions(ctx context.Context, req *ypb.AICodingWork
 			SessionTitle: item.SessionTitle, SessionDeletedAt: item.SessionDeletedAt})
 	}
 	return result, nil
-}
-
-func (s *Server) CreateAICodingWorktree(ctx context.Context, req *ypb.AICodingWorkspaceRequest) (*ypb.AICodingWorktree, error) {
-	return nil, grpcstatus.Error(codes.FailedPrecondition, "worktrees are created at session startup; set AIStartParams.CodingCreateWorktree")
 }
 
 func (s *Server) ListAICodingBranches(ctx context.Context, req *ypb.AICodingWorkspaceRequest) (*ypb.ListAICodingBranchesResponse, error) {

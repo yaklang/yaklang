@@ -723,7 +723,6 @@ func (r *reActSessionRuntime) attachConnection(
 	startParams = proto.Clone(startParams).(*ypb.AIStartParams)
 	cfg := reAct.GetConfig().(*aicommon.Config)
 	startParams.AgentMode = cfg.AgentMode
-	startParams.CodingMode = cfg.AgentMode == ypb.AgentModeCoding
 	startParams.CodingWorkspaceID = cfg.CodingWorkspaceID
 	startParams.CodingWorkingDirectory = cfg.CodingWorkingDirectory
 	startParams.CodingWorktreeID = cfg.CodingWorktreeID

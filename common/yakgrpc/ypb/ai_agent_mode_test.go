@@ -7,17 +7,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestAgentModeCompatibility(t *testing.T) {
+func TestAgentModeNormalization(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		params *AIStartParams
 		want   string
 	}{
 		{"default", &AIStartParams{}, AgentModeSecurity},
-		{"legacy coding", &AIStartParams{CodingMode: true}, AgentModeCoding},
-		{"legacy security", &AIStartParams{CodingMode: false}, AgentModeSecurity},
 		{"coding", &AIStartParams{AgentMode: AgentModeCoding}, AgentModeCoding},
-		{"explicit security wins", &AIStartParams{AgentMode: AgentModeSecurity, CodingMode: true}, AgentModeSecurity},
+		{"security", &AIStartParams{AgentMode: AgentModeSecurity}, AgentModeSecurity},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wire, err := proto.Marshal(tc.params)
@@ -26,9 +24,8 @@ func TestAgentModeCompatibility(t *testing.T) {
 			require.NoError(t, proto.Unmarshal(wire, decoded))
 			require.NoError(t, decoded.NormalizeAgentMode())
 			require.Equal(t, tc.want, decoded.AgentMode)
-			require.Equal(t, tc.want == AgentModeCoding, decoded.CodingMode)
 		})
 	}
-	params := &AIStartParams{AgentMode: "unsupported", CodingMode: true}
+	params := &AIStartParams{AgentMode: "unsupported"}
 	require.ErrorContains(t, params.NormalizeAgentMode(), "unsupported agent mode")
 }

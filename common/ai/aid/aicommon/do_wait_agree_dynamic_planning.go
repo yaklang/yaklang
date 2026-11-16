@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // PlanningReviewControl is a callback that reviews plan or task decisions
@@ -92,6 +93,7 @@ func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		WorkingDir:      workingDir,
 		Workspace:       strings.TrimSpace(osArch+workingDir) != "",
 	}
+	ApplyAgentPromptContext(prefixMaterials, config)
 	ApplyPromptFrozenOpenMaterials(prefixMaterials, frozenOpen)
 
 	return NewDefaultPromptPrefixBuilder().AssemblePromptWithDynamicSection(
@@ -115,6 +117,9 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 	}
 
 	data.WorkingDir = config.Workdir
+	if config.AgentMode == ypb.AgentModeCoding {
+		data.WorkingDir = config.CodingWorkingDirectory
+	}
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(config)
 
@@ -148,6 +153,7 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		WorkingDir:      data.WorkingDir,
 		Workspace:       strings.TrimSpace(data.OSArch+data.WorkingDir) != "",
 	}
+	ApplyAgentPromptContext(prefixMaterials, config)
 	ApplyPromptFrozenOpenMaterials(prefixMaterials, frozenOpen)
 	if err := PopulateToolInventoryFromConfig(prefixMaterials, config); err != nil {
 		return "", fmt.Errorf("populate task review tool inventory failed: %w", err)

@@ -5,40 +5,74 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var (
-	codingSystemsTemplate                           = promptloader.MustLoad("mainloop/coding/systems.txt")
-	codingHighStaticTemplate                        = promptloader.MustLoad("mainloop/coding/textstream/high_static_section.txt")
-	codingHighStaticFunctionCallTemplate            = promptloader.MustLoad("mainloop/coding/functioncall/high_static_section.txt")
-	codingMethodologyTemplate                       = promptloader.MustLoad("mainloop/coding/methodology.txt")
-	SharedPlanAndExecHighStaticTemplate             = promptloader.MustLoad("mainloop/textstream/high_static_section.txt")
-	SharedPlanAndExecHighStaticFunctionCallTemplate = promptloader.MustLoad("mainloop/functioncall/high_static_section.txt")
-	SharedFrozenBlockTemplate                       = promptloader.MustLoad("mainloop/textstream/frozen_block_section.txt")
-	SharedFrozenBlockFunctionCallTemplate           = promptloader.MustLoad("mainloop/functioncall/frozen_block_section.txt")
-	SharedTaskInstructionSchemaExampleTemplate      = promptloader.MustLoad("mainloop/textstream/semi_dynamic_2_section.txt")
-	SharedTaskInstructionFunctionCallTemplate       = promptloader.MustLoad("mainloop/functioncall/semi_dynamic_2_section.txt")
-	SharedSemiDynamic1Template                      = promptloader.MustLoad("mainloop/semi_dynamic_1_section.txt")
-	SharedTimelineOpenTemplate                      = promptloader.MustLoad("mainloop/timeline_open_section.txt")
-)
+// AgentPromptSet owns mode-specific content. Protocol, cache sections and caller
+// schemas remain shared. Returned values contain immutable strings only.
+type AgentPromptSet struct {
+	textHighStatic            string
+	functionHighStatic        string
+	DefaultInstruction        string
+	DefaultOutputExample      string
+	VerificationInstruction   string
+	VerificationOutputExample string
+	WorkspaceTemplate         string
+}
 
-// HighStaticData contains only static coding guidance, never paths or live Git state.
-func (m *PromptMaterials) HighStaticData() map[string]any {
-	return map[string]any{
-		"CodingMethodology": codingMethodologyTemplate,
-		"CodingSystems":     codingSystemsTemplate,
+func (p AgentPromptSet) HighStatic(functionCallMode bool) string {
+	if functionCallMode {
+		return p.functionHighStatic
+	}
+	return p.textHighStatic
+}
+
+func loadAgentPrompts(mode string) AgentPromptSet {
+	root := "agents/" + mode + "/"
+	static := func(protocol string) string {
+		content := promptloader.MustLoad(root + "high_static/" + protocol + ".txt")
+		if mode == ypb.AgentModeCoding {
+			// Compose fixed fragments once, never with session data.
+			var err error
+			content, err = RenderPromptTemplate("coding-high-static", content, map[string]string{
+				"CodingMethodology": promptloader.MustLoad(root + "high_static/methodology.txt"),
+				"CodingSystems":     promptloader.MustLoad(root + "high_static/systems.txt"),
+			})
+			if err != nil {
+				panic(err)
+			}
+		}
+		return content
+	}
+	workspace := "mainloop/workspace.txt"
+	if mode == ypb.AgentModeCoding {
+		workspace = root + "workspace_context.txt"
+	}
+	return AgentPromptSet{
+		textHighStatic: static("textstream"), functionHighStatic: static("functioncall"),
+		DefaultInstruction:        promptloader.MustLoad(root + "default_loop/instruction.txt"),
+		DefaultOutputExample:      promptloader.MustLoad(root + "default_loop/output_example.txt"),
+		VerificationInstruction:   promptloader.MustLoad(root + "verification/instruction.txt"),
+		VerificationOutputExample: promptloader.MustLoad(root + "verification/output_example.txt"),
+		WorkspaceTemplate:         promptloader.MustLoad(workspace),
 	}
 }
 
-func MainloopHighStaticTemplate(functionCallMode bool, agentMode string) string {
-	if agentMode == ypb.AgentModeCoding {
-		if functionCallMode {
-			return codingHighStaticFunctionCallTemplate
-		}
-		return codingHighStaticTemplate
+var (
+	securityPrompts                            = loadAgentPrompts(ypb.AgentModeSecurity)
+	codingPrompts                              = loadAgentPrompts(ypb.AgentModeCoding)
+	SharedFrozenBlockTemplate                  = promptloader.MustLoad("mainloop/textstream/frozen_block_section.txt")
+	SharedFrozenBlockFunctionCallTemplate      = promptloader.MustLoad("mainloop/functioncall/frozen_block_section.txt")
+	SharedTaskInstructionSchemaExampleTemplate = promptloader.MustLoad("mainloop/textstream/semi_dynamic_2_section.txt")
+	SharedTaskInstructionFunctionCallTemplate  = promptloader.MustLoad("mainloop/functioncall/semi_dynamic_2_section.txt")
+	SharedSemiDynamic1Template                 = promptloader.MustLoad("mainloop/semi_dynamic_1_section.txt")
+	SharedTimelineOpenTemplate                 = promptloader.MustLoad("mainloop/timeline_open_section.txt")
+)
+
+// AgentPrompts is the single content selector. Config/start-parameter validation
+// rejects unsupported modes before prompt assembly; an unspecified mode is security.
+func AgentPrompts(mode string) AgentPromptSet {
+	if mode == ypb.AgentModeCoding {
+		return codingPrompts
 	}
-	if functionCallMode {
-		return SharedPlanAndExecHighStaticFunctionCallTemplate
-	}
-	return SharedPlanAndExecHighStaticTemplate
+	return securityPrompts
 }
 
 func MainloopFrozenBlockTemplate(functionCallMode bool) string {

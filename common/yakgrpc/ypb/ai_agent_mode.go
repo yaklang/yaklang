@@ -7,17 +7,6 @@ const (
 	AgentModeCoding   = "coding"
 )
 
-// EffectiveAgentMode reads the legacy flag only when AgentMode is absent.
-func (p *AIStartParams) EffectiveAgentMode() string {
-	if p.GetAgentMode() != "" {
-		return p.GetAgentMode()
-	}
-	if p.GetCodingMode() {
-		return AgentModeCoding
-	}
-	return AgentModeSecurity
-}
-
 func NormalizeAgentMode(mode string) (string, error) {
 	switch mode {
 	case "", AgentModeSecurity:
@@ -29,13 +18,12 @@ func NormalizeAgentMode(mode string) (string, error) {
 	}
 }
 
-// NormalizeAgentMode keeps the deprecated wire field consistent for old clients.
+// NormalizeAgentMode validates the session mode and applies the security default.
 func (p *AIStartParams) NormalizeAgentMode() error {
-	mode, err := NormalizeAgentMode(p.EffectiveAgentMode())
+	mode, err := NormalizeAgentMode(p.GetAgentMode())
 	if err != nil {
 		return err
 	}
 	p.AgentMode = mode
-	p.CodingMode = mode == AgentModeCoding
 	return nil
 }

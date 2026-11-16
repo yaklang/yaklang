@@ -73,7 +73,6 @@ type PromptMaterials struct {
 	CurrentTime                string
 	AgentMode                  string
 	CodingWorkspaceID          string
-	CodingWorkingDirectory     string
 	CodingWorktreeID           string
 	CodingBaseRef              string
 	CodingBaseCommit           string

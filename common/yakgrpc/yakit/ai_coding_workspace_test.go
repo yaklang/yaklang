@@ -207,17 +207,3 @@ func TestCodingWorkspaceValidation(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, trees)
 }
-
-func TestCodingLegacyWorkspacePathMigration(t *testing.T) {
-	db := codingTestDB(t)
-	require.NoError(t, db.Model(&schema.AICodingWorkspace{}).AddUniqueIndex("uix_ai_coding_workspaces_root_path", "root_path").Error)
-	root, err := coding.Directory(t.TempDir())
-	require.NoError(t, err)
-	require.NoError(t, db.Create(&schema.AICodingWorkspace{WorkspaceID: "legacy", Name: "legacy", RootPath: root}).Error)
-	require.NoError(t, migrateCodingWorkspacePaths(db))
-	legacy, err := GetAICodingWorkspace(db, "legacy")
-	require.NoError(t, err)
-	require.Equal(t, schema.StringSlice{root}, legacy.RootPaths)
-	_, err = CreateAICodingWorkspace(context.Background(), db, "another", root)
-	require.NoError(t, err)
-}

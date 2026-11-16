@@ -9,12 +9,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestAgentModeSessionMigration(t *testing.T) {
+func TestAgentModeSessionPersistence(t *testing.T) {
 	for _, tc := range []struct{ raw, mode string }{
 		{`{}`, ypb.AgentModeSecurity},
-		{`{"CodingMode":true}`, ypb.AgentModeCoding},
-		{`{"CodingMode":false}`, ypb.AgentModeSecurity},
-		{`{"AgentMode":"security","CodingMode":true}`, ypb.AgentModeSecurity},
 		{`{"AgentMode":"coding"}`, ypb.AgentModeCoding},
 	} {
 		params, err := UnmarshalAISessionStartParams(tc.raw)
@@ -29,24 +26,17 @@ func TestAgentModeSessionMigration(t *testing.T) {
 
 	db := codingTestDB(t)
 	ctx := context.Background()
-	workspace, err := CreateAICodingWorkspace(ctx, db, "legacy", t.TempDir())
+	workspace, err := CreateAICodingWorkspace(ctx, db, "project", t.TempDir())
 	require.NoError(t, err)
-	// Historical metadata predating AgentMode and without a coding binding row.
-	_, err = EnsureAISessionMeta(db, "legacy-mode")
+	// Persisted security sessions cannot be switched to coding by an attachment.
+	_, err = EnsureAISessionMeta(db, "saved-security")
 	require.NoError(t, err)
-	legacy := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID}
-	// Store raw legacy JSON so the normal serializer cannot upgrade it first.
-	raw := `{"CodingMode":true,"CodingWorkspaceID":"` + workspace.WorkspaceID + `"}`
-	require.NoError(t, db.Model(&schema.AISession{}).Where("session_id = ?", "legacy-mode").UpdateColumn("start_params", raw).Error)
-	request := &ypb.AIStartParams{AgentMode: ypb.AgentModeSecurity}
-	require.NoError(t, ResolveCodingSessionBinding(ctx, db, db, "legacy-mode", request))
-	require.Equal(t, ypb.AgentModeCoding, request.AgentMode)
-	require.Equal(t, workspace.RootPath, request.CodingWorkingDirectory)
-	_, err = marshalAISessionStartParams(legacy)
-	require.NoError(t, err)
-	require.Empty(t, legacy.AgentMode, "serialization must not mutate the caller")
-
-	security := &ypb.AIStartParams{AgentMode: ypb.AgentModeSecurity, CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true}
+	require.NoError(t, db.Model(&schema.AISession{}).Where("session_id = ?", "saved-security").UpdateColumn("start_params", `{"AgentMode":"security"}`).Error)
+	request := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID}
+	require.NoError(t, ResolveCodingSessionBinding(ctx, db, db, "saved-security", request))
+	require.Equal(t, ypb.AgentModeSecurity, request.AgentMode)
+	require.Empty(t, request.CodingWorkspaceID)
+	security := &ypb.AIStartParams{AgentMode: ypb.AgentModeSecurity, CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, db, db, "explicit-security", security))
 	require.Empty(t, security.CodingWorkspaceID)
 	require.False(t, security.CodingCreateWorktree)

@@ -2,8 +2,11 @@ package aireact
 
 import (
 	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,7 +38,7 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			require.NotContains(t, loop.GetOutputExample(), "重放漏洞")
 			result, err := react.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{Nonce: "coding", FunctionCallMode: native, UserQuery: "implement a feature", Schema: `{"type":"object"}`})
 			require.NoError(t, err)
-			require.Contains(t, result.Prompt, "# Coding Agent (Experimental)")
+			require.Contains(t, result.Prompt, "# Workspace Context")
 			require.Contains(t, result.Prompt, "# 第一部分: Coding Agent 工作方法")
 			require.Contains(t, result.Prompt, "detached HEAD")
 			require.Contains(t, result.Prompt, "不复制源目录的暂存、未暂存、未跟踪或忽略文件")
@@ -43,13 +46,13 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			require.NotContains(t, result.Prompt, "未落档的风险禁止终结")
 			require.NotContains(t, result.Prompt, "任务 / 目标已外层鉴权")
 			require.Contains(t, result.Prompt, "workspace-a")
-			require.Contains(t, result.Prompt, "working dir: "+react.config.CodingWorkingDirectory)
-			require.Contains(t, result.Prompt, "AI Artifacts dir: "+artifacts)
+			require.Contains(t, result.Prompt, `"working_directory": "`+react.config.CodingWorkingDirectory+`"`)
+			require.Contains(t, result.Prompt, `"artifacts_directory": "`+artifacts+`"`)
 			require.Contains(t, result.Prompt, "AGENTS.md")
 			require.Contains(t, result.Prompt, secondary)
 			require.Contains(t, result.Prompt, "managed-tree")
-			require.Contains(t, result.Prompt, `Creation base ref (reference only, not current branch): "origin/main"`)
-			require.Contains(t, result.Prompt, `Creation base commit (immutable, not current HEAD): "initial-commit"`)
+			require.Contains(t, result.Prompt, `"creation_base_ref": "origin/main"`)
+			require.Contains(t, result.Prompt, `"creation_base_commit": "initial-commit"`)
 			require.Contains(t, result.Prompt, "其余目录仍指向原目录")
 			require.NoDirExists(t, artifacts)
 			after, err := os.Getwd()
@@ -87,7 +90,7 @@ func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
 		t.Run(map[bool]string{true: "native", false: "text"}[native], func(t *testing.T) {
 			builder := aicommon.NewDefaultPromptPrefixBuilder()
 			materials := &aicommon.PromptMaterials{AgentMode: ypb.AgentModeCoding, FunctionCallMode: native,
-				Workspace: true, WorkingDir: "/project-one", CodingWorkingDirectory: "/project-one",
+				Workspace: true, WorkingDir: "/project-one",
 				CodingWorkspaceID: "workspace-one", CodingWorkspaceRoots: []string{"/project-one"}}
 			first, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
@@ -97,7 +100,7 @@ func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
 			require.NotContains(t, first.HighStatic, materials.WorkingDir)
 			require.Contains(t, materials.WorkspaceContext(), "未创建托管工作树")
 			require.NotContains(t, materials.WorkspaceContext(), "detached HEAD")
-			materials.WorkingDir, materials.CodingWorkingDirectory = "/another-project", "/another-project"
+			materials.WorkingDir = "/another-project"
 			materials.CodingWorkspaceID, materials.CodingWorktreeID = "another-workspace", "another-tree"
 			second, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
@@ -114,5 +117,44 @@ func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "custom caller instructions", custom.HighStatic)
 		})
+	}
+}
+
+func TestAgentModeHelperPrompts(t *testing.T) {
+	for _, mode := range []string{ypb.AgentModeSecurity, ypb.AgentModeCoding} {
+		for _, native := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/native=%v", mode, native), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				opts := []aicommon.ConfigOption{aicommon.WithContext(ctx), aicommon.WithAgentMode(mode), aicommon.WithEnableFunctionCallMode(native)}
+				if mode == ypb.AgentModeCoding {
+					opts = append(opts, aicommon.WithCodingWorkspace("helper-workspace", t.TempDir()))
+				}
+				r, err := NewTestReAct(opts...)
+				require.NoError(t, err)
+				prompts := aicommon.AgentPrompts(mode)
+				verification, _, err := r.promptManager.GenerateVerificationPrompt("fix input", true, "regression passed")
+				require.NoError(t, err)
+				require.Contains(t, verification, strings.TrimSpace(prompts.VerificationInstruction))
+				require.Contains(t, verification, strings.TrimSpace(prompts.VerificationOutputExample))
+				answer, _, err := r.promptManager.GenerateDirectlyAnswerPrompt("explain changes", nil)
+				require.NoError(t, err)
+				for _, prompt := range []string{verification, answer} {
+					if mode == ypb.AgentModeCoding {
+						require.Contains(t, prompt, "Coding Agent 工作方法")
+						require.Contains(t, prompt, "helper-workspace")
+						require.NotContains(t, prompt, "未落档的风险禁止终结")
+						require.NotContains(t, prompt, "安全测试阴性结论必须有区分力")
+					} else {
+						require.NotContains(t, prompt, "Coding Agent 工作方法")
+					}
+					require.True(t, aiprojection.Project(aiprojection.ProjectionInput{Prompt: prompt}).Metadata.CacheProjected)
+				}
+				// Specialized loops retain their explicit caller instruction.
+				custom, err := loop_default.NewLoop("custom", r, reactloops.WithPersistentInstruction("caller-specific task"))
+				require.NoError(t, err)
+				require.Equal(t, "caller-specific task", custom.GetPersistentInstruction())
+			})
+		}
 	}
 }

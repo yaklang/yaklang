@@ -29,10 +29,6 @@ var forgeParamsOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts
 
 var forgeParamsDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/forge-params/dynamic.txt")
 
-var verificationInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/instruction.txt")
-
-var verificationOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/output_example.txt")
-
 var verificationDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/verification/dynamic.txt")
 
 var verificationSchemaJSON = promptloader.MustLoad("ai/aid/aireact/prompts/verification/verification.json")
@@ -305,8 +301,9 @@ func (pm *PromptManager) GenerateVerificationPrompt(
 	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(verificationInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(verificationOutputExampleText)
+	prompts := aicommon.AgentPrompts(prefixMaterials.AgentMode)
+	prefixMaterials.TaskInstruction = strings.TrimSpace(prompts.VerificationInstruction)
+	prefixMaterials.OutputExample = strings.TrimSpace(prompts.VerificationOutputExample)
 
 	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,

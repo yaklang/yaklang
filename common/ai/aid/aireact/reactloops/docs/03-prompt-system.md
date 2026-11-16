@@ -49,15 +49,17 @@ flowchart TD
 
 ## 3.2 5 段 prefix 的字节稳定性分层
 
-公共前缀模板都放在 `common/ai/aid/aicommon/prompts/prefix/`，由 [aicommon/prompt_section_builder.go](../../../aicommon/prompt_section_builder.go) 中 `//go:embed prompts/prefix/...` 静态注入。
+模板统一位于 `common/ai/aid/aicommon/promptloader/prompts/`，通过 `promptloader` 加载。`agents/security/` 与 `agents/coding/` 按 AgentMode 分离身份、主循环指令和结果验证；`mainloop/` 保留公共分段与协议包装。具体资源分布、测试与完整提示词导出方式见 [promptloader/README.md](../../../aicommon/promptloader/README.md)。
 
 | 段 | 模板 | 稳定性 | 主要内容 |
 |----|------|--------|---------|
-| HighStatic | [high_static_section.txt](../../../aicommon/prompts/prefix/high_static_section.txt) | 跨 caller / 跨 turn 字节恒定 | TRAITS + 方法论协议 + 能力系统介绍（完全无变量） |
-| FrozenBlock | [frozen_block_section.txt](../../../aicommon/prompts/prefix/frozen_block_section.txt) | 整体字节稳定（被 `<\|AI_CACHE_FROZEN_*\|>` 包裹） | Tool Inventory + Forge Inventory + Timeline-frozen |
-| SemiDynamic1 | [semi_dynamic_1_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_1_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI_*\|>` 包裹） | SkillsContext + Cache Tool Call |
-| SemiDynamic2 | [semi_dynamic_2_section.txt](../../../aicommon/prompts/prefix/semi_dynamic_2_section.txt) | caller-specific 稳定（被 `<\|AI_CACHE_SEMI2_*\|>` 包裹） | TaskInstruction + ExecutionPolicy + Schema + OutputExample |
-| TimelineOpen | [timeline_open_section.txt](../../../aicommon/prompts/prefix/timeline_open_section.txt) | 易变尾段，落在所有 cache 边界外 | Timeline 末桶 + SessionEvidence + Todo + Workspace + UserHistory + Current Time + PlanContext |
+| HighStatic | `agents/<mode>/high_static/` | 同一 AgentMode / 协议下跨 caller、跨 turn 稳定 | 身份、方法论、协议、平台机制；不含路径或动态数据 |
+| FrozenBlock | `mainloop/{textstream,functioncall}/frozen_block_section.txt` | 稳定清单与冻结分区 | 工具 / 技能 / 蓝图清单、冻结历史 |
+| SemiDynamic1 | `mainloop/semi_dynamic_1_section.txt` | caller-specific 稳定 | Workspace、已加载能力、提升后的用户输入 / 证据、当前计划与报告 |
+| SemiDynamic2 | `mainloop/{textstream,functioncall}/semi_dynamic_2_section.txt` | caller-specific 稳定 | TaskInstruction + ExecutionPolicy + Schema + OutputExample |
+| TimelineOpen | `mainloop/timeline_open_section.txt` | 位于稳定前缀之后 | 最近历史、计划状态、TODO、用户历史与子任务上下文 |
+
+当轮 Dynamic 包含当前用户输入、当前时间与当轮注入材料。主循环、回答、验证、计划审查和任务审查都继承会话 AgentMode 与目录绑定；辅助调用保留自己的任务指令和 Schema，不复用主循环的动作决策指令。
 
 最后由 `dynamic_section.txt`（loop 自己的 dynamic 段）渲染 UserQuery / AutoContext / ExtraCapabilities / ReactiveData / InjectedMemory / TodoCheckpoint，与前 5 段一起经 `buildTaggedPromptSections` 拼成完整 prompt。
 
@@ -74,7 +76,7 @@ flowchart TD
 | `Nonce` | 当前 nonce | 由 caller 注入 |
 | `OSArch` | 操作系统架构 | runtime |
 | `CurrentTime` | 当前时间 | `time.Now` |
-| `WorkingDir` | 工作目录 | `os.Getwd` |
+| `WorkingDir` | 有效工作目录 | PromptManager / 会话绑定；Coding 使用已解析的有效源码目录 |
 | `Tools` | 工具列表 | `r.toolsGetter()` |
 | `TopTools` | 摘要后的工具 | 同上但省略详情 |
 | `AllowPlan` | 是否允许 plan | `r.allowPlanAndExec()` |

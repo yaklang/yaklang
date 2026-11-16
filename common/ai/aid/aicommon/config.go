@@ -4708,3 +4708,20 @@ func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackT
 	}
 	return InvokeLiteForge(prompt, opts...)
 }
+
+// WithAgentMode selects the session persona. Unspecified mode is the security agent.
+func WithAgentMode(mode string) ConfigOption {
+	return func(c *Config) error {
+		normalized, err := ypb.NormalizeAgentMode(mode)
+		if err != nil {
+			return err
+		}
+		c.AgentMode = normalized
+		if normalized != ypb.AgentModeCoding {
+			c.CodingWorkspaceID, c.CodingWorkingDirectory, c.CodingWorktreeID = "", "", ""
+			c.CodingBaseRef, c.CodingBaseCommit = "", ""
+			c.CodingSourceRoots, c.CodingWorkspaceRoots = nil, nil
+		}
+		return nil
+	}
+}
