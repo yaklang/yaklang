@@ -58,13 +58,13 @@ type BrowserAttachmentProvider interface {
 
 type BrowserAttachmentSession interface {
 	BrowserAttachmentProvider
-	SetBrowserAttachments([]AttachedBrowserBinding)
+	AddBrowserAttachments([]AttachedBrowserBinding)
 }
 
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeBrowser,
-		func() AttachedResourceData { return &AttachedBrowserResourceData{} },
+		newAttachedBrowserResourceData,
 	)
 }
 
@@ -72,45 +72,46 @@ func (d *AttachedBrowserResourceData) Type() string {
 	return AttachedResourceTypeBrowser
 }
 
-func (d *AttachedBrowserResourceData) Unmarshal(resource *AttachedResource) error {
+func (d *AttachedBrowserResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), d.DeviceID)
+}
+
+func newAttachedBrowserResourceData(resource *AttachedResource) (AttachedResourceData, error) {
+	d := &AttachedBrowserResourceData{}
 	if err := json.Unmarshal([]byte(resource.Value), d); err != nil {
-		return utils.Errorf("parse attached browser instance: %v", err)
+		return nil, utils.Errorf("parse attached browser instance: %v", err)
 	}
 	d.DeviceID = strings.TrimSpace(d.DeviceID)
 	d.Name = strings.TrimSpace(d.Name)
 	d.Reference = strings.TrimSpace(d.Reference)
 	if d.DeviceID == "" {
-		return utils.Error("attached browser instance has no deviceId")
+		return nil, utils.Error("attached browser instance has no deviceId")
 	}
 	if d.Reference == "" {
 		d.Reference = d.DeviceID
 	}
 	if len(d.DeviceID) > 512 || len(d.Name) > 512 || len(d.Reference) > 512 {
-		return utils.Error("attached browser instance metadata is too long")
+		return nil, utils.Error("attached browser instance metadata is too long")
 	}
-	return nil
+	return d, nil
 }
 
 func (d *AttachedBrowserResourceData) BindLoopData(loop ReActLoopIF) error {
-	bindAttachedBrowserResources(loop, []AttachedResourceData{d})
+	if loop == nil || loop.GetInvoker() == nil {
+		return nil
+	}
+	session, ok := loop.GetInvoker().(BrowserAttachmentSession)
+	if !ok {
+		return nil
+	}
+	session.AddBrowserAttachments([]AttachedBrowserBinding{d.Binding()})
+	promoteAttachedBrowserTools(loop.GetConfig())
 	return nil
 }
 
 func (d *AttachedBrowserResourceData) ToAttachData(loop ReActLoopIF) string {
 	return renderAttachedBrowserIntroduction(
 		browserBindingsFromAttachedResources([]AttachedResourceData{d}),
-		missingAttachedBrowserTools(loopConfig(loop)),
-	)
-}
-
-func (d *AttachedBrowserResourceData) BindLoopDataBatch(loop ReActLoopIF, resources []AttachedResourceData) error {
-	bindAttachedBrowserResources(loop, resources)
-	return nil
-}
-
-func (d *AttachedBrowserResourceData) ToAttachDataBatch(loop ReActLoopIF, resources []AttachedResourceData) string {
-	return renderAttachedBrowserIntroduction(
-		browserBindingsFromAttachedResources(resources),
 		missingAttachedBrowserTools(loopConfig(loop)),
 	)
 }
@@ -132,32 +133,14 @@ func loopConfig(loop ReActLoopIF) AICallerConfigIf {
 
 func browserBindingsFromAttachedResources(resources []AttachedResourceData) []AttachedBrowserBinding {
 	bindings := make([]AttachedBrowserBinding, 0, len(resources))
-	seen := make(map[string]struct{})
 	for _, resource := range resources {
 		browser, ok := resource.(*AttachedBrowserResourceData)
 		if !ok || browser == nil {
 			continue
 		}
-		if _, exists := seen[browser.DeviceID]; exists {
-			continue
-		}
-		seen[browser.DeviceID] = struct{}{}
 		bindings = append(bindings, browser.Binding())
 	}
 	return bindings
-}
-
-func bindAttachedBrowserResources(loop ReActLoopIF, resources []AttachedResourceData) {
-	if loop == nil || loop.GetInvoker() == nil {
-		return
-	}
-	session, ok := loop.GetInvoker().(BrowserAttachmentSession)
-	if !ok {
-		return
-	}
-	bindings := browserBindingsFromAttachedResources(resources)
-	session.SetBrowserAttachments(bindings)
-	promoteAttachedBrowserTools(loop.GetConfig())
 }
 
 func promoteAttachedBrowserTools(config AICallerConfigIf) []string {

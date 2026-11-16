@@ -25,13 +25,15 @@ var _ AttachedResourceData = (*AttachedFileContentResourceData)(nil)
 
 func (d *AttachedFileContentResourceData) Type() string { return AttachedResourceTypeFile }
 
-func (d *AttachedFileContentResourceData) Unmarshal(resource *AttachedResource) error {
-	d.Key = resource.Key
-	d.content = resource.Value
-	d.savedPath = ""
-	d.once = sync.Once{}
-	d.rendered, d.err = "", nil
-	return nil
+func (d *AttachedFileContentResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), d.Key, d.content)
+}
+
+func newAttachedFileContentResourceData(resource *AttachedResource) (AttachedResourceData, error) {
+	return &AttachedFileContentResourceData{
+		Key:     resource.Key,
+		content: resource.Value,
+	}, nil
 }
 
 func (d *AttachedFileContentResourceData) BindLoopData(loop ReActLoopIF) error {

@@ -10,7 +10,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		CONTEXT_PROVIDER_TYPE_AITOOL,
-		func() AttachedResourceData { return &AttachedAIToolResourceData{} },
+		newAttachedAIToolResourceData,
 	)
 }
 
@@ -25,13 +25,19 @@ func (d *AttachedAIToolResourceData) Type() string {
 	return CONTEXT_PROVIDER_TYPE_AITOOL
 }
 
-func (d *AttachedAIToolResourceData) Unmarshal(resource *AttachedResource) error {
-	d.Key = resource.Key
-	d.Name = strings.TrimSpace(resource.Value)
-	if d.Name == "" {
-		return fmt.Errorf("attached AI tool name is empty")
+func (d *AttachedAIToolResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), d.Key, d.Name)
+}
+
+func newAttachedAIToolResourceData(resource *AttachedResource) (AttachedResourceData, error) {
+	name := strings.TrimSpace(resource.Value)
+	if name == "" {
+		return nil, fmt.Errorf("attached AI tool name is empty")
 	}
-	return nil
+	return &AttachedAIToolResourceData{
+		Key:  resource.Key,
+		Name: name,
+	}, nil
 }
 
 func (d *AttachedAIToolResourceData) BindLoopData(loop ReActLoopIF) error {

@@ -12,7 +12,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		CONTEXT_PROVIDER_TYPE_AIFORGE,
-		func() AttachedResourceData { return &AttachedAIForgeResourceData{} },
+		newAttachedAIForgeResourceData,
 	)
 }
 
@@ -28,13 +28,19 @@ func (d *AttachedAIForgeResourceData) Type() string {
 	return CONTEXT_PROVIDER_TYPE_AIFORGE
 }
 
-func (d *AttachedAIForgeResourceData) Unmarshal(resource *AttachedResource) error {
-	d.Key = resource.Key
-	d.Name = strings.TrimSpace(resource.Value)
-	if d.Name == "" {
-		return fmt.Errorf("attached AI Forge name is empty")
+func (d *AttachedAIForgeResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), d.Key, d.Name)
+}
+
+func newAttachedAIForgeResourceData(resource *AttachedResource) (AttachedResourceData, error) {
+	name := strings.TrimSpace(resource.Value)
+	if name == "" {
+		return nil, fmt.Errorf("attached AI Forge name is empty")
 	}
-	return nil
+	return &AttachedAIForgeResourceData{
+		Key:  resource.Key,
+		Name: name,
+	}, nil
 }
 
 func (d *AttachedAIForgeResourceData) BindLoopData(loop ReActLoopIF) error {

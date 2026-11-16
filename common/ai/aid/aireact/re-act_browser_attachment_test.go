@@ -68,16 +68,15 @@ func TestReActBrowserAttachmentsAreSessionState(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("browser-session", "inspect", context.Background(), react.Emitter, true)
 	bindBrowserRouteTestRuntime(task, react)
 
-	react.SetBrowserAttachments([]aicommon.AttachedBrowserBinding{{
+	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{{
 		DeviceID: "device-a", Reference: "A",
 	}})
 	params, err := aicommon.BindAttachedBrowserToolParams(task, "browser.capability.call", nil)
 	require.NoError(t, err)
 	require.Equal(t, "device-a", params.GetString("device_id"))
 
-	// The selection is session-wide and is replaced as one value.
-	react.SetBrowserAttachments([]aicommon.AttachedBrowserBinding{
-		{DeviceID: "device-a", Reference: "A"},
+	// Browser resources only add to the session; removal is a separate operation.
+	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{
 		{DeviceID: "device-b", Reference: "B"},
 	})
 	params, err = aicommon.BindAttachedBrowserToolParams(task, "browser.capability.call", aitool.InvokeParams{"browser_ref": "@B"})
@@ -94,11 +93,14 @@ func TestReActBrowserAttachmentsAreSessionState(t *testing.T) {
 	require.Empty(t, other.GetBrowserAttachments(), "browser state must not leak across ReAct sessions")
 }
 
-func TestReActBrowserAttachmentSessionReplacement(t *testing.T) {
+func TestReActBrowserAttachmentSessionAddsWithoutRemoving(t *testing.T) {
 	react := newBrowserAttachmentTestReAct(t)
-	react.SetBrowserAttachments([]aicommon.AttachedBrowserBinding{{DeviceID: "device-a", Reference: "A"}})
+	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{{DeviceID: "device-a", Reference: "A"}})
 	require.Equal(t, []string{"A"}, browserReferences(react.GetBrowserAttachments()))
 
-	react.SetBrowserAttachments(nil)
-	require.Empty(t, react.GetBrowserAttachments())
+	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{
+		{DeviceID: "device-a", Name: "duplicate", Reference: "A2"},
+		{DeviceID: "device-b", Reference: "B"},
+	})
+	require.Equal(t, []string{"A", "B"}, browserReferences(react.GetBrowserAttachments()))
 }

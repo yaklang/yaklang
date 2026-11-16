@@ -36,51 +36,35 @@ func RunAttachedExtraResourcesInit(
 		return nil
 	}
 
-	sectionsByType := make(map[string][]string)
-	resourcesByType := make(map[string][]aicommon.AttachedResourceData)
-	var resources []aicommon.AttachedResourceData
-
-	for idx, data := range aicommon.NonEmptyAttachedResources(attachedDatas) {
+	nonEmptyResources := aicommon.NonEmptyAttachedResources(attachedDatas)
+	for idx := range nonEmptyResources {
 		loop.UserStatus(
 			fmt.Sprintf("正在加载第 %d 个附加资源", idx+1),
 			fmt.Sprintf("Loading attached resource %d", idx+1),
 		)
+	}
 
-		resource, err := aicommon.ParseAttachedResourceData(data)
-		if err != nil {
-			log.Warnf("attached extra resources: failed to parse type=%q value=%q: %v", strings.TrimSpace(data.Type), strings.TrimSpace(data.Value), err)
-			continue
-		}
-		resources = append(resources, resource)
+	resources, parseErrors := aicommon.ParseAttachedResourceDataList(nonEmptyResources)
+	for _, err := range parseErrors {
+		log.Warnf("attached extra resources: %v", err)
+	}
+	resourcesByType := make(map[string][]aicommon.AttachedResourceData)
+	for _, resource := range resources {
 		resourcesByType[resource.Type()] = append(resourcesByType[resource.Type()], resource)
 	}
 
+	sectionsByType := make(map[string][]string)
 	for typ, typedResources := range resourcesByType {
-		if len(typedResources) == 0 {
-			continue
-		}
-		if batch, ok := typedResources[0].(aicommon.AttachedResourceBatchProcessor); ok {
-			if err := batch.BindLoopDataBatch(loop, typedResources); err != nil {
-				log.Warnf("attached extra resources: failed to batch bind type=%q: %v", typ, err)
-				continue
-			}
-			rendered := strings.TrimSpace(batch.ToAttachDataBatch(loop, typedResources))
-			if rendered != "" {
-				sectionsByType[typ] = append(sectionsByType[typ], rendered)
-			}
-			continue
-		}
 		for _, resource := range typedResources {
 			if err := resource.BindLoopData(loop); err != nil {
-				log.Warnf("attached extra resources: failed to bind type=%q: %v", resource.Type(), err)
+				log.Warnf("attached extra resources: failed to bind type=%q: %v", typ, err)
 				continue
 			}
 			recordAttachedResourceUserPin(r, resource)
 			rendered := strings.TrimSpace(resource.ToAttachData(loop))
-			if rendered == "" {
-				continue
+			if rendered != "" {
+				sectionsByType[typ] = append(sectionsByType[typ], rendered)
 			}
-			sectionsByType[resource.Type()] = append(sectionsByType[resource.Type()], rendered)
 		}
 	}
 

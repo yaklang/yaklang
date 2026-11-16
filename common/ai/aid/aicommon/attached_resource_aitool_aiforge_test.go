@@ -36,12 +36,13 @@ func TestAttachedAIToolResourceResolvesStableName(t *testing.T) {
 	)
 	loop := newAttachedCapabilityTestLoop(t, WithTools(tool))
 
-	data := &AttachedAIToolResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(
 		CONTEXT_PROVIDER_TYPE_AITOOL,
 		CONTEXT_PROVIDER_KEY_NAME,
 		tool.GetName(),
-	)))
+	))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIToolResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Nil(t, data.lookupErr)
 	require.Equal(t, tool.GetName(), data.tool.GetName())
@@ -60,12 +61,13 @@ func TestAttachedAIToolResourceDoesNotResolveVerboseName(t *testing.T) {
 	)
 	loop := newAttachedCapabilityTestLoop(t, WithTools(tool))
 
-	data := &AttachedAIToolResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(
 		CONTEXT_PROVIDER_TYPE_AITOOL,
 		CONTEXT_PROVIDER_KEY_NAME,
 		"Readable Tool",
-	)))
+	))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIToolResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
@@ -77,8 +79,9 @@ func TestAttachedAIToolResourceDoesNotResolveVerboseName(t *testing.T) {
 
 func TestAttachedAIToolResourceKeepsUnresolvedMark(t *testing.T) {
 	loop := newAttachedCapabilityTestLoop(t)
-	data := &AttachedAIToolResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AITOOL, CONTEXT_PROVIDER_KEY_NAME, "missing-tool-display-name")))
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AITOOL, CONTEXT_PROVIDER_KEY_NAME, "missing-tool-display-name"))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIToolResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
@@ -98,12 +101,13 @@ func TestAttachedAIForgeResourceRecommendsRunnableForge(t *testing.T) {
 	}
 	loop := newAttachedCapabilityTestLoop(t, WithForges(forge))
 
-	data := &AttachedAIForgeResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(
 		CONTEXT_PROVIDER_TYPE_AIFORGE,
 		CONTEXT_PROVIDER_KEY_NAME,
 		forge.ForgeName,
-	)))
+	))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIForgeResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Nil(t, data.lookupErr)
 	require.Equal(t, forge.ForgeName, data.forge.ForgeName)
@@ -122,12 +126,13 @@ func TestAttachedAIForgeResourceDoesNotResolveVerboseName(t *testing.T) {
 	}
 	loop := newAttachedCapabilityTestLoop(t, WithForges(forge))
 
-	data := &AttachedAIForgeResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(
 		CONTEXT_PROVIDER_TYPE_AIFORGE,
 		CONTEXT_PROVIDER_KEY_NAME,
 		"Readable Forge",
-	)))
+	))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIForgeResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
@@ -139,8 +144,9 @@ func TestAttachedAIForgeResourceDoesNotResolveVerboseName(t *testing.T) {
 
 func TestAttachedAIForgeResourceKeepsUnresolvedMark(t *testing.T) {
 	loop := newAttachedCapabilityTestLoop(t)
-	data := &AttachedAIForgeResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AIFORGE, CONTEXT_PROVIDER_KEY_NAME, "missing-forge-display-name")))
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AIFORGE, CONTEXT_PROVIDER_KEY_NAME, "missing-forge-display-name"))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIForgeResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Error(t, data.lookupErr)
 	rendered := data.ToAttachData(loop)
@@ -154,8 +160,9 @@ func TestAttachedAIForgeResourceKeepsUnresolvedMark(t *testing.T) {
 
 func TestAttachedAIForgeResourceLoadsSkillMD(t *testing.T) {
 	loop := newAttachedCapabilityTestLoop(t, WithSkillsFS(buildSkillsVFS()))
-	data := &AttachedAIForgeResourceData{Key: CONTEXT_PROVIDER_KEY_NAME}
-	require.NoError(t, data.Unmarshal(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AIFORGE, CONTEXT_PROVIDER_KEY_NAME, "code-review")))
+	parsed, err := ParseAttachedResourceData(NewAttachedResource(CONTEXT_PROVIDER_TYPE_AIFORGE, CONTEXT_PROVIDER_KEY_NAME, "code-review"))
+	require.NoError(t, err)
+	data := parsed.(*AttachedAIForgeResourceData)
 	require.NoError(t, data.BindLoopData(loop))
 	require.Nil(t, data.lookupErr)
 	require.True(t, loop.config.GetSkillsContextManager().IsSkillLoaded("code-review"))
