@@ -8,7 +8,7 @@ import "strings"
 func isLoad(name string) bool {
 	switch name {
 	case "lb", "lh", "lwl", "lw", "lbu", "lhu", "lwr", "lwu", "ll", "lld",
-		"ld", "lwc1", "ldc1", "lwc2", "ldc2", "luxc1":
+		"ldl", "ldr", "ld", "lwc1", "ldc1", "lwc2", "ldc2", "luxc1":
 		return true
 	}
 	return false
@@ -89,6 +89,10 @@ func branchTarget(ins instruction) (uint64, bool) {
 	case "j", "jal":
 		// The jump target is an absolute address region, not a PC offset.
 		return uint64(ins.operands[len(ins.operands)-1].immediat), true
+	case "bal":
+		// BAL carries a PC-relative displacement like the other branches, and
+		// the program counter of the delay slot is the base.
+		return ins.address + 4 + uint64(ins.operands[len(ins.operands)-1].immediat), true
 	}
 	last := ins.operands[len(ins.operands)-1]
 	if !isBranch(ins.op) {

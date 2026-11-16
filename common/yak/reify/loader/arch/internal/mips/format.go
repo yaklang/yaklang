@@ -59,6 +59,11 @@ func decodeWord(raw uint32, profile Profile) (instruction, bool) {
 		default:
 			return instruction{}, false
 		}
+		if name == "bgezal" && rs == 0 {
+			// BAL is BGEZAL with a zero source: the branch is always taken, so
+			// only the link write remains and the form is a call.
+			name = "bal"
+		}
 		target := branchAddress(raw, rs)
 		return instruction{op: name, operands: []operand{
 			{kind: operandRegister, register: rs},
@@ -126,6 +131,9 @@ func primaryInstruction(opcode uint32) (string, string, bool) {
 		0x17: {"bgtzl", "b1"},
 		0x18: {"daddi", "i"},
 		0x19: {"daddiu", "i"},
+		// The unaligned doubleword forms load or store one object as two halves.
+		0x1a: {"ldl", "m"},
+		0x1b: {"ldr", "m"},
 		0x20: {"lb", "m"},
 		0x21: {"lh", "m"},
 		0x22: {"lwl", "m"},
