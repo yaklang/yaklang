@@ -119,9 +119,7 @@ type ReAct struct {
 	browserSessionsMu sync.Mutex
 	browserSessionIDs map[string]struct{}
 
-	browserAttachmentsMu    sync.RWMutex
-	selectedBrowserBindings []aicommon.AttachedBrowserBinding
-	activeBrowserBindings   []aicommon.AttachedBrowserBinding
+	browserAttachments browserAttachmentState
 
 	miniAITaskRegistry *MiniAITaskRegistry
 }
