@@ -345,11 +345,7 @@ func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent, resources []*aicom
 	task.SetScheduleName(control.schedule.name)
 	task.SetScheduledAt(control.schedule.scheduledAt)
 	task.SetScheduleTrigger(control.schedule.trigger)
-	r.updateBrowserAttachments(resources)
 	for _, attached := range resources {
-		if attached.HasType(aicommon.AttachedResourceTypeBrowser) {
-			continue
-		}
 		attachedDatas = append(attachedDatas, attached)
 	}
 	task.SetAttachedDatas(attachedDatas)

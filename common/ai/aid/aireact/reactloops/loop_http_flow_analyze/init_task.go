@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/consts"
@@ -18,7 +18,7 @@ import (
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		datas := reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
+		datas := loop.GetAttachedResources()
 		var flowIds []int64
 		for _, data := range datas {
 			switch data.(type) {

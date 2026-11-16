@@ -423,6 +423,8 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		})
 	}
 
+	r.prepareTaskAttachedResources(task)
+
 	// Initialize action constraints from init handler
 	var initOperator *InitTaskOperator
 

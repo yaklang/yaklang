@@ -14,6 +14,14 @@ type AttachedResourceData interface {
 	Unmarshal(resource *AttachedResource) error
 }
 
+// AttachedResourceBatchProcessor lets one resource type bind and render all of
+// its instances together. It is used when a type has session-wide semantics
+// that cannot be decided from one instance in isolation.
+type AttachedResourceBatchProcessor interface {
+	BindLoopDataBatch(loop ReActLoopIF, resources []AttachedResourceData) error
+	ToAttachDataBatch(loop ReActLoopIF, resources []AttachedResourceData) string
+}
+
 type AttachedResourceDataFactory func() AttachedResourceData
 
 var attachedResourceDataFactories = struct {
