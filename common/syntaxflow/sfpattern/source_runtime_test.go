@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/minirehs"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -448,4 +449,62 @@ alert $hit`)
 	require.True(t, memedit.NewMemEditorFromSafeString(shared, "owned.txt").SameSource(
 		memedit.NewMemEditorFromSafeString(owned, "owned.txt")))
 	require.Equal(t, int64(3), store.reads.Load(), "an owned body is not read again, and a failed read stays cached")
+}
+
+// A negative expression that only the PCRE2 engine can compile (\Z is not in
+// Go's regexp syntax) used to drop the whole pattern_regex_not search from the
+// pre-scan. The legacy matcher then rescanned every file for each hit window.
+func TestSourceScanRuntime_PatternRegexNotWithPCRE2NegativeJoinsPreScan(t *testing.T) {
+	frames := sourceFrames(t,
+		`${*.txt}.pattern_regex(/alpha/) as $hit
+alert $hit`,
+		`${*.txt}.pattern_regex_not(/AKC[A-Z0-9]{10}/, /sha(256|512).*\n/, /(?s)---BEGIN.*---\Z/) as $hit
+alert $hit`,
+	)
+	vfs := filesys.NewVirtualFs()
+	// 600 alpha hits make the executor run more than one 512-hit window.
+	vfs.AddFile("many.txt", strings.Repeat("alpha\n", 600)+"AKC1234567890\n")
+	// The AKC token sits inside a PEM block, so the PCRE2 negative must drop it.
+	vfs.AddFile("pem.txt", "---BEGIN AKC0987654321 ---\n")
+	store, err := OpenStreamingSource(vfs, nil, 2)
+	require.NoError(t, err)
+	plan, err := NewSourceScanPlan(frames)
+	require.NoError(t, err)
+	defer plan.Close()
+	require.Len(t, plan.searches, 2, "a PCRE2-only negative must not drop the search from the pre-scan")
+	runtime := plan.StartStore(context.Background(), store)
+	defer runtime.Close()
+	require.NoError(t, runtime.Wait(context.Background()))
+
+	located := false
+	for id, pattern := range runtime.plan.patterns {
+		if !strings.Contains(pattern.expr, "---BEGIN") {
+			continue
+		}
+		require.NotEmpty(t, runtime.matches[id]["pem.txt"], "the PCRE2 negative needs a located range")
+		located = true
+	}
+	require.True(t, located, "the PCRE2 negative must join the shared scan")
+
+	root := NewRootFromStore(store)
+	root.SetFileFilterMatcher(runtime.Matcher(context.Background()))
+	var notAlerts []string
+	for _, frame := range frames {
+		for offset := 0; offset < 1200; offset += DefaultSourceHitBatchSize {
+			root.SetSourceHitBatch(offset, DefaultSourceHitBatchSize)
+			result, err := frame.Feed(sfvm.ValuesOf(root))
+			require.NoError(t, err)
+			if frame == frames[1] {
+				notAlerts = append(notAlerts, sourceAlertSnapshot(result)...)
+			}
+			_, _, total := root.SourceHitBatch()
+			if total == 0 || offset+DefaultSourceHitBatchSize >= total {
+				break
+			}
+		}
+	}
+	joined := strings.Join(notAlerts, "\n")
+	require.Contains(t, joined, "many.txt")
+	require.NotContains(t, joined, "pem.txt", "the PCRE2 negative must exclude the token inside the PEM block")
+	require.Equal(t, int64(2), store.ReadCount())
 }
