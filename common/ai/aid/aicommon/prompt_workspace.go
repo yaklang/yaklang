@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var codingPromptTemplate = promptloader.MustLoad("mainloop/coding.txt")
@@ -19,7 +20,7 @@ func (m *PromptMaterials) WorkspaceContext() string {
 	if err != nil {
 		return ""
 	}
-	if m.CodingMode {
+	if m.AgentMode == ypb.AgentModeCoding {
 		codingContent, codingErr := RenderPromptTemplate("coding", codingPromptTemplate, m)
 		if codingErr == nil {
 			content += "\n" + codingContent

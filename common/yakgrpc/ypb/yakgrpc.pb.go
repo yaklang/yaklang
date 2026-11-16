@@ -11147,6 +11147,9 @@ type AIStartParams struct {
 	// Connection-local, build-generated component catalog and interaction capabilities.
 	ClientUI string `protobuf:"bytes,53,opt,name=ClientUI,proto3" json:"ClientUI,omitempty"`
 	// Experimental coding persona and immutable engine-host workspace binding.
+	// Deprecated: use AgentMode. Read only as a fallback when AgentMode is empty.
+	//
+	// Deprecated: Marked as deprecated in yakgrpc.proto.
 	CodingMode             bool   `protobuf:"varint,54,opt,name=CodingMode,proto3" json:"CodingMode,omitempty"`
 	CodingWorkspaceID      string `protobuf:"bytes,55,opt,name=CodingWorkspaceID,proto3" json:"CodingWorkspaceID,omitempty"`
 	CodingWorkingDirectory string `protobuf:"bytes,56,opt,name=CodingWorkingDirectory,proto3" json:"CodingWorkingDirectory,omitempty"`
@@ -11156,8 +11159,10 @@ type AIStartParams struct {
 	CodingWorktreeID      string   `protobuf:"bytes,59,opt,name=CodingWorktreeID,proto3" json:"CodingWorktreeID,omitempty"`           // Reuse a managed worktree in the same workspace.
 	CodingWorkspaceRoots  []string `protobuf:"bytes,60,rep,name=CodingWorkspaceRoots,proto3" json:"CodingWorkspaceRoots,omitempty"`   // Server-resolved effective directories.
 	CodingSourceRoots     []string `protobuf:"bytes,61,rep,name=CodingSourceRoots,proto3" json:"CodingSourceRoots,omitempty"`         // Server-resolved original directories.
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Agent persona: security (default) or coding. Explicit value overrides CodingMode.
+	AgentMode     string `protobuf:"bytes,62,opt,name=AgentMode,proto3" json:"AgentMode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -11540,6 +11545,7 @@ func (x *AIStartParams) GetClientUI() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in yakgrpc.proto.
 func (x *AIStartParams) GetCodingMode() bool {
 	if x != nil {
 		return x.CodingMode
@@ -11594,6 +11600,13 @@ func (x *AIStartParams) GetCodingSourceRoots() []string {
 		return x.CodingSourceRoots
 	}
 	return nil
+}
+
+func (x *AIStartParams) GetAgentMode() string {
+	if x != nil {
+		return x.AgentMode
+	}
+	return ""
 }
 
 type AIExecutionStrategy struct {
@@ -82418,7 +82431,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xf5\x15\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\x97\x16\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -82474,9 +82487,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\x12(\n" +
 	"\x0fSingleModelMode\x182 \x01(\bR\x0fSingleModelMode\x12'\n" +
 	"\fNetworkDebug\x184 \x01(\bH\x00R\fNetworkDebug\x88\x01\x01\x12\x1a\n" +
-	"\bClientUI\x185 \x01(\tR\bClientUI\x12\x1e\n" +
+	"\bClientUI\x185 \x01(\tR\bClientUI\x12\"\n" +
 	"\n" +
-	"CodingMode\x186 \x01(\bR\n" +
+	"CodingMode\x186 \x01(\bB\x02\x18\x01R\n" +
 	"CodingMode\x12,\n" +
 	"\x11CodingWorkspaceID\x187 \x01(\tR\x11CodingWorkspaceID\x126\n" +
 	"\x16CodingWorkingDirectory\x188 \x01(\tR\x16CodingWorkingDirectory\x122\n" +
@@ -82484,7 +82497,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x15CodingWorktreeBaseRef\x18: \x01(\tR\x15CodingWorktreeBaseRef\x12*\n" +
 	"\x10CodingWorktreeID\x18; \x01(\tR\x10CodingWorktreeID\x122\n" +
 	"\x14CodingWorkspaceRoots\x18< \x03(\tR\x14CodingWorkspaceRoots\x12,\n" +
-	"\x11CodingSourceRoots\x18= \x03(\tR\x11CodingSourceRootsB\x0f\n" +
+	"\x11CodingSourceRoots\x18= \x03(\tR\x11CodingSourceRoots\x12\x1c\n" +
+	"\tAgentMode\x18> \x01(\tR\tAgentModeB\x0f\n" +
 	"\r_NetworkDebug\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +

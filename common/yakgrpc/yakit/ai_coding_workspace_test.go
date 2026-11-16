@@ -27,16 +27,16 @@ func TestCodingWorkspaceSessionBinding(t *testing.T) {
 	same, err := CreateAICodingWorkspace(ctx, db, "Duplicate", workspace.RootPath)
 	require.NoError(t, err)
 	require.NotEqual(t, workspace.WorkspaceID, same.WorkspaceID)
-	params := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID}
+	params := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, db, db, "coding", params))
 	require.Equal(t, workspace.RootPath, params.CodingWorkingDirectory)
 	_, err = CreateOrUpdateAISessionMetaOnStart(db, "coding", params, time.Now())
 	require.NoError(t, err)
 	reconnect := &ypb.AIStartParams{CodingWorkingDirectory: t.TempDir()}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, db, db, "coding", reconnect))
-	require.True(t, reconnect.CodingMode)
+	require.Equal(t, ypb.AgentModeCoding, reconnect.AgentMode)
 	require.Equal(t, workspace.RootPath, reconnect.CodingWorkingDirectory)
-	invalid := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID, CodingWorkingDirectory: t.TempDir()}
+	invalid := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID, CodingWorkingDirectory: t.TempDir()}
 	require.Error(t, ResolveCodingSessionBinding(ctx, db, db, "new", invalid))
 	ordinary := &ypb.AIStartParams{CodingWorkspaceID: workspace.WorkspaceID, CodingWorkingDirectory: workspace.RootPath}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, db, db, "ordinary", ordinary))
@@ -88,7 +88,7 @@ func TestCodingMultiDirectorySessionLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, primary, workspace.RootPath, "primary subdirectory must not become repo root")
 	require.Equal(t, schema.StringSlice{primary, back}, workspace.RootPaths)
-	plain := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID}
+	plain := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, profile, project, "plain", plain))
 	require.Equal(t, []string{primary, back}, plain.CodingWorkspaceRoots)
 	require.Empty(t, plain.CodingWorktreeID)
@@ -97,7 +97,7 @@ func TestCodingMultiDirectorySessionLifecycle(t *testing.T) {
 	external := filepath.Join(t.TempDir(), "external")
 	codingTestGit(t, front, "worktree", "add", "--detach", external)
 	base := codingTestGit(t, front, "rev-parse", "HEAD")
-	params := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true,
+	params := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true,
 		CodingWorktreeBaseRef: base, CodingWorkspaceRoots: []string{"/untrusted"}}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, profile, project, "isolated", params))
 	require.Equal(t, []string{primary, back}, params.CodingSourceRoots)
@@ -126,17 +126,17 @@ func TestCodingMultiDirectorySessionLifecycle(t *testing.T) {
 	require.Equal(t, front, lookup.RepositoryRoot)
 
 	// Reusing a checkout records another session, not another checkout.
-	reuse := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID, CodingWorktreeID: tree.WorktreeID}
+	reuse := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID, CodingWorktreeID: tree.WorktreeID}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, profile, project, "reuse", reuse))
 	require.Equal(t, params.CodingWorkingDirectory, reuse.CodingWorkingDirectory)
 	other, err := CreateAICodingWorkspace(ctx, profile, "other", front)
 	require.NoError(t, err)
-	require.Error(t, ResolveCodingSessionBinding(ctx, profile, project, "foreign", &ypb.AIStartParams{CodingMode: true,
+	require.Error(t, ResolveCodingSessionBinding(ctx, profile, project, "foreign", &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding,
 		CodingWorkspaceID: other.WorkspaceID, CodingWorktreeID: tree.WorktreeID}))
 
 	_, err = UpdateAICodingWorkspace(ctx, profile, workspace.WorkspaceID, "reordered", []string{back, primary})
 	require.NoError(t, err)
-	reconnect := &ypb.AIStartParams{CodingMode: false, CodingWorkspaceID: other.WorkspaceID, CodingCreateWorktree: true}
+	reconnect := &ypb.AIStartParams{AgentMode: ypb.AgentModeSecurity, CodingWorkspaceID: other.WorkspaceID, CodingCreateWorktree: true}
 	require.NoError(t, ResolveCodingSessionBinding(ctx, profile, project, "isolated", reconnect))
 	require.Equal(t, params.CodingWorkspaceRoots, reconnect.CodingWorkspaceRoots)
 	require.Equal(t, tree.WorktreeID, reconnect.CodingWorktreeID)
@@ -165,7 +165,7 @@ func TestCodingWorktreeFailedSetupRetriesSameReservation(t *testing.T) {
 	// Prevent directory creation after the binding is persisted.
 	block := filepath.Join(home, "coding-worktrees")
 	require.NoError(t, os.WriteFile(block, []byte("blocked"), 0600))
-	params := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true}
+	params := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true}
 	require.Error(t, ResolveCodingSessionBinding(ctx, db, db, "retry", params))
 	trees, err := ListAICodingWorktrees(db, workspace.WorkspaceID)
 	require.NoError(t, err)
@@ -197,11 +197,11 @@ func TestCodingWorkspaceValidation(t *testing.T) {
 	workspace, err := CreateAICodingWorkspace(ctx, db, "plain primary", root, repo)
 	require.NoError(t, err)
 	require.False(t, workspace.IsGit)
-	require.ErrorContains(t, ResolveCodingSessionBinding(ctx, db, db, "no-fallback", &ypb.AIStartParams{CodingMode: true,
+	require.ErrorContains(t, ResolveCodingSessionBinding(ctx, db, db, "no-fallback", &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding,
 		CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true}), "primary directory is not a Git")
 	workspace, err = CreateAICodingWorkspace(ctx, db, "git", repo)
 	require.NoError(t, err)
-	require.Error(t, ResolveCodingSessionBinding(ctx, db, db, "bad-ref", &ypb.AIStartParams{CodingMode: true,
+	require.Error(t, ResolveCodingSessionBinding(ctx, db, db, "bad-ref", &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding,
 		CodingWorkspaceID: workspace.WorkspaceID, CodingCreateWorktree: true, CodingWorktreeBaseRef: "--help"}))
 	trees, err := ListAICodingWorktrees(db, workspace.WorkspaceID)
 	require.NoError(t, err)

@@ -200,6 +200,7 @@ func GetAICodingWorktree(db *gorm.DB, id, path string) (*schema.AICodingWorktree
 }
 
 func applyCodingBinding(params *ypb.AIStartParams, binding *schema.AICodingSession) {
+	params.AgentMode = ypb.AgentModeCoding
 	params.CodingMode = true
 	params.CodingWorkspaceID = binding.WorkspaceID
 	params.CodingWorkingDirectory = binding.WorkingDirectory
@@ -312,7 +313,7 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 				return err
 			}
 			if cached != nil {
-				params.CodingMode = cached.GetCodingMode()
+				params.AgentMode = cached.EffectiveAgentMode()
 				params.CodingWorkspaceID = cached.GetCodingWorkspaceID()
 				params.CodingWorkingDirectory = cached.GetCodingWorkingDirectory()
 				params.CodingWorktreeID = cached.GetCodingWorktreeID()
@@ -321,7 +322,10 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 			}
 		}
 	}
-	if !params.GetCodingMode() {
+	if err := params.NormalizeAgentMode(); err != nil {
+		return err
+	}
+	if params.GetAgentMode() != ypb.AgentModeCoding {
 		clearCodingBinding(params)
 		return nil
 	}

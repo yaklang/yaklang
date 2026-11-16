@@ -355,7 +355,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil {
 		materials.ExecutionPolicy = pm.react.config.GetExecutionPolicy()
-		materials.CodingMode = pm.react.config.CodingMode
+		materials.AgentMode = pm.react.config.AgentMode
 		materials.CodingWorkspaceID = pm.react.config.CodingWorkspaceID
 		materials.CodingWorkingDirectory = pm.react.config.CodingWorkingDirectory
 		materials.CodingWorktreeID = pm.react.config.CodingWorktreeID
@@ -974,7 +974,7 @@ func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPr
 	if materials == nil {
 		return ""
 	}
-	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode, materials.CodingMode), materials.HighStaticData())
+	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode, materials.AgentMode), materials.HighStaticData())
 	if err != nil {
 		return ""
 	}

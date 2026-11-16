@@ -63,7 +63,7 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 	modelErrors := make(chan error, 1)
 	var cfg *aicommon.Config
 	connection, err := runtime.connectWithOptions(ctx, ConnectRequest{StartParams: &ypb.AIStartParams{
-		TimelineSessionID: id, CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID,
+		TimelineSessionID: id, AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID,
 		CodingCreateWorktree: true, DisableAISearchForge: true,
 	}}, func(event *schema.AiOutputEvent) error {
 		if event.Type == schema.EVENT_TOOL_CALL_DONE {
@@ -80,7 +80,7 @@ func TestCodingRuntimeFreeInputWritesOnlyManagedWorktree(t *testing.T) {
 			prompt := request.GetPrompt()
 			action := map[string]any{"@action": "finish", "human_readable_thought": "file updated"}
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
-				if !cfg.CodingMode || cfg.CodingWorktreeID == "" ||
+				if cfg.AgentMode != ypb.AgentModeCoding || cfg.CodingWorktreeID == "" ||
 					cfg.CodingBaseRef != "HEAD" || cfg.CodingBaseCommit == "" ||
 					!strings.Contains(prompt, cfg.CodingBaseCommit) ||
 					!strings.Contains(prompt, cfg.CodingWorkingDirectory) ||

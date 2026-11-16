@@ -14,6 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const prevUserInputTagMaxTokens = 20 * 1024
@@ -70,7 +71,7 @@ type PromptManager struct {
 }
 
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
-	if react != nil && react.config != nil && react.config.CodingMode {
+	if react != nil && react.config != nil && react.config.AgentMode == ypb.AgentModeCoding {
 		workdir = react.config.CodingWorkingDirectory
 	}
 	return &PromptManager{

@@ -71,7 +71,7 @@ type PromptMaterials struct {
 	FrozenPartitions           []FrozenBlockPartition
 	SessionEvidenceSemiDynamic string
 	CurrentTime                string
-	CodingMode                 bool
+	AgentMode                  string
 	CodingWorkspaceID          string
 	CodingWorkingDirectory     string
 	CodingWorktreeID           string

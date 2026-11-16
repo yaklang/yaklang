@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")
@@ -21,7 +22,7 @@ var codingInstruction = promptloader.MustLoad("mainloop/coding/instruction.txt")
 var codingOutputExample = promptloader.MustLoad("mainloop/coding/output_example.txt")
 
 func promptOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
-	if typed, ok := cfg.(*aicommon.Config); ok && typed.CodingMode {
+	if typed, ok := cfg.(*aicommon.Config); ok && typed.AgentMode == ypb.AgentModeCoding {
 		return []reactloops.ReActLoopOption{
 			reactloops.WithPersistentInstruction(codingInstruction),
 			// Coding examples must not append unrelated registered focus-mode examples.

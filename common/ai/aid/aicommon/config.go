@@ -415,7 +415,7 @@ type Config struct {
 	*/
 	Keywords               []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
 	ForgeName              string   // if current config use in forge , this is the forge name
-	CodingMode             bool
+	AgentMode              string
 	CodingWorkspaceID      string
 	CodingWorkingDirectory string
 	CodingWorktreeID       string
@@ -778,6 +778,7 @@ func newConfig(ctx context.Context) *Config {
 	initStatus := NewConfigInitStatus()
 
 	config := &Config{
+		AgentMode:                          ypb.AgentModeSecurity,
 		HotPatchBroadcaster:                chanx.NewBroadcastChannel[ConfigOption](ctx, 10),
 		KeyValueConfig:                     NewKeyValueConfig(),
 		Ctx:                                ctx,
@@ -4500,7 +4501,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
 	}
 
-	opts = append(opts, WithCodingMode(i.CodingMode, i.CodingWorkspaceID, i.CodingWorkingDirectory), WithCodingDirectories(i.CodingWorktreeID, i.CodingSourceRoots, i.CodingWorkspaceRoots))
+	opts = append(opts, WithAgentMode(i.AgentMode), WithCodingWorkspace(i.CodingWorkspaceID, i.CodingWorkingDirectory), WithCodingDirectories(i.CodingWorktreeID, i.CodingSourceRoots, i.CodingWorkspaceRoots))
 	opts = append(opts, WithCodingWorktreeBase(i.CodingBaseRef, i.CodingBaseCommit))
 
 	// Misc

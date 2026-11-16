@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestCodingPromptAndChildConfig(t *testing.T) {
@@ -24,7 +25,7 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			artifacts := filepath.Join(t.TempDir(), "artifacts")
 			cwd, err := os.Getwd()
 			require.NoError(t, err)
-			react, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(artifacts), aicommon.WithCodingMode(true, "workspace-a", source), aicommon.WithCodingDirectories("managed-tree", []string{"/original/project", secondary}, []string{source, secondary}), aicommon.WithCodingWorktreeBase("origin/main", "initial-commit"))
+			react, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(artifacts), aicommon.WithAgentMode(ypb.AgentModeCoding), aicommon.WithCodingWorkspace("workspace-a", source), aicommon.WithCodingDirectories("managed-tree", []string{"/original/project", secondary}, []string{source, secondary}), aicommon.WithCodingWorktreeBase("origin/main", "initial-commit"))
 			require.NoError(t, err)
 			loop, err := loop_default.NewLoop("coding-prompt-test", react)
 			require.NoError(t, err)
@@ -55,7 +56,7 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, cwd, after)
 			child := aicommon.NewConfig(ctx, aicommon.ConvertConfigToOptions(react.config)...)
-			require.True(t, child.CodingMode)
+			require.Equal(t, ypb.AgentModeCoding, child.AgentMode)
 			require.Equal(t, react.config.CodingWorkingDirectory, child.CodingWorkingDirectory)
 			require.Equal(t, artifacts, child.Workdir)
 			require.Equal(t, react.config.CodingWorkspaceRoots, child.CodingWorkspaceRoots)
@@ -73,6 +74,7 @@ func TestCodingPromptAbsentForOrdinarySession(t *testing.T) {
 	defer cancel()
 	react, err := NewTestReAct(aicommon.WithContext(ctx))
 	require.NoError(t, err)
+	require.Equal(t, ypb.AgentModeSecurity, react.config.AgentMode)
 	result, err := react.AssembleLoopPrompt(nil, &reactloops.LoopPromptAssemblyInput{Nonce: "ordinary", UserQuery: "hello", Schema: `{"type":"object"}`})
 	require.NoError(t, err)
 	require.NotContains(t, result.Prompt, "# Coding Agent")
@@ -84,7 +86,7 @@ func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(map[bool]string{true: "native", false: "text"}[native], func(t *testing.T) {
 			builder := aicommon.NewDefaultPromptPrefixBuilder()
-			materials := &aicommon.PromptMaterials{CodingMode: true, FunctionCallMode: native,
+			materials := &aicommon.PromptMaterials{AgentMode: ypb.AgentModeCoding, FunctionCallMode: native,
 				Workspace: true, WorkingDir: "/project-one", CodingWorkingDirectory: "/project-one",
 				CodingWorkspaceID: "workspace-one", CodingWorkspaceRoots: []string{"/project-one"}}
 			first, err := builder.AssemblePromptPrefix(materials)
@@ -100,14 +102,14 @@ func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
 			second, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
 			require.Equal(t, first.HighStatic, second.HighStatic, "paths and worktree IDs must not fragment the mode's system prefix")
-			materials.CodingMode = false
+			materials.AgentMode = ypb.AgentModeSecurity
 			ordinary, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
 			require.NotEqual(t, first.HighStatic, ordinary.HighStatic)
 			require.Contains(t, ordinary.HighStatic, "未落档的风险禁止终结")
 			require.NotContains(t, ordinary.HighStatic, "Coding Agent 工作方法")
 			builder.HighStaticTemplate = "custom caller instructions"
-			materials.CodingMode = true
+			materials.AgentMode = ypb.AgentModeCoding
 			custom, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
 			require.Equal(t, "custom caller instructions", custom.HighStatic)

@@ -583,7 +583,7 @@ func (r *reActSessionRuntime) createRuntime(
 		return nil, err
 	}
 	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(r.projectDatabase(), sessionID, resolvedStartParams, time.Now()); err != nil {
-		if resolvedStartParams.GetCodingMode() {
+		if resolvedStartParams.GetAgentMode() == ypb.AgentModeCoding {
 			return nil, utils.Errorf("persist coding session metadata: %v", err)
 		}
 		log.Warnf("persist ai session start meta failed for %s: %v", sessionID, err)
@@ -618,7 +618,7 @@ func (r *reActSessionRuntime) createRuntime(
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
 	configOptions = append(configOptions, ConvertStartParamsToReActConfig(resolvedStartParams)...)
-	if resolvedStartParams.GetCodingMode() && resolvedStartParams.GetCodingWorktreeID() != "" {
+	if resolvedStartParams.GetAgentMode() == ypb.AgentModeCoding && resolvedStartParams.GetCodingWorktreeID() != "" {
 		worktree, err := yakit.GetAICodingWorktree(r.profileDB(), resolvedStartParams.GetCodingWorktreeID(), "")
 		if err != nil {
 			return nil, utils.Errorf("load coding worktree context: %v", err)
@@ -722,7 +722,8 @@ func (r *reActSessionRuntime) attachConnection(
 	// for its immutable source binding, including when the client has opted out.
 	startParams = proto.Clone(startParams).(*ypb.AIStartParams)
 	cfg := reAct.GetConfig().(*aicommon.Config)
-	startParams.CodingMode = cfg.CodingMode
+	startParams.AgentMode = cfg.AgentMode
+	startParams.CodingMode = cfg.AgentMode == ypb.AgentModeCoding
 	startParams.CodingWorkspaceID = cfg.CodingWorkspaceID
 	startParams.CodingWorkingDirectory = cfg.CodingWorkingDirectory
 	startParams.CodingWorktreeID = cfg.CodingWorktreeID

@@ -38,7 +38,7 @@ func TestCodingRuntimeAttachKeepsProfileAndBinding(t *testing.T) {
 	runtime.newReAct = aireact.NewTestReAct
 	manager, _ := aicommon.NewMockEKManagerAndToken()
 	id := "coding-" + uuid.NewString()
-	params := &ypb.AIStartParams{TimelineSessionID: id, CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID, DisableAISearchForge: true, DisableToolUse: true}
+	params := &ypb.AIStartParams{TimelineSessionID: id, AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID, DisableAISearchForge: true, DisableToolUse: true}
 	owner, err := runtime.connectWithOptions(ctx, ConnectRequest{StartParams: params}, nil, false, aicommon.WithEnhanceKnowledgeManager(manager))
 	require.NoError(t, err)
 	defer owner.Close()
@@ -49,10 +49,10 @@ func TestCodingRuntimeAttachKeepsProfileAndBinding(t *testing.T) {
 	require.NoError(t, err)
 	defer attached.Close()
 	require.False(t, attached.CreatedRuntime())
-	require.False(t, attachParams.CodingMode, "the caller's request must not be mutated")
+	require.Empty(t, attachParams.AgentMode, "the caller's request must not be mutated")
 	saved, err := yakit.GetAISessionMetaStartParamsBySessionID(project, id)
 	require.NoError(t, err)
-	require.True(t, saved.CodingMode)
+	require.Equal(t, ypb.AgentModeCoding, saved.AgentMode)
 	require.Equal(t, workspace.WorkspaceID, saved.CodingWorkspaceID)
 	require.Equal(t, workspace.RootPath, saved.CodingWorkingDirectory)
 	require.Equal(t, []string{workspace.RootPath}, saved.CodingWorkspaceRoots)
@@ -79,7 +79,7 @@ func TestCodingRuntimeFailureAndConcurrentRestartReuseWorktree(t *testing.T) {
 	require.NoError(t, err)
 	runtime := New(func() *gorm.DB { return project }, func() *gorm.DB { return profile }).(*reActSessionRuntime)
 	id := "coding-" + uuid.NewString()
-	params := &ypb.AIStartParams{TimelineSessionID: id, CodingMode: true, CodingWorkspaceID: workspace.WorkspaceID,
+	params := &ypb.AIStartParams{TimelineSessionID: id, AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.WorkspaceID,
 		CodingCreateWorktree: true, DisableAISearchForge: true, DisableToolUse: true}
 	runtime.newReAct = func(...aicommon.ConfigOption) (*aireact.ReAct, error) {
 		return nil, fmt.Errorf("injected initialization failure")

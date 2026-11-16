@@ -1,6 +1,9 @@
 package aicommon
 
-import "github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
 
 var (
 	codingSystemsTemplate                           = promptloader.MustLoad("mainloop/coding/systems.txt")
@@ -25,8 +28,8 @@ func (m *PromptMaterials) HighStaticData() map[string]any {
 	}
 }
 
-func MainloopHighStaticTemplate(functionCallMode, codingMode bool) string {
-	if codingMode {
+func MainloopHighStaticTemplate(functionCallMode bool, agentMode string) string {
+	if agentMode == ypb.AgentModeCoding {
 		if functionCallMode {
 			return codingHighStaticFunctionCallTemplate
 		}

@@ -21,7 +21,7 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	}
 	opts = append(opts, aicommon.WithSingleAIModelMode(i.GetSingleModelMode()), aicommon.WithNetworkDebug(i.GetNetworkDebug()))
 	opts = append(opts, aicommon.WithClientUI(i.GetClientUI()))
-	opts = append(opts, aicommon.WithCodingMode(i.GetCodingMode(), i.GetCodingWorkspaceID(), i.GetCodingWorkingDirectory()), aicommon.WithCodingDirectories(i.GetCodingWorktreeID(), i.GetCodingSourceRoots(), i.GetCodingWorkspaceRoots()))
+	opts = append(opts, aicommon.WithAgentMode(i.EffectiveAgentMode()), aicommon.WithCodingWorkspace(i.GetCodingWorkspaceID(), i.GetCodingWorkingDirectory()), aicommon.WithCodingDirectories(i.GetCodingWorktreeID(), i.GetCodingSourceRoots(), i.GetCodingWorkspaceRoots()))
 	enableMultiAgent, goalModeEnabled, goalMinIterations, maxSubAgents := resolveAIExecutionStrategy(i)
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))

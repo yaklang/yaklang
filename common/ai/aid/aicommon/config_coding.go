@@ -5,12 +5,45 @@ import (
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/ai/aid/coding"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// WithCodingMode keeps source code separate from Workdir, which owns disposable artifacts.
-// Tools must use explicit absolute paths / shell working directories, never os.Chdir.
-func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
+// WithAgentMode selects the session persona. Unspecified mode is the security agent.
+func WithAgentMode(mode string) ConfigOption {
 	return func(c *Config) error {
+		normalized, err := ypb.NormalizeAgentMode(mode)
+		if err != nil {
+			return err
+		}
+		c.AgentMode = normalized
+		if normalized != ypb.AgentModeCoding {
+			c.CodingWorkspaceID, c.CodingWorkingDirectory, c.CodingWorktreeID = "", "", ""
+			c.CodingBaseRef, c.CodingBaseCommit = "", ""
+			c.CodingSourceRoots, c.CodingWorkspaceRoots = nil, nil
+		}
+		return nil
+	}
+}
+
+// Deprecated: use WithAgentMode and WithCodingWorkspace.
+func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
+	mode := ypb.AgentModeSecurity
+	if enabled {
+		mode = ypb.AgentModeCoding
+	}
+	return func(c *Config) error {
+		if err := WithAgentMode(mode)(c); err != nil {
+			return err
+		}
+		return WithCodingWorkspace(workspaceID, directory)(c)
+	}
+}
+
+// WithCodingWorkspace keeps source code separate from Workdir, which owns disposable artifacts.
+// Tools must use explicit absolute paths / shell working directories, never os.Chdir.
+func WithCodingWorkspace(workspaceID, directory string) ConfigOption {
+	return func(c *Config) error {
+		enabled := c.AgentMode == ypb.AgentModeCoding
 		if enabled {
 			path, err := coding.Directory(directory)
 			if err != nil {
@@ -27,7 +60,6 @@ func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
 			c.CodingWorkspaceRoots = []string{directory}
 			c.CodingSourceRoots = []string{directory}
 		}
-		c.CodingMode = enabled
 		c.CodingWorkspaceID = workspaceID
 		c.CodingWorkingDirectory = directory
 		return nil
@@ -38,7 +70,7 @@ func WithCodingMode(enabled bool, workspaceID, directory string) ConfigOption {
 // worktree record. It does not describe the current branch or HEAD.
 func WithCodingWorktreeBase(ref, commit string) ConfigOption {
 	return func(c *Config) error {
-		if c.CodingMode && c.CodingWorktreeID != "" {
+		if c.AgentMode == ypb.AgentModeCoding && c.CodingWorktreeID != "" {
 			c.CodingBaseRef, c.CodingBaseCommit = ref, commit
 		}
 		return nil
@@ -49,7 +81,7 @@ func WithCodingWorktreeBase(ref, commit string) ConfigOption {
 func WithCodingDirectories(worktreeID string, sourceRoots, workspaceRoots []string) ConfigOption {
 	sources, roots := append([]string(nil), sourceRoots...), append([]string(nil), workspaceRoots...)
 	return func(c *Config) error {
-		if !c.CodingMode {
+		if c.AgentMode != ypb.AgentModeCoding {
 			return nil
 		}
 		effective, original := roots, sources

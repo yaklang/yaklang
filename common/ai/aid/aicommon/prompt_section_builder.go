@@ -102,7 +102,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	frozenBlockTemplate := b.FrozenBlockTemplate
 	semiDynamic2Template := b.SemiDynamic2Template
 	if highStaticTemplate == SharedPlanAndExecHighStaticTemplate || highStaticTemplate == SharedPlanAndExecHighStaticFunctionCallTemplate {
-		highStaticTemplate = MainloopHighStaticTemplate(materials.FunctionCallMode, materials.CodingMode)
+		highStaticTemplate = MainloopHighStaticTemplate(materials.FunctionCallMode, materials.AgentMode)
 	}
 	if materials.FunctionCallMode {
 		if frozenBlockTemplate == SharedFrozenBlockTemplate {

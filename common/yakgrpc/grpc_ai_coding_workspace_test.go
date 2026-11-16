@@ -58,9 +58,9 @@ func TestCodingManagedWorktreeRPCOwnershipAndAvailability(t *testing.T) {
 	require.NotEmpty(t, branches.CurrentCommit)
 	_, err = server.ListAICodingBranches(ctx, &ypb.AICodingWorkspaceRequest{WorkspaceID: "missing"})
 	require.Error(t, err)
-	params := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.ID, CodingCreateWorktree: true}
+	params := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.ID, CodingCreateWorktree: true}
 	require.NoError(t, yakit.ResolveCodingSessionBinding(ctx, db, db, "owner", params))
-	reuse := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.ID, CodingWorktreeID: params.CodingWorktreeID}
+	reuse := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.ID, CodingWorktreeID: params.CodingWorktreeID}
 	require.NoError(t, yakit.ResolveCodingSessionBinding(ctx, db, db, "linked", reuse))
 	list, err := server.ListAICodingWorktrees(ctx, &ypb.AICodingWorkspaceRequest{WorkspaceID: workspace.ID})
 	require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestCodingSessionDeletionKeepsWorktrees(t *testing.T) {
 			server := &Server{profileDatabase: profile, projectDatabase: project}
 			workspace, err := server.CreateAICodingWorkspace(context.Background(), &ypb.CreateAICodingWorkspaceRequest{Name: "project", RootPaths: []string{root}})
 			require.NoError(t, err)
-			params := &ypb.AIStartParams{CodingMode: true, CodingWorkspaceID: workspace.ID, CodingCreateWorktree: true}
+			params := &ypb.AIStartParams{AgentMode: ypb.AgentModeCoding, CodingWorkspaceID: workspace.ID, CodingCreateWorktree: true}
 			require.NoError(t, yakit.ResolveCodingSessionBinding(context.Background(), profile, project, "deleted-chat", params))
 			_, err = yakit.CreateOrUpdateAISessionMeta(project, "deleted-chat", "Preserved chat title")
 			require.NoError(t, err)
