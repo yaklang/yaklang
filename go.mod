@@ -7,10 +7,6 @@ replace github.com/yaklang/yaklang v0.0.0 => ./
 // Use the locally forked go-sqlite3 (FTS5 enabled by default) without rewriting imports.
 replace github.com/mattn/go-sqlite3 => github.com/yaklang/go-sqlite3 v0.0.2
 
-// Local go-llvm branch feat/c-api-wrappers: expose the FFI helpers ssa2llvm
-// needs so callers stop using cgo directly.
-replace github.com/yaklang/go-llvm => /home/wlz/Developer/work/go-llvm
-
 require (
 	github.com/BurntSushi/toml v1.3.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
@@ -105,7 +101,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.1.0
-	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
+	github.com/yaklang/go-llvm v0.0.0-20261110094028-e7fe69236a2f
 	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
 	github.com/yaklang/goja v0.1.0
 	github.com/yaklang/gorm v1.9.18-0.20261027075104-00c777df9a43
