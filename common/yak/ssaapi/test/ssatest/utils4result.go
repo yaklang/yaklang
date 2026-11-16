@@ -103,7 +103,7 @@ func (g *GraphInTest) CreateEdge(edge ssaapi.Edge) error {
 	g.edgeStr = append(g.edgeStr,
 		fmt.Sprintf("%s %v %v %v %v",
 			pathStr(edge.From.GetRange().GetText(), edge.To.GetRange().GetText()),
-			label, edge.Step, edge.Msg, edge.Kind,
+			label, edge.Step, edge.Kind,
 		),
 	)
 	return nil
