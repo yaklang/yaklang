@@ -1,0 +1,103 @@
+name: Reify Tests
+
+# Reify turns a native executable back into LowIR, YakSSA and source. Its test
+# suite is self-contained: every fixture is embedded or generated at run time,
+# so one job covers the whole directory.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "common/yak/reify/**"
+      - "go.mod"
+      - "go.sum"
+      - "scripts/ssa-test.sh"
+      - ".github/workflows/reify-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "common/yak/reify/**"
+      - ".github/workflows/reify-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Reify tests
+    runs-on: ubuntu-22.04
+    # A cold run compiles the SSA packages the reify API depends on, including
+    # the vendored PCRE2 C sources. Warm runs finish in seconds; the cap only
+    # stops a hung job.
+    timeout-minutes: 45
+    env:
+      # go-pcre2-lite compiles its bundled PCRE2 sources, so cgo stays on.
+      CGO_ENABLED: "1"
+      GOMAXPROCS: "4"
+
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+          cache: true
+
+      # Two tests assemble a real object file to prove the loaders read what a
+      # toolchain writes. Both skip when the assembler is missing, so provide it
+      # instead of silently losing the coverage. Runners ship a versioned binary
+      # under /usr/bin, not the unversioned name.
+      - name: Provide llvm-mc
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          for candidate in llvm-mc llvm-mc-20 llvm-mc-19 llvm-mc-18 llvm-mc-17 \
+                           llvm-mc-16 llvm-mc-15 llvm-mc-14 llvm-mc-13; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              ln -sf "$(command -v "$candidate")" "$RUNNER_TEMP/bin/llvm-mc"
+              echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+              echo "llvm-mc -> $(readlink -f "$RUNNER_TEMP/bin/llvm-mc")"
+              exit 0
+            fi
+          done
+          echo "no llvm-mc found; the COFF assembler test will skip"
+
+      - name: Build the CLI
+        # cmd/reify is the only binary the directory ships, so a build failure
+        # has to fail the job before the tests run.
+        run: go build -o "$RUNNER_TEMP/reify" ./common/yak/reify/cmd/reify
+
+      - name: Run the reify suite
+        # scripts/ssa-test.sh with arguments forwards to go test and sets an
+        # isolated YAKIT_HOME, which is the repository's test entry point.
+        run: ./scripts/ssa-test.sh -count=1 -timeout 20m ./common/yak/reify/...
+
+      - name: Check formatting
+        run: |
+          set -euo pipefail
+          unformatted=$(gofmt -l common/yak/reify)
+          if [ -n "$unformatted" ]; then
+            echo "these files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./common/yak/reify/...
+
+      - name: Report the registered architectures and formats
+        # The register is the public surface: a parser that silently fails to
+        # register still compiles and still passes most tests.
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/reify" parsers
+          "$RUNNER_TEMP/reify" loaders
