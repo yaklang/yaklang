@@ -47,6 +47,28 @@ type Profile struct {
 // profile. The 64-bit System V ABI passes six arguments in registers; the 32-bit
 // cdecl ABI passes every argument on the stack.
 func (p Profile) Registers() core.RegisterModel {
+	return p.RegistersFor(core.Target{})
+}
+
+// RegistersFor selects the argument registers of the target system. Windows passes
+// its first four integer arguments in rcx, rdx, r8 and r9, while the System V
+// targets use rdi, rsi, rdx and rcx.
+func (p Profile) RegistersFor(target core.Target) core.RegisterModel {
+	if p.Mode == 64 && target.OS == core.OSWindows {
+		return core.RegisterModel{
+			Naming:     core.RegisterNamingX86,
+			Width:      64,
+			Flags:      "rflags",
+			FlagsWidth: 64,
+			Arguments:  []string{"rcx", "rdx", "r8", "r9"},
+			Return:     "rax",
+		}
+	}
+	return p.registers()
+	return p.registers()
+}
+
+func (p Profile) registers() core.RegisterModel {
 	model := core.RegisterModel{
 		Naming:     core.RegisterNamingX86,
 		Width:      p.Bits,

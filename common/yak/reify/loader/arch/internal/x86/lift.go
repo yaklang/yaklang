@@ -27,7 +27,7 @@ type place struct {
 }
 
 func liftFunctions(profile Profile, target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
-	ir := &core.LowIR{Target: target, Frame: profile.Frame(), Registers: profile.Registers(), Canary: profile.Canary}
+	ir := &core.LowIR{Target: target, Frame: profile.Frame(), Registers: profile.RegistersFor(target), Canary: profile.Canary}
 	for index, functionBody := range functions {
 		ir.Functions = append(ir.Functions, liftFunction(profile, target, functionBody, core.FunctionID(index+1), blockIDs, diagnostics))
 	}

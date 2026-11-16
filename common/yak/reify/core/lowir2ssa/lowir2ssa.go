@@ -31,6 +31,17 @@ type Result struct {
 type Options struct {
 	ProgramName string
 	LowIRPasses []string
+	// PointerAt resolves a pointer-sized value stored at an image address. A
+	// target reaches a global through a table of addresses, so a load from that
+	// table has to become the address it holds; otherwise every access stays
+	// symbolic and the object it names cannot be recovered.
+	PointerAt func(address uint64, size uint16) (uint64, bool)
+}
+
+// WithPointerReader supplies the table lookup that turns a load from a table of
+// addresses into the address it holds.
+func WithPointerReader(read func(address uint64, size uint16) (uint64, bool)) Option {
+	return func(options *Options) { options.PointerAt = read }
 }
 
 // Option customizes conversion.
@@ -71,6 +82,7 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 		ctx:         ctx,
 		program:     program,
 		facts:       ir.Facts(),
+		pointerAt:   settings.PointerAt,
 		frameValues: make(map[ssa.Value]bool),
 		spDerived:   make(map[ssa.Value]bool),
 		diagnostics: make([]core.Diagnostic, 0),
@@ -136,6 +148,8 @@ type converter struct {
 	// frameValues marks the values read from a frame register, which a prologue
 	// saves but never passes as an argument.
 	frameValues map[ssa.Value]bool
+	// pointerAt resolves the pointer stored at an image address.
+	pointerAt func(address uint64, size uint16) (uint64, bool)
 	// spDerived marks the values computed from the stack pointer. A cdecl
 	// argument area is the only thing a caller stores through that chain.
 	spDerived map[ssa.Value]bool
@@ -385,6 +399,17 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 		value := c.operandValue(firstOperand(instruction.Operands))
 		if value == nil {
 			c.setResult(instruction, c.opaqueValue("copy", instruction))
+			return
+		}
+		// A copy of a constant is that constant. A cast would produce a new value
+		// that no longer folds, and a target builds an address chain out of copies:
+		// the base register is copied, the displacement is added, and the sum has
+		// to collapse into one address.
+		if _, ok := ssa.ToConstInst(value); ok {
+			if typ := c.typeFor(instruction.Results[0].Type); typ != nil {
+				value.SetType(typ)
+			}
+			c.setResult(instruction, value)
 			return
 		}
 		c.setResult(instruction, c.coerceType(value, instruction.Results))
@@ -1092,6 +1117,24 @@ func (c *converter) emitLoad(instruction core.Instruction) {
 	if len(instruction.Operands) == 0 {
 		return
 	}
+	// A load from a table of addresses is the address it holds. The target stores
+	// its globals that way, so resolving the table entry is what turns a symbolic
+	// chain into a nameable object.
+	if c.pointerAt != nil && len(instruction.Results) == 1 {
+		if address, ok := c.constantAddress(instruction.Operands[0].Value); ok {
+			bits := instruction.Results[0].Type.Bits
+			if bits == 0 {
+				bits = c.facts.Registers.Width
+			}
+			if value, ok := c.pointerAt(address, bits); ok {
+				if constant := c.builder.EmitConstInst(int64(value)); constant != nil {
+					constant.SetType(c.typeFor(instruction.Results[0].Type))
+					c.setResult(instruction, constant)
+					return
+				}
+			}
+		}
+	}
 	key := valueKey(c.defs, instruction.Operands[0].Value)
 	name := c.memoryName(key)
 	variable := c.memoryVariable(name)
@@ -1782,4 +1825,21 @@ func (c *converter) isStackDerived(instruction core.Instruction) bool {
 		}
 	}
 	return false
+}
+
+// constantAddress resolves one operand to a constant image address.
+func (c *converter) constantAddress(id core.ValueID) (uint64, bool) {
+	value, ok := c.values[id]
+	if !ok || value == nil {
+		return 0, false
+	}
+	constant, ok := ssa.ToConstInst(value)
+	if !ok {
+		return 0, false
+	}
+	number, ok := constInteger(constant)
+	if !ok || number < 0 {
+		return 0, false
+	}
+	return uint64(number), true
 }
