@@ -703,11 +703,12 @@ func (l *lifter) branchOnCount(ins instruction) (core.ValueID, bool) {
 	if !ok {
 		return 0, false
 	}
-	kind := core.OpSub
-	if strings.HasPrefix(name, "cl") {
-		kind = core.OpSub
-	}
-	flags := l.operation(ins, kind, []core.Operand{l.value(left), l.value(right)}, addressBits, core.EffectNone)
+	// The compare-and-branch forms compare two operands and branch on the result.
+	// Publishing the comparison under the flag namespace lets the condition resolve
+	// into the comparison itself instead of an opaque marker.
+	flags := l.operation(ins, core.OpIntrinsic, []core.Operand{
+		symbolOperand(core.FlagsIntrinsicPrefix + "cmp"), l.value(left), l.value(right),
+	}, addressBits, core.EffectNone)
 	mask := l.conditionMask(ins)
 	conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
 		symbolOperand("cond." + conditionName(mask)), l.value(flags),

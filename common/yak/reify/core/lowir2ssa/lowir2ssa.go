@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -139,10 +140,17 @@ type converter struct {
 	loopPhiDone map[int64]bool
 	headerStore map[core.BlockID]map[string]bool
 	loopCarried map[core.BlockID]map[string]bool
-	current     core.BlockID
-	types       map[core.ValueType]ssa.Type
-	undefined   map[string]ssa.Value
-	facts       core.ArchFacts
+	// mergePhis holds the join phis of a block keyed by the register key, and
+	// blockOut holds the value a block leaves in each register.
+	mergePhis  map[core.BlockID]map[string]*ssa.Phi
+	blockOut   map[core.BlockID]map[string]ssa.Value
+	lowirBySSA map[int64]core.BlockID
+	idom       map[core.BlockID]core.BlockID
+	predsOf    map[core.BlockID][]core.BlockID
+	current    core.BlockID
+	types      map[core.ValueType]ssa.Type
+	undefined  map[string]ssa.Value
+	facts      core.ArchFacts
 	// stackStores collects the values a cdecl caller stores for its arguments.
 	stackStores []ssa.Value
 	// frameValues marks the values read from a frame register, which a prologue
@@ -202,6 +210,9 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.loopPhiDone = make(map[int64]bool)
 	c.headerStore = make(map[core.BlockID]map[string]bool)
 	c.loopCarried = make(map[core.BlockID]map[string]bool)
+	c.mergePhis = make(map[core.BlockID]map[string]*ssa.Phi)
+	c.blockOut = make(map[core.BlockID]map[string]ssa.Value)
+	c.lowirBySSA = make(map[int64]core.BlockID, len(function.Blocks))
 	c.types = make(map[core.ValueType]ssa.Type)
 	c.undefined = make(map[string]ssa.Value)
 
@@ -218,6 +229,13 @@ func (c *converter) convertFunction(function core.Function) error {
 		}
 		c.blocks[block.ID] = ssaBlock
 	}
+	// The block ids are stable only after every block exists, so the reverse map is
+	// built here rather than inside the creation loop.
+	for _, block := range function.Blocks {
+		if ssaBlock := c.blocks[block.ID]; ssaBlock != nil {
+			c.lowirBySSA[ssaBlock.GetId()] = block.ID
+		}
+	}
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {
 			for _, result := range instruction.Results {
@@ -228,11 +246,13 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.markLoopHeaders(function)
 	c.collectLoopCarried(function)
 	c.bindParameters()
+	c.planMergePhis(function)
 	for _, block := range function.Blocks {
 		if err := c.convertBlock(block); err != nil {
 			return err
 		}
 	}
+	c.fillMergePhis()
 	ssaFunction.Finish()
 	return nil
 }
@@ -316,9 +336,24 @@ func (c *converter) prepareLoopPhis(blockID core.BlockID) {
 }
 
 func (c *converter) bindParameters() {
+	// The entry parameters are the values the first block leaves in those
+	// registers when it does not write them again.
+	if len(c.sourceFunction.Blocks) > 0 {
+		c.current = c.sourceFunction.Blocks[0].ID
+	}
 	c.builder.CurrentBlock = c.entry
+	stackPointer := ""
+	if sp := c.facts.Frame.StackPointer; sp != "" {
+		stackPointer = c.registerView(sp, 0).canonical
+	}
 	for _, name := range c.entryRegisters() {
-		parameter := ssa.NewParam("entry_"+name, false, c.builder)
+		parameterName := "entry_" + name
+		if stackPointer != "" && c.registerView(name, 0).canonical == stackPointer {
+			// The stack pointer is not a parameter of the recovered function. Naming
+			// it frame keeps the ABI register out of the source.
+			parameterName = "frame"
+		}
+		parameter := ssa.NewParam(parameterName, false, c.builder)
 		if parameter == nil {
 			continue
 		}
@@ -625,6 +660,7 @@ func (c *converter) emitRegisterWrite(instruction core.Instruction) {
 	if err := variable.Assign(value); err != nil {
 		c.addDiagnostic("lowir2ssa-assignment", fmt.Sprintf("cannot assign %s: %v", view.canonical, err))
 	}
+	c.recordRegisterValue(view.canonical, value)
 	c.markHeaderStore("reg:" + view.canonical)
 	if c.isArgumentRegister(view.canonical) {
 		c.arguments[view.canonical] = true
@@ -711,9 +747,17 @@ func (c *converter) assignRegister(name string, value ssa.Value) {
 	if err := variable.Assign(value); err != nil {
 		c.addDiagnostic("lowir2ssa-assignment", fmt.Sprintf("cannot assign %s: %v", view.canonical, err))
 	}
+	c.recordRegisterValue(view.canonical, value)
 }
 
 func (c *converter) registerValue(view registerView) ssa.Value {
+	// Resolve the value along the dominator chain. The variable holds whichever
+	// write the conversion reached last, and blocks are converted in reverse
+	// postorder, so a block converted earlier can leave a value that does not
+	// dominate this read.
+	if value := c.outgoingRegisterValue(c.current, "reg:"+view.canonical); value != nil {
+		return value
+	}
 	variable := c.registerVariable(view.canonical)
 	if variable == nil {
 		return nil
@@ -799,6 +843,9 @@ func (c *converter) emitCall(instruction core.Instruction) {
 		return
 	}
 	args := c.operandValues(instruction.Operands[1:])
+	if os.Getenv("REIFY_DEBUG_CALL") != "" {
+		fmt.Fprintf(os.Stderr, "call@%x opargs=%d arguments=%v names=%v\n", instruction.Address, len(args), c.arguments, c.argumentRegisters())
+	}
 	args = append(args, c.captureArguments()...)
 	if c.facts.Registers.StackArguments {
 		// The arguments are the values the caller stored just before the call,
@@ -845,19 +892,26 @@ func (c *converter) stackArguments() []ssa.Value {
 
 func (c *converter) captureArguments() []ssa.Value {
 	names := c.argumentRegisters()
-	last := -1
-	for index, name := range names {
-		if c.arguments[name] {
-			last = index
+	// Arguments are positional: the caller fills a prefix of the argument
+	// registers. A register written past a gap was written for something else, so
+	// the capture stops at the gap instead of inventing the arguments in between.
+	count := 0
+	for _, name := range names {
+		if !c.arguments[name] {
+			break
 		}
+		count++
 	}
-	if last < 0 {
+	if count == 0 {
 		return nil
 	}
-	args := make([]ssa.Value, 0, last+1)
-	for index := 0; index <= last; index++ {
+	args := make([]ssa.Value, 0, count)
+	for index := 0; index < count; index++ {
 		name := names[index]
 		args = append(args, c.registerValue(c.registerView(name, 0)))
+		c.arguments[name] = false
+	}
+	for _, name := range names[count:] {
 		c.arguments[name] = false
 	}
 	return args
@@ -961,7 +1015,7 @@ func (c *converter) conditionValue(cc string, instruction core.Instruction) ssa.
 	if flags == nil {
 		return nil
 	}
-	info, ok := c.flags[core.ValueID(flags.GetId())]
+	info, ok := c.flagInfoOf(flags)
 	if !ok {
 		return nil
 	}
@@ -1250,6 +1304,11 @@ func (c *converter) markHeaderStore(key string) {
 func (c *converter) loopPhi(key string, variable *ssa.Variable) *ssa.Phi {
 	if c.headerStore[c.current] != nil && c.headerStore[c.current][key] {
 		return nil
+	}
+	if merge := c.mergePhis[c.current]; merge != nil {
+		if phi := merge[key]; phi != nil {
+			return phi
+		}
 	}
 	if existing := c.loopPhis[c.current]; existing != nil {
 		if phi := existing[key]; phi != nil {
@@ -1894,4 +1953,25 @@ func (c *converter) constantAddress(id core.ValueID) (uint64, bool) {
 		return 0, false
 	}
 	return uint64(number), true
+}
+
+// flagInfoOf looks up the comparison a value carries. A narrow flag register is
+// read through a type cast, and the comparison is recorded under the value the
+// cast reads, so the search follows the cast.
+func (c *converter) flagInfoOf(value ssa.Value) (flagInfo, bool) {
+	for depth := 0; depth < 4 && value != nil; depth++ {
+		if info, ok := c.flags[core.ValueID(value.GetId())]; ok {
+			return info, true
+		}
+		cast, ok := ssa.ToTypeCast(value)
+		if !ok || cast == nil {
+			return flagInfo{}, false
+		}
+		inner, ok := cast.GetValueById(cast.Value)
+		if !ok || inner == nil {
+			return flagInfo{}, false
+		}
+		value = inner
+	}
+	return flagInfo{}, false
 }

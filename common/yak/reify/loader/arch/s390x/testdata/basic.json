@@ -215,9 +215,9 @@
       "block b1 @ 0x1c00",
       "  0x1c00  v1:i64 = read_register %r2 [read_register]",
       "  0x1c00  v2:i64 = read_register %r3 [read_register]",
-      "  0x1c00  v3:i64 = sub v1, v2",
+      "  0x1c00  v3:i64 = intrinsic @flags.cmp, v1, v2",
       "  0x1c00  v4:i1 = intrinsic @cond.e, v3 [read_register]",
-      "  0x1c00  branch v4 -\u003e b1"
+      "  0x1c00  branch v4 -> b1"
     ]
   },
   {
@@ -232,7 +232,7 @@
       "block b1 @ 0x1d00",
       "  0x1d00  v1:i2 = read_register %cc [read_register]",
       "  0x1d00  v2:i1 = intrinsic @cond.e, v1 [read_register]",
-      "  0x1d00  branch v2 -\u003e b1"
+      "  0x1d00  branch v2 -> b1"
     ]
   },
   {

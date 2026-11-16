@@ -130,7 +130,7 @@ PE 映像的目录项 14 是 COM descriptor，只有 .NET 程序集填写。命�
 
 表示约定：
 
-- 通用寄存器在 LowIR 中是显式 `read_register` / `write_register`。部分寄存器使用原名称，例如 `al`、`eax`、`rax`；转换到 YakSSA 时按别名合并为带位宽类型的变量。普通分支汇合沿用变量；循环头插入 loop-carried Phi。
+- 通用寄存器在 LowIR 中是显式 `read_register` / `write_register`。部分寄存器使用原名称，例如 `al`、`eax`、`rax`；转换到 YakSSA 时按别名合并为带位宽类型的变量。分支汇合按支配边界插入 Phi，边数与前驱数相同；循环头也是合流点，由同一套构造覆盖。标志寄存器不参与合流，条件读取按比较值查找。
 - `rflags` 是伪寄存器。算术、逻辑、比较和测试指令写入它；`Jcc`、`SETcc` 和 `CMOVcc` 从它读取。`JCXZ`、`JECXZ` 和 `JRCXZ` 例外，它们直接比较 `cx`、`ecx` 或 `rcx`。
 - 多字节 NOP（`0f 1f`）的 ModRM/SIB 只编码指令长度，CPU 不访问内存。汇编文本统一显示为 `nop`，机器字节保留原始长度，LowIR 是 `nop`。
 - 内存地址是 `pointer` 值。基址寄存器先转换为指针，索引和位移作为整数偏移相加。

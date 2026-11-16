@@ -684,14 +684,29 @@ func TestParseLiftModeAndAsmSyntaxAliases(t *testing.T) {
 	}
 }
 
+// callArgumentCount returns the largest argument count any occurrence of the name
+// is called with. The definition comes first in the text and has its own count, so
+// a single match would report the definition as if it were a call.
 func callArgumentCount(text, name string) int {
-	index := strings.Index(text, name+"(")
-	if index < 0 {
-		return -1
+	largest := -1
+	for offset := 0; offset < len(text); {
+		index := strings.Index(text[offset:], name+"(")
+		if index < 0 {
+			return largest
+		}
+		index += offset
+		if count := argumentCountAt(text[index+len(name):]); count > largest {
+			largest = count
+		}
+		offset = index + len(name) + 1
 	}
+	return largest
+}
+
+func argumentCountAt(text string) int {
 	depth := 0
 	commas := 0
-	for _, r := range text[index+len(name):] {
+	for _, r := range text {
 		switch r {
 		case '(':
 			depth++

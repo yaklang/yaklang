@@ -73,7 +73,7 @@ LowIR (Function → Block → Instruction)
 
 ## 寄存器
 
-通用寄存器变成 YakSSA 变量。普通分支汇合不插 Phi；循环头插入 loop-carried Phi。
+通用寄存器变成 YakSSA 变量。汇合点按支配边界插入 Phi，边数等于前驱数。
 
 | LowIR | YakSSA |
 | --- | --- |
@@ -130,7 +130,7 @@ merged = cleared or inserted
 
 因此：
 
-- 寄存器与内存槽都是变量；普通汇合不插 Phi，循环头插入 loop-carried Phi。
+- 寄存器与内存槽都是变量。寄存器在汇合点按支配边界插入 Phi，边数等于前驱数；内存槽不插 Phi。
 - 只有汇编 `call` 对应 YakSSA `Call`。
 - 不推断函数签名。间接调用只保留目标值。
 - 未建模的 intrinsic 保留为可见标记，不伪装成调用。
@@ -303,7 +303,7 @@ rbp 相对地址；需要保留时通过 pass 选项改为自定义 LowIR pass �
 ## 限制
 
 - 一个 LowIR Function 对应一个 YakSSA Function。跨函数调用图尚未恢复。
-- 寄存器已提升为变量；普通汇合不插 Phi。循环头使用 Phi。
+- 寄存器已提升为变量，汇合点有 Phi；内存槽未提升，合流仍按变量赋值。
 - 类型只保留位宽，不做语言级类型恢复。
 - 内存未提升为 SSA 状态。
 - 部分寄存器按位合并，未模拟标志位的部分写规则。

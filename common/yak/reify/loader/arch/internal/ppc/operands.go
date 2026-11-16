@@ -256,6 +256,13 @@ func (l *lifter) branch(ins instruction) {
 	if cc, ok := branchConditionCode(ins); ok {
 		symbol = core.ConditionIntrinsicPrefix + cc
 	}
+	// A branch that ignores the condition register has one successor. Listing the
+	// instruction after it as a second successor invents a condition the program
+	// never tests.
+	if len(targets) == 1 || unconditionalBranch(ins, name) {
+		l.emit(core.OpJump, nil, nil, targets[:1], core.EffectNone, ins.address)
+		return
+	}
 	condition := l.newValue(core.TypeInteger, 1)
 	// Name the comparison itself when this block made one. The condition register
 	// read loses the comparison once the value crosses a block boundary, so it is
@@ -710,4 +717,26 @@ func branchConditionCode(ins instruction) (string, bool) {
 		return "gt", true
 	}
 	return "", false
+}
+
+// unconditionalBranch reports whether a branch takes its target without reading a
+// condition. The options word names the shapes; the plain mnemonics are the common
+// spelling.
+func unconditionalBranch(ins instruction, name string) bool {
+	if name == "b" || name == "ba" {
+		return true
+	}
+	arguments := args(ins)
+	if len(arguments) == 0 {
+		return false
+	}
+	options, ok := arguments[0].(ppc64asm.Imm)
+	if !ok {
+		return false
+	}
+	switch uint32(options) {
+	case 18, 20:
+		return true
+	}
+	return false
 }
