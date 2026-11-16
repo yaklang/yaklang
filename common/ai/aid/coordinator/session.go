@@ -348,7 +348,11 @@ func (s *Session) run(planningOnly bool) (err error) {
 		s.detached = false
 	}
 	s.registerControls()
+	s.SetAgentPolicySnapshotEmitHandler(func() {
+		s.EmitAgentPolicySnapshot()
+	})
 	s.EmitCurrentConfigInfo()
+	s.EmitAgentPolicySnapshot()
 	key := "coordinator-wake-" + s.GetRuntimeId()
 	s.InputEventManager.RegisterAfterInputEvent(key, func(e *ypb.AIInputEvent) {
 		// Forwarded input is journaled and notified by its owning parent once.

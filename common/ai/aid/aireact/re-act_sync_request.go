@@ -45,6 +45,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeSessionSnapshotEvent(event)
 	case aicommon.SYNC_TYPE_TASK_SNAPSHOT:
 		return r.HandleSyncTypeTaskSnapshotEvent(event)
+	case aicommon.SYNC_TYPE_AGENT_POLICY_SNAPSHOT:
+		return r.config.HandleSyncAgentPolicySnapshotEvent(event)
 	case aicommon.SYNC_TYPE_ASYNC_EXECUTION:
 		return r.HandleSyncTypeAsyncExecutionEvent(event)
 	case aicommon.SYNC_TYPE_STOP_ASYNC_EXECUTION:
