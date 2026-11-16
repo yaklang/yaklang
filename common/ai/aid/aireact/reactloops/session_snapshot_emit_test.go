@@ -24,6 +24,8 @@ func TestBuildSessionSnapshot_AlwaysEmitsFullPayload(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &payload))
 	require.Contains(t, payload, "revision")
 	require.Contains(t, payload, "updated_at")
+	require.Contains(t, payload, "current_round")
+	require.Contains(t, payload, "total_rounds")
 	require.Contains(t, payload, "execution")
 	require.Contains(t, payload, "perception")
 	require.Contains(t, payload, "capabilities")
@@ -49,6 +51,34 @@ func TestBuildSessionSnapshot_ExecutionRoundsFromLoop(t *testing.T) {
 	require.NotNil(t, snapshot)
 	require.NotNil(t, snapshot.Execution)
 	require.Equal(t, 4, snapshot.Execution.ExecutionRounds)
+}
+
+func TestBuildSessionSnapshot_SessionRounds(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true))
+	firstTask := aicommon.NewStatefulTaskBase("round-task-1", "first", context.Background(), nil, true)
+	firstTask.SetStatus(aicommon.AITaskState_Completed)
+
+	first := BuildSessionSnapshot(cfg, nil, firstTask)
+	require.NotNil(t, first)
+	require.Equal(t, 1, first.CurrentRound)
+	require.Equal(t, 1, first.TotalRounds)
+
+	subTask := aicommon.NewStatefulTaskBase("round-sub-task", "subagent", context.Background(), nil, true)
+	subTask.SetSubAgent(true)
+	sub := BuildSessionSnapshot(cfg, nil, subTask)
+	require.NotNil(t, sub)
+	require.Equal(t, 1, sub.CurrentRound,
+		"sub-agent task snapshots must not advance the current session round")
+	require.Equal(t, 1, sub.TotalRounds,
+		"sub-agent task snapshots must not increase the session round count")
+	require.Len(t, sub.Tasks, 2)
+
+	secondTask := aicommon.NewStatefulTaskBase("round-task-2", "second", context.Background(), nil, true)
+	second := BuildSessionSnapshot(cfg, nil, secondTask)
+	require.NotNil(t, second)
+	require.Equal(t, 2, second.CurrentRound)
+	require.Equal(t, 2, second.TotalRounds)
+	require.Len(t, second.Tasks, 3)
 }
 
 func TestEmitSessionSnapshotLoadedSkillTokenCounts(t *testing.T) {

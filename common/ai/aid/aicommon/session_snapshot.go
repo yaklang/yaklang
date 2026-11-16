@@ -29,6 +29,28 @@ type sessionSnapshotEmitHandler func()
 // SessionSnapshot is the unified real-time sidebar payload for frontend consumption.
 // TaskId / TaskIndex are carried on the outer AIOutputEvent envelope, not duplicated here.
 type SessionSnapshot struct {
+	Revision  int64 `json:"revision"`
+	UpdatedAt int64 `json:"updated_at"`
+	// CurrentRound is the 1-based ordinal of the logical session round represented
+	// by this cumulative session snapshot.
+	CurrentRound int `json:"current_round"`
+	// TotalRounds counts distinct top-level logical tasks materialized in this session.
+	// Tasks that are still queued have not entered the session snapshot document
+	// and therefore are not included.
+	TotalRounds         int                                `json:"total_rounds"`
+	Execution           *SessionSnapshotExecution          `json:"execution"`
+	Perception          *SessionSnapshotPerception         `json:"perception"`
+	Capabilities        []CapabilityInventoryItem          `json:"capabilities"`
+	BackgroundProcesses []SessionSnapshotBackgroundProcess `json:"background_processes"`
+	Tasks               []SessionSnapshotTaskSummary       `json:"tasks"`
+	Todo                *SessionSnapshotTodoSummary        `json:"todo"`
+}
+
+// SessionSnapshotTaskProjection is the task-scoped portion of a session
+// snapshot. It intentionally has no session-level current_round/total_rounds.
+// Execution.ExecutionRounds remains the number of execution steps performed by
+// the task itself.
+type SessionSnapshotTaskProjection struct {
 	Revision            int64                              `json:"revision"`
 	UpdatedAt           int64                              `json:"updated_at"`
 	Execution           *SessionSnapshotExecution          `json:"execution"`
@@ -63,7 +85,9 @@ type SessionSnapshotExecution struct {
 	// ExecutionMinutes is the fuzzy minute representation derived from it.
 	ExecutionSeconds int64 `json:"execution_seconds"`
 	ExecutionMinutes int   `json:"execution_minutes"`
-	// ExecutionRounds is the raw number of ReAct loop iterations executed.
+	// ExecutionRounds counts ReAct execution steps, not logical session rounds.
+	// Task projections contain task-local steps; session snapshots accumulate
+	// steps across tasks and attempts. The wire name is retained for compatibility.
 	ExecutionRounds   int `json:"execution_rounds"`
 	HTTPFlowCount     int `json:"http_flow_count"`
 	RiskCount         int `json:"risk_count"`
@@ -510,6 +534,37 @@ func emptySessionSnapshotExecution() *SessionSnapshotExecution {
 // NormalizeSessionSnapshot ensures every emit carries a full payload so the
 // frontend can replace planDetails sections without merging missing keys.
 func NormalizeSessionSnapshot(snapshot *SessionSnapshot) {
+	if snapshot == nil {
+		return
+	}
+	if snapshot.Execution == nil {
+		snapshot.Execution = emptySessionSnapshotExecution()
+	}
+	executionSeconds := snapshot.Execution.ExecutionSeconds
+	if executionSeconds == 0 && snapshot.Execution.ExecutionMinutes > 0 {
+		executionSeconds = int64(snapshot.Execution.ExecutionMinutes) * int64(time.Minute/time.Second)
+	}
+	if executionSeconds != 0 {
+		setSessionSnapshotExecutionSeconds(snapshot.Execution, executionSeconds)
+	}
+	if snapshot.Perception == nil {
+		snapshot.Perception = &SessionSnapshotPerception{}
+	}
+	if snapshot.Capabilities == nil {
+		snapshot.Capabilities = []CapabilityInventoryItem{}
+	}
+	if snapshot.BackgroundProcesses == nil {
+		snapshot.BackgroundProcesses = []SessionSnapshotBackgroundProcess{}
+	}
+	if snapshot.Tasks == nil {
+		snapshot.Tasks = []SessionSnapshotTaskSummary{}
+	}
+	if snapshot.Todo == nil {
+		snapshot.Todo = &SessionSnapshotTodoSummary{ByTask: []SessionSnapshotTodoTaskSummary{}}
+	}
+}
+
+func NormalizeSessionSnapshotTaskProjection(snapshot *SessionSnapshotTaskProjection) {
 	if snapshot == nil {
 		return
 	}

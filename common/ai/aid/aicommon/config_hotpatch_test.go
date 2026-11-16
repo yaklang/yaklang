@@ -336,6 +336,69 @@ func TestHotPatch_ExecutionStrategy_WithDurationAndCriteria(t *testing.T) {
 	require.False(t, deadline.IsZero())
 	require.True(t, deadline.After(time.Now()))
 	require.False(t, c.IsGoalDeadlinePassed())
+
+	reloadStartedAt := time.Now()
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableMultiAgent:       true,
+				EnableGoalMode:         true,
+				GoalMinIterations:      3,
+				MaxSubAgents:           5,
+				GoalDurationSeconds:    60,
+				GoalAcceptanceCriteria: "must produce at least 3 vulnerability findings with evidence",
+			},
+		},
+	}, 6)
+
+	require.Equal(t, int64(60), c.GetGoalDurationSeconds())
+	reloadedDeadline := c.GetGoalDeadline()
+	require.True(t, reloadedDeadline.Before(deadline), "hot reload must replace the active deadline")
+	require.WithinDuration(t, reloadStartedAt.Add(time.Minute), reloadedDeadline, 2*time.Second)
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableMultiAgent:       true,
+				EnableGoalMode:         true,
+				GoalMinIterations:      3,
+				MaxSubAgents:           5,
+				GoalDurationSeconds:    60,
+				GoalAcceptanceCriteria: "must produce at least 3 vulnerability findings with evidence",
+			},
+		},
+	}, 6)
+	require.Equal(t, reloadedDeadline, c.GetGoalDeadline(),
+		"reapplying the same strategy must not extend the active deadline")
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableGoalMode:      true,
+				GoalMinIterations:   3,
+				GoalDurationSeconds: 0,
+			},
+		},
+	}, 6)
+	require.True(t, c.GetGoalDeadline().IsZero(), "disabling the time window must clear its deadline")
+}
+
+func TestGoalDurationHotReload_PreservesLazyDeadlineUntilStarted(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(3600)(c))
+	require.NoError(t, WithGoalDurationSeconds(60)(c))
+	require.True(t, c.GetGoalDeadline().IsZero(),
+		"changing duration before the first finish attempt must not start the deadline")
+
+	c.StartGoalDeadline()
+	require.EqualValues(t, 60, c.GetGoalDurationSeconds())
+	require.False(t, c.GetGoalDeadline().IsZero())
 }
 
 func TestHotPatch_ExecutionStrategy_NeverEndingDeadline(t *testing.T) {

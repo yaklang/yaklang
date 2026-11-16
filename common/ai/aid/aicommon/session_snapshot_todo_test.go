@@ -139,7 +139,7 @@ func TestSessionSnapshotTodo_LoadsVersionOneWithoutTodos(t *testing.T) {
 		SchemaVersion: 1, Revision: 4,
 		Tasks: map[string]*SessionTaskSnapshot{
 			"old-task": {TaskID: "old-task", Attempt: 1, Revision: 1, Status: "completed", IsFinal: true,
-				Snapshot: &SessionSnapshot{Execution: &SessionSnapshotExecution{Status: "completed"}}},
+				Snapshot: &SessionSnapshotTaskProjection{Execution: &SessionSnapshotExecution{Status: "completed"}}},
 		},
 	}
 	raw, err := json.Marshal(previous)
