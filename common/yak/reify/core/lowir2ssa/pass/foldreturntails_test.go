@@ -23,7 +23,7 @@ func TestFoldReturnTailsReplacesJumpToEpilogue(t *testing.T) {
 		}},
 		core.Block{ID: 2, Address: 0x1004, Instructions: []core.Instruction{returnWithRAX(0x1004)}},
 	)
-	FoldReturnTails(&function)
+	FoldReturnTails(&function, x86Facts())
 	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
 	if last.Kind != core.OpReturn {
 		t.Fatalf("tail jump survived: %s", last.Kind)
@@ -39,7 +39,7 @@ func TestFoldReturnTailsKeepsLoopBackEdge(t *testing.T) {
 		core.Block{ID: 2, Address: 0x1002, Instructions: []core.Instruction{{Kind: core.OpBranch, Targets: []core.BlockID{3, 1}, Address: 0x1002}}},
 		core.Block{ID: 3, Address: 0x1004, Instructions: []core.Instruction{returnWithRAX(0x1004)}},
 	)
-	FoldReturnTails(&function)
+	FoldReturnTails(&function, x86Facts())
 	last := function.Blocks[1].Instructions[len(function.Blocks[1].Instructions)-1]
 	if last.Kind != core.OpBranch {
 		t.Fatalf("loop branch was folded away: %s", last.Kind)
@@ -54,7 +54,7 @@ func TestFoldReturnTailsSkipsTailWithReturningCall(t *testing.T) {
 			returnWithRAX(0x1004),
 		}},
 	)
-	FoldReturnTails(&function)
+	FoldReturnTails(&function, x86Facts())
 	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
 	if last.Kind != core.OpJump {
 		t.Fatalf("tail with a returning call was folded: %s", last.Kind)
@@ -69,9 +69,37 @@ func TestFoldReturnTailsFoldsAfterNonReturningCall(t *testing.T) {
 			returnWithRAX(0x1004),
 		}},
 	)
-	FoldReturnTails(&function)
+	FoldReturnTails(&function, x86Facts())
 	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
 	if last.Kind != core.OpReturn {
 		t.Fatalf("tail after exit was not folded: %s", last.Kind)
+	}
+}
+
+// x86Facts declares the return register of the architecture the existing cases
+// were written for.
+func x86Facts() core.ArchFacts {
+	return core.ArchFacts{Registers: core.RegisterModel{Return: "rax", Width: 64}}
+}
+
+// TestFoldReturnTailsReadsTheDeclaredReturnRegister keeps the fold neutral: a
+// PowerPC function returns in r3, so the folded return must read r3 and not a
+// register that does not exist on the target.
+func TestFoldReturnTailsReadsTheDeclaredReturnRegister(t *testing.T) {
+	function := functionWithBlocks(
+		core.Block{ID: 1, Address: 0x1000, Instructions: []core.Instruction{
+			{Kind: core.OpConstant, Results: []core.Value{{ID: 1, Type: integer(32)}}, Operands: []core.Operand{literal(2)}, Address: 0x1000},
+			{Kind: core.OpWriteRegister, Operands: []core.Operand{register("r3", 32), value(1, integer(32))}, Address: 0x1000},
+			jumpTo(2, 0x1000),
+		}},
+		core.Block{ID: 2, Address: 0x1004, Instructions: []core.Instruction{returnWithRAX(0x1004)}},
+	)
+	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Return: "r3", Width: 32}})
+	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
+	if last.Kind != core.OpReturn {
+		t.Fatalf("tail jump survived: %s", last.Kind)
+	}
+	if len(last.Operands) != 1 || last.Operands[0].Name != "r3" || last.Operands[0].Type.Bits != 32 {
+		t.Fatalf("return reads %v, want r3 at 32 bits", last.Operands)
 	}
 }

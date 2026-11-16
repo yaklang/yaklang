@@ -487,6 +487,14 @@ func (l *lifter) specialRegister(ins instruction, name string) (core.ValueID, bo
 			if !ok {
 				return 0, false
 			}
+			if l.hasPushedPC && sprName(spr) == "lr" {
+				// The branch just before this read pushed the address of the
+				// instruction after it; the link register holds that constant.
+				l.hasPushedPC = false
+				value := l.pointerConstant(ins.address, l.pushedPC)
+				l.writeRegister(ins.address, destination, bits, value)
+				return value, true
+			}
 			value := l.readRegister(ins.address, sprName(spr), bits)
 			l.writeRegister(ins.address, destination, bits, value)
 			return value, true

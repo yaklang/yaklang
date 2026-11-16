@@ -14,15 +14,24 @@ type Section struct {
 	Flags          uint64 `json:"flags"`
 }
 
+// Relocation states the value a loader writes at an address before the program
+// runs. A position-independent image leaves zero in the file and relies on the
+// dynamic linker, so reading the bytes alone is not enough.
+type Relocation struct {
+	Address uint64 `json:"address"`
+	Value   uint64 `json:"value"`
+}
+
 // Image is a concrete, format-neutral address-space view. Loaders fill it from
 // their format headers; consumers do not need a format-specific image type.
 // EntryPoint reports whether a header-derived entry address is available.
 type Image struct {
-	ObjectType string          `json:"object_type"`
-	Base       uint64          `json:"image_base,omitempty"`
-	Entry      *uint64         `json:"entry_point,omitempty"`
-	Sections   []Section       `json:"sections"`
-	Symbols    []symbol.Symbol `json:"symbols,omitempty"`
+	ObjectType  string          `json:"object_type"`
+	Base        uint64          `json:"image_base,omitempty"`
+	Entry       *uint64         `json:"entry_point,omitempty"`
+	Sections    []Section       `json:"sections"`
+	Symbols     []symbol.Symbol `json:"symbols,omitempty"`
+	Relocations []Relocation    `json:"relocations,omitempty"`
 }
 
 func (i *Image) ImageBase() uint64 {
@@ -52,6 +61,19 @@ func (i *Image) SectionAt(address uint64) (*Section, bool) {
 		}
 	}
 	return nil, false
+}
+
+// RelocationAt returns the relocation that writes this address.
+func (i *Image) RelocationAt(address uint64) (Relocation, bool) {
+	if i == nil {
+		return Relocation{}, false
+	}
+	for _, relocation := range i.Relocations {
+		if relocation.Address == address {
+			return relocation, true
+		}
+	}
+	return Relocation{}, false
 }
 
 // SymbolByName returns the first symbol with this name.

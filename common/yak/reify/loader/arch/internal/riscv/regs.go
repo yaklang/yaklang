@@ -48,6 +48,20 @@ func signedImmediate(arg riscv64asm.Arg) (int64, bool) {
 // memoryOperand returns the base register and the displacement of a load or
 // store operand. The AMO and LR/SC forms use AmoReg, which is a base register
 // with no displacement; scalar loads and stores use RegOffset.
+// upperImmediate returns the twenty-bit upper immediate as a signed value. LUI and
+// AUIPC place it in the high half of a signed address, so 0xfffff means -1, not
+// one million forty-eight thousand five hundred and seventy-five.
+func upperImmediate(arg riscv64asm.Arg) (int64, bool) {
+	value, ok := signedImmediate(arg)
+	if !ok {
+		return 0, false
+	}
+	if value&0x80000 != 0 {
+		value -= 0x100000
+	}
+	return value, true
+}
+
 func memoryOperand(arg riscv64asm.Arg) (string, int64, bool) {
 	switch value := arg.(type) {
 	case riscv64asm.RegOffset:

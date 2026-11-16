@@ -55,7 +55,11 @@ func liftFunction(profile Profile, body function, id core.FunctionID, blockIDs m
 	}
 	for index, current := range body.blocks {
 		lifter.instructions = make([]core.Instruction, 0, len(current.instructions)*2)
-		for _, ins := range current.instructions {
+		for index, ins := range current.instructions {
+			lifter.next = nil
+			if index+1 < len(current.instructions) {
+				lifter.next = &current.instructions[index+1]
+			}
 			lifter.lift(ins)
 		}
 		if len(lifter.instructions) == 0 || !controlTransfer(lifter.instructions[len(lifter.instructions)-1].Kind) {
@@ -86,7 +90,24 @@ func (l *lifter) lift(ins instruction) {
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("ppc.data")}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return
 	}
+	// A pending pushed address belongs to the instruction right after the branch.
+	if l.hasPushedPC && ins.address != l.pushedPC {
+		l.hasPushedPC = false
+	}
 	name := normalize(opName(ins.inst.Op))
+	// Position-independent code finds its own address with a branch to the next
+	// instruction and a read of the link register. The branch pushes the address;
+	// it is not a call.
+	if (name == "bcl" || name == "bcl+" || name == "bcla") && l.isPCIdiom(ins) {
+		l.pushedPC = ins.address + 4
+		l.hasPushedPC = true
+		// The instruction is a block terminator even though it is not a branch to
+		// another function, so the block still needs its fallthrough edge.
+		if next, ok := l.blockIDs[ins.address+4]; ok {
+			l.emit(core.OpJump, nil, nil, []core.BlockID{next}, core.EffectNone, ins.address)
+		}
+		return
+	}
 	if isUnknownOpcode(name) || name == "" {
 		// Zero words are alignment padding or data inside .text; the decoder
 		// has no mnemonic for them.
@@ -316,4 +337,12 @@ func containsBlock(blocks []core.BlockID, target core.BlockID) bool {
 		}
 	}
 	return false
+}
+
+// isPCIdiom reports whether the branch is the way position-independent code reads
+// its own address. The branch targets the instruction that follows it, so taking
+// it and falling through are the same continuation.
+func (l *lifter) isPCIdiom(ins instruction) bool {
+	target, ok := staticTarget(ins.inst, ins.address)
+	return ok && target == ins.address+4
 }

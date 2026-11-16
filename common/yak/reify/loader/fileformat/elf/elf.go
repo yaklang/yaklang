@@ -108,18 +108,21 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 	}
 	// A relocatable symbol value is relative to its section, so the loader adds
 	// the section base that the layout above assigned.
-	descriptors := ppc64Descriptors(file)
+	relocations := relativeRelocations(file)
+	descriptors := ppc64Descriptors(file, relocations)
 	parseELFSymbols(file, image, sectionBases, file.Type == elf.ET_REL, descriptors)
 	hints := parseELFHints(file, image, sectionBases)
 	// A PowerPC ELFv1 call reaches the function descriptor; the symbol lookup needs
 	// the code address it holds.
 	hints.OpdDescriptors = descriptors
+	image.Relocations = relocations
 	return image, target, hints, nil, nil
 }
 
 type elfRelocation struct {
 	offset   uint64
 	symIndex uint32
+	addend   uint64
 }
 
 // parseELFSymbols reads the static symbol table. When relocatable is true the
@@ -129,7 +132,7 @@ type elfRelocation struct {
 // descriptor in .opd: the first word is the entry point and the second the TOC.
 // Without the mapping a symbol reports an address in a data section, and the
 // parser has nothing to decode.
-func ppc64Descriptors(file *elf.File) map[uint64]uint64 {
+func ppc64Descriptors(file *elf.File, relocations []core.Relocation) map[uint64]uint64 {
 	if file.Machine != elf.EM_PPC64 || file.ByteOrder != binary.BigEndian {
 		return nil
 	}
@@ -141,13 +144,23 @@ func ppc64Descriptors(file *elf.File) map[uint64]uint64 {
 	if err != nil {
 		return nil
 	}
+	// A position-independent image leaves the descriptor empty in the file and
+	// fills it through a relative relocation at load time.
+	written := make(map[uint64]uint64, len(relocations))
+	for _, relocation := range relocations {
+		written[relocation.Address] = relocation.Value
+	}
 	descriptors := make(map[uint64]uint64, len(data)/8)
 	for offset := 0; offset+8 <= len(data); offset += 8 {
+		address := section.Addr + uint64(offset)
 		entry := binary.BigEndian.Uint64(data[offset:])
+		if entry == 0 {
+			entry = written[address]
+		}
 		if entry == 0 {
 			continue
 		}
-		descriptors[section.Addr+uint64(offset)] = entry
+		descriptors[address] = entry
 	}
 	return descriptors
 }
@@ -304,15 +317,23 @@ func elfRelocations(file *elf.File, relaName, relName string) []elfRelocation {
 	for offset := uint64(0); offset+entrySize <= uint64(len(data)); offset += entrySize {
 		switch file.Class {
 		case elf.ELFCLASS64:
-			result = append(result, elfRelocation{
+			entry := elfRelocation{
 				offset:   file.ByteOrder.Uint64(data[offset:]),
 				symIndex: elf.R_SYM64(file.ByteOrder.Uint64(data[offset+8:])),
-			})
+			}
+			if hasAddend {
+				entry.addend = file.ByteOrder.Uint64(data[offset+16:])
+			}
+			result = append(result, entry)
 		case elf.ELFCLASS32:
-			result = append(result, elfRelocation{
+			entry := elfRelocation{
 				offset:   uint64(file.ByteOrder.Uint32(data[offset:])),
 				symIndex: elf.R_SYM32(file.ByteOrder.Uint32(data[offset+4:])),
-			})
+			}
+			if hasAddend {
+				entry.addend = uint64(file.ByteOrder.Uint32(data[offset+8:]))
+			}
+			result = append(result, entry)
 		}
 	}
 	return result
@@ -639,6 +660,21 @@ func elfRelocationTargets(file *elf.File) map[uint64]uint64 {
 				result[slot] = uint64(target)
 			}
 		}
+	}
+	return result
+}
+
+// relativeRelocations lists the value the dynamic linker writes at an address. A
+// relative relocation carries no symbol: the addend is the address to write. A
+// position-independent image leaves zero in the file, so a reader that ignores
+// these entries sees an empty slot where a pointer is.
+func relativeRelocations(file *elf.File) []core.Relocation {
+	var result []core.Relocation
+	for _, relocation := range elfRelocations(file, ".rela.dyn", ".rel.dyn") {
+		if relocation.symIndex != 0 {
+			continue
+		}
+		result = append(result, core.Relocation{Address: relocation.offset, Value: relocation.addend})
 	}
 	return result
 }

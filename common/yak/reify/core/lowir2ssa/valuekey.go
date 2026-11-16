@@ -41,6 +41,16 @@ func valueKeyDepth(defs map[core.ValueID]core.Instruction, id core.ValueID, dept
 		return fmt.Sprintf("add(%s,%s)",
 			valueKeyDepth(defs, instruction.Operands[0].Value, depth+1, visiting),
 			valueKeyDepth(defs, instruction.Operands[1].Value, depth+1, visiting))
+	case core.OpSub:
+		// A frame-relative address is built by subtracting the offset from the base,
+		// and a memory slot is identified by the expression that produces it. Without
+		// this case two accesses to the same slot look unrelated.
+		if len(instruction.Operands) < 2 {
+			return ""
+		}
+		return fmt.Sprintf("sub(%s,%s)",
+			valueKeyDepth(defs, instruction.Operands[0].Value, depth+1, visiting),
+			valueKeyDepth(defs, instruction.Operands[1].Value, depth+1, visiting))
 	case core.OpReadRegister:
 		if len(instruction.Operands) == 0 {
 			return ""
