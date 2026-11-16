@@ -141,7 +141,6 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	releaseCompletion := r.beginUserTaskMemory(task)
 	defer r.memoryContinuations.Delete(task.GetId())
 	defer releaseCompletion()
-	r.prepareBrowserAttachmentContext()
 	// Recovery tasks have a different execution path: they skip the ReAct loop
 	// and directly invoke plan-and-execute with the recovery parameters.
 	if task.GetTaskKind() == aicommon.AITaskKind_Recovery {

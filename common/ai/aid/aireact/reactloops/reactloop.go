@@ -110,8 +110,9 @@ type ReActLoop struct {
 	aiTagFields  *omap.OrderedMap[string, *LoopAITagField]
 
 	// execution state
-	taskMutex   *sync.Mutex
-	currentTask aicommon.AIStatefulTask
+	taskMutex         *sync.Mutex
+	currentTask       aicommon.AIStatefulTask
+	attachedResources []aicommon.AttachedResourceData
 	// promptMode is the prompt mode of the current iteration. It is set when the
 	// prompt is built and stays until the next prompt replaces it.
 	promptMode aicommon.LoopPromptMode
@@ -561,6 +562,23 @@ func (r *ReActLoop) GetLoopName() string {
 
 func (r *ReActLoop) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
+}
+
+// GetAttachedResources returns the parsed resources prepared for the current
+// task. Parsing and binding happen once in ExecuteWithExistedTask before any
+// loop-specific init handler runs.
+func (r *ReActLoop) GetAttachedResources() []aicommon.AttachedResourceData {
+	if r == nil {
+		return nil
+	}
+	return r.attachedResources
+}
+
+func (r *ReActLoop) prepareTaskAttachedResources(task aicommon.AIStatefulTask) {
+	if r == nil || task == nil {
+		return
+	}
+	r.attachedResources = RunAttachedExtraResourcesInit(r.invoker, r, task.GetAttachedDatas())
 }
 
 // GetSubAgentProgressRegistry returns the sub-agent progress registry.

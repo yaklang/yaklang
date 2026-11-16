@@ -88,7 +88,7 @@ func TestInitWorkspaceAttachedContext_SamePayloadForBothAudits(t *testing.T) {
 	for _, targetKey := range []string{"code_audit_target_path", "skill_audit_target_path"} {
 		task := aicommon.NewStatefulTaskBase("test", "", context.Background(), nil, true)
 		task.SetAttachedDatas(attached)
-		ws := InitWorkspaceAttachedContext(nil, nil, task, targetKey)
+		ws := InitWorkspaceAttachedContext(task, targetKey)
 		require.NotNil(t, ws)
 		require.Equal(t, filepath.FromSlash("/tmp/shared-root"), ws.ResolveAttachedScanDirectory())
 		require.Equal(t, filepath.FromSlash("/tmp/shared-root/main.go"), ws.FilePath)

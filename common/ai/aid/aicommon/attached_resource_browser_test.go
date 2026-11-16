@@ -19,6 +19,10 @@ func (i *browserAttachmentTestInvoker) GetBrowserAttachments() []AttachedBrowser
 	return append([]AttachedBrowserBinding(nil), i.bindings...)
 }
 
+func (i *browserAttachmentTestInvoker) SetBrowserAttachments(bindings []AttachedBrowserBinding) {
+	i.bindings = append([]AttachedBrowserBinding(nil), bindings...)
+}
+
 func newBrowserAttachmentTestTask(
 	t *testing.T,
 	taskID string,
@@ -45,7 +49,41 @@ func TestAttachedBrowserResourceData(t *testing.T) {
 	require.Equal(t, AttachedBrowserBinding{
 		DeviceID: "device-1", Name: "Login debugging", Reference: "A",
 	}, browserResource.Binding())
-	require.Empty(t, browserResource.ToAttachData(nil))
+	require.Contains(t, browserResource.ToAttachData(nil), "`A` (Login debugging)")
+}
+
+func TestAttachedBrowserResourceBatchBindsSessionAndPromotesTools(t *testing.T) {
+	toolNames := AttachedBrowserBridgeToolNames()
+	tools := make([]*aitool.Tool, 0, len(toolNames))
+	for _, name := range toolNames {
+		tools = append(tools, aitool.NewWithoutCallback(name))
+	}
+	cfg := NewConfig(context.Background(), WithTools(tools...))
+	for _, name := range toolNames {
+		cfg.GetAiToolManager().DisableTool(name)
+	}
+	invoker := &browserAttachmentTestInvoker{}
+	loop := &attachedBrowserTestLoop{config: cfg, invoker: invoker}
+
+	resources := []AttachedResourceData{
+		&AttachedBrowserResourceData{DeviceID: "device-a", Reference: "A"},
+		&AttachedBrowserResourceData{DeviceID: "device-b", Reference: "B"},
+		&AttachedBrowserResourceData{DeviceID: "device-a", Reference: "A"},
+	}
+	batch, ok := resources[0].(AttachedResourceBatchProcessor)
+	require.True(t, ok)
+	require.NoError(t, batch.BindLoopDataBatch(loop, resources))
+	require.Equal(t, []AttachedBrowserBinding{
+		{DeviceID: "device-a", Reference: "A"},
+		{DeviceID: "device-b", Reference: "B"},
+	}, invoker.bindings)
+	for _, name := range toolNames {
+		require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(name), name)
+	}
+	rendered := batch.ToAttachDataBatch(loop, resources)
+	require.Contains(t, rendered, "`A`")
+	require.Contains(t, rendered, "`B`")
+	require.NotContains(t, rendered, "device-a")
 }
 
 func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {

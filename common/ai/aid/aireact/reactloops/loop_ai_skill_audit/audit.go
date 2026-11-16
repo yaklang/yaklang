@@ -81,7 +81,7 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *SkillAuditStat
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {
 		userInput := task.GetUserInput()
 
-		ws := reactloops.InitWorkspaceAttachedContext(r, loop, task, AttachedResourceKeySkillAuditTargetPath)
+		ws := reactloops.InitWorkspaceAttachedContext(task, AttachedResourceKeySkillAuditTargetPath)
 		reactloops.RecordWorkspaceAttachedTimeline(r, ws, "SKILL_AUDIT")
 		if ws != nil {
 			var sel *aicommon.AttachedCodeSelection

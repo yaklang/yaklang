@@ -9,10 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 type timelineWritingInvoker struct {
 	*mock.MockInvoker
+	browserBindings []aicommon.AttachedBrowserBinding
 }
 
 func (i *timelineWritingInvoker) AddToTimeline(entry, content string) {
@@ -23,6 +25,66 @@ func (i *timelineWritingInvoker) AddToTimeline(entry, content string) {
 		return
 	}
 	provider.GetTimeline().PushText(i.GetConfig().AcquireId(), "[%s]:\n%s", entry, content)
+}
+
+func (i *timelineWritingInvoker) GetBrowserAttachments() []aicommon.AttachedBrowserBinding {
+	return i.browserBindings
+}
+
+func (i *timelineWritingInvoker) SetBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
+	i.browserBindings = bindings
+}
+
+func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
+	ctx := context.Background()
+	toolNames := aicommon.AttachedBrowserBridgeToolNames()
+	tools := make([]*aitool.Tool, 0, len(toolNames))
+	for _, name := range toolNames {
+		tools = append(tools, aitool.NewWithoutCallback(name))
+	}
+	cfg := aicommon.NewConfig(
+		ctx,
+		aicommon.WithTools(tools...),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithWorkdir(t.TempDir()),
+	)
+	for _, name := range toolNames {
+		cfg.GetAiToolManager().DisableTool(name)
+	}
+	invoker := &timelineWritingInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
+	invoker.SetConfig(cfg)
+	loop := NewMinimalReActLoop(cfg, invoker)
+	task := aicommon.NewStatefulTaskBase("browser-common-prep", "inspect", ctx, cfg.GetEmitter())
+	task.SetAttachedDatas([]*aicommon.AttachedResource{
+		aicommon.NewAttachedResource(
+			aicommon.AttachedResourceTypeBrowser,
+			aicommon.AttachedResourceKeyBrowserDevice,
+			`{"deviceId":"device-a","reference":"A"}`,
+		),
+		aicommon.NewAttachedResource(
+			aicommon.AttachedResourceTypeBrowser,
+			aicommon.AttachedResourceKeyBrowserDevice,
+			`{"deviceId":"device-b","reference":"B"}`,
+		),
+	})
+	loop.SetCurrentTask(task)
+	loop.prepareTaskAttachedResources(task)
+
+	require.Len(t, loop.GetAttachedResources(), 2)
+	require.Equal(t, []aicommon.AttachedBrowserBinding{
+		{DeviceID: "device-a", Reference: "A"},
+		{DeviceID: "device-b", Reference: "B"},
+	}, invoker.GetBrowserAttachments())
+	for _, name := range toolNames {
+		require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(name), name)
+	}
+	output := cfg.Timeline.GetTimelineOutput()
+	require.NotEmpty(t, output)
+	require.Contains(t, output[len(output)-1].Content, "## Attached Browser")
+	require.Contains(t, output[len(output)-1].Content, "`A`")
+	require.Contains(t, output[len(output)-1].Content, "`B`")
 }
 
 func TestAttachedFileContentPersistsAndPinSurvivesCompression(t *testing.T) {

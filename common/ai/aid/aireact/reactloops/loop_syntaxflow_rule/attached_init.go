@@ -24,8 +24,6 @@ func seedSyntaxFlowFromAttached(
 		return false, false
 	}
 
-	reactloops.RunAttachedExtraResourcesInit(r, loop, attached)
-
 	for _, data := range attached {
 		if data == nil || !data.HasType(aicommon.AttachedResourceTypeSelected) {
 			continue

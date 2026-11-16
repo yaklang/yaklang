@@ -35,7 +35,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		// 获取附加的数据（文件、知识库等）
 		attachedDatas := aicommon.NonEmptyAttachedResources(task.GetAttachedDatas())
-		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		for _, data := range attachedDatas {
 			log.Infof("report_generating attached data: type=%s, value=%s", data.Type, data.Value)
 			switch data.Type {
