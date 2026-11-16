@@ -363,8 +363,8 @@ github.com/yaklang/antlr/v4 v4.0.0-20260713034513-d8e6ed6334bf h1:RJjNj12ALCgULQ
 github.com/yaklang/antlr/v4 v4.0.0-20260713034513-d8e6ed6334bf/go.mod h1:Iy/qj07Ec2kcOY9OhdclyPd0IieCSf4ZkzwhKSXPBn8=
 github.com/yaklang/fastgocaptcha v1.1.0 h1:Q6aigWdM1hm71rU+iTe1n9Q6Xo8ubdBDEIbNVdebpbo=
 github.com/yaklang/fastgocaptcha v1.1.0/go.mod h1:fymGgV4ndLQHr+NZakv91Dlc2iri1fpeyzSKIPWsFlI=
-github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33 h1:1R6ppYeuBxDEoBqTfogfwT+fFe4X6RxIButkKr0pv+I=
-github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
+github.com/yaklang/go-llvm v0.0.0-20261110094028-e7fe69236a2f h1:+FJsotHoFZ9K1cBJ6X/stVsNMnnOIEFth7+yVQ1+Opo=
+github.com/yaklang/go-llvm v0.0.0-20261110094028-e7fe69236a2f/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
 github.com/yaklang/go-sqlite3 v0.0.1 h1:IXdqvUAct8FygqoQ3XgWBqw8Bh7qQFa0miTl4cM4B+4=
 github.com/yaklang/go-sqlite3 v0.0.1/go.mod h1:RCLoOuANeSNMmFMCABJyusomiGXnZjkLk20oZSAAh5U=
 github.com/yaklang/go-sqlite3 v0.0.2 h1:PFp1aIHBKBA0Ss7i/NaVtB2eHbueRxWJI7QGSCNHgOk=
