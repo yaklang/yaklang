@@ -353,7 +353,7 @@ func (l *lifter) registerTransfer(ins instruction) {
 // condition materializes one condition code by reading cpsr.
 func (l *lifter) condition(ins instruction, code string) core.ValueID {
 	cpsr := l.readRegister(ins.address, "cpsr", 32)
-	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("arm.cond." + code), l.value(cpsr)}, 1, core.EffectReadRegister)
+	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("cond." + code), l.value(cpsr)}, 1, core.EffectReadRegister)
 }
 
 // loadPair lifts LDRD. armasm splits the register pair into two arguments and

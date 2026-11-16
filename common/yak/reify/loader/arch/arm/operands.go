@@ -334,7 +334,7 @@ func (l *lifter) intrinsicValue(ins instruction, name string) {
 
 func (l *lifter) setFlags(ins instruction, name string, values ...core.ValueID) {
 	operands := make([]core.Operand, 0, len(values)+1)
-	operands = append(operands, symbolOperand("arm.flags."+name))
+	operands = append(operands, symbolOperand("flags."+name))
 	for _, value := range values {
 		operands = append(operands, l.value(value))
 	}

@@ -14,7 +14,7 @@
       "  0x401000  v2:i32 = read_register %ebx [read_register]",
       "  0x401000  v3:i32 = add v1, v2",
       "  0x401000  write_register %eax, v3 [write_register]",
-      "  0x401000  v4:i32 = intrinsic @x86.flags.add, v1, v2, v3 [write_register]",
+      "  0x401000  v4:i32 = intrinsic @flags.add, v1, v2, v3 [write_register]",
       "  0x401000  write_register %eflags, v4 [write_register]",
       "  0x401002  return [may_trap, unknown]"
     ]

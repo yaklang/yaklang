@@ -306,10 +306,10 @@ func TestAMD64ConditionalBranchBuildsTwoTargets(t *testing.T) {
 	if !addresses[0x1006] || !addresses[0x1004] {
 		t.Fatalf("branch targets are wrong: %+v", addresses)
 	}
-	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "x86.flags.test"); !ok {
+	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "flags.test"); !ok {
 		t.Fatal("test did not update flags")
 	}
-	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "x86.cond.e"); !ok {
+	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "cond.e"); !ok {
 		t.Fatal("branch did not read the equality condition")
 	}
 }
@@ -434,7 +434,7 @@ func TestAMD64NewlyLiftedInstructions(t *testing.T) {
 		code   []byte
 		symbol string
 	}{
-		{"bt", []byte{0x48, 0x0f, 0xa3, 0xd8, 0xc3}, "x86.flags.bt"},
+		{"bt", []byte{0x48, 0x0f, 0xa3, 0xd8, 0xc3}, "flags.bt"},
 		{"mul", []byte{0x48, 0xf7, 0xe1, 0xc3}, "x86.mul.lo"},
 		{"div", []byte{0x48, 0xf7, 0xf1, 0xc3}, "x86.div.quot"},
 		{"idiv", []byte{0x48, 0xf7, 0xf9, 0xc3}, "x86.idiv.rem"},
@@ -695,7 +695,7 @@ func TestAMD64SETccAndCMOVcc(t *testing.T) {
 		0xc3,
 	}
 	result := parseAMD64At(t, 0xd000, code)
-	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "x86.cond.ne"); !ok {
+	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "cond.ne"); !ok {
 		t.Fatal("setne did not read the ne condition")
 	}
 	if _, ok := findInstruction(result.IR, core.OpSelect, nil); !ok {

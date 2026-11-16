@@ -228,10 +228,10 @@ func TestARM64ConditionalBranchBuildsTwoTargets(t *testing.T) {
 	if !addresses[0x1010] || !addresses[0x1008] {
 		t.Fatalf("branch targets are wrong: %+v", addresses)
 	}
-	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "arm64.flags.cmp"); !ok {
+	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "flags.cmp"); !ok {
 		t.Fatal("cmp did not update the flags")
 	}
-	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "arm64.cond.le"); !ok {
+	if _, ok := findSymbol(result.IR, core.OpIntrinsic, "cond.le"); !ok {
 		t.Fatal("branch did not read the less-or-equal condition")
 	}
 }

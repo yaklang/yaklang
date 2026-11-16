@@ -138,9 +138,9 @@ func (l *lifter) conditionalCompare(ins instruction) {
 		return
 	}
 	condition := l.condition(ins, code)
-	name := "arm64.flags.ccmp"
+	name := "flags.ccmp"
 	if ins.inst.Op == arm64asm.CCMN {
-		name = "arm64.flags.ccmn"
+		name = "flags.ccmn"
 	}
 	flags := l.operation(ins, core.OpIntrinsic, []core.Operand{
 		symbolOperand(name),

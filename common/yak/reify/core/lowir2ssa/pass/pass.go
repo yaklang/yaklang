@@ -7,11 +7,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
 
-// Pass is one selectable LowIR transformation.
+// Pass is one selectable LowIR transformation. A pass receives the frame model of
+// the target architecture, so it can name the stack and frame registers without
+// matching architecture-specific spellings.
 type Pass struct {
 	Name        string
 	Description string
-	Apply       func(*core.Function) error
+	Apply       func(*core.Function, core.ArchFacts) error
 }
 
 var (
@@ -55,13 +57,13 @@ func All() []Pass {
 }
 
 // Apply runs the named passes in the given order.
-func Apply(function *core.Function, names ...string) error {
+func Apply(function *core.Function, facts core.ArchFacts, names ...string) error {
 	for _, name := range names {
 		pass, ok := Get(name)
 		if !ok {
 			return fmt.Errorf("unknown LowIR pass %q", name)
 		}
-		if err := pass.Apply(function); err != nil {
+		if err := pass.Apply(function, facts); err != nil {
 			return fmt.Errorf("LowIR pass %s: %w", name, err)
 		}
 	}
@@ -69,23 +71,23 @@ func Apply(function *core.Function, names ...string) error {
 }
 
 func init() {
-	Register(Pass{Name: "remove-canary", Description: "remove stack-protector canary checks", Apply: func(function *core.Function) error {
-		RemoveStackCanary(function)
+	Register(Pass{Name: "remove-canary", Description: "remove stack-protector canary checks", Apply: func(function *core.Function, facts core.ArchFacts) error {
+		RemoveStackCanary(function, facts)
 		return nil
 	}})
-	Register(Pass{Name: "duplicate-return-blocks", Description: "duplicate shared return epilogues", Apply: func(function *core.Function) error {
+	Register(Pass{Name: "duplicate-return-blocks", Description: "duplicate shared return epilogues", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		DuplicateReturnBlocks(function)
 		return nil
 	}})
-	Register(Pass{Name: "remove-stackframe", Description: "remove standard stack frame setup and teardown", Apply: func(function *core.Function) error {
-		RemoveFrame(function)
+	Register(Pass{Name: "remove-stackframe", Description: "remove standard stack frame setup and teardown", Apply: func(function *core.Function, facts core.ArchFacts) error {
+		RemoveFrame(function, facts)
 		return nil
 	}})
-	Register(Pass{Name: "fold-return-tails", Description: "fold acyclic return-only tails", Apply: func(function *core.Function) error {
+	Register(Pass{Name: "fold-return-tails", Description: "fold acyclic return-only tails", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		FoldReturnTails(function)
 		return nil
 	}})
-	Register(Pass{Name: "reverse-postorder", Description: "order blocks for loop construction", Apply: func(function *core.Function) error {
+	Register(Pass{Name: "reverse-postorder", Description: "order blocks for loop construction", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		ReorderReversePostorder(function)
 		return nil
 	}})

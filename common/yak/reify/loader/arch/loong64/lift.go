@@ -20,7 +20,7 @@ type lifter struct {
 }
 
 func liftFunctions(target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
-	ir := &core.LowIR{Target: target}
+	ir := &core.LowIR{Target: target, Frame: frame(), Registers: registers()}
 	for index, body := range functions {
 		ir.Functions = append(ir.Functions, liftFunction(body, core.FunctionID(index+1), blockIDs, diagnostics))
 	}

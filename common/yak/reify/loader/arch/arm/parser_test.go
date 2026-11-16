@@ -143,7 +143,7 @@ func TestARMConditionalBranchBuildsTwoTargets(t *testing.T) {
 		t.Fatalf("branch targets are wrong: %+v", addresses)
 	}
 	if _, ok := findInstruction(result.IR, core.OpIntrinsic, func(instruction core.Instruction) bool {
-		return len(instruction.Operands) > 0 && instruction.Operands[0].Name == "arm.cond.ne"
+		return len(instruction.Operands) > 0 && instruction.Operands[0].Name == "cond.ne"
 	}); !ok {
 		t.Fatal("branch did not read the not-equal condition")
 	}

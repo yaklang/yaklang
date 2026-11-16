@@ -109,7 +109,7 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 	// A relocatable symbol value is relative to its section, so the loader adds
 	// the section base that the layout above assigned.
 	parseELFSymbols(file, image, sectionBases, file.Type == elf.ET_REL)
-	return image, target, parseELFHints(file, image), nil, nil
+	return image, target, parseELFHints(file, image, sectionBases), nil, nil
 }
 
 type elfRelocation struct {
@@ -444,14 +444,22 @@ func LoaderArchitecture(machine elf.Machine, bits int) core.Architecture {
 // parseELFHints collects the format facts an architecture boundary discoverer
 // needs: executable ranges, .eh_frame, init/fini targets, PLT stubs and GOT
 // resolutions. It never decodes instructions.
-func parseELFHints(file *elf.File, image *core.Image) *core.BoundaryHints {
+func parseELFHints(file *elf.File, image *core.Image, bases map[elf.SectionIndex]uint64) *core.BoundaryHints {
 	hints := &core.BoundaryHints{GOTRelocs: make(map[uint64]uint64)}
-	for _, section := range file.Sections {
+	for index, section := range file.Sections {
 		if section.Flags&elf.SHF_EXECINSTR == 0 || section.FileSize == 0 {
 			continue
 		}
+		// A relocatable object records no addresses, so the region address has
+		// to be the one the layout assigned. Using the raw header value would
+		// put every executable section at zero and a lookup by address would
+		// then find the wrong section.
+		address := section.Addr
+		if base, ok := bases[elf.SectionIndex(index)]; ok && address == 0 {
+			address = base
+		}
 		hints.ExecSections = append(hints.ExecSections, core.Region{
-			Address: section.Addr,
+			Address: address,
 			Offset:  section.Offset,
 			Size:    section.FileSize,
 		})
@@ -460,7 +468,7 @@ func parseELFHints(file *elf.File, image *core.Image) *core.BoundaryHints {
 		// decodes each range with the right decoder.
 		if file.Machine == elf.EM_ARM && (section.Name == ".plt" || section.Name == ".init" || section.Name == ".plt.sec") {
 			hints.ModeRegions = append(hints.ModeRegions, core.ModeRegion{
-				Region: core.Region{Address: section.Addr, Offset: section.Offset, Size: section.FileSize},
+				Region: core.Region{Address: address, Offset: section.Offset, Size: section.FileSize},
 				Mode:   "arm",
 			})
 		}

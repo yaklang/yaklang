@@ -375,12 +375,12 @@ func (l *lifter) condition(ins instruction, code string) core.ValueID {
 		return l.constant(ins.address, 1, 1)
 	}
 	nzcv := l.readRegister(ins.address, "nzcv", 4)
-	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("arm64.cond." + code), l.value(nzcv)}, 1, core.EffectReadRegister)
+	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("cond." + code), l.value(nzcv)}, 1, core.EffectReadRegister)
 }
 
 func (l *lifter) setFlags(ins instruction, name string, values ...core.ValueID) {
 	operands := make([]core.Operand, 0, len(values)+1)
-	operands = append(operands, symbolOperand("arm64.flags."+name))
+	operands = append(operands, symbolOperand("flags."+name))
 	for _, value := range values {
 		operands = append(operands, l.value(value))
 	}

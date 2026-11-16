@@ -1,6 +1,7 @@
 package lowirtext
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -57,6 +58,56 @@ func TestParseRejectsMalformedText(t *testing.T) {
 	} {
 		if _, err := Parse(text); err == nil {
 			t.Fatalf("malformed text accepted: %q", text)
+		}
+	}
+}
+
+// factsRoundTripCase carries every architecture fact: the frame, the register
+// model and the stack guard. A round trip that dropped them would turn every
+// LowIR pass into a no-op, because a pass reads these instead of guessing.
+const factsRoundTripCase = `target: linux/arm64 (64-bit, little-endian)
+frame: sp=sp fp=x29 ret=x30 flags=nzcv saved=x19,x20,x29 growth=-1
+registers: naming=aarch64 width=64 flags=nzcv flags_width=64 args=x0,x1,x2,x3,x4,x5,x6,x7 return=x0
+canary: kind=tls register=tpidr_el0 offset=0x28
+function f @ 0x1000
+block b1 @ 0x1000
+  0x1000  return
+`
+
+// TestFactsRoundTrip keeps the architecture facts in the text form.
+func TestFactsRoundTrip(t *testing.T) {
+	ir, err := Parse(factsRoundTripCase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ir.Frame.StackPointer != "sp" || ir.Frame.FramePointer != "x29" || ir.Frame.ReturnAddress != "x30" {
+		t.Fatalf("frame = %+v", ir.Frame)
+	}
+	if len(ir.Frame.CalleeSaved) != 3 || ir.Frame.StackGrowth != -1 {
+		t.Fatalf("frame = %+v", ir.Frame)
+	}
+	if ir.Registers.Naming != core.RegisterNamingAArch64 || ir.Registers.Width != 64 {
+		t.Fatalf("registers = %+v", ir.Registers)
+	}
+	if len(ir.Registers.Arguments) != 8 || ir.Registers.Return != "x0" {
+		t.Fatalf("registers = %+v", ir.Registers)
+	}
+	if ir.Canary.Kind != core.CanaryTLS || ir.Canary.Offset != 0x28 {
+		t.Fatalf("canary = %+v", ir.Canary)
+	}
+	if got := Format(ir); got != factsRoundTripCase {
+		t.Fatalf("round trip changed the text:\n--- want ---\n%s\n--- got ---\n%s", factsRoundTripCase, got)
+	}
+}
+
+// TestFactsOmittedWhenEmpty keeps the text form compact for a program that
+// carries no facts.
+func TestFactsOmittedWhenEmpty(t *testing.T) {
+	ir := &core.LowIR{Target: core.Target{OS: core.OSLinux, Architecture: core.ArchAMD64, Bits: 64, ByteOrder: core.LittleEndian}}
+	text := Format(ir)
+	for _, prefix := range []string{"frame:", "registers:", "canary:"} {
+		if strings.Contains(text, prefix) {
+			t.Fatalf("empty facts emitted %q:\n%s", prefix, text)
 		}
 	}
 }

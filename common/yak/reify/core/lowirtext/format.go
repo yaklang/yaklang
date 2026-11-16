@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -17,6 +18,18 @@ func Format(ir *core.LowIR) string {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "target: %s/%s (%d-bit, %s-endian)\n", ir.Target.OS, ir.Target.Architecture, ir.Target.Bits, ir.Target.ByteOrder)
+	// The architecture facts are data, so the text form has to carry them:
+	// without them a pass cannot name a stack pointer or bind an argument
+	// register, and a round trip would silently change what the program means.
+	if line := formatFrame(ir.Frame); line != "" {
+		b.WriteString(line)
+	}
+	if line := formatRegisters(ir.Registers); line != "" {
+		b.WriteString(line)
+	}
+	if line := formatCanary(ir.Canary); line != "" {
+		b.WriteString(line)
+	}
 	for _, function := range ir.Functions {
 		if function.Name != "" {
 			fmt.Fprintf(&b, "function %s @ 0x%x\n", function.Name, function.Address)
@@ -135,4 +148,80 @@ func formatEffects(effects core.Effect) string {
 		parts = append(parts, fmt.Sprintf("0x%x", uint32(remainder)))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// formatFrame renders the frame model as one line of key=value pairs. An absent
+// field is omitted so the line stays readable.
+func formatFrame(frame core.FrameModel) string {
+	parts := make([]string, 0, 6)
+	if frame.StackPointer != "" {
+		parts = append(parts, "sp="+frame.StackPointer)
+	}
+	if frame.FramePointer != "" {
+		parts = append(parts, "fp="+frame.FramePointer)
+	}
+	if frame.ReturnAddress != "" {
+		parts = append(parts, "ret="+frame.ReturnAddress)
+	}
+	if frame.Flags != "" {
+		parts = append(parts, "flags="+frame.Flags)
+	}
+	if len(frame.CalleeSaved) > 0 {
+		parts = append(parts, "saved="+strings.Join(frame.CalleeSaved, ","))
+	}
+	if frame.StackGrowth != 0 {
+		parts = append(parts, "growth="+strconv.Itoa(int(frame.StackGrowth)))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "frame: " + strings.Join(parts, " ") + "\n"
+}
+
+// formatRegisters renders the register model as one line of key=value pairs.
+func formatRegisters(registers core.RegisterModel) string {
+	parts := make([]string, 0, 6)
+	if registers.Naming != "" {
+		parts = append(parts, "naming="+registers.Naming)
+	}
+	if registers.Width != 0 {
+		parts = append(parts, "width="+strconv.Itoa(int(registers.Width)))
+	}
+	if registers.Flags != "" {
+		parts = append(parts, "flags="+registers.Flags)
+	}
+	if registers.FlagsWidth != 0 {
+		parts = append(parts, "flags_width="+strconv.Itoa(int(registers.FlagsWidth)))
+	}
+	if len(registers.Arguments) > 0 {
+		parts = append(parts, "args="+strings.Join(registers.Arguments, ","))
+	}
+	if registers.Return != "" {
+		parts = append(parts, "return="+registers.Return)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "registers: " + strings.Join(parts, " ") + "\n"
+}
+
+// formatCanary renders the stack guard model as one line of key=value pairs.
+func formatCanary(canary core.CanaryModel) string {
+	parts := make([]string, 0, 4)
+	if canary.Kind != "" {
+		parts = append(parts, "kind="+canary.Kind)
+	}
+	if canary.Register != "" {
+		parts = append(parts, "register="+canary.Register)
+	}
+	if canary.Offset != 0 {
+		parts = append(parts, fmt.Sprintf("offset=0x%x", canary.Offset))
+	}
+	if canary.Symbol != "" {
+		parts = append(parts, "symbol="+canary.Symbol)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "canary: " + strings.Join(parts, " ") + "\n"
 }

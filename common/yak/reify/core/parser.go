@@ -63,6 +63,13 @@ type Disassembly struct {
 
 // Disassembler is an optional Parser capability. Parsers without a textual
 // disassembly return ErrNoDisassembler through Artifact.
+// ArchFactsProvider is implemented by a parser that declares the architecture
+// facts of the target it decodes: the frame layout, the register naming and the
+// stack guard. A consumer reads these instead of switching on the architecture.
+type ArchFactsProvider interface {
+	Facts() ArchFacts
+}
+
 type Disassembler interface {
 	Disassemble(context.Context, ParseRequest) (*Disassembly, error)
 }

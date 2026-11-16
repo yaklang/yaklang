@@ -110,3 +110,83 @@ func (p unavailableParser) Check(core.Target) error { return nil }
 func (p unavailableParser) Parse(context.Context, core.ParseRequest) (*core.ParseResult, error) {
 	return unavailable(p.kind)
 }
+
+// TestEveryParserReportsArchFacts checks that each parser describes its own
+// architecture. A pass cannot name a stack pointer, and a converter cannot bind an
+// argument register, without these facts; a parser that forgets them silently
+// produces a program with no parameters and no frame removal.
+func TestEveryParserReportsArchFacts(t *testing.T) {
+	for _, parser := range All() {
+		provider, ok := parser.(core.ArchFactsProvider)
+		if !ok {
+			t.Fatalf("%s does not report arch facts", parser.Kind())
+		}
+		facts := provider.Facts()
+		if facts.Frame.StackPointer == "" {
+			t.Fatalf("%s reports no stack pointer", parser.Kind())
+		}
+		if facts.Registers.Naming == "" || facts.Registers.Width == 0 {
+			t.Fatalf("%s reports no register model", parser.Kind())
+		}
+		if facts.Frame.StackGrowth != -1 && facts.Frame.StackGrowth != 1 {
+			t.Fatalf("%s reports stack growth %d", parser.Kind(), facts.Frame.StackGrowth)
+		}
+		// The frame and register models must agree about the flag register: a
+		// consumer reads the width from one and the name from the other.
+		if facts.Frame.Flags != "" && facts.Frame.Flags != facts.Registers.Flags {
+			t.Fatalf("%s reports flag register %q and %q", parser.Kind(), facts.Frame.Flags, facts.Registers.Flags)
+		}
+		// Argument registers belong to the same register file as the stack
+		// pointer, so they must use the naming the model declares.
+		for _, name := range append(append([]string{}, facts.Registers.Arguments...), facts.Registers.Return) {
+			if name == "" {
+				t.Fatalf("%s reports an empty argument or return register", parser.Kind())
+			}
+		}
+	}
+}
+
+// TestArgumentRegistersPerArchitecture checks that the ABI facts are not one
+// shared default. Before they were data, a converter that switched on the
+// architecture handed every other target the System V registers, so a RISC-V
+// function came out with no parameters at all.
+func TestArgumentRegistersPerArchitecture(t *testing.T) {
+	cases := []struct {
+		kind   core.Architecture
+		first  string
+		ret    string
+		expect int
+	}{
+		{core.ArchAMD64, "rdi", "rax", 6},
+		{core.Arch386, "", "eax", 0},
+		{core.ArchARM, "r0", "r0", 4},
+		{core.ArchARM64, "x0", "x0", 8},
+		{core.ArchRISCV64, "x10", "x10", 8},
+		{core.ArchPPC64, "r3", "r3", 8},
+		{core.ArchMIPS64, "a0", "v0", 4},
+		{core.ArchS390X, "r2", "r2", 5},
+		{core.ArchLOONG64, "r4", "r4", 8},
+	}
+	for _, testCase := range cases {
+		var parser core.Parser
+		for _, candidate := range All() {
+			if candidate.Kind() == testCase.kind {
+				parser = candidate
+				break
+			}
+		}
+		if parser == nil {
+			t.Fatalf("%s is not registered", testCase.kind)
+		}
+		registers := parser.(core.ArchFactsProvider).Facts().Registers
+		if len(registers.Arguments) != testCase.expect {
+			t.Fatalf("%s has %d argument registers, want %d", testCase.kind, len(registers.Arguments), testCase.expect)
+		}
+		if testCase.expect > 0 && registers.Arguments[0] != testCase.first {
+			t.Fatalf("%s first argument register is %q, want %q", testCase.kind, registers.Arguments[0], testCase.first)
+		}
+		if registers.Return != testCase.ret {
+			t.Fatalf("%s returns in %q, want %q", testCase.kind, registers.Return, testCase.ret)
+		}
+	}
+}

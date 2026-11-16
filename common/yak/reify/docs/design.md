@@ -490,15 +490,40 @@ remove-canary → duplicate-return-blocks → remove-stackframe
 
 每个 pass 都只改 `core.Function`，不碰 SSA。
 
+#### 架构事实：`core.ArchFacts`
+
+pass 不按寄存器名字符串猜测架构。parser 把自己架构的事实以数据形式写进 `core.LowIR`，`lowir2ssa` 通过 `ir.Facts()` 交给每个 pass：
+
+| 字段 | 内容 | 谁填 |
+| --- | --- | --- |
+| `Frame.StackPointer` | 栈指针寄存器名（`rsp`、`esp`、`sp`、`r15`、`r1`、`r3`） | 各架构 lifter |
+| `Frame.FramePointer` | 帧指针寄存器名（可为空） | 同上 |
+| `Frame.ReturnAddress` | 链接寄存器（`lr`、`x30`、`ra`、`r14`、`r1`） | 同上 |
+| `Frame.Flags` | 标志伪寄存器 | 同上 |
+| `Frame.CalleeSaved` | 被调用者保存寄存器 | 同上 |
+| `Frame.StackGrowth` | 栈增长方向 | 同上 |
+| `Registers.Naming` | 寄存器命名规则：`x86`（部分寄存器共享一个变量）、`aarch64`（Wn/Xn 共享）、`plain`（每个名字一个寄存器） | 同上 |
+| `Registers.Width` | 默认整数寄存器宽度 | 同上 |
+| `Registers.Arguments` / `Return` | 整数参数寄存器顺序、返回值寄存器 | 同上 |
+| `Canary.Kind` / `Register` / `Offset` | 栈保护值从哪里读 | 同上 |
+
+同一份事实也决定语义标记的命名：lifter 只写中立命名空间 `tls.base`、`flags.*`、`cond.*`，不写架构前缀。canary 的读取形态本身是架构知识（x86 是 `fs:0x28`，arm64 是 `tpidr_el0+0x28`，RISC 类目标经 GOT 取 `__stack_chk_guard`），所以由 lifter 识别并发出 `tls.base`，pass 只处理中立形态。
+
+`internal` 只放被复用的实现；单变体架构（arm、arm64、s390x、loong64）直接在自己的包里。
+
+每个 parser 实现 `core.ArchFactsProvider`，`Facts()` 一次性给出 frame、register 和 canary 三份事实。`asm2lowir` 把它们写到 `core.LowIR`，`lowir2ssa` 用它绑定入口寄存器、参数和返回值。`lowirtext` 以 `frame:`、`registers:`、`canary:` 三行承载同样的内容，所以文本往返不丢事实。
+
+`lowir2ssa` 不再有按架构分支：入口寄存器由 `FrameModel.EntryRegisters()` 推导，参数与返回寄存器读 `Registers`，寄存器别名规则读 `Naming`。
+
 #### `remove-canary`
 
-识别 Linux x86_64 的 stack protector 模式：
+识别 stack protector 模式，架构中立：
 
-1. `x86.segment.fs` + 常量 `0x28` → TLS canary。
+1. `tls.base` → 栈保护值；偏移取自 `ArchFacts.Canary.Offset`。两种形态：段基址把偏移折进标记（x86），线程指针在 `add` 里加偏移（arm64）。
 2. canary 写入栈槽（store）。
 3. 返回前从同一槽读回（load）。
 4. 与 canary 比较（`sub/xor/cmp`）。
-5. 比较结果经 `x86.flags.*` / `x86.cond.*` 进入分支。
+5. 比较结果经 `flags.*` / `cond.*` 进入分支。
 6. 分支一侧是不返回的失败处理块（含 `call` 或 `trap`）。
 
 命中后：
@@ -524,16 +549,16 @@ remove-canary → duplicate-return-blocks → remove-stackframe
 
 #### `remove-stackframe`
 
-按“同一机器地址的指令组”分组，识别：
+按“同一机器地址的指令组”分组，用 `ArchFacts.Frame` 的寄存器名识别：
 
-- 被调用者保存寄存器压栈。
-- `mov rbp, rsp`。
-- `sub/and rsp, ...` 的栈分配。
-- `leave`。
+- 被调用者保存寄存器或返回地址压栈。
+- 帧指针建立（`mov rbp, rsp`、`mov x29, sp`、`mov r11, sp`）。
+- 栈指针减去立即数的栈分配。
+- 拾取帧指针的 `leave`。
 - 弹栈恢复。
-- `add rsp, ...` 的栈释放。
+- 栈指针加回立即数的栈释放。
 
-删除序言和尾声，并给被删指令打 `EffectFrameRestore`。它**不重写 rbp 相对局部变量**，所以删除后地址可能失去基址。随后的转换阶段按“是否启用了该 pass”在函数上记录：
+同一个实现服务 13 种架构，因为寄存器名来自 `FrameModel` 而不是字符串常量。删除序言和尾声，并给被删指令打 `EffectFrameRestore`。它**不重写帧指针相对局部变量**，所以删除后地址可能失去基址。随后的转换阶段按“是否启用了该 pass”在函数上记录：
 
 - `FrameCleanup`：启用了框架清理。
 - `FrameKept`：未启用，保留框架。

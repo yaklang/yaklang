@@ -110,7 +110,7 @@
       "block b1 @ 0x8049040",
       "  0x8049040  v1:i32 = read_register %r0 [read_register]",
       "  0x8049040  v2:i32 = constant 0x1",
-      "  0x8049040  v3:i32 = intrinsic @arm.flags.cmp, v1, v2 [write_register]",
+      "  0x8049040  v3:i32 = intrinsic @flags.cmp, v1, v2 [write_register]",
       "  0x8049040  write_register %cpsr, v3 [write_register]",
       "  0x8049044  v4:i32 = read_register %lr [read_register]",
       "  0x8049044  v5:ptr32 = copy v4",

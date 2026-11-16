@@ -20,7 +20,7 @@ type lifter struct {
 }
 
 func liftFunctions(target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
-	ir := &core.LowIR{Target: target}
+	ir := &core.LowIR{Target: target, Frame: frame(), Registers: registers()}
 	for index, body := range functions {
 		ir.Functions = append(ir.Functions, liftFunction(body, core.FunctionID(index+1), blockIDs, diagnostics))
 	}
@@ -378,7 +378,7 @@ func (l *lifter) branch(ins instruction) {
 	}
 	mask := l.conditionMask(ins)
 	conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
-		symbolOperand("s390x.cond." + mask), l.value(l.readRegister(ins.address, "cc", 2)),
+		symbolOperand("cond." + conditionName(mask)), l.value(l.readRegister(ins.address, "cc", 2)),
 	}, 1, core.EffectReadRegister)
 	targets := make([]core.BlockID, 0, 2)
 	if block, ok := l.blockIDs[target]; ok {
@@ -424,7 +424,7 @@ func (l *lifter) registerBranch(ins instruction) {
 	if isConditionalBranch(ins.inst) {
 		mask := l.conditionMask(ins)
 		conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
-			symbolOperand("s390x.cond." + mask), l.value(l.readRegister(ins.address, "cc", 2)),
+			symbolOperand("cond." + conditionName(mask)), l.value(l.readRegister(ins.address, "cc", 2)),
 		}, 1, core.EffectReadRegister)
 		l.emit(core.OpBranch, []core.Operand{l.value(conditionValue), l.value(target)}, nil, nil, core.EffectUnknown, ins.address)
 		return
@@ -704,7 +704,7 @@ func (l *lifter) branchOnCount(ins instruction) (core.ValueID, bool) {
 	flags := l.operation(ins, kind, []core.Operand{l.value(left), l.value(right)}, addressBits, core.EffectNone)
 	mask := l.conditionMask(ins)
 	conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
-		symbolOperand("s390x.cond." + mask), l.value(flags),
+		symbolOperand("cond." + conditionName(mask)), l.value(flags),
 	}, 1, core.EffectReadRegister)
 	targets := make([]core.BlockID, 0, 2)
 	if block, ok := l.blockIDs[target]; ok {
@@ -763,4 +763,34 @@ func (l *lifter) opaqueRegisterForm(ins instruction) (core.ValueID, bool) {
 		}
 	}
 	return 0, false
+}
+
+// conditionName maps one branch mask to the comparison it tests. A mask may name
+// several conditions at once, and a few name none of the six comparisons, so a
+// mask without a single equivalent keeps its numeric form and the consumer leaves
+// the branch unresolved instead of inventing a comparison.
+func conditionName(mask string) string {
+	switch mask {
+	case "8":
+		return "e"
+	case "7":
+		return "ne"
+	case "2":
+		return "hi"
+	case "4":
+		return "lo"
+	case "9":
+		return "hs"
+	case "12":
+		return "ls"
+	case "3":
+		return "g"
+	case "5":
+		return "l"
+	case "10":
+		return "ge"
+	case "13":
+		return "le"
+	}
+	return mask
 }

@@ -17,6 +17,9 @@ type Profile struct {
 	Name string
 	// Bits is the default integer and address width.
 	Bits uint16
+	// Canary describes where the stack protector reads its guard. It is empty
+	// for a target whose guard read this package does not recognize.
+	Canary core.CanaryModel
 }
 
 // Profile64 is the mips64 profile.
@@ -41,4 +44,26 @@ func (p Profile) Check(target core.Target) error {
 		return fmt.Errorf("%s does not support execution mode %q", p.Name, target.Mode)
 	}
 	return nil
+}
+
+// Frame describes the O32/N64 call frame. The stack pointer, the frame pointer
+// and the return address register keep their architectural names.
+func (p Profile) Frame() core.FrameModel {
+	return core.FrameModel{
+		StackPointer:  "sp",
+		FramePointer:  "fp",
+		ReturnAddress: "ra",
+		CalleeSaved:   []string{"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "fp"},
+		StackGrowth:   -1,
+	}
+}
+
+// Registers describes register naming and the O32/N64 argument registers.
+func (p Profile) Registers() core.RegisterModel {
+	return core.RegisterModel{
+		Naming:    core.RegisterNamingPlain,
+		Width:     p.Bits,
+		Arguments: []string{"a0", "a1", "a2", "a3"},
+		Return:    "v0",
+	}
 }

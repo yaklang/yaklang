@@ -14,7 +14,7 @@
       "block b1 @ 0x10100",
       "  0x10100  v1:i32 = read_register %r3 [read_register]",
       "  0x10100  v2:i32 = constant 0x0",
-      "  0x10100  v3:i32 = intrinsic @ppc.flags.cmpwi, v1, v2 [write_register]",
+      "  0x10100  v3:i32 = intrinsic @flags.cmpwi, v1, v2 [write_register]",
       "  0x10100  write_register %cr0, v3 [write_register]",
       "  0x10104  v5:i32 = read_register %cr0 [read_register]",
       "  0x10104  v4:i1 = intrinsic @ppc.branch.bc, v5 [read_register, unknown]",

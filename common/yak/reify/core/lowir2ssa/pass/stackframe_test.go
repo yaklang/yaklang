@@ -34,7 +34,7 @@ func stackAllocationFunction(t *testing.T) core.Function {
 
 func TestRemoveStackFrameDropsSetupAndTeardown(t *testing.T) {
 	function := stackAllocationFunction(t)
-	if removed := RemoveStackFrame(&function); removed == 0 {
+	if removed := RemoveStackFrame(&function, core.ArchFacts{Frame: amd64Frame}); removed == 0 {
 		t.Fatal("stack frame pass removed nothing")
 	}
 	for _, block := range function.Blocks {
@@ -80,7 +80,7 @@ func TestStackFrameWithFramePointer(t *testing.T) {
 		{Kind: core.OpWriteRegister, Operands: []core.Operand{register("rsp", 64), value(16, integer(64))}, Address: 0x9105},
 	}
 	function := ir.Functions[0]
-	if removed := RemoveStackFrame(&function); removed < 6 {
+	if removed := RemoveStackFrame(&function, core.ArchFacts{Frame: amd64Frame}); removed < 6 {
 		t.Fatalf("removed %d frame instructions", removed)
 	}
 	for _, block := range ir.Functions[0].Blocks {
@@ -95,4 +95,20 @@ func TestStackFrameWithFramePointer(t *testing.T) {
 			}
 		}
 	}
+}
+
+// amd64Frame is the frame model the amd64 parser produces. The pass reads the
+// register names from it instead of hard-coding them, which is what lets the
+// same implementation serve every architecture.
+var amd64Canary = core.CanaryModel{Kind: core.CanarySegment, Register: "fs", Offset: 0x28}
+
+// amd64Facts is the facts pair the amd64 parser produces.
+var amd64Facts = core.ArchFacts{Frame: amd64Frame, Canary: amd64Canary}
+
+var amd64Frame = core.FrameModel{
+	StackPointer: "rsp",
+	FramePointer: "rbp",
+	Flags:        "rflags",
+	CalleeSaved:  []string{"rbp", "rbx", "r12", "r13", "r14", "r15"},
+	StackGrowth:  -1,
 }
