@@ -122,7 +122,11 @@ func buildFunctions(decoded []instruction, start, end uint64, diagnostics *diagn
 					fmt.Sprintf("control transfer at 0x%x targets 0x%x outside the decoded region", ins.address, target))
 			}
 		}
-		if isTerminator(name) {
+		// A control transfer ends its block. A conditional branch keeps a
+		// fallthrough, so the instruction after it starts a new block; without
+		// this the branch and the instruction that follows it share one block and
+		// the second terminator is unreachable.
+		if isTerminator(name) || isBranch(name) {
 			starts[next] = true
 		}
 	}

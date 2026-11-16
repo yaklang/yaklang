@@ -355,7 +355,7 @@
       "target: linux/loong64 (64-bit, little-endian)",
       "function sub_0x2400 @ 0x2400",
       "block b1 @ 0x2400",
-      "  0x2400  jump -\u003e b1"
+      "  0x2400  jump -> b1"
     ]
   },
   {
