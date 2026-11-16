@@ -492,7 +492,53 @@ func (c *converter) emitBinary(instruction core.Instruction, op ssa.BinaryOpcode
 		c.setResult(instruction, c.opaqueValue(string(instruction.Kind), instruction))
 		return
 	}
-	c.setResult(instruction, c.emitBinOp(op, values[0], values[1]))
+	// Fold at the width the result declares: a 32-bit addition wraps at 32 bits,
+	// so a negative addend must not grow into the upper half.
+	bits := uint16(0)
+	if len(instruction.Results) == 1 {
+		bits = instruction.Results[0].Type.Bits
+	}
+	c.setResult(instruction, c.emitBinOpWidth(op, values[0], values[1], bits))
+}
+
+// emitBinOpWidth folds one operation and truncates the result to the width the
+// instruction declares.
+func (c *converter) emitBinOpWidth(op ssa.BinaryOpcode, left, right ssa.Value, bits uint16) ssa.Value {
+	if value, ok := c.foldBinOpWidth(op, left, right, bits); ok {
+		return value
+	}
+	return c.builder.EmitBinOp(op, left, right)
+}
+
+// foldBinOpWidth computes one operation on two constants and truncates it.
+func (c *converter) foldBinOpWidth(op ssa.BinaryOpcode, left, right ssa.Value, bits uint16) (ssa.Value, bool) {
+	value, ok := c.foldBinOp(op, left, right)
+	if !ok {
+		return nil, false
+	}
+	if bits == 0 || bits >= 64 {
+		return value, true
+	}
+	raw, ok := ssa.ToConstInst(value)
+	if !ok {
+		return value, true
+	}
+	number, ok := constInteger(raw)
+	if !ok {
+		return value, true
+	}
+	mask := int64(1)<<bits - 1
+	sign := int64(1) << (bits - 1)
+	number &= mask
+	if number&sign != 0 {
+		number -= int64(1) << bits
+	}
+	folded := c.builder.EmitConstInst(number)
+	if folded == nil {
+		return value, true
+	}
+	folded.SetType(value.GetType())
+	return folded, true
 }
 
 func (c *converter) emitUnary(instruction core.Instruction, op ssa.UnaryOpcode) {
@@ -1553,7 +1599,10 @@ func registerViewFor(name string, bits uint16, model core.RegisterModel) registe
 	}
 	switch model.Naming {
 	case core.RegisterNamingX86:
-		return x86RegisterView(lower, bits)
+		// The canonical variable is as wide as the target's registers. A 32-bit
+		// target keeps eax and ax in one 32-bit variable, so a read must not
+		// extract from a 64-bit one and lose the constant.
+		return x86RegisterView(lower, bits, model.Width)
 	case core.RegisterNamingAArch64:
 		return aarch64RegisterView(lower, bits, model.Width)
 	default:
@@ -1567,7 +1616,10 @@ func registerViewFor(name string, bits uint16, model core.RegisterModel) registe
 
 // x86RegisterView maps one x86 register name, including the partial views, to the
 // 64-bit variable that holds it.
-func x86RegisterView(lower string, bits uint16) registerView {
+func x86RegisterView(lower string, bits, canonicalBits uint16) registerView {
+	if canonicalBits == 0 {
+		canonicalBits = 64
+	}
 	if family, ok := generalRegisterFamily(lower); ok {
 		width := bits
 		if width == 0 {
@@ -1577,7 +1629,7 @@ func x86RegisterView(lower string, bits uint16) registerView {
 			canonical:     family,
 			width:         width,
 			shift:         generalRegisterShift(lower),
-			canonicalBits: 64,
+			canonicalBits: canonicalBits,
 		}
 	}
 	switch {

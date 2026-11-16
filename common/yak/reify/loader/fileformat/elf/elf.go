@@ -250,7 +250,7 @@ func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionInd
 				Imported: true,
 				Library:  symbol.Library,
 			})
-			if !set.plt || file.Machine != elf.EM_X86_64 {
+			if !set.plt {
 				continue
 			}
 			pltAddress, ok := elfPLTAddress(file, index)
@@ -322,8 +322,20 @@ func elfRelocations(file *elf.File, relaName, relName string) []elfRelocation {
 // first .plt entry; .plt.sec, when present, has one entry per import.
 func elfPLTAddress(file *elf.File, index int) (uint64, bool) {
 	// The stub size follows the relocation the architecture uses: sixteen bytes
-	// on x86 and ARM64, twelve on 32-bit ARM, which keeps a four-byte literal.
+	// on x86, ARM64, RISC-V and LoongArch; twenty-four on PowerPC64; thirty-two
+	// on s390x; twelve on 32-bit ARM, which keeps a four-byte literal.
 	stride := uint64(16)
+	switch file.Machine {
+	case elf.EM_386, elf.EM_X86_64, elf.EM_AARCH64, elf.EM_RISCV, elf.EM_LOONGARCH, elf.EM_ARM:
+	case elf.EM_PPC64:
+		stride = 24
+	case elf.EM_S390:
+		stride = 32
+	default:
+		// The remaining architectures place their import stubs elsewhere or use a
+		// layout that this formula does not describe.
+		return 0, false
+	}
 	if file.Machine == elf.EM_ARM {
 		// The ARM PLT is not uniform: the linker inserts a four-byte Thumb
 		// trampoline where an import is only reachable through one. Reading the
@@ -340,14 +352,36 @@ func elfPLTAddress(file *elf.File, index int) (uint64, bool) {
 		return section.Addr + uint64(index)*stride, true
 	}
 	if section := file.Section(".plt"); section != nil && section.Addr != 0 {
-		header := uint64(1)
-		if file.Machine == elf.EM_ARM {
-			// The ARM PLT header occupies two stub slots on ARMv7.
-			header = 2
+		offset, ok := pltStubOffset(file.Machine, index)
+		if !ok {
+			return 0, false
 		}
-		return section.Addr + (uint64(index)+header)*stride, true
+		return section.Addr + offset, true
 	}
 	return 0, false
+}
+
+// pltStubOffset returns the distance from the start of .plt to the stub of one
+// relocation. The first entry follows the resolver header, whose size differs by
+// architecture: one stub on x86 and PowerPC64, two on ARM, ARM64, RISC-V and
+// LoongArch, and a single wide entry on s390x.
+func pltStubOffset(machine elf.Machine, index int) (uint64, bool) {
+	stride := uint64(16)
+	header := uint64(1)
+	switch machine {
+	case elf.EM_386, elf.EM_X86_64:
+	case elf.EM_ARM, elf.EM_AARCH64, elf.EM_RISCV, elf.EM_LOONGARCH:
+		header = 2
+	case elf.EM_PPC64:
+		stride = 24
+	case elf.EM_S390:
+		stride = 32
+	default:
+		// The remaining architectures place their import stubs elsewhere or use a
+		// layout that this formula does not describe.
+		return 0, false
+	}
+	return (uint64(index) + header) * stride, true
 }
 
 // armPLTEntries returns the address of every ARM PLT stub in relocation order.

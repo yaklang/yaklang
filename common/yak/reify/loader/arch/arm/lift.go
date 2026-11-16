@@ -13,6 +13,10 @@ import (
 // and writes, memory operations carry their own effects, and flags are the
 // pseudo register cpsr, exactly like rflags on x86.
 type lifter struct {
+	// pcAddress is the instruction being lifted, and pcThumb records whether it
+	// is a Thumb encoding. A read of the program counter uses both.
+	pcAddress    uint64
+	pcThumb      bool
 	blockIDs     map[uint64]core.BlockID
 	diagnostics  *diagnostics
 	nextValue    core.ValueID
@@ -59,6 +63,10 @@ func liftFunction(body function, id core.FunctionID, blockIDs map[uint64]core.Bl
 }
 
 func (l *lifter) lift(ins instruction) {
+	// The program counter holds the address of the instruction plus the pipeline
+	// offset, so a read of it is a constant.
+	l.pcAddress = ins.address
+	l.pcThumb = ins.thumb
 	if ins.undefined {
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("arm.data")}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return
@@ -348,7 +356,19 @@ func (l *lifter) pointerConstant(address, value uint64) core.ValueID {
 	return result.ID
 }
 
+// pcValue returns the address a read of the program counter delivers. A Thumb
+// instruction is two or four bytes wide and the base is word aligned.
+func (l *lifter) pcValue(address uint64) uint64 {
+	if l.pcThumb {
+		return (l.pcAddress + 4) &^ 3
+	}
+	return l.pcAddress + 8
+}
+
 func (l *lifter) readRegister(address uint64, name string, bits uint16) core.ValueID {
+	if name == "pc" {
+		return l.pointerConstant(address, l.pcValue(address))
+	}
 	result := l.newValue(core.TypeInteger, bits)
 	l.emit(core.OpReadRegister, []core.Operand{registerOperand(name, bits)}, []core.Value{result}, nil, core.EffectReadRegister, address)
 	return result.ID
