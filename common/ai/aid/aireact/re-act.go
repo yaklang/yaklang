@@ -436,6 +436,9 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	cfg.SetSessionSnapshotEmitHandler(func() {
 		reactloops.EmitSessionSnapshot(react.config, react.GetCurrentLoop(), react.GetCurrentTask())
 	})
+	cfg.SetAgentPolicySnapshotEmitHandler(func() {
+		react.config.EmitAgentPolicySnapshot()
+	})
 
 	// Register pending context providers
 	react.promptManager.cpm = cfg.ContextProviderManager

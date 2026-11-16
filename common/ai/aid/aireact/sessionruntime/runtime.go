@@ -613,6 +613,9 @@ func (r *reActSessionRuntime) createRuntime(
 		log.Errorf("create re-act failed: %v", err)
 		return nil, utils.Errorf("create re-act instance failed: %v", err)
 	}
+	if cfg, ok := reAct.GetConfig().(*aicommon.Config); ok {
+		cfg.EmitAgentPolicySnapshot()
+	}
 	reAct.GetConfig().SetConfig("MustProcessAttachedData", true)
 	owner := &ownedReActRuntime{
 		sessionID: sessionID,
@@ -700,6 +703,9 @@ func (r *reActSessionRuntime) attachConnection(
 	if !ok {
 		delivery.cancel()
 		return nil, utils.Errorf("failed to subscribe running aireact session: %s", sessionID)
+	}
+	if cfg, ok := reAct.GetConfig().(*aicommon.Config); ok {
+		cfg.EmitAgentPolicySnapshot()
 	}
 	return newReActConnection(r, ctx, delivery, sessionID, reAct, owner, reservation, false, unsubscribe), nil
 }

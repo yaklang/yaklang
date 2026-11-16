@@ -450,4 +450,5 @@ func (c *Config) RegisterBasicSyncHandlers() {
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_MEMORY_CONTEXT, c.HandleSyncMemoryContextEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PLAN_EXEC_TASKS, c.HandleSyncPlanExecTasksEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_HISTORY, c.HandleSyncRecoveryHistoryEvent)
+	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_AGENT_POLICY_SNAPSHOT, c.HandleSyncAgentPolicySnapshotEvent)
 }
