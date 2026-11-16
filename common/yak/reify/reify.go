@@ -477,6 +477,16 @@ func countValues(ir *core.LowIR) int {
 	return total
 }
 
+// readOnlySection reports whether a section holds constants only.
+func readOnlySection(name string) bool {
+	for _, prefix := range []string{".rodata", ".rdata", ".text", ".data.rel.ro", ".srodata", ".const", "__const", ".cstring"} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // pointerReader reads a pointer-sized value stored at an image address. It accepts
 // a value only when it lands inside a mapped section, which keeps an ordinary
 // integer that happens to look like an address out of the result.
@@ -510,6 +520,12 @@ func pointerReader(artifact *core.Artifact) func(uint64, uint16) (uint64, bool) 
 			for index := len(data) - 1; index >= 0; index-- {
 				value = value<<8 | uint64(data[index])
 			}
+		}
+		// A read from a read-only section is a constant: a literal pool, a jump
+		// table or a string. The value does not have to look like a pointer, because
+		// position-independent code adds such a word to the program counter.
+		if readOnlySection(section.Name) {
+			return value, value != 0
 		}
 		if value == 0 {
 			return 0, false

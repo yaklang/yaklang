@@ -199,24 +199,25 @@ func Address(base uint64, rva uint32) (uint64, error) {
 func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 	seen := make(map[uint64]bool)
 	for _, item := range file.Symbols {
-		if item.SectionNumber <= 0 || item.Value == 0 {
+		if item.SectionNumber <= 0 || int(item.SectionNumber) > len(file.Sections) {
 			continue
 		}
-		kind := sym.SymbolUnknown
-		if item.Type&peSymbolTypeFunction != 0 {
-			kind = sym.SymbolFunction
-		}
-		if kind != sym.SymbolFunction {
+		section := file.Sections[item.SectionNumber-1]
+		if section.Characteristics&(peSectionCode|peSectionExecute) == 0 {
 			continue
 		}
-		if seen[uint64(item.Value)] {
+		// A COFF value is an offset inside its section, and a linked image adds
+		// the image base to the section address. Requiring a non-zero value would
+		// drop the first function of every section.
+		address := image.Base + uint64(section.VirtualAddress) + uint64(item.Value)
+		if address == 0 || seen[address] {
 			continue
 		}
-		seen[uint64(item.Value)] = true
+		seen[address] = true
 		image.Symbols = append(image.Symbols, sym.Symbol{
 			Name:    item.Name,
-			Address: uint64(item.Value),
-			Kind:    kind,
+			Address: address,
+			Kind:    sym.SymbolFunction,
 		})
 	}
 }

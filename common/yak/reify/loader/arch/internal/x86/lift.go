@@ -17,6 +17,14 @@ type lifter struct {
 	values       map[core.ValueID]core.ValueType
 	instructions []core.Instruction
 	variadic     bool
+	// pushedPC is the address a call-to-next-instruction pushed, and
+	// hasPushedPC says whether a pop may still read it.
+	pushedPC    uint64
+	hasPushedPC bool
+	// pcThunks marks the addresses of the call/pop idiom that reads the program
+	// counter. A call to the next instruction alone is not enough: the following
+	// instruction has to be the pop that consumes it.
+	pcThunks map[uint64]bool
 }
 
 type place struct {
@@ -42,6 +50,7 @@ func liftFunction(profile Profile, target core.Target, functionBody function, id
 		Blocks:  make([]core.Block, 0, len(blocks)),
 	}
 	lifter := &lifter{profile: profile, blockIDs: blockIDs, diagnostics: diagnostics, values: make(map[core.ValueID]core.ValueType)}
+	lifter.pcThunks = findPCThunks(blocks)
 	for index, block := range blocks {
 		lifter.instructions = make([]core.Instruction, 0, len(block.instructions)*2)
 		for _, instruction := range block.instructions {
@@ -716,6 +725,23 @@ func (l *lifter) pushValue(ins instruction, value core.ValueID) {
 	l.store(ins.address, l.pointerFrom(ins.address, next), value, bits)
 }
 
+// takePushedPC consumes a pending call-to-next-instruction idiom. A position-
+// independent 32-bit program obtains its own address that way: the call pushes the
+// address of the following instruction, and the pop reads it back.
+func (l *lifter) takePushedPC(ins instruction, destination place) bool {
+	if !l.hasPushedPC {
+		return false
+	}
+	if destination.memory {
+		l.hasPushedPC = false
+		return false
+	}
+	l.hasPushedPC = false
+	value := l.pointerConstant(ins.address, l.pushedPC)
+	l.writePlace(ins, destination, value)
+	return true
+}
+
 func (l *lifter) pop(ins instruction) {
 	args := args(ins)
 	if len(args) != 1 || (!isGPRDestination(args[0]) && !isMemory(args[0])) {
@@ -726,6 +752,9 @@ func (l *lifter) pop(ins instruction) {
 	destination, ok := l.place(ins, args[0], bits)
 	if !ok {
 		l.unsupported(ins)
+		return
+	}
+	if l.takePushedPC(ins, destination) {
 		return
 	}
 	pointerBits := l.profile.Bits
@@ -850,6 +879,14 @@ func (l *lifter) branch(ins instruction) {
 
 func (l *lifter) call(ins instruction) {
 	if target, ok := directTarget(ins); ok {
+		if target == ins.address+uint64(ins.size) && l.pcThunks[ins.address] {
+			// A call to the next instruction is how position-independent code
+			// reads its own address: the pushed return address is the value the
+			// following pop wants. Record it and emit no call.
+			l.pushedPC = target
+			l.hasPushedPC = true
+			return
+		}
 		instruction := core.Instruction{
 			Kind:     core.OpCall,
 			Operands: []core.Operand{l.pointerOperand(target)},
@@ -1057,11 +1094,18 @@ func (l *lifter) readSource(ins instruction, arg x86asm.Arg, bits uint16) (core.
 	}
 }
 
+// signedDisp sign-extends one displacement. The decoder reports a 32-bit field
+// zero-extended, so a negative offset arrives as a large positive number and an
+// address computed from it lands far past the image.
+func signedDisp(disp int64) int64 {
+	return int64(int32(uint32(disp)))
+}
+
 // RIP-relative displacements are relative to the end of the instruction.
 func (l *lifter) address(ins instruction, memory x86asm.Mem) core.ValueID {
 	var result core.ValueID
 	if memory.Base == x86asm.RIP {
-		result = l.pointerConstant(ins.address, ins.address+uint64(ins.size)+uint64(memory.Disp))
+		result = l.pointerConstant(ins.address, ins.address+uint64(ins.size)+uint64(signedDisp(memory.Disp)))
 	} else if memory.Base != 0 {
 		base, ok := l.readAddressRegister(ins, memory.Base)
 		if ok {
@@ -1079,7 +1123,7 @@ func (l *lifter) address(ins instruction, memory x86asm.Mem) core.ValueID {
 		}
 	}
 	if memory.Base != x86asm.RIP && memory.Disp != 0 {
-		displacement := l.constant(ins.address, uint64(memory.Disp), 64)
+		displacement := l.constant(ins.address, uint64(signedDisp(memory.Disp)), 64)
 		result = l.addAddress(ins, result, displacement)
 	}
 	if result == 0 {
@@ -1345,4 +1389,32 @@ func containsBlock(blocks []core.BlockID, target core.BlockID) bool {
 		}
 	}
 	return false
+}
+
+// findPCThunks marks every call that pushes the address of the instruction after
+// it when that instruction pops the value back. A position-independent 32-bit
+// program reads its own address that way.
+func findPCThunks(blocks []block) map[uint64]bool {
+	at := make(map[uint64]x86asm.Op)
+	for _, current := range blocks {
+		for _, ins := range current.instructions {
+			at[ins.address] = ins.inst.Op
+		}
+	}
+	result := make(map[uint64]bool)
+	for _, current := range blocks {
+		for _, ins := range current.instructions {
+			if ins.inst.Op != x86asm.CALL {
+				continue
+			}
+			target, ok := directTarget(ins)
+			if !ok || target != ins.address+uint64(ins.size) {
+				continue
+			}
+			if at[target] == x86asm.POP {
+				result[ins.address] = true
+			}
+		}
+	}
+	return result
 }

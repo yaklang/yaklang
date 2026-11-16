@@ -1,6 +1,7 @@
 package elf
 
 import (
+	"debug/elf"
 	"encoding/binary"
 	"os"
 	"testing"
@@ -77,5 +78,39 @@ func TestELFSymbolsFromSystemBinary(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("no imported function symbol with an address in %s", path)
+	}
+}
+
+// TestPLTStubOffsets checks where the first import stub starts on each
+// architecture. A wrong header size names a resolver stub after an import, and
+// every call to that import then reports a function that is not the one called.
+func TestPLTStubOffsets(t *testing.T) {
+	cases := []struct {
+		machine elf.Machine
+		want    []uint64
+	}{
+		{elf.EM_X86_64, []uint64{16, 32, 48}},
+		{elf.EM_386, []uint64{16, 32, 48}},
+		{elf.EM_ARM, []uint64{32, 48, 64}},
+		{elf.EM_AARCH64, []uint64{32, 48, 64}},
+		{elf.EM_RISCV, []uint64{32, 48, 64}},
+		{elf.EM_LOONGARCH, []uint64{32, 48, 64}},
+		{elf.EM_PPC64, []uint64{24, 48, 72}},
+		{elf.EM_S390, []uint64{32, 64, 96}},
+		{elf.EM_MIPS, nil},
+	}
+	for _, testCase := range cases {
+		if testCase.want == nil {
+			if _, ok := pltStubOffset(testCase.machine, 0); ok {
+				t.Errorf("%v should not report a stub offset", testCase.machine)
+			}
+			continue
+		}
+		for index, want := range testCase.want {
+			got, ok := pltStubOffset(testCase.machine, index)
+			if !ok || got != want {
+				t.Errorf("%v index %d = %#x (ok=%v), want %#x", testCase.machine, index, got, ok, want)
+			}
+		}
 	}
 }

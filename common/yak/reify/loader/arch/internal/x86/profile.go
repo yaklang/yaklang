@@ -65,7 +65,6 @@ func (p Profile) RegistersFor(target core.Target) core.RegisterModel {
 		}
 	}
 	return p.registers()
-	return p.registers()
 }
 
 func (p Profile) registers() core.RegisterModel {

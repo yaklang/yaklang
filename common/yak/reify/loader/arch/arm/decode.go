@@ -102,6 +102,9 @@ func decode(ctx context.Context, request core.ParseRequest, diagnostics *diagnos
 	// The linker places jump tables and padding after an unconditional branch.
 	// A word that fails to decode there is data, not a decoder gap.
 	dataRegion := false
+	// A PC-relative load reads a word the linker placed inside .text. The word is
+	// data, so the decoder has to skip it instead of reporting a gap.
+	literals := make(map[uint64]bool)
 	for offset := int64(0); offset+4 <= total; offset += 4 {
 		if offset&0xfff == 0 {
 			if err := ctx.Err(); err != nil {
@@ -117,6 +120,11 @@ func decode(ctx context.Context, request core.ParseRequest, diagnostics *diagnos
 			break
 		}
 		raw := binary.LittleEndian.Uint32(code[:])
+		if literals[address] {
+			result = append(result, instruction{address: address, raw: raw, size: 4, undefined: true})
+			address += 4
+			continue
+		}
 		if transfer, ok := decodeCoprocessorTransfer(raw); ok {
 			result = append(result, instruction{address: address, raw: raw, size: 4, text: transfer.text(), systemRegister: transfer})
 			address += 4
@@ -146,6 +154,9 @@ func decode(ctx context.Context, request core.ParseRequest, diagnostics *diagnos
 			continue
 		}
 		dataRegion = isUnconditionalTerminator(inst)
+		if target, ok := literalAddress(inst, address); ok {
+			literals[target] = true
+		}
 		result = append(result, instruction{address: address, raw: raw, inst: inst, size: 4})
 		address += 4
 	}
@@ -238,4 +249,22 @@ func isDataWord(raw uint32) bool {
 	}
 	first := byte(raw)
 	return byte(raw>>8) == first && byte(raw>>16) == first && byte(raw>>24) == first
+}
+
+// literalAddress returns the address a PC-relative load reads. A load with the
+// program counter as its base reaches a word the linker placed in .text.
+func literalAddress(inst armasm.Inst, address uint64) (uint64, bool) {
+	switch baseOp(inst.Op) {
+	case armasm.LDR, armasm.LDRB, armasm.LDRH, armasm.LDRSB, armasm.LDRSH, armasm.LDRD:
+	default:
+		return 0, false
+	}
+	for _, arg := range inst.Args {
+		memory, ok := arg.(armasm.Mem)
+		if !ok || memory.Base != armasm.PC {
+			continue
+		}
+		return (address + 8 + uint64(memory.Offset)) &^ 3, true
+	}
+	return 0, false
 }
