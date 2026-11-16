@@ -12,12 +12,25 @@ import (
 // writes; r1 is the stack pointer and the condition register CR0 carries the
 // comparison flags.
 type lifter struct {
-	profile      Profile
-	blockIDs     map[uint64]core.BlockID
-	diagnostics  *diagnostics
-	nextValue    core.ValueID
-	values       map[core.ValueID]core.ValueType
-	instructions []core.Instruction
+	// pushedPC is the address a branch-to-next pushed into the link register, and
+	// hasPushedPC says whether a read of that register may still return it.
+	pushedPC    uint64
+	hasPushedPC bool
+	// next is the instruction that follows the one being lifted. It tells the
+	// program-counter idiom from a plain branch.
+	next *instruction
+	// flagsValue is the comparison this block wrote last, and hasFlagsValue says a
+	// branch may use it. A reader that looks the comparison up by register value
+	// loses it across blocks; the branch can name it directly while the compare is
+	// in the same block.
+	flagsValue    core.ValueID
+	hasFlagsValue bool
+	profile       Profile
+	blockIDs      map[uint64]core.BlockID
+	diagnostics   *diagnostics
+	nextValue     core.ValueID
+	values        map[core.ValueID]core.ValueType
+	instructions  []core.Instruction
 }
 
 func liftFunctions(profile Profile, target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
@@ -64,6 +77,11 @@ func liftFunction(profile Profile, body function, id core.FunctionID, blockIDs m
 }
 
 func (l *lifter) lift(ins instruction) {
+	if _, start := l.blockIDs[ins.address]; start {
+		// A comparison only describes a branch in its own block; after a block
+		// boundary another path may have written the condition register.
+		l.hasFlagsValue = false
+	}
 	if ins.undefined {
 		l.emit(core.OpTrap, []core.Operand{symbolOperand("ppc.data")}, nil, nil, core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return

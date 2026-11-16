@@ -108,8 +108,13 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 	}
 	// A relocatable symbol value is relative to its section, so the loader adds
 	// the section base that the layout above assigned.
-	parseELFSymbols(file, image, sectionBases, file.Type == elf.ET_REL)
-	return image, target, parseELFHints(file, image, sectionBases), nil, nil
+	descriptors := ppc64Descriptors(file)
+	parseELFSymbols(file, image, sectionBases, file.Type == elf.ET_REL, descriptors)
+	hints := parseELFHints(file, image, sectionBases)
+	// A PowerPC ELFv1 call reaches the function descriptor; the symbol lookup needs
+	// the code address it holds.
+	hints.OpdDescriptors = descriptors
+	return image, target, hints, nil, nil
 }
 
 type elfRelocation struct {
@@ -119,7 +124,35 @@ type elfRelocation struct {
 
 // parseELFSymbols reads the static symbol table. When relocatable is true the
 // symbol values are section-relative and need the section base.
-func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionIndex]uint64, relocatable bool) {
+// ppc64Descriptors maps each PowerPC ELFv1 function descriptor to the code
+// address it holds. In that ABI a function symbol points at an eight-byte
+// descriptor in .opd: the first word is the entry point and the second the TOC.
+// Without the mapping a symbol reports an address in a data section, and the
+// parser has nothing to decode.
+func ppc64Descriptors(file *elf.File) map[uint64]uint64 {
+	if file.Machine != elf.EM_PPC64 || file.ByteOrder != binary.BigEndian {
+		return nil
+	}
+	section := file.Section(".opd")
+	if section == nil || section.Type == elf.SHT_NOBITS {
+		return nil
+	}
+	data, err := section.Data()
+	if err != nil {
+		return nil
+	}
+	descriptors := make(map[uint64]uint64, len(data)/8)
+	for offset := 0; offset+8 <= len(data); offset += 8 {
+		entry := binary.BigEndian.Uint64(data[offset:])
+		if entry == 0 {
+			continue
+		}
+		descriptors[section.Addr+uint64(offset)] = entry
+	}
+	return descriptors
+}
+
+func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionIndex]uint64, relocatable bool, descriptors map[uint64]uint64) {
 	seen := make(map[string]bool)
 	add := func(symbol sym.Symbol) {
 		if symbol.Name == "" {
@@ -148,6 +181,11 @@ func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionInd
 				continue
 			}
 			address := symbol.Value
+			if entry, ok := descriptors[address]; ok {
+				// The symbol names a function descriptor; the code lives at the
+				// address the descriptor holds.
+				address = entry
+			}
 			if relocatable {
 				// A relocatable value is relative to its section, and zero is a
 				// legitimate offset: the first function of a section starts at
@@ -446,6 +484,11 @@ func LoaderArchitecture(machine elf.Machine, bits int) core.Architecture {
 // resolutions. It never decodes instructions.
 func parseELFHints(file *elf.File, image *core.Image, bases map[elf.SectionIndex]uint64) *core.BoundaryHints {
 	hints := &core.BoundaryHints{GOTRelocs: make(map[uint64]uint64)}
+	if file.Machine == elf.EM_PPC64 && file.ByteOrder == binary.LittleEndian {
+		// ELFv2 keeps a local entry point eight bytes past the global one, and a
+		// local call targets it.
+		hints.LocalEntryOffset = 8
+	}
 	for index, section := range file.Sections {
 		if section.Flags&elf.SHF_EXECINSTR == 0 || section.FileSize == 0 {
 			continue
