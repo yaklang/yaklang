@@ -1,6 +1,7 @@
 package sfpattern
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -208,4 +209,51 @@ alert $hit for {
 	require.NoError(t, err)
 	require.True(t, HasAlert(result))
 	require.Equal(t, 1, AlertCount(result))
+}
+
+// unreadableSource keeps the path list but fails every body read. A cached
+// completed search must not call it.
+type unreadableSource struct{ paths []string }
+
+func (s unreadableSource) Paths() []string { return s.paths }
+
+func (s unreadableSource) Read(string) (string, error) {
+	return "", fmt.Errorf("source body is no longer readable")
+}
+
+func TestMatchRegexp_CachesCompletedEmptySearch(t *testing.T) {
+	root := NewRoot(map[string]string{"a.txt": "alpha"})
+	_, err := root.FileFilter("*", "regexp", nil, []string{"absent"})
+	require.ErrorContains(t, err, "no file contains data matching rule")
+
+	hits, cached := root.SourceHits(sourceHitKey("*", []string{"absent"}))
+	require.True(t, cached, "a completed zero-hit search must be cached")
+	require.Empty(t, hits)
+
+	// Repeat the same search with a source that cannot be read. Answering from
+	// the cache repeats the original error; a rescan would return the read error.
+	root.SetSource(unreadableSource{paths: []string{"a.txt"}})
+	_, err = root.FileFilter("*", "regexp", nil, []string{"absent"})
+	require.ErrorContains(t, err, "no file contains data matching rule")
+}
+
+func TestMatchRegexpWithNegatives_CachesCompletedEmptyResults(t *testing.T) {
+	params := sfvm.SetFileFilterParam(nil, sfvm.FileFilterParamPatternNotList)
+
+	// Empty positive: the old code returned before writing any cache entry, so
+	// every execution window rescanned every file.
+	root := NewRoot(map[string]string{"a.txt": "SECRET value"})
+	_, err := root.FileFilter("*", "regexp", params, []string{"absent", "value"})
+	require.ErrorContains(t, err, "no file contains data matching rule")
+	root.SetSource(unreadableSource{paths: []string{"a.txt"}})
+	_, err = root.FileFilter("*", "regexp", params, []string{"absent", "value"})
+	require.ErrorContains(t, err, "no file contains data matching rule")
+
+	// Fully filtered positive: cache the zero-kept negative result as well.
+	root = NewRoot(map[string]string{"a.txt": "SECRET value"})
+	_, err = root.FileFilter("*", "regexp", params, []string{"SECRET value", "value"})
+	require.ErrorContains(t, err, "after negative filter")
+	root.SetSource(unreadableSource{paths: []string{"a.txt"}})
+	_, err = root.FileFilter("*", "regexp", params, []string{"SECRET value", "value"})
+	require.ErrorContains(t, err, "after negative filter")
 }

@@ -183,14 +183,10 @@ func cleanPatterns(patterns []string) []string {
 
 func usablePatterns(patterns []string) bool {
 	for _, expr := range patterns {
-		// The legacy multi-pattern helper omits PCRE2 existence-only entries.
-		// Keep those uncommon calls on that path rather than changing their
-		// capture/negative-filter semantics as part of a performance change.
-		if len(patterns) >= 2 {
-			if _, err := regexp.Compile(expr); err != nil {
-				return false
-			}
-		}
+		// Go's regexp rejects lookaround, backrefs and \Z, but the PCRE2 engine
+		// in regexp-utils accepts them. The pre-scan locates such a match with
+		// the same locator the legacy path used, so keep the whole search in the
+		// plan instead of rescanning it file by file outside the shared scan.
 		if !regexp_utils.NewYakRegexpUtils(expr).CanUse() {
 			return false
 		}
@@ -199,13 +195,18 @@ func usablePatterns(patterns []string) bool {
 }
 
 func directSearchKey(path string, params map[string]string, patterns []string) string {
-	// Length-safe encoding: patterns can themselves contain NULs. Negative
-	// and ordinary calls with identical arguments must not share a result.
+	return sourceSearchKey(path, sfvm.FileFilterParamOn(params, sfvm.FileFilterParamPatternNotList), patterns)
+}
+
+// sourceSearchKey identifies one content search. NotList keeps a
+// negative-filtered result apart from a plain union of the same expressions:
+// they hold different hits and must never share a cache entry.
+func sourceSearchKey(path string, notList bool, patterns []string) string {
 	key, _ := json.Marshal(struct {
 		Path     string
 		Patterns []string
 		NotList  bool
-	}{path, patterns, sfvm.FileFilterParamOn(params, sfvm.FileFilterParamPatternNotList)})
+	}{path, patterns, notList})
 	return string(key)
 }
 
