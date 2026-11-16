@@ -32,7 +32,7 @@ var attachedBrowserBridgeToolNames = []string{
 }
 
 // AttachedBrowserBridgeToolNames returns the browser-extension tools that are
-// promoted when a browser instance is active on the ReAct runtime.
+// promoted when a browser instance is bound to the ReAct session.
 func AttachedBrowserBridgeToolNames() []string {
 	return append([]string(nil), attachedBrowserBridgeToolNames...)
 }
@@ -51,10 +51,9 @@ type AttachedBrowserBinding struct {
 	Reference string
 }
 
-// BrowserAttachmentProvider exposes the browser selection active for the task
-// currently executing on a ReAct runtime.
+// BrowserAttachmentProvider exposes the current ReAct session selection.
 type BrowserAttachmentProvider interface {
-	GetActiveBrowserAttachments() []AttachedBrowserBinding
+	GetBrowserAttachments() []AttachedBrowserBinding
 }
 
 func init() {
@@ -88,8 +87,8 @@ func (d *AttachedBrowserResourceData) Unmarshal(resource *AttachedResource) erro
 }
 
 // BindLoopData is intentionally a no-op. Browser attachments are applied to
-// the owning ReAct before task initialization; the loop only consumes the
-// already-activated runtime selection.
+// the owning ReAct before task initialization; the loop only consumes session
+// state.
 func (d *AttachedBrowserResourceData) BindLoopData(ReActLoopIF) error {
 	return nil
 }
@@ -121,7 +120,7 @@ func attachedBrowserResources(task AITask, runtime AIInvokeRuntime) ([]AttachedB
 	if !ok {
 		return nil, false, nil
 	}
-	attached := provider.GetActiveBrowserAttachments()
+	attached := provider.GetBrowserAttachments()
 	resources := make([]AttachedBrowserBinding, 0, len(attached))
 	seen := make(map[string]struct{})
 	for _, resource := range attached {

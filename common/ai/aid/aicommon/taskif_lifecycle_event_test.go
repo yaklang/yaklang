@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -68,24 +67,6 @@ func TestNewSubTaskBase_SkipLifecycleEvents(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"subtask_custom_event"}, taskLifecycleNodeIDs(events))
 	require.NotEmpty(t, events[0].TaskUUID)
-}
-
-func TestNewSubTaskBaseInheritsBrowserBindings(t *testing.T) {
-	parent := NewStatefulTaskBase("browser-parent", "parent", context.Background(), nil, true)
-	parent.SetAttachedBrowserBindings([]AttachedBrowserBinding{{
-		DeviceID: "device-a", Reference: "A",
-	}})
-
-	child := NewSubTaskBase(parent, "browser-child", "child", true)
-	require.Equal(t, []AttachedBrowserBinding{{
-		DeviceID: "device-a", Reference: "A",
-	}}, child.GetAttachedBrowserBindings())
-
-	parent.SetAttachedBrowserBindings([]AttachedBrowserBinding{{
-		DeviceID: "device-b", Reference: "B",
-	}})
-	require.Equal(t, "device-a", child.GetAttachedBrowserBindings()[0].DeviceID,
-		"child browser selection must be an immutable task snapshot")
 }
 
 func taskLifecycleNodeIDs(events []*schema.AiOutputEvent) []string {

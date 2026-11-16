@@ -141,6 +141,7 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	releaseCompletion := r.beginUserTaskMemory(task)
 	defer r.memoryContinuations.Delete(task.GetId())
 	defer releaseCompletion()
+	r.prepareBrowserAttachmentContext()
 	// Recovery tasks have a different execution path: they skip the ReAct loop
 	// and directly invoke plan-and-execute with the recovery parameters.
 	if task.GetTaskKind() == aicommon.AITaskKind_Recovery {
@@ -149,7 +150,6 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	}
 	restoreExecutionPolicy := r.applyTaskExecutionPolicy(task)
 	defer restoreExecutionPolicy()
-	r.prepareBrowserAttachmentForTask(task)
 
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
@@ -252,8 +252,6 @@ func (r *ReAct) processRecoveryTask(task aicommon.AIStatefulTask) {
 			r.AddToTimeline("error", fmt.Sprintf("recovery task panic: %v", err))
 		}
 	}()
-	r.activateBrowserAttachmentForResumedTask(task)
-
 	data := task.GetRecoveryData()
 	if data == nil {
 		log.Errorf("recovery task %s has no recovery data", task.GetId())

@@ -15,7 +15,7 @@ type browserAttachmentTestInvoker struct {
 	bindings []AttachedBrowserBinding
 }
 
-func (i *browserAttachmentTestInvoker) GetActiveBrowserAttachments() []AttachedBrowserBinding {
+func (i *browserAttachmentTestInvoker) GetBrowserAttachments() []AttachedBrowserBinding {
 	return append([]AttachedBrowserBinding(nil), i.bindings...)
 }
 
