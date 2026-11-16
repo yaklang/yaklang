@@ -3,11 +3,22 @@ package pass
 import "github.com/yaklang/yaklang/common/yak/reify/core"
 
 // foldReturnTails replaces a jump to an acyclic return-only tail with an
-// explicit return. The return operand is the current rax value, so a shared
-// epilogue cannot overwrite the value of an earlier branch.
-func foldReturnTails(function *core.Function) {
+// explicit return. The return operand is the current value of the return
+// register the architecture declares, so a shared epilogue cannot overwrite the
+// value of an earlier branch.
+func foldReturnTails(function *core.Function, facts core.ArchFacts) {
 	if function == nil || len(function.Blocks) == 0 {
 		return
+	}
+	// The return register belongs to the architecture. Without it the fold has no
+	// operand to read, and the tail stays in place.
+	returnRegister := facts.Registers.Return
+	if returnRegister == "" {
+		return
+	}
+	returnBits := facts.Registers.Width
+	if returnBits == 0 {
+		returnBits = 64
 	}
 	blocks := make(map[core.BlockID]core.Block, len(function.Blocks))
 	for _, block := range function.Blocks {
@@ -39,7 +50,9 @@ func foldReturnTails(function *core.Function) {
 				result = isReturnLike(last.Targets[0])
 			}
 		case core.OpBranch:
-			if len(last.Targets) == 2 {
+			// A branch is only return-like when both arms reach a return without
+			// calling a function that may change the return value.
+			if len(last.Targets) == 2 && !blockHasReturningCall(block) {
 				result = isReturnLike(last.Targets[0]) && isReturnLike(last.Targets[1])
 			}
 		}
@@ -63,8 +76,8 @@ func foldReturnTails(function *core.Function) {
 			Kind: core.OpReturn,
 			Operands: []core.Operand{{
 				Kind: core.OperandRegister,
-				Name: "rax",
-				Type: core.ValueType{Kind: core.TypeInteger, Bits: 64},
+				Name: returnRegister,
+				Type: core.ValueType{Kind: core.TypeInteger, Bits: returnBits},
 			}},
 			Address: last.Address,
 		}
@@ -134,4 +147,4 @@ func hasBackEdge(start core.BlockID, blocks map[core.BlockID]core.Block) bool {
 }
 
 // FoldReturnTails is the exported pass entry point.
-func FoldReturnTails(function *core.Function) { foldReturnTails(function) }
+func FoldReturnTails(function *core.Function, facts core.ArchFacts) { foldReturnTails(function, facts) }

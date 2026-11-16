@@ -74,6 +74,18 @@ func isCall(op ppc64asm.Op) bool {
 	return false
 }
 
+// isPCIdiom reports whether a branch is the way position-independent code reads
+// its own address: the branch targets the instruction after it and the link
+// register receives that address. The target is not a function, so the scanner
+// must not start one there.
+func isPCIdiom(name string, address, target uint64) bool {
+	switch name {
+	case "bcl", "bcla", "bcl+":
+		return target == address+4
+	}
+	return false
+}
+
 // isReturn reports whether the instruction returns to the caller.
 func isReturn(name string) bool {
 	switch name {

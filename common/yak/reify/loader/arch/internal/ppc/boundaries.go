@@ -283,7 +283,8 @@ func (s *boundaryScanner) walkFunction(start, limit uint64) (uint64, []uint64) {
 		name := opName(inst.Op)
 		switch {
 		case isCall(inst.Op):
-			if target, ok := staticTarget(inst, address); ok {
+			target, ok := staticTarget(inst, address)
+			if ok && !isPCIdiom(name, address, target) {
 				calls = append(calls, target)
 			}
 			work = append(work, end)

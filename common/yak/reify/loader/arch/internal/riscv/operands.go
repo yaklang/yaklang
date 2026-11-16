@@ -23,7 +23,7 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		if !ok {
 			return 0, false
 		}
-		immediate, ok := signedImmediate(arguments[1])
+		immediate, ok := upperImmediate(arguments[1])
 		if !ok {
 			return 0, false
 		}
@@ -40,7 +40,7 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		if !ok {
 			return 0, false
 		}
-		immediate, ok := signedImmediate(arguments[1])
+		immediate, ok := upperImmediate(arguments[1])
 		if !ok {
 			return 0, false
 		}

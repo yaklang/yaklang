@@ -87,8 +87,8 @@ func init() {
 		RemoveFrame(function, facts)
 		return nil
 	}})
-	Register(Pass{Name: "fold-return-tails", Description: "fold acyclic return-only tails", Apply: func(function *core.Function, _ core.ArchFacts) error {
-		FoldReturnTails(function)
+	Register(Pass{Name: "fold-return-tails", Description: "fold acyclic return-only tails", Apply: func(function *core.Function, facts core.ArchFacts) error {
+		FoldReturnTails(function, facts)
 		return nil
 	}})
 	Register(Pass{Name: "drop-unreachable-blocks", Description: "remove blocks no path reaches", Apply: func(function *core.Function, _ core.ArchFacts) error {

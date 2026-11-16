@@ -479,7 +479,7 @@ func countValues(ir *core.LowIR) int {
 
 // readOnlySection reports whether a section holds constants only.
 func readOnlySection(name string) bool {
-	for _, prefix := range []string{".rodata", ".rdata", ".text", ".data.rel.ro", ".srodata", ".const", "__const", ".cstring"} {
+	for _, prefix := range []string{".rodata", ".rdata", ".text", ".data.rel.ro", ".srodata", ".const", "__const", ".cstring", ".got", ".plt", ".dynamic", ".interp"} {
 		if strings.HasPrefix(name, prefix) {
 			return true
 		}
@@ -498,6 +498,11 @@ func pointerReader(artifact *core.Artifact) func(uint64, uint16) (uint64, bool) 
 		width := int(size / 8)
 		if width != 4 && width != 8 {
 			return 0, false
+		}
+		// A relative relocation writes this slot before the program runs, and the
+		// file holds zero there. The relocated value is the one the program reads.
+		if relocation, ok := artifact.Image.RelocationAt(address); ok && relocation.Value != 0 {
+			return relocation.Value, true
 		}
 		section, ok := artifact.Image.SectionAt(address)
 		if !ok || section.VirtualAddress == 0 {
