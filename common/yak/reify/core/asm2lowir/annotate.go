@@ -112,6 +112,27 @@ func constantFromDefinitions(definitions map[core.ValueID]core.Instruction, id c
 }
 
 func functionSymbol(a *core.Artifact, address uint64) string {
+	// A PowerPC ELFv1 call reaches the function descriptor; the code address it
+	// holds is what the symbol names.
+	if a != nil && a.Hints != nil {
+		if code, ok := a.Hints.OpdDescriptors[address]; ok {
+			if name := symbolNameAt(a, code); name != "" {
+				return name
+			}
+		}
+	}
+	// A local call on PowerPC ELFv2 targets the local entry point, which sits a
+	// fixed distance past the symbol.
+	if a != nil && a.Hints != nil && a.Hints.LocalEntryOffset > 0 && address > a.Hints.LocalEntryOffset {
+		if name := symbolNameAt(a, address-a.Hints.LocalEntryOffset); name != "" {
+			return name
+		}
+	}
+	return symbolNameAt(a, address)
+}
+
+// symbolNameAt returns the function name defined exactly at one address.
+func symbolNameAt(a *core.Artifact, address uint64) string {
 	if a == nil || a.Image == nil {
 		return ""
 	}

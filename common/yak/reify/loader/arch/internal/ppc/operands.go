@@ -177,6 +177,8 @@ func (l *lifter) compare(ins instruction, name string) (core.ValueID, bool) {
 		symbolOperand("flags." + name), l.value(left), l.value(right),
 	}, 32, core.EffectWriteRegister)
 	l.writeRegister(ins.address, fieldName, 32, result)
+	l.flagsValue = result
+	l.hasFlagsValue = true
 	return result, true
 }
 
@@ -247,10 +249,26 @@ func (l *lifter) branch(ins instruction) {
 	if block, ok := l.blockIDs[next]; ok && !containsBlock(targets, block) {
 		targets = append(targets, block)
 	}
+	// A branch names the condition register bit it tests. Without that bit the
+	// condition reads as the whole compare result, which is what the lifted value
+	// carries anyway.
+	symbol := "ppc.branch." + name
+	if cc, ok := branchConditionCode(ins); ok {
+		symbol = core.ConditionIntrinsicPrefix + cc
+	}
 	condition := l.newValue(core.TypeInteger, 1)
+	// Name the comparison itself when this block made one. The condition register
+	// read loses the comparison once the value crosses a block boundary, so it is
+	// only the fallback.
+	var flags core.ValueID
+	if l.hasFlagsValue {
+		flags = l.flagsValue
+	} else {
+		flags = l.readRegister(ins.address, "cr0", 32)
+	}
 	l.emit(core.OpIntrinsic, []core.Operand{
-		symbolOperand("ppc.branch." + name),
-		l.value(l.readRegister(ins.address, "cr0", 32)),
+		symbolOperand(symbol),
+		l.value(flags),
 	}, []core.Value{condition}, nil, core.EffectReadRegister|core.EffectUnknown, ins.address)
 	effects := core.EffectNone
 	if len(targets) == 0 {
@@ -644,4 +662,44 @@ func hasUpdate(op ppc64asm.Op) bool {
 	name := opName(op)
 	return len(name) > 2 && name[len(name)-1] == 'u' &&
 		(strings.HasPrefix(name, "st") || strings.HasPrefix(name, "l"))
+}
+
+// branchConditionCode returns the comparison a branch tests, as the neutral
+// condition code the SSA layer understands. The branch operand names the bit it
+// tests and whether it branches on the bit or against it, so the mnemonic alias
+// is not needed.
+func branchConditionCode(ins instruction) (string, bool) {
+	arguments := args(ins)
+	if len(arguments) < 2 {
+		return "", false
+	}
+	options, optionsOK := arguments[0].(ppc64asm.Imm)
+	field, fieldOK := arguments[1].(ppc64asm.CondReg)
+	if !optionsOK || !fieldOK {
+		return "", false
+	}
+	// An options word without bit three takes the branch when the tested bit is
+	// clear; with the bit, when it is set.
+	if uint32(options)&0x10 != 0 && uint32(options)&0x08 == 0 {
+		return "", false
+	}
+	negated := uint32(options)&0x08 == 0
+	switch (int(field) - 1) % 4 {
+	case 2:
+		if negated {
+			return "ne", true
+		}
+		return "eq", true
+	case 0:
+		if negated {
+			return "ge", true
+		}
+		return "lt", true
+	case 1:
+		if negated {
+			return "le", true
+		}
+		return "gt", true
+	}
+	return "", false
 }

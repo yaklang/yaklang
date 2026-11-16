@@ -416,7 +416,7 @@
       "function sub_0x2300 @ 0x2300",
       "block b1 @ 0x2300",
       "  0x2300  v2:i32 = read_register %cr0 [read_register]",
-      "  0x2300  v1:i1 = intrinsic @ppc.branch.bc, v2 [read_register, unknown]",
+      "  0x2300  v1:i1 = intrinsic @cond.eq, v2 [read_register, unknown]",
       "  0x2300  branch v1 -> b1"
     ]
   },
@@ -431,7 +431,7 @@
       "function sub_0x2400 @ 0x2400",
       "block b1 @ 0x2400",
       "  0x2400  v2:i32 = read_register %cr0 [read_register]",
-      "  0x2400  v1:i1 = intrinsic @ppc.branch.bc, v2 [read_register, unknown]",
+      "  0x2400  v1:i1 = intrinsic @cond.ne, v2 [read_register, unknown]",
       "  0x2400  branch v1 -> b1"
     ]
   },

@@ -895,7 +895,8 @@ func (c *converter) conditionValue(cc string, instruction core.Instruction) ssa.
 		return nil
 	}
 	switch info.name {
-	case "cmp", "cmn":
+	case "cmp", "cmn", "cmpwi", "cmpdi", "cmplwi", "cmpldi",
+		"cmpw", "cmpd", "cmplw", "cmpld":
 		if len(info.operands) < 2 {
 			return nil
 		}

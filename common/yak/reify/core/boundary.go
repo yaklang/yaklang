@@ -48,6 +48,13 @@ type BoundaryHints struct {
 	// ExecSections lists file-backed executable ranges in image addresses.
 	ExecSections []Region
 
+	// OpdDescriptors maps a PowerPC ELFv1 function descriptor to the code address
+	// it holds. A call reaches the descriptor, and the symbol names the code.
+	OpdDescriptors map[uint64]uint64
+	// LocalEntryOffset is the distance from a function symbol to the entry a
+	// local call targets. PowerPC ELFv2 places it eight bytes after the global
+	// entry, past the code that computes the table of contents.
+	LocalEntryOffset uint64
 	// FunctionStarts lists exact function entry addresses from format metadata
 	// (Mach-O LC_FUNCTION_STARTS, PE exports/exception data).
 	FunctionStarts []uint64

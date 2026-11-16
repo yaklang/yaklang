@@ -91,6 +91,10 @@ func init() {
 		FoldReturnTails(function)
 		return nil
 	}})
+	Register(Pass{Name: "drop-unreachable-blocks", Description: "remove blocks no path reaches", Apply: func(function *core.Function, _ core.ArchFacts) error {
+		DropUnreachable(function)
+		return nil
+	}})
 	Register(Pass{Name: "reverse-postorder", Description: "order blocks for loop construction", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		ReorderReversePostorder(function)
 		return nil
@@ -99,5 +103,5 @@ func init() {
 
 // DefaultNames returns the default LowIR pass pipeline.
 func DefaultNames() []string {
-	return []string{"fold-constants", "remove-canary", "duplicate-return-blocks", "remove-stackframe", "fold-return-tails", "reverse-postorder"}
+	return []string{"fold-constants", "remove-canary", "duplicate-return-blocks", "remove-stackframe", "fold-return-tails", "drop-unreachable-blocks", "reverse-postorder"}
 }
