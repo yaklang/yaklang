@@ -90,6 +90,36 @@ func TestSetAndGetAIGlobalConfig(t *testing.T) {
 	assert.Len(t, providers, 2)
 }
 
+func TestDownloadedModelHeadersSurviveAccountReplacement(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	for _, user := range []string{"alice.zh", "bob.zh"} {
+		config := &ypb.AIGlobalConfig{Enabled: true, IntelligentModels: []*ypb.AIModelConfig{{
+			ModelName: "enterprise-model", IsOnline: true,
+			Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "fixture", Headers: []*ypb.KVPair{
+				{Key: "agile-user-id", Value: user}, {Key: "X-Static", Value: "keep"},
+			}},
+		}}}
+		_, err := SetAIGlobalConfig(db, config)
+		require.NoError(t, err)
+		loaded, err := GetAIGlobalConfig(db)
+		require.NoError(t, err)
+		require.True(t, loaded.IntelligentModels[0].IsOnline)
+		require.Equal(t, user, loaded.IntelligentModels[0].Provider.Headers[0].Value)
+		require.NoError(t, ApplyAIGlobalConfig(db, loaded))
+		runtime := consts.GetTieredAIConfig().IntelligentConfigs[0]
+		require.Equal(t, user, runtime.Provider.Headers[0].Value)
+		loaded.IntelligentModels[0].Provider.Headers[0].Value = "mutated"
+		require.Equal(t, user, runtime.Provider.Headers[0].Value, "runtime must own its provider snapshot")
+	}
+	_, err := SetAIGlobalConfig(db, &ypb.AIGlobalConfig{Enabled: true})
+	require.NoError(t, err)
+	loaded, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Empty(t, loaded.IntelligentModels)
+	require.NoError(t, ApplyAIGlobalConfig(db, loaded))
+	require.Empty(t, consts.GetTieredAIConfig().IntelligentConfigs)
+}
+
 func TestGetAIGlobalConfig_MigratesLegacyBaseURL(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
 	defer db.Close()
