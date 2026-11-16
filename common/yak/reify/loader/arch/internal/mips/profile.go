@@ -66,6 +66,9 @@ func (p Profile) Registers() core.RegisterModel {
 		Arguments:           []string{"a0", "a1", "a2", "a3"},
 		GlobalPointer:       "gp",
 		GlobalPointerSymbol: "_gp",
-		Return:              "v0",
+		// A position-independent function receives its own address in t9 and
+		// computes gp from it.
+		EntryAddress: "t9",
+		Return:       "v0",
 	}
 }

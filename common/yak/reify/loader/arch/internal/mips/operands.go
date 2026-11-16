@@ -268,7 +268,9 @@ func isFloatOpcode(name string) bool {
 // call lifts JAL and JALR. The return address goes to the link register.
 func (l *lifter) call(ins instruction) {
 	name := ins.op
-	if name == "jal" {
+	// BAL is the always-taken form of BGEZAL: it carries an immediate target and
+	// writes the link register, so it is a call and not an indirect one.
+	if name == "jal" || name == "bal" {
 		target, _ := branchTarget(ins)
 		l.emit(core.OpCall, []core.Operand{pointerOperand(target, l.profile.Bits)}, nil, nil,
 			core.EffectCall|core.EffectMayTrap|core.EffectUnknown, ins.address)

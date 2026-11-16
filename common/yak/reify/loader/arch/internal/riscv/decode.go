@@ -84,14 +84,30 @@ func decodeInstructions(ctx context.Context, profile Profile, request core.Parse
 			diagnostics.add("decode-error", fmt.Sprintf("short instruction at 0x%x", address))
 			break
 		}
-		inst, decodeErr := riscv64asm.Decode(code[:n])
+		var inst riscv64asm.Inst
+		var decodeErr error
+		if profile.Bits == 32 {
+			// C.JAL exists on RV32 only; the RV64 decoder reads the same halfword
+			// as an add-immediate-word, or rejects it outright.
+			if jal, ok := compressedJAL(code[:2]); ok {
+				inst, decodeErr = jal, nil
+			}
+		}
+		if decodeErr == nil && inst.Len <= 0 {
+			inst, decodeErr = riscv64asm.Decode(code[:n])
+		}
 		if decodeErr != nil || inst.Len <= 0 {
-			// A rejected word is data inside the code region: padding, a
-			// literal pool or an unsupported extension.
-			result = append(result, instruction{address: address, raw: binary.LittleEndian.Uint32(code[:]), size: 4, undefined: true})
-			undecodable.Add(address, 4)
-			offset += 4
-			address += 4
+			// A rejected word is data inside the code region: padding, a literal
+			// pool or an unsupported extension. Its length still follows the
+			// encoding: the low two bits are 11 only for a four-byte instruction.
+			size := 4
+			if code[0]&0x3 != 0x3 {
+				size = 2
+			}
+			result = append(result, instruction{address: address, raw: binary.LittleEndian.Uint32(code[:]), size: size, undefined: true})
+			undecodable.Add(address, size)
+			offset += int64(size)
+			address += uint64(size)
 			continue
 		}
 		raw := binary.LittleEndian.Uint32(code[:])
@@ -142,4 +158,35 @@ func buildFunctions(profile Profile, decoded []instruction, start, end uint64, d
 		blockIDs[blocks[index].start] = core.BlockID(index + 1)
 	}
 	return []function{{start: blocks[0].start, blocks: blocks}}, blockIDs
+}
+
+// compressedJAL decodes the RV32 C.JAL form, which the RV64 decoder maps to a
+// different instruction. The immediate uses the C.J layout, and the form always
+// links through x1.
+func compressedJAL(code []byte) (riscv64asm.Inst, bool) {
+	if len(code) < 2 {
+		return riscv64asm.Inst{}, false
+	}
+	half := binary.LittleEndian.Uint16(code)
+	if half&0xe003 != 0x2001 {
+		return riscv64asm.Inst{}, false
+	}
+	// The immediate is reordered across the halfword; reassemble it in the order
+	// the JAL argument expects.
+	offset := int32(0)
+	offset |= int32((half>>12)&1) << 11
+	offset |= int32((half>>11)&1) << 4
+	offset |= int32((half>>9)&0x3) << 8
+	offset |= int32((half>>8)&1) << 10
+	offset |= int32((half>>7)&1) << 6
+	offset |= int32((half>>6)&1) << 7
+	offset |= int32((half>>3)&0x7) << 1
+	offset |= int32((half>>2)&1) << 5
+	// Sign-extend from bit eleven.
+	offset = (offset << 20) >> 20
+	return riscv64asm.Inst{
+		Op:   riscv64asm.JAL,
+		Args: riscv64asm.Args{riscv64asm.Reg(1), riscv64asm.Simm{Imm: offset, Width: 12}},
+		Len:  2,
+	}, true
 }
