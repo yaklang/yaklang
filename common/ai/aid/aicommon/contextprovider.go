@@ -257,8 +257,10 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 // FileContentContextProvider retains one bounded preview and a readable full-content
 // file across prompt refreshes and inherited task contexts.
 func FileContentContextProvider(content string, userPrompt ...string) ContextProvider {
-	resource := &AttachedFileContentResourceData{}
-	_ = resource.Unmarshal(NewAttachedResource(CONTEXT_PROVIDER_TYPE_FILE, CONTEXT_PROVIDER_KEY_FILE_CONTENT, content))
+	resource := &AttachedFileContentResourceData{
+		Key:     CONTEXT_PROVIDER_KEY_FILE_CONTENT,
+		content: content,
+	}
 	return func(config AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
 		rendered, err := resource.render(emitter)
 		if err != nil {

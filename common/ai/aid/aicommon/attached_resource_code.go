@@ -11,7 +11,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeCode,
-		func() AttachedResourceData { return NewAttachedCodeResourceData("") },
+		newAttachedCodeResourceData,
 	)
 }
 
@@ -32,17 +32,23 @@ func (d *AttachedCodeResourceData) Type() string {
 	return AttachedResourceTypeCode
 }
 
-func (d *AttachedCodeResourceData) Unmarshal(resource *AttachedResource) error {
-	d.Key = resource.Key
+func (d *AttachedCodeResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), d.Key, d.Path)
+}
+
+func newAttachedCodeResourceData(resource *AttachedResource) (AttachedResourceData, error) {
 	path := strings.TrimSpace(resource.Value)
 	if path == "" {
-		return utils.Error("attached code path is empty")
+		return nil, utils.Error("attached code path is empty")
 	}
-	d.Path = filepath.Clean(path)
-	if d.Key == "" {
-		d.Key = CONTEXT_PROVIDER_KEY_FILE_PATH
+	key := resource.Key
+	if key == "" {
+		key = CONTEXT_PROVIDER_KEY_FILE_PATH
 	}
-	return nil
+	return &AttachedCodeResourceData{
+		Key:  key,
+		Path: filepath.Clean(path),
+	}, nil
 }
 
 func (d *AttachedCodeResourceData) BindLoopData(reactloop ReActLoopIF) error {

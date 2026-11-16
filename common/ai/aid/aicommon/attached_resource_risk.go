@@ -12,7 +12,7 @@ import (
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeRisk,
-		func() AttachedResourceData { return &AttachedRiskResourceData{} },
+		newAttachedRiskResourceData,
 	)
 }
 
@@ -27,31 +27,35 @@ func (d *AttachedRiskResourceData) Type() string {
 	return AttachedResourceTypeRisk
 }
 
-func (d *AttachedRiskResourceData) Unmarshal(resource *AttachedResource) error {
+func (d *AttachedRiskResourceData) DedupKey() string {
+	return attachedResourceDedupKey(d.Type(), fmt.Sprint(d.IDs))
+}
+
+func newAttachedRiskResourceData(resource *AttachedResource) (AttachedResourceData, error) {
 	raw := strings.TrimSpace(resource.Value)
 	if raw == "" {
-		return utils.Error("attached risk IDs are empty")
+		return nil, utils.Error("attached risk IDs are empty")
 	}
 	if !strings.HasPrefix(raw, "[") {
-		return utils.Error("attached risk value must be a JSON array of positive risk IDs")
+		return nil, utils.Error("attached risk value must be a JSON array of positive risk IDs")
 	}
 
 	var ids []int64
 	if err := json.Unmarshal([]byte(raw), &ids); err != nil {
-		return fmt.Errorf("parse attached risk IDs: %w", err)
+		return nil, fmt.Errorf("parse attached risk IDs: %w", err)
 	}
 	if len(ids) == 0 {
-		return utils.Error("attached risk ID list is empty")
+		return nil, utils.Error("attached risk ID list is empty")
 	}
 	if len(ids) > AttachedRiskResourceMaxIDs {
-		return fmt.Errorf("attached risk ID count %d exceeds limit %d", len(ids), AttachedRiskResourceMaxIDs)
+		return nil, fmt.Errorf("attached risk ID count %d exceeds limit %d", len(ids), AttachedRiskResourceMaxIDs)
 	}
 
 	seen := make(map[int64]struct{}, len(ids))
 	normalized := make([]int64, 0, len(ids))
 	for _, id := range ids {
 		if id <= 0 {
-			return fmt.Errorf("attached risk ID must be positive: %d", id)
+			return nil, fmt.Errorf("attached risk ID must be positive: %d", id)
 		}
 		if _, ok := seen[id]; ok {
 			continue
@@ -59,8 +63,7 @@ func (d *AttachedRiskResourceData) Unmarshal(resource *AttachedResource) error {
 		seen[id] = struct{}{}
 		normalized = append(normalized, id)
 	}
-	d.IDs = normalized
-	return nil
+	return &AttachedRiskResourceData{IDs: normalized}, nil
 }
 
 func (d *AttachedRiskResourceData) BindLoopData(ReActLoopIF) error {

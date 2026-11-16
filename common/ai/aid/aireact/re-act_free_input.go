@@ -251,20 +251,10 @@ func normalizeInputAttachments(event *ypb.AIInputEvent) ([]*aicommon.AttachedRes
 		return resources, control
 	}
 
-	seen := make(map[string]struct{})
 	appendResource := func(resource *aicommon.AttachedResource) {
 		if resource == nil {
 			return
 		}
-		value := strings.TrimSpace(resource.Value)
-		if resource.HasType(aicommon.AttachedResourceTypeFile) && resource.HasKey(aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT) {
-			value = resource.Value
-		}
-		key := resource.NormalizedType() + "\x00" + strings.TrimSpace(resource.Key) + "\x00" + value
-		if _, ok := seen[key]; ok {
-			return
-		}
-		seen[key] = struct{}{}
 		resources = append(resources, resource)
 	}
 

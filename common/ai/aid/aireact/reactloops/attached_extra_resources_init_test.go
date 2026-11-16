@@ -31,8 +31,18 @@ func (i *timelineWritingInvoker) GetBrowserAttachments() []aicommon.AttachedBrow
 	return i.browserBindings
 }
 
-func (i *timelineWritingInvoker) SetBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
-	i.browserBindings = bindings
+func (i *timelineWritingInvoker) AddBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
+	seen := make(map[string]struct{}, len(i.browserBindings))
+	for _, binding := range i.browserBindings {
+		seen[binding.DeviceID] = struct{}{}
+	}
+	for _, binding := range bindings {
+		if _, exists := seen[binding.DeviceID]; exists {
+			continue
+		}
+		seen[binding.DeviceID] = struct{}{}
+		i.browserBindings = append(i.browserBindings, binding)
+	}
 }
 
 func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
@@ -67,6 +77,11 @@ func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
 			aicommon.AttachedResourceTypeBrowser,
 			aicommon.AttachedResourceKeyBrowserDevice,
 			`{"deviceId":"device-b","reference":"B"}`,
+		),
+		aicommon.NewAttachedResource(
+			aicommon.AttachedResourceTypeBrowser,
+			aicommon.AttachedResourceKeyBrowserDevice,
+			`{"deviceId":"device-a","reference":"A2"}`,
 		),
 	})
 	loop.SetCurrentTask(task)
