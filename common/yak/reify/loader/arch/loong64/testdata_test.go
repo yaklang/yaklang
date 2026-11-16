@@ -138,8 +138,8 @@ func TestLiftArithmetic(t *testing.T) {
 
 // TestBranchTarget checks the PC-relative offset, which is a byte count.
 func TestBranchTarget(t *testing.T) {
-	// b .+0x10 : the offset occupies the low sixteen bits of the immediate, and
-	// the library reports them shifted left by sixteen.
+	// b .+0x10 : the decoder reports this form scaled by sixty-four kilobytes,
+	// while the call forms report bytes directly.
 	code := regionBytes(t, 0x50000004)
 	reader, _ := core.NewByteReader("test", bytes.NewReader(code), int64(len(code)))
 	decoded, err := decodeInstructions(context.Background(),

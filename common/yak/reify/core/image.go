@@ -54,6 +54,19 @@ func (i *Image) SectionAt(address uint64) (*Section, bool) {
 	return nil, false
 }
 
+// SymbolByName returns the first symbol with this name.
+func (i *Image) SymbolByName(name string) (symbol.Symbol, bool) {
+	if i == nil || name == "" {
+		return symbol.Symbol{}, false
+	}
+	for _, entry := range i.Symbols {
+		if entry.Name == name {
+			return entry, true
+		}
+	}
+	return symbol.Symbol{}, false
+}
+
 // SymbolAt returns the symbol at address.
 func (i *Image) SymbolAt(address uint64) (symbol.Symbol, bool) {
 	if i == nil {

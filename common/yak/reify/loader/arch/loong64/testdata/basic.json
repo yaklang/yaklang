@@ -385,7 +385,7 @@
       "  0x2600  v1:i64 = read_register %r4 [read_register]",
       "  0x2600  v2:i64 = read_register %r5 [read_register]",
       "  0x2600  v3:i1 = eq v1, v2",
-      "  0x2600  branch v3 -\u003e b1"
+      "  0x2600  branch v3 [unknown]"
     ]
   },
   {
@@ -402,7 +402,7 @@
       "  0x2700  v2:i64 = read_register %r5 [read_register]",
       "  0x2700  v3:i1 = eq v1, v2",
       "  0x2700  v4:i1 = not v3",
-      "  0x2700  branch v4 -\u003e b1"
+      "  0x2700  branch v4 [unknown]"
     ]
   },
   {

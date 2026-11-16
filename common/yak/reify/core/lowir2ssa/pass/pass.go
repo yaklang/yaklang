@@ -75,6 +75,10 @@ func init() {
 		RemoveStackCanary(function, facts)
 		return nil
 	}})
+	Register(Pass{Name: "fold-constants", Description: "fold arithmetic on constants", Apply: func(function *core.Function, _ core.ArchFacts) error {
+		FoldConstants(function)
+		return nil
+	}})
 	Register(Pass{Name: "duplicate-return-blocks", Description: "duplicate shared return epilogues", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		DuplicateReturnBlocks(function)
 		return nil
@@ -95,5 +99,5 @@ func init() {
 
 // DefaultNames returns the default LowIR pass pipeline.
 func DefaultNames() []string {
-	return []string{"remove-canary", "duplicate-return-blocks", "remove-stackframe", "fold-return-tails", "reverse-postorder"}
+	return []string{"fold-constants", "remove-canary", "duplicate-return-blocks", "remove-stackframe", "fold-return-tails", "reverse-postorder"}
 }

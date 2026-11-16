@@ -84,6 +84,22 @@ type RegisterModel struct {
 	Arguments []string `json:"arguments,omitempty"`
 	// Return names the register that carries a scalar result.
 	Return string `json:"return,omitempty"`
+	// StackArguments reports that the caller places its arguments on the stack
+	// instead of in registers, as the 32-bit x86 cdecl convention does.
+	StackArguments bool `json:"stack_arguments,omitempty"`
+	// EntryAddress names a register that holds the address of the function when it
+	// starts. PowerPC ELFv2 passes it in r12, and the callee computes its TOC from
+	// that value.
+	EntryAddress string `json:"entry_address,omitempty"`
+	// GlobalPointer names the register a target uses to reach a table of global
+	// addresses: r2 on PowerPC, gp on MIPS and RISC-V.
+	GlobalPointer string `json:"global_pointer,omitempty"`
+	// GlobalPointerSymbol names the symbol that holds the base address the
+	// global pointer register carries at runtime.
+	GlobalPointerSymbol string `json:"global_pointer_symbol,omitempty"`
+	// GlobalPointerAddress is the resolved base address, filled by the loader
+	// stage from GlobalPointerSymbol. It is not part of the text form.
+	GlobalPointerAddress uint64 `json:"-"`
 }
 
 // ArchFacts carries the architecture facts a LowIR pass reads. A parser fills

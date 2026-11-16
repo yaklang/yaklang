@@ -61,9 +61,11 @@ func (p Profile) Frame() core.FrameModel {
 // Registers describes register naming and the integer argument registers.
 func (p Profile) Registers() core.RegisterModel {
 	return core.RegisterModel{
-		Naming:    core.RegisterNamingPlain,
-		Width:     p.Bits,
-		Arguments: []string{"x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17"},
-		Return:    "x10",
+		Naming:              core.RegisterNamingPlain,
+		Width:               p.Bits,
+		Arguments:           []string{"x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17"},
+		GlobalPointer:       "x3",
+		GlobalPointerSymbol: "__global_pointer$",
+		Return:              "x10",
 	}
 }

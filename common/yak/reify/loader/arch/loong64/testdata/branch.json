@@ -1,0 +1,19 @@
+[
+  {
+    "name": "branch offset is a byte displacement",
+    "address": "0x1000",
+    "code": [
+      "00 04 00 54 // bl 0x1004",
+      "20 00 00 4c // ret"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  call 0x1004 [call, may_trap, unknown]",
+      "  0x1004  jump -> b2",
+      "block b2 @ 0x1004",
+      "  0x1004  return [may_trap, unknown]"
+    ]
+  }
+]

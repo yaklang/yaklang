@@ -61,9 +61,11 @@ func (p Profile) Frame() core.FrameModel {
 // Registers describes register naming and the O32/N64 argument registers.
 func (p Profile) Registers() core.RegisterModel {
 	return core.RegisterModel{
-		Naming:    core.RegisterNamingPlain,
-		Width:     p.Bits,
-		Arguments: []string{"a0", "a1", "a2", "a3"},
-		Return:    "v0",
+		Naming:              core.RegisterNamingPlain,
+		Width:               p.Bits,
+		Arguments:           []string{"a0", "a1", "a2", "a3"},
+		GlobalPointer:       "gp",
+		GlobalPointerSymbol: "_gp",
+		Return:              "v0",
 	}
 }

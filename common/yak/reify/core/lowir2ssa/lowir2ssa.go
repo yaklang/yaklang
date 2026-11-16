@@ -71,6 +71,8 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 		ctx:         ctx,
 		program:     program,
 		facts:       ir.Facts(),
+		frameValues: make(map[ssa.Value]bool),
+		spDerived:   make(map[ssa.Value]bool),
 		diagnostics: make([]core.Diagnostic, 0),
 	}
 	for index := range ir.Functions {
@@ -129,9 +131,21 @@ type converter struct {
 	types       map[core.ValueType]ssa.Type
 	undefined   map[string]ssa.Value
 	facts       core.ArchFacts
+	// stackStores collects the values a cdecl caller stores for its arguments.
+	stackStores []ssa.Value
+	// frameValues marks the values read from a frame register, which a prologue
+	// saves but never passes as an argument.
+	frameValues map[ssa.Value]bool
+	// spDerived marks the values computed from the stack pointer. A cdecl
+	// argument area is the only thing a caller stores through that chain.
+	spDerived map[ssa.Value]bool
+	// sourceFunction is the LowIR function being converted. A few entry values are
+	// derived from its address.
+	sourceFunction core.Function
 }
 
 func (c *converter) convertFunction(function core.Function) error {
+	c.sourceFunction = function
 	name := functionName(function)
 	ssaFunction := c.program.NewFunction(name)
 	metadata := ""
@@ -297,6 +311,22 @@ func (c *converter) bindParameters() {
 		parameter.SetType(c.typeFor(integerType(64)))
 		c.assignRegister(name, parameter)
 	}
+	// A function may know its own address at entry. Binding it lets a PowerPC
+	// callee compute its TOC pointer, which is what turns a TOC-relative access
+	// into a named literal.
+	if name := c.facts.Registers.EntryAddress; name != "" {
+		if value := c.builder.EmitConstInst(int64(c.sourceFunction.Address)); value != nil {
+			c.assignRegister(name, value)
+		}
+	}
+	// A global pointer register carries a base address the loader resolved. Binding
+	// it turns an indirect access into an address the renderer can name.
+	if name := c.facts.Registers.GlobalPointer; name != "" && c.facts.Registers.GlobalPointerAddress != 0 {
+		if value := c.builder.EmitConstInst(int64(c.facts.Registers.GlobalPointerAddress)); value != nil {
+			value.SetType(c.typeFor(core.ValueType{Kind: core.TypePointer, Bits: c.facts.Registers.Width}))
+			c.assignRegister(name, value)
+		}
+	}
 	for index, name := range c.argumentRegisters() {
 		parameter := ssa.NewParam(fmt.Sprintf("arg%d", index), false, c.builder)
 		if parameter == nil {
@@ -399,6 +429,7 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpLoad:
 		c.emitLoad(instruction)
 	case core.OpStore:
+		c.rememberStackStore(instruction)
 		c.emitStore(instruction)
 	case core.OpCall:
 		c.emitCall(instruction)
@@ -407,6 +438,7 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpZeroExtend, core.OpSignExtend, core.OpTruncate:
 		c.emitWidthCast(instruction)
 	case core.OpJump:
+		c.stackStores = c.stackStores[:0]
 		c.emitJump(instruction)
 	case core.OpBranch:
 		c.emitBranch(instruction)
@@ -435,7 +467,7 @@ func (c *converter) emitBinary(instruction core.Instruction, op ssa.BinaryOpcode
 		c.setResult(instruction, c.opaqueValue(string(instruction.Kind), instruction))
 		return
 	}
-	c.setResult(instruction, c.builder.EmitBinOp(op, values[0], values[1]))
+	c.setResult(instruction, c.emitBinOp(op, values[0], values[1]))
 }
 
 func (c *converter) emitUnary(instruction core.Instruction, op ssa.UnaryOpcode) {
@@ -466,6 +498,14 @@ func (c *converter) emitRegisterRead(instruction core.Instruction) {
 	if value == nil {
 		c.setResult(instruction, c.opaqueValue("read_register", instruction))
 		return
+	}
+	if c.isFrameRegister(view.canonical) {
+		// Saving the frame pointer or the return address is not an argument, so
+		// a later cdecl call must not treat the store as one.
+		c.frameValues[value] = true
+	}
+	if view.canonical == c.registerView(c.facts.Frame.StackPointer, 0).canonical {
+		c.spDerived[value] = true
 	}
 	if view.narrow() {
 		value = c.extractRegister(value, view)
@@ -515,7 +555,7 @@ func (c *converter) emitRegisterWrite(instruction core.Instruction) {
 		c.addDiagnostic("lowir2ssa-assignment", fmt.Sprintf("cannot assign %s: %v", view.canonical, err))
 	}
 	c.markHeaderStore("reg:" + view.canonical)
-	if argumentRegister(view.canonical) {
+	if c.isArgumentRegister(view.canonical) {
 		c.arguments[view.canonical] = true
 	}
 }
@@ -633,7 +673,7 @@ func (c *converter) undefinedValue(name string) ssa.Value {
 }
 
 func (c *converter) typedBinOp(op ssa.BinaryOpcode, left, right ssa.Value, valueType core.ValueType) ssa.Value {
-	value := c.builder.EmitBinOp(op, left, right)
+	value := c.emitBinOp(op, left, right)
 	if value != nil {
 		value.SetType(c.typeFor(valueType))
 	}
@@ -689,6 +729,12 @@ func (c *converter) emitCall(instruction core.Instruction) {
 	}
 	args := c.operandValues(instruction.Operands[1:])
 	args = append(args, c.captureArguments()...)
+	if c.facts.Registers.StackArguments {
+		// The arguments are the values the caller stored just before the call,
+		// last store first.
+		args = append(args, c.stackArguments()...)
+		c.stackStores = c.stackStores[:0]
+	}
 	call := c.builder.EmitCall(c.builder.NewCall(target, args))
 	if call == nil {
 		// The builder refuses a call in some malformed states. Keep the
@@ -708,6 +754,24 @@ func (c *converter) emitCall(instruction core.Instruction) {
 // captureArguments reads the System V AMD64 integer argument registers that
 // were written since the previous call. Registers above the highest written
 // slot are omitted; missing lower slots become undefined arguments.
+// stackArguments returns the values of the stack stores that precede a call, in
+// argument order. A caller that pushes b then a passes a as the first argument,
+// so the last store comes first.
+func (c *converter) stackArguments() []ssa.Value {
+	if len(c.stackStores) == 0 {
+		return nil
+	}
+	limit := len(c.stackStores)
+	if limit > 6 {
+		limit = 6
+	}
+	args := make([]ssa.Value, 0, limit)
+	for index := 0; index < limit; index++ {
+		args = append(args, c.stackStores[len(c.stackStores)-1-index])
+	}
+	return args
+}
+
 func (c *converter) captureArguments() []ssa.Value {
 	names := c.argumentRegisters()
 	last := -1
@@ -728,13 +792,17 @@ func (c *converter) captureArguments() []ssa.Value {
 	return args
 }
 
-func argumentRegister(name string) bool {
-	switch name {
-	case "rdi", "rsi", "rdx", "rcx", "r8", "r9", "r0", "r1", "r2", "r3":
-		return true
+// isArgumentRegister reports whether one register carries a call argument. The
+// list comes from the ABI facts, so a target whose argument registers are not
+// r0..r3 and rdi..r9 still captures them.
+func (c *converter) isArgumentRegister(name string) bool {
+	if name == "" {
+		return false
 	}
-	if len(name) == 2 && name[0] == 'x' && name[1] >= '0' && name[1] <= '7' {
-		return true
+	for _, candidate := range c.argumentRegisters() {
+		if c.registerView(candidate, 0).canonical == name {
+			return true
+		}
 	}
 	return false
 }
@@ -853,6 +921,85 @@ func (c *converter) conditionValue(cc string, instruction core.Instruction) ssa.
 		}
 		return c.zeroCondition(cc, subject)
 	}
+}
+
+// emitBinOp emits one binary operation, folding it when both operands are
+// already constants. A target writes an address in pieces, and some of those
+// pieces only become constant after the entry registers are bound; folding here
+// is what collapses the chain into one address the renderer can name.
+func (c *converter) emitBinOp(op ssa.BinaryOpcode, left, right ssa.Value) ssa.Value {
+	if value, ok := c.foldBinOp(op, left, right); ok {
+		return value
+	}
+	return c.builder.EmitBinOp(op, left, right)
+}
+
+// foldBinOp computes one operation on two constant operands.
+func (c *converter) foldBinOp(op ssa.BinaryOpcode, left, right ssa.Value) (ssa.Value, bool) {
+	leftConstant, ok := ssa.ToConstInst(left)
+	if !ok {
+		return nil, false
+	}
+	rightConstant, ok := ssa.ToConstInst(right)
+	if !ok {
+		return nil, false
+	}
+	a, ok := constInteger(leftConstant)
+	if !ok {
+		return nil, false
+	}
+	b, ok := constInteger(rightConstant)
+	if !ok {
+		return nil, false
+	}
+	var result int64
+	switch op {
+	case ssa.OpAdd:
+		result = a + b
+	case ssa.OpSub:
+		result = a - b
+	case ssa.OpMul:
+		result = a * b
+	case ssa.OpAnd:
+		result = a & b
+	case ssa.OpOr:
+		result = a | b
+	case ssa.OpXor:
+		result = a ^ b
+	case ssa.OpShl:
+		if b < 0 || b >= 64 {
+			return nil, false
+		}
+		result = a << uint(b)
+	case ssa.OpShr:
+		if b < 0 || b >= 64 {
+			return nil, false
+		}
+		result = int64(uint64(a) >> uint(b))
+	default:
+		return nil, false
+	}
+	value := c.builder.EmitConstInst(result)
+	if value == nil {
+		return nil, false
+	}
+	if left != nil {
+		value.SetType(left.GetType())
+	}
+	return value, true
+}
+
+// constInteger reads the integer payload of one constant.
+func constInteger(constant *ssa.ConstInst) (int64, bool) {
+	switch value := constant.GetRawValue().(type) {
+	case int64:
+		return value, true
+	case int:
+		return int64(value), true
+	case uint64:
+		return int64(value), true
+	}
+	return 0, false
 }
 
 func (c *converter) compareCondition(cc string, leftID, rightID core.ValueID) ssa.Value {
@@ -1289,6 +1436,18 @@ func (c *converter) setResult(instruction core.Instruction, value ssa.Value) {
 		}
 	}
 	c.values[instruction.Results[0].ID] = value
+	// Mark the values that derive from the stack pointer, so a call can tell a
+	// pushed argument from an ordinary spill.
+	if c.isStackDerived(instruction) {
+		c.spDerived[value] = true
+	}
+	// A copy of a frame register is still that register: the prologue saves the
+	// frame pointer through a copy, and that value is not an argument.
+	if instruction.Kind == core.OpCopy && len(instruction.Operands) > 0 {
+		if source, ok := c.values[instruction.Operands[0].Value]; ok && c.frameValues[source] {
+			c.frameValues[value] = true
+		}
+	}
 }
 
 func (c *converter) addDiagnostic(code, message string) {
@@ -1576,6 +1735,48 @@ func literalUint64(literal []byte) uint64 {
 func containsPass(names []string, want string) bool {
 	for _, name := range names {
 		if name == want {
+			return true
+		}
+	}
+	return false
+}
+
+// rememberStackStore records the value of one store so a following cdecl call can
+// pass it as an argument. Only the nearest run matters, so a branch or a jump
+// forgets it.
+func (c *converter) rememberStackStore(instruction core.Instruction) {
+	if !c.facts.Registers.StackArguments || len(instruction.Operands) < 2 {
+		return
+	}
+	value := c.operandValue(instruction.Operands[1])
+	if value == nil {
+		return
+	}
+	c.stackStores = append(c.stackStores, value)
+}
+
+// isFrameRegister reports whether one register belongs to the call frame.
+func (c *converter) isFrameRegister(name string) bool {
+	if name == "" {
+		return false
+	}
+	frame := c.facts.Frame
+	for _, candidate := range []string{frame.StackPointer, frame.FramePointer, frame.ReturnAddress} {
+		if candidate != "" && c.registerView(candidate, 0).canonical == name {
+			return true
+		}
+	}
+	return false
+}
+
+// isStackDerived reports whether one binary operation combines a stack-derived
+// value with a constant, which is how a push computes its address.
+func (c *converter) isStackDerived(instruction core.Instruction) bool {
+	for _, operand := range instruction.Operands {
+		if operand.Kind != core.OperandValue {
+			continue
+		}
+		if value, ok := c.values[operand.Value]; ok && c.spDerived[value] {
 			return true
 		}
 	}

@@ -88,12 +88,27 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		if !ok {
 			return 0, false
 		}
+		if shiftedImmediate(name) {
+			// The "is" forms carry the high half of a 32-bit constant: addis,
+			// andis, oris and xoris all shift their immediate left by sixteen.
+			right = l.operation(ins, core.OpShl, []core.Operand{l.value(right), l.value(l.constant(ins.address, 16, bits))}, bits, core.EffectNone)
+		}
 	} else {
 		right = left
 	}
 	result := l.operation(ins, kind, []core.Operand{l.value(left), l.value(right)}, bits, core.EffectNone)
 	l.writeRegister(ins.address, destination, bits, result)
 	return result, true
+}
+
+// shiftedImmediate reports whether one mnemonic shifts its immediate left by
+// sixteen bits. PowerPC spells those forms with a trailing "is".
+func shiftedImmediate(name string) bool {
+	switch name {
+	case "addis", "andis", "oris", "xoris":
+		return true
+	}
+	return false
 }
 
 // destinationName returns the register name of one destination operand.
