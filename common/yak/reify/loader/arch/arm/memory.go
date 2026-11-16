@@ -289,7 +289,9 @@ func (l *lifter) branchOrCall(ins instruction) {
 		l.unsupported(ins)
 		return
 	}
-	if baseOp(ins.inst.Op) == armasm.BL {
+	// BL and BLX both write the link register, so both are calls. BLX switches
+	// to ARM state for the callee, which the PLT stubs rely on.
+	if base := baseOp(ins.inst.Op); base == armasm.BL || base == armasm.BLX {
 		l.emit(core.OpCall, []core.Operand{pointerOperand(target)}, nil, nil, core.EffectCall|core.EffectMayTrap|core.EffectUnknown, ins.address)
 		return
 	}

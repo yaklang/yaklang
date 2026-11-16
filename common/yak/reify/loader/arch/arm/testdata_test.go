@@ -638,3 +638,28 @@ func TestThumbModeIsRejectedWithoutTheDecoder(t *testing.T) {
 		t.Fatal("unknown mode accepted")
 	}
 }
+
+// TestThumbBlxIsACall checks the interworking call. BLX writes the link register
+// and switches to ARM state for the callee, which is how a Thumb function reaches
+// an ARM PLT stub. Lifting it as a plain jump loses the call and everything the
+// call returns.
+func TestThumbBlxIsACall(t *testing.T) {
+	// blx <target> followed by bx lr; the target is the second halfword pair.
+	code := thumbBytes(0xf7ff, 0xef84, 0x4770)
+	result := parseThumbAt(t, 0x2000, code)
+	var kinds []core.Opcode
+	for _, block := range result.IR.Functions[0].Blocks {
+		for _, instruction := range block.Instructions {
+			kinds = append(kinds, instruction.Kind)
+		}
+	}
+	calls := 0
+	for _, kind := range kinds {
+		if kind == core.OpCall {
+			calls++
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("calls = %d, want 1 (%v)", calls, kinds)
+	}
+}

@@ -43,3 +43,35 @@ func TestAnnotateSymbolsNamesFunctionsAndCalls(t *testing.T) {
 		t.Fatalf("GOT call target = %+v", got)
 	}
 }
+
+// TestMappingSymbolIsNeverACallTarget covers the RISC-V and ARM mapping symbols.
+// A mapping symbol marks where one encoding or data run starts and may carry an
+// ISA string, so using it as a call name produces an identifier that is not a
+// legal C name.
+func TestMappingSymbolIsNeverACallTarget(t *testing.T) {
+	artifact := &core.Artifact{
+		Image: &core.Image{Symbols: []symbol.Symbol{{
+			Name:    "$xrv64i2p1_m2p0",
+			Address: 0x1000,
+			Kind:    symbol.SymbolUnknown,
+		}}},
+	}
+	ir := &core.LowIR{Functions: []core.Function{{
+		ID:      1,
+		Address: 0x2000,
+		Blocks: []core.Block{{
+			ID:      1,
+			Address: 0x2000,
+			Instructions: []core.Instruction{
+				{Kind: core.OpCall, Operands: []core.Operand{{Kind: core.OperandConstant, Literal: []byte{0x00, 0x10}}}},
+				{Kind: core.OpReturn},
+			},
+		}},
+	}}}
+
+	annotateSymbols(artifact, ir)
+
+	if got := ir.Functions[0].Blocks[0].Instructions[0].Operands[0]; got.Kind == core.OperandSymbol {
+		t.Fatalf("mapping symbol used as a call target: %+v", got)
+	}
+}

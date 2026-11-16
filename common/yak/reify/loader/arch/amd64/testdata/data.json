@@ -1,0 +1,22 @@
+[
+  {
+    "name": "string literal through a data section",
+    "address": "0x1000",
+    "code": [
+      "bf 00 20 00 00 // mov edi, 0x2000",
+      "e8 00 00 00 00 // call sub_0x100a",
+      "c3 // ret"
+    ],
+    "data": [
+      {
+        "name": ".rodata",
+        "address": "0x2000",
+        "bytes": "hello, reify\\0",
+        "text": true
+      }
+    ],
+    "source": [
+      "0x2000 /* \"hello, reify\" */"
+    ]
+  }
+]
