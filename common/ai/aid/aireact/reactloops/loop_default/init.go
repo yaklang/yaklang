@@ -20,7 +20,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		config := r.GetConfig()
 
 		attachedDatas := aicommon.NonEmptyAttachedResources(task.GetAttachedDatas())
-		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
+		attachedResources := loop.GetAttachedResources()
 		// Local greeting classification must remain available when expensive
 		// synchronous enrichment is disabled. It enables one-answer completion
 		// without restoring model-backed intent or knowledge initialization.

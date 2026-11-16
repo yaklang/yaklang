@@ -158,20 +158,13 @@ func ParseWorkspaceAttachedContext(attached []*aicommon.AttachedResource, target
 	return ctx
 }
 
-// InitWorkspaceAttachedContext parses attachments, records rendered resources to timeline,
-// and returns the parsed workspace context.
-func InitWorkspaceAttachedContext(
-	r aicommon.AIInvokeRuntime,
-	loop *ReActLoop,
-	task aicommon.AIStatefulTask,
-	targetKey string,
-) *WorkspaceAttachedContext {
+// InitWorkspaceAttachedContext returns the parsed workspace context. Resource
+// parsing and timeline recording already happened in task preparation.
+func InitWorkspaceAttachedContext(task aicommon.AIStatefulTask, targetKey string) *WorkspaceAttachedContext {
 	if task == nil {
 		return nil
 	}
-	attached := task.GetAttachedDatas()
-	RunAttachedExtraResourcesInit(r, loop, attached)
-	return ParseWorkspaceAttachedContext(attached, targetKey)
+	return ParseWorkspaceAttachedContext(task.GetAttachedDatas(), targetKey)
 }
 
 // ValidateAttachedDirectoryTarget ensures path exists and is a directory.

@@ -56,6 +56,11 @@ type BrowserAttachmentProvider interface {
 	GetBrowserAttachments() []AttachedBrowserBinding
 }
 
+type BrowserAttachmentSession interface {
+	BrowserAttachmentProvider
+	SetBrowserAttachments([]AttachedBrowserBinding)
+}
+
 func init() {
 	RegisterAttachedResourceDataFactory(
 		AttachedResourceTypeBrowser,
@@ -86,18 +91,28 @@ func (d *AttachedBrowserResourceData) Unmarshal(resource *AttachedResource) erro
 	return nil
 }
 
-// BindLoopData is intentionally a no-op. Browser attachments are applied to
-// the owning ReAct before task initialization; the loop only consumes session
-// state.
-func (d *AttachedBrowserResourceData) BindLoopData(ReActLoopIF) error {
+func (d *AttachedBrowserResourceData) BindLoopData(loop ReActLoopIF) error {
+	bindAttachedBrowserResources(loop, []AttachedResourceData{d})
 	return nil
 }
 
-// ToAttachData is rendered once by ReAct at task initialization. Keeping it
-// empty prevents the generic attached-resource pipeline from duplicating the
-// browser instructions.
-func (d *AttachedBrowserResourceData) ToAttachData(ReActLoopIF) string {
-	return ""
+func (d *AttachedBrowserResourceData) ToAttachData(loop ReActLoopIF) string {
+	return renderAttachedBrowserIntroduction(
+		browserBindingsFromAttachedResources([]AttachedResourceData{d}),
+		missingAttachedBrowserTools(loopConfig(loop)),
+	)
+}
+
+func (d *AttachedBrowserResourceData) BindLoopDataBatch(loop ReActLoopIF, resources []AttachedResourceData) error {
+	bindAttachedBrowserResources(loop, resources)
+	return nil
+}
+
+func (d *AttachedBrowserResourceData) ToAttachDataBatch(loop ReActLoopIF, resources []AttachedResourceData) string {
+	return renderAttachedBrowserIntroduction(
+		browserBindingsFromAttachedResources(resources),
+		missingAttachedBrowserTools(loopConfig(loop)),
+	)
 }
 
 func (d *AttachedBrowserResourceData) Binding() AttachedBrowserBinding {
@@ -106,6 +121,116 @@ func (d *AttachedBrowserResourceData) Binding() AttachedBrowserBinding {
 		Name:      d.Name,
 		Reference: d.Reference,
 	}
+}
+
+func loopConfig(loop ReActLoopIF) AICallerConfigIf {
+	if loop == nil {
+		return nil
+	}
+	return loop.GetConfig()
+}
+
+func browserBindingsFromAttachedResources(resources []AttachedResourceData) []AttachedBrowserBinding {
+	bindings := make([]AttachedBrowserBinding, 0, len(resources))
+	seen := make(map[string]struct{})
+	for _, resource := range resources {
+		browser, ok := resource.(*AttachedBrowserResourceData)
+		if !ok || browser == nil {
+			continue
+		}
+		if _, exists := seen[browser.DeviceID]; exists {
+			continue
+		}
+		seen[browser.DeviceID] = struct{}{}
+		bindings = append(bindings, browser.Binding())
+	}
+	return bindings
+}
+
+func bindAttachedBrowserResources(loop ReActLoopIF, resources []AttachedResourceData) {
+	if loop == nil || loop.GetInvoker() == nil {
+		return
+	}
+	session, ok := loop.GetInvoker().(BrowserAttachmentSession)
+	if !ok {
+		return
+	}
+	bindings := browserBindingsFromAttachedResources(resources)
+	session.SetBrowserAttachments(bindings)
+	promoteAttachedBrowserTools(loop.GetConfig())
+}
+
+func promoteAttachedBrowserTools(config AICallerConfigIf) []string {
+	missing := missingAttachedBrowserTools(config)
+	if config == nil || config.GetAiToolManager() == nil {
+		return missing
+	}
+	manager := config.GetAiToolManager()
+	missing = missing[:0]
+	for _, name := range attachedBrowserBridgeToolNames {
+		manager.EnableTool(name)
+		tool, err := manager.GetToolByName(name)
+		if err != nil || tool == nil {
+			missing = append(missing, name)
+			continue
+		}
+		if !manager.IsRecentlyUsedTool(name) {
+			config.RecordRecentlyUsedTool(tool)
+		}
+	}
+	return missing
+}
+
+func missingAttachedBrowserTools(config AICallerConfigIf) []string {
+	if config == nil || config.GetAiToolManager() == nil {
+		return append([]string(nil), attachedBrowserBridgeToolNames...)
+	}
+	manager := config.GetAiToolManager()
+	missing := make([]string, 0)
+	for _, name := range attachedBrowserBridgeToolNames {
+		tool, err := manager.GetToolByName(name)
+		if err != nil || tool == nil {
+			missing = append(missing, name)
+		}
+	}
+	return missing
+}
+
+func renderAttachedBrowserIntroduction(bindings []AttachedBrowserBinding, missing []string) string {
+	if len(bindings) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("## Attached Browser\n\n")
+	b.WriteString("- The user selected browser instance")
+	if len(bindings) > 1 {
+		b.WriteString("s")
+	}
+	b.WriteString(": ")
+	for index, binding := range bindings {
+		if index > 0 {
+			b.WriteString(", ")
+		}
+		name := strings.TrimSpace(binding.Name)
+		if name == "" {
+			name = "Unnamed browser"
+		}
+		b.WriteString(fmt.Sprintf("`%s` (%s)", binding.Reference, name))
+	}
+	b.WriteString("\n")
+	b.WriteString("- This is an already-open browser connected through the Yakit browser extension, not a Rod-managed browser session.\n")
+	b.WriteString("- Browser bridge calls are bound to the selected instance by the runtime. Never generate or pass `device_id` yourself.\n")
+	if len(bindings) > 1 {
+		b.WriteString("- Multiple browsers are selected. Pass the exact `browser_ref` for singular operations; split requests by browser identity.\n")
+	}
+	b.WriteString("- Use the browser bridge tools for page, tab, crypto, transform, handoff, and browser-backed HTTP work. Do not use `use_browser`, `op=open`, or create a replacement browser.\n")
+	b.WriteString("- For ordinary request replay or authorization testing, use `do_http_request`; the runtime binds and labels the selected browser identity.\n")
+	if len(missing) > 0 {
+		b.WriteString(fmt.Sprintf("- Browser bridge is unavailable because these tools are missing: %s. Report that fact instead of falling back to Rod.\n", strings.Join(missing, ", ")))
+	} else {
+		b.WriteString("- The required browser bridge tools are available and have been promoted for direct use.\n")
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func attachedBrowserResources(task AITask, runtime AIInvokeRuntime) ([]AttachedBrowserBinding, bool, error) {

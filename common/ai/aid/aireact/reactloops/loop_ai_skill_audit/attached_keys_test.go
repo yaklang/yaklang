@@ -16,7 +16,7 @@ func TestWorkspaceAttachedContext_TargetOverridesDirectory(t *testing.T) {
 		aicommon.NewAttachedResource(reactloops.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, "/tmp/new-workspace"),
 		aicommon.NewAttachedResource(reactloops.AttachedResourceTypeFile, AttachedResourceKeySkillAuditTargetPath, "/tmp/legacy-target"),
 	})
-	ws := reactloops.InitWorkspaceAttachedContext(nil, nil, task, AttachedResourceKeySkillAuditTargetPath)
+	ws := reactloops.InitWorkspaceAttachedContext(task, AttachedResourceKeySkillAuditTargetPath)
 	require.NotNil(t, ws)
 	require.Equal(t, filepath.FromSlash("/tmp/legacy-target"), ws.ResolveAttachedScanDirectory())
 }
@@ -26,7 +26,7 @@ func TestWorkspaceAttachedContext_LegacyTargetFallback(t *testing.T) {
 	task.SetAttachedDatas([]*aicommon.AttachedResource{
 		aicommon.NewAttachedResource(reactloops.AttachedResourceTypeFile, AttachedResourceKeySkillAuditTargetPath, "/tmp/skill/demo"),
 	})
-	ws := reactloops.InitWorkspaceAttachedContext(nil, nil, task, AttachedResourceKeySkillAuditTargetPath)
+	ws := reactloops.InitWorkspaceAttachedContext(task, AttachedResourceKeySkillAuditTargetPath)
 	require.NotNil(t, ws)
 	require.Equal(t, filepath.FromSlash("/tmp/skill/demo"), ws.ResolveAttachedScanDirectory())
 }

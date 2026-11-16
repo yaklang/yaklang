@@ -46,7 +46,7 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 		reactloops.EmitStatusI18n(loop, "代码安全审计启动", "Starting code security audit")
 		r.AddToTimeline("[AUDIT_START]", "代码安全审计开始，用户输入: "+utils.ShrinkTextBlock(userInput, 300))
 
-		ws := reactloops.InitWorkspaceAttachedContext(r, loop, task, AttachedResourceKeyCodeAuditTargetPath)
+		ws := reactloops.InitWorkspaceAttachedContext(task, AttachedResourceKeyCodeAuditTargetPath)
 		reactloops.RecordWorkspaceAttachedTimeline(r, ws, "CODE_AUDIT")
 		if ws != nil {
 			var sel *aicommon.AttachedCodeSelection
