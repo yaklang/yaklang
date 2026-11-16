@@ -199,13 +199,20 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 			return 0, false
 		}
 		shift := uint(2)
+		base := ins.address
 		switch name {
-		case "pcaddu12i", "pcalau12i":
+		case "pcalau12i":
+			// The page-address form starts from the page of the instruction, not
+			// from the instruction address: the low twelve bits of the result are
+			// zero, and the following addi supplies the offset inside the page.
+			shift = 12
+			base = ins.address &^ 0xfff
+		case "pcaddu12i":
 			shift = 12
 		case "pcaddu18i":
 			shift = 18
 		}
-		value := l.pointerConstant(ins.address, ins.address+uint64(immediate<<shift))
+		value := l.pointerConstant(ins.address, base+uint64(immediate<<shift))
 		l.writeRegister(ins.address, destination, bits, value)
 		return value, true
 	case "ori", "andi", "xori":
