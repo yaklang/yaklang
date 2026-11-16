@@ -420,7 +420,7 @@ func (s *structurer) emitLoop(loop *loopInfo, indent string, stop map[int64]bool
 			bodyStart = ifInstruction.True
 			exit = ifInstruction.False
 		case loop.body[ifInstruction.False] && !loop.body[ifInstruction.True]:
-			condition = "!(" + condition + ")"
+			condition = negatedCondition(ifInstruction, ifInstruction.Cond)
 			bodyStart = ifInstruction.False
 			exit = ifInstruction.True
 		default:
@@ -484,7 +484,12 @@ func (s *structurer) emitLoopPhis(loop *loopInfo, header *ssa.BasicBlock, indent
 		}
 		if len(values) == 1 {
 			if !backEdge {
-				fmt.Fprintf(s.text, "%s%s = %s;\n", indent, assignName(phi), valueName(values[0]))
+				name := assignName(values[0])
+				if _, isConst := ssa.ToConstInst(values[0]); isConst {
+					// A constant has no assignment line of its own, so it is written here.
+					name = valueName(values[0])
+				}
+				fmt.Fprintf(s.text, "%s%s = %s;\n", indent, assignName(phi), name)
 			}
 			continue
 		}
@@ -497,6 +502,9 @@ func (s *structurer) emitLoopPhis(loop *loopInfo, header *ssa.BasicBlock, indent
 }
 
 func (s *structurer) renderBlockInstructions(block *ssa.BasicBlock, indent string, skipCondition int64) {
+	if s.loops[block.GetId()] == nil {
+		s.renderMergePhis(block, indent)
+	}
 	for _, instructionID := range block.Insts {
 		instruction, ok := s.function.GetInstructionById(instructionID)
 		if !ok || instruction == nil {
@@ -543,4 +551,48 @@ func copyStop(stop map[int64]bool) map[int64]bool {
 		result[id] = true
 	}
 	return result
+}
+
+// renderMergePhis prints the phis of a join block. A loop header prints its own
+// phis while the loop is emitted, so this skips it.
+//
+// A merge phi stands for one variable on every incoming edge, and the statements
+// that follow read it as a single value, so the first edge names it.
+func (s *structurer) renderMergePhis(block *ssa.BasicBlock, indent string) {
+	for _, phiID := range block.Phis {
+		instruction, ok := s.function.GetInstructionById(phiID)
+		if !ok || instruction == nil {
+			continue
+		}
+		phi, ok := ssa.ToPhi(instruction)
+		if !ok || phi == nil || !valueUsed(phi) {
+			continue
+		}
+		values := phi.GetValues()
+		if len(values) == 0 {
+			continue
+		}
+		name := assignName(representativePhiValue(values))
+		if _, isConst := ssa.ToConstInst(values[0]); isConst {
+			// A constant has no assignment line of its own, so it is written here.
+			name = valueName(values[0])
+		}
+		fmt.Fprintf(s.text, "%s%s = %s;\n", indent, assignName(phi), name)
+	}
+}
+
+// representativePhiValue picks the value a join is printed with. An entry
+// parameter is the last choice: a register nobody wrote before the branch only
+// happens to hold it, and naming it would pull a parameter into the signature.
+func representativePhiValue(values []ssa.Value) ssa.Value {
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		if _, isParameter := value.(*ssa.Parameter); isParameter {
+			continue
+		}
+		return value
+	}
+	return values[0]
 }

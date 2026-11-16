@@ -17,11 +17,34 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+// unexpectedInstruction reports an instruction the conversion never produces. It
+// is raised from deep inside the structurer, which has no error return, and turned
+// into an error by Render.
+type unexpectedInstruction struct {
+	kind string
+	name string
+}
+
+func (e unexpectedInstruction) Error() string {
+	return fmt.Sprintf("ssa2source: unexpected %s %q: the LowIR conversion does not emit it", e.kind, e.name)
+}
+
 // Render converts a YakSSA program into source-like text.
-func Render(ctx context.Context, program *ssa.Program) (string, error) {
+func Render(ctx context.Context, program *ssa.Program) (source string, err error) {
 	if program == nil {
 		return "", fmt.Errorf("ssa2source: nil program")
 	}
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+		if failure, ok := recovered.(unexpectedInstruction); ok {
+			source, err = "", failure
+			return
+		}
+		panic(recovered)
+	}()
 	var output strings.Builder
 	var renderErr error
 	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
@@ -103,9 +126,18 @@ func renumberSource(function *ssa.Function, source string) string {
 
 func renderFunction(text *strings.Builder, function *ssa.Function) {
 	params := make([]string, 0, len(function.Params))
+	usesFrame := false
 	for _, id := range function.Params {
 		value, ok := function.GetValueById(id)
-		if !ok || value == nil || !value.HasUsers() {
+		if !ok || value == nil {
+			continue
+		}
+		if value.GetName() == "frame" {
+			// The stack pointer is an ABI register, not an argument.
+			usesFrame = true
+			continue
+		}
+		if !value.HasUsers() {
 			continue
 		}
 		params = append(params, fmt.Sprintf("%s %s", paramTypeName(value.GetType()), value.GetName()))
@@ -122,7 +154,12 @@ func renderFunction(text *strings.Builder, function *ssa.Function) {
 	} else {
 		fmt.Fprintf(text, "%s %s(%s) {\n", signature, function.GetName(), strings.Join(params, ", "))
 	}
-	newStructurer(function).render(text)
+	var body strings.Builder
+	newStructurer(function).render(&body)
+	if usesFrame || strings.Contains(body.String(), "frame") {
+		text.WriteString("    void *frame; /* stack frame base */\n")
+	}
+	text.WriteString(body.String())
 	text.WriteString("}\n")
 }
 
@@ -165,6 +202,7 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 	if !strings.Contains(function.GetVerboseName(), "frame-kept") {
 		lines = pruneDeadAssignments(function, lines)
 	}
+	lines = pruneUnusedParameters(lines)
 	text = strings.Join(lines, "\n")
 	definitions := make(map[int64]int)
 	for index, line := range lines {
@@ -344,7 +382,53 @@ func inlineFrameBaseAliases(lines []string) []string {
 	return filtered
 }
 
+// pruneUnusedParameters removes the parameters the body never mentions. A phi that
+// merges a register the function never wrote can name an entry register, and that
+// register is not a parameter of the recovered function.
+func pruneUnusedParameters(lines []string) []string {
+	headerIndex := -1
+	for index, line := range lines {
+		if strings.Contains(line, ") {") {
+			headerIndex = index
+			break
+		}
+	}
+	if headerIndex < 0 {
+		return lines
+	}
+	header := lines[headerIndex]
+	open := strings.Index(header, "(")
+	closing := strings.LastIndex(header, ") {")
+	if open < 0 || closing < 0 || closing < open {
+		return lines
+	}
+	params := strings.Split(header[open+1:closing], ", ")
+	if len(params) == 1 && strings.TrimSpace(params[0]) == "void" {
+		return lines
+	}
+	body := strings.Join(lines[headerIndex+1:], "\n")
+	kept := make([]string, 0, len(params))
+	for _, param := range params {
+		fields := strings.Fields(param)
+		if len(fields) == 0 {
+			continue
+		}
+		name := regexp.QuoteMeta(fields[len(fields)-1])
+		if regexp.MustCompile(`\b` + name + `\b`).MatchString(body) {
+			kept = append(kept, param)
+		}
+	}
+	if len(kept) == 0 {
+		kept = []string{"void"}
+	}
+	lines[headerIndex] = header[:open+1] + strings.Join(kept, ", ") + header[closing:]
+	return lines
+}
+
 func pruneDeadAssignments(function *ssa.Function, lines []string) []string {
+	// A phi that names the first edge still depends on every other edge: dropping
+	// them would hide the value the other path supplies.
+	kept := phiEdgeValues(function)
 	for {
 		uses := make(map[int64]int)
 		for _, line := range lines {
@@ -366,7 +450,7 @@ func pruneDeadAssignments(function *ssa.Function, lines []string) []string {
 			match := sourceAssignment.FindStringSubmatch(line)
 			if match != nil {
 				id, _ := strconv.ParseInt(match[1], 10, 64)
-				if uses[id] == 0 && !assignmentHasSideEffect(function, id) {
+				if uses[id] == 0 && kept[id] == 0 && !assignmentHasSideEffect(function, id) {
 					changed = true
 					continue
 				}
@@ -380,13 +464,44 @@ func pruneDeadAssignments(function *ssa.Function, lines []string) []string {
 	}
 }
 
+// phiEdgeValues counts the values a phi names on its edges.
+func phiEdgeValues(function *ssa.Function) map[int64]int {
+	counts := make(map[int64]int)
+	if function == nil {
+		return counts
+	}
+	for _, blockID := range function.Blocks {
+		block, ok := function.GetBasicBlockByID(blockID)
+		if !ok || block == nil {
+			continue
+		}
+		for _, phiID := range block.Phis {
+			instruction, ok := function.GetInstructionById(phiID)
+			if !ok || instruction == nil {
+				continue
+			}
+			phi, ok := ssa.ToPhi(instruction)
+			if !ok || phi == nil {
+				continue
+			}
+			for _, value := range phi.GetValues() {
+				if value == nil {
+					continue
+				}
+				counts[value.GetId()]++
+			}
+		}
+	}
+	return counts
+}
+
 func assignmentHasSideEffect(function *ssa.Function, id int64) bool {
 	value, ok := function.GetValueById(id)
 	if !ok || value == nil {
 		return false
 	}
 	switch value.(type) {
-	case *ssa.Call, *ssa.Panic, *ssa.SideEffect:
+	case *ssa.Call, *ssa.Panic:
 		return true
 	default:
 		return false
@@ -419,7 +534,10 @@ func renderInstructionAt(text *strings.Builder, instruction ssa.Instruction, ind
 	case *ssa.TypeCast:
 		// Type casts are inlined at their use sites.
 	case *ssa.SideEffect:
-		fmt.Fprintf(text, "%s%s = side-effect(%s);\n", indent, assignName(value), value.String())
+		// reify models no cross-procedure side effects, so the conversion has no
+		// path that emits one. A node here means an invariant broke; report it
+		// instead of rendering a statement no lifted instruction produced.
+		panic(unexpectedInstruction{kind: "side effect", name: value.GetName()})
 	case *ssa.Undefined:
 		if !valueUsed(value) {
 			break
@@ -454,6 +572,11 @@ func conditionExpression(instruction ssa.Instruction, id int64) string {
 	case *ssa.BinOp:
 		return binaryExpression(typed)
 	case *ssa.UnOp:
+		if typed.Op == ssa.OpNot {
+			if inverted, ok := invertedComparison(typed); ok {
+				return inverted
+			}
+		}
 		return unarySymbol(typed.Op) + valueNameByID(typed, typed.X)
 	case *ssa.TypeCast:
 		return cCast(typed.GetType(), conditionExpression(typed, typed.Value))
@@ -1055,4 +1178,77 @@ func unarySymbol(op ssa.UnaryOpcode) string {
 	default:
 		return string(op) + " "
 	}
+}
+
+// invertedComparison turns the negation of a comparison into the comparison that
+// says the same thing. A loop condition is often the negated test, and
+// !(i >= 3) reads worse than i < 3.
+func invertedComparison(value *ssa.UnOp) (string, bool) {
+	if value == nil {
+		return "", false
+	}
+	inner, ok := value.GetValueById(value.X)
+	if !ok || inner == nil {
+		return "", false
+	}
+	comparison, ok := inner.(*ssa.BinOp)
+	if !ok || comparison == nil {
+		return "", false
+	}
+	op, ok := oppositeComparison(comparison.Op)
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("%s %s %s", valueNameByID(comparison, comparison.X), op, valueNameByID(comparison, comparison.Y)), true
+}
+
+// oppositeComparison returns the comparison that holds when the given one does not.
+func oppositeComparison(op ssa.BinaryOpcode) (string, bool) {
+	switch op {
+	case ssa.OpGt:
+		return "<=", true
+	case ssa.OpGtEq:
+		return "<", true
+	case ssa.OpLt:
+		return ">=", true
+	case ssa.OpLtEq:
+		return ">", true
+	case ssa.OpEq:
+		return "!=", true
+	case ssa.OpNotEq:
+		return "==", true
+	}
+	return "", false
+}
+
+// negatedCondition renders the condition of the arm that the block does not take.
+// A comparison inverts into the opposite comparison, which reads better than
+// wrapping it in a logical not.
+func negatedCondition(instruction ssa.Instruction, id int64) string {
+	if instruction != nil {
+		if value, ok := instruction.GetValueById(id); ok && value != nil {
+			if inverted, ok := invertValue(value); ok {
+				return inverted
+			}
+		}
+	}
+	return "!(" + conditionExpression(instruction, id) + ")"
+}
+
+func invertValue(value ssa.Value) (string, bool) {
+	switch typed := value.(type) {
+	case *ssa.BinOp:
+		op, ok := oppositeComparison(typed.Op)
+		if !ok {
+			return "", false
+		}
+		return fmt.Sprintf("%s %s %s", valueNameByID(typed, typed.X), op, valueNameByID(typed, typed.Y)), true
+	case *ssa.TypeCast:
+		inner, ok := typed.GetValueById(typed.Value)
+		if !ok || inner == nil {
+			return "", false
+		}
+		return invertValue(inner)
+	}
+	return "", false
 }

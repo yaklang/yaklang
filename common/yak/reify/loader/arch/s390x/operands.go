@@ -363,7 +363,8 @@ func signExtending(name string) bool {
 // are handled by the branch path, which fuses the comparison with the branch.
 func isCompareRegister(name string) bool {
 	switch name {
-	case "cgr", "clgr", "cr", "clr", "cg", "clg", "cy", "cly", "c", "cl":
+	case "cgr", "clgr", "cr", "clr", "cg", "clg", "cy", "cly", "c", "cl",
+		"chi", "cghi", "ch", "clh", "cli", "clfi", "clgi":
 		return true
 	}
 	return false
