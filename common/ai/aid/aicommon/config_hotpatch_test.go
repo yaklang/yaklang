@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -30,11 +31,15 @@ func newHotPatchTestConfig(t *testing.T, ctx context.Context, opts ...ConfigOpti
 	return c, func(event *ypb.AIInputEvent, optionCount int) {
 		t.Helper()
 		c.EventInputChan.SafeFeed(event)
-		for i := 0; i < optionCount; i++ {
+		expectedEvents := optionCount
+		if hotpatchAffectsAgentPolicy(event.HotpatchType) {
+			expectedEvents++
+		}
+		for i := 0; i < expectedEvents; i++ {
 			select {
 			case <-applied:
 			case <-ctx.Done():
-				t.Fatalf("hot-patch %s did not finish applying %d options: %v", event.HotpatchType, optionCount, ctx.Err())
+				t.Fatalf("hot-patch %s did not finish applying %d options: %v", event.HotpatchType, expectedEvents, ctx.Err())
 			}
 		}
 	}
@@ -399,6 +404,193 @@ func TestGoalDurationHotReload_PreservesLazyDeadlineUntilStarted(t *testing.T) {
 	c.StartGoalDeadline()
 	require.EqualValues(t, 60, c.GetGoalDurationSeconds())
 	require.False(t, c.GetGoalDeadline().IsZero())
+}
+
+func TestHotPatch_GoalTimeAppliesEveryReceivedCommand(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	c, feed := newHotPatchTestConfig(t, ctx)
+	c.StartEventLoop(ctx)
+	require.NoError(t, WithGoalDurationSeconds(3600)(c))
+	c.StartGoalDeadline()
+	originalDeadline := c.GetGoalDeadline()
+	originalRevision := c.GetGoalTimeState().Revision
+
+	makeEvent := func() *ypb.AIInputEvent {
+		return &ypb.AIInputEvent{
+			IsConfigHotpatch: true,
+			HotpatchType:     HotPatchType_GoalTime,
+			GoalTimePatch: &ypb.AIGoalTimePatch{
+				Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+				ExtendSeconds: 60,
+			},
+		}
+	}
+
+	feed(makeEvent(), 1)
+	extended := c.GetGoalDeadline()
+	require.WithinDuration(t, originalDeadline.Add(time.Minute), extended, 2*time.Second)
+	require.Equal(t, originalRevision+1, c.GetGoalTimeState().Revision)
+
+	feed(makeEvent(), 1)
+	require.WithinDuration(t, originalDeadline.Add(2*time.Minute), c.GetGoalDeadline(), 2*time.Second)
+	require.Equal(t, originalRevision+2, c.GetGoalTimeState().Revision)
+
+	info := c.SimpleInfoMap()
+	require.Equal(t, c.GetGoalTimeState().Revision, info["GoalTimeRevision"])
+	require.Equal(t, true, info["GoalTimeStarted"])
+	require.Greater(t, info["GoalDeadlineUnix"].(int64), time.Now().Unix())
+}
+
+func TestHotPatch_ExecutionStrategyEmitsOneCoherentPolicySnapshot(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	policyEvents := make(chan *schema.AiOutputEvent, 8)
+	c := NewTestConfig(ctx, WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event != nil && event.Type == schema.EVENT_TYPE_AGENT_POLICY_SNAPSHOT && event.NodeId == AgentPolicySnapshotNodeID {
+			policyEvents <- event
+		}
+	}))
+	t.Cleanup(func() {
+		cancel()
+		c.WaitHotPatchLoopStopped()
+	})
+	c.StartEventLoop(ctx)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableMultiAgent:       true,
+				EnableGoalMode:         true,
+				GoalMinIterations:      11,
+				MaxSubAgents:           6,
+				GoalDurationSeconds:    120,
+				GoalAcceptanceCriteria: "evidence required",
+			},
+		},
+	})
+
+	select {
+	case event := <-policyEvents:
+		var snapshot AgentPolicySnapshot
+		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
+		require.True(t, snapshot.Goal.Enabled)
+		require.EqualValues(t, 11, snapshot.Goal.MinIterations)
+		require.Equal(t, "evidence required", snapshot.Goal.AcceptanceCriteria)
+		require.Equal(t, GoalTimeLimitModeNotStarted, snapshot.Goal.TimeLimit.Mode)
+		require.True(t, snapshot.MultiAgent.Enabled)
+		require.True(t, snapshot.MultiAgent.PreferDispatch)
+		require.EqualValues(t, 6, snapshot.MultiAgent.MaxConcurrency)
+	case <-ctx.Done():
+		t.Fatal("policy snapshot was not emitted")
+	}
+	select {
+	case <-policyEvents:
+		t.Fatal("one hotpatch transaction must emit exactly one policy snapshot")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestGoalTimePatch_SupportsExplicitActionsWithoutOneof(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(120)(c))
+
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+		ExtendSeconds: 60,
+	})(c))
+	state := c.GetGoalTimeState()
+	require.EqualValues(t, 180, state.DurationSeconds)
+	require.False(t, state.Started, "extending an unstarted window must remain lazy")
+
+	target := time.Now().Add(5 * time.Minute).Unix()
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:       ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE,
+		DeadlineUnix: target,
+	})(c))
+	state = c.GetGoalTimeState()
+	require.True(t, state.Started)
+	require.Equal(t, target, state.DeadlineUnix)
+
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE,
+	})(c))
+	state = c.GetGoalTimeState()
+	require.Zero(t, state.DurationSeconds)
+	require.False(t, state.Started)
+
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING,
+	})(c))
+	state = c.GetGoalTimeState()
+	require.EqualValues(t, -1, state.DurationSeconds)
+	require.True(t, state.NeverEnding)
+	require.True(t, state.Started)
+}
+
+func TestGoalTimePatch_ExtendingExpiredDeadlineReopensFromNow(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(60)(c))
+	c.m.Lock()
+	c.GoalDeadline = time.Now().Add(-time.Minute)
+	c.m.Unlock()
+
+	startedAt := time.Now()
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+		ExtendSeconds: 60,
+	})(c))
+	require.WithinDuration(t, startedAt.Add(time.Minute), c.GetGoalDeadline(), 2*time.Second)
+}
+
+func TestGoalTimePatch_SetDeadlineEnablesDisabledWindow(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.Zero(t, c.GetGoalDurationSeconds())
+
+	target := time.Now().Add(2 * time.Minute)
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:       ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE,
+		DeadlineUnix: target.Unix(),
+	})(c))
+	state := c.GetGoalTimeState()
+	require.True(t, state.Started)
+	require.Greater(t, state.DurationSeconds, int64(0))
+	require.Equal(t, target.Unix(), state.DeadlineUnix)
+}
+
+func TestGoalTimePatch_RejectsInvalidMutations(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.Error(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+	})(c), "zero extension is invalid")
+	require.Error(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+		ExtendSeconds: 60,
+	})(c), "a disabled time window cannot be extended")
+	require.Error(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE,
+	})(c))
+	require.Error(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{})(c))
+}
+
+func TestGoalTimePatch_MergeDoesNotPersistRuntimeCommand(t *testing.T) {
+	base := &ypb.AIStartParams{
+		Strategy: &ypb.AIExecutionStrategy{EnableGoalMode: true, GoalDurationSeconds: 1800},
+	}
+	next, changed := mergeHotpatchSessionStartParams(base, &ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_GoalTime,
+		GoalTimePatch: &ypb.AIGoalTimePatch{
+			Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+			ExtendSeconds: 60,
+		},
+	})
+	require.False(t, changed)
+	require.Same(t, base, next)
 }
 
 func TestHotPatch_ExecutionStrategy_NeverEndingDeadline(t *testing.T) {
