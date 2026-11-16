@@ -76,7 +76,7 @@ Region（虚拟地址 + 文件偏移 + 长度）
 | `unixar.Loader` | `archive` | 首个可解析成员的 Target | ar 归档：成员按各自格式解析 |
 | `mz.Loader` | `mz` | 固定 DOS/8086 | MZ 可执行；COM 需显式选择格式 |
 
-ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。PE 读取导出表、导入表与 `.pdata` 异常目录。Mach-O 读取 `LC_MAIN`、`LC_FUNCTION_STARTS`、符号表与导入符号，并在 universal 文件中选择一个切片。
+ELF 额外读取 `.dynsym`、`.symtab`、`.rela.plt` 和 `.rela.dyn`，把 PLT 入口与 GOT 槽映射到导入符号名，并记录定义符号的地址。相对重定位（符号索引为 0）以「地址 → 写入值」的形式写入 `Image.Relocations`：位置无关映像在文件里把这些槽留成 0，由动态链接器在装载时填值，读取端必须先查这张表。PowerPC ELFv1 的函数描述符同样依赖它。PE 读取导出表、导入表与 `.pdata` 异常目录。Mach-O 读取 `LC_MAIN`、`LC_FUNCTION_STARTS`、符号表与导入符号，并在 universal 文件中选择一个切片。
 
 COFF 与 MZ 共享同一个前两个字：PE 映像的 DOS stub 在 0x3c 处记录签名偏移，普通 MZ 可执行没有这个偏移。PE loader 只在偏移落在 DOS 头之后时才认领输入，因此三种格式不会互相覆盖。
 

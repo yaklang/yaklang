@@ -351,10 +351,10 @@ common/yak/reify/scripts/lift-all.sh -o /mnt/data/scan-outputs/reify-lift /bin/t
 
 任一模式失败时，脚本把错误写入对应文件，继续其余模式，最后返回 1。
 
-示例二进制：[test/examples/hello.c](../test/examples/hello.c)。
+示例二进制：[test/examples/hello.c](../test/examples/hello.c)。默认的位置无关构建与 `-fno-pie -no-pie` 的固定装载地址构建都支持。
 
 ```bash
-gcc -O1 -fno-pie -no-pie -o /tmp/hello common/yak/reify/test/examples/hello.c
+gcc -O1 -o /tmp/hello common/yak/reify/test/examples/hello.c
 main_addr=$(nm -S --defined-only /tmp/hello | awk '$4 == "main" {print "0x"$1}')
 main_size=$(nm -S --defined-only /tmp/hello | awk '$4 == "main" {print "0x"$2}')
 

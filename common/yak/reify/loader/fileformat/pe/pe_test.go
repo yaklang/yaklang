@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 )
 
 func writeValue(t *testing.T, buffer *bytes.Buffer, value any) {
@@ -151,6 +152,32 @@ func writeImports(t *testing.T, raw, data []byte) {
 
 // TestLoadRejectsManagedAssembly checks that a .NET assembly is refused instead
 // of decoded as machine code. The CLI header directory marks the IL payload.
+// TestLoadNamesCodeSymbols checks that a COFF symbol table names the functions of a
+// linked image. A symbol value is an offset inside its section, so the loader has
+// to add the section address and the image base; reporting the raw value names
+// nothing and drops the first function of a section.
+func TestLoadNamesCodeSymbols(t *testing.T) {
+	raw := peWithSymbol(t, "work", 0x20)
+	artifact, err := (Loader{}).Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := uint64(fixtureBase + fixtureTextRVA + 0x20)
+	for _, symbol := range artifact.Image.Symbols {
+		if symbol.Name != "work" {
+			continue
+		}
+		if symbol.Address != want {
+			t.Fatalf("address = %#x, want %#x", symbol.Address, want)
+		}
+		if symbol.Kind != sym.SymbolFunction {
+			t.Fatalf("kind = %v", symbol.Kind)
+		}
+		return
+	}
+	t.Fatalf("symbol not recovered: %+v", artifact.Image.Symbols)
+}
+
 func TestLoadRejectsManagedAssembly(t *testing.T) {
 	raw := fixture(t, fixtureOptions{managed: true})
 	_, err := (Loader{}).Load(context.Background(), newReader(t, raw))
@@ -260,4 +287,26 @@ func TestAddressOverflow(t *testing.T) {
 	if address, err := Address(fixtureBase, fixtureTextRVA); err != nil || address != fixtureBase+fixtureTextRVA {
 		t.Fatalf("address = %#x, %v", address, err)
 	}
+}
+
+// peWithSymbol appends one COFF symbol to the fixture and points the file header
+// at it. Value is the offset inside .text.
+func peWithSymbol(t *testing.T, name string, value uint32) []byte {
+	t.Helper()
+	raw := fixture(t, fixtureOptions{})
+	offset := len(raw)
+	symbol := make([]byte, 18)
+	copy(symbol, name)
+	binary.LittleEndian.PutUint32(symbol[8:], value)
+	// A positive section number names the section the value is relative to.
+	binary.LittleEndian.PutUint16(symbol[12:], 1)
+	symbol[16] = 2 // external storage class
+	raw = append(raw, symbol...)
+	// An empty string table follows the symbol table.
+	raw = append(raw, 0, 0, 0, 0)
+	// The file header follows the four-byte PE signature: the symbol table pointer
+	// is its ninth field and the symbol count the tenth.
+	binary.LittleEndian.PutUint32(raw[0x84+8:], uint32(offset))
+	binary.LittleEndian.PutUint32(raw[0x84+12:], 1)
+	return raw
 }

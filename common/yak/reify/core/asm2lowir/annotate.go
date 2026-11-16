@@ -2,6 +2,7 @@ package asm2lowir
 
 import (
 	"encoding/binary"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -113,6 +114,13 @@ func constantFromDefinitions(definitions map[core.ValueID]core.Instruction, id c
 func functionSymbol(a *core.Artifact, address uint64) string {
 	symbol, ok := a.Image.SymbolAt(address)
 	if !ok || symbol.Name == "" || symbol.Kind == sym.SymbolObject {
+		return ""
+	}
+	// A mapping symbol marks where one encoding or data run starts: $a and $t on
+	// ARM, $x and $d on RISC-V, sometimes with an ISA string appended. Its name
+	// describes the section content, not a function, so it must never become a
+	// call target.
+	if strings.HasPrefix(symbol.Name, "$") {
 		return ""
 	}
 	return symbol.Name

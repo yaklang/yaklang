@@ -85,3 +85,44 @@ func TestParseRejectsMissingSelection(t *testing.T) {
 		t.Fatal("missing selection was accepted")
 	}
 }
+
+// thumbSymbolParser reports one Thumb function whose symbol value keeps the
+// marker bit set. A boundary discoverer aligns it and records the mode.
+type thumbSymbolParser struct {
+	stubParser
+	address uint64
+	mode    string
+}
+
+func (p *thumbSymbolParser) DiscoverBoundaries(*core.ByteReader, core.BoundaryHints, *core.Image) (core.BoundaryResult, error) {
+	return core.BoundaryResult{Functions: []core.FunctionBoundary{{
+		Address: 0x1000, Size: 4, Name: "thumb_func", Source: core.BoundarySymbol, Mode: "thumb",
+	}}}, nil
+}
+
+func (p *thumbSymbolParser) Parse(_ context.Context, request core.ParseRequest) (*core.ParseResult, error) {
+	p.address, p.mode = request.Address, request.Target.Mode
+	return p.stubParser.Parse(context.Background(), request)
+}
+
+// TestFunctionSelectionUsesTheDiscoveredBoundary checks that decoding one function
+// by name starts where the boundary discoverer said, not at the raw symbol value.
+// On ARM a Thumb symbol is stored with the low bit set, and decoding from there
+// lands half an instruction early.
+func TestFunctionSelectionUsesTheDiscoveredBoundary(t *testing.T) {
+	parser := &thumbSymbolParser{}
+	artifact := testArtifact(t, parser)
+	artifact.Target = core.Target{OS: core.OSLinux, Architecture: core.ArchARM, Bits: 32, ByteOrder: core.LittleEndian}
+	artifact.Image.Symbols = []sym.Symbol{{Name: "thumb_func", Address: 0x1001, Size: 4, Kind: sym.SymbolFunction}}
+	artifact.Hints = &core.BoundaryHints{ExecSections: []core.Region{{Address: 0x1000, Size: 16}}}
+
+	if _, err := Parse(context.Background(), artifact, WithFunction("thumb_func")); err != nil {
+		t.Fatal(err)
+	}
+	if parser.address != 0x1000 {
+		t.Fatalf("parsed address = %#x, want 0x1000", parser.address)
+	}
+	if parser.mode != "thumb" {
+		t.Fatalf("parsed mode = %q, want thumb", parser.mode)
+	}
+}

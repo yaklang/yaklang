@@ -184,6 +184,16 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 		hints = *artifact.Hints
 	}
 	if config.Function != "" {
+		// Prefer the boundary the parser discovered. It carries the aligned
+		// address and the execution mode, which a bare symbol value does not: on
+		// ARM a Thumb symbol is stored with the low bit set, and decoding from that
+		// address would start half an instruction early.
+		boundaries, stats := discoverWithParser(artifact, hints)
+		for _, boundary := range boundaries {
+			if boundary.Name == config.Function {
+				return []core.FunctionBoundary{boundary}, stats, nil
+			}
+		}
 		boundary, err := functionBoundary(artifact, config.Function)
 		if err != nil {
 			return nil, core.BoundaryStats{}, err
@@ -244,7 +254,10 @@ func symbolBoundaries(artifact *core.Artifact) []core.FunctionBoundary {
 		if symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
 			continue
 		}
-		result = append(result, core.FunctionBoundary{Address: symbol.Address, Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol})
+		// A function starts on at least a two-byte boundary on every supported
+		// target. ARM stores the Thumb marker in the low bit of the value.
+		address := symbol.Address &^ 1
+		result = append(result, core.FunctionBoundary{Address: address, Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol})
 	}
 	return result
 }
@@ -327,7 +340,7 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		if symbol.Imported || symbol.Address == 0 {
 			return core.FunctionBoundary{}, fmt.Errorf("function %q has no local body", name)
 		}
-		return core.FunctionBoundary{Address: symbol.Address, Size: symbol.Size, Name: name, Source: core.BoundarySymbol}, nil
+		return core.FunctionBoundary{Address: symbol.Address &^ 1, Size: symbol.Size, Name: name, Source: core.BoundarySymbol}, nil
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }
