@@ -1,0 +1,41 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: dynamically resolved command name"
+	title_zh: "Bash：命令名由变量动态决定"
+	type: audit
+	level: "middle"
+	rule_id: "bash-dynamic-command"
+	risk: "unsafe-shell-expansion"
+	desc: <<<DESC
+### 说明
+命令名本身来自变量或其它展开（例如 `$CMD -rf /`），静态分析无法确定实际
+执行的程序。攻击者只要控制这个变量，就可以把原本无害的调用替换成任意命令，
+而针对固定命令名的白名单或危险命令规则会失效。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+把命令名固定为字面量，动态部分只作为参数传入；如果确实需要可配置的命令，
+使用显式白名单枚举允许的命令，并拒绝其余值。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+$CMD -rf /
+POS
+	"safefile://neg.sh": <<<NEG
+rm -rf /tmp/build
+NEG
+)
+
+Command(* as $argv) as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Bash: dynamically resolved command name",
+	title_zh: "Bash：命令名由变量动态决定",
+	message: "检测到动态命令名，静态分析无法确认实际执行的程序。",
+	risk: "unsafe-shell-expansion",
+}
