@@ -2,8 +2,10 @@ package aicommon
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -69,6 +71,7 @@ func (c *Config) WaitHotPatchLoopStopped() {
 
 func (c *Config) SimpleInfoMap() map[string]interface{} {
 	input, output, _ := c.GetConsumptionConfig()
+	goalTime := c.GetGoalTimeState()
 	return map[string]interface{}{
 		"ID":                          c.Id,
 		"AllowPlanUserInteract":       c.AllowPlanUserInteract,
@@ -100,8 +103,12 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"EnableGoalMode":              c.GetEnableGoalMode(),
 		"GoalMinIterations":           c.GetGoalMinIterations(),
 		"MaxSubAgents":                c.GetMaxSubAgents(),
-		"GoalDurationSeconds":         c.GetGoalDurationSeconds(),
+		"GoalDurationSeconds":         goalTime.DurationSeconds,
 		"GoalAcceptanceCriteria":      c.GetGoalAcceptanceCriteria(),
+		"GoalTimeRevision":            goalTime.Revision,
+		"GoalTimeStarted":             goalTime.Started,
+		"GoalTimeNeverEnding":         goalTime.NeverEnding,
+		"GoalDeadlineUnix":            goalTime.DeadlineUnix,
 	}
 }
 
@@ -115,6 +122,7 @@ var (
 	HotPatchType_AllowPlanUserInteract       = "AllowPlanUserInteract"
 	HotPatchType_SyncPerceptionTrigger       = "SyncPerceptionTrigger"
 	HotPatchType_ExecutionStrategy           = "ExecutionStrategy"
+	HotPatchType_GoalTime                    = "GoalTime"
 	HotPatchType_RuntimeContextSizeLimit     = "RuntimeContextSizeLimit"
 
 	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
@@ -258,6 +266,13 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		aiOption = append(aiOption, WithTimelineContentLimit(runtimeContextSizeLimitFromHotpatch(hotPatchParams.GetRuntimeContextSizeLimit())))
 	}
 
+	if e.HotpatchType == HotPatchType_GoalTime {
+		if patch := e.GetGoalTimePatch(); patch != nil {
+			aiOption = append(aiOption, WithGoalTimePatch(patch))
+		}
+		return c.withAgentPolicySnapshotEmit(aiOption)
+	}
+
 	if e.HotpatchType == HotPatchType_ExecutionStrategy {
 		strategy := hotPatchParams.GetStrategy()
 		if strategy == nil {
@@ -279,7 +294,102 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 			WithGoalAcceptanceCriteria(strategy.GetGoalAcceptanceCriteria()),
 		)
 	}
+	if hotpatchAffectsAgentPolicy(e.HotpatchType) {
+		return c.withAgentPolicySnapshotEmit(aiOption)
+	}
 	return aiOption
+}
+
+func hotpatchAffectsAgentPolicy(hotpatchType string) bool {
+	switch hotpatchType {
+	case HotPatchType_ExecutionStrategy,
+		HotPatchType_GoalTime,
+		HotPatchType_EnablePlan,
+		HotPatchType_AllowPlanUserInteract:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Config) withAgentPolicySnapshotEmit(options []ConfigOption) []ConfigOption {
+	if len(options) == 0 {
+		return options
+	}
+	return append(options, c.agentPolicySnapshotEmitOption())
+}
+
+// WithGoalTimePatch applies an imperative runtime goal-time mutation.
+func WithGoalTimePatch(patch *ypb.AIGoalTimePatch) ConfigOption {
+	return func(c *Config) error {
+		return c.applyGoalTimePatch(patch)
+	}
+}
+
+func (c *Config) applyGoalTimePatch(patch *ypb.AIGoalTimePatch) error {
+	if c == nil {
+		return fmt.Errorf("goal time config is nil")
+	}
+	if patch == nil {
+		return fmt.Errorf("goal time patch is nil")
+	}
+	if c.m == nil {
+		c.m = new(sync.Mutex)
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	now := time.Now()
+	switch patch.GetAction() {
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND:
+		delta := patch.GetExtendSeconds()
+		if delta == 0 {
+			return fmt.Errorf("goal time extension must not be zero")
+		}
+		switch {
+		case c.GoalDurationSeconds == 0:
+			return fmt.Errorf("goal time window is disabled")
+		case c.GoalDurationSeconds == -1:
+			// The window is already open indefinitely.
+		case c.GoalDeadline.IsZero():
+			if c.GoalDurationSeconds+delta <= 0 {
+				return fmt.Errorf("goal duration must remain positive")
+			}
+			c.GoalDurationSeconds += delta
+		default:
+			base := c.GoalDeadline
+			if base.Before(now) {
+				base = now
+			}
+			c.GoalDeadline = base.Add(time.Duration(delta) * time.Second)
+			if c.GoalDeadline.Before(now) {
+				c.GoalDeadline = now
+			}
+		}
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE:
+		if patch.GetDeadlineUnix() <= 0 {
+			return fmt.Errorf("goal deadline unix timestamp must be positive")
+		}
+		c.GoalDeadline = time.Unix(patch.GetDeadlineUnix(), 0)
+		if c.GoalDurationSeconds <= 0 {
+			remainingSeconds := int64(c.GoalDeadline.Sub(now) / time.Second)
+			if remainingSeconds <= 0 {
+				remainingSeconds = 1
+			}
+			c.GoalDurationSeconds = remainingSeconds
+		}
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE:
+		c.GoalDurationSeconds = 0
+		c.GoalDeadline = time.Time{}
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING:
+		c.GoalDurationSeconds = -1
+		c.GoalDeadline = computeGoalDeadline(now, -1)
+	default:
+		return fmt.Errorf("unsupported goal time action: %s", patch.GetAction())
+	}
+
+	c.goalTimeRevision++
+	return nil
 }
 
 // mergeHotpatchSessionStartParams overlays hotpatch Params onto cached session start_params.

@@ -42,6 +42,7 @@ var eventTypeNotSaveBlackList = []EventType{
 	EVENT_TYPE_MEMORY_ADD_CONTEXT,
 	EVENT_TYPE_MEMORY_REMOVE_CONTEXT,
 	EVENT_TYPE_MEMORY_CONTEXT,
+	EVENT_TYPE_AGENT_POLICY_SNAPSHOT,
 	// 价值评估结果只回吐前端展示, 不落本地数据库
 	EVENT_TYPE_VALUE_FEEDBACK,
 }
@@ -240,6 +241,7 @@ const (
 	EVENT_TYPE_MEMORY_ADD_CONTEXT     EventType = "memory_add_context"
 	EVENT_TYPE_MEMORY_REMOVE_CONTEXT  EventType = "memory_remove_context"
 	EVENT_TYPE_MEMORY_CONTEXT         EventType = "memory_context" // memory context sync event, used to emit all memory context information
+	EVENT_TYPE_AGENT_POLICY_SNAPSHOT  EventType = "agent_policy_snapshot"
 
 	// AI Task Execution Mode Switch
 	EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC EventType = "ai_task_switched_to_async" // AI task switched to async execution event

@@ -458,6 +458,12 @@ func overlayAIExecutionStrategy(base, patch *ypb.AIExecutionStrategy) *ypb.AIExe
 	if patch.GetMaxSubAgents() > 0 {
 		next.MaxSubAgents = patch.GetMaxSubAgents()
 	}
+	if patch.GetGoalDurationSeconds() != 0 {
+		next.GoalDurationSeconds = patch.GetGoalDurationSeconds()
+	}
+	if patch.GetGoalAcceptanceCriteria() != "" {
+		next.GoalAcceptanceCriteria = patch.GetGoalAcceptanceCriteria()
+	}
 	return next
 }
 
