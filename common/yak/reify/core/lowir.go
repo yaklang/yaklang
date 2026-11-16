@@ -7,8 +7,19 @@ package core
 // definitions. Registers and memory remain explicit effects rather than
 // implicit mutable SSA values.
 type LowIR struct {
-	Target    Target     `json:"target"`
-	Functions []Function `json:"functions"`
+	Target Target `json:"target"`
+	// Frame describes the call frame of the target architecture. A parser fills
+	// it so a pass can name the stack and frame registers without matching
+	// architecture-specific spellings.
+	Frame FrameModel `json:"frame,omitempty"`
+	// Registers describes register naming and the argument and return
+	// registers of the target ABI.
+	Registers RegisterModel `json:"registers,omitempty"`
+	// Canary describes how the target reads its stack-protector guard. A lifter
+	// that recognizes the read emits the neutral canary intrinsic, so the canary
+	// pass stays architecture-neutral.
+	Canary    CanaryModel `json:"canary,omitempty"`
+	Functions []Function  `json:"functions"`
 }
 
 // Function is one decoded unit. Address is its entry address. The current

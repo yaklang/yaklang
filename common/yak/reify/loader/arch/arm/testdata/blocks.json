@@ -13,7 +13,7 @@
       "function sub_0x8050000 @ 0x8050000",
       "block b1 @ 0x8050000",
       "  0x8050000  v1:i32 = read_register %cpsr [read_register]",
-      "  0x8050000  v2:i1 = intrinsic @arm.cond.ne, v1 [read_register]",
+      "  0x8050000  v2:i1 = intrinsic @cond.ne, v1 [read_register]",
       "  0x8050000  branch v2 -> b2",
       "block b2 @ 0x8050004",
       "  0x8050004  v3:i32 = read_register %r0 [read_register]",

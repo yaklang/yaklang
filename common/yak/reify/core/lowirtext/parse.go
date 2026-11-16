@@ -12,6 +12,9 @@ import (
 
 var (
 	targetLine      = regexp.MustCompile(`^target: ([^/]+)/([^ ]+) \((\d+)-bit, ([a-z]+)-endian\)$`)
+	frameLine       = regexp.MustCompile(`^frame: (.+)$`)
+	registersLine   = regexp.MustCompile(`^registers: (.+)$`)
+	canaryLine      = regexp.MustCompile(`^canary: (.+)$`)
 	functionLine    = regexp.MustCompile(`^function (\S+) @ (0x[0-9a-fA-F]+)$`)
 	blockLine       = regexp.MustCompile(`^block b(\d+) @ (0x[0-9a-fA-F]+)$`)
 	instructionLine = regexp.MustCompile(`^  (0x[0-9a-fA-F]+)  (.*)$`)
@@ -26,6 +29,18 @@ func Parse(text string) (*core.LowIR, error) {
 	for lineNumber, raw := range strings.Split(text, "\n") {
 		line := strings.TrimRight(raw, " \t")
 		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if match := frameLine.FindStringSubmatch(line); match != nil {
+			ir.Frame = parseFrame(match[1])
+			continue
+		}
+		if match := registersLine.FindStringSubmatch(line); match != nil {
+			ir.Registers = parseRegisters(match[1])
+			continue
+		}
+		if match := canaryLine.FindStringSubmatch(line); match != nil {
+			ir.Canary = parseCanary(match[1])
 			continue
 		}
 		if match := targetLine.FindStringSubmatch(line); match != nil {
@@ -229,4 +244,94 @@ func registerTypeBits(name string) uint16 {
 	default:
 		return 64
 	}
+}
+
+// parseFrame reads the frame line. An unknown key is ignored, so a newer writer
+// does not make an older reader fail.
+func parseFrame(text string) core.FrameModel {
+	var frame core.FrameModel
+	for key, value := range parsePairs(text) {
+		switch key {
+		case "sp":
+			frame.StackPointer = value
+		case "fp":
+			frame.FramePointer = value
+		case "ret":
+			frame.ReturnAddress = value
+		case "flags":
+			frame.Flags = value
+		case "saved":
+			frame.CalleeSaved = splitList(value)
+		case "growth":
+			growth, _ := strconv.Atoi(value)
+			frame.StackGrowth = int8(growth)
+		}
+	}
+	return frame
+}
+
+// parseRegisters reads the register line.
+func parseRegisters(text string) core.RegisterModel {
+	var registers core.RegisterModel
+	for key, value := range parsePairs(text) {
+		switch key {
+		case "naming":
+			registers.Naming = value
+		case "width":
+			width, _ := strconv.Atoi(value)
+			registers.Width = uint16(width)
+		case "flags":
+			registers.Flags = value
+		case "flags_width":
+			width, _ := strconv.Atoi(value)
+			registers.FlagsWidth = uint16(width)
+		case "args":
+			registers.Arguments = splitList(value)
+		case "return":
+			registers.Return = value
+		}
+	}
+	return registers
+}
+
+// parseCanary reads the canary line.
+func parseCanary(text string) core.CanaryModel {
+	var canary core.CanaryModel
+	for key, value := range parsePairs(text) {
+		switch key {
+		case "kind":
+			canary.Kind = value
+		case "register":
+			canary.Register = value
+		case "offset":
+			offset, err := strconv.ParseUint(value, 0, 64)
+			if err == nil {
+				canary.Offset = offset
+			}
+		case "symbol":
+			canary.Symbol = value
+		}
+	}
+	return canary
+}
+
+// parsePairs splits "key=value" pairs separated by spaces.
+func parsePairs(text string) map[string]string {
+	pairs := make(map[string]string)
+	for _, field := range strings.Fields(text) {
+		key, value, ok := strings.Cut(field, "=")
+		if !ok {
+			continue
+		}
+		pairs[key] = value
+	}
+	return pairs
+}
+
+// splitList splits a comma-separated list.
+func splitList(text string) []string {
+	if text == "" {
+		return nil
+	}
+	return strings.Split(text, ",")
 }

@@ -70,7 +70,7 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 	converter := &converter{
 		ctx:         ctx,
 		program:     program,
-		arch:        ir.Target.Architecture,
+		facts:       ir.Facts(),
 		diagnostics: make([]core.Diagnostic, 0),
 	}
 	for index := range ir.Functions {
@@ -82,7 +82,7 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 		if len(names) == 0 {
 			names = pass.DefaultNames()
 		}
-		if err := pass.Apply(&function, names...); err != nil {
+		if err := pass.Apply(&function, ir.Facts(), names...); err != nil {
 			return nil, err
 		}
 		function.FrameCleanup = containsPass(names, "remove-stackframe")
@@ -128,7 +128,7 @@ type converter struct {
 	current     core.BlockID
 	types       map[core.ValueType]ssa.Type
 	undefined   map[string]ssa.Value
-	arch        core.Architecture
+	facts       core.ArchFacts
 }
 
 func (c *converter) convertFunction(function core.Function) error {
@@ -309,47 +309,20 @@ func (c *converter) bindParameters() {
 }
 
 // entryRegisters lists the frame registers that start with ABI-defined values.
+// They come from the frame model, so a new architecture needs no change here.
 func (c *converter) entryRegisters() []string {
-	switch c.arch {
-	case core.ArchARM64:
-		// SP, the frame pointer (X29) and the link register (X30).
-		return []string{"sp", "x29", "x30"}
-	case core.ArchARM:
-		// SP, the frame pointer (R11) and the link register (R14).
-		return []string{"sp", "r11", "lr"}
-	case core.Arch386:
-		return []string{"esp", "ebp"}
-	default:
-		return []string{"rsp", "rbp"}
-	}
+	return c.facts.Frame.EntryRegisters()
 }
 
+// argumentRegisters lists the integer argument registers of the target ABI. An
+// empty list means the ABI passes every argument on the stack.
 func (c *converter) argumentRegisters() []string {
-	switch c.arch {
-	case core.ArchARM64:
-		return []string{"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"}
-	case core.ArchARM:
-		// AAPCS passes the first four integer arguments in r0..r3.
-		return []string{"r0", "r1", "r2", "r3"}
-	case core.Arch386:
-		// cdecl passes every argument on the stack; no register holds one.
-		return nil
-	default:
-		return []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
-	}
+	return c.facts.Registers.Arguments
 }
 
+// returnRegister names the register that carries a scalar result.
 func (c *converter) returnRegister() string {
-	switch c.arch {
-	case core.ArchARM64:
-		return "x0"
-	case core.ArchARM:
-		return "r0"
-	case core.Arch386:
-		return "eax"
-	default:
-		return "rax"
-	}
+	return c.facts.Registers.Return
 }
 
 func (c *converter) convertBlock(block core.Block) error {
@@ -440,7 +413,7 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpReturn:
 		values := c.operandValues(instruction.Operands)
 		if len(values) == 0 {
-			if value := c.currentRegister("rax"); value != nil {
+			if value := c.currentRegister(c.returnRegister()); value != nil {
 				values = append(values, value)
 			}
 		}
@@ -592,28 +565,12 @@ func (c *converter) currentRegister(name string) ssa.Value {
 	return variable.GetValue()
 }
 
-// registerView returns the register view for the current architecture. The
-// 32-bit ARM register names r0..r15 collide with the x86 extended registers, so
-// the architecture decides how they are interpreted.
+// registerView returns the register view for the current architecture. The rule
+// comes from the register model, because the same spelling means different things
+// on different targets: r8 is an x86 extended register and an ARM register, and
+// x2 is a RISC-V register, not the second half of an AArch64 pair.
 func (c *converter) registerView(name string, bits uint16) registerView {
-	view := registerViewFor(name, bits)
-	if c.arch != core.ArchARM {
-		return view
-	}
-	switch strings.ToLower(name) {
-	case "sp", "lr", "pc", "cpsr":
-	default:
-		if !isARMRegister(name) {
-			return view
-		}
-	}
-	// Every ARM register is one 32-bit word, including sp, lr and pc. The
-	// 64-bit names x29/x30 must not leak into ARM output.
-	view.canonical = strings.ToLower(name)
-	view.shift = 0
-	view.width = 32
-	view.canonicalBits = 32
-	return view
+	return registerViewFor(name, bits, c.facts.Registers)
 }
 
 func isARMRegister(name string) bool {
@@ -838,24 +795,21 @@ func (c *converter) emitIntrinsic(instruction core.Instruction) {
 	c.setResult(instruction, c.opaqueValue(name, instruction))
 }
 
-// flagSymbolName returns the comparison name of an architecture flag update,
-// for example x86.flags.cmp or arm64.flags.cmp.
+// flagSymbolName returns the comparison name of a flag update, for example
+// flags.cmp. Every lifter writes this one namespace, so a consumer does not have
+// to enumerate architecture spellings.
 func flagSymbolName(symbol string) (string, bool) {
-	for _, prefix := range []string{"x86.flags.", "arm64.flags.", "arm.flags."} {
-		if strings.HasPrefix(symbol, prefix) {
-			return strings.TrimPrefix(symbol, prefix), true
-		}
+	if strings.HasPrefix(symbol, core.FlagsIntrinsicPrefix) {
+		return strings.TrimPrefix(symbol, core.FlagsIntrinsicPrefix), true
 	}
 	return "", false
 }
 
 // conditionSymbolName returns the condition code of an architecture condition
-// read, for example x86.cond.e or arm64.cond.eq.
+// read, for example cond.e.
 func conditionSymbolName(symbol string) (string, bool) {
-	for _, prefix := range []string{"x86.cond.", "arm64.cond.", "arm.cond."} {
-		if strings.HasPrefix(symbol, prefix) {
-			return strings.TrimPrefix(symbol, prefix), true
-		}
+	if strings.HasPrefix(symbol, core.ConditionIntrinsicPrefix) {
+		return strings.TrimPrefix(symbol, core.ConditionIntrinsicPrefix), true
 	}
 	return "", false
 }
@@ -1371,11 +1325,46 @@ func (v registerView) mask() uint64 {
 // registerViewFor maps a machine register name to one SSA variable. Partial
 // registers share the canonical 64-bit variable; their width and bit offset
 // decide how a read is extracted or a write is merged.
-func registerViewFor(name string, bits uint16) registerView {
+//
+// The rule follows the register model, not a table of every name the parsers
+// might emit. x86 splits one register into 8, 16 and 32-bit views; AArch64 shares
+// a variable between Wn and Xn; every other target treats a name as one register.
+func registerViewFor(name string, bits uint16, model core.RegisterModel) registerView {
 	lower := strings.ToLower(name)
 	if lower == "" {
 		return registerView{}
 	}
+	if model.Flags != "" && lower == model.Flags {
+		// A flag word is not an integer register, so its width is declared rather
+		// than derived from the machine width. x86 keeps one variable for the
+		// flags word across the 32-bit and 64-bit spellings.
+		width := model.FlagsWidth
+		if width == 0 {
+			width = model.Width
+		}
+		canonical := lower
+		if model.Naming == core.RegisterNamingX86 {
+			canonical = "rflags"
+		}
+		return registerView{canonical: canonical, width: width, canonicalBits: width}
+	}
+	switch model.Naming {
+	case core.RegisterNamingX86:
+		return x86RegisterView(lower, bits)
+	case core.RegisterNamingAArch64:
+		return aarch64RegisterView(lower, bits, model.Width)
+	default:
+		width := bits
+		if width == 0 {
+			width = model.Width
+		}
+		return registerView{canonical: lower, width: width, canonicalBits: width}
+	}
+}
+
+// x86RegisterView maps one x86 register name, including the partial views, to the
+// 64-bit variable that holds it.
+func x86RegisterView(lower string, bits uint16) registerView {
 	if family, ok := generalRegisterFamily(lower); ok {
 		width := bits
 		if width == 0 {
@@ -1399,11 +1388,37 @@ func registerViewFor(name string, bits uint16) registerView {
 		// The flags pseudo register is one opaque word regardless of the
 		// machine width, so a 32-bit write must not become a partial write.
 		return registerView{canonical: "rflags", width: 64, canonicalBits: 64}
-	case lower == "cpsr":
-		return registerView{canonical: "cpsr", width: 32, canonicalBits: 32}
 	default:
 		return registerView{canonical: lower, width: bits}
 	}
+}
+
+// aarch64RegisterView shares one variable between a W register and its X
+// counterpart, and between SP and WSP.
+func aarch64RegisterView(lower string, bits, defaultBits uint16) registerView {
+	switch lower {
+	case "wsp", "sp":
+		return registerView{canonical: "sp", width: 64, canonicalBits: 64}
+	case "wzr", "xzr":
+		return registerView{canonical: "xzr", width: 64, canonicalBits: 64}
+	case "fp":
+		return registerView{canonical: "x29", width: 64, canonicalBits: 64}
+	case "lr":
+		return registerView{canonical: "x30", width: 64, canonicalBits: 64}
+	}
+	digits, ok := registerDigits(lower[1:])
+	if !ok || len(lower) < 2 || (lower[0] != 'w' && lower[0] != 'x') {
+		width := bits
+		if width == 0 {
+			width = defaultBits
+		}
+		return registerView{canonical: lower, width: width, canonicalBits: width}
+	}
+	width := uint16(64)
+	if lower[0] == 'w' {
+		width = 32
+	}
+	return registerView{canonical: "x" + digits, width: width, canonicalBits: 64}
 }
 
 func generalRegisterFamily(name string) (string, bool) {

@@ -36,6 +36,47 @@ type Profile struct {
 	Flags string
 	// Endbr marks the CET landing-pad mnemonics this profile accepts.
 	Endbr string
+	// CalleeSaved lists the registers a callee must preserve, including the
+	// frame pointer.
+	CalleeSaved []string
+	// Canary describes where the stack protector reads its guard.
+	Canary core.CanaryModel
+}
+
+// Registers describes register naming and the integer argument registers of this
+// profile. The 64-bit System V ABI passes six arguments in registers; the 32-bit
+// cdecl ABI passes every argument on the stack.
+func (p Profile) Registers() core.RegisterModel {
+	model := core.RegisterModel{
+		Naming:     core.RegisterNamingX86,
+		Width:      p.Bits,
+		Flags:      p.Flags,
+		FlagsWidth: 64,
+	}
+	if p.Mode == 64 {
+		model.Arguments = []string{"rdi", "rsi", "rdx", "rcx", "r8", "r9"}
+		model.Return = "rax"
+		return model
+	}
+	// A 32-bit result is the low half of the same variable.
+	model.Return = "eax"
+	if p.Mode == 16 {
+		model.Return = "ax"
+	}
+	return model
+}
+
+// Frame describes the call frame for this profile. The stack and frame pointer
+// names differ between the 32-bit and the 64-bit mode, which is the whole reason
+// a pass cannot hard-code one spelling.
+func (p Profile) Frame() core.FrameModel {
+	return core.FrameModel{
+		StackPointer: p.StackPointer,
+		FramePointer: p.StackFrame,
+		Flags:        p.Flags,
+		CalleeSaved:  p.CalleeSaved,
+		StackGrowth:  -1,
+	}
 }
 
 // Profile64 is the AMD64 profile.
@@ -55,6 +96,8 @@ func Profile64() Profile {
 		CountRegister:      "rcx",
 		Flags:              "rflags",
 		Endbr:              "endbr64",
+		CalleeSaved:        []string{"rbp", "rbx", "r12", "r13", "r14", "r15"},
+		Canary:             core.CanaryModel{Kind: core.CanarySegment, Register: "fs", Offset: 0x28},
 	}
 }
 
@@ -73,6 +116,7 @@ func Profile32() Profile {
 		Accumulator8High: "ah",
 		CountRegister:    "ecx",
 		Flags:            "eflags",
+		CalleeSaved:      []string{"ebp", "ebx", "esi", "edi"},
 	}
 }
 
@@ -92,6 +136,7 @@ func Profile16() Profile {
 		Accumulator8High: "ah",
 		CountRegister:    "cx",
 		Flags:            "flags",
+		CalleeSaved:      []string{"bp", "bx", "si", "di"},
 	}
 }
 

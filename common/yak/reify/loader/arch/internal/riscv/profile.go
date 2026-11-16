@@ -17,6 +17,9 @@ type Profile struct {
 	Name string
 	// Bits is the default integer and address width.
 	Bits uint16
+	// Canary describes where the stack protector reads its guard. It is empty
+	// for a target whose guard read this package does not recognize.
+	Canary core.CanaryModel
 }
 
 // Profile64 is the RV64 profile.
@@ -41,4 +44,26 @@ func (p Profile) Check(target core.Target) error {
 		return fmt.Errorf("%s does not support execution mode %q", p.Name, target.Mode)
 	}
 	return nil
+}
+
+// Frame describes the RISC-V call frame. x2 is the stack pointer, x8 the frame
+// pointer and x1 the return address register.
+func (p Profile) Frame() core.FrameModel {
+	return core.FrameModel{
+		StackPointer:  "x2",
+		FramePointer:  "x8",
+		ReturnAddress: "x1",
+		CalleeSaved:   []string{"x8", "x9", "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26", "x27"},
+		StackGrowth:   -1,
+	}
+}
+
+// Registers describes register naming and the integer argument registers.
+func (p Profile) Registers() core.RegisterModel {
+	return core.RegisterModel{
+		Naming:    core.RegisterNamingPlain,
+		Width:     p.Bits,
+		Arguments: []string{"x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17"},
+		Return:    "x10",
+	}
 }

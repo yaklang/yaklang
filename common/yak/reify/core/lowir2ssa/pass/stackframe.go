@@ -3,18 +3,24 @@ package pass
 import "github.com/yaklang/yaklang/common/yak/reify/core"
 
 // RemoveStackFrame removes standard frame setup and teardown from one LowIR
-// function: callee-saved pushes, `mov rbp, rsp`, stack allocation, `leave`,
-// callee-saved pops, and matching stack release. It returns the number of
-// removed instructions.
+// function: callee-saved pushes, the frame-pointer move, stack allocation, the
+// epilogue pop and the matching stack release. It returns the number of removed
+// instructions.
+//
+// The register names come from the frame model, so one implementation serves
+// every architecture: rsp/rbp on amd64, esp/ebp on 386, sp/r11 on ARM, r15/r11 on
+// s390x, r3/r22 on loong64. A model without a stack pointer removes nothing,
+// because without it the pattern cannot be told apart from ordinary code.
 //
 // Frame-relative locals are not rewritten. Removing the frame therefore keeps
-// the code readable but can make an rbp-relative address lose its base.
-func RemoveStackFrame(function *core.Function) int {
-	if function == nil || len(function.Blocks) == 0 {
+// the code readable but can make a frame-relative address lose its base.
+func RemoveStackFrame(function *core.Function, facts core.ArchFacts) int {
+	frame := facts.Frame
+	if function == nil || len(function.Blocks) == 0 || frame.StackPointer == "" {
 		return 0
 	}
 	removed := make(map[instructionRef]bool)
-	removeBlockFrames(function, removed)
+	removeBlockFrames(function, frame, removed)
 	if len(removed) == 0 {
 		return 0
 	}
@@ -50,7 +56,7 @@ type frameGroupInstruction struct {
 
 // removeBlockFrames trims frame setup and teardown at every block boundary, so
 // functions recovered inside one linear scan also lose their frames.
-func removeBlockFrames(function *core.Function, removed map[instructionRef]bool) {
+func removeBlockFrames(function *core.Function, frame core.FrameModel, removed map[instructionRef]bool) {
 	for blockIndex := range function.Blocks {
 		groups := blockFrameGroups(function, blockIndex)
 		if len(groups) == 0 {
@@ -58,8 +64,8 @@ func removeBlockFrames(function *core.Function, removed map[instructionRef]bool)
 		}
 		// A prologue can be interleaved with unrelated setup instructions, so
 		// inspect a small window instead of requiring contiguous groups.
-		if blockUsesFrameBase(groups) {
-			markReturnEpilogue(groups, removed)
+		if blockUsesFrameBase(groups, frame) {
+			markReturnEpilogue(groups, frame, removed)
 			continue
 		}
 		window := len(groups)
@@ -68,13 +74,13 @@ func removeBlockFrames(function *core.Function, removed map[instructionRef]bool)
 		}
 		hasPrologue := blockIndex == 0
 		for index := 0; index < window && !hasPrologue; index++ {
-			if frameHasCalleePush(groups[index]) || frameHasFramePointer(groups[index]) {
+			if frameHasCalleePush(groups[index], frame) || frameHasFramePointer(groups[index], frame) {
 				hasPrologue = true
 			}
 		}
 		if hasPrologue {
 			for index := 0; index < window; index++ {
-				if frameSetup(groups[index]) {
+				if frameSetup(groups[index], frame) {
 					markFrameGroup(removed, groups[index])
 				}
 			}
@@ -94,7 +100,7 @@ func removeBlockFrames(function *core.Function, removed map[instructionRef]bool)
 				end--
 				continue
 			}
-			if !frameTeardown(group) {
+			if !frameTeardown(group, frame) {
 				break
 			}
 			markFrameGroup(removed, group)
@@ -126,10 +132,10 @@ func frameTerminatorKind(function *core.Function, blockIndex int) core.Opcode {
 	return instructions[len(instructions)-1].Kind
 }
 
-// markReturnEpilogue removes teardown groups even when rbp-relative locals
-// keep the prologue. These values only restore rsp/rbp and are not part of the
-// function result.
-func markReturnEpilogue(groups []frameGroup, removed map[instructionRef]bool) {
+// markReturnEpilogue removes teardown groups even when frame-relative locals
+// keep the prologue. These values only restore the stack and frame pointers and
+// are not part of the function result.
+func markReturnEpilogue(groups []frameGroup, frame core.FrameModel, removed map[instructionRef]bool) {
 	if len(groups) == 0 || !frameTerminator(groups[len(groups)-1]) {
 		return
 	}
@@ -143,7 +149,7 @@ func markReturnEpilogue(groups []frameGroup, removed map[instructionRef]bool) {
 			end--
 			continue
 		}
-		if !frameTeardown(group) {
+		if !frameTeardown(group, frame) {
 			break
 		}
 		markFrameGroup(removed, group)
@@ -151,24 +157,30 @@ func markReturnEpilogue(groups []frameGroup, removed map[instructionRef]bool) {
 	}
 }
 
-func blockUsesFrameBase(groups []frameGroup) bool {
+func blockUsesFrameBase(groups []frameGroup, frame core.FrameModel) bool {
+	if frame.FramePointer == "" {
+		return false
+	}
 	for _, group := range groups {
-		if frameNoise(group) || frameSetup(group) || frameTeardown(group) {
+		if frameNoise(group) || frameSetup(group, frame) || frameTeardown(group, frame) {
 			continue
 		}
-		if frameReads(group, "rbp") {
+		if frameReads(group, frame.FramePointer) {
 			return true
 		}
 	}
 	return false
 }
 
-func frameHasCalleePush(group frameGroup) bool {
-	return frameWrites(group, "rsp") && frameHasStore(group) && frameReadsCalleeSaved(group)
+func frameHasCalleePush(group frameGroup, frame core.FrameModel) bool {
+	return frameWrites(group, frame.StackPointer) && frameHasStore(group) && frameReadsCalleeSaved(group, frame)
 }
 
-func frameHasFramePointer(group frameGroup) bool {
-	return frameWrites(group, "rbp") && frameReads(group, "rsp")
+func frameHasFramePointer(group frameGroup, frame core.FrameModel) bool {
+	if frame.FramePointer == "" {
+		return false
+	}
+	return frameWrites(group, frame.FramePointer) && frameReads(group, frame.StackPointer)
 }
 
 func frameNoise(group frameGroup) bool {
@@ -180,7 +192,7 @@ func frameNoise(group frameGroup) bool {
 		return true
 	}
 	return instruction.Kind == core.OpIntrinsic && len(instruction.Operands) > 0 &&
-		instruction.Operands[0].Name == "x86.endbr64"
+		core.IsLandingPadIntrinsic(instruction.Operands[0].Name)
 }
 
 func frameTerminator(group frameGroup) bool {
@@ -192,25 +204,26 @@ func frameTerminator(group frameGroup) bool {
 	return false
 }
 
-func frameSetup(group frameGroup) bool {
-	writesRSP := frameWrites(group, "rsp")
-	if frameWrites(group, "rbp") && frameReads(group, "rsp") {
+func frameSetup(group frameGroup, frame core.FrameModel) bool {
+	writesStack := frameWrites(group, frame.StackPointer)
+	readsStack := frameReads(group, frame.StackPointer)
+	if frameHasFramePointer(group, frame) {
 		return true
 	}
-	if writesRSP && (frameHasKind(group, core.OpSub) || frameHasKind(group, core.OpAnd)) && frameReads(group, "rsp") {
+	if writesStack && (frameHasKind(group, core.OpSub) || frameHasKind(group, core.OpAnd)) && readsStack {
 		return true
 	}
-	return writesRSP && frameHasStore(group) && frameReadsCalleeSaved(group)
+	return writesStack && frameHasStore(group) && frameReadsCalleeSaved(group, frame)
 }
 
-func frameTeardown(group frameGroup) bool {
-	if frameHasLoad(group) && frameReads(group, "rsp") && frameWritesCalleeSaved(group) {
+func frameTeardown(group frameGroup, frame core.FrameModel) bool {
+	if frameHasLoad(group) && frameReads(group, frame.StackPointer) && frameWritesCalleeSaved(group, frame) {
 		return true
 	}
-	if frameWrites(group, "rsp") && frameReads(group, "rbp") {
+	if frame.FramePointer != "" && frameWrites(group, frame.StackPointer) && frameReads(group, frame.FramePointer) {
 		return true
 	}
-	if frameHasKind(group, core.OpAdd) && frameReads(group, "rsp") && frameWritesOnlyRSP(group) {
+	if frameHasKind(group, core.OpAdd) && frameReads(group, frame.StackPointer) && frameWritesOnlyStack(group, frame) {
 		return true
 	}
 	return false
@@ -242,8 +255,11 @@ func frameReads(group frameGroup, name string) bool {
 	return false
 }
 
-func frameReadsCalleeSaved(group frameGroup) bool {
-	for _, name := range []string{"rbp", "rbx", "r12", "r13", "r14", "r15"} {
+// frameReadsCalleeSaved reports whether one group saves a register a callee must
+// preserve. Saving the return address is part of the same prologue on a
+// link-register target, where the callee has no stack slot for it by default.
+func frameReadsCalleeSaved(group frameGroup, frame core.FrameModel) bool {
+	for _, name := range frame.SavedRegisters() {
 		if frameReads(group, name) {
 			return true
 		}
@@ -251,8 +267,8 @@ func frameReadsCalleeSaved(group frameGroup) bool {
 	return false
 }
 
-func frameWritesCalleeSaved(group frameGroup) bool {
-	for _, name := range []string{"rbp", "rbx", "r12", "r13", "r14", "r15"} {
+func frameWritesCalleeSaved(group frameGroup, frame core.FrameModel) bool {
+	for _, name := range frame.SavedRegisters() {
 		if frameWrites(group, name) {
 			return true
 		}
@@ -260,14 +276,17 @@ func frameWritesCalleeSaved(group frameGroup) bool {
 	return false
 }
 
-func frameWritesOnlyRSP(group frameGroup) bool {
+// frameWritesOnlyStack reports whether one group writes nothing but the stack
+// pointer. A flag update may accompany the adjustment, because some targets
+// compute the new stack pointer with a flag-setting subtract.
+func frameWritesOnlyStack(group frameGroup, frame core.FrameModel) bool {
 	for _, item := range group.instructions {
 		instruction := item.instruction
 		if instruction.Kind != core.OpWriteRegister || len(instruction.Operands) == 0 {
 			continue
 		}
 		name := instruction.Operands[0].Name
-		if name != "rsp" && name != "rflags" {
+		if name != frame.StackPointer && name != frame.Flags {
 			return false
 		}
 	}
@@ -301,4 +320,6 @@ func countFrameInstructions(function *core.Function) int {
 }
 
 // RemoveFrame is the registry entry point for stack-frame removal.
-func RemoveFrame(function *core.Function) int { return RemoveStackFrame(function) }
+func RemoveFrame(function *core.Function, facts core.ArchFacts) int {
+	return RemoveStackFrame(function, facts)
+}

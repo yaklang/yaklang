@@ -20,6 +20,41 @@ var (
 	_ core.BoundaryDiscoverer = Parser{}
 )
 
+// registers describes AAPCS register naming and the argument registers.
+func registers() core.RegisterModel {
+	return core.RegisterModel{
+		Naming:     core.RegisterNamingPlain,
+		Width:      32,
+		Flags:      "cpsr",
+		FlagsWidth: 32,
+		Arguments:  []string{"r0", "r1", "r2", "r3"},
+		Return:     "r0",
+	}
+}
+
+// frame describes the AAPCS call frame. r11 is the frame pointer and r14 the
+// link register.
+func frame() core.FrameModel {
+	return core.FrameModel{
+		StackPointer:  "sp",
+		FramePointer:  "r11",
+		ReturnAddress: "lr",
+		Flags:         "cpsr",
+		CalleeSaved:   []string{"r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11"},
+		StackGrowth:   -1,
+	}
+}
+
+// Facts describes the call frame, the register naming and the stack guard of
+// this architecture.
+func (Parser) Facts() core.ArchFacts {
+	return core.ArchFacts{
+		Frame:     frame(),
+		Registers: registers(),
+		Canary:    core.CanaryModel{},
+	}
+}
+
 func (Parser) Kind() core.Architecture { return core.ArchARM }
 func (Parser) Name() string            { return "arm" }
 func (Parser) Available() bool         { return true }

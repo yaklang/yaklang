@@ -26,7 +26,7 @@
       "  0x403000  v2:i32 = read_register %ebx [read_register]",
       "  0x403000  v3:i32 = add v1, v2",
       "  0x403000  write_register %eax, v3 [write_register]",
-      "  0x403000  v4:i32 = intrinsic @x86.flags.add, v1, v2, v3 [write_register]",
+      "  0x403000  v4:i32 = intrinsic @flags.add, v1, v2, v3 [write_register]",
       "  0x403000  write_register %eflags, v4 [write_register]",
       "  0x403002  return [may_trap, unknown]",
       "function second @ 0x403003",
@@ -35,7 +35,7 @@
       "  0x403003  v2:i32 = read_register %ebx [read_register]",
       "  0x403003  v3:i32 = sub v1, v2",
       "  0x403003  write_register %eax, v3 [write_register]",
-      "  0x403003  v4:i32 = intrinsic @x86.flags.sub, v1, v2, v3 [write_register]",
+      "  0x403003  v4:i32 = intrinsic @flags.sub, v1, v2, v3 [write_register]",
       "  0x403003  write_register %eflags, v4 [write_register]",
       "  0x403005  return [may_trap, unknown]"
     ]

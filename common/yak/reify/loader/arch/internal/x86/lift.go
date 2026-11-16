@@ -27,7 +27,7 @@ type place struct {
 }
 
 func liftFunctions(profile Profile, target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
-	ir := &core.LowIR{Target: target}
+	ir := &core.LowIR{Target: target, Frame: profile.Frame(), Registers: profile.Registers(), Canary: profile.Canary}
 	for index, functionBody := range functions {
 		ir.Functions = append(ir.Functions, liftFunction(profile, target, functionBody, core.FunctionID(index+1), blockIDs, diagnostics))
 	}
@@ -951,12 +951,12 @@ func (l *lifter) condition(ins instruction) core.ValueID {
 		return l.operation(ins, core.OpEqual, []core.Operand{l.value(value), l.value(zero)}, 1, core.EffectNone)
 	}
 	flags := l.readRegister(ins.address, l.profile.Flags, l.profile.Bits)
-	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("x86.cond." + code), l.value(flags)}, 1, core.EffectReadRegister)
+	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("cond." + code), l.value(flags)}, 1, core.EffectReadRegister)
 }
 
 func (l *lifter) setFlags(ins instruction, name string, values ...core.ValueID) {
 	operands := make([]core.Operand, 0, len(values)+1)
-	operands = append(operands, symbolOperand("x86.flags."+name))
+	operands = append(operands, symbolOperand("flags."+name))
 	for _, value := range values {
 		operands = append(operands, l.value(value))
 	}
@@ -1087,7 +1087,13 @@ func (l *lifter) address(ins instruction, memory x86asm.Mem) core.ValueID {
 	}
 	if memory.Segment != 0 {
 		segment := strings.ToLower(memory.Segment.String())
-		result = l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("x86.segment." + segment), l.value(result)}, 64, core.EffectReadRegister|core.EffectUnknown)
+		name := "x86.segment." + segment
+		if canary := l.profile.Canary; canary.Kind == core.CanarySegment && canary.Register == segment {
+			// The guard lives behind this segment base. Mark the base so the
+			// canary pass does not need to know the segment spelling.
+			name = core.TLSBaseIntrinsic
+		}
+		result = l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand(name), l.value(result)}, 64, core.EffectReadRegister|core.EffectUnknown)
 	}
 	return result
 }

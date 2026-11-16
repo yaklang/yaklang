@@ -19,6 +19,17 @@ var _ core.BoundaryDiscoverer = Parser{}
 
 func profile() internal.Profile { return internal.Profile16() }
 
+// Facts describes the call frame, the register naming and the stack guard of
+// this architecture.
+func (Parser) Facts() core.ArchFacts {
+	profile := internal.Profile16()
+	return core.ArchFacts{
+		Frame:     profile.Frame(),
+		Registers: profile.Registers(),
+		Canary:    profile.Canary,
+	}
+}
+
 func (Parser) Kind() core.Architecture { return core.Arch8086 }
 func (Parser) Name() string            { return "8086" }
 func (Parser) Available() bool         { return true }

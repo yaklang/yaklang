@@ -14,11 +14,11 @@ import (
 // The pass works on LowIR, before conversion to YakSSA. It does not remove
 // unrelated TLS accesses, and it leaves the function unchanged when the
 // pattern is incomplete.
-func RemoveStackCanary(function *core.Function) int {
+func RemoveStackCanary(function *core.Function, facts core.ArchFacts) int {
 	if function == nil || len(function.Blocks) == 0 {
 		return 0
 	}
-	state := newCanaryState(function)
+	state := newCanaryState(function, facts)
 	if !state.scan() {
 		return 0
 	}
@@ -32,6 +32,7 @@ type instructionRef struct {
 
 type canaryState struct {
 	function *core.Function
+	facts    core.ArchFacts
 	defs     map[core.ValueID]core.Instruction
 	aliases  map[core.ValueID]core.ValueID
 	removed  map[instructionRef]bool
@@ -45,9 +46,10 @@ type canaryState struct {
 	registers map[string]core.ValueID
 }
 
-func newCanaryState(function *core.Function) *canaryState {
+func newCanaryState(function *core.Function, facts core.ArchFacts) *canaryState {
 	return &canaryState{
 		function:  function,
+		facts:     facts,
 		defs:      make(map[core.ValueID]core.Instruction),
 		aliases:   make(map[core.ValueID]core.ValueID),
 		removed:   make(map[instructionRef]bool),
@@ -69,46 +71,114 @@ func (s *canaryState) scan() bool {
 			}
 		}
 	}
-	if !s.scanTLSCanary() {
+	// Registers are tracked first: on a thread-pointer target the guard load
+	// reads a register the thread-pointer instruction wrote, and the offset is
+	// added after that.
+	s.scanRegisters()
+	if !s.scanCanary() {
 		return false
 	}
-	s.scanRegisters()
 	if !s.scanSpills() {
 		return false
 	}
 	checked := s.scanChecks()
 	flagged := s.scanFlagChecks()
+	if debugCanary {
+		println("canary: tlsLoads", len(s.tlsLoads), "spillSlots", len(s.slots), "reloads", len(s.reloads), "checked", checked, "flagged", flagged)
+	}
 	return checked || flagged
 }
 
-func (s *canaryState) scanTLSCanary() bool {
-	found := false
+// scanCanary finds the guard value. A lifter marks the thread pointer with the
+// neutral tls.base intrinsic, so this scan needs no architecture knowledge: it
+// looks for the marker, then for the model's offset, then for the load.
+//
+// Two shapes occur. A segment base folds the offset into the marker operand
+// (x86: fs:0x28); a thread pointer register leaves the offset to an add
+// (arm64: tpidr_el0, then ldr [x8,#0x28]).
+func (s *canaryState) scanCanary() bool {
+	offset := s.facts.Canary.Offset
+	if s.facts.Canary.Kind == "" || offset == 0 {
+		return false
+	}
+	addresses := make(map[core.ValueID]bool)
+	bases := make(map[core.ValueID]bool)
 	for blockIndex := range s.function.Blocks {
-		for index, instruction := range s.function.Blocks[blockIndex].Instructions {
-			if instruction.Kind != core.OpIntrinsic || len(instruction.Operands) < 2 {
+		for _, instruction := range s.function.Blocks[blockIndex].Instructions {
+			if instruction.Kind != core.OpIntrinsic || len(instruction.Operands) == 0 {
 				continue
 			}
-			if instruction.Operands[0].Name != "x86.segment.fs" {
-				continue
-			}
-			if s.constant(instruction.Operands[1].Value) != 0x28 {
+			if instruction.Operands[0].Name != core.TLSBaseIntrinsic {
 				continue
 			}
 			if len(instruction.Results) == 0 {
 				continue
 			}
-			tlsValue := instruction.Results[0].ID
-			for _, load := range s.usersOf(blockIndex, index, tlsValue, core.OpLoad) {
-				if len(load.Results) == 0 {
-					continue
-				}
-				s.tlsLoads[load.Results[0].ID] = true
-				s.canary[load.Results[0].ID] = true
-				found = true
+			// A segment base folds the offset into the marker; a thread pointer
+			// register leaves it to an add after the marker.
+			if len(instruction.Operands) >= 2 && s.constant(s.resolve(instruction.Operands[1].Value)) == offset {
+				addresses[instruction.Results[0].ID] = true
+				continue
+			}
+			bases[instruction.Results[0].ID] = true
+		}
+	}
+	// The offset may be added after the marker, in which case the sum is the
+	// guard address.
+	for blockIndex := range s.function.Blocks {
+		for _, instruction := range s.function.Blocks[blockIndex].Instructions {
+			if instruction.Kind != core.OpAdd || len(instruction.Operands) < 2 || len(instruction.Results) == 0 {
+				continue
+			}
+			left, right := s.resolve(instruction.Operands[0].Value), s.resolve(instruction.Operands[1].Value)
+			if bases[left] && s.constant(right) == offset {
+				addresses[instruction.Results[0].ID] = true
+			}
+			if bases[right] && s.constant(left) == offset {
+				addresses[instruction.Results[0].ID] = true
 			}
 		}
 	}
+	if len(addresses) == 0 {
+		return false
+	}
+	found := false
+	for blockIndex := range s.function.Blocks {
+		for _, instruction := range s.function.Blocks[blockIndex].Instructions {
+			if instruction.Kind != core.OpLoad || len(instruction.Operands) == 0 || len(instruction.Results) == 0 {
+				continue
+			}
+			if !addresses[s.resolve(instruction.Operands[0].Value)] {
+				continue
+			}
+			s.tlsLoads[instruction.Results[0].ID] = true
+			s.canary[instruction.Results[0].ID] = true
+			found = true
+		}
+	}
 	return found
+}
+
+// resolve follows the alias chain of one value so a scan matches the value a
+// register read or a copy stands for, not only the instruction that produced it.
+// A register read is linked by scanRegisters; a copy links through its operand.
+func (s *canaryState) resolve(id core.ValueID) core.ValueID {
+	for seen := 0; seen < 32; seen++ {
+		if next, ok := s.aliases[id]; ok && next != id {
+			id = next
+			continue
+		}
+		definition, ok := s.defs[id]
+		if !ok || definition.Kind != core.OpCopy || len(definition.Operands) == 0 {
+			return id
+		}
+		next := definition.Operands[0].Value
+		if next == id {
+			return id
+		}
+		id = next
+	}
+	return id
 }
 
 func (s *canaryState) scanRegisters() {
@@ -140,6 +210,8 @@ func (s *canaryState) scanRegisters() {
 	}
 }
 
+var debugCanary = false
+
 func (s *canaryState) scanSpills() bool {
 	found := false
 	for blockIndex := range s.function.Blocks {
@@ -158,6 +230,9 @@ func (s *canaryState) scanSpills() bool {
 			s.markRemoved(blockIndex, index)
 			found = true
 		}
+	}
+	if debugCanary {
+		println("canary: spill found", found)
 	}
 	if !found {
 		return false
@@ -191,11 +266,11 @@ func (s *canaryState) scanChecks() bool {
 				continue
 			}
 			compareID := instruction.Results[0].ID
-			flags, flagsRef, ok := s.singleUserIntrinsic(blockIndex, index, compareID, "x86.flags.")
+			flags, flagsRef, ok := s.singleUserIntrinsic(blockIndex, index, compareID, core.FlagsIntrinsicPrefix)
 			if !ok || len(flags.Results) == 0 {
 				continue
 			}
-			condition, conditionRef, ok := s.singleUserIntrinsic(flagsRef.block, flagsRef.index, flags.Results[0].ID, "x86.cond.")
+			condition, conditionRef, ok := s.singleUserIntrinsic(flagsRef.block, flagsRef.index, flags.Results[0].ID, core.ConditionIntrinsicPrefix)
 			if !ok || len(condition.Results) == 0 {
 				continue
 			}
@@ -231,7 +306,7 @@ func (s *canaryState) scanFlagChecks() bool {
 				continue
 			}
 			name := instruction.Operands[0].Name
-			if !strings.HasPrefix(name, "x86.flags.") {
+			if !strings.HasPrefix(name, core.FlagsIntrinsicPrefix) {
 				continue
 			}
 			if len(instruction.Results) == 0 || !s.flagCheckOperands(instruction) {
@@ -241,7 +316,7 @@ func (s *canaryState) scanFlagChecks() bool {
 			if s.removed[flagsRef] {
 				continue
 			}
-			condition, conditionRef, ok := s.singleUserIntrinsic(blockIndex, index, instruction.Results[0].ID, "x86.cond.")
+			condition, conditionRef, ok := s.singleUserIntrinsic(blockIndex, index, instruction.Results[0].ID, core.ConditionIntrinsicPrefix)
 			if !ok || len(condition.Results) == 0 {
 				continue
 			}
@@ -496,20 +571,23 @@ func removableWhenUnused(instruction core.Instruction) bool {
 	if len(instruction.Results) == 0 {
 		return false
 	}
-	// Segment reads carry EffectUnknown, but a segment address that no remaining
-	// instruction uses has no observable effect of its own.
-	if instruction.Kind == core.OpIntrinsic && segmentIntrinsic(instruction) {
+	// A thread-pointer or segment read carries EffectUnknown, but an address
+	// that no remaining instruction uses has no observable effect of its own.
+	if instruction.Kind == core.OpIntrinsic && baseAddressIntrinsic(instruction) {
 		return true
 	}
 	const allowed = core.EffectReadMemory | core.EffectReadRegister
 	return instruction.Effects&^allowed == 0
 }
 
-func segmentIntrinsic(instruction core.Instruction) bool {
+// baseAddressIntrinsic reports whether one intrinsic only computes the address of
+// the thread pointer or the stack guard. Both are marked neutrally by the lifter.
+func baseAddressIntrinsic(instruction core.Instruction) bool {
 	if len(instruction.Operands) == 0 || instruction.Operands[0].Kind != core.OperandSymbol {
 		return false
 	}
-	return strings.HasPrefix(instruction.Operands[0].Name, "x86.segment.")
+	name := instruction.Operands[0].Name
+	return name == core.TLSBaseIntrinsic || name == core.CanaryIntrinsic
 }
 
 func hasUsedResult(instruction core.Instruction, used map[core.ValueID]bool) bool {

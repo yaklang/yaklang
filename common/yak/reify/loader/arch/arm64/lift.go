@@ -18,7 +18,7 @@ type lifter struct {
 }
 
 func liftFunctions(target core.Target, functions []function, blockIDs map[uint64]core.BlockID, diagnostics *diagnostics) *core.LowIR {
-	ir := &core.LowIR{Target: target}
+	ir := &core.LowIR{Target: target, Frame: frame(), Registers: registers(), Canary: core.CanaryModel{Kind: core.CanaryTLS, Register: "tpidr_el0", Offset: 0x28}}
 	for index, body := range functions {
 		ir.Functions = append(ir.Functions, liftFunction(body, core.FunctionID(index+1), blockIDs, diagnostics))
 	}
@@ -162,7 +162,13 @@ func (l *lifter) lift(ins instruction) {
 		l.reverse(ins)
 	case arm64asm.ADR, arm64asm.ADRP:
 		l.address(ins)
-	case arm64asm.MRS, arm64asm.MSR, arm64asm.SYS, arm64asm.SYSL,
+	case arm64asm.MRS:
+		if l.tlsBase(ins) {
+			return
+		}
+		l.emit(core.OpIntrinsic, []core.Operand{symbolOperand("arm64.mrs")}, nil, nil,
+			core.EffectUnknown, ins.address)
+	case arm64asm.MSR, arm64asm.SYS, arm64asm.SYSL,
 		arm64asm.DC, arm64asm.IC, arm64asm.AT, arm64asm.TLBI:
 		// System register access, cache maintenance and TLB maintenance. They
 		// change architectural state that is not part of the data flow model.
@@ -442,4 +448,34 @@ func (l *lifter) extendValue(ins instruction, value core.ValueID, kind extension
 	default:
 		return 0, false
 	}
+}
+
+// tpidrEL0 is the system register name golang.org/x/arch prints for the thread
+// pointer the stack guard is stored behind.
+const tpidrEL0 = "S3_3_C13_C0_2"
+
+// tlsBase lowers a read of the thread pointer the stack guard is stored behind.
+// The value becomes the neutral marker the canary pass looks for, so the pass
+// never has to know the system register name.
+func (l *lifter) tlsBase(ins instruction) bool {
+	if len(ins.inst.Args) < 2 {
+		return false
+	}
+	// golang.org/x/arch exposes the system register as an opaque value with a
+	// canonical name, so the name is the only way to identify tpidr_el0.
+	register, ok := ins.inst.Args[1].(arm64asm.Systemreg)
+	if !ok || register.String() != tpidrEL0 {
+		return false
+	}
+	destination, ok := ins.inst.Args[0].(arm64asm.Reg)
+	if !ok {
+		return false
+	}
+	name, bits, ok := registerName(destination)
+	if !ok {
+		return false
+	}
+	value := l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand(core.TLSBaseIntrinsic)}, bits, core.EffectNone)
+	l.writeRegister(ins.address, name, bits, value)
+	return true
 }

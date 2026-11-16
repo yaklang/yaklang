@@ -119,7 +119,7 @@ func TestRegisterViewNames(t *testing.T) {
 		{"xmm3", 128, "xmm3", 128, 0},
 		{"rflags", 64, "rflags", 64, 0},
 	} {
-		view := registerViewFor(tc.name, tc.bits)
+		view := registerViewFor(tc.name, tc.bits, core.RegisterModel{Naming: core.RegisterNamingX86, Width: 64, Flags: "rflags", FlagsWidth: 64})
 		if view.canonical != tc.canonical || view.width != tc.width || view.shift != tc.shift {
 			t.Fatalf("%s: %+v", tc.name, view)
 		}

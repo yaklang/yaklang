@@ -103,8 +103,8 @@ func runFixtures(t *testing.T, data []byte) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := strings.TrimRight(lowirtext.Format(result.IR), "\n")
-			want := strings.Join(tc.LowIR, "\n")
+			got := strings.TrimRight(withoutFacts(lowirtext.Format(result.IR)), "\n")
+			want := withoutFacts(strings.Join(tc.LowIR, "\n"))
 			if got != want {
 				t.Fatalf("LowIR mismatch:\n--- want ---\n%s\n--- got ---\n%s", want, got)
 			}
@@ -142,4 +142,19 @@ func parseAddress(t *testing.T, text string) uint64 {
 		t.Fatalf("bad address %q: %v", text, err)
 	}
 	return value
+}
+
+// withoutFacts removes the architecture fact header. A fixture describes the
+// instructions one encoding produces; the facts are asserted separately, so they
+// do not have to be repeated in every fixture.
+func withoutFacts(text string) string {
+	lines := strings.Split(text, "\n")
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(line, "frame: ") || strings.HasPrefix(line, "registers: ") || strings.HasPrefix(line, "canary: ") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }

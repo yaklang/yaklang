@@ -154,6 +154,15 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 				function.Name = boundary.Name
 			}
 		}
+		if result.IR.Frame.StackPointer == "" {
+			// Every function of one artifact comes from the same parser, so the
+			// architecture facts only have to be taken once. Without them a pass
+			// cannot name the stack and frame registers, cannot find the stack
+			// guard, and cannot bind the argument and return registers.
+			result.IR.Frame = parsed.IR.Frame
+			result.IR.Registers = parsed.IR.Registers
+			result.IR.Canary = parsed.IR.Canary
+		}
 		result.IR.Functions = append(result.IR.Functions, parsed.IR.Functions...)
 		result.Assembly += parsed.Assembly
 		result.Diagnostics = append(result.Diagnostics, parsed.Diagnostics...)
