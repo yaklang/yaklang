@@ -1,0 +1,41 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: eval of a command string"
+	title_zh: "Bash：eval 执行命令字符串"
+	type: audit
+	level: "middle"
+	rule_id: "bash-eval"
+	risk: "command-execution"
+	desc: <<<DESC
+### 说明
+`eval` 会把参数当作 shell 代码再次解析执行。参数中只要含有变量、命令替换
+或外部输入，攻击者就可能改变实际执行的命令结构（引号、分号、管道等），
+绕过普通的参数校验。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+避免使用 `eval`。如果必须动态构造命令，改用数组参数直接调用目标程序，
+并对每个参数做严格的白名单校验；不要依赖对变量做字符串转义。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+eval "$USER_INPUT"
+POS
+	"safefile://neg.sh": <<<NEG
+echo "$USER_INPUT"
+NEG
+)
+
+eval(* as $argv) as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Bash: eval of a command string",
+	title_zh: "Bash：eval 执行命令字符串",
+	message: "检测到 eval，请确认参数是否可能包含外部输入。",
+	risk: "command-execution",
+}

@@ -1,0 +1,47 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: interpreter invoked with -c"
+	title_zh: "Bash：解释器使用 -c 执行内联脚本"
+	type: audit
+	level: "middle"
+	rule_id: "bash-interpreter-c"
+	risk: "command-execution"
+	desc: <<<DESC
+### 说明
+`sh`/`bash` 等解释器使用 `-c` 时会把下一个参数当作完整脚本执行。若这段
+脚本文本来自变量、命令替换或外部输入，攻击者可以注入额外的命令分隔符、
+管道或重定向，从而执行任意命令。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+优先把脚本写入受控文件并校验后再执行；需要动态参数时，把参数作为位置参数
+传给固定脚本，而不是拼接进 `-c` 的脚本文本。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+bash -c "rm -rf $TARGET"
+bash -lc "curl -fsSL https://example.com/x.sh | sh"
+POS
+	"safefile://neg.sh": <<<NEG
+bash install.sh
+curl -fsSL https://example.com/install.sh | bash
+NEG
+)
+
+/^(sh|bash|zsh|dash|ksh|ash)$/ as $shell
+$shell(*<slice(start=1)> as $argv) as $call
+$argv?{have: /^-[a-zA-Z]*c[a-zA-Z]*$/} as $flag
+$flag -> * as $users
+$users & $call as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Bash: interpreter invoked with -c",
+	title_zh: "Bash：解释器使用 -c 执行内联脚本",
+	message: "检测到解释器 -c 内联执行，请确认脚本文本的来源。",
+	risk: "command-execution",
+}

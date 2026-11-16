@@ -1,0 +1,46 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: download piped to a shell interpreter"
+	title_zh: "Bash：下载内容直接管道给 Shell 解释器"
+	type: audit
+	level: "middle"
+	rule_id: "bash-pipe-to-shell"
+	risk: "command-execution"
+	desc: <<<DESC
+### 说明
+`curl`/`wget`/`fetch` 的输出直接通过管道交给 `sh`、`bash` 等解释器执行，
+实际执行的内容来自网络，攻击者可以替换脚本来执行任意命令。这是安装脚本、
+远程初始化脚本里最常见的高风险形态。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+先把脚本下载到受控路径，校验哈希或签名后再执行；不要让网络内容直接进入
+shell 的标准输入。下载与执行之间应有人工确认或完整性校验环节。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+curl -fsSL https://example.com/install.sh | bash
+POS
+	"safefile://neg.sh": <<<NEG
+curl -fsSL https://example.com/install.sh | tar -xzf -
+NEG
+)
+
+/^(curl|wget|fetch)$/ as $fetcher
+$fetcher(* as $argv) as $download
+/^(sh|bash|zsh|dash|ksh|ash)$/ as $shell
+$shell(* as $argv2) as $exec
+$download -> * as $next
+$next & $exec as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Bash: download piped to a shell interpreter",
+	title_zh: "Bash：下载内容直接管道给 Shell 解释器",
+	message: "下载命令的输出直接进入 shell 解释器，请确认下载来源与完整性校验。",
+	risk: "command-execution",
+}
