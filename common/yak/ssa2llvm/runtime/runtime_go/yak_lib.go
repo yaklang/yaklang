@@ -1,7 +1,8 @@
 package main
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/libs -lgc
+#cgo !windows LDFLAGS: -L${SRCDIR}/libs -lgc
+#cgo windows LDFLAGS: -L${SRCDIR}/libs/windows-amd64 -lgc
 #include "local_gc.h"
 #include <stdlib.h>
 #include <stdint.h>
