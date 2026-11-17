@@ -1,5 +1,0 @@
-uint64_t sub_0x5b00(void) {
-    v1 = helper();
-    return v1;
-}
-

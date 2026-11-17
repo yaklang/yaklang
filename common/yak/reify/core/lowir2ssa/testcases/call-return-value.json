@@ -1,0 +1,31 @@
+{
+  "name": "call-return-value",
+  "lowir": [
+    "target: linux/amd64 (64-bit, little-endian)",
+    "frame: sp=rsp fp=rbp flags=rflags saved=rbp,rbx,r12,r13,r14,r15 growth=-1",
+    "registers: naming=x86 width=64 flags=rflags flags_width=64 args=rdi,rsi,rdx,rcx,r8,r9 return=rax",
+    "function sub_0x5b00 @ 0x5b00",
+    "block b1 @ 0x5b00",
+    "  0x5b00  call @helper [call]",
+    "  0x5b01  v1:i64 = read_register %rax [read_register]",
+    "  0x5b02  return v1",
+    ""
+  ],
+  "ssair": [
+    "extern helper",
+    "sub_0x5b00",
+    "type: () -> i64",
+    "entry_0: (<nil condition>)",
+    "<i64> t1 = call <any> helper () binding[] member[]",
+    "ret <i64> t1",
+    ""
+  ],
+  "source": [
+    "uint64_t sub_0x5b00(void) {",
+    "    v1 = helper();",
+    "    return v1;",
+    "}",
+    "",
+    ""
+  ]
+}

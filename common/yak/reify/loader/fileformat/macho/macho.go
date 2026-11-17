@@ -152,6 +152,7 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 			VirtualAddress: section.Addr,
 			MemorySize:     section.Size,
 			Flags:          uint64(section.Flags),
+			Writable:       strings.HasPrefix(section.Seg, "__DATA"),
 		})
 		if fileSize == 0 {
 			continue

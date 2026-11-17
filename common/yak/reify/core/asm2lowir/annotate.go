@@ -139,8 +139,8 @@ func symbolNameAt(a *core.Artifact, address uint64) string {
 	// Several symbols share an address: a mapping symbol marks the start of a
 	// run and the function name follows. Skip the marker and keep looking, so a
 	// RISC-V call to puts is named puts and not sub_0x<address>.
-	for _, symbol := range a.Image.Symbols {
-		if symbol.Address != address || symbol.Name == "" || symbol.Kind == sym.SymbolObject {
+	for _, symbol := range a.Image.SymbolsAt(address) {
+		if symbol.Name == "" || symbol.Kind == sym.SymbolObject {
 			continue
 		}
 		// A mapping symbol marks where one encoding or data run starts: $a and $t

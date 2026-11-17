@@ -1,0 +1,45 @@
+{
+  "name": "arithmetic-branch",
+  "lowir": [
+    "target: linux/amd64 (64-bit, little-endian)",
+    "frame: sp=rsp fp=rbp flags=rflags saved=rbp,rbx,r12,r13,r14,r15 growth=-1",
+    "registers: naming=x86 width=64 flags=rflags flags_width=64 args=rdi,rsi,rdx,rcx,r8,r9 return=rax",
+    "function sub_0x1000 @ 0x1000",
+    "block b1 @ 0x1000",
+    "  0x1000  v1:i64 = constant 0x2a",
+    "  0x1001  v2:i64 = constant 0x3",
+    "  0x1002  v3:i64 = add v1, v2",
+    "  0x1003  branch v3 -> b2, b3",
+    "block b2 @ 0x1004",
+    "  0x1004  return v3",
+    "block b3 @ 0x1005",
+    "  0x1005  return 0x0",
+    ""
+  ],
+  "ssair": [
+    "sub_0x1000",
+    "type: () -> i64",
+    "entry_0: (<nil condition>)",
+    "<i64> t1 = <i64> 42",
+    "<i64> t2 = <i64> 3",
+    "<i64> t3 = <i64> 45",
+    "If [<i64> 45] true -> b2_1, false -> b3_2",
+    "b2_1: <- entry_0  (<nil condition>)",
+    "ret <i64> 45",
+    "b3_2: <- entry_0  (<nil condition>)",
+    "<i64> t4 = <i64> 0",
+    "ret <i64> 0",
+    ""
+  ],
+  "source": [
+    "uint64_t sub_0x1000(void) {",
+    "    if (0x2d) {",
+    "      return 0x2d;",
+    "    } else {",
+    "      return 0x0;",
+    "    }",
+    "}",
+    "",
+    ""
+  ]
+}

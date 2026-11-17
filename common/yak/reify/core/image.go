@@ -1,10 +1,15 @@
 package core
 
-import "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
+import (
+	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
+)
 
 // Section preserves header facts. FileSize is zero for zero-filled sections.
 // FileOffset is relative to Origin; VirtualAddress is an image address before
-// runtime relocation. Flags retain their file-format-specific meaning.
+// runtime relocation. Flags retain their file-format-specific meaning, and
+// Writable states the one fact consumers need in a format-neutral form.
 type Section struct {
 	Name           string `json:"name"`
 	FileOffset     uint64 `json:"file_offset"`
@@ -12,6 +17,10 @@ type Section struct {
 	VirtualAddress uint64 `json:"virtual_address"`
 	MemorySize     uint64 `json:"memory_size"`
 	Flags          uint64 `json:"flags"`
+	// Writable reports whether the section can change while the program runs.
+	// A loader sets it from its own section attributes, so a consumer never has to
+	// recognize section names.
+	Writable bool `json:"writable,omitempty"`
 }
 
 // Relocation states the value a loader writes at an address before the program
@@ -32,6 +41,10 @@ type Image struct {
 	Sections    []Section       `json:"sections"`
 	Symbols     []symbol.Symbol `json:"symbols,omitempty"`
 	Relocations []Relocation    `json:"relocations,omitempty"`
+
+	// byAddress indexes Symbols by address, built on first use.
+	once      sync.Once
+	byAddress map[uint64][]symbol.Symbol
 }
 
 func (i *Image) ImageBase() uint64 {
@@ -74,6 +87,21 @@ func (i *Image) RelocationAt(address uint64) (Relocation, bool) {
 		}
 	}
 	return Relocation{}, false
+}
+
+// SymbolsAt returns every symbol defined at one address. Several symbols share an
+// address: a mapping symbol marks the start of a run and the function name follows.
+func (i *Image) SymbolsAt(address uint64) []symbol.Symbol {
+	if i == nil {
+		return nil
+	}
+	i.once.Do(func() {
+		i.byAddress = make(map[uint64][]symbol.Symbol, len(i.Symbols))
+		for _, entry := range i.Symbols {
+			i.byAddress[entry.Address] = append(i.byAddress[entry.Address], entry)
+		}
+	})
+	return i.byAddress[address]
 }
 
 // SymbolByName returns the first symbol with this name.

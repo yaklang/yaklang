@@ -48,14 +48,14 @@ func newCLIApp(env *commandEnv) *cli.App {
 			Name:      "inspect",
 			Usage:     "Load headers and display the artifact, target and sections",
 			ArgsUsage: "<file>",
-			Flags:     []cli.Flag{jsonFlag(), formatFlag()},
+			Flags:     outputFlags(),
 			Action:    env.inspect,
 		},
 		{
 			Name:      "check",
 			Usage:     "Validate headers and report the selected loader and parser",
 			ArgsUsage: "<file>",
-			Flags:     []cli.Flag{jsonFlag(), formatFlag()},
+			Flags:     outputFlags(),
 			Action:    env.check,
 		},
 		{
@@ -91,6 +91,11 @@ func formatFlag() cli.Flag {
 
 func jsonFlag() cli.Flag {
 	return cli.BoolFlag{Name: "json", Usage: "Emit JSON"}
+}
+
+// outputFlags are the flags every command that reports an artifact accepts.
+func outputFlags() []cli.Flag {
+	return []cli.Flag{jsonFlag(), formatFlag()}
 }
 
 func usageErrorHandler(_ *cli.Context, err error, _ bool) error {
@@ -281,18 +286,19 @@ func scopeFor(result *reify.Result, mode reify.Mode) string {
 	if result != nil && result.Artifact != nil {
 		arch = string(result.Artifact.Target.Architecture)
 	}
-	switch mode {
-	case reify.ModeASM:
-		return arch + "-assembly"
-	case reify.ModeLowIR:
-		return arch + "-lowir"
-	case reify.ModeSSAIR:
-		return arch + "-ssair"
-	case reify.ModeSource:
-		return arch + "-source"
-	default:
-		return arch + "-all"
+	if suffix := modeScopeSuffix[mode]; suffix != "" {
+		return arch + "-" + suffix
 	}
+	return arch + "-" + modeScopeSuffix[reify.ModeAll]
+}
+
+// modeScopeSuffix names each mode once, so the scope string has one source.
+var modeScopeSuffix = map[reify.Mode]string{
+	reify.ModeASM:    "assembly",
+	reify.ModeLowIR:  "lowir",
+	reify.ModeSSAIR:  "ssair",
+	reify.ModeSource: "source",
+	reify.ModeAll:    "all",
 }
 
 func liftText(result *reify.Result) io.Reader {

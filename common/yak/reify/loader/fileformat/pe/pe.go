@@ -131,6 +131,7 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 			VirtualAddress: address,
 			MemorySize:     memorySize,
 			Flags:          uint64(section.Characteristics),
+			Writable:       section.Characteristics&pe.IMAGE_SCN_MEM_WRITE != 0,
 		})
 		if section.Size == 0 {
 			continue

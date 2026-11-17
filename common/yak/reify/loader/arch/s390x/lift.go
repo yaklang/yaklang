@@ -383,6 +383,16 @@ func (l *lifter) branch(ins instruction) {
 		return
 	}
 	mask := l.conditionMask(ins)
+	if conditionName(mask) == "" {
+		// A branch on every condition bit is unconditional; listing the fallthrough
+		// as a second successor would invent a test the program never makes.
+		if block, ok := l.blockIDs[target]; ok {
+			l.emit(core.OpJump, nil, nil, []core.BlockID{block}, core.EffectNone, ins.address)
+			return
+		}
+		l.unsupported(ins)
+		return
+	}
 	conditionValue := l.operation(ins, core.OpIntrinsic, []core.Operand{
 		symbolOperand("cond." + conditionName(mask)), l.value(l.readRegister(ins.address, "cc", 2)),
 	}, 1, core.EffectReadRegister)
@@ -778,6 +788,12 @@ func (l *lifter) opaqueRegisterForm(ins instruction) (core.ValueID, bool) {
 // the branch unresolved instead of inventing a comparison.
 func conditionName(mask string) string {
 	switch mask {
+	case "14", "15":
+		// Every condition bit is set, so the branch never reads the condition code.
+		return ""
+	case "6":
+		// Neither equal nor a defined order: the comparison was unordered.
+		return "ne"
 	case "8":
 		return "e"
 	case "7":

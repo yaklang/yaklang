@@ -104,6 +104,7 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 			VirtualAddress: address,
 			MemorySize:     section.Size,
 			Flags:          uint64(section.Flags),
+			Writable:       section.Flags&elf.SHF_WRITE != 0,
 		})
 	}
 	// A relocatable symbol value is relative to its section, so the loader adds

@@ -1,4 +1,0 @@
-uint64_t sub_0x9000(void) {
-    return 0x0;
-}
-

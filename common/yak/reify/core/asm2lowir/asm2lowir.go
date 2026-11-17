@@ -155,10 +155,9 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 			}
 		}
 		if result.IR.Frame.StackPointer == "" {
-			// Every function of one artifact comes from the same parser, so the
-			// architecture facts only have to be taken once. Without them a pass
-			// cannot name the stack and frame registers, cannot find the stack
-			// guard, and cannot bind the argument and return registers.
+			// Without the facts a pass cannot name the stack and frame registers,
+			// cannot find the stack guard, and cannot bind the argument and return
+			// registers. They are the parser's, not a per-function result.
 			result.IR.Frame = parsed.IR.Frame
 			result.IR.Registers = parsed.IR.Registers
 			result.IR.Canary = parsed.IR.Canary
@@ -346,7 +345,7 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		if symbol.Imported || symbol.Address == 0 {
 			return core.FunctionBoundary{}, fmt.Errorf("function %q has no local body", name)
 		}
-		return core.FunctionBoundary{Address: symbol.Address &^ 1, Size: symbol.Size, Name: name, Source: core.BoundarySymbol}, nil
+		return core.FunctionBoundary{Address: codeAddress(symbol.Address), Size: symbol.Size, Name: name, Source: core.BoundarySymbol}, nil
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }
@@ -448,4 +447,11 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 		diagnostics = filterCrossFunctionDiagnostics(diagnostics)
 	}
 	return &core.Disassembly{Text: text, Instructions: total, Diagnostics: diagnostics}, nil
+}
+
+// codeAddress clears the Thumb selector. An ARM symbol that names a Thumb
+// function stores its address with the low bit set, and the instruction stream
+// starts at the aligned address.
+func codeAddress(address uint64) uint64 {
+	return address &^ 1
 }

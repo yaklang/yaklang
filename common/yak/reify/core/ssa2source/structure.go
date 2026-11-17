@@ -28,22 +28,25 @@ type structurer struct {
 	loopHeaders map[int64]bool
 	emitted     map[int64]bool
 	rendered    map[int64]int
-	text        *strings.Builder
+	// printedMergePhi marks a phi already written by the arm that supplies it.
+	printedMergePhi map[int64]bool
+	text            *strings.Builder
 }
 
 func newStructurer(function *ssa.Function) *structurer {
 	s := &structurer{
-		function:    function,
-		blocks:      make(map[int64]*ssa.BasicBlock),
-		succs:       make(map[int64][]int64),
-		preds:       make(map[int64][]int64),
-		dom:         make(map[int64]map[int64]bool),
-		pdom:        make(map[int64]map[int64]bool),
-		ipdom:       make(map[int64]int64),
-		loops:       make(map[int64]*loopInfo),
-		loopHeaders: make(map[int64]bool),
-		emitted:     make(map[int64]bool),
-		rendered:    make(map[int64]int),
+		function:        function,
+		blocks:          make(map[int64]*ssa.BasicBlock),
+		succs:           make(map[int64][]int64),
+		preds:           make(map[int64][]int64),
+		dom:             make(map[int64]map[int64]bool),
+		pdom:            make(map[int64]map[int64]bool),
+		ipdom:           make(map[int64]int64),
+		loops:           make(map[int64]*loopInfo),
+		loopHeaders:     make(map[int64]bool),
+		printedMergePhi: make(map[int64]bool),
+		emitted:         make(map[int64]bool),
+		rendered:        make(map[int64]int),
 	}
 	for _, id := range function.Blocks {
 		block, ok := function.GetBasicBlockByID(id)
@@ -336,6 +339,26 @@ func (s *structurer) emitIf(block *ssa.BasicBlock, instruction *ssa.If, indent s
 		s.emitBranch(instruction.True, indent+"  ", branchStop)
 		fmt.Fprintf(s.text, "%s}\n", indent)
 	default:
+		if s.armEndsAt(instruction.True, join) && s.armEndsAt(instruction.False, join) {
+			// One merge value and nothing else in the arms: the diamond is the
+			// conditional expression it came from.
+			if s.armsAreEmpty(instruction.True, join) && s.armsAreEmpty(instruction.False, join) &&
+				s.emitMergeTernary(join, instruction.True, instruction.False, condition, indent) {
+				s.emitRegion(join, indent, stop)
+				return
+			}
+			// Both arms merge directly. The values they supply are the phi edges, so
+			// print them at the end of each arm and let the merge continue.
+			fmt.Fprintf(s.text, "%sif (%s) {\n", indent, condition)
+			s.emitBranch(instruction.True, indent+"  ", branchStop)
+			s.printMergeEdges(s.blocks[join], instruction.True, indent+"  ")
+			fmt.Fprintf(s.text, "%s} else {\n", indent)
+			s.emitBranch(instruction.False, indent+"  ", branchStop)
+			s.printMergeEdges(s.blocks[join], instruction.False, indent+"  ")
+			fmt.Fprintf(s.text, "%s}\n", indent)
+			s.emitRegion(join, indent, stop)
+			return
+		}
 		fmt.Fprintf(s.text, "%sif (%s) {\n", indent, condition)
 		s.emitBranch(instruction.True, indent+"  ", branchStop)
 		fmt.Fprintf(s.text, "%s} else {\n", indent)
@@ -560,6 +583,9 @@ func copyStop(stop map[int64]bool) map[int64]bool {
 // that follow read it as a single value, so the first edge names it.
 func (s *structurer) renderMergePhis(block *ssa.BasicBlock, indent string) {
 	for _, phiID := range block.Phis {
+		if s.printedMergePhi[phiID] {
+			continue
+		}
 		instruction, ok := s.function.GetInstructionById(phiID)
 		if !ok || instruction == nil {
 			continue
@@ -595,4 +621,134 @@ func representativePhiValue(values []ssa.Value) ssa.Value {
 		return value
 	}
 	return values[0]
+}
+
+// singleJumpTarget reports whether a block holds one unconditional jump and
+// nothing else.
+func singleJumpTarget(block *ssa.BasicBlock) (int64, bool) {
+	if block == nil || len(block.Insts) != 1 || len(block.Phis) != 0 {
+		return 0, false
+	}
+	instruction, ok := block.GetInstructionById(block.Insts[0])
+	if !ok || instruction == nil {
+		return 0, false
+	}
+	jump, ok := instruction.(*ssa.Jump)
+	if !ok || jump == nil {
+		return 0, false
+	}
+	return jump.To, true
+}
+
+// emitMergeArms prints a diamond whose arms only carry the values a join phi
+// selects. Each arm assigns its own edge, which is the conditional expression the
+// original instruction stood for.
+func (s *structurer) emitMergeArms(join, thenBlock, elseBlock int64, condition, indent string) {
+	joinBlock := s.blocks[join]
+	if joinBlock == nil {
+		return
+	}
+	fmt.Fprintf(s.text, "%sif (%s) {\n", indent, condition)
+	s.printMergeEdges(joinBlock, thenBlock, indent+"  ")
+	fmt.Fprintf(s.text, "%s} else {\n", indent)
+	s.printMergeEdges(joinBlock, elseBlock, indent+"  ")
+	fmt.Fprintf(s.text, "%s}\n", indent)
+}
+
+func (s *structurer) printMergeEdges(joinBlock *ssa.BasicBlock, pred int64, indent string) {
+	index := -1
+	for at, candidate := range joinBlock.Preds {
+		if candidate == pred {
+			index = at
+			break
+		}
+	}
+	if index < 0 {
+		return
+	}
+	for _, phiID := range joinBlock.Phis {
+		instruction, ok := s.function.GetInstructionById(phiID)
+		if !ok || instruction == nil {
+			continue
+		}
+		phi, ok := ssa.ToPhi(instruction)
+		if !ok || phi == nil || index >= len(phi.Edge) {
+			continue
+		}
+		value, ok := phi.GetValueById(phi.Edge[index])
+		if !ok || value == nil {
+			continue
+		}
+		fmt.Fprintf(s.text, "%s%s = %s;\n", indent, assignName(phi), valueName(value))
+		s.printedMergePhi[phi.GetId()] = true
+	}
+}
+
+// emitMergeTernary prints a diamond that selects one value as a conditional
+// expression. It reports false when the merge carries anything else, because then
+// the branches do more than choose a value.
+func (s *structurer) emitMergeTernary(join, thenBlock, elseBlock int64, condition, indent string) bool {
+	joinBlock := s.blocks[join]
+	if joinBlock == nil || len(joinBlock.Phis) != 1 {
+		return false
+	}
+	phiID := joinBlock.Phis[0]
+	instruction, ok := s.function.GetInstructionById(phiID)
+	if !ok || instruction == nil {
+		return false
+	}
+	phi, ok := ssa.ToPhi(instruction)
+	if !ok || phi == nil || len(phi.Edge) != len(joinBlock.Preds) {
+		return false
+	}
+	whenTrue, ok := mergeEdgeValue(phi, joinBlock, thenBlock)
+	if !ok {
+		return false
+	}
+	whenFalse, ok := mergeEdgeValue(phi, joinBlock, elseBlock)
+	if !ok {
+		return false
+	}
+	fmt.Fprintf(s.text, "%s%s = (%s ? %s : %s);\n", indent, assignName(phi), condition, valueName(whenTrue), valueName(whenFalse))
+	s.printedMergePhi[phiID] = true
+	return true
+}
+
+// mergeEdgeValue returns the value a phi takes on the edge from one predecessor.
+func mergeEdgeValue(phi *ssa.Phi, joinBlock *ssa.BasicBlock, pred int64) (ssa.Value, bool) {
+	for at, candidate := range joinBlock.Preds {
+		if candidate != pred || at >= len(phi.Edge) {
+			continue
+		}
+		value, ok := phi.GetValueById(phi.Edge[at])
+		if !ok || value == nil {
+			return nil, false
+		}
+		return value, true
+	}
+	return nil, false
+}
+
+// armEndsAt reports whether a block ends with a jump to the merge block. The arm
+// may hold other instructions; only its exit matters.
+func (s *structurer) armEndsAt(id, join int64) bool {
+	block := s.blocks[id]
+	if block == nil || len(block.Insts) == 0 {
+		return false
+	}
+	instruction, ok := block.GetInstructionById(block.Insts[len(block.Insts)-1])
+	if !ok || instruction == nil {
+		return false
+	}
+	jump, ok := instruction.(*ssa.Jump)
+	if !ok || jump == nil {
+		return false
+	}
+	return jump.To == join
+}
+
+// armsAreEmpty reports whether a block does nothing but jump to the merge.
+func (s *structurer) armsAreEmpty(id, join int64) bool {
+	target, ok := singleJumpTarget(s.blocks[id])
+	return ok && target == join
 }
