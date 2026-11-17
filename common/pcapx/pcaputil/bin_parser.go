@@ -74,6 +74,9 @@ type ProtocolEvent struct {
 	ocpp                               bool
 	applicationMessagePacketRefs       []PacketReference
 	applicationObjectDirection         string
+	applicationObjectURI               string
+	applicationObjectAuthority         string
+	applicationObjectMethod            string
 	Domain                             CaptureDomain
 	SourceBytes                        ByteSource
 	// CarrierLayers lists observed protocol envelopes between the physical
@@ -129,6 +132,15 @@ func (e *ProtocolEvent) ApplicationObjectDirection() string {
 		return ""
 	}
 	return e.applicationObjectDirection
+}
+
+// ApplicationObjectContext reports retained request context for a complete
+// application object when the carrying protocol provides it.
+func (e *ProtocolEvent) ApplicationObjectContext() (uri, authority, method string) {
+	if e == nil {
+		return "", "", ""
+	}
+	return e.applicationObjectURI, e.applicationObjectAuthority, e.applicationObjectMethod
 }
 
 // BinParserEvent is retained for source compatibility. Use ProtocolEvent.

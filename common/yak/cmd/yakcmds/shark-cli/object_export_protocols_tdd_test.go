@@ -10,6 +10,8 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 type objectExportUDPDirection struct {
@@ -182,4 +184,84 @@ func TestAnalysisCLIObjectExportWebSocketApplicationMessages(t *testing.T) {
 	require.Equal(t, "text", got["client_to_server"]["manifest"].(map[string]any)["opcode"])
 	refs := got["client_to_server"]["manifest"].(map[string]any)["packet_refs"].([]any)
 	require.Len(t, refs, 2)
+}
+
+func TestAnalysisCLIObjectExportGRPCMessages(t *testing.T) {
+	input, err := trafficfixture.Materialize(top30Sessions+"first-batch-m1/tls-h2-bidi.pcap", t.TempDir())
+	require.NoError(t, err)
+	keylog, err := trafficfixture.Materialize(top30Sessions+"first-batch-m1/tls-h2-bidi.keys", t.TempDir())
+	require.NoError(t, err)
+
+	directory := filepath.Join(t.TempDir(), "objects")
+	var output bytes.Buffer
+	require.NoError(t, invoke(&output, "-r", input, "--tls-keylog", keylog, "--json", "--export-objects", directory))
+	manifests := objectExportManifests(t, output.Bytes())
+	require.Len(t, manifests, 12)
+
+	seenMessages := map[string]bool{}
+	directions := map[string]int{}
+	for _, manifest := range manifests {
+		require.Equal(t, "message", manifest["object_type"])
+		require.Equal(t, "grpc", manifest["protocol"])
+		require.Equal(t, true, manifest["complete"])
+		require.NotZero(t, manifest["stream_id"])
+		require.NotZero(t, manifest["message_id"])
+		require.NotEmpty(t, manifest["packet_refs"])
+		require.Contains(t, manifest["content_type"], "application/grpc")
+		require.Equal(t, "POST", manifest["method"])
+		require.NotEmpty(t, manifest["uri"])
+		require.NotEmpty(t, manifest["authority"])
+		direction := manifest["direction"].(string)
+		directions[direction]++
+		key := manifest["path"].(string)
+		require.False(t, seenMessages[key], key)
+		seenMessages[key] = true
+		wire, err := os.ReadFile(manifest["path"].(string))
+		require.NoError(t, err)
+		require.NotEmpty(t, wire)
+	}
+	require.NotZero(t, directions["client_to_server"])
+	require.NotZero(t, directions["server_to_client"])
+}
+
+func TestObjectExporterGRPCCompressedPackedAndEmptyMessages(t *testing.T) {
+	event := &pcaputil.ProtocolEvent{
+		ID: 77, Protocol: "grpc", Status: "decoded", Direction: 0,
+		Source: "192.0.2.1:50000", Destination: "192.0.2.2:443",
+		SourceBytes: pcaputil.ByteSource{
+			Kind:       "decrypted",
+			ParentPDUs: []uint64{70},
+			PacketRefs: []pcaputil.PacketReference{{Number: 12}, {Number: 13}},
+		},
+		Session: map[string]any{
+			"Stream ID":         uint32(7),
+			"GRPC Content Type": "application/grpc+proto",
+			"GRPC Messages": []map[string]any{
+				{"Index": uint64(1), "Compressed": true, "Payload": []byte("compressed"), "Decoded Payload": []byte("one")},
+				{"Index": uint64(2), "Compressed": false, "Payload": []byte{}},
+			},
+		},
+	}
+	observations := observedObjects(event)
+	require.Len(t, observations, 2)
+
+	exporter, err := newObjectExporter(t.TempDir())
+	require.NoError(t, err)
+	first, err := exporter.process(observations[0], true)
+	require.NoError(t, err)
+	require.EqualValues(t, 7, first.StreamID)
+	require.EqualValues(t, 1, first.MessageID)
+	require.True(t, first.Compressed)
+	require.Equal(t, "decompressed", first.ByteSource.Kind)
+	wire, err := os.ReadFile(first.Path)
+	require.NoError(t, err)
+	require.Equal(t, "one", string(wire))
+
+	second, err := exporter.process(observations[1], true)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, second.MessageID)
+	require.Zero(t, second.ObservedLength)
+	wire, err = os.ReadFile(second.Path)
+	require.NoError(t, err)
+	require.Empty(t, wire)
 }

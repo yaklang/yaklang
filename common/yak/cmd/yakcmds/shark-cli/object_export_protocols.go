@@ -2,11 +2,71 @@ package sharkcli
 
 import (
 	"bytes"
+	"fmt"
 	"mime"
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
+
+func observedGRPCObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
+	if e == nil || e.Protocol != "grpc" || e.Session == nil || e.Status == "malformed" {
+		return nil
+	}
+	messages, ok := e.Session["GRPC Messages"].([]map[string]any)
+	if !ok || len(messages) == 0 {
+		return nil
+	}
+	streamID, _ := objectUint64(e.Session["Stream ID"])
+	uri, authority, method := e.ApplicationObjectContext()
+	contentType, _ := e.Session["GRPC Content Type"].(string)
+	if contentType == "" {
+		contentType = "application/grpc"
+	}
+	refs := e.ApplicationMessagePacketRefs()
+	if len(refs) == 0 {
+		snapshot := e.DisplayFieldValues()
+		refs = append([]pcaputil.PacketReference(nil), snapshot.Source.PacketRefs...)
+	}
+	parents := append([]uint64(nil), e.SourceBytes.ParentPDUs...)
+	if e.ID != 0 && !containsUint64(parents, e.ID) {
+		parents = append(parents, e.ID)
+	}
+	direction := "client_to_server"
+	if e.Direction != 0 {
+		direction = "server_to_client"
+	}
+	var out []*objectObservation
+	for position, message := range messages {
+		payload, _ := message["Decoded Payload"].([]byte)
+		compressed := message["Compressed"] == true
+		if payload == nil {
+			payload, _ = message["Payload"].([]byte)
+		}
+		payload = bytes.Clone(payload)
+		messageID, _ := objectUint64(message["Index"])
+		if messageID == 0 {
+			messageID = uint64(position + 1)
+		}
+		declared := int64(len(payload))
+		byteKind := "decoded"
+		if compressed {
+			byteKind = "decompressed"
+		} else if e.SourceBytes.Kind == "decrypted" {
+			byteKind = "decrypted"
+		}
+		name := fmt.Sprintf("grpc-s%d-m%d", streamID, messageID)
+		out = append(out, &objectObservation{
+			id: e.ID, protocol: e.Protocol, objectType: "message", direction: direction,
+			source: e.Source, destination: e.Destination, streamID: streamID, messageID: messageID,
+			authority: authority, method: method, uri: uri,
+			contentType: contentType, suggestedFilename: safeObjectName(name, contentType),
+			allowEmpty: true, compressed: compressed, body: bytes.NewReader(payload), declared: &declared,
+			refs: refs, bytes: assembledObjectByteSource(payload, byteKind, parents, refs),
+		})
+	}
+	return out
+}
 
 func observedWebSocketObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
 	if e == nil || e.Protocol != "websocket" || e.Session == nil || e.Status == "malformed" {
