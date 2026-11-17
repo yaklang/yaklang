@@ -90,15 +90,19 @@ func TestProtocolSessionFTPReplayWinlabCorpus(t *testing.T) {
 	var events []*ProtocolEvent
 	var stats ProtocolStats
 	err := replayFixtureFile(t, path,
+		WithProtocolFTPFileAssembly(1024),
 		WithOnProtocolMessage(func(event *ProtocolEvent) { events = append(events, event) }),
 		WithOnProtocolStats(func(value ProtocolStats) { stats = value }),
 	)
 	require.NoError(t, err)
 
-	var ftpEvents, dataEvents []*ProtocolEvent
+	var ftpEvents, dataEvents, fileEvents []*ProtocolEvent
 	for _, event := range events {
 		if event.Protocol == "ftp" {
 			ftpEvents = append(ftpEvents, event)
+			if _, ok := event.Session["File Bytes"]; ok {
+				fileEvents = append(fileEvents, event)
+			}
 			continue
 		}
 		if strings.HasSuffix(event.Source, ":1025") || strings.HasSuffix(event.Destination, ":1025") {
@@ -136,6 +140,17 @@ func TestProtocolSessionFTPReplayWinlabCorpus(t *testing.T) {
 	// four-byte chunks, with no application framing added by the data decoder.
 	require.Equal(t, "flag{winlab-ftp-reassembly-5013}", string(data))
 	require.Equal(t, ftpBytes+uint64(len(data)), stats.MessageBytes)
+	require.Len(t, fileEvents, 1)
+	file := fileEvents[0]
+	require.Equal(t, []byte("flag{winlab-ftp-reassembly-5013}"), file.Session["File Bytes"])
+	require.Equal(t, "download", file.Session["File Transfer"])
+	require.Equal(t, "RETR", file.Session["FTP Command"])
+	require.EqualValues(t, 226, file.Session["FTP Completion Code"])
+	require.Equal(t, dataEvents[0].Source, file.Session["FTP File Source"])
+	require.Equal(t, dataEvents[0].Destination, file.Session["FTP File Destination"])
+	byteSource := file.Session["File Byte Source"].(ByteSource)
+	require.Len(t, byteSource.PacketRefs, 8)
+	require.Len(t, file.Session["FTP File Sources"].([]map[string]any), 8)
 }
 
 func TestProtocolSessionFTPRejectsDecoyBannerAndCommandPrefixes(t *testing.T) {

@@ -59,7 +59,7 @@ var Command = &cli.Command{
 		cli.BoolFlag{Name: "json", Usage: "Legacy: stream JSONL to stdout; prefer --json-file for reproducible output"},
 		cli.StringFlag{Name: "json-file", Usage: "Write JSONL to a new file instead of stdout (implies JSON output)"},
 		cli.BoolFlag{Name: "json-physical-only", Usage: "Write JSONL physical frames only; omits nonphysical publications"},
-		cli.StringFlag{Name: "export-objects", Usage: "Automatically export complete HTTP bodies, TFTP files, WebSocket and gRPC messages to a directory (new files only), with byte provenance in JSONL manifests"},
+		cli.StringFlag{Name: "export-objects", Usage: "Automatically export complete HTTP bodies, TFTP/FTP files, WebSocket and gRPC messages to a directory (new files only), with byte provenance in JSONL manifests"},
 		cli.StringSliceFlag{Name: "stats", Usage: "Print statistics over display-filter matches: conv, io, proto, endpoints (repeatable; replaces packet summaries)"},
 		cli.DurationFlag{Name: "stats-interval", Value: time.Second, Usage: "IO statistics bucket width, e.g. 1s or 100ms"},
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
