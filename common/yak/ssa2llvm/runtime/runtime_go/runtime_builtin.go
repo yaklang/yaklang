@@ -12,8 +12,6 @@ import (
 	"os"
 	"runtime/cgo"
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 func normalizePrintArg(v any) any {
@@ -49,31 +47,6 @@ func plausibleFloat(v uint64) (float64, bool) {
 // a NUL-terminated string must fall through to int/float instead of becoming
 // an unbounded copy of whatever bytes happen to follow it.
 const maxCStringProbe = 1 << 20
-
-// tryReadProcessMemory copies len(dst) bytes from addr without faulting.
-// process_vm_readv returns EFAULT instead of delivering SIGSEGV, which
-// C.GoString cannot: a bad pointer there is a fatal, unrecovered crash.
-// A single iovec that crosses into an unmapped page fails as a whole, so
-// callers keep each read inside one page.
-func tryReadProcessMemory(addr uintptr, dst []byte) int {
-	if len(dst) == 0 || addr == 0 {
-		return -1
-	}
-	n, err := unix.ProcessVMReadv(os.Getpid(), []unix.Iovec{{
-		Base: &dst[0],
-		Len:  uint64(len(dst)),
-	}}, []unix.RemoteIovec{{
-		Base: addr,
-		Len:  len(dst),
-	}}, 0)
-	if err != nil || n <= 0 {
-		return -1
-	}
-	if n > len(dst) {
-		n = len(dst)
-	}
-	return n
-}
 
 // tryCString reports the NUL-terminated text at addr when that address is a
 // readable C string. An ordinary integer that merely looks like a user
