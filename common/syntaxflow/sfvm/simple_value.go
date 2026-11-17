@@ -361,6 +361,15 @@ type PatternRoot struct {
 	sourceHitTotal   int
 	sourceHitCaches  map[string][]SourceHit
 	sourceHitEditors map[string]*memedit.MemEditor
+
+	// sourceFlightOnce guards sourceFlight. A rule executes several searches
+	// that can share one cache key (the same positive pattern inside and
+	// outside pattern_regex_not), and the source executor runs a rule once per
+	// hit window. Without a flight, concurrent misses on the same key each scan
+	// every file and then race to store the same result. The flight wraps no
+	// cache: sourceHitCaches stays the single authority.
+	sourceFlightOnce sync.Once
+	sourceFlight     *utils.SingleFlightCache[string, []SourceHit]
 }
 
 // SourceHit is a raw source match before it is wrapped as a ValueOperator.
@@ -455,6 +464,52 @@ func (r *PatternRoot) SourceHits(key string) ([]SourceHit, bool) {
 	}
 	r.sourceHitTotal = max(r.sourceHitTotal, len(hits))
 	return hits, true
+}
+
+// SourceHitsOrLoad returns the cached raw hits for key, running load once when
+// several callers miss the same key concurrently. A completed search, empty
+// included, is cached by the loader's store; a loader error reaches every
+// waiter and stays uncached so a later window retries a real failure.
+func (r *PatternRoot) SourceHitsOrLoad(key string, load func() ([]SourceHit, error)) ([]SourceHit, error) {
+	if r == nil {
+		return nil, utils.Error("sfvm: nil pattern root")
+	}
+	if load == nil {
+		return nil, utils.Error("sfvm: nil source hit loader")
+	}
+	if hits, ok := r.SourceHits(key); ok {
+		return hits, nil
+	}
+	hits, err := r.sourceHitFlight().Do(context.Background(), key, func() ([]SourceHit, error) {
+		if hits, ok := r.SourceHits(key); ok {
+			return hits, nil
+		}
+		loaded, err := load()
+		if err != nil {
+			return nil, err
+		}
+		r.SetSourceHits(key, loaded)
+		// SetSourceHits keeps an entry another caller stored first; return the
+		// authoritative slice instead of this flight's copy.
+		if cached, ok := r.SourceHits(key); ok {
+			return cached, nil
+		}
+		return loaded, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return hits, nil
+}
+
+// sourceHitFlight returns the shared loader, building it on first use. A nil
+// cache keeps the root's own map authoritative; the helper only collapses
+// concurrent misses for one key.
+func (r *PatternRoot) sourceHitFlight() *utils.SingleFlightCache[string, []SourceHit] {
+	r.sourceFlightOnce.Do(func() {
+		r.sourceFlight = utils.NewSingleFlightCache[string, []SourceHit](nil)
+	})
+	return r.sourceFlight
 }
 
 // SourceHitEditor returns one editor per file across all batches. Reusing the
