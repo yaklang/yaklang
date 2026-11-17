@@ -58,7 +58,7 @@ func TestAnalysisHTTPFieldsUseAdmittedLiteralHeaders(t *testing.T) {
 func TestAnalysisHTTPMessageBodyExtractsCompleteRequest(t *testing.T) {
 	body := "username=admin&password=plaintext"
 	request := fmt.Sprintf("POST /login HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s", len(body), body)
-	response := "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK"
+	response := "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK"
 	for _, deferred := range []bool{false, true} {
 		events, _, err := binReplay(t, binTestPcap(t, []tcpStep{{seq: 0, syn: true}, {seq: 0, syn: true, reverse: true}, {seq: 1, data: request}, {seq: 1, data: response, reverse: true}}, 80, false, false), 1, WithBinParserDeferred(deferred))
 		require.NoError(t, err)
@@ -73,6 +73,9 @@ func TestAnalysisHTTPMessageBodyExtractsCompleteRequest(t *testing.T) {
 		require.Equal(t, body, string(wire))
 		_, _, ok = events[0].HTTPResponseBody()
 		require.False(t, ok, "the response-only compatibility accessor must reject a request")
+		require.Equal(t, []any{"application/x-www-form-urlencoded"}, events[0].DisplayFields()["http.request.content_type"])
+		require.NotContains(t, events[0].DisplayFields(), "http.response.content_type")
+		require.Equal(t, []string{"application/x-www-form-urlencoded"}, events[0].HTTPMessageHeaderValues("Content-Type"))
 
 		reader, declared, isRequest, ok = events[1].HTTPMessageBody()
 		require.True(t, ok)
@@ -81,6 +84,9 @@ func TestAnalysisHTTPMessageBodyExtractsCompleteRequest(t *testing.T) {
 		wire, err = io.ReadAll(reader)
 		require.NoError(t, err)
 		require.Equal(t, "OK", string(wire))
+		require.Equal(t, []any{"text/plain"}, events[1].DisplayFields()["http.response.content_type"])
+		require.NotContains(t, events[1].DisplayFields(), "http.request.content_type")
+		require.Equal(t, []string{"text/plain"}, events[1].HTTPMessageHeaderValues("Content-Type"))
 	}
 }
 

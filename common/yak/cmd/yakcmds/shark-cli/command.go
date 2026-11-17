@@ -267,15 +267,13 @@ func runPlainAnalysis(ctx context.Context, s *captureSession, out io.Writer, asJ
 			return nil
 		}
 		for _, observation := range packet.objects {
-			if matched {
-				manifest, err := options.exporter.export(observation)
-				if err != nil {
+			manifest, err := options.exporter.process(observation, matched)
+			if err != nil {
+				return err
+			}
+			if manifest != nil {
+				if err = encoder.Encode(manifest); err != nil {
 					return err
-				}
-				if manifest != nil {
-					if err = encoder.Encode(manifest); err != nil {
-						return err
-					}
 				}
 			}
 			options.exporter.forget(observation)

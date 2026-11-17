@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -27,9 +29,47 @@ type objectObservation struct {
 	declared                                        *int64
 	refs                                            []pcaputil.PacketReference
 	bytes                                           pcaputil.ByteSource
+	httpStream                                      *httpStreamFragment
+	streamID                                        uint64
+}
+
+type httpStreamKey struct {
+	protocol         string
+	domain           pcaputil.CaptureDomain
+	flowID, streamID uint64
+}
+
+type httpStreamFragment struct {
+	key        httpStreamKey
+	direction  int
+	headerKind string
+	endStream  bool
+	payload    []byte
+	reset      bool
 }
 
 func observedObject(e *pcaputil.ProtocolEvent) *objectObservation {
+	observations := observedObjects(e)
+	if len(observations) == 0 {
+		return nil
+	}
+	return observations[0]
+}
+
+func observedObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
+	if e == nil {
+		return nil
+	}
+	if observation := observedHTTP2Object(e); observation != nil {
+		return []*objectObservation{observation}
+	}
+	if observation := observedHTTP1Object(e); observation != nil {
+		return []*objectObservation{observation}
+	}
+	return nil
+}
+
+func observedHTTP1Object(e *pcaputil.ProtocolEvent) *objectObservation {
 	body, declared, bodyRequest, bodyOK := e.HTTPMessageBody()
 	snapshot := e.DisplayFieldValues()
 	fields := snapshot.FieldMap()
@@ -61,14 +101,93 @@ func observedObject(e *pcaputil.ProtocolEvent) *objectObservation {
 		}
 		return ""
 	}
+	contentType := ""
+	if values := e.HTTPMessageHeaderValues("Content-Type"); len(values) > 0 {
+		contentType = values[0]
+	}
 	return &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: request, body: body, declared: declared, method: text("http.request.method"),
-		uri: text("http.request.uri"), contentType: text("http.response.content_type"), authorization: literal("http.request.authorization"), cookie: literal("http.cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source}
+		uri: text("http.request.uri"), contentType: contentType, authorization: literal("http.request.authorization"), cookie: literal("http.cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source}
+}
+
+func observedHTTP2Object(e *pcaputil.ProtocolEvent) *objectObservation {
+	if e == nil || e.Protocol != "http2" && e.Protocol != "grpc" {
+		return nil
+	}
+	key := httpStreamKey{protocol: "h2", domain: e.Domain, flowID: e.TCPFlowID}
+	if reset, ok := e.HTTP2StreamReset(); ok {
+		key.streamID = reset
+		return &objectObservation{id: e.ID, protocol: e.Protocol, httpStream: &httpStreamFragment{key: key, reset: true}}
+	}
+	if data, ok := e.HTTP2DataFragment(); ok {
+		key.streamID = data.StreamID
+		snapshot := e.DisplayFieldValues()
+		return &objectObservation{id: e.ID, protocol: e.Protocol, refs: snapshot.Source.PacketRefs, bytes: snapshot.Source,
+			httpStream: &httpStreamFragment{key: key, direction: e.Direction, endStream: data.EndStream, payload: data.Payload}}
+	}
+	header, ok := e.HTTP2HeaderFragment()
+	if !ok {
+		return nil
+	}
+	key.streamID = header.StreamID
+	snapshot := e.DisplayFieldValues()
+	fields := snapshot.FieldMap()
+	text := func(key string) string {
+		if values := fields[key]; len(values) > 0 {
+			value, _ := values[0].(string)
+			return value
+		}
+		return ""
+	}
+	headerLiteral := func(name string) any {
+		values := e.HTTPMessageHeaderValues(name)
+		if len(values) == 0 {
+			return nil
+		}
+		if len(values) == 1 {
+			return values[0]
+		}
+		out := make([]any, 0, len(values))
+		for _, value := range values {
+			out = append(out, value)
+		}
+		return out
+	}
+	contentType := ""
+	if values := e.HTTPMessageHeaderValues("Content-Type"); len(values) > 0 {
+		contentType = values[0]
+	}
+	var declared *int64
+	if values := e.HTTPMessageHeaderValues("Content-Length"); len(values) > 0 {
+		if length, err := strconv.ParseInt(strings.TrimSpace(values[0]), 10, 64); err == nil && length >= 0 {
+			declared = &length
+		}
+	}
+	return &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: header.Kind == "request", method: text("http.request.method"),
+		uri: text("http.request.uri"), contentType: contentType, declared: declared, authorization: headerLiteral("Authorization"), cookie: headerLiteral("Cookie"),
+		refs: snapshot.Source.PacketRefs, bytes: snapshot.Source,
+		httpStream: &httpStreamFragment{key: key, direction: e.Direction, headerKind: header.Kind, endStream: header.EndStream}}
 }
 
 type objectExporter struct {
-	directory    string
-	requests     map[uint64]*objectObservation
-	requestBytes int
+	directory       string
+	requests        map[uint64]*objectObservation
+	requestBytes    int
+	httpStream      map[httpStreamKey]*httpStreamState
+	httpStreamBytes int
+}
+
+type httpStreamDirection struct {
+	header   *objectObservation
+	declared *int64
+	selected bool
+	done     bool
+	body     []byte
+	refs     []pcaputil.PacketReference
+	parents  []uint64
+}
+
+type httpStreamState struct {
+	directions [2]*httpStreamDirection
 }
 
 func newObjectExporter(directory string) (*objectExporter, error) {
@@ -79,11 +198,14 @@ func newObjectExporter(directory string) (*objectExporter, error) {
 	if err = os.MkdirAll(directory, 0700); err != nil {
 		return nil, fmt.Errorf("create object directory: %w", err)
 	}
-	return &objectExporter{directory: directory, requests: make(map[uint64]*objectObservation)}, nil
+	return &objectExporter{directory: directory, requests: make(map[uint64]*objectObservation), httpStream: make(map[httpStreamKey]*httpStreamState)}, nil
 }
 
 func (x *objectExporter) observe(observations []*objectObservation) error {
 	for _, observation := range observations {
+		if observation.httpStream != nil {
+			continue
+		}
 		if !observation.request {
 			continue
 		}
@@ -106,6 +228,9 @@ func (x *objectExporter) observe(observations []*objectObservation) error {
 }
 
 func (x *objectExporter) forget(observation *objectObservation) {
+	if observation.httpStream != nil {
+		return
+	}
 	if request := x.requests[observation.responseTo]; request != nil {
 		x.requestBytes -= len(request.uri) + len(fmt.Sprint(request.authorization)) + len(fmt.Sprint(request.cookie)) + 256
 		delete(x.requests, observation.responseTo)
@@ -134,6 +259,9 @@ func safeObjectName(uri, contentType string) string {
 	if name == "" {
 		name = "object"
 	}
+	if windowsDeviceName(name) {
+		name = "_" + name
+	}
 	if path.Ext(name) == "" {
 		media, _, _ := mime.ParseMediaType(contentType)
 		extensions := map[string]string{"application/octet-stream": ".bin", "text/plain": ".txt", "text/html": ".html", "application/json": ".json", "image/png": ".png", "image/jpeg": ".jpg", "application/pdf": ".pdf", "application/zip": ".zip"}
@@ -146,11 +274,28 @@ func safeObjectName(uri, contentType string) string {
 	return name
 }
 
+func windowsDeviceName(name string) bool {
+	base := name
+	if at := strings.IndexByte(base, '.'); at >= 0 {
+		base = base[:at]
+	}
+	base = strings.ToUpper(strings.TrimRight(base, " ."))
+	switch base {
+	case "CON", "PRN", "AUX", "NUL", "CLOCK$":
+		return true
+	}
+	if len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9' {
+		return true
+	}
+	return false
+}
+
 type objectManifest struct {
 	RecordType     string              `json:"record_type"`
 	Physical       bool                `json:"physical"`
 	PDU            uint64              `json:"pdu"`
 	Protocol       string              `json:"protocol"`
+	StreamID       uint64              `json:"stream_id,omitempty"`
 	Direction      string              `json:"direction"`
 	Method         string              `json:"method,omitempty"`
 	Source         string              `json:"source"`
@@ -169,6 +314,16 @@ type objectManifest struct {
 	Cookie         any                 `json:"cookie"`
 }
 
+func (x *objectExporter) process(o *objectObservation, matched bool) (*objectManifest, error) {
+	if o.httpStream != nil {
+		return x.processHTTP2(o, matched)
+	}
+	if !matched {
+		return nil, nil
+	}
+	return x.export(o)
+}
+
 func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	if o.body == nil {
 		return nil, nil
@@ -176,7 +331,9 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	var uri, authorization, cookie any
 	method := ""
 	uriText := ""
-	if o.request {
+	if o.httpStream != nil {
+		uriText, uri, authorization, cookie, method = o.uri, o.uri, o.authorization, o.cookie, o.method
+	} else if o.request {
 		uriText, uri, authorization, cookie, method = o.uri, o.uri, o.authorization, o.cookie, o.method
 	} else if request := x.requests[o.responseTo]; request != nil {
 		uriText = request.uri
@@ -198,9 +355,9 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 		}
 		return nil, closeErr
 	}
-	if o.request && written == 0 && (o.declared == nil || *o.declared == 0) {
+	if written == 0 {
 		if err := os.Remove(name); err != nil {
-			return nil, fmt.Errorf("remove empty exported request: %w", err)
+			return nil, fmt.Errorf("remove empty exported body: %w", err)
 		}
 		return nil, nil
 	}
@@ -213,5 +370,159 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	if o.request {
 		direction = "request"
 	}
-	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, Direction: direction, Method: method, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType, DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
+	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, StreamID: o.streamID, Direction: direction, Method: method, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType, DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
+}
+
+const maxPendingHTTPStreamBytes = 64 << 20
+
+func (x *objectExporter) processHTTP2(o *objectObservation, matched bool) (*objectManifest, error) {
+	fragment := o.httpStream
+	key := fragment.key
+	if fragment.reset {
+		if stream := x.httpStream[key]; stream != nil {
+			x.releaseHTTP2Bodies(stream)
+			delete(x.httpStream, key)
+		}
+		return nil, nil
+	}
+	if fragment.direction != 0 && fragment.direction != 1 {
+		return nil, fmt.Errorf("HTTP/2 object export has invalid direction %d", fragment.direction)
+	}
+	stream := x.httpStream[key]
+	if stream == nil {
+		if len(x.httpStream) >= 4096 {
+			return nil, fmt.Errorf("HTTP/2 object export stream budget exceeded (4096 pending streams)")
+		}
+		stream = &httpStreamState{}
+		x.httpStream[key] = stream
+	}
+	direction := stream.directions[fragment.direction]
+	if direction == nil {
+		direction = &httpStreamDirection{}
+		stream.directions[fragment.direction] = direction
+	}
+	if fragment.headerKind != "" {
+		if direction.header != nil && direction.done {
+			return nil, nil
+		}
+		if direction.header == nil {
+			copy := *o
+			copy.body = nil
+			copy.refs = nil
+			copy.bytes = pcaputil.ByteSource{}
+			direction.header = &copy
+			declared := o.declared
+			direction.declared = declared
+			direction.selected = matched
+			direction.done = fragment.endStream
+			x.cleanupHTTP2(key, stream)
+		}
+		return nil, nil
+	}
+	if direction.header == nil {
+		return nil, nil
+	}
+	if matched {
+		direction.selected = true
+	}
+	if len(fragment.payload) > 0 {
+		if x.httpStreamBytes+len(fragment.payload) > maxPendingHTTPStreamBytes {
+			return nil, fmt.Errorf("HTTP/2 object export body budget exceeded (%d MiB)", maxPendingHTTPStreamBytes>>20)
+		}
+		direction.body = append(direction.body, fragment.payload...)
+		x.httpStreamBytes += len(fragment.payload)
+	}
+	for _, ref := range o.refs {
+		if !containsPacketReference(direction.refs, ref) {
+			direction.refs = append(direction.refs, ref)
+		}
+	}
+	if !containsUint64(direction.parents, o.id) {
+		direction.parents = append(direction.parents, o.id)
+	}
+	if !fragment.endStream {
+		return nil, nil
+	}
+	direction.done = true
+	if !direction.selected || len(direction.body) == 0 {
+		x.httpStreamBytes -= len(direction.body)
+		direction.body = nil
+		x.cleanupHTTP2(key, stream)
+		return nil, nil
+	}
+
+	body := direction.body
+	bodyObservation := *direction.header
+	bodyObservation.id = o.id
+	bodyObservation.body = bytes.NewReader(body)
+	bodyObservation.declared = direction.declared
+	bodyObservation.refs = append([]pcaputil.PacketReference(nil), direction.refs...)
+	bodyObservation.bytes = http2BodyByteSource(body, direction.parents, direction.refs)
+	bodyObservation.streamID = key.streamID
+	if !bodyObservation.request {
+		request := stream.directions[1-fragment.direction]
+		if request != nil && request.header != nil {
+			bodyObservation.uri = request.header.uri
+			bodyObservation.authorization = request.header.authorization
+			bodyObservation.cookie = request.header.cookie
+			bodyObservation.method = request.header.method
+		}
+	}
+	manifest, err := x.export(&bodyObservation)
+	x.httpStreamBytes -= len(body)
+	direction.body = nil
+	x.cleanupHTTP2(key, stream)
+	return manifest, err
+}
+
+func (x *objectExporter) releaseHTTP2Bodies(stream *httpStreamState) {
+	if stream == nil {
+		return
+	}
+	for _, direction := range stream.directions {
+		if direction != nil {
+			x.httpStreamBytes -= len(direction.body)
+			direction.body = nil
+		}
+	}
+}
+
+func (x *objectExporter) cleanupHTTP2(key httpStreamKey, stream *httpStreamState) {
+	if stream == nil {
+		return
+	}
+	for _, direction := range stream.directions {
+		if direction == nil || direction.header == nil || !direction.done {
+			return
+		}
+	}
+	delete(x.httpStream, key)
+}
+
+func containsPacketReference(values []pcaputil.PacketReference, want pcaputil.PacketReference) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func containsUint64(values []uint64, want uint64) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func http2BodyByteSource(body []byte, parents []uint64, refs []pcaputil.PacketReference) pcaputil.ByteSource {
+	digest := sha256.Sum256(body)
+	source := pcaputil.ByteSource{Kind: "reassembled", SHA256: hex.EncodeToString(digest[:]), ParentPDUs: append([]uint64(nil), parents...), PacketRefs: append([]pcaputil.PacketReference(nil), refs...)}
+	if len(refs) > 0 {
+		completed := refs[len(refs)-1]
+		source.CompletedIn = &completed
+	}
+	return source
 }
