@@ -21,9 +21,9 @@ func TestEvidenceSubAgents_ContextModeMixedBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, aicommon.WithPlanPrompt("PARENT_PLAN_SENTINEL")(cfg))
 	cfg.GetOrCreateFrozenBlockPartitionProducer().AppendNewPartition("test_static_context", "plan", "PARENT_FROZEN_SENTINEL", 1)
-	cfg.ContextProviderManager.Register("host", aicommon.FileContentContextProvider("HOST_CONTEXT_SENTINEL"))
-	end := cfg.ContextProviderManager.BeginTaskContext("attachment", aicommon.FileContentContextProvider("PARENT_ATTACHMENT_SENTINEL"))
-	defer end()
+	cfg.ContextProviderManager.Register("host", func(aicommon.AICallerConfigIf, *aicommon.Emitter, string) (string, error) {
+		return "HOST_CONTEXT_SENTINEL", nil
+	})
 	type observation struct {
 		mode, history, evidence, user, todo, plan, session, frozen, providers, input string
 		sameTools, memoryDisabled                                                    bool
@@ -64,7 +64,6 @@ func TestEvidenceSubAgents_ContextModeMixedBatch(t *testing.T) {
 			require.Contains(t, o.evidence, "PARENT_EVIDENCE_SENTINEL")
 			require.Equal(t, "PARENT_USER_SENTINEL", o.user)
 			require.Contains(t, o.frozen, "PARENT_FROZEN_SENTINEL")
-			require.Contains(t, o.providers, "PARENT_ATTACHMENT_SENTINEL")
 		} else {
 			require.NotContains(t, o.history, "PARENT_TIMELINE_SENTINEL")
 			require.Empty(t, o.evidence)

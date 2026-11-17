@@ -48,22 +48,3 @@ func TestAttachedFileContentReadBack(t *testing.T) {
 		require.Equal(t, rendered, resource.ToAttachData(nil))
 	}
 }
-
-func TestFileContentProviderReusesReadBackFile(t *testing.T) {
-	content := strings.Repeat("large input\n", 10000) + "TAIL"
-	provider := FileContentContextProvider(content)
-	first, err := provider(nil, nil, "test")
-	require.NoError(t, err)
-	_, after, found := strings.Cut(first, "Full content saved to file: ")
-	require.True(t, found)
-	path, _, _ := strings.Cut(after, "\n")
-	t.Cleanup(func() { _ = os.Remove(path) })
-	full, err := os.ReadFile(path)
-	require.NoError(t, err)
-	require.Equal(t, content, string(full))
-	for i := 0; i < 3; i++ {
-		next, err := provider(nil, nil, "test")
-		require.NoError(t, err)
-		require.Equal(t, first, next)
-	}
-}

@@ -300,7 +300,6 @@ func snapshotSubAgentConfig(parent *aicommon.Config, contextMode ...string) []ai
 	)
 	if taskOnly {
 		opts = append(opts, aicommon.WithPlanPrompt(""),
-			aicommon.WithContextProvider(parent.ContextProviderManager.WithoutTaskContext()),
 			// Otherwise LiteForge can restore the parent's persisted history, and
 			// frozen plan partitions/automatic memory recall can refill the prompt.
 			aicommon.WithPersistentSessionId(""),
