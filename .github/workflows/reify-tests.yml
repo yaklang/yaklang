@@ -9,9 +9,6 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "common/yak/reify/**"
-      - "go.mod"
-      - "go.sum"
-      - "scripts/ssa-test.sh"
       - ".github/workflows/reify-tests.yml"
   push:
     branches: [main]
