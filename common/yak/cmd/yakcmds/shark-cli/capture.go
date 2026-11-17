@@ -276,7 +276,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		}
 		if current != nil {
 			if cfg.collectObjects {
-				if observation := observedObject(e); observation != nil {
+				for _, observation := range observedObjects(e) {
 					current.objects = append(current.objects, observation)
 				}
 			}
@@ -316,7 +316,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 			publication := &capturedPacket{publicationPhase: "capture_close", fieldsAtObservation: true, observedFieldBudget: observedPacketFieldBytes - 1024, filterObserver: filterObserver}
 			publication.recordObservedPDU(e)
 			if cfg.collectObjects {
-				if observation := observedObject(e); observation != nil {
+				for _, observation := range observedObjects(e) {
 					publication.objects = append(publication.objects, observation)
 				}
 			}
