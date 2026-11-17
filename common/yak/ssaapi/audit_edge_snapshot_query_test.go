@@ -80,7 +80,7 @@ func TestGetPredecessorsUsesResultSnapshot(t *testing.T) {
 		nodeCount, snapshotQueries, perNodeQueries)
 	require.Less(t, snapshotQueries, perNodeQueries)
 
-	// A different result on the same Program reloads the slot.
+	// A different result on the same Program must not evict the earlier one.
 	otherID := resultID + 1
 	other := ssadb.NewAuditNode()
 	other.ResultId = otherID
@@ -92,9 +92,12 @@ func TestGetPredecessorsUsesResultSnapshot(t *testing.T) {
 	otherEdge := other.CreatePredecessorEdge(progName, nodes[1], 1, "other")
 	require.NoError(t, db.Create(otherEdge).Error)
 	t.Cleanup(func() { db.Unscoped().Delete(otherEdge) })
-	prog.resetAuditEdgeSnapshot()
-	prog.getAuditEdgeSnapshot(otherID)
-	require.Equal(t, otherID, prog.auditEdgeResultID)
+	require.NotNil(t, prog.getAuditEdgeSnapshot(otherID))
+	before = ssadb.SnapshotDBOpStats()
+	require.NotNil(t, prog.getAuditEdgeSnapshot(resultID))
+	require.Zero(t,
+		ssadb.DeltaDBOpStats(before, ssadb.SnapshotDBOpStats()).Ops[ssadb.DBOpQuery].Count,
+		"revisiting the earlier result must not query the database again")
 }
 
 // TestAuditEdgeSnapshotEmptyResultFallsBack keeps the per-node reader for a
