@@ -62,33 +62,50 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, pathPattern string, positi
 	// window, so an uncached empty result rescans every file for every window.
 	// NotList keeps this entry apart from a plain union of the same expressions.
 	resultKey := sourceSearchKey(pathPattern, true, append([]string{positive}, negatives...))
-	kept, cached := root.SourceHits(resultKey)
-	if cached {
-		if len(kept) == 0 {
-			return nil, noNegativeMatchError(positive)
-		}
-		return sourceHitsToValues(root, kept)
+	kept, err := root.SourceHitsOrLoad(resultKey, func() ([]Hit, error) {
+		return filterNegativeHits(root, pathPattern, positive, negatives)
+	})
+	if err != nil {
+		return nil, err
 	}
+	if len(kept) == 0 {
+		return nil, noNegativeMatchError(positive)
+	}
+	return sourceHitsToValues(root, kept)
+}
 
+// positiveHits returns the hits of one positive pattern, scanning at most once
+// while several callers wait. The plain search and the negative filter use the
+// same key, so a rule that mentions the pattern twice scans it once.
+func positiveHits(root *sfvm.PatternRoot, pathPattern string, patterns []string) ([]Hit, error) {
+	return root.SourceHitsOrLoad(sourceHitKey(pathPattern, patterns), func() ([]Hit, error) {
+		hits, _, err := scanRegexpHitsWithReason(root, pathPattern, patterns)
+		// A completed search is returned even when it is empty; the flight stores it.
+		return hits, err
+	})
+}
+
+// filterNegativeHits computes one pattern_regex_not result. It runs inside the
+// result key's flight, so concurrent windows share one positive scan and one
+// negative filter instead of repeating both.
+//
+// This is the only nested flight in the file: the result flight may enter the
+// positive flight, and no path enters the result key from inside the positive
+// one. The two keys are also distinct (NotList differs), so neither can wait
+// on itself.
+func filterNegativeHits(root *sfvm.PatternRoot, pathPattern string, positive string, negatives []string) ([]Hit, error) {
 	// Reuse the regular regexp cache for the positive set; then apply the
 	// negative filter ourselves. This avoids recomputing the (often large)
 	// positive hit list every time a pattern_regex_not statement runs.
-	positiveKey := sourceHitKey(pathPattern, []string{positive})
-	hits, cached := root.SourceHits(positiveKey)
-	if !cached {
-		var err error
-		hits, _, err = scanRegexpHitsWithReason(root, pathPattern, []string{positive})
-		if err != nil {
-			return nil, err
-		}
-		// Cache the completed search even when it found nothing.
-		root.SetSourceHits(positiveKey, hits)
+	hits, err := positiveHits(root, pathPattern, []string{positive})
+	if err != nil {
+		return nil, err
 	}
 	if len(hits) == 0 {
 		return nil, emptySearchError(root, pathPattern, []string{positive})
 	}
 	if len(negatives) == 0 {
-		return sourceHitsToValues(root, hits)
+		return hits, nil
 	}
 
 	negativeMatcher := compileContentMatchers(negatives)
@@ -118,11 +135,7 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, pathPattern string, positi
 			}
 		}
 	}
-	root.SetSourceHits(resultKey, keptHits)
-	if len(keptHits) == 0 {
-		return nil, noNegativeMatchError(positive)
-	}
-	return sourceHitsToValues(root, keptHits)
+	return keptHits, nil
 }
 
 func noNegativeMatchError(positive string) error {
@@ -206,18 +219,9 @@ func MatchRegexp(files map[string]string, pathPattern string, patterns []string)
 }
 
 func matchRegexp(root *sfvm.PatternRoot, pathPattern string, patterns []string) (sfvm.Values, error) {
-	key := sourceHitKey(pathPattern, patterns)
-	hits, cached := root.SourceHits(key)
-	if !cached {
-		var err error
-		hits, _, err = scanRegexpHitsWithReason(root, pathPattern, patterns)
-		if err != nil {
-			return nil, err
-		}
-		// Cache the completed search, including an empty result. The source
-		// executor replays a rule once per bounded hit window; without this
-		// entry every replay rescanned the same content.
-		root.SetSourceHits(key, hits)
+	hits, err := positiveHits(root, pathPattern, patterns)
+	if err != nil {
+		return nil, err
 	}
 	if len(hits) == 0 {
 		return nil, emptySearchError(root, pathPattern, patterns)
