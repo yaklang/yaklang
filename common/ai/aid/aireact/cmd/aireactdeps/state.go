@@ -17,7 +17,6 @@ type CLIConfig struct {
 	DebugMode       bool
 	InteractiveMode bool
 	BreakpointMode  bool
-	FilePath        string // File to monitor with traced file context provider
 }
 
 // ReactApp 包含 ReAct 应用的核心组件

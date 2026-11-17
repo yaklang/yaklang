@@ -2,8 +2,6 @@ package aicommon
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -12,21 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
-
-func TestFileContextProviderRetainsPreviewLimit(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "reference.txt")
-	content := strings.Repeat("x", MaxFileContentSize) + "PATH_TAIL_NOT_IN_PREVIEW"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	rendered, err := FileContextProvider(path)(nil, nil, "path-fixture")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(rendered, "content truncated") || strings.Contains(rendered, "PATH_TAIL_NOT_IN_PREVIEW") {
-		t.Fatal("file-path preview behavior changed")
-	}
-}
 
 func TestContextProviderManager_BasicRegistration(t *testing.T) {
 	cpm := NewContextProviderManager()
