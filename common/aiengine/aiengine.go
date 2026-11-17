@@ -383,6 +383,10 @@ func (e *AIEngine) SendInputEvent(event *ypb.AIInputEvent) error {
 
 // Close 关闭 AI 引擎，释放资源
 func (e *AIEngine) Close() {
+	if closer, ok := e.operator.(interface{ CloseAttachedFileMonitors() }); ok {
+		closer.CloseAttachedFileMonitors()
+	}
+
 	// 先取消上下文，通知所有 goroutine 停止
 	e.cancel()
 

@@ -121,6 +121,9 @@ type ReAct struct {
 
 	browserAttachments browserAttachmentState
 
+	attachedFileMonitorsMu sync.Mutex
+	attachedFileMonitors   map[string]*attachedFileMonitor
+
 	miniAITaskRegistry *MiniAITaskRegistry
 }
 
@@ -252,6 +255,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		wg:                   new(sync.WaitGroup),
 		lifecycleWG:          new(sync.WaitGroup),
 		browserSessionIDs:    make(map[string]struct{}),
+		attachedFileMonitors: make(map[string]*attachedFileMonitor),
 	}
 
 	// Initialize mini AI task registry and register built-in handlers
