@@ -128,7 +128,7 @@ func TuneSQLiteByDatabaseFileSize(db *gorm.DB, pureDBPath string) bool {
 	applySQLiteLargeDBTune(db, level)
 	sqliteLargeDBTuneLast.Store(pathKey, level)
 	mmapSize, walCheckpoint := level.mmapAndWAL()
-	log.Infof(
+	log.Debugf(
 		"sqlite tuned for large project db (%s): cache=%s mmap=%s wal_autocheckpoint=%d",
 		utils.ByteSize(uint64(size)),
 		utils.ByteSize(uint64(int64(level)*1024)),
