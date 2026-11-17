@@ -170,6 +170,21 @@ func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
 	return body, length, true
 }
 
+// HTTPMessageHeaderValues returns accepted literal values for one header in
+// the current HTTP message. Header evidence remains directional.
+func (e *ProtocolEvent) HTTPMessageHeaderValues(name string) []string {
+	if e == nil || e.nativeDiagnosticError != "" {
+		return nil
+	}
+	var out []string
+	displayHTTPHeaderField(e, name, func(value any) {
+		if text, ok := value.(string); ok {
+			out = append(out, text)
+		}
+	}, &displayProjection{snapshot: &DisplayFieldSnapshot{}, remaining: maxDisplayFieldValues * 4})
+	return out
+}
+
 // Both export manifests and display fields use the same accepted literal
 // headers. HTTP/1 maps and HTTP/2/3 Name/Value lists remain separate shapes.
 func displayHTTPHeaderField(e *ProtocolEvent, name string, emit func(any), p *displayProjection) {
@@ -240,13 +255,20 @@ func analysisDisplayBindings() []displayFieldBinding {
 		header    bool
 		typ       DisplayFieldType
 		bits      int
+		request   bool
+		response  bool
 	}{
-		{"http.host", "Host", false, DisplayString, 0}, {"http.request.uri", "Request URI", false, DisplayString, 0}, {"http.request.version", "Protocol", false, DisplayString, 0},
-		{"http.user_agent", "User-Agent", true, DisplayString, 0}, {"http.response.location", "Location", true, DisplayString, 0}, {"http.response.content_type", "Content-Type", true, DisplayString, 0},
-		{"http.request.header.length", "Content-Length", true, DisplayUnsigned, 16}, {"http.cookie", "Cookie", true, DisplayString, 0}, {"http.request.authorization", "Authorization", true, DisplayString, 0},
+		{"http.host", "Host", false, DisplayString, 0, false, false}, {"http.request.uri", "Request URI", false, DisplayString, 0, true, false}, {"http.request.version", "Protocol", false, DisplayString, 0, true, false},
+		{"http.user_agent", "User-Agent", true, DisplayString, 0, false, false}, {"http.response.location", "Location", true, DisplayString, 0, false, true}, {"http.response.content_type", "Content-Type", true, DisplayString, 0, false, true},
+		{"http.request.content_type", "Content-Type", true, DisplayString, 0, true, false},
+		{"http.request.header.length", "Content-Length", true, DisplayUnsigned, 16, true, false}, {"http.cookie", "Cookie", true, DisplayString, 0, true, false}, {"http.request.authorization", "Authorization", true, DisplayString, 0, true, false},
 	} {
 		b := displayCustom("http", f.name, "Literal HTTP "+f.key, f.typ, f.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 			if e.nativeDiagnosticError != "" {
+				return
+			}
+			request, response := httpDisplayDirection(e)
+			if f.request && response && !request || f.response && request && !response {
 				return
 			}
 			if f.header {
@@ -373,6 +395,13 @@ func kerberosAnalysisDisplayBindings() []displayFieldBinding {
 		}))
 	}
 	return out
+}
+
+func httpDisplayDirection(e *ProtocolEvent) (request, response bool) {
+	p := &displayProjection{snapshot: &DisplayFieldSnapshot{}, remaining: 8}
+	displayHTTPValues(e, true, func(any) { request = true }, p)
+	displayHTTPValues(e, false, func(any) { response = true }, p)
+	return
 }
 
 func displayScalarValues(value any, emit func(any), p *displayProjection) {
