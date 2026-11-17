@@ -693,6 +693,14 @@ const (
 	Yak_GetAISessionCurrentResources_FullMethodName               = "/ypb.Yak/GetAISessionCurrentResources"
 	Yak_GetAIModelContext_FullMethodName                          = "/ypb.Yak/GetAIModelContext"
 	Yak_SetAIModelContext_FullMethodName                          = "/ypb.Yak/SetAIModelContext"
+	Yak_ImportPCAPFile_FullMethodName                             = "/ypb.Yak/ImportPCAPFile"
+	Yak_QueryPCAPDatabase_FullMethodName                          = "/ypb.Yak/QueryPCAPDatabase"
+	Yak_QueryPCAPPackets_FullMethodName                           = "/ypb.Yak/QueryPCAPPackets"
+	Yak_GetPCAPPacketDetail_FullMethodName                        = "/ypb.Yak/GetPCAPPacketDetail"
+	Yak_ReadPCAPBytes_FullMethodName                              = "/ypb.Yak/ReadPCAPBytes"
+	Yak_QueryPCAPPacket_FullMethodName                            = "/ypb.Yak/QueryPCAPPacket"
+	Yak_ExportPCAPData_FullMethodName                             = "/ypb.Yak/ExportPCAPData"
+	Yak_DeletePCAPDatabase_FullMethodName                         = "/ypb.Yak/DeletePCAPDatabase"
 )
 
 // YakClient is the client API for Yak service.
@@ -1560,6 +1568,16 @@ type YakClient interface {
 	// Model-specific compression budgets, available before a session starts.
 	GetAIModelContext(ctx context.Context, in *GetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error)
 	SetAIModelContext(ctx context.Context, in *SetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error)
+	// Offline capture library (packet viewing).
+	ImportPCAPFile(ctx context.Context, in *ImportPCAPFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportPCAPFileResponse], error)
+	QueryPCAPDatabase(ctx context.Context, in *QueryPCAPDatabaseRequest, opts ...grpc.CallOption) (*QueryPCAPDatabaseResponse, error)
+	QueryPCAPPackets(ctx context.Context, in *QueryPCAPPacketsRequest, opts ...grpc.CallOption) (*QueryPCAPPacketsResponse, error)
+	GetPCAPPacketDetail(ctx context.Context, in *GetPCAPPacketDetailRequest, opts ...grpc.CallOption) (*PCAPPacketDetail, error)
+	ReadPCAPBytes(ctx context.Context, in *ReadPCAPBytesRequest, opts ...grpc.CallOption) (*ReadPCAPBytesResponse, error)
+	// Superseded by QueryPCAPPackets and GetPCAPPacketDetail.
+	QueryPCAPPacket(ctx context.Context, in *QueryPCAPPacketRequest, opts ...grpc.CallOption) (*QueryPCAPPacketResponse, error)
+	ExportPCAPData(ctx context.Context, in *ExportPCAPDataRequest, opts ...grpc.CallOption) (*ExportPCAPDataResponse, error)
+	DeletePCAPDatabase(ctx context.Context, in *DeletePCAPDatabaseRequest, opts ...grpc.CallOption) (*DeletePCAPDatabaseResponse, error)
 }
 
 type yakClient struct {
@@ -9318,6 +9336,95 @@ func (c *yakClient) SetAIModelContext(ctx context.Context, in *SetAIModelContext
 	return out, nil
 }
 
+func (c *yakClient) ImportPCAPFile(ctx context.Context, in *ImportPCAPFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportPCAPFileResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[124], Yak_ImportPCAPFile_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ImportPCAPFileRequest, ImportPCAPFileResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ImportPCAPFileClient = grpc.ServerStreamingClient[ImportPCAPFileResponse]
+
+func (c *yakClient) QueryPCAPDatabase(ctx context.Context, in *QueryPCAPDatabaseRequest, opts ...grpc.CallOption) (*QueryPCAPDatabaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryPCAPDatabaseResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryPCAPDatabase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryPCAPPackets(ctx context.Context, in *QueryPCAPPacketsRequest, opts ...grpc.CallOption) (*QueryPCAPPacketsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryPCAPPacketsResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryPCAPPackets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetPCAPPacketDetail(ctx context.Context, in *GetPCAPPacketDetailRequest, opts ...grpc.CallOption) (*PCAPPacketDetail, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PCAPPacketDetail)
+	err := c.cc.Invoke(ctx, Yak_GetPCAPPacketDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ReadPCAPBytes(ctx context.Context, in *ReadPCAPBytesRequest, opts ...grpc.CallOption) (*ReadPCAPBytesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadPCAPBytesResponse)
+	err := c.cc.Invoke(ctx, Yak_ReadPCAPBytes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryPCAPPacket(ctx context.Context, in *QueryPCAPPacketRequest, opts ...grpc.CallOption) (*QueryPCAPPacketResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryPCAPPacketResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryPCAPPacket_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ExportPCAPData(ctx context.Context, in *ExportPCAPDataRequest, opts ...grpc.CallOption) (*ExportPCAPDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportPCAPDataResponse)
+	err := c.cc.Invoke(ctx, Yak_ExportPCAPData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeletePCAPDatabase(ctx context.Context, in *DeletePCAPDatabaseRequest, opts ...grpc.CallOption) (*DeletePCAPDatabaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeletePCAPDatabaseResponse)
+	err := c.cc.Invoke(ctx, Yak_DeletePCAPDatabase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -10183,6 +10290,16 @@ type YakServer interface {
 	// Model-specific compression budgets, available before a session starts.
 	GetAIModelContext(context.Context, *GetAIModelContextRequest) (*AIModelContextResponse, error)
 	SetAIModelContext(context.Context, *SetAIModelContextRequest) (*AIModelContextResponse, error)
+	// Offline capture library (packet viewing).
+	ImportPCAPFile(*ImportPCAPFileRequest, grpc.ServerStreamingServer[ImportPCAPFileResponse]) error
+	QueryPCAPDatabase(context.Context, *QueryPCAPDatabaseRequest) (*QueryPCAPDatabaseResponse, error)
+	QueryPCAPPackets(context.Context, *QueryPCAPPacketsRequest) (*QueryPCAPPacketsResponse, error)
+	GetPCAPPacketDetail(context.Context, *GetPCAPPacketDetailRequest) (*PCAPPacketDetail, error)
+	ReadPCAPBytes(context.Context, *ReadPCAPBytesRequest) (*ReadPCAPBytesResponse, error)
+	// Superseded by QueryPCAPPackets and GetPCAPPacketDetail.
+	QueryPCAPPacket(context.Context, *QueryPCAPPacketRequest) (*QueryPCAPPacketResponse, error)
+	ExportPCAPData(context.Context, *ExportPCAPDataRequest) (*ExportPCAPDataResponse, error)
+	DeletePCAPDatabase(context.Context, *DeletePCAPDatabaseRequest) (*DeletePCAPDatabaseResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -12214,6 +12331,30 @@ func (UnimplementedYakServer) GetAIModelContext(context.Context, *GetAIModelCont
 }
 func (UnimplementedYakServer) SetAIModelContext(context.Context, *SetAIModelContextRequest) (*AIModelContextResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetAIModelContext not implemented")
+}
+func (UnimplementedYakServer) ImportPCAPFile(*ImportPCAPFileRequest, grpc.ServerStreamingServer[ImportPCAPFileResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method ImportPCAPFile not implemented")
+}
+func (UnimplementedYakServer) QueryPCAPDatabase(context.Context, *QueryPCAPDatabaseRequest) (*QueryPCAPDatabaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryPCAPDatabase not implemented")
+}
+func (UnimplementedYakServer) QueryPCAPPackets(context.Context, *QueryPCAPPacketsRequest) (*QueryPCAPPacketsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryPCAPPackets not implemented")
+}
+func (UnimplementedYakServer) GetPCAPPacketDetail(context.Context, *GetPCAPPacketDetailRequest) (*PCAPPacketDetail, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPCAPPacketDetail not implemented")
+}
+func (UnimplementedYakServer) ReadPCAPBytes(context.Context, *ReadPCAPBytesRequest) (*ReadPCAPBytesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadPCAPBytes not implemented")
+}
+func (UnimplementedYakServer) QueryPCAPPacket(context.Context, *QueryPCAPPacketRequest) (*QueryPCAPPacketResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryPCAPPacket not implemented")
+}
+func (UnimplementedYakServer) ExportPCAPData(context.Context, *ExportPCAPDataRequest) (*ExportPCAPDataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExportPCAPData not implemented")
+}
+func (UnimplementedYakServer) DeletePCAPDatabase(context.Context, *DeletePCAPDatabaseRequest) (*DeletePCAPDatabaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeletePCAPDatabase not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -23428,6 +23569,143 @@ func _Yak_SetAIModelContext_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ImportPCAPFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ImportPCAPFileRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ImportPCAPFile(m, &grpc.GenericServerStream[ImportPCAPFileRequest, ImportPCAPFileResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ImportPCAPFileServer = grpc.ServerStreamingServer[ImportPCAPFileResponse]
+
+func _Yak_QueryPCAPDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPCAPDatabaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryPCAPDatabase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryPCAPDatabase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryPCAPDatabase(ctx, req.(*QueryPCAPDatabaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryPCAPPackets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPCAPPacketsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryPCAPPackets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryPCAPPackets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryPCAPPackets(ctx, req.(*QueryPCAPPacketsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetPCAPPacketDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPCAPPacketDetailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetPCAPPacketDetail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetPCAPPacketDetail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetPCAPPacketDetail(ctx, req.(*GetPCAPPacketDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ReadPCAPBytes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadPCAPBytesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ReadPCAPBytes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ReadPCAPBytes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ReadPCAPBytes(ctx, req.(*ReadPCAPBytesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryPCAPPacket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryPCAPPacketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryPCAPPacket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryPCAPPacket_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryPCAPPacket(ctx, req.(*QueryPCAPPacketRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ExportPCAPData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportPCAPDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ExportPCAPData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ExportPCAPData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ExportPCAPData(ctx, req.(*ExportPCAPDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeletePCAPDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePCAPDatabaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeletePCAPDatabase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeletePCAPDatabase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeletePCAPDatabase(ctx, req.(*DeletePCAPDatabaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -25635,6 +25913,34 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "SetAIModelContext",
 			Handler:    _Yak_SetAIModelContext_Handler,
 		},
+		{
+			MethodName: "QueryPCAPDatabase",
+			Handler:    _Yak_QueryPCAPDatabase_Handler,
+		},
+		{
+			MethodName: "QueryPCAPPackets",
+			Handler:    _Yak_QueryPCAPPackets_Handler,
+		},
+		{
+			MethodName: "GetPCAPPacketDetail",
+			Handler:    _Yak_GetPCAPPacketDetail_Handler,
+		},
+		{
+			MethodName: "ReadPCAPBytes",
+			Handler:    _Yak_ReadPCAPBytes_Handler,
+		},
+		{
+			MethodName: "QueryPCAPPacket",
+			Handler:    _Yak_QueryPCAPPacket_Handler,
+		},
+		{
+			MethodName: "ExportPCAPData",
+			Handler:    _Yak_ExportPCAPData_Handler,
+		},
+		{
+			MethodName: "DeletePCAPDatabase",
+			Handler:    _Yak_DeletePCAPDatabase_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -26273,6 +26579,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "UploadToTemporaryFile",
 			Handler:       _Yak_UploadToTemporaryFile_Handler,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "ImportPCAPFile",
+			Handler:       _Yak_ImportPCAPFile_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",
