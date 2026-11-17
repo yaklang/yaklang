@@ -1,0 +1,299 @@
+__DESC__ = "只读查询 360 本地安全大脑的威胁告警与安全事件，按 R5.0 API 规范分页返回真实记录及覆盖情况，供智能体进行证据化研判。"
+__VERBOSE_NAME__ = "360 Local Security Brain Collector"
+__VERBOSE_NAME_ZH__ = "360 本地安全大脑告警与事件采集"
+__KEYWORDS__ = "360,security brain,alarm,event,incident,triage,openapi,read only"
+__USAGE__ = <<<USAGE_BLOCK
+只读查询 360 本地安全大脑中的威胁告警和安全事件。本工具按随附的 R5.0 API 规范调用接口，不修改告警或事件状态，也不执行处置。
+
+## 连接配置
+- `xdr-base-url`：360 本地安全大脑地址，例如 `https://host:port`。
+- `x-api-key`：运营中心管理台签发的 API Key。作为本次运行参数输入；脚本只把它写入 HTTP `x-api-key` 请求头，不写入结果或日志。
+- API 文档规定最多 5 次请求/秒；本工具在连续请求之间等待 250 毫秒。
+
+## 查询参数
+- `time-window`：滚动窗口，默认 `24h`；支持正整数加 `d`、`h` 或 `m`，例如 `7d`、`2h`、`30m`。
+- `start-time` / `end-time`：可选 RFC3339 时间（需带时区），例如 `2026-11-14T09:00:00+08:00`；提供后覆盖对应边界。
+- `page-size`：每页条数，默认 20，范围 1–1000。
+- `max-pages`：告警和事件各自最多查询页数，默认 3，范围 1–10。
+
+## 返回
+JSON 分开包含 `alarm_query` 和 `event_query`。每类都返回接口 `total`、实际成功页数、拉取条数、`has_more`、`complete`、错误和记录。告警使用 `/__rest/discover/search`，安全事件使用 `/__rest/hqlite/1.0/search`。若接口未返回总量，覆盖状态会标为未知/不完整；不得把部分样本当作全量。
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+xdrBaseUrl = cli.String("xdr-base-url", cli.setVerboseName("360 平台地址"), cli.setDefault(""), cli.setHelp("360 本地安全大脑协议、IP 和端口"))
+xdrApiKey = cli.String("x-api-key", cli.setVerboseName("API Key"), cli.setDefault(""), cli.setHelp("从 360 运营中心管理台获取；仅用于本次 API 请求"))
+timeWindow = cli.String("time-window", cli.setVerboseName("时间窗口"), cli.setDefault("24h"), cli.setHelp("正整数+d/h/m，例如 24h、7d、30m"))
+startTime = cli.String("start-time", cli.setVerboseName("起始时间"), cli.setDefault(""), cli.setHelp("可选 RFC3339 时间，需带时区"))
+endTime = cli.String("end-time", cli.setVerboseName("结束时间"), cli.setDefault(""), cli.setHelp("可选 RFC3339 时间，需带时区"))
+pageSize = cli.Int("page-size", cli.setVerboseName("每页条数"), cli.setDefault(20), cli.setHelp("每页条数，范围 1–1000"))
+maxPages = cli.Int("max-pages", cli.setVerboseName("每类最大页数"), cli.setDefault(3), cli.setHelp("告警与事件分别最多查询页数，范围 1–10"))
+cli.check()
+
+if xdrBaseUrl == "" || xdrApiKey == "" {
+    yakit.Error("缺少连接参数：请提供 xdr-base-url 和 x-api-key")
+    return
+}
+if pageSize <= 0 {
+    pageSize = 20
+}
+if pageSize > 1000 {
+    pageSize = 1000
+}
+if maxPages <= 0 {
+    maxPages = 3
+}
+if maxPages > 10 {
+    maxPages = 10
+}
+
+now = time.Now()
+windowEnd = now
+windowStart = now.Add(time.ParseDuration("-24h")~)
+window = str.ToLower(str.TrimSpace(timeWindow))
+if window == "" {
+    window = "24h"
+}
+if window != "24h" {
+    digits = ""
+    unit = ""
+    for _, ch := range window {
+        if str.Contains("0123456789", string(ch)) {
+            digits += string(ch)
+        } else {
+            unit += string(ch)
+        }
+    }
+    amount = 0
+    try {
+        amount = int(digits)
+    } catch e {
+        yakit.Error("time-window 格式无效，应为正整数+d/h/m")
+        return
+    }
+    seconds = 0
+    if unit == "d" {
+        seconds = amount * 86400
+    } else if unit == "h" {
+        seconds = amount * 3600
+    } else if unit == "m" {
+        seconds = amount * 60
+    }
+    if amount <= 0 || seconds <= 0 {
+        yakit.Error("time-window 仅支持正整数+d/h/m，例如 24h、7d、30m")
+        return
+    }
+    windowStart = now.Add(time.ParseDuration(sprintf("-%ds", seconds))~)
+}
+
+parseBoundary = func(raw, fieldName) {
+    if str.TrimSpace(raw) == "" {
+        return {"empty": true}
+    }
+    try {
+        value, err = time.Parse("2006-01-02T15:04:05Z07:00", str.TrimSpace(raw))
+        if err != nil {
+            return {"err": sprintf("%s 格式错误，应为带时区的 RFC3339 时间", fieldName)}
+        }
+        return {"value": value}
+    } catch e {
+        return {"err": sprintf("%s 解析失败: %v", fieldName, e)}
+    }
+}
+
+startParsed = parseBoundary(startTime, "start-time")
+if startParsed["err"] != nil {
+    yakit.Error("%v", startParsed["err"])
+    return
+}
+if startParsed["empty"] != true {
+    windowStart = startParsed["value"]
+}
+endParsed = parseBoundary(endTime, "end-time")
+if endParsed["err"] != nil {
+    yakit.Error("%v", endParsed["err"])
+    return
+}
+if endParsed["empty"] != true {
+    windowEnd = endParsed["value"]
+}
+if !windowStart.Before(windowEnd) {
+    yakit.Error("查询时间范围无效：start-time 必须早于 end-time")
+    return
+}
+reportedWindow = window
+if str.TrimSpace(startTime) != "" || str.TrimSpace(endTime) != "" {
+    reportedWindow = "custom"
+}
+
+toUnixMillis = func(value) {
+    return int64(value.UnixNano() / 1000000)
+}
+startMillis = toUnixMillis(windowStart)
+endMillis = toUnixMillis(windowEnd)
+
+requestCount = 0
+postJson = func(path, requestBody) {
+    if requestCount > 0 {
+        time.Sleep(0.25)
+    }
+    requestCount += 1
+
+    fullUrl = sprintf("%v/%v", str.TrimRight(xdrBaseUrl, "/"), str.TrimLeft(path, "/"))
+    opts = [poc.timeout(20)]
+    autoHttps, packet, err = poc.ParseUrlToHTTPRequestRaw("POST", fullUrl)
+    if err != nil {
+        return {"err": sprintf("parse URL failed: %v", err)}
+    }
+    if autoHttps {
+        opts = append(opts, poc.https(true))
+    }
+    packet = poc.ReplaceHTTPPacketHeader(packet, "Content-Type", "application/json")
+    packet = poc.ReplaceHTTPPacketHeader(packet, "x-api-key", xdrApiKey)
+    packet = poc.ReplaceHTTPPacketBody(packet, []byte(json.dumps(requestBody)))
+    response, _, err = poc.HTTPEx(packet, opts...)
+    if err != nil {
+        return {"err": sprintf("HTTP request failed: %v", err)}
+    }
+    httpStatus = poc.GetStatusCodeFromResponse(response.RawPacket)
+    body = poc.GetHTTPPacketBody(response.RawPacket)
+    parsed = {}
+    try {
+        parsed = json.loads(string(body))
+    } catch e {
+        return {"err": sprintf("response is not JSON (HTTP %v)", httpStatus)}
+    }
+    parsed["_http_status"] = httpStatus
+    return parsed
+}
+
+queryPaged = func(path, requestBody, useScroll) {
+    rows = []
+    pagesFetched = 0
+    total = nil
+    totalCount = 0
+    totalKnown = false
+    hasMore = false
+    errorMessage = ""
+    scrollId = ""
+
+    for pageIndex := 0; pageIndex < maxPages; pageIndex++ {
+        offset = pageIndex * pageSize
+        search = requestBody["search"]
+        search["from"] = offset
+        requestBody["search"] = search
+        if useScroll && scrollId != "" {
+            requestBody["scroll_id"] = scrollId
+        }
+
+        response = postJson(path, requestBody)
+        if response["err"] != nil {
+            errorMessage = response["err"]
+            break
+        }
+        httpStatus = int(response["_http_status"])
+        if httpStatus < 200 || httpStatus >= 300 {
+            errorMessage = sprintf("HTTP %v returned by XDR", httpStatus)
+            break
+        }
+        statusCode = response["statusCode"]
+        if statusCode == nil || str.TrimSpace(sprint(statusCode)) != "0" {
+            errorMessage = sprintf("HTTP %v, statusCode=%v, messages=%v", httpStatus, statusCode, response["messages"])
+            break
+        }
+
+        data = response["data"]
+        if data == nil {
+            data = {}
+        }
+        searchData = data["search"]
+        if searchData == nil {
+            searchData = {}
+        }
+        pageRows = searchData["data"]
+        if pageRows == nil {
+            pageRows = []
+        }
+        for _, row := range pageRows {
+            rows.Push(row)
+        }
+        pagesFetched += 1
+
+        pageTotal = searchData["total"]
+        if pageTotal != nil {
+            total = pageTotal
+            try {
+                totalCount = int(pageTotal)
+                totalKnown = true
+            } catch e {
+                totalKnown = false
+            }
+        }
+        if useScroll && data["scroll_id"] != nil {
+            scrollId = sprint(data["scroll_id"])
+        }
+
+        if totalKnown {
+            hasMore = totalCount > offset + len(pageRows)
+        } else {
+            // Without an upstream total, a full page may have more rows; coverage stays unknown.
+            hasMore = len(pageRows) >= pageSize
+        }
+        if !hasMore || len(pageRows) == 0 {
+            break
+        }
+    }
+
+    return {
+        "ok": errorMessage == "",
+        "total": total,
+        "coverage_known": totalKnown,
+        "pages_fetched": pagesFetched,
+        "items_fetched": len(rows),
+        "has_more": hasMore,
+        "complete": errorMessage == "" && totalKnown && !hasMore,
+        "error": errorMessage,
+        "records": rows,
+    }
+}
+
+timeFilter = sprintf("开始时间 >= %v AND 开始时间 <= %v", startMillis, endMillis)
+alarmBody = {
+    "source": "alarm_merge",
+    "search": {
+        "from": 0,
+        "size": pageSize,
+        "columns": [{"field": "start_time", "order": "desc"}, "*"],
+    },
+    "timeFilter": timeFilter,
+    "filter": "(alarm_name exist) AND (incident_type = \"alarm_merge\")",
+}
+eventBody = {
+    "source": "incident",
+    "search": {
+        "from": 0,
+        "size": pageSize,
+        "columns": [{"field": "start_time", "order": "desc"}, "*"],
+    },
+    "timeFilter": timeFilter,
+    "filter": "",
+}
+
+alarmResult = queryPaged("/__rest/discover/search", alarmBody, false)
+eventResult = queryPaged("/__rest/hqlite/1.0/search", eventBody, true)
+
+result = {
+    "ok": alarmResult["ok"] && eventResult["ok"],
+    "source": "360 Local Security Brain R5.0 API",
+    "time_range": {
+        "start": windowStart.Format("2006-01-02T15:04:05Z07:00"),
+        "end": windowEnd.Format("2006-01-02T15:04:05Z07:00"),
+        "time_window": reportedWindow,
+    },
+    "page_size": pageSize,
+    "max_pages_per_type": maxPages,
+    "alarm_query": alarmResult,
+    "event_query": eventResult,
+}
+yakit.Info("XDR_SECURITY_OPS_RESULT %v", json.dumps(result))

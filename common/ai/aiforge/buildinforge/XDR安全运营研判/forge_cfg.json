@@ -1,0 +1,13 @@
+{
+  "name": "XDR安全运营研判",
+  "verbose_name": "360 本地安全大脑事件研判",
+  "description": "只读获取 360 本地安全大脑的告警和安全事件，基于真实接口记录进行证据化研判。",
+  "tags": "360本地安全大脑,告警研判,安全事件,安全运营,senso-role:threat-analyst",
+  "tools": "xdr_security_ops_collect",
+  "params": "",
+  "init_prompt": "",
+  "persistent_prompt": "",
+  "plan_prompt": "",
+  "result_prompt": "",
+  "forge_content": ""
+}

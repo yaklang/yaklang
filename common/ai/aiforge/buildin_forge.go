@@ -197,6 +197,7 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("异常行为狩猎")
 	registerBuildInForge("安全事件响应编排")
 	registerBuildInForge("安全运营报告生成")
+	registerBuildInForge("XDR安全运营研判")
 	registerBuildInForge("安全成熟度评估")
 	registerBuildInForge("security_awareness_training")
 	registerBuildInForge("XDR告警研判")
