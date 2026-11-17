@@ -23,12 +23,14 @@ type objectObservation struct {
 	id, responseTo                                  uint64
 	protocol, source, destination, uri, contentType string
 	objectType, direction                           string
+	authority                                       string
 	method                                          string
 	status                                          int
 	contentEncoding, contentDisposition             string
 	contentRange, suggestedFilename                 string
 	authorization, cookie                           any
 	transferID                                      uint64
+	messageID                                       uint64
 	opcode                                          string
 	request                                         bool
 	allowEmpty                                      bool
@@ -70,6 +72,11 @@ func observedObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
 	}
 	if e.Protocol == "http3" {
 		return observedHTTP3Objects(e)
+	}
+	if e.Protocol == "grpc" {
+		if observations := observedGRPCObjects(e); len(observations) > 0 {
+			return observations
+		}
 	}
 	if observation := observedHTTP2Object(e); observation != nil {
 		return []*objectObservation{observation}
@@ -517,7 +524,9 @@ type objectManifest struct {
 	ObjectType         string              `json:"object_type"`
 	StreamID           uint64              `json:"stream_id,omitempty"`
 	TransferID         uint64              `json:"transfer_id,omitempty"`
+	MessageID          uint64              `json:"message_id,omitempty"`
 	Direction          string              `json:"direction"`
+	Authority          string              `json:"authority,omitempty"`
 	Method             string              `json:"method,omitempty"`
 	StatusCode         int                 `json:"status_code,omitempty"`
 	Opcode             string              `json:"opcode,omitempty"`
@@ -557,9 +566,13 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	if o.body == nil {
 		return nil, nil
 	}
-	var uri, authorization, cookie any
-	method := ""
-	uriText := ""
+	var uri any
+	if o.uri != "" {
+		uri = o.uri
+	}
+	authorization, cookie := o.authorization, o.cookie
+	method := o.method
+	uriText := o.uri
 	if o.httpStream != nil {
 		uriText, uri, authorization, cookie, method = o.uri, o.uri, o.authorization, o.cookie, o.method
 	} else if o.request {
@@ -610,7 +623,7 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	if objectType == "" {
 		objectType = "object"
 	}
-	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, ObjectType: objectType, StreamID: o.streamID, TransferID: o.transferID, Direction: direction, Method: method, StatusCode: o.status, Opcode: o.opcode, Compressed: o.compressed, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType,
+	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, ObjectType: objectType, StreamID: o.streamID, TransferID: o.transferID, MessageID: o.messageID, Direction: direction, Authority: o.authority, Method: method, StatusCode: o.status, Opcode: o.opcode, Compressed: o.compressed, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType,
 		ContentEncoding: o.contentEncoding, ContentDisposition: o.contentDisposition, ContentRange: o.contentRange, SuggestedFilename: o.suggestedFilename, Partial: o.contentRange != "",
 		DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
 }

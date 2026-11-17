@@ -57,6 +57,11 @@ func TestFirstBatchT09(t *testing.T) {
 							}
 						}
 						if ms, ok := e.Session["GRPC Messages"].([]map[string]any); ok {
+							require.NotEmpty(t, e.ApplicationMessagePacketRefs())
+							uri, authority, method := e.ApplicationObjectContext()
+							require.NotEmpty(t, uri)
+							require.NotEmpty(t, authority)
+							require.Equal(t, "POST", method)
 							for _, m := range ms {
 								b := m["Payload"].([]byte)
 								require.Len(t, b, 5)
