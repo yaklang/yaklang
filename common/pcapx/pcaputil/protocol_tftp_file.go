@@ -7,7 +7,11 @@ import (
 	"strconv"
 )
 
-const tftpMaximumFileBytes = 16 << 20
+const (
+	// MaxTFTPFileBytes bounds one automatically assembled observed TFTP file.
+	MaxTFTPFileBytes     = 16 << 20
+	tftpMaximumFileBytes = MaxTFTPFileBytes
+)
 
 // WithProtocolTFTPFileAssembly selects bounded observed octet RRQ/WRQ files on
 // one initial UDP service port. Files are returned as owned bytes only after
@@ -25,7 +29,22 @@ func WithProtocolTFTPFileAssembly(port uint16, maximum int) CaptureOption {
 		if c.datagramDecodeAs[port] != "" {
 			return fmt.Errorf("TFTP file service conflicts with explicit DecodeAs")
 		}
-		c.binParserConfig.TFTPFilePort, c.binParserConfig.TFTPFileBytesLimit = port, maximum
+		c.binParserConfig.TFTPFilePort, c.binParserConfig.TFTPFileBytesLimit, c.binParserConfig.TFTPFileAuto = port, maximum, false
+		return nil
+	}
+}
+
+// WithProtocolTFTPFileAutoAssembly selects bounded observed octet RRQ/WRQ files
+// on any initial UDP service port. TFTP request grammar still gates assembly.
+func WithProtocolTFTPFileAutoAssembly(maximum int) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if maximum < 1 || maximum > tftpMaximumFileBytes {
+			return fmt.Errorf("TFTP file auto assembly requires 1..16777216 bytes")
+		}
+		if c.binParserConfig == nil {
+			c.binParserConfig = &BinParserConfig{}
+		}
+		c.binParserConfig.TFTPFilePort, c.binParserConfig.TFTPFileBytesLimit, c.binParserConfig.TFTPFileAuto = 0, maximum, true
 		return nil
 	}
 }
@@ -39,7 +58,18 @@ func WithSessionTFTPFileAssembly(port uint16, maximum int) ProtocolSessionOption
 		if s.f.a.datagramDecodeAs[port] != "" {
 			return fmt.Errorf("TFTP file service conflicts with explicit DecodeAs")
 		}
-		s.f.a.config.TFTPFilePort, s.f.a.config.TFTPFileBytesLimit = port, maximum
+		s.f.a.config.TFTPFilePort, s.f.a.config.TFTPFileBytesLimit, s.f.a.config.TFTPFileAuto = port, maximum, false
+		return nil
+	}
+}
+
+// WithSessionTFTPFileAutoAssembly selects auto-port TFTP file assembly.
+func WithSessionTFTPFileAutoAssembly(maximum int) ProtocolSessionOption {
+	return func(s *captureSession) error {
+		if maximum < 1 || maximum > tftpMaximumFileBytes {
+			return fmt.Errorf("TFTP file auto assembly requires 1..16777216 bytes")
+		}
+		s.f.a.config.TFTPFilePort, s.f.a.config.TFTPFileBytesLimit, s.f.a.config.TFTPFileAuto = 0, maximum, true
 		return nil
 	}
 }
@@ -103,13 +133,18 @@ func tftpFileBoolInt(v bool) int {
 }
 
 func (a *binParser) newTFTPFile(peer string) *binTFTPFile {
-	_, p, err := net.SplitHostPort(peer)
-	if err != nil {
+	if a.config.TFTPFileBytesLimit <= 0 {
 		return nil
 	}
-	port, err := strconv.ParseUint(p, 10, 16)
-	if err != nil || uint16(port) != a.config.TFTPFilePort || a.config.TFTPFileBytesLimit <= 0 {
-		return nil
+	if !a.config.TFTPFileAuto {
+		_, p, err := net.SplitHostPort(peer)
+		if err != nil {
+			return nil
+		}
+		port, err := strconv.ParseUint(p, 10, 16)
+		if err != nil || uint16(port) != a.config.TFTPFilePort {
+			return nil
+		}
 	}
 	return &binTFTPFile{limit: a.config.TFTPFileBytesLimit}
 }

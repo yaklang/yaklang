@@ -35,6 +35,7 @@ func TestAnalysisCLIObjectExportHTTP1EdgeCases(t *testing.T) {
 		require.NoError(t, invoke(&output, "-r", input, "--json", "--export-objects", dir))
 		manifests := objectExportManifests(t, output.Bytes())
 		require.Len(t, manifests, 1)
+		require.Equal(t, "http_body", manifests[0]["object_type"])
 		require.Equal(t, "request", manifests[0]["direction"])
 		require.Nil(t, manifests[0]["declared_length"])
 		wire, err := os.ReadFile(manifests[0]["path"].(string))
