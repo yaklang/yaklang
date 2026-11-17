@@ -12,6 +12,8 @@ type binWebSocket struct {
 	noContext, compressed [2]bool
 	dictionary            [2][]byte
 	limit                 int
+	evidenceLimit         int
+	sources               [2][]PacketReference
 	client                int
 	phase                 string
 	buf                   [2][]byte
@@ -200,6 +202,54 @@ func (f *binFlow) frameWebSocket(dir int, w []byte) (int, *binSpec, error) {
 		return 0, nil, err
 	}
 	return n, f.spec("websocket", "WebSocket"), nil
+}
+
+func (ws *binWebSocket) observeMessageSource(dir int, raw []byte, e *ProtocolEvent) {
+	if ws == nil || e == nil || len(raw) < 2 {
+		return
+	}
+	op := raw[0] & 15
+	if op == 1 || op == 2 {
+		ws.sources[dir] = nil
+	}
+	if op > 2 {
+		return
+	}
+	for _, ref := range e.SourceBytes.PacketRefs {
+		if ws.evidenceLimit > 0 && len(ws.sources[dir]) >= ws.evidenceLimit {
+			return
+		}
+		found := false
+		for _, existing := range ws.sources[dir] {
+			if existing == ref {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ws.sources[dir] = append(ws.sources[dir], ref)
+		}
+	}
+}
+
+func (ws *binWebSocket) takeMessageSource(dir int) []PacketReference {
+	if ws == nil || len(ws.sources[dir]) == 0 {
+		return nil
+	}
+	refs := append([]PacketReference(nil), ws.sources[dir]...)
+	ws.sources[dir] = nil
+	return refs
+}
+
+func websocketCompleteApplicationMessage(info map[string]any) bool {
+	if info == nil {
+		return false
+	}
+	if _, ok := info["Application"].([]byte); !ok {
+		return false
+	}
+	name, _ := info["Opcode Name"].(string)
+	return name == "text" || name == "binary"
 }
 
 func (ws *binWebSocket) consume(dir int, raw []byte) (map[string]any, error) {
