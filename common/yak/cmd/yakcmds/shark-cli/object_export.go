@@ -22,12 +22,17 @@ import (
 type objectObservation struct {
 	id, responseTo                                  uint64
 	protocol, source, destination, uri, contentType string
+	objectType, direction                           string
 	method                                          string
 	status                                          int
 	contentEncoding, contentDisposition             string
 	contentRange, suggestedFilename                 string
 	authorization, cookie                           any
+	transferID                                      uint64
+	opcode                                          string
 	request                                         bool
+	allowEmpty                                      bool
+	compressed                                      bool
 	body                                            io.Reader
 	declared                                        *int64
 	refs                                            []pcaputil.PacketReference
@@ -72,6 +77,12 @@ func observedObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
 	if observation := observedHTTP1Object(e); observation != nil {
 		return []*objectObservation{observation}
 	}
+	if observations := observedWebSocketObjects(e); len(observations) > 0 {
+		return observations
+	}
+	if observation := observedTFTPObject(e); observation != nil {
+		return []*objectObservation{observation}
+	}
 	return nil
 }
 
@@ -113,7 +124,7 @@ func observedHTTP1Object(e *pcaputil.ProtocolEvent) *objectObservation {
 			status = int(value)
 		}
 	}
-	observation := &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: request, body: body, declared: declared, method: text("http.request.method"), status: status,
+	observation := &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, objectType: "http_body", source: e.Source, destination: e.Destination, request: request, body: body, declared: declared, method: text("http.request.method"), status: status,
 		uri: text("http.request.uri"), authorization: literal("http.request.authorization"), cookie: literal("http.cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source}
 	applyObjectMessageMetadata(observation, func(name string) []string { return e.HTTPMessageHeaderValues(name) })
 	return observation
@@ -174,7 +185,7 @@ func observedHTTP2Object(e *pcaputil.ProtocolEvent) *objectObservation {
 			status = int(value)
 		}
 	}
-	observation := &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: header.Kind == "request", method: text("http.request.method"), status: status,
+	observation := &objectObservation{id: e.ID, protocol: e.Protocol, objectType: "http_body", source: e.Source, destination: e.Destination, request: header.Kind == "request", method: text("http.request.method"), status: status,
 		uri: text("http.request.uri"), declared: declared, authorization: headerLiteral("Authorization"), cookie: headerLiteral("Cookie"),
 		refs: snapshot.Source.PacketRefs, bytes: snapshot.Source,
 		httpStream: &httpStreamFragment{key: key, direction: e.Direction, headerKind: header.Kind, endStream: header.EndStream}}
@@ -326,7 +337,7 @@ func http3HeaderObject(e *pcaputil.ProtocolEvent, key httpStreamKey, direction i
 			status = parsed
 		}
 	}
-	observation := &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: kind == "request",
+	observation := &objectObservation{id: e.ID, protocol: e.Protocol, objectType: "http_body", source: e.Source, destination: e.Destination, request: kind == "request",
 		method: first(":method"), uri: first(":path"), status: status, declared: declared,
 		authorization: literal("Authorization"), cookie: literal("Cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source,
 		streamID: key.streamID, httpStream: &httpStreamFragment{key: key, direction: direction, headerKind: kind}}
@@ -503,10 +514,14 @@ type objectManifest struct {
 	Physical           bool                `json:"physical"`
 	PDU                uint64              `json:"pdu"`
 	Protocol           string              `json:"protocol"`
+	ObjectType         string              `json:"object_type"`
 	StreamID           uint64              `json:"stream_id,omitempty"`
+	TransferID         uint64              `json:"transfer_id,omitempty"`
 	Direction          string              `json:"direction"`
 	Method             string              `json:"method,omitempty"`
 	StatusCode         int                 `json:"status_code,omitempty"`
+	Opcode             string              `json:"opcode,omitempty"`
+	Compressed         bool                `json:"compressed,omitempty"`
 	Source             string              `json:"source"`
 	Destination        string              `json:"destination"`
 	URI                any                 `json:"uri"`
@@ -573,7 +588,7 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 		}
 		return nil, closeErr
 	}
-	if written == 0 {
+	if written == 0 && !o.allowEmpty {
 		if err := os.Remove(name); err != nil {
 			return nil, fmt.Errorf("remove empty exported body: %w", err)
 		}
@@ -588,7 +603,14 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	if o.request {
 		direction = "request"
 	}
-	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, StreamID: o.streamID, Direction: direction, Method: method, StatusCode: o.status, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType,
+	if o.direction != "" {
+		direction = o.direction
+	}
+	objectType := o.objectType
+	if objectType == "" {
+		objectType = "object"
+	}
+	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, ObjectType: objectType, StreamID: o.streamID, TransferID: o.transferID, Direction: direction, Method: method, StatusCode: o.status, Opcode: o.opcode, Compressed: o.compressed, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType,
 		ContentEncoding: o.contentEncoding, ContentDisposition: o.contentDisposition, ContentRange: o.contentRange, SuggestedFilename: o.suggestedFilename, Partial: o.contentRange != "",
 		DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
 }
@@ -744,8 +766,12 @@ func containsUint64(values []uint64, want uint64) bool {
 }
 
 func httpStreamBodyByteSource(body []byte, parents []uint64, refs []pcaputil.PacketReference) pcaputil.ByteSource {
+	return assembledObjectByteSource(body, "reassembled", parents, refs)
+}
+
+func assembledObjectByteSource(body []byte, kind string, parents []uint64, refs []pcaputil.PacketReference) pcaputil.ByteSource {
 	digest := sha256.Sum256(body)
-	source := pcaputil.ByteSource{Kind: "reassembled", SHA256: hex.EncodeToString(digest[:]), ParentPDUs: append([]uint64(nil), parents...), PacketRefs: append([]pcaputil.PacketReference(nil), refs...)}
+	source := pcaputil.ByteSource{Kind: kind, SHA256: hex.EncodeToString(digest[:]), ParentPDUs: append([]uint64(nil), parents...), PacketRefs: append([]pcaputil.PacketReference(nil), refs...)}
 	if len(refs) > 0 {
 		completed := refs[len(refs)-1]
 		source.CompletedIn = &completed
