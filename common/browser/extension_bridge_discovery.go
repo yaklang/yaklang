@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 const extensionBridgeDiscoveryPath = "/discovery"
@@ -62,6 +63,21 @@ type extensionBridgeDiscoveryEnvelope struct {
 func extensionBridgeFrontend() (string, string) {
 	edition := strings.ToLower(os.Getenv("YAKIT_EDITION"))
 	database := strings.ToLower(filepath.Base(os.Getenv("YAK_DEFAULT_PROJECT_DATABASE_NAME")))
+	// The desktop launcher supplies --frontend before the bridge starts. Its
+	// identity takes precedence over shared Yakit paths and environment values.
+	switch strings.ToLower(strings.TrimSpace(consts.GetFrontendName())) {
+	case "memfit":
+		return "memfit", "Memfit AI"
+	case "irify", "irifyee":
+		return "irify", "IRify"
+	case "yakitee", "yakit-enterprise":
+		return "yakit-enterprise", "Yakit 企业版"
+	case "yakit":
+		if edition == "yakitee" || edition == "yakit-enterprise" || strings.Contains(database, "company") {
+			return "yakit-enterprise", "Yakit 企业版"
+		}
+		return "yakit", "Yakit"
+	}
 	switch {
 	case strings.Contains(edition, "memfit") || strings.Contains(database, "memfit"):
 		return "memfit", "Memfit AI"
