@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	_ "github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -64,10 +64,6 @@ func MainEntry() {
 			Name:  "breakpoint,b",
 			Usage: "Enable breakpoint mode (pause before/after each AI interaction for inspection)",
 		},
-		cli.StringFlag{
-			Name:  "file,f",
-			Usage: "Monitor a file with traced file context provider (tracks file changes)",
-		},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -89,7 +85,6 @@ func runReActCLI(c *cli.Context) error {
 		DebugMode:       c.Bool("debug"),
 		InteractiveMode: !c.Bool("no-interact"),
 		BreakpointMode:  c.Bool("breakpoint"),
-		FilePath:        c.String("file"),
 	}
 
 	// 设置调试模式
@@ -110,18 +105,7 @@ func runReActCLI(c *cli.Context) error {
 		log.Info("Non-interactive mode enabled - all tool usage will be automatically approved")
 	}
 
-	// 显示文件监控信息
-	if config.FilePath != "" {
-		log.Infof("File monitoring enabled - will track changes to: %s", config.FilePath)
-	}
-
 	log.Info("Starting ReAct CLI Demo")
-
-	// 如果启用了文件监控，显示使用提示
-	if config.FilePath != "" {
-		log.Info("💡 Tip: File monitoring is active. The AI will see file changes as context.")
-		log.Info("💡 You can modify the file and ask questions about the changes!")
-	}
 
 	// 初始化数据库和配置
 	if err := initializeDatabase(); err != nil {
@@ -275,11 +259,6 @@ func buildReActOptions(ctx context.Context, aiCallback aicommon.AICallbackType, 
 			outputChan <- e
 		}),
 		aireact.WithBuiltinTools(),
-	}
-
-	// 如果指定了文件路径，添加 traced file context provider
-	if config.FilePath != "" {
-		options = append(options, aicommon.WithTracedFileContext("monitored_file", config.FilePath))
 	}
 
 	return options

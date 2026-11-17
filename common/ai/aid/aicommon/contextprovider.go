@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"mime"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -47,17 +46,6 @@ const (
 )
 
 type ContextProvider func(config AICallerConfigIf, emitter *Emitter, key string) (string, error)
-
-// Only the main-loop attachment view omits the echoed query. Helper prompts
-// receive the original config and retain their existing attachment context.
-type mainLoopContextProviderConfig struct{ AICallerConfigIf }
-
-func attachmentUserPrompt(config AICallerConfigIf, userPrompt []string) string {
-	if _, mainLoop := config.(*mainLoopContextProviderConfig); mainLoop {
-		return ""
-	}
-	return fmt.Sprintf("User Prompt: %s\n", strings.Join(userPrompt, " "))
-}
 
 // isTextMimeType 判断是否为文本类型的 MIME
 func isTextMimeType(mimeType string) bool {
@@ -136,7 +124,7 @@ func isTextFileExtension(ext string) bool {
 
 // IsImageContextAttachmentPath reports whether filePath should be treated as an image
 // for prompt attachment (by extension or image/* MIME). Used so callers can route
-// images to vision pipelines instead of FileContextProvider (text-only).
+// images to vision pipelines instead of text previews.
 func IsImageContextAttachmentPath(filePath string) bool {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	imageExts := map[string]bool{
@@ -154,104 +142,6 @@ func IsImageContextAttachmentPath(filePath string) bool {
 		return strings.HasPrefix(strings.ToLower(mimeType), "image/")
 	}
 	return false
-}
-
-// MaxFileContentSize 文件内容最大读取大小（1KB）
-const MaxFileContentSize = 1024
-
-func FileContextProvider(filePath string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		// 构建基本信息（即使出错也要包含）
-		baseInfo := attachmentUserPrompt(config, userPrompt) + fmt.Sprintf("File: %s\n", filePath)
-
-		if !utils.FileExists(filePath) {
-			return baseInfo + "[Error: file does not exist]", utils.Errorf("file %s does not exist", filePath)
-		}
-
-		ext := filepath.Ext(filePath)
-		fileName := filepath.Base(filePath)
-
-		// 1. 先使用 mime.TypeByExtension 获取 MIME 类型
-		mimeType := mime.TypeByExtension(ext)
-
-		// 2. 判断是否为文本类型
-		isText := false
-		if mimeType != "" {
-			isText = isTextMimeType(mimeType)
-		}
-		// 如果 MIME 类型未知，回退到扩展名判断
-		if !isText {
-			isText = isTextFileExtension(ext)
-		}
-		// 特殊处理：没有扩展名的文件（如 Makefile, Dockerfile）
-		if ext == "" {
-			lowerName := strings.ToLower(fileName)
-			if lowerName == "makefile" || lowerName == "dockerfile" || lowerName == "vagrantfile" ||
-				lowerName == "gemfile" || lowerName == "rakefile" || lowerName == "procfile" {
-				isText = true
-			}
-		}
-
-		// 3. 非文本类型，返回未实现错误（包含文件路径信息）
-		if !isText {
-			errInfo := fmt.Sprintf("[Error: file type '%s' (MIME: %s) is not supported yet, only text files are supported]", ext, mimeType)
-			return baseInfo + errInfo, utils.Errorf("file %s: file type '%s' (MIME: %s) is not supported yet, only text files are supported", filePath, ext, mimeType)
-		}
-
-		// 4. 读取文本文件内容
-		file, err := os.Open(filePath)
-		if err != nil {
-			return baseInfo + fmt.Sprintf("[Error: failed to open file: %v]", err), utils.Errorf("failed to open file %s: %w", filePath, err)
-		}
-		defer file.Close()
-
-		// 获取文件大小
-		fileInfo, err := file.Stat()
-		if err != nil {
-			return baseInfo + fmt.Sprintf("[Error: failed to stat file: %v]", err), utils.Errorf("failed to stat file %s: %w", filePath, err)
-		}
-		fileSize := fileInfo.Size()
-
-		// 读取内容，限制为最大 1KB
-		var content string
-		var truncated bool
-		if fileSize > MaxFileContentSize {
-			// 文件过大，只读取前 1KB
-			buffer := make([]byte, MaxFileContentSize)
-			n, err := file.Read(buffer)
-			if err != nil {
-				return baseInfo + fmt.Sprintf("File Size: %d bytes\n[Error: failed to read file: %v]", fileSize, err), utils.Errorf("failed to read file %s: %w", filePath, err)
-			}
-			content = string(buffer[:n])
-			truncated = true
-		} else {
-			// 文件较小，全部读取
-			contentBytes, err := os.ReadFile(filePath)
-			if err != nil {
-				return baseInfo + fmt.Sprintf("File Size: %d bytes\n[Error: failed to read file: %v]", fileSize, err), utils.Errorf("failed to read file %s: %w", filePath, err)
-			}
-			content = string(contentBytes)
-		}
-
-		// 5. 构建提示词
-		var result bytes.Buffer
-		result.WriteString(baseInfo)
-		if mimeType != "" {
-			result.WriteString(fmt.Sprintf("MIME Type: %s\n", mimeType))
-		}
-		result.WriteString(fmt.Sprintf("File Size: %d bytes\n", fileSize))
-		if truncated {
-			result.WriteString(fmt.Sprintf("Note: File content truncated to first %d bytes (original size: %d bytes)\n", MaxFileContentSize, fileSize))
-		}
-		result.WriteString("\n--- File Content ---\n")
-		result.WriteString(content)
-		if truncated {
-			result.WriteString("\n... (content truncated) ...")
-		}
-		result.WriteString("\n--- End of File Content ---\n")
-
-		return result.String(), nil
-	}
 }
 
 // ArtifactsContextMaxTokens is the maximum size (in tokens) for the artifacts context output.
@@ -284,15 +174,9 @@ func NewContextProviderManager() *ContextProviderManager {
 
 func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextProvider) {
 	update := newContextProviderTrace()
-	mainLoopUpdate := newContextProviderTrace()
 	wrapper := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 		result, err := cb(config, emitter, key)
-		trace := update
-		if _, mainLoop := config.(*mainLoopContextProviderConfig); mainLoop {
-			// Helper-only query headers must never return via a change diff.
-			trace = mainLoopUpdate
-		}
-		extra := trace(result, err)
+		extra := update(result, err)
 		if err != nil {
 			if extra == "" {
 				return result, err
@@ -416,12 +300,6 @@ func (r *ContextProviderManager) ExecuteWithNonce(config AICallerConfigIf, emitt
 	return r.executeWithTagStrategy(config, emitter, func(name string) string {
 		return contextProviderTagWithNonce(nonce, name)
 	})
-}
-
-// ExecuteMainLoopWithNonce retains attachment contents and coordinates while
-// leaving task queries exclusively in Timeline Open / promoted user history.
-func (r *ContextProviderManager) ExecuteMainLoopWithNonce(config AICallerConfigIf, emitter *Emitter, nonce string) string {
-	return r.ExecuteWithNonce(&mainLoopContextProviderConfig{config}, emitter, nonce)
 }
 
 func (r *ContextProviderManager) executeWithTagStrategy(

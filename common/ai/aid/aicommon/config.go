@@ -1793,17 +1793,6 @@ func WithTracedDynamicContextProvider(name string, provider ContextProvider) Con
 	}
 }
 
-// WithTracedFileContext monitors a file and provides its content as context with change tracking
-func WithTracedFileContext(name string, filePath string) ConfigOption {
-	return func(c *Config) error {
-		if name != "" && filePath != "" {
-			provider := FileContextProvider(filePath)
-			c.ContextProviderManager.RegisterTracedContent(name, provider)
-		}
-		return nil
-	}
-}
-
 func WithAiToolManagerOptions(opts ...buildinaitools.ToolManagerOption) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {

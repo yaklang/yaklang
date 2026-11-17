@@ -114,7 +114,7 @@ func (pm *PromptManager) getLoopPromptBaseMaterials(
 	materials.TaskType = taskType
 	if !options.UserInputOnly && pm.cpm != nil {
 		if options.PromoteUserInput {
-			materials.AutoContext = pm.cpm.ExecuteMainLoopWithNonce(pm.react.config, pm.react.config.Emitter, nonce)
+			materials.AutoContext = pm.cpm.ExecuteWithNonce(pm.react.config, pm.react.config.Emitter, nonce)
 		} else {
 			materials.AutoContext = pm.AutoContextWithNonce(nonce)
 		}
