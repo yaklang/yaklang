@@ -19,11 +19,15 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 	if stream == nil {
 		return nil
 	}
+	e.applicationObjectMethod = stream.method
+	e.applicationObjectURI = stream.path
+	e.applicationObjectAuthority = stream.authority
 	if e.Session["Reset"] == true || e.Session["Exchange Complete"] == true {
 		defer func() {
 			for d := range stream.grpc {
 				h.grpcBuffered -= int64(cap(stream.grpc[d]))
 				stream.grpc[d] = nil
+				stream.grpcSources[d] = nil
 			}
 		}()
 	}
@@ -66,6 +70,11 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 	typ, _ := e.Session["Frame Type"].(byte)
 	if typ == 0 {
 		payload := grpcDATAPayload(e.Raw)
+		if len(payload) > 0 {
+			if err := f.retainGRPCSource(stream, dir, e.SourceBytes.PacketRefs); err != nil {
+				return err
+			}
+		}
 		old := stream.grpc[dir]
 		// At most one partial message plus one bounded HTTP/2 frame is transiently retained.
 		size := len(old) + len(payload)
@@ -116,7 +125,11 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 					m["Protobuf Wire Status"] = "opaque-or-unsupported"
 				}
 			}
+			e.applicationMessagePacketRefs = append([]PacketReference(nil), stream.grpcSources[dir]...)
 			e.Session["GRPC Messages"] = msgs
+			if len(stream.grpc[dir]) == 0 {
+				stream.grpcSources[dir] = nil
+			}
 			if err := f.reserveSession(h.sessionStorageBytes()); err != nil {
 				return err
 			}
@@ -124,6 +137,40 @@ func (f *binFlow) consumeGRPC(dir int, e *ProtocolEvent, stream *binH2Stream) er
 	}
 	if e.Session["End Stream"] == true && len(stream.grpc[dir]) != 0 {
 		return protocolError(ErrMalformedMessage, "gRPC END_STREAM inside a length-prefixed message")
+	}
+	return nil
+}
+
+func (h *binHTTP2) grpcSourceStorageBytes() int64 {
+	var n int64
+	for _, stream := range h.streams {
+		n += int64(cap(stream.grpcSources[0])+cap(stream.grpcSources[1])) * 128
+	}
+	return n
+}
+
+func (f *binFlow) retainGRPCSource(stream *binH2Stream, dir int, refs []PacketReference) error {
+	for _, ref := range refs {
+		if ref.Number == 0 || packetReferenceContains(stream.grpcSources[dir], ref) {
+			continue
+		}
+		if len(stream.grpcSources[dir]) >= f.a.budget.MaxCollectionElements {
+			return protocolError(ErrResourceExceeded, "gRPC packet evidence count exceeds limit")
+		}
+		sources := stream.grpcSources[dir]
+		if len(sources) == cap(sources) {
+			nextCap := max(1, min(f.a.budget.MaxCollectionElements, max(2*cap(sources), 1)))
+			delta := int64(nextCap-cap(sources)) * 128
+			if delta > 0 {
+				if err := f.reserveSession(f.h2.sessionStorageBytes() + delta); err != nil {
+					return err
+				}
+			}
+			grown := make([]PacketReference, len(sources), nextCap)
+			copy(grown, sources)
+			sources = grown
+		}
+		stream.grpcSources[dir] = append(sources, ref)
 	}
 	return nil
 }

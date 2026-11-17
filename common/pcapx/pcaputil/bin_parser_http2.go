@@ -21,7 +21,10 @@ type binH2Stream struct {
 	headers, ended [2]bool
 	window         [2]int64
 	method         string
+	authority      string
+	path           string
 	grpc           [2][]byte
+	grpcSources    [2][]PacketReference
 	grpcEnabled    [2]bool
 	dohRetained    int64
 	dohFailed      bool
@@ -348,6 +351,7 @@ func (h *binHTTP2) consume(dir int, wire []byte) (map[string]any, error) {
 					}
 				}
 				stream.method = method
+				stream.authority, stream.path = pseudo[":authority"], pseudo[":path"]
 				stream.headers[dir] = true
 			} else {
 				kind = "response"
@@ -444,5 +448,5 @@ func (h *binHTTP2) applyLimits(receiver int, before binH2Settings) error {
 // shrinking reservation in binDoH; both reservations share a.buffered.
 func (h *binHTTP2) sessionStorageBytes() int64 {
 	tables := int64(h.settings[0].table) + int64(h.settings[1].table)
-	return 12288 + int64(len(h.streams)+1)*512 + int64(len(h.pending[0])+len(h.pending[1])+1)*64 + 8*tables + h.grpcBuffered
+	return 12288 + int64(len(h.streams)+1)*512 + int64(len(h.pending[0])+len(h.pending[1])+1)*64 + 8*tables + h.grpcBuffered + h.grpcSourceStorageBytes()
 }
