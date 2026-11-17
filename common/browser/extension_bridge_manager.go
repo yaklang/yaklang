@@ -245,6 +245,16 @@ func (m *ExtensionBridgeManager) Start(port int) error {
 			break
 		}
 	}
+	return m.replaceBridge(server, err)
+}
+
+func (m *ExtensionBridgeManager) StartNative() error {
+	server, err := newNativeExtensionBridgeServer(m)
+	return m.replaceBridge(server, err)
+}
+
+func (m *ExtensionBridgeManager) replaceBridge(server *ExtensionBridgeServer, err error) error {
+
 	m.mu.Lock()
 	previous := m.server
 	if err != nil {

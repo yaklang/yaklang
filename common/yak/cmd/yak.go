@@ -576,6 +576,12 @@ var startGRPCServerCommand = cli.Command{
 			Value: 64333,
 			Usage: "浏览器插件本机 Bridge 首选端口；端口占用或无权限时自动避让",
 		},
+		cli.StringFlag{
+			Name:   "browser-extension-bridge-transport",
+			Value:  "websocket",
+			EnvVar: "YAK_BROWSER_EXTENSION_BRIDGE_TRANSPORT",
+			Usage:  "浏览器插件 Bridge 传输，可选 websocket 或 Windows npipe",
+		},
 		cli.BoolFlag{
 			Name:  "disable-browser-extension-bridge",
 			Usage: "关闭浏览器插件本机 Bridge",
@@ -828,11 +834,21 @@ var startGRPCServerCommand = cli.Command{
 			yakgrpc.WithStartCacheLog(),
 		}
 		if !c.Bool("disable-browser-extension-bridge") {
-			bridgePort := c.Int("browser-extension-bridge-port")
-			if bridgePort <= 0 || bridgePort > 65535 {
-				return utils.Errorf("browser extension bridge port out of range: %d", bridgePort)
+			switch c.String("browser-extension-bridge-transport") {
+			case "npipe":
+				if runtime.GOOS != "windows" {
+					return utils.Error("browser extension bridge npipe requires Windows")
+				}
+				serverOptions = append(serverOptions, yakgrpc.WithNativeBrowserExtensionBridge())
+			case "websocket":
+				bridgePort := c.Int("browser-extension-bridge-port")
+				if bridgePort <= 0 || bridgePort > 65535 {
+					return utils.Errorf("browser extension bridge port out of range: %d", bridgePort)
+				}
+				serverOptions = append(serverOptions, yakgrpc.WithBrowserExtensionBridge(bridgePort))
+			default:
+				return utils.Error("browser extension bridge transport must be websocket or npipe")
 			}
-			serverOptions = append(serverOptions, yakgrpc.WithBrowserExtensionBridge(bridgePort))
 		}
 		s, err := yakgrpc.NewServer(serverOptions...)
 		if err != nil {
