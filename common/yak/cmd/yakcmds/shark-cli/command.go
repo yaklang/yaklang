@@ -4,6 +4,7 @@ package sharkcli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"golang.org/x/term"
@@ -25,10 +27,10 @@ var Command = &cli.Command{
 	UsageText: "yak shark [options]\n\n" +
 		"  yak shark\n  yak shark -i en0 --protocol dns,tls --bpf 'host 1.1.1.1'\n" +
 		"  yak shark --pcap-file traffic.pcapng\n  yak shark --output-file capture.pcapng\n" +
-		"  yak shark --plain --protocol tcp --count 100\n  yak shark --pcap-file traffic.pcap --json\n\n" +
-		"  yak shark -r traffic.pcap --export-objects ./objects --json\n" +
-		"  yak shark -r traffic.pcap --stats proto --stats conv --json\n" +
-		"  yak shark -r traffic.pcap --json-physical-only -Y 'frame.number <= 5'\n\n" +
+		"  yak shark --plain --protocol tcp --count 100\n  yak shark --pcap-file traffic.pcap --json-file traffic.jsonl\n\n" +
+		"  yak shark -r traffic.pcap --export-objects ./objects --json-file traffic.jsonl\n" +
+		"  yak shark -r traffic.pcap --stats proto --stats conv --json-file traffic.jsonl\n" +
+		"  yak shark -r traffic.pcap --json-file frames.jsonl --json-physical-only -Y 'frame.number <= 5'\n\n" +
 		"Interactive: wheel/trackpad scrolls the hovered pane; click selects; drag scrollbars.\n" +
 		"Arrows/j/k select, Tab switches panes, Enter pins flat fields, / searches, f edits BPF,\n" +
 		"p builds a protocol filter, Space freezes/resumes the list, g/G first/follow, q quits.\n" +
@@ -54,8 +56,9 @@ var Command = &cli.Command{
 		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types, scope and supported protocols; --json prints the versioned schema"},
 		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter: http.host == \"example.test\", pdu.content contains \"GET /\", pdu.content hex:00ff, stream.content contains \"example\"; selects proven matches; missing evidence is unknown; saved capture remains complete"},
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
-		cli.BoolFlag{Name: "json", Usage: "Print JSONL packet snapshots plus nonphysical record_type=protocol_publication records for capture-close diagnostics; byte_source defines original contributors"},
-		cli.BoolFlag{Name: "json-physical-only", Usage: "Print JSONL physical frames only; implies --json and omits nonphysical publications"},
+		cli.BoolFlag{Name: "json", Usage: "Legacy: stream JSONL to stdout; prefer --json-file for reproducible output"},
+		cli.StringFlag{Name: "json-file", Usage: "Write JSONL to a new file instead of stdout (implies JSON output)"},
+		cli.BoolFlag{Name: "json-physical-only", Usage: "Write JSONL physical frames only; omits nonphysical publications"},
 		cli.StringFlag{Name: "export-objects", Usage: "Automatically export complete HTTP bodies, TFTP files, WebSocket and gRPC messages to a directory (new files only), with byte provenance in JSONL manifests"},
 		cli.StringSliceFlag{Name: "stats", Usage: "Print statistics over display-filter matches: conv, io, proto, endpoints (repeatable; replaces packet summaries)"},
 		cli.DurationFlag{Name: "stats-interval", Value: time.Second, Usage: "IO statistics bucket width, e.g. 1s or 100ms"},
@@ -71,12 +74,29 @@ var Command = &cli.Command{
 	Action: run,
 }
 
-func run(c *cli.Context) error {
+func run(c *cli.Context) (resultErr error) {
 	out := c.App.Writer
 	if out == nil {
 		out = os.Stdout
 	}
-	asJSON := c.Bool("json") || c.Bool("json-physical-only")
+	jsonFile := c.String("json-file")
+	if jsonFile != "" && c.Bool("json") {
+		return fmt.Errorf("--json and --json-file cannot be combined")
+	}
+	asJSON := c.Bool("json") || c.Bool("json-physical-only") || jsonFile != ""
+	if asJSON {
+		log.SetOutput(os.Stderr)
+	}
+	if jsonFile != "" {
+		file, err := os.OpenFile(jsonFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			return fmt.Errorf("create JSON output: %w", err)
+		}
+		defer func() {
+			resultErr = errors.Join(resultErr, file.Close())
+		}()
+		out = file
+	}
 	if c.NArg() != 0 {
 		return fmt.Errorf("unexpected argument %q; use --protocol dns or --bpf 'tcp port 80'", c.Args().First())
 	}
