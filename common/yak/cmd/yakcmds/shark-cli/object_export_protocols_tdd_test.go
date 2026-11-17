@@ -224,6 +224,33 @@ func TestAnalysisCLIObjectExportGRPCMessages(t *testing.T) {
 	require.NotZero(t, directions["server_to_client"])
 }
 
+func TestAnalysisCLIObjectExportFTPFiles(t *testing.T) {
+	input, err := trafficfixture.Materialize("../../../../bin-parser/testdata/winlab5013/captures/ctf-01-ftp.pcapng", t.TempDir())
+	require.NoError(t, err)
+	jsonFile := filepath.Join(t.TempDir(), "analysis.jsonl")
+	directory := filepath.Join(t.TempDir(), "objects")
+
+	var stdout bytes.Buffer
+	require.NoError(t, invoke(&stdout, "-r", input, "--json-file", jsonFile, "--export-objects", directory))
+	require.Empty(t, stdout.String())
+	var ftpObjects []map[string]any
+	for _, manifest := range objectExportManifests(t, mustReadFile(t, jsonFile)) {
+		if manifest["protocol"] == "ftp" {
+			ftpObjects = append(ftpObjects, manifest)
+		}
+	}
+	require.Len(t, ftpObjects, 1)
+	manifest := ftpObjects[0]
+	require.Equal(t, "file", manifest["object_type"])
+	require.Equal(t, "download", manifest["direction"])
+	require.Equal(t, true, manifest["complete"])
+	require.NotZero(t, manifest["transfer_id"])
+	require.NotEmpty(t, manifest["suggested_filename"])
+	require.NotEmpty(t, manifest["packet_refs"])
+	wire := mustReadFile(t, manifest["path"].(string))
+	require.NotEmpty(t, wire)
+}
+
 func TestObjectExporterGRPCCompressedPackedAndEmptyMessages(t *testing.T) {
 	event := &pcaputil.ProtocolEvent{
 		ID: 77, Protocol: "grpc", Status: "decoded", Direction: 0,

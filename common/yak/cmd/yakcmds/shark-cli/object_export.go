@@ -84,6 +84,9 @@ func observedObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
 	if observation := observedHTTP1Object(e); observation != nil {
 		return []*objectObservation{observation}
 	}
+	if observation := observedFTPObject(e); observation != nil {
+		return []*objectObservation{observation}
+	}
 	if observations := observedWebSocketObjects(e); len(observations) > 0 {
 		return observations
 	}
