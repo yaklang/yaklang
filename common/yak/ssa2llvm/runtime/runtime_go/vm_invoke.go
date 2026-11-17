@@ -1,24 +1,8 @@
 package main
 
 /*
-#cgo linux CFLAGS: -D_GNU_SOURCE
-#cgo linux LDFLAGS: -ldl
 #include <stdint.h>
 #include <stdlib.h>
-#include <dlfcn.h>
-
-typedef void (*yak_ctx_fn_t)(void*);
-
-static const char* yak_invoke_ctx_symbol(void* ctx, const char* name) {
-	dlerror();
-	void* sym = dlsym(RTLD_DEFAULT, name);
-	const char* err = dlerror();
-	if (err != NULL) {
-		return err;
-	}
-	((yak_ctx_fn_t)sym)(ctx);
-	return NULL;
-}
 */
 import "C"
 
@@ -30,6 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
+// callCtxSymbol resolves name in the running executable and calls it with ctx
+// as the only argument. The resolver is platform specific: dlsym(RTLD_DEFAULT)
+// on Unix, GetProcAddress on Windows. See vm_invoke_unix.go and
+// vm_invoke_windows.go.
 func invokeVMBoundSymbol(symbol string, args []int64) (int64, error) {
 	argc := len(args)
 	ctxWords := make([]uint64, abi.HeaderWords+argc*2)
@@ -43,10 +31,8 @@ func invokeVMBoundSymbol(symbol string, args []int64) (int64, error) {
 		}
 	}
 
-	cSymbol := C.CString(symbol)
-	defer C.free(unsafe.Pointer(cSymbol))
-	if errMsg := C.yak_invoke_ctx_symbol(ctx, cSymbol); errMsg != nil {
-		return 0, fmt.Errorf("vm runtime: invoke %q failed: %s", symbol, C.GoString(errMsg))
+	if err := callCtxSymbol(ctx, symbol); err != nil {
+		return 0, fmt.Errorf("vm runtime: invoke %q failed: %w", symbol, err)
 	}
 	return int64(ctxLoadWord(ctx, abi.WordRet)), nil
 }

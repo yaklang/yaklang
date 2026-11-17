@@ -2,9 +2,12 @@
 
 #include "local_gc.h"
 
+#include <stdint.h>
+
+#if defined(__linux__)
 #include <elf.h>
 #include <link.h>
-#include <stdint.h>
+#endif
 
 typedef struct yak_ctx_root yak_ctx_root;
 
@@ -22,6 +25,7 @@ static yak_ctx_root* yak_ctx_root_head = 0;
  * the runtime.  Provide a strong dl_iterate_phdr that reports the main
  * executable program headers; bdwgc then registers writable PT_LOAD segments
  * as roots through its normal dl_iterate_phdr path, without any probing. */
+#if defined(__linux__)
 extern const ElfW(Ehdr) __ehdr_start;
 
 int dl_iterate_phdr(int (*callback)(struct dl_phdr_info*, size_t, void*),
@@ -46,6 +50,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info*, size_t, void*),
     info.dlpi_tls_data = NULL;
     return callback(&info, sizeof(info), data);
 }
+#endif /* __linux__ */
 
 uintptr_t yak_ctx_root_add(void* ctx) {
     yak_ctx_root* node = (yak_ctx_root*)GC_malloc(sizeof(yak_ctx_root));
