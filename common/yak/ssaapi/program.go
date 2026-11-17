@@ -57,12 +57,12 @@ type Program struct {
 	// which made the same map live once per concurrent query.
 	structBoundCache sync.Map
 
-	// auditEdgeMu guards the single-result audit-edge snapshot below. Report
-	// generation walks one result at a time, so one slot avoids per-result
-	// caches that would grow with the number of rules.
-	auditEdgeMu       sync.Mutex
-	auditEdgeResultID uint
-	auditEdgeSnapshot *auditEdgeSnapshot
+	// auditEdgeCacheOnce builds the per-result snapshot cache on first use.
+	// Report generation walks several results and rules, so one slot would
+	// reload whenever a later result revisits an earlier one. The cache keeps a
+	// small window of results, bounded by capacity and TTL.
+	auditEdgeCacheOnce sync.Once
+	auditEdgeSnapshots *utils.CacheExWithKey[uint, *auditEdgeSnapshot]
 }
 
 // resetInterRuleStateCacheThreshold is the default nodeId2ValueCache entry
@@ -102,10 +102,7 @@ func (p *Program) ResetInterRuleState() {
 	// don't observe a half-niled Value mid-reset.
 	entries := p.nodeId2ValueCache.GetAll()
 	p.nodeId2ValueCache.Purge()
-	p.auditEdgeMu.Lock()
-	p.auditEdgeResultID = 0
-	p.auditEdgeSnapshot = nil
-	p.auditEdgeMu.Unlock()
+	p.resetAuditEdgeSnapshot()
 	goatomic.AddInt64(&p.InterRuleResetCount, 1)
 	for _, v := range entries {
 		if v == nil {
