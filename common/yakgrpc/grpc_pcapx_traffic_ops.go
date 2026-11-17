@@ -15,7 +15,10 @@ import (
 )
 
 func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPacketRequest) (*ypb.QueryTrafficPacketResponse, error) {
-	pg, data, err := yakit.QueryTrafficPacket(consts.GetGormProjectDatabase(), req)
+	if req.GetDatasetID() != "" {
+		return s.queryPCAPTrafficPacket(ctx, req)
+	}
+	pg, data, err := yakit.QueryTrafficPacket(s.GetProjectDatabase(), req)
 	if err != nil {
 		return nil, err
 	}

@@ -274,6 +274,9 @@ func newInMemoryClient(s *Server) (*Client, error) {
 	return &Client{YakClient: ypb.NewYakClient(conn), server: s, closeFunc: func() error {
 		err := conn.Close()
 		stop()
+		if closeErr := s.ClosePCAPDatabases(); err == nil {
+			err = closeErr
+		}
 		return err
 	}}, nil
 }

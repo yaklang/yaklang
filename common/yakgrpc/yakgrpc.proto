@@ -1140,6 +1140,17 @@ service Yak {
   // Query resources attached by the latest input and the distinct resources
   // attached throughout an AI session.
   rpc GetAISessionCurrentResources(GetAISessionCurrentResourcesRequest) returns (GetAISessionCurrentResourcesResponse);
+
+  // Offline capture library (packet viewing).
+  rpc ImportPCAPFile(ImportPCAPFileRequest) returns (stream ImportPCAPFileResponse);
+  rpc QueryPCAPDatabase(QueryPCAPDatabaseRequest) returns (QueryPCAPDatabaseResponse);
+  rpc QueryPCAPPackets(QueryPCAPPacketsRequest) returns (QueryPCAPPacketsResponse);
+  rpc GetPCAPPacketDetail(GetPCAPPacketDetailRequest) returns (PCAPPacketDetail);
+  rpc ReadPCAPBytes(ReadPCAPBytesRequest) returns (ReadPCAPBytesResponse);
+  // Superseded by QueryPCAPPackets and GetPCAPPacketDetail.
+  rpc QueryPCAPPacket(QueryPCAPPacketRequest) returns (QueryPCAPPacketResponse);
+  rpc ExportPCAPData(ExportPCAPDataRequest) returns (ExportPCAPDataResponse);
+  rpc DeletePCAPDatabase(DeletePCAPDatabaseRequest) returns (DeletePCAPDatabaseResponse);
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
@@ -3092,6 +3103,13 @@ message QueryTrafficPacketRequest {
   string DstPort = 11;
 
   int64 FromId = 12;
+  // Omitted: legacy project database. Present: packets in this PCAP dataset.
+  string DatasetID = 13;
+  bool Full = 14; // PCAP mode: include Raw and Details; list mode reads no BLOBs.
+  int64 Id = 15; // PCAP mode: exact original packet ID, using the same response model.
+  optional int64 StartTimestampNS = 16;
+  optional int64 EndTimestampNS = 17; // Capture-time interval [start,end), not insertion time.
+  string Keyword = 18; // PCAP mode: literal substring of endpoints or saved message summaries.
 }
 
 message QueryTrafficTCPReassembledRequest {
@@ -3162,12 +3180,26 @@ message TrafficPacket {
   int64 Id = 16;
   string Protocol = 17;
   string Info = 18;
+  optional int64 TimestampNS = 19;
+  int64 CapturedLength = 20;
+  int64 OriginalLength = 21;
+  int64 LinkType = 22;
+  int64 Section = 23;
+  int64 Interface = 24;
+  string DecodeError = 25;
+  // Full PCAP detail JSON: Result uses the existing ParseTraffic tree format;
+  // Messages contains saved protocol messages, each with its own RAW and Result.
+  // A tree's scope is in bits, relative to its own byte source, never another frame.
+  string Details = 26;
 }
 
 message QueryTrafficPacketResponse {
   repeated TrafficPacket Data = 1;
   Paging Pagination = 2;
   int64 Total = 3;
+  int64 NextCursor = 4;
+  bool HasMore = 5;
+  bool Truncated = 6;
 }
 
 message TrafficTCPReassembled {
@@ -8262,6 +8294,7 @@ message YakVersionAtLeastRequest{
 message ParseTrafficRequest{
   int64 Id = 1;
   string Type = 2;
+  string DatasetID = 3; // Optional PCAP dataset; omitted preserves legacy behavior.
 }
 message ParseTrafficResponse{
   bool OK = 1;
@@ -10716,4 +10749,251 @@ message QueryKnowledgeBaseResponse {
   Paging Pagination = 1;
   repeated KnowledgeBaseInfo Data = 2;
   int64 Total = 3;
+}
+
+message PCAPDatabase {
+  int64 Id = 1; // Catalog row ID. Use DatasetID for subsequent operations.
+  string DatasetID = 2;
+  string SourcePath = 3;
+  int64 SourceSize = 4;
+  string Format = 5;
+  string State = 6;
+  int64 PacketCount = 7;
+  string LastError = 8;
+  bool PreviewTruncated = 9;
+  bool ProtocolsIndexed = 10;
+}
+
+message ImportPCAPFileRequest {
+  string InputFile = 1; // Path on the engine; indexes original packets and protocol messages, not streams.
+}
+
+message ImportPCAPFileResponse {
+  string DatasetID = 1;
+  string State = 2;
+  int64 BytesIndexed = 3;
+  int64 TotalBytes = 4;
+  int64 PacketCount = 5;
+  bool Finished = 6; // Final successful event, also sent when reusing an existing dataset.
+  PCAPDatabase Database = 7;
+}
+
+message PCAPDatabaseFilter {
+  string DatasetID = 1; // Exact canonical ID. Empty lists all registered datasets.
+}
+
+message QueryPCAPDatabaseRequest {
+  PCAPDatabaseFilter Filter = 1;
+  Paging Pagination = 2; // Limit and AfterId, ID ascending. Page is omitted or 1.
+}
+
+message QueryPCAPDatabaseResponse {
+  Paging Pagination = 1;
+  repeated PCAPDatabase Data = 2;
+  int64 Total = 3; // Matching catalog entries before applying AfterId.
+  int64 NextCursor = 4;
+  bool HasMore = 5;
+  bool Truncated = 6; // Page shortened by the result byte budget.
+}
+
+message PCAPPacketFilter {
+  int64 Id = 1; // Exact packet ID within DatasetID; zero means no ID filter.
+  string Transport = 2;
+  string SourceIP = 3;
+  string DestinationIP = 4;
+  optional int32 SourcePort = 5; // Port zero is distinct from an unset filter.
+  optional int32 DestinationPort = 6;
+  PCAPPacketTimeRange TimeRange = 7;
+}
+
+message PCAPPacketTimeRange {
+  int64 StartNS = 1;
+  int64 EndNS = 2; // Exclusive: [StartNS, EndNS).
+}
+
+message PCAPPacket {
+  int64 Id = 1;
+  optional int64 TimestampNS = 2; // An absent capture timestamp is distinct from zero.
+  int64 CapturedLength = 3;
+  int64 OriginalLength = 4;
+  int64 LinkType = 5;
+  int64 Section = 6;
+  int64 Interface = 7;
+  string SourceMAC = 8;
+  string DestinationMAC = 9;
+  string VLANStack = 10;
+  string SourceIP = 11;
+  string DestinationIP = 12;
+  int32 SourcePort = 13;
+  int32 DestinationPort = 14;
+  string Transport = 15;
+  string DecodeError = 16;
+  bytes Raw = 17; // Complete captured bytes, populated only when Full=true.
+}
+
+message QueryPCAPPacketRequest {
+  string DatasetID = 1;
+  PCAPPacketFilter Filter = 2;
+  Paging Pagination = 3; // Limit and AfterId, ID ascending. Page is omitted or 1.
+  bool Full = 4; // Same filter/model as list mode; also load complete raw bytes.
+}
+
+message QueryPCAPPacketResponse {
+  Paging Pagination = 1;
+  repeated PCAPPacket Data = 2;
+  optional int64 Total = 3; // Known for unfiltered queries or an exact ID without a cursor.
+  int64 NextCursor = 4;
+  bool HasMore = 5;
+  bool Truncated = 6; // Page shortened by byte budget; individual Raw values remain complete.
+}
+
+message PCAPPacketsFilter {
+  int64 Id = 1; // Exact original packet ID; zero disables the ID predicate.
+  repeated string SourceIP = 2; // OR within this field; canonical IPv4/IPv6.
+  repeated string DestinationIP = 3;
+  repeated int32 SourcePort = 4; // Port zero is a valid exact value.
+  repeated int32 DestinationPort = 5;
+  repeated string TransportLayerTypes = 6; // Case-insensitive, for example tcp or udp.
+  repeated string ApplicationLayerTypes = 7; // Completion-frame semantics, for example http.
+  repeated string LinkLayerTypes = 8; // Names or numeric DLT values.
+  repeated string NetworkLayerTypes = 9; // ipv4 or ipv6.
+  optional int64 StartTimestampNS = 10;
+  optional int64 EndTimestampNS = 11; // Exclusive: [StartTimestampNS, EndTimestampNS).
+  string Keyword = 12; // Literal endpoint/transport/packet summary/message summary substring.
+}
+
+message PCAPPacketSummary {
+  int64 Id = 1;
+  optional int64 TimestampNS = 2;
+  int64 CapturedLength = 3;
+  int64 OriginalLength = 4;
+  int64 LinkType = 5;
+  int64 Section = 6;
+  int64 Interface = 7;
+  string SourceMAC = 8;
+  string DestinationMAC = 9;
+  string VLANStack = 10;
+  string SourceIP = 11;
+  string DestinationIP = 12;
+  int32 SourcePort = 13;
+  int32 DestinationPort = 14;
+  string Transport = 15;
+  string Protocol = 16; // Effective protocol shown in the packet-list Protocol column.
+  repeated string ApplicationProtocols = 17; // Completed by this frame.
+  string Info = 18; // Bounded summary shown in the packet-list Info column.
+  string DecodeError = 19;
+}
+
+message QueryPCAPPacketsRequest {
+  string DatasetID = 1;
+  PCAPPacketsFilter Filter = 2;
+  Paging Pagination = 3; // ID ascending, AfterId + Limit only; Limit defaults to 100, max 1000.
+  // Absent: count the first page/cursor origin and skip later cursor pages.
+  // True: count every page. False: do not count.
+  optional bool IncludeTotal = 4;
+}
+
+message QueryPCAPPacketsResponse {
+  Paging Pagination = 1;
+  repeated PCAPPacketSummary Data = 2;
+  optional int64 Total = 3; // Exact matching packet count; absent when not computed.
+  int64 NextCursor = 4;
+  bool HasMore = 5;
+}
+
+message PCAPFieldRange {
+  string SourceID = 1; // frame:<id> or message:<id>.
+  int64 BitOffset = 2; // Bits from the beginning of SourceID.
+  int64 BitLength = 3;
+}
+
+message PCAPFieldNode {
+  string Name = 1;
+  optional string DisplayValue = 2; // Absent for a pure container node.
+  repeated PCAPFieldNode Children = 3;
+  repeated PCAPFieldRange Ranges = 4; // Empty when no reliable wire span is known.
+}
+
+message PCAPByteSource {
+  string ID = 1;
+  string Kind = 2; // frame or message.
+  string Name = 3;
+  int64 Length = 4;
+  string Completeness = 5; // Protocol evidence; independent from EOF.
+  repeated uint64 ContributorPacketIds = 6;
+  uint64 CompletedInPacketId = 7;
+  bytes InitialData = 8; // Bounded prefix; full content is available through ReadPCAPBytes.
+  int64 InitialOffset = 9;
+  bool InitialTruncated = 10; // InitialData does not cover the full source.
+}
+
+message PCAPMessageDetail {
+  uint64 MessageId = 1;
+  string Protocol = 2;
+  string Summary = 3;
+  string Status = 4;
+  string Completeness = 5;
+  string SourceID = 6;
+  repeated PCAPFieldNode Nodes = 7;
+  string DecodeError = 8;
+  bool NodesTruncated = 9; // Display-field tree reached its storage projection limit.
+}
+
+message PCAPRelatedMessage {
+  uint64 MessageId = 1;
+  string Protocol = 2;
+  string Summary = 3;
+  string SourceID = 4;
+  uint64 CompletedInPacketId = 5;
+  string Completeness = 6;
+}
+
+message GetPCAPPacketDetailRequest {
+  string DatasetID = 1;
+  int64 PacketID = 2;
+}
+
+message PCAPPacketDetail {
+  PCAPPacketSummary Packet = 1;
+  repeated PCAPFieldNode Nodes = 2; // Original frame tree; ranges use frame:<Packet.Id>.
+  repeated PCAPMessageDetail Messages = 3; // Messages completed in this frame.
+  repeated PCAPRelatedMessage RelatedMessages = 4; // Messages to which this frame contributes.
+  repeated PCAPByteSource ByteSources = 5; // Includes the frame and every completed message.
+}
+
+message ReadPCAPBytesRequest {
+  string DatasetID = 1;
+  string SourceID = 2; // frame:<packet-id> or message:<protocol-message-id>.
+  int64 Offset = 3; // Zero-based byte offset within the selected source.
+  int64 Length = 4; // Requested bytes; capped by the remaining source and server maximum.
+}
+
+message ReadPCAPBytesResponse {
+  bytes Data = 1;
+  int64 Offset = 2; // Offset of Data; echoes the validated request offset.
+  int64 TotalLength = 3;
+  bool EOF = 4; // True when the returned range reaches the selected source's end.
+}
+
+message ExportPCAPDataRequest {
+  string DatasetID = 1;
+  string TargetPath = 2; // Path on the engine; an existing file is never overwritten.
+  int64 PacketID = 3; // Zero: original PCAP/PCAPNG; positive: one packet's raw captured bytes.
+}
+
+message ExportPCAPDataResponse {
+  string Path = 1;
+  int64 Bytes = 2;
+  string SHA256 = 3;
+}
+
+message DeletePCAPDatabaseRequest {
+  string DatasetID = 1; // Exact canonical ID; never accepts a path or catalog row ID.
+}
+
+message DeletePCAPDatabaseResponse {
+  DbOperateMessage Message = 1;
+  bool Deleted = 2;
+  bool CleanupPending = 3;
+  string CleanupError = 4; // Deletion was committed but file cleanup needs retry.
 }

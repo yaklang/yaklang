@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/imcontrol"
+	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -50,6 +51,9 @@ type Server struct {
 	browserBridge *browser.ExtensionBridgeManager
 	browserTasks  chan struct{}
 	runtimeForges *aiforge.RuntimeForgeRegistry
+
+	pcapManagerMu sync.Mutex
+	pcapManager   *pcapdb.InstanceManager // Owned when the server has an explicit profile.
 }
 
 type ServerOpts func(config *ServerConfig)

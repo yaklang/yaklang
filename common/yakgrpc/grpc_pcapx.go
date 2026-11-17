@@ -247,6 +247,9 @@ func ParseTraffic(data []byte, rule string) ([]any, error) {
 	return packageRootNodes, nil
 }
 func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
+	if req.GetDatasetID() != "" {
+		return s.parsePCAPTraffic(ctx, req)
+	}
 	rsp := &ypb.ParseTrafficResponse{}
 	var payload []byte
 	pagination := &ypb.Paging{
@@ -267,7 +270,7 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 		}
 		//payload = sessions[0].
 	case "packet":
-		_, packet, err := yakit.QueryTrafficPacket(consts.GetGormProjectDatabase(), &ypb.QueryTrafficPacketRequest{
+		_, packet, err := yakit.QueryTrafficPacket(s.GetProjectDatabase(), &ypb.QueryTrafficPacketRequest{
 			Pagination: pagination,
 			FromId:     req.GetId() - 1,
 		})
