@@ -26,3 +26,5 @@ runtime/embed/assets/manifest_generated.go
 
 # elfsplit tool binary (produced by scripts/build_yaklib.sh)
 cmd/elfsplit/elfsplit
+# Prebuilt Windows bdwgc archive is tracked so Windows builds need no local build.
+!runtime/runtime_go/libs/windows-amd64/libgc.a
