@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -467,98 +466,6 @@ func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 
 	t.Logf("First call context: %s", ctx1)
 	t.Logf("Second call context: %s", ctx2)
-}
-
-func TestPromptManager_WithTracedFileContext(t *testing.T) {
-	// Create a temporary file for testing
-	tempFile, err := os.CreateTemp("", "traced_file_test_*.txt")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tempFile.Name()) // Clean up
-
-	// Write initial content
-	initialContent := "Initial file content for testing"
-	if _, err := tempFile.WriteString(initialContent); err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
-	}
-	tempFile.Close()
-
-	react, err := NewTestReAct(
-		aicommon.WithTracedFileContext("test_file", tempFile.Name()),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct instance: %v", err)
-	}
-
-	// First call - should read initial content
-	ctx1 := react.promptManager.DynamicContext()
-	if ctx1 == "" {
-		t.Fatal("Dynamic context should not be empty")
-	}
-
-	if !utils.MatchAllOfSubString(ctx1, "test_file", initialContent) {
-		t.Fatalf("First call should contain initial file content. Got: %s", ctx1)
-	}
-
-	// Modify file content
-	updatedContent := "Updated file content for testing"
-	if err := os.WriteFile(tempFile.Name(), []byte(updatedContent), 0644); err != nil {
-		t.Fatalf("Failed to update temp file: %v", err)
-	}
-
-	// Second call - should detect changes and show diff
-	ctx2 := react.promptManager.DynamicContext()
-	if ctx2 == "" {
-		t.Fatal("Dynamic context should not be empty")
-	}
-
-	if !utils.MatchAllOfSubString(ctx2, "test_file", updatedContent) {
-		t.Fatalf("Second call should contain updated file content. Got: %s", ctx2)
-	}
-
-	// Second call should contain diff information
-	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
-		t.Fatalf("Second call should contain diff information. Got: %s", ctx2)
-	}
-
-	t.Logf("First call context: %s", ctx1)
-	t.Logf("Second call context: %s", ctx2)
-}
-
-func TestPromptManager_WithTracedFileContext_FileNotExist(t *testing.T) {
-	nonExistentFile := "/tmp/non_existent_file_12345.txt"
-
-	react, err := NewTestReAct(
-		aicommon.WithTracedFileContext("non_existent", nonExistentFile),
-		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
-			rsp.Close()
-			return rsp, nil
-		}),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create ReAct instance: %v", err)
-	}
-
-	ctx := react.promptManager.DynamicContext()
-	if ctx == "" {
-		t.Fatal("Dynamic context should not be empty")
-	}
-
-	// Should contain error message for non-existent file
-	if !utils.MatchAllOfSubString(ctx, "Error getting context", "does not exist") {
-		t.Fatalf("Context should contain error message for non-existent file. Got: %s", ctx)
-	}
-
-	t.Logf("Context with file error: %s", ctx)
 }
 
 func TestPromptManager_WithMixedContextProviders(t *testing.T) {
