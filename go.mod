@@ -101,7 +101,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.1.0
-	github.com/yaklang/go-llvm v0.0.0-20261110094028-e7fe69236a2f
+	github.com/yaklang/go-llvm v0.0.0-20261117060838-b69c4d0eb2ee
 	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
 	github.com/yaklang/goja v0.1.0
 	github.com/yaklang/gorm v1.9.18-0.20261027075104-00c777df9a43
