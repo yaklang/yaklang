@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -81,6 +82,64 @@ func TestAnalysisCLIExportsAssociatedLiteralCredentialsAndDecodedChunks(t *testi
 	unchanged, err := os.ReadFile(name)
 	require.NoError(t, err)
 	require.Equal(t, wire, unchanged)
+}
+
+func TestAnalysisCLIExportsHTTPRequestAndResponseBodies(t *testing.T) {
+	body := "username=admin&password=plaintext"
+	request := fmt.Sprintf("POST /login HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/x-www-form-urlencoded\r\nAuthorization: Basic YWRtaW46cGFzc3dvcmQ=\r\nCookie: session=deadbeef\r\nContent-Length: %d\r\n\r\n%s", len(body), body)
+	response := "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK"
+	input := analysisHTTPFixture(t, []string{request}, []string{response})
+
+	dir := filepath.Join(t.TempDir(), "all")
+	var output bytes.Buffer
+	require.NoError(t, invoke(&output, "-r", input, "--json", "--export-objects", dir))
+	manifests := map[string]map[string]any{}
+	for _, row := range analysisJSONRows(t, output.Bytes()) {
+		if row["record_type"] == "object_export" {
+			direction := row["direction"].(string)
+			require.Nil(t, manifests[direction])
+			manifests[direction] = row
+		}
+	}
+	require.Len(t, manifests, 2)
+
+	requestManifest := manifests["request"]
+	require.NotNil(t, requestManifest)
+	require.Equal(t, "POST", requestManifest["method"])
+	require.Equal(t, "/login", requestManifest["uri"])
+	require.Equal(t, "application/x-www-form-urlencoded", requestManifest["content_type"])
+	require.Equal(t, "Basic YWRtaW46cGFzc3dvcmQ=", requestManifest["authorization"])
+	require.Equal(t, "session=deadbeef", requestManifest["cookie"])
+	require.EqualValues(t, len(body), requestManifest["declared_length"])
+	require.EqualValues(t, len(body), requestManifest["observed_length"])
+	requestWire, err := os.ReadFile(requestManifest["path"].(string))
+	require.NoError(t, err)
+	require.Equal(t, body, string(requestWire))
+
+	responseManifest := manifests["response"]
+	require.NotNil(t, responseManifest)
+	require.Equal(t, "POST", responseManifest["method"])
+	require.Equal(t, "/login", responseManifest["uri"])
+	require.Equal(t, "text/plain", responseManifest["content_type"])
+	responseWire, err := os.ReadFile(responseManifest["path"].(string))
+	require.NoError(t, err)
+	require.Equal(t, "OK", string(responseWire))
+
+	dir = filepath.Join(t.TempDir(), "requests")
+	output.Reset()
+	require.NoError(t, invoke(&output, "-r", input, "--json", "--export-objects", dir, "-Y", `http.request.method == "POST"`))
+	var requestOnly map[string]any
+	for _, row := range analysisJSONRows(t, output.Bytes()) {
+		if row["record_type"] == "object_export" {
+			require.Nil(t, requestOnly)
+			requestOnly = row
+		}
+	}
+	require.NotNil(t, requestOnly)
+	require.Equal(t, "request", requestOnly["direction"])
+	requestWire, err = os.ReadFile(requestOnly["path"].(string))
+	require.NoError(t, err)
+	require.Equal(t, body, string(requestWire))
 }
 
 func TestAnalysisObjectExportMissingRequestLengthMismatchAndPathSafety(t *testing.T) {
