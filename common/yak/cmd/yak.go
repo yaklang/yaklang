@@ -1868,6 +1868,7 @@ func cliGroup(group string, cmds ...*cli.Command) []cli.Command {
 }
 
 func main() {
+	log.ConfigureSharkJSONLogging(os.Args)
 	// log.SetLevel(log.WarnLevel)
 	app := cli.NewApp()
 	app.Usage = "yaklang core engine"
