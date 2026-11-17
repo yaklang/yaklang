@@ -254,22 +254,6 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 	}
 }
 
-// FileContentContextProvider retains one bounded preview and a readable full-content
-// file across prompt refreshes and inherited task contexts.
-func FileContentContextProvider(content string, userPrompt ...string) ContextProvider {
-	resource := &AttachedFileContentResourceData{
-		Key:     CONTEXT_PROVIDER_KEY_FILE_CONTENT,
-		content: content,
-	}
-	return func(config AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
-		rendered, err := resource.render(emitter)
-		if err != nil {
-			return "", err
-		}
-		return attachmentUserPrompt(config, userPrompt) + rendered, nil
-	}
-}
-
 // ArtifactsContextMaxTokens is the maximum size (in tokens) for the artifacts context output.
 const ArtifactsContextMaxTokens = 8 * 1024
 
@@ -289,12 +273,6 @@ type ContextProviderManager struct {
 	maxTokens int
 	m         sync.RWMutex
 	callback  *omap.OrderedMap[string, ContextProvider]
-
-	// Derived managers share ordinary providers, but own a snapshot of the
-	// task-only layer. They never read later task layers from the shared owner.
-	ordinary      *ContextProviderManager
-	taskProviders *omap.OrderedMap[string, ContextProvider]
-	taskScopes    int
 }
 
 func NewContextProviderManager() *ContextProviderManager {
@@ -302,76 +280,6 @@ func NewContextProviderManager() *ContextProviderManager {
 		maxTokens: 48 * 1024, // 48k tokens
 		callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
-}
-
-// BeginTaskContext binds an immutable provider to one execution scope. A nil
-// provider still marks the scope: children of an input without attachments must
-// not inherit inline content from a later input. Cleanup never removes ordinary
-// providers or the copies already captured by derived managers.
-func (r *ContextProviderManager) BeginTaskContext(name string, cb ContextProvider) func() {
-	r.m.Lock()
-	r.taskScopes++
-	registered := false
-	if cb != nil {
-		if r.taskProviders == nil {
-			r.taskProviders = omap.NewOrderedMap(make(map[string]ContextProvider))
-		}
-		if !r.taskProviders.Have(name) {
-			r.taskProviders.Set(name, wrapContextProvider(name, cb))
-			registered = true
-		}
-	}
-	r.m.Unlock()
-	var once sync.Once
-	return func() {
-		once.Do(func() {
-			r.m.Lock()
-			defer r.m.Unlock()
-			r.taskScopes--
-			if registered {
-				r.taskProviders.Delete(name)
-			}
-		})
-	}
-}
-
-// snapshotForChild freezes only task-owned context, including an empty task
-// scope. Ordinary managers outside task execution retain pointer sharing.
-func (r *ContextProviderManager) snapshotForChild() *ContextProviderManager {
-	r.m.RLock()
-	defer r.m.RUnlock()
-	if r.ordinary == nil && r.taskScopes == 0 {
-		return r
-	}
-	ordinary := r.ordinary
-	if ordinary == nil {
-		ordinary = r
-	}
-	child := &ContextProviderManager{maxTokens: r.maxTokens, ordinary: ordinary}
-	if r.taskProviders != nil {
-		child.taskProviders = omap.NewOrderedMap(make(map[string]ContextProvider))
-		r.taskProviders.ForEach(func(name string, cb ContextProvider) bool {
-			child.taskProviders.Set(name, cb)
-			return true
-		})
-	}
-	return child
-}
-
-// WithoutTaskContext retains host providers but excludes the parent's input-
-// scoped providers, including inline attachments. Keep an explicit empty task
-// scope so nested child snapshots cannot inherit a later parent's attachments.
-func (r *ContextProviderManager) WithoutTaskContext() *ContextProviderManager {
-	if r == nil {
-		return nil
-	}
-	r.m.RLock()
-	defer r.m.RUnlock()
-	ordinary := r.ordinary
-	if ordinary == nil {
-		ordinary = r
-	}
-	return &ContextProviderManager{maxTokens: r.maxTokens, ordinary: ordinary}
 }
 
 func (r *ContextProviderManager) RegisterTracedContent(name string, cb ContextProvider) {
@@ -464,10 +372,6 @@ func newContextProviderTrace() func(string, error) string {
 }
 
 func (r *ContextProviderManager) Register(name string, cb ContextProvider) {
-	if r.ordinary != nil {
-		r.ordinary.Register(name, cb)
-		return
-	}
 	r.m.Lock()
 	defer r.m.Unlock()
 	if r.callback.Have(name) {
@@ -491,10 +395,6 @@ func wrapContextProvider(name string, cb ContextProvider) ContextProvider {
 }
 
 func (r *ContextProviderManager) Unregister(name string) {
-	if r.ordinary != nil {
-		r.ordinary.Unregister(name)
-		return
-	}
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.callback.Delete(name)
@@ -529,18 +429,10 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 	emitter *Emitter,
 	tagStrategy func(name string) string,
 ) string {
-	ordinary := r
-	if r.ordinary != nil {
-		ordinary = r.ordinary
-		// Always lock the shared registry before the local task layer. Mutations
-		// touch only one of them, so derived views cannot invert this order.
-		ordinary.m.RLock()
-		defer ordinary.m.RUnlock()
-	}
 	r.m.RLock()
 	defer r.m.RUnlock()
 
-	if ordinary.callback.Len() == 0 && (r.taskProviders == nil || r.taskProviders.Len() == 0) {
+	if r.callback.Len() == 0 {
 		return ""
 	}
 
@@ -563,10 +455,7 @@ func (r *ContextProviderManager) executeWithTagStrategy(
 		buf.WriteString(fmt.Sprintf("\n<|AUTO_PROVIDE_CTX_[%v]_END|>", flag))
 		return true
 	}
-	ordinary.callback.ForEach(render)
-	if r.taskProviders != nil {
-		r.taskProviders.ForEach(render)
-	}
+	r.callback.ForEach(render)
 
 	result := buf.String()
 	if TokenCountExceeds(result, r.maxTokens) {
