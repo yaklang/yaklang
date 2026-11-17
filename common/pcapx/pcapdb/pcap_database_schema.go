@@ -54,6 +54,7 @@ type Packet struct {
 	DestinationMAC     string `gorm:"column:dst_mac;type:text;not null;default:''" json:"destination_mac,omitempty"`
 	VLANStack          string `gorm:"column:vlan_stack;type:text;not null;default:''" json:"vlan_stack,omitempty"`
 	Transport          string `gorm:"type:text;not null" json:"transport"`
+	Summary            string `gorm:"type:text;not null;default:''" json:"summary"`
 	DecodeError        string `gorm:"type:text;not null" json:"decode_error,omitempty"`
 }
 
@@ -66,39 +67,41 @@ func (Packet) TableName() string { return "packets" }
 // Data 保存消息重组字节；SessionID/StreamID 关联网络会话和方向流。
 type PCAPProtocolMessage struct {
 	gorm.Model
-	EventID         int64          `gorm:"unique_index;not null" json:"event_id"`
-	FlowID          int64          `gorm:"not null" json:"flow_id"`
-	TimestampNS     *int64         `json:"timestamp_ns"`
-	Protocol        string         `gorm:"type:text;not null" json:"protocol"`
-	Transport       string         `gorm:"type:text;not null" json:"transport"`
-	Source          string         `gorm:"type:text;not null" json:"source"`
-	Destination     string         `gorm:"type:text;not null" json:"destination"`
-	Direction       int            `gorm:"not null" json:"direction"`
-	LogicalOffset   int64          `gorm:"not null" json:"logical_offset"`
-	Length          int            `gorm:"not null" json:"length"`
-	Status          string         `gorm:"type:text;not null" json:"status"`
-	Summary         string         `gorm:"type:text;not null" json:"summary"`
-	Error           string         `gorm:"type:text;not null" json:"error,omitempty"`
-	DecodeError     string         `gorm:"type:text;not null" json:"decode_error,omitempty"`
-	Fields          map[string]any `gorm:"-" json:"fields"`
-	Session         map[string]any `gorm:"-" json:"session"`
-	Section         int64          `gorm:"not null"`
-	Interface       int            `gorm:"column:interface_id;not null"`
-	Encapsulation   string         `gorm:"type:text;not null"`
-	Profile         string         `gorm:"type:text;not null"`
-	Rule            string         `gorm:"type:text;not null" json:"rule"`
-	Entry           string         `gorm:"type:text;not null" json:"entry"`
-	Completeness    string         `gorm:"type:text;not null"`
-	ExpertCode      string         `gorm:"type:text;not null"`
-	TransactionID   int64          `gorm:"not null"`
-	ResponseTo      int64          `gorm:"not null"`
-	DataLength      int            `gorm:"not null" json:"data_length"`
-	Data            []byte         `gorm:"type:blob;not null" json:"-"`
-	SessionID       uint           `gorm:"type:integer REFERENCES sessions(id);default:null" json:"session_id,omitempty"`
-	StreamID        uint           `gorm:"type:integer REFERENCES streams(id);default:null" json:"stream_id,omitempty"`
-	FieldsJSON      []byte         `gorm:"column:fields;type:blob;not null" json:"-"`
-	SessionJSON     []byte         `gorm:"column:session;type:blob;not null" json:"-"`
-	SourceBytesJSON []byte         `gorm:"column:source_bytes;type:blob;not null" json:"-"`
+	EventID             int64          `gorm:"unique_index;not null" json:"event_id"`
+	FlowID              int64          `gorm:"not null" json:"flow_id"`
+	TimestampNS         *int64         `json:"timestamp_ns"`
+	Protocol            string         `gorm:"type:text;not null" json:"protocol"`
+	Transport           string         `gorm:"type:text;not null" json:"transport"`
+	Source              string         `gorm:"type:text;not null" json:"source"`
+	Destination         string         `gorm:"type:text;not null" json:"destination"`
+	Direction           int            `gorm:"not null" json:"direction"`
+	LogicalOffset       int64          `gorm:"not null" json:"logical_offset"`
+	Length              int            `gorm:"not null" json:"length"`
+	Status              string         `gorm:"type:text;not null" json:"status"`
+	Summary             string         `gorm:"type:text;not null" json:"summary"`
+	Error               string         `gorm:"type:text;not null" json:"error,omitempty"`
+	DecodeError         string         `gorm:"type:text;not null" json:"decode_error,omitempty"`
+	Fields              map[string]any `gorm:"-" json:"fields"`
+	Session             map[string]any `gorm:"-" json:"session"`
+	Section             int64          `gorm:"not null"`
+	Interface           int            `gorm:"column:interface_id;not null"`
+	Encapsulation       string         `gorm:"type:text;not null"`
+	Profile             string         `gorm:"type:text;not null"`
+	Rule                string         `gorm:"type:text;not null" json:"rule"`
+	Entry               string         `gorm:"type:text;not null" json:"entry"`
+	Completeness        string         `gorm:"type:text;not null"`
+	ExpertCode          string         `gorm:"type:text;not null"`
+	TransactionID       int64          `gorm:"not null"`
+	ResponseTo          int64          `gorm:"not null"`
+	DataLength          int            `gorm:"not null" json:"data_length"`
+	CompletedInPacketID uint           `gorm:"not null;default:0" json:"completed_in_packet_id,omitempty"`
+	Data                []byte         `gorm:"type:blob;not null" json:"-"`
+	SessionID           uint           `gorm:"type:integer REFERENCES sessions(id);default:null" json:"session_id,omitempty"`
+	StreamID            uint           `gorm:"type:integer REFERENCES streams(id);default:null" json:"stream_id,omitempty"`
+	FieldsJSON          []byte         `gorm:"column:fields;type:blob;not null" json:"-"`
+	SessionJSON         []byte         `gorm:"column:session;type:blob;not null" json:"-"`
+	SourceBytesJSON     []byte         `gorm:"column:source_bytes;type:blob;not null" json:"-"`
+	DisplayFieldsJSON   []byte         `gorm:"column:display_fields;type:blob" json:"-"`
 }
 
 func (PCAPProtocolMessage) TableName() string { return "protocol_messages" }
@@ -221,7 +224,9 @@ func migratePCAPDatabase(db *gorm.DB) error {
 		{&PCAPProtocolMessage{}, "messages_flow", []string{"flow_id", "id"}},
 		{&PCAPProtocolMessage{}, "messages_time", []string{"timestamp_ns", "id"}},
 		{&PCAPProtocolMessage{}, "messages_transaction", []string{"transaction_id", "id"}},
-		{&PCAPMessagePacket{}, "message_packets_packet", []string{"packet_id", "message_id"}},
+		{&PCAPProtocolMessage{}, "messages_protocol_completed", []string{"protocol", "deleted_at", "completed_in_packet_id"}},
+		{&PCAPProtocolMessage{}, "messages_completed_in", []string{"completed_in_packet_id", "deleted_at", "id"}},
+		{&PCAPMessagePacket{}, "message_packets_packet", []string{"packet_id", "deleted_at", "message_id"}},
 		{&PCAPProtocolMessage{}, "messages_session", []string{"session_id", "id"}},
 		{&PCAPProtocolMessage{}, "messages_stream", []string{"stream_id", "id"}},
 		{&PCAPSession{}, "sessions_transport", []string{"transport", "id"}},
