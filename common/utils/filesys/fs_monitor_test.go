@@ -96,6 +96,30 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 	}
 }
 
+func TestWatchPathSupportsSingleFileRoot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "single.txt")
+	require.NoError(t, os.WriteFile(path, []byte("content"), 0o600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	called := make(chan struct{}, 1)
+	monitor, err := filesys.WatchPath(ctx, path, func(*filesys.EventSet) {
+		select {
+		case called <- struct{}{}:
+		default:
+		}
+	}, filesys.WithPollInterval(20*time.Millisecond))
+	require.NoError(t, err)
+	defer monitor.CancelFunc()
+
+	select {
+	case <-called:
+	case <-ctx.Done():
+		t.Fatal("single-file watch did not invoke its poll callback")
+	}
+}
+
 // TestHandlerFileMonitor_DirectoryChanges tests that the monitor detects directory changes
 func TestHandlerFileMonitor_DirectoryChanges(t *testing.T) {
 	// Create a temporary directory for testing

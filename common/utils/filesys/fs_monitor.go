@@ -73,6 +73,9 @@ func GetCurrentFileTree(path string) (*FileNode, error) {
 		return nil, utils.Errorf("failed to watch path: %s", err)
 	}
 	var currentFileTree = initFileNode(path, rootInfo, nil, true)
+	if !rootInfo.IsDir() {
+		return currentFileTree, nil
+	}
 
 	onStat := func(isDir bool, path string, info os.FileInfo) error {
 		newNode := initFileNode(path, info, currentFileTree, false)
@@ -116,7 +119,7 @@ func (m *YakFileMonitor) SetFileTree(fileTree *FileNode) {
 
 func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandler, opts ...WatchPathOption) (*YakFileMonitor, error) {
 	ctx, cancelFunc := context.WithCancel(ctx)
-	
+
 	config := &watchPathConfig{
 		PollInterval: 5 * time.Second,
 	}
@@ -140,6 +143,7 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 	}
 
 	go func() {
+		var lastScanError string
 		for {
 			time.Sleep(m.PollInterval)
 			select {
@@ -148,9 +152,19 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 			default:
 				currentFileTree, err := GetCurrentFileTree(path)
 				if err != nil {
-					log.Errorf("failed to watch path: %s", err)
+					errText := err.Error()
+					if errText != lastScanError {
+						log.Errorf("failed to watch path: %s", err)
+						lastScanError = errText
+					}
+					// The path may have been deleted or be temporarily
+					// unreadable. Deliver an empty poll so fingerprint-based
+					// consumers can still observe disappearance/recovery.
+					m.Events <- &EventSet{}
+					m.RecursiveFinish <- struct{}{}
 					continue
 				}
+				lastScanError = ""
 				m.Events <- CompareFileTree(m.FileTree, currentFileTree)
 				m.RecursiveFinish <- struct{}{}
 				m.SetFileTree(currentFileTree)
