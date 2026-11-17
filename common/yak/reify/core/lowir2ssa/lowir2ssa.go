@@ -449,12 +449,11 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 		}
 		c.setResult(instruction, c.coerceType(value, instruction.Results))
 	case core.OpPhi:
-		c.addDiagnostic("lowir2ssa-unexpected-phi", "LowIR Phi was folded into variable assignment")
-		values := c.operandValues(instruction.Operands)
-		if len(values) > 0 {
-			c.setResult(instruction, values[0])
-		}
+		c.emitPhi(instruction)
 	case core.OpSelect:
+		// The split-select pass rewrites a conditional move into control flow, so a
+		// select that reaches the conversion was not split.
+		c.addDiagnostic("lowir2ssa-unexpected-select", fmt.Sprintf("select at 0x%x was not split into control flow", instruction.Address))
 		c.setResult(instruction, c.opaqueValue("select", instruction))
 	case core.OpAdd:
 		c.emitBinary(instruction, ssa.OpAdd)
@@ -1974,4 +1973,33 @@ func (c *converter) flagInfoOf(value ssa.Value) (flagInfo, bool) {
 		value = inner
 	}
 	return flagInfo{}, false
+}
+
+// emitPhi builds the merge value a split conditional move left behind. The
+// operands are the values of the incoming arms, in predecessor order.
+func (c *converter) emitPhi(instruction core.Instruction) {
+	if len(instruction.Results) == 0 || len(instruction.Operands) == 0 {
+		return
+	}
+	block := c.builder.CurrentBlock
+	if block == nil {
+		return
+	}
+	phi := ssa.NewPhi(block, fmt.Sprintf("phi_%d", instruction.Results[0].ID))
+	if phi == nil {
+		return
+	}
+	for _, operand := range instruction.Operands {
+		value := c.operandValue(operand)
+		if value == nil {
+			continue
+		}
+		phi.Edge = append(phi.Edge, value.GetId())
+		value.AddUser(phi)
+	}
+	if typ := c.typeFor(instruction.Results[0].Type); typ != nil {
+		phi.SetType(typ)
+	}
+	block.Phis = append(block.Phis, phi.GetId())
+	c.setResult(instruction, phi)
 }

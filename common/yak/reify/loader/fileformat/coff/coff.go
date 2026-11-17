@@ -33,6 +33,7 @@ const (
 const (
 	sectionCode        = 0x00000020
 	sectionExecute     = 0x20000000
+	sectionWrite       = 0x80000000
 	symbolTypeMask     = 0x00000030
 	symbolTypeFunction = 0x00000020
 	storageClassStatic = 3
@@ -161,6 +162,7 @@ func (Loader) Load(ctx context.Context, reader *core.ByteReader) (*core.Artifact
 			VirtualAddress: address,
 			MemorySize:     size,
 			Flags:          uint64(characteristics),
+			Writable:       characteristics&sectionWrite != 0,
 		})
 		if characteristics&(sectionCode|sectionExecute) != 0 {
 			hints.ExecSections = append(hints.ExecSections, core.Region{

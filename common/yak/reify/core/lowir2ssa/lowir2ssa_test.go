@@ -3,6 +3,8 @@ package lowir2ssa
 import (
 	"context"
 	"embed"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -14,23 +16,53 @@ import (
 //go:embed testcases
 var testcases embed.FS
 
-func TestLowIRToSSAIRFixtures(t *testing.T) {
+// lowIRCase is one conversion fixture. LowIR, SSAIR and source are stored as the
+// lines of the text they hold, so a diff shows one changed line instead of the
+// whole document.
+type lowIRCase struct {
+	Name   string   `json:"name"`
+	LowIR  []string `json:"lowir"`
+	SSAIR  []string `json:"ssair"`
+	Source []string `json:"source"`
+}
+
+func loadLowIRCases(t *testing.T) []lowIRCase {
+	t.Helper()
 	entries, err := testcases.ReadDir("testcases")
 	if err != nil {
 		t.Fatal(err)
 	}
-	count := 0
+	var cases []lowIRCase
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
+		data, err := testcases.ReadFile("testcases/" + entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var single lowIRCase
+		if err := json.Unmarshal(data, &single); err != nil {
+			t.Fatalf("%s: %v", entry.Name(), err)
+		}
+		if single.Name == "" {
+			single.Name = strings.TrimSuffix(entry.Name(), ".json")
+		}
+		cases = append(cases, single)
+	}
+	return cases
+}
+
+func TestLowIRToSSAIRFixtures(t *testing.T) {
+	cases := loadLowIRCases(t)
+	if len(cases) == 0 {
+		t.Fatal("no testcases")
+	}
+	count := 0
+	for _, tc := range cases {
 		count++
-		t.Run(entry.Name(), func(t *testing.T) {
-			lowIRText, err := testcases.ReadFile("testcases/" + entry.Name() + "/lowir.txt")
-			if err != nil {
-				t.Fatal(err)
-			}
-			ir, err := lowirtext.Parse(string(lowIRText))
+		t.Run(tc.Name, func(t *testing.T) {
+			ir, err := lowirtext.Parse(strings.Join(tc.LowIR, "\n"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -38,23 +70,15 @@ func TestLowIRToSSAIRFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			wantSSAIR, err := testcases.ReadFile("testcases/" + entry.Name() + "/ssair.txt")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := Text(result.Program); got != string(wantSSAIR) {
-				t.Fatalf("SSAIR mismatch:\n--- want ---\n%s\n--- got ---\n%s", wantSSAIR, got)
+			if got, want := normalizeIndent(Text(result.Program)), normalizeIndent(strings.Join(tc.SSAIR, "\n")); got != want {
+				t.Fatalf("SSAIR mismatch:\n--- want ---\n%s\n--- got ---\n%s", want, got)
 			}
 			source, err := ssa2source.Render(context.Background(), result.Program)
 			if err != nil {
 				t.Fatal(err)
 			}
-			wantSource, err := testcases.ReadFile("testcases/" + entry.Name() + "/source.txt")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if source != string(wantSource) {
-				t.Fatalf("source mismatch:\n--- want ---\n%s\n--- got ---\n%s", wantSource, source)
+			if want := strings.Join(tc.Source, "\n"); source != want {
+				t.Fatalf("source mismatch:\n--- want ---\n%s\n--- got ---\n%s", want, source)
 			}
 		})
 	}
@@ -124,4 +148,14 @@ func TestRegisterViewNames(t *testing.T) {
 			t.Fatalf("%s: %+v", tc.name, view)
 		}
 	}
+}
+
+// normalizeIndent drops the leading tab of each line. The fixture stores the text
+// without the indent so it reads as plain lines; the comparison is about content.
+func normalizeIndent(text string) string {
+	lines := strings.Split(text, "\n")
+	for index, line := range lines {
+		lines[index] = strings.TrimLeft(line, "\t")
+	}
+	return strings.Join(lines, "\n")
 }

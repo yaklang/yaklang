@@ -7,6 +7,19 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
 
+// The pass names are constants so registration and the default pipeline cannot
+// disagree about a spelling.
+const (
+	PassRemoveCanary     = "remove-canary"
+	PassFoldConstants    = "fold-constants"
+	PassDuplicateReturns = "duplicate-return-blocks"
+	PassRemoveStackFrame = "remove-stackframe"
+	PassFoldReturnTails  = "fold-return-tails"
+	PassSplitSelect      = "split-select"
+	PassDropUnreachable  = "drop-unreachable-blocks"
+	PassReversePostorder = "reverse-postorder"
+)
+
 // Pass is one selectable LowIR transformation. A pass receives the frame model of
 // the target architecture, so it can name the stack and frame registers without
 // matching architecture-specific spellings.
@@ -71,31 +84,35 @@ func Apply(function *core.Function, facts core.ArchFacts, names ...string) error
 }
 
 func init() {
-	Register(Pass{Name: "remove-canary", Description: "remove stack-protector canary checks", Apply: func(function *core.Function, facts core.ArchFacts) error {
+	Register(Pass{Name: PassRemoveCanary, Description: "remove stack-protector canary checks", Apply: func(function *core.Function, facts core.ArchFacts) error {
 		RemoveStackCanary(function, facts)
 		return nil
 	}})
-	Register(Pass{Name: "fold-constants", Description: "fold arithmetic on constants", Apply: func(function *core.Function, _ core.ArchFacts) error {
+	Register(Pass{Name: PassFoldConstants, Description: "fold arithmetic on constants", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		FoldConstants(function)
 		return nil
 	}})
-	Register(Pass{Name: "duplicate-return-blocks", Description: "duplicate shared return epilogues", Apply: func(function *core.Function, _ core.ArchFacts) error {
+	Register(Pass{Name: PassDuplicateReturns, Description: "duplicate shared return epilogues", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		DuplicateReturnBlocks(function)
 		return nil
 	}})
-	Register(Pass{Name: "remove-stackframe", Description: "remove standard stack frame setup and teardown", Apply: func(function *core.Function, facts core.ArchFacts) error {
+	Register(Pass{Name: PassRemoveStackFrame, Description: "remove standard stack frame setup and teardown", Apply: func(function *core.Function, facts core.ArchFacts) error {
 		RemoveFrame(function, facts)
 		return nil
 	}})
-	Register(Pass{Name: "fold-return-tails", Description: "fold acyclic return-only tails", Apply: func(function *core.Function, facts core.ArchFacts) error {
+	Register(Pass{Name: PassSplitSelect, Description: "rewrite a conditional move as control flow", Apply: func(function *core.Function, _ core.ArchFacts) error {
+		SplitSelect(function)
+		return nil
+	}})
+	Register(Pass{Name: PassFoldReturnTails, Description: "fold acyclic return-only tails", Apply: func(function *core.Function, facts core.ArchFacts) error {
 		FoldReturnTails(function, facts)
 		return nil
 	}})
-	Register(Pass{Name: "drop-unreachable-blocks", Description: "remove blocks no path reaches", Apply: func(function *core.Function, _ core.ArchFacts) error {
+	Register(Pass{Name: PassDropUnreachable, Description: "remove blocks no path reaches", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		DropUnreachable(function)
 		return nil
 	}})
-	Register(Pass{Name: "reverse-postorder", Description: "order blocks for loop construction", Apply: func(function *core.Function, _ core.ArchFacts) error {
+	Register(Pass{Name: PassReversePostorder, Description: "order blocks for loop construction", Apply: func(function *core.Function, _ core.ArchFacts) error {
 		ReorderReversePostorder(function)
 		return nil
 	}})
@@ -103,5 +120,5 @@ func init() {
 
 // DefaultNames returns the default LowIR pass pipeline.
 func DefaultNames() []string {
-	return []string{"fold-constants", "remove-canary", "duplicate-return-blocks", "remove-stackframe", "fold-return-tails", "drop-unreachable-blocks", "reverse-postorder"}
+	return []string{PassFoldConstants, PassRemoveCanary, PassDuplicateReturns, PassRemoveStackFrame, PassFoldReturnTails, PassDropUnreachable, PassSplitSelect, PassReversePostorder}
 }

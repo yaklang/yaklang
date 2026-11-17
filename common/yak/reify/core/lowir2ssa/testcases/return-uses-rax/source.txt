@@ -1,4 +1,0 @@
-uint64_t sub_0x5a00(void) {
-    return 0x7;
-}
-

@@ -761,7 +761,12 @@ func binaryExpression(value *ssa.BinOp) string {
 			return left
 		}
 	}
-	return left + " " + binarySymbol(value.Op) + " " + right
+	symbol := binarySymbol(value.Op)
+	if value.Op == ssa.OpAndNot {
+		// The complement binds to the right operand only: a & ~b.
+		return left + " " + symbol + " " + right
+	}
+	return left + " " + symbol + " " + right
 }
 
 func binaryFoldsAway(value *ssa.BinOp) bool {
@@ -1019,6 +1024,11 @@ func callExpression(call *ssa.Call) string {
 	}
 	target := valueNameByID(call, call.Method)
 	args := call.GetValuesByIDs(call.Args)
+	if target == "select" && len(args) == 3 {
+		// A conditional move carries no function: print it as the conditional
+		// expression it stands for.
+		return fmt.Sprintf("(%s ? %s : %s)", valueName(args[0]), valueName(args[1]), valueName(args[2]))
+	}
 	return fmt.Sprintf("%s(%s)", target, joinValues(args))
 }
 
@@ -1142,6 +1152,8 @@ func binarySymbol(op ssa.BinaryOpcode) string {
 		return "%"
 	case ssa.OpAnd:
 		return "&"
+	case ssa.OpAndNot:
+		return "& ~"
 	case ssa.OpOr:
 		return "|"
 	case ssa.OpXor:

@@ -1,0 +1,47 @@
+{
+  "name": "select-phi",
+  "lowir": [
+    "target: linux/amd64 (64-bit, little-endian)",
+    "frame: sp=rsp fp=rbp flags=rflags saved=rbp,rbx,r12,r13,r14,r15 growth=-1",
+    "registers: naming=x86 width=64 flags=rflags flags_width=64 args=rdi,rsi,rdx,rcx,r8,r9 return=rax",
+    "function sub_0x3000 @ 0x3000",
+    "block b1 @ 0x3000",
+    "  0x3000  v1:i64 = read_register %rdi [read_register]",
+    "  0x3001  v2:i64 = constant 0x2a",
+    "  0x3002  v3:i64 = constant 0x0",
+    "  0x3003  v4:i64 = constant 0x1",
+    "  0x3004  v5:i64 = intrinsic @flags.cmp, v1, v2 [write_register]",
+    "  0x3004  v6:i1 = intrinsic @cond.g, v5 [read_register, unknown]",
+    "  0x3005  v7:i64 = select v6, v3, v4",
+    "  0x3006  return v7",
+    ""
+  ],
+  "ssair": [
+    "sub_0x3000 <i64> (1) arg0",
+    "type: () -> i64",
+    "entry_0: (<nil condition>)",
+    "<i64> t2    = <i64> 42",
+    "<i64> t3    = <i64> 0",
+    "<i64> t4    = <i64> 1",
+    "<string> t5 = <string> flags.cmp",
+    "<i64> t6    = type_cast[i64] <string> flags.cmp",
+    "<i1> t7     = <i64> arg0 gt <i64> 42",
+    "If [<i1> t7] true -> b2_1, false -> b3_2",
+    "b2_1: <- entry_0  (<nil condition>)",
+    "jump -> b4_3",
+    "b3_2: <- entry_0  (<nil condition>)",
+    "jump -> b4_3",
+    "b4_3: <- b2_1 b3_2  (<nil condition>)",
+    "<i64> t8    = phi [0, 1]",
+    "ret <i64> t8",
+    ""
+  ],
+  "source": [
+    "uint64_t sub_0x3000(uint64_t arg0) {",
+    "    v11 = (arg0 > 0x2a ? 0x0 : 0x1);",
+    "    return v11;",
+    "}",
+    "",
+    ""
+  ]
+}
