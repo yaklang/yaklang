@@ -654,7 +654,8 @@ type BinParserConfig struct {
 	// observed TCP delivery boundaries. The default never scans inside an
 	// accepted protocol message or a UDP datagram.
 	DisableTCPProbeResync bool
-	TFTPFileAuto       bool
+	TFTPFileAuto          bool
+	FTPFileBytesLimit     int
 	// DecodeDNP3ReadPoints opts into bounded class READ/static point observations.
 	DecodeDNP3ReadPoints bool
 	// DecodeDNP3TransportFragments enables bounded TCP DNP3 transport assembly.
@@ -769,6 +770,8 @@ type binParser struct {
 	ftpMu                                                                      sync.Mutex
 	ftpClock                                                                   time.Time
 	ftpEndpoints                                                               map[ftpDataKey]ftpDataBinding
+	ftpFiles                                                                   map[uint64]*ftpFileTransfer
+	ftpFileBytes                                                               int64
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool                                       // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore                               // udpMu; token quarantine must survive unrelated UDP expiry
@@ -884,6 +887,9 @@ func (c *CaptureConfig) prepareBinParser() error {
 	}
 	if config.TFTPFilePort != 0 && c.datagramDecodeAs[config.TFTPFilePort] != "" {
 		return fmt.Errorf("TFTP file service conflicts with explicit DecodeAs")
+	}
+	if config.FTPFileBytesLimit < 0 || config.FTPFileBytesLimit > MaxFTPFileBytes {
+		return fmt.Errorf("invalid FTP file assembly configuration")
 	}
 	if config.TFTPFileBytesLimit < 0 || config.TFTPFileBytesLimit > tftpMaximumFileBytes ||
 		config.TFTPFileBytesLimit == 0 && (config.TFTPFilePort != 0 || config.TFTPFileAuto) ||

@@ -109,6 +109,48 @@ func observedWebSocketObjects(e *pcaputil.ProtocolEvent) []*objectObservation {
 	}}
 }
 
+func observedFTPObject(e *pcaputil.ProtocolEvent) *objectObservation {
+	if e == nil || e.Protocol != "ftp" || e.Session == nil || e.Status == "malformed" {
+		return nil
+	}
+	payload, ok := e.Session["File Bytes"].([]byte)
+	if !ok {
+		return nil
+	}
+	payload = bytes.Clone(payload)
+	filename, _ := e.Session["Filename"].(string)
+	if filename == "" {
+		filename = "ftp-object"
+	}
+	contentType, _ := e.Session["FTP File Content Type"].(string)
+	if contentType == "" {
+		contentType = mime.TypeByExtension(filepath.Ext(filename))
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	direction, _ := e.Session["File Transfer"].(string)
+	if direction != "upload" && direction != "download" {
+		return nil
+	}
+	source, _ := e.Session["FTP File Source"].(string)
+	destination, _ := e.Session["FTP File Destination"].(string)
+	if source == "" || destination == "" {
+		return nil
+	}
+	transferID, _ := objectUint64(e.Session["File Request ID"])
+	byteSource, _ := e.Session["File Byte Source"].(pcaputil.ByteSource)
+	refs := append([]pcaputil.PacketReference(nil), byteSource.PacketRefs...)
+	declared := int64(len(payload))
+	return &objectObservation{
+		id: e.ID, protocol: e.Protocol, objectType: "file", direction: direction,
+		source: source, destination: destination,
+		contentType: contentType, suggestedFilename: safeObjectName(filename, contentType),
+		transferID: transferID, allowEmpty: true, body: bytes.NewReader(payload), declared: &declared,
+		refs: refs, bytes: byteSource,
+	}
+}
+
 func observedTFTPObject(e *pcaputil.ProtocolEvent) *objectObservation {
 	if e == nil || e.Protocol != "tftp" || e.Session == nil || e.Status == "malformed" {
 		return nil

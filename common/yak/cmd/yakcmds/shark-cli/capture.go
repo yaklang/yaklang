@@ -237,7 +237,10 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	// still reports gaps and never concatenates bytes across a missing range.
 	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
 	if cfg.collectObjects {
-		options = append(options, pcaputil.WithProtocolTFTPFileAutoAssembly(pcaputil.MaxTFTPFileBytes))
+		options = append(options,
+			pcaputil.WithProtocolTFTPFileAutoAssembly(pcaputil.MaxTFTPFileBytes),
+			pcaputil.WithProtocolFTPFileAssembly(pcaputil.MaxFTPFileBytes),
+		)
 	}
 	if src.offline {
 		options = append(options, pcaputil.WithCaptureReplayClock())
