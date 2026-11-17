@@ -2,6 +2,7 @@ package sharkcli
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -222,6 +223,204 @@ func TestObjectExporterHTTP3RequestBodyUsesSelectedHeaders(t *testing.T) {
 	wire, err := os.ReadFile(manifest.Path)
 	require.NoError(t, err)
 	require.Equal(t, "password=hunter", string(wire))
+}
+
+func TestAnalysisCLIObjectExportRepresentationMetadata(t *testing.T) {
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	_, err := writer.Write([]byte(`{"username":"admin","password":"plaintext"}`))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	request := "GET /download HTTP/1.1\r\nHost: example.test\r\n\r\n"
+	response := fmt.Sprintf("HTTP/1.1 206 Partial Content\r\nContent-Type: application/json\r\nContent-Encoding: gzip\r\nContent-Range: bytes 0-%d/100\r\nContent-Disposition: attachment; filename=\"../report.json\"\r\nContent-Length: %d\r\n\r\n%s", compressed.Len()-1, compressed.Len(), compressed.String())
+	input := analysisHTTPFixture(t, []string{request}, []string{response})
+	dir := filepath.Join(t.TempDir(), "objects")
+	var output bytes.Buffer
+	require.NoError(t, invoke(&output, "-r", input, "--json", "--export-objects", dir))
+	manifests := objectExportManifests(t, output.Bytes())
+	require.Len(t, manifests, 1)
+	manifest := manifests[0]
+	require.Equal(t, "gzip", manifest["content_encoding"])
+	require.Equal(t, fmt.Sprintf("bytes 0-%d/100", compressed.Len()-1), manifest["content_range"])
+	require.Equal(t, true, manifest["partial"])
+	require.Equal(t, "report.json", manifest["suggested_filename"])
+	require.True(t, strings.HasSuffix(manifest["path"].(string), "-report.json"))
+	wire, err := os.ReadFile(manifest["path"].(string))
+	require.NoError(t, err)
+	require.Equal(t, compressed.Bytes(), wire)
+}
+
+func TestObjectExporterSkipsHTTP3ConnectTunnelBytes(t *testing.T) {
+	request := &pcaputil.ProtocolEvent{
+		ID: 90, Protocol: "http3", FlowID: 9, Source: "192.0.2.1:443", Destination: "192.0.2.2:443", SourceBytes: pcaputil.ByteSource{Kind: "reassembled"},
+		Session: map[string]any{
+			"HTTP3 Frames": []map[string]any{{
+				"Frame Type":  "HEADERS",
+				"Header Kind": "request",
+				"Headers": []map[string]any{
+					{"Name": ":method", "Value": "CONNECT"},
+					{"Name": ":protocol", "Value": "websocket"},
+					{"Name": ":scheme", "Value": "https"},
+					{"Name": ":authority", "Value": "example.test"},
+					{"Name": ":path", "Value": "/chat"},
+				},
+				"Stream ID": uint64(0),
+				"Direction": uint64(0),
+			}},
+			"HTTP3 Message Conformance": map[string]any{"Drained FIN": true, "Stream ID": uint64(0), "Direction": uint64(0)},
+		},
+	}
+	response := &pcaputil.ProtocolEvent{
+		ID: 91, Protocol: "http3", FlowID: 9, Source: "192.0.2.2:443", Destination: "192.0.2.1:443", SourceBytes: pcaputil.ByteSource{Kind: "reassembled"},
+		Session: map[string]any{
+			"HTTP3 Frames": []map[string]any{
+				{
+					"Frame Type":  "HEADERS",
+					"Header Kind": "response",
+					"Headers":     []map[string]any{{"Name": ":status", "Value": "200"}},
+					"Stream ID":   uint64(0),
+					"Direction":   uint64(1),
+				},
+				{
+					"Frame Type": "DATA",
+					"Payload":    []byte("tunnel-secret"),
+					"Stream ID":  uint64(0),
+					"Direction":  uint64(1),
+				},
+			},
+			"HTTP3 Message Conformance": map[string]any{"Drained FIN": true, "Stream ID": uint64(0), "Direction": uint64(1)},
+		},
+	}
+	exporter, err := newObjectExporter(t.TempDir())
+	require.NoError(t, err)
+	for _, event := range []*pcaputil.ProtocolEvent{request, response} {
+		for _, observation := range observedObjects(event) {
+			manifest, err := exporter.process(observation, true)
+			require.NoError(t, err)
+			require.Nil(t, manifest)
+		}
+	}
+
+	failedRequest := *request
+	failedRequest.ID, failedRequest.FlowID = 92, 10
+	failedResponse := *response
+	failedResponse.ID, failedResponse.FlowID = 93, 10
+	failedResponse.Session = map[string]any{
+		"HTTP3 Frames": []map[string]any{
+			{
+				"Frame Type":  "HEADERS",
+				"Header Kind": "response",
+				"Headers":     []map[string]any{{"Name": ":status", "Value": "407"}},
+				"Stream ID":   uint64(0),
+				"Direction":   uint64(1),
+			},
+			{
+				"Frame Type": "DATA",
+				"Payload":    []byte("proxy authentication required"),
+				"Stream ID":  uint64(0),
+				"Direction":  uint64(1),
+			},
+		},
+		"HTTP3 Message Conformance": map[string]any{"Drained FIN": true, "Stream ID": uint64(0), "Direction": uint64(1)},
+	}
+	exporter, err = newObjectExporter(t.TempDir())
+	require.NoError(t, err)
+	var failedManifest *objectManifest
+	for _, event := range []*pcaputil.ProtocolEvent{&failedRequest, &failedResponse} {
+		for _, observation := range observedObjects(event) {
+			manifest, err := exporter.process(observation, true)
+			require.NoError(t, err)
+			if manifest != nil {
+				failedManifest = manifest
+			}
+		}
+	}
+	require.NotNil(t, failedManifest)
+	require.Equal(t, 407, failedManifest.StatusCode)
+	wire, err := os.ReadFile(failedManifest.Path)
+	require.NoError(t, err)
+	require.Equal(t, "proxy authentication required", string(wire))
+}
+
+func TestObjectExporterHTTP3QPACKResumedHeaders(t *testing.T) {
+	headerEvent := &pcaputil.ProtocolEvent{
+		ID: 120, Protocol: "http3", FlowID: 12, Source: "192.0.2.1:443", Destination: "192.0.2.2:443", SourceBytes: pcaputil.ByteSource{Kind: "reassembled"},
+		Session: map[string]any{"QPACK Resumed Streams": []map[string]any{{
+			"HTTP3 Frames": []map[string]any{{
+				"Frame Type":  "HEADERS",
+				"Header Kind": "request",
+				"Headers": []map[string]any{
+					{"Name": ":method", "Value": "POST"},
+					{"Name": ":path", "Value": "/resumed"},
+					{"Name": "content-type", "Value": "text/plain"},
+				},
+				"Stream ID": uint64(0),
+				"Direction": uint64(0),
+			}},
+		}}},
+	}
+	dataEvent := &pcaputil.ProtocolEvent{
+		ID: 121, Protocol: "http3", FlowID: 12, Source: "192.0.2.1:443", Destination: "192.0.2.2:443", SourceBytes: pcaputil.ByteSource{Kind: "reassembled"},
+		Session: map[string]any{
+			"HTTP3 Frames": []map[string]any{{
+				"Frame Type": "DATA",
+				"Payload":    []byte("resumed-body"),
+				"Stream ID":  uint64(0),
+				"Direction":  uint64(0),
+			}},
+			"HTTP3 Message Conformance": map[string]any{"Drained FIN": true, "Stream ID": uint64(0), "Direction": uint64(0)},
+		},
+	}
+	exporter, err := newObjectExporter(t.TempDir())
+	require.NoError(t, err)
+	var manifest *objectManifest
+	for _, event := range []*pcaputil.ProtocolEvent{headerEvent, dataEvent} {
+		for _, observation := range observedObjects(event) {
+			got, err := exporter.process(observation, true)
+			require.NoError(t, err)
+			if got != nil {
+				manifest = got
+			}
+		}
+	}
+	require.NotNil(t, manifest)
+	require.Equal(t, "POST", manifest.Method)
+	require.Equal(t, "/resumed", manifest.URI)
+	wire, err := os.ReadFile(manifest.Path)
+	require.NoError(t, err)
+	require.Equal(t, "resumed-body", string(wire))
+}
+
+func TestObjectExporterHTTP3ResetReleasesPendingStream(t *testing.T) {
+	headerEvent := &pcaputil.ProtocolEvent{
+		ID: 130, Protocol: "http3", FlowID: 13, Source: "192.0.2.1:443", Destination: "192.0.2.2:443", SourceBytes: pcaputil.ByteSource{Kind: "reassembled"},
+		Session: map[string]any{"HTTP3 Frames": []map[string]any{{
+			"Frame Type":  "HEADERS",
+			"Header Kind": "request",
+			"Headers":     []map[string]any{{"Name": ":method", "Value": "POST"}, {"Name": ":path", "Value": "/reset"}},
+			"Stream ID":   uint64(0),
+			"Direction":   uint64(0),
+		}}},
+	}
+	resetEvent := &pcaputil.ProtocolEvent{
+		ID: 131, Protocol: "http3", FlowID: 13, Source: "192.0.2.2:443", Destination: "192.0.2.1:443", SourceBytes: pcaputil.ByteSource{Kind: "reassembled"},
+		Session: map[string]any{"Frames": []map[string]any{{"Frame Type": "RESET_STREAM", "Stream ID": uint64(0)}}},
+	}
+	exporter, err := newObjectExporter(t.TempDir())
+	require.NoError(t, err)
+	for _, observation := range observedObjects(headerEvent) {
+		manifest, err := exporter.process(observation, true)
+		require.NoError(t, err)
+		require.Nil(t, manifest)
+	}
+	require.Len(t, exporter.httpStream, 1)
+	for _, observation := range observedObjects(resetEvent) {
+		manifest, err := exporter.process(observation, true)
+		require.NoError(t, err)
+		require.Nil(t, manifest)
+	}
+	require.Empty(t, exporter.httpStream)
 }
 
 func TestSafeObjectNameAvoidsWindowsDeviceNames(t *testing.T) {

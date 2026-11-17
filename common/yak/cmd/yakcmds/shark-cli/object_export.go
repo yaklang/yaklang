@@ -23,6 +23,9 @@ type objectObservation struct {
 	id, responseTo                                  uint64
 	protocol, source, destination, uri, contentType string
 	method                                          string
+	status                                          int
+	contentEncoding, contentDisposition             string
+	contentRange, suggestedFilename                 string
 	authorization, cookie                           any
 	request                                         bool
 	body                                            io.Reader
@@ -104,12 +107,16 @@ func observedHTTP1Object(e *pcaputil.ProtocolEvent) *objectObservation {
 		}
 		return ""
 	}
-	contentType := ""
-	if values := e.HTTPMessageHeaderValues("Content-Type"); len(values) > 0 {
-		contentType = values[0]
+	status := 0
+	if values := fields["http.response.code"]; len(values) > 0 {
+		if value, ok := objectUint64(values[0]); ok {
+			status = int(value)
+		}
 	}
-	return &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: request, body: body, declared: declared, method: text("http.request.method"),
-		uri: text("http.request.uri"), contentType: contentType, authorization: literal("http.request.authorization"), cookie: literal("http.cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source}
+	observation := &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: request, body: body, declared: declared, method: text("http.request.method"), status: status,
+		uri: text("http.request.uri"), authorization: literal("http.request.authorization"), cookie: literal("http.cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source}
+	applyObjectMessageMetadata(observation, func(name string) []string { return e.HTTPMessageHeaderValues(name) })
+	return observation
 }
 
 func observedHTTP2Object(e *pcaputil.ProtocolEvent) *objectObservation {
@@ -155,20 +162,24 @@ func observedHTTP2Object(e *pcaputil.ProtocolEvent) *objectObservation {
 		}
 		return out
 	}
-	contentType := ""
-	if values := e.HTTPMessageHeaderValues("Content-Type"); len(values) > 0 {
-		contentType = values[0]
-	}
 	var declared *int64
 	if values := e.HTTPMessageHeaderValues("Content-Length"); len(values) > 0 {
 		if length, err := strconv.ParseInt(strings.TrimSpace(values[0]), 10, 64); err == nil && length >= 0 {
 			declared = &length
 		}
 	}
-	return &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: header.Kind == "request", method: text("http.request.method"),
-		uri: text("http.request.uri"), contentType: contentType, declared: declared, authorization: headerLiteral("Authorization"), cookie: headerLiteral("Cookie"),
+	status := 0
+	if values := fields["http.response.code"]; len(values) > 0 {
+		if value, ok := objectUint64(values[0]); ok {
+			status = int(value)
+		}
+	}
+	observation := &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: header.Kind == "request", method: text("http.request.method"), status: status,
+		uri: text("http.request.uri"), declared: declared, authorization: headerLiteral("Authorization"), cookie: headerLiteral("Cookie"),
 		refs: snapshot.Source.PacketRefs, bytes: snapshot.Source,
 		httpStream: &httpStreamFragment{key: key, direction: e.Direction, headerKind: header.Kind, endStream: header.EndStream}}
+	applyObjectMessageMetadata(observation, func(name string) []string { return e.HTTPMessageHeaderValues(name) })
+	return observation
 }
 
 func observedHTTP3Objects(e *pcaputil.ProtocolEvent) []*objectObservation {
@@ -176,9 +187,23 @@ func observedHTTP3Objects(e *pcaputil.ProtocolEvent) []*objectObservation {
 		return nil
 	}
 	snapshot := e.DisplayFieldValues()
-	frames, _ := e.Session["HTTP3 Frames"].([]map[string]any)
+	frames := http3ObjectFrames(e)
 	completions := map[httpStreamKey]bool{}
 	var out []*objectObservation
+	if quicFrames, ok := e.Session["Frames"].([]map[string]any); ok {
+		for _, frame := range quicFrames {
+			if frame["Frame Type"] != "RESET_STREAM" {
+				continue
+			}
+			streamID, ok := objectUint64(frame["Stream ID"])
+			if !ok {
+				continue
+			}
+			key := httpStreamKey{protocol: "h3", domain: e.Domain, flowID: e.FlowID, streamID: streamID}
+			out = append(out, &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination,
+				httpStream: &httpStreamFragment{key: key, reset: true}})
+		}
+	}
 	addCompletion := func(values map[string]any) {
 		if values == nil || values["Drained FIN"] != true {
 			return
@@ -229,6 +254,34 @@ func observedHTTP3Objects(e *pcaputil.ProtocolEvent) []*objectObservation {
 	return out
 }
 
+func http3ObjectFrames(e *pcaputil.ProtocolEvent) []map[string]any {
+	found := false
+	var out []map[string]any
+	add := func(value any) {
+		frames, ok := value.([]map[string]any)
+		if !ok {
+			return
+		}
+		found = found || len(frames) > 0
+		out = append(out, frames...)
+	}
+	if frames, ok := e.Session["Frames"].([]map[string]any); ok {
+		for _, frame := range frames {
+			add(frame["HTTP3 Frames"])
+		}
+	}
+	if resumed, ok := e.Session["QPACK Resumed Streams"].([]map[string]any); ok {
+		for _, stream := range resumed {
+			add(stream["HTTP3 Frames"])
+		}
+	}
+	if found {
+		return out
+	}
+	frames, _ := e.Session["HTTP3 Frames"].([]map[string]any)
+	return frames
+}
+
 func http3HeaderObject(e *pcaputil.ProtocolEvent, key httpStreamKey, direction int, kind string, headers []map[string]any, snapshot pcaputil.DisplayFieldSnapshot) *objectObservation {
 	values := func(name string) []string {
 		var out []string
@@ -267,10 +320,38 @@ func http3HeaderObject(e *pcaputil.ProtocolEvent, key httpStreamKey, direction i
 			declared = &length
 		}
 	}
-	return &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: kind == "request",
-		method: first(":method"), uri: first(":path"), contentType: first("Content-Type"), declared: declared,
+	status := 0
+	if value := first(":status"); value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			status = parsed
+		}
+	}
+	observation := &objectObservation{id: e.ID, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: kind == "request",
+		method: first(":method"), uri: first(":path"), status: status, declared: declared,
 		authorization: literal("Authorization"), cookie: literal("Cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source,
 		streamID: key.streamID, httpStream: &httpStreamFragment{key: key, direction: direction, headerKind: kind}}
+	applyObjectMessageMetadata(observation, values)
+	return observation
+}
+
+func applyObjectMessageMetadata(o *objectObservation, values func(string) []string) {
+	first := func(name string) string {
+		if out := values(name); len(out) > 0 {
+			return out[0]
+		}
+		return ""
+	}
+	o.contentType = first("Content-Type")
+	o.contentEncoding = strings.Join(values("Content-Encoding"), ", ")
+	o.contentRange = first("Content-Range")
+	o.contentDisposition = first("Content-Disposition")
+	if o.contentDisposition != "" {
+		if _, parameters, err := mime.ParseMediaType(o.contentDisposition); err == nil {
+			if filename := parameters["filename"]; filename != "" {
+				o.suggestedFilename = safeObjectName(filename, o.contentType)
+			}
+		}
+	}
 }
 
 func objectUint64(value any) (uint64, bool) {
@@ -418,27 +499,33 @@ func windowsDeviceName(name string) bool {
 }
 
 type objectManifest struct {
-	RecordType     string              `json:"record_type"`
-	Physical       bool                `json:"physical"`
-	PDU            uint64              `json:"pdu"`
-	Protocol       string              `json:"protocol"`
-	StreamID       uint64              `json:"stream_id,omitempty"`
-	Direction      string              `json:"direction"`
-	Method         string              `json:"method,omitempty"`
-	Source         string              `json:"source"`
-	Destination    string              `json:"destination"`
-	URI            any                 `json:"uri"`
-	ContentType    string              `json:"content_type"`
-	DeclaredLength *int64              `json:"declared_length"`
-	ObservedLength int64               `json:"observed_length"`
-	Complete       bool                `json:"complete"`
-	LengthMismatch bool                `json:"length_mismatch,omitempty"`
-	SHA256         string              `json:"sha256"`
-	Path           string              `json:"path"`
-	PacketRefs     []uint64            `json:"packet_refs"`
-	ByteSource     pcaputil.ByteSource `json:"byte_source"`
-	Authorization  any                 `json:"authorization"`
-	Cookie         any                 `json:"cookie"`
+	RecordType         string              `json:"record_type"`
+	Physical           bool                `json:"physical"`
+	PDU                uint64              `json:"pdu"`
+	Protocol           string              `json:"protocol"`
+	StreamID           uint64              `json:"stream_id,omitempty"`
+	Direction          string              `json:"direction"`
+	Method             string              `json:"method,omitempty"`
+	StatusCode         int                 `json:"status_code,omitempty"`
+	Source             string              `json:"source"`
+	Destination        string              `json:"destination"`
+	URI                any                 `json:"uri"`
+	ContentType        string              `json:"content_type"`
+	ContentEncoding    string              `json:"content_encoding,omitempty"`
+	ContentDisposition string              `json:"content_disposition,omitempty"`
+	ContentRange       string              `json:"content_range,omitempty"`
+	SuggestedFilename  string              `json:"suggested_filename,omitempty"`
+	Partial            bool                `json:"partial,omitempty"`
+	DeclaredLength     *int64              `json:"declared_length"`
+	ObservedLength     int64               `json:"observed_length"`
+	Complete           bool                `json:"complete"`
+	LengthMismatch     bool                `json:"length_mismatch,omitempty"`
+	SHA256             string              `json:"sha256"`
+	Path               string              `json:"path"`
+	PacketRefs         []uint64            `json:"packet_refs"`
+	ByteSource         pcaputil.ByteSource `json:"byte_source"`
+	Authorization      any                 `json:"authorization"`
+	Cookie             any                 `json:"cookie"`
 }
 
 func (x *objectExporter) process(o *objectObservation, matched bool) (*objectManifest, error) {
@@ -467,7 +554,11 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 		uri, authorization, cookie = request.uri, request.authorization, request.cookie
 		method = request.method
 	}
-	name := filepath.Join(x.directory, fmt.Sprintf("%d-%s", o.id, safeObjectName(uriText, o.contentType)))
+	nameText := uriText
+	if o.suggestedFilename != "" {
+		nameText = o.suggestedFilename
+	}
+	name := filepath.Join(x.directory, fmt.Sprintf("%d-%s", o.id, safeObjectName(nameText, o.contentType)))
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("create exported object: %w", err)
@@ -497,7 +588,9 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 	if o.request {
 		direction = "request"
 	}
-	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, StreamID: o.streamID, Direction: direction, Method: method, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType, DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
+	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, StreamID: o.streamID, Direction: direction, Method: method, StatusCode: o.status, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType,
+		ContentEncoding: o.contentEncoding, ContentDisposition: o.contentDisposition, ContentRange: o.contentRange, SuggestedFilename: o.suggestedFilename, Partial: o.contentRange != "",
+		DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
 }
 
 const maxPendingHTTPStreamBytes = 64 << 20
@@ -594,6 +687,12 @@ func (x *objectExporter) processHTTPStream(o *objectObservation, matched bool) (
 			bodyObservation.cookie = request.header.cookie
 			bodyObservation.method = request.header.method
 		}
+	}
+	if !bodyObservation.request && bodyObservation.method == "CONNECT" && bodyObservation.status >= 200 && bodyObservation.status < 300 {
+		x.httpStreamBytes -= len(body)
+		direction.body = nil
+		x.cleanupHTTPStream(key, stream)
+		return nil, nil
 	}
 	manifest, err := x.export(&bodyObservation)
 	x.httpStreamBytes -= len(body)
