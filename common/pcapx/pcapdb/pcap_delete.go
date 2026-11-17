@@ -18,6 +18,7 @@ type DeleteResult struct {
 	DatasetID      string       `json:"dataset_id"`
 	Deleted        bool         `json:"deleted"`
 	CleanupPending bool         `json:"cleanup_pending"`
+	AffectedRows   int64        `json:"affected_rows"`
 	Error          *ResultError `json:"error"`
 }
 
@@ -171,12 +172,14 @@ func (m *InstanceManager) Delete(ctx context.Context, id string) (result *Delete
 	if err = indexWithContext(commitCtx, tx).Unscoped().Model(&PCAPFileDBMetadata{}).Where("dataset_id = ?", id).UpdateColumn("full_sha256", "").Error; err != nil {
 		return result, err
 	}
-	if err = indexWithContext(commitCtx, tx).Where("dataset_id = ?", id).Delete(&PCAPFileDBMetadata{}).Error; err != nil {
+	deleted := indexWithContext(commitCtx, tx).Where("dataset_id = ?", id).Delete(&PCAPFileDBMetadata{})
+	if err = deleted.Error; err != nil {
 		return result, err
 	}
 	if err = tx.Commit().Error; err != nil {
 		return result, err
 	}
+	result.AffectedRows = deleted.RowsAffected
 	for _, name := range []string{"index.sqlite-wal", "index.sqlite-shm", "index.sqlite-journal", "index.sqlite"} {
 		if err = os.Remove(filepath.Join(directory, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return result, err
