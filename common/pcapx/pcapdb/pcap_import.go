@@ -686,5 +686,6 @@ func packetMetadata(raw []byte, link layers.LinkType) Packet {
 	if failed := packet.ErrorLayer(); failed != nil {
 		result.DecodeError = failed.Error().Error()
 	}
+	result.Summary = packetFrameSummary(packet, result)
 	return result
 }
