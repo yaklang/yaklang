@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -51,6 +52,35 @@ func TestAnalysisHTTPFieldsUseAdmittedLiteralHeaders(t *testing.T) {
 		require.NotContains(t, e.DisplayFields(), "http.host")
 		_, _, ok := e.HTTPResponseBody()
 		require.False(t, ok)
+	}
+}
+
+func TestAnalysisHTTPMessageBodyExtractsCompleteRequest(t *testing.T) {
+	body := "username=admin&password=plaintext"
+	request := fmt.Sprintf("POST /login HTTP/1.1\r\nHost: example.test\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n\r\n%s", len(body), body)
+	response := "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK"
+	for _, deferred := range []bool{false, true} {
+		events, _, err := binReplay(t, binTestPcap(t, []tcpStep{{seq: 0, syn: true}, {seq: 0, syn: true, reverse: true}, {seq: 1, data: request}, {seq: 1, data: response, reverse: true}}, 80, false, false), 1, WithBinParserDeferred(deferred))
+		require.NoError(t, err)
+		require.Len(t, events, 2)
+
+		reader, declared, isRequest, ok := events[0].HTTPMessageBody()
+		require.True(t, ok)
+		require.True(t, isRequest)
+		require.EqualValues(t, len(body), *declared)
+		wire, err := io.ReadAll(reader)
+		require.NoError(t, err)
+		require.Equal(t, body, string(wire))
+		_, _, ok = events[0].HTTPResponseBody()
+		require.False(t, ok, "the response-only compatibility accessor must reject a request")
+
+		reader, declared, isRequest, ok = events[1].HTTPMessageBody()
+		require.True(t, ok)
+		require.False(t, isRequest)
+		require.EqualValues(t, 2, *declared)
+		wire, err = io.ReadAll(reader)
+		require.NoError(t, err)
+		require.Equal(t, "OK", string(wire))
 	}
 }
 

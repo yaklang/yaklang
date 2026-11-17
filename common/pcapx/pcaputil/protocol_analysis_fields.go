@@ -125,21 +125,28 @@ type httpMessageEvidence struct {
 	digest            [32]byte
 }
 
-// HTTPResponseBody returns only the body of a fully admitted HTTP/1 message.
-// Chunk framing is decoded over that exact message's bytes; no stream recovery
-// or inference of a missing request method is performed.
-func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
+// HTTPMessageBody returns the body of a fully admitted HTTP/1 request or
+// response. Chunk framing is decoded over that exact message's bytes; no stream
+// recovery or inference of a missing request method is performed. The third
+// result reports whether the message is a request; the fourth reports success.
+func (e *ProtocolEvent) HTTPMessageBody() (io.Reader, *int64, bool, bool) {
 	if e == nil || e.nativeHTTPMessage == nil || e.nativeDiagnosticError != "" || e.Completeness != "message" && e.Completeness != "transaction" {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
 	h := e.nativeHTTPMessage
-	status, _ := displayUint(h.fields["Status Code"])
-	if !h.response || !h.complete || status < 200 || h.header > len(e.Raw) || h.header < 0 || e.Status == "malformed" || e.Status == "encrypted" || sha256.Sum256(e.Raw) != h.digest {
-		return nil, nil, false
+	if !h.complete || h.header > len(e.Raw) || h.header < 0 || e.Status == "malformed" || e.Status == "encrypted" || sha256.Sum256(e.Raw) != h.digest {
+		return nil, nil, false, false
+	}
+	request := !h.response
+	if !request {
+		status, _ := displayUint(h.fields["Status Code"])
+		if status < 200 {
+			return nil, nil, false, false
+		}
 	}
 	var length *int64
 	// Content-Length is literal metadata; HEAD/304 may declare a representation
-	// length even though framing correctly admitted an empty response body.
+	// length even though framing correctly admitted an empty body.
 	displayHTTPHeaderField(e, "Content-Length", func(v any) {
 		if s, ok := v.(string); ok {
 			if n, err := strconv.ParseInt(s, 10, 64); err == nil && n >= 0 {
@@ -150,6 +157,15 @@ func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
 	var body io.Reader = bytes.NewReader(e.Raw[h.header:])
 	if h.chunked {
 		body = httputil.NewChunkedReader(body)
+	}
+	return body, length, request, true
+}
+
+// HTTPResponseBody returns only the body of a fully admitted HTTP/1 response.
+func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
+	body, length, request, ok := e.HTTPMessageBody()
+	if !ok || request {
+		return nil, nil, false
 	}
 	return body, length, true
 }

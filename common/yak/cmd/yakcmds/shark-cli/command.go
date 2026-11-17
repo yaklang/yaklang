@@ -56,7 +56,7 @@ var Command = &cli.Command{
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
 		cli.BoolFlag{Name: "json", Usage: "Print JSONL packet snapshots plus nonphysical record_type=protocol_publication records for capture-close diagnostics; byte_source defines original contributors"},
 		cli.BoolFlag{Name: "json-physical-only", Usage: "Print JSONL physical frames only; implies --json and omits nonphysical publications"},
-		cli.StringFlag{Name: "export-objects", Usage: "Export complete HTTP response bodies to a directory (new files only) and print JSONL object manifests"},
+		cli.StringFlag{Name: "export-objects", Usage: "Export complete HTTP request and response bodies to a directory (new files only) and print JSONL object manifests"},
 		cli.StringSliceFlag{Name: "stats", Usage: "Print statistics over display-filter matches: conv, io, proto, endpoints (repeatable; replaces packet summaries)"},
 		cli.DurationFlag{Name: "stats-interval", Value: time.Second, Usage: "IO statistics bucket width, e.g. 1s or 100ms"},
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
@@ -267,9 +267,6 @@ func runPlainAnalysis(ctx context.Context, s *captureSession, out io.Writer, asJ
 			return nil
 		}
 		for _, observation := range packet.objects {
-			if observation.request {
-				continue
-			}
 			if matched {
 				manifest, err := options.exporter.export(observation)
 				if err != nil {

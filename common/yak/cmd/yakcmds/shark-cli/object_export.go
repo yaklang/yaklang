@@ -20,6 +20,7 @@ import (
 type objectObservation struct {
 	id, responseTo                                  uint64
 	protocol, source, destination, uri, contentType string
+	method                                          string
 	authorization, cookie                           any
 	request                                         bool
 	body                                            io.Reader
@@ -29,14 +30,17 @@ type objectObservation struct {
 }
 
 func observedObject(e *pcaputil.ProtocolEvent) *objectObservation {
-	body, declared, response := e.HTTPResponseBody()
-	if !response && e.Completeness != "message" && e.Completeness != "transaction" {
-		return nil
-	}
+	body, declared, bodyRequest, bodyOK := e.HTTPMessageBody()
 	snapshot := e.DisplayFieldValues()
 	fields := snapshot.FieldMap()
 	request := len(fields["http.request.method"]) > 0
-	if !response && !request {
+	if bodyOK {
+		request = bodyRequest
+	}
+	if !request && !bodyOK {
+		return nil
+	}
+	if !bodyOK && (!request || e.Completeness != "message" && e.Completeness != "transaction") {
 		return nil
 	}
 	literal := func(key string) any {
@@ -57,7 +61,7 @@ func observedObject(e *pcaputil.ProtocolEvent) *objectObservation {
 		}
 		return ""
 	}
-	return &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: request, body: body, declared: declared,
+	return &objectObservation{id: e.ID, responseTo: e.ResponseTo, protocol: e.Protocol, source: e.Source, destination: e.Destination, request: request, body: body, declared: declared, method: text("http.request.method"),
 		uri: text("http.request.uri"), contentType: text("http.response.content_type"), authorization: literal("http.request.authorization"), cookie: literal("http.cookie"), refs: snapshot.Source.PacketRefs, bytes: snapshot.Source}
 }
 
@@ -91,6 +95,8 @@ func (x *objectExporter) observe(observations []*objectObservation) error {
 			return fmt.Errorf("object export request context budget exceeded (4096 pending requests / 4 MiB)")
 		}
 		copy := *observation
+		copy.body = nil
+		copy.declared = nil
 		copy.refs = nil
 		copy.bytes = pcaputil.ByteSource{}
 		x.requests[observation.id] = &copy
@@ -145,6 +151,8 @@ type objectManifest struct {
 	Physical       bool                `json:"physical"`
 	PDU            uint64              `json:"pdu"`
 	Protocol       string              `json:"protocol"`
+	Direction      string              `json:"direction"`
+	Method         string              `json:"method,omitempty"`
 	Source         string              `json:"source"`
 	Destination    string              `json:"destination"`
 	URI            any                 `json:"uri"`
@@ -166,10 +174,14 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 		return nil, nil
 	}
 	var uri, authorization, cookie any
+	method := ""
 	uriText := ""
-	if request := x.requests[o.responseTo]; request != nil {
+	if o.request {
+		uriText, uri, authorization, cookie, method = o.uri, o.uri, o.authorization, o.cookie, o.method
+	} else if request := x.requests[o.responseTo]; request != nil {
 		uriText = request.uri
 		uri, authorization, cookie = request.uri, request.authorization, request.cookie
+		method = request.method
 	}
 	name := filepath.Join(x.directory, fmt.Sprintf("%d-%s", o.id, safeObjectName(uriText, o.contentType)))
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -186,10 +198,20 @@ func (x *objectExporter) export(o *objectObservation) (*objectManifest, error) {
 		}
 		return nil, closeErr
 	}
+	if o.request && written == 0 && (o.declared == nil || *o.declared == 0) {
+		if err := os.Remove(name); err != nil {
+			return nil, fmt.Errorf("remove empty exported request: %w", err)
+		}
+		return nil, nil
+	}
 	mismatch := o.declared != nil && *o.declared != written
 	refs := make([]uint64, 0, len(o.refs))
 	for _, ref := range o.refs {
 		refs = append(refs, ref.Number)
 	}
-	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType, DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
+	direction := "response"
+	if o.request {
+		direction = "request"
+	}
+	return &objectManifest{RecordType: "object_export", PDU: o.id, Protocol: o.protocol, Direction: direction, Method: method, Source: o.source, Destination: o.destination, URI: uri, ContentType: o.contentType, DeclaredLength: o.declared, ObservedLength: written, Complete: !mismatch, LengthMismatch: mismatch, SHA256: hex.EncodeToString(hash.Sum(nil)), Path: name, PacketRefs: refs, ByteSource: o.bytes, Authorization: authorization, Cookie: cookie}, nil
 }
