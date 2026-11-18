@@ -59,6 +59,12 @@ C++ 使用独立的语法包 `common/yak/cpp` 和前端包 `common/yak/cpp/cpp2s
    `pointerOperator* LeftBracket constantExpression? RightBracket attributeSpecifierSeq?`。
    上游不接受无名数组类型，例如 `std::unique_ptr<char[]>`、`std::unique_ptr<const char*[]>`。
    cxxopts 等真实项目使用该写法。
+4. C++17 结构（任务要求，见 §5.1）：折叠表达式、`noexcept(expr)` 运算符、
+   `if constexpr`、结构化绑定（声明与范围 for）、嵌套命名空间定义 `namespace a::b {}`。
+5. `literalOperatorId` 接受 `Operator UserDefinedLiteral`，
+   使无空格的 `operator""_km` 可解析。
+6. GNU `__attribute__((...))`：词法器新增 `AttributeGnu` 记号（放在 `Identifier` 前），
+   语法器把双括号内的 `balancedTokenSeq` 当作属性。glibc 与 doctest 使用该写法。
 
 补丁全部记录在 `common/yak/cpp/NOTICE.md` 和 `gen.sh` 注释里。
 
@@ -130,7 +136,13 @@ C 回归：`./scripts/ssa-test.sh -count=1 -timeout 5m ./common/yak/c2ssa/...` �
 - 表达式：字面量、标识符、限定名、成员访问、下标、调用、一元/二元运算、
   复合赋值、三目运算、类型转换（C 风格与 `static_cast` 等）、lambda、花括号初始化。
 - C++11/14 常用写法：`auto`、`nullptr`、`enum class`、`override`/`final`、
-  `constexpr`、尾置返回类型。
+  `constexpr`、尾置返回类型、`noexcept` 说明符与 `noexcept(expr)` 运算符、
+  属性 `[[...]]` 与 GNU `__attribute__((...))`。
+- C++17 常用写法：`if constexpr`、结构化绑定、折叠表达式、
+  嵌套命名空间定义、`inline namespace`、类模板参数推导的语法外壳。
+- 模板声明层：类模板、成员函数模板、全特化与偏特化、模板参数默认值、
+  可变参数模板、别名模板、`typename`/`template` 消歧、嵌套 `>>`。
+- 运算符重载（含转换函数、`operator()`、`operator[]`）与用户定义字面量。
 
 ### 5.2 未覆盖
 
@@ -139,10 +151,13 @@ C 回归：`./scripts/ssa-test.sh -count=1 -timeout 5m ./common/yak/c2ssa/...` �
 - 虚函数分派：只登记基类关系，不做动态派发求解。
 - 多重继承的对象布局、虚基类、RTTI（`dynamic_cast`/`typeid` 只透传操作数）。
 - 编译期求值：`constexpr` 函数、`sizeof`/`alignof` 求值（返回常量 0）。
-- C++20 的 concepts/requires、modules、coroutines、ranges 仅依赖 CPP14 语法的接受度。
+- C++20 语法未纳入：`concept`/`requires`、`<=>`、指定初始化器
+  （`S s{.x = 1}`）、modules、coroutines。遇到即解析失败，不做降级。
+- MSVC 扩展 `__declspec(...)` 未纳入；GNU `__attribute__((...))` 已纳入。
 - `goto` 不建立 CFG 边，只记录调用式占位；`label:` 直接访问内部语句。
-- 宏展开沿用 C 端实现：函数宏和对象宏可用，`##`/`#` 令牌粘贴不完整，
-  doctest/Catch2 的 `TEST_CASE` 类宏不会展开。
+- 宏展开的剩余限制：`__VA_OPT__`、`#include` 计算式路径、
+  `#define` 内嵌 `#if` 的分支收集、`#` 字符串化保留原始宏实参
+  （当前对实参先做宏展开，ISO C 规定 `#`/`##` 操作数不展开）。
 - 纯头文件项目不产生翻译单元，见 §4.1。
 
 ## 6. 标准库基线
@@ -231,19 +246,54 @@ C 回归：`./scripts/ssa-test.sh -count=1 -timeout 5m ./common/yak/c2ssa/...` �
 语料：`cxxopts`（MIT）、`argparse`（MIT），共 57 个 `.cpp` 翻译单元。
 语料不进入 git，存放于 `/mnt/data/scan-outputs/cpp-support-<时间>/corpus/`。
 
-| 测法 | PASS | FAIL | p50 | p95 | 最大 |
-| --- | --- | --- | --- | --- | --- |
-| 现有 C 解析器（对照） | 4 | 53 | — | — | — |
-| C++ 语法，纯解析 | 22 | 35 | 6.1 ms | 83.0 ms | 213.2 ms |
-| C++ 语法 + 预处理 | 23 | 34 | 17.3 ms | 164.3 ms | 3,281.8 ms |
+基线提交 `4b69840d81`（宏健壮性修复前）与当前提交用同一语料、同一统计脚本对比。
+每个顶层目录按独立项目预处理：两个项目各自带一份测试框架头文件，
+宏表跨项目合并会互相覆盖 `TEST_CASE`，那是检出布局的产物，不是前端行为。
 
-失败归类：34 个失败全部同一原因——测试框架宏 `TEST_CASE` 未被展开。
-这些文件来自 doctest/Catch2，宏定义依赖 `##` 令牌粘贴，C 端宏展开器不完整。
-库源码文件（非测试）全部通过。
+| 测法 | 修复前 PASS/57 | 修复后 PASS/57 | p50（前→后） | p95（前→后） | 最大（前→后） |
+| --- | --- | --- | --- | --- | --- |
+| 现有 C 解析器（对照） | 4 | 4 | — | — | — |
+| C++ 语法，纯解析 | 22 | 22 | 8.7→6.4 ms | 172.0→203.5 ms | 246.3→257.7 ms |
+| C++ 语法 + 预处理 | 23 | **57** | 18.3→14.3 ms | 191.2→1201.4 ms | 3,366.8→4,306.5 ms |
+
+修复前的失败分布：34 个失败全部来自 doctest/Catch2 测试文件，
+根因是共享宏展开器的 5 个缺陷（见 §8.2），库源码文件全部通过。
+修复后这 34 个文件全部通过；纯解析仍是 22，因为纯解析不做 include 与宏展开。
+
+预处理耗时上升集中在测试文件：`options.cpp` 4.3 s、`test_scan.cpp` 1.8 s、
+`test_repr.cpp` 1.2 s。这些文件以前快速失败（宏不展开），现在真正展开出
+数百个 `do { ... } while(false)` 断言块再解析。库源码文件仍在 10 ms 量级。
+
+### 8.2 语法特性夹具与宏修复清单
+
+夹具位置：`common/yak/cpp/tests/code/`。`TestAllSyntaxForCpp_G4` 逐个解析，
+预算 10 s。宏夹具在子目录 `code/macros/`，由 `macro_test.go` 先预处理再解析。
+
+| 特性组 | 夹具 | 覆盖点 |
+| --- | --- | --- |
+| 模板 | `templates.cpp`、`templates_advanced.cpp` | 类模板、成员函数模板、全特化、偏特化、默认参数、可变参数、别名模板、`typename`/`template` 消歧、`>>`、`extern template` |
+| 宏 | `code/macros/{framework.hpp,macros.cpp}` | 对象宏、函数宏、`__VA_ARGS__`、`#`、`##`、多行宏体、多行调用、`#if/#elif/#else`、宏体行注释、`#x##suffix` |
+| 运算符 | `operators.cpp` | 算术/比较/下标/调用/转换运算符、成员与非成员重载、用户定义字面量 |
+| lambda 与基础 | `lambdas.cpp` | 捕获列表、`mutable`、泛型 lambda、尾置返回、`noexcept`、`[[nodiscard]]`、范围 for、`auto`、`decltype` |
+| C++17 | `cxx17.cpp` | 结构化绑定、`if constexpr`、折叠表达式、嵌套命名空间、`inline namespace` |
+
+本轮修复的共享宏展开缺陷（`common/yak/c2ssa/preprocess`，C 与 C++ 共用）：
+
+| 缺陷 | 影响 | 修复 |
+| --- | --- | --- |
+| 多行宏调用按行展开 | `TEST_CASE("..." * tag("x"))` 跨行时不展开 | 括号未配平时缓存逻辑行，配平后整段展开 |
+| `#elif` 设置了 `elseSeen` | `#if 0 / #elif 0 / #else` 的 `#else` 被跳过，`DOCTEST_UNUSED` 缺失 | `elif` 不再设置 `elseSeen` |
+| 指令名取整个字段 | `#endif// x` 被当作未知指令，条件栈失衡，`SECTION` 定义落在“非活动”分支 | 指令名只取前导标识符串 |
+| `#` 字符串化不折叠空白、不转义 | 多行实参产生含换行的字符串，导致词法错误 | 空白折叠为一个空格，转义 `\` 与 `"` |
+| `#x##suffix` 不粘贴 | `#matcher##_catch_sr` 残留 `##` | 字符串化结果参与同一轮 `##` 折叠 |
+| 宏体行注释保留 | `} while(false) // NOLINT` 吞掉调用方的 `;` | 宏体注释按翻译阶段 3 变为一个空格 |
+| `"a" "b"` 相邻字面量不合并 | 宏展开产生相邻字符串时解析失败 | 新增翻译阶段 6 合并（raw string 除外） |
 
 ## 9. 剩余风险
 
-- 宏展开能力沿用 C 端实现：`##`、`#` 和复杂条件宏会漏展开，测试框架文件解析失败。
+- 宏展开仍不是完整预处理器：`__VA_OPT__`、`#`/`##` 操作数先展开、
+  `#define` 内嵌 `#if` 的分支收集都有偏差；语料未覆盖的宏写法可能仍失败。
+- 预处理后解析耗时上升：测试框架宏真正展开后，单文件最大 4.3 s（原 3.4 s 快速失败）。
 - 模板只做声明解析，模板实例化后的成员访问可能落到占位类型。
 - 头文件只通过 include 内联，纯头文件项目不产生翻译单元。
 - 标准库占位没有行为，跨库数据流不成立。
