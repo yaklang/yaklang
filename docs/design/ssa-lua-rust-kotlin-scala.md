@@ -160,6 +160,7 @@
 - 支持属性声明 `val` / `var`、多变量声明、类型标注、默认参数。
 - 支持表达式：字面量、字符串、集合字面量、调用、成员访问、索引、二元/一元运算、`if`、`when`、`for`、`while`、`do while`、`return`、`break`、`continue`。
 - 支持 `when` 的主体条件、逗号条件、`else` 分支；`is` 类型条件按真值占位。
+- `.kts` 脚本使用独立入口 `ScriptFrontend`，复用同一套 `KotlinLexer.g4` / `KotlinParser.g4` 的 `script` 规则。
 
 ### 6.3 实测覆盖
 
@@ -177,7 +178,7 @@
 | `common/yak/kotlin/tests/code/modern2.kt` | Kotlin 2.x 风格：`data class`、`sealed interface`、尾随逗号 | PASS |
 | `common/yak/kotlin/tests/code/basic.kt` | 基础函数、循环、`when`、集合 | PASS |
 
-测试入口：`TestKotlinFrontendBasic`、`TestKotlinFrontendVersionSamples`、`TestKotlinProjectCompileBasic`、`TestKotlinCorpusCoverage`。
+测试入口：`TestKotlinFrontendBasic`、`TestKotlinFrontendVersionSamples`、`TestKotlinProjectCompileBasic`、`TestKotlinCorpusCoverage`、`TestAllSyntaxForKotlin_G4`。
 
 ### 6.4 SSA 降级边界
 
@@ -248,7 +249,7 @@ Scala 3 明显覆盖更多 Scala 2 代码，因此选择 Scala 3 语法作为唯
 | `common/yak/scala/tests/code/modern3.scala` | Scala 3：缩进语法、`enum`、`case class` | PASS |
 | `common/yak/scala/tests/code/basic.scala` | 基础对象、函数、循环 | PASS |
 
-测试入口：`TestScalaFrontendBasic`、`TestScalaFrontendVersionSamples`、`TestScalaProjectCompileBasic`、`TestScalaCorpusCoverage`。
+测试入口：`TestScalaFrontendBasic`、`TestScalaFrontendVersionSamples`、`TestScalaProjectCompileBasic`、`TestScalaCorpusCoverage`、`TestAllSyntaxForScala_G4`。
 
 ### 7.5 Scala 2 后续路径
 
@@ -329,3 +330,67 @@ go build -o /mnt/data/scan-outputs/feature-ssa-lua-rust-kotlin-scala/final/yak .
 - 新语言四个测试步骤全部通过。
 - `./common/yak/ssa/...` 和 `./common/yak/ssa/ssadb` 在 20 秒包超时处失败。
 - 失败包不属于本次修改范围，失败日志见 `final/full-suite.log`。
+
+## 11. 真实项目语料与 CI
+
+### 11.1 CI 语料入口
+
+四个语言都在 `tests/` 提供统一入口：
+
+```text
+common/yak/<lang>/tests/syntax_<lang>_test.go
+```
+
+`TestAllSyntaxFor<Lang>_G4` 遍历 `tests/code/` 中对应扩展名的夹具，逐个调用语言
+`Frontend`，默认单文件预算 10 秒；预算可通过
+`YAK_<LANG>_FIXTURE_PARSE_BUDGET_SEC` 覆盖。失败消息包含文件名、耗时和解析错误。
+Kotlin 的 `.kts` 夹具使用 `kotlin2ssa.ScriptFrontend`，`.kt` 使用
+`kotlin2ssa.Frontend`。
+
+`.github/workflows/syntax-g4-tests.yml` 的 matrix 已加入：
+
+```text
+./common/yak/lua/tests
+./common/yak/rust/tests
+./common/yak/kotlin/tests
+./common/yak/scala/tests
+```
+
+触发路径沿用现有的 `common/yak/**/*.g4`、`common/yak/**/parser/**`、
+`common/yak/**/code/**` 和 `common/yak/**/syntax_*.go`，不需要为新语言增加单独规则。
+
+### 11.2 真实项目结果
+
+扫描使用 `scripts/ssa-lang-corpus`，固定单文件预算 10 秒。项目源码不入库，结果在：
+
+```text
+/mnt/data/scan-outputs/feature-ssa-lua-rust-kotlin-scala/realworld/
+```
+
+| 语言 | 项目 | 文件 | 通过 | 失败 | 超时 | p50 | p95 | 总耗时 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Lua | plenary.nvim | 113 | 112 | 1 | 0 | 3.57ms | 38.1ms | 1.19s |
+| Lua | kong | 1311 | 1306 | 5 | 0 | 0.88ms | 37.3ms | 12.1s |
+| Rust | serde | 208 | 205 | 2 | 1 | 4.34ms | 1.92s | 1m10.6s |
+| Rust | ripgrep | 102 | 94 | 8 | 0 | 249ms | 2.60s | 1m20.4s |
+| Kotlin | okhttp | 620 | 620 | 0 | 0 | 86.9ms | 1.18s | 3m01s |
+| Kotlin | kotlinx.coroutines | 1082 | 1082 | 0 | 0 | 44.0ms | 587ms | 2m39s |
+| Scala | scalatra | 235 | 227 | 8 | 0 | 15.1ms | 336ms | 29.4s |
+| Scala | zio | 976 | 762 | 210 | 4 | 23.1ms | 1.21s | 6m45s |
+
+Kotlin 的两个语料全部通过，包含 `.kts` Gradle 脚本。Scala 的剩余失败集中在
+XML 字面量、宏展开和少数缩进边界；Rust 的剩余失败集中在 `let` 链、宏 token
+树和宏调用；Lua 的剩余失败包含 `goto`/长注释边界样本。解析预算没有放宽。
+
+### 11.3 性能口径
+
+真实项目总耗时包含 SLL 优先解析失败后的 LL 回退。Lua 和 Kotlin 的语料覆盖率
+提升后，部分文件开始进入完整解析路径，因此总耗时不能直接和修复前的失败短路
+路径比较。Scala zio 的回退文件最多，是本轮性能风险最高的语料。
+
+## 12. 后续工作
+
+- Scala 继续减少 SLL→LL 回退，优先处理 `for`/`if` 缩进和 XML 字面量。
+- Rust 处理 `let` 链、宏 token 树和 `union` 上下文关键字。
+- Lua 处理剩余长注释和 `goto` 边界样本。
+- Kotlin 已覆盖 `.kts`；后续如需解析 Gradle DSL 语义，再单独设计脚本 SSA 降级。
