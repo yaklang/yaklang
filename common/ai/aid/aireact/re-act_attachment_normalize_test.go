@@ -8,8 +8,68 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestInputPinsAttachedFilesAndDirectories(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "report.txt")
+	other := filepath.Join(dir, "other.yak")
+	require.NoError(t, os.WriteFile(file, []byte("report"), 0o600))
+	require.NoError(t, os.WriteFile(other, nil, 0o600))
+	type pin struct {
+		taskID string
+		kind   schema.EventType
+		path   string
+	}
+	var pins []pin
+	react := &ReAct{
+		config:    &aicommon.Config{Ctx: context.Background()},
+		taskQueue: NewTaskQueue("input-pins"),
+		Emitter: aicommon.NewEmitter("session", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+			switch e.Type {
+			case schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME, schema.EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY:
+				pins = append(pins, pin{e.TaskId, e.Type, e.GetContentJSONPath("$.path")})
+			}
+			return e, nil
+		}),
+	}
+	id, err := react.enqueueReTaskWithID(&ypb.AIInputEvent{
+		IsFreeInput: true, FreeInput: "inspect attachments", AttachedFilePath: []string{file},
+		AttachedResourceInfo: []*ypb.AttachedResourceInfo{
+			{Type: "file", Key: "file_path", Value: file},
+			{Type: "file", Key: "file_path", Value: dir}, // Yakit @folder
+			{Type: "file", Key: "directory_path", Value: dir},
+			{Type: "file", Key: "file_path", Value: filepath.Join(dir, "missing")},
+			{Type: "file", Key: "file_content", Value: other}, // literal, not a path
+			{Type: "code", Key: "file_path", Value: other},    // editor target, not an attachment pin
+		},
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []pin{
+		{id, schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME, file},
+		{id, schema.EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY, dir},
+	}, pins)
+
+	pins = nil
+	_, err = react.enqueueReTaskWithID(&ypb.AIInputEvent{IsFreeInput: true, FreeInput: "continue"})
+	require.NoError(t, err)
+	require.Empty(t, pins)
+
+	id, err = react.enqueueReTaskWithID(&ypb.AIInputEvent{
+		IsFreeInput: true, FreeInput: "use the workspace again",
+		AttachedResourceInfo: []*ypb.AttachedResourceInfo{
+			{Type: "file", Key: "directory_path", Value: dir},
+			{Type: "file_path", Value: file},
+		},
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []pin{
+		{id, schema.EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY, dir},
+		{id, schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME, file},
+	}, pins)
+}
 
 func TestNormalizeInputAttachmentsUnifiesFilePath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "reference.txt")
