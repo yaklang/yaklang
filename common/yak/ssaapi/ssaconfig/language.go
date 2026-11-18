@@ -23,6 +23,10 @@ const (
 	PYTHON  Language = "python"
 	CSHARP  Language = "csharp"
 	BASH    Language = "bash"
+	LUA     Language = "lua"
+	RUST    Language = "rust"
+	KOTLIN  Language = "kotlin"
+	SCALA   Language = "scala"
 	General Language = "general"
 )
 
@@ -48,6 +52,14 @@ func (l Language) GetFileExt() string {
 		return ".cs"
 	case BASH:
 		return ".sh"
+	case LUA:
+		return ".lua"
+	case RUST:
+		return ".rs"
+	case KOTLIN:
+		return ".kt"
+	case SCALA:
+		return ".scala"
 	default:
 		return ""
 	}
@@ -65,6 +77,10 @@ func GetAllSupportedLanguages() []string {
 		string(PYTHON),
 		string(CSHARP),
 		string(BASH),
+		string(LUA),
+		string(RUST),
+		string(KOTLIN),
+		string(SCALA),
 	}
 }
 
@@ -92,6 +108,14 @@ func ValidateLanguage(language string) (Language, error) {
 		return CSHARP, nil
 	case "bash", "sh", "shell":
 		return BASH, nil
+	case "lua":
+		return LUA, nil
+	case "rust", "rs":
+		return RUST, nil
+	case "kotlin", "kt", "kts":
+		return KOTLIN, nil
+	case "scala", "sc":
+		return SCALA, nil
 	case "general":
 		return General, nil
 	}

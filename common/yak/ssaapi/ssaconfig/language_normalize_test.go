@@ -29,7 +29,26 @@ func TestJSONConfigNormalizesLanguageAlias(t *testing.T) {
 	}
 }
 
+func TestJSONConfigNormalizesNewLanguageAliases(t *testing.T) {
+	tests := []struct {
+		alias string
+		want  Language
+	}{
+		{alias: "lua", want: LUA},
+		{alias: "rs", want: RUST},
+		{alias: "kT", want: KOTLIN},
+		{alias: "sc", want: SCALA},
+	}
+	for _, tt := range tests {
+		t.Run(tt.alias, func(t *testing.T) {
+			cfg, err := New(ModeAll, WithJsonRawConfig([]byte(`{"BaseInfo":{"language":"`+tt.alias+`"}}`)))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, cfg.GetLanguage())
+		})
+	}
+}
+
 func TestJSONConfigRejectsUnknownLanguage(t *testing.T) {
-	_, err := New(ModeAll, WithJsonRawConfig([]byte(`{"BaseInfo":{"language":"rust"}}`)))
+	_, err := New(ModeAll, WithJsonRawConfig([]byte(`{"BaseInfo":{"language":"cobol"}}`)))
 	require.Error(t, err)
 }
