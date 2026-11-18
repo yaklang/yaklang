@@ -12,8 +12,9 @@ Reify 是 Yaklang 的程序表示接入框架。它把文件格式、目标平�
 | 指令集 | `core.Architecture` | 一个 Parser 对应一种架构 |
 | 字节序 | `core.ByteOrder` | ByteReader 的读取模式 |
 | 指令操作 | `core.Opcode` | LowIR 指令的 Kind |
+| 产物语言 | `core.Language` | 语言层在 Loader 之后识别，见 [语言层](docs/language.md) |
 
-Loader 和 Parser 使用两条独立的分派路径。ELF、PE、Mach-O、COFF、ar 与 MZ 各自有独立 loader 包；十三种架构都有解码器。操作系统、ABI 和执行模式属于 Target，随请求传给 parser。
+Loader 和 Parser 使用两条独立的分派路径。ELF、PE、Mach-O、COFF、ar 与 MZ 各自有独立 loader 包；十三种架构都有解码器。操作系统、ABI 和执行模式属于 Target，随请求传给 parser。产物语言不参与这两条分派：语言层在 loader 完成后读取编译器元数据、恢复符号并按函数挂 ABI 覆盖，见 [语言层](docs/language.md)。
 
 ```text
 path ── os.File ── ByteReader ── Format ── Loader ── Artifact
@@ -53,6 +54,7 @@ common/yak/reify/
 ├── reify.go               # 统一 API：load、lift、pass options
 ├── loader/
 │   ├── catalog.go         # 全局 Catalog：注册、检测、打开、检查
+│   ├── language/          # 语言层：Go pclntab、Rust demangle、ABI 覆盖
 │   ├── fileformat/        # ELF、PE、Mach-O Loader
 │   │   └── elf/           # ELF Loader、符号与 BoundaryHints
 │   └── arch/              # 按 Architecture 注册的 Parser
@@ -64,7 +66,7 @@ common/yak/reify/
 │           ├── lift.go
 │           └── regs.go
 ├── cmd/reify/             # 命令行入口
-└── docs/                  # 架构、接口、LowIR、SSA 和命令文档
+└── docs/                  # 架构、接口、语言层、LowIR、SSA 和命令文档
 ```
 
 ## 快速使用
@@ -115,7 +117,7 @@ common/yak/reify/scripts/lift-all.sh -o /mnt/data/scan-outputs/reify-lift /bin/t
 
 脚本按 `1asm`、`2lowir`、`3ssair`、`4source` 顺序生成 `<name>.1asm.txt`、`<name>.2lowir.txt`、`<name>.3ssair.txt`、`<name>.4source.txt` 和 `version`。无 `-a/-s` 时输出到 `<output>/all`。`version` 记录版本、提交哈希和输入摘要。
 
-示例程序在 `test/examples/`：`hello.c` 是最小入口；`linked_list.c` 含结构体、成员访问、循环、条件、函数调用、malloc 和 free；`control_flow.c` 用 `classify` 与 `accumulate` 演示 if/else 与 for。
+示例程序在 `test/examples/`：`hello.c` 是最小入口；`linked_list.c` 含结构体、成员访问、循环、条件、函数调用、malloc 和 free；`control_flow.c` 用 `classify` 与 `accumulate` 演示 if/else 与 for。`go_hello.go`、`go_interface.go`、`rust_hello.rs`、`rust_trait.rs` 是语言层样例，构建命令写在文件头与 [test/examples/README.md](test/examples/README.md)。
 
 代码中的调用链：
 
