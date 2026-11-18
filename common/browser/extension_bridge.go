@@ -117,6 +117,7 @@ type extensionBridgePendingCall struct {
 
 type ExtensionBridgeConnection struct {
 	DeviceID          string                            `json:"deviceId"`
+	Reference         string                            `json:"reference,omitempty"`
 	InstallationID    string                            `json:"installationId"`
 	ManagedInstance   *ExtensionBridgeManagedInstance   `json:"managedInstance,omitempty"`
 	Client            string                            `json:"client"`
@@ -555,7 +556,8 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 		s.managedClients[deviceID] = &extensionBridgeConnectedClient{
 			connection: connection,
 			status: ExtensionBridgeConnection{
-				DeviceID: deviceID, InstallationID: hello.InstallationID, Client: hello.Client,
+				DeviceID: deviceID, Reference: formatExtensionBridgeReference(device.Reference),
+				InstallationID: hello.InstallationID, Client: hello.Client,
 				ManagedInstance: hello.ManagedInstance,
 				ClientVersion:   hello.Version, Capabilities: append([]string(nil), hello.Capabilities...),
 				CapabilityCatalog: hello.CapabilityCatalog,
