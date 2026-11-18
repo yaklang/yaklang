@@ -274,29 +274,33 @@ func ParseIncludePath(line string) (path string, system bool, ok bool) {
 }
 
 // DirectiveName returns the first token of a # directive line (e.g. "if", "define", "include").
+// Only the leading identifier run counts, so comments without separating
+// whitespace (`#endif// x`, `#endif/* x */`) and parenthesized conditions
+// (`#if(x)`) still yield the directive name.
 func DirectiveName(line string) string {
 	trimmed := trimDirectiveLine(line)
 	if trimmed == "" {
 		return ""
 	}
-	parts := splitDirectiveFields(trimmed)
-	if len(parts) == 0 {
-		return ""
+	i := 0
+	for i < len(trimmed) && isDirectiveNameByte(trimmed[i]) {
+		i++
 	}
-	return parts[0]
+	return trimmed[:i]
 }
 
-// DirectiveRest returns tokens after the directive name joined as a string.
+// DirectiveRest returns everything after the directive name.
 func DirectiveRest(line string) string {
 	trimmed := trimDirectiveLine(line)
-	if trimmed == "" {
+	name := DirectiveName(line)
+	if name == "" || len(name) >= len(trimmed) {
 		return ""
 	}
-	parts := splitDirectiveFields(trimmed)
-	if len(parts) <= 1 {
-		return ""
-	}
-	return joinDirectiveRest(trimmed, parts[0])
+	return trimSpace(trimmed[len(name):])
+}
+
+func isDirectiveNameByte(c byte) bool {
+	return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
 }
 
 func trimDirectiveLine(line string) string {
