@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/lua/lua2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/rust/rust2ssa"
+	"github.com/yaklang/yaklang/common/yak/scala/scala2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -36,6 +37,7 @@ var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.LUA:    lua2ssa.CreateBuilder,
 	ssaconfig.RUST:   rust2ssa.CreateBuilder,
 	ssaconfig.KOTLIN: kotlin2ssa.CreateBuilder,
+	ssaconfig.SCALA:  scala2ssa.CreateBuilder,
 }
 
 // ArchiveCodeSourceOpener opens a code source that is itself an archive.
