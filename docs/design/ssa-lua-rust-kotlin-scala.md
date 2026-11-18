@@ -370,15 +370,16 @@ Kotlin 的 `.kts` 夹具使用 `kotlin2ssa.ScriptFrontend`，`.kt` 使用
 | 语言 | 项目 | 文件 | 通过 | 失败 | 超时 | p50 | p95 | 总耗时 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Lua | plenary.nvim | 113 | 112 | 1 | 0 | 3.49ms | 40.2ms | 1.18s |
-| Lua | kong | 1311 | 1306 | 5 | 0 | 0.81ms | 40.0ms | 12.1s |
+| Lua | kong | 1310 | 1306 | 4 | 0 | 0.85ms | 34.1ms | 11.3s |
 | Rust | serde | 208 | 206 | 2 | 0 | 4.88ms | 1.55s | 1m02s |
 | Rust | ripgrep | 102 | 94 | 8 | 0 | 244ms | 2.66s | 1m21s |
 | Kotlin | okhttp | 620 | 620 | 0 | 0 | 66.9ms | 1.09s | 2m38s |
 | Kotlin | kotlinx.coroutines | 1082 | 1082 | 0 | 0 | 42.0ms | 534ms | 2m32s |
-| Scala | scalatra | 235 | 227 | 8 | 0 | 16.7ms | 493ms | 34.9s |
-| Scala | zio | 976 | 762 | 210 | 4 | 22.2ms | 1.03s | 6m29s |
+| Scala | scalatra | 235 | 226 | 8 | 1 | 19.1ms | 480ms | 44.5s |
+| Scala | zio | 976 | 763 | 210 | 3 | 22.5ms | 911ms | 5m27s |
 
-Kotlin 的两个语料全部通过，包含 `.kts` Gradle 脚本。Scala 的剩余失败集中在
+Lua kong 的 `spec/fixtures/invalid-module.lua` 是故意非法样本，已用
+`-exclude invalid-module.lua` 从统计中排除。Kotlin 的两个语料全部通过，包含 `.kts` Gradle 脚本。Scala 的剩余失败集中在
 XML 字面量、宏展开和少数缩进边界；Rust 的剩余失败集中在 `let` 链、宏 token
 树和宏调用；Lua 的剩余失败包含 `goto`/长注释边界样本。解析预算没有放宽。
 
@@ -386,7 +387,9 @@ XML 字面量、宏展开和少数缩进边界；Rust 的剩余失败集中在 `
 
 真实项目总耗时包含 SLL 优先解析失败后的 LL 回退。Lua 和 Kotlin 的语料覆盖率
 提升后，部分文件开始进入完整解析路径，因此总耗时不能直接和修复前的失败短路
-路径比较。Scala zio 的回退文件最多，是本轮性能风险最高的语料。
+路径比较。Scala `simpleExpr` 改成 primary + suffix 循环后，ServiceReloader
+从约 23 秒降到约 3.3 秒，zio 总耗时从 6m29s 降到 5m27s；Scalatra 仍有一个
+缩进边界样本超过 10 秒，是本轮剩余性能风险。
 
 ## 12. 后续工作
 
