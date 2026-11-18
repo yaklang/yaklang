@@ -75,7 +75,7 @@ Go 与 Rust 产物（容器仍是 ELF/PE/Mach-O）：
 "$OUT/bin/reify" lift --mode all --func _RNvCs4FrXkKnA8Dq_10rust_hello3add "$RUN/rust_hello"
 ```
 
-`inspect` 始终打印 `Language` 行。剥离符号的 Go 产物会显示 `Evidence [pclntab]`，Rust 产物会显示 demangle 后的函数名。样例构建命令见 [test/examples/README.md](../test/examples/README.md)。
+`inspect` 始终打印 `Language` 行。语言提供覆盖时还会输出 `ABI` 与 `Strings` 行；没有语言覆盖的产物不打印这两行，仍按平台约定处理。剥离符号的 Go 产物会显示 `Evidence [pclntab]`，Rust 产物会显示 demangle 后的函数名。样例构建命令见 [test/examples/README.md](../test/examples/README.md)。
 
 ## loaders 与 parsers
 
@@ -122,6 +122,8 @@ Compiler: go1.27.4-X:nodwarf5
 Evidence [buildinfo]: go1.27.4-X:nodwarf5
 Evidence [section]: .gopclntab
 Evidence [pclntab]: 1481 functions
+ABI: language override (9 argument registers, return rax, no callee-saved)
+Strings: go (pointer+length, utf-8, not nul-terminated)
 Object: ET_DYN
 Header entry: 0x2590
 SECTION       FILE OFFSET  FILE SIZE  VIRTUAL ADDRESS  MEMORY SIZE

@@ -2,164 +2,197 @@
 
 本文描述 `loader/language` 与它引入的 `core` 契约。签名以源码为准。
 
-## 为什么是第三层
+## 三条分派轴
 
 Rust 与 Go 的产物仍是 ELF、Mach-O 或 PE。容器没有变，变的是容器内部：
 
-| 内容 | C / C++ 产物 | Go 产物 | Rust 产物 |
+| 内容 | C 产物 | Go 产物 | Rust 产物 |
 | --- | --- | --- | --- |
 | 函数符号 | `.symtab`、`.dynsym` | `.symtab` 与 `.gopclntab` 并存；剥离后只剩 pclntab | `.symtab`，v0 或 legacy 编码 |
 | 运行时 | 由 libc 提供 | 自带调度器、GC、栈增长 | 自带 panic/unwind、分配器 |
-| 调用约定 | 平台 ABI | ABIInternal：`RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11` | 不保证稳定，简单标量接近平台 ABI |
-| 异常/展开 | `.eh_frame` / `.pdata` | 每个函数自带栈增长检查 | `.eh_frame` 加 panic 表 |
+| 调用约定 | 平台 ABI | ABIInternal 覆盖平台 ABI | 不保证稳定，简单标量接近平台 ABI |
+| 字符串 | 指针 + NUL 结尾 | 指针 + 长度，不保证 NUL | 指针 + 长度，UTF-8，不保证 NUL |
 | 动态分派 | 函数指针 | 接口调用读 itab | trait 对象调用读 vtable |
 
-因此 `Format` 与 `Architecture` 两条分派轴都不适合承载“语言”。语言层是独立的第三条轴：
+`Format` 与 `Architecture` 都不能承载“语言”。语言层是第三条轴，位于容器加载之后、指令解析之前：
 
 ```text
 path ── ByteReader ── Format ── Loader ── Artifact
                                             │
                                   language.Inspect（语言层）
                                             │  识别编译器
-                                            │  恢复符号
-                                            │  改写可读名
-                                            │  给函数挂 ABI 覆盖
+                                            │  恢复符号与可读名
+                                            │  给出平台 ABI 的语言覆盖
+                                            │  给出字符串表示模型
                                             ▼
                                   asm2lowir ── LowIR ── lowssa ── 伪源码
 ```
 
-`Loader` 仍然只认识容器，`Parser` 仍然只认识指令集。语言层不解析头部、不解码指令，也不注册新的 `Format` 或 `Architecture`。
+`Loader` 只认识容器，`Parser` 只认识指令集。语言层不解析头部、不解码指令，也不注册新的 `Format` 或 `Architecture`。
 
-## 接口
+每个原生产物都有语言。没有编译器证据时，默认语言是 `c`；它不增加任何覆盖，只表示“使用平台约定”。平台约定来自 `Architecture` 与 `OS` 的 profile：
+
+- 参数寄存器：SysV AMD64 为 `RDI, RSI, RDX, RCX, R8, R9`，Win64 为 `RCX, RDX, R8, R9`，AArch64 为 `X0..X7`。
+- 这些是平台约定，不是 C 独有属性。Go 与 Rust 可以覆盖它，覆盖范围按函数记录。
+
+## 插件接口
 
 定义：[core/language.go](../core/language.go)、[loader/language/language.go](../loader/language/language.go)。
 
 ```go
-type Detector interface {
-    Name() string
+type Language interface {
+    Kind() core.Language
     Detect(*core.Artifact) *core.LanguageReport
-}
-
-type SymbolRecoverer interface {
     Recover(*core.Artifact) ([]symbol.Symbol, error)
 }
-
-func Inspect(*core.Artifact) *core.LanguageReport
 ```
 
-`Inspect` 在 `Catalog.OpenAs` 校验 Artifact 之后调用，位置见 [loader/catalog.go](../loader/catalog.go)。调用发生在 `Image.SymbolsAt` 建立地址索引之前，因此新增符号不需要重建索引。
-
-检测结果写入 `Artifact.Language`：
+检测与恢复属于同一个所有者。拆成两个可独立注册的接口会产生“能识别但不能恢复”的标签，也会产生没有检测依据的恢复器。注册表按 `Kind()` 去重，每种语言一个实现：
 
 ```go
-type LanguageReport struct {
-    Language   Language      // unknown、c、go、rust
-    Confidence string        // certain、likely、none
-    Runtime    string        // 例如 go1.27.4 或 rustc version 1.97.1
-    Evidence   []LanguageEvidence
-    Registers  *RegisterModel // 仅当语言 ABI 已建模
-    Notes      []string       // 未能恢复的能力
-}
+var languages = []Language{c.C{}, golang.Golang{}, rust.Rust{}}
 ```
 
-置信度只有两级。`certain` 表示找到编译器拥有的结构：pclntab、buildinfo、可解码的 Rust 符号。`likely` 表示只有弱证据：`.comment` 里的 rustc 版本。`unknown` 表示没有证据，**不等于 C**。
+C 层始终以最低置信度命中，因此 `Inspect` 一定返回一个语言；未知的 kind 也回退到 C 层。置信度排序为 certain > likely > none。
+
+`Inspect` 在 `Catalog.OpenAs` 校验 Artifact 之后调用，位置见 [loader/catalog.go](../loader/catalog.go)。它先选置信度最高的检测结果，再调用该层的 `Recover`：
+
+- Go：`debug/buildinfo` 读版本；按 `.gopclntab`、`<segment>,__gopclntab` 定位函数表，PE 与外部链接场景回退 `.rdata`、`.data.rel.ro`；用 `debug/gosym` 恢复名字、入口和大小。剥离 `.symtab` 后仍可用。
+- Rust：识别 v0（`_R`）与 legacy（`_ZN...17h...E`）；`Recover` 把符号表里的编码名改写为可读名，原始名保留在 `Symbol.Mangled`。剥离符号表的 Rust 产物没有名字可恢复，只保留 `.comment` 证据。
+
+`Recover` 返回的符号按 `(名字, 地址)` 合并：
+
+- 同地址、同编码名或同展示名：改写展示名、来源与约定，保留容器给出的精确大小。
+- 其他情况：追加。同名不同地址的函数是两个函数体，不合并。
+
+一个 Go 镜像可以链接 Rust 代码。`Inspect` 在检测语言之外仍运行 Rust 命名，给这类符号可读名；这不改变检测出的语言，也不把 Rust ABI 应用到 Go 函数。
 
 ## 符号模型
 
-`core/symbol.Symbol` 增加两个字段：
+`core/symbol.Symbol`：
 
 ```go
 type Symbol struct {
-    Name     string // 展示名，例如 main.Add、rust_hello::add
-    Mangled  string // 原始名，例如 _RNvCs4FrXkKnA8Dq_10rust_hello3add
-    Address  uint64
-    Size     uint64
-    Kind     SymbolKind
-    Imported bool
-    Library  string
-    Source   string // pclntab、rust-demangle；空表示容器符号表
+    Name       string     // 展示名，例如 main.Add、rust_hello::add
+    Mangled    string     // 原始名，例如 _RNvCs4FrXkKnA8Dq_10rust_hello3add
+    Address    uint64
+    Size       uint64
+    Kind       SymbolKind
+    Imported   bool
+    Library    string
+    Source     string     // pclntab、rust-demangle；空表示容器符号表
+    Convention Convention // 空表示语言约定；platform 表示保留平台约定
 }
 ```
 
 - `Image.SymbolByName` 同时匹配 `Name` 与 `Mangled`，所以 `--func` 可用任一形式。
-- VM 索引与展示名在冲突时加地址后缀。demangle 会省略 crate hash，两个单态化函数可能得到同一展示名；`normalizeRustSymbols` 检测到冲突后写成 `name@0xADDRESS`，不会把两个函数合并成一个 SSA 函数。
-- `MergeSymbols` 只在地址上没有命名函数时追加 pclntab 符号。`.symtab` 已给出名字时保留其大小，只补 `Source=pclntab` 作为来源标记。
+- Rust 的 demangle 会省略 crate hash。展示名冲突时写成 `name@0xADDRESS`，不会把两个单态化合并成一个 SSA 函数。
+- `Convention` 让 `asm2lowir` 不必认识具体语言：它只检查语言是否提供覆盖，以及该函数是否被标记为 `platform`。
 
-## 函数级 ABI
+## ABI：平台默认与语言覆盖
 
-`core.Function` 增加一个可选覆盖：
+默认调用约定属于平台，不属于 C 层。SysV/Win64/AArch64 的参数寄存器、栈方向与 callee-save 集合由 `Architecture` 与 `OS` 的 profile 给出；C 代码和手写汇编都遵循它。C 语言层因此不提供 `ABI`，只提供默认标签和字符串模型。Rust/Go 只覆盖自己恢复出的函数，不改变同一地址空间里的其他函数。
+
+这样分层的原因是：把 ABI 放进 C 层会让非 C 语言的镜像丢失平台约定，也会让汇编函数随检测结果变化。放在架构 profile、由语言按函数覆盖，就不会出现这两种问题。
+
+`LanguageReport.ABI` 是语言对平台约定的覆盖，不是完整模型：
 
 ```go
-type Function struct {
-    // ...
-    Facts *ArchFacts `json:"facts,omitempty"`
+type ABI struct {
+    Registers    RegisterModel // 参数与返回寄存器
+    NoCalleeSave bool          // 该语言没有普通 callee-save 寄存器
 }
-
-func (ir *LowIR) FactsFor(function Function) ArchFacts
 ```
 
-`asm2lowir` 只对同时满足以下条件的函数设置 `Facts`：
+`schema` 不变的平台字段（栈方向、帧指针、寄存器命名与位宽）继续来自架构 profile。语言只覆盖它确实不同的部分。
 
-1. 检测语言是 Go；
-2. Go 版本与架构支持寄存器 ABI（amd64 ≥ 1.17，arm64 ≥ 1.18）；
-3. 该地址上有 `Source=pclntab` 且不是 `.abi0` 的符号。
+`asm2lowir` 把覆盖写成每函数的 `Function.Facts`，条件是：
 
-同一个进程里并存 cgo、汇编与 ABI0 函数，它们必须继续使用平台 ABI，因此不能用整份 Artifact 的字段覆盖。`lowir2ssa` 按函数读取 `FactsFor`，`lowirtext` 用一行 `function-facts: {json}` 保留该覆盖，缺省时回退到架构默认值。
+1. 检测语言提供了 `ABI`（C 默认层没有）；
+2. 该地址上有语言恢复出的函数符号（`Source` 非空）；
+3. 该符号没有被标记为 `ConventionPlatform`。
 
-Go ABIInternal 还取消普通整型 callee-save 寄存器。`Facts.Frame.CalleeSaved` 只保留帧指针，避免把 `RBX` 当作被调用者保存。
+Go 插件对 amd64 Go 1.17+、arm64 Go 1.18+ 给出 ABIInternal 覆盖：整数参数寄存器为 `RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11`（arm64 为 `X0..X15`），返回 `RAX`/`X0`，普通整型无 callee-save 寄存器，帧指针仍按自己的约定恢复。`.abi0` 包装函数标记为 `platform`；cgo 与汇编函数不在 pclntab 中，保持平台约定。
 
-## 复用了什么，新写了什么
+`lowir2ssa` 按函数读取 `FactsFor`，`lowirtext` 用 `function-facts: {json}` 保留该覆盖。同一进程内的 cgo、汇编与 ABI0 函数因此不会被错误地换成 Go 约定。
 
-复用：
+本文只描述模型。浮点、聚合参数与多返回值未建模：`Registers.Return` 只记录一个整数返回值。
 
-| 能力 | 现状 |
+## 字符串模型
+
+`LanguageReport.Strings` 记录语言的字符串表示：
+
+```go
+type StringModel struct {
+    Kind          string // c、go、rust
+    Encoding      string // utf-8、bytes
+    Header        string // pointer+length；C 为 pointer
+    NulTerminated bool
+}
+```
+
+| 语言 | 值布局 | 终止 | 备注 |
+| --- | --- | --- | --- |
+| C（平台默认） | 指针 | NUL | `strlen` 决定长度 |
+| Go | 指针 + 长度 | 否 | `reflect.StringHeader`；字节不保证合法 UTF-8 |
+| Rust | 指针 + 长度 | 否 | `&str` 保证 UTF-8；`String` 额外带容量 |
+
+语言层只报告模型，不重建字符串值。重建需要追踪描述符的赋值与调用点，属于数据流分析，当前不做；报告里会写明这条限制。消费者不应把 Go 或 Rust 的指针当作 C 字符串读取。
+
+## 包结构
+
+语言层按语言分包，公共机制留在父包：
+
+| 路径 | 职责 |
 | --- | --- |
-| ELF / PE / Mach-O 节、入口、`.eh_frame`、`LC_FUNCTION_STARTS`、`.pdata` | 已有 loader，不改 |
-| 函数边界发现 | 已有 `BoundaryDiscoverer`；pclntab 符号直接进入符号表即可 |
-| 指令解码与 lift | 已有 amd64 / arm64 parser，不改 |
-| 调用目标命名 | 已有 `annotateSymbols`，自动使用 demangle 后的名字 |
+| `loader/language` | `Language` 契约、注册表、`Inspect`、符号合并与消歧 |
+| `loader/language/c` | 默认层：C 标签、C 字符串模型、无 ABI 覆盖 |
+| `loader/language/golang` | Go 检测、pclntab 恢复、goFuncSize、ABI 与字符串模型 |
+| `loader/language/rust` | Rust 检测、v0/legacy 解码器、恢复、字符串模型 |
 
-新写：
+语言包都只依赖 `core` 与 `core/symbol`，父包按 `Kind()` 组装注册表。Go 的 pclntab 解析使用标准库 `debug/gosym`。
 
-| 能力 | 位置 |
-| --- | --- |
-| 语言识别与证据收集 | `loader/language/language.go` |
-| Go pclntab 定位与函数恢复 | `loader/language/go.go` |
-| pclntab 尾部对齐填充剥离 | `loader/language/go.go`，`goFuncSize` |
-| Go buildinfo 版本 | 标准库 `debug/buildinfo`，无新依赖 |
-| Go ABIInternal 寄存器模型 | `loader/language/go.go` |
-| Rust 符号识别与 demangle | `loader/language/rust.go`，依赖 `github.com/ianlancetaylor/demangle` |
-| 原始名/展示名双字段 | `core/symbol`、`core/image.go` |
-| 函数级 ABI 覆盖 | `core/lowir.go`、`core/asm2lowir`、`core/lowir2ssa`、`core/lowirtext` |
+## Rust 解码器
 
-pclntab 解析直接使用标准库 `debug/gosym`：`NewLineTable` 识别 Go 1.2 / 1.16 / 1.18 / 1.20+ 四种格式，`NewTable(nil, lineTable)` 从 funcnametab 取名字。新写的部分只有定位与校验：
+`loader/language/rust` 自带解码器，不引入模块依赖，也不复制第三方实现。入口是 `Demangle`，只接受通过 `IsMangled` 检查的名字。
 
-- 优先按节名 `.gopclntab`、`<segment>,__gopclntab`；
-- PE 与外部链接场景回退到 `.rdata`、`.data.rel.ro`，按魔数扫描；
-- 校验 `nfunc` 上界、每个 `Entry/End` 落在可执行节内，任一失败即拒绝，不把错误表当作有效结果。
+v0（RFC 2603）支持：
 
-Rust demangle 使用纯 Go 实现，不调用外部 `rustfilt` 或 `c++filt`。依赖在 `go.mod` 中固定版本。
+- 路径：crate、实现（`M`/`X`/`Y`）、嵌套路径（`N`，含闭包与 shim 命名空间）、泛型实例（`I`）、反向引用（`B`）。
+- 标识符：可选消歧数、长度前缀、punycode 变体；空标识符按 rustc 的规则读作单个 `0`。
+- 泛型参数：类型、生命周期（含 `G` binder）、常量。
+- 类型：基本类型、数组与切片、元组、引用与裸指针、函数签名（含 `unsafe` 与 ABI）、`dyn` trait 与关联类型绑定。
+- 常量：整数、布尔、字符、字符串字面量、引用、数组、元组、结构体值与占位符。
+- 符号尾部：实例化 crate 与 `.llvm.<hash>` 后缀。
 
-pclntab 只记录下一个函数入口，不记录精确大小。`goFuncSize` 在函数尾部最多回退 64 字节，剥掉 x86 的 `int3`/`nop` 填充与 arm64 的 `nop`/零字填充，得到函数体长度。实测三个平台都与反汇编一致：
+legacy 支持 `_ZN...17h<hash>E`，包含 `$...$` 转义；hash 必须有 16 个十六进制字符且至少 5 个不同数字，否则视为 C++ 名字。
+
+限制：
+
+- 解码上限：输入 64 KiB、输出 64 KiB、反向引用深度 64、解析步数 1M。
+- 任何语法错误都会保留编码名，并在报告里计数；不会猜测。
+- 不打印 crate 的 hash 后缀；常量表达式按 rustc 的语法打印，但不保证与 rustc 的括号形式逐字一致。
+
+验证：`rust_hello` 的 583 个 Rust 符号全部解码；可选测试 `TestRealBinaryCorpus` 用 `REIFY_RUST_CORPUS=<elf>` 对任意 Rust 二进制统计解码率。
 
 ## 能力边界
 
-已实测（2026-11-18，命令与输出见下节）：
+已实测（2026-11-18）：
 
 | 场景 | 状态 |
 | --- | --- |
 | Go 未剥离，ELF / PE / Mach-O | 识别、恢复、lift 通过 |
 | Go 剥离（`-s -w`），ELF / PE / Mach-O | 识别、恢复、lift 通过；名字来自 pclntab |
-| Rust v0 未剥离 | 识别、demangle、lift 通过；可直接调用被 demangle 的 `rust_hello::add` |
+| Rust v0 未剥离 | 识别、demangle、lift 通过；可用展示名或编码名选函数 |
 | Rust legacy（`_ZN...17h...E`） | demangle 单元测试通过 |
 | Go 接口调用 | 不解析 itab，调用目标保持间接调用 |
 | Rust trait 对象调用 | 不解析 vtable，调用目标保持间接调用 |
 | Go goroutine、栈增长、defer/recover、GC 写屏障 | 不重建 |
 | Go 多返回值、浮点与聚合参数 | 未建模；`Return` 只有 `RAX`/`X0` |
-| Go ABI0、cgo、跨 ABI 调用 | 不建模；这些函数保留平台 ABI |
+| Go ABI0、cgo、跨 ABI 调用 | 保留平台约定 |
 | 剥离的 Rust 产物 | 无法恢复函数名；实测 `rust (likely)`，只有 `.comment` 版本证据 |
 | Go 函数精确大小 | pclntab 只给到下一个入口；尾部填充剥离后与代码体一致，超过 64 字节的填充不剥离 |
-| Rust panic/unwind 控制流 | 不重建，异常边不进入 CFG |
+| 字符串值重建 | 未实现；只报告表示模型 |
 
 Go 接口调用的实测形态（`main.total`，`go_interface.go`）：
 
@@ -207,11 +240,24 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | --- | --- |
 | `TestGoBinariesIdentifyRecoverAndLift` | linux/amd64 未剥离与剥离、windows/amd64、darwin/arm64；识别、pclntab 恢复、lift、函数级 ABI |
 | `TestRustBinaryIdentifyDemangleAndLift` | v0 demangle、展示名与编码名都能选函数、直接调用目标可读 |
-| `TestRustDemangle` | v0、legacy、Mach-O 前导下划线、非 Rust 名字拒绝 |
-| `TestLanguageUnknownAndMalformedMetadata` | 未知输入保持 unknown；截断与超大计数被拒绝 |
+| `TestDemangleV0AndLegacy` | v0、legacy、Mach-O 前导下划线、`.llvm` 后缀 |
+| `TestV0RealForms` | 空标识符、嵌套闭包与消歧数、`K` 命名空间、闭包作泛型实参 |
+| `TestDemangleRejectsNonRustNames` | C++ 与畸形名字被拒绝 |
+| `TestMalformedInputDoesNotPanic` | 任意截断输入返回错误，不 panic |
+| `TestExpandPunycode` | RFC 3492 示例与非法输入 |
+| `TestRealBinaryCorpus` | 可选；`REIFY_RUST_CORPUS` 指向 ELF 时要求 ≥98% 解码率 |
+| `TestDetectAndRecover` | Rust 检测、字符串模型、恢复的 Name/Mangled/Source/Size |
+| `TestCommentOnlyIsLikelyAndRecoversNothing` | 只有 `.comment` 时为 likely，不伪造名字 |
+| `TestVersionAndABI` | Go 版本解析、寄存器模型、无 callee-save、字符串模型 |
+| `TestPclntabRejectsUnboundedCount` | 超大函数计数被拒绝 |
+| `TestFuncSizeTrimsOnlyAlignmentFill` | 只剥尾部填充；整段填充至少保留 1 字节；未知架构不动 |
+| `TestCDefaultAndMalformedMetadata` | 无编译器证据时为 C/none；坏 pclntab 回退 C 并保留失败说明 |
 | `TestRustNamesKeepIdentityAndRebuildIndex` | 展示名冲突消歧、原名可查、重复 Inspect 幂等 |
+| `TestMergeGoSymbolsKeepsExactSizeAndProvenance` | 容器精确大小保留，来源改写为 pclntab |
+| `TestMergeKeepsSameNameAtDifferentAddresses` | 同名不同地址的函数体不被合并 |
+| `TestMergeRenamesEncodedSymbolInPlace` | Rust 改名不新增重复符号 |
 | `TestLanguageNamesAndFunctionFactsRoundTrip` | 含逗号/箭头/空格的 Rust 名与函数级 ABI 的文本往返 |
-| `TestLanguageFactsArePerFunction` | Go ABI 不落到 C 函数、ABI0 函数或未标记地址 |
-| `TestGoFuncSizeTrimsOnlyAlignmentFill` | 只剥尾部填充；整段填充至少保留 1 字节；未知架构不动 |
+| `TestLanguageFactsArePerFunction` | 语言 ABI 不落到 cgo、平台约定或未标记地址 |
+| `TestVersionAndABI` / `TestFuncSizeTrimsOnlyAlignmentFill` / `TestPclntabRejectsUnboundedCount` | Go 版本、ABI、填充剥离与坏表拒绝 |
 
-`FuzzGoPCLNTab` 对 pclntab 头部做模糊测试，要求不 panic。
+`FuzzPCLNTab` 对 pclntab 头部做模糊测试，要求不 panic。

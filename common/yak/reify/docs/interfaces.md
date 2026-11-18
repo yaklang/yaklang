@@ -129,7 +129,7 @@ type Image struct {
 
 `Symbol` 记录名称、地址、大小、种类、是否导入和来源库。ELF loader 从 `.dynsym`、`.symtab` 和重定位表填充；PLT 与 GOT 地址都映射到导入符号名。PE loader 从导出表、导入表与 `.pdata` 填充，Mach-O loader 从符号表、导入符号与 `LC_FUNCTION_STARTS` 填充。
 
-`Symbol` 另有 `Mangled` 与 `Source` 两个字段，由语言层写入：`Name` 是展示名，`Mangled` 是编译器原始名，`Source` 记录来源（`pclntab`、`rust-demangle`，空表示容器符号表）。`SymbolByName` 同时匹配两种名字。详见[语言层](language.md)。
+`Symbol` 另有 `Mangled`、`Source` 与 `Convention` 三个字段，由语言层写入：`Name` 是展示名，`Mangled` 是编译器原始名，`Source` 记录来源（`pclntab`、`rust-demangle`，空表示容器符号表）。`Convention` 为空表示按语言约定；`platform` 表示该函数保留平台约定，例如 Go 的 `.abi0` 包装。`SymbolByName` 同时匹配两种名字。详见[语言层](language.md)。
 
 Section 的 `FileSize == 0` 表示零填充。`Flags` 保留格式原义，不做跨格式归一化。
 
@@ -226,25 +226,29 @@ type Disassembly struct {
 语言层是 `Format` 与 `Architecture` 之外的第三条分派轴。它不注册新的 loader 或 parser，在 `Catalog.OpenAs` 完成容器加载与校验之后运行，把结果写入 `Artifact.Language`。
 
 ```go
-type Detector interface {
-    Name() string
+type Language interface {
+    Kind() core.Language
     Detect(*core.Artifact) *core.LanguageReport
-}
-
-type SymbolRecoverer interface {
     Recover(*core.Artifact) ([]symbol.Symbol, error)
 }
 
 func Inspect(*core.Artifact) *core.LanguageReport
 ```
 
-当前实现识别 Go 与 Rust：
+检测与恢复属于同一个实现。注册表按 `Kind()` 去重，每种语言一个包：
 
+- 语言实现按包拆分：`loader/language/c`、`loader/language/golang`、`loader/language/rust`，父包只保留契约与合并逻辑。
+- C 是默认层：没有编译器证据时返回 `c`/`none`，不增加 ABI 或符号；未知 kind 也回退到它。
 - Go：`debug/buildinfo` 读版本，按 `.gopclntab` 节名或 pclntab 魔数定位函数表，用 `debug/gosym` 恢复名字、入口和大小。剥离 `.symtab` 后仍可用。
-- Rust：识别 v0（`_R`）与 legacy（`_ZN...17h...E`）编码，用纯 Go demangler 改写 `Name`，保留 `Mangled`。
-- 未知容器只得到 `LanguageUnknown`，不推断为 C。
+- Rust：识别 v0（`_R`）与 legacy（`_ZN...17h...E`）编码，把编码名恢复为可读名，原始名保留在 `Mangled`。demangler 位于 `loader/language/rust`，是仓库内的实现，不是模块依赖。
+- 无编译器证据的产物得到 `c`/`none`；平台调用约定仍来自架构 profile，C 层不覆盖它。
 
-`LanguageReport.Registers` 只在版本与架构支持时给出 Go ABIInternal 模型。该模型按函数挂到 `Function.Facts`，不覆盖整份 Artifact；cgo、汇编与 ABI0 函数继续使用平台 ABI。
+`LanguageReport` 里的两个模型都是覆盖或说明，不是完整约定：
+
+- `ABI`：语言对平台调用约定的覆盖（参数寄存器、返回寄存器、是否有 callee-save）。只有语言恢复且未标记 `ConventionPlatform` 的函数会拿到 `Function.Facts`；cgo、汇编与 ABI0 函数继续使用平台 ABI。
+- `Strings`：字符串表示（C 为指针 + NUL；Go 与 Rust 为指针 + 长度，不保证 NUL）。只报告模型，不重建值。
+
+`Inspect` 按 `(名字, 地址)` 合并恢复结果：同地址改写展示名和来源，同名不同地址保持为两个函数。一个 Go 镜像里的 Rust 符号也会被命名，但不改变检测语言与 ABI。
 
 `Inspect` 必须早于 `Image.SymbolsAt` 的首次调用，因为它会替换符号表并使地址索引失效。`Catalog.OpenAs` 已保证这个顺序。
 
@@ -256,7 +260,7 @@ func Inspect(*core.Artifact) *core.LanguageReport
 
 LowIR 是具体结构，不是接口。`ParseResult.IR` 是指向 `core.LowIR` 的指针。LowIR 包含 `Functions`；每个 Function 包含 `Blocks`；每个 Block 包含 `Instructions`。直接调用 `Parser.Parse` 时，nil 表示解析器没有产出表示；`asm2lowir.Parse` 要求结果非 nil、至少一个 Function，且 Target 与 Artifact 一致。
 
-`Function.Facts` 是可选的语言 ABI 覆盖。`LowIR.FactsFor(function)` 在覆盖存在时返回它，否则返回架构默认值。当前只有 Go pclntab 函数会带上 `Facts`。
+`Function.Facts` 是可选的语言 ABI 覆盖。`LowIR.FactsFor(function)` 在覆盖存在时返回它，否则返回架构默认值。只有语言层恢复并标记为语言约定的函数会带上 `Facts`。
 
 详细约束见 [LowIR 文档](lowir.md)。
 

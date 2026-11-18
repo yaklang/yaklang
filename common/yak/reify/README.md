@@ -40,6 +40,7 @@ common/yak/reify/
 │   ├── target.go          # Target
 │   ├── reader.go          # ByteReader（按字节序读取，边界受限）
 │   ├── image.go           # Image、Section
+│   ├── language.go        # LanguageReport、ABI、StringModel
 │   ├── symbol.go          # Symbol、SymbolAt
 │   ├── artifact.go        # Artifact、Region
 │   ├── loader.go          # Loader 接口与 CheckResult
@@ -54,7 +55,10 @@ common/yak/reify/
 ├── reify.go               # 统一 API：load、lift、pass options
 ├── loader/
 │   ├── catalog.go         # 全局 Catalog：注册、检测、打开、检查
-│   ├── language/          # 语言层：Go pclntab、Rust demangle、ABI 覆盖
+│   ├── language/          # 语言层：契约、注册表、符号合并
+│   │   ├── c/             # 默认层：C 标签与 NUL 字符串，无 ABI 覆盖
+│   │   ├── golang/        # Go pclntab 恢复、ABI 与字符串模型
+│   │   └── rust/          # Rust v0/legacy 解码器、恢复与字符串模型
 │   ├── fileformat/        # ELF、PE、Mach-O Loader
 │   │   └── elf/           # ELF Loader、符号与 BoundaryHints
 │   └── arch/              # 按 Architecture 注册的 Parser

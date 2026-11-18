@@ -1,4 +1,4 @@
-package language
+package golang
 
 import (
 	"bytes"
@@ -17,12 +17,12 @@ import (
 // section. Large or malformed tables leave the container usable with a note.
 const maxMetadataSize = 64 << 20
 
-type goDetector struct{}
+type Golang struct{}
 
-func (goDetector) Name() string { return "go" }
+func (Golang) Kind() core.Language { return core.LanguageGo }
 
-func (goDetector) Detect(a *core.Artifact) *core.LanguageReport {
-	r := &core.LanguageReport{Language: core.LanguageGo, Confidence: core.ConfidenceLikely}
+func (Golang) Detect(a *core.Artifact) *core.LanguageReport {
+	r := &core.LanguageReport{Language: core.LanguageGo, Confidence: core.ConfidenceLikely, Strings: goStrings()}
 	if a.Reader != nil {
 		if info, err := buildinfo.Read(a.Reader); err == nil {
 			r.Runtime = info.GoVersion
@@ -43,13 +43,30 @@ func (goDetector) Detect(a *core.Artifact) *core.LanguageReport {
 	minor := goMinor(r.Runtime)
 	if a.Target.Architecture == core.ArchAMD64 && minor >= 17 ||
 		a.Target.Architecture == core.ArchARM64 && minor >= 18 {
-		r.Registers = goRegisters(a.Target)
+		r.ABI = goABI(a.Target)
 	}
 	r.Notes = []string{
 		"Go interface dispatch, goroutine scheduling, stack growth, defer/recover and GC semantics are not reconstructed",
 		"only scalar integer ABIInternal registers are modelled; ABI0, cross-ABI calls, floats, aggregates and multiple results are not modelled",
 	}
 	return r
+}
+
+// goABI returns the ABIInternal override. ABIInternal passes integers in
+// registers chosen by Go, not by the platform convention, and keeps no ordinary
+// callee-saved integer registers.
+func goABI(target core.Target) *core.ABI {
+	registers := goRegisters(target)
+	if registers == nil {
+		return nil
+	}
+	return &core.ABI{Registers: *registers, NoCalleeSave: true}
+}
+
+// goStrings reports the Go string header. A string is a pointer and a length;
+// the bytes are not NUL terminated, so C string rules do not apply.
+func goStrings() *core.StringModel {
+	return &core.StringModel{Kind: core.StringGo, Encoding: "utf-8", Header: "pointer+length", NulTerminated: false}
 }
 
 func goMinor(version string) int {
@@ -84,13 +101,16 @@ func goRegisters(target core.Target) *core.RegisterModel {
 	}
 }
 
-type goSymbols struct{}
-
 func isGoTableSection(name string) bool {
 	return name == ".gopclntab" || name == ".data.rel.ro.gopclntab" || strings.HasSuffix(name, ",__gopclntab")
 }
 
-func (goSymbols) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
+// RecoveryEvidence reports the size of the recovered function table.
+func (Golang) RecoveryEvidence(count int) core.LanguageEvidence {
+	return core.LanguageEvidence{Source: symbol.SourcePCLNTab, Detail: fmt.Sprintf("%d functions", count)}
+}
+
+func (Golang) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 	if a.Reader == nil {
 		return nil, fmt.Errorf("no reader for Go metadata")
 	}
@@ -204,8 +224,14 @@ func parseGoTable(a *core.Artifact, data []byte, magic uint32, order binary.Byte
 		if f.Sym == nil || f.Name == "" || f.End <= f.Entry || !executableRange(a, f.Entry, f.End-f.Entry) || bytes.IndexByte([]byte(f.Name), 0) >= 0 {
 			return nil, fmt.Errorf("invalid pclntab function at 0x%x", f.Entry)
 		}
+		convention := symbol.Convention("")
+		if strings.HasSuffix(f.Name, ".abi0") {
+			// ABI0 wrappers use the platform convention even though pclntab
+			// names them. Leave them out of the language ABI override.
+			convention = symbol.ConventionPlatform
+		}
 		symbols = append(symbols, symbol.Symbol{Name: f.Name, Address: f.Entry, Size: goFuncSize(a, f.Entry, f.End-f.Entry, a.Target.Architecture),
-			Kind: symbol.SymbolFunction, Source: symbol.SourcePCLNTab})
+			Kind: symbol.SymbolFunction, Source: symbol.SourcePCLNTab, Convention: convention})
 	}
 	return symbols, nil
 }

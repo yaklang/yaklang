@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -194,35 +193,33 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 	return result, nil
 }
 
-// languageFacts returns the per-function override a compiler layer supplies. A
-// Go pclntab function uses the Go register ABI; the same address space also holds
-// cgo and assembly functions that use the C ABI, so the override is per function.
+// languageFacts returns the per-function override a compiler layer supplies.
+// The override applies only to a function the layer recovered and did not mark
+// as platform convention: one address space holds cgo, assembly and ABI0
+// functions that keep the platform ABI even inside a Go image.
 func languageFacts(artifact *core.Artifact, boundary core.FunctionBoundary, ir *core.LowIR) *core.ArchFacts {
-	if artifact == nil || artifact.Language == nil || artifact.Language.Registers == nil {
+	if artifact == nil || artifact.Language == nil || artifact.Language.ABI == nil || artifact.Image == nil {
 		return nil
 	}
-	if artifact.Language.Language != core.LanguageGo {
-		return nil
-	}
-	if artifact.Image == nil {
-		return nil
-	}
-	goFunction := false
+	applies := false
 	for _, entry := range artifact.Image.SymbolsAt(boundary.Address) {
-		if entry.Source == sym.SourcePCLNTab && entry.Kind == sym.SymbolFunction && !strings.HasSuffix(entry.Name, ".abi0") {
-			goFunction = true
+		if entry.Imported || entry.Kind != sym.SymbolFunction || entry.Source == "" || entry.Convention == sym.ConventionPlatform {
+			continue
 		}
+		applies = true
 	}
-	if !goFunction {
+	if !applies {
 		return nil
 	}
 	facts := ir.Facts()
-	facts.Registers = *artifact.Language.Registers
-	// ABIInternal has no ordinary callee-save integer registers. The frame
-	// pointer is still restored by the prologue/epilogue convention.
-	facts.Frame.CalleeSaved = nil
-	if facts.Frame.FramePointer != "" {
-		facts.Frame.CalleeSaved = []string{facts.Frame.FramePointer}
+	facts.Registers = artifact.Language.ABI.Registers
+	if artifact.Language.ABI.NoCalleeSave {
+		// The language ABI keeps no ordinary callee-save integer registers. The
+		// frame pointer is still restored by its own prologue/epilogue rule.
+		facts.Frame.CalleeSaved = nil
+		if facts.Frame.FramePointer != "" {
+			facts.Frame.CalleeSaved = []string{facts.Frame.FramePointer}
+		}
 	}
 	return &facts
 }
