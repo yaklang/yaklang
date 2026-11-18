@@ -87,6 +87,10 @@ func (v *BaseScalaParserVisitor) VisitImportSelectors(ctx *ImportSelectorsContex
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseScalaParserVisitor) VisitImportSelector(ctx *ImportSelectorContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseScalaParserVisitor) VisitSimpleRef(ctx *SimpleRefContext) interface{} {
 	return v.VisitChildren(ctx)
 }

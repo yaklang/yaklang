@@ -100,7 +100,7 @@ FloatingPointLiteral
 // -----------------------------------------------------------------------
 
 CharacterLiteral
-    : '\'' (PrintableChar | CharEscapeSeq) '\''
+    : '\'' (PrintableChar | CharEscapeSeq | UnicodeEscape) '\''
     ;
 
 // -----------------------------------------------------------------------
