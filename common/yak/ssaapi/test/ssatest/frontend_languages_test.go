@@ -9,8 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// TestFrontendLuaRustKotlinScalaCompile covers the SSA lowering of the four
-// added frontends. Grammar-only parsing lives in the TestAllSyntax*_G4 drivers
+// TestFrontendLuaRustKotlinScalaCompile covers the SSA lowering of the added
+// frontends, including C++. Grammar-only parsing lives in the TestAllSyntax*_G4 drivers
 // under the language tests packages and runs in the syntax-g4 workflow.
 func TestFrontendLuaRustKotlinScalaCompile(t *testing.T) {
 	cases := []struct {
@@ -120,6 +120,30 @@ object Main {
 }
 `,
 			refs: []string{"add", "main"},
+		},
+		{
+			name: "cpp",
+			lang: ssaconfig.CPP,
+			file: "main.cpp",
+			code: `
+class Counter {
+public:
+    Counter() : total_(0) {}
+    void add(int value) { total_ += value; }
+    int total() const { return total_; }
+private:
+    int total_;
+};
+
+int main() {
+    Counter counter;
+    for (int i = 0; i < 3; i++) {
+        counter.add(i);
+    }
+    return counter.total();
+}
+`,
+			refs: []string{"Counter", "main", "counter"},
 		},
 	}
 
