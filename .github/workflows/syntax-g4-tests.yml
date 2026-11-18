@@ -1,9 +1,10 @@
 name: Syntax G4 Tests
 
 # The per-language `TestAllSyntax*_G4` corpus tests parse every embedded syntax
-# fixture through the antlr grammar and SSA frontend. They are CPU-heavy
-# (PHP alone ~190s) and only change when a grammar or its fixtures change, so
-# they run here instead of in Essential Tests on every PR.
+# fixture through the frontend and SSA builder. Most languages use their antlr
+# grammar; bash uses mvdan.cc/sh. They are CPU-heavy (PHP alone ~190s) and only
+# change when a grammar or its fixtures change, so they run here instead of in
+# Essential Tests on every PR.
 #
 # ---------------------------------------------------------------------------
 # When this workflow runs
@@ -21,6 +22,7 @@ name: Syntax G4 Tests
 #   common/yak/**/code/**       corpus fixtures
 #   common/yak/**/syntax/**     corpus fixtures (the php and python corpora use
 #                               this name)
+#   common/yak/bash/bash2ssa/** the bash frontend (mvdan, no .g4) and its corpus
 #   common/yak/**/syntax_*.go   the corpus drivers and their helpers, named
 #                               `syntax_<language>_test.go` (the glob also picks
 #                               up the legacy-named antlr4JS/syntax_test.go and
@@ -53,6 +55,7 @@ on:
       - "common/yak/**/parser/**"
       - "common/yak/**/code/**"
       - "common/yak/**/syntax/**"
+      - "common/yak/bash/bash2ssa/**"
       - "common/yak/**/syntax_*.go"
       - "common/sfweb/templates/java/cwe-1336-ssti.java"
       # This workflow itself
@@ -83,6 +86,7 @@ jobs:
           - ./common/yak/c2ssa/test
           - ./common/yak/yak2ssa/test
           - ./common/yak/JS2ssa/test
+          - ./common/yak/bash/bash2ssa/test
     steps:
       - name: Check out code
         uses: actions/checkout@v4
