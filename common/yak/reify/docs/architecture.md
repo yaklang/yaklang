@@ -17,6 +17,8 @@ Reify 不使用“操作系统 × 架构”的目录矩阵。每个维度单独�
 
 架构也不等于格式。同一个 AMD64 parser 可以处理 ELF 或 PE 中的代码区域；loader 只负责给出 Target 和代码范围。
 
+语言也不等于格式。Go 与 Rust 产物仍是 ELF、PE 或 Mach-O；语言层在容器加载后读取编译器元数据、恢复符号、给函数挂 ABI 覆盖，不注册新的 loader 或 parser。见[语言层](language.md)。
+
 ## 两级注册表
 
 `loader.Default` 是进程级只读 Catalog，构造时显式注册：
@@ -51,7 +53,9 @@ ByteReader（边界 + 字节序）
 Loader.Check / Load
   │  Target、Image、Diagnostics
   ▼
-Artifact（Reader + Loader + Parser）
+language.Inspect（语言层：识别、恢复符号、函数级 ABI）
+  ▼
+Artifact（Reader + Loader + Parser + Language）
   │  EntryRegion / RegionAt
   ▼
 Region（虚拟地址 + 文件偏移 + 长度）

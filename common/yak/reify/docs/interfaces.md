@@ -90,6 +90,7 @@ type Artifact struct {
     Image  *Image
     Diagnostics []Diagnostic
     Hints  *BoundaryHints
+    Language *LanguageReport `json:"language,omitempty"`
     Reader *ByteReader
     Loader Loader
     Parser Parser
@@ -127,6 +128,8 @@ type Image struct {
 `EntryPoint` 的布尔返回值区分“地址为零”和“没有入口信息”。`SectionAt` 返回包含地址的节。`SymbolAt` 先匹配精确地址，再匹配带大小的符号范围。`Artifact.StringAt` 读取文件中的 NUL 结尾可打印字符串。
 
 `Symbol` 记录名称、地址、大小、种类、是否导入和来源库。ELF loader 从 `.dynsym`、`.symtab` 和重定位表填充；PLT 与 GOT 地址都映射到导入符号名。PE loader 从导出表、导入表与 `.pdata` 填充，Mach-O loader 从符号表、导入符号与 `LC_FUNCTION_STARTS` 填充。
+
+`Symbol` 另有 `Mangled` 与 `Source` 两个字段，由语言层写入：`Name` 是展示名，`Mangled` 是编译器原始名，`Source` 记录来源（`pclntab`、`rust-demangle`，空表示容器符号表）。`SymbolByName` 同时匹配两种名字。详见[语言层](language.md)。
 
 Section 的 `FileSize == 0` 表示零填充。`Flags` 保留格式原义，不做跨格式归一化。
 
@@ -216,11 +219,44 @@ type Disassembly struct {
 
 十三种架构都有实现；新增架构只需要提供一个 `Profile` 和薄封装。
 
+## 语言层
+
+定义：[core/language.go](../core/language.go)、[loader/language](../loader/language)。
+
+语言层是 `Format` 与 `Architecture` 之外的第三条分派轴。它不注册新的 loader 或 parser，在 `Catalog.OpenAs` 完成容器加载与校验之后运行，把结果写入 `Artifact.Language`。
+
+```go
+type Detector interface {
+    Name() string
+    Detect(*core.Artifact) *core.LanguageReport
+}
+
+type SymbolRecoverer interface {
+    Recover(*core.Artifact) ([]symbol.Symbol, error)
+}
+
+func Inspect(*core.Artifact) *core.LanguageReport
+```
+
+当前实现识别 Go 与 Rust：
+
+- Go：`debug/buildinfo` 读版本，按 `.gopclntab` 节名或 pclntab 魔数定位函数表，用 `debug/gosym` 恢复名字、入口和大小。剥离 `.symtab` 后仍可用。
+- Rust：识别 v0（`_R`）与 legacy（`_ZN...17h...E`）编码，用纯 Go demangler 改写 `Name`，保留 `Mangled`。
+- 未知容器只得到 `LanguageUnknown`，不推断为 C。
+
+`LanguageReport.Registers` 只在版本与架构支持时给出 Go ABIInternal 模型。该模型按函数挂到 `Function.Facts`，不覆盖整份 Artifact；cgo、汇编与 ABI0 函数继续使用平台 ABI。
+
+`Inspect` 必须早于 `Image.SymbolsAt` 的首次调用，因为它会替换符号表并使地址索引失效。`Catalog.OpenAs` 已保证这个顺序。
+
+能力边界、实测形态与测试清单见[语言层文档](language.md)。
+
 ## LowIR
 
 定义：[core/lowir.go](../core/lowir.go)。
 
 LowIR 是具体结构，不是接口。`ParseResult.IR` 是指向 `core.LowIR` 的指针。LowIR 包含 `Functions`；每个 Function 包含 `Blocks`；每个 Block 包含 `Instructions`。直接调用 `Parser.Parse` 时，nil 表示解析器没有产出表示；`asm2lowir.Parse` 要求结果非 nil、至少一个 Function，且 Target 与 Artifact 一致。
+
+`Function.Facts` 是可选的语言 ABI 覆盖。`LowIR.FactsFor(function)` 在覆盖存在时返回它，否则返回架构默认值。当前只有 Go pclntab 函数会带上 `Facts`。
 
 详细约束见 [LowIR 文档](lowir.md)。
 
