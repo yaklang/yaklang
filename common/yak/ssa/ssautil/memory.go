@@ -17,5 +17,12 @@ func AvailableMemoryBytes() (int64, bool) {
 // An unknown host returns false so callers keep their conservative path.
 func HasMemoryHeadroom(floor int64) bool {
 	available, ok := AvailableMemoryBytes()
+	return memoryHeadroom(available, ok, floor)
+}
+
+// memoryHeadroom is the pure decision behind HasMemoryHeadroom. The live probe
+// returns a different value on every call, so the capacity boundary can only be
+// asserted against one sampled value.
+func memoryHeadroom(available int64, ok bool, floor int64) bool {
 	return ok && available >= floor
 }
