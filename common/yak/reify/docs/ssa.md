@@ -348,50 +348,53 @@ SSAIR 用例是普通文本，不使用 JSON 转义。
 
 ## 落库与 SyntaxFlow 审计
 
-reify 可以把一次 lift 的 YakSSA 直接写入 ssadb，再由 `ssaapi.FromDatabase`
-加载并执行 SyntaxFlow。链路不经过伪源码，也不重新解析二进制。
+reify 的 SSA 结果通过 `Result.Program` 暴露。落库不是 `Lift` 的隐含动作：
+调用方先 lift 到 SSA，再把 program 写入 ssadb。查询既可以直接使用内存 program，
+也可以从 ssadb 重新加载。
 
 ```text
 ELF/PE/MachO
   -> asm2lowir
-  -> lowir2ssa（ProgramCacheDBWrite）
+  -> lowir2ssa
   -> SSA passes + 符号标注
-  -> ssa.Program.SaveToDatabase
+  -> Result.Program
+  -> Program.SaveToDatabase（仅落库时）
   -> ssadb（ir_programs / ir_codes / ir_indices_v1 / ir_name_pool_v1）
   -> ssaapi.FromDatabase
   -> SyntaxFlow
 ```
 
-### 落库接口
+### API
 
-- `lowir2ssa.WithProgramCache(ssa.ProgramCacheDBWrite)`：转换阶段直接使用
-  DB 写缓存，指令随构建进入 ssadb。
-- `lowir2ssa.WithProgramName(name)`：写入 `ir_programs.program_name`。
-- `lowir2ssa.WithLanguage(ssaconfig.C)`：记录语言。二进制没有源语言，
-  这里用 C 表示其 ABI 与符号模型。
-- `reify.WithPersist(name)`：`Lift` 在 SSA pass 和符号标注之后调用
-  `(*ssa.Program).SaveToDatabase()`，返回的 `Result.ProgramName` 即库中程序名。
-- `(*ssa.Program).SaveToDatabase()`：写元数据、把所有指令标脏、flush 四个
-  cache store。调用后缓存关闭，查询必须重新从 ssadb 加载。
-- `(*ssa.Program).RegisterInstructionName(name, inst)`：把直接创建的函数登记到
-  变量索引和名称池。语言前端通常通过 builder 完成这一步；reify 绕过 builder，
-  因此必须显式登记，否则按名字搜索找不到函数。
+- `reify.WithProgramName(name)`：命名生成的 SSA 程序。
+- `reify.WithProgramCache(ssa.ProgramCacheDBWrite)`：选择 DB 写缓存。默认是内存缓存。
+- `Result.Program`：lift 得到的 `*ssa.Program`。`asm` 和 `lowir` 模式下为 nil。
+- `(*ssa.Program).SaveToDatabase()`：写 `ir_programs`，把指令标脏，再 flush
+  四个 cache store。只接受 DB 写缓存。调用后缓存关闭，查询需要重新加载。
+- 函数名索引只在 `SaveToDatabase` 中写入，且只写 `Function` 值。语言前端通过
+  builder 建索引；reify 绕过 builder，所以在保存阶段补索引。
+- `ssaapi.NewProgram(program, nil)`：包装内存 SSA，直接执行 SyntaxFlow。
+- `ssaapi.FromDatabase(name)`：从 ssadb 加载程序，再执行 SyntaxFlow。
 
 ### 命令行
 
 ```bash
-OUT=/mnt/data/scan-outputs/bin-ssa-feasibility/final-20261118-0203
+OUT=/mnt/data/scan-outputs/reify-review-20261118-1521
 export YAKIT_HOME="$OUT/yakit-home"
 gcc -O0 -fno-pie -no-pie -fno-stack-protector -o "$OUT/src/demo" "$OUT/src/demo.c"
 
-# 1. lift + 落库
+# save = lift 到 SSA，然后 program.SaveToDatabase
 "$OUT/bin/reify" save "$OUT/src/demo" --name demo-e2e --section .text
 
-# 2. 查询所有调用 printf 的位置和实参
+# audit 文件 = lift 到内存 SSA，直接在 SSA 上执行 SyntaxFlow
+"$OUT/bin/reify" audit "$OUT/src/demo" --section .text --call printf
+
+# audit program = 从 ssadb 加载，再执行 SyntaxFlow
 "$OUT/bin/reify" audit --program demo-e2e --call printf
 
-# 3. 查询内部函数调用
-"$OUT/bin/reify" audit --program demo-e2e --call helper
+# 指定 ssadb 文件
+"$OUT/bin/reify" audit --program demo-e2e \
+  --db "$OUT/yakit-home/default-yakssa.db" --call printf
 ```
 
 `save` 输出：
@@ -404,14 +407,10 @@ Values: 208
 Query: reify audit --program demo-e2e --call <function>
 ```
 
-`YAKIT_HOME` 决定 ssadb 位置，默认是 `~/yakit-projects`。重复使用同一个程序名
-需要 `--replace`；它会先删除旧程序和旧指令行，再写入新结果。每次 lift 使用
-唯一名字可以避免覆盖。
-
-`audit --call printf` 输出（实参表达式节选）：
+`audit` 文件模式输出：
 
 ```text
-Program: demo-e2e
+Program: reify-lowir
 Rule: printf(* as $args) as $call
 Match args: 4
 Match call: 2
@@ -424,20 +423,11 @@ Callee printf (extern): 2
   Function-printf("result: %d\n", ...)
 ```
 
-`audit --call helper` 输出：
+`audit --program` 输出结构与文件模式相同。`YAKIT_HOME` 决定默认 ssadb 位置；
+`--db` 可以覆盖它。重复使用同一个程序名需要 `--replace`。
 
-```text
-Program: demo-e2e
-Rule: helper(* as $args) as $call
-Match args: 1
-Match call: 1
-Callee helper (local): 1
-  castType(i64, ... Parameter-arg0 ...)
-  Function-boundary: symbol;frame-cleanup(...)
-```
-
-`--call X` 等价于规则 `X(* as $args) as $call`。`--rule` 接受任意
-SyntaxFlow 规则，例如列出所有调用：
+`--call X` 等价于规则 `X(* as $args) as $call`。`--rule` 接受任意 SyntaxFlow
+规则，例如列出所有调用：
 
 ```bash
 "$OUT/bin/reify" audit --program demo-e2e --rule '*?{opcode: call} as $call'
@@ -468,6 +458,8 @@ ir_codes:    Call=6, Function=11, BasicBlock=19, Parameter=80, ...
 - 实参：按 ABI 参数寄存器与栈传参捕获。已知 C 签名会裁剪多余寄存器实参；
   内部函数按被调用方实际读取的参数个数裁剪（最多 6 个）。
 - SyntaxFlow 结果绑定调用值：`X(* as $args) as $call` 同时得到实参和调用点。
+- 文件审计与数据库审计返回相同的调用点和实参。内存程序按函数表匹配名称；
+  落库程序按名称索引匹配。
 
 未做到：
 
@@ -488,5 +480,6 @@ export TMPDIR="$GOTMPDIR"
 ./scripts/ssa-test.sh -count=1 -run TestBinarySSAIsPersistedAndQueriedBySyntaxFlow ./common/yak/reify/test/
 ```
 
-测试覆盖：C 源码编译、`WithPersist` 落库、`ssaapi.FromDatabase` 重新加载、
+测试覆盖：C 源码编译、内存 SSA 查询、`WithProgramName` +
+`WithProgramCache(ProgramCacheDBWrite)` 落库、`ssaapi.FromDatabase` 重新加载、
 `printf` 外部调用查询、`helper` 本地调用查询，以及 `$call` 的 callee 还原。
