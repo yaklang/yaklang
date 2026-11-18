@@ -321,8 +321,10 @@ func (p *Program) matchVariable(ctx context.Context, compareMode ssadb.CompareMo
 // matchVariableWithExcludeFiles 搜索变量，支持排除指定文件
 // excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
 func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, excludeFiles []string) (bool, sfvm.Values, error) {
+	insts := ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles)
+	insts = p.appendMatchingMemoryFunctions(insts, compareMode, mod, pattern)
 	var values Values = lo.FilterMap(
-		ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
+		insts,
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, err := p.NewValue(i); err != nil {
 				log.Errorf("matchVariable: new value failed: %v", err)
@@ -354,6 +356,48 @@ func (p *Program) matchVariableWithIncludeFiles(ctx context.Context, compareMode
 		},
 	)
 	return len(values) > 0, ToSFVMValues(values), nil
+}
+
+// appendMatchingMemoryFunctions adds recovered function values to a name
+// search over an in-memory program. A producer that builds SSA outside a
+// language builder does not populate the variable index, while a persisted
+// program gets the same functions registered by SaveToDatabase. Scanning the
+// function table keeps a file audit consistent with a database audit without
+// writing an index just to query the live program.
+func (p *Program) appendMatchingMemoryFunctions(insts []ssa.Instruction, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string) []ssa.Instruction {
+	if p == nil || p.Program == nil || p.Program.DatabaseKind != ssa.ProgramCacheMemory || p.Program.Funcs == nil || mod&ssadb.NameMatch == 0 {
+		return insts
+	}
+	check := func(name string) bool {
+		switch compareMode {
+		case ssadb.ExactCompare:
+			return name == pattern
+		case ssadb.GlobCompare:
+			matcher, err := glob.Compile(pattern)
+			return err == nil && matcher.Match(name)
+		case ssadb.RegexpCompare:
+			matcher, err := regexp.Compile(pattern)
+			return err == nil && matcher.MatchString(name)
+		default:
+			return false
+		}
+	}
+	seen := make(map[int64]struct{}, len(insts))
+	for _, inst := range insts {
+		seen[inst.GetId()] = struct{}{}
+	}
+	p.Program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
+		if function == nil || function.GetName() == "" || !check(function.GetName()) {
+			return true
+		}
+		if _, ok := seen[function.GetId()]; ok {
+			return true
+		}
+		seen[function.GetId()] = struct{}{}
+		insts = append(insts, function)
+		return true
+	})
+	return insts
 }
 
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
