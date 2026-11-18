@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/proto"
 )
@@ -19,6 +20,7 @@ func contextStorageFixture(t *testing.T) (*gorm.DB, *ypb.AIGlobalConfig) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
+	configtest.RequirePristine(t, db, nil)
 	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}).Error)
 	provider := func() *ypb.AIModelConfig {
 		return &ypb.AIModelConfig{ModelName: "model-a", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", BaseURL: "https://example.test/v1", APIKey: "test-only"}}

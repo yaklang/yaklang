@@ -16,6 +16,7 @@ import (
 )
 
 func TestModelContextSettingOnlyControlsQualityLoop(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	model := &ypb.AIModelConfig{ModelName: uuid.NewString(), Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", BaseURL: "https://example.test/v1", APIKey: "test-only"}}
 	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithPrimaryModelContext(model))
 	quality, speed := makeSchemaStabilityTestLoop(cfg), makeSchemaStabilityTestLoop(cfg)
@@ -42,6 +43,7 @@ func TestModelContextSettingOnlyControlsQualityLoop(t *testing.T) {
 }
 
 func TestModelContextDisabledOnlyStopsMatchingQualityOverflow(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	model := &ypb.AIModelConfig{ModelName: uuid.NewString(), Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", BaseURL: "https://example.test/v1", APIKey: "test-only"}}
 	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithPrimaryModelContext(model))
 	registerModelContextTestConfig(t, model)

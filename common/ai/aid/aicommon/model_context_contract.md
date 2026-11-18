@@ -26,7 +26,22 @@
 
 配置绑定字段只用于本地设置管理，不发送为上游 API 参数，也不改变主模型、辅助模型或视觉模型的路由。
 
-无会话时 `GetAIModelContext` / `SetAIModelContext` 传完整 `Config`，后端返回 `ContextKey`。之后可传 `Provider/Model/ContextKey`；只传类型和名字会被拒绝。运行时事件返回同一标识，热更新传 `AIService/AIModelName/ModelContextKey`。配置已切换时拒绝旧标识，避免误改另一个同名模型。
+无会话时 `GetAIModelContext` / `SetAIModelContext` 传完整 `Config`，后端返回 `ContextKey`。之后可传 `Provider/Model/ContextKey`；只传类型和名字会被拒绝。
+
+运行时 `model_context` 事件的 `context_key` 返回同一标识。热更新只需原样携带 `ModelContextKey` 和阈值/自动调整设置；后端从当前质量优先配置获取 provider、model，并校验 Key。此入口不依赖已废弃的 `AIService` / `AIModelName` 请求字段；旧前端仍携带时忽略这两个字段，不用它们选择或切换模型。配置已切换时拒绝旧 Key，避免误改另一个同名模型。成功的模型设置不会复制到会话启动预算；会话恢复继续读取模型保存值。
+
+```json
+{
+  "IsConfigHotpatch": true,
+  "HotpatchType": "RuntimeContextSizeLimit",
+  "Params": {
+    "ModelContextKey": "后端 model_context.context_key 的原始值",
+    "RuntimeContextSizeLimit": 600000
+  }
+}
+```
+
+只切换自动调整时，传 `RuntimeContextSizeLimit: 0` 并显式携带 `DisableContextAutoAdjust: true/false`，保留已保存阈值。事件中的 `provider/model` 和会话外 API 的 `Provider/Model` 不属于这两个废弃的热更新请求字段。
 
 ## 手动设置
 
@@ -59,6 +74,8 @@
 | 无会话 Config/ContextKey 往返，已删除配置拒绝读写，手动上下限 | `yakgrpc/TestAIModelContextConfiguredIdentityAndBounds` |
 | 切换保留、删除清理、重新添加隔离、并发迟到写入不复活 | `yakit/TestAIModelContextProviderLifecycle`、`TestAIModelContextDeleteAndLateWriteAreAtomic` |
 | 运行时边界与过期配置拒绝 | `TestModelContextContractManualBoundsAndIdentity` |
+| 只传 Key 保存并跨会话读取；忽略旧服务/模型字段；清除旧会话预算 | `TestModelContextContractHotpatchResolvesCurrentModel` |
+| 越界、无效零值和模型切换后的迟到请求不修改模型设置或会话预算 | `TestModelContextContractRejectedHotpatchPreservesSessionOverride` |
 | 失败不落库、匹配成功保存、跨会话读取 | `TestModelContextContractSuccessPersistsOnlyMatchingConfiguration` |
 | 取消、手动编辑、关闭开关或删除配置后的迟到成功不覆盖 | `TestModelContextContractLateSuccessAndCancellationDoNotOverwrite` |
 | 与原运行时算法逐例比较、原 SDK 默认值 | `TestModelContextContractOriginalReductionFormula`、`TestModelContextContractEventsAndLegacyDefaults` |
