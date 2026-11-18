@@ -28,18 +28,21 @@ func TestAttachedFileMonitorWritesTimelineOnContentChange(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "pinned.txt")
 	require.NoError(t, os.WriteFile(path, []byte("VERSION_ONE\n"), 0o600))
 
-	react.ensureAttachedFileMonitors([]*aicommon.AttachedResource{
+	task := aicommon.NewStatefulTaskBase("file-pins", "inspect attachments", ctx, react.Emitter)
+	task.SetAttachedDatas([]*aicommon.AttachedResource{
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT, "VERSION_ONE\n"),
-	}, filesys.WithPollInterval(20*time.Millisecond))
+		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, filepath.Dir(path)),
+	})
+	react.pinInputFilePaths(task, filesys.WithPollInterval(20*time.Millisecond))
 	react.attachedFileMonitorsMu.Lock()
-	require.Empty(t, react.attachedFileMonitors, "literal file content has no filesystem path to monitor")
+	require.Empty(t, react.attachedFileMonitors, "literal content and directories must not start file monitors")
 	react.attachedFileMonitorsMu.Unlock()
 
-	resources := []*aicommon.AttachedResource{
+	task.SetAttachedDatas([]*aicommon.AttachedResource{
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, path),
 		aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, path),
-	}
-	react.ensureAttachedFileMonitors(resources, filesys.WithPollInterval(20*time.Millisecond))
+	})
+	react.pinInputFilePaths(task, filesys.WithPollInterval(20*time.Millisecond))
 
 	react.attachedFileMonitorsMu.Lock()
 	require.Len(t, react.attachedFileMonitors, 1, "the same pinned path must have one session monitor")

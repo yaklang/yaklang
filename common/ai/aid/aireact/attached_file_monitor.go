@@ -110,46 +110,69 @@ func (m *attachedFileMonitor) check(runtime *ReAct) {
 	runtime.recordAttachedFileChange(m.path, previous, current)
 }
 
-func (r *ReAct) ensureAttachedFileMonitors(resources []*aicommon.AttachedResource, opts ...filesys.WatchPathOption) {
-	if r == nil {
-		return
-	}
-	for _, resource := range resources {
+// Pin once per user input, before focus loops can replay the attachments or
+// filter pin events for their intermediate output files.
+func (r *ReAct) pinInputFilePaths(task aicommon.AIStatefulTask, opts ...filesys.WatchPathOption) {
+	seen := make(map[string]struct{})
+	emitter := task.GetEmitter()
+	for _, resource := range task.GetAttachedDatas() {
 		if !isAttachedFilePathResource(resource) {
 			continue
 		}
-		if err := r.ensureAttachedFilePathMonitor(resource.Value, opts...); err != nil {
-			log.Warnf("failed to monitor attached file %s: %v", resource.Value, err)
+		path := strings.TrimSpace(resource.Value)
+		if path == "" {
+			continue
+		}
+		path, err := filepath.Abs(path)
+		if err != nil {
+			log.Warnf("cannot resolve attached path %q: %v", resource.Value, err)
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		info, err := os.Stat(path)
+		if err != nil {
+			log.Warnf("cannot pin attached path %q: %v", path, err)
+			continue
+		}
+		switch {
+		case info.IsDir():
+			if emitter != nil {
+				_, err = emitter.EmitPinDirectory(path)
+			}
+		case info.Mode().IsRegular():
+			if emitter != nil {
+				_, err = emitter.EmitPinFilename(path)
+			}
+			if watchErr := r.ensureAttachedFilePathMonitor(path, opts...); watchErr != nil {
+				log.Warnf("failed to monitor attached file %s: %v", path, watchErr)
+			}
+		}
+		if err != nil {
+			log.Warnf("failed to emit pin for attached path %q: %v", path, err)
 		}
 	}
 }
 
 func isAttachedFilePathResource(resource *aicommon.AttachedResource) bool {
-	if resource == nil || !resource.HasType(aicommon.AttachedResourceTypeFile) {
-		return false
+	if !resource.HasType(aicommon.AttachedResourceTypeFile) {
+		// The structured parser also accepts the path key as a legacy type.
+		return resource.HasType(aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "filepath", "file-path")
 	}
 	switch strings.ToLower(strings.TrimSpace(resource.Key)) {
-	case aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, "filepath", "file-path":
+	case aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, aicommon.CONTEXT_PROVIDER_KEY_DIRECTORY_PATH, "filepath", "file-path":
 		return true
 	default:
 		return false
 	}
 }
 
-func (r *ReAct) ensureAttachedFilePathMonitor(path string, opts ...filesys.WatchPathOption) error {
+func (r *ReAct) ensureAttachedFilePathMonitor(absolutePath string, opts ...filesys.WatchPathOption) error {
 	if r == nil || r.config == nil || r.config.Timeline == nil {
 		return nil
 	}
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return nil
-	}
-
-	absolutePath, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	absolutePath = filepath.Clean(absolutePath)
 
 	r.attachedFileMonitorsMu.Lock()
 	defer r.attachedFileMonitorsMu.Unlock()
@@ -160,13 +183,6 @@ func (r *ReAct) ensureAttachedFilePathMonitor(path string, opts ...filesys.Watch
 		return nil
 	}
 
-	info, err := os.Stat(absolutePath)
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
-		return nil
-	}
 	initial, err := readAttachedFileFingerprint(absolutePath)
 	if err != nil {
 		return err

@@ -224,17 +224,19 @@ func isYakRunnerIntermediatePinPath(path string) bool {
 	return false
 }
 
-func assertYakRunnerNoYakPinFilenameEvents(t *testing.T, events []*ypb.AIOutputEvent) {
+func assertYakRunnerUserFilePins(t *testing.T, events []*ypb.AIOutputEvent, want ...string) {
 	t.Helper()
+	var paths []string
 	for _, e := range events {
 		path := utils.InterfaceToString(jsonpath.FindFirst(string(e.GetContent()), "$.path"))
 		if isYakRunnerIntermediatePinPath(path) {
 			continue
 		}
 		if strings.HasSuffix(strings.ToLower(path), ".yak") || strings.Contains(path, "gen_code_") {
-			t.Fatalf("unexpected yak pin_filename before loop finished: %s", path)
+			paths = append(paths, path)
 		}
 	}
+	require.ElementsMatch(t, want, paths, "only user-attached Yak files should be pinned before delivery")
 }
 
 func parseYaklangCodeChangeResponse(t *testing.T, e *ypb.AIOutputEvent) yaklangCodeChangeResponse {
@@ -287,7 +289,7 @@ func TestYakRunnerProtocol_3_FullFreeInputModifyWithAllAttachments(t *testing.T)
 
 	require.GreaterOrEqual(t, len(result.codeChangeEvents), 1, "should emit yaklang_code_change when loop finishes")
 	assert.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
-	assertYakRunnerNoYakPinFilenameEvents(t, result.pinFilenameEvents)
+	assertYakRunnerUserFilePins(t, result.pinFilenameEvents, yakPath)
 }
 
 // TestYakRunnerProtocol_4_YaklangCodeChangeResponseShape verifies the「返回数据」协议字段。
@@ -342,7 +344,7 @@ func TestYakRunnerProtocol_5_NoAttachmentsEmitsCreateOp(t *testing.T) {
 	)
 	require.False(t, result.taskFailed, "preview task should complete")
 	require.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
-	assertYakRunnerNoYakPinFilenameEvents(t, result.pinFilenameEvents)
+	assertYakRunnerUserFilePins(t, result.pinFilenameEvents)
 
 	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[0])
 	assert.Equal(t, "create", payload.Op)
@@ -365,7 +367,7 @@ func TestYakRunnerProtocol_6_DirectoryPathOnlyEmitsCreateOp(t *testing.T) {
 	)
 	require.False(t, result.taskFailed, "directory-only preview task should complete")
 	require.Len(t, result.codeChangeEvents, 1, "exactly one yaklang_code_change per conversation")
-	assertYakRunnerNoYakPinFilenameEvents(t, result.pinFilenameEvents)
+	assertYakRunnerUserFilePins(t, result.pinFilenameEvents)
 
 	payload := parseYaklangCodeChangeResponse(t, result.codeChangeEvents[0])
 	assert.Equal(t, "create", payload.Op)
