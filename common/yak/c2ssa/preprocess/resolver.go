@@ -56,7 +56,7 @@ func (r *IncludeResolver) ResolveHeader(includePath string, system bool, includi
 }
 
 func (r *IncludeResolver) resolveProject(includePath string, system bool, includingFile string) (string, bool) {
-	if system && r.config.SkipSystemIncludes && len(r.externalFS) == 0 {
+	if system && r.config.SkipSystemIncludes && len(r.externalFS) == 0 && !r.config.ResolveProjectAngleIncludes {
 		if r.looksLikeSystemHeader(includePath) {
 			return "", false
 		}
@@ -92,7 +92,7 @@ func (r *IncludeResolver) candidatePaths(includePath string, system bool, includ
 
 	add(includePath)
 
-	if !system {
+	if !system || r.config.ResolveProjectAngleIncludes {
 		dir := path.Dir(normalizeSlash(includingFile))
 		if dir != "." && dir != "" {
 			add(path.Join(dir, includePath))

@@ -33,7 +33,7 @@ func BuildProject(fs fi.FileSystem, config PreprocessConfig) *CPreprocessProject
 	if config.ExternalIncludeDirs == nil {
 		config.ExternalIncludeDirs = EnsureExternalIncludeDirs()
 	}
-	reg := BuildHeaderRegistry(fs)
+	reg := BuildHeaderRegistryWithExtensions(fs, config.HeaderExtensions)
 	return &CPreprocessProject{
 		fs:       fs,
 		registry: reg,
