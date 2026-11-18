@@ -11,6 +11,7 @@ import (
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/bash/bash2ssa"
+	cpp2ssa "github.com/yaklang/yaklang/common/yak/cpp/cpp2ssa"
 	"github.com/yaklang/yaklang/common/yak/csharp/csharp2ssa"
 	"github.com/yaklang/yaklang/common/yak/go2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
@@ -30,6 +31,7 @@ var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.JAVA:   java2ssa.CreateBuilder,
 	ssaconfig.GO:     go2ssa.CreateBuilder,
 	ssaconfig.C:      c2ssa.CreateBuilder,
+	ssaconfig.CPP:    cpp2ssa.CreateBuilder,
 	ssaconfig.TS:     ts2ssa.CreateBuilder,
 	ssaconfig.PYTHON: python2ssa.CreateBuilder,
 	ssaconfig.CSHARP: csharp2ssa.CreateBuilder,
