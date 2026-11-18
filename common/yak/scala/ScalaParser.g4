@@ -93,7 +93,7 @@ importSpec
     ;
 
 namedSelector
-    : id (AS (id | USCORE))?
+    : id (AS (id | USCORE) | ARROW id)?
     ;
 
 // wildcard: '*', '_' (--3.0-migration), or 'given [Type]'
@@ -104,8 +104,12 @@ wildCardSelector
     ;
 
 importSelectors
-    : namedSelector (COMMA importSelectors)?
-    | wildCardSelector (COMMA wildCardSelector)*
+    : importSelector (COMMA importSelector)* COMMA?
+    ;
+
+importSelector
+    : namedSelector
+    | wildCardSelector
     ;
 
 // =====================================================================
@@ -335,10 +339,10 @@ funParams
 // alternatives all shared the same prefix, forcing ALL(*) to scan hundreds of
 // tokens before ruling out assignment alternatives.
 expr1
-    : INLINE? IF LPAREN expr RPAREN expr (SEMI? ELSE expr)?   // if (cond) t [else f]
-    | INLINE? IF expr THEN expr (SEMI? ELSE expr)?             // if cond then t [else f]
-    | WHILE LPAREN expr RPAREN expr                            // while (cond) body
-    | WHILE expr DO expr                                       // while cond do body
+    : INLINE? IF LPAREN expr RPAREN NEWLINE* expr (SEMI? ELSE expr)?   // if (cond) t [else f]
+    | INLINE? IF expr THEN NEWLINE* expr (SEMI? ELSE expr)?             // if cond then t [else f]
+    | WHILE LPAREN expr RPAREN NEWLINE* expr                            // while (cond) body
+    | WHILE expr DO NEWLINE* expr                                       // while cond do body
     | TRY expr catches (FINALLY expr)?
     | TRY expr (FINALLY expr)?
     | THROW expr
@@ -467,7 +471,7 @@ blockStat
     ;
 
 forExpr
-    : FOR LPAREN enumerators0 RPAREN (DO | YIELD)? expr
+    : FOR LPAREN enumerators0 RPAREN NEWLINE* INDENT? (DO | YIELD)? NEWLINE* expr DEDENT?
     | FOR LBRACE enumerators0 RBRACE (DO | YIELD)? expr
     | FOR LBRACE INDENT enumerators0 DEDENT RBRACE (DO | YIELD)? expr
     | FOR INDENT enumerators0 DEDENT (DO | YIELD) indent (blockStat end_of_stat*)* blockResult? outdent
@@ -480,7 +484,7 @@ enumerators0
     ;
 
 enumerators
-    : generator (end_of_stat enumerator)*
+    : generator (end_of_stat? enumerator)*
     ;
 
 enumerator
@@ -711,7 +715,7 @@ accessModifier
     ;
 
 accessQualifier
-    : LBRACKET id RBRACKET
+    : LBRACKET (id | THIS) RBRACKET
     ;
 
 // =====================================================================
@@ -719,7 +723,7 @@ accessQualifier
 // =====================================================================
 
 annotation
-    : AT simpleType_ parArgumentExprs*
+    : AT simpleType_ parArgumentExprs* end_of_stat?
     ;
 
 // =====================================================================
@@ -898,7 +902,7 @@ withTemplateBody
     ;
 
 templateBody
-    : colonTripleOpen end_of_stat? selfType? end_of_stat? (templateStat (end_of_stat templateStat)*)? tripleClose
+    : colonTripleOpen end_of_stat? selfType? end_of_stat? INDENT? (templateStat (end_of_stat templateStat)*)? tripleClose
     ;
 
 templateStat

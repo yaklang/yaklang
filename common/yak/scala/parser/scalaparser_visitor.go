@@ -67,6 +67,9 @@ type ScalaParserVisitor interface {
 	// Visit a parse tree produced by ScalaParser#importSelectors.
 	VisitImportSelectors(ctx *ImportSelectorsContext) interface{}
 
+	// Visit a parse tree produced by ScalaParser#importSelector.
+	VisitImportSelector(ctx *ImportSelectorContext) interface{}
+
 	// Visit a parse tree produced by ScalaParser#simpleRef.
 	VisitSimpleRef(ctx *SimpleRefContext) interface{}
 
