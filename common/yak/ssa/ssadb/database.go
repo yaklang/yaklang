@@ -403,6 +403,12 @@ func validateProgramDeletion(db *gorm.DB, program string) error {
 // it. A missing table is not a failed delete, and it is a stable condition:
 // retrying it only burns the backoff budget below.
 func deleteOptionalProgramRows(db *gorm.DB, table, condition string, args ...any) error {
+	// Skip the query when the table is absent. Relying on the missing-table
+	// error alone still makes the ORM log a red error for a condition that is
+	// expected on new databases.
+	if !db.HasTable(table) {
+		return nil
+	}
 	err := deleteProgramRows(db, table, condition, args...)
 	if err != nil && isMissingTableError(err) {
 		return nil
