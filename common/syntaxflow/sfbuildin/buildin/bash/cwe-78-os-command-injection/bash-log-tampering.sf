@@ -1,0 +1,79 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: shell history or system log tampering"
+	title_zh: "Bash：清除命令历史或系统日志"
+	type: audit
+	level: "middle"
+	rule_id: "bash-log-tampering"
+	risk: "defense-evasion"
+	desc: <<<DESC
+### 说明
+命令清除或覆盖审计痕迹：`history -c`、删除 `/var/log`、`truncate` 日志、
+`journalctl --vacuum`。攻击者常用这些操作隐藏入侵过程。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+把审计日志发送到远端集中存储，限制本地日志删除权限，并监控 history
+清理、日志截断和 journal 清理操作。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-779](https://cwe.mitre.org/data/definitions/779.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+history -c
+rm -rf /var/log/*
+truncate -s 0 /var/log/syslog
+journalctl --vacuum-time=1s
+POS
+	"safefile://neg.sh": <<<NEG
+history | tail
+ls /var/log
+journalctl -n 10
+NEG
+)
+
+history(* as $historyArgs) as $historyCall
+$historyCall?{have: /"-c"/} as $historyHit
+
+rm(* as $rmArgs) as $rmCall
+$rmCall?{have: /\/var\/log/} as $rmLogHit
+
+truncate(* as $truncateArgs) as $truncateCall
+$truncateCall?{have: /\/var\/log/} as $truncateHit
+
+journalctl(* as $journalArgs) as $journalCall
+$journalCall?{have: /--vacuum/} as $journalHit
+
+alert $historyHit for {
+	level: "middle",
+	title: "Bash: shell history or system log tampering",
+	title_zh: "Bash：清除命令历史或系统日志",
+	message: "检测到 history 清理。",
+	risk: "defense-evasion",
+}
+
+alert $rmLogHit for {
+	level: "middle",
+	title: "Bash: shell history or system log tampering",
+	title_zh: "Bash：清除命令历史或系统日志",
+	message: "检测到删除 /var/log 内容。",
+	risk: "defense-evasion",
+}
+
+alert $truncateHit for {
+	level: "middle",
+	title: "Bash: shell history or system log tampering",
+	title_zh: "Bash：清除命令历史或系统日志",
+	message: "检测到截断系统日志。",
+	risk: "defense-evasion",
+}
+
+alert $journalHit for {
+	level: "middle",
+	title: "Bash: shell history or system log tampering",
+	title_zh: "Bash：清除命令历史或系统日志",
+	message: "检测到清理 journal 日志。",
+	risk: "defense-evasion",
+}

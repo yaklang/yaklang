@@ -1,8 +1,10 @@
 package buildin_rule
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,21 +14,43 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestBashRules(t *testing.T) {
-	files := []string{
-		filepath.Join("..", "bash", "cwe-78-os-command-injection", "bash-pipe-to-shell.sf"),
-		filepath.Join("..", "bash", "cwe-78-os-command-injection", "bash-eval.sf"),
-		filepath.Join("..", "bash", "cwe-78-os-command-injection", "bash-interpreter-c.sf"),
-		filepath.Join("..", "bash", "cwe-78-os-command-injection", "bash-rm-rf-root.sf"),
-		filepath.Join("..", "bash", "cwe-78-os-command-injection", "bash-dynamic-command.sf"),
-	}
+type bashRule struct {
+	name    string
+	content string
+}
 
-	for _, file := range files {
-		file := file
-		t.Run(filepath.Base(file), func(t *testing.T) {
-			raw, err := os.ReadFile(file)
-			require.NoError(t, err)
-			require.NoError(t, ssatest.EvaluateVerifyFilesystem(string(raw), t, true))
+func loadBashRules(t *testing.T) []bashRule {
+	t.Helper()
+	root := filepath.Join("..", "bash")
+	var rules []bashRule
+	err := filepath.WalkDir(root, func(rulePath string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".sf") {
+			return nil
+		}
+		raw, err := os.ReadFile(rulePath)
+		if err != nil {
+			return err
+		}
+		name, err := filepath.Rel(root, rulePath)
+		if err != nil {
+			name = rulePath
+		}
+		rules = append(rules, bashRule{name: filepath.ToSlash(name), content: string(raw)})
+		return nil
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, rules)
+	return rules
+}
+
+func TestBashRules(t *testing.T) {
+	for _, rule := range loadBashRules(t) {
+		rule := rule
+		t.Run(rule.name, func(t *testing.T) {
+			require.NoError(t, ssatest.EvaluateVerifyFilesystem(rule.content, t, true))
 		})
 	}
 
