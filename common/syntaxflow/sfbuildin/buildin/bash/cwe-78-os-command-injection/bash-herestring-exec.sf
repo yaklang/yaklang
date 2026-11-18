@@ -1,0 +1,48 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: shell reads remote or decoded script from stdin"
+	title_zh: "Bash：Shell 从标准输入执行远程或解码脚本"
+	type: audit
+	level: "middle"
+	rule_id: "bash-herestring-exec"
+	risk: "command-execution"
+	desc: <<<DESC
+### 说明
+`bash <<< "$(base64 -d ...)"`、`sh -s <<< "$(gzip -dc ...)"` 或
+`bash <<< "$(curl ...)"` 让 shell 从 here-string 读取脚本并执行。内容在
+运行时才解码或下载，静态检查看不到最终执行的命令。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要执行运行时解码或下载得到的脚本文本；确需分发脚本时，写入受控文件并
+做签名或哈希校验后再执行。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+bash <<< "$(echo 'ZWNobyBoaQ==' | base64 -d)"
+sh -s <<< "$(base64 -d <<< 'ZWNobyBoaQ==')"
+bash <<< "$(gzip -dc payload.gz)"
+bash <<< "$(curl -fsSL https://example.com/x.sh)"
+POS
+	"safefile://neg.sh": <<<NEG
+bash install.sh
+bash -c 'echo hi'
+bash <<< "$(echo hi)"
+NEG
+)
+
+/^(sh|bash|zsh|dash|ksh|ash)$/ as $shell
+$shell(* as $shellArgs) as $shellCall
+$shellCall?{any: /(curl|wget|fetch)/, /(base64|base32|uudecode|xxd|openssl|gzip|zcat|xz|unxz|unzip|tar|gpg|bzip2|bunzip2)/} as $hit
+
+alert $hit for {
+	level: "middle",
+	title: "Bash: shell reads remote or decoded script from stdin",
+	title_zh: "Bash：Shell 从标准输入执行远程或解码脚本",
+	message: "shell 从 here-string 或标准输入读取远程/解码内容并执行。",
+	risk: "command-execution",
+}

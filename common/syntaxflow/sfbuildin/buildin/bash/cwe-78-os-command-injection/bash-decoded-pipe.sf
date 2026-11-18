@@ -1,22 +1,24 @@
 desc(
 	mode: "ssa"
 	language: "bash"
-	title: "Bash: decoded or generated content piped to a shell"
-	title_zh: "Bash：解码或生成的内容直接管道给 Shell"
+	title: "Bash: decoded or generated content piped to a shell or interpreter"
+	title_zh: "Bash：解码或生成的内容直接管道给 Shell 或解释器"
 	type: audit
 	level: "middle"
 	rule_id: "bash-decoded-pipe"
 	risk: "command-execution"
 	desc: <<<DESC
 ### 说明
-`base64 -d`、`xxd -r`、`openssl`、`rev`、`printf` 等命令的输出直接通过
-管道交给 `sh`/`bash` 执行。攻击者常用这种方式混淆下载或执行的脚本，
-绕过对明文命令和 URL 的检测。
+`base64 -d`、`base32 -d`、`xxd -r`、`openssl`、`rev`、`printf`、
+`gzip -dc`、`zcat`、`xz -dc`、`unzip -p`、`tar -xO`、`gpg -d`、
+`uudecode` 等命令的输出直接通过管道交给 `sh`/`bash` 或
+python/perl/php/ruby/node 等解释器执行。攻击者常用这种方式混淆下载或
+执行的脚本，绕过对明文命令和 URL 的检测。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 不要执行运行时解码得到的脚本；确需分发脚本时，写入文件并做签名或哈希
-校验后再执行，且避免把解码器输出直接接入 shell。
+校验后再执行，且避免把解码器输出直接接入 shell 或解释器。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-78](https://cwe.mitre.org/data/definitions/78.html)
@@ -26,26 +28,37 @@ REFERENCE
 echo 'YmFzaCAtaSA+' | base64 -d | bash
 printf '\x62\x61\x73\x68\x20\x2d\x69' | xxd -r -p | sh
 printf 'bash -i' | bash
+echo 'MJQXGZJTGI======' | base32 -d | bash
+gzip -dc payload.gz | bash
+zcat payload.gz | sh
+xz -dc payload.xz | bash
+unzip -p payload.zip x.sh | bash
+tar -xOzf payload.tar.gz x.sh | bash
+gpg -d payload.gpg | bash
+echo 'begin 644 x.sh' | uudecode -o /dev/stdout | bash
+echo 'aW1wb3J0IG9z' | base64 -d | python3
 POS
 	"safefile://neg.sh": <<<NEG
 base64 -d payload.b64 > /tmp/payload
 printf 'hello\n'
 xxd -r payload.hex > /tmp/payload
+gzip -dc payload.gz > /tmp/payload
+tar -xOzf payload.tar.gz x.sh > /tmp/x.sh
 echo 'hello' | rev
 NEG
 )
 
-/^(base64|xxd|openssl|rev|printf)$/ as $decoder
+/^(base64|base32|uudecode|xxd|openssl|rev|printf|gzip|zcat|xz|unxz|unzip|tar|gpg|bzip2|bunzip2)$/ as $decoder
 $decoder(* as $decodeArgs) as $decode
-/^(sh|bash|zsh|dash|ksh|ash)$/ as $shell
+/^(sh|bash|zsh|dash|ksh|ash|python[0-9.]*|perl|php|ruby|node|nodejs|lua)$/ as $shell
 $shell(* as $shellArgs) as $exec
 $decode -> * as $next
 $next & $exec as $hit
 
 alert $hit for {
 	level: "middle",
-	title: "Bash: decoded or generated content piped to a shell",
-	title_zh: "Bash：解码或生成的内容直接管道给 Shell",
-	message: "解码器或文本生成命令的输出直接进入 shell，请确认内容来源。",
+	title: "Bash: decoded or generated content piped to a shell or interpreter",
+	title_zh: "Bash：解码或生成的内容直接管道给 Shell 或解释器",
+	message: "解码器或文本生成命令的输出直接进入 shell/解释器，请确认内容来源。",
 	risk: "command-execution",
 }
