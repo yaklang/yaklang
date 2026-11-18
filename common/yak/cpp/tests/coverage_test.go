@@ -14,18 +14,43 @@ import (
 
 // TestCppCorpusCoverage parses a real-world C++ tree and reports one RESULT line
 // per file. The corpus is not committed; point CPP_CORPUS at a local checkout.
+//
+// CPP_CORPUS_PREPROCESS=1 measures the production path: include inlining and
+// macro expansion before parsing. Without it the grammar is measured alone.
+//
+// Each top-level directory under CPP_CORPUS is treated as one project, so macro
+// tables stay scoped to the headers a project actually ships. Merging unrelated
+// trees (two vendored test frameworks that both define TEST_CASE) would measure
+// an artifact of the checkout layout, not the frontend.
 func TestCppCorpusCoverage(t *testing.T) {
 	root := os.Getenv("CPP_CORPUS")
 	if root == "" {
 		t.Skip("CPP_CORPUS not set")
 	}
-	// CPP_CORPUS_PREPROCESS=1 measures the production path: include inlining and
-	// macro expansion before parsing. Without it the grammar is measured alone.
-	var project *preprocess.CPreprocessProject
-	if os.Getenv("CPP_CORPUS_PREPROCESS") != "" {
-		project = preprocess.BuildProject(filesys.NewRelLocalFs(root), cpp2ssa.DefaultPreprocessConfig())
-		defer project.Close()
+	projects := map[string]*preprocess.CPreprocessProject{}
+	defer func() {
+		for _, project := range projects {
+			project.Close()
+		}
+	}()
+	projectFor := func(path string) (*preprocess.CPreprocessProject, string) {
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil, ""
+		}
+		scope, inside := root, relative
+		if index := strings.IndexRune(relative, filepath.Separator); index > 0 {
+			scope = filepath.Join(root, relative[:index])
+			inside = relative[index+1:]
+		}
+		if project, ok := projects[scope]; ok {
+			return project, inside
+		}
+		project := preprocess.BuildProject(filesys.NewRelLocalFs(scope), cpp2ssa.DefaultPreprocessConfig())
+		projects[scope] = project
+		return project, inside
 	}
+
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil || info.IsDir() {
 			return nil
@@ -40,9 +65,8 @@ func TestCppCorpusCoverage(t *testing.T) {
 			return nil
 		}
 		source := string(raw)
-		if project != nil {
-			relative, relErr := filepath.Rel(root, path)
-			if relErr == nil {
+		if os.Getenv("CPP_CORPUS_PREPROCESS") != "" {
+			if project, relative := projectFor(path); project != nil {
 				if expanded, expandErr := project.PreprocessTU(relative, source); expandErr == nil {
 					source = expanded
 				}
