@@ -327,10 +327,20 @@ func (s *Save[T]) Save(item T) {
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			s.buffer.FeedBlock(item)
-			queued = true
+			// FeedWithDone keeps backpressure while the saver runs, but it stops
+			// waiting once the saver context is cancelled. FeedBlock alone hangs
+			// forever in that case: the buffer reader exits on cancellation and
+			// nothing ever frees a slot. A rule that exceeds its budget cancels
+			// the context and then still walks its result graph, so that hang was
+			// reachable from any timed-out scan rule.
+			queued = s.buffer.FeedWithDone(item, s.ctx.Done())
 		}()
 		if !queued {
+			s.queued.Add(-1)
+			// The saver context ended while a writer still had items. Report it:
+			// silently losing rows hides a producer that outlives its saver.
+			log.Errorf("dbcache save dropped item (%s): saver context done, buf=%d queued=%d",
+				s.config.name, s.buffer.BufLen(), s.queued.Load())
 			return
 		}
 		blockCost := time.Since(start)
