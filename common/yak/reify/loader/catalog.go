@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/fileformat"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/language"
 )
 
 var (
@@ -257,6 +258,10 @@ func (c *Catalog) OpenAs(ctx context.Context, name string, src io.ReaderAt, size
 	if err := core.ValidateArtifact(artifact); err != nil {
 		return nil, fmt.Errorf("loader %s metadata: %w", loader.Name(), err)
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	language.Inspect(artifact)
 	return artifact, nil
 }
 

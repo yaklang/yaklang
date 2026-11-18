@@ -117,9 +117,11 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 		if len(names) == 0 {
 			names = pass.DefaultNames()
 		}
-		if err := pass.Apply(&function, ir.Facts(), names...); err != nil {
+		facts := ir.FactsFor(function)
+		if err := pass.Apply(&function, facts, names...); err != nil {
 			return nil, err
 		}
+		converter.facts = facts
 		function.FrameCleanup = containsPass(names, "remove-stackframe")
 		function.FrameKept = !function.FrameCleanup
 		if err := converter.convertFunction(function); err != nil {

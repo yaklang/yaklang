@@ -32,6 +32,12 @@ type Artifact struct {
 
 	Hints *BoundaryHints `json:"-"`
 
+	// Language records the compiler family behind this image. A loader reads the
+	// container; the language layer reads compiler metadata inside it. It is nil
+	// for a container the layer does not inspect, such as a relocatable object
+	// that carries no complete image.
+	Language *LanguageReport `json:"language,omitempty"`
+
 	Reader *ByteReader `json:"-"`
 	Loader Loader      `json:"-"`
 	Parser Parser      `json:"-"`

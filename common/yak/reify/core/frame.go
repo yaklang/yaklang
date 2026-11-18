@@ -119,6 +119,15 @@ func (ir *LowIR) Facts() ArchFacts {
 	return ArchFacts{Frame: ir.Frame, Registers: ir.Registers, Canary: ir.Canary}
 }
 
+// FactsFor returns the compiler override of one function, or the architecture
+// defaults for functions whose calling convention was not recovered.
+func (ir *LowIR) FactsFor(function Function) ArchFacts {
+	if function.Facts != nil {
+		return *function.Facts
+	}
+	return ir.Facts()
+}
+
 // EntryRegisters lists the registers that hold an ABI-defined value when a
 // function starts: the stack pointer, the frame pointer and the return address.
 // A converter binds them before it converts the body, so a prologue that saves or

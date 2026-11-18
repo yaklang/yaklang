@@ -4,6 +4,7 @@ package lowirtext
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,10 +33,11 @@ func Format(ir *core.LowIR) string {
 	}
 	for _, function := range ir.Functions {
 		if function.Name != "" {
-			fmt.Fprintf(&b, "function %s @ 0x%x\n", function.Name, function.Address)
+			fmt.Fprintf(&b, "function %s @ 0x%x\n", quoteName(function.Name), function.Address)
 		} else {
 			fmt.Fprintf(&b, "function f%d @ 0x%x\n", function.ID, function.Address)
 		}
+		b.WriteString(formatFunctionFacts(function.Facts))
 		for _, block := range function.Blocks {
 			fmt.Fprintf(&b, "block b%d @ 0x%x\n", block.ID, block.Address)
 			for _, instruction := range block.Instructions {
@@ -102,10 +104,17 @@ func formatOperand(operand core.Operand) string {
 	case core.OperandRegister:
 		return "%" + operand.Name
 	case core.OperandSymbol:
-		return "@" + operand.Name
+		return "@" + quoteName(operand.Name)
 	default:
 		return string(operand.Kind)
 	}
+}
+
+func quoteName(name string) string {
+	if strings.ContainsAny(name, ",\t\n\r\"\\") || strings.Contains(name, " -> ") || strings.Contains(name, " = ") || strings.Contains(name, " [") {
+		return strconv.Quote(name)
+	}
+	return name
 }
 
 func formatLiteral(literal []byte) string {
@@ -180,6 +189,24 @@ func formatFrame(frame core.FrameModel) string {
 
 // formatRegisters renders the register model as one line of key=value pairs.
 func formatRegisters(registers core.RegisterModel) string {
+	if pairs := registerPairs(registers); pairs != "" {
+		return "registers: " + pairs + "\n"
+	}
+	return ""
+}
+
+// formatFunctionFacts renders a per-function compiler ABI override. Losing it in
+// a text round trip would silently give one Go function the C argument order.
+func formatFunctionFacts(facts *core.ArchFacts) string {
+	if facts == nil {
+		return ""
+	}
+	data, _ := json.Marshal(facts)
+	return "function-facts: " + string(data) + "\n"
+}
+
+// registerPairs renders the fields that differ between register models.
+func registerPairs(registers core.RegisterModel) string {
 	parts := make([]string, 0, 6)
 	if registers.Naming != "" {
 		parts = append(parts, "naming="+registers.Naming)
@@ -202,7 +229,7 @@ func formatRegisters(registers core.RegisterModel) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return "registers: " + strings.Join(parts, " ") + "\n"
+	return strings.Join(parts, " ")
 }
 
 // formatCanary renders the stack guard model as one line of key=value pairs.

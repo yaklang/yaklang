@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -88,6 +89,11 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 	}
 
 	result := &Result{Boundaries: boundaries, BoundaryStats: stats}
+	if artifact.Language != nil {
+		for _, note := range artifact.Language.Notes {
+			result.Diagnostics = append(result.Diagnostics, core.Diagnostic{Code: "language-limit", Message: note})
+		}
+	}
 	result.IR = &core.LowIR{Target: artifact.Target}
 	nextID := core.FunctionID(1)
 	for index, boundary := range boundaries {
@@ -143,6 +149,11 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 			})
 			continue
 		}
+		if facts := languageFacts(artifact, boundary, parsed.IR); facts != nil {
+			for functionIndex := range parsed.IR.Functions {
+				parsed.IR.Functions[functionIndex].Facts = facts
+			}
+		}
 		for functionIndex := range parsed.IR.Functions {
 			function := &parsed.IR.Functions[functionIndex]
 			function.ID = nextID
@@ -183,12 +194,50 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 	return result, nil
 }
 
+// languageFacts returns the per-function override a compiler layer supplies. A
+// Go pclntab function uses the Go register ABI; the same address space also holds
+// cgo and assembly functions that use the C ABI, so the override is per function.
+func languageFacts(artifact *core.Artifact, boundary core.FunctionBoundary, ir *core.LowIR) *core.ArchFacts {
+	if artifact == nil || artifact.Language == nil || artifact.Language.Registers == nil {
+		return nil
+	}
+	if artifact.Language.Language != core.LanguageGo {
+		return nil
+	}
+	if artifact.Image == nil {
+		return nil
+	}
+	goFunction := false
+	for _, entry := range artifact.Image.SymbolsAt(boundary.Address) {
+		if entry.Source == sym.SourcePCLNTab && entry.Kind == sym.SymbolFunction && !strings.HasSuffix(entry.Name, ".abi0") {
+			goFunction = true
+		}
+	}
+	if !goFunction {
+		return nil
+	}
+	facts := ir.Facts()
+	facts.Registers = *artifact.Language.Registers
+	// ABIInternal has no ordinary callee-save integer registers. The frame
+	// pointer is still restored by the prologue/epilogue convention.
+	facts.Frame.CalleeSaved = nil
+	if facts.Frame.FramePointer != "" {
+		facts.Frame.CalleeSaved = []string{facts.Frame.FramePointer}
+	}
+	return &facts
+}
+
 func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, core.BoundaryStats, error) {
 	hints := core.BoundaryHints{}
 	if artifact.Hints != nil {
 		hints = *artifact.Hints
 	}
 	if config.Function != "" {
+		if artifact.Image != nil {
+			if entry, ok := artifact.Image.SymbolByName(config.Function); ok {
+				config.Function = entry.Name
+			}
+		}
 		// Prefer the boundary the parser discovered. It carries the aligned
 		// address and the execution mode, which a bare symbol value does not: on
 		// ARM a Thumb symbol is stored with the low bit set, and decoding from that
@@ -336,7 +385,7 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		return core.FunctionBoundary{}, fmt.Errorf("function %q: artifact has no symbols", name)
 	}
 	for _, symbol := range artifact.Image.Symbols {
-		if symbol.Name != name {
+		if symbol.Name != name && symbol.Mangled != name {
 			continue
 		}
 		if symbol.Kind != sym.SymbolFunction {
@@ -345,7 +394,7 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		if symbol.Imported || symbol.Address == 0 {
 			return core.FunctionBoundary{}, fmt.Errorf("function %q has no local body", name)
 		}
-		return core.FunctionBoundary{Address: codeAddress(symbol.Address), Size: symbol.Size, Name: name, Source: core.BoundarySymbol}, nil
+		return core.FunctionBoundary{Address: codeAddress(symbol.Address), Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol}, nil
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }

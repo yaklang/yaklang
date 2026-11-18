@@ -25,15 +25,18 @@ type LowIR struct {
 // Function is one decoded unit. Address is its entry address. The current
 // parsers create one function for each ParseRequest region.
 type Function struct {
-	ID           FunctionID     `json:"id"`
-	Name         string         `json:"name,omitempty"`
-	Address      uint64         `json:"address"`
-	Size         uint64         `json:"size,omitempty"`
-	Boundary     BoundarySource `json:"boundary,omitempty"`
-	FrameRemoved bool           `json:"frame_removed,omitempty"`
-	FrameCleanup bool           `json:"frame_cleanup,omitempty"`
-	FrameKept    bool           `json:"frame_kept,omitempty"`
-	Blocks       []Block        `json:"blocks"`
+	ID       FunctionID     `json:"id"`
+	Name     string         `json:"name,omitempty"`
+	Address  uint64         `json:"address"`
+	Size     uint64         `json:"size,omitempty"`
+	Boundary BoundarySource `json:"boundary,omitempty"`
+	// Facts overrides the architecture defaults for this function only. A
+	// compiler ABI must not change the conventions of foreign functions.
+	Facts        *ArchFacts `json:"facts,omitempty"`
+	FrameRemoved bool       `json:"frame_removed,omitempty"`
+	FrameCleanup bool       `json:"frame_cleanup,omitempty"`
+	FrameKept    bool       `json:"frame_kept,omitempty"`
+	Blocks       []Block    `json:"blocks"`
 }
 
 // Block contains ordered operations and ends in a control-transfer operation.

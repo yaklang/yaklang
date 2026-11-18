@@ -13,15 +13,30 @@ const (
 	SymbolUnknown  SymbolKind = "unknown"
 )
 
+// Symbol source values record which structure supplied a name. An empty source
+// means the container's own symbol table.
+const (
+	SourcePCLNTab      = "pclntab"
+	SourceRustDemangle = "rust-demangle"
+)
+
 // Symbol is one named address from a file-format symbol or relocation table.
 // Imported symbols may have Address zero when the format only names them.
+//
+// Name is the name a consumer should display. Mangled keeps the name exactly as
+// the image stores it when a language layer rewrote Name: a Rust symbol is
+// stored as _RNv... and displayed as crate::func. A lookup accepts either form.
+// Source names where the symbol came from: an empty value means the container's
+// own symbol table, and "pclntab" means it was recovered from Go metadata.
 type Symbol struct {
 	Name     string     `json:"name"`
+	Mangled  string     `json:"mangled,omitempty"`
 	Address  uint64     `json:"address,omitempty"`
 	Size     uint64     `json:"size,omitempty"`
 	Kind     SymbolKind `json:"kind"`
 	Imported bool       `json:"imported,omitempty"`
 	Library  string     `json:"library,omitempty"`
+	Source   string     `json:"source,omitempty"`
 }
 
 // At returns the symbol at address. An exact address match wins; a symbol with

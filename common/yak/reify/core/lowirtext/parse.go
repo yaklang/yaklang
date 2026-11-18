@@ -2,6 +2,7 @@ package lowirtext
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -15,7 +16,8 @@ var (
 	frameLine       = regexp.MustCompile(`^frame: (.+)$`)
 	registersLine   = regexp.MustCompile(`^registers: (.+)$`)
 	canaryLine      = regexp.MustCompile(`^canary: (.+)$`)
-	functionLine    = regexp.MustCompile(`^function (\S+) @ (0x[0-9a-fA-F]+)$`)
+	factsLine       = regexp.MustCompile(`^function-facts: (.+)$`)
+	functionLine    = regexp.MustCompile(`^function (.+) @ (0x[0-9a-fA-F]+)$`)
 	blockLine       = regexp.MustCompile(`^block b(\d+) @ (0x[0-9a-fA-F]+)$`)
 	instructionLine = regexp.MustCompile(`^  (0x[0-9a-fA-F]+)  (.*)$`)
 )
@@ -53,11 +55,25 @@ func Parse(text string) (*core.LowIR, error) {
 			}
 			continue
 		}
+		if match := factsLine.FindStringSubmatch(line); match != nil {
+			if function == nil {
+				return nil, fmt.Errorf("lowirtext: line %d: function facts before function", lineNumber+1)
+			}
+			function.Facts = &core.ArchFacts{}
+			if err := json.Unmarshal([]byte(match[1]), function.Facts); err != nil {
+				return nil, fmt.Errorf("lowirtext: line %d: function facts: %w", lineNumber+1, err)
+			}
+			continue
+		}
 		if match := functionLine.FindStringSubmatch(line); match != nil {
 			address, _ := strconv.ParseUint(match[2], 0, 64)
+			name, err := parseName(match[1])
+			if err != nil {
+				return nil, fmt.Errorf("lowirtext: line %d: function name: %w", lineNumber+1, err)
+			}
 			ir.Functions = append(ir.Functions, core.Function{
 				ID:      core.FunctionID(len(ir.Functions) + 1),
-				Name:    match[1],
+				Name:    name,
 				Address: address,
 			})
 			function = &ir.Functions[len(ir.Functions)-1]
@@ -96,7 +112,7 @@ func Parse(text string) (*core.LowIR, error) {
 func parseInstruction(addressText, body string) (core.Instruction, error) {
 	address, _ := strconv.ParseUint(addressText, 0, 64)
 	instruction := core.Instruction{Address: address}
-	if index := strings.LastIndex(body, " ["); index >= 0 && strings.HasSuffix(body, "]") {
+	if index := unquotedSeparator(body, " [", true); index >= 0 && strings.HasSuffix(body, "]") {
 		effects, err := parseEffects(body[index+2 : len(body)-1])
 		if err != nil {
 			return core.Instruction{}, err
@@ -104,7 +120,7 @@ func parseInstruction(addressText, body string) (core.Instruction, error) {
 		instruction.Effects = effects
 		body = body[:index]
 	}
-	if index := strings.Index(body, " -> "); index >= 0 {
+	if index := unquotedSeparator(body, " -> ", false); index >= 0 {
 		for _, target := range strings.Split(body[index+4:], ", ") {
 			if !strings.HasPrefix(target, "b") {
 				return core.Instruction{}, fmt.Errorf("bad target %q", target)
@@ -117,7 +133,7 @@ func parseInstruction(addressText, body string) (core.Instruction, error) {
 		}
 		body = body[:index]
 	}
-	if index := strings.Index(body, " = "); index >= 0 {
+	if index := unquotedSeparator(body, " = ", false); index >= 0 {
 		results, err := parseResults(body[:index])
 		if err != nil {
 			return core.Instruction{}, err
@@ -130,7 +146,11 @@ func parseInstruction(addressText, body string) (core.Instruction, error) {
 	if operands == "" {
 		return instruction, nil
 	}
-	for _, part := range strings.Split(operands, ", ") {
+	parts, err := splitOperands(operands)
+	if err != nil {
+		return core.Instruction{}, err
+	}
+	for _, part := range parts {
 		operand, err := parseOperand(part)
 		if err != nil {
 			return core.Instruction{}, err
@@ -138,6 +158,70 @@ func parseInstruction(addressText, body string) (core.Instruction, error) {
 		instruction.Operands = append(instruction.Operands, operand)
 	}
 	return instruction, nil
+}
+
+// unquotedSeparator ignores punctuation inside a quoted compiler symbol. A
+// Rust function-pointer type can itself contain an arrow or an equals sign.
+func unquotedSeparator(text, separator string, last bool) int {
+	found := -1
+	quoted, escaped := false, false
+	for i := 0; i < len(text); i++ {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quoted && text[i] == '\\' {
+			escaped = true
+			continue
+		}
+		if text[i] == '"' {
+			quoted = !quoted
+		}
+		if !quoted && strings.HasPrefix(text[i:], separator) {
+			found = i
+			if !last {
+				return found
+			}
+		}
+	}
+	return found
+}
+
+func parseName(text string) (string, error) {
+	if strings.HasPrefix(text, "\"") {
+		return strconv.Unquote(text)
+	}
+	return text, nil
+}
+
+// Rust generic names contain commas and spaces. The writer quotes those names,
+// so delimit operands only outside quoted strings.
+func splitOperands(text string) ([]string, error) {
+	var result []string
+	start := 0
+	quoted, escaped := false, false
+	for i := 0; i < len(text); i++ {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quoted && text[i] == '\\' {
+			escaped = true
+			continue
+		}
+		if text[i] == '"' {
+			quoted = !quoted
+		}
+		if !quoted && text[i] == ',' && i+1 < len(text) && text[i+1] == ' ' {
+			result = append(result, text[start:i])
+			start = i + 2
+			i++
+		}
+	}
+	if quoted {
+		return nil, fmt.Errorf("unterminated quoted symbol")
+	}
+	return append(result, text[start:]), nil
 }
 
 func parseResults(text string) ([]core.Value, error) {
@@ -172,7 +256,8 @@ func parseOperand(text string) (core.Operand, error) {
 			Name: name,
 		}, nil
 	case strings.HasPrefix(text, "@"):
-		return core.Operand{Kind: core.OperandSymbol, Name: strings.TrimPrefix(text, "@")}, nil
+		name, err := parseName(strings.TrimPrefix(text, "@"))
+		return core.Operand{Kind: core.OperandSymbol, Name: name}, err
 	case strings.HasPrefix(text, "0x"):
 		value, err := strconv.ParseUint(strings.TrimPrefix(text, "0x"), 16, 64)
 		if err != nil {
