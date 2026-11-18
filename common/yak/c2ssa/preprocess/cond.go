@@ -63,19 +63,13 @@ func (cs *ConditionalStack) HandleDirective(line string) (consumed bool, skipCon
 			return true, true
 		}
 		top := &cs.frames[len(cs.frames)-1]
-		if !top.parentActive {
+		// elif must not mark elseSeen: a following #else is still reachable
+		// when every earlier branch was false.
+		if !top.parentActive || top.active || top.elseSeen {
 			top.active = false
-			top.elseSeen = true
 			return true, true
 		}
-		if top.active || top.elseSeen {
-			top.active = false
-			top.elseSeen = true
-			return true, true
-		}
-		val := EvalPreprocessorCondition(DirectiveRest(line), cs.env, cs.global, cs.defs)
-		top.active = val
-		top.elseSeen = true
+		top.active = EvalPreprocessorCondition(DirectiveRest(line), cs.env, cs.global, cs.defs)
 		return true, true
 	case "else":
 		if len(cs.frames) == 0 {

@@ -14,6 +14,8 @@ type tuExpandCtx struct {
 	includeDepth int
 	collectOnly  int
 	typeAcc      headerStmtAcc
+	// pendingExpand holds a macro invocation split over several source lines.
+	pendingExpand []string
 }
 
 func (tu *tuProcessor) run(src string) string {
@@ -38,7 +40,9 @@ func (tu *tuProcessor) run(src string) string {
 	outLines := ctx.expandSource(src, tu.entryPath)
 	out := strings.Join(outLines, "\n")
 	// Single collapse at end (logical lines already joined; macro bodies may reintroduce \\n).
-	return CollapsePreprocessorContinuations(out)
+	out = CollapsePreprocessorContinuations(out)
+	// Translation phase 6: join string literals that macro expansion placed side by side.
+	return ConcatAdjacentStringLiterals(out)
 }
 
 func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
@@ -82,13 +86,34 @@ func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
 				outLines = append(outLines, ctx.takeHeaderTypeLines(line)...)
 				continue
 			}
+			if len(ctx.pendingExpand) > 0 {
+				ctx.pendingExpand = append(ctx.pendingExpand, line)
+				joined := strings.Join(ctx.pendingExpand, "\n")
+				if macroParenBalance(joined) <= 0 {
+					expanded := ctx.expandEnv.expandSourceWithState(joined, ctx.commentState)
+					outLines = append(outLines, strings.Split(expanded, "\n")...)
+					ctx.pendingExpand = nil
+				}
+				continue
+			}
 			if !ctx.expandEnv.lineMayNeedExpand(line) {
 				outLines = append(outLines, line)
+				continue
+			}
+			if macroParenBalance(line) > 0 {
+				// A macro invocation may span lines (TEST_CASE("x" * tag(...))).
+				// Join until the parentheses balance, then expand once.
+				ctx.pendingExpand = []string{line}
 				continue
 			}
 			expanded := ctx.expandEnv.expandSourceWithState(line, ctx.commentState)
 			outLines = append(outLines, expanded)
 		}
+	}
+	if len(ctx.pendingExpand) > 0 {
+		// Unbalanced to EOF: keep the original text instead of dropping code.
+		outLines = append(outLines, ctx.pendingExpand...)
+		ctx.pendingExpand = nil
 	}
 	if ctx.collectOnly > 0 {
 		if _, lines, keep := ctx.typeAcc.flush(); keep {

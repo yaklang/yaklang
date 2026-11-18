@@ -121,7 +121,7 @@ func (e *macroEnv) getObjectBodyTokens(name, body string) []macroToken {
 	if toks, ok := e.objectBodyTokens[name]; ok {
 		return toks
 	}
-	toks := tokenizeMacroSource(body)
+	toks := sanitizeMacroBodyTokens(tokenizeMacroSource(body))
 	e.objectBodyTokens[name] = toks
 	return toks
 }
@@ -133,7 +133,7 @@ func (e *macroEnv) getFunctionBodyTokens(name string, fm functionMacro) []macroT
 	if toks, ok := e.functionBodyTokens[name]; ok {
 		return toks
 	}
-	toks := tokenizeMacroSource(fm.body)
+	toks := sanitizeMacroBodyTokens(tokenizeMacroSource(fm.body))
 	e.functionBodyTokens[name] = toks
 	return toks
 }
@@ -269,10 +269,10 @@ func parseMacroCallArgs(tokens []macroToken, start int) ([][]macroToken, int, er
 
 func trimArgTokens(tokens []macroToken) []macroToken {
 	start, end := 0, len(tokens)
-	for start < end && tokens[start].kind == macroTokWhitespace {
+	for start < end && isMacroWhitespaceToken(tokens[start]) {
 		start++
 	}
-	for end > start && tokens[end-1].kind == macroTokWhitespace {
+	for end > start && isMacroWhitespaceToken(tokens[end-1]) {
 		end--
 	}
 	return tokens[start:end]
@@ -292,7 +292,9 @@ func (e *macroEnv) substituteMacro(name string, fm functionMacro, args [][]macro
 		var va []macroToken
 		for i := len(fm.params); i < len(args); i++ {
 			if i > len(fm.params) {
-				va = append(va, macroToken{macroTokPunct, ","})
+				// Keep a space after the comma: #__VA_ARGS__ stringifies the
+				// token sequence, and the source usually has one there.
+				va = append(va, macroToken{macroTokPunct, ","}, macroToken{macroTokWhitespace, " "})
 			}
 			va = append(va, args[i]...)
 		}
@@ -305,54 +307,46 @@ func expandMacroBody(body []macroToken, argMap map[string][]macroToken) []macroT
 	var out []macroToken
 	i := 0
 	for i < len(body) {
-		// stringification: # param
+		// Produce the expansion of one body token: # param, a param, or the token.
+		var produced []macroToken
 		if body[i].kind == macroTokPunct && body[i].text == "#" {
 			j := skipWhitespaceTokens(body, i+1)
 			if j < len(body) && body[j].kind == macroTokIdent {
 				if arg, ok := argMap[body[j].text]; ok {
-					out = append(out, macroToken{macroTokString, stringifyMacroTokens(arg)})
+					produced = []macroToken{{macroTokString, stringifyMacroTokens(arg)}}
 					i = j + 1
-					continue
 				}
 			}
-		}
-		// token pasting: lhs ## rhs (whitespace around ## is ignored, as in ISO C)
-		// Chains such as EVUTIL_##name##_ are folded in one go (a##b##c).
-		hashPos := skipWhitespaceTokens(body, i+1)
-		if hashPos < len(body) && body[hashPos].kind == macroTokPunct && body[hashPos].text == "##" {
-			left := resolveBodyToken(body[i], argMap)
-			k := skipWhitespaceTokens(body, hashPos+1)
-			if k < len(body) {
-				merged := pasteMacroTokens(left, resolveBodyToken(body[k], argMap))
-				k++
-				for {
-					next := skipWhitespaceTokens(body, k)
-					if next >= len(body) || body[next].kind != macroTokPunct || body[next].text != "##" {
-						k = next
-						break
-					}
-					rhs := skipWhitespaceTokens(body, next+1)
-					if rhs >= len(body) {
-						k = next
-						break
-					}
-					merged = pasteMacroTokens(merged, resolveBodyToken(body[rhs], argMap))
-					k = rhs + 1
-				}
-				out = append(out, merged...)
-				i = k
-				continue
-			}
-		}
-		if body[i].kind == macroTokIdent {
-			if arg, ok := argMap[body[i].text]; ok {
-				out = append(out, arg...)
+			if produced == nil {
+				// Not a stringification; keep the '#' as an ordinary token.
+				produced = []macroToken{body[i]}
 				i++
-				continue
+			}
+		} else if body[i].kind == macroTokIdent {
+			if arg, ok := argMap[body[i].text]; ok {
+				produced = arg
+				i++
 			}
 		}
-		out = append(out, body[i])
-		i++
+		if produced == nil {
+			produced = []macroToken{body[i]}
+			i++
+		}
+		// token pasting: produced ## rhs, with whitespace around ## ignored.
+		// Chains such as a##b##c and #x##suffix fold in one go.
+		for {
+			k := skipWhitespaceTokens(body, i)
+			if k >= len(body) || body[k].kind != macroTokPunct || body[k].text != "##" {
+				break
+			}
+			rhs := skipWhitespaceTokens(body, k+1)
+			if rhs >= len(body) {
+				break
+			}
+			produced = pasteMacroTokens(produced, resolveBodyToken(body[rhs], argMap))
+			i = rhs + 1
+		}
+		out = append(out, produced...)
 	}
 	return out
 }
@@ -394,19 +388,88 @@ func pasteMacroTokens(left, right []macroToken) []macroToken {
 	return combined
 }
 
+// macroParenBalance counts unmatched '(' minus ')' in text. Comments and
+// string/char literals are ignored, so a parenthesis inside either does not
+// change the result. The caller uses it to join a macro invocation that spans
+// several source lines before expansion.
+func macroParenBalance(text string) int {
+	depth := 0
+	for _, t := range tokenizeMacroSource(text) {
+		if t.kind != macroTokPunct {
+			continue
+		}
+		switch t.text {
+		case "(":
+			depth++
+		case ")":
+			if depth > 0 {
+				depth--
+			}
+		}
+	}
+	return depth
+}
+
+// sanitizeMacroBodyTokens turns comments into one space. Translation phase 3
+// removes comments before macro expansion; leaving a // comment in a body would
+// comment out the rest of the expansion and swallow the caller's semicolon.
+func sanitizeMacroBodyTokens(tokens []macroToken) []macroToken {
+	for i := range tokens {
+		if tokens[i].kind == macroTokComment {
+			tokens[i] = macroToken{kind: macroTokWhitespace, text: " "}
+		}
+	}
+	return tokens
+}
+
+// isMacroWhitespaceToken reports whether t separates tokens in a macro body.
+func isMacroWhitespaceToken(t macroToken) bool {
+	return t.kind == macroTokWhitespace || t.kind == macroTokNewline
+}
+
+// escapeStringifyText escapes the characters that would end or alter the
+// enclosing string literal produced by # (backslash and double quote).
+func escapeStringifyText(text string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); i++ {
+		if text[i] == '\\' || text[i] == '"' {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(text[i])
+	}
+	return b.String()
+}
+
 func stringifyMacroTokens(tokens []macroToken) string {
 	var b strings.Builder
 	b.WriteByte('"')
+	// ISO C 6.10.3.2: a run of whitespace between tokens becomes one space,
+	// and leading/trailing whitespace is dropped. Keeping a raw newline here
+	// produced an unterminated string literal for multi-line arguments.
+	pendingSpace := false
 	for _, t := range tokens {
+		if isMacroWhitespaceToken(t) || t.kind == macroTokComment {
+			if b.Len() > 1 {
+				pendingSpace = true
+			}
+			continue
+		}
+		if pendingSpace {
+			b.WriteByte(' ')
+			pendingSpace = false
+		}
 		switch t.kind {
 		case macroTokString:
 			inner := t.text
 			if len(inner) >= 2 && inner[0] == '"' && inner[len(inner)-1] == '"' {
 				inner = inner[1 : len(inner)-1]
 			}
-			b.WriteString(inner)
+			// ISO C 6.10.3.2: escape \ and " of a string literal inside the result.
+			b.WriteString(`\"`)
+			b.WriteString(escapeStringifyText(inner))
+			b.WriteString(`\"`)
 		case macroTokChar:
-			b.WriteString(t.text)
+			b.WriteString(escapeStringifyText(t.text))
 		default:
 			b.WriteString(t.text)
 		}
