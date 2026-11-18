@@ -1,0 +1,37 @@
+{
+  "name": "type-casts",
+  "lowir": [
+    "target: linux/amd64 (64-bit, little-endian)",
+    "registers: naming=x86 width=64 args=rdi return=rax",
+    "function convert @ 0x1000",
+    "block b1 @ 0x1000",
+    "  0x1000  v1:i64 = read_register %rdi",
+    "  0x1001  v2:i8 = trunc v1",
+    "  0x1002  v3:i32 = zext v2",
+    "  0x1003  v4:i64 = sext v3",
+    "  0x1004  v5:ptr64 = copy v4",
+    "  0x1005  call v5",
+    "  0x1006  return v5",
+    ""
+  ],
+  "ssair": [
+    "convert <i64> (1) arg0",
+    "type: () -> ptr64",
+    "entry_0: (<nil condition>)",
+    "<i8> t2    = type_cast[i8] <i64> arg0",
+    "<i32> t3   = type_cast[i32] <i8> t2",
+    "<i64> t4   = type_cast[i64] <i32> t3",
+    "<ptr64> t5 = type_cast[ptr64] <i64> t4",
+    "<any> t6   = call <ptr64> t5 () binding[] member[]",
+    "ret <ptr64> t5",
+    ""
+  ],
+  "source": [
+    "void * convert(uint64_t arg0) {",
+    "    v6 = (void *)((uint32_t)((uint8_t)arg0))();",
+    "    return (void *)((uint32_t)((uint8_t)arg0));",
+    "}",
+    "",
+    ""
+  ]
+}
