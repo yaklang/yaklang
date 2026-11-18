@@ -4016,8 +4016,8 @@
   {
     "rule_id": "source-java-empty-trust-manager",
     "rule_name": "源码匹配：检测 Java 空 TrustManager",
-    "hash": "860cfa6550ffd613dd7e097f6aa81345722a1ba9b96327f3dfffae1d0319d42f",
-    "version": "20261109.0001"
+    "hash": "cc21358a6de14326d907a3bca2836324e7f5242c54ec75f659965fdc45f5480f",
+    "version": "20261118.0001"
   },
   {
     "rule_id": "source-java-encode-url",
@@ -4028,8 +4028,8 @@
   {
     "rule_id": "source-java-hostname-verifier-true",
     "rule_name": "源码匹配：检测 Java HostnameVerifier 恒返回 true",
-    "hash": "3c3e4e774d77de401baf4f1f0b66e779090faa0086c869250828e69b4a2bc61f",
-    "version": "20261109.0001"
+    "hash": "3eef8c9f6f2469bf922348bee18ff73c52dbc3e7bc5c62fed760e9e5e2bdf7a1",
+    "version": "20261118.0001"
   },
   {
     "rule_id": "source-java-ivparameterspec",
@@ -4082,8 +4082,8 @@
   {
     "rule_id": "source-java-script-engine-eval",
     "rule_name": "源码匹配：检测 Java ScriptEngine.eval 调用",
-    "hash": "e8f2b72b5d8b28a5beca07551949776b2853d68c3d9d2f0ab6b6bd611337f7cf",
-    "version": "20261109.0001"
+    "hash": "fe60466470e9462215fedf58706921203134d88a4ca7453620c4719795ca72fa",
+    "version": "20261118.0001"
   },
   {
     "rule_id": "source-java-sha1",
@@ -5276,8 +5276,8 @@
   {
     "rule_id": "source-secrets-username-password-uri",
     "rule_name": "源码匹配：URI 中的用户名和口令",
-    "hash": "83014d5a3b2310e180dcb211d0d03ba4c48dee05a16e177433f0a4b611447e15",
-    "version": "20261109.0002"
+    "hash": "8da31a6ec8eb87e2744047cf02ae22bff52b13aefd53e06a0a94e31c02231e0a",
+    "version": "20261118.0001"
   },
   {
     "rule_id": "source-solidity-delegatecall",
