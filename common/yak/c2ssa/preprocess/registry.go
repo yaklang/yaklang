@@ -23,6 +23,19 @@ type HeaderRegistry struct {
 // BuildHeaderRegistry walks fs and indexes .h files.
 // .h.in templates are build inputs only and are intentionally excluded.
 func BuildHeaderRegistry(filesystem fi.FileSystem) *HeaderRegistry {
+	return BuildHeaderRegistryWithExtensions(filesystem, nil)
+}
+
+// BuildHeaderRegistryWithExtensions indexes the given header extensions. An
+// empty list means only ".h", which is the C profile.
+func BuildHeaderRegistryWithExtensions(filesystem fi.FileSystem, extensions []string) *HeaderRegistry {
+	if len(extensions) == 0 {
+		extensions = []string{".h"}
+	}
+	accepted := make(map[string]bool, len(extensions))
+	for _, extension := range extensions {
+		accepted[strings.ToLower(extension)] = true
+	}
 	reg := &HeaderRegistry{
 		byPath: make(map[string]*HeaderEntry),
 	}
@@ -30,18 +43,18 @@ func BuildHeaderRegistry(filesystem fi.FileSystem) *HeaderRegistry {
 		if info.IsDir() {
 			return nil
 		}
-		reg.indexPath(filesystem, filePath)
+		reg.indexPath(filesystem, filePath, accepted)
 		return nil
 	}))
 	return reg
 }
 
-func (r *HeaderRegistry) indexPath(filesystem fi.FileSystem, filePath string) {
+func (r *HeaderRegistry) indexPath(filesystem fi.FileSystem, filePath string, accepted map[string]bool) {
 	name := path.Base(filePath)
 	if strings.HasSuffix(name, ".h.in") {
 		return
 	}
-	if filesystem.Ext(name) != ".h" {
+	if !accepted[strings.ToLower(filesystem.Ext(name))] {
 		return
 	}
 	rel := normalizeSlash(trimDot(filePath))

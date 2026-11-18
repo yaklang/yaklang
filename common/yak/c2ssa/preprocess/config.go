@@ -20,7 +20,15 @@ type PreprocessConfig struct {
 	ExternalIncludeFS  []fi.FileSystem
 	Defines            map[string]string
 	SkipSystemIncludes bool
-	MaxIncludeDepth    int
+	// ResolveProjectAngleIncludes makes angle-bracket includes search the
+	// project registry, including the including file's directory, before the
+	// system-include skip applies. C leaves it false; C++ enables it because
+	// vendored headers are commonly included as <name.hpp>.
+	ResolveProjectAngleIncludes bool
+	// HeaderExtensions lists the extensions indexed as project headers. Empty
+	// means only ".h", which keeps the C behaviour.
+	HeaderExtensions []string
+	MaxIncludeDepth  int
 }
 
 // DefaultConfig returns sensible defaults for project preprocessing.
