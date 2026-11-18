@@ -1,7 +1,7 @@
 # SSA 前端：统一管线与各语言实现
 
 本文说明 yaklang 的 SSA 前端架构、语言注册、各语言语法来源、SSA 降级边界和测试入口。
-重点覆盖新增的 Lua、Rust、Kotlin、Scala 四个前端，同时记录已有语言的接入方式。
+重点覆盖新增的 Lua、Rust、Kotlin、Scala、C++ 五个前端，同时记录已有语言的接入方式。
 前端统一使用仓库内的 ANTLR 4.13.2；TypeScript 前端是历史例外，见 §4.3。
 
 ## 1. 设计口径
@@ -64,6 +64,7 @@
 | Java | `JAVA` | `.java` | `java2ssa` | 另有 JSP、Freemarker、SpEL 子前端。 |
 | Go | `GO` | `.go`, `.mod` | `go2ssa` | 支持 Go module 和包级编译。 |
 | C | `C` | `.c` | `c2ssa` | 带 C 预处理文件系统。 |
+| C++ | `CPP` | `.cpp`, `.cc`, `.cxx` | `cpp2ssa` | 独立语法包，复用 C 预处理；细节见 `docs/design/ssa-cpp-frontend.md`。 |
 | Python | `PYTHON` | `.py` | `python2ssa` | ANTLR Python 语法。 |
 | C# | `CSHARP` | `.cs` | `csharp2ssa` | 另有 ASP/ASPX 子前端。 |
 | Lua | `LUA` | `.lua` | `lua2ssa` | 复用 `antlr4Lua`。 |
@@ -173,6 +174,17 @@
 - 兼容：`migration30()` 默认开启，支持 Scala 2 的 `._` 通配符导入和 `_` 通配符类型；不引入第二套 Scala 2 语法。
 - 覆盖 Scala 3 缩进和花括号语法、`package`、`import`、`def`、`val`/`var`、`class`/`object`/`trait`/`enum`/`case class`/`given`。
 - SSA 降级边界：继承和虚方法分派、`match`、`given`/`extension`、泛型/隐式推导、Lambda 捕获、字符串插值和 `for` 生成器迭代不展开。
+
+### 4.13 C++（新增）
+
+- 语法来源：`antlr/grammars-v4` 的 `cpp/`（CPP14），提交 `de38599628d2`；MIT 许可，见 `common/yak/cpp/LICENSE` 和 `NOTICE.md`。
+- 文件：`common/yak/cpp/CPP14Lexer.g4`、`CPP14Parser.g4`；生成到 `common/yak/cpp/parser`。
+- 生成脚本：`common/yak/cpp/gen.sh`。
+- 与 C 分开：不改 `CParser.g4`；C 解析器实测只通过 7% 的真实 C++ 文件。详见 `docs/design/ssa-cpp-frontend.md` §1。
+- 共用：`common/yak/c2ssa/preprocess`（宏和 include）与 `common/yak/cfamily/cliteral`（字面量）；共享改动用配置开关保持 C 默认行为。
+- 头文件策略：`.h` 归 C；`.hpp`、`.hxx`、`.hh` 归 C++；头文件只通过 `#include` 内联，不做翻译单元。
+- 覆盖：命名空间、类与继承、成员函数、构造/析构与初始化列表、模板声明、引用/指针、`new`/`delete`、`using`/`typedef`。
+- SSA 降级边界：不实例化模板、不做重载决议和虚分派；标准库只提供声明占位（`stdlib.go` 单表）。
 
 ## 5. 新增语言的接入清单
 
