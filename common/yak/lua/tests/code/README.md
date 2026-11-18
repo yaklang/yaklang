@@ -13,5 +13,5 @@ projects, but no source code was copied:
   (Apache-2.0). The lexer accepts the suffix; it is not evaluated as a 64-bit
   cdata value.
 
-Real project checkouts are not committed. The corpus runner is
-`scripts/ssa-lang-corpus`.
+Real project checkouts are not committed. The syntax fixtures run through
+`TestAllSyntaxForLua_G4` in the syntax-g4 workflow.

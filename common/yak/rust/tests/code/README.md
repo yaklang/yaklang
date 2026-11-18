@@ -14,5 +14,5 @@ projects, but no source code was copied:
 - associated-type bounds (`type Error: std::error::Error;`), observed in serde
   (MIT/Apache-2.0).
 
-Real project checkouts are not committed. The corpus runner is
-`scripts/ssa-lang-corpus`.
+Real project checkouts are not committed. The syntax fixtures run through
+`TestAllSyntaxForRust_G4` in the syntax-g4 workflow.
