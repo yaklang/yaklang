@@ -41,7 +41,7 @@ NEG
 )
 
 rm(*<slice(start=1)> as $args) as $call
-$args?{have: /^\/\*?$/} as $root
+$args?{any: /^\/\*?$/, /^~\/?\*?$/} as $root
 $root -> * as $rootUser
 $rootUser & $call as $linkedCall
 $linkedCall?{any: /-[a-zA-Z]*[rR][a-zA-Z]*f/, /-[a-zA-Z]*f[a-zA-Z]*[rR]/, /"-[rR]","-f"/, /"-f","-[rR]"/} as $hit
