@@ -16,7 +16,8 @@ name: Syntax G4 Tests
 #   common/yak/**/*.g4          any grammar (antlr4c, antlr4go, antlr4JS,
 #                               antlr4Lua, antlr4nasl, antlr4yak, csharp,
 #                               csharp/asp, java, java/jsp, java/spel,
-#                               java/freemarker, php, python)
+#                               java/freemarker, php, python, rust, kotlin,
+#                               scala)
 #   common/yak/**/parser/**     the antlr-generated lexer/parser packages, which
 #                               also carry hand-maintained _base.go / utils.go
 #   common/yak/**/code/**       corpus fixtures
