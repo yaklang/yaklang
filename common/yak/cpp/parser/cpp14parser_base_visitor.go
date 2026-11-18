@@ -15,6 +15,14 @@ func (v *BaseCPP14ParserVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCPP14ParserVisitor) VisitFoldExpression(ctx *FoldExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCPP14ParserVisitor) VisitFoldOperator(ctx *FoldOperatorContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCPP14ParserVisitor) VisitIdExpression(ctx *IdExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -264,6 +272,10 @@ func (v *BaseCPP14ParserVisitor) VisitAliasDeclaration(ctx *AliasDeclarationCont
 }
 
 func (v *BaseCPP14ParserVisitor) VisitSimpleDeclaration(ctx *SimpleDeclarationContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCPP14ParserVisitor) VisitIdentifierList(ctx *IdentifierListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

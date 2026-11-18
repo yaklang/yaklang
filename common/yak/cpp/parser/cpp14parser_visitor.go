@@ -13,6 +13,12 @@ type CPP14ParserVisitor interface {
 	// Visit a parse tree produced by CPP14Parser#primaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
 
+	// Visit a parse tree produced by CPP14Parser#foldExpression.
+	VisitFoldExpression(ctx *FoldExpressionContext) interface{}
+
+	// Visit a parse tree produced by CPP14Parser#foldOperator.
+	VisitFoldOperator(ctx *FoldOperatorContext) interface{}
+
 	// Visit a parse tree produced by CPP14Parser#idExpression.
 	VisitIdExpression(ctx *IdExpressionContext) interface{}
 
@@ -201,6 +207,9 @@ type CPP14ParserVisitor interface {
 
 	// Visit a parse tree produced by CPP14Parser#simpleDeclaration.
 	VisitSimpleDeclaration(ctx *SimpleDeclarationContext) interface{}
+
+	// Visit a parse tree produced by CPP14Parser#identifierList.
+	VisitIdentifierList(ctx *IdentifierListContext) interface{}
 
 	// Visit a parse tree produced by CPP14Parser#staticAssertDeclaration.
 	VisitStaticAssertDeclaration(ctx *StaticAssertDeclarationContext) interface{}

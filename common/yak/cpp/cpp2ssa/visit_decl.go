@@ -241,18 +241,19 @@ func (b *singleFileBuilder) visitNamespaceDefinition(raw cppparser.INamespaceDef
 	if !ok || definition == nil {
 		return
 	}
-	name := ""
-	if identifier := definition.Identifier(); identifier != nil {
-		name = identifier.GetText()
-	} else if original := definition.OriginalNamespaceName(); original != nil {
-		name = original.GetText()
+	// namespace a::b { } contributes one scope per name.
+	var names []string
+	for _, identifier := range definition.AllIdentifier() {
+		if identifier != nil {
+			names = append(names, identifier.GetText())
+		}
 	}
-	if name != "" {
-		b.namespace = append(b.namespace, name)
+	if len(names) > 0 {
+		b.namespace = append(b.namespace, names...)
 	}
 	b.visitDeclarationSeq(definition.DeclarationSeq())
-	if name != "" {
-		b.namespace = b.namespace[:len(b.namespace)-1]
+	if len(names) > 0 {
+		b.namespace = b.namespace[:len(b.namespace)-len(names)]
 	}
 }
 

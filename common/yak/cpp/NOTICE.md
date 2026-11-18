@@ -30,4 +30,21 @@ the upstream `cpp/` files state, so MIT is recorded here as the binding license.
    real projects (cxxopts). The new alternative cannot start with the same token
    as the existing ones, so it adds no ambiguity.
 
+4. `CPP14Parser.g4`, C++17 syntax the task requires (each new alternative has a
+   distinct first token or requires `...`/`constexpr`, so none adds ambiguity):
+   - `primaryExpression`: `foldExpression` for fold expressions such as
+     `(args + ...)`, `(... && flags)` and `(args + ... + more)`;
+   - `primaryExpression`: `Noexcept LeftParen expression RightParen`, the
+     `noexcept(expr)` operator (the `noexcept` *specifier* was already covered);
+   - `selectionStatement`: `If Constexpr? ...` for `if constexpr`;
+   - `simpleDeclaration` and `forRangeDeclaration`: structured bindings
+     (`auto [a, b] = pair;`, `for (const auto& [k, v] : map)`);
+   - `namespaceDefinition`: nested namespace definitions, `namespace a::b { }`.
+5. `CPP14Parser.g4`, `literalOperatorId`: accepts `Operator UserDefinedLiteral`,
+   so `operator""_km` written without spaces parses.
+6. `CPP14Parser.g4` + `CPP14Lexer.g4`: GNU `__attribute__((...))` as an
+   `attributeSpecifier`. The lexer gains an `AttributeGnu` token before
+   `Identifier`; the parser accepts `balancedTokenSeq` inside the double
+   parentheses. System and test headers (glibc, doctest) use this spelling.
+
 No other grammar edits were made. Regenerate with `./gen.sh`.
