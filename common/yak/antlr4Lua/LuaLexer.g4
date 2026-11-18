@@ -62,7 +62,9 @@ Comma: ',';
 Pound: '#';
 AssignEq: '=';
 PlusPlus: '++';
-SubSub: '--';
+// `--` is a comment opener, not an operator. Keep this token slot for
+// stable token numbering, but never let it win over LINE_COMMENT.
+SubSub: '--' {false}?;
 PlusEq: '+=';
 MinusEq: '-=';
 MulEq: '*=';
@@ -109,7 +111,7 @@ INT
     ;
 
 HEX
-    : '0' [xX] HexDigit+
+    : '0' [xX] HexDigit+ ([uU]? [lL] [lL]?)?
     ;
 
 FLOAT
@@ -179,8 +181,10 @@ COMMENT
     : '--[' NESTED_STR ']' -> channel(HIDDEN)
     ;
 
+// The block-comment rule is longer for `--[[...]]`; keep line comments from
+// swallowing the trailing expression by rejecting the `--[` prefix here.
 LINE_COMMENT
-    : '--' SingleLineInputCharacter* -> channel(HIDDEN)
+    : '--' {p.GetInputStream().LA(1) != '['}? ~[\r\n]* -> channel(HIDDEN)
     ;
 
 WS
