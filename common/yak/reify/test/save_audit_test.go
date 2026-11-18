@@ -61,6 +61,7 @@ int main(void) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, memoryLift.Program)
+	memoryLift.Program.FlushInstruction()
 	memoryProgram := ssaapi.NewProgram(memoryLift.Program, nil)
 	memoryResult, err := memoryProgram.SyntaxFlowWithError("helper(* as $args) as $call")
 	require.NoError(t, err)
