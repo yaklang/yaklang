@@ -20,6 +20,10 @@ observed in [OkHttp](https://github.com/square/okhttp) and
 [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines), both
 Apache-2.0. No project source was copied.
 
+`unicode_identifier.kt` is an original fixture for non-ASCII Kotlin
+identifiers (`café`, `变量`, `Ω`).
+
 Gradle `.kts` scripts use the grammar's `script` entry rule and are tested
 separately from Kotlin source files. Real project checkouts are not committed.
-The corpus runner is `scripts/ssa-lang-corpus`.
+The syntax fixtures run through `TestAllSyntaxForKotlin_G4` in the syntax-g4
+workflow.

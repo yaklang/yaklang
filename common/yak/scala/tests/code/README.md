@@ -18,5 +18,5 @@ bodies, unicode character literals, indentation-only `if` bodies and
 `for`-comprehension guards, observed in Scalatra and ZIO (same licenses as
 above).
 
-Real project checkouts are not committed. The corpus runner is
-`scripts/ssa-lang-corpus`.
+Real project checkouts are not committed. The syntax fixtures run through
+`TestAllSyntaxForScala_G4` in the syntax-g4 workflow.
