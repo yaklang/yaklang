@@ -64,7 +64,7 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 	}
 
 	if isStatic {
-		ab.emitWrappedCommands(cmd.Args, ret)
+		ab.emitWrappedCommands(cmd.Args, ret, stdin)
 	}
 	return ret
 }
@@ -109,9 +109,12 @@ func (ab *astBuilder) applyRedirs(call *ssa.Call, redirs []*syntax.Redirect) {
 			call.Binding["stdout"] = id
 			call.Binding["stderr"] = id
 		case syntax.RdrOut, syntax.AppOut, syntax.ClbOut, syntax.DplOut:
-			if fdIsStderr(redir.N) {
+			switch {
+			case fdIsStdin(redir.N):
+				call.Binding["stdin"] = id
+			case fdIsStderr(redir.N):
 				call.Binding["stderr"] = id
-			} else {
+			default:
 				call.Binding["stdout"] = id
 			}
 		case syntax.RdrInOut:
@@ -121,11 +124,15 @@ func (ab *astBuilder) applyRedirs(call *ssa.Call, redirs []*syntax.Redirect) {
 	}
 }
 
+func fdIsStdin(fd *syntax.Lit) bool {
+	return fd != nil && strings.TrimSpace(fd.Value) == "0"
+}
+
 func fdIsStderr(fd *syntax.Lit) bool {
 	return fd != nil && strings.TrimSpace(fd.Value) == "2"
 }
 
-func (ab *astBuilder) emitWrappedCommands(args []*syntax.Word, outer *ssa.Call) {
+func (ab *astBuilder) emitWrappedCommands(args []*syntax.Word, outer *ssa.Call, stdin ssa.Value) {
 	if len(args) == 0 || ab.wrapperDepth >= maxWrapperDepth {
 		return
 	}
@@ -152,32 +159,39 @@ func (ab *astBuilder) emitWrappedCommands(args []*syntax.Word, outer *ssa.Call) 
 	case "sudo", "env", "timeout", "nice", "ionice", "nohup", "exec", "command", "builtin", "stdbuf":
 		start := wrapperCommandIndex(base, args)
 		if start > 0 && start < len(args) {
-			ab.buildNestedCall(args[start:], outer)
+			ab.buildNestedCall(args[start:], outer, stdin)
 		}
 	case "xargs":
 		start := xargsCommandIndex(args)
 		if start > 0 && start < len(args) {
-			ab.buildNestedCall(args[start:], outer)
+			ab.buildNestedCall(args[start:], outer, stdin)
 		}
 	case "find":
 		start, end := findExecCommand(args)
 		if start > 0 && start < end {
-			ab.buildNestedCall(args[start:end], outer)
+			ab.buildNestedCall(args[start:end], outer, stdin)
 		}
 	}
 }
 
-func (ab *astBuilder) buildNestedCall(words []*syntax.Word, outer *ssa.Call) {
+func (ab *astBuilder) buildNestedCall(words []*syntax.Word, outer *ssa.Call, stdin ssa.Value) {
 	if len(words) == 0 || ab.wrapperDepth >= maxWrapperDepth {
 		return
 	}
 	ab.wrapperDepth++
 	defer func() { ab.wrapperDepth-- }()
 
-	ret := ab.buildCallExpr(&syntax.CallExpr{Args: words}, nil, nil)
+	ret := ab.buildCallExpr(&syntax.CallExpr{Args: words}, nil, stdin)
 	inner, ok := ret.(*ssa.Call)
 	if !ok || inner == nil || outer == nil {
 		return
+	}
+	// The wrapper passes its streams through to the effective command, so a
+	// pipeline such as `curl ... | sudo bash` must keep the stdin edge.
+	for _, key := range []string{"stdin", "stdout", "stderr"} {
+		if id, ok := outer.Binding[key]; ok {
+			inner.Binding[key] = id
+		}
 	}
 	inner.Binding["wrapped_by"] = outer.GetId()
 }
