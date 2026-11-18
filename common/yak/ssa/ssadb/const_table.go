@@ -187,7 +187,14 @@ type IrConstPool struct {
 	mu      sync.Mutex
 	program string
 	seen    map[int64]struct{}
-	pending []*IrConst
+	// pending is keyed by ConstID, not a slice. The pool is filled by the
+	// concurrent marshal workers, and a value only joins seen after its row is
+	// written, so the same id can be interned many times between two flushes.
+	// Keying the queue keeps exactly one row per id for the next batch: a
+	// duplicate row in one INSERT ... ON CONFLICT statement is rejected by
+	// PostgreSQL ("cannot affect row a second time"), which fails the whole IR
+	// batch.
+	pending map[int64]*IrConst
 }
 
 var irConstPools sync.Map
@@ -197,7 +204,11 @@ func GetIrConstPool(program string) *IrConstPool {
 	if v, ok := irConstPools.Load(program); ok {
 		return v.(*IrConstPool)
 	}
-	pool := &IrConstPool{program: program, seen: make(map[int64]struct{}, 64)}
+	pool := &IrConstPool{
+		program: program,
+		seen:    make(map[int64]struct{}, 64),
+		pending: make(map[int64]*IrConst, 64),
+	}
 	actual, _ := irConstPools.LoadOrStore(program, pool)
 	return actual.(*IrConstPool)
 }
@@ -227,13 +238,18 @@ func (p *IrConstPool) Intern(kind IrConstKind, text string) int64 {
 	id := IrConstPoolID(kind, text)
 	p.mu.Lock()
 	if _, ok := p.seen[id]; !ok {
-		p.pending = append(p.pending, &IrConst{
-			ProgramName: p.program,
-			ConstID:     id,
-			Kind:        int64(kind),
-			TextSize:    int64(len(text)),
-			String:      text,
-		})
+		if p.pending == nil {
+			p.pending = make(map[int64]*IrConst, 1)
+		}
+		if _, queued := p.pending[id]; !queued {
+			p.pending[id] = &IrConst{
+				ProgramName: p.program,
+				ConstID:     id,
+				Kind:        int64(kind),
+				TextSize:    int64(len(text)),
+				String:      text,
+			}
+		}
 	}
 	p.mu.Unlock()
 	return id
@@ -247,28 +263,42 @@ func (p *IrConstPool) Intern(kind IrConstKind, text string) int64 {
 // Intern time would lose the row when the surrounding transaction rolls back:
 // the batch is retried, intern sees the value as already known, and the IR row
 // ends up pointing at a pool row that was never committed.
+//
+// The pending queue is swapped for an empty map before the write, so values
+// interned while the batch is in flight own their own next-batch entry. The
+// flush and its retry both add rows by key, so no batch can contain the same
+// (program_name, const_id) twice.
 func (p *IrConstPool) Flush(db *gorm.DB) error {
 	if p == nil || db == nil {
 		return nil
 	}
 	p.mu.Lock()
-	rows := p.pending
-	p.pending = nil
+	pending := p.pending
+	p.pending = make(map[int64]*IrConst, len(pending))
 	p.mu.Unlock()
-	if len(rows) == 0 {
+	if len(pending) == 0 {
 		return nil
+	}
+	rows := make([]*IrConst, 0, len(pending))
+	for _, row := range pending {
+		rows = append(rows, row)
 	}
 	if err := db.New().SaveInBatches(rows, irConstBatchChunk, "program_name", "const_id").Error; err != nil {
 		// Put the rows back: the caller's transaction may be retried, and a
-		// silent drop would leave ir_codes rows pointing at nothing.
+		// silent drop would leave ir_codes rows pointing at nothing. A value
+		// interned again meanwhile already has its entry; keep that one.
 		p.mu.Lock()
-		p.pending = append(rows, p.pending...)
+		for id, row := range pending {
+			if _, queued := p.pending[id]; !queued {
+				p.pending[id] = row
+			}
+		}
 		p.mu.Unlock()
 		return err
 	}
 	p.mu.Lock()
-	for _, row := range rows {
-		p.seen[row.ConstID] = struct{}{}
+	for id := range pending {
+		p.seen[id] = struct{}{}
 	}
 	p.mu.Unlock()
 	return nil
