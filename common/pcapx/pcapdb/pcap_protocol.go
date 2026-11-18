@@ -244,6 +244,10 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 	}
 	options := []pcaputil.CaptureOption{
 		pcaputil.WithContext(replayCtx),
+		// Offline viewing starts from arbitrary points in long captures. Allow a
+		// validated HTTP response to retain its own framing when the request was
+		// captured before the file began or was otherwise unavailable.
+		pcaputil.WithHTTPResponseWithoutRequest(true),
 		// Offline traffic viewing must keep usable packets and protocol
 		// diagnostics when one flow reaches a reassembly resource limit.
 		// Strict replay can be added separately for validation workflows.

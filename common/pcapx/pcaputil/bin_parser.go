@@ -611,6 +611,10 @@ type BinParserBinding struct {
 type BinParserConfig struct {
 	TFTPFilePort       uint16
 	TFTPFileBytesLimit int
+	// HTTPResponseWithoutRequest enables response framing from the response
+	// itself when an offline capture starts in the middle of a TCP stream.
+	// Such events remain explicitly marked as lacking request context.
+	HTTPResponseWithoutRequest bool
 	// DecodeDNP3ReadPoints opts into bounded class READ/static point observations.
 	DecodeDNP3ReadPoints bool
 	// DecodeDNP3TransportFragments enables bounded TCP DNP3 transport assembly.

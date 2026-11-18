@@ -38,6 +38,7 @@ type binHTTPState struct {
 	status                                                         int
 	doh, ipp                                                       bool
 	responseComplete                                               bool
+	requestContextMissing                                          bool
 }
 
 func (h *binHTTPState) config(bodyLimit int) map[string]any {
@@ -312,10 +313,16 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			h.rawHeader = bytes.Clone(w[:end])
 			d.http = h
 			if len(f.httpMethods) == 0 {
-				if f.httpMayAwaitRequest(dir) {
+				if f.a.config.HTTPResponseWithoutRequest {
+					// The response remains independently framable when its status
+					// and headers determine no-body, fixed, chunked or close-delimited
+					// framing. Request-dependent semantics stay explicitly unknown.
+					h.requestContextMissing = true
+				} else if f.httpMayAwaitRequest(dir) {
 					return 0, nil, f.awaitHTTPRequest(h)
+				} else {
+					return 0, nil, sessionContext("HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
 				}
-				return 0, nil, sessionContext("HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
 			}
 			// Interim responses do not complete the queued request and carry
 			// no DNS message. Associate only this request's final response.
@@ -517,24 +524,26 @@ func (f *binFlow) finishHTTP(dir int) {
 			if request := f.directions[1-dir].http; request != nil && !request.response && len(f.httpIDs) > 0 && request.requestID == f.httpIDs[0] {
 				request.responseComplete = true
 			}
-			f.httpMethods[0] = ""
-			f.httpMethods = f.httpMethods[1:]
-			f.httpIDs = f.httpIDs[1:]
-			f.httpTimes = f.httpTimes[1:]
-			if len(f.httpUpgrades) > 0 {
-				f.httpUpgrades = f.httpUpgrades[1:]
-				if len(f.httpUpgradeIssues) > 0 {
-					f.httpUpgradeIssues = f.httpUpgradeIssues[1:]
+			if len(f.httpMethods) > 0 {
+				f.httpMethods[0] = ""
+				f.httpMethods = f.httpMethods[1:]
+				f.httpIDs = f.httpIDs[1:]
+				f.httpTimes = f.httpTimes[1:]
+				if len(f.httpUpgrades) > 0 {
+					f.httpUpgrades = f.httpUpgrades[1:]
+					if len(f.httpUpgradeIssues) > 0 {
+						f.httpUpgradeIssues = f.httpUpgradeIssues[1:]
+					}
+					f.httpWSKeys = f.httpWSKeys[1:]
+					f.httpWSExtensions = f.httpWSExtensions[1:]
+					f.httpWSProtocols = f.httpWSProtocols[1:]
 				}
-				f.httpWSKeys = f.httpWSKeys[1:]
-				f.httpWSExtensions = f.httpWSExtensions[1:]
-				f.httpWSProtocols = f.httpWSProtocols[1:]
-			}
-			if len(f.httpIPP) > 0 {
-				f.httpIPP = f.httpIPP[1:]
-			}
-			if len(f.httpDoH) > 0 {
-				f.httpDoH = f.httpDoH[1:]
+				if len(f.httpIPP) > 0 {
+					f.httpIPP = f.httpIPP[1:]
+				}
+				if len(f.httpDoH) > 0 {
+					f.httpDoH = f.httpDoH[1:]
+				}
 			}
 		}
 	}
@@ -606,6 +615,13 @@ func (f *binFlow) httpEvidence(dir int, e *ProtocolEvent) {
 		return // No guessed method, request ID, or message boundary.
 	}
 	e.Completeness = "message"
+	if h.requestContextMissing {
+		e.Admission = "validated-response-without-request-context"
+		if e.Session == nil {
+			e.Session = map[string]any{}
+		}
+		e.Session["Request Context Available"] = false
+	}
 	if !h.response {
 		e.ID = h.requestID
 		e.TransactionID = e.ID
