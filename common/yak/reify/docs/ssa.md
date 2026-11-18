@@ -358,9 +358,10 @@ ELF/PE/MachO
   -> lowir2ssa
   -> SSA passes + 符号标注
   -> Result.Program
-  -> Program.SaveToDatabase（仅落库时）
+  -> Program.FlushInstruction（内存查询）
+  -> Program.SaveToDatabase（落库；内部先 flush）
   -> ssadb（ir_programs / ir_codes / ir_indices_v1 / ir_name_pool_v1）
-  -> ssaapi.FromDatabase
+  -> ssaapi.FromDatabase / ssaapi.NewProgram
   -> SyntaxFlow
 ```
 
@@ -369,11 +370,13 @@ ELF/PE/MachO
 - `reify.WithProgramName(name)`：命名生成的 SSA 程序。
 - `reify.WithProgramCache(ssa.ProgramCacheDBWrite)`：选择 DB 写缓存。默认是内存缓存。
 - `Result.Program`：lift 得到的 `*ssa.Program`。`asm` 和 `lowir` 模式下为 nil。
-- `(*ssa.Program).SaveToDatabase()`：写 `ir_programs`，把指令标脏，再 flush
-  四个 cache store。只接受 DB 写缓存。调用后缓存关闭，查询需要重新加载。
-- 函数名索引只在 `SaveToDatabase` 中写入，且只写 `Function` 值。语言前端通过
-  builder 建索引；reify 绕过 builder，所以在保存阶段补索引。
-- `ssaapi.NewProgram(program, nil)`：包装内存 SSA，直接执行 SyntaxFlow。
+- `(*ssa.Program).FlushInstruction()`：登记所有函数名到变量索引，并把指令标脏。
+  内存程序在查询前调用它；`SaveToDatabase` 也会在落库前调用。
+- `(*ssa.Program).SaveToDatabase()`：调用 `FlushInstruction`，写 `ir_programs`，
+  再 flush 四个 cache store。只接受 DB 写缓存。调用后缓存关闭，查询需要重新加载。
+- 函数名索引由 `FlushInstruction` 写入，且只写 `Function` 值。语言前端通过
+  builder 建索引；reify 绕过 builder，所以由 flush 补索引。
+- `ssaapi.NewProgram(program, nil)`：包装已 flush 的内存 SSA，执行 SyntaxFlow。
 - `ssaapi.FromDatabase(name)`：从 ssadb 加载程序，再执行 SyntaxFlow。
 
 ### 命令行
@@ -387,14 +390,14 @@ gcc -O0 -fno-pie -no-pie -fno-stack-protector -o "$OUT/src/demo" "$OUT/src/demo.
 "$OUT/bin/reify" save "$OUT/src/demo" --name demo-e2e --section .text
 
 # audit 文件 = lift 到内存 SSA，直接在 SSA 上执行 SyntaxFlow
-"$OUT/bin/reify" audit "$OUT/src/demo" --section .text --call printf
+"$OUT/bin/reify" audit "$OUT/src/demo" 'printf(* as $args) as $call' --section .text
 
 # audit program = 从 ssadb 加载，再执行 SyntaxFlow
-"$OUT/bin/reify" audit --program demo-e2e --call printf
+"$OUT/bin/reify" audit --program demo-e2e 'printf(* as $args) as $call'
 
 # 指定 ssadb 文件
 "$OUT/bin/reify" audit --program demo-e2e \
-  --db "$OUT/yakit-home/default-yakssa.db" --call printf
+  --db "$OUT/yakit-home/default-yakssa.db" 'printf(* as $args) as $call'
 ```
 
 `save` 输出：
@@ -404,33 +407,33 @@ Program: demo-e2e
 Functions: 10
 Blocks: 20
 Values: 208
-Query: reify audit --program demo-e2e --call <function>
+Query: reify audit --program demo-e2e '<syntaxflow>'
 ```
 
 `audit` 文件模式输出：
 
 ```text
 Program: reify-lowir
-Rule: printf(* as $args) as $call
-Match args: 4
-Match call: 2
-Callee printf (extern): 2
-  "compute: %d\n"
-  castType(i64, ... Parameter-arg0 ...)
-  "result: %d\n"
-  castType(i64, ... 41 ...)
-  Function-printf("compute: %d\n", ...)
-  Function-printf("result: %d\n", ...)
+rule md5 hash: e850ee9d7a37f47148a2e5814ea3a0ae
+rule preview: printf(* as $args) as $call
+description: {"desc":"","lang":"","level":"","solution":"","title":"","title_zh":"","type":""}
+Result Vars:
+  $args:
+    t305: "compute: %d\ "
+    ...
+  $call:
+    t261: Function-printf("compute: %d\ ",...)
+    ...
 ```
 
-`audit --program` 输出结构与文件模式相同。`YAKIT_HOME` 决定默认 ssadb 位置；
-`--db` 可以覆盖它。重复使用同一个程序名需要 `--replace`。
+文本输出直接来自 `SyntaxFlowResult.String()`。`audit --program` 的输出结构
+相同。`YAKIT_HOME` 决定默认 ssadb 位置；`--db` 可以覆盖它。重复使用同一个
+程序名需要 `--replace`。
 
-`--call X` 等价于规则 `X(* as $args) as $call`。`--rule` 接受任意 SyntaxFlow
-规则，例如列出所有调用：
+规则作为最后一个参数传入，也可以用 `--rule`。例如列出所有调用：
 
 ```bash
-"$OUT/bin/reify" audit --program demo-e2e --rule '*?{opcode: call} as $call'
+"$OUT/bin/reify" audit --program demo-e2e '*?{opcode: call} as $call'
 ```
 
 ### ssadb 内容
@@ -458,13 +461,15 @@ ir_codes:    Call=6, Function=11, BasicBlock=19, Parameter=80, ...
 - 实参：按 ABI 参数寄存器与栈传参捕获。已知 C 签名会裁剪多余寄存器实参；
   内部函数按被调用方实际读取的参数个数裁剪（最多 6 个）。
 - SyntaxFlow 结果绑定调用值：`X(* as $args) as $call` 同时得到实参和调用点。
-- 文件审计与数据库审计返回相同的调用点和实参。内存程序按函数表匹配名称；
-  落库程序按名称索引匹配。
+- 文件审计与数据库审计返回相同的调用点和实参。文件审计先调用
+  `FlushInstruction` 登记函数名，落库程序使用保存时写入的名称索引。
+- 外部与本地函数的区分通过 `GetCallee()` 和 `Function.IsExtern()` 提供；
+  CLI 文本输出只展示 `SyntaxFlowResult.String()`。
 
 未做到：
 
 - 函数指针经栈或内存槽中转的间接调用不解析符号。实测
-  `op_t op = inc; op(41)` 的 Call 目标是寄存器值，`--call inc` 返回 0；
+  `op_t op = inc; op(41)` 的 Call 目标是寄存器值，`inc(* as $args) as $call` 返回 0；
   调用点仍能通过 `*?{opcode: call} as $call` 找到，目标显示为地址常量。
 - 虚表、GOT 动态改写、跨函数内存传播未做。
 - 无源码，因此没有行号和源码片段；结果展示 SSA 指令文本。
@@ -480,6 +485,7 @@ export TMPDIR="$GOTMPDIR"
 ./scripts/ssa-test.sh -count=1 -run TestBinarySSAIsPersistedAndQueriedBySyntaxFlow ./common/yak/reify/test/
 ```
 
-测试覆盖：C 源码编译、内存 SSA 查询、`WithProgramName` +
-`WithProgramCache(ProgramCacheDBWrite)` 落库、`ssaapi.FromDatabase` 重新加载、
+测试覆盖：C 源码编译、内存 SSA 调用 `FlushInstruction` 后查询、
+`WithProgramName` + `WithProgramCache(ProgramCacheDBWrite)` 落库、
+`ssaapi.FromDatabase` 重新加载、
 `printf` 外部调用查询、`helper` 本地调用查询，以及 `$call` 的 callee 还原。
