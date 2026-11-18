@@ -60,6 +60,24 @@ func TestGoWeakCryptoFalsePositiveRuleFixes(t *testing.T) {
 	}
 }
 
+func TestSourceRuleFalsePositiveFixes(t *testing.T) {
+	files := []string{
+		filepath.Join("..", "general", "secrets", "secrets-username-password-uri.sf"),
+		filepath.Join("..", "java", "cwe-295-certificate-validation", "java-hostname-verifier-true.sf"),
+		filepath.Join("..", "java", "cwe-295-certificate-validation", "java-empty-trust-manager.sf"),
+		filepath.Join("..", "java", "cwe-94-code-injection", "source-java-script-engine-eval.sf"),
+	}
+	for _, f := range files {
+		f := f
+		t.Run(filepath.Base(f), func(t *testing.T) {
+			raw, err := os.ReadFile(f)
+			require.NoError(t, err)
+			err = ssatest.EvaluateVerifyFilesystem(string(raw), t, true)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()

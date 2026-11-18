@@ -9,16 +9,18 @@ desc(
 	risk: "code-injection"
 	desc: <<<DESC
 ### 规则说明
-检测到 Java 脚本引擎 eval 调用。
+检测到 Java 脚本引擎 eval 调用。把可被外部影响的内容交给脚本引擎执行，可能导致任意代码执行。
 
 ### 风险类型
 code-injection
 
 ### 影响
-该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+不可信输入被脚本引擎直接执行时，攻击者可以读写应用数据或执行任意逻辑。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配，要求调用接收者明确是脚本引擎：`scriptEngine`、`jsEngine`、`ScriptEngine` 或 `engine`，或 `getEngine(...)` / `getEngineByName(...)` 的返回值。
+
+普通对象的同名方法不会命中：`VelocityUtil.eval(...)`、`engine.evaluate(...)`、`obj.eval(...)` 都不算脚本引擎调用。是否可被外部影响仍需结合数据流确认。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -27,8 +29,12 @@ SOLUTION
 	alert_min: 1
 	"file://Dyn.java": <<<POS
 class Dyn {
-  Object bad(javax.script.ScriptEngine engine, String code) throws Exception {
-    return engine.eval(code);
+  Object bad(javax.script.ScriptEngine scriptEngine, String code) throws Exception {
+    return scriptEngine.eval(code);
+  }
+
+  Object bad2(javax.script.ScriptEngineManager manager, String code) throws Exception {
+    return manager.getEngineByName("js").eval(code);
   }
 }
 POS
@@ -39,9 +45,17 @@ class DynSafe {
   }
 }
 NEG
+	"safefile://VelocitySafe.java": <<<NEG
+class VelocitySafe {
+  void ok(Object engine, Object ctx, Object out, String template) {
+    VelocityUtil.eval(template, ctx);
+    engine.evaluate(ctx, out, "tag", template);
+  }
+}
+NEG
 )
 
-${*.java}.pattern_regex(/\.eval\s*\(/) as $hit
+${*.java}.pattern_regex(/(?m)\b(?:scriptEngine|ScriptEngine|jsEngine|engine)\s*\.\s*eval\s*\(|getEngine(?:ByName|ByExtension|ByMimeType)?\s*\([^)]*\)\s*\.\s*eval\s*\(/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 Java ScriptEngine.eval 调用",
