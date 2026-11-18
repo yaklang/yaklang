@@ -594,6 +594,23 @@ func writeLanguage(w io.Writer, report *core.LanguageReport) {
 	for _, evidence := range report.Evidence {
 		fmt.Fprintf(w, "Evidence [%s]: %s\n", evidence.Source, evidence.Detail)
 	}
+	if abi := report.ABI; abi != nil {
+		parts := []string{fmt.Sprintf("%d argument registers", len(abi.Registers.Arguments))}
+		if abi.Registers.Return != "" {
+			parts = append(parts, "return "+abi.Registers.Return)
+		}
+		if abi.NoCalleeSave {
+			parts = append(parts, "no callee-saved")
+		}
+		fmt.Fprintf(w, "ABI: language override (%s)\n", strings.Join(parts, ", "))
+	}
+	if model := report.Strings; model != nil {
+		termination := "nul-terminated"
+		if !model.NulTerminated {
+			termination = "not nul-terminated"
+		}
+		fmt.Fprintf(w, "Strings: %s (%s, %s, %s)\n", model.Kind, model.Header, model.Encoding, termination)
+	}
 }
 
 func writeBoundaryStats(text *bytes.Buffer, stats *core.BoundaryStats) {

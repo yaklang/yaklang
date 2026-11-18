@@ -20,6 +20,18 @@ const (
 	SourceRustDemangle = "rust-demangle"
 )
 
+// Convention records which calling convention a function follows. An empty
+// value means the language layer's convention, and a language without an
+// override keeps the platform convention. A function the language does not own,
+// such as a Go .abi0 wrapper or a cgo function, is marked explicitly.
+type Convention string
+
+const (
+	// ConventionPlatform marks a function that follows the platform ABI even
+	// inside an image whose language has its own convention.
+	ConventionPlatform Convention = "platform"
+)
+
 // Symbol is one named address from a file-format symbol or relocation table.
 // Imported symbols may have Address zero when the format only names them.
 //
@@ -29,14 +41,15 @@ const (
 // Source names where the symbol came from: an empty value means the container's
 // own symbol table, and "pclntab" means it was recovered from Go metadata.
 type Symbol struct {
-	Name     string     `json:"name"`
-	Mangled  string     `json:"mangled,omitempty"`
-	Address  uint64     `json:"address,omitempty"`
-	Size     uint64     `json:"size,omitempty"`
-	Kind     SymbolKind `json:"kind"`
-	Imported bool       `json:"imported,omitempty"`
-	Library  string     `json:"library,omitempty"`
-	Source   string     `json:"source,omitempty"`
+	Name       string     `json:"name"`
+	Mangled    string     `json:"mangled,omitempty"`
+	Address    uint64     `json:"address,omitempty"`
+	Size       uint64     `json:"size,omitempty"`
+	Kind       SymbolKind `json:"kind"`
+	Imported   bool       `json:"imported,omitempty"`
+	Library    string     `json:"library,omitempty"`
+	Source     string     `json:"source,omitempty"`
+	Convention Convention `json:"convention,omitempty"`
 }
 
 // At returns the symbol at address. An exact address match wins; a symbol with
