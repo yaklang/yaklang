@@ -89,16 +89,21 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" lift --mode source --address 0xmain --size 0x40 /bin/ls
 "$OUT/bin/reify" lift --json --mode lowir /bin/true
 
-# 落库到 ssadb，再用 syntaxflow 查询
+# lift 到 SSA 后直接审计
+"$OUT/bin/reify" audit /bin/ls --section .text --call printf
+
+# lift 到 SSA，落库到 ssadb，再从数据库审计
 export YAKIT_HOME="$OUT/yakit-home"
 "$OUT/bin/reify" save /bin/ls --name ls-binary --section .text
 "$OUT/bin/reify" audit --program ls-binary --call printf
+"$OUT/bin/reify" audit --program ls-binary \
+  --db "$OUT/yakit-home/default-yakssa.db" --call printf
 "$OUT/bin/reify" audit --program ls-binary --rule '*?{opcode: call} as $call'
 ```
 
 `lift` 默认输出 `asm`。默认恢复并解码全部已发现函数；`--section` 选择单个节，`--func` 选择一个函数，`--address/--size` 选择地址区间。`--mode` 选择 `asm`、`lowir`、`ssair`、`source` 或 `all`。默认使用 Intel 语法；`--asm-syntax att` 切换 GNU/AT&T。用 `--address` 和 `--size` 可以限定一个连续代码区域。两个参数必须同时给出。
 
-`save` 把 SSA 写入 ssadb；`YAKIT_HOME` 选择数据库目录。同名程序默认拒绝写入，加 `--replace` 先删旧行。`audit` 从 ssadb 加载程序并执行 SyntaxFlow；`--call X` 是规则 `X(* as $args) as $call` 的简写。`--rule` 接受任意规则，`--json` 输出结构化结果。
+`save` 先调用 lift 得到 `Result.Program`，再调用 `Program.SaveToDatabase()` 写入 ssadb。`YAKIT_HOME` 选择数据库目录；同名程序默认拒绝写入，加 `--replace` 先删旧行。`audit <file>` 在内存 SSA 上执行 SyntaxFlow。`audit --program` 从 ssadb 加载程序后执行；`--db` 可指定数据库文件。`--call X` 是规则 `X(* as $args) as $call` 的简写。`--rule` 接受任意规则，`--json` 输出结构化结果。
 
 `ssair` 先执行 LowIR 转换，再输出 YakSSA 文本。`source` 在 `ssair` 之后输出伪源码。两者都不是可编译源码。
 
