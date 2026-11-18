@@ -15,6 +15,7 @@ const recoveryTaskIDPrefix = "react-recovery-"
 
 type invokePlanAndExecuteOptions struct {
 	task                     aicommon.AIStatefulTask
+	rootAttachments          []*aicommon.AttachedResource
 	planPayload              string
 	forgeName                string
 	forgeParams              any
@@ -29,6 +30,16 @@ type InvokePlanAndExecuteOption func(*invokePlanAndExecuteOptions)
 func WithInvokePlanAndExecuteTask(task aicommon.AIStatefulTask) InvokePlanAndExecuteOption {
 	return func(cfg *invokePlanAndExecuteOptions) {
 		cfg.task = task
+	}
+}
+
+// Direct coordinator focus skips the parent loop. Only this route forwards
+// raw attachments; a plan requested by a running loop already has its timeline.
+func withCoordinatorInputTask(task aicommon.AIStatefulTask) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.task = task
+		cfg.planPayload = task.GetUserInput()
+		cfg.rootAttachments = task.GetAttachedDatas()
 	}
 }
 

@@ -367,7 +367,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		taskTypeName = "coordinator"
 	}
 	if taskTypeName == "coordinator" {
-		return false, r.invokeCoordinatorChannel(taskTypeName, make(chan struct{}), task.GetContext(), WithInvokePlanAndExecuteTask(task), WithInvokePlanAndExecutePlanPayload(task.GetUserInput()))
+		return false, r.invokeCoordinatorChannel(taskTypeName, make(chan struct{}), task.GetContext(), withCoordinatorInputTask(task))
 	}
 	defaultOptions := reactloops.BasicAICommonConfigOption(r.config)
 	defaultOptions = append(defaultOptions,
