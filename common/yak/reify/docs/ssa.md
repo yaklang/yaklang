@@ -345,3 +345,148 @@ loader/arch/amd64/testdata/*.json         # 机器码 → 精确 LowIR
 
 AMD64 用例的 `lowir` 是完整期望文本，不做片段匹配；
 SSAIR 用例是普通文本，不使用 JSON 转义。
+
+## 落库与 SyntaxFlow 审计
+
+reify 可以把一次 lift 的 YakSSA 直接写入 ssadb，再由 `ssaapi.FromDatabase`
+加载并执行 SyntaxFlow。链路不经过伪源码，也不重新解析二进制。
+
+```text
+ELF/PE/MachO
+  -> asm2lowir
+  -> lowir2ssa（ProgramCacheDBWrite）
+  -> SSA passes + 符号标注
+  -> ssa.Program.SaveToDatabase
+  -> ssadb（ir_programs / ir_codes / ir_indices_v1 / ir_name_pool_v1）
+  -> ssaapi.FromDatabase
+  -> SyntaxFlow
+```
+
+### 落库接口
+
+- `lowir2ssa.WithProgramCache(ssa.ProgramCacheDBWrite)`：转换阶段直接使用
+  DB 写缓存，指令随构建进入 ssadb。
+- `lowir2ssa.WithProgramName(name)`：写入 `ir_programs.program_name`。
+- `lowir2ssa.WithLanguage(ssaconfig.C)`：记录语言。二进制没有源语言，
+  这里用 C 表示其 ABI 与符号模型。
+- `reify.WithPersist(name)`：`Lift` 在 SSA pass 和符号标注之后调用
+  `(*ssa.Program).SaveToDatabase()`，返回的 `Result.ProgramName` 即库中程序名。
+- `(*ssa.Program).SaveToDatabase()`：写元数据、把所有指令标脏、flush 四个
+  cache store。调用后缓存关闭，查询必须重新从 ssadb 加载。
+- `(*ssa.Program).RegisterInstructionName(name, inst)`：把直接创建的函数登记到
+  变量索引和名称池。语言前端通常通过 builder 完成这一步；reify 绕过 builder，
+  因此必须显式登记，否则按名字搜索找不到函数。
+
+### 命令行
+
+```bash
+OUT=/mnt/data/scan-outputs/bin-ssa-feasibility/final-20261118-0203
+export YAKIT_HOME="$OUT/yakit-home"
+gcc -O0 -fno-pie -no-pie -fno-stack-protector -o "$OUT/src/demo" "$OUT/src/demo.c"
+
+# 1. lift + 落库
+"$OUT/bin/reify" save "$OUT/src/demo" --name demo-e2e --section .text
+
+# 2. 查询所有调用 printf 的位置和实参
+"$OUT/bin/reify" audit --program demo-e2e --call printf
+
+# 3. 查询内部函数调用
+"$OUT/bin/reify" audit --program demo-e2e --call helper
+```
+
+`save` 输出：
+
+```text
+Program: demo-e2e
+Functions: 10
+Blocks: 20
+Values: 208
+Query: reify audit --program demo-e2e --call <function>
+```
+
+`YAKIT_HOME` 决定 ssadb 位置，默认是 `~/yakit-projects`。重复使用同一个程序名
+需要 `--replace`；它会先删除旧程序和旧指令行，再写入新结果。每次 lift 使用
+唯一名字可以避免覆盖。
+
+`audit --call printf` 输出（实参表达式节选）：
+
+```text
+Program: demo-e2e
+Rule: printf(* as $args) as $call
+Match args: 4
+Match call: 2
+Callee printf (extern): 2
+  "compute: %d\n"
+  castType(i64, ... Parameter-arg0 ...)
+  "result: %d\n"
+  castType(i64, ... 41 ...)
+  Function-printf("compute: %d\n", ...)
+  Function-printf("result: %d\n", ...)
+```
+
+`audit --call helper` 输出：
+
+```text
+Program: demo-e2e
+Rule: helper(* as $args) as $call
+Match args: 1
+Match call: 1
+Callee helper (local): 1
+  castType(i64, ... Parameter-arg0 ...)
+  Function-boundary: symbol;frame-cleanup(...)
+```
+
+`--call X` 等价于规则 `X(* as $args) as $call`。`--rule` 接受任意
+SyntaxFlow 规则，例如列出所有调用：
+
+```bash
+"$OUT/bin/reify" audit --program demo-e2e --rule '*?{opcode: call} as $call'
+```
+
+### ssadb 内容
+
+一次 `demo-e2e` 落库后实测：
+
+```text
+ir_programs: demo-e2e | application | c
+ir_codes:    Call=6, Function=11, BasicBlock=19, Parameter=80, ...
+```
+
+- 调用目标是指向 `Function` 指令的值，`ir_codes.call_method` 保存该值 ID。
+- `ir_indices_v1` 保存函数名到函数值 ID 的索引。
+- `ir_name_pool_v1` 保存名称字符串。
+- 调用实参保存在 `ir_codes.call_args`。
+
+### 调用分析边界
+
+已实测：
+
+- 直接调用：调用目标是常量地址时，按镜像符号表命名。调用 `printf` 的
+  PLT/GOT 目标会解析为 `printf`，并标记为外部函数。
+- 本地函数：符号表中有定义的函数保留名字（如 `helper`、`compute`），
+  调用目标为本地 `Function`，`IsExtern` 为假。
+- 实参：按 ABI 参数寄存器与栈传参捕获。已知 C 签名会裁剪多余寄存器实参；
+  内部函数按被调用方实际读取的参数个数裁剪（最多 6 个）。
+- SyntaxFlow 结果绑定调用值：`X(* as $args) as $call` 同时得到实参和调用点。
+
+未做到：
+
+- 函数指针经栈或内存槽中转的间接调用不解析符号。实测
+  `op_t op = inc; op(41)` 的 Call 目标是寄存器值，`--call inc` 返回 0；
+  调用点仍能通过 `*?{opcode: call} as $call` 找到，目标显示为地址常量。
+- 虚表、GOT 动态改写、跨函数内存传播未做。
+- 无源码，因此没有行号和源码片段；结果展示 SSA 指令文本。
+- 反编译后的类型是近似值；实参表达式中保留 `castType` 链。
+
+### 测试
+
+```bash
+export GOCACHE=/mnt/data/cache/go-build
+export GOMODCACHE=/mnt/data/cache/go-mod
+export GOTMPDIR=/mnt/data/cache/go-tmp
+export TMPDIR="$GOTMPDIR"
+./scripts/ssa-test.sh -count=1 -run TestBinarySSAIsPersistedAndQueriedBySyntaxFlow ./common/yak/reify/test/
+```
+
+测试覆盖：C 源码编译、`WithPersist` 落库、`ssaapi.FromDatabase` 重新加载、
+`printf` 外部调用查询、`helper` 本地调用查询，以及 `$call` 的 callee 还原。
