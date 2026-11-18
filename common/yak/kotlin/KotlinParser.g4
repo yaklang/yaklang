@@ -234,7 +234,7 @@ typeParameterModifier
     ;
 
 type_
-    : typeModifiers? (parenthesizedType | nullableType | typeReference | functionType)
+    : typeModifiers? (parenthesizedType | nullableType | typeReference | functionType) (NL* AMP NL* typeReference)*
     ;
 
 typeModifiers
@@ -350,7 +350,7 @@ infixFunctionCall
     ;
 
 rangeExpression
-    : additiveExpression (/* NO NL! */ '..' NL* additiveExpression)*
+    : additiveExpression (/* NO NL! */ (RANGE | RANGE_UNTIL) NL* additiveExpression)*
     ;
 
 additiveExpression
@@ -482,6 +482,7 @@ literalConstant
     | RealLiteral
     | NullLiteral
     | LongLiteral
+    | UnsignedLiteral
     ;
 
 stringLiteral
@@ -504,7 +505,7 @@ lineStringContent
     ;
 
 lineStringExpression
-    : LineStrExprStart expression '}'
+    : LineStrExprStart NL* expression NL* '}'
     ;
 
 multiLineStringContent
@@ -570,11 +571,16 @@ ifExpression
     ;
 
 whenExpression
-    : 'when' NL* ('(' expression ')')? NL* '{' NL* (whenEntry NL*)* NL* '}'
+    : 'when' NL* ('(' NL* whenSubject NL* ')')? NL* '{' NL* (whenEntry NL*)* NL* '}'
+    ;
+
+whenSubject
+    : ('val' | 'var') NL* variableDeclaration NL* '=' NL* expression
+    | expression
     ;
 
 whenEntry
-    : whenCondition (NL* ',' NL* whenCondition)* NL* '->' NL* controlStructureBody semi?
+    : whenCondition (NL* ',' NL* whenCondition)* NL* ','? NL* '->' NL* controlStructureBody semi?
     | 'else' NL* '->' NL* controlStructureBody semi?
     ;
 
@@ -727,6 +733,8 @@ classModifier
     | 'annotation'
     | 'data'
     | 'inner'
+    | 'fun'
+    | 'value'
     ;
 
 memberModifier
@@ -824,6 +832,7 @@ simpleIdentifier
     | 'constructor'
     | 'crossinline'
     | 'data'
+    | 'value'
     | 'dynamic'
     | 'enum'
     | 'external'

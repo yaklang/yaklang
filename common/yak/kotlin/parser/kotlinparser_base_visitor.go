@@ -467,6 +467,10 @@ func (v *BaseKotlinParserVisitor) VisitWhenExpression(ctx *WhenExpressionContext
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseKotlinParserVisitor) VisitWhenSubject(ctx *WhenSubjectContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseKotlinParserVisitor) VisitWhenEntry(ctx *WhenEntryContext) interface{} {
 	return v.VisitChildren(ctx)
 }

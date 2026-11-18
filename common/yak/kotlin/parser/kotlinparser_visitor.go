@@ -352,6 +352,9 @@ type KotlinParserVisitor interface {
 	// Visit a parse tree produced by KotlinParser#whenExpression.
 	VisitWhenExpression(ctx *WhenExpressionContext) interface{}
 
+	// Visit a parse tree produced by KotlinParser#whenSubject.
+	VisitWhenSubject(ctx *WhenSubjectContext) interface{}
+
 	// Visit a parse tree produced by KotlinParser#whenEntry.
 	VisitWhenEntry(ctx *WhenEntryContext) interface{}
 

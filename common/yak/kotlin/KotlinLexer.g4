@@ -49,6 +49,7 @@ ADD              : '+';
 SUB              : '-';
 INCR             : '++';
 DECR             : '--';
+AMP              : '&';
 CONJ             : '&&';
 DISJ             : '||';
 EXCL_WS          : '!' Hidden;
@@ -63,6 +64,7 @@ DIV_ASSIGNMENT   : '/=';
 MOD_ASSIGNMENT   : '%=';
 ARROW            : '->';
 DOUBLE_ARROW     : '=>';
+RANGE_UNTIL      : '..<';
 RANGE            : '..';
 COLONCOLON       : '::';
 DOUBLE_SEMICOLON : ';;';
@@ -151,6 +153,7 @@ ENUM        : 'enum';
 SEALED      : 'sealed';
 ANNOTATION  : 'annotation';
 DATA        : 'data';
+VALUE       : 'value';
 INNER       : 'inner';
 TAILREC     : 'tailrec';
 OPERATOR    : 'operator';
@@ -172,6 +175,7 @@ REIFIED     : 'reified';
 EXPECT : 'expect';
 ACTUAL : 'actual';
 
+MULTI_DOLLAR_QUOTE_OPEN: '$$"' -> pushMode(MultiDollarLineString), type(QUOTE_OPEN);
 QUOTE_OPEN        : '"'   -> pushMode(LineString);
 TRIPLE_QUOTE_OPEN : '"""' -> pushMode(MultiLineString);
 
@@ -186,6 +190,7 @@ fragment DoubleExponent      : [eE] [+-]? DecDigits;
 DoubleLiteral: DecDigits? '.' DecDigits DoubleExponent? | DecDigits DoubleExponent;
 
 LongLiteral: (IntegerLiteral | HexLiteral | BinLiteral) 'L';
+UnsignedLiteral: (IntegerLiteral | HexLiteral | BinLiteral) [uU] [lL]?;
 
 IntegerLiteral:
     DecDigitNoZero DecDigitOrSeparator* DecDigit
@@ -304,6 +309,7 @@ Inside_ADD              : ADD               -> type(ADD);
 Inside_SUB              : SUB               -> type(SUB);
 Inside_INCR             : INCR              -> type(INCR);
 Inside_DECR             : DECR              -> type(DECR);
+Inside_AMP              : AMP               -> type(AMP);
 Inside_CONJ             : CONJ              -> type(CONJ);
 Inside_DISJ             : DISJ              -> type(DISJ);
 Inside_EXCL_WS          : '!' (Hidden | NL) -> type(EXCL_WS);
@@ -318,6 +324,7 @@ Inside_DIV_ASSIGNMENT   : DIV_ASSIGNMENT    -> type(DIV_ASSIGNMENT);
 Inside_MOD_ASSIGNMENT   : MOD_ASSIGNMENT    -> type(MOD_ASSIGNMENT);
 Inside_ARROW            : ARROW             -> type(ARROW);
 Inside_DOUBLE_ARROW     : DOUBLE_ARROW      -> type(DOUBLE_ARROW);
+Inside_RANGE_UNTIL      : RANGE_UNTIL      -> type(RANGE_UNTIL);
 Inside_RANGE            : RANGE             -> type(RANGE);
 Inside_RESERVED         : RESERVED          -> type(RESERVED);
 Inside_COLONCOLON       : COLONCOLON        -> type(COLONCOLON);
@@ -340,7 +347,8 @@ Inside_AS_SAFE          : AS_SAFE           -> type(AS_SAFE);
 Inside_EQEQ             : EQEQ              -> type(EQEQ);
 Inside_EQEQEQ           : EQEQEQ            -> type(EQEQEQ);
 Inside_SINGLE_QUOTE     : SINGLE_QUOTE      -> type(SINGLE_QUOTE);
-Inside_QUOTE_OPEN       : QUOTE_OPEN        -> pushMode(LineString), type(QUOTE_OPEN);
+Inside_MULTI_DOLLAR_QUOTE_OPEN: '$$"' -> pushMode(MultiDollarLineString), type(QUOTE_OPEN);
+Inside_QUOTE_OPEN       : QUOTE_OPEN       -> pushMode(LineString), type(QUOTE_OPEN);
 Inside_TRIPLE_QUOTE_OPEN:
     TRIPLE_QUOTE_OPEN -> pushMode(MultiLineString), type(TRIPLE_QUOTE_OPEN)
 ;
@@ -351,6 +359,7 @@ Inside_FUN         : FUN         -> type(FUN);
 Inside_OBJECT      : OBJECT      -> type(OBJECT);
 Inside_SUPER       : SUPER       -> type(SUPER);
 Inside_IN          : IN          -> type(IN);
+Inside_BY          : BY          -> type(BY);
 Inside_OUT         : OUT         -> type(OUT);
 Inside_AT_FIELD    : AT_FIELD    -> type(AT_FIELD);
 Inside_AT_FILE     : AT_FILE     -> type(AT_FILE);
@@ -414,6 +423,7 @@ Inside_CharacterLiteral : CharacterLiteral -> type(CharacterLiteral);
 Inside_RealLiteral      : RealLiteral      -> type(RealLiteral);
 Inside_NullLiteral      : NullLiteral      -> type(NullLiteral);
 Inside_LongLiteral      : LongLiteral      -> type(LongLiteral);
+Inside_UnsignedLiteral  : UnsignedLiteral  -> type(UnsignedLiteral);
 
 Inside_Identifier   : Identifier                       -> type(Identifier);
 Inside_IdentifierAt : IdentifierAt                     -> type(IdentifierAt);
@@ -449,3 +459,13 @@ MultiLineStrText:
 MultiLineStrExprStart: '${' -> pushMode(DEFAULT_MODE);
 
 MultiLineNL: NL -> type(NL);
+
+mode MultiDollarLineString;
+
+MD_LineStrEscapedChar: (EscapedIdentifier | UniCharacterLiteral) -> type(LineStrEscapedChar);
+
+MD_QUOTE_CLOSE: '"' -> popMode, type(QUOTE_CLOSE);
+
+MD_LineStrText: (~('\\' | '"' | '$')+ | '$') -> type(LineStrText);
+
+MD_LineStrExprStart: '$${' -> pushMode(DEFAULT_MODE), type(LineStrExprStart);
