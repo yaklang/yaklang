@@ -369,14 +369,14 @@ Kotlin 的 `.kts` 夹具使用 `kotlin2ssa.ScriptFrontend`，`.kt` 使用
 
 | 语言 | 项目 | 文件 | 通过 | 失败 | 超时 | p50 | p95 | 总耗时 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Lua | plenary.nvim | 113 | 112 | 1 | 0 | 3.57ms | 38.1ms | 1.19s |
-| Lua | kong | 1311 | 1306 | 5 | 0 | 0.88ms | 37.3ms | 12.1s |
-| Rust | serde | 208 | 205 | 2 | 1 | 4.34ms | 1.92s | 1m10.6s |
-| Rust | ripgrep | 102 | 94 | 8 | 0 | 249ms | 2.60s | 1m20.4s |
-| Kotlin | okhttp | 620 | 620 | 0 | 0 | 86.9ms | 1.18s | 3m01s |
-| Kotlin | kotlinx.coroutines | 1082 | 1082 | 0 | 0 | 44.0ms | 587ms | 2m39s |
-| Scala | scalatra | 235 | 227 | 8 | 0 | 15.1ms | 336ms | 29.4s |
-| Scala | zio | 976 | 762 | 210 | 4 | 23.1ms | 1.21s | 6m45s |
+| Lua | plenary.nvim | 113 | 112 | 1 | 0 | 3.49ms | 40.2ms | 1.18s |
+| Lua | kong | 1311 | 1306 | 5 | 0 | 0.81ms | 40.0ms | 12.1s |
+| Rust | serde | 208 | 206 | 2 | 0 | 4.88ms | 1.55s | 1m02s |
+| Rust | ripgrep | 102 | 94 | 8 | 0 | 244ms | 2.66s | 1m21s |
+| Kotlin | okhttp | 620 | 620 | 0 | 0 | 66.9ms | 1.09s | 2m38s |
+| Kotlin | kotlinx.coroutines | 1082 | 1082 | 0 | 0 | 42.0ms | 534ms | 2m32s |
+| Scala | scalatra | 235 | 227 | 8 | 0 | 16.7ms | 493ms | 34.9s |
+| Scala | zio | 976 | 762 | 210 | 4 | 22.2ms | 1.03s | 6m29s |
 
 Kotlin 的两个语料全部通过，包含 `.kts` Gradle 脚本。Scala 的剩余失败集中在
 XML 字面量、宏展开和少数缩进边界；Rust 的剩余失败集中在 `let` 链、宏 token
