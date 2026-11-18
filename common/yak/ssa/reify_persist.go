@@ -36,18 +36,18 @@ func (p *Program) SaveToDatabase() error {
 	// SSA passes mutate exported instruction fields directly (for example
 	// call.Args). Republish the live instructions so the final flush writes the
 	// post-pass state instead of the construction-time snapshot.
-	p.markAllInstructionsDirty()
+	p.FlushInstruction()
 	return p.Cache.SaveToDatabase()
 }
 
-// markAllInstructionsDirty republishes every live instruction and registers
-// the recovered function names before the final flush.
+// FlushInstruction publishes the live program state to the instruction cache.
 //
-// A producer that creates functions without a language builder leaves no entry
-// in the variable index, so a syntaxflow name search cannot find them. The
-// index is only useful when the program is persisted, which is why the
-// registration lives on this save path instead of in the converter.
-func (p *Program) markAllInstructionsDirty() {
+// It registers every recovered function name in the variable index and marks
+// every instruction of its blocks dirty. A producer that creates functions
+// without a language builder leaves no index entry, so a syntaxflow name search
+// cannot find them. An in-memory program calls this before a query; a persisted
+// program gets the same work from SaveToDatabase before the final cache flush.
+func (p *Program) FlushInstruction() {
 	if p == nil || p.Cache == nil || p.Funcs == nil {
 		return
 	}
