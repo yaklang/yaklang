@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -21,7 +22,7 @@ type bashDangerousRule struct {
 // the corpus test exercises every shipped .sf without a hardcoded list.
 func loadBashDangerousRules(t *testing.T) []bashDangerousRule {
 	t.Helper()
-	root := filepath.Join("..", "..", "syntaxflow", "sfbuildin", "buildin", "bash")
+	root := filepath.Join("..", "..", "..", "..", "syntaxflow", "sfbuildin", "buildin", "bash")
 	var rules []bashDangerousRule
 	err := filepath.WalkDir(root, func(rulePath string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -233,7 +234,7 @@ func TestBashDangerousCommands(t *testing.T) {
 	for _, tc := range bashDangerousCases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
-			prog, err := Parse(tc.Code, WithLanguage(ssaconfig.BASH), WithMemory())
+			prog, err := ssaapi.Parse(tc.Code, ssaapi.WithLanguage(ssaconfig.BASH), ssaapi.WithMemory())
 			require.NoError(t, err)
 
 			var matched []string
@@ -265,7 +266,7 @@ func TestBashDangerousCommands(t *testing.T) {
 // bash corpus. Literal lists are unrolled so every item reaches the rule, while
 // non-literal lists stay unknown.
 func TestBashRMRootLoopUnrolling(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "syntaxflow", "sfbuildin", "buildin", "bash", "cwe-78-os-command-injection", "bash-rm-rf-root.sf"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "syntaxflow", "sfbuildin", "buildin", "bash", "cwe-78-os-command-injection", "bash-rm-rf-root.sf"))
 	require.NoError(t, err)
 	cases := []struct {
 		code string
@@ -277,7 +278,7 @@ func TestBashRMRootLoopUnrolling(t *testing.T) {
 		{`for p in "$@"; do rm -rf "$p"; done`, 0},
 	}
 	for _, tc := range cases {
-		prog, err := Parse(tc.code, WithLanguage(ssaconfig.BASH), WithMemory())
+		prog, err := ssaapi.Parse(tc.code, ssaapi.WithLanguage(ssaconfig.BASH), ssaapi.WithMemory())
 		require.NoError(t, err)
 		res, err := prog.SyntaxFlowWithError(string(raw))
 		require.NoError(t, err)

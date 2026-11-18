@@ -56,7 +56,6 @@ on:
       - "common/yak/**/parser/**"
       - "common/yak/**/code/**"
       - "common/yak/**/syntax/**"
-      - "common/yak/bash/bash2ssa/**"
       - "common/yak/**/syntax_*.go"
       - "common/sfweb/templates/java/cwe-1336-ssti.java"
       # This workflow itself
