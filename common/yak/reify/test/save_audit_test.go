@@ -54,6 +54,21 @@ int main(void) {
 		t.Skipf("cannot build demo: %v\n%s", err, output)
 	}
 
+	// File-mode audit: lift into memory and query the program directly.
+	memoryLift, err := reify.Lift(context.Background(), binary,
+		reify.WithMode(reify.ModeSSAIR),
+		reify.WithSection(".text"),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, memoryLift.Program)
+	memoryProgram := ssaapi.NewProgram(memoryLift.Program, nil)
+	memoryResult, err := memoryProgram.SyntaxFlowWithError("helper(* as $args) as $call")
+	require.NoError(t, err)
+	memoryCalls, ok := memoryResult.GetSFResult().SymbolTable.Get("call")
+	require.True(t, ok, "in-memory audit did not bind call")
+	require.GreaterOrEqual(t, len(memoryCalls), 1)
+	_ = memoryLift.Close()
+
 	programName := "reify-e2e-" + uuid.NewString()
 	db, cleanup := isolatedSSADB(t)
 	defer cleanup()
@@ -61,11 +76,14 @@ int main(void) {
 	result, err := reify.Lift(context.Background(), binary,
 		reify.WithMode(reify.ModeSSAIR),
 		reify.WithSection(".text"),
-		reify.WithPersist(programName),
+		reify.WithProgramName(programName),
+		reify.WithProgramCache(ssa.ProgramCacheDBWrite),
 	)
 	require.NoError(t, err)
 	defer func() { _ = result.Close() }()
+	require.NotNil(t, result.Program)
 	require.Equal(t, programName, result.ProgramName)
+	require.NoError(t, result.Program.SaveToDatabase())
 
 	program, err := ssaapi.FromDatabase(programName)
 	require.NoError(t, err)
