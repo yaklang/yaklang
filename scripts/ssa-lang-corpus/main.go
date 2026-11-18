@@ -34,12 +34,19 @@ var skipDirs = map[string]bool{
 
 func main() {
 	var (
-		lang   = flag.String("lang", "", "lua, rust, kotlin, or scala")
-		root   = flag.String("root", "", "project root")
-		budget = flag.Duration("budget", 10*time.Second, "single-file budget")
-		out    = flag.String("out", "", "optional TSV output path")
+		lang    = flag.String("lang", "", "lua, rust, kotlin, or scala")
+		root    = flag.String("root", "", "project root")
+		budget  = flag.Duration("budget", 10*time.Second, "single-file budget")
+		out     = flag.String("out", "", "optional TSV output path")
+		exclude = flag.String("exclude", "", "comma-separated path substrings to skip")
 	)
 	flag.Parse()
+	excluded := make([]string, 0)
+	for _, item := range strings.Split(*exclude, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			excluded = append(excluded, item)
+		}
+	}
 	if *lang == "" || *root == "" {
 		fmt.Fprintln(os.Stderr, "usage: go run ./scripts/ssa-lang-corpus -lang <lua|rust|kotlin|scala> -root <dir> [-budget 10s] [-out result.tsv]")
 		os.Exit(2)
@@ -59,6 +66,11 @@ func main() {
 				return filepath.SkipDir
 			}
 			return nil
+		}
+		for _, pattern := range excluded {
+			if strings.Contains(path, pattern) {
+				return nil
+			}
 		}
 		for _, ext := range exts {
 			if strings.EqualFold(filepath.Ext(path), ext) {
