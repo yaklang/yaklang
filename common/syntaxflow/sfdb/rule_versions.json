@@ -6106,5 +6106,125 @@
     "rule_name": "结构匹配：Java System.setProperty 接受外部值",
     "hash": "cfd26fda2205f2ec061b7cb3f060946c91c474ef44331c4b42d37f3f59f6ac34",
     "version": "20261109.0001"
+  },
+  {
+    "rule_id": "bash-ansi-c-command",
+    "rule_name": "Bash：使用 ANSI-C 转义隐藏命令名",
+    "hash": "315885dbf4216affe57945347225d9d11744fb5d33cf2dae9ecc42edf84acc60",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-container-escape",
+    "rule_name": "Bash：容器逃逸或访问宿主机命名空间",
+    "hash": "68af6d05dd48b9bfeca768eb3eff532e5179078eb530d5d36d0a8954c0b1be6f",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-credential-persistence",
+    "rule_name": "Bash：读取凭据或写入系统持久化位置",
+    "hash": "40cd72552dde8a1988284f7aff19ac37fc941c0792ceb8dbc579f9367289e22c",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-decoded-pipe",
+    "rule_name": "Bash：解码或生成的内容直接管道给 Shell 或解释器",
+    "hash": "39f3bbacea9a1abbd21bfcbebb1c59fb7d0cb77648c4cc989999421e6cc6e763",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-defense-evasion",
+    "rule_name": "Bash：关闭审计、防火墙或命令历史以规避检测",
+    "hash": "4819dbe2999ed46d88f61681addc96618815759b48549457c8b859490d17d8e4",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-dynamic-command",
+    "rule_name": "Bash：命令名由变量动态决定",
+    "hash": "d3e740c2578648f3732970eca2942c0a9811a5cf2108eea9316ffe3b6cf6e241",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-encoded-interpreter",
+    "rule_name": "Bash：解释器执行编码后的载荷",
+    "hash": "5fab15c491a581500f76abd1ac3ec23a2801ae68a5e004d06b245dffd0958005",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-eval",
+    "rule_name": "Bash：eval 执行命令字符串",
+    "hash": "ef0b7c6fede39f01d19c5ce48762bb8f28cfa339c27adce2f2c749db16b321e8",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-exfiltration",
+    "rule_name": "Bash：通过网络外传敏感数据",
+    "hash": "735156fd38bc3baec8d89753a6c0dd0ae2e12271d22d0d4584246209d29ddfe0",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-herestring-exec",
+    "rule_name": "Bash：Shell 从标准输入执行远程或解码脚本",
+    "hash": "abc1dc64a6a74c08238681e53d8f9d79ba84f777f60af69d359b9b5abcfe94c3",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-interpreter-c",
+    "rule_name": "Bash：解释器使用 -c 执行内联脚本",
+    "hash": "d0022560ce7055f6d7e96226ab72641558e086f614eeaee1315c26f75b39753a",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-log-tampering",
+    "rule_name": "Bash：清除命令历史或系统日志",
+    "hash": "adb4108d334907f44b61169bb26c609bb1fd9ee1afdd957cfa36faa4d9c295c1",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-offensive-tooling",
+    "rule_name": "Bash：使用攻击工具或建立隧道",
+    "hash": "45de43e83f20fa522b745ea0bd1092231bec2c3cc136f3265f3b86ac1eeeb072",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-persistence",
+    "rule_name": "Bash：写入启动项、定时任务或 sudoers 持久化",
+    "hash": "fdf169009bee5acd11833ed713c962a1829ce72a3551f36581003c0a216579b5",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-pipe-to-shell",
+    "rule_name": "Bash：下载内容直接管道给 Shell 解释器",
+    "hash": "56998635bf5c6ba0d70243a754a3f3b531030fa06354d3f3b9ae775084812917",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-privilege-escalation",
+    "rule_name": "Bash：通过 setuid、setcap 或特权容器提权",
+    "hash": "c7ec306b57a4e164095ad4966eedac04e5b46e6960c998d456fc1d89fee0e9bf",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-process-substitution",
+    "rule_name": "Bash：通过进程替换执行远程或解码内容",
+    "hash": "518c241b714d0b0daf6d4ea1490c96fb2a294b3afaedb308f2749e5db561bb35",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-remote-shell",
+    "rule_name": "Bash：反弹 Shell 或远程命令通道",
+    "hash": "2422774caaf674dec566854a6c415790aa7a2959ec222ba3355ef6fb82ec85db",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-rm-rf-root",
+    "rule_name": "Bash：递归强制删除文件系统根目录",
+    "hash": "a3860ac174ad04750b0e88085b25a3f90a662fd256cc61bd11f74d84975fb8f5",
+    "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-system-destruction",
+    "rule_name": "Bash：破坏块设备或系统根目录",
+    "hash": "9310075ce1b6463e65d7533840fc2023361fbdc2a89e45147c2b305b5f10ecfb",
+    "version": "20261118.0001"
   }
 ]
