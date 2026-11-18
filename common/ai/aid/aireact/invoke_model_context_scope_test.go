@@ -17,6 +17,7 @@ import (
 )
 
 func TestReAct_ModelContextPersistsOriginalRecoveryOnlyAfterSuccess(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	for _, native := range []bool{false, true} {
 		for _, disabled := range []bool{false, true} {
 			t.Run(fmt.Sprintf("native=%v/disabled=%v", native, disabled), func(t *testing.T) {

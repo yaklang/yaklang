@@ -35,9 +35,9 @@ func bindContext(t *testing.T, cfg *Config, model *ypb.AIModelConfig) string {
 	return aispec.ModelContextIdentity(model)
 }
 func contextPatch(cfg *Config, tokens int64) *ypb.AIInputEvent {
-	provider, model, key := cfg.PrimaryModelContext()
+	_, _, key := cfg.PrimaryModelContext()
 	return &ypb.AIInputEvent{IsConfigHotpatch: true, HotpatchType: HotPatchType_RuntimeContextSizeLimit,
-		Params: &ypb.AIStartParams{AIService: provider, AIModelName: model, ModelContextKey: key, RuntimeContextSizeLimit: tokens}}
+		Params: &ypb.AIStartParams{ModelContextKey: key, RuntimeContextSizeLimit: tokens}}
 }
 func applyContextPatch(t *testing.T, cfg *Config, patch *ypb.AIInputEvent) error {
 	t.Helper()
@@ -47,6 +47,7 @@ func applyContextPatch(t *testing.T, cfg *Config, patch *ypb.AIInputEvent) error
 }
 
 func TestModelContextContractManualBoundsAndIdentity(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	for _, tokens := range []int64{-1, 0, 1, 99999, 100000, 100001, 102400, 500000, 1000000, 1000001} {
 		t.Run(strconv.FormatInt(tokens, 10), func(t *testing.T) {
 			cfg := newConfig(context.Background())
@@ -57,8 +58,6 @@ func TestModelContextContractManualBoundsAndIdentity(t *testing.T) {
 			if tokens < 100000 || tokens > 1000000 {
 				require.Error(t, err)
 				require.Equal(t, before, cfg.ModelContextStatus(0))
-				_, changed := mergeHotpatchSessionStartParams(&ypb.AIStartParams{}, patch)
-				require.False(t, changed)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tokens, cfg.ModelContextStatus(0).ThresholdTokens)
@@ -69,7 +68,107 @@ func TestModelContextContractManualBoundsAndIdentity(t *testing.T) {
 	}
 }
 
+func TestModelContextContractHotpatchResolvesCurrentModel(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
+	for _, mode := range []string{"omitted", "service_only", "model_only", "matching", "unrelated", "mode_only"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			sessionID := uuid.NewString()
+			cfg := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+			model := contextTestModel()
+			key := bindContext(t, cfg, model)
+			_, err := yakit.CreateOrUpdateAISessionMetaStartParams(cfg.GetDB(), sessionID, &ypb.AIStartParams{
+				RuntimeContextSizeLimit: 300 * 1024, ReviewPolicy: "manual",
+			})
+			require.NoError(t, err)
+			patch := contextPatch(cfg, 600000)
+			expected := int64(600000)
+			switch mode {
+			case "service_only":
+				patch.Params.AIService = "openai"
+			case "model_only":
+				patch.Params.AIModelName = model.ModelName
+			case "matching":
+				patch.Params.AIService, patch.Params.AIModelName = "openai", model.ModelName
+			case "unrelated":
+				patch.Params.AIService, patch.Params.AIModelName = "other-service", "other-model"
+			case "mode_only":
+				expected = 500000
+				disabled := true
+				patch.Params.RuntimeContextSizeLimit = 0
+				patch.Params.DisableContextAutoAdjust = &disabled
+			}
+			// The input loop persists session metadata before applying queued options.
+			cfg.PersistSessionStartParamsFromHotpatch(patch)
+			require.NoError(t, applyContextPatch(t, cfg, patch))
+			saved, err := yakit.GetAISessionMetaStartParamsBySessionID(cfg.GetDB(), sessionID)
+			require.NoError(t, err)
+			require.Zero(t, saved.RuntimeContextSizeLimit, "resume must use the model setting, not a session override")
+			require.Equal(t, "manual", saved.ReviewPolicy)
+			require.Empty(t, saved.AIService)
+			require.Empty(t, saved.AIModelName)
+			provider, name, currentKey := cfg.PrimaryModelContext()
+			require.Equal(t, "openai", provider)
+			require.Equal(t, model.ModelName, name)
+			require.Equal(t, key, currentKey)
+			require.EqualValues(t, expected, cfg.GetTimeline().GetTimelineContentLimit())
+			require.EqualValues(t, expected, yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, name, key).ThresholdTokens)
+			fresh := newConfig(ctx)
+			bindContext(t, fresh, model)
+			require.EqualValues(t, expected, fresh.ModelContextStatus(0).ThresholdTokens)
+			require.Equal(t, mode == "mode_only", fresh.ModelContextStatus(0).DisableAutoAdjust)
+		})
+	}
+}
+
+func TestModelContextContractRejectedHotpatchPreservesSessionOverride(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
+	for _, mode := range []string{"below_minimum", "above_maximum", "zero_without_mode", "switched_model"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			sessionID := uuid.NewString()
+			cfg := NewTestConfig(ctx, WithPersistentSessionId(sessionID))
+			model := contextTestModel()
+			key := bindContext(t, cfg, model)
+			_, err := yakit.CreateOrUpdateAISessionMetaStartParams(cfg.GetDB(), sessionID, &ypb.AIStartParams{
+				RuntimeContextSizeLimit: 300 * 1024, ReviewPolicy: "manual",
+			})
+			require.NoError(t, err)
+			patch := contextPatch(cfg, 600000)
+			switch mode {
+			case "below_minimum":
+				patch.Params.RuntimeContextSizeLimit = 99999
+			case "above_maximum":
+				patch.Params.RuntimeContextSizeLimit = 1000001
+			case "zero_without_mode":
+				patch.Params.RuntimeContextSizeLimit = 0
+			}
+			opts := cfg.ProcessHotPatchMessage(patch)
+			require.Len(t, opts, 1)
+			if mode == "switched_model" {
+				// Same service and model name, different configured provider. A queued
+				// edit must recheck its key when applied, even without legacy fields.
+				other := contextTestModel()
+				other.ModelName = model.ModelName
+				bindContext(t, cfg, other)
+			}
+			before := cfg.ModelContextStatus(0)
+			cfg.PersistSessionStartParamsFromHotpatch(patch)
+			require.Error(t, opts[0](cfg))
+			require.Equal(t, before, cfg.ModelContextStatus(0))
+			require.EqualValues(t, 500000, yakit.GetAIModelContext(consts.GetGormProfileDatabase(), "openai", model.ModelName, key).ThresholdTokens)
+			saved, err := yakit.GetAISessionMetaStartParamsBySessionID(cfg.GetDB(), sessionID)
+			require.NoError(t, err)
+			require.EqualValues(t, 300*1024, saved.RuntimeContextSizeLimit)
+			require.Equal(t, "manual", saved.ReviewPolicy)
+		})
+	}
+}
+
 func TestModelContextContractSuccessPersistsOnlyMatchingConfiguration(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	cfg := newConfig(context.Background())
 	model := contextTestModel()
 	key := bindContext(t, cfg, model)
@@ -96,6 +195,7 @@ func TestModelContextContractSuccessPersistsOnlyMatchingConfiguration(t *testing
 }
 
 func TestModelContextContractLateSuccessAndCancellationDoNotOverwrite(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	for _, mode := range []string{"manual", "disabled", "cancelled", "deleted"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -139,6 +239,7 @@ func TestModelContextContractLateSuccessAndCancellationDoNotOverwrite(t *testing
 }
 
 func TestModelContextContractOriginalReductionFormula(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	for _, tc := range []struct {
 		name              string
 		measured, maximum int64
@@ -158,6 +259,7 @@ func TestModelContextContractOriginalReductionFormula(t *testing.T) {
 }
 
 func TestModelContextContractEventsAndLegacyDefaults(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
 	var events []ModelContextStatus
 	cfg := NewTestConfig(context.Background(), WithEventHandler(func(event *schema.AiOutputEvent) {
 		if event.Type == schema.EVENT_TYPE_MODEL_CONTEXT {

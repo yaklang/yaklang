@@ -266,7 +266,9 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		raw := hotPatchParams.GetRuntimeContextSizeLimit()
 		aiOption = append(aiOption, func(config *Config) error {
 			provider, model, key := config.PrimaryModelContext()
-			if key == "" || hotPatchParams.GetModelContextKey() != key || hotPatchParams.GetAIService() != provider || hotPatchParams.GetAIModelName() != model {
+			// Routing comes from the backend's quality configuration. The opaque
+			// key binds this edit to the configuration the user actually saw.
+			if key == "" || hotPatchParams.GetModelContextKey() != key {
 				status := config.ModelContextStatus(0)
 				status.Error = "模型配置已变化，请刷新上下文设置后重试"
 				config.emitModelContextStatus(status)
@@ -504,16 +506,9 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 		if yakit.ValidateAIModelContextThreshold(limit) != nil || (limit == 0 && p.DisableContextAutoAdjust == nil) {
 			return base, false
 		}
-		if limit > 0 && p.GetAIModelName() != "" {
-			value := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), p.GetAIService(), p.GetAIModelName(), p.GetModelContextKey())
-			if limit > yakit.AIModelContextMaximumThreshold(value) {
-				return base, false
-			}
-		}
-		next.RuntimeContextSizeLimit = limit
-		if p.GetAIModelName() != "" {
-			next.RuntimeContextSizeLimit = 0
-		}
+		// The caller validates the current model identity and upper bound.
+		// On resume, read its saved setting instead of replaying a session limit.
+		next.RuntimeContextSizeLimit = 0
 
 	default:
 		return base, false
@@ -594,10 +589,14 @@ func (c *Config) PersistSessionStartParamsFromHotpatch(e *ypb.AIInputEvent) {
 	}
 	if e.HotpatchType == HotPatchType_RuntimeContextSizeLimit && e.Params.GetModelContextKey() != "" {
 		provider, model, key := c.PrimaryModelContext()
-		if key == "" || e.Params.GetModelContextKey() != key || e.Params.GetAIService() != provider || e.Params.GetAIModelName() != model {
+		if key == "" || e.Params.GetModelContextKey() != key {
 			return
 		}
 		if yakit.ValidateAIModelContextThreshold(e.Params.GetRuntimeContextSizeLimit()) != nil {
+			return
+		}
+		value := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model, key)
+		if e.Params.GetRuntimeContextSizeLimit() > yakit.AIModelContextMaximumThreshold(value) {
 			return
 		}
 	}
