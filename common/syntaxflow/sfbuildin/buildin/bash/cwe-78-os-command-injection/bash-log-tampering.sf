@@ -6,7 +6,7 @@ desc(
 	type: audit
 	level: "middle"
 	rule_id: "bash-log-tampering"
-	risk: "defense-evasion"
+	risk: "data-integrity"
 	desc: <<<DESC
 ### 说明
 命令清除或覆盖审计痕迹：`history -c`、删除 `/var/log`、`truncate` 日志、
@@ -51,7 +51,7 @@ alert $historyHit for {
 	title: "Bash: shell history or system log tampering",
 	title_zh: "Bash：清除命令历史或系统日志",
 	message: "检测到 history 清理。",
-	risk: "defense-evasion",
+	risk: "data-integrity",
 }
 
 alert $rmLogHit for {
@@ -59,7 +59,7 @@ alert $rmLogHit for {
 	title: "Bash: shell history or system log tampering",
 	title_zh: "Bash：清除命令历史或系统日志",
 	message: "检测到删除 /var/log 内容。",
-	risk: "defense-evasion",
+	risk: "data-integrity",
 }
 
 alert $truncateHit for {
@@ -67,7 +67,7 @@ alert $truncateHit for {
 	title: "Bash: shell history or system log tampering",
 	title_zh: "Bash：清除命令历史或系统日志",
 	message: "检测到截断系统日志。",
-	risk: "defense-evasion",
+	risk: "data-integrity",
 }
 
 alert $journalHit for {
@@ -75,5 +75,5 @@ alert $journalHit for {
 	title: "Bash: shell history or system log tampering",
 	title_zh: "Bash：清除命令历史或系统日志",
 	message: "检测到清理 journal 日志。",
-	risk: "defense-evasion",
+	risk: "data-integrity",
 }

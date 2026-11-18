@@ -6,7 +6,7 @@ desc(
 	type: vuln
 	level: "high"
 	rule_id: "bash-privilege-escalation"
-	risk: "privilege-escalation"
+	risk: "access-control"
 	desc: <<<DESC
 ### 说明
 命令设置 setuid/setgid 位、赋予危险 capability，或以 `--privileged`
@@ -48,7 +48,7 @@ alert $setuidHit for {
 	title: "Bash: privilege escalation via setuid or privileged containers",
 	title_zh: "Bash：通过 setuid、setcap 或特权容器提权",
 	message: "检测到 setuid/setgid 位设置。",
-	risk: "privilege-escalation",
+	risk: "access-control",
 }
 
 alert $setcapHit for {
@@ -56,7 +56,7 @@ alert $setcapHit for {
 	title: "Bash: privilege escalation via setuid or privileged containers",
 	title_zh: "Bash：通过 setuid、setcap 或特权容器提权",
 	message: "检测到授予 cap_setuid capability。",
-	risk: "privilege-escalation",
+	risk: "access-control",
 }
 
 alert $dockerHit for {
@@ -64,5 +64,5 @@ alert $dockerHit for {
 	title: "Bash: privilege escalation via setuid or privileged containers",
 	title_zh: "Bash：通过 setuid、setcap 或特权容器提权",
 	message: "检测到特权容器启动。",
-	risk: "privilege-escalation",
+	risk: "access-control",
 }
