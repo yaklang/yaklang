@@ -87,6 +87,10 @@ jobs:
           - ./common/yak/yak2ssa/test
           - ./common/yak/JS2ssa/test
           - ./common/yak/bash/bash2ssa/test
+          - ./common/yak/lua/tests
+          - ./common/yak/rust/tests
+          - ./common/yak/kotlin/tests
+          - ./common/yak/scala/tests
     steps:
       - name: Check out code
         uses: actions/checkout@v4
