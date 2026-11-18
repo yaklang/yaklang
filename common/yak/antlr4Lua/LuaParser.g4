@@ -84,7 +84,7 @@ stat
     | functioncall
     | label
     | Break
-    | Goto NAME
+    | Goto (NAME | Continue)
     | Do block End
     | While exp Do block End
     | Repeat block Until exp
@@ -105,11 +105,11 @@ attrib
     ;
 
 laststat
-    : Return explist? | Break | Continue SemiColon?
+    : Return explist? SemiColon? | Break | Continue SemiColon?
     ;
 
 label
-    : DoubleColon NAME DoubleColon
+    : DoubleColon (NAME | Continue) DoubleColon
     ;
 
 funcname
