@@ -202,6 +202,12 @@ type ScalaParserVisitor interface {
 	// Visit a parse tree produced by ScalaParser#simpleExpr.
 	VisitSimpleExpr(ctx *SimpleExprContext) interface{}
 
+	// Visit a parse tree produced by ScalaParser#simpleExprPrimary.
+	VisitSimpleExprPrimary(ctx *SimpleExprPrimaryContext) interface{}
+
+	// Visit a parse tree produced by ScalaParser#simpleExprSuffix.
+	VisitSimpleExprSuffix(ctx *SimpleExprSuffixContext) interface{}
+
 	// Visit a parse tree produced by ScalaParser#colonArgument.
 	VisitColonArgument(ctx *ColonArgumentContext) interface{}
 

@@ -386,6 +386,10 @@ prefixOperator
     ;
 
 simpleExpr
+    : simpleExprPrimary simpleExprSuffix*
+    ;
+
+simpleExprPrimary
     : simpleRef
     | literal
     | USCORE
@@ -394,14 +398,17 @@ simpleExpr
     | QuoteId
     | NEW constrApp (WITH constrApp)* templateBody?
     | NEW templateBody
-    | LPAREN RPAREN                                             // unit literal ()
+    | LPAREN RPAREN
     | LPAREN exprsInParens RPAREN
     | LPAREN namedExprInParens (COMMA namedExprInParens)* RPAREN
-    | simpleExpr DOT id
-    | simpleExpr DOT matchClause
-    | simpleExpr typeArgs
-    | simpleExpr argumentExprs
-    | simpleExpr colonArgument
+    ;
+
+simpleExprSuffix
+    : DOT id
+    | DOT matchClause
+    | typeArgs
+    | argumentExprs
+    | colonArgument
     ;
 
 colonArgument

@@ -105,6 +105,29 @@ func (b *singleFileBuilder) visitPrefixExpr(raw scalaparser.IPrefixExprContext) 
 
 func (b *singleFileBuilder) visitSimpleExpr(raw scalaparser.ISimpleExprContext) ssa.Value {
 	simple, ok := raw.(*scalaparser.SimpleExprContext)
+	if !ok || simple == nil || simple.SimpleExprPrimary() == nil {
+		return b.EmitConstInstNil()
+	}
+	value := b.visitSimpleExprPrimary(simple.SimpleExprPrimary())
+	for _, rawSuffix := range simple.AllSimpleExprSuffix() {
+		suffix, ok := rawSuffix.(*scalaparser.SimpleExprSuffixContext)
+		if !ok || suffix == nil {
+			continue
+		}
+		switch {
+		case suffix.DOT() != nil && suffix.Id() != nil:
+			key := b.EmitConstInst(suffix.Id().GetText())
+			value = b.ReadMemberCallValue(value, key)
+		case suffix.ArgumentExprs() != nil:
+			args := b.visitArgumentExprs(suffix.ArgumentExprs())
+			value = b.EmitCall(b.NewCall(value, args))
+		}
+	}
+	return value
+}
+
+func (b *singleFileBuilder) visitSimpleExprPrimary(raw scalaparser.ISimpleExprPrimaryContext) ssa.Value {
+	simple, ok := raw.(*scalaparser.SimpleExprPrimaryContext)
 	if !ok || simple == nil {
 		return b.EmitConstInstNil()
 	}
@@ -113,17 +136,6 @@ func (b *singleFileBuilder) visitSimpleExpr(raw scalaparser.ISimpleExprContext) 
 		return b.visitSimpleRef(simple.SimpleRef())
 	case simple.Literal() != nil:
 		return b.visitLiteral(simple.Literal())
-	case simple.SimpleExpr() != nil:
-		base := b.visitSimpleExpr(simple.SimpleExpr())
-		switch {
-		case simple.DOT() != nil && simple.Id() != nil:
-			key := b.EmitConstInst(simple.Id().GetText())
-			return b.ReadMemberCallValue(base, key)
-		case simple.ArgumentExprs() != nil:
-			args := b.visitArgumentExprs(simple.ArgumentExprs())
-			return b.EmitCall(b.NewCall(base, args))
-		}
-		return base
 	case simple.ExprsInParens() != nil:
 		if values, ok := simple.ExprsInParens().(*scalaparser.ExprsInParensContext); ok && values != nil && len(values.AllExprInParens()) > 0 {
 			return b.visitExprInParens(values.ExprInParens(0))

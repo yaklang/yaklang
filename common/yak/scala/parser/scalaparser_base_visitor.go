@@ -267,6 +267,14 @@ func (v *BaseScalaParserVisitor) VisitSimpleExpr(ctx *SimpleExprContext) interfa
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseScalaParserVisitor) VisitSimpleExprPrimary(ctx *SimpleExprPrimaryContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseScalaParserVisitor) VisitSimpleExprSuffix(ctx *SimpleExprSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseScalaParserVisitor) VisitColonArgument(ctx *ColonArgumentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
