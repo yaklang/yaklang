@@ -436,6 +436,10 @@ Result Vars:
 "$OUT/bin/reify" audit --program demo-e2e '*?{opcode: call} as $call'
 ```
 
+`opcode: call` 只检查结果指令，不检查它的操作数。间接调用显示为
+`castType(ptr64, value)()` 时，末尾的 `()` 是调用；前面的 `castType(...)`
+是产生目标指针的 `TypeCast` 指令。单独查转换用 `*?{opcode: typecast} as $cast`。
+
 ### ssadb 内容
 
 一次 `demo-e2e` 落库后实测：

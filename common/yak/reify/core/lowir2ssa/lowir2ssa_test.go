@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowirtext"
 	"github.com/yaklang/yaklang/common/yak/reify/core/ssa2source"
@@ -84,6 +85,62 @@ func TestLowIRToSSAIRFixtures(t *testing.T) {
 	}
 	if count == 0 {
 		t.Fatal("no testcases")
+	}
+}
+
+func TestLowIRTypeChangesEmitTypeCastNotCall(t *testing.T) {
+	// Use a parameter, not a constant: the casts must survive constant folding.
+	const casts = `target: linux/amd64 (64-bit, little-endian)
+registers: naming=x86 width=64 args=rdi return=rax
+function convert @ 0x1000
+block b1 @ 0x1000
+  0x1000  v1:i64 = read_register %rdi
+  0x1001  v2:i8 = trunc v1
+  0x1002  v3:i32 = zext v2
+  0x1003  v4:i64 = sext v3
+  0x1004  v5:ptr64 = copy v4
+`
+	for _, tc := range []struct {
+		name      string
+		call      string
+		wantCalls int
+	}{
+		{"casts_only", "", 0},
+		{"call_through_cast", "  0x1005  call v5\n", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			ir, err := lowirtext.Parse(casts + tc.call + "  0x1006  return v5")
+			require.NoError(t, err)
+			converted, err := Convert(ctx, ir)
+			require.NoError(t, err)
+			p := converted.Program
+			calls := ssa.MatchInstructionByOpcodes(ctx, p, ssa.SSAOpcodeCall)
+			require.Len(t, calls, tc.wantCalls, "only a LowIR call may emit an SSA Call")
+			require.Len(t, ssa.MatchInstructionByOpcodes(ctx, p, ssa.SSAOpcodeTypeCast), 4)
+
+			returns := ssa.MatchInstructionByOpcodes(ctx, p, ssa.SSAOpcodeReturn)
+			require.Len(t, returns, 1)
+			ret, ok := ssa.ToReturn(returns[0])
+			require.True(t, ok)
+			require.Len(t, ret.Results, 1)
+			id := ret.Results[0]
+			if tc.wantCalls == 1 {
+				call, ok := ssa.ToCall(calls[0])
+				require.True(t, ok)
+				require.Equal(t, id, call.Method, "the indirect call must target the pointer cast's result")
+			}
+			// Walk the actual return operand back through copy, sext, zext and trunc.
+			for _, want := range []string{"ptr64", "i64", "i32", "i8"} {
+				inst, ok := p.GetInstructionById(id)
+				require.True(t, ok, "missing operand t%d", id)
+				cast, ok := ssa.ToTypeCast(inst)
+				require.True(t, ok, "want TypeCast to %s, got %T", want, inst)
+				require.Equal(t, want, cast.GetType().String())
+				id = cast.Value
+			}
+			require.Equal(t, ret.GetFunc().Params, []int64{id}, "the first cast must consume the input parameter")
+		})
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/core/lowirtext"
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 )
 
@@ -41,6 +42,46 @@ func TestAnnotateSymbolsNamesFunctionsAndCalls(t *testing.T) {
 	}
 	if got := function.Blocks[0].Instructions[3].Operands[0]; got.Kind != core.OperandSymbol || got.Name != "__libc_start_main" {
 		t.Fatalf("GOT call target = %+v", got)
+	}
+}
+
+// The two callers reuse v1..v3. Only the first one's load reads a known GOT
+// slot. Neither losing that symbol nor lending it to the other call is valid.
+func TestCallTargetValueIDsAreFunctionLocal(t *testing.T) {
+	artifact := &core.Artifact{Image: &core.Image{Symbols: []symbol.Symbol{
+		{Name: "puts", Address: 0x3000, Kind: symbol.SymbolFunction, Imported: true},
+	}}}
+	const got = `function from_got @ 0x1000
+block b1 @ 0x1000
+  0x1000  v1:ptr64 = constant 0x3000
+  0x1000  v2:i64 = load v1
+  0x1000  v3:ptr64 = copy v2
+  0x1000  call v3
+  0x1006  return
+`
+	const dynamic = `function from_register @ 0x2000
+block b1 @ 0x2000
+  0x2000  v1:ptr64 = read_register %rax
+  0x2000  v2:i64 = load v1
+  0x2000  v3:ptr64 = copy v2
+  0x2000  call v3
+  0x2002  return
+`
+	for _, text := range []string{got + dynamic, dynamic + got} {
+		ir, err := lowirtext.Parse(text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		annotateSymbols(artifact, ir)
+		for _, f := range ir.Functions {
+			target := f.Blocks[0].Instructions[3].Operands[0]
+			if f.Name == "from_got" && (target.Kind != core.OperandSymbol || target.Name != "puts") {
+				t.Errorf("%s: want puts, got %+v", f.Name, target)
+			}
+			if f.Name == "from_register" && (target.Kind != core.OperandValue || target.Value != 3) {
+				t.Errorf("%s: want indirect call through v3, got %+v", f.Name, target)
+			}
+		}
 	}
 }
 
