@@ -39,3 +39,16 @@ func TestGRPCSecretAuth(t *testing.T) {
 		})
 	}
 }
+
+func TestBrowserExtensionBridgeTransportDefault(t *testing.T) {
+	for platform, expected := range map[string]string{"windows": "npipe", "darwin": "unix", "linux": "websocket"} {
+		t.Run(platform, func(t *testing.T) {
+			if actual := browserExtensionBridgeTransport("auto", platform); actual != expected {
+				t.Fatalf("default browser bridge transport = %q, want %q", actual, expected)
+			}
+			if actual := browserExtensionBridgeTransport("websocket", platform); actual != "websocket" {
+				t.Fatalf("explicit compatibility transport = %q, want websocket", actual)
+			}
+		})
+	}
+}

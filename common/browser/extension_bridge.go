@@ -144,7 +144,7 @@ type ExtensionBridgeServer struct {
 
 	server   *http.Server
 	listener net.Listener
-	native   *extensionBridgePipeServer
+	native   *extensionBridgeNativeServer
 	closed   atomic.Bool
 	sequence atomic.Uint64
 
@@ -258,7 +258,7 @@ func (s *ExtensionBridgeServer) URL() string {
 		return ""
 	}
 	if s.native != nil {
-		return "npipe:" + s.native.name
+		return s.native.address
 	}
 	return "ws://" + s.addr + extensionBridgePath
 }
@@ -883,7 +883,7 @@ func (s *ExtensionBridgeServer) handleBridgePairing(ctx context.Context, connect
 		return
 	}
 	_ = connection.SetReadDeadline(time.Time{})
-	if pipe, ok := connection.(*extensionBridgePipeWire); ok {
+	if pipe, ok := connection.(*extensionBridgeNativeWire); ok {
 		disconnected, cancel := context.WithCancel(ctx)
 		defer cancel()
 		ctx = disconnected

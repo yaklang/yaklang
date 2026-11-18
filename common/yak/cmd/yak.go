@@ -470,6 +470,20 @@ func slowLogUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.Un
 	return resp, err
 }
 
+func browserExtensionBridgeTransport(transport, platform string) string {
+	if transport != "auto" {
+		return transport
+	}
+	switch platform {
+	case "windows":
+		return "npipe"
+	case "darwin":
+		return "unix"
+	default:
+		return "websocket"
+	}
+}
+
 var startGRPCServerCommand = cli.Command{
 	Name:   "grpc",
 	Usage:  "Start GRPC Server to Receive Connections",
@@ -574,13 +588,13 @@ var startGRPCServerCommand = cli.Command{
 		cli.IntFlag{
 			Name:  "browser-extension-bridge-port",
 			Value: 64333,
-			Usage: "浏览器插件本机 Bridge 首选端口；端口占用或无权限时自动避让",
+			Usage: "浏览器插件 Bridge 的 WebSocket 首选端口，仅在 websocket 传输下使用",
 		},
 		cli.StringFlag{
 			Name:   "browser-extension-bridge-transport",
-			Value:  "websocket",
+			Value:  "auto",
 			EnvVar: "YAK_BROWSER_EXTENSION_BRIDGE_TRANSPORT",
-			Usage:  "浏览器插件 Bridge 传输，可选 websocket 或 Windows npipe",
+			Usage:  "浏览器插件 Bridge 传输：auto（Windows 命名管道，macOS Unix Socket）/ websocket / npipe / unix",
 		},
 		cli.BoolFlag{
 			Name:  "disable-browser-extension-bridge",
@@ -827,17 +841,23 @@ var startGRPCServerCommand = cli.Command{
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
 		reverse_port := c.Int("reverse-port")
-		init_reverse := c.Bool("disable-reverse-server")
+		// Desktop IPC startup only opens a reverse listener when explicitly requested.
+		initReverse := !c.Bool("disable-reverse-server") && (transport == "tcp" || reverse_port > 0)
 		serverOptions := []yakgrpc.ServerOpts{
 			yakgrpc.WithReverseServerPort(reverse_port),
-			yakgrpc.WithInitFacadeServer(!init_reverse),
+			yakgrpc.WithInitFacadeServer(initReverse),
 			yakgrpc.WithStartCacheLog(),
 		}
 		if !c.Bool("disable-browser-extension-bridge") {
-			switch c.String("browser-extension-bridge-transport") {
+			switch browserExtensionBridgeTransport(c.String("browser-extension-bridge-transport"), runtime.GOOS) {
 			case "npipe":
 				if runtime.GOOS != "windows" {
 					return utils.Error("browser extension bridge npipe requires Windows")
+				}
+				serverOptions = append(serverOptions, yakgrpc.WithNativeBrowserExtensionBridge())
+			case "unix":
+				if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+					return utils.Error("browser extension bridge unix requires macOS or Linux")
 				}
 				serverOptions = append(serverOptions, yakgrpc.WithNativeBrowserExtensionBridge())
 			case "websocket":
@@ -847,7 +867,7 @@ var startGRPCServerCommand = cli.Command{
 				}
 				serverOptions = append(serverOptions, yakgrpc.WithBrowserExtensionBridge(bridgePort))
 			default:
-				return utils.Error("browser extension bridge transport must be websocket or npipe")
+				return utils.Error("browser extension bridge transport must be auto, websocket, npipe or unix")
 			}
 		}
 		s, err := yakgrpc.NewServer(serverOptions...)

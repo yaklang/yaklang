@@ -69,10 +69,22 @@ func TestManagedClientAuthPayloadBindsBrowserInstanceIdentity(t *testing.T) {
 }
 
 func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) {
+	t.Run("websocket", func(t *testing.T) { testManagedExtensionBridge(t, false) })
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		t.Run("unix", func(t *testing.T) { testManagedExtensionBridge(t, true) })
+	}
+}
+
+func testManagedExtensionBridge(t *testing.T, unix bool) {
+	t.Helper()
 	store := NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json"))
 	manager, err := NewExtensionBridgeManager(store, nil)
 	require.NoError(t, err)
-	require.NoError(t, manager.Start(0))
+	if unix {
+		require.NoError(t, manager.StartNative())
+	} else {
+		require.NoError(t, manager.Start(0))
+	}
 	SetActiveExtensionBridgeManager(manager)
 	t.Cleanup(func() {
 		SetActiveExtensionBridgeManager(nil)
@@ -86,11 +98,50 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.Empty(t, snapshot.Devices)
 
 	origin := "chrome-extension://managed-test-extension"
-	header := http.Header{"Origin": []string{origin}}
-	pairingURL := strings.Replace(snapshot.URL, extensionBridgePath, extensionBridgePairingPath, 1)
-	pairingConnection, _, err := websocket.DefaultDialer.Dial(pairingURL, header)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = pairingConnection.Close() })
+	if unix {
+		origin = extensionBridgePipeOrigin
+		require.True(t, strings.HasPrefix(snapshot.URL, "unix:"))
+		socket := strings.TrimPrefix(snapshot.URL, "unix:")
+		discovery, err := net.DialTimeout("unix", socket, time.Second)
+		require.NoError(t, err)
+		defer discovery.Close()
+		require.NoError(t, discovery.SetDeadline(time.Now().Add(time.Second)))
+		require.NoError(t, WriteNativeMessagingMessage(discovery, map[string]string{
+			"type": "discover", "engineInstanceId": snapshot.EngineInstanceID,
+			"engineIdentityId": snapshot.EngineIdentityID,
+		}))
+		reply, err := ReadNativeMessagingMessage(discovery)
+		require.NoError(t, err)
+		var descriptor extensionBridgeNativeDescriptor
+		require.NoError(t, json.Unmarshal(reply, &descriptor))
+		require.Equal(t, snapshot.EngineIdentityID, descriptor.EngineIdentityID)
+		require.Equal(t, snapshot.EngineInstanceID, descriptor.EngineInstanceID)
+		require.Equal(t, filepath.Base(socket), descriptor.SocketName)
+		require.Equal(t, os.Getpid(), descriptor.PID)
+	}
+	dial := func(purpose string) extensionBridgeWire {
+		t.Helper()
+		if unix {
+			conn, err := net.DialTimeout("unix", strings.TrimPrefix(snapshot.URL, "unix:"), time.Second)
+			require.NoError(t, err)
+			wire := &extensionBridgeNativeWire{Conn: conn, readLimit: MaxNativeMessagingMessageSize}
+			t.Cleanup(func() { _ = wire.Close() })
+			require.NoError(t, wire.WriteJSON(map[string]string{
+				"type": "open", "purpose": purpose, "origin": origin,
+				"engineInstanceId": snapshot.EngineInstanceID, "engineIdentityId": snapshot.EngineIdentityID,
+			}))
+			return wire
+		}
+		url := snapshot.URL
+		if purpose == "pair" {
+			url = strings.Replace(url, extensionBridgePath, extensionBridgePairingPath, 1)
+		}
+		conn, _, err := websocket.DefaultDialer.Dial(url, http.Header{"Origin": []string{origin}})
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = conn.Close() })
+		return conn
+	}
+	pairingConnection := dial("pair")
 
 	clientKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -104,7 +155,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 		Nonce:           base64.RawURLEncoding.EncodeToString(clientNonce), PublicKey: ptrExtensionBridgeJWK(publicKeyToJWK(&clientKey.PublicKey)),
 	}))
 	var pending extensionBridgePairingEnvelope
-	require.NoError(t, pairingConnection.ReadJSON(&pending))
+	require.NoError(t, readStrictExtensionBridgeJSON(pairingConnection, &pending))
 	require.Equal(t, "pair_pending", pending.Type)
 	require.Regexp(t, `^\d{6}$`, pending.Code)
 	require.NotEmpty(t, pending.RequestID)
@@ -115,14 +166,13 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, "managed-installation", device.InstallationID)
 	var approved extensionBridgePairingEnvelope
-	require.NoError(t, pairingConnection.ReadJSON(&approved))
+	require.NoError(t, readStrictExtensionBridgeJSON(pairingConnection, &approved))
 	require.Equal(t, "pair_approved", approved.Type)
 	require.Equal(t, device.ID, approved.DeviceID)
 
-	bridgeConnection, _, err := websocket.DefaultDialer.Dial(snapshot.URL, header)
-	require.NoError(t, err)
+	bridgeConnection := dial("connect")
 	var challenge ExtensionBridgeEnvelope
-	require.NoError(t, bridgeConnection.ReadJSON(&challenge))
+	require.NoError(t, readStrictExtensionBridgeJSON(bridgeConnection, &challenge))
 	require.Equal(t, "challenge", challenge.Type)
 	require.Equal(t, managedExtensionBridgeProtocolVersion, challenge.ProtocolVersion)
 	require.Equal(t, snapshot.EngineInstanceID, challenge.EngineInstanceID)
@@ -147,7 +197,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	))
 	require.NoError(t, bridgeConnection.WriteJSON(auth))
 	var acknowledged ExtensionBridgeEnvelope
-	require.NoError(t, bridgeConnection.ReadJSON(&acknowledged))
+	require.NoError(t, readStrictExtensionBridgeJSON(bridgeConnection, &acknowledged))
 	require.Equal(t, "hello_ack", acknowledged.Type)
 	require.Equal(t, managedExtensionBridgeProtocolVersion, acknowledged.ProtocolVersion)
 	require.Equal(t, snapshot.EngineIdentityID, acknowledged.EngineIdentityID)
@@ -165,7 +215,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 		Params: json.RawMessage(`{"proxyHost":"127.0.0.1","proxyPort":8083}`),
 	}))
 	var ingressReply ExtensionBridgeEnvelope
-	require.NoError(t, bridgeConnection.ReadJSON(&ingressReply))
+	require.NoError(t, readStrictExtensionBridgeJSON(bridgeConnection, &ingressReply))
 	require.Nil(t, ingressReply.Error)
 	var ingress extensionMITMIngress
 	require.NoError(t, json.Unmarshal(ingressReply.Result, &ingress))
@@ -175,7 +225,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	responseDone := make(chan error, 1)
 	go func() {
 		var request ExtensionBridgeEnvelope
-		if readErr := bridgeConnection.ReadJSON(&request); readErr != nil {
+		if readErr := readStrictExtensionBridgeJSON(bridgeConnection, &request); readErr != nil {
 			responseDone <- readErr
 			return
 		}
@@ -198,7 +248,7 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	responseDone = make(chan error, 1)
 	go func() {
 		var request ExtensionBridgeEnvelope
-		if readErr := bridgeConnection.ReadJSON(&request); readErr != nil {
+		if readErr := readStrictExtensionBridgeJSON(bridgeConnection, &request); readErr != nil {
 			responseDone <- readErr
 			return
 		}
@@ -217,17 +267,15 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	_ = bridgeConnection.SetReadDeadline(time.Now().Add(time.Second))
 	_, _, err = bridgeConnection.ReadMessage()
 	require.Error(t, err)
-	revokedConnection, _, err := websocket.DefaultDialer.Dial(snapshot.URL, header)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = revokedConnection.Close() })
-	require.NoError(t, revokedConnection.ReadJSON(&challenge))
+	revokedConnection := dial("connect")
+	require.NoError(t, readStrictExtensionBridgeJSON(revokedConnection, &challenge))
 	auth.Challenge = challenge.Challenge
 	auth.Signature = signManagedTestPayload(t, clientKey, managedClientAuthPayload(
 		origin, challenge.EngineIdentityID, challenge.EngineInstanceID, challenge.Challenge, auth,
 	))
 	require.NoError(t, revokedConnection.WriteJSON(auth))
 	var rejection ExtensionBridgeEnvelope
-	require.NoError(t, revokedConnection.ReadJSON(&rejection))
+	require.NoError(t, readStrictExtensionBridgeJSON(revokedConnection, &rejection))
 	require.NotNil(t, rejection.Error)
 	require.Equal(t, "unauthorized", rejection.Error.Code)
 }
