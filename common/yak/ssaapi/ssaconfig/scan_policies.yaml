@@ -147,6 +147,9 @@ custom_rule_groups:
         - name: "c"
           display_name: "C"
           canonical_name: "c"
+        - name: "cpp"
+          display_name: "C++"
+          canonical_name: "cpp"
         # Exact engine language names; retain the policy aliases above.
         # Appending keeps existing display order and policy selection intact.
         - name: "golang"
