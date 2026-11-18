@@ -17,8 +17,6 @@
 
 lexer grammar KotlinLexer;
 
-import UnicodeClasses;
-
 ShebangLine: '#!' ~[\r\n]*;
 
 DelimitedComment: '/*' ( DelimitedComment | .)*? '*/' -> channel(HIDDEN);
@@ -197,7 +195,7 @@ IntegerLiteral:
     | DecDigit // including '0'
 ;
 
-fragment UnicodeDigit: UNICODE_CLASS_ND;
+fragment UnicodeDigit: [\p{Nd}];
 
 fragment DecDigit: '0' ..'9';
 
@@ -280,14 +278,7 @@ fragment UniCharacterLiteral: '\\' 'u' HexDigit HexDigit HexDigit HexDigit;
 
 fragment EscapedIdentifier: '\\' ('t' | 'b' | 'r' | 'n' | '\'' | '"' | '\\' | '$');
 
-fragment Letter:
-    UNICODE_CLASS_LL
-    | UNICODE_CLASS_LM
-    | UNICODE_CLASS_LO
-    | UNICODE_CLASS_LT
-    | UNICODE_CLASS_LU
-    | UNICODE_CLASS_NL
-;
+fragment Letter: [\p{L}\p{Nl}];
 
 ErrorCharacter: .;
 

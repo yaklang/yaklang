@@ -76,11 +76,9 @@ func kotlinparserParserInit() {
 		"FloatLiteral", "DoubleLiteral", "LongLiteral", "UnsignedLiteral", "IntegerLiteral",
 		"HexLiteral", "BinLiteral", "BooleanLiteral", "NullLiteral", "Identifier",
 		"IdentifierAt", "FieldIdentifier", "CharacterLiteral", "ErrorCharacter",
-		"UNICODE_CLASS_LL", "UNICODE_CLASS_LM", "UNICODE_CLASS_LO", "UNICODE_CLASS_LT",
-		"UNICODE_CLASS_LU", "UNICODE_CLASS_ND", "UNICODE_CLASS_NL", "Inside_Comment",
-		"Inside_WS", "Inside_NL", "QUOTE_CLOSE", "LineStrRef", "LineStrText",
-		"LineStrEscapedChar", "LineStrExprStart", "TRIPLE_QUOTE_CLOSE", "MultiLineStringQuote",
-		"MultiLineStrRef", "MultiLineStrText", "MultiLineStrExprStart",
+		"Inside_Comment", "Inside_WS", "Inside_NL", "QUOTE_CLOSE", "LineStrRef",
+		"LineStrText", "LineStrEscapedChar", "LineStrExprStart", "TRIPLE_QUOTE_CLOSE",
+		"MultiLineStringQuote", "MultiLineStrRef", "MultiLineStrText", "MultiLineStrExprStart",
 	}
 	staticData.RuleNames = []string{
 		"kotlinFile", "script", "fileAnnotation", "packageHeader", "importList",
@@ -127,7 +125,7 @@ func kotlinparserParserInit() {
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 173, 3383, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
+		4, 1, 166, 3383, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4,
 		7, 4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10,
 		7, 10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7,
 		15, 2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20,
@@ -551,8 +549,8 @@ func kotlinparserParserInit() {
 		268, 270, 272, 274, 276, 278, 280, 282, 284, 286, 288, 290, 292, 294, 296,
 		298, 300, 302, 304, 306, 308, 310, 312, 314, 316, 318, 320, 322, 324, 326,
 		328, 330, 332, 0, 29, 1, 0, 63, 64, 1, 0, 67, 68, 2, 0, 5, 5, 28, 28, 1,
-		0, 37, 38, 3, 0, 139, 139, 142, 148, 152, 152, 1, 0, 165, 167, 1, 0, 170,
-		172, 2, 0, 59, 59, 74, 74, 2, 0, 56, 56, 88, 88, 1, 0, 30, 34, 2, 0, 50,
+		0, 37, 38, 3, 0, 139, 139, 142, 148, 152, 152, 1, 0, 158, 160, 1, 0, 163,
+		165, 2, 0, 59, 59, 74, 74, 2, 0, 56, 56, 88, 88, 1, 0, 30, 34, 2, 0, 50,
 		51, 53, 54, 1, 0, 46, 49, 2, 0, 93, 93, 95, 95, 2, 0, 92, 92, 94, 94, 1,
 		0, 18, 19, 1, 0, 15, 17, 2, 0, 52, 52, 91, 91, 2, 0, 65, 65, 113, 118,
 		2, 0, 125, 125, 130, 130, 1, 0, 109, 112, 2, 0, 93, 93, 96, 96, 1, 0, 119,
@@ -1425,20 +1423,20 @@ func kotlinparserParserInit() {
 		1, 0, 0, 0, 2422, 2427, 5, 137, 0, 0, 2423, 2426, 3, 200, 100, 0, 2424,
 		2426, 3, 202, 101, 0, 2425, 2423, 1, 0, 0, 0, 2425, 2424, 1, 0, 0, 0, 2426,
 		2429, 1, 0, 0, 0, 2427, 2425, 1, 0, 0, 0, 2427, 2428, 1, 0, 0, 0, 2428,
-		2430, 1, 0, 0, 0, 2429, 2427, 1, 0, 0, 0, 2430, 2431, 5, 164, 0, 0, 2431,
+		2430, 1, 0, 0, 0, 2429, 2427, 1, 0, 0, 0, 2430, 2431, 5, 157, 0, 0, 2431,
 		197, 1, 0, 0, 0, 2432, 2438, 5, 138, 0, 0, 2433, 2437, 3, 204, 102, 0,
-		2434, 2437, 3, 206, 103, 0, 2435, 2437, 5, 170, 0, 0, 2436, 2433, 1, 0,
+		2434, 2437, 3, 206, 103, 0, 2435, 2437, 5, 163, 0, 0, 2436, 2433, 1, 0,
 		0, 0, 2436, 2434, 1, 0, 0, 0, 2436, 2435, 1, 0, 0, 0, 2437, 2440, 1, 0,
 		0, 0, 2438, 2436, 1, 0, 0, 0, 2438, 2439, 1, 0, 0, 0, 2439, 2441, 1, 0,
-		0, 0, 2440, 2438, 1, 0, 0, 0, 2441, 2442, 5, 169, 0, 0, 2442, 199, 1, 0,
-		0, 0, 2443, 2444, 7, 5, 0, 0, 2444, 201, 1, 0, 0, 0, 2445, 2449, 5, 168,
+		0, 0, 2440, 2438, 1, 0, 0, 0, 2441, 2442, 5, 162, 0, 0, 2442, 199, 1, 0,
+		0, 0, 2443, 2444, 7, 5, 0, 0, 2444, 201, 1, 0, 0, 0, 2445, 2449, 5, 161,
 		0, 0, 2446, 2448, 5, 5, 0, 0, 2447, 2446, 1, 0, 0, 0, 2448, 2451, 1, 0,
 		0, 0, 2449, 2447, 1, 0, 0, 0, 2449, 2450, 1, 0, 0, 0, 2450, 2452, 1, 0,
 		0, 0, 2451, 2449, 1, 0, 0, 0, 2452, 2456, 3, 128, 64, 0, 2453, 2455, 5,
 		5, 0, 0, 2454, 2453, 1, 0, 0, 0, 2455, 2458, 1, 0, 0, 0, 2456, 2454, 1,
 		0, 0, 0, 2456, 2457, 1, 0, 0, 0, 2457, 2459, 1, 0, 0, 0, 2458, 2456, 1,
 		0, 0, 0, 2459, 2460, 5, 14, 0, 0, 2460, 203, 1, 0, 0, 0, 2461, 2462, 7,
-		6, 0, 0, 2462, 205, 1, 0, 0, 0, 2463, 2467, 5, 173, 0, 0, 2464, 2466, 5,
+		6, 0, 0, 2462, 205, 1, 0, 0, 0, 2463, 2467, 5, 166, 0, 0, 2464, 2466, 5,
 		5, 0, 0, 2465, 2464, 1, 0, 0, 0, 2466, 2469, 1, 0, 0, 0, 2467, 2465, 1,
 		0, 0, 0, 2467, 2468, 1, 0, 0, 0, 2468, 2470, 1, 0, 0, 0, 2469, 2467, 1,
 		0, 0, 0, 2470, 2474, 3, 128, 64, 0, 2471, 2473, 5, 5, 0, 0, 2472, 2471,
@@ -2033,26 +2031,19 @@ const (
 	KotlinParserFieldIdentifier       = 151
 	KotlinParserCharacterLiteral      = 152
 	KotlinParserErrorCharacter        = 153
-	KotlinParserUNICODE_CLASS_LL      = 154
-	KotlinParserUNICODE_CLASS_LM      = 155
-	KotlinParserUNICODE_CLASS_LO      = 156
-	KotlinParserUNICODE_CLASS_LT      = 157
-	KotlinParserUNICODE_CLASS_LU      = 158
-	KotlinParserUNICODE_CLASS_ND      = 159
-	KotlinParserUNICODE_CLASS_NL      = 160
-	KotlinParserInside_Comment        = 161
-	KotlinParserInside_WS             = 162
-	KotlinParserInside_NL             = 163
-	KotlinParserQUOTE_CLOSE           = 164
-	KotlinParserLineStrRef            = 165
-	KotlinParserLineStrText           = 166
-	KotlinParserLineStrEscapedChar    = 167
-	KotlinParserLineStrExprStart      = 168
-	KotlinParserTRIPLE_QUOTE_CLOSE    = 169
-	KotlinParserMultiLineStringQuote  = 170
-	KotlinParserMultiLineStrRef       = 171
-	KotlinParserMultiLineStrText      = 172
-	KotlinParserMultiLineStrExprStart = 173
+	KotlinParserInside_Comment        = 154
+	KotlinParserInside_WS             = 155
+	KotlinParserInside_NL             = 156
+	KotlinParserQUOTE_CLOSE           = 157
+	KotlinParserLineStrRef            = 158
+	KotlinParserLineStrText           = 159
+	KotlinParserLineStrEscapedChar    = 160
+	KotlinParserLineStrExprStart      = 161
+	KotlinParserTRIPLE_QUOTE_CLOSE    = 162
+	KotlinParserMultiLineStringQuote  = 163
+	KotlinParserMultiLineStrRef       = 164
+	KotlinParserMultiLineStrText      = 165
+	KotlinParserMultiLineStrExprStart = 166
 )
 
 // KotlinParser rules.
@@ -27802,7 +27793,7 @@ func (p *KotlinParser) LineStringLiteral() (localctx ILineStringLiteralContext) 
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64((_la-165)) & ^0x3f) == 0 && ((int64(1)<<(_la-165))&15) != 0 {
+	for (int64((_la-158)) & ^0x3f) == 0 && ((int64(1)<<(_la-158))&15) != 0 {
 		p.SetState(2425)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -28049,7 +28040,7 @@ func (p *KotlinParser) MultiLineStringLiteral() (localctx IMultiLineStringLitera
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64((_la-170)) & ^0x3f) == 0 && ((int64(1)<<(_la-170))&15) != 0 {
+	for (int64((_la-163)) & ^0x3f) == 0 && ((int64(1)<<(_la-163))&15) != 0 {
 		p.SetState(2436)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -28203,7 +28194,7 @@ func (p *KotlinParser) LineStringContent() (localctx ILineStringContentContext) 
 		p.SetState(2443)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64((_la-165)) & ^0x3f) == 0 && ((int64(1)<<(_la-165))&7) != 0) {
+		if !((int64((_la-158)) & ^0x3f) == 0 && ((int64(1)<<(_la-158))&7) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -28515,7 +28506,7 @@ func (p *KotlinParser) MultiLineStringContent() (localctx IMultiLineStringConten
 		p.SetState(2461)
 		_la = p.GetTokenStream().LA(1)
 
-		if !((int64((_la-170)) & ^0x3f) == 0 && ((int64(1)<<(_la-170))&7) != 0) {
+		if !((int64((_la-163)) & ^0x3f) == 0 && ((int64(1)<<(_la-163))&7) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
