@@ -16,6 +16,7 @@ import (
 	ssapass "github.com/yaklang/yaklang/common/yak/reify/core/ssa2source/pass"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // Mode selects the deepest representation rendered by Lift.
@@ -76,6 +77,8 @@ type Result struct {
 	Functions     int
 	Blocks        int
 	Values        int
+	// ProgramName is the ssadb program name when Lift persisted the SSA.
+	ProgramName string
 }
 
 // Close releases the input opened by Lift.
@@ -96,6 +99,8 @@ type Config struct {
 	Address     string
 	Size        string
 	Function    string
+	// PersistName names the ssadb program. Empty means the SSA stays in memory.
+	PersistName string
 	// Format forces one loader. It is needed only for a format that carries no
 	// magic, such as a COM image.
 	Format string
@@ -139,6 +144,13 @@ func WithFunction(name string) Option { return func(config *Config) { config.Fun
 // WithFormat forces one loader by format name. It is needed only for a format
 // that carries no magic, such as a COM image.
 func WithFormat(name string) Option { return func(config *Config) { config.Format = name } }
+
+// WithPersist writes the lifted SSA to ssadb under name. It requires a mode
+// that produces SSA (ssair, source or all). The program is loaded from ssadb
+// with ssaapi.FromDatabase once the lift returns.
+func WithPersist(name string) Option {
+	return func(config *Config) { config.PersistName = name }
+}
 
 // resolveFormat validates a forced format name against the register.
 func resolveFormat(name string) (core.Format, error) {
@@ -208,6 +220,9 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	settings := config(options)
 	if settings.Size != "" && settings.Address == "" {
 		return nil, fmt.Errorf("lift: --size requires --address")
+	}
+	if settings.PersistName != "" && (settings.Mode == ModeASM || settings.Mode == ModeLowIR) {
+		return nil, fmt.Errorf("lift: --persist requires --mode ssair, source or all")
 	}
 	format, err := resolveFormat(settings.Format)
 	if err != nil {
@@ -285,6 +300,15 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	// A load from a table of addresses names the object it points at, so the
 	// converter reads the table through the artifact.
 	convertOptions = append(convertOptions, lowir2ssa.WithPointerReader(pointerReader(artifact)))
+	if settings.PersistName != "" {
+		// A binary has no source language. Record C as the modeled language so
+		// the ir_programs row and language-aware rules have a stable value.
+		convertOptions = append(convertOptions,
+			lowir2ssa.WithProgramName(settings.PersistName),
+			lowir2ssa.WithProgramCache(ssa.ProgramCacheDBWrite),
+			lowir2ssa.WithLanguage(ssaconfig.C),
+		)
+	}
 	converted, err := lowir2ssa.Convert(ctx, parsed.IR, convertOptions...)
 	if err != nil {
 		return nil, err
@@ -294,10 +318,23 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 		return nil, err
 	}
 	ssa2source.AnnotateArtifact(converted.Program, artifact)
+	persist := func() error {
+		if settings.PersistName == "" {
+			return nil
+		}
+		if err := converted.Program.SaveToDatabase(); err != nil {
+			return fmt.Errorf("lift: persist program %q: %w", settings.PersistName, err)
+		}
+		result.ProgramName = settings.PersistName
+		return nil
+	}
 	if settings.Mode == ModeSSAIR || settings.Mode == ModeAll {
 		result.SSAIR = lowir2ssa.Text(converted.Program)
 	}
 	if settings.Mode == ModeSSAIR {
+		if err := persist(); err != nil {
+			return nil, err
+		}
 		ok = true
 		return result, nil
 	}
@@ -308,6 +345,9 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	result.Source = source
 	if settings.Mode == ModeSource {
 		result.Functions = countSourceFunctions(parsed.IR)
+	}
+	if err := persist(); err != nil {
+		return nil, err
 	}
 	ok = true
 	return result, nil
