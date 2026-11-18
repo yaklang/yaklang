@@ -2,9 +2,12 @@ package ssadb
 
 import (
 	"fmt"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 )
 
 // The pool key covers the kind, so values that render the same text restore
@@ -96,4 +99,94 @@ func TestFlushIrConstPoolsReadsKindFromExtra(t *testing.T) {
 	var stored IrCode
 	require.NoError(t, db.Where("program_name = ? AND code_id = ?", prog, 7).First(&stored).Error)
 	require.Zero(t, stored.ConstID, "a row without const_value must not be guessed as a string")
+}
+
+// createConstPoolIndex adds the unique key SaveInBatches upserts on. A bare
+// AutoMigrate does not create it; only ensureIrConstIndexes does.
+func createConstPoolIndex(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	require.NoError(t, db.Exec(
+		`CREATE UNIQUE INDEX IF NOT EXISTS "`+irConstPoolProgramIDIndex+`" ON "`+
+			TableIrConstPool+`" ("program_name", "const_id");`,
+	).Error)
+}
+
+// The pool is filled by the concurrent marshal workers and a value only joins
+// seen after its row is written. Interning the same literal many times before
+// the first flush must still queue exactly one row: PostgreSQL rejects an
+// INSERT ... ON CONFLICT statement that carries the same conflict key twice,
+// which fails the whole IR batch.
+func TestIrConstPoolConcurrentInternKeepsOnePendingRow(t *testing.T) {
+	prog := "const-dedupe-" + t.Name()
+	pool := GetIrConstPool(prog)
+	t.Cleanup(func() { DropIrConstPool(prog) })
+
+	const workers, rounds = 16, 64
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < rounds; j++ {
+				pool.Intern(IrConstKindString, "same-literal")
+			}
+		}()
+	}
+	wg.Wait()
+
+	pool.mu.Lock()
+	pending := len(pool.pending)
+	pool.mu.Unlock()
+	require.Equal(t, 1, pending, "one literal must queue one const pool row per flush cycle")
+
+	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "const.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&IrConst{}).Error)
+	createConstPoolIndex(t, db)
+
+	require.NoError(t, pool.Flush(db))
+	id := IrConstPoolID(IrConstKindString, "same-literal")
+	var count int64
+	require.NoError(t, db.Model(&IrConst{}).
+		Where("program_name = ? AND const_id = ?", prog, id).
+		Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+// A failed flush puts its rows back for the retry. A worker that interns the
+// same value again after the failure already has an entry; merging must not
+// queue a second row, or the retry repeats the duplicate-key failure.
+func TestIrConstPoolFailedFlushRetryKeepsOneRow(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "const.db")
+	db, err := gorm.Open("sqlite3", path)
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&IrConst{}).Error)
+	createConstPoolIndex(t, db)
+	sqlDB := db.DB()
+	require.NoError(t, sqlDB.Close())
+
+	prog := "const-retry-" + t.Name()
+	pool := GetIrConstPool(prog)
+	t.Cleanup(func() { DropIrConstPool(prog) })
+
+	id := pool.Intern(IrConstKindString, "retry-literal")
+	require.Error(t, pool.Flush(db), "a closed database must fail the batch")
+
+	require.Equal(t, id, pool.Intern(IrConstKindString, "retry-literal"))
+	pool.mu.Lock()
+	pending := len(pool.pending)
+	pool.mu.Unlock()
+	require.Equal(t, 1, pending, "the retry must keep one row for the value")
+
+	retry, err := gorm.Open("sqlite3", path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = retry.Close() })
+	require.NoError(t, pool.Flush(retry))
+
+	var count int64
+	require.NoError(t, retry.Model(&IrConst{}).
+		Where("program_name = ? AND const_id = ?", prog, id).
+		Count(&count).Error)
+	require.Equal(t, int64(1), count)
 }
