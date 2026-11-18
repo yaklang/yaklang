@@ -113,27 +113,19 @@ RAW_IDENTIFIER: 'r#' NON_KEYWORD_IDENTIFIER;
 // comments https://doc.rust-lang.org/reference/comments.html
 LINE_COMMENT: ('//' (~[/!] | '//') ~[\r\n]* | '//') -> channel (HIDDEN);
 
-BLOCK_COMMENT:
-    (
-        '/*' (~[*!] | '**' | BLOCK_COMMENT_OR_DOC) (BLOCK_COMMENT_OR_DOC | ~[*])*? '*/'
-        | '/**/'
-        | '/***/'
-    ) -> channel (HIDDEN)
-;
+BLOCK_COMMENT: '/*' (BLOCK_COMMENT | .)*? '*/' -> channel (HIDDEN);
 
 INNER_LINE_DOC: '//!' ~[\n\r]* -> channel (HIDDEN); // isolated cr
 
-INNER_BLOCK_DOC: '/*!' ( BLOCK_COMMENT_OR_DOC | ~[*])*? '*/' -> channel (HIDDEN);
+INNER_BLOCK_DOC: '/*!' (BLOCK_COMMENT | .)*? '*/' -> channel (HIDDEN);
 
 OUTER_LINE_DOC: '///' (~[/] ~[\n\r]*)? -> channel (HIDDEN); // isolated cr
 
-OUTER_BLOCK_DOC:
-    '/**' (~[*] | BLOCK_COMMENT_OR_DOC) (BLOCK_COMMENT_OR_DOC | ~[*])*? '*/' -> channel (HIDDEN)
-;
+OUTER_BLOCK_DOC: '/**' (BLOCK_COMMENT | .)*? '*/' -> channel (HIDDEN);
 
 BLOCK_COMMENT_OR_DOC: ( BLOCK_COMMENT | INNER_BLOCK_DOC | OUTER_BLOCK_DOC) -> channel (HIDDEN);
 
-SHEBANG: {p.SOF()}? '\ufeff'? '#!' ~[\r\n]* -> channel(HIDDEN);
+SHEBANG: {p.SOF()}? '\ufeff'? '#!' ('/' | ' ' | '\t') ~[\r\n]* -> channel(HIDDEN);
 
 // whitespace https://doc.rust-lang.org/reference/whitespace.html
 WHITESPACE : [\p{Zs}]          -> channel(HIDDEN);

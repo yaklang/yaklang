@@ -239,7 +239,7 @@ functionReturnType
 
 // 6.5
 typeAlias
-    : KW_TYPE identifier genericParams? whereClause? (EQ type_)? SEMI
+    : KW_TYPE identifier genericParams? (COLON typeParamBounds?)? whereClause? (EQ type_)? SEMI
     ;
 
 // 6.6
@@ -428,7 +428,7 @@ statement
     ;
 
 letStatement
-    : outerAttribute* KW_LET patternNoTopAlt (COLON type_)? (EQ expression)? SEMI
+    : outerAttribute* KW_LET patternNoTopAlt (COLON type_)? (EQ expression (KW_ELSE blockExpression)?)? SEMI?
     ;
 
 expressionStatement
