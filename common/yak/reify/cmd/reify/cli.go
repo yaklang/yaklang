@@ -5,12 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/reify"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -104,12 +102,11 @@ func newCLIApp(env *commandEnv) *cli.App {
 		{
 			Name:      "audit",
 			Usage:     "Run a syntaxflow rule against a lifted file or a saved program",
-			ArgsUsage: "[file]",
+			ArgsUsage: "<file> <syntaxflow> | --program <name> <syntaxflow>",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "program", Usage: "ssadb program name; omit it to audit a file"},
 				cli.StringFlag{Name: "db", Usage: "SSA database path for --program; empty uses the default YAKIT_HOME database"},
-				cli.StringFlag{Name: "rule", Usage: "SyntaxFlow rule text"},
-				cli.StringFlag{Name: "call", Usage: "Find every call to this function; shorthand for '<call>(* as $args) as $call'"},
+				cli.StringFlag{Name: "rule", Usage: "SyntaxFlow rule text; alternatively pass it as the last argument"},
 				cli.StringFlag{Name: "asm-syntax", Value: "intel", Usage: "Assembly syntax: intel or att"},
 				cli.StringFlag{Name: "func", Usage: "Select a function by symbol name"},
 				cli.StringFlag{Name: "section", Usage: "Section to lift when no address is given; empty lifts every region"},
@@ -265,12 +262,10 @@ func (e *commandEnv) check(c *cli.Context) error {
 }
 
 type auditReport struct {
-	Program string         `json:"program"`
-	Rule    string         `json:"rule"`
-	Matches map[string]int `json:"matches"`
-	Callees map[string]int `json:"callees,omitempty"`
-	Values  []string       `json:"values,omitempty"`
-	Errors  []string       `json:"errors,omitempty"`
+	Program string   `json:"program"`
+	Rule    string   `json:"rule"`
+	Result  string   `json:"result"`
+	Errors  []string `json:"errors,omitempty"`
 }
 
 // save lifts a binary into YakSSA on the ssadb write cache and keeps the
@@ -293,7 +288,7 @@ func (e *commandEnv) save(c *cli.Context) error {
 		// index rows pointing at removed name-pool entries.
 		ssadb.DeleteProgram(ssadb.GetDB(), name)
 	}
-	options, err := liftSSAOptions(c)
+	options, err := liftOptions(c, reify.ModeSSAIR)
 	if err != nil {
 		return err
 	}
@@ -316,13 +311,14 @@ func (e *commandEnv) save(c *cli.Context) error {
 	fmt.Fprintf(e.stdout, "Functions: %d\n", result.Functions)
 	fmt.Fprintf(e.stdout, "Blocks: %d\n", result.Blocks)
 	fmt.Fprintf(e.stdout, "Values: %d\n", result.Values)
-	fmt.Fprintf(e.stdout, "Query: reify audit --program %s --call <function>\n", result.ProgramName)
+	fmt.Fprintf(e.stdout, "Query: reify audit --program %s '<syntaxflow>'\n", result.ProgramName)
 	return nil
 }
 
-// liftSSAOptions collects the loader and region flags shared by save and the
-// file form of audit. The caller adds the mode and persistence options.
-func liftSSAOptions(c *cli.Context) ([]reify.Option, error) {
+// liftOptions collects the loader, region and pass flags shared by lift, save
+// and the file form of audit. The caller selects the mode and, for save, the
+// persistence options.
+func liftOptions(c *cli.Context, mode reify.Mode) ([]reify.Option, error) {
 	syntax, err := reify.ParseAsmSyntax(c.String("asm-syntax"))
 	if err != nil {
 		return nil, cli.NewExitError(err, 2)
@@ -332,7 +328,7 @@ func liftSSAOptions(c *cli.Context) ([]reify.Option, error) {
 		return nil, cli.NewExitError("--func cannot be combined with --address or --size", 2)
 	}
 	options := []reify.Option{
-		reify.WithMode(reify.ModeSSAIR),
+		reify.WithMode(mode),
 		reify.WithAsmSyntax(syntax),
 	}
 	if c.IsSet("section") {
@@ -362,28 +358,37 @@ func liftSSAOptions(c *cli.Context) ([]reify.Option, error) {
 // specific SSA database.
 func (e *commandEnv) audit(c *cli.Context) error {
 	name := strings.TrimSpace(c.String("program"))
-	file := c.Args().First()
-	if c.NArg() > 1 {
-		return cli.NewExitError("audit accepts at most one file", 2)
+	var (
+		file string
+		rule string
+	)
+	if name != "" {
+		if c.NArg() > 1 {
+			return cli.NewExitError("audit --program accepts one syntaxflow argument", 2)
+		}
+		if c.NArg() == 1 {
+			rule = strings.TrimSpace(c.Args().Get(0))
+		}
+	} else {
+		if c.NArg() < 1 || c.NArg() > 2 {
+			return cli.NewExitError("audit requires a file and a syntaxflow rule", 2)
+		}
+		file = c.Args().First()
+		if c.NArg() == 2 {
+			rule = strings.TrimSpace(c.Args().Get(1))
+		}
 	}
-	if name != "" && file != "" {
-		return cli.NewExitError("use either a file or --program, not both", 2)
+	if rule != "" && strings.TrimSpace(c.String("rule")) != "" {
+		return cli.NewExitError("use either an argument or --rule, not both", 2)
 	}
-	if name == "" && file == "" {
-		return cli.NewExitError("audit requires a file or --program", 2)
+	if rule == "" {
+		rule = strings.TrimSpace(c.String("rule"))
+	}
+	if rule == "" {
+		return cli.NewExitError("audit requires a syntaxflow rule", 2)
 	}
 	if name == "" && c.IsSet("db") {
 		return cli.NewExitError("--db requires --program", 2)
-	}
-	rule := strings.TrimSpace(c.String("rule"))
-	if call := strings.TrimSpace(c.String("call")); call != "" {
-		if rule != "" {
-			return cli.NewExitError("use --rule or --call, not both", 2)
-		}
-		rule = fmt.Sprintf("%s(* as $args) as $call", call)
-	}
-	if rule == "" {
-		return cli.NewExitError("audit requires --rule or --call", 2)
 	}
 
 	var (
@@ -405,7 +410,7 @@ func (e *commandEnv) audit(c *cli.Context) error {
 		}
 		programName = name
 	} else {
-		options, optionErr := liftSSAOptions(c)
+		options, optionErr := liftOptions(c, reify.ModeSSAIR)
 		if optionErr != nil {
 			return optionErr
 		}
@@ -417,6 +422,7 @@ func (e *commandEnv) audit(c *cli.Context) error {
 		if lifted.Program == nil {
 			return cli.NewExitError("lift produced no SSA program", 1)
 		}
+		lifted.Program.FlushInstruction()
 		program = ssaapi.NewProgram(lifted.Program, nil)
 		programName = lifted.ProgramName
 	}
@@ -425,69 +431,13 @@ func (e *commandEnv) audit(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	report := auditReport{Program: programName, Rule: rule, Matches: make(map[string]int), Callees: make(map[string]int), Errors: result.GetErrors()}
-	if frame := result.GetSFResult(); frame != nil && frame.SymbolTable != nil {
-		frame.SymbolTable.ForEach(func(symbol string, values sfvm.Values) bool {
-			report.Matches[symbol] = len(values)
-			for _, value := range values {
-				report.Values = append(report.Values, auditValueLine(value))
-				if symbol != "call" {
-					continue
-				}
-				typed, ok := value.(*ssaapi.Value)
-				if !ok {
-					continue
-				}
-				callee := typed.GetCallee()
-				if callee == nil {
-					continue
-				}
-				kind := "local"
-				if function, ok := ssa.ToFunction(callee.GetSSAInst()); ok && function.IsExtern() {
-					kind = "extern"
-				}
-				report.Callees[fmt.Sprintf("%s (%s)", callee.GetName(), kind)]++
-			}
-			return true
-		})
-	}
+	report := auditReport{Program: programName, Rule: rule, Result: result.String(), Errors: result.GetErrors()}
 	if c.Bool("json") {
 		return writeJSON(e.stdout, report)
 	}
 	fmt.Fprintf(e.stdout, "Program: %s\n", report.Program)
-	fmt.Fprintf(e.stdout, "Rule: %s\n", report.Rule)
-	symbols := make([]string, 0, len(report.Matches))
-	for symbol := range report.Matches {
-		symbols = append(symbols, symbol)
-	}
-	sort.Strings(symbols)
-	for _, symbol := range symbols {
-		fmt.Fprintf(e.stdout, "Match %s: %d\n", symbol, report.Matches[symbol])
-	}
-	callees := make([]string, 0, len(report.Callees))
-	for callee := range report.Callees {
-		callees = append(callees, callee)
-	}
-	sort.Strings(callees)
-	for _, callee := range callees {
-		fmt.Fprintf(e.stdout, "Callee %s: %d\n", callee, report.Callees[callee])
-	}
-	for _, line := range report.Values {
-		fmt.Fprintf(e.stdout, "  %s\n", line)
-	}
-	for _, message := range report.Errors {
-		fmt.Fprintf(e.stdout, "Error: %s\n", message)
-	}
+	fmt.Fprint(e.stdout, report.Result)
 	return nil
-}
-
-func auditValueLine(value sfvm.ValueOperator) string {
-	if typed, ok := value.(*ssaapi.Value); ok {
-		if line := strings.TrimSpace(typed.String()); line != "" {
-			return line
-		}
-	}
-	return fmt.Sprintf("%v", value)
 }
 
 func (e *commandEnv) lift(c *cli.Context) error {
@@ -498,35 +448,9 @@ func (e *commandEnv) lift(c *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(err, 2)
 	}
-	syntax, err := reify.ParseAsmSyntax(c.String("asm-syntax"))
+	options, err := liftOptions(c, mode)
 	if err != nil {
-		return cli.NewExitError(err, 2)
-	}
-	address, size, function := c.String("address"), c.String("size"), c.String("func")
-	if function != "" && (address != "" || size != "") {
-		return cli.NewExitError("--func cannot be combined with --address or --size", 2)
-	}
-	options := []reify.Option{
-		reify.WithMode(mode),
-		reify.WithAsmSyntax(syntax),
-	}
-	if c.IsSet("section") {
-		options = append(options, reify.WithSection(c.String("section")))
-	}
-	if address != "" || size != "" {
-		options = append(options, reify.WithAddress(address, size))
-	}
-	if function != "" {
-		options = append(options, reify.WithFunction(function))
-	}
-	if c.IsSet("format") {
-		options = append(options, reify.WithFormat(c.String("format")))
-	}
-	if passes := splitPassNames(c.String("lowir-pass")); len(passes) > 0 {
-		options = append(options, reify.WithLowIRPasses(passes...))
-	}
-	if passes := splitPassNames(c.String("ssa-pass")); len(passes) > 0 {
-		options = append(options, reify.WithSSAPasses(passes...))
+		return err
 	}
 	result, err := reify.Lift(e.ctx, c.Args().First(), options...)
 	if err != nil {
