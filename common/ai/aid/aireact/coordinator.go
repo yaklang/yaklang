@@ -252,7 +252,7 @@ func (r *ReAct) invokeNativeCoordinator(done chan struct{}, ctx context.Context,
 		r.memoryContinuations.Store(task.GetId(), true)
 		return session.RunPlanOnly()
 	}
-	err = session.Run()
+	err = session.RunWithAttachments(cfg.rootAttachments)
 	if err == nil && session.PlanningOnly() {
 		r.memoryContinuations.Store(task.GetId(), true)
 	}
