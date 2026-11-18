@@ -167,6 +167,9 @@ custom_rule_groups:
         - name: "csharp"
           display_name: "C#"
           canonical_name: "csharp"
+        - name: "bash"
+          display_name: "Bash"
+          canonical_name: "bash"
 
     - id: "language-library"
       category: "语言库"
