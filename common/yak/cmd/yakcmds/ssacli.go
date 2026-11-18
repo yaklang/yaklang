@@ -355,7 +355,9 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		}
 		// if not set dialect, bind the current process to the target SSA database path
 		if !memoryMode && databaseDialect == "" && databaseFileRaw != "" {
-			consts.SetSSADatabaseInfo(databaseFileRaw)
+			if err := consts.SetSSADatabaseInfo(databaseFileRaw); err != nil {
+				return utils.Errorf("open database failed: %v", err)
+			}
 			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseFileRaw); err != nil {
 				return utils.Errorf("open database failed: %v", err)
 			}

@@ -154,7 +154,8 @@ func TestDMDatabasePoolUnboundedWrapperAndPostgresCompatibility(t *testing.T) {
 		})
 	}
 	pgURL := "postgres://app:private-password@db.example/ir?sslmode=disable&poolMaxOpenConns=3"
-	dialect, raw := parseDatabaseURL(pgURL)
+	dialect, raw, err := parseDatabaseURL(pgURL)
+	require.NoError(t, err)
 	require.Equal(t, Postgres, dialect)
 	require.Equal(t, pgURL, raw, "PG URL handling must remain unchanged")
 }

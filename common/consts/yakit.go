@@ -376,7 +376,9 @@ func InitializeYakitDatabase(projectDB string, profileDB string, ssaDB string) e
 	if ssaDB != "" {
 		ssaProjectDatabaseRaw = ssaDB
 	}
-	SetSSADatabaseInfo(ssaProjectDatabaseRaw)
+	if err := SetSSADatabaseInfo(ssaProjectDatabaseRaw); err != nil {
+		return err
+	}
 
 	return initYakitDatabase()
 }

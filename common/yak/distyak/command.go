@@ -21,7 +21,9 @@ var DistYakCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		ctx, stop := newDistYakContext()
 		defer stop()
-		applySSADatabaseFromEnv()
+		if err := applySSADatabaseFromEnv(); err != nil {
+			return err
+		}
 		runtimeID := os.Getenv("YAK_RUNTIME_ID")
 		args := c.Args()
 		if len(args) > 0 {
@@ -56,10 +58,11 @@ func newDistYakContext() (context.Context, context.CancelFunc) {
 // shared Postgres and scan jobs reload it via NewProgramFromDB. Without this
 // call the global SSA_PROJECT_DB_RAW stays at the default SQLite path and the
 // env var is silently ignored.
-func applySSADatabaseFromEnv() {
+func applySSADatabaseFromEnv() error {
 	if envRaw := consts.GetSSADatabaseInfoFromEnv(); envRaw != "" {
-		consts.SetSSADatabaseInfo(envRaw)
+		return consts.SetSSADatabaseInfo(envRaw)
 	}
+	return nil
 }
 
 func runDistYakFile(parent context.Context, file string, runtimeID string) error {

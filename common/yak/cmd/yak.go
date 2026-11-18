@@ -1701,7 +1701,9 @@ var fixupDatabaseCommand = cli.Command{
 
 		consts.SetDefaultYakitProfileDatabaseName(profilePath)
 		consts.SetDefaultYakitProjectDatabaseName(projectPath)
-		consts.SetSSADatabaseInfo(ssaPath)
+		if err := consts.SetSSADatabaseInfo(ssaPath); err != nil {
+			return err
+		}
 
 		needUserDeletePath := []string{}
 		defer func() {

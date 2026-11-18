@@ -84,50 +84,69 @@ func GetSSADataBaseInfo() (string, string) {
 	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
 }
 
-func parseDatabaseURL(raw string) (string, string) {
-	// mysql://root:password@tcp()/<dbname>?charset=utf8&parseTime=True&loc=Local
+// parseDatabaseURL maps SSA_DATABASE_RAW to the gorm driver and the DSN that
+// driver receives. A value without a scheme is a SQLite file path; a value
+// with "://" must name a driver this build supports.
+//
+// An unknown scheme is an error. It used to fall back to SQLite with the whole
+// string as a path, so a mistyped DSN silently created a local database and
+// the process looked healthy while writing IR somewhere nobody expected.
+func parseDatabaseURL(raw string) (string, string, error) {
+	raw = strings.TrimSpace(raw)
 	parts := strings.SplitN(raw, "://", 2)
-	if len(parts) == 2 {
-		dialect := strings.ToLower(parts[0])
-		connectionDetails := parts[1]
-		switch dialect {
-		case "sqlite", "sqlite3":
-			// Assuming SQLiteExtend is a defined constant for the dialect string
-			return SQLiteExtend, connectionDetails
-		case "mysql":
-			// Assuming MySQL is a defined constant for the dialect string
-			return MySQL, connectionDetails
-		case "postgres", "postgresql":
-			// Keep the full raw string to preserve URL scheme.
-			// lib/pq and gorm both accept URL DSNs like: postgres://user:pass@host:5432/db?sslmode=disable
-			return Postgres, raw
-		case "dm":
-			return damenggorm.Dialect, raw
-		// Add other supported dialects here
-		// case "postgres", "postgresql":
-		// 	return PostgreSQL, connectionDetails // Assuming PostgreSQL constant exists
-		default:
-			// Default case for unknown schemes: treat as SQLite with the full raw string as path
-			return SQLiteExtend, raw
-		}
-	} else {
-		// Assume raw is a file path for SQLite if no scheme is provided
-		return SQLiteExtend, raw
+	if len(parts) != 2 {
+		// No scheme: a SQLite database file.
+		return SQLiteExtend, raw, nil
+	}
+
+	scheme := strings.ToLower(strings.TrimSpace(parts[0]))
+	connectionDetails := parts[1]
+	switch scheme {
+	case "sqlite", "sqlite3", "file":
+		return SQLiteExtend, connectionDetails, nil
+	case "mysql":
+		return MySQL, connectionDetails, nil
+	case "postgres", "postgresql":
+		// Keep the full raw string to preserve the URL scheme. lib/pq and gorm
+		// both accept URL DSNs like postgres://user:pass@host:5432/db?sslmode=disable
+		return Postgres, raw, nil
+	case "dm":
+		return damenggorm.Dialect, raw, nil
+	default:
+		return "", "", fmt.Errorf(
+			"unsupported SSA database URL scheme %q: use a file path or sqlite://, mysql://, postgres://, dm://",
+			scheme,
+		)
 	}
 }
 
-func SetSSADatabaseInfo(raw string) {
-	if raw == "" {
-		return
+// SetSSADatabaseInfo points this process at raw as its SSA database. On error
+// the previous configuration is left untouched, so a bad value cannot quietly
+// redirect IR to a default local file.
+//
+// Callers that ignore the returned error still compile; the error is what
+// distyak and the CLI surface instead of failing later with an unrelated
+// "failed to open" message.
+func SetSSADatabaseInfo(raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return nil
 	}
 
-	dialect, connectionDetails := parseDatabaseURL(raw)
+	dialect, connectionDetails, err := parseDatabaseURL(raw)
+	if err != nil {
+		// The DSN can carry a password, so only the error (scheme only) is logged.
+		log.Errorf("invalid SSA database configuration: %v", err)
+		return err
+	}
 	SSA_PROJECT_DB_DIALECT = dialect
 	SSA_PROJECT_DB_RAW = connectionDetails
+	return nil
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
-	SetSSADatabaseInfo(raw)
+	if err := SetSSADatabaseInfo(raw); err != nil {
+		return err
+	}
 	db, err := CreateSSAProjectDatabaseRaw(raw)
 	if err != nil {
 		return err
@@ -137,7 +156,10 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 }
 
 func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
-	dialect, path := parseDatabaseURL(raw)
+	dialect, path, err := parseDatabaseURL(raw)
+	if err != nil {
+		return nil, err
+	}
 	return CreateSSAProjectDatabase(dialect, path)
 }
 

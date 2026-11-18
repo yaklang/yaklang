@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -185,6 +186,39 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	return createAndConfigDatabaseWithOptions(path, defaultDatabaseOpenOptions(), drivers...)
 }
 
+// withDSNParams adds the parameters this package requires without replacing
+// the ones the caller already provided.
+//
+// Both mysql:// and sqlite:// values can carry a query string. Appending
+// "?charset=..." to such a DSN produced a second "?", and the driver then read
+// the whole parameter list as one broken value. Parameters already present win,
+// so a caller can override mode/parseTime/loc through the DSN.
+func withDSNParams(dsn string, required url.Values) string {
+	base, query := dsn, ""
+	if i := strings.Index(dsn, "?"); i >= 0 {
+		base, query = dsn[:i], dsn[i+1:]
+	}
+
+	merged, err := url.ParseQuery(query)
+	if err != nil {
+		// Leave an unparsable query string for the driver to report.
+		return dsn
+	}
+
+	changed := false
+	for key, values := range required {
+		if _, ok := merged[key]; ok {
+			continue
+		}
+		merged[key] = values
+		changed = true
+	}
+	if !changed {
+		return dsn
+	}
+	return base + "?" + merged.Encode()
+}
+
 func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions, drivers ...string) (*gorm.DB, error) {
 	if path == "" {
 		return nil, utils.Errorf("database path is empty")
@@ -219,9 +253,13 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 		if options.sqliteTxLock != "" {
 			params.Set("_txlock", options.sqliteTxLock)
 		}
-		path = fmt.Sprintf("%s?%s", path, params.Encode())
+		path = withDSNParams(path, params)
 	case MySQL:
-		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
+		path = withDSNParams(path, url.Values{
+			"charset":   {"utf8mb4"},
+			"parseTime": {"True"},
+			"loc":       {"Local"},
+		})
 	default:
 	}
 
