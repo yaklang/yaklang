@@ -379,6 +379,11 @@ func (b *singleFileBuilder) visitLiteralConstant(raw kotlinparser.ILiteralConsta
 		if value, err := strconv.ParseFloat(text, 64); err == nil {
 			return b.EmitConstInst(value)
 		}
+	case literal.UnsignedLiteral() != nil:
+		text := strings.TrimRight(literal.UnsignedLiteral().GetText(), "uUlL")
+		if value, err := strconv.ParseInt(strings.ReplaceAll(text, "_", ""), 0, 64); err == nil {
+			return b.EmitConstInst(int64(value))
+		}
 	case literal.CharacterLiteral() != nil:
 		return b.EmitConstInst(strings.Trim(literal.CharacterLiteral().GetText(), "'"))
 	case literal.NullLiteral() != nil:
@@ -401,14 +406,22 @@ func (b *singleFileBuilder) visitCollectionLiteral(raw kotlinparser.ICollectionL
 	return container
 }
 
+func (b *singleFileBuilder) visitWhenSubject(raw kotlinparser.IWhenSubjectContext) ssa.Value {
+	subject, ok := raw.(*kotlinparser.WhenSubjectContext)
+	if !ok || subject == nil || subject.Expression() == nil {
+		return b.EmitConstInstNil()
+	}
+	return b.VisitExpression(subject.Expression())
+}
+
 func (b *singleFileBuilder) visitWhenExpression(raw kotlinparser.IWhenExpressionContext) ssa.Value {
 	when, ok := raw.(*kotlinparser.WhenExpressionContext)
 	if !ok || when == nil {
 		return b.EmitConstInstNil()
 	}
 	var subject ssa.Value
-	if when.Expression() != nil {
-		subject = b.VisitExpression(when.Expression())
+	if when.WhenSubject() != nil {
+		subject = b.visitWhenSubject(when.WhenSubject())
 	}
 	ifBuilder := b.CreateIfBuilder()
 	for _, rawEntry := range when.AllWhenEntry() {
