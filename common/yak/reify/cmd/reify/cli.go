@@ -214,6 +214,7 @@ func (e *commandEnv) inspect(c *cli.Context) error {
 	fmt.Fprintf(&text, "Input: %q\nSize: %d bytes\nLoader: %s\nFormat: %s\n", artifact.Origin.Name, artifact.Origin.Size, artifact.Loader.Name(), artifact.Format)
 	fmt.Fprintf(&text, "Target: %s\n", targetSummary(artifact.Target))
 	fmt.Fprintf(&text, "Parser: %s\n", parserSummary(parser))
+	writeLanguage(&text, artifact.Language)
 	if image := artifact.Image; image != nil {
 		fmt.Fprintf(&text, "Object: %s\n", image.ObjectType)
 		if entry, present := image.EntryPoint(); present {
@@ -575,10 +576,24 @@ func liftText(result *reify.Result) io.Reader {
 		fmt.Fprintf(&text, "===== 3ssair =====\n%s", result.SSAIR)
 		fmt.Fprintf(&text, "===== 4source =====\n%s", result.Source)
 	}
+	writeLanguage(&text, result.Artifact.Language)
 	for _, diagnostic := range result.Diagnostics {
 		fmt.Fprintf(&text, "Note [%s]: %s\n", diagnostic.Code, diagnostic.Message)
 	}
 	return &text
+}
+
+func writeLanguage(w io.Writer, report *core.LanguageReport) {
+	if report == nil {
+		return
+	}
+	fmt.Fprintf(w, "Language: %s (%s)\n", report.Language, report.Confidence)
+	if report.Runtime != "" {
+		fmt.Fprintf(w, "Compiler: %s\n", report.Runtime)
+	}
+	for _, evidence := range report.Evidence {
+		fmt.Fprintf(w, "Evidence [%s]: %s\n", evidence.Source, evidence.Detail)
+	}
 }
 
 func writeBoundaryStats(text *bytes.Buffer, stats *core.BoundaryStats) {

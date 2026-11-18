@@ -55,6 +55,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hpcloud/tail v1.0.0
 	github.com/huin/asn1ber v0.0.0-20120622192748-af09f62e6358
+	github.com/ianlancetaylor/demangle v0.0.0-20261012173340-cbb8aaea4290
 	github.com/icza/bitio v1.1.0
 	github.com/itchyny/gojq v0.12.8
 	github.com/jellydator/ttlcache/v3 v3.3.0

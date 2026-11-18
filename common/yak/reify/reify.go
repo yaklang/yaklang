@@ -381,7 +381,7 @@ func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.
 		return core.Region{}, fmt.Errorf("lift: artifact has no symbols")
 	}
 	for _, symbol := range artifact.Image.Symbols {
-		if symbol.Name != name {
+		if symbol.Name != name && symbol.Mangled != name {
 			continue
 		}
 		if symbol.Address == 0 || symbol.Imported {

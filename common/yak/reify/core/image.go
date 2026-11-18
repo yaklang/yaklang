@@ -47,6 +47,15 @@ type Image struct {
 	byAddress map[uint64][]symbol.Symbol
 }
 
+// SetSymbols replaces the symbol table during artifact construction. Call it
+// before publishing the image to concurrent readers; it invalidates the lazy
+// address index when a metadata layer adds or renames symbols.
+func (i *Image) SetSymbols(symbols []symbol.Symbol) {
+	i.Symbols = symbols
+	i.once = sync.Once{}
+	i.byAddress = nil
+}
+
 func (i *Image) ImageBase() uint64 {
 	if i == nil {
 		return 0
@@ -104,13 +113,20 @@ func (i *Image) SymbolsAt(address uint64) []symbol.Symbol {
 	return i.byAddress[address]
 }
 
-// SymbolByName returns the first symbol with this name.
+// SymbolByName returns the first symbol with this name. A language layer keeps
+// the compiler-encoded name in Mangled, so a caller may pass either the display
+// name or the encoded one.
 func (i *Image) SymbolByName(name string) (symbol.Symbol, bool) {
 	if i == nil || name == "" {
 		return symbol.Symbol{}, false
 	}
 	for _, entry := range i.Symbols {
 		if entry.Name == name {
+			return entry, true
+		}
+	}
+	for _, entry := range i.Symbols {
+		if entry.Mangled == name {
 			return entry, true
 		}
 	}
