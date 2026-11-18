@@ -15,10 +15,15 @@ desc(
 certificate-validation
 
 ### 影响
-该用法属于已知危险 API 或弱密码学原语，若处理外部数据或用于安全场景，可能导致命令执行、代码执行、反序列化或机密性破坏。
+主机名校验被关闭后，攻击者可以用任意证书冒充目标服务，中间人攻击不再被阻断。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配，只在两种明确实现里命中：
+
+- `new HostnameVerifier(...) { ... return true; }` 匿名类；
+- 类型为 `HostnameVerifier` 的变量或 `setHostnameVerifier(...)` 参数直接返回 `-> true`。
+
+仅仅声明、导入或使用 `DefaultHostnameVerifier`、`NoopHostnameVerifier` 之类已有实现不会命中，注释里的类名也不会命中。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -27,11 +32,22 @@ SOLUTION
 	alert_min: 1
 	"file://Tls.java": <<<POS
 class Tls {
-  javax.net.ssl.HostnameVerifier v = (h, s) -> true;
+  javax.net.ssl.HostnameVerifier lambdaVerifier = (h, s) -> true;
+  void setIt(javax.net.ssl.HttpsURLConnection c) {
+    c.setHostnameVerifier(new javax.net.ssl.HostnameVerifier() {
+      public boolean verify(String host, javax.net.ssl.SSLSession s) {
+        return true;
+      }
+    });
+  }
 }
 POS
 	"safefile://TlsSafe.java": <<<NEG
+import org.apache.hc.client5.http.ssl.DefaultHostnameVerifier;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+
 class TlsSafe {
+  javax.net.ssl.HostnameVerifier v = new DefaultHostnameVerifier();
   void ok() {
     System.out.println("default-verifier");
   }
@@ -40,13 +56,12 @@ NEG
 	"safefile://TlsCompare.java": <<<NEG
 class TlsCompare {
   javax.net.ssl.HostnameVerifier v = (h, s) -> h.equals(s.getPeerHost());
+  // the trust manager installed for TLS_SELF_SIGNED skips the HostnameVerifier
 }
 NEG
 )
 
-${*.java}.pattern_regex(/(?s)HostnameVerifier.{0,400}?(?:return\s+true\s*;|->\s*true)/) as $hit
-${*.java}.pattern_regex(/(?s)->\s*true\s*;?[^;]{0,200}?HostnameVerifier/) as $hit2
-$hit + $hit2 as $hit
+${*.java}.pattern_regex(/(?s)\b(?:new\s+HostnameVerifier\s*\([^)]*\)\s*\{.{0,300}?return\s+true\s*;|HostnameVerifier\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*\([^)]*\)\s*->\s*true|setHostnameVerifier\s*\(\s*\([^)]*\)\s*->\s*true)/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 Java HostnameVerifier 恒返回 true",

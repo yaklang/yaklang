@@ -9,16 +9,21 @@ desc(
 	risk: "certificate-validation"
 	desc: <<<DESC
 ### 规则说明
-检测到 X509TrustManager 或 TrustAll 命名。空校验等于关闭证书验证。
+检测到 X509TrustManager 的空实现。`checkServerTrusted` 方法体为空时，客户端不再验证服务端证书，等于关闭证书校验。
 
 ### 风险类型
 certificate-validation
 
 ### 影响
-该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
+证书校验被关闭后，攻击者可以用任意自签证书冒充目标服务，中间人攻击不再被阻断。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配，要求同时出现实现和一个空的 `checkServerTrusted`：
+
+- `new X509TrustManager() { ... checkServerTrusted(...) {} ... }` 匿名类；
+- `implements ... X509TrustManager ... checkServerTrusted(...) {}` 具名类。
+
+仅仅声明、导入或引用 `X509TrustManager`，或者 `checkServerTrusted` 有实际校验逻辑，都不会命中。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -27,16 +32,38 @@ SOLUTION
 	alert_min: 1
 	"file://T.java": <<<POS
 import javax.net.ssl.X509TrustManager;
-class T { X509TrustManager tm; }
+
+class T {
+  javax.net.ssl.TrustManager[] insecure() {
+    return new javax.net.ssl.TrustManager[]{
+      new X509TrustManager() {
+        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; }
+      }
+    };
+  }
+}
 
 POS
 	"safefile://S.java": <<<NEG
-class S { void ok() { System.out.println("default-tm"); } }
+import javax.net.ssl.X509TrustManager;
+
+class S {
+  X509TrustManager tm;
+
+  Object secure() {
+    return new MyX509TrustManager(truststorePath, password.toCharArray());
+  }
+
+  // for an instance of X509TrustManager use the default trust store
+  void ok() { System.out.println("default-tm"); }
+}
 
 NEG
 )
 
-${*.java}.pattern_regex(/X509TrustManager|TrustAllCerts|trustAllCerts/) as $hit
+${*.java}.pattern_regex(/(?s)(?:new\s+X509TrustManager\s*\([^)]*\)\s*\{.{0,400}?checkServerTrusted\s*\([^)]*\)[^{;]*\{\s*\}|implements\s+[^{]{0,120}?X509TrustManager.{0,600}?checkServerTrusted\s*\([^)]*\)[^{;]*\{\s*\})/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 Java 空 TrustManager",
