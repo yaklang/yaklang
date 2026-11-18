@@ -7,7 +7,11 @@
 #   2. parser/ holds CPP14ParserBase from grammars-v4/cpp/Go, retargeted to
 #      github.com/yaklang/antlr/v4 so it shares the generated parser package;
 #   3. abstractDeclarator accepts unnamed array types (`unique_ptr<char[]>`),
-#      which upstream rejects.
+#      which upstream rejects;
+#   4. C++17 additions required by the task: fold expressions, if constexpr,
+#      structured bindings, nested namespace definitions, noexcept operator;
+#   5. literalOperatorId accepts `operator""_suffix` without spaces;
+#   6. GNU __attribute__((...)) (lexer token AttributeGnu + parser attribute).
 set -e
 rm -f ./parser/*.tokens
 rm -f ./parser/*.interp

@@ -43,9 +43,53 @@ translationUnit
 primaryExpression
     : literal+
     | This
+    // Local patch (C++17): fold expressions, e.g. (args + ...), (... && flags).
+    | foldExpression
+    // Local patch: the noexcept operator, e.g. noexcept(f()).
+    | Noexcept LeftParen expression RightParen
     | LeftParen expression RightParen
     | idExpression
     | lambdaExpression
+    ;
+
+// Local patch (C++17): fold expressions.
+foldExpression
+    : LeftParen castExpression (
+        foldOperator Ellipsis
+        | Ellipsis foldOperator castExpression
+        | foldOperator Ellipsis foldOperator castExpression
+    ) RightParen
+    ;
+
+foldOperator
+    : Plus
+    | Minus
+    | Star
+    | Div
+    | Mod
+    | Caret
+    | And
+    | Or
+    | Less Less
+    | Greater Greater
+    | Assign
+    | PlusAssign
+    | MinusAssign
+    | StarAssign
+    | DivAssign
+    | ModAssign
+    | XorAssign
+    | AndAssign
+    | OrAssign
+    | Less
+    | Greater
+    | LessEqual
+    | GreaterEqual
+    | Equal
+    | NotEqual
+    | AndAnd
+    | OrOr
+    | Comma
     ;
 
 idExpression
@@ -316,7 +360,8 @@ statementSeq
     ;
 
 selectionStatement
-    : If LeftParen condition RightParen statement (Else statement)?
+    // Local patch (C++17): if constexpr and else if constexpr.
+    : If Constexpr? LeftParen condition RightParen statement (Else statement)?
     | Switch LeftParen condition RightParen statement
     ;
 
@@ -344,6 +389,8 @@ forInitStatement
 
 forRangeDeclaration
     : attributeSpecifierSeq? declSpecifierSeq declarator
+    // Local patch (C++17): for (const auto& [k, v] : map).
+    | attributeSpecifierSeq? declSpecifierSeq pointerOperator* LeftBracket identifierList RightBracket
     ;
 
 forRangeInitializer
@@ -395,6 +442,13 @@ aliasDeclaration
 simpleDeclaration
     : declSpecifierSeq? initDeclaratorList? Semi
     | attributeSpecifierSeq declSpecifierSeq? initDeclaratorList Semi
+    // Local patch (C++17): structured binding, e.g. auto [a, b] = pair;
+    | declSpecifierSeq pointerOperator* LeftBracket identifierList RightBracket Assign initializerClause Semi
+    ;
+
+// Local patch (C++17): names introduced by a structured binding.
+identifierList
+    : Identifier (Comma Identifier)*
     ;
 
 staticAssertDeclaration
@@ -558,7 +612,8 @@ originalNamespaceName
     ;
 
 namespaceDefinition
-    : Inline? Namespace (Identifier | originalNamespaceName)? LeftBrace namespaceBody = declarationSeq? RightBrace
+    // Local patch (C++17): nested namespace definition, namespace a::b { }.
+    : Inline? Namespace (Identifier (Doublecolon Identifier)*)? LeftBrace namespaceBody = declarationSeq? RightBrace
     ;
 
 namespaceAlias
@@ -596,6 +651,8 @@ attributeSpecifierSeq
 attributeSpecifier
     : LeftBracket LeftBracket attributeList? RightBracket RightBracket
     | alignmentSpecifier
+    // Local patch: GNU __attribute__((...)), common in system and test headers.
+    | AttributeGnu LeftParen LeftParen balancedTokenSeq? RightParen RightParen
     ;
 
 alignmentSpecifier
@@ -917,6 +974,8 @@ operatorFunctionId
 
 literalOperatorId
     : Operator (StringLiteral Identifier | UserDefinedStringLiteral)
+    // Local patch: operator""_km without spaces lexes ""_km as UserDefinedLiteral.
+    | Operator UserDefinedLiteral
     ;
 
 /*Templates*/

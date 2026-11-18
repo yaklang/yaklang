@@ -287,6 +287,10 @@ fragment Hexquad: HEXADECIMALDIGIT HEXADECIMALDIGIT HEXADECIMALDIGIT HEXADECIMAL
 
 fragment Universalcharactername: '\\u' Hexquad | '\\U' Hexquad Hexquad;
 
+// Local patch: GNU attribute keyword. It precedes Identifier so the longer
+// matcher wins and the parser can accept __attribute__((...)) as an attribute.
+AttributeGnu: '__attribute__';
+
 Identifier:
     /*
 	 Identifiernondigit | Identifier Identifiernondigit | Identifier DIGIT
