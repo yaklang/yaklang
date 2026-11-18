@@ -1,13 +1,50 @@
-package buildin_rule
+package ssaapi
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+type bashDangerousRule struct {
+	name    string
+	content string
+}
+
+// loadBashDangerousRules reads the built-in bash rules from the source tree so
+// the corpus test exercises every shipped .sf without a hardcoded list.
+func loadBashDangerousRules(t *testing.T) []bashDangerousRule {
+	t.Helper()
+	root := filepath.Join("..", "..", "syntaxflow", "sfbuildin", "buildin", "bash")
+	var rules []bashDangerousRule
+	err := filepath.WalkDir(root, func(rulePath string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".sf") {
+			return nil
+		}
+		raw, err := os.ReadFile(rulePath)
+		if err != nil {
+			return err
+		}
+		name, err := filepath.Rel(root, rulePath)
+		if err != nil {
+			name = rulePath
+		}
+		rules = append(rules, bashDangerousRule{name: filepath.ToSlash(name), content: string(raw)})
+		return nil
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, rules)
+	return rules
+}
 
 // bashDangerousCases is the registration point for common post-exploitation
 // shell commands. The test runs every registered case against every rule under
@@ -146,11 +183,11 @@ var bashDangerousCases = []struct {
 }
 
 func TestBashDangerousCommands(t *testing.T) {
-	rules := loadBashRules(t)
+	rules := loadBashDangerousRules(t)
 	for _, tc := range bashDangerousCases {
 		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
-			prog, err := ssaapi.Parse(tc.Code, ssaapi.WithLanguage(ssaconfig.BASH), ssaapi.WithMemory())
+			prog, err := Parse(tc.Code, WithLanguage(ssaconfig.BASH), WithMemory())
 			require.NoError(t, err)
 
 			var matched []string
@@ -175,5 +212,33 @@ func TestBashDangerousCommands(t *testing.T) {
 			require.NotEmpty(t, matched, "dangerous command was not detected: %s", tc.Code)
 			t.Logf("matched rules: %v", matched)
 		})
+	}
+}
+
+// TestBashRMRootLoopUnrolling keeps the loop-modelling regression next to the
+// bash corpus. Literal lists are unrolled so every item reaches the rule, while
+// non-literal lists stay unknown.
+func TestBashRMRootLoopUnrolling(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "syntaxflow", "sfbuildin", "buildin", "bash", "cwe-78-os-command-injection", "bash-rm-rf-root.sf"))
+	require.NoError(t, err)
+	cases := []struct {
+		code string
+		want int
+	}{
+		{`for p in / /tmp/build; do rm -rf "$p"; done`, 1},
+		{`for p in /tmp/build /; do rm -rf "$p"; done`, 1},
+		{`for p in /tmp/build /var/tmp; do rm -rf "$p"; done`, 0},
+		{`for p in "$@"; do rm -rf "$p"; done`, 0},
+	}
+	for _, tc := range cases {
+		prog, err := Parse(tc.code, WithLanguage(ssaconfig.BASH), WithMemory())
+		require.NoError(t, err)
+		res, err := prog.SyntaxFlowWithError(string(raw))
+		require.NoError(t, err)
+		hits := 0
+		for _, name := range res.GetAlertVariables() {
+			hits += len(res.GetValues(name))
+		}
+		require.Equalf(t, tc.want, hits, "code=%s", tc.code)
 	}
 }

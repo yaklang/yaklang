@@ -72,7 +72,7 @@ func validateBashSource(t *testing.T, filename string, src []byte) {
 	})
 }
 
-func TestAllBashSyntaxFixtures(t *testing.T) {
+func TestAllSyntaxForBash_G4(t *testing.T) {
 	err := fs.WalkDir(codeFs, "code", func(fixturePath string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
