@@ -15,7 +15,6 @@ func (Rust) Kind() core.Language { return core.LanguageRust }
 
 func (Rust) Detect(a *core.Artifact) *core.LanguageReport {
 	report := &core.LanguageReport{Language: core.LanguageRust, Confidence: core.ConfidenceLikely,
-		Strings: Strings(),
 		Notes: []string{
 			"Rust trait-object dispatch, panic/unwind edges and Rust type layouts are not reconstructed",
 			"Rust calling conventions are not stable; scalar examples use the platform ABI as an approximation",
@@ -90,8 +89,8 @@ func (Rust) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 	return recovered, nil
 }
 
-// Strings reports the &str layout. A String adds a capacity word to the same
-// pointer and length; neither form is NUL terminated.
-func Strings() *core.StringModel {
-	return &core.StringModel{Kind: core.StringRust, Encoding: "utf-8", Header: "pointer+length", NulTerminated: false}
+// Strings reports the &str layout: a pointer and a length. A String adds a
+// capacity word to the same pointer and length; both are UTF-8.
+func (Rust) Strings() core.Strings {
+	return core.Strings{Layout: core.StringLayoutPointerLength, Encoding: core.StringEncodingUTF8, ValidateUTF8: true}
 }

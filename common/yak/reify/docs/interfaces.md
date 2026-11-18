@@ -228,6 +228,7 @@ type Disassembly struct {
 ```go
 type Language interface {
     Kind() core.Language
+    Strings() core.Strings
     Detect(*core.Artifact) *core.LanguageReport
     Recover(*core.Artifact) ([]symbol.Symbol, error)
 }
@@ -246,7 +247,7 @@ func Inspect(*core.Artifact) *core.LanguageReport
 `LanguageReport` 里的两个模型都是覆盖或说明，不是完整约定：
 
 - `ABI`：语言对平台调用约定的覆盖（参数寄存器、返回寄存器、是否有 callee-save）。只有语言恢复且未标记 `ConventionPlatform` 的函数会拿到 `Function.Facts`；cgo、汇编与 ABI0 函数继续使用平台 ABI。
-- `Strings`：字符串表示（C 为指针 + NUL；Go 与 Rust 为指针 + 长度，不保证 NUL）。只报告模型，不重建值。
+- `Strings`：字符串表示与解码器（C 为 NUL 结尾，Go/Rust 为指针 + 长度）。语言注册模型，解码统一走 `Strings.Decode`，调用点不按语言分支。
 
 `Inspect` 按 `(名字, 地址)` 合并恢复结果：同地址改写展示名和来源，同名不同地址保持为两个函数。一个 Go 镜像里的 Rust 符号也会被命名，但不改变检测语言与 ABI。
 

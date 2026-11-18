@@ -22,7 +22,6 @@ func (C) Detect(*core.Artifact) *core.LanguageReport {
 	return &core.LanguageReport{
 		Language:   core.LanguageC,
 		Confidence: core.ConfidenceNone,
-		Strings:    Strings(),
 	}
 }
 
@@ -30,6 +29,6 @@ func (C) Detect(*core.Artifact) *core.LanguageReport {
 func (C) Recover(*core.Artifact) ([]symbol.Symbol, error) { return nil, nil }
 
 // Strings reports a NUL-terminated byte string reached through a pointer.
-func Strings() *core.StringModel {
-	return &core.StringModel{Kind: core.StringC, Encoding: "bytes", Header: "pointer", NulTerminated: true}
+func (C) Strings() core.Strings {
+	return core.Strings{Layout: core.StringLayoutNulTerminated, Encoding: core.StringEncodingBytes}
 }

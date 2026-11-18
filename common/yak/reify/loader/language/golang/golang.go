@@ -22,7 +22,7 @@ type Golang struct{}
 func (Golang) Kind() core.Language { return core.LanguageGo }
 
 func (Golang) Detect(a *core.Artifact) *core.LanguageReport {
-	r := &core.LanguageReport{Language: core.LanguageGo, Confidence: core.ConfidenceLikely, Strings: goStrings()}
+	r := &core.LanguageReport{Language: core.LanguageGo, Confidence: core.ConfidenceLikely}
 	if a.Reader != nil {
 		if info, err := buildinfo.Read(a.Reader); err == nil {
 			r.Runtime = info.GoVersion
@@ -63,10 +63,10 @@ func goABI(target core.Target) *core.ABI {
 	return &core.ABI{Registers: *registers, NoCalleeSave: true}
 }
 
-// goStrings reports the Go string header. A string is a pointer and a length;
-// the bytes are not NUL terminated, so C string rules do not apply.
-func goStrings() *core.StringModel {
-	return &core.StringModel{Kind: core.StringGo, Encoding: "utf-8", Header: "pointer+length", NulTerminated: false}
+// Strings reports the Go string header: a pointer and a length. Go does not
+// require valid UTF-8, so the decoder returns the raw bytes.
+func (Golang) Strings() core.Strings {
+	return core.Strings{Layout: core.StringLayoutPointerLength, Encoding: core.StringEncodingUTF8}
 }
 
 func goMinor(version string) int {

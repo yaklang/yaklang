@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -65,6 +66,17 @@ func newCLIApp(env *commandEnv) *cli.App {
 			ArgsUsage: "<file>",
 			Flags:     outputFlags(),
 			Action:    env.check,
+		},
+		{
+			Name:      "strings",
+			Usage:     "Decode one string with the detected language model",
+			ArgsUsage: "<file>",
+			Flags: []cli.Flag{
+				jsonFlag(),
+				cli.StringFlag{Name: "at", Usage: "Address or symbol of the bytes (C) or descriptor (Go/Rust)"},
+				formatFlag(),
+			},
+			Action: env.strings,
 		},
 		{
 			Name:      "lift",
@@ -234,6 +246,78 @@ func (e *commandEnv) inspect(c *cli.Context) error {
 	}
 	_, err = io.Copy(e.stdout, &text)
 	return err
+}
+
+func (e *commandEnv) strings(c *cli.Context) error {
+	if c.NArg() != 1 {
+		return cli.NewExitError("strings requires exactly one file", 2)
+	}
+	if !c.IsSet("at") {
+		return cli.NewExitError("strings requires --at", 2)
+	}
+	var options []reify.Option
+	if c.IsSet("format") {
+		options = append(options, reify.WithFormat(c.String("format")))
+	}
+	artifact, _, err := reify.Inspect(e.ctx, c.Args().First(), options...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = artifact.Close() }()
+	if artifact.Language == nil || artifact.Language.Strings == nil {
+		return cli.NewExitError("strings: this artifact has no string model", 1)
+	}
+	address, err := stringAddress(artifact, c.String("at"))
+	if err != nil {
+		return err
+	}
+	value, err := artifact.Language.Strings.Decode(artifact, address)
+	if err != nil {
+		return err
+	}
+	if c.Bool("json") {
+		return writeJSON(e.stdout, stringReport{Scope: "one string", Address: address,
+			Layout: artifact.Language.Strings.Layout, Encoding: artifact.Language.Strings.Encoding, Value: value})
+	}
+	var text bytes.Buffer
+	fmt.Fprintf(&text, "Scope: one string\n")
+	fmt.Fprintf(&text, "Input: %q\n", artifact.Origin.Name)
+	writeLanguage(&text, artifact.Language)
+	fmt.Fprintf(&text, "Address: 0x%x\n", address)
+	fmt.Fprintf(&text, "Value: %q\n", value)
+	_, err = io.Copy(e.stdout, &text)
+	return err
+}
+
+type stringReport struct {
+	Scope    string              `json:"scope"`
+	Address  uint64              `json:"address"`
+	Layout   core.StringLayout   `json:"layout"`
+	Encoding core.StringEncoding `json:"encoding"`
+	Value    string              `json:"value"`
+}
+
+func stringAddress(artifact *core.Artifact, text string) (uint64, error) {
+	if value, err := parseAddress(text); err == nil {
+		return value, nil
+	}
+	if artifact.Image != nil {
+		if entry, ok := artifact.Image.SymbolByName(text); ok && entry.Address != 0 && !entry.Imported {
+			return entry.Address, nil
+		}
+	}
+	return 0, cli.NewExitError(fmt.Sprintf("strings: unknown address %q", text), 2)
+}
+
+func parseAddress(text string) (uint64, error) {
+	text = strings.TrimSpace(text)
+	if strings.HasPrefix(text, "0x") || strings.HasPrefix(text, "0X") {
+		return strconv.ParseUint(text[2:], 16, 64)
+	}
+	if value, err := strconv.ParseUint(text, 10, 64); err == nil {
+		return value, nil
+	}
+	return strconv.ParseUint(text, 16, 64)
 }
 
 func (e *commandEnv) check(c *cli.Context) error {
@@ -605,11 +689,11 @@ func writeLanguage(w io.Writer, report *core.LanguageReport) {
 		fmt.Fprintf(w, "ABI: language override (%s)\n", strings.Join(parts, ", "))
 	}
 	if model := report.Strings; model != nil {
-		termination := "nul-terminated"
-		if !model.NulTerminated {
-			termination = "not nul-terminated"
+		termination := "length-delimited"
+		if model.Layout == core.StringLayoutNulTerminated {
+			termination = "nul-terminated"
 		}
-		fmt.Fprintf(w, "Strings: %s (%s, %s, %s)\n", model.Kind, model.Header, model.Encoding, termination)
+		fmt.Fprintf(w, "Strings: %s (%s, %s)\n", model.Layout, model.Encoding, termination)
 	}
 }
 

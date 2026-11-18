@@ -22,6 +22,9 @@ import (
 // recoverer without a detector would have no way to prove its input matches.
 type Language interface {
 	Kind() core.Language
+	// Strings is the representation this language registers. Decoding uses the
+	// model, never the language name.
+	Strings() core.Strings
 	// Detect returns nil when the image holds no evidence for this language.
 	Detect(*core.Artifact) *core.LanguageReport
 	// Recover returns the functions this language can name. It must not decode
@@ -64,7 +67,8 @@ func confidenceRank(confidence string) int {
 
 // Inspect runs before an artifact is exposed to consumers, including before
 // Image.SymbolsAt builds its index. Every native artifact gets a report: the C
-// layer is the fallback, and it adds no ABI or string override. Evidence
+// layer is the fallback, with no ABI override and a NUL-terminated string
+// model. Evidence
 // describes compiler presence, not proof that every function in a mixed-language
 // executable has the same language or ABI.
 func Inspect(a *core.Artifact) *core.LanguageReport {
@@ -93,7 +97,8 @@ func Inspect(a *core.Artifact) *core.LanguageReport {
 		// compiler version, fall back to the default layer and keep the note.
 		if report.Runtime == "" {
 			failure := report.Notes
-			report = (c.C{}).Detect(a)
+			chosen = c.C{}
+			report = chosen.Detect(a)
 			report.Notes = append(report.Notes, failure...)
 		}
 	default:
@@ -105,6 +110,9 @@ func Inspect(a *core.Artifact) *core.LanguageReport {
 			mergeSymbols(a, recovered)
 		}
 	}
+	// The model comes from the layer that won, including the C fallback.
+	model := chosen.Strings()
+	report.Strings = &model
 	// A Go image can link Rust code and a Rust image can export Go code. Naming
 	// those functions does not change the detected language or its ABI.
 	if report.Language != core.LanguageRust {
@@ -115,10 +123,6 @@ func Inspect(a *core.Artifact) *core.LanguageReport {
 	disambiguateRustSymbols(a)
 	if failed := undecodedRustSymbols(a); failed > 0 {
 		report.Notes = append(report.Notes, fmt.Sprintf("%d Rust symbols retained their encoded name because demangling failed", failed))
-	}
-	if report.Strings != nil && report.Language != core.LanguageC {
-		// The C default has no descriptor; the note only explains Go and Rust.
-		report.Notes = append(report.Notes, "string values are not reconstructed from their descriptor; only the representation model is reported")
 	}
 	if report.Language == core.LanguageGo && report.ABI == nil {
 		report.Notes = append(report.Notes, "Go ABIInternal is not modelled for this architecture or compiler version")

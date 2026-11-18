@@ -40,7 +40,8 @@ common/yak/reify/
 │   ├── target.go          # Target
 │   ├── reader.go          # ByteReader（按字节序读取，边界受限）
 │   ├── image.go           # Image、Section
-│   ├── language.go        # LanguageReport、ABI、StringModel
+│   ├── language.go        # LanguageReport、ABI、置信度
+│   ├── stringmodel.go     # Strings：布局、编码与 Decode
 │   ├── symbol.go          # Symbol、SymbolAt
 │   ├── artifact.go        # Artifact、Region
 │   ├── loader.go          # Loader 接口与 CheckResult
@@ -94,6 +95,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" lift --mode all --func main /bin/ls
 "$OUT/bin/reify" lift --mode source --address 0xmain --size 0x40 /bin/ls
 "$OUT/bin/reify" lift --json --mode lowir /bin/true
+"$OUT/bin/reify" strings --at greeting ./fixture
 
 # lift 到 SSA 后直接审计
 "$OUT/bin/reify" audit /bin/ls '*() as $call' --section .text

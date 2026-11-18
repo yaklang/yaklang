@@ -120,24 +120,50 @@ Go 插件对 amd64 Go 1.17+、arm64 Go 1.18+ 给出 ABIInternal 覆盖：整数�
 
 ## 字符串模型
 
-`LanguageReport.Strings` 记录语言的字符串表示：
+`core.Strings` 是语言注册的字符串表示，带解码行为，不只是描述：
 
 ```go
-type StringModel struct {
-    Kind          string // c、go、rust
-    Encoding      string // utf-8、bytes
-    Header        string // pointer+length；C 为 pointer
-    NulTerminated bool
+type Strings struct {
+    Layout       StringLayout   // nul-terminated 或 pointer-length
+    Encoding     StringEncoding // bytes 或 utf-8
+    ValidateUTF8 bool           // 不合法 UTF-8 是否报错
 }
 ```
 
-| 语言 | 值布局 | 终止 | 备注 |
-| --- | --- | --- | --- |
-| C（平台默认） | 指针 | NUL | `strlen` 决定长度 |
-| Go | 指针 + 长度 | 否 | `reflect.StringHeader`；字节不保证合法 UTF-8 |
-| Rust | 指针 + 长度 | 否 | `&str` 保证 UTF-8；`String` 额外带容量 |
+两种布局由 `core` 实现，语言只选择并注册：
 
-语言层只报告模型，不重建字符串值。重建需要追踪描述符的赋值与调用点，属于数据流分析，当前不做；报告里会写明这条限制。消费者不应把 Go 或 Rust 的指针当作 C 字符串读取。
+| 布局 | 值 | 解码 |
+| --- | --- | --- |
+| `nul-terminated` | 指针 | 从指针读字节，遇到 NUL 停止；上限 4096 字节 |
+| `pointer-length` | 指针 + 长度 | 读描述符（按产物字节序与字宽），再读指定长度；长度上限 4096 字节 |
+
+语言注册：
+
+| 语言 | Layout | Encoding | ValidateUTF8 |
+| --- | --- | --- | --- |
+| C（默认） | `nul-terminated` | `bytes` | 否 |
+| Go | `pointer-length` | `utf-8` | 否（Go 允许非法字节） |
+| Rust | `pointer-length` | `utf-8` | 是（`&str` 保证 UTF-8） |
+
+`Language` 接口要求实现 `Strings() core.Strings`；`Inspect` 把该值写进 `LanguageReport.Strings`。解码统一调用 `Strings.Decode(artifact, address)`：
+
+- `nul-terminated`：`address` 指向首字节。
+- `pointer-length`：`address` 指向描述符；指针与长度按 `Target.Bits` 与 `Target.ByteOrder` 读取。
+
+没有任何调用点按语言名或 kind 分支；两种模式的差别只存在于 `core` 的解码函数里。
+
+命令行入口：
+
+```sh
+reify strings --at 0x47c000 bin/hello       # C 字节地址
+reify strings --at 0x5200 bin/go_hello      # Go/Rust 描述符地址
+reify strings --at greeting bin/hello       # 也接受符号名
+```
+
+限制：
+
+- 解码需要一个已知地址。语言层不做数据流分析，不会自动从调用参数反推出字符串描述符。
+- 不应用重定位。PIE 产物的描述符指针在文件里常为 0，解码会报 `zero pointer; relocations are not applied`。非 PIE 的 Go/Rust 样例可直接解码；要支持 PIE，需要先在加载阶段应用重定位。
 
 ## 包结构
 
@@ -192,7 +218,7 @@ legacy 支持 `_ZN...17h<hash>E`，包含 `$...$` 转义；hash 必须有 16 个
 | Go ABI0、cgo、跨 ABI 调用 | 保留平台约定 |
 | 剥离的 Rust 产物 | 无法恢复函数名；实测 `rust (likely)`，只有 `.comment` 版本证据 |
 | Go 函数精确大小 | pclntab 只给到下一个入口；尾部填充剥离后与代码体一致，超过 64 字节的填充不剥离 |
-| 字符串值重建 | 未实现；只报告表示模型 |
+| 字符串值重建 | 部分实现：`strings --at` 按模型解码；不从参数自动反推地址 |
 
 Go 接口调用的实测形态（`main.total`，`go_interface.go`）：
 
