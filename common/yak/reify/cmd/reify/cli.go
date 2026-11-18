@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/reify"
@@ -84,7 +85,7 @@ func newCLIApp(env *commandEnv) *cli.App {
 		},
 		{
 			Name:      "save",
-			Usage:     "Lift a binary, build YakSSA and persist it to ssadb",
+			Usage:     "Lift a file to SSA and save the program to ssadb",
 			ArgsUsage: "<file>",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "name", Usage: "ssadb program name (required)"},
@@ -101,12 +102,22 @@ func newCLIApp(env *commandEnv) *cli.App {
 			Action: env.save,
 		},
 		{
-			Name:  "audit",
-			Usage: "Run a syntaxflow rule against a program persisted by save",
+			Name:      "audit",
+			Usage:     "Run a syntaxflow rule against a lifted file or a saved program",
+			ArgsUsage: "[file]",
 			Flags: []cli.Flag{
-				cli.StringFlag{Name: "program", Usage: "ssadb program name (required)"},
+				cli.StringFlag{Name: "program", Usage: "ssadb program name; omit it to audit a file"},
+				cli.StringFlag{Name: "db", Usage: "SSA database path for --program; empty uses the default YAKIT_HOME database"},
 				cli.StringFlag{Name: "rule", Usage: "SyntaxFlow rule text"},
-				cli.StringFlag{Name: "call", Usage: "Find every call to this function; shorthand for '<call>(* as $args)'"},
+				cli.StringFlag{Name: "call", Usage: "Find every call to this function; shorthand for '<call>(* as $args) as $call'"},
+				cli.StringFlag{Name: "asm-syntax", Value: "intel", Usage: "Assembly syntax: intel or att"},
+				cli.StringFlag{Name: "func", Usage: "Select a function by symbol name"},
+				cli.StringFlag{Name: "section", Usage: "Section to lift when no address is given; empty lifts every region"},
+				cli.StringFlag{Name: "address", Usage: "Start virtual address or symbol name"},
+				cli.StringFlag{Name: "size", Usage: "Region size in bytes"},
+				cli.StringFlag{Name: "lowir-pass", Usage: "Comma-separated LowIR pass names"},
+				cli.StringFlag{Name: "ssa-pass", Usage: "Comma-separated SSA pass names"},
+				formatFlag(),
 				jsonFlag(),
 			},
 			Action: env.audit,
@@ -277,20 +288,52 @@ func (e *commandEnv) save(c *cli.Context) error {
 		if !c.Bool("replace") {
 			return cli.NewExitError(fmt.Sprintf("program %q already exists (use --replace)", name), 2)
 		}
+		// Delete before the lift creates the new NameCache. The cache preloads
+		// name ids from the database, so deleting after that would leave the new
+		// index rows pointing at removed name-pool entries.
 		ssadb.DeleteProgram(ssadb.GetDB(), name)
 	}
+	options, err := liftSSAOptions(c)
+	if err != nil {
+		return err
+	}
+	options = append(options,
+		reify.WithProgramName(name),
+		reify.WithProgramCache(ssa.ProgramCacheDBWrite),
+	)
+	result, err := reify.Lift(e.ctx, c.Args().First(), options...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = result.Close() }()
+	if result.Program == nil {
+		return cli.NewExitError("save produced no SSA program", 1)
+	}
+	if err := result.Program.SaveToDatabase(); err != nil {
+		return err
+	}
+	fmt.Fprintf(e.stdout, "Program: %s\n", result.ProgramName)
+	fmt.Fprintf(e.stdout, "Functions: %d\n", result.Functions)
+	fmt.Fprintf(e.stdout, "Blocks: %d\n", result.Blocks)
+	fmt.Fprintf(e.stdout, "Values: %d\n", result.Values)
+	fmt.Fprintf(e.stdout, "Query: reify audit --program %s --call <function>\n", result.ProgramName)
+	return nil
+}
+
+// liftSSAOptions collects the loader and region flags shared by save and the
+// file form of audit. The caller adds the mode and persistence options.
+func liftSSAOptions(c *cli.Context) ([]reify.Option, error) {
 	syntax, err := reify.ParseAsmSyntax(c.String("asm-syntax"))
 	if err != nil {
-		return cli.NewExitError(err, 2)
+		return nil, cli.NewExitError(err, 2)
 	}
 	address, size, function := c.String("address"), c.String("size"), c.String("func")
 	if function != "" && (address != "" || size != "") {
-		return cli.NewExitError("--func cannot be combined with --address or --size", 2)
+		return nil, cli.NewExitError("--func cannot be combined with --address or --size", 2)
 	}
 	options := []reify.Option{
 		reify.WithMode(reify.ModeSSAIR),
 		reify.WithAsmSyntax(syntax),
-		reify.WithPersist(name),
 	}
 	if c.IsSet("section") {
 		options = append(options, reify.WithSection(c.String("section")))
@@ -310,26 +353,27 @@ func (e *commandEnv) save(c *cli.Context) error {
 	if passes := splitPassNames(c.String("ssa-pass")); len(passes) > 0 {
 		options = append(options, reify.WithSSAPasses(passes...))
 	}
-	result, err := reify.Lift(e.ctx, c.Args().First(), options...)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = result.Close() }()
-	fmt.Fprintf(e.stdout, "Program: %s\n", result.ProgramName)
-	fmt.Fprintf(e.stdout, "Functions: %d\n", result.Functions)
-	fmt.Fprintf(e.stdout, "Blocks: %d\n", result.Blocks)
-	fmt.Fprintf(e.stdout, "Values: %d\n", result.Values)
-	fmt.Fprintf(e.stdout, "Query: reify audit --program %s --call <function>\n", result.ProgramName)
-	return nil
+	return options, nil
 }
 
-// audit loads a persisted program and runs one syntaxflow rule over it. The
-// program is read from ssadb, so the query scans stored instructions rather
-// than a live compilation.
+// audit runs one syntaxflow rule over either a freshly lifted file or a
+// program loaded from ssadb. The file form keeps the SSA in memory; the
+// --program form reads the stored instructions and optionally opens a
+// specific SSA database.
 func (e *commandEnv) audit(c *cli.Context) error {
 	name := strings.TrimSpace(c.String("program"))
-	if name == "" {
-		return cli.NewExitError("audit requires --program", 2)
+	file := c.Args().First()
+	if c.NArg() > 1 {
+		return cli.NewExitError("audit accepts at most one file", 2)
+	}
+	if name != "" && file != "" {
+		return cli.NewExitError("use either a file or --program, not both", 2)
+	}
+	if name == "" && file == "" {
+		return cli.NewExitError("audit requires a file or --program", 2)
+	}
+	if name == "" && c.IsSet("db") {
+		return cli.NewExitError("--db requires --program", 2)
 	}
 	rule := strings.TrimSpace(c.String("rule"))
 	if call := strings.TrimSpace(c.String("call")); call != "" {
@@ -341,15 +385,47 @@ func (e *commandEnv) audit(c *cli.Context) error {
 	if rule == "" {
 		return cli.NewExitError("audit requires --rule or --call", 2)
 	}
-	program, err := ssaapi.FromDatabase(name)
-	if err != nil {
-		return err
+
+	var (
+		program     *ssaapi.Program
+		programName string
+		err         error
+	)
+	if name != "" {
+		if dbPath := strings.TrimSpace(c.String("db")); dbPath != "" {
+			database, openErr := consts.CreateSSAProjectDatabase(consts.SQLiteExtend, dbPath)
+			if openErr != nil {
+				return openErr
+			}
+			ssadb.SetDB(database)
+		}
+		program, err = ssaapi.FromDatabase(name)
+		if err != nil {
+			return err
+		}
+		programName = name
+	} else {
+		options, optionErr := liftSSAOptions(c)
+		if optionErr != nil {
+			return optionErr
+		}
+		lifted, liftErr := reify.Lift(e.ctx, file, options...)
+		if liftErr != nil {
+			return liftErr
+		}
+		defer func() { _ = lifted.Close() }()
+		if lifted.Program == nil {
+			return cli.NewExitError("lift produced no SSA program", 1)
+		}
+		program = ssaapi.NewProgram(lifted.Program, nil)
+		programName = lifted.ProgramName
 	}
+
 	result, err := program.SyntaxFlowWithError(rule)
 	if err != nil {
 		return err
 	}
-	report := auditReport{Program: name, Rule: rule, Matches: make(map[string]int), Callees: make(map[string]int), Errors: result.GetErrors()}
+	report := auditReport{Program: programName, Rule: rule, Matches: make(map[string]int), Callees: make(map[string]int), Errors: result.GetErrors()}
 	if frame := result.GetSFResult(); frame != nil && frame.SymbolTable != nil {
 		frame.SymbolTable.ForEach(func(symbol string, values sfvm.Values) bool {
 			report.Matches[symbol] = len(values)
