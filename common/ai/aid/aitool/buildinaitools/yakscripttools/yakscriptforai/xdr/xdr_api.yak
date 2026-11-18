@@ -1,39 +1,47 @@
-__DESC__ = "XDR 开放接口统一查询工具。通过 action 区分两种操作：action=query_alerts 查询告警列表，action=get_intel 查询威胁情报。工具内部固定使用 POST 请求 XDR 开放接口，地址、鉴权头、参数转换、分页、毫秒时间戳归一化与 code/state 校验全部内置，AI 只传查询条件即可。告警查询传 start-time/end-time/alert-name/attack-ip/victim-ip/risk-level/handle-states/page-size/max-pages，时间留空默认拉取最近 5 小时；情报查询传 search-content。"
+__DESC__ = "XDR 开放接口查询工具。告警查询在脚本内部分页取数并暂存，首次只返回有大小上限的一块；智能体可用 continuation-id 和 offset 按需读取已缓存的后续块，不会为续取再次请求 XDR。也支持查询威胁情报。"
 __VERBOSE_NAME__ = "XDR OpenAPI Query Tool"
 __VERBOSE_NAME_ZH__ = "XDR 开放接口查询工具"
-__KEYWORDS__ = "xdr,alarm,alert,intel,ioc,threat intelligence,soar,siem,openapi,query,security"
+__KEYWORDS__ = "xdr,alarm,alert,intel,ioc,threat intelligence,soar,siem,openapi,query,security,chunk,pagination"
 __USAGE__ = <<<USAGE_BLOCK
-XDR 开放接口统一查询工具。
+XDR 开放接口查询工具。告警查询会在本次脚本执行中完成分页，并把已拉取的告警临时保存在本机临时目录。首次仅返回一块；后续通过续取 ID 读取该次查询已缓存的数据，不会再次访问 XDR。
 
 ## 操作
-- `action=query_alerts`：查询告警列表，固定调用 POST {base}/maxs/rv/openapi/alarm/query。
-- `action=get_intel`：查询威胁情报，固定调用 POST {base}/maxs/intel/openapi/getIntel。
+- `action=query_alerts`：查询告警，首次返回一块结果。
+- `action=continue_alerts`：读取已有查询缓存中的下一块。必须传入上次返回的 `result_id` 和 `next_offset`；不访问 XDR。
+- `action=clear_alerts_cache`：删除指定 `continuation-id` 对应的本地缓存。
+- `action=get_intel`：查询威胁情报。
 
-## query_alerts 参数
-- `xdr-base-url`：平台地址，默认 https://10.21.17.218:8686，通常无需修改。
-- `xdr-token`：Bearer Token，默认 5a57ff89-e77e-46da-9172-9c1536c098c8，通常无需修改。
-- `start-time` / `end-time`：格式 yyyy-MM-dd HH:mm:ss；两者都留空时默认拉取最近 5 小时。
-- `alert-name`、`attack-ip`、`victim-ip`：筛选条件，可留空。
-- `risk-level`：威胁等级，逗号分隔字符串（如 "高危,超危"），可留空。
-- `handle-states`：处置状态，逗号分隔字符串（如 "-1,0"），可留空。
+## 告警查询参数
+- `xdr-base-url`：XDR 平台地址。
+- `xdr-token`：XDR Bearer Token，默认沿用当前工具配置，可按需覆盖。
+- `start-time` / `end-time`：格式 `yyyy-MM-dd HH:mm:ss`；两者都留空时默认拉取最近 5 小时。
+- `alert-name`、`attack-ip`、`victim-ip`、`risk-level`、`handle-states`：告警筛选条件。
 - `page-size`：每页条数，默认 10，最大 1000。
-- `max-pages`：最大查询页数，默认 5。
+- `max-pages`：本次查询最多请求页数，默认 5，最大 10。
+- `max-fetch-alerts`：本次最多暂存的告警数，默认 1000，最大 5000。达到上限或页数上限时会标记 `upstream_has_more=true`。
+- `chunk-size`：每次最多返回多少条，默认 10，最大 50。
+- `max-output-bytes`：单次工具输出 JSON 字节数上限，默认 16000，允许 4000–32000。长文本字段也会截断并标记；字节上限不是精确 token 数。
+- `continuation-id` / `offset`：续取或清理缓存时使用。续取时 `offset` 应使用上次结果中的 `next_offset`。
 
-## get_intel 参数
-- `search-content`：要查询的 IOC 或攻击者 IP。
+## 智能体续取规则
+- `has_more_cached=true` 表示本次已经拉取的数据还有未返回的块；只有分析确实需要时才调用 `continue_alerts`，不要为了“取完”而自动拉取所有块。
+- 续取调用传 `action=continue_alerts`、`continuation-id=<result_id>`、`offset=<next_offset>`。最后一块返回后脚本会删除缓存。
+- `upstream_has_more=true` 表示受 `max-pages` 或 `max-fetch-alerts` 限制，尚有数据没有从 XDR 拉取；缓存续取无法拿到这些未拉取数据，需要重新发起范围更窄或上限更高的查询。
+- 续取有效期为 30 分钟，过期后不可再读；最后一块读取后会删除缓存。若任务中途结束，可用 `clear_alerts_cache` 和 `continuation-id` 删除缓存。告警缓存写入本机 Yakit 临时目录，文件按 `0600` 权限创建；脚本不缓存访问令牌。
 
-## 输出
-工具返回 JSON：{ok, action, code, message, page_size, pages, total_rows, alerts[] 或 intel}。
-alerts 中每条已提取 SNOW_ID、ALERT_NAME、RISK_LEVEL、ALERT_DESC、ATTACKER_IP、VICTIM_IP、SRC_PORT、DST_PORT、PROTOCOL、DIRECTION、KILL_CHAIN、ATTCKLIST、PARENTUUID_S、ALERT_CAT_FIRST、ALERT_CAT_SECOND、HANDLE_RESULT、HANDLE_STATUS、DETECTION_ENGINE、IOC_RESOURCE、IOC_RISK_LEVEL、COUNT、MERGE_NUM、VICTIM_ASSET_NAME、ATTACKER_INFO、VICTIM_INFO，START_TIME/END_TIME 已由毫秒时间戳转为 yyyy-MM-dd HH:mm:ss。
-接口失败时返回 {ok:false, code, message}，不得把错误字段当作数据。
+## 输出说明
+- `fetched_rows` 是本次实际拉取并暂存的数量，不代表平台全量总数。
+- `risk_counts` 是已拉取数据的风险等级统计。
+- `returned_rows` 是当前块实际返回数；`has_more_cached` 表示缓存里是否还有后续块。
+- `query_complete=false` 时不能把已拉取的数据描述为全量结果。
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
 // --- 参数 ---
-action = cli.String("action", cli.setVerboseName("操作"), cli.setDefault("query_alerts"), cli.setHelp("query_alerts 查询告警 / get_intel 查询情报"))
-xdrBaseUrl = cli.String("xdr-base-url", cli.setVerboseName("XDR 平台地址"), cli.setDefault("https://10.21.17.218:8686"), cli.setHelp("协议、IP 和端口，默认 https://10.21.17.218:8686"))
-xdrToken = cli.String("xdr-token", cli.setVerboseName("访问令牌"), cli.setDefault("5a57ff89-e77e-46da-9172-9c1536c098c8"), cli.setHelp("XDR Bearer Token，默认 5a57ff89-e77e-46da-9172-9c1536c098c8"))
+action = cli.String("action", cli.setVerboseName("操作"), cli.setDefault("query_alerts"), cli.setHelp("query_alerts 查询告警 / continue_alerts 续取缓存 / clear_alerts_cache 清理缓存 / get_intel 查询情报"))
+xdrBaseUrl = cli.String("xdr-base-url", cli.setVerboseName("XDR 平台地址"), cli.setDefault("https://10.21.17.218:8686"), cli.setHelp("协议、IP 和端口"))
+xdrToken = cli.String("xdr-token", cli.setVerboseName("访问令牌"), cli.setDefault("5a57ff89-e77e-46da-9172-9c1536c098c8"), cli.setHelp("XDR Bearer Token；续取缓存不保存令牌"))
 startTime = cli.String("start-time", cli.setVerboseName("起始时间"), cli.setDefault(""), cli.setHelp("格式 yyyy-MM-dd HH:mm:ss，留空默认最近 5 小时"))
 endTime = cli.String("end-time", cli.setVerboseName("结束时间"), cli.setDefault(""), cli.setHelp("格式 yyyy-MM-dd HH:mm:ss，留空默认当前时刻"))
 alertName = cli.String("alert-name", cli.setVerboseName("告警名称"), cli.setDefault(""), cli.setHelp("告警名称模糊查询，可留空"))
@@ -41,14 +49,25 @@ attackIp = cli.String("attack-ip", cli.setVerboseName("攻击者 IP"), cli.setDe
 victimIp = cli.String("victim-ip", cli.setVerboseName("受害者 IP"), cli.setDefault(""), cli.setHelp("受害者 IP 精确查询，可留空"))
 riskLevel = cli.String("risk-level", cli.setVerboseName("威胁等级"), cli.setDefault(""), cli.setHelp("逗号分隔，例如 高危,超危，可留空"))
 handleStates = cli.String("handle-states", cli.setVerboseName("处置状态"), cli.setDefault(""), cli.setHelp("逗号分隔，例如 -1,0，可留空"))
-pageSize = cli.Int("page-size", cli.setVerboseName("每页条数"), cli.setDefault(10), cli.setHelp("最大 1000"))
-maxPages = cli.Int("max-pages", cli.setVerboseName("最大页数"), cli.setDefault(5), cli.setHelp("最多查询页数，避免请求过多"))
+pageSize = cli.Int("page-size", cli.setVerboseName("每页条数"), cli.setDefault(10), cli.setHelp("每页条数，最大 1000"))
+maxPages = cli.Int("max-pages", cli.setVerboseName("最大页数"), cli.setDefault(5), cli.setHelp("本次最多请求页数，最大 10"))
+maxFetchAlerts = cli.Int("max-fetch-alerts", cli.setVerboseName("最多暂存告警数"), cli.setDefault(1000), cli.setHelp("本次最多拉取并暂存的告警数，最大 5000"))
+chunkSize = cli.Int("chunk-size", cli.setVerboseName("每次返回条数"), cli.setDefault(10), cli.setHelp("单次最多返回告警数，最大 50；仍受输出字符上限约束"))
+maxOutputBytes = cli.Int("max-output-bytes", cli.setVerboseName("单次输出字节上限"), cli.setDefault(16000), cli.setHelp("单次序列化 JSON 输出字节上限，允许 4000–32000；不是精确 token 数"))
+continuationId = cli.String("continuation-id", cli.setVerboseName("续取 ID"), cli.setDefault(""), cli.setHelp("continue_alerts 或 clear_alerts_cache 使用上次返回的 result_id"))
+offset = cli.Int("offset", cli.setVerboseName("续取偏移量"), cli.setDefault(0), cli.setHelp("continue_alerts 使用上次返回的 next_offset"))
 searchContent = cli.String("search-content", cli.setVerboseName("情报检索内容"), cli.setDefault(""), cli.setHelp("get_intel 使用的 IOC 或攻击者 IP"))
 cli.check()
 
-// --- 工具函数 ---
+action = str.ToLower(str.TrimSpace(action))
+cacheDir = file.Join(yakit.GetHomeTempDir(), "xdr-alert-chunks")
+cacheTTLSeconds = 1800
 
-// 逗号分隔字符串（或 JSON 数组字符串）-> JSON 数组
+cachePathFor = func(resultId) {
+    // 对外部传入的续取 ID 做哈希，避免将其直接拼进文件路径。
+    return file.Join(cacheDir, codec.Sha256(sprint(resultId)) + ".json")
+}
+
 toStrArray = func(raw) {
     if raw == "" || raw == nil {
         return []
@@ -72,7 +91,6 @@ toStrArray = func(raw) {
     return out
 }
 
-// 逗号分隔字符串（或 JSON 数组字符串）-> 整数数组
 toIntArray = func(raw) {
     if raw == "" || raw == nil {
         return []
@@ -96,7 +114,6 @@ toIntArray = func(raw) {
     return out
 }
 
-// 毫秒时间戳 -> yyyy-MM-dd HH:mm:ss
 fmtMs = func(ms) {
     if ms == nil {
         return ""
@@ -112,38 +129,22 @@ fmtMs = func(ms) {
     }
 }
 
-// 发送一个 POST JSON 请求，返回解析后的响应 map
-postJson = func(fullUrl, bodyMap) {
-    opts = [poc.timeout(15)]
-    autoHttps, packet, err := poc.ParseUrlToHTTPRequestRaw("POST", fullUrl)
-    if err != nil {
-        return {"err": sprintf("parse url failed: %v", err)}
+clipText = func(value, limit) {
+    s = sprint(value)
+    chars = str.Split(s, "")
+    if len(chars) <= limit {
+        return s
     }
-    // ParseUrlToHTTPRequestRaw 返回的报文是 origin-form，不含协议头；必须把 autoHttps
-    // 传回 HTTPEx，否则 https 地址会被当成明文 HTTP 发送
-    if autoHttps {
-        opts = append(opts, poc.https(true))
+    out = ""
+    for i, ch := range chars {
+        if i >= limit {
+            break
+        }
+        out += ch
     }
-    packet = poc.ReplaceHTTPPacketHeader(packet, "Content-Type", "application/json")
-    packet = poc.ReplaceHTTPPacketHeader(packet, "Authorization", sprintf("Bearer %v", xdrToken))
-    packet = poc.ReplaceHTTPPacketBody(packet, []byte(json.dumps(bodyMap)))
-    rspIns, _, err := poc.HTTPEx(packet, opts...)
-    if err != nil {
-        return {"err": sprintf("http request failed: %v", err)}
-    }
-    status = poc.GetStatusCodeFromResponse(rspIns.RawPacket)
-    body = poc.GetHTTPPacketBody(rspIns.RawPacket)
-    parsed = {}
-    try {
-        parsed = json.loads(string(body))
-    } catch e {
-        return {"err": sprintf("response not json (status %v): %v", status, e)}
-    }
-    parsed["_http_status"] = status
-    return parsed
+    return out + "…[截断]"
 }
 
-// 从告警行提取字段并归一化时间
 normalizeAlert = func(row) {
     get = func(k) {
         v = row[k]
@@ -183,30 +184,290 @@ normalizeAlert = func(row) {
     }
 }
 
-// --- 主流程 ---
+alertForOutput = func(alert, minimal) {
+    if minimal {
+        return {
+            "SNOW_ID": clipText(alert["SNOW_ID"], 80),
+            "ALERT_NAME": clipText(alert["ALERT_NAME"], 160),
+            "RISK_LEVEL": clipText(alert["RISK_LEVEL"], 40),
+            "ALERT_DESC": clipText(alert["ALERT_DESC"], 400),
+            "ATTACKER_IP": clipText(alert["ATTACKER_IP"], 80),
+            "VICTIM_IP": clipText(alert["VICTIM_IP"], 80),
+            "KILL_CHAIN": clipText(alert["KILL_CHAIN"], 120),
+            "START_TIME": clipText(alert["START_TIME"], 40),
+            "END_TIME": clipText(alert["END_TIME"], 40),
+        }
+    }
+    return {
+        "SNOW_ID": clipText(alert["SNOW_ID"], 80),
+        "ALERT_NAME": clipText(alert["ALERT_NAME"], 160),
+        "RISK_LEVEL": clipText(alert["RISK_LEVEL"], 40),
+        "ALERT_DESC": clipText(alert["ALERT_DESC"], 700),
+        "ATTACKER_IP": clipText(alert["ATTACKER_IP"], 80),
+        "VICTIM_IP": clipText(alert["VICTIM_IP"], 80),
+        "SRC_PORT": clipText(alert["SRC_PORT"], 40),
+        "DST_PORT": clipText(alert["DST_PORT"], 40),
+        "PROTOCOL": clipText(alert["PROTOCOL"], 40),
+        "DIRECTION": clipText(alert["DIRECTION"], 80),
+        "KILL_CHAIN": clipText(alert["KILL_CHAIN"], 240),
+        "ATTCKLIST": clipText(alert["ATTCKLIST"], 400),
+        "PARENTUUID_S": clipText(alert["PARENTUUID_S"], 100),
+        "ALERT_CAT_FIRST": clipText(alert["ALERT_CAT_FIRST"], 100),
+        "ALERT_CAT_SECOND": clipText(alert["ALERT_CAT_SECOND"], 100),
+        "HANDLE_RESULT": clipText(alert["HANDLE_RESULT"], 240),
+        "HANDLE_STATUS": clipText(alert["HANDLE_STATUS"], 60),
+        "DETECTION_ENGINE": clipText(alert["DETECTION_ENGINE"], 120),
+        "IOC_RESOURCE": clipText(alert["IOC_RESOURCE"], 400),
+        "IOC_RISK_LEVEL": clipText(alert["IOC_RISK_LEVEL"], 80),
+        "COUNT": clipText(alert["COUNT"], 40),
+        "MERGE_NUM": clipText(alert["MERGE_NUM"], 40),
+        "VICTIM_ASSET_NAME": clipText(alert["VICTIM_ASSET_NAME"], 120),
+        "ATTACKER_INFO": clipText(alert["ATTACKER_INFO"], 500),
+        "VICTIM_INFO": clipText(alert["VICTIM_INFO"], 500),
+        "START_TIME": clipText(alert["START_TIME"], 40),
+        "END_TIME": clipText(alert["END_TIME"], 40),
+    }
+}
 
-if str.ToLower(str.TrimSpace(action)) == "get_intel" {
+postJson = func(fullUrl, bodyMap) {
+    opts = [poc.timeout(15)]
+    autoHttps, packet, err := poc.ParseUrlToHTTPRequestRaw("POST", fullUrl)
+    if err != nil {
+        return {"err": sprintf("parse url failed: %v", err)}
+    }
+    if autoHttps {
+        opts = append(opts, poc.https(true))
+    }
+    packet = poc.ReplaceHTTPPacketHeader(packet, "Content-Type", "application/json")
+    packet = poc.ReplaceHTTPPacketHeader(packet, "Authorization", sprintf("Bearer %v", xdrToken))
+    packet = poc.ReplaceHTTPPacketBody(packet, []byte(json.dumps(bodyMap)))
+    rspIns, _, err := poc.HTTPEx(packet, opts...)
+    if err != nil {
+        return {"err": sprintf("http request failed: %v", err)}
+    }
+    status = poc.GetStatusCodeFromResponse(rspIns.RawPacket)
+    body = poc.GetHTTPPacketBody(rspIns.RawPacket)
+    parsed = {}
+    try {
+        parsed = json.loads(string(body))
+    } catch e {
+        return {"err": sprintf("response not json (status %v): %v", status, e)}
+    }
+    parsed["_http_status"] = status
+    return parsed
+}
+
+riskCountsFor = func(alerts) {
+    counts = {}
+    for _, alert := range alerts {
+        level = str.TrimSpace(sprint(alert["RISK_LEVEL"]))
+        if level == "" {
+            level = "未知"
+        }
+        if counts[level] == nil {
+            counts[level] = 0
+        }
+        counts[level] = int(counts[level]) + 1
+    }
+    return counts
+}
+
+makeChunk = func(alerts, startOffset, requestedChunkSize, maxBytes, resultId, metadata) {
+    chunkAlerts = []
+    nextOffset = startOffset
+    for i := startOffset; i < len(alerts) && len(chunkAlerts) < requestedChunkSize; i++ {
+        candidate = []
+        for _, oldAlert := range chunkAlerts {
+            candidate.Push(oldAlert)
+        }
+        candidate.Push(alertForOutput(alerts[i], false))
+        candidateNext = i + 1
+        candidateHasMore = candidateNext < len(alerts)
+        candidateId = ""
+        if candidateHasMore {
+            candidateId = resultId
+        }
+        candidateOutput = {
+            "ok": true,
+            "action": metadata["action"],
+            "code": 200,
+            "fetched_rows": len(alerts),
+            "pages_fetched": metadata["pages_fetched"],
+            "query_complete": metadata["query_complete"],
+            "upstream_has_more": metadata["upstream_has_more"],
+            "query_error": metadata["query_error"],
+            "risk_counts": metadata["risk_counts"],
+            "result_id": candidateId,
+            "offset": startOffset,
+            "returned_rows": len(candidate),
+            "next_offset": candidateNext,
+            "has_more_cached": candidateHasMore,
+            "alerts": candidate,
+        }
+        candidateText = json.dumps(candidateOutput)
+        if len(candidateText) > maxBytes {
+            if len(chunkAlerts) > 0 {
+                break
+            }
+            candidate = [alertForOutput(alerts[i], true)]
+            candidateOutput["alerts"] = candidate
+            candidateOutput["returned_rows"] = 1
+            candidateText = json.dumps(candidateOutput)
+            if len(candidateText) > maxBytes {
+                return {"err": "单条告警的最小输出仍超过 max-output-bytes；请提高字节上限或缩小查询条件"}
+            }
+        }
+        chunkAlerts = candidate
+        nextOffset = candidateNext
+    }
+    hasMore = nextOffset < len(alerts)
+    finalId = ""
+    if hasMore {
+        finalId = resultId
+    }
+    return {
+        "ok": true,
+        "result": {
+            "ok": true,
+            "action": metadata["action"],
+            "code": 200,
+            "fetched_rows": len(alerts),
+            "pages_fetched": metadata["pages_fetched"],
+            "query_complete": metadata["query_complete"],
+            "upstream_has_more": metadata["upstream_has_more"],
+            "query_error": metadata["query_error"],
+            "risk_counts": metadata["risk_counts"],
+            "result_id": finalId,
+            "offset": startOffset,
+            "returned_rows": len(chunkAlerts),
+            "next_offset": nextOffset,
+            "has_more_cached": hasMore,
+            "alerts": chunkAlerts,
+        },
+        "next_offset": nextOffset,
+        "has_more_cached": hasMore,
+    }
+}
+
+if action == "clear_alerts_cache" {
+    if str.TrimSpace(continuationId) == "" {
+        yakit.Error("clear_alerts_cache 需要 continuation-id")
+        return
+    }
+    cachePath = cachePathFor(continuationId)
+    if !file.IsExisted(cachePath) {
+        yakit.Info("XDR_ALERT_CACHE_RESULT %v", json.dumps({"ok": true, "action": "clear_alerts_cache", "removed": false, "message": "缓存不存在或已清理"}))
+        return
+    }
+    try {
+        file.Remove(cachePath)~
+    } catch e {
+        yakit.Error("清理告警缓存失败: %v", e)
+        return
+    }
+    yakit.Info("XDR_ALERT_CACHE_RESULT %v", json.dumps({"ok": true, "action": "clear_alerts_cache", "removed": true}))
+    return
+}
+
+if action == "continue_alerts" {
+    if str.TrimSpace(continuationId) == "" {
+        yakit.Error("continue_alerts 需要 continuation-id（上次返回的 result_id）")
+        return
+    }
+    if offset < 0 {
+        yakit.Error("offset 不能小于 0")
+        return
+    }
+    cachePath = cachePathFor(continuationId)
+    if !file.IsExisted(cachePath) {
+        yakit.Error("续取缓存不存在或已经清理；请重新执行 query_alerts")
+        return
+    }
+    cache = {}
+    try {
+        rawCache = file.ReadFile(cachePath)~
+        cache = json.loads(string(rawCache))
+    } catch e {
+        yakit.Error("读取续取缓存失败: %v", e)
+        return
+    }
+    if cache["created_at"] == nil || cache["alerts"] == nil || cache["metadata"] == nil {
+        try {
+            file.Remove(cachePath)~
+        } catch e {}
+        yakit.Error("续取缓存格式不完整，已清理；请重新执行 query_alerts")
+        return
+    }
+    createdAt = int64(cache["created_at"])
+    if time.Now().Unix()-createdAt > cacheTTLSeconds {
+        try {
+            file.Remove(cachePath)~
+        } catch e {}
+        yakit.Error("续取缓存已超过 30 分钟有效期并已清理；请重新执行 query_alerts")
+        return
+    }
+    cachedAlerts = cache["alerts"]
+    if offset >= len(cachedAlerts) {
+        yakit.Error("offset 超出缓存范围；请使用上次结果返回的 next_offset")
+        return
+    }
+    if chunkSize <= 0 {
+        chunkSize = 10
+    }
+    if chunkSize > 50 {
+        chunkSize = 50
+    }
+    if maxOutputBytes < 4000 {
+        maxOutputBytes = 4000
+    }
+    if maxOutputBytes > 32000 {
+        maxOutputBytes = 32000
+    }
+    metadata = cache["metadata"]
+    metadata["action"] = "continue_alerts"
+    chunkResult = makeChunk(cachedAlerts, offset, chunkSize, maxOutputBytes, continuationId, metadata)
+    if chunkResult["err"] != nil {
+        yakit.Error("告警续取失败: %v", chunkResult["err"])
+        return
+    }
+    if !chunkResult["has_more_cached"] {
+        try {
+            file.Remove(cachePath)~
+        } catch e {
+            yakit.Warn("已返回最后一块，但缓存文件清理失败: %v", e)
+        }
+    }
+    yakit.Info("XDR_ALERT_RESULT %v", json.dumps(chunkResult["result"]))
+    return
+}
+
+if action != "query_alerts" && action != "get_intel" {
+    yakit.Error("不支持的 action：%v", action)
+    return
+}
+if str.TrimSpace(xdrToken) == "" {
+    yakit.Error("缺少 xdr-token：请提供当前有效的 XDR Bearer access token")
+    return
+}
+
+if action == "get_intel" {
     if searchContent == "" {
         yakit.Error("get_intel 需要 search-content 参数")
         return
     }
-    url = sprintf("%v/maxs/intel/openapi/getIntel", str.TrimRight(xdrBaseUrl, "/"))
-    resp = postJson(url, {"searchContent": searchContent})
-    if resp["err"] != nil {
-        yakit.Error("getIntel 失败: %v", resp["err"])
+    intelUrl = sprintf("%v/maxs/intel/openapi/getIntel", str.TrimRight(xdrBaseUrl, "/"))
+    intelResp = postJson(intelUrl, {"searchContent": searchContent})
+    if intelResp["err"] != nil {
+        yakit.Error("getIntel 失败: %v", intelResp["err"])
         return
     }
-    code = resp["code"]
-    state = resp["state"]
-    if code != 200 || !(state == true || state == "true") {
-        yakit.Error("getIntel 返回异常: code=%v state=%v message=%v", code, state, resp["message"])
+    if intelResp["code"] != 200 || !(intelResp["state"] == true || intelResp["state"] == "true") {
+        yakit.Error("getIntel 返回异常: code=%v state=%v message=%v", intelResp["code"], intelResp["state"], intelResp["message"])
         return
     }
-    yakit.Info("XDR_INTEL_RESULT %v", json.dumps({"ok": true, "action": "get_intel", "search_content": searchContent, "intel": resp["data"]}))
+    yakit.Info("XDR_INTEL_RESULT %v", json.dumps({"ok": true, "action": "get_intel", "search_content": searchContent, "intel": intelResp["data"]}))
     return
 }
-
-// --- 查询告警 ---
 
 if pageSize <= 0 {
     pageSize = 10
@@ -217,27 +478,48 @@ if pageSize > 1000 {
 if maxPages <= 0 {
     maxPages = 5
 }
+if maxPages > 10 {
+    maxPages = 10
+}
+if maxFetchAlerts <= 0 {
+    maxFetchAlerts = 1000
+}
+if maxFetchAlerts > 5000 {
+    maxFetchAlerts = 5000
+}
+if chunkSize <= 0 {
+    chunkSize = 10
+}
+if chunkSize > 50 {
+    chunkSize = 50
+}
+if maxOutputBytes < 4000 {
+    maxOutputBytes = 4000
+}
+if maxOutputBytes > 32000 {
+    maxOutputBytes = 32000
+}
 
 now = time.Now()
 start = now.Add(time.ParseDuration("-5h")~)
 end = now
 if startTime != "" {
     try {
-        parsed, err := time.Parse("2006-01-02 15:04:05", startTime)
-        if err == nil {
-            start = parsed
+        parsedStart, parseErr = time.Parse("2006-01-02 15:04:05", startTime)
+        if parseErr == nil {
+            start = parsedStart
         } else {
-            yakit.Warn("start-time 解析失败，使用默认最近 5 小时: %v", err)
+            yakit.Warn("start-time 解析失败，使用默认最近 5 小时: %v", parseErr)
         }
     } catch e {}
 }
 if endTime != "" {
     try {
-        parsed, err := time.Parse("2006-01-02 15:04:05", endTime)
-        if err == nil {
-            end = parsed
+        parsedEnd, parseErr = time.Parse("2006-01-02 15:04:05", endTime)
+        if parseErr == nil {
+            end = parsedEnd
         } else {
-            yakit.Warn("end-time 解析失败，使用默认当前时刻: %v", err)
+            yakit.Warn("end-time 解析失败，使用默认当前时刻: %v", parseErr)
         }
     } catch e {}
 }
@@ -264,52 +546,99 @@ if handleStates != "" {
     body["handleStates"] = toIntArray(handleStates)
 }
 
-url = sprintf("%v/maxs/rv/openapi/alarm/query", str.TrimRight(xdrBaseUrl, "/"))
+queryUrl = sprintf("%v/maxs/rv/openapi/alarm/query", str.TrimRight(xdrBaseUrl, "/"))
 alerts = []
-hasNext = true
-page = 0
+upstreamHasMore = false
 lastError = ""
-for hasNext {
-    page += 1
-    if page > maxPages {
-        break
-    }
+pagesFetched = 0
+page = 1
+shouldFetch = true
+for shouldFetch && page <= maxPages && len(alerts) < maxFetchAlerts {
     body["pageIndex"] = page
-    resp = postJson(url, body)
-    if resp["err"] != nil {
-        lastError = resp["err"]
+    pageResp = postJson(queryUrl, body)
+    if pageResp["err"] != nil {
+        lastError = sprint(pageResp["err"])
         break
     }
-    code = resp["code"]
-    state = resp["state"]
-    if code != 200 || !(state == true || state == "true") {
-        lastError = sprintf("code=%v state=%v message=%v", code, state, resp["message"])
+    if pageResp["code"] != 200 || !(pageResp["state"] == true || pageResp["state"] == "true") {
+        lastError = sprintf("code=%v state=%v message=%v", pageResp["code"], pageResp["state"], pageResp["message"])
         break
     }
-    data = resp["data"]
-    if data == nil {
-        data = {}
+    pagesFetched += 1
+    pageData = pageResp["data"]
+    if pageData == nil {
+        pageData = {}
     }
-    rowData = data["rowData"]
-    if rowData == nil {
-        rowData = []
+    pageRows = pageData["rowData"]
+    if pageRows == nil {
+        pageRows = []
     }
-    for _, row := range rowData {
+    droppedRowsInPage = false
+    for _, row := range pageRows {
+        if len(alerts) >= maxFetchAlerts {
+            droppedRowsInPage = true
+            break
+        }
         alerts.Push(normalizeAlert(row))
     }
-    hasNext = data["hasNextPage"] == true
+    pageHasNext = pageData["hasNextPage"] == true || pageData["hasNextPage"] == "true"
+    upstreamHasMore = pageHasNext || droppedRowsInPage
+    shouldFetch = pageHasNext && !droppedRowsInPage
+    page += 1
+    if len(alerts) >= maxFetchAlerts && upstreamHasMore {
+        break
+    }
 }
-if lastError != "" && len(alerts) == 0 {
+
+if len(alerts) == 0 && lastError != "" {
     yakit.Error("告警查询失败: %v", lastError)
     return
 }
-yakit.Info("XDR_ALERT_RESULT %v", json.dumps({
-    "ok": true,
+if page > maxPages && upstreamHasMore {
+    shouldFetch = false
+}
+
+metadata = {
     "action": "query_alerts",
-    "code": 200,
-    "page_size": pageSize,
-    "pages": page,
-    "total_rows": len(alerts),
-    "error": lastError,
-    "alerts": alerts,
-}))
+    "pages_fetched": pagesFetched,
+    "query_complete": lastError == "" && !upstreamHasMore,
+    "upstream_has_more": upstreamHasMore,
+    "query_error": lastError,
+    "risk_counts": riskCountsFor(alerts),
+}
+resultId = uuid()
+firstChunk = makeChunk(alerts, 0, chunkSize, maxOutputBytes, resultId, metadata)
+if firstChunk["err"] != nil {
+    yakit.Error("构造告警结果失败: %v", firstChunk["err"])
+    return
+}
+
+if firstChunk["has_more_cached"] {
+    cacheData = {
+        "created_at": time.Now().Unix(),
+        "metadata": metadata,
+        "alerts": alerts,
+    }
+    cacheDirErr = file.MkdirAll(cacheDir)
+    if cacheDirErr != nil {
+        yakit.Error("创建告警缓存目录失败，无法安全续取；本次不返回不完整分块: %v", cacheDirErr)
+        return
+    }
+    cachePath = cachePathFor(resultId)
+    cacheFile, cacheOpenErr = file.OpenFile(cachePath, file.O_CREATE|file.O_WRONLY|file.O_TRUNC, 0o600)
+    if cacheOpenErr != nil {
+        yakit.Error("创建告警缓存失败，无法安全续取；本次不返回不完整分块: %v", cacheOpenErr)
+        return
+    }
+    _, cacheWriteErr = cacheFile.WriteString(json.dumps(cacheData))
+    cacheCloseErr = cacheFile.Close()
+    if cacheWriteErr != nil || cacheCloseErr != nil {
+        try {
+            file.Remove(cachePath)~
+        } catch e {}
+        yakit.Error("写入告警缓存失败，无法安全续取；本次不返回不完整分块: write=%v close=%v", cacheWriteErr, cacheCloseErr)
+        return
+    }
+}
+
+yakit.Info("XDR_ALERT_RESULT %v", json.dumps(firstChunk["result"]))
