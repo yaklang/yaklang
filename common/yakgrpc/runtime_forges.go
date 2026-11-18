@@ -56,6 +56,13 @@ func (b serverBrowserExtensionBridge) Connections() []browser.ExtensionBridgeCon
 	return b.server.browserBridge.Snapshot().Connections
 }
 
+func (b serverBrowserExtensionBridge) ResolveBrowserReference(deviceID string) (string, error) {
+	if !b.Available() {
+		return "", errors.New("browser extension bridge is not running")
+	}
+	return b.server.browserBridge.BrowserReference(deviceID)
+}
+
 func (b serverBrowserExtensionBridge) resolveHTTPFlowIdentity(deviceID, browserRef string) (httpctx.BrowserInstance, error) {
 	deviceID, _, err := browsertools.ResolveBrowserDevice(b, deviceID, browserRef)
 	if err != nil {

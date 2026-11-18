@@ -20,7 +20,7 @@ func (i *browserAttachmentTestInvoker) GetBrowserAttachments() []AttachedBrowser
 	return append([]AttachedBrowserBinding(nil), i.bindings...)
 }
 
-func (i *browserAttachmentTestInvoker) AddBrowserAttachments(bindings []AttachedBrowserBinding) {
+func (i *browserAttachmentTestInvoker) AddBrowserAttachments(bindings []AttachedBrowserBinding) error {
 	seen := make(map[string]struct{}, len(i.bindings))
 	for _, binding := range i.bindings {
 		seen[binding.DeviceID] = struct{}{}
@@ -32,6 +32,7 @@ func (i *browserAttachmentTestInvoker) AddBrowserAttachments(bindings []Attached
 		seen[binding.DeviceID] = struct{}{}
 		i.bindings = append(i.bindings, binding)
 	}
+	return nil
 }
 
 func newBrowserAttachmentTestTask(
@@ -58,9 +59,44 @@ func TestAttachedBrowserResourceData(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "device-1", browserResource.DeviceID)
 	require.Equal(t, AttachedBrowserBinding{
-		DeviceID: "device-1", Name: "Login debugging", Reference: "A",
+		DeviceID: "device-1", Name: "Login debugging", Reference: "device-1",
 	}, browserResource.Binding())
-	require.Contains(t, browserResource.ToAttachData(nil), "`A` (Login debugging)")
+	require.Contains(t, browserResource.ToAttachData(nil), "`device-1` (Login debugging)")
+}
+
+func TestAttachedBrowserResourceUsesBridgeOwnedReference(t *testing.T) {
+	cfg := NewConfig(
+		context.Background(),
+		WithBrowserAttachmentReferenceResolver(func(deviceID string) (string, error) {
+			require.Equal(t, "device-1", deviceID)
+			return "br_7", nil
+		}),
+	)
+	invoker := &browserAttachmentTestInvoker{}
+	loop := &attachedBrowserTestLoop{config: cfg, invoker: invoker}
+	resource, err := ParseAttachedResourceData(NewAttachedResource(
+		AttachedResourceTypeBrowser,
+		AttachedResourceKeyBrowserDevice,
+		`{"deviceId":"device-1","name":"Login debugging","reference":"A"}`,
+	))
+	require.NoError(t, err)
+	require.NoError(t, resource.BindLoopData(loop))
+	require.Equal(t, []AttachedBrowserBinding{{
+		DeviceID: "device-1", Name: "Login debugging", Reference: "br_7",
+	}}, invoker.bindings)
+	require.Contains(t, resource.ToAttachData(loop), "`br_7` (Login debugging)")
+
+	task := NewStatefulTaskBase("browser-resolved-ref", "inspect", context.Background(), nil, true)
+	task.SetReActLoop(loop)
+	params, err := BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
+		"browser_ref": "br_7",
+		"method":      "browser.tabs",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "device-1", params.GetString("device_id"))
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(cfg)...)
+	require.NotNil(t, child.GetBrowserAttachmentReferenceResolver())
 }
 
 func TestAttachedBrowserResourceAddsSessionAndPromotesTools(t *testing.T) {
@@ -77,19 +113,19 @@ func TestAttachedBrowserResourceAddsSessionAndPromotesTools(t *testing.T) {
 	loop := &attachedBrowserTestLoop{config: cfg, invoker: invoker}
 
 	resources := []AttachedResourceData{
-		&AttachedBrowserResourceData{DeviceID: "device-a", Reference: "A"},
-		&AttachedBrowserResourceData{DeviceID: "device-b", Reference: "B"},
+		&AttachedBrowserResourceData{DeviceID: "device-a", Reference: "br_1"},
+		&AttachedBrowserResourceData{DeviceID: "device-b", Reference: "br_2"},
 	}
 	require.Equal(t,
-		(&AttachedBrowserResourceData{DeviceID: "device-a", Reference: "A"}).DedupKey(),
+		(&AttachedBrowserResourceData{DeviceID: "device-a", Reference: "br_1"}).DedupKey(),
 		(&AttachedBrowserResourceData{DeviceID: "device-a", Name: "same device, changed name"}).DedupKey(),
 	)
 	for _, resource := range resources {
 		require.NoError(t, resource.BindLoopData(loop))
 	}
 	require.Equal(t, []AttachedBrowserBinding{
-		{DeviceID: "device-a", Reference: "A"},
-		{DeviceID: "device-b", Reference: "B"},
+		{DeviceID: "device-a", Reference: "br_1"},
+		{DeviceID: "device-b", Reference: "br_2"},
 	}, invoker.bindings)
 	for _, name := range toolNames {
 		require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(name), name)
@@ -98,8 +134,8 @@ func TestAttachedBrowserResourceAddsSessionAndPromotesTools(t *testing.T) {
 	for _, resource := range resources {
 		rendered = append(rendered, resource.ToAttachData(loop))
 	}
-	require.Contains(t, strings.Join(rendered, "\n"), "`A`")
-	require.Contains(t, strings.Join(rendered, "\n"), "`B`")
+	require.Contains(t, strings.Join(rendered, "\n"), "`br_1`")
+	require.Contains(t, strings.Join(rendered, "\n"), "`br_2`")
 	require.NotContains(t, strings.Join(rendered, "\n"), "device-a")
 }
 
@@ -108,7 +144,7 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 		t,
 		"browser-route",
 		"inspect current browser",
-		AttachedBrowserBinding{DeviceID: "device-1", Name: "Chrome Browser", Reference: "device-1"},
+		AttachedBrowserBinding{DeviceID: "device-1", Name: "Chrome Browser", Reference: "br_1"},
 	)
 
 	allow, feedback := CheckAttachedBrowserToolRoute(task, attachedBrowserRodToolName)
@@ -134,7 +170,7 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 	require.Equal(t, "device-1", params.GetString("device_id"))
 
 	params, err = BindAttachedBrowserToolParams(task, attachedBrowserHandoffToolName, aitool.InvokeParams{
-		"browser_ref": "device-1",
+		"browser_ref": "br_1",
 		"reason":      "qr_code",
 	})
 	require.NoError(t, err)
@@ -142,7 +178,7 @@ func TestAttachedBrowserResourceBlocksRodIdentitySwitch(t *testing.T) {
 	require.NotContains(t, params, "browser_ref")
 
 	params, err = BindAttachedBrowserToolParams(task, attachedBrowserCryptoToolName, aitool.InvokeParams{
-		"browser_ref": "device-1",
+		"browser_ref": "br_1",
 		"captureId":   "capture-1",
 		"nodeId":      "n1",
 	})
@@ -208,12 +244,12 @@ func TestAttachedBrowserResourceRoutesMultipleMentionsByReference(t *testing.T) 
 		t,
 		"browser-route",
 		"compare browsers",
-		AttachedBrowserBinding{DeviceID: "device-a", Name: "A · Chrome Browser", Reference: "A"},
-		AttachedBrowserBinding{DeviceID: "device-b", Name: "B · Chrome Browser", Reference: "B"},
+		AttachedBrowserBinding{DeviceID: "device-a", Name: "A · Chrome Browser", Reference: "br_1"},
+		AttachedBrowserBinding{DeviceID: "device-b", Name: "B · Chrome Browser", Reference: "br_2"},
 	)
 
 	params, err := BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
-		"browser_ref": "@B",
+		"browser_ref": "@br_2",
 		"method":      "browser.tabs",
 	})
 	require.NoError(t, err)
@@ -221,15 +257,37 @@ func TestAttachedBrowserResourceRoutesMultipleMentionsByReference(t *testing.T) 
 	require.NotContains(t, params, "browser_ref")
 
 	_, err = BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
+		"browser_ref": "B",
+		"method":      "browser.tabs",
+	})
+	require.ErrorContains(t, err, "does not match")
+
+	_, err = BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
 		"method": "browser.tabs",
 	})
 	require.ErrorContains(t, err, "browser_ref is required")
 
 	_, err = BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
-		"browser_ref": "C",
+		"browser_ref": "br_3",
 		"method":      "browser.tabs",
 	})
 	require.ErrorContains(t, err, "does not match an attached browser")
+}
+
+func TestAttachedBrowserResourceRejectsAmbiguousReference(t *testing.T) {
+	task, _ := newBrowserAttachmentTestTask(
+		t,
+		"browser-ambiguous",
+		"compare browsers",
+		AttachedBrowserBinding{DeviceID: "device-a", Reference: "br_9"},
+		AttachedBrowserBinding{DeviceID: "device-b", Reference: "br_9"},
+	)
+
+	_, err := BindAttachedBrowserToolParams(task, attachedBrowserCallToolName, aitool.InvokeParams{
+		"browser_ref": "br_9",
+		"method":      "browser.tabs",
+	})
+	require.ErrorContains(t, err, "is ambiguous between attached devices")
 }
 
 func TestToolCallerBindsAttachedBrowserDevice(t *testing.T) {
@@ -248,7 +306,7 @@ func TestToolCallerBindsAttachedBrowserDevice(t *testing.T) {
 	cfg := NewTestConfig(ctx, WithWorkdir(t.TempDir()))
 	task := NewStatefulTaskBase("browser-call", "inspect browser", ctx, cfg.Emitter, true)
 	invoker := &browserAttachmentTestInvoker{bindings: []AttachedBrowserBinding{{
-		DeviceID: "device-1", Reference: "device-1",
+		DeviceID: "device-1", Reference: "br_1",
 	}}}
 	caller, err := NewToolCaller(
 		ctx,

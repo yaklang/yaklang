@@ -43,8 +43,8 @@ type AttachedBrowserResourceData struct {
 	Reference string `json:"reference"`
 }
 
-// AttachedBrowserBinding is the runtime-owned browser selection. DeviceID is
-// intentionally never rendered into prompts or exposed to the model.
+// AttachedBrowserBinding is the runtime-owned browser selection. Reference is
+// resolved by the Bridge from DeviceID and must be unique within the session.
 type AttachedBrowserBinding struct {
 	DeviceID  string
 	Name      string
@@ -58,7 +58,25 @@ type BrowserAttachmentProvider interface {
 
 type BrowserAttachmentSession interface {
 	BrowserAttachmentProvider
-	AddBrowserAttachments([]AttachedBrowserBinding)
+	AddBrowserAttachments([]AttachedBrowserBinding) error
+}
+
+// BrowserAttachmentReferenceResolver maps the authoritative DeviceID to the
+// Bridge-owned browser_ref. Client-provided labels never participate in routing.
+type BrowserAttachmentReferenceResolver func(deviceID string) (string, error)
+
+func WithBrowserAttachmentReferenceResolver(resolver BrowserAttachmentReferenceResolver) ConfigOption {
+	return func(c *Config) error {
+		c.browserAttachmentReferenceResolver = resolver
+		return nil
+	}
+}
+
+func (c *Config) GetBrowserAttachmentReferenceResolver() BrowserAttachmentReferenceResolver {
+	if c == nil {
+		return nil
+	}
+	return c.browserAttachmentReferenceResolver
 }
 
 func init() {
@@ -83,14 +101,13 @@ func newAttachedBrowserResourceData(resource *AttachedResource) (AttachedResourc
 	}
 	d.DeviceID = strings.TrimSpace(d.DeviceID)
 	d.Name = strings.TrimSpace(d.Name)
-	d.Reference = strings.TrimSpace(d.Reference)
 	if d.DeviceID == "" {
 		return nil, utils.Error("attached browser instance has no deviceId")
 	}
-	if d.Reference == "" {
-		d.Reference = d.DeviceID
-	}
-	if len(d.DeviceID) > 512 || len(d.Name) > 512 || len(d.Reference) > 512 {
+	// Client references are compatibility metadata only. Use DeviceID as the
+	// safe one-to-one fallback until BindLoopData resolves the Bridge ref.
+	d.Reference = d.DeviceID
+	if len(d.DeviceID) > 512 || len(d.Name) > 512 {
 		return nil, utils.Error("attached browser instance metadata is too long")
 	}
 	return d, nil
@@ -100,11 +117,28 @@ func (d *AttachedBrowserResourceData) BindLoopData(loop ReActLoopIF) error {
 	if loop == nil || loop.GetInvoker() == nil {
 		return nil
 	}
+	binding := d.Binding()
+	if provider, ok := loop.GetConfig().(interface {
+		GetBrowserAttachmentReferenceResolver() BrowserAttachmentReferenceResolver
+	}); ok && provider.GetBrowserAttachmentReferenceResolver() != nil {
+		reference, err := provider.GetBrowserAttachmentReferenceResolver()(binding.DeviceID)
+		if err != nil {
+			return err
+		}
+		reference = strings.TrimSpace(reference)
+		if reference == "" {
+			return utils.Errorf("browser attachment resolver returned an empty reference for device %q", binding.DeviceID)
+		}
+		binding.Reference = reference
+		d.Reference = reference
+	}
 	session, ok := loop.GetInvoker().(BrowserAttachmentSession)
 	if !ok {
 		return nil
 	}
-	session.AddBrowserAttachments([]AttachedBrowserBinding{d.Binding()})
+	if err := session.AddBrowserAttachments([]AttachedBrowserBinding{binding}); err != nil {
+		return err
+	}
 	promoteAttachedBrowserTools(loop.GetConfig())
 	return nil
 }
@@ -230,7 +264,8 @@ func attachedBrowserResources(task AITask, runtime AIInvokeRuntime) ([]AttachedB
 	}
 	attached := provider.GetBrowserAttachments()
 	resources := make([]AttachedBrowserBinding, 0, len(attached))
-	seen := make(map[string]struct{})
+	seenDevices := make(map[string]struct{})
+	seenReferences := make(map[string]string)
 	for _, resource := range attached {
 		resource.DeviceID = strings.TrimSpace(resource.DeviceID)
 		resource.Name = strings.TrimSpace(resource.Name)
@@ -238,13 +273,23 @@ func attachedBrowserResources(task AITask, runtime AIInvokeRuntime) ([]AttachedB
 		if resource.DeviceID == "" {
 			return nil, true, utils.Error("attached browser resource has no device ID")
 		}
-		if resource.Reference == "" {
-			resource.Reference = resource.DeviceID
-		}
-		if _, exists := seen[resource.DeviceID]; exists {
+		if _, exists := seenDevices[resource.DeviceID]; exists {
 			continue
 		}
-		seen[resource.DeviceID] = struct{}{}
+		if resource.Reference == "" {
+			return nil, true, utils.Errorf("attached browser device %q has no runtime reference", resource.DeviceID)
+		}
+		referenceKey := strings.ToLower(resource.Reference)
+		if existingDeviceID, exists := seenReferences[referenceKey]; exists && existingDeviceID != resource.DeviceID {
+			return nil, true, utils.Errorf(
+				"browser reference %q is ambiguous between attached devices %q and %q",
+				resource.Reference,
+				existingDeviceID,
+				resource.DeviceID,
+			)
+		}
+		seenDevices[resource.DeviceID] = struct{}{}
+		seenReferences[referenceKey] = resource.DeviceID
 		resources = append(resources, resource)
 	}
 	return resources, len(resources) > 0, nil
@@ -263,12 +308,20 @@ func attachedBrowserDeviceID(task AITask, runtime AIInvokeRuntime, browserRef st
 		return "", true, utils.Error("multiple browser instances are attached; browser_ref is required")
 	}
 	var matched *AttachedBrowserBinding
-	for _, resource := range resources {
+	for index := range resources {
+		resource := &resources[index]
 		if browserRef != resource.DeviceID && !strings.EqualFold(browserRef, resource.Reference) {
 			continue
 		}
-		matched = &resource
-		break
+		if matched != nil && matched.DeviceID != resource.DeviceID {
+			return "", true, utils.Errorf(
+				"browser_ref %q matches more than one attached browser (%q and %q)",
+				browserRef,
+				matched.DeviceID,
+				resource.DeviceID,
+			)
+		}
+		matched = resource
 	}
 	if matched == nil {
 		return "", true, utils.Errorf("browser_ref %q does not match an attached browser", browserRef)

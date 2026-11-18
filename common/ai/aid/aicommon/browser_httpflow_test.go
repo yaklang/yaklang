@@ -15,16 +15,16 @@ import (
 func TestAttachedBrowserHTTPRequestRouting(t *testing.T) {
 	task := NewStatefulTaskBase("http-test", "compare A and B", context.Background(), nil, true)
 	invoker := &browserAttachmentTestInvoker{bindings: []AttachedBrowserBinding{
-		{DeviceID: "device-a", Reference: "A"},
-		{DeviceID: "device-b", Reference: "B"},
+		{DeviceID: "device-a", Reference: "br_1"},
+		{DeviceID: "device-b", Reference: "br_2"},
 	}}
 	task.SetReActLoop(&attachedBrowserTestLoop{invoker: invoker})
 	params, err := BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{
-		"browser_ref": "@B", "device_id": "spoofed", "url": "http://example.test/user?id=1",
+		"browser_ref": "@br_2", "device_id": "spoofed", "url": "http://example.test/user?id=1",
 	})
 	require.NoError(t, err)
 	require.Equal(t, "device-b", params.GetString("device_id"))
-	require.Equal(t, "@B", params.GetString("browser_ref"), "keep the selector when reviewing/editing ordinary HTTP parameters")
+	require.Equal(t, "@br_2", params.GetString("browser_ref"), "keep the selector when reviewing/editing ordinary HTTP parameters")
 
 	_, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"device_id": "spoofed"})
 	require.ErrorContains(t, err, "browser_ref is required")
@@ -36,13 +36,13 @@ func TestAttachedBrowserHTTPRequestRouting(t *testing.T) {
 	require.Empty(t, params)
 
 	invoker.bindings = nil
-	params, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"browser_ref": "B", "device_id": "spoofed"})
+	params, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"browser_ref": "br_2", "device_id": "spoofed"})
 	require.NoError(t, err)
 	require.NotContains(t, params, "device_id")
-	require.Equal(t, "B", params.GetString("browser_ref"))
+	require.Equal(t, "br_2", params.GetString("browser_ref"))
 
-	invoker.bindings = []AttachedBrowserBinding{{DeviceID: "device-a", Reference: "A"}}
-	_, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"browser_ref": "B"})
+	invoker.bindings = []AttachedBrowserBinding{{DeviceID: "device-a", Reference: "br_1"}}
+	_, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{"browser_ref": "br_2"})
 	require.ErrorContains(t, err, "does not match an attached browser")
 	params, err = BindAttachedBrowserToolParams(task, "do_http_request", aitool.InvokeParams{})
 	require.NoError(t, err)
@@ -52,14 +52,24 @@ func TestAttachedBrowserHTTPRequestRouting(t *testing.T) {
 func TestToolCallerBindsBrowserHTTPFlowIdentity(t *testing.T) {
 	ctx := context.Background()
 	resolver := func(deviceID, browserRef string) (httpctx.BrowserInstance, error) {
-		badge := map[string]string{"device-a": "A", "device-b": "B"}[deviceID]
-		require.NotEmpty(t, badge)
-		require.Equal(t, badge, strings.TrimPrefix(browserRef, "@"))
+		testCase := map[string]struct{ reference, badge string }{
+			"device-a": {reference: "br_1", badge: "A"},
+			"device-b": {reference: "br_2", badge: "B"},
+		}[deviceID]
+		require.NotEmpty(t, testCase.reference)
+		require.Equal(t, testCase.reference, strings.TrimPrefix(browserRef, "@"))
+		badge := testCase.badge
 		return httpctx.BrowserInstance{Manager: "ytray", InstanceID: deviceID, Badge: badge, ColorizeHTTPFlow: true}, nil
 	}
 	cfg := NewTestConfig(ctx, WithWorkdir(t.TempDir()), WithBrowserHTTPFlowIdentityResolver(resolver))
-	for _, badge := range []string{"A", "B"} {
-		t.Run(badge, func(t *testing.T) {
+	for _, testCase := range []struct {
+		reference string
+		badge     string
+	}{
+		{reference: "br_1", badge: "A"},
+		{reference: "br_2", badge: "B"},
+	} {
+		t.Run(testCase.reference, func(t *testing.T) {
 			invoked := false
 			tool, err := aitool.New("do_http_request",
 				aitool.WithDangerousNoNeedUserReview(true),
@@ -68,23 +78,23 @@ func TestToolCallerBindsBrowserHTTPFlowIdentity(t *testing.T) {
 					require.NoError(t, err)
 					identity, ok := httpctx.GetBrowserInstance(req)
 					require.True(t, ok)
-					require.Equal(t, badge, identity.Badge)
+					require.Equal(t, testCase.badge, identity.Badge)
 					require.True(t, identity.ColorizeHTTPFlow)
 					invoked = true
 					return "ok", nil
 				}),
 			)
 			require.NoError(t, err)
-			task := NewStatefulTaskBase("http-"+badge, "compare A and B", ctx, cfg.Emitter, true)
+			task := NewStatefulTaskBase("http-"+testCase.reference, "compare A and B", ctx, cfg.Emitter, true)
 			invoker := &browserAttachmentTestInvoker{bindings: []AttachedBrowserBinding{
-				{DeviceID: "device-a", Reference: "A"},
-				{DeviceID: "device-b", Reference: "B"},
+				{DeviceID: "device-a", Reference: "br_1"},
+				{DeviceID: "device-b", Reference: "br_2"},
 			}}
 			task.SetReActLoop(&attachedBrowserTestLoop{invoker: invoker})
 			caller, err := NewToolCaller(ctx, WithToolCaller_AICallerConfig(cfg), WithToolCaller_Task(task),
-				WithToolCaller_Emitter(cfg.Emitter), WithToolCaller_RuntimeId("http-"+badge))
+				WithToolCaller_Emitter(cfg.Emitter), WithToolCaller_RuntimeId("http-"+testCase.reference))
 			require.NoError(t, err)
-			result, _, err := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{"browser_ref": badge})
+			result, _, err := caller.CallToolWithExistedParams(tool, aitool.InvokeParams{"browser_ref": testCase.reference})
 			require.NoError(t, err)
 			require.True(t, result.Success)
 			require.True(t, invoked)
@@ -99,7 +109,7 @@ func TestToolCallerBindsBrowserHTTPFlowIdentity(t *testing.T) {
 
 func TestBrowserHTTPFlowContextRequiresBridgeForSelection(t *testing.T) {
 	cfg := NewTestConfig(context.Background(), WithWorkdir(t.TempDir()))
-	_, err := bindBrowserHTTPFlowContext(context.Background(), cfg, "do_http_request", aitool.InvokeParams{"browser_ref": "A"})
+	_, err := bindBrowserHTTPFlowContext(context.Background(), cfg, "do_http_request", aitool.InvokeParams{"browser_ref": "br_1"})
 	require.ErrorContains(t, err, "authenticated browser Bridge")
 	ctx, err := bindBrowserHTTPFlowContext(context.Background(), cfg, "do_http_request", nil)
 	require.NoError(t, err)
