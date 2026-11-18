@@ -190,12 +190,6 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.sourceFunction = function
 	name := functionName(function)
 	ssaFunction := c.program.NewFunction(name)
-	if ssaFunction != nil && name != "" {
-		// The converter bypasses the language builder, which is what normally
-		// registers a function name in the variable index. Register it here so
-		// a name search over ssadb finds the function.
-		c.program.RegisterInstructionName(name, ssaFunction)
-	}
 	metadata := ""
 	if function.Boundary != "" {
 		metadata = "boundary: " + string(function.Boundary)
@@ -972,7 +966,6 @@ func (c *converter) externFunction(name string) ssa.Value {
 	}
 	function := c.program.NewFunction(name)
 	function.SetExtern(true)
-	c.program.RegisterInstructionName(name, function)
 	c.functions[name] = function
 	return function
 }
