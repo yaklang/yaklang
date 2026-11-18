@@ -19,6 +19,7 @@ const (
 	JAVA    Language = "java"
 	GO      Language = "golang"
 	C       Language = "c"
+	CPP     Language = "cpp"
 	TS      Language = "ts"
 	PYTHON  Language = "python"
 	CSHARP  Language = "csharp"
@@ -44,6 +45,8 @@ func (l Language) GetFileExt() string {
 		return ".js"
 	case C:
 		return ".c"
+	case CPP:
+		return ".cpp"
 	case PHP:
 		return ".php"
 	case PYTHON:
@@ -73,6 +76,7 @@ func GetAllSupportedLanguages() []string {
 		string(JAVA),
 		string(GO),
 		string(C),
+		string(CPP),
 		string(TS),
 		string(PYTHON),
 		string(CSHARP),
@@ -100,6 +104,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return GO, nil
 	case "c", "clang":
 		return C, nil
+	case "cpp", "c++", "cplusplus", "cc", "cxx":
+		return CPP, nil
 	case "ts", "typescript":
 		return TS, nil
 	case "python", "py":

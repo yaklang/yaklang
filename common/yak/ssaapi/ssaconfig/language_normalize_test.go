@@ -38,6 +38,8 @@ func TestJSONConfigNormalizesNewLanguageAliases(t *testing.T) {
 		{alias: "rs", want: RUST},
 		{alias: "kT", want: KOTLIN},
 		{alias: "sc", want: SCALA},
+		{alias: "cpp", want: CPP},
+		{alias: "c++", want: CPP},
 	}
 	for _, tt := range tests {
 		t.Run(tt.alias, func(t *testing.T) {
