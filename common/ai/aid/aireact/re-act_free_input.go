@@ -210,11 +210,11 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 
 func (r *ReAct) enqueueReTaskWithID(event *ypb.AIInputEvent) (string, error) {
 	resources, control := normalizeInputAttachments(event)
-	r.ensureAttachedFileMonitors(resources)
 	task := r.buildReTaskFromEvent(event, resources, control)
 	if task == nil {
 		return "", fmt.Errorf("failed to build task from event")
 	}
+	r.pinInputFilePaths(task)
 	// 任务不相关，进入排队状态
 	task.SetFocusMode(event.GetFocusModeLoop())
 	task.SetStatus(aicommon.AITaskState_Queueing)
