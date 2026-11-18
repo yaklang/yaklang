@@ -15,18 +15,17 @@ func annotateSymbols(a *core.Artifact, ir *core.LowIR) {
 	if a == nil || a.Image == nil || len(a.Image.Symbols) == 0 || ir == nil {
 		return
 	}
-	definitions := make(map[core.ValueID]core.Instruction)
 	for functionIndex := range ir.Functions {
-		for blockIndex := range ir.Functions[functionIndex].Blocks {
-			for _, instruction := range ir.Functions[functionIndex].Blocks[blockIndex].Instructions {
+		function := &ir.Functions[functionIndex]
+		// Value IDs span blocks but start over in each decoded function.
+		definitions := make(map[core.ValueID]core.Instruction)
+		for _, block := range function.Blocks {
+			for _, instruction := range block.Instructions {
 				for _, result := range instruction.Results {
 					definitions[result.ID] = instruction
 				}
 			}
 		}
-	}
-	for functionIndex := range ir.Functions {
-		function := &ir.Functions[functionIndex]
 		if function.Name == "" {
 			if symbol, ok := a.Image.SymbolAt(function.Address); ok && symbol.Kind == sym.SymbolFunction {
 				function.Name = symbol.Name
