@@ -393,6 +393,44 @@ func TestCLILiftsSSAIRAndSourceJSON(t *testing.T) {
 	}
 }
 
+func TestCLIDecodesCString(t *testing.T) {
+	if _, err := exec.LookPath("gcc"); err != nil {
+		t.Skip("gcc is not installed")
+	}
+	directory := t.TempDir()
+	source := filepath.Join(directory, "string.c")
+	if err := os.WriteFile(source, []byte("const char greeting[] = \"reify-string\";\nint main(void) { return greeting[0]; }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	binary := filepath.Join(directory, "string")
+	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
+	if output, err := compile.CombinedOutput(); err != nil {
+		t.Skipf("cannot build fixture: %v\n%s", err, output)
+	}
+	code, out, errOut := runCLI("strings", "--at", "greeting", binary)
+	if code != 0 || errOut != "" {
+		t.Fatalf("strings: %d %s", code, errOut)
+	}
+	if !strings.Contains(out, `Value: "reify-string"`) || !strings.Contains(out, "nul-terminated") {
+		t.Fatalf("unexpected output:\n%s", out)
+	}
+	code, out, errOut = runCLI("strings", "--json", "--at", "greeting", binary)
+	if code != 0 || errOut != "" {
+		t.Fatalf("strings --json: %d %s", code, errOut)
+	}
+	var report struct {
+		Address uint64 `json:"address"`
+		Layout  string `json:"layout"`
+		Value   string `json:"value"`
+	}
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Value != "reify-string" || report.Layout != "nul-terminated" || report.Address == 0 {
+		t.Fatalf("report = %+v", report)
+	}
+}
+
 func TestCLILiftsControlFlowExample(t *testing.T) {
 	if _, err := exec.LookPath("gcc"); err != nil {
 		t.Skip("gcc is not installed")

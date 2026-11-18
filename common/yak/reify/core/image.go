@@ -76,13 +76,22 @@ func (i *Image) SectionAt(address uint64) (*Section, bool) {
 	if i == nil {
 		return nil, false
 	}
+	// A TLS .tbss can share virtual addresses with the sections that follow it;
+	// its bytes are not in the file. Prefer a section that can supply bytes.
+	var zeroFill *Section
 	for idx := range i.Sections {
 		section := &i.Sections[idx]
-		if address >= section.VirtualAddress && address-section.VirtualAddress < section.MemorySize {
+		if address < section.VirtualAddress || address-section.VirtualAddress >= section.MemorySize {
+			continue
+		}
+		if address-section.VirtualAddress < section.FileSize {
 			return section, true
 		}
+		if zeroFill == nil {
+			zeroFill = section
+		}
 	}
-	return nil, false
+	return zeroFill, zeroFill != nil
 }
 
 // RelocationAt returns the relocation that writes this address.

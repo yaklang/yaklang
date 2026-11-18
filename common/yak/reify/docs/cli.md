@@ -20,6 +20,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 | `parsers` | `--json` 可选 | 按 Architecture 注册的 parser 与解码器状态 |
 | `inspect` | `<file>`，`--json`、`--format` 可选 | Artifact、Target、Image、节和诊断 |
 | `check` | `<file>`，`--json`、`--format` 可选 | 头部检查、loader 和 parser 选择 |
+| `strings` | `<file>`，`--at` 必填，`--json`、`--format` 可选 | 按语言模型解码一个字符串 |
 | `lift` | `<file>`，`--mode`、`--json`、`--format` 可选 | 汇编、LowIR、YakSSA 或伪源码 |
 | `help` | 无 | 用法 |
 
@@ -64,6 +65,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 "$OUT/bin/reify" lift --mode source --func main /bin/true
 "$OUT/bin/reify" lift --mode all --func main /bin/true
 "$OUT/bin/reify" lift --json --mode lowir /bin/true
+"$OUT/bin/reify" strings --at 0x2590 /bin/true
 ```
 
 Go 与 Rust 产物（容器仍是 ELF/PE/Mach-O）：
@@ -73,6 +75,21 @@ Go 与 Rust 产物（容器仍是 ELF/PE/Mach-O）：
 "$OUT/bin/reify" lift --mode all --func main.Add "$RUN/go_hello_stripped"
 "$OUT/bin/reify" lift --mode all --func rust_hello::add "$RUN/rust_hello"
 "$OUT/bin/reify" lift --mode all --func _RNvCs4FrXkKnA8Dq_10rust_hello3add "$RUN/rust_hello"
+```
+
+`strings` 用检测到的语言模型解码一个值：
+
+- C（`nul-terminated`）：`--at` 是字节地址，读到 NUL 为止。
+- Go/Rust（`pointer-length`）：`--at` 是描述符地址，读指针与长度后再读字节。
+- `--at` 也接受符号名。Go 允许非法 UTF-8，Rust 模型会拒绝。
+
+```text
+Scope: one string
+Input: "fixture"
+Language: c (none)
+Strings: nul-terminated (bytes, nul-terminated)
+Address: 0x404028
+Value: "reify-string"
 ```
 
 `inspect` 始终打印 `Language` 行。语言提供覆盖时还会输出 `ABI` 与 `Strings` 行；没有语言覆盖的产物不打印这两行，仍按平台约定处理。剥离符号的 Go 产物会显示 `Evidence [pclntab]`，Rust 产物会显示 demangle 后的函数名。样例构建命令见 [test/examples/README.md](../test/examples/README.md)。

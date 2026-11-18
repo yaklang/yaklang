@@ -39,7 +39,7 @@ func TestCDefaultAndMalformedMetadata(t *testing.T) {
 			if report.ABI != nil {
 				t.Fatalf("C default must not add an ABI: %+v", report.ABI)
 			}
-			if report.Strings == nil || report.Strings.Kind != core.StringC || !report.Strings.NulTerminated {
+			if report.Strings == nil || report.Strings.Layout != core.StringLayoutNulTerminated || report.Strings.Encoding != core.StringEncodingBytes {
 				t.Fatalf("C string model = %+v", report.Strings)
 			}
 			if len(a.Image.Symbols) != 0 {

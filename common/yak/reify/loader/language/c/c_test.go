@@ -18,8 +18,12 @@ func TestDefaultLayer(t *testing.T) {
 	if report.ABI != nil {
 		t.Fatalf("default layer must not override the platform ABI: %+v", report.ABI)
 	}
-	if report.Strings == nil || report.Strings.Kind != core.StringC || !report.Strings.NulTerminated || report.Strings.Header != "pointer" {
-		t.Fatalf("string model = %+v", report.Strings)
+	model := (C{}).Strings()
+	if model.Layout != core.StringLayoutNulTerminated || model.Encoding != core.StringEncodingBytes || model.ValidateUTF8 {
+		t.Fatalf("string model = %+v", model)
+	}
+	if report.Strings != nil {
+		t.Fatalf("Detect must leave the model to Inspect: %+v", report.Strings)
 	}
 	if len(report.Notes) != 0 {
 		t.Fatalf("default layer must not add limitation notes: %v", report.Notes)

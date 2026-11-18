@@ -31,7 +31,8 @@ func TestVersionAndABI(t *testing.T) {
 	if goABI(core.Target{Architecture: core.Arch386}) != nil {
 		t.Fatal("unimplemented ABI was guessed")
 	}
-	if model := goStrings(); model.Kind != core.StringGo || model.NulTerminated || model.Header != "pointer+length" {
+	if model := (Golang{}).Strings(); model.Layout != core.StringLayoutPointerLength ||
+		model.Encoding != core.StringEncodingUTF8 || model.ValidateUTF8 {
 		t.Fatalf("string model = %+v", model)
 	}
 }

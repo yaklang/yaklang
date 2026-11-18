@@ -51,31 +51,6 @@ type ABI struct {
 	NoCalleeSave bool `json:"no_callee_save,omitempty"`
 }
 
-// String representation kinds. A string is not a byte array with C rules: Go
-// and Rust pass a descriptor, and only C promises a NUL terminator.
-const (
-	StringUnknown = "unknown"
-	StringC       = "c"
-	StringGo      = "go"
-	StringRust    = "rust"
-)
-
-// StringModel records how a language represents a string value. The language
-// layer reports the model; reconstructing a concrete value still requires
-// data-flow analysis, which this layer does not perform.
-type StringModel struct {
-	Kind string `json:"kind"`
-	// Encoding is the byte encoding the language library expects, for example
-	// "utf-8" or "bytes".
-	Encoding string `json:"encoding,omitempty"`
-	// Header is the value layout, for example "pointer+length" or
-	// "pointer" for a NUL-terminated C string.
-	Header string `json:"header,omitempty"`
-	// NulTerminated reports whether the bytes are terminated. Go and Rust
-	// strings are not; a C string is.
-	NulTerminated bool `json:"nul_terminated"`
-}
-
 // LanguageReport is the language layer's result for one artifact. It records
 // what was found, what overrides the platform defaults, and what could not be
 // recovered. A nil value means the language layer did not run, which happens for
@@ -92,9 +67,9 @@ type LanguageReport struct {
 	// platform-convention functions such as Go .abi0 wrappers. A nil value means
 	// every function keeps the platform convention.
 	ABI *ABI `json:"abi,omitempty"`
-	// Strings is the string representation of the language. It never rewrites
-	// C string handling; it tells a consumer which layout applies.
-	Strings *StringModel `json:"strings,omitempty"`
+	// Strings is the string representation the language registered. Decoding a
+	// value uses Strings.Decode; no consumer switches on the language name.
+	Strings *Strings `json:"strings,omitempty"`
 	// Notes lists what the layer could not recover. A consumer must not read a
 	// missing capability as a working one.
 	Notes []string `json:"notes,omitempty"`

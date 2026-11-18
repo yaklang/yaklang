@@ -29,9 +29,9 @@ func TestDetectAndRecover(t *testing.T) {
 	if report == nil || report.Language != core.LanguageRust || report.Confidence != core.ConfidenceCertain {
 		t.Fatalf("report = %+v", report)
 	}
-	if report.Strings == nil || report.Strings.Kind != core.StringRust ||
-		report.Strings.NulTerminated || report.Strings.Header != "pointer+length" {
-		t.Fatalf("string model = %+v", report.Strings)
+	model := (Rust{}).Strings()
+	if model.Layout != core.StringLayoutPointerLength || model.Encoding != core.StringEncodingUTF8 || !model.ValidateUTF8 {
+		t.Fatalf("string model = %+v", model)
 	}
 	recovered, err := (Rust{}).Recover(a)
 	if err != nil || len(recovered) != 1 {

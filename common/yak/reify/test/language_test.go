@@ -50,6 +50,55 @@ func compileLanguageExample(t *testing.T, tool string, args, environment []strin
 	}
 }
 
+func TestStringModelsDecodeRealDescriptors(t *testing.T) {
+	ctx := context.Background()
+	directory := languageOutputDir(t)
+
+	goBinary := filepath.Join(directory, "go_string")
+	compileLanguageExample(t, "go", []string{"build", "-o", goBinary, "examples/go_hello.go"}, []string{"CGO_ENABLED=0"})
+	goArtifact, _, err := reify.Inspect(ctx, goBinary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer goArtifact.Close()
+	greeting, ok := goArtifact.Image.SymbolByName("main.Greeting")
+	if !ok || greeting.Address == 0 {
+		t.Fatalf("Go string header symbol = %+v, %v", greeting, ok)
+	}
+	if goArtifact.Language == nil || goArtifact.Language.Strings == nil || goArtifact.Language.Strings.Layout != core.StringLayoutPointerLength {
+		t.Fatalf("Go string model = %+v", goArtifact.Language)
+	}
+	value, err := goArtifact.Language.Strings.Decode(goArtifact, greeting.Address)
+	if err != nil || value != "hello from reify" {
+		t.Fatalf("Go string = %q, %v", value, err)
+	}
+
+	// Static (non-PIE) linking writes the descriptor pointer into the file. A
+	// PIE keeps it in a relocation, which this decoder does not apply.
+	rustBinary := filepath.Join(directory, "rust_string")
+	compileLanguageExample(t, "rustc", []string{
+		"--edition=2021", "-C", "opt-level=0", "-C", "overflow-checks=off", "-C", "symbol-mangling-version=v0",
+		"-C", "relocation-model=static", "-C", "link-arg=-no-pie", "-o", rustBinary, "examples/rust_hello.rs",
+	}, nil)
+	rustArtifact, _, err := reify.Inspect(ctx, rustBinary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rustArtifact.Close()
+	greeting, ok = rustArtifact.Image.SymbolByName("GREETING")
+	if !ok || greeting.Address == 0 {
+		t.Fatalf("Rust string descriptor symbol = %+v, %v", greeting, ok)
+	}
+	if rustArtifact.Language == nil || rustArtifact.Language.Strings == nil || !rustArtifact.Language.Strings.ValidateUTF8 {
+		t.Fatalf("Rust string model = %+v", rustArtifact.Language)
+	}
+	value, err = rustArtifact.Language.Strings.Decode(rustArtifact, greeting.Address)
+	if err != nil || value != "hello from reify" {
+		t.Fatalf("Rust string = %q, %v", value, err)
+	}
+	t.Logf("Go and Rust descriptors decoded: %q", value)
+}
+
 func TestGoBinariesIdentifyRecoverAndLift(t *testing.T) {
 	for _, tc := range []struct {
 		os, arch string

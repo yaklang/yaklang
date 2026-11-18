@@ -46,7 +46,16 @@ rustc --edition=2021 -C opt-level=0 -C overflow-checks=off \
 reify inspect "$RUN/rust_hello"
 reify lift --mode all --func rust_hello::add "$RUN/rust_hello"
 reify lift --mode all --func rust_hello::add _RNvCs4FrXkKnA8Dq_10rust_hello3add  # same body by encoded name
+
+# GREETING is a static &str descriptor (pointer + length).
+rustc --edition=2021 -C opt-level=0 -C overflow-checks=off \
+  -C symbol-mangling-version=v0 -C relocation-model=static -C link-arg=-no-pie \
+  -o "$RUN/rust_string" rust_hello.rs
+reify strings --at GREETING "$RUN/rust_string"
 ```
+
+A PIE keeps the descriptor pointer in a relocation. `reify strings` reads the
+file as-is and reports `relocations are not applied`; link non-PIE to decode it.
 
 Rust names live in the symbol table. `-C strip=symbols` removes them and this
 layer cannot recover Rust function names from a stripped Rust image.
