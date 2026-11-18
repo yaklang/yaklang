@@ -2,8 +2,6 @@ package ssa
 
 import (
 	"fmt"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // SaveToDatabase persists a program that was built on a DB-backed cache.
@@ -38,31 +36,27 @@ func (p *Program) SaveToDatabase() error {
 	// SSA passes mutate exported instruction fields directly (for example
 	// call.Args). Republish the live instructions so the final flush writes the
 	// post-pass state instead of the construction-time snapshot.
-	p.MarkAllInstructionsDirty()
+	p.markAllInstructionsDirty()
 	return p.Cache.SaveToDatabase()
 }
 
-// RegisterInstructionName publishes name in the program's variable index and
-// name pool without changing the instruction's verbose name. A producer that
-// creates functions directly, instead of through a language builder, needs it
-// so a syntaxflow name search can find those function values.
-func (p *Program) RegisterInstructionName(name string, instruction Instruction) {
-	if p == nil || p.Cache == nil || name == "" || utils.IsNil(instruction) {
-		return
-	}
-	p.Cache.AddVariable(name, instruction)
-}
-
-// MarkAllInstructionsDirty republishes every live instruction of a program.
-// It is the exported form of the persistence hook that instruction setters use
-// after a direct field mutation.
-func (p *Program) MarkAllInstructionsDirty() {
+// markAllInstructionsDirty republishes every live instruction and registers
+// the recovered function names before the final flush.
+//
+// A producer that creates functions without a language builder leaves no entry
+// in the variable index, so a syntaxflow name search cannot find them. The
+// index is only useful when the program is persisted, which is why the
+// registration lives on this save path instead of in the converter.
+func (p *Program) markAllInstructionsDirty() {
 	if p == nil || p.Cache == nil || p.Funcs == nil {
 		return
 	}
 	p.Funcs.ForEach(func(_ string, function *Function) bool {
 		if function == nil {
 			return true
+		}
+		if name := function.GetName(); name != "" {
+			p.Cache.AddVariable(name, function)
 		}
 		for _, blockID := range function.Blocks {
 			block, ok := function.GetBasicBlockByID(blockID)
