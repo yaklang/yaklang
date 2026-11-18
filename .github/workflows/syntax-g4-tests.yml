@@ -43,7 +43,8 @@ name: Syntax G4 Tests
 #
 # Adding a language: give its driver the `syntax_<language>_test.go` name, keep
 # its fixtures in `code/` or `syntax/`, and add its package to the job matrix.
-# No change to the trigger is needed.
+# No change to the trigger is needed; a non-antlr frontend (bash) registers its
+# package the same way.
 # ---------------------------------------------------------------------------
 
 on:
