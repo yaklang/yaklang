@@ -19,6 +19,9 @@ type indexDialect interface {
 	DeleteDuplicatesSQL(spec indexSpec) string
 	// SupportsPartialIndex reports whether spec.partial can be expressed.
 	SupportsPartialIndex() bool
+	// SupportsIndexPruning reports whether the legacy redundant IR indexes can
+	// be dropped on this backend.
+	SupportsIndexPruning() bool
 }
 
 // indexSetInstaller is implemented by a backend that owns the whole index set
@@ -60,6 +63,8 @@ func (ansiIndexDialect) DeleteDuplicatesSQL(spec indexSpec) string {
 
 func (ansiIndexDialect) SupportsPartialIndex() bool { return true }
 
+func (ansiIndexDialect) SupportsIndexPruning() bool { return true }
+
 // mysqlIndexDialect uses backtick identifiers. A functional key part needs its
 // own parentheses and only exists from MySQL 8.0.13; a server without it makes
 // the adapter refuse expression keys instead of emitting a rejected statement on
@@ -82,6 +87,10 @@ func (mysqlIndexDialect) DeleteDuplicatesSQL(spec indexSpec) string {
 
 func (mysqlIndexDialect) SupportsPartialIndex() bool { return false }
 
+// SupportsIndexPruning stays false until a MySQL-specific drop path exists;
+// the legacy indexes are harmless there, only unused.
+func (mysqlIndexDialect) SupportsIndexPruning() bool { return false }
+
 // dmIndexDialect hands the whole set to installDMIRIndexes, which reads
 // ALL_INDEXES and refuses duplicate rows. The rendering methods still produce
 // DM-compatible SQL, so an accidental per-spec call does not emit garbage.
@@ -90,6 +99,8 @@ type dmIndexDialect struct {
 }
 
 func (dmIndexDialect) SupportsPartialIndex() bool { return false }
+
+func (dmIndexDialect) SupportsIndexPruning() bool { return false }
 
 func (dmIndexDialect) InstallIndexSet(db *gorm.DB) {
 	if err := installDMIRIndexes(db); err != nil {

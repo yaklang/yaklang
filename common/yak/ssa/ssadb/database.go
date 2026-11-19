@@ -338,11 +338,7 @@ var redundantIRIndexes = []struct{ table, index string }{
 }
 
 func pruneRedundantIRIndexes(db *gorm.DB) {
-	if db == nil || db.Dialect() == nil {
-		return
-	}
-	dialect := db.Dialect().GetName()
-	if dialect != "sqlite3" && dialect != "sqlite" && dialect != "postgres" && dialect != "postgresql" {
+	if db == nil || db.Dialect() == nil || !indexDialectFor(db).SupportsIndexPruning() {
 		return
 	}
 	dropped := 0

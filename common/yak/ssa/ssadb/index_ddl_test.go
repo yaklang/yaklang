@@ -123,10 +123,14 @@ func TestDeleteDuplicatesSQLIsPortable(t *testing.T) {
 	require.NotContains(t, mysqlSQL, "(COALESCE(variable_name, ''))")
 }
 
-func TestDialectPartialIndexSupport(t *testing.T) {
+func TestDialectCapabilities(t *testing.T) {
 	require.True(t, ansiIndexDialect{}.SupportsPartialIndex())
 	require.False(t, mysqlAdapter(true).SupportsPartialIndex())
 	require.False(t, dmIndexDialect{}.SupportsPartialIndex())
+
+	require.True(t, ansiIndexDialect{}.SupportsIndexPruning())
+	require.False(t, mysqlAdapter(true).SupportsIndexPruning())
+	require.False(t, dmIndexDialect{}.SupportsIndexPruning())
 }
 
 func TestIndexDialectForSQLiteUsesAnsiAdapter(t *testing.T) {
