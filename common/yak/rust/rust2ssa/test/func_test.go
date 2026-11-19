@@ -82,3 +82,14 @@ fn main() {
 `, "main")
 	})
 }
+
+func TestRustCallSiteOperand(t *testing.T) {
+	checkPrintlnValueRegexp(t, `
+fn identity(a: i32) -> i32 {
+    a
+}
+fn main() {
+    println(identity(7));
+}
+`, `identity\(7\)`)
+}
