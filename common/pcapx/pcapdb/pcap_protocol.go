@@ -33,6 +33,9 @@ type protocolBatch struct {
 }
 
 func newProtocolBatch(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) *protocolBatch {
+	if config.timing == nil {
+		config.timing = &importTiming{}
+	}
 	capacity := min(config.batchSize, maxPreallocatedBatchSize)
 	return &protocolBatch{
 		ctx: ctx, db: db, meta: meta, config: config, sessions: newSessionIndexer(meta), hasher: sha256.New(),
@@ -113,9 +116,12 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 }
 
 func (b *protocolBatch) flush(ctx context.Context, tx *gorm.DB) error {
+	sessionStart := b.config.timing.begin()
 	if err := b.sessions.flush(ctx, tx); err != nil {
 		return err
 	}
+	b.config.timing.add(&b.config.timing.sessionInsert, sessionStart)
+	messageStart := b.config.timing.begin()
 	if err := tx.CreateInBatches(&b.messages).Error; err != nil {
 		return err
 	}
@@ -126,7 +132,11 @@ func (b *protocolBatch) flush(ctx context.Context, tx *gorm.DB) error {
 			return err
 		}
 	}
-	return tx.CreateInBatches(&b.references).Error
+	b.config.timing.add(&b.config.timing.messageInsert, messageStart)
+	referenceStart := b.config.timing.begin()
+	err := tx.CreateInBatches(&b.references).Error
+	b.config.timing.add(&b.config.timing.referenceInsert, referenceStart)
+	return err
 }
 
 func (b *protocolBatch) clear() {
