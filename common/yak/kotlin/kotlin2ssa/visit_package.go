@@ -69,6 +69,9 @@ func (b *singleFileBuilder) visitFunctionDeclaration(raw kotlinparser.IFunctionD
 	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
+	for name, value := range b.classFields {
+		b.AssignVariable(b.CreateVariable(name), value)
+	}
 	if params := fnCtx.FunctionValueParameters(); params != nil {
 		b.addFunctionValueParameters(params)
 	}
@@ -133,6 +136,9 @@ func (b *singleFileBuilder) visitPropertyDeclaration(raw kotlinparser.IPropertyD
 			name := v.SimpleIdentifier().GetText()
 			b.AssignVariable(b.CreateVariable(name), value)
 			b.GetProgram().SetExportValue(name, value)
+			if b.classFields != nil {
+				b.classFields[name] = value
+			}
 		}
 		return
 	}
@@ -172,6 +178,9 @@ func (b *singleFileBuilder) visitClassBody(raw kotlinparser.IClassBodyContext) {
 	if !ok || members == nil {
 		return
 	}
+	previousFields := b.classFields
+	b.classFields = make(map[string]ssa.Value)
+	defer func() { b.classFields = previousFields }()
 	for _, rawMember := range members.AllClassMemberDeclaration() {
 		member, ok := rawMember.(*kotlinparser.ClassMemberDeclarationContext)
 		if !ok || member == nil || member.Declaration() == nil {
