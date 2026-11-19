@@ -35,6 +35,7 @@ type importConfig struct {
 	tlsSecrets        pcaputil.TLSSecretProvider
 	tlsKeyLogSHA256   string
 	deferQueryIndexes bool
+	timing            *importTiming
 }
 type ImportOption func(*importConfig) error
 
@@ -157,6 +158,9 @@ func (m *InstanceManager) GetOrCreate(filename string, options ...ImportOption) 
 	if config.tlsSecrets != nil && !config.protocols {
 		return nil, fmt.Errorf("pcapdb: TLS key log requires withProtocols(true)")
 	}
+	config.timing = newImportTiming()
+	defer config.timing.report()
+	setupStart := config.timing.begin()
 	ctx, cancel := m.operationContext(config.ctx)
 	defer cancel()
 	config.ctx, config.cancel = ctx, cancel
@@ -261,6 +265,7 @@ func (m *InstanceManager) GetOrCreate(filename string, options ...ImportOption) 
 		os.RemoveAll(directory)
 		return nil, err
 	}
+	config.timing.add(&config.timing.setup, setupStart)
 	return m.buildDatasetLocked(source, info, fingerprint, path, meta, config)
 }
 
@@ -428,6 +433,7 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 		return m.useExisting(source, info, fp, path, existing, config)
 	}
 	meta.FullSHA256 = digest
+	indexStart := config.timing.begin()
 	if err = ensureProtocolFieldIndexes(config.ctx, writer, config.fieldIndexes); err != nil {
 		return nil, err
 	}
@@ -436,6 +442,8 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 			return nil, err
 		}
 	}
+	config.timing.add(&config.timing.finalIndexes, indexStart)
+	finalizeStart := config.timing.begin()
 	if err = m.transition(config.ctx, writer, meta, StateReady); err != nil {
 		return nil, err
 	}
@@ -446,6 +454,7 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 	if err = checkpointIndex(config.ctx, writer); err != nil {
 		return nil, err
 	}
+	config.timing.add(&config.timing.finalize, finalizeStart)
 	return m.openReady(meta, config.leased)
 }
 
@@ -489,11 +498,14 @@ func newOfflinePacketAnalyzer(ctx context.Context, options []pcaputil.CaptureOpt
 // ingestCapture reads the source once. Physical packets and protocol analysis
 // consume the same bounded record, and their pending rows share one transaction.
 func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *os.File, meta *PCAPFileDBMetadata, config *importConfig) (_ string, resultErr error) {
+	ingestStart := config.timing.begin()
+	defer config.timing.add(&config.timing.ingest, ingestStart)
 	reader, err := newPacketReader(file)
 	if err != nil {
 		return "", err
 	}
 	meta.Format = reader.format
+	resetStart := config.timing.begin()
 	reset := db.BeginTx(ctx, nil)
 	if reset.Error != nil {
 		return "", reset.Error
@@ -517,6 +529,7 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 	if err := reset.Commit().Error; err != nil {
 		return "", err
 	}
+	config.timing.add(&config.timing.setup, resetStart)
 
 	packets := make([]Packet, 0, min(config.batchSize, maxPreallocatedBatchSize))
 	records := make([]PCAPCaptureRecord, 0, min(config.batchSize, maxPreallocatedBatchSize))
@@ -549,17 +562,33 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 	var batchBytes int
 	// flushLocked requires analysis.mu.
 	flushLocked := func(final bool) error {
+		if config.timing.enabled {
+			config.timing.flushCount.Add(1)
+		}
+		flushStart := config.timing.begin()
+		defer config.timing.add(&config.timing.dbFlush, flushStart)
 		tx := db.BeginTx(ctx, nil)
 		if tx.Error != nil {
 			return tx.Error
 		}
 		defer tx.Rollback()
 		scoped := indexWithContext(ctx, tx)
-		for _, rows := range []interface{}{&interfaces, &packets, &records} {
-			if err := scoped.CreateInBatches(rows).Error; err != nil {
-				return err
-			}
+		packetInsertStart := config.timing.begin()
+		if err := scoped.CreateInBatches(&interfaces).Error; err != nil {
+			return err
 		}
+		config.timing.add(&config.timing.interfaceInsert, packetInsertStart)
+		packetRowStart := config.timing.begin()
+		if err := scoped.CreateInBatches(&packets).Error; err != nil {
+			return err
+		}
+		config.timing.add(&config.timing.packetRowInsert, packetRowStart)
+		captureRecordStart := config.timing.begin()
+		if err := scoped.CreateInBatches(&records).Error; err != nil {
+			return err
+		}
+		config.timing.add(&config.timing.captureRecordInsert, captureRecordStart)
+		config.timing.add(&config.timing.packetInsert, packetInsertStart)
 		if err := analysis.flush(ctx, scoped); err != nil {
 			return err
 		}
@@ -577,16 +606,22 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 			}
 		}
 		meta.UpdatedAt = time.Now().UTC()
+		manifestStart := config.timing.begin()
 		if err := writeManifest(ctx, scoped, meta); err != nil {
 			return err
 		}
+		config.timing.add(&config.timing.manifestWrite, manifestStart)
+		commitStart := config.timing.begin()
 		if err := tx.Commit().Error; err != nil {
 			return err
 		}
+		config.timing.add(&config.timing.transaction, commitStart)
 		if final || time.Since(lastCatalog) >= 250*time.Millisecond {
+			catalogStart := config.timing.begin()
 			if err := m.saveCatalog(meta); err != nil {
 				return err
 			}
+			config.timing.add(&config.timing.catalog, catalogStart)
 			lastCatalog = time.Now()
 		}
 		config.notify(meta)
@@ -656,8 +691,12 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 		}
 		if config.protocols {
 			options = append(options, pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {
+				callbackStart := config.timing.begin()
 				consume(func() error {
-					if err := analysis.appendEvent(event); err != nil {
+					assembleStart := config.timing.begin()
+					err := analysis.appendEvent(event)
+					config.timing.add(&config.timing.protocolAssemble, assembleStart)
+					if err != nil {
 						return err
 					}
 					if analysis.full() {
@@ -665,6 +704,7 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 					}
 					return nil
 				})
+				config.timing.add(&config.timing.protocolCallback, callbackStart)
 			}))
 		}
 		if config.streams {
@@ -693,7 +733,9 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 		if err = ctx.Err(); err != nil {
 			return "", err
 		}
+		readStart := config.timing.begin()
 		raw, ci, location, readErr := reader.next()
+		config.timing.add(&config.timing.captureRead, readStart)
 		analysis.mu.Lock()
 		for _, iface := range reader.takeInterfaces() {
 			key := [2]int64{iface.section, int64(iface.id)}
@@ -730,7 +772,9 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 		// The PCAPNG reader reuses its packet buffer. Own the bytes before the
 		// next read, including a zero-length packet's non-NULL empty BLOB.
 		data := append(make([]byte, 0, len(raw)), raw...)
+		metadataStart := config.timing.begin()
 		packet := packetMetadata(data, reader.link)
+		config.timing.add(&config.timing.packetMetadata, metadataStart)
 		meta.PacketCount++
 		packet.ID = uint(meta.PacketCount)
 		packet.CaptureInterfaceID = interfaceIDs[[2]int64{location.section, int64(location.iface)}]
@@ -758,7 +802,10 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 				Number: uint64(packet.ID),
 				Domain: pcaputil.CaptureDomain{Section: uint32(location.section), Interface: location.iface},
 			}
-			if err = analyzer.FeedWithReference(data, ci, reader.link, ref); err != nil {
+			feedStart := config.timing.begin()
+			err = analyzer.FeedWithReference(data, ci, reader.link, ref)
+			config.timing.add(&config.timing.analyzerFeed, feedStart)
+			if err != nil {
 				analysis.mu.Lock()
 				if analysis.err == nil {
 					analysis.err = err
@@ -778,7 +825,9 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 		}
 	}
 	if analyzer != nil {
+		closeStart := config.timing.begin()
 		closeErr := analyzer.Close()
+		config.timing.add(&config.timing.analysisClose, closeStart)
 		analysisClosed = true
 		if closeErr != nil {
 			return "", closeErr
