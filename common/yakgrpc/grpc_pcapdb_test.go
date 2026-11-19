@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 func newPCAPTestClient(t *testing.T) (*Server, *Client) {
@@ -225,136 +224,6 @@ func TestPCAPGRPCQueryDatabaseRejectsUnsupportedParameters(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
 }
 
-func TestPCAPGRPCQueryPacketFullAndPagination(t *testing.T) {
-	_, client := newPCAPTestClient(t)
-	path, _, raw := pcapTestCapture(t, 5)
-	events := importPCAPForTest(t, client, path)
-	id := events[len(events)-1].GetDatasetID()
-	ctx := context.Background()
-	for _, full := range []bool{false, true} {
-		var after int64
-		var all []*ypb.PCAPPacket
-		for {
-			page, err := client.QueryPCAPPacket(ctx, &ypb.QueryPCAPPacketRequest{
-				DatasetID: id, Full: full, Pagination: &ypb.Paging{Limit: 2, AfterId: after},
-			})
-			require.NoError(t, err)
-			require.NotNil(t, page.Total)
-			require.EqualValues(t, 5, page.GetTotal())
-			all = append(all, page.GetData()...)
-			if !page.GetHasMore() {
-				break
-			}
-			require.Greater(t, page.GetNextCursor(), after)
-			after = page.GetNextCursor()
-		}
-		require.Len(t, all, 5)
-		for i, packet := range all {
-			require.EqualValues(t, i+1, packet.GetId())
-			require.NotNil(t, packet.TimestampNS)
-			require.EqualValues(t, 1700000000123456789+int64(i)*int64(time.Second), packet.GetTimestampNS())
-			require.EqualValues(t, len(raw[i]), packet.GetCapturedLength())
-			require.Equal(t, "udp", packet.GetTransport())
-			if full {
-				require.Equal(t, raw[i], packet.GetRaw())
-			} else {
-				require.Empty(t, packet.GetRaw())
-			}
-		}
-	}
-	// ID + Full uses the same response/model, and Full is also valid for lists.
-	detail, err := client.QueryPCAPPacket(ctx, &ypb.QueryPCAPPacketRequest{
-		DatasetID: id, Filter: &ypb.PCAPPacketFilter{Id: 3}, Full: true,
-	})
-	require.NoError(t, err)
-	require.Len(t, detail.GetData(), 1)
-	require.Equal(t, raw[2], detail.GetData()[0].GetRaw())
-	require.EqualValues(t, 1, detail.GetTotal())
-	require.False(t, detail.GetHasMore())
-	past, err := client.QueryPCAPPacket(ctx, &ypb.QueryPCAPPacketRequest{
-		DatasetID: id, Filter: &ypb.PCAPPacketFilter{Id: 3}, Pagination: &ypb.Paging{AfterId: 3}, Full: true,
-	})
-	require.NoError(t, err)
-	require.Empty(t, past.GetData())
-	require.False(t, past.GetHasMore())
-}
-
-func TestPCAPGRPCQueryPacketFilters(t *testing.T) {
-	_, client := newPCAPTestClient(t)
-	path, _, _ := pcapTestCapture(t, 4)
-	events := importPCAPForTest(t, client, path)
-	id := events[len(events)-1].GetDatasetID()
-	ctx := context.Background()
-	for _, full := range []bool{false, true} {
-		for _, tc := range []struct {
-			filter *ypb.PCAPPacketFilter
-			ids    []int64
-		}{
-			{&ypb.PCAPPacketFilter{SourcePort: proto.Int32(0)}, []int64{1}},
-			{&ypb.PCAPPacketFilter{SourceIP: "10.0.0.2", DestinationPort: proto.Int32(53), Transport: "UDP"}, []int64{2}},
-			{&ypb.PCAPPacketFilter{TimeRange: &ypb.PCAPPacketTimeRange{StartNS: 1700000001123456789, EndNS: 1700000003123456789}}, []int64{2, 3}},
-			{&ypb.PCAPPacketFilter{Id: 2, SourceIP: "10.0.0.3"}, nil},
-			{&ypb.PCAPPacketFilter{Id: 999}, nil},
-			{&ypb.PCAPPacketFilter{Transport: "tcp"}, nil},
-		} {
-			page, err := client.QueryPCAPPacket(ctx, &ypb.QueryPCAPPacketRequest{DatasetID: id, Filter: tc.filter, Full: full})
-			require.NoError(t, err)
-			var got []int64
-			for _, packet := range page.GetData() {
-				got = append(got, packet.GetId())
-			}
-			require.Equal(t, tc.ids, got)
-			if tc.filter.GetId() == 0 {
-				require.Nil(t, page.Total, "a filtered query must not claim the dataset's total")
-			}
-		}
-	}
-	otherPath, _, _ := pcapTestCapture(t, 1)
-	other := importPCAPForTest(t, client, otherPath)
-	page, err := client.QueryPCAPPacket(ctx, &ypb.QueryPCAPPacketRequest{
-		DatasetID: other[len(other)-1].GetDatasetID(), Filter: &ypb.PCAPPacketFilter{Id: 2}, Full: true,
-	})
-	require.NoError(t, err)
-	require.Empty(t, page.GetData(), "packet IDs belong to their dataset")
-}
-
-func TestPCAPGRPCQueryPacketErrors(t *testing.T) {
-	_, client := newPCAPTestClient(t)
-	id := uuid.NewString()
-	for _, filter := range []*ypb.PCAPPacketFilter{
-		{Id: -1}, {SourcePort: proto.Int32(-1)}, {DestinationPort: proto.Int32(65536)},
-		{SourceIP: "10.0.0.0/24"}, {DestinationIP: "invalid"},
-		{TimeRange: &ypb.PCAPPacketTimeRange{StartNS: 2, EndNS: 1}},
-	} {
-		_, err := client.QueryPCAPPacket(context.Background(), &ypb.QueryPCAPPacketRequest{DatasetID: id, Filter: filter})
-		require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
-	}
-	_, err := client.QueryPCAPPacket(context.Background(), &ypb.QueryPCAPPacketRequest{DatasetID: id})
-	require.Equal(t, codes.NotFound, grpcstatus.Code(err))
-	_, err = client.QueryPCAPPacket(context.Background(), &ypb.QueryPCAPPacketRequest{})
-	require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
-}
-
-func TestPCAPGRPCQueryPacketMaximumPage(t *testing.T) {
-	_, client := newPCAPTestClient(t)
-	path, _, _ := pcapTestCapture(t, 1001)
-	events := importPCAPForTest(t, client, path)
-	id := events[len(events)-1].GetDatasetID()
-	first, err := client.QueryPCAPPacket(context.Background(), &ypb.QueryPCAPPacketRequest{
-		DatasetID: id, Pagination: &ypb.Paging{Limit: 1000},
-	})
-	require.NoError(t, err)
-	require.Len(t, first.GetData(), 1000)
-	require.True(t, first.GetHasMore())
-	last, err := client.QueryPCAPPacket(context.Background(), &ypb.QueryPCAPPacketRequest{
-		DatasetID: id, Pagination: &ypb.Paging{Limit: 1000, AfterId: first.GetNextCursor()},
-	})
-	require.NoError(t, err)
-	require.Len(t, last.GetData(), 1)
-	require.EqualValues(t, 1001, last.GetData()[0].GetId())
-	require.False(t, last.GetHasMore())
-}
-
 func TestPCAPGRPCExport(t *testing.T) {
 	_, client := newPCAPTestClient(t)
 	input, capture, packets := pcapTestCapture(t, 3)
@@ -468,7 +337,7 @@ func TestPCAPGRPCDelete(t *testing.T) {
 	listed, err := client.QueryPCAPDatabase(ctx, &ypb.QueryPCAPDatabaseRequest{})
 	require.NoError(t, err)
 	require.Zero(t, listed.GetTotal())
-	_, err = client.QueryPCAPPacket(ctx, &ypb.QueryPCAPPacketRequest{DatasetID: id})
+	_, err = client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{DatasetID: id})
 	require.Equal(t, codes.NotFound, grpcstatus.Code(err))
 	repeated, err := client.DeletePCAPDatabase(ctx, &ypb.DeletePCAPDatabaseRequest{DatasetID: id})
 	require.NoError(t, err)

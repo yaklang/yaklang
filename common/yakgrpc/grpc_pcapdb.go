@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"errors"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 // Normal servers share the existing Yak library manager. Explicit profile
@@ -116,6 +114,9 @@ func pcapPagination(p *ypb.Paging) (*ypb.Paging, error) {
 	return &ypb.Paging{Page: 1, Limit: limit, AfterId: p.GetAfterId(), OrderBy: "id", Order: "asc"}, nil
 }
 
+// Full responses remain bounded while each delivered packet stays complete.
+const pcapPacketResponseBytes = 32 << 20
+
 func (s *Server) QueryPCAPDatabase(ctx context.Context, req *ypb.QueryPCAPDatabaseRequest) (*ypb.QueryPCAPDatabaseResponse, error) {
 	paging, err := pcapPagination(req.GetPagination())
 	if err != nil {
@@ -165,157 +166,6 @@ func (s *Server) QueryPCAPDatabase(ctx context.Context, req *ypb.QueryPCAPDataba
 		return nil, pcapRPCError(err)
 	}
 	response.NextCursor, response.HasMore, response.Truncated = page.NextCursor, page.HasMore, page.Truncated
-	return response, nil
-}
-
-// Full responses remain bounded while each delivered packet stays complete.
-const pcapPacketResponseBytes = 32 << 20
-
-func pcapPacketOptions(filter *ypb.PCAPPacketFilter) ([]pcapdb.QueryOption, error) {
-	if filter.GetId() < 0 {
-		return nil, grpcstatus.Error(codes.InvalidArgument, "packet Id cannot be negative")
-	}
-	options := make([]pcapdb.QueryOption, 0, 6)
-	if filter.GetTransport() != "" {
-		options = append(options, pcapdb.QueryTransport(filter.GetTransport()))
-	}
-	for _, address := range []struct {
-		value  string
-		option func(string) pcapdb.QueryOption
-	}{
-		{filter.GetSourceIP(), pcapdb.QuerySourceIP},
-		{filter.GetDestinationIP(), pcapdb.QueryDestinationIP},
-	} {
-		if address.value != "" {
-			ip := net.ParseIP(address.value)
-			if ip == nil {
-				return nil, grpcstatus.Error(codes.InvalidArgument, "IP filters must be individual IPv4 or IPv6 addresses")
-			}
-			options = append(options, address.option(ip.String()))
-		}
-	}
-	if filter != nil {
-		for _, port := range []struct {
-			value  *int32
-			option func(int) pcapdb.QueryOption
-		}{
-			{filter.SourcePort, pcapdb.QuerySourcePort},
-			{filter.DestinationPort, pcapdb.QueryDestinationPort},
-		} {
-			if port.value != nil {
-				if *port.value < 0 || *port.value > 65535 {
-					return nil, grpcstatus.Error(codes.InvalidArgument, "port filters must be 0..65535")
-				}
-				options = append(options, port.option(int(*port.value)))
-			}
-		}
-	}
-	if r := filter.GetTimeRange(); r != nil {
-		if r.EndNS < r.StartNS {
-			return nil, grpcstatus.Error(codes.InvalidArgument, "time range must satisfy StartNS <= EndNS")
-		}
-		options = append(options, pcapdb.QueryTimeRange(r.StartNS, r.EndNS))
-	}
-	return options, nil
-}
-
-func pcapPacketModel(p pcapdb.Packet) *ypb.PCAPPacket {
-	return &ypb.PCAPPacket{
-		Id: int64(p.ID), TimestampNS: p.TimestampNS,
-		CapturedLength: int64(p.CapturedLength), OriginalLength: int64(p.OriginalLength),
-		LinkType: int64(p.LinkType), Section: p.Section, Interface: int64(p.Interface),
-		SourceMAC: p.SourceMAC, DestinationMAC: p.DestinationMAC, VLANStack: p.VLANStack,
-		SourceIP: p.SourceIP, DestinationIP: p.DestinationIP,
-		SourcePort: int32(p.SourcePort), DestinationPort: int32(p.DestinationPort),
-		Transport: p.Transport, DecodeError: p.DecodeError,
-	}
-}
-
-func (s *Server) QueryPCAPPacket(ctx context.Context, req *ypb.QueryPCAPPacketRequest) (*ypb.QueryPCAPPacketResponse, error) {
-	if err := validatePCAPDatasetID(req.GetDatasetID()); err != nil {
-		return nil, err
-	}
-	paging, err := pcapPagination(req.GetPagination())
-	if err != nil {
-		return nil, err
-	}
-	filter := req.GetFilter()
-	options, err := pcapPacketOptions(filter)
-	if err != nil {
-		return nil, err
-	}
-	manager, err := s.getPCAPManager()
-	if err != nil {
-		return nil, pcapRPCError(err)
-	}
-	handle, err := manager.Acquire(ctx, req.GetDatasetID())
-	if err != nil {
-		return nil, pcapRPCError(err)
-	}
-	defer handle.Close()
-	response := &ypb.QueryPCAPPacketResponse{
-		Pagination: paging, Data: make([]*ypb.PCAPPacket, 0), NextCursor: paging.AfterId,
-	}
-	if len(options) == 0 && filter.GetId() == 0 {
-		meta, err := handle.Metadata()
-		if err != nil {
-			return nil, pcapRPCError(err)
-		}
-		response.Total = proto.Int64(meta.PacketCount)
-	}
-	after, limit := paging.AfterId, int(paging.Limit)
-	if id := filter.GetId(); id > 0 {
-		if after < id-1 {
-			after = id - 1
-		}
-		limit = 1
-	}
-	query := append(append([]pcapdb.QueryOption(nil), options...), pcapdb.QueryAfter(after), pcapdb.QueryLimit(limit))
-	packets, err := handle.QueryPackets(query...)
-	if err != nil {
-		return nil, pcapRPCError(err)
-	}
-	if id := filter.GetId(); id > 0 {
-		if len(packets) != 0 && int64(packets[0].ID) != id {
-			packets = nil
-		}
-		if paging.AfterId == 0 {
-			response.Total = proto.Int64(int64(len(packets)))
-		}
-	} else if len(packets) == limit {
-		// One-row lookahead also works at the native 1000-row limit.
-		next := append(append([]pcapdb.QueryOption(nil), options...),
-			pcapdb.QueryAfter(int64(packets[len(packets)-1].ID)), pcapdb.QueryLimit(1))
-		extra, err := handle.QueryPackets(next...)
-		if err != nil {
-			return nil, pcapRPCError(err)
-		}
-		response.HasMore = len(extra) != 0
-	}
-	used := proto.Size(response) + 128
-	for _, packet := range packets {
-		item := pcapPacketModel(packet)
-		size := proto.Size(item) + 16
-		if req.GetFull() {
-			size += packet.CapturedLength + 10
-		}
-		if size > pcapPacketResponseBytes-used {
-			if len(response.Data) == 0 {
-				return nil, grpcstatus.Error(codes.ResourceExhausted, "packet exceeds the response byte budget; use ExportPCAPData")
-			}
-			response.HasMore, response.Truncated = true, true
-			break
-		}
-		if req.GetFull() {
-			item.Raw, err = handle.ReadPacket(packet.ID)
-			if err != nil {
-				return nil, pcapRPCError(err)
-			}
-		}
-		response.Data = append(response.Data, item)
-		response.NextCursor = item.Id
-		used += size
-	}
 	return response, nil
 }
 

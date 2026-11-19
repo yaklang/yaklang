@@ -23,7 +23,7 @@
 | `GetPCAPPacketDetail` | `DatasetID`、`PacketID` | 单个包摘要、协议树、字节源描述、重组关系；小额初始字节可随详情返回 |
 | `ReadPCAPBytes` | `DatasetID`、`SourceID`、`Offset`、`Length` | `Data: bytes`、`Offset`、`TotalLength`、`EOF`；读取指定字节源的一个区间 |
 
-`QueryPCAPPackets` 替代现有 PCAP 列表查询契约，不与 `QueryPCAPPacket` 长期并存。新前端完成切换后清理 `QueryTrafficPacket` / `ParseTraffic` 的 PCAP 专用适配。其他仍在使用老 traffic 接口的功能不属于这次重构范围，删除前检查调用方。
+`QueryPCAPPackets` 已替代旧的 `QueryPCAPPacket`，后者及其请求/响应模型已从 proto 删除。新前端完成切换后清理 `QueryTrafficPacket` / `ParseTraffic` 的 PCAP 专用适配。其他仍在使用老 traffic 接口的功能不属于这次重构范围，删除前检查调用方。
 
 沿用项目 CRUD 的 `Filter`、`Pagination`、`Data` 组织方式和 gRPC 错误处理。HTTPFlow 本身也有独立的查询、按 ID 获取以及正文读取接口，不把 `Full` 作为这轮设计的约束。
 
@@ -221,7 +221,7 @@ MessageRef
 - 复用 pcapdb 现有存储、解析和查询能力。
 - 第一阶段聚焦数据包，会话和流查询留到后续阶段。
 - 按返回模型划分接口，不设置通用 QueryType。
-- 前端的数据包列表、过滤查询、单包详情共用扩展后的 `QueryTrafficPacket`；先前实现的 `QueryPCAPPacket` 保留为原始包基础接口。
+- 前端的数据包列表、过滤查询和单包详情最终收敛到 `QueryPCAPPackets`、`GetPCAPPacketDetail` 与 `ReadPCAPBytes`；旧 `QueryPCAPPacket` 已移除。
 - 参考 HTTPFlow 的 `Full`：控制返回结构完整度，不改变查询对象、过滤语义或响应类型。
 
 ### 2. 第一阶段的 5 个接口（上一版）
@@ -230,7 +230,7 @@ MessageRef
 | --- | --- |
 | `ImportPCAPFile` | 导入 PCAP/PCAPNG，服务端流返回进度和 DatasetID；建立包索引并保存协议分析 |
 | `QueryPCAPDatabase` | 查询数据集列表；按 DatasetID 获取对应元信息 |
-| `QueryPCAPPacket` | 过滤查询数据包，Full 控制摘要/完整结构 |
+| `QueryPCAPPacket`（已移除） | 被 `QueryPCAPPackets` 和 `GetPCAPPacketDetail` 替代 |
 | `DeletePCAPDatabase` | 按 DatasetID 删除数据集，保留底层清理状态 |
 | `ExportPCAPData` | 导出完整捕获文件，或指定包的原始字节 |
 
@@ -245,7 +245,7 @@ MessageRef
 - [yakit/httpflow.go](../common/yakgrpc/yakit/httpflow.go)：`BuildHTTPFlowQuery` 在数据库投影阶段控制大字段读取。
 - [grpc_note.go](../common/yakgrpc/grpc_note.go)：参考 Filter、Pagination、Data 和操作结果的组织。
 
-下述为仍保留的原生 `QueryPCAPPacket` 契约；新前端使用上文的老接口扩展。原生数据包请求形状：
+下述仅记录已移除的旧 `QueryPCAPPacket` 契约，便于理解历史测试和迁移差异：
 
 ```text
 QueryPCAPPacketRequest
