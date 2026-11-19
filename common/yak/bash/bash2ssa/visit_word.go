@@ -21,6 +21,38 @@ func staticWord(word *syntax.Word) (string, bool) {
 	return staticParts(word.Parts, false)
 }
 
+// rawStaticWord returns a static word's source text without decoding quotes or
+// escapes. Command identity keeps this form so ANSI-C obfuscation such as
+// $'\x63\x75\x72\x6c' stays visible to static rules, matching bash's own
+// word text before expansion.
+func rawStaticWord(word *syntax.Word) (string, bool) {
+	if word == nil {
+		return "", true
+	}
+	return rawParts(word.Parts)
+}
+
+func rawParts(parts []syntax.WordPart) (string, bool) {
+	var b strings.Builder
+	for _, part := range parts {
+		switch p := part.(type) {
+		case *syntax.Lit:
+			b.WriteString(p.Value)
+		case *syntax.SglQuoted:
+			b.WriteString(p.Value)
+		case *syntax.DblQuoted:
+			inner, ok := rawParts(p.Parts)
+			if !ok {
+				return "", false
+			}
+			b.WriteString(inner)
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
+}
+
 func literalText(raw string, double bool) string {
 	if !strings.Contains(raw, `\`) {
 		return raw
