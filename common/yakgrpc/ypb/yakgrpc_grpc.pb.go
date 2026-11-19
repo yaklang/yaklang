@@ -446,6 +446,7 @@ const (
 	Yak_ListAiModel_FullMethodName                                = "/ypb.Yak/ListAiModel"
 	Yak_AIConfigHealthCheck_FullMethodName                        = "/ypb.Yak/AIConfigHealthCheck"
 	Yak_ProbeReasoningEffort_FullMethodName                       = "/ypb.Yak/ProbeReasoningEffort"
+	Yak_ProbeModelVision_FullMethodName                           = "/ypb.Yak/ProbeModelVision"
 	Yak_GetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/GetAIGlobalConfig"
 	Yak_SetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/SetAIGlobalConfig"
 	Yak_ListAIProviders_FullMethodName                            = "/ypb.Yak/ListAIProviders"
@@ -1248,6 +1249,7 @@ type YakClient interface {
 	ListAiModel(ctx context.Context, in *ListAiModelRequest, opts ...grpc.CallOption) (*ListAiModelResponse, error)
 	AIConfigHealthCheck(ctx context.Context, in *AIConfigHealthCheckRequest, opts ...grpc.CallOption) (*AIConfigHealthCheckResponse, error)
 	ProbeReasoningEffort(ctx context.Context, in *ProbeReasoningEffortRequest, opts ...grpc.CallOption) (*ProbeReasoningEffortResponse, error)
+	ProbeModelVision(ctx context.Context, in *ProbeModelVisionRequest, opts ...grpc.CallOption) (*ProbeModelVisionResponse, error)
 	GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(ctx context.Context, in *AIGlobalConfig, opts ...grpc.CallOption) (*Empty, error)
 	ListAIProviders(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListAIProvidersResponse, error)
@@ -6481,6 +6483,16 @@ func (c *yakClient) ProbeReasoningEffort(ctx context.Context, in *ProbeReasoning
 	return out, nil
 }
 
+func (c *yakClient) ProbeModelVision(ctx context.Context, in *ProbeModelVisionRequest, opts ...grpc.CallOption) (*ProbeModelVisionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProbeModelVisionResponse)
+	err := c.cc.Invoke(ctx, Yak_ProbeModelVision_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AIGlobalConfig)
@@ -9837,6 +9849,7 @@ type YakServer interface {
 	ListAiModel(context.Context, *ListAiModelRequest) (*ListAiModelResponse, error)
 	AIConfigHealthCheck(context.Context, *AIConfigHealthCheckRequest) (*AIConfigHealthCheckResponse, error)
 	ProbeReasoningEffort(context.Context, *ProbeReasoningEffortRequest) (*ProbeReasoningEffortResponse, error)
+	ProbeModelVision(context.Context, *ProbeModelVisionRequest) (*ProbeModelVisionResponse, error)
 	GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(context.Context, *AIGlobalConfig) (*Empty, error)
 	ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error)
@@ -11432,6 +11445,9 @@ func (UnimplementedYakServer) AIConfigHealthCheck(context.Context, *AIConfigHeal
 }
 func (UnimplementedYakServer) ProbeReasoningEffort(context.Context, *ProbeReasoningEffortRequest) (*ProbeReasoningEffortResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProbeReasoningEffort not implemented")
+}
+func (UnimplementedYakServer) ProbeModelVision(context.Context, *ProbeModelVisionRequest) (*ProbeModelVisionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProbeModelVision not implemented")
 }
 func (UnimplementedYakServer) GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAIGlobalConfig not implemented")
@@ -19264,6 +19280,24 @@ func _Yak_ProbeReasoningEffort_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ProbeModelVision_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProbeModelVisionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ProbeModelVision(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ProbeModelVision_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ProbeModelVision(ctx, req.(*ProbeModelVisionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAIGlobalConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -24718,6 +24752,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ProbeReasoningEffort",
 			Handler:    _Yak_ProbeReasoningEffort_Handler,
+		},
+		{
+			MethodName: "ProbeModelVision",
+			Handler:    _Yak_ProbeModelVision_Handler,
 		},
 		{
 			MethodName: "GetAIGlobalConfig",

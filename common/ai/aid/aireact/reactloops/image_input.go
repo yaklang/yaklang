@@ -66,8 +66,11 @@ func (r *ReActLoop) imageRoute() (bool, *ypb.AIModelConfig, error) {
 		return false, nil, nil
 	}
 	native, model, err := c.ImageInputRoute(r.useSpeedPriorityAI)
-	if native && c.GetImageInputConfig().Mode == "auto" && r.imageRejectedModel == imageModelKey(model) {
-		native = false
+	if native && c.GetImageInputConfig().Mode == "auto" {
+		if r.imageRejectedModel == imageModelKey(model) || (r.functionCallMode && model != nil &&
+			!model.GetSupportsImageToolCalling()) {
+			native = false
+		}
 	}
 	return native, model, err
 }
@@ -244,6 +247,10 @@ func (r *ReActLoop) recordImageUsage(resp *aicommon.AIResponse) {
 	if s == nil || len(s.inputs) == 0 || resp == nil {
 		return
 	}
+	r.imageEvent("read", map[string]any{
+		"route": "native", "model": resp.GetModelName(), "provider": resp.GetProviderName(),
+		"image_count": len(s.inputs),
+	})
 	emitter := r.GetEmitter()
 	resp.OnUsage(func(u *aispec.ChatUsage) {
 		if emitter != nil {
