@@ -101,3 +101,23 @@ fun main() {
 `, "main", "println")
 	})
 }
+
+func TestKotlinShortCircuit(t *testing.T) {
+	t.Run("false and short circuits", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+fun side(): Boolean { return true }
+fun main() {
+    println(false && side())
+}
+`, "false")
+	})
+
+	t.Run("true or short circuits", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+fun side(): Boolean { return false }
+fun main() {
+    println(true || side())
+}
+`, "true")
+	})
+}

@@ -80,3 +80,14 @@ fun main() {
 `, "main", "f")
 	})
 }
+
+func TestKotlinCallSiteOperand(t *testing.T) {
+	checkPrintlnValueRegexp(t, `
+fun identity(a: Int): Int {
+    return a
+}
+fun main() {
+    println(identity(7))
+}
+`, `identity\(7\)`)
+}

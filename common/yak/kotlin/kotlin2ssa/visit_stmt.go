@@ -1,11 +1,15 @@
 package kotlin2ssa
 
 import (
+	"fmt"
 	"strings"
+	"sync/atomic"
 
 	kotlinparser "github.com/yaklang/yaklang/common/yak/kotlin/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
+
+var kotlinIfExpressionSeq atomic.Uint64
 
 func (b *singleFileBuilder) visitBlock(raw kotlinparser.IBlockContext) {
 	block, ok := raw.(*kotlinparser.BlockContext)
@@ -68,13 +72,31 @@ func (b *singleFileBuilder) assignDirectly(raw kotlinparser.IDirectlyAssignableE
 		return
 	}
 	if direct.SimpleIdentifier() != nil {
-		b.AssignVariable(b.CreateVariable(direct.SimpleIdentifier().GetText()), value)
+		name := direct.SimpleIdentifier().GetText()
+		b.AssignVariable(b.CreateVariable(name), value)
+		if b.classFields != nil {
+			if _, ok := b.classFields[name]; ok {
+				b.classFields[name] = value
+			}
+		}
 		return
 	}
 	if direct.PostfixUnaryExpression() == nil {
 		return
 	}
+	isThis := strings.HasPrefix(direct.PostfixUnaryExpression().GetText(), "this.")
+	if postfix, ok := direct.PostfixUnaryExpression().(*kotlinparser.PostfixUnaryExpressionContext); ok && postfix != nil {
+		if primary, ok := postfix.PrimaryExpression().(*kotlinparser.PrimaryExpressionContext); ok && primary != nil {
+			isThis = isThis || primary.ThisExpression() != nil
+		}
+	}
 	base := b.visitPostfixUnaryExpression(direct.PostfixUnaryExpression())
+	if isThis || (base != nil && base.GetName() == "this") {
+		if suffix := direct.AssignableSuffix(); suffix != nil {
+			b.assignThisSuffix(suffix, value)
+			return
+		}
+	}
 	if suffix := direct.AssignableSuffix(); suffix != nil {
 		b.assignSuffix(base, suffix, value)
 		return
@@ -100,6 +122,24 @@ func (b *singleFileBuilder) assignAssignable(raw kotlinparser.IAssignableExpress
 	op = strings.TrimSuffix(op, "=")
 	result := b.EmitBinOp(kotlinBinaryOpcode(op), current, value)
 	b.AssignVariable(b.CreateVariable(assignable.PrefixUnaryExpression().GetText()), result)
+}
+
+func (b *singleFileBuilder) assignThisSuffix(raw kotlinparser.IAssignableSuffixContext, value ssa.Value) {
+	suffix, ok := raw.(*kotlinparser.AssignableSuffixContext)
+	if !ok || suffix == nil || suffix.NavigationSuffix() == nil {
+		return
+	}
+	nav, ok := suffix.NavigationSuffix().(*kotlinparser.NavigationSuffixContext)
+	if !ok || nav == nil || nav.SimpleIdentifier() == nil {
+		return
+	}
+	name := nav.SimpleIdentifier().GetText()
+	b.AssignVariable(b.CreateVariable(name), value)
+	if b.classFields != nil {
+		if _, ok := b.classFields[name]; ok {
+			b.classFields[name] = value
+		}
+	}
 }
 
 func (b *singleFileBuilder) assignSuffix(base ssa.Value, raw kotlinparser.IAssignableSuffixContext, value ssa.Value) {
@@ -222,25 +262,93 @@ func (b *singleFileBuilder) visitControlStructureBody(raw kotlinparser.IControlS
 	}
 }
 
-func (b *singleFileBuilder) visitIfExpression(raw kotlinparser.IIfExpressionContext) {
+func (b *singleFileBuilder) visitIfExpression(raw kotlinparser.IIfExpressionContext) ssa.Value {
 	ifExpr, ok := raw.(*kotlinparser.IfExpressionContext)
 	if !ok || ifExpr == nil || ifExpr.Expression() == nil {
-		return
+		return b.EmitConstInstNil()
+	}
+	name := fmt.Sprintf("__kotlin_if_%d", kotlinIfExpressionSeq.Add(1))
+	b.AssignVariable(b.CreateLocalVariable(name), b.EmitConstInstNil())
+	assign := func(body func() ssa.Value) {
+		value := body()
+		if value == nil {
+			value = b.EmitConstInstNil()
+		}
+		b.AssignVariable(b.CreateVariable(name), value)
 	}
 	ifBuilder := b.CreateIfBuilder()
 	ifBuilder.SetCondition(func() ssa.Value {
 		return b.VisitExpression(ifExpr.Expression())
 	}, func() {
-		if ifExpr.ControlStructureBody(0) != nil {
-			b.visitControlStructureBody(ifExpr.ControlStructureBody(0))
-		}
+		assign(func() ssa.Value {
+			return b.visitControlStructureBodyValue(ifExpr.ControlStructureBody(0))
+		})
 	})
 	if ifExpr.ELSE() != nil && ifExpr.ControlStructureBody(1) != nil {
 		ifBuilder.SetElse(func() {
-			b.visitControlStructureBody(ifExpr.ControlStructureBody(1))
+			assign(func() ssa.Value {
+				return b.visitControlStructureBodyValue(ifExpr.ControlStructureBody(1))
+			})
 		})
 	}
 	ifBuilder.Build()
+	return b.ReadValue(name)
+}
+
+// visitBlockValue returns the value of the last statement so lambdas and
+// expression bodies keep their result.
+func (b *singleFileBuilder) visitBlockValue(raw kotlinparser.IBlockContext) ssa.Value {
+	block, ok := raw.(*kotlinparser.BlockContext)
+	if !ok || block == nil || block.Statements() == nil {
+		return nil
+	}
+	return b.visitStatementsValue(block.Statements())
+}
+
+func (b *singleFileBuilder) visitStatementsValue(raw kotlinparser.IStatementsContext) ssa.Value {
+	statements, ok := raw.(*kotlinparser.StatementsContext)
+	if !ok || statements == nil {
+		return nil
+	}
+	var result ssa.Value
+	for _, rawStatement := range statements.AllStatement() {
+		result = b.visitStatementValue(rawStatement)
+		if b.IsStop() {
+			return result
+		}
+	}
+	return result
+}
+
+func (b *singleFileBuilder) visitStatementValue(raw kotlinparser.IStatementContext) ssa.Value {
+	statement, ok := raw.(*kotlinparser.StatementContext)
+	if !ok || statement == nil {
+		return nil
+	}
+	switch {
+	case statement.Expression() != nil:
+		return b.VisitExpression(statement.Expression())
+	case statement.Assignment() != nil:
+		b.visitAssignment(statement.Assignment())
+		return nil
+	default:
+		b.visitStatement(raw)
+		return nil
+	}
+}
+
+func (b *singleFileBuilder) visitControlStructureBodyValue(raw kotlinparser.IControlStructureBodyContext) ssa.Value {
+	body, ok := raw.(*kotlinparser.ControlStructureBodyContext)
+	if !ok || body == nil {
+		return nil
+	}
+	if body.Block() != nil {
+		return b.visitBlockValue(body.Block())
+	}
+	if body.Statement() != nil {
+		return b.visitStatementValue(body.Statement())
+	}
+	return nil
 }
 
 func (b *singleFileBuilder) visitJumpExpression(raw kotlinparser.IJumpExpressionContext) {
