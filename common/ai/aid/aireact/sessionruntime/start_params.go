@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -15,13 +16,25 @@ import (
 // ReAct config options. The protobuf model is retained because ReAct itself
 // still consumes it; this package is independent of the gRPC stream transport.
 func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOption {
+	opts, err := convertStartParamsToReActConfig(i, nil)
+	if err != nil {
+		return []aicommon.ConfigOption{func(*aicommon.Config) error { return err }}
+	}
+	return opts
+}
+
+func convertStartParamsToReActConfig(i *ypb.AIStartParams, worktree *schema.AICodingWorktree) ([]aicommon.ConfigOption, error) {
 	opts := make([]aicommon.ConfigOption, 0)
 	if i == nil {
-		return opts
+		return opts, nil
 	}
 	opts = append(opts, aicommon.WithSingleAIModelMode(i.GetSingleModelMode()), aicommon.WithNetworkDebug(i.GetNetworkDebug()))
 	opts = append(opts, aicommon.WithClientUI(i.GetClientUI()))
-	opts = append(opts, aicommon.WithAgentMode(i.GetAgentMode()), aicommon.WithCodingWorkspace(i.GetCodingWorkspaceID(), i.GetCodingWorkingDirectory()), aicommon.WithCodingDirectories(i.GetCodingWorktreeID(), i.GetCodingSourceRoots(), i.GetCodingWorkspaceRoots()))
+	codingConfig, err := codingConfigFromStartParams(i, worktree)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, aicommon.WithAgentMode(i.GetAgentMode()), aicommon.WithCodingConfig(codingConfig))
 	enableMultiAgent, goalModeEnabled, goalMinIterations, maxSubAgents := resolveAIExecutionStrategy(i)
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))
@@ -144,7 +157,7 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 		opts = append(opts, aicommon.WithDisableMemoryTriage(true))
 	}
 
-	return opts
+	return opts, nil
 }
 
 func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, enableGoalMode bool, goalMinIterations int64, maxSubAgents int64) {

@@ -31,12 +31,12 @@ type AICodingSession struct {
 type AICodingWorktree struct {
 	gorm.Model
 	WorktreeID       string `gorm:"unique_index;not null"`
-	WorkspaceID      string `gorm:"index;not null"`
+	WorkspaceID      string `gorm:"index;index:idx_ai_coding_worktree_workspace_path;not null"`
 	OwnerSessionID   string `gorm:"unique_index;not null"`
 	SourceDirectory  string
 	RepositoryRoot   string
 	GitCommonDir     string
-	Path             string `gorm:"unique_index;not null"`
+	Path             string `gorm:"unique_index;index:idx_ai_coding_worktree_workspace_path;not null"`
 	WorkingDirectory string
 	BaseRef          string
 	BaseCommit       string

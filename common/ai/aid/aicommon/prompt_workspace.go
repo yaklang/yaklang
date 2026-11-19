@@ -19,13 +19,7 @@ func ApplyAgentPromptContext(m *PromptMaterials, config *Config) {
 	if config.AgentMode != ypb.AgentModeCoding {
 		return
 	}
-	m.CodingWorkspaceID = config.CodingWorkspaceID
-	m.CodingWorktreeID = config.CodingWorktreeID
-	m.CodingBaseRef = config.CodingBaseRef
-	m.CodingBaseCommit = config.CodingBaseCommit
-	m.CodingWorkspaceRoots = append([]string(nil), config.CodingWorkspaceRoots...)
-	m.CodingSourceRoots = append([]string(nil), config.CodingSourceRoots...)
-	m.WorkingDir = config.CodingWorkingDirectory
+	m.Coding = config.Coding.Clone()
 	m.AIArtifactsDir = config.Workdir
 	m.Workspace = true
 }
@@ -53,29 +47,29 @@ type codingWorkspacePromptData struct {
 
 func (m *PromptMaterials) codingWorkspaceData() codingWorkspacePromptData {
 	data := codingWorkspacePromptData{
-		WorkspaceID: m.CodingWorkspaceID, OSArch: m.OSArch,
-		WorkingDirectory: m.WorkingDir, ArtifactsDirectory: m.AIArtifactsDir,
+		WorkspaceID: m.Coding.WorkspaceID, OSArch: m.OSArch,
+		WorkingDirectory: m.Coding.PrimaryProjectDir, ArtifactsDirectory: m.AIArtifactsDir,
 	}
-	roots := m.CodingWorkspaceRoots
-	if len(roots) == 0 {
-		roots = []string{m.WorkingDir}
+	sources := m.Coding.SourceProjectDirs()
+	for i, dir := range m.Coding.ProjectDirs() {
+		data.Directories = append(data.Directories, codingPromptDirectory{Primary: i == 0, Source: sources[i], Effective: dir})
 	}
-	for i, effective := range roots {
-		source := effective
-		if i < len(m.CodingSourceRoots) {
-			source = m.CodingSourceRoots[i]
-		}
-		data.Directories = append(data.Directories, codingPromptDirectory{Primary: i == 0, Source: source, Effective: effective})
-	}
-	if m.CodingWorktreeID != "" {
-		data.Worktree = &codingPromptWorktree{m.CodingWorktreeID, m.CodingBaseRef, m.CodingBaseCommit}
+	if worktree := m.Coding.Worktree; worktree != nil {
+		data.Worktree = &codingPromptWorktree{worktree.ID, worktree.BaseRef, worktree.BaseCommit}
 	}
 	return data
 }
 
 // WorkspaceContext renders configured coordinates without inspecting the file system.
 func (m *PromptMaterials) WorkspaceContext() string {
-	if m == nil || !m.Workspace || strings.TrimSpace(m.OSArch+m.WorkingDir+m.AIArtifactsDir) == "" {
+	if m == nil || !m.Workspace {
+		return ""
+	}
+	workingDir := m.WorkingDir
+	if m.AgentMode == ypb.AgentModeCoding {
+		workingDir = m.Coding.PrimaryProjectDir
+	}
+	if strings.TrimSpace(m.OSArch+workingDir+m.AIArtifactsDir) == "" {
 		return ""
 	}
 	var data any = m

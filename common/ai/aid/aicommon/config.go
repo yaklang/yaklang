@@ -413,18 +413,12 @@ type Config struct {
 	/*
 		Meta Info
 	*/
-	Keywords               []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
-	ForgeName              string   // if current config use in forge , this is the forge name
-	AgentMode              string
-	CodingWorkspaceID      string
-	CodingWorkingDirectory string
-	CodingWorktreeID       string
-	CodingBaseRef          string
-	CodingBaseCommit       string
-	CodingWorkspaceRoots   []string
-	CodingSourceRoots      []string
-	Workdir                string
-	Language               string // Response language preference
+	Keywords  []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
+	ForgeName string   // if current config use in forge , this is the forge name
+	AgentMode string
+	Coding    CodingConfig
+	Workdir   string // AI artifacts directory; never the Coding project's source directory.
+	Language  string // Response language preference
 
 	/*
 		debug config
@@ -4501,8 +4495,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
 	}
 
-	opts = append(opts, WithAgentMode(i.AgentMode), WithCodingWorkspace(i.CodingWorkspaceID, i.CodingWorkingDirectory), WithCodingDirectories(i.CodingWorktreeID, i.CodingSourceRoots, i.CodingWorkspaceRoots))
-	opts = append(opts, WithCodingWorktreeBase(i.CodingBaseRef, i.CodingBaseCommit))
+	opts = append(opts, WithAgentMode(i.AgentMode), WithCodingConfig(i.Coding))
 
 	// Misc
 	if i.PromptHook != nil {
@@ -4718,9 +4711,7 @@ func WithAgentMode(mode string) ConfigOption {
 		}
 		c.AgentMode = normalized
 		if normalized != ypb.AgentModeCoding {
-			c.CodingWorkspaceID, c.CodingWorkingDirectory, c.CodingWorktreeID = "", "", ""
-			c.CodingBaseRef, c.CodingBaseCommit = "", ""
-			c.CodingSourceRoots, c.CodingWorkspaceRoots = nil, nil
+			c.Coding = CodingConfig{}
 		}
 		return nil
 	}

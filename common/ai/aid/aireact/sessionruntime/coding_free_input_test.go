@@ -92,10 +92,10 @@ func testCodingRuntimeFreeInput(t *testing.T, native bool) {
 			wire := aispec.NewDefaultAIConfig(request.GetExtraSpecOpts()...)
 			action := map[string]any{"@action": "finish", "human_readable_thought": "file updated"}
 			if aicommon.IsPrimaryDecisionPrompt(prompt) {
-				if cfg.AgentMode != ypb.AgentModeCoding || cfg.CodingWorktreeID == "" ||
-					cfg.CodingBaseRef != "HEAD" || cfg.CodingBaseCommit == "" ||
-					!strings.Contains(prompt, cfg.CodingBaseCommit) ||
-					!strings.Contains(prompt, cfg.CodingWorkingDirectory) ||
+				if cfg.AgentMode != ypb.AgentModeCoding || cfg.Coding.Worktree == nil ||
+					cfg.Coding.Worktree.BaseRef != "HEAD" || cfg.Coding.Worktree.BaseCommit == "" ||
+					!strings.Contains(prompt, cfg.Coding.Worktree.BaseCommit) ||
+					!strings.Contains(prompt, cfg.Coding.PrimaryProjectDir) ||
 					!strings.Contains(prompt, "Coding Agent 工作方法") ||
 					!strings.Contains(prompt, "# Coding 主循环") ||
 					(!native && !strings.Contains(prompt, "编程任务决策示例")) ||
@@ -118,7 +118,7 @@ func testCodingRuntimeFreeInput(t *testing.T, native bool) {
 					}
 					return nil, exportErr
 				}
-				target := filepath.Join(cfg.CodingWorkingDirectory, filename)
+				target := filepath.Join(cfg.Coding.PrimaryProjectDir, filename)
 				data, _ := os.ReadFile(target)
 				if string(data) != "updated in worktree\n" {
 					action = map[string]any{"@action": "directly_call_tool", "directly_call_tool_name": "write_file",

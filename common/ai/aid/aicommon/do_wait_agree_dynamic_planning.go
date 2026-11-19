@@ -118,7 +118,7 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 
 	data.WorkingDir = config.Workdir
 	if config.AgentMode == ypb.AgentModeCoding {
-		data.WorkingDir = config.CodingWorkingDirectory
+		data.WorkingDir = config.Coding.PrimaryProjectDir
 	}
 
 	frozenOpen := BuildPromptFrozenOpenMaterials(config)

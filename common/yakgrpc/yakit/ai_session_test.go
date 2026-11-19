@@ -11,6 +11,31 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestDeleteAISessionTransactionRollback(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	defer db.Close()
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
+	_, err = CreateOrUpdateAISessionMeta(db, "rollback-session", "preserve on failure")
+	require.NoError(t, err)
+	require.NoError(t, db.Create(&schema.AiOutputEvent{EventUUID: "rollback-event", SessionId: "rollback-session"}).Error)
+	require.NoError(t, db.Create(&schema.AiProcessAndAiEvent{ProcessesId: "process", EventId: "rollback-event"}).Error)
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	_, events, err := DeleteAISession(tx, "rollback-session")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, events)
+	require.NoError(t, tx.Rollback().Error)
+	_, err = GetAISessionMetaBySessionID(db, "rollback-session")
+	require.NoError(t, err)
+	var count int
+	require.NoError(t, db.Model(&schema.AiOutputEvent{}).Where("session_id = ?", "rollback-session").Count(&count).Error)
+	require.Equal(t, 1, count)
+	require.NoError(t, db.Model(&schema.AiProcessAndAiEvent{}).Where("event_id = ?", "rollback-event").Count(&count).Error)
+	require.Equal(t, 1, count)
+}
+
 func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)

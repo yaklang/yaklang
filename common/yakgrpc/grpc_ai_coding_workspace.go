@@ -92,7 +92,7 @@ func (s *Server) ListAICodingWorktrees(ctx context.Context, req *ypb.AICodingWor
 }
 
 func (s *Server) GetAICodingWorktree(ctx context.Context, req *ypb.GetAICodingWorktreeRequest) (*ypb.AICodingWorktree, error) {
-	item, err := yakit.GetAICodingWorktree(s.GetProfileDatabase(), req.GetWorktreeID(), req.GetPath())
+	item, err := yakit.GetAICodingWorktree(s.GetProfileDatabase(), req.GetWorkspaceID(), req.GetWorktreeID(), req.GetPath())
 	if err != nil {
 		return nil, err
 	}
@@ -131,4 +131,12 @@ func (s *Server) ListAICodingBranches(ctx context.Context, req *ypb.AICodingWork
 		result.Data = append(result.Data, &ypb.AICodingBranch{Name: branch.Name, Ref: branch.Ref, Commit: branch.Commit, Remote: branch.Remote})
 	}
 	return result, nil
+}
+
+// Ready worktrees still used by sessions are removed via DeleteAISession.
+func (s *Server) DeleteAICodingWorktree(ctx context.Context, req *ypb.DeleteAICodingWorktreeRequest) (*ypb.Empty, error) {
+	if err := yakit.DeleteAICodingWorktree(ctx, s.GetProfileDatabase(), req.GetWorkspaceID(), req.GetWorktreeID()); err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
 }

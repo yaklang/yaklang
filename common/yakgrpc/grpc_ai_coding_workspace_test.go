@@ -73,6 +73,12 @@ func TestCodingManagedWorktreeRPCOwnershipAndAvailability(t *testing.T) {
 	lookup, err := server.GetAICodingWorktree(ctx, &ypb.GetAICodingWorktreeRequest{Path: filepath.Join(tree.Path, "file-not-yet-created")})
 	require.NoError(t, err)
 	require.Equal(t, tree.ID, lookup.ID)
+	_, err = server.GetAICodingWorktree(ctx, &ypb.GetAICodingWorktreeRequest{WorkspaceID: "another-workspace", WorktreeID: tree.ID})
+	require.Error(t, err)
+	_, err = server.GetAICodingWorktree(ctx, &ypb.GetAICodingWorktreeRequest{WorkspaceID: "another-workspace", Path: tree.Path})
+	require.Error(t, err)
+	_, err = server.DeleteAICodingWorktree(ctx, &ypb.DeleteAICodingWorktreeRequest{WorkspaceID: workspace.ID, WorktreeID: tree.ID})
+	require.ErrorContains(t, err, "associated sessions first")
 	sessions, err := server.ListAICodingSessions(ctx, &ypb.AICodingWorkspaceRequest{WorkspaceID: workspace.ID})
 	require.NoError(t, err)
 	require.Len(t, sessions.Data, 2)
@@ -88,9 +94,15 @@ func TestCodingManagedWorktreeRPCOwnershipAndAvailability(t *testing.T) {
 	require.Equal(t, "unavailable", lookup.State)
 	require.NotEmpty(t, lookup.LastError)
 	require.Equal(t, workspace.ID, lookup.WorkspaceID, "ownership survives a missing checkout")
+	// An orphan with only a stale Git registration can be explicitly cleaned up.
+	require.NoError(t, db.Unscoped().Where("worktree_id = ?", tree.ID).Delete(&schema.AICodingSession{}).Error)
+	_, err = server.DeleteAICodingWorktree(ctx, &ypb.DeleteAICodingWorktreeRequest{WorkspaceID: workspace.ID, WorktreeID: tree.ID})
+	require.NoError(t, err)
+	_, err = server.GetAICodingWorktree(ctx, &ypb.GetAICodingWorktreeRequest{WorktreeID: tree.ID})
+	require.Error(t, err)
 }
 
-func TestCodingSessionDeletionKeepsWorktrees(t *testing.T) {
+func TestCodingSessionDeletionRemovesExclusiveWorktrees(t *testing.T) {
 	for _, deleteAll := range []bool{false, true} {
 		t.Run(fmt.Sprint(deleteAll), func(t *testing.T) {
 			t.Setenv("YAKIT_HOME", t.TempDir())
@@ -117,28 +129,24 @@ func TestCodingSessionDeletionKeepsWorktrees(t *testing.T) {
 			require.NoError(t, profile.Create(&schema.AICodingSession{SessionID: "other-project-chat", WorkspaceID: workspace.ID}).Error)
 			marker := filepath.Join(params.CodingWorkingDirectory, "uncommitted.txt")
 			require.NoError(t, os.WriteFile(marker, []byte("keep this work"), 0600))
-			_, err = server.DeleteAISession(context.Background(), &ypb.DeleteAISessionRequest{DeleteAll: deleteAll, Filter: &ypb.DeleteAISessionFilter{SessionID: []string{"deleted-chat"}}})
+			deleted, err := server.DeleteAISession(context.Background(), &ypb.DeleteAISessionRequest{DeleteAll: deleteAll, Filter: &ypb.DeleteAISessionFilter{SessionID: []string{"deleted-chat"}}})
 			require.NoError(t, err)
 			sessions, err := server.ListAICodingSessions(context.Background(), &ypb.AICodingWorkspaceRequest{WorkspaceID: workspace.ID})
 			require.NoError(t, err)
-			require.Len(t, sessions.Data, 2)
-			for _, session := range sessions.Data {
-				if session.SessionID == "deleted-chat" {
-					require.Greater(t, session.SessionDeletedAt, int64(0))
-					require.Equal(t, "Preserved chat title", session.SessionTitle)
-				} else {
-					require.Zero(t, session.SessionDeletedAt, "a missing session in another project DB is not deleted")
-				}
-			}
+			require.Len(t, sessions.Data, 1)
+			require.Equal(t, "other-project-chat", sessions.Data[0].SessionID)
 			trees, err := server.ListAICodingWorktrees(context.Background(), &ypb.AICodingWorkspaceRequest{WorkspaceID: workspace.ID})
 			require.NoError(t, err)
-			require.Len(t, trees.Data, 1)
-			require.Equal(t, "ready", trees.Data[0].State)
-			require.Contains(t, trees.Data[0].SessionIDs, "deleted-chat")
-			content, err := os.ReadFile(marker)
-			require.NoError(t, err)
-			require.Equal(t, "keep this work", string(content))
-			require.ErrorContains(t, yakit.ResolveCodingSessionBinding(context.Background(), profile, project, "deleted-chat", params), "deleted")
+			require.Empty(t, trees.Data)
+			require.NoDirExists(t, params.CodingWorkingDirectory)
+			require.DirExists(t, root)
+			require.Contains(t, deleted.ExtraMessage, "deleted_coding_sessions=1")
+			require.Contains(t, deleted.ExtraMessage, "deleted_coding_worktrees=1")
+			var count int
+			require.NoError(t, profile.Unscoped().Model(&schema.AICodingSession{}).Where("session_id = ?", "deleted-chat").Count(&count).Error)
+			require.Zero(t, count, "hard delete must not leave a soft-deleted binding")
+			require.NoError(t, profile.Unscoped().Model(&schema.AICodingWorktree{}).Count(&count).Error)
+			require.Zero(t, count)
 		})
 	}
 }

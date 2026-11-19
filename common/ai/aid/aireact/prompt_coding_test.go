@@ -28,7 +28,10 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			artifacts := filepath.Join(t.TempDir(), "artifacts")
 			cwd, err := os.Getwd()
 			require.NoError(t, err)
-			react, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(artifacts), aicommon.WithAgentMode(ypb.AgentModeCoding), aicommon.WithCodingWorkspace("workspace-a", source), aicommon.WithCodingDirectories("managed-tree", []string{"/original/project", secondary}, []string{source, secondary}), aicommon.WithCodingWorktreeBase("origin/main", "initial-commit"))
+			react, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(artifacts), aicommon.WithAgentMode(ypb.AgentModeCoding), aicommon.WithCodingConfig(aicommon.CodingConfig{
+				WorkspaceID: "workspace-a", PrimaryProjectDir: source, AdditionalProjectDirs: []string{secondary},
+				Worktree: &aicommon.CodingWorktreeConfig{ID: "managed-tree", SourceProjectDir: "/original/project", BaseRef: "origin/main", BaseCommit: "initial-commit"},
+			}))
 			require.NoError(t, err)
 			loop, err := loop_default.NewLoop("coding-prompt-test", react)
 			require.NoError(t, err)
@@ -46,7 +49,7 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			require.NotContains(t, result.Prompt, "未落档的风险禁止终结")
 			require.NotContains(t, result.Prompt, "任务 / 目标已外层鉴权")
 			require.Contains(t, result.Prompt, "workspace-a")
-			require.Contains(t, result.Prompt, `"working_directory": "`+react.config.CodingWorkingDirectory+`"`)
+			require.Contains(t, result.Prompt, `"working_directory": "`+react.config.Coding.PrimaryProjectDir+`"`)
 			require.Contains(t, result.Prompt, `"artifacts_directory": "`+artifacts+`"`)
 			require.Contains(t, result.Prompt, "AGENTS.md")
 			require.Contains(t, result.Prompt, secondary)
@@ -60,14 +63,16 @@ func TestCodingPromptAndChildConfig(t *testing.T) {
 			require.Equal(t, cwd, after)
 			child := aicommon.NewConfig(ctx, aicommon.ConvertConfigToOptions(react.config)...)
 			require.Equal(t, ypb.AgentModeCoding, child.AgentMode)
-			require.Equal(t, react.config.CodingWorkingDirectory, child.CodingWorkingDirectory)
+			require.Equal(t, react.config.Coding.PrimaryProjectDir, child.Coding.PrimaryProjectDir)
 			require.Equal(t, artifacts, child.Workdir)
-			require.Equal(t, react.config.CodingWorkspaceRoots, child.CodingWorkspaceRoots)
-			require.Equal(t, "managed-tree", child.CodingWorktreeID)
-			require.Equal(t, "origin/main", child.CodingBaseRef)
-			require.Equal(t, "initial-commit", child.CodingBaseCommit)
-			child.CodingWorkspaceRoots[1] = "changed"
-			require.Equal(t, secondary, react.config.CodingWorkspaceRoots[1])
+			require.Equal(t, react.config.Coding.ProjectDirs(), child.Coding.ProjectDirs())
+			require.Equal(t, "managed-tree", child.Coding.Worktree.ID)
+			require.Equal(t, "origin/main", child.Coding.Worktree.BaseRef)
+			require.Equal(t, "initial-commit", child.Coding.Worktree.BaseCommit)
+			child.Coding.AdditionalProjectDirs[0] = "changed"
+			child.Coding.Worktree.BaseCommit = "changed"
+			require.Equal(t, "initial-commit", react.config.Coding.Worktree.BaseCommit)
+			require.Equal(t, secondary, react.config.Coding.ProjectDirs()[1])
 		})
 	}
 }
@@ -90,18 +95,19 @@ func TestCodingPromptStaticPrefixAndDirectSourceContext(t *testing.T) {
 		t.Run(map[bool]string{true: "native", false: "text"}[native], func(t *testing.T) {
 			builder := aicommon.NewDefaultPromptPrefixBuilder()
 			materials := &aicommon.PromptMaterials{AgentMode: ypb.AgentModeCoding, FunctionCallMode: native,
-				Workspace: true, WorkingDir: "/project-one",
-				CodingWorkspaceID: "workspace-one", CodingWorkspaceRoots: []string{"/project-one"}}
+				Workspace: true,
+				Coding:    aicommon.CodingConfig{WorkspaceID: "workspace-one", PrimaryProjectDir: "/project-one"}}
 			first, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
 			require.Contains(t, first.HighStatic, "Coding Agent 工作方法")
 			require.Contains(t, first.HighStatic, "## 输出协议")
 			require.Contains(t, first.HighStatic, "directly_call_tool_params_group")
-			require.NotContains(t, first.HighStatic, materials.WorkingDir)
+			require.NotContains(t, first.HighStatic, materials.Coding.PrimaryProjectDir)
 			require.Contains(t, materials.WorkspaceContext(), "未创建托管工作树")
 			require.NotContains(t, materials.WorkspaceContext(), "detached HEAD")
-			materials.WorkingDir = "/another-project"
-			materials.CodingWorkspaceID, materials.CodingWorktreeID = "another-workspace", "another-tree"
+			materials.Coding.PrimaryProjectDir = "/another-project"
+			materials.Coding.WorkspaceID = "another-workspace"
+			materials.Coding.Worktree = &aicommon.CodingWorktreeConfig{ID: "another-tree", SourceProjectDir: "/project-one"}
 			second, err := builder.AssemblePromptPrefix(materials)
 			require.NoError(t, err)
 			require.Equal(t, first.HighStatic, second.HighStatic, "paths and worktree IDs must not fragment the mode's system prefix")
@@ -128,7 +134,9 @@ func TestAgentModeHelperPrompts(t *testing.T) {
 				defer cancel()
 				opts := []aicommon.ConfigOption{aicommon.WithContext(ctx), aicommon.WithAgentMode(mode), aicommon.WithEnableFunctionCallMode(native)}
 				if mode == ypb.AgentModeCoding {
-					opts = append(opts, aicommon.WithCodingWorkspace("helper-workspace", t.TempDir()))
+					primary, err := filepath.EvalSymlinks(t.TempDir())
+					require.NoError(t, err)
+					opts = append(opts, aicommon.WithCodingConfig(aicommon.CodingConfig{WorkspaceID: "helper-workspace", PrimaryProjectDir: primary}))
 				}
 				r, err := NewTestReAct(opts...)
 				require.NoError(t, err)

@@ -8,73 +8,82 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// WithCodingWorkspace keeps source code separate from Workdir, which owns disposable artifacts.
-// Tools must use explicit absolute paths / shell working directories, never os.Chdir.
-func WithCodingWorkspace(workspaceID, directory string) ConfigOption {
-	return func(c *Config) error {
-		enabled := c.AgentMode == ypb.AgentModeCoding
-		if enabled {
-			path, err := coding.Directory(directory)
-			if err != nil {
-				return fmt.Errorf("coding working directory: %w", err)
-			}
-			directory = filepath.Clean(path)
-		} else {
-			workspaceID, directory = "", ""
-		}
-		c.CodingWorktreeID = ""
-		c.CodingBaseRef, c.CodingBaseCommit = "", ""
-		c.CodingWorkspaceRoots, c.CodingSourceRoots = nil, nil
-		if enabled {
-			c.CodingWorkspaceRoots = []string{directory}
-			c.CodingSourceRoots = []string{directory}
-		}
-		c.CodingWorkspaceID = workspaceID
-		c.CodingWorkingDirectory = directory
-		return nil
-	}
+// CodingConfig is the session's resolved project snapshot, separate from Config.Workdir
+// (disposable AI artifacts). Tools use explicit paths / cwd, never os.Chdir.
+type CodingConfig struct {
+	WorkspaceID string
+	// PrimaryProjectDir is the session's actual source-code working directory.
+	// With a managed worktree it points into that checkout, preserving any project subdirectory.
+	PrimaryProjectDir string
+	// AdditionalProjectDirs are the remaining user-selected folders, in selection order.
+	// They stay in their original locations when only the primary project gets a worktree.
+	AdditionalProjectDirs []string
+	Worktree              *CodingWorktreeConfig // nil when working in the original project.
 }
 
-// WithCodingWorktreeBase carries immutable creation metadata from the managed
-// worktree record. It does not describe the current branch or HEAD.
-func WithCodingWorktreeBase(ref, commit string) ConfigOption {
-	return func(c *Config) error {
-		if c.AgentMode == ypb.AgentModeCoding && c.CodingWorktreeID != "" {
-			c.CodingBaseRef, c.CodingBaseCommit = ref, commit
-		}
-		return nil
-	}
+// CodingWorktreeConfig describes the managed checkout's origin, not its current branch/HEAD.
+type CodingWorktreeConfig struct {
+	ID               string
+	SourceProjectDir string // Original primary project directory, before worktree substitution.
+	BaseRef          string
+	BaseCommit       string
 }
 
-// WithCodingDirectories propagates the server-resolved snapshot to child agents.
-func WithCodingDirectories(worktreeID string, sourceRoots, workspaceRoots []string) ConfigOption {
-	sources, roots := append([]string(nil), sourceRoots...), append([]string(nil), workspaceRoots...)
+// ProjectDirs returns [PrimaryProjectDir, AdditionalProjectDirs...].
+// The returned slice is independent of the session snapshot.
+func (c CodingConfig) ProjectDirs() []string {
+	if c.PrimaryProjectDir == "" {
+		return nil
+	}
+	return append([]string{c.PrimaryProjectDir}, c.AdditionalProjectDirs...)
+}
+
+// SourceProjectDirs restores only the original primary directory; secondary projects are shared.
+func (c CodingConfig) SourceProjectDirs() []string {
+	dirs := c.ProjectDirs()
+	if len(dirs) > 0 && c.Worktree != nil {
+		dirs[0] = c.Worktree.SourceProjectDir
+	}
+	return dirs
+}
+
+// Clone isolates child agents and prompt snapshots from subsequent mutations.
+func (c CodingConfig) Clone() CodingConfig {
+	c.AdditionalProjectDirs = append([]string(nil), c.AdditionalProjectDirs...)
+	if c.Worktree != nil {
+		worktree := *c.Worktree
+		c.Worktree = &worktree
+	}
+	return c
+}
+
+// WithCodingConfig installs one complete, resolved project snapshot.
+// Call WithAgentMode first; security sessions ignore Coding configuration.
+func WithCodingConfig(config CodingConfig) ConfigOption {
+	snapshot := config.Clone()
 	return func(c *Config) error {
 		if c.AgentMode != ypb.AgentModeCoding {
 			return nil
 		}
-		effective, original := roots, sources
-		if len(effective) == 0 {
-			effective = []string{c.CodingWorkingDirectory}
+		if snapshot.PrimaryProjectDir == "" {
+			return fmt.Errorf("coding primary project directory is required")
 		}
-		if len(original) == 0 {
-			original = effective
+		if tree := snapshot.Worktree; tree != nil {
+			if tree.ID == "" || !filepath.IsAbs(tree.SourceProjectDir) {
+				return fmt.Errorf("coding worktree requires an ID and absolute source project directory")
+			}
 		}
-		if len(original) != len(effective) || effective[0] != c.CodingWorkingDirectory {
-			return fmt.Errorf("inconsistent coding directories")
-		}
-		for _, root := range effective {
-			path, err := coding.Directory(root)
+		// Only effective directories must exist. A worktree may outlive its source checkout.
+		for _, dir := range snapshot.ProjectDirs() {
+			canonical, err := coding.Directory(dir)
 			if err != nil {
 				return err
 			}
-			if path != root {
-				return fmt.Errorf("coding directory identity changed: %s", root)
+			if canonical != dir {
+				return fmt.Errorf("coding directory identity changed: %s", dir)
 			}
 		}
-		c.CodingWorktreeID = worktreeID
-		c.CodingSourceRoots = append([]string(nil), original...)
-		c.CodingWorkspaceRoots = append([]string(nil), effective...)
+		c.Coding = snapshot.Clone()
 		return nil
 	}
 }

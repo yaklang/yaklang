@@ -3,10 +3,9 @@ package yakit
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -16,6 +15,9 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// Serialize binding mutations with worktree cleanup, including shared checkouts.
+var codingLifecycleMu sync.RWMutex
 
 func validateCodingWorkspace(ctx context.Context, name string, paths []string) (string, []string, bool, error) {
 	name = strings.TrimSpace(name)
@@ -106,38 +108,6 @@ func ListAICodingSessions(db *gorm.DB, workspaceID string) ([]*schema.AICodingSe
 	return items, err
 }
 
-// CaptureCodingSessionTitles retains the names before the project history is removed.
-// Only explicit deletion writes a tombstone: a missing session may belong to another project DB.
-func CaptureCodingSessionTitles(profileDB, projectDB *gorm.DB, sessionIDs []string) ([]*schema.AISession, error) {
-	if profileDB == nil || !profileDB.HasTable(&schema.AICodingSession{}) || len(sessionIDs) == 0 {
-		return nil, nil
-	}
-	var bindings []*schema.AICodingSession
-	if err := profileDB.Where("session_id IN (?)", sessionIDs).Find(&bindings).Error; err != nil {
-		return nil, err
-	}
-	if len(bindings) == 0 {
-		return nil, nil
-	}
-	ids := make([]string, 0, len(bindings))
-	for _, binding := range bindings {
-		ids = append(ids, binding.SessionID)
-	}
-	var sessions []*schema.AISession
-	err := projectDB.Select("session_id, title").Where("session_id IN (?)", ids).Find(&sessions).Error
-	return sessions, err
-}
-
-func MarkCodingSessionsDeleted(profileDB *gorm.DB, sessions []*schema.AISession) error {
-	for _, session := range sessions {
-		if err := profileDB.Model(&schema.AICodingSession{}).Where("session_id = ?", session.SessionID).
-			Updates(map[string]interface{}{"session_title": session.Title, "session_deleted_at": time.Now().Unix()}).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func ListAICodingWorktrees(db *gorm.DB, workspaceID string) ([]*schema.AICodingWorktree, error) {
 	var items []*schema.AICodingWorktree
 	err := db.Where("workspace_id = ?", workspaceID).Order("id desc").Find(&items).Error
@@ -145,8 +115,12 @@ func ListAICodingWorktrees(db *gorm.DB, workspaceID string) ([]*schema.AICodingW
 }
 
 // Lookup uses persisted ownership; common-dir alone cannot distinguish workspaces
-// referencing the same repository. Path lookups choose the deepest managed checkout.
-func GetAICodingWorktree(db *gorm.DB, id, path string) (*schema.AICodingWorktree, error) {
+// referencing the same repository. Ancestor candidates retain subdirectory lookup
+// without scanning other workspaces or loading the full table.
+func GetAICodingWorktree(db *gorm.DB, workspaceID, id, path string) (*schema.AICodingWorktree, error) {
+	if workspaceID != "" {
+		db = db.Where("workspace_id = ?", workspaceID)
+	}
 	if id != "" && path != "" {
 		return nil, fmt.Errorf("specify worktree ID or path, not both")
 	}
@@ -164,20 +138,17 @@ func GetAICodingWorktree(db *gorm.DB, id, path string) (*schema.AICodingWorktree
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		path = resolved
 	}
-	var items []*schema.AICodingWorktree
-	if err := db.Find(&items).Error; err != nil {
-		return nil, err
-	}
-	var result *schema.AICodingWorktree
-	for _, item := range items {
-		if coding.Contains(item.Path, path) && (result == nil || len(item.Path) > len(result.Path)) {
-			result = item
+	var candidates []string
+	for dir := path; ; dir = filepath.Dir(dir) {
+		candidates = append(candidates, dir)
+		if filepath.Dir(dir) == dir {
+			break
 		}
 	}
-	if result == nil {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return result, nil
+	var item schema.AICodingWorktree
+	err := db.Where("path IN (?)", candidates).
+		Order("length(path) desc").First(&item).Error
+	return &item, err
 }
 
 func applyCodingBinding(params *ypb.AIStartParams, binding *schema.AICodingSession) {
@@ -198,19 +169,19 @@ func clearCodingBinding(params *ypb.AIStartParams) {
 	params.CodingCreateWorktree, params.CodingWorktreeBaseRef = false, ""
 }
 
-func validateCodingBinding(ctx context.Context, db *gorm.DB, binding *schema.AICodingSession) error {
+func validateCodingBinding(ctx context.Context, db *gorm.DB, binding *schema.AICodingSession, progress func(string, *schema.AICodingWorktree)) error {
 	if binding.SessionDeletedAt != 0 {
 		return fmt.Errorf("coding session has been deleted")
 	}
 	if binding.WorktreeID != "" {
-		item, err := GetAICodingWorktree(db, binding.WorktreeID, "")
+		item, err := GetAICodingWorktree(db, binding.WorkspaceID, binding.WorktreeID, "")
 		if err != nil {
 			return err
 		}
 		if item.WorkspaceID != binding.WorkspaceID || item.WorkingDirectory != binding.WorkingDirectory {
 			return fmt.Errorf("session worktree binding is inconsistent")
 		}
-		if err := ensureCodingWorktree(ctx, db, item); err != nil {
+		if err := ensureCodingWorktree(ctx, db, item, progress); err != nil {
 			return err
 		}
 	}
@@ -228,22 +199,16 @@ func validateCodingBinding(ctx context.Context, db *gorm.DB, binding *schema.AIC
 
 // A reservation is persisted before Git runs. Failed setup retries the same path
 // and commit; ready checkouts that disappear are reported, never silently recreated.
-func ensureCodingWorktree(ctx context.Context, db *gorm.DB, item *schema.AICodingWorktree) error {
-	var err error
-	if item.State != "ready" {
-		if _, statErr := os.Lstat(item.Path); os.IsNotExist(statErr) {
-			var repo *coding.Repository
-			repo, err = coding.InspectRepository(ctx, item.RepositoryRoot)
-			if err == nil && repo.CommonDir != item.GitCommonDir {
-				err = fmt.Errorf("source repository identity changed")
-			}
-			if err == nil {
-				err = os.MkdirAll(filepath.Dir(item.Path), 0700)
-			}
-			if err == nil {
-				err = coding.CreateWorktree(ctx, item.RepositoryRoot, item.Path, item.BaseCommit)
-			}
-		}
+func ensureCodingWorktree(ctx context.Context, db *gorm.DB, item *schema.AICodingWorktree, progress func(string, *schema.AICodingWorktree)) error {
+	if progress != nil {
+		progress("checkout", item)
+	}
+	if item.State == "deleting" {
+		return fmt.Errorf("managed worktree deletion is in progress; retry deletion")
+	}
+	err := validateManagedWorktreePath(item)
+	if err == nil && item.State != "ready" {
+		err = coding.RecoverWorktree(ctx, item.RepositoryRoot, item.Path, item.GitCommonDir, item.WorkingDirectory, item.BaseCommit)
 	}
 	if err == nil {
 		_, err = coding.InspectWorktree(ctx, item.Path, item.GitCommonDir, item.WorkingDirectory)
@@ -262,16 +227,55 @@ func ensureCodingWorktree(ctx context.Context, db *gorm.DB, item *schema.AICodin
 	return nil
 }
 
+// CodingWorktreeProgress is a startup snapshot. Only implemented Git stages are
+// reported; fetching and environment setup are not part of managed creation.
+type CodingWorktreeProgress struct {
+	Stage      string `json:"stage"`
+	WorktreeID string `json:"worktree_id,omitempty"`
+	Path       string `json:"path,omitempty"`
+	BaseRef    string `json:"base_ref,omitempty"`
+	BaseCommit string `json:"base_commit,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
 // ResolveCodingSessionBinding runs under sessionruntime's per-session start lock.
 // It owns all source selection; incoming effective roots are never trusted.
-func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm.DB, sessionID string, params *ypb.AIStartParams) error {
+func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm.DB, sessionID string, params *ypb.AIStartParams, observers ...func(CodingWorktreeProgress)) (resultErr error) {
+	codingLifecycleMu.RLock()
+	defer codingLifecycleMu.RUnlock()
 	if params == nil {
 		return fmt.Errorf("AI start params required")
+	}
+	// Progress belongs to the startup attempt, not the model's message stream.
+	var progress func(string, *schema.AICodingWorktree)
+	if params.GetAgentMode() == ypb.AgentModeCoding && params.GetCodingCreateWorktree() && len(observers) > 0 {
+		snapshot := CodingWorktreeProgress{Stage: "workspace"}
+		progress = func(stage string, item *schema.AICodingWorktree) {
+			snapshot.Stage = stage
+			if item != nil {
+				snapshot.WorktreeID, snapshot.Path = item.WorktreeID, item.WorkingDirectory
+				snapshot.BaseRef, snapshot.BaseCommit = item.BaseRef, item.BaseCommit
+			}
+			for _, observer := range observers {
+				if observer != nil {
+					observer(snapshot)
+				}
+			}
+		}
+		progress("workspace", nil)
+		defer func() {
+			if resultErr != nil {
+				snapshot.Error = resultErr.Error()
+				progress("failed", nil)
+			} else {
+				progress("ready", nil)
+			}
+		}()
 	}
 	if profileDB != nil && profileDB.HasTable(&schema.AICodingSession{}) {
 		binding, err := GetAICodingSession(profileDB, sessionID)
 		if err == nil {
-			if err := validateCodingBinding(ctx, profileDB, binding); err != nil {
+			if err := validateCodingBinding(ctx, profileDB, binding, progress); err != nil {
 				return err
 			}
 			applyCodingBinding(params, binding)
@@ -327,7 +331,7 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 		SourceRoots: append([]string(nil), workspace.RootPaths...), WorkspaceRoots: append([]string(nil), workspace.RootPaths...), WorkingDirectory: workspace.RootPath}
 	var reserved *schema.AICodingWorktree
 	if params.CodingWorktreeID != "" {
-		item, err := GetAICodingWorktree(profileDB, params.CodingWorktreeID, "")
+		item, err := GetAICodingWorktree(profileDB, workspace.WorkspaceID, params.CodingWorktreeID, "")
 		if err != nil {
 			return err
 		}
@@ -346,7 +350,11 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 		}
 		base := params.CodingWorktreeBaseRef
 		if base == "" {
-			base = "HEAD"
+			branches, err := coding.ListBranches(ctx, workspace.RootPath)
+			if err != nil {
+				return err
+			}
+			base = branches.DefaultRef
 		}
 		commit, err := coding.ResolveBase(ctx, repo, base)
 		if err != nil {
@@ -398,7 +406,7 @@ func ResolveCodingSessionBinding(ctx context.Context, profileDB, projectDB *gorm
 		return err
 	}
 	if reserved != nil {
-		if err := ensureCodingWorktree(ctx, profileDB, reserved); err != nil {
+		if err := ensureCodingWorktree(ctx, profileDB, reserved, progress); err != nil {
 			return err
 		}
 	}

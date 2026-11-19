@@ -2,6 +2,7 @@ package sessionruntime
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/coding"
 	"os/exec"
@@ -84,7 +85,17 @@ func TestCodingRuntimeFailureAndConcurrentRestartReuseWorktree(t *testing.T) {
 	runtime.newReAct = func(...aicommon.ConfigOption) (*aireact.ReAct, error) {
 		return nil, fmt.Errorf("injected initialization failure")
 	}
-	_, err = runtime.connectWithOptions(ctx, ConnectRequest{StartParams: params}, nil, false)
+	var startupStages []string
+	_, err = runtime.connectWithOptions(ctx, ConnectRequest{StartParams: params}, func(event *schema.AiOutputEvent) error {
+		if event.Type == "coding_worktree_progress" {
+			require.Equal(t, id, event.SessionId)
+			var progress yakit.CodingWorktreeProgress
+			require.NoError(t, json.Unmarshal(event.Content, &progress))
+			startupStages = append(startupStages, progress.Stage)
+		}
+		return nil
+	}, false)
+	require.Equal(t, []string{"workspace", "checkout", "ready"}, startupStages)
 	require.ErrorContains(t, err, "injected initialization failure")
 	trees, err := yakit.ListAICodingWorktrees(profile, workspace.WorkspaceID)
 	require.NoError(t, err)

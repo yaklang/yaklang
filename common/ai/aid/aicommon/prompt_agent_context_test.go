@@ -16,10 +16,9 @@ func TestCodingWorkspaceJSONRoundTrip(t *testing.T) {
 	// Include shell metacharacters, template syntax, control characters and projection tags.
 	primary := "C:\\项目\\quote\"\n\t\v\x01 ${HOME} {{ .Wrong }} <|TRAITS_END|>"
 	secondary := "/source/second folder"
-	m := &PromptMaterials{AgentMode: ypb.AgentModeCoding, Workspace: true, OSArch: "windows/amd64", WorkingDir: primary,
-		AIArtifactsDir: "/artifacts", CodingWorkspaceID: "workspace", CodingWorktreeID: "tree",
-		CodingSourceRoots: []string{"/original", secondary}, CodingWorkspaceRoots: []string{primary, secondary},
-		CodingBaseRef: "origin/main", CodingBaseCommit: "abc"}
+	m := &PromptMaterials{AgentMode: ypb.AgentModeCoding, Workspace: true, OSArch: "windows/amd64", AIArtifactsDir: "/artifacts",
+		Coding: CodingConfig{WorkspaceID: "workspace", PrimaryProjectDir: primary, AdditionalProjectDirs: []string{secondary},
+			Worktree: &CodingWorktreeConfig{ID: "tree", SourceProjectDir: "/original", BaseRef: "origin/main", BaseCommit: "abc"}}}
 	content := m.WorkspaceContext()
 	require.Equal(t, 1, strings.Count(content, "# Workspace Context"))
 	start := strings.Index(content, "\n{")
@@ -31,7 +30,7 @@ func TestCodingWorkspaceJSONRoundTrip(t *testing.T) {
 	require.Equal(t, "origin/main", data.Worktree.CreationBaseRef)
 	require.NotContains(t, content, "<|TRAITS_END|>", "path data must not become projection boundaries")
 	require.NotContains(t, content, "<no value>")
-	m.CodingWorktreeID = ""
+	m.Coding.Worktree = nil
 	require.NotContains(t, m.WorkspaceContext(), `"worktree":`)
 	require.NotContains(t, m.WorkspaceContext(), `"creation_base_commit":`)
 }
@@ -40,7 +39,7 @@ func TestAgentPromptCacheBoundaries(t *testing.T) {
 	for _, mode := range []string{ypb.AgentModeSecurity, ypb.AgentModeCoding} {
 		for _, native := range []bool{false, true} {
 			m := &PromptMaterials{AgentMode: mode, FunctionCallMode: native, Workspace: true,
-				WorkingDir: "/project", OSArch: "linux/amd64", TaskInstruction: "task", Schema: "schema"}
+				WorkingDir: "/project", Coding: CodingConfig{PrimaryProjectDir: "/project"}, OSArch: "linux/amd64", TaskInstruction: "task", Schema: "schema"}
 			builder := NewDefaultPromptPrefixBuilder()
 			build := func(query string) map[string][]*aiprojection.Chunk {
 				prompt, err := builder.AssemblePromptWithDynamicSection(m, "dynamic", "{{ . }}", query, query)
@@ -54,7 +53,9 @@ func TestAgentPromptCacheBoundaries(t *testing.T) {
 				require.Equal(t, first[section], second[section], "%s native=%v %s", mode, native, section)
 			}
 			require.NotEqual(t, first[aiprojection.SectionDynamic], second[aiprojection.SectionDynamic])
-			m.WorkingDir, m.CodingWorktreeID = "/other-project", "tree"
+			m.WorkingDir = "/other-project"
+			m.Coding.PrimaryProjectDir = "/other-project"
+			m.Coding.Worktree = &CodingWorktreeConfig{ID: "tree", SourceProjectDir: "/project"}
 			third := build("second")
 			require.Equal(t, second[aiprojection.SectionHighStatic], third[aiprojection.SectionHighStatic])
 			require.Equal(t, second[aiprojection.SectionSemiDynamic2], third[aiprojection.SectionSemiDynamic2])
@@ -73,10 +74,8 @@ func TestAgentModePlanningReviewContext(t *testing.T) {
 			t.Run(mode+"/"+name, func(t *testing.T) {
 				// Prompt rendering must use the bound snapshot without requiring these paths to exist.
 				cfg := NewConfig(context.Background(), WithAgentMode(mode), WithWorkdir("/review-artifacts"))
-				cfg.CodingWorkingDirectory, cfg.CodingWorkspaceID = "/review-worktree", "review-workspace"
-				cfg.CodingWorktreeID, cfg.CodingBaseCommit = "review-tree", "base-commit"
-				cfg.CodingWorkspaceRoots = []string{cfg.CodingWorkingDirectory, "/secondary"}
-				cfg.CodingSourceRoots = []string{"/source", "/secondary"}
+				cfg.Coding = CodingConfig{WorkspaceID: "review-workspace", PrimaryProjectDir: "/review-worktree", AdditionalProjectDirs: []string{"/secondary"},
+					Worktree: &CodingWorktreeConfig{ID: "review-tree", SourceProjectDir: "/source", BaseCommit: "base-commit"}}
 				prompt, err := build(cfg, aitool.InvokeParams{"progress": "task observation"})
 				require.NoError(t, err)
 				require.Contains(t, prompt, "task observation")

@@ -72,12 +72,7 @@ type PromptMaterials struct {
 	SessionEvidenceSemiDynamic string
 	CurrentTime                string
 	AgentMode                  string
-	CodingWorkspaceID          string
-	CodingWorktreeID           string
-	CodingBaseRef              string
-	CodingBaseCommit           string
-	CodingWorkspaceRoots       []string
-	CodingSourceRoots          []string
+	Coding                     CodingConfig
 	Workspace                  bool
 	OSArch                     string
 	WorkingDir                 string

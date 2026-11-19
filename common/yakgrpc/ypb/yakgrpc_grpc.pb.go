@@ -695,6 +695,7 @@ const (
 	Yak_QueryAICodingWorkspaces_FullMethodName                    = "/ypb.Yak/QueryAICodingWorkspaces"
 	Yak_ListAICodingWorktrees_FullMethodName                      = "/ypb.Yak/ListAICodingWorktrees"
 	Yak_GetAICodingWorktree_FullMethodName                        = "/ypb.Yak/GetAICodingWorktree"
+	Yak_DeleteAICodingWorktree_FullMethodName                     = "/ypb.Yak/DeleteAICodingWorktree"
 	Yak_ListAICodingBranches_FullMethodName                       = "/ypb.Yak/ListAICodingBranches"
 	Yak_ListAICodingSessions_FullMethodName                       = "/ypb.Yak/ListAICodingSessions"
 )
@@ -1565,6 +1566,7 @@ type YakClient interface {
 	QueryAICodingWorkspaces(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryAICodingWorkspacesResponse, error)
 	ListAICodingWorktrees(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingWorktreesResponse, error)
 	GetAICodingWorktree(ctx context.Context, in *GetAICodingWorktreeRequest, opts ...grpc.CallOption) (*AICodingWorktree, error)
+	DeleteAICodingWorktree(ctx context.Context, in *DeleteAICodingWorktreeRequest, opts ...grpc.CallOption) (*Empty, error)
 	ListAICodingBranches(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingBranchesResponse, error)
 	ListAICodingSessions(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingSessionsResponse, error)
 }
@@ -9345,6 +9347,16 @@ func (c *yakClient) GetAICodingWorktree(ctx context.Context, in *GetAICodingWork
 	return out, nil
 }
 
+func (c *yakClient) DeleteAICodingWorktree(ctx context.Context, in *DeleteAICodingWorktreeRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_DeleteAICodingWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) ListAICodingBranches(ctx context.Context, in *AICodingWorkspaceRequest, opts ...grpc.CallOption) (*ListAICodingBranchesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListAICodingBranchesResponse)
@@ -10231,6 +10243,7 @@ type YakServer interface {
 	QueryAICodingWorkspaces(context.Context, *Empty) (*QueryAICodingWorkspacesResponse, error)
 	ListAICodingWorktrees(context.Context, *AICodingWorkspaceRequest) (*ListAICodingWorktreesResponse, error)
 	GetAICodingWorktree(context.Context, *GetAICodingWorktreeRequest) (*AICodingWorktree, error)
+	DeleteAICodingWorktree(context.Context, *DeleteAICodingWorktreeRequest) (*Empty, error)
 	ListAICodingBranches(context.Context, *AICodingWorkspaceRequest) (*ListAICodingBranchesResponse, error)
 	ListAICodingSessions(context.Context, *AICodingWorkspaceRequest) (*ListAICodingSessionsResponse, error)
 	mustEmbedUnimplementedYakServer()
@@ -12270,6 +12283,9 @@ func (UnimplementedYakServer) ListAICodingWorktrees(context.Context, *AICodingWo
 }
 func (UnimplementedYakServer) GetAICodingWorktree(context.Context, *GetAICodingWorktreeRequest) (*AICodingWorktree, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAICodingWorktree not implemented")
+}
+func (UnimplementedYakServer) DeleteAICodingWorktree(context.Context, *DeleteAICodingWorktreeRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAICodingWorktree not implemented")
 }
 func (UnimplementedYakServer) ListAICodingBranches(context.Context, *AICodingWorkspaceRequest) (*ListAICodingBranchesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListAICodingBranches not implemented")
@@ -23526,6 +23542,24 @@ func _Yak_GetAICodingWorktree_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DeleteAICodingWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAICodingWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAICodingWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAICodingWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAICodingWorktree(ctx, req.(*DeleteAICodingWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_ListAICodingBranches_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AICodingWorkspaceRequest)
 	if err := dec(in); err != nil {
@@ -25776,6 +25810,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAICodingWorktree",
 			Handler:    _Yak_GetAICodingWorktree_Handler,
+		},
+		{
+			MethodName: "DeleteAICodingWorktree",
+			Handler:    _Yak_DeleteAICodingWorktree_Handler,
 		},
 		{
 			MethodName: "ListAICodingBranches",

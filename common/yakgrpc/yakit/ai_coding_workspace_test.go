@@ -120,7 +120,7 @@ func TestCodingMultiDirectorySessionLifecycle(t *testing.T) {
 	original, err := os.ReadFile(filepath.Join(primary, "source.txt"))
 	require.NoError(t, err)
 	require.Equal(t, "first", string(original))
-	lookup, err := GetAICodingWorktree(profile, "", params.CodingWorkingDirectory)
+	lookup, err := GetAICodingWorktree(profile, workspace.WorkspaceID, "", params.CodingWorkingDirectory)
 	require.NoError(t, err)
 	require.Equal(t, workspace.WorkspaceID, lookup.WorkspaceID)
 	require.Equal(t, front, lookup.RepositoryRoot)

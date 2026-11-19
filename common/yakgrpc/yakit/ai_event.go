@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -314,7 +315,7 @@ func DeleteAIEventBySessionID(db *gorm.DB, sessionId string) (int64, error) {
 	}
 
 	var deletedEvents int64
-	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+	deleteEvents := func(tx *gorm.DB) error {
 		// Delete associations in-DB to avoid loading huge UUID lists into memory.
 		eventTable := tx.NewScope(&schema.AiOutputEvent{}).TableName()
 		if r := tx.Model(&schema.AiProcessAndAiEvent{}).
@@ -334,7 +335,17 @@ func DeleteAIEventBySessionID(db *gorm.DB, sessionId string) (int64, error) {
 		}
 		deletedEvents = r.RowsAffected
 		return nil
-	})
+	}
+	// Session deletion can include metadata and events in one outer transaction.
+	// Gorm v1 cannot begin a nested transaction on an existing *sql.Tx.
+	var err error
+	if db != nil {
+		if _, inTransaction := db.CommonDB().(*sql.Tx); inTransaction {
+			err = deleteEvents(db)
+			return deletedEvents, err
+		}
+	}
+	err = utils.GormTransaction(db, deleteEvents)
 	return deletedEvents, err
 }
 
