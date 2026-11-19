@@ -12,6 +12,22 @@
     "timeout": "1m"
   },
   {
+    "package": "./common/yak/lua/lua2ssa/test",
+    "timeout": "2m"
+  },
+  {
+    "package": "./common/yak/rust/rust2ssa/test",
+    "timeout": "2m"
+  },
+  {
+    "package": "./common/yak/kotlin/kotlin2ssa/test",
+    "timeout": "2m"
+  },
+  {
+    "package": "./common/yak/scala/scala2ssa/test",
+    "timeout": "5m"
+  },
+  {
     "package": "./common/yak/ssaapi/ssareducer",
     "timeout": "1m"
   },

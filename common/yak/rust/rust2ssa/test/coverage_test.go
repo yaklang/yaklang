@@ -1,4 +1,4 @@
-package tests
+package test
 
 import (
 	"os"
@@ -6,16 +6,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/kotlin/kotlin2ssa"
+	"github.com/yaklang/yaklang/common/yak/rust/rust2ssa"
 )
 
-func TestKotlinCorpusCoverage(t *testing.T) {
-	root := os.Getenv("KOTLIN_CORPUS")
+func TestRustCorpusCoverage(t *testing.T) {
+	root := os.Getenv("RUST_CORPUS")
 	if root == "" {
-		t.Skip("KOTLIN_CORPUS not set")
+		t.Skip("RUST_CORPUS not set")
 	}
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() || !strings.HasSuffix(path, ".kt") {
+		if err != nil || info == nil || info.IsDir() || !strings.HasSuffix(path, ".rs") {
 			return nil
 		}
 		raw, err := os.ReadFile(path)
@@ -23,7 +23,7 @@ func TestKotlinCorpusCoverage(t *testing.T) {
 			t.Logf("RESULT\tFAIL\t%s\tread: %v", path, err)
 			return nil
 		}
-		_, parseErr := kotlin2ssa.Frontend(string(raw))
+		_, parseErr := rust2ssa.Frontend(string(raw))
 		if parseErr != nil {
 			message := strings.ReplaceAll(parseErr.Error(), "\n", " ")
 			if len(message) > 300 {
