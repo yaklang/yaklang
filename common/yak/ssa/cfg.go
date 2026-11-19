@@ -633,7 +633,8 @@ type SwitchBuilder struct {
 
 	buildDefault func()
 
-	AutoBreak bool
+	AutoBreak       bool
+	DirectBodyMerge bool
 }
 
 func (b *FunctionBuilder) BuildSwitch() *SwitchBuilder {
@@ -670,6 +671,7 @@ func (t *SwitchBuilder) Finish() {
 	enter := t.enter
 	scope := enter.ScopeTable
 	switchBuilder := ssautil.NewSwitchStmt(ssautil.ScopedVersionedTableIF[Value](scope), t.AutoBreak)
+	switchBuilder.DirectBodyMerge = t.DirectBodyMerge
 	var cond Value
 
 	condb := builder.NewBasicBlockNotAddBlocks("switch-condition")
@@ -749,6 +751,9 @@ func (t *SwitchBuilder) Finish() {
 			t.buildBody(i)
 			builder.PopTarget()
 
+			if t.DirectBodyMerge {
+				return builder.CurrentBlock.ScopeTable, svt
+			}
 			bodyEnd := svt.CreateShadowScope()
 			bodyEnd.CoverBy(builder.CurrentBlock.ScopeTable)
 			return bodyEnd, svt
@@ -772,6 +777,9 @@ func (t *SwitchBuilder) Finish() {
 			builder.PushTarget(switchBuilder, done, nil, nil)
 			t.buildDefault()
 			builder.PopTarget()
+		}
+		if t.DirectBodyMerge {
+			return builder.CurrentBlock.ScopeTable, svt
 		}
 		bodyEnd := svt.CreateShadowScope()
 		bodyEnd.CoverBy(builder.CurrentBlock.ScopeTable)
