@@ -319,6 +319,11 @@ type SwitchStmt[T versionedValue] struct {
 	mergeToSwitchEnd []ScopedVersionedTableIF[T]
 	mergeToNextBody  ScopedVersionedTableIF[T]
 	AutoBreak        bool
+	// DirectBodyMerge keeps the case body scope for the switch join instead of
+	// shadowing it through CoverBy. Languages whose case bodies assign to
+	// variables declared in an outer scope (C++) need it; the default keeps the
+	// historical behaviour for C, Java and PHP.
+	DirectBodyMerge bool
 }
 
 func NewSwitchStmt[T versionedValue](global ScopedVersionedTableIF[T], AutoBreak bool) *SwitchStmt[T] {
@@ -352,10 +357,21 @@ func (s *SwitchStmt[T]) BuildBody(
 		s.mergeToNextBody = nil
 	}
 	retBody, retSvt := body(sub)
-	endSvt := s.condition.CreateSubScope()
-	endSvt.CoverBy(retSvt)
-	endBody := endSvt.CreateShadowScope()
-	endBody.CoverBy(retBody)
+	var endBody ScopedVersionedTableIF[T]
+	if s.DirectBodyMerge {
+		if retBody == nil {
+			retBody = sub
+		}
+		// Merge the case body scope itself. CoverBy only copies variables that
+		// are capturable from this scope; a variable first assigned in a case
+		// arm has a different version root, and a shadow/cover would drop it.
+		endBody = retBody
+	} else {
+		endSvt := s.condition.CreateSubScope()
+		endSvt.CoverBy(retSvt)
+		endBody = endSvt.CreateShadowScope()
+		endBody.CoverBy(retBody)
+	}
 
 	if s.AutoBreak { // if this switch fall through, then merge to next body
 		// if switch default break to switch end
