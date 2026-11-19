@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/damenggorm"
 )
 
@@ -528,7 +529,7 @@ func nativeGetConstIDsFromIrConsts(ctx context.Context, db *gorm.DB, progName st
 		case "postgres", "postgresql", "cloudsqlpostgres":
 			query = `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND "string" ~ ?`
 		default:
-			if isSQLiteDB(db) {
+			if schema.IsSQLite(db) {
 				query = `SELECT code_id FROM "` + TableIrConsts + `" NOT INDEXED WHERE program_name = ? AND "string" REGEXP ?`
 			}
 		}

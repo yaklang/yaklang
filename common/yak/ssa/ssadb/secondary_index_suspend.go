@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 // secondaryIndexTables are the IR tables a compile writes. Non-unique indexes
@@ -22,18 +23,6 @@ var secondaryIndexTables = []string{
 	TableIrSources,
 }
 
-func isSQLiteDB(db *gorm.DB) bool {
-	if db == nil || db.Dialect() == nil {
-		return false
-	}
-	switch strings.ToLower(db.Dialect().GetName()) {
-	case "sqlite", "sqlite3":
-		return true
-	default:
-		return false
-	}
-}
-
 func quoteSQLIdent(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
@@ -42,7 +31,7 @@ func quoteSQLIdent(name string) string {
 // returns the CREATE statements needed to put them back. SQLite only; other
 // dialects are a no-op. Unique indexes are not dropped.
 func SuspendSecondaryIndexes(db *gorm.DB) ([]string, error) {
-	if !isSQLiteDB(db) || db.DB() == nil {
+	if !schema.IsSQLite(db) || db.DB() == nil {
 		return nil, nil
 	}
 	ctx := context.Background()
@@ -103,7 +92,7 @@ func SuspendSecondaryIndexes(db *gorm.DB) ([]string, error) {
 // SuspendSecondaryIndexes. The sorter spills to disk so a multi-gigabyte
 // index build does not have to fit in the SQLite page cache.
 func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
-	if len(ddls) == 0 || !isSQLiteDB(db) || db.DB() == nil {
+	if len(ddls) == 0 || !schema.IsSQLite(db) || db.DB() == nil {
 		return nil
 	}
 	ctx := context.Background()
@@ -150,7 +139,7 @@ func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 // automatic checkpoints off so a multi-gigabyte compile does not copy the
 // database on every commit; this is the single fold before queries.
 func CheckpointSQLiteWAL(db *gorm.DB) error {
-	if !isSQLiteDB(db) || db.DB() == nil {
+	if !schema.IsSQLite(db) || db.DB() == nil {
 		return nil
 	}
 	started := time.Now()

@@ -1,6 +1,9 @@
 package ssadb
 
-import "github.com/yaklang/gorm"
+import (
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/schema"
+)
 
 // BeginSQLiteBulkDelete relaxes SQLite durability for a large DELETE and
 // returns a function that restores the compile write profile.
@@ -11,7 +14,7 @@ import "github.com/yaklang/gorm"
 // and a crash leaves the program to be deleted again on the next attempt.
 // Non-SQLite databases keep their defaults.
 func BeginSQLiteBulkDelete(db *gorm.DB) func() {
-	if !isSQLiteDB(db) || db.DB() == nil {
+	if !schema.IsSQLite(db) || db.DB() == nil {
 		return func() {}
 	}
 	db.Exec("PRAGMA synchronous = OFF;")
@@ -28,7 +31,7 @@ func BeginSQLiteBulkDelete(db *gorm.DB) func() {
 // the SSA pool otherwise has eight connections and the delete could land on
 // one that still has FULL synchronous and WAL autocheckpoint enabled.
 func BeginSQLiteSingleConn(db *gorm.DB) func() {
-	if !isSQLiteDB(db) || db.DB() == nil {
+	if !schema.IsSQLite(db) || db.DB() == nil {
 		return func() {}
 	}
 	sqlDB := db.DB()
