@@ -84,7 +84,7 @@ func ensureIndex(db *gorm.DB, spec indexSpec) error {
 	if hasNamedIndex(db, spec.table, spec.name) {
 		return nil
 	}
-	ddl, ok := indexDialectFor(db).CreateIndexSQL(spec)
+	ddl, ok := indexDialectFor(db).CreateIndexSQL(db, spec)
 	if !ok {
 		return fmt.Errorf("%s cannot express index %s with its key", db.Dialect().GetName(), spec.name)
 	}

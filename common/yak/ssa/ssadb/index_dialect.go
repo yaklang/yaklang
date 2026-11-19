@@ -13,8 +13,10 @@ import (
 // support. The template in index_maintenance.go never inspects a dialect name.
 type indexDialect interface {
 	// CreateIndexSQL renders CREATE [UNIQUE] INDEX for spec. ok is false when
-	// this backend cannot express the key.
-	CreateIndexSQL(spec indexSpec) (string, bool)
+	// this backend cannot express the key. db is passed so an implementation
+	// can ask its own server a question the render call depends on; the other
+	// implementations ignore it.
+	CreateIndexSQL(db *gorm.DB, spec indexSpec) (string, bool)
 	// DeleteDuplicatesSQL renders the statement that keeps MIN(id) per key.
 	DeleteDuplicatesSQL(spec indexSpec) string
 	// SupportsPartialIndex reports whether spec.partial can be expressed.
@@ -45,7 +47,7 @@ func indexDialectFor(db *gorm.DB) indexDialect {
 		return dmIndexDialect{}
 	}
 	if strings.EqualFold(db.Dialect().GetName(), "mysql") {
-		return mysqlIndexDialect{functionalIndex: mysqlFunctionalIndexSupported(db)}
+		return mysqlIndexDialect{}
 	}
 	return standardIndexDialect{}
 }
@@ -58,7 +60,7 @@ func indexDialectFor(db *gorm.DB) indexDialect {
 // and isUniqueViolation, not by this adapter.
 type standardIndexDialect struct{}
 
-func (standardIndexDialect) CreateIndexSQL(spec indexSpec) (string, bool) {
+func (standardIndexDialect) CreateIndexSQL(_ *gorm.DB, spec indexSpec) (string, bool) {
 	return createIndexSQL(doubleQuote, asWrittenKeyPart, spec)
 }
 
@@ -73,14 +75,20 @@ func (standardIndexDialect) SupportsIndexPruning() bool { return true }
 // mysqlIndexDialect uses backtick identifiers. A functional key part needs its
 // own parentheses and only exists from MySQL 8.0.13; a server without it makes
 // the adapter refuse expression keys instead of emitting a rejected statement on
-// every open.
-type mysqlIndexDialect struct {
-	functionalIndex bool
+// every open. The server version is a property of the connection, not of the
+// dialect name, so the adapter asks its own server here -- the dispatch point
+// in indexDialectFor only selects the adapter and stays free of version logic.
+type mysqlIndexDialect struct{}
+
+func (mysqlIndexDialect) CreateIndexSQL(db *gorm.DB, spec indexSpec) (string, bool) {
+	return mysqlCreateIndexSQL(mysqlFunctionalIndexSupported(db), spec)
 }
 
-func (d mysqlIndexDialect) CreateIndexSQL(spec indexSpec) (string, bool) {
+// mysqlCreateIndexSQL renders the MySQL statement for a known capability; the
+// version probe is the caller's, which keeps the renderer testable offline.
+func mysqlCreateIndexSQL(functionalIndex bool, spec indexSpec) (string, bool) {
 	return createIndexSQL(backtick, func(expression string) (string, bool) {
-		return "(" + expression + ")", d.functionalIndex
+		return "(" + expression + ")", functionalIndex
 	}, spec)
 }
 

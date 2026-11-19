@@ -16,9 +16,12 @@ import (
 //     wrapped in its own parentheses and only supports it from 8.0.13; MariaDB
 //     has no equivalent syntax.
 //
-// This file only answers the MySQL version question the MySQL adapter needs.
-// Everything else (identifier quoting, catalog lookups, error vocabulary) is
-// already owned by the dialect.
+// This file answers the one capability question MySQL's adapter cannot read
+// off the dialect name: whether the server has functional key parts. It is an
+// internal detail of mysqlIndexDialect (index_dialect.go), called from its
+// CreateIndexSQL with the live connection. Everything else the adapters need
+// (identifier quoting, catalog lookups, error vocabulary) stays with the
+// dialect.
 
 // mysqlFunctionalIndexMinVersion is MySQL's first release with functional key
 // parts, encoded as major*10000 + minor*100 + patch.
