@@ -1,6 +1,7 @@
 package bash2ssa
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -205,10 +206,13 @@ func (ab *astBuilder) buildArithm(expr syntax.ArithmExpr) ssa.Value {
 
 	switch e := expr.(type) {
 	case *syntax.Word:
-		return ab.buildWord(e)
+		return ab.buildArithmWord(e)
 	case *syntax.ParenArithm:
 		return ab.buildArithm(e.X)
 	case *syntax.UnaryArithm:
+		if e.Op == syntax.Inc || e.Op == syntax.Dec {
+			return ab.buildArithmStep(e)
+		}
 		value := ab.buildArithm(e.X)
 		if utils.IsNil(value) {
 			return nil
@@ -257,6 +261,77 @@ func (ab *astBuilder) buildArithm(expr syntax.ArithmExpr) ssa.Value {
 	default:
 		return nil
 	}
+}
+
+// buildArithmWord resolves a bare arithmetic word. In shell arithmetic a bare
+// word is a variable read, not a string literal, so `$((N+1))` must read N.
+func (ab *astBuilder) buildArithmWord(word *syntax.Word) ssa.Value {
+	if word == nil {
+		return nil
+	}
+	if name, ok := staticWord(word); ok {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			if number, err := strconv.ParseInt(name, 0, 64); err == nil {
+				return ab.EmitConstInst(number)
+			}
+			if isArithmeticIdentifier(name) {
+				return ab.readOrCreate(name)
+			}
+		}
+	}
+	return ab.buildWord(word)
+}
+
+// isArithmeticIdentifier reports whether name is a plain shell variable name.
+// Array subscripts and base#number forms keep their word form instead of
+// creating a variable with punctuation in its name.
+func isArithmeticIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for index, r := range name {
+		switch {
+		case r == '_':
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+			if index == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// buildArithmStep lowers `i++` / `--i` to a versioned read-modify-write so a
+// C-style loop updates the variable that feeds the loop Phi.
+func (ab *astBuilder) buildArithmStep(step *syntax.UnaryArithm) ssa.Value {
+	if step == nil {
+		return nil
+	}
+	name, ok := arithmeticVariableName(step.X)
+	if !ok {
+		ab.buildArithm(step.X)
+		return nil
+	}
+	old := ab.readOrCreate(name)
+	if utils.IsNil(old) {
+		return nil
+	}
+	op := ssa.BinaryOpcode(ssa.OpAdd)
+	if step.Op == syntax.Dec {
+		op = ssa.OpSub
+	}
+	value := ab.EmitBinOp(op, old, ab.EmitConstInst(int64(1)))
+	if utils.IsNil(value) {
+		value = old
+	}
+	if variable := ab.CreateVariable(name); variable != nil {
+		ab.AssignVariable(variable, value)
+	}
+	return value
 }
 
 func arithmeticVariableName(expr syntax.ArithmExpr) (string, bool) {
