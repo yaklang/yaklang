@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
@@ -15,36 +14,23 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
-func TestPCAPGRPCLegacyPacketWithoutDataset(t *testing.T) {
-	s, client := newPCAPTestClient(t)
-	legacy, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "legacy.sqlite"))
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, legacy.Close()) })
-	s.projectDatabase = legacy
-	require.NoError(t, legacy.AutoMigrate(&schema.TrafficPacket{}).Error)
-	_, _, raws := pcapTestCapture(t, 1)
-	row := &schema.TrafficPacket{QuotedRaw: strconv.Quote(string(raws[0])), NetworkEndpointIPSrc: "10.0.0.1"}
-	require.NoError(t, legacy.Create(row).Error)
-	result, err := client.QueryTrafficPacket(context.Background(), &ypb.QueryTrafficPacketRequest{Pagination: &ypb.Paging{Page: 1, Limit: 10}})
-	require.NoError(t, err)
-	require.Len(t, result.Data, 1)
-	require.Equal(t, raws[0], result.Data[0].Raw, "legacy list still includes bytes without opting into Full")
-	require.EqualValues(t, row.ID, result.Data[0].Id)
-	parsed, err := client.ParseTraffic(context.Background(), &ypb.ParseTrafficRequest{Type: "packet", Id: int64(row.ID)})
-	require.NoError(t, err)
-	require.True(t, parsed.OK)
-	var envelope struct{ RAW []byte }
-	require.NoError(t, json.Unmarshal([]byte(parsed.Result), &envelope))
-	require.Equal(t, raws[0], envelope.RAW)
+func TestDeprecatedTrafficRPCs(t *testing.T) {
+	_, client := newPCAPTestClient(t)
+	_, err := client.QueryTrafficPacket(context.Background(), &ypb.QueryTrafficPacketRequest{})
+	require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
+	_, err = client.ParseTraffic(context.Background(), &ypb.ParseTrafficRequest{Type: "packet", Id: 1})
+	require.Equal(t, codes.InvalidArgument, grpcstatus.Code(err))
+	_, err = client.QueryTrafficSession(context.Background(), &ypb.QueryTrafficSessionRequest{})
+	require.Equal(t, codes.Unimplemented, grpcstatus.Code(err))
+	_, err = client.QueryTrafficTCPReassembled(context.Background(), &ypb.QueryTrafficTCPReassembledRequest{})
+	require.Equal(t, codes.Unimplemented, grpcstatus.Code(err))
 }
 
 func TestPCAPGRPCLegacyPacketQuery(t *testing.T) {

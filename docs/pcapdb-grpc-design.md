@@ -171,7 +171,7 @@ MessageRef
 
 以下保留改造前的实现记录，便于定位现有代码；其中共用接口、旧数据兼容及 Full 的设计不再约束上面的新计划。
 
-数据集管理接口已实现；流量查看器现改为扩展老 `QueryTrafficPacket`，不传 DatasetID 保持旧行为。定义见 [yakgrpc.proto](../common/yakgrpc/yakgrpc.proto)，兼容实现见 [grpc_traffic_pcapdb.go](../common/yakgrpc/grpc_traffic_pcapdb.go)，测试见 [grpc_traffic_pcapdb_test.go](../common/yakgrpc/grpc_traffic_pcapdb_test.go)。
+数据集管理接口已实现。老 project traffic 查询机制已删除；`QueryTrafficPacket` 和 `ParseTraffic` 仅作为 deprecated pcapdb 兼容壳，要求传 DatasetID。`QueryTrafficSession` 和 `QueryTrafficTCPReassembled` 仅保留 RPC 名称并返回 Unimplemented。定义见 [yakgrpc.proto](../common/yakgrpc/yakgrpc.proto)，pcapdb 兼容实现见 [grpc_traffic_pcapdb.go](../common/yakgrpc/grpc_traffic_pcapdb.go)。
 
 ### 改造前前端使用的契约
 

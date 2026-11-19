@@ -7,7 +7,6 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
-	bin_parser2 "github.com/yaklang/yaklang/common/bin-parser"
 	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
@@ -19,8 +18,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -247,77 +247,8 @@ func ParseTraffic(data []byte, rule string) ([]any, error) {
 	return packageRootNodes, nil
 }
 func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
-	if req.GetDatasetID() != "" {
-		return s.parsePCAPTraffic(ctx, req)
+	if strings.TrimSpace(req.GetDatasetID()) == "" {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "ParseTraffic is deprecated; DatasetID is required, use GetPCAPPacketDetail")
 	}
-	rsp := &ypb.ParseTrafficResponse{}
-	var payload []byte
-	pagination := &ypb.Paging{
-		Limit: 1,
-	}
-	finalResult := map[string]any{}
-	switch req.GetType() {
-	case "session":
-		_, sessions, err := yakit.QueryTrafficSession(consts.GetGormProjectDatabase(), &ypb.QueryTrafficSessionRequest{
-			Pagination: pagination,
-			FromId:     req.GetId() - 1,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(sessions) != 1 {
-			return nil, utils.Error("invalid session id")
-		}
-		//payload = sessions[0].
-	case "packet":
-		_, packet, err := yakit.QueryTrafficPacket(s.GetProjectDatabase(), &ypb.QueryTrafficPacketRequest{
-			Pagination: pagination,
-			FromId:     req.GetId() - 1,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(packet) != 1 {
-			return nil, utils.Error("invalid packet id")
-		}
-		raw, _ := strconv.Unquote(packet[0].QuotedRaw)
-		packageRootNodes, err := ParseTraffic([]byte(raw), "ethernet")
-		if err == nil {
-			finalResult["Result"] = packageRootNodes
-		}
-		finalResult["RAW"] = codec.EncodeBase64(raw)
-		rsp.OK = true
-		resJson, err := bin_parser2.ResultToJson(finalResult)
-		if err != nil {
-			return nil, err
-		}
-		rsp.Result = resJson
-		return rsp, nil
-	case "reassembled":
-		_, sessions, err := yakit.QueryTrafficTCPReassembled(consts.GetGormProjectDatabase(), &ypb.QueryTrafficTCPReassembledRequest{
-			Pagination: pagination,
-			FromId:     req.GetId() - 1,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(sessions) != 1 {
-			return nil, utils.Error("invalid session id")
-		}
-		payload = codec.StrConvUnquoteForce(sessions[0].QuotedData)
-		packageRootNodes, err := ParseReassembledTraffic([]byte(payload))
-		if err == nil {
-			finalResult["Result"] = packageRootNodes
-		}
-		finalResult["RAW"] = codec.EncodeBase64(payload)
-		rsp.OK = true
-		resJson, err := bin_parser2.ResultToJson(finalResult)
-		if err != nil {
-			return nil, err
-		}
-		rsp.Result = resJson
-		return rsp, nil
-	}
-	rsp.OK = false
-	return rsp, errors.New("unknown type")
+	return s.parsePCAPTraffic(ctx, req)
 }
