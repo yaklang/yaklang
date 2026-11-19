@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
+	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -17,19 +18,42 @@ func staticWord(word *syntax.Word) (string, bool) {
 	if word == nil {
 		return "", true
 	}
-	return staticParts(word.Parts)
+	return staticParts(word.Parts, false)
 }
 
-func staticParts(parts []syntax.WordPart) (string, bool) {
+func literalText(raw string, double bool) string {
+	if !strings.Contains(raw, `\`) {
+		return raw
+	}
+	var b strings.Builder
+	for i := 0; i < len(raw); i++ {
+		if raw[i] == '\\' && i+1 < len(raw) && (!double || strings.ContainsRune("\\\"$`\n", rune(raw[i+1]))) {
+			i++
+			if raw[i] == '\n' {
+				continue
+			}
+		}
+		b.WriteByte(raw[i])
+	}
+	return b.String()
+}
+func quotedText(q *syntax.SglQuoted) string {
+	if q.Dollar {
+		s, _, _ := expand.Format(nil, q.Value, nil)
+		return s
+	}
+	return q.Value
+}
+func staticParts(parts []syntax.WordPart, double bool) (string, bool) {
 	var b strings.Builder
 	for _, part := range parts {
 		switch p := part.(type) {
 		case *syntax.Lit:
-			b.WriteString(p.Value)
+			b.WriteString(literalText(p.Value, double))
 		case *syntax.SglQuoted:
-			b.WriteString(p.Value)
+			b.WriteString(quotedText(p))
 		case *syntax.DblQuoted:
-			inner, ok := staticParts(p.Parts)
+			inner, ok := staticParts(p.Parts, true)
 			if !ok {
 				return "", false
 			}
@@ -50,14 +74,15 @@ func (ab *astBuilder) buildWord(word *syntax.Word) ssa.Value {
 	}
 	defer ab.setRange(word)()
 
-	switch len(word.Parts) {
-	case 1:
-		return ab.buildWordPart(word.Parts[0])
+	return ab.buildParts(word.Parts, false)
+}
+func (ab *astBuilder) buildParts(parts []syntax.WordPart, double bool) ssa.Value {
+	if text, ok := staticParts(parts, double); ok {
+		return ab.EmitConstInst(text)
 	}
-
 	var out ssa.Value
-	for _, part := range word.Parts {
-		value := ab.buildWordPart(part)
+	for _, part := range parts {
+		value := ab.buildWordPart(part, double)
 		if utils.IsNil(value) {
 			continue
 		}
@@ -65,30 +90,25 @@ func (ab *astBuilder) buildWord(word *syntax.Word) ssa.Value {
 			out = value
 			continue
 		}
-		if merged := ab.EmitBinOp(ssa.OpAdd, out, value); !utils.IsNil(merged) {
-			out = merged
-		}
+		out = ab.concat(out, value)
 	}
 	return out
 }
 
-func (ab *astBuilder) buildWordPart(part syntax.WordPart) ssa.Value {
+func (ab *astBuilder) buildWordPart(part syntax.WordPart, double bool) ssa.Value {
 	switch p := part.(type) {
 	case *syntax.Lit:
-		return ab.EmitConstInst(p.Value)
+		return ab.EmitConstInst(literalText(p.Value, double))
 	case *syntax.SglQuoted:
-		return ab.EmitConstInst(p.Value)
+		return ab.EmitConstInst(quotedText(p))
 	case *syntax.DblQuoted:
-		if len(p.Parts) == 0 {
-			return ab.EmitConstInst("")
-		}
-		return ab.buildWord(&syntax.Word{Parts: p.Parts})
+		return ab.buildParts(p.Parts, true)
 	case *syntax.ParamExp:
 		return ab.buildParamExp(p)
 	case *syntax.CmdSubst:
 		return ab.buildCmdSubst(p)
 	case *syntax.ArithmExp:
-		return ab.buildArithm(p.X)
+		return ab.text(ab.buildArithm(p.X))
 	case *syntax.ProcSubst:
 		return ab.buildProcSubst(p)
 	case *syntax.ExtGlob:
@@ -116,24 +136,47 @@ func (ab *astBuilder) buildParamExp(exp *syntax.ParamExp) ssa.Value {
 	if name == "" {
 		name = "$?"
 	}
-	switch name {
-	case "@", "*", "#", "?", "$", "!", "-", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		name = "$" + name
-	}
-
-	value := ab.readOrCreate(name)
-
-	if exp.Exp != nil && exp.Exp.Word != nil {
-		if fallback := ab.buildWord(exp.Exp.Word); !utils.IsNil(fallback) {
-			if utils.IsNil(value) {
-				value = fallback
-			} else if merged := ab.EmitPhi(name+"$expansion", ssa.Values{value, fallback}); !utils.IsNil(merged) {
-				value = merged
-			}
+	var value ssa.Value
+	if positionalName(name) {
+		value = ab.positional(name)
+	} else {
+		switch name {
+		case "?", "$", "!", "-":
+			name = "$" + name
 		}
+		value = ab.readOrCreate(name)
 	}
 	if exp.Index != nil {
-		ab.buildArithm(exp.Index)
+		if w, ok := exp.Index.(*syntax.Word); ok && (w.Lit() == "@" || w.Lit() == "*") {
+			if exp.Length {
+				if _, concrete := ssa.ToMake(value); concrete {
+					return ab.EmitConstInst(len(ssa.GetLastWinsMemberPairs(value)))
+				}
+				return ab.intrinsic("length", value)
+			}
+			if w.Lit() == "*" {
+				var vs []ssa.Value
+				for _, p := range ssa.GetLastWinsMemberPairs(value) {
+					vs = append(vs, p.Member)
+				}
+				return ab.join(vs, " ")
+			}
+		} else {
+			value = ab.ReadMemberCallValue(value, ab.arrayKey(name, exp.Index))
+		}
+	} else if !positionalName(name) {
+		if _, ok := ssa.ToMake(value); ok {
+			value = ab.ReadMemberCallValue(value, ab.EmitConstInst(0))
+		}
+	}
+	if exp.Length {
+		if c, ok := ssa.ToConstInst(value); ok {
+			return ab.EmitConstInst(len([]rune(c.String())))
+		}
+		return ab.intrinsic("length", value)
+	}
+	if exp.Exp != nil {
+		value = ab.parameterOperator(name, value, exp.Exp)
 	}
 	if exp.Slice != nil {
 		ab.buildArithm(exp.Slice.Offset)
@@ -152,12 +195,10 @@ func (ab *astBuilder) buildCmdSubst(subst *syntax.CmdSubst) ssa.Value {
 	}
 	defer ab.setRange(subst)()
 
-	previous := ab.pendingStdin
-	ab.pendingStdin = nil
-	out := ab.buildStmts(subst.Stmts)
-	ab.pendingStdin = previous
-	if utils.IsNil(out) {
-		out = ab.EmitUndefined("$()")
+	out, status := ab.childShell(func() ssa.Value { ab.pendingStdin = nil; return ab.buildStmts(subst.Stmts) })
+	ab.lastSubst = status
+	if out == nil {
+		out = ab.EmitConstInst("")
 	}
 	return out
 }
@@ -167,13 +208,9 @@ func (ab *astBuilder) buildProcSubst(subst *syntax.ProcSubst) ssa.Value {
 		return nil
 	}
 	defer ab.setRange(subst)()
-
-	previous := ab.pendingStdin
-	ab.pendingStdin = nil
-	out := ab.buildStmts(subst.Stmts)
-	ab.pendingStdin = previous
-	if utils.IsNil(out) {
-		out = ab.EmitUndefined("$()")
+	out, _ := ab.childShell(func() ssa.Value { ab.pendingStdin = nil; return ab.buildStmts(subst.Stmts) })
+	if out == nil {
+		out = ab.EmitUndefined("<()")
 	}
 	return out
 }
@@ -230,6 +267,13 @@ func (ab *astBuilder) buildArithm(expr syntax.ArithmExpr) ssa.Value {
 			return value
 		}
 	case *syntax.BinaryArithm:
+		if e.Op == syntax.Assgn {
+			if name, ok := arithmeticVariableName(e.X); ok {
+				v := ab.buildArithm(e.Y)
+				ab.put(name, v)
+				return v
+			}
+		}
 		left := ab.buildArithm(e.X)
 		right := ab.buildArithm(e.Y)
 		if utils.IsNil(left) {
@@ -243,7 +287,7 @@ func (ab *astBuilder) buildArithm(expr syntax.ArithmExpr) ssa.Value {
 				value := right
 				if assignOp != ssa.OpNone {
 					if old := ab.ReadValue(name); !utils.IsNil(old) {
-						if merged := ab.EmitBinOp(assignOp, old, right); !utils.IsNil(merged) {
+						if merged := ab.EmitBinOp(assignOp, ab.number(old), right); !utils.IsNil(merged) {
 							value = merged
 						}
 					}
@@ -275,34 +319,12 @@ func (ab *astBuilder) buildArithmWord(word *syntax.Word) ssa.Value {
 			if number, err := strconv.ParseInt(name, 0, 64); err == nil {
 				return ab.EmitConstInst(number)
 			}
-			if isArithmeticIdentifier(name) {
-				return ab.readOrCreate(name)
+			if syntax.ValidName(name) {
+				return ab.number(ab.readOrCreate(name))
 			}
 		}
 	}
-	return ab.buildWord(word)
-}
-
-// isArithmeticIdentifier reports whether name is a plain shell variable name.
-// Array subscripts and base#number forms keep their word form instead of
-// creating a variable with punctuation in its name.
-func isArithmeticIdentifier(name string) bool {
-	if name == "" {
-		return false
-	}
-	for index, r := range name {
-		switch {
-		case r == '_':
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
-		case r >= '0' && r <= '9':
-			if index == 0 {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return true
+	return ab.number(ab.buildWord(word))
 }
 
 // buildArithmStep lowers `i++` / `--i` to a versioned read-modify-write so a
@@ -316,7 +338,7 @@ func (ab *astBuilder) buildArithmStep(step *syntax.UnaryArithm) ssa.Value {
 		ab.buildArithm(step.X)
 		return nil
 	}
-	old := ab.readOrCreate(name)
+	old := ab.number(ab.readOrCreate(name))
 	if utils.IsNil(old) {
 		return nil
 	}
@@ -328,8 +350,9 @@ func (ab *astBuilder) buildArithmStep(step *syntax.UnaryArithm) ssa.Value {
 	if utils.IsNil(value) {
 		value = old
 	}
-	if variable := ab.CreateVariable(name); variable != nil {
-		ab.AssignVariable(variable, value)
+	ab.put(name, value)
+	if step.Post {
+		return old
 	}
 	return value
 }
