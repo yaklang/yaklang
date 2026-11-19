@@ -76,6 +76,9 @@ func (b *singleFileBuilder) visitPatDef(raw scalaparser.IPatDefContext) {
 				name := names.Id(i).GetText()
 				b.AssignVariable(b.CreateVariable(name), value)
 				b.GetProgram().SetExportValue(name, value)
+				if b.classFields != nil {
+					b.classFields[name] = value
+				}
 			}
 		}
 	}
@@ -94,6 +97,9 @@ func (b *singleFileBuilder) visitDefDef(raw scalaparser.IDefDefContext) {
 	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
+	for fieldName, fieldValue := range b.classFields {
+		b.AssignVariable(b.CreateVariable(fieldName), fieldValue)
+	}
 	if clauses := sig.DefParamClauses(); clauses != nil {
 		b.addDefParamClauses(clauses)
 	}
@@ -173,6 +179,9 @@ func (b *singleFileBuilder) visitTemplate(raw scalaparser.ITemplateContext) {
 	if !ok || body == nil {
 		return
 	}
+	previousFields := b.classFields
+	b.classFields = make(map[string]ssa.Value)
+	defer func() { b.classFields = previousFields }()
 	for _, rawStat := range body.AllTemplateStat() {
 		stat, ok := rawStat.(*scalaparser.TemplateStatContext)
 		if !ok || stat == nil {
