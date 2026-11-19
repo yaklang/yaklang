@@ -3,11 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/google/uuid"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/reify"
@@ -87,7 +90,7 @@ func newCLIApp(env *commandEnv) *cli.App {
 			ArgsUsage: "<file>",
 			Flags: []cli.Flag{
 				cli.StringFlag{Name: "name", Usage: "ssadb program name (required)"},
-				cli.BoolFlag{Name: "replace", Usage: "Delete an existing program with the same name"},
+				cli.BoolFlag{Name: "replace", Usage: "Replace an existing program after the new program is fully built"},
 				cli.StringFlag{Name: "asm-syntax", Value: "intel", Usage: "Assembly syntax: intel or att"},
 				cli.StringFlag{Name: "func", Usage: "Select a function by symbol name"},
 				cli.StringFlag{Name: "section", Usage: "Section to lift when no address is given; empty lifts every region"},
@@ -271,6 +274,10 @@ type auditReport struct {
 // save lifts a binary into YakSSA on the ssadb write cache and keeps the
 // program under --name. It is the producer half of the audit loop; audit is the
 // consumer half.
+//
+// The lift writes to a staging program name. Only after the lift and the cache
+// flush succeed does the staging program replace --name in one transaction, so
+// a bad flag, unreadable file or lift failure leaves the old program intact.
 func (e *commandEnv) save(c *cli.Context) error {
 	if c.NArg() != 1 {
 		return cli.NewExitError("save requires exactly one file", 2)
@@ -279,40 +286,62 @@ func (e *commandEnv) save(c *cli.Context) error {
 	if name == "" {
 		return cli.NewExitError("save requires --name", 2)
 	}
-	if existing, err := ssadb.GetProgram(name, ssadb.Application); err == nil && existing != nil {
-		if !c.Bool("replace") {
+	replace := c.Bool("replace")
+	_, err := ssadb.GetProgram(name, "")
+	switch {
+	case err == nil:
+		if !replace {
 			return cli.NewExitError(fmt.Sprintf("program %q already exists (use --replace)", name), 2)
 		}
-		// Delete before the lift creates the new NameCache. The cache preloads
-		// name ids from the database, so deleting after that would leave the new
-		// index rows pointing at removed name-pool entries.
-		ssadb.DeleteProgram(ssadb.GetDB(), name)
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// A new name is fine. Finalize rechecks under the transaction.
+	case err != nil:
+		return fmt.Errorf("inspect program %q: %w", name, err)
 	}
 	options, err := liftOptions(c, reify.ModeSSAIR)
 	if err != nil {
 		return err
 	}
+	staged := "reify-staging-" + uuid.NewString()
 	options = append(options,
-		reify.WithProgramName(name),
+		reify.WithProgramName(staged),
 		reify.WithProgramCache(ssa.ProgramCacheDBWrite),
 	)
 	result, err := reify.Lift(e.ctx, c.Args().First(), options...)
 	if err != nil {
-		return err
+		return discardStagedProgram(nil, staged, err)
 	}
 	defer func() { _ = result.Close() }()
 	if result.Program == nil {
-		return cli.NewExitError("save produced no SSA program", 1)
+		return discardStagedProgram(nil, staged, cli.NewExitError("save produced no SSA program", 1))
 	}
 	if err := result.Program.SaveToDatabase(); err != nil {
-		return err
+		return discardStagedProgram(result.Program, staged, err)
 	}
-	fmt.Fprintf(e.stdout, "Program: %s\n", result.ProgramName)
+	if err := ssadb.FinalizeStagedProgramChecked(ssadb.GetDB(), staged, name, replace); err != nil {
+		return discardStagedProgram(result.Program, staged, err)
+	}
+	fmt.Fprintf(e.stdout, "Program: %s\n", name)
 	fmt.Fprintf(e.stdout, "Functions: %d\n", result.Functions)
 	fmt.Fprintf(e.stdout, "Blocks: %d\n", result.Blocks)
 	fmt.Fprintf(e.stdout, "Values: %d\n", result.Values)
-	fmt.Fprintf(e.stdout, "Query: reify audit --program %s '<syntaxflow>'\n", result.ProgramName)
+	fmt.Fprintf(e.stdout, "Query: reify audit --program %s '<syntaxflow>'\n", name)
 	return nil
+}
+
+// discardStagedProgram closes a cache that never reached the final flush and
+// removes the staging rows. A cleanup failure is reported together with the
+// original error, because leaving either an open writer or unreachable rows is
+// part of the failure the caller must see.
+func discardStagedProgram(program *ssa.Program, staged string, cause error) error {
+	if program != nil && program.Cache != nil && !program.Cache.IsClosed() {
+		program.Cache.CloseWithoutSave()
+	}
+	err := ssadb.DeleteProgramChecked(ssadb.GetDB(), staged)
+	if err != nil {
+		return errors.Join(cause, fmt.Errorf("discard staging program %q: %w", staged, err))
+	}
+	return cause
 }
 
 // liftOptions collects the loader, region and pass flags shared by lift, save

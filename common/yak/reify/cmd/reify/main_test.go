@@ -14,9 +14,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/reify"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 func runCLI(args ...string) (int, string, string) {
@@ -564,4 +569,96 @@ func TestCLILiftsAllMode(t *testing.T) {
 			t.Fatalf("all output lacks %q:\n%s", marker, out)
 		}
 	}
+}
+
+func TestCLISaveReplaceKeepsOldProgramOnFailure(t *testing.T) {
+	if _, err := exec.LookPath("gcc"); err != nil {
+		t.Skip("gcc is not installed")
+	}
+	directory := t.TempDir()
+	source := filepath.Join(directory, "tiny.c")
+	require.NoError(t, os.WriteFile(source, []byte(`
+int helper(int x) { return x + 1; }
+int main(void) { return helper(1); }
+`), 0o644))
+	binary := filepath.Join(directory, "tiny")
+	build := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Skipf("cannot build tiny program: %v\n%s", err, output)
+	}
+
+	db, cleanup := isolatedCLIDB(t)
+	defer cleanup()
+	name := "cli-replace-" + uuid.NewString()
+	code, out, errOut := runCLI("save", "--name", name, "--section", ".text", binary)
+	require.Zero(t, code, "save failed: %s\n%s", errOut, out)
+	oldCodes, oldMax := programCodeStats(t, db, name)
+	require.NotZero(t, oldCodes)
+
+	corrupt := filepath.Join(directory, "corrupt.bin")
+	require.NoError(t, os.WriteFile(corrupt, []byte("not an executable"), 0o644))
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"invalid flag", []string{"save", "--name", name, "--replace", "--asm-syntax", "invalid", "--section", ".text", binary}},
+		{"missing file", []string{"save", "--name", name, "--replace", "--section", ".text", filepath.Join(directory, "missing")}},
+		{"invalid file", []string{"save", "--name", name, "--replace", "--section", ".text", corrupt}},
+		{"unknown SSA pass", []string{"save", "--name", name, "--replace", "--ssa-pass", "unknown-pass", "--section", ".text", binary}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, _, errOut := runCLI(tc.args...)
+			require.NotZero(t, code, "failure case succeeded")
+			require.NotEmpty(t, errOut)
+			codes, maxID := programCodeStats(t, db, name)
+			require.Equal(t, oldCodes, codes, "old program rows changed")
+			require.Equal(t, oldMax, maxID, "old program was replaced")
+			require.Zero(t, stagingProgramCount(t, db), "staging rows were left behind")
+			_, err := ssadb.GetProgram(name, "")
+			require.NoError(t, err, "old program disappeared")
+		})
+	}
+
+	code, out, errOut = runCLI("save", "--name", name, "--replace", "--section", ".text", binary)
+	require.Zero(t, code, "replace failed: %s\n%s", errOut, out)
+	require.Contains(t, out, "Program: "+name)
+	require.Zero(t, stagingProgramCount(t, db), "staging rows were left behind")
+	codes, maxID := programCodeStats(t, db, name)
+	require.NotZero(t, codes)
+	require.NotEqual(t, oldMax, maxID, "replace did not write new instructions")
+	_, err := ssadb.GetProgram(name, "")
+	require.NoError(t, err)
+	code, out, errOut = runCLI("audit", "--program", name, "helper(* as $args) as $call")
+	require.Zero(t, code, "audit after replace failed: %s\n%s", errOut, out)
+	require.Contains(t, out, "helper")
+}
+
+func isolatedCLIDB(t *testing.T) (*gorm.DB, func()) {
+	t.Helper()
+	database, err := consts.CreateSSAProjectDatabase(consts.SQLiteExtend, filepath.Join(t.TempDir(), "ssa.db"))
+	require.NoError(t, err)
+	oldSSA := ssadb.GetDB()
+	oldProject := consts.GetGormSSAProjectDataBase()
+	ssadb.SetDB(database)
+	consts.SetGormSSAProjectDatabase(database)
+	return database, func() {
+		ssadb.SetDB(oldSSA)
+		consts.SetGormSSAProjectDatabase(oldProject)
+		_ = database.Close()
+	}
+}
+
+func programCodeStats(t *testing.T, db *gorm.DB, program string) (int, int64) {
+	t.Helper()
+	var count int
+	var maxRowID int64
+	require.NoError(t, db.Raw(`SELECT count(*), COALESCE(MAX(id), 0) FROM "`+ssadb.TableIrCodes+`" WHERE program_name = ?`, program).Row().Scan(&count, &maxRowID))
+	return count, maxRowID
+}
+
+func stagingProgramCount(t *testing.T, db *gorm.DB) int {
+	t.Helper()
+	var count int
+	require.NoError(t, db.Raw(`SELECT count(*) FROM "`+ssadb.TableIrPrograms+`" WHERE program_name LIKE 'reify-staging-%'`).Row().Scan(&count))
+	return count
 }

@@ -374,6 +374,9 @@ ELF/PE/MachO
   内存程序在查询前调用它；`SaveToDatabase` 也会在落库前调用。
 - `(*ssa.Program).SaveToDatabase()`：调用 `FlushInstruction`，写 `ir_programs`，
   再 flush 四个 cache store。只接受 DB 写缓存。调用后缓存关闭，查询需要重新加载。
+- `ssadb.FinalizeStagedProgramChecked(db, staged, target, replace)`：事务内删除
+  旧程序并把临时程序的 IR 行改名为最终程序名。`replace` 为 false 且目标已存在时
+  返回错误，两个程序都保留。
 - 函数名索引由 `FlushInstruction` 写入，且只写 `Function` 值。语言前端通过
   builder 建索引；reify 绕过 builder，所以由 flush 补索引。
 - `ssaapi.NewProgram(program, nil)`：包装已 flush 的内存 SSA，执行 SyntaxFlow。
@@ -428,7 +431,8 @@ Result Vars:
 
 文本输出直接来自 `SyntaxFlowResult.String()`。`audit --program` 的输出结构
 相同。`YAKIT_HOME` 决定默认 ssadb 位置；`--db` 可以覆盖它。重复使用同一个
-程序名需要 `--replace`。
+程序名需要 `--replace`。替换时先把新程序写到临时程序名，完整落库后再在
+一个事务内删除旧程序并改名；失败不会改动旧程序。
 
 规则作为最后一个参数传入，也可以用 `--rule`。例如列出所有调用：
 
