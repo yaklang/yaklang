@@ -83,6 +83,10 @@ func TestAgentModePlanningReviewContext(t *testing.T) {
 				require.NotEmpty(t, chunks[aiprojection.SectionHighStatic])
 				require.Contains(t, chunks[aiprojection.SectionHighStatic][0].Content, map[string]string{ypb.AgentModeCoding: "Coding Agent 工作方法", ypb.AgentModeSecurity: "# 第一部分: 工作方法论"}[mode])
 				if mode == ypb.AgentModeCoding {
+					require.Contains(t, prompt, map[string]string{"plan": "# Coding Plan Review", "task": "# Coding Task Review"}[name])
+					require.NotContains(t, prompt, "new attack surfaces")
+					require.NotContains(t, prompt, "sqlmap")
+					require.NotContains(t, prompt, "SQL injection")
 					require.Contains(t, prompt, `"working_directory": "/review-worktree"`)
 					require.Contains(t, prompt, `"artifacts_directory": "/review-artifacts"`)
 					require.Contains(t, prompt, "review-tree")

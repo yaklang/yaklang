@@ -91,6 +91,14 @@ type PromptMaterials struct {
 	FrozenUserContext string
 }
 
+// Protocol converts the request's FunctionCallMode flag at the prompt assembly boundary.
+func (m *PromptMaterials) Protocol() PromptProtocol {
+	if m != nil && m.FunctionCallMode {
+		return PromptProtocolFunctionCall
+	}
+	return PromptProtocolTextStream
+}
+
 // SemiDynamicData 供 caller-specific semi-dynamic 模板消费。
 func (m *PromptMaterials) SemiDynamicData() map[string]any {
 	if m == nil {

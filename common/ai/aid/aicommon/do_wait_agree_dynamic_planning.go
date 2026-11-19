@@ -24,17 +24,9 @@ type PlanningReviewControl func(ctx context.Context, config *Config, ep *Endpoin
 
 var aiPlanReviewPromptTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan.txt")
 
-var aiPlanReviewInstructionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan_instruction.txt")
-
 var aiPlanReviewSchemaTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan_schema.json")
 
-var aiPlanReviewOutputExampleTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-plan_output_example.txt")
-
 var aiTaskReviewPromptTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task.txt")
-
-var aiTaskReviewInstructionTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task_instruction.txt")
-
-var aiTaskReviewOutputExampleTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task_output_example.txt")
 
 var aiTaskReviewSchemaTemplate = promptloader.MustLoad("ai/aid/aicommon/prompts/review/ai-review-task_schema.json")
 
@@ -83,11 +75,12 @@ func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 
 	workingDir := config.Workdir
 	osArch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	prompts := AgentPrompts(config.AgentMode)
 
 	prefixMaterials := &PromptMaterials{
-		TaskInstruction: strings.TrimSpace(aiPlanReviewInstructionTemplate),
+		TaskInstruction: strings.TrimSpace(prompts.PlanReviewInstruction),
 		Schema:          strings.TrimSpace(aiPlanReviewSchemaTemplate),
-		OutputExample:   strings.TrimSpace(aiPlanReviewOutputExampleTemplate),
+		OutputExample:   strings.TrimSpace(prompts.PlanReviewOutputExample),
 		CurrentTime:     time.Now().Format("2006-01-02 15:04"),
 		OSArch:          osArch,
 		WorkingDir:      workingDir,
@@ -144,10 +137,11 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 		}
 	}
 
+	prompts := AgentPrompts(config.AgentMode)
 	prefixMaterials := &PromptMaterials{
-		TaskInstruction: strings.TrimSpace(aiTaskReviewInstructionTemplate),
+		TaskInstruction: strings.TrimSpace(prompts.TaskReviewInstruction),
 		Schema:          strings.TrimSpace(aiTaskReviewSchemaTemplate),
-		OutputExample:   strings.TrimSpace(aiTaskReviewOutputExampleTemplate),
+		OutputExample:   strings.TrimSpace(prompts.TaskReviewOutputExample),
 		CurrentTime:     data.CurrentTime,
 		OSArch:          data.OSArch,
 		WorkingDir:      data.WorkingDir,

@@ -1,0 +1,7 @@
+Examples:
+
+`{"@action":"task_review","suggestion":"continue","reason":"任务继续"}`
+
+`{"@action":"task_review","suggestion":"inaccurate","reason":"缺少验证结果"}`
+
+`{"@action":"task_review","suggestion":"adjust_plan","reason":"缺少边界验证","task_delta_summary":"补充空输入的回归测试","task_deltas":[{"op":"append","tasks":[{"subtask_name":"验证空输入行为","subtask_goal":"使用项目现有测试确认空输入返回预期结果，并运行相关回归用例"}]}]}`

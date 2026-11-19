@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func promptBuilderChunksBySection(t *testing.T, prompt string) map[string][]*aiprojection.Chunk {
@@ -58,7 +59,7 @@ func TestSharedToolCallModePromptsUseOneConsistentBatchContract(t *testing.T) {
 	}{
 		{
 			name:           "high static",
-			prompt:         AgentPrompts("security").HighStatic(true),
+			prompt:         AgentPrompts(ypb.AgentModeSecurity).HighStatic(PromptProtocolFunctionCall),
 			singleCallRule: "简单无歧义",
 		},
 		{

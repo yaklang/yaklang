@@ -100,7 +100,7 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	frozenBlockTemplate := b.FrozenBlockTemplate
 	semiDynamic2Template := b.SemiDynamic2Template
 	if highStaticTemplate == "" {
-		highStaticTemplate = AgentPrompts(materials.AgentMode).HighStatic(materials.FunctionCallMode)
+		highStaticTemplate = AgentPrompts(materials.AgentMode).HighStatic(materials.Protocol())
 	}
 	if materials.FunctionCallMode {
 		if frozenBlockTemplate == SharedFrozenBlockTemplate {

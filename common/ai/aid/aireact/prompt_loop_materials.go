@@ -967,7 +967,7 @@ func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPr
 	if materials == nil {
 		return ""
 	}
-	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.AgentPrompts(materials.AgentMode).HighStatic(materials.FunctionCallMode), nil)
+	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.AgentPrompts(materials.AgentMode).HighStatic(materials.Protocol()), nil)
 	if err != nil {
 		return ""
 	}
@@ -1073,7 +1073,7 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 	// Other frozen materials belong to their own observation nodes.
 	inventory := &aicommon.PromptMaterials{ToolInventory: true, TopTools: materials.TopTools}
 	rendered, err := aicommon.RenderPromptTemplate("tool-inventory-observation",
-		aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), inventory)
+		aicommon.MainloopFrozenBlockTemplate(materials.Protocol()), inventory)
 	if err != nil {
 		log.Warnf("cannot render tool inventory observation: %v", err)
 		return ""
@@ -1143,7 +1143,7 @@ func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.Pro
 //
 //	AI_CACHE_SEMI2 cc
 func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.MainloopSemiDynamic2Template(materials.FunctionCallMode), materials.SemiDynamic2Data())
+	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.MainloopSemiDynamic2Template(materials.Protocol()), materials.SemiDynamic2Data())
 }
 
 // renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
@@ -1151,7 +1151,7 @@ func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.Pro
 //
 // 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
 func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), materials.FrozenBlockData())
+	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.MainloopFrozenBlockTemplate(materials.Protocol()), materials.FrozenBlockData())
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {
