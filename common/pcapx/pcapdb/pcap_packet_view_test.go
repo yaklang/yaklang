@@ -3,6 +3,7 @@ package pcapdb
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -110,4 +111,34 @@ func TestPacketViewHandleCancellation(t *testing.T) {
 	cancel()
 	_, err = handle.QueryPacketView(PacketViewFilter{Limit: 1})
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestPacketDetailLoadsOnlyNeededSnapshots(t *testing.T) {
+	m := testManager(t)
+	db, err := m.GetOrCreate(writeCapture(t, classicCapture(t, 2)), WithProtocols(true), WithStreams(false))
+	require.NoError(t, err)
+	meta, err := db.Metadata()
+	require.NoError(t, err)
+	writer, err := openIndex(meta.DatabasePath, true, false)
+	require.NoError(t, err)
+	defer writer.Close()
+	require.False(t, writer.Dialect().HasColumn("protocol_messages", "display_fields"))
+	// A frame contributing to a large message must still open without
+	// fetching, budgeting or decoding the terminal message's parser snapshots.
+	msg := PCAPProtocolMessage{EventID: 500, Protocol: "smb", FieldsJSON: []byte(`{}`),
+		SessionJSON: []byte(`{"large":"` + strings.Repeat("x", 32<<10) + `"}`),
+		Data:        []byte{1}, DataLength: 1, SourceBytesJSON: []byte(`{}`), CompletedInPacketID: 2}
+	require.NoError(t, writer.Create(&msg).Error)
+	require.NoError(t, writer.Create(&PCAPMessagePacket{MessageID: msg.ID, PacketID: 1}).Error)
+	handle, err := m.Acquire(context.Background(), db.ID)
+	require.NoError(t, err)
+	defer handle.Close()
+	_, links, err := handle.PacketDetailMessages(1, 16<<10)
+	require.NoError(t, err)
+	require.Len(t, links, 1)
+	require.Equal(t, msg.ID, links[0].ID)
+	require.Nil(t, links[0].FieldsJSON)
+	require.Nil(t, links[0].SessionJSON)
+	_, _, err = handle.PacketDetailMessages(2, 16<<10)
+	require.ErrorIs(t, err, ErrResultTooLarge)
 }

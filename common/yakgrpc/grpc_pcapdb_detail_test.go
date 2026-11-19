@@ -16,7 +16,9 @@ import (
 	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 )
@@ -215,13 +217,65 @@ func TestPCAPGRPCGetPacketDetailLargeMessage(t *testing.T) {
 	require.True(t, next.GetEOF())
 }
 
-func TestPCAPDecodeMessageNodesKeepsParsedFieldsOnDisplayError(t *testing.T) {
+func TestPCAPDecodeMessageNodesKeepsParsedFieldsOnSessionError(t *testing.T) {
 	nodes, truncated, diagnostic := pcapDecodeMessageNodes(pcapdb.ProtocolMessage{
-		FieldsJSON:        []byte(`{"Method":"GET","Nested":{"Code":200}}`),
-		DisplayFieldsJSON: []byte(`{broken`),
-	}, "message:1", nil, 0)
+		FieldsJSON:  []byte(`{"Method":"GET","Nested":{"Code":200}}`),
+		SessionJSON: []byte(`{broken`),
+	}, "message:1", pcaputil.MessageDisplayInput{})
 	require.False(t, truncated)
-	require.Contains(t, diagnostic, "display fields")
+	require.Contains(t, diagnostic, "session fields")
 	require.NotNil(t, findPCAPFieldNode(nodes, "Parsed fields"))
 	require.NotNil(t, findPCAPFieldNode(nodes, "Method"))
+}
+
+func TestPCAPGRPCMessageDetailRestoresTLSRange(t *testing.T) {
+	s, client := newPCAPTestClient(t)
+	input, err := trafficfixture.Materialize("../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-tls.pcap", t.TempDir())
+	require.NoError(t, err)
+	imports := importPCAPForTest(t, client, input)
+	id := imports[len(imports)-1].GetDatasetID()
+	ctx := context.Background()
+	page, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{DatasetID: id,
+		Filter: &ypb.PCAPPacketsFilter{ApplicationLayerTypes: []string{"tls"}}, Pagination: &ypb.Paging{Page: 1, Limit: 1}})
+	require.NoError(t, err)
+	require.Len(t, page.Data, 1)
+	detail, err := client.GetPCAPPacketDetail(ctx, &ypb.GetPCAPPacketDetailRequest{DatasetID: id, PacketID: page.Data[0].Id})
+	require.NoError(t, err)
+	require.NotEmpty(t, detail.Messages)
+	message := detail.Messages[0]
+	require.Equal(t, "TLS", message.Protocol)
+	node := findPCAPFieldNode(message.Nodes, "tls.record.version")
+	require.NotNil(t, node)
+	require.Len(t, node.Ranges, 1)
+	r := node.Ranges[0]
+	require.Equal(t, message.SourceID, r.SourceID)
+	require.EqualValues(t, 8, r.BitOffset)
+	require.EqualValues(t, 16, r.BitLength)
+	wire, err := client.ReadPCAPBytes(ctx, &ypb.ReadPCAPBytesRequest{DatasetID: id, SourceID: r.SourceID, Offset: r.BitOffset / 8, Length: r.BitLength / 8})
+	require.NoError(t, err)
+	require.Len(t, wire.Data, 2)
+	require.Equal(t, byte(0x03), wire.Data[0])
+
+	// A preceding message has used the response preview budget. Five
+	// server-only header bytes still suffice; a shorter budget must not
+	// fabricate the record word or materialize the full TLS payload.
+	manager, err := s.getPCAPManager()
+	require.NoError(t, err)
+	handle, err := manager.Acquire(ctx, id)
+	require.NoError(t, err)
+	defer handle.Close()
+	completed, _, err := handle.PacketDetailMessages(uint(page.Data[0].Id), pcapDetailMessagesBudget)
+	require.NoError(t, err)
+	require.NotEmpty(t, completed)
+	for _, budget := range []int{5, 4} {
+		left := budget
+		view, err := pcapMessageProjection(handle, completed[0], pcaputil.ByteSource{}, nil, &left)
+		require.NoError(t, err)
+		require.Len(t, view.Prefix, budget)
+		require.Zero(t, left)
+		nodes, partial, diagnostics := pcapDecodeMessageNodes(completed[0], message.SourceID, view)
+		require.Empty(t, diagnostics)
+		require.Equal(t, budget < 5, partial)
+		require.Equal(t, budget == 5, findPCAPFieldNode(nodes, "tls.record.version") != nil)
+	}
 }

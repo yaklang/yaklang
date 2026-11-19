@@ -22,20 +22,28 @@ import (
 )
 
 type importConfig struct {
-	ctx             context.Context
-	parent          context.Context
-	batchSize       int
-	protocols       bool
-	streams         bool
-	fieldIndexes    []string
-	progress        func(Progress)
-	cancel          context.CancelFunc
-	progressErr     error
-	leased          bool
-	tlsSecrets      pcaputil.TLSSecretProvider
-	tlsKeyLogSHA256 string
+	ctx               context.Context
+	parent            context.Context
+	batchSize         int
+	protocols         bool
+	streams           bool
+	fieldIndexes      []string
+	progress          func(Progress)
+	cancel            context.CancelFunc
+	progressErr       error
+	leased            bool
+	tlsSecrets        pcaputil.TLSSecretProvider
+	tlsKeyLogSHA256   string
+	deferQueryIndexes bool
 }
 type ImportOption func(*importConfig) error
+
+const (
+	defaultImportBatchSize          = 100000
+	maxPreallocatedBatchSize        = 10000
+	maxPacketImportBatchBytes       = 64 << 20
+	deferQueryIndexesMinSourceBytes = 64 << 20
+)
 
 func WithContext(ctx context.Context) ImportOption {
 	return func(c *importConfig) error {
@@ -134,7 +142,7 @@ func (m *InstanceManager) GetOrCreate(filename string, options ...ImportOption) 
 		return nil, err
 	}
 	defer m.ops.Done()
-	config := &importConfig{ctx: context.Background(), batchSize: 2000, streams: true}
+	config := &importConfig{ctx: context.Background(), batchSize: defaultImportBatchSize, streams: true}
 	for _, option := range options {
 		if option == nil {
 			return nil, fmt.Errorf("pcapdb: nil import option")
@@ -348,6 +356,12 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 	if err = syncDirectory(filepath.Dir(meta.DatabasePath)); err != nil {
 		return nil, err
 	}
+	if info.Size() >= deferQueryIndexesMinSourceBytes {
+		if err = dropPCAPQueryIndexes(writer); err != nil {
+			return nil, err
+		}
+		config.deferQueryIndexes = true
+	}
 	defer func() {
 		if resultErr != nil && meta != nil {
 			resultErr = m.failImport(writer, meta, resultErr, config)
@@ -418,8 +432,15 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 		if err = m.indexProtocols(config.ctx, writer, meta, config); err != nil {
 			return nil, err
 		}
-	} else if err = m.transition(config.ctx, writer, meta, StateReady); err != nil {
-		return nil, err
+	} else {
+		if config.deferQueryIndexes {
+			if err = ensurePCAPQueryIndexes(writer); err != nil {
+				return nil, err
+			}
+		}
+		if err = m.transition(config.ctx, writer, meta, StateReady); err != nil {
+			return nil, err
+		}
 	}
 	if err = m.addAlias(config.ctx, meta, path); err != nil {
 		return nil, err
@@ -487,8 +508,8 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 		return "", err
 	}
 
-	packets := make([]Packet, 0, min(config.batchSize, 2000))
-	records := make([]PCAPCaptureRecord, 0)
+	packets := make([]Packet, 0, min(config.batchSize, maxPreallocatedBatchSize))
+	records := make([]PCAPCaptureRecord, 0, min(config.batchSize, maxPreallocatedBatchSize))
 	interfaces := make([]PCAPCaptureInterface, 0)
 	interfaceIDs := make(map[[2]int64]int64)
 	hasher := sha256.New()
@@ -556,7 +577,7 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 			hasher.Write(data)
 			batchBytes += len(data)
 			meta.BytesIndexed = next
-			if batchBytes >= maxImportBatchBytes || len(records) >= max(2000, config.batchSize) {
+			if batchBytes >= maxPacketImportBatchBytes || len(records) >= max(2000, config.batchSize) {
 				if err := commit(false); err != nil {
 					return err
 				}
@@ -622,7 +643,7 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 		hasher.Write(suffix)
 		batchBytes += len(prefix) + len(data) + len(suffix)
 		meta.BytesIndexed = location.endOffset
-		if len(packets) >= config.batchSize || batchBytes >= maxImportBatchBytes {
+		if len(packets) >= config.batchSize || batchBytes >= maxPacketImportBatchBytes {
 			if err = commit(false); err != nil {
 				return "", err
 			}

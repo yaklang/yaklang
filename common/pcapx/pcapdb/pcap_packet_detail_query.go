@@ -1,12 +1,9 @@
 package pcapdb
 
-import (
-	"fmt"
-)
+import "fmt"
 
-// PacketDetailMessages loads typed display trees and source metadata without
-// materializing protocol message BLOBs. Callers read initial or requested
-// ranges through the bounded data-range API.
+// PacketDetailMessages loads the parser snapshots for completed messages only.
+// A contributor needs a link, not the other message's field tree or raw BLOB.
 func (h *DatabaseHandle) PacketDetailMessages(packetID uint, budget int) (completed []ProtocolMessage, related []ProtocolMessage, err error) {
 	if packetID == 0 {
 		return nil, nil, fmt.Errorf("pcapdb: packet ID is required")
@@ -44,12 +41,16 @@ func (h *DatabaseHandle) PacketDetailMessages(packetID uint, budget int) (comple
 		Count int
 	}
 	var completedSize, relatedSize detailSize
-	err = completedQuery.Select("COALESCE(sum(length(fields)+length(display_fields)+length(source_bytes)),0) AS bytes,count(*) AS count").
+	// Charge the UTF-8 JSON bytes that the SELECT below actually returns,
+	// not the size of SQLite's compact JSONB or its character count.
+	const completedBytes = "length(CAST(json(fields) AS BLOB))+length(CAST(json(session) AS BLOB))+length(CAST(json(source_bytes) AS BLOB))"
+	const relatedSource = "CASE WHEN pm.completed_in_packet_id=0 THEN json(pm.source_bytes) END"
+	err = completedQuery.Select("COALESCE(sum(" + completedBytes + "),0) AS bytes,count(*) AS count").
 		Scan(&completedSize).Error
 	if err != nil {
 		return nil, nil, err
 	}
-	err = scoped.Raw("SELECT COALESCE(sum(length(pm.fields)+length(pm.display_fields)+length(pm.source_bytes)),0) AS bytes,count(*) AS count"+
+	err = scoped.Raw("SELECT COALESCE(sum(length(CAST("+relatedSource+" AS BLOB))),0) AS bytes,count(*) AS count"+
 		relatedFrom, packetID, packetID).Scan(&relatedSize).Error
 	if err != nil {
 		return nil, nil, err
@@ -57,7 +58,7 @@ func (h *DatabaseHandle) PacketDetailMessages(packetID uint, budget int) (comple
 	if completedSize.Bytes+relatedSize.Bytes > int64(budget) || completedSize.Count+relatedSize.Count > 1000 {
 		return nil, nil, ErrResultTooLarge
 	}
-	completedSelection := protocolColumns(scoped, false) + ",json(fields) AS fields,json(display_fields) AS display_fields,json(source_bytes) AS source_bytes"
+	completedSelection := protocolColumns(scoped, false) + ",json(fields) AS fields,json(session) AS session,json(source_bytes) AS source_bytes"
 	err = scoped.Model(&PCAPProtocolMessage{}).
 		Select(completedSelection).
 		Where("completed_in_packet_id = ?", packetID).
@@ -65,8 +66,7 @@ func (h *DatabaseHandle) PacketDetailMessages(packetID uint, budget int) (comple
 	if err != nil {
 		return nil, nil, err
 	}
-	relatedSelection := protocolColumnsWithPrefix(scoped, "pm.", false) +
-		",json(pm.fields) AS fields,json(pm.display_fields) AS display_fields,json(pm.source_bytes) AS source_bytes"
+	const relatedSelection = "pm.id,pm.protocol,pm.summary,pm.completeness,pm.completed_in_packet_id," + relatedSource + " AS source_bytes"
 	err = scoped.Raw("SELECT "+relatedSelection+relatedFrom+" ORDER BY pm.id LIMIT 1001", packetID, packetID).
 		Scan(&related).Error
 	if err != nil {

@@ -106,6 +106,9 @@ type ProtocolEvent struct {
 	historySequence uint64
 	ipp             bool
 	sessionError    *ProtocolError
+	// Only a request-local detail view can have a bounded Raw prefix.
+	// Its storage length checks saved coordinates; never use it to slice Raw.
+	storedWireLength int
 }
 
 // BinParserEvent is retained for source compatibility. Use ProtocolEvent.

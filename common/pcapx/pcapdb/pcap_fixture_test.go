@@ -136,36 +136,38 @@ func TestPCAPDBComprehensiveFixture(t *testing.T) {
 	var projectionError error
 	var references [][]int64
 	var protocolBytes [][]byte
-	require.NoError(t, pcaputil.ReplayPcapFile(input, pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {
-		expected[event.Protocol]++
-		eventIDs = append(eventIDs, int64(event.ID))
-		parserRules = append(parserRules, event.Rule)
-		parserEntries = append(parserEntries, event.Entry)
-		fields := event.Fields
-		if fields == nil {
-			fields, _ = event.GetFields() // Decode failures are persisted as null fields.
-		}
-		fieldsJSON, err := json.Marshal(fields)
-		if err != nil {
-			projectionError = err
-		}
-		sessionJSON, err := json.Marshal(event.Session)
-		if err != nil {
-			projectionError = err
-		}
-		fieldTrees = append(fieldTrees, fieldsJSON)
-		sessionTrees = append(sessionTrees, sessionJSON)
-		ids := make([]int64, 0)
-		seen := make(map[uint64]bool)
-		for _, packet := range event.SourceBytes.PacketRefs {
-			if !seen[packet.Number] {
-				ids = append(ids, int64(packet.Number))
-				seen[packet.Number] = true
+	require.NoError(t, pcaputil.ReplayPcapFile(input,
+		pcaputil.WithHTTPResponseWithoutRequest(true),
+		pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {
+			expected[event.Protocol]++
+			eventIDs = append(eventIDs, int64(event.ID))
+			parserRules = append(parserRules, event.Rule)
+			parserEntries = append(parserEntries, event.Entry)
+			fields := event.Fields
+			if fields == nil {
+				fields, _ = event.GetFields() // Decode failures are persisted as null fields.
 			}
-		}
-		references = append(references, ids)
-		protocolBytes = append(protocolBytes, append([]byte(nil), event.Raw...))
-	})))
+			fieldsJSON, err := json.Marshal(fields)
+			if err != nil {
+				projectionError = err
+			}
+			sessionJSON, err := json.Marshal(event.Session)
+			if err != nil {
+				projectionError = err
+			}
+			fieldTrees = append(fieldTrees, fieldsJSON)
+			sessionTrees = append(sessionTrees, sessionJSON)
+			ids := make([]int64, 0)
+			seen := make(map[uint64]bool)
+			for _, packet := range event.SourceBytes.PacketRefs {
+				if !seen[packet.Number] {
+					ids = append(ids, int64(packet.Number))
+					seen[packet.Number] = true
+				}
+			}
+			references = append(references, ids)
+			protocolBytes = append(protocolBytes, append([]byte(nil), event.Raw...))
+		})))
 	require.NoError(t, projectionError)
 	require.EqualValues(t, len(eventIDs), meta.ProtocolCount)
 	actual := make(map[string]int)

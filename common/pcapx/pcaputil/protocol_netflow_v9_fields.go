@@ -52,7 +52,7 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 				before := len(p.snapshot.Values)
 				emit(row[key])
 				if len(p.snapshot.Values) == before+1 {
-					p.snapshot.Values[before].Range = (&ProtocolEvent{Session: row, Raw: e.Raw}).displayPDUFieldRange(key)
+					p.snapshot.Values[before].Range = e.displayRowRange(row, key)
 				}
 			})
 		})
@@ -118,7 +118,7 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 				before := len(p.snapshot.Values)
 				emit(field["Value"])
 				if len(p.snapshot.Values) == before+1 {
-					p.snapshot.Values[before].Range = (&ProtocolEvent{Session: field, Raw: e.Raw}).displayPDUFieldRange("Value")
+					p.snapshot.Values[before].Range = e.displayRowRange(field, "Value")
 				}
 			}
 		})
