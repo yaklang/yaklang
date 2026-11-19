@@ -342,9 +342,9 @@ func TestListJarDirectoryInZip(t *testing.T) {
 	classFound := false
 	for _, res := range dirResp.Resources {
 		t.Logf("Path in JAR directory: %s, Type: %s", res.Path, res.ResourceType)
-		if strings.Contains(res.Path, "App1Class.class") {
+		if strings.Contains(res.Path, "App1Class.java") {
 			classFound = true
 		}
 	}
-	require.True(t, classFound, "Should find App1Class.class in app1.jar/com/app1 directory")
+	require.True(t, classFound, "Should find App1Class.java in app1.jar/com/app1 directory")
 }

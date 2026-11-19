@@ -299,11 +299,11 @@ func TestNestedJarAccess(t *testing.T) {
 		classFound := false
 		for _, res := range nestedResp.Resources {
 			t.Logf("Path in nested JAR: %s, Type: %s", res.Path, res.ResourceType)
-			if strings.Contains(res.Path, "NestedClass.class") {
+			if strings.Contains(res.Path, "NestedClass.java") {
 				classFound = true
 			}
 		}
-		require.True(t, classFound, "Should find NestedClass.class in nested JAR")
+		require.True(t, classFound, "Should find NestedClass.java in nested JAR")
 	})
 }
 
@@ -375,11 +375,11 @@ func TestDeeplyNestedJarAccess(t *testing.T) {
 		classFound := false
 		for _, res := range innerResp.Resources {
 			t.Logf("Path in inner JAR: %s, Type: %s", res.Path, res.ResourceType)
-			if strings.Contains(res.Path, "InnerClass.class") {
+			if strings.Contains(res.Path, "InnerClass.java") {
 				classFound = true
 			}
 		}
-		require.True(t, classFound, "Should find InnerClass.class in inner JAR")
+		require.True(t, classFound, "Should find InnerClass.java in inner JAR")
 	})
 
 	t.Run("read class from inner jar", func(t *testing.T) {
