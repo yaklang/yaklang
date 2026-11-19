@@ -183,6 +183,7 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 		if frame.Connection != t.ClientConn {
 			direction = 1
 		}
+		t.binState.noteTCPProbeArrival(direction, frame.Timestamp)
 		if len(frame.evidence.refs) > 0 {
 			for _, ref := range frame.evidence.refs {
 				t.binState.contributeCaptured(direction, len(frame.Payload), ref, frame.evidence)
