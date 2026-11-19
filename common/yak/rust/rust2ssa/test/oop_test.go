@@ -13,7 +13,7 @@ fn main() {
     let p = Point { x: 1, y: 2 };
     println(p.x);
 }
-`, "p.x")
+`, "1")
 	})
 
 	t.Run("struct field assignment", func(t *testing.T) {
@@ -54,6 +54,42 @@ fn main() {
     println(pair.0);
     println(array[1]);
 }
-`, "pair", "array")
+`, "1", "4")
+	})
+}
+
+func TestRustMethodReceiver(t *testing.T) {
+	t.Run("impl method receives self", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+struct Point {
+    x: i32,
+}
+impl Point {
+    fn get(&self) -> i32 {
+        self.x
+    }
+}
+fn main() {
+    let p = Point { x: 7 };
+    println(p.get());
+}
+`, "get")
+	})
+
+	t.Run("impl method keeps method symbol", func(t *testing.T) {
+		checkSymbols(t, `
+struct Counter {
+    value: i32,
+}
+impl Counter {
+    fn next(&self) -> i32 {
+        self.value
+    }
+}
+fn main() {
+    let c = Counter { value: 1 };
+    c.next();
+}
+`, "next", "main")
 	})
 }

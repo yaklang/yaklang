@@ -80,7 +80,7 @@ fn main() {
     let a = [10, 20, 30];
     println(a[1]);
 }
-`, "a", "1")
+`, "20")
 	})
 
 	t.Run("struct field access", func(t *testing.T) {
@@ -92,7 +92,7 @@ fn main() {
     let p = Point { x: 42 };
     println(p.x);
 }
-`, "p.x")
+`, "42")
 	})
 
 	t.Run("if expression", func(t *testing.T) {
@@ -111,5 +111,25 @@ fn main() {
     println(a);
 }
 `, "main", "a")
+	})
+}
+
+func TestRustShortCircuit(t *testing.T) {
+	t.Run("false and short circuits", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+fn side() -> bool { return true; }
+fn main() {
+    println(false && side());
+}
+`, "false")
+	})
+
+	t.Run("true or short circuits", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+fn side() -> bool { return false; }
+fn main() {
+    println(true || side());
+}
+`, "true")
 	})
 }

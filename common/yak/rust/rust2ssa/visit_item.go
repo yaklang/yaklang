@@ -53,6 +53,8 @@ func (b *singleFileBuilder) visitVisItem(raw rustparser.IVisItemContext) {
 		b.visitConstant(item.ConstantItem())
 	case item.StaticItem() != nil:
 		b.visitStatic(item.StaticItem())
+	case item.Implementation() != nil:
+		b.visitImplementation(item.Implementation())
 	}
 }
 
@@ -73,6 +75,7 @@ func (b *singleFileBuilder) visitFunction(raw rustparser.IFunction_Context) {
 	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
+	b.LoadGlobalVariable()
 	if params := fnCtx.FunctionParameters(); params != nil {
 		b.addFunctionParams(params)
 	}
@@ -157,6 +160,7 @@ func (b *singleFileBuilder) visitConstant(raw rustparser.IConstantItemContext) {
 	}
 	b.AssignVariable(b.CreateVariable(name), value)
 	b.GetProgram().SetExportValue(name, value)
+	b.AddGlobalVariable(name, func() ssa.Value { return value })
 }
 
 func (b *singleFileBuilder) visitStatic(raw rustparser.IStaticItemContext) {
@@ -173,6 +177,7 @@ func (b *singleFileBuilder) visitStatic(raw rustparser.IStaticItemContext) {
 	}
 	b.AssignVariable(b.CreateVariable(name), value)
 	b.GetProgram().SetExportValue(name, value)
+	b.AddGlobalVariable(name, func() ssa.Value { return value })
 }
 
 func rustPatternName(raw rustparser.IPatternContext) string {
@@ -209,4 +214,26 @@ func rustPatternNoTopAltName(raw rustparser.IPatternNoTopAltContext) string {
 		return ""
 	}
 	return identifier.Identifier().GetText()
+}
+
+func (b *singleFileBuilder) visitImplementation(raw rustparser.IImplementationContext) {
+	impl, ok := raw.(*rustparser.ImplementationContext)
+	if !ok || impl == nil {
+		return
+	}
+	if inherent := impl.InherentImpl(); inherent != nil {
+		inherentImpl, ok := inherent.(*rustparser.InherentImplContext)
+		if !ok || inherentImpl == nil {
+			return
+		}
+		for _, rawItem := range inherentImpl.AllAssociatedItem() {
+			item, ok := rawItem.(*rustparser.AssociatedItemContext)
+			if !ok || item == nil {
+				continue
+			}
+			if item.Function_() != nil {
+				b.visitFunction(item.Function_())
+			}
+		}
+	}
 }

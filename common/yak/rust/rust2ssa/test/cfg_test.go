@@ -146,3 +146,84 @@ fn main() {
 `, "phi(a)")
 	})
 }
+
+func TestRustMatch(t *testing.T) {
+	t.Run("literal arms select first match", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fn main() {
+    let x = 2;
+    let r = match x {
+        1 => 10,
+        2 => 20,
+        _ => 30,
+    };
+    println(r);
+}
+`, "20")
+	})
+
+	t.Run("guard participates in matching", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fn main() {
+    let x = 5;
+    let r = match x {
+        n if n > 3 => 1,
+        _ => 0,
+    };
+    println(r);
+}
+`, "1")
+	})
+
+	t.Run("or pattern", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fn main() {
+    let x = 2;
+    let r = match x {
+        1 | 2 => 5,
+        _ => 0,
+    };
+    println(r);
+}
+`, "5")
+	})
+
+	t.Run("inclusive range pattern", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fn main() {
+    let x = 3;
+    let r = match x {
+        1..=5 => 7,
+        _ => 0,
+    };
+    println(r);
+}
+`, "7")
+	})
+
+	t.Run("string pattern", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fn main() {
+    let x = "a";
+    let r = match x {
+        "a" => 9,
+        _ => 0,
+    };
+    println(r);
+}
+`, "9")
+	})
+
+	t.Run("arm block body", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fn main() {
+    let x = 1;
+    let r = match x {
+        1 => { let y = 3; y + 1 },
+        _ => 0,
+    };
+    println(r);
+}
+`, "4")
+	})
+}
