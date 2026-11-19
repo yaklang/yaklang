@@ -73,7 +73,29 @@ func TestBuildDisplayFieldTreeHTTPChunkedRanges(t *testing.T) {
 	require.Equal(t, " world", displayRangeText(raw, displayNode(t, second.Children, "Content").Ranges))
 }
 
-func TestBuildDisplayFieldTreeDoesNotPersistHTTPPrefixRanges(t *testing.T) {
-	tree := BuildDisplayFieldTree(&ProtocolEvent{Protocol: "http", Raw: []byte("GET / HTTP/1.1\r\n\r\n")})
-	require.Empty(t, tree.Nodes)
+func TestMessageDisplayHTTPPartialHeaderAndHeaderlessBody(t *testing.T) {
+	prefix := []byte("HTTP/1.1 200 OK\r\nX-Complete: yes\r\nX-Partial: n")
+	nodes, truncated := BuildMessageDisplayNodes(MessageDisplayInput{Protocol: "http", Prefix: prefix, Length: 1000})
+	require.True(t, truncated)
+	http := displayNode(t, nodes, "HTTP")
+	require.Len(t, http.Children, 2, "the prefix boundary is not the body start")
+	headers := displayNode(t, http.Children, "Headers")
+	require.Len(t, headers.Children, 1)
+	require.Equal(t, "yes", displayRangeText(prefix, headers.Children[0].Ranges))
+
+	wire := []byte("HTTP/1.0 200 OK\r\n\r\nbody")
+	nodes, truncated = BuildMessageDisplayNodes(MessageDisplayInput{Protocol: "http", Prefix: wire, Length: len(wire)})
+	require.False(t, truncated)
+	body := displayNode(t, nodes[0].Children, "Body (wire)")
+	require.Equal(t, "body", displayRangeText(wire, body.Ranges))
+}
+
+func TestDisplayTreePropagatesSnapshotLimit(t *testing.T) {
+	b := &displayTreeBuilder{remaining: 100}
+	root := DisplayNode{}
+	appendDecodedRanges(&root, DisplayFieldSnapshot{Truncated: true, Values: []DisplayFieldValue{
+		{Name: "wire.field", Origin: "pdu", Range: &DisplayFieldRange{Offset: 0, Length: 1}},
+	}}, 1, b)
+	require.True(t, b.truncated, "projection can be incomplete before exhausting the tree's node budget")
+	require.Len(t, root.Children[0].Children, 1)
 }

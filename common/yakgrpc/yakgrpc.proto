@@ -10936,7 +10936,7 @@ message PCAPMessageDetail {
   string SourceID = 6;
   repeated PCAPFieldNode Nodes = 7;
   string DecodeError = 8;
-  bool NodesTruncated = 9; // Display-field tree reached its storage projection limit.
+  bool NodesTruncated = 9; // A detail projection or byte-preview limit prevented full coverage.
 }
 
 message PCAPRelatedMessage {

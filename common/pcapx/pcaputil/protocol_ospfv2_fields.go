@@ -47,7 +47,7 @@ func ospfv2DisplayBindings() []displayFieldBinding {
 				if value, present := row[key]; present {
 					var span *DisplayFieldRange
 					if !derived {
-						span = pimOccurrenceRange(row, key, len(e.Raw))
+						span = pimOccurrenceRange(row, key, e.displayRangeLimit())
 						if span == nil {
 							continue // Derived selectors are separate from literal bytes.
 						}

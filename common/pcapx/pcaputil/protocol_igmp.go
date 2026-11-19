@@ -122,6 +122,7 @@ func (a *binParser) observeIGMP(p gopacket.Packet, evidence captureEvidence) (ob
 	if result.Fields != nil {
 		e.Session, e.semanticFields, e.semanticSession = cloneSession(result.Fields), cloneSession(result.Fields), cloneSession(result.Fields)
 		e.Structured = map[string]any{"fields": cloneSession(result.Fields)}
+		e.SourceBytes.ProtocolOffset, e.SourceBytes.ProtocolLength = offset, len(wire)
 		e.retainNativeIGMPFields(result, offset, len(wire))
 	}
 	if status == "decoded" {

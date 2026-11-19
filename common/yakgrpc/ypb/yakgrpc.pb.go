@@ -82231,7 +82231,7 @@ type PCAPMessageDetail struct {
 	SourceID       string                 `protobuf:"bytes,6,opt,name=SourceID,proto3" json:"SourceID,omitempty"`
 	Nodes          []*PCAPFieldNode       `protobuf:"bytes,7,rep,name=Nodes,proto3" json:"Nodes,omitempty"`
 	DecodeError    string                 `protobuf:"bytes,8,opt,name=DecodeError,proto3" json:"DecodeError,omitempty"`
-	NodesTruncated bool                   `protobuf:"varint,9,opt,name=NodesTruncated,proto3" json:"NodesTruncated,omitempty"` // Display-field tree reached its storage projection limit.
+	NodesTruncated bool                   `protobuf:"varint,9,opt,name=NodesTruncated,proto3" json:"NodesTruncated,omitempty"` // A detail projection or byte-preview limit prevented full coverage.
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }

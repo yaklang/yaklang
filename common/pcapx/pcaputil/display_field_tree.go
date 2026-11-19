@@ -25,8 +25,8 @@ type DisplayNode struct {
 	Ranges       []DisplayRange `json:"r,omitempty"`
 }
 
-// DisplayFieldTree is persisted with one protocol message. All ranges are
-// relative to that message's stored Raw bytes, never to a contributing frame.
+// DisplayFieldTree describes one protocol message. All ranges are relative
+// to that message's Raw bytes, never to a contributing frame.
 type DisplayFieldTree struct {
 	SchemaVersion int           `json:"schema_version"`
 	Nodes         []DisplayNode `json:"nodes"`
@@ -72,8 +72,11 @@ func appendDecodedRanges(parent *DisplayNode, snapshot DisplayFieldSnapshot, raw
 		if value.Origin != "pdu" || value.Range == nil {
 			continue
 		}
+		if value.Range.Offset < 0 || value.Range.Offset > rawLength || value.Range.Length > rawLength-value.Range.Offset {
+			continue
+		}
 		ranges := displayByteRange(value.Range.Offset, value.Range.Length)
-		if len(ranges) == 0 || int64(rawLength)*8 < ranges[0].BitOffset+ranges[0].BitLength {
+		if len(ranges) == 0 {
 			continue
 		}
 		if !b.take() {
@@ -82,7 +85,8 @@ func appendDecodedRanges(parent *DisplayNode, snapshot DisplayFieldSnapshot, raw
 		node := DisplayNode{Name: value.Name, Ranges: ranges}
 		values.Children = append(values.Children, node)
 	}
-	if snapshot.Truncated || b.truncated {
+	b.truncated = b.truncated || snapshot.Truncated
+	if b.truncated {
 		values.DisplayValue = "truncated"
 	}
 	if len(values.Children) > 0 {
@@ -160,12 +164,20 @@ func appendHTTPHeadersAndBody(parent *DisplayNode, raw []byte, totalLength int, 
 		return
 	}
 	headerStart := firstLineEnd + 2
-	headerEndRelative := bytes.Index(raw[headerStart:], []byte("\r\n\r\n"))
-	headersEnd := len(raw)
-	bodyStart := len(raw)
+	headerEndRelative := bytes.Index(raw[firstLineEnd:], []byte("\r\n\r\n"))
+	headersEnd, bodyStart := 0, -1
 	if headerEndRelative >= 0 {
-		headersEnd = headerStart + headerEndRelative
+		headersEnd = firstLineEnd + headerEndRelative
 		bodyStart = headersEnd + 4
+	} else {
+		// A preview can end inside a header. Only terminated lines belong
+		// to the display tree; its last byte is not evidence of a body start.
+		b.truncated = len(raw) < totalLength
+		lastComplete := bytes.LastIndex(raw[headerStart:], []byte("\r\n"))
+		if lastComplete < 0 {
+			return
+		}
+		headersEnd = headerStart + lastComplete
 	}
 	headers := DisplayNode{Name: "Headers"}
 	offset := headerStart
@@ -207,13 +219,14 @@ func appendHTTPHeadersAndBody(parent *DisplayNode, raw []byte, totalLength int, 
 	if sourceLength < len(raw) {
 		sourceLength = len(raw)
 	}
-	if bodyStart < sourceLength {
+	if bodyStart >= 0 && bodyStart < sourceLength {
 		parent.Children = append(parent.Children, DisplayNode{
 			Name: "Body (wire)", DisplayValue: strconv.Itoa(sourceLength-bodyStart) + " bytes",
 			Ranges: displayByteRange(bodyStart, sourceLength-bodyStart),
 		})
 		if chunked {
 			appendHTTPChunkedBody(parent, raw, bodyStart, b)
+			b.truncated = b.truncated || len(raw) < totalLength
 		}
 	}
 }
@@ -262,6 +275,9 @@ func BuildHTTPDisplayNodes(protocol string, raw []byte, totalLength int) ([]Disp
 	if !isHTTPDisplayProtocol(protocol) || len(raw) == 0 {
 		return nil, false
 	}
+	if _, _, _, ok := parseHTTPRequestStartLine(raw); !ok {
+		return nil, len(raw) < totalLength
+	}
 	builder := &displayTreeBuilder{remaining: maxDisplayTreeNodes}
 	root := DisplayNode{Name: strings.ToUpper(protocol)}
 	appendHTTPStartLine(&root, raw, builder)
@@ -272,9 +288,8 @@ func BuildHTTPDisplayNodes(protocol string, raw []byte, totalLength int) ([]Disp
 	return []DisplayNode{root}, builder.truncated
 }
 
-// BuildDisplayFieldTree materializes a bounded, persisted field tree. Only
-// parser-confirmed wire spans are emitted. HTTP/1 spans are reconstructed from
-// message bytes in the detail request instead of being duplicated on disk.
+// BuildDisplayFieldTree projects parser-confirmed spans from an event.
+// HTTP/1 has its own wire grammar in BuildHTTPDisplayNodes.
 func BuildDisplayFieldTree(event *ProtocolEvent) DisplayFieldTree {
 	tree := DisplayFieldTree{SchemaVersion: DisplayFieldTreeSchemaVersion}
 	if event == nil || isHTTPDisplayProtocol(event.Protocol) {
@@ -286,7 +301,7 @@ func BuildDisplayFieldTree(event *ProtocolEvent) DisplayFieldTree {
 		protocol = "Application"
 	}
 	root := DisplayNode{Name: protocol}
-	appendDecodedRanges(&root, event.DisplayFieldValues(), len(event.Raw), builder)
+	appendDecodedRanges(&root, event.DisplayFieldValues(), event.displayRangeLimit(), builder)
 	if len(root.Children) > 0 {
 		tree.Nodes = append(tree.Nodes, root)
 	}

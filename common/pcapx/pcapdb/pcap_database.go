@@ -38,6 +38,10 @@ func openIndex(path string, write, create bool) (*gorm.DB, error) {
 		if create {
 			query.Set("mode", "rwc")
 		}
+		// Bulk imports maintain several indexes over multi-gigabyte databases.
+		// A larger writer cache avoids repeated page churn without changing
+		// fullfsync/FULL durability; readers keep their smaller bounded cache.
+		query.Set("_cache_size", "-32768")
 		query.Set("_journal_mode", "WAL")
 		query.Set("_synchronous", "FULL")
 	} else {

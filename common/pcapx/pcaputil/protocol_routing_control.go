@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"container/list"
+	"encoding/json"
 	"fmt"
 	"net"
 	"time"
@@ -19,7 +20,16 @@ type routingDatagramState struct {
 	last           time.Time
 }
 
-func routingNumber(m map[string]any, key string) uint64 { v, _ := m[key].(uint64); return v }
+func routingNumber(m map[string]any, key string) uint64 {
+	switch v := m[key].(type) {
+	case uint64:
+		return v
+	case json.Number: // exact integer from a stored parser snapshot
+		n, _ := displayUint(v)
+		return n
+	}
+	return 0
+}
 func routingHost(endpoint string) string {
 	host, _, err := net.SplitHostPort(endpoint)
 	if err == nil {

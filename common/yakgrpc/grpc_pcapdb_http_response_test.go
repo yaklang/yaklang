@@ -16,22 +16,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func pcapHTTPResponseWithoutRequestCapture(t *testing.T) string {
+type pcapHTTPTestFrame struct {
+	reverse, syn, ack, fin bool
+	seq, ackNo             uint32
+	payload                []byte
+}
+
+func writePCAPHTTPTestCapture(t *testing.T, frames []pcapHTTPTestFrame) string {
 	t.Helper()
-	response := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nThe response starts before this capture.")
-	type frame struct {
-		reverse, syn, ack, fin bool
-		seq, ackNo             uint32
-		payload                []byte
-	}
-	frames := []frame{
-		{syn: true, seq: 1000},
-		{reverse: true, syn: true, ack: true, seq: 2000, ackNo: 1001},
-		{ack: true, seq: 1001, ackNo: 2001},
-		{reverse: true, ack: true, seq: 2001, ackNo: 1001, payload: response},
-		{reverse: true, ack: true, fin: true, seq: 2001 + uint32(len(response)), ackNo: 1001},
-		{ack: true, fin: true, seq: 1001, ackNo: 2002 + uint32(len(response))},
-	}
 	var capture bytes.Buffer
 	writer := pcapgo.NewWriterNanos(&capture)
 	require.NoError(t, writer.WriteFileHeader(65535, layers.LinkTypeEthernet))
@@ -65,9 +57,23 @@ func pcapHTTPResponseWithoutRequestCapture(t *testing.T) string {
 			raw,
 		))
 	}
-	path := filepath.Join(t.TempDir(), "http-response-without-request.pcap")
+	path := filepath.Join(t.TempDir(), "http-test.pcap")
 	require.NoError(t, os.WriteFile(path, capture.Bytes(), 0600))
 	return path
+}
+
+func pcapHTTPResponseWithoutRequestCapture(t *testing.T) string {
+	t.Helper()
+	response := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nThe response starts before this capture.")
+	frames := []pcapHTTPTestFrame{
+		{syn: true, seq: 1000},
+		{reverse: true, syn: true, ack: true, seq: 2000, ackNo: 1001},
+		{ack: true, seq: 1001, ackNo: 2001},
+		{reverse: true, ack: true, seq: 2001, ackNo: 1001, payload: response},
+		{reverse: true, ack: true, fin: true, seq: 2001 + uint32(len(response)), ackNo: 1001},
+		{ack: true, fin: true, seq: 1001, ackNo: 2002 + uint32(len(response))},
+	}
+	return writePCAPHTTPTestCapture(t, frames)
 }
 
 func TestPCAPGRPCQueriesHTTPResponseWithoutRequest(t *testing.T) {
@@ -97,4 +103,41 @@ func TestPCAPGRPCQueriesHTTPResponseWithoutRequest(t *testing.T) {
 	require.Contains(t, detail.GetMessages()[0].GetSummary(), "HTTP/1.1 200 OK")
 	require.Equal(t, "decoded", detail.GetMessages()[0].GetStatus())
 	require.Equal(t, "message", detail.GetMessages()[0].GetCompleteness())
+}
+
+func TestPCAPGRPCResynchronizesHTTPAfterUnclassifiedBytes(t *testing.T) {
+	request := []byte("GET /download.html HTTP/1.1\r\nHost: example.test\r\nUser-Agent: offline-resync\r\n\r\n")
+	capture := writePCAPHTTPTestCapture(t, []pcapHTTPTestFrame{
+		{syn: true, seq: 1000},
+		{reverse: true, syn: true, ack: true, seq: 2000, ackNo: 1001},
+		{ack: true, seq: 1001, ackNo: 2001},
+		{ack: true, seq: 1001, ackNo: 2001, payload: []byte{0}},
+		{ack: true, seq: 1002, ackNo: 2001, payload: request},
+		{ack: true, fin: true, seq: 1002 + uint32(len(request)), ackNo: 2001},
+	})
+
+	_, client := newPCAPTestClient(t)
+	events := importPCAPForTest(t, client, capture)
+	datasetID := events[len(events)-1].GetDatasetID()
+	ctx := context.Background()
+
+	page, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{
+		DatasetID: datasetID,
+		Filter:    &ypb.PCAPPacketsFilter{ApplicationLayerTypes: []string{"http"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, page.GetData(), 1)
+	require.EqualValues(t, 1, page.GetTotal())
+	require.EqualValues(t, 5, page.GetData()[0].GetId())
+	require.Equal(t, "HTTP", page.GetData()[0].GetProtocol())
+	require.Contains(t, page.GetData()[0].GetInfo(), "GET /download.html HTTP/1.1")
+
+	detail, err := client.GetPCAPPacketDetail(ctx, &ypb.GetPCAPPacketDetailRequest{
+		DatasetID: datasetID,
+		PacketID:  page.GetData()[0].GetId(),
+	})
+	require.NoError(t, err)
+	require.Len(t, detail.GetMessages(), 1)
+	require.Equal(t, "HTTP", detail.GetMessages()[0].GetProtocol())
+	require.Contains(t, detail.GetMessages()[0].GetSummary(), "GET /download.html HTTP/1.1")
 }

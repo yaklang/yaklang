@@ -33,7 +33,11 @@ type protocolBatch struct {
 }
 
 func newProtocolBatch(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) *protocolBatch {
-	return &protocolBatch{ctx: ctx, db: db, meta: meta, config: config, sessions: newSessionIndexer(meta), hasher: sha256.New()}
+	capacity := min(config.batchSize, maxPreallocatedBatchSize)
+	return &protocolBatch{
+		ctx: ctx, db: db, meta: meta, config: config, sessions: newSessionIndexer(meta), hasher: sha256.New(),
+		messages: make([]PCAPProtocolMessage, 0, capacity), references: make([]PCAPMessagePacket, 0, capacity),
+	}
 }
 
 // appendEvent runs under mu. Session associations consult the current batch
@@ -64,11 +68,8 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 	if err != nil {
 		return err
 	}
-	displayFieldsJSON, err := json.Marshal(pcaputil.BuildDisplayFieldTree(event))
-	if err != nil {
-		return err
-	}
-	if len(event.Raw) > maxCaptureBlock || len(fieldsJSON)+len(sessionJSON)+len(sourceJSON)+len(displayFieldsJSON) > 8<<20 {
+	jsonBytes := len(fieldsJSON) + len(sessionJSON) + len(sourceJSON)
+	if len(event.Raw) > maxCaptureBlock || jsonBytes > 8<<20 {
 		return fmt.Errorf("pcapdb: protocol message or JSON metadata exceeds storage budget")
 	}
 	var sessionID, streamID uint
@@ -92,7 +93,7 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 		Status: event.Status, Summary: event.Summary, Error: event.Error, DecodeError: decodeError, Section: int64(event.Domain.Section), Interface: event.Domain.Interface, Encapsulation: event.Domain.Encapsulation,
 		Profile: event.Profile, Rule: event.Rule, Entry: event.Entry, Completeness: event.Completeness, ExpertCode: event.ExpertCode, TransactionID: int64(event.TransactionID), ResponseTo: int64(event.ResponseTo),
 		Data: append([]byte{}, event.Raw...), DataLength: len(event.Raw), CompletedInPacketID: completedInPacketID,
-		SessionID: sessionID, StreamID: streamID, FieldsJSON: fieldsJSON, SessionJSON: sessionJSON, SourceBytesJSON: sourceJSON, DisplayFieldsJSON: displayFieldsJSON,
+		SessionID: sessionID, StreamID: streamID, FieldsJSON: fieldsJSON, SessionJSON: sessionJSON, SourceBytesJSON: sourceJSON,
 	})
 	seen := make(map[uint64]bool, len(event.SourceBytes.PacketRefs))
 	for _, packet := range event.SourceBytes.PacketRefs {
@@ -107,7 +108,7 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 	b.hasher.Write(event.Raw)
 	b.meta.ProtocolCount++
 	b.meta.ProtocolDataSize += int64(len(event.Raw))
-	b.bytes += len(event.Raw) + len(fieldsJSON) + len(sessionJSON) + len(sourceJSON) + len(displayFieldsJSON)
+	b.bytes += len(event.Raw) + jsonBytes
 	return nil
 }
 
@@ -298,6 +299,11 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 	// expression-index maintenance during the initial import.
 	if err = ensureProtocolFieldIndexes(ctx, db, config.fieldIndexes); err != nil {
 		return err
+	}
+	if config.deferQueryIndexes {
+		if err = ensurePCAPQueryIndexes(db); err != nil {
+			return err
+		}
 	}
 	return m.transition(ctx, db, meta, StateReady)
 }

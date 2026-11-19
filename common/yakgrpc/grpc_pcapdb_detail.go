@@ -95,35 +95,48 @@ func pcapInitialRange(handle *pcapdb.DatabaseHandle, protocol bool, id uint, len
 	return result.Data, int64(len(result.Data)) < length, nil
 }
 
-func pcapDecodeMessageNodes(message pcapdb.ProtocolMessage, sourceID string, initial []byte, totalLength int) ([]*ypb.PCAPFieldNode, bool, string) {
-	var nodes []*ypb.PCAPFieldNode
-	var truncated bool
-	var diagnostics []string
-	if httpNodes, httpTruncated := pcaputil.BuildHTTPDisplayNodes(message.Protocol, initial, totalLength); len(httpNodes) > 0 {
-		nodes = append(nodes, pcapDisplayFieldNodes(sourceID, httpNodes)...)
-		truncated = httpTruncated
-	}
-	if len(message.DisplayFieldsJSON) > 0 {
-		var tree pcaputil.DisplayFieldTree
-		if err := json.Unmarshal(message.DisplayFieldsJSON, &tree); err != nil {
-			diagnostics = append(diagnostics, "display fields: "+err.Error())
-		} else if tree.SchemaVersion != pcaputil.DisplayFieldTreeSchemaVersion {
-			diagnostics = append(diagnostics, fmt.Sprintf("display fields: unsupported schema %d", tree.SchemaVersion))
+// A previous PDU can exhaust the bytes sent to the client. Its successor may
+// still need a few header bytes to locate fields. Read only the missing prefix,
+// within a separate per-request budget; don't enlarge ByteSource.InitialData.
+func pcapMessageProjection(handle *pcapdb.DatabaseHandle, message pcapdb.ProtocolMessage, source pcaputil.ByteSource, initial []byte, remaining *int) (pcaputil.MessageDisplayInput, error) {
+	m := pcaputil.MessageDisplayInput{Protocol: message.Protocol, Profile: message.Profile, Status: message.Status,
+		Transport: message.Transport, Source: source, Prefix: initial, Length: message.DataLength}
+	needed := min(m.WirePrefixLength(), pcapDetailSourceInitialBytes)
+	if n := min(needed-len(initial), *remaining); n > 0 {
+		extra, err := handle.ReadProtocolRange(message.ID, int64(len(initial)), n)
+		if err != nil {
+			return m, err
+		}
+		*remaining -= len(extra.Data)
+		if len(initial) == 0 {
+			m.Prefix = extra.Data
 		} else {
-			nodes = append(nodes, pcapDisplayFieldNodes(sourceID, tree.Nodes)...)
-			truncated = truncated || tree.Truncated
+			m.Prefix = append(initial[:len(initial):len(initial)], extra.Data...)
 		}
 	}
-	if len(message.FieldsJSON) > 0 {
-		fields := make(map[string]any)
-		decoder := json.NewDecoder(bytes.NewReader(message.FieldsJSON))
+	return m, nil
+}
+
+func pcapDecodeMessageNodes(message pcapdb.ProtocolMessage, sourceID string, view pcaputil.MessageDisplayInput) ([]*ypb.PCAPFieldNode, bool, string) {
+	var diagnostics []string
+	decode := func(label string, raw []byte, target *map[string]any) {
+		if len(raw) == 0 {
+			return
+		}
+		var fields map[string]any
+		decoder := json.NewDecoder(bytes.NewReader(raw))
 		decoder.UseNumber()
 		if err := decoder.Decode(&fields); err != nil {
-			diagnostics = append(diagnostics, "parsed fields: "+err.Error())
-		} else if len(fields) > 0 {
-			message.Fields = fields
+			diagnostics = append(diagnostics, label+": "+err.Error())
+			return
 		}
+		*target = fields
 	}
+	decode("parsed fields", message.FieldsJSON, &message.Fields)
+	decode("session fields", message.SessionJSON, &message.Session)
+	view.Fields, view.Session = message.Fields, message.Session
+	projected, truncated := pcaputil.BuildMessageDisplayNodes(view)
+	nodes := pcapDisplayFieldNodes(sourceID, projected)
 	if len(message.Fields) > 0 {
 		nodes = append(nodes, &ypb.PCAPFieldNode{
 			Name:     "Parsed fields",
@@ -180,6 +193,7 @@ func (s *Server) GetPCAPPacketDetail(ctx context.Context, req *ypb.GetPCAPPacket
 		ByteSources:     make([]*ypb.PCAPByteSource, 0),
 	}
 	remainingInitial := int64(pcapDetailInitialBudget)
+	remainingProjection := pcapDetailInitialBudget
 	frameInitial, frameTruncated, err := pcapInitialRange(handle, false, packetID, int64(len(raw)), &remainingInitial)
 	if err != nil {
 		return nil, pcapRPCError(err)
@@ -204,7 +218,11 @@ func (s *Server) GetPCAPPacketDetail(ctx context.Context, req *ypb.GetPCAPPacket
 		if err != nil {
 			return nil, pcapRPCError(err)
 		}
-		nodes, nodesTruncated, nodesDiagnostic := pcapDecodeMessageNodes(message, sourceID, initial, message.DataLength)
+		view, err := pcapMessageProjection(handle, message, source, initial, &remainingProjection)
+		if err != nil {
+			return nil, pcapRPCError(err)
+		}
+		nodes, nodesTruncated, nodesDiagnostic := pcapDecodeMessageNodes(message, sourceID, view)
 		if nodesDiagnostic != "" {
 			decodeDiagnostics = append(decodeDiagnostics, nodesDiagnostic)
 		}
