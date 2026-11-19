@@ -379,6 +379,7 @@ func (b *singleFileBuilder) visitJumpStatement(raw cppparser.IJumpStatementConte
 	case jump.Goto() != nil:
 		// Goto targets are not turned into CFG edges yet; record the call so the
 		// statement is not silently dropped.
+		// TODO(ssa-cpp): create CFG edges for goto/label instead of a placeholder call.
 		target := ""
 		if identifier := jump.Identifier(); identifier != nil {
 			target = identifier.GetText()

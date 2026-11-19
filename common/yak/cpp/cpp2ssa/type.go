@@ -76,6 +76,8 @@ func (b *singleFileBuilder) typeSpecifierInfo(raw cppparser.IDeclSpecifierSeqCon
 
 // typeFromText resolves a C++ type spelling to an SSA type. Unknown names become
 // placeholder blueprints instead of nil so later member access has a target.
+// TODO(ssa-cpp): lay out unknown types from their declarations; the placeholder
+// carries no fields or methods.
 func (b *singleFileBuilder) typeFromText(text string) ssa.Type {
 	text = normalizeTypeText(text)
 	if text == "" {

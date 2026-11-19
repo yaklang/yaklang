@@ -145,7 +145,7 @@ int main() {
 
 // TestCppExpressionSizeOfIsPlaceholder records the current compile-time
 // behaviour: sizeof is accepted but lowered to 0 because object layout is not
-// modelled. TODO: evaluate sizeof for scalar and pointer types.
+// modelled. TODO(ssa-cpp): evaluate sizeof for scalar and pointer types.
 func TestCppExpressionSizeOfIsPlaceholder(t *testing.T) {
 	test.CheckPrintlnValue(`
 int main() {

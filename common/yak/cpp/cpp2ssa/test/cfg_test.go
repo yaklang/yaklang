@@ -164,10 +164,10 @@ int sumDoWhile(int n) {
 // TestCppPhiLoopConditionUsesBodyValue asserts the loop condition reads the
 // merged variable, not the pre-loop constant.
 //
-// TODO: the for-init counter (`i`) is only assigned in the third expression;
-// the current loop builder creates a phi for variables assigned in the body but
-// not for latch-only updates, so the counter stays at its init value in the
-// condition.
+// TODO(ssa-cpp): the for-init counter (`i`) is only assigned in the third
+// expression; the current loop builder creates a phi for variables assigned in
+// the body but not for latch-only updates, so the counter stays at its init
+// value in the condition.
 func TestCppPhiLoopConditionUsesBodyValue(t *testing.T) {
 	progs := compileCppProject(t, map[string]string{
 		"forcond.cpp": `
