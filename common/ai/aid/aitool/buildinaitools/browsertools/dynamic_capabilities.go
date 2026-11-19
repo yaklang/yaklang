@@ -61,7 +61,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithDescription("List already-open browsers currently connected to this Yak engine through the Yakit browser extension. Use this when the user refers to YTray browsers without an explicit @ mention."),
 		aitool.WithVerboseName("Connected Browser Instances"),
 		aitool.WithVerboseNameZh("在线浏览器实例"),
-		aitool.WithUsage("References such as A, B, and C are stable user-facing selectors. Device IDs are intentionally hidden. With one online instance, other browser tools select it automatically; with several, pass browser_ref for singular operations."),
+		aitool.WithUsage("Use the exact browserRef values returned here. They are Bridge-owned selectors and map one-to-one to browser instances. Badges such as A or B are display-only and may repeat. With one online instance, other browser tools select it automatically; with several, pass browser_ref for singular operations."),
 		aitool.WithKeywords([]string{"browser instances", "YTray", "connected browser", "A/B browser", "浏览器实例", "在线浏览器", "多浏览器"}),
 		aitool.WithDangerousNoNeedUserReview(true),
 		aitool.WithNoRuntimeCallback(func(
@@ -75,6 +75,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 			for _, instance := range instances {
 				result = append(result, map[string]interface{}{
 					"browserRef":        instance.Reference,
+					"badge":             instance.Badge,
 					"online":            true,
 					"manager":           instance.Manager,
 					"client":            instance.Client,
@@ -92,12 +93,12 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithDescription("List the signed capability catalog of an already-open browser connected through the Yakit browser extension. This does not create or control a Rod browser session."),
 		aitool.WithVerboseName("Browser Extension Capability Catalog"),
 		aitool.WithVerboseNameZh("浏览器插件能力目录"),
-		aitool.WithUsage("An explicit @ attachment is bound by the runtime. Otherwise browser_ref selects an online A/B/C instance, and the sole online instance is selected automatically. Query only the relevant domain before browser.capability.call and follow paramsSchema exactly. For one page cryptography operation, use browser.crypto.inspect directly after browser.context. For encrypted HTTP testing, use browser.transform.prepare and pass validationDraft.id to browser.http.test. Never substitute use_browser/op=open for a connected extension browser."),
+		aitool.WithUsage("An explicit @ attachment is bound by the runtime. Otherwise use the exact browser_ref returned by browser.instances.list; badges are display-only. The sole online instance is selected automatically. Query only the relevant domain before browser.capability.call and follow paramsSchema exactly. For one page cryptography operation, use browser.crypto.inspect directly after browser.context. For encrypted HTTP testing, use browser.transform.prepare and pass validationDraft.id to browser.http.test. Never substitute use_browser/op=open for a connected extension browser."),
 		aitool.WithKeywords([]string{"browser", "browser instance", "attached browser", "browser extension", "current website", "open tabs", "capability catalog", "schema", "浏览器", "浏览器实例", "已打开浏览器", "浏览器插件", "当前网站", "标签页", "能力目录", "参数"}),
 		aitool.WithDangerousNoNeedUserReview(true),
 		aitool.WithStringParam(
 			"browser_ref",
-			aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"),
+			aitool.WithParam_Description("Exact browser_ref returned by browser.instances.list; optional when exactly one browser is online"),
 			aitool.WithParam_MaxLength(512),
 		),
 		aitool.WithStringParam(
@@ -138,6 +139,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 			}
 			return map[string]interface{}{
 				"browserRef":    instance.Reference,
+				"badge":         instance.Badge,
 				"schemaVersion": catalog.Version,
 				"schemaHash":    catalog.Hash,
 				"schemaDialect": catalog.SchemaDialect,
@@ -162,7 +164,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithKeywords([]string{"browser", "browser instance", "attached browser", "browser extension", "current website", "open tabs", "page interaction", "network", "debugging", "proxy", "浏览器", "浏览器实例", "已打开浏览器", "浏览器插件", "当前网站", "标签页", "页面操作", "网络", "调试"}),
 		aitool.WithStringParam(
 			"browser_ref",
-			aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"),
+			aitool.WithParam_Description("Exact browser_ref returned by browser.instances.list; optional when exactly one browser is online"),
 			aitool.WithParam_MaxLength(512),
 		),
 		aitool.WithStringParam(
@@ -212,7 +214,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithKeywords([]string{"browser crypto", "page encryption", "decrypt", "AES", "RSA", "signature", "页面加密", "页面解密", "加密算法", "签名"}),
 		aitool.WithStringParam(
 			"browser_ref",
-			aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"),
+			aitool.WithParam_Description("Exact browser_ref returned by browser.instances.list; optional when exactly one browser is online"),
 			aitool.WithParam_MaxLength(512),
 		),
 		aitool.WithStringParam("captureId", aitool.WithParam_Description("captureId returned by browser.context"), aitool.WithParam_MaxLength(160), aitool.WithParam_Required(true)),
@@ -260,7 +262,7 @@ func BuildDynamicCapabilityTools(bridge Bridge) ([]*aitool.Tool, error) {
 		aitool.WithKeywords([]string{"browser login", "QR code", "scan login", "MFA", "CAPTCHA", "user handoff", "浏览器登录", "扫码登录", "二维码", "验证码", "人工接管"}),
 		aitool.WithStringParam(
 			"browser_ref",
-			aitool.WithParam_Description("Online browser reference such as A or B; optional when exactly one browser is online"),
+			aitool.WithParam_Description("Exact browser_ref returned by browser.instances.list; optional when exactly one browser is online"),
 			aitool.WithParam_MaxLength(512),
 		),
 		aitool.WithStringParam(

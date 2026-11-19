@@ -31,7 +31,7 @@ func (i *timelineWritingInvoker) GetBrowserAttachments() []aicommon.AttachedBrow
 	return i.browserBindings
 }
 
-func (i *timelineWritingInvoker) AddBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) {
+func (i *timelineWritingInvoker) AddBrowserAttachments(bindings []aicommon.AttachedBrowserBinding) error {
 	seen := make(map[string]struct{}, len(i.browserBindings))
 	for _, binding := range i.browserBindings {
 		seen[binding.DeviceID] = struct{}{}
@@ -43,6 +43,7 @@ func (i *timelineWritingInvoker) AddBrowserAttachments(bindings []aicommon.Attac
 		seen[binding.DeviceID] = struct{}{}
 		i.browserBindings = append(i.browserBindings, binding)
 	}
+	return nil
 }
 
 func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
@@ -59,6 +60,9 @@ func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
 		aicommon.WithDisableCreateDBRuntime(true),
 		aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithBrowserAttachmentReferenceResolver(func(deviceID string) (string, error) {
+			return map[string]string{"device-a": "br_1", "device-b": "br_2"}[deviceID], nil
+		}),
 	)
 	for _, name := range toolNames {
 		cfg.GetAiToolManager().DisableTool(name)
@@ -89,8 +93,8 @@ func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
 
 	require.Len(t, loop.GetAttachedResources(), 2)
 	require.Equal(t, []aicommon.AttachedBrowserBinding{
-		{DeviceID: "device-a", Reference: "A"},
-		{DeviceID: "device-b", Reference: "B"},
+		{DeviceID: "device-a", Reference: "br_1"},
+		{DeviceID: "device-b", Reference: "br_2"},
 	}, invoker.GetBrowserAttachments())
 	for _, name := range toolNames {
 		require.True(t, cfg.GetAiToolManager().IsRecentlyUsedTool(name), name)
@@ -98,8 +102,8 @@ func TestTaskPreparationRunsBrowserResourceThroughCommonPipeline(t *testing.T) {
 	output := cfg.Timeline.GetTimelineOutput()
 	require.NotEmpty(t, output)
 	require.Contains(t, output[len(output)-1].Content, "## Attached Browser")
-	require.Contains(t, output[len(output)-1].Content, "`A`")
-	require.Contains(t, output[len(output)-1].Content, "`B`")
+	require.Contains(t, output[len(output)-1].Content, "`br_1`")
+	require.Contains(t, output[len(output)-1].Content, "`br_2`")
 }
 
 func TestAttachedFileContentPersistsAndPinSurvivesCompression(t *testing.T) {

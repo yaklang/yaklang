@@ -28,6 +28,7 @@ const (
 	extensionPairingTTL                   = 2 * time.Minute
 	extensionPairingMaxPending            = 8
 	extensionPairingMaxPerMinute          = 5
+	maxExtensionBridgeReference           = ^uint64(0)
 )
 
 type ExtensionBridgeJWK struct {
@@ -39,6 +40,7 @@ type ExtensionBridgeJWK struct {
 
 type ExtensionBridgeDevice struct {
 	ID             string             `json:"id"`
+	Reference      uint64             `json:"reference,omitempty"` // stable browser_ref number
 	InstallationID string             `json:"installationId"`
 	Name           string             `json:"name"`
 	Client         string             `json:"client"`
@@ -53,6 +55,7 @@ type extensionBridgeIdentityState struct {
 	Version          int                     `json:"version"`
 	EngineIdentityID string                  `json:"engineIdentityId"`
 	EnginePrivateKey string                  `json:"enginePrivateKey"`
+	NextReference    uint64                  `json:"nextReference,omitempty"` // never reused after device revocation
 	Devices          []ExtensionBridgeDevice `json:"devices"`
 }
 
@@ -207,6 +210,15 @@ func loadOrCreateExtensionBridgeIdentity(store ExtensionBridgeIdentityStore) (*e
 		if parseErr != nil || key.Curve != elliptic.P256() {
 			return nil, nil, errors.New("browser extension private key is invalid")
 		}
+		changed, normalizeErr := normalizeExtensionBridgeDeviceReferences(state)
+		if normalizeErr != nil {
+			return nil, nil, normalizeErr
+		}
+		if changed {
+			if err := store.Save(state); err != nil {
+				return nil, nil, fmt.Errorf("persist browser extension device references: %w", err)
+			}
+		}
 		return state, key, nil
 	}
 	if !os.IsNotExist(err) {
@@ -228,6 +240,7 @@ func loadOrCreateExtensionBridgeIdentity(store ExtensionBridgeIdentityStore) (*e
 		Version:          extensionBridgeIdentityVersion,
 		EngineIdentityID: identityID,
 		EnginePrivateKey: base64.RawURLEncoding.EncodeToString(encoded),
+		NextReference:    1,
 		Devices:          make([]ExtensionBridgeDevice, 0),
 	}
 	if err := store.Save(state); err != nil {
@@ -324,6 +337,24 @@ func (m *ExtensionBridgeManager) EngineIdentity() (string, ExtensionBridgeJWK) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.identity.EngineIdentityID, publicKeyToJWK(&m.privateKey.PublicKey)
+}
+
+func (m *ExtensionBridgeManager) BrowserReference(deviceID string) (string, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return "", errors.New("browser extension device id is required")
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, device := range m.identity.Devices {
+		if device.ID == deviceID {
+			if reference := formatExtensionBridgeReference(device.Reference); reference != "" {
+				return reference, nil
+			}
+			return "", errors.New("paired browser extension device has no runtime reference")
+		}
+	}
+	return "", errors.New("paired browser extension device not found")
 }
 
 func (m *ExtensionBridgeManager) currentServer() *ExtensionBridgeServer {
@@ -474,11 +505,13 @@ func (m *ExtensionBridgeManager) ApprovePairing(requestID, name, replaceDeviceID
 	}
 
 	deviceID := ""
+	var reference uint64
 	createdAt := int64(0)
 	previousInstallationIDs := make(map[string]struct{})
 	if replacementIndex >= 0 {
 		replacement := m.identity.Devices[replacementIndex]
 		deviceID = replacement.ID
+		reference = replacement.Reference
 		createdAt = replacement.CreatedAt
 		previousInstallationIDs[replacement.InstallationID] = struct{}{}
 		if strings.TrimSpace(replacement.Name) != "" {
@@ -499,12 +532,25 @@ func (m *ExtensionBridgeManager) ApprovePairing(requestID, name, replaceDeviceID
 	if createdAt == 0 {
 		createdAt = now
 	}
+	nextReference := m.identity.NextReference
+	if nextReference == 0 {
+		nextReference = 1
+	}
+	if reference == 0 {
+		if nextReference == maxExtensionBridgeReference {
+			m.mu.Unlock()
+			return nil, errors.New("browser extension reference space is exhausted")
+		}
+		reference = nextReference
+		nextReference++
+	}
 	device := ExtensionBridgeDevice{
-		ID: deviceID, InstallationID: pending.input.InstallationID, Name: strings.TrimSpace(name),
+		ID: deviceID, Reference: reference, InstallationID: pending.input.InstallationID, Name: strings.TrimSpace(name),
 		Client: pending.input.Client, ClientVersion: pending.input.ClientVersion,
 		Origin: pending.request.Origin, PublicKey: pending.input.PublicKey, CreatedAt: createdAt, LastSeenAt: now,
 	}
 	updated := m.identity
+	updated.NextReference = nextReference
 	updated.Devices = make([]ExtensionBridgeDevice, 0, len(m.identity.Devices)+1)
 	replaced := false
 	for index, candidate := range m.identity.Devices {
@@ -791,6 +837,56 @@ func managedClientAuthPayload(origin, engineIdentityID, engineInstanceID, challe
 		)
 	}
 	return strings.Join(fields, "\n")
+}
+
+// normalizeExtensionBridgeDeviceReferences backfills devices paired before
+// runtime references existed and rejects duplicate persisted numbers.
+func normalizeExtensionBridgeDeviceReferences(state *extensionBridgeIdentityState) (bool, error) {
+	if state == nil {
+		return false, nil
+	}
+	next := state.NextReference
+	if next == 0 {
+		next = 1
+	}
+	used := make(map[uint64]struct{}, len(state.Devices))
+	for _, device := range state.Devices {
+		if device.Reference == 0 {
+			continue
+		}
+		if _, exists := used[device.Reference]; exists {
+			return false, fmt.Errorf("duplicate browser extension device reference %q", formatExtensionBridgeReference(device.Reference))
+		}
+		used[device.Reference] = struct{}{}
+		if device.Reference >= next {
+			if device.Reference == maxExtensionBridgeReference {
+				return false, errors.New("browser extension reference space is exhausted")
+			}
+			next = device.Reference + 1
+		}
+	}
+	changed := state.NextReference != next
+	state.NextReference = next
+	for index := range state.Devices {
+		if state.Devices[index].Reference != 0 {
+			continue
+		}
+		if next == maxExtensionBridgeReference {
+			return false, errors.New("browser extension reference space is exhausted")
+		}
+		state.Devices[index].Reference = next
+		next++
+		changed = true
+	}
+	state.NextReference = next
+	return changed, nil
+}
+
+func formatExtensionBridgeReference(reference uint64) string {
+	if reference == 0 {
+		return ""
+	}
+	return fmt.Sprintf("br_%d", reference)
 }
 
 var activeExtensionBridgeManager struct {
