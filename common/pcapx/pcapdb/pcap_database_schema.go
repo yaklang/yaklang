@@ -65,6 +65,7 @@ func (Packet) TableName() string { return "packets" }
 // JSONB 是持久化原本，Fields/Session 仅在详情查询时解码，普通列表只加载摘要。
 // 字段索引同样只创建在子库中，方案见 PROTOCOL_FIELDS_SEACH.md。
 // Data 保存消息重组字节；SessionID/StreamID 关联网络会话和方向流。
+// CompletedInPacketID 以 0 表示尚无可确认的完成帧，必须作为普通零值写入。
 type PCAPProtocolMessage struct {
 	gorm.Model
 	EventID             int64          `gorm:"unique_index;not null" json:"event_id"`
@@ -94,7 +95,7 @@ type PCAPProtocolMessage struct {
 	TransactionID       int64          `gorm:"not null"`
 	ResponseTo          int64          `gorm:"not null"`
 	DataLength          int            `gorm:"not null" json:"data_length"`
-	CompletedInPacketID uint           `gorm:"not null;default:0" json:"completed_in_packet_id,omitempty"`
+	CompletedInPacketID uint           `gorm:"not null" json:"completed_in_packet_id,omitempty"`
 	Data                []byte         `gorm:"type:blob;not null" json:"-"`
 	SessionID           uint           `gorm:"type:integer REFERENCES sessions(id);default:null" json:"session_id,omitempty"`
 	StreamID            uint           `gorm:"type:integer REFERENCES streams(id);default:null" json:"stream_id,omitempty"`
