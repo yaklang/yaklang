@@ -35,7 +35,11 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 	}
 	word := ab.buildWord(cmd.Args[0])
 	fields, spread := ab.words(cmd.Args[1:])
-	name, isStatic := staticWord(cmd.Args[0])
+	// Command identity uses the raw word text; value expansion stays decoded.
+	name, isStatic := rawStaticWord(cmd.Args[0])
+	if isStatic {
+		word = ab.EmitConstInst(name)
+	}
 	fn := ab.funcs[name]
 	if !isStatic || !isPlainName(name) {
 		fn = nil
