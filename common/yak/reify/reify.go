@@ -321,6 +321,15 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	if err != nil {
 		return nil, err
 	}
+	// A failure after conversion must close the program cache. Otherwise a DB
+	// writer can keep flushing a program that the caller never receives, and a
+	// staging program would be recreated after its cleanup.
+	program := converted.Program
+	defer func() {
+		if !ok && program != nil && program.Cache != nil && !program.Cache.IsClosed() {
+			program.Cache.CloseWithoutSave()
+		}
+	}()
 	result.Diagnostics = append(result.Diagnostics, converted.Diagnostics...)
 	result.Program = converted.Program
 	result.ProgramName = converted.Program.GetProgramName()

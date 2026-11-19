@@ -103,7 +103,7 @@ export YAKIT_HOME="$OUT/yakit-home"
 
 `lift` 默认输出 `asm`。默认恢复并解码全部已发现函数；`--section` 选择单个节，`--func` 选择一个函数，`--address/--size` 选择地址区间。`--mode` 选择 `asm`、`lowir`、`ssair`、`source` 或 `all`。默认使用 Intel 语法；`--asm-syntax att` 切换 GNU/AT&T。用 `--address` 和 `--size` 可以限定一个连续代码区域。两个参数必须同时给出。
 
-`save` 先调用 lift 得到 `Result.Program`，再调用 `Program.SaveToDatabase()` 写入 ssadb。`YAKIT_HOME` 选择数据库目录；同名程序默认拒绝写入，加 `--replace` 先删旧行。`audit <file> '<syntaxflow>'` 在内存 SSA 上执行 SyntaxFlow。`audit --program <name> '<syntaxflow>'` 从 ssadb 加载程序后执行；`--db` 可指定数据库文件。规则也可以写到 `--rule`。`--json` 输出结构化结果。
+`save` 先调用 lift 得到 `Result.Program`，再调用 `Program.SaveToDatabase()` 写入 ssadb。新程序先写到临时程序名；写完后才在一个事务内替换同名旧程序。参数错误、文件缺失或 lift 失败都不会修改旧程序。`YAKIT_HOME` 选择数据库目录；同名程序默认拒绝写入，加 `--replace` 允许替换。`audit <file> '<syntaxflow>'` 在内存 SSA 上执行 SyntaxFlow。`audit --program <name> '<syntaxflow>'` 从 ssadb 加载程序后执行；`--db` 可指定数据库文件。规则也可以写到 `--rule`。`--json` 输出结构化结果。
 
 `ssair` 先执行 LowIR 转换，再输出 YakSSA 文本。`source` 在 `ssair` 之后输出伪源码。两者都不是可编译源码。
 
