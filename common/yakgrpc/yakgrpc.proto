@@ -746,6 +746,8 @@ service Yak {
 
   // Wireshark
   rpc GetPcapMetadata(PcapMetadataRequest) returns (PcapMetadata);
+  // Start one persistent pcapdb live capture. The first response carries
+  // DatasetID, which can be queried while capture is running.
   rpc PcapX(stream PcapXRequest) returns (stream PcapXResponse);
   // Deprecated: legacy session storage is no longer served; the RPC remains as
   // a compatibility shell and returns Unimplemented.
@@ -3238,10 +3240,17 @@ message QueryTrafficSessionRequest {
 }
 
 message PcapXRequest {
-  // first request
+  // First request. Exactly one interface is supported in this phase.
   repeated string NetInterfaceList = 1;
+  // Deprecated: unused compatibility field. Use DurationMilliseconds.
   double TimeoutFloat = 2;
   SuricataConfig SuricataLoader = 3;
+  string BPF = 4;
+  int32 Snaplen = 5;
+  bool Promisc = 6;
+  int64 BatchSize = 7;
+  int64 FlushIntervalMilliseconds = 8;
+  int64 DurationMilliseconds = 9;
 }
 
 message SuricataConfig {
@@ -3253,6 +3262,16 @@ message PcapXResponse {
   int64 NetInterfaceTransferKBPerSeconds = 2;
   int64 TCPReassembledCount = 3;
   int64 TrafficSessionCount = 4;
+  string DatasetID = 5; // Available once the live pcapdb dataset is created.
+  string State = 6;
+  int64 BytesIndexed = 7;
+  int64 TotalBytes = 8;
+  int64 ProtocolCount = 9;
+  int64 SessionCount = 10;
+  int64 StreamCount = 11;
+  int64 StreamChunkCount = 12;
+  bool Finished = 13;
+  string Error = 14;
 }
 
 

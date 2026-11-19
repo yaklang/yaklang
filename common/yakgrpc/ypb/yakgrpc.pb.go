@@ -18306,12 +18306,19 @@ func (x *QueryTrafficSessionRequest) GetTimestampNow() int64 {
 
 type PcapXRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// first request
-	NetInterfaceList []string        `protobuf:"bytes,1,rep,name=NetInterfaceList,proto3" json:"NetInterfaceList,omitempty"`
-	TimeoutFloat     float64         `protobuf:"fixed64,2,opt,name=TimeoutFloat,proto3" json:"TimeoutFloat,omitempty"`
-	SuricataLoader   *SuricataConfig `protobuf:"bytes,3,opt,name=SuricataLoader,proto3" json:"SuricataLoader,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// First request. Exactly one interface is supported in this phase.
+	NetInterfaceList []string `protobuf:"bytes,1,rep,name=NetInterfaceList,proto3" json:"NetInterfaceList,omitempty"`
+	// Deprecated: unused compatibility field. Use DurationMilliseconds.
+	TimeoutFloat              float64         `protobuf:"fixed64,2,opt,name=TimeoutFloat,proto3" json:"TimeoutFloat,omitempty"`
+	SuricataLoader            *SuricataConfig `protobuf:"bytes,3,opt,name=SuricataLoader,proto3" json:"SuricataLoader,omitempty"`
+	BPF                       string          `protobuf:"bytes,4,opt,name=BPF,proto3" json:"BPF,omitempty"`
+	Snaplen                   int32           `protobuf:"varint,5,opt,name=Snaplen,proto3" json:"Snaplen,omitempty"`
+	Promisc                   bool            `protobuf:"varint,6,opt,name=Promisc,proto3" json:"Promisc,omitempty"`
+	BatchSize                 int64           `protobuf:"varint,7,opt,name=BatchSize,proto3" json:"BatchSize,omitempty"`
+	FlushIntervalMilliseconds int64           `protobuf:"varint,8,opt,name=FlushIntervalMilliseconds,proto3" json:"FlushIntervalMilliseconds,omitempty"`
+	DurationMilliseconds      int64           `protobuf:"varint,9,opt,name=DurationMilliseconds,proto3" json:"DurationMilliseconds,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *PcapXRequest) Reset() {
@@ -18365,6 +18372,48 @@ func (x *PcapXRequest) GetSuricataLoader() *SuricataConfig {
 	return nil
 }
 
+func (x *PcapXRequest) GetBPF() string {
+	if x != nil {
+		return x.BPF
+	}
+	return ""
+}
+
+func (x *PcapXRequest) GetSnaplen() int32 {
+	if x != nil {
+		return x.Snaplen
+	}
+	return 0
+}
+
+func (x *PcapXRequest) GetPromisc() bool {
+	if x != nil {
+		return x.Promisc
+	}
+	return false
+}
+
+func (x *PcapXRequest) GetBatchSize() int64 {
+	if x != nil {
+		return x.BatchSize
+	}
+	return 0
+}
+
+func (x *PcapXRequest) GetFlushIntervalMilliseconds() int64 {
+	if x != nil {
+		return x.FlushIntervalMilliseconds
+	}
+	return 0
+}
+
+func (x *PcapXRequest) GetDurationMilliseconds() int64 {
+	if x != nil {
+		return x.DurationMilliseconds
+	}
+	return 0
+}
+
 type SuricataConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -18407,6 +18456,16 @@ type PcapXResponse struct {
 	NetInterfaceTransferKBPerSeconds int64                  `protobuf:"varint,2,opt,name=NetInterfaceTransferKBPerSeconds,proto3" json:"NetInterfaceTransferKBPerSeconds,omitempty"`
 	TCPReassembledCount              int64                  `protobuf:"varint,3,opt,name=TCPReassembledCount,proto3" json:"TCPReassembledCount,omitempty"`
 	TrafficSessionCount              int64                  `protobuf:"varint,4,opt,name=TrafficSessionCount,proto3" json:"TrafficSessionCount,omitempty"`
+	DatasetID                        string                 `protobuf:"bytes,5,opt,name=DatasetID,proto3" json:"DatasetID,omitempty"` // Available once the live pcapdb dataset is created.
+	State                            string                 `protobuf:"bytes,6,opt,name=State,proto3" json:"State,omitempty"`
+	BytesIndexed                     int64                  `protobuf:"varint,7,opt,name=BytesIndexed,proto3" json:"BytesIndexed,omitempty"`
+	TotalBytes                       int64                  `protobuf:"varint,8,opt,name=TotalBytes,proto3" json:"TotalBytes,omitempty"`
+	ProtocolCount                    int64                  `protobuf:"varint,9,opt,name=ProtocolCount,proto3" json:"ProtocolCount,omitempty"`
+	SessionCount                     int64                  `protobuf:"varint,10,opt,name=SessionCount,proto3" json:"SessionCount,omitempty"`
+	StreamCount                      int64                  `protobuf:"varint,11,opt,name=StreamCount,proto3" json:"StreamCount,omitempty"`
+	StreamChunkCount                 int64                  `protobuf:"varint,12,opt,name=StreamChunkCount,proto3" json:"StreamChunkCount,omitempty"`
+	Finished                         bool                   `protobuf:"varint,13,opt,name=Finished,proto3" json:"Finished,omitempty"`
+	Error                            string                 `protobuf:"bytes,14,opt,name=Error,proto3" json:"Error,omitempty"`
 	unknownFields                    protoimpl.UnknownFields
 	sizeCache                        protoimpl.SizeCache
 }
@@ -18467,6 +18526,76 @@ func (x *PcapXResponse) GetTrafficSessionCount() int64 {
 		return x.TrafficSessionCount
 	}
 	return 0
+}
+
+func (x *PcapXResponse) GetDatasetID() string {
+	if x != nil {
+		return x.DatasetID
+	}
+	return ""
+}
+
+func (x *PcapXResponse) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *PcapXResponse) GetBytesIndexed() int64 {
+	if x != nil {
+		return x.BytesIndexed
+	}
+	return 0
+}
+
+func (x *PcapXResponse) GetTotalBytes() int64 {
+	if x != nil {
+		return x.TotalBytes
+	}
+	return 0
+}
+
+func (x *PcapXResponse) GetProtocolCount() int64 {
+	if x != nil {
+		return x.ProtocolCount
+	}
+	return 0
+}
+
+func (x *PcapXResponse) GetSessionCount() int64 {
+	if x != nil {
+		return x.SessionCount
+	}
+	return 0
+}
+
+func (x *PcapXResponse) GetStreamCount() int64 {
+	if x != nil {
+		return x.StreamCount
+	}
+	return 0
+}
+
+func (x *PcapXResponse) GetStreamChunkCount() int64 {
+	if x != nil {
+		return x.StreamChunkCount
+	}
+	return 0
+}
+
+func (x *PcapXResponse) GetFinished() bool {
+	if x != nil {
+		return x.Finished
+	}
+	return false
+}
+
+func (x *PcapXResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
 }
 
 type RequestYakURLParams struct {
@@ -84044,17 +84173,36 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aFromNow\x18\x02 \x01(\bR\aFromNow\x12\x16\n" +
 	"\x06FromId\x18\x03 \x01(\x03R\x06FromId\x12\x18\n" +
 	"\aUntilId\x18\x04 \x01(\x03R\aUntilId\x12\"\n" +
-	"\fTimestampNow\x18\x05 \x01(\x03R\fTimestampNow\"\x9b\x01\n" +
+	"\fTimestampNow\x18\x05 \x01(\x03R\fTimestampNow\"\xf1\x02\n" +
 	"\fPcapXRequest\x12*\n" +
 	"\x10NetInterfaceList\x18\x01 \x03(\tR\x10NetInterfaceList\x12\"\n" +
 	"\fTimeoutFloat\x18\x02 \x01(\x01R\fTimeoutFloat\x12;\n" +
-	"\x0eSuricataLoader\x18\x03 \x01(\v2\x13.ypb.SuricataConfigR\x0eSuricataLoader\"\x10\n" +
-	"\x0eSuricataConfig\"\xef\x01\n" +
+	"\x0eSuricataLoader\x18\x03 \x01(\v2\x13.ypb.SuricataConfigR\x0eSuricataLoader\x12\x10\n" +
+	"\x03BPF\x18\x04 \x01(\tR\x03BPF\x12\x18\n" +
+	"\aSnaplen\x18\x05 \x01(\x05R\aSnaplen\x12\x18\n" +
+	"\aPromisc\x18\x06 \x01(\bR\aPromisc\x12\x1c\n" +
+	"\tBatchSize\x18\a \x01(\x03R\tBatchSize\x12<\n" +
+	"\x19FlushIntervalMilliseconds\x18\b \x01(\x03R\x19FlushIntervalMilliseconds\x122\n" +
+	"\x14DurationMilliseconds\x18\t \x01(\x03R\x14DurationMilliseconds\"\x10\n" +
+	"\x0eSuricataConfig\"\xb1\x04\n" +
 	"\rPcapXResponse\x12.\n" +
 	"\x12PacketFrameCounter\x18\x01 \x01(\x03R\x12PacketFrameCounter\x12J\n" +
 	" NetInterfaceTransferKBPerSeconds\x18\x02 \x01(\x03R NetInterfaceTransferKBPerSeconds\x120\n" +
 	"\x13TCPReassembledCount\x18\x03 \x01(\x03R\x13TCPReassembledCount\x120\n" +
-	"\x13TrafficSessionCount\x18\x04 \x01(\x03R\x13TrafficSessionCount\"\x90\x01\n" +
+	"\x13TrafficSessionCount\x18\x04 \x01(\x03R\x13TrafficSessionCount\x12\x1c\n" +
+	"\tDatasetID\x18\x05 \x01(\tR\tDatasetID\x12\x14\n" +
+	"\x05State\x18\x06 \x01(\tR\x05State\x12\"\n" +
+	"\fBytesIndexed\x18\a \x01(\x03R\fBytesIndexed\x12\x1e\n" +
+	"\n" +
+	"TotalBytes\x18\b \x01(\x03R\n" +
+	"TotalBytes\x12$\n" +
+	"\rProtocolCount\x18\t \x01(\x03R\rProtocolCount\x12\"\n" +
+	"\fSessionCount\x18\n" +
+	" \x01(\x03R\fSessionCount\x12 \n" +
+	"\vStreamCount\x18\v \x01(\x03R\vStreamCount\x12*\n" +
+	"\x10StreamChunkCount\x18\f \x01(\x03R\x10StreamChunkCount\x12\x1a\n" +
+	"\bFinished\x18\r \x01(\bR\bFinished\x12\x14\n" +
+	"\x05Error\x18\x0e \x01(\tR\x05Error\"\x90\x01\n" +
 	"\x13RequestYakURLParams\x12\x16\n" +
 	"\x06Method\x18\x01 \x01(\tR\x06Method\x12\x1d\n" +
 	"\x03Url\x18\x02 \x01(\v2\v.ypb.YakURLR\x03Url\x12\x12\n" +

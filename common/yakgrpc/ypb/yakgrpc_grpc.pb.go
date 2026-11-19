@@ -1228,6 +1228,8 @@ type YakClient interface {
 	DownloadOfficialCHeaders(ctx context.Context, in *DownloadOfficialCHeadersRequest, opts ...grpc.CallOption) (*DownloadOfficialCHeadersResponse, error)
 	// Wireshark
 	GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error)
+	// Start one persistent pcapdb live capture. The first response carries
+	// DatasetID, which can be queried while capture is running.
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PcapXRequest, PcapXResponse], error)
 	// Deprecated: legacy session storage is no longer served; the RPC remains as
 	// a compatibility shell and returns Unimplemented.
@@ -9901,6 +9903,8 @@ type YakServer interface {
 	DownloadOfficialCHeaders(context.Context, *DownloadOfficialCHeadersRequest) (*DownloadOfficialCHeadersResponse, error)
 	// Wireshark
 	GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error)
+	// Start one persistent pcapdb live capture. The first response carries
+	// DatasetID, which can be queried while capture is running.
 	PcapX(grpc.BidiStreamingServer[PcapXRequest, PcapXResponse]) error
 	// Deprecated: legacy session storage is no longer served; the RPC remains as
 	// a compatibility shell and returns Unimplemented.

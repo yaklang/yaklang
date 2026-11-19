@@ -25,6 +25,8 @@
 
 `QueryPCAPPackets` 已替代旧的 `QueryPCAPPacket`，后者及其请求/响应模型已从 proto 删除。新前端完成切换后清理 `QueryTrafficPacket` / `ParseTraffic` 的 PCAP 专用适配。其他仍在使用老 traffic 接口的功能不属于这次重构范围，删除前检查调用方。
 
+`PcapX` 保留原双向流名称，但实现已切换为单网卡 pcapdb 实时抓包。首个响应返回 `DatasetID`，前端可在抓包过程中使用 `QueryPCAPPackets` 和 `GetPCAPPacketDetail` 查询；关闭流即停止捕获，最终响应带 `Finished` 和错误信息。
+
 沿用项目 CRUD 的 `Filter`、`Pagination`、`Data` 组织方式和 gRPC 错误处理。HTTPFlow 本身也有独立的查询、按 ID 获取以及正文读取接口，不把 `Full` 作为这轮设计的约束。
 
 实现位置：
