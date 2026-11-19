@@ -5,27 +5,27 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (b *singleFileBuilder) visitBlockExpression(raw rustparser.IBlockExpressionContext, functionBody bool) {
+func (b *singleFileBuilder) visitBlockExpression(raw rustparser.IBlockExpressionContext, functionBody bool) ssa.Value {
 	block, ok := raw.(*rustparser.BlockExpressionContext)
 	if !ok || block == nil {
-		return
+		return nil
 	}
 	statements := block.Statements()
 	if statements == nil {
-		return
+		return nil
 	}
-	b.visitStatements(statements, functionBody)
+	return b.visitStatements(statements, functionBody)
 }
 
-func (b *singleFileBuilder) visitStatements(raw rustparser.IStatementsContext, functionBody bool) {
+func (b *singleFileBuilder) visitStatements(raw rustparser.IStatementsContext, functionBody bool) ssa.Value {
 	statements, ok := raw.(*rustparser.StatementsContext)
 	if !ok || statements == nil {
-		return
+		return nil
 	}
 	for _, rawStatement := range statements.AllStatement() {
 		b.visitStatement(rawStatement)
 		if b.IsStop() {
-			return
+			return nil
 		}
 	}
 	if trailing := statements.Expression(); trailing != nil {
@@ -33,7 +33,9 @@ func (b *singleFileBuilder) visitStatements(raw rustparser.IStatementsContext, f
 		if functionBody && value != nil {
 			b.EmitReturn([]ssa.Value{value})
 		}
+		return value
 	}
+	return nil
 }
 
 func (b *singleFileBuilder) visitStatement(raw rustparser.IStatementContext) {
