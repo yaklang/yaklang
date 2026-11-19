@@ -116,24 +116,27 @@ func GetExampleInterface() ExampleInterface {
 }
 
 // --------------------- for test ---------------------
-func CheckPrintlnValue(code string, want []string, t *testing.T) {
+func CheckPrintlnValue(code string, want []string, t *testing.T, opt ...ssaconfig.Option) {
 	CheckPrintf(t, TestCase{
-		Code: code,
-		Want: want,
+		Code:   code,
+		Want:   want,
+		Option: opt,
 	})
 }
 
-func CheckPrintlnValueContain(code string, want []string, t *testing.T) {
+func CheckPrintlnValueContain(code string, want []string, t *testing.T, opt ...ssaconfig.Option) {
 	CheckPrintf(t, TestCase{
-		Code: code,
-		Want: want,
+		Code:   code,
+		Want:   want,
+		Option: opt,
 	}, true)
 }
 
-func CheckPrintlnValueRegexp(code string, want []string, t *testing.T) {
+func CheckPrintlnValueRegexp(code string, want []string, t *testing.T, opt ...ssaconfig.Option) {
 	CheckPrintfRegexp(t, TestCase{
-		Code: code,
-		Want: want,
+		Code:   code,
+		Want:   want,
+		Option: opt,
 	})
 }
 
