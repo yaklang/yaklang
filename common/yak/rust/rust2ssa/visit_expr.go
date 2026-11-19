@@ -80,6 +80,7 @@ func (b *singleFileBuilder) VisitExpression(raw rustparser.IExpressionContext) s
 		}
 		return b.ReadMemberCallValue(receiver, b.EmitConstInst(index))
 	default:
+		// TODO(ssa-rust): unsupported expression forms are represented as Undefined instead of being lowered.
 		return b.EmitUndefined(raw.GetText())
 	}
 }
@@ -462,6 +463,7 @@ func (b *singleFileBuilder) visitMacro(raw rustparser.IMacroInvocationContext) s
 	if target == nil {
 		target = b.EmitUndefined(name)
 	}
+	// TODO(ssa-rust): macro token trees are kept as strings; expansion and hygiene are not modeled.
 	args := []ssa.Value{}
 	if macro.DelimTokenTree() != nil {
 		args = append(args, b.EmitConstInst(macro.DelimTokenTree().GetText()))
@@ -600,6 +602,7 @@ func unquoteRustString(text string) string {
 }
 
 func (b *singleFileBuilder) visitTypeCast(ctx *rustparser.TypeCastExpressionContext) ssa.Value {
+	// TODO(ssa-rust): `as` has no runtime check; pointer/reference and user-defined casts collapse to TypeCast.
 	value := b.VisitExpression(ctx.Expression())
 	if value == nil {
 		value = b.EmitConstInstNil()
@@ -639,6 +642,7 @@ func (b *singleFileBuilder) visitClosure(raw rustparser.IClosureExpressionContex
 	previous := b.FunctionBuilder
 	previousSupport := previous.SupportClosure
 	previous.SupportClosure = true
+	// TODO(ssa-rust): move/borrow capture, upvalue mutation, and lifetimes are not modeled.
 	fn := previous.NewFunc("")
 	b.FunctionBuilder = previous.PushFunction(fn)
 	b.SupportClosure = true
@@ -677,6 +681,7 @@ func (b *singleFileBuilder) visitClosure(raw rustparser.IClosureExpressionContex
 }
 
 func (b *singleFileBuilder) visitMatch(raw rustparser.IMatchExpressionContext) ssa.Value {
+	// TODO(ssa-rust): match exhaustiveness, enum variants, and destructuring patterns are not modeled.
 	match, ok := raw.(*rustparser.MatchExpressionContext)
 	if !ok || match == nil || match.MatchArms() == nil {
 		return b.EmitConstInstNil()
@@ -800,12 +805,14 @@ func (b *singleFileBuilder) rustPatternNoTopAltCondition(subject ssa.Value, alt 
 		if strings.HasSuffix(without.PathPattern().GetText(), "None") {
 			return b.EmitBinOp(ssa.OpEq, subject, b.EmitConstInstNil()), nil
 		}
+		// TODO(ssa-rust): non-None path patterns (enum variants/constants) become a catch-all arm.
 		return b.EmitConstInst(true), nil
 	case without.TupleStructPattern() != nil:
 		text := without.TupleStructPattern().GetText()
 		if strings.HasSuffix(strings.TrimSpace(strings.SplitN(text, "(", 2)[0]), "None") {
 			return b.EmitBinOp(ssa.OpEq, subject, b.EmitConstInstNil()), nil
 		}
+		// TODO(ssa-rust): tuple/struct pattern fields are not destructured or bound.
 		return b.EmitConstInst(true), nil
 	}
 	return b.EmitConstInst(true), nil

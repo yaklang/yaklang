@@ -178,6 +178,7 @@ func (b *singleFileBuilder) visitAssignExpr1(expr *scalaparser.Expr1Context) ssa
 }
 
 func (b *singleFileBuilder) visitForExpr(raw scalaparser.IForExprContext) {
+	// TODO(ssa-scala): for-comprehension iterators bind Undefined and use a true condition; guards/yield are incomplete.
 	forExpr, ok := raw.(*scalaparser.ForExprContext)
 	if !ok || forExpr == nil {
 		return

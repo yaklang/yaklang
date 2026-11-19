@@ -57,6 +57,7 @@ func (b *singleFileBuilder) visitDef(raw scalaparser.IDef_Context) {
 	case def.TmplDef() != nil:
 		b.visitTmplDef(def.TmplDef())
 	}
+	// TODO(ssa-scala): given/using and extension-method definitions are not lowered here.
 }
 
 func (b *singleFileBuilder) visitPatDef(raw scalaparser.IPatDefContext) {
@@ -93,6 +94,7 @@ func (b *singleFileBuilder) assignPatDefName(name string, value ssa.Value) {
 		b.AddGlobalVariable(name, func() ssa.Value { return value })
 	}
 	if b.classFields != nil {
+		// TODO(ssa-scala): class fields are copied into each method; writes do not propagate back to other methods.
 		b.classFields[name] = value
 	}
 }
