@@ -16,8 +16,8 @@ type Finding struct {
 }
 
 // Result is the outcome of checking one shell command. Available is false when
-// the checker itself is not usable (slim build, rule compile failure); callers
-// must treat that as "not blocked" and decide their own fail-open policy.
+// the checker itself is not usable (rule compile failure); callers must treat
+// that as "not blocked" and decide their own fail-open policy.
 type Result struct {
 	Available bool
 	Blocked   bool
