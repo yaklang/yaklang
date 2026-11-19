@@ -5276,8 +5276,8 @@
   {
     "rule_id": "source-secrets-username-password-uri",
     "rule_name": "源码匹配：URI 中的用户名和口令",
-    "hash": "8da31a6ec8eb87e2744047cf02ae22bff52b13aefd53e06a0a94e31c02231e0a",
-    "version": "20261118.0001"
+    "hash": "d2fc2b998d976715b830e0a570a1c92993db148acada0e07f128b59b0fead739",
+    "version": "20261119.0001"
   },
   {
     "rule_id": "source-solidity-delegatecall",
