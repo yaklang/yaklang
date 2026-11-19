@@ -138,6 +138,9 @@ func (cs *codeSource) exportZipEntryPath(absOrRelativePath string) (string, erro
 }
 
 func (cs *codeSource) readFileForExport(path string) ([]byte, error) {
+	if strings.HasSuffix(strings.ToLower(path), ".class") {
+		return cs.readClassFile(path)
+	}
 	return cs.expandedFS.ReadFile(cs.resolveFSPath(path))
 }
 
