@@ -12,6 +12,30 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// VariadicArgsBinding optionally supplies the whole positional vector. Args
+// still contains the source arguments, not a synthetic leading container.
+// A frontend may specify the value of an omitted positional member as well.
+const VariadicArgsBinding = "@variadic.args"
+const VariadicDefaultBinding = "@variadic.default"
+
+// PackedVariadic returns the aggregate for the final formal parameter only.
+// Calls without an explicit pack retain the ordinary Args ABI.
+func (c *Call) PackedVariadic(formalIndex int) (Value, bool) {
+	id := c.Binding[VariadicArgsBinding]
+	if id == 0 {
+		return nil, false
+	}
+	method, ok := c.GetValueById(c.Method)
+	if !ok {
+		return nil, false
+	}
+	typ, ok := ToFunctionType(method.GetType())
+	if !ok || !typ.IsVariadic || formalIndex != len(typ.Parameter)-1 {
+		return nil, false
+	}
+	return c.GetValueById(id)
+}
+
 func NewCall(target Value, args Values, binding map[string]Value, block *BasicBlock) *Call {
 	bind := make(map[string]int64, len(binding))
 	for name, value := range binding {
@@ -449,6 +473,25 @@ func (c *Call) handleCalleeFunction() {
 				}
 			}
 
+			if p.MemberCallKind == ParameterMemberCall {
+				if vec, ok := c.PackedVariadic(p.MemberCallObjectIndex); ok {
+					var member Value
+					if _, concrete := ToMake(vec); concrete {
+						member, _ = vec.GetStringMember(actualKey.String())
+						if member == nil {
+							member, _ = c.GetValueById(c.Binding[VariadicDefaultBinding])
+						}
+					}
+					if member == nil {
+						member = builder.ReadMemberCallValue(vec, actualKey)
+					}
+					if !utils.IsNil(member) {
+						member.AddUser(c)
+						c.ArgMember = append(c.ArgMember, member.GetId())
+						continue
+					}
+				}
+			}
 			object, ok := p.GetActualParam(c)
 			if !ok {
 				continue
@@ -585,6 +628,12 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 	}
 
 	for _, fv := range fvs {
+		// The frontend may already have resolved a dynamically scoped input
+		// at the call site. Do not replace an explicit binding with the
+		// lexical declaration's default.
+		if c.Binding[fv.GetName()] != 0 {
+			continue
+		}
 		handleError := func() {
 			// mark error in freeValue.Variable
 			// get freeValue
