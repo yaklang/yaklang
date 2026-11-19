@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -93,6 +94,12 @@ func (c *Config) DescribeImage(ctx context.Context, img *aimedia.Image, question
 	}
 	if strings.TrimSpace(string(text)) == "" {
 		return "", fmt.Errorf("vision returned an empty observation")
+	}
+	if emitter := c.GetEmitter(); emitter != nil {
+		_, _ = emitter.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "image_context", map[string]any{
+			"state": "read", "route": "vision", "model": resp.GetModelName(),
+			"provider": resp.GetProviderName(), "image_count": 1,
+		})
 	}
 	return ShrinkTextBlockByTokens(string(text), 4096), nil
 }

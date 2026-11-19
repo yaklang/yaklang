@@ -779,6 +779,7 @@ service Yak {
   rpc ListAiModel(ListAiModelRequest) returns (ListAiModelResponse);
   rpc AIConfigHealthCheck(AIConfigHealthCheckRequest) returns (AIConfigHealthCheckResponse);
   rpc ProbeReasoningEffort(ProbeReasoningEffortRequest) returns (ProbeReasoningEffortResponse);
+  rpc ProbeModelVision(ProbeModelVisionRequest) returns (ProbeModelVisionResponse);
   rpc GetAIGlobalConfig(Empty) returns (AIGlobalConfig);
   rpc SetAIGlobalConfig(AIGlobalConfig) returns (Empty);
   rpc ListAIProviders(Empty) returns (ListAIProvidersResponse);
@@ -9624,6 +9625,7 @@ message AIModelConfig {
   // Unset means unknown, not false. Auto mode uses separate vision for unknown models.
   optional bool SupportsImageInput = 8;
   string ImageTokenEstimator = 9; // conservative (default), patch32, tile512
+  optional bool SupportsImageToolCalling = 10; // Unset means unknown.
 }
 
 message AIGlobalConfig {
@@ -10772,4 +10774,16 @@ message AIGoalTimePatch {
   int64 ExtendSeconds = 2;
   // Absolute Unix timestamp for AI_GOAL_TIME_ACTION_SET_DEADLINE.
   int64 DeadlineUnix = 3;
+}
+
+message ProbeModelVisionRequest {
+  ThirdPartyApplicationConfig Config = 1;
+  string Model = 2;
+}
+
+message ProbeModelVisionResponse {
+  optional bool SupportsImageInput = 1;
+  optional bool SupportsImageToolCalling = 2;
+  string ImageInputStatus = 3;
+  string ImageToolCallingStatus = 4;
 }
