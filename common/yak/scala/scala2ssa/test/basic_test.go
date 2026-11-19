@@ -40,3 +40,28 @@ object Main {
 `, "2")
 	})
 }
+
+func TestScalaBasicLiterals(t *testing.T) {
+	t.Run("var reassignment", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    var a = 1
+    a = 2
+    println(a)
+  }
+}
+`, "2")
+	})
+
+	t.Run("string and boolean literals", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    println("hi")
+    println(true)
+  }
+}
+`, "\"hi\"", "true")
+	})
+}

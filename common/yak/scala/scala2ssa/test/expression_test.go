@@ -140,3 +140,27 @@ object Main {
 `, "hello")
 	})
 }
+
+func TestScalaShortCircuit(t *testing.T) {
+	t.Run("false and short circuits", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+object Main {
+  def side(): Boolean = { return true }
+  def main(args: Array[String]): Unit = {
+    println(false && side())
+  }
+}
+`, "false")
+	})
+
+	t.Run("true or short circuits", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+object Main {
+  def side(): Boolean = { return false }
+  def main(args: Array[String]): Unit = {
+    println(true || side())
+  }
+}
+`, "true")
+	})
+}

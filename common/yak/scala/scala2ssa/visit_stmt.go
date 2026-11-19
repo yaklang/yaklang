@@ -1,9 +1,15 @@
 package scala2ssa
 
 import (
+	"fmt"
+	"strings"
+	"sync/atomic"
+
 	scalaparser "github.com/yaklang/yaklang/common/yak/scala/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
+
+var scalaIfExpressionSeq atomic.Uint64
 
 func (b *singleFileBuilder) VisitExpr(raw scalaparser.IExprContext) ssa.Value {
 	expr, ok := raw.(*scalaparser.ExprContext)
@@ -49,7 +55,14 @@ func (b *singleFileBuilder) VisitExpr1(raw scalaparser.IExpr1Context) ssa.Value 
 	case expr.ASSIGN() != nil:
 		return b.visitAssignExpr1(expr)
 	case expr.PostfixExpr() != nil:
-		return b.visitPostfixExpr(expr.PostfixExpr())
+		value := b.visitPostfixExpr(expr.PostfixExpr())
+		if expr.Ascription() != nil {
+			asp, ok := expr.Ascription().(*scalaparser.AscriptionContext)
+			if ok && asp != nil && asp.InfixType() != nil {
+				value = b.EmitTypeCast(value, scalaTypeFromText(asp.InfixType().GetText()))
+			}
+		}
+		return value
 	case expr.InfixExpr() != nil:
 		return b.visitInfixExpr(expr.InfixExpr())
 	}
@@ -62,6 +75,8 @@ func (b *singleFileBuilder) visitIfExpr1(expr *scalaparser.Expr1Context) ssa.Val
 		return b.EmitConstInstNil()
 	}
 	ifBuilder := b.CreateIfBuilder()
+	previous := b.suppressValueBlock
+	b.suppressValueBlock = true
 	ifBuilder.SetCondition(func() ssa.Value {
 		return b.VisitExpr(exprs[0])
 	}, func() {
@@ -73,7 +88,59 @@ func (b *singleFileBuilder) visitIfExpr1(expr *scalaparser.Expr1Context) ssa.Val
 		})
 	}
 	ifBuilder.Build()
+	b.suppressValueBlock = previous
 	return b.EmitConstInstNil()
+}
+
+func (b *singleFileBuilder) visitExprValue(raw scalaparser.IExprContext) ssa.Value {
+	expr, ok := raw.(*scalaparser.ExprContext)
+	if !ok || expr == nil {
+		return b.EmitConstInstNil()
+	}
+	if expr.Expr1() != nil {
+		return b.visitExpr1Value(expr.Expr1())
+	}
+	return b.VisitExpr(raw)
+}
+
+func (b *singleFileBuilder) visitExpr1Value(raw scalaparser.IExpr1Context) ssa.Value {
+	expr, ok := raw.(*scalaparser.Expr1Context)
+	if !ok || expr == nil {
+		return b.EmitConstInstNil()
+	}
+	if expr.IF() != nil {
+		return b.visitIfExpr1Value(expr)
+	}
+	return b.VisitExpr1(raw)
+}
+
+func (b *singleFileBuilder) visitIfExpr1Value(expr *scalaparser.Expr1Context) ssa.Value {
+	exprs := expr.AllExpr()
+	if len(exprs) < 2 {
+		return b.EmitConstInstNil()
+	}
+	name := fmt.Sprintf("__scala_if_%d", scalaIfExpressionSeq.Add(1))
+	b.AssignVariable(b.CreateLocalVariable(name), b.EmitConstInstNil())
+	assign := func(body func() ssa.Value) {
+		value := body()
+		if value == nil {
+			value = b.EmitConstInstNil()
+		}
+		b.AssignVariable(b.CreateVariable(name), value)
+	}
+	ifBuilder := b.CreateIfBuilder()
+	ifBuilder.SetCondition(func() ssa.Value {
+		return b.VisitExpr(exprs[0])
+	}, func() {
+		assign(func() ssa.Value { return b.visitExprValue(exprs[1]) })
+	})
+	if expr.ELSE() != nil && len(exprs) > 2 {
+		ifBuilder.SetElse(func() {
+			assign(func() ssa.Value { return b.visitExprValue(exprs[2]) })
+		})
+	}
+	ifBuilder.Build()
+	return b.ReadValue(name)
 }
 
 func (b *singleFileBuilder) visitWhileExpr1(expr *scalaparser.Expr1Context) ssa.Value {
@@ -91,13 +158,21 @@ func (b *singleFileBuilder) visitWhileExpr1(expr *scalaparser.Expr1Context) ssa.
 func (b *singleFileBuilder) visitAssignExpr1(expr *scalaparser.Expr1Context) ssa.Value {
 	var value ssa.Value = b.EmitConstInstNil()
 	if len(expr.AllExpr()) > 0 {
-		if v := b.VisitExpr(expr.Expr(0)); v != nil {
+		if v := b.visitExprValue(expr.Expr(0)); v != nil {
 			value = v
 		}
 	}
 	if expr.PostfixExpr() != nil {
 		target := expr.PostfixExpr().GetText()
+		if strings.HasPrefix(target, "this.") {
+			target = strings.TrimPrefix(target, "this.")
+		}
 		b.AssignVariable(b.CreateVariable(target), value)
+		if b.classFields != nil {
+			if _, ok := b.classFields[target]; ok {
+				b.classFields[target] = value
+			}
+		}
 	}
 	return value
 }

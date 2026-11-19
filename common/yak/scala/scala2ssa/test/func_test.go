@@ -79,3 +79,16 @@ object Main {
 `, "main", "f")
 	})
 }
+
+func TestScalaCallSiteOperand(t *testing.T) {
+	checkPrintlnValueRegexp(t, `
+object Main {
+  def identity(a: Int): Int = {
+    return a
+  }
+  def main(args: Array[String]): Unit = {
+    println(identity(7))
+  }
+}
+`, `identity\(7\)`)
+}
