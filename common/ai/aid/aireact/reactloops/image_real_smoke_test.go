@@ -54,7 +54,7 @@ func TestRealImageProviderSmoke(t *testing.T) {
 	loop := makeSchemaStabilityTestLoop(cfg)
 	cfg.Timeline.PushTextWithImages(cfg.AcquireId(), "[attached_image]: generated colour swatch", img)
 	nativeStart := time.Now()
-	snapshot, err := loop.prepareImages(ctx, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).Images)
+	snapshot, err := loop.prepareImages(ctx, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).Images, "", nil)
 	require.NoError(t, err)
 	loop.imagePrompt = snapshot
 	opts := append(loop.imageRequestOptions(), aicommon.WithAIRequest_Context(ctx), aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(64), aispec.WithEnableThinking(false)))
@@ -71,7 +71,7 @@ func TestRealImageProviderSmoke(t *testing.T) {
 	describeStart := time.Now()
 	require.NoError(t, aicommon.WithImageInputMode("describe")(cfg))
 	require.NoError(t, cfg.RecordImageObservation(ctx, "smoke-swatch", img, "What solid colour is the rectangle?"))
-	described, err := loop.prepareImages(ctx, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).Images)
+	described, err := loop.prepareImages(ctx, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).Images, "", nil)
 	require.NoError(t, err)
 	require.Nil(t, described)
 	textReq := aicommon.NewAIRequest("Based on the provided visual observation, what solid colour is the rectangle? Reply with one English colour word."+cfg.Timeline.DumpForPrompt(), aicommon.WithAIRequest_Context(ctx), aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithMaxTokens(64), aispec.WithEnableThinking(false)))

@@ -101,9 +101,9 @@ func TestNativeImagesKeepOrderAndDoNotUseSeparateActiveSlots(t *testing.T) {
 	for i, ref := range result.Images {
 		require.Equal(t, fmt.Sprintf("capture-%d", i+1), ref.Image.Source.ToolCallID)
 	}
-	first, err := loop.prepareImages(ctx, result.Images[:1])
+	first, err := loop.prepareImages(ctx, result.Images[:1], "", nil)
 	require.NoError(t, err)
-	duplicate, err := loop.prepareImages(ctx, append(result.Images[:1:1], result.Images[0]))
+	duplicate, err := loop.prepareImages(ctx, append(result.Images[:1:1], result.Images[0]), "", nil)
 	require.NoError(t, err)
 	require.Len(t, duplicate.inputs, 1)
 	require.Equal(t, first.imageTokens, duplicate.imageTokens)
@@ -206,6 +206,73 @@ func TestImageCompressionUsesTimelineAndDoesNotResurrectSummarizedImages(t *test
 	require.Contains(t, result.Prompt, "screenshot showed the dialog")
 }
 
+func TestImageByteOverflowUsesBoundedCompressionRequest(t *testing.T) {
+	loop, cfg := imageTestLoop(t, &ypb.AIImageInputConfig{Mode: "native"})
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	cfg.Timeline.PushTextWithImages(cfg.AcquireId(), "first screenshot", imageFixture(t, 0))
+	first := buildImagePrompt(t, loop)
+	policy := cfg.GetImageInputConfig()
+	policy.MaxRequestBytes = int64(len(first.Prompt)) + 48*1024
+	require.NoError(t, aicommon.WithImageInput(policy)(cfg))
+	var latest *aimedia.Image
+	for i := 1; i <= 40; i++ {
+		latest = imageFixture(t, i)
+		cfg.Timeline.PushTextWithImages(cfg.AcquireId(), "later screenshot", latest)
+	}
+	result := buildImagePrompt(t, loop)
+	require.Equal(t, aicommon.LoopPromptModeCompressContext, result.Mode)
+	require.Positive(t, loop.imagePrompt.omitted)
+	require.NotEmpty(t, result.Images)
+	require.Equal(t, latest.ID, result.Images[len(result.Images)-1].Image.ID)
+	require.Contains(t, result.Prompt, "did not fit the request byte budget")
+	require.Equal(t, result.Images, loop.imagePrompt.references)
+	req := aicommon.NewAIRequest(result.Prompt, loop.imageRequestOptions()...)
+	require.Len(t, req.GetImageList(), len(result.Images))
+	require.NoError(t, req.CheckImageBudget())
+	_, err := cfg.Timeline.ApplyCompressionSelection(&aicommon.TimelineCompressionSelection{Summary: "Older screenshot history summarized."}, "")
+	require.NoError(t, err)
+	result = buildImagePrompt(t, loop)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.Contains(t, result.Prompt, "Older screenshot history summarized")
+}
+
+type longImageCompressionGuideInvoker struct {
+	aicommon.AIInvokeRuntime
+}
+
+func (i longImageCompressionGuideInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+	result, err := i.AIInvokeRuntime.AssembleLoopPrompt(tools, input)
+	if err == nil && input.PromptMode == aicommon.LoopPromptModeCompressContext {
+		result.Prompt += strings.Repeat("compression guide ", 4096)
+		result.Images = result.Images[:1]
+	}
+	return result, err
+}
+
+func TestImageCompressionFallbackKeepsOrdinaryTextAndImagesTogether(t *testing.T) {
+	loop, cfg := imageTestLoop(t, &ypb.AIImageInputConfig{Mode: "native"})
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	loop.invoker = longImageCompressionGuideInvoker{AIInvokeRuntime: loop.invoker}
+	cfg.Timeline.PushTextWithImages(cfg.AcquireId(), "first screenshot", imageFixture(t, 1))
+	latest := imageFixture(t, 2)
+	cfg.Timeline.PushTextWithImages(cfg.AcquireId(), "latest screenshot", latest)
+	normal := buildImagePrompt(t, loop)
+	policy := cfg.GetImageInputConfig()
+	policy.MaxRequestBytes = int64(len(normal.Prompt)) + loop.imagePrompt.imageBytes + 4096
+	require.NoError(t, aicommon.WithImageInput(policy)(cfg))
+	input := loop.captureLoopPromptBuildInput("image-test", "check if the dialog opened", "", nil, "", &LoopActionHandlerOperator{})
+	input.overflowCompression = true
+	result, err := loop.generateLoopPromptFromInput(input)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.LoopPromptModeNormal, result.Mode)
+	require.Len(t, result.Images, 2)
+	require.Contains(t, result.Prompt, latest.ID)
+	require.Equal(t, result.Images, loop.imagePrompt.references)
+	req := aicommon.NewAIRequest(result.Prompt, loop.imageRequestOptions()...)
+	require.Len(t, req.GetImageList(), 2)
+	require.NoError(t, req.CheckImageBudget())
+}
+
 func TestImageAttachmentPersistsResourceAndReportsMissingOriginal(t *testing.T) {
 	ctx := context.Background()
 	loop, cfg := imageTestLoop(t, &ypb.AIImageInputConfig{Mode: "native", MaxLongEdge: 512})
@@ -225,7 +292,7 @@ func TestImageAttachmentPersistsResourceAndReportsMissingOriginal(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, 1024, catalog.Snapshot()[0].Image.Width)
 	require.NoError(t, os.Remove(catalog.Snapshot()[0].Image.Path))
-	_, err = loop.prepareImages(ctx, result.Images)
+	_, err = loop.prepareImages(ctx, result.Images, "", nil)
 	require.ErrorContains(t, err, "cannot load image")
 }
 
