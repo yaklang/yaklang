@@ -16,6 +16,25 @@ func init() {
 	test.SetLanguage(ssaconfig.LUA, lua2ssa.CreateBuilder)
 }
 
+func luaWithPrintln(code string) string {
+	return code
+}
+
+func checkPrintlnValue(t *testing.T, code string, want ...string) {
+	t.Helper()
+	test.CheckPrintlnValue(luaWithPrintln(code), want, t, ssaapi.WithMemory())
+}
+
+func checkPrintlnValueContain(t *testing.T, code string, want ...string) {
+	t.Helper()
+	test.CheckPrintlnValueContain(luaWithPrintln(code), want, t, ssaapi.WithMemory())
+}
+
+func checkPrintlnValueRegexp(t *testing.T, code string, want ...string) {
+	t.Helper()
+	test.CheckPrintlnValueRegexp(luaWithPrintln(code), want, t, ssaapi.WithMemory())
+}
+
 func checkValues(t *testing.T, code string, want ...string) {
 	t.Helper()
 	test.CheckPrintf(t, test.TestCase{
@@ -40,6 +59,54 @@ func checkSymbols(t *testing.T, code string, names ...string) {
 		for _, name := range names {
 			require.NotEmpty(t, prog.Ref(name), "missing SSA symbol %q", name)
 		}
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.LUA), ssaapi.WithMemory())
+}
+
+func checkFreeValues(t *testing.T, code string, want ...string) {
+	t.Helper()
+	test.CheckWithNameOnlyInMemory("", t, luaWithPrintln(code), func(prog *ssaapi.Program) error {
+		found := make(map[string]bool)
+		var visit func(*ssa.Function)
+		visit = func(fn *ssa.Function) {
+			if fn == nil {
+				return
+			}
+			for variable := range fn.FreeValues {
+				if variable != nil {
+					found[variable.GetName()] = true
+				}
+			}
+			for _, id := range fn.ChildFuncs {
+				if child, ok := fn.GetValueById(id); ok {
+					if childFn, ok := ssa.ToFunction(child); ok {
+						visit(childFn)
+					}
+				}
+			}
+		}
+		if prog.Program != nil {
+			prog.Program.Funcs.ForEach(func(_ string, fn *ssa.Function) bool {
+				visit(fn)
+				return true
+			})
+		}
+		for _, name := range want {
+			require.Truef(t, found[name], "free value %q not found; got %v", name, found)
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.LUA), ssaapi.WithMemory())
+}
+
+func checkTypeCast(t *testing.T, code, name string) {
+	t.Helper()
+	test.CheckWithNameOnlyInMemory("", t, code, func(prog *ssaapi.Program) error {
+		for _, value := range prog.Ref(name) {
+			if value.IsTypeCast() {
+				return nil
+			}
+		}
+		t.Fatalf("no typecast for %s", name)
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.LUA), ssaapi.WithMemory())
 }

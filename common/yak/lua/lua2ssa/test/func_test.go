@@ -86,3 +86,12 @@ println(outer(1))
 `, "outer", "1")
 	})
 }
+
+func TestLuaCallSiteOperand(t *testing.T) {
+	checkPrintlnValueRegexp(t, `
+function identity(a)
+    return a
+end
+println(identity(7))
+`, `identity\(7\)`)
+}
