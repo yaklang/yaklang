@@ -58,6 +58,12 @@ func (b *singleFileBuilder) VisitExp(raw luaparser.IExpContext) ssa.Value {
 		return b.evalUnary(exp.OperatorUnary().GetText(), operand)
 	}
 
+	if exp.OperatorAnd() != nil || exp.OperatorOr() != nil {
+		left := b.visitExpAt(exp, 0)
+		return b.BuildLuaLogical(left, func() ssa.Value {
+			return b.visitExpAt(exp, 1)
+		}, exp.OperatorAnd() != nil)
+	}
 	if len(exp.AllExp()) >= 2 {
 		left := b.visitExpAt(exp, 0)
 		right := b.visitExpAt(exp, 1)
@@ -268,6 +274,17 @@ func (b *singleFileBuilder) applyNameAndArgs(base ssa.Value, raw luaparser.IName
 		target = b.EmitUndefined("call")
 	}
 	args := b.visitArgs(ctx.Args())
+	if ctx.Colon() == nil && len(args) > 0 && base != nil {
+		// Lua has no cast syntax; the standard conversions are the only
+		// explicit type changes, so keep them as a dedicated TypeCast
+		// instruction instead of a generic call.
+		switch base.GetName() {
+		case "tonumber":
+			return b.EmitTypeCast(args[0], ssa.CreateNumberType())
+		case "tostring":
+			return b.EmitTypeCast(args[0], ssa.CreateStringType())
+		}
+	}
 	call := b.NewCall(target, args)
 	return b.EmitCall(call)
 }
@@ -427,9 +444,21 @@ func (b *singleFileBuilder) buildFunction(name string, raw luaparser.IFuncbodyCo
 	if !ok || body == nil {
 		return nil
 	}
-	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
+	// Lua functions close over their lexical environment. A function
+	// declared inside another function is a child function and captures
+	// free values; top-level functions keep the historical global lookup.
+	nested := b.functionDepth > 0
+	previousSupport := previous.SupportClosure
+	if previous != nil {
+		previous.SupportClosure = nested
+	}
+	fn := b.NewFunc(name)
 	b.FunctionBuilder = b.PushFunction(fn)
+	b.SupportClosure = nested
+	b.SetForceCapture(nested)
+	b.functionDepth++
+	defer func() { b.functionDepth-- }()
 	if method {
 		b.NewParam("self")
 	}
@@ -450,7 +479,11 @@ func (b *singleFileBuilder) buildFunction(name string, raw luaparser.IFuncbodyCo
 	}
 	b.VisitBlock(body.Block())
 	b.Finish()
+	b.SetForceCapture(false)
 	b.FunctionBuilder = b.PopFunction()
 	b.FunctionBuilder = previous
+	if previous != nil {
+		previous.SupportClosure = previousSupport
+	}
 	return fn
 }

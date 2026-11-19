@@ -70,4 +70,5 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 
 type singleFileBuilder struct {
 	*ssa.FunctionBuilder
+	functionDepth int
 }

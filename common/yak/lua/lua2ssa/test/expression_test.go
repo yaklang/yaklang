@@ -93,3 +93,23 @@ string]])
 `, "long")
 	})
 }
+
+func TestLuaShortCircuit(t *testing.T) {
+	t.Run("false and keeps left operand", func(t *testing.T) {
+		checkPrintlnValue(t, `
+println(false and true)
+`, "false")
+	})
+
+	t.Run("true or keeps left operand", func(t *testing.T) {
+		checkPrintlnValue(t, `
+println(true or false)
+`, "true")
+	})
+
+	t.Run("and returns right operand", func(t *testing.T) {
+		checkPrintlnValue(t, `
+println(true and false)
+`, "false")
+	})
+}
