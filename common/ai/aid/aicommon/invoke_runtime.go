@@ -368,11 +368,12 @@ type AIInvokeRuntime interface {
 	// AddRuntimeTask appends a task to the runtime task list in a thread-safe manner.
 	AddRuntimeTask(task AIStatefulTask)
 	ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams, opt ...ToolCallerOption) (*aitool.ToolResult, bool, error)
-	// DirectlyCallTool handles a directly_call_tool action: it creates the tool-call
-	// card (loading) first, then reads reason/params from the streaming action and
-	// invokes the tool. The loop-layer prepare callback does param normalize/validate
-	// rejects invalid parameters and returns control to the owning loop for retry.
-	DirectlyCallTool(ctx context.Context, toolName string, action *Action, prepare DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error)
+	// ReviewDirectToolCall creates the tool-call card, prepares the explicit
+	// proposal and blocks until the review decision is final. It never invokes
+	// the tool and never creates an async execution.
+	ReviewDirectToolCall(ctx context.Context, toolName string, action *Action, prepare DirectlyCallPrepareFunc, opt ...ToolCallerOption) (*ToolCallReviewResult, error)
+	// ExecuteReviewedToolCall executes only an approved review result.
+	ExecuteReviewedToolCall(ctx context.Context, review *ToolCallReviewResult) (*aitool.ToolResult, bool, error)
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error)

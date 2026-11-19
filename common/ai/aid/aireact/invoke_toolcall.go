@@ -83,8 +83,15 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 			}
 			params = reactloops.ApplyToolInvokeParamsMutators(currentLoop, toolName, params)
 		}
+		review, err := toolCaller.ReviewToolCall(tool, params)
+		if err != nil {
+			return nil, false, utils.Errorf("tool call failed: %w", err)
+		}
+		if review.DirectlyAnswer {
+			return nil, true, nil
+		}
 		result, directlyAnswer, err := r.runDetachableToolCall(currentTask, toolCaller, toolName, func() (*aitool.ToolResult, bool, error) {
-			return toolCaller.CallToolWithExistedParams(tool, params)
+			return toolCaller.ExecuteReviewedToolCall(review)
 		})
 
 		if err != nil {
@@ -259,18 +266,16 @@ func (r *ReAct) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, t
 	return r.executeToolCallInternal(ctx, toolName, params, opt...)
 }
 
-// DirectlyCallTool handles a directly_call_tool action. It emits the tool-call
-// card (loading) first, then reads reason/params from the streaming action and
-// invokes the tool. The loop-layer prepare callback does param normalize/validate
-// returns invalid proposals to the owning loop; it never generates arguments.
-func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
+// ReviewDirectToolCall prepares a directly_call_tool action and blocks until
+// review is final. It never invokes the tool or creates an async execution.
+func (r *ReAct) ReviewDirectToolCall(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc, opt ...aicommon.ToolCallerOption) (*aicommon.ToolCallReviewResult, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}
 
 	select {
 	case <-ctx.Done():
-		return nil, false, ctx.Err()
+		return nil, ctx.Err()
 	default:
 	}
 
@@ -304,11 +309,13 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 		ctx,
 		currentTask,
 		toolName,
-		aicommon.WithToolCaller_OmitResultParamsInTimeline(),
-		aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
+		append(opt,
+			aicommon.WithToolCaller_OmitResultParamsInTimeline(),
+			aicommon.WithToolCaller_StatsSource(aicommon.StatsSourceToolDirect),
+		)...,
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	directlyCallTool := &aitool.Tool{Tool: &mcp.Tool{Name: toolName}}
@@ -318,9 +325,43 @@ func (r *ReAct) DirectlyCallTool(ctx context.Context, toolName string, action *a
 	// real tool used for the actual invocation is still resolved later
 	// inside the prepare callback (loop-layer resolveTool).
 	r.tryFillVerboseNameForPlaceholder(directlyCallTool)
-	result, directlyAnswer, err := r.runDetachableToolCall(currentTask, toolCaller, toolName, func() (*aitool.ToolResult, bool, error) {
-		return toolCaller.DirectlyCallTool(directlyCallTool, action, prepare)
-	})
+	reviewedPrepare := func(action *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
+		params, retry, tool, err := prepare(action, name)
+		if err != nil || retry || tool == nil {
+			return params, retry, tool, err
+		}
+		if ownerLoop, _ := currentTask.GetReActLoop().(*reactloops.ReActLoop); ownerLoop != nil {
+			if allow, message := reactloops.CheckToolInvokeGuard(ownerLoop, tool.Name, params); !allow {
+				return nil, false, tool, utils.Error(message)
+			}
+			params = reactloops.ApplyToolInvokeParamsMutators(ownerLoop, tool.Name, params)
+		}
+		return params, false, tool, nil
+	}
+	return toolCaller.ReviewDirectToolCall(directlyCallTool, action, reviewedPrepare)
+}
+
+// ExecuteReviewedToolCall executes one already-reviewed proposal.
+func (r *ReAct) ExecuteReviewedToolCall(ctx context.Context, review *aicommon.ToolCallReviewResult) (*aitool.ToolResult, bool, error) {
+	if review == nil {
+		return nil, false, utils.Error("approved tool review is required")
+	}
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	default:
+	}
+	if review.DirectlyAnswer {
+		return nil, true, nil
+	}
+	currentTask := r.GetCurrentTask()
+	if currentTask == nil {
+		currentTask = r.config.DefaultTask
+	}
+	result, directlyAnswer, err := r.runDetachableToolCall(currentTask, review.ToolCaller(), review.Tool.Name, review.Execute)
 	if err != nil {
 		return nil, false, utils.Errorf("tool call failed: %w", err)
 	}
