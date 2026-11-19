@@ -90,6 +90,12 @@ func (ab *astBuilder) buildStmts(stmts []*syntax.Stmt) ssa.Value {
 		if stmt == nil {
 			continue
 		}
+		// break/continue finish the block; later statements are unreachable.
+		// Building them would still create values in a finished block and
+		// pollute the scope merged after the loop.
+		if ab.IsBlockFinish() {
+			break
+		}
 		if v := ab.buildStmt(stmt); !utils.IsNil(v) {
 			out = v
 		}

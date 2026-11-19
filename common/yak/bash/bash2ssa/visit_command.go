@@ -65,8 +65,30 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 
 	if isStatic {
 		ab.emitWrappedCommands(cmd.Args, ret, stdin)
+		ab.applyBuiltinEffect(commandBase(name), cmd.Args, ret)
 	}
 	return ret
+}
+
+// applyBuiltinEffect models shell builtins that mutate variables or control
+// flow. `read` binds its arguments to the command output, and break/continue
+// jump to the enclosing loop target so the loop Phi sees the exit value.
+func (ab *astBuilder) applyBuiltinEffect(name string, args []*syntax.Word, value ssa.Value) {
+	switch name {
+	case "read":
+		if utils.IsNil(value) {
+			return
+		}
+		for _, target := range readTargetNames(args) {
+			if variable := ab.CreateVariable(target); variable != nil {
+				ab.AssignVariable(variable, value)
+			}
+		}
+	case "break":
+		ab.Break()
+	case "continue":
+		ab.Continue()
+	}
 }
 
 // commandBase resolves the command identity. Paths are reduced to their base
