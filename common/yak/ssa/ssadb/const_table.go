@@ -148,33 +148,36 @@ func ensureIrConstIndexes(db *gorm.DB) {
 		log.Errorf("SSA const pool %q is missing after migrate: const lookups and deletes will fail", TableIrConstPool)
 		return
 	}
-	queries := []struct {
-		name  string
-		query string
-	}{
+	specs := []indexSpec{
 		{
-			irConstPoolProgramIDIndex,
-			`CREATE UNIQUE INDEX IF NOT EXISTS "` + irConstPoolProgramIDIndex + `" ON "` + TableIrConstPool + `" ("program_name", "const_id");`,
+			table:  TableIrConstPool,
+			name:   irConstPoolProgramIDIndex,
+			unique: true,
+			key:    []indexKeyPart{indexCol("program_name"), indexCol("const_id")},
 		},
 		{
-			irConstPoolSizeIndex,
-			`CREATE INDEX IF NOT EXISTS "` + irConstPoolSizeIndex + `" ON "` + TableIrConstPool + `" ("program_name", "text_size");`,
-		},
-		{
-			irCodeConstIDIndex,
-			`CREATE INDEX IF NOT EXISTS "` + irCodeConstIDIndex + `" ON "` + TableIrCodes + `" ("program_name", "const_id") WHERE const_id <> 0;`,
+			table: TableIrConstPool,
+			name:  irConstPoolSizeIndex,
+			key:   []indexKeyPart{indexCol("program_name"), indexCol("text_size")},
 		},
 	}
-	for _, idx := range queries {
-		table := TableIrConstPool
-		if idx.name == irCodeConstIDIndex {
-			table = TableIrCodes
-		}
-		if hasNamedIndex(db, table, idx.name) {
-			continue
-		}
-		if err := db.Exec(idx.query).Error; err != nil {
-			log.Warnf("failed to add index %s: %v", idx.name, err)
+	if supportsPartialIndex(db.Dialect().GetName()) {
+		specs = append(specs, indexSpec{
+			table:   TableIrCodes,
+			name:    irCodeConstIDIndex,
+			key:     []indexKeyPart{indexCol("program_name"), indexCol("const_id")},
+			partial: "const_id <> 0",
+		})
+	} else {
+		// The legacy fallback this index serves is unreachable on a database
+		// written by this build (the const pool always exists), and a full
+		// index would add one entry per non-const instruction. Skipping is
+		// cheaper than issuing a CREATE the backend rejects on every open.
+		log.Debugf("skipping partial index %s: %s has no partial indexes", irCodeConstIDIndex, db.Dialect().GetName())
+	}
+	for _, spec := range specs {
+		if err := ensureIndex(db, spec); err != nil {
+			log.Warnf("failed to add index %s: %v", spec.name, err)
 		}
 	}
 }

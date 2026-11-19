@@ -102,31 +102,29 @@ func patchIrCodeIndex(db *gorm.DB) {
 		return
 	}
 
-	// 为 ir_codes 表添加复合索引 (program_name, code_id)
-	// 这是最常见的查询模式: WHERE program_name = ? AND code_id IN (...)
-	indexQueries := []struct {
-		name  string
-		query string
-	}{
+	// Composite indexes for the most common read patterns:
+	// WHERE program_name = ? AND opcode = ?, and the indices/name-pool joins.
+	indexSpecs := []indexSpec{
 		{
-			"idx_ir_codes_program_opcode",
-			// composite index for program+opcode lookups
-			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_opcode" ON "` + TableIrCodes + `" ("program_name", "opcode");`,
-		},
-		// 为 ir_indices 表添加复合索引以优化常见查询
-		{
-			"idx_ir_indices_program_value",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "` + TableIrIndices + `" ("program_name", "value_id");`,
+			table: TableIrCodes,
+			name:  "idx_ir_codes_program_opcode",
+			key:   []indexKeyPart{indexCol("program_name"), indexCol("opcode")},
 		},
 		{
-			"idx_ir_name_pool_program_name_name",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_name_pool_program_name_name" ON "` + TableIrNamePool + `" ("program_name", "name");`,
+			table: TableIrIndices,
+			name:  "idx_ir_indices_program_value",
+			key:   []indexKeyPart{indexCol("program_name"), indexCol("value_id")},
+		},
+		{
+			table: TableIrNamePool,
+			name:  "idx_ir_name_pool_program_name_name",
+			key:   []indexKeyPart{indexCol("program_name"), indexCol("name")},
 		},
 	}
 
-	for _, idx := range indexQueries {
-		if err := db.Exec(idx.query).Error; err != nil {
-			log.Warnf("failed to add index %s: %v", idx.name, err)
+	for _, spec := range indexSpecs {
+		if err := ensureIndex(db, spec); err != nil {
+			log.Warnf("failed to add index %s: %v", spec.name, err)
 		}
 	}
 
@@ -155,33 +153,121 @@ func patchIrCodeIndex(db *gorm.DB) {
 // parameter makes SQLite ignore this index.
 const irCodeConstLookupIndex = "idx_ir_codes_const_lookup"
 
-// uniqueIndex is one unique key the SSA schema requires. Both IR indexes
-// differ only in the table, the name, the DDL and the columns that must be
-// unique, so a single maintenance template serves them.
-type uniqueIndex struct {
-	table        string
-	name         string
-	definition   string // idempotent CREATE UNIQUE INDEX
-	duplicateKey string // partition key used only when a repair is needed
+// indexKeyPart is one column or SQL expression of an index key. Expressions
+// stay unevaluated because each backend renders an expression key part
+// differently: SQLite and PostgreSQL take it as written, MySQL needs it
+// wrapped in its own parentheses.
+type indexKeyPart struct {
+	column     string
+	expression string
 }
 
-var irUniqueIndexes = []uniqueIndex{
+func indexCol(column string) indexKeyPart { return indexKeyPart{column: column} }
+
+func indexExpr(expression string) indexKeyPart { return indexKeyPart{expression: expression} }
+
+// indexSpec is one index the SSA schema installs. The same description drives
+// the existence check, the CREATE statement and, for unique keys, the
+// duplicate repair.
+type indexSpec struct {
+	table   string
+	name    string
+	key     []indexKeyPart
+	unique  bool
+	partial string // WHERE predicate; empty means a full index
+}
+
+var irUniqueIndexes = []indexSpec{
 	{
-		table:        TableIrCodes,
-		name:         "ux_ir_codes_program_code",
-		definition:   `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`,
-		duplicateKey: `program_name, code_id`,
+		table:  TableIrCodes,
+		name:   "ux_ir_codes_program_code",
+		unique: true,
+		key:    []indexKeyPart{indexCol("program_name"), indexCol("code_id")},
 	},
 	{
-		table:      TableIrOffsets,
-		name:       "ux_ir_offsets_program_value_file_range",
-		definition: `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`,
-		// A NULL variable name and '' name the same location, so the index
-		// treats them as one key. The duplicate key stays unquoted: MySQL reads
-		// double quotes as string literals (ANSI_QUOTES is off by default), and
-		// a constant partition would collapse every row into one group.
-		duplicateKey: `program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')`,
+		table:  TableIrOffsets,
+		name:   "ux_ir_offsets_program_value_file_range",
+		unique: true,
+		key: []indexKeyPart{
+			indexCol("program_name"),
+			indexCol("value_id"),
+			indexCol("file_hash"),
+			indexCol("start_offset"),
+			indexCol("end_offset"),
+			// A NULL variable name and '' name the same location, so they
+			// must collide.
+			indexExpr("COALESCE(variable_name, '')"),
+		},
 	},
+}
+
+// indexCapabilities is the per-backend part of index maintenance: identifier
+// quoting and how (or whether) an expression can be an index key part. Both
+// come from the dialect, so this file never carries a backend's own rules.
+type indexCapabilities struct {
+	quote             func(string) string
+	expressionKeyPart func(string) (string, bool)
+}
+
+func indexCapabilitiesFor(db *gorm.DB) indexCapabilities {
+	caps := indexCapabilities{
+		quote:             func(name string) string { return `"` + name + `"` },
+		expressionKeyPart: func(expression string) (string, bool) { return expression, true },
+	}
+	if db == nil || db.Dialect() == nil {
+		return caps
+	}
+	caps.quote = db.Dialect().Quote
+	if strings.EqualFold(db.Dialect().GetName(), "mysql") {
+		// MySQL functional key parts need their own parentheses and only exist
+		// from 8.0.13. MariaDB has no equivalent syntax.
+		supported := mysqlFunctionalIndexSupported(db)
+		caps.expressionKeyPart = func(expression string) (string, bool) {
+			return "(" + expression + ")", supported
+		}
+	}
+	return caps
+}
+
+// dedupKeySQL renders the key for GROUP BY, where every backend accepts an
+// expression as written.
+func dedupKeySQL(caps indexCapabilities, key []indexKeyPart) string {
+	parts := make([]string, 0, len(key))
+	for _, part := range key {
+		if part.expression != "" {
+			parts = append(parts, part.expression)
+			continue
+		}
+		parts = append(parts, caps.quote(part.column))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// buildIndexDDL renders CREATE [UNIQUE] INDEX for this backend. ok is false
+// when the key needs an expression the backend cannot index: a capability gap,
+// not a transient error worth retrying on every open.
+func buildIndexDDL(caps indexCapabilities, spec indexSpec) (string, bool) {
+	parts := make([]string, 0, len(spec.key))
+	for _, part := range spec.key {
+		if part.expression == "" {
+			parts = append(parts, caps.quote(part.column))
+			continue
+		}
+		rendered, ok := caps.expressionKeyPart(part.expression)
+		if !ok {
+			return "", false
+		}
+		parts = append(parts, rendered)
+	}
+	kind := "INDEX"
+	if spec.unique {
+		kind = "UNIQUE INDEX"
+	}
+	ddl := "CREATE " + kind + " " + caps.quote(spec.name) + " ON " + caps.quote(spec.table) + " (" + strings.Join(parts, ", ") + ")"
+	if spec.partial != "" {
+		ddl += " WHERE " + spec.partial
+	}
+	return ddl, true
 }
 
 // hasNamedIndex is the polymorphic seam of index maintenance: each backend
@@ -198,21 +284,32 @@ func hasNamedIndex(db *gorm.DB, table, index string) bool {
 }
 
 // removeDuplicateRows keeps the oldest row (MIN id) per unique key and returns
-// how many rows it removed. Window functions are standard SQL, so every
-// supported backend runs the same statement and only the partition key
-// changes. The oldest row is what the single-read paths already return, so a
-// repaired database behaves exactly as before.
-func removeDuplicateRows(db *gorm.DB, spec uniqueIndex) (int64, error) {
-	res := db.Exec(`DELETE FROM ` + spec.table + ` WHERE id IN (
-		SELECT id FROM (
-			SELECT id, ROW_NUMBER() OVER (PARTITION BY ` + spec.duplicateKey + ` ORDER BY id) AS rn
-			FROM ` + spec.table + `
-		) WHERE rn > 1
-	)`)
+// how many rows it removed. An aggregate plus an anti-join replaces the window
+// function so MySQL 5.7 and DM run the same statement as SQLite and
+// PostgreSQL, and the derived table keeps MySQL from refusing to read the
+// table it deletes from. The oldest row is what the single-read paths already
+// return, so a repaired database behaves exactly as before.
+func removeDuplicateRows(db *gorm.DB, spec indexSpec) (int64, error) {
+	res := db.Exec(duplicateRepairSQL(indexCapabilitiesFor(db), spec))
 	if res.Error != nil {
 		return 0, res.Error
 	}
 	return res.RowsAffected, nil
+}
+
+// duplicateRepairSQL is the statement removeDuplicateRows runs. It is separate
+// so a test can pin its portability without a server of each kind.
+func duplicateRepairSQL(caps indexCapabilities, spec indexSpec) string {
+	table := caps.quote(spec.table)
+	id := caps.quote("id")
+	keepID := caps.quote("keep_id")
+	keep := caps.quote("keep")
+	return `DELETE FROM ` + table + ` WHERE ` + id + ` NOT IN (
+		SELECT ` + keepID + ` FROM (
+			SELECT MIN(` + id + `) AS ` + keepID + ` FROM ` + table + `
+			GROUP BY ` + dedupKeySQL(caps, spec.key) + `
+		) ` + keep + `
+	)`
 }
 
 // isUniqueViolation reports whether err is the backend refusing to build a
@@ -239,20 +336,45 @@ func isUniqueViolation(err error) bool {
 	return false
 }
 
-// ensureUniqueIndex is the single maintenance template for every unique index:
+// ensureIndex installs one index from its spec. An existing index costs a
+// single catalog lookup; only a missing one is built. Anything that fails
+// after a concurrent process won the race is reported as success, because the
+// state the caller asked for is the state the database is in.
+func ensureIndex(db *gorm.DB, spec indexSpec) error {
+	if db == nil || db.Dialect() == nil || !db.HasTable(spec.table) {
+		return nil
+	}
+	if hasNamedIndex(db, spec.table, spec.name) {
+		return nil
+	}
+	ddl, ok := buildIndexDDL(indexCapabilitiesFor(db), spec)
+	if !ok {
+		return fmt.Errorf("%s cannot index an expression key, so %s is unavailable",
+			db.Dialect().GetName(), spec.name)
+	}
+	if err := db.Exec(ddl).Error; err != nil {
+		if hasNamedIndex(db, spec.table, spec.name) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// ensureUniqueIndex is the maintenance template for the IR unique keys:
 //
-//  1. hasNamedIndex asks the backend whether the index is already there. This
-//     is the only dialect-specific step and it is delegated to the dialect.
-//  2. The idempotent CREATE runs only on a database that really lacks it.
-//  3. Only when the backend rejects that CREATE because duplicate rows exist
-//     does the shared repair run, once, before the same CREATE is retried.
+//  1. hasNamedIndex asks the backend whether the index is already there. The
+//     dialect answers from its own catalog, so no backend re-runs the repair.
+//  2. Only a missing index is built.
+//  3. Only when the backend rejects that build because duplicate rows exist
+//     does the shared repair run, once, before the build is retried.
 //
-// The repair is a whole-table window delete, so it must never sit on the
-// common path: an interrupted legacy run never reaches its CREATE, and
-// treating a missing index as "repair needed" made every later process dedup
-// the entire table again.
-func ensureUniqueIndex(db *gorm.DB, spec uniqueIndex) {
-	if db == nil || !db.HasTable(spec.table) {
+// The repair is a whole-table delete, so it must never sit on the common
+// path: an interrupted legacy run never reaches its CREATE, and treating a
+// missing index as "repair needed" made every later process dedup the entire
+// table again.
+func ensureUniqueIndex(db *gorm.DB, spec indexSpec) {
+	if db == nil || db.Dialect() == nil || !db.HasTable(spec.table) {
 		return
 	}
 	if hasNamedIndex(db, spec.table, spec.name) {
@@ -265,8 +387,8 @@ func ensureUniqueIndex(db *gorm.DB, spec uniqueIndex) {
 
 // createUniqueIndexRepairingDuplicates builds the index and recovers from the
 // one expected failure: rows that are already duplicated.
-func createUniqueIndexRepairingDuplicates(db *gorm.DB, spec uniqueIndex) error {
-	err := db.Exec(spec.definition).Error
+func createUniqueIndexRepairingDuplicates(db *gorm.DB, spec indexSpec) error {
+	err := ensureIndex(db, spec)
 	if err == nil {
 		return nil
 	}
@@ -281,7 +403,7 @@ func createUniqueIndexRepairingDuplicates(db *gorm.DB, spec uniqueIndex) error {
 	if removed > 0 {
 		log.Infof("[unique-constraint] removed %d duplicate rows blocking %s", removed, spec.name)
 	}
-	return db.Exec(spec.definition).Error
+	return ensureIndex(db, spec)
 }
 
 func GetDB() *gorm.DB {

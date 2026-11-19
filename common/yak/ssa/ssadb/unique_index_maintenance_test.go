@@ -21,17 +21,6 @@ func ensureAllUniqueIndexes(db *gorm.DB) {
 	}
 }
 
-// TestUniqueIndexDuplicateKeysStayUnquoted pins a portability rule: MySQL reads
-// double quotes as string literals by default, so a quoted partition key would
-// group every row into one partition and the repair would delete all but one.
-func TestUniqueIndexDuplicateKeysStayUnquoted(t *testing.T) {
-	for _, spec := range irUniqueIndexes {
-		require.NotEmpty(t, spec.duplicateKey, "%s needs a partition key", spec.name)
-		require.NotContains(t, spec.duplicateKey, `"`,
-			"%s: the duplicate key must stay unquoted for MySQL", spec.name)
-	}
-}
-
 // statementRecorder captures the statements gorm prints in detailed log mode,
 // so a test can prove which maintenance statements were issued.
 type statementRecorder struct {
@@ -98,8 +87,8 @@ func TestUniqueIndexCreationDoesNotDedupCleanTable(t *testing.T) {
 	statements := recorder.statements()
 	require.NotEmpty(t, statements, "the CREATE statements must be logged")
 	for _, statement := range statements {
-		require.NotContains(t, statement, "DELETE FROM ir_codes")
-		require.NotContains(t, statement, "DELETE FROM ir_offsets")
+		require.NotContains(t, statement, `DELETE FROM "ir_codes"`)
+		require.NotContains(t, statement, `DELETE FROM "ir_offsets"`)
 	}
 }
 

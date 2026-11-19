@@ -20,6 +20,11 @@ func installDMIRIndexes(db *gorm.DB) error {
 		{"ux_ir_offsets_program_value_file_range", TableIrOffsets, "program_name,value_id,file_hash,start_offset,end_offset,COALESCE(variable_name,'')", true},
 		{"idx_ir_codes_program_opcode", TableIrCodes, "program_name,opcode", false},
 		{irTypeUniqueIndex, TableIrTypes, "program_name,type_id", true},
+		// The const pool upserts on (program_name, const_id), so DM needs the
+		// same conflict target the other backends get from
+		// ensureIrConstIndexes.
+		{irConstPoolProgramIDIndex, TableIrConstPool, "program_name,const_id", true},
+		{irConstPoolSizeIndex, TableIrConstPool, "program_name,text_size", false},
 		{"idx_ir_indices_program_value", TableIrIndices, "program_name,value_id", false},
 		{"idx_ir_name_pool_program_name_name", TableIrNamePool, "program_name,name", false},
 	} {
@@ -92,6 +97,11 @@ func installDMIRIndexes(db *gorm.DB) error {
 			kind = "UNIQUE "
 		}
 		if err = db.Exec("CREATE " + kind + "INDEX " + db.Dialect().Quote(indexName) + " ON " + db.Dialect().Quote(spec.table) + " (" + spec.columns + ")").Error; err != nil {
+			// Another process may have created it between the catalog read and
+			// this statement; that is the state this call asks for.
+			if db.Dialect().HasIndex(spec.table, indexName) {
+				continue
+			}
 			return err
 		}
 	}

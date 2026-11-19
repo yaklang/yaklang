@@ -67,8 +67,8 @@ func TestPostgresUniqueIndexMaintenance(t *testing.T) {
 	statements := recorder.statements()
 	require.NotEmpty(t, statements, "the CREATE statements must be visible")
 	for _, statement := range statements {
-		require.NotContains(t, statement, "DELETE FROM ir_codes")
-		require.NotContains(t, statement, "DELETE FROM ir_offsets")
+		require.NotContains(t, statement, `DELETE FROM "ir_codes"`)
+		require.NotContains(t, statement, `DELETE FROM "ir_offsets"`)
 	}
 	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
 	require.True(t, hasNamedIndex(db, TableIrOffsets, irOffsetsUniqueIndex))
@@ -82,11 +82,13 @@ func TestPostgresUniqueIndexMaintenance(t *testing.T) {
 	).Error)
 
 	recorder = installRecorder(db)
+	start = time.Now()
 	ensureAllUniqueIndexes(db)
+	elapsed = time.Since(start)
 	statements = recorder.statements()
 	deduped := false
 	for _, statement := range statements {
-		if strings.Contains(statement, "DELETE FROM ir_codes") {
+		if strings.Contains(statement, `DELETE FROM "ir_codes"`) {
 			deduped = true
 		}
 	}
@@ -98,7 +100,7 @@ func TestPostgresUniqueIndexMaintenance(t *testing.T) {
 		`SELECT COUNT(*) FROM ir_codes WHERE program_name = 'duplicate-prog' AND code_id = 1`,
 	).Row().Scan(&duplicateRows))
 	require.Equal(t, int64(1), duplicateRows)
-	t.Logf("duplicate rows: repaired and indexed")
+	t.Logf("duplicate rows: repaired and indexed in %s", elapsed.Round(time.Millisecond))
 }
 
 func installRecorder(db *gorm.DB) *statementRecorder {

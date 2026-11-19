@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/gorm"
@@ -78,6 +79,20 @@ func (level sqliteLargeDBTuneLevel) mmapAndWAL() (mmapSize int64, walCheckpoint 
 	}
 }
 
+// isSQLiteDatabase reports whether db talks to a SQLite file. The tuning
+// below is PRAGMA-only, so it must never be sent to a server database.
+func isSQLiteDatabase(db *gorm.DB) bool {
+	if db == nil || db.Dialect() == nil {
+		return false
+	}
+	switch strings.ToLower(db.Dialect().GetName()) {
+	case "sqlite", "sqlite3":
+		return true
+	default:
+		return false
+	}
+}
+
 func applySQLiteLargeDBTune(db *gorm.DB, level sqliteLargeDBTuneLevel) {
 	mmapSize, walCheckpoint := level.mmapAndWAL()
 	db.Exec(fmt.Sprintf("PRAGMA cache_size = %d;", -int64(level)))
@@ -94,7 +109,7 @@ func applySQLiteLargeDBTune(db *gorm.DB, level sqliteLargeDBTuneLevel) {
 // writes several gigabytes into it. Every dirty page then has to leave the
 // cache, which turns the per-batch flush into random writes.
 func TuneSQLiteBulkWrite(db *gorm.DB) bool {
-	if db == nil {
+	if !isSQLiteDatabase(db) {
 		return false
 	}
 	applySQLiteLargeDBTune(db, sqliteLargeDBTune256M)
@@ -111,7 +126,7 @@ func TuneSQLiteBulkWrite(db *gorm.DB) bool {
 // TuneSQLiteByDatabaseFileSize raises cache/mmap for large project databases to reduce slow inserts.
 // Returns true when PRAGMAs were applied and logged; false when skipped (below threshold or same tier as last time).
 func TuneSQLiteByDatabaseFileSize(db *gorm.DB, pureDBPath string) bool {
-	if db == nil || pureDBPath == "" {
+	if !isSQLiteDatabase(db) || pureDBPath == "" {
 		return false
 	}
 	size := sqliteDatabaseOnDiskBytes(pureDBPath)
