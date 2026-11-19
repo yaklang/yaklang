@@ -37,13 +37,24 @@ type astBuilder struct {
 
 	// callees is keyed by builder because a function body gets its own
 	// FunctionBuilder; values must be emitted in the function that uses them.
-	callees map[*ssa.FunctionBuilder]map[string]ssa.Value
-	funcs   map[string]*ssa.Function
+	callees  map[*ssa.FunctionBuilder]map[string]ssa.Value
+	funcs    map[string]*ssa.Function
+	declared map[*syntax.FuncDecl]*ssa.Function
+	forward  map[string]*ssa.Function
 
-	pendingStdin ssa.Value
-	inlineDepth  int
-	synthetic    int
-	wrapperDepth int
+	redirects                     map[string]int64
+	pendingStdin                  ssa.Value
+	inlineDepth                   int
+	synthetic                     int
+	wrapperDepth                  int
+	serial, loopDepth, childDepth int
+	inFunction                    bool
+	// argvFrames contains the known fields of immutable positional vectors.
+	argvFrames map[int64][]ssa.Value
+	assoc      map[string]bool
+	sourcing   map[string]bool
+	stdoutSlot string
+	lastSubst  ssa.Value
 
 	// Loop bodies are unrolled for small literal item lists so value-matching
 	// rules can see every iteration; the budget bounds total duplication.
@@ -53,9 +64,10 @@ type astBuilder struct {
 
 func newASTBuilder(b *ssa.FunctionBuilder) *astBuilder {
 	return &astBuilder{
-		FunctionBuilder:  b,
-		callees:          make(map[*ssa.FunctionBuilder]map[string]ssa.Value),
-		funcs:            make(map[string]*ssa.Function),
+		FunctionBuilder: b,
+		callees:         make(map[*ssa.FunctionBuilder]map[string]ssa.Value),
+		funcs:           make(map[string]*ssa.Function),
+		argvFrames:      make(map[int64][]ssa.Value), assoc: make(map[string]bool), sourcing: make(map[string]bool),
 		loopUnrollBudget: 64,
 	}
 }
@@ -64,23 +76,25 @@ func (ab *astBuilder) buildFile(file *syntax.File) {
 	if file == nil {
 		return
 	}
-	ab.registerTopLevelFunctions(file)
+	ab.SupportClosure = true
+	ab.AssignVariable(ab.CreateLocalVariable(statusName), ab.EmitConstInst(0))
+	ab.forward = make(map[string]*ssa.Function)
+	ab.declared = make(map[*syntax.FuncDecl]*ssa.Function)
+	ab.indexFunctions(file)
 	ab.buildStmts(file.Stmts)
 }
 
-// registerTopLevelFunctions makes shell function declarations callable even
-// when the call appears earlier in the file. Shell resolves functions at
-// runtime, so a conservative pre-pass is preferable for safety analysis.
-func (ab *astBuilder) registerTopLevelFunctions(file *syntax.File) {
-	for _, stmt := range file.Stmts {
-		fd, ok := stmt.Cmd.(*syntax.FuncDecl)
-		if !ok || fd.Name == nil || fd.Name.Value == "" {
-			continue
+// Bodies may call a function declared later in the file. A direct command at
+// file scope still uses only definitions executed up to that point.
+func (ab *astBuilder) indexFunctions(f *syntax.File) {
+	for _, s := range f.Stmts {
+		if d, ok := s.Cmd.(*syntax.FuncDecl); ok && ab.declared[d] == nil {
+			restore := ab.setRange(d)
+			fn := ab.NewFunc(d.Name.Value)
+			restore()
+			ab.declared[d] = fn
+			ab.forward[d.Name.Value] = fn
 		}
-		if _, exists := ab.funcs[fd.Name.Value]; exists {
-			continue
-		}
-		ab.funcs[fd.Name.Value] = ab.NewFunc(fd.Name.Value)
 	}
 }
 
@@ -96,8 +110,15 @@ func (ab *astBuilder) buildStmts(stmts []*syntax.Stmt) ssa.Value {
 		if ab.IsBlockFinish() {
 			break
 		}
-		if v := ab.buildStmt(stmt); !utils.IsNil(v) {
-			out = v
+		var v ssa.Value
+		if stmt.Background || stmt.Coprocess {
+			ab.childShell(func() ssa.Value { return ab.buildStmt(stmt) })
+			ab.put(statusName, ab.EmitConstInst(0))
+		} else {
+			v = ab.buildStmt(stmt)
+		}
+		if !utils.IsNil(v) && !ab.IsBlockFinish() {
+			out = ab.concat(out, v)
 		}
 	}
 	return out
@@ -151,7 +172,14 @@ func (ab *astBuilder) calleeValue(name string) ssa.Value {
 	if v, ok := table[name]; ok {
 		return v
 	}
+	// Callees are shared across branches. Their definitions must dominate
+	// all uses, not sit in the first arm that happens to call the command.
+	previous := ab.CurrentBlock
+	if entry, ok := ab.GetBasicBlockByID(ab.EnterBlock); ok {
+		ab.CurrentBlock = entry
+	}
 	v := ab.EmitUndefined(name)
+	ab.CurrentBlock = previous
 	if !utils.IsNil(v) {
 		// EmitUndefined only allocates a virtual register; the name index used
 		// by SyntaxFlow's bare-name filters (curl, rm, ...) is separate.
@@ -161,28 +189,21 @@ func (ab *astBuilder) calleeValue(name string) ssa.Value {
 	return v
 }
 
-func (ab *astBuilder) resolveCallee(name string) ssa.Value {
-	if fn, ok := ab.funcs[name]; ok && fn != nil {
-		return fn
-	}
-	return ab.calleeValue(name)
-}
-
 func (ab *astBuilder) readOrCreate(name string) ssa.Value {
-	if v := ab.ReadValue(name); !utils.IsNil(v) {
-		return v
+	if v := ab.PeekValue(name); !utils.IsNil(v) && !v.IsExtern() {
+		if _, hostLib := ssa.ToExternLib(v); !hostLib {
+			return v
+		}
 	}
-	v := ab.EmitUndefined(name)
-	if utils.IsNil(v) {
-		return nil
-	}
-	if variable := ab.CreateVariable(name); variable != nil {
-		ab.AssignVariable(variable, v)
-	}
+	// A shell name may come from the caller's environment, but never from a
+	// Yak plugin's extern library of the same name.
+	v := ab.EmitValueOnlyDeclare(name)
+	ab.put(name, v)
 	return v
 }
 
-func (ab *astBuilder) buildAssign(a *syntax.Assign) ssa.Value {
+func (ab *astBuilder) buildAssign(a *syntax.Assign) ssa.Value { return ab.assign(a, false) }
+func (ab *astBuilder) assign(a *syntax.Assign, local bool) ssa.Value {
 	if a == nil {
 		return nil
 	}
@@ -201,12 +222,12 @@ func (ab *astBuilder) buildAssign(a *syntax.Assign) ssa.Value {
 	case a.Value != nil:
 		value = ab.buildWord(a.Value)
 	case a.Array != nil:
-		value = ab.buildArray(a.Array)
+		value = ab.arrayLiteral(name, a.Array)
 	default:
-		value = ab.readOrCreate(name)
+		value = ab.EmitConstInst("")
 	}
 	if a.Index != nil {
-		ab.buildArithm(a.Index)
+		return ab.assignElement(name, ab.arrayKey(name, a.Index), value, a.Append)
 	}
 	if utils.IsNil(value) {
 		value = ab.EmitUndefined(name)
@@ -218,32 +239,10 @@ func (ab *astBuilder) buildAssign(a *syntax.Assign) ssa.Value {
 			}
 		}
 	}
-	if variable := ab.CreateVariable(name); variable != nil {
-		ab.AssignVariable(variable, value)
+	if local {
+		ab.AssignVariable(ab.CreateLocalVariable(name), value)
+	} else {
+		ab.put(name, value)
 	}
 	return value
-}
-
-func (ab *astBuilder) buildArray(a *syntax.ArrayExpr) ssa.Value {
-	if a == nil {
-		return nil
-	}
-	var first ssa.Value
-	for _, elem := range a.Elems {
-		if elem == nil {
-			continue
-		}
-		if elem.Index != nil {
-			ab.buildArithm(elem.Index)
-		}
-		if elem.Value != nil {
-			if v := ab.buildWord(elem.Value); !utils.IsNil(v) && utils.IsNil(first) {
-				first = v
-			}
-		}
-	}
-	if utils.IsNil(first) {
-		first = ab.EmitUndefined("array")
-	}
-	return first
 }

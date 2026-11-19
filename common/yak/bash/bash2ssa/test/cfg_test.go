@@ -162,9 +162,11 @@ func TestBashCFG_ForLoopPhi(t *testing.T) {
 		accumulator := requirePhi(t, phis, ssa.LoopCondition, "X")
 		require.Len(t, accumulator.Edges, 2)
 
-		// The loop variable merges the iterated items in the loop header.
-		loopVar := requirePhi(t, phis, ssa.LoopHeader, "i$loop")
-		require.ElementsMatch(t, []string{"a", "b"}, loopVar.Edges)
+		// The item selection has actual predecessors; the loop head Phi
+		// joins the entering variable with the selected item on the latch.
+		choice := requirePhi(t, phis, ssa.IfDone, "i")
+		require.ElementsMatch(t, []string{"a", "b"}, choice.Edges)
+		require.Len(t, requirePhi(t, phis, ssa.LoopCondition, "i").Edges, 2)
 	})
 }
 
@@ -269,15 +271,69 @@ func TestBashCFG_CommandSubstitutionPhi(t *testing.T) {
 	})
 }
 
-// Literal item lists without body assignments stay unrolled so value-matching
-// rules see each iteration; the loop variable still receives a merged Phi.
+// Specialization retains both concrete calls, but never puts a two-input
+// Phi in the predecessor-free entry block.
 func TestBashCFG_LiteralForUnrollPhi(t *testing.T) {
 	checkBash(t, `for i in a b; do echo "$i"; done`, func(prog *ssaapi.Program) {
-		merged := requirePhi(t, bashPhis(t, prog), "", "i$loop")
+		merged := requirePhi(t, bashPhis(t, prog), ssa.IfDone, "i")
 		require.ElementsMatch(t, []string{"a", "b"}, merged.Edges)
 
 		res, err := prog.SyntaxFlowWithError(`echo(* as $argv) as $call`)
 		require.NoError(t, err)
 		require.Len(t, res.GetValues("call"), 2, "each literal iteration must keep its own call")
+	})
+}
+
+func TestBashCFG_CasePhi(t *testing.T) {
+	checkBash(t, `case "$1" in a) X=1;; b) X=2;; esac; echo "$X"`, func(prog *ssaapi.Program) {
+		phi := requirePhiArgument(t, prog, "echo")
+		requirePhiInBlock(t, phi, ssa.IfDone)
+		require.True(t, len(phi.Edge) >= 2)
+	})
+}
+
+func TestBashCFG_SelectLoop(t *testing.T) {
+	checkBash(t, `select choice in a b; do X=$choice; done; echo "$X"`, func(prog *ssaapi.Program) {
+		requirePhi(t, bashPhis(t, prog), ssa.LoopCondition, "X")
+	})
+}
+
+func TestBashCFG_NestedBreakDepth(t *testing.T) {
+	checkBash(t, `for i in a; do for j in b; do X=$i$j; break 2; done; done; echo "$X"`, func(prog *ssaapi.Program) {
+		phi := requirePhiArgument(t, prog, "echo")
+		require.NotNil(t, phi)
+	})
+}
+
+func TestBashCFG_BackgroundJob(t *testing.T) {
+	checkBash(t, `sleep 1 & wait; X=done; echo "$X"`, func(prog *ssaapi.Program) {
+		res, err := prog.SyntaxFlowWithError(`echo(* as $argv)`)
+		require.NoError(t, err)
+		require.NotEmpty(t, res.GetValues("argv"))
+	})
+}
+
+func TestBashPrintlnCFG(t *testing.T) {
+	ssatest.CheckPrintlnValue(sink+`i=old; for i in; do i=bad; done; println "$i"; for i in a b; do :; done; println "$i"`, []string{`"old"`, `"b"`}, t)
+	for _, code := range []string{`if probe; then x=a; elif probe2; then x=b; else x=c; fi`, `case "$1" in a|b) x=a;; c*) x=b;; *) x=c;; esac`} {
+		ssatest.CheckPrintlnValueRegexp(sink+code+`; println "$x"`, []string{`^phi\([^)]*\)\["a","b","c"\]$`}, t)
+	}
+	ssatest.CheckPrintlnValueRegexp(sink+`x=a; probe && x=b; probe2 || x=c; println "$x"`, []string{`^phi\([^)]*\)\["c",phi\([^)]*\)\["b","a"\]\]$`}, t)
+	checkBash(t, `for i in "$@"; do continue; never; done; until done_test; do break; done; select choice in a b; do break; done`, func(p *ssaapi.Program) {
+		r, err := p.SyntaxFlowWithError(`never() as $dead`)
+		require.NoError(t, err)
+		require.Empty(t, r.GetValues("dead"))
+		fn := p.Program.GetFunction(string(ssa.MainFunctionName), "")
+		loops := 0
+		for _, id := range fn.Blocks {
+			b, _ := fn.GetBasicBlockByID(id)
+			for _, id := range b.Insts {
+				inst, _ := fn.GetInstructionById(id)
+				if inst.GetOpcode() == ssa.SSAOpcodeLoop {
+					loops++
+				}
+			}
+		}
+		require.Equal(t, 3, loops)
 	})
 }
