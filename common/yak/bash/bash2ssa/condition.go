@@ -61,6 +61,7 @@ func (ab *astBuilder) parameterOperator(name string, v ssa.Value, e *syntax.Expa
 			return out
 		})
 	default:
+		// TODO(ssa-bash): pattern trimming, replacement and case conversion stay expand.* intrinsic calls.
 		return ab.intrinsic("expand."+e.Op.String(), v, word())
 	}
 }

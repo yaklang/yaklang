@@ -28,6 +28,7 @@ func (ab *astBuilder) buildFuncDecl(d *syntax.FuncDecl) {
 	// Materialize the outer slots before PushFunction. The SSA closure builder
 	// can then bind reads at the actual call site and publish non-local writes as
 	// SideEffects. Do not import local declarations into the parent.
+	// TODO(ssa-bash): non-local writes are published through SSA closure bindings; bash's dynamic scope is not reproduced at the call site.
 	for _, s := range assignedNames(d.Body) {
 		if !locals[s] {
 			ab.readOrCreate(s)

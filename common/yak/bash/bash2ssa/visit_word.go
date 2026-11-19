@@ -179,6 +179,7 @@ func (ab *astBuilder) buildParamExp(exp *syntax.ParamExp) ssa.Value {
 		value = ab.parameterOperator(name, value, exp.Exp)
 	}
 	if exp.Slice != nil {
+		// TODO(ssa-bash): slicing and replacement expansions evaluate their operands but return the whole value.
 		ab.buildArithm(exp.Slice.Offset)
 		ab.buildArithm(exp.Slice.Length)
 	}
@@ -203,6 +204,7 @@ func (ab *astBuilder) buildCmdSubst(subst *syntax.CmdSubst) ssa.Value {
 	return out
 }
 
+// TODO(ssa-bash): process substitution returns the child stdout instead of a file-descriptor path.
 func (ab *astBuilder) buildProcSubst(subst *syntax.ProcSubst) ssa.Value {
 	if subst == nil {
 		return nil
@@ -303,6 +305,7 @@ func (ab *astBuilder) buildArithm(expr syntax.ArithmExpr) ssa.Value {
 		}
 		return left
 	default:
+		// TODO(ssa-bash): ternary and other arithmetic forms fall back to nil.
 		return nil
 	}
 }
