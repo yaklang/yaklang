@@ -417,14 +417,24 @@ func filterParamsForMCPCall(params InvokeParams) map[string]interface{} {
 // JSON unmarshaling yields map[string]interface{} rather than mcp.TextContent structs.
 func firstMCPTextFromContent(content []any) string {
 	for _, item := range content {
-		if textContent, ok := item.(mcp.TextContent); ok && textContent.Text != "" {
-			return textContent.Text
+		if text := mcpTextBlock(item); text != "" {
+			return text
 		}
-		if m, ok := item.(map[string]interface{}); ok {
-			if text, _ := m["text"].(string); text != "" {
-				return text
-			}
+	}
+	return ""
+}
+
+func mcpTextBlock(item any) string {
+	switch block := item.(type) {
+	case mcp.TextContent:
+		return block.Text
+	case *mcp.TextContent:
+		if block != nil {
+			return block.Text
 		}
+	case map[string]any:
+		text, _ := block["text"].(string)
+		return text
 	}
 	return ""
 }
@@ -448,36 +458,22 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 
 		result, err := mcpClient.CallTool(callCtx, callRequest)
 		if err != nil {
-			errMsg := fmt.Sprintf("call mcp tool failed: %v", err)
-			stderr.Write([]byte(errMsg))
-			return nil, utils.Errorf(errMsg)
-		}
-		if result == nil {
-			return nil, fmt.Errorf("MCP tool %s returned no result", toolName)
-		}
-
-		// 处理结果
-		if result.IsError {
-			errMsg := firstMCPTextFromContent(result.Content)
-			if errMsg == "" {
-				errMsg = "tool execution failed"
-			}
-			log.Errorf("mcp tool %s execution error: %s", toolName, errMsg)
-			stderr.Write([]byte(errMsg))
-			return nil, utils.Errorf(errMsg)
+			failure := fmt.Errorf("call mcp tool failed: %w", err)
+			stderr.Write([]byte(failure.Error()))
+			return nil, failure
 		}
 
 		source := aimedia.Source{Kind: "mcp", ToolName: toolName, ServerName: serverName, ObservedAt: time.Now()}
 		if runtimeConfig != nil {
 			source.ToolCallID = runtimeConfig.RuntimeID
 		}
-		contents, err := resolveMCPImageResources(ctx, mcpClient, result.Content)
+		value, resultContent, err := convertMCPToolResult(ctx, mcpClient, result, source)
 		if err != nil {
-			return nil, err
-		}
-		value, resultContent, err := convertMCPToolContent(ctx, contents, source)
-		if err != nil {
-			return nil, err
+			if result != nil && result.IsError {
+				log.Errorf("mcp tool %s execution error: %s", toolName, err)
+				stderr.Write([]byte(err.Error()))
+			}
+			return value, err
 		}
 
 		// 输出到 stdout
