@@ -4142,8 +4142,8 @@
   {
     "rule_id": "source-js-innerhtml",
     "rule_name": "源码匹配：检测 JavaScript innerHTML 赋值",
-    "hash": "ee4abd05451cda7df178c3a34279eb45930a255b41221dd092c936850d624e53",
-    "version": "20261109.0002"
+    "hash": "d7569c85f26d370625b6c8e38e35469c49d487ff431933a078a210861fd8a19a",
+    "version": "20261119.0001"
   },
   {
     "rule_id": "source-js-jwt-none",
