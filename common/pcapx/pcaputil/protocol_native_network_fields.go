@@ -48,6 +48,11 @@ func (e *ProtocolEvent) retainNativeMLDFields(p gopacket.Packet, result *stream_
 		return
 	}
 	available := len(layer.LayerContents()) + len(layer.LayerPayload())
+	e.retainMLDOccurrences(result, offset, available)
+}
+
+func (e *ProtocolEvent) retainMLDOccurrences(result *stream_parser.MLDWireResult, offset, available int) {
+	n := e.nativeNetworkFields
 	n.mldValues = map[string][]nativeNetworkField{}
 	for _, f := range result.Values {
 		if f.Name == "" || f.Offset < 0 || f.Length <= 0 || f.Offset > available || f.Length > available-f.Offset {
@@ -99,7 +104,12 @@ func (e *ProtocolEvent) retainNativeNetworkFields(p gopacket.Packet) {
 	if available > len(p.Data())-offset || !bytes.Equal(payload, p.Data()[offset+len(contents):offset+available]) {
 		return
 	}
-	wire := p.Data()[offset : offset+available]
+	e.SourceBytes.ProtocolOffset, e.SourceBytes.ProtocolLength = offset, available
+	e.retainNetworkHeaderFields(p.Data()[offset:offset+available], len(contents), offset)
+}
+
+func (e *ProtocolEvent) retainNetworkHeaderFields(wire []byte, headerBytes, offset int) {
+	available := len(wire)
 	n := &nativeNetworkObservation{protocol: e.Protocol, values: map[string]nativeNetworkField{}}
 	add := func(name string, value any, at, size int) {
 		if at >= 0 && size > 0 && at <= available && size <= available-at {
@@ -110,11 +120,11 @@ func (e *ProtocolEvent) retainNativeNetworkFields(p gopacket.Packet) {
 	ipv6 := func(w []byte) string { return netip.AddrFrom16([16]byte(w)).String() }
 	switch e.Protocol {
 	case "arp":
-		if len(contents) < 8 {
+		if headerBytes < 8 {
 			return
 		}
 		hlen, plen := int(wire[4]), int(wire[5])
-		if len(contents) < 8+2*(hlen+plen) {
+		if headerBytes < 8+2*(hlen+plen) {
 			return
 		}
 		add("arp.opcode", binary.BigEndian.Uint16(wire[6:8]), 6, 2)
@@ -128,7 +138,7 @@ func (e *ProtocolEvent) retainNativeNetworkFields(p gopacket.Packet) {
 			add("arp.dst.proto_ipv4", ipv4(wire[at:at+4]), at, 4)
 		}
 	case "icmp":
-		if len(contents) != 8 {
+		if headerBytes != 8 {
 			return
 		}
 		typ, code := wire[0], wire[1]
@@ -157,7 +167,7 @@ func (e *ProtocolEvent) retainNativeNetworkFields(p gopacket.Packet) {
 			}
 		}
 	case "icmpv6":
-		if len(contents) != 4 {
+		if headerBytes != 4 {
 			return
 		}
 		typ := wire[0]

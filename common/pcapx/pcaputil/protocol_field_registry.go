@@ -1180,6 +1180,14 @@ func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
 	if e.nativeQUICObservation || e.nativeESPObservation {
 		m = e.semanticSession
 	}
+	return e.displayRowRange(m, key)
+}
+
+func (e *ProtocolEvent) displayRangeLimit() int {
+	return max(len(e.Raw), e.storedWireLength)
+}
+
+func (e *ProtocolEvent) displayRowRange(m map[string]any, key string) *DisplayFieldRange {
 	ranges, _ := m["Wire Field Ranges"].(map[string]any)
 	span, _ := ranges[key].([]any)
 	if len(span) != 2 {
@@ -1187,7 +1195,7 @@ func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
 	}
 	lo, ok := displayUint(span[0])
 	hi, ok2 := displayUint(span[1])
-	if !ok || !ok2 || hi < lo || hi > uint64(len(e.Raw)) {
+	if !ok || !ok2 || hi < lo || hi > uint64(e.displayRangeLimit()) {
 		return nil
 	}
 	return &DisplayFieldRange{Offset: int(lo), Length: int(hi - lo)}
@@ -1206,7 +1214,7 @@ func (e *ProtocolEvent) displayTLSRecordHeaderRange(key string) *DisplayFieldRan
 	length, lengthOK := displayUint(e.semanticFields["Record Length"])
 	if !typeOK || !versionOK || !lengthOK || typ != uint64(e.Raw[0]) ||
 		version != uint64(binary.BigEndian.Uint16(e.Raw[1:3])) ||
-		length != uint64(binary.BigEndian.Uint16(e.Raw[3:5])) || length+5 != uint64(len(e.Raw)) {
+		length != uint64(binary.BigEndian.Uint16(e.Raw[3:5])) || length+5 != uint64(e.displayRangeLimit()) {
 		return nil
 	}
 	switch key {

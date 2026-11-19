@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-const SchemaVersion = 5
+const SchemaVersion = 6
 
 // Live snapshots use the existing fingerprint fields for their committed
 // capture digest; FullSHA256 remains reserved for offline content deduplication.

@@ -54,6 +54,7 @@ type Packet struct {
 	DestinationMAC     string `gorm:"column:dst_mac;type:text;not null;default:''" json:"destination_mac,omitempty"`
 	VLANStack          string `gorm:"column:vlan_stack;type:text;not null;default:''" json:"vlan_stack,omitempty"`
 	Transport          string `gorm:"type:text;not null" json:"transport"`
+	Summary            string `gorm:"type:text;not null;default:''" json:"summary"`
 	DecodeError        string `gorm:"type:text;not null" json:"decode_error,omitempty"`
 }
 
@@ -64,41 +65,43 @@ func (Packet) TableName() string { return "packets" }
 // JSONB 是持久化原本，Fields/Session 仅在详情查询时解码，普通列表只加载摘要。
 // 字段索引同样只创建在子库中，方案见 PROTOCOL_FIELDS_SEACH.md。
 // Data 保存消息重组字节；SessionID/StreamID 关联网络会话和方向流。
+// CompletedInPacketID 以 0 表示尚无可确认的完成帧，必须作为普通零值写入。
 type PCAPProtocolMessage struct {
 	gorm.Model
-	EventID         int64          `gorm:"unique_index;not null" json:"event_id"`
-	FlowID          int64          `gorm:"not null" json:"flow_id"`
-	TimestampNS     *int64         `json:"timestamp_ns"`
-	Protocol        string         `gorm:"type:text;not null" json:"protocol"`
-	Transport       string         `gorm:"type:text;not null" json:"transport"`
-	Source          string         `gorm:"type:text;not null" json:"source"`
-	Destination     string         `gorm:"type:text;not null" json:"destination"`
-	Direction       int            `gorm:"not null" json:"direction"`
-	LogicalOffset   int64          `gorm:"not null" json:"logical_offset"`
-	Length          int            `gorm:"not null" json:"length"`
-	Status          string         `gorm:"type:text;not null" json:"status"`
-	Summary         string         `gorm:"type:text;not null" json:"summary"`
-	Error           string         `gorm:"type:text;not null" json:"error,omitempty"`
-	DecodeError     string         `gorm:"type:text;not null" json:"decode_error,omitempty"`
-	Fields          map[string]any `gorm:"-" json:"fields"`
-	Session         map[string]any `gorm:"-" json:"session"`
-	Section         int64          `gorm:"not null"`
-	Interface       int            `gorm:"column:interface_id;not null"`
-	Encapsulation   string         `gorm:"type:text;not null"`
-	Profile         string         `gorm:"type:text;not null"`
-	Rule            string         `gorm:"type:text;not null" json:"rule"`
-	Entry           string         `gorm:"type:text;not null" json:"entry"`
-	Completeness    string         `gorm:"type:text;not null"`
-	ExpertCode      string         `gorm:"type:text;not null"`
-	TransactionID   int64          `gorm:"not null"`
-	ResponseTo      int64          `gorm:"not null"`
-	DataLength      int            `gorm:"not null" json:"data_length"`
-	Data            []byte         `gorm:"type:blob;not null" json:"-"`
-	SessionID       uint           `gorm:"type:integer REFERENCES sessions(id);default:null" json:"session_id,omitempty"`
-	StreamID        uint           `gorm:"type:integer REFERENCES streams(id);default:null" json:"stream_id,omitempty"`
-	FieldsJSON      []byte         `gorm:"column:fields;type:blob;not null" json:"-"`
-	SessionJSON     []byte         `gorm:"column:session;type:blob;not null" json:"-"`
-	SourceBytesJSON []byte         `gorm:"column:source_bytes;type:blob;not null" json:"-"`
+	EventID             int64          `gorm:"unique_index;not null" json:"event_id"`
+	FlowID              int64          `gorm:"not null" json:"flow_id"`
+	TimestampNS         *int64         `json:"timestamp_ns"`
+	Protocol            string         `gorm:"type:text;not null" json:"protocol"`
+	Transport           string         `gorm:"type:text;not null" json:"transport"`
+	Source              string         `gorm:"type:text;not null" json:"source"`
+	Destination         string         `gorm:"type:text;not null" json:"destination"`
+	Direction           int            `gorm:"not null" json:"direction"`
+	LogicalOffset       int64          `gorm:"not null" json:"logical_offset"`
+	Length              int            `gorm:"not null" json:"length"`
+	Status              string         `gorm:"type:text;not null" json:"status"`
+	Summary             string         `gorm:"type:text;not null" json:"summary"`
+	Error               string         `gorm:"type:text;not null" json:"error,omitempty"`
+	DecodeError         string         `gorm:"type:text;not null" json:"decode_error,omitempty"`
+	Fields              map[string]any `gorm:"-" json:"fields"`
+	Session             map[string]any `gorm:"-" json:"session"`
+	Section             int64          `gorm:"not null"`
+	Interface           int            `gorm:"column:interface_id;not null"`
+	Encapsulation       string         `gorm:"type:text;not null"`
+	Profile             string         `gorm:"type:text;not null"`
+	Rule                string         `gorm:"type:text;not null" json:"rule"`
+	Entry               string         `gorm:"type:text;not null" json:"entry"`
+	Completeness        string         `gorm:"type:text;not null"`
+	ExpertCode          string         `gorm:"type:text;not null"`
+	TransactionID       int64          `gorm:"not null"`
+	ResponseTo          int64          `gorm:"not null"`
+	DataLength          int            `gorm:"not null" json:"data_length"`
+	CompletedInPacketID uint           `gorm:"not null" json:"completed_in_packet_id,omitempty"`
+	Data                []byte         `gorm:"type:blob;not null" json:"-"`
+	SessionID           uint           `gorm:"type:integer REFERENCES sessions(id);default:null" json:"session_id,omitempty"`
+	StreamID            uint           `gorm:"type:integer REFERENCES streams(id);default:null" json:"stream_id,omitempty"`
+	FieldsJSON          []byte         `gorm:"column:fields;type:blob;not null" json:"-"`
+	SessionJSON         []byte         `gorm:"column:session;type:blob;not null" json:"-"`
+	SourceBytesJSON     []byte         `gorm:"column:source_bytes;type:blob;not null" json:"-"`
 }
 
 func (PCAPProtocolMessage) TableName() string { return "protocol_messages" }
@@ -200,45 +203,63 @@ func (PCAPStreamChunkPacket) TableName() string { return "stream_chunk_packets" 
 
 // migratePCAPDatabase 仅迁移当前流量子库的数据表和查询索引。
 // 所有模型和复合索引都由当前子库的 GORM 句柄管理。
+type pcapQueryIndex struct {
+	model   interface{}
+	name    string
+	columns []string
+}
+
+var pcapQueryIndexes = []pcapQueryIndex{
+	{&Packet{}, "packets_time", []string{"timestamp_ns", "id"}},
+	{&Packet{}, "packets_transport", []string{"transport", "id"}},
+	{&Packet{}, "packets_src_ip", []string{"src_ip", "id"}},
+	{&Packet{}, "packets_dst_ip", []string{"dst_ip", "id"}},
+	{&Packet{}, "packets_src_port", []string{"src_port", "id"}},
+	{&Packet{}, "packets_dst_port", []string{"dst_port", "id"}},
+	{&Packet{}, "packets_l2_endpoint", []string{"section", "interface_id", "link_type", "vlan_stack", "src_mac", "src_ip"}},
+	{&PCAPProtocolMessage{}, "messages_protocol", []string{"protocol", "id"}},
+	{&PCAPProtocolMessage{}, "messages_flow", []string{"flow_id", "id"}},
+	{&PCAPProtocolMessage{}, "messages_time", []string{"timestamp_ns", "id"}},
+	{&PCAPProtocolMessage{}, "messages_transaction", []string{"transaction_id", "id"}},
+	{&PCAPProtocolMessage{}, "messages_protocol_completed", []string{"protocol", "deleted_at", "completed_in_packet_id"}},
+	{&PCAPProtocolMessage{}, "messages_completed_in", []string{"completed_in_packet_id", "deleted_at", "id"}},
+	{&PCAPMessagePacket{}, "message_packets_packet", []string{"packet_id", "deleted_at", "message_id"}},
+	{&PCAPProtocolMessage{}, "messages_session", []string{"session_id", "id"}},
+	{&PCAPProtocolMessage{}, "messages_stream", []string{"stream_id", "id"}},
+	{&PCAPSession{}, "sessions_transport", []string{"transport", "id"}},
+	{&PCAPSession{}, "sessions_src_ip", []string{"src_ip", "id"}},
+	{&PCAPSession{}, "sessions_dst_ip", []string{"dst_ip", "id"}},
+	{&PCAPSession{}, "sessions_src_port", []string{"src_port", "id"}},
+	{&PCAPSession{}, "sessions_dst_port", []string{"dst_port", "id"}},
+	{&PCAPSession{}, "sessions_time", []string{"first_timestamp_ns", "id"}},
+	{&PCAPStreamChunk{}, "chunks_stream_cursor", []string{"stream_id", "id"}},
+	{&PCAPStreamChunk{}, "chunks_stream_offset", []string{"stream_id", "byte_offset", "id"}},
+	{&PCAPSessionPacket{}, "session_packets_cursor", []string{"session_id", "packet_id"}},
+	{&PCAPSessionPacket{}, "stream_packets_cursor", []string{"stream_id", "packet_id"}},
+	{&PCAPSessionPacket{}, "session_packets_reverse", []string{"packet_id", "session_id", "stream_id"}},
+	{&PCAPStreamChunkPacket{}, "chunk_packets_reverse", []string{"packet_id", "chunk_id"}},
+}
+
 func migratePCAPDatabase(db *gorm.DB) error {
 	if err := db.AutoMigrate(&PCAPDatasetInfo{}, &PCAPCaptureInterface{}, &Packet{}, &PCAPCaptureRecord{}, &PCAPSession{}, &PCAPStream{}, &PCAPStreamChunk{}, &PCAPSessionPacket{}, &PCAPStreamChunkPacket{}, &PCAPProtocolMessage{}, &PCAPMessagePacket{}).Error; err != nil {
 		return err
 	}
-	// Keep cursor order as the second column of each searchable index.
-	indexes := []struct {
-		model   interface{}
-		name    string
-		columns []string
-	}{
-		{&Packet{}, "packets_time", []string{"timestamp_ns", "id"}},
-		{&Packet{}, "packets_transport", []string{"transport", "id"}},
-		{&Packet{}, "packets_src_ip", []string{"src_ip", "id"}},
-		{&Packet{}, "packets_dst_ip", []string{"dst_ip", "id"}},
-		{&Packet{}, "packets_src_port", []string{"src_port", "id"}},
-		{&Packet{}, "packets_dst_port", []string{"dst_port", "id"}},
-		{&Packet{}, "packets_l2_endpoint", []string{"section", "interface_id", "link_type", "vlan_stack", "src_mac", "src_ip"}},
-		{&PCAPProtocolMessage{}, "messages_protocol", []string{"protocol", "id"}},
-		{&PCAPProtocolMessage{}, "messages_flow", []string{"flow_id", "id"}},
-		{&PCAPProtocolMessage{}, "messages_time", []string{"timestamp_ns", "id"}},
-		{&PCAPProtocolMessage{}, "messages_transaction", []string{"transaction_id", "id"}},
-		{&PCAPMessagePacket{}, "message_packets_packet", []string{"packet_id", "message_id"}},
-		{&PCAPProtocolMessage{}, "messages_session", []string{"session_id", "id"}},
-		{&PCAPProtocolMessage{}, "messages_stream", []string{"stream_id", "id"}},
-		{&PCAPSession{}, "sessions_transport", []string{"transport", "id"}},
-		{&PCAPSession{}, "sessions_src_ip", []string{"src_ip", "id"}},
-		{&PCAPSession{}, "sessions_dst_ip", []string{"dst_ip", "id"}},
-		{&PCAPSession{}, "sessions_src_port", []string{"src_port", "id"}},
-		{&PCAPSession{}, "sessions_dst_port", []string{"dst_port", "id"}},
-		{&PCAPSession{}, "sessions_time", []string{"first_timestamp_ns", "id"}},
-		{&PCAPStreamChunk{}, "chunks_stream_cursor", []string{"stream_id", "id"}},
-		{&PCAPStreamChunk{}, "chunks_stream_offset", []string{"stream_id", "byte_offset", "id"}},
-		{&PCAPSessionPacket{}, "session_packets_cursor", []string{"session_id", "packet_id"}},
-		{&PCAPSessionPacket{}, "stream_packets_cursor", []string{"stream_id", "packet_id"}},
-		{&PCAPSessionPacket{}, "session_packets_reverse", []string{"packet_id", "session_id", "stream_id"}},
-		{&PCAPStreamChunkPacket{}, "chunk_packets_reverse", []string{"packet_id", "chunk_id"}},
-	}
-	for _, index := range indexes {
+	return ensurePCAPQueryIndexes(db)
+}
+
+// Keep cursor order as the second column of each searchable index.
+func ensurePCAPQueryIndexes(db *gorm.DB) error {
+	for _, index := range pcapQueryIndexes {
 		if err := db.Model(index.model).AddIndex(index.name, index.columns...).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func dropPCAPQueryIndexes(db *gorm.DB) error {
+	for _, index := range pcapQueryIndexes {
+		if err := db.Exec("DROP INDEX IF EXISTS " + index.name).Error; err != nil {
 			return err
 		}
 	}

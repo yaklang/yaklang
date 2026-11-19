@@ -16,7 +16,7 @@ func (m *InstanceManager) RebuildAnalysis(identifier string, options ...ImportOp
 		return nil, err
 	}
 	defer m.ops.Done()
-	config := &importConfig{ctx: context.Background(), batchSize: 2000, streams: true}
+	config := &importConfig{ctx: context.Background(), batchSize: defaultImportBatchSize, streams: true}
 	for _, option := range options {
 		if option == nil {
 			return nil, fmt.Errorf("pcapdb: nil rebuild option")

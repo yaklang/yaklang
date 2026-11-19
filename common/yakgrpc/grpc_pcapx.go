@@ -4,24 +4,23 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/gopacket/gopacket"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
-	bin_parser2 "github.com/yaklang/yaklang/common/bin-parser"
 	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"runtime"
-	"strconv"
 	"strings"
+	"time"
 )
 
 func pcapIftoYpbIf(item *pcap.Interface, index int) (*ypb.NetInterface, bool) {
@@ -114,58 +113,169 @@ func (s *Server) GetPcapMetadata(ctx context.Context, req *ypb.PcapMetadataReque
 	}, nil
 }
 
+type pcapXCaptureResult struct {
+	metadata *pcapdb.PCAPFileDBMetadata
+	err      error
+}
+
+type pcapXCaptureRunner func(context.Context, *pcapdb.InstanceManager, pcapdb.LiveCaptureConfig, func(pcapdb.PCAPFileDBMetadata)) (*pcapdb.PCAPFileDBMetadata, error)
+
+var pcapXRunLiveCapture pcapXCaptureRunner = func(ctx context.Context, manager *pcapdb.InstanceManager, config pcapdb.LiveCaptureConfig, started func(pcapdb.PCAPFileDBMetadata)) (*pcapdb.PCAPFileDBMetadata, error) {
+	return manager.RunLiveCapture(ctx, config, started)
+}
+
+func pcapXLiveCaptureConfig(req *ypb.PcapXRequest) (pcapdb.LiveCaptureConfig, error) {
+	interfaces := utils.StringArrayFilterEmpty(req.GetNetInterfaceList())
+	if len(interfaces) != 1 {
+		return pcapdb.LiveCaptureConfig{}, grpcstatus.Error(codes.InvalidArgument, "PcapX requires exactly one capture interface")
+	}
+	if req.GetSnaplen() < 0 || req.GetSnaplen() > 16<<20 {
+		return pcapdb.LiveCaptureConfig{}, grpcstatus.Error(codes.InvalidArgument, "Snaplen must be between 0 and 16777216")
+	}
+	if req.GetBatchSize() < 0 || req.GetBatchSize() > 100000 {
+		return pcapdb.LiveCaptureConfig{}, grpcstatus.Error(codes.InvalidArgument, "BatchSize must be between 0 and 100000")
+	}
+	if req.GetFlushIntervalMilliseconds() < 0 || req.GetDurationMilliseconds() < 0 {
+		return pcapdb.LiveCaptureConfig{}, grpcstatus.Error(codes.InvalidArgument, "capture intervals cannot be negative")
+	}
+	if req.GetDurationMilliseconds() > int64((1<<63-1)/time.Millisecond) {
+		return pcapdb.LiveCaptureConfig{}, grpcstatus.Error(codes.InvalidArgument, "DurationMilliseconds is too large")
+	}
+	return pcapdb.LiveCaptureConfig{
+		Interface:     strings.TrimSpace(interfaces[0]),
+		BPF:           strings.TrimSpace(req.GetBPF()),
+		Snaplen:       int(req.GetSnaplen()),
+		Promisc:       req.GetPromisc(),
+		Duration:      time.Duration(req.GetDurationMilliseconds()) * time.Millisecond,
+		FlushInterval: time.Duration(req.GetFlushIntervalMilliseconds()) * time.Millisecond,
+		BatchSize:     int(req.GetBatchSize()),
+	}, nil
+}
+
+func pcapXTransferKBPerSecond(deltaBytes int64, elapsed time.Duration) int64 {
+	if deltaBytes <= 0 || elapsed <= 0 {
+		return 0
+	}
+	return deltaBytes * int64(time.Second) / elapsed.Nanoseconds() / 1024
+}
+
+func pcapXResponse(meta *pcapdb.PCAPFileDBMetadata, finished bool, captureErr error, transferKBPerSecond int64) *ypb.PcapXResponse {
+	response := &ypb.PcapXResponse{Finished: finished, NetInterfaceTransferKBPerSeconds: transferKBPerSecond}
+	if meta != nil {
+		response.DatasetID = meta.DatasetID
+		response.State = string(meta.State)
+		response.PacketFrameCounter = meta.PacketCount
+		response.TCPReassembledCount = meta.StreamChunkCount
+		response.TrafficSessionCount = meta.SessionCount
+		response.BytesIndexed = meta.BytesIndexed
+		response.TotalBytes = meta.SourceSize
+		response.ProtocolCount = meta.ProtocolCount
+		response.SessionCount = meta.SessionCount
+		response.StreamCount = meta.StreamCount
+		response.StreamChunkCount = meta.StreamChunkCount
+	}
+	if captureErr != nil {
+		response.Error = captureErr.Error()
+	}
+	return response
+}
+
 func (s *Server) PcapX(stream ypb.Yak_PcapXServer) error {
 	firstReq, err := stream.Recv()
 	if err != nil {
 		return err
 	}
-
-	list := utils.StringArrayFilterEmpty(firstReq.GetNetInterfaceList())
-
-	storageManager := yakit.NewTrafficStorageManager(consts.GetGormProjectDatabase())
-
-	// run pcap
-	err = pcaputil.Start(
-		pcaputil.WithContext(stream.Context()),
-		pcaputil.WithEveryPacket(func(a gopacket.Packet) {
-			err := storageManager.SaveRawPacket(a)
-			if err != nil {
-				log.Errorf("save raw packet failed: %s", err)
-			}
-		}),
-		pcaputil.WithDevice(list...),
-		pcaputil.WithOnTrafficFlowCreated(func(flow *pcaputil.TrafficFlow) {
-			err := storageManager.CreateTCPReassembledFlow(flow)
-			if err != nil {
-				log.Errorf("create flow failed: %s", err)
-			}
-		}),
-		pcaputil.WithOnTrafficFlowOnDataFrameReassembled(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
-			err := storageManager.SaveTCPReassembledFrame(flow, frame)
-			if err != nil {
-				log.Errorf("save frame failed: %s", err)
-			}
-		}),
-		pcaputil.WithOnTrafficFlowClosed(func(reason pcaputil.TrafficFlowCloseReason, flow *pcaputil.TrafficFlow) {
-			var err error
-			switch reason {
-			case pcaputil.TrafficFlowCloseReason_INACTIVE:
-				err = storageManager.CloseTCPFlow(flow, false)
-			case pcaputil.TrafficFlowCloseReason_FIN:
-				err = storageManager.CloseTCPFlow(flow, false)
-			case pcaputil.TrafficFlowCloseReason_RST:
-				err = storageManager.CloseTCPFlow(flow, true)
-			}
-			if err != nil {
-				log.Errorf("close flow failed: %s", err)
-			}
-		}),
-	)
+	config, err := pcapXLiveCaptureConfig(firstReq)
 	if err != nil {
 		return err
 	}
+	manager, err := s.getPCAPManager()
+	if err != nil {
+		return pcapRPCError(err)
+	}
 
-	return nil
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+	started := make(chan pcapdb.PCAPFileDBMetadata, 1)
+	done := make(chan pcapXCaptureResult, 1)
+	go func() {
+		meta, runErr := pcapXRunLiveCapture(ctx, manager, config, func(meta pcapdb.PCAPFileDBMetadata) {
+			select {
+			case started <- meta:
+			default:
+			}
+		})
+		done <- pcapXCaptureResult{metadata: meta, err: runErr}
+	}()
+
+	var current *pcapdb.PCAPFileDBMetadata
+	select {
+	case meta := <-started:
+		current = &meta
+	case result := <-done:
+		if result.metadata == nil {
+			return pcapRPCError(result.err)
+		}
+		current = result.metadata
+		sendErr := stream.Send(pcapXResponse(current, true, result.err, 0))
+		if sendErr != nil {
+			return sendErr
+		}
+		if result.err != nil {
+			return pcapRPCError(result.err)
+		}
+		return nil
+	case <-ctx.Done():
+		result := <-done
+		if result.err != nil && !errors.Is(result.err, context.Canceled) {
+			return pcapRPCError(result.err)
+		}
+		return nil
+	}
+
+	if err = stream.Send(pcapXResponse(current, false, nil, 0)); err != nil {
+		cancel()
+		<-done
+		return err
+	}
+	lastBytes, lastAt := current.BytesIndexed, time.Now()
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case result := <-done:
+			var transfer int64
+			if result.metadata != nil {
+				transfer = pcapXTransferKBPerSecond(result.metadata.BytesIndexed-lastBytes, time.Since(lastAt))
+			}
+			if sendErr := stream.Send(pcapXResponse(result.metadata, true, result.err, transfer)); sendErr != nil {
+				return sendErr
+			}
+			if result.err != nil {
+				return pcapRPCError(result.err)
+			}
+			return nil
+		case now := <-ticker.C:
+			meta, metadataErr := manager.Metadata(current.DatasetID)
+			if metadataErr != nil {
+				continue
+			}
+			transfer := pcapXTransferKBPerSecond(meta.BytesIndexed-lastBytes, now.Sub(lastAt))
+			lastBytes, lastAt = meta.BytesIndexed, now
+			if sendErr := stream.Send(pcapXResponse(meta, false, nil, transfer)); sendErr != nil {
+				cancel()
+				<-done
+				return sendErr
+			}
+		case <-ctx.Done():
+			cancel()
+			result := <-done
+			if result.err != nil && !errors.Is(result.err, context.Canceled) {
+				return pcapRPCError(result.err)
+			}
+			return nil
+		}
+	}
 }
 func ParseReassembledTraffic(data []byte) ([]any, error) {
 	for _, ruleName := range []string{"http", "tls"} {
@@ -247,74 +357,8 @@ func ParseTraffic(data []byte, rule string) ([]any, error) {
 	return packageRootNodes, nil
 }
 func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
-	rsp := &ypb.ParseTrafficResponse{}
-	var payload []byte
-	pagination := &ypb.Paging{
-		Limit: 1,
+	if strings.TrimSpace(req.GetDatasetID()) == "" {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "ParseTraffic is deprecated; DatasetID is required, use GetPCAPPacketDetail")
 	}
-	finalResult := map[string]any{}
-	switch req.GetType() {
-	case "session":
-		_, sessions, err := yakit.QueryTrafficSession(consts.GetGormProjectDatabase(), &ypb.QueryTrafficSessionRequest{
-			Pagination: pagination,
-			FromId:     req.GetId() - 1,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(sessions) != 1 {
-			return nil, utils.Error("invalid session id")
-		}
-		//payload = sessions[0].
-	case "packet":
-		_, packet, err := yakit.QueryTrafficPacket(consts.GetGormProjectDatabase(), &ypb.QueryTrafficPacketRequest{
-			Pagination: pagination,
-			FromId:     req.GetId() - 1,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(packet) != 1 {
-			return nil, utils.Error("invalid packet id")
-		}
-		raw, _ := strconv.Unquote(packet[0].QuotedRaw)
-		packageRootNodes, err := ParseTraffic([]byte(raw), "ethernet")
-		if err == nil {
-			finalResult["Result"] = packageRootNodes
-		}
-		finalResult["RAW"] = codec.EncodeBase64(raw)
-		rsp.OK = true
-		resJson, err := bin_parser2.ResultToJson(finalResult)
-		if err != nil {
-			return nil, err
-		}
-		rsp.Result = resJson
-		return rsp, nil
-	case "reassembled":
-		_, sessions, err := yakit.QueryTrafficTCPReassembled(consts.GetGormProjectDatabase(), &ypb.QueryTrafficTCPReassembledRequest{
-			Pagination: pagination,
-			FromId:     req.GetId() - 1,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(sessions) != 1 {
-			return nil, utils.Error("invalid session id")
-		}
-		payload = codec.StrConvUnquoteForce(sessions[0].QuotedData)
-		packageRootNodes, err := ParseReassembledTraffic([]byte(payload))
-		if err == nil {
-			finalResult["Result"] = packageRootNodes
-		}
-		finalResult["RAW"] = codec.EncodeBase64(payload)
-		rsp.OK = true
-		resJson, err := bin_parser2.ResultToJson(finalResult)
-		if err != nil {
-			return nil, err
-		}
-		rsp.Result = resJson
-		return rsp, nil
-	}
-	rsp.OK = false
-	return rsp, errors.New("unknown type")
+	return s.parsePCAPTraffic(ctx, req)
 }

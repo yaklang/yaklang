@@ -311,7 +311,15 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		return
 	}
 	if isHTTPStartLineCandidate(wire) {
-		return
+		// The generic detector only sees ProbeBytes. Re-run the dedicated HTTP
+		// start-line probe over the full bounded input so a valid long URL is not
+		// held forever merely because its CRLF falls outside the generic window.
+		if p := f.probeHTTPStartLine(wire); p.Verdict == ProbeAccept {
+			f.protocol = "http"
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
 	}
 	if f.captureTCP && f.port(11300) && probeBeanstalk(w, f.a.config.ProbeBytes).Verdict == ProbeAccept {
 		f.protocol, f.beanstalk = "beanstalkd", &binBeanstalk{client: dir}
