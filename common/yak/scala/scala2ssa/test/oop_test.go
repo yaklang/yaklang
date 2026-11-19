@@ -93,3 +93,40 @@ object Main {
 `, "main")
 	})
 }
+
+func TestScalaThisField(t *testing.T) {
+	t.Run("this field read", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+class Box {
+  val value = 42
+  def get(): Int = {
+    println(this.value)
+    return this.value
+  }
+}
+object Main {
+  def main(args: Array[String]): Unit = {
+    get()
+  }
+}
+`, "42")
+	})
+
+	t.Run("this field write", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+class Counter {
+  var value = 1
+  def bump(): Int = {
+    this.value = this.value + 1
+    println(this.value)
+    return this.value
+  }
+}
+object Main {
+  def main(args: Array[String]): Unit = {
+    bump()
+  }
+}
+`, "2")
+	})
+}

@@ -66,7 +66,7 @@ func (b *singleFileBuilder) visitPatDef(raw scalaparser.IPatDefContext) {
 	}
 	var value ssa.Value = b.EmitConstInstNil()
 	if pat.Expr() != nil {
-		if v := b.VisitExpr(pat.Expr()); v != nil {
+		if v := b.visitExprValue(pat.Expr()); v != nil {
 			value = v
 		}
 	}
@@ -74,14 +74,63 @@ func (b *singleFileBuilder) visitPatDef(raw scalaparser.IPatDefContext) {
 		if names, ok := ids.(*scalaparser.IdsContext); ok && names != nil {
 			for i := 0; i < len(names.AllId()); i++ {
 				name := names.Id(i).GetText()
-				b.AssignVariable(b.CreateVariable(name), value)
-				b.GetProgram().SetExportValue(name, value)
-				if b.classFields != nil {
-					b.classFields[name] = value
-				}
+				b.assignPatDefName(name, value)
 			}
 		}
+		return
 	}
+	if pattern := pat.Pattern2(); pattern != nil {
+		if name := scalaPattern2Name(pattern); name != "" && name != "_" {
+			b.assignPatDefName(name, value)
+		}
+	}
+}
+
+func (b *singleFileBuilder) assignPatDefName(name string, value ssa.Value) {
+	b.AssignVariable(b.CreateVariable(name), value)
+	b.GetProgram().SetExportValue(name, value)
+	if b.classFields == nil {
+		b.AddGlobalVariable(name, func() ssa.Value { return value })
+	}
+	if b.classFields != nil {
+		b.classFields[name] = value
+	}
+}
+
+func scalaPattern2Name(raw scalaparser.IPattern2Context) string {
+	pattern, ok := raw.(*scalaparser.Pattern2Context)
+	if !ok || pattern == nil {
+		return ""
+	}
+	if pattern.Id() != nil {
+		return pattern.Id().GetText()
+	}
+	if pattern.InfixPattern() != nil {
+		return scalaInfixPatternName(pattern.InfixPattern())
+	}
+	return ""
+}
+
+func scalaInfixPatternName(raw scalaparser.IInfixPatternContext) string {
+	infix, ok := raw.(*scalaparser.InfixPatternContext)
+	if !ok || infix == nil || len(infix.AllSimplePattern()) == 0 {
+		return ""
+	}
+	simple, ok := infix.SimplePattern(0).(*scalaparser.SimplePatternContext)
+	if !ok || simple == nil || simple.PatVar() == nil {
+		return ""
+	}
+	variable, ok := simple.PatVar().(*scalaparser.PatVarContext)
+	if !ok || variable == nil {
+		return ""
+	}
+	if variable.USCORE() != nil {
+		return "_"
+	}
+	if variable.Varid() != nil {
+		return variable.Varid().GetText()
+	}
+	return ""
 }
 
 func (b *singleFileBuilder) visitDefDef(raw scalaparser.IDefDefContext) {
@@ -97,6 +146,7 @@ func (b *singleFileBuilder) visitDefDef(raw scalaparser.IDefDefContext) {
 	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
+	b.LoadGlobalVariable()
 	for fieldName, fieldValue := range b.classFields {
 		b.AssignVariable(b.CreateVariable(fieldName), fieldValue)
 	}
@@ -104,7 +154,7 @@ func (b *singleFileBuilder) visitDefDef(raw scalaparser.IDefDefContext) {
 		b.addDefParamClauses(clauses)
 	}
 	if def.Expr() != nil {
-		if value := b.VisitExpr(def.Expr()); value != nil {
+		if value := b.visitExprValue(def.Expr()); value != nil {
 			b.EmitReturn([]ssa.Value{value})
 		}
 	} else if def.Block() != nil {
@@ -117,6 +167,7 @@ func (b *singleFileBuilder) visitDefDef(raw scalaparser.IDefDefContext) {
 	b.FunctionBuilder = previous
 	b.AssignVariable(b.CreateVariable(name), fn)
 	b.GetProgram().SetExportValue(name, fn)
+	b.AddGlobalVariable(name, func() ssa.Value { return fn })
 }
 
 func (b *singleFileBuilder) addDefParamClauses(raw scalaparser.IDefParamClausesContext) {
@@ -204,9 +255,14 @@ func (b *singleFileBuilder) visitBlockResult(raw scalaparser.IBlockContext) ssa.
 	if !ok || block == nil {
 		return nil
 	}
+	if blockResult := block.BlockResult(); blockResult != nil {
+		if result, ok := blockResult.(*scalaparser.BlockResultContext); ok && result != nil && result.FunParams() != nil && result.Block() != nil {
+			return b.visitLambdaBlockResult(result)
+		}
+	}
 	var result ssa.Value
 	stats := block.AllBlockStat()
-	for _, rawStat := range stats {
+	for index, rawStat := range stats {
 		stat, ok := rawStat.(*scalaparser.BlockStatContext)
 		if !ok || stat == nil {
 			continue
@@ -215,7 +271,12 @@ func (b *singleFileBuilder) visitBlockResult(raw scalaparser.IBlockContext) ssa.
 			b.visitDef(stat.Def_())
 			result = nil
 		} else if stat.Expr1() != nil {
-			result = b.VisitExpr1(stat.Expr1())
+			if index == len(stats)-1 && !b.suppressValueBlock {
+				result = b.visitExpr1Value(stat.Expr1())
+			} else {
+				b.VisitExpr1(stat.Expr1())
+				result = nil
+			}
 		}
 	}
 	return result

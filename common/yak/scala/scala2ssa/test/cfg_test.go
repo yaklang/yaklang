@@ -127,3 +127,100 @@ object Main {
 `, "phi(a)")
 	})
 }
+
+func TestScalaMatch(t *testing.T) {
+	t.Run("literal cases select first match", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    val x = 2
+    val r = x match {
+      case 1 => 10
+      case 2 => 20
+      case _ => 30
+    }
+    println(r)
+  }
+}
+`, "20")
+	})
+
+	t.Run("guard participates in matching", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    val x = 5
+    val r = x match {
+      case n if n > 3 => 1
+      case _ => 0
+    }
+    println(r)
+  }
+}
+`, "1")
+	})
+
+	t.Run("binding pattern keeps subject", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    val x = 4
+    val r = x match {
+      case n => n
+    }
+    println(r)
+  }
+}
+`, "4")
+	})
+
+	t.Run("case block body", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    val x = 1
+    val r = x match {
+      case 1 => {
+        val y = 3
+        y + 1
+      }
+      case _ => 0
+    }
+    println(r)
+  }
+}
+`, "4")
+	})
+}
+
+func TestScalaMatchPatterns(t *testing.T) {
+	t.Run("or pattern", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    val x = 2
+    val r = x match {
+      case 1 | 2 => 5
+      case _ => 0
+    }
+    println(r)
+  }
+}
+`, "5")
+	})
+
+	t.Run("guard falls through", func(t *testing.T) {
+		checkPrintlnValue(t, `
+object Main {
+  def main(args: Array[String]): Unit = {
+    val x = 1
+    val r = x match {
+      case n if n > 3 => 1
+      case _ => 0
+    }
+    println(r)
+  }
+}
+`, "0")
+	})
+}
