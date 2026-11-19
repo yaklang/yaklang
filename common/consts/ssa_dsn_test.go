@@ -2,6 +2,7 @@ package consts
 
 import (
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,7 +21,9 @@ func TestParseDatabaseURL(t *testing.T) {
 		{"absolute sqlite path", "/tmp/ssa.db", SQLiteExtend, "/tmp/ssa.db"},
 		{"sqlite url", "sqlite:///tmp/ssa.db", SQLiteExtend, "/tmp/ssa.db"},
 		{"sqlite3 url", "sqlite3:///tmp/ssa.db", SQLiteExtend, "/tmp/ssa.db"},
-		{"file url", "file:///tmp/ssa.db", SQLiteExtend, "/tmp/ssa.db"},
+		{"file url keeps uri and query", "file:///tmp/ssa.db?mode=ro", SQLiteExtend, "file:///tmp/ssa.db?mode=ro"},
+		{"file uri without slashes", "file:/tmp/ssa.db?mode=ro", SQLiteExtend, "file:/tmp/ssa.db?mode=ro"},
+		{"uppercase file scheme", "FILE:///tmp/ssa.db?mode=ro", SQLiteExtend, "file:///tmp/ssa.db?mode=ro"},
 		{
 			"mysql url keeps its query",
 			"mysql://root:pass@tcp(db:3306)/ir?charset=utf8&tls=skip-verify",
@@ -106,4 +109,70 @@ func TestWithDSNParams(t *testing.T) {
 		})
 		require.Equal(t, dsn, got)
 	})
+
+	t.Run("mysql password containing ? is not split", func(t *testing.T) {
+		got := withMySQLDSNParams("root:pa?ss@tcp(db:3306)/ir", url.Values{
+			"charset":   {"utf8mb4"},
+			"parseTime": {"True"},
+		})
+		require.Equal(t, "root:pa?ss@tcp(db:3306)/ir?charset=utf8mb4&parseTime=True", got)
+		require.Equal(t, 2, strings.Count(got, "?"), "only one '?' starts the query; the other belongs to the password")
+	})
+
+	t.Run("mysql password containing ? keeps its query", func(t *testing.T) {
+		got := withMySQLDSNParams("root:pa?ss@tcp(db:3306)/ir?charset=utf8", url.Values{
+			"parseTime": {"True"},
+		})
+		require.Equal(t, "root:pa?ss@tcp(db:3306)/ir?charset=utf8&parseTime=True", got)
+	})
+}
+
+// sqliteFileURITestDSN builds a file: URI for path on every platform.
+func sqliteFileURITestDSN(path string) string {
+	slashPath := filepath.ToSlash(path)
+	if !strings.HasPrefix(slashPath, "/") {
+		// Windows drive paths need the third slash: file:///C:/...
+		slashPath = "/" + slashPath
+	}
+	return "file://" + slashPath
+}
+
+// TestSQLiteFileURIModeReadOnlyIsPreserved pins the connection-level behavior
+// of file: URIs: the driver keeps the URI (and SQLite applies mode=ro) only
+// while the file: prefix survives parsing. Dropping it made an explicit
+// read-only DSN open the database read-write.
+func TestSQLiteFileURIModeReadOnlyIsPreserved(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "readonly.db")
+
+	seed, err := createAndConfigDatabase(path, SQLiteExtend)
+	require.NoError(t, err)
+	require.NoError(t, seed.Exec("CREATE TABLE t (id INTEGER)").Error)
+	seedSQL := seed.DB()
+	require.NotNil(t, seedSQL)
+	require.NoError(t, seedSQL.Close())
+
+	_, dsn, err := parseDatabaseURL(sqliteFileURITestDSN(path) + "?mode=ro")
+	require.NoError(t, err)
+
+	db, err := createAndConfigDatabase(dsn, SQLiteExtend)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = db.DB().Close()
+	})
+
+	err = db.Exec("INSERT INTO t (id) VALUES (1)").Error
+	require.Error(t, err, "a mode=ro URI must not accept writes")
+	require.Contains(t, strings.ToLower(err.Error()), "readonly")
+}
+
+func TestGetSSADataBaseInfoKeepsFileURI(t *testing.T) {
+	oldDialect, oldRaw := SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
+	t.Cleanup(func() {
+		SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW = oldDialect, oldRaw
+	})
+
+	require.NoError(t, SetSSADatabaseInfo("file:///tmp/readonly.db?mode=ro"))
+	dialect, raw := GetSSADataBaseInfo()
+	require.Equal(t, SQLiteExtend, dialect)
+	require.Equal(t, "file:///tmp/readonly.db?mode=ro", raw, "a file: URI is not a path and must not be joined with the base dir")
 }

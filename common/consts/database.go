@@ -194,9 +194,32 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 // the whole parameter list as one broken value. Parameters already present win,
 // so a caller can override mode/parseTime/loc through the DSN.
 func withDSNParams(dsn string, required url.Values) string {
+	return mergeDSNParams(dsn, required, false)
+}
+
+// withMySQLDSNParams is withDSNParams for go-sql-driver/mysql DSNs. That
+// driver looks for the parameter '?' only after the final '/', because the
+// password part may itself contain '?'. Splitting at the first '?' in the
+// whole DSN would move part of "user:pa?ss@host/db" into the query and break
+// the connection.
+func withMySQLDSNParams(dsn string, required url.Values) string {
+	return mergeDSNParams(dsn, required, true)
+}
+
+func mergeDSNParams(dsn string, required url.Values, queryAfterLastSlash bool) string {
+	sep := strings.Index(dsn, "?")
+	if queryAfterLastSlash {
+		sep = -1
+		if slash := strings.LastIndex(dsn, "/"); slash >= 0 {
+			if i := strings.Index(dsn[slash:], "?"); i >= 0 {
+				sep = slash + i
+			}
+		}
+	}
+
 	base, query := dsn, ""
-	if i := strings.Index(dsn, "?"); i >= 0 {
-		base, query = dsn[:i], dsn[i+1:]
+	if sep >= 0 {
+		base, query = dsn[:sep], dsn[sep+1:]
 	}
 
 	merged, err := url.ParseQuery(query)
@@ -255,7 +278,7 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 		}
 		path = withDSNParams(path, params)
 	case MySQL:
-		path = withDSNParams(path, url.Values{
+		path = withMySQLDSNParams(path, url.Values{
 			"charset":   {"utf8mb4"},
 			"parseTime": {"True"},
 			"loc":       {"Local"},

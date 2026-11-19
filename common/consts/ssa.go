@@ -77,11 +77,22 @@ func GetSSADatabaseInfoFromEnv() string {
 func GetSSADataBaseInfo() (string, string) {
 	// Only SQLite uses a filesystem path. DSNs (MySQL/Postgres/...) must not be joined with base dir.
 	if SSA_PROJECT_DB_DIALECT == SQLiteExtend || SSA_PROJECT_DB_DIALECT == SQLite {
-		if !filepath.IsAbs(SSA_PROJECT_DB_RAW) {
+		// A file: URI is not a path. Joining it would turn the scheme into a
+		// directory name and drop the query, so the driver would open the file
+		// read-write even though the URI says mode=ro.
+		if !isSQLiteFileURI(SSA_PROJECT_DB_RAW) && !filepath.IsAbs(SSA_PROJECT_DB_RAW) {
 			SSA_PROJECT_DB_RAW = filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_DB_RAW)
 		}
 	}
 	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
+}
+
+// isSQLiteFileURI reports whether raw is a SQLite URI (file:...). The prefix
+// has to reach the driver: SQLite parses parameters such as mode=ro itself,
+// while the driver strips everything after '?' from a plain path.
+func isSQLiteFileURI(raw string) bool {
+	const prefix = "file:"
+	return len(raw) >= len(prefix) && strings.EqualFold(raw[:len(prefix)], prefix)
 }
 
 // parseDatabaseURL maps SSA_DATABASE_RAW to the gorm driver and the DSN that
@@ -93,6 +104,14 @@ func GetSSADataBaseInfo() (string, string) {
 // the process looked healthy while writing IR somewhere nobody expected.
 func parseDatabaseURL(raw string) (string, string, error) {
 	raw = strings.TrimSpace(raw)
+	// A SQLite URI is passed through unchanged (with a lowercased scheme,
+	// because the driver matches "file:" case-sensitively). SQLite understands
+	// the query itself: rewriting file:///tmp/ssa.db?mode=ro as a path would
+	// make the driver drop the query and open the database read-write.
+	if isSQLiteFileURI(raw) {
+		return SQLiteExtend, "file:" + raw[len("file:"):], nil
+	}
+
 	parts := strings.SplitN(raw, "://", 2)
 	if len(parts) != 2 {
 		// No scheme: a SQLite database file.
@@ -102,7 +121,7 @@ func parseDatabaseURL(raw string) (string, string, error) {
 	scheme := strings.ToLower(strings.TrimSpace(parts[0]))
 	connectionDetails := parts[1]
 	switch scheme {
-	case "sqlite", "sqlite3", "file":
+	case "sqlite", "sqlite3":
 		return SQLiteExtend, connectionDetails, nil
 	case "mysql":
 		return MySQL, connectionDetails, nil
@@ -114,7 +133,7 @@ func parseDatabaseURL(raw string) (string, string, error) {
 		return damenggorm.Dialect, raw, nil
 	default:
 		return "", "", fmt.Errorf(
-			"unsupported SSA database URL scheme %q: use a file path or sqlite://, mysql://, postgres://, dm://",
+			"unsupported SSA database URL scheme %q: use a file path or file:, sqlite://, mysql://, postgres://, dm://",
 			scheme,
 		)
 	}
