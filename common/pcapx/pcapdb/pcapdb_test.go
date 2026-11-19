@@ -482,7 +482,7 @@ func TestPCAPDBCancellationRecoveryAndDurableCounts(t *testing.T) {
 
 	// Three complete packets and a partial header: only the first two commit.
 	broken := append(classicCapture(t, 3), []byte{1, 2, 3}...)
-	_, err = m.GetOrCreate(writeCapture(t, broken), WithBatchSize(2))
+	_, err = m.GetOrCreate(writeCapture(t, broken), WithBatchSize(2), WithStreams(false))
 	require.Error(t, err)
 	entries, err = m.List()
 	require.NoError(t, err)

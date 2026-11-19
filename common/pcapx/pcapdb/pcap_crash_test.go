@@ -94,11 +94,11 @@ func TestPCAPDBCrashHelperProcess(t *testing.T) {
 			case "packet_transaction":
 				return meta.State == StateIndexing && meta.PacketCount == 4
 			case "protocol_transaction":
-				return meta.State == StateAnalyzing && meta.ProtocolCount == 2
+				return meta.State == StateIndexing && meta.ProtocolCount == 2
 			case "stream_transaction":
-				return meta.State == StateAnalyzing && meta.StreamChunkCount == 2
+				return meta.State == StateIndexing && meta.StreamChunkCount == 2
 			case "session_transaction":
-				return meta.State == StateAnalyzing && meta.SessionCount == 1 && meta.StreamChunkCount == 1
+				return meta.State == StateIndexing && meta.SessionCount == 1 && meta.StreamChunkCount == 1
 			default:
 				return meta.State == StateIndexing && meta.PacketCount == 0
 			}

@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
@@ -218,4 +220,31 @@ func TestNativeReaderOrdinalFailures(t *testing.T) {
 	require.Equal(t, "driver", numbered.AncillaryData[0])
 	numbered.AncillaryData[0] = "mutated"
 	require.Equal(t, "driver", original.AncillaryData[0])
+}
+
+func TestPacketAnalyzerFeedWithReferencePreservesDomain(t *testing.T) {
+	var events []*ProtocolEvent
+	analyzer, err := NewPacketAnalyzer(
+		WithCaptureReplayClock(),
+		WithOnProtocolMessage(func(event *ProtocolEvent) { events = append(events, event) }),
+	)
+	require.NoError(t, err)
+	raw := m1UDP(t, m1DNSQuery())
+	ref := PacketReference{Number: 42, Domain: CaptureDomain{Section: 7, Interface: 3}}
+	require.NoError(t, analyzer.FeedWithReference(raw, gopacket.CaptureInfo{
+		Timestamp: time.Unix(100, 0), CaptureLength: len(raw), Length: len(raw), InterfaceIndex: 3,
+	}, layers.LinkTypeRaw, ref))
+	require.NoError(t, analyzer.Close())
+	require.NotEmpty(t, events)
+	require.Equal(t, ref, events[0].SourceBytes.PacketRefs[0])
+
+	zero, err := NewPacketAnalyzer(
+		WithCaptureReplayClock(),
+		WithOnProtocolMessage(func(*ProtocolEvent) {}),
+	)
+	require.NoError(t, err)
+	require.Error(t, zero.FeedWithReference(raw, gopacket.CaptureInfo{
+		Timestamp: time.Unix(100, 0), CaptureLength: len(raw), Length: len(raw),
+	}, layers.LinkTypeRaw, PacketReference{}))
+	require.NoError(t, zero.Close())
 }

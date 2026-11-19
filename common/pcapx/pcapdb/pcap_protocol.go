@@ -142,6 +142,9 @@ func (b *protocolBatch) full() bool {
 	return len(b.messages) >= b.config.batchSize || len(b.references) >= b.config.batchSize || b.sessions.pending() >= b.config.batchSize || b.bytes+b.sessions.bytes >= maxImportBatchBytes
 }
 
+// indexProtocols rebuilds derived protocol data from an already stored capture.
+// New imports analyze in ingestCapture; this path remains for enabling analysis
+// on an existing dataset and for an explicit full rebuild.
 func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) (resultErr error) {
 	if err := m.transition(ctx, db, meta, StateAnalyzing); err != nil {
 		return err
