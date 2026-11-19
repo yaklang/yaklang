@@ -33,10 +33,13 @@ type indexSetInstaller interface {
 }
 
 // indexDialectFor is the single dispatch point of index maintenance; every
-// function below it works through the returned adapter.
+// function below it works through the returned adapter. Only the backends that
+// need a differently shaped statement get their own adapter: SQLite and
+// PostgreSQL emit identical index DDL and dedup SQL, so they share the standard
+// one instead of two copies that would drift apart.
 func indexDialectFor(db *gorm.DB) indexDialect {
 	if db == nil || db.Dialect() == nil {
-		return ansiIndexDialect{}
+		return standardIndexDialect{}
 	}
 	if damenggorm.IsDM(db) {
 		return dmIndexDialect{}
@@ -44,26 +47,28 @@ func indexDialectFor(db *gorm.DB) indexDialect {
 	if strings.EqualFold(db.Dialect().GetName(), "mysql") {
 		return mysqlIndexDialect{functionalIndex: mysqlFunctionalIndexSupported(db)}
 	}
-	return ansiIndexDialect{}
+	return standardIndexDialect{}
 }
 
-// ansiIndexDialect is the shape SQLite and PostgreSQL share: double-quoted
-// identifiers, expression key parts as written, partial indexes supported. The
-// remaining difference between the two is their catalog, which
-// Dialect().HasIndex already owns.
-type ansiIndexDialect struct{}
+// standardIndexDialect is the index shape SQLite and PostgreSQL share:
+// double-quoted identifiers, expression key parts as written, partial indexes
+// and index pruning. They are not merged by accident: the two backends really
+// produce the same statements here. What does differ between them -- the
+// catalog and the duplicate-key error wording -- is owned by Dialect().HasIndex
+// and isUniqueViolation, not by this adapter.
+type standardIndexDialect struct{}
 
-func (ansiIndexDialect) CreateIndexSQL(spec indexSpec) (string, bool) {
+func (standardIndexDialect) CreateIndexSQL(spec indexSpec) (string, bool) {
 	return createIndexSQL(doubleQuote, asWrittenKeyPart, spec)
 }
 
-func (ansiIndexDialect) DeleteDuplicatesSQL(spec indexSpec) string {
+func (standardIndexDialect) DeleteDuplicatesSQL(spec indexSpec) string {
 	return deleteDuplicatesSQL(doubleQuote, spec)
 }
 
-func (ansiIndexDialect) SupportsPartialIndex() bool { return true }
+func (standardIndexDialect) SupportsPartialIndex() bool { return true }
 
-func (ansiIndexDialect) SupportsIndexPruning() bool { return true }
+func (standardIndexDialect) SupportsIndexPruning() bool { return true }
 
 // mysqlIndexDialect uses backtick identifiers. A functional key part needs its
 // own parentheses and only exists from MySQL 8.0.13; a server without it makes
@@ -95,7 +100,7 @@ func (mysqlIndexDialect) SupportsIndexPruning() bool { return false }
 // ALL_INDEXES and refuses duplicate rows. The rendering methods still produce
 // DM-compatible SQL, so an accidental per-spec call does not emit garbage.
 type dmIndexDialect struct {
-	ansiIndexDialect
+	standardIndexDialect
 }
 
 func (dmIndexDialect) SupportsPartialIndex() bool { return false }

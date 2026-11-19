@@ -26,7 +26,7 @@ func mysqlAdapter(functional bool) indexDialect {
 // made MySQL and DM unable to create any IR index: both reject
 // "CREATE INDEX IF NOT EXISTS". Existence is answered by the catalog instead.
 func TestCreateIndexSQLDoesNotRelyOnIfNotExists(t *testing.T) {
-	for _, adapter := range []indexDialect{ansiIndexDialect{}, mysqlAdapter(true)} {
+	for _, adapter := range []indexDialect{standardIndexDialect{}, mysqlAdapter(true)} {
 		for _, spec := range irUniqueIndexes {
 			ddl, ok := adapter.CreateIndexSQL(spec)
 			require.True(t, ok)
@@ -41,7 +41,7 @@ func TestCreateIndexSQLDoesNotRelyOnIfNotExists(t *testing.T) {
 func TestCreateIndexSQLQuotesPerDialect(t *testing.T) {
 	codes := specByName(t, "ux_ir_codes_program_code")
 
-	ddl, ok := ansiIndexDialect{}.CreateIndexSQL(codes)
+	ddl, ok := standardIndexDialect{}.CreateIndexSQL(codes)
 	require.True(t, ok)
 	require.Equal(t,
 		`CREATE UNIQUE INDEX "ux_ir_codes_program_code" ON "ir_codes" ("program_name", "code_id")`,
@@ -60,7 +60,7 @@ func TestCreateIndexSQLQuotesPerDialect(t *testing.T) {
 func TestCreateIndexSQLWrapsMySQLExpressionKeys(t *testing.T) {
 	offsets := specByName(t, "ux_ir_offsets_program_value_file_range")
 
-	ddl, ok := ansiIndexDialect{}.CreateIndexSQL(offsets)
+	ddl, ok := standardIndexDialect{}.CreateIndexSQL(offsets)
 	require.True(t, ok)
 	require.Contains(t, ddl, "COALESCE(variable_name, '')")
 	require.NotContains(t, ddl, "(COALESCE(variable_name, ''))")
@@ -91,7 +91,7 @@ func TestCreateIndexSQLPartialPredicate(t *testing.T) {
 		key:     []indexKeyPart{indexCol("program_name")},
 		partial: "const_id <> 0",
 	}
-	ddl, ok := ansiIndexDialect{}.CreateIndexSQL(spec)
+	ddl, ok := standardIndexDialect{}.CreateIndexSQL(spec)
 	require.True(t, ok)
 	require.True(t, strings.HasSuffix(ddl, "WHERE const_id <> 0"), ddl)
 }
@@ -100,7 +100,7 @@ func TestCreateIndexSQLPartialPredicate(t *testing.T) {
 // an anti-join instead of a window function, so MySQL 5.7 and DM run it too,
 // and a derived table so MySQL accepts reading the table it deletes from.
 func TestDeleteDuplicatesSQLIsPortable(t *testing.T) {
-	for _, adapter := range []indexDialect{ansiIndexDialect{}, mysqlAdapter(true)} {
+	for _, adapter := range []indexDialect{standardIndexDialect{}, mysqlAdapter(true)} {
 		for _, spec := range irUniqueIndexes {
 			sql := adapter.DeleteDuplicatesSQL(spec)
 			require.Contains(t, sql, "GROUP BY")
@@ -124,18 +124,18 @@ func TestDeleteDuplicatesSQLIsPortable(t *testing.T) {
 }
 
 func TestDialectCapabilities(t *testing.T) {
-	require.True(t, ansiIndexDialect{}.SupportsPartialIndex())
+	require.True(t, standardIndexDialect{}.SupportsPartialIndex())
 	require.False(t, mysqlAdapter(true).SupportsPartialIndex())
 	require.False(t, dmIndexDialect{}.SupportsPartialIndex())
 
-	require.True(t, ansiIndexDialect{}.SupportsIndexPruning())
+	require.True(t, standardIndexDialect{}.SupportsIndexPruning())
 	require.False(t, mysqlAdapter(true).SupportsIndexPruning())
 	require.False(t, dmIndexDialect{}.SupportsIndexPruning())
 }
 
 func TestIndexDialectForSQLiteUsesAnsiAdapter(t *testing.T) {
 	db := openRepairTestDB(t)
-	_, ok := indexDialectFor(db).(ansiIndexDialect)
+	_, ok := indexDialectFor(db).(standardIndexDialect)
 	require.True(t, ok)
 }
 
