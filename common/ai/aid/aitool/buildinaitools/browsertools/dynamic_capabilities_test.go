@@ -82,8 +82,8 @@ func TestDynamicCapabilityToolsSelectAndValidateDeviceAtInvocationTime(t *testin
 		"device-1": testDynamicCapabilityCatalog(),
 		"device-2": testDynamicCapabilityCatalog(),
 	}, connections: []browser.ExtensionBridgeConnection{
-		{DeviceID: "device-1", Client: "yakit-browser-extension", ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-a", Badge: "A"}, CapabilityCatalog: testDynamicCapabilityCatalog()},
-		{DeviceID: "device-2", Client: "yakit-browser-extension", ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-b", Badge: "B"}, CapabilityCatalog: testDynamicCapabilityCatalog()},
+		{DeviceID: "device-1", Reference: "br_1", Client: "yakit-browser-extension", ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-a", Badge: "A"}, CapabilityCatalog: testDynamicCapabilityCatalog()},
+		{DeviceID: "device-2", Reference: "br_2", Client: "yakit-browser-extension", ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-b", Badge: "B"}, CapabilityCatalog: testDynamicCapabilityCatalog()},
 	}}
 	tools, err := BuildDynamicCapabilityTools(bridge)
 	require.NoError(t, err)
@@ -113,11 +113,12 @@ func TestDynamicCapabilityToolsSelectAndValidateDeviceAtInvocationTime(t *testin
 	require.True(t, ok)
 	instances, ok := executionResult.Result.([]map[string]interface{})
 	require.True(t, ok)
-	require.Equal(t, "A", instances[0]["browserRef"])
+	require.Equal(t, "br_1", instances[0]["browserRef"])
+	require.Equal(t, "A", instances[0]["badge"])
 	require.NotContains(t, instances[0], "deviceId")
 
 	result, err = catalogTool.InvokeWithParams(map[string]interface{}{
-		"browser_ref": "@B",
+		"browser_ref": "@br_2",
 		"domain":      "page",
 		"query":       "async",
 	})
@@ -125,7 +126,7 @@ func TestDynamicCapabilityToolsSelectAndValidateDeviceAtInvocationTime(t *testin
 	require.True(t, result.Success)
 
 	result, err = callTool.InvokeWithParams(map[string]interface{}{
-		"browser_ref": "B",
+		"browser_ref": "br_2",
 		"method":      "browser.eval",
 		"params": map[string]interface{}{
 			"tabId":      9,
@@ -142,7 +143,7 @@ func TestDynamicCapabilityToolsSelectAndValidateDeviceAtInvocationTime(t *testin
 	require.EqualValues(t, 9, bridge.params["tabId"])
 
 	result, err = cryptoTool.InvokeWithParams(map[string]interface{}{
-		"browser_ref": "B",
+		"browser_ref": "br_2",
 		"captureId":   "capture-2",
 		"nodeId":      "n7",
 		"tabId":       9,
@@ -155,7 +156,7 @@ func TestDynamicCapabilityToolsSelectAndValidateDeviceAtInvocationTime(t *testin
 	require.Equal(t, "n7", bridge.params["nodeId"])
 
 	result, err = handoffTool.InvokeWithParams(map[string]interface{}{
-		"browser_ref": "B",
+		"browser_ref": "br_2",
 		"reason":      "qr_code",
 		"message":     "Scan to sign in",
 		"tabId":       7,
@@ -181,7 +182,7 @@ func TestDynamicCapabilityToolsAutomaticallySelectSoleOnlineBrowser(t *testing.T
 	bridge := &fakeDynamicBridge{
 		catalogs: map[string]*browser.ExtensionBridgeCapabilityCatalog{"device-a": catalog},
 		connections: []browser.ExtensionBridgeConnection{{
-			DeviceID: "device-a", Client: "extension", CapabilityCatalog: catalog,
+			DeviceID: "device-a", Reference: "br_1", Client: "extension", CapabilityCatalog: catalog,
 			ManagedInstance: &browser.ExtensionBridgeManagedInstance{Manager: "ytray", InstanceID: "instance-a", Badge: "A"},
 		}},
 	}
@@ -199,6 +200,7 @@ func TestDynamicCapabilityToolsAutomaticallySelectSoleOnlineBrowser(t *testing.T
 	require.Contains(t, RuntimeContext(bridge), "@-mention is optional")
 	require.Contains(t, RuntimeContext(bridge), "The use_browser tool is unrelated Rod automation and never routes to these instances")
 	require.Contains(t, RuntimeContext(bridge), "browser.capability.call")
+	require.Contains(t, RuntimeContext(bridge), "br_1: online, badge A")
 	require.NotContains(t, RuntimeContext(bridge), "device-a")
 }
 
@@ -207,8 +209,8 @@ func TestDynamicCapabilityToolsRequireReferenceForMultipleOnlineBrowsers(t *test
 	bridge := &fakeDynamicBridge{
 		catalogs: map[string]*browser.ExtensionBridgeCapabilityCatalog{"device-a": catalog, "device-b": catalog},
 		connections: []browser.ExtensionBridgeConnection{
-			{DeviceID: "device-a", CapabilityCatalog: catalog, ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "A"}},
-			{DeviceID: "device-b", CapabilityCatalog: catalog, ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "B"}},
+			{DeviceID: "device-a", Reference: "br_1", CapabilityCatalog: catalog, ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "A"}},
+			{DeviceID: "device-b", Reference: "br_2", CapabilityCatalog: catalog, ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "B"}},
 		},
 	}
 	tools, err := BuildDynamicCapabilityTools(bridge)
@@ -219,6 +221,106 @@ func TestDynamicCapabilityToolsRequireReferenceForMultipleOnlineBrowsers(t *test
 			"tabId": 1, "frameId": 0, "documentId": "doc-a", "mode": "expression", "code": "document.title",
 		},
 	})
-	require.ErrorContains(t, err, "multiple browser-extension instances are online (A, B)")
+	require.ErrorContains(t, err, "multiple browser-extension instances are online (br_1, br_2)")
+	require.False(t, result.Success)
+}
+
+func TestDynamicCapabilityToolsRejectAmbiguousBadgeAlias(t *testing.T) {
+	catalog := testDynamicCapabilityCatalog()
+	bridge := &fakeDynamicBridge{
+		catalogs: map[string]*browser.ExtensionBridgeCapabilityCatalog{
+			"device-a": catalog,
+			"device-b": catalog,
+		},
+		connections: []browser.ExtensionBridgeConnection{
+			{
+				DeviceID: "device-a", Reference: "br_1", CapabilityCatalog: catalog,
+				ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "A"},
+			},
+			{
+				DeviceID: "device-b", Reference: "br_2", CapabilityCatalog: catalog,
+				ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "A"},
+			},
+		},
+	}
+	tools, err := BuildDynamicCapabilityTools(bridge)
+	require.NoError(t, err)
+	callTool := toolByName(t, tools, "browser.capability.call")
+
+	result, err := callTool.InvokeWithParams(map[string]interface{}{
+		"browser_ref": "A",
+		"method":      "browser.eval",
+		"params": map[string]interface{}{
+			"tabId": 1, "frameId": 0, "documentId": "doc-a", "mode": "expression", "code": "document.title",
+		},
+	})
+	require.ErrorContains(t, err, `browser_ref "A" matches more than one online browser`)
+	require.False(t, result.Success)
+
+	result, err = callTool.InvokeWithParams(map[string]interface{}{
+		"browser_ref": "br_2",
+		"method":      "browser.eval",
+		"params": map[string]interface{}{
+			"tabId": 1, "frameId": 0, "documentId": "doc-b", "mode": "expression", "code": "document.title",
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Equal(t, "device-b", bridge.deviceID)
+}
+
+func TestDynamicCapabilityToolsRejectAmbiguousCanonicalReference(t *testing.T) {
+	catalog := testDynamicCapabilityCatalog()
+	bridge := &fakeDynamicBridge{
+		catalogs: map[string]*browser.ExtensionBridgeCapabilityCatalog{
+			"device-a": catalog,
+			"device-b": catalog,
+		},
+		connections: []browser.ExtensionBridgeConnection{
+			{DeviceID: "device-a", Reference: "br_9", CapabilityCatalog: catalog},
+			{DeviceID: "device-b", Reference: "br_9", CapabilityCatalog: catalog},
+		},
+	}
+	tools, err := BuildDynamicCapabilityTools(bridge)
+	require.NoError(t, err)
+	result, err := toolByName(t, tools, "browser.capability.call").InvokeWithParams(map[string]interface{}{
+		"browser_ref": "br_9",
+		"method":      "browser.eval",
+		"params": map[string]interface{}{
+			"tabId": 1, "frameId": 0, "documentId": "doc-a", "mode": "expression", "code": "document.title",
+		},
+	})
+	require.ErrorContains(t, err, `browser_ref "br_9" matches more than one online browser`)
+	require.False(t, result.Success)
+}
+
+func TestDynamicCapabilityToolsRejectCrossFieldAmbiguousReference(t *testing.T) {
+	catalog := testDynamicCapabilityCatalog()
+	bridge := &fakeDynamicBridge{
+		catalogs: map[string]*browser.ExtensionBridgeCapabilityCatalog{
+			"device-a": catalog,
+			"device-b": catalog,
+		},
+		connections: []browser.ExtensionBridgeConnection{
+			{
+				DeviceID: "device-a", Reference: "br_1", CapabilityCatalog: catalog,
+				ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "br_2"},
+			},
+			{
+				DeviceID: "device-b", Reference: "br_2", CapabilityCatalog: catalog,
+				ManagedInstance: &browser.ExtensionBridgeManagedInstance{Badge: "B"},
+			},
+		},
+	}
+	tools, err := BuildDynamicCapabilityTools(bridge)
+	require.NoError(t, err)
+	result, err := toolByName(t, tools, "browser.capability.call").InvokeWithParams(map[string]interface{}{
+		"browser_ref": "br_2",
+		"method":      "browser.eval",
+		"params": map[string]interface{}{
+			"tabId": 1, "frameId": 0, "documentId": "doc-a", "mode": "expression", "code": "document.title",
+		},
+	})
+	require.ErrorContains(t, err, `browser_ref "br_2" matches more than one online browser`)
 	require.False(t, result.Success)
 }

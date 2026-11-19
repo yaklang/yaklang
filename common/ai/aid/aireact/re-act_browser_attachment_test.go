@@ -69,7 +69,7 @@ func TestReActBrowserAttachmentsAreSessionState(t *testing.T) {
 	bindBrowserRouteTestRuntime(task, react)
 
 	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{{
-		DeviceID: "device-a", Reference: "A",
+		DeviceID: "device-a", Reference: "br_1",
 	}})
 	params, err := aicommon.BindAttachedBrowserToolParams(task, "browser.capability.call", nil)
 	require.NoError(t, err)
@@ -77,15 +77,15 @@ func TestReActBrowserAttachmentsAreSessionState(t *testing.T) {
 
 	// Browser resources only add to the session; removal is a separate operation.
 	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{
-		{DeviceID: "device-b", Reference: "B"},
+		{DeviceID: "device-b", Reference: "br_2"},
 	})
-	params, err = aicommon.BindAttachedBrowserToolParams(task, "browser.capability.call", aitool.InvokeParams{"browser_ref": "@B"})
+	params, err = aicommon.BindAttachedBrowserToolParams(task, "browser.capability.call", aitool.InvokeParams{"browser_ref": "@br_2"})
 	require.NoError(t, err)
 	require.Equal(t, "device-b", params.GetString("device_id"))
 
 	child := aicommon.NewSubTaskBase(task, "browser-child", "continue", true)
 	bindBrowserRouteTestRuntime(child, react)
-	params, err = aicommon.BindAttachedBrowserToolParams(child, "browser.capability.call", aitool.InvokeParams{"browser_ref": "A"})
+	params, err = aicommon.BindAttachedBrowserToolParams(child, "browser.capability.call", aitool.InvokeParams{"browser_ref": "br_1"})
 	require.NoError(t, err)
 	require.Equal(t, "device-a", params.GetString("device_id"))
 
@@ -95,12 +95,24 @@ func TestReActBrowserAttachmentsAreSessionState(t *testing.T) {
 
 func TestReActBrowserAttachmentSessionAddsWithoutRemoving(t *testing.T) {
 	react := newBrowserAttachmentTestReAct(t)
-	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{{DeviceID: "device-a", Reference: "A"}})
-	require.Equal(t, []string{"A"}, browserReferences(react.GetBrowserAttachments()))
+	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{{DeviceID: "device-a", Reference: "br_1"}})
+	require.Equal(t, []string{"br_1"}, browserReferences(react.GetBrowserAttachments()))
 
 	react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{
-		{DeviceID: "device-a", Name: "duplicate", Reference: "A2"},
-		{DeviceID: "device-b", Reference: "B"},
+		{DeviceID: "device-a", Name: "duplicate", Reference: "br_1_duplicate"},
+		{DeviceID: "device-b", Reference: "br_2"},
 	})
-	require.Equal(t, []string{"A", "B"}, browserReferences(react.GetBrowserAttachments()))
+	require.Equal(t, []string{"br_1", "br_2"}, browserReferences(react.GetBrowserAttachments()))
+
+	err := react.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{
+		{DeviceID: "device-c", Reference: "br_1"},
+	})
+	require.ErrorContains(t, err, "is ambiguous between attached devices")
+	require.Equal(t, []string{"br_1", "br_2"}, browserReferences(react.GetBrowserAttachments()))
+
+	aliasReact := newBrowserAttachmentTestReAct(t)
+	err = aliasReact.AddBrowserAttachments([]aicommon.AttachedBrowserBinding{
+		{DeviceID: "device-c", Reference: "A"},
+	})
+	require.NoError(t, err)
 }

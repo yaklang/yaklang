@@ -33,6 +33,7 @@ type Bridge interface {
 
 type connectedBrowser struct {
 	Reference  string
+	Badge      string
 	DeviceID   string
 	Manager    string
 	InstanceID string
@@ -51,17 +52,16 @@ func connectedBrowsers(bridge Bridge) []connectedBrowser {
 		if deviceID == "" {
 			continue
 		}
+		reference := strings.TrimSpace(connection.Reference)
 		item := connectedBrowser{
-			Reference: fmt.Sprintf("Browser %d", len(result)+1),
+			Reference: reference,
 			DeviceID:  deviceID,
 			Client:    strings.TrimSpace(connection.Client),
 		}
 		if connection.ManagedInstance != nil {
 			item.Manager = strings.TrimSpace(connection.ManagedInstance.Manager)
 			item.InstanceID = strings.TrimSpace(connection.ManagedInstance.InstanceID)
-			if badge := strings.TrimSpace(connection.ManagedInstance.Badge); badge != "" {
-				item.Reference = badge
-			}
+			item.Badge = strings.TrimSpace(connection.ManagedInstance.Badge)
 		}
 		domains := make(map[string]struct{})
 		if connection.CapabilityCatalog != nil {
@@ -114,6 +114,7 @@ func resolveBrowserDevice(bridge Bridge, deviceID, browserRef string) (connected
 	for index := range instances {
 		instance := &instances[index]
 		if !strings.EqualFold(browserRef, instance.Reference) &&
+			!strings.EqualFold(browserRef, instance.Badge) &&
 			!strings.EqualFold(browserRef, instance.InstanceID) && browserRef != instance.DeviceID {
 			continue
 		}
@@ -128,8 +129,8 @@ func resolveBrowserDevice(bridge Bridge, deviceID, browserRef string) (connected
 	return *matched, nil
 }
 
-// ResolveBrowserDevice resolves a user-facing A/B/C reference inside the
-// engine. Device IDs never need to enter the model-visible result.
+// ResolveBrowserDevice resolves the Bridge-owned browser reference inside the
+// engine and rejects any alias that matches more than one browser.
 func ResolveBrowserDevice(bridge Bridge, deviceID, browserRef string) (string, string, error) {
 	instance, err := resolveBrowserDevice(bridge, deviceID, browserRef)
 	if err != nil {
@@ -138,8 +139,8 @@ func ResolveBrowserDevice(bridge Bridge, deviceID, browserRef string) (string, s
 	return instance.DeviceID, instance.Reference, nil
 }
 
-// RuntimeContext is refreshed before every Agent decision. Device IDs stay in
-// the engine; the model only sees stable, user-facing browser references.
+// RuntimeContext is refreshed before every Agent decision. browser_ref is owned
+// by the Bridge and maps one-to-one to DeviceID; badges are display metadata.
 func RuntimeContext(bridge Bridge) string {
 	instances := connectedBrowsers(bridge)
 	if len(instances) == 0 {
@@ -147,10 +148,13 @@ func RuntimeContext(bridge Bridge) string {
 	}
 	var output strings.Builder
 	output.WriteString("# Connected Browser Extension Instances\n\n")
-	output.WriteString("These are already-open external browsers, not Rod automation sessions. Use browser.instances.list, browser.capability.catalog, browser.capability.call, browser.crypto.inspect, browser.transform.prepare, browser.handoff.request, and browser.http.test. The use_browser tool is unrelated Rod automation and never routes to these instances. @-mention is optional; an explicit @ or browser_ref always wins. When exactly one instance is online, the browser-extension tools select it automatically. With multiple instances, use their references for singular operations and use all relevant references for comparison or authorization testing. For page-backed encrypted HTTP, call browser.crypto.inspect once, browser.transform.prepare once, then browser.http.test; prefer automatic preparation; use catalog-discovered recording/callable/debugger/Profile tools when advanced diagnosis or recovery is needed. Never reopen a page merely because a dialog appeared or resend its plaintext with another HTTP tool. Never invent or expose a device ID.\n")
-	output.WriteString("For ordinary HTTP replay or authorization testing with do_http_request, pass browser_ref matching the browser whose credentials or context the request uses (A, B, etc.). This automatically tags and colors all saved flows without a MITM proxy. Changing a target user/resource ID does not change the originating browser. Split calls by browser; never mix A/B credentials in one batch. Use browser_ref=none for a deliberately unauthenticated control.\n")
+	output.WriteString("These are already-open external browsers, not Rod automation sessions. Use browser.instances.list, browser.capability.catalog, browser.capability.call, browser.crypto.inspect, browser.transform.prepare, browser.handoff.request, and browser.http.test. The use_browser tool is unrelated Rod automation and never routes to these instances. @-mention is optional; an explicit @ or browser_ref always wins. When exactly one instance is online, the browser-extension tools select it automatically. With multiple instances, copy the exact browser_ref values listed below for singular operations and use all relevant references for comparison or authorization testing. Badges such as A or B are display-only and may repeat; never use an ambiguous badge as browser_ref. For page-backed encrypted HTTP, call browser.crypto.inspect once, browser.transform.prepare once, then browser.http.test; prefer automatic preparation; use catalog-discovered recording/callable/debugger/Profile tools when advanced diagnosis or recovery are needed. Never reopen a page merely because a dialog appeared or resend its plaintext with another HTTP tool.\n")
+	output.WriteString("For ordinary HTTP replay or authorization testing with do_http_request, copy the exact browser_ref for the browser whose credentials or context the request uses. This automatically tags and colors all saved flows without a MITM proxy. Changing a target user/resource ID does not change the originating browser. Split calls by browser; never mix multiple browser credentials in one batch. Use browser_ref=none for a deliberately unauthenticated control.\n")
 	for _, instance := range instances {
 		fmt.Fprintf(&output, "\n- %s: online", instance.Reference)
+		if instance.Badge != "" {
+			fmt.Fprintf(&output, ", badge %s", instance.Badge)
+		}
 		if instance.Manager != "" {
 			fmt.Fprintf(&output, ", managed by %s", instance.Manager)
 		}

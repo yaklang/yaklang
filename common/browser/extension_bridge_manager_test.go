@@ -165,6 +165,11 @@ func testManagedExtensionBridge(t *testing.T, unix bool) {
 	device, err := manager.ApprovePairing(pending.RequestID, "Test Chrome", "")
 	require.NoError(t, err)
 	require.Equal(t, "managed-installation", device.InstallationID)
+	require.EqualValues(t, 1, device.Reference)
+	require.EqualValues(t, 1, manager.Snapshot().Devices[0].Reference)
+	reference, err := manager.BrowserReference(device.ID)
+	require.NoError(t, err)
+	require.Equal(t, "br_1", reference)
 	var approved extensionBridgePairingEnvelope
 	require.NoError(t, readStrictExtensionBridgeJSON(pairingConnection, &approved))
 	require.Equal(t, "pair_approved", approved.Type)
@@ -205,6 +210,7 @@ func testManagedExtensionBridge(t *testing.T, unix bool) {
 	require.Equal(t, managedExtensionBridgeProtocolVersion, manager.Snapshot().ProtocolVersion)
 	require.Len(t, manager.Snapshot().Connections, 1)
 	require.Equal(t, device.ID, manager.Snapshot().Connections[0].DeviceID)
+	require.Equal(t, "br_1", manager.Snapshot().Connections[0].Reference)
 	require.Equal(t, auth.ManagedInstance, manager.Snapshot().Connections[0].ManagedInstance)
 	require.Equal(t, auth.CapabilityCatalog.Hash, manager.Snapshot().Connections[0].CapabilityCatalog.Hash)
 
@@ -280,6 +286,58 @@ func testManagedExtensionBridge(t *testing.T, unix bool) {
 	require.Equal(t, "unauthorized", rejection.Error.Code)
 }
 
+func TestManagedDeviceRuntimeReferencesPersistAndBackfill(t *testing.T) {
+	store := NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json"))
+	_, err := NewExtensionBridgeManager(store, nil)
+	require.NoError(t, err)
+
+	state, err := store.Load()
+	require.NoError(t, err)
+	state.Devices = []ExtensionBridgeDevice{
+		{ID: "browser-newer", CreatedAt: 20, Reference: 7},
+		{ID: "browser-older", CreatedAt: 10},
+	}
+	state.NextReference = 0
+	require.NoError(t, store.Save(state))
+
+	reloaded, err := NewExtensionBridgeManager(store, nil)
+	require.NoError(t, err)
+	snapshot := reloaded.Snapshot()
+	require.Len(t, snapshot.Devices, 2)
+	references := map[string]string{}
+	for _, device := range snapshot.Devices {
+		references[device.ID] = formatExtensionBridgeReference(device.Reference)
+	}
+	require.Equal(t, "br_8", references["browser-older"])
+	require.Equal(t, "br_7", references["browser-newer"])
+
+	persisted, err := store.Load()
+	require.NoError(t, err)
+	require.EqualValues(t, 8, persisted.Devices[1].Reference)
+	require.EqualValues(t, 9, persisted.NextReference)
+}
+
+func TestManagedExtensionBridgeDoesNotReuseRevokedReference(t *testing.T) {
+	manager, err := NewExtensionBridgeManager(
+		NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json")), nil,
+	)
+	require.NoError(t, err)
+	origin := "chrome-extension://managed-test-extension"
+
+	firstPending, err := manager.beginPairing(origin, managedTestPairingInput(t, "first-installation"))
+	require.NoError(t, err)
+	first, err := manager.ApprovePairing(firstPending.request.ID, "First Browser", "")
+	require.NoError(t, err)
+	require.EqualValues(t, 1, first.Reference)
+	require.NoError(t, manager.RevokeDevice(first.ID))
+
+	secondPending, err := manager.beginPairing(origin, managedTestPairingInput(t, "second-installation"))
+	require.NoError(t, err)
+	second, err := manager.ApprovePairing(secondPending.request.ID, "Second Browser", "")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, second.Reference)
+}
+
 func ptrExtensionBridgeJWK(value ExtensionBridgeJWK) *ExtensionBridgeJWK {
 	return &value
 }
@@ -318,6 +376,7 @@ func TestManagedExtensionBridgeRePairingReusesTrustedDevice(t *testing.T) {
 	second, err := manager.ApprovePairing(secondPending.request.ID, "Chrome Browser", "")
 	require.NoError(t, err)
 	require.Equal(t, first.ID, second.ID)
+	require.Equal(t, first.Reference, second.Reference)
 	require.Equal(t, first.CreatedAt, second.CreatedAt)
 	require.Equal(t, "Named Browser", second.Name)
 	require.Equal(t, rotatedInput.PublicKey, second.PublicKey)
@@ -329,6 +388,7 @@ func TestManagedExtensionBridgeRePairingReusesTrustedDevice(t *testing.T) {
 	replaced, err := manager.ApprovePairing(resetPending.request.ID, "Chrome Browser", second.ID)
 	require.NoError(t, err)
 	require.Equal(t, second.ID, replaced.ID)
+	require.Equal(t, second.Reference, replaced.Reference)
 	require.Equal(t, "reset-installation", replaced.InstallationID)
 	require.Equal(t, "Named Browser", replaced.Name)
 	require.Len(t, manager.Snapshot().Devices, 1)

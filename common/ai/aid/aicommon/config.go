@@ -266,8 +266,9 @@ type Config struct {
 	inheritedToolManager         bool
 
 	// browserSessionTracker records browser ids opened by yak tools for session cleanup.
-	browserSessionTracker           BrowserSessionTracker
-	browserHTTPFlowIdentityResolver BrowserHTTPFlowIdentityResolver
+	browserSessionTracker              BrowserSessionTracker
+	browserHTTPFlowIdentityResolver    BrowserHTTPFlowIdentityResolver
+	browserAttachmentReferenceResolver BrowserAttachmentReferenceResolver
 
 	// tool config
 	DisableToolUse               bool
@@ -4352,6 +4353,9 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
 	if i.browserHTTPFlowIdentityResolver != nil {
 		opts = append(opts, WithBrowserHTTPFlowIdentityResolver(i.browserHTTPFlowIdentityResolver))
+	}
+	if i.browserAttachmentReferenceResolver != nil {
+		opts = append(opts, WithBrowserAttachmentReferenceResolver(i.browserAttachmentReferenceResolver))
 	}
 	// Goal strategy itself is top-level only, but its no-blocking boundary must
 	// survive a handoff into a coordinator or another nested runtime.
