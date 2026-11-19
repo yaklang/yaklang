@@ -161,7 +161,7 @@ func ensureIrConstIndexes(db *gorm.DB) {
 			key:   []indexKeyPart{indexCol("program_name"), indexCol("text_size")},
 		},
 	}
-	if supportsPartialIndex(db.Dialect().GetName()) {
+	if indexDialectFor(db).SupportsPartialIndex() {
 		specs = append(specs, indexSpec{
 			table:   TableIrCodes,
 			name:    irCodeConstIDIndex,

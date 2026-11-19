@@ -7,26 +7,18 @@ import (
 	"github.com/yaklang/gorm"
 )
 
-// Index DDL is not fully portable, so the two capability questions that change
-// the statement are answered here instead of being guessed at the call site:
+// Index DDL is not fully portable, so the capability questions that change the
+// statement are answered by the indexDialect implementations in
+// index_dialect.go:
 //
 //   - partial indexes (CREATE INDEX ... WHERE ...): SQLite and PostgreSQL only.
 //   - expression key parts: every backend accepts one, but MySQL needs it
 //     wrapped in its own parentheses and only supports it from 8.0.13; MariaDB
 //     has no equivalent syntax.
 //
+// This file only answers the MySQL version question the MySQL adapter needs.
 // Everything else (identifier quoting, catalog lookups, error vocabulary) is
 // already owned by the dialect.
-
-// supportsPartialIndex reports whether CREATE INDEX ... WHERE ... is valid.
-func supportsPartialIndex(dialect string) bool {
-	switch strings.ToLower(dialect) {
-	case "sqlite3", "sqlite", "postgres", "postgresql", "cloudsqlpostgres":
-		return true
-	default:
-		return false
-	}
-}
 
 // mysqlFunctionalIndexMinVersion is MySQL's first release with functional key
 // parts, encoded as major*10000 + minor*100 + patch.
