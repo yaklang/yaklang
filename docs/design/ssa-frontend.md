@@ -200,9 +200,9 @@
    - `common/coreplugin/base-yak-plugin/SSA 项目探测.yak` 的扩展名、标记文件和清单文件。
    - `scripts/ssa-test.sh` 的本地测试序列。
 6. 测试
-   - 语法夹具：`common/yak/<lang>/tests/code/`，配 `README.md` 记录来源和许可证。
+   - 语法夹具：`common/yak/<lang>/<lang>2ssa/test/code/`，配 `README.md` 记录来源和许可证。
    - AST 解析：`syntax_<lang>_test.go` 只保留 `TestAllSyntaxFor<Lang>_G4`。
-   - SSA 降级：`common/yak/ssaapi/test/ssatest/` 增加编译和符号检查。
+   - SSA 降级：`common/yak/<lang>/<lang>2ssa/test/` 的 `cfg_test.go`、`func_test.go`、`expression_test.go`、`oop_test.go`、`import_test.go`、`multi_file_test.go`，使用 `ssatest` 助手断言 Phi、调用操作数和符号。
 7. CI
    - `.github/workflows/syntax-g4-tests.yml` matrix 加入语言测试包。
    - 普通 SSA 测试交给 `scripts/ci/configs/ssa.json` 和 Essential Tests，不放进语法工作流。
@@ -211,9 +211,10 @@
 
 | 层级 | 位置 | 运行方式 |
 | --- | --- | --- |
-| 语法/AST 解析 | `common/yak/<lang>/tests/syntax_<lang>_test.go` | `syntax-g4-tests.yml`，`-run '^TestAllSyntax.*_G4$'` |
-| 语法夹具 | `common/yak/<lang>/tests/code/` | 由 `TestAllSyntax...` 嵌入并逐个解析 |
-| SSA 降级 | `common/yak/ssaapi/test/ssatest/` | `scripts/ci/configs/ssa.json`，Essential Tests 的 SSA 组 |
+| 语法/AST 解析 | `common/yak/<lang>/<lang>2ssa/test/syntax_<lang>_test.go` | `syntax-g4-tests.yml`，`-run '^TestAllSyntax.*_G4$'` |
+| 语法夹具 | `common/yak/<lang>/<lang>2ssa/test/code/` | 由 `TestAllSyntax...` 嵌入并逐个解析 |
+| SSA 降级与 CFG | `common/yak/<lang>/<lang>2ssa/test/` | `scripts/ssa-test.sh` 跑语言测试包；Phi 用 `checkPhi`，值用 `CheckPrintf` |
+| 跨语言项目编译 | `common/yak/ssaapi/test/ssatest/frontend_languages_test.go` | Essential Tests 的 SSA 组 |
 | 本地全量 | `scripts/ssa-test.sh` | 无参数时按语言顺序跑完整 SSA 套件 |
 
 `syntax_<lang>_test.go` 的职责只有一个：解析夹具并检查单文件预算。
@@ -224,20 +225,22 @@ Kotlin 的 `.kts` 使用 `ScriptFrontend`，`.kt` 使用 `Frontend`。
 新增四语言的语法驱动：
 
 ```text
-common/yak/lua/tests/syntax_lua_test.go       TestAllSyntaxForLua_G4
-common/yak/rust/tests/syntax_rust_test.go     TestAllSyntaxForRust_G4
-common/yak/kotlin/tests/syntax_kotlin_test.go TestAllSyntaxForKotlin_G4
-common/yak/scala/tests/syntax_scala_test.go   TestAllSyntaxForScala_G4
+common/yak/lua/lua2ssa/test/syntax_lua_test.go       TestAllSyntaxForLua_G4
+common/yak/rust/rust2ssa/test/syntax_rust_test.go     TestAllSyntaxForRust_G4
+common/yak/kotlin/kotlin2ssa/test/syntax_kotlin_test.go TestAllSyntaxForKotlin_G4
+common/yak/scala/scala2ssa/test/syntax_scala_test.go   TestAllSyntaxForScala_G4
 ```
 
-新增四语言的 SSA 降级测试在：
+新增四语言的 SSA 降级测试在各自语言的 `test/` 目录：
 
 ```text
-common/yak/ssaapi/test/ssatest/frontend_languages_test.go
-TestFrontendLuaRustKotlinScalaCompile
+common/yak/lua/lua2ssa/test/       cfg/func/expression/oop/import/multi_file
+common/yak/rust/rust2ssa/test/     cfg/func/expression/oop/import/multi_file
+common/yak/kotlin/kotlin2ssa/test/ cfg/func/expression/oop/import/multi_file
+common/yak/scala/scala2ssa/test/   cfg/func/expression/oop/import/multi_file
 ```
 
-该测试只检查项目编译和符号存在性，不重复语法解析预算；这样语法失败和 SSA 失败能分开定位。
+`TestFrontendLuaRustKotlinScalaCompile` 只检查项目编译和符号存在性，不重复语法解析预算；这样语法失败和 SSA 失败能分开定位。
 
 ### 6.1 真实项目语料
 
