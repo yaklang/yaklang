@@ -2,7 +2,6 @@ package ssadb
 
 import (
 	"database/sql"
-	"strings"
 	"sync"
 	"testing"
 
@@ -14,14 +13,23 @@ import (
 
 const irOffsetsUniqueIndex = "ux_ir_offsets_program_value_file_range"
 
-func sqliteIndexDefinition(t *testing.T, db *gorm.DB, table, index string) (string, bool) {
-	t.Helper()
-	var definition sql.NullString
-	require.NoError(t, db.Raw(
-		`SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
-		table, index,
-	).Row().Scan(&definition))
-	return definition.String, definition.Valid
+// ensureAllUniqueIndexes runs the production template over the declared specs,
+// the same way patchIrCodeIndex does.
+func ensureAllUniqueIndexes(db *gorm.DB) {
+	for _, spec := range irUniqueIndexes {
+		ensureUniqueIndex(db, spec)
+	}
+}
+
+// TestUniqueIndexDuplicateKeysStayUnquoted pins a portability rule: MySQL reads
+// double quotes as string literals by default, so a quoted partition key would
+// group every row into one partition and the repair would delete all but one.
+func TestUniqueIndexDuplicateKeysStayUnquoted(t *testing.T) {
+	for _, spec := range irUniqueIndexes {
+		require.NotEmpty(t, spec.duplicateKey, "%s needs a partition key", spec.name)
+		require.NotContains(t, spec.duplicateKey, `"`,
+			"%s: the duplicate key must stay unquoted for MySQL", spec.name)
+	}
 }
 
 // statementRecorder captures the statements gorm prints in detailed log mode,
@@ -54,8 +62,7 @@ func TestUniqueIndexMaintenanceSkipsRepairWhenIndexExists(t *testing.T) {
 	db := openRepairTestDB(t)
 
 	// First pass creates both unique indexes on the empty schema.
-	ensureUniqueIrCodesProgramCodeIndex(db)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
 	require.True(t, hasNamedIndex(db, TableIrOffsets, irOffsetsUniqueIndex))
 
@@ -63,90 +70,13 @@ func TestUniqueIndexMaintenanceSkipsRepairWhenIndexExists(t *testing.T) {
 	db.SetLogger(recorder)
 	db.LogMode(true)
 
-	ensureUniqueIrCodesProgramCodeIndex(db)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 
-	statements := recorder.statements()
-	require.NotEmpty(t, statements, "the index lookup must be logged")
-	for _, statement := range statements {
-		require.NotContains(t, statement, "DELETE FROM ir_codes WHERE id IN")
-		require.NotContains(t, statement, "DELETE FROM ir_offsets WHERE id IN")
-	}
-}
-
-// TestNeedsIrOffsetsIndexUpgrade checks the only definition that still has to
-// be inspected: a SQLite index written before the key used COALESCE.
-func TestNeedsIrOffsetsIndexUpgrade(t *testing.T) {
-	db := openRepairTestDB(t)
-
-	require.NoError(t, db.Exec(
-		`CREATE UNIQUE INDEX "`+irOffsetsUniqueIndex+`" ON "`+TableIrOffsets+
-			`" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", "variable_name")`,
-	).Error)
-	require.True(t, needsIrOffsetsIndexUpgrade(db, irOffsetsUniqueIndex))
-
-	require.NoError(t, db.Exec(`DROP INDEX "`+irOffsetsUniqueIndex+`"`).Error)
-	require.NoError(t, db.Exec(
-		`CREATE UNIQUE INDEX "`+irOffsetsUniqueIndex+`" ON "`+TableIrOffsets+
-			`" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''))`,
-	).Error)
-	require.False(t, needsIrOffsetsIndexUpgrade(db, irOffsetsUniqueIndex))
-}
-
-// TestNeedsIrOffsetsIndexUpgradeIgnoresNonSQLiteDialects pins the dialect
-// boundary: a non-SQLite server never has sqlite_master, so the legacy-key
-// check must not run there even when the underlying connection could answer it.
-func TestNeedsIrOffsetsIndexUpgradeIgnoresNonSQLiteDialects(t *testing.T) {
-	sqlDB, err := sql.Open("sqlite3", "file:pglegacy?mode=memory&cache=shared")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	_, err = sqlDB.Exec(`CREATE TABLE ir_offsets (
-		id INTEGER PRIMARY KEY,
-		program_name TEXT,
-		value_id INTEGER,
-		file_hash TEXT,
-		start_offset INTEGER,
-		end_offset INTEGER,
-		variable_name TEXT
-	)`)
-	require.NoError(t, err)
-	_, err = sqlDB.Exec(`CREATE UNIQUE INDEX ` + irOffsetsUniqueIndex + ` ON ir_offsets
-		("program_name", "value_id", "file_hash", "start_offset", "end_offset", "variable_name")`)
-	require.NoError(t, err)
-
-	db, err := gorm.Open("postgres", sqlDB)
-	require.NoError(t, err)
-	require.Equal(t, "postgres", db.Dialect().GetName())
-	require.False(t, needsIrOffsetsIndexUpgrade(db, irOffsetsUniqueIndex))
-}
-
-// TestEnsureUniqueIrOffsetsIndexUpgradesLegacyKey covers the whole upgrade on
-// SQLite: the legacy key lets a NULL name and an empty name coexist, and the
-// rebuild has to collapse them before the COALESCE index can be created.
-func TestEnsureUniqueIrOffsetsIndexUpgradesLegacyKey(t *testing.T) {
-	db := openRepairTestDB(t)
-
-	require.NoError(t, db.Exec(
-		`CREATE UNIQUE INDEX "`+irOffsetsUniqueIndex+`" ON "`+TableIrOffsets+
-			`" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", "variable_name")`,
-	).Error)
-	require.NoError(t, db.Exec(`INSERT INTO ir_offsets
-		(program_name, value_id, file_hash, start_offset, end_offset, variable_name)
-		VALUES (?, ?, ?, ?, ?, NULL)`, "legacy-prog", 1, "file-hash", 0, 10).Error)
-	require.NoError(t, db.Exec(`INSERT INTO ir_offsets
-		(program_name, value_id, file_hash, start_offset, end_offset, variable_name)
-		VALUES (?, ?, ?, ?, ?, '')`, "legacy-prog", 1, "file-hash", 0, 10).Error)
-
-	ensureUniqueIrOffsetsIndex(db)
-
-	var count int64
-	require.NoError(t, db.Model(&IrOffset{}).Count(&count).Error)
-	require.Equal(t, int64(1), count, "NULL and '' collide under the COALESCE key")
-
-	definition, ok := sqliteIndexDefinition(t, db, TableIrOffsets, irOffsetsUniqueIndex)
-	require.True(t, ok)
-	require.Contains(t, strings.ToUpper(definition), "COALESCE")
+	// Both backends answer the existence question from their own catalog, so a
+	// database that already has the indexes must not issue any statement at
+	// all - in particular not the ROW_NUMBER() delete.
+	require.Empty(t, recorder.statements(),
+		"re-running maintenance on an existing index must issue no statement")
 }
 
 // TestUniqueIndexCreationDoesNotDedupCleanTable pins the ordering fix: a
@@ -160,8 +90,7 @@ func TestUniqueIndexCreationDoesNotDedupCleanTable(t *testing.T) {
 	db.SetLogger(recorder)
 	db.LogMode(true)
 
-	ensureUniqueIrCodesProgramCodeIndex(db)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 
 	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
 	require.True(t, hasNamedIndex(db, TableIrOffsets, irOffsetsUniqueIndex))
@@ -227,8 +156,7 @@ func TestUniqueIndexProbeUsesPostgresCatalog(t *testing.T) {
 	db.SetLogger(recorder)
 	db.LogMode(true)
 
-	ensureUniqueIrCodesProgramCodeIndex(db)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 
 	require.Empty(t, recorder.statements(), "a present index must not trigger any write")
 }

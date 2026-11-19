@@ -13,7 +13,7 @@ import (
 func TestOffsetVariableLookupKeepsFilteredIDOrder(t *testing.T) {
 	db := setupA2LoaderDB(t)
 	require.NoError(t, db.AutoMigrate(&IrOffset{}).Error)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 
 	prog := "offset-plan"
 	rows := []*IrOffset{
@@ -61,7 +61,7 @@ func TestOffsetVariableLookupKeepsFilteredIDOrder(t *testing.T) {
 func TestOffsetVariableLookupKeepsValueIndexAfterIndexRecreation(t *testing.T) {
 	db := setupA2LoaderDB(t)
 	require.NoError(t, db.AutoMigrate(&IrOffset{}).Error)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 	// The model no longer declares this index; create it to replay the legacy
 	// schema that the redundant-index prune removes on open.
 	require.NoError(t, db.Exec(`CREATE INDEX idx_ir_offsets_variable_name ON ir_offsets(variable_name)`).Error)
@@ -94,7 +94,7 @@ func TestOffsetVariableLookupKeepsValueIndexAfterIndexRecreation(t *testing.T) {
 func TestOffsetVariableLookupKeepsExactTextName(t *testing.T) {
 	db := setupA2LoaderDB(t)
 	require.NoError(t, db.AutoMigrate(&IrOffset{}).Error)
-	ensureUniqueIrOffsetsIndex(db)
+	ensureAllUniqueIndexes(db)
 
 	prog := "offset-name-text"
 	one := &IrOffset{ProgramName: prog, ValueID: 11, VariableName: "1", FileHash: "f1", StartOffset: 1, EndOffset: 2}

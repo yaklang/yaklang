@@ -1,7 +1,6 @@
 package ssadb
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -131,11 +130,12 @@ func patchIrCodeIndex(db *gorm.DB) {
 		}
 	}
 
-	// Add UNIQUE constraint on (program_name, code_id) to prevent
-	// duplicate instruction INSERTs from race conditions in the async
-	// persist pipeline. This is a hard database invariant.
-	ensureUniqueIrCodesProgramCodeIndex(db)
-	ensureUniqueIrOffsetsIndex(db)
+	// The IR unique keys are a hard database invariant: the async persist
+	// pipeline upserts on them, and the write path relies on the database
+	// rejecting a second row for the same key.
+	for _, spec := range irUniqueIndexes {
+		ensureUniqueIndex(db, spec)
+	}
 	ensureIrConstIndexes(db)
 
 	// Supported SQLite and PostgreSQL databases shed these redundant indexes
@@ -155,8 +155,41 @@ func patchIrCodeIndex(db *gorm.DB) {
 // parameter makes SQLite ignore this index.
 const irCodeConstLookupIndex = "idx_ir_codes_const_lookup"
 
-// hasNamedIndex asks the dialect whether an index exists. db.New() clears a
-// program_name row scope while keeping the current connection.
+// uniqueIndex is one unique key the SSA schema requires. Both IR indexes
+// differ only in the table, the name, the DDL and the columns that must be
+// unique, so a single maintenance template serves them.
+type uniqueIndex struct {
+	table        string
+	name         string
+	definition   string // idempotent CREATE UNIQUE INDEX
+	duplicateKey string // partition key used only when a repair is needed
+}
+
+var irUniqueIndexes = []uniqueIndex{
+	{
+		table:        TableIrCodes,
+		name:         "ux_ir_codes_program_code",
+		definition:   `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`,
+		duplicateKey: `program_name, code_id`,
+	},
+	{
+		table:      TableIrOffsets,
+		name:       "ux_ir_offsets_program_value_file_range",
+		definition: `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`,
+		// A NULL variable name and '' name the same location, so the index
+		// treats them as one key. The duplicate key stays unquoted: MySQL reads
+		// double quotes as string literals (ANSI_QUOTES is off by default), and
+		// a constant partition would collapse every row into one group.
+		duplicateKey: `program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')`,
+	},
+}
+
+// hasNamedIndex is the polymorphic seam of index maintenance: each backend
+// answers from its own catalog through Dialect().HasIndex. SQLite reads
+// sqlite_master, PostgreSQL reads pg_indexes filtered by CURRENT_SCHEMA(),
+// MySQL reads SHOW INDEXES and DM reads ALL_INDEXES. No catalog name appears
+// in this file, so an index that exists is always reported as existing.
+// db.New() clears a program_name row scope while keeping the connection.
 func hasNamedIndex(db *gorm.DB, table, index string) bool {
 	if db == nil || db.Dialect() == nil {
 		return false
@@ -164,15 +197,16 @@ func hasNamedIndex(db *gorm.DB, table, index string) bool {
 	return db.New().Dialect().HasIndex(table, index)
 }
 
-// deleteDuplicateIrCodes removes every row except the oldest (MIN id) per
-// (program_name, code_id) using a single window query, and returns the number
-// of removed rows. The oldest row is exactly what normal single-read paths
-// return, so existing databases keep behaving identically after the cleanup.
-func deleteDuplicateIrCodes(db *gorm.DB) (int64, error) {
-	res := db.Exec(`DELETE FROM ` + TableIrCodes + ` WHERE id IN (
+// removeDuplicateRows keeps the oldest row (MIN id) per unique key and returns
+// how many rows it removed. Window functions are standard SQL, so every
+// supported backend runs the same statement and only the partition key
+// changes. The oldest row is what the single-read paths already return, so a
+// repaired database behaves exactly as before.
+func removeDuplicateRows(db *gorm.DB, spec uniqueIndex) (int64, error) {
+	res := db.Exec(`DELETE FROM ` + spec.table + ` WHERE id IN (
 		SELECT id FROM (
-			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, code_id ORDER BY id) AS rn
-			FROM ` + TableIrCodes + `
+			SELECT id, ROW_NUMBER() OVER (PARTITION BY ` + spec.duplicateKey + ` ORDER BY id) AS rn
+			FROM ` + spec.table + `
 		) WHERE rn > 1
 	)`)
 	if res.Error != nil {
@@ -181,38 +215,22 @@ func deleteDuplicateIrCodes(db *gorm.DB) (int64, error) {
 	return res.RowsAffected, nil
 }
 
-// deleteDuplicateIrOffsets removes every row except the oldest (MIN id) per
-// composite key using a single window query, and returns the number of
-// removed rows.
-func deleteDuplicateIrOffsets(db *gorm.DB) (int64, error) {
-	res := db.Exec(`DELETE FROM ` + TableIrOffsets + ` WHERE id IN (
-		SELECT id FROM (
-			SELECT id, ROW_NUMBER() OVER (
-				PARTITION BY program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')
-				ORDER BY id
-			) AS rn
-			FROM ` + TableIrOffsets + `
-		) WHERE rn > 1
-	)`)
-	if res.Error != nil {
-		return 0, res.Error
-	}
-	return res.RowsAffected, nil
-}
-
-// isUniqueViolation reports whether err is the database refusing to build a
-// unique index over duplicate rows. Any other failure (permissions, a lock
-// timeout, a read-only credential) must not start the whole-table repair.
+// isUniqueViolation reports whether err is the backend refusing to build a
+// unique index over duplicate rows. The message is the backend's own error
+// vocabulary; only that refusal may start the whole-table repair, so a
+// permission error, a read-only credential or a lock timeout is returned as is.
+//
+// DM never reaches this path: patchIrCodeIndex installs its indexes through
+// installDMIRIndexes, which does not repair duplicates.
 func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
 	message := strings.ToLower(err.Error())
 	for _, marker := range []string{
-		"unique constraint",             // SQLite
-		"could not create unique index", // PostgreSQL
-		"duplicate key",                 // PostgreSQL
-		"duplicate entry",               // MySQL
+		"unique constraint",             // SQLite: UNIQUE constraint failed
+		"could not create unique index", // PostgreSQL: SQLSTATE 23505
+		"duplicate entry",               // MySQL: Duplicate entry ... for key
 	} {
 		if strings.Contains(message, marker) {
 			return true
@@ -221,16 +239,34 @@ func isUniqueViolation(err error) bool {
 	return false
 }
 
-// createUniqueIndexRepairingDuplicates runs the CREATE and, when existing
-// duplicate rows block it, removes them once and retries.
+// ensureUniqueIndex is the single maintenance template for every unique index:
 //
-// The repair is a whole-table window delete, so it must stay off the common
-// path: an interrupted legacy run never reaches its CREATE, and treating the
-// missing index as "repair needed" made every later process dedup the entire
-// table again. Building first keeps that cost to a database that actually has
-// duplicates.
-func createUniqueIndexRepairingDuplicates(db *gorm.DB, indexName, query string, repair func(*gorm.DB) (int64, error)) error {
-	err := db.Exec(query).Error
+//  1. hasNamedIndex asks the backend whether the index is already there. This
+//     is the only dialect-specific step and it is delegated to the dialect.
+//  2. The idempotent CREATE runs only on a database that really lacks it.
+//  3. Only when the backend rejects that CREATE because duplicate rows exist
+//     does the shared repair run, once, before the same CREATE is retried.
+//
+// The repair is a whole-table window delete, so it must never sit on the
+// common path: an interrupted legacy run never reaches its CREATE, and
+// treating a missing index as "repair needed" made every later process dedup
+// the entire table again.
+func ensureUniqueIndex(db *gorm.DB, spec uniqueIndex) {
+	if db == nil || !db.HasTable(spec.table) {
+		return
+	}
+	if hasNamedIndex(db, spec.table, spec.name) {
+		return
+	}
+	if err := createUniqueIndexRepairingDuplicates(db, spec); err != nil {
+		log.Errorf("[unique-constraint] failed to ensure UNIQUE INDEX %s: %v", spec.name, err)
+	}
+}
+
+// createUniqueIndexRepairingDuplicates builds the index and recovers from the
+// one expected failure: rows that are already duplicated.
+func createUniqueIndexRepairingDuplicates(db *gorm.DB, spec uniqueIndex) error {
+	err := db.Exec(spec.definition).Error
 	if err == nil {
 		return nil
 	}
@@ -238,105 +274,14 @@ func createUniqueIndexRepairingDuplicates(db *gorm.DB, indexName, query string, 
 		return err
 	}
 
-	removed, repairErr := repair(db)
+	removed, repairErr := removeDuplicateRows(db, spec)
 	if repairErr != nil {
 		return fmt.Errorf("remove duplicate rows: %w (index create failed with: %v)", repairErr, err)
 	}
 	if removed > 0 {
-		log.Infof("[unique-constraint] removed %d duplicate rows blocking %s", removed, indexName)
+		log.Infof("[unique-constraint] removed %d duplicate rows blocking %s", removed, spec.name)
 	}
-	return db.Exec(query).Error
-}
-
-// ensureUniqueIrCodesProgramCodeIndex creates a UNIQUE INDEX on
-// (program_name, code_id) for the ir_codes table. If duplicate rows already
-// exist, the extras are removed (keeping MIN(id)) before the index is
-// created, so legacy databases upgrade cleanly.
-func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
-	if !db.HasTable(TableIrCodes) {
-		return
-	}
-
-	indexName := "ux_ir_codes_program_code"
-
-	// Ask the dialect, not a fixed catalog: sqlite_master on SQLite, pg_indexes
-	// on PostgreSQL, SHOW INDEXES on MySQL, ALL_INDEXES on DM. A hardcoded
-	// sqlite_master probe reported "absent" on PostgreSQL, which re-ran the
-	// whole-table dedup below on every database open.
-	if hasNamedIndex(db, TableIrCodes, indexName) {
-		return // already created
-	}
-
-	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`
-	if err := createUniqueIndexRepairingDuplicates(db, indexName, query, deleteDuplicateIrCodes); err != nil {
-		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
-		return
-	}
-	log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_codes (program_name, code_id)", indexName)
-}
-
-// ensureUniqueIrOffsetsIndex creates a UNIQUE INDEX for ir_offsets that treats
-// NULL variable names as empty strings. This prevents duplicate offset INSERTs.
-//
-// If an older non-COALESCE index with the same name exists, it is dropped and
-// recreated with COALESCE. If duplicate rows exist, the extras are removed
-// (keeping MIN(id)) before the index is created.
-func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
-	if !db.HasTable(TableIrOffsets) {
-		return
-	}
-
-	indexName := "ux_ir_offsets_program_value_file_range"
-
-	// Existence comes from the dialect, so every backend reads its own catalog.
-	// Only the legacy-key upgrade needs a definition, and only SQLite can carry
-	// one; see needsIrOffsetsIndexUpgrade.
-	exists := hasNamedIndex(db, TableIrOffsets, indexName)
-	if exists && !needsIrOffsetsIndexUpgrade(db, indexName) {
-		return // already the COALESCE version
-	}
-
-	// If the index exists WITHOUT COALESCE, drop it so we can recreate
-	if exists {
-		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
-		if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
-			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
-			return
-		}
-	}
-
-	// Legacy async-persist runs can leave duplicate rows. The CREATE below
-	// removes them only when they actually block the index.
-	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`
-	if err := createUniqueIndexRepairingDuplicates(db, indexName, query, deleteDuplicateIrOffsets); err != nil {
-		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
-		return
-	}
-	log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_offsets (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))", indexName)
-}
-
-// needsIrOffsetsIndexUpgrade reports whether the offsets unique index that
-// already exists still uses the legacy key without COALESCE.
-//
-// Only SQLite can carry one. The key has been created with COALESCE since the
-// index was introduced, and the non-SQLite backends only ever received that
-// form, so no other dialect has to be inspected. A definition that cannot be
-// read leaves the index untouched rather than dropping it on a guess.
-func needsIrOffsetsIndexUpgrade(db *gorm.DB, indexName string) bool {
-	if !schema.IsSQLite(db) {
-		return false
-	}
-	var definition sql.NullString
-	if err := db.New().Raw(
-		`SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
-		TableIrOffsets, indexName,
-	).Row().Scan(&definition); err != nil {
-		return false
-	}
-	if !definition.Valid || strings.TrimSpace(definition.String) == "" {
-		return false
-	}
-	return !strings.Contains(strings.ToUpper(definition.String), "COALESCE")
+	return db.Exec(spec.definition).Error
 }
 
 func GetDB() *gorm.DB {
