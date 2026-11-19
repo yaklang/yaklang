@@ -28,7 +28,11 @@ type PreprocessConfig struct {
 	// HeaderExtensions lists the extensions indexed as project headers. Empty
 	// means only ".h", which keeps the C behaviour.
 	HeaderExtensions []string
-	MaxIncludeDepth  int
+	// InlineProjectHeaders keeps the full text of a project header. The default
+	// (false) keeps only type declarations and macros, which is what C needs;
+	// C++ headers also define classes and member functions, so C++ enables it.
+	InlineProjectHeaders bool
+	MaxIncludeDepth      int
 }
 
 // DefaultConfig returns sensible defaults for project preprocessing.

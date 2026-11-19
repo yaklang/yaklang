@@ -169,6 +169,27 @@ func (ctx *tuExpandCtx) ingestInclude(incPath string, system bool) []string {
 	ctx.cond = NewConditionalStack(ctx.env, ctx.tu.defs)
 	ctx.typeAcc = headerStmtAcc{}
 	ctx.includeDepth++
+	if ctx.tu.project.config.InlineProjectHeaders {
+		// C++ headers define classes and member functions; keep the header body
+		// instead of extracting type declarations only.
+		//
+		// Project header macros are pre-collected without following includes, so
+		// an include guard (SHAPE_HPP) is already defined when the header body is
+		// expanded. Undefine the macros this header owns first; its own #define
+		// directives then run in include order and the guard behaves normally.
+		tables := ctx.tu.project.collectMacrosFromSource(h.Path, string(h.Content))
+		for name := range tables.Object {
+			undefineMacroIncremental(name, &ctx.localTables, ctx.expandEnv)
+		}
+		for name := range tables.Function {
+			undefineMacroIncremental(name, &ctx.localTables, ctx.expandEnv)
+		}
+		lines := ctx.expandSource(string(h.Content), h.Path)
+		ctx.includeDepth--
+		ctx.cond = savedCond
+		ctx.typeAcc = savedAcc
+		return lines
+	}
 	ctx.collectOnly++
 	lines := ctx.expandSource(string(h.Content), h.Path)
 	ctx.collectOnly--
