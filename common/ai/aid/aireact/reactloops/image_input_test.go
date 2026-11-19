@@ -273,6 +273,31 @@ func TestImageCompressionFallbackKeepsOrdinaryTextAndImagesTogether(t *testing.T
 	require.NoError(t, req.CheckImageBudget())
 }
 
+func TestImageCompressionKeepsLatestFailedToolResult(t *testing.T) {
+	loop, cfg := imageTestLoop(t, &ypb.AIImageInputConfig{Mode: "native", MaxRequestBytes: 4096})
+	loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+	cfg.Timeline.PushTextWithImages(cfg.AcquireId(), "older screenshot", imageFixture(t, 1))
+	failedID := cfg.AcquireId()
+	cfg.Timeline.PushToolResult(&aitool.ToolResult{
+		ID: failedID, Name: "click", ToolCallID: "failed-click", Success: false,
+		Error: "view changed; resume_from 42", Images: []*aimedia.Image{imageFixture(t, 2)},
+	})
+	result := buildImagePrompt(t, loop)
+	require.Equal(t, aicommon.LoopPromptModeCompressContext, result.Mode)
+	require.Empty(t, loop.imagePrompt.inputs)
+	require.Equal(t, failedID, loop.imagePrompt.recoveryItemID)
+	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{"summary": "Previous screenshots summarized."})
+	selection, err := loop.prepareContextCompression(action)
+	require.NoError(t, err)
+	require.Contains(t, selection.RetainedIDs, failedID)
+	_, err = cfg.Timeline.ApplyCompressionSelection(selection, result.Prompt)
+	require.NoError(t, err)
+	postCompression := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
+	require.Len(t, postCompression.Images, 1)
+	require.Equal(t, failedID, postCompression.Images[0].TimelineItemID)
+	require.Contains(t, postCompression.PromptText(), "resume_from 42")
+}
+
 func TestImageAttachmentPersistsResourceAndReportsMissingOriginal(t *testing.T) {
 	ctx := context.Background()
 	loop, cfg := imageTestLoop(t, &ypb.AIImageInputConfig{Mode: "native", MaxLongEdge: 512})
