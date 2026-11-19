@@ -747,10 +747,27 @@ service Yak {
   // Wireshark
   rpc GetPcapMetadata(PcapMetadataRequest) returns (PcapMetadata);
   rpc PcapX(stream PcapXRequest) returns (stream PcapXResponse);
+  // Deprecated: legacy session storage is no longer served; the RPC remains as
+  // a compatibility shell and returns Unimplemented.
   rpc QueryTrafficSession(QueryTrafficSessionRequest) returns (QueryTrafficSessionResponse);
+  // Deprecated: use QueryPCAPPackets or GetPCAPPacketDetail with DatasetID.
+  // The legacy project-traffic query path is not supported; DatasetID is required.
   rpc QueryTrafficPacket(QueryTrafficPacketRequest) returns (QueryTrafficPacketResponse);
+  // Deprecated: legacy TCP reassembled storage is no longer served; the RPC
+  // remains as a compatibility shell and returns Unimplemented.
   rpc QueryTrafficTCPReassembled(QueryTrafficTCPReassembledRequest) returns (QueryTrafficTCPReassembledResponse);
+  // Deprecated: use GetPCAPPacketDetail. DatasetID is required; the legacy
+  // project-traffic detail path is not supported.
   rpc ParseTraffic(ParseTrafficRequest) returns (ParseTrafficResponse);
+
+  // Offline capture library (packet viewing).
+  rpc ImportPCAPFile(ImportPCAPFileRequest) returns (stream ImportPCAPFileResponse);
+  rpc QueryPCAPDatabase(QueryPCAPDatabaseRequest) returns (QueryPCAPDatabaseResponse);
+  rpc QueryPCAPPackets(QueryPCAPPacketsRequest) returns (QueryPCAPPacketsResponse);
+  rpc GetPCAPPacketDetail(GetPCAPPacketDetailRequest) returns (PCAPPacketDetail);
+  rpc ReadPCAPBytes(ReadPCAPBytesRequest) returns (ReadPCAPBytesResponse);
+  rpc ExportPCAPData(ExportPCAPDataRequest) returns (ExportPCAPDataResponse);
+  rpc DeletePCAPDatabase(DeletePCAPDatabaseRequest) returns (DeletePCAPDatabaseResponse);
 
   // 与前端交互的双工长连接，用于通知某些消息
   rpc DuplexConnection(stream DuplexConnectionRequest) returns (stream DuplexConnectionResponse);
@@ -1147,14 +1164,6 @@ service Yak {
   rpc SetAIModelContext(SetAIModelContextRequest) returns (AIModelContextResponse);
 
 
-  // Offline capture library (packet viewing).
-  rpc ImportPCAPFile(ImportPCAPFileRequest) returns (stream ImportPCAPFileResponse);
-  rpc QueryPCAPDatabase(QueryPCAPDatabaseRequest) returns (QueryPCAPDatabaseResponse);
-  rpc QueryPCAPPackets(QueryPCAPPacketsRequest) returns (QueryPCAPPacketsResponse);
-  rpc GetPCAPPacketDetail(GetPCAPPacketDetailRequest) returns (PCAPPacketDetail);
-  rpc ReadPCAPBytes(ReadPCAPBytesRequest) returns (ReadPCAPBytesResponse);
-  rpc ExportPCAPData(ExportPCAPDataRequest) returns (ExportPCAPDataResponse);
-  rpc DeletePCAPDatabase(DeletePCAPDatabaseRequest) returns (DeletePCAPDatabaseResponse);
 }
 
 // IMBotConfig 描述一个 IM 平台 bot 的配置凭证。
