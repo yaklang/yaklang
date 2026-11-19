@@ -236,6 +236,7 @@ func (b *singleFileBuilder) visitAsExpression(raw kotlinparser.IAsExpressionCont
 	if asExpr.Type_() != nil {
 		typ = kotlinTypeFromText(asExpr.Type_().GetText())
 	}
+	// TODO(ssa-kotlin): `as?` failure/null and smart casts are not modeled; both forms emit TypeCast.
 	return b.EmitTypeCast(value, typ)
 }
 
@@ -443,6 +444,7 @@ func (b *singleFileBuilder) visitWhenSubject(raw kotlinparser.IWhenSubjectContex
 }
 
 func (b *singleFileBuilder) visitWhenExpression(raw kotlinparser.IWhenExpressionContext) ssa.Value {
+	// TODO(ssa-kotlin): sealed/enum exhaustiveness and subject-less when conditions are not checked.
 	when, ok := raw.(*kotlinparser.WhenExpressionContext)
 	if !ok || when == nil {
 		return b.EmitConstInstNil()
@@ -499,6 +501,7 @@ func (b *singleFileBuilder) visitWhenExpression(raw kotlinparser.IWhenExpression
 func (b *singleFileBuilder) visitWhenCondition(subject ssa.Value, condition *kotlinparser.WhenConditionContext) ssa.Value {
 	switch {
 	case condition.TypeTest() != nil:
+		// TODO(ssa-kotlin): type tests use a synthetic `is` call; smart casts are not inferred.
 		test, ok := condition.TypeTest().(*kotlinparser.TypeTestContext)
 		if !ok || test == nil || test.Type_() == nil {
 			return b.EmitConstInst(true)
@@ -526,6 +529,7 @@ func (b *singleFileBuilder) visitWhenCondition(subject ssa.Value, condition *kot
 		}
 		return b.EmitBinOp(ssa.OpEq, subject, value)
 	}
+	// TODO(ssa-kotlin): unsupported when-condition forms become a catch-all true branch.
 	return b.EmitConstInst(true)
 }
 
@@ -559,6 +563,7 @@ func kotlinTypeFromText(text string) ssa.Type {
 	case "Boolean":
 		return ssa.CreateBooleanType()
 	default:
+		// TODO(ssa-kotlin): user-defined, sealed, and generic types collapse to any.
 		return ssa.CreateAnyType()
 	}
 }

@@ -91,6 +91,7 @@ func (b *singleFileBuilder) evalUnary(operator string, operand ssa.Value) ssa.Va
 	case "~":
 		return b.EmitUnOp(ssa.OpBitwiseNot, operand)
 	case "#":
+		// TODO(ssa-lua): runtime table/string length is not lowered; only constant strings are folded.
 		if constant, ok := operand.(*ssa.ConstInst); ok {
 			if text, ok := constant.GetRawValue().(string); ok {
 				return b.EmitConstInst(int64(len(text)))
@@ -278,6 +279,7 @@ func (b *singleFileBuilder) applyNameAndArgs(base ssa.Value, raw luaparser.IName
 		// Lua has no cast syntax; the standard conversions are the only
 		// explicit type changes, so keep them as a dedicated TypeCast
 		// instruction instead of a generic call.
+		// TODO(ssa-lua): tonumber failure (nil) and tostring __tostring/metatable semantics are not modeled.
 		switch base.GetName() {
 		case "tonumber":
 			return b.EmitTypeCast(args[0], ssa.CreateNumberType())
@@ -449,6 +451,7 @@ func (b *singleFileBuilder) buildFunction(name string, raw luaparser.IFuncbodyCo
 	// declared inside another function is a child function and captures
 	// free values; top-level functions keep the historical global lookup.
 	nested := b.functionDepth > 0
+	// TODO(ssa-lua): upvalue mutation and _ENV lookup are not modeled; captured values are SSA FreeValues.
 	previousSupport := previous.SupportClosure
 	if previous != nil {
 		previous.SupportClosure = nested

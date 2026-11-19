@@ -75,7 +75,7 @@ func (b *singleFileBuilder) VisitStat(raw luaparser.IStatContext) {
 	case stat.Break() != nil:
 		b.Break()
 	case stat.Goto() != nil:
-		// goto and labels do not have a first-class SSA form in this frontend.
+		// TODO(ssa-lua): goto/label control flow is not lowered to SSA.
 		return
 	case stat.Label() != nil:
 		return

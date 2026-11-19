@@ -70,6 +70,7 @@ func (b *singleFileBuilder) visitFunctionDeclaration(raw kotlinparser.IFunctionD
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
 	b.LoadGlobalVariable()
+	// TODO(ssa-kotlin): class fields are copied into each method; writes do not propagate back to other methods.
 	for name, value := range b.classFields {
 		b.AssignVariable(b.CreateVariable(name), value)
 	}

@@ -138,6 +138,7 @@ func (b *singleFileBuilder) visitSimpleExpr(raw scalaparser.ISimpleExprContext) 
 			if name == "asInstanceOf" && i+1 < len(simple.AllSimpleExprSuffix()) {
 				if next, ok := simple.SimpleExprSuffix(i + 1).(*scalaparser.SimpleExprSuffixContext); ok && next != nil && next.TypeArgs() != nil {
 					typeName := next.TypeArgs().GetText()
+					// TODO(ssa-scala): asInstanceOf has no runtime check; user-defined/generic types collapse to any.
 					value = b.EmitTypeCast(value, scalaTypeFromText(typeName))
 					i++
 					continue
@@ -390,6 +391,7 @@ func (b *singleFileBuilder) visitLambdaBlockResult(result *scalaparser.BlockResu
 }
 
 func (b *singleFileBuilder) visitMatchClause(subject ssa.Value, raw scalaparser.IMatchClauseContext) ssa.Value {
+	// TODO(ssa-scala): extractor/case-class/tuple patterns and match exhaustiveness are not modeled.
 	clause, ok := raw.(*scalaparser.MatchClauseContext)
 	if !ok || clause == nil || clause.CaseClauses() == nil {
 		return b.EmitConstInstNil()
@@ -507,6 +509,7 @@ func (b *singleFileBuilder) scalaPattern2Condition(subject ssa.Value, raw scalap
 	if pattern.InfixPattern() != nil {
 		return b.scalaSimplePatternCondition(subject, pattern.InfixPattern())
 	}
+	// TODO(ssa-scala): unsupported pattern forms (extractor/tuple/typed) become a catch-all arm.
 	return b.EmitConstInst(true), nil
 }
 
@@ -561,6 +564,7 @@ func (b *singleFileBuilder) scalaSimplePatternOneCondition(subject ssa.Value, si
 }
 
 func (b *singleFileBuilder) emitScalaIsType(value ssa.Value, typeName string) ssa.Value {
+	// TODO(ssa-scala): type tests use a synthetic `is` call; no smart cast or erased-type check.
 	if value == nil {
 		value = b.EmitUndefined("value")
 	}
