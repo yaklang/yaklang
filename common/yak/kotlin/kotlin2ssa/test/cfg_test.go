@@ -155,3 +155,89 @@ fun main() {
 `, "phi(a)", "2", "3")
 	})
 }
+
+func TestKotlinWhen(t *testing.T) {
+	t.Run("value when selects first match", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fun main() {
+    val x = 2
+    val r = when (x) {
+        1 -> 10
+        2 -> 20
+        else -> 30
+    }
+    println(r)
+}
+`, "20")
+	})
+
+	t.Run("when without subject", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fun main() {
+    val x = 5
+    val r = when {
+        x > 3 -> 1
+        else -> 0
+    }
+    println(r)
+}
+`, "1")
+	})
+
+	t.Run("when branch block", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fun main() {
+    val x = 1
+    val r = when (x) {
+        1 -> {
+            val y = 3
+            y + 1
+        }
+        else -> 0
+    }
+    println(r)
+}
+`, "4")
+	})
+
+	t.Run("when as statement", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fun main() {
+    val x = 1
+    when (x) {
+        1 -> println(1)
+        else -> println(0)
+    }
+}
+`, "1")
+	})
+}
+
+func TestKotlinWhenConditions(t *testing.T) {
+	t.Run("multiple conditions in one entry", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fun main() {
+    val x = 2
+    val r = when (x) {
+        1, 2 -> 5
+        else -> 0
+    }
+    println(r)
+}
+`, "5")
+	})
+
+	t.Run("first matching entry wins", func(t *testing.T) {
+		checkPrintlnValue(t, `
+fun main() {
+    val x = 1
+    val r = when (x) {
+        1 -> 10
+        1 -> 20
+        else -> 30
+    }
+    println(r)
+}
+`, "10")
+	})
+}

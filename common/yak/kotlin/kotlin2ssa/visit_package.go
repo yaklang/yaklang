@@ -69,6 +69,7 @@ func (b *singleFileBuilder) visitFunctionDeclaration(raw kotlinparser.IFunctionD
 	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
+	b.LoadGlobalVariable()
 	for name, value := range b.classFields {
 		b.AssignVariable(b.CreateVariable(name), value)
 	}
@@ -83,6 +84,7 @@ func (b *singleFileBuilder) visitFunctionDeclaration(raw kotlinparser.IFunctionD
 	b.FunctionBuilder = previous
 	b.AssignVariable(b.CreateVariable(name), fn)
 	b.GetProgram().SetExportValue(name, fn)
+	b.AddGlobalVariable(name, func() ssa.Value { return fn })
 }
 
 func (b *singleFileBuilder) addFunctionValueParameters(raw kotlinparser.IFunctionValueParametersContext) {
@@ -136,6 +138,9 @@ func (b *singleFileBuilder) visitPropertyDeclaration(raw kotlinparser.IPropertyD
 			name := v.SimpleIdentifier().GetText()
 			b.AssignVariable(b.CreateVariable(name), value)
 			b.GetProgram().SetExportValue(name, value)
+			if b.classFields == nil {
+				b.AddGlobalVariable(name, func() ssa.Value { return value })
+			}
 			if b.classFields != nil {
 				b.classFields[name] = value
 			}

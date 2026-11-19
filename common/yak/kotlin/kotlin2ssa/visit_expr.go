@@ -59,12 +59,15 @@ func (b *singleFileBuilder) visitDisjunction(raw kotlinparser.IDisjunctionContex
 	if !ok || disjunction == nil || len(disjunction.AllConjunction()) == 0 {
 		return b.EmitConstInstNil()
 	}
-	left := b.visitConjunction(disjunction.Conjunction(0))
+	result := func() ssa.Value { return b.visitConjunction(disjunction.Conjunction(0)) }
 	for i := 1; i < len(disjunction.AllConjunction()); i++ {
-		right := b.visitConjunction(disjunction.Conjunction(i))
-		left = b.EmitBinOp(ssa.OpOr, left, right)
+		next := disjunction.Conjunction(i)
+		previous := result
+		result = func() ssa.Value {
+			return b.BuildShortCircuit(previous, func() ssa.Value { return b.visitConjunction(next) }, false)
+		}
 	}
-	return left
+	return result()
 }
 
 func (b *singleFileBuilder) visitConjunction(raw kotlinparser.IConjunctionContext) ssa.Value {
@@ -72,12 +75,15 @@ func (b *singleFileBuilder) visitConjunction(raw kotlinparser.IConjunctionContex
 	if !ok || conjunction == nil || len(conjunction.AllEquality()) == 0 {
 		return b.EmitConstInstNil()
 	}
-	left := b.visitEquality(conjunction.Equality(0))
+	result := func() ssa.Value { return b.visitEquality(conjunction.Equality(0)) }
 	for i := 1; i < len(conjunction.AllEquality()); i++ {
-		right := b.visitEquality(conjunction.Equality(i))
-		left = b.EmitBinOp(ssa.OpAnd, left, right)
+		next := conjunction.Equality(i)
+		previous := result
+		result = func() ssa.Value {
+			return b.BuildShortCircuit(previous, func() ssa.Value { return b.visitEquality(next) }, true)
+		}
 	}
-	return left
+	return result()
 }
 
 func (b *singleFileBuilder) visitEquality(raw kotlinparser.IEqualityContext) ssa.Value {
@@ -222,7 +228,15 @@ func (b *singleFileBuilder) visitAsExpression(raw kotlinparser.IAsExpressionCont
 	if !ok || asExpr == nil || asExpr.PrefixUnaryExpression() == nil {
 		return b.EmitConstInstNil()
 	}
-	return b.visitPrefixUnaryExpression(asExpr.PrefixUnaryExpression())
+	value := b.visitPrefixUnaryExpression(asExpr.PrefixUnaryExpression())
+	if asExpr.AsOperator() == nil {
+		return value
+	}
+	typ := ssa.CreateAnyType()
+	if asExpr.Type_() != nil {
+		typ = kotlinTypeFromText(asExpr.Type_().GetText())
+	}
+	return b.EmitTypeCast(value, typ)
 }
 
 func (b *singleFileBuilder) visitPrefixUnaryExpression(raw kotlinparser.IPrefixUnaryExpressionContext) ssa.Value {
@@ -263,6 +277,10 @@ func (b *singleFileBuilder) visitPostfixUnaryExpression(raw kotlinparser.IPostfi
 		return b.EmitConstInstNil()
 	}
 	value := b.visitPrimaryExpression(postfix.PrimaryExpression())
+	isThis := strings.HasPrefix(postfix.GetText(), "this.")
+	if primary, ok := postfix.PrimaryExpression().(*kotlinparser.PrimaryExpressionContext); ok && primary != nil {
+		isThis = isThis || primary.ThisExpression() != nil
+	}
 	for _, rawSuffix := range postfix.AllPostfixUnarySuffix() {
 		suffix, ok := rawSuffix.(*kotlinparser.PostfixUnarySuffixContext)
 		if !ok || suffix == nil {
@@ -279,6 +297,15 @@ func (b *singleFileBuilder) visitPostfixUnaryExpression(raw kotlinparser.IPostfi
 			}
 		case suffix.NavigationSuffix() != nil:
 			if nav, ok := suffix.NavigationSuffix().(*kotlinparser.NavigationSuffixContext); ok && nav != nil && nav.SimpleIdentifier() != nil {
+				if isThis || (value != nil && value.GetName() == "this") {
+					// Methods receive class fields as plain SSA variables.
+					// Keep `this.x` on the same variable instead of building a
+					// member on an undefined `this` object.
+					if field := b.ReadValue(nav.SimpleIdentifier().GetText()); field != nil {
+						value = field
+						continue
+					}
+				}
 				key := b.EmitConstInst(nav.SimpleIdentifier().GetText())
 				value = b.ReadMemberCallValue(value, key)
 			}
@@ -333,13 +360,14 @@ func (b *singleFileBuilder) visitPrimaryExpression(raw kotlinparser.IPrimaryExpr
 	case primary.CollectionLiteral() != nil:
 		return b.visitCollectionLiteral(primary.CollectionLiteral())
 	case primary.IfExpression() != nil:
-		b.visitIfExpression(primary.IfExpression())
-		return b.EmitConstInstNil()
+		return b.visitIfExpression(primary.IfExpression())
 	case primary.JumpExpression() != nil:
 		b.visitJumpExpression(primary.JumpExpression())
 		return b.EmitConstInstNil()
 	case primary.WhenExpression() != nil:
 		return b.visitWhenExpression(primary.WhenExpression())
+	case primary.FunctionLiteral() != nil:
+		return b.visitFunctionLiteral(primary.FunctionLiteral())
 	case primary.ThisExpression() != nil:
 		return b.ReadValue("this")
 	}
@@ -423,51 +451,214 @@ func (b *singleFileBuilder) visitWhenExpression(raw kotlinparser.IWhenExpression
 	if when.WhenSubject() != nil {
 		subject = b.visitWhenSubject(when.WhenSubject())
 	}
-	ifBuilder := b.CreateIfBuilder()
+	cases := make([]ssa.MatchCase, 0, len(when.AllWhenEntry()))
+	var otherwise func() ssa.Value
 	for _, rawEntry := range when.AllWhenEntry() {
 		entry, ok := rawEntry.(*kotlinparser.WhenEntryContext)
 		if !ok || entry == nil {
 			continue
 		}
 		if entry.ELSE() != nil {
-			ifBuilder.SetElse(func() {
-				b.visitControlStructureBody(entry.ControlStructureBody())
-			})
+			otherwise = func() ssa.Value {
+				return b.visitControlStructureBodyValue(entry.ControlStructureBody())
+			}
 			continue
 		}
-		conditions := make([]kotlinparser.IWhenConditionContext, 0, len(entry.AllWhenCondition()))
-		for i := 0; i < len(entry.AllWhenCondition()); i++ {
-			conditions = append(conditions, entry.WhenCondition(i))
-		}
-		ifBuilder.AppendItem(func() ssa.Value {
-			var result ssa.Value
-			for _, rawCondition := range conditions {
-				condition, ok := rawCondition.(*kotlinparser.WhenConditionContext)
-				if !ok || condition == nil {
-					continue
-				}
-				var current ssa.Value
-				if condition.TypeTest() != nil {
-					current = b.EmitConstInst(true)
-				} else if condition.Expression() != nil {
-					current = b.EmitBinOp(ssa.OpEq, subject, b.VisitExpression(condition.Expression()))
-				} else {
-					current = b.EmitConstInst(true)
+		conditions := entry.AllWhenCondition()
+		cases = append(cases, ssa.MatchCase{
+			Condition: func() ssa.Value {
+				var result ssa.Value
+				for _, rawCondition := range conditions {
+					condition, ok := rawCondition.(*kotlinparser.WhenConditionContext)
+					if !ok || condition == nil {
+						continue
+					}
+					value := b.visitWhenCondition(subject, condition)
+					if value == nil {
+						value = b.EmitConstInst(true)
+					}
+					if result == nil {
+						result = value
+					} else {
+						result = b.EmitBinOp(ssa.OpOr, result, value)
+					}
 				}
 				if result == nil {
-					result = current
-				} else {
-					result = b.EmitBinOp(ssa.OpOr, result, current)
+					result = b.EmitConstInst(true)
 				}
-			}
-			if result == nil {
-				result = b.EmitConstInst(true)
-			}
-			return result
-		}, func() {
-			b.visitControlStructureBody(entry.ControlStructureBody())
+				return result
+			},
+			Body: func() ssa.Value {
+				return b.visitControlStructureBodyValue(entry.ControlStructureBody())
+			},
 		})
 	}
-	ifBuilder.Build()
+	return b.BuildMatchValue(cases, otherwise)
+}
+
+func (b *singleFileBuilder) visitWhenCondition(subject ssa.Value, condition *kotlinparser.WhenConditionContext) ssa.Value {
+	switch {
+	case condition.TypeTest() != nil:
+		test, ok := condition.TypeTest().(*kotlinparser.TypeTestContext)
+		if !ok || test == nil || test.Type_() == nil {
+			return b.EmitConstInst(true)
+		}
+		value := b.emitKotlinIsType(subject, test.Type_().GetText())
+		if test.IsOperator() != nil && strings.Contains(test.IsOperator().GetText(), "!") {
+			return b.EmitUnOp(ssa.OpNot, value)
+		}
+		return value
+	case condition.RangeTest() != nil:
+		test, ok := condition.RangeTest().(*kotlinparser.RangeTestContext)
+		if !ok || test == nil || test.Expression() == nil || subject == nil {
+			return b.EmitConstInst(true)
+		}
+		rangeValue := b.VisitExpression(test.Expression())
+		value := b.EmitBinOp(ssa.OpIn, subject, rangeValue)
+		if test.InOperator() != nil && strings.Contains(test.InOperator().GetText(), "!") {
+			return b.EmitUnOp(ssa.OpNot, value)
+		}
+		return value
+	case condition.Expression() != nil:
+		value := b.VisitExpression(condition.Expression())
+		if subject == nil {
+			return value
+		}
+		return b.EmitBinOp(ssa.OpEq, subject, value)
+	}
+	return b.EmitConstInst(true)
+}
+
+func (b *singleFileBuilder) emitKotlinIsType(value ssa.Value, typeName string) ssa.Value {
+	if value == nil {
+		value = b.EmitUndefined("value")
+	}
+	callee := b.ReadValue("is")
+	if callee == nil {
+		callee = b.EmitUndefined("is")
+	}
+	result := b.EmitCall(b.NewCall(callee, []ssa.Value{value, b.EmitConstInst(typeName)}))
+	if result != nil {
+		result.SetType(ssa.CreateBooleanType())
+	}
+	return result
+}
+
+func kotlinTypeFromText(text string) ssa.Type {
+	text = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(text), "?"))
+	if index := strings.IndexByte(text, '<'); index >= 0 {
+		text = text[:index]
+	}
+	switch text {
+	case "Double", "Float":
+		return ssa.CreateFloatType()
+	case "Int", "Long", "Short", "Byte", "UInt", "ULong", "UShort", "UByte":
+		return ssa.CreateNumberType()
+	case "String", "Char", "CharSequence":
+		return ssa.CreateStringType()
+	case "Boolean":
+		return ssa.CreateBooleanType()
+	default:
+		return ssa.CreateAnyType()
+	}
+}
+
+func (b *singleFileBuilder) visitFunctionLiteral(raw kotlinparser.IFunctionLiteralContext) ssa.Value {
+	literal, ok := raw.(*kotlinparser.FunctionLiteralContext)
+	if !ok || literal == nil {
+		return b.EmitConstInstNil()
+	}
+	switch {
+	case literal.LambdaLiteral() != nil:
+		return b.visitLambdaLiteral(literal.LambdaLiteral())
+	case literal.AnonymousFunction() != nil:
+		return b.visitAnonymousFunction(literal.AnonymousFunction())
+	}
 	return b.EmitConstInstNil()
+}
+
+func (b *singleFileBuilder) visitLambdaLiteral(raw kotlinparser.ILambdaLiteralContext) ssa.Value {
+	lambda, ok := raw.(*kotlinparser.LambdaLiteralContext)
+	if !ok || lambda == nil {
+		return b.EmitConstInstNil()
+	}
+	previous := b.FunctionBuilder
+	fn := b.newClosureFunction(previous)
+	b.FunctionBuilder = previous.PushFunction(fn)
+	b.SupportClosure = true
+	b.SetForceCapture(true)
+	if params := lambda.LambdaParameters(); params != nil {
+		if list, ok := params.(*kotlinparser.LambdaParametersContext); ok && list != nil {
+			for _, rawParam := range list.AllLambdaParameter() {
+				param, ok := rawParam.(*kotlinparser.LambdaParameterContext)
+				if !ok || param == nil {
+					continue
+				}
+				b.addLambdaParameter(param)
+			}
+		}
+	}
+	if value := b.visitStatementsValue(lambda.Statements()); value != nil {
+		b.EmitReturn([]ssa.Value{value})
+	}
+	b.Finish()
+	b.SetForceCapture(false)
+	b.FunctionBuilder = b.PopFunction()
+	b.FunctionBuilder = previous
+	return fn
+}
+
+func (b *singleFileBuilder) addLambdaParameter(param *kotlinparser.LambdaParameterContext) {
+	if param == nil {
+		return
+	}
+	if variable := param.VariableDeclaration(); variable != nil {
+		if v, ok := variable.(*kotlinparser.VariableDeclarationContext); ok && v.SimpleIdentifier() != nil {
+			b.NewParam(v.SimpleIdentifier().GetText())
+		}
+		return
+	}
+	if multi := param.MultiVariableDeclaration(); multi != nil {
+		if m, ok := multi.(*kotlinparser.MultiVariableDeclarationContext); ok && m != nil {
+			for _, rawVariable := range m.AllVariableDeclaration() {
+				if v, ok := rawVariable.(*kotlinparser.VariableDeclarationContext); ok && v.SimpleIdentifier() != nil {
+					b.NewParam(v.SimpleIdentifier().GetText())
+				}
+			}
+		}
+	}
+}
+
+func (b *singleFileBuilder) visitAnonymousFunction(raw kotlinparser.IAnonymousFunctionContext) ssa.Value {
+	fnCtx, ok := raw.(*kotlinparser.AnonymousFunctionContext)
+	if !ok || fnCtx == nil {
+		return b.EmitConstInstNil()
+	}
+	previous := b.FunctionBuilder
+	fn := b.newClosureFunction(previous)
+	b.FunctionBuilder = previous.PushFunction(fn)
+	b.SupportClosure = true
+	b.SetForceCapture(true)
+	if params := fnCtx.FunctionValueParameters(); params != nil {
+		b.addFunctionValueParameters(params)
+	}
+	if body := fnCtx.FunctionBody(); body != nil {
+		b.visitFunctionBody(body)
+	}
+	b.Finish()
+	b.SetForceCapture(false)
+	b.FunctionBuilder = b.PopFunction()
+	b.FunctionBuilder = previous
+	return fn
+}
+
+func (b *singleFileBuilder) newClosureFunction(previous *ssa.FunctionBuilder) *ssa.Function {
+	if previous == nil {
+		return nil
+	}
+	previousSupport := previous.SupportClosure
+	previous.SupportClosure = true
+	fn := previous.NewFunc("")
+	previous.SupportClosure = previousSupport
+	return fn
 }

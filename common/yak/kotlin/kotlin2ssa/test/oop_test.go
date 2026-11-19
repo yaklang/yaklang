@@ -84,3 +84,36 @@ fun main() {
 `, "main")
 	})
 }
+
+func TestKotlinThisField(t *testing.T) {
+	t.Run("this field read", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+class Box {
+    val value = 42
+    fun fetch(): Int {
+        println(this.value)
+        return this.value
+    }
+}
+fun main() {
+    fetch()
+}
+`, "42")
+	})
+
+	t.Run("this field write", func(t *testing.T) {
+		checkPrintlnValueContain(t, `
+class Counter {
+    var value = 1
+    fun bump(): Int {
+        this.value = this.value + 1
+        println(this.value)
+        return this.value
+    }
+}
+fun main() {
+    bump()
+}
+`, "2")
+	})
+}
