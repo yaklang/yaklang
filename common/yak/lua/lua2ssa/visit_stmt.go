@@ -53,8 +53,6 @@ func (b *singleFileBuilder) VisitStat(raw luaparser.IStatContext) {
 		b.visitAssignment(stat)
 	case stat.Functioncall() != nil:
 		b.VisitFunctioncall(stat.Functioncall())
-	case stat.Do() != nil:
-		b.VisitBlock(stat.Block(0))
 	case stat.While() != nil:
 		b.visitWhile(stat)
 	case stat.Repeat() != nil:
@@ -63,6 +61,11 @@ func (b *singleFileBuilder) VisitStat(raw luaparser.IStatContext) {
 		b.visitIf(stat)
 	case stat.For() != nil:
 		b.visitFor(stat)
+	case stat.Do() != nil:
+		// Plain `do ... end`. Compound forms are matched above: their `Do`
+		// token also satisfies this accessor, which previously lowered
+		// every loop body as one straight-line block.
+		b.VisitBlock(stat.Block(0))
 	case stat.Local() != nil && stat.Function() != nil:
 		b.visitFunctionStat(stat, true)
 	case stat.Function() != nil:

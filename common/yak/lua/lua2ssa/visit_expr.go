@@ -39,6 +39,9 @@ func (b *singleFileBuilder) VisitExp(raw luaparser.IExpContext) ssa.Value {
 	case exp.String_() != nil:
 		return b.EmitConstInst(luaStringValue(exp.String_().GetText()))
 	case exp.Ellipsis() != nil:
+		if value := b.ReadValue("..."); value != nil {
+			return value
+		}
 		return b.EmitUndefined("...")
 	case exp.Functiondef() != nil:
 		def, ok := exp.Functiondef().(*luaparser.FunctiondefContext)
@@ -82,6 +85,11 @@ func (b *singleFileBuilder) evalUnary(operator string, operand ssa.Value) ssa.Va
 	case "~":
 		return b.EmitUnOp(ssa.OpBitwiseNot, operand)
 	case "#":
+		if constant, ok := operand.(*ssa.ConstInst); ok {
+			if text, ok := constant.GetRawValue().(string); ok {
+				return b.EmitConstInst(int64(len(text)))
+			}
+		}
 		return b.EmitUndefined("#")
 	default:
 		return b.EmitUndefined("lua-unary:" + operator)
