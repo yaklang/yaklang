@@ -1,6 +1,7 @@
 package cpp2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	cppparser "github.com/yaklang/yaklang/common/yak/cpp/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -28,6 +29,9 @@ func (b *singleFileBuilder) visitStatement(raw cppparser.IStatementContext) {
 		b.visitLabeledStatement(statement.LabeledStatement())
 	case statement.DeclarationStatement() != nil:
 		if declaration, ok := statement.DeclarationStatement().(*cppparser.DeclarationStatementContext); ok && declaration != nil {
+			if b.lowerCallShapedDeclaration(declaration.BlockDeclaration()) {
+				break
+			}
 			b.visitBlockDeclaration(declaration.BlockDeclaration())
 		}
 	case statement.CompoundStatement() != nil:
@@ -103,6 +107,7 @@ func (b *singleFileBuilder) visitSwitchStatement(selection *cppparser.SelectionS
 	segments := b.splitSwitchSegments(statements[0])
 
 	builder := b.BuildSwitch()
+	builder.DirectBodyMerge = true
 	builder.BuildCondition(func() ssa.Value {
 		return b.visitCondition(selection.Condition())
 	})
@@ -153,9 +158,18 @@ func (b *singleFileBuilder) splitSwitchSegments(raw cppparser.IStatementContext)
 
 	var segments []*switchSegment
 	var current *switchSegment
-	for _, statement := range statements {
-		if label := switchLabel(statement); label != nil {
+	for _, raw := range statements {
+		statement := raw
+		// `case 1: case 2: body` nests the labels: the grammar puts the
+		// statement after a label inside that labeledStatement. Unwrap every
+		// label and keep the innermost statement as body content.
+		for statement != nil {
+			label := switchLabel(statement)
+			if label == nil {
+				break
+			}
 			segment := &switchSegment{}
+			isCase := true
 			switch {
 			case label.ConstantExpression() != nil:
 				segment.labels = []ssa.Value{b.evalNode(label.ConstantExpression())}
@@ -163,10 +177,21 @@ func (b *singleFileBuilder) splitSwitchSegments(raw cppparser.IStatementContext)
 				segment.isDefault = true
 			default:
 				// A plain `label:` is not a case arm.
+				isCase = false
+			}
+			if !isCase {
+				statement = label.Statement()
 				continue
 			}
 			segments = append(segments, segment)
 			current = segment
+			statement = label.Statement()
+		}
+		if statement == nil {
+			continue
+		}
+		if switchLabel(statement) != nil {
+			// Only possible when the label is not a case/default.
 			continue
 		}
 		if current == nil {
@@ -212,15 +237,28 @@ func (b *singleFileBuilder) visitIterationStatement(raw cppparser.IIterationStat
 		})
 		loop.Finish()
 	case iteration.Do() != nil:
-		condition := iteration.Condition()
+		// do-while runs the body before the condition. The loop builder always
+		// tests first, so the body is emitted once per iteration and exits with
+		// a break when the trailing condition is false.
+		condition := iteration.Expression()
 		loop := b.CreateLoopBuilder()
 		loop.SetCondition(func() ssa.Value {
-			return b.visitCondition(condition)
+			return b.EmitConstInst(true)
 		})
 		loop.SetBody(func() {
 			if body := iteration.Statement(); body != nil {
 				b.visitStatement(body)
 			}
+			if condition == nil {
+				return
+			}
+			ifBuilder := b.CreateIfBuilder()
+			ifBuilder.SetCondition(func() ssa.Value {
+				return b.EmitUnOp(ssa.OpNot, b.evalNode(condition))
+			}, func() {
+				b.Break()
+			})
+			ifBuilder.Build()
 		})
 		loop.Finish()
 	case iteration.For() != nil:
@@ -232,18 +270,32 @@ func (b *singleFileBuilder) visitForStatement(iteration *cppparser.IterationStat
 	statement := iteration.Statement()
 	if rangeDeclaration := iteration.ForRangeDeclaration(); rangeDeclaration != nil {
 		declaration, ok := rangeDeclaration.(*cppparser.ForRangeDeclarationContext)
+		var declaredName string
+		var iterable ssa.Value
 		if ok && declaration != nil {
 			info := b.typeSpecifierInfo(declaration.DeclSpecifierSeq())
 			resolved := b.parseDeclarator(declaration.Declarator(), info.typ)
-			if resolved.name != "" {
-				b.AssignVariable(b.CreateVariable(resolved.name), b.EmitUndefined(resolved.name))
-			}
-		}
-		if initializer := iteration.ForRangeInitializer(); initializer != nil {
-			b.evalNode(initializer)
+			declaredName = resolved.name
 		}
 		loop := b.CreateLoopBuilder()
-		loop.SetCondition(func() ssa.Value { return b.EmitConstInst(true) })
+		loop.SetFirst(func() []ssa.Value {
+			if initializer := iteration.ForRangeInitializer(); initializer != nil {
+				iterable = b.evalNode(initializer)
+			}
+			return nil
+		})
+		loop.SetCondition(func() ssa.Value {
+			if declaredName != "" && !utils.IsNil(iterable) {
+				_, field, nextOK := b.EmitNext(iterable, false)
+				if !utils.IsNil(field) {
+					b.AssignVariable(b.CreateVariable(declaredName), field)
+					if !utils.IsNil(nextOK) {
+						return nextOK
+					}
+				}
+			}
+			return b.EmitConstInst(true)
+		})
 		loop.SetBody(func() {
 			if statement != nil {
 				b.visitStatement(statement)
@@ -257,42 +309,13 @@ func (b *singleFileBuilder) visitForStatement(iteration *cppparser.IterationStat
 	condition := iteration.Condition()
 	step := iteration.Expression()
 
+	// Declare the init variables in the enclosing scope before the loop builder
+	// snapshots its variables. A variable created inside SetFirst is newer than
+	// the loop scope snapshot, so the loop would read its pre-loop constant on
+	// every iteration instead of a merged phi.
+	b.visitForInitStatement(init)
+
 	loop := b.CreateLoopBuilder()
-	loop.SetFirst(func() []ssa.Value {
-		if init == nil {
-			return nil
-		}
-		forInit, ok := init.(*cppparser.ForInitStatementContext)
-		if !ok || forInit == nil {
-			return nil
-		}
-		if statement, ok := forInit.ExpressionStatement().(*cppparser.ExpressionStatementContext); ok && statement != nil && statement.Expression() != nil {
-			b.evalNode(statement.Expression())
-			return nil
-		}
-		if declaration, ok := forInit.SimpleDeclaration().(*cppparser.SimpleDeclarationContext); ok && declaration != nil {
-			info := b.typeSpecifierInfo(declaration.DeclSpecifierSeq())
-			list, ok := declaration.InitDeclaratorList().(*cppparser.InitDeclaratorListContext)
-			if !ok || list == nil {
-				return nil
-			}
-			for _, rawInit := range list.AllInitDeclarator() {
-				initDeclarator, ok := rawInit.(*cppparser.InitDeclaratorContext)
-				if !ok || initDeclarator == nil || initDeclarator.Declarator() == nil {
-					continue
-				}
-				resolved := b.parseDeclarator(initDeclarator.Declarator(), info.typ)
-				value := b.declareValue(resolved, info)
-				if initializer := initDeclarator.Initializer(); initializer != nil {
-					if assigned := b.visitInitializer(initializer, resolved.typ); assigned != nil {
-						value = assigned
-					}
-				}
-				b.AssignVariable(b.CreateVariable(resolved.name), value)
-			}
-		}
-		return nil
-	})
 	loop.SetCondition(func() ssa.Value {
 		if condition == nil {
 			return b.EmitConstInst(true)
@@ -313,8 +336,26 @@ func (b *singleFileBuilder) visitForStatement(iteration *cppparser.IterationStat
 	loop.Finish()
 }
 
-func (b *singleFileBuilder) visitJumpStatement(raw cppparser.IJumpStatementContext) {
-	jump, ok := raw.(*cppparser.JumpStatementContext)
+// visitForInitStatement lowers the for-init clause in the enclosing block, so
+// the declared variables exist before the loop scope is snapshotted.
+func (b *singleFileBuilder) visitForInitStatement(raw cppparser.IForInitStatementContext) {
+	if raw == nil {
+		return
+	}
+	forInit, ok := raw.(*cppparser.ForInitStatementContext)
+	if !ok || forInit == nil {
+		return
+	}
+	if statement, ok := forInit.ExpressionStatement().(*cppparser.ExpressionStatementContext); ok && statement != nil && statement.Expression() != nil {
+		b.evalNode(statement.Expression())
+		return
+	}
+	if declaration, ok := forInit.SimpleDeclaration().(*cppparser.SimpleDeclarationContext); ok && declaration != nil {
+		b.visitSimpleDeclaration(declaration)
+	}
+}
+
+func (b *singleFileBuilder) visitJumpStatement(raw cppparser.IJumpStatementContext) {	jump, ok := raw.(*cppparser.JumpStatementContext)
 	if !ok || jump == nil {
 		return
 	}

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/antlr/v4"
+
+	"github.com/yaklang/yaklang/common/utils"
 	cppparser "github.com/yaklang/yaklang/common/yak/cpp/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -93,6 +96,220 @@ func (b *singleFileBuilder) visitBlockDeclaration(raw cppparser.IBlockDeclaratio
 	}
 }
 
+// lowerCallShapedDeclaration rewrites the grammar's declaration reading of a
+// statement such as `println(value);`. The CPP14 grammar cannot tell `T (x);`
+// (a declaration) from `f(x);` (a call) without a symbol table, and ANTLR picks
+// the declaration alternative. When the spelled type is not a known type and
+// the declarator is exactly one parenthesized identifier, the statement is a
+// call and is lowered as one.
+func (b *singleFileBuilder) lowerCallShapedDeclaration(raw cppparser.IBlockDeclarationContext) bool {
+	block, ok := raw.(*cppparser.BlockDeclarationContext)
+	if !ok || block == nil || block.SimpleDeclaration() == nil {
+		return false
+	}
+	declaration, ok := block.SimpleDeclaration().(*cppparser.SimpleDeclarationContext)
+	if !ok || declaration == nil {
+		return false
+	}
+	if declaration.DeclSpecifierSeq() == nil {
+		// `println("x");` parses as a declaration of a variable named println
+		// with a parenthesized initializer: there is no decl-specifier. A block
+		// declaration always needs a type, so this shape is a call.
+		return b.lowerCallInitializerDeclaration(declaration)
+	}
+	callee := strings.TrimSpace(declaration.DeclSpecifierSeq().GetText())
+	if !isPlainCppIdentifier(callee) || b.isKnownTypeSpelling(callee) {
+		return false
+	}
+	list, ok := declaration.InitDeclaratorList().(*cppparser.InitDeclaratorListContext)
+	if !ok || list == nil || len(list.AllInitDeclarator()) != 1 {
+		return false
+	}
+	init, ok := list.AllInitDeclarator()[0].(*cppparser.InitDeclaratorContext)
+	if !ok || init == nil || init.Initializer() != nil || init.Declarator() == nil {
+		return false
+	}
+	calleeValue := b.resolveCallableValue(callee, 1)
+	if utils.IsNil(calleeValue) {
+		return false
+	}
+	var argumentValue ssa.Value
+	if argument := parenthesizedDeclaratorIdentifier(init.Declarator()); argument != "" {
+		argumentValue = b.PeekValue(argument)
+	} else if inner := parenthesizedDeclaratorInner(init.Declarator()); inner != nil {
+		// `println(*p);` and `println(values[1]);` parse as declarations whose
+		// parenthesized declarator is an expression-shaped declarator.
+		argumentValue = b.evalDeclaratorExpression(inner)
+	}
+	if utils.IsNil(argumentValue) {
+		return false
+	}
+	b.EmitCall(b.NewCall(calleeValue, []ssa.Value{argumentValue}))
+	return true
+}
+
+// lowerCallInitializerDeclaration lowers `f(args);` when the parser read the
+// call as a declaration whose declarator is the function name and whose
+// initializer is the parenthesized argument list.
+func (b *singleFileBuilder) lowerCallInitializerDeclaration(declaration *cppparser.SimpleDeclarationContext) bool {
+	list, ok := declaration.InitDeclaratorList().(*cppparser.InitDeclaratorListContext)
+	if !ok || list == nil || len(list.AllInitDeclarator()) != 1 {
+		return false
+	}
+	init, ok := list.AllInitDeclarator()[0].(*cppparser.InitDeclaratorContext)
+	if !ok || init == nil || init.Declarator() == nil || init.Initializer() == nil {
+		return false
+	}
+	initializer, ok := init.Initializer().(*cppparser.InitializerContext)
+	if !ok || initializer == nil || initializer.ExpressionList() == nil {
+		return false
+	}
+	name := bareDeclaratorName(init.Declarator())
+	if name == "" {
+		return false
+	}
+	args := b.visitExpressionList(initializer.ExpressionList())
+	callee := b.resolveCallableValue(name, len(args))
+	if utils.IsNil(callee) {
+		return false
+	}
+	b.EmitCall(b.NewCall(callee, args))
+	return true
+}
+
+// bareDeclaratorName returns the name of a declarator with no pointer, array or
+// parameter list decorations.
+func bareDeclaratorName(raw cppparser.IDeclaratorContext) string {
+	declarator, ok := raw.(*cppparser.DeclaratorContext)
+	if !ok || declarator == nil {
+		return ""
+	}
+	pointer, ok := declarator.PointerDeclarator().(*cppparser.PointerDeclaratorContext)
+	if !ok || pointer == nil || len(pointer.AllPointerOperator()) != 0 {
+		return ""
+	}
+	noPointer, ok := pointer.NoPointerDeclarator().(*cppparser.NoPointerDeclaratorContext)
+	if !ok || noPointer == nil || noPointer.DeclaratorId() == nil {
+		return ""
+	}
+	if noPointer.LeftParen() != nil || noPointer.LeftBracket() != nil || noPointer.ParametersAndQualifiers() != nil {
+		return ""
+	}
+	id, ok := noPointer.DeclaratorId().(*cppparser.DeclaratorIdContext)
+	if !ok || id == nil {
+		return ""
+	}
+	name := strings.TrimSpace(id.GetText())
+	if !isPlainCppIdentifier(name) {
+		return ""
+	}
+	return name
+}
+
+// parenthesizedDeclaratorIdentifier returns the inner name of a declarator that
+// is exactly `(name)`. Other declarator shapes return an empty string.
+func parenthesizedDeclaratorIdentifier(raw cppparser.IDeclaratorContext) string {
+	declarator, ok := raw.(*cppparser.DeclaratorContext)
+	if !ok || declarator == nil {
+		return ""
+	}
+	pointer, ok := declarator.PointerDeclarator().(*cppparser.PointerDeclaratorContext)
+	if !ok || pointer == nil || len(pointer.AllPointerOperator()) != 0 {
+		return ""
+	}
+	noPointer, ok := pointer.NoPointerDeclarator().(*cppparser.NoPointerDeclaratorContext)
+	if !ok || noPointer == nil || noPointer.LeftParen() == nil || noPointer.RightParen() == nil {
+		return ""
+	}
+	inner, ok := noPointer.PointerDeclarator().(*cppparser.PointerDeclaratorContext)
+	if !ok || inner == nil || len(inner.AllPointerOperator()) != 0 {
+		return ""
+	}
+	innerNoPointer, ok := inner.NoPointerDeclarator().(*cppparser.NoPointerDeclaratorContext)
+	if !ok || innerNoPointer == nil || innerNoPointer.LeftParen() != nil || innerNoPointer.DeclaratorId() == nil {
+		return ""
+	}
+	id, ok := innerNoPointer.DeclaratorId().(*cppparser.DeclaratorIdContext)
+	if !ok || id == nil {
+		return ""
+	}
+	name := strings.TrimSpace(id.GetText())
+	if !isPlainCppIdentifier(name) {
+		return ""
+	}
+	return name
+}
+
+func isPlainCppIdentifier(text string) bool {
+	if text == "" {
+		return false
+	}
+	for index, r := range text {
+		if r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' {
+			continue
+		}
+		if index > 0 && r >= '0' && r <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// isKnownTypeSpelling reports whether name already names a type in this
+// translation unit. It never creates a blueprint, so an unknown callee name is
+// not poisoned into a declaration on the next occurrence.
+func (b *singleFileBuilder) isKnownTypeSpelling(name string) bool {
+	if isBuiltinTypeSpelling(name) {
+		return true
+	}
+	if _, ok := b.typeAliases[name]; ok {
+		return true
+	}
+	if b.GetBluePrint(name) != nil {
+		return true
+	}
+	return b.GetProgram().GetType(name) != nil
+}
+
+func isBuiltinTypeSpelling(name string) bool {
+	switch name {
+	case "void", "bool", "char", "wchar_t", "char16_t", "char32_t", "char8_t",
+		"short", "shortint", "unsignedshort", "unsignedshortint",
+		"int", "signed", "signedint", "unsigned", "unsignedint",
+		"long", "longint", "unsignedlong", "unsignedlongint",
+		"longlong", "longlongint", "unsignedlonglong", "unsignedlonglongint",
+		"float", "double", "longdouble", "auto", "decltype", "size_t", "ssize_t",
+		"ptrdiff_t", "intptr_t", "uintptr_t",
+		"int8_t", "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t", "uint64_t":
+		return true
+	}
+	return false
+}
+
+// resolveIdentifierValue mirrors the lookup order of visitIdExpression without
+// materializing an Undefined value.
+func (b *singleFileBuilder) resolveIdentifierValue(name string) ssa.Value {
+	// PeekValue must come before ReadValue: ReadValue creates an Undefined
+	// binding for an unknown name, which would shadow the program export table
+	// and turn a call to a sibling function into a call to an undefined value.
+	if value := b.PeekValue(name); !utils.IsNil(value) {
+		return value
+	}
+	if value := b.GetProgram().GetExportValue(name); !utils.IsNil(value) {
+		return value
+	}
+	for _, using := range b.usingNamespaces {
+		if value := b.PeekValue(using + "::" + name); !utils.IsNil(value) {
+			return value
+		}
+		if value := b.GetProgram().GetExportValue(using + "::" + name); !utils.IsNil(value) {
+			return value
+		}
+	}
+	return nil
+}
+
 // visitSimpleDeclaration handles variable declarations, typedefs, prototypes and
 // inline class/struct definitions such as `struct Point { int x; } p;`.
 func (b *singleFileBuilder) visitSimpleDeclaration(raw cppparser.ISimpleDeclarationContext) {
@@ -121,14 +338,31 @@ func (b *singleFileBuilder) visitSimpleDeclaration(raw cppparser.ISimpleDeclarat
 			continue
 		}
 		if resolved.isFunction {
+			if init.Initializer() != nil {
+				// `int (*fp)(int) = inc;` is a pointer variable holding a
+				// function, not a prototype declaration.
+				if value := b.visitInitializer(init.Initializer(), resolved.typ); !utils.IsNil(value) {
+					b.AssignVariable(b.CreateVariable(resolved.name), value)
+				}
+				continue
+			}
 			b.declareFunction(resolved, b.class, info)
 			continue
 		}
-		value := b.declareValue(resolved, info)
+		declared := b.declareValue(resolved, info)
+		value := declared
 		if initializer := init.Initializer(); initializer != nil {
 			if assigned := b.visitInitializer(initializer, resolved.typ); assigned != nil {
+				initializerType := assigned.GetType()
 				value = assigned
-				value.SetType(resolved.typ)
+				if !info.isAuto {
+					value.SetType(resolved.typ)
+				}
+				if info.isAuto && initializerType != nil {
+					// auto takes the initializer's type; the placeholder value
+					// keeps that type for name-based type queries.
+					declared.SetType(initializerType)
+				}
 			}
 		}
 		b.AssignVariable(b.CreateVariable(resolved.name), value)
@@ -210,14 +444,24 @@ func (b *singleFileBuilder) visitBracedInitList(raw cppparser.IBracedInitListCon
 	if len(values) == 1 {
 		return values[0]
 	}
-	sliceType := ssa.NewSliceType(ssa.CreateAnyType())
+	var sliceType ssa.Type = ssa.NewSliceType(ssa.CreateAnyType())
 	if typ != nil {
-		sliceType = ssa.NewSliceType(typ)
+		if object, ok := ssa.ToObjectType(typ); ok && object != nil && object.Kind == ssa.SliceTypeKind {
+			sliceType = typ
+		} else {
+			sliceType = ssa.NewSliceType(typ)
+		}
 	}
-	value := b.EmitUndefined("braced-init-list")
-	value.SetType(sliceType)
-	_ = values
-	return value
+	container := b.EmitEmptyContainer()
+	if utils.IsNil(container) {
+		return b.EmitUndefined("braced-init-list")
+	}
+	container.SetType(sliceType)
+	for index, element := range values {
+		key := b.EmitConstInst(int64(index))
+		b.AssignVariable(b.CreateMemberCallVariable(container, key), element)
+	}
+	return container
 }
 
 func (b *singleFileBuilder) visitInitializerList(raw cppparser.IInitializerListContext) []ssa.Value {
@@ -449,6 +693,14 @@ func (b *singleFileBuilder) visitMemberDeclaration(raw cppparser.IMemberDeclarat
 	case member.AliasDeclaration() != nil:
 		b.visitAliasDeclaration(member.AliasDeclaration())
 	}
+	if member.MemberDeclaratorList() == nil {
+		// A nested class or struct definition has no declarator; visiting the
+		// specifier creates its blueprint (`class Outer { class Inner {}; };`).
+		if specifiers := member.DeclSpecifierSeq(); specifiers != nil {
+			b.typeSpecifierInfo(specifiers)
+		}
+		return
+	}
 	list, ok := member.MemberDeclaratorList().(*cppparser.MemberDeclaratorListContext)
 	if !ok || list == nil {
 		return
@@ -516,6 +768,15 @@ func (b *singleFileBuilder) classFromScope(scope []string) *ssa.Blueprint {
 // still bind to a callable.
 func (b *singleFileBuilder) declareFunction(resolved declaratorInfo, class *ssa.Blueprint, info declTypeInfo) *ssa.Function {
 	fullName := b.functionFullName(resolved, class)
+	// A prototype in a later translation unit must not replace the definition
+	// that was already built under the same name; re-register the definition
+	// instead of creating a body-less function.
+	if existing := b.GetProgram().GetExportValue(fullName); !utils.IsNil(existing) {
+		if fn, ok := ssa.ToFunction(existing); ok && fn != nil && len(fn.Params) == len(resolved.params) {
+			b.registerFunction(fn, resolved.name, class, resolved.isStatic || info.isStatic)
+			return fn
+		}
+	}
 	fn := b.NewFunc(fullName)
 	fn.SetMethodName(resolved.name)
 	b.registerFunction(fn, resolved.name, class, resolved.isStatic || info.isStatic)
@@ -557,6 +818,15 @@ func (b *singleFileBuilder) buildFunction(resolved declaratorInfo, class *ssa.Bl
 	fn := b.NewFunc(fullName)
 	fn.SetMethodName(resolved.name)
 	b.registerFunction(fn, resolved.name, class, resolved.isStatic)
+	// Publish the name before lowering the body so recursion and sibling
+	// lookups resolve to this function instead of an undefined value.
+	b.GetProgram().SetExportValue(fullName, fn)
+	if class == nil {
+		b.AssignVariable(b.CreateVariable(fullName), fn)
+		if resolved.name != fullName {
+			b.AssignVariable(b.CreateVariable(resolved.name), fn)
+		}
+	}
 
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
@@ -579,14 +849,6 @@ func (b *singleFileBuilder) buildFunction(resolved declaratorInfo, class *ssa.Bl
 	b.FunctionBuilder = previous
 	b.class = savedClass
 	b.MarkedThisClassBlueprint = nil
-
-	b.GetProgram().SetExportValue(fullName, fn)
-	if class == nil {
-		b.AssignVariable(b.CreateVariable(fullName), fn)
-		if resolved.name != fullName {
-			b.AssignVariable(b.CreateVariable(resolved.name), fn)
-		}
-	}
 	return fn
 }
 
@@ -829,4 +1091,106 @@ func normalizeOperatorName(text string) string {
 		return text
 	}
 	return text
+}
+
+// functionAccepts reports whether fn can take argCount arguments.
+func functionAccepts(fn *ssa.Function, argCount int) bool {
+	if fn == nil {
+		return false
+	}
+	return len(fn.Params) == argCount
+}
+
+// resolveCallableValue resolves a function name and prefers the overload whose
+// parameter count matches the call site. The export table holds one entry per
+// name, so overloads must be looked up in the function table.
+func (b *singleFileBuilder) resolveCallableValue(name string, argCount int) ssa.Value {
+	value := b.resolveIdentifierValue(name)
+	if fn, ok := ssa.ToFunction(value); ok && fn != nil && functionAccepts(fn, argCount) {
+		return fn
+	}
+	var match *ssa.Function
+	b.GetProgram().Funcs.ForEach(func(key string, candidate *ssa.Function) bool {
+		if candidate == nil || (key != name && candidate.GetName() != name) {
+			return true
+		}
+		if functionAccepts(candidate, argCount) {
+			match = candidate
+			return false
+		}
+		return true
+	})
+	if match != nil {
+		return match
+	}
+	return value
+}
+
+// parenthesizedDeclaratorInner returns the declarator inside a declarator that
+// is exactly `( ... )`, for call-shaped declarations such as `println(*p);`.
+func parenthesizedDeclaratorInner(raw cppparser.IDeclaratorContext) antlr.Tree {
+	declarator, ok := raw.(*cppparser.DeclaratorContext)
+	if !ok || declarator == nil {
+		return nil
+	}
+	pointer, ok := declarator.PointerDeclarator().(*cppparser.PointerDeclaratorContext)
+	if !ok || pointer == nil || len(pointer.AllPointerOperator()) != 0 {
+		return nil
+	}
+	noPointer, ok := pointer.NoPointerDeclarator().(*cppparser.NoPointerDeclaratorContext)
+	if !ok || noPointer == nil || noPointer.LeftParen() == nil {
+		return nil
+	}
+	if inner := noPointer.PointerDeclarator(); inner != nil {
+		return inner
+	}
+	if inner := noPointer.NoPointerDeclarator(); inner != nil {
+		return inner
+	}
+	return nil
+}
+
+// evalDeclaratorExpression evaluates a declarator node as an expression. It is
+// used only for parenthesized declarators in call-shaped declarations, where
+// the grammar has no expression context to evaluate.
+func (b *singleFileBuilder) evalDeclaratorExpression(raw antlr.Tree) ssa.Value {
+	switch node := raw.(type) {
+	case *cppparser.PointerDeclaratorContext:
+		if node == nil {
+			return nil
+		}
+		value := b.evalDeclaratorExpression(node.NoPointerDeclarator())
+		for _, operator := range node.AllPointerOperator() {
+			switch operator.GetText() {
+			case "*":
+				if value != nil {
+					if origin := b.GetOriginValue(value); origin != nil && !utils.IsNil(origin) {
+						value = origin
+					}
+				}
+			case "&":
+				// Address-of in this shape is rare; keep the operand.
+			}
+		}
+		return value
+	case *cppparser.NoPointerDeclaratorContext:
+		if node == nil {
+			return nil
+		}
+		var value ssa.Value
+		switch {
+		case node.PointerDeclarator() != nil:
+			value = b.evalDeclaratorExpression(node.PointerDeclarator())
+		case node.NoPointerDeclarator() != nil:
+			value = b.evalDeclaratorExpression(node.NoPointerDeclarator())
+		case node.DeclaratorId() != nil:
+			name, _ := splitQualifiedName(node.DeclaratorId().GetText())
+			value = b.ReadValue(name)
+		}
+		if node.LeftBracket() != nil && node.ConstantExpression() != nil {
+			value = b.ReadMemberCallValue(value, b.evalNode(node.ConstantExpression()))
+		}
+		return value
+	}
+	return nil
 }

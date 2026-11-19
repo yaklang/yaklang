@@ -185,31 +185,60 @@ func (b *singleFileBuilder) visitConditionalExpression(expression *cppparser.Con
 		return condition
 	}
 	name := fmt.Sprintf("ternary_%d", expression.GetStart().GetStart())
+	// Register the result in the enclosing scope before branching. A variable
+	// first created inside an if arm is not visible to the merge, and the join
+	// would have no phi for the ternary result.
+	b.CreateVariable(name)
+	var trueValue, falseValue ssa.Value
 	builder := b.CreateIfBuilder()
 	builder.SetCondition(func() ssa.Value {
 		return condition
 	}, func() {
 		if value := b.evalNode(expression.Expression()); value != nil {
+			trueValue = value
 			b.AssignVariable(b.CreateVariable(name), value)
 		}
 	})
 	if elseExpression := expression.AssignmentExpression(); elseExpression != nil {
 		builder.SetElse(func() {
 			if value := b.evalNode(elseExpression); value != nil {
+				falseValue = value
 				b.AssignVariable(b.CreateVariable(name), value)
 			}
 		})
 	}
 	builder.Build()
-	if value := b.ReadValue(name); value != nil {
+	if value := b.PeekValue(name); !utils.IsNil(value) {
+		if phi, ok := ssa.ToPhi(value); ok {
+			// The if merge kept the variable name but the phi value itself is
+			// unnamed; name it so the result is traceable in SSA dumps.
+			phi.SetName(name)
+		}
 		return value
+	}
+	// IfStmt.BuildFinish shadows the join scope with CoverBy, which drops a
+	// variable that did not exist before the if. Merge the two branch values
+	// explicitly in that case so the ternary still has a phi result.
+	if !utils.IsNil(trueValue) && !utils.IsNil(falseValue) {
+		return b.EmitPhi(name, ssa.Values{trueValue, falseValue})
 	}
 	return b.EmitConstInstNil()
 }
 
 func (b *singleFileBuilder) visitCastExpression(expression *cppparser.CastExpressionContext) ssa.Value {
+	if expression == nil {
+		return b.EmitConstInstNil()
+	}
 	if unary := expression.UnaryExpression(); unary != nil {
 		return b.evalNode(unary)
+	}
+	// C-style cast: (type-id) cast-expression.
+	if typeID := expression.TheTypeId(); typeID != nil && expression.CastExpression() != nil {
+		value := b.evalNode(expression.CastExpression())
+		if utils.IsNil(value) {
+			return b.EmitConstInstNil()
+		}
+		return b.EmitTypeCast(value, b.typeFromTypeIDText(typeID.GetText()))
 	}
 	if inner := expression.CastExpression(); inner != nil {
 		return b.evalNode(inner)
@@ -349,6 +378,9 @@ func (b *singleFileBuilder) visitPostfixExpression(expression *cppparser.Postfix
 		switch {
 		case expression.LeftParen() != nil:
 			args := b.visitExpressionList(expression.ExpressionList())
+			if name := postfixCalleeName(expression); name != "" {
+				base = b.resolveCallableValue(name, len(args))
+			}
 			return b.EmitCall(b.NewCall(base, args))
 		case expression.LeftBracket() != nil:
 			if target := expression.Expression(); target != nil {
@@ -369,17 +401,62 @@ func (b *singleFileBuilder) visitPostfixExpression(expression *cppparser.Postfix
 					object = origin
 				}
 			}
+			if method := b.memberMethodForValue(object, name); !utils.IsNil(method) {
+				return method
+			}
 			return b.ReadMemberCallValue(object, b.EmitConstInst(name))
 		case expression.PlusPlus() != nil || expression.MinusMinus() != nil:
-			one := b.EmitConstInst(1)
-			if expression.PlusPlus() != nil {
-				return b.EmitBinOp(ssa.OpAdd, base, one)
+			// The postfix form also updates the lvalue; treating it as a pure
+			// BinOp would leave `i++` without an assignment and the loop
+			// variable would keep its pre-loop value.
+			value, variable := b.evalLValue(expression.PostfixExpression())
+			if utils.IsNil(value) {
+				value = base
 			}
-			return b.EmitBinOp(ssa.OpSub, base, one)
+			one := b.EmitConstInst(1)
+			var updated ssa.Value
+			if expression.PlusPlus() != nil {
+				updated = b.EmitBinOp(ssa.OpAdd, value, one)
+			} else {
+				updated = b.EmitBinOp(ssa.OpSub, value, one)
+			}
+			if variable != nil {
+				b.AssignVariable(variable, updated)
+			}
+			return updated
 		}
 		return base
 	case expression.SimpleTypeSpecifier() != nil || expression.TypeNameSpecifier() != nil:
+		// The grammar also matches `name(args)` as a function-style cast on a
+		// type specifier. For an unknown plain name this is a call, not a
+		// temporary: `println("x")` must reach println, not a discarded value.
+		spelling := ""
+		if simple := expression.SimpleTypeSpecifier(); simple != nil {
+			spelling = simple.GetText()
+			if specifier, ok := simple.(*cppparser.SimpleTypeSpecifierContext); ok && specifier != nil && specifier.SimpleTemplateId() != nil {
+				if templateID, ok := specifier.SimpleTemplateId().(*cppparser.SimpleTemplateIdContext); ok && templateID != nil && templateID.TemplateName() != nil {
+					spelling = templateID.TemplateName().GetText()
+				}
+			}
+		}
+		// An explicit template call `twice<int>(3)` names the function before
+		// the angle brackets. Monomorphization is not performed; the call binds
+		// to the template function built with placeholder types.
+		callableSpelling, templateArguments := splitTemplateSpelling(spelling)
+		if len(templateArguments) == 0 {
+			callableSpelling = spelling
+		}
+		if expression.LeftParen() != nil && isPlainCppIdentifier(callableSpelling) && !b.isKnownTypeSpelling(callableSpelling) {
+			args := b.visitExpressionList(expression.ExpressionList())
+			if callee := b.resolveCallableValue(callableSpelling, len(args)); !utils.IsNil(callee) {
+				return b.EmitCall(b.NewCall(callee, args))
+			}
+		}
 		typeText := expression.GetText()
+		if expression.LeftParen() != nil && isPlainCppIdentifier(spelling) && b.isKnownTypeSpelling(spelling) {
+			// Functional cast: the type is the spelling before the parenthesis.
+			typeText = spelling
+		}
 		typ := b.typeFromText(typeText)
 		value := b.EmitUndefined("value-of " + typeText)
 		value.SetType(typ)
@@ -389,13 +466,23 @@ func (b *singleFileBuilder) visitPostfixExpression(expression *cppparser.Postfix
 			}
 		}
 		if expression.LeftParen() != nil {
-			b.visitExpressionList(expression.ExpressionList())
+			args := b.visitExpressionList(expression.ExpressionList())
+			if len(args) == 1 && !utils.IsNil(args[0]) {
+				// Functional cast: `int(x)` and `Counter(x)`.
+				return b.EmitTypeCast(args[0], typ)
+			}
 		}
 		return value
 	case expression.Dynamic_cast() != nil || expression.Static_cast() != nil ||
 		expression.Reinterpret_cast() != nil || expression.Const_cast() != nil:
+		// All four named casts lower to the dedicated typecast instruction;
+		// the cast flavour changes diagnostics, not SSA dataflow.
 		if castValue := expression.Expression(); castValue != nil {
-			return b.evalNode(castValue)
+			value := b.evalNode(castValue)
+			if typeID := expression.TheTypeId(); typeID != nil && !utils.IsNil(value) {
+				return b.EmitTypeCast(value, b.typeFromTypeIDText(typeID.GetText()))
+			}
+			return value
 		}
 	case expression.TypeIdOfTheTypeId() != nil:
 		if castValue := expression.Expression(); castValue != nil {
@@ -436,8 +523,9 @@ func (b *singleFileBuilder) visitPrimaryExpression(expression *cppparser.Primary
 	return b.EmitConstInstNil()
 }
 
-// visitLambdaExpression builds the lambda body as an anonymous function. Capture
-// lists are recorded but not turned into closure variables yet.
+// visitLambdaExpression builds the lambda body as an anonymous function.
+// Explicit captures become free-value parameters, matching the Go/yak closure
+// model; default captures (`[&]`, `[=]`) are accepted but not expanded yet.
 func (b *singleFileBuilder) visitLambdaExpression(lambda *cppparser.LambdaExpressionContext) ssa.Value {
 	if lambda == nil || lambda.CompoundStatement() == nil {
 		return b.EmitConstInstNil()
@@ -446,6 +534,26 @@ func (b *singleFileBuilder) visitLambdaExpression(lambda *cppparser.LambdaExpres
 	fn := b.NewFunc(name)
 	previous := b.FunctionBuilder
 	b.FunctionBuilder = b.PushFunction(fn)
+	if declarator, ok := lambda.LambdaDeclarator().(*cppparser.LambdaDeclaratorContext); ok && declarator != nil {
+		if clause, ok := declarator.ParameterDeclarationClause().(*cppparser.ParameterDeclarationClauseContext); ok && clause != nil {
+			if list, ok := clause.ParameterDeclarationList().(*cppparser.ParameterDeclarationListContext); ok && list != nil {
+				for _, rawDeclaration := range list.AllParameterDeclaration() {
+					declaration, ok := rawDeclaration.(*cppparser.ParameterDeclarationContext)
+					if !ok || declaration == nil {
+						continue
+					}
+					parameter := b.parseParameterDeclaration(declaration)
+					param := b.NewParam(parameter.name)
+					if parameter.typ != nil {
+						param.SetType(parameter.typ)
+					}
+				}
+			}
+		}
+	}
+	for _, capture := range lambdaCaptureNames(lambda) {
+		b.BuildFreeValue(capture)
+	}
 	b.visitCompoundStatement(lambda.CompoundStatement())
 	b.Finish()
 	b.FunctionBuilder = b.PopFunction()
@@ -453,16 +561,76 @@ func (b *singleFileBuilder) visitLambdaExpression(lambda *cppparser.LambdaExpres
 	return fn
 }
 
+// lambdaCaptureNames returns the identifiers in a lambda capture list.
+// Default captures and `this` contribute no identifier.
+func lambdaCaptureNames(lambda *cppparser.LambdaExpressionContext) []string {
+	if lambda == nil {
+		return nil
+	}
+	introducer, ok := lambda.LambdaIntroducer().(*cppparser.LambdaIntroducerContext)
+	if !ok || introducer == nil {
+		return nil
+	}
+	capture, ok := introducer.LambdaCapture().(*cppparser.LambdaCaptureContext)
+	if !ok || capture == nil {
+		return nil
+	}
+	list, ok := capture.CaptureList().(*cppparser.CaptureListContext)
+	if !ok || list == nil {
+		return nil
+	}
+	var names []string
+	seen := make(map[string]struct{})
+	for _, raw := range list.AllCapture() {
+		item, ok := raw.(*cppparser.CaptureContext)
+		if !ok || item == nil {
+			continue
+		}
+		name := ""
+		if simple, ok := item.SimpleCapture().(*cppparser.SimpleCaptureContext); ok && simple != nil && simple.Identifier() != nil {
+			name = simple.Identifier().GetText()
+		}
+		if init, ok := item.InitCapture().(*cppparser.InitCaptureContext); ok && init != nil && init.Identifier() != nil {
+			name = init.Identifier().GetText()
+		}
+		if name == "" || !isPlainCppIdentifier(name) {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+	return names
+}
+
 func (b *singleFileBuilder) visitIdExpression(expression *cppparser.IdExpressionContext) ssa.Value {
 	if expression == nil {
 		return b.EmitConstInstNil()
 	}
 	text := strings.TrimPrefix(expression.GetText(), "::")
-	if value := b.ReadValue(text); value != nil {
+	if base, args := splitTemplateSpelling(text); len(args) > 0 {
+		// `twice<int>` names the template function twice; monomorphization is
+		// not performed, so resolve the base name.
+		text = base
+	}
+	// PeekValue does not create an Undefined for an unknown name. Creating one
+	// here would shadow a sibling function exported in the program table.
+	if value := b.PeekValue(text); !utils.IsNil(value) {
+		return value
+	}
+	// Function definitions are exported by their qualified name. A function
+	// body or a sibling function resolves the name through this table; the
+	// lexical scope only holds locals.
+	if value := b.GetProgram().GetExportValue(text); !utils.IsNil(value) {
 		return value
 	}
 	if name, scope := splitQualifiedName(text); len(scope) > 0 {
-		if value := b.ReadValue(name); value != nil {
+		if value := b.PeekValue(name); !utils.IsNil(value) {
+			return value
+		}
+		if value := b.GetProgram().GetExportValue(name); !utils.IsNil(value) {
 			return value
 		}
 		if blueprint := b.ensureClassBlueprint(strings.Join(scope, "::")); blueprint != nil && !utils.IsNil(blueprint.Container()) {
@@ -472,11 +640,14 @@ func (b *singleFileBuilder) visitIdExpression(expression *cppparser.IdExpression
 		}
 	}
 	for _, using := range b.usingNamespaces {
-		if value := b.ReadValue(using + "::" + text); value != nil {
+		if value := b.PeekValue(using + "::" + text); !utils.IsNil(value) {
+			return value
+		}
+		if value := b.GetProgram().GetExportValue(using + "::" + text); !utils.IsNil(value) {
 			return value
 		}
 	}
-	return b.EmitUndefined(text)
+	return b.ReadValue(text)
 }
 
 func (b *singleFileBuilder) visitLiteral(literal *cppparser.LiteralContext) ssa.Value {
@@ -559,6 +730,16 @@ func (b *singleFileBuilder) evalLValue(node antlr.Tree) (ssa.Value, *ssa.Variabl
 	}
 	name := value.GetName()
 	if name == "" {
+		// Constants carry no name. Recover a plain lvalue from the source text
+		// so `value += 2` still updates `value`; member and pointer targets are
+		// handled by the branches above.
+		if titled, ok := node.(interface{ GetText() string }); ok {
+			if text := strings.TrimPrefix(titled.GetText(), "::"); isPlainCppIdentifier(text) {
+				name = text
+			}
+		}
+	}
+	if name == "" {
 		return value, nil
 	}
 	return value, b.CreateVariable(name)
@@ -607,4 +788,55 @@ func (b *singleFileBuilder) postfixLValue(expression *cppparser.PostfixExpressio
 		}
 	}
 	return nil, nil
+}
+
+// memberMethodForValue returns the blueprint method a member access names, so a
+// call binds to the function definition instead of a detached member value.
+func (b *singleFileBuilder) memberMethodForValue(object ssa.Value, name string) ssa.Value {
+	if utils.IsNil(object) || name == "" {
+		return nil
+	}
+	typ := object.GetType()
+	if obj, ok := ssa.ToObjectType(typ); ok && obj != nil && obj.Kind == ssa.PointerKind && obj.FieldType != nil {
+		typ = obj.FieldType
+	}
+	blueprint, ok := ssa.ToClassBluePrintType(typ)
+	if !ok || blueprint == nil {
+		return nil
+	}
+	if method := blueprint.GetNormalMethod(name); !utils.IsNil(method) {
+		return method
+	}
+	if method := blueprint.GetStaticMethod(name); !utils.IsNil(method) {
+		return method
+	}
+	return nil
+}
+
+// postfixCalleeName returns the identifier a call is made through, when the
+// callee is a plain name (`add(1, 2)`); member and pointer calls return "".
+func postfixCalleeName(expression *cppparser.PostfixExpressionContext) string {
+	if expression == nil {
+		return ""
+	}
+	nested := expression.PostfixExpression()
+	if nested == nil {
+		return ""
+	}
+	postfix, ok := nested.(*cppparser.PostfixExpressionContext)
+	if !ok || postfix == nil || postfix.PrimaryExpression() == nil {
+		return ""
+	}
+	primary, ok := postfix.PrimaryExpression().(*cppparser.PrimaryExpressionContext)
+	if !ok || primary == nil || primary.IdExpression() == nil {
+		return ""
+	}
+	text := strings.TrimPrefix(primary.IdExpression().GetText(), "::")
+	if base, args := splitTemplateSpelling(text); len(args) > 0 {
+		text = base
+	}
+	if !isPlainCppIdentifier(text) {
+		return ""
+	}
+	return text
 }

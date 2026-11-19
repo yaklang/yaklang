@@ -46,6 +46,9 @@ func CreateBuilder() ssa.Builder {
 	builder.WithLanguageConfigOpts(
 		ssa.WithLanguageConfigBind(true),
 		ssa.WithLanguageConfigVirtualImport(true),
+		// C++ class instances keep the blueprint as their type, so member
+		// lookup and virtual/member call binding see GetNormalMethod.
+		ssa.WithLanguageConfigSupportClass(true),
 		ssa.WithLanguageBuilder(builder),
 	)
 	return builder
@@ -82,6 +85,7 @@ func DefaultPreprocessConfig() preprocess.PreprocessConfig {
 		SkipSystemIncludes:          true,
 		ResolveProjectAngleIncludes: true,
 		HeaderExtensions:            []string{".h", ".hpp", ".hxx", ".hh", ".inl", ".ipp", ".tpp"},
+		InlineProjectHeaders:        true,
 		MaxIncludeDepth:             64,
 		ExternalIncludeDirs:         []string{},
 		Defines: map[string]string{
@@ -131,8 +135,18 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 		templateTypes:   make(map[string]ssa.Type),
 		usingNamespaces: make([]string, 0),
 	}
+	builder.WithExternValue(cppBuildIn)
 	b.visitTranslationUnit(ast)
 	return nil
+}
+
+// cppBuildIn lists the names the C++ frontend resolves without a declaration.
+// println/print are the test helpers the C builder also provides, so SSA tests
+// can assert values with ssatest.CheckPrintlnValue. Standard-library types and
+// members come from the blueprint placeholders in stdlib.go.
+var cppBuildIn = map[string]any{
+	"println": func(args ...any) {},
+	"print":   func(args ...any) {},
 }
 
 // singleFileBuilder carries the C++-only scopes: namespace path, the class body

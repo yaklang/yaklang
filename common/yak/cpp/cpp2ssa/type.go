@@ -14,6 +14,7 @@ type declTypeInfo struct {
 	text      string
 	isTypedef bool
 	isStatic  bool
+	isAuto    bool
 	className string
 }
 
@@ -67,6 +68,8 @@ func (b *singleFileBuilder) typeSpecifierInfo(raw cppparser.IDeclSpecifierSeqCon
 	if info.className == "" && len(spellings) > 0 {
 		info.text = strings.Join(spellings, " ")
 		info.typ = b.typeFromText(info.text)
+		normalized := normalizeTypeText(info.text)
+		info.isAuto = normalized == "auto" || strings.HasPrefix(normalized, "decltype(")
 	}
 	return info
 }
@@ -306,4 +309,26 @@ func splitTemplateArguments(body string) []string {
 		args = append(args, tail)
 	}
 	return args
+}
+
+// typeFromTypeIDText maps a type-id spelling (including pointer/reference
+// decorations) to an SSA type. References use the pointer kind: the SSA core has
+// no separate reference type, and pointer kind preserves aliasing information.
+func (b *singleFileBuilder) typeFromTypeIDText(text string) ssa.Type {
+	text = strings.TrimSpace(text)
+	text = strings.TrimPrefix(text, "const ")
+	text = strings.TrimSpace(strings.TrimSuffix(text, " const"))
+	depth := 0
+	for {
+		switch {
+		case strings.HasSuffix(text, "*"):
+			depth++
+			text = strings.TrimSpace(strings.TrimSuffix(text, "*"))
+		case strings.HasSuffix(text, "&"):
+			depth++
+			text = strings.TrimSpace(strings.TrimSuffix(text, "&"))
+		default:
+			return wrapPointerType(b.typeFromText(text), depth)
+		}
+	}
 }
