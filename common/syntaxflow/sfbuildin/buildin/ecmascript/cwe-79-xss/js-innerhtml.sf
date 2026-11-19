@@ -9,7 +9,7 @@ desc(
 	risk: "xss"
 	desc: <<<DESC
 ### 规则说明
-检测到 innerHTML 赋值。若内容包含外部数据，可导致 XSS。
+检测到 innerHTML 赋值，且右侧不是常量字符串。若内容包含外部数据，可导致 XSS。
 
 ### 风险类型
 xss
@@ -27,16 +27,30 @@ SOLUTION
 	alert_min: 1
 	"file://app.js": <<<POS
 function show(html) { document.body.innerHTML = html; }
+function render(html) { document.body.innerHTML = "<b>" + html + "</b>"; }
+function renderTemplate(name) { document.body.innerHTML = `<b>${name}</b>`; }
 
 POS
 	"safefile://app-safe.js": <<<NEG
 function show(html) { document.body.textContent = html; }
+has.clearElement = function(element) {
+	// summary:
+	//	 Deletes the contents of the element passed to test functions.
+	element.innerHTML= "";
+	return element;
+};
+function reset(element) { element.innerHTML = '<span class="loading">loading</span>'; }
+function blank(element) { element.innerHTML = `static`; }
+function empty(element) { element.innerHTML = null; }
+if (element.innerHTML == "") { element.focus(); }
 
 NEG
 )
 
-${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/\.innerHTML\s*=/) as $hit
-alert $hit for {
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/(?m)\.innerHTML[ \t]*=[ \t\r\n]*(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\$]|\\.)*`|null\b|undefined\b)[ \t]*(?:;|\/\/[^\n]*|\r?\n|$)/) as $constant
+${/\.(js|mjs|cjs|jsx)$/}.pattern_regex(/\.innerHTML[ \t]*=[ \t\r\n]*[^=\s]/) as $hit
+$hit not_inside $constant as $finding
+alert $finding for {
 	level: "middle",
 	title: "检测 JavaScript innerHTML 赋值",
 	title_zh: "检测 JavaScript innerHTML 赋值",
