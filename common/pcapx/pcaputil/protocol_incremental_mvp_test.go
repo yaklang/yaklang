@@ -345,7 +345,13 @@ func assertDNSStreamMVPEvents(t testing.TB, answer json.RawMessage, events []*Pr
 	require.NoError(t, json.Unmarshal(answer, &a))
 	if a.Status != "decoded" {
 		require.Len(t, events, 1, "a failed admission or exact DNS frame emits one terminal diagnostic")
-		require.Equal(t, a.Status, events[0].Status)
+		if a.Status == "unrecognized" && events[0].Status == "incomplete" {
+			// Probe resynchronization keeps an unaccepted candidate pending until
+			// capture close. It must still remain unclassified.
+			require.Empty(t, events[0].Protocol)
+		} else {
+			require.Equal(t, a.Status, events[0].Status)
+		}
 		if a.Error != "" {
 			require.Contains(t, events[0].Error, a.Error)
 		}
