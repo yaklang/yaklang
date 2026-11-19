@@ -17,6 +17,7 @@ func (*SSABuilder) PreHandlerProject(_ fi.FileSystem, _ ssa.FrontAST, b *ssa.Fun
 }
 
 func (ab *astBuilder) source(w *syntax.Word, fields []ssa.Value, spread bool) (ssa.Value, bool) {
+	// TODO(ssa-bash): absolute paths and $PATH lookup are intentionally unresolved; only project files are inlined.
 	name, ok := staticWord(w)
 	if !ok || name == "" || path.IsAbs(name) || ab.GetEditor() == nil {
 		return nil, false

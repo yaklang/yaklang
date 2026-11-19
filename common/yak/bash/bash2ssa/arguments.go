@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// TODO(ssa-bash): a non-constant subscript cannot select a concrete element; the read stays a member-call value.
 func (ab *astBuilder) arrayKey(name string, index syntax.ArithmExpr) ssa.Value {
 	if word, ok := index.(*syntax.Word); ok && ab.assoc[name] {
 		return ab.buildWord(word)
@@ -168,6 +169,7 @@ func (ab *astBuilder) words(words []*syntax.Word) ([]ssa.Value, bool) {
 		if len(w.Parts) == 1 {
 			switch part := w.Parts[0].(type) {
 			case *syntax.ParamExp, *syntax.CmdSubst:
+				// TODO(ssa-bash): a runtime IFS value is passed to the fields intrinsic; the split is not resolved statically.
 				ifs := ab.PeekValue("IFS")
 				if ifs == nil {
 					ifs = ab.EmitConstInst(" \t\n")

@@ -112,6 +112,7 @@ func (ab *astBuilder) buildStmts(stmts []*syntax.Stmt) ssa.Value {
 		}
 		var v ssa.Value
 		if stmt.Background || stmt.Coprocess {
+			// TODO(ssa-bash): background jobs run in a child shell; completion order and wait status are not modeled.
 			ab.childShell(func() ssa.Value { return ab.buildStmt(stmt) })
 			ab.put(statusName, ab.EmitConstInst(0))
 		} else {

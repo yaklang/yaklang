@@ -120,6 +120,7 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 			status = v
 		}
 	} else if isStatic {
+		// TODO(ssa-bash): trap handlers are not registered; their commands never join the CFG.
 		switch name {
 		case "true", ":", "false":
 			n := 0
@@ -149,6 +150,7 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 			output = ab.join(args, sep)
 			status = ab.EmitConstInst(0)
 		case "set":
+			// TODO(ssa-bash): only set -- is modeled; set -e/-u/-o options do not change later control flow.
 			if len(cmd.Args) >= 2 && cmd.Args[1].Lit() == "--" {
 				ab.put("$@", ab.packFields(fields[1:], spread))
 				status = ab.EmitConstInst(0)
@@ -185,6 +187,7 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 		}
 	}
 	if status == nil {
+		// TODO(ssa-bash): a non-constant exit status stays an intrinsic; static value matching sees no number.
 		status = ab.intrinsic("exit-status", ret)
 	}
 	ab.put(statusName, status)
@@ -197,6 +200,7 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 	return output
 }
 
+// TODO(ssa-bash): read assigns one value to every target; field-by-field splitting of `read a b` is not modeled.
 func (ab *astBuilder) applyRead(args []*syntax.Word, value ssa.Value) {
 	for _, name := range readTargetNames(args) {
 		ab.put(name, value)
@@ -255,6 +259,7 @@ func (ab *astBuilder) bindRedirs(binding map[string]int64, redirs []*syntax.Redi
 		var value ssa.Value
 		switch redir.Op {
 		case syntax.Hdoc, syntax.DashHdoc:
+			// TODO(ssa-bash): heredoc newline and tab normalization (<<, <<-) is not modeled.
 			value = ab.buildWord(redir.Hdoc)
 		default:
 			value = ab.buildWord(redir.Word)
@@ -311,8 +316,10 @@ func (ab *astBuilder) emitWrappedCommands(args []*syntax.Word, outer *ssa.Call, 
 		if src, ok := staticWord(args[1]); ok {
 			ab.buildInlineScript(src, outer)
 		}
+		// TODO(ssa-bash): eval with a non-constant payload is not parsed or inlined.
 	case "sh", "bash", "zsh", "dash", "ksh", "ash":
 		if idx := commandFlagIndex(args, "-c"); idx >= 0 && idx+1 < len(args) {
+			// TODO(ssa-bash): a non-constant sh -c payload is not parsed.
 			if src, ok := staticWord(args[idx+1]); ok {
 				ab.childShell(func() ssa.Value { ab.buildInlineScript(src, outer); return nil })
 			}

@@ -71,6 +71,7 @@ func (ab *astBuilder) buildForClause(c *syntax.ForClause) ssa.Value {
 		lb := ab.CreateLoopBuilder()
 		var item, index ssa.Value
 		if c.Select {
+			// TODO(ssa-bash): select input is modeled with intrinsic calls; the menu text and REPLY formatting are not.
 			ab.readOrCreate("REPLY")
 			lb.SetCondition(func() ssa.Value {
 				line := ab.intrinsic("select.read")
@@ -91,6 +92,7 @@ func (ab *astBuilder) buildForClause(c *syntax.ForClause) ssa.Value {
 		// Specialize literal arguments inside a real loop so concrete-argument
 		// rules still see each command. The latch, not the last compiled body,
 		// determines the value carried to the next iteration.
+		// TODO(ssa-bash): literal lists beyond the unroll budget silently fall back to a generic loop.
 		specialize := !c.Select && !spread && len(fields) > 1 && len(fields) <= maxLiteralLoopUnroll && ab.loopUnrollDepth < maxLoopUnrollDepth && ab.loopUnrollBudget >= len(fields)
 		for _, w := range it.Items {
 			if _, ok := staticWord(w); !ok {
@@ -171,6 +173,7 @@ func (ab *astBuilder) buildForClause(c *syntax.ForClause) ssa.Value {
 
 // read consumes option operands; only shell identifiers (or an array target)
 // are writes. Without an explicit name Bash uses REPLY.
+// TODO(ssa-bash): read recognizes only simple names and a fixed option set; -t timing and pipeline stdin edges are not modeled.
 func readTargetNames(args []*syntax.Word) []string {
 	if len(args) == 0 || args[0].Lit() != "read" {
 		return nil
