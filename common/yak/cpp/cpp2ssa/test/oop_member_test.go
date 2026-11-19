@@ -10,8 +10,8 @@ import (
 // TestCppOperatorOverloadSymbol asserts an operator overload is lowered as a
 // named function. Operator resolution at call sites is not modelled; `a + b`
 // stays a BinOp.
-// TODO: bind operator expressions to overload functions when both operands are
-// class types.
+// TODO(ssa-cpp): bind operator expressions to overload functions when both
+// operands are class types.
 func TestCppOperatorOverloadSymbol(t *testing.T) {
 	progs := compileCppProject(t, map[string]string{
 		"operator.cpp": `

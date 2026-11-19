@@ -571,6 +571,7 @@ func (b *singleFileBuilder) visitNamespaceAlias(raw cppparser.INamespaceAliasDef
 // visitTemplateDeclaration records the template parameters and then builds the
 // declaration they parameterize. Template instantiation is not performed: the
 // declared function or class is built once with placeholder parameter types.
+// TODO(ssa-cpp): build one specialized function/class per template argument list.
 func (b *singleFileBuilder) visitTemplateDeclaration(raw cppparser.ITemplateDeclarationContext) {
 	declaration, ok := raw.(*cppparser.TemplateDeclarationContext)
 	if !ok || declaration == nil {
@@ -1094,6 +1095,8 @@ func normalizeOperatorName(text string) string {
 }
 
 // functionAccepts reports whether fn can take argCount arguments.
+// TODO(ssa-cpp): compare parameter types and honour default arguments;
+// only the parameter count is checked today.
 func functionAccepts(fn *ssa.Function, argCount int) bool {
 	if fn == nil {
 		return false

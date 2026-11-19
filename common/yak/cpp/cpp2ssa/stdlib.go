@@ -11,6 +11,8 @@ import (
 // without reading the real headers. The declarations are placeholders: they give
 // types and callable member names so real projects do not fail on a missing type,
 // but they carry no behaviour.
+// TODO(ssa-cpp): model standard-library behaviour; placeholder members return
+// undefined and dataflow does not cross library calls.
 type StdlibType struct {
 	// Names are the spellings accepted for this family, without the std:: prefix.
 	Names []string

@@ -100,6 +100,8 @@ func (b *singleFileBuilder) foldChain(ctx antlr.ParserRuleContext, eval func(ant
 			left = value
 			continue
 		}
+		// TODO(ssa-cpp): resolve operator overloads; `a + b` stays a BinOp even
+		// when both operands are class types.
 		left = b.EmitBinOp(cppBinaryOpcode(operator), left, value)
 		operator = ""
 	}
@@ -292,6 +294,7 @@ func (b *singleFileBuilder) visitUnaryExpression(expression *cppparser.UnaryExpr
 	case expression.Sizeof() != nil || expression.Alignof() != nil:
 		// sizeof and alignof are compile-time constants; the frontend does not
 		// model object layout, so the value is 0 rather than a guess.
+		// TODO(ssa-cpp): evaluate sizeof/alignof from a type layout model.
 		return b.EmitConstInst(0)
 	case expression.NewExpression_() != nil:
 		return b.visitNewExpression(expression.NewExpression_().(*cppparser.NewExpression_Context))
@@ -328,6 +331,8 @@ func (b *singleFileBuilder) visitNewExpression(expression *cppparser.NewExpressi
 	if strings.Contains(typeText, "[") {
 		typ = ssa.NewSliceType(typ)
 	}
+	// TODO(ssa-cpp): `new` yields a placeholder; allocation, lifetime and array
+	// bounds are not modelled.
 	value := b.EmitUndefined("new " + typeText)
 	if typ != nil {
 		value.SetType(typ)
@@ -358,6 +363,8 @@ func (b *singleFileBuilder) visitNewInitializer(raw cppparser.INewInitializer_Co
 }
 
 func (b *singleFileBuilder) visitDeleteExpression(expression *cppparser.DeleteExpressionContext) ssa.Value {
+	// TODO(ssa-cpp): `delete` evaluates its operand but has no lifetime effect;
+	// the expression lowers to nil.
 	if cast := expression.CastExpression(); cast != nil {
 		b.evalNode(cast)
 	}
@@ -563,6 +570,7 @@ func (b *singleFileBuilder) visitLambdaExpression(lambda *cppparser.LambdaExpres
 
 // lambdaCaptureNames returns the identifiers in a lambda capture list.
 // Default captures and `this` contribute no identifier.
+// TODO(ssa-cpp): expand default captures (`[&]`, `[=]`, `this`) into free values.
 func lambdaCaptureNames(lambda *cppparser.LambdaExpressionContext) []string {
 	if lambda == nil {
 		return nil
@@ -613,6 +621,7 @@ func (b *singleFileBuilder) visitIdExpression(expression *cppparser.IdExpression
 	if base, args := splitTemplateSpelling(text); len(args) > 0 {
 		// `twice<int>` names the template function twice; monomorphization is
 		// not performed, so resolve the base name.
+		// TODO(ssa-cpp): instantiate the template with the given arguments.
 		text = base
 	}
 	// PeekValue does not create an Undefined for an unknown name. Creating one
@@ -701,6 +710,9 @@ func (b *singleFileBuilder) evalLValue(node antlr.Tree) (ssa.Value, *ssa.Variabl
 		return b.ReadValue(name), b.CreateVariable(name)
 	case *cppparser.UnaryExpressionContext:
 		if n.UnaryOperator() != nil && n.UnaryOperator().GetText() == "*" {
+			// TODO(ssa-cpp): a write reaches the pointee only when the pointer
+			// keeps a direct &x origin; pointer parameters and pointer
+			// arithmetic do not propagate the write.
 			pointer := b.evalNode(n.UnaryExpression())
 			if pointer != nil {
 				if origin := b.GetOriginValue(pointer); origin != nil && !utils.IsNil(origin) {
@@ -762,6 +774,8 @@ func (b *singleFileBuilder) postfixLValue(expression *cppparser.PostfixExpressio
 				name = id.GetText()
 			}
 			if name != "" && object != nil {
+				// TODO(ssa-cpp): the member write does not reach a later read;
+				// `box.value = 5` leaves box.value undefined.
 				key := b.EmitConstInst(name)
 				value := b.ReadMemberCallValue(object, key)
 				return value, b.CreateMemberCallVariable(object, key, true)
@@ -792,6 +806,8 @@ func (b *singleFileBuilder) postfixLValue(expression *cppparser.PostfixExpressio
 
 // memberMethodForValue returns the blueprint method a member access names, so a
 // call binds to the function definition instead of a detached member value.
+// TODO(ssa-cpp): resolve virtual dispatch; the static type's method is returned
+// even when the call is virtual.
 func (b *singleFileBuilder) memberMethodForValue(object ssa.Value, name string) ssa.Value {
 	if utils.IsNil(object) || name == "" {
 		return nil
