@@ -46,6 +46,29 @@ func (b *FunctionBuilder) Break() bool {
 	return false
 }
 
+// BranchToLoop targets an enclosing loop by depth, ignoring switch/label
+// targets. Depth one is the innermost loop. The caller checks shell boundaries.
+func (b *FunctionBuilder) BranchToLoop(depth int, continueLoop bool) bool {
+	for t := b.target; t != nil && depth > 0; t = t.tail {
+		if t._continue == nil || t._break == nil {
+			continue
+		}
+		depth--
+		if depth != 0 {
+			continue
+		}
+		if continueLoop {
+			t.LabelTarget.Continue(b.CurrentBlock.ScopeTable)
+			b.EmitJump(t._continue)
+		} else {
+			t.LabelTarget.Break(b.CurrentBlock.ScopeTable)
+			b.EmitJump(t._break)
+		}
+		return true
+	}
+	return false
+}
+
 func (b *FunctionBuilder) BreakWithLabelName(labelName string) bool {
 	for target := b.target; target != nil; target = target.tail {
 		if target._break != nil && strings.Contains(target._break.name, labelName) {

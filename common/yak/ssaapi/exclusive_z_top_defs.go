@@ -756,7 +756,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 			} else {
 				// parameter
-				if inst.FormalParameterIndex >= len(calledInstance.Args) {
+				if pack, ok := calledInstance.PackedVariadic(inst.FormalParameterIndex); ok {
+					actualParam = pack
+				} else if inst.FormalParameterIndex >= len(calledInstance.Args) {
 					// Optional parameters keep their declared default on the formal.
 					// A call intentionally omits trailing optional arguments, so an
 					// out-of-range formal is not necessarily a broken call vector.

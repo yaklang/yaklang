@@ -1075,6 +1075,20 @@ func (pm *ParameterMember) GetActualCallParam(c *Call) (obj Value, ok bool) {
 	}
 
 	if pm.FormalParameterIndex >= len(c.ArgMember) {
+		// A recursive/forward call can precede the definition of this member.
+		// The explicit positional vector is already attached at that call site.
+		if pm.MemberCallKind == ParameterMemberCall {
+			if vec, ok := c.PackedVariadic(pm.MemberCallObjectIndex); ok {
+				if key, ok := pm.GetValueById(pm.MemberCallKey); ok {
+					if v, ok := vec.GetStringMember(key.String()); ok {
+						return v, true
+					}
+					if _, concrete := ToMake(vec); concrete {
+						return c.GetValueById(c.Binding[VariadicDefaultBinding])
+					}
+				}
+			}
+		}
 		return nil, false
 	}
 
