@@ -379,7 +379,7 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 		return nil, err
 	}
 	config.notify(meta)
-	digest, err := m.indexPackets(config.ctx, writer, source, meta, config)
+	digest, err := m.ingestCapture(config.ctx, writer, source, meta, config)
 	if err != nil {
 		return nil, err
 	}
@@ -428,19 +428,16 @@ func (m *InstanceManager) buildDatasetLocked(source *os.File, info os.FileInfo, 
 		return m.useExisting(source, info, fp, path, existing, config)
 	}
 	meta.FullSHA256 = digest
-	if config.protocols || config.streams {
-		if err = m.indexProtocols(config.ctx, writer, meta, config); err != nil {
+	if err = ensureProtocolFieldIndexes(config.ctx, writer, config.fieldIndexes); err != nil {
+		return nil, err
+	}
+	if config.deferQueryIndexes {
+		if err = ensurePCAPQueryIndexes(writer); err != nil {
 			return nil, err
 		}
-	} else {
-		if config.deferQueryIndexes {
-			if err = ensurePCAPQueryIndexes(writer); err != nil {
-				return nil, err
-			}
-		}
-		if err = m.transition(config.ctx, writer, meta, StateReady); err != nil {
-			return nil, err
-		}
+	}
+	if err = m.transition(config.ctx, writer, meta, StateReady); err != nil {
+		return nil, err
 	}
 	if err = m.addAlias(config.ctx, meta, path); err != nil {
 		return nil, err
@@ -478,7 +475,20 @@ func (m *InstanceManager) failImport(writer *gorm.DB, meta *PCAPFileDBMetadata, 
 	return errors.Join(cause, err)
 }
 
-func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *os.File, meta *PCAPFileDBMetadata, config *importConfig) (string, error) {
+func newOfflinePacketAnalyzer(ctx context.Context, options []pcaputil.CaptureOption) (*pcaputil.PacketAnalyzer, context.CancelFunc, error) {
+	analysisCtx, cancel := context.WithCancel(ctx)
+	options = append(options, pcaputil.WithContext(analysisCtx))
+	analyzer, err := pcaputil.NewPacketAnalyzer(options...)
+	if err != nil {
+		cancel()
+		return nil, nil, err
+	}
+	return analyzer, cancel, nil
+}
+
+// ingestCapture reads the source once. Physical packets and protocol analysis
+// consume the same bounded record, and their pending rows share one transaction.
+func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *os.File, meta *PCAPFileDBMetadata, config *importConfig) (_ string, resultErr error) {
 	reader, err := newPacketReader(file)
 	if err != nil {
 		return "", err
@@ -513,9 +523,32 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 	interfaces := make([]PCAPCaptureInterface, 0)
 	interfaceIDs := make(map[[2]int64]int64)
 	hasher := sha256.New()
+	analysis := newProtocolBatch(ctx, db, meta, config)
+	var analyzer *pcaputil.PacketAnalyzer
+	var cancelAnalysis context.CancelFunc
+	analysisClosed := false
+	defer func() {
+		if analyzer != nil && !analysisClosed {
+			analysis.mu.Lock()
+			if analysis.err == nil {
+				if resultErr != nil {
+					analysis.err = resultErr
+				} else {
+					analysis.err = fmt.Errorf("pcapdb: capture ingestion stopped before analyzer close")
+				}
+			}
+			analysis.mu.Unlock()
+			resultErr = errors.Join(resultErr, analyzer.Close())
+			analysisClosed = true
+		}
+		if cancelAnalysis != nil {
+			cancelAnalysis()
+		}
+	}()
 	var lastCatalog time.Time
 	var batchBytes int
-	commit := func(final bool) error {
+	// flushLocked requires analysis.mu.
+	flushLocked := func(final bool) error {
 		tx := db.BeginTx(ctx, nil)
 		if tx.Error != nil {
 			return tx.Error
@@ -525,6 +558,22 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 		for _, rows := range []interface{}{&interfaces, &packets, &records} {
 			if err := scoped.CreateInBatches(rows).Error; err != nil {
 				return err
+			}
+		}
+		if err := analysis.flush(ctx, scoped); err != nil {
+			return err
+		}
+		if final {
+			meta.ProtocolsIndexed, meta.StreamsIndexed = config.protocols, config.streams
+			if config.protocols {
+				meta.ProtocolDataSHA256 = hex.EncodeToString(analysis.hasher.Sum(nil))
+			} else {
+				meta.ProtocolDataSHA256 = ""
+			}
+			if config.streams {
+				meta.StreamDataSHA256 = analysis.sessions.digest()
+			} else {
+				meta.StreamDataSHA256 = ""
 			}
 		}
 		meta.UpdatedAt = time.Now().UTC()
@@ -538,14 +587,15 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 			if err := m.saveCatalog(meta); err != nil {
 				return err
 			}
-			config.notify(meta)
 			lastCatalog = time.Now()
 		}
+		config.notify(meta)
 		clear(packets)
 		packets = packets[:0]
 		clear(records)
 		records = records[:0]
 		interfaces = interfaces[:0]
+		analysis.clear()
 		batchBytes = 0
 		return ctx.Err()
 	}
@@ -578,18 +628,73 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 			batchBytes += len(data)
 			meta.BytesIndexed = next
 			if batchBytes >= maxPacketImportBatchBytes || len(records) >= max(2000, config.batchSize) {
-				if err := commit(false); err != nil {
+				if err := flushLocked(false); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	}
+
+	consume := func(work func() error) {
+		analysis.mu.Lock()
+		defer analysis.mu.Unlock()
+		if analysis.err == nil {
+			analysis.err = work()
+		}
+	}
+	if config.protocols || config.streams {
+		if config.protocols {
+			if err = ensureProtocolCompletionColumn(ctx, db); err != nil {
+				return "", err
+			}
+		}
+		options := []pcaputil.CaptureOption{
+			pcaputil.WithCaptureReplayClock(),
+			pcaputil.WithHTTPResponseWithoutRequest(true),
+			pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+		}
+		if config.protocols {
+			options = append(options, pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {
+				consume(func() error {
+					if err := analysis.appendEvent(event); err != nil {
+						return err
+					}
+					if analysis.full() {
+						return flushLocked(false)
+					}
+					return nil
+				})
+			}))
+		}
+		if config.streams {
+			options = append(options,
+				pcaputil.WithBeforeTransportPacket(func(packet gopacket.Packet) { consume(func() error { return analysis.sessions.datagram(packet) }) }),
+				pcaputil.WithOnTrafficFlowPacket(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, ts time.Time) {
+					consume(func() error { return analysis.sessions.tcpPacket(flow, conn, refs, ts) })
+				}),
+				pcaputil.WithOnTrafficFlowOnDataFrameArrived(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
+					consume(func() error { return analysis.sessions.tcpData(flow, conn, frame) })
+				}),
+				pcaputil.WithOnTrafficFlowClosed(func(reason pcaputil.TrafficFlowCloseReason, flow *pcaputil.TrafficFlow) {
+					consume(func() error { analysis.sessions.closeTCP(reason, flow); return nil })
+				}),
+			)
+		}
+		if config.tlsSecrets != nil {
+			options = append(options, pcaputil.WithTLSSecrets(config.tlsSecrets))
+		}
+		analyzer, cancelAnalysis, err = newOfflinePacketAnalyzer(ctx, options)
+		if err != nil {
+			return "", err
+		}
+	}
 	for {
 		if err = ctx.Err(); err != nil {
 			return "", err
 		}
 		raw, ci, location, readErr := reader.next()
+		analysis.mu.Lock()
 		for _, iface := range reader.takeInterfaces() {
 			key := [2]int64{iface.section, int64(iface.id)}
 			id := int64(len(interfaceIDs) + 1)
@@ -598,25 +703,28 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 		}
 		if readErr == io.EOF {
 			if err = storeGap(meta.SourceSize); err != nil {
+				analysis.mu.Unlock()
 				return "", err
 			}
-			if err = commit(true); err != nil {
-				return "", err
-			}
-			return hex.EncodeToString(hasher.Sum(nil)), nil
+			analysis.mu.Unlock()
+			break
 		}
 		if readErr != nil {
+			analysis.mu.Unlock()
 			return "", readErr
 		}
 		if err = storeGap(location.recordOffset); err != nil {
+			analysis.mu.Unlock()
 			return "", err
 		}
 		prefix, err := readSpan(location.recordOffset, location.dataOffset)
 		if err != nil {
+			analysis.mu.Unlock()
 			return "", err
 		}
 		suffix, err := readSpan(location.dataOffset+int64(len(raw)), location.endOffset)
 		if err != nil {
+			analysis.mu.Unlock()
 			return "", err
 		}
 		// The PCAPNG reader reuses its packet buffer. Own the bytes before the
@@ -627,6 +735,7 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 		packet.ID = uint(meta.PacketCount)
 		packet.CaptureInterfaceID = interfaceIDs[[2]int64{location.section, int64(location.iface)}]
 		if packet.CaptureInterfaceID == 0 {
+			analysis.mu.Unlock()
 			return "", fmt.Errorf("pcapdb: packet has unknown interface")
 		}
 		packet.Section, packet.Interface, packet.LinkType = location.section, location.iface, int(reader.link)
@@ -643,12 +752,51 @@ func (m *InstanceManager) indexPackets(ctx context.Context, db *gorm.DB, file *o
 		hasher.Write(suffix)
 		batchBytes += len(prefix) + len(data) + len(suffix)
 		meta.BytesIndexed = location.endOffset
-		if len(packets) >= config.batchSize || batchBytes >= maxPacketImportBatchBytes {
-			if err = commit(false); err != nil {
+		analysis.mu.Unlock()
+		if analyzer != nil {
+			ref := pcaputil.PacketReference{
+				Number: uint64(packet.ID),
+				Domain: pcaputil.CaptureDomain{Section: uint32(location.section), Interface: location.iface},
+			}
+			if err = analyzer.FeedWithReference(data, ci, reader.link, ref); err != nil {
+				analysis.mu.Lock()
+				if analysis.err == nil {
+					analysis.err = err
+				}
+				analysis.mu.Unlock()
 				return "", err
 			}
 		}
+		analysis.mu.Lock()
+		if analysis.err == nil && (len(packets) >= config.batchSize || batchBytes >= maxPacketImportBatchBytes || analysis.full()) {
+			analysis.err = flushLocked(false)
+		}
+		err = analysis.err
+		analysis.mu.Unlock()
+		if err != nil {
+			return "", err
+		}
 	}
+	if analyzer != nil {
+		closeErr := analyzer.Close()
+		analysisClosed = true
+		if closeErr != nil {
+			return "", closeErr
+		}
+	}
+	analysis.mu.Lock()
+	defer analysis.mu.Unlock()
+	if analysis.err != nil {
+		return "", analysis.err
+	}
+	if err = ctx.Err(); err != nil {
+		return "", err
+	}
+	analysis.sessions.finish()
+	if err = flushLocked(true); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func timestampNano(timestamp time.Time) *int64 {

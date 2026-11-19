@@ -141,8 +141,10 @@ func NewPacketAnalyzer(options ...CaptureOption) (*PacketAnalyzer, error) {
 	if err := c.prepareBinParser(); err != nil {
 		return nil, err
 	}
-	if c.binParser == nil {
-		return nil, fmt.Errorf("PacketAnalyzer requires a protocol subscription")
+	// Stream/session observers use the lightweight transport normalizer, while
+	// protocol subscribers use the full BIN parser.
+	if c.binParser == nil && c.transportNormalizer == nil {
+		return nil, fmt.Errorf("PacketAnalyzer requires capture analysis")
 	}
 	parent := c.Context
 	if parent == nil {
@@ -160,6 +162,21 @@ func NewPacketAnalyzer(options ...CaptureOption) (*PacketAnalyzer, error) {
 	return &PacketAnalyzer{conf: c, pool: p, cancel: cancel}, nil
 }
 func (a *PacketAnalyzer) Feed(raw []byte, ci gopacket.CaptureInfo, link layers.LinkType) error {
+	return a.feed(raw, ci, link, nil)
+}
+
+// FeedWithReference feeds one capture record using the caller's physical packet
+// identity. Offline import uses this to keep packets.id and PCAPNG
+// section/interface domains identical across the capture and protocol indexes.
+// Feed remains the native-capture entry and assigns sequential record numbers.
+func (a *PacketAnalyzer) FeedWithReference(raw []byte, ci gopacket.CaptureInfo, link layers.LinkType, ref PacketReference) error {
+	if ref.Number == 0 {
+		return fmt.Errorf("capture packet reference number is required")
+	}
+	return a.feed(raw, ci, link, &ref)
+}
+
+func (a *PacketAnalyzer) feed(raw []byte, ci gopacket.CaptureInfo, link layers.LinkType, ref *PacketReference) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.closed {
@@ -172,6 +189,10 @@ func (a *PacketAnalyzer) Feed(raw []byte, ci gopacket.CaptureInfo, link layers.L
 		return fmt.Errorf("invalid capture lengths")
 	}
 	e := evidenceFrom(ci)
+	if ref != nil {
+		e.Ref = *ref
+		ci = withEvidence(ci, e)
+	}
 	if e.Ref.Number == 0 {
 		a.number++
 		e.Ref.Number = a.number
