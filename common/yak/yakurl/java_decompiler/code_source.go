@@ -77,24 +77,84 @@ func (cs *codeSource) listDirectory(relativeDir string) ([]fs.DirEntry, error) {
 }
 
 func (cs *codeSource) readFile(relativePath string) ([]byte, error) {
-	if strings.HasSuffix(strings.ToLower(relativePath), ".class") {
-		return cs.readClassFile(relativePath)
+	if classPath := cs.sourceClassPath(relativePath); classPath != "" {
+		return cs.readClassFile(classPath)
 	}
-	return cs.expandedFS.ReadFile(cs.resolveFSPath(relativePath))
+	return cs.expandedFS.ReadFile(cs.resolveFSPath(cs.pathKey(relativePath)))
 }
 
 // readClassFile returns decompiled Java source for a .class entry. Archive roots
 // must go through JarFS: ExpandedZipFS returns the raw class bytes. Directory
-// roots keep absolute paths because resolveFSPath handles both forms.
+// roots resolve the outermost archive and read through its JarFS, so nested
+// archives decompile instead of returning the class bytes.
 func (cs *codeSource) readClassFile(relativePath string) ([]byte, error) {
+	key := cs.pathKey(relativePath)
 	if !cs.isDirectory && cs.jarFS != nil {
-		return cs.jarFS.ReadFile(normalizeJarInternalPath(relativePath))
+		return cs.jarFS.ReadFile(key)
 	}
-	return cs.expandedFS.ReadFile(cs.resolveFSPath(relativePath))
+	absPath := cs.resolveFSPath(key)
+	if archivePath, internalPath, ok := splitLocalArchivePath(absPath); ok {
+		jarFS, err := cs.openArchiveJarFS(archivePath)
+		if err != nil {
+			return nil, err
+		}
+		return jarFS.ReadFile(internalPath)
+	}
+	return cs.expandedFS.ReadFile(absPath)
+}
+
+// openArchiveJarFS returns the cached JarFS for an archive on the host disk.
+// The ExpandedZipFS cache owns the handle, so callers must not close it.
+func (cs *codeSource) openArchiveJarFS(archivePath string) (*javaclassparser.JarFS, error) {
+	expanded, ok := cs.expandedFS.(*javaclassparser.ExpandedZipFS)
+	if !ok {
+		return nil, utils.Errorf("code source filesystem does not expand archives: %T", cs.expandedFS)
+	}
+	unified, err := expanded.GetJarFS(archivePath)
+	if err != nil {
+		return nil, err
+	}
+	jarFS, ok := unified.GetFileSystem().(*javaclassparser.JarFS)
+	if !ok {
+		return nil, utils.Errorf("expanded archive is not a JarFS: %T", unified.GetFileSystem())
+	}
+	return jarFS, nil
+}
+
+// splitLocalArchivePath splits /dir/lib.jar/com/A.class into the archive path
+// and the internal path. The outermost archive wins so nested archives stay a
+// JarFS concern.
+func splitLocalArchivePath(absPath string) (archivePath, internalPath string, ok bool) {
+	lower := strings.ToLower(absPath)
+	best := -1
+	bestExt := ""
+	for _, ext := range javaArchiveExtensions {
+		if idx := strings.Index(lower, ext+"/"); idx >= 0 && (best < 0 || idx < best) {
+			best = idx
+			bestExt = ext
+		}
+	}
+	if best < 0 {
+		return "", "", false
+	}
+	archivePath = absPath[:best+len(bestExt)]
+	internalPath = strings.TrimPrefix(absPath[best+len(bestExt)+1:], "/")
+	if internalPath == "" {
+		return "", "", false
+	}
+	st, err := os.Stat(archivePath)
+	if err != nil || st.IsDir() {
+		return "", "", false
+	}
+	return archivePath, internalPath, true
 }
 
 func (cs *codeSource) stat(relativePath string) (fs.FileInfo, error) {
-	return cs.expandedFS.Stat(cs.resolveFSPath(relativePath))
+	key := cs.pathKey(relativePath)
+	if classPath := cs.sourceClassPath(key); classPath != "" {
+		key = classPath
+	}
+	return cs.expandedFS.Stat(cs.resolveFSPath(key))
 }
 
 func (cs *codeSource) walkFS() fi.FileSystem {

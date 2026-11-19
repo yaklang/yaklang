@@ -1,252 +1,92 @@
 package java_decompiler
 
 import (
-	"io/fs"
 	"path"
 	"strings"
 
-	"github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// displayEntryName returns the entry name shown in YakURL listings.
-// ExpandedZipFS may expose decompiled classes as .java via UnifiedFS; the UI
-// should still present .class paths for navigation and decompilation routes.
-func displayEntryName(entry fs.DirEntry) string {
-	orig := javaclassparser.EntryOriginalName(entry)
-	if strings.HasSuffix(strings.ToLower(orig), ".class") {
-		return orig
-	}
-	return entry.Name()
-}
-
-
-// listJarDirectory lists the contents of a directory in a JAR file
-// If hideInnerClasses is true, it will add hide=true and outerClass attributes to inner class resources
-func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string, jarFS *javaclassparser.JarFS, hideInnerClasses bool) (*ypb.RequestYakURLResponse, error) {
-	dirPath = normalizeJarInternalPath(dirPath)
-	currentDirPath = normalizeJarInternalPath(currentDirPath)
-
-	// List directory
-	entries, err := jarFS.ReadDir(currentDirPath)
-	if err != nil {
-		return nil, utils.Wrapf(err, "failed to read directory: %s in jar: %s", currentDirPath, jarPath)
-	}
-
-	resources := make([]*ypb.YakURLResource, 0, len(entries))
-
-	// If hideInnerClasses is true, first collect all inner classes
-	innerClassesByOuter := make(map[string][]string)
-	if hideInnerClasses {
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".class") {
-				className := entry.Name()
-				// Check if this is an inner class (contains $ in name)
-				dollarIndex := strings.Index(className, "$")
-				if dollarIndex > 0 {
-					// Get the outer class name
-					outerClassName := className[:dollarIndex] + ".class"
-					// Add this inner class to the list for its outer class
-					entryPath := path.Join(currentDirPath, className)
-					outerClassPath := path.Join(currentDirPath, outerClassName)
-					innerClassesByOuter[outerClassPath] = append(innerClassesByOuter[outerClassPath], entryPath)
-				}
-			}
-		}
-	}
-	innerClassMap := make(map[string]string)
-	for outerClass, innerClasses := range innerClassesByOuter {
-		for _, innerClass := range innerClasses {
-			innerClassMap[innerClass] = outerClass
-		}
-	}
-
+// innerClassIndex groups inner classes below their outer class using the
+// display paths, so /class and /class-aifix receive the same .java names the
+// listing serves.
+func innerClassIndex(entries []sourceEntry) (map[string][]string, map[string]string) {
+	byOuter := make(map[string][]string)
 	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			log.Errorf("failed to get info for %s: %v", entry.Name(), err)
+		if entry.Dir || entry.ClassPath == "" {
 			continue
 		}
-
-		entryName := displayEntryName(entry)
-		entryPath := path.Join(dirPath, entryName)
-
-		// Create a new URL for this resource
-		resourceURL := &ypb.YakURL{
-			Schema: "javaDec",
-			Path:   "/jar",
+		dollarIndex := strings.Index(entry.Name, "$")
+		if dollarIndex <= 0 {
+			continue
 		}
-
-		if entry.IsDir() {
-			// For directories, we'll update the dir parameter
-			resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
-				Key:   "jar",
-				Value: jarPath,
-			}, &ypb.KVPair{
-				Key:   "dir",
-				Value: entryPath,
-			})
-		} else {
-			// For class files, we'll create a link to the decompiler/class endpoint
-			if strings.HasSuffix(entry.Name(), ".class") {
-				resourceURL.Path = "/class"
-				resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
-					Key:   "jar",
-					Value: jarPath,
-				}, &ypb.KVPair{
-					Key:   "class",
-					Value: entryPath,
-				})
-			} else {
-				resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
-					Key:   "jar",
-					Value: jarPath,
-				}, &ypb.KVPair{
-					Key:   "dir",
-					Value: path.Dir(entryPath),
-				})
-			}
-		}
-
-		resource := a.createResourceFromFileInfo(resourceURL, info, entryPath)
-
-		// For directories, check if they have children
-		if entry.IsDir() {
-			actualEntryPath := path.Join(currentDirPath, entry.Name())
-			subEntries, err := jarFS.ReadDir(actualEntryPath)
-			if err == nil {
-				resource.HaveChildrenNodes = len(subEntries) > 0
-			}
-		}
-
-		// If this is an outer class with inner classes, add them to the Extra field
-		if hideInnerClasses && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".class") {
-			if innerClasses, hasInnerClasses := innerClassesByOuter[entryPath]; hasInnerClasses {
-				// Add all inner classes to this outer class
-				for _, innerClassPath := range innerClasses {
-					resource.Extra = append(resource.Extra, &ypb.KVPair{
-						Key:   "innerClass",
-						Value: innerClassPath,
-					})
-				}
-			}
-
-			// If this is an inner class, add the hide property
-			if v, ok := innerClassMap[entryPath]; ok {
-				resource.Extra = append(resource.Extra, &ypb.KVPair{
-					Key:   "hide",
-					Value: "true",
-				})
-
-				// Add the outer class path
-				outerClassPath := v
-				resource.Extra = append(resource.Extra, &ypb.KVPair{
-					Key:   "outerClass",
-					Value: outerClassPath,
-				})
-			}
-		}
-
-		resources = append(resources, resource)
+		outerPath := path.Join(path.Dir(entry.Path), entry.Name[:dollarIndex]+".java")
+		byOuter[outerPath] = append(byOuter[outerPath], entry.Path)
 	}
-
-	return &ypb.RequestYakURLResponse{
-		Resources: resources,
-		Total:     int64(len(resources)),
-		Page:      1,
-		PageSize:  int64(len(resources)),
-	}, nil
+	byInner := make(map[string]string, len(byOuter))
+	for outerPath, innerPaths := range byOuter {
+		for _, innerPath := range innerPaths {
+			byInner[innerPath] = outerPath
+		}
+	}
+	return byOuter, byInner
 }
 
+// listCodeSourceDirectory lists one directory of a code source. Bytecode
+// entries are presented as .java files and read through the decompiler.
 func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath string, cs *codeSource, hideInnerClasses bool) (*ypb.RequestYakURLResponse, error) {
 	dirPath = normalizeJarInternalPath(dirPath)
 	currentDirPath = normalizeJarInternalPath(currentDirPath)
 
-	entries, err := cs.listDirectory(currentDirPath)
+	entries, err := cs.listSourceEntries(currentDirPath)
 	if err != nil {
 		return nil, utils.Wrapf(err, "failed to read directory: %s in code source: %s", currentDirPath, jarPath)
 	}
 
+	innerClassesByOuter, innerClassMap := innerClassIndex(entries)
+
 	resources := make([]*ypb.YakURLResource, 0, len(entries))
-
-	innerClassesByOuter := make(map[string][]string)
-	if hideInnerClasses {
-		for _, entry := range entries {
-			className := displayEntryName(entry)
-			if !entry.IsDir() && strings.HasSuffix(className, ".class") {
-				dollarIndex := strings.Index(className, "$")
-				if dollarIndex > 0 {
-					outerClassName := className[:dollarIndex] + ".class"
-					entryPath := path.Join(dirPath, className)
-					outerClassPath := path.Join(dirPath, outerClassName)
-					innerClassesByOuter[outerClassPath] = append(innerClassesByOuter[outerClassPath], entryPath)
-				}
-			}
-		}
-	}
-	innerClassMap := make(map[string]string)
-	for outerClass, innerClasses := range innerClassesByOuter {
-		for _, innerClass := range innerClasses {
-			innerClassMap[innerClass] = outerClass
-		}
-	}
-
 	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			log.Errorf("failed to get info for %s: %v", entry.Name(), err)
-			continue
-		}
-
-		entryName := displayEntryName(entry)
-		entryPath := path.Join(dirPath, entryName)
-		isDirLike := entry.IsDir() || javaclassparserIsArchiveLeaf(entryName)
+		isDirLike := entry.Dir || javaclassparserIsArchiveLeaf(entry.Name)
 
 		resourceURL := &ypb.YakURL{
 			Schema: "javaDec",
 			Path:   "/jar",
 		}
-
-		if isDirLike {
-			resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
-				Key:   "jar",
-				Value: jarPath,
-			}, &ypb.KVPair{
-				Key:   "dir",
-				Value: entryPath,
-			})
-		} else if strings.HasSuffix(entryName, ".class") {
+		switch {
+		case isDirLike:
+			resourceURL.Query = []*ypb.KVPair{
+				{Key: "jar", Value: jarPath},
+				{Key: "dir", Value: entry.Path},
+			}
+		case entry.ClassPath != "":
 			resourceURL.Path = "/class"
-			resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
-				Key:   "jar",
-				Value: jarPath,
-			}, &ypb.KVPair{
-				Key:   "class",
-				Value: entryPath,
-			})
-		} else {
-			resourceURL.Query = append(resourceURL.Query, &ypb.KVPair{
-				Key:   "jar",
-				Value: jarPath,
-			}, &ypb.KVPair{
-				Key:   "dir",
-				Value: path.Dir(entryPath),
-			})
-		}
-
-		resource := a.createResourceFromFileInfo(resourceURL, info, entryPath)
-
-		if isDirLike {
-			subEntries, err := cs.listDirectory(entryPath)
-			if err == nil {
-				resource.HaveChildrenNodes = len(subEntries) > 0
+			resourceURL.Query = []*ypb.KVPair{
+				{Key: "jar", Value: jarPath},
+				{Key: "class", Value: entry.Path},
+			}
+		default:
+			resourceURL.Query = []*ypb.KVPair{
+				{Key: "jar", Value: jarPath},
+				{Key: "dir", Value: path.Dir(entry.Path)},
 			}
 		}
 
-		if hideInnerClasses && !entry.IsDir() && strings.HasSuffix(entryName, ".class") {
-			if innerClasses, hasInnerClasses := innerClassesByOuter[entryPath]; hasInnerClasses {
+		resource := a.createResourceFromFileInfo(resourceURL, entry.Info, entry.Path)
+		if isDirLike {
+			resource.HaveChildrenNodes = cs.hasChildren(entry.Path)
+		}
+		if entry.ClassPath != "" {
+			resource.Extra = append(resource.Extra, &ypb.KVPair{
+				Key:   "originalPath",
+				Value: entry.ClassPath,
+			})
+		}
+
+		if hideInnerClasses && entry.ClassPath != "" {
+			if innerClasses, ok := innerClassesByOuter[entry.Path]; ok {
 				for _, innerClassPath := range innerClasses {
 					resource.Extra = append(resource.Extra, &ypb.KVPair{
 						Key:   "innerClass",
@@ -254,15 +94,11 @@ func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath
 					})
 				}
 			}
-			if v, ok := innerClassMap[entryPath]; ok {
-				resource.Extra = append(resource.Extra, &ypb.KVPair{
-					Key:   "hide",
-					Value: "true",
-				})
-				resource.Extra = append(resource.Extra, &ypb.KVPair{
-					Key:   "outerClass",
-					Value: v,
-				})
+			if outerClass, ok := innerClassMap[entry.Path]; ok {
+				resource.Extra = append(resource.Extra,
+					&ypb.KVPair{Key: "hide", Value: "true"},
+					&ypb.KVPair{Key: "outerClass", Value: outerClass},
+				)
 			}
 		}
 
@@ -275,4 +111,14 @@ func (a *Action) listCodeSourceDirectory(jarPath, dirPath string, currentDirPath
 		Page:      1,
 		PageSize:  int64(len(resources)),
 	}, nil
+}
+
+// hasChildren reports whether a directory or archive entry can be expanded.
+func (cs *codeSource) hasChildren(entryPath string) bool {
+	subEntries, err := cs.listDirectory(entryPath)
+	if err != nil {
+		log.Warnf("failed to probe children for %s: %v", entryPath, err)
+		return false
+	}
+	return len(subEntries) > 0
 }

@@ -30,9 +30,12 @@ func (a *Action) createResourceFromFileInfo(url *ypb.YakURL, info fs.FileInfo, r
 		resource.VerboseName = fileName
 	} else {
 		resource.ResourceType = "file"
-		if strings.HasSuffix(resourcePath, ".class") {
+		switch {
+		case strings.HasSuffix(strings.ToLower(resourcePath), ".java"):
+			resource.VerboseType = "java-source"
+		case strings.HasSuffix(strings.ToLower(resourcePath), ".class"):
 			resource.VerboseType = "java-class"
-		} else {
+		default:
 			resource.VerboseType = "java-file"
 		}
 		resource.VerboseName = fileName + " [" + resource.SizeVerbose + "]"
