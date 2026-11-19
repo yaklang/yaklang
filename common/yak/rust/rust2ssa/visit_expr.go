@@ -1,10 +1,12 @@
 package rust2ssa
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
+	"sync/atomic"
 
 	"github.com/yaklang/antlr/v4"
-	"strings"
 
 	rustparser "github.com/yaklang/yaklang/common/yak/rust/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -57,8 +59,7 @@ func (b *singleFileBuilder) VisitExpression(raw rustparser.IExpressionContext) s
 		b.Continue()
 		return nil
 	case *rustparser.ExpressionWithBlock_Context:
-		b.visitExpressionWithBlock(expr.ExpressionWithBlock())
-		return nil
+		return b.visitExpressionWithBlock(expr.ExpressionWithBlock())
 	case *rustparser.MacroInvocationAsExpressionContext:
 		return b.visitMacro(expr.MacroInvocation())
 	case *rustparser.StructExpression_Context:
@@ -68,21 +69,67 @@ func (b *singleFileBuilder) VisitExpression(raw rustparser.IExpressionContext) s
 	}
 }
 
-func (b *singleFileBuilder) visitExpressionWithBlock(raw rustparser.IExpressionWithBlockContext) {
+func (b *singleFileBuilder) visitExpressionWithBlock(raw rustparser.IExpressionWithBlockContext) ssa.Value {
 	ctx, ok := raw.(*rustparser.ExpressionWithBlockContext)
 	if !ok || ctx == nil {
-		return
+		return nil
 	}
 	switch {
 	case ctx.BlockExpression() != nil:
-		b.visitBlockExpression(ctx.BlockExpression(), false)
+		return b.visitBlockExpression(ctx.BlockExpression(), false)
 	case ctx.IfExpression() != nil:
 		if ifExpr, ok := ctx.IfExpression().(*rustparser.IfExpressionContext); ok {
-			b.visitIf(ifExpr)
+			return b.visitIfExpression(ifExpr)
 		}
 	case ctx.LoopExpression() != nil:
 		b.visitLoop(ctx.LoopExpression())
 	}
+	return nil
+}
+
+var rustIfExpressionSeq atomic.Uint64
+
+// visitIfExpression lowers Rust's value-producing if expression. The IfBuilder
+// only merges control flow, so branch values are written into a temporary
+// variable and read after the merge, where the builder materializes its phi.
+func (b *singleFileBuilder) visitIfExpression(ctx *rustparser.IfExpressionContext) ssa.Value {
+	if ctx == nil || ctx.Expression() == nil {
+		return nil
+	}
+	name := fmt.Sprintf("__rust_if_expr_%d", rustIfExpressionSeq.Add(1))
+	variable := b.CreateLocalVariable(name)
+	b.AssignVariable(variable, b.EmitConstInstNil())
+	ifBuilder := b.CreateIfBuilder()
+	ifBuilder.SetCondition(func() ssa.Value {
+		return b.VisitExpression(ctx.Expression())
+	}, func() {
+		value := b.visitBlockExpression(ctx.BlockExpression(0), false)
+		if value == nil {
+			value = b.EmitConstInstNil()
+		}
+		b.AssignVariable(b.CreateVariable(name), value)
+	})
+	if ctx.IfExpression() != nil {
+		if elseIf, ok := ctx.IfExpression().(*rustparser.IfExpressionContext); ok {
+			ifBuilder.SetElse(func() {
+				value := b.visitIfExpression(elseIf)
+				if value == nil {
+					value = b.EmitConstInstNil()
+				}
+				b.AssignVariable(b.CreateVariable(name), value)
+			})
+		}
+	} else if ctx.BlockExpression(1) != nil {
+		ifBuilder.SetElse(func() {
+			value := b.visitBlockExpression(ctx.BlockExpression(1), false)
+			if value == nil {
+				value = b.EmitConstInstNil()
+			}
+			b.AssignVariable(b.CreateVariable(name), value)
+		})
+	}
+	ifBuilder.Build()
+	return b.ReadValue(name)
 }
 
 func (b *singleFileBuilder) visitLiteral(raw rustparser.ILiteralExpressionContext) ssa.Value {
