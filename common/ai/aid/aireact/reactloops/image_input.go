@@ -19,19 +19,20 @@ import (
 // imagePromptSnapshot is request-local transport material. It has no authority
 // over resource visibility or Timeline retention and performs no model calls.
 type imagePromptSnapshot struct {
-	model       *ypb.AIModelConfig
-	modelKey    string
-	references  []aicommon.PromptImage
-	inputs      []*aicommon.ImageData
-	caption     string
-	imageTokens int64
-	imageBytes  int64
-	toolTokens  int64
-	toolBytes   int64
-	inputLimit  int64
-	reserve     int64
-	maxBytes    int64
-	omitted     int
+	model          *ypb.AIModelConfig
+	modelKey       string
+	references     []aicommon.PromptImage
+	inputs         []*aicommon.ImageData
+	caption        string
+	imageTokens    int64
+	imageBytes     int64
+	toolTokens     int64
+	toolBytes      int64
+	inputLimit     int64
+	reserve        int64
+	maxBytes       int64
+	omitted        int
+	recoveryItemID int64
 }
 
 const (
@@ -141,6 +142,10 @@ func (r *ReActLoop) prepareImages(ctx context.Context, references []aicommon.Pro
 	s := &imagePromptSnapshot{model: model, modelKey: imageModelKey(model),
 		inputLimit: r.wholePromptTokenLimit(), reserve: policy.OutputReserveTokens, maxBytes: policy.MaxRequestBytes,
 		toolBytes: int64(len(toolSchema)), toolTokens: int64(aicommon.MeasureTokens(string(toolSchema)))}
+	latest := references[len(references)-1]
+	if latest.FailedToolResult {
+		s.recoveryItemID = latest.TimelineItemID
+	}
 	type promptView struct {
 		data   *aicommon.ImageData
 		tokens int64

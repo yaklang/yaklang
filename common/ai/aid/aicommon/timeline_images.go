@@ -9,8 +9,9 @@ import (
 // It is captured under the same Timeline lock as the text, not reconstructed
 // from a session-wide resource catalogue after prompt assembly.
 type PromptImage struct {
-	TimelineItemID int64
-	Image          *aimedia.Image
+	TimelineItemID   int64
+	Image            *aimedia.Image
+	FailedToolResult bool
 }
 
 func (m *Timeline) PushTextWithImages(id int64, text string, images ...*aimedia.Image) {
@@ -41,17 +42,19 @@ func timelineItemImages(item *TimelineItem) []PromptImage {
 		return nil
 	}
 	var images []*aimedia.Image
+	failed := false
 	switch value := item.value.(type) {
 	case *TextTimelineItem:
 		images = value.Images
 	case *aitool.ToolResult:
 		images = value.Images
+		failed = !value.Success
 	}
 	var out []PromptImage
 	for _, img := range images {
 		if img != nil {
 			copy := *img
-			out = append(out, PromptImage{TimelineItemID: item.GetID(), Image: &copy})
+			out = append(out, PromptImage{TimelineItemID: item.GetID(), Image: &copy, FailedToolResult: failed})
 		}
 	}
 	return out
