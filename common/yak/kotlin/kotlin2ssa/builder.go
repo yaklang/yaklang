@@ -68,5 +68,6 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 
 type singleFileBuilder struct {
 	*ssa.FunctionBuilder
-	imports []string
+	imports     []string
+	classFields map[string]ssa.Value
 }
