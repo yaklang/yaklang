@@ -127,6 +127,8 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ALLOW, result.Action)
+		require.Contains(t, result.Message(), "allowed")
+		require.NotContains(t, result.Message(), "warning")
 	})
 
 	t.Run("highest-action-wins", func(t *testing.T) {
