@@ -21,7 +21,10 @@ type PCAPFileDBMetadata struct {
 	DatabaseType       string    `gorm:"not null" json:"database_type"`
 	DatabasePath       string    `gorm:"not null" json:"database_path"`
 	SourcePath         string    `gorm:"index;not null" json:"source_path"`
+	SourceKind         string    `gorm:"type:text;not null;default:''" json:"source_kind"`
 	SourceAliases      string    `gorm:"type:text;not null" json:"source_aliases"`
+	CaptureInterface   string    `gorm:"type:text;not null;default:''" json:"capture_interface"`
+	CaptureBPF         string    `gorm:"type:text;not null;default:''" json:"capture_bpf"`
 	SourceSize         int64     `json:"source_size"`
 	SourceModTimeNS    int64     `json:"source_mod_time_ns"`
 	Fingerprint        string    `gorm:"index;not null" json:"fingerprint"`

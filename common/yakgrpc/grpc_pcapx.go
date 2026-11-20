@@ -162,17 +162,10 @@ func pcapXTransferKBPerSecond(deltaBytes int64, elapsed time.Duration) int64 {
 func pcapXResponse(meta *pcapdb.PCAPFileDBMetadata, finished bool, captureErr error, transferKBPerSecond int64) *ypb.PcapXResponse {
 	response := &ypb.PcapXResponse{Finished: finished, NetInterfaceTransferKBPerSeconds: transferKBPerSecond}
 	if meta != nil {
-		response.DatasetID = meta.DatasetID
-		response.State = string(meta.State)
+		response.Database = pcapDatabaseModel(meta)
 		response.PacketFrameCounter = meta.PacketCount
 		response.TCPReassembledCount = meta.StreamChunkCount
 		response.TrafficSessionCount = meta.SessionCount
-		response.BytesIndexed = meta.BytesIndexed
-		response.TotalBytes = meta.SourceSize
-		response.ProtocolCount = meta.ProtocolCount
-		response.SessionCount = meta.SessionCount
-		response.StreamCount = meta.StreamCount
-		response.StreamChunkCount = meta.StreamChunkCount
 	}
 	if captureErr != nil {
 		response.Error = captureErr.Error()

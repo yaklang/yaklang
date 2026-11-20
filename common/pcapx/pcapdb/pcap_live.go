@@ -114,7 +114,22 @@ func (m *InstanceManager) CreateLiveDataset(ctx context.Context, config LiveCapt
 	if err = makeDurableDirectory(dir); err != nil {
 		return nil, err
 	}
-	meta := &PCAPFileDBMetadata{DatasetID: id, DatabaseType: "sqlite", DatabasePath: filepath.Join(dir, "index.sqlite"), FingerprintMode: liveFingerprintMode, SourceAliases: "[]", Format: "pcap", SchemaVersion: SchemaVersion, State: StateRegistered, ProtocolsIndexed: true, StreamsIndexed: true}
+	meta := &PCAPFileDBMetadata{
+		Model:            gorm.Model{CreatedAt: time.Now().UTC()},
+		DatasetID:        id,
+		DatabaseType:     "sqlite",
+		DatabasePath:     filepath.Join(dir, "index.sqlite"),
+		SourceKind:       SourceKindLive,
+		CaptureInterface: config.Interface,
+		CaptureBPF:       config.BPF,
+		FingerprintMode:  liveFingerprintMode,
+		SourceAliases:    "[]",
+		Format:           "pcap",
+		SchemaVersion:    SchemaVersion,
+		State:            StateRegistered,
+		ProtocolsIndexed: true,
+		StreamsIndexed:   true,
+	}
 	lock, err := acquireFileLock(operation, datasetLockPath(meta), true)
 	if err != nil {
 		return nil, err

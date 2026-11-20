@@ -51,6 +51,52 @@ func (m *InstanceManager) ListPage(ctx context.Context, options ...QueryOption) 
 	return pageItems(page, items, c.limit, c.resultBytes, func(p CatalogSummary) int64 { return int64(p.ID) })
 }
 
+// QueryMetadata provides paginated catalog rows for direct API projection.
+// Export-oriented callers should continue using ListPage/CatalogSummary.
+func (m *InstanceManager) QueryMetadata(ctx context.Context, datasetID string, options ...QueryOption) (*ResultPage[PCAPFileDBMetadata], error) {
+	page := emptyPage[PCAPFileDBMetadata]("", 0, "catalog_id")
+	c, err := parseDetailQueryWithoutCursor(options)
+	if err != nil {
+		return failPage(page, err)
+	}
+	page.NextCursor = c.after
+	page.requestCursor = c.after
+	if err = m.begin(); err != nil {
+		return failPage(page, err)
+	}
+	defer m.ops.Done()
+	c.parent = ctx
+	queryCtx, cancel := c.operationContext(m)
+	defer cancel()
+	var rows []PCAPFileDBMetadata
+	projection := "id,dataset_id,state,source_path,database_path,source_kind,capture_interface,capture_bpf,format,source_size,packet_count,protocol_count,session_count,stream_count,stream_chunk_count,protocols_indexed,streams_indexed,last_error,created_at"
+	query := indexWithContext(queryCtx, m.profile).Select(projection)
+	if datasetID != "" {
+		query = query.Where("dataset_id = ?", datasetID)
+	}
+	err = query.Where("id > ?", c.after).Order("id").Limit(c.limit + 1).Find(&rows).Error
+	if err != nil {
+		return failPage(page, err)
+	}
+	page.State = StateReady
+	return pageItems(page, rows, c.limit, c.resultBytes, func(p PCAPFileDBMetadata) int64 { return int64(p.ID) })
+}
+
+func (m *InstanceManager) CountMetadata(ctx context.Context, datasetID string) (int64, error) {
+	if err := m.begin(); err != nil {
+		return 0, err
+	}
+	defer m.ops.Done()
+	ctx, cancel := m.operationContext(ctx)
+	defer cancel()
+	query := indexWithContext(ctx, m.profile).Model(&PCAPFileDBMetadata{})
+	if datasetID != "" {
+		query = query.Where("dataset_id = ?", datasetID)
+	}
+	var count int64
+	return count, query.Count(&count).Error
+}
+
 func parseDetailQueryWithoutCursor(options []QueryOption) (*queryConfig, error) {
 	c, err := parseQuery(options, false)
 	if err != nil {

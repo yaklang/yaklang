@@ -85,10 +85,21 @@ func pcapRPCError(err error) error {
 }
 
 func pcapDatabaseModel(meta *pcapdb.PCAPFileDBMetadata) *ypb.PCAPDatabase {
+	createdAt := int64(0)
+	if !meta.CreatedAt.IsZero() {
+		createdAt = meta.CreatedAt.Unix()
+	}
 	return &ypb.PCAPDatabase{
 		Id: int64(meta.ID), DatasetID: meta.DatasetID, SourcePath: meta.SourcePath,
 		SourceSize: meta.SourceSize, Format: meta.Format, State: meta.State,
-		PacketCount: meta.PacketCount, LastError: meta.LastError, ProtocolsIndexed: meta.ProtocolsIndexed,
+		PacketCount: meta.PacketCount, LastError: meta.LastError,
+		ProtocolsIndexed: meta.ProtocolsIndexed, SourceKind: meta.SourceKind,
+		CaptureInterface: meta.CaptureInterface, CaptureBPF: meta.CaptureBPF,
+		ProtocolCount: meta.ProtocolCount, SessionCount: meta.SessionCount, StreamCount: meta.StreamCount,
+		StreamChunkCount: meta.StreamChunkCount, StreamsIndexed: meta.StreamsIndexed,
+		CreatedAt: createdAt,
+		PreviewTruncated: len(meta.SourcePath) > 512 || len(meta.DatabasePath) > 512 ||
+			len(meta.CaptureInterface) > 512 || len(meta.CaptureBPF) > 512 || len(meta.LastError) > 512,
 	}
 }
 
@@ -135,33 +146,14 @@ func (s *Server) QueryPCAPDatabase(ctx context.Context, req *ypb.QueryPCAPDataba
 	response := &ypb.QueryPCAPDatabaseResponse{
 		Pagination: paging, Data: make([]*ypb.PCAPDatabase, 0), NextCursor: paging.AfterId,
 	}
-	if id != "" {
-		meta, err := manager.MetadataContext(ctx, id)
-		if errors.Is(err, pcapdb.ErrNotFound) {
-			return response, nil
-		}
-		if err != nil {
-			return nil, pcapRPCError(err)
-		}
-		response.Total = 1
-		if int64(meta.ID) > paging.AfterId {
-			response.Data = append(response.Data, pcapDatabaseModel(meta))
-			response.NextCursor = int64(meta.ID)
-		}
-		return response, nil
-	}
-	page, err := manager.ListPage(ctx, pcapdb.QueryLimit(int(paging.Limit)), pcapdb.QueryAfter(paging.AfterId))
+	page, err := manager.QueryMetadata(ctx, id, pcapdb.QueryLimit(int(paging.Limit)), pcapdb.QueryAfter(paging.AfterId))
 	if err != nil {
 		return nil, pcapRPCError(err)
 	}
-	for _, row := range page.Items {
-		response.Data = append(response.Data, &ypb.PCAPDatabase{
-			Id: int64(row.ID), DatasetID: row.DatasetID, SourcePath: row.SourcePath,
-			SourceSize: row.SourceSize, Format: row.Format, State: row.State,
-			PacketCount: row.PacketCount, LastError: row.LastError, PreviewTruncated: row.PreviewTruncated,
-		})
+	for i := range page.Items {
+		response.Data = append(response.Data, pcapDatabaseModel(&page.Items[i]))
 	}
-	response.Total, err = manager.CountContext(ctx)
+	response.Total, err = manager.CountMetadata(ctx, id)
 	if err != nil {
 		return nil, pcapRPCError(err)
 	}

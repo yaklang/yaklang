@@ -3276,16 +3276,9 @@ message PcapXResponse {
   int64 NetInterfaceTransferKBPerSeconds = 2;
   int64 TCPReassembledCount = 3;
   int64 TrafficSessionCount = 4;
-  string DatasetID = 5; // Available once the live pcapdb dataset is created.
-  string State = 6;
-  int64 BytesIndexed = 7;
-  int64 TotalBytes = 8;
-  int64 ProtocolCount = 9;
-  int64 SessionCount = 10;
-  int64 StreamCount = 11;
-  int64 StreamChunkCount = 12;
-  bool Finished = 13;
-  string Error = 14;
+  PCAPDatabase Database = 5;
+  bool Finished = 6;
+  string Error = 7;
 }
 
 
@@ -10895,6 +10888,15 @@ message PCAPDatabase {
   string LastError = 8;
   bool PreviewTruncated = 9;
   bool ProtocolsIndexed = 10;
+  string SourceKind = 11; // file or live.
+  string CaptureInterface = 12; // Selected live capture interface; empty for file imports.
+  string CaptureBPF = 13; // Live capture BPF; empty when no filter was configured.
+  int64 ProtocolCount = 14;
+  int64 SessionCount = 15;
+  int64 StreamCount = 16;
+  int64 StreamChunkCount = 17;
+  bool StreamsIndexed = 18;
+  int64 CreatedAt = 19; // Dataset creation time as Unix seconds.
 }
 
 message ImportPCAPFileRequest {

@@ -253,6 +253,7 @@ func (m *InstanceManager) GetOrCreate(filename string, options ...ImportOption) 
 		DatabaseType:       "sqlite",
 		DatabasePath:       filepath.Join(directory, "index.sqlite"),
 		SourcePath:         path,
+		SourceKind:         SourceKindFile,
 		SourceAliases:      "[]",
 		SourceSize:         info.Size(),
 		SourceModTimeNS:    info.ModTime().UnixNano(),

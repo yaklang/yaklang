@@ -26,6 +26,11 @@ const (
 	StateInvalid     State = "invalid"
 )
 
+const (
+	SourceKindFile = "file"
+	SourceKindLive = "live"
+)
+
 var (
 	ErrClosed            = errors.New("pcapdb: instance manager or database is closed")
 	ErrBusy              = errors.New("pcapdb: dataset is being modified by another operation")

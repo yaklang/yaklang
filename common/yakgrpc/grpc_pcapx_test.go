@@ -54,8 +54,10 @@ func TestPcapXStreamsLiveDataset(t *testing.T) {
 	initial := pcapdb.PCAPFileDBMetadata{
 		DatasetID: datasetID, State: pcapdb.StateReady,
 		PacketCount: 2, ProtocolCount: 1, SessionCount: 1, StreamCount: 2, StreamChunkCount: 3,
-		BytesIndexed: 2048, SourceSize: 4096,
+		BytesIndexed: 2048, SourceSize: 4096, SourceKind: pcapdb.SourceKindLive,
+		CaptureInterface: "controlled", CaptureBPF: "tcp port 80",
 	}
+	initial.CreatedAt = time.Unix(1700000000, 0).UTC()
 	pcapXRunLiveCapture = func(ctx context.Context, _ *pcapdb.InstanceManager, _ pcapdb.LiveCaptureConfig, started func(pcapdb.PCAPFileDBMetadata)) (*pcapdb.PCAPFileDBMetadata, error) {
 		started(initial)
 		<-ctx.Done()
@@ -71,11 +73,18 @@ func TestPcapXStreamsLiveDataset(t *testing.T) {
 	require.NoError(t, stream.Send(&ypb.PcapXRequest{NetInterfaceList: []string{"controlled"}}))
 	first, err := stream.Recv()
 	require.NoError(t, err)
-	require.Equal(t, datasetID, first.GetDatasetID())
-	require.Equal(t, string(pcapdb.StateReady), first.GetState())
 	require.EqualValues(t, 2, first.GetPacketFrameCounter())
-	require.EqualValues(t, 1, first.GetProtocolCount())
+	require.EqualValues(t, 3, first.GetTCPReassembledCount())
+	require.EqualValues(t, 1, first.GetTrafficSessionCount())
+	require.Equal(t, datasetID, first.GetDatabase().GetDatasetID())
+	require.Equal(t, string(pcapdb.StateReady), first.GetDatabase().GetState())
+	require.EqualValues(t, 2, first.GetDatabase().GetPacketCount())
+	require.EqualValues(t, 1, first.GetDatabase().GetProtocolCount())
 	require.False(t, first.GetFinished())
+	require.Equal(t, pcapdb.SourceKindLive, first.GetDatabase().GetSourceKind())
+	require.Equal(t, "controlled", first.GetDatabase().GetCaptureInterface())
+	require.Equal(t, "tcp port 80", first.GetDatabase().GetCaptureBPF())
+	require.EqualValues(t, initial.CreatedAt.Unix(), first.GetDatabase().GetCreatedAt())
 
 	cancel()
 	require.Eventually(t, func() bool {
