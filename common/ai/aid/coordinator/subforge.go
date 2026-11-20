@@ -108,7 +108,10 @@ func (s *Session) invokeSubForge(ctx context.Context, task aicommon.AIStatefulTa
 		return nil, err
 	}
 	call := newSubForgeCall(ctx, s, task, callID, releaseSlot)
-	defer call.finish()
+	if binding.Schema != nil {
+		call.tree.ToolName = binding.Schema.Name
+	}
+	defer func() { call.finish(retErr) }()
 	childCtx := WithForgeParent(ctx, s.invoker, task, call.childID)
 	manager := buildinaitools.NewToolManager(buildinaitools.WithOnlyTools(allowed...))
 	opts := []aicommon.ConfigOption{

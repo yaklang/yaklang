@@ -32,6 +32,7 @@ type subForgeCall struct {
 	eventMu      sync.Mutex
 	deliveryMu   sync.Mutex
 	childID      string
+	tree         subForgeTaskTree
 	callID       string
 	pending      map[string]struct{}
 	queued       []*schema.AiOutputEvent
@@ -48,6 +49,7 @@ func newSubForgeCall(ctx context.Context, s *Session, task aicommon.AIStatefulTa
 		childID: uuid.NewString(),
 		callID:  callID,
 	}
+	c.tree = subForgeTaskTree{ParentCoordinatorID: s.GetRuntimeId(), ParentTaskID: task.GetId(), ParentTaskUUID: task.GetUUID(), CallToolID: callID, ChildCoordinatorID: c.childID, Revision: 1, Status: "running"}
 	c.unregister = s.InputEventManager.RouteInteractiveInput(c.childID, c.routeInput)
 	return c
 }
@@ -94,9 +96,12 @@ func (c *subForgeCall) interrupted(err error) error {
 	return err
 }
 
-func (c *subForgeCall) finish() {
+func (c *subForgeCall) finish(err error) {
 	c.eventMu.Lock()
 	c.closed = true
+	c.tree.Revision++
+	c.tree.Status = subForgeTreeStatus(err)
+	terminal := c.tree
 	active := c.active
 	c.eventMu.Unlock()
 	var retiredIDs []string
@@ -121,17 +126,32 @@ func (c *subForgeCall) finish() {
 			})
 		}()
 	}
+	// Terminal snapshots are saved synchronously; Config dispatches their callbacks asynchronously.
+	c.session.emitSubForgeTaskTree(terminal)
+
 }
 
 func (c *subForgeCall) handleEvent(event *schema.AiOutputEvent) {
+	c.deliveryMu.Lock()
+	defer c.deliveryMu.Unlock()
+	c.eventMu.Lock()
+	if c.closed || c.ctx.Err() != nil {
+		c.eventMu.Unlock()
+		return
+	}
+	changed := c.tree.observePlan(event)
+	snapshot := c.tree
+	c.eventMu.Unlock()
+	if changed {
+		c.session.emitSubForgeTaskTree(snapshot)
+	}
 	original := event
-	// Internal plans and task/tool lifecycle belong to the child only.
+	// Only the explicit snapshot can update the client's child tree. Keep raw
+	// child lifecycle and tool results isolated from the parent execution view.
 	event = subForgeInteractiveEvent(event)
 	if event == nil {
 		return
 	}
-	c.deliveryMu.Lock()
-	defer c.deliveryMu.Unlock()
 	c.eventMu.Lock()
 	if c.closed || c.ctx.Err() != nil {
 		c.eventMu.Unlock()
@@ -193,6 +213,7 @@ func (c *subForgeCall) run(ctx context.Context, binding SubForgeTool, params ait
 		err   error
 	}
 	done := make(chan childResult, 1)
+	initial := c.tree
 	go func() {
 		var result childResult
 		defer func() {
@@ -202,6 +223,7 @@ func (c *subForgeCall) run(ctx context.Context, binding SubForgeTool, params ait
 			c.releaseSlot()
 			done <- result
 		}()
+		c.session.emitSubForgeTaskTree(initial)
 		c.eventMu.Lock()
 		result.err = ctx.Err()
 		c.childStarted = result.err == nil

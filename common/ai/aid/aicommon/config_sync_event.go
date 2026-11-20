@@ -277,10 +277,18 @@ func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
 		})
 	}
 
+	// Restore child projections independently of the paginated chat history.
+	trees, err := c.subForgeTaskTreesForSession(sessionID)
+	if err != nil {
+		// Optional child projections must not suppress the existing parent list.
+		log.Warnf("restore sub-Forge task trees: %v", err)
+		trees = []json.RawMessage{}
+	}
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "plan_exec_tasks", map[string]interface{}{
-		"session_id": sessionID,
-		"total":      len(items),
-		"records":    items,
+		"session_id":           sessionID,
+		"total":                len(items),
+		"records":              items,
+		"sub_forge_task_trees": trees,
 	}, event.SyncID)
 	return nil
 }
