@@ -28,6 +28,13 @@ type memberCallReadVisitKey struct {
 // into 16381 emitted phis at depth 12. results therefore reuses the value a
 // node already produced inside this read: the read is pure (it emits instructions
 // but never rewrites member tables), so the same key resolves to the same value.
+//
+// A long chain of distinct phi nodes defeats both the cycle guard and the result
+// cache: every node is new, so every branch expands the full remaining chain.
+// C code with large global/struct initialiser trees reaches that shape (php-src
+// Zend: one read stayed above 2^50 nodes and never finished). nodes caps the
+// total expansions per read; past the cap the read falls back to the field
+// lookup, exactly like a cycle does.
 type memberCallReadVisitSet struct {
 	keys     [memberCallReadVisitStackDepth]memberCallReadVisitKey
 	length   int
@@ -40,6 +47,11 @@ type memberCallReadVisitSet struct {
 	resultLen  int
 	resultOver map[memberCallReadVisitKey]Value
 	fallbacks  int
+	// nodes counts phi nodes this read expanded, including repeats.
+	nodes int
+	// exhausted reports that the node budget was hit, so callers stop caching
+	// results that depend on the truncated subtree.
+	exhausted bool
 }
 
 type memberCallReadResult struct {
@@ -48,6 +60,12 @@ type memberCallReadResult struct {
 }
 
 const memberCallReadVisitStackDepth = 8
+
+// memberCallReadMaxNodes bounds one top-level member read. It is far above any
+// real phi chain (Java/JS bundles peak in the hundreds) and only stops shapes
+// that grow without repeating a node, where the work would otherwise be
+// exponential in the chain length.
+const memberCallReadMaxNodes = 4096
 
 // phiEdgeIdentity replaces the formatted dedupe key without copying it.
 // Constants still compare by their existing string. Undefined values compare
@@ -113,6 +131,10 @@ func (s *memberCallReadVisitSet) contains(k memberCallReadVisitKey) bool {
 // the inline stack (shallower frame) and in the overflow map (deeper frame), so
 // pop cannot infer the storage location from the key alone.
 func (s *memberCallReadVisitSet) push(k memberCallReadVisitKey) (inOverflow bool) {
+	s.nodes++
+	if s.nodes > memberCallReadMaxNodes {
+		s.exhausted = true
+	}
 	if s.length < memberCallReadVisitStackDepth {
 		s.keys[s.length] = k
 		s.length++
@@ -154,6 +176,11 @@ func (s *memberCallReadVisitSet) lookup(k memberCallReadVisitKey) (Value, bool) 
 }
 
 func (s *memberCallReadVisitSet) remember(k memberCallReadVisitKey, value Value) {
+	// A subtree truncated by the node budget depends on the active path in the
+	// same way a cycle fallback does, so it must not seed a later path.
+	if s.exhausted {
+		return
+	}
 	if s.resultLen < memberCallReadVisitStackDepth {
 		s.results[s.resultLen] = memberCallReadResult{key: k, value: value}
 		s.resultLen++
@@ -237,6 +264,13 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 			return cached
 		}
 		if visited.contains(vk) {
+			visited.fallbacks++
+			return b.getFieldValue(objectt, key, wantFunction)
+		}
+		if visited.nodes >= memberCallReadMaxNodes {
+			// The chain does not repeat a node, so the cycle guard never fires.
+			// Stop expanding and resolve the field directly, as for a cycle.
+			visited.exhausted = true
 			visited.fallbacks++
 			return b.getFieldValue(objectt, key, wantFunction)
 		}
