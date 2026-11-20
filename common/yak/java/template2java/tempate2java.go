@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/java/jsp"
+	"github.com/yaklang/yaklang/common/yak/java/templateconst"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
@@ -15,7 +16,7 @@ const (
 )
 
 const (
-	JAVA_TEMPLATE_SERVER_NAME = "_JavaTemplateService"
+	JAVA_TEMPLATE_SERVER_NAME = templateconst.JAVA_TEMPLATE_SERVER_NAME
 )
 
 var _ tl.TemplateGeneratedInfo = (*GeneratedJavaInfo)(nil)
