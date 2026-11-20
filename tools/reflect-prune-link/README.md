@@ -156,3 +156,54 @@ CI Run: https://github.com/yaklang/yaklang/actions/runs/44754788571 （7 Full + 
    - 追求最稳最省心：先推 **方案 A（`tier3`）**，把 Full 压到 **< 200M**、Slim 压到 **~156M**。
    - 追求 Slim 极致瘦身（< 150M）：投入一次自动化 AST 白名单扫描，直接上 **方案 B**。
 3. **是否需要在 CI 中增加一条“使用裁剪后产物跑 `YAKIT_HOME` 初始化 + 关键 Yak 脚本冒烟”的门禁步骤？**（强烈建议，可提前拦截类似 `pcapx` / `browser` / `javajive` 被误裁的问题。）
+
+---
+
+## 7. Linker 扩展研究（非反射）：`__gopclntab` 前缀折叠 & `pcline` 行号表裁剪实测
+
+除 `deadcode.go` 反射裁剪外，对 `tier2` 产物的段级剖析发现 `__gopclntab` 占整个二进制近 **30%**（Full `59.81 MiB` / Slim `44.60 MiB`，其中 `pcln/functab/inltree` `22.00 MiB`、`funcnametab` `20.36 MiB`、`pctab` `16.38 MiB`；泛型仅占 `funcnametab` 的 `9.9%` / `2.01 MiB`）。
+
+我们基于同一 `-overlay` 通道对 `cmd/link/internal/ld/pcln.go` 做了两项非反射 Linker 实验并本地实测（`darwin/arm64`，`-trimpath -ldflags "-s -w"`，**叠加在 `tier2` 之上**）：
+
+1. **`funcnametab` 路径前缀折叠**：在 `generateFuncnametab` 中将重复前缀 `github.com/yaklang/yaklang/common/` → `y/`、`github.com/yaklang/yaklang/` → `yk/`、`github.com/` → `gh/`（不影响反射与运行逻辑，仅缩短堆栈显示名）。
+2. **`pctab` 行号表（`pcline`）裁剪**：在 `generatePctab` / `writeFuncs` 中跳过目标函数的 `pcline` 表并置偏移为 `0`（Go runtime 原生支持 `pcline == 0` 返回未知行号 `:0`；**`pcsp` 栈回溯与 `pcdata` GC 栈图 100% 保留**）。分为两档：
+   - `cold`：仅裁剪三方库 + 生成的 ANTLR parser / `*2ssa`，**保留全部 Yaklang 业务代码行号**；
+   - `ALL`：裁剪全部函数行号表（测理论上限）。
+
+### 7.1 实测收益（原始二进制体积 & Zip 压缩体积，叠加在 `tier2` 之上）
+
+#### Full (`gzip_embed`)
+
+| 实验项（叠加在 `tier2` 之上） | 原始体积增量 | Zip 体积增量 | 相对 `main` 累计原始减少（不含 #5487） | 叠加 #5487 后预计 Full |
+| :--- | ---: | ---: | ---: | ---: |
+| `tier2` 基线 | +0.00 MiB | +0.00 MiB | -14.21 MiB | ~204.9 MiB |
+| `+ fold (yaklang/common -> y/)` | **-5.94 MiB** | -0.13 MiB | -20.15 MiB | ~199.0 MiB |
+| `+ fold (yaklang + github.com -> gh/)` | **-6.25 MiB** | -0.14 MiB | -20.46 MiB | ~198.6 MiB |
+| `+ strip pcline (cold: 三方库 + parser)` | **-4.08 MiB** | **-2.56 MiB** | -18.29 MiB | ~200.8 MiB |
+| `+ strip pcline (ALL)` | **-7.57 MiB** | **-4.95 MiB** | -21.78 MiB | ~197.3 MiB |
+| **`+ fold(all) + strip pcline(cold)`（推荐平衡档）** | **-10.35 MiB** | **-2.71 MiB** | **-24.56 MiB** | **~194.5 MiB** |
+| `+ fold(all) + strip pcline(ALL)`（极限档） | **-13.84 MiB** | **-5.10 MiB** | **-28.05 MiB** | **~191.0 MiB** |
+
+#### Slim (`gzip_embed,irify_exclude`)
+
+| 实验项（叠加在 `tier2` 之上） | 原始体积增量 | Zip 体积增量 | 相对 `main` 累计原始减少（不含 #5487） | 叠加 #5487 后预计 Slim |
+| :--- | ---: | ---: | ---: | ---: |
+| `tier2` 基线 | +0.00 MiB | +0.00 MiB | -4.05 MiB | ~162.0 MiB |
+| `+ fold (yaklang/common -> y/)` | **-3.43 MiB** | -0.09 MiB | -7.48 MiB | ~158.6 MiB |
+| `+ fold (yaklang + github.com -> gh/)` | **-3.75 MiB** | -0.10 MiB | -7.80 MiB | ~158.3 MiB |
+| `+ strip pcline (cold: 三方库 + parser)` | **-2.61 MiB** | **-1.71 MiB** | -6.66 MiB | ~159.4 MiB |
+| `+ strip pcline (ALL)` | **-5.97 MiB** | **-4.01 MiB** | -10.02 MiB | ~156.0 MiB |
+| **`+ fold(all) + strip pcline(cold)`（推荐平衡档）** | **-6.36 MiB** | **-1.81 MiB** | **-10.41 MiB** | **~155.6 MiB** |
+| `+ fold(all) + strip pcline(ALL)`（极限档） | **-9.72 MiB** | **-4.11 MiB** | **-13.77 MiB** | **~152.3 MiB** |
+
+### 7.2 关键发现与取舍评估
+
+1. **前缀折叠 vs 行号裁剪的互补特性**：
+   - **前缀折叠**：立省 **6.25 MiB (Full) / 3.75 MiB (Slim)** 原始磁盘与 OSS 裸包体积，但因重复 ASCII 前缀本就极易被 LZ77 压缩，对 Zip 仅省 `~0.14 MiB`。运行时堆栈显示为 `y/yak/ssa.(*Program).handlerType.func1()`，清晰可读且零风险（仅需确认业务中无依赖 `runtime.FuncForPC(...).Name()` 做 `github.com/yaklang/yaklang/` 前缀精确匹配的逻辑）。
+   - **`pcline` 行号表裁剪**：`pcline` 是高熵 varint delta 编码流，Zip 几乎压不动，因此 **Zip 转化率高达 ~65%**（Full Zip 实省 **2.56–4.95 MiB**，Slim Zip 实省 **1.71–4.01 MiB**），是极少数能显著压缩传输体积的纯链接优化！
+2. **日志与堆栈副作用实测**：
+   - `strip pcline (ALL)` 会让基于 `runtime.Caller` 的日志位置与 panic 堆栈全部显示为 `?:0`，**不建议直接用于生产排障**。
+   - `strip pcline (cold)`（仅裁三方库与 ANTLR 生成 parser，保留 Yaklang 自身业务包及日志框架行号）：业务代码 panic 与日志行号 100% 完整保留，仅三方库/parser 内部帧显示 `?:0`，**综合性价比最高**。
+3. **结论建议**：
+   - 若团队认可，可在 PR #5488 合入后，在同一 `tools/reflect-prune-link` 通道中通过独立开关（如 `--fold-prefix` / `--strip-cold-pcline`）接入 **`fold(all) + strip pcline(cold)`**，可再白捡 **Full -10.35 MiB（Zip -2.71 MiB）** 与 **Slim -6.36 MiB（Zip -1.81 MiB）**，与 #5487 + #5488 叠加后 Full 直接压进 **~194 MiB**、Slim 压进 **~155 MiB**。
+
