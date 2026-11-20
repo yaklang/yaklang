@@ -67,6 +67,9 @@ func TestSourceRuleFalsePositiveFixes(t *testing.T) {
 		filepath.Join("..", "java", "cwe-295-certificate-validation", "java-empty-trust-manager.sf"),
 		filepath.Join("..", "java", "cwe-94-code-injection", "source-java-script-engine-eval.sf"),
 		filepath.Join("..", "ecmascript", "cwe-79-xss", "js-innerhtml.sf"),
+		filepath.Join("..", "c", "cwe-319-cleartext", "c-cleartext-transmission.sf"),
+		filepath.Join("..", "general", "insecure-api", "unquoted-variable-expansion-in-command.sf"),
+		filepath.Join("..", "general", "insecure-api", "unquoted-command-substitution-in-command.sf"),
 	}
 	for _, f := range files {
 		f := f
