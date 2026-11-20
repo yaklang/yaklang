@@ -1,41 +1,80 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
+
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestBashPrintlnExpression(t *testing.T) {
-	ssatest.CheckPrintlnValueContain(sink+`s=$(greet hello); println "$s"`, []string{`greet`, `"hello"`}, t)
-	checkBash(t, sink+`x=4; y=$((x+2)); println "$y"`, func(p *ssaapi.Program) {
-		fn := p.Program.GetFunction(string(ssa.MainFunctionName), "")
+	checkBashPrintlnRegexp(t, `
+x=4
+y=$((x+2))
+println "$y"
+`, `^castType\(string, add\(castType\(number, "4"\), 2\)\)$`)
+
+	checkBashPrintlnRegexp(t, `
+((i=4))
+old=$((i++))
+println "$old"
+println "$((i))"
+`, `^castType\(string, 4\)$`, `^castType\(string, 5\)$`)
+}
+
+// Arithmetic operands are converted explicitly: numbers for the operation and
+// a string for the expansion result. The conversion kind is part of the ABI
+// shared with other frontends, so assert it instead of only the value.
+func TestBashArithmeticCasts(t *testing.T) {
+	checkBash(t, `
+x=4
+y=$((x+2))
+println "$y"
+`, func(prog *ssaapi.Program) {
+		fn := prog.Program.GetFunction(string(ssa.MainFunctionName), "")
+		require.NotNil(t, fn)
 		seen := map[ssa.TypeKind]bool{}
 		for _, id := range fn.Blocks {
-			b, _ := fn.GetBasicBlockByID(id)
-			for _, id := range b.Insts {
-				if i, ok := fn.GetInstructionById(id); ok {
-					if cast, ok := ssa.ToTypeCast(i); ok {
-						seen[cast.GetType().GetTypeKind()] = true
-					}
+			block, _ := fn.GetBasicBlockByID(id)
+			for _, instID := range block.Insts {
+				inst, ok := fn.GetInstructionById(instID)
+				if !ok {
+					continue
+				}
+				if cast, ok := ssa.ToTypeCast(inst); ok {
+					seen[cast.GetType().GetTypeKind()] = true
 				}
 			}
 		}
 		require.True(t, seen[ssa.NumberTypeKind], "arithmetic operand needs a numeric TypeCast")
 		require.True(t, seen[ssa.StringTypeKind], "arithmetic expansion needs a string TypeCast")
 	})
-	ssatest.CheckPrintlnValueRegexp(sink+`((i=4)); old=$((i++)); println "$old"; println "$((i))"`, []string{`4`, `5`}, t)
 }
 
 func TestBashPrintlnCommandSubstitution(t *testing.T) {
-	ssatest.CheckPrintlnValue(sink+`out=$(echo hi); println "$out"`, []string{`"hi"`}, t)
-	ssatest.CheckPrintlnValue(sink+`out=$(f(){ echo inner; }; f); println "$out"`, []string{`"inner"`}, t)
-	ssatest.CheckPrintlnValueContain(sink+`out=$(printf %s value); println "$out"`, []string{`printf`, `"value"`}, t)
+	checkBashPrintln(t, `
+out=$(echo hi)
+println "$out"
+`, `"hi"`)
+
+	checkBashPrintln(t, `
+out=$(f(){ echo inner; }; f)
+println "$out"
+`, `"inner"`)
+
+	checkBashPrintlnContain(t, `
+out=$(printf %s value)
+println "$out"
+`, "printf", `"value"`)
 }
 
 func TestBashPrintlnPipelineScope(t *testing.T) {
 	// Bash runs every pipeline component in a subshell unless lastpipe is set.
-	ssatest.CheckPrintlnValue(sink+`x=before; println hi | { x=pipe; }; println "$x"`, []string{`"hi"`, `"before"`}, t)
+	checkBashPrintln(t, `
+x=before
+println hi | { x=pipe; }
+println "$x"
+`, `"hi"`, `"before"`)
 }
