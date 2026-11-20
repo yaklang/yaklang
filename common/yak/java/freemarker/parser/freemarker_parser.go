@@ -475,16 +475,6 @@ func (s *TemplateContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitTemplate(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) Template() (localctx ITemplateContext) {
 	this := p
 	_ = this
@@ -612,16 +602,6 @@ func (s *ElementsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ElementsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Elements() (localctx IElementsContext) {
@@ -770,16 +750,6 @@ func (s *InlineExprElementContext) EXPR_EXIT_R_BRACE() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_EXIT_R_BRACE, 0)
 }
 
-func (s *InlineExprElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitInlineExprElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type RawTextElementContext struct {
 	ElementContext
 }
@@ -814,16 +784,6 @@ func (s *RawTextElementContext) RawText() IRawTextContext {
 	return t.(IRawTextContext)
 }
 
-func (s *RawTextElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitRawTextElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DirectiveElementContext struct {
 	ElementContext
 }
@@ -856,16 +816,6 @@ func (s *DirectiveElementContext) Directive() IDirectiveContext {
 	}
 
 	return t.(IDirectiveContext)
-}
-
-func (s *DirectiveElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Element() (localctx IElementContext) {
@@ -1000,16 +950,6 @@ func (s *RawTextContext) GetRuleContext() antlr.RuleContext {
 
 func (s *RawTextContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *RawTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitRawText(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) RawText() (localctx IRawTextContext) {
@@ -1269,16 +1209,6 @@ func (s *DirectiveContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirective(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Directive() (localctx IDirectiveContext) {
@@ -1625,16 +1555,6 @@ func (s *DirectiveIfContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveIfContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveIf(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveIf() (localctx IDirectiveIfContext) {
 	this := p
 	_ = this
@@ -1882,16 +1802,6 @@ func (s *DirectiveIfTrueElementsContext) ToStringTree(ruleNames []string, recog 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveIfTrueElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveIfTrueElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveIfTrueElements() (localctx IDirectiveIfTrueElementsContext) {
 	this := p
 	_ = this
@@ -1985,16 +1895,6 @@ func (s *DirectiveIfElseIfElementsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveIfElseIfElementsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveIfElseIfElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveIfElseIfElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveIfElseIfElements() (localctx IDirectiveIfElseIfElementsContext) {
@@ -2092,16 +1992,6 @@ func (s *DirectiveIfElseElementsContext) ToStringTree(ruleNames []string, recog 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveIfElseElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveIfElseElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveIfElseElements() (localctx IDirectiveIfElseElementsContext) {
 	this := p
 	_ = this
@@ -2195,16 +2085,6 @@ func (s *TagExprElseIfsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TagExprElseIfsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TagExprElseIfsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitTagExprElseIfs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) TagExprElseIfs() (localctx ITagExprElseIfsContext) {
@@ -2362,16 +2242,6 @@ func (s *DirectiveAssignContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveAssignContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveAssignContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveAssign(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveAssign() (localctx IDirectiveAssignContext) {
@@ -2705,16 +2575,6 @@ func (s *DirectiveListContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveList() (localctx IDirectiveListContext) {
 	this := p
 	_ = this
@@ -2965,16 +2825,6 @@ func (s *DirectiveListBodyElementsContext) ToStringTree(ruleNames []string, reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveListBodyElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveListBodyElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveListBodyElements() (localctx IDirectiveListBodyElementsContext) {
 	this := p
 	_ = this
@@ -3068,16 +2918,6 @@ func (s *DirectiveListElseElementsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveListElseElementsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveListElseElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveListElseElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveListElseElements() (localctx IDirectiveListElseElementsContext) {
@@ -3188,16 +3028,6 @@ func (s *DirectiveIncludeContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveIncludeContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveIncludeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveInclude(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveInclude() (localctx IDirectiveIncludeContext) {
@@ -3342,16 +3172,6 @@ func (s *DirectiveImportContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveImportContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveImportContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveImport(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveImport() (localctx IDirectiveImportContext) {
@@ -3527,16 +3347,6 @@ func (s *DirectiveMacroContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveMacroContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveMacroContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveMacro(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveMacro() (localctx IDirectiveMacroContext) {
@@ -3767,16 +3577,6 @@ func (s *DirectiveNestedContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveNestedContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveNested(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveNested() (localctx IDirectiveNestedContext) {
 	this := p
 	_ = this
@@ -3932,16 +3732,6 @@ func (s *DirectiveReturnContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveReturnContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveReturnContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveReturn(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveReturn() (localctx IDirectiveReturnContext) {
@@ -4161,16 +3951,6 @@ func (s *DirectiveUserContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveUserContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveUser(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveUser() (localctx IDirectiveUserContext) {
 	this := p
 	_ = this
@@ -4360,16 +4140,6 @@ func (s *DirectiveUserIdContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveUserIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveUserId(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveUserId() (localctx IDirectiveUserIdContext) {
 	this := p
 	_ = this
@@ -4557,16 +4327,6 @@ func (s *DirectiveUserParamsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveUserParamsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveUserParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveUserParams(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) DirectiveUserParams() (localctx IDirectiveUserParamsContext) {
@@ -4773,16 +4533,6 @@ func (s *DirectiveUserLoopParamsContext) ToStringTree(ruleNames []string, recog 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DirectiveUserLoopParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDirectiveUserLoopParams(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) DirectiveUserLoopParams() (localctx IDirectiveUserLoopParamsContext) {
 	this := p
 	_ = this
@@ -4934,16 +4684,6 @@ func (s *TagExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TagExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitTagExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) TagExpr() (localctx ITagExprContext) {
 	this := p
 	_ = this
@@ -5037,16 +4777,6 @@ func (s *InlineExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InlineExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InlineExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitInlineExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) InlineExpr() (localctx IInlineExprContext) {
@@ -5162,16 +4892,6 @@ func (s *DoubleQuoteContext) Double_quote_string() IDouble_quote_stringContext {
 	return t.(IDouble_quote_stringContext)
 }
 
-func (s *DoubleQuoteContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDoubleQuote(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type SingleQuoteContext struct {
 	StringContext
 }
@@ -5204,16 +4924,6 @@ func (s *SingleQuoteContext) Single_quote_string() ISingle_quote_stringContext {
 	}
 
 	return t.(ISingle_quote_stringContext)
-}
-
-func (s *SingleQuoteContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitSingleQuote(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) String_() (localctx IStringContext) {
@@ -5364,16 +5074,6 @@ func (s *ExprUnaryOpContext) EXPR_SUB() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_SUB, 0)
 }
 
-func (s *ExprUnaryOpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprUnaryOp(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExprMulDivModContext struct {
 	ExprContext
 	op antlr.Token
@@ -5450,16 +5150,6 @@ func (s *ExprMulDivModContext) EXPR_MOD() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_MOD, 0)
 }
 
-func (s *ExprMulDivModContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprMulDivMod(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type BoolExprContext struct {
 	ExprContext
 }
@@ -5484,16 +5174,6 @@ func (s *BoolExprContext) EXPR_TRUE() antlr.TerminalNode {
 
 func (s *BoolExprContext) EXPR_FALSE() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_FALSE, 0)
-}
-
-func (s *BoolExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitBoolExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type StringExprContext struct {
@@ -5528,16 +5208,6 @@ func (s *StringExprContext) String_() IStringContext {
 	}
 
 	return t.(IStringContext)
-}
-
-func (s *StringExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitStringExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprBoolRelationalContext struct {
@@ -5615,16 +5285,6 @@ func (s *ExprBoolRelationalContext) BooleanRelationalOperator() IBooleanRelation
 	return t.(IBooleanRelationalOperatorContext)
 }
 
-func (s *ExprBoolRelationalContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprBoolRelational(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExprRoundParenthesesContext struct {
 	ExprContext
 }
@@ -5665,16 +5325,6 @@ func (s *ExprRoundParenthesesContext) Expr() IExprContext {
 
 func (s *ExprRoundParenthesesContext) EXPR_R_PAREN() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_R_PAREN, 0)
-}
-
-func (s *ExprRoundParenthesesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprRoundParentheses(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprBoolAndContext struct {
@@ -5740,16 +5390,6 @@ func (s *ExprBoolAndContext) EXPR_LOGICAL_AND() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_LOGICAL_AND, 0)
 }
 
-func (s *ExprBoolAndContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprBoolAnd(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type SymbolExprContext struct {
 	ExprContext
 }
@@ -5770,16 +5410,6 @@ func (s *SymbolExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SymbolExprContext) EXPR_SYMBOL() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_SYMBOL, 0)
-}
-
-func (s *SymbolExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitSymbolExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprBuiltInContext struct {
@@ -5848,16 +5478,6 @@ func (s *ExprBuiltInContext) EXPR_R_PAREN() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_R_PAREN, 0)
 }
 
-func (s *ExprBuiltInContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprBuiltIn(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type StructExprContext struct {
 	ExprContext
 }
@@ -5890,16 +5510,6 @@ func (s *StructExprContext) Struct_() IStructContext {
 	}
 
 	return t.(IStructContext)
-}
-
-func (s *StructExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitStructExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprMissingTestContext struct {
@@ -5938,16 +5548,6 @@ func (s *ExprMissingTestContext) Expr() IExprContext {
 
 func (s *ExprMissingTestContext) EXPR_DBL_QUESTION() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_DBL_QUESTION, 0)
-}
-
-func (s *ExprMissingTestContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprMissingTest(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprAddSubContext struct {
@@ -6022,16 +5622,6 @@ func (s *ExprAddSubContext) EXPR_SUB() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_SUB, 0)
 }
 
-func (s *ExprAddSubContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprAddSub(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExprDotAccessContext struct {
 	ExprContext
 }
@@ -6080,16 +5670,6 @@ func (s *ExprDotAccessContext) AllEXPR_SYMBOL() []antlr.TerminalNode {
 
 func (s *ExprDotAccessContext) EXPR_SYMBOL(i int) antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_SYMBOL, i)
-}
-
-func (s *ExprDotAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprDotAccess(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprBoolEqContext struct {
@@ -6163,16 +5743,6 @@ func (s *ExprBoolEqContext) EXPR_EQ() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_EQ, 0)
 }
 
-func (s *ExprBoolEqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprBoolEq(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExprFunctionCallContext struct {
 	ExprContext
 }
@@ -6231,16 +5801,6 @@ func (s *ExprFunctionCallContext) EXPR_R_PAREN() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_R_PAREN, 0)
 }
 
-func (s *ExprFunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprFunctionCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NumberExprContext struct {
 	ExprContext
 }
@@ -6261,16 +5821,6 @@ func (s *NumberExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NumberExprContext) EXPR_NUM() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_NUM, 0)
-}
-
-func (s *NumberExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitNumberExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ExprDefaultContext struct {
@@ -6346,16 +5896,6 @@ func (s *ExprDefaultContext) Expr(i int) IExprContext {
 	return t.(IExprContext)
 }
 
-func (s *ExprDefaultContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprDefault(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExprSquareParenthesesContext struct {
 	ExprContext
 }
@@ -6423,16 +5963,6 @@ func (s *ExprSquareParenthesesContext) EXPR_R_SQ_PAREN() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_R_SQ_PAREN, 0)
 }
 
-func (s *ExprSquareParenthesesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprSquareParentheses(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExprBoolOrContext struct {
 	ExprContext
 }
@@ -6494,16 +6024,6 @@ func (s *ExprBoolOrContext) Expr(i int) IExprContext {
 
 func (s *ExprBoolOrContext) EXPR_LOGICAL_OR() antlr.TerminalNode {
 	return s.GetToken(FreemarkerParserEXPR_LOGICAL_OR, 0)
-}
-
-func (s *ExprBoolOrContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitExprBoolOr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Expr() (localctx IExprContext) {
@@ -7175,16 +6695,6 @@ func (s *FunctionParamsContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FunctionParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitFunctionParams(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) FunctionParams() (localctx IFunctionParamsContext) {
 	this := p
 	_ = this
@@ -7350,16 +6860,6 @@ func (s *BooleanRelationalOperatorContext) ToStringTree(ruleNames []string, reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BooleanRelationalOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitBooleanRelationalOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *FreemarkerParser) BooleanRelationalOperator() (localctx IBooleanRelationalOperatorContext) {
 	this := p
 	_ = this
@@ -7508,16 +7008,6 @@ func (s *StructContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StructContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StructContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitStruct(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Struct_() (localctx IStructContext) {
@@ -7696,16 +7186,6 @@ func (s *Struct_pairContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Struct_pairContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Struct_pairContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitStruct_pair(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Struct_pair() (localctx IStruct_pairContext) {
@@ -7912,16 +7392,6 @@ func (s *Single_quote_stringContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Single_quote_stringContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Single_quote_stringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitSingle_quote_string(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Single_quote_string() (localctx ISingle_quote_stringContext) {
@@ -8176,16 +7646,6 @@ func (s *Double_quote_stringContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Double_quote_stringContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Double_quote_stringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case FreemarkerParserVisitor:
-		return t.VisitDouble_quote_string(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *FreemarkerParser) Double_quote_string() (localctx IDouble_quote_stringContext) {

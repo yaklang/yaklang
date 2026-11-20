@@ -451,16 +451,6 @@ func (s *ProgramContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitProgram(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) Program() (localctx IProgramContext) {
 	this := p
 	_ = this
@@ -600,16 +590,6 @@ func (s *StatementListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StatementListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitStatementList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) StatementList() (localctx IStatementListContext) {
@@ -895,16 +875,6 @@ func (s *StatementContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) Statement() (localctx IStatementContext) {
 	this := p
 	_ = this
@@ -1126,16 +1096,6 @@ func (s *BlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) Block() (localctx IBlockContext) {
 	this := p
 	_ = this
@@ -1319,16 +1279,6 @@ func (s *VariableDeclarationStatementContext) ToStringTree(ruleNames []string, r
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VariableDeclarationStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitVariableDeclarationStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) VariableDeclarationStatement() (localctx IVariableDeclarationStatementContext) {
 	this := p
 	_ = this
@@ -1502,16 +1452,6 @@ func (s *VariableAssignStatementContext) ToStringTree(ruleNames []string, recog 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VariableAssignStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitVariableAssignStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) VariableAssignStatement() (localctx IVariableAssignStatementContext) {
 	this := p
 	_ = this
@@ -1640,16 +1580,6 @@ func (s *ExpressionStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ExpressionStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitExpressionStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) ExpressionStatement() (localctx IExpressionStatementContext) {
@@ -1825,16 +1755,6 @@ func (s *IfStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *IfStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitIfStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) IfStatement() (localctx IIfStatementContext) {
@@ -2091,16 +2011,6 @@ func (s *TraditionalForContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *TraditionalForContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitTraditionalFor(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type RepeatContext struct {
 	IterationStatementContext
 }
@@ -2175,16 +2085,6 @@ func (s *RepeatContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *RepeatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitRepeat(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type WhileContext struct {
 	IterationStatementContext
 }
@@ -2245,16 +2145,6 @@ func (s *WhileContext) Statement() IStatementContext {
 	}
 
 	return t.(IStatementContext)
-}
-
-func (s *WhileContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitWhile(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ForEachContext struct {
@@ -2333,16 +2223,6 @@ func (s *ForEachContext) Statement() IStatementContext {
 	}
 
 	return t.(IStatementContext)
-}
-
-func (s *ForEachContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitForEach(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) IterationStatement() (localctx IIterationStatementContext) {
@@ -2648,16 +2528,6 @@ func (s *ContinueStatementContext) ToStringTree(ruleNames []string, recog antlr.
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitContinueStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) ContinueStatement() (localctx IContinueStatementContext) {
 	this := p
 	_ = this
@@ -2743,16 +2613,6 @@ func (s *BreakStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *BreakStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBreakStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) BreakStatement() (localctx IBreakStatementContext) {
@@ -2867,16 +2727,6 @@ func (s *ReturnStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ReturnStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitReturnStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) ReturnStatement() (localctx IReturnStatementContext) {
@@ -3050,16 +2900,6 @@ func (s *ArgumentListContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ArgumentListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitArgumentList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) ArgumentList() (localctx IArgumentListContext) {
 	this := p
 	_ = this
@@ -3205,16 +3045,6 @@ func (s *ArgumentContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArgumentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitArgument(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) Argument() (localctx IArgumentContext) {
@@ -3366,16 +3196,6 @@ func (s *ExpressionSequenceContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ExpressionSequenceContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ExpressionSequenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitExpressionSequence(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) ExpressionSequence() (localctx IExpressionSequenceContext) {
@@ -3550,16 +3370,6 @@ func (s *FunctionDeclarationStatementContext) GetRuleContext() antlr.RuleContext
 
 func (s *FunctionDeclarationStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionDeclarationStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitFunctionDeclarationStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) FunctionDeclarationStatement() (localctx IFunctionDeclarationStatementContext) {
@@ -3737,16 +3547,6 @@ func (s *ParameterListContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitParameterList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) ParameterList() (localctx IParameterListContext) {
 	this := p
 	_ = this
@@ -3880,16 +3680,6 @@ func (s *ArrayLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArrayLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArrayLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitArrayLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) ArrayLiteral() (localctx IArrayLiteralContext) {
@@ -4049,16 +3839,6 @@ func (s *ElementListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ElementListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ElementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitElementList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) ElementList() (localctx IElementListContext) {
@@ -4222,16 +4002,6 @@ func (s *ArrayElementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArrayElementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArrayElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitArrayElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) ArrayElement() (localctx IArrayElementContext) {
@@ -4410,16 +4180,6 @@ func (s *LogicalAndExpressionContext) And() antlr.TerminalNode {
 	return s.GetToken(NaslParserAnd, 0)
 }
 
-func (s *LogicalAndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitLogicalAndExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type PreIncrementExpressionContext struct {
 	SingleExpressionContext
 }
@@ -4456,16 +4216,6 @@ func (s *PreIncrementExpressionContext) SingleExpression() ISingleExpressionCont
 	}
 
 	return t.(ISingleExpressionContext)
-}
-
-func (s *PreIncrementExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitPreIncrementExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type LogicalOrExpressionContext struct {
@@ -4531,16 +4281,6 @@ func (s *LogicalOrExpressionContext) Or() antlr.TerminalNode {
 	return s.GetToken(NaslParserOr, 0)
 }
 
-func (s *LogicalOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitLogicalOrExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NotExpressionContext struct {
 	SingleExpressionContext
 }
@@ -4577,16 +4317,6 @@ func (s *NotExpressionContext) SingleExpression() ISingleExpressionContext {
 	}
 
 	return t.(ISingleExpressionContext)
-}
-
-func (s *NotExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitNotExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type PreDecreaseExpressionContext struct {
@@ -4627,16 +4357,6 @@ func (s *PreDecreaseExpressionContext) SingleExpression() ISingleExpressionConte
 	return t.(ISingleExpressionContext)
 }
 
-func (s *PreDecreaseExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitPreDecreaseExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type UnaryMinusExpressionContext struct {
 	SingleExpressionContext
 }
@@ -4673,16 +4393,6 @@ func (s *UnaryMinusExpressionContext) SingleExpression() ISingleExpressionContex
 	}
 
 	return t.(ISingleExpressionContext)
-}
-
-func (s *UnaryMinusExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitUnaryMinusExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type AssignmentExpressionContext struct {
@@ -4813,16 +4523,6 @@ func (s *AssignmentExpressionContext) Dot() antlr.TerminalNode {
 	return s.GetToken(NaslParserDot, 0)
 }
 
-func (s *AssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitAssignmentExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type PostDecreaseExpressionContext struct {
 	SingleExpressionContext
 }
@@ -4861,16 +4561,6 @@ func (s *PostDecreaseExpressionContext) MinusMinus() antlr.TerminalNode {
 	return s.GetToken(NaslParserMinusMinus, 0)
 }
 
-func (s *PostDecreaseExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitPostDecreaseExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type UnaryPlusExpressionContext struct {
 	SingleExpressionContext
 }
@@ -4907,16 +4597,6 @@ func (s *UnaryPlusExpressionContext) SingleExpression() ISingleExpressionContext
 	}
 
 	return t.(ISingleExpressionContext)
-}
-
-func (s *UnaryPlusExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitUnaryPlusExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type EqualityExpressionContext struct {
@@ -5002,16 +4682,6 @@ func (s *EqualityExpressionContext) EqualsRe() antlr.TerminalNode {
 	return s.GetToken(NaslParserEqualsRe, 0)
 }
 
-func (s *EqualityExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitEqualityExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type BitXOrExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5073,16 +4743,6 @@ func (s *BitXOrExpressionContext) SingleExpression(i int) ISingleExpressionConte
 
 func (s *BitXOrExpressionContext) BitXOr() antlr.TerminalNode {
 	return s.GetToken(NaslParserBitXOr, 0)
-}
-
-func (s *BitXOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBitXOrExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type MultiplicativeExpressionContext struct {
@@ -5160,16 +4820,6 @@ func (s *MultiplicativeExpressionContext) Modulus() antlr.TerminalNode {
 	return s.GetToken(NaslParserModulus, 0)
 }
 
-func (s *MultiplicativeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitMultiplicativeExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type CallExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5226,16 +4876,6 @@ func (s *CallExpressionContext) ArgumentList() IArgumentListContext {
 	}
 
 	return t.(IArgumentListContext)
-}
-
-func (s *CallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitCallExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type BitShiftExpressionContext struct {
@@ -5313,16 +4953,6 @@ func (s *BitShiftExpressionContext) RightShiftLogical() antlr.TerminalNode {
 	return s.GetToken(NaslParserRightShiftLogical, 0)
 }
 
-func (s *BitShiftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBitShiftExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ParenthesizedExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5363,16 +4993,6 @@ func (s *ParenthesizedExpressionContext) ExpressionSequence() IExpressionSequenc
 
 func (s *ParenthesizedExpressionContext) CloseParen() antlr.TerminalNode {
 	return s.GetToken(NaslParserCloseParen, 0)
-}
-
-func (s *ParenthesizedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitParenthesizedExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type AdditiveExpressionContext struct {
@@ -5440,16 +5060,6 @@ func (s *AdditiveExpressionContext) Plus() antlr.TerminalNode {
 
 func (s *AdditiveExpressionContext) Minus() antlr.TerminalNode {
 	return s.GetToken(NaslParserMinus, 0)
-}
-
-func (s *AdditiveExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitAdditiveExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type RelationalExpressionContext struct {
@@ -5527,16 +5137,6 @@ func (s *RelationalExpressionContext) GreaterThanEquals() antlr.TerminalNode {
 	return s.GetToken(NaslParserGreaterThanEquals, 0)
 }
 
-func (s *RelationalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitRelationalExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type PostIncrementExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5573,16 +5173,6 @@ func (s *PostIncrementExpressionContext) SingleExpression() ISingleExpressionCon
 
 func (s *PostIncrementExpressionContext) PlusPlus() antlr.TerminalNode {
 	return s.GetToken(NaslParserPlusPlus, 0)
-}
-
-func (s *PostIncrementExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitPostIncrementExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type BitNotExpressionContext struct {
@@ -5623,16 +5213,6 @@ func (s *BitNotExpressionContext) SingleExpression() ISingleExpressionContext {
 	return t.(ISingleExpressionContext)
 }
 
-func (s *BitNotExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBitNotExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type LiteralExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5667,16 +5247,6 @@ func (s *LiteralExpressionContext) Literal() ILiteralContext {
 	return t.(ILiteralContext)
 }
 
-func (s *LiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitLiteralExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ArrayLiteralExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5709,16 +5279,6 @@ func (s *ArrayLiteralExpressionContext) ArrayLiteral() IArrayLiteralContext {
 	}
 
 	return t.(IArrayLiteralContext)
-}
-
-func (s *ArrayLiteralExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitArrayLiteralExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type MemberDotExpressionContext struct {
@@ -5761,16 +5321,6 @@ func (s *MemberDotExpressionContext) Dot() antlr.TerminalNode {
 
 func (s *MemberDotExpressionContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(NaslParserIdentifier, 0)
-}
-
-func (s *MemberDotExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitMemberDotExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type MemberIndexExpressionContext struct {
@@ -5840,16 +5390,6 @@ func (s *MemberIndexExpressionContext) CloseBracket() antlr.TerminalNode {
 	return s.GetToken(NaslParserCloseBracket, 0)
 }
 
-func (s *MemberIndexExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitMemberIndexExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type IdentifierExpressionContext struct {
 	SingleExpressionContext
 }
@@ -5882,16 +5422,6 @@ func (s *IdentifierExpressionContext) Identifier() IIdentifierContext {
 	}
 
 	return t.(IIdentifierContext)
-}
-
-func (s *IdentifierExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitIdentifierExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type BitAndExpressionContext struct {
@@ -5957,16 +5487,6 @@ func (s *BitAndExpressionContext) BitAnd() antlr.TerminalNode {
 	return s.GetToken(NaslParserBitAnd, 0)
 }
 
-func (s *BitAndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBitAndExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type BitOrExpressionContext struct {
 	SingleExpressionContext
 }
@@ -6030,16 +5550,6 @@ func (s *BitOrExpressionContext) BitOr() antlr.TerminalNode {
 	return s.GetToken(NaslParserBitOr, 0)
 }
 
-func (s *BitOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitBitOrExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type XExpressionContext struct {
 	SingleExpressionContext
 }
@@ -6101,16 +5611,6 @@ func (s *XExpressionContext) SingleExpression(i int) ISingleExpressionContext {
 
 func (s *XExpressionContext) X() antlr.TerminalNode {
 	return s.GetToken(NaslParserX, 0)
-}
-
-func (s *XExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitXExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) SingleExpression() (localctx ISingleExpressionContext) {
@@ -6893,16 +6393,6 @@ func (s *LiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) Literal() (localctx ILiteralContext) {
 	this := p
 	_ = this
@@ -7053,16 +6543,6 @@ func (s *NumericLiteralContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitNumericLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) NumericLiteral() (localctx INumericLiteralContext) {
 	this := p
 	_ = this
@@ -7158,16 +6638,6 @@ func (s *IdentifierContext) GetRuleContext() antlr.RuleContext {
 
 func (s *IdentifierContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitIdentifier(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) Identifier() (localctx IIdentifierContext) {
@@ -7307,16 +6777,6 @@ func (s *AssignmentOperatorContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitAssignmentOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *NaslParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
 	this := p
 	_ = this
@@ -7412,16 +6872,6 @@ func (s *EosContext) GetRuleContext() antlr.RuleContext {
 
 func (s *EosContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case NaslParserVisitor:
-		return t.VisitEos(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *NaslParser) Eos() (localctx IEosContext) {
