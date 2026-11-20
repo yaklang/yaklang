@@ -26,7 +26,7 @@ func extractUserUsageCallbackOpts(i AICallerConfigIf) []aispec.AIConfigOption {
 	}
 	var cfg *Config
 	if t, ok := i.(*tierAwareConsumptionCaller); ok && t != nil {
-		cfg = t.owner
+		cfg = t.Config
 	} else if c, ok := i.(*Config); ok {
 		cfg = c
 	}

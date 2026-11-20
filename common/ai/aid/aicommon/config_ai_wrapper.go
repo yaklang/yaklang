@@ -21,8 +21,8 @@ import (
 
 type tierAwareConsumptionCaller struct {
 	AICallerConfigIf
-	owner *Config
-	tier  consts.ModelTier
+	Config *Config
+	tier   consts.ModelTier
 }
 
 type tierUsageMetrics struct {
@@ -46,7 +46,7 @@ func (c *tierAwareConsumptionCaller) CallAIResponseConsumptionCallback(current i
 func wrapCallerWithTierConsumption(owner *Config, tier consts.ModelTier) AICallerConfigIf {
 	return &tierAwareConsumptionCaller{
 		AICallerConfigIf: owner,
-		owner:            owner,
+		Config:           owner,
 		tier:             tier,
 	}
 }
