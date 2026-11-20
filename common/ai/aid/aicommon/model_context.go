@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 // Pending adjustments are isolated by concrete quality-model configuration.
@@ -108,9 +109,11 @@ func (c *Config) EffectiveModelContextLimit(provider, model string, base int64, 
 	probe := state.models[modelContextProbeKey(provider, model, contextKey)]
 	// A manual update from another session supersedes an in-flight probe.
 	if probe != nil && probe.pending && probe.ManualRevision == saved.ManualRevision {
-		return c.EffectiveTimelineTokenLimit(provider, model, min(base, probe.ThresholdTokens))
+		return min(base, probe.ThresholdTokens)
 	}
-	return c.EffectiveTimelineTokenLimit(provider, model, base)
+	// Quality settings are isolated by ContextKey. Legacy auxiliary recovery is
+	// keyed by model name and must not clamp another configured provider here.
+	return base
 }
 
 func (c *Config) resetModelContextLimit(provider, model, contextKey string) {
@@ -163,17 +166,32 @@ type ModelContextStatus struct {
 // PrimaryModelContext returns only the quality-tier binding. Auxiliary loops do
 // not opt in, even when single-model mode uses the same physical model.
 func (c *Config) PrimaryModelContext() (provider, model, key string) {
-	if c == nil || !c.modelContextSettingsEnabled {
+	config := c.primaryModelConfig()
+	if config == nil {
 		return
+	}
+	return config.GetProvider().GetType(), config.GetModelName(), aispec.ModelContextIdentity(config)
+}
+
+func (c *Config) primaryModelConfig() *ypb.AIModelConfig {
+	if c == nil || !c.modelContextSettingsEnabled {
+		return nil
 	}
 	config := c.primaryModelContextConfig
 	if config == nil {
 		config = aiconfig.GetGlobalManager().GetFirstConfig(consts.TierIntelligent)
 	}
+	return config
+}
+
+// SnapshotPrimaryModelConfig pins the routing identity used to build one
+// quality prompt. The same snapshot must be carried into its gateway request.
+func (c *Config) SnapshotPrimaryModelConfig() *ypb.AIModelConfig {
+	config := c.primaryModelConfig()
 	if config == nil {
-		return
+		return nil
 	}
-	return config.GetProvider().GetType(), config.GetModelName(), aispec.ModelContextIdentity(config)
+	return proto.Clone(config).(*ypb.AIModelConfig)
 }
 
 // WithPrimaryModelContext binds an explicit quality configuration (also useful

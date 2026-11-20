@@ -30,6 +30,7 @@ type AIRequest struct {
 	modelTier              string
 	callerLabel            string
 	ctx                    context.Context
+	qualityModelConfig     *ypb.AIModelConfig
 
 	// extraSpecOpts carries additional aispec.AIConfigOption values that
 	// AIChatToAICallbackType will append to its option list when calling the
@@ -81,6 +82,17 @@ func NewAIRequest(prompt string, opt ...AIRequestOption) *AIRequest {
 }
 
 type AIRequestOption func(req *AIRequest)
+
+// WithAIRequest_QualityModelConfig keeps quality routing consistent with the
+// model whose context threshold was used to build this prompt. Other tiers
+// retain their existing routing, including single-model auxiliary calls.
+func WithAIRequest_QualityModelConfig(config *ypb.AIModelConfig) AIRequestOption {
+	return func(req *AIRequest) {
+		if config != nil {
+			req.qualityModelConfig = proto.Clone(config).(*ypb.AIModelConfig)
+		}
+	}
+}
 
 // WithAIRequest_DetachCheckpoint marks an auxiliary AI request as independent
 // from the coordinator's replay sequence. Progress/interval reviews use this so

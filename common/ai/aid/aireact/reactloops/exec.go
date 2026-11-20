@@ -737,8 +737,8 @@ LOOP:
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
 			tokens := r.completeInputTokens(prompt)
-			if _, _, key := r.primaryModelContext(); key != "" {
-				r.config.(*aicommon.Config).EmitModelContext(int64(tokens))
+			if provider, model, key := r.primaryModelContext(); key != "" {
+				r.config.(*aicommon.Config).EmitModelContextFor(provider, model, int64(tokens), key)
 			}
 			if r.promptMode == aicommon.LoopPromptModeCompressContext {
 				r.noteCompressionStatus()
@@ -771,13 +771,8 @@ LOOP:
 			}
 			streamWg.Wait()
 			if transactionErr == nil {
-				if provider, model, key := r.primaryModelContext(); key != "" && task.GetContext().Err() == nil && resultDescriptor != nil {
-					identity := resultDescriptor.Snapshot()
-					if identity.ContextKey == key && identity.Provider == provider && identity.Model == model {
-						config := r.config.(*aicommon.Config)
-						config.ConfirmModelContextSuccess(provider, model, key)
-						config.EmitModelContextFor(provider, model, int64(tokens), key)
-					}
+				if task.GetContext().Err() == nil {
+					r.confirmModelContextSuccess(resultDescriptor, int64(tokens))
 				}
 				r.noteFittingTimelineThroughID(assembled.TimelineThroughID)
 				break

@@ -664,6 +664,9 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		captureOption,
 	}
+	if !r.useSpeedPriorityAI {
+		requestOpts = append(requestOpts, aicommon.WithAIRequest_QualityModelConfig(r.requestModelConfig))
+	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
 	requestOpts = append(requestOpts, r.imageRequestOptions()...)
@@ -973,6 +976,9 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 					}
 				})(req)
 		},
+	}
+	if !r.useSpeedPriorityAI {
+		requestOpts = append(requestOpts, aicommon.WithAIRequest_QualityModelConfig(r.requestModelConfig))
 	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
