@@ -264,8 +264,9 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 		pcaputil.WithHTTPResponseWithoutRequest(true),
 		// Offline traffic viewing must keep usable packets and protocol
 		// diagnostics when one flow reaches a reassembly resource limit.
-		// Strict replay can be added separately for validation workflows.
-		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+		// Validation workflows can opt into strict replay with
+		// WithStrictTCPReassembly.
+		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: !config.strictReassembly, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
 	}
 	if config.tlsSecrets != nil {
 		options = append(options, pcaputil.WithTLSSecrets(config.tlsSecrets))

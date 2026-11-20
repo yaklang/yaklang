@@ -158,8 +158,10 @@ func (m *InstanceManager) CreateLiveDataset(ctx context.Context, config LiveCapt
 			w.batch.err = fn()
 		}
 	}
+	// Live captures can legitimately observe packet loss, midstream starts and
+	// stale resets. Keep those diagnostics without terminating the dataset.
 	w.analyzer, err = pcaputil.NewPacketAnalyzer(
-		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
 		pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) { consume(func() error { return w.batch.appendEvent(e) }) }),
 		pcaputil.WithBeforeTransportPacket(func(p gopacket.Packet) { consume(func() error { return w.batch.sessions.datagram(p) }) }),
 		pcaputil.WithOnTrafficFlowPacket(func(f *pcaputil.TrafficFlow, c *pcaputil.TrafficConnection, r []pcaputil.PacketReference, ts time.Time) {

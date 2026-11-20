@@ -27,6 +27,7 @@ type importConfig struct {
 	batchSize         int
 	protocols         bool
 	streams           bool
+	strictReassembly  bool
 	fieldIndexes      []string
 	progress          func(Progress)
 	cancel            context.CancelFunc
@@ -74,6 +75,13 @@ func WithProtocols(enabled bool) ImportOption {
 // Enabled by default. Disable it for a packet-only import with no replay cost.
 func WithStreams(enabled bool) ImportOption {
 	return func(c *importConfig) error { c.streams = enabled; return nil }
+}
+
+// WithStrictTCPReassembly makes unresolved TCP gaps and invalid segments fail
+// the import. The default is best-effort reassembly so captured files remain
+// viewable while incomplete diagnostics are retained.
+func WithStrictTCPReassembly(enabled bool) ImportOption {
+	return func(c *importConfig) error { c.strictReassembly = enabled; return nil }
 }
 
 // WithTLSKeyLog enables authorized NSS key-log decryption during protocol
@@ -687,7 +695,7 @@ func (m *InstanceManager) ingestCapture(ctx context.Context, db *gorm.DB, file *
 		options := []pcaputil.CaptureOption{
 			pcaputil.WithCaptureReplayClock(),
 			pcaputil.WithHTTPResponseWithoutRequest(true),
-			pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+			pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: !config.strictReassembly, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
 		}
 		if config.protocols {
 			options = append(options, pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {

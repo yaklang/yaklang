@@ -264,3 +264,36 @@ func TestPCAPDBIncompleteReplayRetainsDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, valid.Valid, valid.Error)
 }
+
+func TestPCAPDBIncompleteReplayFailureAndPacketOnlyRetry(t *testing.T) {
+	input, err := trafficfixture.Materialize("../../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-tls.pcap", t.TempDir())
+	require.NoError(t, err)
+	m := testManager(t)
+	_, err = m.GetOrCreate(input, WithProtocols(true), WithStrictTCPReassembly(true), WithBatchSize(1))
+	require.ErrorContains(t, err, "unfilled sequence gap")
+	entries, err := m.List()
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	meta := entries[0]
+	require.Equal(t, StateFailed, meta.State)
+	require.EqualValues(t, 120, meta.PacketCount)
+	require.False(t, meta.ProtocolsIndexed)
+	var messages int64
+	reader, err := openIndex(meta.DatabasePath, false, false)
+	require.NoError(t, err)
+	require.NoError(t, reader.Model(&PCAPProtocolMessage{}).Count(&messages).Error)
+	require.NoError(t, reader.Close())
+	require.Equal(t, meta.ProtocolCount, messages, "failed replay must report committed protocol rows only")
+	db, err := m.GetOrCreate(input)
+	require.NoError(t, err)
+	require.Equal(t, meta.DatasetID, db.ID)
+	recovered, err := db.Metadata()
+	require.NoError(t, err)
+	require.Equal(t, StateReady, recovered.State)
+	require.EqualValues(t, 120, recovered.PacketCount)
+	require.Zero(t, recovered.ProtocolCount)
+	require.False(t, recovered.ProtocolsIndexed)
+	valid, err := m.Validate(context.Background(), db.ID, true)
+	require.NoError(t, err)
+	require.True(t, valid.Valid, valid.Error)
+}
