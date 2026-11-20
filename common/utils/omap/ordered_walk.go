@@ -21,7 +21,7 @@ func Walkable(i any) bool {
 	}
 }
 
-func (m *OrderedMap[T, V]) WalkMap(visited *sync.Map, f func(self, key, value any) bool) {
+func (m *OrderedMap[T, V]) walkMap(visited *sync.Map, f func(self, key, value any) bool) {
 	for _, k := range m.Keys() {
 		v, ok := m.Get(k)
 		if !ok {
@@ -41,7 +41,7 @@ func Walk(m any, f func(parent any, key any, value any) bool) {
 }
 
 type walkif interface {
-	WalkMap(*sync.Map, func(self, key, value any) bool)
+	walkMap(*sync.Map, func(self, key, value any) bool)
 }
 
 func walk(visited *sync.Map, m any, f func(parent any, key any, value any) bool) {
@@ -93,14 +93,14 @@ func walk(visited *sync.Map, m any, f func(parent any, key any, value any) bool)
 		default:
 			// do nothing
 			if result, ok := m.(walkif); ok {
-				result.WalkMap(visited, f)
+				result.walkMap(visited, f)
 			} else if result, ok := ptrTo.Interface().(walkif); ok {
-				result.WalkMap(visited, f)
+				result.walkMap(visited, f)
 			}
 		}
 	default:
 		if result, ok := m.(walkif); ok {
-			result.WalkMap(visited, f)
+			result.walkMap(visited, f)
 		}
 	}
 }

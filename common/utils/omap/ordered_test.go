@@ -56,7 +56,7 @@ func TestWalkSearch(t *testing.T) {
 	a.Set("BBBD", "CCC")
 	b.Set("CCCD", "DDD")
 	a.Set("bD", b)
-	vars, err := a.WalkSearchGlobKey("*D")
+	vars, err := WalkSearchGlobKey(a, "*D")
 	if err != nil {
 		t.Fatal(err)
 	}

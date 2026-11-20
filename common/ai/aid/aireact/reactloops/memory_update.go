@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func (r *ReActLoop) currentMemorySize() int {
@@ -45,7 +46,7 @@ func (r *ReActLoop) PushMemory(result *aicommon.SearchMemoryResult) {
 		for size > r.memorySizeLimit {
 			// 删除最早的记忆
 			var removed *aicommon.MemoryEntity
-			removed = r.currentMemories.Shift()
+			removed = omap.Shift(r.currentMemories)
 			if utils.IsNil(removed) {
 				continue
 			}

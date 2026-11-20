@@ -234,7 +234,7 @@ func process[T any](validator chan struct{}, ctx context.Context, in, out chan T
 					ch.buffer.Pop()
 					atomic.AddInt64(&ch.bufCount, -1)
 					// log.Debug("write to unlimited channel: delta -1")
-					if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
+					if ch.buffer.IsEmpty() && ch.buffer.core.size > ch.buffer.core.initialSize { // after burst
 						ch.buffer.Reset()
 						atomic.StoreInt64(&ch.bufCount, 0)
 					}

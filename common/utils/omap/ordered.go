@@ -3,21 +3,17 @@ package omap
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
 
-	"github.com/gobwas/glob"
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 func tryGetParent[V any](v any) *OrderedMap[string, V] {
-	switch v.(type) {
-	case *OrderedMap[string, V]:
-		return v.(*OrderedMap[string, V])
+	if p, ok := v.(*OrderedMap[string, V]); ok {
+		return p
 	}
 	return nil
 }
@@ -50,6 +46,46 @@ func (o *OrderedMap[T, V]) init() {
 	})
 }
 
+func (o *OrderedMap[T, V]) snapshotAny() ([]any, []any) {
+	if o == nil {
+		return nil, nil
+	}
+	o.init()
+	o.lock.RLock()
+	keys := make([]any, 0, len(o.keyChain))
+	vals := make([]any, 0, len(o.keyChain))
+	for _, k := range o.keyChain {
+		v, ok := o.m[k]
+		if !ok {
+			continue
+		}
+		keys = append(keys, k)
+		vals = append(vals, v)
+	}
+	o.lock.RUnlock()
+	return keys, vals
+}
+
+func (o *OrderedMap[T, V]) snapshotKeysVals() ([]T, []V) {
+	if o == nil {
+		return nil, nil
+	}
+	o.init()
+	o.lock.RLock()
+	keys := make([]T, 0, len(o.keyChain))
+	vals := make([]V, 0, len(o.keyChain))
+	for _, k := range o.keyChain {
+		v, ok := o.m[k]
+		if !ok {
+			continue
+		}
+		keys = append(keys, k)
+		vals = append(vals, v)
+	}
+	o.lock.RUnlock()
+	return keys, vals
+}
+
 func (i *OrderedMap[T, V]) LiteralValue() any {
 	if i == nil {
 		return nil
@@ -57,7 +93,7 @@ func (i *OrderedMap[T, V]) LiteralValue() any {
 	return i.literalValue
 }
 
-func (i *OrderedMap[T, V]) HaveLiteralValue() bool {
+func (i *OrderedMap[T, V]) haveLiteralValue() bool {
 	if i == nil {
 		return false
 	}
@@ -87,7 +123,7 @@ func NewOrderedMap[T comparable, V any](m map[T]V, initOrder ...func(int, int) b
 	if m == nil {
 		return NewEmptyOrderedMap[T, V]()
 	}
-	k := make([]T, 0)
+	k := make([]T, 0, len(m))
 	for key := range m {
 		k = append(k, key)
 	}
@@ -109,25 +145,15 @@ func (o *OrderedMap[T, V]) Add(v V) error {
 		return fmt.Errorf("cannot add to a nil OrderedMap")
 	}
 	o.init()
-	o.lock.Lock()
-	defer o.lock.Unlock()
-
-	conv := func(i any) (T, bool) {
-		res, ok := i.(T)
-		if ok {
-			return res, true
-		}
-		var z T
-		return z, false
-	}
-
-	k := ksuid.New().String() + nonnamedkeyconst
-	val, ok := conv(k)
+	k := newNonNamedKey()
+	val, ok := any(k).(T)
 	if !ok {
 		return utils.Errorf("convert failed:  cannot convert %v to %v", k, reflect.TypeOf(val))
 	}
+	o.lock.Lock()
 	o.m[val] = v
 	o.keyChain = append(o.keyChain, val)
+	o.lock.Unlock()
 	return nil
 }
 
@@ -137,19 +163,12 @@ func (o *OrderedMap[T, V]) Set(key T, v V) {
 	}
 	o.init()
 	o.lock.Lock()
-	defer o.lock.Unlock()
-
-	_, ok := o.m[key]
-	if !ok {
-		o.m[key] = v
+	if _, ok := o.m[key]; !ok {
 		o.keyChain = append(o.keyChain, key)
-		o.namedKey = true
-		return
 	}
-
-	// existed
 	o.m[key] = v
 	o.namedKey = true
+	o.lock.Unlock()
 }
 
 // OrderInsert inserts (key, v) into the map and places the key in keyChain according to less.
@@ -198,7 +217,6 @@ func (o *OrderedMap[T, V]) BringKeyToLastOne(target T) {
 	}
 	o.init()
 	o.lock.Lock()
-	defer o.lock.Unlock()
 	for key, instance := range o.keyChain {
 		if instance == target {
 			o.keyChain = append(o.keyChain[:key], o.keyChain[key+1:]...)
@@ -206,6 +224,7 @@ func (o *OrderedMap[T, V]) BringKeyToLastOne(target T) {
 		}
 	}
 	o.keyChain = append(o.keyChain, target)
+	o.lock.Unlock()
 }
 
 func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
@@ -215,9 +234,8 @@ func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
 	v, ok := o.m[key]
+	o.lock.RUnlock()
 	return v, ok
 }
 
@@ -227,16 +245,16 @@ func (o *OrderedMap[T, V]) GetOrSet(key T, value V) V {
 	}
 	o.init()
 	o.lock.Lock()
-	defer o.lock.Unlock()
-
 	existValue, ok := o.m[key]
 	if !ok {
 		o.m[key] = value
 		o.keyChain = append(o.keyChain, key)
 		o.namedKey = true
+		o.lock.Unlock()
 		return value
 	}
 	o.namedKey = true
+	o.lock.Unlock()
 	return existValue
 }
 
@@ -247,38 +265,33 @@ func (o *OrderedMap[T, V]) GetMust(key T) V {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
-	v, ok := o.m[key]
-	if !ok {
-		var z V
-		return z
-	}
+	v := o.m[key]
+	o.lock.RUnlock()
 	return v
 }
 
-func (o *OrderedMap[T, V]) Index(i int) *OrderedMap[string, V] {
+func Index[T comparable, V any](o *OrderedMap[T, V], i int) *OrderedMap[string, V] {
 	if o == nil {
 		return nil
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
 	if i < 0 || i >= len(o.keyChain) {
+		o.lock.RUnlock()
 		return NewEmptyOrderedMap[string, V]()
 	}
+	v := o.m[o.keyChain[i]]
+	o.lock.RUnlock()
 
 	result := NewEmptyOrderedMap[string, V]()
-	err := result.Add(o.m[o.keyChain[i]])
-	if err != nil {
+	if err := result.Add(v); err != nil {
 		log.Errorf("BUG: why? general map type convert failed: %v", err)
 	}
 	result.parent = tryGetParent[V](o)
 	return result
 }
 
-func (o *OrderedMap[T, V]) Field(key T) *OrderedMap[string, V] {
+func Field[T comparable, V any](o *OrderedMap[T, V], key T) *OrderedMap[string, V] {
 	if o == nil {
 		return nil
 	}
@@ -294,46 +307,20 @@ func (o *OrderedMap[T, V]) Field(key T) *OrderedMap[string, V] {
 
 func BuildGeneralMap[V any](m any) *OrderedMap[string, V] {
 	if m == nil {
-		t := NewEmptyOrderedMap[string, V]()
-		return t
+		return NewEmptyOrderedMap[string, V]()
 	}
-
-	ty := reflect.TypeOf(m)
-	switch ty.Kind() {
-	case reflect.Map:
-		vv := reflect.ValueOf(m)
-		result := NewEmptyOrderedMap[string, V]()
-		for _, key := range vv.MapKeys() {
-			value := vv.MapIndex(key).Interface().(V)
-			result.Set(utils.InterfaceToString(key.Interface()), value)
-		}
-		return result
-	case reflect.Array, reflect.Slice:
-		vv := reflect.ValueOf(m)
-		result := NewEmptyOrderedMap[string, V]()
-		for i := 0; i < vv.Len(); i++ {
-			result.Add(vv.Index(i).Interface().(V))
-		}
-		return result
-	case reflect.Ptr:
-		switch ret := m.(type) {
-		case *OrderedMap[string, V]:
-			return ret
-		}
-		vv := reflect.ValueOf(m)
-		return BuildGeneralMap[V](vv.Elem().Interface())
-	case reflect.Struct:
-		vv := reflect.ValueOf(m)
-		result := NewEmptyOrderedMap[string, V]()
-		for i := 0; i < vv.NumField(); i++ {
-			result.Set(vv.Type().Field(i).Name, vv.Field(i).Interface().(V))
-		}
-		return result
-	default:
-		result := NewEmptyOrderedMap[string, V]()
-		result.Set(utils.InterfaceToString(m), m.(V))
-		return result
+	if ret, ok := m.(*OrderedMap[string, V]); ok {
+		return ret
 	}
+	result := NewEmptyOrderedMap[string, V]()
+	for _, entry := range extractGeneralMapEntries(m) {
+		if entry.named {
+			result.Set(entry.key, entry.val.(V))
+		} else {
+			result.Add(entry.val.(V))
+		}
+	}
+	return result
 }
 
 func (o *OrderedMap[T, V]) GetByIndex(index int) (V, bool) {
@@ -343,14 +330,14 @@ func (o *OrderedMap[T, V]) GetByIndex(index int) (V, bool) {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
 	if index < 0 || index >= len(o.keyChain) {
+		o.lock.RUnlock()
 		var z V
 		return z, false
 	}
-
-	return o.m[o.keyChain[index]], true
+	v := o.m[o.keyChain[index]]
+	o.lock.RUnlock()
+	return v, true
 }
 
 func (o *OrderedMap[T, V]) GetByIndexMust(index int) V {
@@ -359,7 +346,7 @@ func (o *OrderedMap[T, V]) GetByIndexMust(index int) V {
 		return zero
 	}
 	o.init()
-	var r, _ = o.GetByIndex(index)
+	r, _ := o.GetByIndex(index)
 	return r
 }
 
@@ -371,15 +358,16 @@ func (o *OrderedMap[T, V]) First() (T, V, bool) {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
 	if len(o.keyChain) == 0 {
+		o.lock.RUnlock()
 		var z T
 		var v V
 		return z, v, false
 	}
-
-	return o.keyChain[0], o.m[o.keyChain[0]], true
+	k := o.keyChain[0]
+	v := o.m[k]
+	o.lock.RUnlock()
+	return k, v, true
 }
 
 func (o *OrderedMap[T, V]) Last() (T, V, bool) {
@@ -390,16 +378,17 @@ func (o *OrderedMap[T, V]) Last() (T, V, bool) {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
 	if len(o.keyChain) == 0 {
+		o.lock.RUnlock()
 		var z T
 		var v V
 		return z, v, false
 	}
-
 	mi := len(o.keyChain) - 1
-	return o.keyChain[mi], o.m[o.keyChain[mi]], true
+	k := o.keyChain[mi]
+	v := o.m[k]
+	o.lock.RUnlock()
+	return k, v, true
 }
 
 func (o *OrderedMap[T, V]) Len() int {
@@ -408,9 +397,9 @@ func (o *OrderedMap[T, V]) Len() int {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
-	return len(o.keyChain)
+	n := len(o.keyChain)
+	o.lock.RUnlock()
+	return n
 }
 
 func (o *OrderedMap[T, V]) Delete(key T) {
@@ -419,35 +408,30 @@ func (o *OrderedMap[T, V]) Delete(key T) {
 	}
 	o.init()
 	o.lock.Lock()
-	defer o.lock.Unlock()
-
 	delete(o.m, key)
-	var index = -1
+	index := -1
 	for i, k := range o.keyChain {
 		if k == key {
 			index = i
 			break
 		}
 	}
-	if index == -1 {
-		return
+	if index != -1 {
+		// The DFS-style stack uses Pop/Shift, which delete the last or first key.
+		// Truncating either end preserves the old Keys() snapshot because it never
+		// writes through the old slice; only a middle delete needs a new slice.
+		if index == len(o.keyChain)-1 {
+			o.keyChain = o.keyChain[:index:index]
+		} else if index == 0 {
+			o.keyChain = o.keyChain[1:len(o.keyChain):len(o.keyChain)]
+		} else {
+			after := make([]T, len(o.keyChain)-1)
+			copy(after, o.keyChain[:index])
+			copy(after[index:], o.keyChain[index+1:])
+			o.keyChain = after
+		}
 	}
-
-	// The DFS-style stack uses Pop/Shift, which delete the last or first key.
-	// Truncating either end preserves the old Keys() snapshot because it never
-	// writes through the old slice; only a middle delete needs a new slice.
-	if index == len(o.keyChain)-1 {
-		o.keyChain = o.keyChain[:index:index]
-		return
-	}
-	if index == 0 {
-		o.keyChain = o.keyChain[1:len(o.keyChain):len(o.keyChain)]
-		return
-	}
-	after := make([]T, len(o.keyChain)-1)
-	copy(after, o.keyChain[:index])
-	copy(after[index:], o.keyChain[index+1:])
-	o.keyChain = after
+	o.lock.Unlock()
 }
 
 func (o *OrderedMap[T, V]) Keys() []T {
@@ -456,9 +440,9 @@ func (o *OrderedMap[T, V]) Keys() []T {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
-	return o.keyChain
+	ks := o.keyChain
+	o.lock.RUnlock()
+	return ks
 }
 
 func (o *OrderedMap[T, V]) Values() []V {
@@ -467,42 +451,25 @@ func (o *OrderedMap[T, V]) Values() []V {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
 	values := make([]V, len(o.keyChain))
 	for i, k := range o.keyChain {
 		values[i] = o.m[k]
 	}
+	o.lock.RUnlock()
 	return values
 }
 
-func (o *OrderedMap[T, V]) ValuesMap() *OrderedMap[string, V] {
+func ValuesMap[T comparable, V any](o *OrderedMap[T, V]) *OrderedMap[string, V] {
 	if o == nil {
 		return nil
 	}
-	o.init()
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-
+	_, vals := o.snapshotAny()
 	result := NewEmptyOrderedMap[string, V]()
-	for _, v := range o.Values() {
-		vv := reflect.ValueOf(v)
-		vt := reflect.TypeOf(v)
-		switch vt.Kind() {
-		case reflect.Map:
-			for _, key := range vv.MapKeys() {
-				value := vv.MapIndex(key).Interface().(V)
-				result.Set(utils.InterfaceToString(key.Interface()), value)
-			}
-		case reflect.Array:
-			for i := 0; i < vv.Len(); i++ {
-				result.Add(vv.Index(i).Interface().(V))
-			}
-		case reflect.Slice:
-			for i := 0; i < vv.Len(); i++ {
-				result.Add(vv.Index(i).Interface().(V))
-			}
-		default:
-			result.Add(v)
+	for _, entry := range flattenValuesForMap(vals) {
+		if entry.named {
+			result.Set(entry.key, entry.val.(V))
+		} else {
+			result.Add(entry.val.(V))
 		}
 	}
 	result.parent = tryGetParent[V](o)
@@ -514,20 +481,15 @@ func (o *OrderedMap[T, V]) Have(i any) bool {
 		return false
 	}
 	o.init()
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-
-	switch i.(type) {
+	switch key := i.(type) {
 	case T:
-		_, ok := o.m[i.(T)]
+		o.lock.RLock()
+		_, ok := o.m[key]
+		o.lock.RUnlock()
 		return ok
 	case V:
-		for _, v := range o.m {
-			if reflect.DeepEqual(i, v) {
-				return true
-			}
-		}
-		return false
+		_, vals := o.snapshotAny()
+		return containsDeepEqual(vals, i)
 	default:
 		return false
 	}
@@ -552,13 +514,8 @@ func (o *OrderedMap[T, V]) Filter(f func(T, V) (bool, error)) *OrderedMap[T, V] 
 			break
 		}
 		if ok {
-			var k any = key
-			if sk, ok := k.(string); ok {
-				if strings.HasSuffix(sk, nonnamedkeyconst) {
-					r.Add(v)
-				} else {
-					r.Set(key, v)
-				}
+			if sk, ok := any(key).(string); ok && strings.HasSuffix(sk, nonnamedkeyconst) {
+				r.Add(v)
 			} else {
 				r.Set(key, v)
 			}
@@ -576,7 +533,7 @@ func (o *OrderedMap[T, V]) GetParent() *OrderedMap[T, V] {
 	return o.parent
 }
 
-func (o *OrderedMap[T, V]) GetRoot() (*OrderedMap[T, V], bool) {
+func GetRoot[T comparable, V any](o *OrderedMap[T, V]) (*OrderedMap[T, V], bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -584,7 +541,7 @@ func (o *OrderedMap[T, V]) GetRoot() (*OrderedMap[T, V], bool) {
 	if o.parent == nil {
 		return o, true
 	}
-	return o.parent.GetRoot()
+	return GetRoot(o.parent)
 }
 
 func (o *OrderedMap[T, V]) GetMap() map[T]V {
@@ -604,12 +561,11 @@ func (o *OrderedMap[T, V]) SnapshotMap() map[T]V {
 	}
 	o.init()
 	o.lock.RLock()
-	defer o.lock.RUnlock()
-
 	snapshot := make(map[T]V, len(o.m))
 	for key, value := range o.m {
 		snapshot[key] = value
 	}
+	o.lock.RUnlock()
 	return snapshot
 }
 
@@ -621,7 +577,7 @@ func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
-	var r = NewEmptyOrderedMap[T, V]()
+	r := NewEmptyOrderedMap[T, V]()
 	for _, key := range o.keyChain {
 		v, ok := o.m[key]
 		if !ok {
@@ -657,7 +613,7 @@ func (o *OrderedMap[T, V]) ForEach(handler func(i T, v V) bool) {
 	}
 }
 
-func (o *OrderedMap[T, V]) Flat(f func(T, V) (struct {
+func Flat[T comparable, V any](o *OrderedMap[T, V], f func(T, V) (struct {
 	Key   T
 	Value V
 }, error)) *OrderedMap[T, V] {
@@ -668,7 +624,7 @@ func (o *OrderedMap[T, V]) Flat(f func(T, V) (struct {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
-	var r = NewEmptyOrderedMap[T, V]()
+	r := NewEmptyOrderedMap[T, V]()
 	for _, key := range o.keyChain {
 		v, ok := o.m[key]
 		if !ok {
@@ -690,261 +646,136 @@ func (s *OrderedMap[T, V]) Copy() *OrderedMap[T, V] {
 	}
 	s.init()
 	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	m := make(map[T]V)
+	m := make(map[T]V, len(s.m))
 	for k, v := range s.m {
 		m[k] = v
 	}
 	ks := make([]T, len(s.keyChain))
 	copy(ks, s.keyChain)
+	namedKey := s.namedKey
+	s.lock.RUnlock()
+
 	newMap := &OrderedMap[T, V]{
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: ks,
 		parent:   nil,
-		namedKey: s.namedKey,
+		namedKey: namedKey,
 	}
 	newMap.initOnce.Do(func() {})
-
 	return newMap
 }
 
-func (s *OrderedMap[T, V]) SearchKey(i ...string) (*OrderedMap[T, V], error) {
-	if s == nil {
-		return nil, nil
-	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
+func (s *OrderedMap[T, V]) buildMatched(indices []int, addOnly bool) *OrderedMap[T, V] {
+	keys, vals := s.snapshotKeysVals()
 	r := NewEmptyOrderedMap[T, V]()
-	for _, key := range s.keyChain {
-		v, ok := s.m[key]
-		if !ok {
+	for _, idx := range indices {
+		if idx < 0 || idx >= len(keys) {
 			continue
 		}
-		for _, j := range i {
-			if utils.InterfaceToString(key) == j {
-				r.Set(key, v)
-				break
-			}
+		if addOnly {
+			r.Add(vals[idx])
+		} else {
+			r.Set(keys[idx], vals[idx])
 		}
 	}
 	r.parent = s
-	return r, nil
+	return r
 }
 
-func (s *OrderedMap[T, V]) SearchValue(i ...string) (*OrderedMap[T, V], error) {
+func SearchKey[T comparable, V any](s *OrderedMap[T, V], i ...string) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	r := NewEmptyOrderedMap[T, V]()
-	for _, key := range s.keyChain {
-		v, ok := s.m[key]
-		if !ok {
-			continue
-		}
-		for _, j := range i {
-			if utils.InterfaceToString(key) == j {
-				r.Set(key, v)
-				break
-			}
-		}
-	}
-	r.parent = s
-	return r, nil
+	keys, _ := s.snapshotAny()
+	return s.buildMatched(matchExactStrings(keys, i), false), nil
 }
 
-func (s *OrderedMap[T, V]) SearchKeyByValue(i ...string) (*OrderedMap[T, V], error) {
+func SearchValue[T comparable, V any](s *OrderedMap[T, V], i ...string) (*OrderedMap[T, V], error) {
+	return SearchKey(s, i...)
+}
+
+func SearchKeyByValue[T comparable, V any](s *OrderedMap[T, V], i ...string) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	r := NewEmptyOrderedMap[T, V]()
-	for _, key := range s.keyChain {
-		v, ok := s.m[key]
-		if !ok {
-			continue
-		}
-		for _, j := range i {
-			if utils.InterfaceToString(key) == j {
-				r.Add(v)
-				break
-			}
-		}
-	}
-	r.parent = s
-	return r, nil
+	keys, _ := s.snapshotAny()
+	return s.buildMatched(matchExactStrings(keys, i), true), nil
 }
 
-func (s *OrderedMap[T, V]) SearchIndexKey(i ...int) (*OrderedMap[T, V], error) {
+func SearchIndexKey[T comparable, V any](s *OrderedMap[T, V], i ...int) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	var indexMap = make(map[int]struct{})
-	for _, idx := range i {
-		indexMap[idx] = struct{}{}
-	}
-
-	r := NewEmptyOrderedMap[T, V]()
-	for index, key := range s.keyChain {
-		v, ok := s.m[key]
-		if !ok {
-			continue
-		}
-		if _, ok := indexMap[index]; ok {
-			r.Set(key, v)
-		}
-	}
-	r.parent = s
-	return r, nil
+	return s.buildMatched(matchIndexSet(s.Len(), i), false), nil
 }
 
-func (s *OrderedMap[T, V]) SearchRegexKey(i string) (*OrderedMap[T, V], error) {
+func SearchRegexKey[T comparable, V any](s *OrderedMap[T, V], i string) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	rule, err := regexp.Compile(i)
+	keys, _ := s.snapshotAny()
+	matched, err := matchRegexKeys(keys, i)
 	if err != nil {
 		return s, err
 	}
-
-	r := NewEmptyOrderedMap[T, V]()
-	for _, key := range s.keyChain {
-		v, ok := s.m[key]
-		if !ok {
-			continue
-		}
-		if rule.MatchString(utils.InterfaceToString(key)) {
-			r.Set(key, v)
-		}
-	}
-	r.parent = s
-	return r, nil
+	return s.buildMatched(matched, false), nil
 }
 
-func (s *OrderedMap[T, V]) WalkSearchRegexpKey(i string) (*OrderedMap[T, V], error) {
+func WalkSearchRegexpKey[T comparable, V any](s *OrderedMap[T, V], i string) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	rule, err := regexp.Compile(i)
+	matched, err := walkMatchRegex(s, i)
 	if err != nil {
 		return s, err
 	}
-
-	var m = NewOrderedMap[T, V](map[T]V{})
-	Walk(s, func(parent any, key any, value any) bool {
-		if rule.MatchString(utils.InterfaceToString(key)) {
-			v, ok := value.(V)
-			if !ok {
-				return true
-			}
+	m := NewOrderedMap[T, V](map[T]V{})
+	for _, raw := range matched {
+		if v, ok := raw.(V); ok {
 			m.Add(v)
 		}
-		return true
-	})
+	}
 	return m, nil
 }
 
-func (s *OrderedMap[T, V]) SearchGlobKey(i string, seps ...string) (*OrderedMap[T, V], error) {
+func SearchGlobKey[T comparable, V any](s *OrderedMap[T, V], i string, seps ...string) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	var sepsChar = []rune(strings.Join(seps, ""))
-	rule, err := glob.Compile(i, sepsChar...)
+	keys, _ := s.snapshotAny()
+	matched, err := matchGlobKeys(keys, i, seps)
 	if err != nil {
 		return s, err
 	}
-
-	r := NewEmptyOrderedMap[T, V]()
-	for _, key := range s.keyChain {
-		v, ok := s.m[key]
-		if !ok {
-			continue
-		}
-		if rule.Match(utils.InterfaceToString(key)) {
-			r.Set(key, v)
-		}
-	}
-	r.parent = s
-	return r, nil
+	return s.buildMatched(matched, false), nil
 }
 
-func (s *OrderedMap[T, V]) WalkSearchGlobKey(i string, seps ...string) (*OrderedMap[T, V], error) {
+func WalkSearchGlobKey[T comparable, V any](s *OrderedMap[T, V], i string, seps ...string) (*OrderedMap[T, V], error) {
 	if s == nil {
 		return nil, nil
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	var sepsChar = []rune(strings.Join(seps, ""))
-	rule, err := glob.Compile(i, sepsChar...)
+	matched, err := walkMatchGlob(s, i, seps)
 	if err != nil {
 		return s, err
 	}
-
-	var m = NewOrderedMap(map[T]V{})
-	Walk(s, func(parent any, key any, value any) bool {
-		if rule.Match(utils.InterfaceToString(key)) {
-			v, ok := value.(V)
-			if !ok {
-				return true
-			}
+	m := NewOrderedMap(map[T]V{})
+	for _, raw := range matched {
+		if v, ok := raw.(V); ok {
 			m.Add(v)
 		}
-		return true
-	})
+	}
 	return m, nil
 }
 
 func Merge[T comparable, V any](dicts ...*OrderedMap[T, V]) *OrderedMap[T, V] {
 	r := NewEmptyOrderedMap[T, V]()
 	for _, d := range dicts {
-		for _, key := range d.keyChain {
-			v, ok := d.m[key]
-			if !ok {
-				continue
-			}
-			r.Set(key, v)
+		keys, vals := d.snapshotKeysVals()
+		for i, key := range keys {
+			r.Set(key, vals[i])
 		}
 	}
-	return r
-}
-
-func (s *OrderedMap[T, V]) Merge(i ...*OrderedMap[T, V]) *OrderedMap[T, V] {
-	if s == nil {
-		return nil
-	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	r := Merge[T, V](append([]*OrderedMap[T, V]{s}, i...)...)
-	r.parent = s
 	return r
 }
 
@@ -952,30 +783,11 @@ func (s *OrderedMap[T, V]) String() string {
 	if s == nil {
 		return "<nil>"
 	}
-	s.init()
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	var builder strings.Builder
-	builder.WriteString("{")
-	for i, k := range s.keyChain {
-		builder.WriteString(fmt.Sprintf("%v: %#v", k, s.m[k]))
-		if i != len(s.keyChain)-1 {
-			builder.WriteString(", ")
-		}
-	}
-	builder.WriteString("}")
-	return builder.String()
+	keys, vals := s.snapshotAny()
+	return formatOrderedMapString(keys, vals)
 }
 
-func (s *OrderedMap[T, V]) UnsetParent() {
-	if s == nil {
-		return
-	}
-	s.parent = nil
-}
-
-func (s *OrderedMap[T, V]) CanAsList() bool {
+func (s *OrderedMap[T, V]) canAsList() bool {
 	if s == nil {
 		return true
 	}
@@ -987,13 +799,6 @@ func (s *OrderedMap[T, V]) Push(a V) error {
 		return fmt.Errorf("cannot push to a nil OrderedMap")
 	}
 	return s.Add(a)
-}
-
-func (s *OrderedMap[T, V]) PushKey(key T, value V) {
-	if s == nil {
-		return
-	}
-	s.Set(key, value)
 }
 
 func (s *OrderedMap[T, V]) Pop() V {
@@ -1010,7 +815,7 @@ func (s *OrderedMap[T, V]) Pop() V {
 	return ret
 }
 
-func (s *OrderedMap[T, V]) Shift() V {
+func Shift[T comparable, V any](s *OrderedMap[T, V]) V {
 	if s == nil {
 		var zero V
 		return zero
