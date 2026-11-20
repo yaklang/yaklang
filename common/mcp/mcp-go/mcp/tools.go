@@ -35,7 +35,8 @@ type ListToolsResult struct {
 // should be reported as an MCP error response.
 type CallToolResult struct {
 	Result
-	Content []any `json:"content"` // Can be TextContent, ImageContent, or      EmbeddedResource
+	Content           []any           `json:"content"` // Can be TextContent, ImageContent, or EmbeddedResource.
+	StructuredContent json.RawMessage `json:"structuredContent,omitempty"`
 	// Whether the tool call ended in an error.
 	//
 	// If not set, this is assumed to be false (the call was successful).

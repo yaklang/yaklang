@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/configtest"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 func setupAIGlobalConfigTestDB(t *testing.T) *gorm.DB {
@@ -603,4 +604,31 @@ func TestSetGetAIGlobalConfig_ProbedExtendedEfforts(t *testing.T) {
 	require.Len(t, loaded.IntelligentModels, 1)
 	assert.Equal(t, []string{"xhigh", "max"}, loaded.IntelligentModels[0].GetProbedExtendedEfforts())
 	assert.True(t, loaded.IntelligentModels[0].GetEffortProbed())
+}
+
+func TestSetAIGlobalConfigPreservesVisionCapabilitiesForLegacyClient(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	legacy := &ypb.AIGlobalConfig{IntelligentModels: []*ypb.AIModelConfig{{
+		ModelName: "custom",
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "openai", Domain: "api.example.test"},
+	}}}
+	probed := proto.Clone(legacy).(*ypb.AIGlobalConfig)
+	probed.IntelligentModels[0].SupportsImageInput = proto.Bool(true)
+	probed.IntelligentModels[0].SupportsImageToolCalling = proto.Bool(false)
+	_, err := SetAIGlobalConfig(db, probed)
+	require.NoError(t, err)
+
+	saved, err := SetAIGlobalConfig(db, legacy)
+	require.NoError(t, err)
+	assert.Equal(t, proto.Bool(true), saved.IntelligentModels[0].SupportsImageInput)
+	assert.Equal(t, proto.Bool(false), saved.IntelligentModels[0].SupportsImageToolCalling)
+
+	changed := proto.Clone(saved).(*ypb.AIGlobalConfig)
+	changed.IntelligentModels[0].Provider.BaseURL = "https://different.example.test/v1"
+	changed.IntelligentModels[0].SupportsImageInput = nil
+	changed.IntelligentModels[0].SupportsImageToolCalling = nil
+	saved, err = SetAIGlobalConfig(db, changed)
+	require.NoError(t, err)
+	assert.Nil(t, saved.IntelligentModels[0].SupportsImageInput)
+	assert.Nil(t, saved.IntelligentModels[0].SupportsImageToolCalling)
 }

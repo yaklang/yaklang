@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -27,6 +28,7 @@ const (
 var (
 	cachedAIGlobalConfig     *ypb.AIGlobalConfig
 	cachedAIGlobalConfigLock sync.RWMutex
+	aiGlobalConfigSaveLock   sync.Mutex
 )
 
 // DefaultAIGlobalConfig constructs the public builtin model defaults. Bootstrap
@@ -41,12 +43,14 @@ func DefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 			},
 		}}
 	}
-	return &ypb.AIGlobalConfig{
+	config := &ypb.AIGlobalConfig{
 		Enabled: true, RoutingPolicy: "balance",
 		IntelligentModels: model("memfit-standard-free"),
 		LightweightModels: model("memfit-light-free"),
 		VisionModels:      model("memfit-vision-free"),
 	}
+	mergeModelVisionCapabilities(config, nil)
+	return config
 }
 
 func setCachedAIGlobalConfig(cfg *ypb.AIGlobalConfig) {
@@ -94,10 +98,11 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 	}
 	recoverProvidersFromDeprecatedConfig(db, cfg)
 	persistMigratedAIGlobalConfig(db, cfg)
+	mergeModelVisionCapabilities(cfg, nil)
 	return cfg, nil
 }
 
-func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfig, error) {
+func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig, discovered ...map[*ypb.AIModelConfig]bool) (*ypb.AIGlobalConfig, error) {
 	if db == nil {
 		return nil, utils.Error("no set database")
 	}
@@ -126,7 +131,25 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 			return nil, err
 		}
 	}
+	aiGlobalConfigSaveLock.Lock()
+	defer aiGlobalConfigSaveLock.Unlock()
 	migrateAIGlobalConfigBaseURLs(cfg)
+	previous, err := GetAIGlobalConfig(db)
+	if err != nil {
+		log.Warnf("unable to recover previous model capabilities: %v", err)
+	}
+	mergeModelVisionCapabilities(cfg, previous)
+	for _, capabilities := range discovered {
+		for model, supported := range capabilities {
+			// Saved and explicit capabilities take priority over discovery.
+			if model.SupportsImageInput == nil {
+				model.SupportsImageInput = proto.Bool(supported)
+				if !supported {
+					model.SupportsImageToolCalling = proto.Bool(false)
+				}
+			}
+		}
+	}
 
 	data, err := json.Marshal(cfg)
 	if err != nil {
@@ -164,13 +187,16 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				continue
 			}
 			result = append(result, &ypb.AIModelConfig{
-				ProviderId:            model.GetProviderId(),
-				Provider:              providerCfg,
-				ModelName:             model.GetModelName(),
-				ExtraParams:           cloneKVPairs(model.GetExtraParams()),
-				IsOnline:              model.GetIsOnline(),
-				ProbedExtendedEfforts: cloneStringSlice(model.GetProbedExtendedEfforts()),
-				EffortProbed:          model.GetEffortProbed(),
+				ProviderId:               model.GetProviderId(),
+				Provider:                 providerCfg,
+				ModelName:                model.GetModelName(),
+				ExtraParams:              cloneKVPairs(model.GetExtraParams()),
+				IsOnline:                 model.GetIsOnline(),
+				ProbedExtendedEfforts:    cloneStringSlice(model.GetProbedExtendedEfforts()),
+				EffortProbed:             model.GetEffortProbed(),
+				SupportsImageInput:       cloneImageSupport(model.SupportsImageInput),
+				SupportsImageToolCalling: cloneImageSupport(model.SupportsImageToolCalling),
+				ImageTokenEstimator:      model.GetImageTokenEstimator(),
 			})
 		}
 		return result
@@ -241,16 +267,80 @@ func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 			continue
 		}
 		cloned = append(cloned, &ypb.AIModelConfig{
-			ProviderId:            model.GetProviderId(),
-			IsOnline:              model.GetIsOnline(),
-			Provider:              cloneThirdPartyConfig(model.GetProvider()),
-			ModelName:             model.GetModelName(),
-			ExtraParams:           cloneKVPairs(model.GetExtraParams()),
-			ProbedExtendedEfforts: cloneStringSlice(model.GetProbedExtendedEfforts()),
-			EffortProbed:          model.GetEffortProbed(),
+			ProviderId:               model.GetProviderId(),
+			IsOnline:                 model.GetIsOnline(),
+			Provider:                 cloneThirdPartyConfig(model.GetProvider()),
+			ModelName:                model.GetModelName(),
+			ExtraParams:              cloneKVPairs(model.GetExtraParams()),
+			ProbedExtendedEfforts:    cloneStringSlice(model.GetProbedExtendedEfforts()),
+			EffortProbed:             model.GetEffortProbed(),
+			SupportsImageInput:       cloneImageSupport(model.SupportsImageInput),
+			SupportsImageToolCalling: cloneImageSupport(model.SupportsImageToolCalling),
+			ImageTokenEstimator:      model.GetImageTokenEstimator(),
 		})
 	}
 	return cloned
+}
+
+// Older clients omit the optional vision fields when saving the whole config.
+func mergeModelVisionCapabilities(cfg, previous *ypb.AIGlobalConfig) {
+	previousModels := [][]*ypb.AIModelConfig{previous.GetIntelligentModels(), previous.GetLightweightModels(), previous.GetVisionModels()}
+	for _, models := range [][]*ypb.AIModelConfig{cfg.GetIntelligentModels(), cfg.GetLightweightModels(), cfg.GetVisionModels()} {
+		for _, model := range models {
+			if model == nil || model.GetProvider() == nil {
+				continue
+			}
+			for _, tier := range previousModels {
+				for _, candidate := range tier {
+					if candidate.GetModelName() != model.GetModelName() || !proto.Equal(candidate.GetProvider(), model.GetProvider()) {
+						continue
+					}
+					if model.SupportsImageInput == nil {
+						model.SupportsImageInput = cloneImageSupport(candidate.SupportsImageInput)
+					}
+					if model.SupportsImageToolCalling == nil {
+						model.SupportsImageToolCalling = cloneImageSupport(candidate.SupportsImageToolCalling)
+					}
+				}
+			}
+			applyBuiltinModelVision(model)
+			if model.SupportsImageInput != nil && !model.GetSupportsImageInput() {
+				model.SupportsImageToolCalling = proto.Bool(false)
+			}
+		}
+	}
+}
+
+func applyBuiltinModelVision(model *ypb.AIModelConfig) {
+	provider := model.GetProvider()
+	if provider.GetType() != aiProviderTypeAIBalance || provider.GetNoHttps() || provider.GetEnableEndpoint() {
+		return
+	}
+	root := provider.GetBaseURL()
+	if root == "" && provider.GetDomain() == aiProviderDefaultDomain {
+		root = "https://" + aiProviderDefaultDomain
+	}
+	endpoint, err := url.Parse(root)
+	if err != nil || endpoint.Scheme != "https" || endpoint.Host != aiProviderDefaultDomain || endpoint.User != nil {
+		return
+	}
+	switch strings.TrimRight(endpoint.Path, "/") {
+	case "", "/v1", "/v1/chat/completions":
+	default:
+		return
+	}
+	switch model.GetModelName() {
+	case "memfit-standard-free", "memfit-light-free", "memfit-vision-free":
+		if model.SupportsImageInput == nil {
+			model.SupportsImageInput = proto.Bool(true)
+		}
+	}
+	switch model.GetModelName() {
+	case "memfit-standard-free", "memfit-light-free":
+		if model.SupportsImageToolCalling == nil {
+			model.SupportsImageToolCalling = proto.Bool(true)
+		}
+	}
 }
 
 func validateModelConfigs(models []*ypb.AIModelConfig) error {
@@ -266,6 +356,14 @@ func validateModelConfigs(models []*ypb.AIModelConfig) error {
 		}
 	}
 	return nil
+}
+
+func cloneImageSupport(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	v := *value
+	return &v
 }
 
 func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb.AIModelConfig) *ypb.ThirdPartyApplicationConfig {

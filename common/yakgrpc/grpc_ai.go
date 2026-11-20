@@ -40,6 +40,7 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 	models, err := ai.ListModels(
 		aispec.WithAPIKey(config.APIKey),
 		aispec.WithType(config.Type),
+		aispec.WithAPIType(config.APIType),
 		aispec.WithBaseURL(config.BaseURL),
 		aispec.WithEndpoint(config.Endpoint),
 		aispec.WithEnableEndpoint(config.EnableEndpoint),

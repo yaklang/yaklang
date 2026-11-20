@@ -26,6 +26,19 @@ func runAttachedImageVisionInit(
 	if len(imagePaths) == 0 || r == nil || loop == nil {
 		return
 	}
+	if aicommon.ImageConfigFrom(loop.GetConfig()) != nil {
+		ctx := loop.GetConfig().GetContext()
+		if task := loop.GetCurrentTask(); task != nil && task.GetContext() != nil {
+			ctx = task.GetContext()
+		}
+		for i, path := range imagePaths {
+			if err := loop.AddImageAttachment(ctx, path, i+1); err != nil {
+				r.AddToTimeline("image_input_error", fmt.Sprintf("Image attachment %q could not be loaded: %v", path, err))
+				loop.UserStatus("附件图片加载失败", "Image attachment could not be loaded", aicommon.WithStatusState(aicommon.StatusStateError))
+			}
+		}
+		return
+	}
 
 	task := loop.GetCurrentTask()
 	if task == nil {

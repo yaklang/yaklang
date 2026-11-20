@@ -92,7 +92,8 @@ type AIResponse struct {
 	httpBodyReady     chan struct{}
 	httpBodyReadyOnce sync.Once
 
-	usageInfo *aispec.ChatUsage
+	usageInfo      *aispec.ChatUsage
+	usageObservers []func(*aispec.ChatUsage)
 
 	// plainOutput / plainReason hold the pure AI output / thinking text
 	// captured automatically as the stream is consumed by
@@ -469,9 +470,9 @@ func (a *AIResponse) SetUsageInfo(usage *aispec.ChatUsage) {
 		return
 	}
 	a.usageInfoMu.Lock()
-	defer a.usageInfoMu.Unlock()
 	if usage == nil {
 		a.usageInfo = nil
+		a.usageInfoMu.Unlock()
 		return
 	}
 	usageCopy := *usage
@@ -480,6 +481,40 @@ func (a *AIResponse) SetUsageInfo(usage *aispec.ChatUsage) {
 		usageCopy.PromptTokensDetails = &detailsCopy
 	}
 	a.usageInfo = &usageCopy
+	observers := a.usageObservers
+	a.usageObservers = nil
+	a.usageInfoMu.Unlock()
+	for _, observe := range observers {
+		value := usageCopy
+		if value.PromptTokensDetails != nil {
+			details := *value.PromptTokensDetails
+			value.PromptTokensDetails = &details
+		}
+		observe(&value)
+	}
+}
+
+// OnUsage observes the first available usage without waiting for provider EOF.
+// It also handles providers reporting usage after an action has been accepted.
+// Observers run outside the response lock and never replace user callbacks.
+func (a *AIResponse) OnUsage(observe func(*aispec.ChatUsage)) {
+	if a == nil || observe == nil {
+		return
+	}
+	a.usageInfoMu.Lock()
+	usage := a.usageInfo
+	if usage == nil {
+		a.usageObservers = append(a.usageObservers, observe)
+		a.usageInfoMu.Unlock()
+		return
+	}
+	copy := *usage
+	if usage.PromptTokensDetails != nil {
+		details := *usage.PromptTokensDetails
+		copy.PromptTokensDetails = &details
+	}
+	a.usageInfoMu.Unlock()
+	observe(&copy)
 }
 
 func (a *AIResponse) GetUsageInfo() *aispec.ChatUsage {

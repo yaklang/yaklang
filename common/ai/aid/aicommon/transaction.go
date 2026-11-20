@@ -111,6 +111,7 @@ func callAITransaction(
 	var lastReq *AIRequest
 	var nonRetryableHTTPFailure bool
 	var promptOverflowFailure bool
+	var unrecoverableInputFailure bool
 
 	// attemptHistory records every attempt (including 429 rate-limit retries) so
 	// that the final failure message can expose the full retry history to the
@@ -217,6 +218,10 @@ func callAITransaction(
 				promptOverflowFailure = true
 				break
 			}
+			if aispec.IsUnrecoverableInput(err) {
+				unrecoverableInputFailure = true
+				break
+			}
 			if isNonRetryableAIHTTPResponse(rsp) {
 				nonRetryableHTTPFailure = true
 				break
@@ -293,6 +298,11 @@ func callAITransaction(
 				promptOverflowFailure = true
 				// A newer overflow must not be hidden by an earlier transient
 				// call error retained for ordinary transaction failures.
+				lastCallAiErr = postHandlerErr
+				break
+			}
+			if aispec.IsUnrecoverableInput(postHandlerErr) {
+				unrecoverableInputFailure = true
 				lastCallAiErr = postHandlerErr
 				break
 			}
@@ -378,6 +388,9 @@ func callAITransaction(
 	// error stays concise — callers that need the full retry history should
 	// consume the emitted events rather than parsing the error string.
 	if finalErr != nil {
+		if unrecoverableInputFailure {
+			return utils.Wrap(finalErr, "non-retryable AI input")
+		}
 		if promptOverflowFailure {
 			return utils.Wrap(finalErr, "non-retryable AI prompt overflow")
 		}

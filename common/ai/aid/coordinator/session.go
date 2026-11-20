@@ -485,7 +485,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	}
 	opts = append(opts, aicommon.WithEnhanceKnowledgeManager(s.EnhanceKnowledgeManager.ForkForSubAgent()))
 	if a.Plan != nil {
-		state := s.GetSessionPromptState().ForkForSubAgent()
+		state := s.Config.ForkSessionPromptState(true)
 		opts = append(opts, aicommon.WithSessionPromptState(state), aicommon.WithFrozenBlockPartitionProducer(aicommon.NewFrozenBlockPartitionProducer(s.GetOrCreateFrozenBlockPartitionProducer().ProducePartitions()...)))
 	}
 	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)

@@ -3,6 +3,7 @@ package reactloops
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -216,6 +217,17 @@ func (r *ReActLoop) prepareContextCompression(action *aicommon.Action, request .
 	selection, err := r.parseContextCompressionSelection(action, candidates, aicommon.TimelineCompressionMaxSummaryTokens)
 	if err != nil {
 		return nil, err
+	}
+	// Keep the latest failed visual result (including recovery metadata) through
+	// this compression, even if its bytes did not fit the compression request.
+	if snapshot := r.imagePrompt; snapshot != nil && snapshot.recoveryItemID > 0 &&
+		!slices.Contains(selection.RetainedIDs, snapshot.recoveryItemID) {
+		for _, candidate := range candidates {
+			if candidate.ID == snapshot.recoveryItemID && candidate.Kind == "" && candidate.PromptText != "" {
+				selection.RetainedIDs = append(selection.RetainedIDs, candidate.ID)
+				break
+			}
+		}
 	}
 	if len(through) > 0 {
 		selection.ThroughID = &through[0]

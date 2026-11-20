@@ -618,7 +618,18 @@ func (m *Timeline) DumpRecentOrdinaryForPrompt(tokenLimit int, includeLatestMode
 	return m.dumpRecentForPrompt(tokenLimit, includeLatestModelReplay, true)
 }
 
-func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay bool, excludeUserInput bool) string {
+type TimelineRecentPrompt struct {
+	Text   string
+	Images []PromptImage
+}
+
+func (m *Timeline) DumpRecentOrdinaryWithImages(tokenLimit int, includeLatestModelReplay bool) TimelineRecentPrompt {
+	var result TimelineRecentPrompt
+	result.Text = m.dumpRecentForPrompt(tokenLimit, includeLatestModelReplay, true, &result.Images)
+	return result
+}
+
+func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay bool, excludeUserInput bool, imageOutput ...*[]PromptImage) string {
 	if m == nil || tokenLimit <= 0 {
 		return ""
 	}
@@ -637,6 +648,11 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 
 	remaining := tokenLimit - baseTokens
 	selected := make([]string, 0)
+	type imageEntry struct {
+		text   string
+		images []PromptImage
+	}
+	var imageEntries []imageEntry
 	omitted := false
 	var latestReplayID int64
 	if includeLatestModelReplay {
@@ -690,6 +706,9 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		}
 		remaining -= cost
 		selected = append([]string{content}, selected...)
+		if images := timelineItemImages(projected); len(images) > 0 {
+			imageEntries = append([]imageEntry{{content, images}}, imageEntries...)
+		}
 	}
 	if len(selected) == 0 {
 		return ""
@@ -722,6 +741,15 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 	}
 	if ytoken.TokenCountExceeds(result, tokenLimit) {
 		return ""
+	}
+	if len(imageOutput) > 0 && imageOutput[0] != nil {
+		for _, entry := range imageEntries {
+			// A clipped entry is text-only; never attach an image whose owning
+			// item did not survive the actual lightweight prompt window.
+			if strings.Contains(result, entry.text) {
+				*imageOutput[0] = append(*imageOutput[0], entry.images...)
+			}
+		}
 	}
 	return result
 }
@@ -864,6 +892,10 @@ func (m *Timeline) PushTextWithPromptProjection(id int64, text, promptText strin
 }
 
 func (m *Timeline) pushTextWithPromptProjection(id int64, text, promptText string) {
+	m.pushTextItem(&TextTimelineItem{ID: id, Text: text, PromptText: promptText})
+}
+
+func (m *Timeline) pushTextItem(text *TextTimelineItem) {
 	m.mu.Lock()
 	var notifications []func()
 	defer m.unlockAndNotifyTimeline(&notifications)
@@ -872,18 +904,14 @@ func (m *Timeline) pushTextWithPromptProjection(id int64, text, promptText strin
 	for m.tsToTimelineItem.Have(ts) {
 		ts++
 	}
-	m.idToTs.Set(id, ts)
+	m.idToTs.Set(text.ID, ts)
 
 	item := &TimelineItem{
 		createdAt: now,
-		value: &TextTimelineItem{
-			ID:         id,
-			Text:       text,
-			PromptText: promptText,
-		},
+		value:     text,
 	}
 
-	m.pushTimelineItem(ts, id, item, &notifications)
+	m.pushTimelineItem(ts, text.ID, item, &notifications)
 }
 
 // TimelineEntry 时间线条目
