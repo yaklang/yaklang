@@ -169,4 +169,15 @@ if (!preg_match('/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/', $host)) {
 $command = 'ping -c 1 ' . escapeshellarg($host);
 shell_exec($command); // wb:sink id=sink
 NEG
+	'safefile://sql-backticks.php': <<<NEG
+<?php
+
+function applyCustomerFilter($qb, $filterName, $value)
+{
+    if ('id_customer' === $filterName) {
+        $qb->andWhere('c.`id_customer` = :' . $filterName);
+        $qb->setParameter($filterName, $value);
+    }
+}
+NEG
 )
