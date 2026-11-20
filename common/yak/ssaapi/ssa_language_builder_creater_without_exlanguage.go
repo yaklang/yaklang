@@ -4,6 +4,7 @@ package ssaapi
 
 import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/bash/bash2ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
@@ -16,12 +17,12 @@ import (
 //
 // Build Tag 使用说明:
 //   - 默认编译（不带 tag）: 包含所有语言支持（Go, Java, PHP, C, TypeScript/JS）
-//   - 使用 -tags irify_exclude: 仅包含 Yak 语言支持，排除其他语言和 SyntaxFlow
+//   - 使用 -tags irify_exclude: 包含 Yak 与 bash 语言支持，排除其他语言和内置 SyntaxFlow 规则
 //
 // 编译命令:
 //
 //	go build                                    # 完整版本（所有语言）
-//	go build -tags irify_exclude               # Irify 排除版本（仅 Yak，排除 SyntaxFlow）
+//	go build -tags irify_exclude               # Irify 排除版本（Yak + bash，排除内置 SyntaxFlow 规则）
 //
 // 性能对比测试结果（实际测量数据）:
 //
@@ -31,8 +32,8 @@ import (
 // │ 完整版              │   450.36 MB   │       -        │ 全部（6种语言）      │
 // │ (默认)              │              │                │ + SyntaxFlow         │
 // ├─────────────────────┼──────────────┼────────────────┼──────────────────────┤
-// │ 精简版              │   335.78 MB   │  -114.58 MB    │ 仅 Yak 语言          │
-// │ (irify_exclude)     │              │  (-25.44%)     │ 排除 SyntaxFlow      │
+// │ 精简版              │   335.78 MB   │  -114.58 MB    │ Yak + bash 语言      │
+// │ (irify_exclude)     │              │  (-25.44%)     │ 排除内置 SyntaxFlow │
 // └─────────────────────┴──────────────┴────────────────┴──────────────────────┘
 //
 // 性能分析:
@@ -48,6 +49,9 @@ import (
 //   - TypeScript: github.com/yaklang/yaklang/common/yak/typescript/ts2ssa
 //   - JavaScript: 同 TypeScript (共享 ts2ssa builder)
 //   - C#:         github.com/yaklang/yaklang/common/yak/csharp/csharp2ssa
+//
+// bash 不在排除列表：bash2ssa 是纯 Go 的 mvdan/sh 解析器，保留在精简版中供
+// AI 命令自检使用。
 //
 // 库导入说明:
 //   - 在 irify_exclude 模式下，ssa 和 syntaxflow 库仍然会被导入到 Yak 脚本环境中
@@ -77,7 +81,8 @@ import (
 //   - ssa 和 syntaxflow 库使用占位实现，支持前端提示但不提供实际功能
 //   - 测试时需要使用相同的 build tag: go test -tags irify_exclude
 var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
-	ssaconfig.Yak: yak2ssa.CreateBuilder,
+	ssaconfig.Yak:  yak2ssa.CreateBuilder,
+	ssaconfig.BASH: bash2ssa.CreateBuilder,
 }
 
 // ArchiveCodeSourceOpener opens a code source that is itself an archive.
