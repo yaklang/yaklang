@@ -38,6 +38,11 @@ func main() {
 		}
 	case "exec":
 		os.Exit(runExec(os.Args[2:]))
+	case "patterns":
+		if err := runPatterns(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "reflect-prune-link patterns: %v\n", err)
+			os.Exit(1)
+		}
 	case "profiles":
 		for _, name := range []string{"tier1", "tier2"} {
 			fmt.Printf("%s:\n", name)
@@ -55,7 +60,22 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage:")
 	fmt.Fprintln(os.Stderr, "  reflect-prune-link prepare -o <patched-link-path>")
 	fmt.Fprintln(os.Stderr, "  reflect-prune-link exec --link <patched-link-path> [--profile tier2] [--verbose] -- <tool> <args...>")
+	fmt.Fprintln(os.Stderr, "  reflect-prune-link patterns [--profile tier2]")
 	fmt.Fprintln(os.Stderr, "  reflect-prune-link profiles")
+}
+
+func runPatterns(args []string) error {
+	fs := flag.NewFlagSet("patterns", flag.ContinueOnError)
+	profile := fs.String("profile", "tier2", "built-in reflect-prune profile (off, tier1, tier2)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	patterns, err := ResolveProfilePatterns(*profile)
+	if err != nil {
+		return err
+	}
+	fmt.Println(patterns)
+	return nil
 }
 
 func goEnv(key string) (string, error) {

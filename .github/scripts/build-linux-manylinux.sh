@@ -61,7 +61,7 @@ args=(go build -trimpath)
 if [ -n "${REFLECT_PRUNE_PROFILE:-}" ] && [ "${REFLECT_PRUNE_PROFILE}" != "off" ] && [ "${REFLECT_PRUNE_PROFILE}" != "none" ]; then
   PRUNE_DIR="$(mktemp -d /tmp/yak-reflect-prune.XXXXXX)"
   echo "Preparing reflect-prune linker (profile=${REFLECT_PRUNE_PROFILE}) in ${PRUNE_DIR}"
-  CGO_ENABLED=0 go build -o "${PRUNE_DIR}/reflect-prune-link" ./tools/reflect-prune-link
+  CGO_ENABLED=0 go build -buildvcs=false -o "${PRUNE_DIR}/reflect-prune-link" ./tools/reflect-prune-link
   "${PRUNE_DIR}/reflect-prune-link" prepare -o "${PRUNE_DIR}/yak-link"
   args+=(-toolexec "${PRUNE_DIR}/reflect-prune-link exec --link ${PRUNE_DIR}/yak-link --profile ${REFLECT_PRUNE_PROFILE} --verbose --")
 fi
