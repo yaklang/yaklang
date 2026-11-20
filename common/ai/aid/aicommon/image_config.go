@@ -103,6 +103,31 @@ func (c *Config) ResolveImageModel(lightweight bool) (*ypb.AIModelConfig, error)
 	return resolveTierModelConfig(tier, c.IsSingleAIModelMode())
 }
 
+// ForkSessionPromptState preserves image ownership independently of whether the
+// child can see the parent's conversation. Recovered catalogs are opened lazily.
+func (c *Config) ForkSessionPromptState(inheritConversation bool) *SessionPromptState {
+	parent := c.GetSessionPromptState()
+	child := parent.forkForSubAgent(inheritConversation)
+	parent.m.RLock()
+	child.imageOwner = c.imageCatalogOwner(parent)
+	parent.m.RUnlock()
+	if inheritConversation && child.inheritedImageCatalog == nil && c.HasImageResources() {
+		child.imageParent = c
+	}
+	return child
+}
+
+// imageCatalogOwner reads the owner while the caller holds the state lock.
+func (c *Config) imageCatalogOwner(state *SessionPromptState) string {
+	if state.imageOwner != "" {
+		return state.imageOwner
+	}
+	if c.PersistentSessionId != "" {
+		return c.PersistentSessionId
+	}
+	return c.Id
+}
+
 func (c *Config) GetImageCatalog() (*aimedia.Catalog, error) {
 	state := c.GetSessionPromptState()
 	workdir := c.GetOrCreateWorkDir()
@@ -119,30 +144,37 @@ func (c *Config) GetImageCatalog() (*aimedia.Catalog, error) {
 		key = state.imageNamespace
 	}
 	root := ImageCatalogDirectory(workdir, key)
-	var err error
-	if state.inheritedImageCatalog != nil {
-		state.imageCatalog, err = state.inheritedImageCatalog.Fork(c.GetContext(), root)
-	} else {
-		state.imageCatalog, err = aimedia.OpenCatalog(root)
-	}
-	if err == nil {
-		owner := c.PersistentSessionId
-		if owner == "" {
-			owner = c.Id
-		}
-		err = state.imageCatalog.BindOwner(owner)
+	inherited := state.inheritedImageCatalog
+	if inherited == nil && state.imageParent != nil {
+		var err error
+		inherited, err = state.imageParent.GetImageCatalog()
 		if err != nil {
-			state.imageCatalog = nil
+			return nil, err
 		}
 	}
-	return state.imageCatalog, err
+	var store *aimedia.Catalog
+	var err error
+	if inherited != nil {
+		store, err = inherited.Fork(c.GetContext(), root)
+	} else {
+		store, err = aimedia.OpenCatalog(root)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := store.BindOwner(c.imageCatalogOwner(state)); err != nil {
+		return nil, err
+	}
+	state.imageCatalog = store
+	state.imageParent = nil
+	return store, nil
 }
 
 // Pure-text sessions do not create a resource index or extra work directory.
 func (c *Config) HasImageResources() bool {
 	state := c.GetSessionPromptState()
 	state.m.Lock()
-	ready := state.imageCatalog != nil || state.inheritedImageCatalog != nil
+	ready := state.imageCatalog != nil || state.inheritedImageCatalog != nil || state.imageParent != nil
 	namespace := state.imageNamespace
 	state.m.Unlock()
 	if ready {

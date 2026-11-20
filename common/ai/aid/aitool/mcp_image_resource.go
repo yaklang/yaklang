@@ -44,7 +44,7 @@ func convertMCPToolResult(ctx context.Context, c MCPImageResourceReader, result 
 		converted, err = convertMCPToolContent(ctx, contents, source)
 	}
 	if err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil && (!result.IsError || ctxErr == context.Canceled) {
 			return nil, "", ctxErr
 		}
 		if !result.IsError {

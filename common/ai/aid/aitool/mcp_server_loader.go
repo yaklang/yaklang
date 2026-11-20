@@ -467,7 +467,7 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 		if runtimeConfig != nil {
 			source.ToolCallID = runtimeConfig.RuntimeID
 		}
-		value, resultContent, err := convertMCPToolResult(ctx, mcpClient, result, source)
+		value, resultContent, err := convertMCPToolResult(callCtx, mcpClient, result, source)
 		if err != nil {
 			if result != nil && result.IsError {
 				log.Errorf("mcp tool %s execution error: %s", toolName, err)

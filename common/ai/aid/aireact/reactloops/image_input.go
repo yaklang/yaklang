@@ -225,7 +225,7 @@ func (r *ReActLoop) prepareImages(ctx context.Context, references []aicommon.Pro
 
 func (r *ReActLoop) imageRequestOptions() []aicommon.AIRequestOption {
 	s := r.imagePrompt
-	if s == nil || len(s.inputs) == 0 {
+	if s == nil {
 		return nil
 	}
 	var opts []aicommon.AIRequestOption

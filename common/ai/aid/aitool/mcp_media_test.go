@@ -359,3 +359,35 @@ func TestMCPRegisteredToolTransportTimeoutAndCancellation(t *testing.T) {
 	require.True(t, result.Success)
 	require.Equal(t, "still usable", result.Data.(*ToolExecutionResult).Result)
 }
+
+type mcpDeadlineFixture struct {
+	client.MCPClient
+	callDeadline, readDeadline time.Time
+}
+
+func (c *mcpDeadlineFixture) CallTool(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c.callDeadline, _ = ctx.Deadline()
+	return &mcp.CallToolResult{
+		IsError:           true,
+		StructuredContent: json.RawMessage(`{"task":{"checkpoint":{"id":23}}}`),
+		Content:           []any{mcp.NewTextContent(`{"delivery":"file","resourceUri":"fixture://capture","mimeType":"image/png"}`)},
+	}, nil
+}
+
+func (c *mcpDeadlineFixture) ReadResource(ctx context.Context, _ mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	c.readDeadline, _ = ctx.Deadline()
+	return nil, context.DeadlineExceeded
+}
+
+func TestMCPResourceReadsShareToolInvocationDeadline(t *testing.T) {
+	fixture := &mcpDeadlineFixture{}
+	callback := createToolCallback(fixture, "capture", "fixture")
+	value, err := callback(context.Background(), nil, nil, io.Discard, io.Discard)
+	require.NotZero(t, fixture.callDeadline)
+	require.Equal(t, fixture.callDeadline, fixture.readDeadline)
+	var failure *mcpToolExecutionError
+	require.ErrorAs(t, err, &failure)
+	result, ok := value.(*mcp.CallToolResult)
+	require.True(t, ok)
+	require.Contains(t, string(result.StructuredContent), "checkpoint")
+}

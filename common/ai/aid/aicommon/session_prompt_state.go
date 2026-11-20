@@ -33,6 +33,8 @@ type SessionPromptState struct {
 	imageCatalog          *aimedia.Catalog
 	inheritedImageCatalog *aimedia.Catalog
 	imageNamespace        string
+	imageOwner            string
+	imageParent           *Config
 
 	// reportedRiskStore is shared across parent and sub-agents for runtime
 	// deduplication only. Config.AppendReportedRisk broadcasts immutable Timeline

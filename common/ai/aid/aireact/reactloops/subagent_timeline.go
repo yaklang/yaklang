@@ -286,13 +286,8 @@ func buildSubAgentInvoker(
 // is cleared; the reported-risk store, ordinary context providers and capability
 // managers deliberately retain their existing sharing/resource boundaries.
 func snapshotSubAgentConfig(parent *aicommon.Config, contextMode ...string) []aicommon.ConfigOption {
-	var state *aicommon.SessionPromptState
 	taskOnly := len(contextMode) > 0 && contextMode[0] == SubAgentContextTaskOnly
-	if taskOnly {
-		state = parent.SessionPromptState.ForkForTaskOnlySubAgent()
-	} else {
-		state = parent.SessionPromptState.ForkForSubAgent()
-	}
+	state := parent.ForkSessionPromptState(!taskOnly)
 	opts := append(aicommon.ConvertConfigToOptions(parent),
 		aicommon.WithInheritedAiToolManager(parent.AiToolManager),
 		aicommon.WithAICallbacks(parent.GetRawAICallbacks()),

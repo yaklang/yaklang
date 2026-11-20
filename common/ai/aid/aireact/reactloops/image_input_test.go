@@ -394,3 +394,53 @@ func TestNativeImagesAreCapturedWithTextBeforeLaterToolCompletions(t *testing.T)
 	require.Equal(t, first.ID, result.Images[0].Image.ID)
 	require.NotContains(t, result.Prompt, later.ID)
 }
+
+func TestImageRequestLimitsWhenNoImagesFit(t *testing.T) {
+	loop, _ := imageTestLoop(t, &ypb.AIImageInputConfig{Mode: "native", MaxRequestBytes: 2048})
+	prompt := strings.Repeat("a", 4096)
+	snapshot, err := loop.prepareImages(context.Background(), []aicommon.PromptImage{{Image: imageFixture(t, 0)}}, prompt, nil)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	require.Empty(t, snapshot.inputs)
+
+	loop.imagePrompt = snapshot
+	req := aicommon.NewAIRequest(prompt, loop.imageRequestOptions()...)
+	require.Empty(t, req.GetImageList())
+	require.ErrorIs(t, req.CheckImageBudget(), aispec.ErrRequestSizeLimit)
+	require.EqualValues(t, 2048, aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...).RequestByteLimit)
+}
+
+func TestSubAgentImageCatalogAfterSessionRestore(t *testing.T) {
+	ctx := context.Background()
+	parentOptions := []aicommon.ConfigOption{
+		aicommon.WithWorkdir(t.TempDir()), aicommon.WithPersistentSessionId("parent-session"),
+		aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true),
+	}
+	original := aicommon.NewConfig(ctx, parentOptions...)
+	store, err := original.GetImageCatalog()
+	require.NoError(t, err)
+	item, err := store.Register(ctx, "parent-capture", imageFixture(t, 0))
+	require.NoError(t, err)
+
+	parent := aicommon.NewConfig(ctx, parentOptions...)
+	full := aicommon.NewConfig(ctx, snapshotSubAgentConfig(parent, SubAgentContextFork)...)
+	require.True(t, full.HasImageResources())
+	fullStore, err := full.GetImageCatalog()
+	require.NoError(t, err)
+	require.Equal(t, "parent-session", fullStore.Owner())
+	require.Len(t, fullStore.Snapshot(), 1)
+	require.Equal(t, item.ID, fullStore.Snapshot()[0].ID)
+
+	task := aicommon.NewConfig(ctx, snapshotSubAgentConfig(parent, SubAgentContextTaskOnly)...)
+	require.Empty(t, task.PersistentSessionId)
+	require.False(t, task.HasImageResources())
+	taskStore, err := task.GetImageCatalog()
+	require.NoError(t, err)
+	require.Empty(t, taskStore.Snapshot())
+	_, err = taskStore.Register(ctx, "child-capture", imageFixture(t, 1))
+	require.NoError(t, err)
+	reopened, err := aimedia.OpenCatalog(aicommon.ImageCatalogDirectory(parent.Workdir, task.ImageScope()))
+	require.NoError(t, err)
+	require.Equal(t, "parent-session", reopened.Owner())
+	require.Len(t, reopened.Snapshot(), 1)
+}
