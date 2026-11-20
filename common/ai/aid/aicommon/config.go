@@ -31,6 +31,7 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 // DefaultPeriodicVerificationInterval 是 verification iter 门的基础节拍.
@@ -1004,12 +1005,22 @@ func WithAICallbacks(callbacks *AICallbacks) ConfigOption {
 	}
 }
 
+// WithInheritTieredAICallback captures callbacks and their quality-context binding
+// when the options are prepared, including for children waiting in a queue.
+// A nil explicit model stays nil so global model selection remains dynamic.
+// Pending overflow recovery is runtime-local and is deliberately not inherited.
 func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
-	return func(c *Config) error {
-		if parent == nil {
-			return nil
+	var raw *AICallbacks
+	var contextEnabled bool
+	var model *ypb.AIModelConfig
+	if parent != nil {
+		raw = parent.GetRawAICallbacks()
+		contextEnabled = parent.modelContextSettingsEnabled
+		if parent.primaryModelContextConfig != nil {
+			model = proto.Clone(parent.primaryModelContextConfig).(*ypb.AIModelConfig)
 		}
-		raw := parent.GetRawAICallbacks()
+	}
+	return func(c *Config) error {
 		if raw == nil {
 			return nil
 		}
@@ -1021,8 +1032,11 @@ func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.setAICallbacksLocked(raw)
-		c.modelContextSettingsEnabled = parent.modelContextSettingsEnabled
-		c.primaryModelContextConfig = parent.primaryModelContextConfig
+		c.modelContextSettingsEnabled = contextEnabled
+		c.primaryModelContextConfig = nil
+		if model != nil {
+			c.primaryModelContextConfig = proto.Clone(model).(*ypb.AIModelConfig)
+		}
 		c.m.Unlock()
 		return nil
 	}

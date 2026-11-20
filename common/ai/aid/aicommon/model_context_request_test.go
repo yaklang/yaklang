@@ -13,13 +13,17 @@ import (
 )
 
 func TestModelContextRequestPinsQualityWithoutChangingAuxiliaryRouting(t *testing.T) {
-	for _, single := range []bool{false, true} {
-		t.Run(fmt.Sprintf("single=%v", single), func(t *testing.T) {
+	for _, tc := range []struct{ single, inherited bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		t.Run(fmt.Sprintf("single=%v/inherited=%v", tc.single, tc.inherited), func(t *testing.T) {
+			single := tc.single
 			yakit.GuardConfigurationForTest(t)
 			observed := pr5128ModeFixture(t, single)
 			consts.GetTieredAIConfig().IntelligentConfigs[0].ContextOwnerId = uuid.NewString()
 			cfg := pr5128NewModeConfig(t)
 			require.NoError(t, WithTieredAICallback(single)(cfg))
+			if tc.inherited {
+				cfg = pr5128NewModeConfig(t, WithInheritTieredAICallback(cfg, true))
+			}
 			pinned := cfg.SnapshotPrimaryModelConfig()
 			require.NotNil(t, pinned)
 			key := aispec.ModelContextIdentity(pinned)

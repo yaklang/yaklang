@@ -38,8 +38,12 @@ func setContextTestThreshold(t *testing.T, cfg *aicommon.Config, key string, tok
 // Channels force the TOCTOU interleaving without sleeps or scheduler timing.
 // Identical display names deliberately rule out name-only identity checks.
 func TestModelContextTOCTOUPinsPromptGatewayAndCompression(t *testing.T) {
-	for _, native := range []bool{false, true} {
-		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
+	for _, tc := range []struct {
+		native    bool
+		childMode string
+	}{{false, ""}, {true, ""}, {false, SubAgentContextFork}, {true, SubAgentContextFork}, {false, SubAgentContextTaskOnly}, {true, SubAgentContextTaskOnly}} {
+		t.Run(fmt.Sprintf("native=%v/child=%s", tc.native, tc.childMode), func(t *testing.T) {
+			native := tc.native
 			yakit.GuardConfigurationForTest(t)
 			var aCalls, bCalls atomic.Int32
 			server := func(count *atomic.Int32, rejectFirst bool) *httptest.Server {
@@ -95,6 +99,9 @@ func TestModelContextTOCTOUPinsPromptGatewayAndCompression(t *testing.T) {
 				})
 				return route(c, req)
 			})(cfg))
+			if tc.childMode != "" {
+				cfg = newModelContextTestSubAgent(t, cfg, tc.childMode)
+			}
 			loop := makeSchemaStabilityTestLoop(cfg)
 			loop.SetCurrentTask(cfg.DefaultTask)
 			t.Cleanup(loop.Release)

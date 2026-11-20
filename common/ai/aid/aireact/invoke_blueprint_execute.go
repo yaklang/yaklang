@@ -55,7 +55,7 @@ func (r *ReAct) executeBlueprint(ctx context.Context, request *invokePlanAndExec
 	var outputMu sync.Mutex
 	opts := aicommon.ConvertConfigToOptionsWithoutHotPatch(r.config)
 	opts = append(opts, aicommon.WithID(id), aicommon.WithContext(ctx),
-		aicommon.WithLiteForgeExecutor(nil), aicommon.WithAICallbacks(r.config.GetRawAICallbacks()),
+		aicommon.WithLiteForgeExecutor(nil), aicommon.WithInheritTieredAICallback(r.config, true),
 		aicommon.WithAllowPlanUserInteract(true), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			e.CoordinatorId = id
