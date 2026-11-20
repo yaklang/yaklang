@@ -15,7 +15,7 @@ import (
 //go:embed all:code
 var codeFS embed.FS
 
-// TestAllSyntaxForCpp_G4 parses every fixture with the CPP14 grammar only. It
+// TestAllSyntaxForCpp_G4 parses every fixture with the C++ grammar only. It
 // guards the grammar and the frontend entry point, not SSA lowering.
 func TestAllSyntaxForCpp_G4(t *testing.T) {
 	budget := 10 * time.Second

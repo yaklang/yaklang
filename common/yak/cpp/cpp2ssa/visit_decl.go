@@ -97,7 +97,7 @@ func (b *singleFileBuilder) visitBlockDeclaration(raw cppparser.IBlockDeclaratio
 }
 
 // lowerCallShapedDeclaration rewrites the grammar's declaration reading of a
-// statement such as `println(value);`. The CPP14 grammar cannot tell `T (x);`
+// statement such as `println(value);`. The C++ grammar cannot tell `T (x);`
 // (a declaration) from `f(x);` (a call) without a symbol table, and ANTLR picks
 // the declaration alternative. When the spelled type is not a known type and
 // the declarator is exactly one parenthesized identifier, the statement is a
