@@ -1,0 +1,3 @@
+`{"@action":"plan_review","suggestion":"continue","reason":"继续执行。"}`
+
+`{"@action":"plan_review","suggestion":"incomplete","reason":"缺少修复后的复现验证"}`

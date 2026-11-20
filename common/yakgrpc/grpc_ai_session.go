@@ -236,7 +236,20 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			return nil, err
 		}
 
-		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(projectDB)
+		var deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec int64
+		codingCleanup, err := yakit.DeleteCodingSessions(ctx, s.GetProfileDatabase(), sessionIDs, func() error {
+			tx := projectDB.Begin()
+			if tx.Error != nil {
+				return tx.Error
+			}
+			defer tx.Rollback()
+			var deleteErr error
+			deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, deleteErr = yakit.DeleteAllAISessionData(tx)
+			if deleteErr != nil {
+				return deleteErr
+			}
+			return tx.Commit().Error
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +259,7 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			Operation:  "delete",
 			EffectRows: deletedRuntimes + deletedEvents,
 			ExtraMessage: fmt.Sprintf(
-				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d deleted_workdirs=%d deleted_memory_entities=%d deleted_memory_collections=%d deleted_rag_collections=%d",
+				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d deleted_workdirs=%d deleted_memory_entities=%d deleted_memory_collections=%d deleted_rag_collections=%d deleted_coding_sessions=%d deleted_coding_worktrees=%d retained_coding_worktrees=%d",
 				deletedSessions,
 				deletedRuntimes,
 				deletedEvents,
@@ -255,6 +268,9 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 				memResult.DeletedMemoryEntities,
 				memResult.DeletedMemoryCollections,
 				memResult.DeletedRAGCollections,
+				codingCleanup.DeletedSessions,
+				codingCleanup.DeletedWorktrees,
+				codingCleanup.RetainedWorktrees,
 			),
 		}, nil
 	}
@@ -309,12 +325,25 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		deletedMemoryCollections += memResult.DeletedMemoryCollections
 		deletedRAGCollections += memResult.DeletedRAGCollections
 
-		runtimeCount, eventCount, err := yakit.DeleteAISession(projectDB, sessionID)
-		if err != nil {
-			return nil, err
+	}
+	codingCleanup, err := yakit.DeleteCodingSessions(ctx, s.GetProfileDatabase(), targetSessionIDs, func() error {
+		tx := projectDB.Begin()
+		if tx.Error != nil {
+			return tx.Error
 		}
-		deletedRuntimes += runtimeCount
-		deletedEvents += eventCount
+		defer tx.Rollback()
+		for _, sessionID := range targetSessionIDs {
+			runtimeCount, eventCount, err := yakit.DeleteAISession(tx, strings.TrimSpace(sessionID))
+			if err != nil {
+				return err
+			}
+			deletedRuntimes += runtimeCount
+			deletedEvents += eventCount
+		}
+		return tx.Commit().Error
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &ypb.DbOperateMessage{
@@ -322,7 +351,7 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		Operation:  "delete",
 		EffectRows: deletedRuntimes + deletedEvents,
 		ExtraMessage: fmt.Sprintf(
-			"deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_workdirs=%d deleted_memory_entities=%d deleted_memory_collections=%d deleted_rag_collections=%d",
+			"deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_workdirs=%d deleted_memory_entities=%d deleted_memory_collections=%d deleted_rag_collections=%d deleted_coding_sessions=%d deleted_coding_worktrees=%d retained_coding_worktrees=%d",
 			len(targetSessionIDs),
 			deletedRuntimes,
 			deletedEvents,
@@ -330,6 +359,9 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			deletedMemoryEntities,
 			deletedMemoryCollections,
 			deletedRAGCollections,
+			codingCleanup.DeletedSessions,
+			codingCleanup.DeletedWorktrees,
+			codingCleanup.RetainedWorktrees,
 		),
 	}, nil
 }

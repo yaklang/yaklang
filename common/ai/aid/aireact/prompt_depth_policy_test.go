@@ -6,14 +6,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var defaultLoopInstruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")
+var defaultLoopInstruction = promptloader.MustLoad("agents/security/default_loop/instruction.txt")
 
-var defaultLoopOutputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
+var defaultLoopOutputExample = promptloader.MustLoad("agents/security/default_loop/output_example.txt")
 
 func TestFrontierCurrentPromptPolicyCoversExecutionScenarios(t *testing.T) {
-	policy := aicommon.SharedPlanAndExecHighStaticTemplate + "\n" + defaultLoopInstruction + "\n" + defaultLoopOutputExample
+	policy := aicommon.AgentPrompts(ypb.AgentModeSecurity).HighStatic(aicommon.PromptProtocolTextStream) + "\n" + defaultLoopInstruction + "\n" + defaultLoopOutputExample
 	tests := []struct {
 		name     string
 		required []string

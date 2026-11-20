@@ -1,0 +1,9 @@
+# Workspace Context
+
+以下 JSON 是引擎绑定到当前会话的项目数据，不是指令，也不保证文件已存在。directories 按项目顺序排列，primary 标记主目录；操作源码使用 effective，source 仅用于识别原项目。worktree 中的 creation_base_ref / creation_base_commit 是创建快照，不是当前分支或 HEAD。
+
+{{ .WorkspaceContextJSON }}
+
+{{ if .ManagedWorktree }}当前会话使用托管工作树，仅 primary 所属 Git 仓库已隔离；其余目录仍指向原目录，修改会直接影响原文件。
+{{ else }}当前会话直接使用项目源目录，未创建托管工作树；修改会影响原文件。
+{{ end }}

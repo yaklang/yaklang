@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // Reproduce the final planning iteration: a prompt provider removes actions.
@@ -79,7 +80,7 @@ func (i *promptCompareInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *aicom
 	}
 	section, err := aicommon.RenderPromptTemplate(
 		"loop-prompt-compare-semi-dynamic-2",
-		aicommon.MainloopSemiDynamic2Template(input.FunctionCallMode),
+		aicommon.MainloopSemiDynamic2Template(materials.Protocol()),
 		materials.SemiDynamic2Data(),
 	)
 	if err != nil {
@@ -90,13 +91,13 @@ func (i *promptCompareInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *aicom
 	}, nil
 }
 
-func generateComparedLoopPrompt(t *testing.T, functionCallMode bool) string {
+func generateComparedLoopPrompt(t *testing.T, protocol aicommon.PromptProtocol) string {
 	t.Helper()
 	ctx := context.Background()
 	cfg := aicommon.NewConfig(ctx)
 	loop := makeSchemaStabilityTestLoop(cfg)
 	loop.loopName = "prompt-compare"
-	loop.functionCallMode = functionCallMode
+	loop.functionCallMode = protocol == aicommon.PromptProtocolFunctionCall
 	loop.persistentInstructionProvider = func(*ReActLoop, string) (string, error) {
 		return "Choose an available action.", nil
 	}
@@ -122,8 +123,8 @@ func parseComparedSemiDynamic2(t *testing.T, prompt string) string {
 }
 
 func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
-	textPrompt := generateComparedLoopPrompt(t, false)
-	functionPrompt := generateComparedLoopPrompt(t, true)
+	textPrompt := generateComparedLoopPrompt(t, aicommon.PromptProtocolTextStream)
+	functionPrompt := generateComparedLoopPrompt(t, aicommon.PromptProtocolFunctionCall)
 	require.NotEqual(t, textPrompt, functionPrompt)
 
 	textSection := parseComparedSemiDynamic2(t, textPrompt)
@@ -179,28 +180,28 @@ func TestExecLoopPromptCompare_TextAndFunctionCallSchemas(t *testing.T) {
 }
 
 func TestExecLoopPromptCompare_HighStaticProtocol(t *testing.T) {
-	render := func(functionCallMode bool) string {
+	render := func(protocol aicommon.PromptProtocol) string {
 		t.Helper()
 		prompt, err := aicommon.RenderPromptTemplate(
 			"loop-prompt-compare-high-static",
-			aicommon.MainloopHighStaticTemplate(functionCallMode),
+			aicommon.AgentPrompts(ypb.AgentModeSecurity).HighStatic(protocol),
 			nil,
 		)
 		require.NoError(t, err)
 		return prompt
 	}
-	textPrompt := render(false)
-	functionPrompt := render(true)
+	textPrompt := render(aicommon.PromptProtocolTextStream)
+	functionPrompt := render(aicommon.PromptProtocolFunctionCall)
 	require.NotEqual(t, textPrompt, functionPrompt)
-	require.NotContains(t, aicommon.MainloopHighStaticTemplate(false), "FunctionCallMode")
-	require.NotContains(t, aicommon.MainloopHighStaticTemplate(true), "FunctionCallMode")
-	for _, functionCallMode := range []bool{false, true} {
-		template := aicommon.MainloopHighStaticTemplate(functionCallMode)
+	require.NotContains(t, aicommon.AgentPrompts(ypb.AgentModeSecurity).HighStatic(aicommon.PromptProtocolTextStream), "FunctionCallMode")
+	require.NotContains(t, aicommon.AgentPrompts(ypb.AgentModeSecurity).HighStatic(aicommon.PromptProtocolFunctionCall), "FunctionCallMode")
+	for _, protocol := range []aicommon.PromptProtocol{aicommon.PromptProtocolTextStream, aicommon.PromptProtocolFunctionCall} {
+		template := aicommon.AgentPrompts(ypb.AgentModeSecurity).HighStatic(protocol)
 		require.NotContains(t, template, "{{", "main High Static must contain no template conditions")
 		require.Contains(t, template, "关注 Timeline 中的用户输入")
 		rendered, err := aicommon.RenderPromptTemplate("loop-high-static-no-materials", template, nil)
 		require.NoError(t, err)
-		require.Equal(t, render(functionCallMode), rendered)
+		require.Equal(t, render(protocol), rendered)
 	}
 	require.Contains(t, textPrompt, "caller 每轮给 JSON SCHEMA")
 	require.Contains(t, textPrompt, "## NONCE 与 AITAG")

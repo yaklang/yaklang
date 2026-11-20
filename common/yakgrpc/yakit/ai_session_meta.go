@@ -83,6 +83,10 @@ func marshalAISessionStartParams(params *ypb.AIStartParams) (string, error) {
 	if params == nil {
 		return "", nil
 	}
+	params = proto.Clone(params).(*ypb.AIStartParams)
+	if err := params.NormalizeAgentMode(); err != nil {
+		return "", err
+	}
 	raw, err := protojson.Marshal(params)
 	if err != nil {
 		return "", utils.Errorf("marshal ai start params failed: %v", err)
@@ -98,6 +102,9 @@ func UnmarshalAISessionStartParams(raw string) (*ypb.AIStartParams, error) {
 	params := &ypb.AIStartParams{}
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal([]byte(raw), params); err != nil {
 		return nil, utils.Errorf("unmarshal ai start params failed: %v", err)
+	}
+	if err := params.NormalizeAgentMode(); err != nil {
+		return nil, err
 	}
 	return params, nil
 }

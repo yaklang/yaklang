@@ -13,12 +13,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactloops_yak"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -87,6 +89,7 @@ type SessionQuiescence interface {
 
 type reActSessionRuntime struct {
 	projectDB func() *gorm.DB
+	profileDB func() *gorm.DB
 	newReAct  func(...aicommon.ConfigOption) (*aireact.ReAct, error)
 
 	mu           sync.Mutex
@@ -189,8 +192,13 @@ func (g *reActSessionQuiescence) Release() {
 	g.once.Do(func() { g.runtime.releaseQuiescence(g.ids, g.all) })
 }
 
-func New(projectDB func() *gorm.DB) ReActSessionRuntime {
+func New(projectDB func() *gorm.DB, profileDatabase ...func() *gorm.DB) ReActSessionRuntime {
+	profileDB := consts.GetGormProfileDatabase
+	if len(profileDatabase) > 0 && profileDatabase[0] != nil {
+		profileDB = profileDatabase[0]
+	}
 	return &reActSessionRuntime{
+		profileDB: profileDB,
 		projectDB: projectDB,
 		newReAct:  aireact.NewReAct,
 		entries:   make(map[string]*reActSessionState),
@@ -570,7 +578,20 @@ func (r *reActSessionRuntime) createRuntime(
 	if err != nil {
 		return nil, utils.Errorf("resolve session cached config failed: %v", err)
 	}
+	resolvedStartParams = proto.Clone(resolvedStartParams).(*ypb.AIStartParams)
+	if err := yakit.ResolveCodingSessionBinding(start.ctx, r.profileDB(), r.projectDatabase(), sessionID, resolvedStartParams, func(progress yakit.CodingWorktreeProgress) {
+		content, _ := json.Marshal(progress)
+		delivery.deliver(&schema.AiOutputEvent{
+			Type: schema.EventType("coding_worktree_progress"), SessionId: sessionID,
+			Content: content, IsJson: true,
+		})
+	}); err != nil {
+		return nil, err
+	}
 	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(r.projectDatabase(), sessionID, resolvedStartParams, time.Now()); err != nil {
+		if resolvedStartParams.GetAgentMode() == ypb.AgentModeCoding {
+			return nil, utils.Errorf("persist coding session metadata: %v", err)
+		}
 		log.Warnf("persist ai session start meta failed for %s: %v", sessionID, err)
 	}
 
@@ -602,7 +623,19 @@ func (r *reActSessionRuntime) createRuntime(
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
-	configOptions = append(configOptions, ConvertStartParamsToReActConfig(resolvedStartParams)...)
+	var worktree *schema.AICodingWorktree
+	if resolvedStartParams.GetAgentMode() == ypb.AgentModeCoding && resolvedStartParams.GetCodingWorktreeID() != "" {
+		var err error
+		worktree, err = yakit.GetAICodingWorktree(r.profileDB(), resolvedStartParams.GetCodingWorkspaceID(), resolvedStartParams.GetCodingWorktreeID(), "")
+		if err != nil {
+			return nil, utils.Errorf("load coding worktree context: %v", err)
+		}
+	}
+	optsFromStartParams, err := convertStartParamsToReActConfig(resolvedStartParams, worktree)
+	if err != nil {
+		return nil, utils.Errorf("resolve coding config: %v", err)
+	}
+	configOptions = append(configOptions, optsFromStartParams...)
 	if aiconfig.IsTieredAIConfig() {
 		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}
@@ -696,6 +729,11 @@ func (r *reActSessionRuntime) attachConnection(
 		delivery.cancel()
 		return nil, err
 	}
+	// An attach request may omit startup settings. The live runtime is authoritative
+	// for its immutable source binding, including when the client has opted out.
+	startParams = proto.Clone(startParams).(*ypb.AIStartParams)
+	cfg := reAct.GetConfig().(*aicommon.Config)
+	applyCodingConfigToStartParams(startParams, cfg)
 	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(r.projectDatabase(), sessionID, startParams, time.Now()); err != nil {
 		log.Warnf("persist ai session start meta failed for %s: %v", sessionID, err)
 	}

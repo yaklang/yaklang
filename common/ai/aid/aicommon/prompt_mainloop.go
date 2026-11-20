@@ -1,35 +1,40 @@
 package aicommon
 
-import "github.com/yaklang/yaklang/common/ai/aid/aicommon/promptloader"
+import "github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
+// AgentPromptSet owns mode-specific content. Protocol, cache sections and caller
+// schemas remain shared. Returned values contain immutable strings only.
+type AgentPromptSet struct {
+	textHighStatic            string
+	functionHighStatic        string
+	DefaultInstruction        string
+	DefaultOutputExample      string
+	VerificationInstruction   string
+	VerificationOutputExample string
+	WorkspaceTemplate         string
+	PlanReviewInstruction     string
+	PlanReviewOutputExample   string
+	TaskReviewInstruction     string
+	TaskReviewOutputExample   string
+}
+
+func (p AgentPromptSet) HighStatic(protocol PromptProtocol) string {
+	if protocol == PromptProtocolFunctionCall {
+		return p.functionHighStatic
+	}
+	return p.textHighStatic
+}
 
 var (
-	SharedPlanAndExecHighStaticTemplate             = promptloader.MustLoad("mainloop/textstream/high_static_section.txt")
-	SharedPlanAndExecHighStaticFunctionCallTemplate = promptloader.MustLoad("mainloop/functioncall/high_static_section.txt")
-	SharedFrozenBlockTemplate                       = promptloader.MustLoad("mainloop/textstream/frozen_block_section.txt")
-	SharedFrozenBlockFunctionCallTemplate           = promptloader.MustLoad("mainloop/functioncall/frozen_block_section.txt")
-	SharedTaskInstructionSchemaExampleTemplate      = promptloader.MustLoad("mainloop/textstream/semi_dynamic_2_section.txt")
-	SharedTaskInstructionFunctionCallTemplate       = promptloader.MustLoad("mainloop/functioncall/semi_dynamic_2_section.txt")
-	SharedSemiDynamic1Template                      = promptloader.MustLoad("mainloop/semi_dynamic_1_section.txt")
-	SharedTimelineOpenTemplate                      = promptloader.MustLoad("mainloop/timeline_open_section.txt")
+	securityPrompts = loadSecurityPrompts()
+	codingPrompts   = loadCodingPrompts()
 )
 
-func MainloopHighStaticTemplate(functionCallMode bool) string {
-	if functionCallMode {
-		return SharedPlanAndExecHighStaticFunctionCallTemplate
+// AgentPrompts is the single content selector. Config/start-parameter validation
+// rejects unsupported modes before prompt assembly; an unspecified mode is security.
+func AgentPrompts(mode string) AgentPromptSet {
+	if mode == ypb.AgentModeCoding {
+		return codingPrompts
 	}
-	return SharedPlanAndExecHighStaticTemplate
-}
-
-func MainloopFrozenBlockTemplate(functionCallMode bool) string {
-	if functionCallMode {
-		return SharedFrozenBlockFunctionCallTemplate
-	}
-	return SharedFrozenBlockTemplate
-}
-
-func MainloopSemiDynamic2Template(functionCallMode bool) string {
-	if functionCallMode {
-		return SharedTaskInstructionFunctionCallTemplate
-	}
-	return SharedTaskInstructionSchemaExampleTemplate
+	return securityPrompts
 }

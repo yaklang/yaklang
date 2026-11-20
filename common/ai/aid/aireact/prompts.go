@@ -14,6 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const prevUserInputTagMaxTokens = 20 * 1024
@@ -27,10 +28,6 @@ var forgeParamsInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/f
 var forgeParamsOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/forge-params/output_example.txt")
 
 var forgeParamsDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/forge-params/dynamic.txt")
-
-var verificationInstructionText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/instruction.txt")
-
-var verificationOutputExampleText = promptloader.MustLoad("ai/aid/aireact/prompts/verification/output_example.txt")
 
 var verificationDynamicTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/verification/dynamic.txt")
 
@@ -70,6 +67,9 @@ type PromptManager struct {
 }
 
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
+	if react != nil && react.config != nil && react.config.AgentMode == ypb.AgentModeCoding {
+		workdir = react.config.Coding.PrimaryProjectDir
+	}
 	return &PromptManager{
 		cpm:     aicommon.NewContextProviderManager(),
 		react:   react,
@@ -301,8 +301,9 @@ func (pm *PromptManager) GenerateVerificationPrompt(
 	prefixMaterials.AllowToolCall = false
 	prefixMaterials.AllowPlanAndExec = false
 	prefixMaterials.HasLoadCapability = false
-	prefixMaterials.TaskInstruction = strings.TrimSpace(verificationInstructionText)
-	prefixMaterials.OutputExample = strings.TrimSpace(verificationOutputExampleText)
+	prompts := aicommon.AgentPrompts(prefixMaterials.AgentMode)
+	prefixMaterials.TaskInstruction = strings.TrimSpace(prompts.VerificationInstruction)
+	prefixMaterials.OutputExample = strings.TrimSpace(prompts.VerificationOutputExample)
 
 	dynamicData := pm.buildLoopPromptSectionData(nil, &reactloops.LoopPromptAssemblyInput{
 		Nonce:     nonceString,

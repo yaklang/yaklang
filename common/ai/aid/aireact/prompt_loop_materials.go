@@ -355,6 +355,7 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 	}
 	if pm != nil && pm.react != nil && pm.react.config != nil {
 		materials.ExecutionPolicy = pm.react.config.GetExecutionPolicy()
+		aicommon.ApplyAgentPromptContext(materials, pm.react.config)
 	}
 	if input != nil {
 		materials.FunctionCallMode = input.FunctionCallMode
@@ -530,12 +531,12 @@ func (pm *PromptManager) buildHighStaticObservation(
 		"Highly Static",
 		aicommon.PromptSectionRoleHighStatic,
 	)
-	// section.high_static 已重构为完全无变量的纯静态系统提示词:
+	// section.high_static 按输出协议和会话模式选择独立静态模板:
 	//   - OutputExample (caller-specific) 在 semi-dynamic 段 Schema 之前
 	//   - TaskInstruction (PERSISTENT, caller-specific) 已迁到 semi-dynamic 段
 	//   - AllowToolCall / AllowPlanAndExec / HasLoadCapability 三个能力开关已移除,
 	//     新模板无条件介绍全部能力, 实际可用性以 SCHEMA enum 为准
-	// 让 high-static chunk hash 跨 caller / 跨 turn 字节恒定, 最大化 AI_CACHE_SYSTEM
+	// 同一模式内让 high-static chunk hash 跨 caller / 跨 turn 字节恒定, 最大化 AI_CACHE_SYSTEM
 	// 段的 prefix cache 命中率.
 	//
 	// 关键词: section.high_static 完全去变量, AI_CACHE_SYSTEM 字节稳定,
@@ -958,15 +959,15 @@ func (pm *PromptManager) buildDynamicObservation(
 }
 
 // renderHighStaticPreamble 渲染 high-static 段的"前导文" (TRAITS + 方法论
-// 协议块 + 能力系统介绍). high_static_section.txt 只按输出协议切换文案,
-// 高静态段不接收每轮材料，同一输出模式内的前缀字节保持稳定。
+// 协议块 + 能力系统介绍). high_static_section.txt 按输出协议和会话模式切换文案,
+// 高静态段不接收每轮材料，同一输出协议和会话模式内的前缀字节保持稳定。
 //
 // 关键词: renderHighStaticPreamble, high-static 纯静态, AI_CACHE_SYSTEM 反污染
 func (pm *PromptManager) renderHighStaticPreamble(materials *reactloops.PromptPrefixMaterials) string {
 	if materials == nil {
 		return ""
 	}
-	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.MainloopHighStaticTemplate(materials.FunctionCallMode), nil)
+	rendered, err := aicommon.RenderPromptTemplate("loop-high-static-preamble", aicommon.AgentPrompts(materials.AgentMode).HighStatic(materials.Protocol()), nil)
 	if err != nil {
 		return ""
 	}
@@ -1072,7 +1073,7 @@ func renderToolInventoryBlock(materials *reactloops.PromptPrefixMaterials) strin
 	// Other frozen materials belong to their own observation nodes.
 	inventory := &aicommon.PromptMaterials{ToolInventory: true, TopTools: materials.TopTools}
 	rendered, err := aicommon.RenderPromptTemplate("tool-inventory-observation",
-		aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), inventory)
+		aicommon.MainloopFrozenBlockTemplate(materials.Protocol()), inventory)
 	if err != nil {
 		log.Warnf("cannot render tool inventory observation: %v", err)
 		return ""
@@ -1142,7 +1143,7 @@ func (pm *PromptManager) renderLoopSemiDynamic1Section(materials *reactloops.Pro
 //
 //	AI_CACHE_SEMI2 cc
 func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.MainloopSemiDynamic2Template(materials.FunctionCallMode), materials.SemiDynamic2Data())
+	return aicommon.RenderPromptTemplate("loop-semi-dynamic-2", aicommon.MainloopSemiDynamic2Template(materials.Protocol()), materials.SemiDynamic2Data())
 }
 
 // renderLoopFrozenBlockSection 渲染"按稳定性分层"路径下的 FrozenBlock 段
@@ -1150,7 +1151,7 @@ func (pm *PromptManager) renderLoopSemiDynamic2Section(materials *reactloops.Pro
 //
 // 关键词: renderLoopFrozenBlockSection, frozen_block_section.txt
 func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.PromptPrefixMaterials) (string, error) {
-	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.MainloopFrozenBlockTemplate(materials.FunctionCallMode), materials.FrozenBlockData())
+	return aicommon.RenderPromptTemplate("loop-frozen-block", aicommon.MainloopFrozenBlockTemplate(materials.Protocol()), materials.FrozenBlockData())
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {

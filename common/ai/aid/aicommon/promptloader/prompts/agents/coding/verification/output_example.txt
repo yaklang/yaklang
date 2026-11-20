@@ -1,0 +1,10 @@
+# 编程验收示例
+
+仅写入代码，尚未验证用户要求的修复：
+{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"修改已写入工作树，尚未验证空输入回归","evidence":[]}
+
+当前子任务要求修复空输入，相关回归测试已通过：
+{"@action":"verify-satisfaction","user_satisfied":true,"completed_task_index":"1-2","reasoning":"空输入行为已修复，相关回归测试通过","evidence":[{"op":"add","id":"empty-input-fixed","content":"工作树中的解析器已处理空输入，回归测试通过，当前子任务完成。"}]}
+
+用户仅要求解释实现，已经给出与源码一致的说明：
+{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"已依据源码解释调用链与边界，无需修改文件","evidence":[]}

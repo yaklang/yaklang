@@ -415,7 +415,9 @@ type Config struct {
 	*/
 	Keywords  []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
 	ForgeName string   // if current config use in forge , this is the forge name
-	Workdir   string
+	AgentMode string
+	Coding    CodingConfig
+	Workdir   string // AI artifacts directory; never the Coding project's source directory.
 	Language  string // Response language preference
 
 	/*
@@ -770,6 +772,7 @@ func newConfig(ctx context.Context) *Config {
 	initStatus := NewConfigInitStatus()
 
 	config := &Config{
+		AgentMode:                          ypb.AgentModeSecurity,
 		HotPatchBroadcaster:                chanx.NewBroadcastChannel[ConfigOption](ctx, 10),
 		KeyValueConfig:                     NewKeyValueConfig(),
 		Ctx:                                ctx,
@@ -4492,6 +4495,8 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
 	}
 
+	opts = append(opts, WithAgentMode(i.AgentMode), WithCodingConfig(i.Coding))
+
 	// Misc
 	if i.PromptHook != nil {
 		opts = append(opts, WithPromptHook(i.PromptHook))
@@ -4695,4 +4700,19 @@ func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackT
 		return c.LiteForgeExecutor(prompt, opts...)
 	}
 	return InvokeLiteForge(prompt, opts...)
+}
+
+// WithAgentMode selects the session persona. Unspecified mode is the security agent.
+func WithAgentMode(mode string) ConfigOption {
+	return func(c *Config) error {
+		normalized, err := ypb.NormalizeAgentMode(mode)
+		if err != nil {
+			return err
+		}
+		c.AgentMode = normalized
+		if normalized != ypb.AgentModeCoding {
+			c.Coding = CodingConfig{}
+		}
+		return nil
+	}
 }

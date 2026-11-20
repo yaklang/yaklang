@@ -48,6 +48,8 @@ func KeySchemaToName(i uint8) string {
 
 // ProfileTables 这些表是独立与项目之外的，每一个用户的数据都不一样
 var ProfileTables = []interface{}{
+	&AICodingWorkspace{},
+	&AICodingSession{}, &AICodingWorktree{},
 	&YakScript{}, &Payload{}, &MenuItem{}, &ContextMenuBinding{},
 	&GeneralStorage{}, &MarkdownDoc{},
 	&Project{},

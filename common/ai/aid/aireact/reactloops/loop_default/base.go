@@ -11,11 +11,24 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var instruction = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/instruction.txt")
-
-var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/output_example.txt")
+func promptOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
+	mode := ypb.AgentModeSecurity
+	if typed, ok := cfg.(*aicommon.Config); ok {
+		mode = typed.AgentMode
+	}
+	prompts := aicommon.AgentPrompts(mode)
+	options := []reactloops.ReActLoopOption{reactloops.WithPersistentInstruction(prompts.DefaultInstruction)}
+	if mode == ypb.AgentModeCoding {
+		// Coding examples must not append unrelated registered focus-mode examples.
+		return append(options, reactloops.WithOutputExampleContextProvider(func(*reactloops.ReActLoop, string) (string, error) {
+			return prompts.DefaultOutputExample, nil
+		}))
+	}
+	return append(options, reactloops.WithOutputExample(prompts.DefaultOutputExample))
+}
 
 var reactiveDataTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_default/prompts/reactive_data.txt")
 
@@ -87,8 +100,6 @@ func NewLoop(name string, r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLo
 		reactloops.WithInitTask(buildInitTask(r)),
 		reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 		reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
-		reactloops.WithPersistentInstruction(instruction),
-		reactloops.WithOutputExample(outputExample),
 		buildDefaultReactiveDataBuilder(),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			if !isDone {
@@ -122,6 +133,7 @@ func NewLoop(name string, r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLo
 		}),
 	}
 
+	preset = append(preset, promptOptions(r.GetConfig())...)
 	preset = append(preset, opts...)
 	loop, err := reactloops.NewReActLoop(name, r, preset...)
 	return loop, err
@@ -152,10 +164,8 @@ func init() {
 // BaseOptions supplies shared prompt materials and iteration limits without
 // selecting a role, initialization policy, or PLAN implementation.
 func BaseOptions(cfg aicommon.AICallerConfigIf) []reactloops.ReActLoopOption {
-	return []reactloops.ReActLoopOption{
+	return append(promptOptions(cfg),
 		reactloops.WithMaxIterations(resolveMaxIterations(cfg)),
-		reactloops.WithPersistentInstruction(instruction),
-		reactloops.WithOutputExample(outputExample),
 		buildDefaultReactiveDataBuilder(),
-	}
+	)
 }
