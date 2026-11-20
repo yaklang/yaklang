@@ -90,6 +90,10 @@ func TestPacketViewFiltersCountOriginalPackets(t *testing.T) {
 	for _, message := range completed {
 		completedIDs[message.ID] = true
 		require.Nil(t, message.Data, "detail metadata query must not materialize message BLOBs")
+		require.NotNil(t, message.Fields, "detail metadata must return decoded fields")
+		require.NotNil(t, message.Session, "detail metadata must return decoded session")
+		require.Nil(t, message.FieldsJSON, "decoded fields must not be retained as a duplicate JSON BLOB")
+		require.Nil(t, message.SessionJSON, "decoded session must not be retained as a duplicate JSON BLOB")
 	}
 	require.True(t, completedIDs[terminalOnly.ID])
 	for _, messageID := range manualMessageIDs {

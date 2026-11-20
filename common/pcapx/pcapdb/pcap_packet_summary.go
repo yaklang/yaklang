@@ -7,6 +7,7 @@ import (
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 const packetSummaryLimit = 512
@@ -25,32 +26,15 @@ func packetFrameSummary(decoded gopacket.Packet, packet Packet) string {
 	switch transport := decoded.TransportLayer().(type) {
 	case *layers.TCP:
 		summary = fmt.Sprintf("[%s] Seq=%d Ack=%d Win=%d Len=%d",
-			packetTCPFlags(transport.SYN, transport.ACK, transport.FIN, transport.RST, transport.PSH, transport.URG, transport.ECE, transport.CWR, transport.NS),
-			transport.Seq, transport.Ack, transport.Window, len(transport.LayerPayload()))
+			pcaputil.TCPFlagText(transport),
+			transport.Seq, transport.Ack, transport.Window, pcaputil.TCPPayloadLength(transport))
 	case *layers.UDP:
-		summary = fmt.Sprintf("SrcPort=%d DstPort=%d Len=%d Payload=%d",
-			uint16(transport.SrcPort), uint16(transport.DstPort), transport.Length, len(transport.LayerPayload()))
+		summary = fmt.Sprintf("%s Len=%d Payload=%d",
+			pcaputil.UDPTransportPorts(transport).Labeled(), transport.Length, pcaputil.UDPPayloadLength(transport))
 	default:
 		summary = packetGenericSummary(packet)
 	}
 	return limitPacketSummary(summary)
-}
-
-func packetTCPFlags(syn, ack, fin, rst, psh, urg, ece, cwr, ns bool) string {
-	type flag struct {
-		set  bool
-		name string
-	}
-	names := make([]string, 0, 9)
-	for _, f := range []flag{{syn, "SYN"}, {ack, "ACK"}, {fin, "FIN"}, {rst, "RST"}, {psh, "PSH"}, {urg, "URG"}, {ece, "ECE"}, {cwr, "CWR"}, {ns, "NS"}} {
-		if f.set {
-			names = append(names, f.name)
-		}
-	}
-	if len(names) == 0 {
-		return "None"
-	}
-	return strings.Join(names, ", ")
 }
 
 func packetGenericSummary(packet Packet) string {

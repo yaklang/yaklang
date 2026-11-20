@@ -1,9 +1,7 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -95,27 +93,10 @@ func pcapMessageProjection(handle *pcapdb.DatabaseHandle, message pcapdb.Protoco
 	return m, nil
 }
 
-func pcapDecodeMessageNodes(message pcapdb.ProtocolMessage, sourceID string, view pcaputil.MessageDisplayInput) ([]*ypb.PCAPFieldNode, bool, string) {
-	var diagnostics []string
-	decode := func(label string, raw []byte, target *map[string]any) {
-		if len(raw) == 0 {
-			return
-		}
-		var fields map[string]any
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.UseNumber()
-		if err := decoder.Decode(&fields); err != nil {
-			diagnostics = append(diagnostics, label+": "+err.Error())
-			return
-		}
-		*target = fields
-	}
-	decode("parsed fields", message.FieldsJSON, &message.Fields)
-	decode("session fields", message.SessionJSON, &message.Session)
+func pcapBuildMessageNodes(message pcapdb.ProtocolMessage, sourceID string, view pcaputil.MessageDisplayInput) ([]*ypb.PCAPFieldNode, bool) {
 	view.Fields, view.Session = message.Fields, message.Session
 	projected, truncated := pcaputil.BuildMessageDisplayNodes(view)
-	nodes := pcapDisplayFieldNodes(sourceID, projected)
-	return nodes, truncated, strings.Join(diagnostics, "; ")
+	return pcapDisplayFieldNodes(sourceID, projected), truncated
 }
 
 func pcapFirstNonEmpty(values ...string) string {
@@ -198,10 +179,7 @@ func (s *Server) GetPCAPPacketDetail(ctx context.Context, req *ypb.GetPCAPPacket
 		if err != nil {
 			return nil, pcapRPCError(err)
 		}
-		nodes, nodesTruncated, nodesDiagnostic := pcapDecodeMessageNodes(message, sourceID, view)
-		if nodesDiagnostic != "" {
-			decodeDiagnostics = append(decodeDiagnostics, nodesDiagnostic)
-		}
+		nodes, nodesTruncated := pcapBuildMessageNodes(message, sourceID, view)
 		completedIn := uint64(message.CompletedInPacketID)
 		if completedIn == 0 && source.CompletedIn != nil {
 			completedIn = source.CompletedIn.Number

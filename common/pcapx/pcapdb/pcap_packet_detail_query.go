@@ -66,6 +66,22 @@ func (h *DatabaseHandle) PacketDetailMessages(packetID uint, budget int) (comple
 	if err != nil {
 		return nil, nil, err
 	}
+	for i := range completed {
+		message := &completed[i]
+		if len(message.FieldsJSON) > 0 {
+			if err := decodeProtocolFields(message.FieldsJSON, &message.Fields); err != nil {
+				message.DecodeError = appendDecodeDiagnostic(message.DecodeError, "fields", err)
+			}
+		}
+		if len(message.SessionJSON) > 0 {
+			if err := decodeProtocolFields(message.SessionJSON, &message.Session); err != nil {
+				message.DecodeError = appendDecodeDiagnostic(message.DecodeError, "session", err)
+			}
+		}
+		// The caller receives owned maps. Returning the JSON BLOBs as well would
+		// duplicate the entire snapshot for every detail response.
+		message.FieldsJSON, message.SessionJSON = nil, nil
+	}
 	const relatedSelection = "pm.id,pm.protocol,pm.summary,pm.completeness,pm.completed_in_packet_id," + relatedSource + " AS source_bytes"
 	err = scoped.Raw("SELECT "+relatedSelection+relatedFrom+" ORDER BY pm.id LIMIT 1001", packetID, packetID).
 		Scan(&related).Error
@@ -73,4 +89,12 @@ func (h *DatabaseHandle) PacketDetailMessages(packetID uint, budget int) (comple
 		return nil, nil, err
 	}
 	return completed, related, nil
+}
+
+func appendDecodeDiagnostic(existing, label string, err error) string {
+	current := label + ": " + err.Error()
+	if existing == "" {
+		return current
+	}
+	return existing + "; " + current
 }

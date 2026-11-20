@@ -217,14 +217,17 @@ func TestPCAPGRPCGetPacketDetailLargeMessage(t *testing.T) {
 	require.True(t, next.GetEOF())
 }
 
-func TestPCAPDecodeMessageNodesDoesNotAppendParsedFieldsFallback(t *testing.T) {
-	nodes, truncated, diagnostic := pcapDecodeMessageNodes(pcapdb.ProtocolMessage{
-		FieldsJSON:  []byte(`{"Method":"GET","Nested":{"Code":200}}`),
-		SessionJSON: []byte(`{broken`),
-	}, "message:1", pcaputil.MessageDisplayInput{})
+func TestPCAPBuildMessageNodesUsesDecodedSnapshotsWithoutParsedFields(t *testing.T) {
+	wire := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+	nodes, truncated := pcapBuildMessageNodes(pcapdb.ProtocolMessage{
+		Fields:  map[string]any{"Method": "GET"},
+		Session: map[string]any{},
+	}, "message:1", pcaputil.MessageDisplayInput{
+		Protocol: "http", Status: "decoded", Prefix: wire, Length: len(wire),
+	})
 	require.False(t, truncated)
-	require.Contains(t, diagnostic, "session fields")
-	require.Empty(t, nodes)
+	require.NotNil(t, findPCAPFieldNode(nodes, "HTTP"))
+	require.NotNil(t, findPCAPFieldNode(nodes, "Method"))
 	require.Nil(t, findPCAPFieldNode(nodes, "Parsed fields"))
 }
 
@@ -273,8 +276,7 @@ func TestPCAPGRPCMessageDetailRestoresTLSRange(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, view.Prefix, budget)
 		require.Zero(t, left)
-		nodes, partial, diagnostics := pcapDecodeMessageNodes(completed[0], message.SourceID, view)
-		require.Empty(t, diagnostics)
+		nodes, partial := pcapBuildMessageNodes(completed[0], message.SourceID, view)
 		require.Equal(t, budget < 5, partial)
 		require.Equal(t, budget == 5, findPCAPFieldNode(nodes, "tls.record.version") != nil)
 	}

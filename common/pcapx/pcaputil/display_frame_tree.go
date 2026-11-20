@@ -90,27 +90,17 @@ func BuildFrameDisplayNodes(input FrameDisplayInput) []DisplayNode {
 			fields = []DisplayNode{leaf("Version", v.Version, 0, 1), leaf("Traffic class", v.TrafficClass, 0, 2), leaf("Flow label", v.FlowLabel, 1, 4), leaf("Payload length", v.Length, 4, 6), leaf("Next header", v.NextHeader, 6, 7), leaf("Hop limit", v.HopLimit, 7, 8), leaf("Source address", v.SrcIP, 8, 24), leaf("Destination address", v.DstIP, 24, 40)}
 			summary = fmt.Sprintf("%s → %s · %s · Hop limit %d", v.SrcIP, v.DstIP, v.NextHeader, v.HopLimit)
 		case *layers.TCP:
-			flags := []string{}
-			for _, f := range []struct {
-				set  bool
-				name string
-			}{{v.FIN, "FIN"}, {v.SYN, "SYN"}, {v.RST, "RST"}, {v.PSH, "PSH"}, {v.ACK, "ACK"}, {v.URG, "URG"}, {v.ECE, "ECE"}, {v.CWR, "CWR"}, {v.NS, "NS"}} {
-				if f.set {
-					flags = append(flags, f.name)
-				}
-			}
+			flags := TCPFlagNames(v)
 			fields = []DisplayNode{leaf("Source port", uint16(v.SrcPort), 0, 2), leaf("Destination port", uint16(v.DstPort), 2, 4), leaf("Sequence number", v.Seq, 4, 8), leaf("Acknowledgment number", v.Ack, 8, 12), leaf("Header length", int(v.DataOffset)*4, 12, 13), leaf("Flags", strings.Join(flags, ", "), 12, 14), leaf("Window", v.Window, 14, 16), leaf("Checksum", fmt.Sprintf("0x%04x", v.Checksum), 16, 18), leaf("Urgent pointer", v.Urgent, 18, 20)}
-			flagSummary := "No flags"
-			if len(flags) > 0 {
-				flagSummary = "[" + strings.Join(flags, ", ") + "]"
-			}
-			summary = fmt.Sprintf("%d → %d · %s · Seq=%d Ack=%d Win=%d", v.SrcPort, v.DstPort, flagSummary, v.Seq, v.Ack, v.Window)
+			summary = fmt.Sprintf("%s · %s · Seq=%d Ack=%d Win=%d Len=%d",
+				TCPTransportPorts(v).Arrow(), TCPFlagBracketed(v), v.Seq, v.Ack, v.Window, TCPPayloadLength(v))
 			if len(header) > 20 {
 				fields = append(fields, leaf("Options", header[20:], 20, len(header)))
 			}
 		case *layers.UDP:
 			fields = []DisplayNode{leaf("Source port", uint16(v.SrcPort), 0, 2), leaf("Destination port", uint16(v.DstPort), 2, 4), leaf("Length", v.Length, 4, 6), leaf("Checksum", fmt.Sprintf("0x%04x", v.Checksum), 6, 8)}
-			summary = fmt.Sprintf("%d → %d · Len=%d", v.SrcPort, v.DstPort, v.Length)
+			summary = fmt.Sprintf("%s · Len=%d · Payload=%d",
+				UDPTransportPorts(v).Arrow(), v.Length, UDPPayloadLength(v))
 		case *layers.ARP:
 			switch v.Operation {
 			case layers.ARPRequest:
