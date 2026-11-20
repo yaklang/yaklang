@@ -107,7 +107,6 @@ func (b *singleFileBuilder) visitSwitchStatement(selection *cppparser.SelectionS
 	segments := b.splitSwitchSegments(statements[0])
 
 	builder := b.BuildSwitch()
-	builder.DirectBodyMerge = true
 	builder.BuildCondition(func() ssa.Value {
 		return b.visitCondition(selection.Condition())
 	})
