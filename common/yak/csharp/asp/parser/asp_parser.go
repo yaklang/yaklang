@@ -305,16 +305,6 @@ func (s *AspDocumentsContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AspDocumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspDocuments(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) AspDocuments() (localctx IAspDocumentsContext) {
 	this := p
 	_ = this
@@ -519,16 +509,6 @@ func (s *AspDocumentContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AspDocumentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AspDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspDocument(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) AspDocument() (localctx IAspDocumentContext) {
@@ -742,16 +722,6 @@ func (s *AspScriptContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AspScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspScript(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) AspScript() (localctx IAspScriptContext) {
 	this := p
 	_ = this
@@ -898,16 +868,6 @@ func (s *AspDirectiveContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AspDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspDirective(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) AspDirective() (localctx IAspDirectiveContext) {
 	this := p
 	_ = this
@@ -1039,16 +999,6 @@ func (s *AspDeclarationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AspDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AspDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) AspDeclaration() (localctx IAspDeclarationContext) {
@@ -1184,16 +1134,6 @@ func (s *AspExpressionContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AspExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) AspExpression() (localctx IAspExpressionContext) {
 	this := p
 	_ = this
@@ -1325,16 +1265,6 @@ func (s *AspDatabindContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AspDatabindContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AspDatabindContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspDatabind(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) AspDatabind() (localctx IAspDatabindContext) {
@@ -1470,16 +1400,6 @@ func (s *AspScriptletContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AspScriptletContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitAspScriptlet(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) AspScriptlet() (localctx IAspScriptletContext) {
 	this := p
 	_ = this
@@ -1594,16 +1514,6 @@ func (s *BlobContentContext) GetRuleContext() antlr.RuleContext {
 
 func (s *BlobContentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *BlobContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitBlobContent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) BlobContent() (localctx IBlobContentContext) {
@@ -1858,16 +1768,6 @@ func (s *HtmlElementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlElementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitHtmlElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) HtmlElement() (localctx IHtmlElementContext) {
@@ -2160,16 +2060,6 @@ func (s *HtmlCloseElementContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlCloseElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitHtmlCloseElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) HtmlCloseElement() (localctx IHtmlCloseElementContext) {
 	this := p
 	_ = this
@@ -2267,16 +2157,6 @@ func (s *HtmlTagContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlTagContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlTagContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitHtmlTag(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) HtmlTag() (localctx IHtmlTagContext) {
@@ -2391,16 +2271,6 @@ func (s *HtmlAttributeContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlAttributeContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlAttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitHtmlAttribute(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
@@ -2649,16 +2519,6 @@ func (s *HtmlContentContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitHtmlContent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) HtmlContent() (localctx IHtmlContentContext) {
 	this := p
 	_ = this
@@ -2795,16 +2655,6 @@ func (s *HtmlMiscContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlMiscContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitHtmlMisc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *ASPParser) HtmlMisc() (localctx IHtmlMiscContext) {
 	this := p
 	_ = this
@@ -2900,16 +2750,6 @@ func (s *ScriptContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ScriptContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitScript(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) Script() (localctx IScriptContext) {
@@ -3010,16 +2850,6 @@ func (s *StyleContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StyleContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StyleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case ASPParserVisitor:
-		return t.VisitStyle(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *ASPParser) Style() (localctx IStyleContext) {

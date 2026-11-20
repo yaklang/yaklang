@@ -481,16 +481,6 @@ func (s *JspDocumentsContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *JspDocumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspDocuments(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
 	this := p
 	_ = this
@@ -726,16 +716,6 @@ func (s *JspDocumentContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *JspDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspDocument(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
 	this := p
 	_ = this
@@ -881,16 +861,6 @@ func (s *JspStartContext) GetRuleContext() antlr.RuleContext {
 
 func (s *JspStartContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *JspStartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspStart(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) JspStart() (localctx IJspStartContext) {
@@ -1162,16 +1132,6 @@ func (s *JspElementsContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *JspElementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspElements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 	this := p
 	_ = this
@@ -1349,16 +1309,6 @@ func (s *HtmlMiscsContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlMiscsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlMiscs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlMiscs() (localctx IHtmlMiscsContext) {
 	this := p
 	_ = this
@@ -1494,16 +1444,6 @@ func (s *JspScriptContext) GetRuleContext() antlr.RuleContext {
 
 func (s *JspScriptContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *JspScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspScript(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) JspScript() (localctx IJspScriptContext) {
@@ -1673,16 +1613,6 @@ func (s *HtmlElementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlElementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
@@ -1899,16 +1829,6 @@ func (s *HtmlCloseElementContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlCloseElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlCloseElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlCloseElement() (localctx IHtmlCloseElementContext) {
 	this := p
 	_ = this
@@ -2066,16 +1986,6 @@ func (s *HtmlBeginContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlBeginContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlBeginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlBegin(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
@@ -2237,16 +2147,6 @@ func (s *HtmlBeginElementContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlBeginElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlBeginElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlBeginElement() (localctx IHtmlBeginElementContext) {
 	this := p
 	_ = this
@@ -2354,16 +2254,6 @@ func (s *TagJspFragmentContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TagJspFragmentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TagJspFragmentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitTagJspFragment(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) TagJspFragment() (localctx ITagJspFragmentContext) {
@@ -2494,16 +2384,6 @@ func (s *HtmlTagContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlTagContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlTagContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlTag(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
@@ -2686,16 +2566,6 @@ func (s *JspDirectiveContext) GetRuleContext() antlr.RuleContext {
 
 func (s *JspDirectiveContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *JspDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspDirective(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
@@ -2931,16 +2801,6 @@ func (s *HtmlContentsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlContentsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlContentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlContents(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
@@ -3220,16 +3080,6 @@ func (s *HtmlContentContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlContent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlContent() (localctx IHtmlContentContext) {
 	this := p
 	_ = this
@@ -3360,16 +3210,6 @@ func (s *JspIfBlockContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *JspIfBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspIfBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) JspIfBlock() (localctx IJspIfBlockContext) {
 	this := p
 	_ = this
@@ -3465,16 +3305,6 @@ func (s *ElExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ElExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ElExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitElExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) ElExpression() (localctx IElExpressionContext) {
@@ -3610,16 +3440,6 @@ func (s *PureHTMLAttributeContext) HtmlAttributeName() IHtmlAttributeNameContext
 	return t.(IHtmlAttributeNameContext)
 }
 
-func (s *PureHTMLAttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitPureHTMLAttribute(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type EqualHTMLAttributeContext struct {
 	HtmlAttributeContext
 }
@@ -3674,16 +3494,6 @@ func (s *EqualHTMLAttributeContext) HtmlAttributeValue() IHtmlAttributeValueCont
 	return t.(IHtmlAttributeValueContext)
 }
 
-func (s *EqualHTMLAttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitEqualHTMLAttribute(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type JSPExpressionAttributeContext struct {
 	HtmlAttributeContext
 }
@@ -3716,16 +3526,6 @@ func (s *JSPExpressionAttributeContext) JspExpression() IJspExpressionContext {
 	}
 
 	return t.(IJspExpressionContext)
-}
-
-func (s *JSPExpressionAttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJSPExpressionAttribute(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
@@ -3865,16 +3665,6 @@ func (s *HtmlAttributeNameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlAttributeNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlAttributeNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlAttributeName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlAttributeName() (localctx IHtmlAttributeNameContext) {
@@ -4044,16 +3834,6 @@ func (s *HtmlAttributeValueContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlAttributeValueContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlAttributeValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlAttributeValue(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
@@ -4285,16 +4065,6 @@ func (s *HtmlAttributeValueElementContext) ToStringTree(ruleNames []string, reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlAttributeValueElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlAttributeValueElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueElementContext) {
 	this := p
 	_ = this
@@ -4429,16 +4199,6 @@ func (s *HtmlTagNameContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlTagNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlTagName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlTagName() (localctx IHtmlTagNameContext) {
 	this := p
 	_ = this
@@ -4529,16 +4289,6 @@ func (s *HtmlChardataContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlChardataContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlChardataContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlChardata(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) HtmlChardata() (localctx IHtmlChardataContext) {
@@ -4701,16 +4451,6 @@ func (s *HtmlMiscContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlMiscContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlMisc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlMisc() (localctx IHtmlMiscContext) {
 	this := p
 	_ = this
@@ -4843,16 +4583,6 @@ func (s *HtmlCommentContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlCommentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitHtmlComment(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) HtmlComment() (localctx IHtmlCommentContext) {
 	this := p
 	_ = this
@@ -4943,16 +4673,6 @@ func (s *XhtmlCDATAContext) GetRuleContext() antlr.RuleContext {
 
 func (s *XhtmlCDATAContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *XhtmlCDATAContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitXhtmlCDATA(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) XhtmlCDATA() (localctx IXhtmlCDATAContext) {
@@ -5134,16 +4854,6 @@ func (s *DtdContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) st
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DtdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitDtd(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) Dtd() (localctx IDtdContext) {
 	this := p
 	_ = this
@@ -5305,16 +5015,6 @@ func (s *DtdElementNameContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DtdElementNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitDtdElementName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) DtdElementName() (localctx IDtdElementNameContext) {
 	this := p
 	_ = this
@@ -5402,16 +5102,6 @@ func (s *PublicIdContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *PublicIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitPublicId(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) PublicId() (localctx IPublicIdContext) {
 	this := p
 	_ = this
@@ -5497,16 +5187,6 @@ func (s *SystemIdContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SystemIdContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SystemIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitSystemId(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) SystemId() (localctx ISystemIdContext) {
@@ -5694,16 +5374,6 @@ func (s *XmlContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) st
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *XmlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitXml(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) Xml() (localctx IXmlContext) {
 	this := p
 	_ = this
@@ -5885,16 +5555,6 @@ func (s *JspScriptletContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *JspScriptletContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspScriptlet(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) JspScriptlet() (localctx IJspScriptletContext) {
 	this := p
 	_ = this
@@ -6019,16 +5679,6 @@ func (s *JspExpressionContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *JspExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJspExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *JSPParser) JspExpression() (localctx IJspExpressionContext) {
 	this := p
 	_ = this
@@ -6123,16 +5773,6 @@ func (s *ScriptletStartContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ScriptletStartContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ScriptletStartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitScriptletStart(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) ScriptletStart() (localctx IScriptletStartContext) {
@@ -6230,16 +5870,6 @@ func (s *ScriptletContentContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ScriptletContentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ScriptletContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitScriptletContent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) ScriptletContent() (localctx IScriptletContentContext) {
@@ -6345,16 +5975,6 @@ func (s *JavaScriptContext) GetRuleContext() antlr.RuleContext {
 
 func (s *JavaScriptContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *JavaScriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitJavaScript(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) JavaScript() (localctx IJavaScriptContext) {
@@ -6465,16 +6085,6 @@ func (s *StyleContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StyleContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StyleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case JSPParserVisitor:
-		return t.VisitStyle(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *JSPParser) Style() (localctx IStyleContext) {

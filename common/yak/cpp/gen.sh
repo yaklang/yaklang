@@ -15,4 +15,4 @@
 set -e
 rm -f ./parser/*.tokens
 rm -f ./parser/*.interp
-../antlr4util/antlr4 -Dlanguage=Go -package cppparser ./CPPLexer.g4 ./CPPParser.g4 -o parser -no-listener -visitor
+../antlr4util/antlr4 -Dlanguage=Go -package cppparser ./CPPLexer.g4 ./CPPParser.g4 -o parser -no-listener -no-visitor
