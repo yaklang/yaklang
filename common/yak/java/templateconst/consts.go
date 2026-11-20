@@ -5,4 +5,5 @@ package templateconst
 const (
 	JAVA_REQUEST_PATH          = "javax.servlet.http"
 	JAVA_UNESCAPE_OUTPUT_PRINT = "print"
+	JAVA_TEMPLATE_SERVER_NAME  = "_JavaTemplateService"
 )

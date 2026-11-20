@@ -29,8 +29,8 @@ func (sm *SafeMapWithKey[K, V]) Get(key K) (V, bool) {
 		return zero, false
 	}
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
 	val, ok := sm.m[key]
+	sm.mu.RUnlock()
 	return val, ok
 }
 
@@ -61,15 +61,15 @@ func (sm *SafeMapWithKey[K, V]) GetOrLoad(key K, f func() (V, error)) (V, error)
 
 func (sm *SafeMapWithKey[K, V]) Have(key K) bool {
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
 	_, ok := sm.m[key]
+	sm.mu.RUnlock()
 	return ok
 }
 
 func (sm *SafeMapWithKey[K, V]) Set(key K, value V) {
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
 	sm.m[key] = value
+	sm.mu.Unlock()
 }
 
 // Update runs fn while holding the write lock, so a read-and-replace of one
@@ -125,11 +125,11 @@ func (sm *SafeMapWithKey[K, V]) Keys() []K {
 		return nil
 	}
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
 	keys := make([]K, 0, len(sm.m))
 	for k := range sm.m {
 		keys = append(keys, k)
 	}
+	sm.mu.RUnlock()
 	return keys
 }
 
@@ -138,11 +138,11 @@ func (sm *SafeMapWithKey[K, V]) Values() []V {
 		return nil
 	}
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
 	values := make([]V, 0, len(sm.m))
 	for _, v := range sm.m {
 		values = append(values, v)
 	}
+	sm.mu.RUnlock()
 	return values
 }
 
@@ -151,8 +151,8 @@ func (sm *SafeMapWithKey[K, V]) Delete(key K) {
 		return
 	}
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
 	delete(sm.m, key)
+	sm.mu.Unlock()
 }
 
 func (sm *SafeMapWithKey[K, V]) ForEach(f func(key K, value V) bool) {
@@ -199,11 +199,11 @@ func (sm *SafeMapWithKey[K, V]) GetAll() map[K]V {
 		return nil
 	}
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
 	ret := make(map[K]V, len(sm.m))
 	for k, v := range sm.m {
 		ret[k] = v
 	}
+	sm.mu.RUnlock()
 	return ret
 }
 
@@ -212,12 +212,13 @@ func (sm *SafeMapWithKey[K, V]) Count() int {
 		return 0
 	}
 	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	return len(sm.m)
+	n := len(sm.m)
+	sm.mu.RUnlock()
+	return n
 }
 
 func (sm *SafeMapWithKey[K, V]) Clear() {
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
 	sm.m = make(map[K]V)
+	sm.mu.Unlock()
 }

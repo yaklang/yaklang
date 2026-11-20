@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/java/template2java"
 	"github.com/yaklang/yaklang/common/yak/java/templateconst"
 
 	"github.com/gobwas/glob"
@@ -747,8 +746,8 @@ func init() {
 			// the template service without forcing the body to load. The marker
 			// test also covers the exact name, which is the generated method
 			// itself when the body is materialized.
-			if strings.Contains(fn.GetName(), template2java.JAVA_TEMPLATE_SERVER_NAME) ||
-				strings.Contains(fn.GetVerboseName(), template2java.JAVA_TEMPLATE_SERVER_NAME) {
+			if strings.Contains(fn.GetName(), templateconst.JAVA_TEMPLATE_SERVER_NAME) ||
+				strings.Contains(fn.GetVerboseName(), templateconst.JAVA_TEMPLATE_SERVER_NAME) {
 				return true
 			}
 			for _, paramID := range fn.Params {
