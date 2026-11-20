@@ -460,6 +460,11 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 			base := strings.TrimSuffix(pattern, "/")
 			return []string{base, base + "/**"}
 		}
+		// "dir/**" means the directory and its contents. The directory walk
+		// asks about "dir" itself (SkipDir), so the bare prefix must match too.
+		if strings.HasSuffix(pattern, "/**") {
+			return []string{pattern, strings.TrimSuffix(pattern, "/**")}
+		}
 		return []string{pattern}
 	}
 
@@ -486,13 +491,26 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 		if hasExcludedDirSegment(path, defaultDirNames) {
 			return true
 		}
-		for _, g := range compiled {
-			if g.Match(path) {
-				return true
-			}
+		if matchCompiled(compiled, path) {
+			return true
+		}
+		// A local scan rooted at its target presents paths as "/sapi/a.c",
+		// while users write patterns relative to that root ("sapi/**").
+		// Match the root-relative form too, or the pattern never applies.
+		if trimmed := strings.TrimPrefix(path, "/"); trimmed != path {
+			return matchCompiled(compiled, trimmed)
 		}
 		return false
 	}
+}
+
+func matchCompiled(patterns []glob.Glob, path string) bool {
+	for _, g := range patterns {
+		if g.Match(path) {
+			return true
+		}
+	}
+	return false
 }
 
 // hasExcludedDirSegment reports whether any directory segment of path is one

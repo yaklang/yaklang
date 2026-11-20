@@ -271,3 +271,17 @@ func TestIsDefaultCompileExcludeDirName(t *testing.T) {
 	require.True(t, IsDefaultCompileExcludeDirName("testing"))
 	require.False(t, IsDefaultCompileExcludeDirName("contest"))
 }
+
+// A local scan rooted at its target reports paths as "/sapi/a.c"; a user who
+// writes "sapi/**" means paths relative to that root. Both spellings must
+// match, otherwise `yak ssa-compile --exclude-file 'sapi/**'` silently
+// compiles the whole tree.
+func TestBuildCompileExcludeFuncMatchesRootRelativePaths(t *testing.T) {
+	f := BuildCompileExcludeFunc([]string{"sapi/**"}, "", true)
+
+	require.True(t, f("/sapi/apache2handler/sapi_apache2.c"), "root-relative path")
+	require.True(t, f("sapi/apache2handler/sapi_apache2.c"), "already relative")
+	require.True(t, f("/sapi"), "directory itself")
+	require.False(t, f("/Zend/zend.c"))
+	require.False(t, f("/ext/sapi/thing.c"), "another sapi segment is not the root one")
+}
