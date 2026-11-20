@@ -3,6 +3,9 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/c2ssa"
+
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -370,4 +373,20 @@ int main() {
 }
 `, []string{"10", "make(Pointer)"}, t)
 	})
+}
+
+// A cast whose type is a typedef or a struct/union tag may carry a unary
+// operator on its operand. php-src relies on it ((zval*)-1 in
+// zend_builtin_functions.c / zend_hash.c, (zend_uchar)~*p in
+// zend_operators.c), and the grammar used to accept only an expression there.
+func TestCastWithUnaryOperand(t *testing.T) {
+	parse := func(src string) error {
+		_, err := c2ssa.Frontend(src, nil)
+		return err
+	}
+	require.NoError(t, parse("int f(void) { return ((union _z*)-1) == 0; }"))
+	require.NoError(t, parse("typedef union { int i; double d; } zval;\nint f(void) { return ((zval*)-1) == 0; }"))
+	require.NoError(t, parse("typedef unsigned char zend_uchar;\nint f(char *s) { zend_uchar not = (zend_uchar) ~*s; return not; }"))
+	require.NoError(t, parse("typedef unsigned char u8;\nint f(char *s) { u8 m = (u8)!*s; return m; }"))
+	require.NoError(t, parse("typedef int i32;\nint f(int *p) { return (i32)+*p; }"))
 }

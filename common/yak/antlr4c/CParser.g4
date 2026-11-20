@@ -158,9 +158,17 @@ unaryExpression
     ;
 
 castExpression
-    : '__extension__'? '(' eos* typeName eos* ')' eos* castExpression
+    : '__extension__'? '(' eos* typeName eos* ')' eos* castOperand
     | unaryExpression
     | DigitSequence
+    ;
+
+// Operand of an explicit cast. C permits a unary operator here, and code such
+// as `(zval*)-1`, `(zend_uchar)~*p` or `(int)!x` relies on it. Builtin-type
+// casts also reach `expression`, but a typedef or struct/union tag cannot.
+castOperand
+    : (Plus | Minus | Tilde | Not | Caret) eos* castOperand
+    | castExpression
     ;
 
 // Keyword-only casts. Used by coreExpression so `(void) x;` / `(int) y`

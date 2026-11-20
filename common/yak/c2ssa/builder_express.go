@@ -1191,8 +1191,8 @@ func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isL
 	var left *ssa.Variable
 	if t := ast.TypeName(); t != nil {
 		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
-		if c := ast.CastExpression(); c != nil {
-			right, left = b.buildCastExpression(c.(*cparser.CastExpressionContext), isLeft)
+		if c := ast.CastOperand(); c != nil {
+			right, left = b.buildCastOperand(c.(*cparser.CastOperandContext), isLeft)
 		}
 		if right != nil && !isLeft && ssatype != nil {
 			existingType := right.GetType()
@@ -1217,6 +1217,42 @@ func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isL
 	}
 
 	return right, left
+}
+
+// buildCastOperand handles `(type)-x`, `(type)~*p`, `(type)!x` and the plain
+// `(type)x` form. The unary variants need their own rule: the operand of a cast
+// whose type is a typedef or a struct/union tag is not an expression in the
+// grammar, so `(zval*)-1` and `(zend_uchar)~*p` failed to parse.
+func (b *astbuilder) buildCastOperand(ast *cparser.CastOperandContext, isLeft bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(&ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if c := ast.CastExpression(); c != nil {
+		return b.buildCastExpression(c.(*cparser.CastExpressionContext), isLeft)
+	}
+
+	var value ssa.Value
+	var left *ssa.Variable
+	if c := ast.CastOperand(); c != nil {
+		value, left = b.buildCastOperand(c.(*cparser.CastOperandContext), false)
+	}
+	if value == nil {
+		return nil, left
+	}
+	switch {
+	case ast.Minus() != nil:
+		return b.EmitUnOp(ssa.OpNeg, value), nil
+	case ast.Plus() != nil:
+		return b.EmitUnOp(ssa.OpPlus, value), nil
+	case ast.Tilde() != nil:
+		return b.EmitUnOp(ssa.OpBitwiseNot, value), nil
+	case ast.Not() != nil:
+		return b.EmitUnOp(ssa.OpNot, value), nil
+	case ast.Caret() != nil:
+		// Unary ^ is a GCC extension; keep the operand value.
+		return value, nil
+	}
+	return value, left
 }
 
 func (b *astbuilder) buildLeftExpression(ast *cparser.LeftExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
