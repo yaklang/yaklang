@@ -12,14 +12,29 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// VariadicArgsBinding optionally supplies the whole positional vector. Args
-// still contains the source arguments, not a synthetic leading container.
-// A frontend may specify the value of an omitted positional member as well.
+// VariadicArgsBinding names the call binding that carries the complete
+// positional vector for the final variadic formal parameter.
+//
+// Most frontends pass one Arg per formal slot and bind a variadic member like
+// fn(a, ...rest)[0] directly to Args[objectIndex+offset]. A shell call has no
+// fixed arity: the callee owns one vector ($@) and $1, $#, $* are members of
+// it. A shell frontend therefore sets this binding to the vector it already
+// built, so member reads and top-def resolution share one value instead of
+// reconstructing the vector from the flat Args list.
+//
+// Args still holds the source arguments, not a synthetic leading container.
+// Leaving the binding unset keeps the ordinary Args ABI for every frontend.
 const VariadicArgsBinding = "@variadic.args"
+
+// VariadicDefaultBinding names the call binding used when the positional vector
+// has no member for a requested key. Shells expand an omitted position to the
+// empty string; without this binding the member would stay undefined.
 const VariadicDefaultBinding = "@variadic.default"
 
-// PackedVariadic returns the aggregate for the final formal parameter only.
-// Calls without an explicit pack retain the ordinary Args ABI.
+// PackedVariadic returns the explicit positional vector attached to the call.
+// It only applies to the final formal parameter of a variadic function. Calls
+// without the binding keep the ordinary Args ABI, and a non-variadic call or a
+// non-final formal index never reaches the packed vector.
 func (c *Call) PackedVariadic(formalIndex int) (Value, bool) {
 	id := c.Binding[VariadicArgsBinding]
 	if id == 0 {
