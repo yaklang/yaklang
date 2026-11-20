@@ -123,6 +123,15 @@ func handleToolCallResult(
 		invoker.AddToTimeline("[TOOL_PROTOCOL_ERROR]", errMsg)
 		emitToolResultStatus(loop, toolPayload, false)
 
+		var securityDenied *aicommon.SecurityRuleDeniedError
+		if errors.As(err, &securityDenied) {
+			feedback := securityDenied.RetryFeedback()
+			invoker.AddToTimeline("[SECURITY_DENIED]", feedback)
+			operator.Feedback(feedback)
+			operator.Continue()
+			return
+		}
+
 		resolved := loop.ResolveIdentifier(toolPayload)
 		var validationErr *directToolValidationError
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -160,6 +169,15 @@ func handleToolCallResult(
 		invoker.AddToTimeline("error", msg)
 		emitToolResultStatus(loop, toolPayload, false)
 		operator.Feedback(directToolRetryFeedback(loop, toolPayload, msg, true))
+		operator.Continue()
+		return
+	}
+
+	if toolResultSecurityDenied(result) {
+		feedback := aicommon.SecurityRuleDeniedRetryFeedback(toolPayload, "", "", "", "security policy blocked the command before execution")
+		invoker.AddToTimeline("[SECURITY_DENIED]", feedback)
+		emitToolResultStatus(loop, toolPayload, false)
+		operator.Feedback(feedback)
 		operator.Continue()
 		return
 	}
@@ -211,4 +229,22 @@ func handleToolCallResult(
 		operator.Feedback(feedbackMsg)
 	}
 	operator.Continue()
+}
+
+// toolResultSecurityDenied recognizes the precheck result shape produced by
+// commandcheck.BlockedResult. That path is a successful callback with a
+// semantic failure payload, so it would otherwise flow into the generic
+// "inspect and retry" branch and invite a bypass.
+func toolResultSecurityDenied(result *aitool.ToolResult) bool {
+	if result == nil {
+		return false
+	}
+	data := utils.InterfaceToGeneralMap(result.Data)
+	if len(data) == 0 {
+		return false
+	}
+	if utils.InterfaceToBoolean(data["security_denied"]) {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(utils.InterfaceToString(data["termination_reason"])), "blocked_by_bash_guard")
 }
