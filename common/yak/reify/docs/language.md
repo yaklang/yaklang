@@ -89,6 +89,20 @@ type Symbol struct {
 - Rust 的 demangle 会省略 crate hash。展示名冲突时写成 `name@0xADDRESS`，不会把两个单态化合并成一个 SSA 函数。
 - `Convention` 让 `asm2lowir` 不必认识具体语言：它只检查语言是否提供覆盖，以及该函数是否被标记为 `platform`。
 
+### Go 名称拆分
+
+`loader/language/golang.ParseInstance` 把 pclntab 名称拆成 `Package`、`Receiver`、`Function`、`Closure`、`Family`、`TypeArgs` 与 `Generic`。规则与 `debug/gosym` 一致：先掩码方括号内容，再按最后一个 `/` 之后的首个 `.` 找包路径，按两个不同 `.` 找接收者。
+
+`Family` 把深度零的方括号组替换为 `[T]`：
+
+```text
+pkg.F[go.shape.int]                              -> pkg.F[T]
+pkg.(*OrderedMap[go.shape.string,go.shape.int64]).Add -> pkg.(*OrderedMap[T]).Add
+pkg.F[go.shape.int].func1                        -> pkg.F[T].func1
+```
+
+`type:` 与 `go:` 前缀是编译器保留名，方括号属于类型语法，不做拆分。`ShapeName` 去掉 `go.shape.` 前缀；`IsShapeHash` 识别 64 位十六进制哈希形状。
+
 ## ABI：平台默认与语言覆盖
 
 默认调用约定属于平台，不属于 C 层。SysV/Win64/AArch64 的参数寄存器、栈方向与 callee-save 集合由 `Architecture` 与 `OS` 的 profile 给出；C 代码和手写汇编都遵循它。C 语言层因此不提供 `ABI`，只提供默认标签和字符串模型。Rust/Go 只覆盖自己恢复出的函数，不改变同一地址空间里的其他函数。
@@ -285,5 +299,8 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | `TestLanguageNamesAndFunctionFactsRoundTrip` | 含逗号/箭头/空格的 Rust 名与函数级 ABI 的文本往返 |
 | `TestLanguageFactsArePerFunction` | 语言 ABI 不落到 cgo、平台约定或未标记地址 |
 | `TestVersionAndABI` / `TestFuncSizeTrimsOnlyAlignmentFill` / `TestPclntabRejectsUnboundedCount` | Go 版本、ABI、填充剥离与坏表拒绝 |
+| `TestParseInstanceSplitsGenericNames` | 泛型函数、泛型方法、闭包、切片/数组/结构体实参、保留名 |
+| `TestParseInstanceKeepsFamilyStable` | 族键幂等；同族实例共享键；不同方法不共享 |
+| `FuzzParseInstance` | 任意名称不 panic，族键重解析不变 |
 
 `FuzzPCLNTab` 对 pclntab 头部做模糊测试，要求不 panic。
