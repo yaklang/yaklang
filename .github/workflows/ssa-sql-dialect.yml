@@ -52,7 +52,7 @@ jobs:
           --health-retries 30
     env:
       YAK_SSA_CONFORMANCE_PG_DSN: postgres://postgres:postgres@127.0.0.1:5432/yaklang_ssa?sslmode=disable
-      YAK_SSA_CONFORMANCE_MYSQL_DSN: mysql://root:root@tcp(127.0.0.1:3306)/yaklang_ssa
+      YAK_SSA_CONFORMANCE_MYSQL_DSN: mysql://root:root@tcp(127.0.0.1:3306)/yaklang_ssa?timeout=5s
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5

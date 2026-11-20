@@ -571,8 +571,8 @@ func irConstPoolHasProgram(ctx context.Context, db *gorm.DB, progName string) bo
 		ctx = context.Background()
 	}
 	var one int
-	row := nativeQueryRowContext(db, ctx,
-		`SELECT 1 FROM `+QuoteIdent(db, TableIrConstPool)+` WHERE program_name = ? LIMIT 1`, progName)
+	query := bindSQLPlaceholdersDB(db, `SELECT 1 FROM `+QuoteIdent(db, TableIrConstPool)+` WHERE program_name = ? LIMIT 1`)
+	row := nativeQueryRowContext(db, ctx, query, progName)
 	if row == nil {
 		return false
 	}
@@ -592,8 +592,8 @@ func irConstTableHasProgram(ctx context.Context, db *gorm.DB, progName string) b
 		ctx = context.Background()
 	}
 	var one int
-	row := nativeQueryRowContext(db, ctx,
-		`SELECT 1 FROM `+QuoteIdent(db, TableIrConsts)+` WHERE program_name = ? LIMIT 1`, progName)
+	query := bindSQLPlaceholdersDB(db, `SELECT 1 FROM `+QuoteIdent(db, TableIrConsts)+` WHERE program_name = ? LIMIT 1`)
+	row := nativeQueryRowContext(db, ctx, query, progName)
 	if row == nil {
 		return false
 	}

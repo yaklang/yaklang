@@ -1,9 +1,11 @@
 package ssadb
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -98,11 +100,17 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 		ProgramKind: Application,
 	}).Error)
 
-	// Const pool: intern, flush, and resolve through the quoted read path.
-	const text = "conformance-const"
+	// Const pool: intern a value longer than IrCodeInlineConstStringLimit so the
+	// search cannot fall back to ir_codes.string, then verify the pool probe and
+	// both read paths. A long value also misses the short-const preload cache, so
+	// GetIrConstValue must execute its single-row query.
+	const textPrefix = "conformance-const-"
+	text := textPrefix + strings.Repeat("x", IrCodeInlineConstStringLimit)
 	constID := InternIrConst(program, IrConstKindString, text)
 	require.NotZero(t, constID)
 	require.NoError(t, GetIrConstPool(program).Flush(db))
+	require.True(t, irConstPoolHasProgram(context.Background(), db, program),
+		"%s: const pool probe must use dialect placeholders", backend)
 	value := GetIrConstValue(db, program, constID)
 	require.NotNil(t, value)
 	require.Equal(t, text, value.Text)
@@ -115,7 +123,9 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 		ConstType:   irCodeConstTypeNormal,
 		ConstID:     constID,
 		Name:        "original",
-		String:      text,
+		// Deliberately empty: the const search must find this row through
+		// ir_const_pool_v1, not the legacy ir_codes.string fallback.
+		String: "",
 	}
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{code}))
 	code.Name = "updated"
@@ -131,13 +141,29 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", program).Count(&codeCount).Error)
 	require.Equal(t, int64(1), codeCount)
 
+	batchCodes, err := nativeGetIrCodesByIds(db, program, []int64{code.CodeID})
+	require.NoError(t, err)
+	require.Len(t, batchCodes, 1)
+	require.Equal(t, "updated", batchCodes[0].Name)
+
 	// Const search: exact and regexp both go through the pool query.
 	ids, err := nativeGetIrCodeIDsByConstType(db, program, ExactCompare, text)
 	require.NoError(t, err)
 	require.Equal(t, []int64{code.CodeID}, ids)
-	ids, err = nativeGetIrCodeIDsByConstType(db, program, RegexpCompare, "conformance-.*")
+	ids, err = nativeGetIrCodeIDsByConstType(db, program, RegexpCompare, "^conformance-const-.*$")
 	require.NoError(t, err)
 	require.Equal(t, []int64{code.CodeID}, ids)
+
+	// Native multi-row INSERT for SQLite/PostgreSQL; MySQL keeps the GORM path.
+	require.NoError(t, InsertIrCodes(db, []*IrCode{{
+		ProgramName: program,
+		CodeID:      2,
+		Opcode:      1,
+		Name:        "native-insert",
+	}}, 10))
+	nativeInserted := nativeGetIrCodeItemById(db, program, 2)
+	require.NotNil(t, nativeInserted)
+	require.Equal(t, "native-insert", nativeInserted.Name)
 
 	// Offsets: the COALESCE expression index must accept a NULL/empty name.
 	require.NoError(t, SaveIrOffsetBatch(db, []*IrOffset{{
