@@ -633,17 +633,12 @@ type SwitchBuilder struct {
 
 	buildDefault func()
 
-	// AutoBreak controls the control-flow edge out of a case body: true jumps
-	// to the switch end (implicit break), false falls through to the next case
-	// (the C/C++ default).
+	// AutoBreak is the language policy for case fallthrough. It decides both
+	// the CFG edge out of a case body (done vs next case) and the scope merge
+	// topology (switch-end merge vs chain into the next case). C and C++ keep
+	// false because an arm falls through unless it breaks; Java-style
+	// languages set true. It does not change how one arm's end scope is built.
 	AutoBreak bool
-	// DirectBodyMerge controls how a case body scope joins the switch merge:
-	// true merges the body scope itself, false uses the historical CoverBy
-	// shadow. It is orthogonal to AutoBreak: AutoBreak decides where control
-	// goes, DirectBodyMerge decides which scope supplies the merged values.
-	// C++ enables it because a case arm can assign a variable declared outside
-	// the switch; C, Java and PHP keep the historical behaviour.
-	DirectBodyMerge bool
 }
 
 func (b *FunctionBuilder) BuildSwitch() *SwitchBuilder {
@@ -680,7 +675,6 @@ func (t *SwitchBuilder) Finish() {
 	enter := t.enter
 	scope := enter.ScopeTable
 	switchBuilder := ssautil.NewSwitchStmt(ssautil.ScopedVersionedTableIF[Value](scope), t.AutoBreak)
-	switchBuilder.DirectBodyMerge = t.DirectBodyMerge
 	var cond Value
 
 	condb := builder.NewBasicBlockNotAddBlocks("switch-condition")
@@ -760,9 +754,6 @@ func (t *SwitchBuilder) Finish() {
 			t.buildBody(i)
 			builder.PopTarget()
 
-			if t.DirectBodyMerge {
-				return builder.CurrentBlock.ScopeTable, svt
-			}
 			bodyEnd := svt.CreateShadowScope()
 			bodyEnd.CoverBy(builder.CurrentBlock.ScopeTable)
 			return bodyEnd, svt
@@ -786,9 +777,6 @@ func (t *SwitchBuilder) Finish() {
 			builder.PushTarget(switchBuilder, done, nil, nil)
 			t.buildDefault()
 			builder.PopTarget()
-		}
-		if t.DirectBodyMerge {
-			return builder.CurrentBlock.ScopeTable, svt
 		}
 		bodyEnd := svt.CreateShadowScope()
 		bodyEnd.CoverBy(builder.CurrentBlock.ScopeTable)

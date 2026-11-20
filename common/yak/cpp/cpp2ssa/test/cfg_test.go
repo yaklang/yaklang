@@ -240,6 +240,22 @@ int fallThrough(int value) {
 	require.Subset(t, phiEdgeInts(t, fn, phi), []int64{12, 3, 0})
 }
 
+// TestCppSwitchNoDefaultNoBreak asserts the last arm's value reaches the join
+// when the switch has no default and the arm falls out without break.
+func TestCppSwitchNoDefaultNoBreak(t *testing.T) {
+	test.CheckPrintlnValue(`
+int pick(int value) {
+    int result = 0;
+    switch (value) {
+    case 1:
+        result = 10;
+    }
+    println(result);
+    return result;
+}
+`, []string{"phi(result)[10,0]"}, t)
+}
+
 // TestCppRangeFor asserts the range-for body reads an iteration value.
 func TestCppRangeFor(t *testing.T) {
 	progs := compileCppProject(t, map[string]string{
