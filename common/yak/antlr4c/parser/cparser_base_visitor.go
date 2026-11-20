@@ -59,6 +59,10 @@ func (v *BaseCParserVisitor) VisitCastExpression(ctx *CastExpressionContext) int
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitCastOperand(ctx *CastOperandContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitBuiltinCastType(ctx *BuiltinCastTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }

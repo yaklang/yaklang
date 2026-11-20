@@ -46,6 +46,9 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#castExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#castOperand.
+	VisitCastOperand(ctx *CastOperandContext) interface{}
+
 	// Visit a parse tree produced by CParser#builtinCastType.
 	VisitBuiltinCastType(ctx *BuiltinCastTypeContext) interface{}
 
