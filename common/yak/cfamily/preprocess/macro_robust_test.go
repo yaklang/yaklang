@@ -81,3 +81,19 @@ func TestPreprocessTUExpandsMultiLineInvocation(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, out, `do { run("multi-line"); } while(false)`)
 }
+
+// A macro that appears after a multi-line block comment must still expand: the
+// incremental scanner has to consume comment lines for their state even when
+// they cannot contain a macro, or it never sees the closing */ and treats the
+// rest of the translation unit as comment text.
+func TestPreprocessTUExpandsAfterMultiLineComment(t *testing.T) {
+	src := "/* first line\n * second line\n */\n#define ADD_ONE(x) ((x) + 1)\nint v = ADD_ONE(1);\n"
+	fs := filesys.NewVirtualFs()
+	require.NoError(t, fs.WriteFile("main.c", []byte(src), 0o644))
+	proj := BuildProject(fs, DefaultConfig())
+
+	out, err := proj.PreprocessTU("main.c", src)
+	require.NoError(t, err)
+	require.NotContains(t, out, "ADD_ONE(")
+	require.Contains(t, out, "((1) + 1)")
+}

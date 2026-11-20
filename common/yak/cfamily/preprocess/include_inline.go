@@ -52,6 +52,14 @@ func (ctx *tuExpandCtx) expandSource(src, filePath string) []string {
 
 	var outLines []string
 	for _, line := range JoinLogicalLines(src) {
+		// A line inside a block comment is comment text, not a directive, and
+		// nothing in it can expand. Consume it for the scan state so the
+		// closing */ is seen, then keep it verbatim.
+		if ctx.commentState.inBlockComment {
+			advanceMacroScanState(line, ctx.commentState)
+			outLines = append(outLines, line)
+			continue
+		}
 		if handleCondDirective(ctx.cond, line) {
 			continue
 		}
