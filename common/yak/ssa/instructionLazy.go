@@ -885,7 +885,7 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
-				handler(p.anValue)
+				handler(&p.anValue)
 			}
 		}
 	}

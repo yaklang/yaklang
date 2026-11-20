@@ -207,9 +207,7 @@ func CreateInstruction(op Opcode) Instruction {
 	case SSAOpcodeExternLib:
 		inst = &ExternLib{}
 	case SSAOpcodePhi:
-		return &Phi{
-			anValue: NewValue(),
-		}
+		inst = &Phi{}
 	case SSAOpcodeConstInst:
 		inst = &ConstInst{
 			Const: &Const{value: nil, str: "nil"},

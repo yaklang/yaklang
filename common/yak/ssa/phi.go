@@ -11,9 +11,9 @@ import (
 
 func NewPhi(block *BasicBlock, variable string) *Phi {
 	p := &Phi{
-		anValue: NewValue(),
-		Edge:    make([]int64, 0, len(block.Preds)),
+		Edge: make([]int64, 0, len(block.Preds)),
 	}
+	p.initValue()
 	p.SetName(variable)
 	p.SetBlock(block)
 	p.SetFunc(block.GetFunc())

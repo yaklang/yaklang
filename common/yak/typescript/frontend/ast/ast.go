@@ -1614,7 +1614,6 @@ func (node *NodeDefault) ClassLikeData() *ClassLikeBase                     { re
 func (node *NodeDefault) BodyData() *BodyBase                               { return nil }
 func (node *NodeDefault) LiteralLikeData() *LiteralLikeBase                 { return nil }
 func (node *NodeDefault) TemplateLiteralLikeData() *TemplateLiteralLikeBase { return nil }
-//go:noinline
 func (node *NodeDefault) SubtreeFacts() SubtreeFacts {
 	return node.data.subtreeFactsWorker(node.data)
 }
@@ -1632,7 +1631,6 @@ func (node *NodeDefault) computeSubtreeFacts() SubtreeFacts {
 	return SubtreeFactsNone
 }
 
-//go:noinline
 func (node *NodeDefault) propagateSubtreeFacts() SubtreeFacts {
 	return node.data.SubtreeFacts() & ^SubtreeExclusionsNode
 }

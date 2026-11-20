@@ -732,7 +732,7 @@ var (
 
 // ----------- Phi
 type Phi struct {
-	*anValue
+	anValue
 
 	CFGEntryBasicBlock int64
 

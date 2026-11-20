@@ -46,7 +46,6 @@ func (lz *LazyInstruction) GetUsersByIDs(ids []int64) Users {
 	return GetExs[User](lz.GetProgram().Cache, ToUser, ids...)
 }
 
-//go:noinline
 func (i *anInstruction) GetInstructionById(id int64) (Instruction, bool) {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil, false
@@ -56,7 +55,6 @@ func (i *anInstruction) GetInstructionById(id int64) (Instruction, bool) {
 	}, id)
 }
 
-//go:noinline
 func (i *anInstruction) GetValueById(id int64) (Value, bool) {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil, false
@@ -64,7 +62,6 @@ func (i *anInstruction) GetValueById(id int64) (Value, bool) {
 	return GetEx[Value](i.GetProgram().Cache, ToValue, id)
 }
 
-//go:noinline
 func (i *anInstruction) GetUsersByID(id int64) (User, bool) {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil, false
@@ -98,7 +95,6 @@ func (i *anInstruction) GetUsersByIDs(ids []int64) Users {
 	return GetExs[User](i.GetProgram().Cache, ToUser, ids...)
 }
 
-//go:noinline
 func (i *anInstruction) GetBasicBlockByID(id int64) (*BasicBlock, bool) {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil, false

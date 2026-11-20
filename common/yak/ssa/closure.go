@@ -784,15 +784,10 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *
 					}
 				}
 			}
-			phit := &Phi{
-				anValue:            phi.anValue,
-				CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-				Edge:               vs.GetIds(),
-			}
-
+			_ = vs
 			if callSite, ok := f.GetValueById(se.CallSite); ok && callSite != nil {
 				if call, ok := callSite.(*Call); ok {
-					sideEffect := f.EmitSideEffect(name, call, phit)
+					sideEffect := f.EmitSideEffect(name, call, phi)
 					return sideEffect
 				}
 			}

@@ -11,7 +11,6 @@ func (n *anValue) HasUsers() bool {
 	return len(n.snapshotUserIDs()) != 0
 }
 
-//go:noinline
 func (n *anValue) GetUsers() Users {
 	ids := n.snapshotUserIDs()
 	if len(ids) == 0 {

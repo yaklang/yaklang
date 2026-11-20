@@ -64,7 +64,6 @@ func (v *anInstruction) RefreshString() {
 	// v.readableNameShort = LineShortDisASM(inst)
 }
 
-//go:noinline
 func (v *anInstruction) GetSourceCode() string {
 	r := v.GetRange()
 	if r == nil {
@@ -73,7 +72,6 @@ func (v *anInstruction) GetSourceCode() string {
 	return r.GetText()
 }
 
-//go:noinline
 func (v *anInstruction) GetSourceCodeContext(n int) string {
 	r := v.GetRange()
 	if r == nil {
@@ -126,7 +124,6 @@ func (i *anInstruction) IsBlock(name string) bool {
 	return false
 }
 
-//go:noinline
 func (i *anInstruction) SelfDelete() {
 	DeleteInst(i)
 }
@@ -141,7 +138,6 @@ func (i *anInstruction) IsFromDB() bool { return i.isFromDB }
 
 func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
-//go:noinline
 func (i *anInstruction) Self() Instruction {
 	inst, _ := i.GetProgram().GetInstructionById(i.GetId())
 	if !utils.IsNil(inst) {
@@ -155,7 +151,6 @@ func (i *anInstruction) Self() Instruction {
 func (i *anInstruction) ReplaceValue(Value, Value) {
 }
 
-//go:noinline
 func (i *anInstruction) GetVerboseName() string {
 	if i == nil {
 		return ""
@@ -169,7 +164,6 @@ func (i *anInstruction) GetVerboseName() string {
 	return ""
 }
 
-//go:noinline
 func (i *anInstruction) GetShortVerboseName() string {
 	if i == nil {
 		return ""
@@ -180,7 +174,6 @@ func (i *anInstruction) GetShortVerboseName() string {
 	return "t" + fmt.Sprint(i.GetId())
 }
 
-//go:noinline
 func (i *anInstruction) SetVerboseName(verbose string) {
 	i.verboseName = verbose
 	i.markPersistenceDirty()
@@ -197,8 +190,6 @@ func NewInstruction() *anInstruction {
 }
 
 // ssa function and block
-//
-//go:noinline
 func (a *anInstruction) SetFunc(f *Function) {
 	a.fun = f
 	if f != nil {
@@ -264,7 +255,6 @@ func (a *anInstruction) GetProgram() *Program {
 	return a.prog
 }
 
-//go:noinline
 func (a *anInstruction) GetProgramName() string {
 	if a.prog == nil {
 		return ""
@@ -276,13 +266,11 @@ func (a *anInstruction) SetProgram(prog *Program) {
 	a.prog = prog
 }
 
-//go:noinline
 func (a *anInstruction) SetIsAnnotation(b bool) {
 	a.isAnnotation = b
 	a.markPersistenceDirty()
 }
 
-//go:noinline
 func (v *anInstruction) IsSupportConstMethod() bool {
 	config := v.GetProgram().Application.config
 	if config == nil {
@@ -295,7 +283,6 @@ func (a *anInstruction) IsAnnotation() bool {
 	return a.isAnnotation
 }
 
-//go:noinline
 func (a *anInstruction) SetBlock(block *BasicBlock) {
 	a.block = block
 	if block != nil {
@@ -342,7 +329,6 @@ func (c *anInstruction) GetRange() *memedit.Range {
 	return nil
 }
 
-//go:noinline
 func (c *anInstruction) SetRange(pos *memedit.Range) {
 	c.R = pos
 	c.markPersistenceDirty()
@@ -373,8 +359,6 @@ func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 // func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
-//
-//go:noinline
 func (a *anInstruction) SetName(v string) {
 	if a == nil {
 		return
@@ -493,7 +477,6 @@ func (n *anValue) GetType() Type {
 	return defaultAnyType
 }
 
-//go:noinline
 func (n *anValue) SetLazySaveType(lazySaveType func()) {
 	n.lazySaveType = lazySaveType
 }
@@ -518,8 +501,6 @@ func (n *anValue) LazySaveType() {
 // SetTypeExact stores typ without instantiating a class. Blueprint.Apply builds
 // an instance and can replace the type; a zero or unresolved value must keep
 // the declaration identity it was given.
-//
-//go:noinline
 func (n *anValue) SetTypeExact(typ Type) {
 	if n == nil || typ == nil {
 		return
@@ -638,7 +619,6 @@ func (a *anValue) GetVariable(name string) *Variable {
 	return nil
 }
 
-//go:noinline
 func (a *anValue) GetLastVariable() *Variable {
 	variablesMap := a.getVariablesMap()
 	if variablesMap == nil {
@@ -648,7 +628,6 @@ func (a *anValue) GetLastVariable() *Variable {
 	return v
 }
 
-//go:noinline
 func (a *anValue) GetAllVariables() map[string]*Variable {
 	variablesMap := a.getVariablesMap()
 	if variablesMap == nil {
@@ -692,14 +671,12 @@ func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
 	return i.mask
 }
 
-//go:noinline
 func (i *anValue) AddMask(v Value) {
 	id := v.GetId()
 	i.getMaskMap(true).Set(id, id)
 	i.markPersistenceDirty()
 }
 
-//go:noinline
 func (i *anValue) GetMask() []Value {
 	maskMap := i.getMaskMap()
 	if maskMap == nil {
@@ -708,7 +685,6 @@ func (i *anValue) GetMask() []Value {
 	return i.GetValuesByIDs(maskMap.Values())
 }
 
-//go:noinline
 func (i *anValue) Masked() bool {
 	maskMap := i.getMaskMap()
 	if maskMap == nil {
@@ -717,36 +693,30 @@ func (i *anValue) Masked() bool {
 	return maskMap.Len() != 0
 }
 
-//go:noinline
 func (i *anValue) SetReference(v Value) {
 	i.reference = v.GetId()
 	i.markPersistenceDirty()
 }
 
-//go:noinline
 func (i *anValue) GetReference() Value {
 	ref, _ := i.GetValueById(i.reference)
 	return ref
 }
 
-//go:noinline
 func (i *anValue) AddPointer(v Value) {
 	i.pointer = append(i.pointer, v.GetId())
 	i.markPersistenceDirty()
 }
 
-//go:noinline
 func (i *anValue) GetPointer() Values {
 	return i.GetValuesByIDs(i.pointer)
 }
 
-//go:noinline
 func (i *anValue) AddOccultation(p Value) {
 	i.occultation = append(i.occultation, p.GetId())
 	i.markPersistenceDirty()
 }
 
-//go:noinline
 func (i *anValue) GetOccultation() []Value {
 	return i.GetValuesByIDs(i.occultation)
 }
@@ -764,7 +734,7 @@ func (i *anValue) FlatOccultation() []Value {
 			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
-				handler(p.anValue)
+				handler(&p.anValue)
 			}
 		}
 	}

@@ -678,9 +678,9 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 
 func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 	p := &Phi{
-		anValue: NewValue(),
-		Edge:    vs.GetIds(),
+		Edge: vs.GetIds(),
 	}
+	p.initValue()
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {
 		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p.GetId())
