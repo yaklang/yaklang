@@ -95,6 +95,10 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 		}
 	}
 	if fn != nil && ab.needsArgv(fn) {
+		// A shell function has no fixed arity. Its single $@ parameter owns the
+		// positional vector, and $1/$#/$* read members of that vector. Attach
+		// the vector to the call so the callee and top-def analysis see the
+		// same value; omitted positions expand to the empty string.
 		call.IsEllipsis = spread
 		call.Binding[ssa.VariadicArgsBinding] = ab.packFields(fields, spread).GetId()
 		call.Binding[ssa.VariadicDefaultBinding] = ab.EmitConstInst("").GetId()
@@ -179,7 +183,11 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 			}
 			if ab.loopDepth > 0 && len(fields) <= 1 && depth > 0 {
 				ab.put(statusName, ab.EmitConstInst(0))
-				ab.BranchToLoop(min(depth, ab.loopDepth), name == "continue")
+				if name == "continue" {
+					ab.ContinueLoop(min(depth, ab.loopDepth))
+				} else {
+					ab.BreakLoop(min(depth, ab.loopDepth))
+				}
 				return nil
 			}
 		case "source", ".":

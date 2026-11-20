@@ -756,6 +756,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 			} else {
 				// parameter
+				// A shell call stores its positional vector in a call binding;
+				// resolve the variadic formal to that vector, not a flat Args slot.
 				if pack, ok := calledInstance.PackedVariadic(inst.FormalParameterIndex); ok {
 					actualParam = pack
 				} else if inst.FormalParameterIndex >= len(calledInstance.Args) {
