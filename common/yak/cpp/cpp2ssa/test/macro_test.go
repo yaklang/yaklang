@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
+	"github.com/yaklang/yaklang/common/yak/cfamily/preprocess"
 	"github.com/yaklang/yaklang/common/yak/cpp/cpp2ssa"
 )
 

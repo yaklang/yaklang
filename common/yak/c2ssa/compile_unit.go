@@ -5,7 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
+	"github.com/yaklang/yaklang/common/yak/cfamily/preprocess"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 

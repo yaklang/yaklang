@@ -8,14 +8,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
+	"github.com/yaklang/yaklang/common/yak/cfamily/preprocess"
 	cppparser "github.com/yaklang/yaklang/common/yak/cpp/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // SSABuilder is the C++ language builder. It shares the C macro/include
-// preprocessor (common/yak/c2ssa/preprocess) and the SSA core with c2ssa, and
+// preprocessor (common/yak/cfamily/preprocess) and the SSA core with c2ssa, and
 // keeps its own grammar and visitor.
 type SSABuilder struct {
 	*ssa.PreHandlerBase

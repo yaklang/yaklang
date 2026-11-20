@@ -4,7 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
+	"github.com/yaklang/yaklang/common/yak/cfamily/preprocess"
 )
 
 func newCPreprocessFS(underlying fi.FileSystem) fi.FileSystem {

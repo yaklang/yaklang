@@ -2,7 +2,7 @@ package c2ssa
 
 import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
-	"github.com/yaklang/yaklang/common/yak/c2ssa/preprocess"
+	"github.com/yaklang/yaklang/common/yak/cfamily/preprocess"
 )
 
 type (
