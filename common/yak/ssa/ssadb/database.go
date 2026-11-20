@@ -163,46 +163,13 @@ func hasNamedIndex(db *gorm.DB, table, index string) bool {
 	return db.New().Dialect().HasIndex(table, index)
 }
 
-// deleteDuplicateIrCodes removes every row except the oldest (MIN id) per
-// (program_name, code_id) using a single window query, and returns the number
-// of removed rows. The oldest row is exactly what normal single-read paths
-// return, so existing databases keep behaving identically after the cleanup.
-func deleteDuplicateIrCodes(db *gorm.DB) (int64, error) {
-	res := db.Exec(`DELETE FROM ` + TableIrCodes + ` WHERE id IN (
-		SELECT id FROM (
-			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, code_id ORDER BY id) AS rn
-			FROM ` + TableIrCodes + `
-		) WHERE rn > 1
-	)`)
-	if res.Error != nil {
-		return 0, res.Error
-	}
-	return res.RowsAffected, nil
-}
-
-// deleteDuplicateIrOffsets removes every row except the oldest (MIN id) per
-// composite key using a single window query, and returns the number of
-// removed rows.
-func deleteDuplicateIrOffsets(db *gorm.DB) (int64, error) {
-	res := db.Exec(`DELETE FROM ` + TableIrOffsets + ` WHERE id IN (
-		SELECT id FROM (
-			SELECT id, ROW_NUMBER() OVER (
-				PARTITION BY program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, '')
-				ORDER BY id
-			) AS rn
-			FROM ` + TableIrOffsets + `
-		) WHERE rn > 1
-	)`)
-	if res.Error != nil {
-		return 0, res.Error
-	}
-	return res.RowsAffected, nil
-}
-
 // ensureUniqueIrCodesProgramCodeIndex creates a UNIQUE INDEX on
-// (program_name, code_id) for the ir_codes table. If duplicate rows already
-// exist, the extras are removed (keeping MIN(id)) before the index is
-// created, so legacy databases upgrade cleanly.
+// (program_name, code_id) for the ir_codes table.
+//
+// Duplicate rows from a legacy database are deliberately left in place: if
+// they exist, CREATE UNIQUE INDEX fails and the error is logged. Deleting rows
+// automatically would hide the write bug that produced them and discard data
+// an operator may still need to inspect.
 func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 	if !db.HasTable(TableIrCodes) {
 		return
@@ -217,20 +184,6 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 		return // already created
 	}
 
-	// Legacy async-persist runs can leave duplicate rows. Remove every row
-	// except the oldest (MIN id) per (program_name, code_id) in one window
-	// query, so the unique index can be created. This runs only once: after
-	// the index exists the function returns at the top.
-	removed, err := deleteDuplicateIrCodes(db)
-	if err != nil {
-		log.Warnf("[unique-constraint] failed to remove duplicate ir_codes rows: %v", err)
-		return
-	}
-	if removed > 0 {
-		log.Infof("[unique-constraint] removed %d duplicate ir_codes rows (kept MIN(id) per (program_name, code_id))", removed)
-	}
-
-	// No duplicates — safe to create the UNIQUE INDEX
 	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`
 	if err := db.Exec(query).Error; err != nil {
 		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
@@ -243,8 +196,9 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 // NULL variable names as empty strings. This prevents duplicate offset INSERTs.
 //
 // If an older non-COALESCE index with the same name exists, it is dropped and
-// recreated with COALESCE. If duplicate rows exist, the extras are removed
-// (keeping MIN(id)) before the index is created.
+// recreated with COALESCE. Duplicate rows from a legacy database are left in
+// place; index creation then fails and the error is logged instead of deleting
+// rows.
 func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 	if !db.HasTable(TableIrOffsets) {
 		return
@@ -285,18 +239,6 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
 			return
 		}
-	}
-
-	// Legacy async-persist runs can leave duplicate rows. Remove every row
-	// except the oldest (MIN id) per composite key in one window query, so
-	// the unique index can be created.
-	removed, err := deleteDuplicateIrOffsets(db)
-	if err != nil {
-		log.Warnf("[unique-constraint] failed to remove duplicate ir_offsets rows: %v", err)
-		return
-	}
-	if removed > 0 {
-		log.Infof("[unique-constraint] removed %d duplicate ir_offsets rows (kept MIN(id) per composite key)", removed)
 	}
 
 	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`
