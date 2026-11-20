@@ -6,13 +6,13 @@ import (
 )
 
 // ParserBase implementation.
-type CPP14ParserBase struct {
+type CPPParserBase struct {
 	*antlr.BaseParser
 }
 
 
 // Returns true if the current Token is a closing bracket (")" or "}")
-func (p *CPP14ParserBase) IsPureSpecifierAllowed() bool {
+func (p *CPPParserBase) IsPureSpecifierAllowed() bool {
     x := p.GetParserRuleContext();
     y := x.GetChild(0)
     c := y.GetChild(0)

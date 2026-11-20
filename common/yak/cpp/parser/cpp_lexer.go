@@ -1,4 +1,4 @@
-// Code generated from ./CPP14Lexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
+// Code generated from ./CPPLexer.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
 package cppparser
 
@@ -14,14 +14,14 @@ var _ = fmt.Printf
 var _ = sync.Once{}
 var _ = unicode.IsLetter
 
-type CPP14Lexer struct {
+type CPPLexer struct {
 	*antlr.BaseLexer
 	channelNames []string
 	modeNames    []string
 	// TODO: EOF string
 }
 
-var CPP14LexerLexerStaticData struct {
+var CPPLexerLexerStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
 	ChannelNames           []string
@@ -34,8 +34,8 @@ var CPP14LexerLexerStaticData struct {
 	decisionToDFA          []*antlr.DFA
 }
 
-func cpp14lexerLexerInit() {
-	staticData := &CPP14LexerLexerStaticData
+func cpplexerLexerInit() {
+	staticData := &CPPLexerLexerStaticData
 	staticData.ChannelNames = []string{
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN",
 	}
@@ -819,179 +819,179 @@ func cpp14lexerLexerInit() {
 	}
 }
 
-// CPP14LexerInit initializes any static state used to implement CPP14Lexer. By default the
+// CPPLexerInit initializes any static state used to implement CPPLexer. By default the
 // static state used to implement the lexer is lazily initialized during the first call to
-// NewCPP14Lexer(). You can call this function if you wish to initialize the static state ahead
+// NewCPPLexer(). You can call this function if you wish to initialize the static state ahead
 // of time.
-func CPP14LexerInit() {
-	staticData := &CPP14LexerLexerStaticData
-	staticData.once.Do(cpp14lexerLexerInit)
+func CPPLexerInit() {
+	staticData := &CPPLexerLexerStaticData
+	staticData.once.Do(cpplexerLexerInit)
 }
 
-// NewCPP14Lexer produces a new lexer instance for the optional input antlr.CharStream.
-func NewCPP14Lexer(input antlr.CharStream) *CPP14Lexer {
-	CPP14LexerInit()
-	l := new(CPP14Lexer)
+// NewCPPLexer produces a new lexer instance for the optional input antlr.CharStream.
+func NewCPPLexer(input antlr.CharStream) *CPPLexer {
+	CPPLexerInit()
+	l := new(CPPLexer)
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	staticData := &CPP14LexerLexerStaticData
+	staticData := &CPPLexerLexerStaticData
 	l.Interpreter = antlr.NewLexerATNSimulator(l, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
 	l.channelNames = staticData.ChannelNames
 	l.modeNames = staticData.ModeNames
 	l.RuleNames = staticData.RuleNames
 	l.LiteralNames = staticData.LiteralNames
 	l.SymbolicNames = staticData.SymbolicNames
-	l.GrammarFileName = "CPP14Lexer.g4"
+	l.GrammarFileName = "CPPLexer.g4"
 	// TODO: l.EOF = antlr.TokenEOF
 
 	return l
 }
 
-// CPP14Lexer tokens.
+// CPPLexer tokens.
 const (
-	CPP14LexerIntegerLiteral              = 1
-	CPP14LexerCharacterLiteral            = 2
-	CPP14LexerFloatingLiteral             = 3
-	CPP14LexerStringLiteral               = 4
-	CPP14LexerBooleanLiteral              = 5
-	CPP14LexerPointerLiteral              = 6
-	CPP14LexerUserDefinedLiteral          = 7
-	CPP14LexerMultiLineMacro              = 8
-	CPP14LexerDirective                   = 9
-	CPP14LexerAlignas                     = 10
-	CPP14LexerAlignof                     = 11
-	CPP14LexerAsm                         = 12
-	CPP14LexerAuto                        = 13
-	CPP14LexerBool                        = 14
-	CPP14LexerBreak                       = 15
-	CPP14LexerCase                        = 16
-	CPP14LexerCatch                       = 17
-	CPP14LexerChar                        = 18
-	CPP14LexerChar16                      = 19
-	CPP14LexerChar32                      = 20
-	CPP14LexerClass                       = 21
-	CPP14LexerConst                       = 22
-	CPP14LexerConstexpr                   = 23
-	CPP14LexerConst_cast                  = 24
-	CPP14LexerContinue                    = 25
-	CPP14LexerDecltype                    = 26
-	CPP14LexerDefault                     = 27
-	CPP14LexerDelete                      = 28
-	CPP14LexerDo                          = 29
-	CPP14LexerDouble                      = 30
-	CPP14LexerDynamic_cast                = 31
-	CPP14LexerElse                        = 32
-	CPP14LexerEnum                        = 33
-	CPP14LexerExplicit                    = 34
-	CPP14LexerExport                      = 35
-	CPP14LexerExtern                      = 36
-	CPP14LexerFalse_                      = 37
-	CPP14LexerFinal                       = 38
-	CPP14LexerFloat                       = 39
-	CPP14LexerFor                         = 40
-	CPP14LexerFriend                      = 41
-	CPP14LexerGoto                        = 42
-	CPP14LexerIf                          = 43
-	CPP14LexerInline                      = 44
-	CPP14LexerInt                         = 45
-	CPP14LexerLong                        = 46
-	CPP14LexerMutable                     = 47
-	CPP14LexerNamespace                   = 48
-	CPP14LexerNew                         = 49
-	CPP14LexerNoexcept                    = 50
-	CPP14LexerNullptr                     = 51
-	CPP14LexerOperator                    = 52
-	CPP14LexerOverride                    = 53
-	CPP14LexerPrivate                     = 54
-	CPP14LexerProtected                   = 55
-	CPP14LexerPublic                      = 56
-	CPP14LexerRegister                    = 57
-	CPP14LexerReinterpret_cast            = 58
-	CPP14LexerReturn                      = 59
-	CPP14LexerShort                       = 60
-	CPP14LexerSigned                      = 61
-	CPP14LexerSizeof                      = 62
-	CPP14LexerStatic                      = 63
-	CPP14LexerStatic_assert               = 64
-	CPP14LexerStatic_cast                 = 65
-	CPP14LexerStruct                      = 66
-	CPP14LexerSwitch                      = 67
-	CPP14LexerTemplate                    = 68
-	CPP14LexerThis                        = 69
-	CPP14LexerThread_local                = 70
-	CPP14LexerThrow                       = 71
-	CPP14LexerTrue_                       = 72
-	CPP14LexerTry                         = 73
-	CPP14LexerTypedef                     = 74
-	CPP14LexerTypeid_                     = 75
-	CPP14LexerTypename_                   = 76
-	CPP14LexerUnion                       = 77
-	CPP14LexerUnsigned                    = 78
-	CPP14LexerUsing                       = 79
-	CPP14LexerVirtual                     = 80
-	CPP14LexerVoid                        = 81
-	CPP14LexerVolatile                    = 82
-	CPP14LexerWchar                       = 83
-	CPP14LexerWhile                       = 84
-	CPP14LexerLeftParen                   = 85
-	CPP14LexerRightParen                  = 86
-	CPP14LexerLeftBracket                 = 87
-	CPP14LexerRightBracket                = 88
-	CPP14LexerLeftBrace                   = 89
-	CPP14LexerRightBrace                  = 90
-	CPP14LexerPlus                        = 91
-	CPP14LexerMinus                       = 92
-	CPP14LexerStar                        = 93
-	CPP14LexerDiv                         = 94
-	CPP14LexerMod                         = 95
-	CPP14LexerCaret                       = 96
-	CPP14LexerAnd                         = 97
-	CPP14LexerOr                          = 98
-	CPP14LexerTilde                       = 99
-	CPP14LexerNot                         = 100
-	CPP14LexerAssign                      = 101
-	CPP14LexerLess                        = 102
-	CPP14LexerGreater                     = 103
-	CPP14LexerPlusAssign                  = 104
-	CPP14LexerMinusAssign                 = 105
-	CPP14LexerStarAssign                  = 106
-	CPP14LexerDivAssign                   = 107
-	CPP14LexerModAssign                   = 108
-	CPP14LexerXorAssign                   = 109
-	CPP14LexerAndAssign                   = 110
-	CPP14LexerOrAssign                    = 111
-	CPP14LexerLeftShiftAssign             = 112
-	CPP14LexerRightShiftAssign            = 113
-	CPP14LexerEqual                       = 114
-	CPP14LexerNotEqual                    = 115
-	CPP14LexerLessEqual                   = 116
-	CPP14LexerGreaterEqual                = 117
-	CPP14LexerAndAnd                      = 118
-	CPP14LexerOrOr                        = 119
-	CPP14LexerPlusPlus                    = 120
-	CPP14LexerMinusMinus                  = 121
-	CPP14LexerComma                       = 122
-	CPP14LexerArrowStar                   = 123
-	CPP14LexerArrow                       = 124
-	CPP14LexerQuestion                    = 125
-	CPP14LexerColon                       = 126
-	CPP14LexerDoublecolon                 = 127
-	CPP14LexerSemi                        = 128
-	CPP14LexerDot                         = 129
-	CPP14LexerDotStar                     = 130
-	CPP14LexerEllipsis                    = 131
-	CPP14LexerAttributeGnu                = 132
-	CPP14LexerIdentifier                  = 133
-	CPP14LexerDecimalLiteral              = 134
-	CPP14LexerOctalLiteral                = 135
-	CPP14LexerHexadecimalLiteral          = 136
-	CPP14LexerBinaryLiteral               = 137
-	CPP14LexerIntegersuffix               = 138
-	CPP14LexerUserDefinedIntegerLiteral   = 139
-	CPP14LexerUserDefinedFloatingLiteral  = 140
-	CPP14LexerUserDefinedStringLiteral    = 141
-	CPP14LexerUserDefinedCharacterLiteral = 142
-	CPP14LexerWhitespace                  = 143
-	CPP14LexerNewline                     = 144
-	CPP14LexerBlockComment                = 145
-	CPP14LexerLineComment                 = 146
+	CPPLexerIntegerLiteral              = 1
+	CPPLexerCharacterLiteral            = 2
+	CPPLexerFloatingLiteral             = 3
+	CPPLexerStringLiteral               = 4
+	CPPLexerBooleanLiteral              = 5
+	CPPLexerPointerLiteral              = 6
+	CPPLexerUserDefinedLiteral          = 7
+	CPPLexerMultiLineMacro              = 8
+	CPPLexerDirective                   = 9
+	CPPLexerAlignas                     = 10
+	CPPLexerAlignof                     = 11
+	CPPLexerAsm                         = 12
+	CPPLexerAuto                        = 13
+	CPPLexerBool                        = 14
+	CPPLexerBreak                       = 15
+	CPPLexerCase                        = 16
+	CPPLexerCatch                       = 17
+	CPPLexerChar                        = 18
+	CPPLexerChar16                      = 19
+	CPPLexerChar32                      = 20
+	CPPLexerClass                       = 21
+	CPPLexerConst                       = 22
+	CPPLexerConstexpr                   = 23
+	CPPLexerConst_cast                  = 24
+	CPPLexerContinue                    = 25
+	CPPLexerDecltype                    = 26
+	CPPLexerDefault                     = 27
+	CPPLexerDelete                      = 28
+	CPPLexerDo                          = 29
+	CPPLexerDouble                      = 30
+	CPPLexerDynamic_cast                = 31
+	CPPLexerElse                        = 32
+	CPPLexerEnum                        = 33
+	CPPLexerExplicit                    = 34
+	CPPLexerExport                      = 35
+	CPPLexerExtern                      = 36
+	CPPLexerFalse_                      = 37
+	CPPLexerFinal                       = 38
+	CPPLexerFloat                       = 39
+	CPPLexerFor                         = 40
+	CPPLexerFriend                      = 41
+	CPPLexerGoto                        = 42
+	CPPLexerIf                          = 43
+	CPPLexerInline                      = 44
+	CPPLexerInt                         = 45
+	CPPLexerLong                        = 46
+	CPPLexerMutable                     = 47
+	CPPLexerNamespace                   = 48
+	CPPLexerNew                         = 49
+	CPPLexerNoexcept                    = 50
+	CPPLexerNullptr                     = 51
+	CPPLexerOperator                    = 52
+	CPPLexerOverride                    = 53
+	CPPLexerPrivate                     = 54
+	CPPLexerProtected                   = 55
+	CPPLexerPublic                      = 56
+	CPPLexerRegister                    = 57
+	CPPLexerReinterpret_cast            = 58
+	CPPLexerReturn                      = 59
+	CPPLexerShort                       = 60
+	CPPLexerSigned                      = 61
+	CPPLexerSizeof                      = 62
+	CPPLexerStatic                      = 63
+	CPPLexerStatic_assert               = 64
+	CPPLexerStatic_cast                 = 65
+	CPPLexerStruct                      = 66
+	CPPLexerSwitch                      = 67
+	CPPLexerTemplate                    = 68
+	CPPLexerThis                        = 69
+	CPPLexerThread_local                = 70
+	CPPLexerThrow                       = 71
+	CPPLexerTrue_                       = 72
+	CPPLexerTry                         = 73
+	CPPLexerTypedef                     = 74
+	CPPLexerTypeid_                     = 75
+	CPPLexerTypename_                   = 76
+	CPPLexerUnion                       = 77
+	CPPLexerUnsigned                    = 78
+	CPPLexerUsing                       = 79
+	CPPLexerVirtual                     = 80
+	CPPLexerVoid                        = 81
+	CPPLexerVolatile                    = 82
+	CPPLexerWchar                       = 83
+	CPPLexerWhile                       = 84
+	CPPLexerLeftParen                   = 85
+	CPPLexerRightParen                  = 86
+	CPPLexerLeftBracket                 = 87
+	CPPLexerRightBracket                = 88
+	CPPLexerLeftBrace                   = 89
+	CPPLexerRightBrace                  = 90
+	CPPLexerPlus                        = 91
+	CPPLexerMinus                       = 92
+	CPPLexerStar                        = 93
+	CPPLexerDiv                         = 94
+	CPPLexerMod                         = 95
+	CPPLexerCaret                       = 96
+	CPPLexerAnd                         = 97
+	CPPLexerOr                          = 98
+	CPPLexerTilde                       = 99
+	CPPLexerNot                         = 100
+	CPPLexerAssign                      = 101
+	CPPLexerLess                        = 102
+	CPPLexerGreater                     = 103
+	CPPLexerPlusAssign                  = 104
+	CPPLexerMinusAssign                 = 105
+	CPPLexerStarAssign                  = 106
+	CPPLexerDivAssign                   = 107
+	CPPLexerModAssign                   = 108
+	CPPLexerXorAssign                   = 109
+	CPPLexerAndAssign                   = 110
+	CPPLexerOrAssign                    = 111
+	CPPLexerLeftShiftAssign             = 112
+	CPPLexerRightShiftAssign            = 113
+	CPPLexerEqual                       = 114
+	CPPLexerNotEqual                    = 115
+	CPPLexerLessEqual                   = 116
+	CPPLexerGreaterEqual                = 117
+	CPPLexerAndAnd                      = 118
+	CPPLexerOrOr                        = 119
+	CPPLexerPlusPlus                    = 120
+	CPPLexerMinusMinus                  = 121
+	CPPLexerComma                       = 122
+	CPPLexerArrowStar                   = 123
+	CPPLexerArrow                       = 124
+	CPPLexerQuestion                    = 125
+	CPPLexerColon                       = 126
+	CPPLexerDoublecolon                 = 127
+	CPPLexerSemi                        = 128
+	CPPLexerDot                         = 129
+	CPPLexerDotStar                     = 130
+	CPPLexerEllipsis                    = 131
+	CPPLexerAttributeGnu                = 132
+	CPPLexerIdentifier                  = 133
+	CPPLexerDecimalLiteral              = 134
+	CPPLexerOctalLiteral                = 135
+	CPPLexerHexadecimalLiteral          = 136
+	CPPLexerBinaryLiteral               = 137
+	CPPLexerIntegersuffix               = 138
+	CPPLexerUserDefinedIntegerLiteral   = 139
+	CPPLexerUserDefinedFloatingLiteral  = 140
+	CPPLexerUserDefinedStringLiteral    = 141
+	CPPLexerUserDefinedCharacterLiteral = 142
+	CPPLexerWhitespace                  = 143
+	CPPLexerNewline                     = 144
+	CPPLexerBlockComment                = 145
+	CPPLexerLineComment                 = 146
 )

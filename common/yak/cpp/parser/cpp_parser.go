@@ -1,6 +1,6 @@
-// Code generated from ./CPP14Parser.g4 by ANTLR 4.13.2. DO NOT EDIT.
+// Code generated from ./CPPParser.g4 by ANTLR 4.13.2. DO NOT EDIT.
 
-package cppparser // CPP14Parser
+package cppparser // CPPParser
 import (
 	"fmt"
 	"strconv"
@@ -14,11 +14,11 @@ var _ = fmt.Printf
 var _ = strconv.Itoa
 var _ = sync.Once{}
 
-type CPP14Parser struct {
-	CPP14ParserBase
+type CPPParser struct {
+	CPPParserBase
 }
 
-var CPP14ParserParserStaticData struct {
+var CPPParserParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
 	LiteralNames           []string
@@ -29,8 +29,8 @@ var CPP14ParserParserStaticData struct {
 	decisionToDFA          []*antlr.DFA
 }
 
-func cpp14parserParserInit() {
-	staticData := &CPP14ParserParserStaticData
+func cppparserParserInit() {
+	staticData := &CPPParserParserStaticData
 	staticData.LiteralNames = []string{
 		"", "", "", "", "", "", "", "", "", "", "'alignas'", "'alignof'", "'asm'",
 		"'auto'", "'bool'", "'break'", "'case'", "'catch'", "'char'", "'char16_t'",
@@ -1256,377 +1256,377 @@ func cpp14parserParserInit() {
 	}
 }
 
-// CPP14ParserInit initializes any static state used to implement CPP14Parser. By default the
+// CPPParserInit initializes any static state used to implement CPPParser. By default the
 // static state used to implement the parser is lazily initialized during the first call to
-// NewCPP14Parser(). You can call this function if you wish to initialize the static state ahead
+// NewCPPParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
-func CPP14ParserInit() {
-	staticData := &CPP14ParserParserStaticData
-	staticData.once.Do(cpp14parserParserInit)
+func CPPParserInit() {
+	staticData := &CPPParserParserStaticData
+	staticData.once.Do(cppparserParserInit)
 }
 
-// NewCPP14Parser produces a new parser instance for the optional input antlr.TokenStream.
-func NewCPP14Parser(input antlr.TokenStream) *CPP14Parser {
-	CPP14ParserInit()
-	this := new(CPP14Parser)
+// NewCPPParser produces a new parser instance for the optional input antlr.TokenStream.
+func NewCPPParser(input antlr.TokenStream) *CPPParser {
+	CPPParserInit()
+	this := new(CPPParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &CPP14ParserParserStaticData
+	staticData := &CPPParserParserStaticData
 	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
 	this.RuleNames = staticData.RuleNames
 	this.LiteralNames = staticData.LiteralNames
 	this.SymbolicNames = staticData.SymbolicNames
-	this.GrammarFileName = "CPP14Parser.g4"
+	this.GrammarFileName = "CPPParser.g4"
 
 	return this
 }
 
-// CPP14Parser tokens.
+// CPPParser tokens.
 const (
-	CPP14ParserEOF                         = antlr.TokenEOF
-	CPP14ParserIntegerLiteral              = 1
-	CPP14ParserCharacterLiteral            = 2
-	CPP14ParserFloatingLiteral             = 3
-	CPP14ParserStringLiteral               = 4
-	CPP14ParserBooleanLiteral              = 5
-	CPP14ParserPointerLiteral              = 6
-	CPP14ParserUserDefinedLiteral          = 7
-	CPP14ParserMultiLineMacro              = 8
-	CPP14ParserDirective                   = 9
-	CPP14ParserAlignas                     = 10
-	CPP14ParserAlignof                     = 11
-	CPP14ParserAsm                         = 12
-	CPP14ParserAuto                        = 13
-	CPP14ParserBool                        = 14
-	CPP14ParserBreak                       = 15
-	CPP14ParserCase                        = 16
-	CPP14ParserCatch                       = 17
-	CPP14ParserChar                        = 18
-	CPP14ParserChar16                      = 19
-	CPP14ParserChar32                      = 20
-	CPP14ParserClass                       = 21
-	CPP14ParserConst                       = 22
-	CPP14ParserConstexpr                   = 23
-	CPP14ParserConst_cast                  = 24
-	CPP14ParserContinue                    = 25
-	CPP14ParserDecltype                    = 26
-	CPP14ParserDefault                     = 27
-	CPP14ParserDelete                      = 28
-	CPP14ParserDo                          = 29
-	CPP14ParserDouble                      = 30
-	CPP14ParserDynamic_cast                = 31
-	CPP14ParserElse                        = 32
-	CPP14ParserEnum                        = 33
-	CPP14ParserExplicit                    = 34
-	CPP14ParserExport                      = 35
-	CPP14ParserExtern                      = 36
-	CPP14ParserFalse_                      = 37
-	CPP14ParserFinal                       = 38
-	CPP14ParserFloat                       = 39
-	CPP14ParserFor                         = 40
-	CPP14ParserFriend                      = 41
-	CPP14ParserGoto                        = 42
-	CPP14ParserIf                          = 43
-	CPP14ParserInline                      = 44
-	CPP14ParserInt                         = 45
-	CPP14ParserLong                        = 46
-	CPP14ParserMutable                     = 47
-	CPP14ParserNamespace                   = 48
-	CPP14ParserNew                         = 49
-	CPP14ParserNoexcept                    = 50
-	CPP14ParserNullptr                     = 51
-	CPP14ParserOperator                    = 52
-	CPP14ParserOverride                    = 53
-	CPP14ParserPrivate                     = 54
-	CPP14ParserProtected                   = 55
-	CPP14ParserPublic                      = 56
-	CPP14ParserRegister                    = 57
-	CPP14ParserReinterpret_cast            = 58
-	CPP14ParserReturn                      = 59
-	CPP14ParserShort                       = 60
-	CPP14ParserSigned                      = 61
-	CPP14ParserSizeof                      = 62
-	CPP14ParserStatic                      = 63
-	CPP14ParserStatic_assert               = 64
-	CPP14ParserStatic_cast                 = 65
-	CPP14ParserStruct                      = 66
-	CPP14ParserSwitch                      = 67
-	CPP14ParserTemplate                    = 68
-	CPP14ParserThis                        = 69
-	CPP14ParserThread_local                = 70
-	CPP14ParserThrow                       = 71
-	CPP14ParserTrue_                       = 72
-	CPP14ParserTry                         = 73
-	CPP14ParserTypedef                     = 74
-	CPP14ParserTypeid_                     = 75
-	CPP14ParserTypename_                   = 76
-	CPP14ParserUnion                       = 77
-	CPP14ParserUnsigned                    = 78
-	CPP14ParserUsing                       = 79
-	CPP14ParserVirtual                     = 80
-	CPP14ParserVoid                        = 81
-	CPP14ParserVolatile                    = 82
-	CPP14ParserWchar                       = 83
-	CPP14ParserWhile                       = 84
-	CPP14ParserLeftParen                   = 85
-	CPP14ParserRightParen                  = 86
-	CPP14ParserLeftBracket                 = 87
-	CPP14ParserRightBracket                = 88
-	CPP14ParserLeftBrace                   = 89
-	CPP14ParserRightBrace                  = 90
-	CPP14ParserPlus                        = 91
-	CPP14ParserMinus                       = 92
-	CPP14ParserStar                        = 93
-	CPP14ParserDiv                         = 94
-	CPP14ParserMod                         = 95
-	CPP14ParserCaret                       = 96
-	CPP14ParserAnd                         = 97
-	CPP14ParserOr                          = 98
-	CPP14ParserTilde                       = 99
-	CPP14ParserNot                         = 100
-	CPP14ParserAssign                      = 101
-	CPP14ParserLess                        = 102
-	CPP14ParserGreater                     = 103
-	CPP14ParserPlusAssign                  = 104
-	CPP14ParserMinusAssign                 = 105
-	CPP14ParserStarAssign                  = 106
-	CPP14ParserDivAssign                   = 107
-	CPP14ParserModAssign                   = 108
-	CPP14ParserXorAssign                   = 109
-	CPP14ParserAndAssign                   = 110
-	CPP14ParserOrAssign                    = 111
-	CPP14ParserLeftShiftAssign             = 112
-	CPP14ParserRightShiftAssign            = 113
-	CPP14ParserEqual                       = 114
-	CPP14ParserNotEqual                    = 115
-	CPP14ParserLessEqual                   = 116
-	CPP14ParserGreaterEqual                = 117
-	CPP14ParserAndAnd                      = 118
-	CPP14ParserOrOr                        = 119
-	CPP14ParserPlusPlus                    = 120
-	CPP14ParserMinusMinus                  = 121
-	CPP14ParserComma                       = 122
-	CPP14ParserArrowStar                   = 123
-	CPP14ParserArrow                       = 124
-	CPP14ParserQuestion                    = 125
-	CPP14ParserColon                       = 126
-	CPP14ParserDoublecolon                 = 127
-	CPP14ParserSemi                        = 128
-	CPP14ParserDot                         = 129
-	CPP14ParserDotStar                     = 130
-	CPP14ParserEllipsis                    = 131
-	CPP14ParserAttributeGnu                = 132
-	CPP14ParserIdentifier                  = 133
-	CPP14ParserDecimalLiteral              = 134
-	CPP14ParserOctalLiteral                = 135
-	CPP14ParserHexadecimalLiteral          = 136
-	CPP14ParserBinaryLiteral               = 137
-	CPP14ParserIntegersuffix               = 138
-	CPP14ParserUserDefinedIntegerLiteral   = 139
-	CPP14ParserUserDefinedFloatingLiteral  = 140
-	CPP14ParserUserDefinedStringLiteral    = 141
-	CPP14ParserUserDefinedCharacterLiteral = 142
-	CPP14ParserWhitespace                  = 143
-	CPP14ParserNewline                     = 144
-	CPP14ParserBlockComment                = 145
-	CPP14ParserLineComment                 = 146
+	CPPParserEOF                         = antlr.TokenEOF
+	CPPParserIntegerLiteral              = 1
+	CPPParserCharacterLiteral            = 2
+	CPPParserFloatingLiteral             = 3
+	CPPParserStringLiteral               = 4
+	CPPParserBooleanLiteral              = 5
+	CPPParserPointerLiteral              = 6
+	CPPParserUserDefinedLiteral          = 7
+	CPPParserMultiLineMacro              = 8
+	CPPParserDirective                   = 9
+	CPPParserAlignas                     = 10
+	CPPParserAlignof                     = 11
+	CPPParserAsm                         = 12
+	CPPParserAuto                        = 13
+	CPPParserBool                        = 14
+	CPPParserBreak                       = 15
+	CPPParserCase                        = 16
+	CPPParserCatch                       = 17
+	CPPParserChar                        = 18
+	CPPParserChar16                      = 19
+	CPPParserChar32                      = 20
+	CPPParserClass                       = 21
+	CPPParserConst                       = 22
+	CPPParserConstexpr                   = 23
+	CPPParserConst_cast                  = 24
+	CPPParserContinue                    = 25
+	CPPParserDecltype                    = 26
+	CPPParserDefault                     = 27
+	CPPParserDelete                      = 28
+	CPPParserDo                          = 29
+	CPPParserDouble                      = 30
+	CPPParserDynamic_cast                = 31
+	CPPParserElse                        = 32
+	CPPParserEnum                        = 33
+	CPPParserExplicit                    = 34
+	CPPParserExport                      = 35
+	CPPParserExtern                      = 36
+	CPPParserFalse_                      = 37
+	CPPParserFinal                       = 38
+	CPPParserFloat                       = 39
+	CPPParserFor                         = 40
+	CPPParserFriend                      = 41
+	CPPParserGoto                        = 42
+	CPPParserIf                          = 43
+	CPPParserInline                      = 44
+	CPPParserInt                         = 45
+	CPPParserLong                        = 46
+	CPPParserMutable                     = 47
+	CPPParserNamespace                   = 48
+	CPPParserNew                         = 49
+	CPPParserNoexcept                    = 50
+	CPPParserNullptr                     = 51
+	CPPParserOperator                    = 52
+	CPPParserOverride                    = 53
+	CPPParserPrivate                     = 54
+	CPPParserProtected                   = 55
+	CPPParserPublic                      = 56
+	CPPParserRegister                    = 57
+	CPPParserReinterpret_cast            = 58
+	CPPParserReturn                      = 59
+	CPPParserShort                       = 60
+	CPPParserSigned                      = 61
+	CPPParserSizeof                      = 62
+	CPPParserStatic                      = 63
+	CPPParserStatic_assert               = 64
+	CPPParserStatic_cast                 = 65
+	CPPParserStruct                      = 66
+	CPPParserSwitch                      = 67
+	CPPParserTemplate                    = 68
+	CPPParserThis                        = 69
+	CPPParserThread_local                = 70
+	CPPParserThrow                       = 71
+	CPPParserTrue_                       = 72
+	CPPParserTry                         = 73
+	CPPParserTypedef                     = 74
+	CPPParserTypeid_                     = 75
+	CPPParserTypename_                   = 76
+	CPPParserUnion                       = 77
+	CPPParserUnsigned                    = 78
+	CPPParserUsing                       = 79
+	CPPParserVirtual                     = 80
+	CPPParserVoid                        = 81
+	CPPParserVolatile                    = 82
+	CPPParserWchar                       = 83
+	CPPParserWhile                       = 84
+	CPPParserLeftParen                   = 85
+	CPPParserRightParen                  = 86
+	CPPParserLeftBracket                 = 87
+	CPPParserRightBracket                = 88
+	CPPParserLeftBrace                   = 89
+	CPPParserRightBrace                  = 90
+	CPPParserPlus                        = 91
+	CPPParserMinus                       = 92
+	CPPParserStar                        = 93
+	CPPParserDiv                         = 94
+	CPPParserMod                         = 95
+	CPPParserCaret                       = 96
+	CPPParserAnd                         = 97
+	CPPParserOr                          = 98
+	CPPParserTilde                       = 99
+	CPPParserNot                         = 100
+	CPPParserAssign                      = 101
+	CPPParserLess                        = 102
+	CPPParserGreater                     = 103
+	CPPParserPlusAssign                  = 104
+	CPPParserMinusAssign                 = 105
+	CPPParserStarAssign                  = 106
+	CPPParserDivAssign                   = 107
+	CPPParserModAssign                   = 108
+	CPPParserXorAssign                   = 109
+	CPPParserAndAssign                   = 110
+	CPPParserOrAssign                    = 111
+	CPPParserLeftShiftAssign             = 112
+	CPPParserRightShiftAssign            = 113
+	CPPParserEqual                       = 114
+	CPPParserNotEqual                    = 115
+	CPPParserLessEqual                   = 116
+	CPPParserGreaterEqual                = 117
+	CPPParserAndAnd                      = 118
+	CPPParserOrOr                        = 119
+	CPPParserPlusPlus                    = 120
+	CPPParserMinusMinus                  = 121
+	CPPParserComma                       = 122
+	CPPParserArrowStar                   = 123
+	CPPParserArrow                       = 124
+	CPPParserQuestion                    = 125
+	CPPParserColon                       = 126
+	CPPParserDoublecolon                 = 127
+	CPPParserSemi                        = 128
+	CPPParserDot                         = 129
+	CPPParserDotStar                     = 130
+	CPPParserEllipsis                    = 131
+	CPPParserAttributeGnu                = 132
+	CPPParserIdentifier                  = 133
+	CPPParserDecimalLiteral              = 134
+	CPPParserOctalLiteral                = 135
+	CPPParserHexadecimalLiteral          = 136
+	CPPParserBinaryLiteral               = 137
+	CPPParserIntegersuffix               = 138
+	CPPParserUserDefinedIntegerLiteral   = 139
+	CPPParserUserDefinedFloatingLiteral  = 140
+	CPPParserUserDefinedStringLiteral    = 141
+	CPPParserUserDefinedCharacterLiteral = 142
+	CPPParserWhitespace                  = 143
+	CPPParserNewline                     = 144
+	CPPParserBlockComment                = 145
+	CPPParserLineComment                 = 146
 )
 
-// CPP14Parser rules.
+// CPPParser rules.
 const (
-	CPP14ParserRULE_translationUnit                 = 0
-	CPP14ParserRULE_primaryExpression               = 1
-	CPP14ParserRULE_foldExpression                  = 2
-	CPP14ParserRULE_foldOperator                    = 3
-	CPP14ParserRULE_idExpression                    = 4
-	CPP14ParserRULE_unqualifiedId                   = 5
-	CPP14ParserRULE_qualifiedId                     = 6
-	CPP14ParserRULE_nestedNameSpecifier             = 7
-	CPP14ParserRULE_lambdaExpression                = 8
-	CPP14ParserRULE_lambdaIntroducer                = 9
-	CPP14ParserRULE_lambdaCapture                   = 10
-	CPP14ParserRULE_captureDefault                  = 11
-	CPP14ParserRULE_captureList                     = 12
-	CPP14ParserRULE_capture                         = 13
-	CPP14ParserRULE_simpleCapture                   = 14
-	CPP14ParserRULE_initCapture                     = 15
-	CPP14ParserRULE_lambdaDeclarator                = 16
-	CPP14ParserRULE_postfixExpression               = 17
-	CPP14ParserRULE_typeIdOfTheTypeId               = 18
-	CPP14ParserRULE_expressionList                  = 19
-	CPP14ParserRULE_pseudoDestructorName            = 20
-	CPP14ParserRULE_unaryExpression                 = 21
-	CPP14ParserRULE_unaryOperator                   = 22
-	CPP14ParserRULE_newExpression_                  = 23
-	CPP14ParserRULE_newPlacement                    = 24
-	CPP14ParserRULE_newTypeId                       = 25
-	CPP14ParserRULE_newDeclarator_                  = 26
-	CPP14ParserRULE_noPointerNewDeclarator          = 27
-	CPP14ParserRULE_newInitializer_                 = 28
-	CPP14ParserRULE_deleteExpression                = 29
-	CPP14ParserRULE_noExceptExpression              = 30
-	CPP14ParserRULE_castExpression                  = 31
-	CPP14ParserRULE_pointerMemberExpression         = 32
-	CPP14ParserRULE_multiplicativeExpression        = 33
-	CPP14ParserRULE_additiveExpression              = 34
-	CPP14ParserRULE_shiftExpression                 = 35
-	CPP14ParserRULE_shiftOperator                   = 36
-	CPP14ParserRULE_relationalExpression            = 37
-	CPP14ParserRULE_equalityExpression              = 38
-	CPP14ParserRULE_andExpression                   = 39
-	CPP14ParserRULE_exclusiveOrExpression           = 40
-	CPP14ParserRULE_inclusiveOrExpression           = 41
-	CPP14ParserRULE_logicalAndExpression            = 42
-	CPP14ParserRULE_logicalOrExpression             = 43
-	CPP14ParserRULE_conditionalExpression           = 44
-	CPP14ParserRULE_assignmentExpression            = 45
-	CPP14ParserRULE_assignmentOperator              = 46
-	CPP14ParserRULE_expression                      = 47
-	CPP14ParserRULE_constantExpression              = 48
-	CPP14ParserRULE_statement                       = 49
-	CPP14ParserRULE_labeledStatement                = 50
-	CPP14ParserRULE_expressionStatement             = 51
-	CPP14ParserRULE_compoundStatement               = 52
-	CPP14ParserRULE_statementSeq                    = 53
-	CPP14ParserRULE_selectionStatement              = 54
-	CPP14ParserRULE_condition                       = 55
-	CPP14ParserRULE_iterationStatement              = 56
-	CPP14ParserRULE_forInitStatement                = 57
-	CPP14ParserRULE_forRangeDeclaration             = 58
-	CPP14ParserRULE_forRangeInitializer             = 59
-	CPP14ParserRULE_jumpStatement                   = 60
-	CPP14ParserRULE_declarationStatement            = 61
-	CPP14ParserRULE_declarationSeq                  = 62
-	CPP14ParserRULE_declaration                     = 63
-	CPP14ParserRULE_blockDeclaration                = 64
-	CPP14ParserRULE_aliasDeclaration                = 65
-	CPP14ParserRULE_simpleDeclaration               = 66
-	CPP14ParserRULE_identifierList                  = 67
-	CPP14ParserRULE_staticAssertDeclaration         = 68
-	CPP14ParserRULE_emptyDeclaration_               = 69
-	CPP14ParserRULE_attributeDeclaration            = 70
-	CPP14ParserRULE_declSpecifier                   = 71
-	CPP14ParserRULE_declSpecifierSeq                = 72
-	CPP14ParserRULE_storageClassSpecifier           = 73
-	CPP14ParserRULE_functionSpecifier               = 74
-	CPP14ParserRULE_typedefName                     = 75
-	CPP14ParserRULE_typeSpecifier                   = 76
-	CPP14ParserRULE_trailingTypeSpecifier           = 77
-	CPP14ParserRULE_typeSpecifierSeq                = 78
-	CPP14ParserRULE_trailingTypeSpecifierSeq        = 79
-	CPP14ParserRULE_simpleTypeLengthModifier        = 80
-	CPP14ParserRULE_simpleTypeSignednessModifier    = 81
-	CPP14ParserRULE_simpleTypeSpecifier             = 82
-	CPP14ParserRULE_theTypeName                     = 83
-	CPP14ParserRULE_decltypeSpecifier               = 84
-	CPP14ParserRULE_elaboratedTypeSpecifier         = 85
-	CPP14ParserRULE_enumName                        = 86
-	CPP14ParserRULE_enumSpecifier                   = 87
-	CPP14ParserRULE_enumHead                        = 88
-	CPP14ParserRULE_opaqueEnumDeclaration           = 89
-	CPP14ParserRULE_enumKey                         = 90
-	CPP14ParserRULE_enumBase                        = 91
-	CPP14ParserRULE_enumeratorList                  = 92
-	CPP14ParserRULE_enumeratorDefinition            = 93
-	CPP14ParserRULE_enumerator                      = 94
-	CPP14ParserRULE_namespaceName                   = 95
-	CPP14ParserRULE_originalNamespaceName           = 96
-	CPP14ParserRULE_namespaceDefinition             = 97
-	CPP14ParserRULE_namespaceAlias                  = 98
-	CPP14ParserRULE_namespaceAliasDefinition        = 99
-	CPP14ParserRULE_qualifiedNamespaceSpecifier     = 100
-	CPP14ParserRULE_usingDeclaration                = 101
-	CPP14ParserRULE_usingDirective                  = 102
-	CPP14ParserRULE_asmDefinition                   = 103
-	CPP14ParserRULE_linkageSpecification            = 104
-	CPP14ParserRULE_attributeSpecifierSeq           = 105
-	CPP14ParserRULE_attributeSpecifier              = 106
-	CPP14ParserRULE_alignmentSpecifier              = 107
-	CPP14ParserRULE_attributeList                   = 108
-	CPP14ParserRULE_attribute                       = 109
-	CPP14ParserRULE_attributeNamespace              = 110
-	CPP14ParserRULE_attributeArgumentClause         = 111
-	CPP14ParserRULE_balancedTokenSeq                = 112
-	CPP14ParserRULE_balancedToken                   = 113
-	CPP14ParserRULE_initDeclaratorList              = 114
-	CPP14ParserRULE_initDeclarator                  = 115
-	CPP14ParserRULE_declarator                      = 116
-	CPP14ParserRULE_pointerDeclarator               = 117
-	CPP14ParserRULE_noPointerDeclarator             = 118
-	CPP14ParserRULE_parametersAndQualifiers         = 119
-	CPP14ParserRULE_trailingReturnType              = 120
-	CPP14ParserRULE_pointerOperator                 = 121
-	CPP14ParserRULE_cvQualifierSeq                  = 122
-	CPP14ParserRULE_cvQualifier                     = 123
-	CPP14ParserRULE_refQualifier                    = 124
-	CPP14ParserRULE_declaratorId                    = 125
-	CPP14ParserRULE_theTypeId                       = 126
-	CPP14ParserRULE_abstractDeclarator              = 127
-	CPP14ParserRULE_pointerAbstractDeclarator       = 128
-	CPP14ParserRULE_noPointerAbstractDeclarator     = 129
-	CPP14ParserRULE_abstractPackDeclarator          = 130
-	CPP14ParserRULE_noPointerAbstractPackDeclarator = 131
-	CPP14ParserRULE_parameterDeclarationClause      = 132
-	CPP14ParserRULE_parameterDeclarationList        = 133
-	CPP14ParserRULE_parameterDeclaration            = 134
-	CPP14ParserRULE_functionDefinition              = 135
-	CPP14ParserRULE_functionBody                    = 136
-	CPP14ParserRULE_initializer                     = 137
-	CPP14ParserRULE_braceOrEqualInitializer         = 138
-	CPP14ParserRULE_initializerClause               = 139
-	CPP14ParserRULE_initializerList                 = 140
-	CPP14ParserRULE_bracedInitList                  = 141
-	CPP14ParserRULE_className                       = 142
-	CPP14ParserRULE_classSpecifier                  = 143
-	CPP14ParserRULE_classHead                       = 144
-	CPP14ParserRULE_classHeadName                   = 145
-	CPP14ParserRULE_classVirtSpecifier              = 146
-	CPP14ParserRULE_classKey                        = 147
-	CPP14ParserRULE_memberSpecification             = 148
-	CPP14ParserRULE_memberDeclaration               = 149
-	CPP14ParserRULE_memberDeclaratorList            = 150
-	CPP14ParserRULE_memberDeclarator                = 151
-	CPP14ParserRULE_virtualSpecifierSeq             = 152
-	CPP14ParserRULE_virtualSpecifier                = 153
-	CPP14ParserRULE_pureSpecifier                   = 154
-	CPP14ParserRULE_baseClause                      = 155
-	CPP14ParserRULE_baseSpecifierList               = 156
-	CPP14ParserRULE_baseSpecifier                   = 157
-	CPP14ParserRULE_classOrDeclType                 = 158
-	CPP14ParserRULE_baseTypeSpecifier               = 159
-	CPP14ParserRULE_accessSpecifier                 = 160
-	CPP14ParserRULE_conversionFunctionId            = 161
-	CPP14ParserRULE_conversionTypeId                = 162
-	CPP14ParserRULE_conversionDeclarator            = 163
-	CPP14ParserRULE_constructorInitializer          = 164
-	CPP14ParserRULE_memInitializerList              = 165
-	CPP14ParserRULE_memInitializer                  = 166
-	CPP14ParserRULE_memInitializerId                = 167
-	CPP14ParserRULE_operatorFunctionId              = 168
-	CPP14ParserRULE_literalOperatorId               = 169
-	CPP14ParserRULE_templateDeclaration             = 170
-	CPP14ParserRULE_templateParameterList           = 171
-	CPP14ParserRULE_templateParameter               = 172
-	CPP14ParserRULE_typeParameter                   = 173
-	CPP14ParserRULE_simpleTemplateId                = 174
-	CPP14ParserRULE_templateId                      = 175
-	CPP14ParserRULE_templateName                    = 176
-	CPP14ParserRULE_templateArgumentList            = 177
-	CPP14ParserRULE_templateArgument                = 178
-	CPP14ParserRULE_typeNameSpecifier               = 179
-	CPP14ParserRULE_explicitInstantiation           = 180
-	CPP14ParserRULE_explicitSpecialization          = 181
-	CPP14ParserRULE_tryBlock                        = 182
-	CPP14ParserRULE_functionTryBlock                = 183
-	CPP14ParserRULE_handlerSeq                      = 184
-	CPP14ParserRULE_handler                         = 185
-	CPP14ParserRULE_exceptionDeclaration            = 186
-	CPP14ParserRULE_throwExpression                 = 187
-	CPP14ParserRULE_exceptionSpecification          = 188
-	CPP14ParserRULE_dynamicExceptionSpecification   = 189
-	CPP14ParserRULE_typeIdList                      = 190
-	CPP14ParserRULE_noExceptSpecification           = 191
-	CPP14ParserRULE_theOperator                     = 192
-	CPP14ParserRULE_literal                         = 193
+	CPPParserRULE_translationUnit                 = 0
+	CPPParserRULE_primaryExpression               = 1
+	CPPParserRULE_foldExpression                  = 2
+	CPPParserRULE_foldOperator                    = 3
+	CPPParserRULE_idExpression                    = 4
+	CPPParserRULE_unqualifiedId                   = 5
+	CPPParserRULE_qualifiedId                     = 6
+	CPPParserRULE_nestedNameSpecifier             = 7
+	CPPParserRULE_lambdaExpression                = 8
+	CPPParserRULE_lambdaIntroducer                = 9
+	CPPParserRULE_lambdaCapture                   = 10
+	CPPParserRULE_captureDefault                  = 11
+	CPPParserRULE_captureList                     = 12
+	CPPParserRULE_capture                         = 13
+	CPPParserRULE_simpleCapture                   = 14
+	CPPParserRULE_initCapture                     = 15
+	CPPParserRULE_lambdaDeclarator                = 16
+	CPPParserRULE_postfixExpression               = 17
+	CPPParserRULE_typeIdOfTheTypeId               = 18
+	CPPParserRULE_expressionList                  = 19
+	CPPParserRULE_pseudoDestructorName            = 20
+	CPPParserRULE_unaryExpression                 = 21
+	CPPParserRULE_unaryOperator                   = 22
+	CPPParserRULE_newExpression_                  = 23
+	CPPParserRULE_newPlacement                    = 24
+	CPPParserRULE_newTypeId                       = 25
+	CPPParserRULE_newDeclarator_                  = 26
+	CPPParserRULE_noPointerNewDeclarator          = 27
+	CPPParserRULE_newInitializer_                 = 28
+	CPPParserRULE_deleteExpression                = 29
+	CPPParserRULE_noExceptExpression              = 30
+	CPPParserRULE_castExpression                  = 31
+	CPPParserRULE_pointerMemberExpression         = 32
+	CPPParserRULE_multiplicativeExpression        = 33
+	CPPParserRULE_additiveExpression              = 34
+	CPPParserRULE_shiftExpression                 = 35
+	CPPParserRULE_shiftOperator                   = 36
+	CPPParserRULE_relationalExpression            = 37
+	CPPParserRULE_equalityExpression              = 38
+	CPPParserRULE_andExpression                   = 39
+	CPPParserRULE_exclusiveOrExpression           = 40
+	CPPParserRULE_inclusiveOrExpression           = 41
+	CPPParserRULE_logicalAndExpression            = 42
+	CPPParserRULE_logicalOrExpression             = 43
+	CPPParserRULE_conditionalExpression           = 44
+	CPPParserRULE_assignmentExpression            = 45
+	CPPParserRULE_assignmentOperator              = 46
+	CPPParserRULE_expression                      = 47
+	CPPParserRULE_constantExpression              = 48
+	CPPParserRULE_statement                       = 49
+	CPPParserRULE_labeledStatement                = 50
+	CPPParserRULE_expressionStatement             = 51
+	CPPParserRULE_compoundStatement               = 52
+	CPPParserRULE_statementSeq                    = 53
+	CPPParserRULE_selectionStatement              = 54
+	CPPParserRULE_condition                       = 55
+	CPPParserRULE_iterationStatement              = 56
+	CPPParserRULE_forInitStatement                = 57
+	CPPParserRULE_forRangeDeclaration             = 58
+	CPPParserRULE_forRangeInitializer             = 59
+	CPPParserRULE_jumpStatement                   = 60
+	CPPParserRULE_declarationStatement            = 61
+	CPPParserRULE_declarationSeq                  = 62
+	CPPParserRULE_declaration                     = 63
+	CPPParserRULE_blockDeclaration                = 64
+	CPPParserRULE_aliasDeclaration                = 65
+	CPPParserRULE_simpleDeclaration               = 66
+	CPPParserRULE_identifierList                  = 67
+	CPPParserRULE_staticAssertDeclaration         = 68
+	CPPParserRULE_emptyDeclaration_               = 69
+	CPPParserRULE_attributeDeclaration            = 70
+	CPPParserRULE_declSpecifier                   = 71
+	CPPParserRULE_declSpecifierSeq                = 72
+	CPPParserRULE_storageClassSpecifier           = 73
+	CPPParserRULE_functionSpecifier               = 74
+	CPPParserRULE_typedefName                     = 75
+	CPPParserRULE_typeSpecifier                   = 76
+	CPPParserRULE_trailingTypeSpecifier           = 77
+	CPPParserRULE_typeSpecifierSeq                = 78
+	CPPParserRULE_trailingTypeSpecifierSeq        = 79
+	CPPParserRULE_simpleTypeLengthModifier        = 80
+	CPPParserRULE_simpleTypeSignednessModifier    = 81
+	CPPParserRULE_simpleTypeSpecifier             = 82
+	CPPParserRULE_theTypeName                     = 83
+	CPPParserRULE_decltypeSpecifier               = 84
+	CPPParserRULE_elaboratedTypeSpecifier         = 85
+	CPPParserRULE_enumName                        = 86
+	CPPParserRULE_enumSpecifier                   = 87
+	CPPParserRULE_enumHead                        = 88
+	CPPParserRULE_opaqueEnumDeclaration           = 89
+	CPPParserRULE_enumKey                         = 90
+	CPPParserRULE_enumBase                        = 91
+	CPPParserRULE_enumeratorList                  = 92
+	CPPParserRULE_enumeratorDefinition            = 93
+	CPPParserRULE_enumerator                      = 94
+	CPPParserRULE_namespaceName                   = 95
+	CPPParserRULE_originalNamespaceName           = 96
+	CPPParserRULE_namespaceDefinition             = 97
+	CPPParserRULE_namespaceAlias                  = 98
+	CPPParserRULE_namespaceAliasDefinition        = 99
+	CPPParserRULE_qualifiedNamespaceSpecifier     = 100
+	CPPParserRULE_usingDeclaration                = 101
+	CPPParserRULE_usingDirective                  = 102
+	CPPParserRULE_asmDefinition                   = 103
+	CPPParserRULE_linkageSpecification            = 104
+	CPPParserRULE_attributeSpecifierSeq           = 105
+	CPPParserRULE_attributeSpecifier              = 106
+	CPPParserRULE_alignmentSpecifier              = 107
+	CPPParserRULE_attributeList                   = 108
+	CPPParserRULE_attribute                       = 109
+	CPPParserRULE_attributeNamespace              = 110
+	CPPParserRULE_attributeArgumentClause         = 111
+	CPPParserRULE_balancedTokenSeq                = 112
+	CPPParserRULE_balancedToken                   = 113
+	CPPParserRULE_initDeclaratorList              = 114
+	CPPParserRULE_initDeclarator                  = 115
+	CPPParserRULE_declarator                      = 116
+	CPPParserRULE_pointerDeclarator               = 117
+	CPPParserRULE_noPointerDeclarator             = 118
+	CPPParserRULE_parametersAndQualifiers         = 119
+	CPPParserRULE_trailingReturnType              = 120
+	CPPParserRULE_pointerOperator                 = 121
+	CPPParserRULE_cvQualifierSeq                  = 122
+	CPPParserRULE_cvQualifier                     = 123
+	CPPParserRULE_refQualifier                    = 124
+	CPPParserRULE_declaratorId                    = 125
+	CPPParserRULE_theTypeId                       = 126
+	CPPParserRULE_abstractDeclarator              = 127
+	CPPParserRULE_pointerAbstractDeclarator       = 128
+	CPPParserRULE_noPointerAbstractDeclarator     = 129
+	CPPParserRULE_abstractPackDeclarator          = 130
+	CPPParserRULE_noPointerAbstractPackDeclarator = 131
+	CPPParserRULE_parameterDeclarationClause      = 132
+	CPPParserRULE_parameterDeclarationList        = 133
+	CPPParserRULE_parameterDeclaration            = 134
+	CPPParserRULE_functionDefinition              = 135
+	CPPParserRULE_functionBody                    = 136
+	CPPParserRULE_initializer                     = 137
+	CPPParserRULE_braceOrEqualInitializer         = 138
+	CPPParserRULE_initializerClause               = 139
+	CPPParserRULE_initializerList                 = 140
+	CPPParserRULE_bracedInitList                  = 141
+	CPPParserRULE_className                       = 142
+	CPPParserRULE_classSpecifier                  = 143
+	CPPParserRULE_classHead                       = 144
+	CPPParserRULE_classHeadName                   = 145
+	CPPParserRULE_classVirtSpecifier              = 146
+	CPPParserRULE_classKey                        = 147
+	CPPParserRULE_memberSpecification             = 148
+	CPPParserRULE_memberDeclaration               = 149
+	CPPParserRULE_memberDeclaratorList            = 150
+	CPPParserRULE_memberDeclarator                = 151
+	CPPParserRULE_virtualSpecifierSeq             = 152
+	CPPParserRULE_virtualSpecifier                = 153
+	CPPParserRULE_pureSpecifier                   = 154
+	CPPParserRULE_baseClause                      = 155
+	CPPParserRULE_baseSpecifierList               = 156
+	CPPParserRULE_baseSpecifier                   = 157
+	CPPParserRULE_classOrDeclType                 = 158
+	CPPParserRULE_baseTypeSpecifier               = 159
+	CPPParserRULE_accessSpecifier                 = 160
+	CPPParserRULE_conversionFunctionId            = 161
+	CPPParserRULE_conversionTypeId                = 162
+	CPPParserRULE_conversionDeclarator            = 163
+	CPPParserRULE_constructorInitializer          = 164
+	CPPParserRULE_memInitializerList              = 165
+	CPPParserRULE_memInitializer                  = 166
+	CPPParserRULE_memInitializerId                = 167
+	CPPParserRULE_operatorFunctionId              = 168
+	CPPParserRULE_literalOperatorId               = 169
+	CPPParserRULE_templateDeclaration             = 170
+	CPPParserRULE_templateParameterList           = 171
+	CPPParserRULE_templateParameter               = 172
+	CPPParserRULE_typeParameter                   = 173
+	CPPParserRULE_simpleTemplateId                = 174
+	CPPParserRULE_templateId                      = 175
+	CPPParserRULE_templateName                    = 176
+	CPPParserRULE_templateArgumentList            = 177
+	CPPParserRULE_templateArgument                = 178
+	CPPParserRULE_typeNameSpecifier               = 179
+	CPPParserRULE_explicitInstantiation           = 180
+	CPPParserRULE_explicitSpecialization          = 181
+	CPPParserRULE_tryBlock                        = 182
+	CPPParserRULE_functionTryBlock                = 183
+	CPPParserRULE_handlerSeq                      = 184
+	CPPParserRULE_handler                         = 185
+	CPPParserRULE_exceptionDeclaration            = 186
+	CPPParserRULE_throwExpression                 = 187
+	CPPParserRULE_exceptionSpecification          = 188
+	CPPParserRULE_dynamicExceptionSpecification   = 189
+	CPPParserRULE_typeIdList                      = 190
+	CPPParserRULE_noExceptSpecification           = 191
+	CPPParserRULE_theOperator                     = 192
+	CPPParserRULE_literal                         = 193
 )
 
 // ITranslationUnitContext is an interface to support dynamic dispatch.
@@ -1652,13 +1652,13 @@ type TranslationUnitContext struct {
 func NewEmptyTranslationUnitContext() *TranslationUnitContext {
 	var p = new(TranslationUnitContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_translationUnit
+	p.RuleIndex = CPPParserRULE_translationUnit
 	return p
 }
 
 func InitEmptyTranslationUnitContext(p *TranslationUnitContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_translationUnit
+	p.RuleIndex = CPPParserRULE_translationUnit
 }
 
 func (*TranslationUnitContext) IsTranslationUnitContext() {}
@@ -1669,7 +1669,7 @@ func NewTranslationUnitContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_translationUnit
+	p.RuleIndex = CPPParserRULE_translationUnit
 
 	return p
 }
@@ -1677,7 +1677,7 @@ func NewTranslationUnitContext(parser antlr.Parser, parent antlr.ParserRuleConte
 func (s *TranslationUnitContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TranslationUnitContext) EOF() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEOF, 0)
+	return s.GetToken(CPPParserEOF, 0)
 }
 
 func (s *TranslationUnitContext) DeclarationSeq() IDeclarationSeqContext {
@@ -1706,7 +1706,7 @@ func (s *TranslationUnitContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *TranslationUnitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTranslationUnit(s)
 
 	default:
@@ -1714,12 +1714,12 @@ func (s *TranslationUnitContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) TranslationUnit() (localctx ITranslationUnitContext) {
+func (p *CPPParser) TranslationUnit() (localctx ITranslationUnitContext) {
 	this := p
 	_ = this
 
 	localctx = NewTranslationUnitContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 0, CPP14ParserRULE_translationUnit)
+	p.EnterRule(localctx, 0, CPPParserRULE_translationUnit)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -1739,7 +1739,7 @@ func (p *CPP14Parser) TranslationUnit() (localctx ITranslationUnitContext) {
 	}
 	{
 		p.SetState(391)
-		p.Match(CPP14ParserEOF)
+		p.Match(CPPParserEOF)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1790,13 +1790,13 @@ type PrimaryExpressionContext struct {
 func NewEmptyPrimaryExpressionContext() *PrimaryExpressionContext {
 	var p = new(PrimaryExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_primaryExpression
+	p.RuleIndex = CPPParserRULE_primaryExpression
 	return p
 }
 
 func InitEmptyPrimaryExpressionContext(p *PrimaryExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_primaryExpression
+	p.RuleIndex = CPPParserRULE_primaryExpression
 }
 
 func (*PrimaryExpressionContext) IsPrimaryExpressionContext() {}
@@ -1807,7 +1807,7 @@ func NewPrimaryExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_primaryExpression
+	p.RuleIndex = CPPParserRULE_primaryExpression
 
 	return p
 }
@@ -1856,7 +1856,7 @@ func (s *PrimaryExpressionContext) Literal(i int) ILiteralContext {
 }
 
 func (s *PrimaryExpressionContext) This() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserThis, 0)
+	return s.GetToken(CPPParserThis, 0)
 }
 
 func (s *PrimaryExpressionContext) FoldExpression() IFoldExpressionContext {
@@ -1876,11 +1876,11 @@ func (s *PrimaryExpressionContext) FoldExpression() IFoldExpressionContext {
 }
 
 func (s *PrimaryExpressionContext) Noexcept() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNoexcept, 0)
+	return s.GetToken(CPPParserNoexcept, 0)
 }
 
 func (s *PrimaryExpressionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *PrimaryExpressionContext) Expression() IExpressionContext {
@@ -1900,7 +1900,7 @@ func (s *PrimaryExpressionContext) Expression() IExpressionContext {
 }
 
 func (s *PrimaryExpressionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *PrimaryExpressionContext) IdExpression() IIdExpressionContext {
@@ -1945,7 +1945,7 @@ func (s *PrimaryExpressionContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *PrimaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPrimaryExpression(s)
 
 	default:
@@ -1953,12 +1953,12 @@ func (s *PrimaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
+func (p *CPPParser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewPrimaryExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 2, CPP14ParserRULE_primaryExpression)
+	p.EnterRule(localctx, 2, CPPParserRULE_primaryExpression)
 	var _alt int
 
 	p.SetState(411)
@@ -2001,7 +2001,7 @@ func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(398)
-			p.Match(CPP14ParserThis)
+			p.Match(CPPParserThis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2019,7 +2019,7 @@ func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(400)
-			p.Match(CPP14ParserNoexcept)
+			p.Match(CPPParserNoexcept)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2027,7 +2027,7 @@ func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 		}
 		{
 			p.SetState(401)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2039,7 +2039,7 @@ func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 		}
 		{
 			p.SetState(403)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2050,7 +2050,7 @@ func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(405)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2062,7 +2062,7 @@ func (p *CPP14Parser) PrimaryExpression() (localctx IPrimaryExpressionContext) {
 		}
 		{
 			p.SetState(407)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2128,13 +2128,13 @@ type FoldExpressionContext struct {
 func NewEmptyFoldExpressionContext() *FoldExpressionContext {
 	var p = new(FoldExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_foldExpression
+	p.RuleIndex = CPPParserRULE_foldExpression
 	return p
 }
 
 func InitEmptyFoldExpressionContext(p *FoldExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_foldExpression
+	p.RuleIndex = CPPParserRULE_foldExpression
 }
 
 func (*FoldExpressionContext) IsFoldExpressionContext() {}
@@ -2145,7 +2145,7 @@ func NewFoldExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_foldExpression
+	p.RuleIndex = CPPParserRULE_foldExpression
 
 	return p
 }
@@ -2153,7 +2153,7 @@ func NewFoldExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *FoldExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *FoldExpressionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *FoldExpressionContext) AllCastExpression() []ICastExpressionContext {
@@ -2198,7 +2198,7 @@ func (s *FoldExpressionContext) CastExpression(i int) ICastExpressionContext {
 }
 
 func (s *FoldExpressionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *FoldExpressionContext) AllFoldOperator() []IFoldOperatorContext {
@@ -2243,7 +2243,7 @@ func (s *FoldExpressionContext) FoldOperator(i int) IFoldOperatorContext {
 }
 
 func (s *FoldExpressionContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *FoldExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -2256,7 +2256,7 @@ func (s *FoldExpressionContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *FoldExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitFoldExpression(s)
 
 	default:
@@ -2264,16 +2264,16 @@ func (s *FoldExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) FoldExpression() (localctx IFoldExpressionContext) {
+func (p *CPPParser) FoldExpression() (localctx IFoldExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewFoldExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 4, CPP14ParserRULE_foldExpression)
+	p.EnterRule(localctx, 4, CPPParserRULE_foldExpression)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(413)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2297,7 +2297,7 @@ func (p *CPP14Parser) FoldExpression() (localctx IFoldExpressionContext) {
 		}
 		{
 			p.SetState(416)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2307,7 +2307,7 @@ func (p *CPP14Parser) FoldExpression() (localctx IFoldExpressionContext) {
 	case 2:
 		{
 			p.SetState(418)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2329,7 +2329,7 @@ func (p *CPP14Parser) FoldExpression() (localctx IFoldExpressionContext) {
 		}
 		{
 			p.SetState(423)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2349,7 +2349,7 @@ func (p *CPP14Parser) FoldExpression() (localctx IFoldExpressionContext) {
 	}
 	{
 		p.SetState(429)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2418,13 +2418,13 @@ type FoldOperatorContext struct {
 func NewEmptyFoldOperatorContext() *FoldOperatorContext {
 	var p = new(FoldOperatorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_foldOperator
+	p.RuleIndex = CPPParserRULE_foldOperator
 	return p
 }
 
 func InitEmptyFoldOperatorContext(p *FoldOperatorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_foldOperator
+	p.RuleIndex = CPPParserRULE_foldOperator
 }
 
 func (*FoldOperatorContext) IsFoldOperatorContext() {}
@@ -2435,7 +2435,7 @@ func NewFoldOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_foldOperator
+	p.RuleIndex = CPPParserRULE_foldOperator
 
 	return p
 }
@@ -2443,115 +2443,115 @@ func NewFoldOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 func (s *FoldOperatorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *FoldOperatorContext) Plus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlus, 0)
+	return s.GetToken(CPPParserPlus, 0)
 }
 
 func (s *FoldOperatorContext) Minus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinus, 0)
+	return s.GetToken(CPPParserMinus, 0)
 }
 
 func (s *FoldOperatorContext) Star() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStar, 0)
+	return s.GetToken(CPPParserStar, 0)
 }
 
 func (s *FoldOperatorContext) Div() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDiv, 0)
+	return s.GetToken(CPPParserDiv, 0)
 }
 
 func (s *FoldOperatorContext) Mod() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMod, 0)
+	return s.GetToken(CPPParserMod, 0)
 }
 
 func (s *FoldOperatorContext) Caret() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserCaret, 0)
+	return s.GetToken(CPPParserCaret, 0)
 }
 
 func (s *FoldOperatorContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *FoldOperatorContext) Or() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOr, 0)
+	return s.GetToken(CPPParserOr, 0)
 }
 
 func (s *FoldOperatorContext) AllLess() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLess)
+	return s.GetTokens(CPPParserLess)
 }
 
 func (s *FoldOperatorContext) Less(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, i)
+	return s.GetToken(CPPParserLess, i)
 }
 
 func (s *FoldOperatorContext) AllGreater() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserGreater)
+	return s.GetTokens(CPPParserGreater)
 }
 
 func (s *FoldOperatorContext) Greater(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, i)
+	return s.GetToken(CPPParserGreater, i)
 }
 
 func (s *FoldOperatorContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *FoldOperatorContext) PlusAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlusAssign, 0)
+	return s.GetToken(CPPParserPlusAssign, 0)
 }
 
 func (s *FoldOperatorContext) MinusAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinusAssign, 0)
+	return s.GetToken(CPPParserMinusAssign, 0)
 }
 
 func (s *FoldOperatorContext) StarAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStarAssign, 0)
+	return s.GetToken(CPPParserStarAssign, 0)
 }
 
 func (s *FoldOperatorContext) DivAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDivAssign, 0)
+	return s.GetToken(CPPParserDivAssign, 0)
 }
 
 func (s *FoldOperatorContext) ModAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserModAssign, 0)
+	return s.GetToken(CPPParserModAssign, 0)
 }
 
 func (s *FoldOperatorContext) XorAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserXorAssign, 0)
+	return s.GetToken(CPPParserXorAssign, 0)
 }
 
 func (s *FoldOperatorContext) AndAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAssign, 0)
+	return s.GetToken(CPPParserAndAssign, 0)
 }
 
 func (s *FoldOperatorContext) OrAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOrAssign, 0)
+	return s.GetToken(CPPParserOrAssign, 0)
 }
 
 func (s *FoldOperatorContext) LessEqual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLessEqual, 0)
+	return s.GetToken(CPPParserLessEqual, 0)
 }
 
 func (s *FoldOperatorContext) GreaterEqual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreaterEqual, 0)
+	return s.GetToken(CPPParserGreaterEqual, 0)
 }
 
 func (s *FoldOperatorContext) Equal() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEqual, 0)
+	return s.GetToken(CPPParserEqual, 0)
 }
 
 func (s *FoldOperatorContext) NotEqual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNotEqual, 0)
+	return s.GetToken(CPPParserNotEqual, 0)
 }
 
 func (s *FoldOperatorContext) AndAnd() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAnd, 0)
+	return s.GetToken(CPPParserAndAnd, 0)
 }
 
 func (s *FoldOperatorContext) OrOr() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOrOr, 0)
+	return s.GetToken(CPPParserOrOr, 0)
 }
 
 func (s *FoldOperatorContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *FoldOperatorContext) GetRuleContext() antlr.RuleContext {
@@ -2564,7 +2564,7 @@ func (s *FoldOperatorContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *FoldOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitFoldOperator(s)
 
 	default:
@@ -2572,12 +2572,12 @@ func (s *FoldOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
+func (p *CPPParser) FoldOperator() (localctx IFoldOperatorContext) {
 	this := p
 	_ = this
 
 	localctx = NewFoldOperatorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 6, CPP14ParserRULE_foldOperator)
+	p.EnterRule(localctx, 6, CPPParserRULE_foldOperator)
 	p.SetState(461)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -2589,7 +2589,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(431)
-			p.Match(CPP14ParserPlus)
+			p.Match(CPPParserPlus)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2600,7 +2600,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(432)
-			p.Match(CPP14ParserMinus)
+			p.Match(CPPParserMinus)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2611,7 +2611,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(433)
-			p.Match(CPP14ParserStar)
+			p.Match(CPPParserStar)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2622,7 +2622,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(434)
-			p.Match(CPP14ParserDiv)
+			p.Match(CPPParserDiv)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2633,7 +2633,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(435)
-			p.Match(CPP14ParserMod)
+			p.Match(CPPParserMod)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2644,7 +2644,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 6)
 		{
 			p.SetState(436)
-			p.Match(CPP14ParserCaret)
+			p.Match(CPPParserCaret)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2655,7 +2655,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 7)
 		{
 			p.SetState(437)
-			p.Match(CPP14ParserAnd)
+			p.Match(CPPParserAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2666,7 +2666,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 8)
 		{
 			p.SetState(438)
-			p.Match(CPP14ParserOr)
+			p.Match(CPPParserOr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2677,7 +2677,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 9)
 		{
 			p.SetState(439)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2685,7 +2685,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		}
 		{
 			p.SetState(440)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2696,7 +2696,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 10)
 		{
 			p.SetState(441)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2704,7 +2704,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		}
 		{
 			p.SetState(442)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2715,7 +2715,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 11)
 		{
 			p.SetState(443)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2726,7 +2726,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 12)
 		{
 			p.SetState(444)
-			p.Match(CPP14ParserPlusAssign)
+			p.Match(CPPParserPlusAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2737,7 +2737,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 13)
 		{
 			p.SetState(445)
-			p.Match(CPP14ParserMinusAssign)
+			p.Match(CPPParserMinusAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2748,7 +2748,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 14)
 		{
 			p.SetState(446)
-			p.Match(CPP14ParserStarAssign)
+			p.Match(CPPParserStarAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2759,7 +2759,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 15)
 		{
 			p.SetState(447)
-			p.Match(CPP14ParserDivAssign)
+			p.Match(CPPParserDivAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2770,7 +2770,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 16)
 		{
 			p.SetState(448)
-			p.Match(CPP14ParserModAssign)
+			p.Match(CPPParserModAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2781,7 +2781,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 17)
 		{
 			p.SetState(449)
-			p.Match(CPP14ParserXorAssign)
+			p.Match(CPPParserXorAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2792,7 +2792,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 18)
 		{
 			p.SetState(450)
-			p.Match(CPP14ParserAndAssign)
+			p.Match(CPPParserAndAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2803,7 +2803,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 19)
 		{
 			p.SetState(451)
-			p.Match(CPP14ParserOrAssign)
+			p.Match(CPPParserOrAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2814,7 +2814,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 20)
 		{
 			p.SetState(452)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2825,7 +2825,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 21)
 		{
 			p.SetState(453)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2836,7 +2836,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 22)
 		{
 			p.SetState(454)
-			p.Match(CPP14ParserLessEqual)
+			p.Match(CPPParserLessEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2847,7 +2847,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 23)
 		{
 			p.SetState(455)
-			p.Match(CPP14ParserGreaterEqual)
+			p.Match(CPPParserGreaterEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2858,7 +2858,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 24)
 		{
 			p.SetState(456)
-			p.Match(CPP14ParserEqual)
+			p.Match(CPPParserEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2869,7 +2869,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 25)
 		{
 			p.SetState(457)
-			p.Match(CPP14ParserNotEqual)
+			p.Match(CPPParserNotEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2880,7 +2880,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 26)
 		{
 			p.SetState(458)
-			p.Match(CPP14ParserAndAnd)
+			p.Match(CPPParserAndAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2891,7 +2891,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 27)
 		{
 			p.SetState(459)
-			p.Match(CPP14ParserOrOr)
+			p.Match(CPPParserOrOr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2902,7 +2902,7 @@ func (p *CPP14Parser) FoldOperator() (localctx IFoldOperatorContext) {
 		p.EnterOuterAlt(localctx, 28)
 		{
 			p.SetState(460)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2949,13 +2949,13 @@ type IdExpressionContext struct {
 func NewEmptyIdExpressionContext() *IdExpressionContext {
 	var p = new(IdExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_idExpression
+	p.RuleIndex = CPPParserRULE_idExpression
 	return p
 }
 
 func InitEmptyIdExpressionContext(p *IdExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_idExpression
+	p.RuleIndex = CPPParserRULE_idExpression
 }
 
 func (*IdExpressionContext) IsIdExpressionContext() {}
@@ -2966,7 +2966,7 @@ func NewIdExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_idExpression
+	p.RuleIndex = CPPParserRULE_idExpression
 
 	return p
 }
@@ -3015,7 +3015,7 @@ func (s *IdExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *IdExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitIdExpression(s)
 
 	default:
@@ -3023,12 +3023,12 @@ func (s *IdExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) IdExpression() (localctx IIdExpressionContext) {
+func (p *CPPParser) IdExpression() (localctx IIdExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewIdExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 8, CPP14ParserRULE_idExpression)
+	p.EnterRule(localctx, 8, CPPParserRULE_idExpression)
 	p.SetState(465)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -3096,13 +3096,13 @@ type UnqualifiedIdContext struct {
 func NewEmptyUnqualifiedIdContext() *UnqualifiedIdContext {
 	var p = new(UnqualifiedIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_unqualifiedId
+	p.RuleIndex = CPPParserRULE_unqualifiedId
 	return p
 }
 
 func InitEmptyUnqualifiedIdContext(p *UnqualifiedIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_unqualifiedId
+	p.RuleIndex = CPPParserRULE_unqualifiedId
 }
 
 func (*UnqualifiedIdContext) IsUnqualifiedIdContext() {}
@@ -3113,7 +3113,7 @@ func NewUnqualifiedIdContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_unqualifiedId
+	p.RuleIndex = CPPParserRULE_unqualifiedId
 
 	return p
 }
@@ -3121,7 +3121,7 @@ func NewUnqualifiedIdContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *UnqualifiedIdContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *UnqualifiedIdContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *UnqualifiedIdContext) OperatorFunctionId() IOperatorFunctionIdContext {
@@ -3173,7 +3173,7 @@ func (s *UnqualifiedIdContext) LiteralOperatorId() ILiteralOperatorIdContext {
 }
 
 func (s *UnqualifiedIdContext) Tilde() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTilde, 0)
+	return s.GetToken(CPPParserTilde, 0)
 }
 
 func (s *UnqualifiedIdContext) ClassName() IClassNameContext {
@@ -3234,7 +3234,7 @@ func (s *UnqualifiedIdContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *UnqualifiedIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitUnqualifiedId(s)
 
 	default:
@@ -3242,12 +3242,12 @@ func (s *UnqualifiedIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) UnqualifiedId() (localctx IUnqualifiedIdContext) {
+func (p *CPPParser) UnqualifiedId() (localctx IUnqualifiedIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewUnqualifiedIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 10, CPP14ParserRULE_unqualifiedId)
+	p.EnterRule(localctx, 10, CPPParserRULE_unqualifiedId)
 	p.SetState(477)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -3259,7 +3259,7 @@ func (p *CPP14Parser) UnqualifiedId() (localctx IUnqualifiedIdContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(467)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -3291,7 +3291,7 @@ func (p *CPP14Parser) UnqualifiedId() (localctx IUnqualifiedIdContext) {
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(471)
-			p.Match(CPP14ParserTilde)
+			p.Match(CPPParserTilde)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -3304,13 +3304,13 @@ func (p *CPP14Parser) UnqualifiedId() (localctx IUnqualifiedIdContext) {
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserIdentifier:
+		case CPPParserIdentifier:
 			{
 				p.SetState(472)
 				p.ClassName()
 			}
 
-		case CPP14ParserDecltype:
+		case CPPParserDecltype:
 			{
 				p.SetState(473)
 				p.DecltypeSpecifier()
@@ -3369,13 +3369,13 @@ type QualifiedIdContext struct {
 func NewEmptyQualifiedIdContext() *QualifiedIdContext {
 	var p = new(QualifiedIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_qualifiedId
+	p.RuleIndex = CPPParserRULE_qualifiedId
 	return p
 }
 
 func InitEmptyQualifiedIdContext(p *QualifiedIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_qualifiedId
+	p.RuleIndex = CPPParserRULE_qualifiedId
 }
 
 func (*QualifiedIdContext) IsQualifiedIdContext() {}
@@ -3386,7 +3386,7 @@ func NewQualifiedIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_qualifiedId
+	p.RuleIndex = CPPParserRULE_qualifiedId
 
 	return p
 }
@@ -3426,7 +3426,7 @@ func (s *QualifiedIdContext) UnqualifiedId() IUnqualifiedIdContext {
 }
 
 func (s *QualifiedIdContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *QualifiedIdContext) GetRuleContext() antlr.RuleContext {
@@ -3439,7 +3439,7 @@ func (s *QualifiedIdContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *QualifiedIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitQualifiedId(s)
 
 	default:
@@ -3447,12 +3447,12 @@ func (s *QualifiedIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) QualifiedId() (localctx IQualifiedIdContext) {
+func (p *CPPParser) QualifiedId() (localctx IQualifiedIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewQualifiedIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 12, CPP14ParserRULE_qualifiedId)
+	p.EnterRule(localctx, 12, CPPParserRULE_qualifiedId)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -3467,10 +3467,10 @@ func (p *CPP14Parser) QualifiedId() (localctx IQualifiedIdContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserTemplate {
+	if _la == CPPParserTemplate {
 		{
 			p.SetState(480)
-			p.Match(CPP14ParserTemplate)
+			p.Match(CPPParserTemplate)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -3525,13 +3525,13 @@ type NestedNameSpecifierContext struct {
 func NewEmptyNestedNameSpecifierContext() *NestedNameSpecifierContext {
 	var p = new(NestedNameSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_nestedNameSpecifier
+	p.RuleIndex = CPPParserRULE_nestedNameSpecifier
 	return p
 }
 
 func InitEmptyNestedNameSpecifierContext(p *NestedNameSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_nestedNameSpecifier
+	p.RuleIndex = CPPParserRULE_nestedNameSpecifier
 }
 
 func (*NestedNameSpecifierContext) IsNestedNameSpecifierContext() {}
@@ -3542,7 +3542,7 @@ func NewNestedNameSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_nestedNameSpecifier
+	p.RuleIndex = CPPParserRULE_nestedNameSpecifier
 
 	return p
 }
@@ -3550,7 +3550,7 @@ func NewNestedNameSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleC
 func (s *NestedNameSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NestedNameSpecifierContext) Doublecolon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, 0)
+	return s.GetToken(CPPParserDoublecolon, 0)
 }
 
 func (s *NestedNameSpecifierContext) TheTypeName() ITheTypeNameContext {
@@ -3618,7 +3618,7 @@ func (s *NestedNameSpecifierContext) NestedNameSpecifier() INestedNameSpecifierC
 }
 
 func (s *NestedNameSpecifierContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *NestedNameSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext {
@@ -3638,7 +3638,7 @@ func (s *NestedNameSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext
 }
 
 func (s *NestedNameSpecifierContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *NestedNameSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -3651,7 +3651,7 @@ func (s *NestedNameSpecifierContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *NestedNameSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNestedNameSpecifier(s)
 
 	default:
@@ -3659,11 +3659,11 @@ func (s *NestedNameSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) NestedNameSpecifier() (localctx INestedNameSpecifierContext) {
+func (p *CPPParser) NestedNameSpecifier() (localctx INestedNameSpecifierContext) {
 	return p.nestedNameSpecifier(0)
 }
 
-func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifierContext) {
+func (p *CPPParser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifierContext) {
 	this := p
 	_ = this
 
@@ -3674,7 +3674,7 @@ func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifier
 	var _prevctx INestedNameSpecifierContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 14
-	p.EnterRecursionRule(localctx, 14, CPP14ParserRULE_nestedNameSpecifier, _p)
+	p.EnterRecursionRule(localctx, 14, CPPParserRULE_nestedNameSpecifier, _p)
 	var _la int
 
 	var _alt int
@@ -3710,7 +3710,7 @@ func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifier
 	}
 	{
 		p.SetState(491)
-		p.Match(CPP14ParserDoublecolon)
+		p.Match(CPPParserDoublecolon)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3734,7 +3734,7 @@ func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifier
 			}
 			_prevctx = localctx
 			localctx = NewNestedNameSpecifierContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_nestedNameSpecifier)
+			p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_nestedNameSpecifier)
 			p.SetState(493)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -3751,7 +3751,7 @@ func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifier
 			case 1:
 				{
 					p.SetState(494)
-					p.Match(CPP14ParserIdentifier)
+					p.Match(CPPParserIdentifier)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -3766,10 +3766,10 @@ func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifier
 				}
 				_la = p.GetTokenStream().LA(1)
 
-				if _la == CPP14ParserTemplate {
+				if _la == CPPParserTemplate {
 					{
 						p.SetState(495)
-						p.Match(CPP14ParserTemplate)
+						p.Match(CPPParserTemplate)
 						if p.HasError() {
 							// Recognition error - abort rule
 							goto errorExit
@@ -3787,7 +3787,7 @@ func (p *CPP14Parser) nestedNameSpecifier(_p int) (localctx INestedNameSpecifier
 			}
 			{
 				p.SetState(501)
-				p.Match(CPP14ParserDoublecolon)
+				p.Match(CPPParserDoublecolon)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -3843,13 +3843,13 @@ type LambdaExpressionContext struct {
 func NewEmptyLambdaExpressionContext() *LambdaExpressionContext {
 	var p = new(LambdaExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaExpression
+	p.RuleIndex = CPPParserRULE_lambdaExpression
 	return p
 }
 
 func InitEmptyLambdaExpressionContext(p *LambdaExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaExpression
+	p.RuleIndex = CPPParserRULE_lambdaExpression
 }
 
 func (*LambdaExpressionContext) IsLambdaExpressionContext() {}
@@ -3860,7 +3860,7 @@ func NewLambdaExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_lambdaExpression
+	p.RuleIndex = CPPParserRULE_lambdaExpression
 
 	return p
 }
@@ -3925,7 +3925,7 @@ func (s *LambdaExpressionContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *LambdaExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLambdaExpression(s)
 
 	default:
@@ -3933,12 +3933,12 @@ func (s *LambdaExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) LambdaExpression() (localctx ILambdaExpressionContext) {
+func (p *CPPParser) LambdaExpression() (localctx ILambdaExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewLambdaExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 16, CPP14ParserRULE_lambdaExpression)
+	p.EnterRule(localctx, 16, CPPParserRULE_lambdaExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -3953,7 +3953,7 @@ func (p *CPP14Parser) LambdaExpression() (localctx ILambdaExpressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserLeftParen {
+	if _la == CPPParserLeftParen {
 		{
 			p.SetState(508)
 			p.LambdaDeclarator()
@@ -4002,13 +4002,13 @@ type LambdaIntroducerContext struct {
 func NewEmptyLambdaIntroducerContext() *LambdaIntroducerContext {
 	var p = new(LambdaIntroducerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaIntroducer
+	p.RuleIndex = CPPParserRULE_lambdaIntroducer
 	return p
 }
 
 func InitEmptyLambdaIntroducerContext(p *LambdaIntroducerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaIntroducer
+	p.RuleIndex = CPPParserRULE_lambdaIntroducer
 }
 
 func (*LambdaIntroducerContext) IsLambdaIntroducerContext() {}
@@ -4019,7 +4019,7 @@ func NewLambdaIntroducerContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_lambdaIntroducer
+	p.RuleIndex = CPPParserRULE_lambdaIntroducer
 
 	return p
 }
@@ -4027,11 +4027,11 @@ func NewLambdaIntroducerContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *LambdaIntroducerContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *LambdaIntroducerContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *LambdaIntroducerContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *LambdaIntroducerContext) LambdaCapture() ILambdaCaptureContext {
@@ -4060,7 +4060,7 @@ func (s *LambdaIntroducerContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *LambdaIntroducerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLambdaIntroducer(s)
 
 	default:
@@ -4068,18 +4068,18 @@ func (s *LambdaIntroducerContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) LambdaIntroducer() (localctx ILambdaIntroducerContext) {
+func (p *CPPParser) LambdaIntroducer() (localctx ILambdaIntroducerContext) {
 	this := p
 	_ = this
 
 	localctx = NewLambdaIntroducerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, CPP14ParserRULE_lambdaIntroducer)
+	p.EnterRule(localctx, 18, CPPParserRULE_lambdaIntroducer)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(513)
-		p.Match(CPP14ParserLeftBracket)
+		p.Match(CPPParserLeftBracket)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4092,7 +4092,7 @@ func (p *CPP14Parser) LambdaIntroducer() (localctx ILambdaIntroducerContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if ((int64((_la-69)) & ^0x3f) == 0 && ((int64(1)<<(_la-69))&4563402753) != 0) || _la == CPP14ParserIdentifier {
+	if ((int64((_la-69)) & ^0x3f) == 0 && ((int64(1)<<(_la-69))&4563402753) != 0) || _la == CPPParserIdentifier {
 		{
 			p.SetState(514)
 			p.LambdaCapture()
@@ -4101,7 +4101,7 @@ func (p *CPP14Parser) LambdaIntroducer() (localctx ILambdaIntroducerContext) {
 	}
 	{
 		p.SetState(517)
-		p.Match(CPP14ParserRightBracket)
+		p.Match(CPPParserRightBracket)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4145,13 +4145,13 @@ type LambdaCaptureContext struct {
 func NewEmptyLambdaCaptureContext() *LambdaCaptureContext {
 	var p = new(LambdaCaptureContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaCapture
+	p.RuleIndex = CPPParserRULE_lambdaCapture
 	return p
 }
 
 func InitEmptyLambdaCaptureContext(p *LambdaCaptureContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaCapture
+	p.RuleIndex = CPPParserRULE_lambdaCapture
 }
 
 func (*LambdaCaptureContext) IsLambdaCaptureContext() {}
@@ -4162,7 +4162,7 @@ func NewLambdaCaptureContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_lambdaCapture
+	p.RuleIndex = CPPParserRULE_lambdaCapture
 
 	return p
 }
@@ -4202,7 +4202,7 @@ func (s *LambdaCaptureContext) CaptureDefault() ICaptureDefaultContext {
 }
 
 func (s *LambdaCaptureContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *LambdaCaptureContext) GetRuleContext() antlr.RuleContext {
@@ -4215,7 +4215,7 @@ func (s *LambdaCaptureContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *LambdaCaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLambdaCapture(s)
 
 	default:
@@ -4223,12 +4223,12 @@ func (s *LambdaCaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) LambdaCapture() (localctx ILambdaCaptureContext) {
+func (p *CPPParser) LambdaCapture() (localctx ILambdaCaptureContext) {
 	this := p
 	_ = this
 
 	localctx = NewLambdaCaptureContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 20, CPP14ParserRULE_lambdaCapture)
+	p.EnterRule(localctx, 20, CPPParserRULE_lambdaCapture)
 	var _la int
 
 	p.SetState(525)
@@ -4258,10 +4258,10 @@ func (p *CPP14Parser) LambdaCapture() (localctx ILambdaCaptureContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserComma {
+		if _la == CPPParserComma {
 			{
 				p.SetState(521)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -4314,13 +4314,13 @@ type CaptureDefaultContext struct {
 func NewEmptyCaptureDefaultContext() *CaptureDefaultContext {
 	var p = new(CaptureDefaultContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_captureDefault
+	p.RuleIndex = CPPParserRULE_captureDefault
 	return p
 }
 
 func InitEmptyCaptureDefaultContext(p *CaptureDefaultContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_captureDefault
+	p.RuleIndex = CPPParserRULE_captureDefault
 }
 
 func (*CaptureDefaultContext) IsCaptureDefaultContext() {}
@@ -4331,7 +4331,7 @@ func NewCaptureDefaultContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_captureDefault
+	p.RuleIndex = CPPParserRULE_captureDefault
 
 	return p
 }
@@ -4339,11 +4339,11 @@ func NewCaptureDefaultContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *CaptureDefaultContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *CaptureDefaultContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *CaptureDefaultContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *CaptureDefaultContext) GetRuleContext() antlr.RuleContext {
@@ -4356,7 +4356,7 @@ func (s *CaptureDefaultContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *CaptureDefaultContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCaptureDefault(s)
 
 	default:
@@ -4364,12 +4364,12 @@ func (s *CaptureDefaultContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) CaptureDefault() (localctx ICaptureDefaultContext) {
+func (p *CPPParser) CaptureDefault() (localctx ICaptureDefaultContext) {
 	this := p
 	_ = this
 
 	localctx = NewCaptureDefaultContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 22, CPP14ParserRULE_captureDefault)
+	p.EnterRule(localctx, 22, CPPParserRULE_captureDefault)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -4377,7 +4377,7 @@ func (p *CPP14Parser) CaptureDefault() (localctx ICaptureDefaultContext) {
 		p.SetState(527)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserAnd || _la == CPP14ParserAssign) {
+		if !(_la == CPPParserAnd || _la == CPPParserAssign) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -4424,13 +4424,13 @@ type CaptureListContext struct {
 func NewEmptyCaptureListContext() *CaptureListContext {
 	var p = new(CaptureListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_captureList
+	p.RuleIndex = CPPParserRULE_captureList
 	return p
 }
 
 func InitEmptyCaptureListContext(p *CaptureListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_captureList
+	p.RuleIndex = CPPParserRULE_captureList
 }
 
 func (*CaptureListContext) IsCaptureListContext() {}
@@ -4441,7 +4441,7 @@ func NewCaptureListContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_captureList
+	p.RuleIndex = CPPParserRULE_captureList
 
 	return p
 }
@@ -4490,15 +4490,15 @@ func (s *CaptureListContext) Capture(i int) ICaptureContext {
 }
 
 func (s *CaptureListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *CaptureListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *CaptureListContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *CaptureListContext) GetRuleContext() antlr.RuleContext {
@@ -4511,7 +4511,7 @@ func (s *CaptureListContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *CaptureListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCaptureList(s)
 
 	default:
@@ -4519,12 +4519,12 @@ func (s *CaptureListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) CaptureList() (localctx ICaptureListContext) {
+func (p *CPPParser) CaptureList() (localctx ICaptureListContext) {
 	this := p
 	_ = this
 
 	localctx = NewCaptureListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 24, CPP14ParserRULE_captureList)
+	p.EnterRule(localctx, 24, CPPParserRULE_captureList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -4539,10 +4539,10 @@ func (p *CPP14Parser) CaptureList() (localctx ICaptureListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(530)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4567,10 +4567,10 @@ func (p *CPP14Parser) CaptureList() (localctx ICaptureListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(537)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4615,13 +4615,13 @@ type CaptureContext struct {
 func NewEmptyCaptureContext() *CaptureContext {
 	var p = new(CaptureContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_capture
+	p.RuleIndex = CPPParserRULE_capture
 	return p
 }
 
 func InitEmptyCaptureContext(p *CaptureContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_capture
+	p.RuleIndex = CPPParserRULE_capture
 }
 
 func (*CaptureContext) IsCaptureContext() {}
@@ -4632,7 +4632,7 @@ func NewCaptureContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_capture
+	p.RuleIndex = CPPParserRULE_capture
 
 	return p
 }
@@ -4681,7 +4681,7 @@ func (s *CaptureContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 
 func (s *CaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCapture(s)
 
 	default:
@@ -4689,12 +4689,12 @@ func (s *CaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Capture() (localctx ICaptureContext) {
+func (p *CPPParser) Capture() (localctx ICaptureContext) {
 	this := p
 	_ = this
 
 	localctx = NewCaptureContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 26, CPP14ParserRULE_capture)
+	p.EnterRule(localctx, 26, CPPParserRULE_capture)
 	p.SetState(542)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -4757,13 +4757,13 @@ type SimpleCaptureContext struct {
 func NewEmptySimpleCaptureContext() *SimpleCaptureContext {
 	var p = new(SimpleCaptureContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleCapture
+	p.RuleIndex = CPPParserRULE_simpleCapture
 	return p
 }
 
 func InitEmptySimpleCaptureContext(p *SimpleCaptureContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleCapture
+	p.RuleIndex = CPPParserRULE_simpleCapture
 }
 
 func (*SimpleCaptureContext) IsSimpleCaptureContext() {}
@@ -4774,7 +4774,7 @@ func NewSimpleCaptureContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_simpleCapture
+	p.RuleIndex = CPPParserRULE_simpleCapture
 
 	return p
 }
@@ -4782,15 +4782,15 @@ func NewSimpleCaptureContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *SimpleCaptureContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *SimpleCaptureContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *SimpleCaptureContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *SimpleCaptureContext) This() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserThis, 0)
+	return s.GetToken(CPPParserThis, 0)
 }
 
 func (s *SimpleCaptureContext) GetRuleContext() antlr.RuleContext {
@@ -4803,7 +4803,7 @@ func (s *SimpleCaptureContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *SimpleCaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSimpleCapture(s)
 
 	default:
@@ -4811,12 +4811,12 @@ func (s *SimpleCaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) SimpleCapture() (localctx ISimpleCaptureContext) {
+func (p *CPPParser) SimpleCapture() (localctx ISimpleCaptureContext) {
 	this := p
 	_ = this
 
 	localctx = NewSimpleCaptureContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 28, CPP14ParserRULE_simpleCapture)
+	p.EnterRule(localctx, 28, CPPParserRULE_simpleCapture)
 	var _la int
 
 	p.SetState(549)
@@ -4826,7 +4826,7 @@ func (p *CPP14Parser) SimpleCapture() (localctx ISimpleCaptureContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserAnd, CPP14ParserIdentifier:
+	case CPPParserAnd, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(545)
 		p.GetErrorHandler().Sync(p)
@@ -4835,10 +4835,10 @@ func (p *CPP14Parser) SimpleCapture() (localctx ISimpleCaptureContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAnd {
+		if _la == CPPParserAnd {
 			{
 				p.SetState(544)
-				p.Match(CPP14ParserAnd)
+				p.Match(CPPParserAnd)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -4848,18 +4848,18 @@ func (p *CPP14Parser) SimpleCapture() (localctx ISimpleCaptureContext) {
 		}
 		{
 			p.SetState(547)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserThis:
+	case CPPParserThis:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(548)
-			p.Match(CPP14ParserThis)
+			p.Match(CPPParserThis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4908,13 +4908,13 @@ type InitCaptureContext struct {
 func NewEmptyInitCaptureContext() *InitCaptureContext {
 	var p = new(InitCaptureContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initCapture
+	p.RuleIndex = CPPParserRULE_initCapture
 	return p
 }
 
 func InitEmptyInitCaptureContext(p *InitCaptureContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initCapture
+	p.RuleIndex = CPPParserRULE_initCapture
 }
 
 func (*InitCaptureContext) IsInitCaptureContext() {}
@@ -4925,7 +4925,7 @@ func NewInitCaptureContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_initCapture
+	p.RuleIndex = CPPParserRULE_initCapture
 
 	return p
 }
@@ -4933,7 +4933,7 @@ func NewInitCaptureContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 func (s *InitCaptureContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *InitCaptureContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *InitCaptureContext) Initializer() IInitializerContext {
@@ -4953,7 +4953,7 @@ func (s *InitCaptureContext) Initializer() IInitializerContext {
 }
 
 func (s *InitCaptureContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *InitCaptureContext) GetRuleContext() antlr.RuleContext {
@@ -4966,7 +4966,7 @@ func (s *InitCaptureContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *InitCaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInitCapture(s)
 
 	default:
@@ -4974,12 +4974,12 @@ func (s *InitCaptureContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) InitCapture() (localctx IInitCaptureContext) {
+func (p *CPPParser) InitCapture() (localctx IInitCaptureContext) {
 	this := p
 	_ = this
 
 	localctx = NewInitCaptureContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 30, CPP14ParserRULE_initCapture)
+	p.EnterRule(localctx, 30, CPPParserRULE_initCapture)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -4990,10 +4990,10 @@ func (p *CPP14Parser) InitCapture() (localctx IInitCaptureContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAnd {
+	if _la == CPPParserAnd {
 		{
 			p.SetState(551)
-			p.Match(CPP14ParserAnd)
+			p.Match(CPPParserAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5003,7 +5003,7 @@ func (p *CPP14Parser) InitCapture() (localctx IInitCaptureContext) {
 	}
 	{
 		p.SetState(554)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5055,13 +5055,13 @@ type LambdaDeclaratorContext struct {
 func NewEmptyLambdaDeclaratorContext() *LambdaDeclaratorContext {
 	var p = new(LambdaDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaDeclarator
+	p.RuleIndex = CPPParserRULE_lambdaDeclarator
 	return p
 }
 
 func InitEmptyLambdaDeclaratorContext(p *LambdaDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_lambdaDeclarator
+	p.RuleIndex = CPPParserRULE_lambdaDeclarator
 }
 
 func (*LambdaDeclaratorContext) IsLambdaDeclaratorContext() {}
@@ -5072,7 +5072,7 @@ func NewLambdaDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_lambdaDeclarator
+	p.RuleIndex = CPPParserRULE_lambdaDeclarator
 
 	return p
 }
@@ -5080,11 +5080,11 @@ func NewLambdaDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *LambdaDeclaratorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *LambdaDeclaratorContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *LambdaDeclaratorContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *LambdaDeclaratorContext) ParameterDeclarationClause() IParameterDeclarationClauseContext {
@@ -5104,7 +5104,7 @@ func (s *LambdaDeclaratorContext) ParameterDeclarationClause() IParameterDeclara
 }
 
 func (s *LambdaDeclaratorContext) Mutable() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMutable, 0)
+	return s.GetToken(CPPParserMutable, 0)
 }
 
 func (s *LambdaDeclaratorContext) ExceptionSpecification() IExceptionSpecificationContext {
@@ -5165,7 +5165,7 @@ func (s *LambdaDeclaratorContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *LambdaDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLambdaDeclarator(s)
 
 	default:
@@ -5173,18 +5173,18 @@ func (s *LambdaDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
+func (p *CPPParser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewLambdaDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 32, CPP14ParserRULE_lambdaDeclarator)
+	p.EnterRule(localctx, 32, CPPParserRULE_lambdaDeclarator)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(557)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5206,7 +5206,7 @@ func (p *CPP14Parser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
 	}
 	{
 		p.SetState(561)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5219,10 +5219,10 @@ func (p *CPP14Parser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserMutable {
+	if _la == CPPParserMutable {
 		{
 			p.SetState(562)
-			p.Match(CPP14ParserMutable)
+			p.Match(CPPParserMutable)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5237,7 +5237,7 @@ func (p *CPP14Parser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserNoexcept || _la == CPP14ParserThrow {
+	if _la == CPPParserNoexcept || _la == CPPParserThrow {
 		{
 			p.SetState(565)
 			p.ExceptionSpecification()
@@ -5251,7 +5251,7 @@ func (p *CPP14Parser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(568)
 			p.AttributeSpecifierSeq()
@@ -5265,7 +5265,7 @@ func (p *CPP14Parser) LambdaDeclarator() (localctx ILambdaDeclaratorContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserArrow {
+	if _la == CPPParserArrow {
 		{
 			p.SetState(571)
 			p.TrailingReturnType()
@@ -5333,13 +5333,13 @@ type PostfixExpressionContext struct {
 func NewEmptyPostfixExpressionContext() *PostfixExpressionContext {
 	var p = new(PostfixExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_postfixExpression
+	p.RuleIndex = CPPParserRULE_postfixExpression
 	return p
 }
 
 func InitEmptyPostfixExpressionContext(p *PostfixExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_postfixExpression
+	p.RuleIndex = CPPParserRULE_postfixExpression
 }
 
 func (*PostfixExpressionContext) IsPostfixExpressionContext() {}
@@ -5350,7 +5350,7 @@ func NewPostfixExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_postfixExpression
+	p.RuleIndex = CPPParserRULE_postfixExpression
 
 	return p
 }
@@ -5406,11 +5406,11 @@ func (s *PostfixExpressionContext) TypeNameSpecifier() ITypeNameSpecifierContext
 }
 
 func (s *PostfixExpressionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *PostfixExpressionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *PostfixExpressionContext) BracedInitList() IBracedInitListContext {
@@ -5446,7 +5446,7 @@ func (s *PostfixExpressionContext) ExpressionList() IExpressionListContext {
 }
 
 func (s *PostfixExpressionContext) Less() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, 0)
+	return s.GetToken(CPPParserLess, 0)
 }
 
 func (s *PostfixExpressionContext) TheTypeId() ITheTypeIdContext {
@@ -5466,7 +5466,7 @@ func (s *PostfixExpressionContext) TheTypeId() ITheTypeIdContext {
 }
 
 func (s *PostfixExpressionContext) Greater() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, 0)
+	return s.GetToken(CPPParserGreater, 0)
 }
 
 func (s *PostfixExpressionContext) Expression() IExpressionContext {
@@ -5486,19 +5486,19 @@ func (s *PostfixExpressionContext) Expression() IExpressionContext {
 }
 
 func (s *PostfixExpressionContext) Dynamic_cast() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDynamic_cast, 0)
+	return s.GetToken(CPPParserDynamic_cast, 0)
 }
 
 func (s *PostfixExpressionContext) Static_cast() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStatic_cast, 0)
+	return s.GetToken(CPPParserStatic_cast, 0)
 }
 
 func (s *PostfixExpressionContext) Reinterpret_cast() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserReinterpret_cast, 0)
+	return s.GetToken(CPPParserReinterpret_cast, 0)
 }
 
 func (s *PostfixExpressionContext) Const_cast() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserConst_cast, 0)
+	return s.GetToken(CPPParserConst_cast, 0)
 }
 
 func (s *PostfixExpressionContext) TypeIdOfTheTypeId() ITypeIdOfTheTypeIdContext {
@@ -5534,19 +5534,19 @@ func (s *PostfixExpressionContext) PostfixExpression() IPostfixExpressionContext
 }
 
 func (s *PostfixExpressionContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *PostfixExpressionContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *PostfixExpressionContext) Dot() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDot, 0)
+	return s.GetToken(CPPParserDot, 0)
 }
 
 func (s *PostfixExpressionContext) Arrow() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserArrow, 0)
+	return s.GetToken(CPPParserArrow, 0)
 }
 
 func (s *PostfixExpressionContext) IdExpression() IIdExpressionContext {
@@ -5582,15 +5582,15 @@ func (s *PostfixExpressionContext) PseudoDestructorName() IPseudoDestructorNameC
 }
 
 func (s *PostfixExpressionContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *PostfixExpressionContext) PlusPlus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlusPlus, 0)
+	return s.GetToken(CPPParserPlusPlus, 0)
 }
 
 func (s *PostfixExpressionContext) MinusMinus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinusMinus, 0)
+	return s.GetToken(CPPParserMinusMinus, 0)
 }
 
 func (s *PostfixExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -5603,7 +5603,7 @@ func (s *PostfixExpressionContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *PostfixExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPostfixExpression(s)
 
 	default:
@@ -5611,11 +5611,11 @@ func (s *PostfixExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) PostfixExpression() (localctx IPostfixExpressionContext) {
+func (p *CPPParser) PostfixExpression() (localctx IPostfixExpressionContext) {
 	return p.postfixExpression(0)
 }
 
-func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionContext) {
+func (p *CPPParser) postfixExpression(_p int) (localctx IPostfixExpressionContext) {
 	this := p
 	_ = this
 
@@ -5626,7 +5626,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 	var _prevctx IPostfixExpressionContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 34
-	p.EnterRecursionRule(localctx, 34, CPP14ParserRULE_postfixExpression, _p)
+	p.EnterRecursionRule(localctx, 34, CPPParserRULE_postfixExpression, _p)
 	var _la int
 
 	var _alt int
@@ -5653,13 +5653,13 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserShort, CPP14ParserSigned, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+		case CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserDecltype, CPPParserDouble, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserShort, CPPParserSigned, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserDoublecolon, CPPParserIdentifier:
 			{
 				p.SetState(576)
 				p.SimpleTypeSpecifier()
 			}
 
-		case CPP14ParserTypename_:
+		case CPPParserTypename_:
 			{
 				p.SetState(577)
 				p.TypeNameSpecifier()
@@ -5676,10 +5676,10 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserLeftParen:
+		case CPPParserLeftParen:
 			{
 				p.SetState(580)
-				p.Match(CPP14ParserLeftParen)
+				p.Match(CPPParserLeftParen)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -5692,7 +5692,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPP14ParserIdentifier {
+			if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPPParserIdentifier {
 				{
 					p.SetState(581)
 					p.ExpressionList()
@@ -5701,14 +5701,14 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 			}
 			{
 				p.SetState(584)
-				p.Match(CPP14ParserRightParen)
+				p.Match(CPPParserRightParen)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
 				}
 			}
 
-		case CPP14ParserLeftBrace:
+		case CPPParserLeftBrace:
 			{
 				p.SetState(585)
 				p.BracedInitList()
@@ -5733,7 +5733,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 		{
 			p.SetState(589)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5745,7 +5745,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 		{
 			p.SetState(591)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5753,7 +5753,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 		{
 			p.SetState(592)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5765,7 +5765,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 		{
 			p.SetState(594)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5779,7 +5779,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 		{
 			p.SetState(597)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5809,7 +5809,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 		}
 		{
 			p.SetState(602)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5844,7 +5844,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 37, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewPostfixExpressionContext(p, _parentctx, _parentState)
-				p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_postfixExpression)
+				p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_postfixExpression)
 				p.SetState(606)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 7)) {
@@ -5853,7 +5853,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 				}
 				{
 					p.SetState(607)
-					p.Match(CPP14ParserLeftBracket)
+					p.Match(CPPParserLeftBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -5866,13 +5866,13 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 				}
 
 				switch p.GetTokenStream().LA(1) {
-				case CPP14ParserIntegerLiteral, CPP14ParserCharacterLiteral, CPP14ParserFloatingLiteral, CPP14ParserStringLiteral, CPP14ParserBooleanLiteral, CPP14ParserPointerLiteral, CPP14ParserUserDefinedLiteral, CPP14ParserAlignof, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserConst_cast, CPP14ParserDecltype, CPP14ParserDelete, CPP14ParserDouble, CPP14ParserDynamic_cast, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserNew, CPP14ParserNoexcept, CPP14ParserOperator, CPP14ParserReinterpret_cast, CPP14ParserShort, CPP14ParserSigned, CPP14ParserSizeof, CPP14ParserStatic_cast, CPP14ParserThis, CPP14ParserThrow, CPP14ParserTypeid_, CPP14ParserTypename_, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot, CPP14ParserPlusPlus, CPP14ParserMinusMinus, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+				case CPPParserIntegerLiteral, CPPParserCharacterLiteral, CPPParserFloatingLiteral, CPPParserStringLiteral, CPPParserBooleanLiteral, CPPParserPointerLiteral, CPPParserUserDefinedLiteral, CPPParserAlignof, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserConst_cast, CPPParserDecltype, CPPParserDelete, CPPParserDouble, CPPParserDynamic_cast, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserNew, CPPParserNoexcept, CPPParserOperator, CPPParserReinterpret_cast, CPPParserShort, CPPParserSigned, CPPParserSizeof, CPPParserStatic_cast, CPPParserThis, CPPParserThrow, CPPParserTypeid_, CPPParserTypename_, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot, CPPParserPlusPlus, CPPParserMinusMinus, CPPParserDoublecolon, CPPParserIdentifier:
 					{
 						p.SetState(608)
 						p.Expression()
 					}
 
-				case CPP14ParserLeftBrace:
+				case CPPParserLeftBrace:
 					{
 						p.SetState(609)
 						p.BracedInitList()
@@ -5884,7 +5884,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 				}
 				{
 					p.SetState(612)
-					p.Match(CPP14ParserRightBracket)
+					p.Match(CPPParserRightBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -5893,7 +5893,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 
 			case 2:
 				localctx = NewPostfixExpressionContext(p, _parentctx, _parentState)
-				p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_postfixExpression)
+				p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_postfixExpression)
 				p.SetState(614)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 6)) {
@@ -5902,7 +5902,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 				}
 				{
 					p.SetState(615)
-					p.Match(CPP14ParserLeftParen)
+					p.Match(CPPParserLeftParen)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -5915,7 +5915,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 				}
 				_la = p.GetTokenStream().LA(1)
 
-				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPP14ParserIdentifier {
+				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPPParserIdentifier {
 					{
 						p.SetState(616)
 						p.ExpressionList()
@@ -5924,7 +5924,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 				}
 				{
 					p.SetState(619)
-					p.Match(CPP14ParserRightParen)
+					p.Match(CPPParserRightParen)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -5933,7 +5933,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 
 			case 3:
 				localctx = NewPostfixExpressionContext(p, _parentctx, _parentState)
-				p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_postfixExpression)
+				p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_postfixExpression)
 				p.SetState(620)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 4)) {
@@ -5944,7 +5944,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 					p.SetState(621)
 					_la = p.GetTokenStream().LA(1)
 
-					if !(_la == CPP14ParserArrow || _la == CPP14ParserDot) {
+					if !(_la == CPPParserArrow || _la == CPPParserDot) {
 						p.GetErrorHandler().RecoverInline(p)
 					} else {
 						p.GetErrorHandler().ReportMatch(p)
@@ -5966,10 +5966,10 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 					}
 					_la = p.GetTokenStream().LA(1)
 
-					if _la == CPP14ParserTemplate {
+					if _la == CPPParserTemplate {
 						{
 							p.SetState(622)
-							p.Match(CPP14ParserTemplate)
+							p.Match(CPPParserTemplate)
 							if p.HasError() {
 								// Recognition error - abort rule
 								goto errorExit
@@ -5994,7 +5994,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 
 			case 4:
 				localctx = NewPostfixExpressionContext(p, _parentctx, _parentState)
-				p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_postfixExpression)
+				p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_postfixExpression)
 				p.SetState(629)
 
 				if !(p.Precpred(p.GetParserRuleContext(), 3)) {
@@ -6005,7 +6005,7 @@ func (p *CPP14Parser) postfixExpression(_p int) (localctx IPostfixExpressionCont
 					p.SetState(630)
 					_la = p.GetTokenStream().LA(1)
 
-					if !(_la == CPP14ParserPlusPlus || _la == CPP14ParserMinusMinus) {
+					if !(_la == CPPParserPlusPlus || _la == CPPParserMinusMinus) {
 						p.GetErrorHandler().RecoverInline(p)
 					} else {
 						p.GetErrorHandler().ReportMatch(p)
@@ -6064,13 +6064,13 @@ type TypeIdOfTheTypeIdContext struct {
 func NewEmptyTypeIdOfTheTypeIdContext() *TypeIdOfTheTypeIdContext {
 	var p = new(TypeIdOfTheTypeIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeIdOfTheTypeId
+	p.RuleIndex = CPPParserRULE_typeIdOfTheTypeId
 	return p
 }
 
 func InitEmptyTypeIdOfTheTypeIdContext(p *TypeIdOfTheTypeIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeIdOfTheTypeId
+	p.RuleIndex = CPPParserRULE_typeIdOfTheTypeId
 }
 
 func (*TypeIdOfTheTypeIdContext) IsTypeIdOfTheTypeIdContext() {}
@@ -6081,7 +6081,7 @@ func NewTypeIdOfTheTypeIdContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typeIdOfTheTypeId
+	p.RuleIndex = CPPParserRULE_typeIdOfTheTypeId
 
 	return p
 }
@@ -6089,7 +6089,7 @@ func NewTypeIdOfTheTypeIdContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *TypeIdOfTheTypeIdContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TypeIdOfTheTypeIdContext) Typeid_() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTypeid_, 0)
+	return s.GetToken(CPPParserTypeid_, 0)
 }
 
 func (s *TypeIdOfTheTypeIdContext) GetRuleContext() antlr.RuleContext {
@@ -6102,7 +6102,7 @@ func (s *TypeIdOfTheTypeIdContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *TypeIdOfTheTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypeIdOfTheTypeId(s)
 
 	default:
@@ -6110,16 +6110,16 @@ func (s *TypeIdOfTheTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) TypeIdOfTheTypeId() (localctx ITypeIdOfTheTypeIdContext) {
+func (p *CPPParser) TypeIdOfTheTypeId() (localctx ITypeIdOfTheTypeIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypeIdOfTheTypeIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 36, CPP14ParserRULE_typeIdOfTheTypeId)
+	p.EnterRule(localctx, 36, CPPParserRULE_typeIdOfTheTypeId)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(636)
-		p.Match(CPP14ParserTypeid_)
+		p.Match(CPPParserTypeid_)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -6161,13 +6161,13 @@ type ExpressionListContext struct {
 func NewEmptyExpressionListContext() *ExpressionListContext {
 	var p = new(ExpressionListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_expressionList
+	p.RuleIndex = CPPParserRULE_expressionList
 	return p
 }
 
 func InitEmptyExpressionListContext(p *ExpressionListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_expressionList
+	p.RuleIndex = CPPParserRULE_expressionList
 }
 
 func (*ExpressionListContext) IsExpressionListContext() {}
@@ -6178,7 +6178,7 @@ func NewExpressionListContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_expressionList
+	p.RuleIndex = CPPParserRULE_expressionList
 
 	return p
 }
@@ -6211,7 +6211,7 @@ func (s *ExpressionListContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExpressionList(s)
 
 	default:
@@ -6219,12 +6219,12 @@ func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) ExpressionList() (localctx IExpressionListContext) {
+func (p *CPPParser) ExpressionList() (localctx IExpressionListContext) {
 	this := p
 	_ = this
 
 	localctx = NewExpressionListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 38, CPP14ParserRULE_expressionList)
+	p.EnterRule(localctx, 38, CPPParserRULE_expressionList)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(638)
@@ -6273,13 +6273,13 @@ type PseudoDestructorNameContext struct {
 func NewEmptyPseudoDestructorNameContext() *PseudoDestructorNameContext {
 	var p = new(PseudoDestructorNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pseudoDestructorName
+	p.RuleIndex = CPPParserRULE_pseudoDestructorName
 	return p
 }
 
 func InitEmptyPseudoDestructorNameContext(p *PseudoDestructorNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pseudoDestructorName
+	p.RuleIndex = CPPParserRULE_pseudoDestructorName
 }
 
 func (*PseudoDestructorNameContext) IsPseudoDestructorNameContext() {}
@@ -6290,7 +6290,7 @@ func NewPseudoDestructorNameContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_pseudoDestructorName
+	p.RuleIndex = CPPParserRULE_pseudoDestructorName
 
 	return p
 }
@@ -6298,7 +6298,7 @@ func NewPseudoDestructorNameContext(parser antlr.Parser, parent antlr.ParserRule
 func (s *PseudoDestructorNameContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *PseudoDestructorNameContext) Tilde() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTilde, 0)
+	return s.GetToken(CPPParserTilde, 0)
 }
 
 func (s *PseudoDestructorNameContext) AllTheTypeName() []ITheTypeNameContext {
@@ -6359,11 +6359,11 @@ func (s *PseudoDestructorNameContext) NestedNameSpecifier() INestedNameSpecifier
 }
 
 func (s *PseudoDestructorNameContext) Doublecolon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, 0)
+	return s.GetToken(CPPParserDoublecolon, 0)
 }
 
 func (s *PseudoDestructorNameContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *PseudoDestructorNameContext) SimpleTemplateId() ISimpleTemplateIdContext {
@@ -6408,7 +6408,7 @@ func (s *PseudoDestructorNameContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *PseudoDestructorNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPseudoDestructorName(s)
 
 	default:
@@ -6416,12 +6416,12 @@ func (s *PseudoDestructorNameContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameContext) {
+func (p *CPPParser) PseudoDestructorName() (localctx IPseudoDestructorNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewPseudoDestructorNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 40, CPP14ParserRULE_pseudoDestructorName)
+	p.EnterRule(localctx, 40, CPPParserRULE_pseudoDestructorName)
 	var _la int
 
 	p.SetState(659)
@@ -6452,14 +6452,14 @@ func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameCont
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserIdentifier {
+		if _la == CPPParserIdentifier {
 			{
 				p.SetState(643)
 				p.TheTypeName()
 			}
 			{
 				p.SetState(644)
-				p.Match(CPP14ParserDoublecolon)
+				p.Match(CPPParserDoublecolon)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6469,7 +6469,7 @@ func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameCont
 		}
 		{
 			p.SetState(648)
-			p.Match(CPP14ParserTilde)
+			p.Match(CPPParserTilde)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6488,7 +6488,7 @@ func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameCont
 		}
 		{
 			p.SetState(651)
-			p.Match(CPP14ParserTemplate)
+			p.Match(CPPParserTemplate)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6500,7 +6500,7 @@ func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameCont
 		}
 		{
 			p.SetState(653)
-			p.Match(CPP14ParserDoublecolon)
+			p.Match(CPPParserDoublecolon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6508,7 +6508,7 @@ func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameCont
 		}
 		{
 			p.SetState(654)
-			p.Match(CPP14ParserTilde)
+			p.Match(CPPParserTilde)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6523,7 +6523,7 @@ func (p *CPP14Parser) PseudoDestructorName() (localctx IPseudoDestructorNameCont
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(657)
-			p.Match(CPP14ParserTilde)
+			p.Match(CPPParserTilde)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6587,13 +6587,13 @@ type UnaryExpressionContext struct {
 func NewEmptyUnaryExpressionContext() *UnaryExpressionContext {
 	var p = new(UnaryExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_unaryExpression
+	p.RuleIndex = CPPParserRULE_unaryExpression
 	return p
 }
 
 func InitEmptyUnaryExpressionContext(p *UnaryExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_unaryExpression
+	p.RuleIndex = CPPParserRULE_unaryExpression
 }
 
 func (*UnaryExpressionContext) IsUnaryExpressionContext() {}
@@ -6604,7 +6604,7 @@ func NewUnaryExpressionContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_unaryExpression
+	p.RuleIndex = CPPParserRULE_unaryExpression
 
 	return p
 }
@@ -6644,11 +6644,11 @@ func (s *UnaryExpressionContext) UnaryExpression() IUnaryExpressionContext {
 }
 
 func (s *UnaryExpressionContext) PlusPlus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlusPlus, 0)
+	return s.GetToken(CPPParserPlusPlus, 0)
 }
 
 func (s *UnaryExpressionContext) MinusMinus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinusMinus, 0)
+	return s.GetToken(CPPParserMinusMinus, 0)
 }
 
 func (s *UnaryExpressionContext) UnaryOperator() IUnaryOperatorContext {
@@ -6668,11 +6668,11 @@ func (s *UnaryExpressionContext) UnaryOperator() IUnaryOperatorContext {
 }
 
 func (s *UnaryExpressionContext) Sizeof() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSizeof, 0)
+	return s.GetToken(CPPParserSizeof, 0)
 }
 
 func (s *UnaryExpressionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *UnaryExpressionContext) TheTypeId() ITheTypeIdContext {
@@ -6692,19 +6692,19 @@ func (s *UnaryExpressionContext) TheTypeId() ITheTypeIdContext {
 }
 
 func (s *UnaryExpressionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *UnaryExpressionContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *UnaryExpressionContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *UnaryExpressionContext) Alignof() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAlignof, 0)
+	return s.GetToken(CPPParserAlignof, 0)
 }
 
 func (s *UnaryExpressionContext) NoExceptExpression() INoExceptExpressionContext {
@@ -6765,7 +6765,7 @@ func (s *UnaryExpressionContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *UnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitUnaryExpression(s)
 
 	default:
@@ -6773,12 +6773,12 @@ func (s *UnaryExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
+func (p *CPPParser) UnaryExpression() (localctx IUnaryExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewUnaryExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 42, CPP14ParserRULE_unaryExpression)
+	p.EnterRule(localctx, 42, CPPParserRULE_unaryExpression)
 	p.SetState(688)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -6802,36 +6802,36 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserPlusPlus:
+		case CPPParserPlusPlus:
 			{
 				p.SetState(662)
-				p.Match(CPP14ParserPlusPlus)
+				p.Match(CPPParserPlusPlus)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
 				}
 			}
 
-		case CPP14ParserMinusMinus:
+		case CPPParserMinusMinus:
 			{
 				p.SetState(663)
-				p.Match(CPP14ParserMinusMinus)
+				p.Match(CPPParserMinusMinus)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
 				}
 			}
 
-		case CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot:
+		case CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot:
 			{
 				p.SetState(664)
 				p.UnaryOperator()
 			}
 
-		case CPP14ParserSizeof:
+		case CPPParserSizeof:
 			{
 				p.SetState(665)
-				p.Match(CPP14ParserSizeof)
+				p.Match(CPPParserSizeof)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6851,7 +6851,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(669)
-			p.Match(CPP14ParserSizeof)
+			p.Match(CPPParserSizeof)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6864,10 +6864,10 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserLeftParen:
+		case CPPParserLeftParen:
 			{
 				p.SetState(670)
-				p.Match(CPP14ParserLeftParen)
+				p.Match(CPPParserLeftParen)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6879,17 +6879,17 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 			}
 			{
 				p.SetState(672)
-				p.Match(CPP14ParserRightParen)
+				p.Match(CPPParserRightParen)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
 				}
 			}
 
-		case CPP14ParserEllipsis:
+		case CPPParserEllipsis:
 			{
 				p.SetState(674)
-				p.Match(CPP14ParserEllipsis)
+				p.Match(CPPParserEllipsis)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6897,7 +6897,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 			}
 			{
 				p.SetState(675)
-				p.Match(CPP14ParserLeftParen)
+				p.Match(CPPParserLeftParen)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6905,7 +6905,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 			}
 			{
 				p.SetState(676)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6913,7 +6913,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 			}
 			{
 				p.SetState(677)
-				p.Match(CPP14ParserRightParen)
+				p.Match(CPPParserRightParen)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -6929,7 +6929,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(680)
-			p.Match(CPP14ParserAlignof)
+			p.Match(CPPParserAlignof)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6937,7 +6937,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 		}
 		{
 			p.SetState(681)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6949,7 +6949,7 @@ func (p *CPP14Parser) UnaryExpression() (localctx IUnaryExpressionContext) {
 		}
 		{
 			p.SetState(683)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7022,13 +7022,13 @@ type UnaryOperatorContext struct {
 func NewEmptyUnaryOperatorContext() *UnaryOperatorContext {
 	var p = new(UnaryOperatorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_unaryOperator
+	p.RuleIndex = CPPParserRULE_unaryOperator
 	return p
 }
 
 func InitEmptyUnaryOperatorContext(p *UnaryOperatorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_unaryOperator
+	p.RuleIndex = CPPParserRULE_unaryOperator
 }
 
 func (*UnaryOperatorContext) IsUnaryOperatorContext() {}
@@ -7039,7 +7039,7 @@ func NewUnaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_unaryOperator
+	p.RuleIndex = CPPParserRULE_unaryOperator
 
 	return p
 }
@@ -7047,31 +7047,31 @@ func NewUnaryOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *UnaryOperatorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *UnaryOperatorContext) Or() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOr, 0)
+	return s.GetToken(CPPParserOr, 0)
 }
 
 func (s *UnaryOperatorContext) Star() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStar, 0)
+	return s.GetToken(CPPParserStar, 0)
 }
 
 func (s *UnaryOperatorContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *UnaryOperatorContext) Plus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlus, 0)
+	return s.GetToken(CPPParserPlus, 0)
 }
 
 func (s *UnaryOperatorContext) Tilde() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTilde, 0)
+	return s.GetToken(CPPParserTilde, 0)
 }
 
 func (s *UnaryOperatorContext) Minus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinus, 0)
+	return s.GetToken(CPPParserMinus, 0)
 }
 
 func (s *UnaryOperatorContext) Not() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNot, 0)
+	return s.GetToken(CPPParserNot, 0)
 }
 
 func (s *UnaryOperatorContext) GetRuleContext() antlr.RuleContext {
@@ -7084,7 +7084,7 @@ func (s *UnaryOperatorContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *UnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitUnaryOperator(s)
 
 	default:
@@ -7092,12 +7092,12 @@ func (s *UnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) UnaryOperator() (localctx IUnaryOperatorContext) {
+func (p *CPPParser) UnaryOperator() (localctx IUnaryOperatorContext) {
 	this := p
 	_ = this
 
 	localctx = NewUnaryOperatorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 44, CPP14ParserRULE_unaryOperator)
+	p.EnterRule(localctx, 44, CPPParserRULE_unaryOperator)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -7155,13 +7155,13 @@ type NewExpression_Context struct {
 func NewEmptyNewExpression_Context() *NewExpression_Context {
 	var p = new(NewExpression_Context)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newExpression_
+	p.RuleIndex = CPPParserRULE_newExpression_
 	return p
 }
 
 func InitEmptyNewExpression_Context(p *NewExpression_Context) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newExpression_
+	p.RuleIndex = CPPParserRULE_newExpression_
 }
 
 func (*NewExpression_Context) IsNewExpression_Context() {}
@@ -7172,7 +7172,7 @@ func NewNewExpression_Context(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_newExpression_
+	p.RuleIndex = CPPParserRULE_newExpression_
 
 	return p
 }
@@ -7180,7 +7180,7 @@ func NewNewExpression_Context(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *NewExpression_Context) GetParser() antlr.Parser { return s.parser }
 
 func (s *NewExpression_Context) New() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNew, 0)
+	return s.GetToken(CPPParserNew, 0)
 }
 
 func (s *NewExpression_Context) NewTypeId() INewTypeIdContext {
@@ -7200,7 +7200,7 @@ func (s *NewExpression_Context) NewTypeId() INewTypeIdContext {
 }
 
 func (s *NewExpression_Context) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NewExpression_Context) TheTypeId() ITheTypeIdContext {
@@ -7220,11 +7220,11 @@ func (s *NewExpression_Context) TheTypeId() ITheTypeIdContext {
 }
 
 func (s *NewExpression_Context) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NewExpression_Context) Doublecolon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, 0)
+	return s.GetToken(CPPParserDoublecolon, 0)
 }
 
 func (s *NewExpression_Context) NewPlacement() INewPlacementContext {
@@ -7269,7 +7269,7 @@ func (s *NewExpression_Context) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *NewExpression_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNewExpression_(s)
 
 	default:
@@ -7277,12 +7277,12 @@ func (s *NewExpression_Context) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) NewExpression_() (localctx INewExpression_Context) {
+func (p *CPPParser) NewExpression_() (localctx INewExpression_Context) {
 	this := p
 	_ = this
 
 	localctx = NewNewExpression_Context(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 46, CPP14ParserRULE_newExpression_)
+	p.EnterRule(localctx, 46, CPPParserRULE_newExpression_)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -7293,10 +7293,10 @@ func (p *CPP14Parser) NewExpression_() (localctx INewExpression_Context) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserDoublecolon {
+	if _la == CPPParserDoublecolon {
 		{
 			p.SetState(692)
-			p.Match(CPP14ParserDoublecolon)
+			p.Match(CPPParserDoublecolon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7306,7 +7306,7 @@ func (p *CPP14Parser) NewExpression_() (localctx INewExpression_Context) {
 	}
 	{
 		p.SetState(695)
-		p.Match(CPP14ParserNew)
+		p.Match(CPPParserNew)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -7331,16 +7331,16 @@ func (p *CPP14Parser) NewExpression_() (localctx INewExpression_Context) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserClass, CPP14ParserConst, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserEnum, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserShort, CPP14ParserSigned, CPP14ParserStruct, CPP14ParserTypename_, CPP14ParserUnion, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserVolatile, CPP14ParserWchar, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserClass, CPPParserConst, CPPParserDecltype, CPPParserDouble, CPPParserEnum, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserShort, CPPParserSigned, CPPParserStruct, CPPParserTypename_, CPPParserUnion, CPPParserUnsigned, CPPParserVoid, CPPParserVolatile, CPPParserWchar, CPPParserDoublecolon, CPPParserIdentifier:
 		{
 			p.SetState(699)
 			p.NewTypeId()
 		}
 
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		{
 			p.SetState(700)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7352,7 +7352,7 @@ func (p *CPP14Parser) NewExpression_() (localctx INewExpression_Context) {
 		}
 		{
 			p.SetState(702)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7370,7 +7370,7 @@ func (p *CPP14Parser) NewExpression_() (localctx INewExpression_Context) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserLeftParen || _la == CPP14ParserLeftBrace {
+	if _la == CPPParserLeftParen || _la == CPPParserLeftBrace {
 		{
 			p.SetState(706)
 			p.NewInitializer_()
@@ -7415,13 +7415,13 @@ type NewPlacementContext struct {
 func NewEmptyNewPlacementContext() *NewPlacementContext {
 	var p = new(NewPlacementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newPlacement
+	p.RuleIndex = CPPParserRULE_newPlacement
 	return p
 }
 
 func InitEmptyNewPlacementContext(p *NewPlacementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newPlacement
+	p.RuleIndex = CPPParserRULE_newPlacement
 }
 
 func (*NewPlacementContext) IsNewPlacementContext() {}
@@ -7432,7 +7432,7 @@ func NewNewPlacementContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_newPlacement
+	p.RuleIndex = CPPParserRULE_newPlacement
 
 	return p
 }
@@ -7440,7 +7440,7 @@ func NewNewPlacementContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 func (s *NewPlacementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NewPlacementContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NewPlacementContext) ExpressionList() IExpressionListContext {
@@ -7460,7 +7460,7 @@ func (s *NewPlacementContext) ExpressionList() IExpressionListContext {
 }
 
 func (s *NewPlacementContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NewPlacementContext) GetRuleContext() antlr.RuleContext {
@@ -7473,7 +7473,7 @@ func (s *NewPlacementContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *NewPlacementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNewPlacement(s)
 
 	default:
@@ -7481,16 +7481,16 @@ func (s *NewPlacementContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) NewPlacement() (localctx INewPlacementContext) {
+func (p *CPPParser) NewPlacement() (localctx INewPlacementContext) {
 	this := p
 	_ = this
 
 	localctx = NewNewPlacementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 48, CPP14ParserRULE_newPlacement)
+	p.EnterRule(localctx, 48, CPPParserRULE_newPlacement)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(709)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -7502,7 +7502,7 @@ func (p *CPP14Parser) NewPlacement() (localctx INewPlacementContext) {
 	}
 	{
 		p.SetState(711)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -7545,13 +7545,13 @@ type NewTypeIdContext struct {
 func NewEmptyNewTypeIdContext() *NewTypeIdContext {
 	var p = new(NewTypeIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newTypeId
+	p.RuleIndex = CPPParserRULE_newTypeId
 	return p
 }
 
 func InitEmptyNewTypeIdContext(p *NewTypeIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newTypeId
+	p.RuleIndex = CPPParserRULE_newTypeId
 }
 
 func (*NewTypeIdContext) IsNewTypeIdContext() {}
@@ -7562,7 +7562,7 @@ func NewNewTypeIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_newTypeId
+	p.RuleIndex = CPPParserRULE_newTypeId
 
 	return p
 }
@@ -7611,7 +7611,7 @@ func (s *NewTypeIdContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *NewTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNewTypeId(s)
 
 	default:
@@ -7619,12 +7619,12 @@ func (s *NewTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) NewTypeId() (localctx INewTypeIdContext) {
+func (p *CPPParser) NewTypeId() (localctx INewTypeIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewNewTypeIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 50, CPP14ParserRULE_newTypeId)
+	p.EnterRule(localctx, 50, CPPParserRULE_newTypeId)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(713)
@@ -7680,13 +7680,13 @@ type NewDeclarator_Context struct {
 func NewEmptyNewDeclarator_Context() *NewDeclarator_Context {
 	var p = new(NewDeclarator_Context)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newDeclarator_
+	p.RuleIndex = CPPParserRULE_newDeclarator_
 	return p
 }
 
 func InitEmptyNewDeclarator_Context(p *NewDeclarator_Context) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newDeclarator_
+	p.RuleIndex = CPPParserRULE_newDeclarator_
 }
 
 func (*NewDeclarator_Context) IsNewDeclarator_Context() {}
@@ -7697,7 +7697,7 @@ func NewNewDeclarator_Context(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_newDeclarator_
+	p.RuleIndex = CPPParserRULE_newDeclarator_
 
 	return p
 }
@@ -7762,7 +7762,7 @@ func (s *NewDeclarator_Context) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *NewDeclarator_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNewDeclarator_(s)
 
 	default:
@@ -7770,12 +7770,12 @@ func (s *NewDeclarator_Context) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) NewDeclarator_() (localctx INewDeclarator_Context) {
+func (p *CPPParser) NewDeclarator_() (localctx INewDeclarator_Context) {
 	this := p
 	_ = this
 
 	localctx = NewNewDeclarator_Context(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 52, CPP14ParserRULE_newDeclarator_)
+	p.EnterRule(localctx, 52, CPPParserRULE_newDeclarator_)
 	p.SetState(722)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -7783,7 +7783,7 @@ func (p *CPP14Parser) NewDeclarator_() (localctx INewDeclarator_Context) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserDecltype, CPP14ParserStar, CPP14ParserAnd, CPP14ParserAndAnd, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserDecltype, CPPParserStar, CPPParserAnd, CPPParserAndAnd, CPPParserDoublecolon, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(717)
@@ -7802,7 +7802,7 @@ func (p *CPP14Parser) NewDeclarator_() (localctx INewDeclarator_Context) {
 			goto errorExit
 		}
 
-	case CPP14ParserLeftBracket:
+	case CPPParserLeftBracket:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(721)
@@ -7854,13 +7854,13 @@ type NoPointerNewDeclaratorContext struct {
 func NewEmptyNoPointerNewDeclaratorContext() *NoPointerNewDeclaratorContext {
 	var p = new(NoPointerNewDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerNewDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerNewDeclarator
 	return p
 }
 
 func InitEmptyNoPointerNewDeclaratorContext(p *NoPointerNewDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerNewDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerNewDeclarator
 }
 
 func (*NoPointerNewDeclaratorContext) IsNoPointerNewDeclaratorContext() {}
@@ -7871,7 +7871,7 @@ func NewNoPointerNewDeclaratorContext(parser antlr.Parser, parent antlr.ParserRu
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_noPointerNewDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerNewDeclarator
 
 	return p
 }
@@ -7879,7 +7879,7 @@ func NewNoPointerNewDeclaratorContext(parser antlr.Parser, parent antlr.ParserRu
 func (s *NoPointerNewDeclaratorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NoPointerNewDeclaratorContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *NoPointerNewDeclaratorContext) Expression() IExpressionContext {
@@ -7899,7 +7899,7 @@ func (s *NoPointerNewDeclaratorContext) Expression() IExpressionContext {
 }
 
 func (s *NoPointerNewDeclaratorContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *NoPointerNewDeclaratorContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -7960,7 +7960,7 @@ func (s *NoPointerNewDeclaratorContext) ToStringTree(ruleNames []string, recog a
 
 func (s *NoPointerNewDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNoPointerNewDeclarator(s)
 
 	default:
@@ -7968,11 +7968,11 @@ func (s *NoPointerNewDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) i
 	}
 }
 
-func (p *CPP14Parser) NoPointerNewDeclarator() (localctx INoPointerNewDeclaratorContext) {
+func (p *CPPParser) NoPointerNewDeclarator() (localctx INoPointerNewDeclaratorContext) {
 	return p.noPointerNewDeclarator(0)
 }
 
-func (p *CPP14Parser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDeclaratorContext) {
+func (p *CPPParser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDeclaratorContext) {
 	this := p
 	_ = this
 
@@ -7983,13 +7983,13 @@ func (p *CPP14Parser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDecl
 	var _prevctx INoPointerNewDeclaratorContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 54
-	p.EnterRecursionRule(localctx, 54, CPP14ParserRULE_noPointerNewDeclarator, _p)
+	p.EnterRecursionRule(localctx, 54, CPPParserRULE_noPointerNewDeclarator, _p)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(725)
-		p.Match(CPP14ParserLeftBracket)
+		p.Match(CPPParserLeftBracket)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -8001,7 +8001,7 @@ func (p *CPP14Parser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDecl
 	}
 	{
 		p.SetState(727)
-		p.Match(CPP14ParserRightBracket)
+		p.Match(CPPParserRightBracket)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -8037,7 +8037,7 @@ func (p *CPP14Parser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDecl
 			}
 			_prevctx = localctx
 			localctx = NewNoPointerNewDeclaratorContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_noPointerNewDeclarator)
+			p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_noPointerNewDeclarator)
 			p.SetState(731)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
@@ -8046,7 +8046,7 @@ func (p *CPP14Parser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDecl
 			}
 			{
 				p.SetState(732)
-				p.Match(CPP14ParserLeftBracket)
+				p.Match(CPPParserLeftBracket)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -8058,7 +8058,7 @@ func (p *CPP14Parser) noPointerNewDeclarator(_p int) (localctx INoPointerNewDecl
 			}
 			{
 				p.SetState(734)
-				p.Match(CPP14ParserRightBracket)
+				p.Match(CPPParserRightBracket)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -8127,13 +8127,13 @@ type NewInitializer_Context struct {
 func NewEmptyNewInitializer_Context() *NewInitializer_Context {
 	var p = new(NewInitializer_Context)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newInitializer_
+	p.RuleIndex = CPPParserRULE_newInitializer_
 	return p
 }
 
 func InitEmptyNewInitializer_Context(p *NewInitializer_Context) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_newInitializer_
+	p.RuleIndex = CPPParserRULE_newInitializer_
 }
 
 func (*NewInitializer_Context) IsNewInitializer_Context() {}
@@ -8144,7 +8144,7 @@ func NewNewInitializer_Context(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_newInitializer_
+	p.RuleIndex = CPPParserRULE_newInitializer_
 
 	return p
 }
@@ -8152,11 +8152,11 @@ func NewNewInitializer_Context(parser antlr.Parser, parent antlr.ParserRuleConte
 func (s *NewInitializer_Context) GetParser() antlr.Parser { return s.parser }
 
 func (s *NewInitializer_Context) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NewInitializer_Context) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NewInitializer_Context) ExpressionList() IExpressionListContext {
@@ -8201,7 +8201,7 @@ func (s *NewInitializer_Context) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *NewInitializer_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNewInitializer_(s)
 
 	default:
@@ -8209,12 +8209,12 @@ func (s *NewInitializer_Context) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) NewInitializer_() (localctx INewInitializer_Context) {
+func (p *CPPParser) NewInitializer_() (localctx INewInitializer_Context) {
 	this := p
 	_ = this
 
 	localctx = NewNewInitializer_Context(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 56, CPP14ParserRULE_newInitializer_)
+	p.EnterRule(localctx, 56, CPPParserRULE_newInitializer_)
 	var _la int
 
 	p.SetState(749)
@@ -8224,11 +8224,11 @@ func (p *CPP14Parser) NewInitializer_() (localctx INewInitializer_Context) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(743)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -8241,7 +8241,7 @@ func (p *CPP14Parser) NewInitializer_() (localctx INewInitializer_Context) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPP14ParserIdentifier {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPPParserIdentifier {
 			{
 				p.SetState(744)
 				p.ExpressionList()
@@ -8250,14 +8250,14 @@ func (p *CPP14Parser) NewInitializer_() (localctx INewInitializer_Context) {
 		}
 		{
 			p.SetState(747)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(748)
@@ -8308,13 +8308,13 @@ type DeleteExpressionContext struct {
 func NewEmptyDeleteExpressionContext() *DeleteExpressionContext {
 	var p = new(DeleteExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_deleteExpression
+	p.RuleIndex = CPPParserRULE_deleteExpression
 	return p
 }
 
 func InitEmptyDeleteExpressionContext(p *DeleteExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_deleteExpression
+	p.RuleIndex = CPPParserRULE_deleteExpression
 }
 
 func (*DeleteExpressionContext) IsDeleteExpressionContext() {}
@@ -8325,7 +8325,7 @@ func NewDeleteExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_deleteExpression
+	p.RuleIndex = CPPParserRULE_deleteExpression
 
 	return p
 }
@@ -8333,7 +8333,7 @@ func NewDeleteExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *DeleteExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *DeleteExpressionContext) Delete() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDelete, 0)
+	return s.GetToken(CPPParserDelete, 0)
 }
 
 func (s *DeleteExpressionContext) CastExpression() ICastExpressionContext {
@@ -8353,15 +8353,15 @@ func (s *DeleteExpressionContext) CastExpression() ICastExpressionContext {
 }
 
 func (s *DeleteExpressionContext) Doublecolon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, 0)
+	return s.GetToken(CPPParserDoublecolon, 0)
 }
 
 func (s *DeleteExpressionContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *DeleteExpressionContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *DeleteExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -8374,7 +8374,7 @@ func (s *DeleteExpressionContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *DeleteExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeleteExpression(s)
 
 	default:
@@ -8382,12 +8382,12 @@ func (s *DeleteExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) DeleteExpression() (localctx IDeleteExpressionContext) {
+func (p *CPPParser) DeleteExpression() (localctx IDeleteExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeleteExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 58, CPP14ParserRULE_deleteExpression)
+	p.EnterRule(localctx, 58, CPPParserRULE_deleteExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -8398,10 +8398,10 @@ func (p *CPP14Parser) DeleteExpression() (localctx IDeleteExpressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserDoublecolon {
+	if _la == CPPParserDoublecolon {
 		{
 			p.SetState(751)
-			p.Match(CPP14ParserDoublecolon)
+			p.Match(CPPParserDoublecolon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -8411,7 +8411,7 @@ func (p *CPP14Parser) DeleteExpression() (localctx IDeleteExpressionContext) {
 	}
 	{
 		p.SetState(754)
-		p.Match(CPP14ParserDelete)
+		p.Match(CPPParserDelete)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -8423,7 +8423,7 @@ func (p *CPP14Parser) DeleteExpression() (localctx IDeleteExpressionContext) {
 	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 58, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(755)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -8431,7 +8431,7 @@ func (p *CPP14Parser) DeleteExpression() (localctx IDeleteExpressionContext) {
 		}
 		{
 			p.SetState(756)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -8484,13 +8484,13 @@ type NoExceptExpressionContext struct {
 func NewEmptyNoExceptExpressionContext() *NoExceptExpressionContext {
 	var p = new(NoExceptExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noExceptExpression
+	p.RuleIndex = CPPParserRULE_noExceptExpression
 	return p
 }
 
 func InitEmptyNoExceptExpressionContext(p *NoExceptExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noExceptExpression
+	p.RuleIndex = CPPParserRULE_noExceptExpression
 }
 
 func (*NoExceptExpressionContext) IsNoExceptExpressionContext() {}
@@ -8501,7 +8501,7 @@ func NewNoExceptExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_noExceptExpression
+	p.RuleIndex = CPPParserRULE_noExceptExpression
 
 	return p
 }
@@ -8509,11 +8509,11 @@ func NewNoExceptExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *NoExceptExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NoExceptExpressionContext) Noexcept() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNoexcept, 0)
+	return s.GetToken(CPPParserNoexcept, 0)
 }
 
 func (s *NoExceptExpressionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NoExceptExpressionContext) Expression() IExpressionContext {
@@ -8533,7 +8533,7 @@ func (s *NoExceptExpressionContext) Expression() IExpressionContext {
 }
 
 func (s *NoExceptExpressionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NoExceptExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -8546,7 +8546,7 @@ func (s *NoExceptExpressionContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *NoExceptExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNoExceptExpression(s)
 
 	default:
@@ -8554,16 +8554,16 @@ func (s *NoExceptExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) NoExceptExpression() (localctx INoExceptExpressionContext) {
+func (p *CPPParser) NoExceptExpression() (localctx INoExceptExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewNoExceptExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 60, CPP14ParserRULE_noExceptExpression)
+	p.EnterRule(localctx, 60, CPPParserRULE_noExceptExpression)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(761)
-		p.Match(CPP14ParserNoexcept)
+		p.Match(CPPParserNoexcept)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -8571,7 +8571,7 @@ func (p *CPP14Parser) NoExceptExpression() (localctx INoExceptExpressionContext)
 	}
 	{
 		p.SetState(762)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -8583,7 +8583,7 @@ func (p *CPP14Parser) NoExceptExpression() (localctx INoExceptExpressionContext)
 	}
 	{
 		p.SetState(764)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -8629,13 +8629,13 @@ type CastExpressionContext struct {
 func NewEmptyCastExpressionContext() *CastExpressionContext {
 	var p = new(CastExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_castExpression
+	p.RuleIndex = CPPParserRULE_castExpression
 	return p
 }
 
 func InitEmptyCastExpressionContext(p *CastExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_castExpression
+	p.RuleIndex = CPPParserRULE_castExpression
 }
 
 func (*CastExpressionContext) IsCastExpressionContext() {}
@@ -8646,7 +8646,7 @@ func NewCastExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_castExpression
+	p.RuleIndex = CPPParserRULE_castExpression
 
 	return p
 }
@@ -8670,7 +8670,7 @@ func (s *CastExpressionContext) UnaryExpression() IUnaryExpressionContext {
 }
 
 func (s *CastExpressionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *CastExpressionContext) TheTypeId() ITheTypeIdContext {
@@ -8690,7 +8690,7 @@ func (s *CastExpressionContext) TheTypeId() ITheTypeIdContext {
 }
 
 func (s *CastExpressionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *CastExpressionContext) CastExpression() ICastExpressionContext {
@@ -8719,7 +8719,7 @@ func (s *CastExpressionContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *CastExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCastExpression(s)
 
 	default:
@@ -8727,12 +8727,12 @@ func (s *CastExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) CastExpression() (localctx ICastExpressionContext) {
+func (p *CPPParser) CastExpression() (localctx ICastExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewCastExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 62, CPP14ParserRULE_castExpression)
+	p.EnterRule(localctx, 62, CPPParserRULE_castExpression)
 	p.SetState(772)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -8751,7 +8751,7 @@ func (p *CPP14Parser) CastExpression() (localctx ICastExpressionContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(767)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -8763,7 +8763,7 @@ func (p *CPP14Parser) CastExpression() (localctx ICastExpressionContext) {
 		}
 		{
 			p.SetState(769)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -8818,13 +8818,13 @@ type PointerMemberExpressionContext struct {
 func NewEmptyPointerMemberExpressionContext() *PointerMemberExpressionContext {
 	var p = new(PointerMemberExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerMemberExpression
+	p.RuleIndex = CPPParserRULE_pointerMemberExpression
 	return p
 }
 
 func InitEmptyPointerMemberExpressionContext(p *PointerMemberExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerMemberExpression
+	p.RuleIndex = CPPParserRULE_pointerMemberExpression
 }
 
 func (*PointerMemberExpressionContext) IsPointerMemberExpressionContext() {}
@@ -8835,7 +8835,7 @@ func NewPointerMemberExpressionContext(parser antlr.Parser, parent antlr.ParserR
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_pointerMemberExpression
+	p.RuleIndex = CPPParserRULE_pointerMemberExpression
 
 	return p
 }
@@ -8884,19 +8884,19 @@ func (s *PointerMemberExpressionContext) CastExpression(i int) ICastExpressionCo
 }
 
 func (s *PointerMemberExpressionContext) AllDotStar() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserDotStar)
+	return s.GetTokens(CPPParserDotStar)
 }
 
 func (s *PointerMemberExpressionContext) DotStar(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDotStar, i)
+	return s.GetToken(CPPParserDotStar, i)
 }
 
 func (s *PointerMemberExpressionContext) AllArrowStar() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserArrowStar)
+	return s.GetTokens(CPPParserArrowStar)
 }
 
 func (s *PointerMemberExpressionContext) ArrowStar(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserArrowStar, i)
+	return s.GetToken(CPPParserArrowStar, i)
 }
 
 func (s *PointerMemberExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -8909,7 +8909,7 @@ func (s *PointerMemberExpressionContext) ToStringTree(ruleNames []string, recog 
 
 func (s *PointerMemberExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPointerMemberExpression(s)
 
 	default:
@@ -8917,12 +8917,12 @@ func (s *PointerMemberExpressionContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *CPP14Parser) PointerMemberExpression() (localctx IPointerMemberExpressionContext) {
+func (p *CPPParser) PointerMemberExpression() (localctx IPointerMemberExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewPointerMemberExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 64, CPP14ParserRULE_pointerMemberExpression)
+	p.EnterRule(localctx, 64, CPPParserRULE_pointerMemberExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -8937,12 +8937,12 @@ func (p *CPP14Parser) PointerMemberExpression() (localctx IPointerMemberExpressi
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserArrowStar || _la == CPP14ParserDotStar {
+	for _la == CPPParserArrowStar || _la == CPPParserDotStar {
 		{
 			p.SetState(775)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == CPP14ParserArrowStar || _la == CPP14ParserDotStar) {
+			if !(_la == CPPParserArrowStar || _la == CPPParserDotStar) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -9004,13 +9004,13 @@ type MultiplicativeExpressionContext struct {
 func NewEmptyMultiplicativeExpressionContext() *MultiplicativeExpressionContext {
 	var p = new(MultiplicativeExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_multiplicativeExpression
+	p.RuleIndex = CPPParserRULE_multiplicativeExpression
 	return p
 }
 
 func InitEmptyMultiplicativeExpressionContext(p *MultiplicativeExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_multiplicativeExpression
+	p.RuleIndex = CPPParserRULE_multiplicativeExpression
 }
 
 func (*MultiplicativeExpressionContext) IsMultiplicativeExpressionContext() {}
@@ -9021,7 +9021,7 @@ func NewMultiplicativeExpressionContext(parser antlr.Parser, parent antlr.Parser
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_multiplicativeExpression
+	p.RuleIndex = CPPParserRULE_multiplicativeExpression
 
 	return p
 }
@@ -9070,27 +9070,27 @@ func (s *MultiplicativeExpressionContext) PointerMemberExpression(i int) IPointe
 }
 
 func (s *MultiplicativeExpressionContext) AllStar() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserStar)
+	return s.GetTokens(CPPParserStar)
 }
 
 func (s *MultiplicativeExpressionContext) Star(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStar, i)
+	return s.GetToken(CPPParserStar, i)
 }
 
 func (s *MultiplicativeExpressionContext) AllDiv() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserDiv)
+	return s.GetTokens(CPPParserDiv)
 }
 
 func (s *MultiplicativeExpressionContext) Div(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDiv, i)
+	return s.GetToken(CPPParserDiv, i)
 }
 
 func (s *MultiplicativeExpressionContext) AllMod() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserMod)
+	return s.GetTokens(CPPParserMod)
 }
 
 func (s *MultiplicativeExpressionContext) Mod(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMod, i)
+	return s.GetToken(CPPParserMod, i)
 }
 
 func (s *MultiplicativeExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -9103,7 +9103,7 @@ func (s *MultiplicativeExpressionContext) ToStringTree(ruleNames []string, recog
 
 func (s *MultiplicativeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMultiplicativeExpression(s)
 
 	default:
@@ -9111,12 +9111,12 @@ func (s *MultiplicativeExpressionContext) Accept(visitor antlr.ParseTreeVisitor)
 	}
 }
 
-func (p *CPP14Parser) MultiplicativeExpression() (localctx IMultiplicativeExpressionContext) {
+func (p *CPPParser) MultiplicativeExpression() (localctx IMultiplicativeExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewMultiplicativeExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 66, CPP14ParserRULE_multiplicativeExpression)
+	p.EnterRule(localctx, 66, CPPParserRULE_multiplicativeExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -9196,13 +9196,13 @@ type AdditiveExpressionContext struct {
 func NewEmptyAdditiveExpressionContext() *AdditiveExpressionContext {
 	var p = new(AdditiveExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_additiveExpression
+	p.RuleIndex = CPPParserRULE_additiveExpression
 	return p
 }
 
 func InitEmptyAdditiveExpressionContext(p *AdditiveExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_additiveExpression
+	p.RuleIndex = CPPParserRULE_additiveExpression
 }
 
 func (*AdditiveExpressionContext) IsAdditiveExpressionContext() {}
@@ -9213,7 +9213,7 @@ func NewAdditiveExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_additiveExpression
+	p.RuleIndex = CPPParserRULE_additiveExpression
 
 	return p
 }
@@ -9262,19 +9262,19 @@ func (s *AdditiveExpressionContext) MultiplicativeExpression(i int) IMultiplicat
 }
 
 func (s *AdditiveExpressionContext) AllPlus() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserPlus)
+	return s.GetTokens(CPPParserPlus)
 }
 
 func (s *AdditiveExpressionContext) Plus(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlus, i)
+	return s.GetToken(CPPParserPlus, i)
 }
 
 func (s *AdditiveExpressionContext) AllMinus() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserMinus)
+	return s.GetTokens(CPPParserMinus)
 }
 
 func (s *AdditiveExpressionContext) Minus(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinus, i)
+	return s.GetToken(CPPParserMinus, i)
 }
 
 func (s *AdditiveExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -9287,7 +9287,7 @@ func (s *AdditiveExpressionContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *AdditiveExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAdditiveExpression(s)
 
 	default:
@@ -9295,12 +9295,12 @@ func (s *AdditiveExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) AdditiveExpression() (localctx IAdditiveExpressionContext) {
+func (p *CPPParser) AdditiveExpression() (localctx IAdditiveExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewAdditiveExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 68, CPP14ParserRULE_additiveExpression)
+	p.EnterRule(localctx, 68, CPPParserRULE_additiveExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -9315,12 +9315,12 @@ func (p *CPP14Parser) AdditiveExpression() (localctx IAdditiveExpressionContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserPlus || _la == CPP14ParserMinus {
+	for _la == CPPParserPlus || _la == CPPParserMinus {
 		{
 			p.SetState(791)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == CPP14ParserPlus || _la == CPP14ParserMinus) {
+			if !(_la == CPPParserPlus || _la == CPPParserMinus) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -9378,13 +9378,13 @@ type ShiftExpressionContext struct {
 func NewEmptyShiftExpressionContext() *ShiftExpressionContext {
 	var p = new(ShiftExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_shiftExpression
+	p.RuleIndex = CPPParserRULE_shiftExpression
 	return p
 }
 
 func InitEmptyShiftExpressionContext(p *ShiftExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_shiftExpression
+	p.RuleIndex = CPPParserRULE_shiftExpression
 }
 
 func (*ShiftExpressionContext) IsShiftExpressionContext() {}
@@ -9395,7 +9395,7 @@ func NewShiftExpressionContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_shiftExpression
+	p.RuleIndex = CPPParserRULE_shiftExpression
 
 	return p
 }
@@ -9494,7 +9494,7 @@ func (s *ShiftExpressionContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *ShiftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitShiftExpression(s)
 
 	default:
@@ -9502,12 +9502,12 @@ func (s *ShiftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) ShiftExpression() (localctx IShiftExpressionContext) {
+func (p *CPPParser) ShiftExpression() (localctx IShiftExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewShiftExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 70, CPP14ParserRULE_shiftExpression)
+	p.EnterRule(localctx, 70, CPPParserRULE_shiftExpression)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -9585,13 +9585,13 @@ type ShiftOperatorContext struct {
 func NewEmptyShiftOperatorContext() *ShiftOperatorContext {
 	var p = new(ShiftOperatorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_shiftOperator
+	p.RuleIndex = CPPParserRULE_shiftOperator
 	return p
 }
 
 func InitEmptyShiftOperatorContext(p *ShiftOperatorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_shiftOperator
+	p.RuleIndex = CPPParserRULE_shiftOperator
 }
 
 func (*ShiftOperatorContext) IsShiftOperatorContext() {}
@@ -9602,7 +9602,7 @@ func NewShiftOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_shiftOperator
+	p.RuleIndex = CPPParserRULE_shiftOperator
 
 	return p
 }
@@ -9610,19 +9610,19 @@ func NewShiftOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *ShiftOperatorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ShiftOperatorContext) AllGreater() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserGreater)
+	return s.GetTokens(CPPParserGreater)
 }
 
 func (s *ShiftOperatorContext) Greater(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, i)
+	return s.GetToken(CPPParserGreater, i)
 }
 
 func (s *ShiftOperatorContext) AllLess() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLess)
+	return s.GetTokens(CPPParserLess)
 }
 
 func (s *ShiftOperatorContext) Less(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, i)
+	return s.GetToken(CPPParserLess, i)
 }
 
 func (s *ShiftOperatorContext) GetRuleContext() antlr.RuleContext {
@@ -9635,7 +9635,7 @@ func (s *ShiftOperatorContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *ShiftOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitShiftOperator(s)
 
 	default:
@@ -9643,12 +9643,12 @@ func (s *ShiftOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) ShiftOperator() (localctx IShiftOperatorContext) {
+func (p *CPPParser) ShiftOperator() (localctx IShiftOperatorContext) {
 	this := p
 	_ = this
 
 	localctx = NewShiftOperatorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 72, CPP14ParserRULE_shiftOperator)
+	p.EnterRule(localctx, 72, CPPParserRULE_shiftOperator)
 	p.SetState(811)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -9656,11 +9656,11 @@ func (p *CPP14Parser) ShiftOperator() (localctx IShiftOperatorContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserGreater:
+	case CPPParserGreater:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(807)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -9668,18 +9668,18 @@ func (p *CPP14Parser) ShiftOperator() (localctx IShiftOperatorContext) {
 		}
 		{
 			p.SetState(808)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserLess:
+	case CPPParserLess:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(809)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -9687,7 +9687,7 @@ func (p *CPP14Parser) ShiftOperator() (localctx IShiftOperatorContext) {
 		}
 		{
 			p.SetState(810)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -9743,13 +9743,13 @@ type RelationalExpressionContext struct {
 func NewEmptyRelationalExpressionContext() *RelationalExpressionContext {
 	var p = new(RelationalExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_relationalExpression
+	p.RuleIndex = CPPParserRULE_relationalExpression
 	return p
 }
 
 func InitEmptyRelationalExpressionContext(p *RelationalExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_relationalExpression
+	p.RuleIndex = CPPParserRULE_relationalExpression
 }
 
 func (*RelationalExpressionContext) IsRelationalExpressionContext() {}
@@ -9760,7 +9760,7 @@ func NewRelationalExpressionContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_relationalExpression
+	p.RuleIndex = CPPParserRULE_relationalExpression
 
 	return p
 }
@@ -9809,35 +9809,35 @@ func (s *RelationalExpressionContext) ShiftExpression(i int) IShiftExpressionCon
 }
 
 func (s *RelationalExpressionContext) AllLess() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLess)
+	return s.GetTokens(CPPParserLess)
 }
 
 func (s *RelationalExpressionContext) Less(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, i)
+	return s.GetToken(CPPParserLess, i)
 }
 
 func (s *RelationalExpressionContext) AllGreater() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserGreater)
+	return s.GetTokens(CPPParserGreater)
 }
 
 func (s *RelationalExpressionContext) Greater(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, i)
+	return s.GetToken(CPPParserGreater, i)
 }
 
 func (s *RelationalExpressionContext) AllLessEqual() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLessEqual)
+	return s.GetTokens(CPPParserLessEqual)
 }
 
 func (s *RelationalExpressionContext) LessEqual(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLessEqual, i)
+	return s.GetToken(CPPParserLessEqual, i)
 }
 
 func (s *RelationalExpressionContext) AllGreaterEqual() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserGreaterEqual)
+	return s.GetTokens(CPPParserGreaterEqual)
 }
 
 func (s *RelationalExpressionContext) GreaterEqual(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreaterEqual, i)
+	return s.GetToken(CPPParserGreaterEqual, i)
 }
 
 func (s *RelationalExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -9850,7 +9850,7 @@ func (s *RelationalExpressionContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *RelationalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitRelationalExpression(s)
 
 	default:
@@ -9858,12 +9858,12 @@ func (s *RelationalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) RelationalExpression() (localctx IRelationalExpressionContext) {
+func (p *CPPParser) RelationalExpression() (localctx IRelationalExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewRelationalExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 74, CPP14ParserRULE_relationalExpression)
+	p.EnterRule(localctx, 74, CPPParserRULE_relationalExpression)
 	var _la int
 
 	var _alt int
@@ -9952,13 +9952,13 @@ type EqualityExpressionContext struct {
 func NewEmptyEqualityExpressionContext() *EqualityExpressionContext {
 	var p = new(EqualityExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_equalityExpression
+	p.RuleIndex = CPPParserRULE_equalityExpression
 	return p
 }
 
 func InitEmptyEqualityExpressionContext(p *EqualityExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_equalityExpression
+	p.RuleIndex = CPPParserRULE_equalityExpression
 }
 
 func (*EqualityExpressionContext) IsEqualityExpressionContext() {}
@@ -9969,7 +9969,7 @@ func NewEqualityExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_equalityExpression
+	p.RuleIndex = CPPParserRULE_equalityExpression
 
 	return p
 }
@@ -10018,19 +10018,19 @@ func (s *EqualityExpressionContext) RelationalExpression(i int) IRelationalExpre
 }
 
 func (s *EqualityExpressionContext) AllEqual() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserEqual)
+	return s.GetTokens(CPPParserEqual)
 }
 
 func (s *EqualityExpressionContext) Equal(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEqual, i)
+	return s.GetToken(CPPParserEqual, i)
 }
 
 func (s *EqualityExpressionContext) AllNotEqual() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserNotEqual)
+	return s.GetTokens(CPPParserNotEqual)
 }
 
 func (s *EqualityExpressionContext) NotEqual(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNotEqual, i)
+	return s.GetToken(CPPParserNotEqual, i)
 }
 
 func (s *EqualityExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -10043,7 +10043,7 @@ func (s *EqualityExpressionContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *EqualityExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEqualityExpression(s)
 
 	default:
@@ -10051,12 +10051,12 @@ func (s *EqualityExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) EqualityExpression() (localctx IEqualityExpressionContext) {
+func (p *CPPParser) EqualityExpression() (localctx IEqualityExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewEqualityExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 76, CPP14ParserRULE_equalityExpression)
+	p.EnterRule(localctx, 76, CPPParserRULE_equalityExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -10071,12 +10071,12 @@ func (p *CPP14Parser) EqualityExpression() (localctx IEqualityExpressionContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserEqual || _la == CPP14ParserNotEqual {
+	for _la == CPPParserEqual || _la == CPPParserNotEqual {
 		{
 			p.SetState(822)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == CPP14ParserEqual || _la == CPP14ParserNotEqual) {
+			if !(_la == CPPParserEqual || _la == CPPParserNotEqual) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -10134,13 +10134,13 @@ type AndExpressionContext struct {
 func NewEmptyAndExpressionContext() *AndExpressionContext {
 	var p = new(AndExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_andExpression
+	p.RuleIndex = CPPParserRULE_andExpression
 	return p
 }
 
 func InitEmptyAndExpressionContext(p *AndExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_andExpression
+	p.RuleIndex = CPPParserRULE_andExpression
 }
 
 func (*AndExpressionContext) IsAndExpressionContext() {}
@@ -10151,7 +10151,7 @@ func NewAndExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_andExpression
+	p.RuleIndex = CPPParserRULE_andExpression
 
 	return p
 }
@@ -10200,11 +10200,11 @@ func (s *AndExpressionContext) EqualityExpression(i int) IEqualityExpressionCont
 }
 
 func (s *AndExpressionContext) AllAnd() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserAnd)
+	return s.GetTokens(CPPParserAnd)
 }
 
 func (s *AndExpressionContext) And(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, i)
+	return s.GetToken(CPPParserAnd, i)
 }
 
 func (s *AndExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -10217,7 +10217,7 @@ func (s *AndExpressionContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *AndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAndExpression(s)
 
 	default:
@@ -10225,12 +10225,12 @@ func (s *AndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) AndExpression() (localctx IAndExpressionContext) {
+func (p *CPPParser) AndExpression() (localctx IAndExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewAndExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 78, CPP14ParserRULE_andExpression)
+	p.EnterRule(localctx, 78, CPPParserRULE_andExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -10245,10 +10245,10 @@ func (p *CPP14Parser) AndExpression() (localctx IAndExpressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserAnd {
+	for _la == CPPParserAnd {
 		{
 			p.SetState(830)
-			p.Match(CPP14ParserAnd)
+			p.Match(CPPParserAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -10305,13 +10305,13 @@ type ExclusiveOrExpressionContext struct {
 func NewEmptyExclusiveOrExpressionContext() *ExclusiveOrExpressionContext {
 	var p = new(ExclusiveOrExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_exclusiveOrExpression
+	p.RuleIndex = CPPParserRULE_exclusiveOrExpression
 	return p
 }
 
 func InitEmptyExclusiveOrExpressionContext(p *ExclusiveOrExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_exclusiveOrExpression
+	p.RuleIndex = CPPParserRULE_exclusiveOrExpression
 }
 
 func (*ExclusiveOrExpressionContext) IsExclusiveOrExpressionContext() {}
@@ -10322,7 +10322,7 @@ func NewExclusiveOrExpressionContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_exclusiveOrExpression
+	p.RuleIndex = CPPParserRULE_exclusiveOrExpression
 
 	return p
 }
@@ -10371,11 +10371,11 @@ func (s *ExclusiveOrExpressionContext) AndExpression(i int) IAndExpressionContex
 }
 
 func (s *ExclusiveOrExpressionContext) AllCaret() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserCaret)
+	return s.GetTokens(CPPParserCaret)
 }
 
 func (s *ExclusiveOrExpressionContext) Caret(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserCaret, i)
+	return s.GetToken(CPPParserCaret, i)
 }
 
 func (s *ExclusiveOrExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -10388,7 +10388,7 @@ func (s *ExclusiveOrExpressionContext) ToStringTree(ruleNames []string, recog an
 
 func (s *ExclusiveOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExclusiveOrExpression(s)
 
 	default:
@@ -10396,12 +10396,12 @@ func (s *ExclusiveOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) ExclusiveOrExpression() (localctx IExclusiveOrExpressionContext) {
+func (p *CPPParser) ExclusiveOrExpression() (localctx IExclusiveOrExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewExclusiveOrExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 80, CPP14ParserRULE_exclusiveOrExpression)
+	p.EnterRule(localctx, 80, CPPParserRULE_exclusiveOrExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -10416,10 +10416,10 @@ func (p *CPP14Parser) ExclusiveOrExpression() (localctx IExclusiveOrExpressionCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserCaret {
+	for _la == CPPParserCaret {
 		{
 			p.SetState(838)
-			p.Match(CPP14ParserCaret)
+			p.Match(CPPParserCaret)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -10476,13 +10476,13 @@ type InclusiveOrExpressionContext struct {
 func NewEmptyInclusiveOrExpressionContext() *InclusiveOrExpressionContext {
 	var p = new(InclusiveOrExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_inclusiveOrExpression
+	p.RuleIndex = CPPParserRULE_inclusiveOrExpression
 	return p
 }
 
 func InitEmptyInclusiveOrExpressionContext(p *InclusiveOrExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_inclusiveOrExpression
+	p.RuleIndex = CPPParserRULE_inclusiveOrExpression
 }
 
 func (*InclusiveOrExpressionContext) IsInclusiveOrExpressionContext() {}
@@ -10493,7 +10493,7 @@ func NewInclusiveOrExpressionContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_inclusiveOrExpression
+	p.RuleIndex = CPPParserRULE_inclusiveOrExpression
 
 	return p
 }
@@ -10542,11 +10542,11 @@ func (s *InclusiveOrExpressionContext) ExclusiveOrExpression(i int) IExclusiveOr
 }
 
 func (s *InclusiveOrExpressionContext) AllOr() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserOr)
+	return s.GetTokens(CPPParserOr)
 }
 
 func (s *InclusiveOrExpressionContext) Or(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOr, i)
+	return s.GetToken(CPPParserOr, i)
 }
 
 func (s *InclusiveOrExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -10559,7 +10559,7 @@ func (s *InclusiveOrExpressionContext) ToStringTree(ruleNames []string, recog an
 
 func (s *InclusiveOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInclusiveOrExpression(s)
 
 	default:
@@ -10567,12 +10567,12 @@ func (s *InclusiveOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) InclusiveOrExpression() (localctx IInclusiveOrExpressionContext) {
+func (p *CPPParser) InclusiveOrExpression() (localctx IInclusiveOrExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewInclusiveOrExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 82, CPP14ParserRULE_inclusiveOrExpression)
+	p.EnterRule(localctx, 82, CPPParserRULE_inclusiveOrExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -10587,10 +10587,10 @@ func (p *CPP14Parser) InclusiveOrExpression() (localctx IInclusiveOrExpressionCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserOr {
+	for _la == CPPParserOr {
 		{
 			p.SetState(846)
-			p.Match(CPP14ParserOr)
+			p.Match(CPPParserOr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -10647,13 +10647,13 @@ type LogicalAndExpressionContext struct {
 func NewEmptyLogicalAndExpressionContext() *LogicalAndExpressionContext {
 	var p = new(LogicalAndExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_logicalAndExpression
+	p.RuleIndex = CPPParserRULE_logicalAndExpression
 	return p
 }
 
 func InitEmptyLogicalAndExpressionContext(p *LogicalAndExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_logicalAndExpression
+	p.RuleIndex = CPPParserRULE_logicalAndExpression
 }
 
 func (*LogicalAndExpressionContext) IsLogicalAndExpressionContext() {}
@@ -10664,7 +10664,7 @@ func NewLogicalAndExpressionContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_logicalAndExpression
+	p.RuleIndex = CPPParserRULE_logicalAndExpression
 
 	return p
 }
@@ -10713,11 +10713,11 @@ func (s *LogicalAndExpressionContext) InclusiveOrExpression(i int) IInclusiveOrE
 }
 
 func (s *LogicalAndExpressionContext) AllAndAnd() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserAndAnd)
+	return s.GetTokens(CPPParserAndAnd)
 }
 
 func (s *LogicalAndExpressionContext) AndAnd(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAnd, i)
+	return s.GetToken(CPPParserAndAnd, i)
 }
 
 func (s *LogicalAndExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -10730,7 +10730,7 @@ func (s *LogicalAndExpressionContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *LogicalAndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLogicalAndExpression(s)
 
 	default:
@@ -10738,12 +10738,12 @@ func (s *LogicalAndExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) LogicalAndExpression() (localctx ILogicalAndExpressionContext) {
+func (p *CPPParser) LogicalAndExpression() (localctx ILogicalAndExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewLogicalAndExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 84, CPP14ParserRULE_logicalAndExpression)
+	p.EnterRule(localctx, 84, CPPParserRULE_logicalAndExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -10758,10 +10758,10 @@ func (p *CPP14Parser) LogicalAndExpression() (localctx ILogicalAndExpressionCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserAndAnd {
+	for _la == CPPParserAndAnd {
 		{
 			p.SetState(854)
-			p.Match(CPP14ParserAndAnd)
+			p.Match(CPPParserAndAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -10818,13 +10818,13 @@ type LogicalOrExpressionContext struct {
 func NewEmptyLogicalOrExpressionContext() *LogicalOrExpressionContext {
 	var p = new(LogicalOrExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_logicalOrExpression
+	p.RuleIndex = CPPParserRULE_logicalOrExpression
 	return p
 }
 
 func InitEmptyLogicalOrExpressionContext(p *LogicalOrExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_logicalOrExpression
+	p.RuleIndex = CPPParserRULE_logicalOrExpression
 }
 
 func (*LogicalOrExpressionContext) IsLogicalOrExpressionContext() {}
@@ -10835,7 +10835,7 @@ func NewLogicalOrExpressionContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_logicalOrExpression
+	p.RuleIndex = CPPParserRULE_logicalOrExpression
 
 	return p
 }
@@ -10884,11 +10884,11 @@ func (s *LogicalOrExpressionContext) LogicalAndExpression(i int) ILogicalAndExpr
 }
 
 func (s *LogicalOrExpressionContext) AllOrOr() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserOrOr)
+	return s.GetTokens(CPPParserOrOr)
 }
 
 func (s *LogicalOrExpressionContext) OrOr(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOrOr, i)
+	return s.GetToken(CPPParserOrOr, i)
 }
 
 func (s *LogicalOrExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -10901,7 +10901,7 @@ func (s *LogicalOrExpressionContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *LogicalOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLogicalOrExpression(s)
 
 	default:
@@ -10909,12 +10909,12 @@ func (s *LogicalOrExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) LogicalOrExpression() (localctx ILogicalOrExpressionContext) {
+func (p *CPPParser) LogicalOrExpression() (localctx ILogicalOrExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewLogicalOrExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 86, CPP14ParserRULE_logicalOrExpression)
+	p.EnterRule(localctx, 86, CPPParserRULE_logicalOrExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -10929,10 +10929,10 @@ func (p *CPP14Parser) LogicalOrExpression() (localctx ILogicalOrExpressionContex
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserOrOr {
+	for _la == CPPParserOrOr {
 		{
 			p.SetState(862)
-			p.Match(CPP14ParserOrOr)
+			p.Match(CPPParserOrOr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -10990,13 +10990,13 @@ type ConditionalExpressionContext struct {
 func NewEmptyConditionalExpressionContext() *ConditionalExpressionContext {
 	var p = new(ConditionalExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conditionalExpression
+	p.RuleIndex = CPPParserRULE_conditionalExpression
 	return p
 }
 
 func InitEmptyConditionalExpressionContext(p *ConditionalExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conditionalExpression
+	p.RuleIndex = CPPParserRULE_conditionalExpression
 }
 
 func (*ConditionalExpressionContext) IsConditionalExpressionContext() {}
@@ -11007,7 +11007,7 @@ func NewConditionalExpressionContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_conditionalExpression
+	p.RuleIndex = CPPParserRULE_conditionalExpression
 
 	return p
 }
@@ -11031,7 +11031,7 @@ func (s *ConditionalExpressionContext) LogicalOrExpression() ILogicalOrExpressio
 }
 
 func (s *ConditionalExpressionContext) Question() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserQuestion, 0)
+	return s.GetToken(CPPParserQuestion, 0)
 }
 
 func (s *ConditionalExpressionContext) Expression() IExpressionContext {
@@ -11051,7 +11051,7 @@ func (s *ConditionalExpressionContext) Expression() IExpressionContext {
 }
 
 func (s *ConditionalExpressionContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *ConditionalExpressionContext) AssignmentExpression() IAssignmentExpressionContext {
@@ -11080,7 +11080,7 @@ func (s *ConditionalExpressionContext) ToStringTree(ruleNames []string, recog an
 
 func (s *ConditionalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitConditionalExpression(s)
 
 	default:
@@ -11088,12 +11088,12 @@ func (s *ConditionalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) ConditionalExpression() (localctx IConditionalExpressionContext) {
+func (p *CPPParser) ConditionalExpression() (localctx IConditionalExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewConditionalExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 88, CPP14ParserRULE_conditionalExpression)
+	p.EnterRule(localctx, 88, CPPParserRULE_conditionalExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -11108,10 +11108,10 @@ func (p *CPP14Parser) ConditionalExpression() (localctx IConditionalExpressionCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserQuestion {
+	if _la == CPPParserQuestion {
 		{
 			p.SetState(870)
-			p.Match(CPP14ParserQuestion)
+			p.Match(CPPParserQuestion)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -11123,7 +11123,7 @@ func (p *CPP14Parser) ConditionalExpression() (localctx IConditionalExpressionCo
 		}
 		{
 			p.SetState(872)
-			p.Match(CPP14ParserColon)
+			p.Match(CPPParserColon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -11175,13 +11175,13 @@ type AssignmentExpressionContext struct {
 func NewEmptyAssignmentExpressionContext() *AssignmentExpressionContext {
 	var p = new(AssignmentExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_assignmentExpression
+	p.RuleIndex = CPPParserRULE_assignmentExpression
 	return p
 }
 
 func InitEmptyAssignmentExpressionContext(p *AssignmentExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_assignmentExpression
+	p.RuleIndex = CPPParserRULE_assignmentExpression
 }
 
 func (*AssignmentExpressionContext) IsAssignmentExpressionContext() {}
@@ -11192,7 +11192,7 @@ func NewAssignmentExpressionContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_assignmentExpression
+	p.RuleIndex = CPPParserRULE_assignmentExpression
 
 	return p
 }
@@ -11289,7 +11289,7 @@ func (s *AssignmentExpressionContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *AssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAssignmentExpression(s)
 
 	default:
@@ -11297,12 +11297,12 @@ func (s *AssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) AssignmentExpression() (localctx IAssignmentExpressionContext) {
+func (p *CPPParser) AssignmentExpression() (localctx IAssignmentExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewAssignmentExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 90, CPP14ParserRULE_assignmentExpression)
+	p.EnterRule(localctx, 90, CPPParserRULE_assignmentExpression)
 	p.SetState(883)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -11388,13 +11388,13 @@ type AssignmentOperatorContext struct {
 func NewEmptyAssignmentOperatorContext() *AssignmentOperatorContext {
 	var p = new(AssignmentOperatorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_assignmentOperator
+	p.RuleIndex = CPPParserRULE_assignmentOperator
 	return p
 }
 
 func InitEmptyAssignmentOperatorContext(p *AssignmentOperatorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_assignmentOperator
+	p.RuleIndex = CPPParserRULE_assignmentOperator
 }
 
 func (*AssignmentOperatorContext) IsAssignmentOperatorContext() {}
@@ -11405,7 +11405,7 @@ func NewAssignmentOperatorContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_assignmentOperator
+	p.RuleIndex = CPPParserRULE_assignmentOperator
 
 	return p
 }
@@ -11413,47 +11413,47 @@ func NewAssignmentOperatorContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *AssignmentOperatorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AssignmentOperatorContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) StarAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStarAssign, 0)
+	return s.GetToken(CPPParserStarAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) DivAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDivAssign, 0)
+	return s.GetToken(CPPParserDivAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) ModAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserModAssign, 0)
+	return s.GetToken(CPPParserModAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) PlusAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlusAssign, 0)
+	return s.GetToken(CPPParserPlusAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) MinusAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinusAssign, 0)
+	return s.GetToken(CPPParserMinusAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) RightShiftAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightShiftAssign, 0)
+	return s.GetToken(CPPParserRightShiftAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) LeftShiftAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftShiftAssign, 0)
+	return s.GetToken(CPPParserLeftShiftAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) AndAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAssign, 0)
+	return s.GetToken(CPPParserAndAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) XorAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserXorAssign, 0)
+	return s.GetToken(CPPParserXorAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) OrAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOrAssign, 0)
+	return s.GetToken(CPPParserOrAssign, 0)
 }
 
 func (s *AssignmentOperatorContext) GetRuleContext() antlr.RuleContext {
@@ -11466,7 +11466,7 @@ func (s *AssignmentOperatorContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAssignmentOperator(s)
 
 	default:
@@ -11474,12 +11474,12 @@ func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
+func (p *CPPParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
 	this := p
 	_ = this
 
 	localctx = NewAssignmentOperatorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 92, CPP14ParserRULE_assignmentOperator)
+	p.EnterRule(localctx, 92, CPPParserRULE_assignmentOperator)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -11533,13 +11533,13 @@ type ExpressionContext struct {
 func NewEmptyExpressionContext() *ExpressionContext {
 	var p = new(ExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_expression
+	p.RuleIndex = CPPParserRULE_expression
 	return p
 }
 
 func InitEmptyExpressionContext(p *ExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_expression
+	p.RuleIndex = CPPParserRULE_expression
 }
 
 func (*ExpressionContext) IsExpressionContext() {}
@@ -11550,7 +11550,7 @@ func NewExpressionContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_expression
+	p.RuleIndex = CPPParserRULE_expression
 
 	return p
 }
@@ -11599,11 +11599,11 @@ func (s *ExpressionContext) AssignmentExpression(i int) IAssignmentExpressionCon
 }
 
 func (s *ExpressionContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *ExpressionContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *ExpressionContext) GetRuleContext() antlr.RuleContext {
@@ -11616,7 +11616,7 @@ func (s *ExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *ExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExpression(s)
 
 	default:
@@ -11624,12 +11624,12 @@ func (s *ExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Expression() (localctx IExpressionContext) {
+func (p *CPPParser) Expression() (localctx IExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 94, CPP14ParserRULE_expression)
+	p.EnterRule(localctx, 94, CPPParserRULE_expression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -11644,10 +11644,10 @@ func (p *CPP14Parser) Expression() (localctx IExpressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(888)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -11701,13 +11701,13 @@ type ConstantExpressionContext struct {
 func NewEmptyConstantExpressionContext() *ConstantExpressionContext {
 	var p = new(ConstantExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_constantExpression
+	p.RuleIndex = CPPParserRULE_constantExpression
 	return p
 }
 
 func InitEmptyConstantExpressionContext(p *ConstantExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_constantExpression
+	p.RuleIndex = CPPParserRULE_constantExpression
 }
 
 func (*ConstantExpressionContext) IsConstantExpressionContext() {}
@@ -11718,7 +11718,7 @@ func NewConstantExpressionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_constantExpression
+	p.RuleIndex = CPPParserRULE_constantExpression
 
 	return p
 }
@@ -11751,7 +11751,7 @@ func (s *ConstantExpressionContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *ConstantExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitConstantExpression(s)
 
 	default:
@@ -11759,12 +11759,12 @@ func (s *ConstantExpressionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) ConstantExpression() (localctx IConstantExpressionContext) {
+func (p *CPPParser) ConstantExpression() (localctx IConstantExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewConstantExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 96, CPP14ParserRULE_constantExpression)
+	p.EnterRule(localctx, 96, CPPParserRULE_constantExpression)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(895)
@@ -11814,13 +11814,13 @@ type StatementContext struct {
 func NewEmptyStatementContext() *StatementContext {
 	var p = new(StatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_statement
+	p.RuleIndex = CPPParserRULE_statement
 	return p
 }
 
 func InitEmptyStatementContext(p *StatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_statement
+	p.RuleIndex = CPPParserRULE_statement
 }
 
 func (*StatementContext) IsStatementContext() {}
@@ -11831,7 +11831,7 @@ func NewStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_statement
+	p.RuleIndex = CPPParserRULE_statement
 
 	return p
 }
@@ -11992,7 +11992,7 @@ func (s *StatementContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitStatement(s)
 
 	default:
@@ -12000,12 +12000,12 @@ func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Statement() (localctx IStatementContext) {
+func (p *CPPParser) Statement() (localctx IStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 98, CPP14ParserRULE_statement)
+	p.EnterRule(localctx, 98, CPPParserRULE_statement)
 	p.SetState(910)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -12048,37 +12048,37 @@ func (p *CPP14Parser) Statement() (localctx IStatementContext) {
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserIntegerLiteral, CPP14ParserCharacterLiteral, CPP14ParserFloatingLiteral, CPP14ParserStringLiteral, CPP14ParserBooleanLiteral, CPP14ParserPointerLiteral, CPP14ParserUserDefinedLiteral, CPP14ParserAlignof, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserConst_cast, CPP14ParserDecltype, CPP14ParserDelete, CPP14ParserDouble, CPP14ParserDynamic_cast, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserNew, CPP14ParserNoexcept, CPP14ParserOperator, CPP14ParserReinterpret_cast, CPP14ParserShort, CPP14ParserSigned, CPP14ParserSizeof, CPP14ParserStatic_cast, CPP14ParserThis, CPP14ParserThrow, CPP14ParserTypeid_, CPP14ParserTypename_, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot, CPP14ParserPlusPlus, CPP14ParserMinusMinus, CPP14ParserDoublecolon, CPP14ParserSemi, CPP14ParserIdentifier:
+		case CPPParserIntegerLiteral, CPPParserCharacterLiteral, CPPParserFloatingLiteral, CPPParserStringLiteral, CPPParserBooleanLiteral, CPPParserPointerLiteral, CPPParserUserDefinedLiteral, CPPParserAlignof, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserConst_cast, CPPParserDecltype, CPPParserDelete, CPPParserDouble, CPPParserDynamic_cast, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserNew, CPPParserNoexcept, CPPParserOperator, CPPParserReinterpret_cast, CPPParserShort, CPPParserSigned, CPPParserSizeof, CPPParserStatic_cast, CPPParserThis, CPPParserThrow, CPPParserTypeid_, CPPParserTypename_, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot, CPPParserPlusPlus, CPPParserMinusMinus, CPPParserDoublecolon, CPPParserSemi, CPPParserIdentifier:
 			{
 				p.SetState(902)
 				p.ExpressionStatement()
 			}
 
-		case CPP14ParserLeftBrace:
+		case CPPParserLeftBrace:
 			{
 				p.SetState(903)
 				p.CompoundStatement()
 			}
 
-		case CPP14ParserIf, CPP14ParserSwitch:
+		case CPPParserIf, CPPParserSwitch:
 			{
 				p.SetState(904)
 				p.SelectionStatement()
 			}
 
-		case CPP14ParserDo, CPP14ParserFor, CPP14ParserWhile:
+		case CPPParserDo, CPPParserFor, CPPParserWhile:
 			{
 				p.SetState(905)
 				p.IterationStatement()
 			}
 
-		case CPP14ParserBreak, CPP14ParserContinue, CPP14ParserGoto, CPP14ParserReturn:
+		case CPPParserBreak, CPPParserContinue, CPPParserGoto, CPPParserReturn:
 			{
 				p.SetState(906)
 				p.JumpStatement()
 			}
 
-		case CPP14ParserTry:
+		case CPPParserTry:
 			{
 				p.SetState(907)
 				p.TryBlock()
@@ -12134,13 +12134,13 @@ type LabeledStatementContext struct {
 func NewEmptyLabeledStatementContext() *LabeledStatementContext {
 	var p = new(LabeledStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_labeledStatement
+	p.RuleIndex = CPPParserRULE_labeledStatement
 	return p
 }
 
 func InitEmptyLabeledStatementContext(p *LabeledStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_labeledStatement
+	p.RuleIndex = CPPParserRULE_labeledStatement
 }
 
 func (*LabeledStatementContext) IsLabeledStatementContext() {}
@@ -12151,7 +12151,7 @@ func NewLabeledStatementContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_labeledStatement
+	p.RuleIndex = CPPParserRULE_labeledStatement
 
 	return p
 }
@@ -12159,7 +12159,7 @@ func NewLabeledStatementContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *LabeledStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *LabeledStatementContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *LabeledStatementContext) Statement() IStatementContext {
@@ -12179,11 +12179,11 @@ func (s *LabeledStatementContext) Statement() IStatementContext {
 }
 
 func (s *LabeledStatementContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *LabeledStatementContext) Case() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserCase, 0)
+	return s.GetToken(CPPParserCase, 0)
 }
 
 func (s *LabeledStatementContext) ConstantExpression() IConstantExpressionContext {
@@ -12203,7 +12203,7 @@ func (s *LabeledStatementContext) ConstantExpression() IConstantExpressionContex
 }
 
 func (s *LabeledStatementContext) Default() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDefault, 0)
+	return s.GetToken(CPPParserDefault, 0)
 }
 
 func (s *LabeledStatementContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -12232,7 +12232,7 @@ func (s *LabeledStatementContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *LabeledStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLabeledStatement(s)
 
 	default:
@@ -12240,12 +12240,12 @@ func (s *LabeledStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) LabeledStatement() (localctx ILabeledStatementContext) {
+func (p *CPPParser) LabeledStatement() (localctx ILabeledStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewLabeledStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 100, CPP14ParserRULE_labeledStatement)
+	p.EnterRule(localctx, 100, CPPParserRULE_labeledStatement)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -12256,7 +12256,7 @@ func (p *CPP14Parser) LabeledStatement() (localctx ILabeledStatementContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(912)
 			p.AttributeSpecifierSeq()
@@ -12270,20 +12270,20 @@ func (p *CPP14Parser) LabeledStatement() (localctx ILabeledStatementContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserIdentifier:
+	case CPPParserIdentifier:
 		{
 			p.SetState(915)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserCase:
+	case CPPParserCase:
 		{
 			p.SetState(916)
-			p.Match(CPP14ParserCase)
+			p.Match(CPPParserCase)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -12294,10 +12294,10 @@ func (p *CPP14Parser) LabeledStatement() (localctx ILabeledStatementContext) {
 			p.ConstantExpression()
 		}
 
-	case CPP14ParserDefault:
+	case CPPParserDefault:
 		{
 			p.SetState(918)
-			p.Match(CPP14ParserDefault)
+			p.Match(CPPParserDefault)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -12310,7 +12310,7 @@ func (p *CPP14Parser) LabeledStatement() (localctx ILabeledStatementContext) {
 	}
 	{
 		p.SetState(921)
-		p.Match(CPP14ParserColon)
+		p.Match(CPPParserColon)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -12357,13 +12357,13 @@ type ExpressionStatementContext struct {
 func NewEmptyExpressionStatementContext() *ExpressionStatementContext {
 	var p = new(ExpressionStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_expressionStatement
+	p.RuleIndex = CPPParserRULE_expressionStatement
 	return p
 }
 
 func InitEmptyExpressionStatementContext(p *ExpressionStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_expressionStatement
+	p.RuleIndex = CPPParserRULE_expressionStatement
 }
 
 func (*ExpressionStatementContext) IsExpressionStatementContext() {}
@@ -12374,7 +12374,7 @@ func NewExpressionStatementContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_expressionStatement
+	p.RuleIndex = CPPParserRULE_expressionStatement
 
 	return p
 }
@@ -12382,7 +12382,7 @@ func NewExpressionStatementContext(parser antlr.Parser, parent antlr.ParserRuleC
 func (s *ExpressionStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ExpressionStatementContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *ExpressionStatementContext) Expression() IExpressionContext {
@@ -12411,7 +12411,7 @@ func (s *ExpressionStatementContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExpressionStatement(s)
 
 	default:
@@ -12419,12 +12419,12 @@ func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) ExpressionStatement() (localctx IExpressionStatementContext) {
+func (p *CPPParser) ExpressionStatement() (localctx IExpressionStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewExpressionStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 102, CPP14ParserRULE_expressionStatement)
+	p.EnterRule(localctx, 102, CPPParserRULE_expressionStatement)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -12435,7 +12435,7 @@ func (p *CPP14Parser) ExpressionStatement() (localctx IExpressionStatementContex
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133201) != 0) || _la == CPP14ParserIdentifier {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133201) != 0) || _la == CPPParserIdentifier {
 		{
 			p.SetState(924)
 			p.Expression()
@@ -12444,7 +12444,7 @@ func (p *CPP14Parser) ExpressionStatement() (localctx IExpressionStatementContex
 	}
 	{
 		p.SetState(927)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -12488,13 +12488,13 @@ type CompoundStatementContext struct {
 func NewEmptyCompoundStatementContext() *CompoundStatementContext {
 	var p = new(CompoundStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_compoundStatement
+	p.RuleIndex = CPPParserRULE_compoundStatement
 	return p
 }
 
 func InitEmptyCompoundStatementContext(p *CompoundStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_compoundStatement
+	p.RuleIndex = CPPParserRULE_compoundStatement
 }
 
 func (*CompoundStatementContext) IsCompoundStatementContext() {}
@@ -12505,7 +12505,7 @@ func NewCompoundStatementContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_compoundStatement
+	p.RuleIndex = CPPParserRULE_compoundStatement
 
 	return p
 }
@@ -12513,11 +12513,11 @@ func NewCompoundStatementContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *CompoundStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *CompoundStatementContext) LeftBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, 0)
+	return s.GetToken(CPPParserLeftBrace, 0)
 }
 
 func (s *CompoundStatementContext) RightBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, 0)
+	return s.GetToken(CPPParserRightBrace, 0)
 }
 
 func (s *CompoundStatementContext) StatementSeq() IStatementSeqContext {
@@ -12546,7 +12546,7 @@ func (s *CompoundStatementContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *CompoundStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCompoundStatement(s)
 
 	default:
@@ -12554,18 +12554,18 @@ func (s *CompoundStatementContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) CompoundStatement() (localctx ICompoundStatementContext) {
+func (p *CPPParser) CompoundStatement() (localctx ICompoundStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewCompoundStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 104, CPP14ParserRULE_compoundStatement)
+	p.EnterRule(localctx, 104, CPPParserRULE_compoundStatement)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(929)
-		p.Match(CPP14ParserLeftBrace)
+		p.Match(CPPParserLeftBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -12587,7 +12587,7 @@ func (p *CPP14Parser) CompoundStatement() (localctx ICompoundStatementContext) {
 	}
 	{
 		p.SetState(933)
-		p.Match(CPP14ParserRightBrace)
+		p.Match(CPPParserRightBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -12630,13 +12630,13 @@ type StatementSeqContext struct {
 func NewEmptyStatementSeqContext() *StatementSeqContext {
 	var p = new(StatementSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_statementSeq
+	p.RuleIndex = CPPParserRULE_statementSeq
 	return p
 }
 
 func InitEmptyStatementSeqContext(p *StatementSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_statementSeq
+	p.RuleIndex = CPPParserRULE_statementSeq
 }
 
 func (*StatementSeqContext) IsStatementSeqContext() {}
@@ -12647,7 +12647,7 @@ func NewStatementSeqContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_statementSeq
+	p.RuleIndex = CPPParserRULE_statementSeq
 
 	return p
 }
@@ -12705,7 +12705,7 @@ func (s *StatementSeqContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *StatementSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitStatementSeq(s)
 
 	default:
@@ -12713,12 +12713,12 @@ func (s *StatementSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) StatementSeq() (localctx IStatementSeqContext) {
+func (p *CPPParser) StatementSeq() (localctx IStatementSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewStatementSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 106, CPP14ParserRULE_statementSeq)
+	p.EnterRule(localctx, 106, CPPParserRULE_statementSeq)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -12786,13 +12786,13 @@ type SelectionStatementContext struct {
 func NewEmptySelectionStatementContext() *SelectionStatementContext {
 	var p = new(SelectionStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_selectionStatement
+	p.RuleIndex = CPPParserRULE_selectionStatement
 	return p
 }
 
 func InitEmptySelectionStatementContext(p *SelectionStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_selectionStatement
+	p.RuleIndex = CPPParserRULE_selectionStatement
 }
 
 func (*SelectionStatementContext) IsSelectionStatementContext() {}
@@ -12803,7 +12803,7 @@ func NewSelectionStatementContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_selectionStatement
+	p.RuleIndex = CPPParserRULE_selectionStatement
 
 	return p
 }
@@ -12811,11 +12811,11 @@ func NewSelectionStatementContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *SelectionStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *SelectionStatementContext) If() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIf, 0)
+	return s.GetToken(CPPParserIf, 0)
 }
 
 func (s *SelectionStatementContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *SelectionStatementContext) Condition() IConditionContext {
@@ -12835,7 +12835,7 @@ func (s *SelectionStatementContext) Condition() IConditionContext {
 }
 
 func (s *SelectionStatementContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *SelectionStatementContext) AllStatement() []IStatementContext {
@@ -12880,15 +12880,15 @@ func (s *SelectionStatementContext) Statement(i int) IStatementContext {
 }
 
 func (s *SelectionStatementContext) Constexpr() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserConstexpr, 0)
+	return s.GetToken(CPPParserConstexpr, 0)
 }
 
 func (s *SelectionStatementContext) Else() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserElse, 0)
+	return s.GetToken(CPPParserElse, 0)
 }
 
 func (s *SelectionStatementContext) Switch() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSwitch, 0)
+	return s.GetToken(CPPParserSwitch, 0)
 }
 
 func (s *SelectionStatementContext) GetRuleContext() antlr.RuleContext {
@@ -12901,7 +12901,7 @@ func (s *SelectionStatementContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *SelectionStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSelectionStatement(s)
 
 	default:
@@ -12909,12 +12909,12 @@ func (s *SelectionStatementContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext) {
+func (p *CPPParser) SelectionStatement() (localctx ISelectionStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewSelectionStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 108, CPP14ParserRULE_selectionStatement)
+	p.EnterRule(localctx, 108, CPPParserRULE_selectionStatement)
 	var _la int
 
 	p.SetState(958)
@@ -12924,11 +12924,11 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserIf:
+	case CPPParserIf:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(940)
-			p.Match(CPP14ParserIf)
+			p.Match(CPPParserIf)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -12941,10 +12941,10 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserConstexpr {
+		if _la == CPPParserConstexpr {
 			{
 				p.SetState(941)
-				p.Match(CPP14ParserConstexpr)
+				p.Match(CPPParserConstexpr)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -12954,7 +12954,7 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 		}
 		{
 			p.SetState(944)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -12966,7 +12966,7 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 		}
 		{
 			p.SetState(946)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -12982,7 +12982,7 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 84, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(948)
-				p.Match(CPP14ParserElse)
+				p.Match(CPPParserElse)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -12997,11 +12997,11 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 			goto errorExit
 		}
 
-	case CPP14ParserSwitch:
+	case CPPParserSwitch:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(952)
-			p.Match(CPP14ParserSwitch)
+			p.Match(CPPParserSwitch)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13009,7 +13009,7 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 		}
 		{
 			p.SetState(953)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13021,7 +13021,7 @@ func (p *CPP14Parser) SelectionStatement() (localctx ISelectionStatementContext)
 		}
 		{
 			p.SetState(955)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13078,13 +13078,13 @@ type ConditionContext struct {
 func NewEmptyConditionContext() *ConditionContext {
 	var p = new(ConditionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_condition
+	p.RuleIndex = CPPParserRULE_condition
 	return p
 }
 
 func InitEmptyConditionContext(p *ConditionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_condition
+	p.RuleIndex = CPPParserRULE_condition
 }
 
 func (*ConditionContext) IsConditionContext() {}
@@ -13095,7 +13095,7 @@ func NewConditionContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_condition
+	p.RuleIndex = CPPParserRULE_condition
 
 	return p
 }
@@ -13151,7 +13151,7 @@ func (s *ConditionContext) Declarator() IDeclaratorContext {
 }
 
 func (s *ConditionContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *ConditionContext) InitializerClause() IInitializerClauseContext {
@@ -13212,7 +13212,7 @@ func (s *ConditionContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *ConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCondition(s)
 
 	default:
@@ -13220,12 +13220,12 @@ func (s *ConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Condition() (localctx IConditionContext) {
+func (p *CPPParser) Condition() (localctx IConditionContext) {
 	this := p
 	_ = this
 
 	localctx = NewConditionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 110, CPP14ParserRULE_condition)
+	p.EnterRule(localctx, 110, CPPParserRULE_condition)
 	var _la int
 
 	p.SetState(971)
@@ -13251,7 +13251,7 @@ func (p *CPP14Parser) Condition() (localctx IConditionContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(961)
 				p.AttributeSpecifierSeq()
@@ -13273,10 +13273,10 @@ func (p *CPP14Parser) Condition() (localctx IConditionContext) {
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserAssign:
+		case CPPParserAssign:
 			{
 				p.SetState(966)
-				p.Match(CPP14ParserAssign)
+				p.Match(CPPParserAssign)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -13287,7 +13287,7 @@ func (p *CPP14Parser) Condition() (localctx IConditionContext) {
 				p.InitializerClause()
 			}
 
-		case CPP14ParserLeftBrace:
+		case CPPParserLeftBrace:
 			{
 				p.SetState(968)
 				p.BracedInitList()
@@ -13349,13 +13349,13 @@ type IterationStatementContext struct {
 func NewEmptyIterationStatementContext() *IterationStatementContext {
 	var p = new(IterationStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_iterationStatement
+	p.RuleIndex = CPPParserRULE_iterationStatement
 	return p
 }
 
 func InitEmptyIterationStatementContext(p *IterationStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_iterationStatement
+	p.RuleIndex = CPPParserRULE_iterationStatement
 }
 
 func (*IterationStatementContext) IsIterationStatementContext() {}
@@ -13366,7 +13366,7 @@ func NewIterationStatementContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_iterationStatement
+	p.RuleIndex = CPPParserRULE_iterationStatement
 
 	return p
 }
@@ -13374,11 +13374,11 @@ func NewIterationStatementContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *IterationStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *IterationStatementContext) While() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserWhile, 0)
+	return s.GetToken(CPPParserWhile, 0)
 }
 
 func (s *IterationStatementContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *IterationStatementContext) Condition() IConditionContext {
@@ -13398,7 +13398,7 @@ func (s *IterationStatementContext) Condition() IConditionContext {
 }
 
 func (s *IterationStatementContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *IterationStatementContext) Statement() IStatementContext {
@@ -13418,7 +13418,7 @@ func (s *IterationStatementContext) Statement() IStatementContext {
 }
 
 func (s *IterationStatementContext) Do() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDo, 0)
+	return s.GetToken(CPPParserDo, 0)
 }
 
 func (s *IterationStatementContext) Expression() IExpressionContext {
@@ -13438,11 +13438,11 @@ func (s *IterationStatementContext) Expression() IExpressionContext {
 }
 
 func (s *IterationStatementContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *IterationStatementContext) For() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserFor, 0)
+	return s.GetToken(CPPParserFor, 0)
 }
 
 func (s *IterationStatementContext) ForInitStatement() IForInitStatementContext {
@@ -13478,7 +13478,7 @@ func (s *IterationStatementContext) ForRangeDeclaration() IForRangeDeclarationCo
 }
 
 func (s *IterationStatementContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *IterationStatementContext) ForRangeInitializer() IForRangeInitializerContext {
@@ -13507,7 +13507,7 @@ func (s *IterationStatementContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *IterationStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitIterationStatement(s)
 
 	default:
@@ -13515,12 +13515,12 @@ func (s *IterationStatementContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext) {
+func (p *CPPParser) IterationStatement() (localctx IIterationStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewIterationStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 112, CPP14ParserRULE_iterationStatement)
+	p.EnterRule(localctx, 112, CPPParserRULE_iterationStatement)
 	var _la int
 
 	p.SetState(1006)
@@ -13530,11 +13530,11 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserWhile:
+	case CPPParserWhile:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(973)
-			p.Match(CPP14ParserWhile)
+			p.Match(CPPParserWhile)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13542,7 +13542,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(974)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13554,7 +13554,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(976)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13565,11 +13565,11 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 			p.Statement()
 		}
 
-	case CPP14ParserDo:
+	case CPPParserDo:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(979)
-			p.Match(CPP14ParserDo)
+			p.Match(CPPParserDo)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13581,7 +13581,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(981)
-			p.Match(CPP14ParserWhile)
+			p.Match(CPPParserWhile)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13589,7 +13589,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(982)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13601,7 +13601,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(984)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13609,18 +13609,18 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(985)
-			p.Match(CPP14ParserSemi)
+			p.Match(CPPParserSemi)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserFor:
+	case CPPParserFor:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(987)
-			p.Match(CPP14ParserFor)
+			p.Match(CPPParserFor)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13628,7 +13628,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(988)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13653,7 +13653,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-714116761242538754) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384301683) != 0) || _la == CPP14ParserAttributeGnu || _la == CPP14ParserIdentifier {
+			if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&-714116761242538754) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384301683) != 0) || _la == CPPParserAttributeGnu || _la == CPPParserIdentifier {
 				{
 					p.SetState(990)
 					p.Condition()
@@ -13662,7 +13662,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 			}
 			{
 				p.SetState(993)
-				p.Match(CPP14ParserSemi)
+				p.Match(CPPParserSemi)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -13675,7 +13675,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133201) != 0) || _la == CPP14ParserIdentifier {
+			if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133201) != 0) || _la == CPPParserIdentifier {
 				{
 					p.SetState(994)
 					p.Expression()
@@ -13690,7 +13690,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 			}
 			{
 				p.SetState(998)
-				p.Match(CPP14ParserColon)
+				p.Match(CPPParserColon)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -13706,7 +13706,7 @@ func (p *CPP14Parser) IterationStatement() (localctx IIterationStatementContext)
 		}
 		{
 			p.SetState(1003)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -13758,13 +13758,13 @@ type ForInitStatementContext struct {
 func NewEmptyForInitStatementContext() *ForInitStatementContext {
 	var p = new(ForInitStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_forInitStatement
+	p.RuleIndex = CPPParserRULE_forInitStatement
 	return p
 }
 
 func InitEmptyForInitStatementContext(p *ForInitStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_forInitStatement
+	p.RuleIndex = CPPParserRULE_forInitStatement
 }
 
 func (*ForInitStatementContext) IsForInitStatementContext() {}
@@ -13775,7 +13775,7 @@ func NewForInitStatementContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_forInitStatement
+	p.RuleIndex = CPPParserRULE_forInitStatement
 
 	return p
 }
@@ -13824,7 +13824,7 @@ func (s *ForInitStatementContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *ForInitStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitForInitStatement(s)
 
 	default:
@@ -13832,12 +13832,12 @@ func (s *ForInitStatementContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) ForInitStatement() (localctx IForInitStatementContext) {
+func (p *CPPParser) ForInitStatement() (localctx IForInitStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewForInitStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 114, CPP14ParserRULE_forInitStatement)
+	p.EnterRule(localctx, 114, CPPParserRULE_forInitStatement)
 	p.SetState(1010)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -13905,13 +13905,13 @@ type ForRangeDeclarationContext struct {
 func NewEmptyForRangeDeclarationContext() *ForRangeDeclarationContext {
 	var p = new(ForRangeDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_forRangeDeclaration
+	p.RuleIndex = CPPParserRULE_forRangeDeclaration
 	return p
 }
 
 func InitEmptyForRangeDeclarationContext(p *ForRangeDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_forRangeDeclaration
+	p.RuleIndex = CPPParserRULE_forRangeDeclaration
 }
 
 func (*ForRangeDeclarationContext) IsForRangeDeclarationContext() {}
@@ -13922,7 +13922,7 @@ func NewForRangeDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_forRangeDeclaration
+	p.RuleIndex = CPPParserRULE_forRangeDeclaration
 
 	return p
 }
@@ -13978,7 +13978,7 @@ func (s *ForRangeDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifier
 }
 
 func (s *ForRangeDeclarationContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *ForRangeDeclarationContext) IdentifierList() IIdentifierListContext {
@@ -13998,7 +13998,7 @@ func (s *ForRangeDeclarationContext) IdentifierList() IIdentifierListContext {
 }
 
 func (s *ForRangeDeclarationContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *ForRangeDeclarationContext) AllPointerOperator() []IPointerOperatorContext {
@@ -14052,7 +14052,7 @@ func (s *ForRangeDeclarationContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *ForRangeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitForRangeDeclaration(s)
 
 	default:
@@ -14060,12 +14060,12 @@ func (s *ForRangeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) ForRangeDeclaration() (localctx IForRangeDeclarationContext) {
+func (p *CPPParser) ForRangeDeclaration() (localctx IForRangeDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewForRangeDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 116, CPP14ParserRULE_forRangeDeclaration)
+	p.EnterRule(localctx, 116, CPPParserRULE_forRangeDeclaration)
 	var _la int
 
 	p.SetState(1032)
@@ -14084,7 +14084,7 @@ func (p *CPP14Parser) ForRangeDeclaration() (localctx IForRangeDeclarationContex
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(1012)
 				p.AttributeSpecifierSeq()
@@ -14109,7 +14109,7 @@ func (p *CPP14Parser) ForRangeDeclaration() (localctx IForRangeDeclarationContex
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(1018)
 				p.AttributeSpecifierSeq()
@@ -14127,7 +14127,7 @@ func (p *CPP14Parser) ForRangeDeclaration() (localctx IForRangeDeclarationContex
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == CPP14ParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
+		for _la == CPPParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
 			{
 				p.SetState(1022)
 				p.PointerOperator()
@@ -14142,7 +14142,7 @@ func (p *CPP14Parser) ForRangeDeclaration() (localctx IForRangeDeclarationContex
 		}
 		{
 			p.SetState(1028)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -14154,7 +14154,7 @@ func (p *CPP14Parser) ForRangeDeclaration() (localctx IForRangeDeclarationContex
 		}
 		{
 			p.SetState(1030)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -14201,13 +14201,13 @@ type ForRangeInitializerContext struct {
 func NewEmptyForRangeInitializerContext() *ForRangeInitializerContext {
 	var p = new(ForRangeInitializerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_forRangeInitializer
+	p.RuleIndex = CPPParserRULE_forRangeInitializer
 	return p
 }
 
 func InitEmptyForRangeInitializerContext(p *ForRangeInitializerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_forRangeInitializer
+	p.RuleIndex = CPPParserRULE_forRangeInitializer
 }
 
 func (*ForRangeInitializerContext) IsForRangeInitializerContext() {}
@@ -14218,7 +14218,7 @@ func NewForRangeInitializerContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_forRangeInitializer
+	p.RuleIndex = CPPParserRULE_forRangeInitializer
 
 	return p
 }
@@ -14267,7 +14267,7 @@ func (s *ForRangeInitializerContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *ForRangeInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitForRangeInitializer(s)
 
 	default:
@@ -14275,12 +14275,12 @@ func (s *ForRangeInitializerContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) ForRangeInitializer() (localctx IForRangeInitializerContext) {
+func (p *CPPParser) ForRangeInitializer() (localctx IForRangeInitializerContext) {
 	this := p
 	_ = this
 
 	localctx = NewForRangeInitializerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 118, CPP14ParserRULE_forRangeInitializer)
+	p.EnterRule(localctx, 118, CPPParserRULE_forRangeInitializer)
 	p.SetState(1036)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -14288,14 +14288,14 @@ func (p *CPP14Parser) ForRangeInitializer() (localctx IForRangeInitializerContex
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserIntegerLiteral, CPP14ParserCharacterLiteral, CPP14ParserFloatingLiteral, CPP14ParserStringLiteral, CPP14ParserBooleanLiteral, CPP14ParserPointerLiteral, CPP14ParserUserDefinedLiteral, CPP14ParserAlignof, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserConst_cast, CPP14ParserDecltype, CPP14ParserDelete, CPP14ParserDouble, CPP14ParserDynamic_cast, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserNew, CPP14ParserNoexcept, CPP14ParserOperator, CPP14ParserReinterpret_cast, CPP14ParserShort, CPP14ParserSigned, CPP14ParserSizeof, CPP14ParserStatic_cast, CPP14ParserThis, CPP14ParserThrow, CPP14ParserTypeid_, CPP14ParserTypename_, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot, CPP14ParserPlusPlus, CPP14ParserMinusMinus, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserIntegerLiteral, CPPParserCharacterLiteral, CPPParserFloatingLiteral, CPPParserStringLiteral, CPPParserBooleanLiteral, CPPParserPointerLiteral, CPPParserUserDefinedLiteral, CPPParserAlignof, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserConst_cast, CPPParserDecltype, CPPParserDelete, CPPParserDouble, CPPParserDynamic_cast, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserNew, CPPParserNoexcept, CPPParserOperator, CPPParserReinterpret_cast, CPPParserShort, CPPParserSigned, CPPParserSizeof, CPPParserStatic_cast, CPPParserThis, CPPParserThrow, CPPParserTypeid_, CPPParserTypename_, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot, CPPParserPlusPlus, CPPParserMinusMinus, CPPParserDoublecolon, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1034)
 			p.Expression()
 		}
 
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1035)
@@ -14349,13 +14349,13 @@ type JumpStatementContext struct {
 func NewEmptyJumpStatementContext() *JumpStatementContext {
 	var p = new(JumpStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_jumpStatement
+	p.RuleIndex = CPPParserRULE_jumpStatement
 	return p
 }
 
 func InitEmptyJumpStatementContext(p *JumpStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_jumpStatement
+	p.RuleIndex = CPPParserRULE_jumpStatement
 }
 
 func (*JumpStatementContext) IsJumpStatementContext() {}
@@ -14366,7 +14366,7 @@ func NewJumpStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_jumpStatement
+	p.RuleIndex = CPPParserRULE_jumpStatement
 
 	return p
 }
@@ -14374,27 +14374,27 @@ func NewJumpStatementContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *JumpStatementContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *JumpStatementContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *JumpStatementContext) Break() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserBreak, 0)
+	return s.GetToken(CPPParserBreak, 0)
 }
 
 func (s *JumpStatementContext) Continue() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserContinue, 0)
+	return s.GetToken(CPPParserContinue, 0)
 }
 
 func (s *JumpStatementContext) Return() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserReturn, 0)
+	return s.GetToken(CPPParserReturn, 0)
 }
 
 func (s *JumpStatementContext) Goto() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGoto, 0)
+	return s.GetToken(CPPParserGoto, 0)
 }
 
 func (s *JumpStatementContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *JumpStatementContext) Expression() IExpressionContext {
@@ -14439,7 +14439,7 @@ func (s *JumpStatementContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *JumpStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitJumpStatement(s)
 
 	default:
@@ -14447,12 +14447,12 @@ func (s *JumpStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) JumpStatement() (localctx IJumpStatementContext) {
+func (p *CPPParser) JumpStatement() (localctx IJumpStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewJumpStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 120, CPP14ParserRULE_jumpStatement)
+	p.EnterRule(localctx, 120, CPPParserRULE_jumpStatement)
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1047)
 	p.GetErrorHandler().Sync(p)
@@ -14461,30 +14461,30 @@ func (p *CPP14Parser) JumpStatement() (localctx IJumpStatementContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserBreak:
+	case CPPParserBreak:
 		{
 			p.SetState(1038)
-			p.Match(CPP14ParserBreak)
+			p.Match(CPPParserBreak)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserContinue:
+	case CPPParserContinue:
 		{
 			p.SetState(1039)
-			p.Match(CPP14ParserContinue)
+			p.Match(CPPParserContinue)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserReturn:
+	case CPPParserReturn:
 		{
 			p.SetState(1040)
-			p.Match(CPP14ParserReturn)
+			p.Match(CPPParserReturn)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -14496,27 +14496,27 @@ func (p *CPP14Parser) JumpStatement() (localctx IJumpStatementContext) {
 			goto errorExit
 		}
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserIntegerLiteral, CPP14ParserCharacterLiteral, CPP14ParserFloatingLiteral, CPP14ParserStringLiteral, CPP14ParserBooleanLiteral, CPP14ParserPointerLiteral, CPP14ParserUserDefinedLiteral, CPP14ParserAlignof, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserConst_cast, CPP14ParserDecltype, CPP14ParserDelete, CPP14ParserDouble, CPP14ParserDynamic_cast, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserNew, CPP14ParserNoexcept, CPP14ParserOperator, CPP14ParserReinterpret_cast, CPP14ParserShort, CPP14ParserSigned, CPP14ParserSizeof, CPP14ParserStatic_cast, CPP14ParserThis, CPP14ParserThrow, CPP14ParserTypeid_, CPP14ParserTypename_, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot, CPP14ParserPlusPlus, CPP14ParserMinusMinus, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+		case CPPParserIntegerLiteral, CPPParserCharacterLiteral, CPPParserFloatingLiteral, CPPParserStringLiteral, CPPParserBooleanLiteral, CPPParserPointerLiteral, CPPParserUserDefinedLiteral, CPPParserAlignof, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserConst_cast, CPPParserDecltype, CPPParserDelete, CPPParserDouble, CPPParserDynamic_cast, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserNew, CPPParserNoexcept, CPPParserOperator, CPPParserReinterpret_cast, CPPParserShort, CPPParserSigned, CPPParserSizeof, CPPParserStatic_cast, CPPParserThis, CPPParserThrow, CPPParserTypeid_, CPPParserTypename_, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot, CPPParserPlusPlus, CPPParserMinusMinus, CPPParserDoublecolon, CPPParserIdentifier:
 			{
 				p.SetState(1041)
 				p.Expression()
 			}
 
-		case CPP14ParserLeftBrace:
+		case CPPParserLeftBrace:
 			{
 				p.SetState(1042)
 				p.BracedInitList()
 			}
 
-		case CPP14ParserSemi:
+		case CPPParserSemi:
 
 		default:
 		}
 
-	case CPP14ParserGoto:
+	case CPPParserGoto:
 		{
 			p.SetState(1045)
-			p.Match(CPP14ParserGoto)
+			p.Match(CPPParserGoto)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -14524,7 +14524,7 @@ func (p *CPP14Parser) JumpStatement() (localctx IJumpStatementContext) {
 		}
 		{
 			p.SetState(1046)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -14537,7 +14537,7 @@ func (p *CPP14Parser) JumpStatement() (localctx IJumpStatementContext) {
 	}
 	{
 		p.SetState(1049)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -14579,13 +14579,13 @@ type DeclarationStatementContext struct {
 func NewEmptyDeclarationStatementContext() *DeclarationStatementContext {
 	var p = new(DeclarationStatementContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declarationStatement
+	p.RuleIndex = CPPParserRULE_declarationStatement
 	return p
 }
 
 func InitEmptyDeclarationStatementContext(p *DeclarationStatementContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declarationStatement
+	p.RuleIndex = CPPParserRULE_declarationStatement
 }
 
 func (*DeclarationStatementContext) IsDeclarationStatementContext() {}
@@ -14596,7 +14596,7 @@ func NewDeclarationStatementContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declarationStatement
+	p.RuleIndex = CPPParserRULE_declarationStatement
 
 	return p
 }
@@ -14629,7 +14629,7 @@ func (s *DeclarationStatementContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *DeclarationStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclarationStatement(s)
 
 	default:
@@ -14637,12 +14637,12 @@ func (s *DeclarationStatementContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) DeclarationStatement() (localctx IDeclarationStatementContext) {
+func (p *CPPParser) DeclarationStatement() (localctx IDeclarationStatementContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclarationStatementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 122, CPP14ParserRULE_declarationStatement)
+	p.EnterRule(localctx, 122, CPPParserRULE_declarationStatement)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1051)
@@ -14685,13 +14685,13 @@ type DeclarationSeqContext struct {
 func NewEmptyDeclarationSeqContext() *DeclarationSeqContext {
 	var p = new(DeclarationSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declarationSeq
+	p.RuleIndex = CPPParserRULE_declarationSeq
 	return p
 }
 
 func InitEmptyDeclarationSeqContext(p *DeclarationSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declarationSeq
+	p.RuleIndex = CPPParserRULE_declarationSeq
 }
 
 func (*DeclarationSeqContext) IsDeclarationSeqContext() {}
@@ -14702,7 +14702,7 @@ func NewDeclarationSeqContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declarationSeq
+	p.RuleIndex = CPPParserRULE_declarationSeq
 
 	return p
 }
@@ -14760,7 +14760,7 @@ func (s *DeclarationSeqContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *DeclarationSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclarationSeq(s)
 
 	default:
@@ -14768,12 +14768,12 @@ func (s *DeclarationSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) DeclarationSeq() (localctx IDeclarationSeqContext) {
+func (p *CPPParser) DeclarationSeq() (localctx IDeclarationSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclarationSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 124, CPP14ParserRULE_declarationSeq)
+	p.EnterRule(localctx, 124, CPPParserRULE_declarationSeq)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -14841,13 +14841,13 @@ type DeclarationContext struct {
 func NewEmptyDeclarationContext() *DeclarationContext {
 	var p = new(DeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declaration
+	p.RuleIndex = CPPParserRULE_declaration
 	return p
 }
 
 func InitEmptyDeclarationContext(p *DeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declaration
+	p.RuleIndex = CPPParserRULE_declaration
 }
 
 func (*DeclarationContext) IsDeclarationContext() {}
@@ -14858,7 +14858,7 @@ func NewDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declaration
+	p.RuleIndex = CPPParserRULE_declaration
 
 	return p
 }
@@ -15019,7 +15019,7 @@ func (s *DeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclaration(s)
 
 	default:
@@ -15027,12 +15027,12 @@ func (s *DeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) Declaration() (localctx IDeclarationContext) {
+func (p *CPPParser) Declaration() (localctx IDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 126, CPP14ParserRULE_declaration)
+	p.EnterRule(localctx, 126, CPPParserRULE_declaration)
 	p.SetState(1067)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -15149,13 +15149,13 @@ type BlockDeclarationContext struct {
 func NewEmptyBlockDeclarationContext() *BlockDeclarationContext {
 	var p = new(BlockDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_blockDeclaration
+	p.RuleIndex = CPPParserRULE_blockDeclaration
 	return p
 }
 
 func InitEmptyBlockDeclarationContext(p *BlockDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_blockDeclaration
+	p.RuleIndex = CPPParserRULE_blockDeclaration
 }
 
 func (*BlockDeclarationContext) IsBlockDeclarationContext() {}
@@ -15166,7 +15166,7 @@ func NewBlockDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_blockDeclaration
+	p.RuleIndex = CPPParserRULE_blockDeclaration
 
 	return p
 }
@@ -15311,7 +15311,7 @@ func (s *BlockDeclarationContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *BlockDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBlockDeclaration(s)
 
 	default:
@@ -15319,12 +15319,12 @@ func (s *BlockDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) BlockDeclaration() (localctx IBlockDeclarationContext) {
+func (p *CPPParser) BlockDeclaration() (localctx IBlockDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewBlockDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 128, CPP14ParserRULE_blockDeclaration)
+	p.EnterRule(localctx, 128, CPPParserRULE_blockDeclaration)
 	p.SetState(1077)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -15432,13 +15432,13 @@ type AliasDeclarationContext struct {
 func NewEmptyAliasDeclarationContext() *AliasDeclarationContext {
 	var p = new(AliasDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_aliasDeclaration
+	p.RuleIndex = CPPParserRULE_aliasDeclaration
 	return p
 }
 
 func InitEmptyAliasDeclarationContext(p *AliasDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_aliasDeclaration
+	p.RuleIndex = CPPParserRULE_aliasDeclaration
 }
 
 func (*AliasDeclarationContext) IsAliasDeclarationContext() {}
@@ -15449,7 +15449,7 @@ func NewAliasDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_aliasDeclaration
+	p.RuleIndex = CPPParserRULE_aliasDeclaration
 
 	return p
 }
@@ -15457,15 +15457,15 @@ func NewAliasDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *AliasDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AliasDeclarationContext) Using() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUsing, 0)
+	return s.GetToken(CPPParserUsing, 0)
 }
 
 func (s *AliasDeclarationContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *AliasDeclarationContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *AliasDeclarationContext) TheTypeId() ITheTypeIdContext {
@@ -15485,7 +15485,7 @@ func (s *AliasDeclarationContext) TheTypeId() ITheTypeIdContext {
 }
 
 func (s *AliasDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *AliasDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -15514,7 +15514,7 @@ func (s *AliasDeclarationContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *AliasDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAliasDeclaration(s)
 
 	default:
@@ -15522,18 +15522,18 @@ func (s *AliasDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) AliasDeclaration() (localctx IAliasDeclarationContext) {
+func (p *CPPParser) AliasDeclaration() (localctx IAliasDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewAliasDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 130, CPP14ParserRULE_aliasDeclaration)
+	p.EnterRule(localctx, 130, CPPParserRULE_aliasDeclaration)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1079)
-		p.Match(CPP14ParserUsing)
+		p.Match(CPPParserUsing)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -15541,7 +15541,7 @@ func (p *CPP14Parser) AliasDeclaration() (localctx IAliasDeclarationContext) {
 	}
 	{
 		p.SetState(1080)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -15554,7 +15554,7 @@ func (p *CPP14Parser) AliasDeclaration() (localctx IAliasDeclarationContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1081)
 			p.AttributeSpecifierSeq()
@@ -15563,7 +15563,7 @@ func (p *CPP14Parser) AliasDeclaration() (localctx IAliasDeclarationContext) {
 	}
 	{
 		p.SetState(1084)
-		p.Match(CPP14ParserAssign)
+		p.Match(CPPParserAssign)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -15575,7 +15575,7 @@ func (p *CPP14Parser) AliasDeclaration() (localctx IAliasDeclarationContext) {
 	}
 	{
 		p.SetState(1086)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -15627,13 +15627,13 @@ type SimpleDeclarationContext struct {
 func NewEmptySimpleDeclarationContext() *SimpleDeclarationContext {
 	var p = new(SimpleDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleDeclaration
+	p.RuleIndex = CPPParserRULE_simpleDeclaration
 	return p
 }
 
 func InitEmptySimpleDeclarationContext(p *SimpleDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleDeclaration
+	p.RuleIndex = CPPParserRULE_simpleDeclaration
 }
 
 func (*SimpleDeclarationContext) IsSimpleDeclarationContext() {}
@@ -15644,7 +15644,7 @@ func NewSimpleDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_simpleDeclaration
+	p.RuleIndex = CPPParserRULE_simpleDeclaration
 
 	return p
 }
@@ -15652,7 +15652,7 @@ func NewSimpleDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *SimpleDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *SimpleDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *SimpleDeclarationContext) DeclSpecifierSeq() IDeclSpecifierSeqContext {
@@ -15704,7 +15704,7 @@ func (s *SimpleDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifierSe
 }
 
 func (s *SimpleDeclarationContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *SimpleDeclarationContext) IdentifierList() IIdentifierListContext {
@@ -15724,11 +15724,11 @@ func (s *SimpleDeclarationContext) IdentifierList() IIdentifierListContext {
 }
 
 func (s *SimpleDeclarationContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *SimpleDeclarationContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *SimpleDeclarationContext) InitializerClause() IInitializerClauseContext {
@@ -15798,7 +15798,7 @@ func (s *SimpleDeclarationContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *SimpleDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSimpleDeclaration(s)
 
 	default:
@@ -15806,12 +15806,12 @@ func (s *SimpleDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
+func (p *CPPParser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewSimpleDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 132, CPP14ParserRULE_simpleDeclaration)
+	p.EnterRule(localctx, 132, CPPParserRULE_simpleDeclaration)
 	var _la int
 
 	p.SetState(1116)
@@ -15842,7 +15842,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserDecltype || _la == CPP14ParserOperator || ((int64((_la-85)) & ^0x3f) == 0 && ((int64(1)<<(_la-85))&356250357354753) != 0) {
+		if _la == CPPParserDecltype || _la == CPPParserOperator || ((int64((_la-85)) & ^0x3f) == 0 && ((int64(1)<<(_la-85))&356250357354753) != 0) {
 			{
 				p.SetState(1091)
 				p.InitDeclaratorList()
@@ -15851,7 +15851,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		{
 			p.SetState(1094)
-			p.Match(CPP14ParserSemi)
+			p.Match(CPPParserSemi)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -15882,7 +15882,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		{
 			p.SetState(1100)
-			p.Match(CPP14ParserSemi)
+			p.Match(CPPParserSemi)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -15902,7 +15902,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == CPP14ParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
+		for _la == CPPParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
 			{
 				p.SetState(1103)
 				p.PointerOperator()
@@ -15917,7 +15917,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		{
 			p.SetState(1109)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -15929,7 +15929,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		{
 			p.SetState(1111)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -15937,7 +15937,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		{
 			p.SetState(1112)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -15949,7 +15949,7 @@ func (p *CPP14Parser) SimpleDeclaration() (localctx ISimpleDeclarationContext) {
 		}
 		{
 			p.SetState(1114)
-			p.Match(CPP14ParserSemi)
+			p.Match(CPPParserSemi)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -15998,13 +15998,13 @@ type IdentifierListContext struct {
 func NewEmptyIdentifierListContext() *IdentifierListContext {
 	var p = new(IdentifierListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_identifierList
+	p.RuleIndex = CPPParserRULE_identifierList
 	return p
 }
 
 func InitEmptyIdentifierListContext(p *IdentifierListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_identifierList
+	p.RuleIndex = CPPParserRULE_identifierList
 }
 
 func (*IdentifierListContext) IsIdentifierListContext() {}
@@ -16015,7 +16015,7 @@ func NewIdentifierListContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_identifierList
+	p.RuleIndex = CPPParserRULE_identifierList
 
 	return p
 }
@@ -16023,19 +16023,19 @@ func NewIdentifierListContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *IdentifierListContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *IdentifierListContext) AllIdentifier() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserIdentifier)
+	return s.GetTokens(CPPParserIdentifier)
 }
 
 func (s *IdentifierListContext) Identifier(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, i)
+	return s.GetToken(CPPParserIdentifier, i)
 }
 
 func (s *IdentifierListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *IdentifierListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *IdentifierListContext) GetRuleContext() antlr.RuleContext {
@@ -16048,7 +16048,7 @@ func (s *IdentifierListContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *IdentifierListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitIdentifierList(s)
 
 	default:
@@ -16056,18 +16056,18 @@ func (s *IdentifierListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) IdentifierList() (localctx IIdentifierListContext) {
+func (p *CPPParser) IdentifierList() (localctx IIdentifierListContext) {
 	this := p
 	_ = this
 
 	localctx = NewIdentifierListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 134, CPP14ParserRULE_identifierList)
+	p.EnterRule(localctx, 134, CPPParserRULE_identifierList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1118)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16080,10 +16080,10 @@ func (p *CPP14Parser) IdentifierList() (localctx IIdentifierListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1119)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -16091,7 +16091,7 @@ func (p *CPP14Parser) IdentifierList() (localctx IIdentifierListContext) {
 		}
 		{
 			p.SetState(1120)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -16147,13 +16147,13 @@ type StaticAssertDeclarationContext struct {
 func NewEmptyStaticAssertDeclarationContext() *StaticAssertDeclarationContext {
 	var p = new(StaticAssertDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_staticAssertDeclaration
+	p.RuleIndex = CPPParserRULE_staticAssertDeclaration
 	return p
 }
 
 func InitEmptyStaticAssertDeclarationContext(p *StaticAssertDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_staticAssertDeclaration
+	p.RuleIndex = CPPParserRULE_staticAssertDeclaration
 }
 
 func (*StaticAssertDeclarationContext) IsStaticAssertDeclarationContext() {}
@@ -16164,7 +16164,7 @@ func NewStaticAssertDeclarationContext(parser antlr.Parser, parent antlr.ParserR
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_staticAssertDeclaration
+	p.RuleIndex = CPPParserRULE_staticAssertDeclaration
 
 	return p
 }
@@ -16172,11 +16172,11 @@ func NewStaticAssertDeclarationContext(parser antlr.Parser, parent antlr.ParserR
 func (s *StaticAssertDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *StaticAssertDeclarationContext) Static_assert() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStatic_assert, 0)
+	return s.GetToken(CPPParserStatic_assert, 0)
 }
 
 func (s *StaticAssertDeclarationContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *StaticAssertDeclarationContext) ConstantExpression() IConstantExpressionContext {
@@ -16196,19 +16196,19 @@ func (s *StaticAssertDeclarationContext) ConstantExpression() IConstantExpressio
 }
 
 func (s *StaticAssertDeclarationContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *StaticAssertDeclarationContext) StringLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStringLiteral, 0)
+	return s.GetToken(CPPParserStringLiteral, 0)
 }
 
 func (s *StaticAssertDeclarationContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *StaticAssertDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *StaticAssertDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -16221,7 +16221,7 @@ func (s *StaticAssertDeclarationContext) ToStringTree(ruleNames []string, recog 
 
 func (s *StaticAssertDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitStaticAssertDeclaration(s)
 
 	default:
@@ -16229,16 +16229,16 @@ func (s *StaticAssertDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *CPP14Parser) StaticAssertDeclaration() (localctx IStaticAssertDeclarationContext) {
+func (p *CPPParser) StaticAssertDeclaration() (localctx IStaticAssertDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewStaticAssertDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 136, CPP14ParserRULE_staticAssertDeclaration)
+	p.EnterRule(localctx, 136, CPPParserRULE_staticAssertDeclaration)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1126)
-		p.Match(CPP14ParserStatic_assert)
+		p.Match(CPPParserStatic_assert)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16246,7 +16246,7 @@ func (p *CPP14Parser) StaticAssertDeclaration() (localctx IStaticAssertDeclarati
 	}
 	{
 		p.SetState(1127)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16258,7 +16258,7 @@ func (p *CPP14Parser) StaticAssertDeclaration() (localctx IStaticAssertDeclarati
 	}
 	{
 		p.SetState(1129)
-		p.Match(CPP14ParserComma)
+		p.Match(CPPParserComma)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16266,7 +16266,7 @@ func (p *CPP14Parser) StaticAssertDeclaration() (localctx IStaticAssertDeclarati
 	}
 	{
 		p.SetState(1130)
-		p.Match(CPP14ParserStringLiteral)
+		p.Match(CPPParserStringLiteral)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16274,7 +16274,7 @@ func (p *CPP14Parser) StaticAssertDeclaration() (localctx IStaticAssertDeclarati
 	}
 	{
 		p.SetState(1131)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16282,7 +16282,7 @@ func (p *CPP14Parser) StaticAssertDeclaration() (localctx IStaticAssertDeclarati
 	}
 	{
 		p.SetState(1132)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16324,13 +16324,13 @@ type EmptyDeclaration_Context struct {
 func NewEmptyEmptyDeclaration_Context() *EmptyDeclaration_Context {
 	var p = new(EmptyDeclaration_Context)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_emptyDeclaration_
+	p.RuleIndex = CPPParserRULE_emptyDeclaration_
 	return p
 }
 
 func InitEmptyEmptyDeclaration_Context(p *EmptyDeclaration_Context) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_emptyDeclaration_
+	p.RuleIndex = CPPParserRULE_emptyDeclaration_
 }
 
 func (*EmptyDeclaration_Context) IsEmptyDeclaration_Context() {}
@@ -16341,7 +16341,7 @@ func NewEmptyDeclaration_Context(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_emptyDeclaration_
+	p.RuleIndex = CPPParserRULE_emptyDeclaration_
 
 	return p
 }
@@ -16349,7 +16349,7 @@ func NewEmptyDeclaration_Context(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *EmptyDeclaration_Context) GetParser() antlr.Parser { return s.parser }
 
 func (s *EmptyDeclaration_Context) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *EmptyDeclaration_Context) GetRuleContext() antlr.RuleContext {
@@ -16362,7 +16362,7 @@ func (s *EmptyDeclaration_Context) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *EmptyDeclaration_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEmptyDeclaration_(s)
 
 	default:
@@ -16370,16 +16370,16 @@ func (s *EmptyDeclaration_Context) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) EmptyDeclaration_() (localctx IEmptyDeclaration_Context) {
+func (p *CPPParser) EmptyDeclaration_() (localctx IEmptyDeclaration_Context) {
 	this := p
 	_ = this
 
 	localctx = NewEmptyDeclaration_Context(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 138, CPP14ParserRULE_emptyDeclaration_)
+	p.EnterRule(localctx, 138, CPPParserRULE_emptyDeclaration_)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1134)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16422,13 +16422,13 @@ type AttributeDeclarationContext struct {
 func NewEmptyAttributeDeclarationContext() *AttributeDeclarationContext {
 	var p = new(AttributeDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeDeclaration
+	p.RuleIndex = CPPParserRULE_attributeDeclaration
 	return p
 }
 
 func InitEmptyAttributeDeclarationContext(p *AttributeDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeDeclaration
+	p.RuleIndex = CPPParserRULE_attributeDeclaration
 }
 
 func (*AttributeDeclarationContext) IsAttributeDeclarationContext() {}
@@ -16439,7 +16439,7 @@ func NewAttributeDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attributeDeclaration
+	p.RuleIndex = CPPParserRULE_attributeDeclaration
 
 	return p
 }
@@ -16463,7 +16463,7 @@ func (s *AttributeDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifie
 }
 
 func (s *AttributeDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *AttributeDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -16476,7 +16476,7 @@ func (s *AttributeDeclarationContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *AttributeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttributeDeclaration(s)
 
 	default:
@@ -16484,12 +16484,12 @@ func (s *AttributeDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) AttributeDeclaration() (localctx IAttributeDeclarationContext) {
+func (p *CPPParser) AttributeDeclaration() (localctx IAttributeDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 140, CPP14ParserRULE_attributeDeclaration)
+	p.EnterRule(localctx, 140, CPPParserRULE_attributeDeclaration)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1136)
@@ -16497,7 +16497,7 @@ func (p *CPP14Parser) AttributeDeclaration() (localctx IAttributeDeclarationCont
 	}
 	{
 		p.SetState(1137)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -16544,13 +16544,13 @@ type DeclSpecifierContext struct {
 func NewEmptyDeclSpecifierContext() *DeclSpecifierContext {
 	var p = new(DeclSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declSpecifier
+	p.RuleIndex = CPPParserRULE_declSpecifier
 	return p
 }
 
 func InitEmptyDeclSpecifierContext(p *DeclSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declSpecifier
+	p.RuleIndex = CPPParserRULE_declSpecifier
 }
 
 func (*DeclSpecifierContext) IsDeclSpecifierContext() {}
@@ -16561,7 +16561,7 @@ func NewDeclSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declSpecifier
+	p.RuleIndex = CPPParserRULE_declSpecifier
 
 	return p
 }
@@ -16617,15 +16617,15 @@ func (s *DeclSpecifierContext) FunctionSpecifier() IFunctionSpecifierContext {
 }
 
 func (s *DeclSpecifierContext) Friend() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserFriend, 0)
+	return s.GetToken(CPPParserFriend, 0)
 }
 
 func (s *DeclSpecifierContext) Typedef() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTypedef, 0)
+	return s.GetToken(CPPParserTypedef, 0)
 }
 
 func (s *DeclSpecifierContext) Constexpr() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserConstexpr, 0)
+	return s.GetToken(CPPParserConstexpr, 0)
 }
 
 func (s *DeclSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -16638,7 +16638,7 @@ func (s *DeclSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *DeclSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclSpecifier(s)
 
 	default:
@@ -16646,12 +16646,12 @@ func (s *DeclSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) DeclSpecifier() (localctx IDeclSpecifierContext) {
+func (p *CPPParser) DeclSpecifier() (localctx IDeclSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 142, CPP14ParserRULE_declSpecifier)
+	p.EnterRule(localctx, 142, CPPParserRULE_declSpecifier)
 	p.SetState(1145)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -16659,54 +16659,54 @@ func (p *CPP14Parser) DeclSpecifier() (localctx IDeclSpecifierContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserExtern, CPP14ParserMutable, CPP14ParserRegister, CPP14ParserStatic, CPP14ParserThread_local:
+	case CPPParserExtern, CPPParserMutable, CPPParserRegister, CPPParserStatic, CPPParserThread_local:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1139)
 			p.StorageClassSpecifier()
 		}
 
-	case CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserClass, CPP14ParserConst, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserEnum, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserShort, CPP14ParserSigned, CPP14ParserStruct, CPP14ParserTypename_, CPP14ParserUnion, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserVolatile, CPP14ParserWchar, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserClass, CPPParserConst, CPPParserDecltype, CPPParserDouble, CPPParserEnum, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserShort, CPPParserSigned, CPPParserStruct, CPPParserTypename_, CPPParserUnion, CPPParserUnsigned, CPPParserVoid, CPPParserVolatile, CPPParserWchar, CPPParserDoublecolon, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1140)
 			p.TypeSpecifier()
 		}
 
-	case CPP14ParserExplicit, CPP14ParserInline, CPP14ParserVirtual:
+	case CPPParserExplicit, CPPParserInline, CPPParserVirtual:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1141)
 			p.FunctionSpecifier()
 		}
 
-	case CPP14ParserFriend:
+	case CPPParserFriend:
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(1142)
-			p.Match(CPP14ParserFriend)
+			p.Match(CPPParserFriend)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserTypedef:
+	case CPPParserTypedef:
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(1143)
-			p.Match(CPP14ParserTypedef)
+			p.Match(CPPParserTypedef)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserConstexpr:
+	case CPPParserConstexpr:
 		p.EnterOuterAlt(localctx, 6)
 		{
 			p.SetState(1144)
-			p.Match(CPP14ParserConstexpr)
+			p.Match(CPPParserConstexpr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -16755,13 +16755,13 @@ type DeclSpecifierSeqContext struct {
 func NewEmptyDeclSpecifierSeqContext() *DeclSpecifierSeqContext {
 	var p = new(DeclSpecifierSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declSpecifierSeq
+	p.RuleIndex = CPPParserRULE_declSpecifierSeq
 	return p
 }
 
 func InitEmptyDeclSpecifierSeqContext(p *DeclSpecifierSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declSpecifierSeq
+	p.RuleIndex = CPPParserRULE_declSpecifierSeq
 }
 
 func (*DeclSpecifierSeqContext) IsDeclSpecifierSeqContext() {}
@@ -16772,7 +16772,7 @@ func NewDeclSpecifierSeqContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declSpecifierSeq
+	p.RuleIndex = CPPParserRULE_declSpecifierSeq
 
 	return p
 }
@@ -16846,7 +16846,7 @@ func (s *DeclSpecifierSeqContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *DeclSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclSpecifierSeq(s)
 
 	default:
@@ -16854,12 +16854,12 @@ func (s *DeclSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) DeclSpecifierSeq() (localctx IDeclSpecifierSeqContext) {
+func (p *CPPParser) DeclSpecifierSeq() (localctx IDeclSpecifierSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclSpecifierSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 144, CPP14ParserRULE_declSpecifierSeq)
+	p.EnterRule(localctx, 144, CPPParserRULE_declSpecifierSeq)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -16941,13 +16941,13 @@ type StorageClassSpecifierContext struct {
 func NewEmptyStorageClassSpecifierContext() *StorageClassSpecifierContext {
 	var p = new(StorageClassSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_storageClassSpecifier
+	p.RuleIndex = CPPParserRULE_storageClassSpecifier
 	return p
 }
 
 func InitEmptyStorageClassSpecifierContext(p *StorageClassSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_storageClassSpecifier
+	p.RuleIndex = CPPParserRULE_storageClassSpecifier
 }
 
 func (*StorageClassSpecifierContext) IsStorageClassSpecifierContext() {}
@@ -16958,7 +16958,7 @@ func NewStorageClassSpecifierContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_storageClassSpecifier
+	p.RuleIndex = CPPParserRULE_storageClassSpecifier
 
 	return p
 }
@@ -16966,23 +16966,23 @@ func NewStorageClassSpecifierContext(parser antlr.Parser, parent antlr.ParserRul
 func (s *StorageClassSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *StorageClassSpecifierContext) Register() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRegister, 0)
+	return s.GetToken(CPPParserRegister, 0)
 }
 
 func (s *StorageClassSpecifierContext) Static() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStatic, 0)
+	return s.GetToken(CPPParserStatic, 0)
 }
 
 func (s *StorageClassSpecifierContext) Thread_local() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserThread_local, 0)
+	return s.GetToken(CPPParserThread_local, 0)
 }
 
 func (s *StorageClassSpecifierContext) Extern() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserExtern, 0)
+	return s.GetToken(CPPParserExtern, 0)
 }
 
 func (s *StorageClassSpecifierContext) Mutable() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMutable, 0)
+	return s.GetToken(CPPParserMutable, 0)
 }
 
 func (s *StorageClassSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -16995,7 +16995,7 @@ func (s *StorageClassSpecifierContext) ToStringTree(ruleNames []string, recog an
 
 func (s *StorageClassSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitStorageClassSpecifier(s)
 
 	default:
@@ -17003,12 +17003,12 @@ func (s *StorageClassSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) StorageClassSpecifier() (localctx IStorageClassSpecifierContext) {
+func (p *CPPParser) StorageClassSpecifier() (localctx IStorageClassSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewStorageClassSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 146, CPP14ParserRULE_storageClassSpecifier)
+	p.EnterRule(localctx, 146, CPPParserRULE_storageClassSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -17061,13 +17061,13 @@ type FunctionSpecifierContext struct {
 func NewEmptyFunctionSpecifierContext() *FunctionSpecifierContext {
 	var p = new(FunctionSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionSpecifier
+	p.RuleIndex = CPPParserRULE_functionSpecifier
 	return p
 }
 
 func InitEmptyFunctionSpecifierContext(p *FunctionSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionSpecifier
+	p.RuleIndex = CPPParserRULE_functionSpecifier
 }
 
 func (*FunctionSpecifierContext) IsFunctionSpecifierContext() {}
@@ -17078,7 +17078,7 @@ func NewFunctionSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_functionSpecifier
+	p.RuleIndex = CPPParserRULE_functionSpecifier
 
 	return p
 }
@@ -17086,15 +17086,15 @@ func NewFunctionSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *FunctionSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *FunctionSpecifierContext) Inline() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserInline, 0)
+	return s.GetToken(CPPParserInline, 0)
 }
 
 func (s *FunctionSpecifierContext) Virtual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserVirtual, 0)
+	return s.GetToken(CPPParserVirtual, 0)
 }
 
 func (s *FunctionSpecifierContext) Explicit() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserExplicit, 0)
+	return s.GetToken(CPPParserExplicit, 0)
 }
 
 func (s *FunctionSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -17107,7 +17107,7 @@ func (s *FunctionSpecifierContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *FunctionSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitFunctionSpecifier(s)
 
 	default:
@@ -17115,12 +17115,12 @@ func (s *FunctionSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) FunctionSpecifier() (localctx IFunctionSpecifierContext) {
+func (p *CPPParser) FunctionSpecifier() (localctx IFunctionSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewFunctionSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 148, CPP14ParserRULE_functionSpecifier)
+	p.EnterRule(localctx, 148, CPPParserRULE_functionSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -17171,13 +17171,13 @@ type TypedefNameContext struct {
 func NewEmptyTypedefNameContext() *TypedefNameContext {
 	var p = new(TypedefNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typedefName
+	p.RuleIndex = CPPParserRULE_typedefName
 	return p
 }
 
 func InitEmptyTypedefNameContext(p *TypedefNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typedefName
+	p.RuleIndex = CPPParserRULE_typedefName
 }
 
 func (*TypedefNameContext) IsTypedefNameContext() {}
@@ -17188,7 +17188,7 @@ func NewTypedefNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typedefName
+	p.RuleIndex = CPPParserRULE_typedefName
 
 	return p
 }
@@ -17196,7 +17196,7 @@ func NewTypedefNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 func (s *TypedefNameContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TypedefNameContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *TypedefNameContext) GetRuleContext() antlr.RuleContext {
@@ -17209,7 +17209,7 @@ func (s *TypedefNameContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *TypedefNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypedefName(s)
 
 	default:
@@ -17217,16 +17217,16 @@ func (s *TypedefNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) TypedefName() (localctx ITypedefNameContext) {
+func (p *CPPParser) TypedefName() (localctx ITypedefNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypedefNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 150, CPP14ParserRULE_typedefName)
+	p.EnterRule(localctx, 150, CPPParserRULE_typedefName)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1159)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -17270,13 +17270,13 @@ type TypeSpecifierContext struct {
 func NewEmptyTypeSpecifierContext() *TypeSpecifierContext {
 	var p = new(TypeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeSpecifier
+	p.RuleIndex = CPPParserRULE_typeSpecifier
 	return p
 }
 
 func InitEmptyTypeSpecifierContext(p *TypeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeSpecifier
+	p.RuleIndex = CPPParserRULE_typeSpecifier
 }
 
 func (*TypeSpecifierContext) IsTypeSpecifierContext() {}
@@ -17287,7 +17287,7 @@ func NewTypeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typeSpecifier
+	p.RuleIndex = CPPParserRULE_typeSpecifier
 
 	return p
 }
@@ -17352,7 +17352,7 @@ func (s *TypeSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *TypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypeSpecifier(s)
 
 	default:
@@ -17360,12 +17360,12 @@ func (s *TypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) TypeSpecifier() (localctx ITypeSpecifierContext) {
+func (p *CPPParser) TypeSpecifier() (localctx ITypeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 152, CPP14ParserRULE_typeSpecifier)
+	p.EnterRule(localctx, 152, CPPParserRULE_typeSpecifier)
 	p.SetState(1164)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -17436,13 +17436,13 @@ type TrailingTypeSpecifierContext struct {
 func NewEmptyTrailingTypeSpecifierContext() *TrailingTypeSpecifierContext {
 	var p = new(TrailingTypeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_trailingTypeSpecifier
+	p.RuleIndex = CPPParserRULE_trailingTypeSpecifier
 	return p
 }
 
 func InitEmptyTrailingTypeSpecifierContext(p *TrailingTypeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_trailingTypeSpecifier
+	p.RuleIndex = CPPParserRULE_trailingTypeSpecifier
 }
 
 func (*TrailingTypeSpecifierContext) IsTrailingTypeSpecifierContext() {}
@@ -17453,7 +17453,7 @@ func NewTrailingTypeSpecifierContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_trailingTypeSpecifier
+	p.RuleIndex = CPPParserRULE_trailingTypeSpecifier
 
 	return p
 }
@@ -17534,7 +17534,7 @@ func (s *TrailingTypeSpecifierContext) ToStringTree(ruleNames []string, recog an
 
 func (s *TrailingTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTrailingTypeSpecifier(s)
 
 	default:
@@ -17542,12 +17542,12 @@ func (s *TrailingTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) TrailingTypeSpecifier() (localctx ITrailingTypeSpecifierContext) {
+func (p *CPPParser) TrailingTypeSpecifier() (localctx ITrailingTypeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewTrailingTypeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 154, CPP14ParserRULE_trailingTypeSpecifier)
+	p.EnterRule(localctx, 154, CPPParserRULE_trailingTypeSpecifier)
 	p.SetState(1170)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -17555,28 +17555,28 @@ func (p *CPP14Parser) TrailingTypeSpecifier() (localctx ITrailingTypeSpecifierCo
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserShort, CPP14ParserSigned, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserDecltype, CPPParserDouble, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserShort, CPPParserSigned, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserDoublecolon, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1166)
 			p.SimpleTypeSpecifier()
 		}
 
-	case CPP14ParserClass, CPP14ParserEnum, CPP14ParserStruct:
+	case CPPParserClass, CPPParserEnum, CPPParserStruct:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1167)
 			p.ElaboratedTypeSpecifier()
 		}
 
-	case CPP14ParserTypename_:
+	case CPPParserTypename_:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1168)
 			p.TypeNameSpecifier()
 		}
 
-	case CPP14ParserConst, CPP14ParserVolatile:
+	case CPPParserConst, CPPParserVolatile:
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(1169)
@@ -17625,13 +17625,13 @@ type TypeSpecifierSeqContext struct {
 func NewEmptyTypeSpecifierSeqContext() *TypeSpecifierSeqContext {
 	var p = new(TypeSpecifierSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_typeSpecifierSeq
 	return p
 }
 
 func InitEmptyTypeSpecifierSeqContext(p *TypeSpecifierSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_typeSpecifierSeq
 }
 
 func (*TypeSpecifierSeqContext) IsTypeSpecifierSeqContext() {}
@@ -17642,7 +17642,7 @@ func NewTypeSpecifierSeqContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_typeSpecifierSeq
 
 	return p
 }
@@ -17716,7 +17716,7 @@ func (s *TypeSpecifierSeqContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *TypeSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypeSpecifierSeq(s)
 
 	default:
@@ -17724,12 +17724,12 @@ func (s *TypeSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) TypeSpecifierSeq() (localctx ITypeSpecifierSeqContext) {
+func (p *CPPParser) TypeSpecifierSeq() (localctx ITypeSpecifierSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypeSpecifierSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 156, CPP14ParserRULE_typeSpecifierSeq)
+	p.EnterRule(localctx, 156, CPPParserRULE_typeSpecifierSeq)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -17809,13 +17809,13 @@ type TrailingTypeSpecifierSeqContext struct {
 func NewEmptyTrailingTypeSpecifierSeqContext() *TrailingTypeSpecifierSeqContext {
 	var p = new(TrailingTypeSpecifierSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_trailingTypeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_trailingTypeSpecifierSeq
 	return p
 }
 
 func InitEmptyTrailingTypeSpecifierSeqContext(p *TrailingTypeSpecifierSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_trailingTypeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_trailingTypeSpecifierSeq
 }
 
 func (*TrailingTypeSpecifierSeqContext) IsTrailingTypeSpecifierSeqContext() {}
@@ -17826,7 +17826,7 @@ func NewTrailingTypeSpecifierSeqContext(parser antlr.Parser, parent antlr.Parser
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_trailingTypeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_trailingTypeSpecifierSeq
 
 	return p
 }
@@ -17900,7 +17900,7 @@ func (s *TrailingTypeSpecifierSeqContext) ToStringTree(ruleNames []string, recog
 
 func (s *TrailingTypeSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTrailingTypeSpecifierSeq(s)
 
 	default:
@@ -17908,12 +17908,12 @@ func (s *TrailingTypeSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor)
 	}
 }
 
-func (p *CPP14Parser) TrailingTypeSpecifierSeq() (localctx ITrailingTypeSpecifierSeqContext) {
+func (p *CPPParser) TrailingTypeSpecifierSeq() (localctx ITrailingTypeSpecifierSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewTrailingTypeSpecifierSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 158, CPP14ParserRULE_trailingTypeSpecifierSeq)
+	p.EnterRule(localctx, 158, CPPParserRULE_trailingTypeSpecifierSeq)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -17992,13 +17992,13 @@ type SimpleTypeLengthModifierContext struct {
 func NewEmptySimpleTypeLengthModifierContext() *SimpleTypeLengthModifierContext {
 	var p = new(SimpleTypeLengthModifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTypeLengthModifier
+	p.RuleIndex = CPPParserRULE_simpleTypeLengthModifier
 	return p
 }
 
 func InitEmptySimpleTypeLengthModifierContext(p *SimpleTypeLengthModifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTypeLengthModifier
+	p.RuleIndex = CPPParserRULE_simpleTypeLengthModifier
 }
 
 func (*SimpleTypeLengthModifierContext) IsSimpleTypeLengthModifierContext() {}
@@ -18009,7 +18009,7 @@ func NewSimpleTypeLengthModifierContext(parser antlr.Parser, parent antlr.Parser
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_simpleTypeLengthModifier
+	p.RuleIndex = CPPParserRULE_simpleTypeLengthModifier
 
 	return p
 }
@@ -18017,11 +18017,11 @@ func NewSimpleTypeLengthModifierContext(parser antlr.Parser, parent antlr.Parser
 func (s *SimpleTypeLengthModifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *SimpleTypeLengthModifierContext) Short() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserShort, 0)
+	return s.GetToken(CPPParserShort, 0)
 }
 
 func (s *SimpleTypeLengthModifierContext) Long() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLong, 0)
+	return s.GetToken(CPPParserLong, 0)
 }
 
 func (s *SimpleTypeLengthModifierContext) GetRuleContext() antlr.RuleContext {
@@ -18034,7 +18034,7 @@ func (s *SimpleTypeLengthModifierContext) ToStringTree(ruleNames []string, recog
 
 func (s *SimpleTypeLengthModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSimpleTypeLengthModifier(s)
 
 	default:
@@ -18042,12 +18042,12 @@ func (s *SimpleTypeLengthModifierContext) Accept(visitor antlr.ParseTreeVisitor)
 	}
 }
 
-func (p *CPP14Parser) SimpleTypeLengthModifier() (localctx ISimpleTypeLengthModifierContext) {
+func (p *CPPParser) SimpleTypeLengthModifier() (localctx ISimpleTypeLengthModifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewSimpleTypeLengthModifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 160, CPP14ParserRULE_simpleTypeLengthModifier)
+	p.EnterRule(localctx, 160, CPPParserRULE_simpleTypeLengthModifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -18055,7 +18055,7 @@ func (p *CPP14Parser) SimpleTypeLengthModifier() (localctx ISimpleTypeLengthModi
 		p.SetState(1188)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserLong || _la == CPP14ParserShort) {
+		if !(_la == CPPParserLong || _la == CPPParserShort) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -18099,13 +18099,13 @@ type SimpleTypeSignednessModifierContext struct {
 func NewEmptySimpleTypeSignednessModifierContext() *SimpleTypeSignednessModifierContext {
 	var p = new(SimpleTypeSignednessModifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTypeSignednessModifier
+	p.RuleIndex = CPPParserRULE_simpleTypeSignednessModifier
 	return p
 }
 
 func InitEmptySimpleTypeSignednessModifierContext(p *SimpleTypeSignednessModifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTypeSignednessModifier
+	p.RuleIndex = CPPParserRULE_simpleTypeSignednessModifier
 }
 
 func (*SimpleTypeSignednessModifierContext) IsSimpleTypeSignednessModifierContext() {}
@@ -18116,7 +18116,7 @@ func NewSimpleTypeSignednessModifierContext(parser antlr.Parser, parent antlr.Pa
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_simpleTypeSignednessModifier
+	p.RuleIndex = CPPParserRULE_simpleTypeSignednessModifier
 
 	return p
 }
@@ -18124,11 +18124,11 @@ func NewSimpleTypeSignednessModifierContext(parser antlr.Parser, parent antlr.Pa
 func (s *SimpleTypeSignednessModifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *SimpleTypeSignednessModifierContext) Unsigned() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUnsigned, 0)
+	return s.GetToken(CPPParserUnsigned, 0)
 }
 
 func (s *SimpleTypeSignednessModifierContext) Signed() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSigned, 0)
+	return s.GetToken(CPPParserSigned, 0)
 }
 
 func (s *SimpleTypeSignednessModifierContext) GetRuleContext() antlr.RuleContext {
@@ -18141,7 +18141,7 @@ func (s *SimpleTypeSignednessModifierContext) ToStringTree(ruleNames []string, r
 
 func (s *SimpleTypeSignednessModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSimpleTypeSignednessModifier(s)
 
 	default:
@@ -18149,12 +18149,12 @@ func (s *SimpleTypeSignednessModifierContext) Accept(visitor antlr.ParseTreeVisi
 	}
 }
 
-func (p *CPP14Parser) SimpleTypeSignednessModifier() (localctx ISimpleTypeSignednessModifierContext) {
+func (p *CPPParser) SimpleTypeSignednessModifier() (localctx ISimpleTypeSignednessModifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewSimpleTypeSignednessModifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 162, CPP14ParserRULE_simpleTypeSignednessModifier)
+	p.EnterRule(localctx, 162, CPPParserRULE_simpleTypeSignednessModifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -18162,7 +18162,7 @@ func (p *CPP14Parser) SimpleTypeSignednessModifier() (localctx ISimpleTypeSigned
 		p.SetState(1190)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserSigned || _la == CPP14ParserUnsigned) {
+		if !(_la == CPPParserSigned || _la == CPPParserUnsigned) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -18223,13 +18223,13 @@ type SimpleTypeSpecifierContext struct {
 func NewEmptySimpleTypeSpecifierContext() *SimpleTypeSpecifierContext {
 	var p = new(SimpleTypeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTypeSpecifier
+	p.RuleIndex = CPPParserRULE_simpleTypeSpecifier
 	return p
 }
 
 func InitEmptySimpleTypeSpecifierContext(p *SimpleTypeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTypeSpecifier
+	p.RuleIndex = CPPParserRULE_simpleTypeSpecifier
 }
 
 func (*SimpleTypeSpecifierContext) IsSimpleTypeSpecifierContext() {}
@@ -18240,7 +18240,7 @@ func NewSimpleTypeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_simpleTypeSpecifier
+	p.RuleIndex = CPPParserRULE_simpleTypeSpecifier
 
 	return p
 }
@@ -18280,7 +18280,7 @@ func (s *SimpleTypeSpecifierContext) NestedNameSpecifier() INestedNameSpecifierC
 }
 
 func (s *SimpleTypeSpecifierContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext {
@@ -18300,59 +18300,59 @@ func (s *SimpleTypeSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext
 }
 
 func (s *SimpleTypeSpecifierContext) Char() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserChar, 0)
+	return s.GetToken(CPPParserChar, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Char16() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserChar16, 0)
+	return s.GetToken(CPPParserChar16, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Char32() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserChar32, 0)
+	return s.GetToken(CPPParserChar32, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Wchar() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserWchar, 0)
+	return s.GetToken(CPPParserWchar, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Bool() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserBool, 0)
+	return s.GetToken(CPPParserBool, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Short() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserShort, 0)
+	return s.GetToken(CPPParserShort, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Int() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserInt, 0)
+	return s.GetToken(CPPParserInt, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Long() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLong, 0)
+	return s.GetToken(CPPParserLong, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Float() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserFloat, 0)
+	return s.GetToken(CPPParserFloat, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Signed() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSigned, 0)
+	return s.GetToken(CPPParserSigned, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Unsigned() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUnsigned, 0)
+	return s.GetToken(CPPParserUnsigned, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Double() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDouble, 0)
+	return s.GetToken(CPPParserDouble, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Void() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserVoid, 0)
+	return s.GetToken(CPPParserVoid, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) Auto() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAuto, 0)
+	return s.GetToken(CPPParserAuto, 0)
 }
 
 func (s *SimpleTypeSpecifierContext) DecltypeSpecifier() IDecltypeSpecifierContext {
@@ -18381,7 +18381,7 @@ func (s *SimpleTypeSpecifierContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *SimpleTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSimpleTypeSpecifier(s)
 
 	default:
@@ -18389,12 +18389,12 @@ func (s *SimpleTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContext) {
+func (p *CPPParser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewSimpleTypeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 164, CPP14ParserRULE_simpleTypeSpecifier)
+	p.EnterRule(localctx, 164, CPPParserRULE_simpleTypeSpecifier)
 	p.SetState(1216)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -18429,7 +18429,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		}
 		{
 			p.SetState(1197)
-			p.Match(CPP14ParserTemplate)
+			p.Match(CPPParserTemplate)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18444,7 +18444,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1200)
-			p.Match(CPP14ParserChar)
+			p.Match(CPPParserChar)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18455,7 +18455,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(1201)
-			p.Match(CPP14ParserChar16)
+			p.Match(CPPParserChar16)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18466,7 +18466,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(1202)
-			p.Match(CPP14ParserChar32)
+			p.Match(CPPParserChar32)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18477,7 +18477,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 6)
 		{
 			p.SetState(1203)
-			p.Match(CPP14ParserWchar)
+			p.Match(CPPParserWchar)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18488,7 +18488,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 7)
 		{
 			p.SetState(1204)
-			p.Match(CPP14ParserBool)
+			p.Match(CPPParserBool)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18499,7 +18499,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 8)
 		{
 			p.SetState(1205)
-			p.Match(CPP14ParserShort)
+			p.Match(CPPParserShort)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18510,7 +18510,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 9)
 		{
 			p.SetState(1206)
-			p.Match(CPP14ParserInt)
+			p.Match(CPPParserInt)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18521,7 +18521,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 10)
 		{
 			p.SetState(1207)
-			p.Match(CPP14ParserLong)
+			p.Match(CPPParserLong)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18532,7 +18532,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 11)
 		{
 			p.SetState(1208)
-			p.Match(CPP14ParserFloat)
+			p.Match(CPPParserFloat)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18543,7 +18543,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 12)
 		{
 			p.SetState(1209)
-			p.Match(CPP14ParserSigned)
+			p.Match(CPPParserSigned)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18554,7 +18554,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 13)
 		{
 			p.SetState(1210)
-			p.Match(CPP14ParserUnsigned)
+			p.Match(CPPParserUnsigned)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18565,7 +18565,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 14)
 		{
 			p.SetState(1211)
-			p.Match(CPP14ParserFloat)
+			p.Match(CPPParserFloat)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18576,7 +18576,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 15)
 		{
 			p.SetState(1212)
-			p.Match(CPP14ParserDouble)
+			p.Match(CPPParserDouble)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18587,7 +18587,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 16)
 		{
 			p.SetState(1213)
-			p.Match(CPP14ParserVoid)
+			p.Match(CPPParserVoid)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18598,7 +18598,7 @@ func (p *CPP14Parser) SimpleTypeSpecifier() (localctx ISimpleTypeSpecifierContex
 		p.EnterOuterAlt(localctx, 17)
 		{
 			p.SetState(1214)
-			p.Match(CPP14ParserAuto)
+			p.Match(CPPParserAuto)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18654,13 +18654,13 @@ type TheTypeNameContext struct {
 func NewEmptyTheTypeNameContext() *TheTypeNameContext {
 	var p = new(TheTypeNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_theTypeName
+	p.RuleIndex = CPPParserRULE_theTypeName
 	return p
 }
 
 func InitEmptyTheTypeNameContext(p *TheTypeNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_theTypeName
+	p.RuleIndex = CPPParserRULE_theTypeName
 }
 
 func (*TheTypeNameContext) IsTheTypeNameContext() {}
@@ -18671,7 +18671,7 @@ func NewTheTypeNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_theTypeName
+	p.RuleIndex = CPPParserRULE_theTypeName
 
 	return p
 }
@@ -18752,7 +18752,7 @@ func (s *TheTypeNameContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *TheTypeNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTheTypeName(s)
 
 	default:
@@ -18760,12 +18760,12 @@ func (s *TheTypeNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) TheTypeName() (localctx ITheTypeNameContext) {
+func (p *CPPParser) TheTypeName() (localctx ITheTypeNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewTheTypeNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 166, CPP14ParserRULE_theTypeName)
+	p.EnterRule(localctx, 166, CPPParserRULE_theTypeName)
 	p.SetState(1222)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -18844,13 +18844,13 @@ type DecltypeSpecifierContext struct {
 func NewEmptyDecltypeSpecifierContext() *DecltypeSpecifierContext {
 	var p = new(DecltypeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_decltypeSpecifier
+	p.RuleIndex = CPPParserRULE_decltypeSpecifier
 	return p
 }
 
 func InitEmptyDecltypeSpecifierContext(p *DecltypeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_decltypeSpecifier
+	p.RuleIndex = CPPParserRULE_decltypeSpecifier
 }
 
 func (*DecltypeSpecifierContext) IsDecltypeSpecifierContext() {}
@@ -18861,7 +18861,7 @@ func NewDecltypeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_decltypeSpecifier
+	p.RuleIndex = CPPParserRULE_decltypeSpecifier
 
 	return p
 }
@@ -18869,15 +18869,15 @@ func NewDecltypeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *DecltypeSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *DecltypeSpecifierContext) Decltype() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDecltype, 0)
+	return s.GetToken(CPPParserDecltype, 0)
 }
 
 func (s *DecltypeSpecifierContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *DecltypeSpecifierContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *DecltypeSpecifierContext) Expression() IExpressionContext {
@@ -18897,7 +18897,7 @@ func (s *DecltypeSpecifierContext) Expression() IExpressionContext {
 }
 
 func (s *DecltypeSpecifierContext) Auto() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAuto, 0)
+	return s.GetToken(CPPParserAuto, 0)
 }
 
 func (s *DecltypeSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -18910,7 +18910,7 @@ func (s *DecltypeSpecifierContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *DecltypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDecltypeSpecifier(s)
 
 	default:
@@ -18918,16 +18918,16 @@ func (s *DecltypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) DecltypeSpecifier() (localctx IDecltypeSpecifierContext) {
+func (p *CPPParser) DecltypeSpecifier() (localctx IDecltypeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewDecltypeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 168, CPP14ParserRULE_decltypeSpecifier)
+	p.EnterRule(localctx, 168, CPPParserRULE_decltypeSpecifier)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1224)
-		p.Match(CPP14ParserDecltype)
+		p.Match(CPPParserDecltype)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -18935,7 +18935,7 @@ func (p *CPP14Parser) DecltypeSpecifier() (localctx IDecltypeSpecifierContext) {
 	}
 	{
 		p.SetState(1225)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -18957,7 +18957,7 @@ func (p *CPP14Parser) DecltypeSpecifier() (localctx IDecltypeSpecifierContext) {
 	case 2:
 		{
 			p.SetState(1227)
-			p.Match(CPP14ParserAuto)
+			p.Match(CPPParserAuto)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -18969,7 +18969,7 @@ func (p *CPP14Parser) DecltypeSpecifier() (localctx IDecltypeSpecifierContext) {
 	}
 	{
 		p.SetState(1230)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -19017,13 +19017,13 @@ type ElaboratedTypeSpecifierContext struct {
 func NewEmptyElaboratedTypeSpecifierContext() *ElaboratedTypeSpecifierContext {
 	var p = new(ElaboratedTypeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_elaboratedTypeSpecifier
+	p.RuleIndex = CPPParserRULE_elaboratedTypeSpecifier
 	return p
 }
 
 func InitEmptyElaboratedTypeSpecifierContext(p *ElaboratedTypeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_elaboratedTypeSpecifier
+	p.RuleIndex = CPPParserRULE_elaboratedTypeSpecifier
 }
 
 func (*ElaboratedTypeSpecifierContext) IsElaboratedTypeSpecifierContext() {}
@@ -19034,7 +19034,7 @@ func NewElaboratedTypeSpecifierContext(parser antlr.Parser, parent antlr.ParserR
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_elaboratedTypeSpecifier
+	p.RuleIndex = CPPParserRULE_elaboratedTypeSpecifier
 
 	return p
 }
@@ -19058,7 +19058,7 @@ func (s *ElaboratedTypeSpecifierContext) ClassKey() IClassKeyContext {
 }
 
 func (s *ElaboratedTypeSpecifierContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *ElaboratedTypeSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext {
@@ -19110,11 +19110,11 @@ func (s *ElaboratedTypeSpecifierContext) AttributeSpecifierSeq() IAttributeSpeci
 }
 
 func (s *ElaboratedTypeSpecifierContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *ElaboratedTypeSpecifierContext) Enum() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEnum, 0)
+	return s.GetToken(CPPParserEnum, 0)
 }
 
 func (s *ElaboratedTypeSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -19127,7 +19127,7 @@ func (s *ElaboratedTypeSpecifierContext) ToStringTree(ruleNames []string, recog 
 
 func (s *ElaboratedTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitElaboratedTypeSpecifier(s)
 
 	default:
@@ -19135,12 +19135,12 @@ func (s *ElaboratedTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifierContext) {
+func (p *CPPParser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewElaboratedTypeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 170, CPP14ParserRULE_elaboratedTypeSpecifier)
+	p.EnterRule(localctx, 170, CPPParserRULE_elaboratedTypeSpecifier)
 	var _la int
 
 	p.SetState(1254)
@@ -19150,7 +19150,7 @@ func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifi
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserClass, CPP14ParserStruct:
+	case CPPParserClass, CPPParserStruct:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1232)
@@ -19171,7 +19171,7 @@ func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifi
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+			if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 				{
 					p.SetState(1233)
 					p.AttributeSpecifierSeq()
@@ -19192,7 +19192,7 @@ func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifi
 			}
 			{
 				p.SetState(1239)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -19217,10 +19217,10 @@ func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifi
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == CPP14ParserTemplate {
+			if _la == CPPParserTemplate {
 				{
 					p.SetState(1242)
-					p.Match(CPP14ParserTemplate)
+					p.Match(CPPParserTemplate)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -19237,11 +19237,11 @@ func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifi
 			goto errorExit
 		}
 
-	case CPP14ParserEnum:
+	case CPPParserEnum:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1249)
-			p.Match(CPP14ParserEnum)
+			p.Match(CPPParserEnum)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -19261,7 +19261,7 @@ func (p *CPP14Parser) ElaboratedTypeSpecifier() (localctx IElaboratedTypeSpecifi
 		}
 		{
 			p.SetState(1253)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -19308,13 +19308,13 @@ type EnumNameContext struct {
 func NewEmptyEnumNameContext() *EnumNameContext {
 	var p = new(EnumNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumName
+	p.RuleIndex = CPPParserRULE_enumName
 	return p
 }
 
 func InitEmptyEnumNameContext(p *EnumNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumName
+	p.RuleIndex = CPPParserRULE_enumName
 }
 
 func (*EnumNameContext) IsEnumNameContext() {}
@@ -19325,7 +19325,7 @@ func NewEnumNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumName
+	p.RuleIndex = CPPParserRULE_enumName
 
 	return p
 }
@@ -19333,7 +19333,7 @@ func NewEnumNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 func (s *EnumNameContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EnumNameContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *EnumNameContext) GetRuleContext() antlr.RuleContext {
@@ -19346,7 +19346,7 @@ func (s *EnumNameContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 
 func (s *EnumNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumName(s)
 
 	default:
@@ -19354,16 +19354,16 @@ func (s *EnumNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) EnumName() (localctx IEnumNameContext) {
+func (p *CPPParser) EnumName() (localctx IEnumNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 172, CPP14ParserRULE_enumName)
+	p.EnterRule(localctx, 172, CPPParserRULE_enumName)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1256)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -19409,13 +19409,13 @@ type EnumSpecifierContext struct {
 func NewEmptyEnumSpecifierContext() *EnumSpecifierContext {
 	var p = new(EnumSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumSpecifier
+	p.RuleIndex = CPPParserRULE_enumSpecifier
 	return p
 }
 
 func InitEmptyEnumSpecifierContext(p *EnumSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumSpecifier
+	p.RuleIndex = CPPParserRULE_enumSpecifier
 }
 
 func (*EnumSpecifierContext) IsEnumSpecifierContext() {}
@@ -19426,7 +19426,7 @@ func NewEnumSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumSpecifier
+	p.RuleIndex = CPPParserRULE_enumSpecifier
 
 	return p
 }
@@ -19450,11 +19450,11 @@ func (s *EnumSpecifierContext) EnumHead() IEnumHeadContext {
 }
 
 func (s *EnumSpecifierContext) LeftBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, 0)
+	return s.GetToken(CPPParserLeftBrace, 0)
 }
 
 func (s *EnumSpecifierContext) RightBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, 0)
+	return s.GetToken(CPPParserRightBrace, 0)
 }
 
 func (s *EnumSpecifierContext) EnumeratorList() IEnumeratorListContext {
@@ -19474,7 +19474,7 @@ func (s *EnumSpecifierContext) EnumeratorList() IEnumeratorListContext {
 }
 
 func (s *EnumSpecifierContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *EnumSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -19487,7 +19487,7 @@ func (s *EnumSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *EnumSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumSpecifier(s)
 
 	default:
@@ -19495,12 +19495,12 @@ func (s *EnumSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) EnumSpecifier() (localctx IEnumSpecifierContext) {
+func (p *CPPParser) EnumSpecifier() (localctx IEnumSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 174, CPP14ParserRULE_enumSpecifier)
+	p.EnterRule(localctx, 174, CPPParserRULE_enumSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -19510,7 +19510,7 @@ func (p *CPP14Parser) EnumSpecifier() (localctx IEnumSpecifierContext) {
 	}
 	{
 		p.SetState(1259)
-		p.Match(CPP14ParserLeftBrace)
+		p.Match(CPPParserLeftBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -19523,7 +19523,7 @@ func (p *CPP14Parser) EnumSpecifier() (localctx IEnumSpecifierContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserIdentifier {
+	if _la == CPPParserIdentifier {
 		{
 			p.SetState(1260)
 			p.EnumeratorList()
@@ -19535,10 +19535,10 @@ func (p *CPP14Parser) EnumSpecifier() (localctx IEnumSpecifierContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserComma {
+		if _la == CPPParserComma {
 			{
 				p.SetState(1261)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -19550,7 +19550,7 @@ func (p *CPP14Parser) EnumSpecifier() (localctx IEnumSpecifierContext) {
 	}
 	{
 		p.SetState(1266)
-		p.Match(CPP14ParserRightBrace)
+		p.Match(CPPParserRightBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -19596,13 +19596,13 @@ type EnumHeadContext struct {
 func NewEmptyEnumHeadContext() *EnumHeadContext {
 	var p = new(EnumHeadContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumHead
+	p.RuleIndex = CPPParserRULE_enumHead
 	return p
 }
 
 func InitEmptyEnumHeadContext(p *EnumHeadContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumHead
+	p.RuleIndex = CPPParserRULE_enumHead
 }
 
 func (*EnumHeadContext) IsEnumHeadContext() {}
@@ -19613,7 +19613,7 @@ func NewEnumHeadContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumHead
+	p.RuleIndex = CPPParserRULE_enumHead
 
 	return p
 }
@@ -19653,7 +19653,7 @@ func (s *EnumHeadContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext 
 }
 
 func (s *EnumHeadContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *EnumHeadContext) EnumBase() IEnumBaseContext {
@@ -19698,7 +19698,7 @@ func (s *EnumHeadContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 
 func (s *EnumHeadContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumHead(s)
 
 	default:
@@ -19706,12 +19706,12 @@ func (s *EnumHeadContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) EnumHead() (localctx IEnumHeadContext) {
+func (p *CPPParser) EnumHead() (localctx IEnumHeadContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumHeadContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 176, CPP14ParserRULE_enumHead)
+	p.EnterRule(localctx, 176, CPPParserRULE_enumHead)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -19726,7 +19726,7 @@ func (p *CPP14Parser) EnumHead() (localctx IEnumHeadContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1269)
 			p.AttributeSpecifierSeq()
@@ -19740,7 +19740,7 @@ func (p *CPP14Parser) EnumHead() (localctx IEnumHeadContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserDecltype || _la == CPP14ParserDoublecolon || _la == CPP14ParserIdentifier {
+	if _la == CPPParserDecltype || _la == CPPParserDoublecolon || _la == CPPParserIdentifier {
 		p.SetState(1273)
 		p.GetErrorHandler().Sync(p)
 
@@ -19755,7 +19755,7 @@ func (p *CPP14Parser) EnumHead() (localctx IEnumHeadContext) {
 		}
 		{
 			p.SetState(1275)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -19770,7 +19770,7 @@ func (p *CPP14Parser) EnumHead() (localctx IEnumHeadContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserColon {
+	if _la == CPPParserColon {
 		{
 			p.SetState(1278)
 			p.EnumBase()
@@ -19817,13 +19817,13 @@ type OpaqueEnumDeclarationContext struct {
 func NewEmptyOpaqueEnumDeclarationContext() *OpaqueEnumDeclarationContext {
 	var p = new(OpaqueEnumDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_opaqueEnumDeclaration
+	p.RuleIndex = CPPParserRULE_opaqueEnumDeclaration
 	return p
 }
 
 func InitEmptyOpaqueEnumDeclarationContext(p *OpaqueEnumDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_opaqueEnumDeclaration
+	p.RuleIndex = CPPParserRULE_opaqueEnumDeclaration
 }
 
 func (*OpaqueEnumDeclarationContext) IsOpaqueEnumDeclarationContext() {}
@@ -19834,7 +19834,7 @@ func NewOpaqueEnumDeclarationContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_opaqueEnumDeclaration
+	p.RuleIndex = CPPParserRULE_opaqueEnumDeclaration
 
 	return p
 }
@@ -19858,11 +19858,11 @@ func (s *OpaqueEnumDeclarationContext) EnumKey() IEnumKeyContext {
 }
 
 func (s *OpaqueEnumDeclarationContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *OpaqueEnumDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *OpaqueEnumDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -19907,7 +19907,7 @@ func (s *OpaqueEnumDeclarationContext) ToStringTree(ruleNames []string, recog an
 
 func (s *OpaqueEnumDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitOpaqueEnumDeclaration(s)
 
 	default:
@@ -19915,12 +19915,12 @@ func (s *OpaqueEnumDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) OpaqueEnumDeclaration() (localctx IOpaqueEnumDeclarationContext) {
+func (p *CPPParser) OpaqueEnumDeclaration() (localctx IOpaqueEnumDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewOpaqueEnumDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 178, CPP14ParserRULE_opaqueEnumDeclaration)
+	p.EnterRule(localctx, 178, CPPParserRULE_opaqueEnumDeclaration)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -19935,7 +19935,7 @@ func (p *CPP14Parser) OpaqueEnumDeclaration() (localctx IOpaqueEnumDeclarationCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1282)
 			p.AttributeSpecifierSeq()
@@ -19944,7 +19944,7 @@ func (p *CPP14Parser) OpaqueEnumDeclaration() (localctx IOpaqueEnumDeclarationCo
 	}
 	{
 		p.SetState(1285)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -19957,7 +19957,7 @@ func (p *CPP14Parser) OpaqueEnumDeclaration() (localctx IOpaqueEnumDeclarationCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserColon {
+	if _la == CPPParserColon {
 		{
 			p.SetState(1286)
 			p.EnumBase()
@@ -19966,7 +19966,7 @@ func (p *CPP14Parser) OpaqueEnumDeclaration() (localctx IOpaqueEnumDeclarationCo
 	}
 	{
 		p.SetState(1289)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -20010,13 +20010,13 @@ type EnumKeyContext struct {
 func NewEmptyEnumKeyContext() *EnumKeyContext {
 	var p = new(EnumKeyContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumKey
+	p.RuleIndex = CPPParserRULE_enumKey
 	return p
 }
 
 func InitEmptyEnumKeyContext(p *EnumKeyContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumKey
+	p.RuleIndex = CPPParserRULE_enumKey
 }
 
 func (*EnumKeyContext) IsEnumKeyContext() {}
@@ -20027,7 +20027,7 @@ func NewEnumKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumKey
+	p.RuleIndex = CPPParserRULE_enumKey
 
 	return p
 }
@@ -20035,15 +20035,15 @@ func NewEnumKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 func (s *EnumKeyContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EnumKeyContext) Enum() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEnum, 0)
+	return s.GetToken(CPPParserEnum, 0)
 }
 
 func (s *EnumKeyContext) Class() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserClass, 0)
+	return s.GetToken(CPPParserClass, 0)
 }
 
 func (s *EnumKeyContext) Struct() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStruct, 0)
+	return s.GetToken(CPPParserStruct, 0)
 }
 
 func (s *EnumKeyContext) GetRuleContext() antlr.RuleContext {
@@ -20056,7 +20056,7 @@ func (s *EnumKeyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 
 func (s *EnumKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumKey(s)
 
 	default:
@@ -20064,18 +20064,18 @@ func (s *EnumKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) EnumKey() (localctx IEnumKeyContext) {
+func (p *CPPParser) EnumKey() (localctx IEnumKeyContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumKeyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 180, CPP14ParserRULE_enumKey)
+	p.EnterRule(localctx, 180, CPPParserRULE_enumKey)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1291)
-		p.Match(CPP14ParserEnum)
+		p.Match(CPPParserEnum)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -20088,12 +20088,12 @@ func (p *CPP14Parser) EnumKey() (localctx IEnumKeyContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserClass || _la == CPP14ParserStruct {
+	if _la == CPPParserClass || _la == CPPParserStruct {
 		{
 			p.SetState(1292)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == CPP14ParserClass || _la == CPP14ParserStruct) {
+			if !(_la == CPPParserClass || _la == CPPParserStruct) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -20139,13 +20139,13 @@ type EnumBaseContext struct {
 func NewEmptyEnumBaseContext() *EnumBaseContext {
 	var p = new(EnumBaseContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumBase
+	p.RuleIndex = CPPParserRULE_enumBase
 	return p
 }
 
 func InitEmptyEnumBaseContext(p *EnumBaseContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumBase
+	p.RuleIndex = CPPParserRULE_enumBase
 }
 
 func (*EnumBaseContext) IsEnumBaseContext() {}
@@ -20156,7 +20156,7 @@ func NewEnumBaseContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumBase
+	p.RuleIndex = CPPParserRULE_enumBase
 
 	return p
 }
@@ -20164,7 +20164,7 @@ func NewEnumBaseContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 func (s *EnumBaseContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EnumBaseContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *EnumBaseContext) TypeSpecifierSeq() ITypeSpecifierSeqContext {
@@ -20193,7 +20193,7 @@ func (s *EnumBaseContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 
 func (s *EnumBaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumBase(s)
 
 	default:
@@ -20201,16 +20201,16 @@ func (s *EnumBaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) EnumBase() (localctx IEnumBaseContext) {
+func (p *CPPParser) EnumBase() (localctx IEnumBaseContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumBaseContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 182, CPP14ParserRULE_enumBase)
+	p.EnterRule(localctx, 182, CPPParserRULE_enumBase)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1295)
-		p.Match(CPP14ParserColon)
+		p.Match(CPPParserColon)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -20259,13 +20259,13 @@ type EnumeratorListContext struct {
 func NewEmptyEnumeratorListContext() *EnumeratorListContext {
 	var p = new(EnumeratorListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumeratorList
+	p.RuleIndex = CPPParserRULE_enumeratorList
 	return p
 }
 
 func InitEmptyEnumeratorListContext(p *EnumeratorListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumeratorList
+	p.RuleIndex = CPPParserRULE_enumeratorList
 }
 
 func (*EnumeratorListContext) IsEnumeratorListContext() {}
@@ -20276,7 +20276,7 @@ func NewEnumeratorListContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumeratorList
+	p.RuleIndex = CPPParserRULE_enumeratorList
 
 	return p
 }
@@ -20325,11 +20325,11 @@ func (s *EnumeratorListContext) EnumeratorDefinition(i int) IEnumeratorDefinitio
 }
 
 func (s *EnumeratorListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *EnumeratorListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *EnumeratorListContext) GetRuleContext() antlr.RuleContext {
@@ -20342,7 +20342,7 @@ func (s *EnumeratorListContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *EnumeratorListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumeratorList(s)
 
 	default:
@@ -20350,12 +20350,12 @@ func (s *EnumeratorListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) EnumeratorList() (localctx IEnumeratorListContext) {
+func (p *CPPParser) EnumeratorList() (localctx IEnumeratorListContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumeratorListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 184, CPP14ParserRULE_enumeratorList)
+	p.EnterRule(localctx, 184, CPPParserRULE_enumeratorList)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -20376,7 +20376,7 @@ func (p *CPP14Parser) EnumeratorList() (localctx IEnumeratorListContext) {
 		if _alt == 1 {
 			{
 				p.SetState(1299)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -20436,13 +20436,13 @@ type EnumeratorDefinitionContext struct {
 func NewEmptyEnumeratorDefinitionContext() *EnumeratorDefinitionContext {
 	var p = new(EnumeratorDefinitionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumeratorDefinition
+	p.RuleIndex = CPPParserRULE_enumeratorDefinition
 	return p
 }
 
 func InitEmptyEnumeratorDefinitionContext(p *EnumeratorDefinitionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumeratorDefinition
+	p.RuleIndex = CPPParserRULE_enumeratorDefinition
 }
 
 func (*EnumeratorDefinitionContext) IsEnumeratorDefinitionContext() {}
@@ -20453,7 +20453,7 @@ func NewEnumeratorDefinitionContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumeratorDefinition
+	p.RuleIndex = CPPParserRULE_enumeratorDefinition
 
 	return p
 }
@@ -20477,7 +20477,7 @@ func (s *EnumeratorDefinitionContext) Enumerator() IEnumeratorContext {
 }
 
 func (s *EnumeratorDefinitionContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *EnumeratorDefinitionContext) ConstantExpression() IConstantExpressionContext {
@@ -20506,7 +20506,7 @@ func (s *EnumeratorDefinitionContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *EnumeratorDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumeratorDefinition(s)
 
 	default:
@@ -20514,12 +20514,12 @@ func (s *EnumeratorDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) EnumeratorDefinition() (localctx IEnumeratorDefinitionContext) {
+func (p *CPPParser) EnumeratorDefinition() (localctx IEnumeratorDefinitionContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumeratorDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 186, CPP14ParserRULE_enumeratorDefinition)
+	p.EnterRule(localctx, 186, CPPParserRULE_enumeratorDefinition)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -20534,10 +20534,10 @@ func (p *CPP14Parser) EnumeratorDefinition() (localctx IEnumeratorDefinitionCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAssign {
+	if _la == CPPParserAssign {
 		{
 			p.SetState(1307)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -20585,13 +20585,13 @@ type EnumeratorContext struct {
 func NewEmptyEnumeratorContext() *EnumeratorContext {
 	var p = new(EnumeratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumerator
+	p.RuleIndex = CPPParserRULE_enumerator
 	return p
 }
 
 func InitEmptyEnumeratorContext(p *EnumeratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_enumerator
+	p.RuleIndex = CPPParserRULE_enumerator
 }
 
 func (*EnumeratorContext) IsEnumeratorContext() {}
@@ -20602,7 +20602,7 @@ func NewEnumeratorContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_enumerator
+	p.RuleIndex = CPPParserRULE_enumerator
 
 	return p
 }
@@ -20610,7 +20610,7 @@ func NewEnumeratorContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *EnumeratorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *EnumeratorContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *EnumeratorContext) GetRuleContext() antlr.RuleContext {
@@ -20623,7 +20623,7 @@ func (s *EnumeratorContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *EnumeratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitEnumerator(s)
 
 	default:
@@ -20631,16 +20631,16 @@ func (s *EnumeratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Enumerator() (localctx IEnumeratorContext) {
+func (p *CPPParser) Enumerator() (localctx IEnumeratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewEnumeratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 188, CPP14ParserRULE_enumerator)
+	p.EnterRule(localctx, 188, CPPParserRULE_enumerator)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1311)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -20683,13 +20683,13 @@ type NamespaceNameContext struct {
 func NewEmptyNamespaceNameContext() *NamespaceNameContext {
 	var p = new(NamespaceNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceName
+	p.RuleIndex = CPPParserRULE_namespaceName
 	return p
 }
 
 func InitEmptyNamespaceNameContext(p *NamespaceNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceName
+	p.RuleIndex = CPPParserRULE_namespaceName
 }
 
 func (*NamespaceNameContext) IsNamespaceNameContext() {}
@@ -20700,7 +20700,7 @@ func NewNamespaceNameContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_namespaceName
+	p.RuleIndex = CPPParserRULE_namespaceName
 
 	return p
 }
@@ -20749,7 +20749,7 @@ func (s *NamespaceNameContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *NamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNamespaceName(s)
 
 	default:
@@ -20757,12 +20757,12 @@ func (s *NamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) NamespaceName() (localctx INamespaceNameContext) {
+func (p *CPPParser) NamespaceName() (localctx INamespaceNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewNamespaceNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 190, CPP14ParserRULE_namespaceName)
+	p.EnterRule(localctx, 190, CPPParserRULE_namespaceName)
 	p.SetState(1315)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -20823,13 +20823,13 @@ type OriginalNamespaceNameContext struct {
 func NewEmptyOriginalNamespaceNameContext() *OriginalNamespaceNameContext {
 	var p = new(OriginalNamespaceNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_originalNamespaceName
+	p.RuleIndex = CPPParserRULE_originalNamespaceName
 	return p
 }
 
 func InitEmptyOriginalNamespaceNameContext(p *OriginalNamespaceNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_originalNamespaceName
+	p.RuleIndex = CPPParserRULE_originalNamespaceName
 }
 
 func (*OriginalNamespaceNameContext) IsOriginalNamespaceNameContext() {}
@@ -20840,7 +20840,7 @@ func NewOriginalNamespaceNameContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_originalNamespaceName
+	p.RuleIndex = CPPParserRULE_originalNamespaceName
 
 	return p
 }
@@ -20848,7 +20848,7 @@ func NewOriginalNamespaceNameContext(parser antlr.Parser, parent antlr.ParserRul
 func (s *OriginalNamespaceNameContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *OriginalNamespaceNameContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *OriginalNamespaceNameContext) GetRuleContext() antlr.RuleContext {
@@ -20861,7 +20861,7 @@ func (s *OriginalNamespaceNameContext) ToStringTree(ruleNames []string, recog an
 
 func (s *OriginalNamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitOriginalNamespaceName(s)
 
 	default:
@@ -20869,16 +20869,16 @@ func (s *OriginalNamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) OriginalNamespaceName() (localctx IOriginalNamespaceNameContext) {
+func (p *CPPParser) OriginalNamespaceName() (localctx IOriginalNamespaceNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewOriginalNamespaceNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 192, CPP14ParserRULE_originalNamespaceName)
+	p.EnterRule(localctx, 192, CPPParserRULE_originalNamespaceName)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1317)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -20935,13 +20935,13 @@ type NamespaceDefinitionContext struct {
 func NewEmptyNamespaceDefinitionContext() *NamespaceDefinitionContext {
 	var p = new(NamespaceDefinitionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceDefinition
+	p.RuleIndex = CPPParserRULE_namespaceDefinition
 	return p
 }
 
 func InitEmptyNamespaceDefinitionContext(p *NamespaceDefinitionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceDefinition
+	p.RuleIndex = CPPParserRULE_namespaceDefinition
 }
 
 func (*NamespaceDefinitionContext) IsNamespaceDefinitionContext() {}
@@ -20952,7 +20952,7 @@ func NewNamespaceDefinitionContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_namespaceDefinition
+	p.RuleIndex = CPPParserRULE_namespaceDefinition
 
 	return p
 }
@@ -20966,27 +20966,27 @@ func (s *NamespaceDefinitionContext) GetNamespaceBody() IDeclarationSeqContext {
 func (s *NamespaceDefinitionContext) SetNamespaceBody(v IDeclarationSeqContext) { s.namespaceBody = v }
 
 func (s *NamespaceDefinitionContext) Namespace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNamespace, 0)
+	return s.GetToken(CPPParserNamespace, 0)
 }
 
 func (s *NamespaceDefinitionContext) LeftBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, 0)
+	return s.GetToken(CPPParserLeftBrace, 0)
 }
 
 func (s *NamespaceDefinitionContext) RightBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, 0)
+	return s.GetToken(CPPParserRightBrace, 0)
 }
 
 func (s *NamespaceDefinitionContext) Inline() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserInline, 0)
+	return s.GetToken(CPPParserInline, 0)
 }
 
 func (s *NamespaceDefinitionContext) AllIdentifier() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserIdentifier)
+	return s.GetTokens(CPPParserIdentifier)
 }
 
 func (s *NamespaceDefinitionContext) Identifier(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, i)
+	return s.GetToken(CPPParserIdentifier, i)
 }
 
 func (s *NamespaceDefinitionContext) DeclarationSeq() IDeclarationSeqContext {
@@ -21006,11 +21006,11 @@ func (s *NamespaceDefinitionContext) DeclarationSeq() IDeclarationSeqContext {
 }
 
 func (s *NamespaceDefinitionContext) AllDoublecolon() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserDoublecolon)
+	return s.GetTokens(CPPParserDoublecolon)
 }
 
 func (s *NamespaceDefinitionContext) Doublecolon(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, i)
+	return s.GetToken(CPPParserDoublecolon, i)
 }
 
 func (s *NamespaceDefinitionContext) GetRuleContext() antlr.RuleContext {
@@ -21023,7 +21023,7 @@ func (s *NamespaceDefinitionContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *NamespaceDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNamespaceDefinition(s)
 
 	default:
@@ -21031,12 +21031,12 @@ func (s *NamespaceDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContext) {
+func (p *CPPParser) NamespaceDefinition() (localctx INamespaceDefinitionContext) {
 	this := p
 	_ = this
 
 	localctx = NewNamespaceDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 194, CPP14ParserRULE_namespaceDefinition)
+	p.EnterRule(localctx, 194, CPPParserRULE_namespaceDefinition)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -21047,10 +21047,10 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserInline {
+	if _la == CPPParserInline {
 		{
 			p.SetState(1319)
-			p.Match(CPP14ParserInline)
+			p.Match(CPPParserInline)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -21060,7 +21060,7 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 	}
 	{
 		p.SetState(1322)
-		p.Match(CPP14ParserNamespace)
+		p.Match(CPPParserNamespace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21073,10 +21073,10 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserIdentifier {
+	if _la == CPPParserIdentifier {
 		{
 			p.SetState(1323)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -21089,10 +21089,10 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == CPP14ParserDoublecolon {
+		for _la == CPPParserDoublecolon {
 			{
 				p.SetState(1324)
-				p.Match(CPP14ParserDoublecolon)
+				p.Match(CPPParserDoublecolon)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -21100,7 +21100,7 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 			}
 			{
 				p.SetState(1325)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -21118,7 +21118,7 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 	}
 	{
 		p.SetState(1333)
-		p.Match(CPP14ParserLeftBrace)
+		p.Match(CPPParserLeftBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21143,7 +21143,7 @@ func (p *CPP14Parser) NamespaceDefinition() (localctx INamespaceDefinitionContex
 	}
 	{
 		p.SetState(1337)
-		p.Match(CPP14ParserRightBrace)
+		p.Match(CPPParserRightBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21185,13 +21185,13 @@ type NamespaceAliasContext struct {
 func NewEmptyNamespaceAliasContext() *NamespaceAliasContext {
 	var p = new(NamespaceAliasContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceAlias
+	p.RuleIndex = CPPParserRULE_namespaceAlias
 	return p
 }
 
 func InitEmptyNamespaceAliasContext(p *NamespaceAliasContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceAlias
+	p.RuleIndex = CPPParserRULE_namespaceAlias
 }
 
 func (*NamespaceAliasContext) IsNamespaceAliasContext() {}
@@ -21202,7 +21202,7 @@ func NewNamespaceAliasContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_namespaceAlias
+	p.RuleIndex = CPPParserRULE_namespaceAlias
 
 	return p
 }
@@ -21210,7 +21210,7 @@ func NewNamespaceAliasContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *NamespaceAliasContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NamespaceAliasContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *NamespaceAliasContext) GetRuleContext() antlr.RuleContext {
@@ -21223,7 +21223,7 @@ func (s *NamespaceAliasContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *NamespaceAliasContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNamespaceAlias(s)
 
 	default:
@@ -21231,16 +21231,16 @@ func (s *NamespaceAliasContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) NamespaceAlias() (localctx INamespaceAliasContext) {
+func (p *CPPParser) NamespaceAlias() (localctx INamespaceAliasContext) {
 	this := p
 	_ = this
 
 	localctx = NewNamespaceAliasContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 196, CPP14ParserRULE_namespaceAlias)
+	p.EnterRule(localctx, 196, CPPParserRULE_namespaceAlias)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1339)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21286,13 +21286,13 @@ type NamespaceAliasDefinitionContext struct {
 func NewEmptyNamespaceAliasDefinitionContext() *NamespaceAliasDefinitionContext {
 	var p = new(NamespaceAliasDefinitionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceAliasDefinition
+	p.RuleIndex = CPPParserRULE_namespaceAliasDefinition
 	return p
 }
 
 func InitEmptyNamespaceAliasDefinitionContext(p *NamespaceAliasDefinitionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_namespaceAliasDefinition
+	p.RuleIndex = CPPParserRULE_namespaceAliasDefinition
 }
 
 func (*NamespaceAliasDefinitionContext) IsNamespaceAliasDefinitionContext() {}
@@ -21303,7 +21303,7 @@ func NewNamespaceAliasDefinitionContext(parser antlr.Parser, parent antlr.Parser
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_namespaceAliasDefinition
+	p.RuleIndex = CPPParserRULE_namespaceAliasDefinition
 
 	return p
 }
@@ -21311,15 +21311,15 @@ func NewNamespaceAliasDefinitionContext(parser antlr.Parser, parent antlr.Parser
 func (s *NamespaceAliasDefinitionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NamespaceAliasDefinitionContext) Namespace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNamespace, 0)
+	return s.GetToken(CPPParserNamespace, 0)
 }
 
 func (s *NamespaceAliasDefinitionContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *NamespaceAliasDefinitionContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *NamespaceAliasDefinitionContext) QualifiedNamespaceSpecifier() IQualifiedNamespaceSpecifierContext {
@@ -21339,7 +21339,7 @@ func (s *NamespaceAliasDefinitionContext) QualifiedNamespaceSpecifier() IQualifi
 }
 
 func (s *NamespaceAliasDefinitionContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *NamespaceAliasDefinitionContext) GetRuleContext() antlr.RuleContext {
@@ -21352,7 +21352,7 @@ func (s *NamespaceAliasDefinitionContext) ToStringTree(ruleNames []string, recog
 
 func (s *NamespaceAliasDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNamespaceAliasDefinition(s)
 
 	default:
@@ -21360,16 +21360,16 @@ func (s *NamespaceAliasDefinitionContext) Accept(visitor antlr.ParseTreeVisitor)
 	}
 }
 
-func (p *CPP14Parser) NamespaceAliasDefinition() (localctx INamespaceAliasDefinitionContext) {
+func (p *CPPParser) NamespaceAliasDefinition() (localctx INamespaceAliasDefinitionContext) {
 	this := p
 	_ = this
 
 	localctx = NewNamespaceAliasDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 198, CPP14ParserRULE_namespaceAliasDefinition)
+	p.EnterRule(localctx, 198, CPPParserRULE_namespaceAliasDefinition)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1341)
-		p.Match(CPP14ParserNamespace)
+		p.Match(CPPParserNamespace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21377,7 +21377,7 @@ func (p *CPP14Parser) NamespaceAliasDefinition() (localctx INamespaceAliasDefini
 	}
 	{
 		p.SetState(1342)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21385,7 +21385,7 @@ func (p *CPP14Parser) NamespaceAliasDefinition() (localctx INamespaceAliasDefini
 	}
 	{
 		p.SetState(1343)
-		p.Match(CPP14ParserAssign)
+		p.Match(CPPParserAssign)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21397,7 +21397,7 @@ func (p *CPP14Parser) NamespaceAliasDefinition() (localctx INamespaceAliasDefini
 	}
 	{
 		p.SetState(1345)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21440,13 +21440,13 @@ type QualifiedNamespaceSpecifierContext struct {
 func NewEmptyQualifiedNamespaceSpecifierContext() *QualifiedNamespaceSpecifierContext {
 	var p = new(QualifiedNamespaceSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_qualifiedNamespaceSpecifier
+	p.RuleIndex = CPPParserRULE_qualifiedNamespaceSpecifier
 	return p
 }
 
 func InitEmptyQualifiedNamespaceSpecifierContext(p *QualifiedNamespaceSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_qualifiedNamespaceSpecifier
+	p.RuleIndex = CPPParserRULE_qualifiedNamespaceSpecifier
 }
 
 func (*QualifiedNamespaceSpecifierContext) IsQualifiedNamespaceSpecifierContext() {}
@@ -21457,7 +21457,7 @@ func NewQualifiedNamespaceSpecifierContext(parser antlr.Parser, parent antlr.Par
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_qualifiedNamespaceSpecifier
+	p.RuleIndex = CPPParserRULE_qualifiedNamespaceSpecifier
 
 	return p
 }
@@ -21506,7 +21506,7 @@ func (s *QualifiedNamespaceSpecifierContext) ToStringTree(ruleNames []string, re
 
 func (s *QualifiedNamespaceSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitQualifiedNamespaceSpecifier(s)
 
 	default:
@@ -21514,12 +21514,12 @@ func (s *QualifiedNamespaceSpecifierContext) Accept(visitor antlr.ParseTreeVisit
 	}
 }
 
-func (p *CPP14Parser) QualifiedNamespaceSpecifier() (localctx IQualifiedNamespaceSpecifierContext) {
+func (p *CPPParser) QualifiedNamespaceSpecifier() (localctx IQualifiedNamespaceSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewQualifiedNamespaceSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 200, CPP14ParserRULE_qualifiedNamespaceSpecifier)
+	p.EnterRule(localctx, 200, CPPParserRULE_qualifiedNamespaceSpecifier)
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1348)
 	p.GetErrorHandler().Sync(p)
@@ -21578,13 +21578,13 @@ type UsingDeclarationContext struct {
 func NewEmptyUsingDeclarationContext() *UsingDeclarationContext {
 	var p = new(UsingDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_usingDeclaration
+	p.RuleIndex = CPPParserRULE_usingDeclaration
 	return p
 }
 
 func InitEmptyUsingDeclarationContext(p *UsingDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_usingDeclaration
+	p.RuleIndex = CPPParserRULE_usingDeclaration
 }
 
 func (*UsingDeclarationContext) IsUsingDeclarationContext() {}
@@ -21595,7 +21595,7 @@ func NewUsingDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_usingDeclaration
+	p.RuleIndex = CPPParserRULE_usingDeclaration
 
 	return p
 }
@@ -21603,7 +21603,7 @@ func NewUsingDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *UsingDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *UsingDeclarationContext) Using() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUsing, 0)
+	return s.GetToken(CPPParserUsing, 0)
 }
 
 func (s *UsingDeclarationContext) UnqualifiedId() IUnqualifiedIdContext {
@@ -21623,7 +21623,7 @@ func (s *UsingDeclarationContext) UnqualifiedId() IUnqualifiedIdContext {
 }
 
 func (s *UsingDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *UsingDeclarationContext) NestedNameSpecifier() INestedNameSpecifierContext {
@@ -21643,11 +21643,11 @@ func (s *UsingDeclarationContext) NestedNameSpecifier() INestedNameSpecifierCont
 }
 
 func (s *UsingDeclarationContext) Doublecolon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, 0)
+	return s.GetToken(CPPParserDoublecolon, 0)
 }
 
 func (s *UsingDeclarationContext) Typename_() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTypename_, 0)
+	return s.GetToken(CPPParserTypename_, 0)
 }
 
 func (s *UsingDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -21660,7 +21660,7 @@ func (s *UsingDeclarationContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *UsingDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitUsingDeclaration(s)
 
 	default:
@@ -21668,18 +21668,18 @@ func (s *UsingDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) UsingDeclaration() (localctx IUsingDeclarationContext) {
+func (p *CPPParser) UsingDeclaration() (localctx IUsingDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewUsingDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 202, CPP14ParserRULE_usingDeclaration)
+	p.EnterRule(localctx, 202, CPPParserRULE_usingDeclaration)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1352)
-		p.Match(CPP14ParserUsing)
+		p.Match(CPPParserUsing)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21700,10 +21700,10 @@ func (p *CPP14Parser) UsingDeclaration() (localctx IUsingDeclarationContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserTypename_ {
+		if _la == CPPParserTypename_ {
 			{
 				p.SetState(1353)
-				p.Match(CPP14ParserTypename_)
+				p.Match(CPPParserTypename_)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -21719,7 +21719,7 @@ func (p *CPP14Parser) UsingDeclaration() (localctx IUsingDeclarationContext) {
 	case 2:
 		{
 			p.SetState(1357)
-			p.Match(CPP14ParserDoublecolon)
+			p.Match(CPPParserDoublecolon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -21735,7 +21735,7 @@ func (p *CPP14Parser) UsingDeclaration() (localctx IUsingDeclarationContext) {
 	}
 	{
 		p.SetState(1361)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21782,13 +21782,13 @@ type UsingDirectiveContext struct {
 func NewEmptyUsingDirectiveContext() *UsingDirectiveContext {
 	var p = new(UsingDirectiveContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_usingDirective
+	p.RuleIndex = CPPParserRULE_usingDirective
 	return p
 }
 
 func InitEmptyUsingDirectiveContext(p *UsingDirectiveContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_usingDirective
+	p.RuleIndex = CPPParserRULE_usingDirective
 }
 
 func (*UsingDirectiveContext) IsUsingDirectiveContext() {}
@@ -21799,7 +21799,7 @@ func NewUsingDirectiveContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_usingDirective
+	p.RuleIndex = CPPParserRULE_usingDirective
 
 	return p
 }
@@ -21807,11 +21807,11 @@ func NewUsingDirectiveContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *UsingDirectiveContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *UsingDirectiveContext) Using() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUsing, 0)
+	return s.GetToken(CPPParserUsing, 0)
 }
 
 func (s *UsingDirectiveContext) Namespace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNamespace, 0)
+	return s.GetToken(CPPParserNamespace, 0)
 }
 
 func (s *UsingDirectiveContext) NamespaceName() INamespaceNameContext {
@@ -21831,7 +21831,7 @@ func (s *UsingDirectiveContext) NamespaceName() INamespaceNameContext {
 }
 
 func (s *UsingDirectiveContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *UsingDirectiveContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -21876,7 +21876,7 @@ func (s *UsingDirectiveContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *UsingDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitUsingDirective(s)
 
 	default:
@@ -21884,12 +21884,12 @@ func (s *UsingDirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) UsingDirective() (localctx IUsingDirectiveContext) {
+func (p *CPPParser) UsingDirective() (localctx IUsingDirectiveContext) {
 	this := p
 	_ = this
 
 	localctx = NewUsingDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 204, CPP14ParserRULE_usingDirective)
+	p.EnterRule(localctx, 204, CPPParserRULE_usingDirective)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -21900,7 +21900,7 @@ func (p *CPP14Parser) UsingDirective() (localctx IUsingDirectiveContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1363)
 			p.AttributeSpecifierSeq()
@@ -21909,7 +21909,7 @@ func (p *CPP14Parser) UsingDirective() (localctx IUsingDirectiveContext) {
 	}
 	{
 		p.SetState(1366)
-		p.Match(CPP14ParserUsing)
+		p.Match(CPPParserUsing)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21917,7 +21917,7 @@ func (p *CPP14Parser) UsingDirective() (localctx IUsingDirectiveContext) {
 	}
 	{
 		p.SetState(1367)
-		p.Match(CPP14ParserNamespace)
+		p.Match(CPPParserNamespace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21941,7 +21941,7 @@ func (p *CPP14Parser) UsingDirective() (localctx IUsingDirectiveContext) {
 	}
 	{
 		p.SetState(1372)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -21987,13 +21987,13 @@ type AsmDefinitionContext struct {
 func NewEmptyAsmDefinitionContext() *AsmDefinitionContext {
 	var p = new(AsmDefinitionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_asmDefinition
+	p.RuleIndex = CPPParserRULE_asmDefinition
 	return p
 }
 
 func InitEmptyAsmDefinitionContext(p *AsmDefinitionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_asmDefinition
+	p.RuleIndex = CPPParserRULE_asmDefinition
 }
 
 func (*AsmDefinitionContext) IsAsmDefinitionContext() {}
@@ -22004,7 +22004,7 @@ func NewAsmDefinitionContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_asmDefinition
+	p.RuleIndex = CPPParserRULE_asmDefinition
 
 	return p
 }
@@ -22012,23 +22012,23 @@ func NewAsmDefinitionContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *AsmDefinitionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AsmDefinitionContext) Asm() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAsm, 0)
+	return s.GetToken(CPPParserAsm, 0)
 }
 
 func (s *AsmDefinitionContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *AsmDefinitionContext) StringLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStringLiteral, 0)
+	return s.GetToken(CPPParserStringLiteral, 0)
 }
 
 func (s *AsmDefinitionContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *AsmDefinitionContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *AsmDefinitionContext) GetRuleContext() antlr.RuleContext {
@@ -22041,7 +22041,7 @@ func (s *AsmDefinitionContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *AsmDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAsmDefinition(s)
 
 	default:
@@ -22049,16 +22049,16 @@ func (s *AsmDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) AsmDefinition() (localctx IAsmDefinitionContext) {
+func (p *CPPParser) AsmDefinition() (localctx IAsmDefinitionContext) {
 	this := p
 	_ = this
 
 	localctx = NewAsmDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 206, CPP14ParserRULE_asmDefinition)
+	p.EnterRule(localctx, 206, CPPParserRULE_asmDefinition)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1374)
-		p.Match(CPP14ParserAsm)
+		p.Match(CPPParserAsm)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22066,7 +22066,7 @@ func (p *CPP14Parser) AsmDefinition() (localctx IAsmDefinitionContext) {
 	}
 	{
 		p.SetState(1375)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22074,7 +22074,7 @@ func (p *CPP14Parser) AsmDefinition() (localctx IAsmDefinitionContext) {
 	}
 	{
 		p.SetState(1376)
-		p.Match(CPP14ParserStringLiteral)
+		p.Match(CPPParserStringLiteral)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22082,7 +22082,7 @@ func (p *CPP14Parser) AsmDefinition() (localctx IAsmDefinitionContext) {
 	}
 	{
 		p.SetState(1377)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22090,7 +22090,7 @@ func (p *CPP14Parser) AsmDefinition() (localctx IAsmDefinitionContext) {
 	}
 	{
 		p.SetState(1378)
-		p.Match(CPP14ParserSemi)
+		p.Match(CPPParserSemi)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22137,13 +22137,13 @@ type LinkageSpecificationContext struct {
 func NewEmptyLinkageSpecificationContext() *LinkageSpecificationContext {
 	var p = new(LinkageSpecificationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_linkageSpecification
+	p.RuleIndex = CPPParserRULE_linkageSpecification
 	return p
 }
 
 func InitEmptyLinkageSpecificationContext(p *LinkageSpecificationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_linkageSpecification
+	p.RuleIndex = CPPParserRULE_linkageSpecification
 }
 
 func (*LinkageSpecificationContext) IsLinkageSpecificationContext() {}
@@ -22154,7 +22154,7 @@ func NewLinkageSpecificationContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_linkageSpecification
+	p.RuleIndex = CPPParserRULE_linkageSpecification
 
 	return p
 }
@@ -22162,19 +22162,19 @@ func NewLinkageSpecificationContext(parser antlr.Parser, parent antlr.ParserRule
 func (s *LinkageSpecificationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *LinkageSpecificationContext) Extern() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserExtern, 0)
+	return s.GetToken(CPPParserExtern, 0)
 }
 
 func (s *LinkageSpecificationContext) StringLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStringLiteral, 0)
+	return s.GetToken(CPPParserStringLiteral, 0)
 }
 
 func (s *LinkageSpecificationContext) LeftBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, 0)
+	return s.GetToken(CPPParserLeftBrace, 0)
 }
 
 func (s *LinkageSpecificationContext) RightBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, 0)
+	return s.GetToken(CPPParserRightBrace, 0)
 }
 
 func (s *LinkageSpecificationContext) Declaration() IDeclarationContext {
@@ -22219,7 +22219,7 @@ func (s *LinkageSpecificationContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *LinkageSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLinkageSpecification(s)
 
 	default:
@@ -22227,18 +22227,18 @@ func (s *LinkageSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) LinkageSpecification() (localctx ILinkageSpecificationContext) {
+func (p *CPPParser) LinkageSpecification() (localctx ILinkageSpecificationContext) {
 	this := p
 	_ = this
 
 	localctx = NewLinkageSpecificationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 208, CPP14ParserRULE_linkageSpecification)
+	p.EnterRule(localctx, 208, CPPParserRULE_linkageSpecification)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1380)
-		p.Match(CPP14ParserExtern)
+		p.Match(CPPParserExtern)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22246,7 +22246,7 @@ func (p *CPP14Parser) LinkageSpecification() (localctx ILinkageSpecificationCont
 	}
 	{
 		p.SetState(1381)
-		p.Match(CPP14ParserStringLiteral)
+		p.Match(CPPParserStringLiteral)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22259,10 +22259,10 @@ func (p *CPP14Parser) LinkageSpecification() (localctx ILinkageSpecificationCont
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		{
 			p.SetState(1382)
-			p.Match(CPP14ParserLeftBrace)
+			p.Match(CPPParserLeftBrace)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22284,14 +22284,14 @@ func (p *CPP14Parser) LinkageSpecification() (localctx ILinkageSpecificationCont
 		}
 		{
 			p.SetState(1386)
-			p.Match(CPP14ParserRightBrace)
+			p.Match(CPPParserRightBrace)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserAlignas, CPP14ParserAsm, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserClass, CPP14ParserConst, CPP14ParserConstexpr, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserEnum, CPP14ParserExplicit, CPP14ParserExtern, CPP14ParserFloat, CPP14ParserFriend, CPP14ParserInline, CPP14ParserInt, CPP14ParserLong, CPP14ParserMutable, CPP14ParserNamespace, CPP14ParserOperator, CPP14ParserRegister, CPP14ParserShort, CPP14ParserSigned, CPP14ParserStatic, CPP14ParserStatic_assert, CPP14ParserStruct, CPP14ParserTemplate, CPP14ParserThread_local, CPP14ParserTypedef, CPP14ParserTypename_, CPP14ParserUnion, CPP14ParserUnsigned, CPP14ParserUsing, CPP14ParserVirtual, CPP14ParserVoid, CPP14ParserVolatile, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserStar, CPP14ParserAnd, CPP14ParserTilde, CPP14ParserAndAnd, CPP14ParserDoublecolon, CPP14ParserSemi, CPP14ParserEllipsis, CPP14ParserAttributeGnu, CPP14ParserIdentifier:
+	case CPPParserAlignas, CPPParserAsm, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserClass, CPPParserConst, CPPParserConstexpr, CPPParserDecltype, CPPParserDouble, CPPParserEnum, CPPParserExplicit, CPPParserExtern, CPPParserFloat, CPPParserFriend, CPPParserInline, CPPParserInt, CPPParserLong, CPPParserMutable, CPPParserNamespace, CPPParserOperator, CPPParserRegister, CPPParserShort, CPPParserSigned, CPPParserStatic, CPPParserStatic_assert, CPPParserStruct, CPPParserTemplate, CPPParserThread_local, CPPParserTypedef, CPPParserTypename_, CPPParserUnion, CPPParserUnsigned, CPPParserUsing, CPPParserVirtual, CPPParserVoid, CPPParserVolatile, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserStar, CPPParserAnd, CPPParserTilde, CPPParserAndAnd, CPPParserDoublecolon, CPPParserSemi, CPPParserEllipsis, CPPParserAttributeGnu, CPPParserIdentifier:
 		{
 			p.SetState(1387)
 			p.Declaration()
@@ -22338,13 +22338,13 @@ type AttributeSpecifierSeqContext struct {
 func NewEmptyAttributeSpecifierSeqContext() *AttributeSpecifierSeqContext {
 	var p = new(AttributeSpecifierSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_attributeSpecifierSeq
 	return p
 }
 
 func InitEmptyAttributeSpecifierSeqContext(p *AttributeSpecifierSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_attributeSpecifierSeq
 }
 
 func (*AttributeSpecifierSeqContext) IsAttributeSpecifierSeqContext() {}
@@ -22355,7 +22355,7 @@ func NewAttributeSpecifierSeqContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attributeSpecifierSeq
+	p.RuleIndex = CPPParserRULE_attributeSpecifierSeq
 
 	return p
 }
@@ -22413,7 +22413,7 @@ func (s *AttributeSpecifierSeqContext) ToStringTree(ruleNames []string, recog an
 
 func (s *AttributeSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttributeSpecifierSeq(s)
 
 	default:
@@ -22421,12 +22421,12 @@ func (s *AttributeSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) AttributeSpecifierSeq() (localctx IAttributeSpecifierSeqContext) {
+func (p *CPPParser) AttributeSpecifierSeq() (localctx IAttributeSpecifierSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeSpecifierSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 210, CPP14ParserRULE_attributeSpecifierSeq)
+	p.EnterRule(localctx, 210, CPPParserRULE_attributeSpecifierSeq)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -22503,13 +22503,13 @@ type AttributeSpecifierContext struct {
 func NewEmptyAttributeSpecifierContext() *AttributeSpecifierContext {
 	var p = new(AttributeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeSpecifier
+	p.RuleIndex = CPPParserRULE_attributeSpecifier
 	return p
 }
 
 func InitEmptyAttributeSpecifierContext(p *AttributeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeSpecifier
+	p.RuleIndex = CPPParserRULE_attributeSpecifier
 }
 
 func (*AttributeSpecifierContext) IsAttributeSpecifierContext() {}
@@ -22520,7 +22520,7 @@ func NewAttributeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attributeSpecifier
+	p.RuleIndex = CPPParserRULE_attributeSpecifier
 
 	return p
 }
@@ -22528,19 +22528,19 @@ func NewAttributeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *AttributeSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AttributeSpecifierContext) AllLeftBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftBracket)
+	return s.GetTokens(CPPParserLeftBracket)
 }
 
 func (s *AttributeSpecifierContext) LeftBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, i)
+	return s.GetToken(CPPParserLeftBracket, i)
 }
 
 func (s *AttributeSpecifierContext) AllRightBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightBracket)
+	return s.GetTokens(CPPParserRightBracket)
 }
 
 func (s *AttributeSpecifierContext) RightBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, i)
+	return s.GetToken(CPPParserRightBracket, i)
 }
 
 func (s *AttributeSpecifierContext) AttributeList() IAttributeListContext {
@@ -22576,23 +22576,23 @@ func (s *AttributeSpecifierContext) AlignmentSpecifier() IAlignmentSpecifierCont
 }
 
 func (s *AttributeSpecifierContext) AttributeGnu() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAttributeGnu, 0)
+	return s.GetToken(CPPParserAttributeGnu, 0)
 }
 
 func (s *AttributeSpecifierContext) AllLeftParen() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftParen)
+	return s.GetTokens(CPPParserLeftParen)
 }
 
 func (s *AttributeSpecifierContext) LeftParen(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, i)
+	return s.GetToken(CPPParserLeftParen, i)
 }
 
 func (s *AttributeSpecifierContext) AllRightParen() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightParen)
+	return s.GetTokens(CPPParserRightParen)
 }
 
 func (s *AttributeSpecifierContext) RightParen(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, i)
+	return s.GetToken(CPPParserRightParen, i)
 }
 
 func (s *AttributeSpecifierContext) BalancedTokenSeq() IBalancedTokenSeqContext {
@@ -22621,7 +22621,7 @@ func (s *AttributeSpecifierContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *AttributeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttributeSpecifier(s)
 
 	default:
@@ -22629,12 +22629,12 @@ func (s *AttributeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext) {
+func (p *CPPParser) AttributeSpecifier() (localctx IAttributeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 212, CPP14ParserRULE_attributeSpecifier)
+	p.EnterRule(localctx, 212, CPPParserRULE_attributeSpecifier)
 	var _la int
 
 	p.SetState(1411)
@@ -22644,11 +22644,11 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftBracket:
+	case CPPParserLeftBracket:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1395)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22656,7 +22656,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1396)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22669,7 +22669,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserIdentifier {
+		if _la == CPPParserIdentifier {
 			{
 				p.SetState(1397)
 				p.AttributeList()
@@ -22678,7 +22678,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1400)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22686,25 +22686,25 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1401)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserAlignas:
+	case CPPParserAlignas:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1402)
 			p.AlignmentSpecifier()
 		}
 
-	case CPP14ParserAttributeGnu:
+	case CPPParserAttributeGnu:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1403)
-			p.Match(CPP14ParserAttributeGnu)
+			p.Match(CPPParserAttributeGnu)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22712,7 +22712,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1404)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22720,7 +22720,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1405)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22742,7 +22742,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1409)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22750,7 +22750,7 @@ func (p *CPP14Parser) AttributeSpecifier() (localctx IAttributeSpecifierContext)
 		}
 		{
 			p.SetState(1410)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22802,13 +22802,13 @@ type AlignmentSpecifierContext struct {
 func NewEmptyAlignmentSpecifierContext() *AlignmentSpecifierContext {
 	var p = new(AlignmentSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_alignmentSpecifier
+	p.RuleIndex = CPPParserRULE_alignmentSpecifier
 	return p
 }
 
 func InitEmptyAlignmentSpecifierContext(p *AlignmentSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_alignmentSpecifier
+	p.RuleIndex = CPPParserRULE_alignmentSpecifier
 }
 
 func (*AlignmentSpecifierContext) IsAlignmentSpecifierContext() {}
@@ -22819,7 +22819,7 @@ func NewAlignmentSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_alignmentSpecifier
+	p.RuleIndex = CPPParserRULE_alignmentSpecifier
 
 	return p
 }
@@ -22827,15 +22827,15 @@ func NewAlignmentSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *AlignmentSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AlignmentSpecifierContext) Alignas() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAlignas, 0)
+	return s.GetToken(CPPParserAlignas, 0)
 }
 
 func (s *AlignmentSpecifierContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *AlignmentSpecifierContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *AlignmentSpecifierContext) TheTypeId() ITheTypeIdContext {
@@ -22871,7 +22871,7 @@ func (s *AlignmentSpecifierContext) ConstantExpression() IConstantExpressionCont
 }
 
 func (s *AlignmentSpecifierContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *AlignmentSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -22884,7 +22884,7 @@ func (s *AlignmentSpecifierContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *AlignmentSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAlignmentSpecifier(s)
 
 	default:
@@ -22892,18 +22892,18 @@ func (s *AlignmentSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) AlignmentSpecifier() (localctx IAlignmentSpecifierContext) {
+func (p *CPPParser) AlignmentSpecifier() (localctx IAlignmentSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewAlignmentSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 214, CPP14ParserRULE_alignmentSpecifier)
+	p.EnterRule(localctx, 214, CPPParserRULE_alignmentSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1413)
-		p.Match(CPP14ParserAlignas)
+		p.Match(CPPParserAlignas)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22911,7 +22911,7 @@ func (p *CPP14Parser) AlignmentSpecifier() (localctx IAlignmentSpecifierContext)
 	}
 	{
 		p.SetState(1414)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -22946,10 +22946,10 @@ func (p *CPP14Parser) AlignmentSpecifier() (localctx IAlignmentSpecifierContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(1419)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -22959,7 +22959,7 @@ func (p *CPP14Parser) AlignmentSpecifier() (localctx IAlignmentSpecifierContext)
 	}
 	{
 		p.SetState(1422)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -23005,13 +23005,13 @@ type AttributeListContext struct {
 func NewEmptyAttributeListContext() *AttributeListContext {
 	var p = new(AttributeListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeList
+	p.RuleIndex = CPPParserRULE_attributeList
 	return p
 }
 
 func InitEmptyAttributeListContext(p *AttributeListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeList
+	p.RuleIndex = CPPParserRULE_attributeList
 }
 
 func (*AttributeListContext) IsAttributeListContext() {}
@@ -23022,7 +23022,7 @@ func NewAttributeListContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attributeList
+	p.RuleIndex = CPPParserRULE_attributeList
 
 	return p
 }
@@ -23071,15 +23071,15 @@ func (s *AttributeListContext) Attribute(i int) IAttributeContext {
 }
 
 func (s *AttributeListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *AttributeListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *AttributeListContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *AttributeListContext) GetRuleContext() antlr.RuleContext {
@@ -23092,7 +23092,7 @@ func (s *AttributeListContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *AttributeListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttributeList(s)
 
 	default:
@@ -23100,12 +23100,12 @@ func (s *AttributeListContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) AttributeList() (localctx IAttributeListContext) {
+func (p *CPPParser) AttributeList() (localctx IAttributeListContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 216, CPP14ParserRULE_attributeList)
+	p.EnterRule(localctx, 216, CPPParserRULE_attributeList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -23120,10 +23120,10 @@ func (p *CPP14Parser) AttributeList() (localctx IAttributeListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1425)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -23148,10 +23148,10 @@ func (p *CPP14Parser) AttributeList() (localctx IAttributeListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(1432)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -23198,13 +23198,13 @@ type AttributeContext struct {
 func NewEmptyAttributeContext() *AttributeContext {
 	var p = new(AttributeContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attribute
+	p.RuleIndex = CPPParserRULE_attribute
 	return p
 }
 
 func InitEmptyAttributeContext(p *AttributeContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attribute
+	p.RuleIndex = CPPParserRULE_attribute
 }
 
 func (*AttributeContext) IsAttributeContext() {}
@@ -23215,7 +23215,7 @@ func NewAttributeContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attribute
+	p.RuleIndex = CPPParserRULE_attribute
 
 	return p
 }
@@ -23223,7 +23223,7 @@ func NewAttributeContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 func (s *AttributeContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AttributeContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *AttributeContext) AttributeNamespace() IAttributeNamespaceContext {
@@ -23243,7 +23243,7 @@ func (s *AttributeContext) AttributeNamespace() IAttributeNamespaceContext {
 }
 
 func (s *AttributeContext) Doublecolon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDoublecolon, 0)
+	return s.GetToken(CPPParserDoublecolon, 0)
 }
 
 func (s *AttributeContext) AttributeArgumentClause() IAttributeArgumentClauseContext {
@@ -23272,7 +23272,7 @@ func (s *AttributeContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *AttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttribute(s)
 
 	default:
@@ -23280,12 +23280,12 @@ func (s *AttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Attribute() (localctx IAttributeContext) {
+func (p *CPPParser) Attribute() (localctx IAttributeContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 218, CPP14ParserRULE_attribute)
+	p.EnterRule(localctx, 218, CPPParserRULE_attribute)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -23299,7 +23299,7 @@ func (p *CPP14Parser) Attribute() (localctx IAttributeContext) {
 		}
 		{
 			p.SetState(1436)
-			p.Match(CPP14ParserDoublecolon)
+			p.Match(CPPParserDoublecolon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -23311,7 +23311,7 @@ func (p *CPP14Parser) Attribute() (localctx IAttributeContext) {
 	}
 	{
 		p.SetState(1440)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -23324,7 +23324,7 @@ func (p *CPP14Parser) Attribute() (localctx IAttributeContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserLeftParen {
+	if _la == CPPParserLeftParen {
 		{
 			p.SetState(1441)
 			p.AttributeArgumentClause()
@@ -23367,13 +23367,13 @@ type AttributeNamespaceContext struct {
 func NewEmptyAttributeNamespaceContext() *AttributeNamespaceContext {
 	var p = new(AttributeNamespaceContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeNamespace
+	p.RuleIndex = CPPParserRULE_attributeNamespace
 	return p
 }
 
 func InitEmptyAttributeNamespaceContext(p *AttributeNamespaceContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeNamespace
+	p.RuleIndex = CPPParserRULE_attributeNamespace
 }
 
 func (*AttributeNamespaceContext) IsAttributeNamespaceContext() {}
@@ -23384,7 +23384,7 @@ func NewAttributeNamespaceContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attributeNamespace
+	p.RuleIndex = CPPParserRULE_attributeNamespace
 
 	return p
 }
@@ -23392,7 +23392,7 @@ func NewAttributeNamespaceContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *AttributeNamespaceContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AttributeNamespaceContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *AttributeNamespaceContext) GetRuleContext() antlr.RuleContext {
@@ -23405,7 +23405,7 @@ func (s *AttributeNamespaceContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *AttributeNamespaceContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttributeNamespace(s)
 
 	default:
@@ -23413,16 +23413,16 @@ func (s *AttributeNamespaceContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) AttributeNamespace() (localctx IAttributeNamespaceContext) {
+func (p *CPPParser) AttributeNamespace() (localctx IAttributeNamespaceContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeNamespaceContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 220, CPP14ParserRULE_attributeNamespace)
+	p.EnterRule(localctx, 220, CPPParserRULE_attributeNamespace)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1444)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -23466,13 +23466,13 @@ type AttributeArgumentClauseContext struct {
 func NewEmptyAttributeArgumentClauseContext() *AttributeArgumentClauseContext {
 	var p = new(AttributeArgumentClauseContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeArgumentClause
+	p.RuleIndex = CPPParserRULE_attributeArgumentClause
 	return p
 }
 
 func InitEmptyAttributeArgumentClauseContext(p *AttributeArgumentClauseContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_attributeArgumentClause
+	p.RuleIndex = CPPParserRULE_attributeArgumentClause
 }
 
 func (*AttributeArgumentClauseContext) IsAttributeArgumentClauseContext() {}
@@ -23483,7 +23483,7 @@ func NewAttributeArgumentClauseContext(parser antlr.Parser, parent antlr.ParserR
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_attributeArgumentClause
+	p.RuleIndex = CPPParserRULE_attributeArgumentClause
 
 	return p
 }
@@ -23491,11 +23491,11 @@ func NewAttributeArgumentClauseContext(parser antlr.Parser, parent antlr.ParserR
 func (s *AttributeArgumentClauseContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AttributeArgumentClauseContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *AttributeArgumentClauseContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *AttributeArgumentClauseContext) BalancedTokenSeq() IBalancedTokenSeqContext {
@@ -23524,7 +23524,7 @@ func (s *AttributeArgumentClauseContext) ToStringTree(ruleNames []string, recog 
 
 func (s *AttributeArgumentClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAttributeArgumentClause(s)
 
 	default:
@@ -23532,18 +23532,18 @@ func (s *AttributeArgumentClauseContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *CPP14Parser) AttributeArgumentClause() (localctx IAttributeArgumentClauseContext) {
+func (p *CPPParser) AttributeArgumentClause() (localctx IAttributeArgumentClauseContext) {
 	this := p
 	_ = this
 
 	localctx = NewAttributeArgumentClauseContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 222, CPP14ParserRULE_attributeArgumentClause)
+	p.EnterRule(localctx, 222, CPPParserRULE_attributeArgumentClause)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1446)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -23565,7 +23565,7 @@ func (p *CPP14Parser) AttributeArgumentClause() (localctx IAttributeArgumentClau
 	}
 	{
 		p.SetState(1450)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -23608,13 +23608,13 @@ type BalancedTokenSeqContext struct {
 func NewEmptyBalancedTokenSeqContext() *BalancedTokenSeqContext {
 	var p = new(BalancedTokenSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_balancedTokenSeq
+	p.RuleIndex = CPPParserRULE_balancedTokenSeq
 	return p
 }
 
 func InitEmptyBalancedTokenSeqContext(p *BalancedTokenSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_balancedTokenSeq
+	p.RuleIndex = CPPParserRULE_balancedTokenSeq
 }
 
 func (*BalancedTokenSeqContext) IsBalancedTokenSeqContext() {}
@@ -23625,7 +23625,7 @@ func NewBalancedTokenSeqContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_balancedTokenSeq
+	p.RuleIndex = CPPParserRULE_balancedTokenSeq
 
 	return p
 }
@@ -23683,7 +23683,7 @@ func (s *BalancedTokenSeqContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *BalancedTokenSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBalancedTokenSeq(s)
 
 	default:
@@ -23691,12 +23691,12 @@ func (s *BalancedTokenSeqContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) BalancedTokenSeq() (localctx IBalancedTokenSeqContext) {
+func (p *CPPParser) BalancedTokenSeq() (localctx IBalancedTokenSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewBalancedTokenSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 224, CPP14ParserRULE_balancedTokenSeq)
+	p.EnterRule(localctx, 224, CPPParserRULE_balancedTokenSeq)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -23768,13 +23768,13 @@ type BalancedTokenContext struct {
 func NewEmptyBalancedTokenContext() *BalancedTokenContext {
 	var p = new(BalancedTokenContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_balancedToken
+	p.RuleIndex = CPPParserRULE_balancedToken
 	return p
 }
 
 func InitEmptyBalancedTokenContext(p *BalancedTokenContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_balancedToken
+	p.RuleIndex = CPPParserRULE_balancedToken
 }
 
 func (*BalancedTokenContext) IsBalancedTokenContext() {}
@@ -23785,7 +23785,7 @@ func NewBalancedTokenContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_balancedToken
+	p.RuleIndex = CPPParserRULE_balancedToken
 
 	return p
 }
@@ -23793,11 +23793,11 @@ func NewBalancedTokenContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *BalancedTokenContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *BalancedTokenContext) AllLeftParen() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftParen)
+	return s.GetTokens(CPPParserLeftParen)
 }
 
 func (s *BalancedTokenContext) LeftParen(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, i)
+	return s.GetToken(CPPParserLeftParen, i)
 }
 
 func (s *BalancedTokenContext) BalancedTokenSeq() IBalancedTokenSeqContext {
@@ -23817,43 +23817,43 @@ func (s *BalancedTokenContext) BalancedTokenSeq() IBalancedTokenSeqContext {
 }
 
 func (s *BalancedTokenContext) AllRightParen() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightParen)
+	return s.GetTokens(CPPParserRightParen)
 }
 
 func (s *BalancedTokenContext) RightParen(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, i)
+	return s.GetToken(CPPParserRightParen, i)
 }
 
 func (s *BalancedTokenContext) AllLeftBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftBracket)
+	return s.GetTokens(CPPParserLeftBracket)
 }
 
 func (s *BalancedTokenContext) LeftBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, i)
+	return s.GetToken(CPPParserLeftBracket, i)
 }
 
 func (s *BalancedTokenContext) AllRightBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightBracket)
+	return s.GetTokens(CPPParserRightBracket)
 }
 
 func (s *BalancedTokenContext) RightBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, i)
+	return s.GetToken(CPPParserRightBracket, i)
 }
 
 func (s *BalancedTokenContext) AllLeftBrace() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftBrace)
+	return s.GetTokens(CPPParserLeftBrace)
 }
 
 func (s *BalancedTokenContext) LeftBrace(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, i)
+	return s.GetToken(CPPParserLeftBrace, i)
 }
 
 func (s *BalancedTokenContext) AllRightBrace() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightBrace)
+	return s.GetTokens(CPPParserRightBrace)
 }
 
 func (s *BalancedTokenContext) RightBrace(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, i)
+	return s.GetToken(CPPParserRightBrace, i)
 }
 
 func (s *BalancedTokenContext) GetRuleContext() antlr.RuleContext {
@@ -23866,7 +23866,7 @@ func (s *BalancedTokenContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *BalancedTokenContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBalancedToken(s)
 
 	default:
@@ -23874,12 +23874,12 @@ func (s *BalancedTokenContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) BalancedToken() (localctx IBalancedTokenContext) {
+func (p *CPPParser) BalancedToken() (localctx IBalancedTokenContext) {
 	this := p
 	_ = this
 
 	localctx = NewBalancedTokenContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 226, CPP14ParserRULE_balancedToken)
+	p.EnterRule(localctx, 226, CPPParserRULE_balancedToken)
 	var _la int
 
 	var _alt int
@@ -23891,11 +23891,11 @@ func (p *CPP14Parser) BalancedToken() (localctx IBalancedTokenContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1457)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -23907,18 +23907,18 @@ func (p *CPP14Parser) BalancedToken() (localctx IBalancedTokenContext) {
 		}
 		{
 			p.SetState(1459)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserLeftBracket:
+	case CPPParserLeftBracket:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1461)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -23930,18 +23930,18 @@ func (p *CPP14Parser) BalancedToken() (localctx IBalancedTokenContext) {
 		}
 		{
 			p.SetState(1463)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1465)
-			p.Match(CPP14ParserLeftBrace)
+			p.Match(CPPParserLeftBrace)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -23953,14 +23953,14 @@ func (p *CPP14Parser) BalancedToken() (localctx IBalancedTokenContext) {
 		}
 		{
 			p.SetState(1467)
-			p.Match(CPP14ParserRightBrace)
+			p.Match(CPPParserRightBrace)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserIntegerLiteral, CPP14ParserCharacterLiteral, CPP14ParserFloatingLiteral, CPP14ParserStringLiteral, CPP14ParserBooleanLiteral, CPP14ParserPointerLiteral, CPP14ParserUserDefinedLiteral, CPP14ParserMultiLineMacro, CPP14ParserDirective, CPP14ParserAlignas, CPP14ParserAlignof, CPP14ParserAsm, CPP14ParserAuto, CPP14ParserBool, CPP14ParserBreak, CPP14ParserCase, CPP14ParserCatch, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserClass, CPP14ParserConst, CPP14ParserConstexpr, CPP14ParserConst_cast, CPP14ParserContinue, CPP14ParserDecltype, CPP14ParserDefault, CPP14ParserDelete, CPP14ParserDo, CPP14ParserDouble, CPP14ParserDynamic_cast, CPP14ParserElse, CPP14ParserEnum, CPP14ParserExplicit, CPP14ParserExport, CPP14ParserExtern, CPP14ParserFalse_, CPP14ParserFinal, CPP14ParserFloat, CPP14ParserFor, CPP14ParserFriend, CPP14ParserGoto, CPP14ParserIf, CPP14ParserInline, CPP14ParserInt, CPP14ParserLong, CPP14ParserMutable, CPP14ParserNamespace, CPP14ParserNew, CPP14ParserNoexcept, CPP14ParserNullptr, CPP14ParserOperator, CPP14ParserOverride, CPP14ParserPrivate, CPP14ParserProtected, CPP14ParserPublic, CPP14ParserRegister, CPP14ParserReinterpret_cast, CPP14ParserReturn, CPP14ParserShort, CPP14ParserSigned, CPP14ParserSizeof, CPP14ParserStatic, CPP14ParserStatic_assert, CPP14ParserStatic_cast, CPP14ParserStruct, CPP14ParserSwitch, CPP14ParserTemplate, CPP14ParserThis, CPP14ParserThread_local, CPP14ParserThrow, CPP14ParserTrue_, CPP14ParserTry, CPP14ParserTypedef, CPP14ParserTypeid_, CPP14ParserTypename_, CPP14ParserUnion, CPP14ParserUnsigned, CPP14ParserUsing, CPP14ParserVirtual, CPP14ParserVoid, CPP14ParserVolatile, CPP14ParserWchar, CPP14ParserWhile, CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserDiv, CPP14ParserMod, CPP14ParserCaret, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot, CPP14ParserAssign, CPP14ParserLess, CPP14ParserGreater, CPP14ParserPlusAssign, CPP14ParserMinusAssign, CPP14ParserStarAssign, CPP14ParserDivAssign, CPP14ParserModAssign, CPP14ParserXorAssign, CPP14ParserAndAssign, CPP14ParserOrAssign, CPP14ParserLeftShiftAssign, CPP14ParserRightShiftAssign, CPP14ParserEqual, CPP14ParserNotEqual, CPP14ParserLessEqual, CPP14ParserGreaterEqual, CPP14ParserAndAnd, CPP14ParserOrOr, CPP14ParserPlusPlus, CPP14ParserMinusMinus, CPP14ParserComma, CPP14ParserArrowStar, CPP14ParserArrow, CPP14ParserQuestion, CPP14ParserColon, CPP14ParserDoublecolon, CPP14ParserSemi, CPP14ParserDot, CPP14ParserDotStar, CPP14ParserEllipsis, CPP14ParserAttributeGnu, CPP14ParserIdentifier, CPP14ParserDecimalLiteral, CPP14ParserOctalLiteral, CPP14ParserHexadecimalLiteral, CPP14ParserBinaryLiteral, CPP14ParserIntegersuffix, CPP14ParserUserDefinedIntegerLiteral, CPP14ParserUserDefinedFloatingLiteral, CPP14ParserUserDefinedStringLiteral, CPP14ParserUserDefinedCharacterLiteral, CPP14ParserWhitespace, CPP14ParserNewline, CPP14ParserBlockComment, CPP14ParserLineComment:
+	case CPPParserIntegerLiteral, CPPParserCharacterLiteral, CPPParserFloatingLiteral, CPPParserStringLiteral, CPPParserBooleanLiteral, CPPParserPointerLiteral, CPPParserUserDefinedLiteral, CPPParserMultiLineMacro, CPPParserDirective, CPPParserAlignas, CPPParserAlignof, CPPParserAsm, CPPParserAuto, CPPParserBool, CPPParserBreak, CPPParserCase, CPPParserCatch, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserClass, CPPParserConst, CPPParserConstexpr, CPPParserConst_cast, CPPParserContinue, CPPParserDecltype, CPPParserDefault, CPPParserDelete, CPPParserDo, CPPParserDouble, CPPParserDynamic_cast, CPPParserElse, CPPParserEnum, CPPParserExplicit, CPPParserExport, CPPParserExtern, CPPParserFalse_, CPPParserFinal, CPPParserFloat, CPPParserFor, CPPParserFriend, CPPParserGoto, CPPParserIf, CPPParserInline, CPPParserInt, CPPParserLong, CPPParserMutable, CPPParserNamespace, CPPParserNew, CPPParserNoexcept, CPPParserNullptr, CPPParserOperator, CPPParserOverride, CPPParserPrivate, CPPParserProtected, CPPParserPublic, CPPParserRegister, CPPParserReinterpret_cast, CPPParserReturn, CPPParserShort, CPPParserSigned, CPPParserSizeof, CPPParserStatic, CPPParserStatic_assert, CPPParserStatic_cast, CPPParserStruct, CPPParserSwitch, CPPParserTemplate, CPPParserThis, CPPParserThread_local, CPPParserThrow, CPPParserTrue_, CPPParserTry, CPPParserTypedef, CPPParserTypeid_, CPPParserTypename_, CPPParserUnion, CPPParserUnsigned, CPPParserUsing, CPPParserVirtual, CPPParserVoid, CPPParserVolatile, CPPParserWchar, CPPParserWhile, CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserDiv, CPPParserMod, CPPParserCaret, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot, CPPParserAssign, CPPParserLess, CPPParserGreater, CPPParserPlusAssign, CPPParserMinusAssign, CPPParserStarAssign, CPPParserDivAssign, CPPParserModAssign, CPPParserXorAssign, CPPParserAndAssign, CPPParserOrAssign, CPPParserLeftShiftAssign, CPPParserRightShiftAssign, CPPParserEqual, CPPParserNotEqual, CPPParserLessEqual, CPPParserGreaterEqual, CPPParserAndAnd, CPPParserOrOr, CPPParserPlusPlus, CPPParserMinusMinus, CPPParserComma, CPPParserArrowStar, CPPParserArrow, CPPParserQuestion, CPPParserColon, CPPParserDoublecolon, CPPParserSemi, CPPParserDot, CPPParserDotStar, CPPParserEllipsis, CPPParserAttributeGnu, CPPParserIdentifier, CPPParserDecimalLiteral, CPPParserOctalLiteral, CPPParserHexadecimalLiteral, CPPParserBinaryLiteral, CPPParserIntegersuffix, CPPParserUserDefinedIntegerLiteral, CPPParserUserDefinedFloatingLiteral, CPPParserUserDefinedStringLiteral, CPPParserUserDefinedCharacterLiteral, CPPParserWhitespace, CPPParserNewline, CPPParserBlockComment, CPPParserLineComment:
 		p.EnterOuterAlt(localctx, 4)
 		p.SetState(1470)
 		p.GetErrorHandler().Sync(p)
@@ -24039,13 +24039,13 @@ type InitDeclaratorListContext struct {
 func NewEmptyInitDeclaratorListContext() *InitDeclaratorListContext {
 	var p = new(InitDeclaratorListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initDeclaratorList
+	p.RuleIndex = CPPParserRULE_initDeclaratorList
 	return p
 }
 
 func InitEmptyInitDeclaratorListContext(p *InitDeclaratorListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initDeclaratorList
+	p.RuleIndex = CPPParserRULE_initDeclaratorList
 }
 
 func (*InitDeclaratorListContext) IsInitDeclaratorListContext() {}
@@ -24056,7 +24056,7 @@ func NewInitDeclaratorListContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_initDeclaratorList
+	p.RuleIndex = CPPParserRULE_initDeclaratorList
 
 	return p
 }
@@ -24105,11 +24105,11 @@ func (s *InitDeclaratorListContext) InitDeclarator(i int) IInitDeclaratorContext
 }
 
 func (s *InitDeclaratorListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *InitDeclaratorListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *InitDeclaratorListContext) GetRuleContext() antlr.RuleContext {
@@ -24122,7 +24122,7 @@ func (s *InitDeclaratorListContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *InitDeclaratorListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInitDeclaratorList(s)
 
 	default:
@@ -24130,12 +24130,12 @@ func (s *InitDeclaratorListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) InitDeclaratorList() (localctx IInitDeclaratorListContext) {
+func (p *CPPParser) InitDeclaratorList() (localctx IInitDeclaratorListContext) {
 	this := p
 	_ = this
 
 	localctx = NewInitDeclaratorListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 228, CPP14ParserRULE_initDeclaratorList)
+	p.EnterRule(localctx, 228, CPPParserRULE_initDeclaratorList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -24150,10 +24150,10 @@ func (p *CPP14Parser) InitDeclaratorList() (localctx IInitDeclaratorListContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1477)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -24208,13 +24208,13 @@ type InitDeclaratorContext struct {
 func NewEmptyInitDeclaratorContext() *InitDeclaratorContext {
 	var p = new(InitDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initDeclarator
+	p.RuleIndex = CPPParserRULE_initDeclarator
 	return p
 }
 
 func InitEmptyInitDeclaratorContext(p *InitDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initDeclarator
+	p.RuleIndex = CPPParserRULE_initDeclarator
 }
 
 func (*InitDeclaratorContext) IsInitDeclaratorContext() {}
@@ -24225,7 +24225,7 @@ func NewInitDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_initDeclarator
+	p.RuleIndex = CPPParserRULE_initDeclarator
 
 	return p
 }
@@ -24274,7 +24274,7 @@ func (s *InitDeclaratorContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *InitDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInitDeclarator(s)
 
 	default:
@@ -24282,12 +24282,12 @@ func (s *InitDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) InitDeclarator() (localctx IInitDeclaratorContext) {
+func (p *CPPParser) InitDeclarator() (localctx IInitDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewInitDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 230, CPP14ParserRULE_initDeclarator)
+	p.EnterRule(localctx, 230, CPPParserRULE_initDeclarator)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -24348,13 +24348,13 @@ type DeclaratorContext struct {
 func NewEmptyDeclaratorContext() *DeclaratorContext {
 	var p = new(DeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declarator
+	p.RuleIndex = CPPParserRULE_declarator
 	return p
 }
 
 func InitEmptyDeclaratorContext(p *DeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declarator
+	p.RuleIndex = CPPParserRULE_declarator
 }
 
 func (*DeclaratorContext) IsDeclaratorContext() {}
@@ -24365,7 +24365,7 @@ func NewDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declarator
+	p.RuleIndex = CPPParserRULE_declarator
 
 	return p
 }
@@ -24446,7 +24446,7 @@ func (s *DeclaratorContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *DeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclarator(s)
 
 	default:
@@ -24454,12 +24454,12 @@ func (s *DeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Declarator() (localctx IDeclaratorContext) {
+func (p *CPPParser) Declarator() (localctx IDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 232, CPP14ParserRULE_declarator)
+	p.EnterRule(localctx, 232, CPPParserRULE_declarator)
 	p.SetState(1493)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -24532,13 +24532,13 @@ type PointerDeclaratorContext struct {
 func NewEmptyPointerDeclaratorContext() *PointerDeclaratorContext {
 	var p = new(PointerDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerDeclarator
+	p.RuleIndex = CPPParserRULE_pointerDeclarator
 	return p
 }
 
 func InitEmptyPointerDeclaratorContext(p *PointerDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerDeclarator
+	p.RuleIndex = CPPParserRULE_pointerDeclarator
 }
 
 func (*PointerDeclaratorContext) IsPointerDeclaratorContext() {}
@@ -24549,7 +24549,7 @@ func NewPointerDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_pointerDeclarator
+	p.RuleIndex = CPPParserRULE_pointerDeclarator
 
 	return p
 }
@@ -24614,11 +24614,11 @@ func (s *PointerDeclaratorContext) PointerOperator(i int) IPointerOperatorContex
 }
 
 func (s *PointerDeclaratorContext) AllConst() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserConst)
+	return s.GetTokens(CPPParserConst)
 }
 
 func (s *PointerDeclaratorContext) Const(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserConst, i)
+	return s.GetToken(CPPParserConst, i)
 }
 
 func (s *PointerDeclaratorContext) GetRuleContext() antlr.RuleContext {
@@ -24631,7 +24631,7 @@ func (s *PointerDeclaratorContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *PointerDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPointerDeclarator(s)
 
 	default:
@@ -24639,12 +24639,12 @@ func (s *PointerDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) PointerDeclarator() (localctx IPointerDeclaratorContext) {
+func (p *CPPParser) PointerDeclarator() (localctx IPointerDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewPointerDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 234, CPP14ParserRULE_pointerDeclarator)
+	p.EnterRule(localctx, 234, CPPParserRULE_pointerDeclarator)
 	var _la int
 
 	var _alt int
@@ -24672,10 +24672,10 @@ func (p *CPP14Parser) PointerDeclarator() (localctx IPointerDeclaratorContext) {
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == CPP14ParserConst {
+			if _la == CPPParserConst {
 				{
 					p.SetState(1496)
-					p.Match(CPP14ParserConst)
+					p.Match(CPPParserConst)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -24744,13 +24744,13 @@ type NoPointerDeclaratorContext struct {
 func NewEmptyNoPointerDeclaratorContext() *NoPointerDeclaratorContext {
 	var p = new(NoPointerDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerDeclarator
 	return p
 }
 
 func InitEmptyNoPointerDeclaratorContext(p *NoPointerDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerDeclarator
 }
 
 func (*NoPointerDeclaratorContext) IsNoPointerDeclaratorContext() {}
@@ -24761,7 +24761,7 @@ func NewNoPointerDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_noPointerDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerDeclarator
 
 	return p
 }
@@ -24801,7 +24801,7 @@ func (s *NoPointerDeclaratorContext) AttributeSpecifierSeq() IAttributeSpecifier
 }
 
 func (s *NoPointerDeclaratorContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NoPointerDeclaratorContext) PointerDeclarator() IPointerDeclaratorContext {
@@ -24821,7 +24821,7 @@ func (s *NoPointerDeclaratorContext) PointerDeclarator() IPointerDeclaratorConte
 }
 
 func (s *NoPointerDeclaratorContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NoPointerDeclaratorContext) NoPointerDeclarator() INoPointerDeclaratorContext {
@@ -24857,11 +24857,11 @@ func (s *NoPointerDeclaratorContext) ParametersAndQualifiers() IParametersAndQua
 }
 
 func (s *NoPointerDeclaratorContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *NoPointerDeclaratorContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *NoPointerDeclaratorContext) ConstantExpression() IConstantExpressionContext {
@@ -24890,7 +24890,7 @@ func (s *NoPointerDeclaratorContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *NoPointerDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNoPointerDeclarator(s)
 
 	default:
@@ -24898,11 +24898,11 @@ func (s *NoPointerDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) NoPointerDeclarator() (localctx INoPointerDeclaratorContext) {
+func (p *CPPParser) NoPointerDeclarator() (localctx INoPointerDeclaratorContext) {
 	return p.noPointerDeclarator(0)
 }
 
-func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclaratorContext) {
+func (p *CPPParser) noPointerDeclarator(_p int) (localctx INoPointerDeclaratorContext) {
 	this := p
 	_ = this
 
@@ -24913,7 +24913,7 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 	var _prevctx INoPointerDeclaratorContext = localctx
 	var _ antlr.ParserRuleContext = _prevctx // TODO: To prevent unused variable warning.
 	_startState := 236
-	p.EnterRecursionRule(localctx, 236, CPP14ParserRULE_noPointerDeclarator, _p)
+	p.EnterRecursionRule(localctx, 236, CPPParserRULE_noPointerDeclarator, _p)
 	var _la int
 
 	var _alt int
@@ -24926,7 +24926,7 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserDecltype, CPP14ParserOperator, CPP14ParserTilde, CPP14ParserDoublecolon, CPP14ParserEllipsis, CPP14ParserIdentifier:
+	case CPPParserDecltype, CPPParserOperator, CPPParserTilde, CPPParserDoublecolon, CPPParserEllipsis, CPPParserIdentifier:
 		{
 			p.SetState(1507)
 			p.DeclaratorId()
@@ -24944,10 +24944,10 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 			goto errorExit
 		}
 
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		{
 			p.SetState(1511)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -24959,7 +24959,7 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 		}
 		{
 			p.SetState(1513)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -24987,7 +24987,7 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 			}
 			_prevctx = localctx
 			localctx = NewNoPointerDeclaratorContext(p, _parentctx, _parentState)
-			p.PushNewRecursionContext(localctx, _startState, CPP14ParserRULE_noPointerDeclarator)
+			p.PushNewRecursionContext(localctx, _startState, CPPParserRULE_noPointerDeclarator)
 			p.SetState(1517)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 2)) {
@@ -25001,16 +25001,16 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 			}
 
 			switch p.GetTokenStream().LA(1) {
-			case CPP14ParserLeftParen:
+			case CPPParserLeftParen:
 				{
 					p.SetState(1518)
 					p.ParametersAndQualifiers()
 				}
 
-			case CPP14ParserLeftBracket:
+			case CPPParserLeftBracket:
 				{
 					p.SetState(1519)
-					p.Match(CPP14ParserLeftBracket)
+					p.Match(CPPParserLeftBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -25023,7 +25023,7 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 				}
 				_la = p.GetTokenStream().LA(1)
 
-				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPP14ParserIdentifier {
+				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPPParserIdentifier {
 					{
 						p.SetState(1520)
 						p.ConstantExpression()
@@ -25032,7 +25032,7 @@ func (p *CPP14Parser) noPointerDeclarator(_p int) (localctx INoPointerDeclarator
 				}
 				{
 					p.SetState(1523)
-					p.Match(CPP14ParserRightBracket)
+					p.Match(CPPParserRightBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -25109,13 +25109,13 @@ type ParametersAndQualifiersContext struct {
 func NewEmptyParametersAndQualifiersContext() *ParametersAndQualifiersContext {
 	var p = new(ParametersAndQualifiersContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parametersAndQualifiers
+	p.RuleIndex = CPPParserRULE_parametersAndQualifiers
 	return p
 }
 
 func InitEmptyParametersAndQualifiersContext(p *ParametersAndQualifiersContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parametersAndQualifiers
+	p.RuleIndex = CPPParserRULE_parametersAndQualifiers
 }
 
 func (*ParametersAndQualifiersContext) IsParametersAndQualifiersContext() {}
@@ -25126,7 +25126,7 @@ func NewParametersAndQualifiersContext(parser antlr.Parser, parent antlr.ParserR
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_parametersAndQualifiers
+	p.RuleIndex = CPPParserRULE_parametersAndQualifiers
 
 	return p
 }
@@ -25134,11 +25134,11 @@ func NewParametersAndQualifiersContext(parser antlr.Parser, parent antlr.ParserR
 func (s *ParametersAndQualifiersContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ParametersAndQualifiersContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *ParametersAndQualifiersContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *ParametersAndQualifiersContext) ParameterDeclarationClause() IParameterDeclarationClauseContext {
@@ -25231,7 +25231,7 @@ func (s *ParametersAndQualifiersContext) ToStringTree(ruleNames []string, recog 
 
 func (s *ParametersAndQualifiersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitParametersAndQualifiers(s)
 
 	default:
@@ -25239,18 +25239,18 @@ func (s *ParametersAndQualifiersContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *CPP14Parser) ParametersAndQualifiers() (localctx IParametersAndQualifiersContext) {
+func (p *CPPParser) ParametersAndQualifiers() (localctx IParametersAndQualifiersContext) {
 	this := p
 	_ = this
 
 	localctx = NewParametersAndQualifiersContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 238, CPP14ParserRULE_parametersAndQualifiers)
+	p.EnterRule(localctx, 238, CPPParserRULE_parametersAndQualifiers)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1534)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -25272,7 +25272,7 @@ func (p *CPP14Parser) ParametersAndQualifiers() (localctx IParametersAndQualifie
 	}
 	{
 		p.SetState(1538)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -25364,13 +25364,13 @@ type TrailingReturnTypeContext struct {
 func NewEmptyTrailingReturnTypeContext() *TrailingReturnTypeContext {
 	var p = new(TrailingReturnTypeContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_trailingReturnType
+	p.RuleIndex = CPPParserRULE_trailingReturnType
 	return p
 }
 
 func InitEmptyTrailingReturnTypeContext(p *TrailingReturnTypeContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_trailingReturnType
+	p.RuleIndex = CPPParserRULE_trailingReturnType
 }
 
 func (*TrailingReturnTypeContext) IsTrailingReturnTypeContext() {}
@@ -25381,7 +25381,7 @@ func NewTrailingReturnTypeContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_trailingReturnType
+	p.RuleIndex = CPPParserRULE_trailingReturnType
 
 	return p
 }
@@ -25389,7 +25389,7 @@ func NewTrailingReturnTypeContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *TrailingReturnTypeContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TrailingReturnTypeContext) Arrow() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserArrow, 0)
+	return s.GetToken(CPPParserArrow, 0)
 }
 
 func (s *TrailingReturnTypeContext) TrailingTypeSpecifierSeq() ITrailingTypeSpecifierSeqContext {
@@ -25434,7 +25434,7 @@ func (s *TrailingReturnTypeContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *TrailingReturnTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTrailingReturnType(s)
 
 	default:
@@ -25442,16 +25442,16 @@ func (s *TrailingReturnTypeContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) TrailingReturnType() (localctx ITrailingReturnTypeContext) {
+func (p *CPPParser) TrailingReturnType() (localctx ITrailingReturnTypeContext) {
 	this := p
 	_ = this
 
 	localctx = NewTrailingReturnTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 240, CPP14ParserRULE_trailingReturnType)
+	p.EnterRule(localctx, 240, CPPParserRULE_trailingReturnType)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1551)
-		p.Match(CPP14ParserArrow)
+		p.Match(CPPParserArrow)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -25514,13 +25514,13 @@ type PointerOperatorContext struct {
 func NewEmptyPointerOperatorContext() *PointerOperatorContext {
 	var p = new(PointerOperatorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerOperator
+	p.RuleIndex = CPPParserRULE_pointerOperator
 	return p
 }
 
 func InitEmptyPointerOperatorContext(p *PointerOperatorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerOperator
+	p.RuleIndex = CPPParserRULE_pointerOperator
 }
 
 func (*PointerOperatorContext) IsPointerOperatorContext() {}
@@ -25531,7 +25531,7 @@ func NewPointerOperatorContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_pointerOperator
+	p.RuleIndex = CPPParserRULE_pointerOperator
 
 	return p
 }
@@ -25539,11 +25539,11 @@ func NewPointerOperatorContext(parser antlr.Parser, parent antlr.ParserRuleConte
 func (s *PointerOperatorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *PointerOperatorContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *PointerOperatorContext) AndAnd() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAnd, 0)
+	return s.GetToken(CPPParserAndAnd, 0)
 }
 
 func (s *PointerOperatorContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -25563,7 +25563,7 @@ func (s *PointerOperatorContext) AttributeSpecifierSeq() IAttributeSpecifierSeqC
 }
 
 func (s *PointerOperatorContext) Star() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStar, 0)
+	return s.GetToken(CPPParserStar, 0)
 }
 
 func (s *PointerOperatorContext) NestedNameSpecifier() INestedNameSpecifierContext {
@@ -25608,7 +25608,7 @@ func (s *PointerOperatorContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *PointerOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPointerOperator(s)
 
 	default:
@@ -25616,12 +25616,12 @@ func (s *PointerOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) PointerOperator() (localctx IPointerOperatorContext) {
+func (p *CPPParser) PointerOperator() (localctx IPointerOperatorContext) {
 	this := p
 	_ = this
 
 	localctx = NewPointerOperatorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 242, CPP14ParserRULE_pointerOperator)
+	p.EnterRule(localctx, 242, CPPParserRULE_pointerOperator)
 	var _la int
 
 	p.SetState(1570)
@@ -25631,13 +25631,13 @@ func (p *CPP14Parser) PointerOperator() (localctx IPointerOperatorContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserAnd, CPP14ParserAndAnd:
+	case CPPParserAnd, CPPParserAndAnd:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1556)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == CPP14ParserAnd || _la == CPP14ParserAndAnd) {
+			if !(_la == CPPParserAnd || _la == CPPParserAndAnd) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -25657,7 +25657,7 @@ func (p *CPP14Parser) PointerOperator() (localctx IPointerOperatorContext) {
 			goto errorExit
 		}
 
-	case CPP14ParserDecltype, CPP14ParserStar, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserDecltype, CPPParserStar, CPPParserDoublecolon, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(1561)
 		p.GetErrorHandler().Sync(p)
@@ -25666,7 +25666,7 @@ func (p *CPP14Parser) PointerOperator() (localctx IPointerOperatorContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserDecltype || _la == CPP14ParserDoublecolon || _la == CPP14ParserIdentifier {
+		if _la == CPPParserDecltype || _la == CPPParserDoublecolon || _la == CPPParserIdentifier {
 			{
 				p.SetState(1560)
 				p.nestedNameSpecifier(0)
@@ -25675,7 +25675,7 @@ func (p *CPP14Parser) PointerOperator() (localctx IPointerOperatorContext) {
 		}
 		{
 			p.SetState(1563)
-			p.Match(CPP14ParserStar)
+			p.Match(CPPParserStar)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -25747,13 +25747,13 @@ type CvQualifierSeqContext struct {
 func NewEmptyCvQualifierSeqContext() *CvQualifierSeqContext {
 	var p = new(CvQualifierSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_cvQualifierSeq
+	p.RuleIndex = CPPParserRULE_cvQualifierSeq
 	return p
 }
 
 func InitEmptyCvQualifierSeqContext(p *CvQualifierSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_cvQualifierSeq
+	p.RuleIndex = CPPParserRULE_cvQualifierSeq
 }
 
 func (*CvQualifierSeqContext) IsCvQualifierSeqContext() {}
@@ -25764,7 +25764,7 @@ func NewCvQualifierSeqContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_cvQualifierSeq
+	p.RuleIndex = CPPParserRULE_cvQualifierSeq
 
 	return p
 }
@@ -25822,7 +25822,7 @@ func (s *CvQualifierSeqContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *CvQualifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCvQualifierSeq(s)
 
 	default:
@@ -25830,12 +25830,12 @@ func (s *CvQualifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) CvQualifierSeq() (localctx ICvQualifierSeqContext) {
+func (p *CPPParser) CvQualifierSeq() (localctx ICvQualifierSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewCvQualifierSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 244, CPP14ParserRULE_cvQualifierSeq)
+	p.EnterRule(localctx, 244, CPPParserRULE_cvQualifierSeq)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -25902,13 +25902,13 @@ type CvQualifierContext struct {
 func NewEmptyCvQualifierContext() *CvQualifierContext {
 	var p = new(CvQualifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_cvQualifier
+	p.RuleIndex = CPPParserRULE_cvQualifier
 	return p
 }
 
 func InitEmptyCvQualifierContext(p *CvQualifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_cvQualifier
+	p.RuleIndex = CPPParserRULE_cvQualifier
 }
 
 func (*CvQualifierContext) IsCvQualifierContext() {}
@@ -25919,7 +25919,7 @@ func NewCvQualifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_cvQualifier
+	p.RuleIndex = CPPParserRULE_cvQualifier
 
 	return p
 }
@@ -25927,11 +25927,11 @@ func NewCvQualifierContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 func (s *CvQualifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *CvQualifierContext) Const() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserConst, 0)
+	return s.GetToken(CPPParserConst, 0)
 }
 
 func (s *CvQualifierContext) Volatile() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserVolatile, 0)
+	return s.GetToken(CPPParserVolatile, 0)
 }
 
 func (s *CvQualifierContext) GetRuleContext() antlr.RuleContext {
@@ -25944,7 +25944,7 @@ func (s *CvQualifierContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *CvQualifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitCvQualifier(s)
 
 	default:
@@ -25952,12 +25952,12 @@ func (s *CvQualifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) CvQualifier() (localctx ICvQualifierContext) {
+func (p *CPPParser) CvQualifier() (localctx ICvQualifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewCvQualifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 246, CPP14ParserRULE_cvQualifier)
+	p.EnterRule(localctx, 246, CPPParserRULE_cvQualifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -25965,7 +25965,7 @@ func (p *CPP14Parser) CvQualifier() (localctx ICvQualifierContext) {
 		p.SetState(1577)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserConst || _la == CPP14ParserVolatile) {
+		if !(_la == CPPParserConst || _la == CPPParserVolatile) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -26009,13 +26009,13 @@ type RefQualifierContext struct {
 func NewEmptyRefQualifierContext() *RefQualifierContext {
 	var p = new(RefQualifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_refQualifier
+	p.RuleIndex = CPPParserRULE_refQualifier
 	return p
 }
 
 func InitEmptyRefQualifierContext(p *RefQualifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_refQualifier
+	p.RuleIndex = CPPParserRULE_refQualifier
 }
 
 func (*RefQualifierContext) IsRefQualifierContext() {}
@@ -26026,7 +26026,7 @@ func NewRefQualifierContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_refQualifier
+	p.RuleIndex = CPPParserRULE_refQualifier
 
 	return p
 }
@@ -26034,11 +26034,11 @@ func NewRefQualifierContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 func (s *RefQualifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *RefQualifierContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *RefQualifierContext) AndAnd() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAnd, 0)
+	return s.GetToken(CPPParserAndAnd, 0)
 }
 
 func (s *RefQualifierContext) GetRuleContext() antlr.RuleContext {
@@ -26051,7 +26051,7 @@ func (s *RefQualifierContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *RefQualifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitRefQualifier(s)
 
 	default:
@@ -26059,12 +26059,12 @@ func (s *RefQualifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) RefQualifier() (localctx IRefQualifierContext) {
+func (p *CPPParser) RefQualifier() (localctx IRefQualifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewRefQualifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 248, CPP14ParserRULE_refQualifier)
+	p.EnterRule(localctx, 248, CPPParserRULE_refQualifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -26072,7 +26072,7 @@ func (p *CPP14Parser) RefQualifier() (localctx IRefQualifierContext) {
 		p.SetState(1579)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserAnd || _la == CPP14ParserAndAnd) {
+		if !(_la == CPPParserAnd || _la == CPPParserAndAnd) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -26116,13 +26116,13 @@ type DeclaratorIdContext struct {
 func NewEmptyDeclaratorIdContext() *DeclaratorIdContext {
 	var p = new(DeclaratorIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declaratorId
+	p.RuleIndex = CPPParserRULE_declaratorId
 	return p
 }
 
 func InitEmptyDeclaratorIdContext(p *DeclaratorIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_declaratorId
+	p.RuleIndex = CPPParserRULE_declaratorId
 }
 
 func (*DeclaratorIdContext) IsDeclaratorIdContext() {}
@@ -26133,7 +26133,7 @@ func NewDeclaratorIdContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_declaratorId
+	p.RuleIndex = CPPParserRULE_declaratorId
 
 	return p
 }
@@ -26157,7 +26157,7 @@ func (s *DeclaratorIdContext) IdExpression() IIdExpressionContext {
 }
 
 func (s *DeclaratorIdContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *DeclaratorIdContext) GetRuleContext() antlr.RuleContext {
@@ -26170,7 +26170,7 @@ func (s *DeclaratorIdContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *DeclaratorIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDeclaratorId(s)
 
 	default:
@@ -26178,12 +26178,12 @@ func (s *DeclaratorIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) DeclaratorId() (localctx IDeclaratorIdContext) {
+func (p *CPPParser) DeclaratorId() (localctx IDeclaratorIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewDeclaratorIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 250, CPP14ParserRULE_declaratorId)
+	p.EnterRule(localctx, 250, CPPParserRULE_declaratorId)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -26194,10 +26194,10 @@ func (p *CPP14Parser) DeclaratorId() (localctx IDeclaratorIdContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(1581)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -26246,13 +26246,13 @@ type TheTypeIdContext struct {
 func NewEmptyTheTypeIdContext() *TheTypeIdContext {
 	var p = new(TheTypeIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_theTypeId
+	p.RuleIndex = CPPParserRULE_theTypeId
 	return p
 }
 
 func InitEmptyTheTypeIdContext(p *TheTypeIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_theTypeId
+	p.RuleIndex = CPPParserRULE_theTypeId
 }
 
 func (*TheTypeIdContext) IsTheTypeIdContext() {}
@@ -26263,7 +26263,7 @@ func NewTheTypeIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_theTypeId
+	p.RuleIndex = CPPParserRULE_theTypeId
 
 	return p
 }
@@ -26312,7 +26312,7 @@ func (s *TheTypeIdContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *TheTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTheTypeId(s)
 
 	default:
@@ -26320,12 +26320,12 @@ func (s *TheTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) TheTypeId() (localctx ITheTypeIdContext) {
+func (p *CPPParser) TheTypeId() (localctx ITheTypeIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewTheTypeIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 252, CPP14ParserRULE_theTypeId)
+	p.EnterRule(localctx, 252, CPPParserRULE_theTypeId)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1586)
@@ -26389,13 +26389,13 @@ type AbstractDeclaratorContext struct {
 func NewEmptyAbstractDeclaratorContext() *AbstractDeclaratorContext {
 	var p = new(AbstractDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_abstractDeclarator
+	p.RuleIndex = CPPParserRULE_abstractDeclarator
 	return p
 }
 
 func InitEmptyAbstractDeclaratorContext(p *AbstractDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_abstractDeclarator
+	p.RuleIndex = CPPParserRULE_abstractDeclarator
 }
 
 func (*AbstractDeclaratorContext) IsAbstractDeclaratorContext() {}
@@ -26406,7 +26406,7 @@ func NewAbstractDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_abstractDeclarator
+	p.RuleIndex = CPPParserRULE_abstractDeclarator
 
 	return p
 }
@@ -26494,11 +26494,11 @@ func (s *AbstractDeclaratorContext) AbstractPackDeclarator() IAbstractPackDeclar
 }
 
 func (s *AbstractDeclaratorContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *AbstractDeclaratorContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *AbstractDeclaratorContext) AllPointerOperator() []IPointerOperatorContext {
@@ -26584,7 +26584,7 @@ func (s *AbstractDeclaratorContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *AbstractDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAbstractDeclarator(s)
 
 	default:
@@ -26592,12 +26592,12 @@ func (s *AbstractDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) AbstractDeclarator() (localctx IAbstractDeclaratorContext) {
+func (p *CPPParser) AbstractDeclarator() (localctx IAbstractDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewAbstractDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 254, CPP14ParserRULE_abstractDeclarator)
+	p.EnterRule(localctx, 254, CPPParserRULE_abstractDeclarator)
 	var _la int
 
 	p.SetState(1612)
@@ -26653,7 +26653,7 @@ func (p *CPP14Parser) AbstractDeclarator() (localctx IAbstractDeclaratorContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		for _la == CPP14ParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
+		for _la == CPPParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
 			{
 				p.SetState(1598)
 				p.PointerOperator()
@@ -26668,7 +26668,7 @@ func (p *CPP14Parser) AbstractDeclarator() (localctx IAbstractDeclaratorContext)
 		}
 		{
 			p.SetState(1604)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -26681,7 +26681,7 @@ func (p *CPP14Parser) AbstractDeclarator() (localctx IAbstractDeclaratorContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPP14ParserIdentifier {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPPParserIdentifier {
 			{
 				p.SetState(1605)
 				p.ConstantExpression()
@@ -26690,7 +26690,7 @@ func (p *CPP14Parser) AbstractDeclarator() (localctx IAbstractDeclaratorContext)
 		}
 		{
 			p.SetState(1608)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -26750,13 +26750,13 @@ type PointerAbstractDeclaratorContext struct {
 func NewEmptyPointerAbstractDeclaratorContext() *PointerAbstractDeclaratorContext {
 	var p = new(PointerAbstractDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerAbstractDeclarator
+	p.RuleIndex = CPPParserRULE_pointerAbstractDeclarator
 	return p
 }
 
 func InitEmptyPointerAbstractDeclaratorContext(p *PointerAbstractDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pointerAbstractDeclarator
+	p.RuleIndex = CPPParserRULE_pointerAbstractDeclarator
 }
 
 func (*PointerAbstractDeclaratorContext) IsPointerAbstractDeclaratorContext() {}
@@ -26767,7 +26767,7 @@ func NewPointerAbstractDeclaratorContext(parser antlr.Parser, parent antlr.Parse
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_pointerAbstractDeclarator
+	p.RuleIndex = CPPParserRULE_pointerAbstractDeclarator
 
 	return p
 }
@@ -26841,7 +26841,7 @@ func (s *PointerAbstractDeclaratorContext) ToStringTree(ruleNames []string, reco
 
 func (s *PointerAbstractDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPointerAbstractDeclarator(s)
 
 	default:
@@ -26849,12 +26849,12 @@ func (s *PointerAbstractDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor
 	}
 }
 
-func (p *CPP14Parser) PointerAbstractDeclarator() (localctx IPointerAbstractDeclaratorContext) {
+func (p *CPPParser) PointerAbstractDeclarator() (localctx IPointerAbstractDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewPointerAbstractDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 256, CPP14ParserRULE_pointerAbstractDeclarator)
+	p.EnterRule(localctx, 256, CPPParserRULE_pointerAbstractDeclarator)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -26892,13 +26892,13 @@ func (p *CPP14Parser) PointerAbstractDeclarator() (localctx IPointerAbstractDecl
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		{
 			p.SetState(1620)
 			p.NoPointerAbstractDeclarator()
 		}
 
-	case CPP14ParserDecltype, CPP14ParserStar, CPP14ParserAnd, CPP14ParserAndAnd, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserDecltype, CPPParserStar, CPPParserAnd, CPPParserAndAnd, CPPParserDoublecolon, CPPParserIdentifier:
 		{
 			p.SetState(1621)
 			p.PointerOperator()
@@ -26956,13 +26956,13 @@ type NoPointerAbstractDeclaratorContext struct {
 func NewEmptyNoPointerAbstractDeclaratorContext() *NoPointerAbstractDeclaratorContext {
 	var p = new(NoPointerAbstractDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerAbstractDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerAbstractDeclarator
 	return p
 }
 
 func InitEmptyNoPointerAbstractDeclaratorContext(p *NoPointerAbstractDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerAbstractDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerAbstractDeclarator
 }
 
 func (*NoPointerAbstractDeclaratorContext) IsNoPointerAbstractDeclaratorContext() {}
@@ -26973,7 +26973,7 @@ func NewNoPointerAbstractDeclaratorContext(parser antlr.Parser, parent antlr.Par
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_noPointerAbstractDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerAbstractDeclarator
 
 	return p
 }
@@ -27022,7 +27022,7 @@ func (s *NoPointerAbstractDeclaratorContext) ParametersAndQualifiers(i int) IPar
 }
 
 func (s *NoPointerAbstractDeclaratorContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NoPointerAbstractDeclaratorContext) PointerAbstractDeclarator() IPointerAbstractDeclaratorContext {
@@ -27042,23 +27042,23 @@ func (s *NoPointerAbstractDeclaratorContext) PointerAbstractDeclarator() IPointe
 }
 
 func (s *NoPointerAbstractDeclaratorContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NoPointerAbstractDeclaratorContext) AllLeftBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftBracket)
+	return s.GetTokens(CPPParserLeftBracket)
 }
 
 func (s *NoPointerAbstractDeclaratorContext) LeftBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, i)
+	return s.GetToken(CPPParserLeftBracket, i)
 }
 
 func (s *NoPointerAbstractDeclaratorContext) AllRightBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightBracket)
+	return s.GetTokens(CPPParserRightBracket)
 }
 
 func (s *NoPointerAbstractDeclaratorContext) RightBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, i)
+	return s.GetToken(CPPParserRightBracket, i)
 }
 
 func (s *NoPointerAbstractDeclaratorContext) AllConstantExpression() []IConstantExpressionContext {
@@ -27153,7 +27153,7 @@ func (s *NoPointerAbstractDeclaratorContext) ToStringTree(ruleNames []string, re
 
 func (s *NoPointerAbstractDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNoPointerAbstractDeclarator(s)
 
 	default:
@@ -27161,12 +27161,12 @@ func (s *NoPointerAbstractDeclaratorContext) Accept(visitor antlr.ParseTreeVisit
 	}
 }
 
-func (p *CPP14Parser) NoPointerAbstractDeclarator() (localctx INoPointerAbstractDeclaratorContext) {
+func (p *CPPParser) NoPointerAbstractDeclarator() (localctx INoPointerAbstractDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewNoPointerAbstractDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 258, CPP14ParserRULE_noPointerAbstractDeclarator)
+	p.EnterRule(localctx, 258, CPPParserRULE_noPointerAbstractDeclarator)
 	var _la int
 
 	var _alt int
@@ -27188,7 +27188,7 @@ func (p *CPP14Parser) NoPointerAbstractDeclarator() (localctx INoPointerAbstract
 	case 2:
 		{
 			p.SetState(1625)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -27200,7 +27200,7 @@ func (p *CPP14Parser) NoPointerAbstractDeclarator() (localctx INoPointerAbstract
 		}
 		{
 			p.SetState(1627)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -27228,16 +27228,16 @@ func (p *CPP14Parser) NoPointerAbstractDeclarator() (localctx INoPointerAbstract
 			}
 
 			switch p.GetTokenStream().LA(1) {
-			case CPP14ParserLeftParen:
+			case CPPParserLeftParen:
 				{
 					p.SetState(1631)
 					p.ParametersAndQualifiers()
 				}
 
-			case CPP14ParserLeftBracket:
+			case CPPParserLeftBracket:
 				{
 					p.SetState(1632)
-					p.Match(CPP14ParserLeftBracket)
+					p.Match(CPPParserLeftBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -27250,7 +27250,7 @@ func (p *CPP14Parser) NoPointerAbstractDeclarator() (localctx INoPointerAbstract
 				}
 				_la = p.GetTokenStream().LA(1)
 
-				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPP14ParserIdentifier {
+				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPPParserIdentifier {
 					{
 						p.SetState(1633)
 						p.ConstantExpression()
@@ -27259,7 +27259,7 @@ func (p *CPP14Parser) NoPointerAbstractDeclarator() (localctx INoPointerAbstract
 				}
 				{
 					p.SetState(1636)
-					p.Match(CPP14ParserRightBracket)
+					p.Match(CPPParserRightBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -27332,13 +27332,13 @@ type AbstractPackDeclaratorContext struct {
 func NewEmptyAbstractPackDeclaratorContext() *AbstractPackDeclaratorContext {
 	var p = new(AbstractPackDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_abstractPackDeclarator
+	p.RuleIndex = CPPParserRULE_abstractPackDeclarator
 	return p
 }
 
 func InitEmptyAbstractPackDeclaratorContext(p *AbstractPackDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_abstractPackDeclarator
+	p.RuleIndex = CPPParserRULE_abstractPackDeclarator
 }
 
 func (*AbstractPackDeclaratorContext) IsAbstractPackDeclaratorContext() {}
@@ -27349,7 +27349,7 @@ func NewAbstractPackDeclaratorContext(parser antlr.Parser, parent antlr.ParserRu
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_abstractPackDeclarator
+	p.RuleIndex = CPPParserRULE_abstractPackDeclarator
 
 	return p
 }
@@ -27423,7 +27423,7 @@ func (s *AbstractPackDeclaratorContext) ToStringTree(ruleNames []string, recog a
 
 func (s *AbstractPackDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAbstractPackDeclarator(s)
 
 	default:
@@ -27431,12 +27431,12 @@ func (s *AbstractPackDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) i
 	}
 }
 
-func (p *CPP14Parser) AbstractPackDeclarator() (localctx IAbstractPackDeclaratorContext) {
+func (p *CPPParser) AbstractPackDeclarator() (localctx IAbstractPackDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewAbstractPackDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 260, CPP14ParserRULE_abstractPackDeclarator)
+	p.EnterRule(localctx, 260, CPPParserRULE_abstractPackDeclarator)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -27447,7 +27447,7 @@ func (p *CPP14Parser) AbstractPackDeclarator() (localctx IAbstractPackDeclarator
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
+	for _la == CPPParserDecltype || ((int64((_la-93)) & ^0x3f) == 0 && ((int64(1)<<(_la-93))&1116725051409) != 0) {
 		{
 			p.SetState(1645)
 			p.PointerOperator()
@@ -27510,13 +27510,13 @@ type NoPointerAbstractPackDeclaratorContext struct {
 func NewEmptyNoPointerAbstractPackDeclaratorContext() *NoPointerAbstractPackDeclaratorContext {
 	var p = new(NoPointerAbstractPackDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerAbstractPackDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerAbstractPackDeclarator
 	return p
 }
 
 func InitEmptyNoPointerAbstractPackDeclaratorContext(p *NoPointerAbstractPackDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noPointerAbstractPackDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerAbstractPackDeclarator
 }
 
 func (*NoPointerAbstractPackDeclaratorContext) IsNoPointerAbstractPackDeclaratorContext() {}
@@ -27527,7 +27527,7 @@ func NewNoPointerAbstractPackDeclaratorContext(parser antlr.Parser, parent antlr
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_noPointerAbstractPackDeclarator
+	p.RuleIndex = CPPParserRULE_noPointerAbstractPackDeclarator
 
 	return p
 }
@@ -27535,7 +27535,7 @@ func NewNoPointerAbstractPackDeclaratorContext(parser antlr.Parser, parent antlr
 func (s *NoPointerAbstractPackDeclaratorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NoPointerAbstractPackDeclaratorContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *NoPointerAbstractPackDeclaratorContext) AllParametersAndQualifiers() []IParametersAndQualifiersContext {
@@ -27580,19 +27580,19 @@ func (s *NoPointerAbstractPackDeclaratorContext) ParametersAndQualifiers(i int) 
 }
 
 func (s *NoPointerAbstractPackDeclaratorContext) AllLeftBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLeftBracket)
+	return s.GetTokens(CPPParserLeftBracket)
 }
 
 func (s *NoPointerAbstractPackDeclaratorContext) LeftBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, i)
+	return s.GetToken(CPPParserLeftBracket, i)
 }
 
 func (s *NoPointerAbstractPackDeclaratorContext) AllRightBracket() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserRightBracket)
+	return s.GetTokens(CPPParserRightBracket)
 }
 
 func (s *NoPointerAbstractPackDeclaratorContext) RightBracket(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, i)
+	return s.GetToken(CPPParserRightBracket, i)
 }
 
 func (s *NoPointerAbstractPackDeclaratorContext) AllConstantExpression() []IConstantExpressionContext {
@@ -27687,7 +27687,7 @@ func (s *NoPointerAbstractPackDeclaratorContext) ToStringTree(ruleNames []string
 
 func (s *NoPointerAbstractPackDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNoPointerAbstractPackDeclarator(s)
 
 	default:
@@ -27695,12 +27695,12 @@ func (s *NoPointerAbstractPackDeclaratorContext) Accept(visitor antlr.ParseTreeV
 	}
 }
 
-func (p *CPP14Parser) NoPointerAbstractPackDeclarator() (localctx INoPointerAbstractPackDeclaratorContext) {
+func (p *CPPParser) NoPointerAbstractPackDeclarator() (localctx INoPointerAbstractPackDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewNoPointerAbstractPackDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 262, CPP14ParserRULE_noPointerAbstractPackDeclarator)
+	p.EnterRule(localctx, 262, CPPParserRULE_noPointerAbstractPackDeclarator)
 	var _la int
 
 	var _alt int
@@ -27708,7 +27708,7 @@ func (p *CPP14Parser) NoPointerAbstractPackDeclarator() (localctx INoPointerAbst
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1653)
-		p.Match(CPP14ParserEllipsis)
+		p.Match(CPPParserEllipsis)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -27732,16 +27732,16 @@ func (p *CPP14Parser) NoPointerAbstractPackDeclarator() (localctx INoPointerAbst
 			}
 
 			switch p.GetTokenStream().LA(1) {
-			case CPP14ParserLeftParen:
+			case CPPParserLeftParen:
 				{
 					p.SetState(1654)
 					p.ParametersAndQualifiers()
 				}
 
-			case CPP14ParserLeftBracket:
+			case CPPParserLeftBracket:
 				{
 					p.SetState(1655)
-					p.Match(CPP14ParserLeftBracket)
+					p.Match(CPPParserLeftBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -27754,7 +27754,7 @@ func (p *CPP14Parser) NoPointerAbstractPackDeclarator() (localctx INoPointerAbst
 				}
 				_la = p.GetTokenStream().LA(1)
 
-				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPP14ParserIdentifier {
+				if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133137) != 0) || _la == CPPParserIdentifier {
 					{
 						p.SetState(1656)
 						p.ConstantExpression()
@@ -27763,7 +27763,7 @@ func (p *CPP14Parser) NoPointerAbstractPackDeclarator() (localctx INoPointerAbst
 				}
 				{
 					p.SetState(1659)
-					p.Match(CPP14ParserRightBracket)
+					p.Match(CPPParserRightBracket)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -27836,13 +27836,13 @@ type ParameterDeclarationClauseContext struct {
 func NewEmptyParameterDeclarationClauseContext() *ParameterDeclarationClauseContext {
 	var p = new(ParameterDeclarationClauseContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parameterDeclarationClause
+	p.RuleIndex = CPPParserRULE_parameterDeclarationClause
 	return p
 }
 
 func InitEmptyParameterDeclarationClauseContext(p *ParameterDeclarationClauseContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parameterDeclarationClause
+	p.RuleIndex = CPPParserRULE_parameterDeclarationClause
 }
 
 func (*ParameterDeclarationClauseContext) IsParameterDeclarationClauseContext() {}
@@ -27853,7 +27853,7 @@ func NewParameterDeclarationClauseContext(parser antlr.Parser, parent antlr.Pars
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_parameterDeclarationClause
+	p.RuleIndex = CPPParserRULE_parameterDeclarationClause
 
 	return p
 }
@@ -27877,11 +27877,11 @@ func (s *ParameterDeclarationClauseContext) ParameterDeclarationList() IParamete
 }
 
 func (s *ParameterDeclarationClauseContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *ParameterDeclarationClauseContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *ParameterDeclarationClauseContext) GetRuleContext() antlr.RuleContext {
@@ -27894,7 +27894,7 @@ func (s *ParameterDeclarationClauseContext) ToStringTree(ruleNames []string, rec
 
 func (s *ParameterDeclarationClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitParameterDeclarationClause(s)
 
 	default:
@@ -27902,12 +27902,12 @@ func (s *ParameterDeclarationClauseContext) Accept(visitor antlr.ParseTreeVisito
 	}
 }
 
-func (p *CPP14Parser) ParameterDeclarationClause() (localctx IParameterDeclarationClauseContext) {
+func (p *CPPParser) ParameterDeclarationClause() (localctx IParameterDeclarationClauseContext) {
 	this := p
 	_ = this
 
 	localctx = NewParameterDeclarationClauseContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 264, CPP14ParserRULE_parameterDeclarationClause)
+	p.EnterRule(localctx, 264, CPPParserRULE_parameterDeclarationClause)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -27922,7 +27922,7 @@ func (p *CPP14Parser) ParameterDeclarationClause() (localctx IParameterDeclarati
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserComma || _la == CPP14ParserEllipsis {
+	if _la == CPPParserComma || _la == CPPParserEllipsis {
 		p.SetState(1670)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -27930,10 +27930,10 @@ func (p *CPP14Parser) ParameterDeclarationClause() (localctx IParameterDeclarati
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserComma {
+		if _la == CPPParserComma {
 			{
 				p.SetState(1669)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -27943,7 +27943,7 @@ func (p *CPP14Parser) ParameterDeclarationClause() (localctx IParameterDeclarati
 		}
 		{
 			p.SetState(1672)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -27990,13 +27990,13 @@ type ParameterDeclarationListContext struct {
 func NewEmptyParameterDeclarationListContext() *ParameterDeclarationListContext {
 	var p = new(ParameterDeclarationListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parameterDeclarationList
+	p.RuleIndex = CPPParserRULE_parameterDeclarationList
 	return p
 }
 
 func InitEmptyParameterDeclarationListContext(p *ParameterDeclarationListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parameterDeclarationList
+	p.RuleIndex = CPPParserRULE_parameterDeclarationList
 }
 
 func (*ParameterDeclarationListContext) IsParameterDeclarationListContext() {}
@@ -28007,7 +28007,7 @@ func NewParameterDeclarationListContext(parser antlr.Parser, parent antlr.Parser
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_parameterDeclarationList
+	p.RuleIndex = CPPParserRULE_parameterDeclarationList
 
 	return p
 }
@@ -28056,11 +28056,11 @@ func (s *ParameterDeclarationListContext) ParameterDeclaration(i int) IParameter
 }
 
 func (s *ParameterDeclarationListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *ParameterDeclarationListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *ParameterDeclarationListContext) GetRuleContext() antlr.RuleContext {
@@ -28073,7 +28073,7 @@ func (s *ParameterDeclarationListContext) ToStringTree(ruleNames []string, recog
 
 func (s *ParameterDeclarationListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitParameterDeclarationList(s)
 
 	default:
@@ -28081,12 +28081,12 @@ func (s *ParameterDeclarationListContext) Accept(visitor antlr.ParseTreeVisitor)
 	}
 }
 
-func (p *CPP14Parser) ParameterDeclarationList() (localctx IParameterDeclarationListContext) {
+func (p *CPPParser) ParameterDeclarationList() (localctx IParameterDeclarationListContext) {
 	this := p
 	_ = this
 
 	localctx = NewParameterDeclarationListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 266, CPP14ParserRULE_parameterDeclarationList)
+	p.EnterRule(localctx, 266, CPPParserRULE_parameterDeclarationList)
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -28107,7 +28107,7 @@ func (p *CPP14Parser) ParameterDeclarationList() (localctx IParameterDeclaration
 		if _alt == 1 {
 			{
 				p.SetState(1676)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -28170,13 +28170,13 @@ type ParameterDeclarationContext struct {
 func NewEmptyParameterDeclarationContext() *ParameterDeclarationContext {
 	var p = new(ParameterDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parameterDeclaration
+	p.RuleIndex = CPPParserRULE_parameterDeclaration
 	return p
 }
 
 func InitEmptyParameterDeclarationContext(p *ParameterDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_parameterDeclaration
+	p.RuleIndex = CPPParserRULE_parameterDeclaration
 }
 
 func (*ParameterDeclarationContext) IsParameterDeclarationContext() {}
@@ -28187,7 +28187,7 @@ func NewParameterDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_parameterDeclaration
+	p.RuleIndex = CPPParserRULE_parameterDeclaration
 
 	return p
 }
@@ -28243,7 +28243,7 @@ func (s *ParameterDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifie
 }
 
 func (s *ParameterDeclarationContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *ParameterDeclarationContext) InitializerClause() IInitializerClauseContext {
@@ -28288,7 +28288,7 @@ func (s *ParameterDeclarationContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *ParameterDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitParameterDeclaration(s)
 
 	default:
@@ -28296,12 +28296,12 @@ func (s *ParameterDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) ParameterDeclaration() (localctx IParameterDeclarationContext) {
+func (p *CPPParser) ParameterDeclaration() (localctx IParameterDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewParameterDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 268, CPP14ParserRULE_parameterDeclaration)
+	p.EnterRule(localctx, 268, CPPParserRULE_parameterDeclaration)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -28312,7 +28312,7 @@ func (p *CPP14Parser) ParameterDeclaration() (localctx IParameterDeclarationCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1683)
 			p.AttributeSpecifierSeq()
@@ -28360,10 +28360,10 @@ func (p *CPP14Parser) ParameterDeclaration() (localctx IParameterDeclarationCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAssign {
+	if _la == CPPParserAssign {
 		{
 			p.SetState(1693)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -28415,13 +28415,13 @@ type FunctionDefinitionContext struct {
 func NewEmptyFunctionDefinitionContext() *FunctionDefinitionContext {
 	var p = new(FunctionDefinitionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionDefinition
+	p.RuleIndex = CPPParserRULE_functionDefinition
 	return p
 }
 
 func InitEmptyFunctionDefinitionContext(p *FunctionDefinitionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionDefinition
+	p.RuleIndex = CPPParserRULE_functionDefinition
 }
 
 func (*FunctionDefinitionContext) IsFunctionDefinitionContext() {}
@@ -28432,7 +28432,7 @@ func NewFunctionDefinitionContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_functionDefinition
+	p.RuleIndex = CPPParserRULE_functionDefinition
 
 	return p
 }
@@ -28529,7 +28529,7 @@ func (s *FunctionDefinitionContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *FunctionDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitFunctionDefinition(s)
 
 	default:
@@ -28537,12 +28537,12 @@ func (s *FunctionDefinitionContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) FunctionDefinition() (localctx IFunctionDefinitionContext) {
+func (p *CPPParser) FunctionDefinition() (localctx IFunctionDefinitionContext) {
 	this := p
 	_ = this
 
 	localctx = NewFunctionDefinitionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 270, CPP14ParserRULE_functionDefinition)
+	p.EnterRule(localctx, 270, CPPParserRULE_functionDefinition)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -28553,7 +28553,7 @@ func (p *CPP14Parser) FunctionDefinition() (localctx IFunctionDefinitionContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1697)
 			p.AttributeSpecifierSeq()
@@ -28583,7 +28583,7 @@ func (p *CPP14Parser) FunctionDefinition() (localctx IFunctionDefinitionContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserFinal || _la == CPP14ParserOverride {
+	if _la == CPPParserFinal || _la == CPPParserOverride {
 		{
 			p.SetState(1704)
 			p.VirtualSpecifierSeq()
@@ -28636,13 +28636,13 @@ type FunctionBodyContext struct {
 func NewEmptyFunctionBodyContext() *FunctionBodyContext {
 	var p = new(FunctionBodyContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionBody
+	p.RuleIndex = CPPParserRULE_functionBody
 	return p
 }
 
 func InitEmptyFunctionBodyContext(p *FunctionBodyContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionBody
+	p.RuleIndex = CPPParserRULE_functionBody
 }
 
 func (*FunctionBodyContext) IsFunctionBodyContext() {}
@@ -28653,7 +28653,7 @@ func NewFunctionBodyContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_functionBody
+	p.RuleIndex = CPPParserRULE_functionBody
 
 	return p
 }
@@ -28709,19 +28709,19 @@ func (s *FunctionBodyContext) FunctionTryBlock() IFunctionTryBlockContext {
 }
 
 func (s *FunctionBodyContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *FunctionBodyContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *FunctionBodyContext) Default() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDefault, 0)
+	return s.GetToken(CPPParserDefault, 0)
 }
 
 func (s *FunctionBodyContext) Delete() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDelete, 0)
+	return s.GetToken(CPPParserDelete, 0)
 }
 
 func (s *FunctionBodyContext) GetRuleContext() antlr.RuleContext {
@@ -28734,7 +28734,7 @@ func (s *FunctionBodyContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *FunctionBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitFunctionBody(s)
 
 	default:
@@ -28742,12 +28742,12 @@ func (s *FunctionBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) FunctionBody() (localctx IFunctionBodyContext) {
+func (p *CPPParser) FunctionBody() (localctx IFunctionBodyContext) {
 	this := p
 	_ = this
 
 	localctx = NewFunctionBodyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 272, CPP14ParserRULE_functionBody)
+	p.EnterRule(localctx, 272, CPPParserRULE_functionBody)
 	var _la int
 
 	p.SetState(1717)
@@ -28757,7 +28757,7 @@ func (p *CPP14Parser) FunctionBody() (localctx IFunctionBodyContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftBrace, CPP14ParserColon:
+	case CPPParserLeftBrace, CPPParserColon:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(1710)
 		p.GetErrorHandler().Sync(p)
@@ -28766,7 +28766,7 @@ func (p *CPP14Parser) FunctionBody() (localctx IFunctionBodyContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserColon {
+		if _la == CPPParserColon {
 			{
 				p.SetState(1709)
 				p.ConstructorInitializer()
@@ -28778,18 +28778,18 @@ func (p *CPP14Parser) FunctionBody() (localctx IFunctionBodyContext) {
 			p.CompoundStatement()
 		}
 
-	case CPP14ParserTry:
+	case CPPParserTry:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1713)
 			p.FunctionTryBlock()
 		}
 
-	case CPP14ParserAssign:
+	case CPPParserAssign:
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(1714)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -28799,7 +28799,7 @@ func (p *CPP14Parser) FunctionBody() (localctx IFunctionBodyContext) {
 			p.SetState(1715)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == CPP14ParserDefault || _la == CPP14ParserDelete) {
+			if !(_la == CPPParserDefault || _la == CPPParserDelete) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -28808,7 +28808,7 @@ func (p *CPP14Parser) FunctionBody() (localctx IFunctionBodyContext) {
 		}
 		{
 			p.SetState(1716)
-			p.Match(CPP14ParserSemi)
+			p.Match(CPPParserSemi)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -28858,13 +28858,13 @@ type InitializerContext struct {
 func NewEmptyInitializerContext() *InitializerContext {
 	var p = new(InitializerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initializer
+	p.RuleIndex = CPPParserRULE_initializer
 	return p
 }
 
 func InitEmptyInitializerContext(p *InitializerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initializer
+	p.RuleIndex = CPPParserRULE_initializer
 }
 
 func (*InitializerContext) IsInitializerContext() {}
@@ -28875,7 +28875,7 @@ func NewInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_initializer
+	p.RuleIndex = CPPParserRULE_initializer
 
 	return p
 }
@@ -28899,7 +28899,7 @@ func (s *InitializerContext) BraceOrEqualInitializer() IBraceOrEqualInitializerC
 }
 
 func (s *InitializerContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *InitializerContext) ExpressionList() IExpressionListContext {
@@ -28919,7 +28919,7 @@ func (s *InitializerContext) ExpressionList() IExpressionListContext {
 }
 
 func (s *InitializerContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *InitializerContext) GetRuleContext() antlr.RuleContext {
@@ -28932,7 +28932,7 @@ func (s *InitializerContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *InitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInitializer(s)
 
 	default:
@@ -28940,12 +28940,12 @@ func (s *InitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) Initializer() (localctx IInitializerContext) {
+func (p *CPPParser) Initializer() (localctx IInitializerContext) {
 	this := p
 	_ = this
 
 	localctx = NewInitializerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 274, CPP14ParserRULE_initializer)
+	p.EnterRule(localctx, 274, CPPParserRULE_initializer)
 	p.SetState(1724)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -28953,18 +28953,18 @@ func (p *CPP14Parser) Initializer() (localctx IInitializerContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftBrace, CPP14ParserAssign:
+	case CPPParserLeftBrace, CPPParserAssign:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1719)
 			p.BraceOrEqualInitializer()
 		}
 
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1720)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -28976,7 +28976,7 @@ func (p *CPP14Parser) Initializer() (localctx IInitializerContext) {
 		}
 		{
 			p.SetState(1722)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -29025,13 +29025,13 @@ type BraceOrEqualInitializerContext struct {
 func NewEmptyBraceOrEqualInitializerContext() *BraceOrEqualInitializerContext {
 	var p = new(BraceOrEqualInitializerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_braceOrEqualInitializer
+	p.RuleIndex = CPPParserRULE_braceOrEqualInitializer
 	return p
 }
 
 func InitEmptyBraceOrEqualInitializerContext(p *BraceOrEqualInitializerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_braceOrEqualInitializer
+	p.RuleIndex = CPPParserRULE_braceOrEqualInitializer
 }
 
 func (*BraceOrEqualInitializerContext) IsBraceOrEqualInitializerContext() {}
@@ -29042,7 +29042,7 @@ func NewBraceOrEqualInitializerContext(parser antlr.Parser, parent antlr.ParserR
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_braceOrEqualInitializer
+	p.RuleIndex = CPPParserRULE_braceOrEqualInitializer
 
 	return p
 }
@@ -29050,7 +29050,7 @@ func NewBraceOrEqualInitializerContext(parser antlr.Parser, parent antlr.ParserR
 func (s *BraceOrEqualInitializerContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *BraceOrEqualInitializerContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *BraceOrEqualInitializerContext) InitializerClause() IInitializerClauseContext {
@@ -29095,7 +29095,7 @@ func (s *BraceOrEqualInitializerContext) ToStringTree(ruleNames []string, recog 
 
 func (s *BraceOrEqualInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBraceOrEqualInitializer(s)
 
 	default:
@@ -29103,12 +29103,12 @@ func (s *BraceOrEqualInitializerContext) Accept(visitor antlr.ParseTreeVisitor) 
 	}
 }
 
-func (p *CPP14Parser) BraceOrEqualInitializer() (localctx IBraceOrEqualInitializerContext) {
+func (p *CPPParser) BraceOrEqualInitializer() (localctx IBraceOrEqualInitializerContext) {
 	this := p
 	_ = this
 
 	localctx = NewBraceOrEqualInitializerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 276, CPP14ParserRULE_braceOrEqualInitializer)
+	p.EnterRule(localctx, 276, CPPParserRULE_braceOrEqualInitializer)
 	p.SetState(1729)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -29116,11 +29116,11 @@ func (p *CPP14Parser) BraceOrEqualInitializer() (localctx IBraceOrEqualInitializ
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserAssign:
+	case CPPParserAssign:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1726)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -29131,7 +29131,7 @@ func (p *CPP14Parser) BraceOrEqualInitializer() (localctx IBraceOrEqualInitializ
 			p.InitializerClause()
 		}
 
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1728)
@@ -29179,13 +29179,13 @@ type InitializerClauseContext struct {
 func NewEmptyInitializerClauseContext() *InitializerClauseContext {
 	var p = new(InitializerClauseContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initializerClause
+	p.RuleIndex = CPPParserRULE_initializerClause
 	return p
 }
 
 func InitEmptyInitializerClauseContext(p *InitializerClauseContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initializerClause
+	p.RuleIndex = CPPParserRULE_initializerClause
 }
 
 func (*InitializerClauseContext) IsInitializerClauseContext() {}
@@ -29196,7 +29196,7 @@ func NewInitializerClauseContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_initializerClause
+	p.RuleIndex = CPPParserRULE_initializerClause
 
 	return p
 }
@@ -29245,7 +29245,7 @@ func (s *InitializerClauseContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *InitializerClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInitializerClause(s)
 
 	default:
@@ -29253,12 +29253,12 @@ func (s *InitializerClauseContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) InitializerClause() (localctx IInitializerClauseContext) {
+func (p *CPPParser) InitializerClause() (localctx IInitializerClauseContext) {
 	this := p
 	_ = this
 
 	localctx = NewInitializerClauseContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 278, CPP14ParserRULE_initializerClause)
+	p.EnterRule(localctx, 278, CPPParserRULE_initializerClause)
 	p.SetState(1733)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -29266,14 +29266,14 @@ func (p *CPP14Parser) InitializerClause() (localctx IInitializerClauseContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserIntegerLiteral, CPP14ParserCharacterLiteral, CPP14ParserFloatingLiteral, CPP14ParserStringLiteral, CPP14ParserBooleanLiteral, CPP14ParserPointerLiteral, CPP14ParserUserDefinedLiteral, CPP14ParserAlignof, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserConst_cast, CPP14ParserDecltype, CPP14ParserDelete, CPP14ParserDouble, CPP14ParserDynamic_cast, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserNew, CPP14ParserNoexcept, CPP14ParserOperator, CPP14ParserReinterpret_cast, CPP14ParserShort, CPP14ParserSigned, CPP14ParserSizeof, CPP14ParserStatic_cast, CPP14ParserThis, CPP14ParserThrow, CPP14ParserTypeid_, CPP14ParserTypename_, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserPlus, CPP14ParserMinus, CPP14ParserStar, CPP14ParserAnd, CPP14ParserOr, CPP14ParserTilde, CPP14ParserNot, CPP14ParserPlusPlus, CPP14ParserMinusMinus, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserIntegerLiteral, CPPParserCharacterLiteral, CPPParserFloatingLiteral, CPPParserStringLiteral, CPPParserBooleanLiteral, CPPParserPointerLiteral, CPPParserUserDefinedLiteral, CPPParserAlignof, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserConst_cast, CPPParserDecltype, CPPParserDelete, CPPParserDouble, CPPParserDynamic_cast, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserNew, CPPParserNoexcept, CPPParserOperator, CPPParserReinterpret_cast, CPPParserShort, CPPParserSigned, CPPParserSizeof, CPPParserStatic_cast, CPPParserThis, CPPParserThrow, CPPParserTypeid_, CPPParserTypename_, CPPParserUnsigned, CPPParserVoid, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserPlus, CPPParserMinus, CPPParserStar, CPPParserAnd, CPPParserOr, CPPParserTilde, CPPParserNot, CPPParserPlusPlus, CPPParserMinusMinus, CPPParserDoublecolon, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1731)
 			p.AssignmentExpression()
 		}
 
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1732)
@@ -29325,13 +29325,13 @@ type InitializerListContext struct {
 func NewEmptyInitializerListContext() *InitializerListContext {
 	var p = new(InitializerListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initializerList
+	p.RuleIndex = CPPParserRULE_initializerList
 	return p
 }
 
 func InitEmptyInitializerListContext(p *InitializerListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_initializerList
+	p.RuleIndex = CPPParserRULE_initializerList
 }
 
 func (*InitializerListContext) IsInitializerListContext() {}
@@ -29342,7 +29342,7 @@ func NewInitializerListContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_initializerList
+	p.RuleIndex = CPPParserRULE_initializerList
 
 	return p
 }
@@ -29391,19 +29391,19 @@ func (s *InitializerListContext) InitializerClause(i int) IInitializerClauseCont
 }
 
 func (s *InitializerListContext) AllEllipsis() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserEllipsis)
+	return s.GetTokens(CPPParserEllipsis)
 }
 
 func (s *InitializerListContext) Ellipsis(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, i)
+	return s.GetToken(CPPParserEllipsis, i)
 }
 
 func (s *InitializerListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *InitializerListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *InitializerListContext) GetRuleContext() antlr.RuleContext {
@@ -29416,7 +29416,7 @@ func (s *InitializerListContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *InitializerListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitInitializerList(s)
 
 	default:
@@ -29424,12 +29424,12 @@ func (s *InitializerListContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) InitializerList() (localctx IInitializerListContext) {
+func (p *CPPParser) InitializerList() (localctx IInitializerListContext) {
 	this := p
 	_ = this
 
 	localctx = NewInitializerListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 280, CPP14ParserRULE_initializerList)
+	p.EnterRule(localctx, 280, CPPParserRULE_initializerList)
 	var _la int
 
 	var _alt int
@@ -29446,10 +29446,10 @@ func (p *CPP14Parser) InitializerList() (localctx IInitializerListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(1736)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -29470,7 +29470,7 @@ func (p *CPP14Parser) InitializerList() (localctx IInitializerListContext) {
 		if _alt == 1 {
 			{
 				p.SetState(1739)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -29487,10 +29487,10 @@ func (p *CPP14Parser) InitializerList() (localctx IInitializerListContext) {
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == CPP14ParserEllipsis {
+			if _la == CPPParserEllipsis {
 				{
 					p.SetState(1741)
-					p.Match(CPP14ParserEllipsis)
+					p.Match(CPPParserEllipsis)
 					if p.HasError() {
 						// Recognition error - abort rule
 						goto errorExit
@@ -29549,13 +29549,13 @@ type BracedInitListContext struct {
 func NewEmptyBracedInitListContext() *BracedInitListContext {
 	var p = new(BracedInitListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_bracedInitList
+	p.RuleIndex = CPPParserRULE_bracedInitList
 	return p
 }
 
 func InitEmptyBracedInitListContext(p *BracedInitListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_bracedInitList
+	p.RuleIndex = CPPParserRULE_bracedInitList
 }
 
 func (*BracedInitListContext) IsBracedInitListContext() {}
@@ -29566,7 +29566,7 @@ func NewBracedInitListContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_bracedInitList
+	p.RuleIndex = CPPParserRULE_bracedInitList
 
 	return p
 }
@@ -29574,11 +29574,11 @@ func NewBracedInitListContext(parser antlr.Parser, parent antlr.ParserRuleContex
 func (s *BracedInitListContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *BracedInitListContext) LeftBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, 0)
+	return s.GetToken(CPPParserLeftBrace, 0)
 }
 
 func (s *BracedInitListContext) RightBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, 0)
+	return s.GetToken(CPPParserRightBrace, 0)
 }
 
 func (s *BracedInitListContext) InitializerList() IInitializerListContext {
@@ -29598,7 +29598,7 @@ func (s *BracedInitListContext) InitializerList() IInitializerListContext {
 }
 
 func (s *BracedInitListContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *BracedInitListContext) GetRuleContext() antlr.RuleContext {
@@ -29611,7 +29611,7 @@ func (s *BracedInitListContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *BracedInitListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBracedInitList(s)
 
 	default:
@@ -29619,18 +29619,18 @@ func (s *BracedInitListContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) BracedInitList() (localctx IBracedInitListContext) {
+func (p *CPPParser) BracedInitList() (localctx IBracedInitListContext) {
 	this := p
 	_ = this
 
 	localctx = NewBracedInitListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 282, CPP14ParserRULE_bracedInitList)
+	p.EnterRule(localctx, 282, CPPParserRULE_bracedInitList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1749)
-		p.Match(CPP14ParserLeftBrace)
+		p.Match(CPPParserLeftBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -29643,7 +29643,7 @@ func (p *CPP14Parser) BracedInitList() (localctx IBracedInitListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPP14ParserIdentifier {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPPParserIdentifier {
 		{
 			p.SetState(1750)
 			p.InitializerList()
@@ -29655,10 +29655,10 @@ func (p *CPP14Parser) BracedInitList() (localctx IBracedInitListContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserComma {
+		if _la == CPPParserComma {
 			{
 				p.SetState(1751)
-				p.Match(CPP14ParserComma)
+				p.Match(CPPParserComma)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -29670,7 +29670,7 @@ func (p *CPP14Parser) BracedInitList() (localctx IBracedInitListContext) {
 	}
 	{
 		p.SetState(1756)
-		p.Match(CPP14ParserRightBrace)
+		p.Match(CPPParserRightBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -29713,13 +29713,13 @@ type ClassNameContext struct {
 func NewEmptyClassNameContext() *ClassNameContext {
 	var p = new(ClassNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_className
+	p.RuleIndex = CPPParserRULE_className
 	return p
 }
 
 func InitEmptyClassNameContext(p *ClassNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_className
+	p.RuleIndex = CPPParserRULE_className
 }
 
 func (*ClassNameContext) IsClassNameContext() {}
@@ -29730,7 +29730,7 @@ func NewClassNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_className
+	p.RuleIndex = CPPParserRULE_className
 
 	return p
 }
@@ -29738,7 +29738,7 @@ func NewClassNameContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 func (s *ClassNameContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ClassNameContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *ClassNameContext) SimpleTemplateId() ISimpleTemplateIdContext {
@@ -29767,7 +29767,7 @@ func (s *ClassNameContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *ClassNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassName(s)
 
 	default:
@@ -29775,12 +29775,12 @@ func (s *ClassNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) ClassName() (localctx IClassNameContext) {
+func (p *CPPParser) ClassName() (localctx IClassNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 284, CPP14ParserRULE_className)
+	p.EnterRule(localctx, 284, CPPParserRULE_className)
 	p.SetState(1760)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -29792,7 +29792,7 @@ func (p *CPP14Parser) ClassName() (localctx IClassNameContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1758)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -29848,13 +29848,13 @@ type ClassSpecifierContext struct {
 func NewEmptyClassSpecifierContext() *ClassSpecifierContext {
 	var p = new(ClassSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classSpecifier
+	p.RuleIndex = CPPParserRULE_classSpecifier
 	return p
 }
 
 func InitEmptyClassSpecifierContext(p *ClassSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classSpecifier
+	p.RuleIndex = CPPParserRULE_classSpecifier
 }
 
 func (*ClassSpecifierContext) IsClassSpecifierContext() {}
@@ -29865,7 +29865,7 @@ func NewClassSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_classSpecifier
+	p.RuleIndex = CPPParserRULE_classSpecifier
 
 	return p
 }
@@ -29889,11 +29889,11 @@ func (s *ClassSpecifierContext) ClassHead() IClassHeadContext {
 }
 
 func (s *ClassSpecifierContext) LeftBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBrace, 0)
+	return s.GetToken(CPPParserLeftBrace, 0)
 }
 
 func (s *ClassSpecifierContext) RightBrace() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBrace, 0)
+	return s.GetToken(CPPParserRightBrace, 0)
 }
 
 func (s *ClassSpecifierContext) MemberSpecification() IMemberSpecificationContext {
@@ -29922,7 +29922,7 @@ func (s *ClassSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *ClassSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassSpecifier(s)
 
 	default:
@@ -29930,12 +29930,12 @@ func (s *ClassSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) ClassSpecifier() (localctx IClassSpecifierContext) {
+func (p *CPPParser) ClassSpecifier() (localctx IClassSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 286, CPP14ParserRULE_classSpecifier)
+	p.EnterRule(localctx, 286, CPPParserRULE_classSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -29945,7 +29945,7 @@ func (p *CPP14Parser) ClassSpecifier() (localctx IClassSpecifierContext) {
 	}
 	{
 		p.SetState(1763)
-		p.Match(CPP14ParserLeftBrace)
+		p.Match(CPPParserLeftBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -29967,7 +29967,7 @@ func (p *CPP14Parser) ClassSpecifier() (localctx IClassSpecifierContext) {
 	}
 	{
 		p.SetState(1767)
-		p.Match(CPP14ParserRightBrace)
+		p.Match(CPPParserRightBrace)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -30014,13 +30014,13 @@ type ClassHeadContext struct {
 func NewEmptyClassHeadContext() *ClassHeadContext {
 	var p = new(ClassHeadContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classHead
+	p.RuleIndex = CPPParserRULE_classHead
 	return p
 }
 
 func InitEmptyClassHeadContext(p *ClassHeadContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classHead
+	p.RuleIndex = CPPParserRULE_classHead
 }
 
 func (*ClassHeadContext) IsClassHeadContext() {}
@@ -30031,7 +30031,7 @@ func NewClassHeadContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_classHead
+	p.RuleIndex = CPPParserRULE_classHead
 
 	return p
 }
@@ -30119,7 +30119,7 @@ func (s *ClassHeadContext) ClassVirtSpecifier() IClassVirtSpecifierContext {
 }
 
 func (s *ClassHeadContext) Union() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUnion, 0)
+	return s.GetToken(CPPParserUnion, 0)
 }
 
 func (s *ClassHeadContext) GetRuleContext() antlr.RuleContext {
@@ -30132,7 +30132,7 @@ func (s *ClassHeadContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 
 func (s *ClassHeadContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassHead(s)
 
 	default:
@@ -30140,12 +30140,12 @@ func (s *ClassHeadContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
+func (p *CPPParser) ClassHead() (localctx IClassHeadContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassHeadContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 288, CPP14ParserRULE_classHead)
+	p.EnterRule(localctx, 288, CPPParserRULE_classHead)
 	var _la int
 
 	p.SetState(1792)
@@ -30155,7 +30155,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserClass, CPP14ParserStruct:
+	case CPPParserClass, CPPParserStruct:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1769)
@@ -30168,7 +30168,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(1770)
 				p.AttributeSpecifierSeq()
@@ -30182,7 +30182,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserDecltype || _la == CPP14ParserDoublecolon || _la == CPP14ParserIdentifier {
+		if _la == CPPParserDecltype || _la == CPPParserDoublecolon || _la == CPPParserIdentifier {
 			{
 				p.SetState(1773)
 				p.ClassHeadName()
@@ -30194,7 +30194,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == CPP14ParserFinal {
+			if _la == CPPParserFinal {
 				{
 					p.SetState(1774)
 					p.ClassVirtSpecifier()
@@ -30210,7 +30210,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserColon {
+		if _la == CPPParserColon {
 			{
 				p.SetState(1779)
 				p.BaseClause()
@@ -30218,11 +30218,11 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 
 		}
 
-	case CPP14ParserUnion:
+	case CPPParserUnion:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1782)
-			p.Match(CPP14ParserUnion)
+			p.Match(CPPParserUnion)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -30235,7 +30235,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(1783)
 				p.AttributeSpecifierSeq()
@@ -30249,7 +30249,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserDecltype || _la == CPP14ParserDoublecolon || _la == CPP14ParserIdentifier {
+		if _la == CPPParserDecltype || _la == CPPParserDoublecolon || _la == CPPParserIdentifier {
 			{
 				p.SetState(1786)
 				p.ClassHeadName()
@@ -30261,7 +30261,7 @@ func (p *CPP14Parser) ClassHead() (localctx IClassHeadContext) {
 			}
 			_la = p.GetTokenStream().LA(1)
 
-			if _la == CPP14ParserFinal {
+			if _la == CPPParserFinal {
 				{
 					p.SetState(1787)
 					p.ClassVirtSpecifier()
@@ -30312,13 +30312,13 @@ type ClassHeadNameContext struct {
 func NewEmptyClassHeadNameContext() *ClassHeadNameContext {
 	var p = new(ClassHeadNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classHeadName
+	p.RuleIndex = CPPParserRULE_classHeadName
 	return p
 }
 
 func InitEmptyClassHeadNameContext(p *ClassHeadNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classHeadName
+	p.RuleIndex = CPPParserRULE_classHeadName
 }
 
 func (*ClassHeadNameContext) IsClassHeadNameContext() {}
@@ -30329,7 +30329,7 @@ func NewClassHeadNameContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_classHeadName
+	p.RuleIndex = CPPParserRULE_classHeadName
 
 	return p
 }
@@ -30378,7 +30378,7 @@ func (s *ClassHeadNameContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *ClassHeadNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassHeadName(s)
 
 	default:
@@ -30386,12 +30386,12 @@ func (s *ClassHeadNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) ClassHeadName() (localctx IClassHeadNameContext) {
+func (p *CPPParser) ClassHeadName() (localctx IClassHeadNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassHeadNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 290, CPP14ParserRULE_classHeadName)
+	p.EnterRule(localctx, 290, CPPParserRULE_classHeadName)
 	p.EnterOuterAlt(localctx, 1)
 	p.SetState(1795)
 	p.GetErrorHandler().Sync(p)
@@ -30445,13 +30445,13 @@ type ClassVirtSpecifierContext struct {
 func NewEmptyClassVirtSpecifierContext() *ClassVirtSpecifierContext {
 	var p = new(ClassVirtSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classVirtSpecifier
+	p.RuleIndex = CPPParserRULE_classVirtSpecifier
 	return p
 }
 
 func InitEmptyClassVirtSpecifierContext(p *ClassVirtSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classVirtSpecifier
+	p.RuleIndex = CPPParserRULE_classVirtSpecifier
 }
 
 func (*ClassVirtSpecifierContext) IsClassVirtSpecifierContext() {}
@@ -30462,7 +30462,7 @@ func NewClassVirtSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_classVirtSpecifier
+	p.RuleIndex = CPPParserRULE_classVirtSpecifier
 
 	return p
 }
@@ -30470,7 +30470,7 @@ func NewClassVirtSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *ClassVirtSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ClassVirtSpecifierContext) Final() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserFinal, 0)
+	return s.GetToken(CPPParserFinal, 0)
 }
 
 func (s *ClassVirtSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -30483,7 +30483,7 @@ func (s *ClassVirtSpecifierContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *ClassVirtSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassVirtSpecifier(s)
 
 	default:
@@ -30491,16 +30491,16 @@ func (s *ClassVirtSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) ClassVirtSpecifier() (localctx IClassVirtSpecifierContext) {
+func (p *CPPParser) ClassVirtSpecifier() (localctx IClassVirtSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassVirtSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 292, CPP14ParserRULE_classVirtSpecifier)
+	p.EnterRule(localctx, 292, CPPParserRULE_classVirtSpecifier)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1799)
-		p.Match(CPP14ParserFinal)
+		p.Match(CPPParserFinal)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -30543,13 +30543,13 @@ type ClassKeyContext struct {
 func NewEmptyClassKeyContext() *ClassKeyContext {
 	var p = new(ClassKeyContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classKey
+	p.RuleIndex = CPPParserRULE_classKey
 	return p
 }
 
 func InitEmptyClassKeyContext(p *ClassKeyContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classKey
+	p.RuleIndex = CPPParserRULE_classKey
 }
 
 func (*ClassKeyContext) IsClassKeyContext() {}
@@ -30560,7 +30560,7 @@ func NewClassKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_classKey
+	p.RuleIndex = CPPParserRULE_classKey
 
 	return p
 }
@@ -30568,11 +30568,11 @@ func NewClassKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 func (s *ClassKeyContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ClassKeyContext) Class() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserClass, 0)
+	return s.GetToken(CPPParserClass, 0)
 }
 
 func (s *ClassKeyContext) Struct() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStruct, 0)
+	return s.GetToken(CPPParserStruct, 0)
 }
 
 func (s *ClassKeyContext) GetRuleContext() antlr.RuleContext {
@@ -30585,7 +30585,7 @@ func (s *ClassKeyContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 
 func (s *ClassKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassKey(s)
 
 	default:
@@ -30593,12 +30593,12 @@ func (s *ClassKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) ClassKey() (localctx IClassKeyContext) {
+func (p *CPPParser) ClassKey() (localctx IClassKeyContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassKeyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 294, CPP14ParserRULE_classKey)
+	p.EnterRule(localctx, 294, CPPParserRULE_classKey)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -30606,7 +30606,7 @@ func (p *CPP14Parser) ClassKey() (localctx IClassKeyContext) {
 		p.SetState(1801)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserClass || _la == CPP14ParserStruct) {
+		if !(_la == CPPParserClass || _la == CPPParserStruct) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -30654,13 +30654,13 @@ type MemberSpecificationContext struct {
 func NewEmptyMemberSpecificationContext() *MemberSpecificationContext {
 	var p = new(MemberSpecificationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberSpecification
+	p.RuleIndex = CPPParserRULE_memberSpecification
 	return p
 }
 
 func InitEmptyMemberSpecificationContext(p *MemberSpecificationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberSpecification
+	p.RuleIndex = CPPParserRULE_memberSpecification
 }
 
 func (*MemberSpecificationContext) IsMemberSpecificationContext() {}
@@ -30671,7 +30671,7 @@ func NewMemberSpecificationContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memberSpecification
+	p.RuleIndex = CPPParserRULE_memberSpecification
 
 	return p
 }
@@ -30761,11 +30761,11 @@ func (s *MemberSpecificationContext) AccessSpecifier(i int) IAccessSpecifierCont
 }
 
 func (s *MemberSpecificationContext) AllColon() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserColon)
+	return s.GetTokens(CPPParserColon)
 }
 
 func (s *MemberSpecificationContext) Colon(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, i)
+	return s.GetToken(CPPParserColon, i)
 }
 
 func (s *MemberSpecificationContext) GetRuleContext() antlr.RuleContext {
@@ -30778,7 +30778,7 @@ func (s *MemberSpecificationContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *MemberSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemberSpecification(s)
 
 	default:
@@ -30786,12 +30786,12 @@ func (s *MemberSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) MemberSpecification() (localctx IMemberSpecificationContext) {
+func (p *CPPParser) MemberSpecification() (localctx IMemberSpecificationContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemberSpecificationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 296, CPP14ParserRULE_memberSpecification)
+	p.EnterRule(localctx, 296, CPPParserRULE_memberSpecification)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -30810,20 +30810,20 @@ func (p *CPP14Parser) MemberSpecification() (localctx IMemberSpecificationContex
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserAlignas, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserClass, CPP14ParserConst, CPP14ParserConstexpr, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserEnum, CPP14ParserExplicit, CPP14ParserExtern, CPP14ParserFloat, CPP14ParserFriend, CPP14ParserInline, CPP14ParserInt, CPP14ParserLong, CPP14ParserMutable, CPP14ParserOperator, CPP14ParserRegister, CPP14ParserShort, CPP14ParserSigned, CPP14ParserStatic, CPP14ParserStatic_assert, CPP14ParserStruct, CPP14ParserTemplate, CPP14ParserThread_local, CPP14ParserTypedef, CPP14ParserTypename_, CPP14ParserUnion, CPP14ParserUnsigned, CPP14ParserUsing, CPP14ParserVirtual, CPP14ParserVoid, CPP14ParserVolatile, CPP14ParserWchar, CPP14ParserLeftParen, CPP14ParserLeftBracket, CPP14ParserStar, CPP14ParserAnd, CPP14ParserTilde, CPP14ParserAndAnd, CPP14ParserColon, CPP14ParserDoublecolon, CPP14ParserSemi, CPP14ParserEllipsis, CPP14ParserAttributeGnu, CPP14ParserIdentifier:
+		case CPPParserAlignas, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserClass, CPPParserConst, CPPParserConstexpr, CPPParserDecltype, CPPParserDouble, CPPParserEnum, CPPParserExplicit, CPPParserExtern, CPPParserFloat, CPPParserFriend, CPPParserInline, CPPParserInt, CPPParserLong, CPPParserMutable, CPPParserOperator, CPPParserRegister, CPPParserShort, CPPParserSigned, CPPParserStatic, CPPParserStatic_assert, CPPParserStruct, CPPParserTemplate, CPPParserThread_local, CPPParserTypedef, CPPParserTypename_, CPPParserUnion, CPPParserUnsigned, CPPParserUsing, CPPParserVirtual, CPPParserVoid, CPPParserVolatile, CPPParserWchar, CPPParserLeftParen, CPPParserLeftBracket, CPPParserStar, CPPParserAnd, CPPParserTilde, CPPParserAndAnd, CPPParserColon, CPPParserDoublecolon, CPPParserSemi, CPPParserEllipsis, CPPParserAttributeGnu, CPPParserIdentifier:
 			{
 				p.SetState(1803)
 				p.MemberDeclaration()
 			}
 
-		case CPP14ParserPrivate, CPP14ParserProtected, CPP14ParserPublic:
+		case CPPParserPrivate, CPPParserProtected, CPPParserPublic:
 			{
 				p.SetState(1804)
 				p.AccessSpecifier()
 			}
 			{
 				p.SetState(1805)
-				p.Match(CPP14ParserColon)
+				p.Match(CPPParserColon)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -30887,13 +30887,13 @@ type MemberDeclarationContext struct {
 func NewEmptyMemberDeclarationContext() *MemberDeclarationContext {
 	var p = new(MemberDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberDeclaration
+	p.RuleIndex = CPPParserRULE_memberDeclaration
 	return p
 }
 
 func InitEmptyMemberDeclarationContext(p *MemberDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberDeclaration
+	p.RuleIndex = CPPParserRULE_memberDeclaration
 }
 
 func (*MemberDeclarationContext) IsMemberDeclarationContext() {}
@@ -30904,7 +30904,7 @@ func NewMemberDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memberDeclaration
+	p.RuleIndex = CPPParserRULE_memberDeclaration
 
 	return p
 }
@@ -30912,7 +30912,7 @@ func NewMemberDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *MemberDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *MemberDeclarationContext) Semi() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserSemi, 0)
+	return s.GetToken(CPPParserSemi, 0)
 }
 
 func (s *MemberDeclarationContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -31069,7 +31069,7 @@ func (s *MemberDeclarationContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *MemberDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemberDeclaration(s)
 
 	default:
@@ -31077,12 +31077,12 @@ func (s *MemberDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) MemberDeclaration() (localctx IMemberDeclarationContext) {
+func (p *CPPParser) MemberDeclaration() (localctx IMemberDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemberDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 298, CPP14ParserRULE_memberDeclaration)
+	p.EnterRule(localctx, 298, CPPParserRULE_memberDeclaration)
 	var _la int
 
 	p.SetState(1827)
@@ -31134,7 +31134,7 @@ func (p *CPP14Parser) MemberDeclaration() (localctx IMemberDeclarationContext) {
 		}
 		{
 			p.SetState(1820)
-			p.Match(CPP14ParserSemi)
+			p.Match(CPPParserSemi)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -31225,13 +31225,13 @@ type MemberDeclaratorListContext struct {
 func NewEmptyMemberDeclaratorListContext() *MemberDeclaratorListContext {
 	var p = new(MemberDeclaratorListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberDeclaratorList
+	p.RuleIndex = CPPParserRULE_memberDeclaratorList
 	return p
 }
 
 func InitEmptyMemberDeclaratorListContext(p *MemberDeclaratorListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberDeclaratorList
+	p.RuleIndex = CPPParserRULE_memberDeclaratorList
 }
 
 func (*MemberDeclaratorListContext) IsMemberDeclaratorListContext() {}
@@ -31242,7 +31242,7 @@ func NewMemberDeclaratorListContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memberDeclaratorList
+	p.RuleIndex = CPPParserRULE_memberDeclaratorList
 
 	return p
 }
@@ -31291,11 +31291,11 @@ func (s *MemberDeclaratorListContext) MemberDeclarator(i int) IMemberDeclaratorC
 }
 
 func (s *MemberDeclaratorListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *MemberDeclaratorListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *MemberDeclaratorListContext) GetRuleContext() antlr.RuleContext {
@@ -31308,7 +31308,7 @@ func (s *MemberDeclaratorListContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *MemberDeclaratorListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemberDeclaratorList(s)
 
 	default:
@@ -31316,12 +31316,12 @@ func (s *MemberDeclaratorListContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) MemberDeclaratorList() (localctx IMemberDeclaratorListContext) {
+func (p *CPPParser) MemberDeclaratorList() (localctx IMemberDeclaratorListContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemberDeclaratorListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 300, CPP14ParserRULE_memberDeclaratorList)
+	p.EnterRule(localctx, 300, CPPParserRULE_memberDeclaratorList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -31336,10 +31336,10 @@ func (p *CPP14Parser) MemberDeclaratorList() (localctx IMemberDeclaratorListCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1830)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -31400,13 +31400,13 @@ type MemberDeclaratorContext struct {
 func NewEmptyMemberDeclaratorContext() *MemberDeclaratorContext {
 	var p = new(MemberDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberDeclarator
+	p.RuleIndex = CPPParserRULE_memberDeclarator
 	return p
 }
 
 func InitEmptyMemberDeclaratorContext(p *MemberDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memberDeclarator
+	p.RuleIndex = CPPParserRULE_memberDeclarator
 }
 
 func (*MemberDeclaratorContext) IsMemberDeclaratorContext() {}
@@ -31417,7 +31417,7 @@ func NewMemberDeclaratorContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memberDeclarator
+	p.RuleIndex = CPPParserRULE_memberDeclarator
 
 	return p
 }
@@ -31489,7 +31489,7 @@ func (s *MemberDeclaratorContext) BraceOrEqualInitializer() IBraceOrEqualInitial
 }
 
 func (s *MemberDeclaratorContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *MemberDeclaratorContext) ConstantExpression() IConstantExpressionContext {
@@ -31509,7 +31509,7 @@ func (s *MemberDeclaratorContext) ConstantExpression() IConstantExpressionContex
 }
 
 func (s *MemberDeclaratorContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *MemberDeclaratorContext) AttributeSpecifierSeq() IAttributeSpecifierSeqContext {
@@ -31538,7 +31538,7 @@ func (s *MemberDeclaratorContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *MemberDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemberDeclarator(s)
 
 	default:
@@ -31546,12 +31546,12 @@ func (s *MemberDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) MemberDeclarator() (localctx IMemberDeclaratorContext) {
+func (p *CPPParser) MemberDeclarator() (localctx IMemberDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemberDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 302, CPP14ParserRULE_memberDeclarator)
+	p.EnterRule(localctx, 302, CPPParserRULE_memberDeclarator)
 	var _la int
 
 	p.SetState(1857)
@@ -31634,10 +31634,10 @@ func (p *CPP14Parser) MemberDeclarator() (localctx IMemberDeclaratorContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserIdentifier {
+		if _la == CPPParserIdentifier {
 			{
 				p.SetState(1849)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -31652,7 +31652,7 @@ func (p *CPP14Parser) MemberDeclarator() (localctx IMemberDeclaratorContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(1852)
 				p.AttributeSpecifierSeq()
@@ -31661,7 +31661,7 @@ func (p *CPP14Parser) MemberDeclarator() (localctx IMemberDeclaratorContext) {
 		}
 		{
 			p.SetState(1855)
-			p.Match(CPP14ParserColon)
+			p.Match(CPPParserColon)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -31712,13 +31712,13 @@ type VirtualSpecifierSeqContext struct {
 func NewEmptyVirtualSpecifierSeqContext() *VirtualSpecifierSeqContext {
 	var p = new(VirtualSpecifierSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_virtualSpecifierSeq
+	p.RuleIndex = CPPParserRULE_virtualSpecifierSeq
 	return p
 }
 
 func InitEmptyVirtualSpecifierSeqContext(p *VirtualSpecifierSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_virtualSpecifierSeq
+	p.RuleIndex = CPPParserRULE_virtualSpecifierSeq
 }
 
 func (*VirtualSpecifierSeqContext) IsVirtualSpecifierSeqContext() {}
@@ -31729,7 +31729,7 @@ func NewVirtualSpecifierSeqContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_virtualSpecifierSeq
+	p.RuleIndex = CPPParserRULE_virtualSpecifierSeq
 
 	return p
 }
@@ -31787,7 +31787,7 @@ func (s *VirtualSpecifierSeqContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *VirtualSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitVirtualSpecifierSeq(s)
 
 	default:
@@ -31795,12 +31795,12 @@ func (s *VirtualSpecifierSeqContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) VirtualSpecifierSeq() (localctx IVirtualSpecifierSeqContext) {
+func (p *CPPParser) VirtualSpecifierSeq() (localctx IVirtualSpecifierSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewVirtualSpecifierSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 304, CPP14ParserRULE_virtualSpecifierSeq)
+	p.EnterRule(localctx, 304, CPPParserRULE_virtualSpecifierSeq)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -31811,7 +31811,7 @@ func (p *CPP14Parser) VirtualSpecifierSeq() (localctx IVirtualSpecifierSeqContex
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = _la == CPP14ParserFinal || _la == CPP14ParserOverride {
+	for ok := true; ok; ok = _la == CPPParserFinal || _la == CPPParserOverride {
 		{
 			p.SetState(1859)
 			p.VirtualSpecifier()
@@ -31861,13 +31861,13 @@ type VirtualSpecifierContext struct {
 func NewEmptyVirtualSpecifierContext() *VirtualSpecifierContext {
 	var p = new(VirtualSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_virtualSpecifier
+	p.RuleIndex = CPPParserRULE_virtualSpecifier
 	return p
 }
 
 func InitEmptyVirtualSpecifierContext(p *VirtualSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_virtualSpecifier
+	p.RuleIndex = CPPParserRULE_virtualSpecifier
 }
 
 func (*VirtualSpecifierContext) IsVirtualSpecifierContext() {}
@@ -31878,7 +31878,7 @@ func NewVirtualSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_virtualSpecifier
+	p.RuleIndex = CPPParserRULE_virtualSpecifier
 
 	return p
 }
@@ -31886,11 +31886,11 @@ func NewVirtualSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *VirtualSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *VirtualSpecifierContext) Override() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOverride, 0)
+	return s.GetToken(CPPParserOverride, 0)
 }
 
 func (s *VirtualSpecifierContext) Final() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserFinal, 0)
+	return s.GetToken(CPPParserFinal, 0)
 }
 
 func (s *VirtualSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -31903,7 +31903,7 @@ func (s *VirtualSpecifierContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *VirtualSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitVirtualSpecifier(s)
 
 	default:
@@ -31911,12 +31911,12 @@ func (s *VirtualSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) VirtualSpecifier() (localctx IVirtualSpecifierContext) {
+func (p *CPPParser) VirtualSpecifier() (localctx IVirtualSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewVirtualSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 306, CPP14ParserRULE_virtualSpecifier)
+	p.EnterRule(localctx, 306, CPPParserRULE_virtualSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -31924,7 +31924,7 @@ func (p *CPP14Parser) VirtualSpecifier() (localctx IVirtualSpecifierContext) {
 		p.SetState(1864)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == CPP14ParserFinal || _la == CPP14ParserOverride) {
+		if !(_la == CPPParserFinal || _la == CPPParserOverride) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -31968,13 +31968,13 @@ type PureSpecifierContext struct {
 func NewEmptyPureSpecifierContext() *PureSpecifierContext {
 	var p = new(PureSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pureSpecifier
+	p.RuleIndex = CPPParserRULE_pureSpecifier
 	return p
 }
 
 func InitEmptyPureSpecifierContext(p *PureSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_pureSpecifier
+	p.RuleIndex = CPPParserRULE_pureSpecifier
 }
 
 func (*PureSpecifierContext) IsPureSpecifierContext() {}
@@ -31985,7 +31985,7 @@ func NewPureSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_pureSpecifier
+	p.RuleIndex = CPPParserRULE_pureSpecifier
 
 	return p
 }
@@ -31993,11 +31993,11 @@ func NewPureSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *PureSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *PureSpecifierContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *PureSpecifierContext) IntegerLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIntegerLiteral, 0)
+	return s.GetToken(CPPParserIntegerLiteral, 0)
 }
 
 func (s *PureSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -32010,7 +32010,7 @@ func (s *PureSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *PureSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitPureSpecifier(s)
 
 	default:
@@ -32018,16 +32018,16 @@ func (s *PureSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) PureSpecifier() (localctx IPureSpecifierContext) {
+func (p *CPPParser) PureSpecifier() (localctx IPureSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewPureSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 308, CPP14ParserRULE_pureSpecifier)
+	p.EnterRule(localctx, 308, CPPParserRULE_pureSpecifier)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1866)
-		p.Match(CPP14ParserAssign)
+		p.Match(CPPParserAssign)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -32035,7 +32035,7 @@ func (p *CPP14Parser) PureSpecifier() (localctx IPureSpecifierContext) {
 	}
 	{
 		p.SetState(1867)
-		p.Match(CPP14ParserIntegerLiteral)
+		p.Match(CPPParserIntegerLiteral)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -32078,13 +32078,13 @@ type BaseClauseContext struct {
 func NewEmptyBaseClauseContext() *BaseClauseContext {
 	var p = new(BaseClauseContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseClause
+	p.RuleIndex = CPPParserRULE_baseClause
 	return p
 }
 
 func InitEmptyBaseClauseContext(p *BaseClauseContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseClause
+	p.RuleIndex = CPPParserRULE_baseClause
 }
 
 func (*BaseClauseContext) IsBaseClauseContext() {}
@@ -32095,7 +32095,7 @@ func NewBaseClauseContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_baseClause
+	p.RuleIndex = CPPParserRULE_baseClause
 
 	return p
 }
@@ -32103,7 +32103,7 @@ func NewBaseClauseContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 func (s *BaseClauseContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *BaseClauseContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *BaseClauseContext) BaseSpecifierList() IBaseSpecifierListContext {
@@ -32132,7 +32132,7 @@ func (s *BaseClauseContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *BaseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBaseClause(s)
 
 	default:
@@ -32140,16 +32140,16 @@ func (s *BaseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) BaseClause() (localctx IBaseClauseContext) {
+func (p *CPPParser) BaseClause() (localctx IBaseClauseContext) {
 	this := p
 	_ = this
 
 	localctx = NewBaseClauseContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 310, CPP14ParserRULE_baseClause)
+	p.EnterRule(localctx, 310, CPPParserRULE_baseClause)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1869)
-		p.Match(CPP14ParserColon)
+		p.Match(CPPParserColon)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -32200,13 +32200,13 @@ type BaseSpecifierListContext struct {
 func NewEmptyBaseSpecifierListContext() *BaseSpecifierListContext {
 	var p = new(BaseSpecifierListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseSpecifierList
+	p.RuleIndex = CPPParserRULE_baseSpecifierList
 	return p
 }
 
 func InitEmptyBaseSpecifierListContext(p *BaseSpecifierListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseSpecifierList
+	p.RuleIndex = CPPParserRULE_baseSpecifierList
 }
 
 func (*BaseSpecifierListContext) IsBaseSpecifierListContext() {}
@@ -32217,7 +32217,7 @@ func NewBaseSpecifierListContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_baseSpecifierList
+	p.RuleIndex = CPPParserRULE_baseSpecifierList
 
 	return p
 }
@@ -32266,19 +32266,19 @@ func (s *BaseSpecifierListContext) BaseSpecifier(i int) IBaseSpecifierContext {
 }
 
 func (s *BaseSpecifierListContext) AllEllipsis() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserEllipsis)
+	return s.GetTokens(CPPParserEllipsis)
 }
 
 func (s *BaseSpecifierListContext) Ellipsis(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, i)
+	return s.GetToken(CPPParserEllipsis, i)
 }
 
 func (s *BaseSpecifierListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *BaseSpecifierListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *BaseSpecifierListContext) GetRuleContext() antlr.RuleContext {
@@ -32291,7 +32291,7 @@ func (s *BaseSpecifierListContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *BaseSpecifierListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBaseSpecifierList(s)
 
 	default:
@@ -32299,12 +32299,12 @@ func (s *BaseSpecifierListContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) BaseSpecifierList() (localctx IBaseSpecifierListContext) {
+func (p *CPPParser) BaseSpecifierList() (localctx IBaseSpecifierListContext) {
 	this := p
 	_ = this
 
 	localctx = NewBaseSpecifierListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 312, CPP14ParserRULE_baseSpecifierList)
+	p.EnterRule(localctx, 312, CPPParserRULE_baseSpecifierList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -32319,10 +32319,10 @@ func (p *CPP14Parser) BaseSpecifierList() (localctx IBaseSpecifierListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(1873)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -32337,10 +32337,10 @@ func (p *CPP14Parser) BaseSpecifierList() (localctx IBaseSpecifierListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1876)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -32357,10 +32357,10 @@ func (p *CPP14Parser) BaseSpecifierList() (localctx IBaseSpecifierListContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserEllipsis {
+		if _la == CPPParserEllipsis {
 			{
 				p.SetState(1878)
-				p.Match(CPP14ParserEllipsis)
+				p.Match(CPPParserEllipsis)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -32415,13 +32415,13 @@ type BaseSpecifierContext struct {
 func NewEmptyBaseSpecifierContext() *BaseSpecifierContext {
 	var p = new(BaseSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseSpecifier
+	p.RuleIndex = CPPParserRULE_baseSpecifier
 	return p
 }
 
 func InitEmptyBaseSpecifierContext(p *BaseSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseSpecifier
+	p.RuleIndex = CPPParserRULE_baseSpecifier
 }
 
 func (*BaseSpecifierContext) IsBaseSpecifierContext() {}
@@ -32432,7 +32432,7 @@ func NewBaseSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_baseSpecifier
+	p.RuleIndex = CPPParserRULE_baseSpecifier
 
 	return p
 }
@@ -32456,7 +32456,7 @@ func (s *BaseSpecifierContext) BaseTypeSpecifier() IBaseTypeSpecifierContext {
 }
 
 func (s *BaseSpecifierContext) Virtual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserVirtual, 0)
+	return s.GetToken(CPPParserVirtual, 0)
 }
 
 func (s *BaseSpecifierContext) AccessSpecifier() IAccessSpecifierContext {
@@ -32501,7 +32501,7 @@ func (s *BaseSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *BaseSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBaseSpecifier(s)
 
 	default:
@@ -32509,12 +32509,12 @@ func (s *BaseSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) BaseSpecifier() (localctx IBaseSpecifierContext) {
+func (p *CPPParser) BaseSpecifier() (localctx IBaseSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewBaseSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 314, CPP14ParserRULE_baseSpecifier)
+	p.EnterRule(localctx, 314, CPPParserRULE_baseSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -32525,7 +32525,7 @@ func (p *CPP14Parser) BaseSpecifier() (localctx IBaseSpecifierContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+	if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 		{
 			p.SetState(1886)
 			p.AttributeSpecifierSeq()
@@ -32539,16 +32539,16 @@ func (p *CPP14Parser) BaseSpecifier() (localctx IBaseSpecifierContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserDecltype, CPP14ParserDoublecolon, CPP14ParserIdentifier:
+	case CPPParserDecltype, CPPParserDoublecolon, CPPParserIdentifier:
 		{
 			p.SetState(1889)
 			p.BaseTypeSpecifier()
 		}
 
-	case CPP14ParserVirtual:
+	case CPPParserVirtual:
 		{
 			p.SetState(1890)
-			p.Match(CPP14ParserVirtual)
+			p.Match(CPPParserVirtual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -32573,7 +32573,7 @@ func (p *CPP14Parser) BaseSpecifier() (localctx IBaseSpecifierContext) {
 			p.BaseTypeSpecifier()
 		}
 
-	case CPP14ParserPrivate, CPP14ParserProtected, CPP14ParserPublic:
+	case CPPParserPrivate, CPPParserProtected, CPPParserPublic:
 		{
 			p.SetState(1895)
 			p.AccessSpecifier()
@@ -32585,10 +32585,10 @@ func (p *CPP14Parser) BaseSpecifier() (localctx IBaseSpecifierContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserVirtual {
+		if _la == CPPParserVirtual {
 			{
 				p.SetState(1896)
-				p.Match(CPP14ParserVirtual)
+				p.Match(CPPParserVirtual)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -32643,13 +32643,13 @@ type ClassOrDeclTypeContext struct {
 func NewEmptyClassOrDeclTypeContext() *ClassOrDeclTypeContext {
 	var p = new(ClassOrDeclTypeContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classOrDeclType
+	p.RuleIndex = CPPParserRULE_classOrDeclType
 	return p
 }
 
 func InitEmptyClassOrDeclTypeContext(p *ClassOrDeclTypeContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_classOrDeclType
+	p.RuleIndex = CPPParserRULE_classOrDeclType
 }
 
 func (*ClassOrDeclTypeContext) IsClassOrDeclTypeContext() {}
@@ -32660,7 +32660,7 @@ func NewClassOrDeclTypeContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_classOrDeclType
+	p.RuleIndex = CPPParserRULE_classOrDeclType
 
 	return p
 }
@@ -32725,7 +32725,7 @@ func (s *ClassOrDeclTypeContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *ClassOrDeclTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitClassOrDeclType(s)
 
 	default:
@@ -32733,12 +32733,12 @@ func (s *ClassOrDeclTypeContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) ClassOrDeclType() (localctx IClassOrDeclTypeContext) {
+func (p *CPPParser) ClassOrDeclType() (localctx IClassOrDeclTypeContext) {
 	this := p
 	_ = this
 
 	localctx = NewClassOrDeclTypeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 316, CPP14ParserRULE_classOrDeclType)
+	p.EnterRule(localctx, 316, CPPParserRULE_classOrDeclType)
 	p.SetState(1908)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -32811,13 +32811,13 @@ type BaseTypeSpecifierContext struct {
 func NewEmptyBaseTypeSpecifierContext() *BaseTypeSpecifierContext {
 	var p = new(BaseTypeSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseTypeSpecifier
+	p.RuleIndex = CPPParserRULE_baseTypeSpecifier
 	return p
 }
 
 func InitEmptyBaseTypeSpecifierContext(p *BaseTypeSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_baseTypeSpecifier
+	p.RuleIndex = CPPParserRULE_baseTypeSpecifier
 }
 
 func (*BaseTypeSpecifierContext) IsBaseTypeSpecifierContext() {}
@@ -32828,7 +32828,7 @@ func NewBaseTypeSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_baseTypeSpecifier
+	p.RuleIndex = CPPParserRULE_baseTypeSpecifier
 
 	return p
 }
@@ -32861,7 +32861,7 @@ func (s *BaseTypeSpecifierContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *BaseTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitBaseTypeSpecifier(s)
 
 	default:
@@ -32869,12 +32869,12 @@ func (s *BaseTypeSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) BaseTypeSpecifier() (localctx IBaseTypeSpecifierContext) {
+func (p *CPPParser) BaseTypeSpecifier() (localctx IBaseTypeSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewBaseTypeSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 318, CPP14ParserRULE_baseTypeSpecifier)
+	p.EnterRule(localctx, 318, CPPParserRULE_baseTypeSpecifier)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1910)
@@ -32918,13 +32918,13 @@ type AccessSpecifierContext struct {
 func NewEmptyAccessSpecifierContext() *AccessSpecifierContext {
 	var p = new(AccessSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_accessSpecifier
+	p.RuleIndex = CPPParserRULE_accessSpecifier
 	return p
 }
 
 func InitEmptyAccessSpecifierContext(p *AccessSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_accessSpecifier
+	p.RuleIndex = CPPParserRULE_accessSpecifier
 }
 
 func (*AccessSpecifierContext) IsAccessSpecifierContext() {}
@@ -32935,7 +32935,7 @@ func NewAccessSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_accessSpecifier
+	p.RuleIndex = CPPParserRULE_accessSpecifier
 
 	return p
 }
@@ -32943,15 +32943,15 @@ func NewAccessSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleConte
 func (s *AccessSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *AccessSpecifierContext) Private() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPrivate, 0)
+	return s.GetToken(CPPParserPrivate, 0)
 }
 
 func (s *AccessSpecifierContext) Protected() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserProtected, 0)
+	return s.GetToken(CPPParserProtected, 0)
 }
 
 func (s *AccessSpecifierContext) Public() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPublic, 0)
+	return s.GetToken(CPPParserPublic, 0)
 }
 
 func (s *AccessSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -32964,7 +32964,7 @@ func (s *AccessSpecifierContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *AccessSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitAccessSpecifier(s)
 
 	default:
@@ -32972,12 +32972,12 @@ func (s *AccessSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) AccessSpecifier() (localctx IAccessSpecifierContext) {
+func (p *CPPParser) AccessSpecifier() (localctx IAccessSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewAccessSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 320, CPP14ParserRULE_accessSpecifier)
+	p.EnterRule(localctx, 320, CPPParserRULE_accessSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -33029,13 +33029,13 @@ type ConversionFunctionIdContext struct {
 func NewEmptyConversionFunctionIdContext() *ConversionFunctionIdContext {
 	var p = new(ConversionFunctionIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conversionFunctionId
+	p.RuleIndex = CPPParserRULE_conversionFunctionId
 	return p
 }
 
 func InitEmptyConversionFunctionIdContext(p *ConversionFunctionIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conversionFunctionId
+	p.RuleIndex = CPPParserRULE_conversionFunctionId
 }
 
 func (*ConversionFunctionIdContext) IsConversionFunctionIdContext() {}
@@ -33046,7 +33046,7 @@ func NewConversionFunctionIdContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_conversionFunctionId
+	p.RuleIndex = CPPParserRULE_conversionFunctionId
 
 	return p
 }
@@ -33054,7 +33054,7 @@ func NewConversionFunctionIdContext(parser antlr.Parser, parent antlr.ParserRule
 func (s *ConversionFunctionIdContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ConversionFunctionIdContext) Operator() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOperator, 0)
+	return s.GetToken(CPPParserOperator, 0)
 }
 
 func (s *ConversionFunctionIdContext) ConversionTypeId() IConversionTypeIdContext {
@@ -33083,7 +33083,7 @@ func (s *ConversionFunctionIdContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *ConversionFunctionIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitConversionFunctionId(s)
 
 	default:
@@ -33091,16 +33091,16 @@ func (s *ConversionFunctionIdContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) ConversionFunctionId() (localctx IConversionFunctionIdContext) {
+func (p *CPPParser) ConversionFunctionId() (localctx IConversionFunctionIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewConversionFunctionIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 322, CPP14ParserRULE_conversionFunctionId)
+	p.EnterRule(localctx, 322, CPPParserRULE_conversionFunctionId)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1914)
-		p.Match(CPP14ParserOperator)
+		p.Match(CPPParserOperator)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -33147,13 +33147,13 @@ type ConversionTypeIdContext struct {
 func NewEmptyConversionTypeIdContext() *ConversionTypeIdContext {
 	var p = new(ConversionTypeIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conversionTypeId
+	p.RuleIndex = CPPParserRULE_conversionTypeId
 	return p
 }
 
 func InitEmptyConversionTypeIdContext(p *ConversionTypeIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conversionTypeId
+	p.RuleIndex = CPPParserRULE_conversionTypeId
 }
 
 func (*ConversionTypeIdContext) IsConversionTypeIdContext() {}
@@ -33164,7 +33164,7 @@ func NewConversionTypeIdContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_conversionTypeId
+	p.RuleIndex = CPPParserRULE_conversionTypeId
 
 	return p
 }
@@ -33213,7 +33213,7 @@ func (s *ConversionTypeIdContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *ConversionTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitConversionTypeId(s)
 
 	default:
@@ -33221,12 +33221,12 @@ func (s *ConversionTypeIdContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) ConversionTypeId() (localctx IConversionTypeIdContext) {
+func (p *CPPParser) ConversionTypeId() (localctx IConversionTypeIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewConversionTypeIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 324, CPP14ParserRULE_conversionTypeId)
+	p.EnterRule(localctx, 324, CPPParserRULE_conversionTypeId)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1917)
@@ -33281,13 +33281,13 @@ type ConversionDeclaratorContext struct {
 func NewEmptyConversionDeclaratorContext() *ConversionDeclaratorContext {
 	var p = new(ConversionDeclaratorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conversionDeclarator
+	p.RuleIndex = CPPParserRULE_conversionDeclarator
 	return p
 }
 
 func InitEmptyConversionDeclaratorContext(p *ConversionDeclaratorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_conversionDeclarator
+	p.RuleIndex = CPPParserRULE_conversionDeclarator
 }
 
 func (*ConversionDeclaratorContext) IsConversionDeclaratorContext() {}
@@ -33298,7 +33298,7 @@ func NewConversionDeclaratorContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_conversionDeclarator
+	p.RuleIndex = CPPParserRULE_conversionDeclarator
 
 	return p
 }
@@ -33347,7 +33347,7 @@ func (s *ConversionDeclaratorContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *ConversionDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitConversionDeclarator(s)
 
 	default:
@@ -33355,12 +33355,12 @@ func (s *ConversionDeclaratorContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) ConversionDeclarator() (localctx IConversionDeclaratorContext) {
+func (p *CPPParser) ConversionDeclarator() (localctx IConversionDeclaratorContext) {
 	this := p
 	_ = this
 
 	localctx = NewConversionDeclaratorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 326, CPP14ParserRULE_conversionDeclarator)
+	p.EnterRule(localctx, 326, CPPParserRULE_conversionDeclarator)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1921)
@@ -33415,13 +33415,13 @@ type ConstructorInitializerContext struct {
 func NewEmptyConstructorInitializerContext() *ConstructorInitializerContext {
 	var p = new(ConstructorInitializerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_constructorInitializer
+	p.RuleIndex = CPPParserRULE_constructorInitializer
 	return p
 }
 
 func InitEmptyConstructorInitializerContext(p *ConstructorInitializerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_constructorInitializer
+	p.RuleIndex = CPPParserRULE_constructorInitializer
 }
 
 func (*ConstructorInitializerContext) IsConstructorInitializerContext() {}
@@ -33432,7 +33432,7 @@ func NewConstructorInitializerContext(parser antlr.Parser, parent antlr.ParserRu
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_constructorInitializer
+	p.RuleIndex = CPPParserRULE_constructorInitializer
 
 	return p
 }
@@ -33440,7 +33440,7 @@ func NewConstructorInitializerContext(parser antlr.Parser, parent antlr.ParserRu
 func (s *ConstructorInitializerContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ConstructorInitializerContext) Colon() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserColon, 0)
+	return s.GetToken(CPPParserColon, 0)
 }
 
 func (s *ConstructorInitializerContext) MemInitializerList() IMemInitializerListContext {
@@ -33469,7 +33469,7 @@ func (s *ConstructorInitializerContext) ToStringTree(ruleNames []string, recog a
 
 func (s *ConstructorInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitConstructorInitializer(s)
 
 	default:
@@ -33477,16 +33477,16 @@ func (s *ConstructorInitializerContext) Accept(visitor antlr.ParseTreeVisitor) i
 	}
 }
 
-func (p *CPP14Parser) ConstructorInitializer() (localctx IConstructorInitializerContext) {
+func (p *CPPParser) ConstructorInitializer() (localctx IConstructorInitializerContext) {
 	this := p
 	_ = this
 
 	localctx = NewConstructorInitializerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 328, CPP14ParserRULE_constructorInitializer)
+	p.EnterRule(localctx, 328, CPPParserRULE_constructorInitializer)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1925)
-		p.Match(CPP14ParserColon)
+		p.Match(CPPParserColon)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -33537,13 +33537,13 @@ type MemInitializerListContext struct {
 func NewEmptyMemInitializerListContext() *MemInitializerListContext {
 	var p = new(MemInitializerListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memInitializerList
+	p.RuleIndex = CPPParserRULE_memInitializerList
 	return p
 }
 
 func InitEmptyMemInitializerListContext(p *MemInitializerListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memInitializerList
+	p.RuleIndex = CPPParserRULE_memInitializerList
 }
 
 func (*MemInitializerListContext) IsMemInitializerListContext() {}
@@ -33554,7 +33554,7 @@ func NewMemInitializerListContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memInitializerList
+	p.RuleIndex = CPPParserRULE_memInitializerList
 
 	return p
 }
@@ -33603,19 +33603,19 @@ func (s *MemInitializerListContext) MemInitializer(i int) IMemInitializerContext
 }
 
 func (s *MemInitializerListContext) AllEllipsis() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserEllipsis)
+	return s.GetTokens(CPPParserEllipsis)
 }
 
 func (s *MemInitializerListContext) Ellipsis(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, i)
+	return s.GetToken(CPPParserEllipsis, i)
 }
 
 func (s *MemInitializerListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *MemInitializerListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *MemInitializerListContext) GetRuleContext() antlr.RuleContext {
@@ -33628,7 +33628,7 @@ func (s *MemInitializerListContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *MemInitializerListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemInitializerList(s)
 
 	default:
@@ -33636,12 +33636,12 @@ func (s *MemInitializerListContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) MemInitializerList() (localctx IMemInitializerListContext) {
+func (p *CPPParser) MemInitializerList() (localctx IMemInitializerListContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemInitializerListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 330, CPP14ParserRULE_memInitializerList)
+	p.EnterRule(localctx, 330, CPPParserRULE_memInitializerList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -33656,10 +33656,10 @@ func (p *CPP14Parser) MemInitializerList() (localctx IMemInitializerListContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(1929)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -33674,10 +33674,10 @@ func (p *CPP14Parser) MemInitializerList() (localctx IMemInitializerListContext)
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1932)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -33694,10 +33694,10 @@ func (p *CPP14Parser) MemInitializerList() (localctx IMemInitializerListContext)
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserEllipsis {
+		if _la == CPPParserEllipsis {
 			{
 				p.SetState(1934)
-				p.Match(CPP14ParserEllipsis)
+				p.Match(CPPParserEllipsis)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -33753,13 +33753,13 @@ type MemInitializerContext struct {
 func NewEmptyMemInitializerContext() *MemInitializerContext {
 	var p = new(MemInitializerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memInitializer
+	p.RuleIndex = CPPParserRULE_memInitializer
 	return p
 }
 
 func InitEmptyMemInitializerContext(p *MemInitializerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memInitializer
+	p.RuleIndex = CPPParserRULE_memInitializer
 }
 
 func (*MemInitializerContext) IsMemInitializerContext() {}
@@ -33770,7 +33770,7 @@ func NewMemInitializerContext(parser antlr.Parser, parent antlr.ParserRuleContex
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memInitializer
+	p.RuleIndex = CPPParserRULE_memInitializer
 
 	return p
 }
@@ -33794,11 +33794,11 @@ func (s *MemInitializerContext) MemInitializerId() IMemInitializerIdContext {
 }
 
 func (s *MemInitializerContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *MemInitializerContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *MemInitializerContext) BracedInitList() IBracedInitListContext {
@@ -33843,7 +33843,7 @@ func (s *MemInitializerContext) ToStringTree(ruleNames []string, recog antlr.Rec
 
 func (s *MemInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemInitializer(s)
 
 	default:
@@ -33851,12 +33851,12 @@ func (s *MemInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface
 	}
 }
 
-func (p *CPP14Parser) MemInitializer() (localctx IMemInitializerContext) {
+func (p *CPPParser) MemInitializer() (localctx IMemInitializerContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemInitializerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 332, CPP14ParserRULE_memInitializer)
+	p.EnterRule(localctx, 332, CPPParserRULE_memInitializer)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -33871,10 +33871,10 @@ func (p *CPP14Parser) MemInitializer() (localctx IMemInitializerContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserLeftParen:
+	case CPPParserLeftParen:
 		{
 			p.SetState(1943)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -33887,7 +33887,7 @@ func (p *CPP14Parser) MemInitializer() (localctx IMemInitializerContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPP14ParserIdentifier {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474400910417) != 0) || _la == CPPParserIdentifier {
 			{
 				p.SetState(1944)
 				p.ExpressionList()
@@ -33896,14 +33896,14 @@ func (p *CPP14Parser) MemInitializer() (localctx IMemInitializerContext) {
 		}
 		{
 			p.SetState(1947)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserLeftBrace:
+	case CPPParserLeftBrace:
 		{
 			p.SetState(1948)
 			p.BracedInitList()
@@ -33950,13 +33950,13 @@ type MemInitializerIdContext struct {
 func NewEmptyMemInitializerIdContext() *MemInitializerIdContext {
 	var p = new(MemInitializerIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memInitializerId
+	p.RuleIndex = CPPParserRULE_memInitializerId
 	return p
 }
 
 func InitEmptyMemInitializerIdContext(p *MemInitializerIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_memInitializerId
+	p.RuleIndex = CPPParserRULE_memInitializerId
 }
 
 func (*MemInitializerIdContext) IsMemInitializerIdContext() {}
@@ -33967,7 +33967,7 @@ func NewMemInitializerIdContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_memInitializerId
+	p.RuleIndex = CPPParserRULE_memInitializerId
 
 	return p
 }
@@ -33991,7 +33991,7 @@ func (s *MemInitializerIdContext) ClassOrDeclType() IClassOrDeclTypeContext {
 }
 
 func (s *MemInitializerIdContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *MemInitializerIdContext) GetRuleContext() antlr.RuleContext {
@@ -34004,7 +34004,7 @@ func (s *MemInitializerIdContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *MemInitializerIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitMemInitializerId(s)
 
 	default:
@@ -34012,12 +34012,12 @@ func (s *MemInitializerIdContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) MemInitializerId() (localctx IMemInitializerIdContext) {
+func (p *CPPParser) MemInitializerId() (localctx IMemInitializerIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewMemInitializerIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 334, CPP14ParserRULE_memInitializerId)
+	p.EnterRule(localctx, 334, CPPParserRULE_memInitializerId)
 	p.SetState(1953)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -34036,7 +34036,7 @@ func (p *CPP14Parser) MemInitializerId() (localctx IMemInitializerIdContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1952)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -34083,13 +34083,13 @@ type OperatorFunctionIdContext struct {
 func NewEmptyOperatorFunctionIdContext() *OperatorFunctionIdContext {
 	var p = new(OperatorFunctionIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_operatorFunctionId
+	p.RuleIndex = CPPParserRULE_operatorFunctionId
 	return p
 }
 
 func InitEmptyOperatorFunctionIdContext(p *OperatorFunctionIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_operatorFunctionId
+	p.RuleIndex = CPPParserRULE_operatorFunctionId
 }
 
 func (*OperatorFunctionIdContext) IsOperatorFunctionIdContext() {}
@@ -34100,7 +34100,7 @@ func NewOperatorFunctionIdContext(parser antlr.Parser, parent antlr.ParserRuleCo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_operatorFunctionId
+	p.RuleIndex = CPPParserRULE_operatorFunctionId
 
 	return p
 }
@@ -34108,7 +34108,7 @@ func NewOperatorFunctionIdContext(parser antlr.Parser, parent antlr.ParserRuleCo
 func (s *OperatorFunctionIdContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *OperatorFunctionIdContext) Operator() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOperator, 0)
+	return s.GetToken(CPPParserOperator, 0)
 }
 
 func (s *OperatorFunctionIdContext) TheOperator() ITheOperatorContext {
@@ -34137,7 +34137,7 @@ func (s *OperatorFunctionIdContext) ToStringTree(ruleNames []string, recog antlr
 
 func (s *OperatorFunctionIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitOperatorFunctionId(s)
 
 	default:
@@ -34145,16 +34145,16 @@ func (s *OperatorFunctionIdContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-func (p *CPP14Parser) OperatorFunctionId() (localctx IOperatorFunctionIdContext) {
+func (p *CPPParser) OperatorFunctionId() (localctx IOperatorFunctionIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewOperatorFunctionIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 336, CPP14ParserRULE_operatorFunctionId)
+	p.EnterRule(localctx, 336, CPPParserRULE_operatorFunctionId)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1955)
-		p.Match(CPP14ParserOperator)
+		p.Match(CPPParserOperator)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -34204,13 +34204,13 @@ type LiteralOperatorIdContext struct {
 func NewEmptyLiteralOperatorIdContext() *LiteralOperatorIdContext {
 	var p = new(LiteralOperatorIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_literalOperatorId
+	p.RuleIndex = CPPParserRULE_literalOperatorId
 	return p
 }
 
 func InitEmptyLiteralOperatorIdContext(p *LiteralOperatorIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_literalOperatorId
+	p.RuleIndex = CPPParserRULE_literalOperatorId
 }
 
 func (*LiteralOperatorIdContext) IsLiteralOperatorIdContext() {}
@@ -34221,7 +34221,7 @@ func NewLiteralOperatorIdContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_literalOperatorId
+	p.RuleIndex = CPPParserRULE_literalOperatorId
 
 	return p
 }
@@ -34229,23 +34229,23 @@ func NewLiteralOperatorIdContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *LiteralOperatorIdContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *LiteralOperatorIdContext) Operator() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOperator, 0)
+	return s.GetToken(CPPParserOperator, 0)
 }
 
 func (s *LiteralOperatorIdContext) StringLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStringLiteral, 0)
+	return s.GetToken(CPPParserStringLiteral, 0)
 }
 
 func (s *LiteralOperatorIdContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *LiteralOperatorIdContext) UserDefinedStringLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUserDefinedStringLiteral, 0)
+	return s.GetToken(CPPParserUserDefinedStringLiteral, 0)
 }
 
 func (s *LiteralOperatorIdContext) UserDefinedLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUserDefinedLiteral, 0)
+	return s.GetToken(CPPParserUserDefinedLiteral, 0)
 }
 
 func (s *LiteralOperatorIdContext) GetRuleContext() antlr.RuleContext {
@@ -34258,7 +34258,7 @@ func (s *LiteralOperatorIdContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *LiteralOperatorIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLiteralOperatorId(s)
 
 	default:
@@ -34266,12 +34266,12 @@ func (s *LiteralOperatorIdContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
+func (p *CPPParser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewLiteralOperatorIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 338, CPP14ParserRULE_literalOperatorId)
+	p.EnterRule(localctx, 338, CPPParserRULE_literalOperatorId)
 	p.SetState(1966)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -34283,7 +34283,7 @@ func (p *CPP14Parser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(1958)
-			p.Match(CPP14ParserOperator)
+			p.Match(CPPParserOperator)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -34296,10 +34296,10 @@ func (p *CPP14Parser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
 		}
 
 		switch p.GetTokenStream().LA(1) {
-		case CPP14ParserStringLiteral:
+		case CPPParserStringLiteral:
 			{
 				p.SetState(1959)
-				p.Match(CPP14ParserStringLiteral)
+				p.Match(CPPParserStringLiteral)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -34307,17 +34307,17 @@ func (p *CPP14Parser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
 			}
 			{
 				p.SetState(1960)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
 				}
 			}
 
-		case CPP14ParserUserDefinedStringLiteral:
+		case CPPParserUserDefinedStringLiteral:
 			{
 				p.SetState(1961)
-				p.Match(CPP14ParserUserDefinedStringLiteral)
+				p.Match(CPPParserUserDefinedStringLiteral)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -34333,7 +34333,7 @@ func (p *CPP14Parser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(1964)
-			p.Match(CPP14ParserOperator)
+			p.Match(CPPParserOperator)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -34341,7 +34341,7 @@ func (p *CPP14Parser) LiteralOperatorId() (localctx ILiteralOperatorIdContext) {
 		}
 		{
 			p.SetState(1965)
-			p.Match(CPP14ParserUserDefinedLiteral)
+			p.Match(CPPParserUserDefinedLiteral)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -34391,13 +34391,13 @@ type TemplateDeclarationContext struct {
 func NewEmptyTemplateDeclarationContext() *TemplateDeclarationContext {
 	var p = new(TemplateDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateDeclaration
+	p.RuleIndex = CPPParserRULE_templateDeclaration
 	return p
 }
 
 func InitEmptyTemplateDeclarationContext(p *TemplateDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateDeclaration
+	p.RuleIndex = CPPParserRULE_templateDeclaration
 }
 
 func (*TemplateDeclarationContext) IsTemplateDeclarationContext() {}
@@ -34408,7 +34408,7 @@ func NewTemplateDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleC
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateDeclaration
+	p.RuleIndex = CPPParserRULE_templateDeclaration
 
 	return p
 }
@@ -34416,11 +34416,11 @@ func NewTemplateDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleC
 func (s *TemplateDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TemplateDeclarationContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *TemplateDeclarationContext) Less() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, 0)
+	return s.GetToken(CPPParserLess, 0)
 }
 
 func (s *TemplateDeclarationContext) TemplateParameterList() ITemplateParameterListContext {
@@ -34440,7 +34440,7 @@ func (s *TemplateDeclarationContext) TemplateParameterList() ITemplateParameterL
 }
 
 func (s *TemplateDeclarationContext) Greater() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, 0)
+	return s.GetToken(CPPParserGreater, 0)
 }
 
 func (s *TemplateDeclarationContext) Declaration() IDeclarationContext {
@@ -34469,7 +34469,7 @@ func (s *TemplateDeclarationContext) ToStringTree(ruleNames []string, recog antl
 
 func (s *TemplateDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateDeclaration(s)
 
 	default:
@@ -34477,16 +34477,16 @@ func (s *TemplateDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) inte
 	}
 }
 
-func (p *CPP14Parser) TemplateDeclaration() (localctx ITemplateDeclarationContext) {
+func (p *CPPParser) TemplateDeclaration() (localctx ITemplateDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 340, CPP14ParserRULE_templateDeclaration)
+	p.EnterRule(localctx, 340, CPPParserRULE_templateDeclaration)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(1968)
-		p.Match(CPP14ParserTemplate)
+		p.Match(CPPParserTemplate)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -34494,7 +34494,7 @@ func (p *CPP14Parser) TemplateDeclaration() (localctx ITemplateDeclarationContex
 	}
 	{
 		p.SetState(1969)
-		p.Match(CPP14ParserLess)
+		p.Match(CPPParserLess)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -34506,7 +34506,7 @@ func (p *CPP14Parser) TemplateDeclaration() (localctx ITemplateDeclarationContex
 	}
 	{
 		p.SetState(1971)
-		p.Match(CPP14ParserGreater)
+		p.Match(CPPParserGreater)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -34555,13 +34555,13 @@ type TemplateParameterListContext struct {
 func NewEmptyTemplateParameterListContext() *TemplateParameterListContext {
 	var p = new(TemplateParameterListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateParameterList
+	p.RuleIndex = CPPParserRULE_templateParameterList
 	return p
 }
 
 func InitEmptyTemplateParameterListContext(p *TemplateParameterListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateParameterList
+	p.RuleIndex = CPPParserRULE_templateParameterList
 }
 
 func (*TemplateParameterListContext) IsTemplateParameterListContext() {}
@@ -34572,7 +34572,7 @@ func NewTemplateParameterListContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateParameterList
+	p.RuleIndex = CPPParserRULE_templateParameterList
 
 	return p
 }
@@ -34621,11 +34621,11 @@ func (s *TemplateParameterListContext) TemplateParameter(i int) ITemplateParamet
 }
 
 func (s *TemplateParameterListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *TemplateParameterListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *TemplateParameterListContext) GetRuleContext() antlr.RuleContext {
@@ -34638,7 +34638,7 @@ func (s *TemplateParameterListContext) ToStringTree(ruleNames []string, recog an
 
 func (s *TemplateParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateParameterList(s)
 
 	default:
@@ -34646,12 +34646,12 @@ func (s *TemplateParameterListContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) TemplateParameterList() (localctx ITemplateParameterListContext) {
+func (p *CPPParser) TemplateParameterList() (localctx ITemplateParameterListContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateParameterListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 342, CPP14ParserRULE_templateParameterList)
+	p.EnterRule(localctx, 342, CPPParserRULE_templateParameterList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -34666,10 +34666,10 @@ func (p *CPP14Parser) TemplateParameterList() (localctx ITemplateParameterListCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(1975)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -34724,13 +34724,13 @@ type TemplateParameterContext struct {
 func NewEmptyTemplateParameterContext() *TemplateParameterContext {
 	var p = new(TemplateParameterContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateParameter
+	p.RuleIndex = CPPParserRULE_templateParameter
 	return p
 }
 
 func InitEmptyTemplateParameterContext(p *TemplateParameterContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateParameter
+	p.RuleIndex = CPPParserRULE_templateParameter
 }
 
 func (*TemplateParameterContext) IsTemplateParameterContext() {}
@@ -34741,7 +34741,7 @@ func NewTemplateParameterContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateParameter
+	p.RuleIndex = CPPParserRULE_templateParameter
 
 	return p
 }
@@ -34790,7 +34790,7 @@ func (s *TemplateParameterContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *TemplateParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateParameter(s)
 
 	default:
@@ -34798,12 +34798,12 @@ func (s *TemplateParameterContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) TemplateParameter() (localctx ITemplateParameterContext) {
+func (p *CPPParser) TemplateParameter() (localctx ITemplateParameterContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateParameterContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 344, CPP14ParserRULE_templateParameter)
+	p.EnterRule(localctx, 344, CPPParserRULE_templateParameter)
 	p.SetState(1984)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -34873,13 +34873,13 @@ type TypeParameterContext struct {
 func NewEmptyTypeParameterContext() *TypeParameterContext {
 	var p = new(TypeParameterContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeParameter
+	p.RuleIndex = CPPParserRULE_typeParameter
 	return p
 }
 
 func InitEmptyTypeParameterContext(p *TypeParameterContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeParameter
+	p.RuleIndex = CPPParserRULE_typeParameter
 }
 
 func (*TypeParameterContext) IsTypeParameterContext() {}
@@ -34890,7 +34890,7 @@ func NewTypeParameterContext(parser antlr.Parser, parent antlr.ParserRuleContext
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typeParameter
+	p.RuleIndex = CPPParserRULE_typeParameter
 
 	return p
 }
@@ -34898,15 +34898,15 @@ func NewTypeParameterContext(parser antlr.Parser, parent antlr.ParserRuleContext
 func (s *TypeParameterContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TypeParameterContext) Class() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserClass, 0)
+	return s.GetToken(CPPParserClass, 0)
 }
 
 func (s *TypeParameterContext) Typename_() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTypename_, 0)
+	return s.GetToken(CPPParserTypename_, 0)
 }
 
 func (s *TypeParameterContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *TypeParameterContext) TheTypeId() ITheTypeIdContext {
@@ -34926,11 +34926,11 @@ func (s *TypeParameterContext) TheTypeId() ITheTypeIdContext {
 }
 
 func (s *TypeParameterContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *TypeParameterContext) Less() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, 0)
+	return s.GetToken(CPPParserLess, 0)
 }
 
 func (s *TypeParameterContext) TemplateParameterList() ITemplateParameterListContext {
@@ -34950,15 +34950,15 @@ func (s *TypeParameterContext) TemplateParameterList() ITemplateParameterListCon
 }
 
 func (s *TypeParameterContext) Greater() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, 0)
+	return s.GetToken(CPPParserGreater, 0)
 }
 
 func (s *TypeParameterContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *TypeParameterContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *TypeParameterContext) GetRuleContext() antlr.RuleContext {
@@ -34971,7 +34971,7 @@ func (s *TypeParameterContext) ToStringTree(ruleNames []string, recog antlr.Reco
 
 func (s *TypeParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypeParameter(s)
 
 	default:
@@ -34979,12 +34979,12 @@ func (s *TypeParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	}
 }
 
-func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
+func (p *CPPParser) TypeParameter() (localctx ITypeParameterContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypeParameterContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 346, CPP14ParserRULE_typeParameter)
+	p.EnterRule(localctx, 346, CPPParserRULE_typeParameter)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -34995,7 +34995,7 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserClass, CPP14ParserTemplate:
+	case CPPParserClass, CPPParserTemplate:
 		p.SetState(1991)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -35003,10 +35003,10 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserTemplate {
+		if _la == CPPParserTemplate {
 			{
 				p.SetState(1986)
-				p.Match(CPP14ParserTemplate)
+				p.Match(CPPParserTemplate)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35014,7 +35014,7 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 			}
 			{
 				p.SetState(1987)
-				p.Match(CPP14ParserLess)
+				p.Match(CPPParserLess)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35026,7 +35026,7 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 			}
 			{
 				p.SetState(1989)
-				p.Match(CPP14ParserGreater)
+				p.Match(CPPParserGreater)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35036,17 +35036,17 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 		}
 		{
 			p.SetState(1993)
-			p.Match(CPP14ParserClass)
+			p.Match(CPPParserClass)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case CPP14ParserTypename_:
+	case CPPParserTypename_:
 		{
 			p.SetState(1994)
-			p.Match(CPP14ParserTypename_)
+			p.Match(CPPParserTypename_)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -35072,10 +35072,10 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserEllipsis {
+		if _la == CPPParserEllipsis {
 			{
 				p.SetState(1997)
-				p.Match(CPP14ParserEllipsis)
+				p.Match(CPPParserEllipsis)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35090,10 +35090,10 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserIdentifier {
+		if _la == CPPParserIdentifier {
 			{
 				p.SetState(2000)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35110,10 +35110,10 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserIdentifier {
+		if _la == CPPParserIdentifier {
 			{
 				p.SetState(2003)
-				p.Match(CPP14ParserIdentifier)
+				p.Match(CPPParserIdentifier)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35123,7 +35123,7 @@ func (p *CPP14Parser) TypeParameter() (localctx ITypeParameterContext) {
 		}
 		{
 			p.SetState(2006)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -35176,13 +35176,13 @@ type SimpleTemplateIdContext struct {
 func NewEmptySimpleTemplateIdContext() *SimpleTemplateIdContext {
 	var p = new(SimpleTemplateIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTemplateId
+	p.RuleIndex = CPPParserRULE_simpleTemplateId
 	return p
 }
 
 func InitEmptySimpleTemplateIdContext(p *SimpleTemplateIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_simpleTemplateId
+	p.RuleIndex = CPPParserRULE_simpleTemplateId
 }
 
 func (*SimpleTemplateIdContext) IsSimpleTemplateIdContext() {}
@@ -35193,7 +35193,7 @@ func NewSimpleTemplateIdContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_simpleTemplateId
+	p.RuleIndex = CPPParserRULE_simpleTemplateId
 
 	return p
 }
@@ -35217,11 +35217,11 @@ func (s *SimpleTemplateIdContext) TemplateName() ITemplateNameContext {
 }
 
 func (s *SimpleTemplateIdContext) Less() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, 0)
+	return s.GetToken(CPPParserLess, 0)
 }
 
 func (s *SimpleTemplateIdContext) Greater() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, 0)
+	return s.GetToken(CPPParserGreater, 0)
 }
 
 func (s *SimpleTemplateIdContext) TemplateArgumentList() ITemplateArgumentListContext {
@@ -35250,7 +35250,7 @@ func (s *SimpleTemplateIdContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *SimpleTemplateIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitSimpleTemplateId(s)
 
 	default:
@@ -35258,12 +35258,12 @@ func (s *SimpleTemplateIdContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) SimpleTemplateId() (localctx ISimpleTemplateIdContext) {
+func (p *CPPParser) SimpleTemplateId() (localctx ISimpleTemplateIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewSimpleTemplateIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 348, CPP14ParserRULE_simpleTemplateId)
+	p.EnterRule(localctx, 348, CPPParserRULE_simpleTemplateId)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -35273,7 +35273,7 @@ func (p *CPP14Parser) SimpleTemplateId() (localctx ISimpleTemplateIdContext) {
 	}
 	{
 		p.SetState(2011)
-		p.Match(CPP14ParserLess)
+		p.Match(CPPParserLess)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -35286,7 +35286,7 @@ func (p *CPP14Parser) SimpleTemplateId() (localctx ISimpleTemplateIdContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979472930990334) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384268307) != 0) || _la == CPP14ParserIdentifier {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979472930990334) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384268307) != 0) || _la == CPPParserIdentifier {
 		{
 			p.SetState(2012)
 			p.TemplateArgumentList()
@@ -35295,7 +35295,7 @@ func (p *CPP14Parser) SimpleTemplateId() (localctx ISimpleTemplateIdContext) {
 	}
 	{
 		p.SetState(2015)
-		p.Match(CPP14ParserGreater)
+		p.Match(CPPParserGreater)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -35342,13 +35342,13 @@ type TemplateIdContext struct {
 func NewEmptyTemplateIdContext() *TemplateIdContext {
 	var p = new(TemplateIdContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateId
+	p.RuleIndex = CPPParserRULE_templateId
 	return p
 }
 
 func InitEmptyTemplateIdContext(p *TemplateIdContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateId
+	p.RuleIndex = CPPParserRULE_templateId
 }
 
 func (*TemplateIdContext) IsTemplateIdContext() {}
@@ -35359,7 +35359,7 @@ func NewTemplateIdContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateId
+	p.RuleIndex = CPPParserRULE_templateId
 
 	return p
 }
@@ -35383,11 +35383,11 @@ func (s *TemplateIdContext) SimpleTemplateId() ISimpleTemplateIdContext {
 }
 
 func (s *TemplateIdContext) Less() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, 0)
+	return s.GetToken(CPPParserLess, 0)
 }
 
 func (s *TemplateIdContext) Greater() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, 0)
+	return s.GetToken(CPPParserGreater, 0)
 }
 
 func (s *TemplateIdContext) OperatorFunctionId() IOperatorFunctionIdContext {
@@ -35448,7 +35448,7 @@ func (s *TemplateIdContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *TemplateIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateId(s)
 
 	default:
@@ -35456,12 +35456,12 @@ func (s *TemplateIdContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) TemplateId() (localctx ITemplateIdContext) {
+func (p *CPPParser) TemplateId() (localctx ITemplateIdContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 350, CPP14ParserRULE_templateId)
+	p.EnterRule(localctx, 350, CPPParserRULE_templateId)
 	var _la int
 
 	p.SetState(2028)
@@ -35471,14 +35471,14 @@ func (p *CPP14Parser) TemplateId() (localctx ITemplateIdContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserIdentifier:
+	case CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(2017)
 			p.SimpleTemplateId()
 		}
 
-	case CPP14ParserOperator:
+	case CPPParserOperator:
 		p.EnterOuterAlt(localctx, 2)
 		p.SetState(2020)
 		p.GetErrorHandler().Sync(p)
@@ -35504,7 +35504,7 @@ func (p *CPP14Parser) TemplateId() (localctx ITemplateIdContext) {
 		}
 		{
 			p.SetState(2022)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -35517,7 +35517,7 @@ func (p *CPP14Parser) TemplateId() (localctx ITemplateIdContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979472930990334) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384268307) != 0) || _la == CPP14ParserIdentifier {
+		if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979472930990334) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384268307) != 0) || _la == CPPParserIdentifier {
 			{
 				p.SetState(2023)
 				p.TemplateArgumentList()
@@ -35526,7 +35526,7 @@ func (p *CPP14Parser) TemplateId() (localctx ITemplateIdContext) {
 		}
 		{
 			p.SetState(2026)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -35573,13 +35573,13 @@ type TemplateNameContext struct {
 func NewEmptyTemplateNameContext() *TemplateNameContext {
 	var p = new(TemplateNameContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateName
+	p.RuleIndex = CPPParserRULE_templateName
 	return p
 }
 
 func InitEmptyTemplateNameContext(p *TemplateNameContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateName
+	p.RuleIndex = CPPParserRULE_templateName
 }
 
 func (*TemplateNameContext) IsTemplateNameContext() {}
@@ -35590,7 +35590,7 @@ func NewTemplateNameContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateName
+	p.RuleIndex = CPPParserRULE_templateName
 
 	return p
 }
@@ -35598,7 +35598,7 @@ func NewTemplateNameContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 func (s *TemplateNameContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TemplateNameContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *TemplateNameContext) GetRuleContext() antlr.RuleContext {
@@ -35611,7 +35611,7 @@ func (s *TemplateNameContext) ToStringTree(ruleNames []string, recog antlr.Recog
 
 func (s *TemplateNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateName(s)
 
 	default:
@@ -35619,16 +35619,16 @@ func (s *TemplateNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 	}
 }
 
-func (p *CPP14Parser) TemplateName() (localctx ITemplateNameContext) {
+func (p *CPPParser) TemplateName() (localctx ITemplateNameContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 352, CPP14ParserRULE_templateName)
+	p.EnterRule(localctx, 352, CPPParserRULE_templateName)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2030)
-		p.Match(CPP14ParserIdentifier)
+		p.Match(CPPParserIdentifier)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -35675,13 +35675,13 @@ type TemplateArgumentListContext struct {
 func NewEmptyTemplateArgumentListContext() *TemplateArgumentListContext {
 	var p = new(TemplateArgumentListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateArgumentList
+	p.RuleIndex = CPPParserRULE_templateArgumentList
 	return p
 }
 
 func InitEmptyTemplateArgumentListContext(p *TemplateArgumentListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateArgumentList
+	p.RuleIndex = CPPParserRULE_templateArgumentList
 }
 
 func (*TemplateArgumentListContext) IsTemplateArgumentListContext() {}
@@ -35692,7 +35692,7 @@ func NewTemplateArgumentListContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateArgumentList
+	p.RuleIndex = CPPParserRULE_templateArgumentList
 
 	return p
 }
@@ -35741,19 +35741,19 @@ func (s *TemplateArgumentListContext) TemplateArgument(i int) ITemplateArgumentC
 }
 
 func (s *TemplateArgumentListContext) AllEllipsis() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserEllipsis)
+	return s.GetTokens(CPPParserEllipsis)
 }
 
 func (s *TemplateArgumentListContext) Ellipsis(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, i)
+	return s.GetToken(CPPParserEllipsis, i)
 }
 
 func (s *TemplateArgumentListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *TemplateArgumentListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *TemplateArgumentListContext) GetRuleContext() antlr.RuleContext {
@@ -35766,7 +35766,7 @@ func (s *TemplateArgumentListContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *TemplateArgumentListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateArgumentList(s)
 
 	default:
@@ -35774,12 +35774,12 @@ func (s *TemplateArgumentListContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) TemplateArgumentList() (localctx ITemplateArgumentListContext) {
+func (p *CPPParser) TemplateArgumentList() (localctx ITemplateArgumentListContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateArgumentListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 354, CPP14ParserRULE_templateArgumentList)
+	p.EnterRule(localctx, 354, CPPParserRULE_templateArgumentList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -35794,10 +35794,10 @@ func (p *CPP14Parser) TemplateArgumentList() (localctx ITemplateArgumentListCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(2033)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -35812,10 +35812,10 @@ func (p *CPP14Parser) TemplateArgumentList() (localctx ITemplateArgumentListCont
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(2036)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -35832,10 +35832,10 @@ func (p *CPP14Parser) TemplateArgumentList() (localctx ITemplateArgumentListCont
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserEllipsis {
+		if _la == CPPParserEllipsis {
 			{
 				p.SetState(2038)
-				p.Match(CPP14ParserEllipsis)
+				p.Match(CPPParserEllipsis)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -35889,13 +35889,13 @@ type TemplateArgumentContext struct {
 func NewEmptyTemplateArgumentContext() *TemplateArgumentContext {
 	var p = new(TemplateArgumentContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateArgument
+	p.RuleIndex = CPPParserRULE_templateArgument
 	return p
 }
 
 func InitEmptyTemplateArgumentContext(p *TemplateArgumentContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_templateArgument
+	p.RuleIndex = CPPParserRULE_templateArgument
 }
 
 func (*TemplateArgumentContext) IsTemplateArgumentContext() {}
@@ -35906,7 +35906,7 @@ func NewTemplateArgumentContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_templateArgument
+	p.RuleIndex = CPPParserRULE_templateArgument
 
 	return p
 }
@@ -35971,7 +35971,7 @@ func (s *TemplateArgumentContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *TemplateArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTemplateArgument(s)
 
 	default:
@@ -35979,12 +35979,12 @@ func (s *TemplateArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) TemplateArgument() (localctx ITemplateArgumentContext) {
+func (p *CPPParser) TemplateArgument() (localctx ITemplateArgumentContext) {
 	this := p
 	_ = this
 
 	localctx = NewTemplateArgumentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 356, CPP14ParserRULE_templateArgument)
+	p.EnterRule(localctx, 356, CPPParserRULE_templateArgument)
 	p.SetState(2049)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -36056,13 +36056,13 @@ type TypeNameSpecifierContext struct {
 func NewEmptyTypeNameSpecifierContext() *TypeNameSpecifierContext {
 	var p = new(TypeNameSpecifierContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeNameSpecifier
+	p.RuleIndex = CPPParserRULE_typeNameSpecifier
 	return p
 }
 
 func InitEmptyTypeNameSpecifierContext(p *TypeNameSpecifierContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeNameSpecifier
+	p.RuleIndex = CPPParserRULE_typeNameSpecifier
 }
 
 func (*TypeNameSpecifierContext) IsTypeNameSpecifierContext() {}
@@ -36073,7 +36073,7 @@ func NewTypeNameSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typeNameSpecifier
+	p.RuleIndex = CPPParserRULE_typeNameSpecifier
 
 	return p
 }
@@ -36081,7 +36081,7 @@ func NewTypeNameSpecifierContext(parser antlr.Parser, parent antlr.ParserRuleCon
 func (s *TypeNameSpecifierContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TypeNameSpecifierContext) Typename_() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTypename_, 0)
+	return s.GetToken(CPPParserTypename_, 0)
 }
 
 func (s *TypeNameSpecifierContext) NestedNameSpecifier() INestedNameSpecifierContext {
@@ -36101,7 +36101,7 @@ func (s *TypeNameSpecifierContext) NestedNameSpecifier() INestedNameSpecifierCon
 }
 
 func (s *TypeNameSpecifierContext) Identifier() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIdentifier, 0)
+	return s.GetToken(CPPParserIdentifier, 0)
 }
 
 func (s *TypeNameSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext {
@@ -36121,7 +36121,7 @@ func (s *TypeNameSpecifierContext) SimpleTemplateId() ISimpleTemplateIdContext {
 }
 
 func (s *TypeNameSpecifierContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *TypeNameSpecifierContext) GetRuleContext() antlr.RuleContext {
@@ -36134,7 +36134,7 @@ func (s *TypeNameSpecifierContext) ToStringTree(ruleNames []string, recog antlr.
 
 func (s *TypeNameSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypeNameSpecifier(s)
 
 	default:
@@ -36142,18 +36142,18 @@ func (s *TypeNameSpecifierContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	}
 }
 
-func (p *CPP14Parser) TypeNameSpecifier() (localctx ITypeNameSpecifierContext) {
+func (p *CPPParser) TypeNameSpecifier() (localctx ITypeNameSpecifierContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypeNameSpecifierContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 358, CPP14ParserRULE_typeNameSpecifier)
+	p.EnterRule(localctx, 358, CPPParserRULE_typeNameSpecifier)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2051)
-		p.Match(CPP14ParserTypename_)
+		p.Match(CPPParserTypename_)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36173,7 +36173,7 @@ func (p *CPP14Parser) TypeNameSpecifier() (localctx ITypeNameSpecifierContext) {
 	case 1:
 		{
 			p.SetState(2053)
-			p.Match(CPP14ParserIdentifier)
+			p.Match(CPPParserIdentifier)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -36188,10 +36188,10 @@ func (p *CPP14Parser) TypeNameSpecifier() (localctx ITypeNameSpecifierContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserTemplate {
+		if _la == CPPParserTemplate {
 			{
 				p.SetState(2054)
-				p.Match(CPP14ParserTemplate)
+				p.Match(CPPParserTemplate)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -36245,13 +36245,13 @@ type ExplicitInstantiationContext struct {
 func NewEmptyExplicitInstantiationContext() *ExplicitInstantiationContext {
 	var p = new(ExplicitInstantiationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_explicitInstantiation
+	p.RuleIndex = CPPParserRULE_explicitInstantiation
 	return p
 }
 
 func InitEmptyExplicitInstantiationContext(p *ExplicitInstantiationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_explicitInstantiation
+	p.RuleIndex = CPPParserRULE_explicitInstantiation
 }
 
 func (*ExplicitInstantiationContext) IsExplicitInstantiationContext() {}
@@ -36262,7 +36262,7 @@ func NewExplicitInstantiationContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_explicitInstantiation
+	p.RuleIndex = CPPParserRULE_explicitInstantiation
 
 	return p
 }
@@ -36270,7 +36270,7 @@ func NewExplicitInstantiationContext(parser antlr.Parser, parent antlr.ParserRul
 func (s *ExplicitInstantiationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ExplicitInstantiationContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *ExplicitInstantiationContext) Declaration() IDeclarationContext {
@@ -36290,7 +36290,7 @@ func (s *ExplicitInstantiationContext) Declaration() IDeclarationContext {
 }
 
 func (s *ExplicitInstantiationContext) Extern() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserExtern, 0)
+	return s.GetToken(CPPParserExtern, 0)
 }
 
 func (s *ExplicitInstantiationContext) GetRuleContext() antlr.RuleContext {
@@ -36303,7 +36303,7 @@ func (s *ExplicitInstantiationContext) ToStringTree(ruleNames []string, recog an
 
 func (s *ExplicitInstantiationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExplicitInstantiation(s)
 
 	default:
@@ -36311,12 +36311,12 @@ func (s *ExplicitInstantiationContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) ExplicitInstantiation() (localctx IExplicitInstantiationContext) {
+func (p *CPPParser) ExplicitInstantiation() (localctx IExplicitInstantiationContext) {
 	this := p
 	_ = this
 
 	localctx = NewExplicitInstantiationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 360, CPP14ParserRULE_explicitInstantiation)
+	p.EnterRule(localctx, 360, CPPParserRULE_explicitInstantiation)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -36327,10 +36327,10 @@ func (p *CPP14Parser) ExplicitInstantiation() (localctx IExplicitInstantiationCo
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserExtern {
+	if _la == CPPParserExtern {
 		{
 			p.SetState(2060)
-			p.Match(CPP14ParserExtern)
+			p.Match(CPPParserExtern)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -36340,7 +36340,7 @@ func (p *CPP14Parser) ExplicitInstantiation() (localctx IExplicitInstantiationCo
 	}
 	{
 		p.SetState(2063)
-		p.Match(CPP14ParserTemplate)
+		p.Match(CPPParserTemplate)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36389,13 +36389,13 @@ type ExplicitSpecializationContext struct {
 func NewEmptyExplicitSpecializationContext() *ExplicitSpecializationContext {
 	var p = new(ExplicitSpecializationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_explicitSpecialization
+	p.RuleIndex = CPPParserRULE_explicitSpecialization
 	return p
 }
 
 func InitEmptyExplicitSpecializationContext(p *ExplicitSpecializationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_explicitSpecialization
+	p.RuleIndex = CPPParserRULE_explicitSpecialization
 }
 
 func (*ExplicitSpecializationContext) IsExplicitSpecializationContext() {}
@@ -36406,7 +36406,7 @@ func NewExplicitSpecializationContext(parser antlr.Parser, parent antlr.ParserRu
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_explicitSpecialization
+	p.RuleIndex = CPPParserRULE_explicitSpecialization
 
 	return p
 }
@@ -36414,15 +36414,15 @@ func NewExplicitSpecializationContext(parser antlr.Parser, parent antlr.ParserRu
 func (s *ExplicitSpecializationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ExplicitSpecializationContext) Template() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTemplate, 0)
+	return s.GetToken(CPPParserTemplate, 0)
 }
 
 func (s *ExplicitSpecializationContext) Less() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, 0)
+	return s.GetToken(CPPParserLess, 0)
 }
 
 func (s *ExplicitSpecializationContext) Greater() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, 0)
+	return s.GetToken(CPPParserGreater, 0)
 }
 
 func (s *ExplicitSpecializationContext) Declaration() IDeclarationContext {
@@ -36451,7 +36451,7 @@ func (s *ExplicitSpecializationContext) ToStringTree(ruleNames []string, recog a
 
 func (s *ExplicitSpecializationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExplicitSpecialization(s)
 
 	default:
@@ -36459,16 +36459,16 @@ func (s *ExplicitSpecializationContext) Accept(visitor antlr.ParseTreeVisitor) i
 	}
 }
 
-func (p *CPP14Parser) ExplicitSpecialization() (localctx IExplicitSpecializationContext) {
+func (p *CPPParser) ExplicitSpecialization() (localctx IExplicitSpecializationContext) {
 	this := p
 	_ = this
 
 	localctx = NewExplicitSpecializationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 362, CPP14ParserRULE_explicitSpecialization)
+	p.EnterRule(localctx, 362, CPPParserRULE_explicitSpecialization)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2066)
-		p.Match(CPP14ParserTemplate)
+		p.Match(CPPParserTemplate)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36476,7 +36476,7 @@ func (p *CPP14Parser) ExplicitSpecialization() (localctx IExplicitSpecialization
 	}
 	{
 		p.SetState(2067)
-		p.Match(CPP14ParserLess)
+		p.Match(CPPParserLess)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36484,7 +36484,7 @@ func (p *CPP14Parser) ExplicitSpecialization() (localctx IExplicitSpecialization
 	}
 	{
 		p.SetState(2068)
-		p.Match(CPP14ParserGreater)
+		p.Match(CPPParserGreater)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36532,13 +36532,13 @@ type TryBlockContext struct {
 func NewEmptyTryBlockContext() *TryBlockContext {
 	var p = new(TryBlockContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_tryBlock
+	p.RuleIndex = CPPParserRULE_tryBlock
 	return p
 }
 
 func InitEmptyTryBlockContext(p *TryBlockContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_tryBlock
+	p.RuleIndex = CPPParserRULE_tryBlock
 }
 
 func (*TryBlockContext) IsTryBlockContext() {}
@@ -36549,7 +36549,7 @@ func NewTryBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_tryBlock
+	p.RuleIndex = CPPParserRULE_tryBlock
 
 	return p
 }
@@ -36557,7 +36557,7 @@ func NewTryBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 func (s *TryBlockContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TryBlockContext) Try() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTry, 0)
+	return s.GetToken(CPPParserTry, 0)
 }
 
 func (s *TryBlockContext) CompoundStatement() ICompoundStatementContext {
@@ -36602,7 +36602,7 @@ func (s *TryBlockContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 
 func (s *TryBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTryBlock(s)
 
 	default:
@@ -36610,16 +36610,16 @@ func (s *TryBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) TryBlock() (localctx ITryBlockContext) {
+func (p *CPPParser) TryBlock() (localctx ITryBlockContext) {
 	this := p
 	_ = this
 
 	localctx = NewTryBlockContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 364, CPP14ParserRULE_tryBlock)
+	p.EnterRule(localctx, 364, CPPParserRULE_tryBlock)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2071)
-		p.Match(CPP14ParserTry)
+		p.Match(CPPParserTry)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36672,13 +36672,13 @@ type FunctionTryBlockContext struct {
 func NewEmptyFunctionTryBlockContext() *FunctionTryBlockContext {
 	var p = new(FunctionTryBlockContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionTryBlock
+	p.RuleIndex = CPPParserRULE_functionTryBlock
 	return p
 }
 
 func InitEmptyFunctionTryBlockContext(p *FunctionTryBlockContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_functionTryBlock
+	p.RuleIndex = CPPParserRULE_functionTryBlock
 }
 
 func (*FunctionTryBlockContext) IsFunctionTryBlockContext() {}
@@ -36689,7 +36689,7 @@ func NewFunctionTryBlockContext(parser antlr.Parser, parent antlr.ParserRuleCont
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_functionTryBlock
+	p.RuleIndex = CPPParserRULE_functionTryBlock
 
 	return p
 }
@@ -36697,7 +36697,7 @@ func NewFunctionTryBlockContext(parser antlr.Parser, parent antlr.ParserRuleCont
 func (s *FunctionTryBlockContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *FunctionTryBlockContext) Try() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTry, 0)
+	return s.GetToken(CPPParserTry, 0)
 }
 
 func (s *FunctionTryBlockContext) CompoundStatement() ICompoundStatementContext {
@@ -36758,7 +36758,7 @@ func (s *FunctionTryBlockContext) ToStringTree(ruleNames []string, recog antlr.R
 
 func (s *FunctionTryBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitFunctionTryBlock(s)
 
 	default:
@@ -36766,18 +36766,18 @@ func (s *FunctionTryBlockContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
-func (p *CPP14Parser) FunctionTryBlock() (localctx IFunctionTryBlockContext) {
+func (p *CPPParser) FunctionTryBlock() (localctx IFunctionTryBlockContext) {
 	this := p
 	_ = this
 
 	localctx = NewFunctionTryBlockContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 366, CPP14ParserRULE_functionTryBlock)
+	p.EnterRule(localctx, 366, CPPParserRULE_functionTryBlock)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2075)
-		p.Match(CPP14ParserTry)
+		p.Match(CPPParserTry)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -36790,7 +36790,7 @@ func (p *CPP14Parser) FunctionTryBlock() (localctx IFunctionTryBlockContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserColon {
+	if _la == CPPParserColon {
 		{
 			p.SetState(2076)
 			p.ConstructorInitializer()
@@ -36842,13 +36842,13 @@ type HandlerSeqContext struct {
 func NewEmptyHandlerSeqContext() *HandlerSeqContext {
 	var p = new(HandlerSeqContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_handlerSeq
+	p.RuleIndex = CPPParserRULE_handlerSeq
 	return p
 }
 
 func InitEmptyHandlerSeqContext(p *HandlerSeqContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_handlerSeq
+	p.RuleIndex = CPPParserRULE_handlerSeq
 }
 
 func (*HandlerSeqContext) IsHandlerSeqContext() {}
@@ -36859,7 +36859,7 @@ func NewHandlerSeqContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_handlerSeq
+	p.RuleIndex = CPPParserRULE_handlerSeq
 
 	return p
 }
@@ -36917,7 +36917,7 @@ func (s *HandlerSeqContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *HandlerSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitHandlerSeq(s)
 
 	default:
@@ -36925,12 +36925,12 @@ func (s *HandlerSeqContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) HandlerSeq() (localctx IHandlerSeqContext) {
+func (p *CPPParser) HandlerSeq() (localctx IHandlerSeqContext) {
 	this := p
 	_ = this
 
 	localctx = NewHandlerSeqContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 368, CPP14ParserRULE_handlerSeq)
+	p.EnterRule(localctx, 368, CPPParserRULE_handlerSeq)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -36941,7 +36941,7 @@ func (p *CPP14Parser) HandlerSeq() (localctx IHandlerSeqContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = _la == CPP14ParserCatch {
+	for ok := true; ok; ok = _la == CPPParserCatch {
 		{
 			p.SetState(2082)
 			p.Handler()
@@ -36994,13 +36994,13 @@ type HandlerContext struct {
 func NewEmptyHandlerContext() *HandlerContext {
 	var p = new(HandlerContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_handler
+	p.RuleIndex = CPPParserRULE_handler
 	return p
 }
 
 func InitEmptyHandlerContext(p *HandlerContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_handler
+	p.RuleIndex = CPPParserRULE_handler
 }
 
 func (*HandlerContext) IsHandlerContext() {}
@@ -37011,7 +37011,7 @@ func NewHandlerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_handler
+	p.RuleIndex = CPPParserRULE_handler
 
 	return p
 }
@@ -37019,11 +37019,11 @@ func NewHandlerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 func (s *HandlerContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *HandlerContext) Catch() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserCatch, 0)
+	return s.GetToken(CPPParserCatch, 0)
 }
 
 func (s *HandlerContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *HandlerContext) ExceptionDeclaration() IExceptionDeclarationContext {
@@ -37043,7 +37043,7 @@ func (s *HandlerContext) ExceptionDeclaration() IExceptionDeclarationContext {
 }
 
 func (s *HandlerContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *HandlerContext) CompoundStatement() ICompoundStatementContext {
@@ -37072,7 +37072,7 @@ func (s *HandlerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 
 func (s *HandlerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitHandler(s)
 
 	default:
@@ -37080,16 +37080,16 @@ func (s *HandlerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Handler() (localctx IHandlerContext) {
+func (p *CPPParser) Handler() (localctx IHandlerContext) {
 	this := p
 	_ = this
 
 	localctx = NewHandlerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 370, CPP14ParserRULE_handler)
+	p.EnterRule(localctx, 370, CPPParserRULE_handler)
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2087)
-		p.Match(CPP14ParserCatch)
+		p.Match(CPPParserCatch)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37097,7 +37097,7 @@ func (p *CPP14Parser) Handler() (localctx IHandlerContext) {
 	}
 	{
 		p.SetState(2088)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37109,7 +37109,7 @@ func (p *CPP14Parser) Handler() (localctx IHandlerContext) {
 	}
 	{
 		p.SetState(2090)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37159,13 +37159,13 @@ type ExceptionDeclarationContext struct {
 func NewEmptyExceptionDeclarationContext() *ExceptionDeclarationContext {
 	var p = new(ExceptionDeclarationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_exceptionDeclaration
+	p.RuleIndex = CPPParserRULE_exceptionDeclaration
 	return p
 }
 
 func InitEmptyExceptionDeclarationContext(p *ExceptionDeclarationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_exceptionDeclaration
+	p.RuleIndex = CPPParserRULE_exceptionDeclaration
 }
 
 func (*ExceptionDeclarationContext) IsExceptionDeclarationContext() {}
@@ -37176,7 +37176,7 @@ func NewExceptionDeclarationContext(parser antlr.Parser, parent antlr.ParserRule
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_exceptionDeclaration
+	p.RuleIndex = CPPParserRULE_exceptionDeclaration
 
 	return p
 }
@@ -37248,7 +37248,7 @@ func (s *ExceptionDeclarationContext) AbstractDeclarator() IAbstractDeclaratorCo
 }
 
 func (s *ExceptionDeclarationContext) Ellipsis() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, 0)
+	return s.GetToken(CPPParserEllipsis, 0)
 }
 
 func (s *ExceptionDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -37261,7 +37261,7 @@ func (s *ExceptionDeclarationContext) ToStringTree(ruleNames []string, recog ant
 
 func (s *ExceptionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExceptionDeclaration(s)
 
 	default:
@@ -37269,12 +37269,12 @@ func (s *ExceptionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) int
 	}
 }
 
-func (p *CPP14Parser) ExceptionDeclaration() (localctx IExceptionDeclarationContext) {
+func (p *CPPParser) ExceptionDeclaration() (localctx IExceptionDeclarationContext) {
 	this := p
 	_ = this
 
 	localctx = NewExceptionDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 372, CPP14ParserRULE_exceptionDeclaration)
+	p.EnterRule(localctx, 372, CPPParserRULE_exceptionDeclaration)
 	var _la int
 
 	p.SetState(2102)
@@ -37284,7 +37284,7 @@ func (p *CPP14Parser) ExceptionDeclaration() (localctx IExceptionDeclarationCont
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserAlignas, CPP14ParserAuto, CPP14ParserBool, CPP14ParserChar, CPP14ParserChar16, CPP14ParserChar32, CPP14ParserClass, CPP14ParserConst, CPP14ParserDecltype, CPP14ParserDouble, CPP14ParserEnum, CPP14ParserFloat, CPP14ParserInt, CPP14ParserLong, CPP14ParserShort, CPP14ParserSigned, CPP14ParserStruct, CPP14ParserTypename_, CPP14ParserUnion, CPP14ParserUnsigned, CPP14ParserVoid, CPP14ParserVolatile, CPP14ParserWchar, CPP14ParserLeftBracket, CPP14ParserDoublecolon, CPP14ParserAttributeGnu, CPP14ParserIdentifier:
+	case CPPParserAlignas, CPPParserAuto, CPPParserBool, CPPParserChar, CPPParserChar16, CPPParserChar32, CPPParserClass, CPPParserConst, CPPParserDecltype, CPPParserDouble, CPPParserEnum, CPPParserFloat, CPPParserInt, CPPParserLong, CPPParserShort, CPPParserSigned, CPPParserStruct, CPPParserTypename_, CPPParserUnion, CPPParserUnsigned, CPPParserVoid, CPPParserVolatile, CPPParserWchar, CPPParserLeftBracket, CPPParserDoublecolon, CPPParserAttributeGnu, CPPParserIdentifier:
 		p.EnterOuterAlt(localctx, 1)
 		p.SetState(2094)
 		p.GetErrorHandler().Sync(p)
@@ -37293,7 +37293,7 @@ func (p *CPP14Parser) ExceptionDeclaration() (localctx IExceptionDeclarationCont
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserAlignas || _la == CPP14ParserLeftBracket || _la == CPP14ParserAttributeGnu {
+		if _la == CPPParserAlignas || _la == CPPParserLeftBracket || _la == CPPParserAttributeGnu {
 			{
 				p.SetState(2093)
 				p.AttributeSpecifierSeq()
@@ -37325,11 +37325,11 @@ func (p *CPP14Parser) ExceptionDeclaration() (localctx IExceptionDeclarationCont
 			goto errorExit
 		}
 
-	case CPP14ParserEllipsis:
+	case CPPParserEllipsis:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(2101)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -37377,13 +37377,13 @@ type ThrowExpressionContext struct {
 func NewEmptyThrowExpressionContext() *ThrowExpressionContext {
 	var p = new(ThrowExpressionContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_throwExpression
+	p.RuleIndex = CPPParserRULE_throwExpression
 	return p
 }
 
 func InitEmptyThrowExpressionContext(p *ThrowExpressionContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_throwExpression
+	p.RuleIndex = CPPParserRULE_throwExpression
 }
 
 func (*ThrowExpressionContext) IsThrowExpressionContext() {}
@@ -37394,7 +37394,7 @@ func NewThrowExpressionContext(parser antlr.Parser, parent antlr.ParserRuleConte
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_throwExpression
+	p.RuleIndex = CPPParserRULE_throwExpression
 
 	return p
 }
@@ -37402,7 +37402,7 @@ func NewThrowExpressionContext(parser antlr.Parser, parent antlr.ParserRuleConte
 func (s *ThrowExpressionContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *ThrowExpressionContext) Throw() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserThrow, 0)
+	return s.GetToken(CPPParserThrow, 0)
 }
 
 func (s *ThrowExpressionContext) AssignmentExpression() IAssignmentExpressionContext {
@@ -37431,7 +37431,7 @@ func (s *ThrowExpressionContext) ToStringTree(ruleNames []string, recog antlr.Re
 
 func (s *ThrowExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitThrowExpression(s)
 
 	default:
@@ -37439,18 +37439,18 @@ func (s *ThrowExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 	}
 }
 
-func (p *CPP14Parser) ThrowExpression() (localctx IThrowExpressionContext) {
+func (p *CPPParser) ThrowExpression() (localctx IThrowExpressionContext) {
 	this := p
 	_ = this
 
 	localctx = NewThrowExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 374, CPP14ParserRULE_throwExpression)
+	p.EnterRule(localctx, 374, CPPParserRULE_throwExpression)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2104)
-		p.Match(CPP14ParserThrow)
+		p.Match(CPPParserThrow)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37463,7 +37463,7 @@ func (p *CPP14Parser) ThrowExpression() (localctx IThrowExpressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133201) != 0) || _la == CPP14ParserIdentifier {
+	if ((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&8364979464334764286) != 0) || ((int64((_la-65)) & ^0x3f) == 0 && ((int64(1)<<(_la-65))&4719772474384133201) != 0) || _la == CPPParserIdentifier {
 		{
 			p.SetState(2105)
 			p.AssignmentExpression()
@@ -37507,13 +37507,13 @@ type ExceptionSpecificationContext struct {
 func NewEmptyExceptionSpecificationContext() *ExceptionSpecificationContext {
 	var p = new(ExceptionSpecificationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_exceptionSpecification
+	p.RuleIndex = CPPParserRULE_exceptionSpecification
 	return p
 }
 
 func InitEmptyExceptionSpecificationContext(p *ExceptionSpecificationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_exceptionSpecification
+	p.RuleIndex = CPPParserRULE_exceptionSpecification
 }
 
 func (*ExceptionSpecificationContext) IsExceptionSpecificationContext() {}
@@ -37524,7 +37524,7 @@ func NewExceptionSpecificationContext(parser antlr.Parser, parent antlr.ParserRu
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_exceptionSpecification
+	p.RuleIndex = CPPParserRULE_exceptionSpecification
 
 	return p
 }
@@ -37573,7 +37573,7 @@ func (s *ExceptionSpecificationContext) ToStringTree(ruleNames []string, recog a
 
 func (s *ExceptionSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitExceptionSpecification(s)
 
 	default:
@@ -37581,12 +37581,12 @@ func (s *ExceptionSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) i
 	}
 }
 
-func (p *CPP14Parser) ExceptionSpecification() (localctx IExceptionSpecificationContext) {
+func (p *CPPParser) ExceptionSpecification() (localctx IExceptionSpecificationContext) {
 	this := p
 	_ = this
 
 	localctx = NewExceptionSpecificationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 376, CPP14ParserRULE_exceptionSpecification)
+	p.EnterRule(localctx, 376, CPPParserRULE_exceptionSpecification)
 	p.SetState(2110)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -37594,14 +37594,14 @@ func (p *CPP14Parser) ExceptionSpecification() (localctx IExceptionSpecification
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case CPP14ParserThrow:
+	case CPPParserThrow:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(2108)
 			p.DynamicExceptionSpecification()
 		}
 
-	case CPP14ParserNoexcept:
+	case CPPParserNoexcept:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(2109)
@@ -37651,13 +37651,13 @@ type DynamicExceptionSpecificationContext struct {
 func NewEmptyDynamicExceptionSpecificationContext() *DynamicExceptionSpecificationContext {
 	var p = new(DynamicExceptionSpecificationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_dynamicExceptionSpecification
+	p.RuleIndex = CPPParserRULE_dynamicExceptionSpecification
 	return p
 }
 
 func InitEmptyDynamicExceptionSpecificationContext(p *DynamicExceptionSpecificationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_dynamicExceptionSpecification
+	p.RuleIndex = CPPParserRULE_dynamicExceptionSpecification
 }
 
 func (*DynamicExceptionSpecificationContext) IsDynamicExceptionSpecificationContext() {}
@@ -37668,7 +37668,7 @@ func NewDynamicExceptionSpecificationContext(parser antlr.Parser, parent antlr.P
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_dynamicExceptionSpecification
+	p.RuleIndex = CPPParserRULE_dynamicExceptionSpecification
 
 	return p
 }
@@ -37676,15 +37676,15 @@ func NewDynamicExceptionSpecificationContext(parser antlr.Parser, parent antlr.P
 func (s *DynamicExceptionSpecificationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *DynamicExceptionSpecificationContext) Throw() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserThrow, 0)
+	return s.GetToken(CPPParserThrow, 0)
 }
 
 func (s *DynamicExceptionSpecificationContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *DynamicExceptionSpecificationContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *DynamicExceptionSpecificationContext) TypeIdList() ITypeIdListContext {
@@ -37713,7 +37713,7 @@ func (s *DynamicExceptionSpecificationContext) ToStringTree(ruleNames []string, 
 
 func (s *DynamicExceptionSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitDynamicExceptionSpecification(s)
 
 	default:
@@ -37721,18 +37721,18 @@ func (s *DynamicExceptionSpecificationContext) Accept(visitor antlr.ParseTreeVis
 	}
 }
 
-func (p *CPP14Parser) DynamicExceptionSpecification() (localctx IDynamicExceptionSpecificationContext) {
+func (p *CPPParser) DynamicExceptionSpecification() (localctx IDynamicExceptionSpecificationContext) {
 	this := p
 	_ = this
 
 	localctx = NewDynamicExceptionSpecificationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 378, CPP14ParserRULE_dynamicExceptionSpecification)
+	p.EnterRule(localctx, 378, CPPParserRULE_dynamicExceptionSpecification)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(2112)
-		p.Match(CPP14ParserThrow)
+		p.Match(CPPParserThrow)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37740,7 +37740,7 @@ func (p *CPP14Parser) DynamicExceptionSpecification() (localctx IDynamicExceptio
 	}
 	{
 		p.SetState(2113)
-		p.Match(CPP14ParserLeftParen)
+		p.Match(CPPParserLeftParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37762,7 +37762,7 @@ func (p *CPP14Parser) DynamicExceptionSpecification() (localctx IDynamicExceptio
 	}
 	{
 		p.SetState(2117)
-		p.Match(CPP14ParserRightParen)
+		p.Match(CPPParserRightParen)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -37809,13 +37809,13 @@ type TypeIdListContext struct {
 func NewEmptyTypeIdListContext() *TypeIdListContext {
 	var p = new(TypeIdListContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeIdList
+	p.RuleIndex = CPPParserRULE_typeIdList
 	return p
 }
 
 func InitEmptyTypeIdListContext(p *TypeIdListContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_typeIdList
+	p.RuleIndex = CPPParserRULE_typeIdList
 }
 
 func (*TypeIdListContext) IsTypeIdListContext() {}
@@ -37826,7 +37826,7 @@ func NewTypeIdListContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_typeIdList
+	p.RuleIndex = CPPParserRULE_typeIdList
 
 	return p
 }
@@ -37875,19 +37875,19 @@ func (s *TypeIdListContext) TheTypeId(i int) ITheTypeIdContext {
 }
 
 func (s *TypeIdListContext) AllEllipsis() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserEllipsis)
+	return s.GetTokens(CPPParserEllipsis)
 }
 
 func (s *TypeIdListContext) Ellipsis(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEllipsis, i)
+	return s.GetToken(CPPParserEllipsis, i)
 }
 
 func (s *TypeIdListContext) AllComma() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserComma)
+	return s.GetTokens(CPPParserComma)
 }
 
 func (s *TypeIdListContext) Comma(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, i)
+	return s.GetToken(CPPParserComma, i)
 }
 
 func (s *TypeIdListContext) GetRuleContext() antlr.RuleContext {
@@ -37900,7 +37900,7 @@ func (s *TypeIdListContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 
 func (s *TypeIdListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTypeIdList(s)
 
 	default:
@@ -37908,12 +37908,12 @@ func (s *TypeIdListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) TypeIdList() (localctx ITypeIdListContext) {
+func (p *CPPParser) TypeIdList() (localctx ITypeIdListContext) {
 	this := p
 	_ = this
 
 	localctx = NewTypeIdListContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 380, CPP14ParserRULE_typeIdList)
+	p.EnterRule(localctx, 380, CPPParserRULE_typeIdList)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -37928,10 +37928,10 @@ func (p *CPP14Parser) TypeIdList() (localctx ITypeIdListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CPP14ParserEllipsis {
+	if _la == CPPParserEllipsis {
 		{
 			p.SetState(2120)
-			p.Match(CPP14ParserEllipsis)
+			p.Match(CPPParserEllipsis)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -37946,10 +37946,10 @@ func (p *CPP14Parser) TypeIdList() (localctx ITypeIdListContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == CPP14ParserComma {
+	for _la == CPPParserComma {
 		{
 			p.SetState(2123)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -37966,10 +37966,10 @@ func (p *CPP14Parser) TypeIdList() (localctx ITypeIdListContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == CPP14ParserEllipsis {
+		if _la == CPPParserEllipsis {
 			{
 				p.SetState(2125)
-				p.Match(CPP14ParserEllipsis)
+				p.Match(CPPParserEllipsis)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -38024,13 +38024,13 @@ type NoExceptSpecificationContext struct {
 func NewEmptyNoExceptSpecificationContext() *NoExceptSpecificationContext {
 	var p = new(NoExceptSpecificationContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noExceptSpecification
+	p.RuleIndex = CPPParserRULE_noExceptSpecification
 	return p
 }
 
 func InitEmptyNoExceptSpecificationContext(p *NoExceptSpecificationContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_noExceptSpecification
+	p.RuleIndex = CPPParserRULE_noExceptSpecification
 }
 
 func (*NoExceptSpecificationContext) IsNoExceptSpecificationContext() {}
@@ -38041,7 +38041,7 @@ func NewNoExceptSpecificationContext(parser antlr.Parser, parent antlr.ParserRul
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_noExceptSpecification
+	p.RuleIndex = CPPParserRULE_noExceptSpecification
 
 	return p
 }
@@ -38049,11 +38049,11 @@ func NewNoExceptSpecificationContext(parser antlr.Parser, parent antlr.ParserRul
 func (s *NoExceptSpecificationContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *NoExceptSpecificationContext) Noexcept() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNoexcept, 0)
+	return s.GetToken(CPPParserNoexcept, 0)
 }
 
 func (s *NoExceptSpecificationContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *NoExceptSpecificationContext) ConstantExpression() IConstantExpressionContext {
@@ -38073,7 +38073,7 @@ func (s *NoExceptSpecificationContext) ConstantExpression() IConstantExpressionC
 }
 
 func (s *NoExceptSpecificationContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *NoExceptSpecificationContext) GetRuleContext() antlr.RuleContext {
@@ -38086,7 +38086,7 @@ func (s *NoExceptSpecificationContext) ToStringTree(ruleNames []string, recog an
 
 func (s *NoExceptSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitNoExceptSpecification(s)
 
 	default:
@@ -38094,12 +38094,12 @@ func (s *NoExceptSpecificationContext) Accept(visitor antlr.ParseTreeVisitor) in
 	}
 }
 
-func (p *CPP14Parser) NoExceptSpecification() (localctx INoExceptSpecificationContext) {
+func (p *CPPParser) NoExceptSpecification() (localctx INoExceptSpecificationContext) {
 	this := p
 	_ = this
 
 	localctx = NewNoExceptSpecificationContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 382, CPP14ParserRULE_noExceptSpecification)
+	p.EnterRule(localctx, 382, CPPParserRULE_noExceptSpecification)
 	p.SetState(2139)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -38111,7 +38111,7 @@ func (p *CPP14Parser) NoExceptSpecification() (localctx INoExceptSpecificationCo
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(2133)
-			p.Match(CPP14ParserNoexcept)
+			p.Match(CPPParserNoexcept)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38119,7 +38119,7 @@ func (p *CPP14Parser) NoExceptSpecification() (localctx INoExceptSpecificationCo
 		}
 		{
 			p.SetState(2134)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38131,7 +38131,7 @@ func (p *CPP14Parser) NoExceptSpecification() (localctx INoExceptSpecificationCo
 		}
 		{
 			p.SetState(2136)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38142,7 +38142,7 @@ func (p *CPP14Parser) NoExceptSpecification() (localctx INoExceptSpecificationCo
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(2138)
-			p.Match(CPP14ParserNoexcept)
+			p.Match(CPPParserNoexcept)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38229,13 +38229,13 @@ type TheOperatorContext struct {
 func NewEmptyTheOperatorContext() *TheOperatorContext {
 	var p = new(TheOperatorContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_theOperator
+	p.RuleIndex = CPPParserRULE_theOperator
 	return p
 }
 
 func InitEmptyTheOperatorContext(p *TheOperatorContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_theOperator
+	p.RuleIndex = CPPParserRULE_theOperator
 }
 
 func (*TheOperatorContext) IsTheOperatorContext() {}
@@ -38246,7 +38246,7 @@ func NewTheOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_theOperator
+	p.RuleIndex = CPPParserRULE_theOperator
 
 	return p
 }
@@ -38254,171 +38254,171 @@ func NewTheOperatorContext(parser antlr.Parser, parent antlr.ParserRuleContext, 
 func (s *TheOperatorContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *TheOperatorContext) New() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNew, 0)
+	return s.GetToken(CPPParserNew, 0)
 }
 
 func (s *TheOperatorContext) LeftBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftBracket, 0)
+	return s.GetToken(CPPParserLeftBracket, 0)
 }
 
 func (s *TheOperatorContext) RightBracket() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightBracket, 0)
+	return s.GetToken(CPPParserRightBracket, 0)
 }
 
 func (s *TheOperatorContext) Delete() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDelete, 0)
+	return s.GetToken(CPPParserDelete, 0)
 }
 
 func (s *TheOperatorContext) Plus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlus, 0)
+	return s.GetToken(CPPParserPlus, 0)
 }
 
 func (s *TheOperatorContext) Minus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinus, 0)
+	return s.GetToken(CPPParserMinus, 0)
 }
 
 func (s *TheOperatorContext) Star() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStar, 0)
+	return s.GetToken(CPPParserStar, 0)
 }
 
 func (s *TheOperatorContext) Div() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDiv, 0)
+	return s.GetToken(CPPParserDiv, 0)
 }
 
 func (s *TheOperatorContext) Mod() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMod, 0)
+	return s.GetToken(CPPParserMod, 0)
 }
 
 func (s *TheOperatorContext) Caret() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserCaret, 0)
+	return s.GetToken(CPPParserCaret, 0)
 }
 
 func (s *TheOperatorContext) And() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAnd, 0)
+	return s.GetToken(CPPParserAnd, 0)
 }
 
 func (s *TheOperatorContext) Or() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOr, 0)
+	return s.GetToken(CPPParserOr, 0)
 }
 
 func (s *TheOperatorContext) Tilde() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserTilde, 0)
+	return s.GetToken(CPPParserTilde, 0)
 }
 
 func (s *TheOperatorContext) Not() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNot, 0)
+	return s.GetToken(CPPParserNot, 0)
 }
 
 func (s *TheOperatorContext) Assign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAssign, 0)
+	return s.GetToken(CPPParserAssign, 0)
 }
 
 func (s *TheOperatorContext) AllGreater() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserGreater)
+	return s.GetTokens(CPPParserGreater)
 }
 
 func (s *TheOperatorContext) Greater(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreater, i)
+	return s.GetToken(CPPParserGreater, i)
 }
 
 func (s *TheOperatorContext) AllLess() []antlr.TerminalNode {
-	return s.GetTokens(CPP14ParserLess)
+	return s.GetTokens(CPPParserLess)
 }
 
 func (s *TheOperatorContext) Less(i int) antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLess, i)
+	return s.GetToken(CPPParserLess, i)
 }
 
 func (s *TheOperatorContext) GreaterEqual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserGreaterEqual, 0)
+	return s.GetToken(CPPParserGreaterEqual, 0)
 }
 
 func (s *TheOperatorContext) PlusAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlusAssign, 0)
+	return s.GetToken(CPPParserPlusAssign, 0)
 }
 
 func (s *TheOperatorContext) MinusAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinusAssign, 0)
+	return s.GetToken(CPPParserMinusAssign, 0)
 }
 
 func (s *TheOperatorContext) StarAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStarAssign, 0)
+	return s.GetToken(CPPParserStarAssign, 0)
 }
 
 func (s *TheOperatorContext) DivAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserDivAssign, 0)
+	return s.GetToken(CPPParserDivAssign, 0)
 }
 
 func (s *TheOperatorContext) ModAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserModAssign, 0)
+	return s.GetToken(CPPParserModAssign, 0)
 }
 
 func (s *TheOperatorContext) XorAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserXorAssign, 0)
+	return s.GetToken(CPPParserXorAssign, 0)
 }
 
 func (s *TheOperatorContext) AndAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAssign, 0)
+	return s.GetToken(CPPParserAndAssign, 0)
 }
 
 func (s *TheOperatorContext) OrAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOrAssign, 0)
+	return s.GetToken(CPPParserOrAssign, 0)
 }
 
 func (s *TheOperatorContext) RightShiftAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightShiftAssign, 0)
+	return s.GetToken(CPPParserRightShiftAssign, 0)
 }
 
 func (s *TheOperatorContext) LeftShiftAssign() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftShiftAssign, 0)
+	return s.GetToken(CPPParserLeftShiftAssign, 0)
 }
 
 func (s *TheOperatorContext) Equal() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserEqual, 0)
+	return s.GetToken(CPPParserEqual, 0)
 }
 
 func (s *TheOperatorContext) NotEqual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserNotEqual, 0)
+	return s.GetToken(CPPParserNotEqual, 0)
 }
 
 func (s *TheOperatorContext) LessEqual() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLessEqual, 0)
+	return s.GetToken(CPPParserLessEqual, 0)
 }
 
 func (s *TheOperatorContext) AndAnd() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserAndAnd, 0)
+	return s.GetToken(CPPParserAndAnd, 0)
 }
 
 func (s *TheOperatorContext) OrOr() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserOrOr, 0)
+	return s.GetToken(CPPParserOrOr, 0)
 }
 
 func (s *TheOperatorContext) PlusPlus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPlusPlus, 0)
+	return s.GetToken(CPPParserPlusPlus, 0)
 }
 
 func (s *TheOperatorContext) MinusMinus() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserMinusMinus, 0)
+	return s.GetToken(CPPParserMinusMinus, 0)
 }
 
 func (s *TheOperatorContext) Comma() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserComma, 0)
+	return s.GetToken(CPPParserComma, 0)
 }
 
 func (s *TheOperatorContext) ArrowStar() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserArrowStar, 0)
+	return s.GetToken(CPPParserArrowStar, 0)
 }
 
 func (s *TheOperatorContext) Arrow() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserArrow, 0)
+	return s.GetToken(CPPParserArrow, 0)
 }
 
 func (s *TheOperatorContext) LeftParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserLeftParen, 0)
+	return s.GetToken(CPPParserLeftParen, 0)
 }
 
 func (s *TheOperatorContext) RightParen() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserRightParen, 0)
+	return s.GetToken(CPPParserRightParen, 0)
 }
 
 func (s *TheOperatorContext) GetRuleContext() antlr.RuleContext {
@@ -38431,7 +38431,7 @@ func (s *TheOperatorContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 
 func (s *TheOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitTheOperator(s)
 
 	default:
@@ -38439,12 +38439,12 @@ func (s *TheOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 	}
 }
 
-func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
+func (p *CPPParser) TheOperator() (localctx ITheOperatorContext) {
 	this := p
 	_ = this
 
 	localctx = NewTheOperatorContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 384, CPP14ParserRULE_theOperator)
+	p.EnterRule(localctx, 384, CPPParserRULE_theOperator)
 	p.SetState(2193)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
@@ -38456,7 +38456,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(2141)
-			p.Match(CPP14ParserNew)
+			p.Match(CPPParserNew)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38468,7 +38468,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 302, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(2142)
-				p.Match(CPP14ParserLeftBracket)
+				p.Match(CPPParserLeftBracket)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -38476,7 +38476,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 			}
 			{
 				p.SetState(2143)
-				p.Match(CPP14ParserRightBracket)
+				p.Match(CPPParserRightBracket)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -38491,7 +38491,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(2146)
-			p.Match(CPP14ParserDelete)
+			p.Match(CPPParserDelete)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38503,7 +38503,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 303, p.GetParserRuleContext()) == 1 {
 			{
 				p.SetState(2147)
-				p.Match(CPP14ParserLeftBracket)
+				p.Match(CPPParserLeftBracket)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -38511,7 +38511,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 			}
 			{
 				p.SetState(2148)
-				p.Match(CPP14ParserRightBracket)
+				p.Match(CPPParserRightBracket)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -38526,7 +38526,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(2151)
-			p.Match(CPP14ParserPlus)
+			p.Match(CPPParserPlus)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38537,7 +38537,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(2152)
-			p.Match(CPP14ParserMinus)
+			p.Match(CPPParserMinus)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38548,7 +38548,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 5)
 		{
 			p.SetState(2153)
-			p.Match(CPP14ParserStar)
+			p.Match(CPPParserStar)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38559,7 +38559,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 6)
 		{
 			p.SetState(2154)
-			p.Match(CPP14ParserDiv)
+			p.Match(CPPParserDiv)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38570,7 +38570,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 7)
 		{
 			p.SetState(2155)
-			p.Match(CPP14ParserMod)
+			p.Match(CPPParserMod)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38581,7 +38581,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 8)
 		{
 			p.SetState(2156)
-			p.Match(CPP14ParserCaret)
+			p.Match(CPPParserCaret)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38592,7 +38592,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 9)
 		{
 			p.SetState(2157)
-			p.Match(CPP14ParserAnd)
+			p.Match(CPPParserAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38603,7 +38603,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 10)
 		{
 			p.SetState(2158)
-			p.Match(CPP14ParserOr)
+			p.Match(CPPParserOr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38614,7 +38614,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 11)
 		{
 			p.SetState(2159)
-			p.Match(CPP14ParserTilde)
+			p.Match(CPPParserTilde)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38625,7 +38625,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 12)
 		{
 			p.SetState(2160)
-			p.Match(CPP14ParserNot)
+			p.Match(CPPParserNot)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38636,7 +38636,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 13)
 		{
 			p.SetState(2161)
-			p.Match(CPP14ParserAssign)
+			p.Match(CPPParserAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38647,7 +38647,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 14)
 		{
 			p.SetState(2162)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38658,7 +38658,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 15)
 		{
 			p.SetState(2163)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38669,7 +38669,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 16)
 		{
 			p.SetState(2164)
-			p.Match(CPP14ParserGreaterEqual)
+			p.Match(CPPParserGreaterEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38680,7 +38680,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 17)
 		{
 			p.SetState(2165)
-			p.Match(CPP14ParserPlusAssign)
+			p.Match(CPPParserPlusAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38691,7 +38691,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 18)
 		{
 			p.SetState(2166)
-			p.Match(CPP14ParserMinusAssign)
+			p.Match(CPPParserMinusAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38702,7 +38702,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 19)
 		{
 			p.SetState(2167)
-			p.Match(CPP14ParserStarAssign)
+			p.Match(CPPParserStarAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38713,7 +38713,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 20)
 		{
 			p.SetState(2168)
-			p.Match(CPP14ParserDivAssign)
+			p.Match(CPPParserDivAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38724,7 +38724,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 21)
 		{
 			p.SetState(2169)
-			p.Match(CPP14ParserModAssign)
+			p.Match(CPPParserModAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38735,7 +38735,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 22)
 		{
 			p.SetState(2170)
-			p.Match(CPP14ParserXorAssign)
+			p.Match(CPPParserXorAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38746,7 +38746,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 23)
 		{
 			p.SetState(2171)
-			p.Match(CPP14ParserAndAssign)
+			p.Match(CPPParserAndAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38757,7 +38757,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 24)
 		{
 			p.SetState(2172)
-			p.Match(CPP14ParserOrAssign)
+			p.Match(CPPParserOrAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38768,7 +38768,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 25)
 		{
 			p.SetState(2173)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38776,7 +38776,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		}
 		{
 			p.SetState(2174)
-			p.Match(CPP14ParserLess)
+			p.Match(CPPParserLess)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38787,7 +38787,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 26)
 		{
 			p.SetState(2175)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38795,7 +38795,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		}
 		{
 			p.SetState(2176)
-			p.Match(CPP14ParserGreater)
+			p.Match(CPPParserGreater)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38806,7 +38806,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 27)
 		{
 			p.SetState(2177)
-			p.Match(CPP14ParserRightShiftAssign)
+			p.Match(CPPParserRightShiftAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38817,7 +38817,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 28)
 		{
 			p.SetState(2178)
-			p.Match(CPP14ParserLeftShiftAssign)
+			p.Match(CPPParserLeftShiftAssign)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38828,7 +38828,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 29)
 		{
 			p.SetState(2179)
-			p.Match(CPP14ParserEqual)
+			p.Match(CPPParserEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38839,7 +38839,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 30)
 		{
 			p.SetState(2180)
-			p.Match(CPP14ParserNotEqual)
+			p.Match(CPPParserNotEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38850,7 +38850,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 31)
 		{
 			p.SetState(2181)
-			p.Match(CPP14ParserLessEqual)
+			p.Match(CPPParserLessEqual)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38861,7 +38861,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 32)
 		{
 			p.SetState(2182)
-			p.Match(CPP14ParserAndAnd)
+			p.Match(CPPParserAndAnd)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38872,7 +38872,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 33)
 		{
 			p.SetState(2183)
-			p.Match(CPP14ParserOrOr)
+			p.Match(CPPParserOrOr)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38883,7 +38883,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 34)
 		{
 			p.SetState(2184)
-			p.Match(CPP14ParserPlusPlus)
+			p.Match(CPPParserPlusPlus)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38894,7 +38894,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 35)
 		{
 			p.SetState(2185)
-			p.Match(CPP14ParserMinusMinus)
+			p.Match(CPPParserMinusMinus)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38905,7 +38905,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 36)
 		{
 			p.SetState(2186)
-			p.Match(CPP14ParserComma)
+			p.Match(CPPParserComma)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38916,7 +38916,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 37)
 		{
 			p.SetState(2187)
-			p.Match(CPP14ParserArrowStar)
+			p.Match(CPPParserArrowStar)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38927,7 +38927,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 38)
 		{
 			p.SetState(2188)
-			p.Match(CPP14ParserArrow)
+			p.Match(CPPParserArrow)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38938,7 +38938,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 39)
 		{
 			p.SetState(2189)
-			p.Match(CPP14ParserLeftParen)
+			p.Match(CPPParserLeftParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38946,7 +38946,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		}
 		{
 			p.SetState(2190)
-			p.Match(CPP14ParserRightParen)
+			p.Match(CPPParserRightParen)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38957,7 +38957,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		p.EnterOuterAlt(localctx, 40)
 		{
 			p.SetState(2191)
-			p.Match(CPP14ParserLeftBracket)
+			p.Match(CPPParserLeftBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -38965,7 +38965,7 @@ func (p *CPP14Parser) TheOperator() (localctx ITheOperatorContext) {
 		}
 		{
 			p.SetState(2192)
-			p.Match(CPP14ParserRightBracket)
+			p.Match(CPPParserRightBracket)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -39017,13 +39017,13 @@ type LiteralContext struct {
 func NewEmptyLiteralContext() *LiteralContext {
 	var p = new(LiteralContext)
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_literal
+	p.RuleIndex = CPPParserRULE_literal
 	return p
 }
 
 func InitEmptyLiteralContext(p *LiteralContext) {
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = CPP14ParserRULE_literal
+	p.RuleIndex = CPPParserRULE_literal
 }
 
 func (*LiteralContext) IsLiteralContext() {}
@@ -39034,7 +39034,7 @@ func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CPP14ParserRULE_literal
+	p.RuleIndex = CPPParserRULE_literal
 
 	return p
 }
@@ -39042,31 +39042,31 @@ func NewLiteralContext(parser antlr.Parser, parent antlr.ParserRuleContext, invo
 func (s *LiteralContext) GetParser() antlr.Parser { return s.parser }
 
 func (s *LiteralContext) IntegerLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserIntegerLiteral, 0)
+	return s.GetToken(CPPParserIntegerLiteral, 0)
 }
 
 func (s *LiteralContext) CharacterLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserCharacterLiteral, 0)
+	return s.GetToken(CPPParserCharacterLiteral, 0)
 }
 
 func (s *LiteralContext) FloatingLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserFloatingLiteral, 0)
+	return s.GetToken(CPPParserFloatingLiteral, 0)
 }
 
 func (s *LiteralContext) StringLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserStringLiteral, 0)
+	return s.GetToken(CPPParserStringLiteral, 0)
 }
 
 func (s *LiteralContext) BooleanLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserBooleanLiteral, 0)
+	return s.GetToken(CPPParserBooleanLiteral, 0)
 }
 
 func (s *LiteralContext) PointerLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserPointerLiteral, 0)
+	return s.GetToken(CPPParserPointerLiteral, 0)
 }
 
 func (s *LiteralContext) UserDefinedLiteral() antlr.TerminalNode {
-	return s.GetToken(CPP14ParserUserDefinedLiteral, 0)
+	return s.GetToken(CPPParserUserDefinedLiteral, 0)
 }
 
 func (s *LiteralContext) GetRuleContext() antlr.RuleContext {
@@ -39079,7 +39079,7 @@ func (s *LiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 
 func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
-	case CPP14ParserVisitor:
+	case CPPParserVisitor:
 		return t.VisitLiteral(s)
 
 	default:
@@ -39087,12 +39087,12 @@ func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	}
 }
 
-func (p *CPP14Parser) Literal() (localctx ILiteralContext) {
+func (p *CPPParser) Literal() (localctx ILiteralContext) {
 	this := p
 	_ = this
 
 	localctx = NewLiteralContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 386, CPP14ParserRULE_literal)
+	p.EnterRule(localctx, 386, CPPParserRULE_literal)
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
@@ -39121,7 +39121,7 @@ errorExit:
 	goto errorExit // Trick to prevent compiler error if the label is not used
 }
 
-func (p *CPP14Parser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
+func (p *CPPParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int) bool {
 	switch ruleIndex {
 	case 7:
 		var t *NestedNameSpecifierContext = nil
@@ -39163,7 +39163,7 @@ func (p *CPP14Parser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex i
 	}
 }
 
-func (p *CPP14Parser) NestedNameSpecifier_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CPPParser) NestedNameSpecifier_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	this := p
 	_ = this
 
@@ -39176,7 +39176,7 @@ func (p *CPP14Parser) NestedNameSpecifier_Sempred(localctx antlr.RuleContext, pr
 	}
 }
 
-func (p *CPP14Parser) PostfixExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CPPParser) PostfixExpression_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	this := p
 	_ = this
 
@@ -39198,7 +39198,7 @@ func (p *CPP14Parser) PostfixExpression_Sempred(localctx antlr.RuleContext, pred
 	}
 }
 
-func (p *CPP14Parser) NoPointerNewDeclarator_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CPPParser) NoPointerNewDeclarator_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	this := p
 	_ = this
 
@@ -39211,7 +39211,7 @@ func (p *CPP14Parser) NoPointerNewDeclarator_Sempred(localctx antlr.RuleContext,
 	}
 }
 
-func (p *CPP14Parser) NoPointerDeclarator_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CPPParser) NoPointerDeclarator_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	this := p
 	_ = this
 
@@ -39224,7 +39224,7 @@ func (p *CPP14Parser) NoPointerDeclarator_Sempred(localctx antlr.RuleContext, pr
 	}
 }
 
-func (p *CPP14Parser) MemberDeclarator_Sempred(localctx antlr.RuleContext, predIndex int) bool {
+func (p *CPPParser) MemberDeclarator_Sempred(localctx antlr.RuleContext, predIndex int) bool {
 	this := p
 	_ = this
 

@@ -117,7 +117,7 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSys
 }
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
-	return s.CreateAntlrCache(cppparser.GetCPP14LexerSerializedATN(), cppparser.GetCPP14ParserSerializedATN())
+	return s.CreateAntlrCache(cppparser.GetCPPLexerSerializedATN(), cppparser.GetCPPParserSerializedATN())
 }
 
 func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {

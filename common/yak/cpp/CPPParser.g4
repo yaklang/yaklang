@@ -23,11 +23,11 @@
 // $antlr-format alignTrailingComments true, columnLimit 150, minEmptyLines 1, maxEmptyLinesToKeep 1, reflowComments false, useTab false
 // $antlr-format allowShortRulesOnASingleLine false, allowShortBlocksOnASingleLine true, alignSemicolons hanging, alignColons hanging
 
-parser grammar CPP14Parser;
+parser grammar CPPParser;
 
 options {
-    superClass = CPP14ParserBase;
-    tokenVocab = CPP14Lexer;
+    superClass = CPPParserBase;
+    tokenVocab = CPPLexer;
 }
 
 // Insert here @header for C++ parser.
