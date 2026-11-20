@@ -64,6 +64,7 @@ func (v *anInstruction) RefreshString() {
 	// v.readableNameShort = LineShortDisASM(inst)
 }
 
+//go:noinline
 func (v *anInstruction) GetSourceCode() string {
 	r := v.GetRange()
 	if r == nil {
@@ -72,6 +73,7 @@ func (v *anInstruction) GetSourceCode() string {
 	return r.GetText()
 }
 
+//go:noinline
 func (v *anInstruction) GetSourceCodeContext(n int) string {
 	r := v.GetRange()
 	if r == nil {
@@ -116,6 +118,7 @@ func (i *anInstruction) IsPhi() bool {
 	return false
 }
 
+//go:noinline
 func (i *anInstruction) IsBlock(name string) bool {
 	if i.GetOpcode() == SSAOpcodeBasicBlock {
 		return strings.HasPrefix(i.GetName(), name)
@@ -123,6 +126,7 @@ func (i *anInstruction) IsBlock(name string) bool {
 	return false
 }
 
+//go:noinline
 func (i *anInstruction) SelfDelete() {
 	DeleteInst(i)
 }
@@ -137,6 +141,7 @@ func (i *anInstruction) IsFromDB() bool { return i.isFromDB }
 
 func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
+//go:noinline
 func (i *anInstruction) Self() Instruction {
 	inst, _ := i.GetProgram().GetInstructionById(i.GetId())
 	if !utils.IsNil(inst) {
@@ -150,8 +155,9 @@ func (i *anInstruction) Self() Instruction {
 func (i *anInstruction) ReplaceValue(Value, Value) {
 }
 
+//go:noinline
 func (i *anInstruction) GetVerboseName() string {
-	if utils.IsNil(i) {
+	if i == nil {
 		return ""
 	}
 	if i.verboseName != "" {
@@ -163,8 +169,9 @@ func (i *anInstruction) GetVerboseName() string {
 	return ""
 }
 
+//go:noinline
 func (i *anInstruction) GetShortVerboseName() string {
-	if utils.IsNil(i) {
+	if i == nil {
 		return ""
 	}
 	if i.name != "" {
@@ -173,9 +180,14 @@ func (i *anInstruction) GetShortVerboseName() string {
 	return "t" + fmt.Sprint(i.GetId())
 }
 
+//go:noinline
 func (i *anInstruction) SetVerboseName(verbose string) {
-	defer i.markPersistenceDirty()
 	i.verboseName = verbose
+	i.markPersistenceDirty()
+}
+
+func newAnInstruction() anInstruction {
+	return anInstruction{id: -1}
 }
 
 func NewInstruction() *anInstruction {
@@ -185,8 +197,9 @@ func NewInstruction() *anInstruction {
 }
 
 // ssa function and block
+//
+//go:noinline
 func (a *anInstruction) SetFunc(f *Function) {
-	defer a.markPersistenceDirty()
 	a.fun = f
 	if f != nil {
 		a.prog = f.GetProgram()
@@ -194,6 +207,7 @@ func (a *anInstruction) SetFunc(f *Function) {
 	} else {
 		a.setLocationIDs(0, a.blockId)
 	}
+	a.markPersistenceDirty()
 }
 
 func (a *anInstruction) setLocationIDs(funcID, blockID int64) {
@@ -236,6 +250,8 @@ func (a *anInstruction) GetFunc() *Function {
 
 // GetCachedFunc returns the cached function pointer without accessing the instruction cache.
 // Used by shouldDelayInstructionEviction to avoid deadlock (cache mutex reentrance).
+//
+//go:noinline
 func (a *anInstruction) GetCachedFunc() *Function {
 	if a.fun == nil {
 		return nil
@@ -248,6 +264,7 @@ func (a *anInstruction) GetProgram() *Program {
 	return a.prog
 }
 
+//go:noinline
 func (a *anInstruction) GetProgramName() string {
 	if a.prog == nil {
 		return ""
@@ -259,10 +276,13 @@ func (a *anInstruction) SetProgram(prog *Program) {
 	a.prog = prog
 }
 
+//go:noinline
 func (a *anInstruction) SetIsAnnotation(b bool) {
-	defer a.markPersistenceDirty()
 	a.isAnnotation = b
+	a.markPersistenceDirty()
 }
+
+//go:noinline
 func (v *anInstruction) IsSupportConstMethod() bool {
 	config := v.GetProgram().Application.config
 	if config == nil {
@@ -275,14 +295,15 @@ func (a *anInstruction) IsAnnotation() bool {
 	return a.isAnnotation
 }
 
+//go:noinline
 func (a *anInstruction) SetBlock(block *BasicBlock) {
-	defer a.markPersistenceDirty()
 	a.block = block
 	if block != nil {
 		a.setLocationIDs(a.funcId, block.GetId())
 	} else {
 		a.setLocationIDs(a.funcId, 0)
 	}
+	a.markPersistenceDirty()
 }
 
 func (a *anInstruction) resolveBlockByID() *BasicBlock {
@@ -321,11 +342,10 @@ func (c *anInstruction) GetRange() *memedit.Range {
 	return nil
 }
 
+//go:noinline
 func (c *anInstruction) SetRange(pos *memedit.Range) {
-	defer c.markPersistenceDirty()
-	// if c.Pos == nil {
 	c.R = pos
-	// }
+	c.markPersistenceDirty()
 }
 
 // func (c *anInstruction) SetRangeInit(editor *memedit.MemEditor) {
@@ -342,6 +362,8 @@ func (c *anInstruction) SetExtern(b bool) {
 }
 
 // error logger
+//
+//go:noinline
 func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	c.GetFunc().NewErrorWithPos(kind, tag, c.GetRange(), msg)
 }
@@ -351,15 +373,17 @@ func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 // func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
+//
+//go:noinline
 func (a *anInstruction) SetName(v string) {
-	defer a.markPersistenceDirty()
-	if utils.IsNil(a) {
+	if a == nil {
 		return
 	}
 	a.name = v
+	a.markPersistenceDirty()
 }
 func (a *anInstruction) GetName() string {
-	if utils.IsNil(a) {
+	if a == nil {
 		return ""
 	}
 	return a.name
@@ -380,6 +404,7 @@ func (a *anInstruction) LineDisasm() string { return "" }
 // opcode
 func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover by instruction
 
+//go:noinline
 func (a *anInstruction) String() string {
 	this, ok := a.GetValueById(a.GetId())
 	if !ok {
@@ -436,12 +461,17 @@ type anValue struct {
 
 var defaultAnyType = CreateAnyType()
 
+// initValue initializes an inline-embedded anValue in-place without an extra
+// heap allocation or lock copy.
+func (n *anValue) initValue() {
+	n.anInstruction.id = -1
+	n.anInstruction.persistState = defaultAnyType
+	n.typId = defaultAnyType.GetId()
+}
+
 func NewValue() *anValue {
-	ret := &anValue{
-		anInstruction: anInstruction{id: -1},
-		typId:         -1,
-	}
-	ret.SetType(defaultAnyType)
+	ret := &anValue{}
+	ret.initValue()
 	return ret
 }
 
@@ -463,10 +493,12 @@ func (n *anValue) GetType() Type {
 	return defaultAnyType
 }
 
+//go:noinline
 func (n *anValue) SetLazySaveType(lazySaveType func()) {
 	n.lazySaveType = lazySaveType
 }
 
+//go:noinline
 func (n *anValue) LazySaveType() {
 	if pendingType, ok := n.persistState.(Type); ok {
 		if cache := n.getProgramCache(); cache != nil {
@@ -486,14 +518,17 @@ func (n *anValue) LazySaveType() {
 // SetTypeExact stores typ without instantiating a class. Blueprint.Apply builds
 // an instance and can replace the type; a zero or unresolved value must keep
 // the declaration identity it was given.
+//
+//go:noinline
 func (n *anValue) SetTypeExact(typ Type) {
 	if n == nil || typ == nil {
 		return
 	}
-	defer n.markPersistenceDirty()
 	n.typId = n.cacheType(typ)
+	n.markPersistenceDirty()
 }
 
+//go:noinline
 func (n *anValue) SetType(typ Type) {
 	defer n.markPersistenceDirty()
 	if typ == nil {
@@ -582,6 +617,7 @@ func (a *anValue) getVariablesMap(create ...bool) *omap.OrderedMap[string, *Vari
 	return a.variables
 }
 
+//go:noinline
 func (a *anValue) GetVariable(name string) *Variable {
 	variablesMap := a.getVariablesMap()
 	if variablesMap != nil {
@@ -602,6 +638,7 @@ func (a *anValue) GetVariable(name string) *Variable {
 	return nil
 }
 
+//go:noinline
 func (a *anValue) GetLastVariable() *Variable {
 	variablesMap := a.getVariablesMap()
 	if variablesMap == nil {
@@ -611,6 +648,7 @@ func (a *anValue) GetLastVariable() *Variable {
 	return v
 }
 
+//go:noinline
 func (a *anValue) GetAllVariables() map[string]*Variable {
 	variablesMap := a.getVariablesMap()
 	if variablesMap == nil {
@@ -619,22 +657,26 @@ func (a *anValue) GetAllVariables() map[string]*Variable {
 	return variablesMap.GetMap()
 }
 
+//go:noinline
 func (a *anValue) AddVariable(v *Variable) {
-	defer a.markPersistenceDirty()
 	if v == nil {
+		a.markPersistenceDirty()
 		return
 	}
 	name := v.GetName()
 	m := a.getVariablesMap(true)
 	if existing, ok := m.Get(name); ok {
 		if existing == v {
+			a.markPersistenceDirty()
 			return
 		}
 		m.Set(name, v)
 		m.BringKeyToLastOne(name)
+		a.markPersistenceDirty()
 		return
 	}
 	m.Set(name, v)
+	a.markPersistenceDirty()
 }
 
 func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
@@ -650,12 +692,14 @@ func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
 	return i.mask
 }
 
+//go:noinline
 func (i *anValue) AddMask(v Value) {
-	defer i.markPersistenceDirty()
 	id := v.GetId()
 	i.getMaskMap(true).Set(id, id)
+	i.markPersistenceDirty()
 }
 
+//go:noinline
 func (i *anValue) GetMask() []Value {
 	maskMap := i.getMaskMap()
 	if maskMap == nil {
@@ -664,6 +708,7 @@ func (i *anValue) GetMask() []Value {
 	return i.GetValuesByIDs(maskMap.Values())
 }
 
+//go:noinline
 func (i *anValue) Masked() bool {
 	maskMap := i.getMaskMap()
 	if maskMap == nil {
@@ -672,34 +717,41 @@ func (i *anValue) Masked() bool {
 	return maskMap.Len() != 0
 }
 
+//go:noinline
 func (i *anValue) SetReference(v Value) {
-	defer i.markPersistenceDirty()
 	i.reference = v.GetId()
+	i.markPersistenceDirty()
 }
 
+//go:noinline
 func (i *anValue) GetReference() Value {
 	ref, _ := i.GetValueById(i.reference)
 	return ref
 }
 
+//go:noinline
 func (i *anValue) AddPointer(v Value) {
-	defer i.markPersistenceDirty()
 	i.pointer = append(i.pointer, v.GetId())
+	i.markPersistenceDirty()
 }
 
+//go:noinline
 func (i *anValue) GetPointer() Values {
 	return i.GetValuesByIDs(i.pointer)
 }
 
+//go:noinline
 func (i *anValue) AddOccultation(p Value) {
-	defer i.markPersistenceDirty()
 	i.occultation = append(i.occultation, p.GetId())
+	i.markPersistenceDirty()
 }
 
+//go:noinline
 func (i *anValue) GetOccultation() []Value {
 	return i.GetValuesByIDs(i.occultation)
 }
 
+//go:noinline
 func (i *anValue) FlatOccultation() []Value {
 	var ret []Value
 	var handler func(i *anValue)

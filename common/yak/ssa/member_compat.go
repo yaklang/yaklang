@@ -4,6 +4,7 @@ package ssa
 // member relations are rolled out. Field-sensitive analysis updates live on
 // feature/ssa/field-sensitive-analysis.
 
+//go:noinline
 func (n *anValue) GetObject() Value {
 	pairs := n.GetObjectKeyPairs()
 	if len(pairs) == 0 {
@@ -12,6 +13,7 @@ func (n *anValue) GetObject() Value {
 	return pairs[len(pairs)-1].Object
 }
 
+//go:noinline
 func (n *anValue) GetKey() Value {
 	pairs := n.GetObjectKeyPairs()
 	if len(pairs) == 0 {
@@ -20,6 +22,7 @@ func (n *anValue) GetKey() Value {
 	return pairs[len(pairs)-1].Key
 }
 
+//go:noinline
 func (n *anValue) GetAllMember() map[Value]Value {
 	pairs := n.GetMemberPairs()
 	if len(pairs) == 0 {
@@ -39,6 +42,7 @@ func (n *anValue) GetAllMember() map[Value]Value {
 	return ret
 }
 
+//go:noinline
 func (n *anValue) GetStringMember(key string) (Value, bool) {
 	members := n.GetMembersByKeyString(key)
 	if len(members) == 0 {

@@ -77,10 +77,10 @@ func NewConst(i any, isPlaceHolder ...bool) *ConstInst {
 	}
 	ci := &ConstInst{
 		Const:     c,
-		anValue:   NewValue(),
 		Unary:     0,
 		ConstType: ConstTypeNormal,
 	}
+	ci.initValue()
 	if placeHolder {
 		ci.ConstType = ConstTypePlaceholder
 	}

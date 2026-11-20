@@ -10,6 +10,8 @@ import (
 func (n *anValue) HasUsers() bool {
 	return len(n.snapshotUserIDs()) != 0
 }
+
+//go:noinline
 func (n *anValue) GetUsers() Users {
 	ids := n.snapshotUserIDs()
 	if len(ids) == 0 {
@@ -23,28 +25,33 @@ func (n *anValue) GetUsers() Users {
 // without copying the full use list on every traversal.
 func (n *anValue) snapshotUserIDs() []int64 {
 	n.relationsMu.Lock()
-	defer n.relationsMu.Unlock()
-	return n.userList
+	ids := n.userList
+	n.relationsMu.Unlock()
+	return ids
 }
 
 // for Value
+//
+//go:noinline
 func (n *anValue) AddUser(u User) {
 	id := u.GetId()
 	n.relationsMu.Lock()
-	defer n.relationsMu.Unlock()
 	if index := slices.Index(n.userList, id); index == -1 {
 		n.userList = append(n.userList, id)
 		n.markPersistenceDirty()
 	}
+	n.relationsMu.Unlock()
 }
 
+//go:noinline
 func (n *anValue) RemoveUser(u User) {
 	id := u.GetId()
 	n.relationsMu.Lock()
-	defer n.relationsMu.Unlock()
 	if len(n.userList) == 0 || !slices.Contains(n.userList, id) {
+		n.relationsMu.Unlock()
 		return
 	}
 	n.userList = utils.RemoveSliceItem(append([]int64(nil), n.userList...), id)
 	n.markPersistenceDirty()
+	n.relationsMu.Unlock()
 }

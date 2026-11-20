@@ -8,12 +8,12 @@ import (
 
 func TestCallReplaceValueTouchesOnlyMatchingSlots(t *testing.T) {
 	call := &Call{
-		anValue:   NewValue(),
 		Method:    10,
 		Args:      []int64{1, 2, 1},
 		ArgMember: []int64{1, 3, 4},
 		Binding:   map[string]int64{"a": 1, "b": 5},
 	}
+	call.initValue()
 	from := NewConst(1)
 	from.SetId(1)
 	to := NewConst(9)

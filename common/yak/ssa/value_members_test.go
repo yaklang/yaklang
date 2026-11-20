@@ -34,8 +34,11 @@ func TestValueConcurrentMemberRelations(t *testing.T) {
 }
 
 func TestMemberReplacementPreservesReaderSnapshot(t *testing.T) {
-	lib := &ExternLib{anValue: NewValue()}
-	from, to := &Call{anValue: NewValue()}, &Call{anValue: NewValue()}
+	lib := &ExternLib{}
+	lib.initValue()
+	from, to := &Call{}, &Call{}
+	from.initValue()
+	to.initValue()
 	from.SetId(1)
 	to.SetId(2)
 	lib.appendMemberPairIDs(3, 1)

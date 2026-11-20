@@ -658,9 +658,9 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 		return nil
 	}
 	p := &Panic{
-		anValue: NewValue(),
-		Info:    info.GetId(),
+		Info: info.GetId(),
 	}
+	p.initValue()
 	f.emit(p)
 	return p
 }
@@ -669,9 +669,8 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	r := &Recover{
-		anValue: NewValue(),
-	}
+	r := &Recover{}
+	r.initValue()
 	r.SetType(CreateAnyType())
 	f.emit(r)
 	return r

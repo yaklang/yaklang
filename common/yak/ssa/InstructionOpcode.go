@@ -180,131 +180,102 @@ func IsUserInstruction(i Instruction) bool {
 }
 
 func CreateInstruction(op Opcode) Instruction {
+	var inst Instruction
 	switch op {
 	case SSAOpcodeFunction:
 		// FreeValues must be non-nil: instructions rebuilt from DB
 		// (CreateInstruction via LazyInstruction) can still get free-value
 		// writes (BuildFreeValue), which would panic on a nil map.
-		return &Function{
-			anValue:    NewValue(),
+		inst = &Function{
 			FreeValues: make(map[*Variable]int64),
 		}
 	case SSAOpcodeBasicBlock:
-		return &BasicBlock{
-			anValue: NewValue(),
-		}
+		inst = &BasicBlock{}
 	case SSAOpcodeParameterMember:
-		return &ParameterMember{
-			anValue:              NewValue(),
+		inst = &ParameterMember{
 			FormalParameterIndex: 0,
 			parameterMemberInner: &parameterMemberInner{},
 		}
 	case SSAOpcodeFreeValue:
-		return &Parameter{
-			anValue:     NewValue(),
+		inst = &Parameter{
 			IsFreeValue: true,
 		}
 	case SSAOpcodeParameter:
-		return &Parameter{
-			anValue:     NewValue(),
+		inst = &Parameter{
 			IsFreeValue: false,
 		}
 	case SSAOpcodeExternLib:
-		return &ExternLib{
-			anValue: NewValue(),
-		}
+		inst = &ExternLib{}
 	case SSAOpcodePhi:
 		return &Phi{
 			anValue: NewValue(),
 		}
 	case SSAOpcodeConstInst:
-		return &ConstInst{
-			Const:   &Const{value: nil, str: "nil"},
-			anValue: NewValue(),
+		inst = &ConstInst{
+			Const: &Const{value: nil, str: "nil"},
 		}
 	case SSAOpcodeUndefined:
-		return &Undefined{
-			anValue: NewValue(),
-		}
+		inst = &Undefined{}
 	case SSAOpcodeBinOp:
-		return &BinOp{
-			anValue: NewValue(),
-		}
+		inst = &BinOp{}
 	case SSAOpcodeUnOp:
-		return &UnOp{
-			anValue: NewValue(),
-		}
+		inst = &UnOp{}
 	case SSAOpcodeCall:
 		// Binding/SideEffectValue must be non-nil: instructions rebuilt from
 		// DB (CreateInstruction via LazyInstruction) can still get writes from
 		// ReplaceValue trees (handleCalleeFunction/handleSideEffect), which
 		// would panic on nil maps.
-		return &Call{
-			anValue:         NewValue(),
+		inst = &Call{
 			Binding:         make(map[string]int64),
 			SideEffectValue: make(map[string]int64),
 		}
 	case SSAOpcodeSideEffect:
-		return &SideEffect{
-			anValue: NewValue(),
-		}
+		inst = &SideEffect{}
 	case SSAOpcodeReturn:
-		return &Return{
-			anValue: NewValue(),
-		}
+		inst = &Return{}
 	case SSAOpcodeMake:
-		return &Make{
-			anValue: NewValue(),
-		}
+		inst = &Make{}
 	case SSAOpcodeNext:
-		return &Next{
-			anValue: NewValue(),
-		}
+		inst = &Next{}
 	case SSAOpcodeAssert:
 		return &Assert{
-			anInstruction: NewInstruction(),
+			anInstruction: newAnInstruction(),
 		}
 	case SSAOpcodeTypeCast:
-		return &TypeCast{
-			anValue: NewValue(),
-		}
+		inst = &TypeCast{}
 	case SSAOpcodeTypeValue:
-		return &TypeValue{
-			anValue: NewValue(),
-		}
+		inst = &TypeValue{}
 	case SSAOpcodeErrorHandler:
 		return &ErrorHandler{
-			anInstruction: NewInstruction(),
+			anInstruction: newAnInstruction(),
 		}
 	case SSAOpcodeErrorCatch:
-		return &ErrorCatch{
-			anValue: NewValue(),
-		}
+		inst = &ErrorCatch{}
 	case SSAOpcodePanic:
-		return &Panic{
-			anValue: NewValue(),
-		}
+		inst = &Panic{}
 	case SSAOpcodeRecover:
-		return &Recover{
-			anValue: NewValue(),
-		}
+		inst = &Recover{}
 	case SSAOpcodeJump:
 		return &Jump{
-			anInstruction: NewInstruction(),
+			anInstruction: newAnInstruction(),
 		}
 	case SSAOpcodeIf:
 		return &If{
-			anInstruction: NewInstruction(),
+			anInstruction: newAnInstruction(),
 		}
 	case SSAOpcodeLoop:
 		return &Loop{
-			anInstruction: NewInstruction(),
+			anInstruction: newAnInstruction(),
 		}
 	case SSAOpcodeSwitch:
 		return &Switch{
-			anInstruction: NewInstruction(),
+			anInstruction: newAnInstruction(),
 		}
 	default:
 		return nil
 	}
+	if v, ok := inst.(interface{ getAnValue() *anValue }); ok {
+		v.getAnValue().initValue()
+	}
+	return inst
 }

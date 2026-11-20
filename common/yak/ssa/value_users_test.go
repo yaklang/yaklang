@@ -11,7 +11,8 @@ func TestValueConcurrentUsersAndStableSnapshot(t *testing.T) {
 	value := NewValue()
 	users := make([]*Call, 512)
 	for i := range users {
-		users[i] = &Call{anValue: NewValue()}
+		users[i] = &Call{}
+		users[i].initValue()
 		users[i].SetId(int64(i + 1))
 	}
 	var wg sync.WaitGroup
