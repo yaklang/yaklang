@@ -64,7 +64,7 @@
 1. 原有错误分类与恢复分支决定是否重建或压缩；普通鉴权、限流等错误不进入阈值学习。
 2. 原有数值算法保持：有最大容量证据取 80%，否则取失败 prompt 估算 token 的 60%，保留原内部 `4 * 1024` 下限，不扩大当前阈值。
 3. 仅在原分支实际收缩阈值时，按本次质量模型身份保留 pending 状态；失败时不落库。
-4. 原分支优先用最近成功历史边界；没有增加截短前缀、跨轮失败计数或停止条件。文本压缩和原生 Speed 压缩原来走哪档，仍走哪档。
+4. 原分支优先用最近成功历史边界；该分支压缩会话内容，不新建阈值学习，即使错误报告了最大容量。压缩成功后，下一轮模型继续使用压缩后的历史；压缩请求失败则保留原历史。没有增加截短前缀、跨轮失败计数或停止条件。文本压缩和原生 Speed 压缩原来走哪档，仍走哪档。
 5. 只有同一具体配置的成功质量响应才能确认保存。其它配置或辅助调用成功、取消、持续失败都不确认。响应身份贯穿流式 response/tee，而非仅凭会话的可变模型名。
 6. 手动修改生成版本号；旧版本迟到的成功不能覆盖新设置。并发成功保存只收紧已有阈值。下次主模型会话直接复用保存结果。
 
@@ -86,6 +86,8 @@
 | 越界、无效零值和模型切换后的迟到请求不修改模型设置或会话预算 | `TestModelContextContractRejectedHotpatchPreservesSessionOverride` |
 | 失败不落库、匹配成功保存、跨会话读取 | `TestModelContextContractSuccessPersistsOnlyMatchingConfiguration` |
 | 取消、手动编辑、关闭开关或删除配置后的迟到成功不覆盖 | `TestModelContextContractLateSuccessAndCancellationDoNotOverwrite` |
+| 待确认收缩仅在原会话内生效，其它会话的同模型成功不能确认它 | `TestModelContextContractUnconfirmedAdjustmentStaysInItsSession` |
+| 两个会话按不同顺序或同时确认时，只保留较小的已验证阈值 | `TestModelContextContractConcurrentSuccessOnlyTightens` |
 | 与原运行时算法逐例比较、原 SDK 默认值 | `TestModelContextContractOriginalReductionFormula`、`TestModelContextContractEventsAndLegacyDefaults` |
 | 主模型设置不修改 Speed 默认值/存储，关闭开关只作用主模型 | `reactloops/TestModelContextSettingOnlyControlsQualityLoop`、`TestModelContextDisabledOnlyStopsMatchingQualityOverflow` |
 | 文本/原生协议压缩路由保持原有差异 | `reactloops/TestModelContextKeepsOriginalCompressionRouting` |
@@ -93,6 +95,7 @@
 | 迟到错误读取实际请求模型的自动调整开关，成功只确认对应 Key | `reactloops/TestModelContextLateOverflowUsesRequestAutoAdjustSetting` |
 | 请求快照不改变轻量/视觉路由，旧的按名称恢复不收缩主模型设置 | `TestModelContextRequestPinsQualityWithoutChangingAuxiliaryRouting`、`TestModelContextQualityIgnoresLegacyNameOnlyOverflow` |
 | 完整文本/原生 ReAct 超限恢复成功后保存，显式关闭首次拒绝即停止 | `aireact/TestReAct_ModelContextPersistsOriginalRecoveryOnlyAfterSuccess` |
+| 完整 Execute 在 A 超限后切换/编辑 B：边界压缩成功与失败均不学习阈值；B 收到对应历史；A 关闭自动调整时立即停止且不调用 B | `aireact/TestReAct_ModelContextSwitchFittingBoundaryContract`（文本/原生 × 3 种结果） |
 | 原成功历史边界、重试行为 | 原 `invoke_overflow_fitting_boundary_test.go`、`prompt_overflow_retry_test.go` |
 | 前端自动调整静默、同名配置不串用量/查询、热更新携带标识 | `aiPerf.handlers.test.ts`、`useSavedModelContext.test.ts`、`ModelContextPopover.test.tsx` |
 
