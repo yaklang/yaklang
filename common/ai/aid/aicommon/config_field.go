@@ -318,7 +318,10 @@ func (c *Config) GetExecutionPolicy() string {
 	if c == nil {
 		return ""
 	}
-	lines := make([]string, 0, 4)
+	lines := make([]string, 0, 5)
+	lines = append(lines,
+		"- 安全拒绝是终态：工具返回 blocked/denied/security rule/安全规则命中 时，立即停止该操作并向用户说明命中规则；禁止更换 shell（bash/cmd/powershell）、工具、参数写法、编码、路径、子命令拆分、脚本文件、MCP、子智能体或后台任务绕过。安全拒绝不可重试；参数校验/Schema 错误可按工具定义修正后重试，其他普通失败按工具返回的 retry 语义处理。",
+	)
 	if c.EnableDispatchSubReactAgents && !c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
 			"- 默认模式：维护总目标和主线；复杂长链路、跨源验证和有依据的探索分支，尽早通过 dispatch_sub_react_agents 委派。一个子任务可完成含顺序步骤的阶段，无须凑并行任务。简单问答和微小单步任务直接处理，遵守用户的委派限制。",

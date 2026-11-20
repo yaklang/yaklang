@@ -1031,13 +1031,17 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 	if ruleDecision != nil {
 		switch ruleDecision.Action {
 		case schema.SFR_ACTION_DENY:
-			blocked := fmt.Sprintf(
-				"tool[%v] blocked by security rule %s (severity=%s): %s",
-				tool.Name, ruleDecision.RuleName, ruleDecision.Severity, ruleDecision.Summary(),
-			)
+			denied := &SecurityRuleDeniedError{
+				ToolName: tool.Name,
+				RuleName: ruleDecision.RuleName,
+				RuleID:   ruleDecision.RuleID,
+				Severity: ruleDecision.Severity,
+				Reason:   ruleDecision.Summary(),
+			}
+			blocked := denied.Error()
 			t.emitter.EmitWarning(blocked)
 			handleError(blocked)
-			return nil, false, utils.Error(blocked)
+			return nil, false, denied
 		case schema.SFR_ACTION_WARN:
 			t.emitter.EmitWarning(
 				"tool[%v] matched security rule %s (severity=%s), continuing with warning: %s",
