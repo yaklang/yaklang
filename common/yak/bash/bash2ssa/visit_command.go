@@ -40,9 +40,15 @@ func (ab *astBuilder) buildCallExpr(cmd *syntax.CallExpr, redirs []*syntax.Redir
 	if isStatic {
 		word = ab.EmitConstInst(name)
 	}
-	fn := ab.funcs[name]
-	if !isStatic || !isPlainName(name) {
-		fn = nil
+	var fn *ssa.Function
+	if isStatic && isPlainName(name) {
+		fn = ab.funcs[name]
+		if fn == nil {
+			// A call may precede the FuncDecl that defines it. The pre-indexed
+			// function already owns the name, so bind this call to it now; its
+			// $@ parameter and return slots are filled when the body is built.
+			fn = ab.forward[name]
+		}
 	}
 	// Expansion precedes temporary command-environment assignments.
 	for _, a := range cmd.Assigns {
