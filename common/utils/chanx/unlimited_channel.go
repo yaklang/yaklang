@@ -16,9 +16,16 @@ type UnlimitedChan[T any] struct {
 	bufCount int64
 	innerIn  chan<- T       // channel for write
 	innerOut <-chan T       // channel for read
-	buffer   *RingBuffer[T] // buffer
+	buffer   ringBufferCore // buffer
 	ctx      context.Context
 	cancel   context.CancelFunc
+}
+
+func logUnlimitedChanTimeout(inLen, inCap, outLen, outCap, bufLen, bufCap int) {
+	log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
+		"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
+		inLen, inCap, outLen, outCap, bufLen, bufCap,
+	)
 }
 
 func (c *UnlimitedChan[T]) FeedBlock(item T) {
@@ -66,12 +73,7 @@ func (c *UnlimitedChan[T]) SafeFeedWithResult(i T) (ok bool) {
 		case c.innerIn <- i:
 			return true
 		case <-timer.C:
-			log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
-				"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
-				len(c.innerIn), cap(c.innerIn),
-				len(c.innerOut), cap(c.innerOut),
-				c.BufLen(), c.buffer.Capacity(),
-			)
+			logUnlimitedChanTimeout(len(c.innerIn), cap(c.innerIn), len(c.innerOut), cap(c.innerOut), c.BufLen(), c.buffer.capacity())
 			return false
 		}
 	}
@@ -80,12 +82,7 @@ func (c *UnlimitedChan[T]) SafeFeedWithResult(i T) (ok bool) {
 	case c.innerIn <- i:
 		return true
 	case <-timer.C:
-		log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
-			"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
-			len(c.innerIn), cap(c.innerIn),
-			len(c.innerOut), cap(c.innerOut),
-			c.BufLen(), c.buffer.Capacity(),
-		)
+		logUnlimitedChanTimeout(len(c.innerIn), cap(c.innerIn), len(c.innerOut), cap(c.innerOut), c.BufLen(), c.buffer.capacity())
 		return false
 	case <-c.ctx.Done():
 		return false
@@ -95,7 +92,7 @@ func (c *UnlimitedChan[T]) SafeFeedWithResult(i T) (ok bool) {
 func (c *UnlimitedChan[T]) OutputChannel() <-chan T {
 	if c.innerOut == nil {
 		out := make(chan T)
-		defer close(out)
+		close(out)
 		return out
 	}
 	return c.innerOut
@@ -143,7 +140,7 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 		ctx = context.Background()
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	ch := UnlimitedChan[T]{innerIn: in, innerOut: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
+	ch := UnlimitedChan[T]{innerIn: in, innerOut: out, buffer: newRingBufferCore(initBufCapacity), ctx: ctx, cancel: cancel}
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
 	// if validator write finished, the process is working!
@@ -156,37 +153,23 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 
 // NewUnlimitedChanSize is like NewUnlimitedChan but you can set initial capacity for In, Out, Buffer.
 func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCapacity, initBufCapacity int) *UnlimitedChan[T] {
-	in := make(chan T, initInCapacity)
-	out := make(chan T, initOutCapacity)
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	ch := UnlimitedChan[T]{innerIn: in, innerOut: out, buffer: NewRingBuffer[T](initBufCapacity), ctx: ctx, cancel: cancel}
-
-	validator := make(chan struct{})
-	go process(validator, ctx, in, out, &ch)
-	select {
-	case validator <- struct{}{}:
-	case <-ctx.Done():
-	}
-	return &ch
+	return NewUnlimitedChanEx(ctx, make(chan T, initInCapacity), make(chan T, initOutCapacity), initBufCapacity)
 }
 
 func process[T any](validator chan struct{}, ctx context.Context, in, out chan T, ch *UnlimitedChan[T]) {
 	defer close(out)
 
 	drain := func() {
-		for !ch.buffer.IsEmpty() {
+		for !ch.buffer.isEmpty() {
 			select {
-			case out <- ch.buffer.Pop():
+			case out <- castRingValue[T](ch.buffer.pop()):
 				atomic.AddInt64(&ch.bufCount, -1)
 			case <-ctx.Done():
 				return
 			}
 		}
 
-		ch.buffer.Reset()
+		ch.buffer.reset()
 		atomic.StoreInt64(&ch.bufCount, 0)
 	}
 	for {
@@ -203,7 +186,7 @@ func process[T any](validator chan struct{}, ctx context.Context, in, out chan T
 			// make sure values' order
 			// buffer has some values
 			if atomic.LoadInt64(&ch.bufCount) > 0 {
-				ch.buffer.Write(val)
+				ch.buffer.write(val)
 				atomic.AddInt64(&ch.bufCount, 1)
 			} else {
 				// out is not full
@@ -214,11 +197,11 @@ func process[T any](validator chan struct{}, ctx context.Context, in, out chan T
 				}
 
 				// out is full
-				ch.buffer.Write(val)
+				ch.buffer.write(val)
 				atomic.AddInt64(&ch.bufCount, 1)
 			}
 
-			for !ch.buffer.IsEmpty() {
+			for !ch.buffer.isEmpty() {
 				select {
 				case <-ctx.Done():
 					return
@@ -227,15 +210,15 @@ func process[T any](validator chan struct{}, ctx context.Context, in, out chan T
 						drain()
 						return
 					}
-					ch.buffer.Write(val)
+					ch.buffer.write(val)
 					atomic.AddInt64(&ch.bufCount, 1)
 
-				case out <- ch.buffer.Peek():
-					ch.buffer.Pop()
+				case out <- castRingValue[T](ch.buffer.peek()):
+					ch.buffer.pop()
 					atomic.AddInt64(&ch.bufCount, -1)
 					// log.Debug("write to unlimited channel: delta -1")
-					if ch.buffer.IsEmpty() && ch.buffer.core.size > ch.buffer.core.initialSize { // after burst
-						ch.buffer.Reset()
+					if ch.buffer.isEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
+						ch.buffer.reset()
 						atomic.StoreInt64(&ch.bufCount, 0)
 					}
 				}

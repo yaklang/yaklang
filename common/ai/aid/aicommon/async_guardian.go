@@ -23,7 +23,7 @@ type GuardianEmitter interface {
 }
 
 type guardianEmitter struct {
-	*Emitter
+	emitter *Emitter
 }
 
 func NewGuardianEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent)) *guardianEmitter {
@@ -32,16 +32,28 @@ func NewGuardianEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent
 		return e, nil
 	}
 	return &guardianEmitter{
-		Emitter: NewEmitter(coordinatorId, baseEmitter),
+		emitter: NewEmitter(coordinatorId, baseEmitter),
 	}
 }
 
+func (e *guardianEmitter) EmitStatus(key string, value any) (*schema.AiOutputEvent, error) {
+	return e.emitter.EmitStatus(key, value)
+}
+
+func (e *guardianEmitter) EmitStructured(nodeId string, result any) (*schema.AiOutputEvent, error) {
+	return e.emitter.EmitStructured(nodeId, result)
+}
+
+func (e *guardianEmitter) WaitForStream() {
+	e.emitter.WaitForStream()
+}
+
 func (e *guardianEmitter) EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader) (*schema.AiOutputEvent, error) {
-	return e.EmitSystemStreamEvent(nodeId, startTime, reader, "")
+	return e.emitter.EmitSystemStreamEvent(nodeId, startTime, reader, "")
 }
 
 func (e *guardianEmitter) EmitJson(typeName schema.EventType, nodeId string, i any) (*schema.AiOutputEvent, error) {
-	return e.EmitJSON(typeName, nodeId, i)
+	return e.emitter.EmitJSON(typeName, nodeId, i)
 }
 
 var _ GuardianEmitter = (*guardianEmitter)(nil)

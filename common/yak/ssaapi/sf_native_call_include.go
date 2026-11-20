@@ -53,7 +53,7 @@ var includeCache = utils.NewTTLCache[Values]()
 // includeFlight single-flights identical include computations on top of
 // includeCache: the first cache miss computes once, concurrent misses share
 // the result, and later callers are served from the cache.
-var includeFlight = utils.NewSingleFlightCache[string, Values](includeCache.CacheExWithKey)
+var includeFlight = utils.NewSingleFlightCache[string, Values](includeCache)
 
 type taskLocalSyntaxFlowRuleLibrariesKey struct{}
 

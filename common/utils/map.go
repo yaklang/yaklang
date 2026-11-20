@@ -126,13 +126,145 @@ type SafeMapWithKey[K comparable, V any] struct {
 }
 
 type SafeMap[V any] struct {
-	*SafeMapWithKey[string, V]
+	core safeMapCore
 }
 
 func NewSafeMap[V any]() *SafeMap[V] {
 	return &SafeMap[V]{
-		SafeMapWithKey: NewSafeMapWithKey[string, V](),
+		core: safeMapCore{m: make(map[any]any)},
 	}
+}
+
+func (sm *SafeMap[V]) Get(key string) (V, bool) {
+	if sm == nil {
+		var zero V
+		return zero, false
+	}
+	raw, ok := sm.core.get(key)
+	if !ok {
+		var zero V
+		return zero, false
+	}
+	return castCacheValue[V](raw), true
+}
+
+func (sm *SafeMap[V]) GetOrLoad(key string, f func() (V, error)) (V, error) {
+	raw, err := sm.core.getOrLoad(key, func() (any, error) {
+		return f()
+	})
+	if err != nil {
+		var zero V
+		return zero, err
+	}
+	return castCacheValue[V](raw), nil
+}
+
+func (sm *SafeMap[V]) Have(key string) bool     { return sm.core.have(key) }
+func (sm *SafeMap[V]) Set(key string, value V) { sm.core.set(key, value) }
+
+func (sm *SafeMap[V]) Update(key string, fn func(old V, loaded bool) (next V, store bool)) (prev V, loaded bool) {
+	if sm == nil || fn == nil {
+		var zero V
+		return zero, false
+	}
+	rawPrev, loaded := sm.core.update(key, func(old any, loaded bool) (any, bool) {
+		return fn(castCacheValue[V](old), loaded)
+	})
+	return castCacheValue[V](rawPrev), loaded
+}
+
+func (sm *SafeMap[V]) UpdateAction(key string, fn func(old V, loaded bool) (next V, action SafeMapAction)) (prev V, loaded bool, action SafeMapAction) {
+	if sm == nil || fn == nil {
+		var zero V
+		return zero, false, SafeMapKeep
+	}
+	rawPrev, loaded, action := sm.core.updateAction(key, func(old any, loaded bool) (any, SafeMapAction) {
+		return fn(castCacheValue[V](old), loaded)
+	})
+	return castCacheValue[V](rawPrev), loaded, action
+}
+
+func (sm *SafeMap[V]) Keys() []string {
+	if sm == nil {
+		return nil
+	}
+	rawKeys, _ := sm.core.snapshotPairs()
+	keys := make([]string, len(rawKeys))
+	for i, k := range rawKeys {
+		keys[i] = castCacheValue[string](k)
+	}
+	return keys
+}
+
+func (sm *SafeMap[V]) Values() []V {
+	if sm == nil {
+		return nil
+	}
+	_, rawVals := sm.core.snapshotPairs()
+	values := make([]V, len(rawVals))
+	for i, v := range rawVals {
+		values[i] = castCacheValue[V](v)
+	}
+	return values
+}
+
+func (sm *SafeMap[V]) Delete(key string) {
+	if sm == nil {
+		return
+	}
+	sm.core.deleteKey(key)
+}
+
+func (sm *SafeMap[V]) ForEach(f func(key string, value V) bool) {
+	if sm == nil || f == nil {
+		return
+	}
+	rawKeys, rawVals := sm.core.snapshotPairs()
+	for i, k := range rawKeys {
+		if !f(castCacheValue[string](k), castCacheValue[V](rawVals[i])) {
+			break
+		}
+	}
+}
+
+func (sm *SafeMap[V]) ValuesMatching(match func(string) bool) []V {
+	if sm == nil || match == nil {
+		return nil
+	}
+	rawVals := sm.core.valuesMatching(func(k any) bool {
+		return match(castCacheValue[string](k))
+	})
+	if len(rawVals) == 0 {
+		return nil
+	}
+	values := make([]V, len(rawVals))
+	for i, v := range rawVals {
+		values[i] = castCacheValue[V](v)
+	}
+	return values
+}
+
+func (sm *SafeMap[V]) GetAll() map[string]V {
+	if sm == nil {
+		return nil
+	}
+	rawKeys, rawVals := sm.core.snapshotPairs()
+	ret := make(map[string]V, len(rawKeys))
+	for i, k := range rawKeys {
+		ret[castCacheValue[string](k)] = castCacheValue[V](rawVals[i])
+	}
+	return ret
+}
+
+func (sm *SafeMap[V]) Count() int {
+	if sm == nil {
+		return 0
+	}
+	return sm.core.count()
+}
+
+func (sm *SafeMap[V]) Clear() {
+	sm.core.clear()
 }
 
 func NewSafeMapWithKey[K comparable, V any]() *SafeMapWithKey[K, V] {

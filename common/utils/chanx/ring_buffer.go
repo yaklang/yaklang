@@ -36,6 +36,11 @@ func (r *ringBufferCore) read() (any, error) {
 	return v, nil
 }
 
+func (r *ringBufferCore) pop() any {
+	v, _ := r.read()
+	return v
+}
+
 func (r *ringBufferCore) peek() any {
 	if r.r == r.w {
 		panic(ErrIsEmpty.Error())
