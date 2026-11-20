@@ -217,15 +217,15 @@ func TestPCAPGRPCGetPacketDetailLargeMessage(t *testing.T) {
 	require.True(t, next.GetEOF())
 }
 
-func TestPCAPDecodeMessageNodesKeepsParsedFieldsOnSessionError(t *testing.T) {
+func TestPCAPDecodeMessageNodesDoesNotAppendParsedFieldsFallback(t *testing.T) {
 	nodes, truncated, diagnostic := pcapDecodeMessageNodes(pcapdb.ProtocolMessage{
 		FieldsJSON:  []byte(`{"Method":"GET","Nested":{"Code":200}}`),
 		SessionJSON: []byte(`{broken`),
 	}, "message:1", pcaputil.MessageDisplayInput{})
 	require.False(t, truncated)
 	require.Contains(t, diagnostic, "session fields")
-	require.NotNil(t, findPCAPFieldNode(nodes, "Parsed fields"))
-	require.NotNil(t, findPCAPFieldNode(nodes, "Method"))
+	require.Empty(t, nodes)
+	require.Nil(t, findPCAPFieldNode(nodes, "Parsed fields"))
 }
 
 func TestPCAPGRPCMessageDetailRestoresTLSRange(t *testing.T) {

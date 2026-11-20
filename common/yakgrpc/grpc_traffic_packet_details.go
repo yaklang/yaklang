@@ -1,16 +1,10 @@
 package yakgrpc
 
 import (
-	"encoding/hex"
-	"fmt"
-	"net"
-	"reflect"
-	"sort"
 	"strings"
 
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 // The node shape is intentionally identical to the original ParseTraffic tree.
@@ -49,50 +43,21 @@ type trafficMessageDetails struct {
 	DecodeError         string `json:",omitempty"`
 }
 
-func trafficLeaf(name string, value any, scope ...int) trafficField {
-	verbose := fmt.Sprint(value)
-	if b, ok := value.([]byte); ok {
-		verbose = "0x" + hex.EncodeToString(b)
-	}
-	return trafficField{Name: name, Value: trafficFieldValue{Leaf: true, Verbose: verbose, Scope: scope}}
-}
-
-// Saved application fields have no reliable physical-frame offsets. Do not
-// invent offsets by reparsing an HTTP message or assigning them to a TCP frame.
-func trafficSavedFields(fields map[string]any) []trafficField {
-	keys := make([]string, 0, len(fields))
-	for k := range fields {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	result := make([]trafficField, 0, len(keys))
-	for _, key := range keys {
-		result = append(result, trafficSavedField(key, fields[key]))
-	}
-	return result
-}
-
-func trafficSavedField(name string, value any) trafficField {
-	switch v := value.(type) {
-	case map[string]any:
-		return trafficField{Name: name, Value: trafficSavedFields(v)}
-	case []any:
-		children := make([]trafficField, 0, len(v))
-		for i, x := range v {
-			children = append(children, trafficSavedField(fmt.Sprintf("[%d]", i), x))
-		}
-		return trafficField{Name: name, Value: children}
-	default:
-		return trafficLeaf(name, value)
-	}
-}
-
 func pcapTrafficDetails(handle *pcapdb.DatabaseHandle, packet pcapdb.Packet, raw []byte) (*trafficPacketDetails, error) {
 	meta, err := handle.Metadata()
 	if err != nil {
 		return nil, err
 	}
-	result := &trafficPacketDetails{Result: trafficFrameFields(packet, raw), Messages: make([]trafficMessageDetails, 0), ProtocolsIndexed: meta.ProtocolsIndexed, DecodeError: packet.DecodeError}
+	result := &trafficPacketDetails{
+		Result: trafficTreeFromDisplayNodes(pcaputil.BuildFrameDisplayNodes(pcaputil.FrameDisplayInput{
+			Raw: raw, LinkType: packet.LinkType, PacketID: uint64(packet.ID),
+			CapturedLength: packet.CapturedLength, OriginalLength: packet.OriginalLength,
+			Section: packet.Section, Interface: packet.Interface, TimestampNS: packet.TimestampNS,
+		})),
+		Messages:         make([]trafficMessageDetails, 0),
+		ProtocolsIndexed: meta.ProtocolsIndexed,
+		DecodeError:      packet.DecodeError,
+	}
 	messages, err := handle.PacketMessages(packet.ID, 1<<20)
 	if err != nil {
 		return nil, err
@@ -102,8 +67,11 @@ func pcapTrafficDetails(handle *pcapdb.DatabaseHandle, packet pcapdb.Packet, raw
 		if err != nil {
 			return nil, err
 		}
-		view := trafficMessageDetails{MessageId: m.ID, Protocol: strings.ToUpper(m.Protocol), Info: m.Summary, Status: m.Status, Completeness: m.Completeness, DataLength: m.DataLength, Kind: source.Kind, RAW: m.Data,
-			PacketIds: make([]uint64, 0, len(source.PacketRefs)), Result: []trafficField{{Name: strings.ToUpper(m.Protocol), DisplayValue: m.Summary, Value: trafficSavedFields(m.Fields)}}, DecodeError: m.DecodeError}
+		protocol := strings.ToUpper(m.Protocol)
+		view := trafficMessageDetails{MessageId: m.ID, Protocol: protocol, Info: m.Summary, Status: m.Status, Completeness: m.Completeness, DataLength: m.DataLength, Kind: source.Kind, RAW: m.Data,
+			PacketIds: make([]uint64, 0, len(source.PacketRefs)), Result: trafficTreeFromDisplayNodes([]pcaputil.DisplayNode{{
+				Name: protocol, DisplayValue: m.Summary, Children: pcaputil.BuildProtocolFieldDisplayNodes(m.Fields),
+			}}), DecodeError: m.DecodeError}
 		if view.DecodeError == "" {
 			view.DecodeError = m.Error
 		}
@@ -120,112 +88,20 @@ func pcapTrafficDetails(handle *pcapdb.DatabaseHandle, packet pcapdb.Packet, raw
 	return result, nil
 }
 
-func trafficFrameFields(packet pcapdb.Packet, raw []byte) []trafficField {
-	frame := []trafficField{trafficLeaf("Number", packet.ID), trafficLeaf("Captured length", packet.CapturedLength), trafficLeaf("Original length", packet.OriginalLength), trafficLeaf("Link type", packet.LinkType), trafficLeaf("Section", packet.Section), trafficLeaf("Interface", packet.Interface)}
-	if packet.TimestampNS != nil {
-		frame = append(frame, trafficLeaf("Timestamp (ns)", *packet.TimestampNS))
-	}
-	result := []trafficField{{Name: fmt.Sprintf("Frame %d: %d bytes on wire, %d bytes captured", packet.ID, packet.OriginalLength, packet.CapturedLength), Value: frame}}
-	decoded := gopacket.NewPacket(raw, layers.LinkType(packet.LinkType), gopacket.Default)
-	offset := 0
-	for _, layer := range decoded.Layers() {
-		if layer.LayerType() == gopacket.LayerTypePayload || layer.LayerType() == gopacket.LayerTypeDecodeFailure {
-			continue
+func trafficTreeFromDisplayNodes(nodes []pcaputil.DisplayNode) []trafficField {
+	result := make([]trafficField, 0, len(nodes))
+	for _, node := range nodes {
+		field := trafficField{Name: node.Name, DisplayValue: node.DisplayValue}
+		if len(node.Children) > 0 {
+			field.Value = trafficTreeFromDisplayNodes(node.Children)
+		} else {
+			scope := make([]int, 0, 2)
+			if len(node.Ranges) > 0 && node.Ranges[0].BitOffset >= 0 && node.Ranges[0].BitLength > 0 {
+				scope = append(scope, int(node.Ranges[0].BitOffset), int(node.Ranges[0].BitOffset+node.Ranges[0].BitLength))
+			}
+			field.Value = trafficFieldValue{Leaf: true, Verbose: node.DisplayValue, Scope: scope}
 		}
-		header := layer.LayerContents()
-		if len(header) == 0 {
-			continue
-		}
-		start := offset * 8
-		leaf := func(name string, value any, first, last int) trafficField {
-			return trafficLeaf(name, value, start+first*8, start+last*8)
-		}
-		var fields []trafficField
-		var summary string
-		switch v := layer.(type) {
-		case *layers.Ethernet:
-			fields = []trafficField{leaf("Destination", v.DstMAC, 0, 6), leaf("Source", v.SrcMAC, 6, 12), leaf("Type", v.EthernetType, 12, 14)}
-			summary = fmt.Sprintf("%s → %s", v.SrcMAC, v.DstMAC)
-		case *layers.Dot1Q:
-			fields = []trafficField{leaf("Priority", v.Priority, 0, 2), leaf("Drop eligible", v.DropEligible, 0, 2), leaf("VLAN ID", v.VLANIdentifier, 0, 2), leaf("Type", v.Type, 2, 4)}
-			summary = fmt.Sprintf("VLAN %d · PCP %d", v.VLANIdentifier, v.Priority)
-		case *layers.IPv4:
-			fields = []trafficField{leaf("Version", v.Version, 0, 1), leaf("Header length", int(v.IHL)*4, 0, 1), leaf("Type of service", v.TOS, 1, 2), leaf("Total length", v.Length, 2, 4), leaf("Identification", v.Id, 4, 6), leaf("Flags", v.Flags, 6, 8), leaf("Fragment offset", v.FragOffset, 6, 8), leaf("Time to live", v.TTL, 8, 9), leaf("Protocol", v.Protocol, 9, 10), leaf("Checksum", fmt.Sprintf("0x%04x", v.Checksum), 10, 12), leaf("Source address", v.SrcIP, 12, 16), leaf("Destination address", v.DstIP, 16, 20)}
-			summary = fmt.Sprintf("%s → %s · %s · TTL %d", v.SrcIP, v.DstIP, v.Protocol, v.TTL)
-			if len(header) > 20 {
-				fields = append(fields, leaf("Options", header[20:], 20, len(header)))
-			}
-		case *layers.IPv6:
-			fields = []trafficField{leaf("Version", v.Version, 0, 1), leaf("Traffic class", v.TrafficClass, 0, 2), leaf("Flow label", v.FlowLabel, 1, 4), leaf("Payload length", v.Length, 4, 6), leaf("Next header", v.NextHeader, 6, 7), leaf("Hop limit", v.HopLimit, 7, 8), leaf("Source address", v.SrcIP, 8, 24), leaf("Destination address", v.DstIP, 24, 40)}
-			summary = fmt.Sprintf("%s → %s · %s · Hop limit %d", v.SrcIP, v.DstIP, v.NextHeader, v.HopLimit)
-		case *layers.TCP:
-			flags := []string{}
-			for _, f := range []struct {
-				set  bool
-				name string
-			}{{v.FIN, "FIN"}, {v.SYN, "SYN"}, {v.RST, "RST"}, {v.PSH, "PSH"}, {v.ACK, "ACK"}, {v.URG, "URG"}, {v.ECE, "ECE"}, {v.CWR, "CWR"}, {v.NS, "NS"}} {
-				if f.set {
-					flags = append(flags, f.name)
-				}
-			}
-			fields = []trafficField{leaf("Source port", uint16(v.SrcPort), 0, 2), leaf("Destination port", uint16(v.DstPort), 2, 4), leaf("Sequence number", v.Seq, 4, 8), leaf("Acknowledgment number", v.Ack, 8, 12), leaf("Header length", int(v.DataOffset)*4, 12, 13), leaf("Flags", strings.Join(flags, ", "), 12, 14), leaf("Window", v.Window, 14, 16), leaf("Checksum", fmt.Sprintf("0x%04x", v.Checksum), 16, 18), leaf("Urgent pointer", v.Urgent, 18, 20)}
-			flagSummary := "No flags"
-			if len(flags) > 0 {
-				flagSummary = "[" + strings.Join(flags, ", ") + "]"
-			}
-			summary = fmt.Sprintf("%d → %d · %s · Seq=%d Ack=%d Win=%d", v.SrcPort, v.DstPort, flagSummary, v.Seq, v.Ack, v.Window)
-			if len(header) > 20 {
-				fields = append(fields, leaf("Options", header[20:], 20, len(header)))
-			}
-		case *layers.UDP:
-			fields = []trafficField{leaf("Source port", uint16(v.SrcPort), 0, 2), leaf("Destination port", uint16(v.DstPort), 2, 4), leaf("Length", v.Length, 4, 6), leaf("Checksum", fmt.Sprintf("0x%04x", v.Checksum), 6, 8)}
-			summary = fmt.Sprintf("%d → %d · Len=%d", v.SrcPort, v.DstPort, v.Length)
-		case *layers.ARP:
-			switch v.Operation {
-			case layers.ARPRequest:
-				summary = fmt.Sprintf("Who has %s? Tell %s", net.IP(v.DstProtAddress), net.IP(v.SourceProtAddress))
-			case layers.ARPReply:
-				summary = fmt.Sprintf("%s is at %s", net.IP(v.SourceProtAddress), net.HardwareAddr(v.SourceHwAddress))
-			default:
-				summary = fmt.Sprintf("Operation %d", v.Operation)
-			}
-		case *layers.ICMPv4:
-			summary = v.TypeCode.String()
-		case *layers.ICMPv6:
-			summary = v.TypeCode.String()
-		default:
-			// All other decoded link/network headers remain inspectable. Their
-			// field offsets are unknown; only expose the verified header range.
-			value := reflect.ValueOf(layer)
-			if value.Kind() == reflect.Pointer {
-				value = value.Elem()
-			}
-			if value.Kind() == reflect.Struct {
-				typ := value.Type()
-				for i := 0; i < value.NumField(); i++ {
-					field := typ.Field(i)
-					if field.PkgPath != "" || field.Anonymous || !value.Field(i).CanInterface() {
-						continue
-					}
-					fields = append(fields, trafficLeaf(field.Name, value.Field(i).Interface()))
-				}
-			}
-		}
-		fields = append(fields, leaf("Header bytes", header, 0, len(header)))
-		result = append(result, trafficField{Name: layer.LayerType().String(), DisplayValue: summary, Value: fields})
-		offset += len(header)
-	}
-	if offset < len(raw) {
-		payload := trafficLeaf("Payload", raw[offset:], offset*8, len(raw)*8)
-		if len(result) > 1 {
-			last := &result[len(result)-1]
-			if fields, ok := last.Value.([]trafficField); ok {
-				last.Value = append(fields, payload)
-				return result
-			}
-		}
-		// Preserve the bytes even when no protocol layer could be decoded.
-		result = append(result, payload)
+		result = append(result, field)
 	}
 	return result
 }

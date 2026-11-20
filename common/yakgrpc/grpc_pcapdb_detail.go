@@ -21,31 +21,6 @@ const (
 	pcapDetailMessagesBudget     = 8 << 20
 )
 
-func pcapFrameFieldNodes(fields []trafficField, sourceID string) []*ypb.PCAPFieldNode {
-	nodes := make([]*ypb.PCAPFieldNode, 0, len(fields))
-	for _, field := range fields {
-		node := &ypb.PCAPFieldNode{Name: field.Name}
-		if field.DisplayValue != "" {
-			node.DisplayValue = proto.String(field.DisplayValue)
-		}
-		switch value := field.Value.(type) {
-		case trafficFieldValue:
-			node.DisplayValue = proto.String(value.Verbose)
-			if len(value.Scope) == 2 && value.Scope[1] >= value.Scope[0] {
-				node.Ranges = append(node.Ranges, &ypb.PCAPFieldRange{
-					SourceID: sourceID, BitOffset: int64(value.Scope[0]), BitLength: int64(value.Scope[1] - value.Scope[0]),
-				})
-			}
-		case []trafficField:
-			node.Children = pcapFrameFieldNodes(value, sourceID)
-		default:
-			node.DisplayValue = proto.String(fmt.Sprint(field.Value))
-		}
-		nodes = append(nodes, node)
-	}
-	return nodes
-}
-
 func pcapDisplayFieldNodes(sourceID string, nodes []pcaputil.DisplayNode) []*ypb.PCAPFieldNode {
 	result := make([]*ypb.PCAPFieldNode, 0, len(nodes))
 	for _, node := range nodes {
@@ -140,12 +115,6 @@ func pcapDecodeMessageNodes(message pcapdb.ProtocolMessage, sourceID string, vie
 	view.Fields, view.Session = message.Fields, message.Session
 	projected, truncated := pcaputil.BuildMessageDisplayNodes(view)
 	nodes := pcapDisplayFieldNodes(sourceID, projected)
-	if len(message.Fields) > 0 {
-		nodes = append(nodes, &ypb.PCAPFieldNode{
-			Name:     "Parsed fields",
-			Children: pcapFrameFieldNodes(trafficSavedFields(message.Fields), sourceID),
-		})
-	}
 	return nodes, truncated, strings.Join(diagnostics, "; ")
 }
 
@@ -189,8 +158,12 @@ func (s *Server) GetPCAPPacketDetail(ctx context.Context, req *ypb.GetPCAPPacket
 	}
 	frameSourceID := fmt.Sprintf("frame:%d", packetID)
 	response := &ypb.PCAPPacketDetail{
-		Packet:          pcapPacketSummaryModel(row),
-		Nodes:           pcapFrameFieldNodes(trafficFrameFields(row.Packet, raw), frameSourceID),
+		Packet: pcapPacketSummaryModel(row),
+		Nodes: pcapDisplayFieldNodes(frameSourceID, pcaputil.BuildFrameDisplayNodes(pcaputil.FrameDisplayInput{
+			Raw: raw, LinkType: row.Packet.LinkType, PacketID: uint64(row.Packet.ID),
+			CapturedLength: row.Packet.CapturedLength, OriginalLength: row.Packet.OriginalLength,
+			Section: row.Packet.Section, Interface: row.Packet.Interface, TimestampNS: row.Packet.TimestampNS,
+		})),
 		Messages:        make([]*ypb.PCAPMessageDetail, 0),
 		RelatedMessages: make([]*ypb.PCAPRelatedMessage, 0),
 		ByteSources:     make([]*ypb.PCAPByteSource, 0),
