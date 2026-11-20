@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -137,4 +138,121 @@ func TestBitVector_COW_ConcurrentCloneSetRace(t *testing.T) {
 	for err := range errs {
 		t.Fatal(err)
 	}
+}
+
+// A single high bit must not allocate a dense word slice. SyntaxFlow anchor
+// scopes set slot `base+i` per value, so a dense form costs O(index/64) words
+// per value and made a 4.6M-instruction program run out of memory.
+func TestBitVector_SparseHighIndexStaysSmall(t *testing.T) {
+	b := NewBitVector()
+	b.Set(4_000_000)
+	require.Nil(t, b.words, "singleton bit must stay sparse")
+	require.True(t, b.Has(4_000_000))
+	require.False(t, b.Has(3_999_999))
+
+	c := NewBitVector()
+	c.Set(4_000_001)
+	b.Or(c)
+	require.Nil(t, b.words, "two sparse bits must stay sparse")
+	var got []int
+	b.ForEach(func(i int) { got = append(got, i) })
+	require.Equal(t, []int{4_000_000, 4_000_001}, got)
+}
+
+// Dense-looking content promotes to the word form, and both forms agree.
+func TestBitVector_PromotesWhenDense(t *testing.T) {
+	b := NewBitVector()
+	for i := 0; i < 4096; i++ {
+		b.Set(i)
+	}
+	require.NotNil(t, b.words, "dense content must use the word form")
+	for i := 0; i < 4096; i++ {
+		require.True(t, b.Has(i))
+	}
+	require.False(t, b.Has(4096))
+}
+
+func TestBitVector_SparseOrContains(t *testing.T) {
+	a := NewBitVector()
+	a.Set(1_000_000)
+	a.Set(2_000_000)
+
+	b := NewBitVector()
+	b.Set(2_000_000)
+
+	require.True(t, a.Contains(b))
+	require.False(t, b.Contains(a))
+
+	c := NewBitVector()
+	c.Set(3_000_000)
+	a.Or(c)
+	require.True(t, a.Has(3_000_000))
+	require.True(t, a.Has(1_000_000))
+}
+
+// Clone must share the sparse slice and detach on mutation.
+func TestBitVector_SparseCloneDetaches(t *testing.T) {
+	a := NewBitVector()
+	a.Set(100)
+	b := a.Clone()
+	require.Equal(t, a.sparse, b.sparse)
+
+	b.Set(200)
+	require.False(t, a.Has(200), "mutating the clone must not touch the source")
+	require.True(t, b.Has(200))
+	require.True(t, b.Has(100))
+}
+
+// Sparse and dense vectors must produce identical results for mixed operation
+// sequences.
+func TestBitVector_SparseDenseEquivalence(t *testing.T) {
+	indices := []int{0, 63, 64, 1000, 5000, 5001, 200_000}
+	var sparse *BitVector = NewBitVector()
+	dense := NewBitVector()
+	// Force the dense form by setting a contiguous run first.
+	for i := 0; i < 1024; i++ {
+		dense.Set(i)
+		sparse.Set(i)
+	}
+	for _, i := range indices {
+		sparse.Set(i + 4096)
+		dense.Set(i + 4096)
+	}
+	var gotSparse, gotDense []int
+	sparse.ForEach(func(i int) { gotSparse = append(gotSparse, i) })
+	dense.ForEach(func(i int) { gotDense = append(gotDense, i) })
+	require.Equal(t, gotDense, gotSparse)
+	for _, i := range append(indices, 5, 500) {
+		require.Equal(t, dense.Has(i+4096), sparse.Has(i+4096))
+	}
+}
+
+// TestBitVector_AnchorScopeAllocationIsLinear pins the memory shape of an
+// anchor scope: one vector per value, each with one bit at its slot index.
+// The dense backing grew to index/64 words per vector, i.e. O(n²/16) bytes for
+// the whole scope, which is what made a 4.6M-instruction SyntaxFlow query
+// exhaust the heap. The sparse backing keeps one entry per vector.
+func TestBitVector_AnchorScopeAllocationIsLinear(t *testing.T) {
+	const n = 50_000
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+
+	vectors := make([]*BitVector, n)
+	for i := 0; i < n; i++ {
+		b := NewBitVector()
+		b.Set(i)
+		vectors[i] = b
+	}
+
+	runtime.GC()
+	runtime.ReadMemStats(&after)
+	grown := after.HeapAlloc - before.HeapAlloc
+	// Dense backing for this shape costs ~n²/16 bytes (~156 MB at n=50k); the
+	// sparse form costs 4 bytes per slot plus the slice headers (~3 MB). The
+	// bound leaves room for slice growth while staying far below dense.
+	const limit = 24 << 20
+	require.Less(t, grown, uint64(limit), "anchor scope allocation must be linear, got %d bytes", grown)
+	require.True(t, vectors[n-1].Has(n-1))
+	require.False(t, vectors[n-1].Has(n-2))
 }
