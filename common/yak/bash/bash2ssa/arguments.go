@@ -150,12 +150,18 @@ func listExpansion(w *syntax.Word) *syntax.ParamExp {
 func (ab *astBuilder) words(words []*syntax.Word) ([]ssa.Value, bool) {
 	var fields []ssa.Value
 	spread := false
-	for _, w := range words {
-		v := ab.buildWord(w)
+	add := func(v ssa.Value) {
 		if v == nil {
 			v = ab.EmitUndefined("word")
 		}
+		fields = append(fields, v)
+	}
+	for _, w := range words {
 		if listExpansion(w) != nil {
+			v := ab.buildWord(w)
+			if v == nil {
+				v = ab.EmitUndefined("word")
+			}
 			vs, dyn := ab.spread(v)
 			if dyn && len(words) > 1 {
 				vs = []ssa.Value{ab.intrinsic("spread", v)}
@@ -164,36 +170,78 @@ func (ab *astBuilder) words(words []*syntax.Word) ([]ssa.Value, bool) {
 			spread = spread || dyn
 			continue
 		}
-		// Quoted empty fields survive. A known unquoted expansion splits on the
-		// default shell whitespace, unlike a literal or an assignment word.
+		// A single unquoted expansion splits on the shell whitespace. A known
+		// constant is resolved into concrete fields; otherwise the split is
+		// marked with an intrinsic. Quoted words and assignments are not split.
 		if len(w.Parts) == 1 {
-			switch part := w.Parts[0].(type) {
-			case *syntax.ParamExp, *syntax.CmdSubst:
-				// TODO(ssa-bash): a runtime IFS value is passed to the fields intrinsic; the split is not resolved statically.
-				ifs := ab.PeekValue("IFS")
-				if ifs == nil {
-					ifs = ab.EmitConstInst(" \t\n")
+			if part, ok := bareExpansion(w); ok {
+				v := ab.buildWord(w)
+				if v == nil {
+					v = ab.EmitUndefined("word")
 				}
-				if c, ok := ssa.ToConstInst(v); ok && c.IsString() {
-					if sep, ok := ssa.ToConstInst(ifs); ok && sep.String() == " \t\n" && !strings.ContainsAny(c.String(), "*?[") {
-						for _, s := range strings.FieldsFunc(c.String(), func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' }) {
-							fields = append(fields, ab.EmitConstInst(s))
-						}
-						continue
+				if ab.appendKnownFields(v, &fields) {
+					continue
+				}
+				switch p := part.(type) {
+				case *syntax.ParamExp:
+					// TODO(ssa-bash): a runtime IFS value is passed to the fields intrinsic; the split is not resolved statically.
+					if paramExpSplits(p) {
+						v = ab.intrinsic("param-fields", v, ab.ifsValue())
+						spread = true
 					}
-				}
-				v = ab.intrinsic("fields", v, ifs)
-				spread = true
-			case *syntax.Lit:
-				if pattern.HasMeta(part.Value, pattern.Filenames) {
-					v = ab.intrinsic("pathname-fields", v)
+				case *syntax.CmdSubst:
+					v = ab.intrinsic("cmd-fields", v, ab.ifsValue())
 					spread = true
 				}
+				fields = append(fields, v)
+				continue
 			}
 		}
-		fields = append(fields, v)
+		v := ab.buildArgWord(w)
+		// Quoted empty fields survive; a literal with glob meta expands to paths.
+		if len(w.Parts) == 1 {
+			if part, ok := w.Parts[0].(*syntax.Lit); ok && pattern.HasMeta(part.Value, pattern.Filenames) {
+				if v == nil {
+					v = ab.EmitUndefined("word")
+				}
+				v = ab.intrinsic("pathname-fields", v)
+				spread = true
+			}
+		}
+		add(v)
 	}
 	return fields, spread
+}
+
+// bareExpansion reports a word that is exactly one unquoted expansion.
+func bareExpansion(w *syntax.Word) (syntax.WordPart, bool) {
+	if w == nil || len(w.Parts) != 1 {
+		return nil, false
+	}
+	switch w.Parts[0].(type) {
+	case *syntax.ParamExp, *syntax.CmdSubst:
+		return w.Parts[0], true
+	default:
+		return nil, false
+	}
+}
+
+// appendKnownFields statically splits an expansion whose value is already a
+// constant. It reports whether the value was consumed.
+func (ab *astBuilder) appendKnownFields(v ssa.Value, fields *[]ssa.Value) bool {
+	c, ok := ssa.ToConstInst(v)
+	if !ok || !c.IsString() {
+		return false
+	}
+	ifs := ab.ifsValue()
+	sep, ok := ssa.ToConstInst(ifs)
+	if !ok || sep.String() != " \t\n" || strings.ContainsAny(c.String(), "*?[") {
+		return false
+	}
+	for _, s := range strings.FieldsFunc(c.String(), func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' }) {
+		*fields = append(*fields, ab.EmitConstInst(s))
+	}
+	return true
 }
 
 func (ab *astBuilder) packFields(fields []ssa.Value, spread bool) ssa.Value {

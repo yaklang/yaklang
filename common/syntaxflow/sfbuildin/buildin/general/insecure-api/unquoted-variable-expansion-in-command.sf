@@ -1,8 +1,8 @@
 desc(
-	mode: "source"
-	language: "general"
-	title: "源码匹配：检测到命令中未加引号的变量展开"
-	title_zh: "检测到命令中未加引号的变量展开",
+	mode: "ssa"
+	language: "bash"
+	title: "Bash：命令参数中的变量展开未加引号"
+	title_zh: "命令参数中的变量展开未加引号"
 	type: vuln
 	level: "middle"
 	rule_id: "source-unquoted-variable-expansion-in-command"
@@ -18,56 +18,42 @@ desc(
 未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
-`[[ ... ]]` 条件表达式、`(( ... ))` 算术表达式和 `case ... in` 的关键字都不做词分割，这些位置上的展开不告警；普通命令参数里的未加引号展开仍会命中。
+Bash 语法解析：命中命令参数中未加引号的参数展开（`$var`、`${var}`、`$1`、
+`${arr[0]}` 等），包括与字面量拼接的写法（`--prefix=$dir`）。双引号内的展开、
+赋值语句右侧，以及 `[[ ]]`、`(( ))`、`case ... in` 等不做词拆分的上下文不会被误报。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 用双引号包裹变量展开；确实需要拆分时使用下划线前缀变量或显式数组。
 SOLUTION
 	alert_min: 1
-	"file://pos.bash": <<<POS
-exec YAKLANG_SF_POS_source-unquoted-variable-expansion-in-command
+	"file://pos.sh": <<<POS
 exec $foo
 exec ${foo%.bar}
 exec $1
+exec --prefix=$dir
+echo $_foo
 POS
-	"safefile://neg.bash": <<<NEG
+	"safefile://neg.sh": <<<NEG
 exec "$foo"
 exec "${foo}"
 x=$foo
 PATH=$foo:$PATH bar
 echo $$
-echo $_foo
+echo $?
+echo ${#foo}
 case " ${seen_files} " in *" ${base} "*) return 0 ;; esac
 echo '$literal_dollar'
 # comment mentioning $docs is not an unquoted expansion
 [[ $mode == "release" ]]
 [[ -n $target && $target != *" "* ]]
 (( total += $step ))
-case $action in
-release) make dist ;;
-esac
+case $action in release) make dist ;; esac
 NEG
 )
 
-${*.sh}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_sh
-${*.bash}.pattern_regex(/(?<![\w"'=:])\$(?:\{[*@0-9A-Za-z][^}]*\}|[*@0-9A-Za-z][A-Za-z0-9_]*)|YAKLANG_SF_POS_source\-unquoted\-variable\-expansion\-in\-command/) as $hit_bash
-$hit_sh + $hit_bash as $expansions
-${*.sh}.pattern_regex(/"[^"\n]*"/) as $dq_sh
-${*.bash}.pattern_regex(/"[^"\n]*"/) as $dq_bash
-${*.sh}.pattern_regex(/'[^'\n]*'/) as $sq_sh
-${*.bash}.pattern_regex(/'[^'\n]*'/) as $sq_bash
-${*.sh}.pattern_regex(/#[^\n]*/) as $cm_sh
-${*.bash}.pattern_regex(/#[^\n]*/) as $cm_bash
-${*.sh}.pattern_regex(/\[\[[^\]]*\]\]/) as $test_sh
-${*.bash}.pattern_regex(/\[\[[^\]]*\]\]/) as $test_bash
-${*.sh}.pattern_regex(/\(\([^\n]*\)\)/) as $carr_sh
-${*.bash}.pattern_regex(/\(\([^\n]*\)\)/) as $carr_bash
-${*.sh}.pattern_regex(/case[ \t]+[^\n;]*\bin\b/) as $case_sh
-${*.bash}.pattern_regex(/case[ \t]+[^\n;]*\bin\b/) as $case_bash
-$dq_sh + $dq_bash + $sq_sh + $sq_bash + $cm_sh + $cm_bash + $test_sh + $test_bash + $carr_sh + $carr_bash + $case_sh + $case_bash as $quoted
-$expansions not_inside $quoted as $hit
+/^@bash\.param-fields$/ as $split
+$split(* as $argv) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到命令中未加引号的变量展开",

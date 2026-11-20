@@ -1,8 +1,8 @@
 desc(
-	mode: "source"
-	language: "general"
-	title: "源码匹配：检测到 Hooks 配置访问敏感文件"
-	title_zh: "检测到 Hooks 配置访问敏感文件",
+	mode: "ssa"
+	language: "bash"
+	title: "Bash：Hooks 脚本把 jq 输出交给文件操作"
+	title_zh: "Hooks 脚本把 jq 输出交给文件操作"
 	type: vuln
 	level: "middle"
 	rule_id: "source-config-hooks-sensitive-file-access-bash"
@@ -18,7 +18,8 @@ Hook 输入经 jq 处理后直接流入文件操作，未检查是否访问敏�
 应用可能暴露内部路径、环境信息或敏感数据，攻击者可借此收集攻击面。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+Bash 语法解析：追踪 jq 命令替换的结果，命中把该结果以未加引号方式传给
+`cat`、`rm`、`cp`、`mv` 等文件操作的链路。
 
 ### 参考
 - CWE-538
@@ -29,27 +30,23 @@ DESC
 SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS
-$('S|	 
-
-	 jq.fxJDz>cAL?) 	
-	
-		rm 	  
-	
-$
+payload=$(cat payload.json | jq -r .command)
+rm $payload
+cp $payload /tmp/out
 POS
-	"safefile://neg/pos.sh": <<<NEG
-#!/bin/bash
-content=$(cat payload.json)
-echo "$content"
+	"safefile://neg.sh": <<<NEG
+payload=$(cat payload.json | jq -r .command)
+rm "$payload"
+cat payload.json | jq -r .command
 NEG
 )
 
-${*.sh}.pattern_regex(/\$\(.*\|\s*jq\b[^)]*\)[\s\S]*?\n\s*(cat|rm|cp|mv)\s+\$/) as $p0
-${*.bash}.pattern_regex(/\$\(.*\|\s*jq\b[^)]*\)[\s\S]*?\n\s*(cat|rm|cp|mv)\s+\$/) as $p1
-$p0 + $p1 as $hit
+/^(cat|rm|cp|mv)$/ as $op
+$op(* as $argv) as $call
+$argv?{have: /@bash\.param-fields/, /(^|[^A-Za-z0-9_])jq\(/} as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到 Hooks 配置访问敏感文件",
 	title_zh: "检测到 Hooks 配置访问敏感文件",
-	message: "检测到 Hooks 配置访问敏感文件",
+	message: "jq 处理后的 Hook 输入直接进入文件操作，请校验目标路径。",
 }
