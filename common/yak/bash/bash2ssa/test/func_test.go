@@ -1,65 +1,173 @@
 package test
 
 import (
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
-func TestBashPrintlnFunction(t *testing.T) {
-	ssatest.CheckPrintlnValueRegexp(sink+`f(){ println "$1"; println "${10}"; println "$#"; println "$*"; return 7; }; f a b c d e f g h i j; println "$?"`, []string{`ParameterMember-.*0`, `ParameterMember-.*9`, `ParameterMember-.*#`, `ParameterMember-.*\*`, `7`}, t)
+// A shell function has one variadic $@ parameter. $1, $#, $* and ${10} are
+// members of that vector, so the callee body always prints a ParameterMember.
+func TestBashPrintlnFunctionArguments(t *testing.T) {
+	checkBashPrintln(t, `
+f() {
+  println "$1"
+  println "$2"
+  println "${10}"
+  println "$#"
+  println "$*"
+  println "$@"
+}
+f "a b" "" c d e f g h i j
+`,
+		"ParameterMember-parameter[0].0",
+		"ParameterMember-parameter[0].1",
+		"ParameterMember-parameter[0].9",
+		"ParameterMember-parameter[0].#",
+		"ParameterMember-parameter[0].*",
+		"Parameter-$@",
+	)
+
+	checkBashPrintln(t, `
+f() {
+  println "$1"
+  println "$2"
+  println "$#"
+  println "$*"
+}
+f
+`,
+		"ParameterMember-parameter[0].0",
+		"ParameterMember-parameter[0].1",
+		"ParameterMember-parameter[0].#",
+		"ParameterMember-parameter[0].*",
+	)
 }
 
-func functionCalls(t *testing.T, caller, target *ssa.Function) []*ssa.Call {
-	t.Helper()
-	var calls []*ssa.Call
-	for _, id := range caller.Blocks {
-		b, ok := caller.GetBasicBlockByID(id)
-		require.True(t, ok)
-		for _, id := range b.Insts {
-			v, ok := caller.GetInstructionById(id)
-			require.True(t, ok)
-			if c, ok := ssa.ToCall(v); ok && c.Method == target.GetId() {
-				calls = append(calls, c)
-			}
-		}
+func TestBashPrintlnFunctionSpreadArguments(t *testing.T) {
+	checkBashPrintln(t, `
+set -- a b
+f() {
+  println "$1"
+  println "$2"
+}
+f "$@"
+`,
+		"ParameterMember-parameter[0].0",
+		"ParameterMember-parameter[0].1",
+	)
+}
+
+func TestBashPrintlnFunctionStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code string
+		want string
+	}{
+		{
+			name: "return value",
+			code: `
+f() { return 7; }
+f
+println "$?"
+`,
+			want: "7",
+		},
+		{
+			name: "last command failure",
+			code: `
+f() { false; }
+f
+println "$?"
+`,
+			want: "1",
+		},
+		{
+			name: "bare return",
+			code: `
+f() { return; }
+f
+println "$?"
+`,
+			want: "0",
+		},
+		{
+			name: "return is masked to one byte",
+			code: `
+f() { return 300; }
+f
+println "$?"
+`,
+			want: "44",
+		},
+		{
+			name: "negated call",
+			code: `
+f() { return 7; }
+! f
+println "$?"
+`,
+			want: "0",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkBashPrintln(t, tc.code, tc.want)
+		})
 	}
-	return calls
+
+	// A failed call on the left of || merges both statuses.
+	checkBashPrintlnRegexp(t, `
+f() { return 7; }
+f || true
+println "$?"
+`, `^phi\(\$\?\)\[0,7\]$`)
 }
 
-func TestBashFunctionCallLayout(t *testing.T) {
-	checkBash(t, `f(){ observe "$1" "$2" "${10}" "$#" "$*"; }; f; f "a b" ""; f a b c d e f g h i j k; set -- 'x y' z; f "$@"; recur(){ recur "$1"; }; recur value`, func(p *ssaapi.Program) {
-		main := p.Program.GetFunction(string(ssa.MainFunctionName), "")
-		f, _ := ssa.ToFunction(p.Program.GetExportValue("f"))
-		require.NotNil(t, f)
-		require.Len(t, f.Params, 1)
-		require.True(t, f.Type.IsVariadic)
-		calls := functionCalls(t, main, f)
-		require.Len(t, calls, 4)
-		for i, want := range [][]string{{}, {"a b", ""}, {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"}, {"x y", "z"}} {
-			call := calls[i]
-			require.Len(t, call.Args, len(want))
-			for j, id := range call.Args {
-				v, _ := call.GetValueById(id)
-				require.Equal(t, want[j], v.String())
-			}
-			require.Len(t, call.ArgMember, 5)
-			for j, which := range []int{0, 1, 9} {
-				expected := ""
-				if which < len(want) {
-					expected = want[which]
-				}
-				v, _ := call.GetValueById(call.ArgMember[j])
-				require.Equal(t, expected, v.String())
-			}
-			v, _ := call.GetValueById(call.ArgMember[3])
-			c, ok := ssa.ToConstInst(v)
-			require.True(t, ok)
-			require.EqualValues(t, len(want), c.Number())
-		}
-		recur, _ := ssa.ToFunction(p.Program.GetExportValue("recur"))
-		require.Len(t, functionCalls(t, recur, recur), 1)
+func TestBashPrintlnFunctionOutput(t *testing.T) {
+	checkBashPrintln(t, `
+f() { echo 5; }
+println "$(f)"
+`, `"5"`)
+
+	checkBashPrintln(t, `
+f() { echo a; echo b; }
+println "$(f)"
+`, `"ab"`)
+
+	checkBashPrintln(t, `
+f() { echo 5; }
+y=$(f)
+println "$y"
+`, `"5"`)
+
+	// The substitution status is the function status, not the output value.
+	checkBashPrintln(t, `
+f() { return 3; }
+y=$(f)
+println "$?"
+println "$y"
+`, "3", `""`)
+}
+
+func TestBashPrintlnFunctionScope(t *testing.T) {
+	t.Run("local shadows global", func(t *testing.T) {
+		checkBashPrintln(t, `
+x=global
+f() {
+  local x=local
+  println "$x"
+}
+f
+println "$x"
+`, `"local"`, `"global"`)
+	})
+
+	t.Run("free value read", func(t *testing.T) {
+		checkBashPrintln(t, `
+root=/srv
+f() {
+  println "$root"
+}
+f
+println "$root"
+`, "FreeValue-root", `"/srv"`)
 	})
 }
