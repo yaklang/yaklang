@@ -51,6 +51,14 @@
 
 自动调整默认开启。用户显式关闭后，主模型的上下文超限会停止任务并保留手动阈值，这是明确选择的退出行为；轻量/视觉错误处理不受该开关影响。
 
+## 运行中切换模型
+
+每轮质量优先 ReAct 在捕获 prompt 输入时复制本轮模型配置，用它的 `ContextKey` 读取阈值；普通请求、function calling 和同轮压缩重试携带这份配置。网关发送时不再重新选择另一个全局主模型，避免读取 A 的阈值后实际发给 B 的 TOCTOU 竞态。下一轮重新读取全局模型配置。
+
+用户在本轮运行期间切到 B 并修改 B 的设置时，热更新仍校验当前全局配置 B 的 Key。本轮已经选定的 A 继续读取 A 的阈值，B 的设置用于后续选到 B 的请求。请求配置快照不冻结阈值：同一模型的手动修改、自动调整结果仍按其 Key 读取。
+
+超限错误使用实际失败请求携带的身份读取自动调整开关、暂存收缩结果；成功响应也只能确认其自身 Key 的结果，不根据当时界面选择或模型显示名判断归属。旧的轻量调用按模型名记录的运行时限制不影响这份主模型配置。
+
 ## 原有恢复与新增保存
 
 1. 原有错误分类与恢复分支决定是否重建或压缩；普通鉴权、限流等错误不进入阈值学习。
@@ -81,6 +89,9 @@
 | 与原运行时算法逐例比较、原 SDK 默认值 | `TestModelContextContractOriginalReductionFormula`、`TestModelContextContractEventsAndLegacyDefaults` |
 | 主模型设置不修改 Speed 默认值/存储，关闭开关只作用主模型 | `reactloops/TestModelContextSettingOnlyControlsQualityLoop`、`TestModelContextDisabledOnlyStopsMatchingQualityOverflow` |
 | 文本/原生协议压缩路由保持原有差异 | `reactloops/TestModelContextKeepsOriginalCompressionRouting` |
+| 在阈值检查和网关发送之间强制切换并修改同名模型，普通/原生请求与压缩重试仍绑定 A，下一轮使用 B | `reactloops/TestModelContextTOCTOUPinsPromptGatewayAndCompression` |
+| 迟到错误读取实际请求模型的自动调整开关，成功只确认对应 Key | `reactloops/TestModelContextLateOverflowUsesRequestAutoAdjustSetting` |
+| 请求快照不改变轻量/视觉路由，旧的按名称恢复不收缩主模型设置 | `TestModelContextRequestPinsQualityWithoutChangingAuxiliaryRouting`、`TestModelContextQualityIgnoresLegacyNameOnlyOverflow` |
 | 完整文本/原生 ReAct 超限恢复成功后保存，显式关闭首次拒绝即停止 | `aireact/TestReAct_ModelContextPersistsOriginalRecoveryOnlyAfterSuccess` |
 | 原成功历史边界、重试行为 | 原 `invoke_overflow_fitting_boundary_test.go`、`prompt_overflow_retry_test.go` |
 | 前端自动调整静默、同名配置不串用量/查询、热更新携带标识 | `aiPerf.handlers.test.ts`、`useSavedModelContext.test.ts`、`ModelContextPopover.test.tsx` |
