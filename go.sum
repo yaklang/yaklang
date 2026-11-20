@@ -365,6 +365,8 @@ github.com/yaklang/antlr/v4 v4.0.0-20260713034513-d8e6ed6334bf h1:RJjNj12ALCgULQ
 github.com/yaklang/antlr/v4 v4.0.0-20260713034513-d8e6ed6334bf/go.mod h1:Iy/qj07Ec2kcOY9OhdclyPd0IieCSf4ZkzwhKSXPBn8=
 github.com/yaklang/antlr/v4 v4.0.0 h1:y5J9OcYZN8Kg/PP0z/V6x6tVo2GofC+x/4G+Af2FPp8=
 github.com/yaklang/antlr/v4 v4.0.0/go.mod h1:Iy/qj07Ec2kcOY9OhdclyPd0IieCSf4ZkzwhKSXPBn8=
+github.com/yaklang/antlr/v4 v4.0.1-0.20261120080942-541953f95ccd h1:6+5Do9YX0k/6H/lMH4PKPqMA3ppNGeabwYyGkOyxHjY=
+github.com/yaklang/antlr/v4 v4.0.1-0.20261120080942-541953f95ccd/go.mod h1:Iy/qj07Ec2kcOY9OhdclyPd0IieCSf4ZkzwhKSXPBn8=
 github.com/yaklang/fastgocaptcha v1.1.0 h1:Q6aigWdM1hm71rU+iTe1n9Q6Xo8ubdBDEIbNVdebpbo=
 github.com/yaklang/fastgocaptcha v1.1.0/go.mod h1:fymGgV4ndLQHr+NZakv91Dlc2iri1fpeyzSKIPWsFlI=
 github.com/yaklang/go-llvm v0.0.0-20261117100009-9cebf763572c h1:G8VtqoPMVHxIw3XiMx23JLrWtjGyGE6IJzpXw6+xoT0=

@@ -185,7 +185,7 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
-	github.com/yaklang/antlr/v4 v4.0.0
+	github.com/yaklang/antlr/v4 v4.0.1-0.20261120080942-541953f95ccd
 	github.com/yaklang/go-llvm/native/darwin-arm64 v0.0.0-20261117094941-9e799b8110e1 // indirect
 	github.com/yaklang/go-llvm/native/linux-amd64 v0.0.0-20261117093357-b6b843bac29d // indirect
 	github.com/yaklang/go-llvm/native/windows-amd64 v0.0.0-20261117093357-b6b843bac29d // indirect
