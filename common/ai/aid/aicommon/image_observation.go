@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
@@ -27,6 +28,9 @@ func (c *Config) ImageInputRoute(lightweight bool) (native bool, model *ypb.AIMo
 	support := policy.MainModelSupportsImages
 	if support == nil && model != nil {
 		support = model.SupportsImageInput
+		if support == nil && policy.Mode == "auto" {
+			support = ai.DiscoverModelImageInput(c.GetContext(), model)
+		}
 	}
 	if policy.Mode == "native" && support != nil && !*support {
 		return false, model, fmt.Errorf("selected main model explicitly does not support image input")

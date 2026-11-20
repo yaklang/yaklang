@@ -29,10 +29,11 @@ import (
 )
 
 func (s *Server) ProbeModelVision(ctx context.Context, req *ypb.ProbeModelVisionRequest) (*ypb.ProbeModelVisionResponse, error) {
-	return probeModelVision(ctx, req, ai.Chat)
+	declared := ai.DiscoverModelImageInput(ctx, &ypb.AIModelConfig{Provider: req.GetConfig(), ModelName: req.GetModel()})
+	return probeModelVision(ctx, req, ai.Chat, declared)
 }
 
-func probeModelVision(ctx context.Context, req *ypb.ProbeModelVisionRequest, chat func(string, ...aispec.AIConfigOption) (string, error)) (*ypb.ProbeModelVisionResponse, error) {
+func probeModelVision(ctx context.Context, req *ypb.ProbeModelVisionRequest, chat func(string, ...aispec.AIConfigOption) (string, error), declared *bool) (*ypb.ProbeModelVisionResponse, error) {
 	if req.GetConfig() == nil || strings.TrimSpace(req.GetModel()) == "" || !ai.HaveAI(req.GetConfig().GetType()) {
 		return nil, grpcstatus.Error(codes.InvalidArgument, "a supported provider and model are required")
 	}
@@ -40,9 +41,13 @@ func probeModelVision(ctx context.Context, req *ypb.ProbeModelVisionRequest, cha
 	defer cancel()
 	result := &ypb.ProbeModelVisionResponse{}
 	var err error
-	result.SupportsImageInput, result.ImageInputStatus, err = probeVisionRequest(ctx, req, chat, false)
-	if err != nil {
-		return nil, err
+	if declared != nil {
+		result.SupportsImageInput, result.ImageInputStatus = declared, "declared"
+	} else {
+		result.SupportsImageInput, result.ImageInputStatus, err = probeVisionRequest(ctx, req, chat, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if result.SupportsImageInput != nil && !result.GetSupportsImageInput() {
 		result.SupportsImageToolCalling = proto.Bool(false)

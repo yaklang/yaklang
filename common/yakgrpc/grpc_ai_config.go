@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -27,7 +28,21 @@ func (s *Server) SetAIGlobalConfig(ctx context.Context, cfg *ypb.AIGlobalConfig)
 	if cfg == nil {
 		return nil, utils.Error("config is nil")
 	}
-	normalized, err := yakit.SetAIGlobalConfig(s.GetProfileDatabase(), cfg)
+	// Bound discovery across the entire save, even when many models were edited.
+	discoveryCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	discovered := make(map[*ypb.AIModelConfig]bool)
+	for _, models := range [][]*ypb.AIModelConfig{cfg.GetIntelligentModels(), cfg.GetLightweightModels(), cfg.GetVisionModels()} {
+		for _, model := range models {
+			if model == nil || model.SupportsImageInput != nil || discoveryCtx.Err() != nil {
+				continue
+			}
+			if support := ai.DiscoverModelImageInput(discoveryCtx, model); support != nil {
+				discovered[model] = *support
+			}
+		}
+	}
+	normalized, err := yakit.SetAIGlobalConfig(s.GetProfileDatabase(), cfg, discovered)
 	if err != nil {
 		return nil, err
 	}

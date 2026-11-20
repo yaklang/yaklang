@@ -36,7 +36,7 @@ func TestProbeModelVisionRejectsUnsupportedAndKeepsTransientFailuresUnknown(t *t
 				calls++
 				cfg.RawHTTPRequestResponseCallback(nil, []byte(fmt.Sprintf("HTTP/1.1 %d Fixture\r\n\r\n", tt.code)), []byte(tt.body), nil)
 				return "unknown", nil
-			})
+			}, nil)
 			require.NoError(t, err)
 			require.Equal(t, 1, calls)
 			require.Equal(t, tt.status, result.GetImageInputStatus())

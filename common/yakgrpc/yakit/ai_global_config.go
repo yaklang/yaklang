@@ -102,7 +102,7 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 	return cfg, nil
 }
 
-func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfig, error) {
+func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig, discovered ...map[*ypb.AIModelConfig]bool) (*ypb.AIGlobalConfig, error) {
 	if db == nil {
 		return nil, utils.Error("no set database")
 	}
@@ -139,6 +139,17 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 		log.Warnf("unable to recover previous model capabilities: %v", err)
 	}
 	mergeModelVisionCapabilities(cfg, previous)
+	for _, capabilities := range discovered {
+		for model, supported := range capabilities {
+			// Saved and explicit capabilities take priority over discovery.
+			if model.SupportsImageInput == nil {
+				model.SupportsImageInput = proto.Bool(supported)
+				if !supported {
+					model.SupportsImageToolCalling = proto.Bool(false)
+				}
+			}
+		}
+	}
 
 	data, err := json.Marshal(cfg)
 	if err != nil {
