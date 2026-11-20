@@ -31,6 +31,7 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 // DefaultPeriodicVerificationInterval 是 verification iter 门的基础节拍.
@@ -49,7 +50,7 @@ const DefaultMaxSubAgentConcurrency = 5
 const AbsoluteMaxSubAgentConcurrency = 20
 
 // DefaultTimelineContentSizeLimit 是运行时上下文的服务端默认压缩阈值，单位是 token。
-// RuntimeContextSizeLimit <= 0 时使用该值，避免零值把带有 Skill、Evidence 的时间线提前压小。
+// 保留 SDK 与辅助循环的原始默认值；质量模型的可编辑默认值独立为 500,000。
 const DefaultTimelineContentSizeLimit = 300 * 1024
 
 type ConfigOption func(*Config) error
@@ -175,6 +176,7 @@ type Config struct {
 	SessionSource      string
 	SessionTitle       string
 	SessionPromptState *SessionPromptState
+	ImageInput         *ypb.AIImageInputConfig
 
 	// memory triage id
 	MemoryTriageId string
@@ -212,9 +214,12 @@ type Config struct {
 	AICallbacks *AICallbacks
 
 	// Optional per-runtime helper implementation; the default uses the registered LiteForge.
-	LiteForgeExecutor   LiteForgeExecuteCallback
-	promptOverflowJudge promptOverflowJudgeState
-	promptOverflowLimit promptOverflowLimitState
+	LiteForgeExecutor           LiteForgeExecuteCallback
+	promptOverflowJudge         promptOverflowJudgeState
+	promptOverflowLimit         promptOverflowLimitState
+	modelContextState           modelContextState
+	modelContextSettingsEnabled bool
+	primaryModelContextConfig   *ypb.AIModelConfig
 	// promptOverflowRetryMax bounds compress-and-retry rounds per iteration
 	// after a confirmed prompt overflow. 0 disables the retry.
 	promptOverflowRetryMax int
@@ -1000,12 +1005,22 @@ func WithAICallbacks(callbacks *AICallbacks) ConfigOption {
 	}
 }
 
+// WithInheritTieredAICallback captures callbacks and their quality-context binding
+// when the options are prepared, including for children waiting in a queue.
+// A nil explicit model stays nil so global model selection remains dynamic.
+// Pending overflow recovery is runtime-local and is deliberately not inherited.
 func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
-	return func(c *Config) error {
-		if parent == nil {
-			return nil
+	var raw *AICallbacks
+	var contextEnabled bool
+	var model *ypb.AIModelConfig
+	if parent != nil {
+		raw = parent.GetRawAICallbacks()
+		contextEnabled = parent.modelContextSettingsEnabled
+		if parent.primaryModelContextConfig != nil {
+			model = proto.Clone(parent.primaryModelContextConfig).(*ypb.AIModelConfig)
 		}
-		raw := parent.GetRawAICallbacks()
+	}
+	return func(c *Config) error {
 		if raw == nil {
 			return nil
 		}
@@ -1017,6 +1032,11 @@ func WithInheritTieredAICallback(parent *Config, force bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.setAICallbacksLocked(raw)
+		c.modelContextSettingsEnabled = contextEnabled
+		c.primaryModelContextConfig = nil
+		if model != nil {
+			c.primaryModelContextConfig = proto.Clone(model).(*ypb.AIModelConfig)
+		}
 		c.m.Unlock()
 		return nil
 	}
@@ -1116,6 +1136,7 @@ func WithTieredAICallback(singleModelMode ...bool) ConfigOption {
 			return nil
 		}
 
+		c.modelContextSettingsEnabled = true
 		serviceName, modelName, err := GetIntelligentAIModelInfo(single)
 		if err != nil {
 			log.Warnf("Failed to get service and model name from tiered config: %v", err)
@@ -4376,6 +4397,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
+	opts = append(opts, WithImageInput(i.GetImageInputConfig()))
 
 	// Keep the policy with the shared manager: NewConfig applies this flag
 	// to the manager, so a child default must not reopen parent MCP access.

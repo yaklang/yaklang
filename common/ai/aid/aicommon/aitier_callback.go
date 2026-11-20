@@ -131,17 +131,24 @@ func resolveTierModelConfig(tier consts.ModelTier, single bool) (*ypb.AIModelCon
 
 // newTierAIModelCallback performs the complete tier callback setup:
 // check routing availability, combine the requested tier with the explicit
-// single-model flag, then build an invocation callback. The invocation reads
-// the latest model config in the already selected tier.
+// single-model flag, then build an invocation callback. Quality prompts can
+// carry their model snapshot; other calls read the latest config in that tier.
 func newTierAIModelCallback(tier consts.ModelTier, modes ...bool) (AICallbackType, error) {
 	single := resolveTierCallbackMode(modes...)
 	if !single && !aiconfig.IsTieredAIConfig() {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 	return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
-		config, err := resolveTierModelConfig(tier, single)
-		if err != nil {
-			return nil, err
+		config := request.GetImageModel()
+		if tier == consts.TierIntelligent && request != nil && request.qualityModelConfig != nil {
+			config = request.qualityModelConfig
+		}
+		if config == nil {
+			var err error
+			config, err = resolveTierModelConfig(tier, single)
+			if err != nil {
+				return nil, err
+			}
 		}
 		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extractUserUsageCallbackOpts(caller)...)
 		if err != nil {

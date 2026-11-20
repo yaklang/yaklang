@@ -36,7 +36,10 @@ type RawHTTPResponseHeaderCallback func(headerBytes []byte)
 type ModelInfoCallback func(provider, model string, thinkingLevel ...string)
 
 type AIConfig struct {
-	NetworkDebug bool `json:"network_debug"`
+	// Runtime-owned image delivery must not change a caller's selected model.
+	PreserveImageModel bool  `json:"-"`
+	RequestByteLimit   int64 `json:"-"`
+	NetworkDebug       bool  `json:"network_debug"`
 	// ModelRequestStatus reports queue/recovery state separately from model tokens.
 	ModelRequestStatus func(string)
 

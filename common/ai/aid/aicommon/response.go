@@ -68,6 +68,7 @@ type AIResponse struct {
 	providerName     string
 	modelName        string
 	modelVerboseName string
+	modelContextKey  string
 	thinkingLevel    string
 
 	firstOutputByteTime time.Time
@@ -92,7 +93,8 @@ type AIResponse struct {
 	httpBodyReady     chan struct{}
 	httpBodyReadyOnce sync.Once
 
-	usageInfo *aispec.ChatUsage
+	usageInfo      *aispec.ChatUsage
+	usageObservers []func(*aispec.ChatUsage)
 
 	// plainOutput / plainReason hold the pure AI output / thinking text
 	// captured automatically as the stream is consumed by
@@ -181,7 +183,23 @@ func (a *AIResponse) GetError() error {
 	if a == nil || a.getErrorFunc == nil {
 		return nil
 	}
-	return a.getErrorFunc()
+	err := a.getErrorFunc()
+	// The transaction layer may prefer the callback error over a classified
+	// post-handler error. Preserve the configured-service identity on that path
+	// without changing classification, retryability, or the original error text.
+	if key := a.GetModelContextKey(); key != "" {
+		if evidence, ok := PromptOverflowEvidenceFrom(err); ok && evidence.ContextKey == "" {
+			evidence.ContextKey = key
+			if evidence.Provider == "" {
+				evidence.Provider = a.GetProviderName()
+			}
+			if evidence.Model == "" {
+				evidence.Model = a.GetModelName()
+			}
+			return &aispec.PromptOverflowError{PromptOverflowEvidence: evidence, Cause: err}
+		}
+	}
+	return err
 }
 
 // SetOnReasonChunk registers a callback invoked for each completed reason/thinking
@@ -303,6 +321,23 @@ func (a *AIResponse) SetModelInfo(provider, model string) {
 	a.providerName = provider
 	a.modelName = model
 	a.modelVerboseName = aispec.ModelVerboseName(model)
+}
+
+func (a *AIResponse) SetModelContextKey(key string) {
+	if a == nil {
+		return
+	}
+	a.modelInfoMu.Lock()
+	defer a.modelInfoMu.Unlock()
+	a.modelContextKey = key
+}
+func (a *AIResponse) GetModelContextKey() string {
+	if a == nil {
+		return ""
+	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
+	return a.modelContextKey
 }
 
 func (a *AIResponse) GetProviderName() string {
@@ -469,9 +504,9 @@ func (a *AIResponse) SetUsageInfo(usage *aispec.ChatUsage) {
 		return
 	}
 	a.usageInfoMu.Lock()
-	defer a.usageInfoMu.Unlock()
 	if usage == nil {
 		a.usageInfo = nil
+		a.usageInfoMu.Unlock()
 		return
 	}
 	usageCopy := *usage
@@ -480,6 +515,40 @@ func (a *AIResponse) SetUsageInfo(usage *aispec.ChatUsage) {
 		usageCopy.PromptTokensDetails = &detailsCopy
 	}
 	a.usageInfo = &usageCopy
+	observers := a.usageObservers
+	a.usageObservers = nil
+	a.usageInfoMu.Unlock()
+	for _, observe := range observers {
+		value := usageCopy
+		if value.PromptTokensDetails != nil {
+			details := *value.PromptTokensDetails
+			value.PromptTokensDetails = &details
+		}
+		observe(&value)
+	}
+}
+
+// OnUsage observes the first available usage without waiting for provider EOF.
+// It also handles providers reporting usage after an action has been accepted.
+// Observers run outside the response lock and never replace user callbacks.
+func (a *AIResponse) OnUsage(observe func(*aispec.ChatUsage)) {
+	if a == nil || observe == nil {
+		return
+	}
+	a.usageInfoMu.Lock()
+	usage := a.usageInfo
+	if usage == nil {
+		a.usageObservers = append(a.usageObservers, observe)
+		a.usageInfoMu.Unlock()
+		return
+	}
+	copy := *usage
+	if usage.PromptTokensDetails != nil {
+		details := *usage.PromptTokensDetails
+		copy.PromptTokensDetails = &details
+	}
+	a.usageInfoMu.Unlock()
+	observe(&copy)
 }
 
 func (a *AIResponse) GetUsageInfo() *aispec.ChatUsage {
@@ -917,12 +986,14 @@ func TeeAIResponse(
 ) *AIResponse {
 	first := NewAIResponse(aiCaller)
 	first.SetTaskIndex(src.GetTaskIndex())
+	first.SetModelContextKey(src.GetModelContextKey())
 	first.consumptionCallback = nil
 	firstReasonReader, firstReasonWriter := utils.NewPipe()
 	firstOutputReader, firstOutputWriter := utils.NewPipe()
 
 	second := NewAIResponse(aiCaller)
 	second.SetTaskIndex(src.GetTaskIndex())
+	second.SetModelContextKey(src.GetModelContextKey())
 	secondReasonReader, secondReasonWriter := utils.NewPipe()
 	secondOutputReader, secondOutputWriter := utils.NewPipe()
 
@@ -938,6 +1009,8 @@ func TeeAIResponse(
 
 	refreshFromSrc := func() {
 		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		first.SetModelContextKey(src.GetModelContextKey())
+		second.SetModelContextKey(src.GetModelContextKey())
 		second.SetModelInfo(src.GetProviderName(), src.GetModelName())
 		first.SetThinkingLevel(src.GetThinkingLevel())
 		second.SetThinkingLevel(src.GetThinkingLevel())

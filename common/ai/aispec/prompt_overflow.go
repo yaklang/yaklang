@@ -47,6 +47,7 @@ type PromptOverflowAmbiguity struct {
 // Unknown identities and token counts are left empty/zero.
 type PromptOverflowEvidence struct {
 	HTTPStatus       int
+	ContextKey       string // Opaque configured-service identity; never credentials.
 	Provider         string
 	Model            string
 	Code             string

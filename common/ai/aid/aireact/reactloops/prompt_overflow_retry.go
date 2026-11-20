@@ -2,6 +2,9 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // defaultPromptOverflowRetryMax mirrors the aicommon default for configs that do
@@ -18,9 +21,8 @@ func (r *ReActLoop) promptOverflowRetryMax() int {
 	return defaultPromptOverflowRetryMax
 }
 
-// syncPromptOverflowTimelineLimit applies the per-model dynamic threshold before
-// the pre-prompt compression measures. It only ever lowers the limit: a session
-// that already had to compress must not silently go back to the full window.
+// Apply quality settings before measurement. Auxiliary loops retain their
+// original runtime-only threshold, including when they share a Config.
 func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -35,6 +37,17 @@ func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 		return
 	}
 	effective := config.EffectiveTimelineTokenLimit(config.AiServerName, config.AiModelName, base)
+	if provider, model, key := r.primaryModelContext(); key != "" {
+		effective = config.EffectiveModelContextLimit(provider, model, base, key)
+		if effective > 0 {
+			timeline.SetTimelineContentLimit(effective)
+		}
+		return
+	}
+	if _, _, key := config.PrimaryModelContext(); key != "" && r.useSpeedPriorityAI {
+		timeline.SetTimelineContentLimit(effective)
+		return
+	}
 	if effective <= 0 || effective >= base {
 		return
 	}
@@ -61,8 +74,20 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	if !ok {
 		return false
 	}
-	measured := int64(aicommon.MeasureTokens(prompt))
-	limit := config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
+	measured := int64(r.completeInputTokens(prompt))
+	var limit int64
+	if _, _, key := r.primaryModelContext(); key != "" {
+		// Overflow evidence belongs to the request that failed, which may finish
+		// after the selected model changes. Never fall back to name-only recovery
+		// for a quality request with a concrete context identity.
+		if evidence.ContextKey == "" {
+			return false
+		}
+		limit = config.RecordModelContextOverflow(evidence.Provider, evidence.Model, measured, &evidence, evidence.ContextKey)
+		config.EmitModelContextFor(evidence.Provider, evidence.Model, measured, evidence.ContextKey)
+	} else {
+		limit = config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
+	}
 	if limit <= 0 {
 		return false
 	}
@@ -72,4 +97,40 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	}
 	timeline.SetTimelineContentLimit(limit)
 	return true
+}
+
+// The new persisted setting belongs to the quality loop only. Keep auxiliary
+// Speed loops on the original runtime-only limit and retry mechanism.
+func (r *ReActLoop) primaryModelContext() (provider, model, key string) {
+	if r.useSpeedPriorityAI {
+		return
+	}
+	if modelConfig := r.requestModelConfig; modelConfig != nil {
+		return modelConfig.GetProvider().GetType(), modelConfig.GetModelName(), aispec.ModelContextIdentity(modelConfig)
+	}
+	if config, ok := r.config.(*aicommon.Config); ok {
+		return config.PrimaryModelContext()
+	}
+	return
+}
+func (r *ReActLoop) promptOverflowAutoAdjustDisabled(err error) bool {
+	_, _, key := r.primaryModelContext()
+	evidence, ok := aicommon.PromptOverflowEvidenceFrom(err)
+	return ok && key != "" && evidence.ContextKey != "" && yakit.GetAIModelContext(consts.GetGormProfileDatabase(), evidence.Provider, evidence.Model, evidence.ContextKey).DisableAutoAdjust
+}
+
+func (r *ReActLoop) confirmModelContextSuccess(descriptor *LoopResultDescriptor, tokens int64) {
+	if _, _, key := r.primaryModelContext(); key == "" || descriptor == nil {
+		return
+	}
+	identity := descriptor.Snapshot()
+	if identity.ContextKey == "" {
+		return
+	}
+	config, ok := r.config.(*aicommon.Config)
+	if !ok || config == nil {
+		return
+	}
+	config.ConfirmModelContextSuccess(identity.Provider, identity.Model, identity.ContextKey)
+	config.EmitModelContextFor(identity.Provider, identity.Model, tokens, identity.ContextKey)
 }

@@ -104,6 +104,14 @@ type AIEngineConfig struct {
 // AIEngineConfigOption 配置选项函数
 type AIEngineConfigOption func(*AIEngineConfig)
 
+// WithImageInputMode selects auto/native/describe. An optional capability
+// override is useful when an AI callback supplies its own model configuration.
+func WithImageInputMode(mode string, supportsImages ...bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.ExtOptions = append(c.ExtOptions, aicommon.WithImageInputMode(mode, supportsImages...))
+	}
+}
+
 // WithPlanEngine is a compatibility alias for the top-level coordinator focus.
 // New callers should use coordinator. ReAct remaps historical focus names to it.
 func WithPlanEngine(engine string) AIEngineConfigOption {

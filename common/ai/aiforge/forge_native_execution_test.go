@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -65,6 +66,8 @@ func TestForgeParentRuntimeInheritsConfigurationAndOwnsOneInputChannel(t *testin
 	}))
 	require.NoError(t, err)
 	parentConfig := parent.GetConfig().(*aicommon.Config)
+	model := &ypb.AIModelConfig{ContextOwnerId: uuid.NewString(), ModelName: "inherited-quality", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai"}}
+	require.NoError(t, aicommon.WithPrimaryModelContext(model)(parentConfig))
 	task := aicommon.NewStatefulTaskBase("outer-forge-task", "caller query", ctx, parent.Emitter, true)
 	input := chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10)
 	hotpatch := parentConfig.HotPatchBroadcaster.Subscribe()
@@ -75,6 +78,8 @@ func TestForgeParentRuntimeInheritsConfigurationAndOwnsOneInputChannel(t *testin
 	execution, err := blueprint.CreateCoordinator(coordinator.WithForgeParent(ctx, parent, task, "owned-forge-id"), map[string]any{"query": "caller query"}, options...)
 	require.NoError(t, err, "an explicitly selected Forge is independent of the generic PLAN action toggle")
 	defer execution.Close()
+	_, _, childContextKey := execution.PrimaryModelContext()
+	require.Equal(t, aispec.ModelContextIdentity(model), childContextKey, "Blueprint coordinator must retain the parent's quality context binding")
 	require.Equal(t, "owned-forge-id", execution.Id)
 	require.False(t, execution.EnableFunctionCallMode)
 	require.False(t, execution.EnableDetachedPlan, "a Forge must keep approval and delivery in its own live invocation")

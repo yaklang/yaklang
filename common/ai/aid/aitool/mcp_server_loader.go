@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimedia"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/gorm"
@@ -416,14 +417,24 @@ func filterParamsForMCPCall(params InvokeParams) map[string]interface{} {
 // JSON unmarshaling yields map[string]interface{} rather than mcp.TextContent structs.
 func firstMCPTextFromContent(content []any) string {
 	for _, item := range content {
-		if textContent, ok := item.(mcp.TextContent); ok && textContent.Text != "" {
-			return textContent.Text
+		if text := mcpTextBlock(item); text != "" {
+			return text
 		}
-		if m, ok := item.(map[string]interface{}); ok {
-			if text, _ := m["text"].(string); text != "" {
-				return text
-			}
+	}
+	return ""
+}
+
+func mcpTextBlock(item any) string {
+	switch block := item.(type) {
+	case mcp.TextContent:
+		return block.Text
+	case *mcp.TextContent:
+		if block != nil {
+			return block.Text
 		}
+	case map[string]any:
+		text, _ := block["text"].(string)
+		return text
 	}
 	return ""
 }
@@ -447,37 +458,22 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 
 		result, err := mcpClient.CallTool(callCtx, callRequest)
 		if err != nil {
-			errMsg := fmt.Sprintf("call mcp tool failed: %v", err)
-			stderr.Write([]byte(errMsg))
-			return nil, utils.Errorf(errMsg)
+			failure := fmt.Errorf("call mcp tool failed: %w", err)
+			stderr.Write([]byte(failure.Error()))
+			return nil, failure
 		}
 
-		// 处理结果
-		if result.IsError {
-			errMsg := firstMCPTextFromContent(result.Content)
-			if errMsg == "" {
-				errMsg = "tool execution failed"
-			}
-			log.Errorf("mcp tool %s execution error: %s, content: %#v", toolName, errMsg, result.Content)
-			stderr.Write([]byte(errMsg))
-			return nil, utils.Errorf(errMsg)
+		source := aimedia.Source{Kind: "mcp", ToolName: toolName, ServerName: serverName, ObservedAt: time.Now()}
+		if runtimeConfig != nil {
+			source.ToolCallID = runtimeConfig.RuntimeID
 		}
-
-		// 提取结果内容
-		var resultContent string
-		for _, content := range result.Content {
-			switch c := content.(type) {
-			case mcp.TextContent:
-				resultContent += c.Text
-			case mcp.ImageContent:
-				resultContent += fmt.Sprintf("[Image: %s]", c.MIMEType)
-			default:
-				if text := firstMCPTextFromContent([]any{c}); text != "" {
-					resultContent += text
-				} else {
-					resultContent += fmt.Sprintf("%v", c)
-				}
+		value, resultContent, err := convertMCPToolResult(callCtx, mcpClient, result, source)
+		if err != nil {
+			if result != nil && result.IsError {
+				log.Errorf("mcp tool %s execution error: %s", toolName, err)
+				stderr.Write([]byte(err.Error()))
 			}
+			return value, err
 		}
 
 		// 输出到 stdout
@@ -485,7 +481,7 @@ func createToolCallback(mcpClient client.MCPClient, toolName string, serverName 
 			stdout.Write([]byte(resultContent))
 		}
 
-		return resultContent, nil
+		return value, nil
 	}
 }
 

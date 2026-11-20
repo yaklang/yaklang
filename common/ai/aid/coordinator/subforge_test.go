@@ -6,12 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestSubForgeScopeAndLifecycle(t *testing.T) {
@@ -147,6 +150,8 @@ func TestSubForgeOverridesAttachedSessionOptions(t *testing.T) {
 		aicommon.WithToolBatchMaxCalls(2), aicommon.WithToolBatchInvokeConcurrency(1),
 		aicommon.WithAllowRequireForUserInteract(true),
 		aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
+	model := &ypb.AIModelConfig{ContextOwnerId: uuid.NewString(), ModelName: "inherited-quality", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai"}}
+	require.NoError(t, aicommon.WithPrimaryModelContext(model)(parent))
 	require.True(t, parent.UIQuestionsEnabled())
 	session := &Session{Config: parent}
 	task := aicommon.NewStatefulTaskBase("task", "query", ctx, parent.GetEmitter(), true)
@@ -163,6 +168,8 @@ func TestSubForgeOverridesAttachedSessionOptions(t *testing.T) {
 	out, err := session.invokeSubForge(ctx, task, "isolate", binding, nil)
 	require.NoError(t, err)
 	child := out.(*aicommon.Config)
+	_, _, childContextKey := child.PrimaryModelContext()
+	require.Equal(t, aispec.ModelContextIdentity(model), childContextKey)
 	require.Empty(t, child.PersistentSessionId)
 	require.True(t, parent.UIQuestionsEnabled())
 	require.False(t, child.UIQuestionsEnabled())

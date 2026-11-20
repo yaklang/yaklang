@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
@@ -92,6 +93,9 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 	// build in code
 	values := r.GetAllActions()
 	disableActionList := []string{}
+	if c := aicommon.ImageConfigFrom(r.config); c == nil || !c.HasImageResources() {
+		disableActionList = append(disableActionList, "inspect_image", "analyze_image", "list_images")
+	}
 	if disallowExit {
 		disableActionList = append(disableActionList, loopAction_Finish.ActionType)
 	}
@@ -306,6 +310,7 @@ type loopPromptBuildInput struct {
 	frozenPartitions  []aicommon.FrozenBlockPartition
 	memory            string
 	operator          *LoopActionHandlerOperator
+	modelConfig       *ypb.AIModelConfig
 
 	// Captured exactly once per iteration: these reads mutate loop state.
 	subAgentInput            string
@@ -338,7 +343,12 @@ func (r *ReActLoop) captureLoopPromptBuildInput(
 	// cursor. Capture before projection so only model-visible saves are acked.
 	evidenceRevision := r.subAgentSharedEvidenceRevision()
 	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
+	var modelConfig *ypb.AIModelConfig
+	if config, ok := r.config.(*aicommon.Config); ok && !r.useSpeedPriorityAI {
+		modelConfig = config.SnapshotPrimaryModelConfig()
+	}
 	return &loopPromptBuildInput{
+		modelConfig:              modelConfig,
 		nonce:                    nonce,
 		userInput:                userInput,
 		frozenUserContext:        frozenUserContext,
@@ -376,6 +386,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	if input == nil {
 		return nil, utils.Error("loop prompt build input is nil")
 	}
+	r.requestModelConfig = input.modelConfig
 	nonce, frozenUserContext := input.nonce, input.frozenUserContext
 	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
 	subAgentInput := input.subAgentInput
@@ -514,7 +525,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		InjectedMemory:           memory,
 		TodoCheckpoint:           todoCheckpoint,
 	}
-	assemble := func() (*LoopPromptAssemblyResult, error) {
+	assemble := func() (*LoopPromptAssemblyResult, *imagePromptSnapshot, error) {
 		// Custom assemblers may not report a watermark. Capture a conservative
 		// boundary before rendering so their in-flight writes are still protected.
 		var fallbackThroughID int64
@@ -528,10 +539,10 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		result, err := r.invoker.AssembleLoopPrompt(tools, assembly)
 		if err != nil {
-			return nil, utils.Wrap(err, "assemble loop prompt failed")
+			return nil, nil, utils.Wrap(err, "assemble loop prompt failed")
 		}
 		if result == nil {
-			return nil, utils.Error("assemble loop prompt returned nil result")
+			return nil, nil, utils.Error("assemble loop prompt returned nil result")
 		}
 		result.Mode = assembly.PromptMode
 		if result.TimelineThroughID == nil {
@@ -540,22 +551,51 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if result.TimelineItemIDs == nil {
 			result.TimelineItemIDs = fallbackItemIDs
 		}
-		return result, nil
+		ctx := r.config.GetContext()
+		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
+			ctx = task.GetContext()
+		}
+		var toolSchema []byte
+		if len(result.Images) > 0 && r.functionCallMode {
+			toolSchema, _ = json.Marshal(r.lastNativeTools)
+		}
+		images, err := r.prepareImages(ctx, result.Images, result.Prompt, toolSchema)
+		if err != nil {
+			return nil, nil, err
+		}
+		if images != nil {
+			// Append a request-local manifest without re-reading Timeline. Text
+			// and attachments therefore retain the same assembly snapshot.
+			result.Prompt += images.caption
+			result.Images = images.references
+			if result.Mode == aicommon.LoopPromptModeCompressContext {
+				images.inputLimit = aicommon.TimelineCompressionMaxInputTokens
+			}
+		}
+		return result, images, nil
 	}
-	// 先缓存已经成功生成的普通 Prompt；后续压缩任一步失败时直接返回它。
-	var normalResult *LoopPromptAssemblyResult
+	// Pick the text and attachments together. Failed compression cannot replace
+	// the attachment snapshot of the ordinary request.
+	finish := func(result *LoopPromptAssemblyResult, images *imagePromptSnapshot) *LoopPromptAssemblyResult {
+		r.imagePrompt = images
+		return r.commitSubAgentPromptAssembly(input, result)
+	}
 	limit := r.wholePromptTokenLimit()
-	normalResult, err = assemble()
+	normalResult, normalImages, err := assemble()
 	if err != nil {
 		return nil, err
 	}
 	result := normalResult
-	promptTokens := int64(aicommon.MeasureTokens(result.Prompt))
-
+	images := normalImages
+	promptTokens := normalImages.totalTokens(normalResult.Prompt)
+	imageOverflow := false
+	if c := aicommon.ImageConfigFrom(r.config); c != nil && normalImages != nil {
+		imageOverflow = normalImages.omitted > 0 || normalImages.imageTokens > c.GetImageInputConfig().VisualTokenLimit
+	}
 	// overflowCompression is a provider signal and may use the last fitting
 	// timeline boundary; an ordinary over-limit prompt keeps the full history.
 	if timeline := timelineFromConfig(r.config); timeline != nil &&
-		(input.overflowCompression || promptTokens > limit) {
+		(input.overflowCompression || promptTokens > limit || imageOverflow) {
 		ctx := r.config.GetContext()
 		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
 			ctx = task.GetContext()
@@ -573,25 +613,30 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if guideErr != nil || strings.TrimSpace(guide) == "" {
 			r.recordContextCompressionFailure("rendering the compression guide", guideErr)
 			r.emitContextCompressionUnavailable(promptTokens, limit, guideErr)
-			return r.commitSubAgentPromptAssembly(input, normalResult), nil
+			return finish(normalResult, normalImages), nil
 		}
 		instructions, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
 			map[string]any{"FunctionCallMode": r.functionCallMode})
 		if err != nil {
 			r.recordContextCompressionFailure("rendering the compression instructions", err)
 			r.emitContextCompressionRuntimeWarning("rendering the compression instructions", err)
-			return r.commitSubAgentPromptAssembly(input, normalResult), nil
+			return finish(normalResult, normalImages), nil
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(instructions) + "\n\n" + guide
-		result, err = assemble()
+		result, images, err = assemble()
 		if err != nil {
 			r.recordContextCompressionFailure("assembling the compression prompt", err)
 			r.emitContextCompressionRuntimeWarning("assembling the compression prompt", err)
-			return r.commitSubAgentPromptAssembly(input, normalResult), nil
+			return finish(normalResult, normalImages), nil
+		}
+		if images != nil && len(images.inputs) == 0 && normalImages != nil && normalImages.omitted == 0 {
+			// The compression guide alone left no space for the visual
+			// evidence, while the ordinary request can still carry it.
+			return finish(normalResult, normalImages), nil
 		}
 		compressionPromptLimit := r.contextCompressionPromptTokenLimit()
-		compressionPromptTokens := int64(aicommon.MeasureTokens(result.Prompt))
+		compressionPromptTokens := images.totalTokens(result.Prompt)
 		if compressionPromptTokens > compressionPromptLimit {
 			log.Warnf(
 				"context-compression prompt exceeds advisory input budget: actual=%d limit=%d; continuing",
@@ -599,7 +644,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			)
 		}
 	}
-	return r.commitSubAgentPromptAssembly(input, result), nil
+	return finish(result, images), nil
 }
 
 func (r *ReActLoop) commitSubAgentPromptAssembly(input *loopPromptBuildInput, result *LoopPromptAssemblyResult) *LoopPromptAssemblyResult {

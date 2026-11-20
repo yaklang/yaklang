@@ -603,7 +603,7 @@ func resolvePreferredTier(config *aispec.AIConfig) (ModelTier, bool) {
 	if config.PreferredTier != "" {
 		return ModelTier(config.PreferredTier), true
 	}
-	if len(config.Images) > 0 {
+	if len(config.Images) > 0 && !config.PreserveImageModel {
 		return TierVision, true
 	}
 	return "", false
@@ -985,7 +985,11 @@ func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 	if utils.IsNil(client) {
 		return nil, utils.Error("List AI model failed:unknown AI type")
 	}
-	return client.GetModelList()
+	models, err := client.GetModelList()
+	if err == nil && supportsModelMetadataDiscovery(config.Type) {
+		modelImageMetadata.Set(modelMetadataKey(config), imageModalities(models))
+	}
+	return models, err
 }
 
 // ListModelByProviderType 根据提供商类型列出可用的 AI 模型。

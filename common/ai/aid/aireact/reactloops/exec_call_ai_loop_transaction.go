@@ -62,6 +62,7 @@ type LoopFunctionCallOutputCallback func(id, functionName string, descriptionRea
 // calls and finish reason. RawResponsePreview is only the transport's preview.
 type LoopResultSnapshot struct {
 	Mode                 string
+	ContextKey           string
 	Provider             string
 	Model                string
 	ProviderFinishReason string
@@ -182,6 +183,15 @@ func (d *LoopResultDescriptor) finishFromResponse(resp *aicommon.AIResponse, cal
 	d.finish(resp, resp.GetPlainOutput(), resp.GetPlainReason(), calls)
 }
 
+func (d *LoopResultDescriptor) setModelIdentity(resp *aicommon.AIResponse) {
+	if d == nil || resp == nil {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.snapshot.Provider, d.snapshot.Model, d.snapshot.ContextKey = resp.GetProviderName(), resp.GetModelName(), resp.GetModelContextKey()
+}
+
 func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason string, calls []*aispec.ToolCall) {
 	if d == nil {
 		return
@@ -197,6 +207,7 @@ func (d *LoopResultDescriptor) finish(resp *aicommon.AIResponse, output, reason 
 		return
 	}
 	d.output, d.reason, d.calls = output, reason, calls
+	d.snapshot.ContextKey = resp.GetModelContextKey()
 	d.snapshot.Provider = provider
 	d.snapshot.Model = model
 	d.snapshot.RawResponsePreview = rawPreview
@@ -653,8 +664,12 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		captureOption,
 	}
+	if !r.useSpeedPriorityAI {
+		requestOpts = append(requestOpts, aicommon.WithAIRequest_QualityModelConfig(r.requestModelConfig))
+	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
+	requestOpts = append(requestOpts, r.imageRequestOptions()...)
 
 	postHandler := func(resp *aicommon.AIResponse) error {
 		r.clearCallsExecutionValues(acceptedCalls)
@@ -850,6 +865,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		descriptor.finish(acceptedResp, lastOutput, lastReason, lastRawCalls)
 		return nil, failedLoopStopReason(descriptor, transactionErr), descriptor, transactionErr
 	}
+	r.recordImageUsage(acceptedResp)
 	if len(acceptedCalls) == 0 || acceptedResp == nil {
 		err := utils.Error("function-call transaction returned no accepted calls")
 		descriptor.setError(err)
@@ -961,8 +977,12 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 				})(req)
 		},
 	}
+	if !r.useSpeedPriorityAI {
+		requestOpts = append(requestOpts, aicommon.WithAIRequest_QualityModelConfig(r.requestModelConfig))
+	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
+	requestOpts = append(requestOpts, r.imageRequestOptions()...)
 	var acceptedResp *aicommon.AIResponse
 
 	postHandler := func(resp *aicommon.AIResponse) (err error) {
@@ -1274,6 +1294,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		log.Errorf("AI transaction failed: %v", transactionErr)
 		return nil, nil, transactionErr
 	}
+	r.recordImageUsage(acceptedResp)
 
 	if ctxCanceled.IsSet() {
 		r.UserStatus(
@@ -1335,6 +1356,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		)
 	}
 	if acceptedResp != nil {
+		descriptor.setModelIdentity(acceptedResp)
 		go func() {
 			action.WaitStream(activeTaskCtx)
 			descriptor.finishFromResponse(acceptedResp, nil)

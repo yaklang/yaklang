@@ -446,6 +446,7 @@ const (
 	Yak_ListAiModel_FullMethodName                                = "/ypb.Yak/ListAiModel"
 	Yak_AIConfigHealthCheck_FullMethodName                        = "/ypb.Yak/AIConfigHealthCheck"
 	Yak_ProbeReasoningEffort_FullMethodName                       = "/ypb.Yak/ProbeReasoningEffort"
+	Yak_ProbeModelVision_FullMethodName                           = "/ypb.Yak/ProbeModelVision"
 	Yak_GetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/GetAIGlobalConfig"
 	Yak_SetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/SetAIGlobalConfig"
 	Yak_ListAIProviders_FullMethodName                            = "/ypb.Yak/ListAIProviders"
@@ -556,6 +557,7 @@ const (
 	Yak_ImportNote_FullMethodName                                 = "/ypb.Yak/ImportNote"
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
 	Yak_StartAIReAct_FullMethodName                               = "/ypb.Yak/StartAIReAct"
+	Yak_ReadAIImage_FullMethodName                                = "/ypb.Yak/ReadAIImage"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
 	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
@@ -689,6 +691,8 @@ const (
 	Yak_ExecuteContextMenuAction_FullMethodName                   = "/ypb.Yak/ExecuteContextMenuAction"
 	Yak_UploadToTemporaryFile_FullMethodName                      = "/ypb.Yak/UploadToTemporaryFile"
 	Yak_GetAISessionCurrentResources_FullMethodName               = "/ypb.Yak/GetAISessionCurrentResources"
+	Yak_GetAIModelContext_FullMethodName                          = "/ypb.Yak/GetAIModelContext"
+	Yak_SetAIModelContext_FullMethodName                          = "/ypb.Yak/SetAIModelContext"
 )
 
 // YakClient is the client API for Yak service.
@@ -1247,6 +1251,7 @@ type YakClient interface {
 	ListAiModel(ctx context.Context, in *ListAiModelRequest, opts ...grpc.CallOption) (*ListAiModelResponse, error)
 	AIConfigHealthCheck(ctx context.Context, in *AIConfigHealthCheckRequest, opts ...grpc.CallOption) (*AIConfigHealthCheckResponse, error)
 	ProbeReasoningEffort(ctx context.Context, in *ProbeReasoningEffortRequest, opts ...grpc.CallOption) (*ProbeReasoningEffortResponse, error)
+	ProbeModelVision(ctx context.Context, in *ProbeModelVisionRequest, opts ...grpc.CallOption) (*ProbeModelVisionResponse, error)
 	GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(ctx context.Context, in *AIGlobalConfig, opts ...grpc.CallOption) (*Empty, error)
 	ListAIProviders(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListAIProvidersResponse, error)
@@ -1383,6 +1388,7 @@ type YakClient interface {
 	ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error)
 	// AI Task
 	StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
+	ReadAIImage(ctx context.Context, in *AIImageRequest, opts ...grpc.CallOption) (*AIImageResponse, error)
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
 	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -1551,6 +1557,9 @@ type YakClient interface {
 	// Query resources attached by the latest input and the distinct resources
 	// attached throughout an AI session.
 	GetAISessionCurrentResources(ctx context.Context, in *GetAISessionCurrentResourcesRequest, opts ...grpc.CallOption) (*GetAISessionCurrentResourcesResponse, error)
+	// Model-specific compression budgets, available before a session starts.
+	GetAIModelContext(ctx context.Context, in *GetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error)
+	SetAIModelContext(ctx context.Context, in *SetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error)
 }
 
 type yakClient struct {
@@ -6479,6 +6488,16 @@ func (c *yakClient) ProbeReasoningEffort(ctx context.Context, in *ProbeReasoning
 	return out, nil
 }
 
+func (c *yakClient) ProbeModelVision(ctx context.Context, in *ProbeModelVisionRequest, opts ...grpc.CallOption) (*ProbeModelVisionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProbeModelVisionResponse)
+	err := c.cc.Invoke(ctx, Yak_ProbeModelVision_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AIGlobalConfig)
@@ -7737,6 +7756,16 @@ func (c *yakClient) StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAIReActClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent]
+
+func (c *yakClient) ReadAIImage(ctx context.Context, in *AIImageRequest, opts ...grpc.CallOption) (*AIImageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIImageResponse)
+	err := c.cc.Invoke(ctx, Yak_ReadAIImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -9269,6 +9298,26 @@ func (c *yakClient) GetAISessionCurrentResources(ctx context.Context, in *GetAIS
 	return out, nil
 }
 
+func (c *yakClient) GetAIModelContext(ctx context.Context, in *GetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIModelContextResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAIModelContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetAIModelContext(ctx context.Context, in *SetAIModelContextRequest, opts ...grpc.CallOption) (*AIModelContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIModelContextResponse)
+	err := c.cc.Invoke(ctx, Yak_SetAIModelContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -9825,6 +9874,7 @@ type YakServer interface {
 	ListAiModel(context.Context, *ListAiModelRequest) (*ListAiModelResponse, error)
 	AIConfigHealthCheck(context.Context, *AIConfigHealthCheckRequest) (*AIConfigHealthCheckResponse, error)
 	ProbeReasoningEffort(context.Context, *ProbeReasoningEffortRequest) (*ProbeReasoningEffortResponse, error)
+	ProbeModelVision(context.Context, *ProbeModelVisionRequest) (*ProbeModelVisionResponse, error)
 	GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(context.Context, *AIGlobalConfig) (*Empty, error)
 	ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error)
@@ -9961,6 +10011,7 @@ type YakServer interface {
 	ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error
 	// AI Task
 	StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
+	ReadAIImage(context.Context, *AIImageRequest) (*AIImageResponse, error)
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
 	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
@@ -10129,6 +10180,9 @@ type YakServer interface {
 	// Query resources attached by the latest input and the distinct resources
 	// attached throughout an AI session.
 	GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error)
+	// Model-specific compression budgets, available before a session starts.
+	GetAIModelContext(context.Context, *GetAIModelContextRequest) (*AIModelContextResponse, error)
+	SetAIModelContext(context.Context, *SetAIModelContextRequest) (*AIModelContextResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -11420,6 +11474,9 @@ func (UnimplementedYakServer) AIConfigHealthCheck(context.Context, *AIConfigHeal
 func (UnimplementedYakServer) ProbeReasoningEffort(context.Context, *ProbeReasoningEffortRequest) (*ProbeReasoningEffortResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProbeReasoningEffort not implemented")
 }
+func (UnimplementedYakServer) ProbeModelVision(context.Context, *ProbeModelVisionRequest) (*ProbeModelVisionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProbeModelVision not implemented")
+}
 func (UnimplementedYakServer) GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAIGlobalConfig not implemented")
 }
@@ -11749,6 +11806,9 @@ func (UnimplementedYakServer) ExportNote(*ExportNoteRequest, grpc.ServerStreamin
 }
 func (UnimplementedYakServer) StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAIReAct not implemented")
+}
+func (UnimplementedYakServer) ReadAIImage(context.Context, *AIImageRequest) (*AIImageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadAIImage not implemented")
 }
 func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITask not implemented")
@@ -12148,6 +12208,12 @@ func (UnimplementedYakServer) UploadToTemporaryFile(grpc.ClientStreamingServer[U
 }
 func (UnimplementedYakServer) GetAISessionCurrentResources(context.Context, *GetAISessionCurrentResourcesRequest) (*GetAISessionCurrentResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAISessionCurrentResources not implemented")
+}
+func (UnimplementedYakServer) GetAIModelContext(context.Context, *GetAIModelContextRequest) (*AIModelContextResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIModelContext not implemented")
+}
+func (UnimplementedYakServer) SetAIModelContext(context.Context, *SetAIModelContextRequest) (*AIModelContextResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAIModelContext not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -19248,6 +19314,24 @@ func _Yak_ProbeReasoningEffort_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_ProbeModelVision_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProbeModelVisionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ProbeModelVision(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ProbeModelVision_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ProbeModelVision(ctx, req.(*ProbeModelVisionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAIGlobalConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -21086,6 +21170,24 @@ func _Yak_StartAIReAct_Handler(srv interface{}, stream grpc.ServerStream) error 
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartAIReActServer = grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]
+
+func _Yak_ReadAIImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ReadAIImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ReadAIImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ReadAIImage(ctx, req.(*AIImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _Yak_StartAITask_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITask(&grpc.GenericServerStream[AIInputEvent, AIOutputEvent]{ServerStream: stream})
@@ -23290,6 +23392,42 @@ func _Yak_GetAISessionCurrentResources_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAIModelContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIModelContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIModelContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIModelContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIModelContext(ctx, req.(*GetAIModelContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetAIModelContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAIModelContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetAIModelContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SetAIModelContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetAIModelContext(ctx, req.(*SetAIModelContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -24686,6 +24824,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_ProbeReasoningEffort_Handler,
 		},
 		{
+			MethodName: "ProbeModelVision",
+			Handler:    _Yak_ProbeModelVision_Handler,
+		},
+		{
 			MethodName: "GetAIGlobalConfig",
 			Handler:    _Yak_GetAIGlobalConfig_Handler,
 		},
@@ -25048,6 +25190,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchNoteContent",
 			Handler:    _Yak_SearchNoteContent_Handler,
+		},
+		{
+			MethodName: "ReadAIImage",
+			Handler:    _Yak_ReadAIImage_Handler,
 		},
 		{
 			MethodName: "QueryAITask",
@@ -25480,6 +25626,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAISessionCurrentResources",
 			Handler:    _Yak_GetAISessionCurrentResources_Handler,
+		},
+		{
+			MethodName: "GetAIModelContext",
+			Handler:    _Yak_GetAIModelContext_Handler,
+		},
+		{
+			MethodName: "SetAIModelContext",
+			Handler:    _Yak_SetAIModelContext_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

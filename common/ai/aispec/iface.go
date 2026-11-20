@@ -68,10 +68,14 @@ type StructuredStreamer interface {
 }
 
 type ModelMeta struct {
-	Id      string `json:"id"`
-	Object  string `json:"object,omitempty"`
-	Created int64  `json:"created,omitempty"`
-	OwnedBy string `json:"owned_by,omitempty"`
+	Id              string   `json:"id"`
+	Object          string   `json:"object,omitempty"`
+	Created         int64    `json:"created,omitempty"`
+	OwnedBy         string   `json:"owned_by,omitempty"`
+	InputModalities []string `json:"input_modalities,omitempty"`
+	Architecture    *struct {
+		InputModalities []string `json:"input_modalities,omitempty"`
+	} `json:"architecture,omitempty"`
 }
 
 type ModelListCaller interface {

@@ -13,7 +13,7 @@ var ErrSubForgeBusy = fmt.Errorf("another sub-Forge is already running: %w", ait
 // without its prompts, timeline, tools, user input or preset plan.
 func SubForgeExecutionPolicy(parent *Config) []ConfigOption {
 	return []ConfigOption{
-		WithAICallbacks(parent.GetRawAICallbacks()),
+		WithInheritTieredAICallback(parent, true),
 		WithAIChatInfo(parent.AiServerName, parent.AiModelName),
 		WithDisablePerception(parent.DisablePerception),
 		WithNoOpMemoryTriage(),

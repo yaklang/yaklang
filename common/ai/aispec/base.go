@@ -210,6 +210,7 @@ const (
 )
 
 type ChatBaseContext struct {
+	RequestByteLimit   int64
 	PoCOptionGenerator func() ([]poc.PocConfigOption, error)
 	// ExtraBody is merged into the outbound JSON body (top-level keys) after marshaling msgResult.
 	ExtraBody      map[string]any
@@ -360,6 +361,7 @@ func WithChatBase_AISamplingFromConfig(cfg *AIConfig) ChatBaseOption {
 			return
 		}
 		c.MaxTokens = cloneInt64Ptr(cfg.MaxTokens)
+		c.RequestByteLimit = cfg.RequestByteLimit
 		c.Temperature = cloneFloat64Ptr(cfg.Temperature)
 		c.TopP = cloneFloat64Ptr(cfg.TopP)
 		c.TopK = cloneInt64Ptr(cfg.TopK)
@@ -1230,6 +1232,24 @@ type chatBaseStreamHandlerAppender func(
 	finishReasonCallback ...func(string, []byte),
 ) (io.Reader, io.Reader, io.Reader, []poc.PocConfigOption, func(), streamReadErrGetter)
 
+// Stream handlers may hand the reader to another goroutine and return before
+// it is drained. Capturing the returned text must not race that deferred read.
+type chatBaseOutputCapture struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (b *chatBaseOutputCapture) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.Write(p)
+}
+func (b *chatBaseOutputCapture) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.String()
+}
+
 func executeChatBaseRequest(
 	url string,
 	handleStream bool,
@@ -1269,6 +1289,9 @@ func executeChatBaseRequest(
 	}
 	if log.GetLevel() <= log.DebugLevel {
 		log.Debugf("ChatBase request body preview: %s", utils.ShrinkString(string(raw), 600))
+	}
+	if ctx.RequestByteLimit > 0 && int64(len(raw)) > ctx.RequestByteLimit {
+		return "", fmt.Errorf("%w: serialized request has %d bytes, limit %d", ErrRequestSizeLimit, len(raw), ctx.RequestByteLimit)
 	}
 	// Set default options BEFORE user options, so user can override
 	defaultOpts := []poc.PocConfigOption{
@@ -1331,7 +1354,7 @@ func executeChatBaseRequest(
 	}
 
 	// 设置流式处理handler（如果需要）
-	var body bytes.Buffer
+	var body chatBaseOutputCapture
 
 	// Handle tool_call arguments stream: either route to a dedicated handler
 	// or drain it to prevent the writer side from blocking. When

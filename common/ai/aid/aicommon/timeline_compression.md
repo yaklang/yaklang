@@ -60,3 +60,7 @@ Push、渲染、Save、恢复和 fork/merge 都不会自行调用 AI 压缩。�
 - `aireact/prompt_compression_mode_test.go`：仅替换动态段，静态前缀与当前任务/TODO 保持不变。
 - `reactloops/prompt_observation_publish_test.go`：主循环统一执行压缩 action、无进展退出及正常 prompt 观测数量。
 - 其余 `timeline_compression_*_test.go`：快照完整性、冻结、恢复、保存和分支合并。
+
+## 主模型可配置阈值
+
+配置质量优先模型的 ReAct 使用该具体服务/模型保存的阈值，初始为 500,000 tokens（1K = 1,000）。轻量、视觉及未绑定的 SDK 路径保留原默认值。压缩算法、时机、历史边界和调用路由不变，新增功能只保存原有自动收缩成功后的阈值。具体身份、边界、静默更新和测试见 [主模型上下文阈值行为契约](model_context_contract.md)。

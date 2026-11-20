@@ -3,7 +3,7 @@ __VERBOSE_NAME__ = "Call MCP Tool"
 __VERBOSE_NAME_ZH__ = "调用 MCP 工具"
 __KEYWORDS__ = "mcp,call,remote,tool,调用,远程,工具"
 __USAGE__ = <<<USAGE
-先用 query_mcp_tools 获取工具名和 inputSchema。server_name 是注册表精确名称，remote_tool 是远端裸名称，arguments 是符合 inputSchema 的 JSON 对象。stdout 保留 MCP content 数组。isError=true 会使本次调用失败，同时输出远端错误内容；不要把远端工具失败当作成功。每次连接执行后关闭，添加后无需重启。timeout 控制单次请求秒数，默认 30。
+先用 query_mcp_tools 获取工具名和 inputSchema。server_name 是注册表精确名称，remote_tool 是远端裸名称，arguments 是符合 inputSchema 的 JSON 对象。图片通过独立媒体通道返回。isError=true 表示调用失败，仍可读取该次回包的结构化数据和图片。每次连接执行后关闭，添加后无需重启。timeout 控制单次请求秒数，默认 30。
 [[- if .FunctionCallMode -]]
 ```json
 {"server_name":"local-demo","remote_tool":"echo","arguments":{"message":"hello"}}
@@ -28,7 +28,18 @@ if connectErr != nil {
 }
 defer client.Close()
 result, err = client.CallTool(toolName, params)
-if result != nil { println(json.dumps(result)) }
-if err != nil {
-    die(sprintf("MCP tool %q on server %q failed: %v. Recovery: inspect the remote error content above, correct arguments against the query_mcp_tools inputSchema, and retry only if the operation is safe to repeat.", toolName, serverName, err))
+recovery = "Recovery: inspect the remote error content above, correct arguments against the query_mcp_tools inputSchema, and retry only if the operation is safe to repeat."
+if err != nil && (result == nil || !result.IsError) {
+    die(sprintf("MCP tool %q on server %q failed: %v. %s", toolName, serverName, err, recovery))
+}
+parsed, parseErr = aiagent.MCPResult(client, serverName, result)
+if parseErr != nil && parsed == nil {
+    die(sprintf("MCP tool %q on server %q failed: %v. %s", toolName, serverName, parseErr, recovery))
+}
+println(json.dumps(parsed))
+RESULT = parsed
+if parseErr != nil {
+    println(sprintf("MCP tool %q on server %q failed: %v. %s", toolName, serverName, parseErr, recovery))
+    // Pass the typed failure with its result through the AI tool callback.
+    RESULT = parseErr
 }

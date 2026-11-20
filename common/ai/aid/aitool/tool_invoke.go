@@ -2,6 +2,7 @@ package aitool
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -223,20 +224,30 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	}
 	execResult, err := t.ExecuteToolWithCapture(cfg.ctx, params, cfg)
 	if err != nil {
-		if cb := cfg.GetErrCallback(); cb != nil {
-			return cb(err)
-		}
-		return &ToolResult{
+		var remoteFailure *mcpToolExecutionError
+		preserveResult := errors.As(err, &remoteFailure) && cfg.ctx.Err() == nil && execResult != nil && execResult.Result != nil
+		result := &ToolResult{
 			Param:       params,
 			Name:        t.Name,
 			Description: t.Description,
-			Success:     false,
 			Error:       fmt.Sprintf("工具调用协议失败: %v", err),
-		}, err
+		}
+		if cb := cfg.GetErrCallback(); cb != nil {
+			result, err = cb(err)
+		}
+		if result != nil && preserveResult {
+			result.Success = false
+			result.Data = execResult
+			result.Images = execResult.Images
+		}
+		return result, err
 	}
 
 	if cb := cfg.resCallback; cb != nil {
 		result, cbErr := cb(execResult)
+		if result != nil && cbErr == nil {
+			result.Images = execResult.Images
+		}
 		return result, cbErr
 	}
 
@@ -246,6 +257,7 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		Param:       params,
 		Success:     true,
 		Data:        execResult,
+		Images:      execResult.Images,
 	}, nil
 }
 
