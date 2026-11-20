@@ -1,0 +1,45 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: cloud metadata service access"
+	title_zh: "Bash：访问云主机元数据服务"
+	type: audit
+	level: "middle"
+	rule_id: "bash-cloud-metadata"
+	risk: "information-exposure"
+	desc: <<<DESC
+### 说明
+命令访问 `169.254.169.254`、`metadata.google.internal`、`100.100.100.200`
+等云厂商元数据地址。元数据服务通常返回实例角色临时凭据、用户数据启动脚本
+和实例身份信息；一旦被 SSRF 或本地低权限进程利用，攻击者可直接接管云资源。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+确认命令访问元数据服务的必要性。对元数据接口强制使用 IMDSv2 或等价的
+会话令牌机制，限制容器和普通用户的访问，并监控异常读取行为。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
+wget -qO- http://metadata.google.internal/computeMetadata/v1/instance/
+curl http://100.100.100.200/latest/meta-data/
+POS
+	"safefile://neg.sh": <<<NEG
+curl https://example.com/health
+curl http://192.168.1.10:8080/status
+wget -qO- https://example.com/
+NEG
+)
+
+*?{any: /169\.254\.169\.254/, /metadata\.google\.internal/, /100\.100\.100\.200/, /fd00:ec2::254/} as $metadataHit
+
+alert $metadataHit for {
+	level: "middle",
+	title: "Bash: cloud metadata service access",
+	title_zh: "Bash：访问云主机元数据服务",
+	message: "检测到访问云元数据地址，可能读取实例凭据或用户数据。",
+	risk: "information-exposure",
+}
