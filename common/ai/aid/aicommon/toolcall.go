@@ -1074,6 +1074,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		t.reviewCheckpointSeq = 0
 		ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, reviewCheckpointSeq)
 		ep.SetDefaultSuggestionContinue()
+		securityAsk := ruleDecision != nil && ruleDecision.Action == schema.SFR_ACTION_ASK
+		if securityAsk {
+			// Mark the endpoint before the event is emitted so both the policy
+			// layer and the frontend see a human-only decision.
+			ep.SetForceHumanReview(ruleDecision.Summary())
+		}
 		reqs := map[string]any{
 			"id":               ep.GetId(),
 			"selectors":        ToolUseReviewSuggestions,
@@ -1089,6 +1095,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		}
 		if ruleDecision != nil {
 			reqs["security_rule"] = ruleDecision
+		}
+		if securityAsk {
+			reqs["force_human_review"] = true
+			reqs["reason"] = securityRuleReviewSummary(ruleDecision)
+			reqs["prompt"] = securityRuleReviewPrompt(ruleDecision, tool.Name, invokeParams)
+			reqs["options"] = securityRuleReviewOptions()
 		}
 		ep.SetReviewMaterials(reqs)
 		reviewCheckpoint := ep.GetCheckpoint()
@@ -1132,6 +1144,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		}
 
 		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
+		if securityAsk {
+			reviewQuestion = securityRuleReviewPrompt(ruleDecision, tool.Name, invokeParams)
+		}
 
 		var params aitool.InvokeParams
 		reviewReplayed := reviewCheckpoint.Finished
@@ -1145,13 +1160,15 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 				handleError(err)
 				return nil, false, err
 			}
-			t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
-
-			// Middle-severity findings must reach a human even under yolo/auto
-			// policies; the endpoint flag overrides the configured policy.
-			if ruleDecision != nil && ruleDecision.Action == schema.SFR_ACTION_ASK {
-				ep.SetForceHumanReview(ruleDecision.Summary())
+			reviewEventType := schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE
+			reviewEventNode := "review-require"
+			if securityAsk {
+				// yolo/auto frontends skip tool_use_review_require cards. Reuse
+				// the user-interactive event so the escalation is always visible.
+				reviewEventType = schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE
+				reviewEventNode = "require-user-interact"
 			}
+			t.emitter.EmitInteractiveJSON(ep.GetId(), reviewEventType, reviewEventNode, reqs)
 
 			// wait for agree
 			config.DoWaitAgree(t.ctx, ep)
@@ -1165,9 +1182,23 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			}
 			reviewDecidedAt := time.Now()
 			params = ep.GetParams()
+			if securityAsk {
+				allowed, cancelReason := securityRuleReviewDecision(params)
+				if !allowed {
+					// The visible card is a user-interactive card; close it with
+					// the raw answer before reporting the cancellation to the AI.
+					t.emitter.EmitInteractiveRelease(ep.GetId(), params)
+					config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+					releaseReview()
+					handleError(cancelReason)
+					return nil, false, utils.Error(cancelReason)
+				}
+				// Continue through the normal review path without asking again.
+				params = aitool.InvokeParams{"suggestion": "continue"}
+			}
 			t.emitter.EmitInteractiveRelease(ep.GetId(), params)
 			config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-			if !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
+			if securityAsk || !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
 				config.CallAfterReview(
 					ep.GetSeq(),
 					reviewQuestion,
