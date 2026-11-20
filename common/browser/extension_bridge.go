@@ -106,12 +106,12 @@ type extensionBridgeClientRequest struct {
 }
 
 type extensionBridgeClientRequestKey struct {
-	connection *websocket.Conn
+	connection extensionBridgeWire
 	id         string
 }
 
 type extensionBridgePendingCall struct {
-	connection *websocket.Conn
+	connection extensionBridgeWire
 	response   chan ExtensionBridgeEnvelope
 }
 
@@ -131,7 +131,7 @@ type ExtensionBridgeConnection struct {
 }
 
 type extensionBridgeConnectedClient struct {
-	connection *websocket.Conn
+	connection extensionBridgeWire
 	status     ExtensionBridgeConnection
 }
 
@@ -144,11 +144,12 @@ type ExtensionBridgeServer struct {
 
 	server   *http.Server
 	listener net.Listener
+	native   *extensionBridgeNativeServer
 	closed   atomic.Bool
 	sequence atomic.Uint64
 
 	clientMu           sync.RWMutex
-	client             *websocket.Conn
+	client             extensionBridgeWire
 	clientName         string
 	clientVersion      string
 	clientCapabilities []string
@@ -195,36 +196,18 @@ func newExtensionBridgeServer(port int, token string, manager *ExtensionBridgeMa
 	if port < 0 || port > 65535 {
 		return nil, fmt.Errorf("extension bridge port out of range: %d", port)
 	}
-	engineInstanceID := ""
-	if manager != nil {
-		engineInstanceID = manager.engineInstanceID
-	}
-	if engineInstanceID == "" {
-		var err error
-		engineInstanceID, err = newExtensionBridgeID("engine")
-		if err != nil {
-			return nil, fmt.Errorf("create extension bridge engine identity: %w", err)
-		}
-	}
-
 	listener, err := net.Listen("tcp", net.JoinHostPort(defaultExtensionBridgeHost, strconv.Itoa(port)))
 	if err != nil {
 		return nil, fmt.Errorf("listen for extension bridge: %w", err)
 	}
 
-	bridge := &ExtensionBridgeServer{
-		token:              token,
-		addr:               listener.Addr().String(),
-		listener:           listener,
-		engineInstanceID:   engineInstanceID,
-		manager:            manager,
-		pending:            make(map[string]extensionBridgePendingCall),
-		events:             make(chan ExtensionBridgeEnvelope, extensionBridgeEventBuffer),
-		clientRequests:     make(map[extensionBridgeClientRequestKey]*extensionBridgeClientRequest),
-		managedClients:     make(map[string]*extensionBridgeConnectedClient),
-		managedSessions:    make(map[string]string),
-		capabilityCatalogs: make(map[string]*ExtensionBridgeCapabilityCatalog),
+	bridge, err := makeExtensionBridgeServer(token, manager)
+	if err != nil {
+		_ = listener.Close()
+		return nil, err
 	}
+	bridge.listener = listener
+	bridge.addr = listener.Addr().String()
 	mux := http.NewServeMux()
 	mux.HandleFunc(extensionBridgePath, bridge.handleWebSocket)
 	if manager != nil {
@@ -244,10 +227,38 @@ func newExtensionBridgeServer(port int, token string, manager *ExtensionBridgeMa
 	}()
 	return bridge, nil
 }
+func makeExtensionBridgeServer(token string, manager *ExtensionBridgeManager) (*ExtensionBridgeServer, error) {
+	engineInstanceID := ""
+	if manager != nil {
+		engineInstanceID = manager.engineInstanceID
+	}
+	if engineInstanceID == "" {
+		var err error
+		engineInstanceID, err = newExtensionBridgeID("engine")
+		if err != nil {
+			return nil, fmt.Errorf("create extension bridge engine identity: %w", err)
+		}
+	}
+
+	return &ExtensionBridgeServer{
+		token:              token,
+		engineInstanceID:   engineInstanceID,
+		manager:            manager,
+		pending:            make(map[string]extensionBridgePendingCall),
+		events:             make(chan ExtensionBridgeEnvelope, extensionBridgeEventBuffer),
+		clientRequests:     make(map[extensionBridgeClientRequestKey]*extensionBridgeClientRequest),
+		managedClients:     make(map[string]*extensionBridgeConnectedClient),
+		managedSessions:    make(map[string]string),
+		capabilityCatalogs: make(map[string]*ExtensionBridgeCapabilityCatalog),
+	}, nil
+}
 
 func (s *ExtensionBridgeServer) URL() string {
 	if s == nil {
 		return ""
+	}
+	if s.native != nil {
+		return s.native.address
 	}
 	return "ws://" + s.addr + extensionBridgePath
 }
@@ -378,7 +389,7 @@ func (s *ExtensionBridgeServer) CallDevice(ctx context.Context, deviceID, method
 	return s.callConnection(ctx, client.connection, method, params)
 }
 
-func (s *ExtensionBridgeServer) callConnection(ctx context.Context, connection *websocket.Conn, method string, params interface{}) (json.RawMessage, error) {
+func (s *ExtensionBridgeServer) callConnection(ctx context.Context, connection extensionBridgeWire, method string, params interface{}) (json.RawMessage, error) {
 	method = strings.TrimSpace(method)
 	if method == "" {
 		return nil, errors.New("extension bridge method is required")
@@ -443,7 +454,7 @@ func (s *ExtensionBridgeServer) Close() error {
 		return nil
 	}
 	s.clientMu.Lock()
-	clients := make([]*websocket.Conn, 0, len(s.managedClients)+1)
+	clients := make([]extensionBridgeWire, 0, len(s.managedClients)+1)
 	if s.client != nil {
 		clients = append(clients, s.client)
 	}
@@ -461,6 +472,9 @@ func (s *ExtensionBridgeServer) Close() error {
 	s.cancelClientRequests()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+	if s.native != nil {
+		return s.native.close()
+	}
 	return s.server.Shutdown(ctx)
 }
 
@@ -472,7 +486,7 @@ func (s *ExtensionBridgeServer) disconnectInstallation(installationID string) {
 		s.manager.releaseMITMInstallation(installationID)
 	}
 	s.clientMu.Lock()
-	clients := make([]*websocket.Conn, 0, 1)
+	clients := make([]extensionBridgeWire, 0, 1)
 	if s.manager != nil {
 		delete(s.managedSessions, installationID)
 		for _, managed := range s.managedClients {
@@ -504,6 +518,15 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 	}
 	defer connection.Close()
 
+	origin, _ := NormalizeBrowserExtensionOrigin(request.Header.Get("Origin"))
+	s.handleBridgeConnection(connection, origin)
+}
+
+func (s *ExtensionBridgeServer) handleBridgeConnection(connection extensionBridgeWire, origin string) {
+	if s.closed.Load() {
+		return
+	}
+
 	connection.SetReadLimit(2 << 20)
 	_ = connection.SetReadDeadline(time.Now().Add(5 * time.Second))
 	protocolVersion := extensionBridgeProtocolVersion
@@ -511,7 +534,6 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 	var hello ExtensionBridgeEnvelope
 	var device *ExtensionBridgeDevice
 	if s.manager != nil {
-		origin, _ := NormalizeBrowserExtensionOrigin(request.Header.Get("Origin"))
 		managedHello, managedDevice, authErr := s.authenticateManagedConnection(connection, origin)
 		if authErr != nil {
 			s.rejectHandshake(connection, authErr.Error())
@@ -539,9 +561,13 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 	}
 	now := time.Now()
 	deviceID := ""
-	var previous *websocket.Conn
+	var previous extensionBridgeWire
 	resumed := false
 	s.clientMu.Lock()
+	if s.closed.Load() {
+		s.clientMu.Unlock()
+		return
+	}
 	if s.manager != nil && device != nil {
 		deviceID = device.ID
 		lastSessionID := s.managedSessions[hello.InstallationID]
@@ -665,7 +691,7 @@ func (s *ExtensionBridgeServer) handleWebSocket(writer http.ResponseWriter, requ
 	}
 }
 
-func (s *ExtensionBridgeServer) deliverResponse(connection *websocket.Conn, message ExtensionBridgeEnvelope) {
+func (s *ExtensionBridgeServer) deliverResponse(connection extensionBridgeWire, message ExtensionBridgeEnvelope) {
 	s.pendingMu.Lock()
 	pending, exists := s.pending[message.ID]
 	s.pendingMu.Unlock()
@@ -678,7 +704,7 @@ func (s *ExtensionBridgeServer) deliverResponse(connection *websocket.Conn, mess
 	}
 }
 
-func (s *ExtensionBridgeServer) rejectHandshake(connection *websocket.Conn, message string) {
+func (s *ExtensionBridgeServer) rejectHandshake(connection extensionBridgeWire, message string) {
 	_ = connection.WriteJSON(ExtensionBridgeEnvelope{
 		Type:  "response",
 		Error: &ExtensionBridgeError{Code: "unauthorized", Message: message},
@@ -714,7 +740,7 @@ func (s *ExtensionBridgeServer) cacheCapabilityCatalog(
 	return cached
 }
 
-func (s *ExtensionBridgeServer) authenticateManagedConnection(connection *websocket.Conn, origin string) (ExtensionBridgeEnvelope, *ExtensionBridgeDevice, error) {
+func (s *ExtensionBridgeServer) authenticateManagedConnection(connection extensionBridgeWire, origin string) (ExtensionBridgeEnvelope, *ExtensionBridgeDevice, error) {
 	var empty ExtensionBridgeEnvelope
 	challengeBytes := make([]byte, 32)
 	if _, err := rand.Read(challengeBytes); err != nil {
@@ -823,6 +849,11 @@ func (s *ExtensionBridgeServer) handlePairingWebSocket(writer http.ResponseWrite
 		return
 	}
 	defer connection.Close()
+	s.handleBridgePairing(request.Context(), connection, origin)
+}
+
+func (s *ExtensionBridgeServer) handleBridgePairing(ctx context.Context, connection extensionBridgeWire, origin string) {
+
 	connection.SetReadLimit(32 << 10)
 	_ = connection.SetReadDeadline(time.Now().Add(5 * time.Second))
 	var message extensionBridgePairingEnvelope
@@ -852,6 +883,17 @@ func (s *ExtensionBridgeServer) handlePairingWebSocket(writer http.ResponseWrite
 		return
 	}
 	_ = connection.SetReadDeadline(time.Time{})
+	if pipe, ok := connection.(*extensionBridgeNativeWire); ok {
+		disconnected, cancel := context.WithCancel(ctx)
+		defer cancel()
+		ctx = disconnected
+		go func() {
+			var data [1]byte
+			_, _ = pipe.Conn.Read(data[:])
+			cancel()
+		}()
+	}
+
 	wait := time.Until(time.UnixMilli(pending.request.ExpiresAt))
 	timer := time.NewTimer(wait)
 	defer timer.Stop()
@@ -868,12 +910,12 @@ func (s *ExtensionBridgeServer) handlePairingWebSocket(writer http.ResponseWrite
 	case <-timer.C:
 		s.manager.cancelPairing(pending.request.ID)
 		_ = connection.WriteJSON(extensionBridgePairingEnvelope{Type: "pair_expired", RequestID: pending.request.ID, Message: "Pairing request expired"})
-	case <-request.Context().Done():
+	case <-ctx.Done():
 		s.manager.cancelPairing(pending.request.ID)
 	}
 }
 
-func (s *ExtensionBridgeServer) startClientRequest(connection *websocket.Conn, deviceID string, message ExtensionBridgeEnvelope) {
+func (s *ExtensionBridgeServer) startClientRequest(connection extensionBridgeWire, deviceID string, message ExtensionBridgeEnvelope) {
 	if strings.TrimSpace(message.ID) == "" || strings.TrimSpace(message.Method) == "" {
 		_ = s.writeConnectionJSON(connection, ExtensionBridgeEnvelope{ID: message.ID, Type: "response", Error: &ExtensionBridgeError{Code: "invalid_request", Message: "extension request requires id and method"}})
 		return
@@ -919,7 +961,7 @@ func (s *ExtensionBridgeServer) startClientRequest(connection *websocket.Conn, d
 	}()
 }
 
-func (s *ExtensionBridgeServer) cancelClientRequest(connection *websocket.Conn, id string) {
+func (s *ExtensionBridgeServer) cancelClientRequest(connection extensionBridgeWire, id string) {
 	key := extensionBridgeClientRequestKey{connection: connection, id: id}
 	s.clientRequestMu.Lock()
 	request, exists := s.clientRequests[key]
@@ -929,7 +971,7 @@ func (s *ExtensionBridgeServer) cancelClientRequest(connection *websocket.Conn, 
 	}
 }
 
-func (s *ExtensionBridgeServer) cancelClientRequestsFor(connection *websocket.Conn) {
+func (s *ExtensionBridgeServer) cancelClientRequestsFor(connection extensionBridgeWire) {
 	s.clientRequestMu.Lock()
 	requests := make([]context.CancelFunc, 0)
 	for key, request := range s.clientRequests {
@@ -955,7 +997,7 @@ func (s *ExtensionBridgeServer) cancelClientRequests() {
 	}
 }
 
-func (s *ExtensionBridgeServer) failPendingCalls(connection *websocket.Conn, message string) {
+func (s *ExtensionBridgeServer) failPendingCalls(connection extensionBridgeWire, message string) {
 	s.pendingMu.Lock()
 	pending := make([]extensionBridgePendingCall, 0)
 	for _, call := range s.pending {
@@ -998,7 +1040,7 @@ func (s *ExtensionBridgeServer) writeJSON(message ExtensionBridgeEnvelope) error
 	return s.writeConnectionJSON(client, message)
 }
 
-func (s *ExtensionBridgeServer) readConnectionJSON(client *websocket.Conn, assemblies map[string]*extensionBridgeChunkAssembly, output *ExtensionBridgeEnvelope) error {
+func (s *ExtensionBridgeServer) readConnectionJSON(client extensionBridgeWire, assemblies map[string]*extensionBridgeChunkAssembly, output *ExtensionBridgeEnvelope) error {
 	for {
 		_, payload, err := client.ReadMessage()
 		if err != nil {
@@ -1081,7 +1123,7 @@ func decodeStrictExtensionBridgeJSON(payload []byte, output interface{}) error {
 	return nil
 }
 
-func readStrictExtensionBridgeJSON(connection *websocket.Conn, output interface{}) error {
+func readStrictExtensionBridgeJSON(connection extensionBridgeWire, output interface{}) error {
 	_, payload, err := connection.ReadMessage()
 	if err != nil {
 		return err
@@ -1089,7 +1131,7 @@ func readStrictExtensionBridgeJSON(connection *websocket.Conn, output interface{
 	return decodeStrictExtensionBridgeJSON(payload, output)
 }
 
-func (s *ExtensionBridgeServer) writeConnectionJSON(client *websocket.Conn, message ExtensionBridgeEnvelope) error {
+func (s *ExtensionBridgeServer) writeConnectionJSON(client extensionBridgeWire, message ExtensionBridgeEnvelope) error {
 	payload, err := json.Marshal(message)
 	if err != nil {
 		return fmt.Errorf("marshal extension bridge message: %w", err)

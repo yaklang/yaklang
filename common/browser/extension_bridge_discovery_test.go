@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func TestExtensionBridgeNativeFrontendDiscovery(t *testing.T) {
@@ -40,6 +41,17 @@ func TestExtensionBridgeNativeFrontendDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	defer blocked.Body.Close()
 	require.Equal(t, http.StatusForbidden, blocked.StatusCode)
+}
+
+func TestExtensionBridgeFrontendPrefersExplicitDesktopIdentity(t *testing.T) {
+	previous := consts.GetFrontendName()
+	t.Cleanup(func() { consts.SetFrontendName(previous) })
+	t.Setenv("YAKIT_EDITION", "yakit")
+	t.Setenv("YAK_DEFAULT_PROJECT_DATABASE_NAME", "default-yakit.db")
+	consts.SetFrontendName("memfit")
+	id, name := extensionBridgeFrontend()
+	require.Equal(t, "memfit", id)
+	require.Equal(t, "Memfit AI", name)
 }
 
 func TestExtensionBridgeFrontendFromProjectDatabase(t *testing.T) {
