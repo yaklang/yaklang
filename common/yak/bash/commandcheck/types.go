@@ -66,7 +66,7 @@ func (r Result) Message() string {
 	if len(r.Findings) == 0 {
 		return "command allowed"
 	}
-	prefix := "command allowed with bash guard warning"
+	prefix := "command allowed"
 	switch r.Action {
 	case schema.SFR_ACTION_DENY:
 		prefix = "command blocked by bash guard"
