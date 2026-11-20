@@ -15,7 +15,23 @@ import (
 
 // Reading compiler metadata must not allocate the size of an arbitrary input
 // section. Large or malformed tables leave the container usable with a note.
-const maxMetadataSize = 64 << 20
+// A section the loader names as the Go function table is compiler-owned, so it
+// gets a larger ceiling: the yaklang binary alone carries an 85 MiB pclntab,
+// and every function name, file name and line table lives in it.
+const (
+	maxMetadataSize     = 64 << 20
+	maxNamedPclntabSize = 512 << 20
+)
+
+// metadataLimit returns how large one candidate section may be. A name that
+// only looks like a Go table by convention (.rdata, .data.rel.ro) keeps the
+// small limit, because those sections hold unrelated data too.
+func metadataLimit(name string) uint64 {
+	if isGoTableSection(name) {
+		return maxNamedPclntabSize
+	}
+	return maxMetadataSize
+}
 
 type Golang struct{}
 
@@ -132,8 +148,9 @@ func (Golang) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 	}
 	var lastErr error
 	for _, s := range candidates {
-		if s.FileSize == 0 || s.FileSize > maxMetadataSize {
-			lastErr = fmt.Errorf("section %s is empty or exceeds %d bytes", s.Name, maxMetadataSize)
+		limit := metadataLimit(s.Name)
+		if s.FileSize == 0 || s.FileSize > limit {
+			lastErr = fmt.Errorf("section %s is empty or exceeds %d bytes", s.Name, limit)
 			continue
 		}
 		data, err := a.Reader.Bytes(s.FileOffset, s.FileSize)
@@ -146,7 +163,7 @@ func (Golang) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 			if !ok {
 				continue
 			}
-			syms, err := parseGoTable(a, data[offset:], magic, order)
+			syms, err := parseGoTable(a, data[offset:], s.VirtualAddress+uint64(offset), magic, order)
 			if err == nil {
 				return syms, nil
 			}
@@ -174,7 +191,7 @@ func pclnHeader(data []byte) (uint32, binary.ByteOrder, bool) {
 	return 0, nil, false
 }
 
-func parseGoTable(a *core.Artifact, data []byte, magic uint32, order binary.ByteOrder) (symbols []symbol.Symbol, err error) {
+func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32, order binary.ByteOrder) (symbols []symbol.Symbol, err error) {
 	// debug/gosym handles most malformed tables itself, but its contract does
 	// not promise panic-free parsing of untrusted compiler metadata.
 	defer func() {
@@ -195,22 +212,25 @@ func parseGoTable(a *core.Artifact, data []byte, magic uint32, order binary.Byte
 	if count == 0 || count > uint64(len(data)/8) {
 		return nil, fmt.Errorf("invalid pclntab function count %d", count)
 	}
+	// gosym reads entry offsets relative to the text base it is given. A Go
+	// 1.18+ table stores offsets, not the base itself, so the base has to come
+	// from runtime.text or runtime.moduledata. Using the start of the first
+	// executable section is wrong when an external linker put C code there.
 	text := uint64(0)
-	if a.Hints != nil && len(a.Hints.ExecSections) != 0 {
-		text = a.Hints.ExecSections[0].Address
-	}
-	if s, ok := a.Image.SymbolByName("runtime.text"); ok {
-		text = s.Address
-	}
 	if magic == 0xfffffff0 || magic == 0xfffffff1 {
-		// The Go 1.18+ header records runtime.text, which need not equal the
-		// section start when an external linker put other code before Go code.
 		if len(data) < 8+8*ptr {
 			return nil, fmt.Errorf("truncated pclntab header")
 		}
-		if start := word(8 + 2*ptr); start != 0 {
-			text = start
+		tables := readPclnTables(headerAddr, count, func(index int) uint64 { return word(8 + index*ptr) })
+		base, err := textStart(a, tables, order)
+		if err != nil {
+			return nil, err
 		}
+		text = base
+	} else if s, ok := a.Image.SymbolByName("runtime.text"); ok {
+		text = s.Address
+	} else if a.Hints != nil && len(a.Hints.ExecSections) != 0 {
+		text = a.Hints.ExecSections[0].Address
 	}
 	table, err := gosym.NewTable(nil, gosym.NewLineTable(data, text))
 	if err != nil {

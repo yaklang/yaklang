@@ -128,3 +128,18 @@ func FuzzPCLNTab(f *testing.F) {
 		_, _ = (Golang{}).Recover(a)
 	})
 }
+
+func TestMetadataLimitAllowsLargeNamedPclntab(t *testing.T) {
+	if got := metadataLimit(".gopclntab"); got != maxNamedPclntabSize {
+		t.Fatalf("named pclntab limit = %d", got)
+	}
+	if got := metadataLimit("<segment>,__gopclntab"); got != maxNamedPclntabSize {
+		t.Fatalf("macho pclntab limit = %d", got)
+	}
+	if got := metadataLimit(".rdata"); got != maxMetadataSize {
+		t.Fatalf("fallback section limit = %d", got)
+	}
+	if maxNamedPclntabSize <= maxMetadataSize || maxNamedPclntabSize < 85<<20 {
+		t.Fatalf("named limit must cover a real 85 MiB table: %d", maxNamedPclntabSize)
+	}
+}
