@@ -193,7 +193,7 @@ func reserveNamePoolID(db *gorm.DB) (int64, error) {
 	sqlDB := db.DB()
 	if !namePoolSeq.seeded || namePoolSeq.db != sqlDB {
 		var maxID int64
-		query := "SELECT COALESCE(MAX(name_id), 0) FROM \"" + TableIrNamePool + "\""
+		query := "SELECT COALESCE(MAX(name_id), 0) FROM " + QuoteIdent(db, TableIrNamePool)
 		if err := db.Raw(query).Row().Scan(&maxID); err != nil {
 			return 0, err
 		}

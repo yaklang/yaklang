@@ -84,7 +84,7 @@ func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	ctx, cancel := nativeQueryContext(context.Background())
 	defer cancel()
 	query := bindSQLPlaceholdersDB(db,
-		`SELECT kind, "string", extra_information FROM "`+TableIrTypes+`"`+
+		`SELECT kind, `+QuoteIdent(db, "string")+`, extra_information FROM `+QuoteIdent(db, TableIrTypes)+
 			` WHERE program_name = ? AND type_id = ? AND deleted_at IS NULL`)
 	var kind int
 	var text, extra string

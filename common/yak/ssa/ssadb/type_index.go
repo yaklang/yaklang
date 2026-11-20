@@ -15,9 +15,12 @@ func ensureIrTypeIndexes(db *gorm.DB) error {
 	if db == nil || db.Dialect() == nil {
 		return errors.New("no dialect")
 	}
-	return db.Exec(
-		`CREATE UNIQUE INDEX IF NOT EXISTS "` + irTypeUniqueIndex + `" ON "` + TableIrTypes + `" ("program_name", "type_id");`,
-	).Error
+	return EnsureIndex(db, IndexSpec{
+		Name:    irTypeUniqueIndex,
+		Table:   TableIrTypes,
+		Columns: []string{"program_name", "type_id"},
+		Unique:  true,
+	})
 }
 
 // EnsureIrTypeIndexesForTest installs the unique key on a bare test database

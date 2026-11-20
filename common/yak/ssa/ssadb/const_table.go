@@ -148,33 +148,30 @@ func ensureIrConstIndexes(db *gorm.DB) {
 		log.Errorf("SSA const pool %q is missing after migrate: const lookups and deletes will fail", TableIrConstPool)
 		return
 	}
-	queries := []struct {
-		name  string
-		query string
-	}{
+	specs := []IndexSpec{
 		{
-			irConstPoolProgramIDIndex,
-			`CREATE UNIQUE INDEX IF NOT EXISTS "` + irConstPoolProgramIDIndex + `" ON "` + TableIrConstPool + `" ("program_name", "const_id");`,
+			Name:    irConstPoolProgramIDIndex,
+			Table:   TableIrConstPool,
+			Columns: []string{"program_name", "const_id"},
+			Unique:  true,
 		},
 		{
-			irConstPoolSizeIndex,
-			`CREATE INDEX IF NOT EXISTS "` + irConstPoolSizeIndex + `" ON "` + TableIrConstPool + `" ("program_name", "text_size");`,
+			Name:    irConstPoolSizeIndex,
+			Table:   TableIrConstPool,
+			Columns: []string{"program_name", "text_size"},
 		},
 		{
-			irCodeConstIDIndex,
-			`CREATE INDEX IF NOT EXISTS "` + irCodeConstIDIndex + `" ON "` + TableIrCodes + `" ("program_name", "const_id") WHERE const_id <> 0;`,
+			Name:    irCodeConstIDIndex,
+			Table:   TableIrCodes,
+			Columns: []string{"program_name", "const_id"},
+			// SQLite/PostgreSQL get the partial index; MySQL has no partial
+			// indexes and BuildIndexDDL drops the predicate there.
+			Where: "const_id <> 0",
 		},
 	}
-	for _, idx := range queries {
-		table := TableIrConstPool
-		if idx.name == irCodeConstIDIndex {
-			table = TableIrCodes
-		}
-		if hasNamedIndex(db, table, idx.name) {
-			continue
-		}
-		if err := db.Exec(idx.query).Error; err != nil {
-			log.Warnf("failed to add index %s: %v", idx.name, err)
+	for _, spec := range specs {
+		if err := EnsureIndex(db, spec); err != nil {
+			log.Warnf("failed to add index %s: %v", spec.Name, err)
 		}
 	}
 }
@@ -460,8 +457,8 @@ func (c *irConstValueCache) preloadShortConsts(db *gorm.DB, program string) {
 		return
 	}
 	values := make(map[int64]*IrConstValue, 1024)
-	query := bindSQLPlaceholdersDB(db, `SELECT const_id, kind, "string" FROM "`+TableIrConstPool+
-		`" WHERE program_name = ? AND text_size <= ?`)
+	query := bindSQLPlaceholdersDB(db, `SELECT const_id, kind, `+QuoteIdent(db, "string")+` FROM `+QuoteIdent(db, TableIrConstPool)+
+		` WHERE program_name = ? AND text_size <= ?`)
 	rows, err := db.Raw(query, program, IrCodeInlineConstStringLimit).Rows()
 	if err != nil {
 		// A database written before the pool has no such table; the decode path
@@ -518,8 +515,8 @@ func GetIrConstValue(db *gorm.DB, program string, constID int64) *IrConstValue {
 	if db == nil {
 		return nil
 	}
-	query := bindSQLPlaceholdersDB(db, `SELECT kind, "string" FROM "`+TableIrConstPool+
-		`" WHERE program_name = ? AND const_id = ? LIMIT 1`)
+	query := bindSQLPlaceholdersDB(db, `SELECT kind, `+QuoteIdent(db, "string")+` FROM `+QuoteIdent(db, TableIrConstPool)+
+		` WHERE program_name = ? AND const_id = ? LIMIT 1`)
 	rows, err := db.Raw(query, program, constID).Rows()
 	if err != nil {
 		log.Debugf("read const value: %v", err)
@@ -574,8 +571,8 @@ func irConstPoolHasProgram(ctx context.Context, db *gorm.DB, progName string) bo
 		ctx = context.Background()
 	}
 	var one int
-	row := nativeQueryRowContext(db, ctx,
-		`SELECT 1 FROM "`+TableIrConstPool+`" WHERE program_name = ? LIMIT 1`, progName)
+	query := bindSQLPlaceholdersDB(db, `SELECT 1 FROM `+QuoteIdent(db, TableIrConstPool)+` WHERE program_name = ? LIMIT 1`)
+	row := nativeQueryRowContext(db, ctx, query, progName)
 	if row == nil {
 		return false
 	}
@@ -595,8 +592,8 @@ func irConstTableHasProgram(ctx context.Context, db *gorm.DB, progName string) b
 		ctx = context.Background()
 	}
 	var one int
-	row := nativeQueryRowContext(db, ctx,
-		`SELECT 1 FROM "`+TableIrConsts+`" WHERE program_name = ? LIMIT 1`, progName)
+	query := bindSQLPlaceholdersDB(db, `SELECT 1 FROM `+QuoteIdent(db, TableIrConsts)+` WHERE program_name = ? LIMIT 1`)
+	row := nativeQueryRowContext(db, ctx, query, progName)
 	if row == nil {
 		return false
 	}
