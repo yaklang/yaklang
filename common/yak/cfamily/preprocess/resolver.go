@@ -12,6 +12,9 @@ import (
 type ResolvedHeader struct {
 	Path    string
 	Content []byte
+	// External marks a header resolved from an external include root (the
+	// c-std-headers pack) rather than from the project tree.
+	External bool
 }
 
 // IncludeResolver resolves #include paths against the header registry.
@@ -50,7 +53,7 @@ func (r *IncludeResolver) ResolveHeader(includePath string, system bool, includi
 		}
 	}
 	if stored, content, ok := readExternalHeader(r.externalFS, includePath); ok {
-		return ResolvedHeader{Path: stored, Content: content}, true
+		return ResolvedHeader{Path: stored, Content: content, External: true}, true
 	}
 	return ResolvedHeader{}, false
 }

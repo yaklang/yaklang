@@ -5,6 +5,12 @@ type macroCollector struct {
 	tables    MacroTables
 	depth     int
 	seenFiles map[string]bool
+	// skipVariantIncludes stops the walk at other-platform headers. The shared
+	// project macro table is built with it so a Windows/COM header that a
+	// project header includes cannot redefine identifiers for every unit. A
+	// translation unit's own include chain still follows them, because that is
+	// where C makes them visible.
+	skipVariantIncludes bool
 }
 
 // buildMacroTables collects macros from all project headers and the entry translation unit.
@@ -26,10 +32,21 @@ func (p *CPreprocessProject) collectMacroEnvironment(entryPath, src string) Macr
 }
 
 func (p *CPreprocessProject) collectMacrosFromSource(filePath, src string) MacroTables {
+	return p.collectMacrosFromSourceOpts(filePath, src, false)
+}
+
+// collectProjectMacrosFromSource is the shared-table pass: project headers only,
+// and no other-platform includes.
+func (p *CPreprocessProject) collectProjectMacrosFromSource(filePath, src string) MacroTables {
+	return p.collectMacrosFromSourceOpts(filePath, src, true)
+}
+
+func (p *CPreprocessProject) collectMacrosFromSourceOpts(filePath, src string, skipVariantIncludes bool) MacroTables {
 	mc := &macroCollector{
-		project:   p,
-		tables:    NewMacroTables(),
-		seenFiles: make(map[string]bool),
+		project:             p,
+		tables:              NewMacroTables(),
+		seenFiles:           make(map[string]bool),
+		skipVariantIncludes: skipVariantIncludes,
 	}
 	mc.scanSource(filePath, src, p.config.Defines)
 	return mc.tables
@@ -85,6 +102,9 @@ func (mc *macroCollector) ingestHeader(fromPath, incPath string, system bool, de
 	}
 	h, ok := mc.project.resolver.ResolveHeader(incPath, system, fromPath)
 	if !ok {
+		return
+	}
+	if mc.skipVariantIncludes && isPlatformVariantHeader(h.Path) {
 		return
 	}
 	mc.scanSource(h.Path, string(h.Content), defs)
