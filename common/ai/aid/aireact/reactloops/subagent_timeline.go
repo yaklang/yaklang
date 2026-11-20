@@ -290,7 +290,7 @@ func snapshotSubAgentConfig(parent *aicommon.Config, contextMode ...string) []ai
 	state := parent.ForkSessionPromptState(!taskOnly)
 	opts := append(aicommon.ConvertConfigToOptions(parent),
 		aicommon.WithInheritedAiToolManager(parent.AiToolManager),
-		aicommon.WithAICallbacks(parent.GetRawAICallbacks()),
+		aicommon.WithInheritTieredAICallback(parent, true),
 		aicommon.WithSessionPromptState(state),
 	)
 	if taskOnly {

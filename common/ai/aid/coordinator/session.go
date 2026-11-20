@@ -151,7 +151,7 @@ func fromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 	// Reapplying it here would duplicate append-only options and could carry
 	// the parent's preset plan into an unrelated Blueprint invocation.
 	opts = append(opts, aicommon.WithForceManualPlanReview(parent.ForceManualPlanReview))
-	opts = append(opts, aicommon.WithAICallbacks(parent.GetRawAICallbacks()), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+	opts = append(opts, aicommon.WithInheritTieredAICallback(parent, true), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 		e.CoordinatorId = id
 		if e.Type == schema.EVENT_TYPE_DETACHED_PLAN_REQUIRE {
 			e.CoordinatorId = parent.Id
@@ -525,7 +525,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	}
 	aicommon.WithStatefulTaskBaseContext(ctx)(task)
 	task.SetName(a.Task.Name)
-	opts = append(opts, aicommon.WithAllowRequireForUserInteract(false), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithContext(ctx), aicommon.WithID(s.Id), aicommon.WithAICallbacks(s.GetRawAICallbacks()), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithEmitter(s.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+	opts = append(opts, aicommon.WithAllowRequireForUserInteract(false), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithContext(ctx), aicommon.WithID(s.Id), aicommon.WithInheritTieredAICallback(s.Config, true), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithEmitter(s.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
 		e.TaskUUID = task.GetUUID()
 		e.TaskId = task.GetId()
 		return e
