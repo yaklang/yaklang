@@ -323,6 +323,10 @@ type SwitchStmt[T versionedValue] struct {
 	// shadowing it through CoverBy. Languages whose case bodies assign to
 	// variables declared in an outer scope (C++) need it; the default keeps the
 	// historical behaviour for C, Java and PHP.
+	//
+	// AutoBreak and DirectBodyMerge are independent. AutoBreak decides whether a
+	// case body jumps to the switch end or falls through; DirectBodyMerge decides
+	// whether the join reads the body scope itself or a CoverBy shadow of it.
 	DirectBodyMerge bool
 }
 
