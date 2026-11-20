@@ -2029,15 +2029,15 @@
   },
   {
     "rule_id": "source-config-hooks-dns-exfiltration-generic",
-    "rule_name": "检测到 Hooks 配置存在 DNS 外传",
-    "hash": "84f475f2919d629807f66e43f328da32642e5c313f6bfc1403e7f09c229018fb",
-    "version": "20261109.0001"
+    "rule_name": "Hooks 脚本通过 DNS 查询外传数据",
+    "hash": "09cda7e27edebf2c5c7a5bd69454b847080baf72a6694c4793e00336938da30c",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-config-hooks-sensitive-file-access-bash",
-    "rule_name": "检测到 Hooks 配置访问敏感文件",
-    "hash": "351b8d9f9847430bed7703004cd16af7d5e9a1ad52aa5b4bba8e5a5046f8e115",
-    "version": "20261112.0001"
+    "rule_name": "Hooks 脚本把 jq 输出交给文件操作",
+    "hash": "d8dbaf4fa94116dde7cf5ec52f34c4a428015199b3485b667b0a3420b48c9ade",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-config-hooks-stop-missing-active-check-generic",
@@ -2053,9 +2053,9 @@
   },
   {
     "rule_id": "source-config-hooks-wget-pipe-bash-generic",
-    "rule_name": "检测到 Hooks 配置使用 wget 管道执行",
-    "hash": "86e2f135a95a5049a5876f95bef6213fbcd2119379695246f3b40cd7acb76ea9",
-    "version": "20261112.0001"
+    "rule_name": "Hooks 脚本把下载内容管道给 Shell",
+    "hash": "ef02a39a17523c0145d7e93033553fd021374fb9c4222cca9f7a736a58c719a2",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-config-ide-settings-executable-path-generic",
@@ -2293,15 +2293,15 @@
   },
   {
     "rule_id": "source-unquoted-command-substitution-in-command",
-    "rule_name": "检测到命令中未加引号的命令替换",
-    "hash": "a10f0e6945c254ec9f5b1882e2c083c0585ac79fd6457d0dbd9acd3784374341",
-    "version": "20261120.0001"
+    "rule_name": "命令参数中的命令替换未加引号",
+    "hash": "39d3f08250807ecae076f953910bcca057478a01d994e2bbaad167e78fcc8b24",
+    "version": "20261120.0002"
   },
   {
     "rule_id": "source-unquoted-variable-expansion-in-command",
-    "rule_name": "检测到命令中未加引号的变量展开",
-    "hash": "42f86342cd685f587e2ca179ace974074594924e79e2bf8150bf2b123379def2",
-    "version": "20261120.0001"
+    "rule_name": "命令参数中的变量展开未加引号",
+    "hash": "6e7db3c6830cab2949de3662843599f3a8275ed1b7d86ad9ad90ff0df28343d7",
+    "version": "20261120.0002"
   },
   {
     "rule_id": "source-detected-artifactory-password",
@@ -3091,9 +3091,9 @@
   },
   {
     "rule_id": "source-config-hooks-relative-script-path",
-    "rule_name": "检测到 Hook 使用相对脚本路径",
-    "hash": "1fa38f769647b71c78e2e62916b4737f915d6bc9b2dd66aca56536c43946f0df",
-    "version": "20261109.0001"
+    "rule_name": "Hook 使用相对脚本路径",
+    "hash": "c37768d9835c260256a5848e29e49dd85a0d1eb5a73e9e089cd9b65ce4911dd8",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-config-visualforce-page-api-version",
