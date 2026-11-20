@@ -168,6 +168,7 @@ type ToolCaller struct {
 	// be scheduled independently without duplicating the tool-call pipeline.
 	reviewGate   ToolCallerGate
 	beforeInvoke ToolCallerBeforeInvoke
+	ruleGate     ToolCallRuleGate
 
 	// Runtime-owned deterministic metadata. These values are allocated before a
 	// batch starts, so goroutine completion order cannot change checkpoint,
@@ -1026,6 +1027,25 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		return nil, false, err
 	}
 
+	ruleDecision := t.applyToolCallRuleGate(tool, invokeParams)
+	if ruleDecision != nil {
+		switch ruleDecision.Action {
+		case schema.SFR_ACTION_DENY:
+			blocked := fmt.Sprintf(
+				"tool[%v] blocked by security rule %s (severity=%s): %s",
+				tool.Name, ruleDecision.RuleName, ruleDecision.Severity, ruleDecision.Summary(),
+			)
+			t.emitter.EmitWarning(blocked)
+			handleError(blocked)
+			return nil, false, utils.Error(blocked)
+		case schema.SFR_ACTION_WARN:
+			t.emitter.EmitWarning(
+				"tool[%v] matched security rule %s (severity=%s), continuing with warning: %s",
+				tool.Name, ruleDecision.RuleName, ruleDecision.Severity, ruleDecision.Summary(),
+			)
+		}
+	}
+
 	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
 	epm := t.config.GetEndpointManager()
 	config := t.config
@@ -1066,6 +1086,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			reqs["batch_id"] = t.batchID
 			reqs["call_index"] = t.batchIndex
 			reqs["call_tool_id"] = t.callToolId
+		}
+		if ruleDecision != nil {
+			reqs["security_rule"] = ruleDecision
 		}
 		ep.SetReviewMaterials(reqs)
 		reviewCheckpoint := ep.GetCheckpoint()
@@ -1123,6 +1146,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 				return nil, false, err
 			}
 			t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+
+			// Middle-severity findings must reach a human even under yolo/auto
+			// policies; the endpoint flag overrides the configured policy.
+			if ruleDecision != nil && ruleDecision.Action == schema.SFR_ACTION_ASK {
+				ep.SetForceHumanReview(ruleDecision.Summary())
+			}
 
 			// wait for agree
 			config.DoWaitAgree(t.ctx, ep)
