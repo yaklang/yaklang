@@ -37,7 +37,10 @@ func NewGuardianEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent
 }
 
 func (e *guardianEmitter) EmitStatus(key string, value any) (*schema.AiOutputEvent, error) {
-	return e.emitter.EmitStatus(key, value)
+	return e.emitter.EmitStructured("status", map[string]any{
+		"key":   key,
+		"value": value,
+	})
 }
 
 func (e *guardianEmitter) EmitStructured(nodeId string, result any) (*schema.AiOutputEvent, error) {
