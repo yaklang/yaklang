@@ -1754,8 +1754,8 @@
   {
     "rule_id": "0528aab2-8f17-40d9-a58a-fb83a632d377",
     "rule_name": "数据流：检测PHP命令注入漏洞",
-    "hash": "2c1eef86b0e5a90836b7b8d3efc1760a09a24520a29cff988ab450073af63de5",
-    "version": "20261109.0001"
+    "hash": "e0b65966cbbbfe730ddff04e84aea4cf3d1c1e5dd8d36f71b802a08d6cdf853a",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "43d98bb1-1f90-4582-9a43-8570852c2d5b",
