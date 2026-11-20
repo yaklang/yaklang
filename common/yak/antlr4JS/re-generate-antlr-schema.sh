@@ -4,10 +4,10 @@
 
 rm ./parser/*.tokens
 rm ./parser/*.interp
-../antlr4util/antlr4 -Dlanguage=Go ./JavaScriptLexer.g4 ./JavaScriptParser.g4 -o parser -package JS -no-listener -visitor
+../antlr4util/antlr4 -Dlanguage=Go ./JavaScriptLexer.g4 ./JavaScriptParser.g4 -o parser -package JS -no-listener -no-visitor
 
 
 
 # re-gen build and test
-# antlr -Dlanguage=Go ./JavaScriptLexer.g4 ./JavaScriptParser.g4 -o parser -package JS -no-listener -visitor && go test -count 1 -memprofile /tmp/a.out && go tool pprof -pdf ./antlr4JS.test binary /tmp/a.out > /tmp/a.pdf && open /tmp/a.pdf
-# rm parser/JavaScriptLexer.tokens parser/JavaScriptParser.tokens && rm parser/JavaScriptLexer.interp parser/JavaScriptParser.interp && antlr -Dlanguage=Go ./JavaScriptLexer.g4 ./JavaScriptParser.g4 -o parser -package JS -no-listener -visitor && go test -run TestBasicSyntax
+# antlr -Dlanguage=Go ./JavaScriptLexer.g4 ./JavaScriptParser.g4 -o parser -package JS -no-listener -no-visitor && go test -count 1 -memprofile /tmp/a.out && go tool pprof -pdf ./antlr4JS.test binary /tmp/a.out > /tmp/a.pdf && open /tmp/a.pdf
+# rm parser/JavaScriptLexer.tokens parser/JavaScriptParser.tokens && rm parser/JavaScriptLexer.interp parser/JavaScriptParser.interp && antlr -Dlanguage=Go ./JavaScriptLexer.g4 ./JavaScriptParser.g4 -o parser -package JS -no-listener -no-visitor && go test -run TestBasicSyntax

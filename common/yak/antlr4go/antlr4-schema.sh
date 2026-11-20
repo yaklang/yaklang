@@ -3,4 +3,4 @@
 #rm ./parser/*.tokens
 #rm ./parser/*.interp
 
-../antlr4util/antlr4 -Dlanguage=Go ./GoLexer.g4 ./GoParser.g4 -o parser -package gol -no-listener -visitor
+../antlr4util/antlr4 -Dlanguage=Go ./GoLexer.g4 ./GoParser.g4 -o parser -package gol -no-listener -no-visitor

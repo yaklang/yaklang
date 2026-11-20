@@ -913,16 +913,6 @@ func (s *RootContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *RootContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitRoot(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Root() (localctx IRootContext) {
 	this := p
 	_ = this
@@ -1101,16 +1091,6 @@ func (s *Single_inputContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Single_inputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitSingle_input(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Single_input() (localctx ISingle_inputContext) {
 	this := p
 	_ = this
@@ -1280,16 +1260,6 @@ func (s *File_inputContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *File_inputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitFile_input(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) File_input() (localctx IFile_inputContext) {
 	this := p
 	_ = this
@@ -1441,16 +1411,6 @@ func (s *Eval_inputContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Eval_inputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitEval_input(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Eval_input() (localctx IEval_inputContext) {
 	this := p
 	_ = this
@@ -1587,16 +1547,6 @@ func (s *StmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Stmt() (localctx IStmtContext) {
@@ -1771,16 +1721,6 @@ func (s *While_stmtContext) Else_clause() IElse_clauseContext {
 	return t.(IElse_clauseContext)
 }
 
-func (s *While_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitWhile_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Try_stmtContext struct {
 	Compound_stmtContext
 }
@@ -1894,16 +1834,6 @@ func (s *Try_stmtContext) Else_clause() IElse_clauseContext {
 	}
 
 	return t.(IElse_clauseContext)
-}
-
-func (s *Try_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTry_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type If_stmtContext struct {
@@ -2026,16 +1956,6 @@ func (s *If_stmtContext) Else_clause() IElse_clauseContext {
 	return t.(IElse_clauseContext)
 }
 
-func (s *If_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitIf_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type With_stmtContext struct {
 	Compound_stmtContext
 }
@@ -2139,16 +2059,6 @@ func (s *With_stmtContext) COMMA(i int) antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, i)
 }
 
-func (s *With_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitWith_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Class_or_func_def_stmtContext struct {
 	Compound_stmtContext
 }
@@ -2238,16 +2148,6 @@ func (s *Class_or_func_def_stmtContext) Decorator(i int) IDecoratorContext {
 	}
 
 	return t.(IDecoratorContext)
-}
-
-func (s *Class_or_func_def_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitClass_or_func_def_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type For_stmtContext struct {
@@ -2348,16 +2248,6 @@ func (s *For_stmtContext) Else_clause() IElse_clauseContext {
 	return t.(IElse_clauseContext)
 }
 
-func (s *For_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitFor_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Match_stmtContext struct {
 	Compound_stmtContext
 }
@@ -2451,16 +2341,6 @@ func (s *Match_stmtContext) Case_clause(i int) ICase_clauseContext {
 	}
 
 	return t.(ICase_clauseContext)
-}
-
-func (s *Match_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitMatch_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Compound_stmt() (localctx ICompound_stmtContext) {
@@ -3186,16 +3066,6 @@ func (s *SuiteContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SuiteContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitSuite(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Suite() (localctx ISuiteContext) {
 	this := p
 	_ = this
@@ -3395,16 +3265,6 @@ func (s *DecoratorContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DecoratorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDecorator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Decorator() (localctx IDecoratorContext) {
 	this := p
 	_ = this
@@ -3585,16 +3445,6 @@ func (s *Elif_clauseContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Elif_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitElif_clause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Elif_clause() (localctx IElif_clauseContext) {
 	this := p
 	_ = this
@@ -3720,16 +3570,6 @@ func (s *Else_clauseContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Else_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitElse_clause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Else_clause() (localctx IElse_clauseContext) {
 	this := p
 	_ = this
@@ -3849,16 +3689,6 @@ func (s *Finally_clauseContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Finally_clauseContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Finally_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitFinally_clause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Finally_clause() (localctx IFinally_clauseContext) {
@@ -3992,16 +3822,6 @@ func (s *With_itemContext) GetRuleContext() antlr.RuleContext {
 
 func (s *With_itemContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *With_itemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitWith_item(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) With_item() (localctx IWith_itemContext) {
@@ -4218,16 +4038,6 @@ func (s *Case_clauseContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Case_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitCase_clause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Case_clause() (localctx ICase_clauseContext) {
 	this := p
 	_ = this
@@ -4421,16 +4231,6 @@ func (s *Case_patternContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Case_patternContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitCase_pattern(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Case_pattern() (localctx ICase_patternContext) {
 	this := p
 	_ = this
@@ -4598,16 +4398,6 @@ func (s *Except_clauseContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Except_clauseContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Except_clauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitExcept_clause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Except_clause() (localctx IExcept_clauseContext) {
@@ -4856,16 +4646,6 @@ func (s *ClassdefContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ClassdefContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ClassdefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitClassdef(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Classdef() (localctx IClassdefContext) {
@@ -5137,16 +4917,6 @@ func (s *FuncdefContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FuncdefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitFuncdef(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Funcdef() (localctx IFuncdefContext) {
 	this := p
 	_ = this
@@ -5394,16 +5164,6 @@ func (s *Type_paramsContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Type_paramsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitType_params(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Type_params() (localctx IType_paramsContext) {
 	this := p
 	_ = this
@@ -5613,16 +5373,6 @@ func (s *TypedargslistContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TypedargslistContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TypedargslistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTypedargslist(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Typedargslist() (localctx ITypedargslistContext) {
@@ -5861,16 +5611,6 @@ func (s *ArgsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ArgsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitArgs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Args() (localctx IArgsContext) {
 	this := p
 	_ = this
@@ -5977,16 +5717,6 @@ func (s *KwargsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *KwargsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *KwargsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitKwargs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Kwargs() (localctx IKwargsContext) {
@@ -6126,16 +5856,6 @@ func (s *Def_parametersContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Def_parametersContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Def_parametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDef_parameters(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Def_parameters() (localctx IDef_parametersContext) {
@@ -6300,16 +6020,6 @@ func (s *Def_parameterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Def_parameterContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Def_parameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDef_parameter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Def_parameter() (localctx IDef_parameterContext) {
@@ -6488,16 +6198,6 @@ func (s *Named_parameterContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Named_parameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitNamed_parameter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Named_parameter() (localctx INamed_parameterContext) {
 	this := p
 	_ = this
@@ -6661,16 +6361,6 @@ func (s *Simple_stmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Simple_stmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Simple_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitSimple_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Simple_stmt() (localctx ISimple_stmtContext) {
@@ -6887,16 +6577,6 @@ func (s *Assert_stmtContext) COMMA() antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, 0)
 }
 
-func (s *Assert_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitAssert_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Nonlocal_stmtContext struct {
 	Small_stmtContext
 }
@@ -6968,16 +6648,6 @@ func (s *Nonlocal_stmtContext) COMMA(i int) antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, i)
 }
 
-func (s *Nonlocal_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitNonlocal_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Pass_stmtContext struct {
 	Small_stmtContext
 }
@@ -6998,16 +6668,6 @@ func (s *Pass_stmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Pass_stmtContext) PASS() antlr.TerminalNode {
 	return s.GetToken(PythonParserPASS, 0)
-}
-
-func (s *Pass_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitPass_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type Import_stmtContext struct {
@@ -7046,16 +6706,6 @@ func (s *Import_stmtContext) Dotted_as_names() IDotted_as_namesContext {
 	}
 
 	return t.(IDotted_as_namesContext)
-}
-
-func (s *Import_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitImport_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type Expr_stmtContext struct {
@@ -7106,16 +6756,6 @@ func (s *Expr_stmtContext) Assign_part() IAssign_partContext {
 	}
 
 	return t.(IAssign_partContext)
-}
-
-func (s *Expr_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitExpr_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type Raise_stmtContext struct {
@@ -7193,16 +6833,6 @@ func (s *Raise_stmtContext) COMMA(i int) antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, i)
 }
 
-func (s *Raise_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitRaise_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Yield_stmtContext struct {
 	Small_stmtContext
 }
@@ -7235,16 +6865,6 @@ func (s *Yield_stmtContext) Yield_expr() IYield_exprContext {
 	}
 
 	return t.(IYield_exprContext)
-}
-
-func (s *Yield_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitYield_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type From_stmtContext struct {
@@ -7333,16 +6953,6 @@ func (s *From_stmtContext) ELLIPSIS(i int) antlr.TerminalNode {
 	return s.GetToken(PythonParserELLIPSIS, i)
 }
 
-func (s *From_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitFrom_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Global_stmtContext struct {
 	Small_stmtContext
 }
@@ -7414,16 +7024,6 @@ func (s *Global_stmtContext) COMMA(i int) antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, i)
 }
 
-func (s *Global_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitGlobal_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Continue_stmtContext struct {
 	Small_stmtContext
 }
@@ -7444,16 +7044,6 @@ func (s *Continue_stmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Continue_stmtContext) CONTINUE() antlr.TerminalNode {
 	return s.GetToken(PythonParserCONTINUE, 0)
-}
-
-func (s *Continue_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitContinue_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type Exec_stmtContext struct {
@@ -7543,16 +7133,6 @@ func (s *Exec_stmtContext) COMMA() antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, 0)
 }
 
-func (s *Exec_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitExec_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Type_stmtContext struct {
 	Small_stmtContext
 }
@@ -7611,16 +7191,6 @@ func (s *Type_stmtContext) Test() ITestContext {
 	return t.(ITestContext)
 }
 
-func (s *Type_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitType_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Break_stmtContext struct {
 	Small_stmtContext
 }
@@ -7641,16 +7211,6 @@ func (s *Break_stmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Break_stmtContext) BREAK() antlr.TerminalNode {
 	return s.GetToken(PythonParserBREAK, 0)
-}
-
-func (s *Break_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitBreak_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type Del_stmtContext struct {
@@ -7689,16 +7249,6 @@ func (s *Del_stmtContext) Exprlist() IExprlistContext {
 	}
 
 	return t.(IExprlistContext)
-}
-
-func (s *Del_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDel_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type Print_stmtContext struct {
@@ -7776,16 +7326,6 @@ func (s *Print_stmtContext) COMMA(i int) antlr.TerminalNode {
 	return s.GetToken(PythonParserCOMMA, i)
 }
 
-func (s *Print_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitPrint_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type Return_stmtContext struct {
 	Small_stmtContext
 }
@@ -7822,16 +7362,6 @@ func (s *Return_stmtContext) Testlist() ITestlistContext {
 	}
 
 	return t.(ITestlistContext)
-}
-
-func (s *Return_stmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitReturn_stmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Small_stmt() (localctx ISmall_stmtContext) {
@@ -8779,16 +8309,6 @@ func (s *Testlist_star_exprContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Testlist_star_exprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTestlist_star_expr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Testlist_star_expr() (localctx ITestlist_star_exprContext) {
 	this := p
 	_ = this
@@ -8977,16 +8497,6 @@ func (s *Star_exprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Star_exprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Star_exprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitStar_expr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Star_expr() (localctx IStar_exprContext) {
@@ -9258,16 +8768,6 @@ func (s *Assign_partContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Assign_partContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Assign_partContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitAssign_part(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Assign_part() (localctx IAssign_partContext) {
@@ -9632,16 +9132,6 @@ func (s *ExprlistContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ExprlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitExprlist(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Exprlist() (localctx IExprlistContext) {
 	this := p
 	_ = this
@@ -9868,16 +9358,6 @@ func (s *Import_as_namesContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Import_as_namesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitImport_as_names(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Import_as_names() (localctx IImport_as_namesContext) {
 	this := p
 	_ = this
@@ -10061,16 +9541,6 @@ func (s *Import_as_nameContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Import_as_nameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitImport_as_name(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Import_as_name() (localctx IImport_as_nameContext) {
 	this := p
 	_ = this
@@ -10226,16 +9696,6 @@ func (s *Dotted_as_namesContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Dotted_as_namesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDotted_as_names(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Dotted_as_names() (localctx IDotted_as_namesContext) {
 	this := p
 	_ = this
@@ -10381,16 +9841,6 @@ func (s *Dotted_as_nameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Dotted_as_nameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Dotted_as_nameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDotted_as_name(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Dotted_as_name() (localctx IDotted_as_nameContext) {
@@ -10621,16 +10071,6 @@ func (s *TestContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TestContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TestContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTest(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Test() (localctx ITestContext) {
@@ -10902,16 +10342,6 @@ func (s *VarargslistContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VarargslistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitVarargslist(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Varargslist() (localctx IVarargslistContext) {
 	this := p
 	_ = this
@@ -11179,16 +10609,6 @@ func (s *Vardef_parametersContext) ToStringTree(ruleNames []string, recog antlr.
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Vardef_parametersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitVardef_parameters(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Vardef_parameters() (localctx IVardef_parametersContext) {
 	this := p
 	_ = this
@@ -11353,16 +10773,6 @@ func (s *Vardef_parameterContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Vardef_parameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitVardef_parameter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Vardef_parameter() (localctx IVardef_parameterContext) {
 	this := p
 	_ = this
@@ -11522,16 +10932,6 @@ func (s *VarargsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VarargsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitVarargs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Varargs() (localctx IVarargsContext) {
 	this := p
 	_ = this
@@ -11638,16 +11038,6 @@ func (s *VarkwargsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *VarkwargsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *VarkwargsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitVarkwargs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Varkwargs() (localctx IVarkwargsContext) {
@@ -11820,16 +11210,6 @@ func (s *Logical_testContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Logical_testContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Logical_testContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitLogical_test(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Logical_test() (localctx ILogical_testContext) {
@@ -12156,16 +11536,6 @@ func (s *ComparisonContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ComparisonContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ComparisonContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitComparison(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Comparison() (localctx IComparisonContext) {
@@ -12631,16 +12001,6 @@ func (s *ExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Expr() (localctx IExprContext) {
@@ -13232,16 +12592,6 @@ func (s *AtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitAtom(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Atom() (localctx IAtomContext) {
 	this := p
 	_ = this
@@ -13736,16 +13086,6 @@ func (s *DictorsetmakerContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DictorsetmakerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDictorsetmaker(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Dictorsetmaker() (localctx IDictorsetmakerContext) {
 	this := p
 	_ = this
@@ -14114,16 +13454,6 @@ func (s *Testlist_compContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Testlist_compContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTestlist_comp(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Testlist_comp() (localctx ITestlist_compContext) {
 	this := p
 	_ = this
@@ -14369,16 +13699,6 @@ func (s *TestlistContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TestlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTestlist(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Testlist() (localctx ITestlistContext) {
 	this := p
 	_ = this
@@ -14549,16 +13869,6 @@ func (s *Dotted_nameContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Dotted_nameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitDotted_name(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Dotted_name() (localctx IDotted_nameContext) {
 	return p.dotted_name(0)
 }
@@ -14723,16 +14033,6 @@ func (s *NameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Name() (localctx INameContext) {
 	this := p
 	_ = this
@@ -14845,16 +14145,6 @@ func (s *NumberContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NumberContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NumberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitNumber(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Number() (localctx INumberContext) {
@@ -14990,16 +14280,6 @@ func (s *IntegerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IntegerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitInteger(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Integer() (localctx IIntegerContext) {
 	this := p
 	_ = this
@@ -15107,16 +14387,6 @@ func (s *Yield_exprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Yield_exprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Yield_exprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitYield_expr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Yield_expr() (localctx IYield_exprContext) {
@@ -15254,16 +14524,6 @@ func (s *Yield_argContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Yield_argContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Yield_argContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitYield_arg(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Yield_arg() (localctx IYield_argContext) {
@@ -15409,16 +14669,6 @@ func (s *TrailerContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TrailerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TrailerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitTrailer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Trailer() (localctx ITrailerContext) {
@@ -15591,16 +14841,6 @@ func (s *ArgumentsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArgumentsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitArguments(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Arguments() (localctx IArgumentsContext) {
@@ -15796,16 +15036,6 @@ func (s *ArglistContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArglistContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArglistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitArglist(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Arglist() (localctx IArglistContext) {
@@ -16018,16 +15248,6 @@ func (s *ArgumentContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitArgument(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Argument() (localctx IArgumentContext) {
 	this := p
 	_ = this
@@ -16220,16 +15440,6 @@ func (s *SubscriptlistContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SubscriptlistContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SubscriptlistContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitSubscriptlist(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Subscriptlist() (localctx ISubscriptlistContext) {
@@ -16435,16 +15645,6 @@ func (s *SubscriptContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SubscriptContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SubscriptContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitSubscript(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Subscript() (localctx ISubscriptContext) {
@@ -16657,16 +15857,6 @@ func (s *SliceopContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SliceopContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitSliceop(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PythonParser) Sliceop() (localctx ISliceopContext) {
 	this := p
 	_ = this
@@ -16824,16 +16014,6 @@ func (s *Comp_forContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Comp_forContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Comp_forContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitComp_for(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Comp_for() (localctx IComp_forContext) {
@@ -17004,16 +16184,6 @@ func (s *Comp_iterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Comp_iterContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Comp_iterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PythonParserVisitor:
-		return t.VisitComp_iter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PythonParser) Comp_iter() (localctx IComp_iterContext) {

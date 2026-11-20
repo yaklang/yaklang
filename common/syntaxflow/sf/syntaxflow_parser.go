@@ -759,16 +759,6 @@ func (s *FlowContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FlowContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFlow(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) Flow() (localctx IFlowContext) {
 	this := p
 	_ = this
@@ -896,16 +886,6 @@ func (s *StatementsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StatementsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StatementsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitStatements(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Statements() (localctx IStatementsContext) {
@@ -1045,16 +1025,6 @@ func (s *EmptyContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *EmptyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitEmpty(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DescriptionContext struct {
 	StatementContext
 }
@@ -1103,16 +1073,6 @@ func (s *DescriptionContext) Eos() IEosContext {
 	}
 
 	return t.(IEosContext)
-}
-
-func (s *DescriptionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDescription(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FilterContext struct {
@@ -1165,16 +1125,6 @@ func (s *FilterContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *FilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type FileFilterContentContext struct {
 	StatementContext
 }
@@ -1223,16 +1173,6 @@ func (s *FileFilterContentContext) Eos() IEosContext {
 	}
 
 	return t.(IEosContext)
-}
-
-func (s *FileFilterContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type CommandContext struct {
@@ -1285,16 +1225,6 @@ func (s *CommandContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *CommandContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitCommand(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type CheckContext struct {
 	StatementContext
 }
@@ -1345,16 +1275,6 @@ func (s *CheckContext) Eos() IEosContext {
 	return t.(IEosContext)
 }
 
-func (s *CheckContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitCheck(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type AlertContext struct {
 	StatementContext
 }
@@ -1403,16 +1323,6 @@ func (s *AlertContext) Eos() IEosContext {
 	}
 
 	return t.(IEosContext)
-}
-
-func (s *AlertContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitAlert(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Statement() (localctx IStatementContext) {
@@ -1714,16 +1624,6 @@ func (s *FileFilterContentStatementContext) ToStringTree(ruleNames []string, rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FileFilterContentStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) FileFilterContentStatement() (localctx IFileFilterContentStatementContext) {
 	this := p
 	_ = this
@@ -1902,16 +1802,6 @@ func (s *FileFilterContentInputContext) ToStringTree(ruleNames []string, recog a
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FileFilterContentInputContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentInput(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) FileFilterContentInput() (localctx IFileFilterContentInputContext) {
 	this := p
 	_ = this
@@ -2038,16 +1928,6 @@ func (s *FileFilterContentMethodContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FileFilterContentMethodContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FileFilterContentMethodContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentMethod(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethod() (localctx IFileFilterContentMethodContext) {
@@ -2258,16 +2138,6 @@ func (s *FileFilterContentMethodParamContext) GetRuleContext() antlr.RuleContext
 
 func (s *FileFilterContentMethodParamContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FileFilterContentMethodParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentMethodParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParam() (localctx IFileFilterContentMethodParamContext) {
@@ -2491,16 +2361,6 @@ func (s *FileFilterContentMethodParamItemContext) ToStringTree(ruleNames []strin
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FileFilterContentMethodParamItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentMethodParamItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) FileFilterContentMethodParamItem() (localctx IFileFilterContentMethodParamItemContext) {
 	this := p
 	_ = this
@@ -2599,16 +2459,6 @@ func (s *FileFilterContentMethodParamKeyContext) GetRuleContext() antlr.RuleCont
 
 func (s *FileFilterContentMethodParamKeyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FileFilterContentMethodParamKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentMethodParamKey(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParamKey() (localctx IFileFilterContentMethodParamKeyContext) {
@@ -2733,16 +2583,6 @@ func (s *FileFilterContentMethodParamValueContext) GetRuleContext() antlr.RuleCo
 
 func (s *FileFilterContentMethodParamValueContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FileFilterContentMethodParamValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileFilterContentMethodParamValue(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FileFilterContentMethodParamValue() (localctx IFileFilterContentMethodParamValueContext) {
@@ -2884,16 +2724,6 @@ func (s *FileNameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FileNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FileNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFileName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FileName() (localctx IFileNameContext) {
@@ -3061,16 +2891,6 @@ func (s *PureFilterExprContext) RefVariable() IRefVariableContext {
 	return t.(IRefVariableContext)
 }
 
-func (s *PureFilterExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitPureFilterExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type RefFilterExprContext struct {
 	FilterStatementContext
 }
@@ -3173,16 +2993,6 @@ func (s *RefFilterExprContext) FilterItem(i int) IFilterItemContext {
 
 func (s *RefFilterExprContext) As() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserAs, 0)
-}
-
-func (s *RefFilterExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitRefFilterExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FilterStatement() (localctx IFilterStatementContext) {
@@ -3365,16 +3175,6 @@ func (s *CommentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CommentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitComment(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) Comment() (localctx ICommentContext) {
 	this := p
 	_ = this
@@ -3477,16 +3277,6 @@ func (s *EosContext) GetRuleContext() antlr.RuleContext {
 
 func (s *EosContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitEos(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Eos() (localctx IEosContext) {
@@ -3594,16 +3384,6 @@ func (s *LineContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LineContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LineContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitLine(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Line() (localctx ILineContext) {
@@ -3729,16 +3509,6 @@ func (s *LinesContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LinesContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LinesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitLines(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Lines() (localctx ILinesContext) {
@@ -3900,16 +3670,6 @@ func (s *DescriptionStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DescriptionStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DescriptionStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDescriptionStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) DescriptionStatement() (localctx IDescriptionStatementContext) {
@@ -4198,16 +3958,6 @@ func (s *DescriptionItemsContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DescriptionItemsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDescriptionItems(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) DescriptionItems() (localctx IDescriptionItemsContext) {
 	this := p
 	_ = this
@@ -4405,16 +4155,6 @@ func (s *DescriptionItemContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DescriptionItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDescriptionItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) DescriptionItem() (localctx IDescriptionItemContext) {
 	this := p
 	_ = this
@@ -4551,16 +4291,6 @@ func (s *DescriptionSepContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DescriptionSepContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DescriptionSepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDescriptionSep(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) DescriptionSep() (localctx IDescriptionSepContext) {
@@ -4732,16 +4462,6 @@ func (s *DescriptionItemValueContext) ToStringTree(ruleNames []string, recog ant
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DescriptionItemValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDescriptionItemValue(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) DescriptionItemValue() (localctx IDescriptionItemValueContext) {
 	this := p
 	_ = this
@@ -4872,16 +4592,6 @@ func (s *CrlfHereDocContext) GetRuleContext() antlr.RuleContext {
 
 func (s *CrlfHereDocContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *CrlfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitCrlfHereDoc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) CrlfHereDoc() (localctx ICrlfHereDocContext) {
@@ -5017,16 +4727,6 @@ func (s *LfHereDocContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitLfHereDoc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) LfHereDoc() (localctx ILfHereDocContext) {
 	this := p
 	_ = this
@@ -5143,16 +4843,6 @@ func (s *CrlfTextContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CrlfTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitCrlfText(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) CrlfText() (localctx ICrlfTextContext) {
 	this := p
 	_ = this
@@ -5261,16 +4951,6 @@ func (s *LfTextContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LfTextContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LfTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitLfText(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) LfText() (localctx ILfTextContext) {
@@ -5415,16 +5095,6 @@ func (s *HereDocContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HereDocContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitHereDoc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) HereDoc() (localctx IHereDocContext) {
@@ -5609,16 +5279,6 @@ func (s *AlertStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AlertStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AlertStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitAlertStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) AlertStatement() (localctx IAlertStatementContext) {
@@ -5822,16 +5482,6 @@ func (s *CheckStatementContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CheckStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitCheckStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) CheckStatement() (localctx ICheckStatementContext) {
 	this := p
 	_ = this
@@ -5964,16 +5614,6 @@ func (s *ThenExprContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ThenExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitThenExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) ThenExpr() (localctx IThenExprContext) {
 	this := p
 	_ = this
@@ -6080,16 +5720,6 @@ func (s *ElseExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ElseExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ElseExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitElseExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) ElseExpr() (localctx IElseExprContext) {
@@ -6208,16 +5838,6 @@ func (s *RefVariableContext) GetRuleContext() antlr.RuleContext {
 
 func (s *RefVariableContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *RefVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitRefVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) RefVariable() (localctx IRefVariableContext) {
@@ -6396,16 +6016,6 @@ func (s *FieldCallFilterContext) Lines() ILinesContext {
 	return t.(ILinesContext)
 }
 
-func (s *FieldCallFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFieldCallFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NamedFilterContext struct {
 	FilterItemFirstContext
 }
@@ -6438,16 +6048,6 @@ func (s *NamedFilterContext) NameFilter() INameFilterContext {
 	}
 
 	return t.(INameFilterContext)
-}
-
-func (s *NamedFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNamedFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ConstFilterContext struct {
@@ -6504,16 +6104,6 @@ func (s *ConstFilterContext) ConstSearchPrefix() IConstSearchPrefixContext {
 	return t.(IConstSearchPrefixContext)
 }
 
-func (s *ConstFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitConstFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NativeCallFilterContext struct {
 	FilterItemFirstContext
 }
@@ -6546,16 +6136,6 @@ func (s *NativeCallFilterContext) NativeCall() INativeCallContext {
 	}
 
 	return t.(INativeCallContext)
-}
-
-func (s *NativeCallFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNativeCallFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FilterItemFirst() (localctx IFilterItemFirstContext) {
@@ -6749,16 +6329,6 @@ func (s *ConstSearchPrefixContext) ToStringTree(ruleNames []string, recog antlr.
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ConstSearchPrefixContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitConstSearchPrefix(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) ConstSearchPrefix() (localctx IConstSearchPrefixContext) {
 	this := p
 	_ = this
@@ -6909,16 +6479,6 @@ func (s *FunctionCallFilterContext) ActualParam() IActualParamContext {
 	return t.(IActualParamContext)
 }
 
-func (s *FunctionCallFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFunctionCallFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DeepChainFilterContext struct {
 	FilterItemContext
 }
@@ -6973,16 +6533,6 @@ func (s *DeepChainFilterContext) Lines() ILinesContext {
 	return t.(ILinesContext)
 }
 
-func (s *DeepChainFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDeepChainFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NextFilterContext struct {
 	FilterItemContext
 }
@@ -7003,16 +6553,6 @@ func (s *NextFilterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NextFilterContext) UseStart() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserUseStart, 0)
-}
-
-func (s *NextFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNextFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type OptionalFilterContext struct {
@@ -7057,16 +6597,6 @@ func (s *OptionalFilterContext) MapBuilderClose() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserMapBuilderClose, 0)
 }
 
-func (s *OptionalFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitOptionalFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type IntersectionRefFilterContext struct {
 	FilterItemContext
 }
@@ -7105,16 +6635,6 @@ func (s *IntersectionRefFilterContext) RefVariable() IRefVariableContext {
 	return t.(IRefVariableContext)
 }
 
-func (s *IntersectionRefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitIntersectionRefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type TopDefFilterContext struct {
 	FilterItemContext
 }
@@ -7135,16 +6655,6 @@ func (s *TopDefFilterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TopDefFilterContext) TopDef() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserTopDef, 0)
-}
-
-func (s *TopDefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitTopDefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type DeepNextConfigFilterContext struct {
@@ -7189,16 +6699,6 @@ func (s *DeepNextConfigFilterContext) Config() IConfigContext {
 	return t.(IConfigContext)
 }
 
-func (s *DeepNextConfigFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDeepNextConfigFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type FieldIndexFilterContext struct {
 	FilterItemContext
 }
@@ -7241,16 +6741,6 @@ func (s *FieldIndexFilterContext) ListSelectClose() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserListSelectClose, 0)
 }
 
-func (s *FieldIndexFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFieldIndexFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type RemoveRefFilterContext struct {
 	FilterItemContext
 }
@@ -7287,16 +6777,6 @@ func (s *RemoveRefFilterContext) RefVariable() IRefVariableContext {
 	}
 
 	return t.(IRefVariableContext)
-}
-
-func (s *RemoveRefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitRemoveRefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type VersionInFilterContext struct {
@@ -7337,16 +6817,6 @@ func (s *VersionInFilterContext) VersionInExpression() IVersionInExpressionConte
 	return t.(IVersionInExpressionContext)
 }
 
-func (s *VersionInFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionInFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DefFilterContext struct {
 	FilterItemContext
 }
@@ -7367,16 +6837,6 @@ func (s *DefFilterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DefFilterContext) DefStart() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserDefStart, 0)
-}
-
-func (s *DefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type TopDefConfigFilterContext struct {
@@ -7421,16 +6881,6 @@ func (s *TopDefConfigFilterContext) Config() IConfigContext {
 	return t.(IConfigContext)
 }
 
-func (s *TopDefConfigFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitTopDefConfigFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NotInsideRefFilterContext struct {
 	FilterItemContext
 }
@@ -7467,16 +6917,6 @@ func (s *NotInsideRefFilterContext) RefVariable() IRefVariableContext {
 	}
 
 	return t.(IRefVariableContext)
-}
-
-func (s *NotInsideRefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNotInsideRefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type MergeRefFilterContext struct {
@@ -7517,16 +6957,6 @@ func (s *MergeRefFilterContext) RefVariable() IRefVariableContext {
 	return t.(IRefVariableContext)
 }
 
-func (s *MergeRefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitMergeRefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DeepNextFilterContext struct {
 	FilterItemContext
 }
@@ -7547,16 +6977,6 @@ func (s *DeepNextFilterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DeepNextFilterContext) DeepNext() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserDeepNext, 0)
-}
-
-func (s *DeepNextFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitDeepNextFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FirstContext struct {
@@ -7591,16 +7011,6 @@ func (s *FirstContext) FilterItemFirst() IFilterItemFirstContext {
 	}
 
 	return t.(IFilterItemFirstContext)
-}
-
-func (s *FirstContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFirst(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type InsideRefFilterContext struct {
@@ -7639,16 +7049,6 @@ func (s *InsideRefFilterContext) RefVariable() IRefVariableContext {
 	}
 
 	return t.(IRefVariableContext)
-}
-
-func (s *InsideRefFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitInsideRefFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) FilterItem() (localctx IFilterItemContext) {
@@ -8160,16 +7560,6 @@ func (s *FilterExprContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FilterExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) FilterExpr() (localctx IFilterExprContext) {
 	this := p
 	_ = this
@@ -8304,16 +7694,6 @@ func (s *NativeCallContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NativeCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNativeCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) NativeCall() (localctx INativeCallContext) {
 	this := p
 	_ = this
@@ -8440,16 +7820,6 @@ func (s *UseNativeCallContext) GetRuleContext() antlr.RuleContext {
 
 func (s *UseNativeCallContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *UseNativeCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitUseNativeCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) UseNativeCall() (localctx IUseNativeCallContext) {
@@ -8581,16 +7951,6 @@ func (s *UseDefCalcParamsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *UseDefCalcParamsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *UseDefCalcParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitUseDefCalcParams(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) UseDefCalcParams() (localctx IUseDefCalcParamsContext) {
@@ -8841,16 +8201,6 @@ func (s *NativeCallActualParamsContext) ToStringTree(ruleNames []string, recog a
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NativeCallActualParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNativeCallActualParams(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) NativeCallActualParams() (localctx INativeCallActualParamsContext) {
 	this := p
 	_ = this
@@ -9072,16 +8422,6 @@ func (s *NativeCallActualParamContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NativeCallActualParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNativeCallActualParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) NativeCallActualParam() (localctx INativeCallActualParamContext) {
 	this := p
 	_ = this
@@ -9200,16 +8540,6 @@ func (s *NativeCallActualParamKeyContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NativeCallActualParamKeyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NativeCallActualParamKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNativeCallActualParamKey(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) NativeCallActualParamKey() (localctx INativeCallActualParamKeyContext) {
@@ -9354,16 +8684,6 @@ func (s *NativeCallActualParamValueContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NativeCallActualParamValueContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NativeCallActualParamValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNativeCallActualParamValue(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) NativeCallActualParamValue() (localctx INativeCallActualParamValueContext) {
@@ -9585,16 +8905,6 @@ func (s *AllParamContext) Lines() ILinesContext {
 	return t.(ILinesContext)
 }
 
-func (s *AllParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitAllParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type EveryParamContext struct {
 	ActualParamContext
 }
@@ -9684,16 +8994,6 @@ func (s *EveryParamContext) Lines() ILinesContext {
 	}
 
 	return t.(ILinesContext)
-}
-
-func (s *EveryParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitEveryParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) ActualParam() (localctx IActualParamContext) {
@@ -9885,16 +9185,6 @@ func (s *ActualParamFilterContext) ToStringTree(ruleNames []string, recog antlr.
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ActualParamFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitActualParamFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) ActualParamFilter() (localctx IActualParamFilterContext) {
 	this := p
 	_ = this
@@ -10069,16 +9359,6 @@ func (s *SingleParamContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SingleParamContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SingleParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitSingleParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) SingleParam() (localctx ISingleParamContext) {
@@ -10299,16 +9579,6 @@ func (s *ConfigContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ConfigContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ConfigContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitConfig(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Config() (localctx IConfigContext) {
@@ -10542,16 +9812,6 @@ func (s *RecursiveConfigItemContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *RecursiveConfigItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitRecursiveConfigItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) RecursiveConfigItem() (localctx IRecursiveConfigItemContext) {
 	this := p
 	_ = this
@@ -10748,16 +10008,6 @@ func (s *RecursiveConfigItemValueContext) ToStringTree(ruleNames []string, recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *RecursiveConfigItemValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitRecursiveConfigItemValue(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) RecursiveConfigItemValue() (localctx IRecursiveConfigItemValueContext) {
 	this := p
 	_ = this
@@ -10932,16 +10182,6 @@ func (s *SliceCallItemContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SliceCallItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitSliceCallItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) SliceCallItem() (localctx ISliceCallItemContext) {
 	this := p
 	_ = this
@@ -11077,16 +10317,6 @@ func (s *NameFilterContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NameFilterContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NameFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNameFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) NameFilter() (localctx INameFilterContext) {
@@ -11278,16 +10508,6 @@ func (s *FlatContext) Comma(i int) antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserComma, i)
 }
 
-func (s *FlatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFlat(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type BuildMapContext struct {
 	ChainFilterContext
 }
@@ -11410,16 +10630,6 @@ func (s *BuildMapContext) AllColon() []antlr.TerminalNode {
 
 func (s *BuildMapContext) Colon(i int) antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserColon, i)
-}
-
-func (s *BuildMapContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitBuildMap(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) ChainFilter() (localctx IChainFilterContext) {
@@ -11752,16 +10962,6 @@ func (s *StringLiteralWithoutStarGroupContext) ToStringTree(ruleNames []string, 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StringLiteralWithoutStarGroupContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitStringLiteralWithoutStarGroup(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) StringLiteralWithoutStarGroup() (localctx IStringLiteralWithoutStarGroupContext) {
 	this := p
 	_ = this
@@ -11901,16 +11101,6 @@ func (s *NegativeConditionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NegativeConditionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NegativeConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNegativeCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) NegativeCondition() (localctx INegativeConditionContext) {
@@ -12116,16 +11306,6 @@ func (s *FilterExpressionBinaryCompareContext) BoolLiteral() IBoolLiteralContext
 	return t.(IBoolLiteralContext)
 }
 
-func (s *FilterExpressionBinaryCompareContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterExpressionBinaryCompare(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type NotConditionContext struct {
 	ConditionExpressionContext
 }
@@ -12176,16 +11356,6 @@ func (s *NotConditionContext) ConditionExpression() IConditionExpressionContext 
 	return t.(IConditionExpressionContext)
 }
 
-func (s *NotConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNotCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ParenConditionContext struct {
 	ConditionExpressionContext
 }
@@ -12228,16 +11398,6 @@ func (s *ParenConditionContext) CloseParen() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserCloseParen, 0)
 }
 
-func (s *ParenConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitParenCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type FilterConditionContext struct {
 	ConditionExpressionContext
 }
@@ -12270,16 +11430,6 @@ func (s *FilterConditionContext) FilterExpr() IFilterExprContext {
 	}
 
 	return t.(IFilterExprContext)
-}
-
-func (s *FilterConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type OpcodeTypeConditionContext struct {
@@ -12357,16 +11507,6 @@ func (s *OpcodeTypeConditionContext) Comma(i int) antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserComma, i)
 }
 
-func (s *OpcodeTypeConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitOpcodeTypeCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type VersionInConditionContext struct {
 	ConditionExpressionContext
 }
@@ -12407,16 +11547,6 @@ func (s *VersionInConditionContext) VersionInExpression() IVersionInExpressionCo
 	}
 
 	return t.(IVersionInExpressionContext)
-}
-
-func (s *VersionInConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionInCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FilterExpressionOrContext struct {
@@ -12482,16 +11612,6 @@ func (s *FilterExpressionOrContext) Or() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserOr, 0)
 }
 
-func (s *FilterExpressionOrContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterExpressionOr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type FilterExpressionAndContext struct {
 	ConditionExpressionContext
 }
@@ -12553,16 +11673,6 @@ func (s *FilterExpressionAndContext) ConditionExpression(i int) IConditionExpres
 
 func (s *FilterExpressionAndContext) And() antlr.TerminalNode {
 	return s.GetToken(SyntaxFlowParserAnd, 0)
-}
-
-func (s *FilterExpressionAndContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterExpressionAnd(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FilterExpressionCompareContext struct {
@@ -12664,16 +11774,6 @@ func (s *FilterExpressionCompareContext) BoolLiteral() IBoolLiteralContext {
 	return t.(IBoolLiteralContext)
 }
 
-func (s *FilterExpressionCompareContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterExpressionCompare(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type FilterExpressionRegexpMatchContext struct {
 	ConditionExpressionContext
 	op antlr.Token
@@ -12737,16 +11837,6 @@ func (s *FilterExpressionRegexpMatchContext) RegexpLiteral() IRegexpLiteralConte
 	return t.(IRegexpLiteralContext)
 }
 
-func (s *FilterExpressionRegexpMatchContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitFilterExpressionRegexpMatch(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type StringContainAnyConditionContext struct {
 	ConditionExpressionContext
 }
@@ -12789,16 +11879,6 @@ func (s *StringContainAnyConditionContext) StringLiteralWithoutStarGroup() IStri
 	return t.(IStringLiteralWithoutStarGroupContext)
 }
 
-func (s *StringContainAnyConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitStringContainAnyCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type StringContainHaveConditionContext struct {
 	ConditionExpressionContext
 }
@@ -12839,16 +11919,6 @@ func (s *StringContainHaveConditionContext) StringLiteralWithoutStarGroup() IStr
 	}
 
 	return t.(IStringLiteralWithoutStarGroupContext)
-}
-
-func (s *StringContainHaveConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitStringContainHaveCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) ConditionExpression() (localctx IConditionExpressionContext) {
@@ -13435,16 +12505,6 @@ func (s *VersionInExpressionContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VersionInExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionInExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) VersionInExpression() (localctx IVersionInExpressionContext) {
 	this := p
 	_ = this
@@ -13619,16 +12679,6 @@ func (s *VersionIntervalContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VersionIntervalContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionInterval(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) VersionInterval() (localctx IVersionIntervalContext) {
 	this := p
 	_ = this
@@ -13780,16 +12830,6 @@ func (s *VstartContext) ToStringTree(ruleNames []string, recog antlr.Recognizer)
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VstartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVstart(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) Vstart() (localctx IVstartContext) {
 	this := p
 	_ = this
@@ -13883,16 +12923,6 @@ func (s *VendContext) GetRuleContext() antlr.RuleContext {
 
 func (s *VendContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *VendContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVend(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Vend() (localctx IVendContext) {
@@ -14021,16 +13051,6 @@ func (s *VersionBlockElementContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VersionBlockElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionBlockElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) VersionBlockElement() (localctx IVersionBlockElementContext) {
 	this := p
 	_ = this
@@ -14143,16 +13163,6 @@ func (s *VersionSuffixContext) GetRuleContext() antlr.RuleContext {
 
 func (s *VersionSuffixContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *VersionSuffixContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionSuffix(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) VersionSuffix() (localctx IVersionSuffixContext) {
@@ -14293,16 +13303,6 @@ func (s *VersionBlockContext) GetRuleContext() antlr.RuleContext {
 
 func (s *VersionBlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *VersionBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) VersionBlock() (localctx IVersionBlockContext) {
@@ -14447,16 +13447,6 @@ func (s *VersionStringContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *VersionStringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitVersionString(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) VersionString() (localctx IVersionStringContext) {
 	this := p
 	_ = this
@@ -14589,16 +13579,6 @@ func (s *OpcodesConditionContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *OpcodesConditionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitOpcodesCondition(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) OpcodesCondition() (localctx IOpcodesConditionContext) {
 	this := p
 	_ = this
@@ -14716,16 +13696,6 @@ func (s *NumberLiteralContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NumberLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitNumberLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) NumberLiteral() (localctx INumberLiteralContext) {
 	this := p
 	_ = this
@@ -14833,16 +13803,6 @@ func (s *StringLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StringLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitStringLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) StringLiteral() (localctx IStringLiteralContext) {
@@ -14981,16 +13941,6 @@ func (s *StringLiteralWithoutStarContext) ToStringTree(ruleNames []string, recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StringLiteralWithoutStarContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitStringLiteralWithoutStar(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) StringLiteralWithoutStar() (localctx IStringLiteralWithoutStarContext) {
 	this := p
 	_ = this
@@ -15092,16 +14042,6 @@ func (s *RegexpLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *RegexpLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *RegexpLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitRegexpLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) RegexpLiteral() (localctx IRegexpLiteralContext) {
@@ -15211,16 +14151,6 @@ func (s *IdentifierContext) GetRuleContext() antlr.RuleContext {
 
 func (s *IdentifierContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitIdentifier(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Identifier() (localctx IIdentifierContext) {
@@ -15445,16 +14375,6 @@ func (s *KeywordsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *KeywordsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *KeywordsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitKeywords(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) Keywords() (localctx IKeywordsContext) {
@@ -15724,16 +14644,6 @@ func (s *OpcodesContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *OpcodesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitOpcodes(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) Opcodes() (localctx IOpcodesContext) {
 	this := p
 	_ = this
@@ -15846,16 +14756,6 @@ func (s *TypesContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TypesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitTypes(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SyntaxFlowParser) Types() (localctx ITypesContext) {
 	this := p
 	_ = this
@@ -15946,16 +14846,6 @@ func (s *BoolLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *BoolLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *BoolLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowParserVisitor:
-		return t.VisitBoolLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SyntaxFlowParser) BoolLiteral() (localctx IBoolLiteralContext) {

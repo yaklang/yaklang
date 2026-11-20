@@ -1996,16 +1996,6 @@ func (s *HtmlDocumentContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlDocumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitHtmlDocument(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) HtmlDocument() (localctx IHtmlDocumentContext) {
 	this := p
 	_ = this
@@ -2210,16 +2200,6 @@ func (s *HtmlDocumentElementContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HtmlDocumentElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitHtmlDocumentElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) HtmlDocumentElement() (localctx IHtmlDocumentElementContext) {
 	this := p
 	_ = this
@@ -2403,16 +2383,6 @@ func (s *InlineHtmlContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InlineHtmlContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InlineHtmlContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInlineHtml(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) InlineHtml() (localctx IInlineHtmlContext) {
@@ -2654,16 +2624,6 @@ func (s *HtmlElementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *HtmlElementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *HtmlElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitHtmlElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) HtmlElement() (localctx IHtmlElementContext) {
@@ -3034,16 +2994,6 @@ func (s *ScriptTextContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ScriptTextContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ScriptTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitScriptText(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ScriptText() (localctx IScriptTextContext) {
@@ -3500,16 +3450,6 @@ func (s *PhpBlockContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *PhpBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPhpBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) PhpBlock() (localctx IPhpBlockContext) {
 	this := p
 	_ = this
@@ -3740,16 +3680,6 @@ func (s *ImportStatementContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ImportStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitImportStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ImportStatement() (localctx IImportStatementContext) {
 	this := p
 	_ = this
@@ -3971,16 +3901,6 @@ func (s *TopStatementContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TopStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTopStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TopStatement() (localctx ITopStatementContext) {
 	this := p
 	_ = this
@@ -4161,16 +4081,6 @@ func (s *UseDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *UseDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitUseDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) UseDeclaration() (localctx IUseDeclarationContext) {
 	this := p
 	_ = this
@@ -4346,16 +4256,6 @@ func (s *UseDeclarationContentListContext) ToStringTree(ruleNames []string, reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *UseDeclarationContentListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitUseDeclarationContentList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) UseDeclarationContentList() (localctx IUseDeclarationContentListContext) {
 	this := p
 	_ = this
@@ -4515,16 +4415,6 @@ func (s *NamespacePathContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NamespacePathContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NamespacePathContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespacePath(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) NamespacePath() (localctx INamespacePathContext) {
@@ -4740,16 +4630,6 @@ func (s *NamespaceDeclarationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NamespaceDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NamespaceDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) NamespaceDeclaration() (localctx INamespaceDeclarationContext) {
@@ -5017,16 +4897,6 @@ func (s *NamespaceDeclarationSemiContext) ToStringTree(ruleNames []string, recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NamespaceDeclarationSemiContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceDeclarationSemi(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) NamespaceDeclarationSemi() (localctx INamespaceDeclarationSemiContext) {
 	this := p
 	_ = this
@@ -5245,16 +5115,6 @@ func (s *NamespaceStatementContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NamespaceStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) NamespaceStatement() (localctx INamespaceStatementContext) {
 	this := p
 	_ = this
@@ -5423,16 +5283,6 @@ func (s *NamespaceDeclarationBodyContext) ToStringTree(ruleNames []string, recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NamespaceDeclarationBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceDeclarationBody(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) NamespaceDeclarationBody() (localctx INamespaceDeclarationBodyContext) {
 	this := p
 	_ = this
@@ -5570,16 +5420,6 @@ func (s *NamespaceUseDeclarationsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NamespaceUseDeclarationsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NamespaceUseDeclarationsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceUseDeclarations(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) NamespaceUseDeclarations() (localctx INamespaceUseDeclarationsContext) {
@@ -5791,16 +5631,6 @@ func (s *FunctionDeclarationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FunctionDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FunctionDeclaration() (localctx IFunctionDeclarationContext) {
@@ -6193,16 +6023,6 @@ func (s *ClassDeclarationContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ClassDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitClassDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ClassDeclaration() (localctx IClassDeclarationContext) {
 	this := p
 	_ = this
@@ -6496,16 +6316,6 @@ func (s *ClassEntryTypeContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ClassEntryTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitClassEntryType(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ClassEntryType() (localctx IClassEntryTypeContext) {
 	this := p
 	_ = this
@@ -6644,16 +6454,6 @@ func (s *InterfaceListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InterfaceListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InterfaceListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInterfaceList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) InterfaceList() (localctx IInterfaceListContext) {
@@ -6817,16 +6617,6 @@ func (s *TypeParameterListContext) ToStringTree(ruleNames []string, recog antlr.
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TypeParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeParameterList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TypeParameterList() (localctx ITypeParameterListContext) {
 	this := p
 	_ = this
@@ -6988,16 +6778,6 @@ func (s *TypeParameterWithDefaultsListContext) ToStringTree(ruleNames []string, 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TypeParameterWithDefaultsListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeParameterWithDefaultsList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TypeParameterWithDefaultsList() (localctx ITypeParameterWithDefaultsListContext) {
 	this := p
 	_ = this
@@ -7138,16 +6918,6 @@ func (s *TypeParameterDeclContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TypeParameterDeclContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TypeParameterDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeParameterDecl(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TypeParameterDecl() (localctx ITypeParameterDeclContext) {
@@ -7317,16 +7087,6 @@ func (s *TypeParameterWithDefaultDeclContext) ToStringTree(ruleNames []string, r
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TypeParameterWithDefaultDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeParameterWithDefaultDecl(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TypeParameterWithDefaultDecl() (localctx ITypeParameterWithDefaultDeclContext) {
 	this := p
 	_ = this
@@ -7486,16 +7246,6 @@ func (s *CallableIdentifierContext) GetRuleContext() antlr.RuleContext {
 
 func (s *CallableIdentifierContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *CallableIdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitCallableIdentifier(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) CallableIdentifier() (localctx ICallableIdentifierContext) {
@@ -7674,16 +7424,6 @@ func (s *AttributesContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AttributesContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AttributesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAttributes(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Attributes() (localctx IAttributesContext) {
@@ -7867,16 +7607,6 @@ func (s *AttributeGroupContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AttributeGroupContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAttributeGroup(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) AttributeGroup() (localctx IAttributeGroupContext) {
 	this := p
 	_ = this
@@ -8055,16 +7785,6 @@ func (s *AttributeContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AttributeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAttribute(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) Attribute() (localctx IAttributeContext) {
 	this := p
 	_ = this
@@ -8200,16 +7920,6 @@ func (s *InnerStatementListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InnerStatementListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InnerStatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInnerStatementList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) InnerStatementList() (localctx IInnerStatementListContext) {
@@ -8366,16 +8076,6 @@ func (s *InnerStatementContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *InnerStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInnerStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) InnerStatement() (localctx IInnerStatementContext) {
 	this := p
 	_ = this
@@ -8488,16 +8188,6 @@ func (s *LabelStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LabelStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LabelStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLabelStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) LabelStatement() (localctx ILabelStatementContext) {
@@ -8986,16 +8676,6 @@ func (s *StatementContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) Statement() (localctx IStatementContext) {
 	this := p
 	_ = this
@@ -9253,16 +8933,6 @@ func (s *EmptyStatement_Context) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *EmptyStatement_Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitEmptyStatement_(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) EmptyStatement_() (localctx IEmptyStatement_Context) {
 	this := p
 	_ = this
@@ -9370,16 +9040,6 @@ func (s *BlockStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *BlockStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *BlockStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitBlockStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) BlockStatement() (localctx IBlockStatementContext) {
@@ -9667,16 +9327,6 @@ func (s *IfStatementContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIfStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) IfStatement() (localctx IIfStatementContext) {
 	this := p
 	_ = this
@@ -9938,16 +9588,6 @@ func (s *ElseIfStatementContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ElseIfStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitElseIfStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ElseIfStatement() (localctx IElseIfStatementContext) {
 	this := p
 	_ = this
@@ -10082,16 +9722,6 @@ func (s *ElseIfColonStatementContext) ToStringTree(ruleNames []string, recog ant
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ElseIfColonStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitElseIfColonStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ElseIfColonStatement() (localctx IElseIfColonStatementContext) {
 	this := p
 	_ = this
@@ -10212,16 +9842,6 @@ func (s *ElseStatementContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ElseStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitElseStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ElseStatement() (localctx IElseStatementContext) {
 	this := p
 	_ = this
@@ -10333,16 +9953,6 @@ func (s *ElseColonStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ElseColonStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ElseColonStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitElseColonStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ElseColonStatement() (localctx IElseColonStatementContext) {
@@ -10508,16 +10118,6 @@ func (s *WhileStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *WhileStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *WhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitWhileStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) WhileStatement() (localctx IWhileStatementContext) {
@@ -10700,16 +10300,6 @@ func (s *DoWhileStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DoWhileStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DoWhileStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDoWhileStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) DoWhileStatement() (localctx IDoWhileStatementContext) {
@@ -10938,16 +10528,6 @@ func (s *ForStatementContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ForStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitForStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ForStatement() (localctx IForStatementContext) {
 	this := p
 	_ = this
@@ -11170,16 +10750,6 @@ func (s *ForInitContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ForInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitForInit(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ForInit() (localctx IForInitContext) {
 	this := p
 	_ = this
@@ -11273,16 +10843,6 @@ func (s *ForUpdateContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ForUpdateContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ForUpdateContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitForUpdate(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ForUpdate() (localctx IForUpdateContext) {
@@ -11499,16 +11059,6 @@ func (s *SwitchStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SwitchStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SwitchStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSwitchStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) SwitchStatement() (localctx ISwitchStatementContext) {
@@ -11822,16 +11372,6 @@ func (s *SwitchCaseBlockContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SwitchCaseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSwitchCaseBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) SwitchCaseBlock() (localctx ISwitchCaseBlockContext) {
 	this := p
 	_ = this
@@ -12003,16 +11543,6 @@ func (s *SwitchDefaultBlockContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SwitchDefaultBlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SwitchDefaultBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSwitchDefaultBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) SwitchDefaultBlock() (localctx ISwitchDefaultBlockContext) {
@@ -12247,16 +11777,6 @@ func (s *SwitchBlockContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SwitchBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSwitchBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) SwitchBlock() (localctx ISwitchBlockContext) {
 	this := p
 	_ = this
@@ -12465,16 +11985,6 @@ func (s *BreakStatementContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BreakStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitBreakStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) BreakStatement() (localctx IBreakStatementContext) {
 	this := p
 	_ = this
@@ -12606,16 +12116,6 @@ func (s *ContinueStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ContinueStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ContinueStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitContinueStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ContinueStatement() (localctx IContinueStatementContext) {
@@ -12751,16 +12251,6 @@ func (s *ReturnStatementContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ReturnStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitReturnStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ReturnStatement() (localctx IReturnStatementContext) {
 	this := p
 	_ = this
@@ -12889,16 +12379,6 @@ func (s *ExpressionStatementContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ExpressionStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitExpressionStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ExpressionStatement() (localctx IExpressionStatementContext) {
 	this := p
 	_ = this
@@ -13020,16 +12500,6 @@ func (s *UnsetStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *UnsetStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *UnsetStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitUnsetStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) UnsetStatement() (localctx IUnsetStatementContext) {
@@ -13336,16 +12806,6 @@ func (s *ForeachStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ForeachStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ForeachStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitForeachStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ForeachStatement() (localctx IForeachStatementContext) {
@@ -13903,16 +13363,6 @@ func (s *ForeachValueContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ForeachValueContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitForeachValue(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ForeachValue() (localctx IForeachValueContext) {
 	this := p
 	_ = this
@@ -14118,16 +13568,6 @@ func (s *TryCatchFinallyContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TryCatchFinallyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TryCatchFinallyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTryCatchFinally(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TryCatchFinally() (localctx ITryCatchFinallyContext) {
@@ -14386,16 +13826,6 @@ func (s *CatchClauseContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CatchClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitCatchClause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) CatchClause() (localctx ICatchClauseContext) {
 	this := p
 	_ = this
@@ -14572,16 +14002,6 @@ func (s *FinallyStatementContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FinallyStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFinallyStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) FinallyStatement() (localctx IFinallyStatementContext) {
 	this := p
 	_ = this
@@ -14693,16 +14113,6 @@ func (s *ThrowStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ThrowStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ThrowStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitThrowStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ThrowStatement() (localctx IThrowStatementContext) {
@@ -14824,16 +14234,6 @@ func (s *GotoStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *GotoStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *GotoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitGotoStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) GotoStatement() (localctx IGotoStatementContext) {
@@ -15009,16 +14409,6 @@ func (s *DeclareStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DeclareStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DeclareStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDeclareStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) DeclareStatement() (localctx IDeclareStatementContext) {
@@ -15223,16 +14613,6 @@ func (s *InlineHtmlStatementContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *InlineHtmlStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInlineHtmlStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) InlineHtmlStatement() (localctx IInlineHtmlStatementContext) {
 	this := p
 	_ = this
@@ -15411,16 +14791,6 @@ func (s *DeclareListContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeclareListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDeclareList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) DeclareList() (localctx IDeclareListContext) {
 	this := p
 	_ = this
@@ -15574,16 +14944,6 @@ func (s *DirectiveContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DirectiveContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DirectiveContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDirective(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Directive() (localctx IDirectiveContext) {
@@ -15817,16 +15177,6 @@ func (s *FormalParameterListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FormalParameterListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FormalParameterListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFormalParameterList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FormalParameterList() (localctx IFormalParameterListContext) {
@@ -16083,16 +15433,6 @@ func (s *FormalParameterContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FormalParameterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFormalParameter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) FormalParameter() (localctx IFormalParameterContext) {
 	this := p
 	_ = this
@@ -16335,16 +15675,6 @@ func (s *TypeHintContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TypeHintContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeHint(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TypeHint() (localctx ITypeHintContext) {
 	this := p
 	_ = this
@@ -16486,16 +15816,6 @@ func (s *TypeHintAtomContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TypeHintAtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TypeHintAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeHintAtom(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TypeHintAtom() (localctx ITypeHintAtomContext) {
@@ -16657,16 +15977,6 @@ func (s *TypeHintIntersectionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TypeHintIntersectionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TypeHintIntersectionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeHintIntersection(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TypeHintIntersection() (localctx ITypeHintIntersectionContext) {
@@ -16834,16 +16144,6 @@ func (s *TypeHintUnionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TypeHintUnionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TypeHintUnionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeHintUnion(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TypeHintUnion() (localctx ITypeHintUnionContext) {
@@ -17017,16 +16317,6 @@ func (s *GlobalStatementContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *GlobalStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitGlobalStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) GlobalStatement() (localctx IGlobalStatementContext) {
 	this := p
 	_ = this
@@ -17176,16 +16466,6 @@ func (s *EchoStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *EchoStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *EchoStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitEchoStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) EchoStatement() (localctx IEchoStatementContext) {
@@ -17343,16 +16623,6 @@ func (s *StaticVariableStatementContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StaticVariableStatementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StaticVariableStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticVariableStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) StaticVariableStatement() (localctx IStaticVariableStatementContext) {
@@ -17626,16 +16896,6 @@ func (s *FunctionContext) ReturnTypeDecl() IReturnTypeDeclContext {
 	return t.(IReturnTypeDeclContext)
 }
 
-func (s *FunctionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunction(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type TraitUseContext struct {
 	ClassStatementContext
 }
@@ -17688,16 +16948,6 @@ func (s *TraitUseContext) TraitAdaptations() ITraitAdaptationsContext {
 	}
 
 	return t.(ITraitAdaptationsContext)
-}
-
-func (s *TraitUseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTraitUse(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ConstContext struct {
@@ -17823,16 +17073,6 @@ func (s *ConstContext) Comma(i int) antlr.TerminalNode {
 	return s.GetToken(PHPParserComma, i)
 }
 
-func (s *ConstContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitConst(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type PropertyModifiersVariableContext struct {
 	ClassStatementContext
 }
@@ -17954,16 +17194,6 @@ func (s *PropertyModifiersVariableContext) AllComma() []antlr.TerminalNode {
 
 func (s *PropertyModifiersVariableContext) Comma(i int) antlr.TerminalNode {
 	return s.GetToken(PHPParserComma, i)
-}
-
-func (s *PropertyModifiersVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPropertyModifiersVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ClassStatement() (localctx IClassStatementContext) {
@@ -18421,16 +17651,6 @@ func (s *TraitAdaptationsContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TraitAdaptationsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTraitAdaptations(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TraitAdaptations() (localctx ITraitAdaptationsContext) {
 	this := p
 	_ = this
@@ -18601,16 +17821,6 @@ func (s *TraitAdaptationStatementContext) ToStringTree(ruleNames []string, recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TraitAdaptationStatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTraitAdaptationStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TraitAdaptationStatement() (localctx ITraitAdaptationStatementContext) {
 	this := p
 	_ = this
@@ -18772,16 +17982,6 @@ func (s *TraitPrecedenceContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TraitPrecedenceContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TraitPrecedenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTraitPrecedence(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TraitPrecedence() (localctx ITraitPrecedenceContext) {
@@ -18955,16 +18155,6 @@ func (s *TraitAliasContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TraitAliasContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTraitAlias(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TraitAlias() (localctx ITraitAliasContext) {
 	this := p
 	_ = this
@@ -19132,16 +18322,6 @@ func (s *TraitMethodReferenceContext) ToStringTree(ruleNames []string, recog ant
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TraitMethodReferenceContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTraitMethodReference(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) TraitMethodReference() (localctx ITraitMethodReferenceContext) {
 	this := p
 	_ = this
@@ -19279,16 +18459,6 @@ func (s *BaseCtorCallContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BaseCtorCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitBaseCtorCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) BaseCtorCall() (localctx IBaseCtorCallContext) {
 	this := p
 	_ = this
@@ -19416,16 +18586,6 @@ func (s *ReturnTypeDeclContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ReturnTypeDeclContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ReturnTypeDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitReturnTypeDecl(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ReturnTypeDecl() (localctx IReturnTypeDeclContext) {
@@ -19556,16 +18716,6 @@ func (s *MethodBodyContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MethodBodyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMethodBody(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MethodBody() (localctx IMethodBodyContext) {
 	this := p
 	_ = this
@@ -19688,16 +18838,6 @@ func (s *PropertyModifiersContext) GetRuleContext() antlr.RuleContext {
 
 func (s *PropertyModifiersContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *PropertyModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPropertyModifiers(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) PropertyModifiers() (localctx IPropertyModifiersContext) {
@@ -19845,16 +18985,6 @@ func (s *MemberModifiersContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MemberModifiersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMemberModifiers(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MemberModifiers() (localctx IMemberModifiersContext) {
 	this := p
 	_ = this
@@ -19982,16 +19112,6 @@ func (s *VariableInitializerContext) GetRuleContext() antlr.RuleContext {
 
 func (s *VariableInitializerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *VariableInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitVariableInitializer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) VariableInitializer() (localctx IVariableInitializerContext) {
@@ -20142,16 +19262,6 @@ func (s *IdentifierInitializerContext) GetRuleContext() antlr.RuleContext {
 
 func (s *IdentifierInitializerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *IdentifierInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIdentifierInitializer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) IdentifierInitializer() (localctx IIdentifierInitializerContext) {
@@ -20345,16 +19455,6 @@ func (s *GlobalConstantDeclarationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *GlobalConstantDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *GlobalConstantDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitGlobalConstantDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) GlobalConstantDeclaration() (localctx IGlobalConstantDeclarationContext) {
@@ -20605,16 +19705,6 @@ func (s *EnumDeclarationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *EnumDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *EnumDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitEnumDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) EnumDeclaration() (localctx IEnumDeclarationContext) {
@@ -21006,16 +20096,6 @@ func (s *EnumItemContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *EnumItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitEnumItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) EnumItem() (localctx IEnumItemContext) {
 	this := p
 	_ = this
@@ -21330,16 +20410,6 @@ func (s *ExpressionListContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitExpressionList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ExpressionList() (localctx IExpressionListContext) {
 	this := p
 	_ = this
@@ -21473,16 +20543,6 @@ func (s *ParenthesesContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ParenthesesContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ParenthesesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitParentheses(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Parentheses() (localctx IParenthesesContext) {
@@ -21630,16 +20690,6 @@ func (s *FullyQualifiedNamespaceExprContext) GetRuleContext() antlr.RuleContext 
 
 func (s *FullyQualifiedNamespaceExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FullyQualifiedNamespaceExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFullyQualifiedNamespaceExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FullyQualifiedNamespaceExpr() (localctx IFullyQualifiedNamespaceExprContext) {
@@ -21823,16 +20873,6 @@ func (s *StaticClassExprContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StaticClassExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticClassExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) StaticClassExpr() (localctx IStaticClassExprContext) {
 	this := p
 	_ = this
@@ -21969,16 +21009,6 @@ func (s *StaticClassExprFunctionMemberContext) ToStringTree(ruleNames []string, 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StaticClassExprFunctionMemberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticClassExprFunctionMember(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) StaticClassExprFunctionMember() (localctx IStaticClassExprFunctionMemberContext) {
 	this := p
 	_ = this
@@ -22106,16 +21136,6 @@ func (s *StaticClassExprVariableMemberContext) GetRuleContext() antlr.RuleContex
 
 func (s *StaticClassExprVariableMemberContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StaticClassExprVariableMemberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticClassExprVariableMember(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) StaticClassExprVariableMember() (localctx IStaticClassExprVariableMemberContext) {
@@ -22274,16 +21294,6 @@ func (s *StaticClassContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StaticClassContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StaticClassContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticClass(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) StaticClass() (localctx IStaticClassContext) {
@@ -22483,16 +21493,6 @@ func (s *MemberCallKeyContext) GetRuleContext() antlr.RuleContext {
 
 func (s *MemberCallKeyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *MemberCallKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMemberCallKey(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) MemberCallKey() (localctx IMemberCallKeyContext) {
@@ -22696,16 +21696,6 @@ func (s *IndexMemberCallKeyContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IndexMemberCallKeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndexMemberCallKey(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) IndexMemberCallKey() (localctx IIndexMemberCallKeyContext) {
 	this := p
 	_ = this
@@ -22864,16 +21854,6 @@ func (s *DynamicStaticClassExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DynamicStaticClassExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DynamicStaticClassExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDynamicStaticClassExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) DynamicStaticClassExpr() (localctx IDynamicStaticClassExprContext) {
@@ -23074,16 +22054,6 @@ func (s *DynamicStaticReceiverContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DynamicStaticReceiverContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDynamicStaticReceiver(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) DynamicStaticReceiver() (localctx IDynamicStaticReceiverContext) {
 	this := p
 	_ = this
@@ -23254,16 +22224,6 @@ func (s *DynamicStaticReceiverBaseContext) ToStringTree(ruleNames []string, reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DynamicStaticReceiverBaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDynamicStaticReceiverBase(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) DynamicStaticReceiverBase() (localctx IDynamicStaticReceiverBaseContext) {
 	this := p
 	_ = this
@@ -23427,16 +22387,6 @@ func (s *DynamicStaticReceiverAccessContext) GetRuleContext() antlr.RuleContext 
 
 func (s *DynamicStaticReceiverAccessContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DynamicStaticReceiverAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDynamicStaticReceiverAccess(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) DynamicStaticReceiverAccess() (localctx IDynamicStaticReceiverAccessContext) {
@@ -23665,16 +22615,6 @@ func (s *SpecialWordExpressionContext) Throw() antlr.TerminalNode {
 	return s.GetToken(PHPParserThrow, 0)
 }
 
-func (s *SpecialWordExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSpecialWordExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ShortQualifiedNameExpressionContext struct {
 	ExpressionContext
 }
@@ -23713,16 +22653,6 @@ func (s *ShortQualifiedNameExpressionContext) NamespaceSeparator() antlr.Termina
 	return s.GetToken(PHPParserNamespaceSeparator, 0)
 }
 
-func (s *ShortQualifiedNameExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitShortQualifiedNameExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ArrayCreationExpressionContext struct {
 	ExpressionContext
 }
@@ -23757,16 +22687,6 @@ func (s *ArrayCreationExpressionContext) ArrayCreation() IArrayCreationContext {
 	return t.(IArrayCreationContext)
 }
 
-func (s *ArrayCreationExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayCreationExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type BackQuoteStringExpressionContext struct {
 	ExpressionContext
 }
@@ -23787,16 +22707,6 @@ func (s *BackQuoteStringExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *BackQuoteStringExpressionContext) BackQuoteString() antlr.TerminalNode {
 	return s.GetToken(PHPParserBackQuoteString, 0)
-}
-
-func (s *BackQuoteStringExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitBackQuoteStringExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type MemberCallExpressionContext struct {
@@ -23857,16 +22767,6 @@ func (s *MemberCallExpressionContext) NullsafeObjectOperator() antlr.TerminalNod
 	return s.GetToken(PHPParserNullsafeObjectOperator, 0)
 }
 
-func (s *MemberCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMemberCallExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ArrayCreationUnpackExpressionContext struct {
 	ExpressionContext
 }
@@ -23921,16 +22821,6 @@ func (s *ArrayCreationUnpackExpressionContext) Expression() IExpressionContext {
 	return t.(IExpressionContext)
 }
 
-func (s *ArrayCreationUnpackExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayCreationUnpackExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type KeywordNewExpressionContext struct {
 	ExpressionContext
 }
@@ -23965,16 +22855,6 @@ func (s *KeywordNewExpressionContext) NewExpr() INewExprContext {
 	return t.(INewExprContext)
 }
 
-func (s *KeywordNewExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitKeywordNewExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type MatchExpressionContext struct {
 	ExpressionContext
 }
@@ -24007,16 +22887,6 @@ func (s *MatchExpressionContext) MatchExpr() IMatchExprContext {
 	}
 
 	return t.(IMatchExprContext)
-}
-
-func (s *MatchExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMatchExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FunctionCallExpressionContext struct {
@@ -24067,16 +22937,6 @@ func (s *FunctionCallExpressionContext) Arguments() IArgumentsContext {
 	}
 
 	return t.(IArgumentsContext)
-}
-
-func (s *FunctionCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCallExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type LogicalExpressionContext struct {
@@ -24155,16 +23015,6 @@ func (s *LogicalExpressionContext) LogicalOr() antlr.TerminalNode {
 	return s.GetToken(PHPParserLogicalOr, 0)
 }
 
-func (s *LogicalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLogicalExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type PrintExpressionContext struct {
 	ExpressionContext
 }
@@ -24201,16 +23051,6 @@ func (s *PrintExpressionContext) Expression() IExpressionContext {
 	}
 
 	return t.(IExpressionContext)
-}
-
-func (s *PrintExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPrintExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type PostfixIncDecExpressionContext struct {
@@ -24253,16 +23093,6 @@ func (s *PostfixIncDecExpressionContext) Inc() antlr.TerminalNode {
 
 func (s *PostfixIncDecExpressionContext) Dec() antlr.TerminalNode {
 	return s.GetToken(PHPParserDec, 0)
-}
-
-func (s *PostfixIncDecExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPostfixIncDecExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FunctionCallAssignableReferenceAssignmentExpressionContext struct {
@@ -24323,16 +23153,6 @@ func (s *FunctionCallAssignableReferenceAssignmentExpressionContext) Expression(
 	return t.(IExpressionContext)
 }
 
-func (s *FunctionCallAssignableReferenceAssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCallAssignableReferenceAssignmentExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type IncludeExpressionContext struct {
 	ExpressionContext
 }
@@ -24385,16 +23205,6 @@ func (s *IncludeExpressionContext) Expression() IExpressionContext {
 	}
 
 	return t.(IExpressionContext)
-}
-
-func (s *IncludeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIncludeExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type IndexCallExpressionContext struct {
@@ -24455,16 +23265,6 @@ func (s *IndexCallExpressionContext) CloseSquareBracket() antlr.TerminalNode {
 	return s.GetToken(PHPParserCloseSquareBracket, 0)
 }
 
-func (s *IndexCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndexCallExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ReferenceAssignmentExpressionContext struct {
 	ExpressionContext
 }
@@ -24523,16 +23323,6 @@ func (s *ReferenceAssignmentExpressionContext) Expression() IExpressionContext {
 	return t.(IExpressionContext)
 }
 
-func (s *ReferenceAssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitReferenceAssignmentExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type CloneExpressionContext struct {
 	ExpressionContext
 }
@@ -24569,16 +23359,6 @@ func (s *CloneExpressionContext) Expression() IExpressionContext {
 	}
 
 	return t.(IExpressionContext)
-}
-
-func (s *CloneExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitCloneExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type UnaryOperatorExpressionContext struct {
@@ -24633,16 +23413,6 @@ func (s *UnaryOperatorExpressionContext) Plus() antlr.TerminalNode {
 
 func (s *UnaryOperatorExpressionContext) Minus() antlr.TerminalNode {
 	return s.GetToken(PHPParserMinus, 0)
-}
-
-func (s *UnaryOperatorExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitUnaryOperatorExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type FunctionCallAssignableAssignmentExpressionContext struct {
@@ -24711,16 +23481,6 @@ func (s *FunctionCallAssignableAssignmentExpressionContext) Expression() IExpres
 	return t.(IExpressionContext)
 }
 
-func (s *FunctionCallAssignableAssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCallAssignableAssignmentExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ParenthesisExpressionContext struct {
 	ExpressionContext
 }
@@ -24761,16 +23521,6 @@ func (s *ParenthesisExpressionContext) Expression() IExpressionContext {
 
 func (s *ParenthesisExpressionContext) CloseRoundBracket() antlr.TerminalNode {
 	return s.GetToken(PHPParserCloseRoundBracket, 0)
-}
-
-func (s *ParenthesisExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitParenthesisExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type SpaceshipExpressionContext struct {
@@ -24839,16 +23589,6 @@ func (s *SpaceshipExpressionContext) Expression(i int) IExpressionContext {
 
 func (s *SpaceshipExpressionContext) Spaceship() antlr.TerminalNode {
 	return s.GetToken(PHPParserSpaceship, 0)
-}
-
-func (s *SpaceshipExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSpaceshipExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ConditionalExpressionContext struct {
@@ -24923,16 +23663,6 @@ func (s *ConditionalExpressionContext) QuestionMark() antlr.TerminalNode {
 	return s.GetToken(PHPParserQuestionMark, 0)
 }
 
-func (s *ConditionalExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitConditionalExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DynamicStaticClassAccessExpressionContext struct {
 	ExpressionContext
 }
@@ -24965,16 +23695,6 @@ func (s *DynamicStaticClassAccessExpressionContext) DynamicStaticClassExpr() IDy
 	}
 
 	return t.(IDynamicStaticClassExprContext)
-}
-
-func (s *DynamicStaticClassAccessExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDynamicStaticClassAccessExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type TemplateExpressionContext struct {
@@ -25027,16 +23747,6 @@ func (s *TemplateExpressionContext) CloseCurlyBracket() antlr.TerminalNode {
 	return s.GetToken(PHPParserCloseCurlyBracket, 0)
 }
 
-func (s *TemplateExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTemplateExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type VariableExpressionContext struct {
 	ExpressionContext
 }
@@ -25073,16 +23783,6 @@ func (s *VariableExpressionContext) FlexiVariable() IFlexiVariableContext {
 
 func (s *VariableExpressionContext) Ampersand() antlr.TerminalNode {
 	return s.GetToken(PHPParserAmpersand, 0)
-}
-
-func (s *VariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitVariableExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type NullCoalescingExpressionContext struct {
@@ -25153,16 +23853,6 @@ func (s *NullCoalescingExpressionContext) NullCoalescing() antlr.TerminalNode {
 	return s.GetToken(PHPParserNullCoalescing, 0)
 }
 
-func (s *NullCoalescingExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNullCoalescingExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DefinedOrScanDefinedExpressionContext struct {
 	ExpressionContext
 }
@@ -25195,16 +23885,6 @@ func (s *DefinedOrScanDefinedExpressionContext) DefineExpr() IDefineExprContext 
 	}
 
 	return t.(IDefineExprContext)
-}
-
-func (s *DefinedOrScanDefinedExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDefinedOrScanDefinedExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ArithmeticExpressionContext struct {
@@ -25299,16 +23979,6 @@ func (s *ArithmeticExpressionContext) Dot() antlr.TerminalNode {
 	return s.GetToken(PHPParserDot, 0)
 }
 
-func (s *ArithmeticExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArithmeticExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ScalarExpressionContext struct {
 	ExpressionContext
 }
@@ -25363,16 +24033,6 @@ func (s *ScalarExpressionContext) Label() antlr.TerminalNode {
 	return s.GetToken(PHPParserLabel, 0)
 }
 
-func (s *ScalarExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitScalarExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type PrefixIncDecExpressionContext struct {
 	ExpressionContext
 }
@@ -25413,16 +24073,6 @@ func (s *PrefixIncDecExpressionContext) Inc() antlr.TerminalNode {
 
 func (s *PrefixIncDecExpressionContext) Dec() antlr.TerminalNode {
 	return s.GetToken(PHPParserDec, 0)
-}
-
-func (s *PrefixIncDecExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPrefixIncDecExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ComparisonExpressionContext struct {
@@ -25529,16 +24179,6 @@ func (s *ComparisonExpressionContext) IsNotEq() antlr.TerminalNode {
 	return s.GetToken(PHPParserIsNotEq, 0)
 }
 
-func (s *ComparisonExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitComparisonExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ParentExpressionContext struct {
 	ExpressionContext
 }
@@ -25579,16 +24219,6 @@ func (s *ParentExpressionContext) MemberCallKey() IMemberCallKeyContext {
 	}
 
 	return t.(IMemberCallKeyContext)
-}
-
-func (s *ParentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitParentExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type IndexLegacyCallExpressionContext struct {
@@ -25651,16 +24281,6 @@ func (s *IndexLegacyCallExpressionContext) IndexMemberCallKey() IIndexMemberCall
 	}
 
 	return t.(IIndexMemberCallKeyContext)
-}
-
-func (s *IndexLegacyCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndexLegacyCallExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type OrdinaryAssignmentExpressionContext struct {
@@ -25729,16 +24349,6 @@ func (s *OrdinaryAssignmentExpressionContext) Expression() IExpressionContext {
 	return t.(IExpressionContext)
 }
 
-func (s *OrdinaryAssignmentExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitOrdinaryAssignmentExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DirectFunctionCallExpressionContext struct {
 	ExpressionContext
 }
@@ -25771,16 +24381,6 @@ func (s *DirectFunctionCallExpressionContext) FunctionCall() IFunctionCallContex
 	}
 
 	return t.(IFunctionCallContext)
-}
-
-func (s *DirectFunctionCallExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDirectFunctionCallExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type CastExpressionContext struct {
@@ -25839,16 +24439,6 @@ func (s *CastExpressionContext) Expression() IExpressionContext {
 	}
 
 	return t.(IExpressionContext)
-}
-
-func (s *CastExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitCastExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type InstanceOfExpressionContext struct {
@@ -25914,16 +24504,6 @@ func (s *InstanceOfExpressionContext) InstanceOf() antlr.TerminalNode {
 	return s.GetToken(PHPParserInstanceOf, 0)
 }
 
-func (s *InstanceOfExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInstanceOfExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type LambdaFunctionExpressionContext struct {
 	ExpressionContext
 }
@@ -25956,16 +24536,6 @@ func (s *LambdaFunctionExpressionContext) LambdaFunctionExpr() ILambdaFunctionEx
 	}
 
 	return t.(ILambdaFunctionExprContext)
-}
-
-func (s *LambdaFunctionExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLambdaFunctionExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type BitwiseExpressionContext struct {
@@ -26052,16 +24622,6 @@ func (s *BitwiseExpressionContext) BooleanOr() antlr.TerminalNode {
 	return s.GetToken(PHPParserBooleanOr, 0)
 }
 
-func (s *BitwiseExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitBitwiseExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type FullyQualifiedNamespaceExpressionContext struct {
 	ExpressionContext
 }
@@ -26094,16 +24654,6 @@ func (s *FullyQualifiedNamespaceExpressionContext) FullyQualifiedNamespaceExpr()
 	}
 
 	return t.(IFullyQualifiedNamespaceExprContext)
-}
-
-func (s *FullyQualifiedNamespaceExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFullyQualifiedNamespaceExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type StaticClassAccessExpressionContext struct {
@@ -26142,16 +24692,6 @@ func (s *StaticClassAccessExpressionContext) StaticClassExpr() IStaticClassExprC
 
 func (s *StaticClassAccessExpressionContext) NamespaceSeparator() antlr.TerminalNode {
 	return s.GetToken(PHPParserNamespaceSeparator, 0)
-}
-
-func (s *StaticClassAccessExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticClassAccessExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Expression() (localctx IExpressionContext) {
@@ -27660,16 +26200,6 @@ func (s *FlexiMemberAccessContext) Arguments() IArgumentsContext {
 	return t.(IArgumentsContext)
 }
 
-func (s *FlexiMemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFlexiMemberAccess(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type IndexLegacyCallVariableContext struct {
 	FlexiVariableContext
 }
@@ -27726,16 +26256,6 @@ func (s *IndexLegacyCallVariableContext) IndexMemberCallKey() IIndexMemberCallKe
 	}
 
 	return t.(IIndexMemberCallKeyContext)
-}
-
-func (s *IndexLegacyCallVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndexLegacyCallVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type IndexVariableContext struct {
@@ -27796,16 +26316,6 @@ func (s *IndexVariableContext) IndexMemberCallKey() IIndexMemberCallKeyContext {
 	return t.(IIndexMemberCallKeyContext)
 }
 
-func (s *IndexVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndexVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type CustomVariableContext struct {
 	FlexiVariableContext
 }
@@ -27838,16 +26348,6 @@ func (s *CustomVariableContext) Variable() IVariableContext {
 	}
 
 	return t.(IVariableContext)
-}
-
-func (s *CustomVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitCustomVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FlexiVariable() (localctx IFlexiVariableContext) {
@@ -28158,16 +26658,6 @@ func (s *DefineExprContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DefineExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDefineExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) DefineExpr() (localctx IDefineExprContext) {
 	this := p
 	_ = this
@@ -28390,16 +26880,6 @@ func (s *NormalVariableContext) SquareCurlyExpression(i int) ISquareCurlyExpress
 	return t.(ISquareCurlyExpressionContext)
 }
 
-func (s *NormalVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNormalVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type DynamicVariableContext struct {
 	VariableContext
 }
@@ -28469,16 +26949,6 @@ func (s *DynamicVariableContext) SquareCurlyExpression(i int) ISquareCurlyExpres
 	}
 
 	return t.(ISquareCurlyExpressionContext)
-}
-
-func (s *DynamicVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitDynamicVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type MemberCallVariableContext struct {
@@ -28570,16 +27040,6 @@ func (s *MemberCallVariableContext) SquareCurlyExpression(i int) ISquareCurlyExp
 	}
 
 	return t.(ISquareCurlyExpressionContext)
-}
-
-func (s *MemberCallVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMemberCallVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Variable() (localctx IVariableContext) {
@@ -28883,16 +27343,6 @@ func (s *IncludeContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IncludeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInclude(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) Include() (localctx IIncludeContext) {
 	this := p
 	_ = this
@@ -29043,16 +27493,6 @@ func (s *LeftArrayCreationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LeftArrayCreationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LeftArrayCreationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLeftArrayCreation(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) LeftArrayCreation() (localctx ILeftArrayCreationContext) {
@@ -29219,16 +27659,6 @@ func (s *AssignableContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) Assignable() (localctx IAssignableContext) {
 	this := p
 	_ = this
@@ -29376,16 +27806,6 @@ func (s *ArrayCreationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArrayCreationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArrayCreationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayCreation(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ArrayCreation() (localctx IArrayCreationContext) {
@@ -29711,16 +28131,6 @@ func (s *ArrayDestructuringContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ArrayDestructuringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayDestructuring(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ArrayDestructuring() (localctx IArrayDestructuringContext) {
 	this := p
 	_ = this
@@ -30044,16 +28454,6 @@ func (s *IndexedDestructItemContext) ToStringTree(ruleNames []string, recog antl
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IndexedDestructItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndexedDestructItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) IndexedDestructItem() (localctx IIndexedDestructItemContext) {
 	this := p
 	_ = this
@@ -30194,16 +28594,6 @@ func (s *KeyedDestructItemContext) GetRuleContext() antlr.RuleContext {
 
 func (s *KeyedDestructItemContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *KeyedDestructItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitKeyedDestructItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) KeyedDestructItem() (localctx IKeyedDestructItemContext) {
@@ -30452,16 +28842,6 @@ func (s *LambdaFunctionExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LambdaFunctionExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LambdaFunctionExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLambdaFunctionExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) LambdaFunctionExpr() (localctx ILambdaFunctionExprContext) {
@@ -30870,16 +29250,6 @@ func (s *MatchExprContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MatchExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMatchExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MatchExpr() (localctx IMatchExprContext) {
 	this := p
 	_ = this
@@ -31117,16 +29487,6 @@ func (s *MatchItemContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MatchItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMatchItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MatchItem() (localctx IMatchItemContext) {
 	this := p
 	_ = this
@@ -31330,16 +29690,6 @@ func (s *NewExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NewExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNewExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) NewExpr() (localctx INewExprContext) {
 	this := p
 	_ = this
@@ -31535,16 +29885,6 @@ func (s *AssignmentOperatorContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignmentOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignmentOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) AssignmentOperator() (localctx IAssignmentOperatorContext) {
 	this := p
 	_ = this
@@ -31688,16 +30028,6 @@ func (s *YieldExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *YieldExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *YieldExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitYieldExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) YieldExpression() (localctx IYieldExpressionContext) {
@@ -31887,16 +30217,6 @@ func (s *ArrayItemListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArrayItemListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArrayItemListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayItemList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ArrayItemList() (localctx IArrayItemListContext) {
@@ -32103,16 +30423,6 @@ func (s *ArrayItemContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArrayItemContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArrayItemContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayItem(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ArrayItem() (localctx IArrayItemContext) {
@@ -32347,16 +30657,6 @@ func (s *LambdaFunctionUseVarsContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LambdaFunctionUseVarsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLambdaFunctionUseVars(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) LambdaFunctionUseVars() (localctx ILambdaFunctionUseVarsContext) {
 	this := p
 	_ = this
@@ -32499,16 +30799,6 @@ func (s *LambdaFunctionUseVarContext) ToStringTree(ruleNames []string, recog ant
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LambdaFunctionUseVarContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLambdaFunctionUseVar(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) LambdaFunctionUseVar() (localctx ILambdaFunctionUseVarContext) {
 	this := p
 	_ = this
@@ -32631,16 +30921,6 @@ func (s *QualifiedStaticTypeRefContext) GetRuleContext() antlr.RuleContext {
 
 func (s *QualifiedStaticTypeRefContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *QualifiedStaticTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitQualifiedStaticTypeRef(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) QualifiedStaticTypeRef() (localctx IQualifiedStaticTypeRefContext) {
@@ -32849,16 +31129,6 @@ func (s *TypeRefContext) GetRuleContext() antlr.RuleContext {
 
 func (s *TypeRefContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitTypeRef(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) TypeRef() (localctx ITypeRefContext) {
@@ -33226,16 +31496,6 @@ func (s *AnonymousClassContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AnonymousClassContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAnonymousClass(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) AnonymousClass() (localctx IAnonymousClassContext) {
 	this := p
 	_ = this
@@ -33568,16 +31828,6 @@ func (s *IndirectTypeRefContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IndirectTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIndirectTypeRef(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) IndirectTypeRef() (localctx IIndirectTypeRefContext) {
 	this := p
 	_ = this
@@ -33688,16 +31938,6 @@ func (s *QualifiedNamespaceNameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *QualifiedNamespaceNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *QualifiedNamespaceNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitQualifiedNamespaceName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) QualifiedNamespaceName() (localctx IQualifiedNamespaceNameContext) {
@@ -33853,16 +32093,6 @@ func (s *NamespaceUseDeclarationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NamespaceUseDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NamespaceUseDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceUseDeclaration(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) NamespaceUseDeclaration() (localctx INamespaceUseDeclarationContext) {
@@ -34059,16 +32289,6 @@ func (s *NamespaceUseTailContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NamespaceUseTailContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NamespaceUseTailContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceUseTail(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) NamespaceUseTail() (localctx INamespaceUseTailContext) {
@@ -34283,16 +32503,6 @@ func (s *NamespaceUseClauseContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NamespaceUseClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNamespaceUseClause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) NamespaceUseClause() (localctx INamespaceUseClauseContext) {
 	this := p
 	_ = this
@@ -34479,16 +32689,6 @@ func (s *QualifiedNamespaceNameListContext) ToStringTree(ruleNames []string, rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *QualifiedNamespaceNameListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitQualifiedNamespaceNameList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) QualifiedNamespaceNameList() (localctx IQualifiedNamespaceNameListContext) {
 	this := p
 	_ = this
@@ -34663,16 +32863,6 @@ func (s *ArgumentsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ArgumentsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArguments(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Arguments() (localctx IArgumentsContext) {
@@ -34963,16 +33153,6 @@ func (s *ActualArgumentContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ActualArgumentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitActualArgument(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ActualArgument() (localctx IActualArgumentContext) {
 	this := p
 	_ = this
@@ -35155,16 +33335,6 @@ func (s *ArgumentNameContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ArgumentNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArgumentName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ArgumentName() (localctx IArgumentNameContext) {
 	this := p
 	_ = this
@@ -35294,16 +33464,6 @@ func (s *UnitializerContext) Minus() antlr.TerminalNode {
 	return s.GetToken(PHPParserMinus, 0)
 }
 
-func (s *UnitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitUnitializer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ConstantStringitializerContext struct {
 	ConstantInitializerContext
 }
@@ -35371,16 +33531,6 @@ func (s *ConstantStringitializerContext) Dot(i int) antlr.TerminalNode {
 	return s.GetToken(PHPParserDot, i)
 }
 
-func (s *ConstantStringitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitConstantStringitializer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type ExpressionitializerContext struct {
 	ConstantInitializerContext
 }
@@ -35413,16 +33563,6 @@ func (s *ExpressionitializerContext) Expression() IExpressionContext {
 	}
 
 	return t.(IExpressionContext)
-}
-
-func (s *ExpressionitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitExpressionitializer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 type ArrayInitializerContext struct {
@@ -35481,16 +33621,6 @@ func (s *ArrayInitializerContext) OpenSquareBracket() antlr.TerminalNode {
 
 func (s *ArrayInitializerContext) CloseSquareBracket() antlr.TerminalNode {
 	return s.GetToken(PHPParserCloseSquareBracket, 0)
-}
-
-func (s *ArrayInitializerContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitArrayInitializer(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ConstantInitializer() (localctx IConstantInitializerContext) {
@@ -35787,16 +33917,6 @@ func (s *ConstantStringContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ConstantStringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitConstantString(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ConstantString() (localctx IConstantStringContext) {
 	this := p
 	_ = this
@@ -35932,16 +34052,6 @@ func (s *ConstantContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ConstantContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitConstant(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Constant() (localctx IConstantContext) {
@@ -36097,16 +34207,6 @@ func (s *LiteralConstantContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LiteralConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitLiteralConstant(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) LiteralConstant() (localctx ILiteralConstantContext) {
 	this := p
 	_ = this
@@ -36245,16 +34345,6 @@ func (s *NumericConstantContext) GetRuleContext() antlr.RuleContext {
 
 func (s *NumericConstantContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *NumericConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitNumericConstant(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) NumericConstant() (localctx INumericConstantContext) {
@@ -36466,16 +34556,6 @@ func (s *ClassConstantContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ClassConstantContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ClassConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitClassConstant(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ClassConstant() (localctx IClassConstantContext) {
@@ -36699,16 +34779,6 @@ func (s *StringConstantContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StringConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStringConstant(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) StringConstant() (localctx IStringConstantContext) {
 	this := p
 	_ = this
@@ -36884,16 +34954,6 @@ func (s *StringContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StringContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StringContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitString(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) String_() (localctx IStringContext) {
@@ -37100,16 +35160,6 @@ func (s *HereDocContentContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *HereDocContentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitHereDocContent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) HereDocContent() (localctx IHereDocContentContext) {
 	this := p
 	_ = this
@@ -37267,16 +35317,6 @@ func (s *InterpolatedStringPartContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InterpolatedStringPartContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InterpolatedStringPartContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitInterpolatedStringPart(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) InterpolatedStringPart() (localctx IInterpolatedStringPartContext) {
@@ -37491,16 +35531,6 @@ func (s *ChainListContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ChainListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitChainList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ChainList() (localctx IChainListContext) {
 	this := p
 	_ = this
@@ -37641,16 +35671,6 @@ func (s *ChainContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ChainContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ChainContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitChain(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Chain() (localctx IChainContext) {
@@ -37842,16 +35862,6 @@ func (s *AssignableChainContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AssignableChainContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AssignableChainContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignableChain(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) AssignableChain() (localctx IAssignableChainContext) {
@@ -38046,16 +36056,6 @@ func (s *FunctionCallAssignableContext) ToStringTree(ruleNames []string, recog a
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FunctionCallAssignableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCallAssignable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) FunctionCallAssignable() (localctx IFunctionCallAssignableContext) {
 	this := p
 	_ = this
@@ -38188,16 +36188,6 @@ func (s *FunctionCallAssignableAccessContext) GetRuleContext() antlr.RuleContext
 
 func (s *FunctionCallAssignableAccessContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionCallAssignableAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCallAssignableAccess(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FunctionCallAssignableAccess() (localctx IFunctionCallAssignableAccessContext) {
@@ -38349,16 +36339,6 @@ func (s *AssignableChainOriginContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignableChainOriginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignableChainOrigin(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) AssignableChainOrigin() (localctx IAssignableChainOriginContext) {
 	this := p
 	_ = this
@@ -38497,16 +36477,6 @@ func (s *AssignableChainAccessContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignableChainAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignableChainAccess(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) AssignableChainAccess() (localctx IAssignableChainAccessContext) {
 	this := p
 	_ = this
@@ -38637,16 +36607,6 @@ func (s *StaticMethodCallContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StaticMethodCallContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StaticMethodCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitStaticMethodCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) StaticMethodCall() (localctx IStaticMethodCallContext) {
@@ -38790,16 +36750,6 @@ func (s *ChainOriginContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ChainOriginContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ChainOriginContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitChainOrigin(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) ChainOrigin() (localctx IChainOriginContext) {
@@ -38961,16 +36911,6 @@ func (s *MemberAccessContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MemberAccessContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMemberAccess(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MemberAccess() (localctx IMemberAccessContext) {
 	this := p
 	_ = this
@@ -39101,16 +37041,6 @@ func (s *FunctionCallContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FunctionCallContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FunctionCall() (localctx IFunctionCallContext) {
@@ -39266,16 +37196,6 @@ func (s *FunctionCallNameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FunctionCallNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionCallNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitFunctionCallName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) FunctionCallName() (localctx IFunctionCallNameContext) {
@@ -39486,16 +37406,6 @@ func (s *ActualArgumentsContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ActualArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitActualArguments(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ActualArguments() (localctx IActualArgumentsContext) {
 	this := p
 	_ = this
@@ -39690,16 +37600,6 @@ func (s *ChainBaseContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ChainBaseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitChainBase(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ChainBase() (localctx IChainBaseContext) {
 	this := p
 	_ = this
@@ -39866,16 +37766,6 @@ func (s *KeyedFieldNameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *KeyedFieldNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *KeyedFieldNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitKeyedFieldName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) KeyedFieldName() (localctx IKeyedFieldNameContext) {
@@ -40061,16 +37951,6 @@ func (s *KeyedSimpleFieldNameContext) GetRuleContext() antlr.RuleContext {
 
 func (s *KeyedSimpleFieldNameContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *KeyedSimpleFieldNameContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitKeyedSimpleFieldName(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) KeyedSimpleFieldName() (localctx IKeyedSimpleFieldNameContext) {
@@ -40300,16 +38180,6 @@ func (s *KeyedVariableContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *KeyedVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitKeyedVariable(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) KeyedVariable() (localctx IKeyedVariableContext) {
 	this := p
 	_ = this
@@ -40532,16 +38402,6 @@ func (s *SquareCurlyExpressionContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SquareCurlyExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitSquareCurlyExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) SquareCurlyExpression() (localctx ISquareCurlyExpressionContext) {
 	this := p
 	_ = this
@@ -40735,16 +38595,6 @@ func (s *AssignmentListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AssignmentListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AssignmentListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignmentList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) AssignmentList() (localctx IAssignmentListContext) {
@@ -40941,16 +38791,6 @@ func (s *AssignmentListElementContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignmentListElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitAssignmentListElement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) AssignmentListElement() (localctx IAssignmentListElementContext) {
 	this := p
 	_ = this
@@ -41094,16 +38934,6 @@ func (s *ClassModifierContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ClassModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitClassModifier(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) ClassModifier() (localctx IClassModifierContext) {
 	this := p
 	_ = this
@@ -41211,16 +39041,6 @@ func (s *IdentifierContext) GetRuleContext() antlr.RuleContext {
 
 func (s *IdentifierContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *IdentifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitIdentifier(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) Identifier() (localctx IIdentifierContext) {
@@ -41895,16 +39715,6 @@ func (s *KeyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) st
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *KeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitKey(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) Key() (localctx IKeyContext) {
 	this := p
 	_ = this
@@ -42040,16 +39850,6 @@ func (s *MemberModifierContext) GetRuleContext() antlr.RuleContext {
 
 func (s *MemberModifierContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *MemberModifierContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMemberModifier(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) MemberModifier() (localctx IMemberModifierContext) {
@@ -42292,16 +40092,6 @@ func (s *MagicConstantContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MagicConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMagicConstant(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MagicConstant() (localctx IMagicConstantContext) {
 	this := p
 	_ = this
@@ -42469,16 +40259,6 @@ func (s *MagicMethodContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MagicMethodContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitMagicMethod(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *PHPParser) MagicMethod() (localctx IMagicMethodContext) {
 	this := p
 	_ = this
@@ -42604,16 +40384,6 @@ func (s *PrimitiveTypeContext) GetRuleContext() antlr.RuleContext {
 
 func (s *PrimitiveTypeContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *PrimitiveTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitPrimitiveType(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) PrimitiveType() (localctx IPrimitiveTypeContext) {
@@ -42781,16 +40551,6 @@ func (s *CastOperationContext) GetRuleContext() antlr.RuleContext {
 
 func (s *CastOperationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *CastOperationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case PHPParserVisitor:
-		return t.VisitCastOperation(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *PHPParser) CastOperation() (localctx ICastOperationContext) {
