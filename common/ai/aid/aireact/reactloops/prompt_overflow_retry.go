@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -75,9 +76,15 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 	}
 	measured := int64(r.completeInputTokens(prompt))
 	var limit int64
-	if provider, model, key := r.primaryModelContext(); key != "" && key == evidence.ContextKey && provider == evidence.Provider && model == evidence.Model {
-		limit = config.RecordModelContextOverflow(provider, model, measured, &evidence, key)
-		config.EmitModelContextFor(provider, model, measured, key)
+	if _, _, key := r.primaryModelContext(); key != "" {
+		// Overflow evidence belongs to the request that failed, which may finish
+		// after the selected model changes. Never fall back to name-only recovery
+		// for a quality request with a concrete context identity.
+		if evidence.ContextKey == "" {
+			return false
+		}
+		limit = config.RecordModelContextOverflow(evidence.Provider, evidence.Model, measured, &evidence, evidence.ContextKey)
+		config.EmitModelContextFor(evidence.Provider, evidence.Model, measured, evidence.ContextKey)
 	} else {
 		limit = config.RecordPromptOverflow(evidence.Provider, evidence.Model, measured, &evidence)
 	}
@@ -98,13 +105,32 @@ func (r *ReActLoop) primaryModelContext() (provider, model, key string) {
 	if r.useSpeedPriorityAI {
 		return
 	}
+	if modelConfig := r.requestModelConfig; modelConfig != nil {
+		return modelConfig.GetProvider().GetType(), modelConfig.GetModelName(), aispec.ModelContextIdentity(modelConfig)
+	}
 	if config, ok := r.config.(*aicommon.Config); ok {
 		return config.PrimaryModelContext()
 	}
 	return
 }
 func (r *ReActLoop) promptOverflowAutoAdjustDisabled(err error) bool {
-	provider, model, key := r.primaryModelContext()
+	_, _, key := r.primaryModelContext()
 	evidence, ok := aicommon.PromptOverflowEvidenceFrom(err)
-	return ok && key != "" && key == evidence.ContextKey && provider == evidence.Provider && model == evidence.Model && yakit.GetAIModelContext(consts.GetGormProfileDatabase(), provider, model, key).DisableAutoAdjust
+	return ok && key != "" && evidence.ContextKey != "" && yakit.GetAIModelContext(consts.GetGormProfileDatabase(), evidence.Provider, evidence.Model, evidence.ContextKey).DisableAutoAdjust
+}
+
+func (r *ReActLoop) confirmModelContextSuccess(descriptor *LoopResultDescriptor, tokens int64) {
+	if _, _, key := r.primaryModelContext(); key == "" || descriptor == nil {
+		return
+	}
+	identity := descriptor.Snapshot()
+	if identity.ContextKey == "" {
+		return
+	}
+	config, ok := r.config.(*aicommon.Config)
+	if !ok || config == nil {
+		return
+	}
+	config.ConfirmModelContextSuccess(identity.Provider, identity.Model, identity.ContextKey)
+	config.EmitModelContextFor(identity.Provider, identity.Model, tokens, identity.ContextKey)
 }
