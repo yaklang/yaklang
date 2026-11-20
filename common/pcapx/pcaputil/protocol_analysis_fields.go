@@ -125,21 +125,28 @@ type httpMessageEvidence struct {
 	digest            [32]byte
 }
 
-// HTTPResponseBody returns only the body of a fully admitted HTTP/1 message.
-// Chunk framing is decoded over that exact message's bytes; no stream recovery
-// or inference of a missing request method is performed.
-func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
+// HTTPMessageBody returns the body of a fully admitted HTTP/1 request or
+// response. Chunk framing is decoded over that exact message's bytes; no stream
+// recovery or inference of a missing request method is performed. The third
+// result reports whether the message is a request; the fourth reports success.
+func (e *ProtocolEvent) HTTPMessageBody() (io.Reader, *int64, bool, bool) {
 	if e == nil || e.nativeHTTPMessage == nil || e.nativeDiagnosticError != "" || e.Completeness != "message" && e.Completeness != "transaction" {
-		return nil, nil, false
+		return nil, nil, false, false
 	}
 	h := e.nativeHTTPMessage
-	status, _ := displayUint(h.fields["Status Code"])
-	if !h.response || !h.complete || status < 200 || h.header > len(e.Raw) || h.header < 0 || e.Status == "malformed" || e.Status == "encrypted" || sha256.Sum256(e.Raw) != h.digest {
-		return nil, nil, false
+	if !h.complete || h.header > len(e.Raw) || h.header < 0 || e.Status == "malformed" || e.Status == "encrypted" || sha256.Sum256(e.Raw) != h.digest {
+		return nil, nil, false, false
+	}
+	request := !h.response
+	if !request {
+		status, _ := displayUint(h.fields["Status Code"])
+		if status < 200 {
+			return nil, nil, false, false
+		}
 	}
 	var length *int64
 	// Content-Length is literal metadata; HEAD/304 may declare a representation
-	// length even though framing correctly admitted an empty response body.
+	// length even though framing correctly admitted an empty body.
 	displayHTTPHeaderField(e, "Content-Length", func(v any) {
 		if s, ok := v.(string); ok {
 			if n, err := strconv.ParseInt(s, 10, 64); err == nil && n >= 0 {
@@ -151,7 +158,31 @@ func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
 	if h.chunked {
 		body = httputil.NewChunkedReader(body)
 	}
+	return body, length, request, true
+}
+
+// HTTPResponseBody returns only the body of a fully admitted HTTP/1 response.
+func (e *ProtocolEvent) HTTPResponseBody() (io.Reader, *int64, bool) {
+	body, length, request, ok := e.HTTPMessageBody()
+	if !ok || request {
+		return nil, nil, false
+	}
 	return body, length, true
+}
+
+// HTTPMessageHeaderValues returns accepted literal values for one header in
+// the current HTTP message. Header evidence remains directional.
+func (e *ProtocolEvent) HTTPMessageHeaderValues(name string) []string {
+	if e == nil || e.nativeDiagnosticError != "" {
+		return nil
+	}
+	var out []string
+	displayHTTPHeaderField(e, name, func(value any) {
+		if text, ok := value.(string); ok {
+			out = append(out, text)
+		}
+	}, &displayProjection{snapshot: &DisplayFieldSnapshot{}, remaining: maxDisplayFieldValues * 4})
+	return out
 }
 
 // Both export manifests and display fields use the same accepted literal
@@ -224,13 +255,20 @@ func analysisDisplayBindings() []displayFieldBinding {
 		header    bool
 		typ       DisplayFieldType
 		bits      int
+		request   bool
+		response  bool
 	}{
-		{"http.host", "Host", false, DisplayString, 0}, {"http.request.uri", "Request URI", false, DisplayString, 0}, {"http.request.version", "Protocol", false, DisplayString, 0},
-		{"http.user_agent", "User-Agent", true, DisplayString, 0}, {"http.response.location", "Location", true, DisplayString, 0}, {"http.response.content_type", "Content-Type", true, DisplayString, 0},
-		{"http.request.header.length", "Content-Length", true, DisplayUnsigned, 16}, {"http.cookie", "Cookie", true, DisplayString, 0}, {"http.request.authorization", "Authorization", true, DisplayString, 0},
+		{"http.host", "Host", false, DisplayString, 0, false, false}, {"http.request.uri", "Request URI", false, DisplayString, 0, true, false}, {"http.request.version", "Protocol", false, DisplayString, 0, true, false},
+		{"http.user_agent", "User-Agent", true, DisplayString, 0, false, false}, {"http.response.location", "Location", true, DisplayString, 0, false, true}, {"http.response.content_type", "Content-Type", true, DisplayString, 0, false, true},
+		{"http.request.content_type", "Content-Type", true, DisplayString, 0, true, false},
+		{"http.request.header.length", "Content-Length", true, DisplayUnsigned, 16, true, false}, {"http.cookie", "Cookie", true, DisplayString, 0, true, false}, {"http.request.authorization", "Authorization", true, DisplayString, 0, true, false},
 	} {
 		b := displayCustom("http", f.name, "Literal HTTP "+f.key, f.typ, f.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 			if e.nativeDiagnosticError != "" {
+				return
+			}
+			request, response := httpDisplayDirection(e)
+			if f.request && response && !request || f.response && request && !response {
 				return
 			}
 			if f.header {
@@ -357,6 +395,13 @@ func kerberosAnalysisDisplayBindings() []displayFieldBinding {
 		}))
 	}
 	return out
+}
+
+func httpDisplayDirection(e *ProtocolEvent) (request, response bool) {
+	p := &displayProjection{snapshot: &DisplayFieldSnapshot{}, remaining: 8}
+	displayHTTPValues(e, true, func(any) { request = true }, p)
+	displayHTTPValues(e, false, func(any) { response = true }, p)
+	return
 }
 
 func displayScalarValues(value any, emit func(any), p *displayProjection) {

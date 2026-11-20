@@ -306,6 +306,30 @@ func TestTFTPOctetFileBoundaries(t *testing.T) {
 	}
 }
 
+func TestTFTPFileAutoAssemblyUsesRequestGrammarOnAnyPort(t *testing.T) {
+	body := append(bytes.Repeat([]byte{'A'}, 512), []byte("tail")...)
+	steps := []tftpPublicStep{
+		{0, 40000, 6969, []byte("\x00\x01auto.bin\x00octet\x00")},
+		{1, 50000, 40000, append([]byte{0, 3, 0, 1}, body[:512]...)},
+		{0, 40000, 50000, []byte{0, 4, 0, 1}},
+		{1, 50000, 40000, append([]byte{0, 3, 0, 2}, body[512:]...)},
+		{0, 40000, 50000, []byte{0, 4, 0, 2}},
+	}
+	events, _ := tftpPublicPackets(t, steps, WithProtocolTFTPFileAutoAssembly(4096))
+	require.Len(t, events, len(steps))
+	require.Nil(t, events[len(events)-1].sessionError)
+	require.Equal(t, body, events[len(events)-1].Session["File Bytes"])
+	require.Equal(t, "download", events[len(events)-1].ApplicationObjectDirection())
+	require.Equal(t, "auto.bin", events[len(events)-1].Session["Filename"])
+}
+
+func TestTFTPFileAutoAssemblyValidation(t *testing.T) {
+	_, err := NewPacketAnalyzer(WithProtocolTFTPFileAutoAssembly(0))
+	require.ErrorContains(t, err, "1..16777216")
+	_, err = NewPacketAnalyzer(WithProtocolTFTPFileAutoAssembly(MaxTFTPFileBytes + 1))
+	require.ErrorContains(t, err, "1..16777216")
+}
+
 // A completed file must release its retained data/evidence reservation without
 // releasing the conversation identity needed to reject delayed datagrams.
 func TestTFTPFileCompletionReleasesBytes(t *testing.T) {

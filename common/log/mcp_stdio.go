@@ -14,6 +14,10 @@ func init() {
 	ConfigureMCPStdioLogging(os.Args)
 }
 
+func init() {
+	ConfigureSharkJSONLogging(os.Args)
+}
+
 // ConfigureMCPStdioLogging detects whether args start Yak's MCP command with
 // the stdio transport. It is intentionally called from package init so logs
 // emitted by dependent package initializers cannot corrupt the JSON-RPC
@@ -42,6 +46,28 @@ func IsMCPStdioLogging() bool {
 // IsMCPStdioCommand identifies the stdio CLI independently of inherited logging
 // settings, so launchers can avoid initializing services in the supervisor.
 func IsMCPStdioCommand(args []string) bool { return isMCPStdioCommand(args) }
+
+// ConfigureSharkJSONLogging reserves stdout for shark JSON/JSONL output before
+// dependent package initializers can emit diagnostics.
+func ConfigureSharkJSONLogging(args []string) bool {
+	if !isSharkJSONCommand(args) {
+		return false
+	}
+	SetOutput(os.Stderr)
+	return true
+}
+
+func isSharkJSONCommand(args []string) bool {
+	if len(args) < 2 || args[1] != "shark" {
+		return false
+	}
+	for _, arg := range args[2:] {
+		if arg == "--json" || arg == "--json-physical-only" || strings.HasPrefix(arg, "--json-file") {
+			return true
+		}
+	}
+	return false
+}
 
 func envEnablesMCPStdioMode() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(mcpStdioModeEnv))) {

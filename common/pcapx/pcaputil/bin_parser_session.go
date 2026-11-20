@@ -835,7 +835,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.consumeRedis(dir, e)
 	case "websocket":
 		if e.Entry == "WebSocket" {
+			if f.ws.evidenceLimit == 0 {
+				f.ws.evidenceLimit = f.a.budget.MaxCollectionElements
+			}
+			f.ws.observeMessageSource(dir, e.Raw, e)
 			e.Session, err = f.ws.consume(dir, e.Raw)
+			if err == nil && websocketCompleteApplicationMessage(e.Session) {
+				e.applicationMessagePacketRefs = f.ws.takeMessageSource(dir)
+			}
 			if err == nil {
 				err = f.consumeOCPP(dir, e)
 			}

@@ -16,6 +16,9 @@ type binFTP struct {
 	clientKnown       bool
 	dataProtected     bool
 	pendingProtection string
+	transferID        uint64
+	transferCommand   string
+	resumePending     bool
 }
 
 func probeFTP(w []byte, limit int) ProbeResult {

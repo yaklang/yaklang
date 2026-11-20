@@ -264,6 +264,14 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 					}
 				}
 				e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements), tftpFileEvidence{ID: e.ID, Refs: e.SourceBytes.PacketRefs})
+				if err == nil && e.Session != nil {
+					if _, complete := e.Session["File Bytes"]; complete {
+						e.applicationObjectDirection = "download"
+						if t.write {
+							e.applicationObjectDirection = "upload"
+						}
+					}
+				}
 				if err != nil && dir == 1 && t.server == "" && tftpCandidatePrefix(w) {
 					// A partial OACK/DATA identifies this exact candidate port,
 					// without committing the server or joining UDP datagrams.

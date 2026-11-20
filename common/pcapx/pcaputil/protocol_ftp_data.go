@@ -81,6 +81,9 @@ func (f *binFlow) observeFTPDataControl(dir int, e *ProtocolEvent) {
 		if name == "PROT" {
 			s.pendingProtection = strings.TrimSpace(string(e.Raw[len("PROT"):]))
 		}
+		if name == "REST" {
+			s.resumePending = true
+		}
 	}
 	if !s.clientKnown {
 		return
@@ -97,6 +100,18 @@ func (f *binFlow) observeFTPDataControl(dir int, e *ProtocolEvent) {
 	a.ftpMu.Lock()
 	defer a.ftpMu.Unlock()
 	a.expireFTPData(e.Timestamp)
+	if role == "reply" && s.transferID != 0 && replyTo == s.transferCommand && code >= 200 {
+		if code == 226 || code == 250 {
+			a.finishFTPFileLocked(s.transferID, e, code)
+		} else {
+			a.abortFTPFileLocked(s.transferID)
+		}
+		s.transferID, s.transferCommand = 0, ""
+	}
+	if role == "command" && name == "ABOR" && s.transferID != 0 {
+		a.abortFTPFileLocked(s.transferID)
+		s.transferID, s.transferCommand = 0, ""
+	}
 	if role == "reply" && ((replyTo == "PASV" && code == 227) || (replyTo == "EPSV" && code == 229)) {
 		p, ok := ftpPassivePort(code, string(e.Raw))
 		if !ok {
@@ -140,6 +155,11 @@ func (f *binFlow) observeFTPDataControl(dir int, e *ProtocolEvent) {
 		if e.ID == 0 {
 			e.ID = a.ids.Add(1)
 		}
+		resumed := s.resumePending
+		s.resumePending = false
+		if name == "RETR" || name == "STOR" || name == "APPE" {
+			s.transferID, s.transferCommand = e.ID, name
+		}
 		for key, b := range a.ftpEndpoints {
 			if b.control == f.id && !b.ambiguous {
 				b.command, b.transfer = name, e.ID
@@ -159,6 +179,9 @@ func (f *binFlow) observeFTPDataControl(dir int, e *ProtocolEvent) {
 				b.touched = a.ftpClock
 				a.ftpEndpoints[key] = b
 				e.Session["Data Transfer ID"] = e.ID
+				if !resumed {
+					f.startFTPFileTransferLocked(e, name, b.file)
+				}
 			}
 		}
 	}
@@ -191,6 +214,7 @@ func (a *binParser) matchFTPData(f *binFlow, ts time.Time) *ftpDataBinding {
 func (a *binParser) forgetFTPControl(id uint64) {
 	a.ftpMu.Lock()
 	defer a.ftpMu.Unlock()
+	a.abortFTPFilesForControl(id)
 	for k, b := range a.ftpEndpoints {
 		if b.control == id && !b.ambiguous {
 			a.buffered.Add(-b.charge)
@@ -201,6 +225,9 @@ func (a *binParser) forgetFTPControl(id uint64) {
 func (a *binParser) closeFTPEndpoints() {
 	a.ftpMu.Lock()
 	defer a.ftpMu.Unlock()
+	for transfer := range a.ftpFiles {
+		a.abortFTPFileLocked(transfer)
+	}
 	for k, b := range a.ftpEndpoints {
 		a.buffered.Add(-b.charge)
 		delete(a.ftpEndpoints, k)
@@ -232,6 +259,10 @@ func (f *binFlow) emitFTPDataChunk(dir int, data []byte, ts time.Time) {
 	e.Session = map[string]any{"Packet Name": "DATA", "Transfer Command": b.command, "File Name": b.file, "Control Flow ID": b.control, "Data Transfer ID": b.transfer, "Stream Offset": d.offset, "Payload Bytes": len(data), "Transfer Completion": "not established by this chunk", "Data Protection": b.protected, "Payload Decrypted": f.byteSource == "decrypted", "Association": "control command + negotiated passive endpoint + peer addresses + capture domain"}
 	e.semanticFields = cloneSession(e.Session)
 	e.Summary = fmt.Sprintf("FTP DATA %s %s · offset %d · %d bytes", b.command, b.file, d.offset, len(data))
+	if e.ID == 0 {
+		e.ID = f.a.ids.Add(1)
+	}
+	f.a.appendFTPFileChunk(e, b)
 	d.offset += uint64(len(data))
 	d.pruneContributions(f.a)
 	f.a.messages.Add(1)

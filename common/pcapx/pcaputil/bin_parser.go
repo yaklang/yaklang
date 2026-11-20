@@ -72,6 +72,11 @@ type ProtocolEvent struct {
 	doipAssociationRefusal             bool // private complete-frame refusal scope
 	nativeCANRecord                    bool
 	ocpp                               bool
+	applicationMessagePacketRefs       []PacketReference
+	applicationObjectDirection         string
+	applicationObjectURI               string
+	applicationObjectAuthority         string
+	applicationObjectMethod            string
 	Domain                             CaptureDomain
 	SourceBytes                        ByteSource
 	// CarrierLayers lists observed protocol envelopes between the physical
@@ -106,6 +111,33 @@ type ProtocolEvent struct {
 	historySequence uint64
 	ipp             bool
 	sessionError    *ProtocolError
+}
+
+// ApplicationMessagePacketRefs returns the physical contributors to a complete
+// application message whose bytes may span several protocol frames.
+func (e *ProtocolEvent) ApplicationMessagePacketRefs() []PacketReference {
+	if e == nil {
+		return nil
+	}
+	return append([]PacketReference(nil), e.applicationMessagePacketRefs...)
+}
+
+// ApplicationObjectDirection reports the observed application transfer
+// direction when a complete object is available. Empty means not established.
+func (e *ProtocolEvent) ApplicationObjectDirection() string {
+	if e == nil {
+		return ""
+	}
+	return e.applicationObjectDirection
+}
+
+// ApplicationObjectContext reports retained request context for a complete
+// application object when the carrying protocol provides it.
+func (e *ProtocolEvent) ApplicationObjectContext() (uri, authority, method string) {
+	if e == nil {
+		return "", "", ""
+	}
+	return e.applicationObjectURI, e.applicationObjectAuthority, e.applicationObjectMethod
 }
 
 // BinParserEvent is retained for source compatibility. Use ProtocolEvent.
@@ -611,6 +643,8 @@ type BinParserBinding struct {
 type BinParserConfig struct {
 	TFTPFilePort       uint16
 	TFTPFileBytesLimit int
+	TFTPFileAuto       bool
+	FTPFileBytesLimit  int
 	// DecodeDNP3ReadPoints opts into bounded class READ/static point observations.
 	DecodeDNP3ReadPoints bool
 	// DecodeDNP3TransportFragments enables bounded TCP DNP3 transport assembly.
@@ -725,6 +759,8 @@ type binParser struct {
 	ftpMu                                                                      sync.Mutex
 	ftpClock                                                                   time.Time
 	ftpEndpoints                                                               map[ftpDataKey]ftpDataBinding
+	ftpFiles                                                                   map[uint64]*ftpFileTransfer
+	ftpFileBytes                                                               int64
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool                                       // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore                               // udpMu; token quarantine must survive unrelated UDP expiry
@@ -841,7 +877,13 @@ func (c *CaptureConfig) prepareBinParser() error {
 	if config.TFTPFilePort != 0 && c.datagramDecodeAs[config.TFTPFilePort] != "" {
 		return fmt.Errorf("TFTP file service conflicts with explicit DecodeAs")
 	}
-	if config.TFTPFileBytesLimit < 0 || config.TFTPFileBytesLimit > tftpMaximumFileBytes || (config.TFTPFilePort == 0) != (config.TFTPFileBytesLimit == 0) {
+	if config.FTPFileBytesLimit < 0 || config.FTPFileBytesLimit > MaxFTPFileBytes {
+		return fmt.Errorf("invalid FTP file assembly configuration")
+	}
+	if config.TFTPFileBytesLimit < 0 || config.TFTPFileBytesLimit > tftpMaximumFileBytes ||
+		config.TFTPFileBytesLimit == 0 && (config.TFTPFilePort != 0 || config.TFTPFileAuto) ||
+		config.TFTPFileBytesLimit > 0 && !config.TFTPFileAuto && config.TFTPFilePort == 0 ||
+		config.TFTPFileAuto && config.TFTPFilePort != 0 {
 		return fmt.Errorf("invalid TFTP file assembly configuration")
 	}
 	if config.MaxMessageBytes < 64 || config.MaxMessageBytes > 64<<20 || config.MaxBufferedBytes < config.MaxMessageBytes || config.ProbeBytes < 16 || config.ProbeBytes > config.MaxMessageBytes {
