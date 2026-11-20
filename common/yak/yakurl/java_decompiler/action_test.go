@@ -116,7 +116,7 @@ func TestJavaDecompilerAction_Get(t *testing.T) {
 
 	// Test decompiling a class file
 	t.Run("TestDecompileClass", func(t *testing.T) {
-		// First find a .class file from the root listing (or recursively)
+		// First find a .java source entry from the root listing (or recursively)
 		var classPath string
 
 		// Helper function to find a class file
@@ -139,7 +139,7 @@ func TestJavaDecompilerAction_Get(t *testing.T) {
 			}
 
 			for _, res := range resp.Resources {
-				if strings.HasSuffix(res.ResourceName, ".class") {
+				if strings.HasSuffix(res.ResourceName, ".java") {
 					classPath = res.Path
 					return true
 				}
@@ -155,7 +155,7 @@ func TestJavaDecompilerAction_Get(t *testing.T) {
 		}
 
 		if !findClassFile(".") {
-			t.Skip("No .class files found in JAR, skipping decompilation test")
+			t.Skip("No .java entries found in JAR, skipping decompilation test")
 		}
 
 		// Decompile the class
