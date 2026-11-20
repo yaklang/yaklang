@@ -33,9 +33,11 @@ func setContextTestThreshold(t *testing.T, cfg *aicommon.Config, key string, tok
 }
 
 // Exercise the real tier callback and HTTP gateway for both ReAct protocols:
-// capture A, select/edit B, send A, compress/retry A, then start the next round B.
+// build/check A's threshold, pause immediately before gateway model selection,
+// select/edit B, resume sending, then compress/retry A and start the next round B.
+// Channels force the TOCTOU interleaving without sleeps or scheduler timing.
 // Identical display names deliberately rule out name-only identity checks.
-func TestModelContextSwitchPinsPromptGatewayAndCompression(t *testing.T) {
+func TestModelContextTOCTOUPinsPromptGatewayAndCompression(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
 			yakit.GuardConfigurationForTest(t)
@@ -77,6 +79,22 @@ func TestModelContextSwitchPinsPromptGatewayAndCompression(t *testing.T) {
 			selectContextTestModel(a)
 			_, cfg := newPromptOverflowRetryTestLoop(t, aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1))
 			require.NoError(t, aicommon.WithTieredAICallback(false)(cfg))
+			route := cfg.GetRawAICallbacks().QualityPriorityRaw
+			require.NotNil(t, route)
+			requestReady, allowRequest := make(chan struct{}), make(chan struct{})
+			var pauseOnce, releaseOnce sync.Once
+			release := func() { releaseOnce.Do(func() { close(allowRequest) }) }
+			t.Cleanup(release)
+			require.NoError(t, aicommon.WithQualityPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				pauseOnce.Do(func() {
+					close(requestReady)
+					select {
+					case <-allowRequest:
+					case <-c.GetContext().Done():
+					}
+				})
+				return route(c, req)
+			})(cfg))
 			loop := makeSchemaStabilityTestLoop(cfg)
 			loop.SetCurrentTask(cfg.DefaultTask)
 			t.Cleanup(loop.Release)
@@ -88,8 +106,6 @@ func TestModelContextSwitchPinsPromptGatewayAndCompression(t *testing.T) {
 			operator := &LoopActionHandlerOperator{}
 			input := loop.captureLoopPromptBuildInput("binding", "task", "context", nil, "", operator)
 
-			selectContextTestModel(b)
-			setContextTestThreshold(t, cfg, bKey, 300000)
 			build := func(input *loopPromptBuildInput, want int64) *LoopPromptAssemblyResult {
 				result, err := loop.generateLoopPromptFromInput(input)
 				require.NoError(t, err)
@@ -105,13 +121,37 @@ func TestModelContextSwitchPinsPromptGatewayAndCompression(t *testing.T) {
 				return descriptor, err
 			}
 			first := build(input, 400000)
-			_, err := call(first)
+			result := make(chan error, 1)
+			go func() {
+				_, err := call(first)
+				result <- err
+			}()
+			select {
+			case <-requestReady:
+			case <-cfg.GetContext().Done():
+				t.Fatal("request did not reach the gateway selection barrier")
+			}
+			// This is the exact check/use gap: the prompt was checked against A,
+			// but the old tier callback would resolve B when released below.
+			selectContextTestModel(b)
+			setContextTestThreshold(t, cfg, bKey, 300000)
+			require.EqualValues(t, 400000, loop.wholePromptTokenLimit())
+			require.Zero(t, aCalls.Load())
+			require.Zero(t, bCalls.Load())
+			release()
+			var err error
+			select {
+			case err = <-result:
+			case <-cfg.GetContext().Done():
+				t.Fatal("request did not finish after releasing the gateway selection barrier")
+			}
+			t.Logf("TOCTOU: checked A at 400000, selected B at 300000 before sending; gateway calls A=%d B=%d", aCalls.Load(), bCalls.Load())
+			require.Zero(t, bCalls.Load(), "TOCTOU: B must not receive a prompt checked against A's threshold")
+			require.EqualValues(t, 1, aCalls.Load())
 			require.True(t, aicommon.IsPromptTooLong(err), "%v", err)
 			evidence, ok := aicommon.PromptOverflowEvidenceFrom(err)
 			require.True(t, ok)
 			require.Equal(t, aKey, evidence.ContextKey)
-			require.EqualValues(t, 1, aCalls.Load())
-			require.Zero(t, bCalls.Load(), "a global switch must not replace the model already used to build the prompt")
 			require.True(t, loop.reduceTimelineLimitForPromptOverflow(err, first.Prompt))
 			db := consts.GetGormProfileDatabase()
 			require.EqualValues(t, 400000, yakit.GetAIModelContext(db, "openai", a.ModelName, aKey).ThresholdTokens, "overflow alone must not persist")
