@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 // TestCppPhiIfElse asserts the merge phi of an if/else and the branch each
@@ -107,16 +108,27 @@ int nested(int a, int b) {
 
 // TestCppPhiLoops asserts every loop kind merges the loop-carried variable.
 func TestCppPhiLoops(t *testing.T) {
-	progs := compileCppProject(t, map[string]string{
-		"loops.cpp": `
+	cases := []struct {
+		name string
+		code string
+		want []string
+	}{
+		{
+			name: "for",
+			code: `
 int sumFor(int n) {
     int total = 0;
     for (int i = 0; i < n; i++) {
         total += i;
     }
-    return total;
+    println(total);
 }
-
+`,
+			want: []string{"phi(total)[0,add(total, phi(i)[0,add(i, 1)])]"},
+		},
+		{
+			name: "while",
+			code: `
 int sumWhile(int n) {
     int index = 0;
     int total = 0;
@@ -124,39 +136,28 @@ int sumWhile(int n) {
         total += index;
         index++;
     }
-    return total;
+    println(total);
 }
-
+`,
+			want: []string{"phi(total)[0,add(total, phi(index)[0,add(index, 1)])]"},
+		},
+		{
+			name: "do-while",
+			code: `
 int sumDoWhile(int n) {
     int total = 0;
     do {
         total++;
     } while (total < n);
-    return total;
+    println(total);
 }
 `,
-	})
-	prog := progs[0]
-
-	for _, name := range []string{"sumFor", "sumWhile", "sumDoWhile"} {
-		t.Run(name, func(t *testing.T) {
-			fn := funcBySymbol(t, prog, name)
-			phi := findPhi(t, fn, "total")
-			require.GreaterOrEqual(t, len(phi.Edge), 2, "loop phi must merge entry and latch")
-			// One incoming edge is the pre-loop constant 0. The other is the
-			// value computed in the body, so it must not be a constant.
-			var constants, computed int
-			for _, edge := range phi.Edge {
-				value, ok := fn.GetValueById(edge)
-				require.True(t, ok)
-				if _, isConst := ssa.ToConstInst(value); isConst {
-					constants++
-				} else {
-					computed++
-				}
-			}
-			require.Equal(t, 1, constants, "loop entry must contribute exactly one constant")
-			require.GreaterOrEqual(t, computed, 1, "loop body must contribute a computed value")
+			want: []string{"phi(total)[0,add(total, 1)]"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			test.CheckPrintlnValue(c.code, c.want, t)
 		})
 	}
 }
