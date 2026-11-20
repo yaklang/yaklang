@@ -25,6 +25,9 @@ func pcapFrameFieldNodes(fields []trafficField, sourceID string) []*ypb.PCAPFiel
 	nodes := make([]*ypb.PCAPFieldNode, 0, len(fields))
 	for _, field := range fields {
 		node := &ypb.PCAPFieldNode{Name: field.Name}
+		if field.DisplayValue != "" {
+			node.DisplayValue = proto.String(field.DisplayValue)
+		}
 		switch value := field.Value.(type) {
 		case trafficFieldValue:
 			node.DisplayValue = proto.String(value.Verbose)
