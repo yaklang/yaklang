@@ -35,6 +35,17 @@ func joinLogicalLines(src string) []string {
 	return lines
 }
 
+// advanceMacroScanState consumes one source line for its scan state only.
+//
+// The incremental preprocessor tokenizes a line only when it may contain a
+// macro. A line inside a block comment usually does not, so without this the
+// state would stay "in comment" after the closing */ and every later line
+// would be tokenized as comment text, silently disabling expansion for the
+// rest of the translation unit.
+func advanceMacroScanState(src string, st *macroScanState) {
+	_ = tokenizeMacroSourceWithState(src, st)
+}
+
 // tokenizeMacroSource lexes src into preprocessor tokens, skipping comments.
 func tokenizeMacroSource(src string) []macroToken {
 	var st macroScanState
