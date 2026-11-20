@@ -633,7 +633,16 @@ type SwitchBuilder struct {
 
 	buildDefault func()
 
-	AutoBreak       bool
+	// AutoBreak controls the control-flow edge out of a case body: true jumps
+	// to the switch end (implicit break), false falls through to the next case
+	// (the C/C++ default).
+	AutoBreak bool
+	// DirectBodyMerge controls how a case body scope joins the switch merge:
+	// true merges the body scope itself, false uses the historical CoverBy
+	// shadow. It is orthogonal to AutoBreak: AutoBreak decides where control
+	// goes, DirectBodyMerge decides which scope supplies the merged values.
+	// C++ enables it because a case arm can assign a variable declared outside
+	// the switch; C, Java and PHP keep the historical behaviour.
 	DirectBodyMerge bool
 }
 
