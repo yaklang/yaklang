@@ -74,3 +74,17 @@ func securityRuleGate(ctx context.Context, toolName string, params aitool.Invoke
 	}
 	return decision
 }
+
+// toolCallRuleGate composes the built-in bash guard with an optional gate
+// compiled from Claude Code-style permissions JSON. Composition is strictest-
+// wins, so a user allow rule cannot suppress a built-in deny or ask finding.
+func (r *ReAct) toolCallRuleGate() aicommon.ToolCallRuleGate {
+	if r == nil || r.config == nil {
+		return securityRuleGate
+	}
+	extra := r.config.GetToolCallPermissionGate()
+	if extra == nil {
+		return securityRuleGate
+	}
+	return aicommon.ComposeToolCallRuleGates(securityRuleGate, extra)
+}

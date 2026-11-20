@@ -173,7 +173,7 @@ func (r *ReAct) newToolCallerForCall(ctx context.Context, currentTask aicommon.A
 		aicommon.WithToolCaller_Emitter(currentTask.GetEmitter()),
 		// Preserve current-task context for script tools.
 		aicommon.WithToolCaller_InvokeRuntime(r),
-		aicommon.WithToolCaller_RuleGate(securityRuleGate),
+		aicommon.WithToolCaller_RuleGate(r.toolCallRuleGate()),
 	)
 
 	// Add task context
