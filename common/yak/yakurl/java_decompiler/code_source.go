@@ -12,13 +12,19 @@ import (
 )
 
 // codeSource is a single JAR/WAR/EAR/ZIP archive or a local directory containing archives.
+//
+// It keeps two filesystem views over the same archive index:
+//   - expandedFS builds the virtual tree. It lists directories, expands nested
+//     archives and reads non-class resources. For an archive root its ReadFile
+//     deliberately returns the raw entry bytes (javajive readSelectedJarEntry),
+//     so it must not be used to decompile classes.
+//   - jarFS decompiles class entries and resolves nested archive paths. Both
+//     views share the root ZipFS, so the archive is parsed once.
 type codeSource struct {
 	rootPath    string
 	isDirectory bool
 	expandedFS  fi.FileSystem
-	// jarFS is set for archive roots. It owns the .class decompilation path;
-	// expandedFS only expands nested archives and serves non-class entries.
-	jarFS *javaclassparser.JarFS
+	jarFS       *javaclassparser.JarFS
 }
 
 func newCodeSource(rootPath string) (*codeSource, error) {
@@ -38,7 +44,8 @@ func newCodeSource(rootPath string) (*codeSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Share one ZipFS index between listing and decompilation.
+	// Share one ZipFS index between listing and decompilation: expandedFS uses
+	// the same entries that jarFS decompiles, so the archive is parsed once.
 	expandedFS := javaclassparser.NewExpandedZipFS(jarFS.ZipFS, jarFS.ZipFS)
 	return &codeSource{
 		rootPath:    rootPath,
