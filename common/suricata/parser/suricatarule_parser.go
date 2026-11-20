@@ -389,16 +389,6 @@ func (s *RulesContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *RulesContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitRules(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Rules() (localctx IRulesContext) {
 	this := p
 	_ = this
@@ -632,16 +622,6 @@ func (s *RuleContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *RuleContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitRule(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Rule_() (localctx IRuleContext) {
 	this := p
 	_ = this
@@ -762,16 +742,6 @@ func (s *ActionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer)
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ActionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitAction(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Action_() (localctx IActionContext) {
 	this := p
 	_ = this
@@ -857,16 +827,6 @@ func (s *ProtocolContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ProtocolContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ProtocolContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitProtocol(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Protocol() (localctx IProtocolContext) {
@@ -968,16 +928,6 @@ func (s *Src_addressContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Src_addressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitSrc_address(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Src_address() (localctx ISrc_addressContext) {
 	this := p
 	_ = this
@@ -1071,16 +1021,6 @@ func (s *Dest_addressContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Dest_addressContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Dest_addressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitDest_address(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Dest_address() (localctx IDest_addressContext) {
@@ -1283,16 +1223,6 @@ func (s *AddressContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AddressContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AddressContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitAddress(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
@@ -1553,16 +1483,6 @@ func (s *Ipv4Context) ToStringTree(ruleNames []string, recog antlr.Recognizer) s
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Ipv4Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv4(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 	this := p
 	_ = this
@@ -1706,16 +1626,6 @@ func (s *Ipv4blockContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Ipv4blockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv4block(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Ipv4block() (localctx IIpv4blockContext) {
 	this := p
 	_ = this
@@ -1801,16 +1711,6 @@ func (s *Ipv4maskContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Ipv4maskContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Ipv4maskContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv4mask(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Ipv4mask() (localctx IIpv4maskContext) {
@@ -1903,16 +1803,6 @@ func (s *Environment_varContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Environment_varContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Environment_varContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitEnvironment_var(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Environment_var() (localctx IEnvironment_varContext) {
@@ -2059,16 +1949,6 @@ func (s *Ipv6Context) GetRuleContext() antlr.RuleContext {
 
 func (s *Ipv6Context) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Ipv6Context) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv6(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Ipv6() (localctx IIpv6Context) {
@@ -2242,16 +2122,6 @@ func (s *Ipv6fullContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Ipv6fullContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Ipv6fullContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv6full(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
@@ -2464,16 +2334,6 @@ func (s *Ipv6compactContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Ipv6compactContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv6compact(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Ipv6compact() (localctx IIpv6compactContext) {
 	this := p
 	_ = this
@@ -2601,16 +2461,6 @@ func (s *Ipv6partContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Ipv6partContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Ipv6partContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv6part(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Ipv6part() (localctx IIpv6partContext) {
@@ -2770,16 +2620,6 @@ func (s *Ipv6blockContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Ipv6blockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv6block(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Ipv6block() (localctx IIpv6blockContext) {
 	this := p
 	_ = this
@@ -2870,16 +2710,6 @@ func (s *Ipv6maskContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Ipv6maskContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Ipv6maskContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitIpv6mask(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Ipv6mask() (localctx IIpv6maskContext) {
@@ -2981,16 +2811,6 @@ func (s *Src_portContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *Src_portContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitSrc_port(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Src_port() (localctx ISrc_portContext) {
 	this := p
 	_ = this
@@ -3084,16 +2904,6 @@ func (s *Dest_portContext) GetRuleContext() antlr.RuleContext {
 
 func (s *Dest_portContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *Dest_portContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitDest_port(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Dest_port() (localctx IDest_portContext) {
@@ -3277,16 +3087,6 @@ func (s *PortContext) GetRuleContext() antlr.RuleContext {
 
 func (s *PortContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *PortContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitPort(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Port() (localctx IPortContext) {
@@ -3640,16 +3440,6 @@ func (s *ParamsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer)
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ParamsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitParams(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
 	this := p
 	_ = this
@@ -3832,16 +3622,6 @@ func (s *ParamContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Param() (localctx IParamContext) {
 	this := p
 	_ = this
@@ -3947,16 +3727,6 @@ func (s *KeywordContext) GetRuleContext() antlr.RuleContext {
 
 func (s *KeywordContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *KeywordContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitKeyword(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Keyword() (localctx IKeywordContext) {
@@ -4092,16 +3862,6 @@ func (s *SettingContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SettingContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SettingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitSetting(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Setting() (localctx ISettingContext) {
@@ -4264,16 +4024,6 @@ func (s *SingleSettingContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SingleSettingContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SingleSettingContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitSingleSetting(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) SingleSetting() (localctx ISingleSettingContext) {
@@ -4458,16 +4208,6 @@ func (s *NegativeContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NegativeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitNegative(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *SuricataRuleParser) Negative() (localctx INegativeContext) {
 	this := p
 	_ = this
@@ -4568,16 +4308,6 @@ func (s *SettingcontentContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SettingcontentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SettingcontentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitSettingcontent(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Settingcontent() (localctx ISettingcontentContext) {
@@ -4722,16 +4452,6 @@ func (s *SepContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SepContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SuricataRuleParserVisitor:
-		return t.VisitSep(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *SuricataRuleParser) Sep() (localctx ISepContext) {
