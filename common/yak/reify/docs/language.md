@@ -103,6 +103,21 @@ pkg.F[go.shape.int].func1                        -> pkg.F[T].func1
 
 `type:` 与 `go:` 前缀是编译器保留名，方括号属于类型语法，不做拆分。`ShapeName` 去掉 `go.shape.` 前缀；`IsShapeHash` 识别 64 位十六进制哈希形状。
 
+### Go text 基址
+
+Go 1.18 起的函数表把每个入口写成相对 `runtime.text` 的偏移，表头本身不再保存基址（第 3 个指针槽未使用）。剥离 `.symtab` 后没有 `runtime.text` 符号，若把某个可执行节的首地址当作基址，所有函数地址都会偏错。
+
+`textStart` 按以下顺序取基址：
+
+1. `runtime.text` 符号。
+2. `runtime.moduledata`：读取 `.go.module` 节，找不到时按 8 字节对齐扫描 `.noptrdata`、`.data`、`.data.rel.ro`、`.rdata`，寻找 `pcHeader` 指针。
+3. `.text` 节地址。
+4. 第一个可执行区域地址。
+
+模块数据必须通过完整校验才算命中：`pcHeader`、`funcnametab`、`cutab`、`filetab`、`pctab`、`pclntable`、`ftab` 指针都与函数表头一致，且 `ftab` 长度等于函数数加一。`text < etext`、`minpc >= text`、`maxpc < etext` 也必须成立。字段偏移只覆盖 Go 1.18 起稳定的前半部分；类型与 itab 区间在后续版本里位置变化，不读取。
+
+`.gopclntab` 的体积上限按名称区分：命名的 Go 表允许 512 MiB，`.rdata`、`.data.rel.ro` 这类回退节仍为 64 MiB。yaklang 二进制自身的函数表约 85 MiB，旧上限会让剥离后的镜像完全无法恢复名称。
+
 ## ABI：平台默认与语言覆盖
 
 默认调用约定属于平台，不属于 C 层。SysV/Win64/AArch64 的参数寄存器、栈方向与 callee-save 集合由 `Architecture` 与 `OS` 的 profile 给出；C 代码和手写汇编都遵循它。C 语言层因此不提供 `ABI`，只提供默认标签和字符串模型。Rust/Go 只覆盖自己恢复出的函数，不改变同一地址空间里的其他函数。
@@ -302,5 +317,10 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | `TestParseInstanceSplitsGenericNames` | 泛型函数、泛型方法、闭包、切片/数组/结构体实参、保留名 |
 | `TestParseInstanceKeepsFamilyStable` | 族键幂等；同族实例共享键；不同方法不共享 |
 | `FuzzParseInstance` | 任意名称不 panic，族键重解析不变 |
+| `TestRecoverModuleDataFromNamedSection` | `.go.module` 中的模块数据通过全部指针与计数校验 |
+| `TestRecoverModuleDataScansDataSection` | 无命名节时从 `.noptrdata` 扫描 |
+| `TestRecoverModuleDataRejectsMismatch` | 指针、计数或 text 区间不符时拒绝 |
+| `TestTextStartPrefersRuntimeTextSymbol` / `TestTextStartUsesModuleDataWhenStripped` / `TestTextStartFallsBackToTextSection` | 基址来源优先级 |
+| `TestMetadataLimitAllowsLargeNamedPclntab` | 命名表允许 85 MiB 以上，回退节仍是 64 MiB |
 
 `FuzzPCLNTab` 对 pclntab 头部做模糊测试，要求不 panic。
