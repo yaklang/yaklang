@@ -126,3 +126,51 @@ func TestReadPhiMemberSeesMemberWritesBetweenReads(t *testing.T) {
 	_, hasNew := seen[newMember.GetId()]
 	require.True(t, hasNew, "second read must observe the replaced member")
 }
+
+// emitPhiBinaryTree builds a tree of distinct phi nodes: every internal node
+// merges two fresh subtrees, so no node repeats and neither the cycle guard nor
+// the per-read result cache can cut the walk. A member read used to expand the
+// whole tree, which is 2^depth emitted phis for depth d.
+func emitPhiBinaryTree(builder *FunctionBuilder, depth int, a, b Value) Value {
+	if depth <= 0 {
+		return builder.EmitPhi("tree-leaf", Values{a, b})
+	}
+	left := emitPhiBinaryTree(builder, depth-1, a, b)
+	right := emitPhiBinaryTree(builder, depth-1, a, b)
+	return builder.EmitPhi("tree-node", Values{left, right})
+}
+
+// A phi chain that never repeats a node must stop at the per-read node budget
+// instead of expanding the full tree. php-src Zend hit this shape and one member
+// read never finished.
+func TestReadPhiMemberTreeStopsAtNodeBudget(t *testing.T) {
+	const depth = 12 // 8192 leaves, 2x that in phis without the budget
+
+	_, builder := newTestBuilder(t)
+	key := builder.EmitConstInst("field")
+	a := emitObject(builder, "a")
+	b := emitObject(builder, "b")
+	setMemberCallRelationship(a, key, builder.EmitConstInst("from-a"))
+	setMemberCallRelationship(b, key, builder.EmitConstInst("from-b"))
+
+	top := emitPhiBinaryTree(builder, depth, a, b)
+	before := countBlockPhis(builder)
+	require.NotNil(t, builder.ReadMemberCallValue(top, key))
+	emitted := countBlockPhis(builder) - before
+	require.LessOrEqual(t, emitted, memberCallReadMaxNodes+32,
+		"member read must stop at the node budget, emitted %d phis", emitted)
+}
+
+func TestMemberCallReadVisitSetNodeBudget(t *testing.T) {
+	var v memberCallReadVisitSet
+	key := memberCallReadVisitKey{objectID: 1, keyID: 2}
+	for i := 0; i < memberCallReadMaxNodes; i++ {
+		v.push(memberCallReadVisitKey{objectID: int64(i + 10)})
+	}
+	require.False(t, v.exhausted)
+	v.push(key)
+	require.True(t, v.exhausted)
+	v.remember(key, nil)
+	_, ok := v.lookup(key)
+	require.False(t, ok, "a truncated read must not cache its result")
+}
