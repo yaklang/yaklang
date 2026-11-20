@@ -16,5 +16,8 @@ The backport adds:
 - the matching Client EncryptedExtensions response after TLS Finished;
 - connection-state and extension-dictionary plumbing for both ALPS codepoints.
 
+Yaklang also backports [refraction-networking/utls#346](https://github.com/refraction-networking/utls/pull/346)
+to encode the cookie length in the second ClientHello after a TLS 1.3 HelloRetryRequest.
+
 Keep changes in this fork limited to compatibility fixes that cannot be
 provided by the upstream version supported by Yaklang's Go toolchain.
