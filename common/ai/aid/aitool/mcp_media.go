@@ -10,35 +10,47 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
 
+// fetchedMCPImage is derived from an existing resource block. It has no
+// separate index in the server's content array.
+type fetchedMCPImage struct{ mcp.ImageContent }
+
+type mcpToolContent struct {
+	blocks []any
+	images []*aimedia.Image
+	text   string
+}
+
 // convertMCPToolContent handles both in-process SDK structs and the maps
 // produced by an actual JSON-RPC round trip. Images never fall through to fmt
 // or stdout. File metadata stays metadata: a remote path is not a local file.
-func convertMCPToolContent(ctx context.Context, content []any, source aimedia.Source) (any, string, error) {
+func convertMCPToolContent(ctx context.Context, content []any, source aimedia.Source) (mcpToolContent, error) {
+	var converted mcpToolContent
 	var text strings.Builder
-	var images []*aimedia.Image
 	encodedBytes := 0
-	addImage := func(encoded, mimeType string) error {
-		if len(images) >= MaxToolImages {
-			return fmt.Errorf("MCP tool result exceeds the %d-image limit", MaxToolImages)
+	addImage := func(encoded, mimeType string) (*aimedia.Image, error) {
+		if len(converted.images) >= MaxToolImages {
+			return nil, fmt.Errorf("MCP tool result exceeds the %d-image limit", MaxToolImages)
 		}
 		if len(encoded) > base64.StdEncoding.EncodedLen(aimedia.MaxImageBytes)-encodedBytes {
-			return fmt.Errorf("MCP tool image payload exceeds the image byte budget")
+			return nil, fmt.Errorf("MCP tool image payload exceeds the image byte budget")
 		}
 		encodedBytes += len(encoded)
 		img, err := aimedia.FromBase64(ctx, encoded, mimeType)
 		if err != nil {
-			return fmt.Errorf("MCP tool image %d: %w", len(images)+1, err)
+			return nil, fmt.Errorf("MCP tool image %d: %w", len(converted.images)+1, err)
 		}
 		img.Source = source
-		images = append(images, img)
-		fmt.Fprintf(&text, "[Image %d: %s, %dx%d, id=%s]", len(images), img.MIMEType, img.Width, img.Height, img.ID)
-		return nil
+		converted.images = append(converted.images, img)
+		fmt.Fprintf(&text, "[Image %d: %s, %dx%d, id=%s]", len(converted.images), img.MIMEType, img.Width, img.Height, img.ID)
+		return img, nil
 	}
 	for _, item := range content {
 		if err := ctx.Err(); err != nil {
-			return nil, "", err
+			return mcpToolContent{}, err
 		}
-		var err error
+		block := item
+		var image *aimedia.Image
+		var imageErr error
 		switch c := item.(type) {
 		case mcp.TextContent:
 			text.WriteString(c.Text)
@@ -46,33 +58,42 @@ func convertMCPToolContent(ctx context.Context, content []any, source aimedia.So
 			if c != nil {
 				text.WriteString(c.Text)
 			}
+		case fetchedMCPImage:
+			if _, err := addImage(c.Data, c.MIMEType); err != nil {
+				return mcpToolContent{}, err
+			}
+			continue
 		case mcp.ImageContent:
-			err = addImage(c.Data, c.MIMEType)
+			image, imageErr = addImage(c.Data, c.MIMEType)
 		case *mcp.ImageContent:
 			if c == nil {
-				return nil, "", fmt.Errorf("MCP tool returned a nil image")
+				return mcpToolContent{}, fmt.Errorf("MCP tool returned a nil image")
 			}
-			err = addImage(c.Data, c.MIMEType)
+			image, imageErr = addImage(c.Data, c.MIMEType)
 		case map[string]any:
 			if typ, _ := c["type"].(string); typ == "image" {
 				encoded, _ := c["data"].(string)
 				mimeType, _ := c["mimeType"].(string)
-				err = addImage(encoded, mimeType)
-			} else if first := firstMCPTextFromContent([]any{c}); first != "" {
-				text.WriteString(first)
+				image, imageErr = addImage(encoded, mimeType)
+			} else if blockText := mcpTextBlock(c); blockText != "" {
+				text.WriteString(blockText)
 			} else {
 				fmt.Fprint(&text, c)
 			}
 		default:
 			fmt.Fprint(&text, c)
 		}
-		if err != nil {
-			return nil, "", err
+		if imageErr != nil {
+			return mcpToolContent{}, imageErr
 		}
+		if image != nil {
+			// Keep the original slot so indexes in structuredContent still
+			// identify the same content block after binary data is removed.
+			block = map[string]any{"type": "image", "mimeType": image.MIMEType,
+				"image_id": image.ID, "image_index": len(converted.images) - 1}
+		}
+		converted.blocks = append(converted.blocks, block)
 	}
-	resultText := text.String()
-	if len(images) == 0 {
-		return resultText, resultText, nil
-	}
-	return &MediaResult{Result: resultText, Images: images}, resultText, nil
+	converted.text = text.String()
+	return converted, nil
 }
