@@ -64,7 +64,7 @@
 | Java | `JAVA` | `.java` | `java2ssa` | 另有 JSP、Freemarker、SpEL 子前端。 |
 | Go | `GO` | `.go`, `.mod` | `go2ssa` | 支持 Go module 和包级编译。 |
 | C | `C` | `.c` | `c2ssa` | 带 C 预处理文件系统。 |
-| C++ | `CPP` | `.cpp`, `.cc`, `.cxx` | `cpp2ssa` | 独立语法包，复用 C 预处理；细节见 `docs/design/ssa-cpp-frontend.md`。 |
+| C++ | `CPP` | `.cpp`, `.cc`, `.cxx` | `cpp2ssa` | 独立语法包，复用 `cfamily/preprocess`。 |
 | Python | `PYTHON` | `.py` | `python2ssa` | ANTLR Python 语法。 |
 | C# | `CSHARP` | `.cs` | `csharp2ssa` | 另有 ASP/ASPX 子前端。 |
 | Lua | `LUA` | `.lua` | `lua2ssa` | 复用 `antlr4Lua`。 |
@@ -177,14 +177,16 @@
 
 ### 4.13 C++（新增）
 
-- 语法来源：`antlr/grammars-v4` 的 `cpp/`（CPP14），提交 `de38599628d2`；MIT 许可，见 `common/yak/cpp/LICENSE` 和 `NOTICE.md`。
-- 文件：`common/yak/cpp/CPP14Lexer.g4`、`CPP14Parser.g4`；生成到 `common/yak/cpp/parser`。
-- 生成脚本：`common/yak/cpp/gen.sh`。
-- 与 C 分开：不改 `CParser.g4`；C 解析器实测只通过 7% 的真实 C++ 文件。详见 `docs/design/ssa-cpp-frontend.md` §1。
-- 共用：`common/yak/c2ssa/preprocess`（宏和 include）与 `common/yak/cfamily/cliteral`（字面量）；共享改动用配置开关保持 C 默认行为。
-- 头文件策略：`.h` 归 C；`.hpp`、`.hxx`、`.hh` 归 C++；头文件只通过 `#include` 内联，不做翻译单元。
-- 覆盖：命名空间、类与继承、成员函数、构造/析构与初始化列表、模板声明、引用/指针、`new`/`delete`、`using`/`typedef`。
-- SSA 降级边界：不实例化模板、不做重载决议和虚分派；标准库只提供声明占位（`stdlib.go` 单表）。
+- 语法：`common/yak/cpp/CPPLexer.g4`、`CPPParser.g4`，生成到 `common/yak/cpp/parser`；生成脚本 `common/yak/cpp/gen.sh`。
+- 维护方式：语法在仓库内维护，不再跟随上游版本；本地补丁记录在 `gen.sh` 注释里。MIT 署名保留在 `.g4` 文件头和 `common/yak/cpp/LICENSE`。
+- 与 C 分开：不改 `CParser.g4`；C 解析器实测只通过 7% 的真实 C++ 文件，扩展 C 语法等于重写 C 前端。
+- 共用：`common/yak/cfamily/preprocess`（宏和 include）与 `common/yak/cfamily/cliteral`（字面量）；共享改动用配置开关保持 C 默认行为。
+- 扩展名：`.cpp`、`.cc`、`.cxx` 是翻译单元；`.h` 归 C，`.hpp`、`.hxx`、`.hh` 归 C++。
+- 头文件：只通过 `#include` 内联，不做独立翻译单元；项目内头文件全文内联，系统头不展开。纯头文件项目不产生翻译单元。
+- 覆盖：命名空间、类与继承、成员函数、构造/析构与初始化列表、模板声明、引用/指针、`new`/`delete`、`using`/`typedef`、lambda、类型转换。
+- 标准库：`stdlib.go` 一份声明表，只给类型和成员名，不给行为；`<algorithm>`、`<regex>`、`<chrono>` 等未收录类型按占位蓝图处理。
+- SSA 降级边界：不实例化模板、重载只按参数个数选择、不做虚分派和 RTTI、`sizeof`/`alignof` 返回 0、`goto` 不建 CFG 边、C++20 concepts/requires/modules/coroutines 不支持。
+- 测试：`common/yak/cpp/cpp2ssa/test`（`TestAllSyntaxForCpp_G4`、`TestCpp*`、`CPP_CORPUS` 语料模式）。
 
 ## 5. 新增语言的接入清单
 
