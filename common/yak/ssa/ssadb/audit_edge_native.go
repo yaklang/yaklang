@@ -27,7 +27,7 @@ func nativeAuditEdgeTargets(db *gorm.DB, fromID string, edgeType AuditEdgeType) 
 	ctx, cancel := nativeQueryContext(context.Background())
 	defer cancel()
 	query := bindSQLPlaceholdersDB(db,
-		`SELECT to_node FROM "`+TableAuditEdges+`" WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL`)
+		`SELECT to_node FROM `+QuoteIdent(db, TableAuditEdges)+` WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL`)
 	started := time.Now()
 	rows, err := nativeQueryContextDB(db, ctx, query, fromID, string(edgeType))
 	if err != nil {
@@ -71,7 +71,7 @@ func nativePredecessorEdges(db *gorm.DB, fromID string) []*AuditEdge {
 	query := bindSQLPlaceholdersDB(db,
 		`SELECT id, created_at, updated_at, deleted_at, task_id, result_id, from_node, to_node, `+
 			`program_name, risk_feature_hash, edge_type, analysis_step, analysis_label `+
-			`FROM "`+TableAuditEdges+`" WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL`)
+			`FROM `+QuoteIdent(db, TableAuditEdges)+` WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL`)
 	started := time.Now()
 	rows, err := nativeQueryContextDB(db, ctx, query, fromID, string(EdgeType_Predecessor))
 	if err != nil {
@@ -157,7 +157,7 @@ func nativePredecessorTargets(db *gorm.DB, fromID string) []AuditPredecessor {
 	ctx, cancel := nativeQueryContext(context.Background())
 	defer cancel()
 	query := bindSQLPlaceholdersDB(db,
-		`SELECT to_node, analysis_step, analysis_label FROM "`+TableAuditEdges+`" `+
+		`SELECT to_node, analysis_step, analysis_label FROM `+QuoteIdent(db, TableAuditEdges)+` `+
 			`WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL`)
 	started := time.Now()
 	rows, err := nativeQueryContextDB(db, ctx, query, fromID, string(EdgeType_Predecessor))

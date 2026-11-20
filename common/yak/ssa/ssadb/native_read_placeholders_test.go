@@ -78,7 +78,7 @@ func TestBindSQLPlaceholdersDB_PostgresDialectStub(t *testing.T) {
 	// / nativeGetIrCodeIDsByConstType all call bindSQLPlaceholdersDB before
 	// Query/QueryRow, so a postgres-named dialect never sends raw "?" to
 	// database/sql.
-	codeQ := bindSQLPlaceholdersDB(db, `SELECT `+nativeIrCodeColumns+` FROM `+TableIrCodes+
+	codeQ := bindSQLPlaceholdersDB(db, `SELECT `+nativeIrCodeColumnsFor(db)+` FROM `+QuoteIdent(db, TableIrCodes)+
 		` WHERE code_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`)
 	require.Contains(t, codeQ, "$1")
 	require.Contains(t, codeQ, "$2")

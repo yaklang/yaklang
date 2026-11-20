@@ -212,11 +212,11 @@ func fromDatabaseIRProgram(irprog *ssadb.IrProgram) (*Program, error) {
 func LoadProgramRegexp(match string) []*Program {
 	programs := []*Program{}
 
-	var irprogram []*ssadb.IrProgram
-	ssadb.GetDB().Model(&ssadb.IrProgram{}).
-		Where("program_name REGEXP ?  OR program_name = ? ", match, match).
-		Where("program_kind = ?", "application").
-		Find(&irprogram)
+	irprogram, err := ssadb.LoadProgramsByRegexp(ssadb.GetDB(), match)
+	if err != nil {
+		log.Errorf("load programs by regexp %q failed: %v", match, err)
+		return programs
+	}
 
 	for _, irp := range irprogram {
 		p, err := fromDatabaseIRProgram(irp)

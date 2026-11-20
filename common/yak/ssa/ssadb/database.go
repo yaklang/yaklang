@@ -104,29 +104,17 @@ func patchIrCodeIndex(db *gorm.DB) {
 
 	// 为 ir_codes 表添加复合索引 (program_name, code_id)
 	// 这是最常见的查询模式: WHERE program_name = ? AND code_id IN (...)
-	indexQueries := []struct {
-		name  string
-		query string
-	}{
-		{
-			"idx_ir_codes_program_opcode",
-			// composite index for program+opcode lookups
-			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_opcode" ON "` + TableIrCodes + `" ("program_name", "opcode");`,
-		},
+	indexSpecs := []IndexSpec{
+		// composite index for program+opcode lookups
+		{Name: "idx_ir_codes_program_opcode", Table: TableIrCodes, Columns: []string{"program_name", "opcode"}},
 		// 为 ir_indices 表添加复合索引以优化常见查询
-		{
-			"idx_ir_indices_program_value",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "` + TableIrIndices + `" ("program_name", "value_id");`,
-		},
-		{
-			"idx_ir_name_pool_program_name_name",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_name_pool_program_name_name" ON "` + TableIrNamePool + `" ("program_name", "name");`,
-		},
+		{Name: "idx_ir_indices_program_value", Table: TableIrIndices, Columns: []string{"program_name", "value_id"}},
+		{Name: "idx_ir_name_pool_program_name_name", Table: TableIrNamePool, Columns: []string{"program_name", "name"}},
 	}
 
-	for _, idx := range indexQueries {
-		if err := db.Exec(idx.query).Error; err != nil {
-			log.Warnf("failed to add index %s: %v", idx.name, err)
+	for _, spec := range indexSpecs {
+		if err := EnsureIndex(db, spec); err != nil {
+			log.Warnf("failed to add index %s: %v", spec.Name, err)
 		}
 	}
 
@@ -176,18 +164,16 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 	}
 
 	indexName := "ux_ir_codes_program_code"
-
-	// Check if the unique index already exists
-	var exists int64
-	db.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='ir_codes' AND name=?`, indexName).Row().Scan(&exists)
-	if exists > 0 {
-		return // already created
+	existed := hasNamedIndex(db, TableIrCodes, indexName)
+	spec := IndexSpec{
+		Name:    indexName,
+		Table:   TableIrCodes,
+		Columns: []string{"program_name", "code_id"},
+		Unique:  true,
 	}
-
-	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`
-	if err := db.Exec(query).Error; err != nil {
+	if err := EnsureIndex(db, spec); err != nil {
 		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
-	} else {
+	} else if !existed {
 		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_codes (program_name, code_id)", indexName)
 	}
 }
@@ -206,45 +192,62 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 
 	indexName := "ux_ir_offsets_program_value_file_range"
 
-	// Check if the index exists and whether its SQL uses COALESCE
+	// SQLite stores the index definition in sqlite_master, so it is the only
+	// dialect where the legacy non-COALESCE index can be recognized and
+	// dropped. Other dialects ask HasIndex once and, if it is absent, create
+	// the COALESCE form directly.
 	type idxInfo struct {
 		Name string
 		SQL  string
 	}
 	var existing []idxInfo
-	rows, err := db.Raw(
-		`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
-		indexName,
-	).Rows()
-	if err == nil {
-		for rows.Next() {
-			var info idxInfo
-			rows.Scan(&info.Name, &info.SQL)
-			existing = append(existing, info)
+	if isSQLiteDB(db) {
+		rows, err := db.Raw(
+			`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
+			indexName,
+		).Rows()
+		if err == nil {
+			for rows.Next() {
+				var info idxInfo
+				rows.Scan(&info.Name, &info.SQL)
+				existing = append(existing, info)
+			}
+			rows.Close()
 		}
-		rows.Close()
+
+		// If the index exists with COALESCE, it's up to date — nothing to do
+		for _, info := range existing {
+			if strings.Contains(strings.ToUpper(info.SQL), "COALESCE") {
+				return // already the COALESCE version
+			}
+		}
+
+		// If the index exists WITHOUT COALESCE, drop it so we can recreate
+		if len(existing) > 0 {
+			log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
+			if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
+				log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
+				return
+			}
+		}
+	} else if hasNamedIndex(db, TableIrOffsets, indexName) {
+		return
 	}
 
-	// If the index exists with COALESCE, it's up to date — nothing to do
-	for _, info := range existing {
-		if strings.Contains(strings.ToUpper(info.SQL), "COALESCE") {
-			return // already the COALESCE version
-		}
+	existed := hasNamedIndex(db, TableIrOffsets, indexName)
+	spec := IndexSpec{
+		Name:        indexName,
+		Table:       TableIrOffsets,
+		Columns:     []string{"program_name", "value_id", "file_hash", "start_offset", "end_offset"},
+		Expressions: []string{"COALESCE(" + QuoteIdent(db, "variable_name") + ", '')"},
+		Unique:      true,
+		// MySQL counts program_name and file_hash as VARCHAR(255); with the
+		// COALESCE expression the full key would exceed the 3072-byte limit.
+		Prefixes: map[string]int{"program_name": 191, "file_hash": 64},
 	}
-
-	// If the index exists WITHOUT COALESCE, drop it so we can recreate
-	if len(existing) > 0 {
-		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
-		if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
-			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
-			return
-		}
-	}
-
-	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_offsets_program_value_file_range" ON "` + TableIrOffsets + `" ("program_name", "value_id", "file_hash", "start_offset", "end_offset", COALESCE("variable_name", ''));`
-	if err := db.Exec(query).Error; err != nil {
+	if err := EnsureIndex(db, spec); err != nil {
 		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
-	} else {
+	} else if !existed {
 		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_offsets (program_name, value_id, file_hash, start_offset, end_offset, COALESCE(variable_name, ''))", indexName)
 	}
 }

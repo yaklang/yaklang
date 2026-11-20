@@ -99,7 +99,7 @@ func nativeGetAuditNodeById(db *gorm.DB, id string) (*AuditNode, error) {
 	ctx, cancel := nativeQueryContext(context.Background())
 	defer cancel()
 	query := bindSQLPlaceholdersDB(db,
-		`SELECT `+auditNodeNativeColumns+` FROM "`+TableAuditNodes+`" `+
+		`SELECT `+auditNodeNativeColumns+` FROM `+QuoteIdent(db, TableAuditNodes)+` `+
 			`WHERE node_id = ? AND deleted_at IS NULL ORDER BY id LIMIT 1`)
 	started := time.Now()
 	rows, err := nativeQueryContextDB(db, ctx, query, id)
@@ -144,7 +144,7 @@ func nativeGetAuditNodesByIds(db *gorm.DB, ids []string) ([]*AuditNode, error) {
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
 	query := bindSQLPlaceholdersDB(db,
-		`SELECT `+auditNodeNativeColumns+` FROM "`+TableAuditNodes+`" `+
+		`SELECT `+auditNodeNativeColumns+` FROM `+QuoteIdent(db, TableAuditNodes)+` `+
 			`WHERE node_id IN (`+placeholders+`) AND deleted_at IS NULL`)
 	args := make([]interface{}, len(ids))
 	for i, id := range ids {

@@ -1,0 +1,67 @@
+name: SSA SQL dialect conformance
+
+on:
+  pull_request:
+    paths:
+      - 'common/yak/ssa/ssadb/**'
+      - 'common/yak/ssaapi/ssa_load_program.go'
+      - 'common/consts/database.go'
+      - 'common/consts/ssa.go'
+      - '.github/workflows/ssa-sql-dialect.yml'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ssa-sql-dialect-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: yaklang_ssa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: yaklang_ssa
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      YAK_SSA_CONFORMANCE_PG_DSN: postgres://postgres:postgres@127.0.0.1:5432/yaklang_ssa?sslmode=disable
+      YAK_SSA_CONFORMANCE_MYSQL_DSN: mysql://root:root@tcp(127.0.0.1:3306)/yaklang_ssa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: ./.github/actions/linux-pcap
+      - name: Run the SSA dialect conformance test on SQLite, PostgreSQL and MySQL
+        run: |
+          go test -mod=readonly ./common/yak/ssa/ssadb \
+            -run '^TestSSADialectConformance$' \
+            -count=1 -v -timeout=20m
