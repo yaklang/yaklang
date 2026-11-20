@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -238,13 +239,74 @@ func TestModelContextContractLateSuccessAndCancellationDoNotOverwrite(t *testing
 	}
 }
 
+func TestModelContextContractUnconfirmedAdjustmentStaysInItsSession(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
+	first, other := newConfig(context.Background()), newConfig(context.Background())
+	model := contextTestModel()
+	key := bindContext(t, first, model)
+	bindContext(t, other, model)
+	require.EqualValues(t, 200000, first.RecordModelContextOverflow("openai", model.ModelName, 400000,
+		&aispec.PromptOverflowEvidence{MaxContextTokens: 250000}, key))
+	require.True(t, first.ModelContextStatus(0).Pending)
+	require.EqualValues(t, 200000, first.ModelContextStatus(0).ThresholdTokens)
+	require.False(t, other.ModelContextStatus(0).Pending)
+	require.EqualValues(t, 500000, other.ModelContextStatus(0).ThresholdTokens)
+	// A successful request in another session has not validated this session's
+	// pending recovery, even when it uses exactly the same model configuration.
+	other.ConfirmModelContextSuccess("openai", model.ModelName, key)
+	require.EqualValues(t, 500000, yakit.GetAIModelContext(consts.GetGormProfileDatabase(), "openai", model.ModelName, key).ThresholdTokens)
+	require.True(t, first.ModelContextStatus(0).Pending)
+}
+
+func TestModelContextContractConcurrentSuccessOnlyTightens(t *testing.T) {
+	for _, order := range []string{"larger_first", "smaller_first", "concurrent"} {
+		t.Run(order, func(t *testing.T) {
+			yakit.GuardConfigurationForTest(t)
+			first, second := newConfig(context.Background()), newConfig(context.Background())
+			model := contextTestModel()
+			key := bindContext(t, first, model)
+			bindContext(t, second, model)
+			require.EqualValues(t, 200000, first.RecordModelContextOverflow("openai", model.ModelName, 400000,
+				&aispec.PromptOverflowEvidence{MaxContextTokens: 250000}, key))
+			require.EqualValues(t, 300000, second.RecordModelContextOverflow("openai", model.ModelName, 400000,
+				&aispec.PromptOverflowEvidence{MaxContextTokens: 375000}, key))
+			confirm := func(cfg *Config) { cfg.ConfirmModelContextSuccess("openai", model.ModelName, key) }
+			switch order {
+			case "larger_first":
+				confirm(second)
+				confirm(first)
+			case "smaller_first":
+				confirm(first)
+				confirm(second)
+			case "concurrent":
+				start := make(chan struct{})
+				var wg sync.WaitGroup
+				for _, cfg := range []*Config{first, second} {
+					wg.Add(1)
+					go func(cfg *Config) { defer wg.Done(); <-start; confirm(cfg) }(cfg)
+				}
+				close(start)
+				wg.Wait()
+			}
+			saved := yakit.GetAIModelContext(consts.GetGormProfileDatabase(), "openai", model.ModelName, key)
+			require.EqualValues(t, 200000, saved.ThresholdTokens, "a later, larger learned value must never raise an already confirmed limit")
+			require.Equal(t, "learned", saved.Source)
+			require.False(t, first.ModelContextStatus(0).Pending)
+			require.False(t, second.ModelContextStatus(0).Pending)
+		})
+	}
+}
+
 func TestModelContextContractOriginalReductionFormula(t *testing.T) {
 	yakit.GuardConfigurationForTest(t)
 	for _, tc := range []struct {
-		name              string
-		measured, maximum int64
+		name                    string
+		measured, maximum, want int64
 	}{
-		{"reported", 280000, 200000}, {"measured", 200000, 0}, {"floor", 1000, 0}, {"not_tighter", 900000, 900000},
+		{"reported", 280000, 200000, 160000},
+		{"measured", 200000, 0, 120000},
+		{"floor", 1000, 0, 4096},
+		{"not_tighter", 900000, 900000, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			original, persisted := newConfig(context.Background()), newConfig(context.Background())
@@ -252,8 +314,8 @@ func TestModelContextContractOriginalReductionFormula(t *testing.T) {
 			key := bindContext(t, persisted, model)
 			require.NoError(t, WithTimelineContentLimit(500000)(original))
 			ev := &aispec.PromptOverflowEvidence{MaxContextTokens: tc.maximum}
-			want := original.RecordPromptOverflow("openai", model.ModelName, tc.measured, ev)
-			require.Equal(t, want, persisted.RecordModelContextOverflow("openai", model.ModelName, tc.measured, ev, key))
+			require.Equal(t, tc.want, original.RecordPromptOverflow("openai", model.ModelName, tc.measured, ev))
+			require.Equal(t, tc.want, persisted.RecordModelContextOverflow("openai", model.ModelName, tc.measured, ev, key))
 		})
 	}
 }
