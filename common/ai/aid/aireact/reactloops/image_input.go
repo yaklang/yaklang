@@ -61,11 +61,22 @@ func (r *ReActLoop) imageEvent(state string, data map[string]any) {
 }
 
 func (r *ReActLoop) imageRoute() (bool, *ypb.AIModelConfig, error) {
+	return r.imageRouteForModel(nil)
+}
+
+func (r *ReActLoop) imageRouteForModel(snapshot *ypb.AIModelConfig) (bool, *ypb.AIModelConfig, error) {
 	c := aicommon.ImageConfigFrom(r.config)
 	if c == nil {
 		return false, nil, nil
 	}
-	native, model, err := c.ImageInputRoute(r.useSpeedPriorityAI)
+	var native bool
+	var model *ypb.AIModelConfig
+	var err error
+	if snapshot != nil && !r.useSpeedPriorityAI {
+		native, model, err = c.ImageInputRouteForModel(snapshot)
+	} else {
+		native, model, err = c.ImageInputRoute(r.useSpeedPriorityAI)
+	}
 	if native && c.GetImageInputConfig().Mode == "auto" {
 		if r.imageRejectedModel == imageModelKey(model) || (r.functionCallMode && model != nil &&
 			!model.GetSupportsImageToolCalling()) {
@@ -136,7 +147,7 @@ func (r *ReActLoop) prepareImages(ctx context.Context, references []aicommon.Pro
 	if len(references) == 0 {
 		return nil, nil
 	}
-	native, model, err := r.imageRoute()
+	native, model, err := r.imageRouteForModel(r.requestModelConfig)
 	if err != nil || !native {
 		return nil, err
 	}

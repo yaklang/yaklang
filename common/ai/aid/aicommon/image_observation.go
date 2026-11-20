@@ -17,13 +17,22 @@ import (
 // ImageInputRoute resolves only how an image is consumed. Resource storage and
 // Timeline history do not depend on model capabilities.
 func (c *Config) ImageInputRoute(lightweight bool) (native bool, model *ypb.AIModelConfig, err error) {
-	policy := c.GetImageInputConfig()
-	if policy.Mode == "describe" {
+	if c.GetImageInputConfig().Mode == "describe" {
 		return false, nil, nil
 	}
 	model, err = c.ResolveImageModel(lightweight)
 	if err != nil {
 		return false, nil, err
+	}
+	return c.ImageInputRouteForModel(model)
+}
+
+// ImageInputRouteForModel checks capabilities against an already selected
+// request model, without rereading global routing during prompt preparation.
+func (c *Config) ImageInputRouteForModel(model *ypb.AIModelConfig) (bool, *ypb.AIModelConfig, error) {
+	policy := c.GetImageInputConfig()
+	if policy.Mode == "describe" {
+		return false, nil, nil
 	}
 	support := policy.MainModelSupportsImages
 	if support == nil && model != nil {
