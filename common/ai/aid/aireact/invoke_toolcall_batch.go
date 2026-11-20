@@ -346,6 +346,7 @@ func (r *ReAct) newToolCallerForBatchCall(
 		aicommon.WithToolCaller_RuntimeId(r.config.Id),
 		aicommon.WithToolCaller_Emitter(childEmitter),
 		aicommon.WithToolCaller_Task(task),
+		aicommon.WithToolCaller_RuleGate(r.toolCallRuleGate()),
 		aicommon.WithToolCaller_CallToolID(work.call.ExecutionCallID),
 		aicommon.WithToolCaller_Reason(work.call.Reason),
 		aicommon.WithToolCaller_CallExpectations(work.call.Expectations),

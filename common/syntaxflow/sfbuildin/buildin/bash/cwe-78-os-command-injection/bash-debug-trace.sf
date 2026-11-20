@@ -1,0 +1,59 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: shell debug tracing enabled"
+	title_zh: "Bash：开启 Shell 调试跟踪"
+	type: audit
+	level: "low"
+	rule_id: "bash-debug-trace"
+	risk: "information-exposure"
+	desc: <<<DESC
+### 说明
+`set -x`、`set -o xtrace` 或 `bash -x` 会把每一条展开后的命令写入 stderr。
+命令中常见的令牌、口令、Cookie 和内部 URL 会因此进入日志、CI 输出或终端
+录制中。攻击者也可能临时开启 trace 观察应用如何处理敏感变量。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+生产环境关闭 xtrace。需要排障时使用最小范围、短时间的 trace，并在结束前
+执行 `set +x`；不要把含密钥的命令放入 trace 范围，必要时通过 `set +x`
+包裹敏感片段。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-532](https://cwe.mitre.org/data/definitions/532.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+set -x
+set -o xtrace
+bash -x deploy.sh
+POS
+	"safefile://neg.sh": <<<NEG
+set -e
+set -o pipefail
+bash deploy.sh
+NEG
+)
+
+set(* as $setArgs) as $setCall
+$setCall?{any: /(^|[^A-Za-z0-9_])-x([^A-Za-z0-9_]|$)/, /xtrace/} as $setXtrace
+
+/^(bash|sh|zsh|dash|ksh|ash)$/ as $shell
+$shell(* as $shellArgs) as $shellCall
+$shellCall?{any: /(^|[^A-Za-z0-9_])-x([^A-Za-z0-9_]|$)/, /xtrace/} as $shellXtrace
+
+alert $setXtrace for {
+	level: "low",
+	title: "Bash: shell debug tracing enabled",
+	title_zh: "Bash：开启 Shell 调试跟踪",
+	message: "检测到 set -x/xtrace，展开后的命令和敏感参数会进入日志。",
+	risk: "information-exposure",
+}
+
+alert $shellXtrace for {
+	level: "low",
+	title: "Bash: shell debug tracing enabled",
+	title_zh: "Bash：开启 Shell 调试跟踪",
+	message: "检测到以 -x 启动 Shell，命令参数会被完整打印。",
+	risk: "information-exposure",
+}

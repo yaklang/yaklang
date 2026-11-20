@@ -34,6 +34,12 @@ type Endpoint struct {
 	// 分支就地写入, 供价值评估区分 policy 与 source (例如 YOLO 下仍人工审批).
 	approvalMeta *ApprovalDecisionMeta
 
+	// forceHumanReview makes the approval bypass yolo/auto/model-judge paths.
+	// A security rule at middle severity sets it so the decision always comes
+	// from a human. The reason is copied into ApprovalDecisionMeta.
+	forceHumanReview       bool
+	forceHumanReviewReason string
+
 	// seq and checkpoint for recovering
 	seq        int64
 	checkpoint *schema.AiCheckpoint
@@ -76,6 +82,30 @@ func (e *Endpoint) GetApprovalMeta() *ApprovalDecisionMeta {
 	}
 	result := *e.approvalMeta
 	return &result
+}
+
+// SetForceHumanReview marks this approval as human-only. DoWaitAgreeWithPolicy
+// checks it before applying the configured policy, so yolo/auto cannot
+// auto-approve a request that a security rule escalated.
+func (e *Endpoint) SetForceHumanReview(reason string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.forceHumanReview = true
+	e.forceHumanReviewReason = reason
+}
+
+// IsForceHumanReview reports whether the approval must be decided by a human.
+func (e *Endpoint) IsForceHumanReview() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.forceHumanReview
+}
+
+// GetForceHumanReviewReason returns the escalation reason.
+func (e *Endpoint) GetForceHumanReviewReason() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.forceHumanReviewReason
 }
 
 func (e *Endpoint) GetSeq() int64 {

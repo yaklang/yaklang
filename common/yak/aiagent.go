@@ -27,7 +27,9 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -144,6 +146,18 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 				params, normalizationNotes := normalizeEmptyObjectParams(tool, params)
 				for _, note := range normalizationNotes {
 					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
+				}
+
+				if aiTool.Name == "bash" {
+					shell := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["shell"])))
+					if shell == "" || shell == "bash" || shell == "bash.exe" {
+						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
+							if check := commandcheck.CheckCommand(ctx, cmd); check.Blocked {
+								fmt.Fprintf(stdout, "[bash guard] %s\n", check.Message())
+								return check.BlockedResult(shell), nil
+							}
+						}
+					}
 				}
 
 				var runtimeId string

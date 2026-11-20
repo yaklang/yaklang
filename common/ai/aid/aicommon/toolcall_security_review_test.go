@@ -1,0 +1,45 @@
+package aicommon
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
+)
+
+func TestSecurityRuleReviewDecision(t *testing.T) {
+	cases := []struct {
+		name   string
+		params aitool.InvokeParams
+		want   bool
+	}{
+		{name: "continue-cn", params: aitool.InvokeParams{"suggestion": "继续执行:"}, want: true},
+		{name: "cancel-cn", params: aitool.InvokeParams{"suggestion": "取消:"}, want: false},
+		{name: "continue-en", params: aitool.InvokeParams{"suggestion": "continue"}, want: true},
+		{name: "cancel-en", params: aitool.InvokeParams{"suggestion": "cancel"}, want: false},
+		{name: "ambiguous", params: aitool.InvokeParams{"suggestion": "想想"}, want: false},
+		{name: "empty", params: nil, want: false},
+	}
+	for _, c := range cases {
+		got, reason := securityRuleReviewDecision(c.params)
+		require.Equal(t, c.want, got, "%s: %s", c.name, reason)
+	}
+
+	decision := &ToolCallRuleDecision{
+		Action:   schema.SFR_ACTION_ASK,
+		Severity: "middle",
+		RuleName: "bash-cloud-metadata",
+		Reason:   "cloud metadata access",
+		Matches:  []ToolCallRuleMatch{{Message: "Bash：访问云主机元数据服务"}},
+	}
+	require.Contains(t, securityRuleReviewSummary(decision), "[middle]")
+	prompt := securityRuleReviewPrompt(decision, "bash", aitool.InvokeParams{
+		"command": "curl http://169.254.169.254/latest/meta-data/",
+	})
+	require.Contains(t, prompt, "安全规则命中")
+	require.Contains(t, prompt, "bash-cloud-metadata")
+	require.Contains(t, prompt, "169.254.169.254")
+	require.Len(t, securityRuleReviewOptions(), 2)
+}

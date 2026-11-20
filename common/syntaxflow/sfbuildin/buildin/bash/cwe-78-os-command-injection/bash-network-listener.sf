@@ -1,0 +1,59 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: network listener opened by nc or socat"
+	title_zh: "Bash：使用 nc/socat 开启网络监听"
+	type: audit
+	level: "middle"
+	rule_id: "bash-network-listener"
+	risk: "audit-check"
+	desc: <<<DESC
+### 说明
+`nc -l`、`ncat -l` 或 `socat TCP-LISTEN` 会在本机开启监听端口。它们既可能
+用于正常排障，也可能是反弹 Shell、内网代理或数据中转的前置步骤；在没有
+`-e/-c/EXEC` 的情况下仍需结合上下文确认监听目的和暴露范围。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+确认监听端口、绑定地址和访问来源。限制监听到回环或内网地址，使用防火墙
+限制来源，并在排障结束后关闭监听。生产环境优先使用受管服务而不是临时
+nc/socat 监听。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-284](https://cwe.mitre.org/data/definitions/284.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+nc -lvnp 4444
+ncat -l 8080
+socat TCP-LISTEN:4444,reuseaddr,fork -
+POS
+	"safefile://neg.sh": <<<NEG
+nc -zv 127.0.0.1 80
+socat -v TCP:example.com:80
+ncat --send-only 127.0.0.1 9000
+NEG
+)
+
+/^(nc|ncat|netcat)$/ as $nc
+$nc(* as $ncArgs) as $ncCall
+$ncCall?{have: /(^|[^A-Za-z0-9_])-l[a-zA-Z]*([^A-Za-z0-9_]|$)/} as $ncListen
+
+socat(* as $socatArgs) as $socatCall
+$socatCall?{have: /(?i)TCP-LISTEN:|UDP-LISTEN:/} as $socatListen
+
+alert $ncListen for {
+	level: "middle",
+	title: "Bash: network listener opened by nc or socat",
+	title_zh: "Bash：使用 nc/socat 开启网络监听",
+	message: "检测到 nc/ncat 监听端口，请确认是否为预期排障。",
+	risk: "audit-check",
+}
+
+alert $socatListen for {
+	level: "middle",
+	title: "Bash: network listener opened by nc or socat",
+	title_zh: "Bash：使用 nc/socat 开启网络监听",
+	message: "检测到 socat 监听端口，请确认绑定地址和访问来源。",
+	risk: "audit-check",
+}
