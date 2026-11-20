@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa"
@@ -329,7 +330,7 @@ func countParams(t *testing.T, ir *core.LowIR) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	function, ok := converted.Program.Funcs.GetByIndex(0)
+	function, ok := omap.GetByIndex(converted.Program.Funcs, 0)
 	if !ok {
 		return 0
 	}

@@ -86,7 +86,7 @@ func (o *OrderedMap[T, V]) snapshotKeysVals() ([]T, []V) {
 	return keys, vals
 }
 
-func (i *OrderedMap[T, V]) LiteralValue() any {
+func LiteralValue[T comparable, V any](i *OrderedMap[T, V]) any {
 	if i == nil {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (i *OrderedMap[T, V]) haveLiteralValue() bool {
 	return i.literalValue != nil
 }
 
-func (i *OrderedMap[T, V]) SetLiteralValue(val any) {
+func SetLiteralValue[T comparable, V any](i *OrderedMap[T, V], val any) {
 	if i == nil {
 		return
 	}
@@ -175,7 +175,7 @@ func (o *OrderedMap[T, V]) Set(key T, v V) {
 // less(a, b) should return true if a should be ordered before b.
 // If key already exists, it will be moved to the new ordered position and its value updated.
 // If less is nil, it falls back to Set (append-on-new).
-func (o *OrderedMap[T, V]) OrderInsert(key T, v V, less func(a, b T) bool) {
+func OrderInsert[T comparable, V any](o *OrderedMap[T, V], key T, v V, less func(a, b T) bool) {
 	if o == nil {
 		return
 	}
@@ -211,7 +211,7 @@ func (o *OrderedMap[T, V]) OrderInsert(key T, v V, less func(a, b T) bool) {
 	o.keyChain[insertAt] = key
 }
 
-func (o *OrderedMap[T, V]) BringKeyToLastOne(target T) {
+func BringKeyToLastOne[T comparable, V any](o *OrderedMap[T, V], target T) {
 	if o == nil {
 		return
 	}
@@ -239,7 +239,7 @@ func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
 	return v, ok
 }
 
-func (o *OrderedMap[T, V]) GetOrSet(key T, value V) V {
+func GetOrSet[T comparable, V any](o *OrderedMap[T, V], key T, value V) V {
 	if o == nil {
 		return value
 	}
@@ -258,7 +258,7 @@ func (o *OrderedMap[T, V]) GetOrSet(key T, value V) V {
 	return existValue
 }
 
-func (o *OrderedMap[T, V]) GetMust(key T) V {
+func GetMust[T comparable, V any](o *OrderedMap[T, V], key T) V {
 	if o == nil {
 		var zero V
 		return zero
@@ -323,7 +323,7 @@ func BuildGeneralMap[V any](m any) *OrderedMap[string, V] {
 	return result
 }
 
-func (o *OrderedMap[T, V]) GetByIndex(index int) (V, bool) {
+func GetByIndex[T comparable, V any](o *OrderedMap[T, V], index int) (V, bool) {
 	if o == nil {
 		var zero V
 		return zero, false
@@ -340,17 +340,17 @@ func (o *OrderedMap[T, V]) GetByIndex(index int) (V, bool) {
 	return v, true
 }
 
-func (o *OrderedMap[T, V]) GetByIndexMust(index int) V {
+func GetByIndexMust[T comparable, V any](o *OrderedMap[T, V], index int) V {
 	if o == nil {
 		var zero V
 		return zero
 	}
 	o.init()
-	r, _ := o.GetByIndex(index)
+	r, _ := GetByIndex(o, index)
 	return r
 }
 
-func (o *OrderedMap[T, V]) First() (T, V, bool) {
+func First[T comparable, V any](o *OrderedMap[T, V]) (T, V, bool) {
 	if o == nil {
 		var zt T
 		var zv V
@@ -370,7 +370,7 @@ func (o *OrderedMap[T, V]) First() (T, V, bool) {
 	return k, v, true
 }
 
-func (o *OrderedMap[T, V]) Last() (T, V, bool) {
+func Last[T comparable, V any](o *OrderedMap[T, V]) (T, V, bool) {
 	if o == nil {
 		var zt T
 		var zv V
@@ -495,7 +495,7 @@ func (o *OrderedMap[T, V]) Have(i any) bool {
 	}
 }
 
-func (o *OrderedMap[T, V]) Filter(f func(T, V) (bool, error)) *OrderedMap[T, V] {
+func Filter[T comparable, V any](o *OrderedMap[T, V], f func(T, V) (bool, error)) *OrderedMap[T, V] {
 	if o == nil {
 		return nil
 	}
@@ -525,7 +525,7 @@ func (o *OrderedMap[T, V]) Filter(f func(T, V) (bool, error)) *OrderedMap[T, V] 
 	return r
 }
 
-func (o *OrderedMap[T, V]) GetParent() *OrderedMap[T, V] {
+func GetParent[T comparable, V any](o *OrderedMap[T, V]) *OrderedMap[T, V] {
 	if o == nil {
 		return nil
 	}
@@ -544,7 +544,7 @@ func GetRoot[T comparable, V any](o *OrderedMap[T, V]) (*OrderedMap[T, V], bool)
 	return GetRoot(o.parent)
 }
 
-func (o *OrderedMap[T, V]) GetMap() map[T]V {
+func GetMap[T comparable, V any](o *OrderedMap[T, V]) map[T]V {
 	if o == nil {
 		return nil
 	}
@@ -555,7 +555,7 @@ func (o *OrderedMap[T, V]) GetMap() map[T]V {
 // SnapshotMap returns a copy of the map. Use it when the caller iterates the
 // result while other goroutines may add entries: GetMap exposes the internal
 // map and ranging it during a Set is a concurrent map read and write.
-func (o *OrderedMap[T, V]) SnapshotMap() map[T]V {
+func SnapshotMap[T comparable, V any](o *OrderedMap[T, V]) map[T]V {
 	if o == nil {
 		return nil
 	}
@@ -569,7 +569,7 @@ func (o *OrderedMap[T, V]) SnapshotMap() map[T]V {
 	return snapshot
 }
 
-func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
+func Map[T comparable, V any](o *OrderedMap[T, V], f func(T, V) (T, V, error)) *OrderedMap[T, V] {
 	if o == nil {
 		return nil
 	}
@@ -794,19 +794,19 @@ func (s *OrderedMap[T, V]) canAsList() bool {
 	return !s.namedKey
 }
 
-func (s *OrderedMap[T, V]) Push(a V) error {
+func Push[T comparable, V any](s *OrderedMap[T, V], a V) error {
 	if s == nil {
 		return fmt.Errorf("cannot push to a nil OrderedMap")
 	}
 	return s.Add(a)
 }
 
-func (s *OrderedMap[T, V]) Pop() V {
+func Pop[T comparable, V any](s *OrderedMap[T, V]) V {
 	if s == nil {
 		var zero V
 		return zero
 	}
-	key, v, ok := s.Last()
+	key, v, ok := Last(s)
 	if ok {
 		s.Delete(key)
 		return v
@@ -820,7 +820,7 @@ func Shift[T comparable, V any](s *OrderedMap[T, V]) V {
 		var zero V
 		return zero
 	}
-	key, v, ok := s.First()
+	key, v, ok := First(s)
 	if ok {
 		s.Delete(key)
 		return v

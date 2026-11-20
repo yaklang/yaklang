@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -61,7 +62,28 @@ type SyntaxFlowResult struct {
 	// One source position is one report row: unrolled loops and container-level
 	// struct alerts otherwise produce N rows that point at the same code.
 	riskPositions map[string]struct{}
-	*ssaconfig.Config
+	Config        *ssaconfig.Config
+}
+
+func (r *SyntaxFlowResult) GetSyntaxFlowResultKind() ssaconfig.SFResultSaveKind {
+	if r == nil {
+		return ssaconfig.SFResultSaveNone
+	}
+	return r.Config.GetSyntaxFlowResultKind()
+}
+
+func (r *SyntaxFlowResult) GetProjectID() uint64 {
+	if r == nil {
+		return 0
+	}
+	return r.Config.GetProjectID()
+}
+
+func (r *SyntaxFlowResult) IsNoSaveRisk() bool {
+	if r == nil {
+		return false
+	}
+	return r.Config.IsNoSaveRisk()
 }
 
 func createEmptyResult() *SyntaxFlowResult {
@@ -212,7 +234,7 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 		sorted = append(sorted, others...)
 		return sfvm.NewValues(sorted)
 	}
-	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.Values) (string, sfvm.Values, error) {
+	res.SymbolTable = omap.Map(res.SymbolTable, func(s string, vo sfvm.Values) (string, sfvm.Values, error) {
 		return s, sortFunc(vo), nil
 	})
 	res.UnNameValue = sortFunc(res.UnNameValue)

@@ -137,7 +137,7 @@ func (prog *Program) RunDeferredBuildsWithCallback(afterEach func(index int, tot
 			app.deferredBuildsMu.Unlock()
 			break
 		}
-		task, ok := app.deferredBuilds.GetByIndex(index)
+		task, ok := omap.GetByIndex(app.deferredBuilds, index)
 		app.deferredBuildsMu.Unlock()
 		if !ok || task == nil {
 			index++

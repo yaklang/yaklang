@@ -552,7 +552,7 @@ func (p *Program) GetIncludeFileNum() int {
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
 	p.editorStackMu.Lock()
-	p.editorStack.Push(e)
+	omap.Push(p.editorStack, e)
 	p.editorStackMu.Unlock()
 	if !p.PreHandler() {
 		p.SetEditor(e.GetUrl(), e)
@@ -564,7 +564,7 @@ func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil
 	}
-	_, v, ok := p.editorStack.Last()
+	_, v, ok := omap.Last(p.editorStack)
 	if !ok {
 		return nil
 	}
@@ -577,7 +577,7 @@ func (p *Program) PopEditor(save bool) {
 		p.editorStackMu.Unlock()
 		return
 	}
-	e := p.editorStack.Pop()
+	e := omap.Pop(p.editorStack)
 	p.editorStackMu.Unlock()
 	if save && e != nil {
 		owner := p

@@ -644,7 +644,7 @@ func (a *anValue) GetLastVariable() *Variable {
 	if variablesMap == nil {
 		return nil
 	}
-	_, v, _ := variablesMap.Last()
+	_, v, _ := omap.Last(variablesMap)
 	return v
 }
 
@@ -654,7 +654,7 @@ func (a *anValue) GetAllVariables() map[string]*Variable {
 	if variablesMap == nil {
 		return make(map[string]*Variable)
 	}
-	return variablesMap.GetMap()
+	return omap.GetMap(variablesMap)
 }
 
 //go:noinline
@@ -671,7 +671,7 @@ func (a *anValue) AddVariable(v *Variable) {
 			return
 		}
 		m.Set(name, v)
-		m.BringKeyToLastOne(name)
+		omap.BringKeyToLastOne(m, name)
 		a.markPersistenceDirty()
 		return
 	}

@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func (v *OrderedMap[T, V]) Jsonify() []byte {
+func Jsonify[T comparable, V any](v *OrderedMap[T, V]) []byte {
 	raw, err := json.Marshal(v)
 	if err != nil {
 		return nil
@@ -24,7 +24,7 @@ func (v *OrderedMap[T, V]) UnmarshalJSON(raw []byte) error {
 				log.Warnf("cannot unmarshal value: %v to %T", err, value)
 				continue
 			}
-			v.Push(value)
+			v.Add(value)
 		}
 	case 2:
 		for _, e := range parsed.entries {
@@ -40,14 +40,14 @@ func (v *OrderedMap[T, V]) UnmarshalJSON(raw []byte) error {
 			v.Set(keyResult, val)
 		}
 	case 3:
-		v.SetLiteralValue(parsed.literal)
+		v.literalValue = parsed.literal
 	}
 	return nil
 }
 
 func (v *OrderedMap[T, V]) MarshalJSONWithKeyValueFetcher(k func(t any) ([]byte, error), vf func(any) ([]byte, error)) ([]byte, error) {
 	if v.haveLiteralValue() {
-		return marshalOrderedMapJSON(true, v.LiteralValue(), false, nil, nil, k, vf)
+		return marshalOrderedMapJSON(true, v.literalValue, false, nil, nil, k, vf)
 	}
 	keys, vals := v.snapshotAny()
 	return marshalOrderedMapJSON(false, nil, v.canAsList(), keys, vals, k, vf)

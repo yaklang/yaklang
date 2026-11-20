@@ -595,7 +595,7 @@ func (f *RuleFormat) getAllRequireAlertDescKey() []SFDescKeyType {
 	if f.requireAlertDescKeyType == nil {
 		return []SFDescKeyType{}
 	}
-	return lo.MapToSlice(f.requireAlertDescKeyType.GetMap(), func(key SFDescKeyType, value bool) SFDescKeyType {
+	return lo.MapToSlice(omap.GetMap(f.requireAlertDescKeyType), func(key SFDescKeyType, value bool) SFDescKeyType {
 		return key
 	})
 }

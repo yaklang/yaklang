@@ -1614,10 +1614,12 @@ func (node *NodeDefault) ClassLikeData() *ClassLikeBase                     { re
 func (node *NodeDefault) BodyData() *BodyBase                               { return nil }
 func (node *NodeDefault) LiteralLikeData() *LiteralLikeBase                 { return nil }
 func (node *NodeDefault) TemplateLiteralLikeData() *TemplateLiteralLikeBase { return nil }
+//go:noinline
 func (node *NodeDefault) SubtreeFacts() SubtreeFacts {
 	return node.data.subtreeFactsWorker(node.data)
 }
 
+//go:noinline
 func (node *NodeDefault) subtreeFactsWorker(self nodeData) SubtreeFacts {
 	// To avoid excessive conditonal checks, the default implementation of subtreeFactsWorker directly invokes
 	// computeSubtreeFacts. More complex nodes should implement CompositeNodeBase, which overrides this
@@ -1630,6 +1632,7 @@ func (node *NodeDefault) computeSubtreeFacts() SubtreeFacts {
 	return SubtreeFactsNone
 }
 
+//go:noinline
 func (node *NodeDefault) propagateSubtreeFacts() SubtreeFacts {
 	return node.data.SubtreeFacts() & ^SubtreeExclusionsNode
 }
@@ -1867,6 +1870,7 @@ type compositeNodeBase struct {
 	facts atomic.Uint32 // caches the SubtreeFacts for this node and its subtree
 }
 
+//go:noinline
 func (node *compositeNodeBase) subtreeFactsWorker(self nodeData) SubtreeFacts {
 	// computeSubtreeFacts() is expected to be idempotent, so races will only impact time, not correctness.
 	facts := SubtreeFacts(node.facts.Load())
