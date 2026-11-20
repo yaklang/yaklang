@@ -19,8 +19,9 @@ cleartext-storage
 中间人窃取传输中的凭据与会话；流量可被篡改注入恶意内容。
 
 ### 检测方式
-这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。
 正则匹配字符串字面量中的 `http://`、`ftp://`、`telnet://` 协议头（`https://` 不命中）。
+位于注释行（`/*`、`//`、文档注释的 `*` 开头行）中的地址是文档链接，不算明文传输，已排除；字符串字面量中的地址仍会命中。
 
 ### 参考
 - [CWE-319：明文传输敏感信息](https://cwe.mitre.org/data/definitions/319.html)
@@ -40,6 +41,9 @@ void bad(void) {
     char *url = "http://api.example.com/v1/pay";
     fetch(url);
 }
+void also_bad(char **slot) {
+    *slot = "ftp://files.example.com/customer.tar";
+}
 
 POS
 	"safefile://ok.c": <<<NEG
@@ -50,9 +54,21 @@ void ok(void) {
 }
 
 NEG
+	"safefile://doc-comment.h": <<<NEG
+/**
+ * @see <a href="http://unicode.org/reports/tr35/#Time_Zone_Fallback">LDML Time Zone Fallback</a>
+ * Reference endpoint: http://example.com/legacy-api
+ */
+// see also "http://example.com/legacy" in the migration notes
+/* telnet://legacy.example.com is documented here, not used */
+#define ENDPOINT "https://api.example.com/v1/pay"
+
+NEG
 )
 ${/\.(c|h)$/}.pattern_regex(/"(http|ftp|telnet):\/\/[^"]*"/) as $hit
-alert $hit for {
+${/\.(c|h)$/}.pattern_regex(/(?m)^[ \t]*(?:\/\*|\/\/|\*[ \t])[^\n]*$/) as $comment
+$hit not_inside $comment as $finding
+alert $finding for {
 	level: "middle",
 	title: "源码扫描：C 明文传输与明文存储",
 	title_zh: "源码扫描：C 明文传输与明文存储",

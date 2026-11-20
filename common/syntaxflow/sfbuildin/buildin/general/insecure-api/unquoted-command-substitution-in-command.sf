@@ -19,6 +19,7 @@ desc(
 
 ### 检测方式
 源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+`[[ ... ]]` 条件表达式、`(( ... ))` 算术表达式和 `case ... in` 的关键字都不做词分割，这些位置上的命令替换不告警；普通命令参数里未加引号的命令替换仍会命中。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -41,6 +42,10 @@ echo " $(foo) "
 echo 'literal $(not_a_subshell)'
 # comment mentioning $(docs) is not a command substitution
 local elapsed=$(( $(date +%s) - start_time ))
+[[ -n $(command -v git) && $(uname -s) == Linux ]]
+case $(uname -s) in
+Linux) make dist ;;
+esac
 NEG
 )
 
@@ -55,7 +60,13 @@ ${*.sh}.pattern_regex(/#[^\n]*/) as $cm_sh
 ${*.bash}.pattern_regex(/#[^\n]*/) as $cm_bash
 ${*.sh}.pattern_regex(/\$\(\([^\n]*\)\)/) as $arith_sh
 ${*.bash}.pattern_regex(/\$\(\([^\n]*\)\)/) as $arith_bash
-$q_sh + $q_bash + $sq_sh + $sq_bash + $cm_sh + $cm_bash + $arith_sh + $arith_bash as $excluded
+${*.sh}.pattern_regex(/\[\[[^\]]*\]\]/) as $test_sh
+${*.bash}.pattern_regex(/\[\[[^\]]*\]\]/) as $test_bash
+${*.sh}.pattern_regex(/\(\([^\n]*\)\)/) as $carr_sh
+${*.bash}.pattern_regex(/\(\([^\n]*\)\)/) as $carr_bash
+${*.sh}.pattern_regex(/case[ \t]+[^\n;]*\bin\b/) as $case_sh
+${*.bash}.pattern_regex(/case[ \t]+[^\n;]*\bin\b/) as $case_bash
+$q_sh + $q_bash + $sq_sh + $sq_bash + $cm_sh + $cm_bash + $arith_sh + $arith_bash + $test_sh + $test_bash + $carr_sh + $carr_bash + $case_sh + $case_bash as $excluded
 $t not_inside $excluded as $hit
 alert $hit for {
 	level: "middle",

@@ -2294,14 +2294,14 @@
   {
     "rule_id": "source-unquoted-command-substitution-in-command",
     "rule_name": "检测到命令中未加引号的命令替换",
-    "hash": "13a6296f398899334ba0cd064bdc40c4f00443a80a9235ef50536785b1a07fa4",
-    "version": "20261109.0001"
+    "hash": "a10f0e6945c254ec9f5b1882e2c083c0585ac79fd6457d0dbd9acd3784374341",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-unquoted-variable-expansion-in-command",
     "rule_name": "检测到命令中未加引号的变量展开",
-    "hash": "f76999723bda53204b19f27e10fa279f7e1174bf4cc5fc024de4db7b2949a990",
-    "version": "20261109.0001"
+    "hash": "42f86342cd685f587e2ca179ace974074594924e79e2bf8150bf2b123379def2",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-detected-artifactory-password",
@@ -5516,8 +5516,8 @@
   {
     "rule_id": "source-c-cleartext-transmission",
     "rule_name": "源码匹配：C 明文传输与明文存储",
-    "hash": "7a89fb2b0294d8a2fd1b35e1e6e674032e793bf3f5c58172135cd849439d78f0",
-    "version": "20261109.0002"
+    "hash": "e8fa9aaa8d43c51c496c65c50589a83400946b4ca5735b800ea921c74e7bc5a9",
+    "version": "20261120.0001"
   },
   {
     "rule_id": "source-c-cors-origin",
