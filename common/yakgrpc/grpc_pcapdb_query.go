@@ -218,11 +218,10 @@ func (s *Server) QueryPCAPPackets(ctx context.Context, req *ypb.QueryPCAPPackets
 	if err != nil {
 		return nil, pcapRPCError(err)
 	}
+	paging.AfterId = page.NextCursor
 	response := &ypb.QueryPCAPPacketsResponse{
 		Pagination: paging,
 		Data:       make([]*ypb.PCAPPacketSummary, 0, len(page.Packets)),
-		NextCursor: page.NextCursor,
-		HasMore:    page.HasMore,
 	}
 	if page.TotalKnown {
 		response.Total = proto.Int64(page.Total)

@@ -26,30 +26,29 @@ func TestPCAPGRPCQueryPacketsPaginationAndTotal(t *testing.T) {
 	require.Len(t, first.GetData(), 2)
 	require.EqualValues(t, []int64{1, 2}, []int64{first.GetData()[0].GetId(), first.GetData()[1].GetId()})
 	require.EqualValues(t, 5, first.GetTotal())
-	require.True(t, first.GetHasMore())
-	require.EqualValues(t, 2, first.GetNextCursor())
+	require.EqualValues(t, 2, first.GetPagination().GetAfterId())
 	require.Equal(t, "UDP", first.GetData()[0].GetProtocol())
 	require.Contains(t, first.GetData()[0].GetInfo(), "DstPort=53")
 
 	second, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{
 		DatasetID:  datasetID,
-		Pagination: &ypb.Paging{Limit: 2, AfterId: first.GetNextCursor()},
+		Pagination: &ypb.Paging{Limit: 2, AfterId: first.GetPagination().GetAfterId()},
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, []int64{3, 4}, []int64{second.GetData()[0].GetId(), second.GetData()[1].GetId()})
 	require.Nil(t, second.Total, "later cursor pages must make an omitted total explicitly unknown")
-	require.True(t, second.GetHasMore())
+	require.EqualValues(t, 4, second.GetPagination().GetAfterId())
 
 	recounted, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{
 		DatasetID:    datasetID,
-		Pagination:   &ypb.Paging{Limit: 2, AfterId: second.GetNextCursor()},
+		Pagination:   &ypb.Paging{Limit: 2, AfterId: second.GetPagination().GetAfterId()},
 		IncludeTotal: proto.Bool(true),
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 5, recounted.GetTotal())
 	require.Len(t, recounted.GetData(), 1)
 	require.EqualValues(t, 5, recounted.GetData()[0].GetId())
-	require.False(t, recounted.GetHasMore())
+	require.EqualValues(t, 5, recounted.GetPagination().GetAfterId())
 
 	skipped, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{
 		DatasetID:    datasetID,
@@ -155,12 +154,11 @@ func TestPCAPGRPCQueryPacketsApplicationCompletion(t *testing.T) {
 	require.EqualValues(t, 4, first.GetData()[0].GetId())
 	require.Equal(t, "HTTP", first.GetData()[0].GetProtocol())
 	require.Contains(t, first.GetData()[0].GetInfo(), "GET /demo")
-	require.True(t, first.GetHasMore())
 
 	second, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{
 		DatasetID:  datasetID,
 		Filter:     &ypb.PCAPPacketsFilter{ApplicationLayerTypes: []string{"http"}},
-		Pagination: &ypb.Paging{Limit: 1, AfterId: first.GetNextCursor()},
+		Pagination: &ypb.Paging{Limit: 1, AfterId: first.GetPagination().GetAfterId()},
 	})
 	require.NoError(t, err)
 	require.Nil(t, second.Total)
@@ -168,5 +166,15 @@ func TestPCAPGRPCQueryPacketsApplicationCompletion(t *testing.T) {
 	require.EqualValues(t, 6, second.GetData()[0].GetId())
 	require.Equal(t, "HTTP", second.GetData()[0].GetProtocol())
 	require.Contains(t, second.GetData()[0].GetInfo(), "HTTP/1.1 200 OK")
-	require.False(t, second.GetHasMore())
+	require.EqualValues(t, 6, second.GetPagination().GetAfterId())
+	require.EqualValues(t, 2, first.GetTotal())
+	require.EqualValues(t, int(first.GetTotal()), len(first.GetData())+len(second.GetData()))
+	exhausted, err := client.QueryPCAPPackets(ctx, &ypb.QueryPCAPPacketsRequest{
+		DatasetID:  datasetID,
+		Filter:     &ypb.PCAPPacketsFilter{ApplicationLayerTypes: []string{"http"}},
+		Pagination: &ypb.Paging{Limit: 1, AfterId: second.GetPagination().GetAfterId()},
+	})
+	require.NoError(t, err)
+	require.Empty(t, exhausted.GetData())
+	require.Equal(t, second.GetPagination().GetAfterId(), exhausted.GetPagination().GetAfterId())
 }

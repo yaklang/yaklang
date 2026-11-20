@@ -3220,9 +3220,6 @@ message QueryTrafficPacketResponse {
   repeated TrafficPacket Data = 1;
   Paging Pagination = 2;
   int64 Total = 3;
-  int64 NextCursor = 4;
-  bool HasMore = 5;
-  bool Truncated = 6;
 }
 
 message TrafficTCPReassembled {
@@ -10923,12 +10920,9 @@ message QueryPCAPDatabaseRequest {
 }
 
 message QueryPCAPDatabaseResponse {
-  Paging Pagination = 1;
+  Paging Pagination = 1; // Normalized request paging; AfterId is the next cursor.
   repeated PCAPDatabase Data = 2;
   int64 Total = 3; // Matching catalog entries before applying AfterId.
-  int64 NextCursor = 4;
-  bool HasMore = 5;
-  bool Truncated = 6; // Page shortened by the result byte budget.
 }
 
 message PCAPPacketsFilter {
@@ -10978,11 +10972,9 @@ message QueryPCAPPacketsRequest {
 }
 
 message QueryPCAPPacketsResponse {
-  Paging Pagination = 1;
+  Paging Pagination = 1; // Normalized request paging; AfterId is the next cursor.
   repeated PCAPPacketSummary Data = 2;
   optional int64 Total = 3; // Exact matching packet count; absent when not computed.
-  int64 NextCursor = 4;
-  bool HasMore = 5;
 }
 
 message PCAPFieldRange {

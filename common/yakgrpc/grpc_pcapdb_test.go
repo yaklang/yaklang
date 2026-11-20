@@ -199,8 +199,7 @@ func TestPCAPGRPCQueryDatabase(t *testing.T) {
 	require.Len(t, first.GetData(), 1)
 	require.Equal(t, ids[0], first.GetData()[0].GetDatasetID())
 	require.EqualValues(t, 2, first.GetTotal())
-	require.True(t, first.GetHasMore())
-	require.Equal(t, first.GetData()[0].GetId(), first.GetNextCursor())
+	require.Equal(t, first.GetData()[0].GetId(), first.GetPagination().GetAfterId())
 	require.Equal(t, firstMeta.SourceKind, first.GetData()[0].GetSourceKind())
 	require.Equal(t, firstMeta.CaptureInterface, first.GetData()[0].GetCaptureInterface())
 	require.Equal(t, firstMeta.CaptureBPF, first.GetData()[0].GetCaptureBPF())
@@ -211,13 +210,19 @@ func TestPCAPGRPCQueryDatabase(t *testing.T) {
 	require.Equal(t, firstMeta.CreatedAt.Unix(), first.GetData()[0].GetCreatedAt())
 	require.Positive(t, first.GetData()[0].GetCreatedAt())
 	second, err := client.QueryPCAPDatabase(ctx, &ypb.QueryPCAPDatabaseRequest{
-		Pagination: &ypb.Paging{Limit: 1, AfterId: first.GetNextCursor()},
+		Pagination: &ypb.Paging{Limit: 1, AfterId: first.GetPagination().GetAfterId()},
 	})
 	require.NoError(t, err)
 	require.Len(t, second.GetData(), 1)
 	require.Equal(t, ids[1], second.GetData()[0].GetDatasetID())
 	require.EqualValues(t, 2, second.GetTotal())
-	require.False(t, second.GetHasMore())
+	require.Equal(t, second.GetData()[0].GetId(), second.GetPagination().GetAfterId())
+	exhausted, err := client.QueryPCAPDatabase(ctx, &ypb.QueryPCAPDatabaseRequest{
+		Pagination: &ypb.Paging{Limit: 1, AfterId: second.GetPagination().GetAfterId()},
+	})
+	require.NoError(t, err)
+	require.Empty(t, exhausted.GetData())
+	require.Equal(t, second.GetPagination().GetAfterId(), exhausted.GetPagination().GetAfterId())
 	// Catalog metadata remains queryable when analysis/import is not ready.
 	require.NoError(t, s.GetProfileDatabase().Model(&pcapdb.PCAPFileDBMetadata{}).
 		Where("dataset_id = ?", ids[0]).Updates(map[string]any{"state": pcapdb.StateFailed, "last_error": "test failure"}).Error)

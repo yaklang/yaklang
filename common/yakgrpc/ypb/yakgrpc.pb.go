@@ -18084,9 +18084,6 @@ type QueryTrafficPacketResponse struct {
 	Data          []*TrafficPacket       `protobuf:"bytes,1,rep,name=Data,proto3" json:"Data,omitempty"`
 	Pagination    *Paging                `protobuf:"bytes,2,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
 	Total         int64                  `protobuf:"varint,3,opt,name=Total,proto3" json:"Total,omitempty"`
-	NextCursor    int64                  `protobuf:"varint,4,opt,name=NextCursor,proto3" json:"NextCursor,omitempty"`
-	HasMore       bool                   `protobuf:"varint,5,opt,name=HasMore,proto3" json:"HasMore,omitempty"`
-	Truncated     bool                   `protobuf:"varint,6,opt,name=Truncated,proto3" json:"Truncated,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -18140,27 +18137,6 @@ func (x *QueryTrafficPacketResponse) GetTotal() int64 {
 		return x.Total
 	}
 	return 0
-}
-
-func (x *QueryTrafficPacketResponse) GetNextCursor() int64 {
-	if x != nil {
-		return x.NextCursor
-	}
-	return 0
-}
-
-func (x *QueryTrafficPacketResponse) GetHasMore() bool {
-	if x != nil {
-		return x.HasMore
-	}
-	return false
-}
-
-func (x *QueryTrafficPacketResponse) GetTruncated() bool {
-	if x != nil {
-		return x.Truncated
-	}
-	return false
 }
 
 type TrafficTCPReassembled struct {
@@ -81901,12 +81877,9 @@ func (x *QueryPCAPDatabaseRequest) GetPagination() *Paging {
 
 type QueryPCAPDatabaseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pagination    *Paging                `protobuf:"bytes,1,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
+	Pagination    *Paging                `protobuf:"bytes,1,opt,name=Pagination,proto3" json:"Pagination,omitempty"` // Normalized request paging; AfterId is the next cursor.
 	Data          []*PCAPDatabase        `protobuf:"bytes,2,rep,name=Data,proto3" json:"Data,omitempty"`
 	Total         int64                  `protobuf:"varint,3,opt,name=Total,proto3" json:"Total,omitempty"` // Matching catalog entries before applying AfterId.
-	NextCursor    int64                  `protobuf:"varint,4,opt,name=NextCursor,proto3" json:"NextCursor,omitempty"`
-	HasMore       bool                   `protobuf:"varint,5,opt,name=HasMore,proto3" json:"HasMore,omitempty"`
-	Truncated     bool                   `protobuf:"varint,6,opt,name=Truncated,proto3" json:"Truncated,omitempty"` // Page shortened by the result byte budget.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -81960,27 +81933,6 @@ func (x *QueryPCAPDatabaseResponse) GetTotal() int64 {
 		return x.Total
 	}
 	return 0
-}
-
-func (x *QueryPCAPDatabaseResponse) GetNextCursor() int64 {
-	if x != nil {
-		return x.NextCursor
-	}
-	return 0
-}
-
-func (x *QueryPCAPDatabaseResponse) GetHasMore() bool {
-	if x != nil {
-		return x.HasMore
-	}
-	return false
-}
-
-func (x *QueryPCAPDatabaseResponse) GetTruncated() bool {
-	if x != nil {
-		return x.Truncated
-	}
-	return false
 }
 
 type PCAPPacketsFilter struct {
@@ -82375,11 +82327,9 @@ func (x *QueryPCAPPacketsRequest) GetIncludeTotal() bool {
 
 type QueryPCAPPacketsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pagination    *Paging                `protobuf:"bytes,1,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
+	Pagination    *Paging                `protobuf:"bytes,1,opt,name=Pagination,proto3" json:"Pagination,omitempty"` // Normalized request paging; AfterId is the next cursor.
 	Data          []*PCAPPacketSummary   `protobuf:"bytes,2,rep,name=Data,proto3" json:"Data,omitempty"`
 	Total         *int64                 `protobuf:"varint,3,opt,name=Total,proto3,oneof" json:"Total,omitempty"` // Exact matching packet count; absent when not computed.
-	NextCursor    int64                  `protobuf:"varint,4,opt,name=NextCursor,proto3" json:"NextCursor,omitempty"`
-	HasMore       bool                   `protobuf:"varint,5,opt,name=HasMore,proto3" json:"HasMore,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -82433,20 +82383,6 @@ func (x *QueryPCAPPacketsResponse) GetTotal() int64 {
 		return *x.Total
 	}
 	return 0
-}
-
-func (x *QueryPCAPPacketsResponse) GetNextCursor() int64 {
-	if x != nil {
-		return x.NextCursor
-	}
-	return 0
-}
-
-func (x *QueryPCAPPacketsResponse) GetHasMore() bool {
-	if x != nil {
-		return x.HasMore
-	}
-	return false
 }
 
 type PCAPFieldRange struct {
@@ -84957,18 +84893,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tInterface\x18\x18 \x01(\x03R\tInterface\x12 \n" +
 	"\vDecodeError\x18\x19 \x01(\tR\vDecodeError\x12\x18\n" +
 	"\aDetails\x18\x1a \x01(\tR\aDetailsB\x0e\n" +
-	"\f_TimestampNS\"\xdf\x01\n" +
+	"\f_TimestampNS\"\x87\x01\n" +
 	"\x1aQueryTrafficPacketResponse\x12&\n" +
 	"\x04Data\x18\x01 \x03(\v2\x12.ypb.TrafficPacketR\x04Data\x12+\n" +
 	"\n" +
 	"Pagination\x18\x02 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\x12\x1e\n" +
-	"\n" +
-	"NextCursor\x18\x04 \x01(\x03R\n" +
-	"NextCursor\x12\x18\n" +
-	"\aHasMore\x18\x05 \x01(\bR\aHasMore\x12\x1c\n" +
-	"\tTruncated\x18\x06 \x01(\bR\tTruncated\"\xe1\x01\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xe1\x01\n" +
 	"\x15TrafficTCPReassembled\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12 \n" +
 	"\vSessionUuid\x18\x02 \x01(\tR\vSessionUuid\x12\x10\n" +
@@ -90622,18 +90553,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Filter\x18\x01 \x01(\v2\x17.ypb.PCAPDatabaseFilterR\x06Filter\x12+\n" +
 	"\n" +
 	"Pagination\x18\x02 \x01(\v2\v.ypb.PagingR\n" +
-	"Pagination\"\xdd\x01\n" +
+	"Pagination\"\x85\x01\n" +
 	"\x19QueryPCAPDatabaseResponse\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12%\n" +
 	"\x04Data\x18\x02 \x03(\v2\x11.ypb.PCAPDatabaseR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\x12\x1e\n" +
-	"\n" +
-	"NextCursor\x18\x04 \x01(\x03R\n" +
-	"NextCursor\x12\x18\n" +
-	"\aHasMore\x18\x05 \x01(\bR\aHasMore\x12\x1c\n" +
-	"\tTruncated\x18\x06 \x01(\bR\tTruncated\"\x8d\x04\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x8d\x04\n" +
 	"\x11PCAPPacketsFilter\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1a\n" +
 	"\bSourceIP\x18\x02 \x03(\tR\bSourceIP\x12$\n" +
@@ -90683,17 +90609,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12'\n" +
 	"\fIncludeTotal\x18\x04 \x01(\bH\x00R\fIncludeTotal\x88\x01\x01B\x0f\n" +
-	"\r_IncludeTotal\"\xd2\x01\n" +
+	"\r_IncludeTotal\"\x98\x01\n" +
 	"\x18QueryPCAPPacketsResponse\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12*\n" +
 	"\x04Data\x18\x02 \x03(\v2\x16.ypb.PCAPPacketSummaryR\x04Data\x12\x19\n" +
-	"\x05Total\x18\x03 \x01(\x03H\x00R\x05Total\x88\x01\x01\x12\x1e\n" +
-	"\n" +
-	"NextCursor\x18\x04 \x01(\x03R\n" +
-	"NextCursor\x12\x18\n" +
-	"\aHasMore\x18\x05 \x01(\bR\aHasMoreB\b\n" +
+	"\x05Total\x18\x03 \x01(\x03H\x00R\x05Total\x88\x01\x01B\b\n" +
 	"\x06_Total\"h\n" +
 	"\x0ePCAPFieldRange\x12\x1a\n" +
 	"\bSourceID\x18\x01 \x01(\tR\bSourceID\x12\x1c\n" +

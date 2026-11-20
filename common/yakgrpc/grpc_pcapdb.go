@@ -144,7 +144,7 @@ func (s *Server) QueryPCAPDatabase(ctx context.Context, req *ypb.QueryPCAPDataba
 		return nil, pcapRPCError(err)
 	}
 	response := &ypb.QueryPCAPDatabaseResponse{
-		Pagination: paging, Data: make([]*ypb.PCAPDatabase, 0), NextCursor: paging.AfterId,
+		Pagination: paging, Data: make([]*ypb.PCAPDatabase, 0),
 	}
 	page, err := manager.QueryMetadata(ctx, id, pcapdb.QueryLimit(int(paging.Limit)), pcapdb.QueryAfter(paging.AfterId))
 	if err != nil {
@@ -157,7 +157,7 @@ func (s *Server) QueryPCAPDatabase(ctx context.Context, req *ypb.QueryPCAPDataba
 	if err != nil {
 		return nil, pcapRPCError(err)
 	}
-	response.NextCursor, response.HasMore, response.Truncated = page.NextCursor, page.HasMore, page.Truncated
+	response.Pagination.AfterId = page.NextCursor
 	return response, nil
 }
 

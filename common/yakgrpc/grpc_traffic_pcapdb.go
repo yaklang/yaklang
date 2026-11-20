@@ -148,7 +148,8 @@ func (s *Server) queryPCAPTrafficPacket(ctx context.Context, req *ypb.QueryTraff
 	if err != nil {
 		return nil, pcapRPCError(err)
 	}
-	rsp := &ypb.QueryTrafficPacketResponse{Pagination: paging, Total: page.Total, HasMore: page.HasMore, NextCursor: filter.AfterID, Data: make([]*ypb.TrafficPacket, 0, len(page.Packets))}
+	paging.AfterId = page.NextCursor
+	rsp := &ypb.QueryTrafficPacketResponse{Pagination: paging, Total: page.Total, Data: make([]*ypb.TrafficPacket, 0, len(page.Packets))}
 	used := 128
 	for _, row := range page.Packets {
 		if err := ctx.Err(); err != nil {
@@ -218,11 +219,10 @@ func (s *Server) queryPCAPTrafficPacket(ctx context.Context, req *ypb.QueryTraff
 			if len(rsp.Data) == 0 {
 				return nil, pcapRPCError(pcapdb.ErrResultTooLarge)
 			}
-			rsp.Truncated, rsp.HasMore = true, true
 			break
 		}
 		rsp.Data = append(rsp.Data, item)
-		rsp.NextCursor = item.Id
+		rsp.Pagination.AfterId = item.Id
 		used += size
 	}
 	return rsp, nil

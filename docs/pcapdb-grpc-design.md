@@ -19,7 +19,7 @@
 
 | RPC | 请求 | 响应与职责 |
 | --- | --- | --- |
-| `QueryPCAPPackets` | `DatasetID`、`Filter`、`Pagination`、可选 `IncludeTotal` | `Data: PacketSummary[]`、`NextCursor`、`HasMore`、可选精确 `Total`；只返回列表信息 |
+| `QueryPCAPPackets` | `DatasetID`、`Filter`、`Pagination`、可选 `IncludeTotal` | `Data: PacketSummary[]`、`Pagination`、可选精确 `Total`；只返回列表信息 |
 | `GetPCAPPacketDetail` | `DatasetID`、`PacketID` | 单个包摘要、协议树、字节源描述、重组关系；小额初始字节可随详情返回 |
 | `ReadPCAPBytes` | `DatasetID`、`SourceID`、`Offset`、`Length` | `Data: bytes`、`Offset`、`TotalLength`、`EOF`；读取指定字节源的一个区间 |
 
@@ -28,6 +28,8 @@
 `PcapX` 保留原双向流名称，但实现已切换为单网卡 pcapdb 实时抓包。首个响应返回 `DatasetID`，前端可在抓包过程中使用 `QueryPCAPPackets` 和 `GetPCAPPacketDetail` 查询；关闭流即停止捕获，最终响应带 `Finished` 和错误信息。
 
 沿用项目 CRUD 的 `Filter`、`Pagination`、`Data` 组织方式和 gRPC 错误处理。HTTPFlow 本身也有独立的查询、按 ID 获取以及正文读取接口，不把 `Full` 作为这轮设计的约束。
+
+分页响应不再增加 `NextCursor`、`HasMore` 等旁路字段。响应中的 `Pagination.AfterId` 表示下一页游标：只要它相对请求游标前进，客户端就继续查询；返回空页且游标不再前进时结束。`Limit` 保持规范化后的请求值，`Total` 是否返回由具体接口的统计语义决定。
 
 实现位置：
 
@@ -76,7 +78,7 @@ MessageRef
 
 在 `common/yakgrpc/yakgrpc.proto` 定义三个查看接口及上述结构，生成绑定，保留数据集管理 RPC。明确 int64 在前端的精确表示、缺失时间和端口零值、范围单位及错误码。
 
-列表只提供 ID 升序的 `AfterId + Limit` 游标分页，默认 100、最大 1000；前后翻页由前端保存游标历史。本轮不提供任意页码跳转或自定义排序。
+列表只提供 ID 升序的 `AfterId + Limit` 游标分页，默认 100、最大 1000；响应把最后返回记录的 ID 写回 `Pagination.AfterId`。前后翻页由前端保存游标历史。本轮不提供任意页码跳转或自定义排序。
 
 `IncludeTotal` 使用可选字段：未设置时首页计算、后续游标页不重复计算；显式为 true 时任何页都返回精确总数。Total 按完整筛选条件统计，不受游标影响；没有统计时缺失，不能返回 0 代表未知。更换筛选条件须重置游标和总数。
 
@@ -184,8 +186,10 @@ MessageRef
        TransportLayerTypes, ApplicationLayerTypes, Keyword,
        FromId, Pagination:{Page:1, Limit:100}}
 详情：{DatasetID, Id:"38", Full:true}
-响应：{Data:TrafficPacket[], Total, NextCursor, HasMore, Truncated}
+响应（历史版本）：{Data:TrafficPacket[], Total, NextCursor, HasMore, Truncated}
 ```
+
+上述响应旁路字段已移除，当前统一使用 `{Data, Pagination, Total}`，其中 `Pagination.AfterId` 是下一页游标。
 
 - 一行始终对应 `packets` 的一条原始捕获记录。消息过滤用 EXISTS，在计数与分页前执行；多条消息不会把一个包重复计数。
 - `Total` 是筛选后的原始包总数，不随游标变化。支持 ID 升序的 Page/Limit 或 FromId/AfterId，页码和游标不能混用；前端使用游标历史前后翻页。
