@@ -7,7 +7,10 @@
 //
 // 用法：
 //   yak ssa-query --program <name> --database <db> --syntaxflow condition-const-compare.sf
-//   yak ssa-query ... --syntaxflow <这个文件所在目录>     // 目录会被逐个执行
+//   导出成 JSON 见同目录 README.md。
+//
+// 配套规则：condition-call-strcmp-literal.sf。C 的字符串比较多数写成
+// `strcmp(x, "https") == 0`，字面量在调用实参里，这条规则看不到，需要那条补。
 //
 // 输出变量：
 //   $stmt  命中的 If / Loop 指令
@@ -19,6 +22,8 @@
 //   * C 前端把 && / || 降级成多个 If，所以每个 If 的条件通常已经是单个比较；
 //     $cond #> 这一行额外覆盖条件被包在 not(...)/cast 里一层的情况。
 //   * 常量是否“短串/单字符”由报告工具按 $const 的值判定，规则本身不判长度。
+//   * opcode 名字在编译期校验：写成 ge / le / gtEq 会直接报错并列出可用名字，
+//     不会像以前那样只打一条 INFO 日志然后返回空结果。
 
 *?{opcode: If || opcode: Loop} as $stmt
 $stmt<cfgConditionValues> as $cond
