@@ -53,6 +53,15 @@ DollarOutput: '$';
 Colon: ':';
 Search: '%';
 Bang: '!';
+// A name filter pattern that starts with '*'. It is a separate token because a
+// pattern may contain '-' (SSA value names do: Function-strcmp, if-condition)
+// while a plain identifier must not: `$a-$b` is a remove reference, and letting
+// '-' continue an identifier would swallow it.
+// '-' is allowed inside a pattern (Function-strcmp) but only when a name
+// character follows it, so `*->x`, `*-{...}->` and `*-->x` keep their original
+// tokenization. The '-' is matched together with that next character because a
+// lexer predicate would test LA(1) before the '-' is consumed.
+GlobPattern: '*' ( '-' GlobPatternChar | GlobPatternChar )+;
 Star: '*';
 Minus: '-';
 As: 'as';
@@ -129,6 +138,7 @@ LFHereDocText: .;
 fragment NameString: [a-zA-Z_\u0080-\ufffe][a-zA-Z0-9_\u0080-\ufffe]*;
 
 fragment IdentifierCharStart: '*' | '_' | [a-z] | [A-Z];
+fragment GlobPatternChar: [a-zA-Z0-9_*];
 fragment HexDigit: [a-fA-F0-9];
 fragment Digit: [0-9];
 fragment OctalDigit: [0-7];

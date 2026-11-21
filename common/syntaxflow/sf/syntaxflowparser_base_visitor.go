@@ -315,6 +315,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitNameFilter(ctx *NameFilterContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitGlobPattern(ctx *GlobPatternContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitFlat(ctx *FlatContext) interface{} {
 	return v.VisitChildren(ctx)
 }

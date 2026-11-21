@@ -159,7 +159,8 @@ recursiveConfigItemValue
 
 sliceCallItem: nameFilter | numberLiteral;
 
-nameFilter: '*' | identifier | regexpLiteral;
+nameFilter: '*' | globPattern | identifier | regexpLiteral;
+globPattern: GlobPattern;
 
 chainFilter
     : '[' ((statements (',' statements)*) | '...') ']'          # Flat
@@ -210,8 +211,8 @@ versionString
 opcodesCondition: opcodes | identifier;
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
-stringLiteral: identifier | '*';
-stringLiteralWithoutStar: identifier | regexpLiteral ;
+stringLiteral: identifier | '*' | globPattern;
+stringLiteralWithoutStar: identifier | globPattern | regexpLiteral ;
 regexpLiteral: RegexpLiteral;
 identifier: Identifier | keywords | QuotedStringLiteral;
 
