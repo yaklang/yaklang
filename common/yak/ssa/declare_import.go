@@ -109,7 +109,7 @@ func readImportDecl(p *Program, get func(*importDeclareItem) bool) {
 	if p.importCoverInner {
 		// read from last to first
 		for i := len - 1; i >= 0; i-- {
-			item, ok := idecl.GetByIndex(i)
+			item, ok := omap.GetByIndex(idecl, i)
 			if ok && get(item) {
 				return // stop
 			}
@@ -117,7 +117,7 @@ func readImportDecl(p *Program, get func(*importDeclareItem) bool) {
 	} else {
 		// read from first to last
 		for i := 0; i < len; i++ {
-			item, ok := idecl.GetByIndex(i)
+			item, ok := omap.GetByIndex(idecl, i)
 			if ok && get(item) {
 				return // stop
 			}
@@ -144,7 +144,7 @@ func (p *Program) TryReadImportDeclare(name string) (Type, bool) {
 		t, ok := idi.getType(name)
 		ret = t
 		if ret == nil {
-			for libName := range p.importDeclares.SnapshotMap() {
+			for libName := range omap.SnapshotMap(p.importDeclares) {
 				lib, exist := p.GetLibrary(libName)
 				if lib != nil && exist {
 					ret, ok = lib.GetExportType(name)
@@ -207,7 +207,7 @@ func (p *Program) checkImportRelationship(lib *Program) (*importDeclareItem, err
 	}
 	pkg, ok := importDecl.Get(lib.Name)
 	if !ok {
-		pkg = importDecl.GetOrSet(lib.Name, &importDeclareItem{
+		pkg = omap.GetOrSet(importDecl, lib.Name, &importDeclareItem{
 			pkgName: lib.Name,
 			typ:     make(map[string]Type),
 			val:     make(map[string]Value),

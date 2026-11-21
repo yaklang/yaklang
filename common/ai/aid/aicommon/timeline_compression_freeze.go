@@ -119,7 +119,7 @@ func (m *Timeline) freezeBudgetGroupsLocked(useSizer bool) TimelineIntervalBlock
 				item.value = &timelineToolCachePromptItem{TextTimelineItem{ID: id, Text: openText}}
 			}
 		}
-		view.idToTimelineItem.OrderInsert(id, item, lessInt64)
+		omap.OrderInsert(view.idToTimelineItem, id, item, lessInt64)
 	}
 	seed := m.openTaskSeedLocked(view)
 	if useSizer && m.bucketSizer != nil {
@@ -348,7 +348,7 @@ func (m *Timeline) openTaskSeedLocked(view *Timeline) string {
 		return ""
 	}
 	batch := m.freezeState.Batches[len(m.freezeState.Batches)-1]
-	first, ok := view.idToTimelineItem.GetByIndex(0)
+	first, ok := omap.GetByIndex(view.idToTimelineItem, 0)
 	if !ok || !alignToBucket(first.createdAt, TimelineDumpDefaultIntervalMinutes).Equal(batch.BucketStart) {
 		return ""
 	}

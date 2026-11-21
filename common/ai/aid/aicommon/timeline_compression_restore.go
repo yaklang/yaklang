@@ -98,8 +98,8 @@ func (m *Timeline) ReassignIDs(generator func() int64) int64 {
 			return 0
 		}
 		ts, _ := m.idToTs.Get(id)
-		newIDs.OrderInsert(next, item, lessInt64)
-		newTS.OrderInsert(ts, item, lessInt64)
+		omap.OrderInsert(newIDs, next, item, lessInt64)
+		omap.OrderInsert(newTS, ts, item, lessInt64)
 		newIDToTS.Set(next, ts)
 	}
 	m.idToTimelineItem, m.tsToTimelineItem, m.idToTs = newIDs, newTS, newIDToTS

@@ -1618,6 +1618,7 @@ func (node *NodeDefault) SubtreeFacts() SubtreeFacts {
 	return node.data.subtreeFactsWorker(node.data)
 }
 
+//go:noinline
 func (node *NodeDefault) subtreeFactsWorker(self nodeData) SubtreeFacts {
 	// To avoid excessive conditonal checks, the default implementation of subtreeFactsWorker directly invokes
 	// computeSubtreeFacts. More complex nodes should implement CompositeNodeBase, which overrides this
@@ -1867,6 +1868,7 @@ type compositeNodeBase struct {
 	facts atomic.Uint32 // caches the SubtreeFacts for this node and its subtree
 }
 
+//go:noinline
 func (node *compositeNodeBase) subtreeFactsWorker(self nodeData) SubtreeFacts {
 	// computeSubtreeFacts() is expected to be idempotent, so races will only impact time, not correctness.
 	facts := SubtreeFacts(node.facts.Load())

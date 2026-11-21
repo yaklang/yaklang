@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type TimelineFork struct {
@@ -203,9 +204,9 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		copy := *active.item
 		copy.createdAt = time.Unix(0, ts*int64(time.Millisecond))
 		active.item = &copy
-		parent.idToTimelineItem.OrderInsert(active.id, active.item, lessInt64)
+		omap.OrderInsert(parent.idToTimelineItem, active.id, active.item, lessInt64)
 		parent.idToTs.Set(active.id, ts)
-		parent.tsToTimelineItem.OrderInsert(ts, active.item, lessInt64)
+		omap.OrderInsert(parent.tsToTimelineItem, ts, active.item, lessInt64)
 		parent.collectItemInputCallbackLocked(&notifications, active.item)
 		if !isPromotableTimelineItem(active.item) {
 			result.ActiveItemsMerged++
@@ -222,9 +223,9 @@ func (f *TimelineFork) MergeBack() (*TimelineMergeResult, error) {
 		item := &TimelineItem{createdAt: time.UnixMilli(nextTS), value: &TextTimelineItem{
 			ID: coveredID, Text: "[subtask_summary]:\n" + compressedHead.Text,
 		}}
-		parent.idToTimelineItem.OrderInsert(coveredID, item, lessInt64)
+		omap.OrderInsert(parent.idToTimelineItem, coveredID, item, lessInt64)
 		parent.idToTs.Set(coveredID, nextTS)
-		parent.tsToTimelineItem.OrderInsert(nextTS, item, lessInt64)
+		omap.OrderInsert(parent.tsToTimelineItem, nextTS, item, lessInt64)
 		parent.collectItemInputCallbackLocked(&notifications, item)
 
 		result.CompressedHeadsMerged++

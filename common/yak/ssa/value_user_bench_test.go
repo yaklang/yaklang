@@ -16,9 +16,10 @@ func BenchmarkValueAddUserDedup(b *testing.B) {
 			target.SetId(1)
 			users := make([]User, n)
 			for i := range users {
-				u := NewValue()
+				u := &Undefined{}
+				u.initValue()
 				u.SetId(int64(i + 2))
-				users[i] = &Undefined{anValue: u}
+				users[i] = u
 			}
 			b.ReportAllocs()
 			b.ResetTimer()

@@ -79,6 +79,7 @@ func (n *anValue) IsObject() bool {
 	return len(n.snapshotMemberPairs()) > 0
 }
 
+//go:noinline
 func (n *anValue) AddMember(k, v Value) {
 	if k == nil || v == nil {
 		return
@@ -121,6 +122,7 @@ func sameConstKeyValue(lhs, rhs Value) bool {
 	return fmt.Sprint(leftConst.value) == fmt.Sprint(rightConst.value)
 }
 
+//go:noinline
 func (n *anValue) AddObjectKeyPair(obj, key Value) {
 	if obj == nil || key == nil {
 		return
@@ -257,6 +259,7 @@ func (n *anValue) latestMemberByKey(key Value) (Value, bool) {
 	return nil, false
 }
 
+//go:noinline
 func (n *anValue) GetMembersByKeyString(key string) []Value {
 	if key == "" {
 		return nil

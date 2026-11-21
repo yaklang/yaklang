@@ -51,7 +51,7 @@ type SaveEndpoint struct {
 
 func (e *SaveEndpoint) SaveEntity(entity *schema.ERModelEntity) error {
 	tempName := entity.EntityName
-	sig := e.nameSig.GetOrSet(tempName, newEndpointSignal())
+	sig := omap.GetOrSet(e.nameSig, tempName, newEndpointSignal())
 	saveEntity, err := e.eb.MergeAndSaveEntity(entity)
 	if err != nil {
 		return utils.Errorf("merge entity failed, %v", err)
@@ -88,11 +88,11 @@ func (e *SaveEndpoint) AddRelationship(sourceName, targetName, relationType, typ
 }
 
 func (e *SaveEndpoint) WaitIndex(name string) (string, error) {
-	sig := e.nameSig.GetOrSet(name, newEndpointSignal())
+	sig := omap.GetOrSet(e.nameSig, name, newEndpointSignal())
 	select {
 	case <-e.entityFinish:
 		index := uuid.New().String()
-		currentIndex := e.nameToIndex.GetOrSet(name, index)
+		currentIndex := omap.GetOrSet(e.nameToIndex, name, index)
 		var err error
 		if currentIndex == index { // 如果Set了，说明之前没有这个实体，需要创建
 			err = e.eb.CreateEntity(&schema.ERModelEntity{

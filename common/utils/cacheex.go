@@ -308,7 +308,69 @@ func castCacheValue[T any](v any) T {
 }
 
 type CacheEx[T any] struct {
-	*CacheExWithKey[string, T]
+	core *cacheExCore
+}
+
+func (cache *CacheEx[T]) Close()                                    { cache.core.close() }
+func (cache *CacheEx[T]) Set(key string, value T)                   { cache.core.set(key, value) }
+func (cache *CacheEx[T]) SetWithTTL(k string, v T, d time.Duration) { cache.core.setWithTTL(k, v, d) }
+func (cache *CacheEx[T]) Remove(key string) bool                    { return cache.core.remove(key) }
+func (cache *CacheEx[T]) Delete(key string)                         { cache.core.deleteKey(key) }
+func (cache *CacheEx[T]) DeleteAll()                                { cache.core.deleteAll() }
+func (cache *CacheEx[T]) Count() int                                { return cache.core.count() }
+func (cache *CacheEx[T]) SetTTL(ttl time.Duration)                  { cache.core.setTTL(ttl) }
+func (cache *CacheEx[T]) SkipTtlExtensionOnHit(value bool)          { cache.core.skipTtlExtensionOnHit(value) }
+func (cache *CacheEx[T]) Purge()                                    { cache.core.purge() }
+
+func (cache *CacheEx[T]) Get(key string) (value T, exists bool) {
+	raw, ok := cache.core.get(key)
+	if !ok {
+		return value, false
+	}
+	return castCacheValue[T](raw), true
+}
+
+func (cache *CacheEx[T]) GetAll() map[string]T {
+	items := cache.core.items.Items()
+	out := make(map[string]T, len(items))
+	for k, item := range items {
+		out[castCacheValue[string](k)] = castCacheValue[T](item.Value())
+	}
+	return out
+}
+
+func (cache *CacheEx[T]) ForEach(handler func(string, T)) {
+	cache.core.items.Range(func(item *ttlcache.Item[any, any]) bool {
+		handler(castCacheValue[string](item.Key()), castCacheValue[T](item.Value()))
+		return true
+	})
+}
+
+func (cache *CacheEx[T]) SetExpirationCallback(callback expireCallback[string, T]) {
+	if callback == nil {
+		cache.core.setExpirationCallback(nil)
+		return
+	}
+	cache.core.setExpirationCallback(func(key, value any, reason EvictionReason) {
+		callback(castCacheValue[string](key), castCacheValue[T](value), reason)
+	})
+}
+
+func (cache *CacheEx[T]) SetNewItemCallback(callback itemCallback[string, T]) {
+	if callback == nil {
+		cache.core.setNewItemCallback(nil)
+		return
+	}
+	cache.core.setNewItemCallback(func(key, value any) {
+		callback(castCacheValue[string](key), castCacheValue[T](value))
+	})
+}
+
+func (cache *CacheEx[T]) GetOrLoad(key string, dataLoader func() (T, error)) (T, error) {
+	raw, err := cache.core.getOrLoad(key, func() (any, error) {
+		return dataLoader()
+	})
+	return castCacheValue[T](raw), err
 }
 
 // CacheExWithKey is a synchronized map of items that can auto-expire once stale
@@ -465,7 +527,7 @@ func WithCacheTTL(ttl ...time.Duration) cacheExOption {
 
 func NewCacheEx[T any](opt ...cacheExOption) *CacheEx[T] {
 	return &CacheEx[T]{
-		CacheExWithKey: NewCacheExWithKey[string, T](opt...),
+		core: newCacheExCore(opt...),
 	}
 }
 

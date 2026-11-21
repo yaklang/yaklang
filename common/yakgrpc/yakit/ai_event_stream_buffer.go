@@ -108,7 +108,7 @@ func (b *streamEventBuffer) getEntry(eventUUID string) *streamEventBufferEntry {
 		// Should never happen, but keep safe defaults.
 		return entry
 	}
-	actual := b.entries.GetOrSet(eventUUID, entry)
+	actual := omap.GetOrSet(b.entries, eventUUID, entry)
 	if actual == entry {
 		b.entryCount.Add(1)
 	}

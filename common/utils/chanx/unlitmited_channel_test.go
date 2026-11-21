@@ -107,7 +107,7 @@ func TestUnlimitedChan_FeedStillTimesOutWhenConsumerIsStuck(t *testing.T) {
 	out := make(chan int)
 	// No process goroutine: the buffer fills and the writer must report a stall
 	// instead of blocking forever.
-	ch := &UnlimitedChan[int]{innerIn: in, innerOut: out, buffer: NewRingBuffer[int](1), ctx: context.Background()}
+	ch := &UnlimitedChan[int]{innerIn: in, innerOut: out, buffer: newRingBufferCore(1), ctx: context.Background()}
 	in <- 1
 	start := time.Now()
 	require.False(t, ch.SafeFeedWithResult(2))

@@ -18,7 +18,7 @@ func (r *SyntaxFlowResult) GetAlertValue(name string) Values {
 }
 
 func (r *SyntaxFlowResult) IsLib() bool {
-	if _, ok := r.memResult.Description.GetMap()["lib"]; ok {
+	if _, ok := omap.GetMap(r.memResult.Description)["lib"]; ok {
 		return true
 	}
 	return false

@@ -50,7 +50,7 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 }
 
 var ttlSSAParseCache = createCache(30 * time.Minute)
-var parseSingleFlightCache = utils.NewSingleFlightCache(ttlSSAParseCache.CacheExWithKey)
+var parseSingleFlightCache = utils.NewSingleFlightCache[string, *programResult](ttlSSAParseCache)
 
 type programResult struct {
 	prog *Program

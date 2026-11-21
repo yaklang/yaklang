@@ -4,20 +4,28 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type ScanTaskCallbacks utils.SafeMap[*ScanTaskCallback]
+type ScanTaskCallbacks struct {
+	m *utils.SafeMap[*ScanTaskCallback]
+}
 
 func NewScanTaskCallbacks() *ScanTaskCallbacks {
 	return &ScanTaskCallbacks{
-		SafeMapWithKey: utils.NewSafeMapWithKey[string, *ScanTaskCallback](),
+		m: utils.NewSafeMap[*ScanTaskCallback](),
 	}
+}
 
+func (s *ScanTaskCallbacks) Set(key string, value *ScanTaskCallback) {
+	if s == nil || s.m == nil {
+		return
+	}
+	s.m.Set(key, value)
 }
 
 func (s *ScanTaskCallbacks) foreach(h func(*ScanTaskCallback) bool) {
-	if s == nil {
+	if s == nil || s.m == nil {
 		return
 	}
-	for _, callback := range s.Values() {
+	for _, callback := range s.m.Values() {
 		if !h(callback) {
 			break
 		}

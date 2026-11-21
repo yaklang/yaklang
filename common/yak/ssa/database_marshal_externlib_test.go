@@ -20,7 +20,8 @@ func TestExternLibMarshalKeepsEmptyExtraInfoWithoutWarning(t *testing.T) {
 		ssalog.Log.SetOutput(os.Stdout)
 	})
 
-	original := &ExternLib{anValue: NewValue(), LibraryName: "reflect"}
+	original := &ExternLib{LibraryName: "reflect"}
+	original.initValue()
 	original.SetName("alias")
 	buf.Reset()
 
@@ -32,7 +33,8 @@ func TestExternLibMarshalKeepsEmptyExtraInfoWithoutWarning(t *testing.T) {
 
 	record := &ssadb.IrCode{}
 	record.SetExtraInfo(first)
-	reloaded := &ExternLib{anValue: NewValue()}
+	reloaded := &ExternLib{}
+	reloaded.initValue()
 	unmarshalExtraInformation(nil, reloaded, record)
 	require.Empty(t, reloaded.GetName())
 	require.Empty(t, reloaded.LibraryName)

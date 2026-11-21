@@ -56,7 +56,7 @@ func TestWalkSearch(t *testing.T) {
 	a.Set("BBBD", "CCC")
 	b.Set("CCCD", "DDD")
 	a.Set("bD", b)
-	vars, err := a.WalkSearchGlobKey("*D")
+	vars, err := WalkSearchGlobKey(a, "*D")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestBringKeyToLastOne(t *testing.T) {
 	m.Set("b", 2)
 	m.Set("c", 3)
 
-	m.BringKeyToLastOne("a")
+	BringKeyToLastOne(m, "a")
 	expectedKeys := []string{"b", "c", "a"}
 	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
 		t.Fatalf("expected keys %v, got %v", expectedKeys, m.Keys())
@@ -215,9 +215,9 @@ func TestOrderInsert_StringAscending(t *testing.T) {
 	m := NewEmptyOrderedMap[string, int]()
 
 	less := func(a, b string) bool { return a < b }
-	m.OrderInsert("b", 2, less)
-	m.OrderInsert("a", 1, less)
-	m.OrderInsert("c", 3, less)
+	OrderInsert(m, "b", 2, less)
+	OrderInsert(m, "a", 1, less)
+	OrderInsert(m, "c", 3, less)
 
 	expectedKeys := []string{"a", "b", "c"}
 	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
@@ -225,7 +225,7 @@ func TestOrderInsert_StringAscending(t *testing.T) {
 	}
 
 	// Existing key should be repositioned (though order unchanged for same key) and value updated.
-	m.OrderInsert("b", 20, less)
+	OrderInsert(m, "b", 20, less)
 	expectedKeys = []string{"a", "b", "c"}
 	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
 		t.Fatalf("expected keys %v after update, got %v", expectedKeys, m.Keys())
@@ -248,10 +248,10 @@ func TestOrderInsert_CustomComparator(t *testing.T) {
 		}
 		return a < b
 	}
-	m.OrderInsert("bb", 2, less)
-	m.OrderInsert("a", 1, less)
-	m.OrderInsert("ccc", 3, less)
-	m.OrderInsert("aa", 4, less)
+	OrderInsert(m, "bb", 2, less)
+	OrderInsert(m, "a", 1, less)
+	OrderInsert(m, "ccc", 3, less)
+	OrderInsert(m, "aa", 4, less)
 
 	expectedKeys := []string{"a", "aa", "bb", "ccc"}
 	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
@@ -259,7 +259,7 @@ func TestOrderInsert_CustomComparator(t *testing.T) {
 	}
 
 	// Updating an existing key should not create duplicates.
-	m.OrderInsert("bb", 200, less)
+	OrderInsert(m, "bb", 200, less)
 	if m.Len() != 4 {
 		t.Fatalf("expected len 4 after updating existing key, got %d", m.Len())
 	}

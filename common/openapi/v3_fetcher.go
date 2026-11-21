@@ -249,7 +249,7 @@ func v3_mockSchemaValueVisited(
 		}
 		return m
 	default:
-		m.SetLiteralValue(ValueViaField(field, i.Type, i.Default))
+		omap.SetLiteralValue(m, ValueViaField(field, i.Type, i.Default))
 		return m
 	}
 }
@@ -259,5 +259,5 @@ func v3_mockSchemaJson(data openapi3.T, i *openapi3.Schema, fieldName ...string)
 	if mocked == nil {
 		return nil
 	}
-	return mocked.Jsonify()
+	return omap.Jsonify(mocked)
 }
