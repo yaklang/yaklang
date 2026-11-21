@@ -112,9 +112,36 @@ func filterInstructionsByFiles(prog *Program, insts []Instruction, includeFiles,
 	}
 	includeSet := ssadb.BuildFilePathSet(includeFiles, progName)
 	excludeSet := ssadb.BuildFilePathSet(excludeFiles, progName)
+	type sourcePath struct {
+		path     string
+		resolved bool
+	}
+	pathCache := make(map[string]sourcePath)
 	out := make([]Instruction, 0, len(insts))
 	for _, inst := range insts {
-		filePath := getInstructionFilePath(inst)
+		filePath := ""
+		if lazy, ok := inst.(interface {
+			GetSourceFileHash() string
+			GetSourceFilePath() (string, bool)
+		}); ok {
+			hash := lazy.GetSourceFileHash()
+			if hash != "" {
+				cached, found := pathCache[hash]
+				if !found {
+					cached.path, cached.resolved = lazy.GetSourceFilePath()
+					pathCache[hash] = cached
+				}
+				if cached.resolved {
+					filePath = cached.path
+				} else {
+					filePath = getInstructionFilePath(inst)
+				}
+			} else {
+				filePath = getInstructionFilePath(inst)
+			}
+		} else {
+			filePath = getInstructionFilePath(inst)
+		}
 		if len(includeSet) > 0 && !ssadb.PathPassesFileFilter(filePath, includeSet, ssadb.FileFilterInclude, progName) {
 			continue
 		}
