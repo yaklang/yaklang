@@ -80,6 +80,17 @@ if grep -Eq '[[:space:]]\.(symtab|debug_info)[[:space:]]' <<< "$sections"; then
   exit 1
 fi
 YAKIT_HOME="$(mktemp -d)" "./${OUTPUT_BINARY}" --help >/tmp/yak-build-help.txt
+if [ -n "${REFLECT_PRUNE_PROFILE:-}" ] && [ "${REFLECT_PRUNE_PROFILE}" != "off" ] && [ "${REFLECT_PRUNE_PROFILE}" != "none" ]; then
+  GATE_HOME="$(mktemp -d)"
+  GATE_LOG="/tmp/yak-reflect-gate.log"
+  YAKIT_HOME="${GATE_HOME}" "./${OUTPUT_BINARY}" -e 'assert str.ToUpper("yak") == "YAK"; vm = js.New(); v, err = vm.RunString("20+22"); die(err); assert v.ToInteger() == 42; println("REFLECT_PRUNE_GATE_OK")' >"${GATE_LOG}" 2>&1
+  if ! grep -q "REFLECT_PRUNE_GATE_OK" "${GATE_LOG}" || grep -Eq "initialize database failed|parse error with panic" "${GATE_LOG}"; then
+    cat "${GATE_LOG}" >&2
+    echo "Reflect-pruned binary failed fresh YAKIT_HOME startup/reflection gate" >&2
+    exit 1
+  fi
+  rm -rf "${GATE_HOME}"
+fi
 echo "Verified stripped binary and startup inside manylinux2014"
 ls -lh "./${OUTPUT_BINARY}"
 EOS
