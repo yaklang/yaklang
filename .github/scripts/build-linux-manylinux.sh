@@ -39,6 +39,7 @@ docker run --rm -i \
   -e YAK_TAG="${YAK_TAG}" \
   -e GIT_HASH="${GIT_HASH}" \
   -e BUILD_TIME="${BUILD_TIME}" \
+  -e REFLECT_PRUNE_PROFILE="${REFLECT_PRUNE_PROFILE:-}" \
   "${MANYLINUX_IMAGE}" \
   bash -leo pipefail -s <<'EOS'
 source /opt/rh/devtoolset-10/enable
@@ -57,6 +58,13 @@ export GOMODCACHE=/gomodcache
 export GOPATH=/tmp/gopath
 GO_VER_STR="$(go version)"
 args=(go build -trimpath)
+if [ -n "${REFLECT_PRUNE_PROFILE:-}" ] && [ "${REFLECT_PRUNE_PROFILE}" != "off" ] && [ "${REFLECT_PRUNE_PROFILE}" != "none" ]; then
+  PRUNE_DIR="$(mktemp -d /tmp/yak-reflect-prune.XXXXXX)"
+  echo "Preparing reflect-prune linker (profile=${REFLECT_PRUNE_PROFILE}) in ${PRUNE_DIR}"
+  CGO_ENABLED=0 go build -buildvcs=false -o "${PRUNE_DIR}/reflect-prune-link" ./tools/reflect-prune-link
+  "${PRUNE_DIR}/reflect-prune-link" prepare -o "${PRUNE_DIR}/yak-link"
+  args+=(-toolexec "${PRUNE_DIR}/reflect-prune-link exec --link ${PRUNE_DIR}/yak-link --profile ${REFLECT_PRUNE_PROFILE} --verbose --")
+fi
 if [ -n "${BUILD_TAGS}" ]; then
   args+=(-tags "${BUILD_TAGS}")
 fi
@@ -72,6 +80,26 @@ if grep -Eq '[[:space:]]\.(symtab|debug_info)[[:space:]]' <<< "$sections"; then
   exit 1
 fi
 YAKIT_HOME="$(mktemp -d)" "./${OUTPUT_BINARY}" --help >/tmp/yak-build-help.txt
+if [ -n "${REFLECT_PRUNE_PROFILE:-}" ] && [ "${REFLECT_PRUNE_PROFILE}" != "off" ] && [ "${REFLECT_PRUNE_PROFILE}" != "none" ]; then
+  GATE_HOME="$(mktemp -d)"
+  GATE_SCRIPT="${GATE_HOME}/gate.yak"
+  cat > "${GATE_SCRIPT}" <<'YAKS'
+assert str.ToUpper("yak") == "YAK"
+vm = js.New()
+v, err = vm.RunString("20 + 22")
+die(err)
+assert v.ToInteger() == 42
+println("REFLECT_PRUNE_GATE_OK")
+YAKS
+  GATE_LOG="/tmp/yak-reflect-gate.log"
+  YAKIT_HOME="${GATE_HOME}" "./${OUTPUT_BINARY}" "${GATE_SCRIPT}" >"${GATE_LOG}" 2>&1
+  if ! grep -q "REFLECT_PRUNE_GATE_OK" "${GATE_LOG}" || grep -Eq "initialize database failed|parse error with panic" "${GATE_LOG}"; then
+    cat "${GATE_LOG}" >&2
+    echo "Reflect-pruned binary failed fresh YAKIT_HOME startup/reflection gate" >&2
+    exit 1
+  fi
+  rm -rf "${GATE_HOME}"
+fi
 echo "Verified stripped binary and startup inside manylinux2014"
 ls -lh "./${OUTPUT_BINARY}"
 EOS
