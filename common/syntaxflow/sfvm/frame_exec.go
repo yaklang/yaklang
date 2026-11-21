@@ -248,6 +248,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}
 
 		comparator := NewOpcodeComparator(s.GetContext())
+		var unknown []string
 		for _, v := range i.Values {
 			op := validSSAOpcode(v)
 			if op != -1 {
@@ -259,7 +260,14 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 				comparator.AddBinOrUnaryOpcode(binOp)
 				continue
 			}
-			log.Infof("invalid opcode: %v", v)
+			unknown = append(unknown, v)
+		}
+		if len(unknown) > 0 {
+			// Empty comparator would silently match nothing; make the typo loud.
+			// Compile rejects this too, but an SFI loaded from a database or a
+			// rule compiled by an older build still reaches this path.
+			return true, utils.Errorf("opcode filter failed: unknown opcode name(s) %s; %s",
+				quoteNames(unknown), opcodeNameHint())
 		}
 
 		var newVal Values

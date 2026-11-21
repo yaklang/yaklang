@@ -3,6 +3,7 @@ package sfvm
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -24,6 +25,27 @@ type SyntaxFlowVisitor struct {
 	// ($a.regexp(/x/)); otherwise the field call is emitted as a plain member
 	// access at the end of the expression.
 	pendingFileFilterField sf.INameFilterContext
+
+	// semanticErrors collects problems the grammar cannot express: an unknown
+	// opcode name, for instance, parses fine and used to produce an empty
+	// result with only an INFO log. Compile turns them into a hard error.
+	semanticErrors []string
+}
+
+// addSemanticError records a problem found after parsing.
+func (y *SyntaxFlowVisitor) addSemanticError(format string, args ...any) {
+	if y == nil {
+		return
+	}
+	y.semanticErrors = append(y.semanticErrors, fmt.Sprintf(format, args...))
+}
+
+// SemanticErrors returns the problems collected while visiting the parse tree.
+func (y *SyntaxFlowVisitor) SemanticErrors() []string {
+	if y == nil {
+		return nil
+	}
+	return y.semanticErrors
 }
 
 type VerifyFsInfo struct {
@@ -264,8 +286,16 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 	case *sf.OpcodeTypeConditionContext:
 		opcodes := i.AllOpcodesCondition()
 		ops := make([]string, 0, len(opcodes))
+		var unknown []string
 		for _, opcode := range opcodes {
-			ops = append(ops, opcode.GetText())
+			name := opcode.GetText()
+			if validSSAOpcode(name) < 0 && validSSABinOpcode(name) == "" {
+				unknown = append(unknown, name)
+			}
+			ops = append(ops, name)
+		}
+		if len(unknown) > 0 {
+			y.addSemanticError("unknown opcode name(s) %s: %s", quoteNames(unknown), opcodeNameHint())
 		}
 		y.EmitCompareOpcode(ops)
 	case *sf.StringContainAnyConditionContext:
@@ -413,6 +443,74 @@ func (y *SyntaxFlowVisitor) tryEmitConstStringShortcutCondition(i *sf.FilterCond
 }
 
 const tmpPH = "__[[PLACEHOLDER]]__"
+
+// quoteNames renders names as 'a', 'b' for an error message.
+func quoteNames(names []string) string {
+	quoted := make([]string, 0, len(names))
+	for _, n := range names {
+		quoted = append(quoted, "'"+n+"'")
+	}
+	return strings.Join(quoted, ", ")
+}
+
+// opcodeNameHint lists the names that a ?{opcode: ...} condition accepts. The
+// list is the union of the SSA opcode table and the binary operator table,
+// restricted to spellings the grammar can express: the filter takes an
+// identifier, so "gteq" works and ">=" does not.
+func opcodeNameHint() string {
+	names := syntaxFlowOpcodeNames()
+	spellable := make([]string, 0, len(names))
+	for _, n := range names {
+		if isWordName(n) {
+			spellable = append(spellable, n)
+		}
+	}
+	return "opcode names are " + strings.Join(spellable, ", ")
+}
+
+// isWordName reports whether the grammar lexes the name as one identifier.
+func isWordName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'):
+		case r >= '0' && r <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// syntaxFlowOpcodeNames returns the accepted ?{opcode: ...} spellings, sorted.
+func syntaxFlowOpcodeNames() []string {
+	names := make([]string, 0, len(ssaOpcodeNames)+len(ssaBinOpNames))
+	names = append(names, ssaOpcodeNames...)
+	names = append(names, ssaBinOpNames...)
+	sort.Strings(names)
+	return names
+}
+
+// ssaOpcodeNames lists validSSAOpcode's spellings.
+var ssaOpcodeNames = []string{
+	"und", "undefined", "free", "freevalue", "externlib", "extern_lib", "lib",
+	"call", "phi", "const", "constant", "constinst", "param", "formal_param",
+	"parameter", "param_member", "parammember", "parametermember", "return",
+	"function", "func", "def", "basicblock", "basic_block", "block", "if", "try",
+	"errorhandler", "catch", "errorcatch", "throw", "panic", "switch", "loop",
+	"typecast", "make", "binop", "unop", "assert", "jump", "next", "recover",
+	"sideeffect", "typevalue", "unknow",
+}
+
+// ssaBinOpNames lists validSSABinOpcode's spellings.
+var ssaBinOpNames = []string{
+	"add", "+", "sub", "-", "mul", "*", "div", "/", "mod", "%", "gt", ">", "lt",
+	"<", "gteq", ">=", "lteq", "<=", "neq", "!=", "eq", "==", "and", "&&", "or",
+	"||", "xor", "^", "shl", "<<", "shr", ">>", "not", "!", "plus", "++", "neg",
+	"--", "bitwise-not", "~", "pow", "**=",
+}
 
 func (y *SyntaxFlowVisitor) VisitStringLiteral(raw sf.IStringLiteralContext) (string, bool) {
 	if y == nil || raw == nil {
