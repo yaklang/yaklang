@@ -1,0 +1,38 @@
+// Triage: a condition that compares a constant while an indexed read is also
+// in scope.
+//
+// This generalizes ext/soap/php_sdl.c:304, where `ctx->sdl->source[4] == 's'`
+// decides whether the URL is https:
+//
+//   *?{opcode: If || opcode: Loop} as $stmt
+//   $stmt<cfgConditionValues> as $cond
+//   $cond #> ?{opcode: param_member} as $indexed        // s[4], p[0], data[l-1]
+//   $cond?{opcode: eq || ...} as $binDirect
+//   $cond #> ?{opcode: eq || ...} as $binNested
+//   $binDirect + $binNested as $bin
+//   $bin #> ?{opcode: const} as $const
+//
+// What this proves: the branch condition compares against a constant, and an
+// indexed read is reachable from the same condition.
+//
+// What this does NOT prove: that the constant comparison *is* the indexed
+// read. `$bin` and `$indexed` are separate value sets, and SyntaxFlow has no
+// "operand of" filter, so the two cannot be intersected in the rule. The
+// exporter has to check the operand shape in the SSA text
+// (`ParameterMember-...`); see common/syntaxflow/docs/sloppy-checks.md.
+//
+// The rule is deliberately silent about intent. Constants that are structural
+// (NUL, newline, space) and files that are format parsers produce most of the
+// hits; narrowing to "critical path" needs the project-specific context
+// described in the same document.
+
+*?{opcode: If || opcode: Loop} as $stmt
+$stmt<cfgConditionValues> as $cond
+
+$cond #> ?{opcode: param_member} as $indexed
+
+$cond?{opcode: eq || opcode: neq || opcode: lt || opcode: gt || opcode: lteq || opcode: gteq} as $binDirect
+$cond #> ?{opcode: eq || opcode: neq || opcode: lt || opcode: gt || opcode: lteq || opcode: gteq} as $binNested
+$binDirect + $binNested as $bin
+
+$bin #> ?{opcode: const} as $const
