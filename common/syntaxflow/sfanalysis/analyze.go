@@ -110,6 +110,7 @@ func analyzeQuality(frame *sfvm.SFFrame, verify *EmbeddedVerifyReport, isBlank b
 	checkDescriptionCompleteness(result, frame)
 	checkTestData(result, frame, verify)
 	checkRuleLogic(result, frame, isBlank)
+	checkSearchIndirection(result, frame)
 	calculateGradeAndSummary(result)
 	return result
 }
@@ -250,6 +251,80 @@ func checkTestData(result *SyntaxFlowRuleAnalyzeResult, frame *sfvm.SFFrame, ver
 		})
 		result.Score -= VerifyTestCaseNotPassPenalty
 	}
+}
+
+// checkSearchIndirection reports a rule that reaches a function value only to
+// come back to its call sites. The direct form filters the call by name:
+//
+//	$cond #> ?{opcode: call} as $calls
+//	$calls?{*strcmp*} as $call
+//
+// The round trip needs three moving parts and drops calls whose callee is not a
+// resolvable Function value: on php-src it reported 277 of 407 sites.
+func checkSearchIndirection(result *SyntaxFlowRuleAnalyzeResult, frame *sfvm.SFFrame) {
+	if result == nil || frame == nil || frame.GetRule() == nil {
+		return
+	}
+	code := stripRuleComments(frame.GetRule().Content)
+	toFunction := hasConditionKey(code, "opcode", "function")
+	backToCall := hasBackEdgeToCall(code)
+	intersects := strings.Contains(code, " & ")
+	if !toFunction || !backToCall || !intersects {
+		return
+	}
+	result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
+		Type:        ProblemTypeIndirectCalleeSearch,
+		Severity:    Info,
+		Description: "规则先跳到函数值再回到调用点做交集",
+		Suggestion:  "直接在调用上按名字过滤即可，例如 $calls?{opcode: call} 之后 $calls?{*strcmp*}；不必经过 #> ?{opcode: function} 与 -> ?{opcode: call} 的往返",
+	})
+}
+
+// stripRuleComments drops // comments and quoted literals so the detectors only
+// see rule code. A comment that mentions an anti-pattern must not trigger the
+// check on a rule that does not use it.
+func stripRuleComments(code string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(code, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		if idx := strings.Index(line, " // "); idx >= 0 {
+			line = line[:idx]
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// hasConditionKey reports whether the code contains `?{key: value}` with value
+// spelled as one of the given aliases.
+func hasConditionKey(code, key string, values ...string) bool {
+	lower := strings.ToLower(code)
+	for _, value := range values {
+		if strings.Contains(lower, key+": "+value) || strings.Contains(lower, key+":"+value) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasBackEdgeToCall reports a `->` or `-->` step whose condition selects calls.
+func hasBackEdgeToCall(code string) bool {
+	lower := strings.ToLower(code)
+	for _, edge := range []string{"->", "-->"} {
+		for _, pattern := range []string{
+			edge + " ?{opcode: call",
+			edge + " ?{opcode:call",
+		} {
+			if strings.Contains(lower, pattern) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func checkRuleLogic(result *SyntaxFlowRuleAnalyzeResult, frame *sfvm.SFFrame, isBlank bool) {
