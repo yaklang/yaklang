@@ -54,6 +54,68 @@ yak ssa-query -p <program> --database <db> --syntaxflow common/syntaxflow/rules/
   选这种写法。
 - `have: 'x'` 是「值文本包含 x」，`opcode:` 是「指令类型」，两者可以混在 `||` 里。
 
+## 推荐写法与反模式
+
+按 SSA 值的 opcode/名字直接过滤即可，不需要绕到函数值再绕回来。下面的数字
+来自 php-src 全量库（4,629,021 条指令），只跑调用规则这一阶段。
+
+### 推荐：先 opcode，再名字
+
+```
+$cond #> ?{opcode: call} as $calls
+$calls?{*strcmp* || *strncmp*} as $call
+```
+
+407 条命中，峰值 10.6 GiB，58 秒。`?{opcode: call}` 是便宜的 opcode 过滤，
+它把后续按名字搜索的范围从「条件可达的全部值」缩到「调用」，这一步决定了内存
+和耗时。
+
+### 反模式 1：绕到函数值再回到调用点
+
+```
+$calls #> ?{opcode: Function} as $callees
+$callees?{*strcmp*} as $callee
+$callee -> ?{opcode: call} as $callers
+$calls & $callers as $call
+```
+
+**结果少 130 条（277 / 407）**：callee 解析不出 Function 值的调用在 `#>` 后
+就丢了，`->` 再取回来的是该函数的全部调用点，不限于条件里那些。耗时 11 分 48 秒。
+
+### 反模式 2：名字过滤放在 opcode 之前
+
+```
+$cond #> ?{*strcmp* || *strncmp*} as $named
+$named?{opcode: call} as $call
+```
+
+结果相同，但峰值 21.5 GiB、98 秒：名字搜索（KeyMatch，会走
+`FlatOccultation`）在全部条件可达值上跑了一遍。
+
+### 反模式 3：去掉 opcode 过滤，单步名字搜索
+
+```
+$cond #> ?{*strcmp* || *strncmp*} as $call
+```
+
+结果相同，但峰值 21.6 GiB、9 分 19 秒。
+
+### 按函数值取名（不是反模式，但用途不同）
+
+```
+strcmp?{opcode: Function} as $func
+```
+
+匹配的是**函数值**（`Function-strcmp`：声明和 import 各一个）。要拿调用点，
+还是从条件里的调用过滤；对调用值写精确名字 `strcmp` 匹配不到，因为它的名字是
+`Function-strcmp(...)`。
+
+### lint
+
+`sfanalysis` 的规则分析会报 `indirect_callee_search`（Info 级，不扣分）：规则
+同时出现 `opcode: function`、`-> ?{opcode: call}` 和 `&` 交集时触发，提示改回
+直接写法。
+
 ## 导出
 
 `sf_report` 是审计时用的导出器（不在本仓库内）：它执行规则、把 `$bin` / `$call`

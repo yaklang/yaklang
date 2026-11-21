@@ -31,6 +31,13 @@
 // Zend's zend_string_equals_literal* and zend_string_starts_with* are macros
 // that expand to a _cstr call with the literal and its sizeof() in the argument
 // list, so matching the expanded name covers both spellings.
+//
+// Keep the opcode filter before the name filter. `?{opcode: call}` is cheap and
+// narrows the name search to calls; moving the name first, or dropping the
+// opcode filter, costs about 2x memory and up to 10x time on a large program
+// (see README.md). Reaching the function value and walking back to the call
+// sites (`#> ?{opcode: Function}` ... `-> ?{opcode: call}` ... `&`) is not
+// needed and loses calls whose callee is not a resolvable Function.
 
 *?{opcode: If || opcode: Loop} as $stmt
 $stmt<cfgConditionValues> as $cond

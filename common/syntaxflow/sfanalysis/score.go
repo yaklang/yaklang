@@ -20,6 +20,12 @@ const (
 	ProblemTypeTestCaseNotPass         = "test_case_not_pass"
 
 	ProblemTypeMissingAlert = "missing_alert"
+
+	// ProblemTypeIndirectCalleeSearch flags the callee round trip: jump from a
+	// call to the function value, filter the name there, then walk back to the
+	// call sites and intersect. A name filter on the call itself is shorter and
+	// loses nothing. No score penalty: it is a style problem, not a defect.
+	ProblemTypeIndirectCalleeSearch = "indirect_callee_search"
 )
 
 const (
