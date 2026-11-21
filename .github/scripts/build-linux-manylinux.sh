@@ -82,8 +82,17 @@ fi
 YAKIT_HOME="$(mktemp -d)" "./${OUTPUT_BINARY}" --help >/tmp/yak-build-help.txt
 if [ -n "${REFLECT_PRUNE_PROFILE:-}" ] && [ "${REFLECT_PRUNE_PROFILE}" != "off" ] && [ "${REFLECT_PRUNE_PROFILE}" != "none" ]; then
   GATE_HOME="$(mktemp -d)"
+  GATE_SCRIPT="${GATE_HOME}/gate.yak"
+  cat > "${GATE_SCRIPT}" <<'YAKS'
+assert str.ToUpper("yak") == "YAK"
+vm = js.New()
+v, err = vm.RunString("20 + 22")
+die(err)
+assert v.ToInteger() == 42
+println("REFLECT_PRUNE_GATE_OK")
+YAKS
   GATE_LOG="/tmp/yak-reflect-gate.log"
-  YAKIT_HOME="${GATE_HOME}" "./${OUTPUT_BINARY}" -e 'assert str.ToUpper("yak") == "YAK"; vm = js.New(); v, err = vm.RunString("20+22"); die(err); assert v.ToInteger() == 42; println("REFLECT_PRUNE_GATE_OK")' >"${GATE_LOG}" 2>&1
+  YAKIT_HOME="${GATE_HOME}" "./${OUTPUT_BINARY}" "${GATE_SCRIPT}" >"${GATE_LOG}" 2>&1
   if ! grep -q "REFLECT_PRUNE_GATE_OK" "${GATE_LOG}" || grep -Eq "initialize database failed|parse error with panic" "${GATE_LOG}"; then
     cat "${GATE_LOG}" >&2
     echo "Reflect-pruned binary failed fresh YAKIT_HOME startup/reflection gate" >&2

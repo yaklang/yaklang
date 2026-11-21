@@ -231,19 +231,21 @@ jobs:
           set -euo pipefail
           GATE_HOME="$(mktemp -d "$RUNNER_TEMP/yak-reflect-gate.XXXXXX")"
           trap 'rm -rf "$GATE_HOME"' EXIT
+          GATE_SCRIPT="$GATE_HOME/gate.yak"
+          cat > "$GATE_SCRIPT" <<'EOF'
+          assert str.ToUpper("yak") == "YAK"
+          vm = js.New()
+          v, err = vm.RunString("20 + 22")
+          die(err)
+          assert v.ToInteger() == 42
+          prog, err = ssa.Parse(`<?php $x = $_GET["a"]; echo $x;`, ssa.withLanguage("php"))
+          die(err)
+          res = prog.SyntaxFlow(`$_GET as $src; $src --> * as $sink;`)
+          assert res != nil && prog.GetLanguage() == "php"
+          println("REFLECT_PRUNE_GATE_OK")
+          EOF
           LOG_FILE="$RUNNER_TEMP/yak-reflect-gate.log"
-          YAKIT_HOME="$GATE_HOME" "$RUNNER_TEMP/yak" -e '
-            assert str.ToUpper("yak") == "YAK"
-            vm = js.New()
-            v, err = vm.RunString("20 + 22")
-            die(err)
-            assert v.ToInteger() == 42
-            prog, err = ssa.Parse(`<?php $x = $_GET["a"]; echo $x;`, ssa.withLanguage("php"))
-            die(err)
-            res = prog.SyntaxFlow(`$_GET as $src; $src --> * as $sink;`)
-            assert res != nil && prog.GetLanguage() == "php"
-            println("REFLECT_PRUNE_GATE_OK")
-          ' 2>&1 | tee "$LOG_FILE"
+          YAKIT_HOME="$GATE_HOME" "$RUNNER_TEMP/yak" "$GATE_SCRIPT" 2>&1 | tee "$LOG_FILE"
           grep -q "REFLECT_PRUNE_GATE_OK" "$LOG_FILE"
           if grep -Eq "initialize database failed|parse error with panic" "$LOG_FILE"; then
             echo "::error::Reflect-pruned yak binary hit DB init or yak2ssa reflection panic"
