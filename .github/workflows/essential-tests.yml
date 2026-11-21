@@ -241,7 +241,7 @@ jobs:
           prog, err = ssa.Parse(`<?php $x = $_GET["a"]; echo $x;`, ssa.withLanguage("php"))
           die(err)
           res = prog.SyntaxFlow(`$_GET as $src; $src --> * as $sink;`)
-          assert res != nil && prog.GetLanguage() == "php"
+          assert res != nil && string(prog.GetLanguage()) == "php"
           println("REFLECT_PRUNE_GATE_OK")
           EOF
           LOG_FILE="$RUNNER_TEMP/yak-reflect-gate.log"
