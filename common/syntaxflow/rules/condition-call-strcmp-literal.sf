@@ -4,8 +4,8 @@
 // frontend keeps as a binary operation with a constant operand. In C that
 // leaves out the usual way to compare strings: a call inside the condition.
 //
-//   if (strcmp(name, "https") == 0)              libc
-//   if (zend_string_equals_literal(str, "true")) Zend helper
+//   if (strcmp(name, "https") == 0)                libc
+//   if (zend_string_equals_literal(str, "true"))   Zend helper
 //
 // The literal is a call argument there, not an operand of the comparison, so it
 // needs its own rule. `$bin #> ?{opcode: const}` cannot reach it: the constant
@@ -24,30 +24,17 @@
 //   if (strcasecmp(filtername, "bzip2.decompress") == 0)
 // matches with $call = Function-strcasecmp(Parameter-filtername,"bzip2.decompress").
 //
-// The filter is a plain substring test on the printed SSA value. `?{name:
-// strcmp}` is not usable here: the name predicate rejects a bare identifier,
-// and `?{*Function-strcmp*}` fails to parse because the wildcard form rejects a
-// constant containing `-`. Alternation inside one wildcard (`?{*a* || *b*}`)
-// parses but matches nothing, so each helper gets its own variable.
+// The filter is a substring test on the printed SSA value. The patterns contain
+// '-' because SSA spells a call as `Function-strcmp(...)`; a pattern that starts
+// with '*' may contain '-', a bare identifier may not.
+//
+// Zend's zend_string_equals_literal* and zend_string_starts_with* are macros
+// that expand to a _cstr call with the literal and its sizeof() in the argument
+// list, so matching the expanded name covers both spellings.
 
 *?{opcode: If || opcode: Loop} as $stmt
 $stmt<cfgConditionValues> as $cond
 $cond #> ?{opcode: call} as $calls
 
-// libc string comparison
-$calls?{*strcmp*} as $strcmp
-$calls?{*strncmp*} as $strncmp
-$calls?{*strcasecmp*} as $strcasecmp
-$calls?{*strncasecmp*} as $strncasecmp
-$calls?{*stricmp*} as $stricmp
-$calls?{*strnicmp*} as $strnicmp
-$calls?{*memcmp*} as $memcmp
-
-// Zend string helpers; the *_literal and *_cstr forms are macros that expand to
-// the _cstr call with the literal and its sizeof() in the argument list.
-$calls?{*zend_string_equals*} as $zeq
-$calls?{*zend_string_starts_with*} as $zstart
-$calls?{*zend_string_ends_with*} as $zend
-
-$strcmp + $strncmp + $strcasecmp + $strncasecmp + $stricmp + $strnicmp + $memcmp + $zeq + $zstart + $zend as $call
+$calls?{*strcmp* || *strncmp* || *strcasecmp* || *strncasecmp* || *stricmp* || *strnicmp* || *memcmp* || *zend_string_equals* || *zend_string_starts_with* || *zend_string_ends_with*} as $call
 $call #> ?{opcode: const} as $arg
