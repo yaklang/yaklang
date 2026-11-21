@@ -700,12 +700,30 @@ func (i *anValue) GetOccultation() []Value {
 	return i.GetValuesByIDs(i.occultation)
 }
 
+// flatOccultationMaxValues bounds one FlatOccultation walk. The walk follows
+// phi members transitively, so a cycle of phis (a loop variable that points
+// back at itself) used to recurse until the heap ran out: on the php-src
+// program (4.6M instructions) the KeyMatch search path spent 2.1 GB in the
+// walk and was OOM-killed at 21 GB. The bound is per call and counts visited
+// values, not returned ones, so repeated traversal of one phi still costs one
+// slot.
+const flatOccultationMaxValues = 4096
+
 func (i *anValue) FlatOccultation() []Value {
 	var ret []Value
 	var handler func(i *anValue)
-
+	// visited stops the walk from following a phi cycle; budget stops shapes
+	// that only add new phis, where the transitive closure would be huge.
+	visited := make(map[int64]struct{}, 8)
 	handler = func(i *anValue) {
 		for _, id := range i.occultation {
+			if _, ok := visited[id]; ok {
+				continue
+			}
+			if len(visited) >= flatOccultationMaxValues {
+				return
+			}
+			visited[id] = struct{}{}
 			v, ok := i.GetValueById(id)
 			if !ok {
 				continue

@@ -872,12 +872,23 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 	lz.check()
 	var ret []Value
 	var handler func(i *anValue)
+	// Same cycle and size bound as anValue.FlatOccultation: the walk follows
+	// phi members transitively, and a loop's phi cycle otherwise recurses
+	// until the heap is gone.
+	visited := make(map[int64]struct{}, 8)
 
 	handler = func(i *anValue) {
 		if utils.IsNil(i) {
 			return
 		}
 		for _, vId := range i.occultation {
+			if _, ok := visited[vId]; ok {
+				continue
+			}
+			if len(visited) >= flatOccultationMaxValues {
+				return
+			}
+			visited[vId] = struct{}{}
 			// Corrected: Use GetValueById from the program's cache
 			v, ok := lz.GetValueById(vId)
 			if !ok || v == nil {
