@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -152,10 +153,13 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	flow := astParser.Flow()
 	// fmt.Printf("%v\n", flow.ToStringTree(astParser.RuleNames, astParser))
 	if len(errLis.GetErrors()) > 0 {
-		return nil, utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrorString())
+		return nil, formatSyntaxFlowParseError(text, s.compileErrors)
 	}
 	result.rule.Content = text
 	result.VisitFlow(flow)
+	if semantic := result.SemanticErrors(); len(semantic) > 0 {
+		return nil, utils.Errorf("SyntaxFlow compile error:\n  %s", strings.Join(semantic, "\n  "))
+	}
 	result.rule.OpCodes = result.ToString()
 	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
