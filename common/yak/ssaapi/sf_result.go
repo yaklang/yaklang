@@ -62,28 +62,7 @@ type SyntaxFlowResult struct {
 	// One source position is one report row: unrolled loops and container-level
 	// struct alerts otherwise produce N rows that point at the same code.
 	riskPositions map[string]struct{}
-	Config        *ssaconfig.Config
-}
-
-func (r *SyntaxFlowResult) GetSyntaxFlowResultKind() ssaconfig.SFResultSaveKind {
-	if r == nil {
-		return ssaconfig.SFResultSaveNone
-	}
-	return r.Config.GetSyntaxFlowResultKind()
-}
-
-func (r *SyntaxFlowResult) GetProjectID() uint64 {
-	if r == nil {
-		return 0
-	}
-	return r.Config.GetProjectID()
-}
-
-func (r *SyntaxFlowResult) IsNoSaveRisk() bool {
-	if r == nil {
-		return false
-	}
-	return r.Config.IsNoSaveRisk()
+	*ssaconfig.Config
 }
 
 func createEmptyResult() *SyntaxFlowResult {

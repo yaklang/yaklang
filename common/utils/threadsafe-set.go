@@ -89,9 +89,20 @@ func (s *Set[T]) ForEach(h func(T)) {
 }
 
 func (s *Set[T]) Diff(other *Set[T]) *Set[T] {
-	s.mu.RLock()
-	other.mu.RLock()
 	diff := NewSet[T]()
+	if s == other {
+		return diff
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if other == nil {
+		for item := range s.m {
+			diff.m[item] = struct{}{}
+		}
+		return diff
+	}
+	other.mu.RLock()
+	defer other.mu.RUnlock()
 	for item := range s.m {
 		if _, ok := other.m[item]; !ok {
 			diff.m[item] = struct{}{}
@@ -102,36 +113,46 @@ func (s *Set[T]) Diff(other *Set[T]) *Set[T] {
 			diff.m[item] = struct{}{}
 		}
 	}
-	other.mu.RUnlock()
-	s.mu.RUnlock()
 	return diff
 }
 
 func (s *Set[T]) And(other *Set[T]) *Set[T] {
-	s.mu.RLock()
-	other.mu.RLock()
 	intersection := NewSet[T]()
+	if other == nil {
+		return intersection
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s == other {
+		for item := range s.m {
+			intersection.m[item] = struct{}{}
+		}
+		return intersection
+	}
+	other.mu.RLock()
+	defer other.mu.RUnlock()
 	for item := range s.m {
 		if _, ok := other.m[item]; ok {
 			intersection.m[item] = struct{}{}
 		}
 	}
-	other.mu.RUnlock()
-	s.mu.RUnlock()
 	return intersection
 }
 
 func (s *Set[T]) Or(other *Set[T]) *Set[T] {
-	s.mu.RLock()
-	other.mu.RLock()
 	union := NewSet[T]()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for item := range s.m {
 		union.m[item] = struct{}{}
 	}
+	if other == nil || s == other {
+		return union
+	}
+	other.mu.RLock()
+	defer other.mu.RUnlock()
 	for item := range other.m {
 		union.m[item] = struct{}{}
 	}
-	other.mu.RUnlock()
-	s.mu.RUnlock()
 	return union
 }
