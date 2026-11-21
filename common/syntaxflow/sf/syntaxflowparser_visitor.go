@@ -238,6 +238,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#nameFilter.
 	VisitNameFilter(ctx *NameFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#globPattern.
+	VisitGlobPattern(ctx *GlobPatternContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#Flat.
 	VisitFlat(ctx *FlatContext) interface{}
 

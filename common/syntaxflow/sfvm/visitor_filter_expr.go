@@ -366,6 +366,23 @@ func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bo
 		// } else if id := ret.DollarOutput(); id != nil {
 		// 	y.EmitSearchExact(mod, id.GetText())
 		// 	return nil
+	} else if gp := ret.GlobPattern(); gp != nil {
+		// A pattern that starts with '*' and may contain '-' (Function-strcmp).
+		filter, isGlob := y.FormatStringOrGlob(gp.GetText())
+		if isGlob {
+			if recursive {
+				y.EmitRecursiveSearchGlob(mod, filter)
+			} else {
+				y.EmitSearchGlob(mod, filter)
+			}
+		} else {
+			if recursive {
+				y.EmitRecursiveSearchExact(mod, filter)
+			} else {
+				y.EmitSearchExact(mod, filter)
+			}
+		}
+		return nil
 	} else if id := ret.Identifier(); id != nil {
 		text := ret.Identifier().GetText()
 		filter, isGlob := y.FormatStringOrGlob(text) // emit field
@@ -431,6 +448,15 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		// } else if id := ret.DollarOutput(); id != nil {
 		// 	y.EmitSearchExact(mod, id.GetText())
 		// 	return nil
+	} else if gp := ret.GlobPattern(); gp != nil {
+		// A pattern that starts with '*' and may contain '-' (Function-strcmp).
+		filter, isGlob := y.FormatStringOrGlob(gp.GetText())
+		if isGlob {
+			y.EmitSearchGlob(mod, filter)
+		} else {
+			y.EmitSearchExact(mod, filter)
+		}
+		return nil
 	} else if id := ret.Identifier(); id != nil {
 		text := ret.Identifier().GetText()
 		filter, isGlob := y.FormatStringOrGlob(text) // emit field
