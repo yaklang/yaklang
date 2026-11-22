@@ -305,6 +305,8 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.Base64Data
 	case "ssh.proto", "ssh_proto":
 		return modifier.SSHProto
+	case "ssh.software", "ssh_software":
+		return modifier.SSHSoftware
 	}
 	return modifier.Default
 }
@@ -342,7 +344,7 @@ func isAlwaysStickyModifier(mdf modifier.Modifier) bool {
 		modifier.TLSSNI, modifier.TLSCertSubject, modifier.TLSCertIssuer,
 		modifier.TLSCertSerial, modifier.TLSCertFingerprint, modifier.TLSCerts,
 		modifier.TLSRandom, modifier.TLSRandomTime, modifier.TLSRandomBytes,
-		modifier.Base64Data, modifier.SSHProto:
+		modifier.Base64Data, modifier.SSHProto, modifier.SSHSoftware:
 		return true
 	default:
 		return false
@@ -910,6 +912,10 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			}
 		case "byte_math":
 			contentRule.ByteMath = vStr
+			contentRule.ByteOps = append(contentRule.ByteOps, ByteOp{Kind: "math", Raw: vStr})
+			if STATUS == HasNone {
+				STATUS = HasContent
+			}
 		case "byte_extract":
 			contentRule.ByteExtract = vStr
 			contentRule.ByteOps = append(contentRule.ByteOps, ByteOp{Kind: "extract", Raw: vStr})

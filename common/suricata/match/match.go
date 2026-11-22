@@ -409,7 +409,7 @@ func matchMutex(c *matchContext) error {
 		c.Attach(tcpCfgMatch)
 		return attachPayloadMatcher(c)
 	case protocol.FTP, protocol.FTPData, protocol.SMB,
-		protocol.SSH, protocol.RDP, protocol.DCERPC, protocol.TCPStream:
+		protocol.SSH, protocol.RDP, protocol.DCERPC, protocol.Telnet, protocol.TCPStream:
 		// Application protocols that ride on TCP share the TCP header/payload
 		// pipeline. SSH additionally exposes its version banner as a buffer.
 		parser := tcpParser
@@ -422,7 +422,13 @@ func matchMutex(c *matchContext) error {
 		}
 		c.Attach(tcpCfgMatch)
 		return attachPayloadMatcher(c)
-	case protocol.UDP:
+	case protocol.SIP:
+		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tcpOrUDPParser)
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
+		return attachPayloadMatcher(c)
+	case protocol.UDP, protocol.IKE, protocol.BitTorrentDHT:
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, udpParser)
 		if err := attachFastPattern(c); err != nil {
 			return err

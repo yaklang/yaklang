@@ -19,8 +19,17 @@ func ipParser(c *matchContext) error {
 		return nil
 	}
 	c.SetBufferProvider(func(mdf modifier.Modifier) []byte {
-		if mdf == modifier.Default {
+		switch mdf {
+		case modifier.Default:
 			return network.LayerPayload()
+		case modifier.ICMPV4HDR:
+			if icmp4 := c.PK.Layer(layers.LayerTypeICMPv4); icmp4 != nil {
+				return icmp4.LayerContents()
+			}
+		case modifier.ICMPV6HDR:
+			if icmp6 := c.PK.Layer(layers.LayerTypeICMPv6); icmp6 != nil {
+				return icmp6.LayerContents()
+			}
 		}
 		return nil
 	})

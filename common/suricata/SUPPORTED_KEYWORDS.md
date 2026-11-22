@@ -12,23 +12,23 @@ The matcher targets Suricata 8 rule syntax while preserving the legacy underscor
 ## Supported now
 
 - Header: `alert`, `->`, `<>`, IPv4/IPv6/CIDR/list/negation variables, ports/ranges/lists/variables.
-- Protocols: IP, TCP, `tcp-pkt`, UDP, ICMPv4, ICMPv6, DNS, HTTP, `http1`, TLS (including JA3/JA3S, `tls.random*`, and certificate fields), and TCP-payload compatibility protocols SMTP, FTP, FTP-data, SMB, SSH, RDP, DCERPC and `tcp-stream`.
-- Payload: `content`, negative content (`content:!"..."`), negative PCRE, `nocase`, `offset`, `depth`, `distance`, `within`, `startswith`, `endswith`, `isdataat`, `fast_pattern`, `bsize`, `dsize`, `rawbytes`, `pkt_data`, `byte_test`, `byte_jump`, `byte_extract` variables, `base64_decode`/`base64_data`, `file_data`/`file.data` (HTTP body, TCP payload or SMTP DATA body), and the 8-bit PCRE2 backend (including lookarounds and backreferences, `/B` raw packet bytes, `/G` ungreedy and `/O` match limits).
+- Protocols: IP, TCP, `tcp-pkt`, UDP, ICMPv4, ICMPv6, DNS, HTTP, `http1`, TLS (including JA3/JA3S, `tls.random*`, and multi-certificate `tls.certs` chain matching), and TCP/UDP-payload compatibility protocols SMTP, FTP, FTP-data, SMB, SSH, RDP, Telnet, SIP, IKE, BitTorrent-DHT, DCERPC and `tcp-stream`.
+- Payload: `content`, negative content (`content:!"..."`), negative PCRE, `nocase`, `offset`, `depth`, `distance`, `within`, `startswith`, `endswith`, `isdataat` (including variable offsets), `fast_pattern`, `bsize`, `dsize`, `rawbytes`, `pkt_data`, `byte_test`, `byte_jump`, `byte_extract`, `byte_math`, `base64_decode`/`base64_data`, `file_data`/`file.data` (HTTP body with bounded gzip/deflate decompression, TCP payload or SMTP DATA body), and the 8-bit PCRE2 backend (including lookarounds and backreferences, `/B` raw packet bytes, `/G` ungreedy and `/O` match limits).
 - Buffer transforms: `dotprefix`, `to_lowercase`, `to_uppercase`, `header_lowercase`, `url_decode`, `strip_whitespace`, `strip_pseudo_headers`, `to_sha1`, `to_sha256`, and `to_md5` (supports ordered chaining per sticky buffer; cleared on buffer switch or `pkt_data`).
 - IPv4/IPv6 packet fields: `ttl` (IPv6 Hop Limit), `sameip`, `ip_proto`; IPv4-only `id`, `fragbits`, `fragoffset`, `tos`, `ipopts`.
-- Header sticky buffers: `ipv4.hdr`/`ipv4_hdr`, `ipv6.hdr`/`ipv6_hdr`, `tcp.hdr`/`tcp_hdr`, `udp.hdr`/`udp_hdr`, `icmpv4.hdr`/`icmpv4_hdr` and `icmpv6.hdr`/`icmpv6_hdr`.
+- Header sticky buffers: `ipv4.hdr`/`ipv4_hdr`, `ipv6.hdr`/`ipv6_hdr`, `tcp.hdr`/`tcp_hdr`, `udp.hdr`/`udp_hdr`, `icmpv4.hdr`/`icmpv4_hdr` and `icmpv6.hdr`/`icmpv6_hdr` (including `icmpv6.hdr` on `ip` rules).
 - TCP: `flags` including `!`, `*`, `+`, ignored-mask syntax, `seq`, `ack`, `window`, and `tcp.mss`.
 - ICMP: `itype`, `icode`, `icmp_id`, `icmp_seq` (ICMPv4), and `itype`/`icode` for ICMPv6.
 - DNS: `dns.query`, `dns.opcode`, `dns.rcode`, `dns.rrtype`.
-- HTTP: the registered request/response buffers, including legacy aliases, `http.request_header`/`http.response_header` (per-header-line multi-buffer evaluation), `http.accept_lang`, `app-layer-protocol:http`/`http1`, and the `http.invalid_transfer_encoding_value_in_request` application event.
-- TLS: `tls.sni`, `tls.random`, `tls.random_time`, `tls.random_bytes` (ClientHello and ServerHello), `ja3.hash`, `ja3.string`, `ja3s.hash`, `ja3s.string`, `tls.cert_subject`, `tls.cert_issuer`, `tls.cert_serial`, `tls.cert_fingerprint`, `tls.certs`, and `tls.version`.
-- SSH/FTP: the `ssh.proto`/`ssh_proto` version-banner buffer and `ftpbounce` source-address comparison.
+- HTTP: the registered request/response buffers, including legacy aliases, `http.request_header`/`http.response_header` (per-header-line multi-buffer evaluation), `http.accept_lang`, bounded `Content-Encoding: gzip/deflate` decompression, `app-layer-protocol` (`http`/`http1`/`tls`/`ssh`/`dns`/`ftp`/`smtp`/`telnet`/`rdp`), and the `http.invalid_transfer_encoding_value_in_request` application event.
+- TLS: `tls.sni`, `tls.random`, `tls.random_time`, `tls.random_bytes` (ClientHello and ServerHello), `ja3.hash`, `ja3.string`, `ja3s.hash`, `ja3s.string`, `tls.cert_subject`, `tls.cert_issuer`, `tls.cert_serial`, `tls.cert_fingerprint`, `tls.certs` (full certificate chain), and `tls.version`.
+- SSH/FTP: `ssh.proto`/`ssh_proto`, `ssh.software`/`ssh_software` version-banner buffers, and `ftpbounce` source-address comparison.
 - ASN.1: `asn1` with `oversize_length`, `bitstring_overflow`, `double_overflow`, `absolute_offset` and `relative_offset` over recursively decoded BER objects.
 - Metadata: `sid`, `rev`, `gid`, `msg`, `classtype`, `reference`, `priority`, `metadata`, and `target` (`src_ip`/`dest_ip`, alert metadata only).
 
 ## Unified engine
 
-`engine.StatefulEngine` is the primary API. It embeds the stateless matcher per rule and adds flow state, alerts, capture binding, pooling, and a unified `common/minirehs` MVS multi-pattern prefilter with protocol/view/header fast-fail and Parse-Once HTTP/TLS buffer sharing (preserving exact ascending rule evaluation order with zero false negatives):
+`engine.StatefulEngine` is the primary API. It embeds the stateless matcher per rule and adds flow state, alerts, capture binding, pooling, atomic hot rule reload (`Reload`), prefilter observability (`Stats().Prefilter`), a global IPv4 sweep-line interval index + TCP-flags bitmask fast-fail, and a unified `common/minirehs` MVS multi-pattern prefilter with Parse-Once HTTP/TLS buffer sharing (preserving exact ascending rule evaluation order with zero false negatives):
 
 - Stateless rules without flow or payload constraints run on the packet view.
 - Stateless TCP rules can also run on the ordered stream view.

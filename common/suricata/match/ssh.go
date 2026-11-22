@@ -25,16 +25,44 @@ func sshProtoParser(c *matchContext) error {
 	if !c.Must(banner != nil) {
 		return nil
 	}
+	software := sshSoftwareField(banner)
 	c.SetBufferProvider(func(mdf modifier.Modifier) []byte {
 		switch mdf {
 		case modifier.SSHProto:
 			return banner
+		case modifier.SSHSoftware:
+			return software
 		case modifier.Default:
 			return payload
 		}
 		return nil
 	})
 	return nil
+}
+
+// LooksLikeSSH reports whether payload begins with or contains a valid SSH
+// version identification banner line ("SSH-").
+func LooksLikeSSH(payload []byte) bool {
+	return sshVersionBanner(payload) != nil
+}
+
+// sshSoftwareField extracts the software version segment after "SSH-<proto>-"
+// (per RFC 4253 / Suricata ssh.software). For example, "SSH-2.0-Erlang/5.2.0"
+// yields "Erlang/5.2.0".
+func sshSoftwareField(banner []byte) []byte {
+	if !bytes.HasPrefix(banner, []byte("SSH-")) {
+		return nil
+	}
+	rest := banner[len("SSH-"):]
+	dash := bytes.IndexByte(rest, '-')
+	if dash < 0 || dash+1 >= len(rest) {
+		return nil
+	}
+	sw := rest[dash+1:]
+	if sp := bytes.IndexByte(sw, ' '); sp >= 0 {
+		sw = sw[:sp]
+	}
+	return sw
 }
 
 // sshVersionBanner returns the first "SSH-" banner line. SSH peers may send

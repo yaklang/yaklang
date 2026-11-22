@@ -27,7 +27,7 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 				return view == ViewStream
 			}
 			return view == ViewNormalizedPacket
-		case "tcp", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "tcp-stream":
+		case "tcp", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet", "sip", "tcp-stream":
 			// handled below
 		case "tls":
 			// Stateful TLS handshake fields (SNI, JA3, certificates) are parsed

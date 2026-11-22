@@ -56,6 +56,7 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) (matchHandler
 			buffer = c.PK.Data()
 		}
 		buffer = applyBufferTransforms(buffer, r.Transforms, r.DotPrefix)
+		deferVarIsDataAt := len(byteOps) > 0 && isVariableIsDataAt(r.IsDataAt)
 		if len(byteOps) > 0 || base64Spec != nil {
 			defer func() {
 				if handlerErr != nil || c.IsRejected() {
@@ -63,6 +64,15 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) (matchHandler
 				}
 				if len(byteOps) > 0 {
 					if err := matchByteOps(c, mdf, buffer, byteOps); err != nil {
+						handlerErr = err
+						return
+					}
+					if c.IsRejected() {
+						return
+					}
+				}
+				if deferVarIsDataAt {
+					if err := matchIsDataAtOnContext(c, mdf, buffer, r.IsDataAt); err != nil {
 						handlerErr = err
 						return
 					}
@@ -91,7 +101,7 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) (matchHandler
 			return contentMatcher(c)
 		}
 		if len(r.Content) == 0 {
-			if r.IsDataAt == "" {
+			if r.IsDataAt == "" || deferVarIsDataAt {
 				return nil
 			}
 			return matchStandaloneIsDataAt(c, buffer, r.IsDataAt)
@@ -199,26 +209,27 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) (matchHandler
 			}
 		}
 
-		if r.IsDataAt != "" {
+		if r.IsDataAt != "" && !deferVarIsDataAt {
 			strpos := strings.Split(r.IsDataAt, ",")
 			var neg bool
 			var strnum string
-			if len(strpos[0]) > 1 && strpos[0][0] == '!' {
+			first := strings.TrimSpace(strpos[0])
+			if len(first) > 1 && first[0] == '!' {
 				neg = true
-				strnum = strpos[0][1:]
+				strnum = strings.TrimSpace(first[1:])
 			} else {
-				strnum = strpos[0]
+				strnum = first
 			}
-			pos, err := strconv.Atoi(strnum)
+			pos, err := resolveIsDataAtPosition(c, strnum)
 			if err != nil {
-				return errors.Wrap(err, "isdataat format error")
+				return err
 			}
 			if len(strpos) == 1 {
 				indexes = slices.DeleteFunc(indexes, func(data.Matched) bool {
 					return negIf(neg, pos >= len(buffer))
 				})
 			} else {
-				if !c.Must(len(strpos) == 2 && strpos[1] == "relative") {
+				if !c.Must(len(strpos) == 2 && strings.TrimSpace(strpos[1]) == "relative") {
 					return errors.New("isdataat format error")
 				}
 				indexes = slices.DeleteFunc(indexes, func(m data.Matched) bool {
@@ -283,11 +294,28 @@ type byteExtractSpec struct {
 	hasBitmask bool
 }
 
+type byteMathSpec struct {
+	bytes      int
+	offset     int
+	operator   string
+	rvalue     uint64
+	rvalueVar  string
+	result     string
+	relative   bool
+	little     bool
+	stringMode bool
+	base       int
+	bitmask    uint64
+	hasBitmask bool
+	shift      uint
+}
+
 type byteOpSpec struct {
 	kind    string
 	test    byteTestSpec
 	jump    byteJumpSpec
 	extract byteExtractSpec
+	math    byteMathSpec
 }
 
 func isByteVariableName(value string) bool {
@@ -371,6 +399,9 @@ func compileByteOps(r *rule.ContentRule) ([]byteOpSpec, error) {
 		if r.ByteExtract != "" {
 			rawOps = append(rawOps, rule.ByteOp{Kind: "extract", Raw: r.ByteExtract})
 		}
+		if r.ByteMath != "" {
+			rawOps = append(rawOps, rule.ByteOp{Kind: "math", Raw: r.ByteMath})
+		}
 	}
 
 	specs := make([]byteOpSpec, 0, len(rawOps))
@@ -394,6 +425,12 @@ func compileByteOps(r *rule.ContentRule) ([]byteOpSpec, error) {
 				return nil, errors.Errorf("byte_extract %q: %v", rawOp.Raw, err)
 			}
 			specs = append(specs, byteOpSpec{kind: "extract", extract: spec})
+		case "math":
+			spec, err := parseByteMath(rawOp.Raw)
+			if err != nil {
+				return nil, errors.Errorf("byte_math %q: %v", rawOp.Raw, err)
+			}
+			specs = append(specs, byteOpSpec{kind: "math", math: spec})
 		default:
 			return nil, errors.Errorf("unsupported byte operation %q", rawOp.Kind)
 		}
@@ -709,6 +746,209 @@ func (s byteExtractSpec) extract(c *matchContext, mdf modifier.Modifier, buffer 
 	return true
 }
 
+func parseByteMath(raw string) (byteMathSpec, error) {
+	parts := strings.Split(raw, ",")
+	spec := byteMathSpec{base: 10}
+	var hasBytes, hasOffset, hasOper, hasRValue, hasResult bool
+	for _, part := range parts {
+		token := strings.TrimSpace(part)
+		if token == "" {
+			continue
+		}
+		lower := strings.ToLower(token)
+		switch lower {
+		case "relative":
+			spec.relative = true
+			continue
+		case "big":
+			spec.little = false
+			continue
+		case "little":
+			spec.little = true
+			continue
+		case "string":
+			spec.stringMode = true
+			continue
+		case "dec":
+			spec.base = 10
+			continue
+		case "hex":
+			spec.base = 16
+			continue
+		case "oct":
+			spec.base = 8
+			continue
+		case "dce":
+			return byteMathSpec{}, errors.New("dce byte order is not implemented")
+		}
+		key, val, ok := strings.Cut(token, " ")
+		if !ok {
+			return byteMathSpec{}, errors.Errorf("unsupported byte_math option %q", token)
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		val = strings.TrimSpace(val)
+		switch key {
+		case "bytes":
+			n, err := strconv.Atoi(val)
+			if err != nil || n < 1 || n > 8 {
+				return byteMathSpec{}, errors.Errorf("byte_math bytes %q must be between 1 and 8", val)
+			}
+			spec.bytes = n
+			hasBytes = true
+		case "offset":
+			n, err := strconv.Atoi(val)
+			if err != nil {
+				return byteMathSpec{}, errors.Errorf("byte_math offset %q must be numeric", val)
+			}
+			spec.offset = n
+			hasOffset = true
+		case "oper":
+			switch val {
+			case "+", "-", "*", "/", "<<", ">>", "&", "^":
+				spec.operator = val
+				hasOper = true
+			default:
+				return byteMathSpec{}, errors.Errorf("unsupported byte_math operator %q", val)
+			}
+		case "rvalue":
+			if v, err := strconv.ParseUint(val, 0, 64); err == nil {
+				spec.rvalue = v
+				hasRValue = true
+			} else if isByteVariableName(val) {
+				spec.rvalueVar = val
+				hasRValue = true
+			} else {
+				return byteMathSpec{}, errors.Errorf("invalid byte_math rvalue %q", val)
+			}
+		case "result":
+			if !isByteVariableName(val) {
+				return byteMathSpec{}, errors.Errorf("invalid byte_math result %q", val)
+			}
+			spec.result = val
+			hasResult = true
+		case "endian":
+			switch strings.ToLower(val) {
+			case "big":
+				spec.little = false
+			case "little":
+				spec.little = true
+			default:
+				return byteMathSpec{}, errors.Errorf("unsupported byte_math endian %q", val)
+			}
+		case "string":
+			spec.stringMode = true
+			switch strings.ToLower(val) {
+			case "dec":
+				spec.base = 10
+			case "hex":
+				spec.base = 16
+			case "oct":
+				spec.base = 8
+			default:
+				return byteMathSpec{}, errors.Errorf("unsupported byte_math string base %q", val)
+			}
+		case "bitmask":
+			mask, err := strconv.ParseUint(val, 0, 64)
+			if err != nil {
+				return byteMathSpec{}, errors.Errorf("byte_math bitmask %q must be numeric", val)
+			}
+			spec.bitmask = mask
+			spec.hasBitmask = true
+			spec.shift = uint(bits.TrailingZeros64(mask))
+		case "nbytes":
+		default:
+			return byteMathSpec{}, errors.Errorf("unsupported byte_math option %q", token)
+		}
+	}
+	if !hasBytes || !hasOffset || !hasOper || !hasRValue || !hasResult {
+		return byteMathSpec{}, errors.New("byte_math requires bytes, offset, oper, rvalue and result")
+	}
+	return spec, nil
+}
+
+func (s byteMathSpec) eval(c *matchContext, mdf modifier.Modifier, buffer []byte) bool {
+	position := s.offset
+	if s.relative {
+		prev, ok := c.GetPrevMatched(mdf)
+		if !ok || len(prev) == 0 {
+			return false
+		}
+		last := prev[len(prev)-1]
+		position += last.Pos + last.Len
+	}
+	if position < 0 || position+s.bytes > len(buffer) {
+		return false
+	}
+	var extracted uint64
+	if s.stringMode {
+		text := strings.TrimSpace(string(buffer[position : position+s.bytes]))
+		text = strings.Trim(text, "\x00")
+		text = strings.TrimPrefix(strings.TrimPrefix(text, "0x"), "0X")
+		parsed, err := strconv.ParseUint(text, s.base, 64)
+		if err != nil {
+			return false
+		}
+		extracted = parsed
+	} else {
+		for index := 0; index < s.bytes; index++ {
+			if s.little {
+				extracted |= uint64(buffer[position+index]) << (8 * index)
+			} else {
+				extracted = extracted<<8 | uint64(buffer[position+index])
+			}
+		}
+	}
+	if s.hasBitmask {
+		extracted = (extracted & s.bitmask) >> s.shift
+	}
+	rval := s.rvalue
+	if s.rvalueVar != "" {
+		v, ok := c.variables[s.rvalueVar]
+		if !ok || v < 0 {
+			return false
+		}
+		rval = uint64(v)
+	}
+	var res uint64
+	switch s.operator {
+	case "+":
+		res = extracted + rval
+	case "-":
+		if extracted < rval {
+			res = 0
+		} else {
+			res = extracted - rval
+		}
+	case "*":
+		res = extracted * rval
+	case "/":
+		if rval == 0 {
+			return false
+		}
+		res = extracted / rval
+	case "<<":
+		if rval >= 64 {
+			res = 0
+		} else {
+			res = extracted << rval
+		}
+	case ">>":
+		if rval >= 64 {
+			res = 0
+		} else {
+			res = extracted >> rval
+		}
+	case "&":
+		res = extracted & rval
+	case "^":
+		res = extracted ^ rval
+	default:
+		return false
+	}
+	c.variables[s.result] = int64(res)
+	return true
+}
+
 func matchByteOps(c *matchContext, mdf modifier.Modifier, buffer []byte, specs []byteOpSpec) error {
 	for _, spec := range specs {
 		switch spec.kind {
@@ -719,6 +959,11 @@ func matchByteOps(c *matchContext, mdf modifier.Modifier, buffer []byte, specs [
 			}
 		case "extract":
 			if !spec.extract.extract(c, mdf, buffer) {
+				c.Reject()
+				return nil
+			}
+		case "math":
+			if !spec.math.eval(c, mdf, buffer) {
 				c.Reject()
 				return nil
 			}
@@ -1010,6 +1255,68 @@ func decodeBase64Prefix(data []byte) []byte {
 	return nil
 }
 
+func isVariableIsDataAt(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	first := strings.TrimSpace(strings.Split(raw, ",")[0])
+	first = strings.TrimSpace(strings.TrimPrefix(first, "!"))
+	return isByteVariableName(first)
+}
+
+func resolveIsDataAtPosition(c *matchContext, token string) (int, error) {
+	token = strings.TrimSpace(token)
+	if pos, err := strconv.Atoi(token); err == nil {
+		if pos < 0 {
+			return 0, errors.New("isdataat format error: negative offset")
+		}
+		return pos, nil
+	}
+	if isByteVariableName(token) {
+		val, ok := c.variables[token]
+		if !ok || val < 0 {
+			return -1, nil
+		}
+		return int(val), nil
+	}
+	return 0, errors.Errorf("isdataat format error: %q", token)
+}
+
+func matchIsDataAtOnContext(c *matchContext, mdf modifier.Modifier, buffer []byte, raw string) error {
+	parts := strings.Split(raw, ",")
+	first := strings.TrimSpace(parts[0])
+	neg := strings.HasPrefix(first, "!")
+	token := strings.TrimSpace(strings.TrimPrefix(first, "!"))
+	pos, err := resolveIsDataAtPosition(c, token)
+	if err != nil {
+		return err
+	}
+	if pos < 0 {
+		c.Reject()
+		return nil
+	}
+	if len(parts) == 1 {
+		c.Must(negIf(neg, pos < len(buffer)))
+		return nil
+	}
+	if !c.Must(len(parts) == 2 && strings.TrimSpace(parts[1]) == "relative") {
+		return errors.New("isdataat format error")
+	}
+	prev, ok := c.GetPrevMatched(mdf)
+	if !ok || len(prev) == 0 {
+		c.Reject()
+		return nil
+	}
+	filtered := slices.DeleteFunc(append([]data.Matched(nil), prev...), func(m data.Matched) bool {
+		return negIf(neg, m.Pos+m.Len+pos > len(buffer))
+	})
+	if !c.Must(len(filtered) > 0) {
+		return nil
+	}
+	c.SetPrevMatched(mdf, filtered)
+	return nil
+}
+
 func matchStandaloneIsDataAt(c *matchContext, buffer []byte, raw string) error {
 	parts := strings.Split(raw, ",")
 	if len(parts) != 1 {
@@ -1017,10 +1324,14 @@ func matchStandaloneIsDataAt(c *matchContext, buffer []byte, raw string) error {
 	}
 	value := strings.TrimSpace(parts[0])
 	negative := strings.HasPrefix(value, "!")
-	value = strings.TrimPrefix(value, "!")
-	position, err := strconv.Atoi(value)
-	if err != nil || position < 0 {
-		return errors.Wrap(err, "isdataat format error")
+	value = strings.TrimSpace(strings.TrimPrefix(value, "!"))
+	position, err := resolveIsDataAtPosition(c, value)
+	if err != nil {
+		return err
+	}
+	if position < 0 {
+		c.Reject()
+		return nil
 	}
 	c.Must(negIf(negative, position < len(buffer)))
 	return nil
@@ -1074,6 +1385,39 @@ func newMultiBufferHeaderMatcher(mdf modifier.Modifier, handlers []matchHandler)
 	}
 }
 
+func newMultiBufferTLSCertsMatcher(handlers []matchHandler) matchHandler {
+	return func(c *matchContext) error {
+		provider, _ := c.Value["tls"].(*tlsProvider)
+		if provider == nil || len(provider.certs) == 0 {
+			c.Reject()
+			return nil
+		}
+		origPrev, origPrevMod := c.prevMatched, c.prevModifier
+		for _, cert := range provider.certs {
+			c.Recover()
+			c.SetBuffer(modifier.TLSCerts, cert)
+			c.prevMatched = nil
+			c.prevModifier = modifier.Default
+			allMatched := true
+			for _, h := range handlers {
+				if err := h(c); err != nil {
+					return err
+				}
+				if c.IsRejected() {
+					allMatched = false
+					break
+				}
+			}
+			if allMatched {
+				return nil
+			}
+		}
+		c.prevMatched, c.prevModifier = origPrev, origPrevMod
+		c.Reject()
+		return nil
+	}
+}
+
 func attachPayloadMatcher(c *matchContext) error {
 	contentRules := c.Rule.ContentRuleConfig.ContentRules
 	if len(contentRules) == 0 {
@@ -1090,7 +1434,7 @@ func attachPayloadMatcher(c *matchContext) error {
 	}
 	for idx := 0; idx < len(contentRules); idx++ {
 		r := contentRules[idx]
-		if r != nil && (r.Modifier == modifier.HTTPRequestHeader || r.Modifier == modifier.HTTPResponseHeader) {
+		if r != nil && (r.Modifier == modifier.HTTPRequestHeader || r.Modifier == modifier.HTTPResponseHeader || r.Modifier == modifier.TLSCerts) {
 			mdf := r.Modifier
 			end := idx + 1
 			for end < len(contentRules) && contentRules[end] != nil && contentRules[end].Modifier == mdf {
@@ -1104,7 +1448,11 @@ func attachPayloadMatcher(c *matchContext) error {
 				}
 				groupHandlers = append(groupHandlers, h)
 			}
-			c.Attach(newMultiBufferHeaderMatcher(mdf, groupHandlers))
+			if mdf == modifier.TLSCerts {
+				c.Attach(newMultiBufferTLSCertsMatcher(groupHandlers))
+			} else {
+				c.Attach(newMultiBufferHeaderMatcher(mdf, groupHandlers))
+			}
 			idx = end - 1
 			continue
 		}

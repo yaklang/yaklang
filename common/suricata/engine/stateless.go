@@ -24,8 +24,11 @@ func (e *StatefulEngine) MatchPacket(packet gopacket.Packet) (bool, error) {
 	if e == nil || e.closed.Load() || packet == nil {
 		return false, nil
 	}
+	e.snapshotMu.RLock()
+	plans := e.snapshot.plans
+	e.snapshotMu.RUnlock()
 	matched := false
-	for _, plan := range e.plans {
+	for _, plan := range plans {
 		if !plan.stateless() {
 			continue
 		}
@@ -48,8 +51,11 @@ func (e *StatefulEngine) MatchStream(packet gopacket.Packet, payload []byte) (bo
 	if e == nil || e.closed.Load() || packet == nil {
 		return false, nil
 	}
+	e.snapshotMu.RLock()
+	plans := e.snapshot.plans
+	e.snapshotMu.RUnlock()
 	matched := false
-	for _, plan := range e.plans {
+	for _, plan := range plans {
 		if !plan.stateless() || plan.Rule.Protocol != "tcp" {
 			continue
 		}

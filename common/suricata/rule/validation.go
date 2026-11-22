@@ -104,7 +104,7 @@ func UsesSSHBuffers(r *Rule) bool {
 		return false
 	}
 	for _, content := range r.ContentRuleConfig.ContentRules {
-		if content != nil && content.Modifier == modifier.SSHProto {
+		if content != nil && (content.Modifier == modifier.SSHProto || content.Modifier == modifier.SSHSoftware) {
 			return true
 		}
 	}
@@ -149,7 +149,7 @@ func UsesRawBytes(r *Rule) bool {
 
 func isTCPBasedProtocol(protocol string) bool {
 	switch protocol {
-	case "tcp", "tcp-pkt", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "tcp-stream":
+	case "tcp", "tcp-pkt", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "telnet", "sip", "tcp-stream":
 		return true
 	default:
 		return false
@@ -186,7 +186,7 @@ func (v *ruleValidator) validateHeader() {
 
 	switch normalizeKeyword(v.rule.Protocol) {
 	case "ip", "dns", "http", "http1", "tcp", "tcp-pkt", "udp", "icmp", "icmpv6", "tls",
-		"smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "tcp-stream":
+		"smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "telnet", "sip", "ike", "bittorrent-dht", "tcp-stream":
 	default:
 		v.add(ValidationStageHeader, "protocol", fmt.Sprintf("protocol %q is not supported by the matcher", v.rule.Protocol), KeywordUnsupported)
 	}
@@ -330,11 +330,13 @@ func (v *ruleValidator) validateModel() {
 		v.add(ValidationStageModel, "http", "HTTP constraints require the http protocol", KeywordUnsupported)
 	}
 	if config.AppLayerProtocol != "" {
-		if config.AppLayerProtocol != "http" && config.AppLayerProtocol != "http1" {
-			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol only supports http", KeywordUnsupported)
+		switch config.AppLayerProtocol {
+		case "http", "http1", "tls", "ssh", "dns", "ftp", "smtp", "telnet", "rdp":
+		default:
+			v.add(ValidationStageModel, "app-layer-protocol", fmt.Sprintf("app-layer-protocol %q is not supported", config.AppLayerProtocol), KeywordUnsupported)
 		}
-		if protocol != "http" && protocol != "http1" && protocol != "tcp" && protocol != "tcp-pkt" {
-			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol requires the http, tcp or tcp-pkt protocol", KeywordUnsupported)
+		if !isTCPBasedProtocol(protocol) && protocol != "udp" && protocol != "dns" && protocol != "ip" {
+			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol requires a TCP, UDP, DNS, HTTP or IP protocol", KeywordUnsupported)
 		}
 	}
 	if len(config.AppLayerEvents) > 0 {
@@ -372,8 +374,8 @@ func (v *ruleValidator) validateModel() {
 		if contentRule.Modifier == modifier.ICMPV4HDR && protocol != "icmp" {
 			v.add(ValidationStageModel, "icmpv4.hdr", "ICMPv4 header buffers require the icmp protocol", KeywordUnsupported)
 		}
-		if contentRule.Modifier == modifier.ICMPV6HDR && protocol != "icmpv6" {
-			v.add(ValidationStageModel, "icmpv6.hdr", "ICMPv6 header buffers require the icmpv6 protocol", KeywordUnsupported)
+		if contentRule.Modifier == modifier.ICMPV6HDR && protocol != "icmpv6" && protocol != "ip" {
+			v.add(ValidationStageModel, "icmpv6.hdr", "ICMPv6 header buffers require the icmpv6 or ip protocol", KeywordUnsupported)
 		}
 		if contentRule.Modifier == modifier.FileData {
 			switch protocol {
@@ -385,7 +387,7 @@ func (v *ruleValidator) validateModel() {
 		if contentRule.Modifier == modifier.TCPHDR && !isTCPBasedProtocol(protocol) {
 			v.add(ValidationStageModel, "tcp.hdr", "TCP header buffers require a TCP-based protocol", KeywordUnsupported)
 		}
-		if contentRule.Modifier == modifier.SSHProto && protocol != "ssh" && protocol != "tcp" && protocol != "tcp-pkt" {
+		if (contentRule.Modifier == modifier.SSHProto || contentRule.Modifier == modifier.SSHSoftware) && protocol != "ssh" && protocol != "tcp" && protocol != "tcp-pkt" {
 			v.add(ValidationStageModel, "ssh.proto", "SSH protocol buffers require the ssh, tcp or tcp-pkt protocol", KeywordUnsupported)
 		}
 		if contentRule.Modifier >= modifier.TLSCertSubject && contentRule.Modifier <= modifier.JA3SString &&
@@ -401,13 +403,8 @@ func (v *ruleValidator) validateModel() {
 		if contentRule.Within != nil && *contentRule.Within < 0 {
 			v.add(ValidationStageModel, "within", "negative within ranges are not implemented", KeywordUnsupported)
 		}
-		for keyword, value := range map[string]string{
-			"byte_math": contentRule.ByteMath,
-			"rpc":       contentRule.RPC,
-		} {
-			if value != "" {
-				v.add(ValidationStageModel, keyword, "parsed field is not evaluated by the matcher", KeywordUnsupported)
-			}
+		if contentRule.RPC != "" {
+			v.add(ValidationStageModel, "rpc", "parsed field is not evaluated by the matcher", KeywordUnsupported)
 		}
 		if len(contentRule.Replace) > 0 {
 			v.add(ValidationStageModel, "replace", "payload replacement is not implemented", KeywordUnsupported)

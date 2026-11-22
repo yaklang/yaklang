@@ -23,6 +23,23 @@ func udpParser(c *matchContext) error {
 	return nil
 }
 
+// tcpOrUDPParser handles dual-transport protocols such as SIP.
+func tcpOrUDPParser(c *matchContext) error {
+	if !c.Must(c.Rule.ContentRuleConfig != nil) {
+		return nil
+	}
+	if provider := newTCPProvider(c.PK, c.overridePayload); provider != nil {
+		c.SetBufferProvider(provider)
+		return nil
+	}
+	if provider := newUDPProvider(c.PK); provider != nil {
+		c.SetBufferProvider(provider)
+		return nil
+	}
+	c.Reject()
+	return nil
+}
+
 func newUDPProvider(pk gopacket.Packet) func(modifier modifier.Modifier) []byte {
 	udp, ok := pk.Layer(layers.LayerTypeUDP).(*layers.UDP)
 	if !ok {
