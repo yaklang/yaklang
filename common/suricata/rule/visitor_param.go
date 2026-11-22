@@ -203,6 +203,10 @@ func modifierMapping(str string) modifier.Modifier {
 	switch str {
 	case "file_data", "file.data":
 		return modifier.FileData
+	case "file.magic":
+		return modifier.FileMagic
+	case "dcerpc.stub_data", "dcerpc_stub_data":
+		return modifier.DCERPCStubData
 	case "http_content_type", "http.content_type":
 		return modifier.HTTPContentType
 	case "http_content_len", "http.content_len":
@@ -344,7 +348,8 @@ func isAlwaysStickyModifier(mdf modifier.Modifier) bool {
 		modifier.TLSSNI, modifier.TLSCertSubject, modifier.TLSCertIssuer,
 		modifier.TLSCertSerial, modifier.TLSCertFingerprint, modifier.TLSCerts,
 		modifier.TLSRandom, modifier.TLSRandomTime, modifier.TLSRandomBytes,
-		modifier.Base64Data, modifier.SSHProto, modifier.SSHSoftware:
+		modifier.Base64Data, modifier.SSHProto, modifier.SSHSoftware,
+		modifier.FileMagic, modifier.DCERPCStubData:
 		return true
 	default:
 		return false
@@ -458,8 +463,8 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 				STATUS = HasNone
 			}
 		case HasContent:
-			if modifierMapping(key) != modifier.Default {
-				if key == "base64_data" || multipleBufferMatching.sticky {
+			if mdf := modifierMapping(key); mdf != modifier.Default {
+				if key == "base64_data" || multipleBufferMatching.sticky || mdf == modifier.FileMagic || mdf == modifier.DCERPCStubData {
 					// Active sticky buffers and base64_data open a new buffer
 					// rather than attaching backwards to the preceding content.
 					multipleBufferMatching.transfer(contentRule)
@@ -1025,6 +1030,100 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 				return
 			}
 			rule.ContentRuleConfig.ASN1 = config
+		case "filemagic":
+			if vStr == "" {
+				if STATUS != HasNone {
+					multipleBufferMatching.transfer(contentRule)
+					contents = append(contents, contentRule)
+					contentRule = new(ContentRule)
+				}
+				contentRule.Modifier = modifier.FileMagic
+				multipleBufferMatching.start(modifier.FileMagic, true)
+				STATUS = HasModif
+			} else {
+				pattern := vStr
+				if unquoted, err := strconv.Unquote(vStr); err == nil {
+					pattern = unquoted
+				}
+				if STATUS != HasNone {
+					multipleBufferMatching.transfer(contentRule)
+					contents = append(contents, contentRule)
+					contentRule = new(ContentRule)
+					STATUS = HasNone
+				}
+				contents = append(contents, &ContentRule{
+					Content:  []byte(pattern),
+					Modifier: modifier.FileMagic,
+				})
+			}
+		case "filesize":
+			nr, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				v.Errorf("parse filesize %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse filesize %q: %w", vStr, err)
+				return
+			}
+			rule.ContentRuleConfig.FileSize = nr
+		case "http2.frametype", "http2_frametype":
+			ft, neg, err := parseHTTP2FrameType(vStr)
+			if err != nil {
+				v.Errorf("parse http2.frametype %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse http2.frametype %q: %w", vStr, err)
+				return
+			}
+			if rule.ContentRuleConfig.HTTP2Config == nil {
+				rule.ContentRuleConfig.HTTP2Config = &HTTP2Rule{}
+			}
+			rule.ContentRuleConfig.HTTP2Config.FrameType = ft
+			rule.ContentRuleConfig.HTTP2Config.FrameTypeSet = true
+			rule.ContentRuleConfig.HTTP2Config.FrameTypeNegated = neg
+		case "http2.window", "http2_window":
+			nr, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				v.Errorf("parse http2.window %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse http2.window %q: %w", vStr, err)
+				return
+			}
+			if rule.ContentRuleConfig.HTTP2Config == nil {
+				rule.ContentRuleConfig.HTTP2Config = &HTTP2Rule{}
+			}
+			rule.ContentRuleConfig.HTTP2Config.Window = nr
+		case "snmp.version", "snmp_version":
+			nr, err := numrange.ParseNumRange(vStr)
+			if err != nil {
+				v.Errorf("parse snmp.version %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse snmp.version %q: %w", vStr, err)
+				return
+			}
+			if rule.ContentRuleConfig.SNMPConfig == nil {
+				rule.ContentRuleConfig.SNMPConfig = &SNMPRule{}
+			}
+			rule.ContentRuleConfig.SNMPConfig.Version = nr
+		case "dcerpc.iface", "dcerpc_iface":
+			uuid, ver, anyFrag, err := parseDCERPCIface(vStr)
+			if err != nil {
+				v.Errorf("parse dcerpc.iface %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse dcerpc.iface %q: %w", vStr, err)
+				return
+			}
+			if rule.ContentRuleConfig.DCERPCConfig == nil {
+				rule.ContentRuleConfig.DCERPCConfig = &DCERPCRule{}
+			}
+			rule.ContentRuleConfig.DCERPCConfig.IfaceUUID = uuid
+			rule.ContentRuleConfig.DCERPCConfig.IfaceVersion = ver
+			rule.ContentRuleConfig.DCERPCConfig.IfaceAnyFrag = anyFrag
+		case "dcerpc.opnum", "dcerpc_opnum":
+			ranges, neg, err := parseDCERPCOpnum(vStr)
+			if err != nil {
+				v.Errorf("parse dcerpc.opnum %q: %v", vStr, err)
+				parseError = fmt.Errorf("parse dcerpc.opnum %q: %w", vStr, err)
+				return
+			}
+			if rule.ContentRuleConfig.DCERPCConfig == nil {
+				rule.ContentRuleConfig.DCERPCConfig = &DCERPCRule{}
+			}
+			rule.ContentRuleConfig.DCERPCConfig.Opnum = ranges
+			rule.ContentRuleConfig.DCERPCConfig.OpnumNegated = neg
 		default:
 			if mdf := modifierMapping(key); mdf != modifier.Default {
 				contentRule.Modifier = mdf
@@ -1048,4 +1147,120 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 
 	rule.ContentRuleConfig.ContentRules = append(rule.ContentRuleConfig.ContentRules, contents...)
 	return
+}
+
+func parseHTTP2FrameType(raw string) (uint8, bool, error) {
+	s := strings.TrimSpace(raw)
+	neg := false
+	if strings.HasPrefix(s, "!") {
+		neg = true
+		s = strings.TrimSpace(s[1:])
+	}
+	if s == "" {
+		return 0, false, fmt.Errorf("empty http2.frametype")
+	}
+	if n, err := strconv.Atoi(s); err == nil {
+		if n < 0 || n > 255 {
+			return 0, false, fmt.Errorf("http2.frametype %d out of range", n)
+		}
+		return uint8(n), neg, nil
+	}
+	switch strings.ToUpper(s) {
+	case "DATA":
+		return 0, neg, nil
+	case "HEADERS":
+		return 1, neg, nil
+	case "PRIORITY":
+		return 2, neg, nil
+	case "RST_STREAM", "RSTSTREAM":
+		return 3, neg, nil
+	case "SETTINGS":
+		return 4, neg, nil
+	case "PUSH_PROMISE", "PUSHPROMISE":
+		return 5, neg, nil
+	case "PING":
+		return 6, neg, nil
+	case "GOAWAY":
+		return 7, neg, nil
+	case "WINDOW_UPDATE", "WINDOWUPDATE":
+		return 8, neg, nil
+	case "CONTINUATION":
+		return 9, neg, nil
+	default:
+		return 0, false, fmt.Errorf("unknown http2.frametype %q", raw)
+	}
+}
+
+func normalizeDCERPCUUID(raw string) (string, error) {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	s = strings.Trim(s, "{}")
+	hexOnly := strings.ReplaceAll(s, "-", "")
+	if len(hexOnly) != 32 {
+		return "", fmt.Errorf("invalid dcerpc.iface uuid %q", raw)
+	}
+	for i := 0; i < len(hexOnly); i++ {
+		c := hexOnly[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return "", fmt.Errorf("invalid dcerpc.iface uuid %q", raw)
+		}
+	}
+	return hexOnly[0:8] + "-" + hexOnly[8:12] + "-" + hexOnly[12:16] + "-" + hexOnly[16:20] + "-" + hexOnly[20:32], nil
+}
+
+func parseDCERPCIface(raw string) (string, *numrange.NumRange, bool, error) {
+	parts := parseCommaParts(raw)
+	if len(parts) == 0 {
+		return "", nil, false, fmt.Errorf("empty dcerpc.iface")
+	}
+	uuid, err := normalizeDCERPCUUID(parts[0])
+	if err != nil {
+		return "", nil, false, err
+	}
+	var ver *numrange.NumRange
+	var anyFrag bool
+	for _, p := range parts[1:] {
+		tok := strings.ToLower(strings.TrimSpace(p))
+		if tok == "" {
+			continue
+		}
+		if tok == "any_frag" {
+			anyFrag = true
+			continue
+		}
+		nr, err := numrange.ParseNumRange(tok)
+		if err != nil {
+			return "", nil, false, fmt.Errorf("invalid dcerpc.iface option %q: %w", p, err)
+		}
+		ver = nr
+	}
+	return uuid, ver, anyFrag, nil
+}
+
+func parseDCERPCOpnum(raw string) ([]*numrange.NumRange, bool, error) {
+	s := strings.TrimSpace(raw)
+	neg := false
+	if strings.HasPrefix(s, "!") {
+		neg = true
+		s = strings.TrimSpace(s[1:])
+	}
+	parts := parseCommaParts(s)
+	if len(parts) == 0 {
+		return nil, false, fmt.Errorf("empty dcerpc.opnum")
+	}
+	ranges := make([]*numrange.NumRange, 0, len(parts))
+	for _, p := range parts {
+		tok := strings.TrimSpace(p)
+		if tok == "" {
+			continue
+		}
+		nr, err := numrange.ParseNumRange(tok)
+		if err != nil {
+			return nil, false, fmt.Errorf("invalid dcerpc.opnum %q: %w", p, err)
+		}
+		ranges = append(ranges, nr)
+	}
+	if len(ranges) == 0 {
+		return nil, false, fmt.Errorf("empty dcerpc.opnum")
+	}
+	return ranges, neg, nil
 }

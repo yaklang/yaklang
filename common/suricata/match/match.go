@@ -136,6 +136,13 @@ func (m *Matcher) MatchStreamEvidenceWithHTTP(pk gopacket.Packet, payload []byte
 // MatchStreamEvidenceWithShared evaluates a stream rule using pre-parsed HTTP
 // and/or TLS buffer providers so the engine parses each stream once per event.
 func (m *Matcher) MatchStreamEvidenceWithShared(pk gopacket.Packet, payload []byte, sharedHTTP *HTTPBufferProvider, sharedTLS *TLSBufferProvider) (bool, int, error) {
+	return m.MatchStreamEvidenceWithDCERPC(pk, payload, sharedHTTP, sharedTLS, nil)
+}
+
+// MatchStreamEvidenceWithDCERPC evaluates a stream rule using pre-parsed HTTP
+// and/or TLS buffer providers and optional flow-level DCE/RPC context bindings
+// bridged from pcaputil protocol dissection.
+func (m *Matcher) MatchStreamEvidenceWithDCERPC(pk gopacket.Packet, payload []byte, sharedHTTP *HTTPBufferProvider, sharedTLS *TLSBufferProvider, dcerpcBindings map[uint16]DCERPCBinding) (bool, int, error) {
 	if m == nil || m.matcher == nil || pk == nil {
 		return false, 0, nil
 	}
@@ -147,7 +154,17 @@ func (m *Matcher) MatchStreamEvidenceWithShared(pk gopacket.Packet, payload []by
 	if sharedTLS != nil {
 		innerTLS = sharedTLS.inner
 	}
-	return m.matcher.matchPayloadEvidenceWithShared(pk, payload, innerHTTP, innerTLS)
+	return m.matcher.matchPayloadEvidenceWithShared(pk, payload, innerHTTP, innerTLS, dcerpcBindings)
+}
+
+// MatchPackageWithDCERPC evaluates a packet rule with optional flow-level
+// DCE/RPC context bindings.
+func (m *Matcher) MatchPackageWithDCERPC(pk gopacket.Packet, dcerpcBindings map[uint16]DCERPCBinding) (bool, error) {
+	if m == nil || m.matcher == nil || pk == nil {
+		return false, nil
+	}
+	matched, _, err := m.matcher.matchPayloadEvidenceWithShared(pk, nil, nil, nil, dcerpcBindings)
+	return matched, err
 }
 
 type matchHandler func(*matchContext) error
@@ -177,11 +194,14 @@ type matchContext struct {
 	jumpCursor   map[modifier.Modifier]jumpCursorState
 	variables    map[string]int64
 
-	PK              gopacket.Packet
-	Rule            *rule.Rule
-	overridePayload []byte
-	sharedHTTP      *httpProvider
-	sharedTLS       *tlsProvider
+	PK                  gopacket.Packet
+	Rule                *rule.Rule
+	overridePayload     []byte
+	sharedHTTP          *httpProvider
+	sharedTLS           *tlsProvider
+	dcerpcBindings      map[uint16]DCERPCBinding
+	protocolEvidenceEnd int
+	fileDataOffset      int
 
 	workflow []matchHandler
 }
@@ -249,6 +269,9 @@ func (c *matchContext) Tidy() {
 	c.overridePayload = nil
 	c.sharedHTTP = nil
 	c.sharedTLS = nil
+	c.dcerpcBindings = nil
+	c.protocolEvidenceEnd = 0
+	c.fileDataOffset = 0
 	c.provider = nil
 	if c.buffer == nil {
 		c.buffer = make(map[modifier.Modifier][]byte, 4)
@@ -302,10 +325,10 @@ func (c *matchContext) MatchPayload(pk gopacket.Packet, payload []byte) (bool, e
 }
 
 func (c *matchContext) MatchPayloadEvidence(pk gopacket.Packet, payload []byte) (bool, int, error) {
-	return c.matchPayloadEvidenceWithShared(pk, payload, nil, nil)
+	return c.matchPayloadEvidenceWithShared(pk, payload, nil, nil, nil)
 }
 
-func (c *matchContext) matchPayloadEvidenceWithShared(pk gopacket.Packet, payload []byte, sharedHTTP *httpProvider, sharedTLS *tlsProvider) (bool, int, error) {
+func (c *matchContext) matchPayloadEvidenceWithShared(pk gopacket.Packet, payload []byte, sharedHTTP *httpProvider, sharedTLS *tlsProvider, dcerpcBindings map[uint16]DCERPCBinding) (bool, int, error) {
 	c.lock.Lock()
 	c.Tidy()
 	defer c.lock.Unlock()
@@ -313,15 +336,20 @@ func (c *matchContext) matchPayloadEvidenceWithShared(pk gopacket.Packet, payloa
 	c.overridePayload = payload
 	c.sharedHTTP = sharedHTTP
 	c.sharedTLS = sharedTLS
+	c.dcerpcBindings = dcerpcBindings
 	if err := c.match(); err != nil {
 		return false, 0, fmt.Errorf("match failed: %w", err)
 	}
 	if c.rejected {
 		return false, 0, nil
 	}
-	end := 0
+	end := c.protocolEvidenceEnd
+	baseOffset := 0
+	if c.prevModifier == modifier.FileData || c.prevModifier == modifier.FileMagic {
+		baseOffset = c.fileDataOffset
+	}
 	for _, evidence := range c.prevMatched {
-		if current := evidence.Pos + evidence.Len; current > end {
+		if current := baseOffset + evidence.Pos + evidence.Len; current > end {
 			end = current
 		}
 	}
@@ -362,10 +390,20 @@ func matchMutex(c *matchContext) error {
 		return attachPayloadMatcher(c)
 	case protocol.HTTP, protocol.HTTP1:
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, httpParser)
+		if c.Rule.ContentRuleConfig != nil && c.Rule.ContentRuleConfig.HTTP2Config != nil {
+			c.Attach(http2Matcher)
+		}
 		if err := attachFastPattern(c); err != nil {
 			return err
 		}
 		attachHTTPMatcher(c)
+		return attachPayloadMatcher(c)
+	case protocol.HTTP2:
+		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tcpParser, http2Matcher)
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
+		c.Attach(tcpCfgMatch)
 		return attachPayloadMatcher(c)
 	case protocol.TCP, protocol.TCPPacket:
 		if rule.UsesSSHBuffers(c.Rule) {
@@ -396,6 +434,15 @@ func matchMutex(c *matchContext) error {
 			return attachPayloadMatcher(c)
 		}
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tcpParser)
+		if rule.UsesDCERPC(c.Rule) {
+			c.Attach(dcerpcMatcher)
+		}
+		if c.Rule.ContentRuleConfig != nil && c.Rule.ContentRuleConfig.HTTP2Config != nil {
+			c.Attach(http2Matcher)
+		}
+		if c.Rule.ContentRuleConfig != nil && c.Rule.ContentRuleConfig.SNMPConfig != nil {
+			c.Attach(snmpMatcher)
+		}
 		if err := attachFastPattern(c); err != nil {
 			return err
 		}
@@ -421,10 +468,19 @@ func matchMutex(c *matchContext) error {
 			parser = sshProtoParser
 		}
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, parser)
+		if rule.UsesDCERPC(c.Rule) {
+			c.Attach(dcerpcMatcher)
+		}
 		if err := attachFastPattern(c); err != nil {
 			return err
 		}
 		c.Attach(tcpCfgMatch)
+		return attachPayloadMatcher(c)
+	case protocol.SNMP:
+		c.Attach(ipMatcher, ipCfgMatch, portMatcher, snmpParser, snmpMatcher)
+		if err := attachFastPattern(c); err != nil {
+			return err
+		}
 		return attachPayloadMatcher(c)
 	case protocol.SIP:
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, tcpOrUDPParser)
@@ -434,6 +490,12 @@ func matchMutex(c *matchContext) error {
 		return attachPayloadMatcher(c)
 	case protocol.UDP, protocol.IKE, protocol.BitTorrentDHT:
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, udpParser)
+		if rule.UsesDCERPC(c.Rule) {
+			c.Attach(dcerpcMatcher)
+		}
+		if c.Rule.ContentRuleConfig != nil && c.Rule.ContentRuleConfig.SNMPConfig != nil {
+			c.Attach(snmpMatcher)
+		}
 		if err := attachFastPattern(c); err != nil {
 			return err
 		}

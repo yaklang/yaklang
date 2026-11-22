@@ -27,6 +27,8 @@ func smtpParser(c *matchContext) error {
 			return raw
 		case modifier.FileData:
 			return data
+		case modifier.FileMagic:
+			return []byte(DetectFileMagic(data))
 		case modifier.TCPHDR:
 			return tcp.Contents
 		}

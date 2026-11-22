@@ -8,6 +8,7 @@ import (
 
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/suricata/match"
 	"github.com/yaklang/yaklang/common/suricata/state"
 )
 
@@ -37,6 +38,7 @@ type flowRuntime struct {
 	streamCursor    map[ruleDirection]int
 	tlsMatched      map[ruleDirection]bool
 	httpNextOffset  [2]int
+	dcerpcBindings  map[uint16]match.DCERPCBinding
 	tags            []flowTag
 
 	// tcpPacketBytes counts unique TCP payload bytes by sequence number. It
@@ -84,6 +86,79 @@ func (f *flowRuntime) observeTCP(direction int, tcp *layers.TCP) {
 	}
 	if tcp.FIN || tcp.RST {
 		f.closed = true
+	}
+}
+
+// observeProtocolEvent bridges structured protocol state decoded by pcaputil
+// (such as DCE/RPC presentation context bindings across SMB/TCP fragments)
+// into per-flow Suricata rule evaluation.
+func (f *flowRuntime) observeProtocolEvent(ev *pcaputil.ProtocolEvent) {
+	if f == nil || ev == nil || ev.Protocol != "dcerpc" || len(ev.Fields) == 0 {
+		return
+	}
+	const maxBindingsPerFlow = 64
+	record := func(ctxID uint16, abstractHex string, major, minor uint16) {
+		if abstractHex == "" {
+			return
+		}
+		uuid, ok := match.DecodeDCERPCAbstractSyntaxHex(abstractHex)
+		if !ok {
+			return
+		}
+		if f.dcerpcBindings == nil {
+			f.dcerpcBindings = make(map[uint16]match.DCERPCBinding, 4)
+		}
+		if _, exists := f.dcerpcBindings[ctxID]; !exists && len(f.dcerpcBindings) >= maxBindingsPerFlow {
+			return
+		}
+		f.dcerpcBindings[ctxID] = match.DCERPCBinding{
+			UUID:         uuid,
+			VersionMajor: major,
+			VersionMinor: minor,
+		}
+	}
+	toUint16 := func(v any) (uint16, bool) {
+		switch n := v.(type) {
+		case uint16:
+			return n, true
+		case int:
+			if n >= 0 && n <= 0xffff {
+				return uint16(n), true
+			}
+		case int64:
+			if n >= 0 && n <= 0xffff {
+				return uint16(n), true
+			}
+		case uint64:
+			if n <= 0xffff {
+				return uint16(n), true
+			}
+		case float64:
+			if n >= 0 && n <= 0xffff {
+				return uint16(n), true
+			}
+		}
+		return 0, false
+	}
+
+	if ctxID, ok := toUint16(ev.Fields["Context ID"]); ok {
+		if hexStr, ok := ev.Fields["Abstract Syntax"].(string); ok {
+			maj, _ := toUint16(ev.Fields["Interface Version Major"])
+			min, _ := toUint16(ev.Fields["Interface Version Minor"])
+			record(ctxID, hexStr, maj, min)
+		}
+	}
+	if list, ok := ev.Fields["Presentation Contexts"].([]map[string]any); ok {
+		for _, item := range list {
+			ctxID, ok := toUint16(item["Context ID"])
+			if !ok {
+				continue
+			}
+			hexStr, _ := item["Abstract Syntax"].(string)
+			maj, _ := toUint16(item["Interface Version Major"])
+			min, _ := toUint16(item["Interface Version Minor"])
+			record(ctxID, hexStr, maj, min)
+		}
 	}
 }
 

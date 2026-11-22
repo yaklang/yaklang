@@ -19,10 +19,10 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 			return view == ViewStream
 		}
 		switch p.Rule.Protocol {
-		case "http", "http1":
-			// Stateful HTTP rules inspect the ordered per-direction TCP stream
-			// so split requests/responses are parsed as one message. Explicit
-			// stateless/no_stream rules stay on the packet lane.
+		case "http", "http1", "http2":
+			// Stateful HTTP/HTTP2 rules inspect the ordered per-direction TCP
+			// stream so split requests/responses/frames are parsed together.
+			// Explicit stateless/no_stream rules stay on the packet lane.
 			if p.Flow != nil && !p.Flow.Stateless && !p.Flow.NoStream {
 				return view == ViewStream
 			}
@@ -54,7 +54,7 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 			return view == ViewNormalizedPacket
 		}
 	}
-	if hasPayloadRule(p.Rule) {
+	if hasPayloadRule(p.Rule) || rule.UsesDCERPC(p.Rule) {
 		return view == ViewStream
 	}
 	return view == ViewNormalizedPacket
@@ -113,10 +113,18 @@ func (p *CompiledRulePlan) match(event InspectionEvent, flow *flowRuntime, strea
 func (p *CompiledRulePlan) matchWithShared(event InspectionEvent, flow *flowRuntime, streamPayload []byte, sharedHTTP *match.HTTPBufferProvider, sharedTLS *match.TLSBufferProvider) (bool, int, error) {
 	matcher := p.acquireMatcher()
 	defer p.releaseMatcher(matcher)
+	var dcerpcBindings map[uint16]match.DCERPCBinding
+	if p.usesDCERPC && flow != nil && len(flow.dcerpcBindings) > 0 {
+		dcerpcBindings = flow.dcerpcBindings
+	}
 	switch event.View {
 	case ViewNormalizedPacket:
 		if event.Packet == nil {
 			return false, 0, fmt.Errorf("packet reference could not be joined to a flow")
+		}
+		if len(dcerpcBindings) > 0 {
+			matched, err := matcher.MatchPackageWithDCERPC(event.Packet, dcerpcBindings)
+			return matched, 0, err
 		}
 		matched, err := matcher.MatchPackageWithError(event.Packet)
 		return matched, 0, err
@@ -127,8 +135,8 @@ func (p *CompiledRulePlan) matchWithShared(event InspectionEvent, flow *flowRunt
 		if flow == nil || event.Direction < 0 || event.Direction > 1 || flow.streamOverflow[event.Direction] {
 			return false, 0, nil
 		}
-		if sharedHTTP != nil || sharedTLS != nil {
-			return matcher.MatchStreamEvidenceWithShared(event.Packet, streamPayload, sharedHTTP, sharedTLS)
+		if sharedHTTP != nil || sharedTLS != nil || len(dcerpcBindings) > 0 {
+			return matcher.MatchStreamEvidenceWithDCERPC(event.Packet, streamPayload, sharedHTTP, sharedTLS, dcerpcBindings)
 		}
 		return matcher.MatchStreamEvidence(event.Packet, streamPayload)
 	default:

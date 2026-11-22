@@ -708,6 +708,8 @@ func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 		return h.raw[:idx+2]
 	case modifier.HTTPRequestBody, modifier.FileData:
 		return h.bodyBuffer()
+	case modifier.FileMagic:
+		return []byte(DetectFileMagic(h.bodyBuffer()))
 	case modifier.HTTPUserAgent:
 		return []byte(h.req.UserAgent())
 	case modifier.HTTPHost:
@@ -838,6 +840,8 @@ func (h *httpProvider) getRes(modi modifier.Modifier) []byte {
 		return []byte(h.res.Header.Get("Set-Cookie"))
 	case modifier.HTTPResponseBody, modifier.FileData:
 		return h.bodyBuffer()
+	case modifier.FileMagic:
+		return []byte(DetectFileMagic(h.bodyBuffer()))
 	case modifier.HTTPServer:
 		return []byte(h.res.Header.Get("Server"))
 	case modifier.HTTPLocation:

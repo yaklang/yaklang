@@ -81,6 +81,12 @@ const (
 	// SSH
 	SSHProto
 	SSHSoftware
+
+	// File inspection
+	FileMagic
+
+	// DCE/RPC
+	DCERPCStubData
 )
 
 var HTTP_REQ_ONLY = []Modifier{

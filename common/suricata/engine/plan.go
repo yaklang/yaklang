@@ -24,7 +24,9 @@ type CompiledRulePlan struct {
 	// Cached protocol/view classifications computed once at compile time so the
 	// hot inspection path does not repeatedly walk ContentRules.
 	isHTTP        bool
+	isHTTP2       bool
 	isTLS         bool
+	usesDCERPC    bool
 	acceptsPacket bool
 	acceptsStream bool
 
@@ -98,7 +100,9 @@ func CompileStatefulRule(r *rule.Rule) (*CompiledRulePlan, error) {
 		usesHTTP := rule.UsesHTTPBuffers(r)
 		usesTLS := rule.UsesTLSBuffers(r)
 		plan.isHTTP = r.Protocol == "http" || r.Protocol == "http1" || (isTCPProto && !usesSSH && usesHTTP)
+		plan.isHTTP2 = r.Protocol == "http2" || (r.ContentRuleConfig != nil && r.ContentRuleConfig.HTTP2Config != nil)
 		plan.isTLS = r.Protocol == "tls" || (isTCPProto && !usesSSH && !usesHTTP && usesTLS)
+		plan.usesDCERPC = rule.UsesDCERPC(r)
 	}
 	plan.acceptsPacket = plan.acceptsView(ViewNormalizedPacket)
 	plan.acceptsStream = plan.acceptsView(ViewStream)
@@ -166,7 +170,7 @@ func (p *CompiledRulePlan) validateProtocolState() error {
 	}
 	protocol := p.Rule.Protocol
 	switch protocol {
-	case "tcp", "http", "http1", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet", "sip", "tcp-stream":
+	case "tcp", "http", "http1", "http2", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet", "sip", "tcp-stream":
 		// These protocols are carried over the same TCP flowRuntime that drives
 		// the handshake, direction, flowbits and threshold state.
 		if len(p.StreamSize) > 0 && p.Flow != nil && (p.Flow.Stateless || p.Flow.NoStream) {
@@ -217,7 +221,7 @@ func (p *CompiledRulePlan) validateProtocolState() error {
 			}
 		}
 		return nil
-	case "udp", "dns", "ike", "bittorrent-dht":
+	case "udp", "dns", "ike", "bittorrent-dht", "snmp":
 		if len(p.StreamSize) > 0 {
 			return fmt.Errorf("stream_size requires a TCP stream")
 		}

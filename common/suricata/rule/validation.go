@@ -128,7 +128,22 @@ func UsesFileData(r *Rule) bool {
 		return false
 	}
 	for _, content := range r.ContentRuleConfig.ContentRules {
-		if content != nil && content.Modifier == modifier.FileData {
+		if content != nil && (content.Modifier == modifier.FileData || content.Modifier == modifier.FileMagic) {
+			return true
+		}
+	}
+	return false
+}
+
+func UsesDCERPC(r *Rule) bool {
+	if r == nil || r.ContentRuleConfig == nil {
+		return false
+	}
+	if r.Protocol == "dcerpc" || r.ContentRuleConfig.DCERPCConfig != nil {
+		return true
+	}
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content != nil && content.Modifier == modifier.DCERPCStubData {
 			return true
 		}
 	}
@@ -149,7 +164,7 @@ func UsesRawBytes(r *Rule) bool {
 
 func isTCPBasedProtocol(protocol string) bool {
 	switch protocol {
-	case "tcp", "tcp-pkt", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "telnet", "sip", "tcp-stream":
+	case "tcp", "tcp-pkt", "http", "http1", "http2", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "telnet", "sip", "tcp-stream":
 		return true
 	default:
 		return false
@@ -185,8 +200,8 @@ func (v *ruleValidator) validateHeader() {
 	}
 
 	switch normalizeKeyword(v.rule.Protocol) {
-	case "ip", "dns", "http", "http1", "tcp", "tcp-pkt", "udp", "icmp", "icmpv6", "tls",
-		"smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "telnet", "sip", "ike", "bittorrent-dht", "tcp-stream":
+	case "ip", "dns", "http", "http1", "http2", "tcp", "tcp-pkt", "udp", "icmp", "icmpv6", "tls",
+		"smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "snmp", "telnet", "sip", "ike", "bittorrent-dht", "tcp-stream":
 	default:
 		v.add(ValidationStageHeader, "protocol", fmt.Sprintf("protocol %q is not supported by the matcher", v.rule.Protocol), KeywordUnsupported)
 	}
@@ -345,10 +360,27 @@ func (v *ruleValidator) validateModel() {
 		}
 		for _, event := range config.AppLayerEvents {
 			switch event.Name {
-			case "http.invalid_transfer_encoding_value_in_request":
+			case "http.invalid_transfer_encoding_value_in_request",
+				"http.request_auth_unrecognized":
 			default:
 				v.add(ValidationStageModel, "app-layer-event", fmt.Sprintf("app-layer-event %q is not implemented", event.Name), KeywordUnsupported)
 			}
+		}
+	}
+	if config.HTTP2Config != nil && protocol != "http2" && protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+		v.add(ValidationStageModel, "http2", "HTTP/2 constraints require the http2, http, tcp or tcp-pkt protocol", KeywordUnsupported)
+	}
+	if config.SNMPConfig != nil && protocol != "snmp" && protocol != "udp" && protocol != "tcp" {
+		v.add(ValidationStageModel, "snmp", "SNMP constraints require the snmp, udp or tcp protocol", KeywordUnsupported)
+	}
+	if config.DCERPCConfig != nil && protocol != "dcerpc" && protocol != "smb" && protocol != "tcp" && protocol != "tcp-pkt" && protocol != "udp" {
+		v.add(ValidationStageModel, "dcerpc", "DCE/RPC constraints require the dcerpc, smb, tcp, tcp-pkt or udp protocol", KeywordUnsupported)
+	}
+	if config.FileSize != nil {
+		switch protocol {
+		case "http", "http1", "tcp", "tcp-pkt", "smtp", "ftp-data", "smb":
+		default:
+			v.add(ValidationStageModel, "filesize", "filesize requires HTTP, TCP, SMTP, FTP-DATA or SMB protocol", KeywordUnsupported)
 		}
 	}
 	if config.FTPBounce && protocol != "tcp" && protocol != "ftp" {
@@ -377,12 +409,15 @@ func (v *ruleValidator) validateModel() {
 		if contentRule.Modifier == modifier.ICMPV6HDR && protocol != "icmpv6" && protocol != "ip" {
 			v.add(ValidationStageModel, "icmpv6.hdr", "ICMPv6 header buffers require the icmpv6 or ip protocol", KeywordUnsupported)
 		}
-		if contentRule.Modifier == modifier.FileData {
+		if contentRule.Modifier == modifier.FileData || contentRule.Modifier == modifier.FileMagic {
 			switch protocol {
-			case "http", "http1", "tcp", "tcp-pkt", "smtp":
+			case "http", "http1", "tcp", "tcp-pkt", "smtp", "ftp-data", "smb":
 			default:
-				v.add(ValidationStageModel, "file_data", "file_data requires HTTP, TCP payload or SMTP DATA body matching", KeywordUnsupported)
+				v.add(ValidationStageModel, "file_data", "file_data/file.magic requires HTTP, TCP payload, SMTP, FTP-DATA or SMB matching", KeywordUnsupported)
 			}
+		}
+		if contentRule.Modifier == modifier.DCERPCStubData && protocol != "dcerpc" && protocol != "smb" && protocol != "tcp" && protocol != "tcp-pkt" && protocol != "udp" {
+			v.add(ValidationStageModel, "dcerpc.stub_data", "dcerpc.stub_data requires the dcerpc, smb, tcp, tcp-pkt or udp protocol", KeywordUnsupported)
 		}
 		if contentRule.Modifier == modifier.TCPHDR && !isTCPBasedProtocol(protocol) {
 			v.add(ValidationStageModel, "tcp.hdr", "TCP header buffers require a TCP-based protocol", KeywordUnsupported)

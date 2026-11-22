@@ -369,9 +369,14 @@ type enginePrefilter struct {
 	plans     []*CompiledRulePlan
 	planCount int
 
-	streamHTTP httpStreamLane
-	streamTLS  tlsStreamLane
-	streamTCP  singleBufferLane
+	streamHTTP  httpStreamLane
+	streamTLS   tlsStreamLane
+	streamTCP   singleBufferLane
+	streamHTTP2 []int
+	// tcpFileDataPlans tracks alert tcp rules using file.data/file.magic whose
+	// indexed prefilter literal lives in file.data, so compressed HTTP-over-TCP
+	// streams can still trigger them without false negatives.
+	tcpFileDataPlans []int
 
 	pktDNS    dnsPacketLane
 	pktTCP    singleBufferLane
@@ -537,6 +542,8 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				} else {
 					pf.streamTLS.alwaysEval = append(pf.streamTLS.alwaysEval, idx)
 				}
+			case plan.isHTTP2:
+				pf.streamHTTP2 = append(pf.streamHTTP2, idx)
 			default:
 				pf.streamTCP.hasPlans = true
 				allowed := tcpStreamAllowedBuffers
@@ -544,6 +551,9 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				// so only index modifier.Default on raw stream bytes for those protocols.
 				if plan.Rule.Protocol == "smtp" || rule.UsesSSHBuffers(plan.Rule) {
 					allowed = defaultOnlyAllowedBuffers
+				}
+				if rule.UsesFileData(plan.Rule) {
+					pf.tcpFileDataPlans = append(pf.tcpFileDataPlans, idx)
 				}
 				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, allowed, false); ok {
 					tcpStreamBuilder.add(expr, flags, isRegex, idx)
@@ -569,11 +579,11 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				} else {
 					pf.pktDNS.alwaysEval = append(pf.pktDNS.alwaysEval, idx)
 				}
-			case "tcp", "tcp-pkt", "tcp-stream", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet":
+			case "tcp", "tcp-pkt", "tcp-stream", "http", "http1", "http2", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet":
 				pf.pktTCP.hasPlans = true
 				// Packet-view HTTP/TLS/SSH/SMTP-file_data rules parse structured
 				// buffers rather than raw TCP payload; keep them in alwaysEval.
-				if plan.isHTTP || plan.isTLS || plan.Rule.Protocol == "smtp" || rule.UsesSSHBuffers(plan.Rule) {
+				if plan.isHTTP || plan.isHTTP2 || plan.isTLS || plan.Rule.Protocol == "smtp" || rule.UsesSSHBuffers(plan.Rule) {
 					pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, idx)
 				} else if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
 					pktTCPBuilder.add(expr, flags, isRegex, idx)
@@ -582,7 +592,7 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				} else {
 					pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, idx)
 				}
-			case "udp", "ike", "bittorrent-dht":
+			case "udp", "ike", "bittorrent-dht", "snmp":
 				pf.pktUDP.hasPlans = true
 				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
 					pktUDPBuilder.add(expr, flags, isRegex, idx)
@@ -964,6 +974,10 @@ func (pf *enginePrefilter) collectStreamCandidates(
 		}
 	}
 
+	if len(pf.streamHTTP2) > 0 && match.LooksLikeHTTP2(streamPayload) {
+		pf.addFiltered(collector, pf.streamHTTP2, meta)
+	}
+
 	if pf.streamTCP.hasPlans {
 		if len(streamPayload) > 0 {
 			if pf.streamTCP.group != nil {
@@ -971,6 +985,28 @@ func (pf *enginePrefilter) collectStreamCandidates(
 			}
 			if pf.streamTCP.binaryAC != nil {
 				pf.streamTCP.binaryAC.scan(streamPayload, collector)
+			}
+		}
+		if len(pf.tcpFileDataPlans) > 0 && match.LooksLikeHTTP(streamPayload) {
+			hdrProbe := streamPayload
+			if len(hdrProbe) > 1024 {
+				hdrProbe = hdrProbe[:1024]
+			}
+			if containsFoldASCII(hdrProbe, "content-encoding:") {
+				if sharedHTTP != nil {
+					if decomp := sharedHTTP.Get(modifier.FileData); len(decomp) > 0 {
+						if pf.streamTCP.group != nil {
+							pf.streamTCP.group.scan(decomp, collector)
+						}
+						if pf.streamTCP.binaryAC != nil {
+							pf.streamTCP.binaryAC.scan(decomp, collector)
+						}
+					} else {
+						pf.addFiltered(collector, pf.tcpFileDataPlans, meta)
+					}
+				} else {
+					pf.addFiltered(collector, pf.tcpFileDataPlans, meta)
+				}
 			}
 		}
 		if pf.streamTCP.hasDirSplit {
@@ -1408,6 +1444,41 @@ func isCommonHTTPMethodLiteral(b []byte) bool {
 	switch string(b) {
 	case "GET", "POST", "HEAD", "PUT", "HTTP/1.1", "HTTP/1.0", "200", "OK":
 		return true
+	}
+	return false
+}
+
+// containsFoldASCII reports whether haystack contains the lowercase ASCII
+// needle without allocating.
+func containsFoldASCII(haystack []byte, needleLower string) bool {
+	n := len(needleLower)
+	if n == 0 || len(haystack) < n {
+		return false
+	}
+	limit := len(haystack) - n
+	first := needleLower[0]
+	for i := 0; i <= limit; i++ {
+		c := haystack[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if c != first {
+			continue
+		}
+		matched := true
+		for j := 1; j < n; j++ {
+			b := haystack[i+j]
+			if b >= 'A' && b <= 'Z' {
+				b += 'a' - 'A'
+			}
+			if b != needleLower[j] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
 	}
 	return false
 }
