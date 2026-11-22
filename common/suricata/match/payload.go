@@ -742,6 +742,9 @@ func (s byteExtractSpec) extract(c *matchContext, mdf modifier.Modifier, buffer 
 	if s.align && value%4 != 0 {
 		value += 4 - value%4
 	}
+	if c.variables == nil {
+		c.variables = make(map[string]int64, 4)
+	}
 	c.variables[s.name] = int64(value)
 	return true
 }
@@ -944,6 +947,9 @@ func (s byteMathSpec) eval(c *matchContext, mdf modifier.Modifier, buffer []byte
 		res = extracted ^ rval
 	default:
 		return false
+	}
+	if c.variables == nil {
+		c.variables = make(map[string]int64, 4)
 	}
 	c.variables[s.result] = int64(res)
 	return true
@@ -1473,6 +1479,9 @@ func attachPayloadMatcher(c *matchContext) error {
 }
 
 func attachFastPattern(c *matchContext) error {
+	if len(c.Rule.ContentRuleConfig.ContentRules) <= 1 {
+		return nil
+	}
 	idx := slices.IndexFunc(c.Rule.ContentRuleConfig.ContentRules, func(rule *rule.ContentRule) bool {
 		return rule.FastPattern && !rule.Negative
 	})

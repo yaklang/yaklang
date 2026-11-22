@@ -26,14 +26,24 @@ func (silentMinirehsLogger) Warnf(string, ...interface{})  {}
 func (silentMinirehsLogger) Errorf(string, ...interface{}) {}
 func (silentMinirehsLogger) Debugf(string, ...interface{}) {}
 
-// minirehsGroup wraps a compiled minirehs Database with deduplicated
-// pattern-to-plan mappings and a bounded, drainable Scratch pool so worker
+// minirehsGroup wraps compiled minirehs Database(s) with deduplicated
+// pattern-to-plan mappings and bounded, drainable Scratch pools so worker
 // goroutines owned by Scratch are cleanly closed on engine shutdown.
+//
+// Plain literal patterns compile into litDB (BackendEngine: C99 Teddy SIMD
+// prefilter with minimal heap footprint), while PCRE patterns compile into
+// reDB (BackendMVS: bit-parallel Glushkov NFA existence scanning). Keeping
+// them separate prevents a handful of PCRE-only rules from forcing tens of
+// thousands of plain literals to build Glushkov NFAs.
 type minirehsGroup struct {
-	db             minirehs.Database
-	patternToPlans [][]int
+	litDB    minirehs.Database
+	litPlans [][]int
+	litPool  chan minirehs.Scratch
 
-	pool   chan minirehs.Scratch
+	reDB    minirehs.Database
+	rePlans [][]int
+	rePool  chan minirehs.Scratch
+
 	closed atomic.Bool
 }
 
@@ -43,55 +53,54 @@ type patternKey struct {
 }
 
 type minirehsGroupBuilder struct {
-	patterns       []minirehs.Pattern
-	patternToPlans [][]int
-	dedup          map[patternKey]minirehs.PatternID
+	litPatterns []minirehs.Pattern
+	litPlans    [][]int
+	litDedup    map[patternKey]minirehs.PatternID
+
+	rePatterns []minirehs.Pattern
+	rePlans    [][]int
+	reDedup    map[patternKey]minirehs.PatternID
 }
 
 func newMinirehsGroupBuilder() *minirehsGroupBuilder {
 	return &minirehsGroupBuilder{
-		dedup: make(map[patternKey]minirehs.PatternID),
+		litDedup: make(map[patternKey]minirehs.PatternID),
+		reDedup:  make(map[patternKey]minirehs.PatternID),
 	}
 }
 
-func (b *minirehsGroupBuilder) add(expr string, flags minirehs.Flag, planIdx int) {
+func (b *minirehsGroupBuilder) add(expr string, flags minirehs.Flag, isRegex bool, planIdx int) {
 	key := patternKey{expr: expr, flags: flags}
-	if id, exists := b.dedup[key]; exists {
-		plans := b.patternToPlans[id]
+	if isRegex {
+		if id, exists := b.reDedup[key]; exists {
+			plans := b.rePlans[id]
+			if len(plans) == 0 || plans[len(plans)-1] != planIdx {
+				b.rePlans[id] = append(plans, planIdx)
+			}
+			return
+		}
+		id := minirehs.PatternID(len(b.rePatterns))
+		b.reDedup[key] = id
+		b.rePatterns = append(b.rePatterns, minirehs.Pattern{ID: id, Expr: expr, Flags: flags})
+		b.rePlans = append(b.rePlans, []int{planIdx})
+		return
+	}
+	if id, exists := b.litDedup[key]; exists {
+		plans := b.litPlans[id]
 		if len(plans) == 0 || plans[len(plans)-1] != planIdx {
-			b.patternToPlans[id] = append(plans, planIdx)
+			b.litPlans[id] = append(plans, planIdx)
 		}
 		return
 	}
-	id := minirehs.PatternID(len(b.patterns))
-	b.dedup[key] = id
-	b.patterns = append(b.patterns, minirehs.Pattern{
-		ID:    id,
-		Expr:  expr,
-		Flags: flags,
-	})
-	b.patternToPlans = append(b.patternToPlans, []int{planIdx})
+	id := minirehs.PatternID(len(b.litPatterns))
+	b.litDedup[key] = id
+	b.litPatterns = append(b.litPatterns, minirehs.Pattern{ID: id, Expr: expr, Flags: flags})
+	b.litPlans = append(b.litPlans, []int{planIdx})
 }
 
 func (b *minirehsGroupBuilder) build() (*minirehsGroup, []int) {
-	if b == nil || len(b.patterns) == 0 {
+	if b == nil || (len(b.litPatterns) == 0 && len(b.rePatterns) == 0) {
 		return nil, nil
-	}
-	db, err := minirehs.Compile(
-		b.patterns,
-		minirehs.WithBackend(minirehs.BackendMVS),
-		minirehs.WithReportLocation(false),
-		minirehs.WithMinLiteralLen(2),
-		minirehs.WithLogger(silentMinirehsLogger{}),
-	)
-	if err != nil {
-		// Fail open for prefiltering: move all plans from this builder into
-		// alwaysEval so rule compilation never fails and zero false negatives occur.
-		var fallback []int
-		for _, plans := range b.patternToPlans {
-			fallback = append(fallback, plans...)
-		}
-		return nil, fallback
 	}
 	poolSize := runtime.NumCPU()
 	if poolSize < 4 {
@@ -100,36 +109,100 @@ func (b *minirehsGroupBuilder) build() (*minirehsGroup, []int) {
 	if poolSize > 16 {
 		poolSize = 16
 	}
-	return &minirehsGroup{
-		db:             db,
-		patternToPlans: b.patternToPlans,
-		pool:           make(chan minirehs.Scratch, poolSize),
-	}, nil
-}
 
-func (g *minirehsGroup) acquireScratch() (minirehs.Scratch, error) {
-	select {
-	case sc := <-g.pool:
-		if sc != nil {
-			return sc, nil
+	grp := &minirehsGroup{}
+	var fallback []int
+
+	if len(b.litPatterns) > 0 {
+		db, err := minirehs.Compile(
+			b.litPatterns,
+			minirehs.WithBackend(minirehs.BackendEngine),
+			minirehs.WithReportLocation(false),
+			minirehs.WithMinLiteralLen(2),
+			minirehs.WithLogger(silentMinirehsLogger{}),
+		)
+		if err != nil {
+			for _, plans := range b.litPlans {
+				fallback = append(fallback, plans...)
+			}
+		} else {
+			grp.litDB = db
+			grp.litPlans = b.litPlans
+			grp.litPool = make(chan minirehs.Scratch, poolSize)
 		}
-	default:
 	}
-	return g.db.NewScratch()
+
+	if len(b.rePatterns) > 0 {
+		db, err := minirehs.Compile(
+			b.rePatterns,
+			minirehs.WithBackend(minirehs.BackendMVS),
+			minirehs.WithReportLocation(false),
+			minirehs.WithMinLiteralLen(2),
+			minirehs.WithLogger(silentMinirehsLogger{}),
+		)
+		if err != nil {
+			for _, plans := range b.rePlans {
+				fallback = append(fallback, plans...)
+			}
+		} else {
+			grp.reDB = db
+			grp.rePlans = b.rePlans
+			grp.rePool = make(chan minirehs.Scratch, poolSize)
+		}
+	}
+
+	if grp.litDB == nil && grp.reDB == nil {
+		return nil, fallback
+	}
+	return grp, fallback
 }
 
-func (g *minirehsGroup) releaseScratch(sc minirehs.Scratch) {
-	if sc == nil {
+func scanMinirehsSubDB(db minirehs.Database, pool chan minirehs.Scratch, planMap [][]int, closed *atomic.Bool, data []byte, collector *candidateCollector) {
+	if db == nil {
 		return
 	}
-	if g.closed.Load() {
-		_ = sc.Close()
-		return
-	}
+	var sc minirehs.Scratch
 	select {
-	case g.pool <- sc:
+	case sc = <-pool:
 	default:
-		_ = sc.Close()
+	}
+	if sc == nil {
+		var err error
+		sc, err = db.NewScratch()
+		if err != nil {
+			for _, plans := range planMap {
+				for _, idx := range plans {
+					collector.add(idx)
+				}
+			}
+			return
+		}
+	}
+	defer func() {
+		if closed.Load() {
+			_ = sc.Close()
+			return
+		}
+		select {
+		case pool <- sc:
+		default:
+			_ = sc.Close()
+		}
+	}()
+
+	if err := db.Scan(data, sc, func(m minirehs.Match) bool {
+		if int(m.ID) < len(planMap) {
+			for _, idx := range planMap[m.ID] {
+				collector.add(idx)
+			}
+		}
+		return true
+	}); err != nil {
+		for _, plans := range planMap {
+			for _, idx := range plans {
+				collector.add(idx)
+			}
+		}
 	}
 }
 
@@ -137,31 +210,30 @@ func (g *minirehsGroup) scan(data []byte, collector *candidateCollector) {
 	if g == nil || len(data) == 0 || g.closed.Load() {
 		return
 	}
-	sc, err := g.acquireScratch()
-	if err != nil {
-		// Safety net: if scratch allocation fails, mark every plan in this group.
-		for _, plans := range g.patternToPlans {
-			for _, idx := range plans {
-				collector.add(idx)
-			}
-		}
-		return
+	if g.litDB != nil {
+		scanMinirehsSubDB(g.litDB, g.litPool, g.litPlans, &g.closed, data, collector)
 	}
-	defer g.releaseScratch(sc)
+	if g.reDB != nil {
+		scanMinirehsSubDB(g.reDB, g.rePool, g.rePlans, &g.closed, data, collector)
+	}
+}
 
-	if err := g.db.Scan(data, sc, func(m minirehs.Match) bool {
-		if int(m.ID) < len(g.patternToPlans) {
-			for _, idx := range g.patternToPlans[m.ID] {
-				collector.add(idx)
+func closeMinirehsSubDB(db minirehs.Database, pool chan minirehs.Scratch) {
+	if pool != nil {
+		for {
+			select {
+			case sc := <-pool:
+				if sc != nil {
+					_ = sc.Close()
+				}
+			default:
+				goto closeDB
 			}
 		}
-		return true
-	}); err != nil {
-		for _, plans := range g.patternToPlans {
-			for _, idx := range plans {
-				collector.add(idx)
-			}
-		}
+	}
+closeDB:
+	if db != nil {
+		_ = db.Close()
 	}
 }
 
@@ -169,19 +241,8 @@ func (g *minirehsGroup) close() {
 	if g == nil || !g.closed.CompareAndSwap(false, true) {
 		return
 	}
-	for {
-		select {
-		case sc := <-g.pool:
-			if sc != nil {
-				_ = sc.Close()
-			}
-		default:
-			if g.db != nil {
-				_ = g.db.Close()
-			}
-			return
-		}
-	}
+	closeMinirehsSubDB(g.litDB, g.litPool)
+	closeMinirehsSubDB(g.reDB, g.rePool)
 }
 
 type bufferGroup struct {
@@ -232,8 +293,14 @@ func (l *tlsStreamLane) close() {
 type singleBufferLane struct {
 	hasPlans   bool
 	group      *minirehsGroup
+	binaryAC   *rawByteAC
 	alwaysEval []int
 	alwaysIdx  ipFilteredSet
+	// Optional direction split for streamTCP fallback rules.
+	alwaysToServer ipFilteredSet
+	alwaysToClient ipFilteredSet
+	alwaysAnyDir   ipFilteredSet
+	hasDirSplit    bool
 }
 
 func (l *singleBufferLane) close() {
@@ -426,13 +493,19 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 	httpBuilders := make(map[modifier.Modifier]*minirehsGroupBuilder)
 	tlsBuilders := make(map[modifier.Modifier]*minirehsGroupBuilder)
 	tcpStreamBuilder := newMinirehsGroupBuilder()
+	tcpStreamBinBuilder := newRawByteACBuilder()
 	dnsQueryBuilder := newMinirehsGroupBuilder()
 	dnsRawBuilder := newMinirehsGroupBuilder()
 	pktTCPBuilder := newMinirehsGroupBuilder()
+	pktTCPBinBuilder := newRawByteACBuilder()
 	pktUDPBuilder := newMinirehsGroupBuilder()
+	pktUDPBinBuilder := newRawByteACBuilder()
 	pktICMPBuilder := newMinirehsGroupBuilder()
+	pktICMPBinBuilder := newRawByteACBuilder()
 	pktICMPv6Builder := newMinirehsGroupBuilder()
+	pktICMPv6BinBuilder := newRawByteACBuilder()
 	pktIPBuilder := newMinirehsGroupBuilder()
+	pktIPBinBuilder := newRawByteACBuilder()
 
 	getBuilder := func(m map[modifier.Modifier]*minirehsGroupBuilder, mod modifier.Modifier) *minirehsGroupBuilder {
 		b := m[mod]
@@ -452,15 +525,15 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 			switch {
 			case plan.isHTTP:
 				pf.streamHTTP.hasPlans = true
-				if mod, expr, flags, ok := extractPrefilterPattern(plan.Rule, httpAllowedBuffers, false); ok {
-					getBuilder(httpBuilders, mod).add(expr, flags, idx)
+				if mod, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, httpAllowedBuffers, false); ok {
+					getBuilder(httpBuilders, mod).add(expr, flags, isRegex, idx)
 				} else {
 					addHTTPAlwaysEval(&pf.streamHTTP, plan, idx)
 				}
 			case plan.isTLS:
 				pf.streamTLS.hasPlans = true
-				if mod, expr, flags, ok := extractPrefilterPattern(plan.Rule, tlsAllowedBuffers, true); ok {
-					getBuilder(tlsBuilders, mod).add(expr, flags, idx)
+				if mod, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, tlsAllowedBuffers, true); ok {
+					getBuilder(tlsBuilders, mod).add(expr, flags, isRegex, idx)
 				} else {
 					pf.streamTLS.alwaysEval = append(pf.streamTLS.alwaysEval, idx)
 				}
@@ -472,8 +545,10 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				if plan.Rule.Protocol == "smtp" || rule.UsesSSHBuffers(plan.Rule) {
 					allowed = defaultOnlyAllowedBuffers
 				}
-				if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, allowed, false); ok {
-					tcpStreamBuilder.add(expr, flags, idx)
+				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, allowed, false); ok {
+					tcpStreamBuilder.add(expr, flags, isRegex, idx)
+				} else if rawLit, caseless, ok := extractBinaryLiteral(plan.Rule, allowed); ok {
+					tcpStreamBinBuilder.add(rawLit, caseless, idx)
 				} else {
 					pf.streamTCP.alwaysEval = append(pf.streamTCP.alwaysEval, idx)
 				}
@@ -485,11 +560,11 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 			switch plan.Rule.Protocol {
 			case "dns":
 				pf.pktDNS.hasPlans = true
-				if mod, expr, flags, ok := extractPrefilterPattern(plan.Rule, dnsAllowedBuffers, false); ok {
+				if mod, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, dnsAllowedBuffers, false); ok {
 					if mod == modifier.DNSQuery {
-						dnsQueryBuilder.add(expr, flags, idx)
+						dnsQueryBuilder.add(expr, flags, isRegex, idx)
 					} else {
-						dnsRawBuilder.add(expr, flags, idx)
+						dnsRawBuilder.add(expr, flags, isRegex, idx)
 					}
 				} else {
 					pf.pktDNS.alwaysEval = append(pf.pktDNS.alwaysEval, idx)
@@ -500,36 +575,46 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				// buffers rather than raw TCP payload; keep them in alwaysEval.
 				if plan.isHTTP || plan.isTLS || plan.Rule.Protocol == "smtp" || rule.UsesSSHBuffers(plan.Rule) {
 					pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, idx)
-				} else if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
-					pktTCPBuilder.add(expr, flags, idx)
+				} else if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
+					pktTCPBuilder.add(expr, flags, isRegex, idx)
+				} else if rawLit, caseless, ok := extractBinaryLiteral(plan.Rule, defaultOnlyAllowedBuffers); ok {
+					pktTCPBinBuilder.add(rawLit, caseless, idx)
 				} else {
 					pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, idx)
 				}
 			case "udp", "ike", "bittorrent-dht":
 				pf.pktUDP.hasPlans = true
-				if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
-					pktUDPBuilder.add(expr, flags, idx)
+				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
+					pktUDPBuilder.add(expr, flags, isRegex, idx)
+				} else if rawLit, caseless, ok := extractBinaryLiteral(plan.Rule, defaultOnlyAllowedBuffers); ok {
+					pktUDPBinBuilder.add(rawLit, caseless, idx)
 				} else {
 					pf.pktUDP.alwaysEval = append(pf.pktUDP.alwaysEval, idx)
 				}
 			case "icmp":
 				pf.pktICMP.hasPlans = true
-				if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
-					pktICMPBuilder.add(expr, flags, idx)
+				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
+					pktICMPBuilder.add(expr, flags, isRegex, idx)
+				} else if rawLit, caseless, ok := extractBinaryLiteral(plan.Rule, defaultOnlyAllowedBuffers); ok {
+					pktICMPBinBuilder.add(rawLit, caseless, idx)
 				} else {
 					pf.pktICMP.alwaysEval = append(pf.pktICMP.alwaysEval, idx)
 				}
 			case "icmpv6":
 				pf.pktICMPv6.hasPlans = true
-				if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
-					pktICMPv6Builder.add(expr, flags, idx)
+				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
+					pktICMPv6Builder.add(expr, flags, isRegex, idx)
+				} else if rawLit, caseless, ok := extractBinaryLiteral(plan.Rule, defaultOnlyAllowedBuffers); ok {
+					pktICMPv6BinBuilder.add(rawLit, caseless, idx)
 				} else {
 					pf.pktICMPv6.alwaysEval = append(pf.pktICMPv6.alwaysEval, idx)
 				}
 			case "ip":
 				pf.pktIP.hasPlans = true
-				if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
-					pktIPBuilder.add(expr, flags, idx)
+				if _, expr, flags, isRegex, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
+					pktIPBuilder.add(expr, flags, isRegex, idx)
+				} else if rawLit, caseless, ok := extractBinaryLiteral(plan.Rule, defaultOnlyAllowedBuffers); ok {
+					pktIPBinBuilder.add(rawLit, caseless, idx)
 				} else {
 					pf.pktIP.alwaysEval = append(pf.pktIP.alwaysEval, idx)
 				}
@@ -587,8 +672,24 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 
 	var fallback []int
 	pf.streamTCP.group, fallback = tcpStreamBuilder.build()
+	pf.streamTCP.binaryAC = tcpStreamBinBuilder.build()
 	pf.streamTCP.alwaysEval = append(pf.streamTCP.alwaysEval, fallback...)
-	pf.streamTCP.alwaysIdx = buildIPFilteredSet(plans, pf.streamTCP.alwaysEval, false)
+	var tcpToSrv, tcpToCli, tcpAnyDir []int
+	for _, idx := range pf.streamTCP.alwaysEval {
+		f := plans[idx].Flow
+		switch {
+		case f != nil && f.ToServer && !f.ToClient:
+			tcpToSrv = append(tcpToSrv, idx)
+		case f != nil && f.ToClient && !f.ToServer:
+			tcpToCli = append(tcpToCli, idx)
+		default:
+			tcpAnyDir = append(tcpAnyDir, idx)
+		}
+	}
+	pf.streamTCP.alwaysToServer = buildIPFilteredSet(plans, tcpToSrv, false)
+	pf.streamTCP.alwaysToClient = buildIPFilteredSet(plans, tcpToCli, false)
+	pf.streamTCP.alwaysAnyDir = buildIPFilteredSet(plans, tcpAnyDir, false)
+	pf.streamTCP.hasDirSplit = true
 
 	pf.pktDNS.queryGroup, fallback = dnsQueryBuilder.build()
 	pf.pktDNS.alwaysEval = append(pf.pktDNS.alwaysEval, fallback...)
@@ -596,22 +697,27 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 	pf.pktDNS.alwaysEval = append(pf.pktDNS.alwaysEval, fallback...)
 
 	pf.pktTCP.group, fallback = pktTCPBuilder.build()
+	pf.pktTCP.binaryAC = pktTCPBinBuilder.build()
 	pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, fallback...)
 	pf.pktTCP.alwaysIdx = buildIPFilteredSet(plans, pf.pktTCP.alwaysEval, true)
 
 	pf.pktUDP.group, fallback = pktUDPBuilder.build()
+	pf.pktUDP.binaryAC = pktUDPBinBuilder.build()
 	pf.pktUDP.alwaysEval = append(pf.pktUDP.alwaysEval, fallback...)
 	pf.pktUDP.alwaysIdx = buildIPFilteredSet(plans, pf.pktUDP.alwaysEval, false)
 
 	pf.pktICMP.group, fallback = pktICMPBuilder.build()
+	pf.pktICMP.binaryAC = pktICMPBinBuilder.build()
 	pf.pktICMP.alwaysEval = append(pf.pktICMP.alwaysEval, fallback...)
 	pf.pktICMP.alwaysIdx = buildIPFilteredSet(plans, pf.pktICMP.alwaysEval, false)
 
 	pf.pktICMPv6.group, fallback = pktICMPv6Builder.build()
+	pf.pktICMPv6.binaryAC = pktICMPv6BinBuilder.build()
 	pf.pktICMPv6.alwaysEval = append(pf.pktICMPv6.alwaysEval, fallback...)
 	pf.pktICMPv6.alwaysIdx = buildIPFilteredSet(plans, pf.pktICMPv6.alwaysEval, false)
 
 	pf.pktIP.group, fallback = pktIPBuilder.build()
+	pf.pktIP.binaryAC = pktIPBinBuilder.build()
 	pf.pktIP.alwaysEval = append(pf.pktIP.alwaysEval, fallback...)
 	pf.pktIP.alwaysIdx = buildIPFilteredSet(plans, pf.pktIP.alwaysEval, false)
 
@@ -779,12 +885,14 @@ func (pf *enginePrefilter) addFiltered(collector *candidateCollector, indices []
 func (pf *enginePrefilter) collectStreamCandidates(
 	collector *candidateCollector,
 	pk gopacket.Packet,
+	flow *flowRuntime,
+	direction int,
 	streamPayload []byte,
 	httpPayload []byte,
-) (*match.HTTPBufferProvider, *match.TLSBufferProvider, bool, bool) {
+) (*match.HTTPBufferProvider, *match.TLSBufferProvider, packetHeaderMeta, bool, bool) {
 	if pk == nil {
 		collector.addSlice(pf.allStreamPlans)
-		return nil, nil, false, false
+		return nil, nil, packetHeaderMeta{}, false, false
 	}
 	meta := extractPacketHeaderMeta(pk)
 
@@ -857,21 +965,46 @@ func (pf *enginePrefilter) collectStreamCandidates(
 	}
 
 	if pf.streamTCP.hasPlans {
-		if len(streamPayload) > 0 && pf.streamTCP.group != nil {
-			pf.streamTCP.group.scan(streamPayload, collector)
+		if len(streamPayload) > 0 {
+			if pf.streamTCP.group != nil {
+				pf.streamTCP.group.scan(streamPayload, collector)
+			}
+			if pf.streamTCP.binaryAC != nil {
+				pf.streamTCP.binaryAC.scan(streamPayload, collector)
+			}
 		}
-		pf.streamTCP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
+		if pf.streamTCP.hasDirSplit {
+			if flow != nil {
+				toSrv, known := flow.toServer(direction)
+				if known {
+					if toSrv {
+						pf.streamTCP.alwaysToServer.collect(pf.plans, collector, meta, false, 0)
+					} else {
+						pf.streamTCP.alwaysToClient.collect(pf.plans, collector, meta, false, 0)
+					}
+				} else {
+					pf.streamTCP.alwaysToServer.collect(pf.plans, collector, meta, false, 0)
+					pf.streamTCP.alwaysToClient.collect(pf.plans, collector, meta, false, 0)
+				}
+			} else {
+				pf.streamTCP.alwaysToServer.collect(pf.plans, collector, meta, false, 0)
+				pf.streamTCP.alwaysToClient.collect(pf.plans, collector, meta, false, 0)
+			}
+			pf.streamTCP.alwaysAnyDir.collect(pf.plans, collector, meta, false, 0)
+		} else {
+			pf.streamTCP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
+		}
 	}
 
-	return sharedHTTP, sharedTLS, httpFastFailed, tlsFastFailed
+	return sharedHTTP, sharedTLS, meta, httpFastFailed, tlsFastFailed
 }
 
 // collectPacketCandidates partitions packet-view evaluation by decoded
 // transport/application layer and scans payloads through minirehs prefilters.
-func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector, pk gopacket.Packet) {
+func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector, pk gopacket.Packet) packetHeaderMeta {
 	if pk == nil {
 		collector.addSlice(pf.allPacketPlans)
-		return
+		return packetHeaderMeta{}
 	}
 	meta := extractPacketHeaderMeta(pk)
 
@@ -889,8 +1022,13 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 
 	if pf.pktTCP.hasPlans {
 		if tcp, ok := pk.Layer(layers.LayerTypeTCP).(*layers.TCP); ok && tcp != nil {
-			if len(tcp.Payload) > 0 && pf.pktTCP.group != nil {
-				pf.pktTCP.group.scan(tcp.Payload, collector)
+			if len(tcp.Payload) > 0 {
+				if pf.pktTCP.group != nil {
+					pf.pktTCP.group.scan(tcp.Payload, collector)
+				}
+				if pf.pktTCP.binaryAC != nil {
+					pf.pktTCP.binaryAC.scan(tcp.Payload, collector)
+				}
 			}
 			pf.pktTCP.alwaysIdx.collect(pf.plans, collector, meta, true, tcpLayerFlagMask(tcp))
 		}
@@ -898,8 +1036,13 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 
 	if pf.pktUDP.hasPlans {
 		if udp, ok := pk.Layer(layers.LayerTypeUDP).(*layers.UDP); ok && udp != nil {
-			if len(udp.Payload) > 0 && pf.pktUDP.group != nil {
-				pf.pktUDP.group.scan(udp.Payload, collector)
+			if len(udp.Payload) > 0 {
+				if pf.pktUDP.group != nil {
+					pf.pktUDP.group.scan(udp.Payload, collector)
+				}
+				if pf.pktUDP.binaryAC != nil {
+					pf.pktUDP.binaryAC.scan(udp.Payload, collector)
+				}
 			}
 			pf.pktUDP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
@@ -907,8 +1050,13 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 
 	if pf.pktICMP.hasPlans {
 		if icmp, ok := pk.Layer(layers.LayerTypeICMPv4).(*layers.ICMPv4); ok && icmp != nil {
-			if len(icmp.Payload) > 0 && pf.pktICMP.group != nil {
-				pf.pktICMP.group.scan(icmp.Payload, collector)
+			if len(icmp.Payload) > 0 {
+				if pf.pktICMP.group != nil {
+					pf.pktICMP.group.scan(icmp.Payload, collector)
+				}
+				if pf.pktICMP.binaryAC != nil {
+					pf.pktICMP.binaryAC.scan(icmp.Payload, collector)
+				}
 			}
 			pf.pktICMP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
@@ -916,8 +1064,13 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 
 	if pf.pktICMPv6.hasPlans {
 		if icmp6, ok := pk.Layer(layers.LayerTypeICMPv6).(*layers.ICMPv6); ok && icmp6 != nil {
-			if len(icmp6.Payload) > 0 && pf.pktICMPv6.group != nil {
-				pf.pktICMPv6.group.scan(icmp6.Payload, collector)
+			if len(icmp6.Payload) > 0 {
+				if pf.pktICMPv6.group != nil {
+					pf.pktICMPv6.group.scan(icmp6.Payload, collector)
+				}
+				if pf.pktICMPv6.binaryAC != nil {
+					pf.pktICMPv6.binaryAC.scan(icmp6.Payload, collector)
+				}
 			}
 			pf.pktICMPv6.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
@@ -925,14 +1078,20 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 
 	if pf.pktIP.hasPlans {
 		if netLayer := pk.NetworkLayer(); netLayer != nil {
-			if payload := netLayer.LayerPayload(); len(payload) > 0 && pf.pktIP.group != nil {
-				pf.pktIP.group.scan(payload, collector)
+			if payload := netLayer.LayerPayload(); len(payload) > 0 {
+				if pf.pktIP.group != nil {
+					pf.pktIP.group.scan(payload, collector)
+				}
+				if pf.pktIP.binaryAC != nil {
+					pf.pktIP.binaryAC.scan(payload, collector)
+				}
 			}
 			pf.pktIP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
 	}
 
 	pf.addFiltered(collector, pf.pktOther, meta)
+	return meta
 }
 
 // extractPrefilterPattern chooses a single sound necessary condition (literal
@@ -942,9 +1101,9 @@ func extractPrefilterPattern(
 	r *rule.Rule,
 	allowed map[modifier.Modifier]bool,
 	includeTLSConfig bool,
-) (modifier.Modifier, string, minirehs.Flag, bool) {
+) (modifier.Modifier, string, minirehs.Flag, bool, bool) {
 	if r == nil || r.ContentRuleConfig == nil {
-		return modifier.Default, "", 0, false
+		return modifier.Default, "", 0, false, false
 	}
 
 	bestScore := -1 << 30
@@ -1011,7 +1170,7 @@ func extractPrefilterPattern(
 		considerLiteral(content.Modifier, run, caseless, content.FastPattern)
 	}
 	if found {
-		return bestMod, bestExpr, bestFlags, true
+		return bestMod, bestExpr, bestFlags, false, true
 	}
 
 	// Secondary fallback: if the rule has no usable literal content, extract a
@@ -1031,10 +1190,41 @@ func extractPrefilterPattern(
 		if !ok {
 			continue
 		}
-		return content.Modifier, expr, flags, true
+		return content.Modifier, expr, flags, true, true
 	}
 
-	return modifier.Default, "", 0, false
+	return modifier.Default, "", 0, false, false
+}
+
+// extractBinaryLiteral extracts the longest sound raw-byte literal (>= 2 bytes)
+// for rules whose positive content contains NUL or non-ASCII bytes (>= 0x80)
+// and therefore could not be indexed in UTF-8 minirehs.
+func extractBinaryLiteral(r *rule.Rule, allowed map[modifier.Modifier]bool) ([]byte, bool, bool) {
+	if r == nil || r.ContentRuleConfig == nil {
+		return nil, false, false
+	}
+	var best []byte
+	bestCaseless := false
+	for _, content := range r.ContentRuleConfig.ContentRules {
+		if content == nil || content.Negative || content.RawBytes || content.PCREParsed != nil || len(content.Content) < 2 {
+			continue
+		}
+		if !allowed[content.Modifier] {
+			continue
+		}
+		caseless, dotPrefix, stripPseudo, mutating := analyzeTransforms(content)
+		if mutating || dotPrefix || stripPseudo {
+			continue
+		}
+		if len(content.Content) > len(best) {
+			best = content.Content
+			bestCaseless = caseless
+		}
+	}
+	if len(best) < 2 {
+		return nil, false, false
+	}
+	return best, bestCaseless, true
 }
 
 func analyzeTransforms(content *rule.ContentRule) (caseless, dotPrefix, stripPseudo, mutating bool) {

@@ -84,6 +84,48 @@ func (c *Config) RandIpVar(varName string) string {
 	n := val.randInt()
 	return fmt.Sprintf("%d.%d.%d.%d", n>>24, n>>16&0xff, n>>8&0xff, n&0xff)
 }
+
+// VarMatcher provides direct zero-map-lookup matching against a resolved
+// Suricata address or port variable scope.
+type VarMatcher struct {
+	s *scope
+}
+
+// MatchAddr matches a pre-parsed netip.Addr without map lookup or big.Int
+// allocation on IPv4 addresses.
+func (m *VarMatcher) MatchAddr(addr netip.Addr) bool {
+	if m == nil || m.s == nil || !addr.IsValid() {
+		return false
+	}
+	addr = addr.Unmap()
+	if addr.Is4() {
+		b := addr.As4()
+		return m.s.hasNumber(binary.BigEndian.Uint32(b[:]))
+	}
+	return m.s.hasNumberBigInt(new(big.Int).SetBytes(addr.AsSlice()))
+}
+
+// MatchPort matches a TCP/UDP port integer without map lookup or allocation.
+func (m *VarMatcher) MatchPort(port int) bool {
+	if m == nil || m.s == nil || port < 0 {
+		return false
+	}
+	return m.s.hasNumber(uint32(port))
+}
+
+// LookupVar resolves varName once so hot-path AddressRule/PortRule matching
+// avoids repeated string map hashing.
+func (c *Config) LookupVar(varName string) *VarMatcher {
+	if c == nil || c.Vars == nil || varName == "" {
+		return nil
+	}
+	val, ok := c.Vars[varName]
+	if !ok || val == nil {
+		return nil
+	}
+	return &VarMatcher{s: val}
+}
+
 func (c *Config) HasVar(varName string) bool {
 	_, ok := c.Vars[varName]
 	return ok
