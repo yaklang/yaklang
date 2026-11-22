@@ -188,13 +188,9 @@ type matchContext struct {
 
 func (c *matchContext) Clone() *matchContext {
 	return &matchContext{
-		Value:      make(map[string]any),
-		pos:        -1,
-		buffer:     make(map[modifier.Modifier][]byte),
-		Rule:       c.Rule,
-		workflow:   c.workflow,
-		jumpCursor: make(map[modifier.Modifier]jumpCursorState),
-		variables:  make(map[string]int64),
+		pos:      -1,
+		Rule:     c.Rule,
+		workflow: c.workflow,
 	}
 }
 
@@ -244,29 +240,37 @@ func (c *matchContext) Must(ok bool) bool {
 }
 
 func (c *matchContext) Tidy() {
-	clear(c.Value)
+	if c.Value == nil {
+		c.Value = make(map[string]any, 4)
+	} else {
+		clear(c.Value)
+	}
 	c.PK = nil
 	c.overridePayload = nil
 	c.sharedHTTP = nil
 	c.sharedTLS = nil
 	c.provider = nil
-	clear(c.buffer)
+	if c.buffer == nil {
+		c.buffer = make(map[modifier.Modifier][]byte, 4)
+	} else {
+		clear(c.buffer)
+	}
 	c.pos = -1
 	c.rejected = false
 	c.prevMatched = nil
 	c.prevModifier = modifier.Default
-	clear(c.jumpCursor)
-	clear(c.variables)
+	if c.jumpCursor != nil {
+		clear(c.jumpCursor)
+	}
+	if c.variables != nil {
+		clear(c.variables)
+	}
 }
 
 func compile(r *rule.Rule) (*matchContext, error) {
 	c := &matchContext{
-		Value:      make(map[string]any),
-		Rule:       r,
-		pos:        -1,
-		buffer:     make(map[modifier.Modifier][]byte),
-		jumpCursor: make(map[modifier.Modifier]jumpCursorState),
-		variables:  make(map[string]int64),
+		Rule: r,
+		pos:  -1,
 	}
 
 	if err := matchMutex(c); err != nil {

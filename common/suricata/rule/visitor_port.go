@@ -26,7 +26,8 @@ type PortRule struct {
 	// PortRule literals directly; Prepare folds any entries into portRanges.
 	Ports []int
 
-	Config *config.Config
+	Config     *config.Config
+	envMatcher *config.VarMatcher
 	// rule cache
 	negativeRules []*PortRule
 	positiveRules []*PortRule
@@ -112,6 +113,9 @@ func (p *PortRule) postHandle() {
 			}
 		}
 	}
+	if p.Env != "" && p.Config != nil {
+		p.envMatcher = p.Config.LookupVar(p.Env)
+	}
 	p.prepared = true
 }
 
@@ -162,6 +166,9 @@ func (p *PortRule) _matchWithoutNegative(i int) bool {
 		}
 	}
 	if p.Env != "" && p.Config != nil {
+		if p.envMatcher != nil {
+			return p.envMatcher.MatchPort(i)
+		}
 		if !p.Config.HasVar(p.Env) {
 			log.Warnf("suricata env %s not found", p.Env)
 			return false

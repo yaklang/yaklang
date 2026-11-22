@@ -38,6 +38,7 @@ type AddressRule struct {
 	ipv4Ranges   []ipv4Range
 	ipv6Prefixes []netip.Prefix
 	positiveSlow []*AddressRule
+	envMatcher   *config.VarMatcher
 	prepared     bool
 
 	// envtable
@@ -135,6 +136,12 @@ func (a *AddressRule) matchAddrWithoutNegative(addr netip.Addr, raw string) bool
 	}
 
 	if a.Env != "" && a.Config != nil {
+		if a.envMatcher != nil {
+			if addr.IsValid() {
+				return a.envMatcher.MatchAddr(addr)
+			}
+			return a.Config.MatchVar(a.Env, raw)
+		}
 		if !a.Config.HasVar(a.Env) {
 			log.Warnf("suricata env %s not found", a.Env)
 			return false
@@ -254,6 +261,9 @@ func (a *AddressRule) Prepare() {
 	}
 	if len(a.ipv4Ranges) > 1 {
 		a.ipv4Ranges = mergeIPv4Ranges(a.ipv4Ranges)
+	}
+	if a.Env != "" && a.Config != nil {
+		a.envMatcher = a.Config.LookupVar(a.Env)
 	}
 	a.prepared = true
 }

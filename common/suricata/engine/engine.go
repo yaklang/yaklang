@@ -460,6 +460,7 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 
 	var sharedHTTP *match.HTTPBufferProvider
 	var sharedTLS *match.TLSBufferProvider
+	var headerMeta packetHeaderMeta
 
 	evalPlan := func(index int) {
 		plan := plans[index]
@@ -478,6 +479,9 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 			}
 		}
 		if flow != nil && !matchFlow(plan.Flow, flow, event.Direction) {
+			return
+		}
+		if headerMeta.hasAddr && !matchRuleHeaderFast(plan.Rule, headerMeta) {
 			return
 		}
 		if len(plan.StreamSize) > 0 {
@@ -571,7 +575,7 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 		collector := prefilter.acquireCollector()
 		if event.View == ViewStream {
 			var httpFastFailed, tlsFastFailed bool
-			sharedHTTP, sharedTLS, httpFastFailed, tlsFastFailed = prefilter.collectStreamCandidates(collector, event.Packet, fullStreamPayload, httpPayload)
+			sharedHTTP, sharedTLS, headerMeta, httpFastFailed, tlsFastFailed = prefilter.collectStreamCandidates(collector, event.Packet, flow, event.Direction, fullStreamPayload, httpPayload)
 			if httpFastFailed {
 				e.streamFastFailHTTP.Add(1)
 			}
@@ -579,7 +583,7 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 				e.streamFastFailTLS.Add(1)
 			}
 		} else {
-			prefilter.collectPacketCandidates(collector, event.Packet)
+			headerMeta = prefilter.collectPacketCandidates(collector, event.Packet)
 		}
 		candidates := collector.sorted()
 		e.candidatesEvaluated.Add(uint64(len(candidates)))
