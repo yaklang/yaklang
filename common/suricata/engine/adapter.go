@@ -102,6 +102,9 @@ func (a *PcapAdapter) Stats() AdapterStats {
 }
 
 func (a *PcapAdapter) onPhysicalPacket(packet gopacket.Packet) {
+	if packet == nil {
+		return
+	}
 	a.counters.physicalPackets.Add(1)
 	a.emitPacket(ViewPhysicalPacket, packet)
 	// pcaputil's normalized callback is transport-oriented. ICMP and other
@@ -114,6 +117,9 @@ func (a *PcapAdapter) onPhysicalPacket(packet gopacket.Packet) {
 }
 
 func (a *PcapAdapter) onNormalizedPacket(packet gopacket.Packet) {
+	if packet == nil {
+		return
+	}
 	a.counters.normalizedPackets.Add(1)
 	snapshot := ownPacket(packet)
 	refs := pcaputil.CapturePacketReferences(packet)
@@ -129,9 +135,13 @@ func (a *PcapAdapter) onNormalizedPacket(packet gopacket.Packet) {
 	if packet.Layer(layers.LayerTypeTCP) != nil {
 		return
 	}
+	var ts time.Time
+	if meta := packet.Metadata(); meta != nil {
+		ts = meta.Timestamp
+	}
 	a.onEvent(InspectionEvent{
 		View:       ViewNormalizedPacket,
-		Timestamp:  packet.Metadata().Timestamp,
+		Timestamp:  ts,
 		Packet:     snapshot.packet,
 		PacketData: append([]byte(nil), snapshot.data...),
 		References: append([]pcaputil.PacketReference(nil), refs...),
@@ -139,10 +149,17 @@ func (a *PcapAdapter) onNormalizedPacket(packet gopacket.Packet) {
 }
 
 func (a *PcapAdapter) emitPacket(view InspectionView, packet gopacket.Packet) {
+	if packet == nil {
+		return
+	}
 	snapshot := ownPacket(packet)
+	var ts time.Time
+	if meta := packet.Metadata(); meta != nil {
+		ts = meta.Timestamp
+	}
 	a.onEvent(InspectionEvent{
 		View:       view,
-		Timestamp:  packet.Metadata().Timestamp,
+		Timestamp:  ts,
 		Packet:     snapshot.packet,
 		PacketData: snapshot.data,
 		References: append([]pcaputil.PacketReference(nil), pcaputil.CapturePacketReferences(packet)...),
@@ -182,6 +199,9 @@ func (a *PcapAdapter) onFlowPacket(flow *pcaputil.TrafficFlow, conn *pcaputil.Tr
 }
 
 func (a *PcapAdapter) onStreamFrame(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
+	if frame == nil {
+		return
+	}
 	a.counters.streamFrames.Add(1)
 	flowSnapshot := snapshotFlow(flow)
 	direction := flowDirection(flow, conn)
@@ -204,7 +224,9 @@ func (a *PcapAdapter) onStreamFrame(flow *pcaputil.TrafficFlow, conn *pcaputil.T
 func (a *PcapAdapter) onFlowClosed(reason pcaputil.TrafficFlowCloseReason, flow *pcaputil.TrafficFlow) {
 	a.counters.flowsClosed.Add(1)
 	snapshot := snapshotFlow(flow)
-	snapshot.PendingGaps = flow.HasPendingGaps()
+	if flow != nil {
+		snapshot.PendingGaps = flow.HasPendingGaps()
+	}
 	a.onEvent(InspectionEvent{View: ViewFlowClosed, Flow: snapshot, CloseReason: reason})
 	a.joinMu.Lock()
 	delete(a.flowPacket, flowDirectionKey{flow: snapshot.Key, direction: 0})
@@ -271,6 +293,9 @@ func (a *PcapAdapter) take(ref pcaputil.PacketReference) (packetSnapshot, bool) 
 }
 
 func ownPacket(packet gopacket.Packet) packetSnapshot {
+	if packet == nil {
+		return packetSnapshot{}
+	}
 	data := append([]byte(nil), packet.Data()...)
 	decoder := gopacket.Decoder(layers.LayerTypeEthernet)
 	if link := packet.LinkLayer(); link != nil {
@@ -279,7 +304,9 @@ func ownPacket(packet gopacket.Packet) packetSnapshot {
 		decoder = network.LayerType()
 	}
 	owned := gopacket.NewPacket(data, decoder, gopacket.Default)
-	owned.Metadata().CaptureInfo = packet.Metadata().CaptureInfo
+	if packet.Metadata() != nil && owned.Metadata() != nil {
+		owned.Metadata().CaptureInfo = packet.Metadata().CaptureInfo
+	}
 	return packetSnapshot{packet: owned, data: data}
 }
 
@@ -302,7 +329,12 @@ func snapshotEndpoint(conn *pcaputil.TrafficConnection) Endpoint {
 	if conn == nil {
 		return Endpoint{}
 	}
-	address, _ := netip.ParseAddr(conn.LocalIP().String())
+	var address netip.Addr
+	if ip := conn.LocalIP(); ip != nil {
+		if parsed, err := netip.ParseAddr(ip.String()); err == nil {
+			address = parsed.Unmap()
+		}
+	}
 	return Endpoint{Address: address, Port: uint16(conn.LocalPort())}
 }
 

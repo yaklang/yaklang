@@ -27,7 +27,7 @@ func appLayerProtocolMatcher(c *matchContext) error {
 	if config == nil || config.AppLayerProtocol == "" {
 		return nil
 	}
-	if config.AppLayerProtocol != "http" {
+	if config.AppLayerProtocol != "http" && config.AppLayerProtocol != "http1" {
 		c.Reject()
 		return nil
 	}

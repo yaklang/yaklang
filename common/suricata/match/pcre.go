@@ -19,9 +19,7 @@ func newPCREMatch(r *rule.ContentRule) (matchHandler, error) {
 		if (r.PCREParsed.RawBytes() || r.RawBytes) && c.PK != nil {
 			buffer = c.PK.Data()
 		}
-		if r.DotPrefix {
-			buffer = dotPrefixBuffer(buffer)
-		}
+		buffer = applyBufferTransforms(buffer, r.Transforms, r.DotPrefix)
 
 		jumpPosition, hasJump := c.takeJumpCursor(r.Modifier)
 

@@ -55,9 +55,7 @@ func newPayloadMatcher(r *rule.ContentRule, mdf modifier.Modifier) (matchHandler
 		if r.RawBytes && c.PK != nil {
 			buffer = c.PK.Data()
 		}
-		if r.DotPrefix {
-			buffer = dotPrefixBuffer(buffer)
-		}
+		buffer = applyBufferTransforms(buffer, r.Transforms, r.DotPrefix)
 		if len(byteOps) > 0 || base64Spec != nil {
 			defer func() {
 				if handlerErr != nil || c.IsRejected() {
@@ -1038,6 +1036,44 @@ func dotPrefixBuffer(buffer []byte) []byte {
 	return append(prefixed, buffer...)
 }
 
+func newMultiBufferHeaderMatcher(mdf modifier.Modifier, handlers []matchHandler) matchHandler {
+	return func(c *matchContext) error {
+		provider, _ := c.Value["httpProvider"].(*httpProvider)
+		if provider == nil {
+			c.Reject()
+			return nil
+		}
+		lines := provider.GetHeaderLines(mdf)
+		if len(lines) == 0 {
+			c.Reject()
+			return nil
+		}
+		origPrev, origPrevMod := c.prevMatched, c.prevModifier
+		for _, line := range lines {
+			c.Recover()
+			c.SetBuffer(mdf, line)
+			c.prevMatched = nil
+			c.prevModifier = modifier.Default
+			allMatched := true
+			for _, h := range handlers {
+				if err := h(c); err != nil {
+					return err
+				}
+				if c.IsRejected() {
+					allMatched = false
+					break
+				}
+			}
+			if allMatched {
+				return nil
+			}
+		}
+		c.prevMatched, c.prevModifier = origPrev, origPrevMod
+		c.Reject()
+		return nil
+	}
+}
+
 func attachPayloadMatcher(c *matchContext) error {
 	contentRules := c.Rule.ContentRuleConfig.ContentRules
 	if len(contentRules) == 0 {
@@ -1052,7 +1088,26 @@ func attachPayloadMatcher(c *matchContext) error {
 			}
 		}
 	}
-	for _, r := range contentRules {
+	for idx := 0; idx < len(contentRules); idx++ {
+		r := contentRules[idx]
+		if r != nil && (r.Modifier == modifier.HTTPRequestHeader || r.Modifier == modifier.HTTPResponseHeader) {
+			mdf := r.Modifier
+			end := idx + 1
+			for end < len(contentRules) && contentRules[end] != nil && contentRules[end].Modifier == mdf {
+				end++
+			}
+			groupHandlers := make([]matchHandler, 0, end-idx)
+			for j := idx; j < end; j++ {
+				h, err := newPayloadMatcher(contentRules[j], mdf)
+				if err != nil {
+					return err
+				}
+				groupHandlers = append(groupHandlers, h)
+			}
+			c.Attach(newMultiBufferHeaderMatcher(mdf, groupHandlers))
+			idx = end - 1
+			continue
+		}
 		matcher, err := newPayloadMatcher(r, r.Modifier)
 		if err != nil {
 			return err

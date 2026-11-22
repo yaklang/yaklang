@@ -1,9 +1,11 @@
 package config
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -109,6 +111,24 @@ func (c *Config) MatchVar(varName string, s any) bool {
 		return val.hasNumber(uint32(ret))
 	}
 	return false
+}
+
+// MatchAddr matches a pre-parsed netip.Addr against an address-group variable
+// without string parsing or big.Int allocation on IPv4 addresses.
+func (c *Config) MatchAddr(varName string, addr netip.Addr) bool {
+	if c == nil || c.Vars == nil || !addr.IsValid() {
+		return false
+	}
+	val, ok := c.Vars[varName]
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	if addr.Is4() {
+		b := addr.As4()
+		return val.hasNumber(binary.BigEndian.Uint32(b[:]))
+	}
+	return val.hasNumberBigInt(new(big.Int).SetBytes(addr.AsSlice()))
 }
 
 func NewConfig() *Config {

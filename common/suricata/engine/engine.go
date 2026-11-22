@@ -23,6 +23,10 @@ type Config struct {
 	State               state.Config
 	OnAlert             func(Alert)
 	OnDiagnostic        func(Diagnostic)
+	// DisablePrefilter turns off minirehs/protocol prefiltering and evaluates
+	// every rule linearly. Primarily intended for differential equivalence
+	// verification and benchmarking.
+	DisablePrefilter bool
 }
 
 type Stats struct {
@@ -42,6 +46,7 @@ type StatefulEngine struct {
 	epoch          uint64
 	maxStreamBytes int
 	plans          []*CompiledRulePlan
+	prefilter      *enginePrefilter
 	store          *state.Store
 	onAlert        func(Alert)
 	onDiagnostic   func(Diagnostic)
@@ -132,6 +137,9 @@ func NewStatefulEngine(rules []*rule.Rule, config Config) (*StatefulEngine, erro
 		plan.Index = uint64(index + 1)
 		engine.plans = append(engine.plans, plan)
 	}
+	if !config.DisablePrefilter && len(engine.plans) > 0 {
+		engine.prefilter = buildEnginePrefilter(engine.plans)
+	}
 	return engine, nil
 }
 
@@ -145,6 +153,10 @@ func (e *StatefulEngine) Handle(event InspectionEvent) Result {
 		_, _ = e.store.Cleanup(eventTime(event))
 	}
 	switch event.View {
+	case ViewPhysicalPacket:
+		// No compiled rule targets raw physical frames directly; avoid
+		// scanning every rule plan on each captured packet.
+		return Result{}
 	case ViewFlowCreated:
 		e.flowsMu.Lock()
 		delete(e.tombstones, event.Flow.Key)
@@ -169,6 +181,11 @@ func (e *StatefulEngine) Handle(event InspectionEvent) Result {
 			e.diagnostic(&result, event, nil, "protocol-event", message)
 			return result
 		}
+		// Complete decoded transactions do not currently match packet/stream
+		// rule plans unless explicitly enabled; fast-fail when prefilter is on.
+		if e.prefilter != nil {
+			return Result{}
+		}
 	}
 	return e.inspect(event)
 }
@@ -176,6 +193,9 @@ func (e *StatefulEngine) Handle(event InspectionEvent) Result {
 func (e *StatefulEngine) Close() error {
 	if e == nil || !e.closed.CompareAndSwap(false, true) {
 		return nil
+	}
+	if e.prefilter != nil {
+		e.prefilter.close()
 	}
 	e.flowsMu.Lock()
 	e.flows = make(map[FlowKey]*flowRuntime)
@@ -329,75 +349,100 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 
 	httpOffset := 0
 	var httpPayload []byte
+	var fullStreamPayload []byte
 	if event.View == ViewStream && flow != nil {
+		fullStreamPayload = flow.stream[event.Direction]
 		httpOffset = flow.httpNextOffset[event.Direction]
-		if httpOffset < len(flow.stream[event.Direction]) {
-			httpPayload = flow.stream[event.Direction][httpOffset:]
+		if httpOffset < len(fullStreamPayload) {
+			httpPayload = fullStreamPayload[httpOffset:]
 		}
 	}
 
-	for index, plan := range e.plans {
-		if !plan.acceptsView(event.View) {
-			continue
+	var sharedHTTP *match.HTTPBufferProvider
+	var sharedTLS *match.TLSBufferProvider
+
+	evalPlan := func(index int) {
+		plan := e.plans[index]
+		switch event.View {
+		case ViewNormalizedPacket:
+			if !plan.acceptsPacket {
+				return
+			}
+		case ViewStream:
+			if !plan.acceptsStream {
+				return
+			}
+		default:
+			if !plan.acceptsView(event.View) {
+				return
+			}
 		}
 		if flow != nil && !matchFlow(plan.Flow, flow, event.Direction) {
-			continue
+			return
 		}
 		if len(plan.StreamSize) > 0 {
 			packetView := plan.Rule != nil && plan.Rule.Protocol == "tcp-pkt"
 			if !plan.matchStreamSize(flow, packetView) {
-				continue
+				return
 			}
 		}
 		streamKey := ruleDirection{ruleIndex: index, direction: event.Direction}
 		var streamPayload []byte
 		cursor := 0
-		isHTTP := plan.Rule != nil && (plan.Rule.Protocol == "http" || rule.UsesHTTPBuffers(plan.Rule))
-		isTLS := plan.Rule != nil && (plan.Rule.Protocol == "tls" || rule.UsesTLSBuffers(plan.Rule))
+		isHTTP := plan.isHTTP
+		isTLS := plan.isTLS
 		if event.View == ViewStream && flow != nil && isTLS && flow.tlsMatched[streamKey] {
 			// TLS buffers are handshake-scoped. Once a rule matched a
 			// direction, later stream frames repeat the same certificate or
 			// SNI data and must not produce duplicate alerts or state effects.
-			continue
+			return
 		}
 		if event.View == ViewStream && flow != nil {
 			if isHTTP {
 				cursor = httpOffset
 				streamPayload = httpPayload
 				if len(streamPayload) == 0 {
-					continue
+					return
 				}
 			} else {
 				cursor = flow.streamCursor[streamKey]
-				streamPayload = flow.stream[event.Direction]
+				streamPayload = fullStreamPayload
 				flow.streamCursor[streamKey] = len(streamPayload)
 			}
 		}
-		matched, evidenceEnd, err := plan.match(event, flow, streamPayload)
+		var planHTTP *match.HTTPBufferProvider
+		if isHTTP {
+			planHTTP = sharedHTTP
+		}
+		var planTLS *match.TLSBufferProvider
+		if isTLS {
+			planTLS = sharedTLS
+		}
+		matched, evidenceEnd, err := plan.matchWithShared(event, flow, streamPayload, planHTTP, planTLS)
 		if err != nil {
 			e.diagnostic(&result, event, plan.Rule, "match-error", err.Error())
-			continue
+			return
 		}
 		if !matched {
-			continue
+			return
 		}
 		if event.View == ViewStream && !isHTTP && !isTLS && evidenceEnd <= cursor {
-			continue
+			return
 		}
 		stateResult, err := e.applyState(plan, event)
 		if err != nil {
 			e.diagnostic(&result, event, plan.Rule, "state-error", err.Error())
-			continue
+			return
 		}
 		if event.View == ViewStream && flow != nil && isTLS {
 			flow.tlsMatched[streamKey] = true
 		}
 		if !stateResult.qualified {
-			continue
+			return
 		}
 		if !stateResult.emit || plan.NoAlert {
 			e.suppressed.Add(1)
-			continue
+			return
 		}
 		alert := buildAlert(plan.Rule, event)
 		result.Alerts = append(result.Alerts, alert)
@@ -414,6 +459,23 @@ func (e *StatefulEngine) inspect(event InspectionEvent) Result {
 				tag.expiresAt = eventTime(event).Add(time.Duration(plan.Tag.Count) * time.Second)
 			}
 			flow.tags = append(flow.tags, tag)
+		}
+	}
+
+	if e.prefilter != nil && (event.View == ViewStream || event.View == ViewNormalizedPacket) {
+		collector := e.prefilter.acquireCollector()
+		if event.View == ViewStream {
+			sharedHTTP, sharedTLS = e.prefilter.collectStreamCandidates(collector, event.Packet, fullStreamPayload, httpPayload)
+		} else {
+			e.prefilter.collectPacketCandidates(collector, event.Packet)
+		}
+		for _, index := range collector.sorted() {
+			evalPlan(index)
+		}
+		e.prefilter.releaseCollector(collector)
+	} else {
+		for index := range e.plans {
+			evalPlan(index)
 		}
 	}
 	// Advance the per-direction HTTP message cursor only after every HTTP rule

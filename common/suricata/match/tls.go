@@ -216,12 +216,46 @@ func tlsServerName(data []byte) []byte {
 	return nil
 }
 
+// TLSBufferProvider exposes a pre-parsed TLS record stream so the stateful
+// engine can parse ClientHello/ServerHello/Certificate records once per stream
+// event and share them across both the prefilter and candidate rules.
+type TLSBufferProvider struct {
+	inner *tlsProvider
+}
+
+// ParseTLSStream parses a TLS record stream once for reuse across rules.
+// Returns nil when raw does not begin with a valid TLS record stream.
+func ParseTLSStream(pk gopacket.Packet, raw []byte) *TLSBufferProvider {
+	inner := newTLSProviderFromBytes(pk, raw)
+	if inner == nil {
+		return nil
+	}
+	return &TLSBufferProvider{inner: inner}
+}
+
+// Get returns the extracted TLS sticky buffer for the given modifier.
+func (p *TLSBufferProvider) Get(mdf modifier.Modifier) []byte {
+	if p == nil || p.inner == nil {
+		return nil
+	}
+	return p.inner.Get(mdf)
+}
+
 func (t *tlsProvider) parseServerHello(body []byte) {
-	if len(body) < 40 {
+	if len(body) < 34 {
 		return
 	}
 	legacyVersion := binary.BigEndian.Uint16(body[0:2])
+	t.versionRaw = legacyVersion
+	t.version = tlsVersionString(legacyVersion)
+	t.random = append([]byte(nil), body[2:34]...)
+	t.randomTime = t.random[0:4]
+	t.randomBytes = t.random[4:32]
+
 	offset := 34
+	if len(body) < offset+1 {
+		return
+	}
 	sessionIDLength := int(body[offset])
 	offset++
 	if len(body) < offset+sessionIDLength+3 {
@@ -231,15 +265,16 @@ func (t *tlsProvider) parseServerHello(body []byte) {
 	cipherSuite := binary.BigEndian.Uint16(body[offset : offset+2])
 	offset += 2
 	offset++ // compression method
-	if len(body) < offset+2 {
-		return
+
+	var extensions []byte
+	if len(body) >= offset+2 {
+		extensionsLength := int(binary.BigEndian.Uint16(body[offset : offset+2]))
+		offset += 2
+		if len(body) < offset+extensionsLength {
+			extensionsLength = len(body) - offset
+		}
+		extensions = body[offset : offset+extensionsLength]
 	}
-	extensionsLength := int(binary.BigEndian.Uint16(body[offset : offset+2]))
-	offset += 2
-	if len(body) < offset+extensionsLength {
-		extensionsLength = len(body) - offset
-	}
-	extensions := body[offset : offset+extensionsLength]
 
 	version := legacyVersion
 	var extensionIDs []string
@@ -473,6 +508,11 @@ func (t *tlsProvider) Get(mdf modifier.Modifier) []byte {
 func tlsParser(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {
 		return fmt.Errorf("content rule config is nil")
+	}
+	if c.sharedTLS != nil {
+		c.SetBufferProvider(c.sharedTLS.Get)
+		c.Value["tls"] = c.sharedTLS
+		return nil
 	}
 	raw := c.overridePayload
 	if len(raw) == 0 {

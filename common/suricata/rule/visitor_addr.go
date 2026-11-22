@@ -9,8 +9,14 @@ import (
 	"math/big"
 	"math/rand"
 	"net/netip"
+	"sort"
 	"strings"
 )
+
+type ipv4Range struct {
+	start uint32
+	end   uint32
+}
 
 type AddressRule struct {
 	// 这两个是修饰词
@@ -27,12 +33,100 @@ type AddressRule struct {
 	positiveRules []*AddressRule
 	SubRules      []*AddressRule
 
+	// Flattened fast lookup structures populated by Prepare() to avoid
+	// allocating per-CIDR HostsFilter maps and repeated string IP parsing.
+	ipv4Ranges   []ipv4Range
+	ipv6Prefixes []netip.Prefix
+	positiveSlow []*AddressRule
+	prepared     bool
+
 	// envtable
 	Config *config.Config
 	Env    string
 }
 
-func (a *AddressRule) _matchWithoutNegative(i string) bool {
+func parseAddrOrPrefix(raw string) (v4 ipv4Range, isV4 bool, v6 netip.Prefix, isV6 bool, ok bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ipv4Range{}, false, netip.Prefix{}, false, false
+	}
+	if strings.Contains(raw, "/") {
+		p, err := netip.ParsePrefix(raw)
+		if err != nil {
+			return ipv4Range{}, false, netip.Prefix{}, false, false
+		}
+		p = p.Masked()
+		if p.Addr().Is4() {
+			b := p.Addr().As4()
+			base := binary.BigEndian.Uint32(b[:])
+			bits := p.Bits()
+			var mask uint32
+			if bits > 0 {
+				mask = ^uint32(0) << uint(32-bits)
+			}
+			start := base & mask
+			end := start | ^mask
+			return ipv4Range{start: start, end: end}, true, netip.Prefix{}, false, true
+		}
+		return ipv4Range{}, false, p, true, true
+	}
+	a, err := netip.ParseAddr(raw)
+	if err != nil {
+		return ipv4Range{}, false, netip.Prefix{}, false, false
+	}
+	a = a.Unmap()
+	if a.Is4() {
+		b := a.As4()
+		v := binary.BigEndian.Uint32(b[:])
+		return ipv4Range{start: v, end: v}, true, netip.Prefix{}, false, true
+	}
+	return ipv4Range{}, false, netip.PrefixFrom(a, 128), true, true
+}
+
+func mergeIPv4Ranges(ranges []ipv4Range) []ipv4Range {
+	if len(ranges) <= 1 {
+		return ranges
+	}
+	sort.Slice(ranges, func(i, j int) bool {
+		if ranges[i].start != ranges[j].start {
+			return ranges[i].start < ranges[j].start
+		}
+		return ranges[i].end < ranges[j].end
+	})
+	merged := ranges[:1]
+	for _, r := range ranges[1:] {
+		last := &merged[len(merged)-1]
+		if uint64(r.start) <= uint64(last.end)+1 {
+			if r.end > last.end {
+				last.end = r.end
+			}
+		} else {
+			merged = append(merged, r)
+		}
+	}
+	return merged
+}
+
+func containsIPv4Range(ranges []ipv4Range, v uint32) bool {
+	lo, hi := 0, len(ranges)
+	for lo < hi {
+		mid := int(uint(lo+hi) >> 1)
+		if ranges[mid].end < v {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return lo < len(ranges) && ranges[lo].start <= v && v <= ranges[lo].end
+}
+
+func (a *AddressRule) isPureFastRangeLeaf() bool {
+	return a != nil && !a.Any && !a.Negative && a.Env == "" &&
+		len(a.negativeRules) == 0 && len(a.positiveSlow) == 0 && a.hostFilter == nil &&
+		(len(a.ipv4Ranges) > 0 || len(a.ipv6Prefixes) > 0)
+}
+
+func (a *AddressRule) matchAddrWithoutNegative(addr netip.Addr, raw string) bool {
 	if a == nil {
 		return false
 	}
@@ -45,27 +139,66 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 			log.Warnf("suricata env %s not found", a.Env)
 			return false
 		}
-		return a.Config.MatchVar(a.Env, i)
+		if addr.IsValid() {
+			return a.Config.MatchAddr(a.Env, addr)
+		}
+		return a.Config.MatchVar(a.Env, raw)
 	}
 
 	for _, n := range a.negativeRules {
-		if !n.Match(i) {
+		if !n.matchAddrWithRaw(addr, raw) {
 			return false
 		}
 	}
 
-	for _, n := range a.positiveRules {
-		if n.Match(i) {
-			return true
+	if addr.IsValid() {
+		if addr.Is4() && len(a.ipv4Ranges) > 0 {
+			b := addr.As4()
+			if containsIPv4Range(a.ipv4Ranges, binary.BigEndian.Uint32(b[:])) {
+				return true
+			}
+		} else if addr.Is6() && len(a.ipv6Prefixes) > 0 {
+			for _, p := range a.ipv6Prefixes {
+				if p.Contains(addr) {
+					return true
+				}
+			}
+		}
+	}
+
+	if a.prepared {
+		for _, n := range a.positiveSlow {
+			if n.matchAddrWithRaw(addr, raw) {
+				return true
+			}
+		}
+	} else {
+		for _, n := range a.positiveRules {
+			if n.matchAddrWithRaw(addr, raw) {
+				return true
+			}
 		}
 	}
 
 	if a.hostFilter != nil {
-		if a.hostFilter.Contains(i) {
+		if raw == "" && addr.IsValid() {
+			raw = addr.String()
+		}
+		if raw != "" && a.hostFilter.Contains(raw) {
 			return true
 		}
 	}
 	return false
+}
+
+func (a *AddressRule) matchAddrWithRaw(addr netip.Addr, raw string) bool {
+	if a == nil {
+		return false
+	}
+	if a.Negative {
+		return !a.matchAddrWithoutNegative(addr, raw)
+	}
+	return a.matchAddrWithoutNegative(addr, raw)
 }
 
 func (a *AddressRule) parseSubRules() {
@@ -83,33 +216,69 @@ func (a *AddressRule) parseSubRules() {
 
 // Prepare materializes all matcher state before a Rule is shared by matchers.
 func (a *AddressRule) Prepare() {
-	if a == nil {
+	if a == nil || a.prepared {
 		return
 	}
 	a.parseSubRules()
 	for _, sub := range a.SubRules {
 		sub.Prepare()
 	}
-	if a.hostFilter == nil && (a.IPv4CIDR != "" || a.IPv6CIDR != "") {
-		a.hostFilter = utils.NewHostsFilter()
-		if a.IPv4CIDR != "" {
-			a.hostFilter.AddCIDR(a.IPv4CIDR)
+
+	addLiteral := func(raw string) {
+		if raw == "" {
+			return
 		}
-		if a.IPv6CIDR != "" {
-			a.hostFilter.AddCIDR(a.IPv6CIDR)
+		if v4, isV4, v6, isV6, ok := parseAddrOrPrefix(raw); ok {
+			if isV4 {
+				a.ipv4Ranges = append(a.ipv4Ranges, v4)
+			} else if isV6 {
+				a.ipv6Prefixes = append(a.ipv6Prefixes, v6)
+			}
+			return
+		}
+		if a.hostFilter == nil {
+			a.hostFilter = utils.NewHostsFilter()
+		}
+		a.hostFilter.AddCIDR(raw)
+	}
+	addLiteral(a.IPv4CIDR)
+	addLiteral(a.IPv6CIDR)
+
+	for _, pos := range a.positiveRules {
+		if pos.isPureFastRangeLeaf() {
+			a.ipv4Ranges = append(a.ipv4Ranges, pos.ipv4Ranges...)
+			a.ipv6Prefixes = append(a.ipv6Prefixes, pos.ipv6Prefixes...)
+		} else {
+			a.positiveSlow = append(a.positiveSlow, pos)
 		}
 	}
+	if len(a.ipv4Ranges) > 1 {
+		a.ipv4Ranges = mergeIPv4Ranges(a.ipv4Ranges)
+	}
+	a.prepared = true
+}
+
+// MatchAddr matches a pre-parsed netip.Addr with zero string parsing or heap
+// allocations on IPv4 ranges and address-group variables.
+func (a *AddressRule) MatchAddr(addr netip.Addr) bool {
+	if a == nil {
+		return false
+	}
+	if addr.IsValid() {
+		addr = addr.Unmap()
+	}
+	return a.matchAddrWithRaw(addr, "")
 }
 
 func (a *AddressRule) Match(i string) bool {
 	if a == nil {
 		return false
 	}
-
-	if a.Negative {
-		return !a._matchWithoutNegative(i)
+	addr, err := netip.ParseAddr(i)
+	if err == nil {
+		addr = addr.Unmap()
 	}
-	return a._matchWithoutNegative(i)
+	return a.matchAddrWithRaw(addr, i)
 }
 
 // Generate is not uniform distribution

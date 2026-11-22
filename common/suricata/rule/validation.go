@@ -149,7 +149,7 @@ func UsesRawBytes(r *Rule) bool {
 
 func isTCPBasedProtocol(protocol string) bool {
 	switch protocol {
-	case "tcp", "tcp-pkt", "http", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "tcp-stream":
+	case "tcp", "tcp-pkt", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "tcp-stream":
 		return true
 	default:
 		return false
@@ -185,8 +185,8 @@ func (v *ruleValidator) validateHeader() {
 	}
 
 	switch normalizeKeyword(v.rule.Protocol) {
-	case "ip", "dns", "http", "tcp", "tcp-pkt", "udp", "icmp", "icmpv6", "tls",
-		"smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "tcp-stream":
+	case "ip", "dns", "http", "http1", "tcp", "tcp-pkt", "udp", "icmp", "icmpv6", "tls",
+		"smtp", "ftp", "ftp-data", "smb", "ssh", "rdp", "dcerpc", "tcp-stream":
 	default:
 		v.add(ValidationStageHeader, "protocol", fmt.Sprintf("protocol %q is not supported by the matcher", v.rule.Protocol), KeywordUnsupported)
 	}
@@ -326,19 +326,19 @@ func (v *ruleValidator) validateModel() {
 			v.add(ValidationStageModel, "icmp", "ICMP constraints require the icmp or icmpv6 protocol", KeywordUnsupported)
 		}
 	}
-	if config.HTTPConfig != nil && protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+	if config.HTTPConfig != nil && protocol != "http" && protocol != "http1" && protocol != "tcp" && protocol != "tcp-pkt" {
 		v.add(ValidationStageModel, "http", "HTTP constraints require the http protocol", KeywordUnsupported)
 	}
 	if config.AppLayerProtocol != "" {
-		if config.AppLayerProtocol != "http" {
+		if config.AppLayerProtocol != "http" && config.AppLayerProtocol != "http1" {
 			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol only supports http", KeywordUnsupported)
 		}
-		if protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+		if protocol != "http" && protocol != "http1" && protocol != "tcp" && protocol != "tcp-pkt" {
 			v.add(ValidationStageModel, "app-layer-protocol", "app-layer-protocol requires the http, tcp or tcp-pkt protocol", KeywordUnsupported)
 		}
 	}
 	if len(config.AppLayerEvents) > 0 {
-		if protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+		if protocol != "http" && protocol != "http1" && protocol != "tcp" && protocol != "tcp-pkt" {
 			v.add(ValidationStageModel, "app-layer-event", "app-layer-event requires an HTTP-capable protocol", KeywordUnsupported)
 		}
 		for _, event := range config.AppLayerEvents {
@@ -357,7 +357,7 @@ func (v *ruleValidator) validateModel() {
 		if contentRule == nil {
 			continue
 		}
-		if modifier.IsHTTPModifier(contentRule.Modifier) && protocol != "http" && protocol != "tcp" && protocol != "tcp-pkt" {
+		if modifier.IsHTTPModifier(contentRule.Modifier) && protocol != "http" && protocol != "http1" && protocol != "tcp" && protocol != "tcp-pkt" {
 			v.add(ValidationStageModel, "http-buffer", "HTTP sticky buffers require the http protocol", KeywordUnsupported)
 		}
 		if (protocol == "tcp" || protocol == "tcp-pkt") && UsesHTTPBuffers(v.rule) && contentRule.Modifier == modifier.TCPHDR {
@@ -377,7 +377,7 @@ func (v *ruleValidator) validateModel() {
 		}
 		if contentRule.Modifier == modifier.FileData {
 			switch protocol {
-			case "http", "tcp", "tcp-pkt", "smtp":
+			case "http", "http1", "tcp", "tcp-pkt", "smtp":
 			default:
 				v.add(ValidationStageModel, "file_data", "file_data requires HTTP, TCP payload or SMTP DATA body matching", KeywordUnsupported)
 			}

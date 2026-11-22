@@ -127,6 +127,29 @@ func (m *Matcher) MatchStreamEvidence(pk gopacket.Packet, payload []byte) (bool,
 	return m.matcher.MatchPayloadEvidence(pk, payload)
 }
 
+// MatchStreamEvidenceWithHTTP evaluates a stream rule using a pre-parsed HTTP
+// buffer provider so the engine parses each HTTP message only once per event.
+func (m *Matcher) MatchStreamEvidenceWithHTTP(pk gopacket.Packet, payload []byte, shared *HTTPBufferProvider) (bool, int, error) {
+	return m.MatchStreamEvidenceWithShared(pk, payload, shared, nil)
+}
+
+// MatchStreamEvidenceWithShared evaluates a stream rule using pre-parsed HTTP
+// and/or TLS buffer providers so the engine parses each stream once per event.
+func (m *Matcher) MatchStreamEvidenceWithShared(pk gopacket.Packet, payload []byte, sharedHTTP *HTTPBufferProvider, sharedTLS *TLSBufferProvider) (bool, int, error) {
+	if m == nil || m.matcher == nil || pk == nil {
+		return false, 0, nil
+	}
+	var innerHTTP *httpProvider
+	if sharedHTTP != nil {
+		innerHTTP = sharedHTTP.inner
+	}
+	var innerTLS *tlsProvider
+	if sharedTLS != nil {
+		innerTLS = sharedTLS.inner
+	}
+	return m.matcher.matchPayloadEvidenceWithShared(pk, payload, innerHTTP, innerTLS)
+}
+
 type matchHandler func(*matchContext) error
 
 type bufferProvider func(modifier modifier.Modifier) []byte
@@ -157,6 +180,8 @@ type matchContext struct {
 	PK              gopacket.Packet
 	Rule            *rule.Rule
 	overridePayload []byte
+	sharedHTTP      *httpProvider
+	sharedTLS       *tlsProvider
 
 	workflow []matchHandler
 }
@@ -219,17 +244,19 @@ func (c *matchContext) Must(ok bool) bool {
 }
 
 func (c *matchContext) Tidy() {
-	c.Value = make(map[string]any)
+	clear(c.Value)
 	c.PK = nil
 	c.overridePayload = nil
+	c.sharedHTTP = nil
+	c.sharedTLS = nil
 	c.provider = nil
-	c.buffer = make(map[modifier.Modifier][]byte)
+	clear(c.buffer)
 	c.pos = -1
 	c.rejected = false
 	c.prevMatched = nil
 	c.prevModifier = modifier.Default
-	c.jumpCursor = make(map[modifier.Modifier]jumpCursorState)
-	c.variables = make(map[string]int64)
+	clear(c.jumpCursor)
+	clear(c.variables)
 }
 
 func compile(r *rule.Rule) (*matchContext, error) {
@@ -271,11 +298,17 @@ func (c *matchContext) MatchPayload(pk gopacket.Packet, payload []byte) (bool, e
 }
 
 func (c *matchContext) MatchPayloadEvidence(pk gopacket.Packet, payload []byte) (bool, int, error) {
+	return c.matchPayloadEvidenceWithShared(pk, payload, nil, nil)
+}
+
+func (c *matchContext) matchPayloadEvidenceWithShared(pk gopacket.Packet, payload []byte, sharedHTTP *httpProvider, sharedTLS *tlsProvider) (bool, int, error) {
 	c.lock.Lock()
 	c.Tidy()
 	defer c.lock.Unlock()
 	c.PK = pk
-	c.overridePayload = append([]byte(nil), payload...)
+	c.overridePayload = payload
+	c.sharedHTTP = sharedHTTP
+	c.sharedTLS = sharedTLS
 	if err := c.match(); err != nil {
 		return false, 0, fmt.Errorf("match failed: %w", err)
 	}
@@ -323,7 +356,7 @@ func matchMutex(c *matchContext) error {
 		}
 		c.Attach(dnsMatcher)
 		return attachPayloadMatcher(c)
-	case protocol.HTTP:
+	case protocol.HTTP, protocol.HTTP1:
 		c.Attach(ipMatcher, ipCfgMatch, portMatcher, httpParser)
 		if err := attachFastPattern(c); err != nil {
 			return err
@@ -376,7 +409,7 @@ func matchMutex(c *matchContext) error {
 		c.Attach(tcpCfgMatch)
 		return attachPayloadMatcher(c)
 	case protocol.FTP, protocol.FTPData, protocol.SMB,
-		protocol.SSH, protocol.DCERPC, protocol.TCPStream:
+		protocol.SSH, protocol.RDP, protocol.DCERPC, protocol.TCPStream:
 		// Application protocols that ride on TCP share the TCP header/payload
 		// pipeline. SSH additionally exposes its version banner as a buffer.
 		parser := tcpParser
