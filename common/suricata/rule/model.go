@@ -151,6 +151,12 @@ type ContentRuleConfig struct {
 	/* TLS */
 	TLSConfig *TLSRule
 
+	/* HTTP/2, SNMP, DCE/RPC, File */
+	HTTP2Config  *HTTP2Rule
+	SNMPConfig   *SNMPRule
+	DCERPCConfig *DCERPCRule
+	FileSize     *numrange.NumRange
+
 	/* Application-layer protocol/event predicates */
 	AppLayerProtocol        string
 	AppLayerProtocolNegated bool

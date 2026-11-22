@@ -15,7 +15,7 @@ func tcpParser(c *matchContext) error {
 	}
 
 	// buffer provider
-	provider := newTCPProvider(c.PK, c.overridePayload)
+	provider := newTCPProviderWithContext(c, c.PK, c.overridePayload)
 	if !c.Must(provider != nil) {
 		return nil
 	}
@@ -167,6 +167,10 @@ func tcpCurrentFlagMask(tcp *layers.TCP) uint16 {
 }
 
 func newTCPProvider(pk gopacket.Packet, override ...[]byte) func(modifier modifier.Modifier) []byte {
+	return newTCPProviderWithContext(nil, pk, override...)
+}
+
+func newTCPProviderWithContext(c *matchContext, pk gopacket.Packet, override ...[]byte) func(modifier modifier.Modifier) []byte {
 	tcp, ok := pk.Layer(layers.LayerTypeTCP).(*layers.TCP)
 	if !ok {
 		return nil
@@ -175,11 +179,31 @@ func newTCPProvider(pk gopacket.Packet, override ...[]byte) func(modifier modifi
 		switch mdf {
 		case modifier.TCPHDR:
 			return tcp.Contents
-		case modifier.Default, modifier.FileData:
+		case modifier.Default:
 			if len(override) > 0 && override[0] != nil {
 				return override[0]
 			}
 			return tcp.Payload
+		case modifier.FileData:
+			raw := tcp.Payload
+			if len(override) > 0 && override[0] != nil {
+				raw = override[0]
+			}
+			data, off := extractFileDataForTCPWithOffset(raw)
+			if c != nil && off > c.fileDataOffset {
+				c.fileDataOffset = off
+			}
+			return data
+		case modifier.FileMagic:
+			raw := tcp.Payload
+			if len(override) > 0 && override[0] != nil {
+				raw = override[0]
+			}
+			data, off := extractFileDataForTCPWithOffset(raw)
+			if c != nil && off > c.fileDataOffset {
+				c.fileDataOffset = off
+			}
+			return []byte(DetectFileMagic(data))
 		}
 		return nil
 	}

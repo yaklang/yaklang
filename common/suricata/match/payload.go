@@ -1471,6 +1471,9 @@ func attachPayloadMatcher(c *matchContext) error {
 	if c.Rule.ContentRuleConfig.ASN1 != nil {
 		c.Attach(asn1Matcher)
 	}
+	if c.Rule.ContentRuleConfig.FileSize != nil {
+		c.Attach(fileSizeMatcher)
+	}
 	attachAppLayerMatchers(c)
 	if c.Rule.ContentRuleConfig.FTPBounce {
 		c.Attach(ftpBounceMatcher)

@@ -15,6 +15,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/suricata/state"
 )
@@ -461,4 +462,151 @@ func BenchmarkStatefulEngineHTTPPrefilterVsLinear(b *testing.B) {
 			}
 		})
 	}
+}
+
+func buildPrefilterTestUDPPacket(t *testing.T, srcIP, dstIP string, srcPort, dstPort uint16, payload []byte) gopacket.Packet {
+	t.Helper()
+	eth := &layers.Ethernet{
+		SrcMAC:       net.HardwareAddr{0x02, 0x00, 0x00, 0x00, 0x00, 0x01},
+		DstMAC:       net.HardwareAddr{0x02, 0x00, 0x00, 0x00, 0x00, 0x02},
+		EthernetType: layers.EthernetTypeIPv4,
+	}
+	ip := &layers.IPv4{
+		Version:  4,
+		IHL:      5,
+		TTL:      64,
+		Protocol: layers.IPProtocolUDP,
+		SrcIP:    net.ParseIP(srcIP).To4(),
+		DstIP:    net.ParseIP(dstIP).To4(),
+	}
+	udp := &layers.UDP{
+		SrcPort: layers.UDPPort(srcPort),
+		DstPort: layers.UDPPort(dstPort),
+	}
+	require.NoError(t, udp.SetNetworkLayerForChecksum(ip))
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}
+	require.NoError(t, gopacket.SerializeLayers(buf, opts, eth, ip, udp, gopacket.Payload(payload)))
+	return gopacket.NewPacket(buf.Bytes(), layers.LayerTypeEthernet, gopacket.Default)
+}
+
+func TestStatefulEngineProtocolExtensionsAndPrefilterEquivalence(t *testing.T) {
+	ruleText := `
+alert http2 any any -> any any (msg:"HTTP2 Window"; flow:established,to_server; http2.frametype:WINDOWUPDATE; http2.window:>2147483000; sid:940001; rev:1;)
+alert snmp any any -> any 161 (msg:"SNMP RCE"; flow:established,to_server; snmp.version:<=2; content:"|06 0D 2B 06 01 04 01 09 09 85 10 01 04 02 01|"; pcre:"/^.{0,256}(?:\x24\x28|\x3b|\x7c|\x60)/R"; sid:940002; rev:1;)
+alert tcp any any -> any 445 (msg:"DCERPC Bridged"; flow:established,to_server; dcerpc.iface:4b324fc8-1670-01d3-1278-5a47bf6ee188; dcerpc.opnum:31; dcerpc.stub_data; content:"|5C|..|5C|"; sid:940003; rev:1;)
+alert tcp any any -> any any (msg:"Gzip Tar ZipSlip"; flow:established,to_client; file.magic; content:"POSIX tar archive"; file.data; content:"|00 00 00 2e 2e 2f|"; fast_pattern; sid:940004; rev:1;)
+alert http any any -> any any (msg:"PigButcher Auth"; flow:established,to_server; app-layer-event:http.request_auth_unrecognized; flowint:http.anomaly.count,+,1; http.header_names; to_lowercase; content:"|0d 0a|x-channel-code"; fast_pattern; sid:940005; rev:1;)
+`
+	rules, err := rule.ParseStrictRule(ruleText)
+	require.NoError(t, err)
+	require.Len(t, rules, 5)
+
+	runScenario := func(disablePrefilter bool) []int {
+		eng, err := NewStatefulEngine(rules, Config{
+			Epoch:            99,
+			State:            state.DefaultConfig(),
+			DisablePrefilter: disablePrefilter,
+		})
+		require.NoError(t, err)
+		defer eng.Close()
+
+		var sids []int
+		collect := func(res Result) {
+			for _, a := range res.Alerts {
+				if a.Rule != nil {
+					sids = append(sids, a.Rule.Sid)
+				}
+			}
+		}
+
+		now := time.Unix(1700050000, 0)
+		establishTCP := func(gen uint64, srcIP, dstIP string, srcPort, dstPort uint16) FlowSnapshot {
+			fc := FlowSnapshot{
+				Key:        FlowKey{Generation: gen},
+				First:      Endpoint{Address: netip.MustParseAddr(srcIP), Port: srcPort},
+				Second:     Endpoint{Address: netip.MustParseAddr(dstIP), Port: dstPort},
+				IPv4:       true,
+				IPProtocol: uint8(layers.IPProtocolTCP),
+			}
+			eng.Handle(InspectionEvent{View: ViewFlowCreated, Timestamp: now, Flow: fc})
+			eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Flow: fc, Direction: 0, Packet: buildPrefilterTestTCPPacket(t, srcIP, dstIP, srcPort, dstPort, 1, 0, true, false, false, nil)})
+			eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Flow: fc, Direction: 1, Packet: buildPrefilterTestTCPPacket(t, dstIP, srcIP, dstPort, srcPort, 10, 2, true, true, false, nil)})
+			eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Flow: fc, Direction: 0, Packet: buildPrefilterTestTCPPacket(t, srcIP, dstIP, srcPort, dstPort, 2, 11, false, true, false, nil)})
+			return fc
+		}
+
+		// 1. Multi-segment HTTP/2 stream: chunk 1 preface, chunk 2 WINDOW_UPDATE, chunk 3 PING (no duplicate replay).
+		fcH2 := establishTCP(1, "198.51.100.1", "10.0.0.10", 40001, 443)
+		preface := []byte("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+		wuFrame := []byte{0, 0, 4, 8, 0, 0, 0, 0, 0, 0x7f, 0xff, 0xff, 0xff}
+		pingFrame := []byte{0, 0, 8, 6, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8}
+		pktH2 := buildPrefilterTestTCPPacket(t, "198.51.100.1", "10.0.0.10", 40001, 443, 2, 11, false, true, true, wuFrame)
+		collect(eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fcH2, Direction: 0, Packet: pktH2, Payload: preface}))
+		collect(eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fcH2, Direction: 0, Packet: pktH2, Payload: wuFrame}))
+		collect(eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fcH2, Direction: 0, Packet: pktH2, Payload: pingFrame}))
+
+		// 2. Established UDP SNMPv2c pseudo-flow (bidirectional packet makes UDP flow established).
+		oid := []byte{0x06, 0x0d, 0x2b, 0x06, 0x01, 0x04, 0x01, 0x09, 0x09, 0x85, 0x10, 0x01, 0x04, 0x02, 0x01}
+		snmpBody := append([]byte{0x02, 0x01, 0x01, 0x04, 0x06, 'p', 'u', 'b', 'l', 'i', 'c'}, oid...)
+		snmpBody = append(snmpBody, []byte(";id")...)
+		snmpPDU := append([]byte{0x30, byte(len(snmpBody))}, snmpBody...)
+		snmpProbe := []byte{0x30, 0x0b, 0x02, 0x01, 0x01, 0x04, 0x06, 'p', 'u', 'b', 'l', 'i', 'c'}
+		collect(eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Packet: buildPrefilterTestUDPPacket(t, "198.51.100.2", "10.0.0.10", 40002, 161, snmpProbe)}))
+		collect(eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Packet: buildPrefilterTestUDPPacket(t, "10.0.0.10", "198.51.100.2", 161, 40002, snmpProbe)}))
+		collect(eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Packet: buildPrefilterTestUDPPacket(t, "198.51.100.2", "10.0.0.10", 40002, 161, snmpPDU)}))
+
+		// 3. DCE/RPC bridged via pcaputil ProtocolEvent (Bind in ViewTransaction, Request in ViewStream).
+		fcRPC := establishTCP(3, "198.51.100.3", "10.0.0.10", 40003, 445)
+		eng.Handle(InspectionEvent{
+			View:      ViewTransaction,
+			Timestamp: now,
+			Flow:      fcRPC,
+			Protocol: &pcaputil.ProtocolEvent{
+				Protocol: "dcerpc",
+				Status:   "decoded",
+				Fields: map[string]any{
+					"Context ID":              uint16(0),
+					"Abstract Syntax":         "c84f324b7016d30112785a47bf6ee188",
+					"Interface Version Major": uint16(3),
+					"Interface Version Minor": uint16(0),
+				},
+			},
+		})
+		stub := []byte("abc\\..\\..\\pwn")
+		reqPDU := make([]byte, 24+len(stub))
+		reqPDU[0], reqPDU[1], reqPDU[2], reqPDU[3], reqPDU[4] = 5, 0, 0, 0x03, 0x10
+		binary.LittleEndian.PutUint16(reqPDU[8:10], uint16(len(reqPDU)))
+		binary.LittleEndian.PutUint16(reqPDU[20:22], 0)  // ctxID 0 bound by pcaputil ProtocolEvent
+		binary.LittleEndian.PutUint16(reqPDU[22:24], 31) // opnum 31
+		copy(reqPDU[24:], stub)
+		pktRPC := buildPrefilterTestTCPPacket(t, "198.51.100.3", "10.0.0.10", 40003, 445, 2, 11, false, true, true, reqPDU)
+		collect(eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fcRPC, Direction: 0, Packet: pktRPC, Payload: reqPDU}))
+
+		// 4. Gzip-compressed HTTP response carrying a POSIX tar Zip-Slip over alert tcp (zero-FN prefilter check).
+		fcTar := establishTCP(4, "10.0.0.10", "198.51.100.4", 40004, 80)
+		tarBuf := make([]byte, 512)
+		copy(tarBuf[257:263], []byte("ustar\x00"))
+		copy(tarBuf[20:26], []byte{0x00, 0x00, 0x00, '.', '.', '/'})
+		var gz bytes.Buffer
+		gw := gzip.NewWriter(&gz)
+		_, _ = gw.Write(tarBuf)
+		_ = gw.Close()
+		httpResp := append([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n", gz.Len())), gz.Bytes()...)
+		pktTar := buildPrefilterTestTCPPacket(t, "198.51.100.4", "10.0.0.10", 80, 40004, 11, 2, false, true, true, httpResp)
+		collect(eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fcTar, Direction: 1, Packet: pktTar, Payload: httpResp}))
+
+		// 5. PigButcher app-layer-event:http.request_auth_unrecognized + flowint.
+		fcAuth := establishTCP(5, "10.0.0.10", "198.51.100.5", 40005, 80)
+		authReq := []byte("GET /x HTTP/1.1\r\nHost: bad.example\r\nAuthorization: baretoken999\r\nX-Channel-Code: 7\r\n\r\n")
+		pktAuth := buildPrefilterTestTCPPacket(t, "10.0.0.10", "198.51.100.5", 40005, 80, 2, 11, false, true, true, authReq)
+		collect(eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fcAuth, Direction: 0, Packet: pktAuth, Payload: authReq}))
+
+		return sids
+	}
+
+	gotPrefilter := runScenario(false)
+	gotLinear := runScenario(true)
+	require.Equal(t, []int{940001, 940002, 940003, 940004, 940005}, gotLinear)
+	require.Equal(t, gotLinear, gotPrefilter, "prefilter and linear baseline must produce identical alerts across all 5 protocol extensions")
 }

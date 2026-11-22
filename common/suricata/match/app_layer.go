@@ -32,6 +32,8 @@ func appLayerProtocolMatcher(c *matchContext) error {
 	switch config.AppLayerProtocol {
 	case "http", "http1":
 		detected = looksLikeHTTP(payload)
+	case "http2":
+		detected = LooksLikeHTTP2(payload)
 	case "tls":
 		detected = LooksLikeTLS(payload)
 	case "ssh":
@@ -46,6 +48,10 @@ func appLayerProtocolMatcher(c *matchContext) error {
 		detected = looksLikeSMTP(payload)
 	case "ftp":
 		detected = looksLikeFTP(payload)
+	case "snmp":
+		_, detected = ParseSNMPVersion(payload)
+	case "dcerpc":
+		detected = LooksLikeDCERPC(payload)
 	default:
 		c.Reject()
 		return nil
@@ -133,6 +139,8 @@ func appLayerEventMatcher(c *matchContext) error {
 		switch event.Name {
 		case "http.invalid_transfer_encoding_value_in_request":
 			present = httpInvalidTransferEncodingInRequest(raw)
+		case "http.request_auth_unrecognized":
+			present = httpRequestAuthUnrecognized(raw)
 		}
 		if event.Negated {
 			present = !present
@@ -177,4 +185,51 @@ func httpInvalidTransferEncodingInRequest(raw []byte) bool {
 		chunked = true
 	}
 	return chunked && !http11OrNewer
+}
+
+// httpRequestAuthUnrecognized mirrors libhtp's Authorization scheme check:
+// fires when an HTTP request carries an Authorization header whose scheme is
+// empty or not a recognized standard HTTP authentication scheme (e.g., bare
+// tokens or proprietary phishing kit headers).
+func httpRequestAuthUnrecognized(raw []byte) bool {
+	headerEnd := bytes.Index(raw, []byte("\r\n\r\n"))
+	if headerEnd < 0 {
+		headerEnd = bytes.Index(raw, []byte("\n\n"))
+	}
+	if headerEnd < 0 {
+		return false
+	}
+	lines := bytes.Split(raw[:headerEnd], []byte("\n"))
+	if len(lines) == 0 {
+		return false
+	}
+	requestLine := strings.Fields(strings.TrimSuffix(string(lines[0]), "\r"))
+	if len(requestLine) < 3 || strings.HasPrefix(requestLine[0], "HTTP/") {
+		return false
+	}
+	for _, line := range lines[1:] {
+		key, value, ok := bytes.Cut(line, []byte(":"))
+		if !ok || !bytes.EqualFold(bytes.TrimSpace(key), []byte("Authorization")) {
+			continue
+		}
+		trimmed := strings.TrimSpace(string(value))
+		if trimmed == "" {
+			return true
+		}
+		scheme, _, hasRest := strings.Cut(trimmed, " ")
+		if !hasRest {
+			// Bare token without scheme (e.g. "Authorization: eyJhbG...") is
+			// always unrecognized by libhtp.
+			return true
+		}
+		switch strings.ToLower(strings.TrimSpace(scheme)) {
+		case "basic", "digest", "bearer", "negotiate", "ntlm", "oauth",
+			"hoba", "mutual", "scram-sha-1", "scram-sha-256", "vapid",
+			"aws4-hmac-sha256", "dpop":
+			continue
+		default:
+			return true
+		}
+	}
+	return false
 }

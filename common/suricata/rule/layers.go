@@ -57,3 +57,22 @@ type TCPLayerRule struct {
 	TCPMss         *numrange.NumRange
 	Flags          string
 }
+
+type HTTP2Rule struct {
+	FrameType        uint8
+	FrameTypeSet     bool
+	FrameTypeNegated bool
+	Window           *numrange.NumRange
+}
+
+type SNMPRule struct {
+	Version *numrange.NumRange
+}
+
+type DCERPCRule struct {
+	IfaceUUID    string
+	IfaceVersion *numrange.NumRange
+	IfaceAnyFrag bool
+	Opnum        []*numrange.NumRange
+	OpnumNegated bool
+}

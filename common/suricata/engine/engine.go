@@ -250,6 +250,15 @@ func (e *StatefulEngine) Handle(event InspectionEvent) Result {
 			e.diagnostic(&result, event, nil, "protocol-event", message)
 			return result
 		}
+		if event.Protocol.Protocol == "dcerpc" && event.Flow.Key.Generation != 0 {
+			if flow := e.flow(event.Flow.Key, true); flow != nil {
+				flow.mu.Lock()
+				if !flow.closed {
+					flow.observeProtocolEvent(event.Protocol)
+				}
+				flow.mu.Unlock()
+			}
+		}
 		// Complete decoded transactions do not currently match packet/stream
 		// rule plans unless explicitly enabled; fast-fail when prefilter is on.
 		if !e.disablePrefilter {
