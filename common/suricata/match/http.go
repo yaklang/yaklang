@@ -3,8 +3,12 @@ package match
 import (
 	"bufio"
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
+	"compress/zlib"
 	"encoding/binary"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -167,6 +171,12 @@ func (p *HTTPBufferProvider) GetHeaderLines(mdf modifier.Modifier) [][]byte {
 	return p.inner.GetHeaderLines(mdf)
 }
 
+// WasDecompressed reports whether the HTTP message body was decompressed
+// (gzip/deflate) during inspection.
+func (p *HTTPBufferProvider) WasDecompressed() bool {
+	return p != nil && p.inner != nil && p.inner.decompressed
+}
+
 // LooksLikeHTTP performs a cheap O(1) prefix check to fast-fail non-HTTP
 // stream payloads before running any HTTP parser or HTTP rule bucket.
 func LooksLikeHTTP(payload []byte) bool {
@@ -293,16 +303,19 @@ func httpResMatcher(_ *matchContext) error {
 	return nil
 }
 
+const maxHTTPDecompressBytes = 4 << 20 // 4 MiB hard cap against zip bombs
+
 type httpProvider struct {
 	PK gopacket.Packet
 
 	// cache
-	raw        []byte
-	body       []byte
-	bodyCached bool
-	bufCache   map[modifier.Modifier][]byte
-	req        *http.Request
-	res        *http.Response
+	raw          []byte
+	body         []byte
+	bodyCached   bool
+	decompressed bool
+	bufCache     map[modifier.Modifier][]byte
+	req          *http.Request
+	res          *http.Response
 }
 
 // if success, return value not nil
@@ -578,8 +591,62 @@ func (h *httpProvider) bodyBuffer() []byte {
 			body = decoded
 		}
 	}
+	var contentEncoding string
+	if h.req != nil {
+		contentEncoding = h.req.Header.Get("Content-Encoding")
+	} else if h.res != nil {
+		contentEncoding = h.res.Header.Get("Content-Encoding")
+	}
+	if contentEncoding != "" && len(body) > 0 {
+		if decoded, ok := decompressHTTPBody(body, contentEncoding); ok {
+			body = decoded
+			h.decompressed = true
+		}
+	}
 	h.body = body
 	return body
+}
+
+// decompressHTTPBody decodes gzip, x-gzip, or deflate (zlib/raw) HTTP bodies
+// with a strict upper bound (maxHTTPDecompressBytes) to protect against zip
+// bombs. Corrupt or unsupported encodings return (nil, false) so matching
+// falls back safely to the raw body bytes.
+func decompressHTTPBody(body []byte, encoding string) ([]byte, bool) {
+	enc := strings.ToLower(strings.TrimSpace(encoding))
+	// Handle chained encodings by checking the outermost token.
+	if idx := strings.LastIndexByte(enc, ','); idx >= 0 {
+		enc = strings.TrimSpace(enc[idx+1:])
+	}
+	switch enc {
+	case "gzip", "x-gzip":
+		gr, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, false
+		}
+		defer gr.Close()
+		out, err := io.ReadAll(io.LimitReader(gr, maxHTTPDecompressBytes))
+		if len(out) == 0 && err != nil {
+			return nil, false
+		}
+		return out, true
+	case "deflate":
+		if zr, err := zlib.NewReader(bytes.NewReader(body)); err == nil {
+			out, rerr := io.ReadAll(io.LimitReader(zr, maxHTTPDecompressBytes))
+			_ = zr.Close()
+			if len(out) > 0 || rerr == nil {
+				return out, true
+			}
+		}
+		fr := flate.NewReader(bytes.NewReader(body))
+		out, err := io.ReadAll(io.LimitReader(fr, maxHTTPDecompressBytes))
+		_ = fr.Close()
+		if len(out) == 0 && err != nil {
+			return nil, false
+		}
+		return out, true
+	default:
+		return nil, false
+	}
 }
 
 // Get part of http.

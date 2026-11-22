@@ -39,21 +39,24 @@ func ParseStrictRule(data string, envs ...string) ([]*Rule, error) {
 }
 
 func parseRules(data string, strict bool, envs ...string) ([]*Rule, error) {
-	config := config2.DefaultConfig.Clone()
+	config := config2.DefaultConfig
 	var envErrors []error
-	for _, env := range envs {
-		name, value, ok := strings.Cut(env, "=")
-		if !ok {
-			envErrors = append(envErrors, fmt.Errorf("suricata env %q must use key=value format", env))
-			continue
-		}
-		name = strings.Trim(strings.TrimSpace(name), "${}")
-		if name == "" {
-			envErrors = append(envErrors, fmt.Errorf("suricata env %q has an empty name", env))
-			continue
-		}
-		if err := config.AddVar(name, strings.TrimSpace(value)); err != nil {
-			envErrors = append(envErrors, fmt.Errorf("add suricata env %s: %w", name, err))
+	if len(envs) > 0 {
+		config = config2.DefaultConfig.Clone()
+		for _, env := range envs {
+			name, value, ok := strings.Cut(env, "=")
+			if !ok {
+				envErrors = append(envErrors, fmt.Errorf("suricata env %q must use key=value format", env))
+				continue
+			}
+			name = strings.Trim(strings.TrimSpace(name), "${}")
+			if name == "" {
+				envErrors = append(envErrors, fmt.Errorf("suricata env %q has an empty name", env))
+				continue
+			}
+			if err := config.AddVar(name, strings.TrimSpace(value)); err != nil {
+				envErrors = append(envErrors, fmt.Errorf("add suricata env %s: %w", name, err))
+			}
 		}
 	}
 

@@ -117,7 +117,7 @@ func buildKeywordCapabilityRegistry() map[string]KeywordCapability {
 	add(KeywordSupported, "byte_test", "", "byte_test")
 	add(KeywordSupported, "byte_jump", "", "byte_jump")
 	add(KeywordSupported, "byte_extract", "", "byte_extract")
-	add(KeywordUnsupported, "byte-operation", "byte arithmetic is not implemented", "byte_math")
+	add(KeywordSupported, "byte_math", "", "byte_math")
 	add(KeywordUnsupported, "rpc", "RPC matching is not implemented", "rpc")
 	add(KeywordUnsupported, "replace", "payload replacement is not implemented", "replace")
 	add(KeywordStatefulRequired, "noalert", "alert suppression is a stateful rule side effect", "noalert")
@@ -126,6 +126,7 @@ func buildKeywordCapabilityRegistry() map[string]KeywordCapability {
 	add(KeywordSupported, "asn1", "", "asn1")
 	add(KeywordSupported, "file.data", "", "file_data", "file.data")
 	add(KeywordSupported, "ssh.proto", "", "ssh.proto", "ssh_proto")
+	add(KeywordSupported, "ssh.software", "", "ssh.software", "ssh_software")
 	add(KeywordSupported, "ftpbounce", "", "ftpbounce")
 	add(KeywordSupported, "ip-header-buffer", "", "ipv4.hdr", "ipv4_hdr", "ipv6.hdr", "ipv6_hdr")
 
@@ -137,7 +138,7 @@ func buildKeywordCapabilityRegistry() map[string]KeywordCapability {
 	add(KeywordUnsupported, "rule-action", "this rule side effect is not implemented", "filestore")
 	add(KeywordUnsupported, "file-property", "file property and hash matching are not implemented", "filemagic", "file.name", "fileext", "filesize", "filemd5", "filesha1", "filesha256")
 	add(KeywordUnsupported, "tls-property", "this TLS property is not wired into rule parsing", "tls.cert_chain_len", "tls_cert_chain_len", "tls.cert_expired", "tls_cert_expired", "tls.cert_valid", "tls_cert_valid")
-	add(KeywordUnsupported, "protocol-property", "this application protocol keyword is not implemented", "ssh.software", "ssh.protoversion")
+	add(KeywordUnsupported, "protocol-property", "this application protocol keyword is not implemented", "ssh.protoversion")
 	add(KeywordSupported, "http.accept_lang", "", "http_accept_lang", "http.accept_lang")
 
 	return registry

@@ -166,7 +166,7 @@ func (p *CompiledRulePlan) validateProtocolState() error {
 	}
 	protocol := p.Rule.Protocol
 	switch protocol {
-	case "tcp", "http", "http1", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "tcp-stream":
+	case "tcp", "http", "http1", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet", "sip", "tcp-stream":
 		// These protocols are carried over the same TCP flowRuntime that drives
 		// the handshake, direction, flowbits and threshold state.
 		if len(p.StreamSize) > 0 && p.Flow != nil && (p.Flow.Stateless || p.Flow.NoStream) {
@@ -217,7 +217,7 @@ func (p *CompiledRulePlan) validateProtocolState() error {
 			}
 		}
 		return nil
-	case "udp", "dns":
+	case "udp", "dns", "ike", "bittorrent-dht":
 		if len(p.StreamSize) > 0 {
 			return fmt.Errorf("stream_size requires a TCP stream")
 		}

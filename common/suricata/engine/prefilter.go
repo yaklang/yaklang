@@ -218,6 +218,7 @@ func (l *httpStreamLane) close() {
 type tlsStreamLane struct {
 	hasPlans   bool
 	buffers    []bufferGroup
+	certsGroup *minirehsGroup
 	alwaysEval []int
 }
 
@@ -225,12 +226,14 @@ func (l *tlsStreamLane) close() {
 	for _, bg := range l.buffers {
 		bg.group.close()
 	}
+	l.certsGroup.close()
 }
 
 type singleBufferLane struct {
 	hasPlans   bool
 	group      *minirehsGroup
 	alwaysEval []int
+	alwaysIdx  ipFilteredSet
 }
 
 func (l *singleBufferLane) close() {
@@ -384,6 +387,7 @@ var tlsAllowedBuffers = map[modifier.Modifier]bool{
 	modifier.TLSCertIssuer:      true,
 	modifier.TLSCertSerial:      true,
 	modifier.TLSCertFingerprint: true,
+	modifier.TLSCerts:           true,
 	modifier.TLSRandom:          true,
 	modifier.TLSRandomTime:      true,
 	modifier.TLSRandomBytes:     true,
@@ -490,7 +494,7 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				} else {
 					pf.pktDNS.alwaysEval = append(pf.pktDNS.alwaysEval, idx)
 				}
-			case "tcp", "tcp-pkt", "tcp-stream", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp":
+			case "tcp", "tcp-pkt", "tcp-stream", "http", "http1", "tls", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "telnet":
 				pf.pktTCP.hasPlans = true
 				// Packet-view HTTP/TLS/SSH/SMTP-file_data rules parse structured
 				// buffers rather than raw TCP payload; keep them in alwaysEval.
@@ -501,7 +505,7 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 				} else {
 					pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, idx)
 				}
-			case "udp":
+			case "udp", "ike", "bittorrent-dht":
 				pf.pktUDP.hasPlans = true
 				if _, expr, flags, ok := extractPrefilterPattern(plan.Rule, defaultOnlyAllowedBuffers, false); ok {
 					pktUDPBuilder.add(expr, flags, idx)
@@ -573,13 +577,18 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 		grp, fallback := tlsBuilders[mod].build()
 		pf.streamTLS.alwaysEval = append(pf.streamTLS.alwaysEval, fallback...)
 		if grp != nil {
-			pf.streamTLS.buffers = append(pf.streamTLS.buffers, bufferGroup{mod: mod, group: grp})
+			if mod == modifier.TLSCerts {
+				pf.streamTLS.certsGroup = grp
+			} else {
+				pf.streamTLS.buffers = append(pf.streamTLS.buffers, bufferGroup{mod: mod, group: grp})
+			}
 		}
 	}
 
 	var fallback []int
 	pf.streamTCP.group, fallback = tcpStreamBuilder.build()
 	pf.streamTCP.alwaysEval = append(pf.streamTCP.alwaysEval, fallback...)
+	pf.streamTCP.alwaysIdx = buildIPFilteredSet(plans, pf.streamTCP.alwaysEval, false)
 
 	pf.pktDNS.queryGroup, fallback = dnsQueryBuilder.build()
 	pf.pktDNS.alwaysEval = append(pf.pktDNS.alwaysEval, fallback...)
@@ -588,14 +597,23 @@ func buildEnginePrefilter(plans []*CompiledRulePlan) *enginePrefilter {
 
 	pf.pktTCP.group, fallback = pktTCPBuilder.build()
 	pf.pktTCP.alwaysEval = append(pf.pktTCP.alwaysEval, fallback...)
+	pf.pktTCP.alwaysIdx = buildIPFilteredSet(plans, pf.pktTCP.alwaysEval, true)
+
 	pf.pktUDP.group, fallback = pktUDPBuilder.build()
 	pf.pktUDP.alwaysEval = append(pf.pktUDP.alwaysEval, fallback...)
+	pf.pktUDP.alwaysIdx = buildIPFilteredSet(plans, pf.pktUDP.alwaysEval, false)
+
 	pf.pktICMP.group, fallback = pktICMPBuilder.build()
 	pf.pktICMP.alwaysEval = append(pf.pktICMP.alwaysEval, fallback...)
+	pf.pktICMP.alwaysIdx = buildIPFilteredSet(plans, pf.pktICMP.alwaysEval, false)
+
 	pf.pktICMPv6.group, fallback = pktICMPv6Builder.build()
 	pf.pktICMPv6.alwaysEval = append(pf.pktICMPv6.alwaysEval, fallback...)
+	pf.pktICMPv6.alwaysIdx = buildIPFilteredSet(plans, pf.pktICMPv6.alwaysEval, false)
+
 	pf.pktIP.group, fallback = pktIPBuilder.build()
 	pf.pktIP.alwaysEval = append(pf.pktIP.alwaysEval, fallback...)
+	pf.pktIP.alwaysIdx = buildIPFilteredSet(plans, pf.pktIP.alwaysEval, false)
 
 	return pf
 }
@@ -763,16 +781,21 @@ func (pf *enginePrefilter) collectStreamCandidates(
 	pk gopacket.Packet,
 	streamPayload []byte,
 	httpPayload []byte,
-) (*match.HTTPBufferProvider, *match.TLSBufferProvider) {
+) (*match.HTTPBufferProvider, *match.TLSBufferProvider, bool, bool) {
 	if pk == nil {
 		collector.addSlice(pf.allStreamPlans)
-		return nil, nil
+		return nil, nil, false, false
 	}
 	meta := extractPacketHeaderMeta(pk)
 
 	var sharedHTTP *match.HTTPBufferProvider
-	if pf.streamHTTP.hasPlans && len(httpPayload) > 0 && match.LooksLikeHTTP(httpPayload) {
-		sharedHTTP = match.ParseHTTPStream(pk, httpPayload)
+	var httpFastFailed bool
+	if pf.streamHTTP.hasPlans && len(httpPayload) > 0 {
+		if !match.LooksLikeHTTP(httpPayload) {
+			httpFastFailed = true
+		} else {
+			sharedHTTP = match.ParseHTTPStream(pk, httpPayload)
+		}
 		if sharedHTTP != nil {
 			if sharedHTTP.IsRequest() {
 				for _, bg := range pf.streamHTTP.reqBuffers {
@@ -809,12 +832,24 @@ func (pf *enginePrefilter) collectStreamCandidates(
 	}
 
 	var sharedTLS *match.TLSBufferProvider
-	if pf.streamTLS.hasPlans && len(streamPayload) > 0 && match.LooksLikeTLS(streamPayload) {
-		sharedTLS = match.ParseTLSStream(pk, streamPayload)
+	var tlsFastFailed bool
+	if pf.streamTLS.hasPlans && len(streamPayload) > 0 {
+		if !match.LooksLikeTLS(streamPayload) {
+			tlsFastFailed = true
+		} else {
+			sharedTLS = match.ParseTLSStream(pk, streamPayload)
+		}
 		if sharedTLS != nil {
 			for _, bg := range pf.streamTLS.buffers {
 				if buf := sharedTLS.Get(bg.mod); len(buf) > 0 {
 					bg.group.scan(buf, collector)
+				}
+			}
+			if pf.streamTLS.certsGroup != nil {
+				for _, cert := range sharedTLS.GetCerts() {
+					if len(cert) > 0 {
+						pf.streamTLS.certsGroup.scan(cert, collector)
+					}
 				}
 			}
 			pf.addFiltered(collector, pf.streamTLS.alwaysEval, meta)
@@ -825,10 +860,10 @@ func (pf *enginePrefilter) collectStreamCandidates(
 		if len(streamPayload) > 0 && pf.streamTCP.group != nil {
 			pf.streamTCP.group.scan(streamPayload, collector)
 		}
-		pf.addFiltered(collector, pf.streamTCP.alwaysEval, meta)
+		pf.streamTCP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 	}
 
-	return sharedHTTP, sharedTLS
+	return sharedHTTP, sharedTLS, httpFastFailed, tlsFastFailed
 }
 
 // collectPacketCandidates partitions packet-view evaluation by decoded
@@ -857,7 +892,7 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 			if len(tcp.Payload) > 0 && pf.pktTCP.group != nil {
 				pf.pktTCP.group.scan(tcp.Payload, collector)
 			}
-			pf.addFiltered(collector, pf.pktTCP.alwaysEval, meta)
+			pf.pktTCP.alwaysIdx.collect(pf.plans, collector, meta, true, tcpLayerFlagMask(tcp))
 		}
 	}
 
@@ -866,7 +901,7 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 			if len(udp.Payload) > 0 && pf.pktUDP.group != nil {
 				pf.pktUDP.group.scan(udp.Payload, collector)
 			}
-			pf.addFiltered(collector, pf.pktUDP.alwaysEval, meta)
+			pf.pktUDP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
 	}
 
@@ -875,7 +910,7 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 			if len(icmp.Payload) > 0 && pf.pktICMP.group != nil {
 				pf.pktICMP.group.scan(icmp.Payload, collector)
 			}
-			pf.addFiltered(collector, pf.pktICMP.alwaysEval, meta)
+			pf.pktICMP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
 	}
 
@@ -884,7 +919,7 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 			if len(icmp6.Payload) > 0 && pf.pktICMPv6.group != nil {
 				pf.pktICMPv6.group.scan(icmp6.Payload, collector)
 			}
-			pf.addFiltered(collector, pf.pktICMPv6.alwaysEval, meta)
+			pf.pktICMPv6.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
 	}
 
@@ -893,7 +928,7 @@ func (pf *enginePrefilter) collectPacketCandidates(collector *candidateCollector
 			if payload := netLayer.LayerPayload(); len(payload) > 0 && pf.pktIP.group != nil {
 				pf.pktIP.group.scan(payload, collector)
 			}
-			pf.addFiltered(collector, pf.pktIP.alwaysEval, meta)
+			pf.pktIP.alwaysIdx.collect(pf.plans, collector, meta, false, 0)
 		}
 	}
 

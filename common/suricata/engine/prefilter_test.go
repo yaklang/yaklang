@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
@@ -272,6 +274,139 @@ func TestStatefulEnginePrefilterConcurrentAndClose(t *testing.T) {
 	}
 	wg.Wait()
 	require.NoError(t, eng.Close())
+}
+
+func TestStatefulEngineHotReloadAndTelemetry(t *testing.T) {
+	initialRules, err := rule.ParseStrictRule(`
+alert http any any -> any any (msg:"v1 rule"; flow:established,to_server; http.uri; content:"/v1-only"; sid:9910001; rev:1;)
+alert http any any -> any any (msg:"flowbit setter"; flow:established,to_server; http.uri; content:"/stage1"; flowbits:set,hot.reload; noalert; sid:9910002; rev:1;)
+`)
+	require.NoError(t, err)
+
+	eng, err := NewStatefulEngine(initialRules, Config{Epoch: 91, State: state.DefaultConfig()})
+	require.NoError(t, err)
+	defer eng.Close()
+
+	fc := FlowSnapshot{
+		Key:        FlowKey{Generation: 500},
+		First:      Endpoint{Address: netip.MustParseAddr("198.51.100.10"), Port: 50100},
+		Second:     Endpoint{Address: netip.MustParseAddr("10.0.0.80"), Port: 80},
+		IPv4:       true,
+		IPProtocol: uint8(layers.IPProtocolTCP),
+	}
+	now := time.Unix(1700040000, 0)
+	eng.Handle(InspectionEvent{View: ViewFlowCreated, Timestamp: now, Flow: fc})
+	eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Flow: fc, Direction: 0, Packet: buildPrefilterTestTCPPacket(t, "198.51.100.10", "10.0.0.80", 50100, 80, 10, 0, true, false, false, nil)})
+	eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Flow: fc, Direction: 1, Packet: buildPrefilterTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 80, 50100, 20, 11, true, true, false, nil)})
+	eng.Handle(InspectionEvent{View: ViewNormalizedPacket, Timestamp: now, Flow: fc, Direction: 0, Packet: buildPrefilterTestTCPPacket(t, "198.51.100.10", "10.0.0.80", 50100, 80, 11, 21, false, true, false, nil)})
+
+	// Set flowbit before reload on the live established flow.
+	req1 := []byte("GET /stage1 HTTP/1.1\r\nHost: demo.local\r\n\r\n")
+	res1 := eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now, Flow: fc, Direction: 0, Packet: buildPrefilterTestTCPPacket(t, "198.51.100.10", "10.0.0.80", 50100, 80, 11, 21, false, true, true, req1), Payload: req1})
+	require.Empty(t, res1.Alerts)
+
+	// Invalid reload (duplicate SID) must fail cleanly without disturbing active rules.
+	badRules, err := rule.ParseStrictRule(`
+alert http any any -> any any (msg:"dup1"; http.uri; content:"/a"; sid:9910099; rev:1;)
+alert http any any -> any any (msg:"dup2"; http.uri; content:"/b"; sid:9910099; rev:1;)
+`)
+	require.NoError(t, err)
+	require.Error(t, eng.Reload(badRules))
+	require.Equal(t, uint64(0), eng.Stats().Prefilter.Reloads)
+
+	// Valid hot reload replacing rules with v2 rule that depends on flowbit set before reload + gzip response rule.
+	v2Rules, err := rule.ParseStrictRule(`
+alert http any any -> any any (msg:"v2 flowbit consumer"; flow:established,to_server; flowbits:isset,hot.reload; http.uri; content:"/stage2"; sid:9910010; rev:1;)
+alert http any any -> any any (msg:"v2 gzip resp"; flow:established,to_client; http.response_body; content:"GZIP_HOT_RELOAD_HIT"; sid:9910011; rev:1;)
+alert tls any any -> any any (msg:"tls dummy"; flow:established,to_server; tls.sni; content:"unused.example"; sid:9910012; rev:1;)
+`)
+	require.NoError(t, err)
+	require.NoError(t, eng.Reload(v2Rules))
+
+	// Continue the SAME keep-alive flow after reload: flowbit must still be set and v2 rule must fire!
+	req2 := []byte("GET /stage2 HTTP/1.1\r\nHost: demo.local\r\n\r\n")
+	res2 := eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now.Add(time.Second), Flow: fc, Direction: 0, Packet: buildPrefilterTestTCPPacket(t, "198.51.100.10", "10.0.0.80", 50100, 80, 11+uint32(len(req1)), 21, false, true, true, req2), Payload: req2})
+	require.Len(t, res2.Alerts, 1)
+	require.Equal(t, 9910010, res2.Alerts[0].Rule.Sid)
+
+	// Send gzipped HTTP response on the same flow and verify decompression telemetry.
+	var gz bytes.Buffer
+	gw := gzip.NewWriter(&gz)
+	_, err = gw.Write([]byte("body with GZIP_HOT_RELOAD_HIT marker"))
+	require.NoError(t, err)
+	require.NoError(t, gw.Close())
+	resp := append([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n", gz.Len())), gz.Bytes()...)
+	res3 := eng.Handle(InspectionEvent{View: ViewStream, Timestamp: now.Add(2 * time.Second), Flow: fc, Direction: 1, Packet: buildPrefilterTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 80, 50100, 21, 11+uint32(len(req1)+len(req2)), false, true, true, resp), Payload: resp})
+	require.Len(t, res3.Alerts, 1)
+	require.Equal(t, 9910011, res3.Alerts[0].Rule.Sid)
+
+	st := eng.Stats().Prefilter
+	require.True(t, st.Enabled)
+	require.Equal(t, 3, st.ActiveRules)
+	require.Equal(t, uint64(1), st.Reloads)
+	require.GreaterOrEqual(t, st.DecompressedHTTPBodies, uint64(1))
+	require.GreaterOrEqual(t, st.StreamFastFailTLS, uint64(1))
+	require.Greater(t, st.RulesSkipped, uint64(0))
+}
+
+func TestIPv4SweepIndexZeroFNEquivalence(t *testing.T) {
+	var ruleText string
+	for i := 0; i < 40; i++ {
+		ruleText += fmt.Sprintf(
+			`alert ip [198.51.%d.0/24,203.0.113.%d] any -> $HOME_NET any (msg:"blk-%d"; sid:%d; rev:1;)`+"\n",
+			i, i+1, i, 9920000+i,
+		)
+	}
+	// Overlapping CIDR + bidirectional + negative exception + TCP flags rules.
+	ruleText += `
+alert ip [198.51.10.0/23,!198.51.10.5] any <> $HOME_NET any (msg:"overlap-bi"; sid:9920100; rev:1;)
+alert tcp-pkt any any -> $HOME_NET 80 (msg:"syn-only"; flags:S,12; sid:9920101; rev:1;)
+alert tcp-pkt any any -> $HOME_NET 80 (msg:"ack-only"; flags:A; sid:9920102; rev:1;)
+`
+	rules, err := rule.ParseStrictRule(ruleText)
+	require.NoError(t, err)
+
+	pkts := []gopacket.Packet{
+		buildPrefilterTestTCPPacket(t, "198.51.10.5", "10.0.0.80", 40001, 80, 1, 0, true, false, false, nil),  // hits blk-10 + syn-only, excluded from overlap-bi
+		buildPrefilterTestTCPPacket(t, "198.51.10.9", "10.0.0.80", 40002, 80, 1, 1, false, true, false, nil),  // hits blk-10 + overlap-bi + ack-only
+		buildPrefilterTestTCPPacket(t, "10.0.0.80", "198.51.11.20", 80, 40003, 1, 1, false, true, false, nil), // reverse hits overlap-bi
+		buildPrefilterTestTCPPacket(t, "203.0.113.15", "10.0.0.80", 40004, 443, 1, 0, true, false, false, nil),
+		buildPrefilterTestTCPPacket(t, "8.8.8.8", "10.0.0.80", 40005, 80, 1, 1, false, true, false, nil), // benign IP, hits ack-only
+	}
+
+	run := func(disablePrefilter bool) [][]int {
+		eng, err := NewStatefulEngine(rules, Config{
+			Epoch:            92,
+			State:            state.DefaultConfig(),
+			DisablePrefilter: disablePrefilter,
+		})
+		require.NoError(t, err)
+		defer eng.Close()
+
+		var out [][]int
+		for i, pk := range pkts {
+			res := eng.Handle(InspectionEvent{
+				View:      ViewNormalizedPacket,
+				Timestamp: time.Unix(1700050000+int64(i), 0),
+				Packet:    pk,
+			})
+			var sids []int
+			for _, a := range res.Alerts {
+				sids = append(sids, a.Rule.Sid)
+			}
+			out = append(out, sids)
+		}
+		return out
+	}
+
+	fast := run(false)
+	linear := run(true)
+	require.Equal(t, linear, fast)
+	require.Equal(t, []int{9920010, 9920101}, fast[0])
+	require.Equal(t, []int{9920010, 9920100, 9920102}, fast[1])
+	require.Equal(t, []int{9920100}, fast[2])
+	require.Equal(t, []int{9920014}, fast[3])
+	require.Equal(t, []int{9920102}, fast[4])
 }
 
 func BenchmarkStatefulEngineHTTPPrefilterVsLinear(b *testing.B) {

@@ -55,7 +55,8 @@ type flowRuntime struct {
 }
 
 type ruleDirection struct {
-	ruleIndex int
+	gid       int
+	sid       int
 	direction int
 }
 

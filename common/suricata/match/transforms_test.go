@@ -1,6 +1,9 @@
 package match
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -282,4 +285,153 @@ func TestAddressRuleFastRangeLookup(t *testing.T) {
 	require.False(t, src.MatchAddr(netip.MustParseAddr("203.0.113.11")))
 	require.True(t, dst.MatchAddr(netip.MustParseAddr("10.0.0.80")))
 	require.False(t, dst.MatchAddr(netip.MustParseAddr("8.8.8.8")))
+}
+
+func TestHTTPGzipAndDeflateBodyDecompression(t *testing.T) {
+	plain := []byte("<html><body>SECRET_EXPLOIT_RESPONSE_MARKER</body></html>")
+
+	// 1. Gzip-encoded HTTP response.
+	var gzBuf bytes.Buffer
+	gw := gzip.NewWriter(&gzBuf)
+	_, err := gw.Write(plain)
+	require.NoError(t, err)
+	require.NoError(t, gw.Close())
+
+	gzResp := append([]byte(fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n",
+		gzBuf.Len(),
+	)), gzBuf.Bytes()...)
+	pkGz := buildTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 80, 52000, gzResp)
+
+	rBody, err := rule.ParseStrictRule(`alert http any any -> any any (msg:"gzip body"; http.response_body; content:"SECRET_EXPLOIT_RESPONSE_MARKER"; sid:5001; rev:1;)`)
+	require.NoError(t, err)
+	mBody, err := CompileRule(rBody[0])
+	require.NoError(t, err)
+	ok, err := mBody.MatchStream(pkGz, gzResp)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// Verify ParseHTTPStream reports WasDecompressed()==true after body access.
+	shared := ParseHTTPStream(pkGz, gzResp)
+	require.NotNil(t, shared)
+	require.Contains(t, string(shared.Get(0x00)), "HTTP/1.1")
+	require.Contains(t, string(shared.inner.bodyBuffer()), "SECRET_EXPLOIT_RESPONSE_MARKER")
+	require.True(t, shared.WasDecompressed())
+
+	// 2. Deflate (zlib) encoded HTTP response via file_data.
+	var zlBuf bytes.Buffer
+	zw := zlib.NewWriter(&zlBuf)
+	_, err = zw.Write(plain)
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+
+	zlResp := append([]byte(fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Encoding: deflate\r\nContent-Length: %d\r\n\r\n",
+		zlBuf.Len(),
+	)), zlBuf.Bytes()...)
+	pkZl := buildTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 80, 52001, zlResp)
+
+	rFD, err := rule.ParseStrictRule(`alert http any any -> any any (msg:"deflate file_data"; file_data; content:"SECRET_EXPLOIT_RESPONSE_MARKER"; sid:5002; rev:1;)`)
+	require.NoError(t, err)
+	mFD, err := CompileRule(rFD[0])
+	require.NoError(t, err)
+	ok, err = mFD.MatchStream(pkZl, zlResp)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// 3. Corrupt gzip falls back cleanly to raw body without error.
+	badResp := []byte("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 12\r\n\r\nRAW_FALLBACK")
+	pkBad := buildTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 80, 52002, badResp)
+	rRaw, err := rule.ParseStrictRule(`alert http any any -> any any (msg:"corrupt gzip fallback"; http.response_body; content:"RAW_FALLBACK"; sid:5003; rev:1;)`)
+	require.NoError(t, err)
+	mRaw, err := CompileRule(rRaw[0])
+	require.NoError(t, err)
+	ok, err = mRaw.MatchStream(pkBad, badResp)
+	require.NoError(t, err)
+	require.True(t, ok)
+}
+
+func TestSSHSoftwareByteMathAndAppLayerProtocols(t *testing.T) {
+	// 1. ssh.software extraction (Erlang/OTP CVE-2025-32433 style).
+	sshBanner := []byte("SSH-2.0-Erlang/5.2.0\r\n")
+	pkSSH := buildTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 22, 53000, sshBanner)
+	rSSH, err := rule.ParseStrictRule(`alert ssh any any -> any any (msg:"erlang ssh"; ssh.software; content:"Erlang/"; pcre:"/^5\.2\.0/R"; sid:5101; rev:1;)`)
+	require.NoError(t, err)
+	mSSH, err := CompileRule(rSSH[0])
+	require.NoError(t, err)
+	ok, err := mSSH.MatchStream(pkSSH, sshBanner)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// 2. byte_math + isdataat:!variable (ETPro implant.js style).
+	// Payload: 0xa1 + uint32_be(4) + 5 bytes => length = 4 + 6 = 10; len(payload) == 10 => !isdataat(10) is true!
+	bmPayloadMatch := []byte{0xa1, 0x00, 0x00, 0x00, 0x04, 'a', 'b', 'c', 'd', 'e'}
+	bmPayloadTooLong := append(append([]byte(nil), bmPayloadMatch...), 'X')
+	rBM, err := rule.ParseStrictRule(`alert tcp any any -> any any (msg:"byte_math"; content:"|a1|"; startswith; byte_math:bytes 4, offset 0, oper +, rvalue 6, result length, relative; isdataat:!length; sid:5102; rev:1;)`)
+	require.NoError(t, err)
+	mBM, err := CompileRule(rBM[0])
+	require.NoError(t, err)
+	ok, err = mBM.MatchStream(buildTestTCPPacket(t, "10.0.0.10", "198.51.100.10", 53001, 4444, bmPayloadMatch), bmPayloadMatch)
+	require.NoError(t, err)
+	require.True(t, ok)
+	ok, err = mBM.MatchStream(buildTestTCPPacket(t, "10.0.0.10", "198.51.100.10", 53001, 4444, bmPayloadTooLong), bmPayloadTooLong)
+	require.NoError(t, err)
+	require.False(t, ok)
+
+	// 3. app-layer-protocol:telnet and app-layer-protocol:!tls.
+	telnetPayload := []byte{0xff, 0xfd, 0x18, 'r', 'u', 'n', 'C', 'm', 'd'}
+	pkTelnet := buildTestTCPPacket(t, "198.51.100.10", "10.0.0.80", 53002, 23, telnetPayload)
+	rTelnet, err := rule.ParseStrictRule(`alert tcp any any -> any 23 (msg:"telnet"; app-layer-protocol:telnet; content:"runCmd"; sid:5103; rev:1;)`)
+	require.NoError(t, err)
+	mTelnet, err := CompileRule(rTelnet[0])
+	require.NoError(t, err)
+	ok, err = mTelnet.MatchStream(pkTelnet, telnetPayload)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	rNotTLS, err := rule.ParseStrictRule(`alert tcp any any -> any any (msg:"not tls"; app-layer-protocol:!tls; content:"runCmd"; sid:5104; rev:1;)`)
+	require.NoError(t, err)
+	mNotTLS, err := CompileRule(rNotTLS[0])
+	require.NoError(t, err)
+	ok, err = mNotTLS.MatchStream(pkTelnet, telnetPayload)
+	require.NoError(t, err)
+	require.True(t, ok)
+}
+
+func TestMultiCertTLSChainMatching(t *testing.T) {
+	// Build a minimal TLS 1.2 Certificate handshake containing 2 DER-prefixed certs.
+	cert1 := append([]byte{0x30, 0x10}, []byte("LEAF-CERT-MARKER")...)
+	cert2 := append([]byte{0x30, 0x18}, []byte("INTERMEDIATE-CA-EVIL-SIG")...)
+
+	var certList []byte
+	for _, cert := range [][]byte{cert1, cert2} {
+		certList = append(certList, byte(len(cert)>>16), byte(len(cert)>>8), byte(len(cert)))
+		certList = append(certList, cert...)
+	}
+	var body []byte
+	body = append(body, byte(len(certList)>>16), byte(len(certList)>>8), byte(len(certList)))
+	body = append(body, certList...)
+
+	hs := make([]byte, 4+len(body))
+	hs[0] = 11 // Certificate
+	hs[1] = byte(len(body) >> 16)
+	hs[2] = byte(len(body) >> 8)
+	hs[3] = byte(len(body))
+	copy(hs[4:], body)
+
+	rec := make([]byte, 5+len(hs))
+	rec[0] = 22
+	rec[1] = 0x03
+	rec[2] = 0x03
+	binary.BigEndian.PutUint16(rec[3:5], uint16(len(hs)))
+	copy(rec[5:], hs)
+
+	pk := buildTestTCPPacket(t, "10.0.0.80", "198.51.100.10", 443, 54000, rec)
+	rCert, err := rule.ParseStrictRule(`alert tls any any -> any any (msg:"intermediate cert"; tls.certs; content:"INTERMEDIATE-CA-EVIL-SIG"; sid:5201; rev:1;)`)
+	require.NoError(t, err)
+	mCert, err := CompileRule(rCert[0])
+	require.NoError(t, err)
+	ok, err := mCert.MatchStream(pk, rec)
+	require.NoError(t, err)
+	require.True(t, ok)
 }

@@ -241,6 +241,14 @@ func (p *TLSBufferProvider) Get(mdf modifier.Modifier) []byte {
 	return p.inner.Get(mdf)
 }
 
+// GetCerts returns every DER-encoded certificate in the handshake chain.
+func (p *TLSBufferProvider) GetCerts() [][]byte {
+	if p == nil || p.inner == nil {
+		return nil
+	}
+	return p.inner.certs
+}
+
 func (t *tlsProvider) parseServerHello(body []byte) {
 	if len(body) < 34 {
 		return

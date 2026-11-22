@@ -258,6 +258,21 @@ func (a *AddressRule) Prepare() {
 	a.prepared = true
 }
 
+// IPv4SupersetRanges returns a sound superset of sorted, non-overlapping IPv4
+// [start, end] ranges that can match this AddressRule when the rule is
+// bounded solely by concrete IPv4 CIDRs/IPs (with optional negative exceptions).
+// Returns ok=false for Any, negated roots, env vars, IPv6 rules, or dynamic subrules.
+func (a *AddressRule) IPv4SupersetRanges() ([][2]uint32, bool) {
+	if a == nil || a.Any || a.Negative || a.Env != "" || len(a.positiveSlow) > 0 || a.hostFilter != nil || len(a.ipv6Prefixes) > 0 || len(a.ipv4Ranges) == 0 {
+		return nil, false
+	}
+	out := make([][2]uint32, len(a.ipv4Ranges))
+	for i, r := range a.ipv4Ranges {
+		out[i] = [2]uint32{r.start, r.end}
+	}
+	return out, true
+}
+
 // MatchAddr matches a pre-parsed netip.Addr with zero string parsing or heap
 // allocations on IPv4 ranges and address-group variables.
 func (a *AddressRule) MatchAddr(addr netip.Addr) bool {

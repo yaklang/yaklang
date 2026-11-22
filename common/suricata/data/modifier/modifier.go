@@ -80,6 +80,7 @@ const (
 
 	// SSH
 	SSHProto
+	SSHSoftware
 )
 
 var HTTP_REQ_ONLY = []Modifier{
