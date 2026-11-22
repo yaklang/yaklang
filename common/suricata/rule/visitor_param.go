@@ -233,6 +233,10 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.HTTPHeader
 	case "http_raw_header", "http.raw_header", "http.header.raw":
 		return modifier.HTTPHeaderRaw
+	case "http_request_header", "http.request_header":
+		return modifier.HTTPRequestHeader
+	case "http_response_header", "http.response_header":
+		return modifier.HTTPResponseHeader
 	case "http_cookie", "http.cookie":
 		return modifier.HTTPCookie
 	case "http_uri", "http.uri":
@@ -291,6 +295,12 @@ func modifierMapping(str string) modifier.Modifier {
 		return modifier.TLSCerts
 	case "tls.sni", "tls_sni":
 		return modifier.TLSSNI
+	case "tls.random", "tls_random":
+		return modifier.TLSRandom
+	case "tls.random_time", "tls_random_time":
+		return modifier.TLSRandomTime
+	case "tls.random_bytes", "tls_random_bytes":
+		return modifier.TLSRandomBytes
 	case "base64_data", "base64.data":
 		return modifier.Base64Data
 	case "ssh.proto", "ssh_proto":
@@ -318,36 +328,67 @@ func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 }
 
 type MultipleBufferMatching struct {
-	last      modifier.Modifier
-	dotPrefix bool
+	last       modifier.Modifier
+	sticky     bool
+	dotPrefix  bool
+	transforms []string
+}
+
+func isAlwaysStickyModifier(mdf modifier.Modifier) bool {
+	switch mdf {
+	case modifier.DNSQuery, modifier.FileData, modifier.HTTPHeader,
+		modifier.HTTPHeaderRaw, modifier.HTTPRequestHeader, modifier.HTTPResponseHeader,
+		modifier.HTTPHeaderNames, modifier.HTTPHost, modifier.HTTPHostRaw,
+		modifier.TLSSNI, modifier.TLSCertSubject, modifier.TLSCertIssuer,
+		modifier.TLSCertSerial, modifier.TLSCertFingerprint, modifier.TLSCerts,
+		modifier.TLSRandom, modifier.TLSRandomTime, modifier.TLSRandomBytes,
+		modifier.Base64Data, modifier.SSHProto:
+		return true
+	default:
+		return false
+	}
 }
 
 // start records a newly selected sticky buffer. Transforms only apply to the
-// buffer that follows them, so a new buffer clears the pending dotprefix.
-func (m *MultipleBufferMatching) start(mdf modifier.Modifier) {
+// buffer that follows them, so a new buffer clears pending transforms.
+func (m *MultipleBufferMatching) start(mdf modifier.Modifier, sticky bool) {
 	m.last = mdf
+	m.sticky = sticky || isAlwaysStickyModifier(mdf)
 	m.dotPrefix = false
+	m.transforms = nil
 }
 
-func (m *MultipleBufferMatching) setDotPrefix() {
-	m.dotPrefix = true
+// reset returns the active sticky buffer to the default packet/stream payload
+// (used by pkt_data).
+func (m *MultipleBufferMatching) reset() {
+	m.last = modifier.Default
+	m.sticky = false
+	m.dotPrefix = false
+	m.transforms = nil
+}
+
+func (m *MultipleBufferMatching) addTransform(name string) {
+	if name == "dotprefix" {
+		m.dotPrefix = true
+	}
+	m.transforms = append(m.transforms, name)
 }
 
 func (m *MultipleBufferMatching) transfer(contentRule *ContentRule) {
-	switch contentRule.Modifier {
-	case modifier.DNSQuery, modifier.FileData, modifier.HTTPHeader,
-		modifier.HTTPHost, modifier.HTTPHostRaw,
-		modifier.TLSSNI, modifier.TLSCertSubject, modifier.TLSCertIssuer,
-		modifier.TLSCertSerial, modifier.TLSCertFingerprint, modifier.TLSCerts,
-		modifier.Base64Data, modifier.SSHProto:
-		m.last = contentRule.Modifier
-	case modifier.Default:
+	if contentRule.Modifier == modifier.Default {
 		contentRule.Modifier = m.last
-	default:
+	} else if !m.sticky && !isAlwaysStickyModifier(contentRule.Modifier) {
 		m.last = modifier.Default
 	}
 	if m.dotPrefix {
 		contentRule.DotPrefix = true
+	}
+	if len(m.transforms) > 0 {
+		contentRule.Transforms = append([]string(nil), m.transforms...)
+	}
+	if !m.sticky && !isAlwaysStickyModifier(contentRule.Modifier) {
+		m.dotPrefix = false
+		m.transforms = nil
 	}
 }
 
@@ -393,6 +434,16 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			rule.SettingMap = make(map[string]string)
 		}
 		rule.SettingMap[key] = vStr
+		if key == "pkt_data" {
+			if STATUS != HasNone {
+				multipleBufferMatching.transfer(contentRule)
+				contents = append(contents, contentRule)
+				contentRule = new(ContentRule)
+				STATUS = HasNone
+			}
+			multipleBufferMatching.reset()
+			continue
+		}
 		switch STATUS {
 		case HasNone:
 			if modifierMapping(key) != modifier.Default {
@@ -406,14 +457,13 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			}
 		case HasContent:
 			if modifierMapping(key) != modifier.Default {
-				if key == "base64_data" {
-					// base64_data always opens a new sticky buffer. Do not
-					// attach it backwards to the content that produced the
-					// base64 input.
+				if key == "base64_data" || multipleBufferMatching.sticky {
+					// Active sticky buffers and base64_data open a new buffer
+					// rather than attaching backwards to the preceding content.
 					multipleBufferMatching.transfer(contentRule)
 					contents = append(contents, contentRule)
 					contentRule = new(ContentRule)
-					STATUS = HasNone
+					STATUS = HasModif
 				} else {
 					STATUS = ContentModif
 				}
@@ -431,10 +481,11 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 				STATUS = HasContent
 			}
 		case SavingPCRE:
+			multipleBufferMatching.transfer(contentRule)
 			contents = append(contents, contentRule)
 			contentRule = new(ContentRule)
 			if modifierMapping(key) != modifier.Default {
-				STATUS = ContentModif
+				STATUS = HasModif
 			} else if key == "content" {
 				STATUS = HasContent
 			} else if key == "pcre" {
@@ -819,9 +870,10 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 			contentRule.StartsWith = true
 		case "endswith":
 			contentRule.EndsWith = true
-		case "dotprefix":
-			contentRule.DotPrefix = true
-			multipleBufferMatching.setDotPrefix()
+		case "dotprefix", "to_lowercase", "to_uppercase", "header_lowercase",
+			"url_decode", "strip_whitespace", "strip_pseudo_headers",
+			"to_sha1", "to_sha256", "to_md5":
+			multipleBufferMatching.addTransform(key)
 		case "distance":
 			value, variable, err := parseOptionalIntOrVar(vStr)
 			if err != nil {
@@ -922,7 +974,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 		case "base64_data":
 			contentRule.Base64Data = true
 			contentRule.Modifier = modifier.Base64Data
-			multipleBufferMatching.start(modifier.Base64Data)
+			multipleBufferMatching.start(modifier.Base64Data, true)
 		case "flowint":
 			flowInt, err := parseStateValueOption(key, vStr, parseCommaParts(vStr))
 			if err != nil {
@@ -970,7 +1022,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) (pa
 		default:
 			if mdf := modifierMapping(key); mdf != modifier.Default {
 				contentRule.Modifier = mdf
-				multipleBufferMatching.start(mdf)
+				multipleBufferMatching.start(mdf, STATUS == HasModif)
 				break
 			}
 			// fallback

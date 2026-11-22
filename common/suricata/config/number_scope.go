@@ -222,10 +222,33 @@ func (s *scope) hasNumberBigInt(n *big.Int) bool {
 	return false
 }
 
-// 保持原有的 uint32 接口
+// 保持原有的 uint32 接口 (热路径避免 big.Int 堆分配)
 func (s *scope) hasNumber(n uint32) bool {
-	nBig := new(big.Int).SetUint64(uint64(n))
-	return s.hasNumberBigInt(nBig)
+	u := uint64(n)
+	var nBig *big.Int
+	for _, item := range s.subScopes {
+		if item.start.Sign() >= 0 && item.start.IsUint64() {
+			startU := item.start.Uint64()
+			if u < startU {
+				continue
+			}
+			if item.end.IsUint64() {
+				if u <= item.end.Uint64() {
+					return true
+				}
+				continue
+			}
+			// end > MaxUint64 >= u >= startU
+			return true
+		}
+		if nBig == nil {
+			nBig = new(big.Int).SetUint64(u)
+		}
+		if item.start.Cmp(nBig) <= 0 && item.end.Cmp(nBig) >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *scope) sub(scopeVal *scope) {

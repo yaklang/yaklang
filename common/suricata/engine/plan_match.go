@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/suricata/match"
 	"github.com/yaklang/yaklang/common/suricata/rule"
 )
 
@@ -18,7 +19,7 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 			return view == ViewStream
 		}
 		switch p.Rule.Protocol {
-		case "http":
+		case "http", "http1":
 			// Stateful HTTP rules inspect the ordered per-direction TCP stream
 			// so split requests/responses are parsed as one message. Explicit
 			// stateless/no_stream rules stay on the packet lane.
@@ -26,7 +27,7 @@ func (p *CompiledRulePlan) acceptsView(view InspectionView) bool {
 				return view == ViewStream
 			}
 			return view == ViewNormalizedPacket
-		case "tcp", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "tcp-stream":
+		case "tcp", "smtp", "ftp", "ftp-data", "smb", "ssh", "dcerpc", "rdp", "tcp-stream":
 			// handled below
 		case "tls":
 			// Stateful TLS handshake fields (SNI, JA3, certificates) are parsed
@@ -106,6 +107,10 @@ func (p *CompiledRulePlan) matchStreamSize(flow *flowRuntime, packetView bool) b
 }
 
 func (p *CompiledRulePlan) match(event InspectionEvent, flow *flowRuntime, streamPayload []byte) (bool, int, error) {
+	return p.matchWithShared(event, flow, streamPayload, nil, nil)
+}
+
+func (p *CompiledRulePlan) matchWithShared(event InspectionEvent, flow *flowRuntime, streamPayload []byte, sharedHTTP *match.HTTPBufferProvider, sharedTLS *match.TLSBufferProvider) (bool, int, error) {
 	matcher := p.acquireMatcher()
 	defer p.releaseMatcher(matcher)
 	switch event.View {
@@ -121,6 +126,9 @@ func (p *CompiledRulePlan) match(event InspectionEvent, flow *flowRuntime, strea
 		}
 		if flow == nil || event.Direction < 0 || event.Direction > 1 || flow.streamOverflow[event.Direction] {
 			return false, 0, nil
+		}
+		if sharedHTTP != nil || sharedTLS != nil {
+			return matcher.MatchStreamEvidenceWithShared(event.Packet, streamPayload, sharedHTTP, sharedTLS)
 		}
 		return matcher.MatchStreamEvidence(event.Packet, streamPayload)
 	default:

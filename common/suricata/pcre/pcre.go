@@ -185,6 +185,16 @@ func (p *PCRE) RawBytes() bool {
 	return p.rawBytes
 }
 
+// PrefilterSpec exposes the normalized expression and RE2-compatible flags
+// when this PCRE can be safely prefiltered without extended/ungreedy/relative/
+// rawbytes semantics.
+func (p *PCRE) PrefilterSpec() (expr string, ignoreCase, multiline, singleline, compatible bool) {
+	if p == nil || p.expr == "" || p.extended || p.ungreedy || p.relative || p.rawBytes {
+		return "", false, false, false, false
+	}
+	return p.expr, p.ignoreCase, p.multiline, p.singleline, true
+}
+
 func trailingBackslashCount(value string) int {
 	count := 0
 	for index := len(value) - 1; index >= 0 && value[index] == '\\'; index-- {

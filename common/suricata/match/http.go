@@ -3,6 +3,7 @@ package match
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"net"
@@ -119,29 +120,146 @@ func (h *HttpFlow) createRequestPacket() []gopacket.Packet {
 	return packets
 }
 
+// HTTPBufferProvider exposes a pre-parsed HTTP message so callers such as
+// StatefulEngine can parse once per stream event and reuse the extracted
+// sticky buffers across prefiltering and candidate rule verification.
+type HTTPBufferProvider struct {
+	inner *httpProvider
+}
+
+// ParseHTTPStream parses a complete HTTP request or response from payload once.
+// Returns nil when payload is not a complete HTTP message.
+func ParseHTTPStream(pk gopacket.Packet, payload []byte) *HTTPBufferProvider {
+	if !LooksLikeHTTP(payload) {
+		return nil
+	}
+	p := newHTTPBufferProviderFromPayload(pk, payload, true)
+	if p == nil {
+		return nil
+	}
+	return &HTTPBufferProvider{inner: p}
+}
+
+// Get returns the extracted bytes for the given HTTP sticky buffer modifier.
+func (p *HTTPBufferProvider) Get(mdf modifier.Modifier) []byte {
+	if p == nil || p.inner == nil {
+		return nil
+	}
+	return p.inner.Get(mdf)
+}
+
+// IsRequest reports whether the parsed HTTP message is a client request.
+func (p *HTTPBufferProvider) IsRequest() bool {
+	return p != nil && p.inner != nil && p.inner.GetRequest() != nil
+}
+
+// IsResponse reports whether the parsed HTTP message is a server response.
+func (p *HTTPBufferProvider) IsResponse() bool {
+	return p != nil && p.inner != nil && p.inner.GetResponse() != nil
+}
+
+// GetHeaderLines returns individual "Name: Value" lines for multi-buffer
+// http.request_header / http.response_header inspection.
+func (p *HTTPBufferProvider) GetHeaderLines(mdf modifier.Modifier) [][]byte {
+	if p == nil || p.inner == nil {
+		return nil
+	}
+	return p.inner.GetHeaderLines(mdf)
+}
+
+// LooksLikeHTTP performs a cheap O(1) prefix check to fast-fail non-HTTP
+// stream payloads before running any HTTP parser or HTTP rule bucket.
+func LooksLikeHTTP(payload []byte) bool {
+	if len(payload) < 4 {
+		return false
+	}
+	switch payload[0] {
+	case 'H': // HTTP/ or HEAD
+		return bytes.HasPrefix(payload, []byte("HTTP/")) || bytes.HasPrefix(payload, []byte("HEAD "))
+	case 'G': // GET
+		return bytes.HasPrefix(payload, []byte("GET "))
+	case 'P': // POST, PUT, PATCH, PROPFIND, PROPPATCH, PURGE, PRI
+		return bytes.HasPrefix(payload, []byte("POST ")) ||
+			bytes.HasPrefix(payload, []byte("PUT ")) ||
+			bytes.HasPrefix(payload, []byte("PATCH ")) ||
+			bytes.HasPrefix(payload, []byte("PROPFIND ")) ||
+			bytes.HasPrefix(payload, []byte("PROPPATCH ")) ||
+			bytes.HasPrefix(payload, []byte("PURGE ")) ||
+			bytes.HasPrefix(payload, []byte("PRI "))
+	case 'D': // DELETE
+		return bytes.HasPrefix(payload, []byte("DELETE "))
+	case 'O': // OPTIONS
+		return bytes.HasPrefix(payload, []byte("OPTIONS "))
+	case 'C': // CONNECT, COPY
+		return bytes.HasPrefix(payload, []byte("CONNECT ")) || bytes.HasPrefix(payload, []byte("COPY "))
+	case 'T': // TRACE
+		return bytes.HasPrefix(payload, []byte("TRACE "))
+	case 'M': // MKCOL, MOVE, M-SEARCH
+		return bytes.HasPrefix(payload, []byte("MKCOL ")) ||
+			bytes.HasPrefix(payload, []byte("MOVE ")) ||
+			bytes.HasPrefix(payload, []byte("M-SEARCH "))
+	case 'L': // LOCK
+		return bytes.HasPrefix(payload, []byte("LOCK "))
+	case 'U': // UNLOCK
+		return bytes.HasPrefix(payload, []byte("UNLOCK "))
+	case 'R': // REPORT
+		return bytes.HasPrefix(payload, []byte("REPORT "))
+	case 'S': // SEARCH
+		return bytes.HasPrefix(payload, []byte("SEARCH "))
+	}
+	// Fallback: check if first line contains " HTTP/" (handles uncommon WebDAV/custom methods).
+	limit := len(payload)
+	if limit > 4096 {
+		limit = 4096
+	}
+	line := payload[:limit]
+	if nl := bytes.IndexByte(line, '\n'); nl >= 0 {
+		line = line[:nl]
+	}
+	return bytes.Contains(line, []byte(" HTTP/"))
+}
+
+// LooksLikeTLS performs a cheap O(1) header check matching parseTLSRecords:
+// ChangeCipherSpec (20), Alert (21), Handshake (22), or ApplicationData (23)
+// with a complete first record present in payload.
+func LooksLikeTLS(payload []byte) bool {
+	if len(payload) < 5 {
+		return false
+	}
+	if payload[0] < 20 || payload[0] > 23 {
+		return false
+	}
+	length := int(binary.BigEndian.Uint16(payload[3:5]))
+	return length > 0 && 5+length <= len(payload)
+}
+
 func httpParser(c *matchContext) error {
 	if !c.Must(c.Rule.ContentRuleConfig != nil) {
 		return nil
 	}
 
-	// Stream inspection passes reassembled bytes through overridePayload while
-	// the real packet still supplies IP/TCP headers. Packet matching keeps the
-	// legacy behavior of accepting header blocks without a trailing blank line.
-	payload := c.overridePayload
-	requireComplete := len(payload) > 0
-	if len(payload) == 0 {
-		if c.PK == nil || c.PK.TransportLayer() == nil {
-			return nil
+	provider := c.sharedHTTP
+	if provider == nil {
+		// Stream inspection passes reassembled bytes through overridePayload while
+		// the real packet still supplies IP/TCP headers. Packet matching keeps the
+		// legacy behavior of accepting header blocks without a trailing blank line.
+		payload := c.overridePayload
+		requireComplete := len(payload) > 0
+		if len(payload) == 0 {
+			if c.PK == nil || c.PK.TransportLayer() == nil {
+				return nil
+			}
+			payload = c.PK.TransportLayer().LayerPayload()
 		}
-		payload = c.PK.TransportLayer().LayerPayload()
+		provider = newHTTPBufferProviderFromPayload(c.PK, payload, requireComplete)
 	}
-	provider := newHTTPBufferProviderFromPayload(c.PK, payload, requireComplete)
 	if !c.Must(provider != nil) {
 		return nil
 	}
 
 	// register buffer provider
 	c.SetBufferProvider(provider.Get)
+	c.Value["httpProvider"] = provider
 	c.Value["data"] = provider.Parsed()
 	c.Value["isReq"] = provider.GetRequest() != nil
 
@@ -182,6 +300,7 @@ type httpProvider struct {
 	raw        []byte
 	body       []byte
 	bodyCached bool
+	bufCache   map[modifier.Modifier][]byte
 	req        *http.Request
 	res        *http.Response
 }
@@ -465,13 +584,22 @@ func (h *httpProvider) bodyBuffer() []byte {
 
 // Get part of http.
 func (h *httpProvider) Get(modi modifier.Modifier) []byte {
+	if h.bufCache != nil {
+		if cached, ok := h.bufCache[modi]; ok {
+			return cached
+		}
+	}
+	var out []byte
 	if h.req != nil {
-		return h.getReq(modi)
+		out = h.getReq(modi)
+	} else if h.res != nil {
+		out = h.getRes(modi)
 	}
-	if h.res != nil {
-		return h.getRes(modi)
+	if h.bufCache == nil {
+		h.bufCache = make(map[modifier.Modifier][]byte, 12)
 	}
-	return nil
+	h.bufCache[modi] = out
+	return out
 }
 
 func rawHTTPHeaderValue(raw []byte, name string) []byte {
@@ -535,7 +663,7 @@ func (h *httpProvider) getReq(modi modifier.Modifier) []byte {
 		return []byte(h.req.Header.Get("Accept-Encoding"))
 	case modifier.HTTPReferer:
 		return []byte(h.req.Header.Get("Referer"))
-	case modifier.HTTPHeader:
+	case modifier.HTTPHeader, modifier.HTTPRequestHeader:
 		var bb bytes.Buffer
 		var strs []string
 		for k := range h.req.Header {
@@ -614,7 +742,7 @@ func (h *httpProvider) getRes(modi modifier.Modifier) []byte {
 			return nil
 		}
 		return h.raw[:ed+2]
-	case modifier.HTTPHeader:
+	case modifier.HTTPHeader, modifier.HTTPResponseHeader:
 		var bb bytes.Buffer
 		var strs []string
 		for k := range h.res.Header {
@@ -681,4 +809,70 @@ func (h *httpProvider) getRes(modi modifier.Modifier) []byte {
 		return h.raw
 	}
 	return nil
+}
+
+// GetHeaderLines returns individual "Name: Value" header lines (without trailing
+// CRLF) for Suricata 7/8 multi-buffer http.request_header / http.response_header.
+func (h *httpProvider) GetHeaderLines(modi modifier.Modifier) [][]byte {
+	if modi == modifier.HTTPRequestHeader && h.req == nil {
+		return nil
+	}
+	if modi == modifier.HTTPResponseHeader && h.res == nil {
+		return nil
+	}
+	rawHeaders := h.getRawHeaderBlock()
+	if len(rawHeaders) > 0 {
+		var lines [][]byte
+		for pos := 0; pos < len(rawHeaders); {
+			nl := bytes.IndexByte(rawHeaders[pos:], '\n')
+			var line []byte
+			if nl < 0 {
+				line = rawHeaders[pos:]
+				pos = len(rawHeaders)
+			} else {
+				line = rawHeaders[pos : pos+nl]
+				pos += nl + 1
+			}
+			line = bytes.TrimSuffix(line, []byte("\r"))
+			if len(line) > 0 && bytes.IndexByte(line, ':') > 0 {
+				lines = append(lines, line)
+			}
+		}
+		if len(lines) > 0 {
+			return lines
+		}
+	}
+	var hdr http.Header
+	if modi == modifier.HTTPRequestHeader {
+		hdr = h.req.Header
+	} else {
+		hdr = h.res.Header
+	}
+	keys := make([]string, 0, len(hdr))
+	for k := range hdr {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	lines := make([][]byte, 0, len(keys))
+	for _, k := range keys {
+		for _, v := range hdr[k] {
+			lines = append(lines, []byte(k+": "+v))
+		}
+	}
+	return lines
+}
+
+func (h *httpProvider) getRawHeaderBlock() []byte {
+	st := bytes.Index(h.raw, []byte("\r\n"))
+	if st < 0 {
+		return nil
+	}
+	rest := h.raw[st+2:]
+	if ed := bytes.Index(rest, []byte("\r\n\r\n")); ed >= 0 {
+		return rest[:ed]
+	}
+	if bytes.HasSuffix(rest, []byte("\r\n")) {
+		return rest[:len(rest)-2]
+	}
+	return rest
 }

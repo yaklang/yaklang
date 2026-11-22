@@ -1,9 +1,31 @@
 package match
 
 import (
+	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 )
+
+// ExtractDNSQueryName extracts the primary DNS query name, QR response flag,
+// raw DNS layer bytes, and presence flag from a decoded packet for engine
+// prefiltering.
+func ExtractDNSQueryName(pk gopacket.Packet) (queryName []byte, rawDNS []byte, isResponse bool, ok bool) {
+	if pk == nil {
+		return nil, nil, false, false
+	}
+	layer := pk.Layer(layers.LayerTypeDNS)
+	if layer == nil {
+		return nil, nil, false, false
+	}
+	dns, valid := layer.(*layers.DNS)
+	if !valid || dns == nil {
+		return nil, nil, false, false
+	}
+	if len(dns.Questions) > 0 {
+		queryName = dns.Questions[0].Name
+	}
+	return queryName, dns.LayerContents(), dns.QR, true
+}
 
 // match dns
 func dnsParser(c *matchContext) error {

@@ -1,6 +1,9 @@
 package match
 
-import "github.com/yaklang/yaklang/common/yak/yaklib/codec"
+import (
+	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+)
 
 // match port
 func portMatcher(c *matchContext) error {
@@ -8,10 +11,20 @@ func portMatcher(c *matchContext) error {
 	if !c.Must(transLayer != nil) {
 		return nil
 	}
-	flow := transLayer.TransportFlow()
+	var srcPort, dstPort int
+	switch tl := transLayer.(type) {
+	case *layers.TCP:
+		srcPort = int(tl.SrcPort)
+		dstPort = int(tl.DstPort)
+	case *layers.UDP:
+		srcPort = int(tl.SrcPort)
+		dstPort = int(tl.DstPort)
+	default:
+		flow := transLayer.TransportFlow()
+		srcPort = codec.Atoi(flow.Src().String())
+		dstPort = codec.Atoi(flow.Dst().String())
+	}
 	directions, _ := c.Value["headerDirections"].(uint8)
-	srcPort := codec.Atoi(flow.Src().String())
-	dstPort := codec.Atoi(flow.Dst().String())
 	if directions&headerDirectionForward != 0 &&
 		!(c.Rule.SourcePort.Match(srcPort) && c.Rule.DestinationPort.Match(dstPort)) {
 		directions &^= headerDirectionForward
