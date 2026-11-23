@@ -2,7 +2,12 @@ package aireact
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -22,32 +27,108 @@ const (
 )
 
 // securityRuleGate turns built-in Bash rule findings into a tool-call decision.
-// It fails open: analysis errors must not prevent the agent from working, and
-// only a confident high/critical match blocks the call.
+// It fails open when the analyzer itself is unavailable. An explicitly selected
+// non-bash shell is never skipped: the command is first checked with the bash
+// rules as a best-effort pass, then escalated to human review because the bash
+// grammar cannot fully cover cmd or PowerShell.
 func securityRuleGate(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
 	if !strings.EqualFold(strings.TrimSpace(toolName), bashToolName) {
-		return nil
-	}
-	// The bash tool can delegate to cmd.exe or PowerShell. Their grammar is not
-	// the one this gate evaluates, so leave those calls to their own guard.
-	switch strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["shell"]))) {
-	case "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe":
 		return nil
 	}
 	command := utils.InterfaceToString(params["command"])
 	if strings.TrimSpace(command) == "" {
 		return nil
 	}
+	shell := normalizeShell(utils.InterfaceToString(params["shell"]))
 
 	check := commandcheck.CheckBuiltinCommand(ctx, command)
 	if !check.Available {
 		log.Warnf("bash security rule evaluation unavailable, allowing tool call: %s", check.Reason)
 		return nil
 	}
-	if check.Action == schema.SFR_ACTION_ALLOW {
+	if check.Action == schema.SFR_ACTION_DENY || check.Action == schema.SFR_ACTION_ASK {
+		return securityRuleDecisionFromCheck(check)
+	}
+	if shell == "bash" {
+		if check.Action == schema.SFR_ACTION_WARN {
+			return securityRuleDecisionFromCheck(check)
+		}
 		return nil
 	}
+	if check.Reason == "disabled" {
+		return nil
+	}
+	return nonBashShellReviewDecision(shell, check)
+}
 
+// normalizeShell maps the bash tool's shell parameter to the grammar that will
+// actually run. An empty value follows bash.yak's bash-first preference, so on
+// Windows it is treated as non-bash when bash cannot be found at all.
+func normalizeShell(shell string) string {
+	switch strings.ToLower(strings.TrimSpace(shell)) {
+	case "bash", "bash.exe", "sh", "shell":
+		return "bash"
+	case "cmd", "cmd.exe":
+		return "cmd"
+	case "powershell", "powershell.exe", "ps", "pwsh", "pwsh.exe":
+		return "powershell"
+	case "":
+		if runtime.GOOS == "windows" && !hasBashOnWindows() {
+			return "auto-non-bash"
+		}
+		return "bash"
+	default:
+		return "unsupported"
+	}
+}
+
+var (
+	bashOnWindowsOnce sync.Once
+	bashOnWindows     bool
+)
+
+// hasBashOnWindows mirrors the candidate list used by bash.yak so the gate
+// agrees with the transport's auto-selection. The result is cached: the tool
+// process does not install or remove a shell during a session.
+func hasBashOnWindows() bool {
+	bashOnWindowsOnce.Do(func() {
+		var candidates []string
+		for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)"} {
+			if base := strings.TrimSpace(os.Getenv(env)); base != "" {
+				candidates = append(candidates,
+					filepath.Join(base, "Git", "bin", "bash.exe"),
+					filepath.Join(base, "Git", "usr", "bin", "bash.exe"),
+				)
+			}
+		}
+		if base := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); base != "" {
+			candidates = append(candidates,
+				filepath.Join(base, "Programs", "Git", "bin", "bash.exe"),
+				filepath.Join(base, "Programs", "Git", "usr", "bin", "bash.exe"),
+			)
+		}
+		if home := strings.TrimSpace(os.Getenv("USERPROFILE")); home != "" {
+			candidates = append(candidates,
+				filepath.Join(home, "scoop", "apps", "git", "current", "bin", "bash.exe"),
+				filepath.Join(home, "scoop", "apps", "git", "current", "usr", "bin", "bash.exe"),
+			)
+		}
+		candidates = append(candidates,
+			`C:\msys64\usr\bin\bash.exe`,
+			`C:\msys64\mingw64\bin\bash.exe`,
+			`C:\cygwin64\bin\bash.exe`,
+		)
+		for _, candidate := range candidates {
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				bashOnWindows = true
+				return
+			}
+		}
+	})
+	return bashOnWindows
+}
+
+func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCallRuleDecision {
 	decision := &aicommon.ToolCallRuleDecision{
 		Action:   check.Action,
 		Severity: check.Severity,
@@ -75,20 +156,33 @@ func securityRuleGate(ctx context.Context, toolName string, params aitool.Invoke
 	return decision
 }
 
-// toolCallRuleGate composes the built-in bash guard with an optional gate
-// compiled from Claude Code-style permissions JSON. Composition is strictest-
-// wins, so a user allow rule cannot suppress a built-in deny or ask finding.
-func (r *ReAct) toolCallRuleGate() aicommon.ToolCallRuleGate {
-	var extra aicommon.ToolCallRuleGate
-	if r != nil && r.config != nil {
-		extra = r.config.GetToolCallPermissionGate()
+func nonBashShellReviewDecision(shell string, check commandcheck.Result) *aicommon.ToolCallRuleDecision {
+	reason := fmt.Sprintf(
+		"shell %q is not bash; built-in bash rules cannot fully analyze it, so human confirmation is required",
+		shell,
+	)
+	if check.Action == schema.SFR_ACTION_WARN && strings.TrimSpace(check.Message()) != "" {
+		reason += ": " + check.Message()
 	}
-	if extra == nil {
-		// Runtime JSON configuration is read here so it participates in the
-		// same strictest-wins composition as programmatic config. Reading on
-		// each call also makes file edits effective without a restart.
-		extra = aicommon.CompileClaudeCodePermissionsFromRuntime()
+
+	decision := securityRuleDecisionFromCheck(check)
+	decision.Action = schema.SFR_ACTION_ASK
+	decision.Severity = schema.SFR_SEVERITY_WARNING
+	if strings.TrimSpace(decision.RuleID) == "" {
+		decision.RuleID = "shell-static-analysis-unavailable"
 	}
+	if strings.TrimSpace(decision.RuleName) == "" {
+		decision.RuleName = "Shell command requires human review"
+	}
+	decision.Reason = reason
+	return decision
+}
+
+// toolCallRuleGate composes the built-in bash guard with the optional runtime
+// gate compiled from Claude Code-style permissions JSON. Composition is
+// strictest-wins, so a user allow rule cannot suppress a built-in deny or ask.
+func toolCallRuleGate() aicommon.ToolCallRuleGate {
+	extra := aicommon.CompileClaudeCodePermissionsFromRuntime()
 	if extra == nil {
 		return securityRuleGate
 	}

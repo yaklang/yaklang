@@ -19,7 +19,14 @@ func TestSecurityRuleReviewDecision(t *testing.T) {
 		{name: "cancel-cn", params: aitool.InvokeParams{"suggestion": "取消:"}, want: false},
 		{name: "continue-en", params: aitool.InvokeParams{"suggestion": "continue"}, want: true},
 		{name: "cancel-en", params: aitool.InvokeParams{"suggestion": "cancel"}, want: false},
+		{name: "continue-value", params: aitool.InvokeParams{"value": "continue"}, want: true},
+		{name: "cancel-value", params: aitool.InvokeParams{"value": "cancel"}, want: false},
+		{name: "continue-index", params: aitool.InvokeParams{"index": 1}, want: true},
+		{name: "cancel-index", params: aitool.InvokeParams{"index": 2}, want: false},
+		{name: "continue-prompt-title", params: aitool.InvokeParams{"prompt_title": "继续执行"}, want: true},
 		{name: "ambiguous", params: aitool.InvokeParams{"suggestion": "想想"}, want: false},
+		{name: "command-text-is-not-approval", params: aitool.InvokeParams{"command": "echo continue"}, want: false},
+		{name: "negated-cancel-is-not-approval", params: aitool.InvokeParams{"suggestion": "不要取消"}, want: false},
 		{name: "empty", params: nil, want: false},
 	}
 	for _, c := range cases {

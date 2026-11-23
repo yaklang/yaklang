@@ -1077,12 +1077,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		reviewCheckpointSeq := t.reviewCheckpointSeq
 		t.reviewCheckpointSeq = 0
 		ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, reviewCheckpointSeq)
-		ep.SetDefaultSuggestionContinue()
 		securityAsk := ruleDecision != nil && ruleDecision.Action == schema.SFR_ACTION_ASK
 		if securityAsk {
-			// Mark the endpoint before the event is emitted so both the policy
-			// layer and the frontend see a human-only decision.
-			ep.SetForceHumanReview(ruleDecision.Summary())
+			// A missing answer must never authorize a security escalation.
+			ep.SetDefaultSuggestion("cancel")
+		} else {
+			ep.SetDefaultSuggestionContinue()
 		}
 		reqs := map[string]any{
 			"id":               ep.GetId(),
@@ -1174,8 +1174,14 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			}
 			t.emitter.EmitInteractiveJSON(ep.GetId(), reviewEventType, reviewEventNode, reqs)
 
-			// wait for agree
-			config.DoWaitAgree(t.ctx, ep)
+			// Security escalation is authoritative: bypass every agree policy,
+			// including yolo/auto, and wait for a real human decision.
+			if securityAsk {
+				ep.SetApprovalMeta(ApprovalSourceRule, true, ruleDecision.Summary())
+				ep.WaitContext(t.ctx)
+			} else {
+				config.DoWaitAgree(t.ctx, ep)
+			}
 			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
 				releaseReview()
 				// The worker can stop while its enclosing session stays alive.

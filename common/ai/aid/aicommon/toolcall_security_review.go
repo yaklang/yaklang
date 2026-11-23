@@ -80,32 +80,40 @@ func securityRuleReviewPrompt(decision *ToolCallRuleDecision, toolName string, p
 
 func securityRuleReviewOptions() []map[string]any {
 	return []map[string]any{
-		{"index": 1, "prompt": "继续执行", "prompt_title": "继续执行"},
-		{"index": 2, "prompt": "取消", "prompt_title": "取消"},
+		{"index": 1, "value": "continue", "prompt": "继续执行", "prompt_title": "继续执行"},
+		{"index": 2, "value": "cancel", "prompt": "取消", "prompt_title": "取消"},
 	}
 }
 
 // securityRuleReviewDecision only treats an explicit approval as consent.
-// Unknown free text is rejected, because silence must never authorize a
-// security-rule escalation.
+// It reads decision fields rather than the whole params map, so command text
+// such as "echo continue" can never be mistaken for a user approval.
 func securityRuleReviewDecision(params aitool.InvokeParams) (bool, string) {
-	text := ""
-	if params != nil {
-		text = strings.TrimSpace(params.GetString("suggestion"))
-		if text == "" {
-			text = strings.TrimSpace(utils.InterfaceToString(params))
-		}
+	const (
+		cancelReason = "bash command cancelled by security rule review"
+		noApproval   = "bash command cancelled: security rule review did not explicitly approve execution"
+	)
+	if params == nil {
+		return false, noApproval
 	}
-	lower := strings.ToLower(text)
-	for _, word := range []string{"取消", "cancel", "deny", "stop", "拒绝", "否", "不要", "别", "不执行"} {
-		if strings.Contains(lower, word) {
-			return false, "bash command cancelled by security rule review"
-		}
-	}
-	for _, word := range []string{"继续", "continue", "允许", "approve", "yes", "同意", "确认", "执行"} {
-		if strings.Contains(lower, word) {
+
+	if index, ok := params["index"]; ok {
+		switch utils.InterfaceToInt(index) {
+		case 1:
 			return true, ""
+		case 2:
+			return false, cancelReason
 		}
 	}
-	return false, "bash command cancelled: security rule review did not explicitly approve execution"
+
+	for _, key := range []string{"suggestion", "value", "option_name", "prompt_title"} {
+		text := strings.ToLower(strings.TrimSpace(strings.TrimRight(utils.InterfaceToString(params[key]), ":：")))
+		switch text {
+		case "continue", "allow", "approve", "yes", "1", "继续", "继续执行", "允许", "同意", "确认":
+			return true, ""
+		case "cancel", "deny", "reject", "no", "2", "取消", "拒绝", "不执行":
+			return false, cancelReason
+		}
+	}
+	return false, noApproval
 }
