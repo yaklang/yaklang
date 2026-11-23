@@ -88,7 +88,7 @@ func severityRule(name string, level schema.SyntaxFlowSeverity, query string) *s
 	}
 }
 
-func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
+func TestCheckWithRulesSeverityActions(t *testing.T) {
 	high := severityRule("test-high-rm", schema.SFR_SEVERITY_HIGH, "rm(* as $hit)\nalert $hit")
 	middle := severityRule("test-middle-curl", schema.SFR_SEVERITY_WARNING, "curl(* as $hit)\nalert $hit")
 	low := severityRule("test-low-chmod", schema.SFR_SEVERITY_LOW, "chmod(* as $hit)\nalert $hit")
@@ -96,7 +96,7 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 	rules := []*schema.SyntaxFlowRule{high, middle, low, info}
 
 	t.Run("high-denies", func(t *testing.T) {
-		result := CheckCommandWithRules(context.Background(), "rm -rf /tmp/build", rules)
+		result := checkWithRules(context.Background(), "rm -rf /tmp/build", rules)
 		require.True(t, result.Available)
 		require.True(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_DENY, result.Action)
@@ -105,7 +105,7 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("middle-asks", func(t *testing.T) {
-		result := CheckCommandWithRules(context.Background(), "curl https://example.com", rules)
+		result := checkWithRules(context.Background(), "curl https://example.com", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ASK, result.Action)
@@ -114,7 +114,7 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("low-warns", func(t *testing.T) {
-		result := CheckCommandWithRules(context.Background(), "chmod 777 /tmp/build", rules)
+		result := checkWithRules(context.Background(), "chmod 777 /tmp/build", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_WARN, result.Action)
@@ -123,7 +123,7 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("info-allows", func(t *testing.T) {
-		result := CheckCommandWithRules(context.Background(), "echo hello", rules)
+		result := checkWithRules(context.Background(), "echo hello", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ALLOW, result.Action)
@@ -133,7 +133,7 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 
 	t.Run("highest-action-wins", func(t *testing.T) {
 		command := "echo hi; chmod 777 /tmp/build; curl https://example.com; rm -rf /tmp/build"
-		result := CheckCommandWithRules(context.Background(), command, rules)
+		result := checkWithRules(context.Background(), command, rules)
 		require.Equal(t, schema.SFR_ACTION_DENY, result.Action)
 		require.Equal(t, "test-high-rm", result.TopFinding().Title)
 		require.GreaterOrEqual(t, len(result.Findings), 4)
@@ -144,7 +144,7 @@ func TestCheckCommandWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("no-match-allows", func(t *testing.T) {
-		result := CheckCommandWithRules(context.Background(), "printf hello", rules)
+		result := checkWithRules(context.Background(), "printf hello", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ALLOW, result.Action)

@@ -136,8 +136,6 @@ func (r Result) BlockedResult(shell string) map[string]any {
 		"termination_reason":  "blocked_by_bash_guard",
 		"process_error":       r.Message() + ". The command was not executed. This is a terminal security decision: do not retry through another shell, tool, encoding, path, script wrapper, MCP, or sub-agent.",
 		"security_denied":     true,
-		"retryable":           false,
-		"bypass_forbidden":    true,
 		"check": map[string]any{
 			"verdict":  "block",
 			"action":   string(r.Action),

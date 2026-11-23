@@ -25,19 +25,6 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 		}
 	}
 
-	// A security-rule escalation is authoritative: no policy, including yolo or
-	// auto, may auto-approve it. The review card is already emitted by the
-	// caller, so waiting here always surfaces a real decision.
-	if endpoint.IsForceHumanReview() {
-		reason := endpoint.GetForceHumanReviewReason()
-		if reason == "" {
-			reason = "security_rule_requires_human_review"
-		}
-		endpoint.SetApprovalMeta(ApprovalSourceRule, true, reason)
-		endpoint.WaitContext(ctx)
-		return
-	}
-
 	skipAIReview := utils.GetContextKeyBool(ctx, "skip_ai_review")
 
 	interactiveId := endpoint.GetId()

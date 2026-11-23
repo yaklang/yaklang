@@ -105,19 +105,6 @@ func CheckBuiltinCommand(ctx context.Context, cmd string) Result {
 	return unavailableResult("no_builtin_bash_rules")
 }
 
-// CheckCommandWithRules is the deterministic evaluator used by tests and by
-// callers that already hold a rule set (for example future user-configured
-// temporary rules).
-func CheckCommandWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule) Result {
-	if isGuardDisabled() {
-		return allowedResult("disabled")
-	}
-	if len(rules) == 0 {
-		return unavailableResult("no_rules")
-	}
-	return checkWithRules(ctx, cmd, rules)
-}
-
 func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule) Result {
 	cmd = normalizeCommand(cmd)
 	if strings.TrimSpace(cmd) == "" {
