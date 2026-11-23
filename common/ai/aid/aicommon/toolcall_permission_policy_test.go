@@ -151,6 +151,31 @@ func TestClaudeCodePermissionPolicy(t *testing.T) {
 		})
 	}
 
+	t.Run("deny-shell-payload-through-bash2ssa", func(t *testing.T) {
+		decision := gate(context.Background(), "bash", aitool.InvokeParams{"command": "sh -c 'rm -rf /tmp/x'"})
+		require.NotNil(t, decision)
+		require.Equal(t, schema.SFR_ACTION_DENY, decision.Action)
+	})
+
+	t.Run("deny-xargs-effective-command", func(t *testing.T) {
+		decision := gate(context.Background(), "bash", aitool.InvokeParams{"command": "printf x | xargs -0 rm -rf /tmp/x"})
+		require.NotNil(t, decision)
+		require.Equal(t, schema.SFR_ACTION_DENY, decision.Action)
+	})
+
+	t.Run("allow-must-cover-nested-payload", func(t *testing.T) {
+		shGate, err := CompileClaudeCodePermissions(`{"permissions":{"allow":["Bash(sh *)"]}}`)
+		require.NoError(t, err)
+		decision := shGate(context.Background(), "bash", aitool.InvokeParams{"command": "sh -c 'echo ok'"})
+		require.Nil(t, decision)
+	})
+
+	t.Run("command-query-is-not-an-effective-command", func(t *testing.T) {
+		lsGate, err := CompileClaudeCodePermissions(`{"permissions":{"deny":["Bash(ls *)"]}}`)
+		require.NoError(t, err)
+		require.Nil(t, lsGate(context.Background(), "bash", aitool.InvokeParams{"command": "command -v ls"}))
+	})
+
 	t.Run("splice-configs-keeps-deny-precedence", func(t *testing.T) {
 		spliced, err := CompileClaudeCodePermissions(
 			`{"permissions":{"allow":["Bash(git *)"]}}`,

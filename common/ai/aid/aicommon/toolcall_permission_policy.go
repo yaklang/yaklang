@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/bash/bash2ssa"
 )
 
 // Claude Code permission rules are a good common shape for user-authored tool
@@ -346,53 +347,49 @@ func (r *ToolCallPolicyRule) Matches(toolName string, params aitool.InvokeParams
 
 func (r *ToolCallPolicyRule) matchesBash(command string) (bool, string) {
 	spec := strings.TrimSpace(r.Specifier)
-	parts := splitShellSubcommands(command)
-	if len(parts) == 0 {
-		parts = []string{command}
+	commands, err := bash2ssa.ExtractShellCommands(command)
+	if err != nil || len(commands) == 0 {
+		// Parsing is advisory here; a malformed command still gets the raw
+		// pattern check instead of silently bypassing a deny rule.
+		commands = []bash2ssa.ShellCommand{{Text: command, EffectiveText: command}}
 	}
 
 	matched := 0
+	total := 0
 	evidence := ""
-	for _, part := range parts {
-		normalized := stripInertShellWrappers(part)
-		if normalized == "" {
-			normalized = strings.TrimSpace(part)
+	for _, extracted := range commands {
+		text := strings.TrimSpace(extracted.Text)
+		if text == "" {
+			continue
 		}
-		candidates := []string{normalized}
-		if r.Action != schema.SFR_ACTION_ALLOW {
-			// For deny/ask, also inspect through privilege and xargs wrappers so a
-			// `Bash(rm -rf *)` rule cannot be dodged with `sudo` or `xargs`.
-			if privileged := stripPrivilegeShellWrappers(normalized); privileged != "" && privileged != normalized {
-				candidates = append(candidates, privileged)
-			}
-		}
+		total++
+		effective := strings.TrimSpace(extracted.EffectiveText)
 
-		hit := false
-		for _, candidate := range candidates {
-			if matchBashPattern(spec, candidate) {
-				hit = true
-				if evidence == "" {
-					evidence = candidate
-				}
-				break
+		if r.Action == schema.SFR_ACTION_ALLOW {
+			// Claude Code requires every simple command, including static
+			// sh -c/eval payloads, to satisfy an allow rule.
+			if !matchBashPattern(spec, text) {
+				return false, ""
 			}
-		}
-		if hit {
 			matched++
-			if r.Action != schema.SFR_ACTION_ALLOW {
-				return true, evidence
+			if evidence == "" {
+				evidence = text
 			}
 			continue
 		}
-		if r.Action == schema.SFR_ACTION_ALLOW {
-			// Claude Code requires every subcommand of a compound command to be
-			// allowed; a single unmatched part cancels the allow.
-			return false, ""
+
+		if matchBashPattern(spec, text) || (effective != "" && effective != text && matchBashPattern(spec, effective)) {
+			if effective != "" && effective != text {
+				evidence = effective
+			} else {
+				evidence = text
+			}
+			return true, evidence
 		}
 	}
 
 	if r.Action == schema.SFR_ACTION_ALLOW {
-		return matched == len(parts), evidence
+		return total > 0 && matched == total, evidence
 	}
 	return false, ""
 }
@@ -739,282 +736,4 @@ func extractURLHost(raw string) string {
 		return parsed.Hostname()
 	}
 	return ""
-}
-
-func splitShellSubcommands(command string) []string {
-	var parts []string
-	var b strings.Builder
-	var quote rune
-	escaped := false
-	parenDepth := 0
-
-	flush := func() {
-		if value := strings.TrimSpace(b.String()); value != "" {
-			parts = append(parts, value)
-		}
-		b.Reset()
-	}
-
-	runes := []rune(command)
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-		if escaped {
-			b.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if quote != 0 {
-			b.WriteRune(r)
-			if r == '\\' && quote == '"' {
-				escaped = true
-				continue
-			}
-			if r == quote {
-				quote = 0
-			}
-			continue
-		}
-
-		switch r {
-		case '\'', '"':
-			quote = r
-			b.WriteRune(r)
-		case '\\':
-			escaped = true
-			b.WriteRune(r)
-		case '(':
-			parenDepth++
-			b.WriteRune(r)
-		case ')':
-			if parenDepth > 0 {
-				parenDepth--
-			}
-			b.WriteRune(r)
-		case ';', '\n':
-			if parenDepth == 0 {
-				flush()
-			} else {
-				b.WriteRune(r)
-			}
-		case '&':
-			if i+1 < len(runes) && runes[i+1] == '&' {
-				if parenDepth == 0 {
-					flush()
-				} else {
-					b.WriteString("&&")
-				}
-				i++
-			} else {
-				b.WriteRune(r)
-			}
-		case '|':
-			if i+1 < len(runes) && runes[i+1] == '|' {
-				if parenDepth == 0 {
-					flush()
-				} else {
-					b.WriteString("||")
-				}
-				i++
-			} else if parenDepth == 0 {
-				flush()
-			} else {
-				b.WriteRune(r)
-			}
-		default:
-			b.WriteRune(r)
-		}
-	}
-	flush()
-	return parts
-}
-
-func splitShellWords(command string) []string {
-	var fields []string
-	var b strings.Builder
-	var quote rune
-	escaped := false
-
-	flush := func() {
-		if b.Len() > 0 {
-			fields = append(fields, b.String())
-			b.Reset()
-		}
-	}
-
-	for _, r := range command {
-		if escaped {
-			b.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if quote != 0 {
-			if r == '\\' && quote == '"' {
-				escaped = true
-				continue
-			}
-			if r == quote {
-				quote = 0
-				continue
-			}
-			b.WriteRune(r)
-			continue
-		}
-		switch r {
-		case '\'', '"':
-			quote = r
-		case '\\':
-			escaped = true
-		case ' ', '\t', '\r', '\n':
-			flush()
-		default:
-			b.WriteRune(r)
-		}
-	}
-	flush()
-	return fields
-}
-
-func stripInertShellWrappers(command string) string {
-	fields := splitShellWords(command)
-	if len(fields) == 0 {
-		return ""
-	}
-	original := strings.Join(fields, " ")
-
-	for len(fields) > 0 {
-		switch fields[0] {
-		case "timeout":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-s" || option == "--signal" || option == "-k" || option == "--kill-after") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-			if len(fields) > 0 {
-				fields = fields[1:] // duration
-			}
-		case "time":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-o" || option == "--output" || option == "-f" || option == "--format") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-		case "nice":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-n" || option == "--adjustment") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-		case "ionice":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-c" || option == "--class" || option == "-n" || option == "--classdata" ||
-					option == "-p" || option == "--pid" || option == "-P" || option == "--pgid" ||
-					option == "-u" || option == "--uid") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-		case "nohup":
-			fields = fields[1:]
-			if len(fields) > 0 && fields[0] == "--" {
-				fields = fields[1:]
-			}
-		case "stdbuf":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				fields = fields[1:]
-			}
-		case "command", "builtin":
-			if len(fields) > 1 && (fields[1] == "-v" || fields[1] == "-V") {
-				return original
-			}
-			fields = fields[1:]
-			if len(fields) > 0 && fields[0] == "--" {
-				fields = fields[1:]
-			}
-		case "env":
-			if len(fields) > 1 && (fields[1] == "-S" || fields[1] == "--split-string") {
-				return original
-			}
-			fields = fields[1:]
-			for len(fields) > 0 && (strings.HasPrefix(fields[0], "-") || isShellEnvAssignment(fields[0])) {
-				fields = fields[1:]
-			}
-		default:
-			return strings.Join(fields, " ")
-		}
-	}
-	return original
-}
-
-func stripPrivilegeShellWrappers(command string) string {
-	fields := splitShellWords(command)
-	if len(fields) == 0 {
-		return ""
-	}
-	original := strings.Join(fields, " ")
-
-	for len(fields) > 0 {
-		switch fields[0] {
-		case "sudo":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-u" || option == "--user" || option == "-g" || option == "--group" ||
-					option == "-p" || option == "--prompt" || option == "-C" || option == "--close-from" ||
-					option == "-T" || option == "--command-timeout" || option == "-r" || option == "--role" ||
-					option == "-t" || option == "--type") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-			if len(fields) > 0 && fields[0] == "--" {
-				fields = fields[1:]
-			}
-		case "doas":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-u" || option == "-C") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-		case "xargs":
-			fields = fields[1:]
-			for len(fields) > 0 && strings.HasPrefix(fields[0], "-") {
-				option := fields[0]
-				fields = fields[1:]
-				if (option == "-n" || option == "--max-args" || option == "-P" || option == "--max-procs" ||
-					option == "-I" || option == "--replace" || option == "-L" || option == "--max-lines" ||
-					option == "-s" || option == "--max-chars" || option == "-a" || option == "--arg-file" ||
-					option == "-E" || option == "--eof" || option == "-d" || option == "--delimiter") && len(fields) > 0 {
-					fields = fields[1:]
-				}
-			}
-		case "su":
-			if len(fields) >= 3 && (fields[1] == "-c" || fields[1] == "--command") {
-				return fields[2]
-			}
-			return original
-		default:
-			return strings.Join(fields, " ")
-		}
-	}
-	return original
-}
-
-func isShellEnvAssignment(value string) bool {
-	index := strings.IndexByte(value, '=')
-	return index > 0
 }
