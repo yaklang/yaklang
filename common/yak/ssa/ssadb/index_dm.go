@@ -26,7 +26,7 @@ func installDMIRIndexes(db *gorm.DB) error {
 		if db.Dialect().HasIndex(spec.table, spec.name) {
 			continue
 		}
-		rows, err := db.DB().Query(`SELECT I.INDEX_NAME,I.UNIQUENESS,C.COLUMN_NAME FROM ALL_INDEXES I JOIN ALL_IND_COLUMNS C ON C.INDEX_OWNER=I.OWNER AND C.INDEX_NAME=I.INDEX_NAME WHERE I.OWNER=SYS_CONTEXT('USERENV','CURRENT_SCHEMA') AND I.TABLE_NAME=? ORDER BY I.INDEX_NAME,C.COLUMN_POSITION`, strings.ToUpper(spec.table))
+		rows, err := nativeQueryContextDB(db, nil, `SELECT I.INDEX_NAME,I.UNIQUENESS,C.COLUMN_NAME FROM ALL_INDEXES I JOIN ALL_IND_COLUMNS C ON C.INDEX_OWNER=I.OWNER AND C.INDEX_NAME=I.INDEX_NAME WHERE I.OWNER=SYS_CONTEXT('USERENV','CURRENT_SCHEMA') AND I.TABLE_NAME=? ORDER BY I.INDEX_NAME,C.COLUMN_POSITION`, strings.ToUpper(spec.table))
 		if err != nil {
 			return err
 		}
@@ -71,7 +71,11 @@ func installDMIRIndexes(db *gorm.DB) error {
 		}
 		if spec.unique {
 			var duplicates int64
-			if err = db.DB().QueryRow("SELECT COUNT(*) FROM (SELECT " + spec.columns + " FROM " + spec.table + " GROUP BY " + spec.columns + " HAVING COUNT(*)>1)").Scan(&duplicates); err != nil {
+			row := nativeQueryRowContext(db, nil, "SELECT COUNT(*) FROM (SELECT "+spec.columns+" FROM "+QuoteIdent(db, spec.table)+" GROUP BY "+spec.columns+" HAVING COUNT(*)>1)")
+			if row == nil {
+				return sql.ErrConnDone
+			}
+			if err = row.Scan(&duplicates); err != nil {
 				return err
 			}
 			if duplicates > 0 {
@@ -79,7 +83,7 @@ func installDMIRIndexes(db *gorm.DB) error {
 			}
 		}
 		for _, name := range matched {
-			if err = db.Exec("DROP INDEX " + db.Dialect().Quote(name)).Error; err != nil {
+			if err = nativeExec(db, "DROP INDEX "+QuoteIdent(db, name)); err != nil {
 				return err
 			}
 		}
@@ -91,7 +95,7 @@ func installDMIRIndexes(db *gorm.DB) error {
 		if spec.unique {
 			kind = "UNIQUE "
 		}
-		if err = db.Exec("CREATE " + kind + "INDEX " + db.Dialect().Quote(indexName) + " ON " + db.Dialect().Quote(spec.table) + " (" + spec.columns + ")").Error; err != nil {
+		if err = nativeExec(db, "CREATE "+kind+"INDEX "+QuoteIdent(db, indexName)+" ON "+QuoteIdent(db, spec.table)+" ("+spec.columns+")"); err != nil {
 			return err
 		}
 	}

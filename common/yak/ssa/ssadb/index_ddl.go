@@ -109,7 +109,7 @@ func EnsureIndex(db *gorm.DB, spec IndexSpec) error {
 	if err != nil {
 		return err
 	}
-	if err := db.Exec(ddl).Error; err != nil {
+	if err := nativeExec(db, ddl); err != nil {
 		return fmt.Errorf("create index %s on %s: %w", spec.Name, spec.Table, err)
 	}
 	return nil

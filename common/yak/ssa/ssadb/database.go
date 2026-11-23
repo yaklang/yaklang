@@ -72,7 +72,7 @@ func patchIrSourceQuotedCode(db *gorm.DB) {
 	case "mysql":
 		// For MySQL, change TEXT to LONGTEXT to support larger source files
 		// TEXT in MySQL is limited to ~64KB, but LONGTEXT can store up to 4GB
-		err := db.Exec("ALTER TABLE " + TableIrSources + " MODIFY COLUMN quoted_code LONGTEXT").Error
+		err := nativeExec(db, "ALTER TABLE "+QuoteIdent(db, TableIrSources)+" MODIFY COLUMN "+QuoteIdent(db, "quoted_code")+" LONGTEXT")
 		if err != nil {
 			log.Warnf("failed to modify %s.quoted_code to LONGTEXT for MySQL: %v", TableIrSources, err)
 		} else {
@@ -159,23 +159,72 @@ func namedIndexDefinition(db *gorm.DB, table, index string) (string, bool) {
 	if db == nil || db.Dialect() == nil {
 		return "", false
 	}
+	var query string
 	switch dialectOf(db) {
 	case sqlDialectSQLite:
-		var ddl string
-		err := db.Raw(
-			`SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`,
-			table, index,
-		).Row().Scan(&ddl)
-		return ddl, err == nil && strings.TrimSpace(ddl) != ""
+		query = `SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?`
 	case sqlDialectPostgres:
-		var ddl string
-		query := bindSQLPlaceholdersDB(db,
-			`SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename::text = ? AND indexname::text = ?`)
-		err := db.Raw(query, table, index).Row().Scan(&ddl)
-		return ddl, err == nil && strings.TrimSpace(ddl) != ""
+		query = `SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename::text = ? AND indexname::text = ?`
 	default:
 		return "", false
 	}
+	var ddl string
+	row := nativeQueryRowContext(db, nil, query, table, index)
+	if row == nil {
+		return "", false
+	}
+	err := row.Scan(&ddl)
+	return ddl, err == nil && strings.TrimSpace(ddl) != ""
+}
+
+// tableColumnType is the catalog read used by migrations and conformance
+// checks. Callers must not query sqlite_master, pg_indexes, information_schema
+// or ALL_TAB_COLUMNS directly; each dialect exposes a different catalog shape.
+func tableColumnType(db *gorm.DB, table, column string) (string, bool) {
+	if db == nil || db.Dialect() == nil {
+		return "", false
+	}
+	if dialectOf(db) == sqlDialectSQLite {
+		rows, err := nativeQueryContextDB(db, nil, `PRAGMA table_info(`+QuoteIdent(db, table)+`)`)
+		if err != nil {
+			return "", false
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var cid, notNull, primaryKey int
+			var name, columnType string
+			var defaultValue interface{}
+			if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+				return "", false
+			}
+			if strings.EqualFold(name, column) {
+				return strings.ToLower(strings.TrimSpace(columnType)), true
+			}
+		}
+		return "", false
+	}
+	var query string
+	args := []interface{}{table, column}
+	switch dialectOf(db) {
+	case sqlDialectMySQL:
+		query = `SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`
+	case sqlDialectPostgres:
+		query = `SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`
+	case sqlDialectDM:
+		query = `SELECT DATA_TYPE FROM ALL_TAB_COLUMNS WHERE OWNER = SYS_CONTEXT('USERENV','CURRENT_SCHEMA') AND TABLE_NAME = ? AND COLUMN_NAME = ?`
+		args = []interface{}{strings.ToUpper(table), strings.ToUpper(column)}
+	default:
+		return "", false
+	}
+	var columnType string
+	row := nativeQueryRowContext(db, nil, query, args...)
+	if row == nil {
+		return "", false
+	}
+	if err := row.Scan(&columnType); err != nil {
+		return "", false
+	}
+	return strings.ToLower(strings.TrimSpace(columnType)), true
 }
 
 // ensureUniqueIrCodesProgramCodeIndex creates a UNIQUE INDEX on
@@ -227,7 +276,7 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 			return // already the COALESCE version
 		}
 		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
-		if err := db.Exec("DROP INDEX IF EXISTS " + QuoteIdent(db, indexName)).Error; err != nil {
+		if err := nativeExec(db, "DROP INDEX IF EXISTS "+QuoteIdent(db, indexName)); err != nil {
 			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
 			return
 		}
@@ -370,7 +419,7 @@ func isMissingTableError(err error) bool {
 
 func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error {
 	return retryProgramDelete(table, func() error {
-		return db.Exec("DELETE FROM "+table+" WHERE "+condition, args...).Error
+		return nativeExec(db, "DELETE FROM "+QuoteIdent(db, table)+" WHERE "+condition, args...)
 	})
 }
 
@@ -457,7 +506,7 @@ func pruneRedundantIRIndexes(db *gorm.DB) {
 		if !hasNamedIndex(db, redundant.table, redundant.index) {
 			continue
 		}
-		if err := db.Exec(`DROP INDEX IF EXISTS ` + quoteSQLIdent(redundant.index)).Error; err != nil {
+		if err := nativeExec(db, `DROP INDEX IF EXISTS `+QuoteIdent(db, redundant.index)); err != nil {
 			log.Warnf("[ir-index-prune] drop %s: %v", redundant.index, err)
 			continue
 		}

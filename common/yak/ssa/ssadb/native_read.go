@@ -554,6 +554,17 @@ func nativeContextErr(err error) bool {
 	return err != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))
 }
 
+// nativePrepareQuery is the single place native SQL is adapted to a dialect:
+// "?" becomes "$n" for Postgres and DM receives its normalized query form.
+// Callers may still pass a pre-bound query; binding is idempotent.
+func nativePrepareQuery(db *gorm.DB, query string) string {
+	query = bindSQLPlaceholdersDB(db, query)
+	if damenggorm.IsDM(db) {
+		query = damenggorm.NormalizeQuery(query)
+	}
+	return query
+}
+
 func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args ...interface{}) *sql.Row {
 	if db == nil {
 		return nil
@@ -565,9 +576,7 @@ func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args 
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if damenggorm.IsDM(db) {
-		query = damenggorm.NormalizeQuery(query)
-	}
+	query = nativePrepareQuery(db, query)
 	switch q := common.(type) {
 	case *sql.DB:
 		return q.QueryRowContext(ctx, query, args...)
@@ -588,16 +597,18 @@ func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args .
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if damenggorm.IsDM(db) {
-		query = damenggorm.NormalizeQuery(query)
+	query = nativePrepareQuery(db, query)
+	common := db.CommonDB()
+	if common == nil {
+		return nil, sql.ErrConnDone
 	}
-	switch q := db.CommonDB().(type) {
+	switch q := common.(type) {
 	case *sql.DB:
 		return q.QueryContext(ctx, query, args...)
 	case *sql.Tx:
 		return q.QueryContext(ctx, query, args...)
 	default:
-		return db.CommonDB().Query(query, args...)
+		return common.Query(query, args...)
 	}
 }
 
@@ -613,15 +624,25 @@ func nativeExecContextDB(db *gorm.DB, ctx context.Context, query string, args ..
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if damenggorm.IsDM(db) {
-		query = damenggorm.NormalizeQuery(query)
+	query = nativePrepareQuery(db, query)
+	common := db.CommonDB()
+	if common == nil {
+		return nil, sql.ErrConnDone
 	}
-	switch q := db.CommonDB().(type) {
+	switch q := common.(type) {
 	case *sql.DB:
 		return q.ExecContext(ctx, query, args...)
 	case *sql.Tx:
 		return q.ExecContext(ctx, query, args...)
 	default:
-		return db.CommonDB().Exec(query, args...)
+		return common.Exec(query, args...)
 	}
+}
+
+// nativeExec runs a statement through the dialect-aware native executor with a
+// background context. Business code must use this instead of db.Exec/tx.Exec
+// when it issues hand-written SQL.
+func nativeExec(db *gorm.DB, query string, args ...interface{}) error {
+	_, err := nativeExecContextDB(db, context.Background(), query, args...)
+	return err
 }

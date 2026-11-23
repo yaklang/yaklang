@@ -457,9 +457,9 @@ func (c *irConstValueCache) preloadShortConsts(db *gorm.DB, program string) {
 		return
 	}
 	values := make(map[int64]*IrConstValue, 1024)
-	query := bindSQLPlaceholdersDB(db, `SELECT const_id, kind, `+QuoteIdent(db, "string")+` FROM `+QuoteIdent(db, TableIrConstPool)+
-		` WHERE program_name = ? AND text_size <= ?`)
-	rows, err := db.Raw(query, program, IrCodeInlineConstStringLimit).Rows()
+	query := `SELECT const_id, kind, ` + QuoteIdent(db, "string") + ` FROM ` + QuoteIdent(db, TableIrConstPool) +
+		` WHERE program_name = ? AND text_size <= ?`
+	rows, err := nativeQueryContextDB(db, nil, query, program, IrCodeInlineConstStringLimit)
 	if err != nil {
 		// A database written before the pool has no such table; the decode path
 		// keeps the extra_information text in that case.
@@ -515,21 +515,16 @@ func GetIrConstValue(db *gorm.DB, program string, constID int64) *IrConstValue {
 	if db == nil {
 		return nil
 	}
-	query := bindSQLPlaceholdersDB(db, `SELECT kind, `+QuoteIdent(db, "string")+` FROM `+QuoteIdent(db, TableIrConstPool)+
-		` WHERE program_name = ? AND const_id = ? LIMIT 1`)
-	rows, err := db.Raw(query, program, constID).Rows()
-	if err != nil {
-		log.Debugf("read const value: %v", err)
-		return nil
-	}
-	defer rows.Close()
-	if !rows.Next() {
+	query := `SELECT kind, ` + QuoteIdent(db, "string") + ` FROM ` + QuoteIdent(db, TableIrConstPool) +
+		` WHERE program_name = ? AND const_id = ? LIMIT 1`
+	row := nativeQueryRowContext(db, nil, query, program, constID)
+	if row == nil {
 		return nil
 	}
 	var kind int64
 	var text string
-	if err := rows.Scan(&kind, &text); err != nil {
-		log.Debugf("scan const value: %v", err)
+	if err := row.Scan(&kind, &text); err != nil {
+		log.Debugf("read const value: %v", err)
 		return nil
 	}
 	return &IrConstValue{Kind: IrConstKind(kind), Text: text}

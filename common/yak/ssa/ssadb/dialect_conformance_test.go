@@ -108,15 +108,15 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 			"%s: index %s on %s was not created", backend, spec.Name, spec.Table)
 	}
 
+	// Every dialect resolves column types through tableColumnType; a direct
+	// information_schema query here would let the catalog helper drift.
+	dataType, ok := tableColumnType(db, TableIrSources, "quoted_code")
+	require.True(t, ok, "%s: tableColumnType could not find %s.quoted_code", backend, TableIrSources)
+	require.NotEmpty(t, dataType)
 	if backend == "mysql" {
 		// patchIrSourceQuotedCode logs a warning instead of failing the open;
 		// assert the column type so the ALTER TABLE is actually covered.
-		var dataType string
-		require.NoError(t, db.Raw(
-			`SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
-			TableIrSources, "quoted_code",
-		).Row().Scan(&dataType))
-		require.Equal(t, "longtext", strings.ToLower(dataType))
+		require.Equal(t, "longtext", dataType)
 	}
 
 	if backend == "sqlite" || backend == "postgres" {
@@ -238,10 +238,41 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 	require.Len(t, found, 1)
 	require.Equal(t, program, found[0].ProgramName)
 
+	exerciseProgramReplacement(t, db)
+
 	require.NoError(t, DeleteProgramChecked(db, program))
 	var remaining int64
 	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", program).Count(&remaining).Error)
 	require.Zero(t, remaining)
+}
+
+// exerciseProgramReplacement covers the transaction-scoped DELETE/UPDATE
+// statements in program_replace.go. They run through nativeExec, so PostgreSQL
+// placeholders and identifier quoting are exercised on every backend.
+func exerciseProgramReplacement(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	suffix := uuid.NewString()
+	target := "replacement-target-" + suffix
+	staged := "replacement-staged-" + suffix
+	t.Cleanup(func() {
+		_ = DeleteProgramChecked(db, target)
+		_ = DeleteProgramChecked(db, staged)
+	})
+
+	require.NoError(t, db.Create(&IrProgram{ProgramName: target, ProgramKind: Application}).Error)
+	require.NoError(t, db.Create(&IrProgram{ProgramName: staged, ProgramKind: Application}).Error)
+
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, deleteProgramRowsForReplacement(tx, target))
+	require.NoError(t, renameProgramRowsForReplacement(tx, staged, target))
+	require.NoError(t, tx.Commit().Error)
+
+	var count int64
+	require.NoError(t, db.Model(&IrProgram{}).Where("program_name = ?", target).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+	require.NoError(t, db.Model(&IrProgram{}).Where("program_name = ?", staged).Count(&count).Error)
+	require.Zero(t, count)
 }
 
 type legacyIrConstRow struct {
