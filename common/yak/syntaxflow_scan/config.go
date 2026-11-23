@@ -66,7 +66,8 @@ type ScanTaskCallback struct {
 	CompiledSource bool `json:"-"`
 
 	// scanModes is the product-stage filter (source/struct/ssa). Empty means all.
-	scanModes []string `json:"-"`
+	scanModes    []string `json:"-"`
+	allLanguages bool     `json:"-"`
 
 	// scanRuntime is the control point of one scan. It owns the risk collect
 	// and the registered consumers (database saver, report writer). Every
