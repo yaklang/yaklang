@@ -134,7 +134,7 @@ func (r Result) BlockedResult(shell string) map[string]any {
 		"exit_code":           nil,
 		"exit_code_available": false,
 		"termination_reason":  "blocked_by_bash_guard",
-		"process_error":       r.Message() + ". The command was not executed. This is a terminal security decision: do not retry through another shell, tool, encoding, path, script wrapper, MCP, or sub-agent.",
+		"process_error":       r.Message() + ". The command was not executed. Do not retry this command through another shell, tool, encoding, path, script wrapper, MCP, or sub-agent. If the next step is the same operation or a bypass, stop it and tell the user; otherwise continue with unrelated work.",
 		"security_denied":     true,
 		"check": map[string]any{
 			"verdict":  "block",

@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -174,7 +175,7 @@ func handleToolCallResult(
 	}
 
 	if toolResultSecurityDenied(result) {
-		feedback := aicommon.SecurityRuleDeniedRetryFeedback(toolPayload, "", "", "", "security policy blocked the command before execution")
+		feedback := securityDeniedFeedbackFromResult(toolPayload, result)
 		invoker.AddToTimeline("[SECURITY_DENIED]", feedback)
 		emitToolResultStatus(loop, toolPayload, false)
 		operator.Feedback(feedback)
@@ -247,4 +248,36 @@ func toolResultSecurityDenied(result *aitool.ToolResult) bool {
 		return true
 	}
 	return strings.EqualFold(strings.TrimSpace(utils.InterfaceToString(data["termination_reason"])), "blocked_by_bash_guard")
+}
+
+// securityDeniedFeedbackFromResult recovers the top finding from the precheck
+// payload so the model sees which rule matched, not just a generic "blocked".
+func securityDeniedFeedbackFromResult(toolName string, result *aitool.ToolResult) string {
+	reason := "security policy blocked the command before execution"
+	var (
+		ruleName string
+		ruleID   string
+		severity schema.SyntaxFlowSeverity
+	)
+	if result != nil {
+		data := utils.InterfaceToGeneralMap(result.Data)
+		check := utils.InterfaceToGeneralMap(data["check"])
+		findings := utils.InterfaceToSliceInterface(check["findings"])
+		if len(findings) > 0 {
+			finding := utils.InterfaceToGeneralMap(findings[0])
+			ruleName = strings.TrimSpace(utils.InterfaceToString(finding["title_zh"]))
+			if ruleName == "" {
+				ruleName = strings.TrimSpace(utils.InterfaceToString(finding["title"]))
+			}
+			ruleID = strings.TrimSpace(utils.InterfaceToString(finding["rule_id"]))
+			severity = schema.SyntaxFlowSeverity(utils.InterfaceToString(finding["severity"]))
+			if message := strings.TrimSpace(utils.InterfaceToString(finding["message"])); message != "" {
+				reason = message
+			}
+			if value := strings.TrimSpace(utils.InterfaceToString(finding["value"])); value != "" {
+				reason += " (matched: " + value + ")"
+			}
+		}
+	}
+	return aicommon.SecurityRuleDeniedRetryFeedback(toolName, ruleName, ruleID, severity, reason)
 }

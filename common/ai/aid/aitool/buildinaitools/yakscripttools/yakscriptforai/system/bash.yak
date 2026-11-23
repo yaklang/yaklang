@@ -12,7 +12,7 @@ __USAGE__ = <<<USAGE_BLOCK
 可选 `shell`：bash、cmd 或 powershell；默认自动选择。bash 以登录 shell 运行，不自动启用 `set -e` 或 `pipefail`；需要让前序命令或管道失败终止脚本时，请自行启用。
 执行原则：较长脚本在关键步骤适量用 `echo`/`printf`（Python 脚本用 `print`）输出阶段、处理对象和必要的中间结果，便于根据输出快速定位并修改问题；不要打印脚本全文、敏感值或大量重复日志。
 判断执行结果请查看 `RESULT.timed_out`、`process_completed`、`exit_code_available`、`exit_code_accepted` 和 `termination_reason`。工具调用成功不等于命令成功；超时可能没有可用退出码。
-安全策略：若 `RESULT.termination_reason` 为 `blocked_by_bash_guard` 或 `RESULT.check.verdict` 为 `block`，命令已被安全规则拒绝。这是终态：不要更换 shell、拆分或改写命令、更换编码/路径、写入脚本后再执行，或改用 MCP/子智能体/后台任务绕过；向用户说明命中的规则并等待明确授权。只有参数/Schema 错误才修正后重试。
+安全策略：若 `RESULT.termination_reason` 为 `blocked_by_bash_guard` 或 `RESULT.check.verdict` 为 `block`，本次命令已被安全规则拒绝且不会执行。不要原样重试，也不要更换 shell（bash/cmd/powershell）、工具、参数写法、编码/路径、子命令拆分、脚本文件、MCP、子智能体或后台任务来绕过。请比较下一步与本次被拒命令：若属于同一操作、同一目标/效果，或目的就是绕过同一限制，停止该操作并向用户说明命中规则；若为无关的独立工作，只放弃本次命令并继续其余任务。
 执行完整脚本时，推荐从工作区提示读取 `AI Artifacts dir` 的实际绝对路径，先写入该目录，再 `chmod +x` 并执行；简单固定文本可用 `echo`，多行或含转义的脚本用 `printf '%s\n'`，并正确引用路径。工具内部自动生成的临时包装脚本会在调用结束时删除，不作为交付物。
 
 典型调用案例：

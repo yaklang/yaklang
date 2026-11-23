@@ -9,8 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestSecurityDeniedTerminalPolicy(t *testing.T) {
-	t.Run("typed-error-feedback-forbids-bypass", func(t *testing.T) {
+func TestSecurityDeniedFeedbackPolicy(t *testing.T) {
+	t.Run("typed-error-feedback-explains-scope", func(t *testing.T) {
 		denied := &SecurityRuleDeniedError{
 			ToolName: "bash",
 			RuleName: "Bash(rm -rf *)",
@@ -20,19 +20,20 @@ func TestSecurityDeniedTerminalPolicy(t *testing.T) {
 		}
 
 		feedback := denied.RetryFeedback()
-		require.Contains(t, feedback, "终态")
-		require.Contains(t, feedback, "禁止通过以下方式绕过")
+		require.Contains(t, feedback, "不是整个任务的终态")
+		require.Contains(t, feedback, "请自行判断下一步")
+		require.Contains(t, feedback, "同一操作")
+		require.Contains(t, feedback, "无关的独立工作")
 		require.Contains(t, feedback, "cmd/powershell")
 		require.Contains(t, feedback, "MCP")
 		require.Contains(t, feedback, "子智能体")
+		require.NotContains(t, feedback, "这是终态")
 		require.True(t, IsSecurityRuleDenied(denied))
 		require.False(t, IsSecurityRuleDenied(errors.New("ordinary tool error")))
 	})
 
-	t.Run("execution-policy-contains-terminal-rule", func(t *testing.T) {
+	t.Run("execution-policy-does-not-own-tool-feedback", func(t *testing.T) {
 		policy := (&Config{}).GetExecutionPolicy()
-		require.Contains(t, policy, "安全拒绝是终态")
-		require.Contains(t, policy, "禁止更换 shell")
-		require.Contains(t, policy, "安全拒绝不可重试")
+		require.NotContains(t, policy, "安全拒绝")
 	})
 }
