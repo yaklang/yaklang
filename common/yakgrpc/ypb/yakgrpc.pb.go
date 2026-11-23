@@ -11152,7 +11152,8 @@ type AIStartParams struct {
 	ImageInput *AIImageInputConfig `protobuf:"bytes,54,opt,name=ImageInput,proto3" json:"ImageInput,omitempty"`
 	// 为 true 时禁用内置 SyntaxFlow 安全规则（内置高危预检与 ReAct 审查）。
 	DisableBuiltinSyntaxFlowRules bool `protobuf:"varint,57,opt,name=DisableBuiltinSyntaxFlowRules,proto3" json:"DisableBuiltinSyntaxFlowRules,omitempty"`
-	// 为 true 时把用户自定义 Bash SyntaxFlow 规则纳入安全审查与高危预检。
+	// 为 true 时把用户自定义 Bash 安全规则（AI Bash 安全规则页的正则规则与规则库中
+	// 的自定义 Bash SyntaxFlow 规则）纳入安全审查与高危预检。
 	EnableCustomSyntaxFlowRules bool `protobuf:"varint,58,opt,name=EnableCustomSyntaxFlowRules,proto3" json:"EnableCustomSyntaxFlowRules,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache
@@ -72157,8 +72158,9 @@ type AIGlobalConfig struct {
 	// Global default for disabling built-in SyntaxFlow security rules. A session
 	// AIStartParams value can override this default.
 	DisableBuiltinSyntaxFlowRules bool `protobuf:"varint,15,opt,name=DisableBuiltinSyntaxFlowRules,proto3" json:"DisableBuiltinSyntaxFlowRules,omitempty"`
-	// Global default for including user-authored Bash SyntaxFlow rules in the
-	// security guard. A session AIStartParams value can override this default.
+	// Global default for including user-authored Bash security rules (regex rows
+	// from the AI Bash guard page and custom Bash SyntaxFlow rules) in the guard.
+	// A session AIStartParams value can override this default.
 	EnableCustomSyntaxFlowRules bool `protobuf:"varint,16,opt,name=EnableCustomSyntaxFlowRules,proto3" json:"EnableCustomSyntaxFlowRules,omitempty"`
 	unknownFields               protoimpl.UnknownFields
 	sizeCache                   protoimpl.SizeCache

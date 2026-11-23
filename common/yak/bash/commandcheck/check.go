@@ -46,8 +46,9 @@ func WithDisableBuiltinRules(disable bool) CheckOption {
 	return func(o *checkOptions) { o.disableBuiltin = disable }
 }
 
-// WithIncludeCustomRules includes user-authored Bash SyntaxFlow rules from the
-// profile DB. Only SSA-mode SyntaxFlow rules are eligible.
+// WithIncludeCustomRules includes user-authored rules from the profile DB:
+// Bash SyntaxFlow rules plus the structured regex rows edited on the AI Bash
+// guard page. Only SSA-mode SyntaxFlow rules are eligible.
 func WithIncludeCustomRules(include bool) CheckOption {
 	return func(o *checkOptions) { o.includeCustom = include }
 }
@@ -109,9 +110,9 @@ func loadGuardRules() {
 	guardRules = rules
 }
 
-// CheckCommand parses one shell command and runs high-severity Bash rules.
-// This is the preflight path wired into the bash tool callback; it cannot ask a
-// human, so only deny findings block execution.
+// CheckCommand parses one shell command and runs high-severity Bash rules plus
+// custom deny rows. This is the preflight path wired into the bash tool
+// callback; it cannot ask a human, so only deny findings block execution.
 func CheckCommand(ctx context.Context, cmd string, options ...CheckOption) Result {
 	if isGuardDisabled() {
 		return allowedResult("disabled")
@@ -122,6 +123,7 @@ func CheckCommand(ctx context.Context, cmd string, options ...CheckOption) Resul
 	}
 
 	var rules []*schema.SyntaxFlowRule
+	var regexRules []compiledRegexRule
 	builtinErr := error(nil)
 	if !opts.disableBuiltin {
 		guardOnce.Do(loadGuardRules)
@@ -144,14 +146,15 @@ func CheckCommand(ctx context.Context, cmd string, options ...CheckOption) Resul
 				}
 			}
 		}
+		regexRules = loadCompiledRegexRules()
 	}
-	if len(rules) == 0 {
+	if len(rules) == 0 && len(regexRules) == 0 {
 		if builtinErr != nil {
 			return unavailableResult("unavailable: " + builtinErr.Error())
 		}
 		return allowedResult("no_rules_by_config")
 	}
-	return checkWithRules(ctx, cmd, rules)
+	return checkWithRules(ctx, cmd, rules, regexRules)
 }
 
 // CheckBuiltinCommand evaluates every built-in Bash rule from the profile DB,
@@ -168,6 +171,7 @@ func CheckBuiltinCommand(ctx context.Context, cmd string, options ...CheckOption
 	}
 
 	var rules []*schema.SyntaxFlowRule
+	var regexRules []compiledRegexRule
 	builtinErr := error(nil)
 	fallbackUsed := false
 	if !opts.disableBuiltin {
@@ -197,16 +201,17 @@ func CheckBuiltinCommand(ctx context.Context, cmd string, options ...CheckOption
 		} else {
 			rules = append(rules, custom...)
 		}
+		regexRules = loadCompiledRegexRules()
 	}
 
-	if len(rules) == 0 {
+	if len(rules) == 0 && len(regexRules) == 0 {
 		if builtinErr != nil {
 			log.Warnf("bash built-in rule check unavailable: %v", builtinErr)
 			return unavailableResult("builtin_unavailable: " + builtinErr.Error())
 		}
 		return allowedResult("no_rules_by_config")
 	}
-	result := checkWithRules(ctx, cmd, rules)
+	result := checkWithRules(ctx, cmd, rules, regexRules)
 	if !result.Available {
 		return result
 	}
@@ -220,7 +225,7 @@ func CheckBuiltinCommand(ctx context.Context, cmd string, options ...CheckOption
 	return result
 }
 
-func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule) Result {
+func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule, regexRules []compiledRegexRule) Result {
 	cmd = normalizeCommand(cmd)
 	if strings.TrimSpace(cmd) == "" {
 		return allowedResult("empty")
@@ -233,6 +238,13 @@ func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowR
 		ctx = context.Background()
 	}
 
+	// Regex rows read the raw command text and stay available even when the
+	// bash SSA frontend rejects the command.
+	findings := matchRegexRules(cmd, regexRules)
+	if len(rules) == 0 {
+		return finalizeResult(findings)
+	}
+
 	prog, err := ssaapi.Parse(cmd,
 		ssaapi.WithLanguage(ssaconfig.BASH),
 		ssaapi.WithMemory(),
@@ -240,14 +252,19 @@ func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowR
 	)
 	if err != nil {
 		log.Warnf("bash command guard skipped unparsable command: %v", err)
+		if len(findings) > 0 {
+			return finalizeResult(findings)
+		}
 		return allowedResult("parse_failed: " + err.Error())
 	}
 	if prog.GetLanguage() != ssaconfig.BASH {
 		log.Warnf("bash command guard skipped language mismatch: %s", prog.GetLanguage())
+		if len(findings) > 0 {
+			return finalizeResult(findings)
+		}
 		return allowedResult("language_mismatch: " + string(prog.GetLanguage()))
 	}
 
-	var findings []Finding
 	seen := make(map[string]struct{})
 	for _, rule := range rules {
 		if rule == nil || strings.TrimSpace(rule.Content) == "" {
