@@ -43,6 +43,9 @@ type Instance struct {
 	// TypeArgs holds source-like type arguments of the receiver and the
 	// function. A hashed shape is rendered as shape#<8 hex digits>.
 	TypeArgs []string `json:"type_args,omitempty"`
+	// RawTypeArgs keeps the compiler spelling of each type argument, including
+	// the go.shape. prefix. Consumers that inspect shapes use this list.
+	RawTypeArgs []string `json:"raw_type_args,omitempty"`
 	// Generic reports that the name carries at least one type-argument list.
 	Generic bool `json:"generic,omitempty"`
 	// Synthetic marks a compiler-owned name: a type: or go: prefix, or a -fm
@@ -75,7 +78,10 @@ func ParseInstance(name string) Instance {
 	if instance.Generic {
 		instance.Name = replaceGroupsWithDisplay(name, groups)
 		for _, group := range groups {
-			instance.TypeArgs = append(instance.TypeArgs, displayTypeArgs(name[group.start+1:group.end])...)
+			for _, arg := range splitTypeArgs(name[group.start+1 : group.end]) {
+				instance.RawTypeArgs = append(instance.RawTypeArgs, arg)
+				instance.TypeArgs = append(instance.TypeArgs, displayTypeArg(arg))
+			}
 		}
 		instance.Family = replaceGroups(name, groups, "[T]")
 	}
