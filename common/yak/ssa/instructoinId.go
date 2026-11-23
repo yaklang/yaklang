@@ -69,6 +69,7 @@ func (i *anInstruction) GetUsersByID(id int64) (User, bool) {
 	return GetEx[User](i.GetProgram().Cache, ToUser, id)
 }
 
+//go:noinline
 func (i *anInstruction) GetInstructionsByIDs(ids []int64) []Instruction {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil
@@ -78,6 +79,7 @@ func (i *anInstruction) GetInstructionsByIDs(ids []int64) []Instruction {
 	}, ids...)
 }
 
+//go:noinline
 func (i *anInstruction) GetValuesByIDs(ids []int64) Values {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil
@@ -85,6 +87,7 @@ func (i *anInstruction) GetValuesByIDs(ids []int64) Values {
 	return GetExs[Value](i.GetProgram().Cache, ToValue, ids...)
 }
 
+//go:noinline
 func (i *anInstruction) GetUsersByIDs(ids []int64) Users {
 	if i == nil || i.GetProgram() == nil || i.GetProgram().Cache == nil {
 		return nil

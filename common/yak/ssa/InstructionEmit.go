@@ -658,9 +658,9 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 		return nil
 	}
 	p := &Panic{
-		anValue: NewValue(),
-		Info:    info.GetId(),
+		Info: info.GetId(),
 	}
+	p.initValue()
 	f.emit(p)
 	return p
 }
@@ -669,9 +669,8 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	r := &Recover{
-		anValue: NewValue(),
-	}
+	r := &Recover{}
+	r.initValue()
 	r.SetType(CreateAnyType())
 	f.emit(r)
 	return r
@@ -679,9 +678,9 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 
 func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 	p := &Phi{
-		anValue: NewValue(),
-		Edge:    vs.GetIds(),
+		Edge: vs.GetIds(),
 	}
+	p.initValue()
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {
 		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p.GetId())

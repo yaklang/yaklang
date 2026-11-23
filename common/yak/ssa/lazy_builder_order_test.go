@@ -9,10 +9,12 @@ import (
 
 func TestLazyFunctionStackUsesSourceBeforeGeneratedName(t *testing.T) {
 	editor := memedit.NewMemEditor("first\nsecond\nthird\n")
-	first := &Function{anValue: NewValue()}
+	first := &Function{}
+	first.initValue()
 	first.SetName("AnonymousFunc-99")
 	first.SetRange(editor.GetRangeOffset(0, 5))
-	second := &Function{anValue: NewValue()}
+	second := &Function{}
+	second.initValue()
 	second.SetName("AnonymousFunc-1")
 	second.SetRange(editor.GetRangeOffset(6, 12))
 	for _, input := range [][]*Function{{first, second}, {second, first}} {

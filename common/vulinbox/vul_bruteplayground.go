@@ -115,28 +115,28 @@ func (s *VulinServer) registerBrutePlayground() {
 	orderIdNTraceIdQuery := fmt.Sprintf("orderId=%s&tradeId=%s", defaultOrderId, "1234567890")
 
 	var virtualRoute = omap.NewEmptyOrderedMap[string, map[string]string]()
-	virtualRoute.Push(map[string]string{
+	omap.Push(virtualRoute, map[string]string{
 		"path":  simpleOrderPath,
 		"title": "订单详情页面（订单号为4位数字 0-9999）",
 		"query": simpleQuery,
 	})
-	virtualRoute.Push(map[string]string{
+	omap.Push(virtualRoute, map[string]string{
 		"path":  dateOrderPath,
 		"title": "订单详情页面（订单号为今日日期+4位数字 0000-9999）",
 		"query": dateQuery,
 	})
-	virtualRoute.Push(map[string]string{
+	omap.Push(virtualRoute, map[string]string{
 		"path":  orderIdNTraceIdPath,
 		"title": "订单详情页面：traceId不重复（爆破/遍历订单号）",
 		"query": orderIdNTraceIdQuery,
 	})
 
 	getQuery := func(i int) string {
-		r := virtualRoute.GetByIndexMust(i)
+		r := omap.GetByIndexMust(virtualRoute, i)
 		return r["query"]
 	}
 	getPath := func(i int) string {
-		r := virtualRoute.GetByIndexMust(i)
+		r := omap.GetByIndexMust(virtualRoute, i)
 		return r["path"]
 	}
 	getPathWithQuery := func(i int) string {

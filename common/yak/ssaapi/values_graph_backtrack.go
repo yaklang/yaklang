@@ -179,7 +179,7 @@ func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
 		current = p
 	}
 	for i := 0; i < count; i++ {
-		err := ret.Push(vals.Pop())
+		err := omap.Push(ret, vals.Pop())
 		if err != nil {
 			log.Warn(err)
 		}

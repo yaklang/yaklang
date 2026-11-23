@@ -58,7 +58,6 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 	}
 
 	c := &Call{
-		anValue:         NewValue(),
 		Method:          target.GetId(),
 		Args:            args.GetIds(),
 		Binding:         bind,
@@ -68,6 +67,7 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 		IsEllipsis:      false,
 		SideEffectValue: map[string]int64{},
 	}
+	c.initValue()
 	if c.Method <= 0 {
 		log.Errorf("NewCall: method id is %d, target: %s", c.Method, target.String())
 	}

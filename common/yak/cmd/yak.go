@@ -1352,7 +1352,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			if checkSecretReasonI18n != nil {
 				m.Set("reasonI18n", checkSecretReasonI18n)
 			}
-			result := string(m.Jsonify())
+			result := string(omap.Jsonify(m))
 			fmt.Printf("\n<json-%v>\n%v\n</json-%v>\n\n", extractorFlag, result, extractorFlag)
 		}()
 
@@ -1759,7 +1759,7 @@ var fixupDatabaseCommand = cli.Command{
 			// failed recreate path
 			m.Set("path", needUserDeletePath) // need show in front for user  handler this file
 			m.Set("info", info)
-			result := string(m.Jsonify())
+			result := string(omap.Jsonify(m))
 			fmt.Printf("\n<json-%v>\n%v\n</json-%v>\n\n", extractorFlag, result, extractorFlag)
 		}()
 

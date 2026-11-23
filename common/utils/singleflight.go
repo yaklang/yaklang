@@ -7,14 +7,23 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+// singleFlightCacheStore is the minimal cache surface required by SingleFlightCache.
+type singleFlightCacheStore[K comparable, V any] interface {
+	Get(key K) (V, bool)
+	Set(key K, value V)
+}
+
 // SingleFlightCache wraps singleflight with cache support
 type SingleFlightCache[K comparable, V any] struct {
 	sf    singleflight.Group
-	cache *CacheExWithKey[K, V]
+	cache singleFlightCacheStore[K, V]
 }
 
 // NewSingleFlightCache creates a new SingleFlightCache. If cache is nil, only single-flight behavior is provided.
-func NewSingleFlightCache[K comparable, V any](cache *CacheExWithKey[K, V]) *SingleFlightCache[K, V] {
+func NewSingleFlightCache[K comparable, V any](cache singleFlightCacheStore[K, V]) *SingleFlightCache[K, V] {
+	if IsNil(cache) {
+		cache = nil
+	}
 	return &SingleFlightCache[K, V]{
 		sf:    singleflight.Group{},
 		cache: cache,

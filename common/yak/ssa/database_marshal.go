@@ -9,31 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func (i anInstruction) MarshalInstruction(code *ssadb.IrCode) {
-
-}
-
-func (anValue anValue) MarshalValue(ir *ssadb.IrCode) {
-	defer func() {
-		if msg := recover(); msg != nil {
-			log.Errorf("value2IrCode panic: %s", msg)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-
-	// code.Defs == v.value
-
-	// // value
-	// for _, def := range value.GetValues() {
-	// 	if def == nil {
-	// 		log.Infof("BUG: value[%s: %s] def is nil", value, value.GetRange())
-	// 		continue
-	// 	}
-	// 	ir.Defs = append(ir.Defs, int64(def.GetId()))
-	// }
-
-}
-
 func fetchIds(origin any) any {
 	var ids []int64
 	switch ret := origin.(type) {

@@ -89,7 +89,7 @@ type queryConfig struct {
 	// control
 	ctx context.Context
 
-	*ssaconfig.Config
+	Config *ssaconfig.Config
 }
 
 func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
@@ -167,7 +167,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 		config.onRisk = append(config.program.config.onRisk, config.onRisk...)
 	}
 	process := func(f float64, msg string) {
-		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
+		if callBack := config.Config.GetSyntaxFlowProcessCallback(); callBack != nil {
 			callBack(f, msg)
 		}
 	}
@@ -493,13 +493,13 @@ func QueryWithFrame(f *sfvm.SFFrame) QueryOption {
 func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 	return func(c *queryConfig) {
 		c.kind = kind
-		c.SetSyntaxFlowResultSaveDataBase()
+		c.Config.SetSyntaxFlowResultSaveDataBase()
 	}
 }
 
 func QueryWithMemory() QueryOption {
 	return func(c *queryConfig) {
-		c.SetSyntaxFlowResultSaveMemory()
+		c.Config.SetSyntaxFlowResultSaveMemory()
 	}
 }
 
@@ -548,19 +548,19 @@ func publishQueryResult(ret *SyntaxFlowResult, config *queryConfig) error {
 		return nil
 	}
 	process := func(f float64, msg string) {
-		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
+		if callBack := config.Config.GetSyntaxFlowProcessCallback(); callBack != nil {
 			callBack(f, msg)
 		}
 	}
 	total := 4
-	switch kind := config.GetSyntaxFlowResultKind(); kind {
+	switch kind := config.Config.GetSyntaxFlowResultKind(); kind {
 	case ssaconfig.SFResultSaveDatabase:
 		process(float64(total-1)/float64(total), "save result")
 		if _, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID); err != nil {
 			return utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
 		}
 		cacheKind := kind
-		if config.IsNoSaveRisk() {
+		if config.Config.IsNoSaveRisk() {
 			cacheKind = ssaconfig.SFResultSaveMemory
 		}
 		setResultToCache(cacheKind, ret)
@@ -682,7 +682,7 @@ func QueryWithWorkBudget(b *sfvm.RuleWorkBudget) QueryOption {
 // ```
 func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	return func(c *queryConfig) {
-		c.SetSyntaxFlowProcessCallback(cb)
+		c.Config.SetSyntaxFlowProcessCallback(cb)
 	}
 }
 

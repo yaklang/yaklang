@@ -6,9 +6,8 @@ import (
 )
 
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
-	i := &Make{
-		anValue: NewValue(),
-	}
+	i := &Make{}
+	i.initValue()
 	if !utils.IsNil(low) {
 		i.low = low.GetId()
 	}
@@ -34,7 +33,7 @@ func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 
 func NewJump(to *BasicBlock) *Jump {
 	j := &Jump{
-		anInstruction: NewInstruction(),
+		anInstruction: newAnInstruction(),
 		To:            to.GetId(),
 	}
 	return j
@@ -42,16 +41,15 @@ func NewJump(to *BasicBlock) *Jump {
 
 func NewLoop(cond Value) *Loop {
 	l := &Loop{
-		anInstruction: NewInstruction(),
+		anInstruction: newAnInstruction(),
 		Cond:          cond.GetId(),
 	}
 	return l
 }
 
 func NewUndefined(name string) *Undefined {
-	u := &Undefined{
-		anValue: NewValue(),
-	}
+	u := &Undefined{}
+	u.initValue()
 	u.SetName(name)
 	return u
 }
@@ -61,11 +59,11 @@ func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 		return nil
 	}
 	b := &BinOp{
-		anValue: NewValue(),
-		Op:      op,
-		X:       x.GetId(),
-		Y:       y.GetId(),
+		Op: op,
+		X:  x.GetId(),
+		Y:  y.GetId(),
 	}
+	b.initValue()
 	if op >= OpGt && op <= OpIn {
 		b.SetType(CreateBooleanType())
 	}
@@ -74,23 +72,23 @@ func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 
 func NewUnOp(op UnaryOpcode, x Value) *UnOp {
 	u := &UnOp{
-		anValue: NewValue(),
-		Op:      op,
-		X:       x.GetId(),
+		Op: op,
+		X:  x.GetId(),
 	}
+	u.initValue()
 	return u
 }
 
 func NewIf() *If {
 	ifSSA := &If{
-		anInstruction: NewInstruction(),
+		anInstruction: newAnInstruction(),
 	}
 	return ifSSA
 }
 
 func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 	sw := &Switch{
-		anInstruction: NewInstruction(),
+		anInstruction: newAnInstruction(),
 		// Cond:          cond.GetId(),
 		DefaultBlock: defaultb,
 		Label:        label,
@@ -103,9 +101,9 @@ func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 
 func NewReturn(vs Values) *Return {
 	r := &Return{
-		anValue: NewValue(),
 		Results: vs.GetIds(),
 	}
+	r.initValue()
 	return r
 }
 
@@ -114,24 +112,23 @@ func NewTypeCast(typ Type, v Value) *TypeCast {
 		return nil
 	}
 	t := &TypeCast{
-		anValue: NewValue(),
-		Value:   v.GetId(),
+		Value: v.GetId(),
 	}
+	t.initValue()
 	t.SetType(typ)
 	return t
 }
 
 func NewTypeValue(typ Type) *TypeValue {
-	t := &TypeValue{
-		anValue: NewValue(),
-	}
+	t := &TypeValue{}
+	t.initValue()
 	t.SetType(typ)
 	return t
 }
 
 func NewAssert(cond, msgValue Value, msg string) *Assert {
 	a := &Assert{
-		anInstruction: NewInstruction(),
+		anInstruction: newAnInstruction(),
 		Cond:          cond.GetId(),
 		Msg:           msg,
 	}
@@ -146,10 +143,10 @@ func NewNext(iter Value, isIn bool) *Next {
 		return nil
 	}
 	n := &Next{
-		anValue: NewValue(),
-		Iter:    iter.GetId(),
-		InNext:  isIn,
+		Iter:   iter.GetId(),
+		InNext: isIn,
 	}
+	n.initValue()
 	typ := newNextType(iter.GetType(), isIn)
 	n.SetType(typ)
 	return n
@@ -157,7 +154,7 @@ func NewNext(iter Value, isIn bool) *Next {
 
 func NewErrorHandler(try *BasicBlock) *ErrorHandler {
 	e := &ErrorHandler{
-		anInstruction: NewInstruction(),
+		anInstruction: newAnInstruction(),
 		Try:           try.GetId(),
 	}
 	return e
@@ -165,19 +162,19 @@ func NewErrorHandler(try *BasicBlock) *ErrorHandler {
 
 func NewErrorCatch(try *ErrorHandler, catch *BasicBlock, exception Value) *ErrorCatch {
 	e := &ErrorCatch{
-		anValue:   NewValue(),
 		CatchBody: catch.GetId(),
 		Exception: exception.GetId(),
 	}
+	e.initValue()
 	return e
 }
 
 func NewExternLib(variable string, builder *FunctionBuilder, table map[string]any) *ExternLib {
 	e := &ExternLib{
-		anValue: NewValue(),
 		table:   table,
 		builder: builder,
 	}
+	e.initValue()
 	e.SetName(variable)
 	e.SetFunc(builder.Function)
 	block, ok := builder.GetBasicBlockByID(builder.EnterBlock)
@@ -194,9 +191,9 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 
 func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Parameter {
 	p := &Parameter{
-		anValue:     NewValue(),
 		IsFreeValue: isFreeValue,
 	}
+	p.initValue()
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 
@@ -221,9 +218,9 @@ func (p *Parameter) Copy() *Parameter {
 
 func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, key Value) *ParameterMember {
 	p := &ParameterMember{
-		anValue:              NewValue(),
 		parameterMemberInner: newParameterMember(obj, key),
 	}
+	p.initValue()
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 
@@ -240,9 +237,9 @@ func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, k
 }
 func NewMoreParamMember(variable string, builder *FunctionBuilder, member *ParameterMember, key Value) *ParameterMember {
 	p := &ParameterMember{
-		anValue:              NewValue(),
 		parameterMemberInner: newMoreParameterMember(member, key),
 	}
+	p.initValue()
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 	block, ok := builder.GetBasicBlockByID(builder.EnterBlock)
@@ -258,10 +255,10 @@ func NewMoreParamMember(variable string, builder *FunctionBuilder, member *Param
 
 func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
-		anValue:  NewValue(),
 		CallSite: call.GetId(),
 		Value:    value.GetId(),
 	}
+	s.initValue()
 	s.SetName(variable)
 	return s
 }

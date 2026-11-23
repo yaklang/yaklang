@@ -423,7 +423,7 @@ type Program struct {
 
 // implement Value
 type Function struct {
-	*anValue
+	anValue
 	*LazyBuilder
 
 	isMethod   bool
@@ -565,7 +565,7 @@ const (
 
 // implement Value
 type BasicBlock struct {
-	*anValue `json:"-"`
+	anValue `json:"-"`
 
 	Index int
 	// BasicBlock graph
@@ -732,7 +732,7 @@ var (
 
 // ----------- Phi
 type Phi struct {
-	*anValue
+	anValue
 
 	CFGEntryBasicBlock int64
 
@@ -787,7 +787,7 @@ var (
 
 // ----------- externLib
 type ExternLib struct {
-	*anValue
+	anValue
 
 	table   map[string]any
 	builder *FunctionBuilder
@@ -1044,7 +1044,7 @@ func (p *parameterMemberInner) GetActualParam(c *Call) (obj Value, ok bool) {
 }
 
 type ParameterMember struct {
-	*anValue
+	anValue
 
 	// FormalParameterIndex	用来标识当前ParameterMember的索引
 	// 其和Call的ArgMemberIndex 对应
@@ -1103,7 +1103,7 @@ var (
 
 // ----------- Parameter
 type Parameter struct {
-	*anValue
+	anValue
 
 	// for FreeValue
 	IsFreeValue  bool
@@ -1159,8 +1159,8 @@ const (
 )
 
 type ConstInst struct {
+	anValue
 	*Const
-	*anValue
 	Unary      int
 	isIdentify bool  // field key
 	Origin     int64 // user
@@ -1202,7 +1202,7 @@ const (
 )
 
 type Undefined struct {
-	*anValue
+	anValue
 	Kind UndefinedKind
 }
 
@@ -1228,7 +1228,7 @@ var (
 
 // ----------- BinOp
 type BinOp struct {
-	*anValue
+	anValue
 	Op   BinaryOpcode
 	X, Y int64
 }
@@ -1241,7 +1241,7 @@ var (
 )
 
 type UnOp struct {
-	*anValue
+	anValue
 
 	Op UnaryOpcode
 	X  int64
@@ -1260,7 +1260,7 @@ var (
 // call instruction call method function  with args as argument
 type Call struct {
 	// call is a value
-	*anValue
+	anValue
 
 	// for call function
 	Method    int64
@@ -1293,7 +1293,7 @@ var (
 
 // ----------- SideEffect
 type SideEffect struct {
-	*anValue
+	anValue
 	CallSite int64 // call instruction
 	Value    int64 // modify to this value
 }
@@ -1313,7 +1313,7 @@ var (
 // The Return instruction returns values and control back to the calling
 // function.
 type Return struct {
-	*anValue
+	anValue
 	Results []int64
 }
 
@@ -1328,7 +1328,7 @@ var (
 
 // ----------- Make
 type Make struct {
-	*anValue
+	anValue
 
 	// when slice
 	low, high, step int64
@@ -1383,7 +1383,7 @@ func (m *Make) GetStep() int64 {
 
 // ------------- Next
 type Next struct {
-	*anValue
+	anValue
 	Iter   int64
 	InNext bool // "in" grammar
 }
@@ -1399,7 +1399,7 @@ var (
 
 // ----------- assert
 type Assert struct {
-	*anInstruction
+	anInstruction
 
 	Cond     int64
 	Msg      string
@@ -1415,7 +1415,7 @@ var (
 // ----------- Type-cast
 // cast value -> type
 type TypeCast struct {
-	*anValue
+	anValue
 
 	Value int64
 }
@@ -1429,7 +1429,7 @@ var (
 
 // ------------- type value
 type TypeValue struct {
-	*anValue
+	anValue
 }
 
 var (
@@ -1441,7 +1441,7 @@ var (
 // ================================= Error Handler
 
 type ErrorCatch struct {
-	*anValue
+	anValue
 	CatchBody int64
 	Exception int64
 }
@@ -1452,7 +1452,7 @@ var _ Value = (*ErrorCatch)(nil)
 
 // ------------- ErrorHandler
 type ErrorHandler struct {
-	*anInstruction
+	anInstruction
 	Try, Final, Done int64
 	// catch and exception align
 	Catch []int64 // error catch
@@ -1464,7 +1464,7 @@ var _ Node = (*ErrorHandler)(nil)
 
 // -------------- PANIC
 type Panic struct {
-	*anValue
+	anValue
 	Info int64
 }
 
@@ -1476,7 +1476,7 @@ var (
 
 // --------------- RECOVER
 type Recover struct {
-	*anValue
+	anValue
 }
 
 var (
@@ -1494,7 +1494,7 @@ var (
 //
 // the block containing Jump instruction only have one successor block
 type Jump struct {
-	*anInstruction
+	anInstruction
 	To int64 // value
 }
 
@@ -1507,7 +1507,7 @@ var _ Node = (*Loop)(nil)
 // of its owning block, depending on the boolean Cond: the first if
 // true, the second if false.
 type If struct {
-	*anInstruction
+	anInstruction
 
 	Cond  int64
 	True  int64
@@ -1559,7 +1559,7 @@ var (
 // ----------- For
 // for loop
 type Loop struct {
-	*anInstruction
+	anInstruction
 
 	Body, Exit int64 // basic block
 
@@ -1587,7 +1587,7 @@ func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {
 }
 
 type Switch struct {
-	*anInstruction
+	anInstruction
 
 	Cond         int64
 	DefaultBlock *BasicBlock

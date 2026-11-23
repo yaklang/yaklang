@@ -1270,10 +1270,10 @@ func TestSwitchFreevalueInSideEffectSkipsNonCallCallSite(t *testing.T) {
 
 	nonCall := builder.EmitConstInst("not-call-site")
 	sideEffect := &SideEffect{
-		anValue:  NewValue(),
 		CallSite: nonCall.GetId(),
 		Value:    value.GetId(),
 	}
+	sideEffect.initValue()
 	sideEffect.SetProgram(prog)
 	sideEffect.SetFunc(builder.Function)
 	sideEffect.SetBlock(builder.CurrentBlock)

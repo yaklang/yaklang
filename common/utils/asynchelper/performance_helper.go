@@ -239,7 +239,7 @@ func (a *AsyncPerformanceHelper) SetStatus(status string) {
 	if !ok {
 		durationList = make([]time.Duration, 0)
 	}
-	durationList = append(durationList, time.Since(a.markToTime.GetMust(a.currentStatusMark)))
+	durationList = append(durationList, time.Since(omap.GetMust(a.markToTime, a.currentStatusMark)))
 	a.statusToDuration.Set(a.status, durationList)
 	a.status = status
 	a.currentStatusMark = a.MarkNow()
@@ -269,7 +269,7 @@ func (a *AsyncPerformanceHelper) CheckLastMarkDefaultConfig(verbose string) time
 
 // CheckLastMarkAndLog checks the last mark against a custom time condition and logs if exceeded.
 func (a *AsyncPerformanceHelper) CheckLastMarkAndLog(timeCondition time.Duration, verbose string) time.Duration {
-	_, startTime, ok := a.markToTime.Last()
+	_, startTime, ok := omap.Last(a.markToTime)
 	if !ok {
 		log.Errorf("no mark found")
 		return 0

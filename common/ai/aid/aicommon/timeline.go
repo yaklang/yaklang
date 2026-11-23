@@ -74,11 +74,11 @@ type Timeline struct {
 }
 
 func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
-	m.idToTimelineItem.OrderInsert(id, item, cmp.Less[int64])
+	omap.OrderInsert(m.idToTimelineItem, id, item, cmp.Less[int64])
 }
 
 func (m *Timeline) OrderInsertTs(ts int64, item *TimelineItem) {
-	m.tsToTimelineItem.OrderInsert(ts, item, cmp.Less[int64])
+	omap.OrderInsert(m.tsToTimelineItem, ts, item, cmp.Less[int64])
 }
 
 // TimelineDumpDefaultBucketByteSize 是 Dump / GroupByMinutes 默认的字节子桶上限（64KB）。
@@ -657,7 +657,7 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 	var latestReplayID int64
 	if includeLatestModelReplay {
 		for i := m.tsToTimelineItem.Len() - 1; i >= 0; i-- {
-			item, ok := m.tsToTimelineItem.GetByIndex(i)
+			item, ok := omap.GetByIndex(m.tsToTimelineItem, i)
 			if !ok || item == nil || item.deleted {
 				continue
 			}
@@ -669,7 +669,7 @@ func (m *Timeline) dumpRecentForPrompt(tokenLimit int, includeLatestModelReplay 
 		}
 	}
 	for i := m.tsToTimelineItem.Len() - 1; i >= 0; i-- {
-		item, ok := m.tsToTimelineItem.GetByIndex(i)
+		item, ok := omap.GetByIndex(m.tsToTimelineItem, i)
 		if !ok || item == nil || item.deleted || isPromotableTimelineItem(item) {
 			continue
 		}
@@ -941,7 +941,7 @@ func (m *Timeline) ToTimelineItemOutputLastN(n int) []*TimelineItemOutput {
 
 	result := make([]*TimelineItemOutput, 0, n)
 	for i := l - 1; i >= 0 && len(result) < n; i-- {
-		item, ok := m.tsToTimelineItem.GetByIndex(i)
+		item, ok := omap.GetByIndex(m.tsToTimelineItem, i)
 		_, evidence := timelineEvidenceDisplay(item)
 		if !ok || item == nil || item.deleted || (isPromotableTimelineItem(item) && !evidence) {
 			continue

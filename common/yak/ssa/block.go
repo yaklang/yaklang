@@ -63,7 +63,6 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	defer f.markPersistenceDirty()
 	b := &BasicBlock{
-		anValue: NewValue(),
 		Preds:   make([]int64, 0),
 		Succs:   make([]int64, 0),
 		Insts:   make([]int64, 0),
@@ -71,6 +70,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		Handler: 0,
 		finish:  false,
 	}
+	b.initValue()
 	b.SetName(name)
 	b.SetFunc(f)
 	b.SetBlock(b)

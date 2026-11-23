@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -212,7 +213,7 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 		sorted = append(sorted, others...)
 		return sfvm.NewValues(sorted)
 	}
-	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.Values) (string, sfvm.Values, error) {
+	res.SymbolTable = omap.Map(res.SymbolTable, func(s string, vo sfvm.Values) (string, sfvm.Values, error) {
 		return s, sortFunc(vo), nil
 	})
 	res.UnNameValue = sortFunc(res.UnNameValue)

@@ -2,6 +2,8 @@ package ssa
 
 // Mutations publish the concrete instruction, rather than looking it up by ID:
 // a completed unit may already have released its clean resident cache entry.
+//
+//go:noinline
 func (a *anInstruction) bindPersistenceInstruction(inst Instruction) {
 	// Reuse the construction-only pending-type slot for the concrete owner.
 	// Binding happens before publishing the instruction in the cache.

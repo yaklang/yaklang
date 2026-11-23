@@ -26,7 +26,6 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		LazyBuilder: NewLazyBuilder("Function:" + name),
-		anValue:     NewValue(),
 		Params:      make([]int64, 0),
 		hasEllipsis: false,
 		Blocks:      make([]int64, 0),
@@ -37,6 +36,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		SideEffects: make([]*FunctionSideEffect, 0),
 		builder:     nil,
 	}
+	f.initValue()
 	if p != nil {
 		f.compileUnitKey = p.CurrentCompileUnit()
 	}
@@ -240,9 +240,8 @@ func (f *Function) GetParent() *Function {
 
 // just create a function define, only function parameter type \ return type \ ellipsis
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
-	f := &Function{
-		anValue: NewValue(),
-	}
+	f := &Function{}
+	f.initValue()
 	f.SetType(typ)
 	f.SetName(name)
 	f.GetProgram().SetVirtualRegister(f)
