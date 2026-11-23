@@ -125,9 +125,6 @@ func pcapPagination(p *ypb.Paging) (*ypb.Paging, error) {
 	return &ypb.Paging{Page: 1, Limit: limit, AfterId: p.GetAfterId(), OrderBy: "id", Order: "asc"}, nil
 }
 
-// Full responses remain bounded while each delivered packet stays complete.
-const pcapPacketResponseBytes = 32 << 20
-
 func (s *Server) QueryPCAPDatabase(ctx context.Context, req *ypb.QueryPCAPDatabaseRequest) (*ypb.QueryPCAPDatabaseResponse, error) {
 	paging, err := pcapPagination(req.GetPagination())
 	if err != nil {

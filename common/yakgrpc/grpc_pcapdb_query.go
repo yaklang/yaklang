@@ -197,6 +197,17 @@ func pcapPacketSummaryModel(row pcapdb.PacketView) *ypb.PCAPPacketSummary {
 	}
 }
 
+func packetNetworkLayer(ip string) string {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return ""
+	}
+	if parsed.To4() != nil {
+		return "IPv4"
+	}
+	return "IPv6"
+}
+
 func (s *Server) QueryPCAPPackets(ctx context.Context, req *ypb.QueryPCAPPacketsRequest) (*ypb.QueryPCAPPacketsResponse, error) {
 	if err := validatePCAPDatasetID(req.GetDatasetID()); err != nil {
 		return nil, err

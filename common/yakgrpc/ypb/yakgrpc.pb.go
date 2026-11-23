@@ -17317,15 +17317,8 @@ type QueryTrafficPacketRequest struct {
 	SrcPort               string                 `protobuf:"bytes,10,opt,name=SrcPort,proto3" json:"SrcPort,omitempty"`
 	DstPort               string                 `protobuf:"bytes,11,opt,name=DstPort,proto3" json:"DstPort,omitempty"`
 	FromId                int64                  `protobuf:"varint,12,opt,name=FromId,proto3" json:"FromId,omitempty"`
-	// Omitted: legacy project database. Present: packets in this PCAP dataset.
-	DatasetID        string `protobuf:"bytes,13,opt,name=DatasetID,proto3" json:"DatasetID,omitempty"`
-	Full             bool   `protobuf:"varint,14,opt,name=Full,proto3" json:"Full,omitempty"` // PCAP mode: include Raw and Details; list mode reads no BLOBs.
-	Id               int64  `protobuf:"varint,15,opt,name=Id,proto3" json:"Id,omitempty"`     // PCAP mode: exact original packet ID, using the same response model.
-	StartTimestampNS *int64 `protobuf:"varint,16,opt,name=StartTimestampNS,proto3,oneof" json:"StartTimestampNS,omitempty"`
-	EndTimestampNS   *int64 `protobuf:"varint,17,opt,name=EndTimestampNS,proto3,oneof" json:"EndTimestampNS,omitempty"` // Capture-time interval [start,end), not insertion time.
-	Keyword          string `protobuf:"bytes,18,opt,name=Keyword,proto3" json:"Keyword,omitempty"`                      // PCAP mode: literal substring of endpoints or saved message summaries.
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *QueryTrafficPacketRequest) Reset() {
@@ -17440,48 +17433,6 @@ func (x *QueryTrafficPacketRequest) GetFromId() int64 {
 		return x.FromId
 	}
 	return 0
-}
-
-func (x *QueryTrafficPacketRequest) GetDatasetID() string {
-	if x != nil {
-		return x.DatasetID
-	}
-	return ""
-}
-
-func (x *QueryTrafficPacketRequest) GetFull() bool {
-	if x != nil {
-		return x.Full
-	}
-	return false
-}
-
-func (x *QueryTrafficPacketRequest) GetId() int64 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-func (x *QueryTrafficPacketRequest) GetStartTimestampNS() int64 {
-	if x != nil && x.StartTimestampNS != nil {
-		return *x.StartTimestampNS
-	}
-	return 0
-}
-
-func (x *QueryTrafficPacketRequest) GetEndTimestampNS() int64 {
-	if x != nil && x.EndTimestampNS != nil {
-		return *x.EndTimestampNS
-	}
-	return 0
-}
-
-func (x *QueryTrafficPacketRequest) GetKeyword() string {
-	if x != nil {
-		return x.Keyword
-	}
-	return ""
 }
 
 type QueryTrafficTCPReassembledRequest struct {
@@ -17852,19 +17803,8 @@ type TrafficPacket struct {
 	Id                              int64                  `protobuf:"varint,16,opt,name=Id,proto3" json:"Id,omitempty"`
 	Protocol                        string                 `protobuf:"bytes,17,opt,name=Protocol,proto3" json:"Protocol,omitempty"`
 	Info                            string                 `protobuf:"bytes,18,opt,name=Info,proto3" json:"Info,omitempty"`
-	TimestampNS                     *int64                 `protobuf:"varint,19,opt,name=TimestampNS,proto3,oneof" json:"TimestampNS,omitempty"`
-	CapturedLength                  int64                  `protobuf:"varint,20,opt,name=CapturedLength,proto3" json:"CapturedLength,omitempty"`
-	OriginalLength                  int64                  `protobuf:"varint,21,opt,name=OriginalLength,proto3" json:"OriginalLength,omitempty"`
-	LinkType                        int64                  `protobuf:"varint,22,opt,name=LinkType,proto3" json:"LinkType,omitempty"`
-	Section                         int64                  `protobuf:"varint,23,opt,name=Section,proto3" json:"Section,omitempty"`
-	Interface                       int64                  `protobuf:"varint,24,opt,name=Interface,proto3" json:"Interface,omitempty"`
-	DecodeError                     string                 `protobuf:"bytes,25,opt,name=DecodeError,proto3" json:"DecodeError,omitempty"`
-	// Full PCAP detail JSON: Result uses the existing ParseTraffic tree format;
-	// Messages contains saved protocol messages, each with its own RAW and Result.
-	// A tree's scope is in bits, relative to its own byte source, never another frame.
-	Details       string `protobuf:"bytes,26,opt,name=Details,proto3" json:"Details,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *TrafficPacket) Reset() {
@@ -18019,62 +17959,6 @@ func (x *TrafficPacket) GetProtocol() string {
 func (x *TrafficPacket) GetInfo() string {
 	if x != nil {
 		return x.Info
-	}
-	return ""
-}
-
-func (x *TrafficPacket) GetTimestampNS() int64 {
-	if x != nil && x.TimestampNS != nil {
-		return *x.TimestampNS
-	}
-	return 0
-}
-
-func (x *TrafficPacket) GetCapturedLength() int64 {
-	if x != nil {
-		return x.CapturedLength
-	}
-	return 0
-}
-
-func (x *TrafficPacket) GetOriginalLength() int64 {
-	if x != nil {
-		return x.OriginalLength
-	}
-	return 0
-}
-
-func (x *TrafficPacket) GetLinkType() int64 {
-	if x != nil {
-		return x.LinkType
-	}
-	return 0
-}
-
-func (x *TrafficPacket) GetSection() int64 {
-	if x != nil {
-		return x.Section
-	}
-	return 0
-}
-
-func (x *TrafficPacket) GetInterface() int64 {
-	if x != nil {
-		return x.Interface
-	}
-	return 0
-}
-
-func (x *TrafficPacket) GetDecodeError() string {
-	if x != nil {
-		return x.DecodeError
-	}
-	return ""
-}
-
-func (x *TrafficPacket) GetDetails() string {
-	if x != nil {
-		return x.Details
 	}
 	return ""
 }
@@ -59587,7 +59471,6 @@ type ParseTrafficRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int64                  `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
 	Type          string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
-	DatasetID     string                 `protobuf:"bytes,3,opt,name=DatasetID,proto3" json:"DatasetID,omitempty"` // Optional PCAP dataset; omitted preserves legacy behavior.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -59632,13 +59515,6 @@ func (x *ParseTrafficRequest) GetId() int64 {
 func (x *ParseTrafficRequest) GetType() string {
 	if x != nil {
 		return x.Type
-	}
-	return ""
-}
-
-func (x *ParseTrafficRequest) GetDatasetID() string {
-	if x != nil {
-		return x.DatasetID
 	}
 	return ""
 }
@@ -84796,7 +84672,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x17AvailableLinkLayerTypes\x18\x03 \x03(\v2\v.ypb.KVPairR\x17AvailableLinkLayerTypes\x12K\n" +
 	"\x1aAvailableNetworkLayerTypes\x18\x04 \x03(\v2\v.ypb.KVPairR\x1aAvailableNetworkLayerTypes\x12O\n" +
 	"\x1cAvailableTransportLayerTypes\x18\x05 \x03(\v2\v.ypb.KVPairR\x1cAvailableTransportLayerTypes\x12O\n" +
-	"\x19DefaultPublicNetInterface\x18\x06 \x01(\v2\x11.ypb.NetInterfaceR\x19DefaultPublicNetInterface\"\xa2\x05\n" +
+	"\x19DefaultPublicNetInterface\x18\x06 \x01(\v2\x11.ypb.NetInterfaceR\x19DefaultPublicNetInterface\"\xc0\x03\n" +
 	"\x19QueryTrafficPacketRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -84812,15 +84688,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aSrcPort\x18\n" +
 	" \x01(\tR\aSrcPort\x12\x18\n" +
 	"\aDstPort\x18\v \x01(\tR\aDstPort\x12\x16\n" +
-	"\x06FromId\x18\f \x01(\x03R\x06FromId\x12\x1c\n" +
-	"\tDatasetID\x18\r \x01(\tR\tDatasetID\x12\x12\n" +
-	"\x04Full\x18\x0e \x01(\bR\x04Full\x12\x0e\n" +
-	"\x02Id\x18\x0f \x01(\x03R\x02Id\x12/\n" +
-	"\x10StartTimestampNS\x18\x10 \x01(\x03H\x00R\x10StartTimestampNS\x88\x01\x01\x12+\n" +
-	"\x0eEndTimestampNS\x18\x11 \x01(\x03H\x01R\x0eEndTimestampNS\x88\x01\x01\x12\x18\n" +
-	"\aKeyword\x18\x12 \x01(\tR\aKeywordB\x13\n" +
-	"\x11_StartTimestampNSB\x11\n" +
-	"\x0f_EndTimestampNS\"\xde\x01\n" +
+	"\x06FromId\x18\f \x01(\x03R\x06FromId\"\xde\x01\n" +
 	"!QueryTrafficTCPReassembledRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -84864,7 +84732,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x02 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x8a\b\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xf3\x05\n" +
 	"\rTrafficPacket\x12$\n" +
 	"\rLinkLayerType\x18\x01 \x01(\tR\rLinkLayerType\x12*\n" +
 	"\x10NetworkLayerType\x18\x02 \x01(\tR\x10NetworkLayerType\x12.\n" +
@@ -84884,16 +84752,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tSessionId\x18\x0f \x01(\tR\tSessionId\x12\x0e\n" +
 	"\x02Id\x18\x10 \x01(\x03R\x02Id\x12\x1a\n" +
 	"\bProtocol\x18\x11 \x01(\tR\bProtocol\x12\x12\n" +
-	"\x04Info\x18\x12 \x01(\tR\x04Info\x12%\n" +
-	"\vTimestampNS\x18\x13 \x01(\x03H\x00R\vTimestampNS\x88\x01\x01\x12&\n" +
-	"\x0eCapturedLength\x18\x14 \x01(\x03R\x0eCapturedLength\x12&\n" +
-	"\x0eOriginalLength\x18\x15 \x01(\x03R\x0eOriginalLength\x12\x1a\n" +
-	"\bLinkType\x18\x16 \x01(\x03R\bLinkType\x12\x18\n" +
-	"\aSection\x18\x17 \x01(\x03R\aSection\x12\x1c\n" +
-	"\tInterface\x18\x18 \x01(\x03R\tInterface\x12 \n" +
-	"\vDecodeError\x18\x19 \x01(\tR\vDecodeError\x12\x18\n" +
-	"\aDetails\x18\x1a \x01(\tR\aDetailsB\x0e\n" +
-	"\f_TimestampNS\"\x87\x01\n" +
+	"\x04Info\x18\x12 \x01(\tR\x04Info\"\x87\x01\n" +
 	"\x1aQueryTrafficPacketResponse\x12&\n" +
 	"\x04Data\x18\x01 \x03(\v2\x12.ypb.TrafficPacketR\x04Data\x12+\n" +
 	"\n" +
@@ -88586,11 +88445,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eAtLeastVersion\x18\x01 \x01(\tR\x0eAtLeastVersion\x12\x1e\n" +
 	"\n" +
 	"YakVersion\x18\x02 \x01(\tR\n" +
-	"YakVersion\"W\n" +
+	"YakVersion\"9\n" +
 	"\x13ParseTrafficRequest\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x1c\n" +
-	"\tDatasetID\x18\x03 \x01(\tR\tDatasetID\"X\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"X\n" +
 	"\x14ParseTrafficResponse\x12\x0e\n" +
 	"\x02OK\x18\x01 \x01(\bR\x02OK\x12\x16\n" +
 	"\x06Result\x18\x02 \x01(\tR\x06Result\x12\x18\n" +
@@ -94964,8 +94822,6 @@ func file_yakgrpc_proto_init() {
 		return
 	}
 	file_yakgrpc_proto_msgTypes[148].OneofWrappers = []any{}
-	file_yakgrpc_proto_msgTypes[227].OneofWrappers = []any{}
-	file_yakgrpc_proto_msgTypes[231].OneofWrappers = []any{}
 	file_yakgrpc_proto_msgTypes[259].OneofWrappers = []any{}
 	file_yakgrpc_proto_msgTypes[724].OneofWrappers = []any{}
 	file_yakgrpc_proto_msgTypes[1001].OneofWrappers = []any{}

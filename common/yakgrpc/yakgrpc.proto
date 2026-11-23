@@ -749,17 +749,16 @@ service Yak {
   // Start one persistent pcapdb live capture. The first response carries
   // DatasetID, which can be queried while capture is running.
   rpc PcapX(stream PcapXRequest) returns (stream PcapXResponse);
-  // Deprecated: legacy session storage is no longer served; the RPC remains as
-  // a compatibility shell and returns Unimplemented.
+  // Deprecated: compatibility shell only; returns Unimplemented.
+  // New code should use the pcapdb DatasetID APIs.
   rpc QueryTrafficSession(QueryTrafficSessionRequest) returns (QueryTrafficSessionResponse);
-  // Deprecated: use QueryPCAPPackets or GetPCAPPacketDetail with DatasetID.
-  // The legacy project-traffic query path is not supported; DatasetID is required.
+  // Deprecated: compatibility shell only; returns Unimplemented.
+  // Use QueryPCAPPackets and GetPCAPPacketDetail instead.
   rpc QueryTrafficPacket(QueryTrafficPacketRequest) returns (QueryTrafficPacketResponse);
-  // Deprecated: legacy TCP reassembled storage is no longer served; the RPC
-  // remains as a compatibility shell and returns Unimplemented.
+  // Deprecated: compatibility shell only; returns Unimplemented.
   rpc QueryTrafficTCPReassembled(QueryTrafficTCPReassembledRequest) returns (QueryTrafficTCPReassembledResponse);
-  // Deprecated: use GetPCAPPacketDetail. DatasetID is required; the legacy
-  // project-traffic detail path is not supported.
+  // Deprecated: compatibility shell only; returns Unimplemented.
+  // Use GetPCAPPacketDetail instead.
   rpc ParseTraffic(ParseTrafficRequest) returns (ParseTrafficResponse);
 
   // Offline capture library (packet viewing).
@@ -3126,13 +3125,6 @@ message QueryTrafficPacketRequest {
   string DstPort = 11;
 
   int64 FromId = 12;
-  // Omitted: legacy project database. Present: packets in this PCAP dataset.
-  string DatasetID = 13;
-  bool Full = 14; // PCAP mode: include Raw and Details; list mode reads no BLOBs.
-  int64 Id = 15; // PCAP mode: exact original packet ID, using the same response model.
-  optional int64 StartTimestampNS = 16;
-  optional int64 EndTimestampNS = 17; // Capture-time interval [start,end), not insertion time.
-  string Keyword = 18; // PCAP mode: literal substring of endpoints or saved message summaries.
 }
 
 message QueryTrafficTCPReassembledRequest {
@@ -3203,17 +3195,6 @@ message TrafficPacket {
   int64 Id = 16;
   string Protocol = 17;
   string Info = 18;
-  optional int64 TimestampNS = 19;
-  int64 CapturedLength = 20;
-  int64 OriginalLength = 21;
-  int64 LinkType = 22;
-  int64 Section = 23;
-  int64 Interface = 24;
-  string DecodeError = 25;
-  // Full PCAP detail JSON: Result uses the existing ParseTraffic tree format;
-  // Messages contains saved protocol messages, each with its own RAW and Result.
-  // A tree's scope is in bits, relative to its own byte source, never another frame.
-  string Details = 26;
 }
 
 message QueryTrafficPacketResponse {
@@ -8324,7 +8305,6 @@ message YakVersionAtLeastRequest{
 message ParseTrafficRequest{
   int64 Id = 1;
   string Type = 2;
-  string DatasetID = 3; // Optional PCAP dataset; omitted preserves legacy behavior.
 }
 message ParseTrafficResponse{
   bool OK = 1;

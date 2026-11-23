@@ -1,20 +1,15 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"github.com/samber/lo"
 	"github.com/yaklang/pcap"
-	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
-	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -269,89 +264,4 @@ func (s *Server) PcapX(stream ypb.Yak_PcapXServer) error {
 			return nil
 		}
 	}
-}
-func ParseReassembledTraffic(data []byte) ([]any, error) {
-	for _, ruleName := range []string{"http", "tls"} {
-		info, err := ParseTraffic(data, "application-layer."+ruleName)
-		if err == nil {
-			return info, nil
-		}
-	}
-	return nil, errors.New("parse traffic failed")
-}
-func ParseTraffic(data []byte, rule string) ([]any, error) {
-	var packageRootNodes []any
-	var toTreeData func(d any) any
-	toTreeData = func(d any) any {
-		switch ret := d.(type) {
-		case []byte:
-			return codec.EncodeToHex(d)
-		case []*base.NodeValue:
-			nodeValue := ret
-			res := []any{}
-			for i := 0; i < len(nodeValue); i++ {
-				nodeRes := toTreeData(nodeValue[i])
-				if nodeRes == nil {
-					continue
-				}
-				res = append(res, nodeRes)
-			}
-			return res
-		case *base.NodeValue:
-			var result any
-			if ret.IsValue() {
-				res := map[string]any{}
-				res["leaf"] = true
-				verbose := ""
-				switch ret := ret.Value.(type) {
-				case []byte:
-					verbose = "0x" + codec.EncodeToHex(ret)
-				default:
-					verbose = utils.InterfaceToString(ret)
-				}
-				res["verbose"] = verbose
-				if v, ok := ret.Origin.Cfg.GetItem(stream_parser.CfgNodeResult).([2]uint64); ok {
-					res["scope"] = v
-				} else {
-					res["scope"] = [2]uint64{0, 0}
-				}
-				result = map[string]any{
-					"name":  ret.Name,
-					"value": res,
-				}
-			} else {
-				result = map[string]any{
-					"name":  ret.Name,
-					"value": toTreeData(ret.Value),
-				}
-			}
-			if ret.Origin.Cfg.GetBool("package-child") {
-				packageRootNodes = append(packageRootNodes, result)
-				return nil
-			}
-			return result
-		default:
-			return d
-		}
-	}
-	node, err := bin_parser.ParseBinary(bytes.NewReader(data), rule)
-	if err != nil {
-		return nil, err
-	}
-	standardResult, err := node.Result()
-	if err != nil {
-		return nil, err
-	}
-	res := toTreeData(standardResult)
-	_ = res
-	for i, j := 0, len(packageRootNodes)-1; i < j; i, j = i+1, j-1 {
-		packageRootNodes[i], packageRootNodes[j] = packageRootNodes[j], packageRootNodes[i]
-	}
-	return packageRootNodes, nil
-}
-func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
-	if strings.TrimSpace(req.GetDatasetID()) == "" {
-		return nil, grpcstatus.Error(codes.InvalidArgument, "ParseTraffic is deprecated; DatasetID is required, use GetPCAPPacketDetail")
-	}
-	return s.parsePCAPTraffic(ctx, req)
 }

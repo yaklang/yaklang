@@ -1235,17 +1235,16 @@ type YakClient interface {
 	// Start one persistent pcapdb live capture. The first response carries
 	// DatasetID, which can be queried while capture is running.
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PcapXRequest, PcapXResponse], error)
-	// Deprecated: legacy session storage is no longer served; the RPC remains as
-	// a compatibility shell and returns Unimplemented.
+	// Deprecated: compatibility query over legacy project traffic storage.
+	// New code should use the pcapdb DatasetID APIs.
 	QueryTrafficSession(ctx context.Context, in *QueryTrafficSessionRequest, opts ...grpc.CallOption) (*QueryTrafficSessionResponse, error)
-	// Deprecated: use QueryPCAPPackets or GetPCAPPacketDetail with DatasetID.
-	// The legacy project-traffic query path is not supported; DatasetID is required.
+	// Deprecated: compatibility query over legacy project traffic storage.
+	// Use QueryPCAPPackets and GetPCAPPacketDetail instead.
 	QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error)
-	// Deprecated: legacy TCP reassembled storage is no longer served; the RPC
-	// remains as a compatibility shell and returns Unimplemented.
+	// Deprecated: compatibility query over legacy project traffic storage.
 	QueryTrafficTCPReassembled(ctx context.Context, in *QueryTrafficTCPReassembledRequest, opts ...grpc.CallOption) (*QueryTrafficTCPReassembledResponse, error)
-	// Deprecated: use GetPCAPPacketDetail. DatasetID is required; the legacy
-	// project-traffic detail path is not supported.
+	// Deprecated: legacy packet/reassembled JSON compatibility.
+	// Use GetPCAPPacketDetail instead.
 	ParseTraffic(ctx context.Context, in *ParseTrafficRequest, opts ...grpc.CallOption) (*ParseTrafficResponse, error)
 	// Offline capture library (packet viewing).
 	ImportPCAPFile(ctx context.Context, in *ImportPCAPFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportPCAPFileResponse], error)
@@ -9955,17 +9954,16 @@ type YakServer interface {
 	// Start one persistent pcapdb live capture. The first response carries
 	// DatasetID, which can be queried while capture is running.
 	PcapX(grpc.BidiStreamingServer[PcapXRequest, PcapXResponse]) error
-	// Deprecated: legacy session storage is no longer served; the RPC remains as
-	// a compatibility shell and returns Unimplemented.
+	// Deprecated: compatibility query over legacy project traffic storage.
+	// New code should use the pcapdb DatasetID APIs.
 	QueryTrafficSession(context.Context, *QueryTrafficSessionRequest) (*QueryTrafficSessionResponse, error)
-	// Deprecated: use QueryPCAPPackets or GetPCAPPacketDetail with DatasetID.
-	// The legacy project-traffic query path is not supported; DatasetID is required.
+	// Deprecated: compatibility query over legacy project traffic storage.
+	// Use QueryPCAPPackets and GetPCAPPacketDetail instead.
 	QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error)
-	// Deprecated: legacy TCP reassembled storage is no longer served; the RPC
-	// remains as a compatibility shell and returns Unimplemented.
+	// Deprecated: compatibility query over legacy project traffic storage.
 	QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error)
-	// Deprecated: use GetPCAPPacketDetail. DatasetID is required; the legacy
-	// project-traffic detail path is not supported.
+	// Deprecated: legacy packet/reassembled JSON compatibility.
+	// Use GetPCAPPacketDetail instead.
 	ParseTraffic(context.Context, *ParseTrafficRequest) (*ParseTrafficResponse, error)
 	// Offline capture library (packet viewing).
 	ImportPCAPFile(*ImportPCAPFileRequest, grpc.ServerStreamingServer[ImportPCAPFileResponse]) error
