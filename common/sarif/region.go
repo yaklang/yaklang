@@ -108,6 +108,6 @@ func (region *Region) WithMessageMarkdown(markdown string) *Region {
 
 // WithSourceLanguage sets the SourceLanguage
 func (region *Region) WithSourceLanguage(sourceLanguage string) *Region {
-
+	region.SourceLanguage = &sourceLanguage
 	return region
 }
