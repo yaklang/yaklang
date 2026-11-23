@@ -397,9 +397,12 @@ func pruneUnusedParameters(lines []string) []string {
 		return lines
 	}
 	header := lines[headerIndex]
-	open := strings.Index(header, "(")
 	closing := strings.LastIndex(header, ") {")
-	if open < 0 || closing < 0 || closing < open {
+	if closing < 0 {
+		return lines
+	}
+	open := matchingOpenParen(header, closing)
+	if open < 0 {
 		return lines
 	}
 	params := strings.Split(header[open+1:closing], ", ")
@@ -423,6 +426,26 @@ func pruneUnusedParameters(lines []string) []string {
 	}
 	lines[headerIndex] = header[:open+1] + strings.Join(kept, ", ") + header[closing:]
 	return lines
+}
+
+// matchingOpenParen returns the '(' that matches the ')' at close. A function
+// name may itself contain parentheses (a Go pointer-receiver method is
+// main.(*Box[int]).Get), so the parameter list is the last balanced group, not
+// the first '(' in the line.
+func matchingOpenParen(text string, close int) int {
+	depth := 0
+	for index := close; index >= 0; index-- {
+		switch text[index] {
+		case ')':
+			depth++
+		case '(':
+			depth--
+			if depth == 0 {
+				return index
+			}
+		}
+	}
+	return -1
 }
 
 func pruneDeadAssignments(function *ssa.Function, lines []string) []string {
