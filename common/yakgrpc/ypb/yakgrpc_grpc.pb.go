@@ -262,6 +262,7 @@ const (
 	Yak_QueryNewRisk_FullMethodName                               = "/ypb.Yak/QueryNewRisk"
 	Yak_NewRiskRead_FullMethodName                                = "/ypb.Yak/NewRiskRead"
 	Yak_UploadRiskToOnline_FullMethodName                         = "/ypb.Yak/UploadRiskToOnline"
+	Yak_UploadRiskToOnlineBatch_FullMethodName                    = "/ypb.Yak/UploadRiskToOnlineBatch"
 	Yak_SetTagForRisk_FullMethodName                              = "/ypb.Yak/SetTagForRisk"
 	Yak_QueryRiskTags_FullMethodName                              = "/ypb.Yak/QueryRiskTags"
 	Yak_RiskFieldGroup_FullMethodName                             = "/ypb.Yak/RiskFieldGroup"
@@ -1010,6 +1011,7 @@ type YakClient interface {
 	NewRiskRead(ctx context.Context, in *NewRiskReadRequest, opts ...grpc.CallOption) (*Empty, error)
 	// 风险漏洞自动同步
 	UploadRiskToOnline(ctx context.Context, in *UploadRiskToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
+	UploadRiskToOnlineBatch(ctx context.Context, in *UploadRiskToOnlineBatchRequest, opts ...grpc.CallOption) (*UploadRiskToOnlineBatchResponse, error)
 	SetTagForRisk(ctx context.Context, in *SetTagForRiskRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryRiskTags(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryRiskTagsResponse, error)
 	RiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*RiskFieldGroupResponse, error)
@@ -1235,15 +1237,15 @@ type YakClient interface {
 	// Start one persistent pcapdb live capture. The first response carries
 	// DatasetID, which can be queried while capture is running.
 	PcapX(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PcapXRequest, PcapXResponse], error)
-	// Deprecated: compatibility query over legacy project traffic storage.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	// New code should use the pcapdb DatasetID APIs.
 	QueryTrafficSession(ctx context.Context, in *QueryTrafficSessionRequest, opts ...grpc.CallOption) (*QueryTrafficSessionResponse, error)
-	// Deprecated: compatibility query over legacy project traffic storage.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	// Use QueryPCAPPackets and GetPCAPPacketDetail instead.
 	QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error)
-	// Deprecated: compatibility query over legacy project traffic storage.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	QueryTrafficTCPReassembled(ctx context.Context, in *QueryTrafficTCPReassembledRequest, opts ...grpc.CallOption) (*QueryTrafficTCPReassembledResponse, error)
-	// Deprecated: legacy packet/reassembled JSON compatibility.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	// Use GetPCAPPacketDetail instead.
 	ParseTraffic(ctx context.Context, in *ParseTrafficRequest, opts ...grpc.CallOption) (*ParseTrafficResponse, error)
 	// Offline capture library (packet viewing).
@@ -4417,6 +4419,16 @@ func (c *yakClient) UploadRiskToOnline(ctx context.Context, in *UploadRiskToOnli
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_UploadRiskToOnline_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UploadRiskToOnlineBatch(ctx context.Context, in *UploadRiskToOnlineBatchRequest, opts ...grpc.CallOption) (*UploadRiskToOnlineBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UploadRiskToOnlineBatchResponse)
+	err := c.cc.Invoke(ctx, Yak_UploadRiskToOnlineBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -9729,6 +9741,7 @@ type YakServer interface {
 	NewRiskRead(context.Context, *NewRiskReadRequest) (*Empty, error)
 	// 风险漏洞自动同步
 	UploadRiskToOnline(context.Context, *UploadRiskToOnlineRequest) (*Empty, error)
+	UploadRiskToOnlineBatch(context.Context, *UploadRiskToOnlineBatchRequest) (*UploadRiskToOnlineBatchResponse, error)
 	SetTagForRisk(context.Context, *SetTagForRiskRequest) (*Empty, error)
 	QueryRiskTags(context.Context, *Empty) (*QueryRiskTagsResponse, error)
 	RiskFieldGroup(context.Context, *Empty) (*RiskFieldGroupResponse, error)
@@ -9954,15 +9967,15 @@ type YakServer interface {
 	// Start one persistent pcapdb live capture. The first response carries
 	// DatasetID, which can be queried while capture is running.
 	PcapX(grpc.BidiStreamingServer[PcapXRequest, PcapXResponse]) error
-	// Deprecated: compatibility query over legacy project traffic storage.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	// New code should use the pcapdb DatasetID APIs.
 	QueryTrafficSession(context.Context, *QueryTrafficSessionRequest) (*QueryTrafficSessionResponse, error)
-	// Deprecated: compatibility query over legacy project traffic storage.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	// Use QueryPCAPPackets and GetPCAPPacketDetail instead.
 	QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error)
-	// Deprecated: compatibility query over legacy project traffic storage.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error)
-	// Deprecated: legacy packet/reassembled JSON compatibility.
+	// Deprecated: compatibility shell only; returns Unimplemented.
 	// Use GetPCAPPacketDetail instead.
 	ParseTraffic(context.Context, *ParseTrafficRequest) (*ParseTrafficResponse, error)
 	// Offline capture library (packet viewing).
@@ -11041,6 +11054,9 @@ func (UnimplementedYakServer) NewRiskRead(context.Context, *NewRiskReadRequest) 
 }
 func (UnimplementedYakServer) UploadRiskToOnline(context.Context, *UploadRiskToOnlineRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UploadRiskToOnline not implemented")
+}
+func (UnimplementedYakServer) UploadRiskToOnlineBatch(context.Context, *UploadRiskToOnlineBatchRequest) (*UploadRiskToOnlineBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UploadRiskToOnlineBatch not implemented")
 }
 func (UnimplementedYakServer) SetTagForRisk(context.Context, *SetTagForRiskRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetTagForRisk not implemented")
@@ -16376,6 +16392,24 @@ func _Yak_UploadRiskToOnline_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).UploadRiskToOnline(ctx, req.(*UploadRiskToOnlineRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UploadRiskToOnlineBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadRiskToOnlineBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UploadRiskToOnlineBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UploadRiskToOnlineBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UploadRiskToOnlineBatch(ctx, req.(*UploadRiskToOnlineBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -24470,6 +24504,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UploadRiskToOnline",
 			Handler:    _Yak_UploadRiskToOnline_Handler,
+		},
+		{
+			MethodName: "UploadRiskToOnlineBatch",
+			Handler:    _Yak_UploadRiskToOnlineBatch_Handler,
 		},
 		{
 			MethodName: "SetTagForRisk",

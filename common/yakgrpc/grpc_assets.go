@@ -671,45 +671,161 @@ func (s *Server) DownloadReport(ctx context.Context, req *ypb.DownloadReportRequ
 	return &ypb.Empty{}, nil
 }
 
+const (
+	riskUploadConcurrency    = 2
+	onlineUploadBodyMaxBytes = 32 << 20
+)
+
+var riskUploadMu sync.Mutex
+
 func (s *Server) UploadRiskToOnline(ctx context.Context, req *ypb.UploadRiskToOnlineRequest) (*ypb.Empty, error) {
-	if req.Token == "" {
+	if req.GetToken() == "" {
 		return nil, utils.Errorf("params empty")
 	}
-	var hash []string
+	if !riskUploadMu.TryLock() {
+		return nil, utils.Errorf("已有风险上传任务正在执行")
+	}
+	defer riskUploadMu.Unlock()
+
 	db := s.GetProjectDatabase()
 	db = db.Where("upload_online <> '1' or upload_online IS NULL")
-	data := yakit.YieldRisks(db, context.Background())
-	for k := range data {
-		content, err := json.Marshal(k)
-		if err != nil {
-			continue
-		}
-		raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
-			req.ProjectName,
-			content,
-			req.ExternalProjectCode,
-			req.ExternalModule,
-		})
-		if err != nil {
-			continue
-		}
-		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		err = client.UploadToOnline(ctx, req.Token, raw, "api/risk/upload")
-		if err != nil {
-			log.Errorf("uploadRiskToOnline failed: %s", err)
-			return &ypb.Empty{}, nil
-		} else {
-			hash = append(hash, k.Hash)
-		}
+	success, failed, err := s.uploadRisksToOnline(ctx, db, req)
+	if err != nil {
+		return nil, err
 	}
-	for _, v := range funk.ChunkStrings(hash, 100) {
-		err := yakit.UploadRiskToOnline(s.GetProjectDatabase(), v)
-		if err != nil {
-			log.Errorf("uploadRiskToOnline failed: %s", err)
-		}
+	if failed > 0 {
+		return nil, utils.Errorf("upload risk to online failed: success %d, failed %d", success, failed)
 	}
-
 	return &ypb.Empty{}, nil
+}
+
+func (s *Server) UploadRiskToOnlineBatch(ctx context.Context, req *ypb.UploadRiskToOnlineBatchRequest) (*ypb.UploadRiskToOnlineBatchResponse, error) {
+	if req.GetToOnlineWhere() == nil || req.GetToOnlineWhere().GetToken() == "" {
+		return nil, utils.Errorf("params empty")
+	}
+	if !riskUploadMu.TryLock() {
+		return nil, utils.Errorf("已有风险上传任务正在执行")
+	}
+	defer riskUploadMu.Unlock()
+
+	db := s.GetProjectDatabase()
+	db = db.Where("upload_online <> '1' or upload_online IS NULL")
+	if req.GetUploadRisksWhere() != nil {
+		db = yakit.FilterByQueryRisks(db, req.GetUploadRisksWhere())
+	}
+	success, failed, err := s.uploadRisksToOnline(ctx, db, req.GetToOnlineWhere())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.UploadRiskToOnlineBatchResponse{
+		SuccessCount: int64(success),
+		FailedCount:  int64(failed),
+	}, nil
+}
+
+func (s *Server) uploadRisksToOnline(ctx context.Context, db *gorm.DB, req *ypb.UploadRiskToOnlineRequest) (int, int, error) {
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	limit := make(chan struct{}, riskUploadConcurrency)
+	var (
+		wg           sync.WaitGroup
+		mu           sync.Mutex
+		success      []string
+		failed       []string
+		total        int
+		lastID       uint
+		tokenExpired bool
+		tokenErr     error
+	)
+	client := s.getOnlineClient()
+	for {
+		if cancelCtx.Err() != nil {
+			break
+		}
+		var page []*schema.Risk
+		if err := db.Where("id > ?", lastID).Order("id asc").Limit(100).Find(&page).Error; err != nil {
+			cancel()
+			wg.Wait()
+			return 0, 0, utils.Errorf("query risks failed: %s", err)
+		}
+		if len(page) == 0 {
+			break
+		}
+		for _, risk := range page {
+			if risk.ID > lastID {
+				lastID = risk.ID
+			}
+			if cancelCtx.Err() != nil {
+				break
+			}
+			total++
+			wg.Add(1)
+			limit <- struct{}{}
+			go func(risk *schema.Risk) {
+				defer func() {
+					<-limit
+					wg.Done()
+				}()
+				select {
+				case <-cancelCtx.Done():
+					return
+				default:
+				}
+
+				err := s.postRisk(cancelCtx, client, req, risk)
+				mu.Lock()
+				defer mu.Unlock()
+				if err != nil && strings.Contains(err.Error(), "token过期") {
+					log.Errorf("token过期, 停止上传")
+					tokenExpired = true
+					tokenErr = err
+					cancel()
+				} else if err != nil && cancelCtx.Err() == nil {
+					log.Errorf("uploadRiskToOnline failed: %s", err)
+					failed = append(failed, risk.Hash)
+				} else if err == nil {
+					success = append(success, risk.Hash)
+				}
+			}(risk)
+		}
+	}
+	wg.Wait()
+	if tokenExpired {
+		return 0, 0, tokenErr
+	}
+	if total == 0 {
+		return 0, 0, utils.Errorf("没有需要上传的数据")
+	}
+	for _, hashes := range funk.ChunkStrings(success, 100) {
+		if err := yakit.UploadRiskToOnline(s.GetProjectDatabase(), hashes); err != nil {
+			log.Errorf("mark risk uploaded failed: %s", err)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return len(success), len(failed), err
+	}
+	return len(success), len(failed), nil
+}
+
+func (s *Server) postRisk(ctx context.Context, client onlineService, req *ypb.UploadRiskToOnlineRequest, risk *schema.Risk) error {
+	content, err := json.Marshal([]*schema.Risk{risk})
+	if err != nil {
+		return err
+	}
+	if len(content) > onlineUploadBodyMaxBytes {
+		return utils.Errorf("请求体过大")
+	}
+	raw, err := json.Marshal(yaklib.QueryUploadRiskOnlineRequest{
+		ProjectName:         req.ProjectName,
+		Content:             content,
+		ExternalProjectCode: req.ExternalProjectCode,
+		ExternalModule:      req.ExternalModule,
+	})
+	if err != nil {
+		return err
+	}
+	return client.UploadToOnline(ctx, req.Token, raw, "api/risk/upload")
 }
 
 func (s *Server) QueryPortsGroup(ctx context.Context, req *ypb.Empty) (*ypb.QueryPortsGroupResponse, error) {
