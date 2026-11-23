@@ -192,43 +192,17 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 
 	indexName := "ux_ir_offsets_program_value_file_range"
 
-	// SQLite stores the index definition in sqlite_master, so it is the only
-	// dialect where the legacy non-COALESCE index can be recognized and
-	// dropped. Other dialects ask HasIndex once and, if it is absent, create
-	// the COALESCE form directly.
-	type idxInfo struct {
-		Name string
-		SQL  string
-	}
-	var existing []idxInfo
-	if isSQLiteDB(db) {
-		rows, err := db.Raw(
-			`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
-			indexName,
-		).Rows()
-		if err == nil {
-			for rows.Next() {
-				var info idxInfo
-				rows.Scan(&info.Name, &info.SQL)
-				existing = append(existing, info)
-			}
-			rows.Close()
+	// SQLite and PostgreSQL expose the stored index definition, so a legacy
+	// non-COALESCE index can be recognized and upgraded. Other dialects ask
+	// HasIndex once and, if it is absent, create the COALESCE form directly.
+	if ddl, ok := namedIndexDefinition(db, TableIrOffsets, indexName); ok {
+		if strings.Contains(strings.ToUpper(ddl), "COALESCE") {
+			return // already the COALESCE version
 		}
-
-		// If the index exists with COALESCE, it's up to date — nothing to do
-		for _, info := range existing {
-			if strings.Contains(strings.ToUpper(info.SQL), "COALESCE") {
-				return // already the COALESCE version
-			}
-		}
-
-		// If the index exists WITHOUT COALESCE, drop it so we can recreate
-		if len(existing) > 0 {
-			log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
-			if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
-				log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
-				return
-			}
+		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
+		if err := db.Exec("DROP INDEX IF EXISTS " + QuoteIdent(db, indexName)).Error; err != nil {
+			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
+			return
 		}
 	} else if hasNamedIndex(db, TableIrOffsets, indexName) {
 		return

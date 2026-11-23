@@ -24,12 +24,12 @@ func dialectOf(db *gorm.DB) sqlDialect {
 		return ""
 	}
 	name := strings.ToLower(strings.TrimSpace(db.Dialect().GetName()))
-	switch {
-	case strings.Contains(name, "sqlite"):
+	switch name {
+	case "sqlite", "sqlite3":
 		return sqlDialectSQLite
-	case name == "mysql":
+	case "mysql":
 		return sqlDialectMySQL
-	case name == "postgres", name == "postgresql", name == "cloudsqlpostgres":
+	case "postgres", "postgresql", "cloudsqlpostgres":
 		return sqlDialectPostgres
 	}
 	if damenggorm.IsDM(db) {

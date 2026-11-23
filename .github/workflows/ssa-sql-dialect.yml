@@ -65,3 +65,5 @@ jobs:
           go test -mod=readonly ./common/yak/ssa/ssadb \
             -run '^TestSSADialectConformance$' \
             -count=1 -v -timeout=20m
+        # DM is env-gated (YAK_SSA_CONFORMANCE_DM_DSN) and additionally needs
+        # -tags dameng plus an isolated DM fixture; keep it out of this job.
