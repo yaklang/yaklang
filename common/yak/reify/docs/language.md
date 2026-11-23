@@ -307,7 +307,8 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | 用例 | 断言 |
 | --- | --- |
 | `TestGoBinariesIdentifyRecoverAndLift` | linux/amd64 未剥离与剥离、windows/amd64、darwin/arm64；识别、pclntab 恢复、lift、函数级 ABI |
-| `TestGoGenericInstanceNamesDriveLift` | 泛型方法、泛型函数、泛型闭包：展示名与 pclntab 原文都选中同一函数体，伪源码使用展示名 |
+| `TestGoGenericInstanceNamesDriveLift` | 泛型方法、泛型函数、泛型闭包：未剥离与剥离产物中，展示名与 pclntab 原文都选中同一函数体，伪源码使用展示名 |
+| `TestMergeKeepsGoIdentity` | 容器符号合并 pclntab 名称时保留 Identity，容器精确大小优先 |
 | `TestRustBinaryIdentifyDemangleAndLift` | v0 demangle、展示名与编码名都能选函数、直接调用目标可读 |
 | `TestDemangleV0AndLegacy` | v0、legacy、Mach-O 前导下划线、`.llvm` 后缀 |
 | `TestV0RealForms` | 空标识符、嵌套闭包与消歧数、`K` 命名空间、闭包作泛型实参 |
