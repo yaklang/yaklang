@@ -90,9 +90,11 @@ type AIEngineConfig struct {
 	OnSessionID          func(sessionID string)                                                                                 // 会话 ID 就绪回调
 
 	// 高级配置
-	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
-	Workdir  string // 工作目录
-	Language string // 响应语言偏好
+	Focus                         string // 焦点，用于聚焦某个任务，如 yaklang_code
+	Workdir                       string // 工作目录
+	Language                      string // 响应语言偏好
+	DisableBuiltinSyntaxFlowRules bool   // 关闭内置 SyntaxFlow 安全规则
+	EnableCustomSyntaxFlowRules   bool   // 纳入用户自定义 Bash SyntaxFlow 规则
 
 	ExtOptions []aicommon.ConfigOption
 
@@ -378,6 +380,20 @@ func WithWorkdir(workdir string) AIEngineConfigOption {
 func WithLanguage(lang string) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.Language = lang
+	}
+}
+
+// WithDisableBuiltinSyntaxFlowRules disables the built-in Bash SyntaxFlow guard.
+func WithDisableBuiltinSyntaxFlowRules(disable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.DisableBuiltinSyntaxFlowRules = disable
+	}
+}
+
+// WithEnableCustomSyntaxFlowRules includes user-authored Bash SyntaxFlow rules.
+func WithEnableCustomSyntaxFlowRules(enable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.EnableCustomSyntaxFlowRules = enable
 	}
 }
 

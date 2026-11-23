@@ -530,6 +530,8 @@ func (a *ToolCaller) invoke(
 		if memory := config.MemoryTriage; memory != nil && memory.GetSessionID() != "noop" {
 			runtimeCfg.MemoryNamespace = memory.GetSessionID()
 		}
+		runtimeCfg.DisableBuiltinSyntaxFlowRules = config.DisableBuiltinSyntaxFlowRules
+		runtimeCfg.EnableCustomSyntaxFlowRules = config.EnableCustomSyntaxFlowRules
 	}
 	setRiskSelectionScope := func(task AIStatefulTask) {
 		if required, ids := AttachedRiskSelectionScope(task); required {

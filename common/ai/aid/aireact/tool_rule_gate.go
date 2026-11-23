@@ -32,33 +32,39 @@ const (
 // rules as a best-effort pass, then escalated to human review because the bash
 // grammar cannot fully cover cmd or PowerShell.
 func securityRuleGate(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
-	if !strings.EqualFold(strings.TrimSpace(toolName), bashToolName) {
-		return nil
-	}
-	command := utils.InterfaceToString(params["command"])
-	if strings.TrimSpace(command) == "" {
-		return nil
-	}
-	shell := normalizeShell(utils.InterfaceToString(params["shell"]))
+	return securityRuleGateWithOptions(nil)(ctx, toolName, params)
+}
 
-	check := commandcheck.CheckBuiltinCommand(ctx, command)
-	if !check.Available {
-		log.Warnf("bash security rule evaluation unavailable, allowing tool call: %s", check.Reason)
-		return nil
-	}
-	if check.Action == schema.SFR_ACTION_DENY || check.Action == schema.SFR_ACTION_ASK {
-		return securityRuleDecisionFromCheck(check)
-	}
-	if shell == "bash" {
-		if check.Action == schema.SFR_ACTION_WARN {
+func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.ToolCallRuleGate {
+	return func(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
+		if !strings.EqualFold(strings.TrimSpace(toolName), bashToolName) {
+			return nil
+		}
+		command := utils.InterfaceToString(params["command"])
+		if strings.TrimSpace(command) == "" {
+			return nil
+		}
+		shell := normalizeShell(utils.InterfaceToString(params["shell"]))
+
+		check := commandcheck.CheckBuiltinCommand(ctx, command, options...)
+		if !check.Available {
+			log.Warnf("bash security rule evaluation unavailable, allowing tool call: %s", check.Reason)
+			return nil
+		}
+		if check.Action == schema.SFR_ACTION_DENY || check.Action == schema.SFR_ACTION_ASK {
 			return securityRuleDecisionFromCheck(check)
 		}
-		return nil
+		if strings.HasPrefix(check.Reason, "disabled") || strings.HasPrefix(check.Reason, "no_rules") {
+			return nil
+		}
+		if shell == "bash" {
+			if check.Action == schema.SFR_ACTION_WARN {
+				return securityRuleDecisionFromCheck(check)
+			}
+			return nil
+		}
+		return nonBashShellReviewDecision(shell, check)
 	}
-	if check.Reason == "disabled" {
-		return nil
-	}
-	return nonBashShellReviewDecision(shell, check)
 }
 
 // normalizeShell maps the bash tool's shell parameter to the grammar that will
@@ -181,10 +187,18 @@ func nonBashShellReviewDecision(shell string, check commandcheck.Result) *aicomm
 // toolCallRuleGate composes the built-in bash guard with the optional runtime
 // gate compiled from Claude Code-style permissions JSON. Composition is
 // strictest-wins, so a user allow rule cannot suppress a built-in deny or ask.
-func toolCallRuleGate() aicommon.ToolCallRuleGate {
+func toolCallRuleGate(cfg *aicommon.Config) aicommon.ToolCallRuleGate {
+	var options []commandcheck.CheckOption
+	if cfg != nil {
+		options = append(options,
+			commandcheck.WithDisableBuiltinRules(cfg.DisableBuiltinSyntaxFlowRules),
+			commandcheck.WithIncludeCustomRules(cfg.EnableCustomSyntaxFlowRules),
+		)
+	}
+	builtinGate := securityRuleGateWithOptions(options)
 	extra := aicommon.CompileClaudeCodePermissionsFromRuntime()
 	if extra == nil {
-		return securityRuleGate
+		return builtinGate
 	}
-	return aicommon.ComposeToolCallRuleGates(securityRuleGate, extra)
+	return aicommon.ComposeToolCallRuleGates(builtinGate, extra)
 }

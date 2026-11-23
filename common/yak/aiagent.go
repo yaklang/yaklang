@@ -152,7 +152,14 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					shell := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["shell"])))
 					if shell == "" || shell == "bash" || shell == "bash.exe" {
 						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
-							if check := commandcheck.CheckCommand(ctx, cmd); check.Blocked {
+							var checkOptions []commandcheck.CheckOption
+							if runtimeConfig != nil {
+								checkOptions = append(checkOptions,
+									commandcheck.WithDisableBuiltinRules(runtimeConfig.DisableBuiltinSyntaxFlowRules),
+									commandcheck.WithIncludeCustomRules(runtimeConfig.EnableCustomSyntaxFlowRules),
+								)
+							}
+							if check := commandcheck.CheckCommand(ctx, cmd, checkOptions...); check.Blocked {
 								fmt.Fprintf(stdout, "[bash guard] %s\n", check.Message())
 								return check.BlockedResult(shell), nil
 							}

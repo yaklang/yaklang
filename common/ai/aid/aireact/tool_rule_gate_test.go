@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 )
 
 func TestSecurityRuleGate(t *testing.T) {
@@ -49,6 +50,20 @@ func TestSecurityRuleGate(t *testing.T) {
 		})
 		require.NotNil(t, decision)
 		require.Equal(t, schema.SFR_ACTION_DENY, decision.Action)
+	})
+
+	t.Run("builtin-disabled-by-config", func(t *testing.T) {
+		gate := securityRuleGateWithOptions([]commandcheck.CheckOption{
+			commandcheck.WithDisableBuiltinRules(true),
+		})
+		require.Nil(t, gate(ctx, "bash", aitool.InvokeParams{
+			"command": "rm -rf /",
+			"shell":   "bash",
+		}))
+		require.Nil(t, gate(ctx, "bash", aitool.InvokeParams{
+			"command": "echo hello",
+			"shell":   "powershell",
+		}), "disabled rules must not turn into a non-bash review prompt")
 	})
 
 	t.Run("other-tool-ignored", func(t *testing.T) {

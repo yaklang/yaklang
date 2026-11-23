@@ -24,21 +24,77 @@ const (
 
 	disableEnv = "YAK_DISABLE_AI_BASH_COMMAND_GUARD"
 
-	// builtinRulesTTL keeps the profile DB lookup out of every tool call while
-	// still picking up rule edits without a restart.
-	builtinRulesTTL = 5 * time.Minute
+	// rulesTTL keeps the profile DB lookup out of every tool call while still
+	// picking up rule edits without a restart.
+	rulesTTL = 5 * time.Minute
 )
+
+// CheckOption changes which rule sources participate in one command check.
+// The zero value keeps the historical behavior: embedded/DB built-in rules are
+// enabled and user-authored rules are excluded.
+type CheckOption func(*checkOptions)
+
+type checkOptions struct {
+	disableBuiltin bool
+	includeCustom  bool
+}
+
+// WithDisableBuiltinRules skips all built-in Bash rules, including the embedded
+// high-severity fallback. It only makes sense together with
+// WithIncludeCustomRules when the caller wants custom rules alone.
+func WithDisableBuiltinRules(disable bool) CheckOption {
+	return func(o *checkOptions) { o.disableBuiltin = disable }
+}
+
+// WithIncludeCustomRules includes user-authored Bash SyntaxFlow rules from the
+// profile DB. Only SSA-mode SyntaxFlow rules are eligible.
+func WithIncludeCustomRules(include bool) CheckOption {
+	return func(o *checkOptions) { o.includeCustom = include }
+}
+
+func resolveCheckOptions(options []CheckOption) checkOptions {
+	var opts checkOptions
+	for _, option := range options {
+		if option != nil {
+			option(&opts)
+		}
+	}
+	return opts
+}
 
 var (
 	guardOnce  sync.Once
 	guardRules []*schema.SyntaxFlowRule
 	guardErr   error
 
-	builtinRulesMu       sync.Mutex
-	builtinRules         []*schema.SyntaxFlowRule
-	builtinRulesLoaded   bool
-	builtinRulesLoadedAt time.Time
+	builtinRulesCache ruleCache
+	customRulesCache  ruleCache
 )
+
+type ruleCache struct {
+	mu       sync.Mutex
+	rules    []*schema.SyntaxFlowRule
+	loaded   bool
+	loadedAt time.Time
+}
+
+func (c *ruleCache) get(loader func() ([]*schema.SyntaxFlowRule, error)) ([]*schema.SyntaxFlowRule, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	if c.loaded && now.Sub(c.loadedAt) < rulesTTL {
+		return c.rules, nil
+	}
+	rules, err := loader()
+	if err != nil {
+		return nil, err
+	}
+	c.rules = rules
+	c.loaded = true
+	c.loadedAt = now
+	return rules, nil
+}
 
 func loadGuardRules() {
 	rules, err := sfbuildin.LoadEmbeddedRulesByLanguage(string(ssaconfig.BASH), schema.SFR_SEVERITY_HIGH)
@@ -53,56 +109,115 @@ func loadGuardRules() {
 	guardRules = rules
 }
 
-// CheckCommand parses one shell command and runs the embedded high-severity
-// bash rules against it. This is the preflight path wired into the bash tool
-// callback; it cannot ask a human, so only deny findings block execution.
-func CheckCommand(ctx context.Context, cmd string) Result {
-	guardOnce.Do(loadGuardRules)
-
+// CheckCommand parses one shell command and runs high-severity Bash rules.
+// This is the preflight path wired into the bash tool callback; it cannot ask a
+// human, so only deny findings block execution.
+func CheckCommand(ctx context.Context, cmd string, options ...CheckOption) Result {
 	if isGuardDisabled() {
 		return allowedResult("disabled")
 	}
-	if guardErr != nil {
-		log.Warnf("bash command guard unavailable: %v", guardErr)
-		return unavailableResult("unavailable: " + guardErr.Error())
+	opts := resolveCheckOptions(options)
+	if opts.disableBuiltin && !opts.includeCustom {
+		return allowedResult("disabled_by_config")
 	}
-	return checkWithRules(ctx, cmd, guardRules)
+
+	var rules []*schema.SyntaxFlowRule
+	builtinErr := error(nil)
+	if !opts.disableBuiltin {
+		guardOnce.Do(loadGuardRules)
+		if guardErr != nil {
+			builtinErr = guardErr
+			log.Warnf("bash command guard unavailable: %v", guardErr)
+		} else {
+			rules = append(rules, guardRules...)
+		}
+	}
+	if opts.includeCustom {
+		custom, err := loadCustomRules()
+		if err != nil {
+			log.Warnf("load custom bash rules failed: %v", err)
+		} else {
+			for _, rule := range custom {
+				if schema.ValidSeverityType(rule.Severity) == schema.SFR_SEVERITY_HIGH ||
+					schema.ValidSeverityType(rule.Severity) == schema.SFR_SEVERITY_CRITICAL {
+					rules = append(rules, rule)
+				}
+			}
+		}
+	}
+	if len(rules) == 0 {
+		if builtinErr != nil {
+			return unavailableResult("unavailable: " + builtinErr.Error())
+		}
+		return allowedResult("no_rules_by_config")
+	}
+	return checkWithRules(ctx, cmd, rules)
 }
 
-// CheckBuiltinCommand evaluates every built-in Bash rule from the profile DB.
-// It is the severity-aware gate used by the AI review flow, where middle
-// findings can be escalated to a human and low findings can warn.
-func CheckBuiltinCommand(ctx context.Context, cmd string) Result {
+// CheckBuiltinCommand evaluates every built-in Bash rule from the profile DB,
+// plus user-authored rules when explicitly enabled. It is the severity-aware
+// gate used by the AI review flow, where middle findings can be escalated to a
+// human and low findings can warn.
+func CheckBuiltinCommand(ctx context.Context, cmd string, options ...CheckOption) Result {
 	if isGuardDisabled() {
 		return allowedResult("disabled")
 	}
-
-	rules, err := loadBuiltinRules()
-	if err == nil && len(rules) > 0 {
-		return checkWithRules(ctx, cmd, rules)
+	opts := resolveCheckOptions(options)
+	if opts.disableBuiltin && !opts.includeCustom {
+		return allowedResult("disabled_by_config")
 	}
 
-	// While the profile DB is unavailable (or has not synced yet), keep the
-	// high-severity deny path working with the embedded rule set. Middle and
-	// low rules are unavailable in that state.
-	guardOnce.Do(loadGuardRules)
-	if guardErr == nil && len(guardRules) > 0 {
-		result := checkWithRules(ctx, cmd, guardRules)
-		if !result.Available {
-			return result
+	var rules []*schema.SyntaxFlowRule
+	builtinErr := error(nil)
+	fallbackUsed := false
+	if !opts.disableBuiltin {
+		builtin, err := loadBuiltinRules()
+		if err == nil && len(builtin) > 0 {
+			rules = append(rules, builtin...)
+		} else {
+			builtinErr = err
+			// While the profile DB is unavailable (or has not synced yet), keep the
+			// high-severity deny path working with the embedded rule set. Middle and
+			// low rules are unavailable in that state.
+			guardOnce.Do(loadGuardRules)
+			if guardErr == nil && len(guardRules) > 0 {
+				rules = append(rules, guardRules...)
+				fallbackUsed = true
+			} else if err != nil {
+				builtinErr = err
+			} else {
+				builtinErr = fmt.Errorf("no embedded bash guard high rules")
+			}
 		}
+	}
+	if opts.includeCustom {
+		custom, err := loadCustomRules()
 		if err != nil {
-			result.Reason = "builtin_unavailable_using_embedded_high: " + err.Error()
+			log.Warnf("load custom bash rules failed: %v", err)
+		} else {
+			rules = append(rules, custom...)
+		}
+	}
+
+	if len(rules) == 0 {
+		if builtinErr != nil {
+			log.Warnf("bash built-in rule check unavailable: %v", builtinErr)
+			return unavailableResult("builtin_unavailable: " + builtinErr.Error())
+		}
+		return allowedResult("no_rules_by_config")
+	}
+	result := checkWithRules(ctx, cmd, rules)
+	if !result.Available {
+		return result
+	}
+	if fallbackUsed {
+		if builtinErr != nil {
+			result.Reason = "builtin_unavailable_using_embedded_high: " + builtinErr.Error()
 		} else {
 			result.Reason = "no_builtin_bash_rules_using_embedded_high"
 		}
-		return result
 	}
-	if err != nil {
-		log.Warnf("bash built-in rule check unavailable: %v", err)
-		return unavailableResult("builtin_unavailable: " + err.Error())
-	}
-	return unavailableResult("no_builtin_bash_rules")
+	return result
 }
 
 func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule) Result {
@@ -167,36 +282,57 @@ func checkWithRules(ctx context.Context, cmd string, rules []*schema.SyntaxFlowR
 }
 
 // loadBuiltinRules returns the built-in Bash rules from the profile database.
-// User rules are intentionally excluded until the guard gets an explicit
-// user-rule configuration path.
 func loadBuiltinRules() ([]*schema.SyntaxFlowRule, error) {
-	builtinRulesMu.Lock()
-	defer builtinRulesMu.Unlock()
+	return builtinRulesCache.get(func() ([]*schema.SyntaxFlowRule, error) {
+		all, err := sfdb.GetRuleByLanguage(string(ssaconfig.BASH))
+		if err != nil {
+			return nil, fmt.Errorf("load built-in bash rules: %w", err)
+		}
+		rules := make([]*schema.SyntaxFlowRule, 0, len(all))
+		for _, rule := range all {
+			if rule == nil || !rule.IsBuildInRule {
+				continue
+			}
+			if strings.TrimSpace(rule.Content) == "" {
+				continue
+			}
+			rules = append(rules, rule)
+		}
+		return rules, nil
+	})
+}
 
-	now := time.Now()
-	if builtinRulesLoaded && now.Sub(builtinRulesLoadedAt) < builtinRulesTTL {
-		return builtinRules, nil
-	}
+// loadCustomRules returns user-authored Bash SyntaxFlow rules. The guard only
+// executes SSA-mode SyntaxFlow rules; Yak rules and source/struct modes are
+// intentionally excluded because checkWithRules compiles a bash SSA program.
+func loadCustomRules() ([]*schema.SyntaxFlowRule, error) {
+	return customRulesCache.get(func() ([]*schema.SyntaxFlowRule, error) {
+		all, err := sfdb.GetRuleByLanguage(string(ssaconfig.BASH))
+		if err != nil {
+			return nil, fmt.Errorf("load custom bash rules: %w", err)
+		}
+		return filterCustomRules(all), nil
+	})
+}
 
-	all, err := sfdb.GetRuleByLanguage(string(ssaconfig.BASH))
-	if err != nil {
-		return nil, fmt.Errorf("load built-in bash rules: %w", err)
-	}
+func filterCustomRules(all []*schema.SyntaxFlowRule) []*schema.SyntaxFlowRule {
 	rules := make([]*schema.SyntaxFlowRule, 0, len(all))
 	for _, rule := range all {
-		if rule == nil || !rule.IsBuildInRule {
+		if rule == nil || rule.IsBuildInRule {
 			continue
 		}
 		if strings.TrimSpace(rule.Content) == "" {
 			continue
 		}
+		if rule.Type != "" && rule.Type != schema.SFR_RULE_TYPE_SF {
+			continue
+		}
+		if rule.Mode != "" && rule.Mode != schema.SFR_MODE_SSA {
+			continue
+		}
 		rules = append(rules, rule)
 	}
-
-	builtinRules = rules
-	builtinRulesLoaded = true
-	builtinRulesLoadedAt = now
-	return rules, nil
+	return rules
 }
 
 func buildFinding(rule *schema.SyntaxFlowRule, info *schema.SyntaxFlowDescInfo, alertName string, value *ssaapi.Value) Finding {

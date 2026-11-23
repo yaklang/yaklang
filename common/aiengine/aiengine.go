@@ -719,6 +719,11 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		options = append(options, aicommon.WithLanguage(config.Language))
 	}
 
+	options = append(options,
+		aicommon.WithDisableBuiltinSyntaxFlowRules(config.DisableBuiltinSyntaxFlowRules),
+		aicommon.WithEnableCustomSyntaxFlowRules(config.EnableCustomSyntaxFlowRules),
+	)
+
 	// 调试模式
 	if config.DebugMode {
 		options = append(options,

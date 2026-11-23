@@ -11148,10 +11148,14 @@ type AIStartParams struct {
 	// Opt-in complete model HTTP diagnostics. Includes credentials/prompts, stored locally and exported with AI logs.
 	NetworkDebug *bool `protobuf:"varint,52,opt,name=NetworkDebug,proto3,oneof" json:"NetworkDebug,omitempty"`
 	// Connection-local, build-generated component catalog and interaction capabilities.
-	ClientUI      string              `protobuf:"bytes,53,opt,name=ClientUI,proto3" json:"ClientUI,omitempty"`
-	ImageInput    *AIImageInputConfig `protobuf:"bytes,54,opt,name=ImageInput,proto3" json:"ImageInput,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ClientUI   string              `protobuf:"bytes,53,opt,name=ClientUI,proto3" json:"ClientUI,omitempty"`
+	ImageInput *AIImageInputConfig `protobuf:"bytes,54,opt,name=ImageInput,proto3" json:"ImageInput,omitempty"`
+	// 为 true 时禁用内置 SyntaxFlow 安全规则（内置高危预检与 ReAct 审查）。
+	DisableBuiltinSyntaxFlowRules bool `protobuf:"varint,57,opt,name=DisableBuiltinSyntaxFlowRules,proto3" json:"DisableBuiltinSyntaxFlowRules,omitempty"`
+	// 为 true 时把用户自定义 Bash SyntaxFlow 规则纳入安全审查与高危预检。
+	EnableCustomSyntaxFlowRules bool `protobuf:"varint,58,opt,name=EnableCustomSyntaxFlowRules,proto3" json:"EnableCustomSyntaxFlowRules,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *AIStartParams) Reset() {
@@ -11553,6 +11557,20 @@ func (x *AIStartParams) GetImageInput() *AIImageInputConfig {
 		return x.ImageInput
 	}
 	return nil
+}
+
+func (x *AIStartParams) GetDisableBuiltinSyntaxFlowRules() bool {
+	if x != nil {
+		return x.DisableBuiltinSyntaxFlowRules
+	}
+	return false
+}
+
+func (x *AIStartParams) GetEnableCustomSyntaxFlowRules() bool {
+	if x != nil {
+		return x.EnableCustomSyntaxFlowRules
+	}
+	return false
 }
 
 type AIExecutionStrategy struct {
@@ -72136,8 +72154,14 @@ type AIGlobalConfig struct {
 	NetworkDebug bool `protobuf:"varint,13,opt,name=NetworkDebug,proto3" json:"NetworkDebug,omitempty"`
 	// Engine-wide model attempts per minute; zero disables proactive rate limiting.
 	ModelRequestsPerMinute int64 `protobuf:"varint,14,opt,name=ModelRequestsPerMinute,proto3" json:"ModelRequestsPerMinute,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Global default for disabling built-in SyntaxFlow security rules. A session
+	// AIStartParams value can override this default.
+	DisableBuiltinSyntaxFlowRules bool `protobuf:"varint,15,opt,name=DisableBuiltinSyntaxFlowRules,proto3" json:"DisableBuiltinSyntaxFlowRules,omitempty"`
+	// Global default for including user-authored Bash SyntaxFlow rules in the
+	// security guard. A session AIStartParams value can override this default.
+	EnableCustomSyntaxFlowRules bool `protobuf:"varint,16,opt,name=EnableCustomSyntaxFlowRules,proto3" json:"EnableCustomSyntaxFlowRules,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *AIGlobalConfig) Reset() {
@@ -72266,6 +72290,20 @@ func (x *AIGlobalConfig) GetModelRequestsPerMinute() int64 {
 		return x.ModelRequestsPerMinute
 	}
 	return 0
+}
+
+func (x *AIGlobalConfig) GetDisableBuiltinSyntaxFlowRules() bool {
+	if x != nil {
+		return x.DisableBuiltinSyntaxFlowRules
+	}
+	return false
+}
+
+func (x *AIGlobalConfig) GetEnableCustomSyntaxFlowRules() bool {
+	if x != nil {
+		return x.EnableCustomSyntaxFlowRules
+	}
+	return false
 }
 
 // Local Model Messages
@@ -82157,7 +82195,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xb8\x14\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xc0\x15\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -82218,7 +82256,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bClientUI\x185 \x01(\tR\bClientUI\x127\n" +
 	"\n" +
 	"ImageInput\x186 \x01(\v2\x17.ypb.AIImageInputConfigR\n" +
-	"ImageInputB\x1b\n" +
+	"ImageInput\x12D\n" +
+	"\x1dDisableBuiltinSyntaxFlowRules\x189 \x01(\bR\x1dDisableBuiltinSyntaxFlowRules\x12@\n" +
+	"\x1bEnableCustomSyntaxFlowRules\x18: \x01(\bR\x1bEnableCustomSyntaxFlowRulesB\x1b\n" +
 	"\x19_DisableContextAutoAdjustB\x0f\n" +
 	"\r_NetworkDebug\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
@@ -87507,7 +87547,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	" \x01(\bH\x01R\x18SupportsImageToolCalling\x88\x01\x01\x12&\n" +
 	"\x0eContextOwnerId\x18\v \x01(\tR\x0eContextOwnerIdB\x15\n" +
 	"\x13_SupportsImageInputB\x1b\n" +
-	"\x19_SupportsImageToolCalling\"\xf8\x04\n" +
+	"\x19_SupportsImageToolCalling\"\x80\x06\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +
@@ -87523,7 +87563,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fSingleModelMode\x18\v \x01(\bR\x0fSingleModelMode\x12\"\n" +
 	"\fRetryForever\x18\f \x01(\bR\fRetryForever\x12\"\n" +
 	"\fNetworkDebug\x18\r \x01(\bR\fNetworkDebug\x126\n" +
-	"\x16ModelRequestsPerMinute\x18\x0e \x01(\x03R\x16ModelRequestsPerMinute\"D\n" +
+	"\x16ModelRequestsPerMinute\x18\x0e \x01(\x03R\x16ModelRequestsPerMinute\x12D\n" +
+	"\x1dDisableBuiltinSyntaxFlowRules\x18\x0f \x01(\bR\x1dDisableBuiltinSyntaxFlowRules\x12@\n" +
+	"\x1bEnableCustomSyntaxFlowRules\x18\x10 \x01(\bR\x1bEnableCustomSyntaxFlowRules\"D\n" +
 	"\x1aIsLlamaServerReadyResponse\x12\x0e\n" +
 	"\x02Ok\x18\x01 \x01(\bR\x02Ok\x12\x16\n" +
 	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"8\n" +
