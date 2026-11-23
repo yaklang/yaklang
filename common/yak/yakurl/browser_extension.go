@@ -15,6 +15,20 @@ import (
 
 type browserExtensionAction struct{}
 
+// Keep the v3 paired-device response independent of the persisted bridge state.
+// Existing desktop clients reject fields that this version did not declare.
+type browserExtensionPairedDeviceSnapshot struct {
+	ID             string                     `json:"id"`
+	InstallationID string                     `json:"installationId"`
+	Name           string                     `json:"name"`
+	Client         string                     `json:"client"`
+	ClientVersion  string                     `json:"clientVersion"`
+	Origin         string                     `json:"origin"`
+	PublicKey      browser.ExtensionBridgeJWK `json:"publicKey"`
+	CreatedAt      int64                      `json:"createdAt"`
+	LastSeenAt     int64                      `json:"lastSeenAt"`
+}
+
 type browserExtensionMutation struct {
 	Name            string `json:"name"`
 	Message         string `json:"message"`
@@ -179,7 +193,18 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 		resources = append(resources, browserExtensionResource("pairing-request", pending.ID, pending.Client, pending, pending.CreatedAt/1000))
 	}
 	for _, device := range snapshot.Devices {
-		resources = append(resources, browserExtensionResource("paired-device", device.ID, device.Name, device, device.LastSeenAt/1000))
+		paired := browserExtensionPairedDeviceSnapshot{
+			ID:             device.ID,
+			InstallationID: device.InstallationID,
+			Name:           device.Name,
+			Client:         device.Client,
+			ClientVersion:  device.ClientVersion,
+			Origin:         device.Origin,
+			PublicKey:      device.PublicKey,
+			CreatedAt:      device.CreatedAt,
+			LastSeenAt:     device.LastSeenAt,
+		}
+		resources = append(resources, browserExtensionResource("paired-device", paired.ID, paired.Name, paired, paired.LastSeenAt/1000))
 	}
 	return &ypb.RequestYakURLResponse{Page: 1, PageSize: int64(len(resources)), Total: int64(len(resources)), Resources: resources}, nil
 }
