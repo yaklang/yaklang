@@ -129,7 +129,7 @@ type Image struct {
 
 `Symbol` 记录名称、地址、大小、种类、是否导入和来源库。ELF loader 从 `.dynsym`、`.symtab` 和重定位表填充；PLT 与 GOT 地址都映射到导入符号名。PE loader 从导出表、导入表与 `.pdata` 填充，Mach-O loader 从符号表、导入符号与 `LC_FUNCTION_STARTS` 填充。
 
-`Symbol` 另有 `Mangled`、`Source` 与 `Convention` 三个字段，由语言层写入：`Name` 是展示名，`Mangled` 是编译器原始名，`Source` 记录来源（`pclntab`、`rust-demangle`，空表示容器符号表）。`Convention` 为空表示按语言约定；`platform` 表示该函数保留平台约定，例如 Go 的 `.abi0` 包装。`SymbolByName` 同时匹配两种名字。详见[语言层](language.md)。
+`Symbol` 另有 `Mangled`、`Source`、`Convention` 与 `Identity` 四个字段，由语言层写入：`Name` 是展示名，`Mangled` 是编译器原始名，`Source` 记录来源（`pclntab`、`rust-demangle`，空表示容器符号表）。`Convention` 为空表示按语言约定；`platform` 表示该函数保留平台约定，例如 Go 的 `.abi0` 包装。`Identity` 是语言中立的名称拆分；Go 泛型实例通过它暴露包、接收者、类型实参、闭包与 family。`SymbolByName` 同时匹配 `Name` 与 `Mangled`。详见[语言层](language.md)。
 
 Section 的 `FileSize == 0` 表示零填充。`Flags` 保留格式原义，不做跨格式归一化。
 

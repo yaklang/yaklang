@@ -57,7 +57,7 @@ C 层始终以最低置信度命中，因此 `Inspect` 一定返回一个语言�
 
 `Inspect` 在 `Catalog.OpenAs` 校验 Artifact 之后调用，位置见 [loader/catalog.go](../loader/catalog.go)。它先选置信度最高的检测结果，再调用该层的 `Recover`：
 
-- Go：`debug/buildinfo` 读版本；按 `.gopclntab`、`<segment>,__gopclntab` 定位函数表，PE 与外部链接场景回退 `.rdata`、`.data.rel.ro`；用 `debug/gosym` 恢复名字、入口和大小。剥离 `.symtab` 后仍可用。
+- Go：`debug/buildinfo` 读版本；按 `.gopclntab`、`<segment>,__gopclntab` 定位函数表，PE 与外部链接场景回退 `.rdata`、`.data.rel.ro`；用 `debug/gosym` 恢复名字、入口和大小，再用 `ParseInstance` 生成展示名与 `Identity`。剥离 `.symtab` 后仍可用。
 - Rust：识别 v0（`_R`）与 legacy（`_ZN...17h...E`）；`Recover` 把符号表里的编码名改写为可读名，原始名保留在 `Symbol.Mangled`。剥离符号表的 Rust 产物没有名字可恢复，只保留 `.comment` 证据。
 
 `Recover` 返回的符号按 `(名字, 地址)` 合并：
