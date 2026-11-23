@@ -73,8 +73,8 @@ C 层始终以最低置信度命中，因此 `Inspect` 一定返回一个语言�
 
 ```go
 type Symbol struct {
-    Name       string     // 展示名，例如 main.Add、rust_hello::add
-    Mangled    string     // 原始名，例如 _RNvCs4FrXkKnA8Dq_10rust_hello3add
+    Name       string     // 展示名，例如 main.Add、main.(*Box[int]).Get、rust_hello::add
+    Mangled    string     // 原始名，例如 _RNv...、main.(*Box[go.shape.int]).Get
     Address    uint64
     Size       uint64
     Kind       SymbolKind
@@ -82,18 +82,29 @@ type Symbol struct {
     Library    string
     Source     string     // pclntab、rust-demangle；空表示容器符号表
     Convention Convention // 空表示语言约定；platform 表示保留平台约定
+    Identity   *Identity  // 语言层拆分：包、接收者、类型实参、闭包、family
 }
 ```
 
 - `Image.SymbolByName` 同时匹配 `Name` 与 `Mangled`，所以 `--func` 可用任一形式。
+- `Identity` 是语言中立的只读拆分。Go 泛型实例的 `Name` 是 `main.(*Box[int]).Get`，`Mangled` 是 `main.(*Box[go.shape.int]).Get`；两者都选中同一个函数体。
 - Rust 的 demangle 会省略 crate hash。展示名冲突时写成 `name@0xADDRESS`，不会把两个单态化合并成一个 SSA 函数。
 - `Convention` 让 `asm2lowir` 不必认识具体语言：它只检查语言是否提供覆盖，以及该函数是否被标记为 `platform`。
 
 ### Go 名称拆分
 
-`loader/language/golang.ParseInstance` 把 pclntab 名称拆成 `Package`、`Receiver`、`Function`、`Closure`、`Family`、`TypeArgs` 与 `Generic`。规则与 `debug/gosym` 一致：先掩码方括号内容，再按最后一个 `/` 之后的首个 `.` 找包路径，按两个不同 `.` 找接收者。
+`loader/language/golang.ParseInstance` 把 pclntab 名称拆成 `Name`、`Raw`、`Package`、`Receiver`、`Function`、`Closure`、`Family`、`TypeArgs`、`Generic` 与 `Synthetic`。规则与 `debug/gosym` 一致：先掩码方括号内容，再按最后一个 `/` 之后的首个 `.` 找包路径，按两个不同 `.` 找接收者。
 
-`Family` 把深度零的方括号组替换为 `[T]`：
+`Name` 是展示名。它去掉编译器写在实参里的 `go.shape.` 前缀，`Raw` 保留函数表中的原文：
+
+```text
+Raw   main.(*Box[go.shape.int]).Get
+Name  main.(*Box[int]).Get
+```
+
+`TypeArgs` 与 `Receiver` 同样使用展示形式。只有 64 位十六进制哈希、没有类型名的形状显示为 `shape#<前 8 位>`，避免把整段哈希写进每个符号名。
+
+`Family` 是分组键，不是展示名：把深度零的方括号组替换为 `[T]`，同一泛型函数的实例共享它。
 
 ```text
 pkg.F[go.shape.int]                              -> pkg.F[T]
@@ -101,7 +112,9 @@ pkg.(*OrderedMap[go.shape.string,go.shape.int64]).Add -> pkg.(*OrderedMap[T]).Ad
 pkg.F[go.shape.int].func1                        -> pkg.F[T].func1
 ```
 
-`type:` 与 `go:` 前缀是编译器保留名，方括号属于类型语法，不做拆分。`ShapeName` 去掉 `go.shape.` 前缀；`IsShapeHash` 识别 64 位十六进制哈希形状。
+`type:` 与 `go:` 前缀是编译器保留名，方括号属于类型语法，不做拆分；`-fm` 方法值包装也标记为 `Synthetic`。这些名字的 `Name` 与 `Raw` 相同。`ShapeName` 去掉 `go.shape.` 前缀；`IsShapeHash` 识别 64 位十六进制哈希形状。
+
+`Golang.Recover` 把拆分结果写进 `Symbol`：`Name` 用展示名，原文不同时写 `Mangled`，并附加 `Identity`。`lift --func` 因此可直接写 `main.(*Box[int]).Get`，也可写 pclntab 原文。伪源码的函数头使用展示名；`ssa2source` 的参数裁剪按最后一对平衡括号定位参数表，保留 `main.(*Box[int]).Get` 这类带括号的函数名。
 
 ### Go text 基址
 
@@ -294,6 +307,7 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | 用例 | 断言 |
 | --- | --- |
 | `TestGoBinariesIdentifyRecoverAndLift` | linux/amd64 未剥离与剥离、windows/amd64、darwin/arm64；识别、pclntab 恢复、lift、函数级 ABI |
+| `TestGoGenericInstanceNamesDriveLift` | 泛型方法、泛型函数、泛型闭包：展示名与 pclntab 原文都选中同一函数体，伪源码使用展示名 |
 | `TestRustBinaryIdentifyDemangleAndLift` | v0 demangle、展示名与编码名都能选函数、直接调用目标可读 |
 | `TestDemangleV0AndLegacy` | v0、legacy、Mach-O 前导下划线、`.llvm` 后缀 |
 | `TestV0RealForms` | 空标识符、嵌套闭包与消歧数、`K` 命名空间、闭包作泛型实参 |
@@ -314,8 +328,11 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | `TestLanguageNamesAndFunctionFactsRoundTrip` | 含逗号/箭头/空格的 Rust 名与函数级 ABI 的文本往返 |
 | `TestLanguageFactsArePerFunction` | 语言 ABI 不落到 cgo、平台约定或未标记地址 |
 | `TestVersionAndABI` / `TestFuncSizeTrimsOnlyAlignmentFill` / `TestPclntabRejectsUnboundedCount` | Go 版本、ABI、填充剥离与坏表拒绝 |
-| `TestParseInstanceSplitsGenericNames` | 泛型函数、泛型方法、闭包、切片/数组/结构体实参、保留名 |
+| `TestParseInstanceSplitsGenericNames` | 泛型函数、泛型方法、闭包、切片/数组/结构体实参、保留名；Name/Raw/Receiver/TypeArgs 展示形式 |
+| `TestParseInstanceRendersHashedShape` | 无类型名的哈希形状显示为 `shape#<8 位>` |
 | `TestParseInstanceKeepsFamilyStable` | 族键幂等；同族实例共享键；不同方法不共享 |
+| `TestInstanceIdentity` | `Symbol.Identity` 的包、接收者、类型实参、闭包与 family |
+| `TestPruneUnusedParametersKeepsParenthesizedName` | 带括号的 Go 方法名不被参数裁剪截断 |
 | `FuzzParseInstance` | 任意名称不 panic，族键重解析不变 |
 | `TestRecoverModuleDataFromNamedSection` | `.go.module` 中的模块数据通过全部指针与计数校验 |
 | `TestRecoverModuleDataScansDataSection` | 无命名节时从 `.noptrdata` 扫描 |

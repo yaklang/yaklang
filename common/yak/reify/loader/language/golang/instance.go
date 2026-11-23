@@ -1,25 +1,35 @@
 package golang
 
-import "strings"
+import (
+	"strings"
 
-// Instance is one function name from the Go function table split into the parts
-// a binary audit needs. The compiler renders a generic instantiation by writing
-// the type arguments into the symbol name, so the name itself carries the
-// package, the receiver, the type arguments and the family.
+	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
+)
+
+// Instance is one function name from the Go function table split into the
+// parts a binary tool needs. The compiler encodes generic type arguments,
+// receivers and closures into the symbol name, so the name itself carries the
+// source-level identity.
 //
-// The split follows debug/gosym: bracket contents are masked before the dot and
-// slash searches, so a package path or a type argument that contains a dot does
-// not move the receiver boundary. Unlike gosym, the result is available without
-// a decoded table entry and the family key is explicit.
+// Name is the readable form a consumer should display. Raw is the exact
+// compiler string, which is also what the pclntab stores. A Go generic loses
+// the compiler's go.shape. prefix in Name:
+//
+//	Raw:  main.(*Box[go.shape.int]).Get
+//	Name: main.(*Box[int]).Get
+//
+// Family is a grouping key, not a display name: every depth-zero
+// type-argument group becomes [T], so instances of one generic share a family.
 type Instance struct {
-	// Name is the full name from the function table.
+	// Name is the source-like display name.
 	Name string `json:"name"`
+	// Raw is the exact name in the function table.
+	Raw string `json:"raw"`
 	// Package is the import path, for example "common/utils/omap". It is empty
 	// for compiler-owned names such as "type:.eq" or "go:buildid".
 	Package string `json:"package,omitempty"`
-	// Receiver is the type text of a method, for example "*OrderedMap[T]" or
-	// "OrderedMap[T]" for a value receiver. The shape of the instantiation is
-	// kept as the compiler wrote it.
+	// Receiver is the source-like receiver type, for example "*OrderedMap[int]"
+	// or "OrderedMap[int]" for a value receiver.
 	Receiver string `json:"receiver,omitempty"`
 	// Function is the declared function or method name without type arguments
 	// and without a closure suffix.
@@ -28,19 +38,22 @@ type Instance struct {
 	// declared function.
 	Closure string `json:"closure,omitempty"`
 	// Family is the name with every depth-zero type-argument list replaced by
-	// "[T]". Two instances of one generic function share a family.
+	// "[T]". Two instances of one generic function share it.
 	Family string `json:"family,omitempty"`
-	// TypeArgs holds the depth-zero type arguments of the receiver and the
-	// function. A non-generic function has none.
+	// TypeArgs holds source-like type arguments of the receiver and the
+	// function. A hashed shape is rendered as shape#<8 hex digits>.
 	TypeArgs []string `json:"type_args,omitempty"`
 	// Generic reports that the name carries at least one type-argument list.
 	Generic bool `json:"generic,omitempty"`
+	// Synthetic marks a compiler-owned name: a type: or go: prefix, or a -fm
+	// method value wrapper. Such a name has no Go source declaration.
+	Synthetic bool `json:"synthetic,omitempty"`
 }
 
 // ParseInstance splits one function name from the Go function table. Names the
-// compiler owns keep their text in Family and leave Package empty.
+// compiler owns keep their text in Name and Raw and set Synthetic.
 func ParseInstance(name string) Instance {
-	instance := Instance{Name: name, Family: name}
+	instance := Instance{Name: name, Raw: name, Family: name}
 	if name == "" {
 		return instance
 	}
@@ -53,14 +66,19 @@ func ParseInstance(name string) Instance {
 	// The compiler reserves these prefixes for names it generates. They have no
 	// import path and their brackets are type syntax, not type arguments.
 	if strings.HasPrefix(masked, "type:") || strings.HasPrefix(masked, "go:") {
+		instance.Synthetic = true
 		return instance
 	}
+	instance.Synthetic = strings.HasSuffix(name, "-fm")
 	groups := depthZeroGroups(name)
 	instance.Generic = len(groups) > 0
-	for _, group := range groups {
-		instance.TypeArgs = append(instance.TypeArgs, splitTypeArgs(name[group.start+1:group.end])...)
+	if instance.Generic {
+		instance.Name = replaceGroupsWithDisplay(name, groups)
+		for _, group := range groups {
+			instance.TypeArgs = append(instance.TypeArgs, displayTypeArgs(name[group.start+1:group.end])...)
+		}
+		instance.Family = replaceGroups(name, groups, "[T]")
 	}
-	instance.Family = replaceGroups(name, groups, "[T]")
 
 	decl, closure := splitClosureMasked(masked)
 	instance.Closure = closure
@@ -81,8 +99,7 @@ func ParseInstance(name string) Instance {
 		// path segment with a dot ("gopkg.in/yaml.v2") is read as a receiver.
 		instance.Package = name[:pathEnd+firstDot]
 		raw := name[pathEnd+firstDot+1 : pathEnd+lastDot]
-		raw = replaceGroups(raw, depthZeroGroups(raw), "[T]")
-		instance.Receiver = strings.TrimSuffix(strings.TrimPrefix(raw, "("), ")")
+		instance.Receiver = trimReceiver(replaceGroupsWithDisplay(raw, depthZeroGroups(raw)))
 		instance.Function = stripGroups(name[pathEnd+lastDot+1 : len(decl)])
 		return instance
 	}
@@ -98,6 +115,24 @@ func FamilyOf(name string) string { return ParseInstance(name).Family }
 // PackageOf returns the import path of one name, or an empty string for a
 // compiler-owned name.
 func PackageOf(name string) string { return ParseInstance(name).Package }
+
+// DisplayOf returns the source-like display name of one pclntab name.
+func DisplayOf(name string) string { return ParseInstance(name).Name }
+
+// Identity returns the language-neutral decomposition attached to a Symbol.
+// The caller owns the slice in the result.
+func (i Instance) Identity() *symbol.Identity {
+	return &symbol.Identity{
+		Package:   i.Package,
+		Receiver:  i.Receiver,
+		Function:  i.Function,
+		Closure:   i.Closure,
+		Family:    i.Family,
+		TypeArgs:  append([]string(nil), i.TypeArgs...),
+		Generic:   i.Generic,
+		Synthetic: i.Synthetic,
+	}
+}
 
 // maskBracketContents replaces every byte inside a bracket group with '_' while
 // keeping the brackets and the byte indices. Dots and slashes inside a type
@@ -178,8 +213,56 @@ func replaceGroups(name string, groups []bracketGroup, replacement string) strin
 	return builder.String()
 }
 
+// replaceGroupsWithDisplay keeps the original text outside the groups and
+// rewrites every group as a display type-argument list.
+func replaceGroupsWithDisplay(name string, groups []bracketGroup) string {
+	if len(groups) == 0 {
+		return name
+	}
+	var builder strings.Builder
+	builder.Grow(len(name))
+	last := 0
+	for _, group := range groups {
+		builder.WriteString(name[last:group.start])
+		builder.WriteByte('[')
+		builder.WriteString(strings.Join(displayTypeArgs(name[group.start+1:group.end]), ","))
+		builder.WriteByte(']')
+		last = group.end + 1
+	}
+	builder.WriteString(name[last:])
+	return builder.String()
+}
+
 func stripGroups(text string) string {
 	return replaceGroups(text, depthZeroGroups(text), "")
+}
+
+func trimReceiver(text string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(text, "("), ")")
+}
+
+// displayTypeArgs returns one display string per top-level type argument.
+func displayTypeArgs(list string) []string {
+	if list == "" {
+		return nil
+	}
+	args := splitTypeArgs(list)
+	for index := range args {
+		args[index] = displayTypeArg(args[index])
+	}
+	return args
+}
+
+// displayTypeArg removes the compiler's shape prefix. A shape without a type
+// string is a 64-digit hash; the first eight digits identify it without
+// printing the whole hash into every symbol name.
+func displayTypeArg(arg string) string {
+	arg = strings.TrimSpace(arg)
+	arg = strings.ReplaceAll(arg, "go.shape.", "")
+	if IsShapeHash(arg) {
+		return "shape#" + arg[:8]
+	}
+	return arg
 }
 
 // splitClosureMasked separates the ".funcN" chain the compiler appends to
