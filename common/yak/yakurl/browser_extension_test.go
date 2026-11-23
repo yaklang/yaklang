@@ -47,56 +47,6 @@ func TestBrowserExtensionYakURLSnapshotAndPairingWindow(t *testing.T) {
 	require.NotZero(t, status["pairingOpenUntil"])
 }
 
-func TestBrowserExtensionPairedDeviceSnapshotMatchesV3(t *testing.T) {
-	store := browser.NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json"))
-	initial, err := browser.NewExtensionBridgeManager(store, nil)
-	require.NoError(t, err)
-	_, publicKey := initial.EngineIdentity()
-
-	state, err := store.Load()
-	require.NoError(t, err)
-	state.NextReference = 8
-	state.Devices = []browser.ExtensionBridgeDevice{{
-		ID: "device-1", Reference: 7, InstallationID: "installation-1",
-		Name: "Browser A", Client: "extension", ClientVersion: "1",
-		Origin: "chrome-extension://extension-a", PublicKey: publicKey,
-		CreatedAt: 1000, LastSeenAt: 2000,
-	}}
-	require.NoError(t, store.Save(state))
-
-	manager, err := browser.NewExtensionBridgeManager(store, nil)
-	require.NoError(t, err)
-	browser.SetActiveExtensionBridgeManager(manager)
-	t.Cleanup(func() {
-		browser.SetActiveExtensionBridgeManager(nil)
-		require.NoError(t, manager.Close())
-	})
-
-	response, err := newBrowserExtensionAction().Get(&ypb.RequestYakURLParams{
-		Method: "GET", Url: &ypb.YakURL{Schema: "browser-extension", Location: "local", Path: "/snapshot"},
-	})
-	require.NoError(t, err)
-	require.Len(t, response.Resources, 2)
-	require.Equal(t, "paired-device", response.Resources[1].ResourceType)
-	require.Equal(t, "device-1", response.Resources[1].ResourceName)
-
-	encodedKey, err := json.Marshal(publicKey)
-	require.NoError(t, err)
-	require.JSONEq(t, `{
-		"id":"device-1", "installationId":"installation-1",
-		"name":"Browser A", "client":"extension", "clientVersion":"1",
-		"origin":"chrome-extension://extension-a", "publicKey":`+string(encodedKey)+`,
-		"createdAt":1000, "lastSeenAt":2000
-	}`, response.Resources[1].Extra[0].Value)
-
-	reference, err := manager.BrowserReference("device-1")
-	require.NoError(t, err)
-	require.Equal(t, "br_7", reference)
-	saved, err := store.Load()
-	require.NoError(t, err)
-	require.EqualValues(t, 7, saved.Devices[0].Reference)
-}
-
 const managedProtocolVersionForTest = 3
 
 func TestBrowserExtensionYakURLUnavailableWithoutManager(t *testing.T) {

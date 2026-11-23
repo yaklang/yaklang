@@ -56,6 +56,11 @@
     "timeout": "15s"
   },
   {
+    "package": "./common/browser",
+    "timeout": "20s",
+    "run": "^TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice$"
+  },
+  {
     "package": "./common/thirdparty_bin",
     "timeout": "1m",
     "skip": "^(TestFetchAllMD5|TestSingleURL|TestInstallMemoryUsage|TestMemoryUsageBaseline)$"
