@@ -258,8 +258,28 @@ func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32
 			// names them. Leave them out of the language ABI override.
 			convention = symbol.ConventionPlatform
 		}
-		symbols = append(symbols, symbol.Symbol{Name: f.Name, Address: f.Entry, Size: goFuncSize(a, f.Entry, f.End-f.Entry, a.Target.Architecture),
-			Kind: symbol.SymbolFunction, Source: symbol.SourcePCLNTab, Convention: convention})
+		instance := ParseInstance(f.Name)
+		name := instance.Name
+		if name == "" {
+			name = f.Name
+		}
+		entry := symbol.Symbol{
+			Name:       name,
+			Address:    f.Entry,
+			Size:       goFuncSize(a, f.Entry, f.End-f.Entry, a.Target.Architecture),
+			Kind:       symbol.SymbolFunction,
+			Source:     symbol.SourcePCLNTab,
+			Convention: convention,
+		}
+		if name != f.Name {
+			// Keep the exact pclntab spelling for lookups and for consumers
+			// that need the compiler's go.shape. type arguments.
+			entry.Mangled = f.Name
+		}
+		if instance.Generic || instance.Synthetic || instance.Receiver != "" || instance.Closure != "" {
+			entry.Identity = instance.Identity()
+		}
+		symbols = append(symbols, entry)
 	}
 	return symbols, nil
 }

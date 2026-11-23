@@ -32,12 +32,29 @@ const (
 	ConventionPlatform Convention = "platform"
 )
 
+// Identity is the language-level decomposition of a symbol name. A language
+// layer fills it when the encoded name carries more than a display string: a Go
+// generic instantiation, a method receiver, a closure chain, or a
+// compiler-generated function. Consumers can inspect it without importing a
+// language loader.
+type Identity struct {
+	Package   string   `json:"package,omitempty"`
+	Receiver  string   `json:"receiver,omitempty"`
+	Function  string   `json:"function,omitempty"`
+	Closure   string   `json:"closure,omitempty"`
+	Family    string   `json:"family,omitempty"`
+	TypeArgs  []string `json:"type_args,omitempty"`
+	Generic   bool     `json:"generic,omitempty"`
+	Synthetic bool     `json:"synthetic,omitempty"`
+}
+
 // Symbol is one named address from a file-format symbol or relocation table.
 // Imported symbols may have Address zero when the format only names them.
 //
 // Name is the name a consumer should display. Mangled keeps the name exactly as
 // the image stores it when a language layer rewrote Name: a Rust symbol is
-// stored as _RNv... and displayed as crate::func. A lookup accepts either form.
+// stored as _RNv... and displayed as crate::func, and a Go generic is stored as
+// pkg.F[go.shape.int] and displayed as pkg.F[int]. A lookup accepts either form.
 // Source names where the symbol came from: an empty value means the container's
 // own symbol table, and "pclntab" means it was recovered from Go metadata.
 type Symbol struct {
@@ -50,6 +67,7 @@ type Symbol struct {
 	Library    string     `json:"library,omitempty"`
 	Source     string     `json:"source,omitempty"`
 	Convention Convention `json:"convention,omitempty"`
+	Identity   *Identity  `json:"identity,omitempty"`
 }
 
 // At returns the symbol at address. An exact address match wins; a symbol with

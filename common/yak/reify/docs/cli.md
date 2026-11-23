@@ -37,7 +37,7 @@ go build -o "$OUT/bin/reify" ./common/yak/reify/cmd/reify
 `lift` 的转换选项：
 
 - `--asm-syntax intel|att`：汇编语法，默认 `intel`；`att` 输出 GNU/AT&T 语法。
-- `--func NAME`：反编译一个已恢复函数；不能和 `--address/--size` 同用。Rust 函数可用展示名（`rust_hello::add`）或原始编码名（`_RNvCs4FrXkKnA8Dq_10rust_hello3add`）。
+- `--func NAME`：反编译一个已恢复函数；不能和 `--address/--size` 同用。Rust 函数可用展示名（`rust_hello::add`）或原始编码名（`_RNvCs4FrXkKnA8Dq_10rust_hello3add`）。Go 泛型可用展示名（`main.(*Box[int]).Get`）或原始 pclntab 名（`main.(*Box[go.shape.int]).Get`）。
 - `--address` 也接受函数符号名（`sum_points` 或 `0xsum_points`）。
 - `--lowir-pass NAME[,NAME...]`：只运行指定的 LowIR pass，默认运行全部默认 pass（含去 canary 和栈帧）。只影响 `ssair`、`source` 和 `all`；`lowir` 输出 asm2lowir 得到的普通 LowIR。
 - `--ssa-pass NAME[,NAME...]`：只运行指定的 SSA pass，默认运行标准 pass 序列。
@@ -75,6 +75,8 @@ Go 与 Rust 产物（容器仍是 ELF/PE/Mach-O）：
 "$OUT/bin/reify" lift --mode all --func main.Add "$RUN/go_hello_stripped"
 "$OUT/bin/reify" lift --mode all --func rust_hello::add "$RUN/rust_hello"
 "$OUT/bin/reify" lift --mode all --func _RNvCs4FrXkKnA8Dq_10rust_hello3add "$RUN/rust_hello"
+"$OUT/bin/reify" lift --mode source --func 'main.(*Box[int]).Get' "$RUN/go_generic_stripped"
+"$OUT/bin/reify" lift --mode source --func 'main.(*Box[go.shape.int]).Get' "$RUN/go_generic_stripped"
 ```
 
 `strings` 用检测到的语言模型解码一个值：
