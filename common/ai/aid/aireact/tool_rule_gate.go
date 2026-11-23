@@ -2,12 +2,7 @@ package aireact
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -27,10 +22,8 @@ const (
 )
 
 // securityRuleGate turns built-in Bash rule findings into a tool-call decision.
-// It fails open when the analyzer itself is unavailable. An explicitly selected
-// non-bash shell is never skipped: the command is first checked with the bash
-// rules as a best-effort pass, then escalated to human review because the bash
-// grammar cannot fully cover cmd or PowerShell.
+// It fails open when the analyzer itself is unavailable. Non-bash shells are
+// passed through for now; their own SyntaxFlow frontends will be added later.
 func securityRuleGate(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
 	return securityRuleGateWithOptions(nil)(ctx, toolName, params)
 }
@@ -44,94 +37,34 @@ func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.To
 		if strings.TrimSpace(command) == "" {
 			return nil
 		}
-		shell := normalizeShell(utils.InterfaceToString(params["shell"]))
+		// TODO: enable the bash rules for cmd/zsh once their frontends land.
+		if !isBashShell(utils.InterfaceToString(params["shell"])) {
+			return nil
+		}
 
 		check := commandcheck.CheckBuiltinCommand(ctx, command, options...)
 		if !check.Available {
 			log.Warnf("bash security rule evaluation unavailable, allowing tool call: %s", check.Reason)
 			return nil
 		}
-		if check.Action == schema.SFR_ACTION_DENY || check.Action == schema.SFR_ACTION_ASK {
+		switch check.Action {
+		case schema.SFR_ACTION_DENY, schema.SFR_ACTION_ASK, schema.SFR_ACTION_WARN:
 			return securityRuleDecisionFromCheck(check)
-		}
-		if strings.HasPrefix(check.Reason, "disabled") || strings.HasPrefix(check.Reason, "no_rules") {
+		default:
 			return nil
 		}
-		if shell == "bash" {
-			if check.Action == schema.SFR_ACTION_WARN {
-				return securityRuleDecisionFromCheck(check)
-			}
-			return nil
-		}
-		return nonBashShellReviewDecision(shell, check)
 	}
 }
 
-// normalizeShell maps the bash tool's shell parameter to the grammar that will
-// actually run. An empty value follows bash.yak's bash-first preference, so on
-// Windows it is treated as non-bash when bash cannot be found at all.
-func normalizeShell(shell string) string {
+// isBashShell reports whether the bash tool's shell parameter selects the bash
+// grammar. An empty value follows bash.yak's bash-first default.
+func isBashShell(shell string) bool {
 	switch strings.ToLower(strings.TrimSpace(shell)) {
-	case "bash", "bash.exe", "sh", "shell":
-		return "bash"
-	case "cmd", "cmd.exe":
-		return "cmd"
-	case "powershell", "powershell.exe", "ps", "pwsh", "pwsh.exe":
-		return "powershell"
-	case "":
-		if runtime.GOOS == "windows" && !hasBashOnWindows() {
-			return "auto-non-bash"
-		}
-		return "bash"
+	case "", "bash", "bash.exe":
+		return true
 	default:
-		return "unsupported"
+		return false
 	}
-}
-
-var (
-	bashOnWindowsOnce sync.Once
-	bashOnWindows     bool
-)
-
-// hasBashOnWindows mirrors the candidate list used by bash.yak so the gate
-// agrees with the transport's auto-selection. The result is cached: the tool
-// process does not install or remove a shell during a session.
-func hasBashOnWindows() bool {
-	bashOnWindowsOnce.Do(func() {
-		var candidates []string
-		for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)"} {
-			if base := strings.TrimSpace(os.Getenv(env)); base != "" {
-				candidates = append(candidates,
-					filepath.Join(base, "Git", "bin", "bash.exe"),
-					filepath.Join(base, "Git", "usr", "bin", "bash.exe"),
-				)
-			}
-		}
-		if base := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); base != "" {
-			candidates = append(candidates,
-				filepath.Join(base, "Programs", "Git", "bin", "bash.exe"),
-				filepath.Join(base, "Programs", "Git", "usr", "bin", "bash.exe"),
-			)
-		}
-		if home := strings.TrimSpace(os.Getenv("USERPROFILE")); home != "" {
-			candidates = append(candidates,
-				filepath.Join(home, "scoop", "apps", "git", "current", "bin", "bash.exe"),
-				filepath.Join(home, "scoop", "apps", "git", "current", "usr", "bin", "bash.exe"),
-			)
-		}
-		candidates = append(candidates,
-			`C:\msys64\usr\bin\bash.exe`,
-			`C:\msys64\mingw64\bin\bash.exe`,
-			`C:\cygwin64\bin\bash.exe`,
-		)
-		for _, candidate := range candidates {
-			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-				bashOnWindows = true
-				return
-			}
-		}
-	})
-	return bashOnWindows
 }
 
 func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCallRuleDecision {
@@ -159,28 +92,6 @@ func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCall
 			Risk:     finding.Risk,
 		})
 	}
-	return decision
-}
-
-func nonBashShellReviewDecision(shell string, check commandcheck.Result) *aicommon.ToolCallRuleDecision {
-	reason := fmt.Sprintf(
-		"shell %q is not bash; built-in bash rules cannot fully analyze it, so human confirmation is required",
-		shell,
-	)
-	if check.Action == schema.SFR_ACTION_WARN && strings.TrimSpace(check.Message()) != "" {
-		reason += ": " + check.Message()
-	}
-
-	decision := securityRuleDecisionFromCheck(check)
-	decision.Action = schema.SFR_ACTION_ASK
-	decision.Severity = schema.SFR_SEVERITY_WARNING
-	if strings.TrimSpace(decision.RuleID) == "" {
-		decision.RuleID = "shell-static-analysis-unavailable"
-	}
-	if strings.TrimSpace(decision.RuleName) == "" {
-		decision.RuleName = "Shell command requires human review"
-	}
-	decision.Reason = reason
 	return decision
 }
 

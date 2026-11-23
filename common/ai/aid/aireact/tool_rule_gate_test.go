@@ -31,22 +31,22 @@ func TestSecurityRuleGate(t *testing.T) {
 		require.Equal(t, schema.SFR_ACTION_DENY, decision.Action)
 	})
 
-	t.Run("non-bash-safe-requires-review", func(t *testing.T) {
+	t.Run("non-bash-shell-passes-through", func(t *testing.T) {
 		for _, shell := range []string{"cmd", "powershell", "pwsh", "unknown-shell"} {
-			decision := securityRuleGate(ctx, "bash", aitool.InvokeParams{
-				"command": "echo hello",
-				"shell":   shell,
-			})
-			require.NotNil(t, decision, "shell=%s", shell)
-			require.Equal(t, schema.SFR_ACTION_ASK, decision.Action, "shell=%s", shell)
-			require.Equal(t, "shell-static-analysis-unavailable", decision.RuleID, "shell=%s", shell)
+			for _, command := range []string{"echo hello", "rm -rf /"} {
+				decision := securityRuleGate(ctx, "bash", aitool.InvokeParams{
+					"command": command,
+					"shell":   shell,
+				})
+				require.Nil(t, decision, "shell=%s command=%s", shell, command)
+			}
 		}
 	})
 
-	t.Run("non-bash-dangerous-still-denied", func(t *testing.T) {
+	t.Run("bash-exe-alias-still-denied", func(t *testing.T) {
 		decision := securityRuleGate(ctx, "bash", aitool.InvokeParams{
 			"command": "rm -rf /",
-			"shell":   "powershell",
+			"shell":   "bash.exe",
 		})
 		require.NotNil(t, decision)
 		require.Equal(t, schema.SFR_ACTION_DENY, decision.Action)
@@ -63,7 +63,7 @@ func TestSecurityRuleGate(t *testing.T) {
 		require.Nil(t, gate(ctx, "bash", aitool.InvokeParams{
 			"command": "echo hello",
 			"shell":   "powershell",
-		}), "disabled rules must not turn into a non-bash review prompt")
+		}))
 	})
 
 	t.Run("other-tool-ignored", func(t *testing.T) {
