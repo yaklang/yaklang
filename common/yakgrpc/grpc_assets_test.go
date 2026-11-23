@@ -3,9 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -446,4 +450,332 @@ func TestRisksFromOnline(t *testing.T) {
 	assert.Nil(t, newRisk.FixTime)
 
 	yakit.DeleteRiskByID(db, int64(newRisk.ID))
+}
+
+func TestUploadRiskToOnlineUsesSearchFilter(t *testing.T) {
+	db := newOnlineTestDB(t, &schema.Risk{})
+	match := &schema.Risk{Hash: "match-hash", Title: "alpha-risk", Severity: "high"}
+	other := &schema.Risk{Hash: "other-hash", Title: "beta-risk", Severity: "low"}
+	uploaded := &schema.Risk{Hash: "uploaded-hash", Title: "alpha-uploaded", Severity: "high", UploadOnline: true}
+	require.NoError(t, db.Create(match).Error)
+	require.NoError(t, db.Create(other).Error)
+	require.NoError(t, db.Create(uploaded).Error)
+
+	var mu sync.Mutex
+	var got []string
+	remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+		assert.Equal(t, "test-token", token)
+		assert.Equal(t, "api/risk/upload", url)
+		var body yaklib.QueryUploadRiskOnlineRequest
+		require.NoError(t, json.Unmarshal(raw, &body))
+		assert.Equal(t, "demo", body.ProjectName)
+		assert.Equal(t, "mod", body.ExternalModule)
+		assert.Equal(t, "proj", body.ExternalProjectCode)
+		var risks []schema.Risk
+		require.NoError(t, json.Unmarshal(body.Content, &risks))
+		mu.Lock()
+		for _, risk := range risks {
+			got = append(got, risk.Hash)
+		}
+		mu.Unlock()
+		return nil
+	}}
+	server := &Server{projectDatabase: db, onlineClient: remote}
+
+	resp, err := server.UploadRiskToOnlineBatch(context.Background(), &ypb.UploadRiskToOnlineBatchRequest{
+		ToOnlineWhere: &ypb.UploadRiskToOnlineRequest{
+			Token:               "test-token",
+			ProjectName:         "demo",
+			ExternalModule:      "mod",
+			ExternalProjectCode: "proj",
+		},
+		UploadRisksWhere: &ypb.QueryRisksRequest{Search: "alpha", Severity: "high"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), resp.GetSuccessCount())
+	assert.Equal(t, int64(0), resp.GetFailedCount())
+	assert.Equal(t, []string{match.Hash}, got)
+
+	var matched, skipped schema.Risk
+	require.NoError(t, db.Where("hash = ?", match.Hash).First(&matched).Error)
+	assert.True(t, matched.UploadOnline)
+	require.NoError(t, db.Where("hash = ?", other.Hash).First(&skipped).Error)
+	assert.False(t, skipped.UploadOnline)
+}
+
+func TestUploadRiskToOnline(t *testing.T) {
+	t.Run("one failure does not stop the rest", func(t *testing.T) {
+		db := newOnlineTestDB(t, &schema.Risk{})
+		okRisk := &schema.Risk{Hash: "ok-hash", Title: "ok"}
+		badRisk := &schema.Risk{Hash: "bad-hash", Title: "bad"}
+		require.NoError(t, db.Create(okRisk).Error)
+		require.NoError(t, db.Create(badRisk).Error)
+
+		remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+			var body yaklib.QueryUploadRiskOnlineRequest
+			require.NoError(t, json.Unmarshal(raw, &body))
+			var risks []schema.Risk
+			require.NoError(t, json.Unmarshal(body.Content, &risks))
+			require.Len(t, risks, 1)
+			if risks[0].Hash == badRisk.Hash {
+				return utils.Errorf("upload rejected")
+			}
+			return nil
+		}}
+		server := &Server{projectDatabase: db, onlineClient: remote}
+
+		resp, err := server.UploadRiskToOnlineBatch(context.Background(), &ypb.UploadRiskToOnlineBatchRequest{
+			ToOnlineWhere: &ypb.UploadRiskToOnlineRequest{Token: "test-token"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), resp.GetSuccessCount())
+		assert.Equal(t, int64(1), resp.GetFailedCount())
+
+		var uploadedRisk, rejectedRisk schema.Risk
+		require.NoError(t, db.Where("hash = ?", okRisk.Hash).First(&uploadedRisk).Error)
+		assert.True(t, uploadedRisk.UploadOnline)
+		require.NoError(t, db.Where("hash = ?", badRisk.Hash).First(&rejectedRisk).Error)
+		assert.False(t, rejectedRisk.UploadOnline)
+	})
+
+	t.Run("cancel keeps finished risks and stops the rest", func(t *testing.T) {
+		db := newOnlineTestDB(t, &schema.Risk{})
+		var risks []*schema.Risk
+		for i := 0; i < riskUploadConcurrency+3; i++ {
+			risk := &schema.Risk{Hash: fmt.Sprintf("cancel-%02d", i), Title: "cancel"}
+			require.NoError(t, db.Create(risk).Error)
+			risks = append(risks, risk)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		release := make(chan struct{})
+		started := make(chan struct{})
+		var mu sync.Mutex
+		var inflight, calls int
+		remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+			mu.Lock()
+			calls++
+			inflight++
+			if inflight == riskUploadConcurrency {
+				select {
+				case <-started:
+				default:
+					close(started)
+				}
+			}
+			mu.Unlock()
+			<-release
+			mu.Lock()
+			inflight--
+			mu.Unlock()
+			return nil
+		}}
+		server := &Server{projectDatabase: db, onlineClient: remote}
+
+		done := make(chan error, 1)
+		go func() {
+			_, err := server.UploadRiskToOnline(ctx, &ypb.UploadRiskToOnlineRequest{Token: "test-token"})
+			done <- err
+		}()
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatal("upload did not reach concurrency")
+		}
+		cancel()
+		close(release)
+		select {
+		case err := <-done:
+			require.Error(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("upload did not finish")
+		}
+		mu.Lock()
+		assert.Equal(t, riskUploadConcurrency, calls)
+		mu.Unlock()
+
+		for i, risk := range risks {
+			var stored schema.Risk
+			require.NoError(t, db.Where("hash = ?", risk.Hash).First(&stored).Error)
+			if i < riskUploadConcurrency {
+				assert.True(t, stored.UploadOnline)
+			} else {
+				assert.False(t, stored.UploadOnline)
+			}
+		}
+	})
+
+	t.Run("busy is counted and the rest still uploads", func(t *testing.T) {
+		db := newOnlineTestDB(t, &schema.Risk{})
+		for i := 0; i < 2; i++ {
+			risk := &schema.Risk{Hash: fmt.Sprintf("busy-%02d", i), Title: "busy"}
+			require.NoError(t, db.Create(risk).Error)
+		}
+		okRisk := &schema.Risk{Hash: "after-busy", Title: "ok"}
+		require.NoError(t, db.Create(okRisk).Error)
+
+		var mu sync.Mutex
+		calls := 0
+		remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+			mu.Lock()
+			calls++
+			mu.Unlock()
+			var body yaklib.QueryUploadRiskOnlineRequest
+			require.NoError(t, json.Unmarshal(raw, &body))
+			var risks []schema.Risk
+			require.NoError(t, json.Unmarshal(body.Content, &risks))
+			require.Len(t, risks, 1)
+			if risks[0].Title == "busy" {
+				return utils.Errorf("上传繁忙，请稍后重试")
+			}
+			return nil
+		}}
+		server := &Server{projectDatabase: db, onlineClient: remote}
+
+		resp, err := server.UploadRiskToOnlineBatch(context.Background(), &ypb.UploadRiskToOnlineBatchRequest{
+			ToOnlineWhere: &ypb.UploadRiskToOnlineRequest{Token: "test-token"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 3, calls)
+		assert.Equal(t, int64(1), resp.GetSuccessCount())
+		assert.Equal(t, int64(2), resp.GetFailedCount())
+
+		var stored schema.Risk
+		require.NoError(t, db.Where("hash = ?", okRisk.Hash).First(&stored).Error)
+		assert.True(t, stored.UploadOnline)
+		var busyRisk schema.Risk
+		require.NoError(t, db.Where("hash = ?", "busy-00").First(&busyRisk).Error)
+		assert.False(t, busyRisk.UploadOnline)
+	})
+
+	t.Run("each risk uploads on its own", func(t *testing.T) {
+		db := newOnlineTestDB(t, &schema.Risk{})
+		first := &schema.Risk{Hash: "split-a", Title: "a"}
+		second := &schema.Risk{Hash: "split-b", Title: "b"}
+		require.NoError(t, db.Create(first).Error)
+		require.NoError(t, db.Create(second).Error)
+
+		var mu sync.Mutex
+		calls := 0
+		remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+			var body yaklib.QueryUploadRiskOnlineRequest
+			require.NoError(t, json.Unmarshal(raw, &body))
+			var risks []schema.Risk
+			require.NoError(t, json.Unmarshal(body.Content, &risks))
+			require.Len(t, risks, 1)
+			mu.Lock()
+			calls++
+			mu.Unlock()
+			return nil
+		}}
+		server := &Server{projectDatabase: db, onlineClient: remote}
+
+		resp, err := server.UploadRiskToOnlineBatch(context.Background(), &ypb.UploadRiskToOnlineBatchRequest{
+			ToOnlineWhere: &ypb.UploadRiskToOnlineRequest{Token: "test-token"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 2, calls)
+		assert.Equal(t, int64(2), resp.GetSuccessCount())
+		assert.Equal(t, int64(0), resp.GetFailedCount())
+
+		for _, hash := range []string{first.Hash, second.Hash} {
+			var stored schema.Risk
+			require.NoError(t, db.Where("hash = ?", hash).First(&stored).Error)
+			assert.True(t, stored.UploadOnline)
+		}
+	})
+
+	t.Run("single oversized risk is skipped", func(t *testing.T) {
+		db := newOnlineTestDB(t, &schema.Risk{})
+		huge := &schema.Risk{Hash: "huge", Title: strings.Repeat("a", onlineUploadBodyMaxBytes)}
+		small := &schema.Risk{Hash: "small", Title: "small"}
+		require.NoError(t, db.Create(huge).Error)
+		require.NoError(t, db.Create(small).Error)
+
+		calls := 0
+		remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+			calls++
+			var body yaklib.QueryUploadRiskOnlineRequest
+			require.NoError(t, json.Unmarshal(raw, &body))
+			assert.NotContains(t, string(body.Content), huge.Hash)
+			return nil
+		}}
+		server := &Server{projectDatabase: db, onlineClient: remote}
+
+		resp, err := server.UploadRiskToOnlineBatch(context.Background(), &ypb.UploadRiskToOnlineBatchRequest{
+			ToOnlineWhere: &ypb.UploadRiskToOnlineRequest{Token: "test-token"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 1, calls)
+		assert.Equal(t, int64(1), resp.GetSuccessCount())
+		assert.Equal(t, int64(1), resp.GetFailedCount())
+
+		var skipped, uploaded schema.Risk
+		require.NoError(t, db.Where("hash = ?", huge.Hash).First(&skipped).Error)
+		assert.False(t, skipped.UploadOnline)
+		require.NoError(t, db.Where("hash = ?", small.Hash).First(&uploaded).Error)
+		assert.True(t, uploaded.UploadOnline)
+	})
+
+	t.Run("token expiry stops the rest", func(t *testing.T) {
+		db := newOnlineTestDB(t, &schema.Risk{})
+		var risks []*schema.Risk
+		for i := 0; i < riskUploadConcurrency+2; i++ {
+			risk := &schema.Risk{Hash: fmt.Sprintf("token-%02d", i), Title: "token"}
+			require.NoError(t, db.Create(risk).Error)
+			risks = append(risks, risk)
+		}
+
+		release := make(chan struct{})
+		started := make(chan struct{})
+		var mu sync.Mutex
+		var inflight, calls int
+		remote := &stubOnlineService{upload: func(ctx context.Context, token string, raw []byte, url string) error {
+			mu.Lock()
+			calls++
+			inflight++
+			if inflight == riskUploadConcurrency {
+				select {
+				case <-started:
+				default:
+					close(started)
+				}
+			}
+			mu.Unlock()
+			<-release
+			return utils.Errorf("token过期")
+		}}
+		server := &Server{projectDatabase: db, onlineClient: remote}
+
+		done := make(chan error, 1)
+		go func() {
+			_, err := server.UploadRiskToOnlineBatch(context.Background(), &ypb.UploadRiskToOnlineBatchRequest{
+				ToOnlineWhere: &ypb.UploadRiskToOnlineRequest{Token: "test-token"},
+			})
+			done <- err
+		}()
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatal("upload did not reach concurrency")
+		}
+		close(release)
+		select {
+		case err := <-done:
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "token过期")
+		case <-time.After(5 * time.Second):
+			t.Fatal("upload did not finish")
+		}
+		mu.Lock()
+		assert.Equal(t, riskUploadConcurrency, calls)
+		mu.Unlock()
+
+		for _, risk := range risks {
+			var stored schema.Risk
+			require.NoError(t, db.Where("hash = ?", risk.Hash).First(&stored).Error)
+			assert.False(t, stored.UploadOnline)
+		}
+	})
 }

@@ -1221,10 +1221,12 @@ func (s *Server) HTTPFlowsToOnlineBatch(ctx context.Context, req *ypb.HTTPFlowsT
 	}, nil
 }
 
+const httpflowUploadConcurrency = 2
+
 func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *ypb.HTTPFlowsToOnlineRequest) (success []string, failed []string, err error) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	limit := make(chan struct{}, 20)
+	limit := make(chan struct{}, httpflowUploadConcurrency)
 	var (
 		wg           sync.WaitGroup
 		mu           sync.Mutex
@@ -1237,7 +1239,7 @@ func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *
 
 	for httpFlow := range ret {
 		total++
-		if tokenExpired {
+		if tokenExpired || cancelCtx.Err() != nil {
 			break
 		}
 
@@ -1285,6 +1287,9 @@ func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *
 					tokenExpired = true
 					tokenErr = err
 					cancel() // 取消所有后续操作
+					return
+				}
+				if cancelCtx.Err() != nil {
 					return
 				}
 				log.Errorf("httpflow to online failed: %s", err.Error())

@@ -25,13 +25,19 @@ type UploadOnlineRequest struct {
 
 func (s *OnlineClient) UploadToOnline(ctx context.Context,
 	token string, raw []byte, urlStr string) error {
-	rsp, _, err := poc.DoPOST(
-		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), urlStr),
+	opts := []poc.PocConfigOption{
 		poc.WithReplaceHttpPacketHeader("Authorization", token),
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
 		poc.WithSave(false),
+	}
+	if ctx != nil {
+		opts = append(opts, poc.WithContext(ctx))
+	}
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), urlStr),
+		opts...,
 	)
 	if err != nil {
 		return utils.Wrapf(err, "UploadToOnline failed: http error")
