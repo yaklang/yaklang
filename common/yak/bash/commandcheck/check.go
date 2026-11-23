@@ -2,24 +2,19 @@ package commandcheck
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
-
-//go:embed rules/*.sf
-var guardRuleFS embed.FS
 
 const (
 	// maxCommandBytes bounds the SSA build. The AI's bash tool usually receives
@@ -46,31 +41,16 @@ var (
 )
 
 func loadGuardRules() {
-	entries, err := fs.ReadDir(guardRuleFS, "rules")
+	rules, err := sfbuildin.LoadEmbeddedRulesByLanguage(string(ssaconfig.BASH), schema.SFR_SEVERITY_HIGH)
 	if err != nil {
-		guardErr = fmt.Errorf("read embedded bash guard rules: %w", err)
+		guardErr = fmt.Errorf("load embedded bash guard rules: %w", err)
 		return
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".sf") {
-			continue
-		}
-		raw, err := guardRuleFS.ReadFile("rules/" + entry.Name())
-		if err != nil {
-			guardErr = fmt.Errorf("read bash guard rule %s: %w", entry.Name(), err)
-			return
-		}
-		rule, err := sfdb.CheckSyntaxFlowRuleContent(string(raw))
-		if err != nil {
-			guardErr = fmt.Errorf("compile bash guard rule %s: %w", entry.Name(), err)
-			return
-		}
-		guardRules = append(guardRules, rule)
+	if len(rules) == 0 {
+		guardErr = fmt.Errorf("no embedded bash guard high rules")
+		return
 	}
-	if len(guardRules) == 0 {
-		guardErr = fmt.Errorf("no embedded bash guard rules")
-	}
+	guardRules = rules
 }
 
 // CheckCommand parses one shell command and runs the embedded high-severity

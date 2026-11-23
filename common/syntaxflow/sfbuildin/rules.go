@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,50 @@ var ruleFSWithHash resources_monitor.ResourceMonitor
 
 func GetRuleFS() *embed.FS {
 	return nil
+}
+
+// LoadEmbeddedRulesByLanguage compiles rules from the embedded snapshot
+// without reading or writing the profile database. Paths are pre-filtered by
+// language so callers such as the bash preflight guard do not pay for parsing
+// unrelated rule sets.
+func LoadEmbeddedRulesByLanguage(language string, severities ...schema.SyntaxFlowSeverity) ([]*schema.SyntaxFlowRule, error) {
+	language = strings.ToLower(strings.TrimSpace(language))
+	if language == "" {
+		return nil, utils.Error("language is empty")
+	}
+	if ruleFSWithHash == nil {
+		return nil, utils.Error("embedded rule filesystem is not initialized")
+	}
+	wanted := normalizeEmbeddedRuleSeverities(severities)
+
+	var rules []*schema.SyntaxFlowRule
+	err := filesys.Recursive(".", filesys.WithFileSystem(ruleFSWithHash), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
+		if info == nil || info.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".sf") {
+			return nil
+		}
+		if !embeddedRulePathMatchesLanguage(path, language) {
+			return nil
+		}
+		raw, err := ruleFSWithHash.ReadFile(path)
+		if err != nil {
+			return utils.Wrapf(err, "read embedded rule %s", path)
+		}
+		rule, err := compileEmbeddedRuleForLanguage(path, string(raw), language, wanted)
+		if err != nil {
+			return err
+		}
+		if rule != nil {
+			rules = append(rules, rule)
+		}
+		return nil
+	}))
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].RuleName < rules[j].RuleName
+	})
+	return rules, nil
 }
 
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
