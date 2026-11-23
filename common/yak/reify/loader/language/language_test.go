@@ -107,6 +107,26 @@ func TestMergeGoSymbolsKeepsExactSizeAndProvenance(t *testing.T) {
 	}
 }
 
+func TestMergeKeepsGoIdentity(t *testing.T) {
+	a := metadataArtifact(t, ".text", nil)
+	a.Image.Symbols = []symbol.Symbol{{Name: "pkg.F[go.shape.int]", Address: 0x1000, Size: 12, Kind: symbol.SymbolFunction}}
+	identity := &symbol.Identity{Package: "pkg", Function: "F", Family: "pkg.F[T]", TypeArgs: []string{"int"}, Generic: true}
+	mergeSymbols(a, []symbol.Symbol{{
+		Name: "pkg.F[int]", Mangled: "pkg.F[go.shape.int]", Address: 0x1000, Size: 32,
+		Kind: symbol.SymbolFunction, Source: symbol.SourcePCLNTab, Identity: identity,
+	}})
+	if len(a.Image.Symbols) != 1 {
+		t.Fatalf("symbols = %+v", a.Image.Symbols)
+	}
+	got := a.Image.Symbols[0]
+	if got.Name != "pkg.F[int]" || got.Mangled != "pkg.F[go.shape.int]" || got.Size != 12 || got.Source != symbol.SourcePCLNTab {
+		t.Fatalf("merged symbol = %+v", got)
+	}
+	if got.Identity == nil || got.Identity.Family != "pkg.F[T]" || !got.Identity.Generic {
+		t.Fatalf("identity = %+v", got.Identity)
+	}
+}
+
 func TestMergeKeepsSameNameAtDifferentAddresses(t *testing.T) {
 	a := metadataArtifact(t, ".text", nil)
 	mergeSymbols(a, []symbol.Symbol{

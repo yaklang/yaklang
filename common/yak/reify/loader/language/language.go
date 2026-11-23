@@ -174,6 +174,9 @@ func mergeSymbols(a *core.Artifact, recovered []symbol.Symbol) {
 			}
 			existing.Source = s.Source
 			existing.Convention = s.Convention
+			if s.Identity != nil {
+				existing.Identity = s.Identity
+			}
 			if existing.Size == 0 {
 				existing.Size = s.Size
 			}
