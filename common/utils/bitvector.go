@@ -22,6 +22,14 @@ import (
 // bit). Both forms iterate in ascending index order, so callers cannot tell
 // them apart.
 //
+// Why not []bool: that is one byte per flag, 64x the dense form. Why uint64
+// and not uint8/uint16 words: smaller words shrink the tail waste of a short
+// dense vector, but they still grow with the index, so the sparse form is what
+// removes that cost; on dense data they only make Or/ForEach touch 4x or 8x
+// more elements. Why not sparse only: a dense set costs 4 bytes per bit in the
+// sparse form against 1 bit in the word form, and `Or` of two million-bit
+// vectors would allocate megabytes.
+//
 // Copy-on-write: Clone() returns a vector that SHARES the backing slice
 // instead of copying it. The shared flag marks a vector whose backing slice may
 // be aliased by at least one other vector; any mutation (Set / Or / promotion)
