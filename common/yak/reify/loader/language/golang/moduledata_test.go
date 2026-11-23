@@ -171,3 +171,47 @@ func TestTextStartFallsBackToTextSection(t *testing.T) {
 		t.Fatalf("text base = 0x%x, want .text", base)
 	}
 }
+
+func TestModuleDataLimitAllowsLargePERData(t *testing.T) {
+	rdata := core.Section{Name: ".rdata", FileSize: 70 << 20}
+	if got := moduleDataLimit(rdata, core.FormatPE); got != maxNamedPclntabSize {
+		t.Fatalf("PE .rdata scan limit = %d", got)
+	}
+	if got := moduleDataLimit(rdata, core.FormatELF); got != maxMetadataSize {
+		t.Fatalf("ELF .rdata scan limit = %d", got)
+	}
+}
+
+func TestModuleDataSourceSectionNames(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want bool
+	}{
+		{".noptrdata", true},
+		{".data.rel.ro", true},
+		{".rdata", true},
+		{"__DATA,__data", true},
+		{"__DATA_CONST,__const", true},
+		{"__DATA,__bss", true},
+		{"__TEXT,__text", false},
+		{"__TEXT,__gopclntab", false},
+		{".gopclntab", false},
+	} {
+		if got := moduleDataSourceSection(core.Section{Name: tc.name}); got != tc.want {
+			t.Errorf("moduleDataSourceSection(%q) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestTextStartFallsBackToMachOTextSection(t *testing.T) {
+	a := &core.Artifact{Image: &core.Image{Sections: []core.Section{
+		{Name: "__TEXT,__text", VirtualAddress: 0x8000, FileSize: 0x100, MemorySize: 0x100},
+	}}}
+	base, err := textStart(a, pclnTables{}, binary.LittleEndian)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base != 0x8000 {
+		t.Fatalf("text base = 0x%x, want __TEXT,__text", base)
+	}
+}

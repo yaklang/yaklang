@@ -24,10 +24,18 @@ const (
 )
 
 // metadataLimit returns how large one candidate section may be. A name that
-// only looks like a Go table by convention (.rdata, .data.rel.ro) keeps the
-// small limit, because those sections hold unrelated data too.
-func metadataLimit(name string) uint64 {
+// only looks like a Go table by convention (.data.rel.ro) keeps the small
+// limit, because it holds unrelated data too. PE .rdata is the exception: the
+// PE linker puts the Go function table there and a large engine exceeds the
+// generic ceiling.
+func metadataLimit(name string, format core.Format) uint64 {
 	if isGoTableSection(name) {
+		return maxNamedPclntabSize
+	}
+	// A PE image has no named Go table: the linker merges .gopclntab into
+	// .rdata. A large engine therefore has a .rdata far beyond the generic
+	// fallback ceiling, and the function table is in that section.
+	if format == core.FormatPE && name == ".rdata" {
 		return maxNamedPclntabSize
 	}
 	return maxMetadataSize
@@ -148,7 +156,7 @@ func (Golang) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 	}
 	var lastErr error
 	for _, s := range candidates {
-		limit := metadataLimit(s.Name)
+		limit := metadataLimit(s.Name, a.Format)
 		if s.FileSize == 0 || s.FileSize > limit {
 			lastErr = fmt.Errorf("section %s is empty or exceeds %d bytes", s.Name, limit)
 			continue

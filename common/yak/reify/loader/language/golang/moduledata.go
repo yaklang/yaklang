@@ -3,6 +3,7 @@ package golang
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
@@ -101,7 +102,7 @@ func recoverModuleData(a *core.Artifact, tables pclnTables, order binary.ByteOrd
 		}
 	}
 	for _, section := range a.Image.Sections {
-		if section.Name == ".go.module" || section.FileSize < moduleDataMinimumSize || section.FileSize > maxMetadataSize {
+		if section.Name == ".go.module" || section.FileSize < moduleDataMinimumSize || section.FileSize > moduleDataLimit(section, a.Format) {
 			continue
 		}
 		if !moduleDataSourceSection(section) {
@@ -114,12 +115,30 @@ func recoverModuleData(a *core.Artifact, tables pclnTables, order binary.ByteOrd
 	return moduleData{}, false
 }
 
+// moduleDataLimit allows a PE .rdata merge to be scanned for module data. The
+// structure itself is small, but the section also holds the function table and
+// large read-only data, so the generic metadata ceiling is too small.
+func moduleDataLimit(section core.Section, format core.Format) uint64 {
+	if format == core.FormatPE && section.Name == ".rdata" {
+		return maxNamedPclntabSize
+	}
+	return maxMetadataSize
+}
+
 // moduleDataSourceSection reports whether a section can hold module data. The
 // structure is static data, so code and compiler tables are excluded.
 func moduleDataSourceSection(section core.Section) bool {
 	switch section.Name {
-	case ".noptrdata", ".data", ".data.rel.ro", ".rdata", ".go.module", "__data", "__const":
+	case ".noptrdata", ".data", ".data.rel.ro", ".rdata", ".go.module":
 		return true
+	}
+	// Mach-O section names are "<segment>,<section>". __DATA and __DATA_CONST
+	// hold the writable and read-only data that module metadata can land in.
+	if index := strings.LastIndexByte(section.Name, ','); index >= 0 {
+		switch section.Name[index+1:] {
+		case "__data", "__const", "__bss", "__common":
+			return true
+		}
 	}
 	return false
 }
@@ -207,7 +226,10 @@ func textStart(a *core.Artifact, tables pclnTables, order binary.ByteOrder) (uin
 		return found.Text, nil
 	}
 	for _, section := range a.Image.Sections {
-		if section.Name == ".text" && section.VirtualAddress != 0 {
+		if section.VirtualAddress == 0 {
+			continue
+		}
+		if section.Name == ".text" || section.Name == "__TEXT,__text" {
 			return section.VirtualAddress, nil
 		}
 	}
