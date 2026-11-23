@@ -68,20 +68,6 @@ func TestBuildFrameDisplayNodesNestsPayloadAndSummarizesLayers(t *testing.T) {
 	require.Equal(t, []DisplayRange{{BitOffset: int64(payloadOffset * 8), BitLength: int64(len(payload) * 8)}}, payloadNode.Ranges)
 }
 
-func TestBuildProtocolFieldDisplayNodesPreservesNestedShape(t *testing.T) {
-	nodes := BuildProtocolFieldDisplayNodes(map[string]any{
-		"Header": map[string]any{
-			"Host": "example.com",
-			"Port": uint16(80),
-		},
-	})
-	require.Len(t, nodes, 1)
-	require.Equal(t, "Header", nodes[0].Name)
-	require.Equal(t, []string{"Host", "Port"}, displayNodeNames(nodes[0].Children))
-	require.Equal(t, "example.com", nodes[0].Children[0].DisplayValue)
-	require.Equal(t, "80", nodes[0].Children[1].DisplayValue)
-}
-
 func findDisplayRoot(nodes []DisplayNode, name string) *DisplayNode {
 	for i := range nodes {
 		if nodes[i].Name == name {

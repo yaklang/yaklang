@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/gopacket/gopacket"
@@ -146,35 +145,4 @@ func BuildFrameDisplayNodes(input FrameDisplayInput) []DisplayNode {
 		result = append(result, payload)
 	}
 	return result
-}
-
-// BuildProtocolFieldDisplayNodes converts saved parser fields into a stable
-// fallback tree. Map keys are sorted because the saved JSON object no longer
-// retains parser order.
-func BuildProtocolFieldDisplayNodes(fields map[string]any) []DisplayNode {
-	keys := make([]string, 0, len(fields))
-	for key := range fields {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	result := make([]DisplayNode, 0, len(keys))
-	for _, key := range keys {
-		result = append(result, savedProtocolFieldNode(key, fields[key]))
-	}
-	return result
-}
-
-func savedProtocolFieldNode(name string, value any) DisplayNode {
-	switch v := value.(type) {
-	case map[string]any:
-		return DisplayNode{Name: name, Children: BuildProtocolFieldDisplayNodes(v)}
-	case []any:
-		children := make([]DisplayNode, 0, len(v))
-		for index, item := range v {
-			children = append(children, savedProtocolFieldNode(fmt.Sprintf("[%d]", index), item))
-		}
-		return DisplayNode{Name: name, Children: children}
-	default:
-		return displayLeaf(name, value, 0, 0)
-	}
 }
