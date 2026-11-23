@@ -180,6 +180,21 @@ func TestParseInstanceRendersHashedShape(t *testing.T) {
 	}
 }
 
+func TestInstanceKeepsRawTypeArgs(t *testing.T) {
+	hash := strings.Repeat("5c1f7d72", 8)
+	instance := ParseInstance("pkg.F[go.shape.int,go.shape." + hash + "]")
+	if strings.Join(instance.RawTypeArgs, "|") != "go.shape.int|go.shape."+hash {
+		t.Fatalf("raw type args = %q", instance.RawTypeArgs)
+	}
+	if strings.Join(instance.TypeArgs, "|") != "int|shape#5c1f7d72" {
+		t.Fatalf("display type args = %q", instance.TypeArgs)
+	}
+	nested := ParseInstance("pkg.F[go.shape.[]go.shape.int]")
+	if strings.Join(nested.RawTypeArgs, "|") != "go.shape.[]go.shape.int" {
+		t.Fatalf("nested raw type args = %q", nested.RawTypeArgs)
+	}
+}
+
 func TestParseInstanceKeepsFamilyStable(t *testing.T) {
 	for _, name := range []string{
 		"pkg.F[go.shape.int]",

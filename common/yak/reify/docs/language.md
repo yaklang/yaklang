@@ -102,7 +102,7 @@ Raw   main.(*Box[go.shape.int]).Get
 Name  main.(*Box[int]).Get
 ```
 
-`TypeArgs` 与 `Receiver` 同样使用展示形式。只有 64 位十六进制哈希、没有类型名的形状显示为 `shape#<前 8 位>`，避免把整段哈希写进每个符号名。
+`TypeArgs` 与 `Receiver` 同样使用展示形式。`RawTypeArgs` 保留每个实参的编译器原文（含 `go.shape.`），供审计统计哈希形状。只有 64 位十六进制哈希、没有类型名的形状显示为 `shape#<前 8 位>`，避免把整段哈希写进每个符号名。
 
 `Family` 是分组键，不是展示名：把深度零的方括号组替换为 `[T]`，同一泛型函数的实例共享它。
 
@@ -330,6 +330,7 @@ REIFY_TEST_OUTPUT_DIR="$RUN/tests" scripts/ssa-test.sh -count=1 -timeout=10m ./c
 | `TestVersionAndABI` / `TestFuncSizeTrimsOnlyAlignmentFill` / `TestPclntabRejectsUnboundedCount` | Go 版本、ABI、填充剥离与坏表拒绝 |
 | `TestParseInstanceSplitsGenericNames` | 泛型函数、泛型方法、闭包、切片/数组/结构体实参、保留名；Name/Raw/Receiver/TypeArgs 展示形式 |
 | `TestParseInstanceRendersHashedShape` | 无类型名的哈希形状显示为 `shape#<8 位>` |
+| `TestInstanceKeepsRawTypeArgs` | `RawTypeArgs` 保留 `go.shape.` 原文，展示实参同时可得 |
 | `TestParseInstanceKeepsFamilyStable` | 族键幂等；同族实例共享键；不同方法不共享 |
 | `TestInstanceIdentity` | `Symbol.Identity` 的包、接收者、类型实参、闭包与 family |
 | `TestPruneUnusedParametersKeepsParenthesizedName` | 带括号的 Go 方法名不被参数裁剪截断 |
