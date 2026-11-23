@@ -460,8 +460,11 @@ func BuildCompileExcludeFunc(userPatterns []string, basePath string, includeDefa
 			base := strings.TrimSuffix(pattern, "/")
 			return []string{base, base + "/**"}
 		}
-		// "dir/**" means the directory and its contents. The directory walk
-		// asks about "dir" itself (SkipDir), so the bare prefix must match too.
+		// "dir/**" means the directory and its contents. glob requires the
+		// slash (`"a/**"` does not match `"a"`), and the directory walk asks
+		// about "a" itself to prune it (SkipDir), so the bare prefix must be a
+		// pattern of its own. No deeper variant is added: "a/**" already
+		// matches every descendant, so "a/**/**" would be the same set.
 		if strings.HasSuffix(pattern, "/**") {
 			return []string{pattern, strings.TrimSuffix(pattern, "/**")}
 		}
