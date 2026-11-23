@@ -444,8 +444,10 @@ func (r *stageOutcomeRecorder) Outcomes() []StageOutcome {
 type ProjectResult struct {
 	Stages      []StageOutcome `json:"stages"`
 	ProgramName string         `json:"program_name,omitempty"`
-	Succeeded   bool           `json:"succeeded"`
-	Error       string         `json:"error,omitempty"`
+	// LanguagePrograms lists reloadable programs produced by an all-language scan.
+	LanguagePrograms map[ssaconfig.Language]string `json:"language_programs,omitempty"`
+	Succeeded        bool                          `json:"succeeded"`
+	Error            string                        `json:"error,omitempty"`
 	// IncompleteStages is true when the caller asked for detection stages
 	// that never started. The run can still Succeeded when an earlier
 	// detection stage completed.

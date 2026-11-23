@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -70,6 +71,14 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	}
 	defer cfg.Cleanup()
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
+	if cfg.allLanguages {
+		if cfg.GetLanguage() != "" {
+			return ProjectResult{}, utils.Error("--all-language and --language/-l are mutually exclusive (including the config language)")
+		}
+		if !hasCodeSource(cfg) || len(cfg.Programs) > 0 {
+			return ProjectResult{}, utils.Error("--all-language requires a source target, not an existing program")
+		}
+	}
 	// A project scan defaults to keeping findings in memory: the callbacks
 	// stream them and no database consumer is registered. A caller that
 	// explicitly asks for database results gets the scan's database saver
@@ -185,7 +194,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	// and when inspect also ran it reuses the collected directory.
 	sourceReady := hasProgram || localDir != ""
 	emit(StageCollect, 0, nil)
-	if !sourceReady && wantSource && hasCode {
+	if !sourceReady && (wantSource || cfg.allLanguages) && hasCode {
 		dir, err := CollectCodeSourceDir(ctx, cfg.Config)
 		if err != nil {
 			report(StageCollect, err)
@@ -201,6 +210,14 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	if sourceReady {
 		emit(StageCollect, 1, nil)
 		report(StageCollect, nil)
+	}
+
+	compileConfigs := []*ssaconfig.Config{cfg.Config}
+	if cfg.allLanguages {
+		compileConfigs, err = projectLanguageConfigs(cfg.Config)
+		if err != nil {
+			return finishScanProject(cfg, recorder, programName, err)
+		}
 	}
 
 	// Source stage: a live source path is scanned on its own. Without a path
@@ -225,6 +242,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 	// nothing is compiled the struct rules have no stage and run with the
 	// program below.
 	ranStructStage := false
+	var compileErrors error
 	if needCompile {
 		// A compile serves whichever product stage asked for it. Compile-only
 		// runs report StageCompile; review runs own it because struct rules run
@@ -247,88 +265,107 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 			emit(StageCollect, 0.5, nil)
 		}
 		collectClosed := sourceReady
-		var compileOpts []ssaconfig.Option
-		if wantReview {
-			compileOpts = structCompileOptions(cfg)
-		}
-		compileOpts = append(compileOpts, ssaapi.WithProcess(func(msg string, process float64) {
-			scaleInfo := parseCompileScale(msg)
-			if scaleInfo != nil {
-				recorder.observeScale(scaleInfo)
-			}
-			info := scaleInfo
-			if !sourceReady && !collectClosed {
-				if scaleInfo != nil {
-					// Filesystem scan after clone/extract: the tree is here, so
-					// collect ends and the remaining compile belongs to review.
-					emit(StageCollect, 1, scaleInfo)
-					report(StageCollect, nil)
-					collectClosed = true
-					if wantReview {
-						emit(StageReview, 0, scaleInfo)
-					} else if compileOnly {
-						emit(StageCompile, process, scaleInfo)
-					}
-					return
-				}
-				emit(StageCollect, 0.5+process*0.5, info)
-				return
-			}
-			if compileOnly {
-				emit(StageCompile, process, info)
-			} else if wantReview {
-				emit(StageReview, process, info)
-			}
-		}))
-		prog, err := compileProductProject(ctx, cfg.Config, compileOpts...)
-		if !sourceReady {
-			if isSourceCollectError(err) {
-				if !collectClosed {
-					report(StageCollect, err)
-				}
+		for languageIndex, compileConfig := range compileConfigs {
+			if err := ctx.Err(); err != nil {
 				return finishScanProject(cfg, recorder, programName, err)
 			}
-			if !collectClosed {
-				report(StageCollect, nil)
-				emit(StageCollect, 1, nil)
-				collectClosed = true
+			var compileOpts []ssaconfig.Option
+			if wantReview {
+				compileOpts = structCompileOptions(cfg)
 			}
-		}
-		captureProgramEvidence(recorder, prog)
-		if prog != nil {
-			diagnostic := prog.Program.CompileDiagnostics()
-			if diagnostic.Incomplete() {
-				recorder.mu.Lock()
-				if recorder.compileDiagnostics == nil {
-					recorder.compileDiagnostics = make(map[ProductStage]ssa.CompileDiagnostics)
+			compileOpts = append(compileOpts, ssaapi.WithProcess(func(msg string, process float64) {
+				process = (float64(languageIndex) + process) / float64(len(compileConfigs))
+				scaleInfo := parseCompileScale(msg)
+				if scaleInfo != nil {
+					recorder.observeScale(scaleInfo)
 				}
-				recorder.compileDiagnostics[compileStage] = diagnostic
+				info := scaleInfo
+				if !sourceReady && !collectClosed {
+					if scaleInfo != nil {
+						// Filesystem scan after clone/extract: the tree is here, so
+						// collect ends and the remaining compile belongs to review.
+						emit(StageCollect, 1, scaleInfo)
+						report(StageCollect, nil)
+						collectClosed = true
+						if wantReview {
+							emit(StageReview, 0, scaleInfo)
+						} else if compileOnly {
+							emit(StageCompile, process, scaleInfo)
+						}
+						return
+					}
+					emit(StageCollect, 0.5+process*0.5, info)
+					return
+				}
+				if compileOnly {
+					emit(StageCompile, process, info)
+				} else if wantReview {
+					emit(StageReview, process, info)
+				}
+			}))
+			prog, err := compileProductProject(ctx, compileConfig, compileOpts...)
+			if !sourceReady {
+				if isSourceCollectError(err) {
+					if !collectClosed {
+						report(StageCollect, err)
+					}
+					return finishScanProject(cfg, recorder, programName, err)
+				}
+				if !collectClosed {
+					report(StageCollect, nil)
+					emit(StageCollect, 1, nil)
+					collectClosed = true
+				}
+			}
+			// A language the tree does not contain is not a failure: the
+			// builder matched no file, so there is nothing to scan for it.
+			if errors.Is(err, ssaapi.ErrNoFoundCompiledFile) {
+				log.Infof("[code-scan] language %s: no compilable file, skipped", compileConfig.GetLanguage())
+				continue
+			}
+			captureProgramEvidence(recorder, prog)
+			if prog != nil && prog.Program != nil {
+				diagnostic := prog.Program.CompileDiagnostics()
+				recordCompileDiagnostics(recorder, compileStage, diagnostic)
 				if wantAnalyze {
-					recorder.compileDiagnostics[StageAnalyze] = diagnostic
+					recordCompileDiagnostics(recorder, StageAnalyze, diagnostic)
 				}
-				recorder.mu.Unlock()
 			}
-		}
-		if wantReview && err == nil {
-			emitStructResults(cfg, prog)
-			recorder.observeStruct(prog)
-			emit(StageReview, 1, mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfo(prog)))
-			ranStructStage = true
+			if wantReview && err == nil {
+				emitStructResults(cfg, prog)
+				recorder.observeStruct(prog)
+				emit(StageReview, float64(languageIndex+1)/float64(len(compileConfigs)), mergeStageInfo(scaleInfoFromRecorder(recorder), structRuleProcessInfo(prog)))
+				ranStructStage = true
+			}
+			if err != nil {
+				if !cfg.allLanguages {
+					if compileStage != "" {
+						report(compileStage, err)
+					}
+					return finishScanProject(cfg, recorder, programName, err)
+				}
+				languageError := utils.Wrapf(err, "compile language %s", compileConfig.GetLanguage())
+				compileErrors = utils.JoinErrors(compileErrors, languageError)
+				log.Errorf("[code-scan] %v; continuing other languages", languageError)
+				continue
+			}
+			if prog != nil && !cfg.allLanguages {
+				if name := strings.TrimSpace(prog.GetProgramName()); name != "" {
+					programName = name
+				}
+			}
+			// SaveToDatabase closes the compile cache. SSA must load a DBRead
+			// program; scanning the closed DBWrite program skips every SSA rule.
+			if prog != nil {
+				cfg.Programs = append(cfg.Programs, reloadCompiledProgram(prog))
+			}
 		}
 		if compileStage != "" {
-			report(compileStage, err)
+			report(compileStage, compileErrors)
 		}
-		if err != nil {
-			return finishScanProject(cfg, recorder, programName, err)
+		if len(cfg.Programs) == 0 {
+			return finishScanProject(cfg, recorder, programName, utils.JoinErrors(compileErrors, utils.Error("no language compiled successfully")))
 		}
-		if prog != nil {
-			if name := strings.TrimSpace(prog.GetProgramName()); name != "" {
-				programName = name
-			}
-		}
-		// SaveToDatabase closes the compile cache. SSA must load a DBRead
-		// program; scanning the closed DBWrite program skips every SSA rule.
-		cfg.Programs = append(cfg.Programs, reloadCompiledProgram(prog))
 		if compileOnly {
 			emit(StageCompile, 1, scaleInfoFromRecorder(recorder))
 		}
@@ -374,7 +411,7 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 			return finishScanProject(cfg, recorder, programName, err)
 		}
 	}
-	return finishScanProject(cfg, recorder, programName, nil)
+	return finishScanProject(cfg, recorder, programName, compileErrors)
 }
 
 // finishScanProject decides the aggregate result and publishes the terminal
@@ -401,6 +438,14 @@ func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName 
 		result.TotalBytes = scale.TotalBytes
 		result.TotalLines = scale.TotalLines
 		result.SourceStatistics = recorder.SourceStatistics()
+	}
+	if cfg.allLanguages {
+		result.LanguagePrograms = make(map[ssaconfig.Language]string)
+		for _, prog := range cfg.Programs {
+			if prog != nil {
+				result.LanguagePrograms[prog.GetLanguage()] = prog.GetProgramName()
+			}
+		}
 	}
 	result.SkippedStages = skippedRequestedStages(resolveProductModes(cfg), result.Stages)
 	result.IncompleteStages = len(result.SkippedStages) > 0

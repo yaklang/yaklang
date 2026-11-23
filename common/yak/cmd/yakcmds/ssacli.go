@@ -1472,6 +1472,10 @@ Exports structured report (sarif/irify).`,
 			Name:  "language,l",
 			Usage: "source language (auto-detect when omitted)",
 		},
+		cli.BoolFlag{
+			Name:  "all-language",
+			Usage: "compile every supported language once and scan each program; mutually exclusive with --language/-l",
+		},
 
 		cli.BoolFlag{
 			Name:  "memory,mem",
@@ -1573,6 +1577,9 @@ Exports structured report (sarif/irify).`,
 		},
 	},
 	Action: func(c *cli.Context) (e error) {
+		if c.Bool("all-language") && c.IsSet("language") {
+			return utils.Error("--all-language and --language/-l are mutually exclusive")
+		}
 		defer func() {
 			log.Infof("code scan done")
 			if err := recover(); err != nil {
@@ -1694,6 +1701,7 @@ Exports structured report (sarif/irify).`,
 			modes = []string{syntaxflow_scan.SourceMode, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode}
 		}
 		scanOpt = append(scanOpt, syntaxflow_scan.WithMode(modes...))
+		scanOpt = append(scanOpt, syntaxflow_scan.WithAllLanguages(c.Bool("all-language")))
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithReporter(reportInstance),
