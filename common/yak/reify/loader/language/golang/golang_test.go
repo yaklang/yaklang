@@ -130,13 +130,21 @@ func FuzzPCLNTab(f *testing.F) {
 }
 
 func TestMetadataLimitAllowsLargeNamedPclntab(t *testing.T) {
-	if got := metadataLimit(".gopclntab"); got != maxNamedPclntabSize {
+	if got := metadataLimit(".gopclntab", core.FormatELF); got != maxNamedPclntabSize {
 		t.Fatalf("named pclntab limit = %d", got)
 	}
-	if got := metadataLimit("<segment>,__gopclntab"); got != maxNamedPclntabSize {
+	if got := metadataLimit("<segment>,__gopclntab", core.FormatMachO); got != maxNamedPclntabSize {
 		t.Fatalf("macho pclntab limit = %d", got)
 	}
-	if got := metadataLimit(".rdata"); got != maxMetadataSize {
+	// PE merges .gopclntab into .rdata; a large engine exceeds the generic
+	// fallback ceiling.
+	if got := metadataLimit(".rdata", core.FormatPE); got != maxNamedPclntabSize {
+		t.Fatalf("PE .rdata limit = %d", got)
+	}
+	if got := metadataLimit(".rdata", core.FormatELF); got != maxMetadataSize {
+		t.Fatalf("ELF fallback section limit = %d", got)
+	}
+	if got := metadataLimit(".data.rel.ro", core.FormatELF); got != maxMetadataSize {
 		t.Fatalf("fallback section limit = %d", got)
 	}
 	if maxNamedPclntabSize <= maxMetadataSize || maxNamedPclntabSize < 85<<20 {
