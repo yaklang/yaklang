@@ -362,10 +362,14 @@ func locationFromRisk(risk *schema.SSARisk) *sarif.Location {
 	if uri == "" || risk.Line <= 0 {
 		return nil
 	}
+	region := sarif.NewRegion().WithStartLine(int(risk.Line))
+	if language := strings.TrimSpace(risk.Language); language != "" {
+		region.WithSourceLanguage(language)
+	}
 	return sarif.NewLocation().WithPhysicalLocation(
 		sarif.NewPhysicalLocation().
 			WithArtifactLocation(sarif.NewArtifactLocation().WithUri(uri)).
-			WithRegion(sarif.NewRegion().WithStartLine(int(risk.Line))),
+			WithRegion(region),
 	)
 }
 
