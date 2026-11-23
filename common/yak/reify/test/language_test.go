@@ -188,53 +188,60 @@ func sourceHeader(source, name string) string {
 }
 
 func TestGoGenericInstanceNamesDriveLift(t *testing.T) {
-	binary := filepath.Join(languageOutputDir(t), "go_generic")
-	compileLanguageExample(t, "go", []string{
-		"build", "-gcflags=-N -l", "-ldflags=-s -w", "-o", binary, "examples/go_generic.go",
-	}, []string{"CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64"})
-	ctx := context.Background()
-	a, _, err := reify.Inspect(ctx, binary)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer a.Close()
-	for _, tc := range []struct {
-		display string
-		raw     string
-		family  string
-	}{
-		{"main.(*Box[int]).Get", "main.(*Box[go.shape.int]).Get", "main.(*Box[T]).Get"},
-		{"main.Map[int,string]", "main.Map[go.shape.int,go.shape.string]", "main.Map[T]"},
-		{"main.Wrap[int].func1", "main.Wrap[go.shape.int].func1", "main.Wrap[T].func1"},
-	} {
-		t.Run(tc.display, func(t *testing.T) {
-			s, ok := a.Image.SymbolByName(tc.display)
-			if !ok || s.Name != tc.display || s.Mangled != tc.raw || s.Source != symbol.SourcePCLNTab {
-				t.Fatalf("display symbol = %+v, present=%v", s, ok)
+	for _, stripped := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stripped=%v", stripped), func(t *testing.T) {
+			binary := filepath.Join(languageOutputDir(t), "go_generic")
+			args := []string{"build", "-gcflags=-N -l", "-o", binary}
+			if stripped {
+				args = append(args, "-ldflags=-s -w")
 			}
-			if s.Identity == nil || !s.Identity.Generic || s.Identity.Family != tc.family {
-				t.Fatalf("identity = %+v", s.Identity)
+			args = append(args, "examples/go_generic.go")
+			compileLanguageExample(t, "go", args, []string{"CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64"})
+			ctx := context.Background()
+			a, _, err := reify.Inspect(ctx, binary)
+			if err != nil {
+				t.Fatal(err)
 			}
-			raw, ok := a.Image.SymbolByName(tc.raw)
-			if !ok || raw.Address != s.Address || raw.Name != tc.display {
-				t.Fatalf("raw lookup = %+v, present=%v", raw, ok)
-			}
-			// Both spellings must select the same body, and the recovered
-			// source must use the readable name, not the compiler string.
-			for _, name := range []string{tc.display, tc.raw} {
-				result, err := reify.Lift(ctx, binary, reify.WithFunction(name), reify.WithMode(reify.ModeSource))
-				if err != nil {
-					t.Fatalf("lift %q: %v", name, err)
-				}
-				if result.Functions != 1 || !strings.Contains(result.Source, tc.display+"(") {
-					result.Close()
-					t.Fatalf("lift %q did not use the display name:\n%s", name, result.Source)
-				}
-				if err := os.WriteFile(binary+"."+strings.NewReplacer("/", "_", "(", "", ")", "", "*", "", "[", "_", "]", "", ",", "_").Replace(tc.display)+".source.txt", []byte(result.Source), 0o644); err != nil {
-					t.Fatal(err)
-				}
-				t.Logf("name=%s mangled=%s family=%s functions=%d header=%s", s.Name, s.Mangled, s.Identity.Family, result.Functions, sourceHeader(result.Source, tc.display))
-				result.Close()
+			defer a.Close()
+			for _, tc := range []struct {
+				display string
+				raw     string
+				family  string
+			}{
+				{"main.(*Box[int]).Get", "main.(*Box[go.shape.int]).Get", "main.(*Box[T]).Get"},
+				{"main.Map[int,string]", "main.Map[go.shape.int,go.shape.string]", "main.Map[T]"},
+				{"main.Wrap[int].func1", "main.Wrap[go.shape.int].func1", "main.Wrap[T].func1"},
+			} {
+				t.Run(tc.display, func(t *testing.T) {
+					s, ok := a.Image.SymbolByName(tc.display)
+					if !ok || s.Name != tc.display || s.Mangled != tc.raw || s.Source != symbol.SourcePCLNTab {
+						t.Fatalf("display symbol = %+v, present=%v", s, ok)
+					}
+					if s.Identity == nil || !s.Identity.Generic || s.Identity.Family != tc.family {
+						t.Fatalf("identity = %+v", s.Identity)
+					}
+					raw, ok := a.Image.SymbolByName(tc.raw)
+					if !ok || raw.Address != s.Address || raw.Name != tc.display {
+						t.Fatalf("raw lookup = %+v, present=%v", raw, ok)
+					}
+					// Both spellings must select the same body, and the recovered
+					// source must use the readable name, not the compiler string.
+					for _, name := range []string{tc.display, tc.raw} {
+						result, err := reify.Lift(ctx, binary, reify.WithFunction(name), reify.WithMode(reify.ModeSource))
+						if err != nil {
+							t.Fatalf("lift %q: %v", name, err)
+						}
+						if result.Functions != 1 || !strings.Contains(result.Source, tc.display+"(") {
+							result.Close()
+							t.Fatalf("lift %q did not use the display name:\n%s", name, result.Source)
+						}
+						if err := os.WriteFile(binary+"."+strings.NewReplacer("/", "_", "(", "", ")", "", "*", "", "[", "_", "]", "", ",", "_").Replace(tc.display)+".source.txt", []byte(result.Source), 0o644); err != nil {
+							t.Fatal(err)
+						}
+						t.Logf("name=%s mangled=%s family=%s functions=%d header=%s", s.Name, s.Mangled, s.Identity.Family, result.Functions, sourceHeader(result.Source, tc.display))
+						result.Close()
+					}
+				})
 			}
 		})
 	}
