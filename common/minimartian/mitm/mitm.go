@@ -30,6 +30,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -249,21 +250,48 @@ func (c *Config) HandshakeErrorCallback(r *http.Request, err error) {
 	}
 }
 
+// certHostnameForHandshake resolves the hostname used to mint the leaf
+// certificate of an inbound (client facing) TLS handshake.
+//
+// SNI always wins: a client that sends SNI validates the certificate against
+// that name. IP-literal targets must not send SNI (RFC 6066 section 3), so a
+// client that CONNECTs to https://<ip>:<port> leaves ServerName empty. In that
+// case the only trustworthy source of truth is the upstream target the proxy
+// is tunnelling to (fallbackHost). Minting the certificate for anything else
+// (the proxy's own listen address, a hardcoded loopback) produces a leaf the
+// client rejects with "certificate is valid for X, not <ip>".
+func certHostnameForHandshake(serverName, fallbackHost string, conn net.Conn) (string, error) {
+	if serverName != "" {
+		return serverName, nil
+	}
+	host := strings.TrimSpace(fallbackHost)
+	if host != "" {
+		host = utils.ExtractHost(host)
+		log.Debugf("mitm: client TLS handshake without SNI, minting certificate for upstream host %s", host)
+		return host, nil
+	}
+	// Last resort for callers that do not know the upstream target. Transparent
+	// (TProxy/redirect) entries may still expose the original destination here.
+	if conn != nil && conn.LocalAddr() != nil {
+		if localHost := utils.ExtractHost(conn.LocalAddr().String()); localHost != "" {
+			log.Debugf("mitm: client TLS handshake without SNI, minting certificate for local address host %s", localHost)
+			return localHost, nil
+		}
+	}
+	return "", errors.New("mitm: SNI not provided and no upstream host is known, failed to build certificate")
+}
+
 // TLS returns a *tls.Config that will generate certificates on-the-fly using
 // the SNI extension in the TLS ClientHello.
 func (c *Config) TLS() *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			if clientHello.ServerName == "" {
-				if clientHello.Conn != nil && clientHello.Conn.LocalAddr() != nil {
-					host := utils.ExtractHost(clientHello.Conn.LocalAddr().String())
-					return c.cert(host)
-				}
-				return nil, errors.New("mitm: SNI not provided, failed to build certificate")
+			host, err := certHostnameForHandshake(clientHello.ServerName, "", clientHello.Conn)
+			if err != nil {
+				return nil, err
 			}
-
-			return c.cert(clientHello.ServerName)
+			return c.cert(host)
 		},
 		NextProtos: []string{"http/1.1"},
 	}
@@ -271,6 +299,10 @@ func (c *Config) TLS() *tls.Config {
 
 // TLSForHost returns a *tls.Config that will generate certificates on-the-fly
 // using SNI from the connection, or fall back to the provided hostname.
+//
+// hostname must be the upstream target of the connection (CONNECT authority,
+// SOCKS5 destination, ...): it is what a client connecting to an IP literal
+// validates the generated certificate against.
 func (c *Config) TLSForHost(hostname string, h2Verify bool) *tls.Config {
 	nextProtos := []string{"http/1.1"}
 	if c.h2AllowedHost(hostname) && h2Verify {
@@ -279,11 +311,10 @@ func (c *Config) TLSForHost(hostname string, h2Verify bool) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			host := clientHello.ServerName
-			if host == "" {
-				host = hostname
+			host, err := certHostnameForHandshake(clientHello.ServerName, hostname, clientHello.Conn)
+			if err != nil {
+				return nil, err
 			}
-
 			return c.cert(host)
 		},
 		NextProtos: nextProtos,
@@ -301,9 +332,9 @@ func (c *Config) ObsoleteTLS(hostname string, h2Verify bool) *gmtls.Config {
 	return &gmtls.Config{
 		InsecureSkipVerify: c.skipVerify,
 		GetCertificate: func(clientHello *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
-			host := clientHello.ServerName
-			if host == "" {
-				host = hostname
+			host, err := certHostnameForHandshake(clientHello.ServerName, hostname, clientHello.Conn)
+			if err != nil {
+				return nil, err
 			}
 			gmFlag := false
 			// 检查支持协议中是否包含GMSSL
@@ -320,9 +351,9 @@ func (c *Config) ObsoleteTLS(hostname string, h2Verify bool) *gmtls.Config {
 			}
 		},
 		GetKECertificate: func(clientHello *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
-			host := clientHello.ServerName
-			if host == "" {
-				host = hostname
+			host, err := certHostnameForHandshake(clientHello.ServerName, hostname, clientHello.Conn)
+			if err != nil {
+				return nil, err
 			}
 
 			return c.obsoleteConfig.getEncryptionCert(host)

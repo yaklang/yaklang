@@ -444,7 +444,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 			// handshake. The origin h2 probe runs in the background.
 			serverUseH2 = p.offerH2ToClient(GetDialDetectionAddr(ctx, conn), strongHostLocalAddrFromCtx(ctx))
 		}
-		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2)
+		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2, GetDialDetectionAddr(ctx, conn))
 		if err != nil {
 			log.Errorf("tls handshake faile:%v", err)
 			return
@@ -577,9 +577,20 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 			serverUseH2 = p.offerH2ToClient(GetDialDetectionAddr(ctx, conn), strongHostLocalAddrFromCtx(ctx))
 		}
 
+		// The client-facing certificate must be minted for the CONNECT target:
+		// clients that CONNECT to an IP literal send no SNI (RFC 6066
+		// section 3), so the authority is the only name they can verify.
+		certHost := parsedConnectedToHost
+		if certHost == "" {
+			certHost = utils.ExtractHost(req.Host)
+		}
+		if certHost == "" {
+			certHost = utils.ExtractHost(connectedTo)
+		}
+
 		// fallback: 最普通的情况，没有任何 http2 支持
 		// do as ordinary https server and use *tls.Conn
-		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2)
+		tlsConn, useH2, err := p.TLSHandshake(utils.TimeoutContextSeconds(5), conn, serverUseH2, certHost)
 		if err != nil {
 			p.mitm.HandshakeErrorCallback(req, err)
 			return utils.Errorf("tls handshake faile:%v", err)
@@ -1124,7 +1135,22 @@ func watchHTTPDownstreamDisconnect(conn net.Conn, reader *bufio.Reader, cancelRe
 	}
 }
 
-func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 bool) (net.Conn, bool, error) {
+// TLSHandshake performs the client-facing TLS handshake of a MITM connection.
+//
+// upstreamHosts carries the target this connection is tunnelled to (CONNECT
+// authority, SOCKS5 destination, LISTEN original destination). It is required
+// for correctness: a client connecting to an IP literal never sends SNI
+// (RFC 6066 section 3), so without the real target the generated certificate
+// can only be minted for a guessed host and the client rejects it.
+func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 bool, upstreamHosts ...string) (net.Conn, bool, error) {
+	fallbackHost := ""
+	for _, candidate := range upstreamHosts {
+		if host := utils.ExtractHost(strings.TrimSpace(candidate)); host != "" {
+			fallbackHost = host
+			break
+		}
+	}
+
 	peekConn, version, err := peekTLSVersion(conn) // !!!!!! should use peekdConn for handshake!!!
 	if err != nil {
 		return nil, false, utils.Errorf("peek tls conn from client falied: %v", err)
@@ -1132,7 +1158,7 @@ func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 boo
 	var newConn net.Conn
 	var useH2 bool
 	if version < tls.VersionTLS12 {
-		config := p.mitm.ObsoleteTLS("127.0.0.1", p.http2 && serverUseH2)
+		config := p.mitm.ObsoleteTLS(fallbackHost, p.http2 && serverUseH2)
 		config.GMSupport = &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch}
 		tlsConn := gmtls.Server(peekConn, config)
 		if tlsConn != nil {
@@ -1144,7 +1170,7 @@ func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 boo
 			newConn = tlsConn
 		}
 	} else {
-		tlsConn := tls.Server(peekConn, p.mitm.TLSForHost("127.0.0.1", p.http2 && serverUseH2))
+		tlsConn := tls.Server(peekConn, p.mitm.TLSForHost(fallbackHost, p.http2 && serverUseH2))
 		if tlsConn != nil {
 			err = tlsConn.HandshakeContext(ctx)
 			if err != nil {
