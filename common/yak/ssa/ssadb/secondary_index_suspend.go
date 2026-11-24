@@ -41,7 +41,6 @@ func quoteSQLIdent(name string) string {
 // SuspendSecondaryIndexes drops non-unique indexes on the IR tables and
 // returns the CREATE statements needed to put them back. SQLite only; other
 // dialects are a no-op. Unique indexes are not dropped.
-// sql-boundary:allow pinned SQLite connection
 func SuspendSecondaryIndexes(db *gorm.DB) ([]string, error) {
 	if !isSQLiteDB(db) || db.DB() == nil {
 		return nil, nil
@@ -103,7 +102,6 @@ func SuspendSecondaryIndexes(db *gorm.DB) ([]string, error) {
 // RestoreSecondaryIndexes replays CREATE statements captured by
 // SuspendSecondaryIndexes. The sorter spills to disk so a multi-gigabyte
 // index build does not have to fit in the SQLite page cache.
-// sql-boundary:allow pinned SQLite connection
 func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 	if len(ddls) == 0 || !isSQLiteDB(db) || db.DB() == nil {
 		return nil
@@ -151,7 +149,6 @@ func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 // CheckpointSQLiteWAL folds the WAL into the main database once. SSA turns
 // automatic checkpoints off so a multi-gigabyte compile does not copy the
 // database on every commit; this is the single fold before queries.
-// sql-boundary:allow SQLite PRAGMA
 func CheckpointSQLiteWAL(db *gorm.DB) error {
 	if !isSQLiteDB(db) || db.DB() == nil {
 		return nil

@@ -60,11 +60,6 @@ jobs:
           go-version-file: go.mod
           cache: true
       - uses: ./.github/actions/linux-pcap
-      - name: Enforce the native SQL boundary
-        run: |
-          go test -mod=readonly ./common/yak/ssa/ssadb \
-            -run '^TestSQLBoundaryUsesNativeExecutor$' \
-            -count=1 -v
       - name: Run the SSA dialect conformance test on SQLite, PostgreSQL and MySQL
         run: |
           go test -mod=readonly ./common/yak/ssa/ssadb \

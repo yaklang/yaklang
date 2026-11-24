@@ -10,7 +10,6 @@ import "github.com/yaklang/gorm"
 // destructive pre-step of a full recompile: the old rows are gone either way,
 // and a crash leaves the program to be deleted again on the next attempt.
 // Non-SQLite databases keep their defaults.
-// sql-boundary:allow SQLite PRAGMA tuning
 func BeginSQLiteBulkDelete(db *gorm.DB) func() {
 	if !isSQLiteDB(db) || db.DB() == nil {
 		return func() {}

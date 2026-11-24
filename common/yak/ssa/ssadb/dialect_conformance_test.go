@@ -257,6 +257,8 @@ func exercisePublicReadAPIs(t *testing.T, db *gorm.DB, program string, codeID in
 	require.NotNil(t, code, "GetIrCodeById")
 	require.Equal(t, "updated", code.Name)
 	require.NotNil(t, GetIrCodeByIdFast(db, program, codeID), "GetIrCodeByIdFast")
+	PreloadIrCodesByIdsFast(db, program, []int64{codeID})
+	require.NotNil(t, GetIrCodeByIdFast(db, program, codeID), "PreloadIrCodesByIdsFast")
 	require.True(t, ExistsIrCodeById(db, program, codeID), "ExistsIrCodeById hit")
 	require.False(t, ExistsIrCodeById(db, program, 999999), "ExistsIrCodeById miss")
 
@@ -306,6 +308,12 @@ func exercisePublicReadAPIs(t *testing.T, db *gorm.DB, program string, codeID in
 	storedSource, err := GetIrSourceByPathAndName("/conformance", "main.java")
 	require.NoError(t, err)
 	require.Equal(t, source.SourceCodeHash, storedSource.SourceCodeHash)
+
+	tree, err := GetIrSourceTreeByProgram(program)
+	require.NoError(t, err)
+	require.Len(t, tree, 1)
+	require.Equal(t, "main.java", tree[0].FileName)
+	require.False(t, tree[0].IsDir)
 
 	require.NoError(t, db.Create(&AuditResult{ProgramName: program, TaskID: "conformance-task"}).Error)
 	count, err := CountAuditResults(db)
