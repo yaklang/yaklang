@@ -376,8 +376,8 @@ type Config struct {
 	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 60s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
-	// SyntaxFlow security-rule switches. Built-in rules are enabled by default;
-	// user-authored Bash rules require an explicit opt-in.
+	// SyntaxFlow security-rule switches. Both default to off so the AI Agent
+	// checkboxes start disabled; callers can enable either layer per session.
 	DisableBuiltinSyntaxFlowRules bool
 	EnableCustomSyntaxFlowRules   bool
 	ToolComposeConcurrency        int // Legacy shared concurrency option, still used by fast-context grep (default 2)
@@ -819,6 +819,7 @@ func newConfig(ctx context.Context) *Config {
 		GoalMinIterations:                  DefaultGoalMinIterations,
 		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
+		DisableBuiltinSyntaxFlowRules:      true,
 		EnableFunctionCallMode:             true,  // 默认开启原生 functioncall 模式
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
