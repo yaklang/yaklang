@@ -201,8 +201,8 @@ func fixHTTPResponse(raw []byte, cloneBody bool) (rsp []byte, body []byte, _ err
 	return fixHTTPResponseWithBorrow(raw, cloneBody, false)
 }
 
-// shouldNotSniff keeps compatibility exceptions narrow. An explicit x-download
-// type can intentionally request downloading even when the body has a known MIME.
+// shouldNotSniff keeps compatibility exceptions narrow. Explicit download types
+// can intentionally request downloading even when the body has a known MIME.
 // Compare the parsed type without changing the original header or its parameters.
 func shouldNotSniff(contentType string) bool {
 	mediaType, _, err := mime.ParseMediaType(contentType)
@@ -210,7 +210,7 @@ func shouldNotSniff(contentType string) bool {
 		return false
 	}
 	switch mediaType {
-	case "application/x-download":
+	case "application/x-download", "application/force-download":
 		return true
 	default:
 		return false

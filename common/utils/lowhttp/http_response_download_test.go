@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFixHTTPResponsePreservesXDownload(t *testing.T) {
+func TestFixHTTPResponsePreservesDownloadContentTypes(t *testing.T) {
 	xlsx, err := os.ReadFile("../fileparser/resources/static/test.xlsx")
 	require.NoError(t, err)
 	payloads := map[string][]byte{
@@ -36,6 +36,9 @@ func TestFixHTTPResponsePreservesXDownload(t *testing.T) {
 		"application/x-download",
 		`Application/X-Download; name="report;2026.pdf"`,
 		"APPLICATION/X-DOWNLOAD; charset=GBK",
+		"application/force-download",
+		`Application/Force-Download; name="report;2026.pdf"`,
+		"APPLICATION/FORCE-DOWNLOAD; charset=GBK",
 	} {
 		for name, payload := range payloads {
 			for api, fix := range fixers {
@@ -70,18 +73,22 @@ func TestFixHTTPResponseNoSniffStillDecodesEncodings(t *testing.T) {
 	require.NoError(t, writer.Close())
 	chunked := append([]byte(fmt.Sprintf("%x\r\n", compressed.Len())), compressed.Bytes()...)
 	chunked = append(chunked, []byte("\r\n0\r\n\r\n")...)
-	raw := append([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/x-download\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n"), chunked...)
-	before := bytes.Clone(raw)
-	for _, fix := range []func([]byte) ([]byte, error){FixHTTPResponsePacket, FixHTTPResponsePacketBorrowed} {
-		fixed, err := fix(raw)
-		require.NoError(t, err)
-		require.Equal(t, "application/x-download", GetHTTPPacketHeader(fixed, "Content-Type"))
-		require.Empty(t, GetHTTPPacketHeader(fixed, "Content-Encoding"))
-		require.Empty(t, GetHTTPPacketHeader(fixed, "Transfer-Encoding"))
-		require.Equal(t, strconv.Itoa(len(payload)), GetHTTPPacketHeader(fixed, "Content-Length"))
-		_, body := SplitHTTPHeadersAndBodyFromPacketView(fixed)
-		require.Equal(t, payload, body)
-		require.Equal(t, before, raw)
+	for _, contentType := range []string{"application/x-download", "application/force-download"} {
+		t.Run(contentType, func(t *testing.T) {
+			raw := append([]byte("HTTP/1.1 200 OK\r\nContent-Type: "+contentType+"\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\n\r\n"), chunked...)
+			before := bytes.Clone(raw)
+			for _, fix := range []func([]byte) ([]byte, error){FixHTTPResponsePacket, FixHTTPResponsePacketBorrowed} {
+				fixed, err := fix(raw)
+				require.NoError(t, err)
+				require.Equal(t, contentType, GetHTTPPacketHeader(fixed, "Content-Type"))
+				require.Empty(t, GetHTTPPacketHeader(fixed, "Content-Encoding"))
+				require.Empty(t, GetHTTPPacketHeader(fixed, "Transfer-Encoding"))
+				require.Equal(t, strconv.Itoa(len(payload)), GetHTTPPacketHeader(fixed, "Content-Length"))
+				_, body := SplitHTTPHeadersAndBodyFromPacketView(fixed)
+				require.Equal(t, payload, body)
+				require.Equal(t, before, raw)
+			}
+		})
 	}
 }
 
@@ -94,7 +101,7 @@ func TestFixHTTPResponseNoSniffKeepsOtherMIMERepairs(t *testing.T) {
 		"application/x-download-custom",
 		"application/octet-stream",
 		"APPLICATION/OCTET-STREAM; charset=GBK",
-		"application/force-download",
+		"application/force-download-custom",
 	} {
 		t.Run(contentType, func(t *testing.T) {
 			header := "HTTP/1.1 200 OK\r\n"
@@ -125,7 +132,7 @@ func TestLowhttpNoSniffContentTypeMetadata(t *testing.T) {
 			require.Equal(t, contentType, rsp.OriginContentType)
 			require.Equal(t, contentType, GetHTTPPacketHeader(rsp.BareResponse, "Content-Type"))
 			wantType := contentType
-			if contentType != "application/x-download" {
+			if contentType != "application/x-download" && contentType != "application/force-download" {
 				wantType = "application/pdf"
 				require.True(t, rsp.IsFixContentType)
 				require.Equal(t, wantType, rsp.FixContentType)
