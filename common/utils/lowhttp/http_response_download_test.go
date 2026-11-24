@@ -16,9 +16,13 @@ import (
 func TestFixHTTPResponsePreservesDownloadContentTypes(t *testing.T) {
 	xlsx, err := os.ReadFile("../fileparser/resources/static/test.xlsx")
 	require.NoError(t, err)
-	payloads := map[string][]byte{
-		"pdf":  []byte("%PDF-1.4\n%\xff\xfe\n%%EOF\n"),
-		"xlsx": xlsx,
+	payloads := map[string]struct {
+		body         []byte
+		detectedType string
+	}{
+		// MIME signature fixture; full PDF rendering is not exercised here.
+		"pdf":  {[]byte("%PDF-1.4\n%\xff\xfe\n%%EOF\n"), "application/pdf"},
+		"xlsx": {xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
 	}
 	fixers := map[string]func([]byte) ([]byte, error){
 		"response": func(raw []byte) ([]byte, error) {
@@ -32,6 +36,25 @@ func TestFixHTTPResponsePreservesDownloadContentTypes(t *testing.T) {
 		"packet":   FixHTTPResponsePacket,
 		"borrowed": FixHTTPResponsePacketBorrowed,
 	}
+	const disposition = `attachment; filename="report"`
+	buildResponse := func(contentType string, payload []byte) []byte {
+		// Deliberately stale length: preserving the type must not disable framing repair.
+		return append([]byte("HTTP/1.1 200 OK\r\nContent-Type: "+contentType+"\r\nContent-Disposition: "+disposition+"\r\nContent-Length: 1\r\n\r\n"), payload...)
+	}
+	// Exercise the same payloads through the normal repair path, so a detector
+	// regression cannot make the preservation assertions below pass vacuously.
+	for name, payload := range payloads {
+		for api, fix := range fixers {
+			t.Run("sniff-control/"+name+"/"+api, func(t *testing.T) {
+				raw := buildResponse("application/octet-stream", payload.body)
+				fixed, err := fix(raw)
+				require.NoError(t, err)
+				require.Equal(t, payload.detectedType, GetHTTPPacketHeader(fixed, "Content-Type"))
+				_, body := SplitHTTPHeadersAndBodyFromPacketView(fixed)
+				require.Equal(t, payload.body, body)
+			})
+		}
+	}
 	for _, contentType := range []string{
 		"application/x-download",
 		`Application/X-Download; name="report;2026.pdf"`,
@@ -40,12 +63,11 @@ func TestFixHTTPResponsePreservesDownloadContentTypes(t *testing.T) {
 		`Application/Force-Download; name="report;2026.pdf"`,
 		"APPLICATION/FORCE-DOWNLOAD; charset=GBK",
 	} {
-		for name, payload := range payloads {
+		for name, sample := range payloads {
+			payload := sample.body
 			for api, fix := range fixers {
 				t.Run(contentType+"/"+name+"/"+api, func(t *testing.T) {
-					const disposition = `attachment; filename="report"`
-					// Deliberately stale length: preserving the type must not disable framing repair.
-					raw := append([]byte("HTTP/1.1 200 OK\r\nContent-Type: "+contentType+"\r\nContent-Disposition: "+disposition+"\r\nContent-Length: 1\r\n\r\n"), payload...)
+					raw := buildResponse(contentType, payload)
 					before := bytes.Clone(raw)
 					fixed, err := fix(raw)
 					require.NoError(t, err)
