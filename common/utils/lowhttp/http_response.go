@@ -201,6 +201,22 @@ func fixHTTPResponse(raw []byte, cloneBody bool) (rsp []byte, body []byte, _ err
 	return fixHTTPResponseWithBorrow(raw, cloneBody, false)
 }
 
+// shouldNotSniff keeps compatibility exceptions narrow. An explicit x-download
+// type can intentionally request downloading even when the body has a known MIME.
+// Compare the parsed type without changing the original header or its parameters.
+func shouldNotSniff(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	switch mediaType {
+	case "application/x-download":
+		return true
+	default:
+		return false
+	}
+}
+
 func fixHTTPResponseWithBorrow(raw []byte, cloneBody, allowBorrow bool) (rsp []byte, body []byte, _ error) {
 	// log.Infof("response raw: \n%v", codec.EncodeBase64(raw))
 	raw, _ = bytes.CutPrefix(raw, expect100continue)
@@ -255,6 +271,11 @@ func fixHTTPResponseWithBorrow(raw []byte, cloneBody, allowBorrow bool) (rsp []b
 	}
 
 	if len(bodyRaw) == 0 {
+		return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
+	}
+	if shouldNotSniff(contentType) {
+		// Decode transfer/content encodings and rebuild framing as usual, while
+		// preserving the origin's download type and the decoded payload bytes.
 		return rebuildFixedHTTPResponse(headerBytes, bodyRaw, cloneBody, bodyIndependentlyOwned, borrowPacket)
 	}
 	mimeResult, err := codec.MatchMIMEType(bodyRaw)
