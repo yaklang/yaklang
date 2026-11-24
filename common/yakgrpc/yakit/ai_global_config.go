@@ -290,7 +290,6 @@ func cloneAIGlobalConfig(cfg *ypb.AIGlobalConfig) *ypb.AIGlobalConfig {
 		AIPresetPrompt:                cfg.GetAIPresetPrompt(),
 		AIPlanPrompt:                  cfg.GetAIPlanPrompt(),
 		DisableBuiltinSyntaxFlowRules: cfg.GetDisableBuiltinSyntaxFlowRules(),
-		EnableCustomSyntaxFlowRules:   cfg.GetEnableCustomSyntaxFlowRules(),
 	}
 }
 

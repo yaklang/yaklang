@@ -43,7 +43,6 @@ func TestSetAndGetAIGlobalConfig(t *testing.T) {
 		GlobalWeight:                  0.75,
 		AIPresetPrompt:                "prefer concise answers",
 		DisableBuiltinSyntaxFlowRules: true,
-		EnableCustomSyntaxFlowRules:   true,
 		IntelligentModels: []*ypb.AIModelConfig{
 			{
 				ModelName: "gpt-4o",
@@ -84,7 +83,6 @@ func TestSetAndGetAIGlobalConfig(t *testing.T) {
 	assert.Equal(t, 0.75, loaded.GlobalWeight)
 	assert.Equal(t, "prefer concise answers", loaded.GetAIPresetPrompt())
 	assert.True(t, loaded.GetDisableBuiltinSyntaxFlowRules())
-	assert.True(t, loaded.GetEnableCustomSyntaxFlowRules())
 
 	require.Len(t, loaded.IntelligentModels, 1)
 	assert.NotNil(t, loaded.IntelligentModels[0].Provider)

@@ -278,7 +278,7 @@ func claudePermissionRuleID(action schema.SyntaxFlowAction, raw string) string {
 }
 
 func (r *ToolCallPolicyRule) decision(evidence string) *ToolCallRuleDecision {
-	message := fmt.Sprintf("Claude Code permission rule matched: %s", r.Raw)
+	message := fmt.Sprintf("tool permission rule matched: %s", r.Raw)
 	if evidence != "" {
 		message += " [" + evidence + "]"
 	}
@@ -293,7 +293,7 @@ func (r *ToolCallPolicyRule) decision(evidence string) *ToolCallRuleDecision {
 			RuleID:   r.RuleID,
 			Severity: string(r.Severity),
 			Message:  message,
-			Risk:     "claude-code-permission",
+			Risk:     "tool-permission",
 		}},
 	}
 }

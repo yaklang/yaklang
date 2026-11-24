@@ -152,18 +152,20 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					shell := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["shell"])))
 					if shell == "" || shell == "bash" || shell == "bash.exe" {
 						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
-							var checkOptions []commandcheck.CheckOption
-							if runtimeConfig != nil {
-								checkOptions = append(checkOptions,
-									commandcheck.WithDisableBuiltinRules(runtimeConfig.DisableBuiltinSyntaxFlowRules),
-									// Custom rules are per-row opt-in; there is no
-									// session-level custom-rule switch.
-									commandcheck.WithIncludeCustomRules(true),
-								)
-							}
-							if check := commandcheck.CheckCommand(ctx, cmd, checkOptions...); check.Blocked {
-								fmt.Fprintf(stdout, "[bash guard] %s\n", check.Message())
-								return check.BlockedResult(shell), nil
+							masterEnabled := runtimeConfig == nil || !runtimeConfig.DisableBuiltinSyntaxFlowRules
+							if masterEnabled {
+								var checkOptions []commandcheck.CheckOption
+								if runtimeConfig != nil {
+									checkOptions = append(checkOptions,
+										commandcheck.WithDisableBuiltinRules(false),
+										// Custom rows are individually opt-in.
+										commandcheck.WithIncludeCustomRules(true),
+									)
+								}
+								if check := commandcheck.CheckCommand(ctx, cmd, checkOptions...); check.Blocked {
+									fmt.Fprintf(stdout, "[bash guard] %s\n", check.Message())
+									return check.BlockedResult(shell), nil
+								}
 							}
 						}
 					}

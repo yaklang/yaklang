@@ -10,17 +10,12 @@ import (
 )
 
 func TestStartParamsSyntaxFlowRuleSwitches(t *testing.T) {
-	params := &ypb.AIStartParams{
-		DisableBuiltinSyntaxFlowRules: true,
-		EnableCustomSyntaxFlowRules:   true,
-	}
+	params := &ypb.AIStartParams{DisableBuiltinSyntaxFlowRules: true}
 	c := aicommon.NewConfig(context.Background(), ConvertStartParamsToReActConfig(params)...)
 	require.True(t, c.DisableBuiltinSyntaxFlowRules)
-	require.True(t, c.EnableCustomSyntaxFlowRules)
 
 	copy := aicommon.NewConfig(context.Background(), aicommon.ConvertConfigToOptions(c)...)
 	require.True(t, copy.DisableBuiltinSyntaxFlowRules)
-	require.True(t, copy.EnableCustomSyntaxFlowRules)
 }
 
 func TestStartParamsClarificationSettings(t *testing.T) {

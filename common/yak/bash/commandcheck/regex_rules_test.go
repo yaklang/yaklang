@@ -32,7 +32,21 @@ func TestParseRegexRules(t *testing.T) {
 		require.Equal(t, `rm\s+-rf\s+/`, rules[0].Pattern)
 		require.Equal(t, RegexRuleMatchRegex, rules[0].Match)
 		require.Equal(t, RegexRuleActionDeny, rules[0].Action)
-		require.True(t, rules[2].Disabled)
+		require.NotNil(t, rules[2].Disabled)
+		require.True(t, *rules[2].Disabled)
+		// Rows without an explicit disabled flag default to off.
+		require.NotNil(t, rules[0].Disabled)
+		require.True(t, *rules[0].Disabled)
+	})
+
+	t.Run("omitted-disabled-defaults-to-off", func(t *testing.T) {
+		rules, err := ParseRegexRules(`[{"pattern":"ls","action":"deny"},{"pattern":"curl","action":"ask","disabled":false}]`)
+		require.NoError(t, err)
+		require.Len(t, rules, 2)
+		require.NotNil(t, rules[0].Disabled)
+		require.True(t, *rules[0].Disabled)
+		require.NotNil(t, rules[1].Disabled)
+		require.False(t, *rules[1].Disabled)
 	})
 
 	t.Run("rejects-broken-json", func(t *testing.T) {
@@ -69,7 +83,7 @@ func TestCompileRegexRulesSkipsUnusableRows(t *testing.T) {
 		{Pattern: "rm\\s+-rf", Action: RegexRuleActionDeny},
 		{Pattern: "   ", Action: RegexRuleActionDeny},
 		{Pattern: "(unclosed", Action: RegexRuleActionDeny},
-		{Pattern: "curl", Action: RegexRuleActionAsk, Disabled: true},
+		{Pattern: "curl", Action: RegexRuleActionAsk, Disabled: boolPointer(true)},
 	})
 	require.Len(t, compiled, 1)
 	require.Equal(t, `rm\s+-rf`, compiled[0].pattern.String())
@@ -246,7 +260,7 @@ func TestRegexRulesStorageRoundTrip(t *testing.T) {
 		InvalidateRegexRulesCache()
 	})
 
-	payload := `[{"name":"deny-tool","pattern":"my-dangerous-tool\\s+--force","action":"deny"}]`
+	payload := `[{"name":"deny-tool","pattern":"my-dangerous-tool\\s+--force","action":"deny","disabled":false}]`
 	require.NoError(t, yakit.SetKey(db, RegexRulesStorageKey, payload))
 
 	// The SetKey RPC invalidates this cache after every save.

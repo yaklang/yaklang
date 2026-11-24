@@ -61,11 +61,9 @@ type ToolRuntimeConfig struct {
 		TrackBrowserSession(id string)
 		UntrackBrowserSession(id string)
 	}
-	// SyntaxFlow guard policy for this invocation. The bash tool callback uses
-	// these flags before executing a command; zero values keep built-in rules on
-	// and custom rules off.
+	// DisableBuiltinSyntaxFlowRules is the master command-security switch for
+	// this invocation. When true the bash tool callback skips all guards.
 	DisableBuiltinSyntaxFlowRules bool
-	EnableCustomSyntaxFlowRules   bool
 }
 
 // NoRuntimeInvokeCallback 定义工具调用回调函数的签名

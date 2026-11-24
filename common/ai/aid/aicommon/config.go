@@ -376,16 +376,12 @@ type Config struct {
 	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 60s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
-	// DisableBuiltinSyntaxFlowRules keeps built-in rules opt-in. Custom rules
-	// have no session-level switch: each stored row is enabled or disabled on
-	// the AI Bash guard page and is always considered by the guard.
+	// DisableBuiltinSyntaxFlowRules is the master command-security switch.
+	// When true, neither built-in nor custom rules run. When false, all built-in
+	// rules run and custom rows participate only when individually enabled.
 	DisableBuiltinSyntaxFlowRules bool
-	// EnableCustomSyntaxFlowRules is retained for proto/session compatibility.
-	// Runtime gates include custom rows unconditionally; leaving this field in
-	// place keeps old start params and hotpatch payloads wire-compatible.
-	EnableCustomSyntaxFlowRules bool
-	ToolComposeConcurrency      int // Legacy shared concurrency option, still used by fast-context grep (default 2)
-	PlanExecTaskConcurrency     int // Max concurrent executable tasks per PE DAG stage (default 1)
+	ToolComposeConcurrency        int // Legacy shared concurrency option, still used by fast-context grep (default 2)
+	PlanExecTaskConcurrency       int // Max concurrent executable tasks per PE DAG stage (default 1)
 
 	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
 	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
@@ -1900,8 +1896,8 @@ func (c *Config) IsToolUseDisabled() bool {
 	return c.DisableToolUse
 }
 
-// WithDisableBuiltinSyntaxFlowRules disables the built-in Bash SyntaxFlow
-// guard for this session, including the embedded high-severity fallback.
+// WithDisableBuiltinSyntaxFlowRules is the master command-security switch.
+// Disabling it skips built-in and custom Bash rules for this session.
 func WithDisableBuiltinSyntaxFlowRules(disable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1909,20 +1905,6 @@ func WithDisableBuiltinSyntaxFlowRules(disable bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.DisableBuiltinSyntaxFlowRules = disable
-		c.m.Unlock()
-		return nil
-	}
-}
-
-// WithEnableCustomSyntaxFlowRules includes user-authored Bash SyntaxFlow rules
-// (SSA mode only) in the session's security guard.
-func WithEnableCustomSyntaxFlowRules(enable bool) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.EnableCustomSyntaxFlowRules = enable
 		c.m.Unlock()
 		return nil
 	}
@@ -4449,10 +4431,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
 	opts = append(opts, WithImageInput(i.GetImageInputConfig()))
-	opts = append(opts,
-		WithDisableBuiltinSyntaxFlowRules(i.DisableBuiltinSyntaxFlowRules),
-		WithEnableCustomSyntaxFlowRules(i.EnableCustomSyntaxFlowRules),
-	)
+	opts = append(opts, WithDisableBuiltinSyntaxFlowRules(i.DisableBuiltinSyntaxFlowRules))
 
 	// Keep the policy with the shared manager: NewConfig applies this flag
 	// to the manager, so a child default must not reopen parent MCP access.

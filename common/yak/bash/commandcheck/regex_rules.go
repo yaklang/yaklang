@@ -47,13 +47,17 @@ const (
 // Match is optional for backward compatibility. An empty Match keeps the
 // legacy behavior: a plain literal deny rule compares the whole command, while
 // every other row is treated as a regex. New rows should set Match explicitly.
+//
+// Disabled is a pointer so ParseRegexRules can distinguish an omitted field
+// from an explicit false. Stored rows default to disabled: a user must turn a
+// row on before it participates in command checking.
 type RegexRule struct {
 	Name        string `json:"name,omitempty"`
 	Pattern     string `json:"pattern"`
 	Action      string `json:"action"`
 	Match       string `json:"match,omitempty"`
 	Description string `json:"description,omitempty"`
-	Disabled    bool   `json:"disabled,omitempty"`
+	Disabled    *bool  `json:"disabled,omitempty"`
 }
 
 // ParseRegexRules decodes the stored payload. An empty payload means the
@@ -67,7 +71,16 @@ func ParseRegexRules(raw string) ([]RegexRule, error) {
 	if err := json.Unmarshal([]byte(raw), &rules); err != nil {
 		return nil, fmt.Errorf("parse ai bash guard regex rules: %w", err)
 	}
+	for i := range rules {
+		if rules[i].Disabled == nil {
+			rules[i].Disabled = boolPointer(true)
+		}
+	}
 	return rules, nil
+}
+
+func boolPointer(value bool) *bool {
+	return &value
 }
 
 // RegexRuleSeverity maps a row action to the severity that drives both the
@@ -101,7 +114,7 @@ type compiledRegexRule struct {
 func compileRegexRules(rules []RegexRule) []compiledRegexRule {
 	compiled := make([]compiledRegexRule, 0, len(rules))
 	for _, rule := range rules {
-		if rule.Disabled {
+		if rule.Disabled != nil && *rule.Disabled {
 			continue
 		}
 		pattern := strings.TrimSpace(rule.Pattern)
@@ -312,9 +325,8 @@ func matchRegexRules(cmd string, rules []compiledRegexRule) []Finding {
 	return findings
 }
 
-// matchCommandPrefix follows Claude Code's Bash(prefix:*) boundary: a prefix
-// matches the command itself or the command followed by an argument separator,
-// so `ls` does not accidentally match `lsof`.
+// matchCommandPrefix matches the command itself or the command followed by an
+// argument separator, so `ls` does not accidentally match `lsof`.
 func matchCommandPrefix(prefix, command string) bool {
 	prefix = strings.TrimSpace(prefix)
 	command = strings.TrimSpace(command)

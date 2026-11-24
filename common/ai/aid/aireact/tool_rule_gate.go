@@ -95,19 +95,18 @@ func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCall
 	return decision
 }
 
-// toolCallRuleGate composes the built-in bash guard with the optional runtime
-// gate compiled from Claude Code-style permissions JSON. Composition is
-// strictest-wins, so a user allow rule cannot suppress a built-in deny or ask.
+// toolCallRuleGate is the single command-security entry point. When the
+// session switch is off it returns nil so neither built-in nor custom rows run.
+// When it is on, all built-in rules participate and stored custom rows are
+// included only when their per-row switch is enabled. Optional runtime
+// permission rules are composed under the same master switch.
 func toolCallRuleGate(cfg *aicommon.Config) aicommon.ToolCallRuleGate {
-	var options []commandcheck.CheckOption
-	if cfg != nil {
-		options = append(options,
-			commandcheck.WithDisableBuiltinRules(cfg.DisableBuiltinSyntaxFlowRules),
-			// Custom rules have no session-level switch anymore. Each row is
-			// enabled/disabled on the AI Bash guard page, so include the stored
-			// rows whenever the guard evaluates a command.
-			commandcheck.WithIncludeCustomRules(true),
-		)
+	if cfg == nil || cfg.DisableBuiltinSyntaxFlowRules {
+		return nil
+	}
+	options := []commandcheck.CheckOption{
+		commandcheck.WithDisableBuiltinRules(false),
+		commandcheck.WithIncludeCustomRules(true),
 	}
 	builtinGate := securityRuleGateWithOptions(options)
 	extra := aicommon.CompileClaudeCodePermissionsFromRuntime()
