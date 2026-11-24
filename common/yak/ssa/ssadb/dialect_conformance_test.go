@@ -238,12 +238,79 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 	require.Len(t, found, 1)
 	require.Equal(t, program, found[0].ProgramName)
 
+	exercisePublicReadAPIs(t, db, program, code.CodeID)
+
 	exerciseProgramReplacement(t, db)
 
 	require.NoError(t, DeleteProgramChecked(db, program))
 	var remaining int64
 	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", program).Count(&remaining).Error)
 	require.Zero(t, remaining)
+}
+
+// exercisePublicReadAPIs runs the exported read surface, not only the native
+// helpers, so a dialect regression in the API layer is caught as well.
+func exercisePublicReadAPIs(t *testing.T, db *gorm.DB, program string, codeID int64) {
+	t.Helper()
+
+	code := GetIrCodeById(db, program, codeID)
+	require.NotNil(t, code, "GetIrCodeById")
+	require.Equal(t, "updated", code.Name)
+	require.NotNil(t, GetIrCodeByIdFast(db, program, codeID), "GetIrCodeByIdFast")
+	require.True(t, ExistsIrCodeById(db, program, codeID), "ExistsIrCodeById hit")
+	require.False(t, ExistsIrCodeById(db, program, 999999), "ExistsIrCodeById miss")
+
+	require.NotNil(t, GetIrTypeById(db, program, 1), "GetIrTypeById")
+
+	apps := GetApplicationPrograms([]string{program, "missing-" + program})
+	require.Contains(t, apps, program)
+	require.NotContains(t, apps, "missing-"+program)
+	app, err := GetApplicationProgram(program)
+	require.NoError(t, err)
+	require.Equal(t, program, app.ProgramName)
+
+	require.Contains(t, AllProgramNames(db), program)
+	var found bool
+	for _, item := range AllPrograms(db) {
+		if item.ProgramName == program {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "AllPrograms")
+
+	require.NoError(t, PreloadOffsetsByValueIDs(db, program, []int64{1}))
+	offsets := GetOffsetByVariable("", 1, program)
+	require.Len(t, offsets, 1)
+	require.Equal(t, int64(1), offsets[0].ValueID)
+
+	var searched int
+	for item := range SearchIrCodeByOpcodes(db, context.Background(), program, irCodeConstOpcode) {
+		if item != nil && item.CodeID == codeID {
+			searched++
+		}
+	}
+	require.Equal(t, 1, searched, "SearchIrCodeByOpcodes")
+
+	source := &IrSource{
+		ProgramName:    program,
+		SourceCodeHash: "conformance-source-hash",
+		FolderPath:     "/conformance/",
+		FileName:       "main.java",
+		QuotedCode:     "class Main {}",
+	}
+	require.NoError(t, db.Create(source).Error)
+	sources, err := GetIrSourceByPath("/conformance")
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+	storedSource, err := GetIrSourceByPathAndName("/conformance", "main.java")
+	require.NoError(t, err)
+	require.Equal(t, source.SourceCodeHash, storedSource.SourceCodeHash)
+
+	require.NoError(t, db.Create(&AuditResult{ProgramName: program, TaskID: "conformance-task"}).Error)
+	count, err := CountAuditResults(db)
+	require.NoError(t, err)
+	require.Positive(t, count)
 }
 
 // exerciseProgramReplacement covers the transaction-scoped DELETE/UPDATE
@@ -378,6 +445,13 @@ func exerciseAuditNativeReads(t *testing.T, db *gorm.DB, program string) {
 	require.NoError(t, err)
 	require.NotNil(t, node)
 	require.Equal(t, nodeID, node.NodeID)
+
+	exportedNode, err := GetAuditNodeById(db, nodeID)
+	require.NoError(t, err)
+	require.NotNil(t, exportedNode)
+	exportedNodes, err := GetAuditNodesByIds(db, []string{nodeID, targetID})
+	require.NoError(t, err)
+	require.Len(t, exportedNodes, 2)
 
 	require.Equal(t, []string{targetID}, nativeAuditEdgeTargets(db, nodeID, EdgeType_Predecessor))
 	edges := nativePredecessorEdges(db, nodeID)
