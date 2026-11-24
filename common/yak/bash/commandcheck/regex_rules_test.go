@@ -21,7 +21,7 @@ func TestParseRegexRules(t *testing.T) {
 
 	t.Run("decodes-rows", func(t *testing.T) {
 		raw := `[
-			{"name":"block-rm-root","pattern":"rm\\s+-rf\\s+/","action":"deny","description":"禁止删根"},
+			{"name":"block-rm-root","pattern":"rm\\s+-rf\\s+/","action":"deny","match":"regex","description":"禁止删根"},
 			{"pattern":"curl\\s+http://","action":"ask"},
 			{"pattern":"chmod\\s+777","action":"warn","disabled":true}
 		]`
@@ -30,6 +30,7 @@ func TestParseRegexRules(t *testing.T) {
 		require.Len(t, rules, 3)
 		require.Equal(t, "block-rm-root", rules[0].Name)
 		require.Equal(t, `rm\s+-rf\s+/`, rules[0].Pattern)
+		require.Equal(t, RegexRuleMatchRegex, rules[0].Match)
 		require.Equal(t, RegexRuleActionDeny, rules[0].Action)
 		require.True(t, rules[2].Disabled)
 	})
@@ -73,6 +74,79 @@ func TestCompileRegexRulesSkipsUnusableRows(t *testing.T) {
 	require.Len(t, compiled, 1)
 	require.Equal(t, `rm\s+-rf`, compiled[0].pattern.String())
 	require.Equal(t, schema.SFR_ACTION_DENY, compiled[0].action)
+}
+
+func TestRegexRuleMatchModes(t *testing.T) {
+	t.Run("explicit-exact", func(t *testing.T) {
+		compiled := compileRegexRules([]RegexRule{
+			{Name: "deny-ls", Pattern: "ls", Action: RegexRuleActionDeny, Match: RegexRuleMatchExact},
+		})
+		require.Len(t, matchRegexRules("ls", compiled), 1)
+		require.Len(t, matchRegexRules("echo hi && ls", compiled), 1)
+		require.Empty(t, matchRegexRules("ls -la", compiled))
+		require.Empty(t, matchRegexRules("lsof -i", compiled))
+	})
+
+	t.Run("legacy-plain-deny-is-exact", func(t *testing.T) {
+		compiled := compileRegexRules([]RegexRule{
+			{Name: "deny-ls", Pattern: "ls", Action: RegexRuleActionDeny},
+		})
+		require.Equal(t, RegexRuleMatchExact, compiled[0].matchMode)
+		require.Len(t, matchRegexRules("ls", compiled), 1)
+		require.Empty(t, matchRegexRules("ls -la", compiled))
+	})
+
+	t.Run("explicit-prefix", func(t *testing.T) {
+		compiled := compileRegexRules([]RegexRule{
+			{Name: "deny-ls-all", Pattern: "ls", Action: RegexRuleActionDeny, Match: RegexRuleMatchPrefix},
+		})
+		require.Len(t, matchRegexRules("ls", compiled), 1)
+		require.Len(t, matchRegexRules("ls -la", compiled), 1)
+		require.Empty(t, matchRegexRules("lsof -i", compiled))
+	})
+
+	t.Run("explicit-regex", func(t *testing.T) {
+		compiled := compileRegexRules([]RegexRule{
+			{Name: "deny-ls-args", Pattern: `ls\s+.*`, Action: RegexRuleActionDeny, Match: RegexRuleMatchRegex},
+		})
+		require.Empty(t, matchRegexRules("ls", compiled))
+		require.Len(t, matchRegexRules("ls -la", compiled), 1)
+	})
+
+	t.Run("ask-plain-remains-regex", func(t *testing.T) {
+		compiled := compileRegexRules([]RegexRule{
+			{Name: "ask-curl", Pattern: "curl", Action: RegexRuleActionAsk},
+		})
+		require.Equal(t, RegexRuleMatchRegex, compiled[0].matchMode)
+		require.Len(t, matchRegexRules("curl http://example.com", compiled), 1)
+	})
+
+	t.Run("exact-with-spaces", func(t *testing.T) {
+		compiled := compileRegexRules([]RegexRule{
+			{Name: "deny-git-status", Pattern: "git status", Action: RegexRuleActionDeny, Match: RegexRuleMatchExact},
+		})
+		require.Len(t, matchRegexRules("git status", compiled), 1)
+		require.Empty(t, matchRegexRules("git status --short", compiled))
+	})
+}
+
+func TestExactDenyRuleOnlyBlocksTheExactCommand(t *testing.T) {
+	ctx := context.Background()
+	rules := compileRegexRules([]RegexRule{
+		{Name: "deny-ls", Pattern: "ls", Action: RegexRuleActionDeny, Match: RegexRuleMatchExact},
+	})
+
+	blocked := checkWithRules(ctx, "ls", nil, rules)
+	require.True(t, blocked.Blocked)
+	require.Equal(t, schema.SFR_ACTION_DENY, blocked.Action)
+
+	allowed := checkWithRules(ctx, "ls --color=never", nil, rules)
+	require.False(t, allowed.Blocked)
+	require.Equal(t, schema.SFR_ACTION_ALLOW, allowed.Action)
+
+	// A sub-command that is exactly `ls` is still the denied operation.
+	chained := checkWithRules(ctx, "echo hello && ls", nil, rules)
+	require.True(t, chained.Blocked)
 }
 
 func TestMatchRegexRulesOnSubCommands(t *testing.T) {

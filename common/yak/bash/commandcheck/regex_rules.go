@@ -27,6 +27,13 @@ const (
 	RegexRuleActionAsk  = string(schema.SFR_ACTION_ASK)
 	RegexRuleActionWarn = string(schema.SFR_ACTION_WARN)
 
+	// RegexRuleMatchExact / Prefix / Regex select how a row's pattern is
+	// compared with each extracted command. Exact and prefix are literal
+	// comparisons; regex keeps the legacy Go RE2 behavior.
+	RegexRuleMatchExact  = "exact"
+	RegexRuleMatchPrefix = "prefix"
+	RegexRuleMatchRegex  = "regex"
+
 	// regexRulesTTL bounds how stale a stored rule set may be during a long AI
 	// session. Saving through SetKey also invalidates the cache in process.
 	regexRulesTTL = 30 * time.Second
@@ -35,11 +42,16 @@ const (
 // RegexRule is one user-authored row from the AI Bash guard page. Patterns are
 // evaluated against the command text (raw sub-commands included) because
 // SyntaxFlow SSA conditions match value representations, not raw source, and
-// therefore cannot express arbitrary command-line regular expressions.
+// therefore cannot express arbitrary command-line constraints.
+//
+// Match is optional for backward compatibility. An empty Match keeps the
+// legacy behavior: a plain literal deny rule compares the whole command, while
+// every other row is treated as a regex. New rows should set Match explicitly.
 type RegexRule struct {
 	Name        string `json:"name,omitempty"`
 	Pattern     string `json:"pattern"`
 	Action      string `json:"action"`
+	Match       string `json:"match,omitempty"`
 	Description string `json:"description,omitempty"`
 	Disabled    bool   `json:"disabled,omitempty"`
 }
@@ -76,12 +88,14 @@ func RegexRuleSeverity(action string) (schema.SyntaxFlowSeverity, bool) {
 
 // compiledRegexRule is one row ready to run against command text.
 type compiledRegexRule struct {
-	ruleID   string
-	title    string
-	message  string
-	pattern  *regexp.Regexp
-	severity schema.SyntaxFlowSeverity
-	action   schema.SyntaxFlowAction
+	ruleID    string
+	title     string
+	message   string
+	matchMode string
+	literal   string
+	pattern   *regexp.Regexp
+	severity  schema.SyntaxFlowSeverity
+	action    schema.SyntaxFlowAction
 }
 
 func compileRegexRules(rules []RegexRule) []compiledRegexRule {
@@ -94,38 +108,96 @@ func compileRegexRules(rules []RegexRule) []compiledRegexRule {
 		if pattern == "" {
 			continue
 		}
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			log.Warnf("ai bash guard skipped invalid regex rule %q: %v", rule.Name, err)
-			continue
-		}
 		severity, ok := RegexRuleSeverity(rule.Action)
 		if !ok {
-			log.Warnf("ai bash guard regex rule %q has unknown action %q, treating it as deny", rule.Name, rule.Action)
+			log.Warnf("ai bash guard rule %q has unknown action %q, treating it as deny", rule.Name, rule.Action)
 		}
+		action := schema.SyntaxFlowActionForSeverity(severity)
+		matchMode, validMatch := normalizeRegexRuleMatch(rule.Match, action, pattern)
+		if !validMatch {
+			log.Warnf("ai bash guard rule %q has unknown match %q, falling back to %s", rule.Name, rule.Match, matchMode)
+		}
+
+		var re *regexp.Regexp
+		if matchMode == RegexRuleMatchRegex {
+			var err error
+			re, err = regexp.Compile(pattern)
+			if err != nil {
+				log.Warnf("ai bash guard skipped invalid regex rule %q: %v", rule.Name, err)
+				continue
+			}
+		}
+
 		title := strings.TrimSpace(rule.Name)
 		if title == "" {
 			title = pattern
 		}
 		message := strings.TrimSpace(rule.Description)
 		if message == "" {
-			message = defaultRegexRuleMessage(schema.SyntaxFlowActionForSeverity(severity))
+			message = defaultRegexRuleMessage(action)
 		}
 		compiled = append(compiled, compiledRegexRule{
-			ruleID:   regexRuleID(pattern, string(schema.SyntaxFlowActionForSeverity(severity))),
-			title:    title,
-			message:  message,
-			pattern:  re,
-			severity: severity,
-			action:   schema.SyntaxFlowActionForSeverity(severity),
+			ruleID:    regexRuleID(pattern, string(action), matchMode),
+			title:     title,
+			message:   message,
+			matchMode: matchMode,
+			literal:   pattern,
+			pattern:   re,
+			severity:  severity,
+			action:    action,
 		})
 	}
 	return compiled
 }
 
+// normalizeRegexRuleMatch resolves the optional match field. When the caller
+// omitted it, a plain literal deny row keeps the historical deny rule precise:
+// `ls` matches the command `ls`, not every command containing the letters. Ask
+// and warn rows stay regex-based because they are contextual prompts.
+func normalizeRegexRuleMatch(raw string, action schema.SyntaxFlowAction, pattern string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case RegexRuleMatchExact, "command":
+		return RegexRuleMatchExact, true
+	case RegexRuleMatchPrefix, "command_prefix":
+		return RegexRuleMatchPrefix, true
+	case RegexRuleMatchRegex, "pattern":
+		return RegexRuleMatchRegex, true
+	case "":
+		if action == schema.SFR_ACTION_DENY && isPlainCommandLiteral(pattern) {
+			return RegexRuleMatchExact, true
+		}
+		return RegexRuleMatchRegex, true
+	default:
+		if action == schema.SFR_ACTION_DENY && isPlainCommandLiteral(pattern) {
+			return RegexRuleMatchExact, false
+		}
+		return RegexRuleMatchRegex, false
+	}
+}
+
+// isPlainCommandLiteral reports whether a pattern contains only command-name
+// characters. Such a row is unambiguous enough to treat as an exact command;
+// anything with spaces or regex metacharacters keeps the regex path.
+func isPlainCommandLiteral(pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+	for _, r := range pattern {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case strings.ContainsRune("_-./:@%+=,", r):
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // regexRuleID is stable across renames so findings and UI rows stay correlated.
-func regexRuleID(pattern, action string) string {
-	sum := sha1.Sum([]byte(action + "\n" + pattern))
+func regexRuleID(pattern, action, matchMode string) string {
+	sum := sha1.Sum([]byte(action + "\n" + matchMode + "\n" + pattern))
 	return fmt.Sprintf("ai-bash-regex-%x", sum[:6])
 }
 
@@ -183,34 +255,81 @@ func matchRegexRules(cmd string, rules []compiledRegexRule) []Finding {
 	targets := regexMatchTargets(cmd)
 	var findings []Finding
 	seen := make(map[string]struct{}, len(rules))
+	appendFinding := func(rule compiledRegexRule, target regexMatchTarget, start, end int, matched string) {
+		key := rule.ruleID + "|" + matched
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		findings = append(findings, Finding{
+			RuleID:   rule.ruleID,
+			Level:    string(rule.severity),
+			Severity: rule.severity,
+			Action:   rule.action,
+			Title:    rule.title,
+			Message:  rule.message,
+			Risk:     "bash-guard",
+			Value:    truncateValue(matched, 512),
+			Start:    target.offset + start,
+			End:      target.offset + end,
+		})
+	}
+
 	for _, rule := range rules {
 		for _, target := range targets {
-			for _, loc := range rule.pattern.FindAllStringIndex(target.text, -1) {
-				if loc[0] == loc[1] {
+			switch rule.matchMode {
+			case RegexRuleMatchExact, RegexRuleMatchPrefix:
+				text := strings.TrimSpace(target.text)
+				if text == "" {
 					continue
 				}
-				matched := target.text[loc[0]:loc[1]]
-				key := rule.ruleID + "|" + matched
-				if _, ok := seen[key]; ok {
+				start := strings.Index(target.text, text)
+				if start < 0 {
+					start = 0
+				}
+				matched := false
+				if rule.matchMode == RegexRuleMatchExact {
+					matched = text == rule.literal
+				} else {
+					matched = matchCommandPrefix(rule.literal, text)
+				}
+				if matched {
+					appendFinding(rule, target, start, start+len(text), text)
+				}
+			default:
+				if rule.pattern == nil {
 					continue
 				}
-				seen[key] = struct{}{}
-				findings = append(findings, Finding{
-					RuleID:   rule.ruleID,
-					Level:    string(rule.severity),
-					Severity: rule.severity,
-					Action:   rule.action,
-					Title:    rule.title,
-					Message:  rule.message,
-					Risk:     "bash-guard",
-					Value:    truncateValue(matched, 512),
-					Start:    target.offset + loc[0],
-					End:      target.offset + loc[1],
-				})
+				for _, loc := range rule.pattern.FindAllStringIndex(target.text, -1) {
+					if loc[0] == loc[1] {
+						continue
+					}
+					appendFinding(rule, target, loc[0], loc[1], target.text[loc[0]:loc[1]])
+				}
 			}
 		}
 	}
 	return findings
+}
+
+// matchCommandPrefix follows Claude Code's Bash(prefix:*) boundary: a prefix
+// matches the command itself or the command followed by an argument separator,
+// so `ls` does not accidentally match `lsof`.
+func matchCommandPrefix(prefix, command string) bool {
+	prefix = strings.TrimSpace(prefix)
+	command = strings.TrimSpace(command)
+	if prefix == "" || command == "" {
+		return false
+	}
+	if command == prefix {
+		return true
+	}
+	for _, sep := range []string{" ", "\t", "\n", ":"} {
+		if strings.HasPrefix(command, prefix+sep) {
+			return true
+		}
+	}
+	return false
 }
 
 var regexRulesCache struct {

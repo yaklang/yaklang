@@ -5,8 +5,58 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// SecurityAskContextKey tells DoWaitAgree that an AI-review failure must
+// escalate to a human instead of auto-continuing.
+const SecurityAskContextKey = "security_ask"
+
+type securityReviewMode string
+
+const (
+	securityReviewNone  securityReviewMode = ""
+	securityReviewHuman securityReviewMode = "human"
+	securityReviewAI    securityReviewMode = "ai"
+)
+
+func agreePolicyFromConfig(cfg AICallerConfigIf) AgreePolicyType {
+	if cfg == nil {
+		return AgreePolicyManual
+	}
+	if provider, ok := cfg.(interface{ GetAgreePolicy() AgreePolicyType }); ok {
+		return provider.GetAgreePolicy()
+	}
+	// Custom implementations that do not expose the policy keep the historical
+	// manual behavior instead of silently auto-approving a security ask.
+	return AgreePolicyManual
+}
+
+// resolveSecurityReviewAction applies the review policy to a rule action.
+// Review policy controls interaction, not detection: deny stays a hard block,
+// warn stays non-interactive, and ask is delegated to the policy's reviewer.
+func resolveSecurityReviewAction(policy AgreePolicyType, action schema.SyntaxFlowAction) (schema.SyntaxFlowAction, securityReviewMode) {
+	switch action {
+	case schema.SFR_ACTION_DENY:
+		return schema.SFR_ACTION_DENY, securityReviewNone
+	case schema.SFR_ACTION_ASK:
+		switch policy {
+		case AgreePolicyYOLO, AgreePolicyAuto:
+			// Non-interactive policies must not surface a security card. Keep
+			// the finding visible as a warning and continue.
+			return schema.SFR_ACTION_WARN, securityReviewNone
+		case AgreePolicyAI, AgreePolicyAIAuto:
+			return schema.SFR_ACTION_ASK, securityReviewAI
+		default:
+			return schema.SFR_ACTION_ASK, securityReviewHuman
+		}
+	case schema.SFR_ACTION_WARN:
+		return schema.SFR_ACTION_WARN, securityReviewNone
+	default:
+		return schema.SFR_ACTION_ALLOW, securityReviewNone
+	}
+}
 
 func securityRuleReviewSummary(decision *ToolCallRuleDecision) string {
 	if decision == nil {
@@ -22,12 +72,12 @@ func securityRuleReviewSummary(decision *ToolCallRuleDecision) string {
 	return summary
 }
 
-// securityRuleReviewPrompt builds the visible human-review card. The frontend
-// renders require_user_interactive prompts regardless of the yolo/auto policy,
-// unlike tool_use_review_require cards.
+// securityRuleReviewPrompt builds the security review payload. It is shown as
+// a human-interactive card in manual mode and as the review reason when an AI
+// reviewer is asked to judge a middle-severity finding.
 func securityRuleReviewPrompt(decision *ToolCallRuleDecision, toolName string, params aitool.InvokeParams) string {
 	var b strings.Builder
-	b.WriteString("安全规则命中，需要人工确认\n\n")
+	b.WriteString("安全规则命中，需要确认\n\n")
 	b.WriteString("工具：")
 	b.WriteString(toolName)
 	b.WriteString("\n")

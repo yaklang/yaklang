@@ -103,7 +103,10 @@ func toolCallRuleGate(cfg *aicommon.Config) aicommon.ToolCallRuleGate {
 	if cfg != nil {
 		options = append(options,
 			commandcheck.WithDisableBuiltinRules(cfg.DisableBuiltinSyntaxFlowRules),
-			commandcheck.WithIncludeCustomRules(cfg.EnableCustomSyntaxFlowRules),
+			// Custom rules have no session-level switch anymore. Each row is
+			// enabled/disabled on the AI Bash guard page, so include the stored
+			// rows whenever the guard evaluates a command.
+			commandcheck.WithIncludeCustomRules(true),
 		)
 	}
 	builtinGate := securityRuleGateWithOptions(options)

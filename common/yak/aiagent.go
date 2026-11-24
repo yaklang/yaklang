@@ -156,7 +156,9 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 							if runtimeConfig != nil {
 								checkOptions = append(checkOptions,
 									commandcheck.WithDisableBuiltinRules(runtimeConfig.DisableBuiltinSyntaxFlowRules),
-									commandcheck.WithIncludeCustomRules(runtimeConfig.EnableCustomSyntaxFlowRules),
+									// Custom rules are per-row opt-in; there is no
+									// session-level custom-rule switch.
+									commandcheck.WithIncludeCustomRules(true),
 								)
 							}
 							if check := commandcheck.CheckCommand(ctx, cmd, checkOptions...); check.Blocked {

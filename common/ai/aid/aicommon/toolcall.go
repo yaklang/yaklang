@@ -1028,8 +1028,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 	}
 
 	ruleDecision := t.applyToolCallRuleGate(tool, invokeParams)
+	securityAction := schema.SFR_ACTION_ALLOW
+	securityReview := securityReviewNone
+	agreePolicy := agreePolicyFromConfig(t.config)
 	if ruleDecision != nil {
-		switch ruleDecision.Action {
+		securityAction, securityReview = resolveSecurityReviewAction(agreePolicy, ruleDecision.Action)
+		switch securityAction {
 		case schema.SFR_ACTION_DENY:
 			denied := &SecurityRuleDeniedError{
 				ToolName: tool.Name,
@@ -1043,10 +1047,17 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			handleError(blocked)
 			return nil, false, denied
 		case schema.SFR_ACTION_WARN:
-			t.emitter.EmitWarning(
-				"tool[%v] matched security rule %s (severity=%s), continuing with warning: %s",
-				tool.Name, ruleDecision.RuleName, ruleDecision.Severity, ruleDecision.Summary(),
-			)
+			if ruleDecision.Action == schema.SFR_ACTION_ASK {
+				t.emitter.EmitWarning(
+					"tool[%v] matched security rule %s (severity=%s); review policy %s downgraded ask to warning, continuing: %s",
+					tool.Name, ruleDecision.RuleName, ruleDecision.Severity, agreePolicy, ruleDecision.Summary(),
+				)
+			} else {
+				t.emitter.EmitWarning(
+					"tool[%v] matched security rule %s (severity=%s), continuing with warning: %s",
+					tool.Name, ruleDecision.RuleName, ruleDecision.Severity, ruleDecision.Summary(),
+				)
+			}
 		}
 	}
 
@@ -1077,8 +1088,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		reviewCheckpointSeq := t.reviewCheckpointSeq
 		t.reviewCheckpointSeq = 0
 		ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, reviewCheckpointSeq)
-		securityAsk := ruleDecision != nil && ruleDecision.Action == schema.SFR_ACTION_ASK
-		if securityAsk {
+		securityNeedsReview := securityReview != securityReviewNone
+		forceHumanSecurityReview := securityReview == securityReviewHuman
+		if securityNeedsReview {
 			// A missing answer must never authorize a security escalation.
 			ep.SetDefaultSuggestion("cancel")
 		} else {
@@ -1099,9 +1111,13 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		}
 		if ruleDecision != nil {
 			reqs["security_rule"] = ruleDecision
+			reqs["security_effective_action"] = string(securityAction)
 		}
-		if securityAsk {
-			reqs["force_human_review"] = true
+		if securityNeedsReview {
+			if forceHumanSecurityReview {
+				reqs["force_human_review"] = true
+			}
+			reqs["security_review_source"] = string(securityReview)
 			reqs["reason"] = securityRuleReviewSummary(ruleDecision)
 			reqs["prompt"] = securityRuleReviewPrompt(ruleDecision, tool.Name, invokeParams)
 			reqs["options"] = securityRuleReviewOptions()
@@ -1148,7 +1164,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		}
 
 		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
-		if securityAsk {
+		if securityNeedsReview {
 			reviewQuestion = securityRuleReviewPrompt(ruleDecision, tool.Name, invokeParams)
 		}
 
@@ -1166,20 +1182,24 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			}
 			reviewEventType := schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE
 			reviewEventNode := "review-require"
-			if securityAsk {
-				// yolo/auto frontends skip tool_use_review_require cards. Reuse
-				// the user-interactive event so the escalation is always visible.
+			if forceHumanSecurityReview {
+				// yolo/auto frontends skip tool_use_review_require cards. Manual
+				// security asks use the user-interactive event so they stay visible.
 				reviewEventType = schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE
 				reviewEventNode = "require-user-interact"
 			}
 			t.emitter.EmitInteractiveJSON(ep.GetId(), reviewEventType, reviewEventNode, reqs)
 
-			// Security escalation is authoritative: bypass every agree policy,
-			// including yolo/auto, and wait for a real human decision.
-			if securityAsk {
+			switch securityReview {
+			case securityReviewHuman:
 				ep.SetApprovalMeta(ApprovalSourceRule, true, ruleDecision.Summary())
 				ep.WaitContext(t.ctx)
-			} else {
+			case securityReviewAI:
+				// Let the configured AI reviewer decide, but make a reviewer
+				// failure escalate to a human instead of auto-continuing.
+				waitCtx := utils.SetContextKey(t.ctx, SecurityAskContextKey, true)
+				config.DoWaitAgree(waitCtx, ep)
+			default:
 				config.DoWaitAgree(t.ctx, ep)
 			}
 			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
@@ -1192,7 +1212,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			}
 			reviewDecidedAt := time.Now()
 			params = ep.GetParams()
-			if securityAsk {
+			if securityNeedsReview {
 				allowed, cancelReason := securityRuleReviewDecision(params)
 				if !allowed {
 					// The visible card is a user-interactive card; close it with
@@ -1208,7 +1228,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			}
 			t.emitter.EmitInteractiveRelease(ep.GetId(), params)
 			config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-			if securityAsk || !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
+			if securityNeedsReview || !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
 				config.CallAfterReview(
 					ep.GetSeq(),
 					reviewQuestion,

@@ -376,12 +376,16 @@ type Config struct {
 	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 60s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
-	// SyntaxFlow security-rule switches. Both default to off so the AI Agent
-	// checkboxes start disabled; callers can enable either layer per session.
+	// DisableBuiltinSyntaxFlowRules keeps built-in rules opt-in. Custom rules
+	// have no session-level switch: each stored row is enabled or disabled on
+	// the AI Bash guard page and is always considered by the guard.
 	DisableBuiltinSyntaxFlowRules bool
-	EnableCustomSyntaxFlowRules   bool
-	ToolComposeConcurrency        int // Legacy shared concurrency option, still used by fast-context grep (default 2)
-	PlanExecTaskConcurrency       int // Max concurrent executable tasks per PE DAG stage (default 1)
+	// EnableCustomSyntaxFlowRules is retained for proto/session compatibility.
+	// Runtime gates include custom rows unconditionally; leaving this field in
+	// place keeps old start params and hotpatch payloads wire-compatible.
+	EnableCustomSyntaxFlowRules bool
+	ToolComposeConcurrency      int // Legacy shared concurrency option, still used by fast-context grep (default 2)
+	PlanExecTaskConcurrency     int // Max concurrent executable tasks per PE DAG stage (default 1)
 
 	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
 	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
@@ -2137,6 +2141,20 @@ func WithAllowRequireForUserInteract(v bool) ConfigOption {
 		}
 		return nil
 	}
+}
+
+// GetAgreePolicy returns the active review policy. It is intentionally a
+// getter rather than a public field read so callers holding the narrower
+// AICallerConfigIf interface can still resolve security-rule interactions.
+func (c *Config) GetAgreePolicy() AgreePolicyType {
+	if c == nil {
+		return AgreePolicyManual
+	}
+	if c.m != nil {
+		c.m.Lock()
+		defer c.m.Unlock()
+	}
+	return c.AgreePolicy
 }
 
 // WithAgreePolicy 设置操作审批策略（导出名为 aiagent.agreePolicy）
