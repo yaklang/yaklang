@@ -65,6 +65,11 @@ jobs:
           go test -mod=readonly ./common/yak/ssa/ssadb \
             -run '^TestSQLBoundaryUsesNativeExecutor$' \
             -count=1 -v
+      - name: Check the SQL inventory
+        run: |
+          go test -mod=readonly ./common/yak/ssa/ssadb \
+            -run '^TestSQLInventory$' \
+            -count=1 -v
       - name: Run the SSA dialect conformance test on SQLite, PostgreSQL and MySQL
         run: |
           go test -mod=readonly ./common/yak/ssa/ssadb \

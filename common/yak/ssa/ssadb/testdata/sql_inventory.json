@@ -1,0 +1,440 @@
+[
+  {
+    "file": "audit_edge_native.go",
+    "function": "nativeAuditEdgeTargets",
+    "fingerprint": "4d1df38e24dba63b0bdd9bf4a19785d4b0bb4134c91d51de995c6621bb8435ef",
+    "snippet": "WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL"
+  },
+  {
+    "file": "audit_edge_native.go",
+    "function": "nativeAuditEdgeTargets",
+    "fingerprint": "7e0ee713f034d05069ca249bfe44f93da6a21b892d3c1a75fc6970dc55ad072d",
+    "snippet": "SELECT to_node FROM"
+  },
+  {
+    "file": "audit_edge_native.go",
+    "function": "nativePredecessorEdges",
+    "fingerprint": "4d1df38e24dba63b0bdd9bf4a19785d4b0bb4134c91d51de995c6621bb8435ef",
+    "snippet": "WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL"
+  },
+  {
+    "file": "audit_edge_native.go",
+    "function": "nativePredecessorEdges",
+    "fingerprint": "f8e5597254647a38e3008c05bcd6ef26786aaaff3f463f5a68b74fb33b13c6c7",
+    "snippet": "SELECT id, created_at, updated_at, deleted_at, task_id, result_id, from_node, to_node,"
+  },
+  {
+    "file": "audit_edge_native.go",
+    "function": "nativePredecessorTargets",
+    "fingerprint": "08f2550185f4c0212ed9342fc9990014504cb3356860eb7261f73ce24a1c93bc",
+    "snippet": "SELECT to_node, analysis_step, analysis_label FROM"
+  },
+  {
+    "file": "audit_edge_native.go",
+    "function": "nativePredecessorTargets",
+    "fingerprint": "4d1df38e24dba63b0bdd9bf4a19785d4b0bb4134c91d51de995c6621bb8435ef",
+    "snippet": "WHERE from_node = ? AND edge_type = ? AND deleted_at IS NULL"
+  },
+  {
+    "file": "audit_node_native.go",
+    "function": "nativeGetAuditNodeById",
+    "fingerprint": "320f2ab38a951917f39a358ea56570b33394aea123d88caabb8f7bbcfce1aeb6",
+    "snippet": "WHERE node_id = ? AND deleted_at IS NULL ORDER BY id LIMIT 1"
+  },
+  {
+    "file": "audit_node_native.go",
+    "function": "nativeGetAuditNodesByIds",
+    "fingerprint": "825e69e8a4e44d57120d9f97407d41013dd0369d75ed89d1a02755bc5df8cffa",
+    "snippet": "WHERE node_id IN ("
+  },
+  {
+    "file": "const_table.go",
+    "function": "GetIrConstValue",
+    "fingerprint": "df8fa64e324f8f03589d34f29bf8773f20cfccd355398c08eb7783d45845ff51",
+    "snippet": "WHERE program_name = ? AND const_id = ? LIMIT 1"
+  },
+  {
+    "file": "const_table.go",
+    "function": "GetIrConstValue",
+    "fingerprint": "f2fe413496938be2a9046936f3ebcf989d8892c22beaed10a90bdc1be3a2f9ab",
+    "snippet": "SELECT kind,"
+  },
+  {
+    "file": "const_table.go",
+    "function": "irConstPoolHasProgram",
+    "fingerprint": "48d61cc64125ec790d3f5010a14bcdd210b383c7ac52900f88574b7d479bae1c",
+    "snippet": "SELECT 1 FROM"
+  },
+  {
+    "file": "const_table.go",
+    "function": "irConstPoolHasProgram",
+    "fingerprint": "66c928d9ba98fdebb741db59405cfb186c4a647a3cf8a1cdcec09990927c20c9",
+    "snippet": "WHERE program_name = ? LIMIT 1"
+  },
+  {
+    "file": "const_table.go",
+    "function": "irConstTableHasProgram",
+    "fingerprint": "48d61cc64125ec790d3f5010a14bcdd210b383c7ac52900f88574b7d479bae1c",
+    "snippet": "SELECT 1 FROM"
+  },
+  {
+    "file": "const_table.go",
+    "function": "irConstTableHasProgram",
+    "fingerprint": "66c928d9ba98fdebb741db59405cfb186c4a647a3cf8a1cdcec09990927c20c9",
+    "snippet": "WHERE program_name = ? LIMIT 1"
+  },
+  {
+    "file": "const_table.go",
+    "function": "preloadShortConsts",
+    "fingerprint": "20d302940b74e46f129d357d4c42b8c6546a4b005a571e03fd8292a603c98292",
+    "snippet": "WHERE program_name = ? AND text_size \u003c= ?"
+  },
+  {
+    "file": "const_table.go",
+    "function": "preloadShortConsts",
+    "fingerprint": "b0bc591c83155e400c795aca5d5cb2bd3901cef8d998134e76b533a5a0295ef0",
+    "snippet": "SELECT const_id, kind,"
+  },
+  {
+    "file": "database.go",
+    "function": "deleteProgramRows",
+    "fingerprint": "e364d98c2276eef8005d490a583ead210b03be906cfecc51c443c1d84a3614eb",
+    "snippet": "DELETE FROM"
+  },
+  {
+    "file": "database.go",
+    "function": "ensureUniqueIrOffsetsIndex",
+    "fingerprint": "bb05a3f5ab04dc900eee1f524b1414d19a66f207d1c7f54e648139b58959d0e3",
+    "snippet": "COALESCE("
+  },
+  {
+    "file": "database.go",
+    "function": "ensureUniqueIrOffsetsIndex",
+    "fingerprint": "e541f61bf68d8d6b02161fe218cd8087fe4b4c17c10ea0d0a2ba6acbd730c721",
+    "snippet": "DROP INDEX IF EXISTS"
+  },
+  {
+    "file": "database.go",
+    "function": "namedIndexDefinition",
+    "fingerprint": "756544a7e5b36dcffeca1c4d50eac9eb615f67df51a5088a4e93e6dfadb3c09f",
+    "snippet": "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name = ?"
+  },
+  {
+    "file": "database.go",
+    "function": "namedIndexDefinition",
+    "fingerprint": "98cc46b95ef29adc02615fe81b4d796682fb2f7d57b185dfa763f1a0c0fc8677",
+    "snippet": "SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename::text = ? AND indexname::text = ?"
+  },
+  {
+    "file": "database.go",
+    "function": "patchIrSourceQuotedCode",
+    "fingerprint": "18fe2016fea59dc69f3d1391d957282b50f5f93674e668ed7abfb5703f02f573",
+    "snippet": "ALTER TABLE"
+  },
+  {
+    "file": "database.go",
+    "function": "pruneRedundantIRIndexes",
+    "fingerprint": "e541f61bf68d8d6b02161fe218cd8087fe4b4c17c10ea0d0a2ba6acbd730c721",
+    "snippet": "DROP INDEX IF EXISTS"
+  },
+  {
+    "file": "database.go",
+    "function": "tableColumnType",
+    "fingerprint": "1c210f39c5e0fe114d0e622e1da3a8f6bfb357916e89b8682af9ead1541de04a",
+    "snippet": "SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+  },
+  {
+    "file": "database.go",
+    "function": "tableColumnType",
+    "fingerprint": "3356bdedb98853e42730141574d3063084eb54086780cdc657f8deb0fe6fdfa5",
+    "snippet": "SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?"
+  },
+  {
+    "file": "database.go",
+    "function": "tableColumnType",
+    "fingerprint": "77b7aa1d71c3eaf9a8c9c1487f861140fc217e35f63edadabbfe683cf5c11182",
+    "snippet": "SELECT DATA_TYPE FROM ALL_TAB_COLUMNS WHERE OWNER = SYS_CONTEXT('USERENV','CURRENT_SCHEMA') AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+  },
+  {
+    "file": "database.go",
+    "function": "tableColumnType",
+    "fingerprint": "8166810c78580e1c22607e279c2770a066863063b615d020f1d853990542f403",
+    "snippet": "PRAGMA table_info("
+  },
+  {
+    "file": "index.go",
+    "function": "GetScope",
+    "fingerprint": "2c45d7b2c9bf2e08f2de640d956b6aef7a5015a2b7612c040d21df4927c5e466",
+    "snippet": "version_id = ( SELECT max(sub.version_id) FROM"
+  },
+  {
+    "file": "index.go",
+    "function": "GetScope",
+    "fingerprint": "8983a33ff8d3af61dbd2db8573664a6d27fd038da424556e7e5f0db12ef017a5",
+    "snippet": "AS sub WHERE sub.variable_id ="
+  },
+  {
+    "file": "index_ddl.go",
+    "function": "BuildIndexDDL",
+    "fingerprint": "fde9c5013bf506100d196c3c865dc3acdc36530b46f661826f62a1b0463de3b3",
+    "snippet": "CREATE"
+  },
+  {
+    "file": "index_ddl.go",
+    "function": "installDMIRIndexes",
+    "fingerprint": "0e8769ebb3e9f266c0761db6f861f08320f308c064da2ddab6714c21afb3da44",
+    "snippet": "SELECT I.INDEX_NAME,I.UNIQUENESS,C.COLUMN_NAME FROM ALL_INDEXES I JOIN ALL_IND_COLUMNS C ON C.INDEX_OWNER=I.OWNER AND C.INDEX_NAME=I.INDEX_NAME WHERE I.OWNER=SY..."
+  },
+  {
+    "file": "index_ddl.go",
+    "function": "installDMIRIndexes",
+    "fingerprint": "89c5ba18fdf3f385fde496d8b3d71563202fc6a2ea91ae94cf196a0517f8b1e6",
+    "snippet": "SELECT COUNT(*) FROM (SELECT"
+  },
+  {
+    "file": "index_ddl.go",
+    "function": "installDMIRIndexes",
+    "fingerprint": "b994a5c3ee5d26c944d13d2c5202cd014b11e2ad08b32295b03a4fc8eee4ac1c",
+    "snippet": "DROP INDEX"
+  },
+  {
+    "file": "index_ddl.go",
+    "function": "installDMIRIndexes",
+    "fingerprint": "fde9c5013bf506100d196c3c865dc3acdc36530b46f661826f62a1b0463de3b3",
+    "snippet": "CREATE"
+  },
+  {
+    "file": "ircode_native_insert.go",
+    "function": "nativeInsertIrCodes",
+    "fingerprint": "94d439de27538027f73098d8dc47d80620c8ec27a0e6b92cb2093739b184145d",
+    "snippet": ") VALUES"
+  },
+  {
+    "file": "ircode_native_insert.go",
+    "function": "nativeInsertIrCodes",
+    "fingerprint": "a3946cfcc37b850495772b94c09f5a800b7f7d4b00aee63e56b23ed84e67b111",
+    "snippet": "INSERT INTO"
+  },
+  {
+    "file": "name_cache.go",
+    "function": "reserveNamePoolID",
+    "fingerprint": "41739243542b3e268ed08f3fc32b98b44305a4cd3f557aa069f6b36dc2072288",
+    "snippet": "SELECT COALESCE(MAX(name_id), 0) FROM"
+  },
+  {
+    "file": "native_read.go",
+    "function": "constLookupIndexHint",
+    "fingerprint": "855292faf1b87782da935638b37a1ae9bfd9ac7e5c9722b5bb5e3ec8b8262b7b",
+    "snippet": "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=? LIMIT 1"
+  },
+  {
+    "file": "native_read.go",
+    "function": "constLookupSQL",
+    "fingerprint": "8e8be05a5e4e7599c7936eddeb5612ec31b68cf4425289b5616237d93753e723",
+    "snippet": "SELECT code_id FROM %s WHERE program_name = ? AND opcode = %d AND const_type = '%s' AND %s %s ? AND deleted_at IS NULL"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromIrConsts",
+    "fingerprint": "1d142e5fe41890d4368c82bcb5ceee7ac9de0164e7720e3e089b3b0be68d7841",
+    "snippet": "WHERE program_name = ? AND"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromIrConsts",
+    "fingerprint": "63a64dc91c30e9a5b0afa0d2c65fa53fdd3a42d1876e6cfa32634cd0d087d1ae",
+    "snippet": "SELECT code_id FROM"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromIrConsts",
+    "fingerprint": "9417fc677eb7e38cefb8079a4461a685f4db6c7a2a39138a5c8cb5cde02b0ca2",
+    "snippet": "NOT INDEXED WHERE program_name = ? AND"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromIrConsts",
+    "fingerprint": "a11eaa34312e6d224857eeb4b474b288e2673ce115c2400b16ffa7b6c19c6636",
+    "snippet": "WHERE program_name = ? AND const_hash = ? AND"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromIrConsts",
+    "fingerprint": "f5db1b8bed3221c254e3ad9a8aea363e7b9c5e4f6e189f5ef097a414454f60bb",
+    "snippet": "REGEXP ?"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromPool",
+    "fingerprint": "1d142e5fe41890d4368c82bcb5ceee7ac9de0164e7720e3e089b3b0be68d7841",
+    "snippet": "WHERE program_name = ? AND"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromPool",
+    "fingerprint": "2f6ac64a718e0ff1bb07bc69416bce933cafeea820dbbba71e7edeb2397b1c72",
+    "snippet": "SELECT c.code_id FROM"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromPool",
+    "fingerprint": "594ae9d7dfcc84f4751985678bc3b66cfe89b65343a63914b74d49669976a3dd",
+    "snippet": "WHERE c.program_name = ? AND c.const_id \u003c\u003e 0 AND c.deleted_at IS NULL"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromPool",
+    "fingerprint": "8deb7b31f9d56e90e7b6c3b8b577a969119a134de8247341ab3e658efb05d3d1",
+    "snippet": "AND c.const_id IN (SELECT const_id FROM"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetConstIDsFromPool",
+    "fingerprint": "bb940055d6d087cffdb0d30de44b10d1e1450d32ecb7165048d2c8599781e944",
+    "snippet": "WHERE p.program_name = ? AND c.const_id \u003c\u003e 0 AND c.deleted_at IS NULL"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetIrCodeIDsByConstTypeContext",
+    "fingerprint": "855292faf1b87782da935638b37a1ae9bfd9ac7e5c9722b5bb5e3ec8b8262b7b",
+    "snippet": "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=? LIMIT 1"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetIrCodeItemByIdErr",
+    "fingerprint": "60eedaf51bd03ef9205d3f822fcc5934980b0a9cdf6ddecdee0401fd10b524be",
+    "snippet": "SELECT id, created_at, updated_at, deleted_at, code_id, program_name, version,"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetIrCodeItemByIdErr",
+    "fingerprint": "6f5117a83878bcef3930c4009b4d6c591b0e7959e51c0fd7912510d4e0395db1",
+    "snippet": "WHERE code_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetIrCodesByIds",
+    "fingerprint": "1d142e5fe41890d4368c82bcb5ceee7ac9de0164e7720e3e089b3b0be68d7841",
+    "snippet": "WHERE program_name = ? AND"
+  },
+  {
+    "file": "native_read.go",
+    "function": "nativeGetIrCodesByIds",
+    "fingerprint": "62df8bbb2c2b087cf2044349650e1e601abcedbe529c684b59ef7744984be594",
+    "snippet": ") AND deleted_at IS NULL ORDER BY code_id"
+  },
+  {
+    "file": "offset_native.go",
+    "function": "\u003cpackage\u003e",
+    "fingerprint": "ed92ba474b15288e7cae2da52cfa52d8a41ba5ad490db6917da01eb5a5fc261d",
+    "snippet": "SELECT id, created_at, updated_at, deleted_at, program_name, file_hash, start_offset, end_offset, variable_name, value_id FROM"
+  },
+  {
+    "file": "offset_native.go",
+    "function": "offsetVariableQuery",
+    "fingerprint": "0129a2e21983dd376383b003b67805f12e7cbc6ab0a2990680500bf96a38c383",
+    "snippet": "WHERE deleted_at IS NULL AND +variable_name = ? AND value_id = ? AND program_name = ?"
+  },
+  {
+    "file": "offset_native.go",
+    "function": "offsetVariableQuery",
+    "fingerprint": "1a94b3c1290314aa261dd03f6abe7bc388b86485b0c25a3c292dd25900b1338e",
+    "snippet": "WHERE deleted_at IS NULL AND variable_name = ? AND value_id = ?"
+  },
+  {
+    "file": "program_replace.go",
+    "function": "deleteProgramRowsForReplacement",
+    "fingerprint": "e364d98c2276eef8005d490a583ead210b03be906cfecc51c443c1d84a3614eb",
+    "snippet": "DELETE FROM"
+  },
+  {
+    "file": "program_replace.go",
+    "function": "renameProgramRowsForReplacement",
+    "fingerprint": "6cb78ab1c6bdad2815633292caac2d1fc296f0b416b8b64e867f4563d4d6b1ae",
+    "snippet": "UPDATE"
+  },
+  {
+    "file": "program_replace.go",
+    "function": "renameProgramRowsForReplacement",
+    "fingerprint": "cb1aa73a1a9bc0dfa50c84c9211f6449840aa02cce174a508cda457feedb3d27",
+    "snippet": "= ? WHERE"
+  },
+  {
+    "file": "secondary_index_suspend.go",
+    "function": "CheckpointSQLiteWAL",
+    "fingerprint": "3f8c1957616c4f2aeae576e5387c4f92e23662a3f612420c3747608c4d3aed1f",
+    "snippet": "PRAGMA wal_checkpoint(TRUNCATE)"
+  },
+  {
+    "file": "secondary_index_suspend.go",
+    "function": "RestoreSecondaryIndexes",
+    "fingerprint": "61324c5153f543982a7e40892ee24726a35d3cabeee7b5f365e144e5e4bf9e81",
+    "snippet": "PRAGMA temp_store=MEMORY"
+  },
+  {
+    "file": "secondary_index_suspend.go",
+    "function": "RestoreSecondaryIndexes",
+    "fingerprint": "7feab9243216c25f6471c4291be4dd1421227172f3877eac1af33fea4e6ddc01",
+    "snippet": "PRAGMA temp_store="
+  },
+  {
+    "file": "secondary_index_suspend.go",
+    "function": "SuspendSecondaryIndexes",
+    "fingerprint": "006e0a98d5781ebd86a04603cf8c6cbaacd3329d1bc21cb1f5bb366703f21718",
+    "snippet": "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND tbl_name IN ("
+  },
+  {
+    "file": "secondary_index_suspend.go",
+    "function": "SuspendSecondaryIndexes",
+    "fingerprint": "e541f61bf68d8d6b02161fe218cd8087fe4b4c17c10ea0d0a2ba6acbd730c721",
+    "snippet": "DROP INDEX IF EXISTS"
+  },
+  {
+    "file": "sqlite_bulk_delete.go",
+    "function": "BeginSQLiteBulkDelete",
+    "fingerprint": "030ba46a956c3cc4b6e40b3bbd38b6e09eedbaedbe16096cb8f220127444ce88",
+    "snippet": "PRAGMA wal_autocheckpoint = 20000;"
+  },
+  {
+    "file": "sqlite_bulk_delete.go",
+    "function": "BeginSQLiteBulkDelete",
+    "fingerprint": "8bfe5fd7d0d3779dcd94944c5c8513bc1deeac8d83581733ef2a9e5f9d8dbedc",
+    "snippet": "PRAGMA synchronous = OFF;"
+  },
+  {
+    "file": "sqlite_bulk_delete.go",
+    "function": "BeginSQLiteBulkDelete",
+    "fingerprint": "978c42ebe23fb14ec11f083fb7a25062d7aac04b66b3a2056fdcaabbf7b2fa07",
+    "snippet": "PRAGMA wal_autocheckpoint = 0;"
+  },
+  {
+    "file": "sqlite_bulk_delete.go",
+    "function": "BeginSQLiteBulkDelete",
+    "fingerprint": "b699e87baea69f0f7a6bab51e8d01e5f4d263cc5e6490b088ddf49c5c25c895a",
+    "snippet": "PRAGMA synchronous = FULL;"
+  },
+  {
+    "file": "sqlite_bulk_delete.go",
+    "function": "BeginSQLiteBulkDelete",
+    "fingerprint": "d53ac3c47a6a06740dd1f20ab8f5fca70c49630d4e68d3f657096de5593007cf",
+    "snippet": "PRAGMA cache_size = -1048576;"
+  },
+  {
+    "file": "type.go",
+    "function": "GetIrTypeItemById",
+    "fingerprint": "053065a7ca5468672f62dac9b14d1c2dd11a7e35bda3c26a9fae20c7eac51cc2",
+    "snippet": ", extra_information FROM"
+  },
+  {
+    "file": "type.go",
+    "function": "GetIrTypeItemById",
+    "fingerprint": "2dd67d3a766ae97171c546a6c821dd364997a74c12bd2750c7cc3b91fe3c6a29",
+    "snippet": "WHERE program_name = ? AND type_id = ? AND deleted_at IS NULL"
+  },
+  {
+    "file": "type.go",
+    "function": "GetIrTypeItemById",
+    "fingerprint": "f2fe413496938be2a9046936f3ebcf989d8892c22beaed10a90bdc1be3a2f9ab",
+    "snippet": "SELECT kind,"
+  }
+]
