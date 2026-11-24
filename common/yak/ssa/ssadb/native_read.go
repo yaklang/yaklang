@@ -339,6 +339,7 @@ func constLookupIndexMissing(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "no such index")
 }
 
+// sql-boundary:allow SQLite index-catalog probe needs a raw driver handle
 func constLookupIndexHint(ctx context.Context, db *gorm.DB) (string, error) {
 	if db == nil || db.Dialect() == nil || db.CommonDB() == nil {
 		return "", nil
@@ -565,6 +566,7 @@ func nativePrepareQuery(db *gorm.DB, query string) string {
 	return query
 }
 
+// sql-boundary:allow native SQL executor
 func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args ...interface{}) *sql.Row {
 	if db == nil {
 		return nil
@@ -587,6 +589,7 @@ func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args 
 	}
 }
 
+// sql-boundary:allow native SQL executor
 func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
 	if db == nil {
 		return nil, sql.ErrConnDone
@@ -614,6 +617,7 @@ func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args .
 
 // nativeExecContextDB executes a statement on the database or transaction
 // behind a gorm handle without building a gorm scope.
+// sql-boundary:allow native SQL executor
 func nativeExecContextDB(db *gorm.DB, ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	if db == nil {
 		return nil, sql.ErrConnDone

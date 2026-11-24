@@ -253,6 +253,7 @@ func EnsureDBOpCallbacks(db *gorm.DB) {
 	dbOpCallbackOnce.Do(registerDefaultDBOpCallbacks)
 }
 
+// sql-boundary:allow GORM callback registration uses Callback.Query()
 func registerDefaultDBOpCallbacks() {
 	defaults := gorm.DefaultCallback
 	defaults.Query().Before("gorm:query").Register("ssadb:stats:before_query", markScopeStart)
