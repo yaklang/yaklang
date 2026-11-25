@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -78,6 +79,15 @@ func LoadClaudeCodePermissionConfigs() []string {
 	return configs
 }
 
+// runtimePermissionCache reuses the compiled gate while the raw documents are
+// unchanged. Files are still read on every call, so edits apply immediately;
+// only JSON parsing and rule compilation are skipped.
+var runtimePermissionCache struct {
+	mu   sync.Mutex
+	key  string
+	gate ToolCallRuleGate
+}
+
 // CompileClaudeCodePermissionsFromRuntime builds the optional runtime gate.
 // A nil result means no configuration was found; callers should fall back to
 // the built-in gate.
@@ -85,6 +95,13 @@ func CompileClaudeCodePermissionsFromRuntime() ToolCallRuleGate {
 	configs := LoadClaudeCodePermissionConfigs()
 	if len(configs) == 0 {
 		return nil
+	}
+	key := strings.Join(configs, string(rune(0)))
+
+	runtimePermissionCache.mu.Lock()
+	defer runtimePermissionCache.mu.Unlock()
+	if runtimePermissionCache.key == key {
+		return runtimePermissionCache.gate
 	}
 
 	var rules []*ToolCallPolicyRule
@@ -96,7 +113,9 @@ func CompileClaudeCodePermissionsFromRuntime() ToolCallRuleGate {
 		}
 		rules = append(rules, parsed...)
 	}
-	return NewToolCallPolicyGate(rules)
+	runtimePermissionCache.key = key
+	runtimePermissionCache.gate = NewToolCallPolicyGate(rules)
+	return runtimePermissionCache.gate
 }
 
 func splitRuntimePermissionConfig(raw string) []string {

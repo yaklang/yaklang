@@ -12,15 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 )
 
-const (
-	// bashToolName is the built-in shell tool backed by bash.yak. Other shell
-	// tools (cmd, powershell) use different grammars and are not evaluable by
-	// the bash frontend.
-	bashToolName = "bash"
-
-	maxSecurityRuleMatches = 8
-)
-
 // securityRuleGate turns built-in Bash rule findings into a tool-call decision.
 // It fails open when the analyzer itself is unavailable. Non-bash shells are
 // passed through for now; their own SyntaxFlow frontends will be added later.
@@ -30,7 +21,7 @@ func securityRuleGate(ctx context.Context, toolName string, params aitool.Invoke
 
 func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.ToolCallRuleGate {
 	return func(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
-		if !strings.EqualFold(strings.TrimSpace(toolName), bashToolName) {
+		if !strings.EqualFold(strings.TrimSpace(toolName), aitool.BashToolName) {
 			return nil
 		}
 		command := utils.InterfaceToString(params["command"])
@@ -38,7 +29,7 @@ func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.To
 			return nil
 		}
 		// TODO: enable the bash rules for cmd/zsh once their frontends land.
-		if !isBashShell(utils.InterfaceToString(params["shell"])) {
+		if !aitool.IsBashShell(utils.InterfaceToString(params["shell"])) {
 			return nil
 		}
 
@@ -56,17 +47,6 @@ func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.To
 	}
 }
 
-// isBashShell reports whether the bash tool's shell parameter selects the bash
-// grammar. An empty value follows bash.yak's bash-first default.
-func isBashShell(shell string) bool {
-	switch strings.ToLower(strings.TrimSpace(shell)) {
-	case "", "bash", "bash.exe":
-		return true
-	default:
-		return false
-	}
-}
-
 func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCallRuleDecision {
 	decision := &aicommon.ToolCallRuleDecision{
 		Action:   check.Action,
@@ -81,7 +61,7 @@ func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCall
 		}
 	}
 	for i, finding := range check.Findings {
-		if i >= maxSecurityRuleMatches {
+		if i >= aicommon.MaxToolCallRuleMatches {
 			break
 		}
 		decision.Matches = append(decision.Matches, aicommon.ToolCallRuleMatch{

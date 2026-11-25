@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,36 +44,7 @@ func LoadEmbeddedRulesByLanguage(language string, severities ...schema.SyntaxFlo
 	if ruleFSWithHash == nil {
 		return nil, utils.Error("embedded rule filesystem is not initialized")
 	}
-	wanted := normalizeEmbeddedRuleSeverities(severities)
-
-	var rules []*schema.SyntaxFlowRule
-	err := filesys.Recursive(".", filesys.WithFileSystem(ruleFSWithHash), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
-		if info == nil || info.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".sf") {
-			return nil
-		}
-		if !embeddedRulePathMatchesLanguage(path, language) {
-			return nil
-		}
-		raw, err := ruleFSWithHash.ReadFile(path)
-		if err != nil {
-			return utils.Wrapf(err, "read embedded rule %s", path)
-		}
-		rule, err := compileEmbeddedRuleForLanguage(path, string(raw), language, wanted)
-		if err != nil {
-			return err
-		}
-		if rule != nil {
-			rules = append(rules, rule)
-		}
-		return nil
-	}))
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(rules, func(i, j int) bool {
-		return rules[i].RuleName < rules[j].RuleName
-	})
-	return rules, nil
+	return loadEmbeddedRulesFromFS(ruleFSWithHash, language, severities)
 }
 
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {

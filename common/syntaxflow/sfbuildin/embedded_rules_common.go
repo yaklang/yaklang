@@ -1,11 +1,15 @@
 package sfbuildin
 
 import (
+	"io/fs"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 func normalizeEmbeddedRuleSeverities(severities []schema.SyntaxFlowSeverity) map[schema.SyntaxFlowSeverity]struct{} {
@@ -40,4 +44,39 @@ func compileEmbeddedRuleForLanguage(path, raw, language string, severities map[s
 	}
 	rule.IsBuildInRule = true
 	return rule, nil
+}
+
+// loadEmbeddedRulesFromFS walks one embedded snapshot and compiles matching
+// rules. Both the full and the slim build share this path so their ordering and
+// filtering cannot drift.
+func loadEmbeddedRulesFromFS(fsInstance filesys_interface.FileSystem, language string, severities []schema.SyntaxFlowSeverity) ([]*schema.SyntaxFlowRule, error) {
+	wanted := normalizeEmbeddedRuleSeverities(severities)
+	var rules []*schema.SyntaxFlowRule
+	err := filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
+		if info == nil || info.IsDir() || !strings.HasSuffix(strings.ToLower(path), ".sf") {
+			return nil
+		}
+		if !embeddedRulePathMatchesLanguage(path, language) {
+			return nil
+		}
+		raw, err := fsInstance.ReadFile(path)
+		if err != nil {
+			return utils.Wrapf(err, "read embedded rule %s", path)
+		}
+		rule, err := compileEmbeddedRuleForLanguage(path, string(raw), language, wanted)
+		if err != nil {
+			return err
+		}
+		if rule != nil {
+			rules = append(rules, rule)
+		}
+		return nil
+	}))
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].RuleName < rules[j].RuleName
+	})
+	return rules, nil
 }

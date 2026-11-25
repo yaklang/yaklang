@@ -14,7 +14,7 @@ func TestSecurityDeniedFeedbackPolicy(t *testing.T) {
 		denied := &SecurityRuleDeniedError{
 			ToolName: "bash",
 			RuleName: "Bash(rm -rf *)",
-			RuleID:   "claude-code-test",
+			RuleID:   "tool-permission-test",
 			Severity: schema.SFR_SEVERITY_HIGH,
 			Reason:   "destructive command",
 		}

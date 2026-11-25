@@ -148,9 +148,9 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
 				}
 
-				if aiTool.Name == "bash" {
+				if aiTool.Name == aitool.BashToolName {
 					shell := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["shell"])))
-					if shell == "" || shell == "bash" || shell == "bash.exe" {
+					if aitool.IsBashShell(shell) {
 						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
 							masterEnabled := runtimeConfig == nil || !runtimeConfig.DisableBuiltinSyntaxFlowRules
 							if masterEnabled {

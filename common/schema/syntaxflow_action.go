@@ -64,11 +64,3 @@ func SyntaxFlowActionForSeverity(severity SyntaxFlowSeverity) SyntaxFlowAction {
 		return SFR_ACTION_ALLOW
 	}
 }
-
-// Action returns the rule's effective enforcement action.
-func (s *SyntaxFlowRule) Action() SyntaxFlowAction {
-	if s == nil {
-		return SFR_ACTION_ALLOW
-	}
-	return SyntaxFlowActionForSeverity(s.Severity)
-}

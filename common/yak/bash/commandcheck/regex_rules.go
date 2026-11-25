@@ -176,16 +176,19 @@ func normalizeRegexRuleMatch(raw string, action schema.SyntaxFlowAction, pattern
 	case RegexRuleMatchRegex, "pattern":
 		return RegexRuleMatchRegex, true
 	case "":
-		if action == schema.SFR_ACTION_DENY && isPlainCommandLiteral(pattern) {
-			return RegexRuleMatchExact, true
-		}
-		return RegexRuleMatchRegex, true
+		return inferRegexRuleMatch(action, pattern), true
 	default:
-		if action == schema.SFR_ACTION_DENY && isPlainCommandLiteral(pattern) {
-			return RegexRuleMatchExact, false
-		}
-		return RegexRuleMatchRegex, false
+		return inferRegexRuleMatch(action, pattern), false
 	}
+}
+
+// inferRegexRuleMatch keeps the legacy fallback in one place: plain literal deny
+// rows are exact commands, everything else stays a regex.
+func inferRegexRuleMatch(action schema.SyntaxFlowAction, pattern string) string {
+	if action == schema.SFR_ACTION_DENY && isPlainCommandLiteral(pattern) {
+		return RegexRuleMatchExact
+	}
+	return RegexRuleMatchRegex
 }
 
 // isPlainCommandLiteral reports whether a pattern contains only command-name
@@ -282,7 +285,7 @@ func matchRegexRules(cmd string, rules []compiledRegexRule) []Finding {
 			Title:    rule.title,
 			Message:  rule.message,
 			Risk:     "bash-guard",
-			Value:    truncateValue(matched, 512),
+			Value:    truncateValue(matched, maxFindingValueBytes),
 			Start:    target.offset + start,
 			End:      target.offset + end,
 		})
@@ -370,7 +373,11 @@ func loadCompiledRegexRules() []compiledRegexRule {
 	}
 	rules, err := ParseRegexRules(raw)
 	if err != nil {
+		// Throttle repeated parse attempts on a broken payload while keeping the
+		// previous rules active.
 		log.Warnf("load ai bash guard regex rules failed: %v", err)
+		regexRulesCache.raw = raw
+		regexRulesCache.loadedAt = now
 		return regexRulesCache.rules
 	}
 	regexRulesCache.raw = raw

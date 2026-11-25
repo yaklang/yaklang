@@ -135,18 +135,13 @@ func CheckCommand(ctx context.Context, cmd string, options ...CheckOption) Resul
 		}
 	}
 	if opts.includeCustom {
-		custom, err := loadCustomRules()
-		if err != nil {
-			log.Warnf("load custom bash rules failed: %v", err)
-		} else {
-			for _, rule := range custom {
-				if schema.ValidSeverityType(rule.Severity) == schema.SFR_SEVERITY_HIGH ||
-					schema.ValidSeverityType(rule.Severity) == schema.SFR_SEVERITY_CRITICAL {
-					rules = append(rules, rule)
-				}
+		custom, compiledRegex := loadCustomRuleSet()
+		for _, rule := range custom {
+			if schema.ValidSeverityType(rule.Severity).Rank() >= schema.SFR_SEVERITY_HIGH.Rank() {
+				rules = append(rules, rule)
 			}
 		}
-		regexRules = loadCompiledRegexRules()
+		regexRules = compiledRegex
 	}
 	if len(rules) == 0 && len(regexRules) == 0 {
 		if builtinErr != nil {
@@ -195,13 +190,9 @@ func CheckBuiltinCommand(ctx context.Context, cmd string, options ...CheckOption
 		}
 	}
 	if opts.includeCustom {
-		custom, err := loadCustomRules()
-		if err != nil {
-			log.Warnf("load custom bash rules failed: %v", err)
-		} else {
-			rules = append(rules, custom...)
-		}
-		regexRules = loadCompiledRegexRules()
+		custom, compiledRegex := loadCustomRuleSet()
+		rules = append(rules, custom...)
+		regexRules = compiledRegex
 	}
 
 	if len(rules) == 0 && len(regexRules) == 0 {
@@ -352,6 +343,18 @@ func filterCustomRules(all []*schema.SyntaxFlowRule) []*schema.SyntaxFlowRule {
 	return rules
 }
 
+// loadCustomRuleSet loads user rows once for both entry points. A failed load
+// still returns the regex rows, so one broken SyntaxFlow rule cannot disable
+// the structured rules edited on the guard page.
+func loadCustomRuleSet() ([]*schema.SyntaxFlowRule, []compiledRegexRule) {
+	rules, err := loadCustomRules()
+	if err != nil {
+		log.Warnf("load custom bash rules failed: %v", err)
+		rules = nil
+	}
+	return rules, loadCompiledRegexRules()
+}
+
 func buildFinding(rule *schema.SyntaxFlowRule, info *schema.SyntaxFlowDescInfo, alertName string, value *ssaapi.Value) Finding {
 	severity := schema.ValidSeverityType(rule.Severity)
 	finding := Finding{
@@ -363,7 +366,7 @@ func buildFinding(rule *schema.SyntaxFlowRule, info *schema.SyntaxFlowDescInfo, 
 		TitleZh:  rule.TitleZh,
 		Message:  rule.Description,
 		Risk:     rule.RiskType,
-		Value:    truncateValue(value.String(), 512),
+		Value:    truncateValue(value.String(), maxFindingValueBytes),
 	}
 	if info != nil {
 		if info.RuleId != "" {

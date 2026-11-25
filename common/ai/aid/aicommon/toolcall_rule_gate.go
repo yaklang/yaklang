@@ -9,6 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
+// MaxToolCallRuleMatches bounds the findings attached to one decision so a
+// noisy analyzer cannot flood the review card.
+const MaxToolCallRuleMatches = 8
+
 // ToolCallRuleGate inspects an explicit tool call before review and execution.
 // Returning nil means no rule matched. The gate must be side-effect free; the
 // ToolCaller owns approval, events and the final error.

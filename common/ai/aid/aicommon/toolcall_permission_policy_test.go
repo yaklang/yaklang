@@ -221,4 +221,24 @@ func TestClaudeCodePermissionPolicy(t *testing.T) {
 		require.Len(t, second, 1)
 		require.Equal(t, first[0].RuleID, second[0].RuleID)
 	})
+
+	t.Run("empty-specifier-matches-every-call", func(t *testing.T) {
+		gate, err := CompileClaudeCodePermissions(`{"permissions":{"deny":["Read","Write","WebFetch"]}}`)
+		require.NoError(t, err)
+		require.NotNil(t, gate)
+
+		for _, tc := range []struct {
+			tool   string
+			params aitool.InvokeParams
+		}{
+			{tool: "read_file", params: aitool.InvokeParams{"file": "/tmp/a"}},
+			{tool: "write_file", params: aitool.InvokeParams{"file": "/tmp/a"}},
+			{tool: "do_http_request", params: aitool.InvokeParams{"url": "https://example.com"}},
+		} {
+			decision := gate(context.Background(), tc.tool, tc.params)
+			require.NotNil(t, decision, tc.tool)
+			require.Equal(t, schema.SFR_ACTION_DENY, decision.Action, tc.tool)
+		}
+		require.Nil(t, gate(context.Background(), "bash", aitool.InvokeParams{"command": "echo ok"}))
+	})
 }

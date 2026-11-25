@@ -23,14 +23,6 @@ import (
 // compiles those entries into in-memory temporary rules. Nothing is persisted
 // to the syntax-flow database; the compiled gate lives with the AI config.
 
-const maxTemporaryPolicyMatches = 8
-
-// ClaudeCodePermissionConfig mirrors the permissions block in Claude Code
-// settings.json. Unknown siblings such as defaultMode are intentionally ignored.
-type ClaudeCodePermissionConfig struct {
-	Permissions ClaudeCodePermissionLists `json:"permissions"`
-}
-
 // ClaudeCodePermissionLists is the allow/ask/deny triple. The same shape is
 // also accepted at the top level to make single-purpose configs convenient.
 type ClaudeCodePermissionLists struct {
@@ -139,7 +131,7 @@ func NewToolCallPolicyGate(rules []*ToolCallPolicyRule) ToolCallRuleGate {
 		}
 		copied := *rule
 		if copied.RuleID == "" {
-			copied.RuleID = claudePermissionRuleID(copied.Action, copied.Raw)
+			copied.RuleID = toolPermissionRuleID(copied.Action, copied.Raw)
 		}
 		snapshot = append(snapshot, copied)
 	}
@@ -231,7 +223,7 @@ func appendUniqueRuleMatches(dst []ToolCallRuleMatch, src ...ToolCallRuleMatch) 
 		}
 		seen[key] = struct{}{}
 		dst = append(dst, match)
-		if len(dst) >= maxTemporaryPolicyMatches {
+		if len(dst) >= MaxToolCallRuleMatches {
 			break
 		}
 	}
@@ -268,13 +260,13 @@ func parseClaudePermissionRule(raw string, action schema.SyntaxFlowAction, sever
 		Tool:      toolName,
 		Specifier: specifier,
 		Raw:       raw,
-		RuleID:    claudePermissionRuleID(action, raw),
+		RuleID:    toolPermissionRuleID(action, raw),
 	}, nil
 }
 
-func claudePermissionRuleID(action schema.SyntaxFlowAction, raw string) string {
+func toolPermissionRuleID(action schema.SyntaxFlowAction, raw string) string {
 	sum := sha1.Sum([]byte(string(action) + "\x00" + raw))
-	return "claude-code-" + hex.EncodeToString(sum[:6])
+	return "tool-permission-" + hex.EncodeToString(sum[:6])
 }
 
 func (r *ToolCallPolicyRule) decision(evidence string) *ToolCallRuleDecision {
@@ -322,17 +314,31 @@ func (r *ToolCallPolicyRule) Matches(toolName string, params aitool.InvokeParams
 		}
 		return r.matchesBash(command)
 	case "read":
-		// Claude Code blocks edits/writes on paths denied by Read(...) as well.
+		// Read(...) also blocks edits/writes on the denied paths.
 		if !isReadToolName(toolName) && !isWriteToolName(toolName) {
 			return false, ""
+		}
+		if strings.TrimSpace(r.Specifier) == "" {
+			return true, toolName
 		}
 		return r.matchesPath(params)
 	case "edit", "write", "multiedit", "notebookedit":
 		if !isWriteToolName(toolName) {
 			return false, ""
 		}
+		if strings.TrimSpace(r.Specifier) == "" {
+			return true, toolName
+		}
 		return r.matchesPath(params)
 	case "webfetch", "websearch":
+		if strings.TrimSpace(r.Specifier) == "" {
+			// A specifier-less web rule covers every call that actually carries
+			// a URL, without denying unrelated tools such as bash.
+			if values := collectURLValues(params); len(values) > 0 {
+				return true, values[0]
+			}
+			return false, ""
+		}
 		return r.matchesDomain(params)
 	default:
 		if !matchToolName(r.Tool, toolName) {

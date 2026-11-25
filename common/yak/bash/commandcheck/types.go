@@ -7,6 +7,15 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
+const (
+	// TerminationReasonBlockedByGuard is the semantic result marker checked by
+	// the ReAct layer after a preflight denial.
+	TerminationReasonBlockedByGuard = "blocked_by_bash_guard"
+
+	// maxFindingValueBytes bounds the matched text copied into a finding.
+	maxFindingValueBytes = 512
+)
+
 // Finding is one guard-rule hit, reduced to plain data so it can be embedded
 // in a tool result without leaking SSA values.
 type Finding struct {
@@ -133,7 +142,7 @@ func (r Result) BlockedResult(shell string) map[string]any {
 		"timed_out":           false,
 		"exit_code":           nil,
 		"exit_code_available": false,
-		"termination_reason":  "blocked_by_bash_guard",
+		"termination_reason":  TerminationReasonBlockedByGuard,
 		"process_error":       r.Message() + ". The command was not executed. Do not retry this command through another shell, tool, encoding, path, script wrapper, MCP, or sub-agent. If the next step is the same operation or a bypass, stop it and tell the user; otherwise continue with unrelated work.",
 		"security_denied":     true,
 		"check": map[string]any{
@@ -155,7 +164,7 @@ func finalizeResult(findings []Finding) Result {
 			return findings[i].Action.Rank() > findings[j].Action.Rank()
 		}
 		if findings[i].Severity != findings[j].Severity {
-			return severityRank(findings[i].Severity) > severityRank(findings[j].Severity)
+			return findings[i].Severity.Rank() > findings[j].Severity.Rank()
 		}
 		if findings[i].RuleID != findings[j].RuleID {
 			return findings[i].RuleID < findings[j].RuleID
@@ -167,19 +176,4 @@ func finalizeResult(findings []Finding) Result {
 	result.Severity = findings[0].Severity
 	result.Blocked = result.Action == schema.SFR_ACTION_DENY
 	return result
-}
-
-func severityRank(severity schema.SyntaxFlowSeverity) int {
-	switch schema.ValidSeverityType(severity) {
-	case schema.SFR_SEVERITY_CRITICAL:
-		return 4
-	case schema.SFR_SEVERITY_HIGH:
-		return 3
-	case schema.SFR_SEVERITY_WARNING:
-		return 2
-	case schema.SFR_SEVERITY_LOW:
-		return 1
-	default:
-		return 0
-	}
 }
