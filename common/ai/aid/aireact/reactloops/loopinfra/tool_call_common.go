@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -233,9 +232,9 @@ func handleToolCallResult(
 }
 
 // toolResultSecurityDenied recognizes the precheck result shape produced by
-// aicommon.BashCommandCheckResult.BlockedResult. That path is a successful
-// callback with a semantic failure payload, so it would otherwise flow into
-// the generic "inspect and retry" branch and invite a bypass.
+// aicommon.BashRuleVerdict.BlockedResult. That path is a successful callback
+// with a semantic failure payload, so it would otherwise flow into the generic
+// "inspect and retry" branch and invite a bypass.
 func toolResultSecurityDenied(result *aitool.ToolResult) bool {
 	if result == nil {
 		return false
@@ -250,34 +249,14 @@ func toolResultSecurityDenied(result *aitool.ToolResult) bool {
 	return strings.EqualFold(strings.TrimSpace(utils.InterfaceToString(data["termination_reason"])), aicommon.TerminationReasonBlockedByGuard)
 }
 
-// securityDeniedFeedbackFromResult recovers the top finding from the precheck
-// payload so the model sees which rule matched, not just a generic "blocked".
+// securityDeniedFeedbackFromResult builds model feedback for a precheck deny.
 func securityDeniedFeedbackFromResult(toolName string, result *aitool.ToolResult) string {
-	reason := "security policy blocked the command before execution"
-	var (
-		ruleName string
-		ruleID   string
-		severity schema.SyntaxFlowSeverity
-	)
+	reason := "rule permission policy blocked the command before execution"
 	if result != nil {
 		data := utils.InterfaceToGeneralMap(result.Data)
-		check := utils.InterfaceToGeneralMap(data["check"])
-		findings := utils.InterfaceToSliceInterface(check["findings"])
-		if len(findings) > 0 {
-			finding := utils.InterfaceToGeneralMap(findings[0])
-			ruleName = strings.TrimSpace(utils.InterfaceToString(finding["title_zh"]))
-			if ruleName == "" {
-				ruleName = strings.TrimSpace(utils.InterfaceToString(finding["title"]))
-			}
-			ruleID = strings.TrimSpace(utils.InterfaceToString(finding["rule_id"]))
-			severity = schema.SyntaxFlowSeverity(utils.InterfaceToString(finding["severity"]))
-			if message := strings.TrimSpace(utils.InterfaceToString(finding["message"])); message != "" {
-				reason = message
-			}
-			if value := strings.TrimSpace(utils.InterfaceToString(finding["value"])); value != "" {
-				reason += " (matched: " + value + ")"
-			}
+		if errText := strings.TrimSpace(utils.InterfaceToString(data["process_error"])); errText != "" {
+			reason = errText
 		}
 	}
-	return aicommon.SecurityRuleDeniedRetryFeedback(toolName, ruleName, ruleID, severity, reason)
+	return aicommon.SecurityRuleDeniedRetryFeedback(toolName, "", "", reason)
 }

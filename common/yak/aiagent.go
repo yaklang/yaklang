@@ -153,16 +153,15 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
 							masterEnabled := runtimeConfig == nil || !runtimeConfig.DisableBuiltinSyntaxFlowRules
 							if masterEnabled {
-								var checkOptions []aicommon.BashCommandCheckOption
+								var checkOptions []aicommon.BashRuleCheckOption
 								if runtimeConfig != nil {
 									checkOptions = append(checkOptions,
 										aicommon.WithDisableBuiltinBashRules(false),
-										// Custom rows are individually opt-in.
 										aicommon.WithIncludeCustomBashRules(true),
 									)
 								}
-								if check := aicommon.CheckBashCommand(ctx, cmd, checkOptions...); check.Blocked {
-									fmt.Fprintf(stdout, "[bash guard] %s\n", check.Message())
+								if check := aicommon.CheckBashCommand(ctx, cmd, checkOptions...); check.Blocked() {
+									fmt.Fprintf(stdout, "[bash guard] denied\n")
 									return check.BlockedResult(shell), nil
 								}
 							}

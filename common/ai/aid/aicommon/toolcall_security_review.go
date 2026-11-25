@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -28,14 +27,10 @@ func agreePolicyFromConfig(cfg AICallerConfigIf) AgreePolicyType {
 	if provider, ok := cfg.(interface{ GetAgreePolicy() AgreePolicyType }); ok {
 		return provider.GetAgreePolicy()
 	}
-	// Custom implementations that do not expose the policy keep the historical
-	// manual behavior instead of silently auto-approving a security ask.
 	return AgreePolicyManual
 }
 
 // resolveSecurityReviewAction applies the review policy to a rule action.
-// Review policy controls interaction, not detection: deny stays a hard block,
-// warn stays non-interactive, and ask is delegated to the policy's reviewer.
 func resolveSecurityReviewAction(policy AgreePolicyType, action schema.SyntaxFlowAction) (schema.SyntaxFlowAction, securityReviewMode) {
 	switch action {
 	case schema.SFR_ACTION_DENY:
@@ -43,8 +38,6 @@ func resolveSecurityReviewAction(policy AgreePolicyType, action schema.SyntaxFlo
 	case schema.SFR_ACTION_ASK:
 		switch policy {
 		case AgreePolicyYOLO, AgreePolicyAuto:
-			// Non-interactive policies must not surface a security card. Keep
-			// the finding visible as a warning and continue.
 			return schema.SFR_ACTION_WARN, securityReviewNone
 		case AgreePolicyAI, AgreePolicyAIAuto:
 			return schema.SFR_ACTION_ASK, securityReviewAI
@@ -64,37 +57,24 @@ func securityRuleReviewSummary(decision *ToolCallRuleDecision) string {
 	}
 	summary := strings.TrimSpace(decision.Summary())
 	if summary == "" {
-		summary = "security rule matched"
-	}
-	if severity := strings.TrimSpace(string(decision.Severity)); severity != "" {
-		return fmt.Sprintf("[%s] %s", severity, summary)
+		return string(decision.Action)
 	}
 	return summary
 }
 
-// securityRuleReviewPrompt builds the security review payload. It is shown as
-// a human-interactive card in manual mode and as the review reason when an AI
-// reviewer is asked to judge a middle-severity finding.
 func securityRuleReviewPrompt(decision *ToolCallRuleDecision, toolName string, params aitool.InvokeParams) string {
 	var b strings.Builder
-	b.WriteString("安全规则命中，需要确认\n\n")
+	b.WriteString("规则权限策略命中，需要确认\n\n")
 	b.WriteString("工具：")
 	b.WriteString(toolName)
 	b.WriteString("\n")
 	if decision != nil {
-		if severity := strings.TrimSpace(string(decision.Severity)); severity != "" {
-			b.WriteString("级别：")
-			b.WriteString(severity)
-			b.WriteString("\n")
-		}
+		b.WriteString("判定：")
+		b.WriteString(verdictLabel(decision.Action))
+		b.WriteString("\n")
 		if decision.RuleName != "" {
 			b.WriteString("规则：")
 			b.WriteString(decision.RuleName)
-			b.WriteString("\n")
-		}
-		if decision.RuleID != "" {
-			b.WriteString("规则ID：")
-			b.WriteString(decision.RuleID)
 			b.WriteString("\n")
 		}
 		if summary := strings.TrimSpace(decision.Summary()); summary != "" {
@@ -102,30 +82,29 @@ func securityRuleReviewPrompt(decision *ToolCallRuleDecision, toolName string, p
 			b.WriteString(summary)
 			b.WriteString("\n")
 		}
-		for i, match := range decision.Matches {
-			if i >= 3 {
-				break
-			}
-			message := strings.TrimSpace(match.Message)
-			if message == "" {
-				message = strings.TrimSpace(match.RuleName)
-			}
-			if message != "" {
-				b.WriteString("命中：")
-				b.WriteString(message)
-				b.WriteString("\n")
-			}
-		}
 	}
 	if toolName == aitool.BashToolName {
-		if command := strings.TrimSpace(utils.InterfaceToString(params["command"])); command != "" {
+		if cmd := strings.TrimSpace(utils.InterfaceToString(params["command"])); cmd != "" {
 			b.WriteString("\n命令：\n")
-			b.WriteString(command)
+			b.WriteString(cmd)
 			b.WriteString("\n")
 		}
 	}
 	b.WriteString("\n是否继续执行？选择“取消”将终止本次工具调用。")
 	return b.String()
+}
+
+func verdictLabel(action schema.SyntaxFlowAction) string {
+	switch action {
+	case schema.SFR_ACTION_DENY:
+		return "拒绝"
+	case schema.SFR_ACTION_ASK:
+		return "询问"
+	case schema.SFR_ACTION_WARN:
+		return "警告"
+	default:
+		return "通过"
+	}
 }
 
 func securityRuleReviewOptions() []map[string]any {
@@ -136,8 +115,6 @@ func securityRuleReviewOptions() []map[string]any {
 }
 
 // securityRuleReviewDecision only treats an explicit approval as consent.
-// It reads decision fields rather than the whole params map, so command text
-// such as "echo continue" can never be mistaken for a user approval.
 func securityRuleReviewDecision(params aitool.InvokeParams) (bool, string) {
 	const (
 		cancelReason = "bash command cancelled by security rule review"

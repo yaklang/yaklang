@@ -14,20 +14,17 @@ func TestSecurityDeniedFeedbackPolicy(t *testing.T) {
 		denied := &SecurityRuleDeniedError{
 			ToolName: "bash",
 			RuleName: "Bash(rm -rf *)",
-			RuleID:   "tool-permission-test",
-			Severity: schema.SFR_SEVERITY_HIGH,
+			RuleID:   "rule-permission-test",
 			Reason:   "destructive command",
+			Action:   schema.SFR_ACTION_DENY,
 		}
 
 		feedback := denied.RetryFeedback()
 		require.Contains(t, feedback, "不是整个任务的终态")
 		require.Contains(t, feedback, "请自行判断下一步")
-		require.Contains(t, feedback, "同一操作")
-		require.Contains(t, feedback, "无关的独立工作")
+		require.Contains(t, feedback, "判定：拒绝")
 		require.Contains(t, feedback, "cmd/powershell")
-		require.Contains(t, feedback, "MCP")
-		require.Contains(t, feedback, "子智能体")
-		require.NotContains(t, feedback, "这是终态")
+		require.NotContains(t, feedback, "级别：")
 		require.True(t, IsSecurityRuleDenied(denied))
 		require.False(t, IsSecurityRuleDenied(errors.New("ordinary tool error")))
 	})

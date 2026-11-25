@@ -1039,25 +1039,18 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 				ToolName: tool.Name,
 				RuleName: ruleDecision.RuleName,
 				RuleID:   ruleDecision.RuleID,
-				Severity: ruleDecision.Severity,
 				Reason:   ruleDecision.Summary(),
+				Action:   schema.SFR_ACTION_DENY,
 			}
 			blocked := denied.Error()
 			t.emitter.EmitWarning(blocked)
 			handleError(blocked)
 			return nil, false, denied
 		case schema.SFR_ACTION_WARN:
-			if ruleDecision.Action == schema.SFR_ACTION_ASK {
-				t.emitter.EmitWarning(
-					"tool[%v] matched security rule %s (severity=%s); review policy %s downgraded ask to warning, continuing: %s",
-					tool.Name, ruleDecision.RuleName, ruleDecision.Severity, agreePolicy, ruleDecision.Summary(),
-				)
-			} else {
-				t.emitter.EmitWarning(
-					"tool[%v] matched security rule %s (severity=%s), continuing with warning: %s",
-					tool.Name, ruleDecision.RuleName, ruleDecision.Severity, ruleDecision.Summary(),
-				)
-			}
+			t.emitter.EmitWarning(
+				"tool[%v] rule permission verdict=warn: %s",
+				tool.Name, ruleDecision.Summary(),
+			)
 		}
 	}
 

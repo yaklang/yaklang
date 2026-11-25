@@ -10,32 +10,22 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 const (
-	// EnvToolCallPermissions accepts either one Claude Code permissions JSON
-	// document or a JSON array of documents. It takes precedence over file
-	// sources, which makes a one-off engine launch easy to configure.
+	// EnvToolCallPermissions accepts one 规则权限策略 JSON document or a JSON
+	// array of documents. It takes precedence over file sources.
 	EnvToolCallPermissions = "YAK_AI_TOOL_PERMISSIONS"
-	// EnvToolCallPermissionsFile is an OS path-list of permissions files.
+	// EnvToolCallPermissionsFile is an OS path-list of permission files.
 	EnvToolCallPermissionsFile = "YAK_AI_TOOL_PERMISSIONS_FILE"
 
 	toolCallPermissionsDirName  = "ai-tool-permissions"
 	toolCallPermissionsFileName = "ai-tool-permissions.json"
 )
 
-// LoadClaudeCodePermissionConfigs reads the runtime permission sources:
-//
-//  1. YAK_AI_TOOL_PERMISSIONS (one document or a JSON array)
-//  2. YAK_AI_TOOL_PERMISSIONS_FILE (OS path-list)
-//  3. <YAKIT_HOME>/ai-tool-permissions.json
-//  4. <YAKIT_HOME>/ai-tool-permissions/*.json, sorted by filename
-//
-// Explicit environment configuration replaces file discovery; the two file
-// tiers are spliced together. Invalid documents are skipped by
-// CompileClaudeCodePermissionsFromRuntime so one bad file cannot disable the
-// built-in guard.
-func LoadClaudeCodePermissionConfigs() []string {
+// LoadRulePermissionConfigs reads runtime 规则权限策略 sources.
+func LoadRulePermissionConfigs() []string {
 	if raw := strings.TrimSpace(os.Getenv(EnvToolCallPermissions)); raw != "" {
 		return splitRuntimePermissionConfig(raw)
 	}
@@ -79,43 +69,50 @@ func LoadClaudeCodePermissionConfigs() []string {
 	return configs
 }
 
-// runtimePermissionCache reuses the compiled gate while the raw documents are
-// unchanged. Files are still read on every call, so edits apply immediately;
-// only JSON parsing and rule compilation are skipped.
 var runtimePermissionCache struct {
-	mu   sync.Mutex
-	key  string
-	gate ToolCallRuleGate
+	mu        sync.Mutex
+	key       string
+	gate      ToolCallRuleGate
+	bashRules []*schema.SyntaxFlowRule
 }
 
-// CompileClaudeCodePermissionsFromRuntime builds the optional runtime gate.
-// A nil result means no configuration was found; callers should fall back to
-// the built-in gate.
-func CompileClaudeCodePermissionsFromRuntime() ToolCallRuleGate {
-	configs := LoadClaudeCodePermissionConfigs()
-	if len(configs) == 0 {
-		return nil
-	}
+// CompileRulePermissionsFromRuntime builds the optional non-bash gate.
+func CompileRulePermissionsFromRuntime() ToolCallRuleGate {
+	refreshRuntimePermissionCache()
+	runtimePermissionCache.mu.Lock()
+	defer runtimePermissionCache.mu.Unlock()
+	return runtimePermissionCache.gate
+}
+
+func loadRuntimeBashPermissionSyntaxFlowRules() []*schema.SyntaxFlowRule {
+	refreshRuntimePermissionCache()
+	runtimePermissionCache.mu.Lock()
+	defer runtimePermissionCache.mu.Unlock()
+	return runtimePermissionCache.bashRules
+}
+
+func refreshRuntimePermissionCache() {
+	configs := LoadRulePermissionConfigs()
 	key := strings.Join(configs, string(rune(0)))
 
 	runtimePermissionCache.mu.Lock()
 	defer runtimePermissionCache.mu.Unlock()
 	if runtimePermissionCache.key == key {
-		return runtimePermissionCache.gate
+		return
 	}
 
-	var rules []*ToolCallPolicyRule
+	var rules []*RulePermissionRule
 	for i, raw := range configs {
-		parsed, err := ParseClaudeCodePermissions(raw)
+		parsed, err := ParseRulePermissions(raw)
 		if err != nil {
-			log.Warnf("skip tool permission config %d: %v", i+1, err)
+			log.Warnf("skip rule permission config %d: %v", i+1, err)
 			continue
 		}
 		rules = append(rules, parsed...)
 	}
 	runtimePermissionCache.key = key
-	runtimePermissionCache.gate = NewToolCallPolicyGate(rules)
-	return runtimePermissionCache.gate
+	runtimePermissionCache.gate = NewRulePermissionGate(rules)
+	runtimePermissionCache.bashRules = CompileBashPermissionSyntaxFlowRules(rules)
 }
 
 func splitRuntimePermissionConfig(raw string) []string {

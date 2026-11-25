@@ -9,59 +9,50 @@ import (
 	"net/url"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/bash/bash2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// Claude Code permission rules are a good common shape for user-authored tool
-// policy: allow/ask/deny lists whose entries are Tool(specifier). This file
-// compiles those entries into in-memory temporary rules. Nothing is persisted
-// to the syntax-flow database; the compiled gate lives with the AI config.
-
-// ClaudeCodePermissionLists is the allow/ask/deny triple. The same shape is
-// also accepted at the top level to make single-purpose configs convenient.
-type ClaudeCodePermissionLists struct {
+// RulePermissionLists is the allow/ask/deny triple for 规则权限策略.
+type RulePermissionLists struct {
 	Allow []string `json:"allow,omitempty"`
 	Ask   []string `json:"ask,omitempty"`
 	Deny  []string `json:"deny,omitempty"`
 }
 
-// ToolCallPolicyRule is one compiled, in-memory permission rule. Raw preserves
-// the source rule for review cards and logs; RuleID is stable across parses.
-type ToolCallPolicyRule struct {
-	Action    schema.SyntaxFlowAction   `json:"action"`
-	Severity  schema.SyntaxFlowSeverity `json:"severity"`
-	Tool      string                    `json:"tool"`
-	Specifier string                    `json:"specifier,omitempty"`
-	Raw       string                    `json:"raw"`
-	RuleID    string                    `json:"rule_id"`
+// RulePermissionRule is one compiled in-memory permission rule for non-bash
+// tools. Bash entries are compiled into SyntaxFlow separately.
+type RulePermissionRule struct {
+	Action    schema.SyntaxFlowAction `json:"action"`
+	Tool      string                  `json:"tool"`
+	Specifier string                  `json:"specifier,omitempty"`
+	Raw       string                  `json:"raw"`
+	RuleID    string                  `json:"rule_id"`
 }
 
-// ParseClaudeCodePermissions parses one Claude Code permissions document. A
-// missing permissions envelope is accepted only when allow/ask/deny are at the
-// top level, which keeps tests and small embedded configs readable.
-func ParseClaudeCodePermissions(raw string) ([]*ToolCallPolicyRule, error) {
+// ParseRulePermissions parses one 规则权限策略 document.
+func ParseRulePermissions(raw string) ([]*RulePermissionRule, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, nil
 	}
 
 	var envelope struct {
-		Permissions *ClaudeCodePermissionLists `json:"permissions"`
-		Allow       []string                   `json:"allow"`
-		Ask         []string                   `json:"ask"`
-		Deny        []string                   `json:"deny"`
+		Permissions *RulePermissionLists `json:"permissions"`
+		Allow       []string             `json:"allow"`
+		Ask         []string             `json:"ask"`
+		Deny        []string             `json:"deny"`
 	}
 	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
-		return nil, fmt.Errorf("invalid Claude Code permissions JSON: %w", err)
+		return nil, fmt.Errorf("invalid rule permission JSON: %w", err)
 	}
 
-	lists := ClaudeCodePermissionLists{
+	lists := RulePermissionLists{
 		Allow: envelope.Allow,
 		Ask:   envelope.Ask,
 		Deny:  envelope.Deny,
@@ -71,19 +62,18 @@ func ParseClaudeCodePermissions(raw string) ([]*ToolCallPolicyRule, error) {
 	}
 
 	groups := []struct {
-		action   schema.SyntaxFlowAction
-		severity schema.SyntaxFlowSeverity
-		values   []string
+		action schema.SyntaxFlowAction
+		values []string
 	}{
-		{schema.SFR_ACTION_DENY, schema.SFR_SEVERITY_HIGH, lists.Deny},
-		{schema.SFR_ACTION_ASK, schema.SFR_SEVERITY_WARNING, lists.Ask},
-		{schema.SFR_ACTION_ALLOW, schema.SFR_SEVERITY_LOW, lists.Allow},
+		{schema.SFR_ACTION_DENY, lists.Deny},
+		{schema.SFR_ACTION_ASK, lists.Ask},
+		{schema.SFR_ACTION_ALLOW, lists.Allow},
 	}
 
-	var rules []*ToolCallPolicyRule
+	var rules []*RulePermissionRule
 	for _, group := range groups {
 		for _, value := range group.values {
-			rule, err := parseClaudePermissionRule(value, group.action, group.severity)
+			rule, err := parseRulePermissionEntry(value, group.action)
 			if err != nil {
 				return nil, err
 			}
@@ -95,13 +85,11 @@ func ParseClaudeCodePermissions(raw string) ([]*ToolCallPolicyRule, error) {
 	return rules, nil
 }
 
-// SpliceClaudeCodePermissionConfigs concatenates several permissions documents
-// into one temporary rule set. Deny still wins at evaluation time regardless of
-// which document declared it.
-func SpliceClaudeCodePermissionConfigs(configs ...string) ([]*ToolCallPolicyRule, error) {
-	var rules []*ToolCallPolicyRule
+// SpliceRulePermissionConfigs concatenates several permission documents.
+func SpliceRulePermissionConfigs(configs ...string) ([]*RulePermissionRule, error) {
+	var rules []*RulePermissionRule
 	for i, raw := range configs {
-		parsed, err := ParseClaudeCodePermissions(raw)
+		parsed, err := ParseRulePermissions(raw)
 		if err != nil {
 			return nil, fmt.Errorf("permissions config %d: %w", i+1, err)
 		}
@@ -110,28 +98,26 @@ func SpliceClaudeCodePermissionConfigs(configs ...string) ([]*ToolCallPolicyRule
 	return rules, nil
 }
 
-// CompileClaudeCodePermissions builds an in-memory gate from one or more
-// permissions documents. Empty input returns (nil, nil), which callers can
-// safely pass to ComposeToolCallRuleGates.
-func CompileClaudeCodePermissions(configs ...string) (ToolCallRuleGate, error) {
-	rules, err := SpliceClaudeCodePermissionConfigs(configs...)
+// CompileRulePermissions builds an in-memory gate for non-bash tools.
+// Bash entries are ignored here; they become SyntaxFlow rules instead.
+func CompileRulePermissions(configs ...string) (ToolCallRuleGate, error) {
+	rules, err := SpliceRulePermissionConfigs(configs...)
 	if err != nil {
 		return nil, err
 	}
-	return NewToolCallPolicyGate(rules), nil
+	return NewRulePermissionGate(rules), nil
 }
 
-// NewToolCallPolicyGate evaluates rules with Claude Code precedence:
-// deny, then ask, then allow. Within one action the first declared match wins.
-func NewToolCallPolicyGate(rules []*ToolCallPolicyRule) ToolCallRuleGate {
-	snapshot := make([]ToolCallPolicyRule, 0, len(rules))
+// NewRulePermissionGate evaluates non-bash rules with deny > ask > allow.
+func NewRulePermissionGate(rules []*RulePermissionRule) ToolCallRuleGate {
+	snapshot := make([]RulePermissionRule, 0, len(rules))
 	for _, rule := range rules {
-		if rule == nil {
+		if rule == nil || isBashPermissionTool(rule.Tool) {
 			continue
 		}
 		copied := *rule
 		if copied.RuleID == "" {
-			copied.RuleID = toolPermissionRuleID(copied.Action, copied.Raw)
+			copied.RuleID = rulePermissionID(copied.Action, copied.Raw)
 		}
 		snapshot = append(snapshot, copied)
 	}
@@ -142,7 +128,7 @@ func NewToolCallPolicyGate(rules []*ToolCallPolicyRule) ToolCallRuleGate {
 	return func(_ context.Context, toolName string, params aitool.InvokeParams) (decision *ToolCallRuleDecision) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				log.Warnf("temporary tool permission gate panicked for tool[%v]: %v", toolName, recovered)
+				log.Warnf("rule permission gate panicked for tool[%v]: %v", toolName, recovered)
 				decision = nil
 			}
 		}()
@@ -166,8 +152,7 @@ func NewToolCallPolicyGate(rules []*ToolCallPolicyRule) ToolCallRuleGate {
 	}
 }
 
-// ComposeToolCallRuleGates merges several gates with deny > ask > warn > allow.
-// A user allow rule can never erase a deny/ask finding from the built-in gate.
+// ComposeToolCallRuleGates merges gates with deny > ask > warn > allow.
 func ComposeToolCallRuleGates(gates ...ToolCallRuleGate) ToolCallRuleGate {
 	filtered := make([]ToolCallRuleGate, 0, len(gates))
 	for _, gate := range gates {
@@ -191,10 +176,6 @@ func ComposeToolCallRuleGates(gates ...ToolCallRuleGate) ToolCallRuleGate {
 			}
 			if best == nil || decision.Action.Rank() > best.Action.Rank() {
 				best = decision
-				continue
-			}
-			if decision.Action == best.Action {
-				best.Matches = appendUniqueRuleMatches(best.Matches, decision.Matches...)
 			}
 		}
 		return best
@@ -211,26 +192,7 @@ func callToolCallRuleGateSafely(ctx context.Context, gate ToolCallRuleGate, tool
 	return gate(ctx, toolName, params)
 }
 
-func appendUniqueRuleMatches(dst []ToolCallRuleMatch, src ...ToolCallRuleMatch) []ToolCallRuleMatch {
-	seen := make(map[string]struct{}, len(dst)+len(src))
-	for _, match := range dst {
-		seen[match.RuleID+"\x00"+match.RuleName] = struct{}{}
-	}
-	for _, match := range src {
-		key := match.RuleID + "\x00" + match.RuleName
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		dst = append(dst, match)
-		if len(dst) >= MaxToolCallRuleMatches {
-			break
-		}
-	}
-	return dst
-}
-
-func parseClaudePermissionRule(raw string, action schema.SyntaxFlowAction, severity schema.SyntaxFlowSeverity) (*ToolCallPolicyRule, error) {
+func parseRulePermissionEntry(raw string, action schema.SyntaxFlowAction) (*RulePermissionRule, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, nil
@@ -254,67 +216,51 @@ func parseClaudePermissionRule(raw string, action schema.SyntaxFlowAction, sever
 		return nil, fmt.Errorf("invalid permission rule %q: tool name must not contain whitespace", raw)
 	}
 
-	return &ToolCallPolicyRule{
+	return &RulePermissionRule{
 		Action:    action,
-		Severity:  severity,
 		Tool:      toolName,
 		Specifier: specifier,
 		Raw:       raw,
-		RuleID:    toolPermissionRuleID(action, raw),
+		RuleID:    rulePermissionID(action, raw),
 	}, nil
 }
 
-func toolPermissionRuleID(action schema.SyntaxFlowAction, raw string) string {
+func rulePermissionID(action schema.SyntaxFlowAction, raw string) string {
 	sum := sha1.Sum([]byte(string(action) + "\x00" + raw))
-	return "tool-permission-" + hex.EncodeToString(sum[:6])
+	return "rule-permission-" + hex.EncodeToString(sum[:6])
 }
 
-func (r *ToolCallPolicyRule) decision(evidence string) *ToolCallRuleDecision {
-	message := fmt.Sprintf("tool permission rule matched: %s", r.Raw)
+func isBashPermissionTool(tool string) bool {
+	switch strings.ToLower(strings.TrimSpace(tool)) {
+	case "bash", "shell", "sh":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *RulePermissionRule) decision(evidence string) *ToolCallRuleDecision {
+	reason := fmt.Sprintf("rule permission matched: %s", r.Raw)
 	if evidence != "" {
-		message += " [" + evidence + "]"
+		reason += " [" + evidence + "]"
 	}
 	return &ToolCallRuleDecision{
 		Action:   r.Action,
-		Severity: r.Severity,
 		RuleName: r.Raw,
 		RuleID:   r.RuleID,
-		Reason:   message,
-		Matches: []ToolCallRuleMatch{{
-			RuleName: r.Raw,
-			RuleID:   r.RuleID,
-			Severity: string(r.Severity),
-			Message:  message,
-			Risk:     "tool-permission",
-		}},
+		Reason:   reason,
 	}
 }
 
-// Matches reports whether the rule applies to one tool call. The evidence is
-// the concrete command/path/url that matched, for review cards and logs.
-func (r *ToolCallPolicyRule) Matches(toolName string, params aitool.InvokeParams) (bool, string) {
-	if r == nil {
+// Matches reports whether the rule applies to one non-bash tool call.
+func (r *RulePermissionRule) Matches(toolName string, params aitool.InvokeParams) (bool, string) {
+	if r == nil || isBashPermissionTool(r.Tool) {
 		return false, ""
 	}
 	toolName = strings.TrimSpace(toolName)
 
 	switch strings.ToLower(strings.TrimSpace(r.Tool)) {
-	case "bash":
-		// Claude Code's Bash rule is about the command, not the transport. Apply
-		// it to every shell tool so cmd/powershell cannot sidestep a Bash rule.
-		if !isShellToolName(toolName) {
-			return false, ""
-		}
-		command := utils.InterfaceToString(params["command"])
-		if strings.TrimSpace(command) == "" {
-			command = utils.InterfaceToString(params["cmd"])
-		}
-		if strings.TrimSpace(command) == "" {
-			return false, ""
-		}
-		return r.matchesBash(command)
 	case "read":
-		// Read(...) also blocks edits/writes on the denied paths.
 		if !isReadToolName(toolName) && !isWriteToolName(toolName) {
 			return false, ""
 		}
@@ -332,8 +278,6 @@ func (r *ToolCallPolicyRule) Matches(toolName string, params aitool.InvokeParams
 		return r.matchesPath(params)
 	case "webfetch", "websearch":
 		if strings.TrimSpace(r.Specifier) == "" {
-			// A specifier-less web rule covers every call that actually carries
-			// a URL, without denying unrelated tools such as bash.
 			if values := collectURLValues(params); len(values) > 0 {
 				return true, values[0]
 			}
@@ -351,56 +295,7 @@ func (r *ToolCallPolicyRule) Matches(toolName string, params aitool.InvokeParams
 	}
 }
 
-func (r *ToolCallPolicyRule) matchesBash(command string) (bool, string) {
-	spec := strings.TrimSpace(r.Specifier)
-	commands, err := bash2ssa.ExtractShellCommands(command)
-	if err != nil || len(commands) == 0 {
-		// Parsing is advisory here; a malformed command still gets the raw
-		// pattern check instead of silently bypassing a deny rule.
-		commands = []bash2ssa.ShellCommand{{Text: command, EffectiveText: command}}
-	}
-
-	matched := 0
-	total := 0
-	evidence := ""
-	for _, extracted := range commands {
-		text := strings.TrimSpace(extracted.Text)
-		if text == "" {
-			continue
-		}
-		total++
-		effective := strings.TrimSpace(extracted.EffectiveText)
-
-		if r.Action == schema.SFR_ACTION_ALLOW {
-			// Claude Code requires every simple command, including static
-			// sh -c/eval payloads, to satisfy an allow rule.
-			if !matchBashPattern(spec, text) {
-				return false, ""
-			}
-			matched++
-			if evidence == "" {
-				evidence = text
-			}
-			continue
-		}
-
-		if matchBashPattern(spec, text) || (effective != "" && effective != text && matchBashPattern(spec, effective)) {
-			if effective != "" && effective != text {
-				evidence = effective
-			} else {
-				evidence = text
-			}
-			return true, evidence
-		}
-	}
-
-	if r.Action == schema.SFR_ACTION_ALLOW {
-		return total > 0 && matched == total, evidence
-	}
-	return false, ""
-}
-
-func (r *ToolCallPolicyRule) matchesPath(params aitool.InvokeParams) (bool, string) {
+func (r *RulePermissionRule) matchesPath(params aitool.InvokeParams) (bool, string) {
 	for _, candidate := range collectPathValues(params) {
 		if matchPathPattern(r.Specifier, candidate) {
 			return true, candidate
@@ -409,7 +304,7 @@ func (r *ToolCallPolicyRule) matchesPath(params aitool.InvokeParams) (bool, stri
 	return false, ""
 }
 
-func (r *ToolCallPolicyRule) matchesDomain(params aitool.InvokeParams) (bool, string) {
+func (r *RulePermissionRule) matchesDomain(params aitool.InvokeParams) (bool, string) {
 	for _, candidate := range collectURLValues(params) {
 		if matchDomainPattern(r.Specifier, candidate) {
 			return true, candidate
@@ -418,24 +313,106 @@ func (r *ToolCallPolicyRule) matchesDomain(params aitool.InvokeParams) (bool, st
 	return false, ""
 }
 
-func matchBashPattern(spec, command string) bool {
+// CompileBashPermissionSyntaxFlowRules turns Bash(...) permission entries into
+// temporary SyntaxFlow rules evaluated by the SSA bash checker.
+func CompileBashPermissionSyntaxFlowRules(rules []*RulePermissionRule) []*schema.SyntaxFlowRule {
+	out := make([]*schema.SyntaxFlowRule, 0, len(rules))
+	for _, rule := range rules {
+		if rule == nil || !isBashPermissionTool(rule.Tool) {
+			continue
+		}
+		// Allow entries do not alert; absence of deny/ask/warn is allow.
+		if rule.Action == schema.SFR_ACTION_ALLOW {
+			continue
+		}
+		sfRule, err := bashPermissionEntryToSyntaxFlow(rule)
+		if err != nil {
+			log.Warnf("skip bash permission rule %q: %v", rule.Raw, err)
+			continue
+		}
+		if sfRule != nil {
+			out = append(out, sfRule)
+		}
+	}
+	return out
+}
+
+func bashPermissionEntryToSyntaxFlow(rule *RulePermissionRule) (*schema.SyntaxFlowRule, error) {
+	pattern, err := bashPermissionSpecifierToRegex(rule.Specifier)
+	if err != nil {
+		return nil, err
+	}
+	severity := severityForPermissionAction(rule.Action)
+	level := string(severity)
+	title := rule.Raw
+	ruleID := rule.RuleID
+	if ruleID == "" {
+		ruleID = rulePermissionID(rule.Action, rule.Raw)
+	}
+	content := fmt.Sprintf(`desc(
+	mode: "ssa"
+	language: "bash"
+	title: %s
+	level: %s
+	rule_id: %s
+)
+/%s/ as $hit
+alert $hit for {
+	level: %s,
+	title: %s,
+	message: %s,
+}
+`,
+		strconv.Quote(title),
+		strconv.Quote(level),
+		strconv.Quote(ruleID),
+		escapeSyntaxFlowRegexBody(pattern),
+		strconv.Quote(level),
+		strconv.Quote(title),
+		strconv.Quote("命中规则权限策略"),
+	)
+	return &schema.SyntaxFlowRule{
+		RuleName: title,
+		RuleId:   ruleID,
+		Title:    title,
+		Language: ssaconfig.BASH,
+		Severity: severity,
+		Type:     schema.SFR_RULE_TYPE_SF,
+		Mode:     schema.SFR_MODE_SSA,
+		Content:  content,
+	}, nil
+}
+
+func bashPermissionSpecifierToRegex(spec string) (string, error) {
 	spec = strings.TrimSpace(spec)
-	command = strings.TrimSpace(command)
 	if spec == "" || spec == "*" {
-		return true
+		return ".*", nil
 	}
 	if strings.HasSuffix(spec, ":*") {
 		prefix := strings.TrimSpace(strings.TrimSuffix(spec, ":*"))
 		if prefix == "" {
-			return true
+			return ".*", nil
 		}
-		return command == prefix ||
-			strings.HasPrefix(command, prefix+" ") ||
-			strings.HasPrefix(command, prefix+"\t") ||
-			strings.HasPrefix(command, prefix+"\n") ||
-			strings.HasPrefix(command, prefix+":")
+		return "^" + regexp.QuoteMeta(prefix) + `(\s|:|$)`, nil
 	}
-	return globMatch(spec, command, false)
+	var b strings.Builder
+	b.WriteString("^")
+	for _, r := range spec {
+		switch r {
+		case '*':
+			b.WriteString(".*")
+		case '?':
+			b.WriteString(".")
+		default:
+			b.WriteString(regexp.QuoteMeta(string(r)))
+		}
+	}
+	b.WriteString("$")
+	pattern := b.String()
+	if _, err := regexp.Compile(pattern); err != nil {
+		return "", err
+	}
+	return pattern, nil
 }
 
 func matchToolName(ruleTool, toolName string) bool {
@@ -492,15 +469,6 @@ func globMatch(pattern, value string, caseInsensitive bool) bool {
 		return pattern == value
 	}
 	return re.MatchString(value)
-}
-
-func isShellToolName(name string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "bash", "shell", "sh", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe":
-		return true
-	default:
-		return false
-	}
 }
 
 func isReadToolName(name string) bool {
@@ -742,4 +710,17 @@ func extractURLHost(raw string) string {
 		return parsed.Hostname()
 	}
 	return ""
+}
+
+func severityForPermissionAction(action schema.SyntaxFlowAction) schema.SyntaxFlowSeverity {
+	switch action {
+	case schema.SFR_ACTION_DENY:
+		return schema.SFR_SEVERITY_HIGH
+	case schema.SFR_ACTION_ASK:
+		return schema.SFR_SEVERITY_WARNING
+	case schema.SFR_ACTION_WARN:
+		return schema.SFR_SEVERITY_LOW
+	default:
+		return schema.SFR_SEVERITY_INFO
+	}
 }

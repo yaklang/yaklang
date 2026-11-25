@@ -9,33 +9,17 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// MaxToolCallRuleMatches bounds the findings attached to one decision so a
-// noisy analyzer cannot flood the review card.
-const MaxToolCallRuleMatches = 8
-
 // ToolCallRuleGate inspects an explicit tool call before review and execution.
-// Returning nil means no rule matched. The gate must be side-effect free; the
-// ToolCaller owns approval, events and the final error.
+// Returning nil means no rule matched (equivalent to allow).
 type ToolCallRuleGate func(ctx context.Context, toolName string, params aitool.InvokeParams) *ToolCallRuleDecision
 
-// ToolCallRuleMatch is one rule finding attached to a decision.
-type ToolCallRuleMatch struct {
-	RuleName string `json:"rule_name"`
-	RuleID   string `json:"rule_id"`
-	Severity string `json:"severity"`
-	Message  string `json:"message"`
-	Risk     string `json:"risk"`
-}
-
-// ToolCallRuleDecision is the gate result for one tool call. The action comes
-// from the shared severity mapping (high/critical=deny, middle=ask, low=warn).
+// ToolCallRuleDecision is the gate result for one tool call.
+// Action is the only verdict: allow / warn / ask / deny.
 type ToolCallRuleDecision struct {
-	Action   schema.SyntaxFlowAction   `json:"action"`
-	Severity schema.SyntaxFlowSeverity `json:"severity"`
-	RuleName string                    `json:"rule_name"`
-	RuleID   string                    `json:"rule_id"`
-	Reason   string                    `json:"reason"`
-	Matches  []ToolCallRuleMatch       `json:"matches,omitempty"`
+	Action   schema.SyntaxFlowAction `json:"action"`
+	RuleName string                  `json:"rule_name,omitempty"`
+	RuleID   string                  `json:"rule_id,omitempty"`
+	Reason   string                  `json:"reason,omitempty"`
 }
 
 // Summary is a compact human-readable description for logs and review cards.
@@ -54,8 +38,7 @@ func (d *ToolCallRuleDecision) Summary() string {
 }
 
 // WithToolCaller_RuleGate installs a deterministic security gate before the
-// tool review step. It runs even for tools marked NoNeedUserReview so a deny
-// decision cannot be skipped by internal-tool exemptions.
+// tool review step.
 func WithToolCaller_RuleGate(gate ToolCallRuleGate) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.ruleGate = gate
@@ -68,7 +51,6 @@ func (t *ToolCaller) applyToolCallRuleGate(tool *aitool.Tool, params aitool.Invo
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			// A broken analyzer must not take down the agent; fail open.
 			log.Warnf("tool rule gate panicked for tool[%v]: %v", tool.Name, recovered)
 			decision = nil
 		}

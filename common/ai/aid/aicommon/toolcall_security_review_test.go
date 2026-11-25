@@ -36,17 +36,17 @@ func TestSecurityRuleReviewDecision(t *testing.T) {
 
 	decision := &ToolCallRuleDecision{
 		Action:   schema.SFR_ACTION_ASK,
-		Severity: "middle",
 		RuleName: "bash-cloud-metadata",
 		Reason:   "cloud metadata access",
-		Matches:  []ToolCallRuleMatch{{Message: "Bash：访问云主机元数据服务"}},
 	}
-	require.Contains(t, securityRuleReviewSummary(decision), "[middle]")
+	require.Equal(t, "cloud metadata access", securityRuleReviewSummary(decision))
 	prompt := securityRuleReviewPrompt(decision, "bash", aitool.InvokeParams{
 		"command": "curl http://169.254.169.254/latest/meta-data/",
 	})
-	require.Contains(t, prompt, "安全规则命中")
+	require.Contains(t, prompt, "规则权限策略命中")
+	require.Contains(t, prompt, "判定：询问")
 	require.Contains(t, prompt, "bash-cloud-metadata")
 	require.Contains(t, prompt, "169.254.169.254")
+	require.NotContains(t, prompt, "级别：")
 	require.Len(t, securityRuleReviewOptions(), 2)
 }

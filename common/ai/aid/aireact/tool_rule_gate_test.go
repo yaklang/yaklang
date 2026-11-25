@@ -53,7 +53,7 @@ func TestSecurityRuleGate(t *testing.T) {
 	})
 
 	t.Run("builtin-disabled-by-config", func(t *testing.T) {
-		gate := securityRuleGateWithOptions([]aicommon.BashCommandCheckOption{
+		gate := securityRuleGateWithOptions([]aicommon.BashRuleCheckOption{
 			aicommon.WithDisableBuiltinBashRules(true),
 		})
 		require.Nil(t, gate(ctx, "bash", aitool.InvokeParams{

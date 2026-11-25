@@ -22,7 +22,6 @@ func newSecurityAskTestCaller(t *testing.T, ctx context.Context, cfg *Config) *T
 		WithToolCaller_RuleGate(func(context.Context, string, aitool.InvokeParams) *ToolCallRuleDecision {
 			return &ToolCallRuleDecision{
 				Action:   schema.SFR_ACTION_ASK,
-				Severity: schema.SFR_SEVERITY_WARNING,
 				RuleName: "test-security-ask",
 				Reason:   "test security review",
 			}

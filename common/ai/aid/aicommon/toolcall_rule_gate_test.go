@@ -24,7 +24,6 @@ func TestToolCallRuleGateApply(t *testing.T) {
 			require.Equal(t, "rm -rf /", got["command"])
 			return &ToolCallRuleDecision{
 				Action:   schema.SFR_ACTION_DENY,
-				Severity: schema.SFR_SEVERITY_HIGH,
 				RuleName: "test-rule",
 			}
 		}
