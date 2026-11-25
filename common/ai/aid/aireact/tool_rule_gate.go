@@ -24,9 +24,6 @@ func securityRuleGateWithOptions(options []aicommon.BashRuleCheckOption) aicommo
 		if strings.TrimSpace(command) == "" {
 			return nil
 		}
-		if !aitool.IsBashShell(utils.InterfaceToString(params["shell"])) {
-			return nil
-		}
 
 		check := aicommon.CheckBuiltinBashCommand(ctx, command, options...)
 		if !check.Available {

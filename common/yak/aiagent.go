@@ -27,7 +27,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -147,28 +146,6 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					fmt.Fprintf(stdout, "[warning] input compatibility: %s. Execution will continue.\n", note)
 				}
 
-				if aiTool.Name == aitool.BashToolName {
-					shell := strings.ToLower(strings.TrimSpace(utils.InterfaceToString(params["shell"])))
-					if aitool.IsBashShell(shell) {
-						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
-							masterEnabled := runtimeConfig == nil || !runtimeConfig.DisableBuiltinSyntaxFlowRules
-							if masterEnabled {
-								var checkOptions []aicommon.BashRuleCheckOption
-								if runtimeConfig != nil {
-									checkOptions = append(checkOptions,
-										aicommon.WithDisableBuiltinBashRules(false),
-										aicommon.WithIncludeCustomBashRules(true),
-									)
-								}
-								if check := aicommon.CheckBashCommand(ctx, cmd, checkOptions...); check.Blocked() {
-									fmt.Fprintf(stdout, "[bash guard] denied\n")
-									return check.BlockedResult(shell), nil
-								}
-							}
-						}
-					}
-				}
-
 				var runtimeId string
 				var runtimeFeedBacker func(result *ypb.ExecResult) error
 				riskSaveHandler := aiToolRiskSaveHandler(runtimeConfig)
@@ -261,6 +238,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					bindAIImageResultToEngine(ae, ctx)
 					bindAIDetachToEngine(ae, runtimeConfig)
 					bindAIToolSleep(ae, ctx)
+					bindBashCommandGuard(ae, ctx, runtimeConfig)
 					bindDBHistoryToEngine(ae, ctx, runtimeConfig)
 					bindMCPToEngine(ae, ctx, runtimeConfig)
 					bindAIKnowledgeToEngine(ae, ctx, runtimeConfig)
@@ -304,10 +282,11 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 
 // exports to yaklang
 var AIAgentExport = map[string]any{
-	"ImageResult":    imageResult,
-	"MCPResult":      mcpResult,
-	"imageInput":     aicommon.WithImageInput,
-	"imageInputMode": aicommon.WithImageInputMode,
+	"ImageResult":      imageResult,
+	"MCPResult":        mcpResult,
+	"BashCommandGuard": exportedBashCommandGuard,
+	"imageInput":       aicommon.WithImageInput,
+	"imageInputMode":   aicommon.WithImageInputMode,
 	/*
 		ai forge api
 	*/

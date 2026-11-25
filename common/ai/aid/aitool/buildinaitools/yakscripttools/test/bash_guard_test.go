@@ -22,11 +22,8 @@ func TestBashToolCommandGuardBlocks(t *testing.T) {
 	assert.Equal(t, utils.InterfaceToString(result["termination_reason"]), "blocked_by_bash_guard")
 	assert.Equal(t, utils.InterfaceToBoolean(result["process_started"]), false)
 	assert.Equal(t, utils.InterfaceToBoolean(result["executed"]), false)
-
-	check := utils.InterfaceToGeneralMap(result["check"])
-	assert.Assert(t, len(check) > 0, "missing structured check result: %v", result)
-	assert.Equal(t, utils.InterfaceToString(check["verdict"]), "block")
-	assert.Assert(t, len(utils.InterfaceToSliceInterface(check["findings"])) > 0, "missing findings: %v", check)
+	assert.Equal(t, utils.InterfaceToBoolean(result["security_denied"]), true)
+	assert.Equal(t, utils.InterfaceToString(result["verdict"]), "deny")
 }
 
 func TestBashToolCommandGuardAllowsSafe(t *testing.T) {

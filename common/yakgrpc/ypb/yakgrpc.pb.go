@@ -82240,7 +82240,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ImageInput\x12D\n" +
 	"\x1dDisableBuiltinSyntaxFlowRules\x189 \x01(\bR\x1dDisableBuiltinSyntaxFlowRulesB\x1b\n" +
 	"\x19_DisableContextAutoAdjustB\x0f\n" +
-	"\r_NetworkDebugJ\x04\b:\x10;\"\xa5\x02\n" +
+	"\r_NetworkDebug\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
 	"\x0eEnableGoalMode\x18\x02 \x01(\bR\x0eEnableGoalMode\x12,\n" +
@@ -87544,7 +87544,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fRetryForever\x18\f \x01(\bR\fRetryForever\x12\"\n" +
 	"\fNetworkDebug\x18\r \x01(\bR\fNetworkDebug\x126\n" +
 	"\x16ModelRequestsPerMinute\x18\x0e \x01(\x03R\x16ModelRequestsPerMinute\x12D\n" +
-	"\x1dDisableBuiltinSyntaxFlowRules\x18\x0f \x01(\bR\x1dDisableBuiltinSyntaxFlowRulesJ\x04\b\x10\x10\x11\"D\n" +
+	"\x1dDisableBuiltinSyntaxFlowRules\x18\x0f \x01(\bR\x1dDisableBuiltinSyntaxFlowRules\"D\n" +
 	"\x1aIsLlamaServerReadyResponse\x12\x0e\n" +
 	"\x02Ok\x18\x01 \x01(\bR\x02Ok\x12\x16\n" +
 	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"8\n" +
