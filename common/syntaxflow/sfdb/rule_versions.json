@@ -6226,5 +6226,53 @@
     "rule_name": "Bash：破坏块设备或系统根目录",
     "hash": "9310075ce1b6463e65d7533840fc2023361fbdc2a89e45147c2b305b5f10ecfb",
     "version": "20261118.0001"
+  },
+  {
+    "rule_id": "bash-cloud-metadata",
+    "rule_name": "Bash：访问云主机元数据服务",
+    "hash": "de287818cfa5f5dd4501bf053d4c712033bd00b516f7c4fcb928c61837327f9f",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-debug-trace",
+    "rule_name": "Bash：开启 Shell 调试跟踪",
+    "hash": "c76b6a6db2e5ab203eeb10e356ff2392f230640a84b91d171196733b1b9668d3",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-insecure-tls",
+    "rule_name": "Bash：禁用 TLS 证书校验",
+    "hash": "5e8d468911a11adbae056f52709d5f4e67b297b121a8f33d60cf40eb795de0a9",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-network-listener",
+    "rule_name": "Bash：使用 nc/socat 开启网络监听",
+    "hash": "580571a2c07660703def60436dab13d8fab3371985402f6e528e687a40d9a258",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-permissive-permissions",
+    "rule_name": "Bash：设置全局可写权限或宽松 umask",
+    "hash": "817ec6d024c02bd62ab0432646d4785f0868a56caaf0cf445417308d95532817",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-plaintext-credentials",
+    "rule_name": "Bash：在命令行参数中传递明文凭据",
+    "hash": "cd75cd0497f29560971627f32f760ec519acbf6a406c7a31518e9dc86086eb89",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-ssh-password-auth",
+    "rule_name": "Bash：使用非交互式 SSH 口令认证",
+    "hash": "c8297675e62cd1782e1e17e22f42cb9453fdb8063c95973fcb0e859d1ae6f756",
+    "version": "20261125.0001"
+  },
+  {
+    "rule_id": "bash-untrusted-package-source",
+    "rule_name": "Bash：从 URL 或 Git 源直接安装软件包",
+    "hash": "95e72f082935c35e4be654ec4c2fad29e2b339e5720bb8dfdfc42e24b618e184",
+    "version": "20261125.0001"
   }
 ]
