@@ -137,6 +137,11 @@ func syncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 	writeCount := 0
 	for i := range files {
 		needsWrite[i] = forceSync || files[i].rule == nil || (replaceBuiltins && changed)
+		// A reused rule keeps the tags of the old directory. Rewrite it when a
+		// directory rename added tags the stored row does not carry yet.
+		if !needsWrite[i] && missingDirTags(files[i].rule, files[i].tags) {
+			needsWrite[i] = true
+		}
 		if needsWrite[i] {
 			writeCount++
 		}
@@ -259,6 +264,29 @@ func syncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 	log.Infof("sync embed rules: total=%d skipped=%d compiled=%d compile=%v write=%v",
 		len(files), len(files)-writeCount, len(compileIndexes), compileCost, time.Since(writeStart))
 	return firstErr
+}
+
+// missingDirTags reports whether the stored rule lacks a tag derived from its
+// current directory. A reused rule keeps the tags written when it was first
+// imported, so a directory rename must rewrite the row to update them.
+func missingDirTags(rule *schema.SyntaxFlowRule, dirTags []string) bool {
+	if rule == nil {
+		return false
+	}
+	stored := make(map[string]struct{}, len(dirTags))
+	for _, tag := range strings.Split(rule.Tag, "|") {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		stored[strings.ToLower(tag)] = struct{}{}
+	}
+	for _, tag := range dirTags {
+		if _, ok := stored[strings.ToLower(tag)]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneRuleForSync(rule *schema.SyntaxFlowRule) *schema.SyntaxFlowRule {

@@ -1,6 +1,6 @@
 desc(
 	mode: "ssa"
-	language: "ts"
+	language: "typescript"
 	title: "数据流：TypeScript XSS: request parameter in HTML template"
 	title_zh: "数据流：TypeScript XSS：请求参数拼进 HTML 模板"
 	type: vuln
