@@ -47,7 +47,7 @@ alert $bypassRisk
 			count += len(result.GetValues(varName))
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 	return count
 }
 

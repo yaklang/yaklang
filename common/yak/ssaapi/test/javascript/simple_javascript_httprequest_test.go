@@ -27,7 +27,7 @@ func Test_JS_XMLHttpRequest(t *testing.T) {
 				"url":    {"\"http://example.com\""},
 				"method": {"\"GET\""},
 			}, false,
-			ssaapi.WithLanguage(ssaconfig.JS),
+			ssaapi.WithLanguage(ssaconfig.TS),
 		)
 	})
 
@@ -73,7 +73,7 @@ const data2 = {
 				"method": {"\"POST\"", "\"POST\""},
 				// "data": {"\"name=job&age=12\"", "\"name=job&age=12\""},
 			},
-			ssaapi.WithLanguage(ssaconfig.JS),
+			ssaapi.WithLanguage(ssaconfig.TS),
 		)
 	})
 
@@ -109,7 +109,7 @@ func TestJs_JQuery(t *testing.T) {
 				"dataType": {"\"json\""},
 				// "data":     {"\"{url:window.location.href}\""},
 			},
-			ssaapi.WithLanguage(ssaconfig.JS),
+			ssaapi.WithLanguage(ssaconfig.TS),
 		)
 	})
 
@@ -148,7 +148,7 @@ func TestJs_JQuery(t *testing.T) {
 				"contentType": {"\"application/json\"", "\"application/json\""},
 				"data":        {"Undefined-JSON.stringify(valid)(Undefined-formData)", "\"aaa\""},
 			},
-			ssaapi.WithLanguage(ssaconfig.JS))
+			ssaapi.WithLanguage(ssaconfig.TS))
 	})
 }
 
@@ -200,7 +200,7 @@ func Test_JS_Fetch(t *testing.T) {
 			// "body":    {"Undefined-JSON.stringify(valid)(make(object{}))"},
 			// "headers": {"make(object{})"},
 		},
-		ssaapi.WithLanguage(ssaconfig.JS))
+		ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func Test_JS_Axios(t *testing.T) {
@@ -229,7 +229,7 @@ func Test_JS_Axios(t *testing.T) {
 			map[string][]string{
 				"getUrl":  {"\"http://example.com\""},
 				"postUrl": {"\"/user\""},
-			}, ssaapi.WithLanguage(ssaconfig.JS))
+			}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 
 	t.Run("test axios post", func(t *testing.T) {
@@ -248,7 +248,7 @@ func Test_JS_Axios(t *testing.T) {
 			`axios.post(* as $url, * as $data)`,
 			map[string][]string{
 				"url": {"\"/user\""},
-			}, ssaapi.WithLanguage(ssaconfig.JS))
+			}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 	t.Run("test http request by config ", func(t *testing.T) {
 		code := `
@@ -270,7 +270,7 @@ func Test_JS_Axios(t *testing.T) {
 				"method": {"\"post\""},
 				"url":    {"\"/user/12345\""},
 				// "data":   {"\"key\":\"value\""},
-			}, ssaapi.WithLanguage(ssaconfig.JS))
+			}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 
 }

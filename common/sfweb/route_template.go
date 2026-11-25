@@ -113,10 +113,12 @@ func toValidLang(lang string) (string, bool) {
 }
 
 func GetAllSupportedLanguages() []ssaconfig.Language {
-	return lo.FilterMap(ssaconfig.GetAllSupportedLanguages(), func(v string, index int) (ssaconfig.Language, bool) {
-		item := ssaconfig.Language(v)
-		return item, item != ssaconfig.JS
-	})
+	names := ssaconfig.GetAllSupportedLanguages()
+	languages := make([]ssaconfig.Language, 0, len(names))
+	for _, name := range names {
+		languages = append(languages, ssaconfig.Language(name))
+	}
+	return languages
 }
 
 func (s *SyntaxFlowWebServer) registerTemplateRoute() {

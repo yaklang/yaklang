@@ -47,7 +47,7 @@ import (
 //   - PHP:        github.com/yaklang/yaklang/common/yak/php/php2ssa
 //   - C:          github.com/yaklang/yaklang/common/yak/c2ssa
 //   - TypeScript: github.com/yaklang/yaklang/common/yak/typescript/ts2ssa
-//   - JavaScript: 同 TypeScript (共享 ts2ssa builder)
+//     （JavaScript 是同一个前端，js/ts 都归一为 typescript）
 //   - C#:         github.com/yaklang/yaklang/common/yak/csharp/csharp2ssa
 //
 // bash 不在排除列表：bash2ssa 是纯 Go 的 mvdan/sh 解析器，保留在精简版中供

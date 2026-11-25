@@ -41,17 +41,11 @@ var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.SCALA:  scala2ssa.CreateBuilder,
 }
 
-// BuilderCreatorFor returns the frontend factory for a language. JavaScript is
-// not a separate frontend: it compiles through the TypeScript builder.
+// BuilderCreatorFor returns the frontend factory for a language. Aliases are
+// resolved first, so js and ts both select the typescript builder.
 func BuilderCreatorFor(language ssaconfig.Language) (ssa.CreateBuilder, bool) {
-	if create, ok := LanguageBuilderCreater[language]; ok {
-		return create, true
-	}
-	if language == ssaconfig.JS {
-		create, ok := LanguageBuilderCreater[ssaconfig.TS]
-		return create, ok
-	}
-	return nil, false
+	create, ok := LanguageBuilderCreater[ssaconfig.CanonicalLanguage(language)]
+	return create, ok
 }
 
 // ArchiveCodeSourceOpener opens a code source that is itself an archive.

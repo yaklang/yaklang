@@ -22,7 +22,7 @@ const v%d;
 exports.m%d = 1;
 `, i, i))
 		}
-		programs, err := ParseProjectWithFS(fs, WithLanguage(ssaconfig.JS), WithMemory(),
+		programs, err := ParseProjectWithFS(fs, WithLanguage(ssaconfig.TS), WithMemory(),
 			ssaconfig.WithCompileConcurrency(1))
 		require.NoError(t, err)
 		require.Len(t, programs, 1)

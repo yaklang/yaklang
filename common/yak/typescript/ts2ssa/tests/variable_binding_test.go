@@ -14,7 +14,7 @@ import (
 )
 
 func TestVariableBindingPatternIR(t *testing.T) {
-	for _, language := range []ssaconfig.Language{ssaconfig.JS, ssaconfig.TS} {
+	for _, language := range []ssaconfig.Language{ssaconfig.TS} {
 		for _, tc := range []struct {
 			name string
 			code string
@@ -50,12 +50,12 @@ func TestVariableBindingPatternIR(t *testing.T) {
 }
 
 func TestVariableBindingPatternSyntaxFlow(t *testing.T) {
-	for _, language := range []ssaconfig.Language{ssaconfig.JS, ssaconfig.TS} {
+	for _, language := range []ssaconfig.Language{ssaconfig.TS} {
 		for _, workers := range []int{1, 4} {
 			for _, module := range []string{"values", "lib/values"} {
 				t.Run(fmt.Sprintf("%s/workers=%d/module=%s", language, workers, module), func(t *testing.T) {
 					fs := filesys.NewVirtualFs()
-					fs.AddFile(module+"."+string(language), `
+					fs.AddFile(module+language.GetFileExt(), `
 function source() { return "user-input"; }
 export const { nested: { value: renamed }, list: [, second], ...rest } = {
   nested: { value: source() }, list: [11, 42], remaining: 99
@@ -66,7 +66,7 @@ export const { nested: exportedObject } = { nested: { value: 71 } };
 `)
 					// In the same unit main sorts before values; across directories
 					// the units can run concurrently. Both must resolve member reads.
-					fs.AddFile("main."+string(language), `
+					fs.AddFile("main"+language.GetFileExt(), `
 import { renamed, second, first, third, rest, all, exportedObject } from './`+module+`';
 function sink(value) {}
 sink(renamed);
@@ -98,7 +98,7 @@ source() as $sources
 						sources := result.GetValues("sources")
 						require.Len(t, sources, 1, "the initializer must only be evaluated once")
 						require.NotNil(t, sources[0].GetRange())
-						require.Equal(t, "values."+string(language), sources[0].GetRange().GetEditor().GetFilename())
+						require.Equal(t, "values"+language.GetFileExt(), sources[0].GetRange().GetEditor().GetFilename())
 						return nil
 					}, ssaapi.WithLanguage(language), ssaconfig.WithCompileConcurrency(workers))
 				})
@@ -108,7 +108,7 @@ source() as $sources
 }
 
 func TestVariableBindingPatternMissingInitializer(t *testing.T) {
-	for _, language := range []ssaconfig.Language{ssaconfig.JS, ssaconfig.TS} {
+	for _, language := range []ssaconfig.Language{ssaconfig.TS} {
 		for _, code := range []string{`let { missing };`, `let [missing];`} {
 			t.Run(fmt.Sprintf("%s/%s", language, code), func(t *testing.T) {
 				prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(language), ssaapi.WithMemory(true))

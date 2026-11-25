@@ -373,7 +373,7 @@ type SyntaxFlowRule struct {
 	// ============ 分类和标签 ============
 
 	// Language 规则适用的编程语言
-	// 如 "java"、"php"、"javascript" 等
+	// 如 "java"、"php"、"typescript" 等
 	// 支持的语言列表见 ssaconfig.GetAllSupportedLanguages()
 	Language ssaconfig.Language
 

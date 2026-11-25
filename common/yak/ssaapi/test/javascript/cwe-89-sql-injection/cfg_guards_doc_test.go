@@ -54,5 +54,5 @@ $nosqlArg<cfgGuards()> as $guards
 		require.Contains(t, out, "cfgGuard(kind="+ssaapi.GuardKindEarlyReturn, "typeof+return 守卫应对 deleteOne 产生 earlyReturn cfgGuard")
 		require.NotContains(t, out, "cfgGuard(kind="+ssaapi.GuardKindNone+", synthetic", "不应仅余 synthetic kind=none（漏检 early return）")
 		return nil
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }

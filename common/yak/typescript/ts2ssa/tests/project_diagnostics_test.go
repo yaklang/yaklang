@@ -13,7 +13,7 @@ import (
 )
 
 func TestProjectDiagnosticsAreNotReplicated(t *testing.T) {
-	for _, language := range []ssaconfig.Language{ssaconfig.JS, ssaconfig.TS} {
+	for _, language := range []ssaconfig.Language{ssaconfig.TS} {
 		for _, workers := range []int{1, 4} {
 			for _, tc := range []struct {
 				name    string
@@ -29,7 +29,7 @@ func TestProjectDiagnosticsAreNotReplicated(t *testing.T) {
 					const fileCount = 4
 					fs := filesys.NewVirtualFs()
 					for i := 0; i < fileCount; i++ {
-						fs.AddFile(fmt.Sprintf("unit%d/file%d.%s", i, i, language), tc.code)
+						fs.AddFile(fmt.Sprintf("unit%d/file%d%s", i, i, language.GetFileExt()), tc.code)
 					}
 					programs, err := ssaapi.ParseProjectWithFS(fs,
 						ssaapi.WithLanguage(language), ssaapi.WithMemory(true),
@@ -51,7 +51,7 @@ func TestProjectDiagnosticsAreNotReplicated(t *testing.T) {
 					}
 					require.Len(t, counts, fileCount, "diagnostics from every file must reach the application")
 					for i := 0; i < fileCount; i++ {
-						require.Equal(t, tc.perFile, counts[fmt.Sprintf("file%d.%s", i, language)])
+						require.Equal(t, tc.perFile, counts[fmt.Sprintf("file%d%s", i, language.GetFileExt())])
 					}
 				})
 			}

@@ -118,7 +118,7 @@ func guessSampleLanguage(code, filename string) string {
 	case strings.HasSuffix(lowerName, ".py"):
 		return "python"
 	case strings.HasSuffix(lowerName, ".js"), strings.HasSuffix(lowerName, ".ts"):
-		return "javascript"
+		return "typescript"
 	case strings.HasSuffix(lowerName, ".c"), strings.HasSuffix(lowerName, ".h"):
 		return "c"
 	case strings.HasSuffix(lowerName, ".yak"):
