@@ -166,12 +166,14 @@ func TestGRPCMUSTPASS_RequestYakURL_BrowserExtensionV3Snapshot(t *testing.T) {
 	require.Len(t, snapshot.Connections, 1)
 	require.Len(t, snapshot.Pending, 1)
 	require.Equal(t, "br_1", snapshot.Connections[0].Reference)
+	require.NotNil(t, snapshot.Connections[0].CapabilityCatalog)
+	require.Equal(t, catalogHash, snapshot.Connections[0].CapabilityCatalog.Hash)
 	expectedStatus["revision"] = snapshot.Revision
 	expectedStatus["connected"] = true
 	expectedStatus["connections"] = []map[string]any{{
 		"deviceId": "device-1", "installationId": "installation-1", "managedInstance": managed,
 		"client": "extension", "clientVersion": "1", "capabilities": []string{"browser.tabs"},
-		"capabilityCatalog": catalog, "sessionId": ack.SessionID, "connectionId": ack.ConnectionID,
+		"sessionId": ack.SessionID, "connectionId": ack.ConnectionID,
 		"taskId": "task-1", "grantId": "grant-1", "connectedAt": snapshot.Connections[0].ConnectedAt,
 	}}
 	expectedDevice["lastSeenAt"] = snapshot.Devices[0].LastSeenAt
