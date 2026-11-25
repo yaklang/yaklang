@@ -83,7 +83,7 @@ func securityRuleReviewPrompt(decision *ToolCallRuleDecision, toolName string, p
 			b.WriteString("\n")
 		}
 	}
-	if toolName == aitool.BashToolName {
+	if toolName == "bash" {
 		if cmd := strings.TrimSpace(utils.InterfaceToString(params["command"])); cmd != "" {
 			b.WriteString("\n命令：\n")
 			b.WriteString(cmd)

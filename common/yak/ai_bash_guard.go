@@ -28,7 +28,7 @@ func bashCommandGuard(ctx context.Context, disable bool, command string) map[str
 		aicommon.WithIncludeCustomBashRules(true),
 	)
 	if check.Blocked() {
-		return check.BlockedResult(aitool.BashToolName)
+		return check.BlockedResult("bash")
 	}
 	return nil
 }

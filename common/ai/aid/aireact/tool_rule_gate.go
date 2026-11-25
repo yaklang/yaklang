@@ -17,7 +17,7 @@ func securityRuleGate(ctx context.Context, toolName string, params aitool.Invoke
 
 func securityRuleGateWithOptions(options []aicommon.BashRuleCheckOption) aicommon.ToolCallRuleGate {
 	return func(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
-		if !strings.EqualFold(strings.TrimSpace(toolName), aitool.BashToolName) {
+		if !strings.EqualFold(strings.TrimSpace(toolName), "bash") {
 			return nil
 		}
 		command := utils.InterfaceToString(params["command"])
