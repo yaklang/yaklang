@@ -35,7 +35,8 @@ type WebFuzzerParamItem struct {
 // WebFuzzerPageParams mirrors pageParams in WebFuzzerConfig.Config JSON.
 // Schema source: yakit getFuzzerProcessedCacheData() + per-tab fields restored via fetchFuzzerList().
 //
-// MCP create_web_fuzzer_tab maps: request, isHttps, actualAddr->actualHost, proxy, concurrent, hotPatchCode.
+// MCP create_web_fuzzer_tab maps request, isHttps, actualAddr->actualHost,
+// proxy, concurrent, hotPatchCode, minDelaySeconds, and maxDelaySeconds.
 type WebFuzzerPageParams struct {
 	ActualHost      string               `json:"actualHost,omitempty"`
 	ID              string               `json:"id"`
@@ -280,13 +281,15 @@ func ParseWebFuzzerConfig(config *ypb.FuzzerConfig) (*WebFuzzerPageCacheItem, er
 
 func buildWebFuzzerPageParamsFromRequest(req *ypb.FuzzerRequest, pageID, request string) *WebFuzzerPageParams {
 	params := &WebFuzzerPageParams{
-		ID:           pageID,
-		IsHttps:      req.GetIsHTTPS(),
-		Request:      request,
-		Params:       defaultWebFuzzerParamItems(),
-		Proxy:        parseWebFuzzerProxy(req.GetProxy()),
-		ActualHost:   req.GetActualAddr(),
-		HotPatchCode: req.GetHotPatchCode(),
+		ID:              pageID,
+		IsHttps:         req.GetIsHTTPS(),
+		Request:         request,
+		Params:          defaultWebFuzzerParamItems(),
+		Proxy:           parseWebFuzzerProxy(req.GetProxy()),
+		ActualHost:      req.GetActualAddr(),
+		HotPatchCode:    req.GetHotPatchCode(),
+		MinDelaySeconds: req.GetDelayMinSeconds(),
+		MaxDelaySeconds: req.GetDelayMaxSeconds(),
 	}
 	if concurrent := req.GetConcurrent(); concurrent > 0 {
 		params.Concurrent = concurrent

@@ -285,9 +285,11 @@ type WebFuzzerTabPush struct {
 }
 
 type WebFuzzerExecutionPush struct {
-	ExecutionID string `json:"executionId"`
-	PageID      string `json:"pageId"`
-	ExpiresAt   int64  `json:"expiresAt"`
+	ExecutionID     string   `json:"executionId"`
+	PageID          string   `json:"pageId"`
+	ExpiresAt       int64    `json:"expiresAt"`
+	MinDelaySeconds *float64 `json:"minDelaySeconds,omitempty"`
+	MaxDelaySeconds *float64 `json:"maxDelaySeconds,omitempty"`
 }
 
 type ProjectPush struct {
@@ -352,17 +354,21 @@ func BroadcastWebFuzzerTabChanged(action string, openFlag bool, changedData []*y
 // Web Fuzzer tab through its normal UI request pipeline. executionID is later
 // written into FuzzerIndex by the renderer, allowing MCP to wait for this
 // exact task rather than an unrelated manual request in the same tab.
-func BroadcastWebFuzzerExecution(executionID, pageID string, expiresAt int64) {
+func BroadcastWebFuzzerExecution(executionID, pageID string, expiresAt int64, options ...func(*WebFuzzerExecutionPush)) {
 	executionID = strings.TrimSpace(executionID)
 	pageID = strings.TrimSpace(pageID)
 	if executionID == "" || pageID == "" || expiresAt <= 0 {
 		return
 	}
-	BroadcastData(ServerPushType_WebFuzzerExecution, &WebFuzzerExecutionPush{
+	push := &WebFuzzerExecutionPush{
 		ExecutionID: executionID,
 		PageID:      pageID,
 		ExpiresAt:   expiresAt,
-	})
+	}
+	for _, option := range options {
+		option(push)
+	}
+	BroadcastData(ServerPushType_WebFuzzerExecution, push)
 }
 
 func BroadcastProjectChanged(action string, id int64, projectName, projectType string) {

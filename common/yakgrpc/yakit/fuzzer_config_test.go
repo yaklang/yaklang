@@ -11,12 +11,14 @@ import (
 
 func TestBuildWebFuzzerConfig(t *testing.T) {
 	cfg, err := BuildWebFuzzerConfig(&ypb.FuzzerRequest{
-		Request:      "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
-		IsHTTPS:      true,
-		Concurrent:   30,
-		HotPatchCode: "println(1)",
-		ActualAddr:   "127.0.0.1:8080",
-		Proxy:        "http://127.0.0.1:7890,http://127.0.0.1:7891",
+		Request:         "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+		IsHTTPS:         true,
+		Concurrent:      30,
+		DelayMinSeconds: 0.25,
+		DelayMaxSeconds: 1.5,
+		HotPatchCode:    "println(1)",
+		ActualAddr:      "127.0.0.1:8080",
+		Proxy:           "http://127.0.0.1:7890,http://127.0.0.1:7891",
 	}, func(opts *WebFuzzerPageBuildOptions) {
 		opts.TabName = "demo-tab"
 		opts.PageID = "page-001"
@@ -34,6 +36,8 @@ func TestBuildWebFuzzerConfig(t *testing.T) {
 	require.Equal(t, "demo-tab", parsed.Verbose)
 	require.True(t, parsed.PageParams.IsHttps)
 	require.Equal(t, int64(30), parsed.PageParams.Concurrent)
+	require.Equal(t, 0.25, parsed.PageParams.MinDelaySeconds)
+	require.Equal(t, 1.5, parsed.PageParams.MaxDelaySeconds)
 	require.Equal(t, "println(1)", parsed.PageParams.HotPatchCode)
 	require.Equal(t, "127.0.0.1:8080", parsed.PageParams.ActualHost)
 	require.Equal(t, []string{"http://127.0.0.1:7890", "http://127.0.0.1:7891"}, parsed.PageParams.Proxy)
@@ -67,6 +71,8 @@ func TestBuildWebFuzzerConfig_OmitsUnsetMCPFields(t *testing.T) {
 	require.False(t, hasHotPatch)
 	_, hasActualHost := pageParams["actualHost"]
 	require.False(t, hasActualHost)
+	require.NotContains(t, pageParams, "minDelaySeconds")
+	require.NotContains(t, pageParams, "maxDelaySeconds")
 }
 
 func TestBuildWebFuzzerConfig_RequestRawFallback(t *testing.T) {

@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -19,14 +20,16 @@ import (
 )
 
 type webFuzzerTabCreateInput struct {
-	Request      string `mapstructure:"request"`
-	IsHTTPS      bool   `mapstructure:"isHttps"`
-	TabName      string `mapstructure:"tabName"`
-	PageID       string `mapstructure:"pageId"`
-	Proxy        string `mapstructure:"proxy"`
-	Concurrent   int64  `mapstructure:"concurrent"`
-	HotPatchCode string `mapstructure:"hotPatchCode"`
-	ActualAddr   string `mapstructure:"actualAddr"`
+	Request         string  `mapstructure:"request"`
+	IsHTTPS         bool    `mapstructure:"isHttps"`
+	TabName         string  `mapstructure:"tabName"`
+	PageID          string  `mapstructure:"pageId"`
+	Proxy           string  `mapstructure:"proxy"`
+	Concurrent      int64   `mapstructure:"concurrent"`
+	MinDelaySeconds float64 `mapstructure:"minDelaySeconds"`
+	MaxDelaySeconds float64 `mapstructure:"maxDelaySeconds"`
+	HotPatchCode    string  `mapstructure:"hotPatchCode"`
+	ActualAddr      string  `mapstructure:"actualAddr"`
 }
 
 type webFuzzerStoredItem struct {
@@ -58,13 +61,18 @@ func decodeWebFuzzerArguments(arguments map[string]any, target any) error {
 }
 
 func (input webFuzzerTabCreateInput) build(groupID string, sortField int64, fallbackName string) (*ypb.FuzzerConfig, error) {
+	if err := validateWebFuzzerDelay(input.MinDelaySeconds, input.MaxDelaySeconds); err != nil {
+		return nil, err
+	}
 	req := &ypb.FuzzerRequest{
-		Request:      input.Request,
-		IsHTTPS:      input.IsHTTPS,
-		Proxy:        input.Proxy,
-		Concurrent:   input.Concurrent,
-		HotPatchCode: input.HotPatchCode,
-		ActualAddr:   input.ActualAddr,
+		Request:         input.Request,
+		IsHTTPS:         input.IsHTTPS,
+		Proxy:           input.Proxy,
+		Concurrent:      input.Concurrent,
+		DelayMinSeconds: input.MinDelaySeconds,
+		DelayMaxSeconds: input.MaxDelaySeconds,
+		HotPatchCode:    input.HotPatchCode,
+		ActualAddr:      input.ActualAddr,
 	}
 	return yakit.BuildWebFuzzerConfig(req, func(opts *yakit.WebFuzzerPageBuildOptions) {
 		if pageID := strings.TrimSpace(input.PageID); pageID != "" {
@@ -78,6 +86,13 @@ func (input webFuzzerTabCreateInput) build(groupID string, sortField int64, fall
 		opts.GroupID = groupID
 		opts.SortField = sortField
 	})
+}
+
+func validateWebFuzzerDelay(min, max float64) error {
+	if math.IsNaN(min) || math.IsInf(min, 0) || math.IsNaN(max) || math.IsInf(max, 0) || min < 0 || max < 0 || min > max {
+		return utils.Error("random delay must be finite and satisfy 0 <= minDelaySeconds <= maxDelaySeconds")
+	}
+	return nil
 }
 
 func handleCreateWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
@@ -127,11 +142,21 @@ func handleExecuteWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 			return nil, err
 		}
 		var args struct {
-			PageID         string `mapstructure:"pageId"`
-			TimeoutSeconds int64  `mapstructure:"timeoutSeconds"`
+			PageID          string   `mapstructure:"pageId"`
+			TimeoutSeconds  int64    `mapstructure:"timeoutSeconds"`
+			MinDelaySeconds *float64 `mapstructure:"minDelaySeconds"`
+			MaxDelaySeconds *float64 `mapstructure:"maxDelaySeconds"`
 		}
 		if err := decodeWebFuzzerArguments(request.Params.Arguments, &args); err != nil {
 			return nil, err
+		}
+		if (args.MinDelaySeconds == nil) != (args.MaxDelaySeconds == nil) {
+			return nil, utils.Error("minDelaySeconds and maxDelaySeconds must be supplied together for execution overrides")
+		}
+		if args.MinDelaySeconds != nil {
+			if err := validateWebFuzzerDelay(*args.MinDelaySeconds, *args.MaxDelaySeconds); err != nil {
+				return nil, err
+			}
 		}
 		state, err := loadWebFuzzerState(ctx, s)
 		if err != nil {
@@ -155,7 +180,10 @@ func handleExecuteWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 		}
 		executionID := uuid.NewString()
 		startedAt := time.Now()
-		yakit.BroadcastWebFuzzerExecution(executionID, pageID, startedAt.Add(time.Duration(timeout)*time.Second).UnixMilli())
+		yakit.BroadcastWebFuzzerExecution(executionID, pageID, startedAt.Add(time.Duration(timeout)*time.Second).UnixMilli(), func(push *yakit.WebFuzzerExecutionPush) {
+			push.MinDelaySeconds = args.MinDelaySeconds
+			push.MaxDelaySeconds = args.MaxDelaySeconds
+		})
 		task, err := waitForWebFuzzerExecution(ctx, db, pageID, executionID, time.Duration(timeout)*time.Second)
 		if err != nil {
 			return nil, err
@@ -373,17 +401,19 @@ func handleUpdateWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 		}
 		arguments := request.Params.Arguments
 		var args struct {
-			PageID        string `mapstructure:"pageId"`
-			TabName       string `mapstructure:"tabName"`
-			Request       string `mapstructure:"request"`
-			IsHTTPS       bool   `mapstructure:"isHttps"`
-			Proxy         string `mapstructure:"proxy"`
-			Concurrent    int64  `mapstructure:"concurrent"`
-			HotPatchCode  string `mapstructure:"hotPatchCode"`
-			ActualAddr    string `mapstructure:"actualAddr"`
-			TargetGroupID string `mapstructure:"targetGroupId"`
-			Sort          int64  `mapstructure:"sort"`
-			OpenFlag      *bool  `mapstructure:"openFlag"`
+			PageID          string   `mapstructure:"pageId"`
+			TabName         string   `mapstructure:"tabName"`
+			Request         string   `mapstructure:"request"`
+			IsHTTPS         bool     `mapstructure:"isHttps"`
+			Proxy           string   `mapstructure:"proxy"`
+			Concurrent      int64    `mapstructure:"concurrent"`
+			MinDelaySeconds *float64 `mapstructure:"minDelaySeconds"`
+			MaxDelaySeconds *float64 `mapstructure:"maxDelaySeconds"`
+			HotPatchCode    string   `mapstructure:"hotPatchCode"`
+			ActualAddr      string   `mapstructure:"actualAddr"`
+			TargetGroupID   string   `mapstructure:"targetGroupId"`
+			Sort            int64    `mapstructure:"sort"`
+			OpenFlag        *bool    `mapstructure:"openFlag"`
 		}
 		if err := decodeWebFuzzerArguments(arguments, &args); err != nil {
 			return nil, err
@@ -456,6 +486,23 @@ func handleUpdateWebFuzzerTab(s *MCPServer) server.ToolHandlerFunc {
 			}
 			if _, exists := arguments["actualAddr"]; exists {
 				params["actualHost"] = args.ActualAddr
+			}
+			if args.MinDelaySeconds != nil || args.MaxDelaySeconds != nil {
+				var min, max float64
+				if current := record.Item.PageParams; current != nil {
+					min, max = current.MinDelaySeconds, current.MaxDelaySeconds
+				}
+				if args.MinDelaySeconds != nil {
+					min = *args.MinDelaySeconds
+					params["minDelaySeconds"] = min
+				}
+				if args.MaxDelaySeconds != nil {
+					max = *args.MaxDelaySeconds
+					params["maxDelaySeconds"] = max
+				}
+				if err := validateWebFuzzerDelay(min, max); err != nil {
+					return err
+				}
 			}
 			return nil
 		})
