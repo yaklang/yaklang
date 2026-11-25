@@ -62,6 +62,11 @@ var loopAction_Finish = &LoopAction{
 			operator.Continue()
 			return
 		}
+		// A strategy hotpatch can switch away from acceptance while the model is
+		// answering its review turn. Do not let that stale turn bypass new gates.
+		if loop.isGoalAcceptanceMode() && loop.goalAcceptanceCriteria() == "" {
+			loop.discardGoalAcceptanceReviewForWork()
+		}
 		if loop.isGoalAcceptanceMode() {
 			if loop.invoker != nil {
 				loop.invoker.AddToTimeline("[GOAL_ACCEPTANCE_CONFIRMED]",
