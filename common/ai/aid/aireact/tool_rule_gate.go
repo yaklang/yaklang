@@ -42,19 +42,13 @@ func securityRuleGateWithOptions(options []aicommon.BashRuleCheckOption) aicommo
 	}
 }
 
-// toolCallRuleGate is the single bash/non-bash rule-permission entry point.
+// toolCallRuleGate hooks only the bash/shell tool and runs SyntaxFlow rules.
 func toolCallRuleGate(cfg *aicommon.Config) aicommon.ToolCallRuleGate {
 	if cfg == nil || cfg.DisableBuiltinSyntaxFlowRules {
 		return nil
 	}
-	options := []aicommon.BashRuleCheckOption{
+	return securityRuleGateWithOptions([]aicommon.BashRuleCheckOption{
 		aicommon.WithDisableBuiltinBashRules(false),
 		aicommon.WithIncludeCustomBashRules(true),
-	}
-	builtinGate := securityRuleGateWithOptions(options)
-	extra := aicommon.CompileRulePermissionsFromRuntime()
-	if extra == nil {
-		return builtinGate
-	}
-	return aicommon.ComposeToolCallRuleGates(builtinGate, extra)
+	})
 }

@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// EnvToolCallPermissions accepts one 规则权限策略 JSON document or a JSON
-	// array of documents. It takes precedence over file sources.
+	// EnvToolCallPermissions accepts one shell 规则权限策略 JSON document or a
+	// JSON array of documents. Only Bash(...) rows are applied.
 	EnvToolCallPermissions = "YAK_AI_TOOL_PERMISSIONS"
 	// EnvToolCallPermissionsFile is an OS path-list of permission files.
 	EnvToolCallPermissionsFile = "YAK_AI_TOOL_PERMISSIONS_FILE"
@@ -24,7 +24,7 @@ const (
 	toolCallPermissionsFileName = "ai-tool-permissions.json"
 )
 
-// LoadRulePermissionConfigs reads runtime 规则权限策略 sources.
+// LoadRulePermissionConfigs reads runtime shell 规则权限策略 sources.
 func LoadRulePermissionConfigs() []string {
 	if raw := strings.TrimSpace(os.Getenv(EnvToolCallPermissions)); raw != "" {
 		return splitRuntimePermissionConfig(raw)
@@ -69,50 +69,34 @@ func LoadRulePermissionConfigs() []string {
 	return configs
 }
 
-var runtimePermissionCache struct {
-	mu        sync.Mutex
-	key       string
-	gate      ToolCallRuleGate
-	bashRules []*schema.SyntaxFlowRule
-}
-
-// CompileRulePermissionsFromRuntime builds the optional non-bash gate.
-func CompileRulePermissionsFromRuntime() ToolCallRuleGate {
-	refreshRuntimePermissionCache()
-	runtimePermissionCache.mu.Lock()
-	defer runtimePermissionCache.mu.Unlock()
-	return runtimePermissionCache.gate
+var runtimeBashPermissionCache struct {
+	mu    sync.Mutex
+	key   string
+	rules []*schema.SyntaxFlowRule
 }
 
 func loadRuntimeBashPermissionSyntaxFlowRules() []*schema.SyntaxFlowRule {
-	refreshRuntimePermissionCache()
-	runtimePermissionCache.mu.Lock()
-	defer runtimePermissionCache.mu.Unlock()
-	return runtimePermissionCache.bashRules
-}
-
-func refreshRuntimePermissionCache() {
 	configs := LoadRulePermissionConfigs()
 	key := strings.Join(configs, string(rune(0)))
 
-	runtimePermissionCache.mu.Lock()
-	defer runtimePermissionCache.mu.Unlock()
-	if runtimePermissionCache.key == key {
-		return
+	runtimeBashPermissionCache.mu.Lock()
+	defer runtimeBashPermissionCache.mu.Unlock()
+	if runtimeBashPermissionCache.key == key {
+		return runtimeBashPermissionCache.rules
 	}
 
-	var rules []*RulePermissionRule
+	var parsed []*RulePermissionRule
 	for i, raw := range configs {
-		parsed, err := ParseRulePermissions(raw)
+		rules, err := ParseRulePermissions(raw)
 		if err != nil {
-			log.Warnf("skip rule permission config %d: %v", i+1, err)
+			log.Warnf("skip shell rule permission config %d: %v", i+1, err)
 			continue
 		}
-		rules = append(rules, parsed...)
+		parsed = append(parsed, rules...)
 	}
-	runtimePermissionCache.key = key
-	runtimePermissionCache.gate = NewRulePermissionGate(rules)
-	runtimePermissionCache.bashRules = CompileBashPermissionSyntaxFlowRules(rules)
+	runtimeBashPermissionCache.key = key
+	runtimeBashPermissionCache.rules = CompileBashPermissionSyntaxFlowRules(parsed)
+	return runtimeBashPermissionCache.rules
 }
 
 func splitRuntimePermissionConfig(raw string) []string {

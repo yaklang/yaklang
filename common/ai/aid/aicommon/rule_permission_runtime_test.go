@@ -10,42 +10,40 @@ import (
 
 func TestRulePermissionRuntimeConfig(t *testing.T) {
 	t.Run("env-document", func(t *testing.T) {
-		t.Setenv(EnvToolCallPermissions, `{"permissions":{"deny":["Read(./.env)"]}}`)
+		t.Setenv(EnvToolCallPermissions, `{"permissions":{"deny":["Bash(rm -rf *)","Read(./.env)"]}}`)
 		t.Setenv(EnvToolCallPermissionsFile, "")
-		runtimePermissionCache.mu.Lock()
-		runtimePermissionCache.key = ""
-		runtimePermissionCache.gate = nil
-		runtimePermissionCache.bashRules = nil
-		runtimePermissionCache.mu.Unlock()
+		runtimeBashPermissionCache.mu.Lock()
+		runtimeBashPermissionCache.key = ""
+		runtimeBashPermissionCache.rules = nil
+		runtimeBashPermissionCache.mu.Unlock()
 
-		gate := CompileRulePermissionsFromRuntime()
-		require.NotNil(t, gate)
+		rules := loadRuntimeBashPermissionSyntaxFlowRules()
+		require.Len(t, rules, 1)
+		require.Contains(t, rules[0].Content, `/^rm$/ as $cmd`)
 	})
 
 	t.Run("file-document", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "perm.json")
-		require.NoError(t, os.WriteFile(path, []byte(`{"permissions":{"deny":["Read(./.env)"]}}`), 0o644))
+		require.NoError(t, os.WriteFile(path, []byte(`{"permissions":{"deny":["Bash(rm -rf *)"]}}`), 0o644))
 		t.Setenv(EnvToolCallPermissions, "")
 		t.Setenv(EnvToolCallPermissionsFile, path)
-		runtimePermissionCache.mu.Lock()
-		runtimePermissionCache.key = ""
-		runtimePermissionCache.gate = nil
-		runtimePermissionCache.bashRules = nil
-		runtimePermissionCache.mu.Unlock()
+		runtimeBashPermissionCache.mu.Lock()
+		runtimeBashPermissionCache.key = ""
+		runtimeBashPermissionCache.rules = nil
+		runtimeBashPermissionCache.mu.Unlock()
 
-		gate := CompileRulePermissionsFromRuntime()
-		require.NotNil(t, gate)
+		rules := loadRuntimeBashPermissionSyntaxFlowRules()
+		require.Len(t, rules, 1)
 	})
 
 	t.Run("empty", func(t *testing.T) {
 		t.Setenv(EnvToolCallPermissions, "")
 		t.Setenv(EnvToolCallPermissionsFile, "")
-		runtimePermissionCache.mu.Lock()
-		runtimePermissionCache.key = "force-miss"
-		runtimePermissionCache.gate = nil
-		runtimePermissionCache.bashRules = nil
-		runtimePermissionCache.mu.Unlock()
-		require.Nil(t, CompileRulePermissionsFromRuntime())
+		runtimeBashPermissionCache.mu.Lock()
+		runtimeBashPermissionCache.key = "force-miss"
+		runtimeBashPermissionCache.rules = nil
+		runtimeBashPermissionCache.mu.Unlock()
+		require.Empty(t, loadRuntimeBashPermissionSyntaxFlowRules())
 	})
 }
