@@ -202,7 +202,8 @@ func deterministicRuleSkip(ignoreLanguage bool, rule *schema.SyntaxFlowRule, tar
 	if !ruleMatchesQueryTarget(rule, target) {
 		return "skipped: target-mode mismatch", true
 	}
-	if !ignoreLanguage && !rule.IsSourceMode() && rule.Language != ssaconfig.General && rule.Language != target.GetLanguage() {
+	if !ignoreLanguage && !rule.IsSourceMode() && rule.Language != ssaconfig.General &&
+		!ssaconfig.SameLanguage(ssaconfig.Language(rule.Language), target.GetLanguage()) {
 		return "skipped: language mismatch", true
 	}
 	return "", false

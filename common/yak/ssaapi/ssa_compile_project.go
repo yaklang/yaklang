@@ -810,7 +810,7 @@ type diffProgressFunc func(f float64, msg string)
 //     archive blacklist (isRawArchiveDiffEntry).
 func resolveDiffSourceFilter(language, baseProgramLanguage ssaconfig.Language) func(string) bool {
 	for _, lang := range []ssaconfig.Language{language, baseProgramLanguage} {
-		if createBuilder, ok := LanguageBuilderCreater[lang]; ok {
+		if createBuilder, ok := BuilderCreatorFor(lang); ok {
 			builder := createBuilder()
 			return func(path string) bool {
 				return builder.FilterFile(path) || builder.FilterPreHandlerFile(path)

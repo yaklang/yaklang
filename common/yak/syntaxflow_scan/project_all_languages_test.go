@@ -77,10 +77,11 @@ func TestScanProjectAllLanguagesCompilesEachLanguage(t *testing.T) {
 		ssaconfig.JAVA:   "App.java",
 		ssaconfig.PYTHON: "app.py",
 		ssaconfig.PHP:    "app.php",
-		ssaconfig.JS:     "app.js",
 		ssaconfig.TS:     "app.ts",
 	}
 	require.Len(t, result.LanguagePrograms, len(owns))
+	require.NotContains(t, result.LanguagePrograms, ssaconfig.JS,
+		"JavaScript compiles through the TypeScript program, not a program of its own")
 	for language, file := range owns {
 		program := result.LanguagePrograms[language]
 		require.Equal(t, name+"-"+string(language), program)
@@ -89,6 +90,8 @@ func TestScanProjectAllLanguagesCompilesEachLanguage(t *testing.T) {
 		require.Equal(t, language, prog.GetLanguage())
 		require.True(t, fileListHas(prog.Program.FileList, file), "%s must compile %s", language, file)
 	}
+	tsFiles := languageProgramFiles(t, result.LanguagePrograms[ssaconfig.TS])
+	require.True(t, fileListHas(tsFiles, "app.js"), "the TypeScript program must compile JavaScript too")
 
 	goFiles := languageProgramFiles(t, result.LanguagePrograms[ssaconfig.GO])
 	require.False(t, fileListHas(goFiles, "App.java"), "a Go program must not compile Java")
@@ -126,6 +129,7 @@ alert $hit`
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: fmt.Sprintf("desc(mode: \"ssa\", language: golang, title: \"go const\")\n%s", body)}),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: fmt.Sprintf("desc(mode: \"ssa\", language: java, title: \"java const\")\n%s", body)}),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: fmt.Sprintf("desc(mode: \"ssa\", language: python, title: \"python const\")\n%s", body)}),
+		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: fmt.Sprintf("desc(mode: \"ssa\", language: js, title: \"js const\")\n%s", body)}),
 		ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: `desc(mode: "source", language: general, title: "source report")
 ${*}.pattern_regex(/report\(/) as $hit
 alert $hit`}),
@@ -157,6 +161,20 @@ alert $hit`}),
 		}
 		require.Positive(t, positioned, "rule %q produced no positioned finding", title)
 	}
+
+	// A js rule runs on the TypeScript program: one ECMAScript frontend and one
+	// program, so the finding is attributed to the program's language.
+	jsRisks := findings["js const"]
+	require.NotEmpty(t, jsRisks, "a js rule must still run after the merge")
+	jsOnJSFile := 0
+	for _, risk := range jsRisks {
+		require.Equal(t, string(ssaconfig.TS), risk.Language)
+		require.True(t, strings.HasSuffix(risk.ProgramName, "-ts"))
+		if strings.HasSuffix(risk.CodeSourceUrl, "/app.js") {
+			jsOnJSFile++
+		}
+	}
+	require.Positive(t, jsOnJSFile, "a js rule must still report JavaScript files")
 
 	sourceFiles := map[string]struct{}{}
 	for _, risk := range findings["source report"] {

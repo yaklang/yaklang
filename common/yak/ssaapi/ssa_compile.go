@@ -277,7 +277,7 @@ func (c *Config) ensureLanguageBuilder() {
 	if language == "" {
 		return
 	}
-	if create, ok := LanguageBuilderCreater[language]; ok && create != nil {
+	if create, ok := BuilderCreatorFor(language); ok && create != nil {
 		c.LanguageBuilder = create()
 	}
 }
