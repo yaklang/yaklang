@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -227,6 +228,16 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 			VariableName: offsetName,
 		},
 	}))
+	deletedAt := time.Now()
+	require.NoError(t, SaveIrOffsetBatch(db, []*IrOffset{{
+		ProgramName:  program,
+		ValueID:      3,
+		FileHash:     "conformance-hash",
+		StartOffset:  70,
+		EndOffset:    80,
+		VariableName: offsetName,
+		Model:        Model{DeletedAt: &deletedAt},
+	}}))
 	var offsetCount int64
 	require.NoError(t, db.Model(&IrOffset{}).Where("program_name = ?", program).Count(&offsetCount).Error)
 	require.Equal(t, int64(2), offsetCount)
@@ -244,6 +255,12 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 	nativeOffsets, err = nativeGetOffsetsByVariable(db, offsetName, 2, "")
 	require.NoError(t, err)
 	require.Len(t, nativeOffsets, 2)
+	nativeOffsets, err = nativeGetOffsetsByVariable(db, offsetName, 3, program)
+	require.NoError(t, err)
+	require.Empty(t, nativeOffsets)
+	nativeOffsets, err = nativeGetOffsetsByVariable(db, offsetName, 3, "")
+	require.NoError(t, err)
+	require.Empty(t, nativeOffsets)
 
 	// Types: upsert on (program_name, type_id).
 	require.NoError(t, SaveIrTypeBatch(db, []*IrType{{ProgramName: program, TypeId: 1, String: "first"}}))
