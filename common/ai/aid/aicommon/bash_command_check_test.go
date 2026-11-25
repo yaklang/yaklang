@@ -1,4 +1,4 @@
-package commandcheck
+package aicommon
 
 import (
 	"context"
@@ -44,7 +44,7 @@ func TestCheckBashCommand(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := CheckCommand(context.Background(), test.command)
+			result := CheckBashCommand(context.Background(), test.command)
 			require.True(t, result.Available, "guard should be available: %s", result.Reason)
 			require.Equal(t, test.blocked, result.Blocked, "findings=%v reason=%s", result.Findings, result.Reason)
 			if test.blocked {
@@ -67,13 +67,13 @@ func TestCheckBashCommand(t *testing.T) {
 }
 
 func TestCheckBashCommandDisabled(t *testing.T) {
-	t.Setenv(disableEnv, "1")
-	result := CheckCommand(context.Background(), "rm -rf /")
+	t.Setenv(disableBashGuardEnv, "1")
+	result := CheckBashCommand(context.Background(), "rm -rf /")
 	require.False(t, result.Blocked)
 	require.Equal(t, "disabled", result.Reason)
 }
 
-func severityRule(name string, level schema.SyntaxFlowSeverity, query string) *schema.SyntaxFlowRule {
+func severityBashRule(name string, level schema.SyntaxFlowSeverity, query string) *schema.SyntaxFlowRule {
 	return &schema.SyntaxFlowRule{
 		RuleName:      name,
 		RuleId:        name,
@@ -90,15 +90,15 @@ func severityRule(name string, level schema.SyntaxFlowSeverity, query string) *s
 	}
 }
 
-func TestCheckWithRulesSeverityActions(t *testing.T) {
-	high := severityRule("test-high-rm", schema.SFR_SEVERITY_HIGH, "rm(* as $hit)\nalert $hit")
-	middle := severityRule("test-middle-curl", schema.SFR_SEVERITY_WARNING, "curl(* as $hit)\nalert $hit")
-	low := severityRule("test-low-chmod", schema.SFR_SEVERITY_LOW, "chmod(* as $hit)\nalert $hit")
-	info := severityRule("test-info-echo", schema.SFR_SEVERITY_INFO, "echo(* as $hit)\nalert $hit")
+func TestCheckBashCommandWithRulesSeverityActions(t *testing.T) {
+	high := severityBashRule("test-high-rm", schema.SFR_SEVERITY_HIGH, "rm(* as $hit)\nalert $hit")
+	middle := severityBashRule("test-middle-curl", schema.SFR_SEVERITY_WARNING, "curl(* as $hit)\nalert $hit")
+	low := severityBashRule("test-low-chmod", schema.SFR_SEVERITY_LOW, "chmod(* as $hit)\nalert $hit")
+	info := severityBashRule("test-info-echo", schema.SFR_SEVERITY_INFO, "echo(* as $hit)\nalert $hit")
 	rules := []*schema.SyntaxFlowRule{high, middle, low, info}
 
 	t.Run("high-denies", func(t *testing.T) {
-		result := checkWithRules(context.Background(), "rm -rf /tmp/build", rules, nil)
+		result := checkBashCommandWithRules(context.Background(), "rm -rf /tmp/build", rules)
 		require.True(t, result.Available)
 		require.True(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_DENY, result.Action)
@@ -107,7 +107,7 @@ func TestCheckWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("middle-asks", func(t *testing.T) {
-		result := checkWithRules(context.Background(), "curl https://example.com", rules, nil)
+		result := checkBashCommandWithRules(context.Background(), "curl https://example.com", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ASK, result.Action)
@@ -116,7 +116,7 @@ func TestCheckWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("low-warns", func(t *testing.T) {
-		result := checkWithRules(context.Background(), "chmod 777 /tmp/build", rules, nil)
+		result := checkBashCommandWithRules(context.Background(), "chmod 777 /tmp/build", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_WARN, result.Action)
@@ -125,7 +125,7 @@ func TestCheckWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("info-allows", func(t *testing.T) {
-		result := checkWithRules(context.Background(), "echo hello", rules, nil)
+		result := checkBashCommandWithRules(context.Background(), "echo hello", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ALLOW, result.Action)
@@ -135,7 +135,7 @@ func TestCheckWithRulesSeverityActions(t *testing.T) {
 
 	t.Run("highest-action-wins", func(t *testing.T) {
 		command := "echo hi; chmod 777 /tmp/build; curl https://example.com; rm -rf /tmp/build"
-		result := checkWithRules(context.Background(), command, rules, nil)
+		result := checkBashCommandWithRules(context.Background(), command, rules)
 		require.Equal(t, schema.SFR_ACTION_DENY, result.Action)
 		require.Equal(t, "test-high-rm", result.TopFinding().Title)
 		require.GreaterOrEqual(t, len(result.Findings), 4)
@@ -146,7 +146,7 @@ func TestCheckWithRulesSeverityActions(t *testing.T) {
 	})
 
 	t.Run("no-match-allows", func(t *testing.T) {
-		result := checkWithRules(context.Background(), "printf hello", rules, nil)
+		result := checkBashCommandWithRules(context.Background(), "printf hello", rules)
 		require.True(t, result.Available)
 		require.False(t, result.Blocked)
 		require.Equal(t, schema.SFR_ACTION_ALLOW, result.Action)
@@ -154,18 +154,18 @@ func TestCheckWithRulesSeverityActions(t *testing.T) {
 	})
 }
 
-func TestCheckConfigDisablesGuard(t *testing.T) {
+func TestCheckBashConfigDisablesGuard(t *testing.T) {
 	ctx := context.Background()
-	preflight := CheckCommand(ctx, "rm -rf /", WithDisableBuiltinRules(true))
+	preflight := CheckBashCommand(ctx, "rm -rf /", WithDisableBuiltinBashRules(true))
 	require.False(t, preflight.Blocked)
 	require.Equal(t, "disabled_by_config", preflight.Reason)
 
-	gate := CheckBuiltinCommand(ctx, "rm -rf /", WithDisableBuiltinRules(true))
+	gate := CheckBuiltinBashCommand(ctx, "rm -rf /", WithDisableBuiltinBashRules(true))
 	require.False(t, gate.Blocked)
 	require.Equal(t, "disabled_by_config", gate.Reason)
 }
 
-func TestCheckCommandIncludesCustomRules(t *testing.T) {
+func TestCheckBashCommandIncludesCustomRules(t *testing.T) {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowRule{}).Error)
@@ -173,8 +173,8 @@ func TestCheckCommandIncludesCustomRules(t *testing.T) {
 	consts.BindProfileDatabase(db, "")
 	t.Cleanup(func() {
 		consts.BindProfileDatabase(old, "")
-		builtinRulesCache = ruleCache{}
-		customRulesCache = ruleCache{}
+		bashBuiltinRulesCache = bashRuleCache{}
+		bashCustomRulesCache = bashRuleCache{}
 	})
 
 	rule := &schema.SyntaxFlowRule{
@@ -189,23 +189,23 @@ func TestCheckCommandIncludesCustomRules(t *testing.T) {
 	}
 	require.NoError(t, db.Create(rule).Error)
 
-	result := CheckCommand(context.Background(), "rm -rf /tmp/build",
-		WithDisableBuiltinRules(true), WithIncludeCustomRules(true))
+	result := CheckBashCommand(context.Background(), "rm -rf /tmp/build",
+		WithDisableBuiltinBashRules(true), WithIncludeCustomBashRules(true))
 	require.True(t, result.Blocked)
 	require.Equal(t, "custom-high-rm", result.TopFinding().RuleID)
 
-	gateResult := CheckBuiltinCommand(context.Background(), "rm -rf /tmp/build",
-		WithDisableBuiltinRules(true), WithIncludeCustomRules(true))
+	gateResult := CheckBuiltinBashCommand(context.Background(), "rm -rf /tmp/build",
+		WithDisableBuiltinBashRules(true), WithIncludeCustomBashRules(true))
 	require.True(t, gateResult.Blocked)
 	require.Equal(t, "custom-high-rm", gateResult.TopFinding().RuleID)
 
-	withoutCustom := CheckCommand(context.Background(), "rm -rf /tmp/build",
-		WithDisableBuiltinRules(true))
+	withoutCustom := CheckBashCommand(context.Background(), "rm -rf /tmp/build",
+		WithDisableBuiltinBashRules(true))
 	require.False(t, withoutCustom.Blocked)
 	require.Equal(t, "disabled_by_config", withoutCustom.Reason)
 }
 
-func TestFilterCustomRules(t *testing.T) {
+func TestFilterCustomBashRules(t *testing.T) {
 	base := func(name string) *schema.SyntaxFlowRule {
 		return &schema.SyntaxFlowRule{
 			RuleName: name,
@@ -228,17 +228,25 @@ func TestFilterCustomRules(t *testing.T) {
 	empty := base("empty")
 	empty.Content = ""
 
-	got := filterCustomRules([]*schema.SyntaxFlowRule{builtin, user, yakRule, sourceRule, empty, nil})
+	got := filterCustomBashRules([]*schema.SyntaxFlowRule{builtin, user, yakRule, sourceRule, empty, nil})
 	require.Len(t, got, 1)
 	require.Equal(t, "user", got[0].RuleName)
 }
 
-func TestSyntaxFlowActionForSeverity(t *testing.T) {
-	require.Equal(t, schema.SFR_ACTION_DENY, schema.SyntaxFlowActionForSeverity(schema.SFR_SEVERITY_CRITICAL))
-	require.Equal(t, schema.SFR_ACTION_DENY, schema.SyntaxFlowActionForSeverity(schema.SFR_SEVERITY_HIGH))
-	require.Equal(t, schema.SFR_ACTION_ASK, schema.SyntaxFlowActionForSeverity("mid"))
-	require.Equal(t, schema.SFR_ACTION_ASK, schema.SyntaxFlowActionForSeverity("warn"))
-	require.Equal(t, schema.SFR_ACTION_WARN, schema.SyntaxFlowActionForSeverity(schema.SFR_SEVERITY_LOW))
-	require.Equal(t, schema.SFR_ACTION_ALLOW, schema.SyntaxFlowActionForSeverity(schema.SFR_SEVERITY_INFO))
-	require.Equal(t, schema.SFR_ACTION_ALLOW, schema.SyntaxFlowActionForSeverity(""))
+func TestCheckBashCommandCustomRegexAsSyntaxFlow(t *testing.T) {
+	enabled := false
+	rule, err := CompileBashGuardRegexRuleToSyntaxFlow(BashGuardRegexRule{
+		Name:     "deny-my-tool",
+		Pattern:  "my-dangerous-tool",
+		Action:   bashCustomRegexRuleActionDeny,
+		Match:    bashCustomRegexMatchPrefix,
+		Disabled: &enabled,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rule)
+
+	result := checkBashCommandWithRules(context.Background(), "my-dangerous-tool --force", []*schema.SyntaxFlowRule{rule})
+	require.True(t, result.Blocked)
+	require.Equal(t, schema.SFR_ACTION_DENY, result.Action)
+	require.Equal(t, "deny-my-tool", result.TopFinding().Title)
 }

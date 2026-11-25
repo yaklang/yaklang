@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 )
 
 // securityRuleGate turns built-in Bash rule findings into a tool-call decision.
@@ -19,7 +18,7 @@ func securityRuleGate(ctx context.Context, toolName string, params aitool.Invoke
 	return securityRuleGateWithOptions(nil)(ctx, toolName, params)
 }
 
-func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.ToolCallRuleGate {
+func securityRuleGateWithOptions(options []aicommon.BashCommandCheckOption) aicommon.ToolCallRuleGate {
 	return func(ctx context.Context, toolName string, params aitool.InvokeParams) *aicommon.ToolCallRuleDecision {
 		if !strings.EqualFold(strings.TrimSpace(toolName), aitool.BashToolName) {
 			return nil
@@ -33,7 +32,7 @@ func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.To
 			return nil
 		}
 
-		check := commandcheck.CheckBuiltinCommand(ctx, command, options...)
+		check := aicommon.CheckBuiltinBashCommand(ctx, command, options...)
 		if !check.Available {
 			log.Warnf("bash security rule evaluation unavailable, allowing tool call: %s", check.Reason)
 			return nil
@@ -47,7 +46,7 @@ func securityRuleGateWithOptions(options []commandcheck.CheckOption) aicommon.To
 	}
 }
 
-func securityRuleDecisionFromCheck(check commandcheck.Result) *aicommon.ToolCallRuleDecision {
+func securityRuleDecisionFromCheck(check aicommon.BashCommandCheckResult) *aicommon.ToolCallRuleDecision {
 	decision := &aicommon.ToolCallRuleDecision{
 		Action:   check.Action,
 		Severity: check.Severity,
@@ -84,9 +83,9 @@ func toolCallRuleGate(cfg *aicommon.Config) aicommon.ToolCallRuleGate {
 	if cfg == nil || cfg.DisableBuiltinSyntaxFlowRules {
 		return nil
 	}
-	options := []commandcheck.CheckOption{
-		commandcheck.WithDisableBuiltinRules(false),
-		commandcheck.WithIncludeCustomRules(true),
+	options := []aicommon.BashCommandCheckOption{
+		aicommon.WithDisableBuiltinBashRules(false),
+		aicommon.WithIncludeCustomBashRules(true),
 	}
 	builtinGate := securityRuleGateWithOptions(options)
 	extra := aicommon.CompileClaudeCodePermissionsFromRuntime()

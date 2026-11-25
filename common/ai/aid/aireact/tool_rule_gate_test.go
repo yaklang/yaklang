@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 )
 
 func TestSecurityRuleGate(t *testing.T) {
@@ -53,8 +53,8 @@ func TestSecurityRuleGate(t *testing.T) {
 	})
 
 	t.Run("builtin-disabled-by-config", func(t *testing.T) {
-		gate := securityRuleGateWithOptions([]commandcheck.CheckOption{
-			commandcheck.WithDisableBuiltinRules(true),
+		gate := securityRuleGateWithOptions([]aicommon.BashCommandCheckOption{
+			aicommon.WithDisableBuiltinBashRules(true),
 		})
 		require.Nil(t, gate(ctx, "bash", aitool.InvokeParams{
 			"command": "rm -rf /",

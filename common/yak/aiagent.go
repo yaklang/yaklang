@@ -29,7 +29,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -154,15 +153,15 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 						if cmd := utils.InterfaceToString(params["command"]); strings.TrimSpace(cmd) != "" {
 							masterEnabled := runtimeConfig == nil || !runtimeConfig.DisableBuiltinSyntaxFlowRules
 							if masterEnabled {
-								var checkOptions []commandcheck.CheckOption
+								var checkOptions []aicommon.BashCommandCheckOption
 								if runtimeConfig != nil {
 									checkOptions = append(checkOptions,
-										commandcheck.WithDisableBuiltinRules(false),
+										aicommon.WithDisableBuiltinBashRules(false),
 										// Custom rows are individually opt-in.
-										commandcheck.WithIncludeCustomRules(true),
+										aicommon.WithIncludeCustomBashRules(true),
 									)
 								}
-								if check := commandcheck.CheckCommand(ctx, cmd, checkOptions...); check.Blocked {
+								if check := aicommon.CheckBashCommand(ctx, cmd, checkOptions...); check.Blocked {
 									fmt.Fprintf(stdout, "[bash guard] %s\n", check.Message())
 									return check.BlockedResult(shell), nil
 								}

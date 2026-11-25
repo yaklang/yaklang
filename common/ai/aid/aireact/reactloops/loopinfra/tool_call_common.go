@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/bash/commandcheck"
 )
 
 // Failed direct calls expose the real schema without executing or generating
@@ -234,9 +233,9 @@ func handleToolCallResult(
 }
 
 // toolResultSecurityDenied recognizes the precheck result shape produced by
-// commandcheck.BlockedResult. That path is a successful callback with a
-// semantic failure payload, so it would otherwise flow into the generic
-// "inspect and retry" branch and invite a bypass.
+// aicommon.BashCommandCheckResult.BlockedResult. That path is a successful
+// callback with a semantic failure payload, so it would otherwise flow into
+// the generic "inspect and retry" branch and invite a bypass.
 func toolResultSecurityDenied(result *aitool.ToolResult) bool {
 	if result == nil {
 		return false
@@ -248,7 +247,7 @@ func toolResultSecurityDenied(result *aitool.ToolResult) bool {
 	if utils.InterfaceToBoolean(data["security_denied"]) {
 		return true
 	}
-	return strings.EqualFold(strings.TrimSpace(utils.InterfaceToString(data["termination_reason"])), commandcheck.TerminationReasonBlockedByGuard)
+	return strings.EqualFold(strings.TrimSpace(utils.InterfaceToString(data["termination_reason"])), aicommon.TerminationReasonBlockedByGuard)
 }
 
 // securityDeniedFeedbackFromResult recovers the top finding from the precheck
