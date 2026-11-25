@@ -33,10 +33,19 @@ func TestScanProjectFiles(t *testing.T) {
 	}
 
 	t.Run("Basic Scan", func(t *testing.T) {
+		// The shared fixture above has only excluded subdirectories (vendor,
+		// test, testdata, .git, target, node_modules). A directory whose own
+		// pattern matches is pruned with SkipDir and is not recorded, so the
+		// folder bookkeeping needs one directory that survives the defaults.
+		folderFS := filesys.NewVirtualFs()
+		folderFS.AddFile("src/main.go", "package main")
+		folderFS.AddFile("src/internal/app.go", "package main")
+		folderFS.AddFile("src/vendor/lib.go", "package lib")
+
 		result, err := ScanProjectFiles(ScanConfig{
 			ProgramName: "test_prog",
 			ProgramPath: "src",
-			FileSystem:  fs,
+			FileSystem:  folderFS,
 			// ScanProjectFiles applies the matcher as given; merging in the
 			// built-in default excludes is DefaultConfig's job, so tests that
 			// want default behavior pass the default matcher explicitly.
@@ -49,10 +58,14 @@ func TestScanProjectFiles(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Default excludes skip dependency/build/VCS roots and test inputs.
-		expectedFiles := []string{"src/main.go", "src/utils.go"}
+		expectedFiles := []string{"src/main.go", "src/internal/app.go"}
 		require.ElementsMatch(t, expectedFiles, result.HandlerFiles)
 		require.Equal(t, 2, result.HandlerTotal)
-		require.GreaterOrEqual(t, len(result.Folders), 1)
+		require.NotEmpty(t, result.Folders)
+		for _, folders := range result.Folders {
+			require.NotContains(t, folders, "vendor",
+				"an excluded directory is pruned with SkipDir, not recorded")
+		}
 	})
 
 	t.Run("Retain sources for preprocessing", func(t *testing.T) {
