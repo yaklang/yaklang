@@ -57,7 +57,7 @@ name says what the rule looks for, not how it runs.
 | Element | Rule | Example |
 | --- | --- | --- |
 | File name | `<language>-<behavior>.sf` | `python-eval.sf`, `go-path-traversal-read.sf` |
-| File name (mode collision) | when a `source` and a `struct` rule share the same language and behavior, keep the mode prefix on both files of that directory | `source-js-eval.sf`, `struct-js-eval.sf` |
+| File name (mode collision) | when a `source` and a `struct` rule share the same language and behavior, keep the mode prefix on both files of that directory | `source-ts-eval.sf`, `struct-ts-eval.sf` |
 | `title` / `title_zh` | the rule's own wording; a new rule does not add a mode marker | `Go 路径穿越：请求参数拼接文件路径` |
 | `level` | one of `critical`, `high`, `middle`, `low`, `info`; quoted; never `mid`/`medium`/`warning` | `level: "middle"` |
 | CWE directory | lowercase `cwe-<id>-<slug>` | `cwe-295-certificate-validation` |

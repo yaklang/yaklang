@@ -1,6 +1,6 @@
 desc(
 	mode: "ssa"
-	language: "ts"
+	language: "typescript"
 	title: "数据流：TypeScript SQL Injection: User Input Concatenated Into Query"
 	title_zh: "数据流：TypeScript SQL 注入：用户输入拼接进查询语句"
 	type: vuln
