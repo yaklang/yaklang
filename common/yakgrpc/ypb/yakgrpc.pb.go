@@ -11565,12 +11565,13 @@ type AIExecutionStrategy struct {
 	// 为 true 时启用 Goal 模式：在达到 GoalMinIterations 之前禁止 finish 提前退出，
 	// 避免“做一点就汇报然后结束”。
 	EnableGoalMode bool `protobuf:"varint,2,opt,name=EnableGoalMode,proto3" json:"EnableGoalMode,omitempty"`
-	// Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
+	// Goal 模式下允许 finish 的最小迭代次数。0 关闭迭代门禁；不能为负数。
+	// Strategy 一旦传入即完整替换旧策略，0/false/空字符串用于清除旧模式配置。
 	GoalMinIterations int64 `protobuf:"varint,3,opt,name=GoalMinIterations,proto3" json:"GoalMinIterations,omitempty"`
 	// Multi 模式下子 Agent 最大并发数（同时运行数量）。
 	// <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
 	MaxSubAgents int64 `protobuf:"varint,4,opt,name=MaxSubAgents,proto3" json:"MaxSubAgents,omitempty"`
-	// Goal 模式时间窗口（秒）。>0 时在时间窗口内无条件拒绝 finish；-1 表示永不自动放行。
+	// Goal 模式时间窗口（秒）。>0 时从配置生效立即计时，到期前拒绝 finish；-1 表示永不自动放行。
 	// 0 或省略表示不启用时间窗口 gate，仅依赖迭代数和验收条件。
 	// 该字段是声明式配置；运行时延长或缩短当前 deadline 请使用 AIInputEvent.GoalTimePatch。
 	GoalDurationSeconds int64 `protobuf:"varint,5,opt,name=GoalDurationSeconds,proto3" json:"GoalDurationSeconds,omitempty"`

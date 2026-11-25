@@ -104,19 +104,17 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	if i.GetSyncPerceptionTrigger() {
 		opts = append(opts, aicommon.WithSyncPerceptionTrigger(true))
 	}
-	if goalModeEnabled {
+	if goalModeEnabled || i.GetStrategy() != nil {
 		opts = append(opts,
-			aicommon.WithEnableGoalMode(true),
+			aicommon.WithEnableGoalMode(goalModeEnabled),
 			aicommon.WithGoalMinIterations(goalMinIterations),
 		)
 		strategy := i.GetStrategy()
 		if strategy != nil {
-			if strategy.GetGoalDurationSeconds() != 0 {
-				opts = append(opts, aicommon.WithGoalDurationSeconds(strategy.GetGoalDurationSeconds()))
-			}
-			if strategy.GetGoalAcceptanceCriteria() != "" {
-				opts = append(opts, aicommon.WithGoalAcceptanceCriteria(strategy.GetGoalAcceptanceCriteria()))
-			}
+			opts = append(opts,
+				aicommon.WithGoalDurationSeconds(strategy.GetGoalDurationSeconds()),
+				aicommon.WithGoalAcceptanceCriteria(strategy.GetGoalAcceptanceCriteria()),
+			)
 		}
 	}
 
@@ -157,7 +155,11 @@ func resolveAIExecutionStrategy(i *ypb.AIStartParams) (enableMultiAgent bool, en
 		goalMinIterations = strategy.GetGoalMinIterations()
 		maxSubAgents = strategy.GetMaxSubAgents()
 	}
-	goalMinIterations = aicommon.NormalizeGoalMinIterations(goalMinIterations)
+	if i.GetStrategy() == nil {
+		goalMinIterations = aicommon.DefaultGoalMinIterations
+	} else {
+		goalMinIterations = aicommon.NormalizeGoalMinIterations(goalMinIterations)
+	}
 	return
 }
 

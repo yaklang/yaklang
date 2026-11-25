@@ -168,11 +168,13 @@ func (c *Config) GetGoalMinIterations() int64 {
 	if c == nil {
 		return DefaultGoalMinIterations
 	}
+	c.m.Lock()
+	defer c.m.Unlock()
 	return NormalizeGoalMinIterations(c.GoalMinIterations)
 }
 
 func NormalizeGoalMinIterations(n int64) int64 {
-	if n <= 0 {
+	if n < 0 {
 		return DefaultGoalMinIterations
 	}
 	return n
@@ -216,9 +218,8 @@ func (c *Config) GetGoalTimeState() GoalTimeState {
 	return state
 }
 
-// setGoalDurationSeconds applies a new goal time window. If the deadline has
-// already been started, a changed duration takes effect immediately from the
-// hot-reload point. Reapplying the same value does not extend the countdown.
+// setGoalDurationSeconds starts a new time window as soon as it is configured.
+// Reapplying the same value preserves an existing deadline, even after expiry.
 func (c *Config) setGoalDurationSeconds(seconds int64) {
 	if c == nil {
 		return
@@ -227,21 +228,22 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 		c.m = new(sync.Mutex)
 	}
 	c.m.Lock()
-	defer c.m.Unlock()
+	changed := applyGoalDuration(&c.GoalDurationSeconds, &c.GoalDeadline, &c.goalTimeRevision, seconds, time.Now())
+	c.m.Unlock()
+	if changed {
+		c.notifyAgentPolicySnapshotEmit()
+	}
+}
 
-	changed := c.GoalDurationSeconds != seconds
-	if !changed {
-		return
+func applyGoalDuration(duration *int64, deadline *time.Time, revision *uint64, seconds int64, now time.Time) bool {
+	changed := *duration != seconds
+	if !changed && (seconds == 0 || !deadline.IsZero()) {
+		return false
 	}
-	c.GoalDurationSeconds = seconds
-	c.goalTimeRevision++
-	if seconds == 0 {
-		c.GoalDeadline = time.Time{}
-		return
-	}
-	if !c.GoalDeadline.IsZero() {
-		c.GoalDeadline = computeGoalDeadline(time.Now(), seconds)
-	}
+	*duration = seconds
+	*revision += 1
+	*deadline = computeGoalDeadline(now, seconds)
+	return true
 }
 
 func (c *Config) GetGoalAcceptanceCriteria() string {
@@ -264,12 +266,9 @@ func (c *Config) GetGoalDeadline() time.Time {
 	return c.GoalDeadline
 }
 
-// StartGoalDeadline computes and stores the goal-mode deadline from the
-// current time + GoalDurationSeconds. If GoalDurationSeconds is 0 the
-// deadline is not set (gate disabled). If -1 the deadline is set to a
-// far-future sentinel (never-ending). This is called lazily on the first
-// finish attempt, not at config creation, so the window measures actual
-// execution time rather than session start time.
+// StartGoalDeadline initializes a missing deadline for legacy callers that set
+// GoalDurationSeconds directly. WithGoalDurationSeconds starts it immediately;
+// finish checks must not start or extend the window.
 func (c *Config) StartGoalDeadline() {
 	if c == nil {
 		return
@@ -368,7 +367,7 @@ func (c *Config) GetExecutionPolicy() string {
 
 func EnsureGoalModeMaxIterations(maxIterations, goalMinIterations int64) int64 {
 	goalMinIterations = NormalizeGoalMinIterations(goalMinIterations)
-	if maxIterations <= 0 {
+	if maxIterations <= 0 || goalMinIterations == 0 {
 		return maxIterations
 	}
 	minRequired := goalMinIterations + GoalModeIterationBuffer

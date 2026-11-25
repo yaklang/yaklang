@@ -2418,14 +2418,15 @@ message AIExecutionStrategy {
   // 避免“做一点就汇报然后结束”。
   bool EnableGoalMode = 2;
 
-  // Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
+  // Goal 模式下允许 finish 的最小迭代次数。0 关闭迭代门禁；不能为负数。
+  // Strategy 一旦传入即完整替换旧策略，0/false/空字符串用于清除旧模式配置。
   int64 GoalMinIterations = 3;
 
   // Multi 模式下子 Agent 最大并发数（同时运行数量）。
   // <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
   int64 MaxSubAgents = 4;
 
-  // Goal 模式时间窗口（秒）。>0 时在时间窗口内无条件拒绝 finish；-1 表示永不自动放行。
+  // Goal 模式时间窗口（秒）。>0 时从配置生效立即计时，到期前拒绝 finish；-1 表示永不自动放行。
   // 0 或省略表示不启用时间窗口 gate，仅依赖迭代数和验收条件。
   // 该字段是声明式配置；运行时延长或缩短当前 deadline 请使用 AIInputEvent.GoalTimePatch。
   int64 GoalDurationSeconds = 5;

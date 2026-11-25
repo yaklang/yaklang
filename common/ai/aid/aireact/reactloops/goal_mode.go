@@ -53,10 +53,14 @@ func (r *ReActLoop) ShouldBlockFinishAtIteration(iteration int) bool {
 	if !r.IsGoalModeEnabled() {
 		return false
 	}
+	minIterations := r.GetGoalMinIterations()
+	if minIterations == 0 {
+		return false
+	}
 	if iteration <= 0 {
 		return true
 	}
-	return iteration-r.subAgentControlIterations < r.GetGoalMinIterations()
+	return iteration-r.subAgentControlIterations < minIterations
 }
 
 // ApplyGoalModeGate enforces the goal-mode finish gate for the given iteration
@@ -80,11 +84,8 @@ func (r *ReActLoop) ApplyGoalModeGate(operator *LoopActionHandlerOperator, itera
 
 // ShouldBlockFinishByDeadline reports whether the finish should be blocked
 // because the goal time window has not elapsed yet. Returns false if the
-// time window gate is disabled (GoalDurationSeconds == 0) or not yet started.
-//
-// The deadline is started lazily on the first call via StartGoalDeadline,
-// so the window measures actual execution time from the first finish attempt
-// rather than from session creation.
+// time window gate is disabled (GoalDurationSeconds == 0).
+// Configuring the duration starts the deadline; this check only observes it.
 func (r *ReActLoop) ShouldBlockFinishByDeadline() bool {
 	if !r.IsGoalModeEnabled() {
 		return false
@@ -96,8 +97,6 @@ func (r *ReActLoop) ShouldBlockFinishByDeadline() bool {
 	if cfg.GetGoalDurationSeconds() == 0 {
 		return false // time window gate disabled
 	}
-	// Lazily start the deadline on first check
-	cfg.StartGoalDeadline()
 	return !cfg.IsGoalDeadlinePassed()
 }
 
