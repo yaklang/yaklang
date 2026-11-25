@@ -14,7 +14,6 @@ const SYNC_TYPE_AGENT_POLICY_SNAPSHOT = "agent_policy_snapshot_sync"
 
 const (
 	GoalTimeLimitModeDisabled    = "disabled"
-	GoalTimeLimitModeNotStarted  = "not_started"
 	GoalTimeLimitModeDeadline    = "deadline"
 	GoalTimeLimitModeNeverEnding = "never_ending"
 )
@@ -79,8 +78,6 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 	switch {
 	case c.GoalDurationSeconds == -1:
 		goalTimeMode = GoalTimeLimitModeNeverEnding
-	case c.GoalDurationSeconds > 0 && c.GoalDeadline.IsZero():
-		goalTimeMode = GoalTimeLimitModeNotStarted
 	case c.GoalDurationSeconds > 0:
 		goalTimeMode = GoalTimeLimitModeDeadline
 		goalDeadlineAt = c.GoalDeadline.Unix()
