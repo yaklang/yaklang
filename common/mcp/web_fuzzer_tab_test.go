@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -37,6 +38,72 @@ func TestCreateWebFuzzerTabToolRegistered(t *testing.T) {
 	}
 	if _, exists := set.Tools["http_fuzzer"]; !exists {
 		t.Fatalf("tool not registered: http_fuzzer")
+	}
+}
+
+func TestWebFuzzerTabDelaySchema(t *testing.T) {
+	for _, name := range []string{"create_web_fuzzer_tab", "update_web_fuzzer_tab", "execute_web_fuzzer_tab"} {
+		properties := toolProps(t, name)
+		for _, field := range []string{"minDelaySeconds", "maxDelaySeconds"} {
+			assertProp(t, name, properties, field, "number")
+			require.EqualValues(t, 0, properties[field]["minimum"])
+			require.NotContains(t, properties[field], "default", "omitting an override must preserve the tab settings")
+		}
+	}
+	assertStructArrayProp(t, "create_web_fuzzer_tabs", toolProps(t, "create_web_fuzzer_tabs"), "tabs", []string{"minDelaySeconds", "maxDelaySeconds"})
+}
+
+func TestWebFuzzerTabDelayValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		min, max float64
+		valid    bool
+	}{
+		{"disabled", 0, 0, true},
+		{"fractional", 0.25, 1.5, true},
+		{"fixed", 1, 1, true},
+		{"negative-min", -1, 1, false},
+		{"negative-max", 0, -1, false},
+		{"inverted", 2, 1, false},
+		{"min-only", 1, 0, false},
+		{"nan", math.NaN(), 1, false},
+		{"infinite", 0, math.Inf(1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			input := webFuzzerTabCreateInput{Request: "GET / HTTP/1.1\r\nHost: example.test\r\n\r\n", MinDelaySeconds: tc.min, MaxDelaySeconds: tc.max}
+			config, err := input.build("0", 1, "delay")
+			if !tc.valid {
+				require.ErrorContains(t, err, "random delay")
+				return
+			}
+			require.NoError(t, err)
+			item, err := yakit.ParseWebFuzzerConfig(config)
+			require.NoError(t, err)
+			require.Equal(t, tc.min, item.PageParams.MinDelaySeconds)
+			require.Equal(t, tc.max, item.PageParams.MaxDelaySeconds)
+		})
+	}
+}
+
+func TestExecuteWebFuzzerTabRejectsInvalidDelay(t *testing.T) {
+	srv, err := NewMCPServer(WithEnableAllToolSets())
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name    string
+		args    map[string]any
+		message string
+	}{
+		{"missing-max", map[string]any{"minDelaySeconds": 0.0}, "supplied together"},
+		{"missing-min", map[string]any{"maxDelaySeconds": 1.0}, "supplied together"},
+		{"negative", map[string]any{"minDelaySeconds": -1.0, "maxDelaySeconds": 1.0}, "random delay"},
+		{"inverted", map[string]any{"minDelaySeconds": 2.0, "maxDelaySeconds": 1.0}, "random delay"},
+		{"nan", map[string]any{"minDelaySeconds": math.NaN(), "maxDelaySeconds": 1.0}, "random delay"},
+		{"infinite", map[string]any{"minDelaySeconds": 0.0, "maxDelaySeconds": math.Inf(1)}, "random delay"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InvokeBuiltinTool(context.Background(), srv, "execute_web_fuzzer_tab", tc.args)
+			require.ErrorContains(t, err, tc.message)
+		})
 	}
 }
 
@@ -175,11 +242,13 @@ func TestWebFuzzerTabManagementLifecycle(t *testing.T) {
 		"openFlag":  false,
 		"tabs": []any{
 			map[string]any{
-				"pageId":     tabOneID,
-				"tabName":    "login request",
-				"request":    "GET /login HTTP/1.1\r\nHost: example.com\r\n\r\n",
-				"isHttps":    true,
-				"concurrent": float64(5),
+				"pageId":          tabOneID,
+				"tabName":         "login request",
+				"request":         "GET /login HTTP/1.1\r\nHost: example.com\r\n\r\n",
+				"isHttps":         true,
+				"concurrent":      float64(5),
+				"minDelaySeconds": 0.25,
+				"maxDelaySeconds": 1.5,
 			},
 			map[string]any{
 				"pageId":  tabTwoID,
@@ -191,6 +260,21 @@ func TestWebFuzzerTabManagementLifecycle(t *testing.T) {
 	})
 	require.Equal(t, "created", created["operation"])
 	require.Equal(t, groupID, created["groupId"])
+	assertDelay := func(min, max float64) {
+		t.Helper()
+		state, err := loadWebFuzzerState(ctx, srv)
+		require.NoError(t, err)
+		require.Equal(t, min, state.ByID[tabOneID].Item.PageParams.MinDelaySeconds)
+		require.Equal(t, max, state.ByID[tabOneID].Item.PageParams.MaxDelaySeconds)
+		response, err := srv.grpcClient.QueryFuzzerConfig(ctx, &ypb.QueryFuzzerConfigRequest{PageId: []string{tabOneID}, Pagination: &ypb.Paging{Limit: -1}})
+		require.NoError(t, err)
+		require.Len(t, response.GetData(), 1)
+		item, err := yakit.ParseWebFuzzerConfig(response.GetData()[0])
+		require.NoError(t, err)
+		require.Equal(t, min, item.PageParams.MinDelaySeconds)
+		require.Equal(t, max, item.PageParams.MaxDelaySeconds)
+	}
+	assertDelay(0.25, 1.5)
 
 	queried := invokeWebFuzzerTool(t, ctx, srv, "query_web_fuzzer_tabs", map[string]any{
 		"pageIds":        allIDs,
@@ -214,6 +298,14 @@ func TestWebFuzzerTabManagementLifecycle(t *testing.T) {
 		"openFlag":      false,
 	})
 	require.Equal(t, "updated", updated["operation"])
+	assertDelay(0.25, 1.5)
+	invokeWebFuzzerTool(t, ctx, srv, "update_web_fuzzer_tab", map[string]any{"pageId": tabOneID, "maxDelaySeconds": 2.5})
+	assertDelay(0.25, 2.5)
+	_, err = InvokeBuiltinTool(ctx, srv, "update_web_fuzzer_tab", map[string]any{"pageId": tabOneID, "minDelaySeconds": 3.0})
+	require.ErrorContains(t, err, "random delay")
+	assertDelay(0.25, 2.5)
+	invokeWebFuzzerTool(t, ctx, srv, "update_web_fuzzer_tab", map[string]any{"pageId": tabOneID, "minDelaySeconds": 0.0, "maxDelaySeconds": 0.0})
+	assertDelay(0, 0)
 
 	groupUpdated := invokeWebFuzzerTool(t, ctx, srv, "manage_web_fuzzer_tab_group", map[string]any{
 		"action":    "update",
@@ -362,6 +454,13 @@ func TestWebFuzzerTabInvalidMutationsAreAtomic(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "already exists")
+	_, err = InvokeBuiltinTool(ctx, srv, "create_web_fuzzer_tabs", map[string]any{
+		"tabs": []any{
+			map[string]any{"pageId": newID, "request": "GET /new HTTP/1.1\r\nHost: example.com\r\n\r\n", "isHttps": false},
+			map[string]any{"request": "GET /invalid HTTP/1.1\r\nHost: example.com\r\n\r\n", "isHttps": false, "minDelaySeconds": 2.0, "maxDelaySeconds": 1.0},
+		},
+	})
+	require.ErrorContains(t, err, "random delay")
 
 	_, err = InvokeBuiltinTool(ctx, srv, "manage_web_fuzzer_tab_group", map[string]any{
 		"action": "create", "groupId": invalidGroupID, "groupName": "invalid", "tabIds": []string{existingID, missingID},
