@@ -147,7 +147,7 @@ func runtimeContextSizeLimitFromHotpatch(raw int64) int {
 }
 
 func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
-	if !e.IsConfigHotpatch {
+	if e == nil || !e.IsConfigHotpatch {
 		return nil
 	}
 
@@ -309,29 +309,217 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 
 	if e.HotpatchType == HotPatchType_ExecutionStrategy {
 		strategy := hotPatchParams.GetStrategy()
-		if strategy == nil {
-			return aiOption
+		if strategy != nil {
+			aiOption = append(aiOption, WithExecutionStrategy(strategy))
 		}
-		// Sub-agents run in pureInvokerMode and never start the HotPatchLoop,
-		// so hotpatch options only execute on the top-level Config. The
-		// "sub-agent cannot call sub-agent" invariant is already enforced by
-		// ConvertConfigToOptions (which omits EnableDispatchSubReactAgents /
-		// PreferDispatchSubReactAgents / MaxSubAgents) and by
-		// buildSubAgentStrategyOptions (which explicitly sets them to false).
-		// No additional guard is needed here.
-		aiOption = append(aiOption,
-			WithEnableMultiAgentMode(strategy.GetEnableMultiAgent()),
-			WithEnableGoalMode(strategy.GetEnableGoalMode()),
-			WithGoalMinIterations(strategy.GetGoalMinIterations()),
-			WithMaxSubAgents(strategy.GetMaxSubAgents()),
-			WithGoalDurationSeconds(strategy.GetGoalDurationSeconds()),
-			WithGoalAcceptanceCriteria(strategy.GetGoalAcceptanceCriteria()),
-		)
+		if patch := e.GetGoalTimePatch(); patch != nil {
+			aiOption = append(aiOption, WithGoalTimePatch(patch))
+		}
 	}
 	if hotpatchAffectsAgentPolicy(e.HotpatchType) {
 		return c.withAgentPolicySnapshotEmit(aiOption)
 	}
 	return aiOption
+}
+
+func validateExecutionStrategy(strategy *ypb.AIExecutionStrategy) error {
+	if strategy == nil {
+		return nil
+	}
+	if strategy.GetGoalMinIterations() < 0 {
+		return fmt.Errorf("goal min iterations must be >= 0")
+	}
+	if strategy.GetMaxSubAgents() < 0 {
+		return fmt.Errorf("max sub agents must be >= 0")
+	}
+	return validateGoalDurationSeconds(strategy.GetGoalDurationSeconds())
+}
+
+type executionPolicyDraft struct {
+	enableDispatchSubReactAgents bool
+	preferDispatchSubReactAgents bool
+	maxSubAgents                 int64
+	enableGoalMode               bool
+	goalMinIterations            int64
+	goalAcceptanceCriteria       string
+	goalDurationSeconds          int64
+	goalDeadline                 time.Time
+	goalTimeRevision             uint64
+}
+
+func (c *Config) currentExecutionPolicyDraft() executionPolicyDraft {
+	return executionPolicyDraft{
+		enableDispatchSubReactAgents: c.EnableDispatchSubReactAgents,
+		preferDispatchSubReactAgents: c.PreferDispatchSubReactAgents,
+		maxSubAgents:                 c.MaxSubAgents,
+		enableGoalMode:               c.EnableGoalMode,
+		goalMinIterations:            c.GoalMinIterations,
+		goalAcceptanceCriteria:       c.GoalAcceptanceCriteria,
+		goalDurationSeconds:          c.GoalDurationSeconds,
+		goalDeadline:                 c.GoalDeadline,
+		goalTimeRevision:             c.goalTimeRevision,
+	}
+}
+
+func (d *executionPolicyDraft) applyExecutionStrategy(strategy *ypb.AIExecutionStrategy, now time.Time) error {
+	if err := validateExecutionStrategy(strategy); err != nil {
+		return err
+	}
+	applyGoalDuration(&d.goalDurationSeconds, &d.goalDeadline, &d.goalTimeRevision, strategy.GetGoalDurationSeconds(), now)
+	d.enableDispatchSubReactAgents = strategy.GetEnableMultiAgent()
+	d.preferDispatchSubReactAgents = strategy.GetEnableMultiAgent()
+	d.maxSubAgents = normalizeMaxSubAgentsLocked(strategy.GetMaxSubAgents())
+	d.enableGoalMode = strategy.GetEnableGoalMode()
+	d.goalMinIterations = strategy.GetGoalMinIterations()
+	d.goalAcceptanceCriteria = strings.TrimSpace(strategy.GetGoalAcceptanceCriteria())
+	return nil
+}
+
+func (d *executionPolicyDraft) applyGoalTimePatch(patch *ypb.AIGoalTimePatch, now time.Time) error {
+	if patch == nil {
+		return nil
+	}
+	var (
+		changed bool
+		err     error
+	)
+	switch patch.GetAction() {
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND:
+		changed, err = d.extendGoalTime(patch.GetExtendSeconds(), now)
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE:
+		changed, err = d.setGoalDeadline(patch.GetDeadlineUnix(), now)
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE:
+		changed = d.disableGoalTime()
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING:
+		changed = d.disableGoalDeadlineExpiry(now)
+	default:
+		return fmt.Errorf("unsupported goal time action: %s", patch.GetAction())
+	}
+	if err != nil {
+		return err
+	}
+	if changed {
+		d.goalTimeRevision++
+	}
+	return nil
+}
+
+func (d *executionPolicyDraft) extendGoalTime(delta int64, now time.Time) (bool, error) {
+	if delta == 0 {
+		return false, fmt.Errorf("goal time extension must not be zero")
+	}
+	switch {
+	case d.goalDurationSeconds == 0:
+		return false, fmt.Errorf("goal time window is disabled")
+	case d.goalDurationSeconds == -1:
+		return false, nil
+	case d.goalDeadline.IsZero():
+		nextDuration := d.goalDurationSeconds + delta
+		if nextDuration <= 0 {
+			return false, fmt.Errorf("goal duration must remain positive")
+		}
+		d.goalDurationSeconds = nextDuration
+	default:
+		base := d.goalDeadline
+		if base.Before(now) {
+			base = now
+		}
+		d.goalDeadline = base.Add(time.Duration(delta) * time.Second)
+		if d.goalDeadline.Before(now) {
+			d.goalDeadline = now
+		}
+	}
+	return true, nil
+}
+
+func (d *executionPolicyDraft) setGoalDeadline(deadlineUnix int64, now time.Time) (bool, error) {
+	if deadlineUnix <= 0 {
+		return false, fmt.Errorf("goal deadline unix timestamp must be positive")
+	}
+	d.goalDeadline = time.Unix(deadlineUnix, 0)
+	if d.goalDurationSeconds <= 0 {
+		remaining := int64(d.goalDeadline.Sub(now) / time.Second)
+		if remaining <= 0 {
+			remaining = 1
+		}
+		d.goalDurationSeconds = remaining
+	}
+	return true, nil
+}
+
+func (d *executionPolicyDraft) disableGoalTime() bool {
+	changed := d.goalDurationSeconds != 0 || !d.goalDeadline.IsZero()
+	d.goalDurationSeconds = 0
+	d.goalDeadline = time.Time{}
+	return changed
+}
+
+func (d *executionPolicyDraft) disableGoalDeadlineExpiry(now time.Time) bool {
+	d.goalDurationSeconds = -1
+	d.goalDeadline = computeGoalDeadline(now, -1)
+	return true
+}
+
+func (d executionPolicyDraft) commit(c *Config) {
+	c.EnableDispatchSubReactAgents = d.enableDispatchSubReactAgents
+	c.PreferDispatchSubReactAgents = d.preferDispatchSubReactAgents
+	c.MaxSubAgents = d.maxSubAgents
+	c.EnableGoalMode = d.enableGoalMode
+	c.GoalMinIterations = d.goalMinIterations
+	c.GoalAcceptanceCriteria = d.goalAcceptanceCriteria
+	c.GoalDurationSeconds = d.goalDurationSeconds
+	c.GoalDeadline = d.goalDeadline
+	c.goalTimeRevision = d.goalTimeRevision
+}
+
+// DispatchHotPatch applies agent policy commands before the event loop advances,
+// so a following sync request observes the committed state. Other hotpatches
+// retain the existing queue and broadcaster behavior.
+func (c *Config) DispatchHotPatch(event *ypb.AIInputEvent) error {
+	if c == nil || event == nil || !event.GetIsConfigHotpatch() {
+		return nil
+	}
+
+	if !hotpatchAffectsAgentPolicy(event.GetHotpatchType()) {
+		options := c.ProcessHotPatchMessage(event)
+		c.PersistSessionStartParamsFromHotpatch(event)
+		for _, option := range options {
+			c.HotPatchOptionChan.SafeFeed(option)
+		}
+		return nil
+	}
+	c.agentPolicyHotpatchMu.Lock()
+	defer c.agentPolicyHotpatchMu.Unlock()
+	if event.GetHotpatchType() == HotPatchType_ExecutionStrategy {
+		if strategy := event.Params.GetStrategy(); strategy != nil {
+			if err := validateExecutionStrategy(strategy); err != nil {
+				return err
+			}
+		}
+	}
+	options := c.ProcessHotPatchMessage(event)
+	if len(options) == 0 {
+		return nil
+	}
+	applyErr := c.applyLocalHotPatchOptions(options)
+	c.PersistSessionStartParamsFromHotpatch(event)
+	c.EmitCurrentConfigInfo()
+	return applyErr
+}
+
+func (c *Config) applyLocalHotPatchOptions(options []ConfigOption) error {
+	var firstErr error
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(c); err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
 }
 
 func hotpatchAffectsAgentPolicy(hotpatchType string) bool {
@@ -353,6 +541,30 @@ func (c *Config) withAgentPolicySnapshotEmit(options []ConfigOption) []ConfigOpt
 	return append(options, c.agentPolicySnapshotEmitOption())
 }
 
+// WithExecutionStrategy replaces the declared execution policy.
+func WithExecutionStrategy(strategy *ypb.AIExecutionStrategy) ConfigOption {
+	return func(c *Config) error {
+		return c.applyExecutionStrategy(strategy)
+	}
+}
+
+func (c *Config) applyExecutionStrategy(strategy *ypb.AIExecutionStrategy) error {
+	if c == nil {
+		return fmt.Errorf("execution strategy config is nil")
+	}
+	if strategy == nil {
+		return fmt.Errorf("execution strategy is nil")
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	next := c.currentExecutionPolicyDraft()
+	if err := next.applyExecutionStrategy(strategy, time.Now()); err != nil {
+		return err
+	}
+	next.commit(c)
+	return nil
+}
+
 // WithGoalTimePatch applies an imperative runtime goal-time mutation.
 func WithGoalTimePatch(patch *ypb.AIGoalTimePatch) ConfigOption {
 	return func(c *Config) error {
@@ -367,62 +579,13 @@ func (c *Config) applyGoalTimePatch(patch *ypb.AIGoalTimePatch) error {
 	if patch == nil {
 		return fmt.Errorf("goal time patch is nil")
 	}
-	if c.m == nil {
-		c.m = new(sync.Mutex)
-	}
 	c.m.Lock()
 	defer c.m.Unlock()
-
-	now := time.Now()
-	switch patch.GetAction() {
-	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND:
-		delta := patch.GetExtendSeconds()
-		if delta == 0 {
-			return fmt.Errorf("goal time extension must not be zero")
-		}
-		switch {
-		case c.GoalDurationSeconds == 0:
-			return fmt.Errorf("goal time window is disabled")
-		case c.GoalDurationSeconds == -1:
-			// The window is already open indefinitely.
-		case c.GoalDeadline.IsZero():
-			if c.GoalDurationSeconds+delta <= 0 {
-				return fmt.Errorf("goal duration must remain positive")
-			}
-			c.GoalDurationSeconds += delta
-		default:
-			base := c.GoalDeadline
-			if base.Before(now) {
-				base = now
-			}
-			c.GoalDeadline = base.Add(time.Duration(delta) * time.Second)
-			if c.GoalDeadline.Before(now) {
-				c.GoalDeadline = now
-			}
-		}
-	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE:
-		if patch.GetDeadlineUnix() <= 0 {
-			return fmt.Errorf("goal deadline unix timestamp must be positive")
-		}
-		c.GoalDeadline = time.Unix(patch.GetDeadlineUnix(), 0)
-		if c.GoalDurationSeconds <= 0 {
-			remainingSeconds := int64(c.GoalDeadline.Sub(now) / time.Second)
-			if remainingSeconds <= 0 {
-				remainingSeconds = 1
-			}
-			c.GoalDurationSeconds = remainingSeconds
-		}
-	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE:
-		c.GoalDurationSeconds = 0
-		c.GoalDeadline = time.Time{}
-	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING:
-		c.GoalDurationSeconds = -1
-		c.GoalDeadline = computeGoalDeadline(now, -1)
-	default:
-		return fmt.Errorf("unsupported goal time action: %s", patch.GetAction())
+	next := c.currentExecutionPolicyDraft()
+	if err := next.applyGoalTimePatch(patch, time.Now()); err != nil {
+		return err
 	}
-
-	c.goalTimeRevision++
+	next.commit(c)
 	return nil
 }
 
