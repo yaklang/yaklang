@@ -118,13 +118,25 @@ func TestRecoverModuleDataScansDataSection(t *testing.T) {
 	}
 }
 
+func TestRecoverModuleDataAllowsMaxPCAtEText(t *testing.T) {
+	// The linker writes maxpc as the address just past the final function.
+	a := moduleArtifact(t, ".noptrdata", func(data []byte) {
+		binary.LittleEndian.PutUint64(data[moduleDataMaxPCOffset:], testETextAddress)
+	})
+	found, ok := recoverModuleData(a, testTables(), binary.LittleEndian)
+	if !ok || found.Text != testTextAddress || found.MaxPC != found.EText {
+		t.Fatalf("module data = %+v, found = %v", found, ok)
+	}
+}
+
 func TestRecoverModuleDataRejectsMismatch(t *testing.T) {
 	for name, mutate := range map[string]func([]byte){
 		"header pointer":   func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataHeaderOffset:], 0x9999) },
 		"file table":       func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataFileTabOffset:], 0x9999) },
 		"function count":   func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataFTabLenOffset:], 99) },
 		"text above etext": func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataTextOffset:], testETextAddress+1) },
-		"maxpc outside":    func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataMaxPCOffset:], testETextAddress) },
+		"empty PC range":   func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataMaxPCOffset:], testTextAddress) },
+		"maxpc outside":    func(data []byte) { binary.LittleEndian.PutUint64(data[moduleDataMaxPCOffset:], testETextAddress+1) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			a := moduleArtifact(t, ".go.module", mutate)
@@ -155,6 +167,31 @@ func TestTextStartUsesModuleDataWhenStripped(t *testing.T) {
 	}
 	if base != testTextAddress {
 		t.Fatalf("text base = 0x%x, want module data", base)
+	}
+}
+
+func TestTextStartUsesMappedHeaderBeforeTextSection(t *testing.T) {
+	// An external link can put C startup code before the first Go function.
+	const sectionStart = testTextAddress - 0x100
+	a := &core.Artifact{
+		Image: &core.Image{Sections: []core.Section{{Name: ".text", VirtualAddress: sectionStart}}},
+		Hints: &core.BoundaryHints{ExecSections: []core.Region{{Address: sectionStart, Size: testETextAddress - sectionStart}}},
+	}
+	for _, tc := range []struct{ header, want uint64 }{
+		{testTextAddress, testTextAddress}, // relocated Go 1.22 header
+		{0, sectionStart},                  // newer linker leaves the slot zero
+		{testETextAddress, sectionStart},   // not a mapped instruction address
+	} {
+		tables := readPclnTables(testPclnAddress, 3, func(i int) uint64 {
+			if i == 2 {
+				return tc.header
+			}
+			return 0
+		})
+		base, err := textStart(a, tables, binary.LittleEndian)
+		if err != nil || base != tc.want {
+			t.Errorf("header %#x: base = %#x, %v; want %#x", tc.header, base, err, tc.want)
+		}
 	}
 }
 

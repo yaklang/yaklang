@@ -220,10 +220,8 @@ func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32
 	if count == 0 || count > uint64(len(data)/8) {
 		return nil, fmt.Errorf("invalid pclntab function count %d", count)
 	}
-	// gosym reads entry offsets relative to the text base it is given. A Go
-	// 1.18+ table stores offsets, not the base itself, so the base has to come
-	// from runtime.text or runtime.moduledata. Using the start of the first
-	// executable section is wrong when an external linker put C code there.
+	// Go 1.18+ entries are offsets from runtime.text, not from the start of
+	// the container's text section. An external linker can put C code first.
 	text := uint64(0)
 	if magic == 0xfffffff0 || magic == 0xfffffff1 {
 		if len(data) < 8+8*ptr {
