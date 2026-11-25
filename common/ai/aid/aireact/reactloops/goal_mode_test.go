@@ -87,6 +87,17 @@ func TestApplyGoalModeGate_NoopWhenGoalModeDisabled(t *testing.T) {
 }
 
 // TestApplyGoalModeGate_NilSafe keeps the nil-guard contract explicit.
+func TestApplyGoalModeGate_ZeroDisablesIterations(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	cfg.enableGoalMode = true
+	cfg.goalMinIterations = 0
+	for _, iteration := range []int{0, 1, 5} {
+		op := NewActionHandlerOperator(task)
+		loop.ApplyGoalModeGate(op, iteration)
+		require.False(t, op.GetDisallowLoopExit(), "time-only and criteria-only modes must not inherit an iteration gate")
+	}
+}
+
 func TestApplyGoalModeGate_NilSafe(t *testing.T) {
 	var loop *ReActLoop
 	loop.ApplyGoalModeGate(nil, 1) // must not panic
@@ -143,6 +154,25 @@ func TestFinishEntersGoalAcceptanceReviewThenConfirms(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, terminated, "finish in the acceptance round confirms completion")
 	require.Contains(t, strings.Join(invoker.timeline, "\n"), "[GOAL_ACCEPTANCE_CONFIRMED]")
+}
+
+func TestGoalAcceptanceModeSwitchClearsPendingReview(t *testing.T) {
+	loop, _, cfg, task := newTodoGateTestLoop(t, nil)
+	cfg.enableGoalMode = true
+	cfg.goalMinIterations = 0
+	cfg.goalCriteria = "must pass"
+	loop.currentIterationIndex = 1
+	require.True(t, loop.armGoalAcceptanceReview())
+	// The UI switches from criteria to iteration mode during the review.
+	cfg.goalCriteria = ""
+	cfg.goalMinIterations = 12
+	op := NewActionHandlerOperator(task)
+	loopAction_Finish.ActionHandler(loop, nil, op)
+	terminated, err := op.IsTerminated()
+	require.NoError(t, err)
+	require.False(t, terminated)
+	require.True(t, op.IsContinued())
+	require.Equal(t, aicommon.LoopPromptModeNormal, loop.promptMode)
 }
 
 func TestGoalAcceptanceReviewIsOneShotAndSkipsDisabledConfig(t *testing.T) {

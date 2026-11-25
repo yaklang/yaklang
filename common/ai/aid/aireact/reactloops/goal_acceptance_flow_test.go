@@ -17,6 +17,25 @@ type goalAcceptanceTimelineInvoker struct {
 	cfg *aicommon.Config
 }
 
+func TestGoalDeadlineStartsAtConfigurationAndFinishOnlyReadsIt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithEnableGoalMode(true), aicommon.WithGoalMinIterations(0), aicommon.WithGoalDurationSeconds(10800))
+	loop := NewMinimalReActLoop(cfg, mock.NewMockInvoker(ctx))
+	deadline := cfg.GetGoalDeadline()
+	require.WithinDuration(t, time.Now().Add(3*time.Hour), deadline, time.Second)
+	require.False(t, loop.ShouldBlockFinishAtIteration(1))
+	require.True(t, loop.ShouldBlockFinishByDeadline())
+	require.Equal(t, deadline, cfg.GetGoalDeadline())
+	// A delayed first finish must observe the expired deadline, not start a new one.
+	cfg.GoalDeadline = time.Now().Add(-time.Minute)
+	expired := cfg.GetGoalDeadline()
+	require.False(t, loop.ShouldBlockFinishByDeadline())
+	require.Equal(t, expired, cfg.GetGoalDeadline())
+}
+
 func (i *goalAcceptanceTimelineInvoker) AddToTimeline(entry, content string) {
 	i.cfg.Timeline.PushText(i.cfg.AcquireId(), "[%s]:\n%s", entry, content)
 }
@@ -33,7 +52,7 @@ func TestGoalAcceptanceRunsOneMainModelReviewTurn(t *testing.T) {
 		aicommon.WithDisableCreateDBRuntime(true),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithEnableGoalMode(true),
-		aicommon.WithGoalMinIterations(1),
+		aicommon.WithGoalMinIterations(0), // criteria-only mode must reach review on its first finish
 		aicommon.WithGoalAcceptanceCriteria(criteria),
 		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			call := calls.Add(1)
