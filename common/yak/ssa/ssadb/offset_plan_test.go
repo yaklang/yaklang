@@ -88,6 +88,23 @@ func TestOffsetVariableLookupKeepsValueIndexAfterIndexRecreation(t *testing.T) {
 	require.Equal(t, rows[2047].ID, got[0].ID)
 }
 
+// PostgreSQL rejects unary "+" on text (issue #5509). Only the SQLite plan
+// hint path may emit +variable_name; other dialects keep the plain column.
+func TestOffsetVariableQueryUnaryPlusIsSQLiteOnly(t *testing.T) {
+	sqliteQuery, _ := offsetVariableQueryWithUnaryPlus("x", 7, "prog", true)
+	require.Contains(t, sqliteQuery, "+variable_name")
+	require.Contains(t, sqliteQuery, "program_name = ?")
+
+	otherQuery, _ := offsetVariableQueryWithUnaryPlus("x", 7, "prog", false)
+	require.NotContains(t, otherQuery, "+variable_name")
+	require.Contains(t, otherQuery, "variable_name = ?")
+	require.Contains(t, otherQuery, "program_name = ?")
+
+	emptyProgram, _ := offsetVariableQueryWithUnaryPlus("x", 7, "", true)
+	require.NotContains(t, emptyProgram, "+variable_name")
+	require.NotContains(t, emptyProgram, "program_name = ?")
+}
+
 // The disqualified term drops variable_name's TEXT affinity. Names stay exact
 // text matches because every caller binds a string; a numeric-looking name
 // must not start matching its neighbours.
