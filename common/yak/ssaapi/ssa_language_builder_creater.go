@@ -26,7 +26,6 @@ import (
 
 var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.Yak:    yak2ssa.CreateBuilder,
-	ssaconfig.JS:     ts2ssa.CreateBuilder,
 	ssaconfig.PHP:    php2ssa.CreateBuilder,
 	ssaconfig.JAVA:   java2ssa.CreateBuilder,
 	ssaconfig.GO:     go2ssa.CreateBuilder,
@@ -40,6 +39,19 @@ var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.RUST:   rust2ssa.CreateBuilder,
 	ssaconfig.KOTLIN: kotlin2ssa.CreateBuilder,
 	ssaconfig.SCALA:  scala2ssa.CreateBuilder,
+}
+
+// BuilderCreatorFor returns the frontend factory for a language. JavaScript is
+// not a separate frontend: it compiles through the TypeScript builder.
+func BuilderCreatorFor(language ssaconfig.Language) (ssa.CreateBuilder, bool) {
+	if create, ok := LanguageBuilderCreater[language]; ok {
+		return create, true
+	}
+	if language == ssaconfig.JS {
+		create, ok := LanguageBuilderCreater[ssaconfig.TS]
+		return create, ok
+	}
+	return nil, false
 }
 
 // ArchiveCodeSourceOpener opens a code source that is itself an archive.

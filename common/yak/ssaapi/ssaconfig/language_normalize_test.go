@@ -54,3 +54,15 @@ func TestJSONConfigRejectsUnknownLanguage(t *testing.T) {
 	_, err := New(ModeAll, WithJsonRawConfig([]byte(`{"BaseInfo":{"language":"cobol"}}`)))
 	require.Error(t, err)
 }
+
+// JavaScript has no frontend of its own: `.js` compiles through the TypeScript
+// builder, so rules and programs of either id share one language family.
+func TestSameLanguageECMAScriptFamily(t *testing.T) {
+	require.True(t, SameLanguage(JS, JS))
+	require.True(t, SameLanguage(TS, TS))
+	require.True(t, SameLanguage(JS, TS))
+	require.True(t, SameLanguage(TS, JS))
+	require.False(t, SameLanguage(JS, General))
+	require.False(t, SameLanguage(JS, GO))
+	require.False(t, SameLanguage("", JS))
+}

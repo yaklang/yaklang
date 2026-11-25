@@ -68,6 +68,20 @@ func (l Language) GetFileExt() string {
 	}
 }
 
+// SameLanguage reports whether two language ids share one frontend. JavaScript
+// has no frontend of its own: it compiles through the TypeScript builder, so a
+// js rule and a ts program describe one language family.
+func SameLanguage(a, b Language) bool {
+	if a == b {
+		return true
+	}
+	return isECMAScript(a) && isECMAScript(b)
+}
+
+func isECMAScript(l Language) bool {
+	return l == JS || l == TS
+}
+
 func GetAllSupportedLanguages() []string {
 	return []string{
 		string(Yak),

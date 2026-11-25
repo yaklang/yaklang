@@ -174,7 +174,7 @@ func (s *structScanState) filterLanguage(language ssaconfig.Language, ignore boo
 	}
 	rules := make([]*schema.SyntaxFlowRule, 0, len(s.rules))
 	for _, rule := range s.rules {
-		if rule != nil && (rule.Language == ssaconfig.General || rule.Language == language) {
+		if rule != nil && (rule.Language == ssaconfig.General || ssaconfig.SameLanguage(ssaconfig.Language(rule.Language), language)) {
 			rules = append(rules, rule)
 		}
 	}
@@ -204,7 +204,7 @@ func (s *structScanState) rulesForUnit(unit *ssa.CompileUnit, programLanguage ss
 		if rule == nil {
 			continue
 		}
-		if rule.Language == "" || rule.Language == ssaconfig.General || rule.Language == language {
+		if rule.Language == "" || rule.Language == ssaconfig.General || ssaconfig.SameLanguage(ssaconfig.Language(rule.Language), language) {
 			rules = append(rules, rule)
 		}
 	}

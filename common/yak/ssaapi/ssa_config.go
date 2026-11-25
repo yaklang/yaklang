@@ -442,7 +442,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	}
 
 	if c.GetLanguage() != "" {
-		if create, ok := LanguageBuilderCreater[c.GetLanguage()]; ok {
+		if create, ok := BuilderCreatorFor(c.GetLanguage()); ok {
 			c.LanguageBuilder = create()
 		}
 	}

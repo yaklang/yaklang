@@ -276,7 +276,7 @@ func (c *Config) resolveCompileProjectGCPercent(totalMemory int64) compileProjec
 		return decision
 	}
 	decision.largeProject = c.GetCompileProjectBytes() >= largeProjectByteCap
-	create, ok := LanguageBuilderCreater[c.GetLanguage()]
+	create, ok := BuilderCreatorFor(c.GetLanguage())
 	if !ok || !create().UsesDeferredFileBuild() {
 		return decision
 	}
