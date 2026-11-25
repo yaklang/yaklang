@@ -338,7 +338,7 @@ func CompileBashPermissionSyntaxFlowRules(rules []*RulePermissionRule) []*schema
 }
 
 func bashPermissionEntryToSyntaxFlow(rule *RulePermissionRule) (*schema.SyntaxFlowRule, error) {
-	pattern, err := bashPermissionSpecifierToRegex(rule.Specifier)
+	query, err := bashPermissionSpecifierToSyntaxFlowQuery(rule.Specifier)
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +356,7 @@ func bashPermissionEntryToSyntaxFlow(rule *RulePermissionRule) (*schema.SyntaxFl
 	level: %s
 	rule_id: %s
 )
-/%s/ as $hit
+%s
 alert $hit for {
 	level: %s,
 	title: %s,
@@ -366,7 +366,7 @@ alert $hit for {
 		strconv.Quote(title),
 		strconv.Quote(level),
 		strconv.Quote(ruleID),
-		escapeSyntaxFlowRegexBody(pattern),
+		query,
 		strconv.Quote(level),
 		strconv.Quote(title),
 		strconv.Quote("命中规则权限策略"),
@@ -383,36 +383,50 @@ alert $hit for {
 	}, nil
 }
 
-func bashPermissionSpecifierToRegex(spec string) (string, error) {
+// bashPermissionSpecifierToSyntaxFlowQuery turns Bash(spec) into an SSA-oriented
+// SyntaxFlow query. Specifiers match command name + required argument tokens
+// (wildcards ignored), because SF regex runs against SSA values, not raw source.
+func bashPermissionSpecifierToSyntaxFlowQuery(spec string) (string, error) {
 	spec = strings.TrimSpace(spec)
 	if spec == "" || spec == "*" {
-		return ".*", nil
+		return `*?{opcode: call} as $hit`, nil
 	}
 	if strings.HasSuffix(spec, ":*") {
-		prefix := strings.TrimSpace(strings.TrimSuffix(spec, ":*"))
-		if prefix == "" {
-			return ".*", nil
-		}
-		return "^" + regexp.QuoteMeta(prefix) + `(\s|:|$)`, nil
+		spec = strings.TrimSpace(strings.TrimSuffix(spec, ":*"))
 	}
+	parts := strings.Fields(spec)
+	if len(parts) == 0 {
+		return `*?{opcode: call} as $hit`, nil
+	}
+
+	tokens := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "*" || part == "?" {
+			continue
+		}
+		tokens = append(tokens, part)
+	}
+	if len(tokens) == 0 {
+		return `*?{opcode: call} as $hit`, nil
+	}
+
+	cmd := tokens[0]
 	var b strings.Builder
-	b.WriteString("^")
-	for _, r := range spec {
-		switch r {
-		case '*':
-			b.WriteString(".*")
-		case '?':
-			b.WriteString(".")
-		default:
-			b.WriteString(regexp.QuoteMeta(string(r)))
+	fmt.Fprintf(&b, "/%s/ as $cmd\n", escapeSyntaxFlowRegexBody("^"+regexp.QuoteMeta(cmd)+"$"))
+	b.WriteString("$cmd(* as $argv) as $call\n")
+	current := "$call"
+	for i, token := range tokens[1:] {
+		name := "$hit"
+		if i+1 < len(tokens[1:]) {
+			name = fmt.Sprintf("$arg%d", i)
 		}
+		fmt.Fprintf(&b, "%s?{have: %s} as %s\n", current, strconv.Quote(token), name)
+		current = name
 	}
-	b.WriteString("$")
-	pattern := b.String()
-	if _, err := regexp.Compile(pattern); err != nil {
-		return "", err
+	if current == "$call" {
+		b.WriteString("$call as $hit\n")
 	}
-	return pattern, nil
+	return strings.TrimSpace(b.String()), nil
 }
 
 func matchToolName(ruleTool, toolName string) bool {

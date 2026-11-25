@@ -56,11 +56,20 @@ func TestBashPermissionCompilesToSyntaxFlow(t *testing.T) {
 	require.NoError(t, err)
 	sfRules := CompileBashPermissionSyntaxFlowRules(rules)
 	require.Len(t, sfRules, 2)
-	require.Contains(t, sfRules[0].Content, `as $hit`)
+	require.Contains(t, sfRules[0].Content, `/^rm$/ as $cmd`)
+	require.Contains(t, sfRules[0].Content, `have: "-rf"`)
 	require.Contains(t, sfRules[0].Content, `alert $hit`)
+	require.Contains(t, sfRules[1].Content, `/^git$/ as $cmd`)
+	require.Contains(t, sfRules[1].Content, `have: "push"`)
 
 	result := checkBashCommandWithRulesForTest(context.Background(), "rm -rf /tmp/x", sfRules[:1])
 	require.Equal(t, schema.SFR_ACTION_DENY, result.Action)
+
+	ask := checkBashCommandWithRulesForTest(context.Background(), "git push origin main", sfRules[1:])
+	require.Equal(t, schema.SFR_ACTION_ASK, ask.Action)
+
+	safe := checkBashCommandWithRulesForTest(context.Background(), "ls -la", sfRules)
+	require.Equal(t, schema.SFR_ACTION_ALLOW, safe.Action)
 }
 
 // checkBashCommandWithRulesForTest exposes runBashSyntaxFlow for focused tests.
