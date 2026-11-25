@@ -484,9 +484,10 @@ var redundantIRIndexes = []struct{ table, index string }{
 	{TableIrIndices, "idx_ir_indices_v1_variable_id"},
 	{TableIrIndices, "idx_ir_indices_v1_class_id"},
 	{TableIrIndices, "idx_ir_indices_v1_field_id"},
-	// offsetVariableQuery adds a unary "+" to variable_name on purpose: the
+	// The SQLite offset query adds a unary "+" to variable_name on purpose: the
 	// index makes SQLite pick a scan of every instruction named "this"
 	// (about 40ms per lookup instead of 20us through the value prefix).
+	// PostgreSQL rejects that syntax, so other dialects keep the plain column.
 	{TableIrOffsets, "idx_ir_offsets_variable_name"},
 	// GetValueBeforeEndOffset is the only end_offset reader; with the
 	// file_hash index present SQLite picks file_hash (4ms against 77ms).

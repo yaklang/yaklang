@@ -206,9 +206,44 @@ func runSSAConformance(t *testing.T, db *gorm.DB, backend string) {
 		StartOffset: 10,
 		EndOffset:   20,
 	}}))
+	offsetName := "conformance-offset"
+	otherProgram := program + "-offset-other"
+	t.Cleanup(func() { _ = DeleteProgramChecked(db, otherProgram) })
+	require.NoError(t, SaveIrOffsetBatch(db, []*IrOffset{
+		{
+			ProgramName:  program,
+			ValueID:      2,
+			FileHash:     "conformance-hash",
+			StartOffset:  30,
+			EndOffset:    40,
+			VariableName: offsetName,
+		},
+		{
+			ProgramName:  otherProgram,
+			ValueID:      2,
+			FileHash:     "conformance-hash-other",
+			StartOffset:  50,
+			EndOffset:    60,
+			VariableName: offsetName,
+		},
+	}))
 	var offsetCount int64
 	require.NoError(t, db.Model(&IrOffset{}).Where("program_name = ?", program).Count(&offsetCount).Error)
-	require.Equal(t, int64(1), offsetCount)
+	require.Equal(t, int64(2), offsetCount)
+
+	// PostgreSQL rejects unary "+" on text. The native lookup must not use the
+	// SQLite plan hint when a program name is present.
+	nativeOffsets, err := nativeGetOffsetsByVariable(db, offsetName, 2, program)
+	require.NoError(t, err, "%s: native offset lookup with a program name", backend)
+	require.Len(t, nativeOffsets, 1)
+	require.Equal(t, program, nativeOffsets[0].ProgramName)
+	nativeOffsets, err = nativeGetOffsetsByVariable(db, offsetName, 2, otherProgram)
+	require.NoError(t, err)
+	require.Len(t, nativeOffsets, 1)
+	require.Equal(t, otherProgram, nativeOffsets[0].ProgramName)
+	nativeOffsets, err = nativeGetOffsetsByVariable(db, offsetName, 2, "")
+	require.NoError(t, err)
+	require.Len(t, nativeOffsets, 2)
 
 	// Types: upsert on (program_name, type_id).
 	require.NoError(t, SaveIrTypeBatch(db, []*IrType{{ProgramName: program, TypeId: 1, String: "first"}}))
