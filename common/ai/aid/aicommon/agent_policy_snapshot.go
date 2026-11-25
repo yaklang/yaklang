@@ -33,7 +33,7 @@ type AgentGoalPolicySnapshot struct {
 	Enabled            bool                       `json:"enabled"`
 	Effective          bool                       `json:"effective"`
 	MinIterations      int64                      `json:"min_iterations"`
-	AcceptanceCriteria string                     `json:"acceptance_criteria,omitempty"`
+	AcceptanceCriteria string                     `json:"acceptance_criteria"`
 	TimeLimit          AgentGoalTimeLimitSnapshot `json:"time_limit"`
 }
 

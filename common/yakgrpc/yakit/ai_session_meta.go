@@ -451,26 +451,9 @@ func overlayAIExecutionStrategy(base, patch *ypb.AIExecutionStrategy) *ypb.AIExe
 	if patch == nil {
 		return proto.Clone(base).(*ypb.AIExecutionStrategy)
 	}
-	next := proto.Clone(base).(*ypb.AIExecutionStrategy)
-	if patch.GetEnableMultiAgent() {
-		next.EnableMultiAgent = true
-	}
-	if patch.GetEnableGoalMode() {
-		next.EnableGoalMode = true
-	}
-	if patch.GetGoalMinIterations() > 0 {
-		next.GoalMinIterations = patch.GetGoalMinIterations()
-	}
-	if patch.GetMaxSubAgents() > 0 {
-		next.MaxSubAgents = patch.GetMaxSubAgents()
-	}
-	if patch.GetGoalDurationSeconds() != 0 {
-		next.GoalDurationSeconds = patch.GetGoalDurationSeconds()
-	}
-	if patch.GetGoalAcceptanceCriteria() != "" {
-		next.GoalAcceptanceCriteria = patch.GetGoalAcceptanceCriteria()
-	}
-	return next
+	// A present Strategy replaces the whole strategy, just like its hotpatch.
+	// Zero/false/empty fields clear the previous UI mode; only nil means retain.
+	return proto.Clone(patch).(*ypb.AIExecutionStrategy)
 }
 
 func GetAISessionMetaBySessionID(db *gorm.DB, sessionID string) (*schema.AISession, error) {
