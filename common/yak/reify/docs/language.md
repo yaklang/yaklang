@@ -118,16 +118,17 @@ pkg.F[go.shape.int].func1                        -> pkg.F[T].func1
 
 ### Go text 基址
 
-Go 1.18 起的函数表把每个入口写成相对 `runtime.text` 的偏移，表头本身不再保存基址（第 3 个指针槽未使用）。剥离 `.symtab` 后没有 `runtime.text` 符号，若把某个可执行节的首地址当作基址，所有函数地址都会偏错。
+Go 1.18 起的函数表把每个入口写成相对 `runtime.text` 的偏移。Go 1.22 的表头还记录 `textStart`；此字段在较新的链接器中为零。外部链接可以把 C 启动代码放在 Go 代码前方。此时用 `.text` 节首地址作基址会算错函数地址。
 
 `textStart` 按以下顺序取基址：
 
 1. `runtime.text` 符号。
 2. `runtime.moduledata`：读取 `.go.module` 节，找不到时按 8 字节对齐扫描 `.noptrdata`、`.data`、`.data.rel.ro`、`.rdata`，寻找 `pcHeader` 指针。
-3. `.text` 节地址。
-4. 第一个可执行区域地址。
+3. 函数表头的 `textStart`，只接受已映射到可执行区域的非零地址。
+4. `.text` 节地址。
+5. 第一个可执行区域地址。
 
-模块数据必须通过完整校验才算命中：`pcHeader`、`funcnametab`、`cutab`、`filetab`、`pctab`、`pclntable`、`ftab` 指针都与函数表头一致，且 `ftab` 长度等于函数数加一。`text < etext`、`minpc >= text`、`maxpc < etext` 也必须成立。字段偏移只覆盖 Go 1.18 起稳定的前半部分；类型与 itab 区间在后续版本里位置变化，不读取。
+模块数据必须通过完整校验才算命中：`pcHeader`、`funcnametab`、`cutab`、`filetab`、`pctab`、`pclntable`、`ftab` 指针都与函数表头一致，且 `ftab` 长度等于函数数加一。`text <= minpc < maxpc <= etext` 也必须成立。`maxpc` 是最后一个函数结束后的地址，可以等于 `etext`。字段偏移只覆盖 Go 1.18 起稳定的前半部分；类型与 itab 区间在后续版本里位置变化，不读取。
 
 `.gopclntab` 的体积上限按名称区分：命名的 Go 表允许 512 MiB，`.rdata`、`.data.rel.ro` 这类回退节仍为 64 MiB。yaklang 二进制自身的函数表约 85 MiB，旧上限会让剥离后的镜像完全无法恢复名称。
 

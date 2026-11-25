@@ -8,11 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 )
 
-// A stripped Go image keeps no symbol that names runtime.text, and the Go 1.20
-// function table stores entry offsets relative to it instead of the address
-// itself. runtime.moduledata still holds the address, and the linker places it
-// in a small data section. Reading that structure is what makes a stripped Go
-// image usable: without the base every recovered name gets the wrong address.
+// A stripped Go image has no runtime.text symbol. Go 1.18+ function entries
+// are offsets from that address, which is not necessarily the start of .text
+// in an externally linked executable. runtime.moduledata stores the base even
+// when the pclntab header omits it.
 //
 // The field offsets below cover the layout every Go release since 1.18 uses for
 // the fields this file reads. Validation checks every table pointer against the
@@ -50,6 +49,7 @@ type moduleData struct {
 // repeats these addresses, which is what validation compares.
 type pclnTables struct {
 	headerAddr uint64
+	textStart  uint64 // relocated runtime.text in older headers, zero in newer ones
 	funcNames  uint64
 	cuTab      uint64
 	fileTab    uint64
@@ -67,6 +67,7 @@ func (t pclnTables) valid() bool {
 func readPclnTables(headerAddr uint64, funcCount uint64, word func(int) uint64) pclnTables {
 	return pclnTables{
 		headerAddr: headerAddr,
+		textStart:  word(2),
 		funcNames:  word(3),
 		cuTab:      word(4),
 		fileTab:    word(5),
@@ -188,7 +189,8 @@ func parseModuleData(data []byte, tables pclnTables, order binary.ByteOrder, add
 	etext := word(moduleDataETextOffset)
 	minPC := word(moduleDataMinPCOffset)
 	maxPC := word(moduleDataMaxPCOffset)
-	if text == 0 || etext <= text || minPC < text || maxPC >= etext {
+	// Both ranges are half-open. The last Go function can end at etext.
+	if text == 0 || minPC < text || maxPC <= minPC || maxPC > etext {
 		return moduleData{}, false
 	}
 	return moduleData{
@@ -215,15 +217,17 @@ func readImageRange(a *core.Artifact, address, size uint64) ([]byte, error) {
 }
 
 // textStart resolves the address the function table offsets are relative to.
-// The order is: the runtime.text symbol, runtime.moduledata, the .text section,
-// then the first executable region. The last two are layout guesses and only
-// apply when no compiler-owned structure records the truth.
+// A symbol or validated moduledata takes precedence over the header, which
+// might need relocation. Section starts are the last resort.
 func textStart(a *core.Artifact, tables pclnTables, order binary.ByteOrder) (uint64, error) {
 	if entry, ok := a.Image.SymbolByName("runtime.text"); ok && entry.Address != 0 {
 		return entry.Address, nil
 	}
 	if found, ok := recoverModuleData(a, tables, order); ok {
 		return found.Text, nil
+	}
+	if tables.textStart != 0 && executableRange(a, tables.textStart, 1) {
+		return tables.textStart, nil
 	}
 	for _, section := range a.Image.Sections {
 		if section.VirtualAddress == 0 {
