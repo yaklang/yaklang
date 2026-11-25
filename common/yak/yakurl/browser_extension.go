@@ -30,32 +30,48 @@ type browserExtensionPairedDeviceSnapshot struct {
 }
 
 // The v3 desktop decoder rejects unknown fields, including in nested records.
+// The desktop only uses capability names. Keeping signed catalogs in the Bridge
+// avoids duplicating all parameter schemas per connection in the desktop status.
 type browserExtensionConnectionSnapshot struct {
-	DeviceID          string                                    `json:"deviceId"`
-	InstallationID    string                                    `json:"installationId"`
-	ManagedInstance   *browser.ExtensionBridgeManagedInstance   `json:"managedInstance,omitempty"`
-	Client            string                                    `json:"client"`
-	ClientVersion     string                                    `json:"clientVersion"`
-	Capabilities      []string                                  `json:"capabilities"`
-	CapabilityCatalog *browser.ExtensionBridgeCapabilityCatalog `json:"capabilityCatalog,omitempty"`
-	SessionID         string                                    `json:"sessionId"`
-	ConnectionID      string                                    `json:"connectionId"`
-	TaskID            string                                    `json:"taskId,omitempty"`
-	GrantID           string                                    `json:"grantId,omitempty"`
-	ConnectedAt       int64                                     `json:"connectedAt"`
+	DeviceID        string                                   `json:"deviceId"`
+	InstallationID  string                                   `json:"installationId"`
+	ManagedInstance *browserExtensionManagedInstanceSnapshot `json:"managedInstance,omitempty"`
+	Client          string                                   `json:"client"`
+	ClientVersion   string                                   `json:"clientVersion"`
+	Capabilities    []string                                 `json:"capabilities"`
+	SessionID       string                                   `json:"sessionId"`
+	ConnectionID    string                                   `json:"connectionId"`
+	TaskID          string                                   `json:"taskId,omitempty"`
+	GrantID         string                                   `json:"grantId,omitempty"`
+	ConnectedAt     int64                                    `json:"connectedAt"`
 }
 
 type browserExtensionPairingSnapshot struct {
-	ID              string                                  `json:"id"`
-	InstallationID  string                                  `json:"installationId"`
-	ManagedInstance *browser.ExtensionBridgeManagedInstance `json:"managedInstance,omitempty"`
-	ExtensionID     string                                  `json:"extensionId"`
-	Client          string                                  `json:"client"`
-	ClientVersion   string                                  `json:"clientVersion"`
-	Origin          string                                  `json:"origin"`
-	Code            string                                  `json:"code"`
-	CreatedAt       int64                                   `json:"createdAt"`
-	ExpiresAt       int64                                   `json:"expiresAt"`
+	ID              string                                   `json:"id"`
+	InstallationID  string                                   `json:"installationId"`
+	ManagedInstance *browserExtensionManagedInstanceSnapshot `json:"managedInstance,omitempty"`
+	ExtensionID     string                                   `json:"extensionId"`
+	Client          string                                   `json:"client"`
+	ClientVersion   string                                   `json:"clientVersion"`
+	Origin          string                                   `json:"origin"`
+	Code            string                                   `json:"code"`
+	CreatedAt       int64                                    `json:"createdAt"`
+	ExpiresAt       int64                                    `json:"expiresAt"`
+}
+
+type browserExtensionManagedInstanceSnapshot struct {
+	Manager    string `json:"manager"`
+	InstanceID string `json:"instanceId"`
+	Badge      string `json:"badge"`
+}
+
+func browserExtensionSnapshotInstance(instance *browser.ExtensionBridgeManagedInstance) *browserExtensionManagedInstanceSnapshot {
+	if instance == nil {
+		return nil
+	}
+	return &browserExtensionManagedInstanceSnapshot{
+		Manager: instance.Manager, InstanceID: instance.InstanceID, Badge: instance.Badge,
+	}
 }
 
 type browserExtensionMutation struct {
@@ -201,18 +217,17 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 	connections := make([]browserExtensionConnectionSnapshot, 0, len(snapshot.Connections))
 	for _, connection := range snapshot.Connections {
 		connections = append(connections, browserExtensionConnectionSnapshot{
-			DeviceID:          connection.DeviceID,
-			InstallationID:    connection.InstallationID,
-			ManagedInstance:   connection.ManagedInstance,
-			Client:            connection.Client,
-			ClientVersion:     connection.ClientVersion,
-			Capabilities:      connection.Capabilities,
-			CapabilityCatalog: connection.CapabilityCatalog,
-			SessionID:         connection.SessionID,
-			ConnectionID:      connection.ConnectionID,
-			TaskID:            connection.TaskID,
-			GrantID:           connection.GrantID,
-			ConnectedAt:       connection.ConnectedAt,
+			DeviceID:        connection.DeviceID,
+			InstallationID:  connection.InstallationID,
+			ManagedInstance: browserExtensionSnapshotInstance(connection.ManagedInstance),
+			Client:          connection.Client,
+			ClientVersion:   connection.ClientVersion,
+			Capabilities:    connection.Capabilities,
+			SessionID:       connection.SessionID,
+			ConnectionID:    connection.ConnectionID,
+			TaskID:          connection.TaskID,
+			GrantID:         connection.GrantID,
+			ConnectedAt:     connection.ConnectedAt,
 		})
 	}
 	resources := make([]*ypb.YakURLResource, 0, 1+len(snapshot.Pending)+len(snapshot.Devices))
@@ -239,7 +254,7 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 		pairing := browserExtensionPairingSnapshot{
 			ID:              pending.ID,
 			InstallationID:  pending.InstallationID,
-			ManagedInstance: pending.ManagedInstance,
+			ManagedInstance: browserExtensionSnapshotInstance(pending.ManagedInstance),
 			ExtensionID:     pending.ExtensionID,
 			Client:          pending.Client,
 			ClientVersion:   pending.ClientVersion,
