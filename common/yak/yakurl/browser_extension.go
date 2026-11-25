@@ -29,6 +29,35 @@ type browserExtensionPairedDeviceSnapshot struct {
 	LastSeenAt     int64                      `json:"lastSeenAt"`
 }
 
+// The v3 desktop decoder rejects unknown fields, including in nested records.
+type browserExtensionConnectionSnapshot struct {
+	DeviceID          string                                    `json:"deviceId"`
+	InstallationID    string                                    `json:"installationId"`
+	ManagedInstance   *browser.ExtensionBridgeManagedInstance   `json:"managedInstance,omitempty"`
+	Client            string                                    `json:"client"`
+	ClientVersion     string                                    `json:"clientVersion"`
+	Capabilities      []string                                  `json:"capabilities"`
+	CapabilityCatalog *browser.ExtensionBridgeCapabilityCatalog `json:"capabilityCatalog,omitempty"`
+	SessionID         string                                    `json:"sessionId"`
+	ConnectionID      string                                    `json:"connectionId"`
+	TaskID            string                                    `json:"taskId,omitempty"`
+	GrantID           string                                    `json:"grantId,omitempty"`
+	ConnectedAt       int64                                     `json:"connectedAt"`
+}
+
+type browserExtensionPairingSnapshot struct {
+	ID              string                                  `json:"id"`
+	InstallationID  string                                  `json:"installationId"`
+	ManagedInstance *browser.ExtensionBridgeManagedInstance `json:"managedInstance,omitempty"`
+	ExtensionID     string                                  `json:"extensionId"`
+	Client          string                                  `json:"client"`
+	ClientVersion   string                                  `json:"clientVersion"`
+	Origin          string                                  `json:"origin"`
+	Code            string                                  `json:"code"`
+	CreatedAt       int64                                   `json:"createdAt"`
+	ExpiresAt       int64                                   `json:"expiresAt"`
+}
+
 type browserExtensionMutation struct {
 	Name            string `json:"name"`
 	Message         string `json:"message"`
@@ -169,28 +198,57 @@ func normalizeBrowserExtensionPath(params *ypb.RequestYakURLParams) string {
 
 func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (*ypb.RequestYakURLResponse, error) {
 	snapshot := manager.Snapshot()
+	connections := make([]browserExtensionConnectionSnapshot, 0, len(snapshot.Connections))
+	for _, connection := range snapshot.Connections {
+		connections = append(connections, browserExtensionConnectionSnapshot{
+			DeviceID:          connection.DeviceID,
+			InstallationID:    connection.InstallationID,
+			ManagedInstance:   connection.ManagedInstance,
+			Client:            connection.Client,
+			ClientVersion:     connection.ClientVersion,
+			Capabilities:      connection.Capabilities,
+			CapabilityCatalog: connection.CapabilityCatalog,
+			SessionID:         connection.SessionID,
+			ConnectionID:      connection.ConnectionID,
+			TaskID:            connection.TaskID,
+			GrantID:           connection.GrantID,
+			ConnectedAt:       connection.ConnectedAt,
+		})
+	}
 	resources := make([]*ypb.YakURLResource, 0, 1+len(snapshot.Pending)+len(snapshot.Devices))
 	status := struct {
-		Revision         uint64                              `json:"revision"`
-		Running          bool                                `json:"running"`
-		Connected        bool                                `json:"connected"`
-		URL              string                              `json:"url,omitempty"`
-		LastError        string                              `json:"lastError,omitempty"`
-		ProtocolVersion  int                                 `json:"protocolVersion"`
-		EngineIdentityID string                              `json:"engineIdentityId"`
-		EngineInstanceID string                              `json:"engineInstanceId"`
-		PairingOpenUntil int64                               `json:"pairingOpenUntil,omitempty"`
-		Connections      []browser.ExtensionBridgeConnection `json:"connections"`
+		Revision         uint64                               `json:"revision"`
+		Running          bool                                 `json:"running"`
+		Connected        bool                                 `json:"connected"`
+		URL              string                               `json:"url,omitempty"`
+		LastError        string                               `json:"lastError,omitempty"`
+		ProtocolVersion  int                                  `json:"protocolVersion"`
+		EngineIdentityID string                               `json:"engineIdentityId"`
+		EngineInstanceID string                               `json:"engineInstanceId"`
+		PairingOpenUntil int64                                `json:"pairingOpenUntil,omitempty"`
+		Connections      []browserExtensionConnectionSnapshot `json:"connections"`
 	}{
 		Revision: snapshot.Revision, Running: snapshot.Running, Connected: snapshot.Connected,
 		URL: snapshot.URL, LastError: snapshot.LastError, ProtocolVersion: snapshot.ProtocolVersion,
 		EngineIdentityID: snapshot.EngineIdentityID, EngineInstanceID: snapshot.EngineInstanceID,
 		PairingOpenUntil: snapshot.PairingOpenUntil,
-		Connections:      snapshot.Connections,
+		Connections:      connections,
 	}
 	resources = append(resources, browserExtensionResource("status", "bridge", "Yak Browser Bridge", status, time.Now().Unix()))
 	for _, pending := range snapshot.Pending {
-		resources = append(resources, browserExtensionResource("pairing-request", pending.ID, pending.Client, pending, pending.CreatedAt/1000))
+		pairing := browserExtensionPairingSnapshot{
+			ID:              pending.ID,
+			InstallationID:  pending.InstallationID,
+			ManagedInstance: pending.ManagedInstance,
+			ExtensionID:     pending.ExtensionID,
+			Client:          pending.Client,
+			ClientVersion:   pending.ClientVersion,
+			Origin:          pending.Origin,
+			Code:            pending.Code,
+			CreatedAt:       pending.CreatedAt,
+			ExpiresAt:       pending.ExpiresAt,
+		}
+		resources = append(resources, browserExtensionResource("pairing-request", pairing.ID, pairing.Client, pairing, pairing.CreatedAt/1000))
 	}
 	for _, device := range snapshot.Devices {
 		paired := browserExtensionPairedDeviceSnapshot{
