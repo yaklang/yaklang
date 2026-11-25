@@ -82176,7 +82176,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\x84\x15\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xfe\x14\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -87527,7 +87527,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	" \x01(\bH\x01R\x18SupportsImageToolCalling\x88\x01\x01\x12&\n" +
 	"\x0eContextOwnerId\x18\v \x01(\tR\x0eContextOwnerIdB\x15\n" +
 	"\x13_SupportsImageInputB\x1b\n" +
-	"\x19_SupportsImageToolCalling\"\xc4\x05\n" +
+	"\x19_SupportsImageToolCalling\"\xbe\x05\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +

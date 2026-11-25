@@ -200,13 +200,29 @@ func (c *RiskCollect) better(incoming, existing *SSARisk) bool {
 	}
 	// Different rules of one mode may report the same finding; keep the more
 	// severe report so a stronger rule covers a weaker one.
-	inSeverity := incoming.Severity.Rank()
-	oldSeverity := existing.Severity.Rank()
+	inSeverity := severityRank(incoming.Severity)
+	oldSeverity := severityRank(existing.Severity)
 	if inSeverity != oldSeverity {
 		return inSeverity > oldSeverity
 	}
 	// Same mode, same level: the later finding is the more complete one.
 	return true
+}
+
+// severityRank orders severities so a stronger rule can cover a weaker one.
+func severityRank(severity SyntaxFlowSeverity) int {
+	switch ValidSeverityType(severity) {
+	case SFR_SEVERITY_CRITICAL:
+		return 5
+	case SFR_SEVERITY_HIGH:
+		return 4
+	case SFR_SEVERITY_WARNING:
+		return 3
+	case SFR_SEVERITY_LOW:
+		return 2
+	default:
+		return 1
+	}
 }
 
 // laterScanMode reports whether a risk of mode incoming may replace a risk of
