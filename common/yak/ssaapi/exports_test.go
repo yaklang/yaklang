@@ -51,7 +51,7 @@ var b = (()=>{return window.location.hostname + "/app/"})()
 window.location.href = b + "/login.html?ts=";
 window.location.href = "www"
 	`,
-		WithLanguage(ssaconfig.JS),
+		WithLanguage(ssaconfig.TS),
 	)
 	if err != nil {
 		t.Fatal("prog parse error", err)
@@ -196,7 +196,7 @@ func TestB(t *testing.T) {
 		  });
 		});
 	  });
-	`, WithLanguage(ssaconfig.JS))
+	`, WithLanguage(ssaconfig.TS))
 	if err != nil {
 		t.Fatal("prog parse error", err)
 	}

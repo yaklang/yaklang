@@ -211,7 +211,7 @@ func astSlotCostBytes(language ssaconfig.Language) int64 {
 	switch language {
 	case ssaconfig.PHP:
 		cost = 4 * defaultASTSlotCost
-	case ssaconfig.JAVA, ssaconfig.JS, ssaconfig.TS, ssaconfig.PYTHON:
+	case ssaconfig.JAVA, ssaconfig.TS, ssaconfig.PYTHON:
 		cost = 2 * defaultASTSlotCost
 	case ssaconfig.C, ssaconfig.GO:
 		cost = defaultASTSlotCost

@@ -36,7 +36,7 @@ func TestRuleGroupTaxonomyIsVersionedAndComplete(t *testing.T) {
 	}
 	for rawName, canonical := range map[string]string{
 		"go": "go", "golang": "go", "javascript": "javascript", "js": "javascript",
-		"general": "general", "yak": "yak", "ts": "typescript",
+		"general": "general", "yak": "yak", "ts": "typescript", "typescript": "typescript",
 	} {
 		require.Equal(t, canonical, groups[rawName].CanonicalName, "raw group %q", rawName)
 	}

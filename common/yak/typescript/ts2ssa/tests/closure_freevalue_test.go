@@ -60,7 +60,7 @@ const fs = require('fs');
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"Parameter-relativePath"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_ThreeLevel_DirectParam 验证三层嵌套时，内层 closure 能捕获
@@ -78,7 +78,7 @@ const fs = require('fs');
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"FreeValue-relativePath"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_ThreeLevel_LocalConst 验证三层嵌套时，内层 closure 能捕获
@@ -99,7 +99,7 @@ const fs = require('fs');
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"FreeValue-x"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_ThreeLevel_LocalLet 验证 let 声明的变量同样能正确捕获。
@@ -116,7 +116,7 @@ const fs = require('fs');
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"FreeValue-outputPath"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_ThreeLevel_MultipleVars 验证中间层定义了多个 local 变量时，
@@ -138,7 +138,7 @@ const path = require('path');
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"FreeValue-a", "FreeValue-b"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_FourLevel 验证四层嵌套（比三层更深）时，local 变量仍能正确捕获。
@@ -158,7 +158,7 @@ const fs = require('fs');
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"FreeValue-x"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_JSZip_LoadAsync 验证 JSZip.loadAsync().then().forEach() 三层
@@ -184,7 +184,7 @@ fs.readFile('test.zip', (err, data) => {
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"FreeValue-sanitizedName"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TestClosureFreeValue_RegularFunction_ThreeLevel 验证普通 function 关键字三层嵌套时，
@@ -304,5 +304,5 @@ fs.readFile('test.zip', (err, data) => {
 });
 `, `fs.writeFile(* as $path,)`, map[string][]string{
 		"path": {"Parameter-relativePath"},
-	}, ssaapi.WithLanguage(ssaconfig.JS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }

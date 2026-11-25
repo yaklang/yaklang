@@ -55,7 +55,7 @@ func HandleJSGetNewRequest(isHttps bool, req []byte, code string, cb ...func(boo
 }
 
 func handleJS(code string, callback func(*requestNewTarget)) {
-	js, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.JS))
+	js, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.TS))
 	if err != nil {
 		log.Error("parse js failed")
 		return

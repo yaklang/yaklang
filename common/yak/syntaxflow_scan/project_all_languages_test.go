@@ -80,8 +80,10 @@ func TestScanProjectAllLanguagesCompilesEachLanguage(t *testing.T) {
 		ssaconfig.TS:     "app.ts",
 	}
 	require.Len(t, result.LanguagePrograms, len(owns))
-	require.NotContains(t, result.LanguagePrograms, ssaconfig.JS,
-		"JavaScript compiles through the TypeScript program, not a program of its own")
+	require.NotContains(t, result.LanguagePrograms, ssaconfig.Language("js"),
+		"a legacy js spelling must not create a program of its own")
+	require.NotContains(t, result.LanguagePrograms, ssaconfig.Language("ts"),
+		"a legacy ts spelling must not create a program of its own")
 	for language, file := range owns {
 		program := result.LanguagePrograms[language]
 		require.Equal(t, name+"-"+string(language), program)
@@ -169,7 +171,7 @@ alert $hit`}),
 	jsOnJSFile := 0
 	for _, risk := range jsRisks {
 		require.Equal(t, string(ssaconfig.TS), risk.Language)
-		require.True(t, strings.HasSuffix(risk.ProgramName, "-ts"))
+		require.True(t, strings.HasSuffix(risk.ProgramName, "-"+string(ssaconfig.TS)))
 		if strings.HasSuffix(risk.CodeSourceUrl, "/app.js") {
 			jsOnJSFile++
 		}

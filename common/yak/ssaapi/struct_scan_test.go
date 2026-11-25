@@ -383,7 +383,7 @@ alert $call`,
 		},
 		{
 			name: "js-eval",
-			lang: ssaconfig.JS,
+			lang: ssaconfig.TS,
 			file: "app.js",
 			code: "function run(code) { return eval(code); }\n",
 			rule: `desc(mode: "struct", language: "javascript")
