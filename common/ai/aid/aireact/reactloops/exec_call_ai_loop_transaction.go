@@ -249,13 +249,13 @@ func (d *LoopResultDescriptor) finalizeLocked() {
 }
 
 // mainAICall returns the main-model call target for this round. The loop holds
-// callbacks generated at prompt-capture time, so every retry and rebuild of the
-// round uses the routing that produced the prompt budget. Auxiliary loops and
-// unbound loops keep the config-level dynamic behavior.
+// the binding generated at prompt-capture time, so every retry and rebuild of
+// the round uses the routing that produced the prompt budget. Auxiliary loops
+// and unbound loops keep the config-level dynamic behavior.
 func (r *ReActLoop) mainAICall() func(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
-	if r.requestAICallback != nil {
+	if r.requestAIBinding != nil && r.requestAIBinding.Callback != nil {
 		return func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return r.requestAICallback(r.config, req)
+			return r.requestAIBinding.Callback(r.config, req)
 		}
 	}
 	return r.config.CallAI
@@ -265,9 +265,9 @@ func (r *ReActLoop) mainAICall() func(*aicommon.AIRequest) (*aicommon.AIResponse
 // quality callback when available; otherwise it keeps Config.CallQualityPriorityAI
 // fallback semantics.
 func (r *ReActLoop) qualityAICall() func(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
-	if r.requestQualityAICallback != nil {
+	if r.requestAIBinding != nil && r.requestAIBinding.Quality != nil {
 		return func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return r.requestQualityAICallback(r.config, req)
+			return r.requestAIBinding.Quality(r.config, req)
 		}
 	}
 	return r.config.CallQualityPriorityAI

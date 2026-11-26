@@ -15,7 +15,7 @@
 - 质量模型的上下文预算（prompt 组装时读取）和实际请求的模型必须是同一个配置。
 - 如果 Config 在构造时就固定回调，probe/组装 prompt 之后发生 hot-patch 或 tier 切换，就会出现
   “按 A 的预算裁剪，却发给 B”的 TOCTOU 竞态。
-- 把“生成时机”交给调用方：主线 ReAct 每轮生成一次并持有，其它调用方按需生成，天然对齐。
+- 把“生成时机”交给调用方：主线 ReAct 每轮生成一次绑定并持有，其它调用方按需生成，天然对齐。
 
 **每轮绑定（推荐主线用法）**
 
@@ -26,9 +26,10 @@
 - 质量回调在生成时即完成绑定（provider、model、thinking level、model context key），
   之后全局 tier 再变化也不会重定向。
 
-ReAct 循环在 `captureLoopPromptBuildInput` 中生成绑定，并保存到 `requestAICallback` /
-`requestQualityAICallback`；同一轮内所有重试、prompt 重建、上下文压缩都复用它。速度/视觉等
-辅助 tier 仍走配置级 getter，不随轮次钉住。
+ReAct 循环在 `captureLoopPromptBuildInput` 中生成绑定，并保存到 `requestAIBinding`。绑定里的
+`ModelConfig` 就是当轮 prompt 预算、image 路由和溢出重试使用的快照，`Callback` / `Quality` 由同一
+快照生成；同一轮内所有重试、prompt 重建、上下文压缩都复用它。速度/视觉等辅助 tier 仍走配置级
+getter，不随轮次钉住。
 
 自定义的固定回调（`WithQualityPriorityAICallback` 等）本身不依赖 tier 配置，生成时原样返回，
 因此不会被快照重定向，这是符合预期的。
