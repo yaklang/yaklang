@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -339,23 +338,6 @@ func (c *Config) GetExecutionPolicy() string {
 			"- 目标模式：finish 由宿主完成门禁控制；根据真实任务状态持续推进，用具体证据支撑进展。",
 			"- 门禁开放前，仅在必要时用 directly_answer 汇报进度；不要反复请求 finish，也不要清空未完成待办来过关。",
 		)
-		if c.GetGoalDurationSeconds() != 0 {
-			if c.GetGoalDurationSeconds() == -1 {
-				lines = append(lines,
-					"- 目标时间窗：无限。时间门禁不会自动放行 finish；持续推进，直至满足已设置的验收标准或用户停止会话。",
-				)
-			} else {
-				lines = append(lines,
-					fmt.Sprintf("- 目标时间窗：%d 秒。到期前不能 finish；继续深入探索、验证结果和补齐边界情况。", c.GetGoalDurationSeconds()),
-				)
-			}
-		}
-		if criteria := c.GetGoalAcceptanceCriteria(); criteria != "" {
-			lines = append(lines,
-				fmt.Sprintf("- 目标验收标准：%s", criteria),
-				"- 达到时间要求后，仍须通过验收审查才能 finish。",
-			)
-		}
 	}
 	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
 		lines = append(lines,
