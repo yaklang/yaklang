@@ -728,9 +728,10 @@ func _httpPool_DialTimeout(f float64) HttpPoolConfigOption {
 	}
 }
 
-// noFixContentLength 是一个 HTTP 连接池/批量请求配置选项，用于设置是否不自动修复 Content-Length 头
+// noFixContentLength 是一个 HTTP 连接池/批量请求配置选项，用于开启「不修复数据包」模式
 // 参数:
-//   - f: 是否禁止自动修复 Content-Length
+//   - f: 为 true 时请求报文原样发出（不修 CRLF/CL/chunked/multipart），
+//     响应报文保留服务端原始字节（不解 Content-Encoding、不修 Content-Type/Length）
 //
 // 返回值:
 //   - 一个连接池配置选项，作为可变参数传入 httpool.Pool / fuzzx 等
@@ -1763,7 +1764,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if rspInstance != nil {
 							// 多请求的话，要保留原样
 							rsp = rspInstance.RawPacket
-							if !rspInstance.MultiResponse {
+							// 「不修复数据包」下必须保留服务端原始响应：解码 Content-Encoding 会同时
+							// 改写 body / Content-Length 并丢掉 Content-Encoding 头，属于被禁止的修复。
+							if !rspInstance.MultiResponse && !config.NoFixContentLength {
 								if ret := lowhttp.GetHTTPPacketHeader(rspInstance.RawPacket, "Content-Encoding"); ret != "" {
 									rspFixed, _, err := lowhttp.FixHTTPResponse(rspInstance.RawPacket)
 									if len(rspFixed) > 0 && err == nil {
@@ -1934,7 +1937,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if len(rsp) <= 0 {
 							finalResult.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
 						}
-						if finalResult.Response == nil && rsp != nil && !config.NoFixContentLength {
+						if finalResult.Response == nil && rsp != nil {
+							// 只解析报文元信息（状态码/头/长度），不修改 rsp。
+							// 「不修复数据包」下也要解析，否则 WebFuzzer 结果表的
+							// StatusCode/Headers/BodyLength 会全空。
 							finalResult.Response, err = utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
 							if err != nil {
 								log.Errorf("parse bytes to response failed: %s", err)
