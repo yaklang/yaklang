@@ -465,6 +465,24 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 	return replaceHTTPPacketBodyEx(raw, body, chunk, forceCL, false)
 }
 
+// ReplaceHTTPPacketBodyKeepContentLength 替换 body，但原封保留所有头部（包括 Content-Length）。
+//
+// 它只适用于「无损表示」场景：新 body 是可以渲染回原始字节的 fuzztag
+// （如 {{file(path)}}、{{unquote(...)}}，用于把超大/二进制 body 外置）。
+// 这类转换如果重算 Content-Length，渲染后就会得到 CL 与真实 body 不匹配的破损报文，
+// 而「不修复数据包」模式下又不会再修正它。
+func ReplaceHTTPPacketBodyKeepContentLength(raw []byte, body []byte) []byte {
+	header, _ := SplitHTTPHeadersAndBodyFromPacket(raw)
+	header = strings.TrimRight(header, "\r\n")
+
+	var buf bytes.Buffer
+	buf.WriteString(header)
+	buf.WriteString(CRLF)
+	buf.WriteString(CRLF)
+	buf.Write(body)
+	return buf.Bytes()
+}
+
 func replaceHTTPPacketBodyExOwned(raw []byte, body []byte, chunk bool, forceCL bool) []byte {
 	return replaceHTTPPacketBodyEx(raw, body, chunk, forceCL, true)
 }
