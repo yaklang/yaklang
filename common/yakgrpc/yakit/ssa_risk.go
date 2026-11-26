@@ -355,6 +355,9 @@ type SSARiskLevelCount struct {
 }
 
 func GetSSARiskLevelCount(DB *gorm.DB, filter *ypb.SSARisksFilter) ([]*SSARiskLevelCount, error) {
+	if DB == nil {
+		return nil, utils.Error("get ssa risk level count: database is nil")
+	}
 	db := DB.Model(&schema.SSARisk{})
 	// db = db.Debug()
 
