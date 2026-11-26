@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -153,6 +154,13 @@ func Text(program *ssa.Program) string {
 	return ssairtext.FormatProgram(program)
 }
 
+// loopPhiRef keeps a header phi together with the key the loop carries, so
+// filling its edge does not depend on the phi name.
+type loopPhiRef struct {
+	key string
+	phi *ssa.Phi
+}
+
 type converter struct {
 	ctx         context.Context
 	program     *ssa.Program
@@ -161,6 +169,7 @@ type converter struct {
 	builder     *ssa.FunctionBuilder
 	entry       *ssa.BasicBlock
 	blocks      map[core.BlockID]*ssa.BasicBlock
+	blockOrder  []core.BlockID
 	values      map[core.ValueID]ssa.Value
 	defs        map[core.ValueID]core.Instruction
 	variables   map[string]*ssa.Variable
@@ -172,21 +181,28 @@ type converter struct {
 	arguments   map[string]bool
 	loopHeaders map[core.BlockID]bool
 	loopPhis    map[core.BlockID]map[string]*ssa.Phi
-	loopPhiDone map[int64]bool
-	headerStore map[core.BlockID]map[string]bool
-	loopCarried map[core.BlockID]map[string]bool
+	// loopPhiOrder lists the phis of a header in creation order, which decides
+	// their identifiers and the printed text.
+	loopPhiOrder map[core.BlockID][]loopPhiRef
+	loopPhiDone  map[int64]bool
+	headerStore  map[core.BlockID]map[string]bool
+	// loopCarried lists the memory keys a header carries, in the order the loop
+	// body first touches them.
+	loopCarried map[core.BlockID][]string
 	// mergePhis holds the join phis of a block keyed by the register key, and
-	// blockOut holds the value a block leaves in each register.
-	mergePhis   map[core.BlockID]map[string]*ssa.Phi
-	blockOut    map[core.BlockID]map[string]ssa.Value
-	lowirBySSA  map[int64]core.BlockID
-	idom        map[core.BlockID]core.BlockID
-	predsOf     map[core.BlockID][]core.BlockID
-	current     core.BlockID
-	types       map[core.ValueType]ssa.Type
-	signedTypes map[uint16]ssa.Type
-	undefined   map[string]ssa.Value
-	facts       core.ArchFacts
+	// blockOut holds the value a block leaves in each register. mergePhiOrder
+	// keeps the creation order of those phis.
+	mergePhis     map[core.BlockID]map[string]*ssa.Phi
+	mergePhiOrder map[core.BlockID][]string
+	blockOut      map[core.BlockID]map[string]ssa.Value
+	lowirBySSA    map[int64]core.BlockID
+	idom          map[core.BlockID]core.BlockID
+	predsOf       map[core.BlockID][]core.BlockID
+	current       core.BlockID
+	types         map[core.ValueType]ssa.Type
+	signedTypes   map[uint16]ssa.Type
+	undefined     map[string]ssa.Value
+	facts         core.ArchFacts
 	// memoryValid records whether a memory variable still holds the value its
 	// last store wrote. A store through a different address expression that may
 	// alias it clears the flag, so a later load keeps the reload.
@@ -252,10 +268,12 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.arguments = make(map[string]bool)
 	c.loopHeaders = make(map[core.BlockID]bool)
 	c.loopPhis = make(map[core.BlockID]map[string]*ssa.Phi)
+	c.loopPhiOrder = make(map[core.BlockID][]loopPhiRef)
 	c.loopPhiDone = make(map[int64]bool)
 	c.headerStore = make(map[core.BlockID]map[string]bool)
-	c.loopCarried = make(map[core.BlockID]map[string]bool)
+	c.loopCarried = make(map[core.BlockID][]string)
 	c.mergePhis = make(map[core.BlockID]map[string]*ssa.Phi)
+	c.mergePhiOrder = make(map[core.BlockID][]string)
 	c.blockOut = make(map[core.BlockID]map[string]ssa.Value)
 	c.lowirBySSA = make(map[int64]core.BlockID, len(function.Blocks))
 	c.types = make(map[core.ValueType]ssa.Type)
@@ -277,6 +295,7 @@ func (c *converter) convertFunction(function core.Function) error {
 			return fmt.Errorf("lowir2ssa: cannot create block b%d", block.ID)
 		}
 		c.blocks[block.ID] = ssaBlock
+		c.blockOrder = append(c.blockOrder, block.ID)
 	}
 	// The block ids are stable only after every block exists, so the reverse map is
 	// built here rather than inside the creation loop.
@@ -326,11 +345,8 @@ func (c *converter) markLoopHeaders(function core.Function) {
 }
 
 func (c *converter) collectLoopCarried(function core.Function) {
-	order := make(map[core.BlockID]int, len(function.Blocks))
-	for index, block := range function.Blocks {
-		order[block.ID] = index
-	}
-	for header, position := range order {
+	for position, block := range function.Blocks {
+		header := block.ID
 		if !c.loopHeaders[header] {
 			continue
 		}
@@ -350,6 +366,10 @@ func (c *converter) collectLoopCarried(function core.Function) {
 		if last <= position {
 			continue
 		}
+		// The keys keep the order the body first touches the memory, so the phis of
+		// the header get stable identifiers without sorting.
+		var order []string
+		seen := make(map[string]bool)
 		loaded := make(map[string]bool)
 		stored := make(map[string]bool)
 		for index := position; index <= last; index++ {
@@ -357,19 +377,29 @@ func (c *converter) collectLoopCarried(function core.Function) {
 				switch instruction.Kind {
 				case core.OpLoad:
 					if len(instruction.Operands) > 0 {
-						loaded[valueKey(c.defs, instruction.Operands[0].Value)] = true
+						key := valueKey(c.defs, instruction.Operands[0].Value)
+						if !seen[key] {
+							seen[key] = true
+							order = append(order, key)
+						}
+						loaded[key] = true
 					}
 				case core.OpStore:
 					if len(instruction.Operands) > 0 {
-						stored[valueKey(c.defs, instruction.Operands[0].Value)] = true
+						key := valueKey(c.defs, instruction.Operands[0].Value)
+						if !seen[key] {
+							seen[key] = true
+							order = append(order, key)
+						}
+						stored[key] = true
 					}
 				}
 			}
 		}
-		keys := make(map[string]bool)
-		for key := range loaded {
-			if stored[key] {
-				keys[key] = true
+		var keys []string
+		for _, key := range order {
+			if loaded[key] && stored[key] {
+				keys = append(keys, key)
 			}
 		}
 		if len(keys) > 0 {
@@ -379,9 +409,7 @@ func (c *converter) collectLoopCarried(function core.Function) {
 }
 
 func (c *converter) prepareLoopPhis(blockID core.BlockID) {
-	// Sorted, because the phis of a header are created here and their creation
-	// order fixes both their identifiers and the printed text.
-	for _, key := range sortedKeys(c.loopCarried[blockID]) {
+	for _, key := range c.loopCarried[blockID] {
 		c.loopPhi("mem:"+key, c.memoryVariable(c.memoryName(key)))
 	}
 }
@@ -1394,7 +1422,7 @@ func (c *converter) emitLoad(instruction core.Instruction) {
 	// constant.
 	address := instruction.Operands[0]
 	if c.memoryValidAt(key) {
-		if c.loopHeaders[c.current] && c.loopCarried[c.current][key] {
+		if c.loopHeaders[c.current] && slices.Contains(c.loopCarried[c.current], key) {
 			prefixed := "mem:" + key
 			if phi := c.loopPhi(prefixed, variable); phi != nil {
 				c.setResult(instruction, phi)
@@ -1482,6 +1510,9 @@ func (c *converter) loopPhi(key string, variable *ssa.Variable) *ssa.Phi {
 	if c.loopPhis[c.current] == nil {
 		c.loopPhis[c.current] = make(map[string]*ssa.Phi)
 	}
+	if _, seen := c.loopPhis[c.current][key]; !seen {
+		c.loopPhiOrder[c.current] = append(c.loopPhiOrder[c.current], loopPhiRef{key: key, phi: phi})
+	}
 	c.loopPhis[c.current][key] = phi
 	return phi
 }
@@ -1495,8 +1526,10 @@ func (c *converter) fillLoopCarried(block core.Block) {
 			if !c.loopHeaders[target] {
 				continue
 			}
-			for _, key := range sortedKeys(c.loopPhis[target]) {
-				phi := c.loopPhis[target][key]
+			// The phis follow creation order: filling an edge can create a value for
+			// a block that leaves nothing behind, so map order must not reach it.
+			for _, carried := range c.loopPhiOrder[target] {
+				key, phi := carried.key, carried.phi
 				if c.loopPhiDone[phi.GetId()] {
 					continue
 				}
