@@ -412,7 +412,6 @@ func (t *Tool) validate(iSchema any, params any) (valid bool, errs []string) {
 		return false, []string{fmt.Sprintf("JSON Schema Compile: %v", trimErrorFirstLine(err.Error()))}
 	}
 	applyDefault(schema, paramMap)
-	coerceParamsToSchema(plainSchema, paramMap)
 
 	err = schema.Validate(paramMap)
 	valid = err == nil

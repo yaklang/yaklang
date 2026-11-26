@@ -318,7 +318,7 @@ func (c *Config) GetExecutionPolicy() string {
 	if c == nil {
 		return ""
 	}
-	lines := make([]string, 0, 5)
+	lines := make([]string, 0, 4)
 	if c.EnableDispatchSubReactAgents && !c.GetPreferDispatchSubReactAgents() {
 		lines = append(lines,
 			"- 默认模式：维护总目标和主线；复杂长链路、跨源验证和有依据的探索分支，尽早通过 dispatch_sub_react_agents 委派。一个子任务可完成含顺序步骤的阶段，无须凑并行任务。简单问答和微小单步任务直接处理，遵守用户的委派限制。",
