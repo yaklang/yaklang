@@ -30,8 +30,8 @@ type Endpoint struct {
 	// createdAtMs 是端点创建 (发起审批) 的毫秒时间戳, 用于计算审批时延.
 	createdAtMs int64
 	// approvalMeta 记录本次审批"运行时真相": 谁做的决定 (source)、是否真的需要
-	// 人工/模型介入 (required)、原因 (reason). 由审批链路在各释放分支就地写入,
-	// 供价值评估区分 policy 与 source (例如 YOLO 下仍人工审批).
+	// 人工/模型介入 (required)、原因 (reason). 由 DoWaitAgreeWithPolicy 在各释放
+	// 分支就地写入, 供价值评估区分 policy 与 source (例如 YOLO 下仍人工审批).
 	approvalMeta *ApprovalDecisionMeta
 
 	// seq and checkpoint for recovering
