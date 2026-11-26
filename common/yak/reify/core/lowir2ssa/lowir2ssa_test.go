@@ -87,6 +87,34 @@ func TestLowIRToSSAIRFixtures(t *testing.T) {
 	}
 }
 
+// TestConvertIsDeterministic guards the order values are created in. Phis of a
+// join are keyed by register or memory slot, and creating them from map iteration
+// order would make their identifiers differ between runs of the same input.
+func TestConvertIsDeterministic(t *testing.T) {
+	const rounds = 25
+	for _, tc := range loadLowIRCases(t) {
+		ir, err := lowirtext.Parse(strings.Join(tc.LowIR, "\n"))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.Name, err)
+		}
+		first := ""
+		for round := 0; round < rounds; round++ {
+			result, err := Convert(context.Background(), ir)
+			if err != nil {
+				t.Fatalf("%s: %v", tc.Name, err)
+			}
+			text := Text(result.Program)
+			if round == 0 {
+				first = text
+				continue
+			}
+			if text != first {
+				t.Fatalf("%s: conversion differs on round %d:\n--- first ---\n%s\n--- round %d ---\n%s", tc.Name, round, first, round, text)
+			}
+		}
+	}
+}
+
 func TestValuesCarryBitWidthTypes(t *testing.T) {
 	converter := &converter{types: make(map[core.ValueType]ssa.Type)}
 	for bits, expected := range map[uint16]string{8: "i8", 16: "i16", 32: "i32", 64: "i64"} {
