@@ -23,10 +23,7 @@ func bashCommandGuard(ctx context.Context, disable bool, command string) map[str
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	check := aicommon.CheckBashCommand(ctx, cmd,
-		aicommon.WithDisableBuiltinBashRules(false),
-		aicommon.WithIncludeCustomBashRules(true),
-	)
+	check := aicommon.CheckBashCommand(ctx, cmd)
 	if check.Blocked() {
 		return check.BlockedResult("bash")
 	}

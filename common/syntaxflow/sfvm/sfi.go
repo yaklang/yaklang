@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -20,10 +19,6 @@ type OpCodes struct {
 const CurrentOpcodeSchemaVersion = 2
 
 func ToOpCodes(code string) (*OpCodes, bool) {
-	if strings.TrimSpace(code) == "" {
-		// Ephemeral / freshly authored rules have no cached opcodes yet.
-		return nil, false
-	}
 	var opcodes *OpCodes
 	if err := json.Unmarshal([]byte(code), &opcodes); err != nil {
 		log.Errorf("to opcode fail: %s", err)

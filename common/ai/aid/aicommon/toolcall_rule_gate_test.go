@@ -23,8 +23,7 @@ func TestToolCallRuleGateApply(t *testing.T) {
 			require.Equal(t, "bash", toolName)
 			require.Equal(t, "rm -rf /", got["command"])
 			return &ToolCallRuleDecision{
-				Action:   schema.SFR_ACTION_DENY,
-				RuleName: "test-rule",
+				Action: schema.SFR_ACTION_DENY,
 			}
 		}
 		decision := caller.applyToolCallRuleGate(tool, params)

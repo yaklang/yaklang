@@ -258,5 +258,5 @@ func securityDeniedFeedbackFromResult(toolName string, result *aitool.ToolResult
 			reason = errText
 		}
 	}
-	return aicommon.SecurityRuleDeniedRetryFeedback(toolName, "", "", reason)
+	return aicommon.SecurityRuleDeniedRetryFeedback(toolName, reason)
 }

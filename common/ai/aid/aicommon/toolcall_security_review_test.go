@@ -23,7 +23,6 @@ func TestSecurityRuleReviewDecision(t *testing.T) {
 		{name: "cancel-value", params: aitool.InvokeParams{"value": "cancel"}, want: false},
 		{name: "continue-index", params: aitool.InvokeParams{"index": 1}, want: true},
 		{name: "cancel-index", params: aitool.InvokeParams{"index": 2}, want: false},
-		{name: "continue-prompt-title", params: aitool.InvokeParams{"prompt_title": "继续执行"}, want: true},
 		{name: "ambiguous", params: aitool.InvokeParams{"suggestion": "想想"}, want: false},
 		{name: "command-text-is-not-approval", params: aitool.InvokeParams{"command": "echo continue"}, want: false},
 		{name: "negated-cancel-is-not-approval", params: aitool.InvokeParams{"suggestion": "不要取消"}, want: false},
@@ -34,18 +33,11 @@ func TestSecurityRuleReviewDecision(t *testing.T) {
 		require.Equal(t, c.want, got, "%s: %s", c.name, reason)
 	}
 
-	decision := &ToolCallRuleDecision{
-		Action:   schema.SFR_ACTION_ASK,
-		RuleName: "bash-cloud-metadata",
-		Reason:   "cloud metadata access",
-	}
-	require.Equal(t, "cloud metadata access", securityRuleReviewSummary(decision))
-	prompt := securityRuleReviewPrompt(decision, "bash", aitool.InvokeParams{
+	prompt := securityRuleReviewPrompt(schema.SFR_ACTION_ASK, "bash", aitool.InvokeParams{
 		"command": "curl http://169.254.169.254/latest/meta-data/",
 	})
 	require.Contains(t, prompt, "规则权限策略命中")
 	require.Contains(t, prompt, "判定：询问")
-	require.Contains(t, prompt, "bash-cloud-metadata")
 	require.Contains(t, prompt, "169.254.169.254")
 	require.NotContains(t, prompt, "级别：")
 	require.Len(t, securityRuleReviewOptions(), 2)

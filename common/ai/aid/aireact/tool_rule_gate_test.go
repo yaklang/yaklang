@@ -38,13 +38,8 @@ func TestSecurityRuleGate(t *testing.T) {
 		require.Equal(t, schema.SFR_ACTION_DENY, decision.Action)
 	})
 
-	t.Run("builtin-disabled-by-config", func(t *testing.T) {
-		gate := securityRuleGateWithOptions([]aicommon.BashRuleCheckOption{
-			aicommon.WithDisableBuiltinBashRules(true),
-		})
-		require.Nil(t, gate(ctx, "bash", aitool.InvokeParams{
-			"command": "rm -rf /",
-		}))
+	t.Run("master-switch-disables-gate", func(t *testing.T) {
+		require.Nil(t, toolCallRuleGate(&aicommon.Config{DisableBuiltinSyntaxFlowRules: true}))
 	})
 
 	t.Run("other-tool-ignored", func(t *testing.T) {

@@ -1037,10 +1037,6 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		case schema.SFR_ACTION_DENY:
 			denied := &SecurityRuleDeniedError{
 				ToolName: tool.Name,
-				RuleName: ruleDecision.RuleName,
-				RuleID:   ruleDecision.RuleID,
-				Reason:   ruleDecision.Summary(),
-				Action:   schema.SFR_ACTION_DENY,
 			}
 			blocked := denied.Error()
 			t.emitter.EmitWarning(blocked)
@@ -1048,8 +1044,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			return nil, false, denied
 		case schema.SFR_ACTION_WARN:
 			t.emitter.EmitWarning(
-				"tool[%v] rule permission verdict=warn: %s",
-				tool.Name, ruleDecision.Summary(),
+				"tool[%v] rule permission verdict=warn",
+				tool.Name,
 			)
 		}
 	}
@@ -1111,8 +1107,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 				reqs["force_human_review"] = true
 			}
 			reqs["security_review_source"] = string(securityReview)
-			reqs["reason"] = securityRuleReviewSummary(ruleDecision)
-			reqs["prompt"] = securityRuleReviewPrompt(ruleDecision, tool.Name, invokeParams)
+			reqs["reason"] = verdictLabel(securityAction)
+			reqs["prompt"] = securityRuleReviewPrompt(securityAction, tool.Name, invokeParams)
 			reqs["options"] = securityRuleReviewOptions()
 		}
 		ep.SetReviewMaterials(reqs)
@@ -1158,7 +1154,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 
 		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
 		if securityNeedsReview {
-			reviewQuestion = securityRuleReviewPrompt(ruleDecision, tool.Name, invokeParams)
+			reviewQuestion = securityRuleReviewPrompt(securityAction, tool.Name, invokeParams)
 		}
 
 		var params aitool.InvokeParams
@@ -1185,7 +1181,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 
 			switch securityReview {
 			case securityReviewHuman:
-				ep.SetApprovalMeta(ApprovalSourceRule, true, ruleDecision.Summary())
+				ep.SetApprovalMeta(ApprovalSourceRule, true, string(securityAction))
 				ep.WaitContext(t.ctx)
 			case securityReviewAI:
 				// Let the configured AI reviewer decide, but make a reviewer

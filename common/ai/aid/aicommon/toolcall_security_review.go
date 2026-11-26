@@ -51,38 +51,15 @@ func resolveSecurityReviewAction(policy AgreePolicyType, action schema.SyntaxFlo
 	}
 }
 
-func securityRuleReviewSummary(decision *ToolCallRuleDecision) string {
-	if decision == nil {
-		return ""
-	}
-	summary := strings.TrimSpace(decision.Summary())
-	if summary == "" {
-		return string(decision.Action)
-	}
-	return summary
-}
-
-func securityRuleReviewPrompt(decision *ToolCallRuleDecision, toolName string, params aitool.InvokeParams) string {
+func securityRuleReviewPrompt(action schema.SyntaxFlowAction, toolName string, params aitool.InvokeParams) string {
 	var b strings.Builder
 	b.WriteString("规则权限策略命中，需要确认\n\n")
 	b.WriteString("工具：")
 	b.WriteString(toolName)
 	b.WriteString("\n")
-	if decision != nil {
-		b.WriteString("判定：")
-		b.WriteString(verdictLabel(decision.Action))
-		b.WriteString("\n")
-		if decision.RuleName != "" {
-			b.WriteString("规则：")
-			b.WriteString(decision.RuleName)
-			b.WriteString("\n")
-		}
-		if summary := strings.TrimSpace(decision.Summary()); summary != "" {
-			b.WriteString("原因：")
-			b.WriteString(summary)
-			b.WriteString("\n")
-		}
-	}
+	b.WriteString("判定：")
+	b.WriteString(verdictLabel(action))
+	b.WriteString("\n")
 	if toolName == "bash" {
 		if cmd := strings.TrimSpace(utils.InterfaceToString(params["command"])); cmd != "" {
 			b.WriteString("\n命令：\n")
@@ -133,12 +110,12 @@ func securityRuleReviewDecision(params aitool.InvokeParams) (bool, string) {
 		}
 	}
 
-	for _, key := range []string{"suggestion", "value", "option_name", "prompt_title"} {
+	for _, key := range []string{"suggestion", "value"} {
 		text := strings.ToLower(strings.TrimSpace(strings.TrimRight(utils.InterfaceToString(params[key]), ":：")))
 		switch text {
-		case "continue", "allow", "approve", "yes", "1", "继续", "继续执行", "允许", "同意", "确认":
+		case "continue", "allow", "1", "继续", "继续执行", "允许":
 			return true, ""
-		case "cancel", "deny", "reject", "no", "2", "取消", "拒绝", "不执行":
+		case "cancel", "deny", "2", "取消", "拒绝":
 			return false, cancelReason
 		}
 	}

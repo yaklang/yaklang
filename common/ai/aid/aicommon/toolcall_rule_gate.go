@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"context"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -16,25 +15,7 @@ type ToolCallRuleGate func(ctx context.Context, toolName string, params aitool.I
 // ToolCallRuleDecision is the gate result for one tool call.
 // Action is the only verdict: allow / warn / ask / deny.
 type ToolCallRuleDecision struct {
-	Action   schema.SyntaxFlowAction `json:"action"`
-	RuleName string                  `json:"rule_name,omitempty"`
-	RuleID   string                  `json:"rule_id,omitempty"`
-	Reason   string                  `json:"reason,omitempty"`
-}
-
-// Summary is a compact human-readable description for logs and review cards.
-func (d *ToolCallRuleDecision) Summary() string {
-	if d == nil {
-		return ""
-	}
-	message := strings.TrimSpace(d.Reason)
-	if message == "" {
-		message = strings.TrimSpace(d.RuleName)
-	}
-	if message == "" {
-		message = string(d.Action)
-	}
-	return message
+	Action schema.SyntaxFlowAction `json:"action"`
 }
 
 // WithToolCaller_RuleGate installs a deterministic security gate before the

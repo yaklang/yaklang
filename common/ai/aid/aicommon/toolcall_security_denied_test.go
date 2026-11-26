@@ -5,18 +5,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestSecurityDeniedFeedbackPolicy(t *testing.T) {
 	t.Run("typed-error-feedback-explains-scope", func(t *testing.T) {
 		denied := &SecurityRuleDeniedError{
 			ToolName: "bash",
-			RuleName: "Bash(rm -rf *)",
-			RuleID:   "rule-permission-test",
 			Reason:   "destructive command",
-			Action:   schema.SFR_ACTION_DENY,
 		}
 
 		feedback := denied.RetryFeedback()

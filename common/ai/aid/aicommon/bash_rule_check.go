@@ -2,11 +2,8 @@ package aicommon
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -21,90 +18,11 @@ const (
 	TerminationReasonBlockedByGuard = "blocked_by_bash_guard"
 
 	maxBashRuleCommandBytes = 64 * 1024
-	disableBashRuleEnv      = "YAK_DISABLE_AI_BASH_COMMAND_GUARD"
-	bashRuleCacheTTL        = 5 * time.Minute
 )
 
-// BashRuleCheckOption selects which SyntaxFlow rule sources participate.
-type BashRuleCheckOption func(*bashRuleCheckOptions)
-
-type bashRuleCheckOptions struct {
-	disableBuiltin bool
-	includeCustom  bool
-}
-
-// WithDisableBuiltinBashRules skips embedded/DB built-in Bash SyntaxFlow rules.
-func WithDisableBuiltinBashRules(disable bool) BashRuleCheckOption {
-	return func(o *bashRuleCheckOptions) { o.disableBuiltin = disable }
-}
-
-// WithIncludeCustomBashRules includes user SF rules and GUI/runtime rows that
-// were compiled into temporary SyntaxFlow rules.
-func WithIncludeCustomBashRules(include bool) BashRuleCheckOption {
-	return func(o *bashRuleCheckOptions) { o.includeCustom = include }
-}
-
-func resolveBashRuleCheckOptions(options []BashRuleCheckOption) bashRuleCheckOptions {
-	var opts bashRuleCheckOptions
-	for _, option := range options {
-		if option != nil {
-			option(&opts)
-		}
-	}
-	return opts
-}
-
-var (
-	bashEmbeddedOnce  sync.Once
-	bashEmbeddedRules []*schema.SyntaxFlowRule
-	bashEmbeddedErr   error
-
-	bashBuiltinCache bashSFRuleCache
-	bashCustomCache  bashSFRuleCache
-)
-
-type bashSFRuleCache struct {
-	mu       sync.Mutex
-	rules    []*schema.SyntaxFlowRule
-	loaded   bool
-	loadedAt time.Time
-}
-
-func (c *bashSFRuleCache) get(loader func() ([]*schema.SyntaxFlowRule, error)) ([]*schema.SyntaxFlowRule, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	now := time.Now()
-	if c.loaded && now.Sub(c.loadedAt) < bashRuleCacheTTL {
-		return c.rules, nil
-	}
-	rules, err := loader()
-	if err != nil {
-		return nil, err
-	}
-	c.rules = rules
-	c.loaded = true
-	c.loadedAt = now
-	return rules, nil
-}
-
-func loadEmbeddedBashRules() {
-	rules, err := sfbuildin.LoadEmbeddedRulesByLanguage(string(ssaconfig.BASH), schema.SFR_SEVERITY_HIGH)
-	if err != nil {
-		bashEmbeddedErr = fmt.Errorf("load embedded bash rules: %w", err)
-		return
-	}
-	if len(rules) == 0 {
-		bashEmbeddedErr = fmt.Errorf("no embedded bash high rules")
-		return
-	}
-	bashEmbeddedRules = rules
-}
-
-// BashRuleVerdict is the only result returned to AI callers after SyntaxFlow.
-// Action is one of: allow / warn / ask / deny.
+// BashRuleVerdict is the enforcement result returned to AI callers.
 type BashRuleVerdict struct {
-	Available bool                    `json:"available"`
-	Action    schema.SyntaxFlowAction `json:"action"`
+	Action schema.SyntaxFlowAction `json:"action"`
 }
 
 // Blocked reports whether execution must stop.
@@ -132,105 +50,56 @@ func (v BashRuleVerdict) BlockedResult(shell string) map[string]any {
 	}
 }
 
-func bashVerdict(action schema.SyntaxFlowAction) BashRuleVerdict {
-	if action == "" {
-		action = schema.SFR_ACTION_ALLOW
-	}
-	return BashRuleVerdict{Available: true, Action: action}
-}
+var (
+	bashBuiltinOnce  sync.Once
+	bashBuiltinRules []*schema.SyntaxFlowRule
+)
 
-func bashVerdictUnavailable() BashRuleVerdict {
-	return BashRuleVerdict{Available: false, Action: schema.SFR_ACTION_ALLOW}
-}
-
-func isBashRuleDisabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(disableBashRuleEnv))) {
-	case "1", "true", "yes":
-		return true
-	default:
-		return false
-	}
-}
-
-// CheckBashCommand runs high-severity built-in SyntaxFlow rules (preflight deny).
-func CheckBashCommand(ctx context.Context, cmd string, options ...BashRuleCheckOption) BashRuleVerdict {
-	if isBashRuleDisabled() {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
-	}
-	opts := resolveBashRuleCheckOptions(options)
-	if opts.disableBuiltin && !opts.includeCustom {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
-	}
-
-	var rules []*schema.SyntaxFlowRule
-	if !opts.disableBuiltin {
-		bashEmbeddedOnce.Do(loadEmbeddedBashRules)
-		if bashEmbeddedErr != nil {
-			log.Warnf("bash rule check unavailable: %v", bashEmbeddedErr)
-		} else {
-			rules = append(rules, bashEmbeddedRules...)
-		}
-	}
-	if opts.includeCustom {
-		rules = append(rules, loadAllCustomBashSFRules()...)
-	}
-	if len(rules) == 0 {
-		if !opts.disableBuiltin && bashEmbeddedErr != nil {
-			return bashVerdictUnavailable()
-		}
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
-	}
-	return runBashSyntaxFlow(ctx, cmd, rules)
-}
-
-// CheckBuiltinBashCommand runs all built-in Bash SyntaxFlow rules for review.
-func CheckBuiltinBashCommand(ctx context.Context, cmd string, options ...BashRuleCheckOption) BashRuleVerdict {
-	if isBashRuleDisabled() {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
-	}
-	opts := resolveBashRuleCheckOptions(options)
-	if opts.disableBuiltin && !opts.includeCustom {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
-	}
-
-	var rules []*schema.SyntaxFlowRule
-	if !opts.disableBuiltin {
-		builtin, err := loadBuiltinBashSFRules()
-		if err == nil && len(builtin) > 0 {
-			rules = append(rules, builtin...)
-		} else {
-			bashEmbeddedOnce.Do(loadEmbeddedBashRules)
-			if bashEmbeddedErr == nil {
-				rules = append(rules, bashEmbeddedRules...)
-			} else if len(rules) == 0 {
-				log.Warnf("bash built-in rule check unavailable: %v", err)
-				if opts.includeCustom {
-					rules = append(rules, loadAllCustomBashSFRules()...)
-					if len(rules) == 0 {
-						return bashVerdictUnavailable()
-					}
-					return runBashSyntaxFlow(ctx, cmd, rules)
+// loadBashSFRules loads built-in Bash rules from the synced database and falls
+// back to the embedded snapshot when the database is not ready.
+func loadBashSFRules() []*schema.SyntaxFlowRule {
+	bashBuiltinOnce.Do(func() {
+		all, err := sfdb.GetRuleByLanguage(string(ssaconfig.BASH))
+		if err == nil {
+			for _, rule := range all {
+				if rule != nil && rule.IsBuildInRule && strings.TrimSpace(rule.Content) != "" {
+					bashBuiltinRules = append(bashBuiltinRules, rule)
 				}
-				return bashVerdictUnavailable()
 			}
 		}
-	}
-	if opts.includeCustom {
-		rules = append(rules, loadAllCustomBashSFRules()...)
-	}
-	if len(rules) == 0 {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
-	}
-	return runBashSyntaxFlow(ctx, cmd, rules)
+		if len(bashBuiltinRules) > 0 {
+			return
+		}
+		embedded, err := sfbuildin.LoadEmbeddedRulesByLanguage(string(ssaconfig.BASH))
+		if err != nil {
+			log.Warnf("load embedded bash rules failed: %v", err)
+			return
+		}
+		bashBuiltinRules = embedded
+	})
+	return bashBuiltinRules
 }
 
-func runBashSyntaxFlow(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule) BashRuleVerdict {
+// CheckBashCommand runs built-in SyntaxFlow rules and user-authored GUI rules.
+// It returns the strongest action found.
+func CheckBashCommand(ctx context.Context, cmd string) BashRuleVerdict {
 	cmd = strings.ReplaceAll(strings.ReplaceAll(cmd, "\r\n", "\n"), "\r", "\n")
-	if strings.TrimSpace(cmd) == "" {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
+	if strings.TrimSpace(cmd) == "" || len(cmd) > maxBashRuleCommandBytes {
+		return BashRuleVerdict{Action: schema.SFR_ACTION_ALLOW}
 	}
-	if len(cmd) > maxBashRuleCommandBytes {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
+
+	best := checkBashGuardRegexRules(cmd)
+	if best != schema.SFR_ACTION_DENY {
+		if action := runBashSyntaxFlow(ctx, cmd, loadBashSFRules()); action.Rank() > best.Rank() {
+			best = action
+		}
+	}
+	return BashRuleVerdict{Action: best}
+}
+
+func runBashSyntaxFlow(ctx context.Context, cmd string, rules []*schema.SyntaxFlowRule) schema.SyntaxFlowAction {
+	if len(rules) == 0 {
+		return schema.SFR_ACTION_ALLOW
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -243,10 +112,10 @@ func runBashSyntaxFlow(ctx context.Context, cmd string, rules []*schema.SyntaxFl
 	)
 	if err != nil {
 		log.Warnf("bash rule check skipped unparsable command: %v", err)
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
+		return schema.SFR_ACTION_ALLOW
 	}
 	if prog.GetLanguage() != ssaconfig.BASH {
-		return bashVerdict(schema.SFR_ACTION_ALLOW)
+		return schema.SFR_ACTION_ALLOW
 	}
 
 	best := schema.SFR_ACTION_ALLOW
@@ -278,57 +147,5 @@ func runBashSyntaxFlow(ctx context.Context, cmd string, rules []*schema.SyntaxFl
 			break
 		}
 	}
-	return bashVerdict(best)
-}
-
-func loadBuiltinBashSFRules() ([]*schema.SyntaxFlowRule, error) {
-	return bashBuiltinCache.get(func() ([]*schema.SyntaxFlowRule, error) {
-		all, err := sfdb.GetRuleByLanguage(string(ssaconfig.BASH))
-		if err != nil {
-			return nil, err
-		}
-		rules := make([]*schema.SyntaxFlowRule, 0, len(all))
-		for _, rule := range all {
-			if rule == nil || !rule.IsBuildInRule || strings.TrimSpace(rule.Content) == "" {
-				continue
-			}
-			rules = append(rules, rule)
-		}
-		return rules, nil
-	})
-}
-
-func loadCustomDBBashSFRules() ([]*schema.SyntaxFlowRule, error) {
-	return bashCustomCache.get(func() ([]*schema.SyntaxFlowRule, error) {
-		all, err := sfdb.GetRuleByLanguage(string(ssaconfig.BASH))
-		if err != nil {
-			return nil, err
-		}
-		rules := make([]*schema.SyntaxFlowRule, 0, len(all))
-		for _, rule := range all {
-			if rule == nil || rule.IsBuildInRule || strings.TrimSpace(rule.Content) == "" {
-				continue
-			}
-			if rule.Type != "" && rule.Type != schema.SFR_RULE_TYPE_SF {
-				continue
-			}
-			if rule.Mode != "" && rule.Mode != schema.SFR_MODE_SSA {
-				continue
-			}
-			rules = append(rules, rule)
-		}
-		return rules, nil
-	})
-}
-
-func loadAllCustomBashSFRules() []*schema.SyntaxFlowRule {
-	var rules []*schema.SyntaxFlowRule
-	if dbRules, err := loadCustomDBBashSFRules(); err != nil {
-		log.Warnf("load custom bash SF rules failed: %v", err)
-	} else {
-		rules = append(rules, dbRules...)
-	}
-	rules = append(rules, loadCompiledCustomRegexSyntaxFlowRules()...)
-	rules = append(rules, loadRuntimeBashPermissionSyntaxFlowRules()...)
-	return rules
+	return best
 }
