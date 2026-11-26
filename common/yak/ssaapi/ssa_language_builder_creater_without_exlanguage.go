@@ -85,6 +85,13 @@ var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
 	ssaconfig.BASH: bash2ssa.CreateBuilder,
 }
 
+// BuilderCreatorFor returns the frontend factory for a language. This build
+// only registers the yak and bash frontends.
+func BuilderCreatorFor(language ssaconfig.Language) (ssa.CreateBuilder, bool) {
+	create, ok := LanguageBuilderCreater[ssaconfig.CanonicalLanguage(language)]
+	return create, ok
+}
+
 // ArchiveCodeSourceOpener opens a code source that is itself an archive.
 type ArchiveCodeSourceOpener func(local string, recursive bool) (fi.FileSystem, error)
 
