@@ -125,7 +125,7 @@ func TestGRPCMUSTPASS_RequestYakURL_BrowserExtensionV3Snapshot(t *testing.T) {
 	// Sign the v3 transcript independently of the engine's internal model.
 	transcript := strings.Join([]string{
 		"yak-browser-bridge-v3", "client-auth", origin, challenge.EngineIdentityID,
-		challenge.EngineInstanceID, challenge.Challenge, "installation-1", "extension", "1",
+		challenge.EngineInstanceID, challenge.Challenge, "installation-1", "extension", "",
 		"browser.tabs", "1", catalogHash, "task-1", "grant-1", "", "ytray", "instance-a", "A",
 	}, "\n")
 	digest := sha256.Sum256([]byte(transcript))
@@ -136,7 +136,7 @@ func TestGRPCMUSTPASS_RequestYakURL_BrowserExtensionV3Snapshot(t *testing.T) {
 	s.FillBytes(signature[32:])
 	require.NoError(t, connection.WriteJSON(map[string]any{
 		"type": "auth", "protocolVersion": 3, "challenge": challenge.Challenge,
-		"installationId": "installation-1", "client": "extension", "version": "1",
+		"installationId": "installation-1", "client": "extension",
 		"managedInstance": managed, "capabilities": []string{"browser.tabs"}, "capabilityCatalog": catalog,
 		"taskId": "task-1", "grantId": "grant-1", "signature": base64.RawURLEncoding.EncodeToString(signature),
 	}))
@@ -150,7 +150,7 @@ func TestGRPCMUSTPASS_RequestYakURL_BrowserExtensionV3Snapshot(t *testing.T) {
 	pairing := dial(strings.TrimSuffix(snapshot.URL, "/extension") + "/pairing")
 	require.NoError(t, pairing.WriteJSON(map[string]any{
 		"type": "pair_request", "protocolVersion": 3, "installationId": "installation-2",
-		"client": "extension", "version": "1", "publicKey": expectedDevice["publicKey"],
+		"client": "extension", "publicKey": expectedDevice["publicKey"],
 		"nonce": base64.RawURLEncoding.EncodeToString(make([]byte, 32)), "managedInstance": managed,
 	}))
 	var pending struct {
@@ -172,11 +172,12 @@ func TestGRPCMUSTPASS_RequestYakURL_BrowserExtensionV3Snapshot(t *testing.T) {
 	expectedStatus["connected"] = true
 	expectedStatus["connections"] = []map[string]any{{
 		"deviceId": "device-1", "installationId": "installation-1", "managedInstance": managed,
-		"client": "extension", "clientVersion": "1", "capabilities": []string{"browser.tabs"},
+		"client": "extension", "clientVersion": "unknown", "capabilities": []string{"browser.tabs"},
 		"sessionId": ack.SessionID, "connectionId": ack.ConnectionID,
 		"taskId": "task-1", "grantId": "grant-1", "connectedAt": snapshot.Connections[0].ConnectedAt,
 	}}
 	expectedDevice["lastSeenAt"] = snapshot.Devices[0].LastSeenAt
+	expectedDevice["clientVersion"] = "unknown"
 
 	// Frozen v3 fields are checked for every resource, including nested online
 	// connections, because shipped clients reject additional fields.
@@ -186,7 +187,7 @@ func TestGRPCMUSTPASS_RequestYakURL_BrowserExtensionV3Snapshot(t *testing.T) {
 	assertBrowserV3SnapshotJSON(t, expectedDevice, online["paired-device"])
 	assertBrowserV3SnapshotJSON(t, map[string]any{
 		"id": pending.RequestID, "installationId": "installation-2", "managedInstance": managed,
-		"extensionId": "extension-a", "client": "extension", "clientVersion": "1", "origin": origin,
+		"extensionId": "extension-a", "client": "extension", "clientVersion": "unknown", "origin": origin,
 		"code": pending.Code, "createdAt": snapshot.Pending[0].CreatedAt, "expiresAt": pending.ExpiresAt,
 	}, online["pairing-request"])
 

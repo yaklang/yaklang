@@ -221,7 +221,7 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 			InstallationID:  connection.InstallationID,
 			ManagedInstance: browserExtensionSnapshotInstance(connection.ManagedInstance),
 			Client:          connection.Client,
-			ClientVersion:   connection.ClientVersion,
+			ClientVersion:   browserExtensionSnapshotVersion(connection.ClientVersion),
 			Capabilities:    connection.Capabilities,
 			SessionID:       connection.SessionID,
 			ConnectionID:    connection.ConnectionID,
@@ -257,7 +257,7 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 			ManagedInstance: browserExtensionSnapshotInstance(pending.ManagedInstance),
 			ExtensionID:     pending.ExtensionID,
 			Client:          pending.Client,
-			ClientVersion:   pending.ClientVersion,
+			ClientVersion:   browserExtensionSnapshotVersion(pending.ClientVersion),
 			Origin:          pending.Origin,
 			Code:            pending.Code,
 			CreatedAt:       pending.CreatedAt,
@@ -271,7 +271,7 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 			InstallationID: device.InstallationID,
 			Name:           device.Name,
 			Client:         device.Client,
-			ClientVersion:  device.ClientVersion,
+			ClientVersion:  browserExtensionSnapshotVersion(device.ClientVersion),
 			Origin:         device.Origin,
 			PublicKey:      device.PublicKey,
 			CreatedAt:      device.CreatedAt,
@@ -280,6 +280,15 @@ func browserExtensionSnapshotResponse(manager *browser.ExtensionBridgeManager) (
 		resources = append(resources, browserExtensionResource("paired-device", paired.ID, paired.Name, paired, paired.LastSeenAt/1000))
 	}
 	return &ypb.RequestYakURLResponse{Page: 1, PageSize: int64(len(resources)), Total: int64(len(resources)), Resources: resources}, nil
+}
+
+// A v3 handshake may omit the client version. Released desktop decoders need
+// a non-empty string for the snapshot even when the browser did not report one.
+func browserExtensionSnapshotVersion(version string) string {
+	if strings.TrimSpace(version) == "" {
+		return "unknown"
+	}
+	return version
 }
 
 func browserExtensionResource(resourceType, name, verboseName string, value interface{}, modified int64) *ypb.YakURLResource {

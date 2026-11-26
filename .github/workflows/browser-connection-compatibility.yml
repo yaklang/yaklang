@@ -1,0 +1,86 @@
+name: Browser Connection Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-connection-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-browser-connection:
+    name: Browser Connection Compatibility (Windows)
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Set fixture paths
+        shell: pwsh
+        run: |
+          "BROWSER_CONNECTION_FIXTURES=$env:RUNNER_TEMP/browser-connection-fixtures" >> $env:GITHUB_ENV
+          "BROWSER_CONNECTION_DOWNLOADS=$env:RUNNER_TEMP/browser-connection-downloads" >> $env:GITHUB_ENV
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.21.1'
+          cache: npm
+          cache-dependency-path: scripts/ci/browser-connection/package-lock.json
+
+      - name: Restore pinned release downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BROWSER_CONNECTION_DOWNLOADS }}
+          key: windows-browser-connection-releases-${{ hashFiles('scripts/ci/browser-connection/prepare.ps1') }}
+
+      - name: Prepare the released Memfit decoder, engines and browser plugins
+        shell: pwsh
+        run: |
+          ./scripts/ci/browser-connection/prepare.ps1 -Directory $env:BROWSER_CONNECTION_FIXTURES -Downloads $env:BROWSER_CONNECTION_DOWNLOADS
+
+      - name: Install the pinned Chromium test harness
+        working-directory: scripts/ci/browser-connection
+        shell: pwsh
+        run: |
+          npm ci --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install playwright-core install chromium --no-shell
+
+      - name: Build the Windows engine from this revision
+        shell: pwsh
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          Get-Command gcc -ErrorAction Stop
+          $exe = Join-Path $env:BROWSER_CONNECTION_FIXTURES 'candidate-yak.exe'
+          go build -p 3 -trimpath -ldflags '-s -w -X main.yakVersion=1.4.9-ci-browser-compat' -o $exe common/yak/cmd/yak.go
+          & $exe version
+
+      - name: Verify released plugins and Memfit with the candidate engine
+        working-directory: scripts/ci/browser-connection
+        shell: pwsh
+        run: node check.mjs $env:BROWSER_CONNECTION_FIXTURES
+
+      - name: Upload isolated engine diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-connection-logs-${{ github.run_attempt }}
+          path: ${{ env.BROWSER_CONNECTION_FIXTURES }}/run-*/logs/*.log
+          if-no-files-found: ignore
+          retention-days: 5
