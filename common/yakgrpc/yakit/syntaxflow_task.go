@@ -70,7 +70,15 @@ func DeleteSyntaxFlowScanTask(db *gorm.DB, params *ypb.DeleteSyntaxFlowScanTaskR
 }
 
 // GetMaxScanBatch 获取指定程序的最大扫描批次号
+//
+// A nil database is an expected state, not a caller bug: ssadb.GetDB() returns
+// nil for the whole process when the shared IR database was unreachable at
+// init. Report it so the caller can fall back to batch 1 instead of
+// dereferencing a nil *gorm.DB.
 func GetMaxScanBatch(db *gorm.DB, programs []string) (uint64, error) {
+	if db == nil {
+		return 0, utils.Error("get max scan batch: database is nil")
+	}
 	var result struct {
 		MaxBatch uint64 `json:"max_batch"`
 	}

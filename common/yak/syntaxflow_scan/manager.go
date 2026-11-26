@@ -154,6 +154,10 @@ func (m *scanManager) GetConcurrency() uint32 {
 }
 
 // setScanBatch 设置扫描批次号
+//
+// The batch number only names the task row. If the SSA database is
+// unavailable the lookup reports an error and the scan keeps running with
+// batch 1 instead of aborting before its first rule.
 func (m *scanManager) setScanBatch() {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
@@ -257,7 +261,11 @@ func (m *scanManager) captureTaskSnapshot(withLevelCounts bool) *schema.SyntaxFl
 
 func (m *scanManager) RestoreTask() error {
 	// load info
-	task, err := schema.GetSyntaxFlowScanTaskById(ssadb.GetDB(), m.TaskId())
+	db := ssadb.GetDB()
+	if db == nil {
+		return utils.Errorf("Resume SyntaxFlow task by [%s] is failed: database is nil", m.TaskId())
+	}
+	task, err := schema.GetSyntaxFlowScanTaskById(db, m.TaskId())
 	if err != nil {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by [%s] is failed", m.TaskId())
 	}
