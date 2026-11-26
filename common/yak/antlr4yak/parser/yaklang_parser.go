@@ -1079,16 +1079,6 @@ func (s *ProgramContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ProgramContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitProgram(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) Program() (localctx IProgramContext) {
 	this := p
 	_ = this
@@ -1245,16 +1235,6 @@ func (s *StatementListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StatementListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StatementListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitStatementList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) StatementList() (localctx IStatementListContext) {
@@ -1716,16 +1696,6 @@ func (s *StatementContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *StatementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitStatement(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) Statement() (localctx IStatementContext) {
 	this := p
 	_ = this
@@ -2068,16 +2038,6 @@ func (s *TryStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TryStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTryStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TryStmt() (localctx ITryStmtContext) {
 	this := p
 	_ = this
@@ -2235,16 +2195,6 @@ func (s *ExpressionStmtContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitExpressionStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) ExpressionStmt() (localctx IExpressionStmtContext) {
 	this := p
 	_ = this
@@ -2340,16 +2290,6 @@ func (s *AssignExpressionStmtContext) ToStringTree(ruleNames []string, recog ant
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitAssignExpressionStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) AssignExpressionStmt() (localctx IAssignExpressionStmtContext) {
 	this := p
 	_ = this
@@ -2436,16 +2376,6 @@ func (s *LineCommentStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LineCommentStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LineCommentStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitLineCommentStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) LineCommentStmt() (localctx ILineCommentStmtContext) {
@@ -2543,16 +2473,6 @@ func (s *IncludeStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *IncludeStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *IncludeStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitIncludeStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) IncludeStmt() (localctx IIncludeStmtContext) {
@@ -2701,16 +2621,6 @@ func (s *DeferStmtContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeferStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitDeferStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) DeferStmt() (localctx IDeferStmtContext) {
 	this := p
 	_ = this
@@ -2841,16 +2751,6 @@ func (s *GoStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *GoStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *GoStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitGoStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) GoStmt() (localctx IGoStmtContext) {
@@ -2997,16 +2897,6 @@ func (s *AssertStmtContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssertStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitAssertStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) AssertStmt() (localctx IAssertStmtContext) {
 	this := p
 	_ = this
@@ -3128,16 +3018,6 @@ func (s *FallthroughStmtContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FallthroughStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFallthroughStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) FallthroughStmt() (localctx IFallthroughStmtContext) {
 	this := p
 	_ = this
@@ -3225,16 +3105,6 @@ func (s *BreakStmtContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BreakStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitBreakStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) BreakStmt() (localctx IBreakStmtContext) {
 	this := p
 	_ = this
@@ -3320,16 +3190,6 @@ func (s *ContinueStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ContinueStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ContinueStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitContinueStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ContinueStmt() (localctx IContinueStmtContext) {
@@ -3434,16 +3294,6 @@ func (s *ReturnStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ReturnStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ReturnStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitReturnStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ReturnStmt() (localctx IReturnStmtContext) {
@@ -3578,16 +3428,6 @@ func (s *CallExprContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CallExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitCallExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) CallExpr() (localctx ICallExprContext) {
 	this := p
 	_ = this
@@ -3700,16 +3540,6 @@ func (s *FunctionCallExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FunctionCallExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionCallExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFunctionCallExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) FunctionCallExpr() (localctx IFunctionCallExprContext) {
@@ -3854,16 +3684,6 @@ func (s *ForStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ForStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ForStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitForStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ForStmt() (localctx IForStmtContext) {
@@ -4057,16 +3877,6 @@ func (s *ForStmtCondContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ForStmtCondContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitForStmtCond(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) ForStmtCond() (localctx IForStmtCondContext) {
 	this := p
 	_ = this
@@ -4233,16 +4043,6 @@ func (s *ForFirstExprContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ForFirstExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitForFirstExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) ForFirstExpr() (localctx IForFirstExprContext) {
 	this := p
 	_ = this
@@ -4372,16 +4172,6 @@ func (s *ForThirdExprContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ForThirdExprContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ForThirdExprContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitForThirdExpr(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ForThirdExpr() (localctx IForThirdExprContext) {
@@ -4555,16 +4345,6 @@ func (s *ForRangeStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ForRangeStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ForRangeStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitForRangeStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ForRangeStmt() (localctx IForRangeStmtContext) {
@@ -4917,16 +4697,6 @@ func (s *SwitchStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SwitchStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SwitchStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSwitchStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) SwitchStmt() (localctx ISwitchStmtContext) {
@@ -5287,16 +5057,6 @@ func (s *PanicStmtContext) ToStringTree(ruleNames []string, recog antlr.Recogniz
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *PanicStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitPanicStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) PanicStmt() (localctx IPanicStmtContext) {
 	this := p
 	_ = this
@@ -5454,16 +5214,6 @@ func (s *RecoverStmtContext) GetRuleContext() antlr.RuleContext {
 
 func (s *RecoverStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *RecoverStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitRecoverStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) RecoverStmt() (localctx IRecoverStmtContext) {
@@ -5704,16 +5454,6 @@ func (s *IfStmtContext) ToStringTree(ruleNames []string, recog antlr.Recognizer)
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IfStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitIfStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) IfStmt() (localctx IIfStmtContext) {
 	this := p
 	_ = this
@@ -5928,16 +5668,6 @@ func (s *IfStmtInitContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *IfStmtInitContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitIfStmtInit(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) IfStmtInit() (localctx IIfStmtInitContext) {
 	this := p
 	_ = this
@@ -6079,16 +5809,6 @@ func (s *ElseBlockContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ElseBlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ElseBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitElseBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ElseBlock() (localctx IElseBlockContext) {
@@ -6264,16 +5984,6 @@ func (s *BlockContext) GetRuleContext() antlr.RuleContext {
 
 func (s *BlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *BlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitBlock(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) Block() (localctx IBlockContext) {
@@ -6456,16 +6166,6 @@ func (s *EmptyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *EmptyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitEmpty(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) Empty() (localctx IEmptyContext) {
 	this := p
 	_ = this
@@ -6632,16 +6332,6 @@ func (s *InplaceAssignOperatorContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InplaceAssignOperatorContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InplaceAssignOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitInplaceAssignOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) InplaceAssignOperator() (localctx IInplaceAssignOperatorContext) {
@@ -6836,16 +6526,6 @@ func (s *AssignExpressionContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *AssignExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitAssignExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) AssignExpression() (localctx IAssignExpressionContext) {
 	this := p
 	_ = this
@@ -7003,16 +6683,6 @@ func (s *DeclareVariableExpressionStmtContext) ToStringTree(ruleNames []string, 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *DeclareVariableExpressionStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitDeclareVariableExpressionStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) DeclareVariableExpressionStmt() (localctx IDeclareVariableExpressionStmtContext) {
 	this := p
 	_ = this
@@ -7123,16 +6793,6 @@ func (s *DeclareVariableExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DeclareVariableExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DeclareVariableExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitDeclareVariableExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) DeclareVariableExpression() (localctx IDeclareVariableExpressionContext) {
@@ -7255,16 +6915,6 @@ func (s *DeclareVariableOnlyContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DeclareVariableOnlyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DeclareVariableOnlyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitDeclareVariableOnly(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) DeclareVariableOnly() (localctx IDeclareVariableOnlyContext) {
@@ -7438,16 +7088,6 @@ func (s *DeclareAndAssignExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *DeclareAndAssignExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *DeclareAndAssignExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitDeclareAndAssignExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) DeclareAndAssignExpression() (localctx IDeclareAndAssignExpressionContext) {
@@ -7649,16 +7289,6 @@ func (s *LeftExpressionListContext) ToStringTree(ruleNames []string, recog antlr
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LeftExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitLeftExpressionList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) LeftExpressionList() (localctx ILeftExpressionListContext) {
 	this := p
 	_ = this
@@ -7842,16 +7472,6 @@ func (s *UnaryOperatorContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *UnaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitUnaryOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) UnaryOperator() (localctx IUnaryOperatorContext) {
 	this := p
 	_ = this
@@ -7969,16 +7589,6 @@ func (s *BitBinaryOperatorContext) ToStringTree(ruleNames []string, recog antlr.
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BitBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitBitBinaryOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) BitBinaryOperator() (localctx IBitBinaryOperatorContext) {
 	this := p
 	_ = this
@@ -8074,16 +7684,6 @@ func (s *AdditiveBinaryOperatorContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AdditiveBinaryOperatorContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AdditiveBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitAdditiveBinaryOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) AdditiveBinaryOperator() (localctx IAdditiveBinaryOperatorContext) {
@@ -8186,16 +7786,6 @@ func (s *MultiplicativeBinaryOperatorContext) GetRuleContext() antlr.RuleContext
 
 func (s *MultiplicativeBinaryOperatorContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *MultiplicativeBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMultiplicativeBinaryOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) MultiplicativeBinaryOperator() (localctx IMultiplicativeBinaryOperatorContext) {
@@ -8320,16 +7910,6 @@ func (s *ComparisonBinaryOperatorContext) ToStringTree(ruleNames []string, recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ComparisonBinaryOperatorContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitComparisonBinaryOperator(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) ComparisonBinaryOperator() (localctx IComparisonBinaryOperatorContext) {
 	this := p
 	_ = this
@@ -8437,16 +8017,6 @@ func (s *LeftExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LeftExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LeftExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitLeftExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) LeftExpression() (localctx ILeftExpressionContext) {
@@ -8956,16 +8526,6 @@ func (s *ExpressionContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ExpressionContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) Expression() (localctx IExpressionContext) {
@@ -9750,16 +9310,6 @@ func (s *ParenExpressionContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ParenExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitParenExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) ParenExpression() (localctx IParenExpressionContext) {
 	this := p
 	_ = this
@@ -10012,16 +9562,6 @@ func (s *MakeExpressionContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MakeExpressionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMakeExpression(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) MakeExpression() (localctx IMakeExpressionContext) {
 	this := p
 	_ = this
@@ -10259,16 +9799,6 @@ func (s *TypeLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTypeLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TypeLiteral() (localctx ITypeLiteralContext) {
 	this := p
 	_ = this
@@ -10442,16 +9972,6 @@ func (s *SliceTypeLiteralContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SliceTypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSliceTypeLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) SliceTypeLiteral() (localctx ISliceTypeLiteralContext) {
 	this := p
 	_ = this
@@ -10604,16 +10124,6 @@ func (s *MapTypeLiteralContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MapTypeLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMapTypeLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) MapTypeLiteral() (localctx IMapTypeLiteralContext) {
 	this := p
 	_ = this
@@ -10742,16 +10252,6 @@ func (s *FuncTypeRefContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FuncTypeRefContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFuncTypeRef(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) FuncTypeRef() (localctx IFuncTypeRefContext) {
 	this := p
 	_ = this
@@ -10874,16 +10374,6 @@ func (s *InstanceCodeContext) GetRuleContext() antlr.RuleContext {
 
 func (s *InstanceCodeContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *InstanceCodeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitInstanceCode(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) InstanceCode() (localctx IInstanceCodeContext) {
@@ -11123,16 +10613,6 @@ func (s *AnonymousFunctionDeclContext) GetRuleContext() antlr.RuleContext {
 
 func (s *AnonymousFunctionDeclContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *AnonymousFunctionDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitAnonymousFunctionDecl(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) AnonymousFunctionDecl() (localctx IAnonymousFunctionDeclContext) {
@@ -11434,16 +10914,6 @@ func (s *FunctionNameDeclContext) ToStringTree(ruleNames []string, recog antlr.R
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FunctionNameDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFunctionNameDecl(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) FunctionNameDecl() (localctx IFunctionNameDeclContext) {
 	this := p
 	_ = this
@@ -11625,16 +11095,6 @@ func (s *FunctionParamDeclContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FunctionParamDeclContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionParamDeclContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFunctionParamDecl(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) FunctionParamDecl() (localctx IFunctionParamDeclContext) {
@@ -11962,16 +11422,6 @@ func (s *FunctionParamContext) ToStringTree(ruleNames []string, recog antlr.Reco
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FunctionParamContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFunctionParam(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) FunctionParam() (localctx IFunctionParamContext) {
 	this := p
 	_ = this
@@ -12192,16 +11642,6 @@ func (s *FunctionResultTypeContext) GetRuleContext() antlr.RuleContext {
 
 func (s *FunctionResultTypeContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *FunctionResultTypeContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFunctionResultType(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) FunctionResultType() (localctx IFunctionResultTypeContext) {
@@ -12469,16 +11909,6 @@ func (s *FunctionCallContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *FunctionCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitFunctionCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) FunctionCall() (localctx IFunctionCallContext) {
 	this := p
 	_ = this
@@ -12700,16 +12130,6 @@ func (s *OrdinaryArgumentsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *OrdinaryArgumentsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *OrdinaryArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitOrdinaryArguments(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) OrdinaryArguments() (localctx IOrdinaryArgumentsContext) {
@@ -12987,16 +12407,6 @@ func (s *MemberCallContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MemberCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMemberCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) MemberCall() (localctx IMemberCallContext) {
 	this := p
 	_ = this
@@ -13153,16 +12563,6 @@ func (s *SliceCallContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SliceCallContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SliceCallContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSliceCall(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) SliceCall() (localctx ISliceCallContext) {
@@ -13568,16 +12968,6 @@ func (s *LiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *LiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) Literal() (localctx ILiteralContext) {
 	this := p
 	_ = this
@@ -13756,16 +13146,6 @@ func (s *NumericLiteralContext) ToStringTree(ruleNames []string, recog antlr.Rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *NumericLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitNumericLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) NumericLiteral() (localctx INumericLiteralContext) {
 	this := p
 	_ = this
@@ -13915,16 +13295,6 @@ func (s *StringLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *StringLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *StringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitStringLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) StringLiteral() (localctx IStringLiteralContext) {
@@ -14131,16 +13501,6 @@ func (s *CrlfHereDocContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *CrlfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitCrlfHereDoc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) CrlfHereDoc() (localctx ICrlfHereDocContext) {
 	this := p
 	_ = this
@@ -14249,16 +13609,6 @@ func (s *LfHereDocContext) GetRuleContext() antlr.RuleContext {
 
 func (s *LfHereDocContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *LfHereDocContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitLfHereDoc(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) LfHereDoc() (localctx ILfHereDocContext) {
@@ -14412,16 +13762,6 @@ func (s *TemplateSingleQuoteStringLiteralContext) GetRuleContext() antlr.RuleCon
 
 func (s *TemplateSingleQuoteStringLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TemplateSingleQuoteStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateSingleQuoteStringLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) TemplateSingleQuoteStringLiteral() (localctx ITemplateSingleQuoteStringLiteralContext) {
@@ -14589,16 +13929,6 @@ func (s *TemplateDoubleQuoteStringLiteralContext) ToStringTree(ruleNames []strin
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateDoubleQuoteStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateDoubleQuoteStringLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TemplateDoubleQuoteStringLiteral() (localctx ITemplateDoubleQuoteStringLiteralContext) {
 	this := p
 	_ = this
@@ -14764,16 +14094,6 @@ func (s *TemplateBackTickStringLiteralContext) ToStringTree(ruleNames []string, 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateBackTickStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateBackTickStringLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TemplateBackTickStringLiteral() (localctx ITemplateBackTickStringLiteralContext) {
 	this := p
 	_ = this
@@ -14937,16 +14257,6 @@ func (s *TemplateStringLiteralContext) ToStringTree(ruleNames []string, recog an
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateStringLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateStringLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TemplateStringLiteral() (localctx ITemplateStringLiteralContext) {
 	this := p
 	_ = this
@@ -15087,16 +14397,6 @@ func (s *TemplateSingleQuoteStringAtomContext) GetRuleContext() antlr.RuleContex
 
 func (s *TemplateSingleQuoteStringAtomContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TemplateSingleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateSingleQuoteStringAtom(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) TemplateSingleQuoteStringAtom() (localctx ITemplateSingleQuoteStringAtomContext) {
@@ -15278,16 +14578,6 @@ func (s *TemplateDoubleQuoteStringAtomContext) ToStringTree(ruleNames []string, 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateDoubleQuoteStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateDoubleQuoteStringAtom(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TemplateDoubleQuoteStringAtom() (localctx ITemplateDoubleQuoteStringAtomContext) {
 	this := p
 	_ = this
@@ -15467,16 +14757,6 @@ func (s *TemplateBackTickStringAtomContext) ToStringTree(ruleNames []string, rec
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *TemplateBackTickStringAtomContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitTemplateBackTickStringAtom(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) TemplateBackTickStringAtom() (localctx ITemplateBackTickStringAtomContext) {
 	this := p
 	_ = this
@@ -15629,16 +14909,6 @@ func (s *BoolLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recogn
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *BoolLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitBoolLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) BoolLiteral() (localctx IBoolLiteralContext) {
 	this := p
 	_ = this
@@ -15729,16 +14999,6 @@ func (s *CharacterLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *CharacterLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *CharacterLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitCharacterLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) CharacterLiteral() (localctx ICharacterLiteralContext) {
@@ -15891,16 +15151,6 @@ func (s *SliceLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SliceLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SliceLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSliceLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) SliceLiteral() (localctx ISliceLiteralContext) {
@@ -16148,16 +15398,6 @@ func (s *SliceTypedLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SliceTypedLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SliceTypedLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSliceTypedLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) SliceTypedLiteral() (localctx ISliceTypedLiteralContext) {
@@ -16441,16 +15681,6 @@ func (s *ExpressionListContext) GetRuleContext() antlr.RuleContext {
 
 func (s *ExpressionListContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *ExpressionListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitExpressionList(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) ExpressionList() (localctx IExpressionListContext) {
@@ -16746,16 +15976,6 @@ func (s *ExpressionListMultilineContext) ToStringTree(ruleNames []string, recog 
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *ExpressionListMultilineContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitExpressionListMultiline(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) ExpressionListMultiline() (localctx IExpressionListMultilineContext) {
 	this := p
 	_ = this
@@ -17001,16 +16221,6 @@ func (s *MapLiteralContext) GetRuleContext() antlr.RuleContext {
 
 func (s *MapLiteralContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *MapLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMapLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) MapLiteral() (localctx IMapLiteralContext) {
@@ -17298,16 +16508,6 @@ func (s *MapTypedLiteralContext) ToStringTree(ruleNames []string, recog antlr.Re
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MapTypedLiteralContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMapTypedLiteral(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) MapTypedLiteral() (localctx IMapTypedLiteralContext) {
 	this := p
 	_ = this
@@ -17581,16 +16781,6 @@ func (s *MapPairsContext) ToStringTree(ruleNames []string, recog antlr.Recognize
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MapPairsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMapPairs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) MapPairs() (localctx IMapPairsContext) {
 	this := p
 	_ = this
@@ -17794,16 +16984,6 @@ func (s *MapPairContext) ToStringTree(ruleNames []string, recog antlr.Recognizer
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MapPairContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitMapPair(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) MapPair() (localctx IMapPairContext) {
 	this := p
 	_ = this
@@ -17922,16 +17102,6 @@ func (s *WsContext) GetRuleContext() antlr.RuleContext {
 
 func (s *WsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *WsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitWs(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) Ws() (localctx IWsContext) {
@@ -18068,16 +17238,6 @@ func (s *EosContext) GetRuleContext() antlr.RuleContext {
 
 func (s *EosContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *EosContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitEos(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) Eos() (localctx IEosContext) {
@@ -18338,16 +17498,6 @@ func (s *SelectStmtContext) ToStringTree(ruleNames []string, recog antlr.Recogni
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SelectStmtContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSelectStmt(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) SelectStmt() (localctx ISelectStmtContext) {
 	this := p
 	_ = this
@@ -18590,16 +17740,6 @@ func (s *SelectClauseContext) ToStringTree(ruleNames []string, recog antlr.Recog
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *SelectClauseContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSelectClause(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 func (p *YaklangParser) SelectClause() (localctx ISelectClauseContext) {
 	this := p
 	_ = this
@@ -18761,16 +17901,6 @@ func (s *SelectCommContext) GetRuleContext() antlr.RuleContext {
 
 func (s *SelectCommContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *SelectCommContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case YaklangParserVisitor:
-		return t.VisitSelectComm(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
 }
 
 func (p *YaklangParser) SelectComm() (localctx ISelectCommContext) {
