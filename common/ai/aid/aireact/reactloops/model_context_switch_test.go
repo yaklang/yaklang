@@ -83,22 +83,33 @@ func TestModelContextTOCTOUPinsPromptGatewayAndCompression(t *testing.T) {
 			selectContextTestModel(a)
 			_, cfg := newPromptOverflowRetryTestLoop(t, aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1))
 			require.NoError(t, aicommon.WithTieredAICallback(false)(cfg))
-			route := cfg.GetRawAICallbacks().QualityPriorityRaw
-			require.NotNil(t, route)
+			routeFactory := cfg.GetRawAICallbacks().QualityPriorityRaw
+			require.NotNil(t, routeFactory)
 			requestReady, allowRequest := make(chan struct{}), make(chan struct{})
 			var pauseOnce, releaseOnce sync.Once
 			release := func() { releaseOnce.Do(func() { close(allowRequest) }) }
 			t.Cleanup(release)
-			require.NoError(t, aicommon.WithQualityPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				pauseOnce.Do(func() {
-					close(requestReady)
-					select {
-					case <-allowRequest:
-					case <-c.GetContext().Done():
-					}
-				})
-				return route(c, req)
-			})(cfg))
+			// Wrap at the factory level so the model snapshot still reaches the
+			// tier route. The pause happens after generation and before the
+			// request, which is exactly the check/use gap the snapshot closes.
+			raw := cfg.GetRawAICallbacks()
+			raw.QualityPriorityRaw = func(model *ypb.AIModelConfig) (aicommon.AICallbackType, error) {
+				route, err := routeFactory(model)
+				if err != nil || route == nil {
+					return route, err
+				}
+				return func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					pauseOnce.Do(func() {
+						close(requestReady)
+						select {
+						case <-allowRequest:
+						case <-c.GetContext().Done():
+						}
+					})
+					return route(c, req)
+				}, nil
+			}
+			require.NoError(t, aicommon.WithAICallbacks(raw)(cfg))
 			if tc.childMode != "" {
 				cfg = newModelContextTestSubAgent(t, cfg, tc.childMode)
 			}

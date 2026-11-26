@@ -103,6 +103,31 @@ func MustGetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, prov
 	return callback
 }
 
+// AICallbackFactory generates the callback for one routing decision.
+//
+// Config stores factories instead of live callbacks so a consumer can pick the
+// generation point. The main ReAct round generates once from the same model
+// snapshot that sized its prompt, holds the result, and sends every request of
+// that round through it. A hot-patch or tier switch after generation therefore
+// cannot desynchronize prompt budget and actual routing.
+//
+// model is the caller's pinned snapshot. A nil model lets the generated
+// callback consult the latest tier configuration at invocation time; callers
+// that size prompts must pass their snapshot so both sides describe one model.
+type AICallbackFactory func(model *ypb.AIModelConfig) (AICallbackType, error)
+
+// FixedAICallbackFactory adapts a callback whose routing does not depend on a
+// tier configuration. A nil callback produces a nil factory so callers keep
+// the existing "not configured" semantics.
+func FixedAICallbackFactory(cb AICallbackType) AICallbackFactory {
+	if cb == nil {
+		return nil
+	}
+	return func(*ypb.AIModelConfig) (AICallbackType, error) {
+		return cb, nil
+	}
+}
+
 // resolveTierCallbackMode fixes the callback role at construction. The bool is
 // supplied by Config initialization; without it, only the global mode applies.
 func resolveTierCallbackMode(modes ...bool) bool {
@@ -129,38 +154,54 @@ func resolveTierModelConfig(tier consts.ModelTier, single bool) (*ypb.AIModelCon
 	return config, nil
 }
 
-// newTierAIModelCallback performs the complete tier callback setup:
-// check routing availability, combine the requested tier with the explicit
-// single-model flag, then build an invocation callback. Quality prompts can
-// carry their model snapshot; other calls read the latest config in that tier.
-func newTierAIModelCallback(tier consts.ModelTier, modes ...bool) (AICallbackType, error) {
+// newTierAICallbackFactory performs the complete tier callback setup: check
+// routing availability, remember the explicit single-model flag, then return a
+// generator. The concrete model is resolved when a callback is generated, so
+// each ReAct round can pin the quality route without freezing auxiliary tiers.
+func newTierAICallbackFactory(tier consts.ModelTier, modes ...bool) (AICallbackFactory, error) {
 	single := resolveTierCallbackMode(modes...)
 	if !single && !aiconfig.IsTieredAIConfig() {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
-	return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
-		config := request.GetImageModel()
-		if tier == consts.TierIntelligent && request != nil && request.qualityModelConfig != nil {
-			config = request.qualityModelConfig
+	return func(model *ypb.AIModelConfig) (AICallbackType, error) {
+		// A pinned snapshot is authoritative for the quality tier. Build the
+		// callback now so its budget identity and provider options are fixed to
+		// the same configuration even if the global tier changes later.
+		if tier == consts.TierIntelligent && model != nil {
+			return CreateCallbackFromConfigWithExtraOpts(model)
 		}
-		if config == nil {
-			var err error
-			config, err = resolveTierModelConfig(tier, single)
+		return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
+			config := request.GetImageModel()
+			if tier == consts.TierIntelligent && request != nil && request.qualityModelConfig != nil {
+				config = request.qualityModelConfig
+			}
+			if config == nil {
+				var err error
+				config, err = resolveTierModelConfig(tier, single)
+				if err != nil {
+					return nil, err
+				}
+			}
+			callback, err := CreateCallbackFromConfigWithExtraOpts(config, extractUserUsageCallbackOpts(caller)...)
 			if err != nil {
 				return nil, err
 			}
-		}
-		callback, err := CreateCallbackFromConfigWithExtraOpts(config, extractUserUsageCallbackOpts(caller)...)
-		if err != nil {
-			return nil, err
-		}
-		return callback(caller, request)
+			return callback(caller, request)
+		}, nil
 	}, nil
+}
+
+func generateTierAICallback(tier consts.ModelTier, modes ...bool) (AICallbackType, error) {
+	factory, err := newTierAICallbackFactory(tier, modes...)
+	if err != nil {
+		return nil, err
+	}
+	return factory(nil)
 }
 
 // GetIntelligentAIModelCallback returns the AI callback for intelligent (high-quality) models.
 func GetIntelligentAIModelCallback(modes ...bool) (AICallbackType, error) {
-	return newTierAIModelCallback(consts.TierIntelligent, modes...)
+	return generateTierAICallback(consts.TierIntelligent, modes...)
 }
 
 func GetIntelligentAIModelInfo(modes ...bool) (string, string, error) {
@@ -177,12 +218,12 @@ func GetIntelligentAIModelInfo(modes ...bool) (string, string, error) {
 
 // GetLightweightAIModelCallback returns the AI callback for lightweight models.
 func GetLightweightAIModelCallback(modes ...bool) (AICallbackType, error) {
-	return newTierAIModelCallback(consts.TierLightweight, modes...)
+	return generateTierAICallback(consts.TierLightweight, modes...)
 }
 
 // GetVisionAIModelCallback returns the AI callback for vision models.
 func GetVisionAIModelCallback(modes ...bool) (AICallbackType, error) {
-	return newTierAIModelCallback(consts.TierVision, modes...)
+	return generateTierAICallback(consts.TierVision, modes...)
 }
 
 // GetDefaultAIModelCallback returns the callback selected by the current policy.
@@ -191,7 +232,7 @@ func GetDefaultAIModelCallback(modes ...bool) (AICallbackType, error) {
 	if aiconfig.GetCurrentPolicy() == consts.PolicyPerformance {
 		tier = consts.TierIntelligent
 	}
-	return newTierAIModelCallback(tier, modes...)
+	return generateTierAICallback(tier, modes...)
 }
 
 // GetAIModelCallbackByTierAndProviderAndModel preserves the legacy explicit

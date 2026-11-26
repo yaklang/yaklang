@@ -496,14 +496,14 @@ type Config struct {
 	artifactsPinned bool
 }
 
+// AICallbacks stores callback generators, not live callbacks. Wrapped tier
+// callbacks are derived lazily by Config.wrapper so consumption accounting is
+// always attached to the config that actually issues the request.
 type AICallbacks struct {
-	Original           AICallbackType
-	QualityPriorityRaw AICallbackType
-	SpeedPriorityRaw   AICallbackType
-	VisionPriorityRaw  AICallbackType
-	QualityPriority    AICallbackType
-	SpeedPriority      AICallbackType
-	VisionPriority     AICallbackType
+	Original           AICallbackFactory
+	QualityPriorityRaw AICallbackFactory
+	SpeedPriorityRaw   AICallbackFactory
+	VisionPriorityRaw  AICallbackFactory
 }
 
 func (callbacks *AICallbacks) RawClone() *AICallbacks {
@@ -525,38 +525,57 @@ func (c *Config) ensureAICallbacks() *AICallbacks {
 	return c.AICallbacks
 }
 
+// snapshotAICallbacks copies the factory set so a generation is not affected by
+// a concurrent option application that replaces one of the fields.
+func (c *Config) snapshotAICallbacks() AICallbacks {
+	if c == nil || c.AICallbacks == nil {
+		return AICallbacks{}
+	}
+	return *c.AICallbacks
+}
+
 func (c *Config) setOriginalAICallbackLocked(cb AICallbackType) {
-	callbacks := c.ensureAICallbacks()
-	callbacks.Original = cb
+	c.setOriginalAICallbackFactoryLocked(FixedAICallbackFactory(cb))
 }
 
 func (c *Config) setQualityPriorityAICallbackLocked(cb AICallbackType) {
-	callbacks := c.ensureAICallbacks()
-	callbacks.QualityPriorityRaw = cb
-	callbacks.QualityPriority = c.wrapper(cb, consts.TierIntelligent)
+	c.setQualityPriorityAICallbackFactoryLocked(FixedAICallbackFactory(cb))
 }
 
 func (c *Config) setSpeedPriorityAICallbackLocked(cb AICallbackType) {
-	callbacks := c.ensureAICallbacks()
-	callbacks.SpeedPriorityRaw = cb
-	callbacks.SpeedPriority = c.wrapper(cb, consts.TierLightweight)
+	c.setSpeedPriorityAICallbackFactoryLocked(FixedAICallbackFactory(cb))
 }
 
 func (c *Config) setVisionPriorityAICallbackLocked(cb AICallbackType) {
+	c.setVisionPriorityAICallbackFactoryLocked(FixedAICallbackFactory(cb))
+}
+
+func (c *Config) setOriginalAICallbackFactoryLocked(factory AICallbackFactory) {
 	callbacks := c.ensureAICallbacks()
-	callbacks.VisionPriorityRaw = cb
-	callbacks.VisionPriority = c.wrapper(cb, consts.TierVision)
+	callbacks.Original = factory
+}
+
+func (c *Config) setQualityPriorityAICallbackFactoryLocked(factory AICallbackFactory) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.QualityPriorityRaw = factory
+}
+
+func (c *Config) setSpeedPriorityAICallbackFactoryLocked(factory AICallbackFactory) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.SpeedPriorityRaw = factory
+}
+
+func (c *Config) setVisionPriorityAICallbackFactoryLocked(factory AICallbackFactory) {
+	callbacks := c.ensureAICallbacks()
+	callbacks.VisionPriorityRaw = factory
 }
 
 func (c *Config) setFastAICallbackLocked(cb AICallbackType) {
 	callbacks := c.ensureAICallbacks()
-	callbacks.Original = cb
+	callbacks.Original = FixedAICallbackFactory(cb)
 	callbacks.QualityPriorityRaw = nil
 	callbacks.SpeedPriorityRaw = nil
 	callbacks.VisionPriorityRaw = nil
-	callbacks.QualityPriority = nil
-	callbacks.SpeedPriority = nil
-	callbacks.VisionPriority = nil
 }
 
 func (c *Config) setAICallbacksLocked(callbacks *AICallbacks) {
@@ -564,10 +583,10 @@ func (c *Config) setAICallbacksLocked(callbacks *AICallbacks) {
 	if callbacks == nil {
 		return
 	}
-	c.setOriginalAICallbackLocked(callbacks.Original)
-	c.setQualityPriorityAICallbackLocked(callbacks.QualityPriorityRaw)
-	c.setSpeedPriorityAICallbackLocked(callbacks.SpeedPriorityRaw)
-	c.setVisionPriorityAICallbackLocked(callbacks.VisionPriorityRaw)
+	c.setOriginalAICallbackFactoryLocked(callbacks.Original)
+	c.setQualityPriorityAICallbackFactoryLocked(callbacks.QualityPriorityRaw)
+	c.setSpeedPriorityAICallbackFactoryLocked(callbacks.SpeedPriorityRaw)
+	c.setVisionPriorityAICallbackFactoryLocked(callbacks.VisionPriorityRaw)
 }
 
 func (c *Config) GetRawAICallbacks() *AICallbacks {
@@ -577,60 +596,91 @@ func (c *Config) GetRawAICallbacks() *AICallbacks {
 	return c.ensureAICallbacks().RawClone()
 }
 
+// generateAICallback resolves one factory. A nil factory means "not
+// configured"; a generation error is surfaced to the caller instead of being
+// hidden behind a fallback tier.
+func generateAICallback(factory AICallbackFactory, model *ypb.AIModelConfig) (AICallbackType, error) {
+	if factory == nil {
+		return nil, nil
+	}
+	return factory(model)
+}
+
 func (c *Config) GetOriginalAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.Original
+	cb, err := generateAICallback(c.snapshotAICallbacks().Original, nil)
+	if err != nil {
+		return nil
+	}
+	return cb
 }
 
 func (c *Config) GetQualityPriorityAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.QualityPriority
+	cb, err := generateAICallback(c.snapshotAICallbacks().QualityPriorityRaw, nil)
+	if err != nil || cb == nil {
+		return nil
+	}
+	return c.wrapper(cb, consts.TierIntelligent)
 }
 
 func (c *Config) GetSpeedPriorityAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.SpeedPriority
+	cb, err := generateAICallback(c.snapshotAICallbacks().SpeedPriorityRaw, nil)
+	if err != nil || cb == nil {
+		return nil
+	}
+	return c.wrapper(cb, consts.TierLightweight)
 }
 
 func (c *Config) GetVisionPriorityAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.VisionPriority
+	cb, err := generateAICallback(c.snapshotAICallbacks().VisionPriorityRaw, nil)
+	if err != nil || cb == nil {
+		return nil
+	}
+	return c.wrapper(cb, consts.TierVision)
 }
 
 func (c *Config) GetQualityPriorityRawAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.QualityPriorityRaw
+	cb, err := generateAICallback(c.snapshotAICallbacks().QualityPriorityRaw, nil)
+	if err != nil {
+		return nil
+	}
+	return cb
 }
 
 func (c *Config) GetSpeedPriorityRawAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.SpeedPriorityRaw
+	cb, err := generateAICallback(c.snapshotAICallbacks().SpeedPriorityRaw, nil)
+	if err != nil {
+		return nil
+	}
+	return cb
 }
 
 func (c *Config) GetVisionPriorityRawAICallback() AICallbackType {
 	if c == nil {
 		return nil
 	}
-	callbacks := c.ensureAICallbacks()
-	return callbacks.VisionPriorityRaw
+	cb, err := generateAICallback(c.snapshotAICallbacks().VisionPriorityRaw, nil)
+	if err != nil {
+		return nil
+	}
+	return cb
 }
 
 // NewConfig creates a new Config with options
@@ -1147,30 +1197,30 @@ func WithTieredAICallback(singleModelMode ...bool) ConfigOption {
 		}
 
 		// Configure quality priority callback (uses intelligent model)
-		intelligentCB, err := GetIntelligentAIModelCallback(single)
+		intelligentFactory, err := newTierAICallbackFactory(consts.TierIntelligent, single)
 		if err == nil {
 			c.m.Lock()
-			c.setQualityPriorityAICallbackLocked(intelligentCB)
+			c.setQualityPriorityAICallbackFactoryLocked(intelligentFactory)
 			c.m.Unlock()
 			log.Debugf("Configured quality priority callback from intelligent model")
 		} else {
 			log.Warnf("Failed to load intelligent model callback: %v", err)
 		}
 
-		lightweightCB, err := GetLightweightAIModelCallback(single)
+		lightweightFactory, err := newTierAICallbackFactory(consts.TierLightweight, single)
 		if err == nil {
 			c.m.Lock()
-			c.setSpeedPriorityAICallbackLocked(lightweightCB)
+			c.setSpeedPriorityAICallbackFactoryLocked(lightweightFactory)
 			c.m.Unlock()
 			log.Debugf("Configured speed priority callback from lightweight model")
 		} else {
 			log.Warnf("Failed to load lightweight model callback: %v", err)
 		}
 
-		visionCB, err := GetVisionAIModelCallback(single)
+		visionFactory, err := newTierAICallbackFactory(consts.TierVision, single)
 		if err == nil {
 			c.m.Lock()
-			c.setVisionPriorityAICallbackLocked(visionCB)
+			c.setVisionPriorityAICallbackFactoryLocked(visionFactory)
 			c.m.Unlock()
 			log.Debugf("Configured vision priority callback from vision model")
 		} else {
@@ -3555,6 +3605,61 @@ func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
+// PrimaryAICallbackBinding is the main-model routing of one ReAct round.
+//
+// The loop generates it once from the same model snapshot that sized the
+// prompt, holds it, and uses it for every request of the round (including
+// retries and context compression). Quality routing and prompt budget therefore
+// always describe the same model, even if a hot-patch swaps the global tier
+// between prompt assembly and the request.
+type PrimaryAICallbackBinding struct {
+	// ModelConfig is the cloned snapshot the callbacks were generated from.
+	ModelConfig *ypb.AIModelConfig
+	// Quality is the generated quality-tier callback, or nil when the config
+	// has no quality factory. Compression uses it so the recovery request stays
+	// on the model whose token budget produced the prompt.
+	Quality AICallbackType
+	// Callback is the normal main call target: quality, then speed, then
+	// original, mirroring Config.CallAI.
+	Callback AICallbackType
+}
+
+// GeneratePrimaryAICallback materializes the main-model callback for one round.
+// A non-nil model pins quality routing to that snapshot; nil keeps dynamic tier
+// selection for consumers that do not size prompts (for example LiteForge).
+func (c *Config) GeneratePrimaryAICallback(model *ypb.AIModelConfig) (*PrimaryAICallbackBinding, error) {
+	callbacks := c.snapshotAICallbacks()
+	binding := &PrimaryAICallbackBinding{}
+	if model != nil {
+		binding.ModelConfig = proto.Clone(model).(*ypb.AIModelConfig)
+	}
+
+	if cb, err := generateAICallback(callbacks.QualityPriorityRaw, binding.ModelConfig); err != nil {
+		return nil, err
+	} else if cb != nil {
+		binding.Quality = c.wrapper(cb, consts.TierIntelligent)
+		binding.Callback = binding.Quality
+		return binding, nil
+	}
+
+	if cb, err := generateAICallback(callbacks.SpeedPriorityRaw, nil); err != nil {
+		return nil, err
+	} else if cb != nil {
+		binding.Callback = c.wrapper(cb, consts.TierLightweight)
+		return binding, nil
+	}
+
+	cb, err := generateAICallback(callbacks.Original, nil)
+	if err != nil {
+		return nil, err
+	}
+	if cb == nil {
+		return nil, utils.Error("no any ai callback is set, cannot found ai config")
+	}
+	binding.Callback = cb
+	return binding, nil
+}
+
 func (c *Config) CallOriginalAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
 		c.GetOriginalAICallback(),
@@ -3590,7 +3695,7 @@ func (c *Config) CallSpeedPriorityAI(request *AIRequest) (*AIResponse, error) {
 		}
 		return cb(c, request)
 	}
-	return nil, utils.Error("no quality priority ai callback is set")
+	return nil, utils.Error("no speed priority ai callback is set")
 }
 
 func (c *Config) Feed(endpointId string, params aitool.InvokeParams) {

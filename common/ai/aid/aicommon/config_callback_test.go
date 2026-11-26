@@ -2,11 +2,60 @@ package aicommon
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestAICallbacksStoreFactories(t *testing.T) {
+	cfg := NewTestConfig(context.Background())
+	var generated atomic.Int64
+	factory := func(*ypb.AIModelConfig) (AICallbackType, error) {
+		generated.Add(1)
+		return func(i AICallerConfigIf, _ *AIRequest) (*AIResponse, error) {
+			rsp := NewAIResponse(i)
+			rsp.Close()
+			return rsp, nil
+		}, nil
+	}
+
+	require.NoError(t, WithAICallbacks(&AICallbacks{QualityPriorityRaw: factory})(cfg))
+	require.EqualValues(t, 0, generated.Load(), "installing callbacks must not generate")
+	require.NotNil(t, cfg.GetQualityPriorityAICallback())
+	require.EqualValues(t, 1, generated.Load())
+	require.NotNil(t, cfg.GetQualityPriorityAICallback())
+	require.EqualValues(t, 2, generated.Load(), "each getter resolves the routing again")
+}
+
+func TestGeneratePrimaryAICallbackPassesSnapshotToFactory(t *testing.T) {
+	cfg := NewTestConfig(context.Background())
+	var seen *ypb.AIModelConfig
+	factory := func(model *ypb.AIModelConfig) (AICallbackType, error) {
+		seen = model
+		return func(i AICallerConfigIf, _ *AIRequest) (*AIResponse, error) {
+			rsp := NewAIResponse(i)
+			rsp.Close()
+			return rsp, nil
+		}, nil
+	}
+	require.NoError(t, WithAICallbacks(&AICallbacks{QualityPriorityRaw: factory})(cfg))
+
+	model := &ypb.AIModelConfig{ModelName: "pinned", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai"}}
+	binding, err := cfg.GeneratePrimaryAICallback(model)
+	require.NoError(t, err)
+	require.NotNil(t, binding)
+	require.NotNil(t, binding.Callback)
+	require.NotNil(t, binding.Quality)
+	require.Equal(t, "pinned", seen.GetModelName())
+
+	// The binding owns a clone; mutating the caller's protobuf must not retarget
+	// a round that already captured its prompt inputs.
+	model.ModelName = "mutated-after-generation"
+	require.Equal(t, "pinned", binding.ModelConfig.GetModelName())
+}
 
 func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 	cfg := NewTestConfig(context.Background())

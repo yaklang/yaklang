@@ -70,7 +70,11 @@ func TestAuditPhase2ForkProtocol(t *testing.T) {
 			cfg := aicommon.NewConfig(ctx, aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableAutoSkills(true),
 				aicommon.WithDisallowMCPServers(true), aicommon.WithDisablePerception(true),
 				aicommon.WithAITransactionAutoRetry(1), aicommon.WithEnableFunctionCallMode(native),
-				aicommon.WithAICallbacks(&aicommon.AICallbacks{Original: callback, QualityPriorityRaw: callback, SpeedPriorityRaw: callback}))
+				aicommon.WithAICallbacks(&aicommon.AICallbacks{
+					Original:           aicommon.FixedAICallbackFactory(callback),
+					QualityPriorityRaw: aicommon.FixedAICallbackFactory(callback),
+					SpeedPriorityRaw:   aicommon.FixedAICallbackFactory(callback),
+				}))
 			parent := &protocolInvoker{mock.NewMockInvoker(ctx)}
 			parent.SetConfig(cfg)
 			original := aicommon.AIRuntimeInvokerGetter

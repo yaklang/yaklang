@@ -66,9 +66,9 @@ func newResumePropagationHarness(t *testing.T) (
 		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithEnableFunctionCallMode(false), // The failure fixture emits text, not tool calls.
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
-			Original:           aiCB,
-			QualityPriorityRaw: aiCB,
-			SpeedPriorityRaw:   aiCB,
+			Original:           aicommon.FixedAICallbackFactory(aiCB),
+			QualityPriorityRaw: aicommon.FixedAICallbackFactory(aiCB),
+			SpeedPriorityRaw:   aicommon.FixedAICallbackFactory(aiCB),
 		}),
 	)
 
