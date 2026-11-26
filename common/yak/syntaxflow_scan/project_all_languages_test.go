@@ -2,6 +2,7 @@ package syntaxflow_scan_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -80,25 +81,25 @@ func TestScanProjectAllLanguagesCompilesEachLanguage(t *testing.T) {
 		ssaconfig.TS:     "app.ts",
 	}
 	require.Len(t, result.LanguagePrograms, len(owns))
-	require.NotContains(t, result.LanguagePrograms, ssaconfig.Language("js"),
+	require.NotContains(t, result.LanguagePrograms, "js",
 		"a legacy js spelling must not create a program of its own")
-	require.NotContains(t, result.LanguagePrograms, ssaconfig.Language("ts"),
+	require.NotContains(t, result.LanguagePrograms, "ts",
 		"a legacy ts spelling must not create a program of its own")
 	for language, file := range owns {
-		program := result.LanguagePrograms[language]
+		program := result.LanguagePrograms[string(language)]
 		require.Equal(t, name+"-"+string(language), program)
 		prog, err := ssaapi.FromDatabase(program)
 		require.NoError(t, err)
 		require.Equal(t, language, prog.GetLanguage())
 		require.True(t, fileListHas(prog.Program.FileList, file), "%s must compile %s", language, file)
 	}
-	tsFiles := languageProgramFiles(t, result.LanguagePrograms[ssaconfig.TS])
+	tsFiles := languageProgramFiles(t, result.LanguagePrograms[string(ssaconfig.TS)])
 	require.True(t, fileListHas(tsFiles, "app.js"), "the TypeScript program must compile JavaScript too")
 
-	goFiles := languageProgramFiles(t, result.LanguagePrograms[ssaconfig.GO])
+	goFiles := languageProgramFiles(t, result.LanguagePrograms[string(ssaconfig.GO)])
 	require.False(t, fileListHas(goFiles, "App.java"), "a Go program must not compile Java")
 	require.False(t, fileListHas(goFiles, "app.py"), "a Go program must not compile Python")
-	pythonFiles := languageProgramFiles(t, result.LanguagePrograms[ssaconfig.PYTHON])
+	pythonFiles := languageProgramFiles(t, result.LanguagePrograms[string(ssaconfig.PYTHON)])
 	require.False(t, fileListHas(pythonFiles, "main.go"), "a Python program must not compile Go")
 }
 
@@ -217,11 +218,11 @@ alert $hit`),
 	)
 	require.NoError(t, err)
 	require.True(t, result.Succeeded)
-	javaProgram := result.LanguagePrograms[ssaconfig.JAVA]
+	javaProgram := result.LanguagePrograms[string(ssaconfig.JAVA)]
 	require.NotEmpty(t, javaProgram)
 	require.True(t, fileListHas(languageProgramFiles(t, javaProgram), "App.java"),
 		"the good Java file must survive its broken sibling")
-	goProgram := result.LanguagePrograms[ssaconfig.GO]
+	goProgram := result.LanguagePrograms[string(ssaconfig.GO)]
 	require.NotEmpty(t, goProgram)
 	require.True(t, fileListHas(languageProgramFiles(t, goProgram), "main.go"),
 		"the good Go file must survive its broken sibling")
@@ -267,8 +268,8 @@ alert $hit`),
 	)
 	require.NoError(t, err, "a failed language must not suppress the others")
 	require.Contains(t, compiled, ssaconfig.GO)
-	require.NotContains(t, result.LanguagePrograms, ssaconfig.GO)
-	require.Contains(t, result.LanguagePrograms, ssaconfig.PYTHON)
+	require.NotContains(t, result.LanguagePrograms, string(ssaconfig.GO))
+	require.Contains(t, result.LanguagePrograms, string(ssaconfig.PYTHON))
 	require.Contains(t, result.Error, "injected compiler failure")
 	require.True(t, result.Succeeded)
 	mu.Lock()
@@ -298,4 +299,51 @@ func TestAllLanguagesRejectsExplicitLanguageAndExistingProgram(t *testing.T) {
 	require.ErrorContains(t, err, "mutually exclusive")
 	_, err = syntaxflow_scan.ScanProject(context.Background(), syntaxflow_scan.WithAllLanguages(true), ssaconfig.WithSetProgramName("existing"))
 	require.ErrorContains(t, err, "source target")
+}
+
+// The platform's builtin project-scan script turns all-language on through the
+// same option the CLI uses. Hosts without this export cannot run the scan, so
+// the name is part of the script contract.
+func TestAllLanguagesIsExportedToYak(t *testing.T) {
+	exported, ok := syntaxflow_scan.Exports["withAllLanguages"]
+	require.True(t, ok, "syntaxflow.withAllLanguages must be exported to yak scripts")
+	option, ok := exported.(func(bool) ssaconfig.Option)
+	require.True(t, ok, "export must accept one bool and return a scan option")
+	require.NotNil(t, option)
+}
+
+// Platform projections read language_programs from the script result, so the
+// JSON object must map a language id to its program name.
+func TestProjectResultLanguageProgramsUseLanguageStringKeys(t *testing.T) {
+	result := syntaxflow_scan.ProjectResult{
+		LanguagePrograms: map[string]string{
+			"golang":     "demo-golang",
+			"typescript": "demo-typescript",
+		},
+	}
+	var decoded map[string]string
+	require.NoError(t, json.Unmarshal([]byte(result.LanguageProgramsJSON()), &decoded))
+	require.Equal(t, map[string]string{
+		"golang":     "demo-golang",
+		"typescript": "demo-typescript",
+	}, decoded)
+	require.Empty(t, (syntaxflow_scan.ProjectResult{}).LanguageProgramsJSON())
+}
+
+func TestProjectResultLanguageProgramsMarshalWithLanguageStringKeys(t *testing.T) {
+	raw, err := json.Marshal(syntaxflow_scan.ProjectResult{
+		LanguagePrograms: map[string]string{
+			"golang":     "demo-golang",
+			"typescript": "demo-typescript",
+		},
+	})
+	require.NoError(t, err)
+	var decoded struct {
+		LanguagePrograms map[string]string `json:"language_programs"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.Equal(t, map[string]string{
+		"golang":     "demo-golang",
+		"typescript": "demo-typescript",
+	}, decoded.LanguagePrograms)
 }

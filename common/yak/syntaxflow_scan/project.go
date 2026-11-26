@@ -440,10 +440,10 @@ func finishScanProject(cfg *Config, recorder *stageOutcomeRecorder, programName 
 		result.SourceStatistics = recorder.SourceStatistics()
 	}
 	if cfg.allLanguages {
-		result.LanguagePrograms = make(map[ssaconfig.Language]string)
+		result.LanguagePrograms = make(map[string]string)
 		for _, prog := range cfg.Programs {
 			if prog != nil {
-				result.LanguagePrograms[prog.GetLanguage()] = prog.GetProgramName()
+				result.LanguagePrograms[string(prog.GetLanguage())] = prog.GetProgramName()
 			}
 		}
 	}
