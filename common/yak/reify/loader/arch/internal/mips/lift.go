@@ -40,7 +40,18 @@ func liftFunction(profile Profile, body function, id core.FunctionID, blockIDs m
 	}
 	for index, current := range body.blocks {
 		lifter.instructions = make([]core.Instruction, 0, len(current.instructions)*2)
-		for _, ins := range current.instructions {
+		// A MIPS branch or jump executes its delay slot before the transfer.
+		// The delay slot word sits after the branch in memory, so lift it first
+		// and the branch last; otherwise the block's terminator hides it.
+		instructions := current.instructions
+		for position := 0; position < len(instructions); position++ {
+			ins := instructions[position]
+			if delaySlotApplies(ins.op) && position+1 < len(instructions) {
+				lifter.lift(instructions[position+1])
+				lifter.lift(ins)
+				position++
+				continue
+			}
 			lifter.lift(ins)
 		}
 		if len(lifter.instructions) == 0 || !controlTransfer(lifter.instructions[len(lifter.instructions)-1].Kind) {
@@ -262,6 +273,13 @@ func controlTransfer(kind core.Opcode) bool {
 	default:
 		return false
 	}
+}
+
+// delaySlotApplies reports whether one mnemonic has a delay slot instruction
+// that executes before the control transfer. Calls have one too: a jal executes
+// the following word before the callee starts.
+func delaySlotApplies(name string) bool {
+	return isBranch(name) || isJump(name)
 }
 
 func containsBlock(blocks []core.BlockID, target core.BlockID) bool {

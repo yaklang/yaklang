@@ -1,0 +1,114 @@
+[
+  {
+    "name": "chi compares into the condition code",
+    "address": "0x1000",
+    "code": [
+      "a7 2e 00 0a // chi %r2, 10",
+      "a7 44 00 03 // jl 0x1006",
+      "07 fe // br %r14",
+      "07 fe // br %r14"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i64 = constant 0xa",
+      "  0x1000  v2:i64 = read_register %r2 [read_register]",
+      "  0x1000  v3:i2 = intrinsic @flags.cmp, v2, v1",
+      "  0x1000  write_register %cc, v3 [write_register]",
+      "  0x1004  v4:i2 = read_register %cc [read_register]",
+      "  0x1004  v5:i1 = intrinsic @cond.lo, v4 [read_register]",
+      "  0x1004  branch v5 -> b3, b2",
+      "block b2 @ 0x1008",
+      "  0x1008  return [may_trap, unknown]",
+      "block b3 @ 0x100a",
+      "  0x100a  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mvhi sign extends the stored immediate",
+    "address": "0x2000",
+    "code": [
+      "e5 4c f0 0c ff ff // mvhi 12(%r15), -1"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  v1:i64 = read_register %r15 [read_register]",
+      "  0x2000  v2:ptr64 = copy v1",
+      "  0x2000  v3:i64 = constant 0xc",
+      "  0x2000  v4:i64 = add v2, v3",
+      "  0x2000  v5:i32 = constant 0xffffffff",
+      "  0x2000  store v4, v5 [write_memory]",
+      "  0x2006  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mvhhi sign extends the stored immediate",
+    "address": "0x2100",
+    "code": [
+      "e5 44 f0 08 ff ff // mvhhi 8(%r15), -1"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2100 @ 0x2100",
+      "block b1 @ 0x2100",
+      "  0x2100  v1:i64 = read_register %r15 [read_register]",
+      "  0x2100  v2:ptr64 = copy v1",
+      "  0x2100  v3:i64 = constant 0x8",
+      "  0x2100  v4:i64 = add v2, v3",
+      "  0x2100  v5:i64 = constant 0xffff",
+      "  0x2100  store v4, v5 [write_memory]",
+      "  0x2106  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mvghi sign extends the stored immediate",
+    "address": "0x2200",
+    "code": [
+      "e5 48 f0 10 ff ff // mvghi 16(%r15), -1"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x2200 @ 0x2200",
+      "block b1 @ 0x2200",
+      "  0x2200  v1:i64 = read_register %r15 [read_register]",
+      "  0x2200  v2:ptr64 = copy v1",
+      "  0x2200  v3:i64 = constant 0x10",
+      "  0x2200  v4:i64 = add v2, v3",
+      "  0x2200  v5:i64 = constant 0xffffffffffffffff",
+      "  0x2200  store v4, v5 [write_memory]",
+      "  0x2206  trap @region-end [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "cgr compares two registers into the condition code",
+    "address": "0x3000",
+    "code": [
+      "b9 20 00 23 // cgr %r2, %r3",
+      "a7 44 00 03 // jl 0x3006",
+      "07 fe // br %r14",
+      "07 fe // br %r14"
+    ],
+    "source": [
+      "arg0 < arg1"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x3000 @ 0x3000",
+      "block b1 @ 0x3000",
+      "  0x3000  v1:i64 = read_register %r2 [read_register]",
+      "  0x3000  v2:i64 = read_register %r3 [read_register]",
+      "  0x3000  v3:i2 = intrinsic @flags.cmp, v1, v2",
+      "  0x3000  write_register %cc, v3 [write_register]",
+      "  0x3004  v4:i2 = read_register %cc [read_register]",
+      "  0x3004  v5:i1 = intrinsic @cond.lo, v4 [read_register]",
+      "  0x3004  branch v5 -> b3, b2",
+      "block b2 @ 0x3008",
+      "  0x3008  return [may_trap, unknown]",
+      "block b3 @ 0x300a",
+      "  0x300a  return [may_trap, unknown]"
+    ]
+  }
+]

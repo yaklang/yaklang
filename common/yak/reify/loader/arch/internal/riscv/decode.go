@@ -20,6 +20,11 @@ type instruction struct {
 	raw     uint32
 	size    int
 	inst    riscv64asm.Inst
+	// target is the link-time destination of a PC-relative control transfer. A
+	// relocatable object leaves the encoded displacement zero and records the
+	// real target only in a relocation.
+	target    uint64
+	hasTarget bool
 	// undefined marks a word the decoder rejected.
 	undefined bool
 }
@@ -111,11 +116,28 @@ func decodeInstructions(ctx context.Context, profile Profile, request core.Parse
 			continue
 		}
 		raw := binary.LittleEndian.Uint32(code[:])
-		result = append(result, instruction{address: address, raw: raw, inst: inst, size: inst.Len})
+		decoded := instruction{address: address, raw: raw, inst: inst, size: inst.Len}
+		if target, ok := relocationTarget(request.Relocations, address); ok {
+			decoded.target = target
+			decoded.hasTarget = true
+		}
+		result = append(result, decoded)
 		offset += int64(inst.Len)
 		address += uint64(inst.Len)
 	}
 	return result, nil
+}
+
+// relocationTarget returns the address a relocation at one instruction address
+// resolves to. RISC-V records every PC-relative branch and jump this way, even
+// when the target is a local label inside the same object.
+func relocationTarget(relocations []core.Relocation, address uint64) (uint64, bool) {
+	for _, relocation := range relocations {
+		if relocation.Address == address && relocation.Value != 0 {
+			return relocation.Value, true
+		}
+	}
+	return 0, false
 }
 
 func buildFunctions(profile Profile, decoded []instruction, start, end uint64, diagnostics *diagnostics) ([]function, map[uint64]core.BlockID) {

@@ -13,7 +13,7 @@
       "13 01 01 01 // addi sp, sp, 16",
       "67 80 00 00 // ret"
     ],
-    "frame_removed": 15,
+    "frame_removed": 22,
     "params": 8
   }
 ]

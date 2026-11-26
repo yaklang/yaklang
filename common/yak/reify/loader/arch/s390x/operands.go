@@ -79,6 +79,7 @@ func isStoreImmediate(name string) bool {
 // storeSource materializes the value one store writes: the register operand when
 // there is one, otherwise the immediate.
 func (l *lifter) storeSource(ins instruction) (core.ValueID, bool) {
+	name := nameOf(ins.inst.Op)
 	for _, arg := range args(ins.inst) {
 		if register, ok := arg.(s390xasm.Reg); ok {
 			name, bits, ok := registerName(register)
@@ -88,12 +89,61 @@ func (l *lifter) storeSource(ins instruction) (core.ValueID, bool) {
 			return l.readRegister(ins.address, name, bits), true
 		}
 	}
+	// MVHI and MVGHI sign-extend their halfword immediate to the store width.
+	// Storing the raw halfword instead turns -1 into 65535.
+	if bits, signed := storeImmediateWidth(name); signed {
+		if raw, ok := storeImmediateRaw(ins); ok {
+			return l.constant(ins.address, uint64(int64(int16(uint16(raw)))), bits), true
+		}
+	}
 	if value, ok := l.immediateValue(ins, append([]s390xasm.Arg{nil}, args(ins.inst)...), addressBits); ok {
 		return value, true
 	}
 	// A move writes a byte, halfword or word count, which stays opaque.
-	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("s390x." + nameOf(ins.inst.Op))},
+	return l.operation(ins, core.OpIntrinsic, []core.Operand{symbolOperand("s390x." + name)},
 		8, core.EffectUnknown), true
+}
+
+// storeImmediateWidth returns the width one store-immediate form writes, and
+// whether its halfword immediate is sign-extended to that width.
+func storeImmediateWidth(name string) (uint16, bool) {
+	switch name {
+	case "mvi", "mviy":
+		return 8, false
+	case "mvhhi":
+		return 16, false
+	case "mvhi":
+		return 32, true
+	case "mvghi":
+		return 64, true
+	}
+	return 0, false
+}
+
+// storeImmediateRaw returns the immediate operand of a store-immediate form as
+// the encoded integer.
+func storeImmediateRaw(ins instruction) (int64, bool) {
+	for _, arg := range args(ins.inst) {
+		switch value := arg.(type) {
+		case s390xasm.Sign8:
+			return int64(int8(value)), true
+		case s390xasm.Sign16:
+			return int64(int16(value)), true
+		case s390xasm.Sign32:
+			return int64(int32(value)), true
+		case s390xasm.Imm:
+			return int64(uint32(value)), true
+		case s390xasm.RegIm16:
+			return 2 * int64(int16(value)), true
+		case s390xasm.RegIm32:
+			return 2 * int64(int32(value)), true
+		case s390xasm.RegIm12:
+			return 2 * int64(int16(value)), true
+		case s390xasm.RegIm24:
+			return 2 * int64(int32(value)), true
+		}
+	}
+	return 0, false
 }
 
 // loadWidth returns the width of the value a load transfers, or zero when the

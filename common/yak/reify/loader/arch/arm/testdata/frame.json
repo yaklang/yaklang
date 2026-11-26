@@ -10,7 +10,7 @@
       "10 d0 8d e2 // add sp, sp, #16",
       "10 88 bd e8 // pop {r4, r11, pc}"
     ],
-    "frame_removed": 39,
+    "frame_removed": 38,
     "params": 4
   }
 ]

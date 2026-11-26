@@ -439,12 +439,11 @@
       "  0x2400  v3:i32 = constant 0x4",
       "  0x2400  v4:ptr32 = add v1, v3",
       "  0x2400  v5:i32 = load v4 [read_memory]",
-      "  0x2400  write_register %pc, v5 [write_register]",
       "  0x2400  v6:i32 = read_register %sp [read_register]",
       "  0x2400  v7:i32 = constant 0x8",
       "  0x2400  v8:i32 = add v6, v7",
       "  0x2400  write_register %sp, v8 [write_register]",
-      "  0x2404  trap @region-end [may_trap, unknown]"
+      "  0x2400  return"
     ]
   },
   {

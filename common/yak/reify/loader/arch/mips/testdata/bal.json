@@ -13,9 +13,7 @@
       "  0x1000  call 0x100c [call, may_trap, unknown]",
       "  0x1000  v1:i32 = constant 0x1004",
       "  0x1000  write_register %ra, v1 [write_register]",
-      "  0x1004  v2:i32 = constant 0x0",
-      "  0x1004  v3:i32 = constant 0x0",
-      "  0x1004  v4:i32 = shl v2, v3",
+      "  0x1004  nop",
       "  0x1008  trap @region-end [may_trap, unknown]"
     ]
   }

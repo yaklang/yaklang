@@ -1,0 +1,21 @@
+[
+  {
+    "name": "ret returns the value in ax",
+    "address": "0x1000",
+    "code": [
+      "b8 2a 00 // mov ax, 42",
+      "c3 // ret"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: dos/8086 (16-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i16 = constant 0x2a",
+      "  0x1000  write_register %ax, v1 [write_register]",
+      "  0x1003  return [may_trap, unknown]"
+    ]
+  }
+]

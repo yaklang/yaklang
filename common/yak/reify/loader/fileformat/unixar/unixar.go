@@ -6,6 +6,7 @@ package unixar
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -118,6 +119,25 @@ func Members(reader *core.ByteReader) ([]Member, error) {
 		if err != nil && len(data) < int(size) {
 			return nil, fmt.Errorf("ar: truncated member at 0x%x", offset)
 		}
+		// BSD ar stores a long member name in the first bytes of the member data
+		// as #1/<length>. The object starts after the name, so both the payload
+		// and its file offset move forward by that length.
+		if length, ok := bsdNameLength(rawName); ok {
+			if length > uint64(len(data)) {
+				return nil, fmt.Errorf("ar: member name at 0x%x is longer than the member", offset)
+			}
+			name := strings.TrimRight(string(data[:length]), "\x00")
+			data = data[length:]
+			dataOffset += length
+			if strings.HasPrefix(name, "__.SYMDEF") {
+				// The BSD symbol index and string table carry no code.
+				offset = offset + memberHeaderSize + size + size%2
+				continue
+			}
+			result = append(result, Member{Name: name, Offset: dataOffset, Data: data})
+			offset = offset + memberHeaderSize + size + size%2
+			continue
+		}
 		name, isLongNames := resolveName(rawName, longNames)
 		switch {
 		case isLongNames:
@@ -132,6 +152,19 @@ func Members(reader *core.ByteReader) ([]Member, error) {
 		offset = dataOffset + size + size%2
 	}
 	return result, nil
+}
+
+// bsdNameLength reads a BSD extended member name. The header field holds
+// #1/<length>, and the name itself is the first <length> bytes of the payload.
+func bsdNameLength(raw string) (uint64, bool) {
+	if !strings.HasPrefix(raw, "#1/") {
+		return 0, false
+	}
+	length, err := strconv.ParseUint(strings.TrimSpace(raw[3:]), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return length, true
 }
 
 // resolveName returns the member name. A name of "//" marks the long-name table

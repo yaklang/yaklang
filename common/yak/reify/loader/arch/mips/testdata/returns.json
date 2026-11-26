@@ -1,0 +1,25 @@
+[
+  {
+    "name": "return value comes from v0",
+    "address": "0x5000",
+    "code": [
+      "20 02 00 2a // addiu $2, $0, 42",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/mips (32-bit, big-endian)",
+      "function sub_0x5000 @ 0x5000",
+      "block b1 @ 0x5000",
+      "  0x5000  v1:i32 = constant 0x0",
+      "  0x5000  v2:i32 = constant 0x2a",
+      "  0x5000  v3:i32 = add v1, v2",
+      "  0x5000  write_register %v0, v3 [write_register]",
+      "  0x5008  nop",
+      "  0x5004  return [may_trap, unknown]"
+    ]
+  }
+]

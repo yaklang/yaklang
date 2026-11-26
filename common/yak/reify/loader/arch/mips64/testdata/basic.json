@@ -381,14 +381,9 @@
       "target: linux/mips64 (64-bit, big-endian)",
       "function sub_0x2300 @ 0x2300",
       "block b1 @ 0x2300",
-      "  0x2300  v1:i64 = constant 0x0",
-      "  0x2300  v2:i64 = constant 0x0",
-      "  0x2300  v3:i1 = eq v1, v2",
-      "  0x2300  branch v3 -> b1, b2",
+      "  0x2300  jump -> b2",
       "block b2 @ 0x2304",
-      "  0x2304  v4:i64 = constant 0x0",
-      "  0x2304  v5:i64 = constant 0x0",
-      "  0x2304  v6:i64 = shl v4, v5",
+      "  0x2304  nop",
       "  0x2308  trap @region-end [may_trap, unknown]"
     ]
   },
@@ -407,9 +402,7 @@
       "  0x2400  write_register %ra, v1 [write_register]",
       "  0x2404  jump -> b2",
       "block b2 @ 0x2404",
-      "  0x2404  v2:i64 = constant 0x0",
-      "  0x2404  v3:i64 = constant 0x0",
-      "  0x2404  v4:i64 = shl v2, v3",
+      "  0x2404  nop",
       "  0x2408  trap @region-end [may_trap, unknown]"
     ]
   },
@@ -423,15 +416,11 @@
       "target: linux/mips64 (64-bit, big-endian)",
       "function sub_0x2500 @ 0x2500",
       "block b1 @ 0x2500",
+      "  0x2504  nop",
       "  0x2500  v1:i64 = read_register %a0 [read_register]",
       "  0x2500  v2:i64 = read_register %a1 [read_register]",
       "  0x2500  v3:i1 = eq v1, v2",
-      "  0x2500  branch v3 -> b2",
-      "block b2 @ 0x2504",
-      "  0x2504  v4:i64 = constant 0x0",
-      "  0x2504  v5:i64 = constant 0x0",
-      "  0x2504  v6:i64 = shl v4, v5",
-      "  0x2508  trap @region-end [may_trap, unknown]"
+      "  0x2500  branch v3 [unknown]"
     ]
   },
   {
@@ -444,16 +433,12 @@
       "target: linux/mips64 (64-bit, big-endian)",
       "function sub_0x2600 @ 0x2600",
       "block b1 @ 0x2600",
+      "  0x2604  nop",
       "  0x2600  v1:i64 = read_register %a0 [read_register]",
       "  0x2600  v2:i64 = read_register %a1 [read_register]",
       "  0x2600  v3:i1 = eq v1, v2",
       "  0x2600  v4:i1 = not v3",
-      "  0x2600  branch v4 -> b2",
-      "block b2 @ 0x2604",
-      "  0x2604  v5:i64 = constant 0x0",
-      "  0x2604  v6:i64 = constant 0x0",
-      "  0x2604  v7:i64 = shl v5, v6",
-      "  0x2608  trap @region-end [may_trap, unknown]"
+      "  0x2600  branch v4 [unknown]"
     ]
   },
   {
@@ -466,12 +451,8 @@
       "target: linux/mips64 (64-bit, big-endian)",
       "function sub_0x2700 @ 0x2700",
       "block b1 @ 0x2700",
-      "  0x2700  return [may_trap, unknown]",
-      "block b2 @ 0x2704",
-      "  0x2704  v1:i64 = constant 0x0",
-      "  0x2704  v2:i64 = constant 0x0",
-      "  0x2704  v3:i64 = shl v1, v2",
-      "  0x2708  trap @region-end [may_trap, unknown]"
+      "  0x2704  nop",
+      "  0x2700  return [may_trap, unknown]"
     ]
   },
   {

@@ -1,0 +1,106 @@
+[
+  {
+    "name": "delay slot belongs to the branch block",
+    "address": "0x1000",
+    "code": [
+      "10 85 00 02 // beq $4, $5, 0x100c",
+      "24 84 00 01 // addiu $4, $4, 1",
+      "24 84 00 02 // addiu $4, $4, 2",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "lowir": [
+      "target: linux/mips (32-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1004  v1:i32 = read_register %a0 [read_register]",
+      "  0x1004  v2:i32 = constant 0x1",
+      "  0x1004  v3:i32 = add v1, v2",
+      "  0x1004  write_register %a0, v3 [write_register]",
+      "  0x1000  v4:i32 = read_register %a0 [read_register]",
+      "  0x1000  v5:i32 = read_register %a1 [read_register]",
+      "  0x1000  v6:i1 = eq v4, v5",
+      "  0x1000  branch v6 -> b3, b2",
+      "block b2 @ 0x1008",
+      "  0x1008  v7:i32 = read_register %a0 [read_register]",
+      "  0x1008  v8:i32 = constant 0x2",
+      "  0x1008  v9:i32 = add v7, v8",
+      "  0x1008  write_register %a0, v9 [write_register]",
+      "  0x100c  jump -> b3",
+      "block b3 @ 0x100c",
+      "  0x1010  nop",
+      "  0x100c  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "beq on equal registers is a jump",
+    "address": "0x2000",
+    "code": [
+      "10 84 00 01 // beq $4, $4, 0x2008",
+      "00 00 00 00 // nop",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "lowir": [
+      "target: linux/mips (32-bit, big-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2004  nop",
+      "  0x2000  jump -> b2",
+      "block b2 @ 0x2008",
+      "  0x200c  nop",
+      "  0x2008  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "bne on equal registers never transfers",
+    "address": "0x3000",
+    "code": [
+      "14 84 00 01 // bne $4, $4, 0x3008",
+      "00 00 00 00 // nop",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "lowir": [
+      "target: linux/mips (32-bit, big-endian)",
+      "function sub_0x3000 @ 0x3000",
+      "block b1 @ 0x3000",
+      "  0x3004  nop",
+      "  0x3000  jump -> b2",
+      "block b2 @ 0x3008",
+      "  0x300c  nop",
+      "  0x3008  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "jal keeps its delay slot before the call",
+    "address": "0x4000",
+    "code": [
+      "0c 00 10 05 // jal 0x4014",
+      "00 00 00 00 // nop",
+      "24 84 00 03 // addiu $4, $4, 3",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "lowir": [
+      "target: linux/mips (32-bit, big-endian)",
+      "function sub_0x4000 @ 0x4000",
+      "block b1 @ 0x4000",
+      "  0x4004  nop",
+      "  0x4000  call 0x4014 [call, may_trap, unknown]",
+      "  0x4000  v1:i32 = constant 0x4004",
+      "  0x4000  write_register %ra, v1 [write_register]",
+      "  0x4008  v2:i32 = read_register %a0 [read_register]",
+      "  0x4008  v3:i32 = constant 0x3",
+      "  0x4008  v4:i32 = add v2, v3",
+      "  0x4008  write_register %a0, v4 [write_register]",
+      "  0x4010  nop",
+      "  0x400c  return [may_trap, unknown]",
+      "block b2 @ 0x4014",
+      "  0x4018  nop",
+      "  0x4014  return [may_trap, unknown]"
+    ]
+  }
+]

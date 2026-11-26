@@ -1,0 +1,75 @@
+[
+  {
+    "name": "dext extracts a bit field",
+    "address": "0x1000",
+    "code": [
+      "7c 22 f8 03 // dext $2, $1, 0, 32",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "source": [
+      "0xffffffff"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i64 = read_register %at [read_register]",
+      "  0x1000  v2:i64 = constant 0x0",
+      "  0x1000  v3:i64 = lshr v1, v2",
+      "  0x1000  v4:i64 = constant 0xffffffff",
+      "  0x1000  v5:i64 = and v3, v4",
+      "  0x1000  write_register %v0, v5 [write_register]",
+      "  0x1008  nop",
+      "  0x1004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "dins inserts a bit field",
+    "address": "0x2000",
+    "code": [
+      "7c 64 38 07 // dins $4, $3, 0, 8",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  v1:i64 = read_register %v1 [read_register]",
+      "  0x2000  v2:i64 = constant 0x0",
+      "  0x2000  v3:i64 = read_register %a0 [read_register]",
+      "  0x2000  v4:i64 = constant 0xffffffffffffff00",
+      "  0x2000  v5:i64 = and v3, v4",
+      "  0x2000  v6:i64 = constant 0xff",
+      "  0x2000  v7:i64 = and v1, v6",
+      "  0x2000  v8:i64 = shl v7, v2",
+      "  0x2000  v9:i64 = or v5, v8",
+      "  0x2000  write_register %a0, v9 [write_register]",
+      "  0x2008  nop",
+      "  0x2004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "dext with a nonzero position",
+    "address": "0x3000",
+    "code": [
+      "7c 22 39 03 // dext $2, $1, 4, 8",
+      "03 e0 00 08 // jr $ra",
+      "00 00 00 00 // nop"
+    ],
+    "lowir": [
+      "target: linux/mips64 (64-bit, big-endian)",
+      "function sub_0x3000 @ 0x3000",
+      "block b1 @ 0x3000",
+      "  0x3000  v1:i64 = read_register %at [read_register]",
+      "  0x3000  v2:i64 = constant 0x4",
+      "  0x3000  v3:i64 = lshr v1, v2",
+      "  0x3000  v4:i64 = constant 0xff",
+      "  0x3000  v5:i64 = and v3, v4",
+      "  0x3000  write_register %v0, v5 [write_register]",
+      "  0x3008  nop",
+      "  0x3004  return [may_trap, unknown]"
+    ]
+  }
+]

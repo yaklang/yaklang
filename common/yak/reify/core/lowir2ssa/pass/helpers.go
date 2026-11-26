@@ -89,7 +89,7 @@ func generalRegisterFamily(name string) (string, bool) {
 		return "rip", true
 	}
 	if len(name) < 2 || name[0] != 'r' || name[1] < '1' || name[1] > '9' {
-		return "", false
+		return aarch64RegisterFamily(name)
 	}
 	digits := name[1:]
 	if last := digits[len(digits)-1]; len(digits) > 1 && (last == 'b' || last == 'w' || last == 'd' || last == 'l') {
@@ -141,6 +141,29 @@ func generalRegisterShift(name string) uint16 {
 	default:
 		return 0
 	}
+}
+
+// aarch64RegisterFamily maps a 32-bit view of an AArch64 general register to its
+// 64-bit canonical name, so w0 and x0 compare as the same register. Zero
+// registers (wzr/xzr) are excluded: writing them discards the value and must
+// never count as a return-register write.
+func aarch64RegisterFamily(name string) (string, bool) {
+	if len(name) < 2 {
+		return "", false
+	}
+	prefix, digits := name[0], name[1:]
+	if prefix != 'w' && prefix != 'x' {
+		return "", false
+	}
+	if digits == "zr" || digits == "" {
+		return "", false
+	}
+	for _, digit := range digits {
+		if digit < '0' || digit > '9' {
+			return "", false
+		}
+	}
+	return "x" + digits, true
 }
 
 func literalUint64(literal []byte) uint64 {

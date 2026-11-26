@@ -1,0 +1,42 @@
+[
+  {
+    "name": "unconditional branch has one target",
+    "address": "0x1000",
+    "code": [
+      "48 00 00 08 // b 0x1008",
+      "4e 80 00 20 // blr",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  jump -> b3",
+      "block b2 @ 0x1004",
+      "  0x1004  return [may_trap, unknown]",
+      "block b3 @ 0x1008",
+      "  0x1008  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "conditional branch keeps two targets",
+    "address": "0x1200",
+    "code": [
+      "41 82 00 08 // beq cr0, 0x1208",
+      "4e 80 00 20 // blr",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc (32-bit, big-endian)",
+      "function sub_0x1200 @ 0x1200",
+      "block b1 @ 0x1200",
+      "  0x1200  v2:i32 = read_register %cr0 [read_register]",
+      "  0x1200  v1:i1 = intrinsic @cond.eq, v2 [read_register, unknown]",
+      "  0x1200  branch v1 -> b3, b2",
+      "block b2 @ 0x1204",
+      "  0x1204  return [may_trap, unknown]",
+      "block b3 @ 0x1208",
+      "  0x1208  return [may_trap, unknown]"
+    ]
+  }
+]

@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa"
 	"github.com/yaklang/yaklang/common/yak/reify/core/ssa2source"
 	ssapass "github.com/yaklang/yaklang/common/yak/reify/core/ssa2source/pass"
+	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -384,7 +385,7 @@ func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.
 		if symbol.Name != name && symbol.Mangled != name {
 			continue
 		}
-		if symbol.Address == 0 || symbol.Imported {
+		if symbol.Imported {
 			return core.Region{}, fmt.Errorf("function %q has no local body", name)
 		}
 		size := symbol.Size
@@ -394,6 +395,10 @@ func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.
 				return core.Region{}, fmt.Errorf("invalid --size %q", sizeText)
 			}
 			size = parsed
+		} else if size == 0 {
+			// Mach-O symbol entries carry no size. The next symbol in the same
+			// section bounds the function, and the section end bounds the last one.
+			size = inferredSymbolSize(artifact, symbol)
 		}
 		if size == 0 {
 			return core.Region{}, fmt.Errorf("function %q has an empty range", name)
@@ -401,6 +406,16 @@ func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.
 		return artifact.RegionAt(symbol.Address, size)
 	}
 	return core.Region{}, fmt.Errorf("symbol %q does not exist", name)
+}
+
+// inferredSymbolSize returns the byte range a symbol covers when the format
+// records no size. Zero is a legitimate symbol value in a relocatable object, so
+// the address itself is not evidence either way.
+func inferredSymbolSize(artifact *core.Artifact, symbol sym.Symbol) uint64 {
+	if artifact == nil || artifact.Image == nil {
+		return 0
+	}
+	return artifact.Image.InferredSymbolSize(symbol)
 }
 
 func displayRegion(artifact *core.Artifact, settings Config) core.Region {

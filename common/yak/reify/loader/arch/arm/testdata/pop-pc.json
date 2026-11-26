@@ -1,0 +1,136 @@
+[
+  {
+    "name": "pop with pc returns",
+    "address": "0x1000",
+    "code": [
+      "2a 00 a0 e3 // mov r0, #42",
+      "80 80 bd e8 // pop {r7, pc}"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i32 = constant 0x2a",
+      "  0x1000  write_register %r0, v1 [write_register]",
+      "  0x1004  v2:i32 = read_register %sp [read_register]",
+      "  0x1004  v3:i32 = load v2 [read_memory]",
+      "  0x1004  write_register %r7, v3 [write_register]",
+      "  0x1004  v4:i32 = constant 0x4",
+      "  0x1004  v5:ptr32 = add v2, v4",
+      "  0x1004  v6:i32 = load v5 [read_memory]",
+      "  0x1004  v7:i32 = read_register %sp [read_register]",
+      "  0x1004  v8:i32 = constant 0x8",
+      "  0x1004  v9:i32 = add v7, v8",
+      "  0x1004  write_register %sp, v9 [write_register]",
+      "  0x1004  return"
+    ]
+  },
+  {
+    "name": "pop pc alone returns",
+    "address": "0x1010",
+    "code": [
+      "2a 00 a0 e3 // mov r0, #42",
+      "00 80 bd e8 // pop {pc}"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x1010 @ 0x1010",
+      "block b1 @ 0x1010",
+      "  0x1010  v1:i32 = constant 0x2a",
+      "  0x1010  write_register %r0, v1 [write_register]",
+      "  0x1014  v2:i32 = read_register %sp [read_register]",
+      "  0x1014  v3:ptr32 = copy v2",
+      "  0x1014  v4:i32 = load v3 [read_memory]",
+      "  0x1014  v5:i32 = constant 0x4",
+      "  0x1014  v6:i32 = add v3, v5",
+      "  0x1014  write_register %sp, v6 [write_register]",
+      "  0x1014  return"
+    ]
+  },
+  {
+    "name": "pop with a saved register and pc returns",
+    "address": "0x1020",
+    "code": [
+      "2a 00 a0 e3 // mov r0, #42",
+      "10 80 bd e8 // pop {r4, pc}"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x1020 @ 0x1020",
+      "block b1 @ 0x1020",
+      "  0x1020  v1:i32 = constant 0x2a",
+      "  0x1020  write_register %r0, v1 [write_register]",
+      "  0x1024  v2:i32 = read_register %sp [read_register]",
+      "  0x1024  v3:i32 = load v2 [read_memory]",
+      "  0x1024  write_register %r4, v3 [write_register]",
+      "  0x1024  v4:i32 = constant 0x4",
+      "  0x1024  v5:ptr32 = add v2, v4",
+      "  0x1024  v6:i32 = load v5 [read_memory]",
+      "  0x1024  v7:i32 = read_register %sp [read_register]",
+      "  0x1024  v8:i32 = constant 0x8",
+      "  0x1024  v9:i32 = add v7, v8",
+      "  0x1024  write_register %sp, v9 [write_register]",
+      "  0x1024  return"
+    ]
+  },
+  {
+    "name": "bx lr returns",
+    "address": "0x1030",
+    "code": [
+      "2a 00 a0 e3 // mov r0, #42",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x1030 @ 0x1030",
+      "block b1 @ 0x1030",
+      "  0x1030  v1:i32 = constant 0x2a",
+      "  0x1030  write_register %r0, v1 [write_register]",
+      "  0x1034  v2:i32 = read_register %lr [read_register]",
+      "  0x1034  v3:ptr32 = copy v2",
+      "  0x1034  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "pop lr alone does not return",
+    "address": "0x1040",
+    "code": [
+      "2a 00 a0 e3 // mov r0, #42",
+      "10 40 bd e8 // pop {r4, lr}",
+      "1e ff 2f e1 // bx lr"
+    ],
+    "lowir": [
+      "target: linux/arm (32-bit, little-endian)",
+      "function sub_0x1040 @ 0x1040",
+      "block b1 @ 0x1040",
+      "  0x1040  v1:i32 = constant 0x2a",
+      "  0x1040  write_register %r0, v1 [write_register]",
+      "  0x1044  v2:i32 = read_register %sp [read_register]",
+      "  0x1044  v3:i32 = load v2 [read_memory]",
+      "  0x1044  write_register %r4, v3 [write_register]",
+      "  0x1044  v4:i32 = constant 0x4",
+      "  0x1044  v5:ptr32 = add v2, v4",
+      "  0x1044  v6:i32 = load v5 [read_memory]",
+      "  0x1044  write_register %lr, v6 [write_register]",
+      "  0x1044  v7:i32 = read_register %sp [read_register]",
+      "  0x1044  v8:i32 = constant 0x8",
+      "  0x1044  v9:i32 = add v7, v8",
+      "  0x1044  write_register %sp, v9 [write_register]",
+      "  0x1048  v10:i32 = read_register %lr [read_register]",
+      "  0x1048  v11:ptr32 = copy v10",
+      "  0x1048  return [may_trap, unknown]"
+    ]
+  }
+]

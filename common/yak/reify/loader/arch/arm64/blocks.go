@@ -29,7 +29,9 @@ func buildFunctions(decoded []instruction, start, end uint64, diagnostics *diagn
 		if target, ok := directTarget(ins); ok {
 			if target >= start && target < end {
 				starts[target] = true
-			} else if isBranch(ins.inst.Op) {
+			} else if isBranch(ins.inst.Op) && ins.inst.Op != arm64asm.BL {
+				// A BL outside the region is a call to another function, which is
+				// normal in a single-function region. Only a real branch is a defect.
 				diagnostics.add("branch-target-outside-region", fmt.Sprintf("control transfer at 0x%x targets 0x%x outside the decoded region", ins.address, target))
 			}
 		}

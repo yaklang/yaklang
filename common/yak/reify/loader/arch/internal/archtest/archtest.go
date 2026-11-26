@@ -37,6 +37,10 @@ type Fixture struct {
 	// from a literal pool or a string table. The bytes are appended to the same
 	// reader the code comes from.
 	Data []Section `json:"data"`
+	// Relocations lists the link-time fixes inside the region. A relocatable
+	// object leaves a PC-relative displacement at zero and records the target
+	// here, so a fixture for a relocatable object sets this field.
+	Relocations []Relocation `json:"relocations"`
 	// LowIR is the exact text the region must produce, minus the fact header.
 	LowIR []string `json:"lowir"`
 	// FrameRemoved is the number of instructions the stack-frame pass removes.
@@ -62,6 +66,15 @@ type Section struct {
 	// Text marks Bytes as literal text instead of hex, so a fixture can write
 	// "hello\0" directly.
 	Text bool `json:"text"`
+}
+
+// Relocation is one link-time fix at an address inside the region. The value is
+// the target address the linker would write and the symbol names it, matching
+// the two ways a parser resolves a relocation.
+type Relocation struct {
+	Address string `json:"address"`
+	Value   string `json:"value"`
+	Symbol  string `json:"symbol"`
 }
 
 // Symbol is one function symbol the fixture places in the image.
@@ -214,6 +227,16 @@ func buildArtifact(t *testing.T, config Config, testCase Fixture, address uint64
 			Address: mustAddress(t, item.Address),
 			Kind:    sym.SymbolFunction,
 		})
+	}
+	for _, item := range testCase.Relocations {
+		relocation := core.Relocation{Symbol: item.Symbol}
+		if item.Address != "" {
+			relocation.Address = mustAddress(t, item.Address)
+		}
+		if item.Value != "" {
+			relocation.Value = mustAddress(t, item.Value)
+		}
+		image.Relocations = append(image.Relocations, relocation)
 	}
 	return &core.Artifact{
 		Origin: core.Origin{Name: testCase.Name, Size: int64(len(code))},

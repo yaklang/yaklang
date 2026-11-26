@@ -1,0 +1,55 @@
+[
+  {
+    "name": "conditional branch splits the block",
+    "address": "0x1000",
+    "code": [
+      "85 0c 00 58 // beq $a0, $a1, 0x1010",
+      "00 00 40 03 // nop",
+      "20 00 00 4c // jirl $zero, $ra, 0",
+      "20 00 00 4c // jirl $zero, $ra, 0"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i64 = read_register %r4 [read_register]",
+      "  0x1000  v2:i64 = read_register %r5 [read_register]",
+      "  0x1000  v3:i1 = eq v1, v2",
+      "  0x1000  branch v3 -> b4, b2",
+      "block b2 @ 0x1004",
+      "  0x1004  v4:i64 = constant 0x0",
+      "  0x1004  v5:i64 = constant 0x0",
+      "  0x1004  v6:i64 = and v4, v5",
+      "  0x1008  jump -> b3",
+      "block b3 @ 0x1008",
+      "  0x1008  return [may_trap, unknown]",
+      "block b4 @ 0x100c",
+      "  0x100c  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "unconditional branch has one target",
+    "address": "0x1100",
+    "code": [
+      "00 10 10 50 // b 0x1210",
+      "00 00 40 03 // nop",
+      "20 00 00 4c // jirl $zero, $ra, 0",
+      "20 00 00 4c // jirl $zero, $ra, 0"
+    ],
+    "lowir": [
+      "target: linux/loong64 (64-bit, little-endian)",
+      "function sub_0x1100 @ 0x1100",
+      "block b1 @ 0x1100",
+      "  0x1100  jump 0x2110 [unknown]",
+      "block b2 @ 0x1104",
+      "  0x1104  v1:i64 = constant 0x0",
+      "  0x1104  v2:i64 = constant 0x0",
+      "  0x1104  v3:i64 = and v1, v2",
+      "  0x1108  jump -> b3",
+      "block b3 @ 0x1108",
+      "  0x1108  return [may_trap, unknown]",
+      "block b4 @ 0x110c",
+      "  0x110c  return [may_trap, unknown]"
+    ]
+  }
+]

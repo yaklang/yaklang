@@ -124,12 +124,13 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 			// The mode is per function: one ARM image mixes ARM and Thumb code.
 			target.Mode = boundary.Mode
 		}
-		parsed, err := artifact.Parser.Parse(ctx, core.ParseRequest{
+		parsed, err := parseFunctionSafely(ctx, artifact.Parser, core.ParseRequest{
 			Target:       target,
 			Address:      region.Address,
 			Reader:       reader,
 			Syntax:       config.Syntax,
 			WithAssembly: config.WithAssembly,
+			Relocations:  regionRelocations(artifact, region),
 		})
 		if err != nil {
 			// One undecodable function must not discard the whole image. Real
@@ -191,6 +192,28 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 		result.Diagnostics = filterCrossFunctionDiagnostics(result.Diagnostics)
 	}
 	return result, nil
+}
+
+// regionRelocations returns the relocations that rewrite bytes inside one
+// region. A relocatable object leaves a PC-relative displacement zero, so a
+// parser needs these to recover the real branch target.
+func regionRelocations(artifact *core.Artifact, region core.Region) []core.Relocation {
+	if artifact == nil || artifact.Image == nil || len(artifact.Image.Relocations) == 0 {
+		return nil
+	}
+	end := region.Address + region.Size
+	var result []core.Relocation
+	for _, relocation := range artifact.Image.Relocations {
+		if relocation.Address < region.Address || relocation.Address >= end {
+			continue
+		}
+		if relocation.Value == 0 {
+			// An undefined symbol has no address yet; the call keeps its name.
+			continue
+		}
+		result = append(result, relocation)
+	}
+	return result
 }
 
 // languageFacts returns the per-function override a compiler layer supplies.
@@ -284,6 +307,19 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 	return nil, core.BoundaryStats{}, fmt.Errorf("asm2lowir: no region, section or function selected")
 }
 
+// parseFunctionSafely decodes one function. A malformed instruction stream can
+// index outside its operands before the parser reports an error; the recovery
+// turns that into a diagnostic for this function instead of aborting the image.
+func parseFunctionSafely(ctx context.Context, parser core.Parser, request core.ParseRequest) (result *core.ParseResult, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = nil
+			err = fmt.Errorf("parser %s panicked: %v", parser.Name(), recovered)
+		}
+	}()
+	return parser.Parse(ctx, request)
+}
+
 func discoverWithParser(artifact *core.Artifact, hints core.BoundaryHints) ([]core.FunctionBoundary, core.BoundaryStats) {
 	discoverer, ok := artifact.Parser.(core.BoundaryDiscoverer)
 	if !ok {
@@ -302,11 +338,12 @@ func symbolBoundaries(artifact *core.Artifact) []core.FunctionBoundary {
 		return result
 	}
 	for _, symbol := range artifact.Image.Symbols {
-		if symbol.Kind != sym.SymbolFunction || symbol.Imported || symbol.Address == 0 {
+		if symbol.Kind != sym.SymbolFunction || symbol.Imported {
 			continue
 		}
 		// A function starts on at least a two-byte boundary on every supported
-		// target. ARM stores the Thumb marker in the low bit of the value.
+		// target. ARM stores the Thumb marker in the low bit of the value. A
+		// relocatable object may define its first function at address zero.
 		address := symbol.Address &^ 1
 		result = append(result, core.FunctionBoundary{Address: address, Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol})
 	}
@@ -388,10 +425,17 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		if symbol.Kind != sym.SymbolFunction {
 			return core.FunctionBoundary{}, fmt.Errorf("symbol %q is not a function", name)
 		}
-		if symbol.Imported || symbol.Address == 0 {
+		if symbol.Imported {
 			return core.FunctionBoundary{}, fmt.Errorf("function %q has no local body", name)
 		}
-		return core.FunctionBoundary{Address: codeAddress(symbol.Address), Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol}, nil
+		// A relocatable object places its first section at address zero, so a
+		// function value of zero is a real body. RegionAt rejects an address the
+		// image does not map.
+		size := symbol.Size
+		if size == 0 && artifact.Image != nil {
+			size = artifact.Image.InferredSymbolSize(symbol)
+		}
+		return core.FunctionBoundary{Address: codeAddress(symbol.Address), Size: size, Name: symbol.Name, Source: core.BoundarySymbol}, nil
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }

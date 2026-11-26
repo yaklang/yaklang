@@ -110,13 +110,19 @@ func inspectELF(reader *core.ByteReader) (*core.Image, core.Target, *core.Bounda
 	// A relocatable symbol value is relative to its section, so the loader adds
 	// the section base that the layout above assigned.
 	relocations := relativeRelocations(file)
-	descriptors := ppc64Descriptors(file, relocations)
+	descriptors := ppc64Descriptors(file, relocations, sectionBases)
 	parseELFSymbols(file, image, sectionBases, file.Type == elf.ET_REL, descriptors)
 	hints := parseELFHints(file, image, sectionBases)
 	// A PowerPC ELFv1 call reaches the function descriptor; the symbol lookup needs
 	// the code address it holds.
 	hints.OpdDescriptors = descriptors
 	image.Relocations = relocations
+	if file.Type == elf.ET_REL {
+		// A relocatable object leaves a call displacement zero and names the callee
+		// only in the relocation. Recording the symbol here is what keeps a call
+		// from resolving to the next instruction of the same section.
+		image.Relocations = append(image.Relocations, relocatableCodeRelocations(file, sectionBases)...)
+	}
 	return image, target, hints, nil, nil
 }
 
@@ -133,7 +139,7 @@ type elfRelocation struct {
 // descriptor in .opd: the first word is the entry point and the second the TOC.
 // Without the mapping a symbol reports an address in a data section, and the
 // parser has nothing to decode.
-func ppc64Descriptors(file *elf.File, relocations []core.Relocation) map[uint64]uint64 {
+func ppc64Descriptors(file *elf.File, relocations []core.Relocation, bases map[elf.SectionIndex]uint64) map[uint64]uint64 {
 	if file.Machine != elf.EM_PPC64 || file.ByteOrder != binary.BigEndian {
 		return nil
 	}
@@ -145,15 +151,42 @@ func ppc64Descriptors(file *elf.File, relocations []core.Relocation) map[uint64]
 	if err != nil {
 		return nil
 	}
+	opdBase := section.Addr
+	for index, candidate := range file.Sections {
+		if candidate == section {
+			if base, ok := bases[elf.SectionIndex(index)]; ok {
+				opdBase = base
+			}
+			break
+		}
+	}
 	// A position-independent image leaves the descriptor empty in the file and
 	// fills it through a relative relocation at load time.
 	written := make(map[uint64]uint64, len(relocations))
 	for _, relocation := range relocations {
 		written[relocation.Address] = relocation.Value
 	}
+	// A relocatable object leaves every descriptor word zero and fills it from
+	// .rela.opd. Each ADDR64 entry names the code section and the function
+	// offset, so the descriptor value is the section base plus both.
+	if relocationSection := file.Section(".rela.opd"); relocationSection != nil {
+		if symbols, err := file.Symbols(); err == nil {
+			for _, entry := range parseRelocationSection(file, relocationSection) {
+				if entry.symIndex == 0 || int(entry.symIndex) > len(symbols) {
+					continue
+				}
+				target := symbols[entry.symIndex-1]
+				value := target.Value + entry.addend
+				if base, ok := bases[target.Section]; ok {
+					value += base
+				}
+				written[opdBase+entry.offset] = value
+			}
+		}
+	}
 	descriptors := make(map[uint64]uint64, len(data)/8)
 	for offset := 0; offset+8 <= len(data); offset += 8 {
-		address := section.Addr + uint64(offset)
+		address := opdBase + uint64(offset)
 		entry := binary.BigEndian.Uint64(data[offset:])
 		if entry == 0 {
 			entry = written[address]
@@ -164,6 +197,107 @@ func ppc64Descriptors(file *elf.File, relocations []core.Relocation) map[uint64]
 		descriptors[address] = entry
 	}
 	return descriptors
+}
+
+// relocatableCodeRelocations records every relocation that rewrites an
+// executable section of a relocatable object. The value the linker writes is
+// not known yet, so the entry carries the symbol name instead; a consumer that
+// decodes a call can then name the callee.
+func relocatableCodeRelocations(file *elf.File, bases map[elf.SectionIndex]uint64) []core.Relocation {
+	symbols, err := file.Symbols()
+	if err != nil || len(symbols) == 0 {
+		return nil
+	}
+	var result []core.Relocation
+	for _, section := range file.Sections {
+		if section.Type != elf.SHT_RELA && section.Type != elf.SHT_REL {
+			continue
+		}
+		targetIndex := elf.SectionIndex(section.Info)
+		if int(targetIndex) >= len(file.Sections) {
+			continue
+		}
+		target := file.Sections[targetIndex]
+		if target.Flags&elf.SHF_EXECINSTR == 0 {
+			continue
+		}
+		entries := parseRelocationSection(file, section)
+		base, ok := bases[targetIndex]
+		if !ok {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.symIndex == 0 || int(entry.symIndex) > len(symbols) {
+				continue
+			}
+			symbol := symbols[entry.symIndex-1]
+			if symbol.Name == "" {
+				continue
+			}
+			// A defined symbol names an address in this object; the value the
+			// linker writes is its section base plus the symbol offset and the
+			// relocation addend. This is what a PC-relative branch or jump needs
+			// when its displacement is still zero before linking.
+			value := uint64(0)
+			if symbol.Section != elf.SHN_UNDEF {
+				if symbolBase, ok := bases[symbol.Section]; ok {
+					value = symbolBase + symbol.Value + entry.addend
+				}
+			}
+			result = append(result, core.Relocation{
+				Address: base + entry.offset,
+				Value:   value,
+				Symbol:  symbol.Name,
+			})
+		}
+	}
+	return result
+}
+
+// parseRelocationSection decodes the SHT_RELA or SHT_REL entries of one section.
+func parseRelocationSection(file *elf.File, section *elf.Section) []elfRelocation {
+	data, err := section.Data()
+	if err != nil {
+		return nil
+	}
+	hasAddend := section.Type == elf.SHT_RELA
+	var entrySize uint64
+	switch file.Class {
+	case elf.ELFCLASS64:
+		if hasAddend {
+			entrySize = 24
+		} else {
+			entrySize = 16
+		}
+	case elf.ELFCLASS32:
+		if hasAddend {
+			entrySize = 12
+		} else {
+			entrySize = 8
+		}
+	default:
+		return nil
+	}
+	result := make([]elfRelocation, 0, uint64(len(data))/entrySize)
+	for offset := uint64(0); offset+entrySize <= uint64(len(data)); offset += entrySize {
+		entry := elfRelocation{}
+		switch file.Class {
+		case elf.ELFCLASS64:
+			entry.offset = file.ByteOrder.Uint64(data[offset:])
+			entry.symIndex = elf.R_SYM64(file.ByteOrder.Uint64(data[offset+8:]))
+			if hasAddend {
+				entry.addend = file.ByteOrder.Uint64(data[offset+16:])
+			}
+		case elf.ELFCLASS32:
+			entry.offset = uint64(file.ByteOrder.Uint32(data[offset:]))
+			entry.symIndex = elf.R_SYM32(file.ByteOrder.Uint32(data[offset+4:]))
+			if hasAddend {
+				entry.addend = uint64(file.ByteOrder.Uint32(data[offset+8:]))
+			}
+		}
+		result = append(result, entry)
+	}
+	return result
 }
 
 func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionIndex]uint64, relocatable bool, descriptors map[uint64]uint64) {
@@ -195,16 +329,17 @@ func parseELFSymbols(file *elf.File, image *core.Image, bases map[elf.SectionInd
 				continue
 			}
 			address := symbol.Value
+			if relocatable {
+				// A relocatable value is relative to its section, and zero is a
+				// legitimate offset: the first function of a section starts at
+				// zero. Resolve it before the descriptor lookup, because the
+				// descriptor table is keyed by the laid-out address.
+				address = bases[symbol.Section] + symbol.Value
+			}
 			if entry, ok := descriptors[address]; ok {
 				// The symbol names a function descriptor; the code lives at the
 				// address the descriptor holds.
 				address = entry
-			}
-			if relocatable {
-				// A relocatable value is relative to its section, and zero is a
-				// legitimate offset: the first function of a section starts at
-				// zero.
-				address = bases[symbol.Section] + symbol.Value
 			}
 			add(sym.Symbol{
 				Name:    symbol.Name,

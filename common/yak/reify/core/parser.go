@@ -30,6 +30,11 @@ type ParseRequest struct {
 	Reader       *ByteReader
 	Syntax       AsmSyntax
 	WithAssembly bool
+	// Relocations lists the link-time fixes inside the region. A relocatable
+	// object leaves a PC-relative displacement zero and records the target
+	// only in a relocation; a parser that reads such a displacement must
+	// consult this list, or every branch resolves to the next word.
+	Relocations []Relocation
 }
 
 // AsmSyntax selects the textual assembly dialect. The empty value uses the
