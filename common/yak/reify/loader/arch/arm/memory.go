@@ -167,12 +167,20 @@ func (l *lifter) loadMultiple(ins instruction) {
 	}
 	pointer := l.addressFromBase(ins, base, displacement)
 	cursor := pointer
+	returns := false
 	for index, name := range registerList(list) {
 		if index > 0 {
 			offset := l.constant(ins.address, 4, 32)
 			cursor = l.addAddress(ins, cursor, offset)
 		}
 		value := l.loadValue(ins.address, cursor, 32)
+		if name == "pc" {
+			// Restoring pc from the stack is the epilogue: it transfers control to
+			// the caller's return address. Writing the register instead leaves the
+			// block without a terminator, and the region end turns it into a trap.
+			returns = true
+			continue
+		}
 		l.writeRegister(ins.address, name, 32, value)
 	}
 	if memory.Mode == armasm.AddrLDM_WB {
@@ -183,6 +191,9 @@ func (l *lifter) loadMultiple(ins instruction) {
 		}
 		updated := l.operation(ins, kind, []core.Operand{l.value(pointer), l.value(count)}, 32, core.EffectNone)
 		l.writeRegister(ins.address, base, 32, updated)
+	}
+	if returns {
+		l.emit(core.OpReturn, nil, nil, nil, core.EffectNone, ins.address)
 	}
 }
 
@@ -267,18 +278,29 @@ func (l *lifter) pop(ins instruction) {
 	}
 	names := registerList(list)
 	loadPointer := l.readRegister(ins.address, "sp", 32)
+	returns := false
 	for index, name := range names {
 		if index > 0 {
 			offset := l.constant(ins.address, 4, 32)
 			loadPointer = l.addAddress(ins, loadPointer, offset)
 		}
 		value := l.loadValue(ins.address, loadPointer, 32)
+		if name == "pc" {
+			// POP {..., pc} is the epilogue. The loaded value is the caller's
+			// return address, so the block ends with a return and not with a
+			// write to pc followed by a fall off the region.
+			returns = true
+			continue
+		}
 		l.writeRegister(ins.address, name, 32, value)
 	}
 	sp := l.readRegister(ins.address, "sp", 32)
 	count := l.constant(ins.address, uint64(4*len(names)), 32)
 	updated := l.operation(ins, core.OpAdd, []core.Operand{l.value(sp), l.value(count)}, 32, core.EffectNone)
 	l.writeRegister(ins.address, "sp", 32, updated)
+	if returns {
+		l.emit(core.OpReturn, nil, nil, nil, core.EffectNone, ins.address)
+	}
 }
 
 // branchOrCall lifts B and BL. A conditional branch carries the condition code

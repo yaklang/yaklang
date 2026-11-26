@@ -104,14 +104,25 @@ func TestMIPSLiftsArithmeticAndReturn(t *testing.T) {
 }
 
 func TestMIPSBranchesAndCalls(t *testing.T) {
-	// beq a0, a1, +8 ; nop ; jr ra
-	result := parseAt(t, 0x10100, words(0x10850002, 0x00000000, 0x03e00008))
+	// beq a0, a1, +8 ; nop ; addiu a0, a0, 1 ; jr ra ; nop
+	// The delay slot executes before the branch, and the taken target is the
+	// instruction after the delay slot.
+	result := parseAt(t, 0x10100, words(0x10850002, 0x00000000, 0x24840001, 0x03e00008, 0x00000000))
 	branch, ok := findInstruction(result.IR, core.OpBranch, nil)
 	if !ok || len(branch.Targets) != 2 {
 		t.Fatalf("conditional branch has no two targets: %+v", branch)
 	}
-	// jal 0x10118 ; nop ; jr ra
-	result = parseAt(t, 0x10110, words(0x0c004006, 0x00000000, 0x03e00008))
+	addresses := map[uint64]bool{}
+	for _, function := range result.IR.Functions {
+		for _, block := range function.Blocks {
+			addresses[block.Address] = true
+		}
+	}
+	if !addresses[0x10108] || !addresses[0x1010c] {
+		t.Fatalf("branch targets are wrong: %+v", addresses)
+	}
+	// jal 0x10118 ; nop ; jr ra ; nop
+	result = parseAt(t, 0x10110, words(0x0c004006, 0x00000000, 0x03e00008, 0x00000000))
 	if _, ok := findInstruction(result.IR, core.OpCall, nil); !ok {
 		t.Fatal("jal did not lift to a call")
 	}

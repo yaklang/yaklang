@@ -26,6 +26,7 @@ type structurer struct {
 	ipdom       map[int64]int64
 	loops       map[int64]*loopInfo
 	loopHeaders map[int64]bool
+	loopExit    int64
 	emitted     map[int64]bool
 	rendered    map[int64]int
 	// printedMergePhi marks a phi already written by the arm that supplies it.
@@ -304,10 +305,18 @@ func (s *structurer) emitRegionInternal(id int64, indent string, stop map[int64]
 	}
 	s.renderBlockInstructions(block, indent, 0)
 	if jump := blockJump(block); jump != nil {
+		if jump.To == s.loopExit {
+			fmt.Fprintf(s.text, "%sbreak;\n", indent)
+			return
+		}
 		s.emitRegion(jump.To, indent, stop)
 		return
 	}
 	for _, succ := range s.succs[id] {
+		if succ == s.loopExit {
+			fmt.Fprintf(s.text, "%sbreak;\n", indent)
+			return
+		}
 		s.emitRegion(succ, indent, stop)
 		return
 	}
@@ -369,7 +378,16 @@ func (s *structurer) emitIf(block *ssa.BasicBlock, instruction *ssa.If, indent s
 }
 
 func (s *structurer) emitBranch(id int64, indent string, stop map[int64]bool) {
-	if id == 0 || stop[id] {
+	if id == 0 {
+		return
+	}
+	// Inside a loop body a branch to the exit is a break. The exit block is
+	// emitted once after the loop, so the arm stays a single statement.
+	if id == s.loopExit {
+		fmt.Fprintf(s.text, "%sbreak;\n", indent)
+		return
+	}
+	if stop[id] {
 		return
 	}
 	s.emitRegionInternal(id, indent, stop, s.emitted[id])
@@ -446,6 +464,14 @@ func (s *structurer) emitLoop(loop *loopInfo, indent string, stop map[int64]bool
 			condition = negatedCondition(ifInstruction, ifInstruction.Cond)
 			bodyStart = ifInstruction.False
 			exit = ifInstruction.True
+		case loop.body[ifInstruction.True] && loop.body[ifInstruction.False]:
+			// Both arms stay inside the loop, so the header branch does not leave
+			// it: it only selects which path computes the loop test. Clang -O0
+			// emits that path as "exit when the test is true", so the continuation
+			// condition is the negation and the false arm reaches the body. The
+			// test itself is re-rendered at the back edge.
+			condition = negatedCondition(ifInstruction, ifInstruction.Cond)
+			bodyStart = ifInstruction.False
 		default:
 			bodyStart = ifInstruction.True
 		}
@@ -471,12 +497,19 @@ func (s *structurer) emitLoop(loop *loopInfo, indent string, stop map[int64]bool
 	if bodyStart != 0 {
 		bodyStop := copyStop(stop)
 		bodyStop[loop.header] = true
-		if exit != 0 {
-			bodyStop[exit] = true
-		}
+		// A branch to the exit from inside the body is a break. The exit block
+		// itself is emitted after the loop, so the arm does not inline it.
+		previousExit := s.loopExit
+		s.loopExit = exit
 		s.emitRegion(bodyStart, indent+"  ", bodyStop)
+		s.loopExit = previousExit
 	}
 	s.emitLoopPhis(loop, header, indent+"  ", true)
+	// The header's own instructions compute the next iteration's condition from the
+	// values the back edge just wrote. They ran once before the loop; repeating
+	// them here is what makes the while condition depend on the current index
+	// instead of the value it had at entry.
+	s.renderBlockInstructions(header, indent+"  ", conditionID)
 	fmt.Fprintf(s.text, "%s}\n", indent)
 	if exit != 0 {
 		s.emitRegion(exit, indent, stop)

@@ -26,6 +26,7 @@ func foldReturnTails(function *core.Function, facts core.ArchFacts) {
 	}
 	returnLike := make(map[core.BlockID]bool)
 	visiting := make(map[core.BlockID]bool)
+	returnView := registerViewFor(returnRegister, returnBits)
 	var isReturnLike func(core.BlockID) bool
 	isReturnLike = func(id core.BlockID) bool {
 		if result, ok := returnLike[id]; ok {
@@ -42,17 +43,21 @@ func foldReturnTails(function *core.Function, facts core.ArchFacts) {
 		defer delete(visiting, id)
 		last := block.Instructions[len(block.Instructions)-1]
 		result := false
+		// A tail that writes the return register is not a return tail: the write
+		// would be skipped and the function would return an earlier value. Clang
+		// -O0 emits such a shared epilogue (load the result slot into x0/w0), and
+		// folding it reports the value of an argument instead of the result.
 		switch last.Kind {
 		case core.OpReturn:
-			result = !blockHasReturningCall(block)
+			result = !blockWritesReturnRegister(block, returnView) && !blockHasReturningCall(block)
 		case core.OpJump:
-			if len(last.Targets) == 1 && !blockHasReturningCall(block) {
+			if len(last.Targets) == 1 && !blockWritesReturnRegister(block, returnView) && !blockHasReturningCall(block) {
 				result = isReturnLike(last.Targets[0])
 			}
 		case core.OpBranch:
 			// A branch is only return-like when both arms reach a return without
 			// calling a function that may change the return value.
-			if len(last.Targets) == 2 && !blockHasReturningCall(block) {
+			if len(last.Targets) == 2 && !blockWritesReturnRegister(block, returnView) && !blockHasReturningCall(block) {
 				result = isReturnLike(last.Targets[0]) && isReturnLike(last.Targets[1])
 			}
 		}
@@ -82,6 +87,28 @@ func foldReturnTails(function *core.Function, facts core.ArchFacts) {
 			Address: last.Address,
 		}
 	}
+}
+
+// blockWritesReturnRegister reports whether a block writes the value the
+// function returns. The write can name a narrow view of the register, so both
+// sides are canonicalized first.
+func blockWritesReturnRegister(block core.Block, returnView registerView) bool {
+	if returnView.canonical == "" {
+		return false
+	}
+	for _, instruction := range block.Instructions {
+		if instruction.Kind != core.OpWriteRegister || len(instruction.Operands) == 0 {
+			continue
+		}
+		operand := instruction.Operands[0]
+		if operand.Kind != core.OperandRegister {
+			continue
+		}
+		if registerViewFor(operand.Name, operand.Type.Bits).canonical == returnView.canonical {
+			return true
+		}
+	}
+	return false
 }
 
 func blockHasReturningCall(block core.Block) bool {

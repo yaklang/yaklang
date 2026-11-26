@@ -87,6 +87,35 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		}
 		l.writeRegister(ins.address, register, bits, value)
 		return value, true
+	case "ext", "dext", "ins", "dins":
+		if len(ins.operands) != 4 {
+			return 0, false
+		}
+		destination := registerName(ins.operands[0].register)
+		source := l.readRegister(ins.address, registerName(ins.operands[1].register), bits)
+		position := ins.operands[2].immediat
+		size := ins.operands[3].immediat
+		if position < 0 || size <= 0 || position+size > 64 {
+			return 0, false
+		}
+		mask := uint64(1)<<uint(size) - 1
+		shift := l.constant(ins.address, uint64(position), bits)
+		if ins.op == "ext" || ins.op == "dext" {
+			shifted := l.operation(ins, core.OpLShr, []core.Operand{l.value(source), l.value(shift)}, bits, core.EffectNone)
+			field := l.constant(ins.address, mask, bits)
+			result := l.operation(ins, core.OpAnd, []core.Operand{l.value(shifted), l.value(field)}, bits, core.EffectNone)
+			l.writeRegister(ins.address, destination, bits, result)
+			return result, true
+		}
+		// INS/DINS keeps the bits outside the field. The masked field is shifted
+		// into place and ORed over the cleared destination.
+		current := l.readRegister(ins.address, destination, bits)
+		cleared := l.operation(ins, core.OpAnd, []core.Operand{l.value(current), l.value(l.constant(ins.address, ^(mask << uint(position)), bits))}, bits, core.EffectNone)
+		field := l.operation(ins, core.OpAnd, []core.Operand{l.value(source), l.value(l.constant(ins.address, mask, bits))}, bits, core.EffectNone)
+		placed := l.operation(ins, core.OpShl, []core.Operand{l.value(field), l.value(shift)}, bits, core.EffectNone)
+		result := l.operation(ins, core.OpOr, []core.Operand{l.value(cleared), l.value(placed)}, bits, core.EffectNone)
+		l.writeRegister(ins.address, destination, bits, result)
+		return result, true
 	case "mult", "multu", "div", "divu", "dmult", "dmultu", "ddiv", "ddivu":
 		if len(ins.operands) != 2 {
 			return 0, false
@@ -337,6 +366,17 @@ func (l *lifter) branch(ins instruction) {
 	}
 	bits := l.profile.Bits
 	name := ins.op
+	// beq $zero, $zero, target is the assembler's spelling of an unconditional
+	// branch, and bne $x, $x never branches. Treating either as a real comparison
+	// produces an always-true or always-false If, not a conditional branch.
+	if (name == "beq" || name == "beql") && sameRegister(ins.operands[0], ins.operands[1]) {
+		l.emitBranchlessJump(ins, target)
+		return
+	}
+	if (name == "bne" || name == "bnel") && sameRegister(ins.operands[0], ins.operands[1]) {
+		l.emitFallthroughOnly(ins)
+		return
+	}
 	left := l.readRegister(ins.address, registerName(ins.operands[0].register), bits)
 	var right core.ValueID
 	if len(ins.operands) == 3 {
@@ -388,13 +428,45 @@ func (l *lifter) branch(ins instruction) {
 	l.emitBranch(ins, condition, target)
 }
 
+// emitBranchlessJump writes a branch whose condition is always true as a plain
+// jump. The delay slot still runs first; the caller lifts it before this
+// instruction.
+func (l *lifter) emitBranchlessJump(ins instruction, target uint64) {
+	if block, ok := l.blockIDs[target]; ok {
+		l.emit(core.OpJump, nil, nil, []core.BlockID{block}, core.EffectNone, ins.address)
+		return
+	}
+	l.emit(core.OpJump, []core.Operand{pointerOperand(target, l.profile.Bits)}, nil, nil, core.EffectUnknown, ins.address)
+}
+
+// emitFallthroughOnly writes a branch that never branches as a jump to the next
+// block, so the block keeps one successor.
+func (l *lifter) emitFallthroughOnly(ins instruction) {
+	next := ins.address + uint64(ins.size) + delaySlotSize(ins.op)
+	if block, ok := l.blockIDs[next]; ok {
+		l.emit(core.OpJump, nil, nil, []core.BlockID{block}, core.EffectNone, ins.address)
+		return
+	}
+	l.emit(core.OpNop, nil, nil, nil, core.EffectNone, ins.address)
+}
+
+// sameRegister reports whether two operands name the same register.
+func sameRegister(left, right operand) bool {
+	if left.kind != operandRegister || right.kind != operandRegister {
+		return false
+	}
+	return left.register == right.register
+}
+
 // emitBranch writes one branch with both successors.
 func (l *lifter) emitBranch(ins instruction, condition core.ValueID, target uint64) {
 	targets := []core.BlockID{}
 	if block, ok := l.blockIDs[target]; ok {
 		targets = append(targets, block)
 	}
-	next := ins.address + uint64(ins.size)
+	// The delay slot runs before the branch decides, so the fall-through block
+	// starts after it, not at it.
+	next := ins.address + uint64(ins.size) + delaySlotSize(ins.op)
 	if block, ok := l.blockIDs[next]; ok && !containsBlock(targets, block) {
 		targets = append(targets, block)
 	}

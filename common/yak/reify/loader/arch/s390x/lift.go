@@ -605,6 +605,20 @@ func (l *lifter) immediateForm(ins instruction) (core.ValueID, bool) {
 	if !hasImmediate {
 		return 0, false
 	}
+	// A compare with an immediate writes only the condition code. Treating it as
+	// an ALU operation would overwrite the compared register and leave cond.*
+	// without a comparison to resolve against.
+	if isCompareRegister(name) {
+		left, ok := l.readRegisterValue(ins, destination, bits)
+		if !ok {
+			return 0, false
+		}
+		flags := l.operation(ins, core.OpIntrinsic, []core.Operand{
+			symbolOperand(core.FlagsIntrinsicPrefix + "cmp"), l.value(left), l.value(right),
+		}, 2, core.EffectNone)
+		l.writeRegister(ins.address, "cc", 2, flags)
+		return flags, true
+	}
 	kind, ok := immediateOpcode(name)
 	if !ok {
 		// An mnemonic with no ALU mapping but a register and an immediate is

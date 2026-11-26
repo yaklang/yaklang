@@ -306,7 +306,15 @@ func frameHasStore(group frameGroup) bool { return frameHasKind(group, core.OpSt
 func frameHasLoad(group frameGroup) bool  { return frameHasKind(group, core.OpLoad) }
 
 func markFrameGroup(removed map[instructionRef]bool, group frameGroup) {
+	// A teardown group can share its address with the terminator: the ARM
+	// epilogue restores the frame pointer with a pop whose last register is pc,
+	// and the return recorded for it carries the same address. Removing the
+	// whole group would delete the terminator and leave the block without a
+	// return, so the terminator always survives.
 	for _, item := range group.instructions {
+		if item.instruction.Kind == core.OpReturn || item.instruction.Kind == core.OpTrap {
+			continue
+		}
 		removed[item.ref] = true
 	}
 }

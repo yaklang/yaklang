@@ -102,8 +102,18 @@ func isFloat(name string) bool {
 }
 
 // branchTarget returns the static target of a branch or jump. A zero offset is
-// a valid target (a self-loop), so it is not skipped.
+// a valid target (a self-loop), so it is not skipped. Only a PC-relative control
+// transfer consults the relocation table: an auipc carries a relocation for the
+// data address it materializes, and that address is not a branch target.
 func branchTarget(ins instruction) (uint64, bool) {
+	name := trimmed(opName(ins.inst.Op))
+	control := isBranch(name) || name == "jal" || name == "j" || name == "c.jal" || name == "c.j"
+	if !control {
+		return 0, false
+	}
+	if ins.hasTarget {
+		return ins.target, true
+	}
 	for _, arg := range ins.inst.Args {
 		if arg == nil {
 			break

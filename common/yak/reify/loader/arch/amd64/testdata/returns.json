@@ -1,0 +1,40 @@
+[
+  {
+    "name": "ret returns the value in rax",
+    "address": "0x401000",
+    "code": [
+      "48 c7 c0 2a 00 00 00 // mov rax, 0x2a",
+      "c3 // ret"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401000 @ 0x401000",
+      "block b1 @ 0x401000",
+      "  0x401000  v1:i64 = constant 0x2a",
+      "  0x401000  write_register %rax, v1 [write_register]",
+      "  0x401007  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "mov eax zero extends the return value",
+    "address": "0x401010",
+    "code": [
+      "b8 ff ff ff ff // mov eax, -1",
+      "c3 // ret"
+    ],
+    "source": [
+      "return 0xffffffff;"
+    ],
+    "lowir": [
+      "target: linux/amd64 (64-bit, little-endian)",
+      "function sub_0x401010 @ 0x401010",
+      "block b1 @ 0x401010",
+      "  0x401010  v1:i32 = constant 0xffffffff",
+      "  0x401010  write_register %eax, v1 [write_register]",
+      "  0x401015  return [may_trap, unknown]"
+    ]
+  }
+]

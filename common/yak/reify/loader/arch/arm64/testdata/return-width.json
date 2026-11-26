@@ -1,0 +1,94 @@
+[
+  {
+    "name": "w0 write returns through x0",
+    "address": "0x1000",
+    "code": [
+      "40 05 80 52 // mov w0, #42",
+      "c0 03 5f d6 // ret"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i32 = constant 0x2a",
+      "  0x1000  write_register %w0, v1 [write_register]",
+      "  0x1004  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "x0 write returns",
+    "address": "0x1010",
+    "code": [
+      "40 05 80 d2 // mov x0, #42",
+      "c0 03 5f d6 // ret"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x1010 @ 0x1010",
+      "block b1 @ 0x1010",
+      "  0x1010  v1:i64 = constant 0x2a",
+      "  0x1010  write_register %x0, v1 [write_register]",
+      "  0x1014  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "a bl outside the region is a call, not a bad branch",
+    "address": "0x1020",
+    "code": [
+      "00 08 00 94 // bl 0x3020",
+      "c0 03 5f d6 // ret"
+    ],
+    "diagnostics": [],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x1020 @ 0x1020",
+      "block b1 @ 0x1020",
+      "  0x1020  call 0x3020 [call, may_trap, unknown]",
+      "  0x1024  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "a b outside the region is still diagnosed",
+    "address": "0x1030",
+    "code": [
+      "00 06 00 14 // b 0x2830",
+      "c0 03 5f d6 // ret"
+    ],
+    "diagnostics": [
+      "branch-target-outside-region"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x1030 @ 0x1030",
+      "block b1 @ 0x1030",
+      "  0x1030  jump 0x2830 [unknown]",
+      "block b2 @ 0x1034",
+      "  0x1034  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "movz w0 zero extends the return value",
+    "address": "0x1040",
+    "code": [
+      "e0 ff 9f 52 // mov w0, #0xffff",
+      "c0 03 5f d6 // ret"
+    ],
+    "source": [
+      "return 0xffff;"
+    ],
+    "lowir": [
+      "target: darwin/arm64 (64-bit, little-endian)",
+      "function sub_0x1040 @ 0x1040",
+      "block b1 @ 0x1040",
+      "  0x1040  v1:i32 = constant 0xffff",
+      "  0x1040  write_register %w0, v1 [write_register]",
+      "  0x1044  return [may_trap, unknown]"
+    ]
+  }
+]

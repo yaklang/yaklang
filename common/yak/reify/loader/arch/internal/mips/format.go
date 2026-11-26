@@ -215,6 +215,11 @@ func buildPrimary(name, layout string, raw uint32, rs, rt, rd, sa int, simm, uim
 
 // decodeSpecial handles opcode 0: the register-register and shift forms.
 func decodeSpecial(raw uint32, rs, rt, rd, sa int, funct uint32, profile Profile) (instruction, bool) {
+	// The all-zero word is the canonical NOP: sll $zero, $zero, 0. Naming it
+	// keeps the delay slot readable instead of lifting three dead constants.
+	if raw == 0 {
+		return instruction{op: "nop"}, true
+	}
 	type entry struct {
 		name   string
 		layout string
@@ -364,35 +369,39 @@ func decodeSpecial2(raw uint32, rs, rt, rd, sa int, funct uint32, profile Profil
 }
 
 func decodeSpecial3(raw uint32, rs, rt, rd, sa int, funct uint32, profile Profile) (instruction, bool) {
-	// MOVZ/MOVN select a value from two registers; LWL/LWR and friends move
-	// bit field halves.
-	switch func2(raw) {
-	case 0x00:
-		if funct == 0x3b {
-			// RDHWR: 011111|00000|rt:5|rd:5|00000|111011. rd receives the value
-			// of the hardware register that rt selects.
-			return instruction{op: "rdhwr", operands: []operand{
-				{kind: operandRegister, register: rd},
-				{kind: operandRegister, register: rt},
-			}}, true
+	// SPECIAL3 splits by function: EXT/DEXT extract a bit field, INS/DINS insert
+	// one, and RDHWR reads a hardware register. EXT and INS operate on 32 bits;
+	// DEXT and DINS read the 64-bit register.
+	switch funct {
+	case 0x3b:
+		// RDHWR: 011111|00000|rt:5|rd:5|00000|111011. rd receives the value
+		// of the hardware register that rt selects.
+		return instruction{op: "rdhwr", operands: []operand{
+			{kind: operandRegister, register: rd},
+			{kind: operandRegister, register: rt},
+		}}, true
+	case 0x00, 0x03:
+		name := "ext"
+		if funct == 0x03 {
+			name = "dext"
 		}
-		if funct == 0x00 {
-			return instruction{op: "ext", operands: []operand{
-				{kind: operandRegister, register: rt},
-				{kind: operandRegister, register: rs},
-				{kind: operandImmediate, immediat: int64((raw >> 6) & 0x1f)},
-				{kind: operandImmediate, immediat: int64(((raw >> 11) & 0x1f) + 1)},
-			}}, true
+		return instruction{op: name, operands: []operand{
+			{kind: operandRegister, register: rt},
+			{kind: operandRegister, register: rs},
+			{kind: operandImmediate, immediat: int64(sa)},
+			{kind: operandImmediate, immediat: int64(rd + 1)},
+		}}, true
+	case 0x04, 0x07:
+		name := "ins"
+		if funct == 0x07 {
+			name = "dins"
 		}
-	case 0x04:
-		if funct == 0x00 {
-			return instruction{op: "ins", operands: []operand{
-				{kind: operandRegister, register: rt},
-				{kind: operandRegister, register: rs},
-				{kind: operandImmediate, immediat: int64((raw >> 6) & 0x1f)},
-				{kind: operandImmediate, immediat: int64(((raw >> 11) & 0x1f) - ((raw >> 6) & 0x1f) + 1)},
-			}}, true
-		}
+		return instruction{op: name, operands: []operand{
+			{kind: operandRegister, register: rt},
+			{kind: operandRegister, register: rs},
+			{kind: operandImmediate, immediat: int64(sa)},
+			{kind: operandImmediate, immediat: int64(rd - sa + 1)},
+		}}, true
 	}
 	return instruction{}, false
 }

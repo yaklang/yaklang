@@ -1,0 +1,151 @@
+[
+  {
+    "name": "branch target comes from the relocation",
+    "address": "0x1000",
+    "code": [
+      "63 00 b5 00 // beq a0, a1, 0",
+      "67 80 00 00 // ret",
+      "13 00 00 00 // nop",
+      "67 80 00 00 // ret"
+    ],
+    "relocations": [
+      {
+        "address": "0x1000",
+        "value": "0x100c"
+      }
+    ],
+    "diagnostics": [],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  v1:i32 = read_register %x10 [read_register]",
+      "  0x1000  v2:i32 = read_register %x11 [read_register]",
+      "  0x1000  v3:i1 = eq v1, v2",
+      "  0x1000  branch v3 -> b4, b2",
+      "block b2 @ 0x1004",
+      "  0x1004  v4:i32 = read_register %x1 [read_register]",
+      "  0x1004  v5:ptr32 = copy v4",
+      "  0x1004  return [may_trap, unknown]",
+      "block b3 @ 0x1008",
+      "  0x1008  v6:i32 = constant 0x0",
+      "  0x1008  v7:i32 = constant 0x0",
+      "  0x1008  v8:i32 = add v6, v7",
+      "  0x100c  jump -> b4",
+      "block b4 @ 0x100c",
+      "  0x100c  v9:i32 = read_register %x1 [read_register]",
+      "  0x100c  v10:ptr32 = copy v9",
+      "  0x100c  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "auipc materializes the relocation target",
+    "address": "0x2000",
+    "code": [
+      "17 05 00 00 // auipc a0, 0",
+      "13 05 05 00 // addi a0, a0, 0",
+      "67 80 00 00 // ret"
+    ],
+    "data": [
+      {
+        "name": ".rodata",
+        "address": "0x3000",
+        "bytes": "point\\0",
+        "text": true
+      }
+    ],
+    "relocations": [
+      {
+        "address": "0x2000",
+        "value": "0x3000"
+      }
+    ],
+    "diagnostics": [],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function sub_0x2000 @ 0x2000",
+      "block b1 @ 0x2000",
+      "  0x2000  v1:ptr32 = constant 0x3000",
+      "  0x2000  write_register %x10, v1 [write_register]",
+      "  0x2004  v2:i32 = read_register %x10 [read_register]",
+      "  0x2004  v3:i32 = constant 0x0",
+      "  0x2004  v4:i32 = add v2, v3",
+      "  0x2004  write_register %x10, v4 [write_register]",
+      "  0x2008  v5:i32 = read_register %x1 [read_register]",
+      "  0x2008  v6:ptr32 = copy v5",
+      "  0x2008  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "auipc call names the callee",
+    "address": "0x4000",
+    "code": [
+      "97 00 00 00 // auipc ra, 0",
+      "e7 80 00 00 // jalr ra",
+      "67 80 00 00 // ret"
+    ],
+    "symbols": [
+      {
+        "name": "callee",
+        "address": "0x4008"
+      }
+    ],
+    "relocations": [
+      {
+        "address": "0x4000",
+        "value": "0x4008",
+        "symbol": "callee"
+      }
+    ],
+    "source": [
+      "callee("
+    ],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function callee @ 0x4008",
+      "block b1 @ 0x4008",
+      "  0x4008  v1:i32 = read_register %x1 [read_register]",
+      "  0x4008  v2:ptr32 = copy v1",
+      "  0x4008  return [may_trap, unknown]"
+    ]
+  },
+  {
+    "name": "call names an undefined relocation symbol",
+    "address": "0x5000",
+    "code": [
+      "97 00 00 00 // auipc ra, 0",
+      "e7 80 00 00 // jalr ra",
+      "13 00 00 00 // nop",
+      "67 80 00 00 // ret"
+    ],
+    "relocations": [
+      {
+        "address": "0x5000",
+        "symbol": "printf"
+      }
+    ],
+    "source": [
+      "printf("
+    ],
+    "lowir": [
+      "target: linux/riscv32 (32-bit, little-endian)",
+      "function sub_0x5000 @ 0x5000",
+      "block b1 @ 0x5000",
+      "  0x5000  v1:ptr32 = constant 0x5000",
+      "  0x5000  write_register %x1, v1 [write_register]",
+      "  0x5004  v2:i32 = read_register %x1 [read_register]",
+      "  0x5004  v3:ptr32 = copy v2",
+      "  0x5004  call @printf [call, may_trap, unknown]",
+      "  0x5004  v4:i32 = constant 0x5008",
+      "  0x5004  write_register %x1, v4 [write_register]",
+      "  0x5008  jump -> b2",
+      "block b2 @ 0x5008",
+      "  0x5008  v5:i32 = constant 0x0",
+      "  0x5008  v6:i32 = constant 0x0",
+      "  0x5008  v7:i32 = add v5, v6",
+      "  0x500c  v8:i32 = read_register %x1 [read_register]",
+      "  0x500c  v9:ptr32 = copy v8",
+      "  0x500c  return [may_trap, unknown]"
+    ]
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "name": "unconditional branch has one target",
+    "address": "0x1000",
+    "code": [
+      "48 00 00 08 // b 0x1008",
+      "4e 80 00 20 // blr",
+      "4e 80 00 20 // blr"
+    ],
+    "lowir": [
+      "target: linux/ppc64 (64-bit, big-endian)",
+      "function sub_0x1000 @ 0x1000",
+      "block b1 @ 0x1000",
+      "  0x1000  jump -> b3",
+      "block b2 @ 0x1004",
+      "  0x1004  return [may_trap, unknown]",
+      "block b3 @ 0x1008",
+      "  0x1008  return [may_trap, unknown]"
+    ]
+  }
+]

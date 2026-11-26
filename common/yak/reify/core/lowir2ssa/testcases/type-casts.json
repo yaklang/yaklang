@@ -20,16 +20,17 @@
     "entry_0: (<nil condition>)",
     "<i8> t2    = type_cast[i8] <i64> arg0",
     "<i32> t3   = type_cast[i32] <i8> t2",
-    "<i64> t4   = type_cast[i64] <i32> t3",
-    "<ptr64> t5 = type_cast[ptr64] <i64> t4",
-    "<any> t6   = call <ptr64> t5 () binding[] member[]",
-    "ret <ptr64> t5",
+    "<int32> t4 = type_cast[int32] <i32> t3",
+    "<int64> t5 = type_cast[int64] <int32> t4",
+    "<ptr64> t6 = type_cast[ptr64] <int64> t5",
+    "<any> t7   = call <ptr64> t6 () binding[] member[]",
+    "ret <ptr64> t6",
     ""
   ],
   "source": [
     "void * convert(uint64_t arg0) {",
-    "    v6 = (void *)((uint32_t)((uint8_t)arg0))();",
-    "    return (void *)((uint32_t)((uint8_t)arg0));",
+    "    v7 = (void *)((int32_t)((uint8_t)arg0))();",
+    "    return (void *)((int32_t)((uint8_t)arg0));",
     "}",
     "",
     ""

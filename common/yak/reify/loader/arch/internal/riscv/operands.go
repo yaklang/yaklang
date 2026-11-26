@@ -32,13 +32,19 @@ func (l *lifter) arithmetic(ins instruction) (core.ValueID, bool) {
 		return value, true
 	case "auipc":
 		// AUIPC adds the immediate, shifted left by twelve, to the address of
-		// the instruction.
+		// the instruction. In a relocatable object the immediate is zero and the
+		// relocation names the real target, so it wins when present.
 		if len(arguments) != 2 {
 			return 0, false
 		}
 		destination, _, ok := registerName(argRegister(arguments[0]))
 		if !ok {
 			return 0, false
+		}
+		if ins.hasTarget {
+			value := l.pointerConstant(ins.address, ins.target)
+			l.writeRegister(ins.address, destination, bits, value)
+			return value, true
 		}
 		immediate, ok := upperImmediate(arguments[1])
 		if !ok {

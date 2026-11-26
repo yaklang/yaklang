@@ -98,5 +98,8 @@ func branchTarget(ins instruction) (uint64, bool) {
 	if !isBranch(ins.op) {
 		return 0, false
 	}
-	return ins.address + uint64(last.immediat), true
+	// A PC-relative branch counts from the delay slot, which is the word after
+	// the branch. Adding the raw offset to the branch address lands on the delay
+	// slot and makes every conditional branch target itself.
+	return ins.address + 4 + uint64(last.immediat), true
 }

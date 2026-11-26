@@ -259,8 +259,22 @@ func (l *lifter) branch(ins instruction) {
 	// A branch that ignores the condition register has one successor. Listing the
 	// instruction after it as a second successor invents a condition the program
 	// never tests.
-	if len(targets) == 1 || unconditionalBranch(ins, name) {
+	if len(targets) == 1 {
 		l.emit(core.OpJump, nil, nil, targets[:1], core.EffectNone, ins.address)
+		return
+	}
+	if unconditionalBranch(ins, name) {
+		// An unconditional branch never falls through. Reporting the following
+		// block as a second successor invents an edge the program does not take,
+		// and a two-target jump has no static successor in the SSA layer.
+		if len(targets) > 0 {
+			l.emit(core.OpJump, nil, nil, targets[:1], core.EffectNone, ins.address)
+			return
+		}
+		// An unconditional branch whose target lies outside the decoded region has
+		// no successor to record. Emitting the jump without a target keeps the
+		// control transfer visible; slicing an empty list would panic.
+		l.emit(core.OpJump, nil, nil, targets, core.EffectUnknown, ins.address)
 		return
 	}
 	condition := l.newValue(core.TypeInteger, 1)

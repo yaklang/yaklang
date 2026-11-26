@@ -25,10 +25,12 @@ type Section struct {
 
 // Relocation states the value a loader writes at an address before the program
 // runs. A position-independent image leaves zero in the file and relies on the
-// dynamic linker, so reading the bytes alone is not enough.
+// dynamic linker, so reading the bytes alone is not enough. A relocatable object
+// records no value at all; Symbol names the callee the relocation refers to.
 type Relocation struct {
 	Address uint64 `json:"address"`
 	Value   uint64 `json:"value"`
+	Symbol  string `json:"symbol,omitempty"`
 }
 
 // Image is a concrete, format-neutral address-space view. Loaders fill it from
@@ -105,6 +107,40 @@ func (i *Image) RelocationAt(address uint64) (Relocation, bool) {
 		}
 	}
 	return Relocation{}, false
+}
+
+// InferredSymbolSize returns the byte range a symbol covers when its format
+// records no size. Mach-O symbol entries carry only an address, so the next
+// symbol in the same section bounds the range and the section end bounds the
+// last symbol. A recorded size is returned unchanged.
+func (i *Image) InferredSymbolSize(entry symbol.Symbol) uint64 {
+	if i == nil || entry.Size > 0 {
+		return entry.Size
+	}
+	section, ok := i.SectionAt(entry.Address)
+	if !ok {
+		return 0
+	}
+	limit := section.VirtualAddress + section.FileSize
+	if limit <= entry.Address {
+		limit = section.VirtualAddress + section.MemorySize
+	}
+	next := limit
+	for _, other := range i.Symbols {
+		if other.Imported || other.Address <= entry.Address {
+			continue
+		}
+		if other.Address-section.VirtualAddress >= section.MemorySize {
+			continue
+		}
+		if other.Address < next {
+			next = other.Address
+		}
+	}
+	if next <= entry.Address {
+		return 0
+	}
+	return next - entry.Address
 }
 
 // SymbolsAt returns every symbol defined at one address. Several symbols share an

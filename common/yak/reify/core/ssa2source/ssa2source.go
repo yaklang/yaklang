@@ -43,7 +43,9 @@ func Render(ctx context.Context, program *ssa.Program) (source string, err error
 			source, err = "", failure
 			return
 		}
-		panic(recovered)
+		// Rendering is diagnostic output. A malformed program must produce an
+		// error the caller can print, not a crash of the whole process.
+		source, err = "", fmt.Errorf("ssa2source: render panic: %v", recovered)
 	}()
 	var output strings.Builder
 	var renderErr error
@@ -555,7 +557,12 @@ func renderInstructionAt(text *strings.Builder, instruction ssa.Instruction, ind
 			fmt.Fprintf(text, "%s%s;\n", indent, expression)
 		}
 	case *ssa.TypeCast:
-		// Type casts are inlined at their use sites.
+		// Most type casts are inlined at their use sites. A store marker is the
+		// exception: it is the only instruction that records an externally
+		// visible write, so it becomes a statement of its own.
+		if statement, ok := storeStatement(value); ok {
+			fmt.Fprintf(text, "%s%s;\n", indent, statement)
+		}
 	case *ssa.SideEffect:
 		// reify models no cross-procedure side effects, so the conversion has no
 		// path that emits one. A node here means an invariant broke; report it
@@ -721,7 +728,7 @@ func castConstantText(cast *ssa.TypeCast, constant *ssa.ConstInst) string {
 		return "nil"
 	}
 	if marker, ok := constant.GetRawValue().(string); ok {
-		if strings.HasPrefix(marker, "load:") {
+		if strings.HasPrefix(marker, "load:") || strings.HasPrefix(marker, "reload:") {
 			return loadMarkerText(cast, marker)
 		}
 		if isBooleanType(cast.GetType()) {
@@ -733,7 +740,8 @@ func castConstantText(cast *ssa.TypeCast, constant *ssa.ConstInst) string {
 }
 
 func loadMarkerText(cast *ssa.TypeCast, marker string) string {
-	addressID, err := strconv.ParseInt(strings.TrimPrefix(marker, "load:"), 10, 64)
+	addressText := strings.TrimPrefix(strings.TrimPrefix(marker, "reload:"), "load:")
+	addressID, err := strconv.ParseInt(addressText, 10, 64)
 	if err != nil || cast == nil {
 		return "*(void *)(unknown)"
 	}
@@ -742,6 +750,41 @@ func loadMarkerText(cast *ssa.TypeCast, marker string) string {
 		return "*(void *)(unknown)"
 	}
 	return fmt.Sprintf("*(%s *)(%s)", cTypeName(cast.GetType()), valueName(address))
+}
+
+// storeStatement renders the marker the converter emits for a store outside the
+// current frame. The marker names the address value and the stored value; both
+// are real SSA values, so the statement uses their rendered names.
+func storeStatement(cast *ssa.TypeCast) (string, bool) {
+	constant, ok := constantSource(cast, cast.Value)
+	if !ok || constant == nil {
+		return "", false
+	}
+	marker, ok := constant.GetRawValue().(string)
+	if !ok || !strings.HasPrefix(marker, "store:") {
+		return "", false
+	}
+	parts := strings.Split(strings.TrimPrefix(marker, "store:"), ":")
+	if len(parts) != 2 {
+		return "", false
+	}
+	addressID, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return "", false
+	}
+	valueID, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return "", false
+	}
+	address, ok := cast.GetValueById(addressID)
+	if !ok || address == nil {
+		return "", false
+	}
+	stored, ok := cast.GetValueById(valueID)
+	if !ok || stored == nil {
+		return "", false
+	}
+	return fmt.Sprintf("*(%s *)(%s) = %s", cTypeName(cast.GetType()), valueName(address), valueName(stored)), true
 }
 
 func binaryExpression(value *ssa.BinOp) string {
@@ -905,7 +948,11 @@ func castExpression(cast *ssa.TypeCast) string {
 				sourceBits := typeBits(sourceValue.GetType())
 				innerBits := typeBits(inner.GetType())
 				outerBits := typeBits(cast.GetType())
-				if sourceBits > 0 && innerBits >= sourceBits && outerBits >= innerBits {
+				// Widening can only drop the intermediate cast when it preserves the
+				// source's signedness: (uint64_t)(int32_t)x sign-extends, while
+				// (uint64_t)x on a uint32_t does not.
+				if sourceBits > 0 && innerBits >= sourceBits && outerBits >= innerBits &&
+					sameIntegerSignedness(inner.GetType(), sourceValue.GetType()) {
 					return cCast(cast.GetType(), valueName(sourceValue))
 				}
 			}
@@ -919,6 +966,34 @@ func sameType(left, right ssa.Type) bool {
 		return false
 	}
 	return left.String() == right.String()
+}
+
+// sameIntegerSignedness reports whether two types carry the same sign. A
+// non-integer type counts as matching, so the caller keeps the previous
+// reduction for casts that do not convert an integer.
+func sameIntegerSignedness(left, right ssa.Type) bool {
+	leftSigned, leftOK := integerTypeSignedness(left)
+	rightSigned, rightOK := integerTypeSignedness(right)
+	if !leftOK || !rightOK {
+		return true
+	}
+	return leftSigned == rightSigned
+}
+
+func integerTypeSignedness(typ ssa.Type) (bool, bool) {
+	if typ == nil {
+		return false, false
+	}
+	name := typ.String()
+	switch {
+	case strings.HasPrefix(name, "int"):
+		return true, true
+	case strings.HasPrefix(name, "uint"):
+		return false, true
+	case len(name) > 1 && name[0] == 'i' && name[1] >= '0' && name[1] <= '9':
+		return false, true
+	}
+	return false, false
 }
 
 func typeBits(typ ssa.Type) int {

@@ -156,7 +156,10 @@ func buildFunctions(profile Profile, decoded []instruction, start, end uint64, d
 			}
 		}
 		if isTerminator(ins.op) {
-			starts[next] = true
+			// MIPS executes the instruction after a branch or jump before the
+			// transfer takes effect. That delay slot belongs to the same block,
+			// so the next block starts after it, not at it.
+			starts[next+delaySlotSize(ins.op)] = true
 		}
 	}
 	addresses := make([]uint64, 0, len(starts))
@@ -178,6 +181,16 @@ func buildFunctions(profile Profile, decoded []instruction, start, end uint64, d
 		blockIDs[blocks[index].start] = core.BlockID(index + 1)
 	}
 	return []function{{start: blocks[0].start, blocks: blocks}}, blockIDs
+}
+
+// delaySlotSize returns the number of bytes the instruction after a control
+// transfer occupies in the same block. MIPS every branch and jump has a delay
+// slot; a trap-like terminator does not.
+func delaySlotSize(name string) uint64 {
+	if isBranch(name) || isJump(name) {
+		return 4
+	}
+	return 0
 }
 
 // isUnconditionalTerminator reports whether execution never falls through to the

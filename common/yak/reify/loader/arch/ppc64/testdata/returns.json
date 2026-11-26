@@ -1,0 +1,21 @@
+[
+  {
+    "name": "return value comes from r3",
+    "address": "0x5000",
+    "code": [
+      "38 60 00 2a // addi r3, 0, 42",
+      "4e 80 00 20 // blr"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/ppc64 (64-bit, big-endian)",
+      "function sub_0x5000 @ 0x5000",
+      "block b1 @ 0x5000",
+      "  0x5000  v1:i64 = constant 0x2a",
+      "  0x5000  write_register %r3, v1 [write_register]",
+      "  0x5004  return [may_trap, unknown]"
+    ]
+  }
+]

@@ -12,7 +12,10 @@ import (
 // table. A call through a GOT slot is resolved by tracing the loaded constant
 // address to its relocation symbol.
 func annotateSymbols(a *core.Artifact, ir *core.LowIR) {
-	if a == nil || a.Image == nil || len(a.Image.Symbols) == 0 || ir == nil {
+	if a == nil || a.Image == nil || ir == nil {
+		return
+	}
+	if len(a.Image.Symbols) == 0 && len(a.Image.Relocations) == 0 {
 		return
 	}
 	for functionIndex := range ir.Functions {
@@ -38,12 +41,37 @@ func annotateSymbols(a *core.Artifact, ir *core.LowIR) {
 				if instruction.Kind != core.OpCall || len(instruction.Operands) == 0 {
 					continue
 				}
+				if name := relocationCallName(a, instruction.Address); name != "" {
+					instruction.Operands[0] = core.Operand{Kind: core.OperandSymbol, Name: name}
+					continue
+				}
 				if name := callSymbolName(a, instruction.Operands[0], definitions); name != "" {
 					instruction.Operands[0] = core.Operand{Kind: core.OperandSymbol, Name: name}
 				}
 			}
 		}
 	}
+}
+
+// relocationCallName returns the symbol a relocatable object's call relocation
+// names. The relocation field lies at the instruction address on fixed-width
+// targets, one byte into the instruction on x86 where it follows the opcode, and
+// one instruction back on RISC-V, where a call is an auipc/jalr pair and the
+// relocation sits on the auipc.
+func relocationCallName(a *core.Artifact, address uint64) string {
+	if a == nil || a.Image == nil {
+		return ""
+	}
+	candidates := []uint64{address, address + 1}
+	if a.Target.Architecture == core.ArchRISCV32 || a.Target.Architecture == core.ArchRISCV64 {
+		candidates = append(candidates, address-4)
+	}
+	for _, candidate := range candidates {
+		if relocation, ok := a.Image.RelocationAt(candidate); ok && relocation.Symbol != "" {
+			return relocation.Symbol
+		}
+	}
+	return ""
 }
 
 func callSymbolName(a *core.Artifact, operand core.Operand, definitions map[core.ValueID]core.Instruction) string {

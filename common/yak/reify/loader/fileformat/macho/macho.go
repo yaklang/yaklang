@@ -175,7 +175,10 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 	}
 	if file.Symtab != nil {
 		for _, item := range file.Symtab.Syms {
-			if item.Value == 0 || !inExec(item.Value) || item.Type&0x0e != 0x0e {
+			// A relocatable Mach-O object places its first section at address zero,
+			// so a symbol value of zero is a real function there. The section
+			// check below is what rejects an undefined or data symbol.
+			if !inExec(item.Value) || item.Type&0x0e != 0x0e {
 				continue
 			}
 			name := strings.TrimPrefix(item.Name, "_")

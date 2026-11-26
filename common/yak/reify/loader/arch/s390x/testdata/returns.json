@@ -1,0 +1,21 @@
+[
+  {
+    "name": "return value comes from r2",
+    "address": "0x5000",
+    "code": [
+      "a7 29 00 2a // lghi %r2, 42",
+      "07 fe // br %r14"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/s390x (64-bit, big-endian)",
+      "function sub_0x5000 @ 0x5000",
+      "block b1 @ 0x5000",
+      "  0x5000  v1:i64 = constant 0x2a",
+      "  0x5000  write_register %r2, v1 [write_register]",
+      "  0x5004  return [may_trap, unknown]"
+    ]
+  }
+]

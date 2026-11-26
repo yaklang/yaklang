@@ -96,7 +96,9 @@ func Format(function *ssa.Function) string {
 }
 
 func renumberIDs(text string) string {
-	index := regexp.MustCompile(`t(\d+)|\((\d+)\)`)
+	// Match a value reference as a whole token. A type name such as int32 also
+	// contains t32, and a substring match would rewrite the type.
+	index := regexp.MustCompile(`\bt(\d+)\b|\((\d+)\)`)
 	next := int64(1)
 	ids := make(map[int64]int64)
 	return index.ReplaceAllStringFunc(text, func(match string) string {

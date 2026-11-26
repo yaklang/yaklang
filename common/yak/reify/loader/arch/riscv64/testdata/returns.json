@@ -1,0 +1,25 @@
+[
+  {
+    "name": "return value comes from a0",
+    "address": "0x5000",
+    "code": [
+      "13 05 a0 02 // addi a0, zero, 42",
+      "67 80 00 00 // ret"
+    ],
+    "source": [
+      "return 0x2a;"
+    ],
+    "lowir": [
+      "target: linux/riscv64 (64-bit, little-endian)",
+      "function sub_0x5000 @ 0x5000",
+      "block b1 @ 0x5000",
+      "  0x5000  v1:i64 = constant 0x0",
+      "  0x5000  v2:i64 = constant 0x2a",
+      "  0x5000  v3:i64 = add v1, v2",
+      "  0x5000  write_register %x10, v3 [write_register]",
+      "  0x5004  v4:i64 = read_register %x1 [read_register]",
+      "  0x5004  v5:ptr64 = copy v4",
+      "  0x5004  return [may_trap, unknown]"
+    ]
+  }
+]
