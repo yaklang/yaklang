@@ -311,6 +311,12 @@ type loopPromptBuildInput struct {
 	memory            string
 	operator          *LoopActionHandlerOperator
 	modelConfig       *ypb.AIModelConfig
+	// aiCallback and qualityAICallback are generated from modelConfig at capture
+	// time and held for the whole round. They are the routing counterpart of the
+	// prompt budget: retries, compression and fallback after overflow must not
+	// re-resolve the tier while the prompt still describes the captured model.
+	aiCallback        aicommon.AICallbackType
+	qualityAICallback aicommon.AICallbackType
 
 	// Captured exactly once per iteration: these reads mutate loop state.
 	subAgentInput            string
@@ -344,11 +350,19 @@ func (r *ReActLoop) captureLoopPromptBuildInput(
 	evidenceRevision := r.subAgentSharedEvidenceRevision()
 	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
 	var modelConfig *ypb.AIModelConfig
+	var aiCallback, qualityAICallback aicommon.AICallbackType
 	if config, ok := r.config.(*aicommon.Config); ok && !r.useSpeedPriorityAI {
 		modelConfig = config.SnapshotPrimaryModelConfig()
+		if binding, err := config.GeneratePrimaryAICallback(modelConfig); err == nil {
+			aiCallback, qualityAICallback = binding.Callback, binding.Quality
+		} else {
+			log.Warnf("failed to generate primary AI callback for this round: %v (falling back to dynamic routing)", err)
+		}
 	}
 	return &loopPromptBuildInput{
 		modelConfig:              modelConfig,
+		aiCallback:               aiCallback,
+		qualityAICallback:        qualityAICallback,
 		nonce:                    nonce,
 		userInput:                userInput,
 		frozenUserContext:        frozenUserContext,
@@ -387,6 +401,8 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		return nil, utils.Error("loop prompt build input is nil")
 	}
 	r.requestModelConfig = input.modelConfig
+	r.requestAICallback = input.aiCallback
+	r.requestQualityAICallback = input.qualityAICallback
 	nonce, frozenUserContext := input.nonce, input.frozenUserContext
 	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
 	subAgentInput := input.subAgentInput

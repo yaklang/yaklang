@@ -124,6 +124,12 @@ type ReActLoop struct {
 	// Pinned when the iteration captures its prompt inputs; shared by prompt
 	// rebuilds and quality requests, never by auxiliary or vision routing.
 	requestModelConfig *ypb.AIModelConfig
+	// Generated together with requestModelConfig and held for this round. Main
+	// calls use requestAICallback; compression uses requestQualityAICallback so
+	// the recovery request remains on the model whose budget built the prompt.
+	// Both stay nil for auxiliary loops and fall back to Config.CallAI variants.
+	requestAICallback        aicommon.AICallbackType
+	requestQualityAICallback aicommon.AICallbackType
 	// lastFittingTimelineThroughID is the boundary of the latest prompt the
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64

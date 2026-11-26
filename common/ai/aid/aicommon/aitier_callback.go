@@ -172,9 +172,6 @@ func newTierAICallbackFactory(tier consts.ModelTier, modes ...bool) (AICallbackF
 		}
 		return func(caller AICallerConfigIf, request *AIRequest) (*AIResponse, error) {
 			config := request.GetImageModel()
-			if tier == consts.TierIntelligent && request != nil && request.qualityModelConfig != nil {
-				config = request.qualityModelConfig
-			}
 			if config == nil {
 				var err error
 				config, err = resolveTierModelConfig(tier, single)
