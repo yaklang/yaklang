@@ -20,8 +20,6 @@ type Position struct {
 }
 
 type YakCompiler struct {
-	yak.BaseYaklangParserVisitor
-
 	language            CompilerLanguage
 	lexerErrorListener  antlr.ErrorListener
 	parserErrorListener antlr.ErrorListener

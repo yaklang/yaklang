@@ -3,8 +3,8 @@ package luaast
 import (
 	"fmt"
 
-	"github.com/yaklang/antlr/v4"
 	"github.com/google/uuid"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4Lua/infrastructure"
 	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
@@ -19,8 +19,6 @@ type Position struct {
 }
 
 type LuaTranslator struct {
-	lua.BaseLuaParserVisitor
-
 	sourceCode      string
 	codes           []*yakvm.Code
 	language        CompilerLanguage

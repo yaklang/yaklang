@@ -93,5 +93,5 @@ for 1 = range [1,2,3] { println(1) }
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
 	p := yak.NewYaklangParser(tokenStream)
 	vt := &yakast.YakCompiler{}
-	p.Program().Accept(vt)
+	vt.VisitProgram(p.Program())
 }
