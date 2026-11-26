@@ -706,10 +706,16 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	response.FromPlugin = option.FromPlugin
 
 	// fix CRLF
-	if option.BorrowFixedRequestPacket {
-		requestPacket = FixHTTPPacketCRLFBorrowed(requestPacket, noFixContentLength)
-	} else {
-		requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+	//
+	// 「不修复数据包」(NoFixContentLength) 必须严格生效：请求报文按原样发送，
+	// 任何归一化都会改变实际发出的字节，破坏 smuggle / pipeline / chunk 扩展等测试语义。
+	// 注意：解析阶段（URL/Host/Cookie/TE/CL 识别）已经完成，这里只影响最终上线的字节。
+	if !noFixContentLength {
+		if option.BorrowFixedRequestPacket {
+			requestPacket = FixHTTPPacketCRLFBorrowed(requestPacket, false)
+		} else {
+			requestPacket = FixHTTPPacketCRLF(requestPacket, false)
+		}
 	}
 
 	if fixQueryEscape {
