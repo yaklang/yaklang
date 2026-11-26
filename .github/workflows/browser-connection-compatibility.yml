@@ -3,10 +3,34 @@ name: Browser Connection Compatibility
 on:
   pull_request:
     branches: [main]
-  merge_group:
-    types: [checks_requested]
+    paths:
+      - '.github/workflows/browser-connection-compatibility.yml'
+      - 'scripts/ci/browser-connection/**'
+      - 'common/browser/extension_*.go'
+      - 'common/browser/native_messaging*.go'
+      - 'common/utils/engineendpoint/**'
+      - 'common/yak/cmd/yak.go'
+      - 'common/yak/yakurl/browser_extension*.go'
+      - 'common/yak/yakurl/iface.go'
+      - 'common/yak/yakurl/iface_yakit.go'
+      - 'common/yakgrpc/grpc_browser_extension*.go'
+      - 'common/yakgrpc/grpc_request_yak_url.go'
+      - 'common/yakgrpc/server.go'
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/browser-connection-compatibility.yml'
+      - 'scripts/ci/browser-connection/**'
+      - 'common/browser/extension_*.go'
+      - 'common/browser/native_messaging*.go'
+      - 'common/utils/engineendpoint/**'
+      - 'common/yak/cmd/yak.go'
+      - 'common/yak/yakurl/browser_extension*.go'
+      - 'common/yak/yakurl/iface.go'
+      - 'common/yak/yakurl/iface_yakit.go'
+      - 'common/yakgrpc/grpc_browser_extension*.go'
+      - 'common/yakgrpc/grpc_request_yak_url.go'
+      - 'common/yakgrpc/server.go'
   workflow_dispatch:
 
 permissions:
