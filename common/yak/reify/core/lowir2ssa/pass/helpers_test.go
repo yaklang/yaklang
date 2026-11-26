@@ -41,23 +41,23 @@ func TestRegisterViewSharesCanonicalVariable(t *testing.T) {
 		"r15l": "r15", "rsp": "rsp",
 	}
 	for name, want := range cases {
-		if got := registerViewFor(name, 0).canonical; got != want {
+		if got := registerViewFor(x86Facts(), name, 0).canonical; got != want {
 			t.Fatalf("registerViewFor(%q) canonical = %q, want %q", name, got, want)
 		}
 	}
-	if view := registerViewFor("eax", 32); view.width != 32 || view.shift != 0 || view.canonicalBits != 64 {
+	if view := registerViewFor(x86Facts(), "eax", 32); view.width != 32 || view.shift != 0 || view.canonicalBits != 64 {
 		t.Fatalf("eax view is %+v", view)
 	}
-	if view := registerViewFor("ah", 8); view.width != 8 || view.shift != 8 {
+	if view := registerViewFor(x86Facts(), "ah", 8); view.width != 8 || view.shift != 8 {
 		t.Fatalf("ah view is %+v", view)
 	}
 }
 
 func TestRegisterViewMaskMatchesWidth(t *testing.T) {
-	if mask := registerViewFor("al", 0).mask(); mask != 0xff {
+	if mask := registerViewFor(x86Facts(), "al", 0).mask(); mask != 0xff {
 		t.Fatalf("al mask = %#x", mask)
 	}
-	if mask := registerViewFor("rax", 0).mask(); mask != ^uint64(0) {
+	if mask := registerViewFor(x86Facts(), "rax", 0).mask(); mask != ^uint64(0) {
 		t.Fatalf("rax mask = %#x", mask)
 	}
 }

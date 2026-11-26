@@ -183,7 +183,7 @@ func TestRegisterViewNames(t *testing.T) {
 func normalizeIndent(text string) string {
 	lines := strings.Split(text, "\n")
 	for index, line := range lines {
-		lines[index] = strings.TrimLeft(line, "\t")
+		lines[index] = strings.TrimLeft(line, " \t")
 	}
 	return strings.Join(lines, "\n")
 }

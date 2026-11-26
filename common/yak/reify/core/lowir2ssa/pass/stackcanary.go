@@ -189,7 +189,7 @@ func (s *canaryState) scanRegisters() {
 				if len(instruction.Operands) < 2 {
 					continue
 				}
-				name := registerViewFor(instruction.Operands[0].Name, 0).canonical
+				name := registerViewFor(s.facts, instruction.Operands[0].Name, 0).canonical
 				if name == "" {
 					continue
 				}
@@ -198,7 +198,7 @@ func (s *canaryState) scanRegisters() {
 				if len(instruction.Results) == 0 || len(instruction.Operands) == 0 {
 					continue
 				}
-				name := registerViewFor(instruction.Operands[0].Name, 0).canonical
+				name := registerViewFor(s.facts, instruction.Operands[0].Name, 0).canonical
 				if name == "" {
 					continue
 				}

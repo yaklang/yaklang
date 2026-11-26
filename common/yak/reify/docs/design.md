@@ -264,6 +264,14 @@ type registerView struct {
 - 写 `eax`：按 x86 规则零扩展到 64 位。
 - 写 `al`：读-改-写，保留高 56 位。
 
+别名规则来自 `core.RegisterModel.AliasOf`，转换器和 LowIR pass 共用同一份，不再各带一张表：
+
+| `Registers.Naming` | 规则 |
+| --- | --- |
+| `x86` | `al/ah/ax/eax/rax` 共享 `rax`，`r8b/r8w/r8d/r8` 共享 `r8` |
+| `aarch64` | `w0` 与 `x0` 共享 `x0`；`wsp/sp`、`wzr/xzr`、`fp`、`lr` 各自归一 |
+| `plain` | 名字即规范名，没有部分视图 |
+
 #### 部分写算法
 
 宽度小于 32 的写不能直接赋值，否则会清掉同一规范寄存器的其他位。实现是标准的掩码合并：
@@ -392,20 +400,17 @@ c.assignRegister(c.returnRegister(), call)
    - 其他：取最后一个操作数与 0 比较。
    - `s/ns`：与 0 比较后取反。
 
-条件码映射：
+条件码映射集中在 `core.ParseCondition`，一张表覆盖三类命名：
 
-| cc | 操作 |
-| --- | --- |
-| `e/z` | `==` |
-| `ne/nz` | `!=` |
-| `l/b/c` | `<` |
-| `le/be` | `<=` |
-| `g/a` | `>` |
-| `ge/ae` | `>=` |
+| 族 | 相等 | 有符号 | 无符号 |
+| --- | --- | --- | --- |
+| x86 | `e/z`、`ne/nz` | `l/le/g/ge`、`s/ns` | `b/be/a/ae`、`c/nc` |
+| AArch64 / ARM | `eq`、`ne` | `lt/le/gt/ge`、`mi/pl` | `lo/cc`、`hs/cs`、`hi`、`ls` |
+| s390x | `e`、`ne` | `l/le/g/ge` | `lo`、`hs`、`hi`、`ls` |
+
+有符号与无符号分开：`l` 生成有符号 `<`，`b` 生成无符号 `<`。`o/no`、`vs/vc` 是溢出条件，YakSSA 没有对应值，`ParseCondition` 返回未知，转换器保留 opaque 值，不伪造比较。
 
 `JCXZ/JECXZ/JRCXZ` 不走 flags，lifter 直接生成计数寄存器与 0 的比较。
-
-当前实现有一个已知近似：`l` 与 `b`、`g` 与 `a` 都映射到同一个比较操作，没有区分有符号与无符号语义。这能让源码保持可读，但会在极端边界值上偏离机器语义。写新的比较规则时必须显式处理这一点，不能默认 `OpLt` 就是无符号。
 
 ### 3.8 控制流
 

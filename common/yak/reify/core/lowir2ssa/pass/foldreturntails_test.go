@@ -79,7 +79,7 @@ func TestFoldReturnTailsFoldsAfterNonReturningCall(t *testing.T) {
 // x86Facts declares the return register of the architecture the existing cases
 // were written for.
 func x86Facts() core.ArchFacts {
-	return core.ArchFacts{Registers: core.RegisterModel{Return: "rax", Width: 64}}
+	return core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingX86, Return: "rax", Width: 64}}
 }
 
 // TestFoldReturnTailsReadsTheDeclaredReturnRegister keeps the fold neutral: a
@@ -94,7 +94,7 @@ func TestFoldReturnTailsReadsTheDeclaredReturnRegister(t *testing.T) {
 		}},
 		core.Block{ID: 2, Address: 0x1004, Instructions: []core.Instruction{returnWithRAX(0x1004)}},
 	)
-	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Return: "r3", Width: 32}})
+	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "r3", Width: 32}})
 	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
 	if last.Kind != core.OpReturn {
 		t.Fatalf("tail jump survived: %s", last.Kind)
@@ -117,7 +117,7 @@ func TestFoldReturnTailsSkipsTailWritingNarrowReturnView(t *testing.T) {
 			returnWithRAX(0x1008),
 		}},
 	)
-	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Return: "x0", Width: 64}})
+	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingAArch64, Return: "x0", Width: 64}})
 	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
 	if last.Kind != core.OpJump {
 		t.Fatalf("tail writing w0 was folded: %s", last.Kind)
@@ -131,7 +131,7 @@ func TestFoldReturnTailsFoldsAArch64DirectTail(t *testing.T) {
 		core.Block{ID: 1, Address: 0x1000, Instructions: []core.Instruction{jumpTo(2, 0x1004)}},
 		core.Block{ID: 2, Address: 0x1004, Instructions: []core.Instruction{returnWithRAX(0x1004)}},
 	)
-	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Return: "x0", Width: 64}})
+	FoldReturnTails(&function, core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingAArch64, Return: "x0", Width: 64}})
 	last := function.Blocks[0].Instructions[len(function.Blocks[0].Instructions)-1]
 	if last.Kind != core.OpReturn {
 		t.Fatalf("direct tail was not folded: %s", last.Kind)
@@ -147,15 +147,15 @@ type crossArchCase struct {
 
 func crossArchCases() []crossArchCase {
 	return []crossArchCase{
-		{"amd64", core.ArchFacts{Registers: core.RegisterModel{Return: "rax", Width: 64}}},
-		{"x86", core.ArchFacts{Registers: core.RegisterModel{Return: "eax", Width: 32}}},
-		{"aarch64", core.ArchFacts{Registers: core.RegisterModel{Return: "x0", Width: 64}}},
-		{"arm", core.ArchFacts{Registers: core.RegisterModel{Return: "r0", Width: 32}}},
-		{"mips", core.ArchFacts{Registers: core.RegisterModel{Return: "v0", Width: 32}}},
-		{"ppc64", core.ArchFacts{Registers: core.RegisterModel{Return: "r3", Width: 64}}},
-		{"riscv64", core.ArchFacts{Registers: core.RegisterModel{Return: "x10", Width: 64}}},
-		{"s390x", core.ArchFacts{Registers: core.RegisterModel{Return: "r2", Width: 64}}},
-		{"loong64", core.ArchFacts{Registers: core.RegisterModel{Return: "r4", Width: 64}}},
+		{"amd64", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingX86, Return: "rax", Width: 64}}},
+		{"x86", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingX86, Return: "eax", Width: 32}}},
+		{"aarch64", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingAArch64, Return: "x0", Width: 64}}},
+		{"arm", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "r0", Width: 32}}},
+		{"mips", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "v0", Width: 32}}},
+		{"ppc64", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "r3", Width: 64}}},
+		{"riscv64", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "x10", Width: 64}}},
+		{"s390x", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "r2", Width: 64}}},
+		{"loong64", core.ArchFacts{Registers: core.RegisterModel{Naming: core.RegisterNamingPlain, Return: "r4", Width: 64}}},
 	}
 }
 

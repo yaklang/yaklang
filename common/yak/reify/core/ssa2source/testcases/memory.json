@@ -1,14 +1,14 @@
 {
   "name": "memory",
-  "note": "\u5185\u5b58\u8bfb\u5199\u662f\u5e26\u771f\u5b9e\u64cd\u4f5c\u6570\u7684\u6307\u4ee4\uff1a\u5199\u6ca1\u6709\u7ed3\u679c\uff0c\u8bfb\u7684\u7ed3\u679c\u662f\u4e00\u6761\u72ec\u7acb\u8bed\u53e5",
+  "note": "内存读写是带真实操作数的指令：写没有结果，读的结果是一条独立语句",
   "ssair": [
     "write_after_read <i64> (1) arg0",
     "type: (i64) -> i32",
     "entry_0:",
-    "\t<ptr64> t2 = type_cast[ptr64] <i64> arg0",
-    "\t<i32> t3   = load <ptr64> t2",
-    "\t<i32> t4   = <ptr64> t2 store <i32> 7",
-    "\tret <i32> t3"
+    "    <ptr64> t2 = type_cast[ptr64] <i64> arg0",
+    "    <i32> t3   = load <ptr64> t2",
+    "    <i32> t4   = <ptr64> t2 store <i32> 7",
+    "    ret <i32> t3"
   ],
   "source": [
     "uint32_t write_after_read(uint64_t arg0) {",

@@ -1,5 +1,7 @@
 package core
 
+import "strings"
+
 // FrameModel describes how one architecture lays out a call frame. A parser
 // fills it from the facts its architecture defines, so a pass can name the stack
 // and frame registers without matching architecture-specific spellings.
@@ -203,4 +205,156 @@ func IsLandingPadIntrinsic(name string) bool {
 		}
 	}
 	return false
+}
+
+// RegisterAlias is one spelling of a register inside a wider register: the name
+// of the whole register, the width of this view, and the bit offset the view
+// occupies.
+type RegisterAlias struct {
+	Name  string
+	Width uint16
+	Shift uint16
+}
+
+// AliasOf maps a register name to the register that holds it. Naming decides the
+// rule, because the same spelling means different things on different targets:
+// r8 is an x86 extended register and an ARM register, and x2 is a RISC-V
+// register, not the second half of an AArch64 pair.
+//
+// A caller keeps the width the disassembly reported and falls back to the width
+// of the name. Plain naming has no partial views, so a name is its own alias and
+// AliasOf reports width 0.
+func (m RegisterModel) AliasOf(name string) (RegisterAlias, bool) {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if lower == "" {
+		return RegisterAlias{}, false
+	}
+	switch m.Naming {
+	case RegisterNamingX86:
+		return x86Alias(lower)
+	case RegisterNamingAArch64:
+		return aarch64Alias(lower)
+	default:
+		return RegisterAlias{Name: lower}, true
+	}
+}
+
+// x86ClassicAliases maps the byte, word, double and quad views of the eight
+// original registers. The high byte views keep their bit offset, which a write
+// needs to merge into the canonical variable.
+var x86ClassicAliases = map[string]RegisterAlias{
+	"al":  {Name: "rax", Width: 8},
+	"ah":  {Name: "rax", Width: 8, Shift: 8},
+	"ax":  {Name: "rax", Width: 16},
+	"eax": {Name: "rax", Width: 32},
+	"rax": {Name: "rax", Width: 64},
+	"cl":  {Name: "rcx", Width: 8},
+	"ch":  {Name: "rcx", Width: 8, Shift: 8},
+	"cx":  {Name: "rcx", Width: 16},
+	"ecx": {Name: "rcx", Width: 32},
+	"rcx": {Name: "rcx", Width: 64},
+	"dl":  {Name: "rdx", Width: 8},
+	"dh":  {Name: "rdx", Width: 8, Shift: 8},
+	"dx":  {Name: "rdx", Width: 16},
+	"edx": {Name: "rdx", Width: 32},
+	"rdx": {Name: "rdx", Width: 64},
+	"bl":  {Name: "rbx", Width: 8},
+	"bh":  {Name: "rbx", Width: 8, Shift: 8},
+	"bx":  {Name: "rbx", Width: 16},
+	"ebx": {Name: "rbx", Width: 32},
+	"rbx": {Name: "rbx", Width: 64},
+	"spl": {Name: "rsp", Width: 8},
+	"sp":  {Name: "rsp", Width: 16},
+	"esp": {Name: "rsp", Width: 32},
+	"rsp": {Name: "rsp", Width: 64},
+	"bpl": {Name: "rbp", Width: 8},
+	"bp":  {Name: "rbp", Width: 16},
+	"ebp": {Name: "rbp", Width: 32},
+	"rbp": {Name: "rbp", Width: 64},
+	"sil": {Name: "rsi", Width: 8},
+	"si":  {Name: "rsi", Width: 16},
+	"esi": {Name: "rsi", Width: 32},
+	"rsi": {Name: "rsi", Width: 64},
+	"dil": {Name: "rdi", Width: 8},
+	"di":  {Name: "rdi", Width: 16},
+	"edi": {Name: "rdi", Width: 32},
+	"rdi": {Name: "rdi", Width: 64},
+	"rip": {Name: "rip", Width: 64},
+	"eip": {Name: "rip", Width: 32},
+}
+
+func x86Alias(name string) (RegisterAlias, bool) {
+	if alias, ok := x86ClassicAliases[name]; ok {
+		return alias, true
+	}
+	switch name {
+	case "rflags", "eflags", "flags":
+		return RegisterAlias{Name: "rflags", Width: 64}, true
+	}
+	// r8..r15 name their width with a suffix; the 64-bit form has none.
+	if len(name) < 2 || name[0] != 'r' || name[1] < '1' || name[1] > '9' {
+		return RegisterAlias{}, false
+	}
+	digits := name[1:]
+	width := uint16(64)
+	if len(digits) > 1 {
+		suffix := digits[len(digits)-1]
+		switch suffix {
+		case 'b':
+			width = 8
+		case 'w':
+			width = 16
+		case 'd', 'l':
+			width = 32
+		}
+		if width != 64 {
+			digits = digits[:len(digits)-1]
+		}
+	}
+	if !decimalDigits(digits) {
+		return RegisterAlias{}, false
+	}
+	return RegisterAlias{Name: "r" + digits, Width: width}, true
+}
+
+// aarch64Alias shares one variable between a W register and its X counterpart.
+// The zero registers alias each other too: a write to WZR discards its value, and
+// the converter keeps that fact on the canonical name.
+func aarch64Alias(name string) (RegisterAlias, bool) {
+	switch name {
+	case "wsp", "sp":
+		return RegisterAlias{Name: "sp", Width: 64}, true
+	case "wzr", "xzr":
+		return RegisterAlias{Name: "xzr", Width: 64}, true
+	case "fp":
+		return RegisterAlias{Name: "x29", Width: 64}, true
+	case "lr":
+		return RegisterAlias{Name: "x30", Width: 64}, true
+	}
+	if len(name) < 2 || (name[0] != 'w' && name[0] != 'x') {
+		return RegisterAlias{}, false
+	}
+	digits := name[1:]
+	if !decimalDigits(digits) {
+		return RegisterAlias{}, false
+	}
+	width := uint16(64)
+	if name[0] == 'w' {
+		width = 32
+	}
+	return RegisterAlias{Name: "x" + digits, Width: width}, true
+}
+
+// decimalDigits reports whether every byte is an ASCII digit and at least one is
+// present.
+func decimalDigits(text string) bool {
+	if text == "" {
+		return false
+	}
+	for _, digit := range text {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	return true
 }
