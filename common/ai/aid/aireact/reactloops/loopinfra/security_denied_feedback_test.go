@@ -9,33 +9,20 @@ import (
 )
 
 func TestSecurityDeniedFeedbackFromResult(t *testing.T) {
-	t.Run("includes-top-finding", func(t *testing.T) {
+	t.Run("includes-process-error", func(t *testing.T) {
 		result := &aitool.ToolResult{Data: map[string]any{
-			"check": map[string]any{
-				"findings": []any{
-					map[string]any{
-						"title_zh": "删除根目录",
-						"title":    "rm root",
-						"rule_id":  "bash-rm-rf-root",
-						"severity": "high",
-						"message":  "rm -rf / is blocked",
-						"value":    "rm -rf /",
-					},
-				},
-			},
+			"security_denied": true,
+			"process_error":   "command denied by rule permission policy. The command was not executed.",
 		}}
 
 		feedback := securityDeniedFeedbackFromResult("bash", result)
-		require.Contains(t, feedback, "bash-rm-rf-root")
-		require.Contains(t, feedback, "删除根目录")
-		require.Contains(t, feedback, "high")
-		require.Contains(t, feedback, "rm -rf / is blocked")
-		require.Contains(t, feedback, "matched: rm -rf /")
+		require.Contains(t, feedback, "规则权限策略拒绝了工具")
+		require.Contains(t, feedback, "command denied by rule permission policy")
 		require.Contains(t, feedback, "请自行判断下一步")
 	})
 
-	t.Run("falls-back-without-findings", func(t *testing.T) {
+	t.Run("falls-back-without-process-error", func(t *testing.T) {
 		feedback := securityDeniedFeedbackFromResult("bash", &aitool.ToolResult{})
-		require.Contains(t, feedback, "security policy blocked the command before execution")
+		require.Contains(t, feedback, "rule permission policy blocked the command before execution")
 	})
 }
