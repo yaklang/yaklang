@@ -33,6 +33,10 @@ const (
 	OpIn       = `in`
 	OpSend     = `send`
 	OpPow      = `pow`
+	// OpStore writes the right operand to the memory the left operand addresses.
+	// It produces no value of its own: a frontend that lifts machine code uses it
+	// to keep a write in the instruction stream with both sides visible.
+	OpStore = `store`
 )
 
 var CompareOpcode = []string{OpGt, OpLt, OpLtEq, OpGtEq, OpNotEq, OpEq}
@@ -54,6 +58,13 @@ const (
 	OpNeg        = `neg`
 	OpChan       = `chan`
 	OpBitwiseNot = `bitwise-not`
+	// OpLoad reads the memory the operand addresses. The result holds the loaded
+	// value, and the operand stays in the use chain as the address.
+	OpLoad = `load`
+	// OpSpill reads a slot of the current frame that no recorded write filled.
+	// The read is still shown, but the value is the lifter's own scratch space,
+	// so a caller cannot rely on it.
+	OpSpill = `spill`
 )
 
 func HandlerBinOp(b *BinOp) (ret Value) {

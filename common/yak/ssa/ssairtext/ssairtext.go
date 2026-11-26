@@ -395,6 +395,10 @@ func (r *resolver) emitAssignment(line string) error {
 		return nil
 	case isBinOpLine(right):
 		return r.emitBinOp(name, declaredType, right)
+	case isMemoryReadLine(right):
+		return r.emitMemoryRead(name, declaredType, right)
+	case r.isStoreLine(right):
+		return r.emitStore(name, declaredType, right)
 	default:
 		value, err := r.operand(right)
 		if err != nil {
@@ -436,6 +440,59 @@ func (r *resolver) emitBinOp(name, declaredType, text string) error {
 		return err
 	}
 	value := r.builder.EmitBinOp(ssa.BinaryOpcode(op), left, right)
+	setValueType(value, declaredType)
+	r.set(name, value)
+	return nil
+}
+
+// isMemoryReadLine reports whether the line reads memory. The mnemonic comes
+// first and the address operand follows it.
+func isMemoryReadLine(text string) bool {
+	return strings.HasPrefix(text, string(ssa.OpLoad)+" ") || strings.HasPrefix(text, string(ssa.OpSpill)+" ")
+}
+
+// emitMemoryRead parses a load or spill line. The operand after the mnemonic is
+// the address the instruction reads.
+func (r *resolver) emitMemoryRead(name, declaredType, text string) error {
+	op, rest, _ := strings.Cut(text, " ")
+	address, err := r.operand(rest)
+	if err != nil {
+		return err
+	}
+	value := r.builder.EmitUnOp(ssa.UnaryOpcode(op), address)
+	setValueType(value, declaredType)
+	r.set(name, value)
+	return nil
+}
+
+// isStoreLine reports whether the line writes memory. A store has two operands
+// and no result of its own, and Format prints it as "<address> store <value>".
+// The address must name a value defined earlier, so a string constant that
+// happens to contain the separator is not mistaken for a store.
+func (r *resolver) isStoreLine(text string) bool {
+	left, right, ok := strings.Cut(text, " "+string(ssa.OpStore)+" ")
+	if !ok || strings.TrimSpace(right) == "" {
+		return false
+	}
+	_, defined := r.lookup(valueName(left))
+	return defined
+}
+
+// emitStore parses a store line into the address and the stored value.
+func (r *resolver) emitStore(name, declaredType, text string) error {
+	left, right, ok := strings.Cut(text, " "+string(ssa.OpStore)+" ")
+	if !ok {
+		return fmt.Errorf("ssairtext: incomplete store: %q", text)
+	}
+	address, err := r.operand(left)
+	if err != nil {
+		return err
+	}
+	stored, err := r.operand(right)
+	if err != nil {
+		return err
+	}
+	value := r.builder.EmitBinOp(ssa.OpStore, address, stored)
 	setValueType(value, declaredType)
 	r.set(name, value)
 	return nil
@@ -588,6 +645,17 @@ func (r *resolver) operand(text string) (ssa.Value, error) {
 		}
 	}
 	if value, ok := r.lookup(text); ok {
+		return value, nil
+	}
+	if strings.HasPrefix(text, "undefined[") {
+		// Format prints an undefined value as "undefined[<name>]".
+		end := strings.Index(text, "]")
+		if end < 0 {
+			return nil, fmt.Errorf("ssairtext: unterminated undefined value in %q", text)
+		}
+		value := r.builder.EmitUndefined(text[len("undefined["):end])
+		setValueType(value, typeName)
+		r.set(text, value)
 		return value, nil
 	}
 	if strings.HasPrefix(text, "\"") {

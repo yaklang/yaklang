@@ -8,11 +8,21 @@ import (
 )
 
 func TestMarkVoidReturns(t *testing.T) {
+	// A spill reads the function's own frame slot, so its value is not a
+	// source-level return. A load through a pointer reads program memory and is a
+	// real return value, so the function keeps it.
 	program := parseSSAForPass(t, `voidish
 type: () -> any
 entry_0:
-    <string> t1 = <string> "load:1"
-    <i64> t2 = type_cast[i64] <string> t1
+    <ptr64> t1 = <ptr64> 16
+    <i64> t2 = spill <ptr64> t1
+    ret <i64> t2
+
+through_pointer
+type: () -> any
+entry_0:
+    <ptr64> t1 = <ptr64> 16
+    <i64> t2 = load <ptr64> t1
     ret <i64> t2
 
 value
@@ -21,6 +31,7 @@ entry_0:
     <i64> t1 = <i64> 0
     ret <i64> t1`)
 	voidFunction := findFunctionForPass(t, program, "voidish")
+	pointerFunction := findFunctionForPass(t, program, "through_pointer")
 	valueFunction := findFunctionForPass(t, program, "value")
 
 	if count := MarkVoidReturns(program); count != 1 {
@@ -28,6 +39,9 @@ entry_0:
 	}
 	if got := voidFunction.GetType().String(); !strings.Contains(got, "-> null") {
 		t.Fatalf("void return type = %s", got)
+	}
+	if got := pointerFunction.GetType().String(); strings.Contains(got, "-> null") {
+		t.Fatal("function returning a pointer load was marked void")
 	}
 	for _, blockID := range voidFunction.Blocks {
 		block, _ := voidFunction.GetBasicBlockByID(blockID)

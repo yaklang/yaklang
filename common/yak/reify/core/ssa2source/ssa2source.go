@@ -538,11 +538,22 @@ func renderInstructionAt(text *strings.Builder, instruction ssa.Instruction, ind
 	case *ssa.ConstInst:
 		// Constants are rendered at their use sites.
 	case *ssa.BinOp:
+		if value.Op == ssa.OpStore {
+			fmt.Fprintf(text, "%s%s;\n", indent, storeExpression(value))
+			break
+		}
 		if !valueUsed(value) {
 			break
 		}
 		fmt.Fprintf(text, "%s%s = %s;\n", indent, assignName(value), binaryExpression(value))
 	case *ssa.UnOp:
+		if value.Op == ssa.OpLoad || value.Op == ssa.OpSpill {
+			// A memory read is an event at a fixed point in the instruction
+			// stream, so it keeps a line of its own. Inlining it at the use site
+			// would move the read past a later write.
+			fmt.Fprintf(text, "%s%s = %s;\n", indent, assignName(value), derefExpression(value))
+			break
+		}
 		if !valueUsed(value) {
 			break
 		}
@@ -557,12 +568,7 @@ func renderInstructionAt(text *strings.Builder, instruction ssa.Instruction, ind
 			fmt.Fprintf(text, "%s%s;\n", indent, expression)
 		}
 	case *ssa.TypeCast:
-		// Most type casts are inlined at their use sites. A store marker is the
-		// exception: it is the only instruction that records an externally
-		// visible write, so it becomes a statement of its own.
-		if statement, ok := storeStatement(value); ok {
-			fmt.Fprintf(text, "%s%s;\n", indent, statement)
-		}
+		// A cast is inlined at its use sites, so it needs no statement of its own.
 	case *ssa.SideEffect:
 		// reify models no cross-procedure side effects, so the conversion has no
 		// path that emits one. A node here means an invariant broke; report it
@@ -728,9 +734,6 @@ func castConstantText(cast *ssa.TypeCast, constant *ssa.ConstInst) string {
 		return "nil"
 	}
 	if marker, ok := constant.GetRawValue().(string); ok {
-		if strings.HasPrefix(marker, "load:") || strings.HasPrefix(marker, "reload:") {
-			return loadMarkerText(cast, marker)
-		}
 		if isBooleanType(cast.GetType()) {
 			return "false /* " + sanitizeComment(marker) + " */"
 		}
@@ -739,52 +742,23 @@ func castConstantText(cast *ssa.TypeCast, constant *ssa.ConstInst) string {
 	return constTextAs(constant, cast.GetType())
 }
 
-func loadMarkerText(cast *ssa.TypeCast, marker string) string {
-	addressText := strings.TrimPrefix(strings.TrimPrefix(marker, "reload:"), "load:")
-	addressID, err := strconv.ParseInt(addressText, 10, 64)
-	if err != nil || cast == nil {
+// derefExpression renders a memory read as a C dereference of its address
+// operand. The load and spill instructions carry the address themselves, so the
+// expression names exactly the value the machine instruction read from.
+func derefExpression(read *ssa.UnOp) string {
+	if read == nil {
 		return "*(void *)(unknown)"
 	}
-	address, ok := cast.GetValueById(addressID)
-	if !ok || address == nil {
-		return "*(void *)(unknown)"
-	}
-	return fmt.Sprintf("*(%s *)(%s)", cTypeName(cast.GetType()), valueName(address))
+	return fmt.Sprintf("*(%s *)(%s)", cTypeName(read.GetType()), valueNameByID(read, read.X))
 }
 
-// storeStatement renders the marker the converter emits for a store outside the
-// current frame. The marker names the address value and the stored value; both
-// are real SSA values, so the statement uses their rendered names.
-func storeStatement(cast *ssa.TypeCast) (string, bool) {
-	constant, ok := constantSource(cast, cast.Value)
-	if !ok || constant == nil {
-		return "", false
+// storeExpression renders a memory write. Its operands are the address and the
+// value written there, in that order.
+func storeExpression(store *ssa.BinOp) string {
+	if store == nil {
+		return "*(void *)(unknown) = unknown"
 	}
-	marker, ok := constant.GetRawValue().(string)
-	if !ok || !strings.HasPrefix(marker, "store:") {
-		return "", false
-	}
-	parts := strings.Split(strings.TrimPrefix(marker, "store:"), ":")
-	if len(parts) != 2 {
-		return "", false
-	}
-	addressID, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil {
-		return "", false
-	}
-	valueID, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil {
-		return "", false
-	}
-	address, ok := cast.GetValueById(addressID)
-	if !ok || address == nil {
-		return "", false
-	}
-	stored, ok := cast.GetValueById(valueID)
-	if !ok || stored == nil {
-		return "", false
-	}
-	return fmt.Sprintf("*(%s *)(%s) = %s", cTypeName(cast.GetType()), valueName(address), valueName(stored)), true
+	return fmt.Sprintf("*(%s *)(%s) = %s", cTypeName(store.GetType()), valueNameByID(store, store.X), valueNameByID(store, store.Y))
 }
 
 func binaryExpression(value *ssa.BinOp) string {

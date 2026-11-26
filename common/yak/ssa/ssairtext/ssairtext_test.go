@@ -51,3 +51,56 @@ func TestFormatProgramSkipsExterns(t *testing.T) {
 		t.Fatalf("extern declaration is duplicated:\n%s", text)
 	}
 }
+
+// TestMemoryTextRoundTrip checks the text form of a memory read and a memory
+// write. Both carry real operands: a read names the address it loads from, and a
+// write names the address and the stored value. Neither is a call, so the text
+// never wraps the mnemonic in parentheses.
+func TestMemoryTextRoundTrip(t *testing.T) {
+	const text = `sub_0x1000 <i64> (1) arg0
+type: (i64) -> i32
+entry_0:
+	<ptr64> t2 = type_cast[ptr64] <i64> arg0
+	<i32> t3   = load <ptr64> t2
+	<i32> t5   = <ptr64> t2 store <i32> 2
+	ret <i32> t3`
+	program, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	formatted := FormatProgram(program)
+	for _, fragment := range []string{"= load <ptr64> t2", "= <ptr64> t2 store <i32> 2"} {
+		if !strings.Contains(formatted, fragment) {
+			t.Fatalf("memory operation lost its operands, want %q:\n%s", fragment, formatted)
+		}
+	}
+	for _, forbidden := range []string{"load(", "load:", "store(", "store:"} {
+		if strings.Contains(formatted, forbidden) {
+			t.Fatalf("memory operation printed as a call or a marker %q:\n%s", forbidden, formatted)
+		}
+	}
+	reparsed, err := Parse(formatted)
+	if err != nil {
+		t.Fatalf("formatted text does not parse back: %v\n%s", err, formatted)
+	}
+	if again := FormatProgram(reparsed); again != formatted {
+		t.Fatalf("round trip changed the text:\n--- first ---\n%s\n--- second ---\n%s", formatted, again)
+	}
+}
+
+// TestStoreWordInStringConstant checks that only a real store parses as one. A
+// string constant can contain the separator, and it must stay a constant.
+func TestStoreWordInStringConstant(t *testing.T) {
+	program, err := Parse("f\ntype: () -> void\nentry_0:\n\t<string> t1 = <string> \"a store b\"\n\tret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	formatted := FormatProgram(program)
+	if !strings.Contains(formatted, "<string> a store b") {
+		t.Fatalf("string constant was not preserved:\n%s", formatted)
+	}
+	// A store line always names a typed operand after the mnemonic.
+	if strings.Contains(formatted, " store <") {
+		t.Fatalf("string constant was parsed as a store:\n%s", formatted)
+	}
+}

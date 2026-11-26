@@ -1,8 +1,6 @@
 package pass
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -128,13 +126,15 @@ func weakReturnValue(value ssa.Value) bool {
 		}
 		break
 	}
-	if constant, ok := ssa.ToConstInst(value); ok && constant != nil {
-		if marker, ok := constant.GetRawValue().(string); ok {
-			return strings.HasPrefix(marker, "load:")
-		}
-	}
 	if _, ok := ssa.ToUndefined(value); ok {
 		return true
+	}
+	// A spill reads the current frame, which is the lifter's own scratch space.
+	// The value never reached memory the caller can see, so it is not a
+	// source-level return value. A load through a pointer is different: it reads
+	// program memory and stands for the dereference the source wrote.
+	if read, ok := ssa.ToUnOp(value); ok && read != nil {
+		return read.Op == ssa.OpSpill
 	}
 	return false
 }
