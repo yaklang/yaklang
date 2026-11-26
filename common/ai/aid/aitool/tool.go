@@ -61,6 +61,9 @@ type ToolRuntimeConfig struct {
 		TrackBrowserSession(id string)
 		UntrackBrowserSession(id string)
 	}
+	// DisableBuiltinSyntaxFlowRules is the master command-security switch for
+	// this invocation. When true the bash tool callback skips all guards.
+	DisableBuiltinSyntaxFlowRules bool
 }
 
 // NoRuntimeInvokeCallback 定义工具调用回调函数的签名

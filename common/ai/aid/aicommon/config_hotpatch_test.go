@@ -100,6 +100,24 @@ func TestHotPatchConfig(t *testing.T) {
 		},
 	}, 1)
 	require.True(t, c.GetSyncPerceptionTrigger())
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_SyntaxFlowRules,
+		Params: &ypb.AIStartParams{
+			DisableBuiltinSyntaxFlowRules: true,
+		},
+	}, 1)
+	require.True(t, c.DisableBuiltinSyntaxFlowRules)
+
+	feed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_SyntaxFlowRules,
+		Params: &ypb.AIStartParams{
+			DisableBuiltinSyntaxFlowRules: false,
+		},
+	}, 1)
+	require.False(t, c.DisableBuiltinSyntaxFlowRules)
 }
 
 func TestWaitHotPatchLoopStoppedWaitsForInFlightOption(t *testing.T) {
@@ -591,6 +609,24 @@ func TestGoalTimePatch_MergeDoesNotPersistRuntimeCommand(t *testing.T) {
 	})
 	require.False(t, changed)
 	require.Same(t, base, next)
+}
+
+func TestNewConfigSyntaxFlowRulesDefaultOff(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.True(t, c.DisableBuiltinSyntaxFlowRules)
+}
+
+func TestHotPatch_SyntaxFlowRulesSessionParams(t *testing.T) {
+	base := &ypb.AIStartParams{}
+	next, changed := mergeHotpatchSessionStartParams(base, &ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_SyntaxFlowRules,
+		Params: &ypb.AIStartParams{
+			DisableBuiltinSyntaxFlowRules: true,
+		},
+	})
+	require.True(t, changed)
+	require.True(t, next.DisableBuiltinSyntaxFlowRules)
 }
 
 func TestHotPatch_ExecutionStrategy_NeverEndingDeadline(t *testing.T) {

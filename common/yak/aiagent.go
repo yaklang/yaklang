@@ -238,6 +238,7 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 					bindAIImageResultToEngine(ae, ctx)
 					bindAIDetachToEngine(ae, runtimeConfig)
 					bindAIToolSleep(ae, ctx)
+					bindBashCommandGuard(ae, ctx, runtimeConfig)
 					bindDBHistoryToEngine(ae, ctx, runtimeConfig)
 					bindMCPToEngine(ae, ctx, runtimeConfig)
 					bindAIKnowledgeToEngine(ae, ctx, runtimeConfig)
@@ -281,10 +282,11 @@ func yakTool2AITool(aitools []*schema.AIYakTool, invokeForgeHandle bool) []*aito
 
 // exports to yaklang
 var AIAgentExport = map[string]any{
-	"ImageResult":    imageResult,
-	"MCPResult":      mcpResult,
-	"imageInput":     aicommon.WithImageInput,
-	"imageInputMode": aicommon.WithImageInputMode,
+	"ImageResult":      imageResult,
+	"MCPResult":        mcpResult,
+	"BashCommandGuard": exportedBashCommandGuard,
+	"imageInput":       aicommon.WithImageInput,
+	"imageInputMode":   aicommon.WithImageInputMode,
 	/*
 		ai forge api
 	*/

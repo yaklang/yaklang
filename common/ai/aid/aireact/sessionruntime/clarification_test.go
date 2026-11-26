@@ -9,6 +9,15 @@ import (
 	"testing"
 )
 
+func TestStartParamsSyntaxFlowRuleSwitches(t *testing.T) {
+	params := &ypb.AIStartParams{DisableBuiltinSyntaxFlowRules: true}
+	c := aicommon.NewConfig(context.Background(), ConvertStartParamsToReActConfig(params)...)
+	require.True(t, c.DisableBuiltinSyntaxFlowRules)
+
+	copy := aicommon.NewConfig(context.Background(), aicommon.ConvertConfigToOptions(c)...)
+	require.True(t, copy.DisableBuiltinSyntaxFlowRules)
+}
+
 func TestStartParamsClarificationSettings(t *testing.T) {
 	params := &ypb.AIStartParams{AllowPlanUserInteract: true, PlanUserInteractMaxCount: 4, UserInteractLimit: 2}
 	c := aicommon.NewConfig(context.Background(), ConvertStartParamsToReActConfig(params)...)

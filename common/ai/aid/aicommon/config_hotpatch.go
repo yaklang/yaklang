@@ -124,6 +124,7 @@ var (
 	HotPatchType_ExecutionStrategy           = "ExecutionStrategy"
 	HotPatchType_GoalTime                    = "GoalTime"
 	HotPatchType_RuntimeContextSizeLimit     = "RuntimeContextSizeLimit"
+	HotPatchType_SyntaxFlowRules             = "SyntaxFlowRules"
 
 	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
 		mgr := aiconfig.GetGlobalManager()
@@ -215,6 +216,10 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 
 	if e.HotpatchType == HotPatchType_SyncPerceptionTrigger {
 		aiOption = append(aiOption, WithSyncPerceptionTrigger(hotPatchParams.GetSyncPerceptionTrigger()))
+	}
+
+	if e.HotpatchType == HotPatchType_SyntaxFlowRules {
+		aiOption = append(aiOption, WithDisableBuiltinSyntaxFlowRules(hotPatchParams.GetDisableBuiltinSyntaxFlowRules()))
 	}
 
 	if e.HotpatchType == HotPatchType_EnabledCapabilities {
@@ -450,6 +455,8 @@ func mergeHotpatchSessionStartParams(base *ypb.AIStartParams, e *ypb.AIInputEven
 		next.EnablePlan = p.GetEnablePlan()
 	case HotPatchType_SyncPerceptionTrigger:
 		next.SyncPerceptionTrigger = p.GetSyncPerceptionTrigger()
+	case HotPatchType_SyntaxFlowRules:
+		next.DisableBuiltinSyntaxFlowRules = p.GetDisableBuiltinSyntaxFlowRules()
 	case HotPatchType_EnabledCapabilities:
 		if len(p.GetEnabledCapabilities()) == 0 {
 			return base, false

@@ -168,6 +168,7 @@ type ToolCaller struct {
 	// be scheduled independently without duplicating the tool-call pipeline.
 	reviewGate   ToolCallerGate
 	beforeInvoke ToolCallerBeforeInvoke
+	ruleGate     ToolCallRuleGate
 
 	// Runtime-owned deterministic metadata. These values are allocated before a
 	// batch starts, so goroutine completion order cannot change checkpoint,
@@ -1026,6 +1027,29 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		return nil, false, err
 	}
 
+	ruleDecision := t.applyToolCallRuleGate(tool, invokeParams)
+	securityAction := schema.SFR_ACTION_ALLOW
+	securityReview := securityReviewNone
+	agreePolicy := agreePolicyFromConfig(t.config)
+	if ruleDecision != nil {
+		securityAction, securityReview = resolveSecurityReviewAction(agreePolicy, ruleDecision.Action)
+		switch securityAction {
+		case schema.SFR_ACTION_DENY:
+			denied := &SecurityRuleDeniedError{
+				ToolName: tool.Name,
+			}
+			blocked := denied.Error()
+			t.emitter.EmitWarning(blocked)
+			handleError(blocked)
+			return nil, false, denied
+		case schema.SFR_ACTION_WARN:
+			t.emitter.EmitWarning(
+				"tool[%v] rule permission verdict=warn",
+				tool.Name,
+			)
+		}
+	}
+
 	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
 	epm := t.config.GetEndpointManager()
 	config := t.config
@@ -1053,7 +1077,14 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		reviewCheckpointSeq := t.reviewCheckpointSeq
 		t.reviewCheckpointSeq = 0
 		ep := epm.CreateEndpointWithEventTypeAndSeq(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, reviewCheckpointSeq)
-		ep.SetDefaultSuggestionContinue()
+		securityNeedsReview := securityReview != securityReviewNone
+		forceHumanSecurityReview := securityReview == securityReviewHuman
+		if securityNeedsReview {
+			// A missing answer must never authorize a security escalation.
+			ep.SetDefaultSuggestion("cancel")
+		} else {
+			ep.SetDefaultSuggestionContinue()
+		}
 		reqs := map[string]any{
 			"id":               ep.GetId(),
 			"selectors":        ToolUseReviewSuggestions,
@@ -1066,6 +1097,19 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			reqs["batch_id"] = t.batchID
 			reqs["call_index"] = t.batchIndex
 			reqs["call_tool_id"] = t.callToolId
+		}
+		if ruleDecision != nil {
+			reqs["security_rule"] = ruleDecision
+			reqs["security_effective_action"] = string(securityAction)
+		}
+		if securityNeedsReview {
+			if forceHumanSecurityReview {
+				reqs["force_human_review"] = true
+			}
+			reqs["security_review_source"] = string(securityReview)
+			reqs["reason"] = verdictLabel(securityAction)
+			reqs["prompt"] = securityRuleReviewPrompt(securityAction, tool.Name, invokeParams)
+			reqs["options"] = securityRuleReviewOptions()
 		}
 		ep.SetReviewMaterials(reqs)
 		reviewCheckpoint := ep.GetCheckpoint()
@@ -1109,6 +1153,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		}
 
 		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
+		if securityNeedsReview {
+			reviewQuestion = securityRuleReviewPrompt(securityAction, tool.Name, invokeParams)
+		}
 
 		var params aitool.InvokeParams
 		reviewReplayed := reviewCheckpoint.Finished
@@ -1122,10 +1169,28 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 				handleError(err)
 				return nil, false, err
 			}
-			t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+			reviewEventType := schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE
+			reviewEventNode := "review-require"
+			if forceHumanSecurityReview {
+				// yolo/auto frontends skip tool_use_review_require cards. Manual
+				// security asks use the user-interactive event so they stay visible.
+				reviewEventType = schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE
+				reviewEventNode = "require-user-interact"
+			}
+			t.emitter.EmitInteractiveJSON(ep.GetId(), reviewEventType, reviewEventNode, reqs)
 
-			// wait for agree
-			config.DoWaitAgree(t.ctx, ep)
+			switch securityReview {
+			case securityReviewHuman:
+				ep.SetApprovalMeta(ApprovalSourceRule, true, string(securityAction))
+				ep.WaitContext(t.ctx)
+			case securityReviewAI:
+				// Let the configured AI reviewer decide, but make a reviewer
+				// failure escalate to a human instead of auto-continuing.
+				waitCtx := utils.SetContextKey(t.ctx, SecurityAskContextKey, true)
+				config.DoWaitAgree(waitCtx, ep)
+			default:
+				config.DoWaitAgree(t.ctx, ep)
+			}
 			if waitErr := toolCallerContextErr(t.ctx); waitErr != nil {
 				releaseReview()
 				// The worker can stop while its enclosing session stays alive.
@@ -1136,9 +1201,23 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			}
 			reviewDecidedAt := time.Now()
 			params = ep.GetParams()
+			if securityNeedsReview {
+				allowed, cancelReason := securityRuleReviewDecision(params)
+				if !allowed {
+					// The visible card is a user-interactive card; close it with
+					// the raw answer before reporting the cancellation to the AI.
+					t.emitter.EmitInteractiveRelease(ep.GetId(), params)
+					config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+					releaseReview()
+					handleError(cancelReason)
+					return nil, false, utils.Error(cancelReason)
+				}
+				// Continue through the normal review path without asking again.
+				params = aitool.InvokeParams{"suggestion": "continue"}
+			}
 			t.emitter.EmitInteractiveRelease(ep.GetId(), params)
 			config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-			if !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
+			if securityNeedsReview || !isFastNoopContinueReview(ep, params, reviewDecidedAt) {
 				config.CallAfterReview(
 					ep.GetSeq(),
 					reviewQuestion,

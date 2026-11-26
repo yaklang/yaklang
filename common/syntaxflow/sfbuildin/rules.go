@@ -32,6 +32,21 @@ func GetRuleFS() *embed.FS {
 	return nil
 }
 
+// LoadEmbeddedRulesByLanguage compiles rules from the embedded snapshot
+// without reading or writing the profile database. Paths are pre-filtered by
+// language so callers such as the bash preflight guard do not pay for parsing
+// unrelated rule sets.
+func LoadEmbeddedRulesByLanguage(language string, severities ...schema.SyntaxFlowSeverity) ([]*schema.SyntaxFlowRule, error) {
+	language = strings.ToLower(strings.TrimSpace(language))
+	if language == "" {
+		return nil, utils.Error("language is empty")
+	}
+	if ruleFSWithHash == nil {
+		return nil, utils.Error("embedded rule filesystem is not initialized")
+	}
+	return loadEmbeddedRulesFromFS(ruleFSWithHash, language, severities)
+}
+
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
 	return SyncRuleFromFileSystemToDB(consts.GetGormProfileDatabase(), fsInstance, buildin, notifies...)
 }

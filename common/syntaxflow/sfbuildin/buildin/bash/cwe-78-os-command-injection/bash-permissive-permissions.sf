@@ -1,0 +1,59 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: world-writable permissions or permissive umask"
+	title_zh: "Bash：设置全局可写权限或宽松 umask"
+	type: audit
+	level: "low"
+	rule_id: "bash-permissive-permissions"
+	risk: "security-misconfiguration"
+	desc: <<<DESC
+### 说明
+`chmod 777/666`、`chmod o+w`、`chmod a+rwx` 或 `umask 000` 会让任意本地用户
+读取、修改甚至替换目标文件。攻击者常把 webshell、计划任务或动态库放在这类
+目录中，再等待高权限进程加载。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+按最小权限原则设置文件权限，例如目录 `755`、普通文件 `644`、仅属主可执行
+`700`。不要对系统目录递归使用 `777`，也不要把 umask 设置为 `000`。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-732](https://cwe.mitre.org/data/definitions/732.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+chmod 777 /var/www/html/upload
+chmod -R 777 /var/www/html
+chmod o+w /tmp/run.sh
+umask 000
+POS
+	"safefile://neg.sh": <<<NEG
+chmod 644 /var/www/html/index.html
+chmod 755 /usr/local/bin/deploy
+chmod +x deploy.sh
+umask 022
+NEG
+)
+
+chmod(* as $chmodArgs) as $chmodCall
+$chmodCall?{any: /(^|[^0-9])777([^0-9]|$)/, /(^|[^0-9])666([^0-9]|$)/, /o\+w/, /a\+rwx/} as $chmodPermissive
+
+umask(* as $umaskArgs) as $umaskCall
+$umaskCall?{have: /(^|[^0-9])0{3,4}([^0-9]|$)/} as $umaskPermissive
+
+alert $chmodPermissive for {
+	level: "low",
+	title: "Bash: world-writable permissions or permissive umask",
+	title_zh: "Bash：设置全局可写权限或宽松 umask",
+	message: "检测到全局可写或全局可读写的权限设置。",
+	risk: "security-misconfiguration",
+}
+
+alert $umaskPermissive for {
+	level: "low",
+	title: "Bash: world-writable permissions or permissive umask",
+	title_zh: "Bash：设置全局可写权限或宽松 umask",
+	message: "检测到 umask 000，新建文件默认全局可写。",
+	risk: "security-misconfiguration",
+}

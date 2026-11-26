@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strconv"
@@ -53,6 +54,9 @@ func (s *Server) SetKey(ctx context.Context, req *ypb.SetKeyRequest) (*ypb.Empty
 	}
 	if req.GetKey() == consts.HTTPFlowListInlineMaxContentLengthKey {
 		yakit.ApplyHTTPFlowListInlineMaxContentLength(req.GetValue())
+	}
+	if req.GetKey() == aicommon.BashGuardRegexRulesStorageKey {
+		aicommon.InvalidateBashGuardRegexRulesCache()
 	}
 	return &ypb.Empty{}, nil
 }

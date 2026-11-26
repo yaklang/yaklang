@@ -1,0 +1,85 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash: TLS certificate verification disabled"
+	title_zh: "Bash：禁用 TLS 证书校验"
+	type: audit
+	level: "low"
+	rule_id: "bash-insecure-tls"
+	risk: "security-misconfiguration"
+	desc: <<<DESC
+### 说明
+命令显式关闭了 TLS 证书校验或 SSH 主机密钥校验：`curl -k/--insecure`、
+`wget --no-check-certificate`、`ssh/scp/sftp -o StrictHostKeyChecking=no`、
+`git -c http.sslVerify=false`。这些选项会让中间人替换证书或冒充目标主机，
+常见于临时排障或攻击者批量下载载荷时。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+恢复证书与主机密钥校验；如目标使用自签证书，应把 CA 加入信任库，
+而不是关闭校验。禁止在生产脚本中硬编码 `-k`、`--insecure` 或
+`StrictHostKeyChecking=no`。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-295](https://cwe.mitre.org/data/definitions/295.html)
+REFERENCE
+	alert_min: 1
+	"file://pos.sh": <<<POS
+curl -k https://example.com/install.sh
+curl --insecure https://example.com/install.sh
+wget --no-check-certificate https://example.com/install.sh
+ssh -o StrictHostKeyChecking=no deploy@example.com
+git -c http.sslVerify=false clone https://example.com/repo.git
+POS
+	"safefile://neg.sh": <<<NEG
+curl -fsSL https://example.com/install.sh
+wget -qO- https://example.com/install.sh
+ssh deploy@example.com
+git clone https://example.com/repo.git
+NEG
+)
+
+curl(* as $curlArgs) as $curlCall
+$curlCall?{any: /(^|[^A-Za-z0-9_])-k([^A-Za-z0-9_]|$)/, /--insecure/} as $curlInsecure
+
+wget(* as $wgetArgs) as $wgetCall
+$wgetCall?{have: /--no-check-certificate/} as $wgetInsecure
+
+/^(ssh|scp|sftp)$/ as $sshCli
+$sshCli(* as $sshArgs) as $sshCall
+$sshCall?{any: /StrictHostKeyChecking=no/, /UserKnownHostsFile=\/dev\/null/} as $sshInsecure
+
+git(* as $gitArgs) as $gitCall
+$gitCall?{any: /http\.sslVerify=false/, /http\.sslverify=false/} as $gitInsecure
+
+alert $curlInsecure for {
+	level: "low",
+	title: "Bash: TLS certificate verification disabled",
+	title_zh: "Bash：禁用 TLS 证书校验",
+	message: "检测到 curl -k/--insecure，TLS 证书校验已关闭。",
+	risk: "security-misconfiguration",
+}
+
+alert $wgetInsecure for {
+	level: "low",
+	title: "Bash: TLS certificate verification disabled",
+	title_zh: "Bash：禁用 TLS 证书校验",
+	message: "检测到 wget --no-check-certificate，TLS 证书校验已关闭。",
+	risk: "security-misconfiguration",
+}
+
+alert $sshInsecure for {
+	level: "low",
+	title: "Bash: TLS certificate verification disabled",
+	title_zh: "Bash：禁用 TLS 证书校验",
+	message: "检测到 SSH 主机密钥校验被关闭，可能遭受中间人攻击。",
+	risk: "security-misconfiguration",
+}
+
+alert $gitInsecure for {
+	level: "low",
+	title: "Bash: TLS certificate verification disabled",
+	title_zh: "Bash：禁用 TLS 证书校验",
+	message: "检测到 git 关闭 TLS 证书校验。",
+	risk: "security-misconfiguration",
+}

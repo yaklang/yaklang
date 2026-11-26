@@ -5,11 +5,17 @@ package sfbuildin
 import (
 	"embed"
 	"errors"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfrisk"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
+
+//go:embed buildin/bash/***
+var embeddedBashRuleFS embed.FS
 
 var (
 	// ErrSyntaxFlowNotAvailable indicates that SyntaxFlow features are not available in the current build
@@ -62,4 +68,13 @@ func GetRuleFS() *embed.FS {
 	return nil
 }
 
-
+// LoadEmbeddedRulesByLanguage loads the canonical bash rule snapshot in the
+// slim build. Full SyntaxFlow rule sets are excluded, but the bash guard needs
+// these rules to keep high-severity preflight working.
+func LoadEmbeddedRulesByLanguage(language string, severities ...schema.SyntaxFlowSeverity) ([]*schema.SyntaxFlowRule, error) {
+	language = strings.ToLower(strings.TrimSpace(language))
+	if language != "bash" {
+		return nil, nil
+	}
+	return loadEmbeddedRulesFromFS(filesys.NewEmbedFS(embeddedBashRuleFS), language, severities)
+}

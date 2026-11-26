@@ -376,8 +376,12 @@ type Config struct {
 	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
 	IntervalReviewDuration            time.Duration // Duration between reviews (default 60s)
 	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
-	ToolComposeConcurrency            int           // Legacy shared concurrency option, still used by fast-context grep (default 2)
-	PlanExecTaskConcurrency           int           // Max concurrent executable tasks per PE DAG stage (default 1)
+	// DisableBuiltinSyntaxFlowRules is the master command-security switch.
+	// When true, neither built-in nor custom rules run. When false, all built-in
+	// rules run and custom rows participate only when individually enabled.
+	DisableBuiltinSyntaxFlowRules bool
+	ToolComposeConcurrency        int // Legacy shared concurrency option, still used by fast-context grep (default 2)
+	PlanExecTaskConcurrency       int // Max concurrent executable tasks per PE DAG stage (default 1)
 
 	// verificationWatchdogToolBlockingStart/End are registered by reactloops.ReActLoop
 	// around synchronous invoker tool execution (aireact.executeToolCallInternal) so the
@@ -815,6 +819,7 @@ func newConfig(ctx context.Context) *Config {
 		GoalMinIterations:                  DefaultGoalMinIterations,
 		MaxSubAgents:                       DefaultMaxSubAgentConcurrency,
 		GenerateReport:                     true,
+		DisableBuiltinSyntaxFlowRules:      true,
 		EnableFunctionCallMode:             true,  // 默认开启原生 functioncall 模式
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
@@ -1891,6 +1896,20 @@ func (c *Config) IsToolUseDisabled() bool {
 	return c.DisableToolUse
 }
 
+// WithDisableBuiltinSyntaxFlowRules is the master command-security switch.
+// Disabling it skips built-in and custom Bash rules for this session.
+func WithDisableBuiltinSyntaxFlowRules(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableBuiltinSyntaxFlowRules = disable
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithEnableToolManagerAISearch(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2104,6 +2123,20 @@ func WithAllowRequireForUserInteract(v bool) ConfigOption {
 		}
 		return nil
 	}
+}
+
+// GetAgreePolicy returns the active review policy. It is intentionally a
+// getter rather than a public field read so callers holding the narrower
+// AICallerConfigIf interface can still resolve security-rule interactions.
+func (c *Config) GetAgreePolicy() AgreePolicyType {
+	if c == nil {
+		return AgreePolicyManual
+	}
+	if c.m != nil {
+		c.m.Lock()
+		defer c.m.Unlock()
+	}
+	return c.AgreePolicy
 }
 
 // WithAgreePolicy 设置操作审批策略（导出名为 aiagent.agreePolicy）
@@ -4398,6 +4431,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	// Disable tool use flag
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
 	opts = append(opts, WithImageInput(i.GetImageInputConfig()))
+	opts = append(opts, WithDisableBuiltinSyntaxFlowRules(i.DisableBuiltinSyntaxFlowRules))
 
 	// Keep the policy with the shared manager: NewConfig applies this flag
 	// to the manager, so a child default must not reopen parent MCP access.

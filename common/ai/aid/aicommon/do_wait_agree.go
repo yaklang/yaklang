@@ -26,6 +26,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 	}
 
 	skipAIReview := utils.GetContextKeyBool(ctx, "skip_ai_review")
+	securityAsk := utils.GetContextKeyBool(ctx, SecurityAskContextKey)
 
 	interactiveId := endpoint.GetId()
 
@@ -88,14 +89,21 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 					})
 				}
 				defer func() {
-					endNormally(1.0, "high", "review interrupted")
+					endNormally(1.0, "high", "review interrupted", securityAsk)
 				}()
 
 				riskResult, err := c.AiAgreeRiskControl(ctx, c, endpoint)
 				if err != nil {
-					endNormally(1, "high", "review failed: "+err.Error())
+					endNormally(1, "high", "review failed: "+err.Error(), securityAsk)
 					log.Errorf("error during auto-review: %v", err)
 					if ctx.Err() != nil {
+						return
+					}
+					if securityAsk {
+						// A security ask must not turn into an implicit approval
+						// because the reviewer failed. Leave the endpoint pending
+						// and let a human decide.
+						endpoint.SetApprovalMeta(ApprovalSourceHuman, true, "ai_review_error_security_escalated_to_human")
 						return
 					}
 					endpoint.SetApprovalMeta(ApprovalSourceTimeoutFallback, false, "ai_review_error_auto_continue")

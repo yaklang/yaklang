@@ -275,20 +275,21 @@ func cloneAIGlobalConfig(cfg *ypb.AIGlobalConfig) *ypb.AIGlobalConfig {
 		return nil
 	}
 	return &ypb.AIGlobalConfig{
-		SingleModelMode:        cfg.GetSingleModelMode(),
-		RetryForever:           cfg.GetRetryForever(),
-		NetworkDebug:           cfg.GetNetworkDebug(),
-		ModelRequestsPerMinute: cfg.GetModelRequestsPerMinute(),
-		Enabled:                cfg.GetEnabled(),
-		RoutingPolicy:          cfg.GetRoutingPolicy(),
-		DisableFallback:        cfg.GetDisableFallback(),
-		DefaultModelId:         cfg.GetDefaultModelId(),
-		GlobalWeight:           cfg.GetGlobalWeight(),
-		IntelligentModels:      cloneAIModelConfigs(cfg.GetIntelligentModels()),
-		LightweightModels:      cloneAIModelConfigs(cfg.GetLightweightModels()),
-		VisionModels:           cloneAIModelConfigs(cfg.GetVisionModels()),
-		AIPresetPrompt:         cfg.GetAIPresetPrompt(),
-		AIPlanPrompt:           cfg.GetAIPlanPrompt(),
+		SingleModelMode:               cfg.GetSingleModelMode(),
+		RetryForever:                  cfg.GetRetryForever(),
+		NetworkDebug:                  cfg.GetNetworkDebug(),
+		ModelRequestsPerMinute:        cfg.GetModelRequestsPerMinute(),
+		Enabled:                       cfg.GetEnabled(),
+		RoutingPolicy:                 cfg.GetRoutingPolicy(),
+		DisableFallback:               cfg.GetDisableFallback(),
+		DefaultModelId:                cfg.GetDefaultModelId(),
+		GlobalWeight:                  cfg.GetGlobalWeight(),
+		IntelligentModels:             cloneAIModelConfigs(cfg.GetIntelligentModels()),
+		LightweightModels:             cloneAIModelConfigs(cfg.GetLightweightModels()),
+		VisionModels:                  cloneAIModelConfigs(cfg.GetVisionModels()),
+		AIPresetPrompt:                cfg.GetAIPresetPrompt(),
+		AIPlanPrompt:                  cfg.GetAIPlanPrompt(),
+		DisableBuiltinSyntaxFlowRules: cfg.GetDisableBuiltinSyntaxFlowRules(),
 	}
 }
 
