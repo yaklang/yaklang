@@ -116,104 +116,104 @@
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
     "rule_name": "结构匹配：Electron webSecurity 被禁用",
-    "hash": "91576823f790c0c20259574fcad0f7bc1665dea979dcb19f2808542d004ff945",
-    "version": "20261109.0001"
+    "hash": "31bd60dff379c8c78fa398e81b5381ba748492e1d9ea52a9668b3d76a11b8ccd",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
     "rule_name": "结构匹配：Electron allowRunningInsecureContent 被启用",
-    "hash": "3630ecb59ced6fe5dbc4f7648b156e3d1243adde05c9e35523e9f98ed850fe65",
-    "version": "20261109.0001"
+    "hash": "ebd5f8fe312b0cf8a0481a6ca8ba83944e5c8485d1e2174b24385abad6166a4b",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
     "rule_name": "数据流：用户可控输入流入代码执行函数导致代码注入",
-    "hash": "8695f795ab8061b1218f11b3793a4763a90c11a653fbfb0602273e8d5341630f",
-    "version": "20261112.0001"
+    "hash": "dc72b65a906f58e3ac8f4e403581c0f4b63d44003058d2cdffa4d0f24d566956",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-094000000003",
     "rule_name": "结构匹配：用户可控对象传入模板引擎导致模板对象注入",
-    "hash": "091cd555147e28eef16607bfccaca29308d6b4542d28d7721daf680acc548295",
-    "version": "20261109.0001"
+    "hash": "366e48cd4458948bcef4a6875e9f529757e52701b7130c33be80563f8bd353c2",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "a7e3f21b-5c8d-4e9a-b6f2-1d4c7e0a3f95",
     "rule_name": "结构匹配：Express.js 中间件使用区分大小写的正则表达式路径",
-    "hash": "0fdb36e256be947a2935d25ecce6e54ac93e371f9e3d0145b60dffdf13aa40c9",
-    "version": "20261109.0001"
+    "hash": "eac2f97dd887f82a91590058a35c57508a29051247bc737919e45a7848494c7e",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "d8f4a22b-9c1e-4b37-8e5d-7f3a901c2e84",
     "rule_name": "数据流：压缩包解压时未验证文件路径导致目录穿越（Zip Slip）",
-    "hash": "77400979de014b956fc65a36e5d17a83d0b61f47c9d58a756c56ff0f99785bb1",
-    "version": "20261112.0001"
+    "hash": "a32146ae338b3b496ecf456ddf7b6d7fdea30632321567c50521e70984a7a18a",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-326000000001",
     "rule_name": "结构匹配：使用密钥长度不足的加密密钥",
-    "hash": "a6bedceb277138e1d0afe8f987138572d6c3cb9caf31d019070990bd68b3287e",
-    "version": "20261109.0001"
+    "hash": "5a130f1c17cf1eef307193e2e54c8302f99dc618ae9f5f4ecc8cb0deacc731f2",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "b2c3d4e5-f6a7-8901-bcde-327000000001",
     "rule_name": "数据流：使用已破解或弱加密算法",
-    "hash": "103df3ea62fcc2c68f7caecfd913719060714109454e3fad2277798e39b33d47",
-    "version": "20261112.0001"
+    "hash": "61b4e4039bf9966ea2744f9bb02ca82773eae22da18449a09a125170fc85eb34",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-338000000001",
     "rule_name": "数据流：安全敏感场景中使用了不安全的伪随机数生成器",
-    "hash": "0860eaabc1a30dfdde1e3eb8f2012413ec7a5a4fb06ba2163fe61eca58f45a0a",
-    "version": "20261112.0001"
+    "hash": "93219d858eb7b68c0d8f393b5aded1dd13722107ecb030fb7f76dad98602d911",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-456789012345",
     "rule_name": "结构匹配：JWT 验证未使用加密密钥（None 算法绕过）",
-    "hash": "0f8ad18ff1aa8ed476e0d29be9108e9fb568be4adb9840016fa64a94068f92ec",
-    "version": "20261109.0001"
+    "hash": "0a2c72e0f4b0bcb1c686e0621ed318719f3fbed43cb77f69e26c25edae643ed6",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "f6a7b8c9-d0e1-2345-f012-345678901234",
     "rule_name": "数据流：用户可控数据流入不安全反序列化函数",
-    "hash": "e1ef227bd6b0c32001768e32969613cd4e4a461f29e0f09c175084ed93cd8cef",
-    "version": "20261112.0001"
+    "hash": "463c758bd776d02075eb65f681595d7dbae8ba25329a2fdcbea9673acbb65528",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "c5d6e7f8-a9b0-1234-cdef-598000000001",
     "rule_name": "结构匹配：GET 请求中读取敏感数据",
-    "hash": "5d678730c0dcee0ff7b4dca4982487da5b76ae5bb154f0c787d05e84fa98df66",
-    "version": "20261109.0001"
+    "hash": "c232ea3cb27ab795e09c1ac68ea8ad69f00befbbc08a168433a3d8f564db55d9",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
     "rule_name": "JavaScript 代码执行 Sink 函数",
-    "hash": "8c26fe7c8f5af2eb6b0db081f97ee6942c2203ebb28717afddc0da1f45957000",
-    "version": "20261112.0001"
+    "hash": "b179d6a56f3340370298b2201b6237354c0bdf4ab610d23ee59644bb2f220e49",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "e5f6a7b8-c9d0-1234-ef01-234567890123",
     "rule_name": "JavaScript 不安全反序列化 Sink 函数",
-    "hash": "e26968df6ea25327e8b0190754bf00ce728a8f5333bac84511f41ff319ab21c5",
-    "version": "20261112.0001"
+    "hash": "d3d609a55357d6e39585864f638df21297865be0e826e8d7c8869ea23019c330",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "d4e5f6a7-b8c9-0123-defa-918000000001",
     "rule_name": "JavaScript HTTP 请求 Sink 函数",
-    "hash": "67aec0353b3aee0f06f1a879dc572600b7dd4ad81d42287f0d8f085956a76c06",
-    "version": "20261112.0001"
+    "hash": "af2a05055da08feac1bfe4a0c69d99221d5b522e34d94477328c3df86d992a06",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "rule_name": "JavaScript/Node.js 用户可控输入源",
-    "hash": "e63957c3d031585956a2276ef9c7163f1511cd175d67d14eab7ccfadb0866487",
-    "version": "20261112.0001"
+    "hash": "9fdf41019faf6d854c4f41088ec0cacc09d91f3169102f33b23b965b6d30f690",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "d4e5f6a7-b8c9-0123-def0-456789012345",
     "rule_name": "JavaScript SQL/NoSQL 查询执行 Sink 函数",
-    "hash": "e449013c487b7928c686337801d3e31304dacffdaf2c9dcfe25d0a47322d1ad7",
-    "version": "20261112.0001"
+    "hash": "e4a5a80f4681f674f108d2e2aafbf079e80a50c996e863e6c2999478c8fec3e7",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
@@ -2264,8 +2264,8 @@
   {
     "rule_id": "source-js-eval",
     "rule_name": "检测 JavaScript eval 调用",
-    "hash": "8c418e262f391e20285a6a79905ff2e427c3b4d986fb1983426830e06c783436",
-    "version": "20261109.0002"
+    "hash": "adc4f377cf9dd065ab246c6a1c361d70af6ca91fefe54127d68027c71ec7940f",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-python-eval",
@@ -3824,8 +3824,8 @@
   {
     "rule_id": "struct-js-eval",
     "rule_name": "结构匹配：JavaScript eval 调用",
-    "hash": "a1fe0af0b39d36787b507ee6240a22fb3fa61beef9af047b769698c3b3da4b1b",
-    "version": "20261109.0001"
+    "hash": "73f9a068d1b8896949b5c57b7b304b6ae314fd61680ea4e5156d1e9a05d70ed0",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-python-eval",
@@ -4118,74 +4118,74 @@
   {
     "rule_id": "source-js-chmod-777",
     "rule_name": "源码匹配：检测 JavaScript chmod 777",
-    "hash": "63b8ef08e2566e5d6ce6001e65c754d7e212215d53a3e0aef635abe73d620ccc",
-    "version": "20261109.0002"
+    "hash": "1f5a4c72204b3bf0116875b5790c74c43ec7a2b6451a765cd4f7f0d44610e82b",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-createhash-sha1",
     "rule_name": "源码匹配：检测 JavaScript createHash SHA1",
-    "hash": "69849ef7bb43265811fa96a7058378e4d4ea3ca9118349d0f3417d9bbf9e2f88",
-    "version": "20261109.0002"
+    "hash": "9e362dda08bb9542820316d064c9fb42d9a0a14b50540b81d6d168c57cce00b1",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-document-write",
     "rule_name": "源码匹配：检测 JavaScript document.write",
-    "hash": "875048ffbe3fa545ef27ed9973964a8d19def569b147b1be98b2324e1e4b8a2f",
-    "version": "20261109.0002"
+    "hash": "66974258509b3ce0dbfb42b15df4f163a7318b00233f6316d79c2286aba23085",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-function-constructor",
     "rule_name": "源码匹配：检测 JavaScript Function 构造器",
-    "hash": "539d686fd9410c368a51884239abdae30d6fa98f8db9a4925f72723eb8c479d9",
-    "version": "20261109.0002"
+    "hash": "2fab900d0f65f15ab0fddd5760f1bd2d421e410006428133a659f37297f3c830",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-innerhtml",
     "rule_name": "源码匹配：检测 JavaScript innerHTML 赋值",
-    "hash": "d7569c85f26d370625b6c8e38e35469c49d487ff431933a078a210861fd8a19a",
-    "version": "20261119.0001"
+    "hash": "34d86838c5793314253b7aedb929b3f70e3f882796f98cda9b19d68ca968eb73",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-jwt-none",
     "rule_name": "源码匹配：检测 JavaScript JWT none 算法",
-    "hash": "b4d027a2ad4cfa292d7100dbb396e3497ab9fb65ce2dcdaa3bed2ca7480d8bd0",
-    "version": "20261109.0002"
+    "hash": "7d5cdfc47a08aa0e984bce51f00dd30a38aa1a929bb865289bc78eb21f8d95b0",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-postmessage-wildcard",
     "rule_name": "源码匹配：检测 JavaScript postMessage 通配源",
-    "hash": "61641a70c761b0222e4aeacc2d00c0b9eb6e94639151bd150fbcfba09dc2a567",
-    "version": "20261109.0002"
+    "hash": "c25ae53913ebd1be620e9f866f2af31be995b36787d8f09a21f457e2c17766be",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-reject-unauthorized-false",
     "rule_name": "源码匹配：检测 JavaScript 关闭 TLS 校验",
-    "hash": "0a64770f16e5e8b87b3f5d025fe10046bae2c28894ba39c9a9e7f80b5fe9a9b1",
-    "version": "20261109.0002"
+    "hash": "beb8e67aee8b21522cd31816a0ac4050a1677f57193a0f7765f36efc7c58eae3",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-setinterval-string",
     "rule_name": "源码匹配：检测 JavaScript setInterval 字符串",
-    "hash": "9c4e8d3e1f5dbe950deb9f309346c5a47469bcdf10c76ac6a72a2ea4c0c7deeb",
-    "version": "20261109.0002"
+    "hash": "359ec12a6b652276c6bae73d94e749c752653fbe7c5611ac4e316cc109eee114",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-settimeout-string",
     "rule_name": "源码匹配：检测 JavaScript setTimeout 字符串参数",
-    "hash": "8d3851f33e54b72b18507d4de4a7234857c64e9dccf91f13dcfd0a8fee417371",
-    "version": "20261109.0002"
+    "hash": "3e0b288321e4cc053c2459cd19a11383f021c38a3e165e06884ad1a8aa520a2c",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-spawn-shell-true",
     "rule_name": "源码匹配：检测 JavaScript spawn shell true",
-    "hash": "7c5d42a2738cbe7891b22739ce16e4dd277e1a282c8f3217ffc428c9869ed90c",
-    "version": "20261109.0002"
+    "hash": "5656d55bb4e0fc3892909d07eaed87352a8a4110692cef40ba0f6769b3653b43",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-vm-script",
     "rule_name": "源码匹配：检测 JavaScript vm.Script",
-    "hash": "e6c3c011ee7cbdd2f16c38ee2b8f8359224925acd85da18082d38ee7dfafca59",
-    "version": "20261109.0002"
+    "hash": "dfb0d333dd230a5d08bf8a250971c47dd8b6fce06ddfc030796e8e74ecb4515a",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-php-allow-url-include",
@@ -4778,50 +4778,50 @@
   {
     "rule_id": "struct-js-child-process-exec",
     "rule_name": "结构匹配：JavaScript child_process.exec",
-    "hash": "9028f179004c07e06f5bbc13e601f26e62bc03780efaa40f942c8727f2a52e2b",
-    "version": "20261109.0001"
+    "hash": "23fa010541a18f86c55503b45c6bd72f48bf26e9c2b098ee067eaea30b4565df",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-createcipher",
     "rule_name": "结构匹配：JavaScript crypto.createCipher",
-    "hash": "9edc20dd97cd279e925543cc7df7d17427ad05e2903af149217c2b31fdab6606",
-    "version": "20261109.0001"
+    "hash": "762b462358da5fe6e789ee5bdb18d4494b6e71e81da1e9b845a2e2f3a5534088",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-dangerously-set-innerhtml",
     "rule_name": "结构匹配：React dangerouslySetInnerHTML",
-    "hash": "03159386d791048ee5a430f7762b07222b04ee54b747c5a8d5ba57e1d856a69d",
-    "version": "20261109.0001"
+    "hash": "6044951045dbcb1b59e139015ed8b1cbfe5d6e67267dcd9e16ca03e4f3cb5d6d",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-function-constructor",
     "rule_name": "结构匹配：JavaScript Function 构造器",
-    "hash": "e848ecc7bae23237c350cb07a4c84735e128e9aecf0f081c4961d58f7f0b52c6",
-    "version": "20261109.0001"
+    "hash": "3dc6c16d72342ef3f5f69d6457629bfa245a66705aa88f0e24d21ff51a16a2e1",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-jwt-decode",
     "rule_name": "结构匹配：JavaScript jwt.decode",
-    "hash": "e3cdfaddd8e99b959da758644785be22b2af11c6a7dadcca0cac193b0e08e002",
-    "version": "20261109.0001"
+    "hash": "5794c939232c7b42a24eb78ff7f85fd30fc93acf09ce5a0032e5120e3cec77a4",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-lodash-merge",
     "rule_name": "结构匹配：JavaScript lodash merge",
-    "hash": "c69d2a41247b5067e8f1b8fed96210a032f5dc2cae65ee7ecdcbb78a853c111a",
-    "version": "20261109.0001"
+    "hash": "1afdd177a90d35214be4d6a853c572ac34e21d0f96de9562ac456c8834da10fd",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-vm-runincontext",
     "rule_name": "结构匹配：JavaScript vm.runInContext",
-    "hash": "faca343988cdc5fedbc020ca8f165d35562050d6c23c27bf85ca97e818b17733",
-    "version": "20261109.0001"
+    "hash": "8cb42eabfef886039143880fbc5cf8f97f74f11f6ae1e87c77793b9ed1720167",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-yaml-load",
     "rule_name": "结构匹配：JavaScript js-yaml load",
-    "hash": "e4cad22611a1d44dde578fdb5b09e9afcad5514310b773af8dc79824992ca65b",
-    "version": "20261109.0001"
+    "hash": "3328aa8c2259b70cb702f181f05ed4fa98c4d9b5defd4614ec43d1a7beb5427d",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-php-assert",
@@ -5150,38 +5150,38 @@
   {
     "rule_id": "source-js-console-log-req",
     "rule_name": "源码匹配：JavaScript 日志写入请求数据",
-    "hash": "634318cee0740f2c5dcd3d47a0601461df1967c7c384b570df8572d6647780b0",
-    "version": "20261109.0002"
+    "hash": "cda85e7fb320a6386a40c370aa61c5a2e12bc3317cf2f71ed777fc5ce1b0a25a",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-csrf-false",
     "rule_name": "源码匹配：JavaScript 关闭 CSRF",
-    "hash": "ff5871130eeeade033b2cc7aac3471fd4d607c1e846c803e15436d2440d023ba",
-    "version": "20261109.0002"
+    "hash": "7790507a8a8d786030585545927d5331061b8475f9f18fac06c0140a91bdd748",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-libxml-noent",
     "rule_name": "源码匹配：JavaScript libxmljs noent",
-    "hash": "ee59edaa14dd669ff97c0e323230a8944fbc2b810086bf864f76f204f17df4b3",
-    "version": "20261109.0002"
+    "hash": "4ecfe344526a8d749cec5a3aaba70acdf908f1afd4cebd8a50c520a417c5f48a",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-regexp-from-input",
     "rule_name": "源码匹配：JavaScript 用外部字符串构造 RegExp",
-    "hash": "97a0431b592e0a89d796811c6fa6ee857cfa17618ca62a4517ea2b9617522aa9",
-    "version": "20261109.0002"
+    "hash": "0a7fc270b4cfd70f60c6f073356541376f546f38bb49d45ab9ddc846c959f543",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-samesite-none",
     "rule_name": "源码匹配：JavaScript Cookie sameSite none",
-    "hash": "4e15d1e5431eb8fed62efc6f94dd2637c15aac145988ca67b348e18d90baa2ca",
-    "version": "20261109.0002"
+    "hash": "66f978d992201916a3f36e9111d98adc7bda13c94e146be6a4711bcd27ebc9c2",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-js-sax-ondoctype",
     "rule_name": "源码匹配：JavaScript sax ondoctype",
-    "hash": "b380434e4d2b8227198fdc907722f934d9dac41b4a188579fd3f15289b07c04b",
-    "version": "20261109.0002"
+    "hash": "9a19465e1c0ded939f4b02f36a65b043624b542a25a4601dfde25d67dfb5873f",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-kotlin-runtime-exec",
@@ -5390,8 +5390,8 @@
   {
     "rule_id": "ssa-js-regexp-from-input",
     "rule_name": "结构匹配：JavaScript 用外部字符串构造 RegExp",
-    "hash": "eb9114e0b79daf9cde22f6acd4cf137401778ec4f8b1e6dd80545afcb1d3b231",
-    "version": "20261109.0001"
+    "hash": "b53c58047243354cb8f2cda61bfc6fa21a02e7cc4e70a0e66872f979f742a900",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-php-new-variable-class",
@@ -5834,14 +5834,14 @@
   {
     "rule_id": "865d7a9f-9f92-48ee-b792-f9709235cde8",
     "rule_name": "源码匹配：TypeScript SSRF：请求值传给 http.get",
-    "hash": "feb4bfa0e3052c6238800f03b318fe570a6b6c038c3c44bb6fa8326e772f8cd4",
-    "version": "20261109.0002"
+    "hash": "01495df79a4fa80a0eb08c05950b94fa620b9500e8602cd7a8c04460fd3e02b9",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "88359376-3def-4abb-a1e4-bbf91d08c59b",
     "rule_name": "数据流：TypeScript XSS：请求参数拼进 HTML 模板",
-    "hash": "06c0b7f1d51f50beea3357a75082f0c43bc17d9dff4fc40ad8beda65760de942",
-    "version": "20261109.0002"
+    "hash": "15a0bf3b5fe8424f5ce1e3830bc4463aa7a91b3df46032f3e8603fb7421ee75f",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "8b5666b4-db0b-4fe8-9fdc-0911a22cf8f4",
@@ -5954,92 +5954,92 @@
   {
     "rule_id": "ssa-js-command-exec-concat",
     "rule_name": "数据流：Node.js 命令执行：用户输入拼接到 exec",
-    "hash": "3333f41646da8c3c671eadc5ec4fb0831f87ec33307bd1ff86b6df78eaf5487a",
-    "version": "20261109.0002"
+    "hash": "f39ddd056d9fd2a3dafcf70800375cc844d85e2035ca2c2d907a470a0a821307",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-cors-origin-reflection",
     "rule_name": "数据流：Node.js CORS：请求 Origin 直接回显",
-    "hash": "166e83cb77f8c648b125527b8d4618308dc1247f20e87fb8b2cf62f3161d9682",
-    "version": "20261109.0003"
+    "hash": "82b068b76aea253f92212a810c727356d47ee964f7128ca3eff5ee95c80ece15",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-llm-output-handling",
     "rule_name": "数据流：Node.js LLM 输出未校验流入危险操作",
-    "hash": "a65798724b5884e580e3ede4a96c49adf285147ee0d873aa7d10829ad8d25257",
-    "version": "20261109.0002"
+    "hash": "67e9189f9338bd16caee3d027339d7cc836ae033e9995f773be4eb86a7c50202",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-log-injection-concat",
     "rule_name": "数据流：Node.js 日志注入：用户输入拼接到日志",
-    "hash": "c975c77c3b640cda588f813d9c9c09aa302a1bac37f24a72efd0ff21da08a2cb",
-    "version": "20261109.0003"
+    "hash": "0bf34b5153e553fa365670746a8a9ca3c8b34b9edc404fd68397f952ec7bd066",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-nosql-injection",
     "rule_name": "数据流：Node.js NoSQL 注入：用户可控对象流入查询",
-    "hash": "c8bba0e15d3d5c7f968e619ce5cc211e39a028e4a895aea86efa200f3d6e958a",
-    "version": "20261109.0002"
+    "hash": "192fa28bfc849f5dfda039df2c5b13ff97ee247c8ec9a693e0a4a7a8ecbdc2ed",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-open-redirect",
     "rule_name": "数据流：Node.js 开放重定向：用户输入作为跳转目标",
-    "hash": "a35fe3be3a41b31052b33a0be387f26c801fd02d52e714eaa09799ffcdd08e56",
-    "version": "20261109.0003"
+    "hash": "eacbcebd9268fb2d4e0aaf2301be8e80dbad826c9d4e5dfba4585edf54e731b2",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-path-traversal-file-read",
     "rule_name": "数据流：Node.js 路径穿越：用户输入拼接到文件读取",
-    "hash": "f71bda1b9602b431d9ac44d4505c318bda82a9d4ad0c1d3478ad2a73fb48001c",
-    "version": "20261109.0002"
+    "hash": "228d3de7bf264e0a0e3c24ab6612c5bde0a8da9f37ceeff76b93de39604539cc",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-prompt-injection",
     "rule_name": "数据流：Node.js 提示词注入：用户输入拼接进提示词",
-    "hash": "81d468d9c98a59c79f1dc618d0c113949a4828fe6d57e865773616fb7fe2fdd9",
-    "version": "20261109.0003"
+    "hash": "41d9e45f27a5a411dfd94574bfa3da79437584e5d8c9984c851f0e442c0c2501",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-prototype-pollution-merge",
     "rule_name": "数据流：Node.js 原型污染：用户对象递归合并",
-    "hash": "4702dd4bb972269df3b15a52bb8c3c7fa1a4e88bef1c099a879adc20e6c755ce",
-    "version": "20261109.0002"
+    "hash": "ac9a2c00daf0aef9e1713c0388dd49149c00d676ecbc5d3a0d63ab6bd0b16aa9",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-sensitive-logging",
     "rule_name": "数据流：Node.js 日志泄露敏感凭据",
-    "hash": "61f8a11d99bccc2235d3dfbbcd908f248589b15ffcb5e83c5ed6e1a87a8fde3b",
-    "version": "20261109.0003"
+    "hash": "db2e0722f2ac14028f381a6315cc31aa43047f55db3470a4d26b6aec5d7c1ada",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-sql-injection",
     "rule_name": "数据流：Node.js SQL/NoSQL 注入：用户输入拼接查询",
-    "hash": "7f367da18ca27ba1a1f3cf5c85f2d4dea711aac5e04605e8b859c5a5e2df8263",
-    "version": "20261109.0002"
+    "hash": "3846de82a563d2291d2f4f43c98469412f58bd363e725f4474d16c5cfd62c47e",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-ssrf-request",
     "rule_name": "数据流：Node.js SSRF：用户输入作为请求地址",
-    "hash": "dcfe2febc610dc477e5809dc240ae268fde65c6bfe5238e383210c88b9053584",
-    "version": "20261109.0002"
+    "hash": "e66bcd57e2a04409bdbcd9831cf12b56eb93aa4a02cabe652359afea9b51def7",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-template-injection-render",
     "rule_name": "数据流：Node.js 模板注入：用户输入作为模板渲染",
-    "hash": "bed032fb4f557f6a143ad2e5d690f5bac1dc97bc5eed40d38114332ef4729e48",
-    "version": "20261109.0002"
+    "hash": "0f191e4d04e040751a426f4119ec6fb1e8261fa4bd4a91e2b17cdf5bad496b4d",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-unbounded-consumption",
     "rule_name": "数据流：Node.js LLM 资源消耗：生成参数由用户控制",
-    "hash": "2582a580ce8d183bc4f4b7e6c09bfa1c91c366dfc26850186d0fdf75e59b5440",
-    "version": "20261109.0003"
+    "hash": "2255d9d585731a8b98677b5516f3b7fe319cbae860ecb425623587ff220c0568",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-js-xss-response-concat",
     "rule_name": "数据流：Node.js XSS：用户输入拼接到 HTML 响应",
-    "hash": "9a0123186650b4e59385e19aa90957d839fa42f7ae45b778d44a09cf0ea4bcd2",
-    "version": "20261109.0002"
+    "hash": "31a7dfa09778d198d83bb99bf7140e1d7642d3a1ae04335119e3fa00fe24220d",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-python-command-injection",
@@ -6068,38 +6068,38 @@
   {
     "rule_id": "ssa-ts-command-injection",
     "rule_name": "数据流：TypeScript 命令注入：用户输入进入 Shell 命令",
-    "hash": "32341673898b9d1f58e0765ab3b98d0b801ffba60777fcc6258449ac5e3774c6",
-    "version": "20261109.0002"
+    "hash": "e68fc510e146f1c8e44dbbe19151e6189486de6c9008d3fdc283e3c101070d10",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-ts-path-traversal",
     "rule_name": "数据流：TypeScript 路径穿越：用户输入作为文件路径",
-    "hash": "c1b75f3b378f4aa00b4b30cacbc84d578b3e838e11294f44cb203ba25836c57c",
-    "version": "20261109.0002"
+    "hash": "8b939fdd9bbc954301f49dcdd9de07910b5af45e6cbff873cf15cbe5d12ca92a",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "ssa-ts-sql-injection",
     "rule_name": "数据流：TypeScript SQL 注入：用户输入拼接进查询语句",
-    "hash": "8000c650261f03cfb73807cda72244c5aa452fd6ff2012f693b49467f0c778a0",
-    "version": "20261109.0002"
+    "hash": "6fdd6783dfa1efbb774543ef79427dbb67beeb4f83ff1a3b9d40e352b2433f6f",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-clear-text-cookie",
     "rule_name": "结构匹配：Cookie 未设置 Secure 标志，可能被明文传输",
-    "hash": "606665d2640145ceff7d1c2279aae5e310ff3b34a895b65495127fdcd85331d6",
-    "version": "20261109.0001"
+    "hash": "941a3a3e934b24ec2ea2eeadac7824a1a52db68acd4af2664d679ed043b4691d",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-idor-dynamic-index",
     "rule_name": "结构匹配：Node.js 越权：用户可控 ID 直接索引对象",
-    "hash": "8d83f80c3ea9a4e4eb77aabef51fa03086ee961857d555be4ba2f36a8e7ea56b",
-    "version": "20261109.0002"
+    "hash": "99b6e89101a2e580f1397b51f6dde792aa39e2d3ba94ae6789fe3fbc182f4341",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "struct-js-llm-tool-dispatch",
     "rule_name": "结构匹配：Node.js LLM 越权：模型输出直接选择工具",
-    "hash": "e377187d044ff5e713558119bfa801f4c7fda2acf59e47ba4ce18836ed2fd2ce",
-    "version": "20261109.0002"
+    "hash": "d8f7bfb1db733314d58090321cc9a5f8c3650d0654cde5f3fdc4a9ac534a2da6",
+    "version": "20261126.0001"
   },
   {
     "rule_id": "source-java-system-set-property",
