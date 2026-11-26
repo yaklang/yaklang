@@ -1,6 +1,7 @@
 package syntaxflow_scan
 
 import (
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -444,10 +445,12 @@ func (r *stageOutcomeRecorder) Outcomes() []StageOutcome {
 type ProjectResult struct {
 	Stages      []StageOutcome `json:"stages"`
 	ProgramName string         `json:"program_name,omitempty"`
-	// LanguagePrograms lists reloadable programs produced by an all-language scan.
-	LanguagePrograms map[ssaconfig.Language]string `json:"language_programs,omitempty"`
-	Succeeded        bool                          `json:"succeeded"`
-	Error            string                        `json:"error,omitempty"`
+	// LanguagePrograms lists reloadable programs produced by an all-language
+	// scan. Keys are language ids (for example "golang" or "typescript"); string
+	// keys keep the map directly readable from yak scripts and JSON.
+	LanguagePrograms map[string]string `json:"language_programs,omitempty"`
+	Succeeded        bool              `json:"succeeded"`
+	Error            string            `json:"error,omitempty"`
 	// IncompleteStages is true when the caller asked for detection stages
 	// that never started. The run can still Succeeded when an earlier
 	// detection stage completed.
@@ -461,6 +464,20 @@ type ProjectResult struct {
 	TotalBytes       int64 `json:"total_bytes,omitempty"`
 	TotalLines       int64 `json:"total_lines,omitempty"`
 	SourceStatistics any   `json:"source_statistics,omitempty"`
+}
+
+// LanguageProgramsJSON returns the language→program mapping as a JSON object.
+// Yak scripts forward the result to the platform through this string so they do
+// not depend on how the VM converts a Go map value.
+func (r ProjectResult) LanguageProgramsJSON() string {
+	if len(r.LanguagePrograms) == 0 {
+		return ""
+	}
+	raw, err := json.Marshal(r.LanguagePrograms)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
 }
 
 // ProjectResultCallback receives the terminal ProjectResult of one ScanProject

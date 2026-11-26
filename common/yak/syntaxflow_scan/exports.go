@@ -17,6 +17,7 @@ var Exports = map[string]any{
 	"StructMode":                   StructMode,
 	"SSAMode":                      SSAMode,
 	"withMode":                     WithMode,
+	"withAllLanguages":             WithAllLanguages,
 	"withStageCallback":            WithStageCallback,
 	"withProjectResultCallback":    WithProjectResultCallback,
 	"stageCompile":                 StageCompile,
