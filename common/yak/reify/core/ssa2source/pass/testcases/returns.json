@@ -1,0 +1,76 @@
+[
+  {
+    "name": "mark-void-returns",
+    "note": "spill 读的是本函数帧内槽，不是源码级返回；指针 load 是真实返回",
+    "pass": "mark-void-returns",
+    "void_count": 1,
+    "ssair": [
+      "voidish",
+      "type: () -> any",
+      "entry_0:",
+      "    <ptr64> t1 = <ptr64> 16",
+      "    <i64> t2 = spill <ptr64> t1",
+      "    ret <i64> t2",
+      "through_pointer",
+      "type: () -> any",
+      "entry_0:",
+      "    <ptr64> t1 = <ptr64> 16",
+      "    <i64> t2 = load <ptr64> t1",
+      "    ret <i64> t2",
+      "value",
+      "type: () -> i64",
+      "entry_0:",
+      "    <i64> t1 = <i64> 0",
+      "    ret <i64> t1"
+    ],
+    "functions": [
+      {
+        "name": "voidish",
+        "return_type": "null"
+      },
+      {
+        "name": "through_pointer",
+        "return_type": "any"
+      },
+      {
+        "name": "value",
+        "return_type": "i64"
+      }
+    ]
+  },
+  {
+    "name": "refine-return-types",
+    "note": "返回类型取指针与整数返回值；空返回保持 void",
+    "pass": "refine-return-types",
+    "ssair": [
+      "pointer",
+      "type: () -> any",
+      "entry_0:",
+      "    <ptr64> t1 = type_cast[ptr64] <i64> 0",
+      "    ret <ptr64> t1",
+      "value",
+      "type: () -> any",
+      "entry_0:",
+      "    <i64> t1 = <i64> 0",
+      "    ret <i64> t1",
+      "void",
+      "type: () -> any",
+      "entry_0:",
+      "    ret"
+    ],
+    "functions": [
+      {
+        "name": "pointer",
+        "return_type": "ptr64"
+      },
+      {
+        "name": "value",
+        "return_type": "i64"
+      },
+      {
+        "name": "void",
+        "return_type": "null"
+      }
+    ]
+  }
+]

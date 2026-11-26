@@ -13,9 +13,11 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"runtime/debug"
 	"slices"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa/pass"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -135,12 +137,18 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 
 // convertFunctionSafely turns a conversion panic into an error that names the
 // function. A malformed instruction stream must not abort the process, and the
-// caller can report the diagnostic with the rest of the run.
+// caller can report the diagnostic with the rest of the run. The recovered value
+// and the stack go to the log, because a panic here is a defect in the converter
+// and the message alone does not say where it started.
 func convertFunctionSafely(converter *converter, function core.Function) (err error) {
 	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("lowir2ssa: function %s at 0x%x: %v", functionName(function), function.Address, recovered)
+		recovered := recover()
+		if recovered == nil {
+			return
 		}
+		log.Errorf("lowir2ssa: function %s at 0x%x panicked: %v\n%s",
+			functionName(function), function.Address, recovered, debug.Stack())
+		err = fmt.Errorf("lowir2ssa: function %s at 0x%x: %v", functionName(function), function.Address, recovered)
 	}()
 	return converter.convertFunction(function)
 }
@@ -1243,64 +1251,61 @@ func constInteger(constant *ssa.ConstInst) (int64, bool) {
 	return 0, false
 }
 
+// compareCondition turns one architecture condition code into a comparison of the
+// two operands the flags value was computed from.
 func (c *converter) compareCondition(cc string, leftID, rightID core.ValueID) ssa.Value {
 	left := c.values[leftID]
 	right := c.values[rightID]
 	if left == nil || right == nil {
 		return nil
 	}
-	switch cc {
-	case "e", "eq", "z":
-		return c.builder.EmitBinOp(ssa.OpEq, left, right)
-	case "ne", "nz":
-		return c.builder.EmitBinOp(ssa.OpNotEq, left, right)
-	case "l", "lt":
-		return c.orderedCompareSource(ssa.OpLt, left, right, true)
-	case "b", "c", "cc", "lo":
-		return c.orderedCompareSource(ssa.OpLt, left, right, false)
-	case "le":
-		return c.orderedCompareSource(ssa.OpLtEq, left, right, true)
-	case "be", "ls":
-		return c.orderedCompareSource(ssa.OpLtEq, left, right, false)
-	case "g", "gt":
-		return c.orderedCompareSource(ssa.OpGt, left, right, true)
-	case "a", "hi":
-		return c.orderedCompareSource(ssa.OpGt, left, right, false)
-	case "ge":
-		return c.orderedCompareSource(ssa.OpGtEq, left, right, true)
-	case "ae", "cs", "hs":
-		return c.orderedCompareSource(ssa.OpGtEq, left, right, false)
-	default:
+	condition, ok := core.ParseCondition(cc)
+	if !ok {
 		return nil
 	}
+	switch condition.Op {
+	case core.CompareEQ:
+		return c.builder.EmitBinOp(ssa.OpEq, left, right)
+	case core.CompareNE:
+		return c.builder.EmitBinOp(ssa.OpNotEq, left, right)
+	case core.CompareLT:
+		return c.orderedCompareSource(ssa.OpLt, left, right, condition.Signed)
+	case core.CompareLE:
+		return c.orderedCompareSource(ssa.OpLtEq, left, right, condition.Signed)
+	case core.CompareGT:
+		return c.orderedCompareSource(ssa.OpGt, left, right, condition.Signed)
+	case core.CompareGE:
+		return c.orderedCompareSource(ssa.OpGtEq, left, right, condition.Signed)
+	}
+	return nil
 }
 
+// zeroCondition turns one condition code into a comparison against zero. A target
+// that tests one operand instead of comparing two reaches this form.
 func (c *converter) zeroCondition(cc string, subject ssa.Value) ssa.Value {
 	if subject == nil {
 		return nil
 	}
-	zero := c.newConstant(int64(0), c.typeFor(integerType(64)))
-	switch cc {
-	case "e", "eq", "z":
-		return c.builder.EmitBinOp(ssa.OpEq, subject, zero)
-	case "ne", "nz":
-		return c.builder.EmitBinOp(ssa.OpNotEq, subject, zero)
-	case "l", "lt", "b", "c", "cc", "lo":
-		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
-	case "le", "be", "ls":
-		return c.builder.EmitBinOp(ssa.OpLtEq, subject, zero)
-	case "g", "gt", "a", "hi":
-		return c.builder.EmitBinOp(ssa.OpGt, subject, zero)
-	case "ge", "ae", "cs", "hs":
-		return c.builder.EmitBinOp(ssa.OpGtEq, subject, zero)
-	case "s", "mi":
-		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
-	case "ns", "pl":
-		less := c.builder.EmitBinOp(ssa.OpLt, subject, zero)
-		return c.builder.EmitUnOp(ssa.OpNot, less)
-	default:
+	condition, ok := core.ParseCondition(cc)
+	if !ok {
 		return nil
 	}
+	zero := c.newConstant(int64(0), c.typeFor(integerType(64)))
+	switch condition.Op {
+	case core.CompareEQ:
+		return c.builder.EmitBinOp(ssa.OpEq, subject, zero)
+	case core.CompareNE:
+		return c.builder.EmitBinOp(ssa.OpNotEq, subject, zero)
+	case core.CompareLT:
+		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
+	case core.CompareLE:
+		return c.builder.EmitBinOp(ssa.OpLtEq, subject, zero)
+	case core.CompareGT:
+		return c.builder.EmitBinOp(ssa.OpGt, subject, zero)
+	case core.CompareGE:
+		return c.builder.EmitBinOp(ssa.OpGtEq, subject, zero)
+	}
+	return nil
 }
 
 // opaqueValue represents a value whose exact semantics are not modeled. It is a
@@ -1869,9 +1874,9 @@ func registerViewFor(name string, bits uint16, model core.RegisterModel) registe
 		// The canonical variable is as wide as the target's registers. A 32-bit
 		// target keeps eax and ax in one 32-bit variable, so a read must not
 		// extract from a 64-bit one and lose the constant.
-		return x86RegisterView(lower, bits, model.Width)
+		return x86RegisterView(model, lower, bits)
 	case core.RegisterNamingAArch64:
-		return aarch64RegisterView(lower, bits, model.Width)
+		return aarch64RegisterView(model, lower, bits, model.Width)
 	default:
 		width := bits
 		if width == 0 {
@@ -1882,22 +1887,11 @@ func registerViewFor(name string, bits uint16, model core.RegisterModel) registe
 }
 
 // x86RegisterView maps one x86 register name, including the partial views, to the
-// 64-bit variable that holds it.
-func x86RegisterView(lower string, bits, canonicalBits uint16) registerView {
+// variable that holds it. The alias rule comes from the register model.
+func x86RegisterView(model core.RegisterModel, lower string, bits uint16) registerView {
+	canonicalBits := model.Width
 	if canonicalBits == 0 {
 		canonicalBits = 64
-	}
-	if family, ok := generalRegisterFamily(lower); ok {
-		width := bits
-		if width == 0 {
-			width = generalRegisterWidth(lower)
-		}
-		return registerView{
-			canonical:     family,
-			width:         width,
-			shift:         generalRegisterShift(lower),
-			canonicalBits: canonicalBits,
-		}
 	}
 	switch {
 	case strings.HasPrefix(lower, "xmm"), strings.HasPrefix(lower, "ymm"), strings.HasPrefix(lower, "zmm"):
@@ -1910,166 +1904,38 @@ func x86RegisterView(lower string, bits, canonicalBits uint16) registerView {
 		// The flags pseudo register is one opaque word regardless of the
 		// machine width, so a 32-bit write must not become a partial write.
 		return registerView{canonical: "rflags", width: 64, canonicalBits: 64}
-	default:
+	}
+	alias, ok := model.AliasOf(lower)
+	if !ok {
 		return registerView{canonical: lower, width: bits}
+	}
+	width := bits
+	if width == 0 {
+		width = alias.Width
+	}
+	return registerView{
+		canonical:     alias.Name,
+		width:         width,
+		shift:         alias.Shift,
+		canonicalBits: canonicalBits,
 	}
 }
 
 // aarch64RegisterView shares one variable between a W register and its X
-// counterpart, and between SP and WSP.
-func aarch64RegisterView(lower string, bits, defaultBits uint16) registerView {
-	switch lower {
-	case "wsp", "sp":
-		return registerView{canonical: "sp", width: 64, canonicalBits: 64}
-	case "wzr", "xzr":
-		return registerView{canonical: "xzr", width: 64, canonicalBits: 64}
-	case "fp":
-		return registerView{canonical: "x29", width: 64, canonicalBits: 64}
-	case "lr":
-		return registerView{canonical: "x30", width: 64, canonicalBits: 64}
-	}
-	digits, ok := registerDigits(lower[1:])
-	if !ok || len(lower) < 2 || (lower[0] != 'w' && lower[0] != 'x') {
+// counterpart, and between SP and WSP. The alias rule comes from the register
+// model.
+func aarch64RegisterView(model core.RegisterModel, lower string, bits, defaultBits uint16) registerView {
+	alias, ok := model.AliasOf(lower)
+	if !ok {
 		width := bits
 		if width == 0 {
 			width = defaultBits
 		}
 		return registerView{canonical: lower, width: width, canonicalBits: width}
 	}
-	width := uint16(64)
-	if lower[0] == 'w' {
-		width = 32
-	}
-	return registerView{canonical: "x" + digits, width: width, canonicalBits: 64}
-}
-
-func generalRegisterFamily(name string) (string, bool) {
-	// AArch64: Wn shares variable Xn; SP and WSP are one variable.
-	if len(name) >= 2 && (name[0] == 'w' || name[0] == 'x') {
-		if digits, ok := registerDigits(name[1:]); ok {
-			return "x" + digits, true
-		}
-	}
-	switch name {
-	case "wsp", "sp":
-		return "sp", true
-	case "wzr", "xzr":
-		return "xzr", true
-	case "fp":
-		return "x29", true
-	case "lr":
-		return "x30", true
-	}
-	switch name {
-	case "al", "ah", "ax", "eax", "rax":
-		return "rax", true
-	case "bl", "bh", "bx", "ebx", "rbx":
-		return "rbx", true
-	case "cl", "ch", "cx", "ecx", "rcx":
-		return "rcx", true
-	case "dl", "dh", "dx", "edx", "rdx":
-		return "rdx", true
-	case "sil", "si", "esi", "rsi":
-		return "rsi", true
-	case "dil", "di", "edi", "rdi":
-		return "rdi", true
-	case "bpl", "bp", "ebp", "rbp":
-		return "rbp", true
-	case "spl", "sp", "esp", "rsp":
-		return "rsp", true
-	case "rip":
-		return "rip", true
-	}
-	if len(name) < 2 || name[0] != 'r' || name[1] < '1' || name[1] > '9' {
-		return "", false
-	}
-	digits := name[1:]
-	if last := digits[len(digits)-1]; len(digits) > 1 && (last == 'b' || last == 'w' || last == 'd' || last == 'l') {
-		digits = digits[:len(digits)-1]
-	}
-	if digits == "" {
-		return "", false
-	}
-	for _, digit := range digits {
-		if digit < '0' || digit > '9' {
-			return "", false
-		}
-	}
-	return "r" + digits, true
-}
-
-func registerDigits(text string) (string, bool) {
-	if text == "" {
-		return "", false
-	}
-	for _, digit := range text {
-		if digit < '0' || digit > '9' {
-			return "", false
-		}
-	}
-	return text, true
-}
-
-func generalRegisterWidth(name string) uint16 {
-	switch name {
-	case "eax", "ebx", "ecx", "edx", "esi", "edi", "esp", "ebp":
-		return 32
-	case "ax", "bx", "cx", "dx", "si", "di", "sp", "bp":
-		return 16
-	case "al", "bl", "cl", "dl", "ah", "bh", "ch", "dh":
-		return 8
-	}
-	// AArch64 W registers are the 32-bit view of an X register.
-	if len(name) >= 2 && name[0] == 'w' && name != "wsp" {
-		if _, ok := registerDigits(name[1:]); ok {
-			return 32
-		}
-	}
-	if name == "wsp" {
-		return 32
-	}
-	if name == "xzr" || name == "sp" || name[0] == 'x' {
-		if name == "xzr" || name == "sp" {
-			return 64
-		}
-		if _, ok := registerDigits(name[1:]); ok {
-			return 64
-		}
-	}
-	switch name {
-	case "ah", "bh", "ch", "dh":
-		return 8
-	}
-	// x86asm names the 32-bit extended registers r8l..r15l.
-	if len(name) > 2 && name[0] == 'r' && name[1] >= '1' && name[1] <= '9' {
-		switch name[len(name)-1] {
-		case 'b':
-			return 8
-		case 'w':
-			return 16
-		case 'd', 'l':
-			return 32
-		}
-	}
-	switch {
-	case strings.HasSuffix(name, "b"), strings.HasSuffix(name, "l"):
-		return 8
-	case strings.HasSuffix(name, "w"):
-		return 16
-	case strings.HasSuffix(name, "d"):
-		return 32
-	default:
-		return 64
-	}
-}
-
-func generalRegisterShift(name string) uint16 {
-	switch name {
-	case "ah", "bh", "ch", "dh":
-		return 8
-	default:
-		return 0
-	}
+	// The name fixes the width: the disassembly reports the width of the operand
+	// type, which is the width of the whole register for a W view.
+	return registerView{canonical: alias.Name, width: alias.Width, canonicalBits: 64}
 }
 
 func functionName(function core.Function) string {

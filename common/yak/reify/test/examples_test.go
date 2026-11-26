@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/reify"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa"
@@ -128,5 +129,38 @@ func TestHelloExampleCompilesAndLifts(t *testing.T) {
 		if !strings.Contains(source, fragment) {
 			t.Fatalf("source lacks %q:\n%s", fragment, source)
 		}
+	}
+}
+
+// TestEveryCExampleLiftsClean lifts every C example end to end. The converter turns
+// a panicking function into an error and a diagnostic, so a run without diagnostics
+// also proves the examples stay inside the instruction forms the converter models.
+func TestEveryCExampleLiftsClean(t *testing.T) {
+	if _, err := exec.LookPath("gcc"); err != nil {
+		t.Skip("gcc is not installed")
+	}
+	sources, err := filepath.Glob("examples/*.c")
+	if err != nil || len(sources) == 0 {
+		t.Fatalf("no C examples: %v", err)
+	}
+	for _, source := range sources {
+		t.Run(filepath.Base(source), func(t *testing.T) {
+			binary := filepath.Join(t.TempDir(), "unit")
+			compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
+			if output, err := compile.CombinedOutput(); err != nil {
+				t.Skipf("cannot build example: %v\n%s", err, output)
+			}
+			result, err := reify.Lift(context.Background(), binary, reify.WithMode(reify.ModeSource))
+			if err != nil {
+				t.Fatalf("lift failed: %v", err)
+			}
+			defer result.Close()
+			if len(result.Diagnostics) != 0 {
+				t.Fatalf("conversion diagnostics: %v", result.Diagnostics)
+			}
+			if strings.TrimSpace(result.Source) == "" {
+				t.Fatal("no source produced")
+			}
+		})
 	}
 }

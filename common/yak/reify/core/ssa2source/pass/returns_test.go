@@ -1,87 +1,100 @@
 package pass
 
 import (
+	"embed"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func TestMarkVoidReturns(t *testing.T) {
-	// A spill reads the function's own frame slot, so its value is not a
-	// source-level return. A load through a pointer reads program memory and is a
-	// real return value, so the function keeps it.
-	program := parseSSAForPass(t, `voidish
-type: () -> any
-entry_0:
-    <ptr64> t1 = <ptr64> 16
-    <i64> t2 = spill <ptr64> t1
-    ret <i64> t2
+//go:embed testcases/*.json
+var returnCases embed.FS
 
-through_pointer
-type: () -> any
-entry_0:
-    <ptr64> t1 = <ptr64> 16
-    <i64> t2 = load <ptr64> t1
-    ret <i64> t2
-
-value
-type: () -> i64
-entry_0:
-    <i64> t1 = <i64> 0
-    ret <i64> t1`)
-	voidFunction := findFunctionForPass(t, program, "voidish")
-	pointerFunction := findFunctionForPass(t, program, "through_pointer")
-	valueFunction := findFunctionForPass(t, program, "value")
-
-	if count := MarkVoidReturns(program); count != 1 {
-		t.Fatalf("void functions = %d", count)
-	}
-	if got := voidFunction.GetType().String(); !strings.Contains(got, "-> null") {
-		t.Fatalf("void return type = %s", got)
-	}
-	if got := pointerFunction.GetType().String(); strings.Contains(got, "-> null") {
-		t.Fatal("function returning a pointer load was marked void")
-	}
-	for _, blockID := range voidFunction.Blocks {
-		block, _ := voidFunction.GetBasicBlockByID(blockID)
-		for _, instructionID := range block.Insts {
-			instruction, _ := voidFunction.GetInstructionById(instructionID)
-			if ret, ok := instruction.(*ssa.Return); ok && len(ret.Results) != 0 {
-				t.Fatalf("void return kept %d values", len(ret.Results))
-			}
-		}
-	}
-	if got := valueFunction.GetType().String(); strings.Contains(got, "-> null") {
-		t.Fatal("value-returning function was marked void")
-	}
+// returnCase is one pass fixture. The SSAIR is the input and the functions list
+// the return type each of them must end up with, so the fixture stays data rather
+// than a wall of text inside a test.
+type returnCase struct {
+	Name      string              `json:"name"`
+	Note      string              `json:"note"`
+	Pass      string              `json:"pass"`
+	VoidCount int                 `json:"void_count"`
+	SSAIR     []string            `json:"ssair"`
+	Functions []returnExpectation `json:"functions"`
 }
 
-func TestRefineReturnTypes(t *testing.T) {
-	program := parseSSAForPass(t, `pointer
-type: () -> any
-entry_0:
-    <ptr64> t1 = type_cast[ptr64] <i64> 0
-    ret <ptr64> t1
+type returnExpectation struct {
+	Name       string `json:"name"`
+	ReturnType string `json:"return_type"`
+}
 
-value
-type: () -> i64
-entry_0:
-    <i64> t1 = <i64> 0
-    ret <i64> t1
+func loadReturnCases(t *testing.T) []returnCase {
+	t.Helper()
+	entries, err := returnCases.ReadDir("testcases")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []returnCase
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := returnCases.ReadFile("testcases/" + entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var loaded []returnCase
+		if err := json.Unmarshal(data, &loaded); err != nil {
+			t.Fatalf("%s: %v", entry.Name(), err)
+		}
+		cases = append(cases, loaded...)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no testcases")
+	}
+	return cases
+}
 
-void
-type: () -> any
-entry_0:
-    ret`)
-	RefineReturnTypes(program)
-	if got := findFunctionForPass(t, program, "pointer").GetType().String(); !strings.Contains(got, "-> ptr64") {
-		t.Fatalf("pointer return type = %s", got)
-	}
-	if got := findFunctionForPass(t, program, "value").GetType().String(); !strings.Contains(got, "-> i64") {
-		t.Fatalf("integer return type = %s", got)
-	}
-	if got := findFunctionForPass(t, program, "void").GetType().String(); !strings.Contains(got, "-> null") {
-		t.Fatalf("void return type = %s", got)
+func TestReturnPassFixtures(t *testing.T) {
+	for _, tc := range loadReturnCases(t) {
+		t.Run(tc.Name, func(t *testing.T) {
+			program := parseSSAForPass(t, tc.SSAIR...)
+			switch tc.Pass {
+			case "mark-void-returns":
+				if count := MarkVoidReturns(program); count != tc.VoidCount {
+					t.Fatalf("void functions = %d, want %d", count, tc.VoidCount)
+				}
+			case "refine-return-types":
+				RefineReturnTypes(program)
+			default:
+				t.Fatalf("unknown pass %q", tc.Pass)
+			}
+			for _, want := range tc.Functions {
+				function := findFunctionForPass(t, program, want.Name)
+				if got := function.GetType().String(); !strings.Contains(got, "-> "+want.ReturnType) {
+					t.Fatalf("%s return type = %s, want -> %s", want.Name, got, want.ReturnType)
+				}
+				if want.ReturnType != "null" {
+					continue
+				}
+				// A void function keeps no return values.
+				for _, blockID := range function.Blocks {
+					block, ok := function.GetBasicBlockByID(blockID)
+					if !ok || block == nil {
+						continue
+					}
+					for _, instructionID := range block.Insts {
+						instruction, ok := function.GetInstructionById(instructionID)
+						if !ok || instruction == nil {
+							continue
+						}
+						if ret, ok := instruction.(*ssa.Return); ok && len(ret.Results) != 0 {
+							t.Fatalf("%s void return kept %d values", want.Name, len(ret.Results))
+						}
+					}
+				}
+			}
+		})
 	}
 }

@@ -11,7 +11,8 @@ import (
 
 // TestRenderReportsSideEffect keeps the renderer honest: reify models no
 // cross-procedure side effects, so a node here means the conversion broke an
-// invariant. Rendering a statement for it would hide that.
+// invariant. The renderer reports the node in a comment and keeps the rest of the
+// function, because a diagnostic must not abort a whole program.
 func TestRenderReportsSideEffect(t *testing.T) {
 	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName("side-effect"))
 	if err != nil {
@@ -37,11 +38,14 @@ func TestRenderReportsSideEffect(t *testing.T) {
 	}
 	builder.EmitReturn([]ssa.Value{value})
 
-	_, renderErr := Render(context.Background(), program)
-	if renderErr == nil {
-		t.Fatal("Render accepted a side effect")
+	source, renderErr := Render(context.Background(), program)
+	if renderErr != nil {
+		t.Fatalf("render failed: %v", renderErr)
 	}
-	if !strings.Contains(renderErr.Error(), "side effect") {
-		t.Fatalf("unexpected error: %v", renderErr)
+	if !strings.Contains(source, "/* unexpected side effect: injected */") {
+		t.Fatalf("side effect was not reported:\n%s", source)
+	}
+	if !strings.Contains(source, "return ") {
+		t.Fatalf("rendering stopped at the side effect:\n%s", source)
 	}
 }

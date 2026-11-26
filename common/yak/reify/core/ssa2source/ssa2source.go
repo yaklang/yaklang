@@ -14,20 +14,9 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
-
-// unexpectedInstruction reports an instruction the conversion never produces. It
-// is raised from deep inside the structurer, which has no error return, and turned
-// into an error by Render.
-type unexpectedInstruction struct {
-	kind string
-	name string
-}
-
-func (e unexpectedInstruction) Error() string {
-	return fmt.Sprintf("ssa2source: unexpected %s %q: the LowIR conversion does not emit it", e.kind, e.name)
-}
 
 // Render converts a YakSSA program into source-like text.
 func Render(ctx context.Context, program *ssa.Program) (source string, err error) {
@@ -37,10 +26,6 @@ func Render(ctx context.Context, program *ssa.Program) (source string, err error
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
-			return
-		}
-		if failure, ok := recovered.(unexpectedInstruction); ok {
-			source, err = "", failure
 			return
 		}
 		// Rendering is diagnostic output. A malformed program must produce an
@@ -571,9 +556,10 @@ func renderInstructionAt(text *strings.Builder, instruction ssa.Instruction, ind
 		// A cast is inlined at its use sites, so it needs no statement of its own.
 	case *ssa.SideEffect:
 		// reify models no cross-procedure side effects, so the conversion has no
-		// path that emits one. A node here means an invariant broke; report it
-		// instead of rendering a statement no lifted instruction produced.
-		panic(unexpectedInstruction{kind: "side effect", name: value.GetName()})
+		// path that emits one. A node here means an invariant broke, so the node
+		// is reported and the rest of the function keeps rendering.
+		log.Errorf("ssa2source: unexpected side effect %q in %s", value.GetName(), functionOf(value))
+		fmt.Fprintf(text, "%s/* unexpected side effect: %s */\n", indent, sanitizeComment(value.GetName()))
 	case *ssa.Undefined:
 		if !valueUsed(value) {
 			break
@@ -1335,4 +1321,17 @@ func invertValue(value ssa.Value) (string, bool) {
 		return invertValue(inner)
 	}
 	return "", false
+}
+
+// functionOf names the function an instruction belongs to, so a diagnostic can
+// point at the function that produced it.
+func functionOf(instruction ssa.Instruction) string {
+	function := instruction.GetFunc()
+	if function == nil {
+		return "<unknown>"
+	}
+	if name := function.GetVerboseName(); name != "" {
+		return name
+	}
+	return function.GetName()
 }
