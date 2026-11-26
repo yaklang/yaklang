@@ -1297,13 +1297,13 @@ func (c *converter) zeroCondition(cc string, subject ssa.Value) ssa.Value {
 	case core.CompareNE:
 		return c.builder.EmitBinOp(ssa.OpNotEq, subject, zero)
 	case core.CompareLT:
-		return c.builder.EmitBinOp(ssa.OpLt, subject, zero)
+		return c.orderedCompareSource(ssa.OpLt, subject, zero, condition.Signed)
 	case core.CompareLE:
-		return c.builder.EmitBinOp(ssa.OpLtEq, subject, zero)
+		return c.orderedCompareSource(ssa.OpLtEq, subject, zero, condition.Signed)
 	case core.CompareGT:
-		return c.builder.EmitBinOp(ssa.OpGt, subject, zero)
+		return c.orderedCompareSource(ssa.OpGt, subject, zero, condition.Signed)
 	case core.CompareGE:
-		return c.builder.EmitBinOp(ssa.OpGtEq, subject, zero)
+		return c.orderedCompareSource(ssa.OpGtEq, subject, zero, condition.Signed)
 	}
 	return nil
 }
