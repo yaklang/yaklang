@@ -379,7 +379,9 @@ func (c *converter) collectLoopCarried(function core.Function) {
 }
 
 func (c *converter) prepareLoopPhis(blockID core.BlockID) {
-	for key := range c.loopCarried[blockID] {
+	// Sorted, because the phis of a header are created here and their creation
+	// order fixes both their identifiers and the printed text.
+	for _, key := range sortedKeys(c.loopCarried[blockID]) {
 		c.loopPhi("mem:"+key, c.memoryVariable(c.memoryName(key)))
 	}
 }
@@ -1388,30 +1390,30 @@ func (c *converter) emitLoad(instruction core.Instruction) {
 		return
 	}
 	// A store through another address that may alias this slot invalidates the
-	// cached value, so the load stays a reload instead of folding to a constant.
+	// cached value, so the load stays a real memory read instead of folding to a
+	// constant.
 	address := instruction.Operands[0]
-	markerPrefix := "load:"
-	if c.classifyMemorySlot(key, address) != memorySlotFrame {
-		// A dereference through a pointer or a global address reads memory the
-		// caller can observe, and SSA preparation must keep it as a real value.
-		markerPrefix = "reload:"
-	}
-	if !c.memoryValidAt(key) {
-		c.setResult(instruction, c.loadMarker(instruction, address.Value, markerPrefix))
-		return
-	}
-	if c.loopHeaders[c.current] && c.loopCarried[c.current][key] {
-		prefixed := "mem:" + key
-		if phi := c.loopPhi(prefixed, variable); phi != nil {
-			c.setResult(instruction, phi)
+	if c.memoryValidAt(key) {
+		if c.loopHeaders[c.current] && c.loopCarried[c.current][key] {
+			prefixed := "mem:" + key
+			if phi := c.loopPhi(prefixed, variable); phi != nil {
+				c.setResult(instruction, phi)
+				return
+			}
+		}
+		if value := variable.GetValue(); value != nil {
+			c.setResult(instruction, value)
 			return
 		}
 	}
-	if value := variable.GetValue(); value != nil {
-		c.setResult(instruction, value)
-		return
+	// A slot inside the current frame holds the lifter's own scratch space, so a
+	// read of a slot no write filled is a spill that lost its value. Memory
+	// outside the frame belongs to the program and the read stands on its own.
+	op := ssa.UnaryOpcode(ssa.OpLoad)
+	if c.classifyMemorySlot(key, address) == memorySlotFrame {
+		op = ssa.OpSpill
 	}
-	c.setResult(instruction, c.loadMarker(instruction, address.Value, markerPrefix))
+	c.setResult(instruction, c.emitMemoryRead(instruction, address, op))
 }
 
 func (c *converter) emitStore(instruction core.Instruction) {
@@ -1433,26 +1435,9 @@ func (c *converter) emitStore(instruction core.Instruction) {
 	}
 	c.recordMemoryStore(key, address)
 	if c.classifyMemorySlot(key, address) != memorySlotFrame {
-		c.emitStoreMarker(instruction, address, value)
+		c.emitMemoryWrite(instruction, address, value)
 	}
 	c.markHeaderStore("mem:" + key)
-}
-
-func (c *converter) loadMarker(instruction core.Instruction, addressID core.ValueID, prefix string) ssa.Value {
-	address := c.values[addressID]
-	markerText := prefix + "unknown"
-	if address != nil {
-		markerText = fmt.Sprintf("%s%d", prefix, address.GetId())
-	}
-	marker := c.newConstant(markerText, ssa.CreateStringType())
-	if len(instruction.Results) == 0 {
-		return marker
-	}
-	value := c.castType(marker, c.typeFor(instruction.Results[0].Type))
-	if user, ok := value.(ssa.User); ok && address != nil && value != address {
-		address.AddUser(user)
-	}
-	return value
 }
 
 func (c *converter) markHeaderStore(key string) {
@@ -1510,7 +1495,8 @@ func (c *converter) fillLoopCarried(block core.Block) {
 			if !c.loopHeaders[target] {
 				continue
 			}
-			for key, phi := range c.loopPhis[target] {
+			for _, key := range sortedKeys(c.loopPhis[target]) {
+				phi := c.loopPhis[target][key]
 				if c.loopPhiDone[phi.GetId()] {
 					continue
 				}

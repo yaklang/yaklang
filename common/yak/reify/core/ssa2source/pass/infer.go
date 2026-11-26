@@ -1,7 +1,6 @@
 package pass
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -157,6 +156,28 @@ func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
 				changed = true
 			}
 		}
+		if typed.Op == ssa.OpStore {
+			// The address a write goes through is a pointer, and a stored value
+			// that has no type yet takes the type the store declares.
+			if setPointerByID(typed, typed.X) {
+				changed = true
+			}
+			stored := valueByID(typed, typed.Y)
+			if stored != nil && typed.GetType() != nil && stored.GetType() != nil && stored.GetType().String() == "any" {
+				stored.SetType(typed.GetType())
+				changed = true
+			}
+		}
+	case *ssa.UnOp:
+		if typed == nil {
+			return false
+		}
+		if typed.Op == ssa.OpLoad || typed.Op == ssa.OpSpill {
+			// The operand of a memory read is the address it dereferences.
+			if setPointerByID(typed, typed.X) {
+				changed = true
+			}
+		}
 	case *ssa.Phi:
 		if typed == nil {
 			return false
@@ -190,40 +211,25 @@ func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
 				changed = true
 			}
 		}
-		if address := loadMarkerAddress(typed); address != nil {
-			if setPointer(address) {
-				changed = true
-			}
-		}
 	}
 	return changed
 }
 
-func loadMarkerAddress(cast *ssa.TypeCast) ssa.Value {
-	if cast == nil {
+// valueByID resolves one operand of an instruction, or nil when it is gone.
+func valueByID(instruction ssa.Instruction, id int64) ssa.Value {
+	value, ok := instruction.GetValueById(id)
+	if !ok {
 		return nil
 	}
-	value, ok := cast.GetValueById(cast.Value)
-	if !ok || value == nil {
-		return nil
+	return value
+}
+
+func setPointerByID(instruction ssa.Instruction, id int64) bool {
+	value := valueByID(instruction, id)
+	if value == nil || isPointerType(value.GetType()) {
+		return false
 	}
-	constant, ok := ssa.ToConstInst(value)
-	if !ok || constant == nil {
-		return nil
-	}
-	marker, ok := constant.GetRawValue().(string)
-	if !ok || !strings.HasPrefix(marker, "load:") {
-		return nil
-	}
-	var id int64
-	if _, err := fmt.Sscanf(strings.TrimPrefix(marker, "load:"), "%d", &id); err != nil {
-		return nil
-	}
-	address, ok := cast.GetValueById(id)
-	if !ok || address == nil {
-		return nil
-	}
-	return address
+	return setPointer(value)
 }
 
 func callName(call *ssa.Call) string {

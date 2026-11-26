@@ -1,0 +1,38 @@
+{
+  "name": "pointer-store",
+  "lowir": [
+    "target: darwin/arm64 (64-bit, little-endian)",
+    "frame: sp=sp fp=x29 ret=x30 flags=nzcv saved=x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29 growth=-1",
+    "registers: naming=aarch64 width=64 flags=nzcv flags_width=64 args=x0,x1,x2,x3,x4,x5,x6,x7 return=x0",
+    "function write7 @ 0x100",
+    "block b1 @ 0x100",
+    "  0x100  v1:i32 = constant 0x7",
+    "  0x100  write_register %w8, v1 [write_register]",
+    "  0x104  v2:i32 = read_register %w8 [read_register]",
+    "  0x104  v3:i64 = read_register %x0 [read_register]",
+    "  0x104  v4:ptr64 = copy v3",
+    "  0x104  store v4, v2 [write_memory]",
+    "  0x108  return %x0",
+    ""
+  ],
+  "ssair": [
+    "write7 <i64> (1) arg0",
+    "type: () -> i64",
+    "entry_0: (<nil condition>)",
+    "<i32> t2   = <i32> 7",
+    "<i64> t3   = type_cast[i64] <i32> 7",
+    "<i32> t4   = type_cast[i32] <i64> t3",
+    "<ptr64> t5 = type_cast[ptr64] <i64> arg0",
+    "<i32> t6   = <ptr64> t5 store <i32> t4",
+    "ret <i64> arg0",
+    ""
+  ],
+  "source": [
+    "uint64_t write7(uint64_t arg0) {",
+    "    *(uint32_t *)((void *)arg0) = 0x7;",
+    "    return arg0;",
+    "}",
+    "",
+    ""
+  ]
+}

@@ -11,7 +11,6 @@ import (
 
 var (
 	ssairAssignment = regexp.MustCompile(`^\t(?:<([^>]+)>\s+)?(t\d+)\s+=\s+(.*)$`)
-	ssairLoad       = regexp.MustCompile(`load:(\d+)`)
 )
 
 // Format renders a function with one type on every assigned value and an
@@ -57,7 +56,6 @@ func Format(function *ssa.Function) string {
 	width := 0
 	for _, line := range lines {
 		line = strings.ReplaceAll(replaceNames(line), "type-case", "type_cast")
-		line = ssairLoad.ReplaceAllString(line, "load(t$1)")
 		match := ssairAssignment.FindStringSubmatch(line)
 		if match == nil {
 			items = append(items, formatted{raw: line})

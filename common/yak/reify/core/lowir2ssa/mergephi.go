@@ -1,6 +1,7 @@
 package lowir2ssa
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -57,8 +58,16 @@ func (c *converter) planMergePhis(function core.Function) {
 			defs[key] = appendUniqueBlock(defs[key], block.ID)
 		}
 	}
-	for key, blocks := range defs {
-		c.insertMergePhi(key, blocks, frontier)
+	// Sorted, because the maps above decide the order in which the phis of a
+	// block are created, and that order fixes their identifiers and the text the
+	// program prints. Map iteration order must not reach the output.
+	keys := make([]string, 0, len(defs))
+	for key := range defs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		c.insertMergePhi(key, defs[key], frontier)
 	}
 }
 
@@ -145,12 +154,17 @@ func (c *converter) recordRegisterValue(name string, value ssa.Value) {
 // fillMergePhis fills the edge operands once every block is converted, because a
 // phi edge follows the predecessor order the builder recorded.
 func (c *converter) fillMergePhis() {
-	for blockID, phis := range c.mergePhis {
+	// The walks are sorted because filling an edge can create a value for a
+	// predecessor that leaves nothing behind, and the order in which those values
+	// are created decides their identifiers and the printed text.
+	for _, blockID := range sortedBlockIDs(c.mergePhis) {
+		phis := c.mergePhis[blockID]
 		block := c.blocks[blockID]
 		if block == nil || len(block.Preds) == 0 {
 			continue
 		}
-		for key, phi := range phis {
+		for _, key := range sortedKeys(phis) {
+			phi := phis[key]
 			edge := make([]int64, 0, len(block.Preds))
 			var edgeType ssa.Type
 			for _, pred := range block.Preds {
@@ -342,4 +356,24 @@ func blockSuccessors(block core.Block) []core.BlockID {
 		return nil
 	}
 	return last.Targets
+}
+
+// sortedBlockIDs returns the block identifiers in ascending order.
+func sortedBlockIDs[T any](values map[core.BlockID]T) []core.BlockID {
+	ids := make([]core.BlockID, 0, len(values))
+	for id := range values {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+// sortedKeys returns the keys of a map in ascending order.
+func sortedKeys[T any](values map[string]T) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

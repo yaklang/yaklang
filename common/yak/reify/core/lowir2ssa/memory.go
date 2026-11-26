@@ -1,7 +1,6 @@
 package lowir2ssa
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -74,32 +73,48 @@ func (c *converter) memoryValidAt(key string) bool {
 	return ok && valid
 }
 
-// emitStoreMarker records an externally visible store as a rendered statement.
-// A store to the current frame is an internal spill: the memory variable carries
-// it to later loads and nothing outside the function can observe it. A store
-// through a pointer or to a global address is an effect of the function, so the
-// pseudo source prints it instead of dropping the unused memory variable.
-func (c *converter) emitStoreMarker(instruction core.Instruction, address core.Operand, value ssa.Value) {
-	if value == nil || len(instruction.Operands) < 2 {
+// emitMemoryRead records a read whose slot holds no known value. The address is
+// the operand of the instruction, so the use chain carries the dependency: type
+// inference marks the address as a pointer and the source pass renders the
+// dereference from it.
+func (c *converter) emitMemoryRead(instruction core.Instruction, address core.Operand, op ssa.UnaryOpcode) ssa.Value {
+	addressValue := c.values[address.Value]
+	if addressValue == nil || addressValue.IsUndefined() {
+		if len(instruction.Results) == 0 {
+			return nil
+		}
+		return c.builder.EmitUndefined("memory")
+	}
+	value := c.builder.EmitUnOp(op, addressValue)
+	if value == nil {
+		return nil
+	}
+	if len(instruction.Results) > 0 {
+		value.SetType(c.typeFor(instruction.Results[0].Type))
+	}
+	return value
+}
+
+// emitMemoryWrite records a write outside the current frame. A write to the
+// current frame is an internal spill: the memory variable carries it to later
+// reads and nothing outside the function observes it. Both the address and the
+// stored value are operands, so the instruction stream keeps the write together
+// with everything it depends on.
+func (c *converter) emitMemoryWrite(instruction core.Instruction, address core.Operand, value ssa.Value) {
+	if value == nil || value.IsUndefined() || len(instruction.Operands) < 2 {
 		return
 	}
 	addressValue := c.operandValue(address)
 	if addressValue == nil || addressValue.IsUndefined() {
 		return
 	}
+	store := c.builder.EmitBinOp(ssa.OpStore, addressValue, value)
+	if store == nil {
+		return
+	}
 	typ := c.typeFor(instruction.Operands[1].Type)
 	if typ == nil || typ.String() == "any" {
 		typ = value.GetType()
 	}
-	markerText := fmt.Sprintf("store:%d:%d", addressValue.GetId(), value.GetId())
-	marker := c.newConstant(markerText, ssa.CreateStringType())
-	if marker == nil {
-		return
-	}
-	cast := c.builder.EmitTypeCast(marker, typ)
-	if cast == nil {
-		return
-	}
-	addressValue.AddUser(cast)
-	value.AddUser(cast)
+	store.SetType(typ)
 }

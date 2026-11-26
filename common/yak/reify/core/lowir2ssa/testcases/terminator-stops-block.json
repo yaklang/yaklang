@@ -1,0 +1,30 @@
+{
+  "name": "terminator-stops-block",
+  "lowir": [
+    "target: linux/amd64 (64-bit, little-endian)",
+    "frame: sp=rsp fp=rbp flags=rflags saved=rbp,rbx,r12,r13,r14,r15 growth=-1",
+    "registers: naming=x86 width=64 flags=rflags flags_width=64 args=rdi,rsi,rdx,rcx,r8,r9 return=rax",
+    "function trailing @ 0x1000",
+    "block b1 @ 0x1000",
+    "  0x1000  v1:i64 = constant 0x1",
+    "  0x1000  return v1",
+    "  0x1001  v2:i8 = constant 0x2",
+    "  0x1001  write_register %ah, v2 [write_register]",
+    ""
+  ],
+  "ssair": [
+    "trailing",
+    "type: () -> i64",
+    "entry_0: (<nil condition>)",
+    "<i64> t1 = <i64> 1",
+    "ret <i64> 1",
+    ""
+  ],
+  "source": [
+    "uint64_t trailing(void) {",
+    "    return 0x1;",
+    "}",
+    "",
+    ""
+  ]
+}
