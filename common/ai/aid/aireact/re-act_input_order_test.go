@@ -68,7 +68,7 @@ func TestSendInputEventAndWaitAcceptedAppliesAgentPolicySynchronously(t *testing
 	require.Equal(t, aicommon.GoalTimeLimitModeDeadline, cfg.BuildAgentPolicySnapshot().Goal.TimeLimit.Mode)
 }
 
-func TestReActStrategyHotpatchWithoutGoalTimePatchReflectsDeadline(t *testing.T) {
+func TestReActStrategyHotpatchWithoutGoalTimePatchDefersDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	events := make(chan *schema.AiOutputEvent, 16)
@@ -99,9 +99,11 @@ func TestReActStrategyHotpatchWithoutGoalTimePatchReflectsDeadline(t *testing.T)
 	pushed := waitForAgentPolicySnapshot(t, events, "")
 	require.True(t, pushed.Goal.Enabled)
 	require.EqualValues(t, 1, pushed.Goal.MinIterations)
-	require.Equal(t, aicommon.GoalTimeLimitModeDeadline, pushed.Goal.TimeLimit.Mode)
+	require.Equal(t, aicommon.GoalTimeLimitModeDisabled, pushed.Goal.TimeLimit.Mode,
+		"a strategy declares the window; only a task start opens it")
+	require.False(t, pushed.Goal.TimeLimit.Enabled)
 	require.EqualValues(t, 7200, pushed.Goal.TimeLimit.ConfiguredDurationSeconds)
-	require.InDelta(t, 7200, pushed.Goal.TimeLimit.DeadlineAt-pushed.ServerTime, 1)
+	require.Zero(t, pushed.Goal.TimeLimit.DeadlineAt)
 
 	const syncID = "strategy-without-time-patch"
 	require.NoError(t, runtime.handleSyncMessage(&ypb.AIInputEvent{
@@ -140,9 +142,14 @@ func TestReActGoalTimeModeSwitchToCriteriaClearsTimeWindow(t *testing.T) {
 			},
 		},
 	}
+	// The strategy only declares 10800s; wait until it is applied, then open the
+	// window the way a task start does.
+	waitForAgentPolicySnapshot(t, events, "")
+	require.True(t, runtime.config.RefreshGoalDeadlineForTask())
+	// The refresh emits its own snapshot, which is the open-window state.
 	timeSnapshot := waitForAgentPolicySnapshot(t, events, "")
 	require.Equal(t, aicommon.GoalTimeLimitModeDeadline, timeSnapshot.Goal.TimeLimit.Mode)
-	require.False(t, timeSnapshot.Goal.TimeLimit.DeadlineAt == 0)
+	require.NotZero(t, timeSnapshot.Goal.TimeLimit.DeadlineAt)
 
 	in <- &ypb.AIInputEvent{
 		IsConfigHotpatch: true,
@@ -171,7 +178,7 @@ func TestReActGoalTimeModeSwitchToCriteriaClearsTimeWindow(t *testing.T) {
 	require.Equal(t, criteriaSnapshot.Goal, synced.Goal)
 }
 
-func TestReActStrategyHotpatchOverridesGoalTimePatchDeadline(t *testing.T) {
+func TestReActStrategyHotpatchKeepsGoalTimePatchDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	events := make(chan *schema.AiOutputEvent, 16)
@@ -200,7 +207,6 @@ func TestReActStrategyHotpatchOverridesGoalTimePatchDeadline(t *testing.T) {
 	patched := waitForAgentPolicySnapshot(t, events, "")
 	require.Equal(t, patchedDeadline, patched.Goal.TimeLimit.DeadlineAt)
 
-	beforeOverride := time.Now()
 	in <- &ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     aicommon.HotPatchType_ExecutionStrategy,
@@ -212,13 +218,19 @@ func TestReActStrategyHotpatchOverridesGoalTimePatchDeadline(t *testing.T) {
 			},
 		},
 	}
-	overridden := waitForAgentPolicySnapshot(t, events, "")
-	require.NotEqual(t, patchedDeadline, overridden.Goal.TimeLimit.DeadlineAt)
-	require.Equal(t, aicommon.GoalTimeLimitModeDeadline, overridden.Goal.TimeLimit.Mode)
-	require.EqualValues(t, 7200, overridden.Goal.TimeLimit.ConfiguredDurationSeconds)
-	require.InDelta(t, beforeOverride.Add(2*time.Hour).Unix(), overridden.Goal.TimeLimit.DeadlineAt, 1)
+	declared := waitForAgentPolicySnapshot(t, events, "")
+	require.Equal(t, patchedDeadline, declared.Goal.TimeLimit.DeadlineAt,
+		"a strategy declares the length; it must not re-time the patched window")
+	require.Equal(t, aicommon.GoalTimeLimitModeDeadline, declared.Goal.TimeLimit.Mode)
+	require.EqualValues(t, 7200, declared.Goal.TimeLimit.ConfiguredDurationSeconds)
 
-	const syncID = "strategy-overrides-time-patch"
+	// The next task start applies the newly declared length.
+	require.True(t, runtime.config.RefreshGoalDeadlineForTask())
+	restarted := runtime.config.BuildAgentPolicySnapshot()
+	require.InDelta(t, time.Now().Add(2*time.Hour).Unix(), restarted.Goal.TimeLimit.DeadlineAt, 2)
+	overridden := restarted
+
+	const syncID = "strategy-keeps-time-patch"
 	require.NoError(t, runtime.handleSyncMessage(&ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      aicommon.SYNC_TYPE_AGENT_POLICY_SNAPSHOT,

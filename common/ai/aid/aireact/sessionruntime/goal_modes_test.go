@@ -3,7 +3,6 @@ package sessionruntime
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -27,11 +26,15 @@ func TestStartParamsGoalModesPreserveZeroValues(t *testing.T) {
 		require.Equal(t, strategy.GoalMinIterations, snapshot.Goal.MinIterations)
 		require.Equal(t, strategy.GoalAcceptanceCriteria, snapshot.Goal.AcceptanceCriteria)
 		require.Equal(t, strategy.GoalDurationSeconds, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+		// Starting a session only carries the declared strategy: the time window
+		// opens when a task starts, so no deadline exists yet.
+		require.Equal(t, aicommon.GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode)
+		require.False(t, snapshot.Goal.TimeLimit.Enabled)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
+		require.True(t, cfg.GetGoalDeadline().IsZero())
 		if strategy.GoalDurationSeconds > 0 {
-			require.Equal(t, aicommon.GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-			require.WithinDuration(t, time.Now().Add(3*time.Hour), cfg.GetGoalDeadline(), time.Second)
-		} else {
-			require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
+			// The declared length is still carried by the configured value.
+			require.EqualValues(t, strategy.GoalDurationSeconds, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 		}
 		cancel()
 	}
