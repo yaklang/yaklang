@@ -32,7 +32,10 @@ class T {
 
 POS
 	"safefile://S.java": <<<NEG
-class S { void ok(Thread t) { t.interrupt(); } }
+class S {
+  static class ProcessContinuation { void stop() {} }
+  void ok(ProcessContinuation p, Thread t) { p.stop(); t.interrupt(); }
+}
 
 NEG
 )

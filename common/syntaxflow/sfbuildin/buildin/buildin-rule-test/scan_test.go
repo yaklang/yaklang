@@ -82,6 +82,52 @@ func TestSourceRuleFalsePositiveFixes(t *testing.T) {
 	}
 }
 
+func TestBuiltinRuleOverMatchFixes(t *testing.T) {
+	files := []string{
+		// 内置函数/方法同名：只匹配内置调用，排除 model.eval / re.compile
+		filepath.Join("..", "python", "cwe-94-code-injection", "struct-python-eval.sf"),
+		filepath.Join("..", "python", "cwe-94-code-injection", "struct-python-compile.sf"),
+		filepath.Join("..", "python", "cwe-94-code-injection", "source-python-eval.sf"),
+		// 批量赋值：只匹配 *.objects.create/update
+		filepath.Join("..", "python", "cwe-915-mass-assignment", "struct-python-model-create-request.sf"),
+		// usedforsecurity=False 不计入弱哈希
+		filepath.Join("..", "python", "cwe-327-weak-crypto", "struct-python-hashlib-md5.sf"),
+		filepath.Join("..", "python", "cwe-327-weak-crypto", "struct-python-hashlib-sha1.sf"),
+		// XXE 是待外部输入的 sink，按 middle 报告
+		filepath.Join("..", "python", "cwe-611-xxe", "struct-python-xml-etree.sf"),
+		filepath.Join("..", "python", "cwe-611-xxe", "source-python-xml-etree.sf"),
+		// Thread.stop / GroovyShell.evaluate 需要真实接收者
+		filepath.Join("..", "java", "cwe-382-stop-thread", "source-java-thread-stop.sf"),
+		filepath.Join("..", "java", "cwe-382-stop-thread", "struct-java-thread-stop.sf"),
+		filepath.Join("..", "java", "cwe-94-code-injection", "java-groovyshell-evaluate.sf"),
+		// Java 配置密码：只读 Spring 配置文件，排除 i18n/占位符
+		filepath.Join("..", "java", "cwe-287-improper-authentication", "java-improper-password-config.sf"),
+		// JSP EL：只报告请求可控作用域
+		filepath.Join("..", "general", "insecure-api", "insecure-api-use-escapexml.sf"),
+		filepath.Join("..", "general", "insecure-api", "insecure-api-use-jstl-escaping.sf"),
+		// npm 版本范围是依赖卫生问题，不是 middle 漏洞
+		filepath.Join("..", "general", "insecure-api", "insecure-api-package-dependencies-check.sf"),
+		// 可维护性提示统一为 low
+		filepath.Join("..", "general", "maintainability", "maintainability-bokeh-deprecated-apis.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-gemini.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-generic-ai-anthprop.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-generic-ai-api.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-generic-ai-gem.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-generic-ai-oai.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-huggingface.sf"),
+		filepath.Join("..", "general", "maintainability", "maintainability-detect-tensorflow.sf"),
+	}
+	for _, f := range files {
+		f := f
+		t.Run(filepath.Base(f), func(t *testing.T) {
+			raw, err := os.ReadFile(f)
+			require.NoError(t, err)
+			err = ssatest.EvaluateVerifyFilesystem(string(raw), t, true)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()

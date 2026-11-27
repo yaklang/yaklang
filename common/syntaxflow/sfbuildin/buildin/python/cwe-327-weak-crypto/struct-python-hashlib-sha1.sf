@@ -19,6 +19,7 @@ weak-hash
 
 ### 检测方式
 结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+显式使用 `usedforsecurity=False` 的非安全用途（缓存键、内部 ID）不告警。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -36,12 +37,16 @@ import hashlib
 def d(x):
     return hashlib.sha256(x).hexdigest()
 
+def non_security(x):
+    return hashlib.sha1(x, usedforsecurity=False).hexdigest()
+
 NEG
 )
 
-hashlib.sha1 as $call
 hashlib.sha1(* as $d) as $call
-alert $call for {
+// `usedforsecurity=False` 是 CPython 明确声明的非安全用途（缓存键/内部 ID），不告警
+$call?{!have: /,\s*false\s*[,)]/} as $hit
+alert $hit for {
 	level: "middle",
 	title: "Struct scan: Python hashlib.sha1",
 	title_zh: "结构扫描：Python hashlib.sha1",

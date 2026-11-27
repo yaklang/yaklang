@@ -19,6 +19,7 @@ code-injection
 
 ### 检测方式
 结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+只匹配内置 `compile(...)`：`re.compile()`、`torch.compile()`、`pattern.compile()` 是模块/对象方法，不告警。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -31,14 +32,18 @@ def r(s):
 
 POS
 	"safefile://s.py": <<<NEG
+import re
+import torch
 def r(s):
-    return s.strip()
+    return re.compile(s), torch.compile(s)
 
 NEG
 )
 
 compile(* as $c) as $call
-alert $call for {
+// 模块/对象上的 compile 不是内置 compile；按调用文本排除带接收者的 .compile(
+$call?{!have: /\.\s*compile\s*\(/} as $hit
+alert $hit for {
 	level: "high",
 	title: "Struct scan: Python compile call",
 	title_zh: "结构扫描：Python compile 调用",

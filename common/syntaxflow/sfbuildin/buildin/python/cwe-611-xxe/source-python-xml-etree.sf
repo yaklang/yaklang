@@ -32,13 +32,15 @@ def p(f):
 
 POS
 	"safefile://s.py": <<<NEG
+import xml.etree.ElementTree as ET
 def p(f):
     return f
 
 NEG
 )
 
-${*.py}.pattern_regex(/xml\.etree|ElementTree\.parse\s*\(/) as $hit
+// 仅匹配真正的解析调用；只出现 `import xml.etree` 不算命中
+${*.py}.pattern_regex(/ElementTree\.parse\s*\(|\bET\.parse\s*\(/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 Python xml.etree 解析",

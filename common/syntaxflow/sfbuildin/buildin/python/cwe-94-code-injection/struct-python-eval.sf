@@ -9,6 +9,7 @@ desc(
 	risk: "code-injection"
 	desc: <<<DESC
 Flags eval(...) as a Call rather than a text match.
+Member methods such as model.eval(...) are not flagged.
 DESC
 	solution: <<<SOLUTION
 Avoid eval; use ast.literal_eval for literals or structured parsers.
@@ -22,11 +23,16 @@ POS
 import ast
 def run(user_input):
     return ast.literal_eval(user_input)
+
+def infer(model, x):
+    return model.eval(x)
 NEG
 )
 
 eval(* as $arg) as $call
-alert $call for {
+// 成员方法（model.eval/self.eval）不是内置 eval；按调用文本排除带接收者的 .eval(
+$call?{!have: /\.\s*eval\s*\(/} as $hit
+alert $hit for {
 	level: "high",
 	title: "Python eval()",
 	title_zh: "Python eval()",

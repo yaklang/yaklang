@@ -19,6 +19,7 @@ weak-hash
 
 ### 检测方式
 结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+显式使用 `usedforsecurity=False` 的非安全用途（缓存键、内部 ID）不告警。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -36,12 +37,16 @@ import hashlib
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
+def non_security(data):
+    return hashlib.md5(data, usedforsecurity=False).hexdigest()
+
 NEG
 )
 
-hashlib.md5 as $call
 hashlib.md5(* as $data) as $call
-alert $call for {
+// `usedforsecurity=False` 是 CPython 明确声明的非安全用途（缓存键/内部 ID），不告警
+$call?{!have: /,\s*false\s*[,)]/} as $hit
+alert $hit for {
 	level: "middle",
 	title: "Python hashlib.md5",
 	title_zh: "Python hashlib.md5",
