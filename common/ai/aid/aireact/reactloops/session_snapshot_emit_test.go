@@ -25,6 +25,7 @@ func TestBuildSessionSnapshot_AlwaysEmitsFullPayload(t *testing.T) {
 	require.Contains(t, payload, "revision")
 	require.Contains(t, payload, "updated_at")
 	require.Contains(t, payload, "current_round")
+	require.Contains(t, payload, "current_round_start_at")
 	require.Contains(t, payload, "total_rounds")
 	require.Contains(t, payload, "execution")
 	require.Contains(t, payload, "perception")

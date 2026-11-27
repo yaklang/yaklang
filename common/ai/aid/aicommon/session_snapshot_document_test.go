@@ -33,7 +33,7 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	task1.SetName("first task")
 
 	startedAt := time.Unix(1_700_000_000, 0)
-	cfg.ResetSessionSnapshotExecution(task1.GetName(), "processing", startedAt)
+	BeginSessionSnapshotExecutionForTask(cfg, task1, startedAt)
 	cfg.RecordSessionSnapshotToolCall(&aitool.ToolResult{ToolCallID: "call-1", Success: true})
 	cfg.RecordSessionSnapshotToolCall(&aitool.ToolResult{ToolCallID: "call-1", Success: true})
 	cfg.RecordSessionSnapshotFileWrite("/tmp/a.txt")
@@ -54,11 +54,12 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.True(t, first.Tasks[0].IsFinal)
 	require.Equal(t, 1, first.CurrentRound)
 	require.Equal(t, 1, first.TotalRounds)
+	require.Equal(t, startedAt.Unix(), first.CurrentRoundStartAt)
 
 	cfg.SetHotpatchCurrentTaskIdResolver(func() string { return "task-2" })
 	task2 := NewStatefulTaskBase("task-2", "second", context.Background(), nil, true)
 	task2.SetName("second task")
-	cfg.ResetSessionSnapshotExecution(task2.GetName(), "processing", startedAt.Add(3*time.Minute))
+	BeginSessionSnapshotExecutionForTask(cfg, task2, startedAt.Add(3*time.Minute))
 	cfg.RecordSessionSnapshotToolCall(&aitool.ToolResult{ToolCallID: "call-2", Success: false})
 	task2Execution := cfg.BuildSessionSnapshotExecution(task2)
 	task2Execution.ExecutionRounds = 2
@@ -74,6 +75,7 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.Len(t, second.Tasks, 2)
 	require.Equal(t, 2, second.CurrentRound)
 	require.Equal(t, 2, second.TotalRounds)
+	require.Equal(t, startedAt.Add(3*time.Minute).Unix(), second.CurrentRoundStartAt)
 
 	raw, err := yakit.GetAISessionMetaSnapshot(db, sessionID)
 	require.NoError(t, err)
@@ -85,6 +87,7 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.Equal(t, 5, persisted.Session.Execution.ExecutionRounds)
 	require.Equal(t, 2, persisted.Session.CurrentRound)
 	require.Equal(t, 2, persisted.Session.TotalRounds)
+	require.Equal(t, startedAt.Add(3*time.Minute).Unix(), persisted.Session.CurrentRoundStartAt)
 
 	restored := NewConfig(context.Background(), WithPersistentSessionId(sessionID), WithDisableAutoSkills(true))
 	restoredTask := restored.GetSessionTaskSnapshot("task-1")
@@ -97,6 +100,7 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.NotContains(t, string(taskRaw), `"round"`,
 		"task snapshots must not carry a logical session round")
 	require.NotContains(t, string(taskRaw), `"current_round"`)
+	require.NotContains(t, string(taskRaw), `"current_round_start_at"`)
 	require.NotContains(t, string(taskRaw), `"total_rounds"`)
 	require.Contains(t, string(taskRaw), `"execution_rounds":3`,
 		"task snapshots retain their own execution step count")
@@ -111,6 +115,8 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	require.Equal(t, 2, retriedSession.CurrentRound,
 		"retrying an existing task does not advance the cumulative session round")
 	require.Equal(t, 2, retriedSession.TotalRounds)
+	require.Equal(t, startedAt.Add(3*time.Minute).Unix(), retriedSession.CurrentRoundStartAt,
+		"retrying an existing task must not reset the current round start")
 	retried := restored.GetSessionTaskSnapshot("task-1")
 	require.NotNil(t, retried)
 	require.Equal(t, 2, retried.Attempt)
@@ -203,7 +209,7 @@ func TestSessionSnapshotDocument_CumulativeExecutionIncludesPreviousAttempts(t *
 	require.Equal(t, 5, execution.ExecutionRounds)
 }
 
-func TestNormalizeSessionSnapshotDocument_RepairsLegacyExecutionSeconds(t *testing.T) {
+func TestNormalizeSessionSnapshotDocument_RepairsExecutionSeconds(t *testing.T) {
 	doc := SessionSnapshotDocument{
 		SchemaVersion: 2,
 		Revision:      3,
@@ -301,4 +307,27 @@ func TestConvertConfigToOptions_SharesSessionSnapshotDocumentStore(t *testing.T)
 	parent := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 	require.Same(t, parent.getSessionSnapshotDocumentStore(), child.getSessionSnapshotDocumentStore())
+}
+
+func TestSessionSnapshotDocument_CurrentRoundStartAtIgnoresSubAgents(t *testing.T) {
+	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
+	startedAt := time.Unix(1_700_000_000, 0)
+	rootTask := NewStatefulTaskBase("round-root", "root", context.Background(), nil, true)
+	BeginSessionSnapshotExecutionForTask(cfg, rootTask, startedAt)
+	rootSnapshot := cfg.MaterializeSessionSnapshot(rootTask, &SessionSnapshot{
+		Execution: cfg.BuildSessionSnapshotExecution(rootTask),
+	})
+	require.Equal(t, 1, rootSnapshot.CurrentRound)
+	require.Equal(t, startedAt.Unix(), rootSnapshot.CurrentRoundStartAt)
+
+	subTask := NewStatefulTaskBase("round-sub", "sub", context.Background(), nil, true)
+	subTask.SetSubAgent(true)
+	BeginSessionSnapshotExecutionForTask(cfg, subTask, startedAt.Add(time.Minute))
+	subSnapshot := cfg.MaterializeSessionSnapshot(subTask, &SessionSnapshot{
+		Execution: cfg.BuildSessionSnapshotExecution(subTask),
+	})
+	require.Equal(t, 1, subSnapshot.CurrentRound,
+		"sub-agent task snapshots must not advance the current session round")
+	require.Equal(t, startedAt.Unix(), subSnapshot.CurrentRoundStartAt,
+		"sub-agent task snapshots must not reset the current round start")
 }

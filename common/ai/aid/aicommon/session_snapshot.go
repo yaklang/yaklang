@@ -34,6 +34,10 @@ type SessionSnapshot struct {
 	// CurrentRound is the 1-based ordinal of the logical session round represented
 	// by this cumulative session snapshot.
 	CurrentRound int `json:"current_round"`
+	// CurrentRoundStartAt is the Unix timestamp in seconds at which the current
+	// logical session round started. It stays fixed across retries of the same
+	// round and is 0 when no top-level round has materialized yet.
+	CurrentRoundStartAt int64 `json:"current_round_start_at"`
 	// TotalRounds counts distinct top-level logical tasks materialized in this session.
 	// Tasks that are still queued have not entered the session snapshot document
 	// and therefore are not included.
@@ -47,9 +51,9 @@ type SessionSnapshot struct {
 }
 
 // SessionSnapshotTaskProjection is the task-scoped portion of a session
-// snapshot. It intentionally has no session-level current_round/total_rounds.
-// Execution.ExecutionRounds remains the number of execution steps performed by
-// the task itself.
+// snapshot. It intentionally has no session-level current_round/
+// current_round_start_at/total_rounds. Execution.ExecutionRounds remains the
+// number of execution steps performed by the task itself.
 type SessionSnapshotTaskProjection struct {
 	Revision            int64                              `json:"revision"`
 	UpdatedAt           int64                              `json:"updated_at"`

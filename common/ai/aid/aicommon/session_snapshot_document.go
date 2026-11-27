@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const SessionSnapshotDocumentSchemaVersion = 4
+const SessionSnapshotDocumentSchemaVersion = 5
 
 // SessionSnapshotTaskSummary is the lightweight task index embedded in the
 // cumulative session snapshot. TaskIndex is display-only; TaskID is the stable
@@ -41,13 +41,18 @@ type SessionTaskSnapshotAttempt struct {
 // task. A terminal projection is frozen and remains available after the live
 // task object has been pruned.
 type SessionTaskSnapshot struct {
-	TaskID           string                         `json:"task_id"`
-	TaskIndex        string                         `json:"task_index,omitempty"`
-	TaskName         string                         `json:"task_name,omitempty"`
-	IsSubAgent       bool                           `json:"is_sub_agent,omitempty"`
-	Attempt          int                            `json:"attempt"`
-	Status           string                         `json:"status"`
-	IsFinal          bool                           `json:"is_final"`
+	TaskID     string `json:"task_id"`
+	TaskIndex  string `json:"task_index,omitempty"`
+	TaskName   string `json:"task_name,omitempty"`
+	IsSubAgent bool   `json:"is_sub_agent,omitempty"`
+	Attempt    int    `json:"attempt"`
+	Status     string `json:"status"`
+	IsFinal    bool   `json:"is_final"`
+	// StartedAt is the Unix timestamp in seconds at which this task started
+	// running, taken from the execution stats reset by
+	// BeginSessionSnapshotExecutionForTask. The current session round starts
+	// from this value.
+	StartedAt        int64                          `json:"started_at,omitempty"`
 	Revision         int64                          `json:"revision"`
 	UpdatedAt        int64                          `json:"updated_at"`
 	Snapshot         *SessionSnapshotTaskProjection `json:"snapshot"`
@@ -78,13 +83,16 @@ type SessionSnapshotAccounting struct {
 // SessionSnapshotDocument is stored as one JSON value on ai_sessions_v1. It is
 // deliberately a materialized projection rather than a serialized task graph.
 type SessionSnapshotDocument struct {
-	SchemaVersion int                                  `json:"schema_version"`
-	Revision      int64                                `json:"revision"`
-	UpdatedAt     int64                                `json:"updated_at"`
-	Session       *SessionSnapshot                     `json:"session"`
-	Tasks         map[string]*SessionTaskSnapshot      `json:"tasks"`
-	TodoScopes    map[string]*sessionSnapshotTodoScope `json:"todo_scopes,omitempty"`
-	Accounting    SessionSnapshotAccounting            `json:"accounting"`
+	SchemaVersion int   `json:"schema_version"`
+	Revision      int64 `json:"revision"`
+	UpdatedAt     int64 `json:"updated_at"`
+	// CurrentRoundTaskID is the task that opened the current round. Its
+	// StartedAt is the value exposed as session.current_round_start_at.
+	CurrentRoundTaskID string                               `json:"current_round_task_id,omitempty"`
+	Session            *SessionSnapshot                     `json:"session"`
+	Tasks              map[string]*SessionTaskSnapshot      `json:"tasks"`
+	TodoScopes         map[string]*sessionSnapshotTodoScope `json:"todo_scopes,omitempty"`
+	Accounting         SessionSnapshotAccounting            `json:"accounting"`
 }
 
 type sessionSnapshotDocumentStore struct {
@@ -168,7 +176,12 @@ func normalizeSessionSnapshotDocumentRounds(doc *SessionSnapshotDocument) {
 	doc.Session.TotalRounds = totalRounds
 	if totalRounds == 0 {
 		doc.Session.CurrentRound = 0
+		doc.Session.CurrentRoundStartAt = 0
+		doc.CurrentRoundTaskID = ""
 		return
+	}
+	if _, ok := doc.Tasks[doc.CurrentRoundTaskID]; !ok {
+		doc.CurrentRoundTaskID = ""
 	}
 	if doc.Session.CurrentRound <= 0 || doc.Session.CurrentRound > totalRounds {
 		doc.Session.CurrentRound = totalRounds
@@ -463,7 +476,7 @@ func (c *Config) BeginSessionSnapshotTask(task AIStatefulTask) {
 	store.document.Tasks[taskID] = &SessionTaskSnapshot{
 		TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName, IsSubAgent: existing.IsSubAgent,
 		Attempt: attempt + 1, Status: "processing", Revision: existing.Revision + 1,
-		UpdatedAt: time.Now().Unix(), PreviousAttempts: history,
+		StartedAt: existing.StartedAt, UpdatedAt: time.Now().Unix(), PreviousAttempts: history,
 	}
 }
 
@@ -642,6 +655,33 @@ func (s *sessionSnapshotDocumentStore) sessionRoundsLocked(newSessionTask bool) 
 	return current, total
 }
 
+// currentRoundStartAtLocked mirrors how CurrentRound advances: the round start
+// is the StartedAt of the task that opened the round, so retries, later emits
+// and sub-agent tasks never move it.
+func (s *sessionSnapshotDocumentStore) currentRoundStartAtLocked(taskID string) int64 {
+	if s == nil {
+		return 0
+	}
+	owner := s.document.CurrentRoundTaskID
+	if owner == "" {
+		owner = taskID
+	}
+	if task := s.document.Tasks[owner]; task != nil {
+		return task.StartedAt
+	}
+	if s.document.Session != nil {
+		return s.document.Session.CurrentRoundStartAt
+	}
+	return 0
+}
+
+func sessionSnapshotExecutionStartAt(latest *SessionSnapshot) int64 {
+	if latest == nil || latest.Execution == nil {
+		return 0
+	}
+	return latest.Execution.StartedAt
+}
+
 // MaterializeSessionSnapshot records the latest task projection, rebuilds the
 // cumulative session view, and persists the complete document on AISession.
 func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *SessionSnapshot) *SessionSnapshot {
@@ -658,6 +698,9 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 	existingTask := store.document.Tasks[taskID]
 	isSubAgent := task != nil && task.IsSubAgent()
 	newSessionRound := taskID != "" && existingTask == nil && !isSubAgent
+	if newSessionRound {
+		store.document.CurrentRoundTaskID = taskID
+	}
 	if taskID != "" {
 		if existing := existingTask; existing == nil || !existing.IsFinal {
 			revision := int64(1)
@@ -679,10 +722,17 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 			if taskSnapshot != nil {
 				normalizeSessionTaskExecutionSeconds(taskSnapshot)
 			}
+			startedAt := sessionSnapshotExecutionStartAt(latest)
+			if existing != nil && existing.StartedAt > 0 && (existing.Attempt > 1 || existing.IsFinal) {
+				// A retry stays in the same logical round, so it keeps the start
+				// recorded by the first attempt.
+				startedAt = existing.StartedAt
+			}
 			store.document.Tasks[taskID] = &SessionTaskSnapshot{
 				TaskID: taskID, TaskIndex: taskIndex, TaskName: taskName, IsSubAgent: isSubAgent,
 				Attempt: attempt, Status: status, IsFinal: isSessionSnapshotExecutionTerminal(status),
-				Revision: revision, UpdatedAt: now, Snapshot: taskSnapshot,
+				StartedAt: startedAt,
+				Revision:  revision, UpdatedAt: now, Snapshot: taskSnapshot,
 				PreviousAttempts: previousAttempts,
 				Todo:             store.taskTodoLocked(taskID),
 			}
@@ -700,6 +750,11 @@ func (c *Config) MaterializeSessionSnapshot(task AIStatefulTask, latest *Session
 	session.Execution = store.buildCumulativeExecutionLocked(c, latest)
 	session.Tasks = store.taskSummariesLocked()
 	session.CurrentRound, session.TotalRounds = store.sessionRoundsLocked(newSessionRound)
+	if session.CurrentRound <= 0 {
+		session.CurrentRoundStartAt = 0
+	} else {
+		session.CurrentRoundStartAt = store.currentRoundStartAtLocked(taskID)
+	}
 	session.BackgroundProcesses = store.backgroundProcessesLocked()
 	session.Todo = store.todoSummaryLocked()
 	NormalizeSessionSnapshot(session)
