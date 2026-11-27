@@ -23,6 +23,25 @@ type DatabaseHandle struct {
 	onClose  func()
 }
 
+// GetOrCreateHandle imports or reuses a dataset with a caller-scoped lease,
+// without retaining a native owner of the shared read pool.
+func (m *InstanceManager) GetOrCreateHandle(ctx context.Context, filename string, options ...ImportOption) (*DatabaseHandle, error) {
+	if ctx == nil {
+		return nil, errors.New("pcapdb: nil handle context")
+	}
+	bound := append([]ImportOption(nil), options...)
+	bound = append(bound, WithContext(ctx), func(c *importConfig) error {
+		c.parent = ctx
+		c.leased = true
+		return nil
+	})
+	database, err := m.GetOrCreate(filename, bound...)
+	if err != nil {
+		return nil, err
+	}
+	return m.acquire(ctx, database)
+}
+
 func (m *InstanceManager) Acquire(ctx context.Context, identifier string) (*DatabaseHandle, error) {
 	if ctx == nil {
 		return nil, errors.New("pcapdb: nil handle context")

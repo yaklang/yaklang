@@ -33,6 +33,11 @@ type ByteSource struct {
 	// decoded observation, not necessarily the frame where another dissector
 	// chooses to display it or the later time when context became available.
 	CompletedIn *PacketReference `json:",omitempty"`
+	// Some network observations keep the entire (possibly decapsulated) packet
+	// as Raw. When ProtocolLength is nonzero this is the exact protocol input
+	// within those logical bytes, excluding link headers and link padding.
+	ProtocolOffset int `json:",omitempty"`
+	ProtocolLength int `json:",omitempty"`
 }
 type captureEvidence struct {
 	byteSourceKind string

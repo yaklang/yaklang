@@ -27,7 +27,7 @@ func rsvpScopedRows(root map[string]any, scope string) []map[string]any {
 	var out []map[string]any
 	for _, row := range rsvpRows(root["Objects"]) {
 		h, _ := row["Header"].(map[string]any)
-		class, _ := h["Class"].(uint64)
+		class := routingNumber(h, "Class")
 		if scope == "object" {
 			out = append(out, h)
 			continue
@@ -97,7 +97,7 @@ func rsvpDisplayBindings() []displayFieldBinding {
 				if value, ok := row[key]; ok {
 					var span *DisplayFieldRange
 					if !derived {
-						span = pimOccurrenceRange(row, key, len(e.Raw))
+						span = pimOccurrenceRange(row, key, e.displayRangeLimit())
 						if span == nil {
 							continue
 						}

@@ -23,7 +23,7 @@ func liveFeed(t testing.TB, w *LiveWriter, raw []byte) {
 
 func TestLiveCaptureQueriesAcrossCommits(t *testing.T) {
 	m := testManager(t)
-	w, err := m.CreateLiveDataset(context.Background(), LiveCaptureConfig{Interface: "controlled", BatchSize: 1}, layers.LinkTypeEthernet)
+	w, err := m.CreateLiveDataset(context.Background(), LiveCaptureConfig{Interface: "controlled", BPF: "tcp port 80", BatchSize: 1}, layers.LinkTypeEthernet)
 	require.NoError(t, err)
 	defer w.Close()
 	// A separate manager must open the live manifest without waiting for its
@@ -107,6 +107,10 @@ func TestLiveCaptureQueriesAcrossCommits(t *testing.T) {
 	require.ErrorIs(t, err, ErrBusy)
 	require.NoError(t, w.Close())
 	require.NoError(t, w.Close())
+	liveMeta := w.Metadata()
+	require.Equal(t, SourceKindLive, liveMeta.SourceKind)
+	require.Equal(t, "controlled", liveMeta.CaptureInterface)
+	require.Equal(t, "tcp port 80", liveMeta.CaptureBPF)
 	sessions, err = db.QuerySessionsPage()
 	require.NoError(t, err)
 	require.Equal(t, StateReady, sessions.State)
@@ -126,6 +130,32 @@ func TestLiveCaptureQueriesAcrossCommits(t *testing.T) {
 	meta, err := imported.Metadata()
 	require.NoError(t, err)
 	require.EqualValues(t, 6, meta.PacketCount)
+	require.Equal(t, SourceKindFile, meta.SourceKind)
+	require.Empty(t, meta.CaptureInterface)
+	require.Empty(t, meta.CaptureBPF)
+}
+
+func TestLiveCaptureToleratesRSTOutsideReceiveWindow(t *testing.T) {
+	m := testManager(t)
+	w, err := m.CreateLiveDataset(context.Background(), LiveCaptureConfig{Interface: "controlled", BatchSize: 1}, layers.LinkTypeEthernet)
+	require.NoError(t, err)
+	defer w.Close()
+	liveFeed(t, w, tcpPacket(t, 100, 0, "S", nil, false))
+	liveFeed(t, w, tcpPacket(t, 500, 101, "SA", nil, true))
+	liveFeed(t, w, tcpPacket(t, 101, 501, "A", nil, false))
+	liveFeed(t, w, tcpPacket(t, 101, 501, "AP", []byte("Hello"), false))
+	liveFeed(t, w, tcpPacket(t, 100_000_000, 0, "R", nil, false))
+	require.NoError(t, w.Flush())
+	meta := w.Metadata()
+	require.Equal(t, StateReady, meta.State)
+	require.EqualValues(t, 5, meta.PacketCount)
+	db, err := m.Open(context.Background(), w.ID)
+	require.NoError(t, err)
+	defer db.Close()
+	packets, err := db.QueryPacketsPage(QueryLimit(100))
+	require.NoError(t, err)
+	require.Len(t, packets.Items, 5)
+	require.Equal(t, StateReady, packets.State)
 }
 
 func TestLiveCaptureTimerCancellationAndIdenticalEmptyCaptures(t *testing.T) {
@@ -242,6 +272,7 @@ func TestLiveCaptureNativeIdleCancellation(t *testing.T) {
 	}()
 	select {
 	case meta := <-started:
+		require.Positive(t, meta.CreatedAt.Unix())
 		db, err := m.Open(context.Background(), meta.DatasetID)
 		require.NoError(t, err)
 		_, err = db.QueryPacketsPage()

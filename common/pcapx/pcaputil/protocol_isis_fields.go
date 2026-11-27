@@ -55,8 +55,7 @@ func isisDisplayBindings() []displayFieldBinding {
 				before := len(p.snapshot.Values)
 				emit(v)
 				if len(p.snapshot.Values) == before+1 {
-					view := ProtocolEvent{Session: row, Raw: e.Raw}
-					p.snapshot.Values[before].Range = view.displayPDUFieldRange(spec.key)
+					p.snapshot.Values[before].Range = e.displayRowRange(row, spec.key)
 				}
 			}
 			project := func(row map[string]any) {

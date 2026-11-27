@@ -33,7 +33,14 @@ type protocolBatch struct {
 }
 
 func newProtocolBatch(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) *protocolBatch {
-	return &protocolBatch{ctx: ctx, db: db, meta: meta, config: config, sessions: newSessionIndexer(meta), hasher: sha256.New()}
+	if config.timing == nil {
+		config.timing = &importTiming{}
+	}
+	capacity := min(config.batchSize, maxPreallocatedBatchSize)
+	return &protocolBatch{
+		ctx: ctx, db: db, meta: meta, config: config, sessions: newSessionIndexer(meta), hasher: sha256.New(),
+		messages: make([]PCAPProtocolMessage, 0, capacity), references: make([]PCAPMessagePacket, 0, capacity),
+	}
 }
 
 // appendEvent runs under mu. Session associations consult the current batch
@@ -64,7 +71,8 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 	if err != nil {
 		return err
 	}
-	if len(event.Raw) > maxCaptureBlock || len(fieldsJSON)+len(sessionJSON)+len(sourceJSON) > 8<<20 {
+	jsonBytes := len(fieldsJSON) + len(sessionJSON) + len(sourceJSON)
+	if len(event.Raw) > maxCaptureBlock || jsonBytes > 8<<20 {
 		return fmt.Errorf("pcapdb: protocol message or JSON metadata exceeds storage budget")
 	}
 	var sessionID, streamID uint
@@ -75,12 +83,20 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 		}
 	}
 	id := b.meta.ProtocolCount + 1
+	var completedInPacketID uint
+	if completed := event.SourceBytes.CompletedIn; completed != nil && completed.Number > 0 {
+		if completed.Number > uint64(b.meta.PacketCount) {
+			return fmt.Errorf("pcapdb: protocol completed in unknown packet %d", completed.Number)
+		}
+		completedInPacketID = uint(completed.Number)
+	}
 	b.messages = append(b.messages, PCAPProtocolMessage{
 		Model: gorm.Model{ID: uint(id)}, EventID: int64(event.ID), FlowID: int64(event.FlowID), TimestampNS: timestampNano(event.Timestamp),
 		Protocol: event.Protocol, Transport: event.Transport, Source: event.Source, Destination: event.Destination, Direction: int(event.Direction), LogicalOffset: int64(event.Offset), Length: event.Length,
 		Status: event.Status, Summary: event.Summary, Error: event.Error, DecodeError: decodeError, Section: int64(event.Domain.Section), Interface: event.Domain.Interface, Encapsulation: event.Domain.Encapsulation,
 		Profile: event.Profile, Rule: event.Rule, Entry: event.Entry, Completeness: event.Completeness, ExpertCode: event.ExpertCode, TransactionID: int64(event.TransactionID), ResponseTo: int64(event.ResponseTo),
-		Data: append([]byte{}, event.Raw...), DataLength: len(event.Raw), SessionID: sessionID, StreamID: streamID, FieldsJSON: fieldsJSON, SessionJSON: sessionJSON, SourceBytesJSON: sourceJSON,
+		Data: append([]byte{}, event.Raw...), DataLength: len(event.Raw), CompletedInPacketID: completedInPacketID,
+		SessionID: sessionID, StreamID: streamID, FieldsJSON: fieldsJSON, SessionJSON: sessionJSON, SourceBytesJSON: sourceJSON,
 	})
 	seen := make(map[uint64]bool, len(event.SourceBytes.PacketRefs))
 	for _, packet := range event.SourceBytes.PacketRefs {
@@ -95,14 +111,17 @@ func (b *protocolBatch) appendEvent(event *pcaputil.ProtocolEvent) error {
 	b.hasher.Write(event.Raw)
 	b.meta.ProtocolCount++
 	b.meta.ProtocolDataSize += int64(len(event.Raw))
-	b.bytes += len(event.Raw) + len(fieldsJSON) + len(sessionJSON) + len(sourceJSON)
+	b.bytes += len(event.Raw) + jsonBytes
 	return nil
 }
 
 func (b *protocolBatch) flush(ctx context.Context, tx *gorm.DB) error {
+	sessionStart := b.config.timing.begin()
 	if err := b.sessions.flush(ctx, tx); err != nil {
 		return err
 	}
+	b.config.timing.add(&b.config.timing.sessionInsert, sessionStart)
+	messageStart := b.config.timing.begin()
 	if err := tx.CreateInBatches(&b.messages).Error; err != nil {
 		return err
 	}
@@ -113,7 +132,11 @@ func (b *protocolBatch) flush(ctx context.Context, tx *gorm.DB) error {
 			return err
 		}
 	}
-	return tx.CreateInBatches(&b.references).Error
+	b.config.timing.add(&b.config.timing.messageInsert, messageStart)
+	referenceStart := b.config.timing.begin()
+	err := tx.CreateInBatches(&b.references).Error
+	b.config.timing.add(&b.config.timing.referenceInsert, referenceStart)
+	return err
 }
 
 func (b *protocolBatch) clear() {
@@ -129,8 +152,14 @@ func (b *protocolBatch) full() bool {
 	return len(b.messages) >= b.config.batchSize || len(b.references) >= b.config.batchSize || b.sessions.pending() >= b.config.batchSize || b.bytes+b.sessions.bytes >= maxImportBatchBytes
 }
 
+// indexProtocols rebuilds derived protocol data from an already stored capture.
+// New imports analyze in ingestCapture; this path remains for enabling analysis
+// on an existing dataset and for an explicit full rebuild.
 func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta *PCAPFileDBMetadata, config *importConfig) (resultErr error) {
 	if err := m.transition(ctx, db, meta, StateAnalyzing); err != nil {
+		return err
+	}
+	if err := ensureProtocolCompletionColumn(ctx, db); err != nil {
 		return err
 	}
 	config.notify(meta)
@@ -229,7 +258,15 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 	}
 	options := []pcaputil.CaptureOption{
 		pcaputil.WithContext(replayCtx),
-		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: !config.protocols, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+		// Offline viewing starts from arbitrary points in long captures. Allow a
+		// validated HTTP response to retain its own framing when the request was
+		// captured before the file began or was otherwise unavailable.
+		pcaputil.WithHTTPResponseWithoutRequest(true),
+		// Offline traffic viewing must keep usable packets and protocol
+		// diagnostics when one flow reaches a reassembly resource limit.
+		// Validation workflows can opt into strict replay with
+		// WithStrictTCPReassembly.
+		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: !config.strictReassembly, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
 	}
 	if config.tlsSecrets != nil {
 		options = append(options, pcaputil.WithTLSSecrets(config.tlsSecrets))
@@ -277,5 +314,29 @@ func (m *InstanceManager) indexProtocols(ctx context.Context, db *gorm.DB, meta 
 	if err = ensureProtocolFieldIndexes(ctx, db, config.fieldIndexes); err != nil {
 		return err
 	}
+	if config.deferQueryIndexes {
+		if err = ensurePCAPQueryIndexes(db); err != nil {
+			return err
+		}
+	}
 	return m.transition(ctx, db, meta, StateReady)
+}
+
+func ensureProtocolCompletionColumn(ctx context.Context, db *gorm.DB) error {
+	scoped := indexWithContext(ctx, db)
+	if !db.Dialect().HasColumn("protocol_messages", "completed_in_packet_id") {
+		if err := scoped.Exec(
+			"ALTER TABLE protocol_messages ADD COLUMN completed_in_packet_id integer NOT NULL DEFAULT 0",
+		).Error; err != nil {
+			return err
+		}
+	}
+	if err := scoped.Exec(
+		"CREATE INDEX IF NOT EXISTS messages_completed_in ON protocol_messages(completed_in_packet_id, deleted_at, id)",
+	).Error; err != nil {
+		return err
+	}
+	return scoped.Exec(
+		"CREATE INDEX IF NOT EXISTS messages_protocol_completed ON protocol_messages(protocol, deleted_at, completed_in_packet_id)",
+	).Error
 }

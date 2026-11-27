@@ -38,7 +38,7 @@ func pimFieldRows(root map[string]any) []map[string]any {
 		if spans, ok := m["Wire Field Ranges"].(map[string]any); ok {
 			for _, span := range spans {
 				if s, ok := span.([]any); ok && len(s) == 2 {
-					if n, ok := s[0].(uint64); ok && n < at {
+					if n, ok := displayUint(s[0]); ok && n < at {
 						at = n
 					}
 				}
@@ -155,7 +155,7 @@ func pimDisplayBindings() []displayFieldBinding {
 					continue
 				}
 				if v, ok := m[key]; ok {
-					emit(v, pimOccurrenceRange(m, key, len(e.Raw)))
+					emit(v, pimOccurrenceRange(m, key, e.displayRangeLimit()))
 				}
 			}
 		})
@@ -223,7 +223,7 @@ func pimDisplayBindings() []displayFieldBinding {
 						}
 					}
 					if s, ok := v.(string); ok && strings.Contains(s, ":") == v6 {
-						emit(s, pimOccurrenceRange(owner, key, len(e.Raw)))
+						emit(s, pimOccurrenceRange(owner, key, e.displayRangeLimit()))
 					}
 				}
 			})
@@ -245,7 +245,7 @@ func pimDisplayBindings() []displayFieldBinding {
 				for _, row := range pimFieldRows(e.Session) {
 					for _, address := range pimAddressRows(row[path]) {
 						if s, ok := address["Address"].(string); ok && strings.Contains(s, ":") == v6 {
-							emit(s, pimOccurrenceRange(address, "Address", len(e.Raw)))
+							emit(s, pimOccurrenceRange(address, "Address", e.displayRangeLimit()))
 						}
 					}
 				}
@@ -262,7 +262,7 @@ func pimDisplayBindings() []displayFieldBinding {
 		b := pimObservedBinding("pim.observed.register."+strings.ToLower(key), key, DisplayAddress, 0, "pdu", func(e *ProtocolEvent, emit func(any, *DisplayFieldRange)) {
 			if header, ok := e.Session["Register IP Header"].(map[string]any); ok {
 				if value, present := header[key]; present {
-					emit(value, pimOccurrenceRange(header, key, len(e.Raw)))
+					emit(value, pimOccurrenceRange(header, key, e.displayRangeLimit()))
 				}
 			}
 		})

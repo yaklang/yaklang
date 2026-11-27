@@ -62,7 +62,7 @@ func gtpv2DisplayBindings() []displayFieldBinding {
 				if value, ok := row[key]; ok {
 					var span *DisplayFieldRange
 					if !derived {
-						span = pimOccurrenceRange(row, key, len(e.Raw))
+						span = pimOccurrenceRange(row, key, e.displayRangeLimit())
 						if span == nil {
 							continue
 						}

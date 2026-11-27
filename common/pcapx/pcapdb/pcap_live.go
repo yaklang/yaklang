@@ -114,7 +114,22 @@ func (m *InstanceManager) CreateLiveDataset(ctx context.Context, config LiveCapt
 	if err = makeDurableDirectory(dir); err != nil {
 		return nil, err
 	}
-	meta := &PCAPFileDBMetadata{DatasetID: id, DatabaseType: "sqlite", DatabasePath: filepath.Join(dir, "index.sqlite"), FingerprintMode: liveFingerprintMode, SourceAliases: "[]", Format: "pcap", SchemaVersion: SchemaVersion, State: StateRegistered, ProtocolsIndexed: true, StreamsIndexed: true}
+	meta := &PCAPFileDBMetadata{
+		Model:            gorm.Model{CreatedAt: time.Now().UTC()},
+		DatasetID:        id,
+		DatabaseType:     "sqlite",
+		DatabasePath:     filepath.Join(dir, "index.sqlite"),
+		SourceKind:       SourceKindLive,
+		CaptureInterface: config.Interface,
+		CaptureBPF:       config.BPF,
+		FingerprintMode:  liveFingerprintMode,
+		SourceAliases:    "[]",
+		Format:           "pcap",
+		SchemaVersion:    SchemaVersion,
+		State:            StateRegistered,
+		ProtocolsIndexed: true,
+		StreamsIndexed:   true,
+	}
 	lock, err := acquireFileLock(operation, datasetLockPath(meta), true)
 	if err != nil {
 		return nil, err
@@ -158,8 +173,10 @@ func (m *InstanceManager) CreateLiveDataset(ctx context.Context, config LiveCapt
 			w.batch.err = fn()
 		}
 	}
+	// Live captures can legitimately observe packet loss, midstream starts and
+	// stale resets. Keep those diagnostics without terminating the dataset.
 	w.analyzer, err = pcaputil.NewPacketAnalyzer(
-		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
+		pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true, Workers: 1, MaxFrameBytes: streamChunkBytes, MaxFlows: maxActiveSessions, MaxPendingBytes: 2 << 20, MaxTotalPendingBytes: 16 << 20, MaxPendingSegments: 4096, MaxTotalPendingSegments: 32768}),
 		pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) { consume(func() error { return w.batch.appendEvent(e) }) }),
 		pcaputil.WithBeforeTransportPacket(func(p gopacket.Packet) { consume(func() error { return w.batch.sessions.datagram(p) }) }),
 		pcaputil.WithOnTrafficFlowPacket(func(f *pcaputil.TrafficFlow, c *pcaputil.TrafficConnection, r []pcaputil.PacketReference, ts time.Time) {

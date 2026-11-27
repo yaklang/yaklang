@@ -105,6 +105,32 @@ func WithProtocolDeferred(deferred bool) CaptureOption {
 	return WithBinParserDeferred(deferred)
 }
 
+// WithHTTPResponseWithoutRequest permits HTTP responses to be framed without a
+// previously observed request. The response start line and framing headers must
+// still validate; emitted events explicitly retain the missing request context.
+func WithHTTPResponseWithoutRequest(enabled bool) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if c.binParserConfig == nil {
+			c.binParserConfig = &BinParserConfig{}
+		}
+		c.binParserConfig.HTTPResponseWithoutRequest = enabled
+		return nil
+	}
+}
+
+// WithTCPProbeResync controls the default-enabled retry of protocol admission
+// at later observed delivery boundaries. A retry never searches inside a TCP
+// segment, an accepted protocol message, or a UDP datagram.
+func WithTCPProbeResync(enabled bool) CaptureOption {
+	return func(c *CaptureConfig) error {
+		if c.binParserConfig == nil {
+			c.binParserConfig = &BinParserConfig{}
+		}
+		c.binParserConfig.DisableTCPProbeResync = !enabled
+		return nil
+	}
+}
+
 // NewProtocolInspector 创建有界协议消息历史，用 OnEvent 接收 pcap_onProtocolMessage 的结果。
 // Rows 返回摘要，Details 按消息 ID 返回独立字段。超出条数或原始字节上限时淘汰最早消息，
 // Evicted 返回淘汰数；历史淘汰不等于抓包丢包。

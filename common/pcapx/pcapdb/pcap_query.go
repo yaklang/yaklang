@@ -293,7 +293,7 @@ func (d *Database) QueryPackets(options ...QueryOption) ([]Packet, error) {
 	packets := make([]Packet, 0)
 	scoped := indexWithContext(ctx, tx)
 	if c.session == nil && c.stream == nil {
-		err = c.apply(scoped).Select(packetColumns(c, "")).Find(&packets).Error
+		err = c.apply(scoped).Select(packetColumns(scoped, "", c.bounded)).Find(&packets).Error
 		return packets, err
 	}
 	rows, err := packetAssociationQuery(scoped, c).Rows()
@@ -316,7 +316,7 @@ func (d *Database) QueryPackets(options ...QueryOption) ([]Packet, error) {
 // JOIN fixes this order in SQLite; IN(SELECT all packet IDs) can materialize a
 // million-ID stream before applying the page limit. All filters remain in GORM.
 func packetAssociationQuery(db *gorm.DB, c *queryConfig) *gorm.DB {
-	query := db.Table("session_packets AS sp").Joins("CROSS JOIN packets AS p ON p.id=sp.packet_id").Select(packetColumns(c, "p.")).
+	query := db.Table("session_packets AS sp").Joins("CROSS JOIN packets AS p ON p.id=sp.packet_id").Select(packetColumns(db, "p.", c.bounded)).
 		Where("sp.deleted_at IS NULL AND p.deleted_at IS NULL AND sp.packet_id > ?", c.after).Order("sp.packet_id").Limit(c.limit)
 	if c.session != nil {
 		query = query.Where("sp.session_id = ?", *c.session)
@@ -419,10 +419,10 @@ func (d *Database) readData(id uint, protocol bool, options ...QueryOption) ([]b
 	return row.Data, nil
 }
 
-const packetSummaryColumns = "id,created_at,updated_at,deleted_at,capture_interface_id,section,interface_id,link_type,captured_length,original_length,timestamp_ns,src_mac,dst_mac,vlan_stack,src_ip,dst_ip,src_port,dst_port,transport,decode_error"
+const packetSummaryColumns = "id,created_at,updated_at,deleted_at,capture_interface_id,section,interface_id,link_type,captured_length,original_length,timestamp_ns,src_mac,dst_mac,vlan_stack,src_ip,dst_ip,src_port,dst_port,transport,summary,decode_error"
 
 // Summary projections avoid loading JSON blobs unless explicitly requested.
-const protocolSummaryColumns = "id,created_at,updated_at,deleted_at,event_id,flow_id,timestamp_ns,protocol,transport,source,destination,direction,logical_offset,length,status,summary,error,decode_error,profile,rule,entry,completeness,expert_code,transaction_id,response_to,section,interface_id,encapsulation,data_length,session_id,stream_id"
+const protocolSummaryColumns = "id,created_at,updated_at,deleted_at,event_id,flow_id,timestamp_ns,protocol,transport,source,destination,direction,logical_offset,length,status,summary,error,decode_error,profile,rule,entry,completeness,expert_code,transaction_id,response_to,section,interface_id,encapsulation,data_length,completed_in_packet_id,session_id,stream_id"
 
 func (d *Database) QueryProtocols(options ...QueryOption) ([]ProtocolMessage, error) {
 	c, err := parseQuery(options, true)
@@ -443,19 +443,7 @@ func (d *Database) QueryProtocols(options ...QueryOption) ([]ProtocolMessage, er
 		return nil, err
 	}
 	defer tx.Rollback()
-	projection := protocolSummaryColumns
-	if c.bounded {
-		columns := strings.Split(projection, ",")
-		for i, name := range columns {
-			switch name {
-			case "protocol", "transport", "source", "destination", "status", "error", "decode_error", "profile", "rule", "entry", "completeness", "expert_code", "encapsulation":
-				columns[i] = "substr(" + name + ",1,513) AS " + name
-			case "summary":
-				columns[i] = "substr(summary,1,1025) AS summary"
-			}
-		}
-		projection = strings.Join(columns, ",")
-	}
+	projection := protocolColumns(tx, c.bounded)
 	if c.includeFields {
 		if c.fieldBytes > 0 {
 			projection += fmt.Sprintf(",CASE WHEN length(fields)+length(session) <= %d THEN json(fields) END AS fields,CASE WHEN length(fields)+length(session) <= %d THEN json(session) END AS session", c.fieldBytes, c.fieldBytes)
@@ -504,13 +492,49 @@ func (d *Database) QueryProtocols(options ...QueryOption) ([]ProtocolMessage, er
 	return messages, rows.Err()
 }
 
-func packetColumns(c *queryConfig, prefix string) string {
+func packetColumns(db *gorm.DB, prefix string, bounded bool) string {
 	columns := strings.Split(packetSummaryColumns, ",")
+	hasSummary := db.Dialect().HasColumn("packets", "summary")
 	for i, name := range columns {
+		if name == "summary" && !hasSummary {
+			columns[i] = "'' AS summary"
+			continue
+		}
 		columns[i] = prefix + name
-		if c.bounded && name == "decode_error" {
+		if bounded && name == "decode_error" {
 			columns[i] = "substr(" + prefix + name + ",1,513) AS decode_error"
 		}
+	}
+	return strings.Join(columns, ",")
+}
+
+func protocolColumns(db *gorm.DB, bounded bool) string {
+	return protocolColumnsWithPrefix(db, "", bounded)
+}
+
+func protocolColumnsWithPrefix(db *gorm.DB, prefix string, bounded bool) string {
+	columns := strings.Split(protocolSummaryColumns, ",")
+	hasCompletedIn := db.Dialect().HasColumn("protocol_messages", "completed_in_packet_id")
+	for i, name := range columns {
+		if name == "completed_in_packet_id" {
+			if hasCompletedIn {
+				columns[i] = prefix + name
+			} else {
+				columns[i] = "0 AS completed_in_packet_id"
+			}
+			continue
+		}
+		if bounded {
+			switch name {
+			case "protocol", "transport", "source", "destination", "status", "error", "decode_error", "profile", "rule", "entry", "completeness", "expert_code", "encapsulation":
+				columns[i] = "substr(" + prefix + name + ",1,513) AS " + name
+				continue
+			case "summary":
+				columns[i] = "substr(" + prefix + "summary,1,1025) AS summary"
+				continue
+			}
+		}
+		columns[i] = prefix + name
 	}
 	return strings.Join(columns, ",")
 }

@@ -8,7 +8,7 @@ func smb1DisplayBindings() []displayFieldBinding {
 			b.path = []string{owner, key}
 			b.rangeFor = func(e *ProtocolEvent, ordinal int) *DisplayFieldRange {
 				m, _ := e.Session[owner].(map[string]any)
-				return (&ProtocolEvent{Raw: e.Raw, Session: m}).displayPDUFieldRange(key)
+				return e.displayRowRange(m, key)
 			}
 		}
 		out = append(out, b)
@@ -42,7 +42,7 @@ func smb1DisplayBindings() []displayFieldBinding {
 	ntStatus.descriptor.Description = "Literal server response Status with REPLY and NT_STATUS set; request format preferences and SMBSTATUS bytes are not NTSTATUS errors"
 	ntStatus.rangeFor = func(e *ProtocolEvent, _ int) *DisplayFieldRange {
 		header, _ := e.Session["Header"].(map[string]any)
-		return (&ProtocolEvent{Raw: e.Raw, Session: header}).displayPDUFieldRange("Status")
+		return e.displayRowRange(header, "Status")
 	}
 	out = append(out, ntStatus)
 	requested := displayCustom("smb", "smb.nt_status_requested", "NTSTATUS response format requested", DisplayBoolean, 0, "derived", func(e *ProtocolEvent, emit func(any), _ *displayProjection) {
@@ -76,7 +76,7 @@ func smb1DisplayBindings() []displayFieldBinding {
 			}
 		})
 		binding.rangeFor = func(e *ProtocolEvent, _ int) *DisplayFieldRange {
-			return (&ProtocolEvent{Raw: e.Raw, Session: smb1WordCountOwner(e, field.key)}).displayPDUFieldRange(field.key)
+			return e.displayRowRange(smb1WordCountOwner(e, field.key), field.key)
 		}
 		out = append(out, binding)
 	}
@@ -144,7 +144,7 @@ func smb1DisplayBindings() []displayFieldBinding {
 				m, _ = entries[ordinal].(map[string]any)
 			}
 		}
-		return (&ProtocolEvent{Raw: e.Raw, Session: m}).displayPDUFieldRange("Name")
+		return e.displayRowRange(m, "Name")
 	}
 	out = append(out, b)
 	out = append(out, displayRoot("smb", "smb.smb2_upgrade_offered", "SMB2 upgrade offered, not selected", DisplayBoolean, 0, "derived", "SMB2 Upgrade Offered"))

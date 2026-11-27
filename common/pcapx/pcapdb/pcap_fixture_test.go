@@ -136,36 +136,38 @@ func TestPCAPDBComprehensiveFixture(t *testing.T) {
 	var projectionError error
 	var references [][]int64
 	var protocolBytes [][]byte
-	require.NoError(t, pcaputil.ReplayPcapFile(input, pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {
-		expected[event.Protocol]++
-		eventIDs = append(eventIDs, int64(event.ID))
-		parserRules = append(parserRules, event.Rule)
-		parserEntries = append(parserEntries, event.Entry)
-		fields := event.Fields
-		if fields == nil {
-			fields, _ = event.GetFields() // Decode failures are persisted as null fields.
-		}
-		fieldsJSON, err := json.Marshal(fields)
-		if err != nil {
-			projectionError = err
-		}
-		sessionJSON, err := json.Marshal(event.Session)
-		if err != nil {
-			projectionError = err
-		}
-		fieldTrees = append(fieldTrees, fieldsJSON)
-		sessionTrees = append(sessionTrees, sessionJSON)
-		ids := make([]int64, 0)
-		seen := make(map[uint64]bool)
-		for _, packet := range event.SourceBytes.PacketRefs {
-			if !seen[packet.Number] {
-				ids = append(ids, int64(packet.Number))
-				seen[packet.Number] = true
+	require.NoError(t, pcaputil.ReplayPcapFile(input,
+		pcaputil.WithHTTPResponseWithoutRequest(true),
+		pcaputil.WithOnProtocolMessage(func(event *pcaputil.ProtocolEvent) {
+			expected[event.Protocol]++
+			eventIDs = append(eventIDs, int64(event.ID))
+			parserRules = append(parserRules, event.Rule)
+			parserEntries = append(parserEntries, event.Entry)
+			fields := event.Fields
+			if fields == nil {
+				fields, _ = event.GetFields() // Decode failures are persisted as null fields.
 			}
-		}
-		references = append(references, ids)
-		protocolBytes = append(protocolBytes, append([]byte(nil), event.Raw...))
-	})))
+			fieldsJSON, err := json.Marshal(fields)
+			if err != nil {
+				projectionError = err
+			}
+			sessionJSON, err := json.Marshal(event.Session)
+			if err != nil {
+				projectionError = err
+			}
+			fieldTrees = append(fieldTrees, fieldsJSON)
+			sessionTrees = append(sessionTrees, sessionJSON)
+			ids := make([]int64, 0)
+			seen := make(map[uint64]bool)
+			for _, packet := range event.SourceBytes.PacketRefs {
+				if !seen[packet.Number] {
+					ids = append(ids, int64(packet.Number))
+					seen[packet.Number] = true
+				}
+			}
+			references = append(references, ids)
+			protocolBytes = append(protocolBytes, append([]byte(nil), event.Raw...))
+		})))
 	require.NoError(t, projectionError)
 	require.EqualValues(t, len(eventIDs), meta.ProtocolCount)
 	actual := make(map[string]int)
@@ -237,11 +239,37 @@ func BenchmarkPCAPDBComprehensiveImport(b *testing.B) {
 	}
 }
 
+func TestPCAPDBIncompleteReplayRetainsDiagnostics(t *testing.T) {
+	input, err := trafficfixture.Materialize("../../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-tls.pcap", t.TempDir())
+	require.NoError(t, err)
+	m := testManager(t)
+	db, err := m.GetOrCreate(input, WithProtocols(true), WithBatchSize(1))
+	require.NoError(t, err)
+	meta, err := db.Metadata()
+	require.NoError(t, err)
+	require.Equal(t, StateReady, meta.State)
+	require.EqualValues(t, 120, meta.PacketCount)
+	require.True(t, meta.ProtocolsIndexed)
+	require.NotZero(t, meta.ProtocolCount)
+	var messages int64
+	reader, err := openIndex(meta.DatabasePath, false, false)
+	require.NoError(t, err)
+	require.NoError(t, reader.Model(&PCAPProtocolMessage{}).Count(&messages).Error)
+	var incomplete int64
+	require.NoError(t, reader.Model(&PCAPProtocolMessage{}).Where("completeness = ?", "incomplete").Count(&incomplete).Error)
+	require.NoError(t, reader.Close())
+	require.Equal(t, meta.ProtocolCount, messages)
+	require.NotZero(t, incomplete, "resource-limited flows must retain incomplete protocol diagnostics")
+	valid, err := m.Validate(context.Background(), db.ID, true)
+	require.NoError(t, err)
+	require.True(t, valid.Valid, valid.Error)
+}
+
 func TestPCAPDBIncompleteReplayFailureAndPacketOnlyRetry(t *testing.T) {
 	input, err := trafficfixture.Materialize("../../bin-parser/testdata/protocol-corpus/captures/ndpi/ndpi-tls.pcap", t.TempDir())
 	require.NoError(t, err)
 	m := testManager(t)
-	_, err = m.GetOrCreate(input, WithProtocols(true), WithBatchSize(1))
+	_, err = m.GetOrCreate(input, WithProtocols(true), WithStrictTCPReassembly(true), WithBatchSize(1))
 	require.ErrorContains(t, err, "unfilled sequence gap")
 	entries, err := m.List()
 	require.NoError(t, err)

@@ -143,12 +143,12 @@ func espDisplayBindings() []displayFieldBinding {
 		key := item.key
 		b := displayCustom("esp", item.name, key+" (observed clear header)", DisplayUnsigned, 32, "pdu", func(e *ProtocolEvent, emit func(any), _ *displayProjection) {
 			if e.nativeESPObservation {
-				v, ok := e.semanticSession[key].(uint32)
+				v, ok := displayUint(e.semanticSession[key])
 				offset := 0
 				if key == "Sequence" {
 					offset = 4
 				}
-				if ok && len(e.Raw) >= offset+4 && binary.BigEndian.Uint32(e.Raw[offset:offset+4]) == v {
+				if ok && len(e.Raw) >= offset+4 && uint64(binary.BigEndian.Uint32(e.Raw[offset:offset+4])) == v {
 					emit(v)
 				}
 			}

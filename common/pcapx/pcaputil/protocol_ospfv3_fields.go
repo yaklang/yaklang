@@ -20,7 +20,7 @@ func ospfv3DisplayBindings() []displayFieldBinding {
 					}
 				}
 				if value, ok := row[key]; ok {
-					emit(value, pimOccurrenceRange(row, key, len(e.Raw)))
+					emit(value, pimOccurrenceRange(row, key, e.displayRangeLimit()))
 				}
 			}
 		}

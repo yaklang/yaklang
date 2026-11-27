@@ -171,27 +171,29 @@ type PacketSummary struct {
 	SourcePort       int    `json:"source_port"`
 	DestinationPort  int    `json:"destination_port"`
 	Transport        string `json:"transport"`
+	Summary          string `json:"summary"`
 	DecodeError      string `json:"decode_error,omitempty"`
 	PreviewTruncated bool   `json:"preview_truncated,omitempty"`
 }
 type ProtocolSummary struct {
-	ID               uint   `json:"id"`
-	Protocol         string `json:"protocol"`
-	Transport        string `json:"transport"`
-	TimestampNS      *int64 `json:"timestamp_ns"`
-	Source           string `json:"source"`
-	Destination      string `json:"destination"`
-	FlowID           int64  `json:"flow_id"`
-	TransactionID    int64  `json:"transaction_id"`
-	ResponseTo       int64  `json:"response_to,omitempty"`
-	SessionID        uint   `json:"session_id"`
-	StreamID         uint   `json:"stream_id"`
-	DataLength       int    `json:"data_length"`
-	Summary          string `json:"summary"`
-	Status           string `json:"status"`
-	Error            string `json:"error,omitempty"`
-	Completeness     string `json:"completeness"`
-	PreviewTruncated bool   `json:"preview_truncated,omitempty"`
+	ID                  uint   `json:"id"`
+	Protocol            string `json:"protocol"`
+	Transport           string `json:"transport"`
+	TimestampNS         *int64 `json:"timestamp_ns"`
+	Source              string `json:"source"`
+	Destination         string `json:"destination"`
+	FlowID              int64  `json:"flow_id"`
+	TransactionID       int64  `json:"transaction_id"`
+	ResponseTo          int64  `json:"response_to,omitempty"`
+	SessionID           uint   `json:"session_id"`
+	StreamID            uint   `json:"stream_id"`
+	DataLength          int    `json:"data_length"`
+	CompletedInPacketID uint   `json:"completed_in_packet_id,omitempty"`
+	Summary             string `json:"summary"`
+	Status              string `json:"status"`
+	Error               string `json:"error,omitempty"`
+	Completeness        string `json:"completeness"`
+	PreviewTruncated    bool   `json:"preview_truncated,omitempty"`
 }
 type SessionSummary struct {
 	ID               uint   `json:"id"`
@@ -247,12 +249,12 @@ func queryResult[S, T any](d *Database, options []QueryOption, messages bool, qu
 
 func (d *Database) QueryPacketsPage(options ...QueryOption) (*ResultPage[PacketSummary], error) {
 	return queryResult(d, options, false, d.QueryPackets, func(p Packet) PacketSummary {
-		return PacketSummary{ID: p.ID, Section: p.Section, Interface: p.Interface, TimestampNS: p.TimestampNS, CapturedLength: p.CapturedLength, OriginalLength: p.OriginalLength, LinkType: p.LinkType, SourceMAC: shortText(p.SourceMAC, 64), DestinationMAC: shortText(p.DestinationMAC, 64), VLANStack: shortText(p.VLANStack, 128), SourceIP: shortText(p.SourceIP, 64), DestinationIP: shortText(p.DestinationIP, 64), SourcePort: p.SourcePort, DestinationPort: p.DestinationPort, Transport: shortText(p.Transport, 32), DecodeError: shortText(p.DecodeError, 512), PreviewTruncated: len(p.DecodeError) > 512}
+		return PacketSummary{ID: p.ID, Section: p.Section, Interface: p.Interface, TimestampNS: p.TimestampNS, CapturedLength: p.CapturedLength, OriginalLength: p.OriginalLength, LinkType: p.LinkType, SourceMAC: shortText(p.SourceMAC, 64), DestinationMAC: shortText(p.DestinationMAC, 64), VLANStack: shortText(p.VLANStack, 128), SourceIP: shortText(p.SourceIP, 64), DestinationIP: shortText(p.DestinationIP, 64), SourcePort: p.SourcePort, DestinationPort: p.DestinationPort, Transport: shortText(p.Transport, 32), Summary: shortText(p.Summary, 512), DecodeError: shortText(p.DecodeError, 512), PreviewTruncated: len(p.Summary) > 512 || len(p.DecodeError) > 512}
 	}, func(p PacketSummary) int64 { return int64(p.ID) })
 }
 func (d *Database) QueryProtocolsPage(options ...QueryOption) (*ResultPage[ProtocolSummary], error) {
 	return queryResult(d, options, true, d.QueryProtocols, func(p ProtocolMessage) ProtocolSummary {
-		return ProtocolSummary{ID: p.ID, Protocol: shortText(p.Protocol, 128), Transport: shortText(p.Transport, 32), TimestampNS: p.TimestampNS, Source: shortText(p.Source, 256), Destination: shortText(p.Destination, 256), FlowID: p.FlowID, TransactionID: p.TransactionID, ResponseTo: p.ResponseTo, SessionID: p.SessionID, StreamID: p.StreamID, DataLength: p.DataLength, Summary: shortText(p.Summary, 512), Status: shortText(p.Status, 128), Error: shortText(p.Error, 512), Completeness: shortText(p.Completeness, 128), PreviewTruncated: len(p.Summary) > 512 || len(p.Error) > 512 || len(p.Source) > 256 || len(p.Destination) > 256}
+		return ProtocolSummary{ID: p.ID, Protocol: shortText(p.Protocol, 128), Transport: shortText(p.Transport, 32), TimestampNS: p.TimestampNS, Source: shortText(p.Source, 256), Destination: shortText(p.Destination, 256), FlowID: p.FlowID, TransactionID: p.TransactionID, ResponseTo: p.ResponseTo, SessionID: p.SessionID, StreamID: p.StreamID, DataLength: p.DataLength, CompletedInPacketID: p.CompletedInPacketID, Summary: shortText(p.Summary, 512), Status: shortText(p.Status, 128), Error: shortText(p.Error, 512), Completeness: shortText(p.Completeness, 128), PreviewTruncated: len(p.Summary) > 512 || len(p.Error) > 512 || len(p.Source) > 256 || len(p.Destination) > 256}
 	}, func(p ProtocolSummary) int64 { return int64(p.ID) })
 }
 func (d *Database) QuerySessionsPage(options ...QueryOption) (*ResultPage[SessionSummary], error) {
