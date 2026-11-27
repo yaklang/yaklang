@@ -32,27 +32,33 @@ func (t *directlyCallTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx 
 	return t.toolCallResult, t.toolCallDirectly, t.toolCallErr
 }
 
-// DirectlyCallTool mirrors aicommon.ToolCaller.DirectlyCallTool for tests: it
-// runs the loop-layer prepare callback (which normalizes/validates params and
-// emits progress), records the explicit params, and returns reason/retry on
-// rejected proposals without executing or generating replacement parameters.
-func (t *directlyCallTestInvoker) DirectlyCallTool(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
-	if prepare != nil && t.tool != nil {
-		params, fallback, _, err := prepare(action, toolName)
+func (t *directlyCallTestInvoker) ReviewDirectToolCall(ctx context.Context, toolName string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc, _ ...aicommon.ToolCallerOption) (*aicommon.ToolCallReviewResult, error) {
+	params := aitool.InvokeParams{}
+	tool := t.tool
+	if prepare != nil && tool != nil {
+		prepared, fallback, resolved, err := prepare(action, toolName)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if fallback {
-			return nil, false, &aicommon.ToolCallRetryError{ToolName: toolName, Reason: "invalid explicit parameters"}
+			return nil, &aicommon.ToolCallRetryError{ToolName: toolName, Reason: "invalid explicit parameters"}
 		}
-		t.mu.Lock()
-		t.withoutRequiredName = toolName
-		t.withoutRequiredParams = make(aitool.InvokeParams)
-		for k, v := range params {
-			t.withoutRequiredParams[k] = v
+		params = prepared
+		if resolved != nil {
+			tool = resolved
 		}
-		t.mu.Unlock()
 	}
+	t.mu.Lock()
+	t.withoutRequiredName = toolName
+	t.withoutRequiredParams = make(aitool.InvokeParams)
+	for k, v := range params {
+		t.withoutRequiredParams[k] = v
+	}
+	t.mu.Unlock()
+	return &aicommon.ToolCallReviewResult{Tool: tool, Params: params}, nil
+}
+
+func (t *directlyCallTestInvoker) ExecuteReviewedToolCall(ctx context.Context, review *aicommon.ToolCallReviewResult) (*aitool.ToolResult, bool, error) {
 	return t.toolCallResult, t.toolCallDirectly, t.toolCallErr
 }
 

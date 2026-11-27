@@ -51,6 +51,32 @@
 
 动作验证使用 canonical 参数，不读会把数组成员混合的 flattened 兼容缓存。原生同一响应中的多个动作拥有各自验证状态，不共享目标或批次。
 
+## 审批与执行两阶段流程
+
+审批是执行前的硬边界。`ReviewToolCall` 只负责参数准备和等待用户决定；审批通过后，同步路径才进入 `ExecuteReviewedToolCall`，异步路径才创建 Manager resource。审批要求直接回答时，调用会在进入 Manager 前结束，并回到 ReAct 主循环交付答案。
+
+```mermaid
+flowchart TD
+    A["工具提案<br/>scalar / batch / native / text"] --> B["ReviewToolCall<br/>参数准备 + 审核卡"]
+    B -->|"取消 / 超时"| X["不执行<br/>不创建 Manager resource"]
+    B -->|"wrong_tool / wrong_params"| R["返回所属循环<br/>按反馈重新决策"]
+    B -->|"direct_answer"| DA["停止子 Agent 与后台执行<br/>请求主循环直答"]
+    DA --> PA["ReAct 主循环<br/>基于现有 Timeline 回答一次"]
+    B -->|"批准"| M{"同步或异步?"}
+    M -->|"同步 / 支持 detach"| E["ExecuteReviewedToolCall"]
+    M -->|"异步"| Q["NewReviewedAsyncResource<br/>Manager 准入"]
+    Q -->|"准入成功"| J["Async Manager 执行"]
+    J --> E
+    Q -->|"拒绝"| X
+    E --> RESULT["执行工具回调<br/>更新 Timeline、产物和结果"]
+    RESULT --> NEXT["继续主循环或结束"]
+    PA --> DONE["结束任务"]
+    X --> CARD["关闭工具卡"]
+    R -. "新的显式调用" .-> B
+```
+
+单次调用、原生 Function Call、文本 action、batch、detach 和旧兼容入口都收敛到同一审核边界。batch 仍按数组顺序审核；一旦选择 `direct_answer`，未启动的兄弟项不会进入 Manager，已经运行的后台工作会先停止。
+
 ## 审核与返回所属循环
 
 | 用户决定 | 行为 |

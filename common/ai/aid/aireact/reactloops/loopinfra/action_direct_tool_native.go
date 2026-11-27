@@ -101,11 +101,27 @@ func executeNativeDirectTool(loop *reactloops.ReActLoop, action *aicommon.Action
 		aicommon.WithToolCaller_Reason(resolveToolCallReason(action, "directly_call_reason")),
 		aicommon.WithToolCaller_DestinationIdentifier(action.GetString("identifier")),
 	}
-	if async, _ := loop.GetActionExecutionValue(action, actionStateDirectToolAsync).(bool); async {
-		submitAsyncDirectTool(loop, name, params, operator, opts...)
+	prepare := func(_ *aicommon.Action, _ string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
+		tool, err := loop.GetConfig().GetAiToolManager().GetToolByName(name)
+		if err != nil {
+			return nil, false, nil, err
+		}
+		return params, false, tool, nil
+	}
+	review, err := invoker.ReviewDirectToolCall(ctx, name, action, prepare, opts...)
+	if err != nil {
+		handleToolCallResult(loop, ctx, invoker, name, nil, false, err, operator)
 		return
 	}
-	result, directly, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, name, params, opts...)
+	if review.DirectlyAnswer {
+		requestDirectAnswerAfterToolReview(loop, invoker, operator)
+		return
+	}
+	if async, _ := loop.GetActionExecutionValue(action, actionStateDirectToolAsync).(bool); async {
+		submitReviewedAsyncDirectTool(loop, review, operator)
+		return
+	}
+	result, directly, err := invoker.ExecuteReviewedToolCall(ctx, review)
 	recordSuccessfulToolCache(loop, name, result, err)
 	handleToolCallResult(loop, ctx, invoker, name, result, directly, err, operator)
 }

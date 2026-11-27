@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -22,16 +24,24 @@ type asyncActionTestInvoker struct {
 	action       *aicommon.Action
 	scalarStates []any
 	groups       []*aicommon.ToolCallGroupRequest
+
+	reviewStarted       chan struct{}
+	reviewRelease       <-chan struct{}
+	prepareReviewedCall atomic.Int32
+	executeCall         atomic.Int32
 }
 
-func (i *asyncActionTestInvoker) DirectlyCallTool(ctx context.Context, name string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc) (*aitool.ToolResult, bool, error) {
-	return i.directlyCallTestInvoker.DirectlyCallTool(ctx, name, action, func(a *aicommon.Action, name string) (aitool.InvokeParams, bool, *aitool.Tool, error) {
-		params, fallback, tool, err := prepare(a, name)
-		if err == nil && !fallback {
-			i.scalarStates = append(i.scalarStates, i.loop.GetActionExecutionValue(a, actionStateDirectToolAsync))
+func (i *asyncActionTestInvoker) ReviewDirectToolCall(ctx context.Context, name string, action *aicommon.Action, prepare aicommon.DirectlyCallPrepareFunc, opts ...aicommon.ToolCallerOption) (*aicommon.ToolCallReviewResult, error) {
+	i.scalarStates = append(i.scalarStates, i.loop.GetActionExecutionValue(action, actionStateDirectToolAsync))
+	if i.reviewStarted != nil {
+		close(i.reviewStarted)
+		select {
+		case <-i.reviewRelease:
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-		return params, fallback, tool, err
-	})
+	}
+	return i.directlyCallTestInvoker.ReviewDirectToolCall(ctx, name, action, prepare, opts...)
 }
 
 func (i *asyncActionTestInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, name string, params aitool.InvokeParams, options ...aicommon.ToolCallerOption) (*aitool.ToolResult, bool, error) {
@@ -47,6 +57,21 @@ func (i *asyncActionTestInvoker) PrepareAsyncToolCall(task aicommon.AIStatefulTa
 			return asyncexecmanager.Observation{}, nil
 		})
 	return resource, func() {}, err
+}
+
+func (i *asyncActionTestInvoker) PrepareReviewedAsyncToolCall(task aicommon.AIStatefulTask, review *aicommon.ToolCallReviewResult) (asyncexecmanager.Resource, func(), error) {
+	i.prepareReviewedCall.Add(1)
+	i.withoutRequiredName, i.withoutRequiredParams = review.Tool.Name, review.Params
+	resource, err := asyncexecmanager.NewResource(func(context.Context) error { return nil },
+		func(context.Context) (asyncexecmanager.Observation, error) {
+			return asyncexecmanager.Observation{}, nil
+		})
+	return resource, func() {}, err
+}
+
+func (i *asyncActionTestInvoker) ExecuteReviewedToolCall(ctx context.Context, review *aicommon.ToolCallReviewResult) (*aitool.ToolResult, bool, error) {
+	i.executeCall.Add(1)
+	return i.directlyCallTestInvoker.ExecuteReviewedToolCall(ctx, review)
 }
 
 func (i *asyncActionTestInvoker) ExecuteToolCallGroup(ctx context.Context, task aicommon.AIStatefulTask, request *aicommon.ToolCallGroupRequest) (*aicommon.ToolCallGroupResult, error) {
@@ -152,6 +177,52 @@ func TestDirectToolAsyncScalarActionInputs(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestDirectToolAsyncBlocksManagerSubmissionUntilReviewFinishes(t *testing.T) {
+	for _, handler := range []*reactloops.LoopAction{loopAction_directlyCallTool, nativeDirectToolAction} {
+		mode := "legacy"
+		if handler == nativeDirectToolAction {
+			mode = "native"
+		}
+		t.Run(mode, func(t *testing.T) {
+			loop, invoker, task := newAsyncActionTestLoop(t)
+			action := parseToolBatchPromptExample(t, asyncActionPayload(t, map[string]any{
+				"directly_call_tool_name":   "async_fixture",
+				"directly_call_tool_params": map[string]any{"file": "/review"},
+				actionStateDirectToolAsync:  true,
+			}, false), schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+			invoker.action = action
+			require.NoError(t, handler.ActionVerifier(loop, action))
+
+			reviewStarted := make(chan struct{})
+			reviewRelease := make(chan struct{})
+			invoker.reviewStarted = reviewStarted
+			invoker.reviewRelease = reviewRelease
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				handler.ActionHandler(loop, action, reactloops.NewActionHandlerOperator(task))
+			}()
+
+			select {
+			case <-reviewStarted:
+			case <-time.After(3 * time.Second):
+				t.Fatal("handler did not enter blocking review")
+			}
+			require.Zero(t, invoker.prepareReviewedCall.Load(), "Manager submission must wait for approval")
+			require.Zero(t, invoker.executeCall.Load(), "tool execution must wait for approval")
+
+			close(reviewRelease)
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				t.Fatal("handler did not continue after approval")
+			}
+			require.EqualValues(t, 1, invoker.prepareReviewedCall.Load())
+			require.Zero(t, invoker.executeCall.Load(), "an approved async call belongs to the Manager")
+		})
 	}
 }
 
