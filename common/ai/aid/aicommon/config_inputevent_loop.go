@@ -103,10 +103,8 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 					}
 
 					if event.IsConfigHotpatch {
-						hotPatchOptions := c.ProcessHotPatchMessage(event)
-						c.PersistSessionStartParamsFromHotpatch(event)
-						for _, option := range hotPatchOptions {
-							c.HotPatchOptionChan.SafeFeed(option)
+						if err := c.DispatchHotPatch(event); err != nil {
+							log.Errorf("dispatch config hotpatch failed: %v", err)
 						}
 						continue
 					}

@@ -429,6 +429,12 @@ const (
 	AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE AIGoalTimeAction = 3
 	// Keep the goal time-window gate open indefinitely.
 	AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING AIGoalTimeAction = 4
+	// Start a fresh window of DurationSeconds from now, replacing whatever the
+	// current window was. This is the only action that moves a disabled or
+	// never-ending window back to a finite one; SET_DEADLINE cannot express that
+	// intent without also rewriting the duration. DurationSeconds must be
+	// positive; use DISABLE or NEVER_ENDING for those two states.
+	AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DURATION AIGoalTimeAction = 5
 )
 
 // Enum value maps for AIGoalTimeAction.
@@ -439,6 +445,7 @@ var (
 		2: "AI_GOAL_TIME_ACTION_SET_DEADLINE",
 		3: "AI_GOAL_TIME_ACTION_DISABLE",
 		4: "AI_GOAL_TIME_ACTION_NEVER_ENDING",
+		5: "AI_GOAL_TIME_ACTION_SET_DURATION",
 	}
 	AIGoalTimeAction_value = map[string]int32{
 		"AI_GOAL_TIME_ACTION_UNSPECIFIED":  0,
@@ -446,6 +453,7 @@ var (
 		"AI_GOAL_TIME_ACTION_SET_DEADLINE": 2,
 		"AI_GOAL_TIME_ACTION_DISABLE":      3,
 		"AI_GOAL_TIME_ACTION_NEVER_ENDING": 4,
+		"AI_GOAL_TIME_ACTION_SET_DURATION": 5,
 	}
 )
 
@@ -11565,12 +11573,13 @@ type AIExecutionStrategy struct {
 	// 为 true 时启用 Goal 模式：在达到 GoalMinIterations 之前禁止 finish 提前退出，
 	// 避免“做一点就汇报然后结束”。
 	EnableGoalMode bool `protobuf:"varint,2,opt,name=EnableGoalMode,proto3" json:"EnableGoalMode,omitempty"`
-	// Goal 模式下允许 finish 的最小迭代次数。<=0 时由服务端使用默认值。
+	// Goal 模式下允许 finish 的最小迭代次数。0 关闭迭代门禁；不能为负数。
+	// Strategy 一旦传入即完整替换旧策略，0/false/空字符串用于清除旧模式配置。
 	GoalMinIterations int64 `protobuf:"varint,3,opt,name=GoalMinIterations,proto3" json:"GoalMinIterations,omitempty"`
 	// Multi 模式下子 Agent 最大并发数（同时运行数量）。
 	// <=0 时由服务端使用默认值 5；超过 AbsoluteMaxSubAgentConcurrency(20) 时由服务端钳制。
 	MaxSubAgents int64 `protobuf:"varint,4,opt,name=MaxSubAgents,proto3" json:"MaxSubAgents,omitempty"`
-	// Goal 模式时间窗口（秒）。>0 时在时间窗口内无条件拒绝 finish；-1 表示永不自动放行。
+	// Goal 模式时间窗口（秒）。>0 时从配置生效立即计时，到期前拒绝 finish；-1 表示永不自动放行。
 	// 0 或省略表示不启用时间窗口 gate，仅依赖迭代数和验收条件。
 	// 该字段是声明式配置；运行时延长或缩短当前 deadline 请使用 AIInputEvent.GoalTimePatch。
 	GoalDurationSeconds int64 `protobuf:"varint,5,opt,name=GoalDurationSeconds,proto3" json:"GoalDurationSeconds,omitempty"`
@@ -81014,9 +81023,12 @@ type AIGoalTimePatch struct {
 	// Signed extension in seconds for AI_GOAL_TIME_ACTION_EXTEND.
 	ExtendSeconds int64 `protobuf:"varint,2,opt,name=ExtendSeconds,proto3" json:"ExtendSeconds,omitempty"`
 	// Absolute Unix timestamp for AI_GOAL_TIME_ACTION_SET_DEADLINE.
-	DeadlineUnix  int64 `protobuf:"varint,3,opt,name=DeadlineUnix,proto3" json:"DeadlineUnix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DeadlineUnix int64 `protobuf:"varint,3,opt,name=DeadlineUnix,proto3" json:"DeadlineUnix,omitempty"`
+	// Window length in seconds for AI_GOAL_TIME_ACTION_SET_DURATION.
+	// Must be positive; -1 and 0 have dedicated actions.
+	DurationSeconds int64 `protobuf:"varint,4,opt,name=DurationSeconds,proto3" json:"DurationSeconds,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AIGoalTimePatch) Reset() {
@@ -81066,6 +81078,13 @@ func (x *AIGoalTimePatch) GetExtendSeconds() int64 {
 func (x *AIGoalTimePatch) GetDeadlineUnix() int64 {
 	if x != nil {
 		return x.DeadlineUnix
+	}
+	return 0
+}
+
+func (x *AIGoalTimePatch) GetDurationSeconds() int64 {
+	if x != nil {
+		return x.DurationSeconds
 	}
 	return 0
 }
@@ -90432,11 +90451,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12*\n" +
 	"\x04Data\x18\x02 \x03(\v2\x16.ypb.KnowledgeBaseInfoR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x8a\x01\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xb4\x01\n" +
 	"\x0fAIGoalTimePatch\x12-\n" +
 	"\x06Action\x18\x01 \x01(\x0e2\x15.ypb.AIGoalTimeActionR\x06Action\x12$\n" +
 	"\rExtendSeconds\x18\x02 \x01(\x03R\rExtendSeconds\x12\"\n" +
-	"\fDeadlineUnix\x18\x03 \x01(\x03R\fDeadlineUnix\"i\n" +
+	"\fDeadlineUnix\x18\x03 \x01(\x03R\fDeadlineUnix\x12(\n" +
+	"\x0fDurationSeconds\x18\x04 \x01(\x03R\x0fDurationSeconds\"i\n" +
 	"\x17ProbeModelVisionRequest\x128\n" +
 	"\x06Config\x18\x01 \x01(\v2 .ypb.ThirdPartyApplicationConfigR\x06Config\x12\x14\n" +
 	"\x05Model\x18\x02 \x01(\tR\x05Model\"\xa8\x02\n" +
@@ -90705,13 +90725,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"&HTTP_FLOW_LIVE_GAP_REASON_CURSOR_AHEAD\x10\x05\x122\n" +
 	".HTTP_FLOW_LIVE_GAP_REASON_UNSUPPORTED_PROTOCOL\x10\x06\x120\n" +
 	",HTTP_FLOW_LIVE_GAP_REASON_UNSUPPORTED_FILTER\x10\a\x12-\n" +
-	")HTTP_FLOW_LIVE_GAP_REASON_PROJECT_EVICTED\x10\b*\xc4\x01\n" +
+	")HTTP_FLOW_LIVE_GAP_REASON_PROJECT_EVICTED\x10\b*\xea\x01\n" +
 	"\x10AIGoalTimeAction\x12#\n" +
 	"\x1fAI_GOAL_TIME_ACTION_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aAI_GOAL_TIME_ACTION_EXTEND\x10\x01\x12$\n" +
 	" AI_GOAL_TIME_ACTION_SET_DEADLINE\x10\x02\x12\x1f\n" +
 	"\x1bAI_GOAL_TIME_ACTION_DISABLE\x10\x03\x12$\n" +
-	" AI_GOAL_TIME_ACTION_NEVER_ENDING\x10\x042˚\x03\n" +
+	" AI_GOAL_TIME_ACTION_NEVER_ENDING\x10\x04\x12$\n" +
+	" AI_GOAL_TIME_ACTION_SET_DURATION\x10\x052˚\x03\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +

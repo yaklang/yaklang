@@ -14,7 +14,6 @@ const SYNC_TYPE_AGENT_POLICY_SNAPSHOT = "agent_policy_snapshot_sync"
 
 const (
 	GoalTimeLimitModeDisabled    = "disabled"
-	GoalTimeLimitModeNotStarted  = "not_started"
 	GoalTimeLimitModeDeadline    = "deadline"
 	GoalTimeLimitModeNeverEnding = "never_ending"
 )
@@ -33,7 +32,7 @@ type AgentGoalPolicySnapshot struct {
 	Enabled            bool                       `json:"enabled"`
 	Effective          bool                       `json:"effective"`
 	MinIterations      int64                      `json:"min_iterations"`
-	AcceptanceCriteria string                     `json:"acceptance_criteria,omitempty"`
+	AcceptanceCriteria string                     `json:"acceptance_criteria"`
 	TimeLimit          AgentGoalTimeLimitSnapshot `json:"time_limit"`
 }
 
@@ -74,16 +73,21 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 	defer c.m.Unlock()
 
 	c.agentPolicyRevision++
+	// Enabled reports whether the time gate is actually in force, so it follows
+	// the runtime deadline: a goal that only configures iterations or acceptance
+	// criteria never opens a window and must never report enabled, and a window
+	// that has not started yet or was disabled by a GoalTimePatch is not enabled
+	// either. ConfiguredDurationSeconds still tells clients what the user asked
+	// for.
+	goalDeadline := c.GoalDeadline
 	goalTimeMode := GoalTimeLimitModeDisabled
 	goalDeadlineAt := int64(0)
 	switch {
-	case c.GoalDurationSeconds == -1:
+	case isGoalNeverEndingDeadline(goalDeadline):
 		goalTimeMode = GoalTimeLimitModeNeverEnding
-	case c.GoalDurationSeconds > 0 && c.GoalDeadline.IsZero():
-		goalTimeMode = GoalTimeLimitModeNotStarted
-	case c.GoalDurationSeconds > 0:
+	case !goalDeadline.IsZero():
 		goalTimeMode = GoalTimeLimitModeDeadline
-		goalDeadlineAt = c.GoalDeadline.Unix()
+		goalDeadlineAt = goalDeadline.Unix()
 	}
 
 	return &AgentPolicySnapshot{
@@ -97,7 +101,7 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 			MinIterations:      NormalizeGoalMinIterations(c.GoalMinIterations),
 			AcceptanceCriteria: c.GoalAcceptanceCriteria,
 			TimeLimit: AgentGoalTimeLimitSnapshot{
-				Enabled:                   c.GoalDurationSeconds != 0,
+				Enabled:                   !goalDeadline.IsZero(),
 				Mode:                      goalTimeMode,
 				DeadlineAt:                goalDeadlineAt,
 				ConfiguredDurationSeconds: c.GoalDurationSeconds,

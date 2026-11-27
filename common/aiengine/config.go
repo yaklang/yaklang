@@ -38,7 +38,7 @@ type AIEngineConfig struct {
 	SessionID              string // 会话 ID，用于持久化
 	AllowSyncInitContext   bool   // 允许首轮同步增强上下文，默认 false
 	EnableGoalMode         bool   // 启用目标模式
-	GoalMinIterations      int64  // 目标模式允许 finish 前的最少迭代数；<=0 使用底层默认值
+	GoalMinIterations      int64  // 目标模式允许 finish 前的最少迭代数；0 关闭迭代门禁
 	GoalDurationSeconds    int64  // 目标模式时间窗口（秒）；-1 表示永不自动结束，0 表示禁用时间 gate
 	GoalAcceptanceCriteria string // 目标模式验收条件；非空时 finish 前由 AI 检查
 
@@ -279,7 +279,7 @@ func WithEnableGoalMode(enable bool) AIEngineConfigOption {
 }
 
 // WithGoalMinIterations 设置目标模式允许 finish 前的最少迭代数
-// （导出名为 aim.goalMinIterations）。<=0 时使用底层默认值。
+// （导出名为 aim.goalMinIterations）。0 关闭迭代门禁，不能为负数。
 func WithGoalMinIterations(iterations int64) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.GoalMinIterations = iterations
@@ -287,7 +287,7 @@ func WithGoalMinIterations(iterations int64) AIEngineConfigOption {
 }
 
 // WithGoalDurationSeconds 设置目标模式时间窗口（导出名为
-// aim.goalDurationSeconds）。>0 时在指定秒数内拒绝 finish；-1 表示永不自动
+// aim.goalDurationSeconds）。>0 时从配置生效立即计时，指定秒数内拒绝 finish；-1 表示永不自动
 // 结束；0 表示不启用时间 gate。
 //
 // Example:

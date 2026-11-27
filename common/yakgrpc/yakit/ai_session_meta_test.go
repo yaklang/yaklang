@@ -371,7 +371,7 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 	require.Equal(t, int64(3), next.GetUserInteractLimit())
 	require.True(t, next.GetEnablePlan())
 	strategy := next.GetStrategy()
-	require.True(t, strategy.GetEnableMultiAgent())
+	require.False(t, strategy.GetEnableMultiAgent(), "explicit Strategy replaces cached false/zero fields too")
 	require.True(t, strategy.GetEnableGoalMode())
 	require.Equal(t, int64(8), strategy.GetGoalMinIterations())
 	require.Equal(t, int64(4), strategy.GetMaxSubAgents())
@@ -381,6 +381,29 @@ func TestOverlayAISessionStartParams(t *testing.T) {
 	require.True(t, next.GetDisableAISearchForge())
 	require.Equal(t, "cached", next.GetUserPresetPrompt())
 	require.Equal(t, "sess-1", next.GetTimelineSessionID())
+}
+
+func TestOverlayAISessionStartParamsStrategyClearsInactiveGoalModes(t *testing.T) {
+	base := &ypb.AIStartParams{Strategy: &ypb.AIExecutionStrategy{
+		EnableGoalMode: true, EnableMultiAgent: true, GoalMinIterations: 12,
+		GoalDurationSeconds: 10800, GoalAcceptanceCriteria: "old criteria",
+	}}
+	for _, strategy := range []*ypb.AIExecutionStrategy{
+		nil,
+		{},
+		{EnableGoalMode: true, GoalDurationSeconds: 60},
+		{EnableGoalMode: true, GoalAcceptanceCriteria: "new criteria"},
+		{EnableGoalMode: true, GoalMinIterations: 5},
+	} {
+		next := OverlayAISessionStartParams(base, &ypb.AIStartParams{Strategy: strategy})
+		want := strategy
+		if want == nil {
+			want = base.Strategy
+		}
+		require.Equal(t, want, next.Strategy)
+		require.NotSame(t, want, next.Strategy)
+	}
+	require.EqualValues(t, 10800, base.Strategy.GoalDurationSeconds, "overlay must not mutate saved input")
 }
 
 func TestMigrateAISessionMetaFromEvents(t *testing.T) {

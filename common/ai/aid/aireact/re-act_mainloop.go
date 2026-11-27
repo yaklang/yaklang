@@ -150,6 +150,11 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	restoreExecutionPolicy := r.applyTaskExecutionPolicy(task)
 	defer restoreExecutionPolicy()
 
+	// A new top-level task owns its own goal time window: restart the window
+	// from GoalDurationSeconds so a previous task's deadline never leaks into
+	// this one. Sub-agents and recovery tasks stay outside goal mode.
+	r.refreshGoalTimeForTask(task)
+
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
 		r.SaveTimeline()
@@ -198,6 +203,24 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	skipStatusFallback.SetTo(skipStatus)
 	if !skipStatus {
 		r.completeUserTaskMemory(task)
+	}
+}
+
+// refreshGoalTimeForTask restarts the goal time window when a top-level task
+// starts executing. Goal time is task-scoped runtime state: the declared window
+// length lives in Config, but the deadline must belong to the task that is
+// running now. Sub-agents and recovery tasks never enter goal mode, so they
+// must not create or move a window.
+func (r *ReAct) refreshGoalTimeForTask(task aicommon.AIStatefulTask) {
+	if r == nil || r.config == nil || task == nil {
+		return
+	}
+	if task.IsSubAgent() || task.GetTaskKind() == aicommon.AITaskKind_Recovery {
+		return
+	}
+	if r.config.RefreshGoalDeadlineForTask() && r.config.DebugEvent {
+		log.Infof("goal time window restarted for task %s: duration=%ds deadline=%v",
+			task.GetId(), r.config.GetGoalDurationSeconds(), r.config.GetGoalDeadline())
 	}
 }
 

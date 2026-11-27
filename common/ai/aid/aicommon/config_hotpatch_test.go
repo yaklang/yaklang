@@ -33,7 +33,7 @@ func newHotPatchTestConfig(t *testing.T, ctx context.Context, opts ...ConfigOpti
 		c.EventInputChan.SafeFeed(event)
 		expectedEvents := optionCount
 		if hotpatchAffectsAgentPolicy(event.HotpatchType) {
-			expectedEvents++
+			expectedEvents = 1 // local policy emits only the final configuration
 		}
 		for i := 0; i < expectedEvents; i++ {
 			select {
@@ -332,14 +332,13 @@ func TestHotPatch_ExecutionStrategy_WithDurationAndCriteria(t *testing.T) {
 	require.Equal(t, int64(3600), c.GetGoalDurationSeconds())
 	require.Equal(t, "must produce at least 3 vulnerability findings with evidence", c.GetGoalAcceptanceCriteria())
 
-	// Deadline should not be started yet (lazy start)
-	require.True(t, c.GetGoalDeadline().IsZero(), "deadline should be lazily started")
-
-	// Start deadline and check it's in the future
-	c.StartGoalDeadline()
+	// A duration-only strategy declares the window length; the window itself is
+	// opened by the task that runs with it.
+	require.True(t, c.GetGoalDeadline().IsZero(),
+		"applying a strategy must not open a window by itself")
+	require.True(t, c.RefreshGoalDeadlineForTask())
 	deadline := c.GetGoalDeadline()
-	require.False(t, deadline.IsZero())
-	require.True(t, deadline.After(time.Now()))
+	require.WithinDuration(t, time.Now().Add(time.Hour), deadline, 2*time.Second)
 	require.False(t, c.IsGoalDeadlinePassed())
 
 	reloadStartedAt := time.Now()
@@ -359,8 +358,11 @@ func TestHotPatch_ExecutionStrategy_WithDurationAndCriteria(t *testing.T) {
 	}, 6)
 
 	require.Equal(t, int64(60), c.GetGoalDurationSeconds())
+	require.Equal(t, deadline, c.GetGoalDeadline(),
+		"a strategy reload declares the next window; it must not re-time the running one")
+	require.True(t, c.RefreshGoalDeadlineForTask())
 	reloadedDeadline := c.GetGoalDeadline()
-	require.True(t, reloadedDeadline.Before(deadline), "hot reload must replace the active deadline")
+	require.True(t, reloadedDeadline.Before(deadline), "the next task start applies the new window")
 	require.WithinDuration(t, reloadStartedAt.Add(time.Minute), reloadedDeadline, 2*time.Second)
 
 	feed(&ypb.AIInputEvent{
@@ -394,16 +396,26 @@ func TestHotPatch_ExecutionStrategy_WithDurationAndCriteria(t *testing.T) {
 	require.True(t, c.GetGoalDeadline().IsZero(), "disabling the time window must clear its deadline")
 }
 
-func TestGoalDurationHotReload_PreservesLazyDeadlineUntilStarted(t *testing.T) {
+func TestGoalDurationHotReloadDefersWindowToTaskStart(t *testing.T) {
 	c := NewTestConfig(context.Background())
 	require.NoError(t, WithGoalDurationSeconds(3600)(c))
-	require.NoError(t, WithGoalDurationSeconds(60)(c))
-	require.True(t, c.GetGoalDeadline().IsZero(),
-		"changing duration before the first finish attempt must not start the deadline")
+	require.True(t, c.GetGoalDeadline().IsZero(), "declaring a duration must not open a window")
 
-	c.StartGoalDeadline()
+	require.True(t, c.RefreshGoalDeadlineForTask())
+	require.WithinDuration(t, time.Now().Add(time.Hour), c.GetGoalDeadline(), time.Second)
+
+	require.NoError(t, WithGoalDurationSeconds(60)(c))
 	require.EqualValues(t, 60, c.GetGoalDurationSeconds())
-	require.False(t, c.GetGoalDeadline().IsZero())
+	require.WithinDuration(t, time.Now().Add(time.Hour), c.GetGoalDeadline(), time.Second,
+		"a declared change must not re-time the running window")
+
+	require.True(t, c.RefreshGoalDeadlineForTask())
+	deadline := c.GetGoalDeadline()
+	require.WithinDuration(t, time.Now().Add(time.Minute), deadline, time.Second)
+
+	require.NoError(t, WithGoalDurationSeconds(60)(c))
+	require.Equal(t, deadline, c.GetGoalDeadline(), "repeating the same duration must not extend the window")
+	require.EqualValues(t, 60, c.GetGoalDurationSeconds())
 }
 
 func TestHotPatch_GoalTimeAppliesEveryReceivedCommand(t *testing.T) {
@@ -481,7 +493,10 @@ func TestHotPatch_ExecutionStrategyEmitsOneCoherentPolicySnapshot(t *testing.T) 
 		require.True(t, snapshot.Goal.Enabled)
 		require.EqualValues(t, 11, snapshot.Goal.MinIterations)
 		require.Equal(t, "evidence required", snapshot.Goal.AcceptanceCriteria)
-		require.Equal(t, GoalTimeLimitModeNotStarted, snapshot.Goal.TimeLimit.Mode)
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode,
+			"one strategy hotpatch declares the window; it must not open one")
+		require.EqualValues(t, 120, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
 		require.True(t, snapshot.MultiAgent.Enabled)
 		require.True(t, snapshot.MultiAgent.PreferDispatch)
 		require.EqualValues(t, 6, snapshot.MultiAgent.MaxConcurrency)
@@ -495,17 +510,192 @@ func TestHotPatch_ExecutionStrategyEmitsOneCoherentPolicySnapshot(t *testing.T) 
 	}
 }
 
+func TestHotPatch_ExecutionStrategyWithoutGoalTimePatchDefersDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	policyEvents := make(chan *schema.AiOutputEvent, 4)
+	c := NewTestConfig(ctx, WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event != nil && event.Type == schema.EVENT_TYPE_AGENT_POLICY_SNAPSHOT && event.NodeId == AgentPolicySnapshotNodeID {
+			policyEvents <- event
+		}
+	}))
+	t.Cleanup(func() {
+		cancel()
+		c.WaitHotPatchLoopStopped()
+	})
+	c.StartEventLoop(ctx)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableGoalMode:      true,
+				GoalMinIterations:   1,
+				GoalDurationSeconds: 7200,
+			},
+		},
+	})
+
+	select {
+	case event := <-policyEvents:
+		var snapshot AgentPolicySnapshot
+		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
+		require.True(t, snapshot.Goal.Enabled)
+		require.True(t, snapshot.Goal.Effective)
+		require.EqualValues(t, 1, snapshot.Goal.MinIterations)
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode,
+			"no task has started, so no window is open")
+		require.EqualValues(t, 7200, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
+	case <-ctx.Done():
+		t.Fatal("agent policy snapshot was not emitted")
+	}
+	require.True(t, c.GetGoalDeadline().IsZero(),
+		"only a task start may open the window")
+	require.True(t, c.RefreshGoalDeadlineForTask())
+	require.WithinDuration(t, time.Now().Add(2*time.Hour), c.GetGoalDeadline(), 2*time.Second)
+	select {
+	case <-policyEvents:
+		t.Fatal("one strategy hotpatch must emit exactly one policy snapshot")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestHotPatch_ExecutionStrategyAppliesGoalTimePatchInOneDispatch(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	policyEvents := make(chan *schema.AiOutputEvent, 4)
+	c := NewTestConfig(ctx, WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event != nil && event.Type == schema.EVENT_TYPE_AGENT_POLICY_SNAPSHOT && event.NodeId == AgentPolicySnapshotNodeID {
+			policyEvents <- event
+		}
+	}))
+	t.Cleanup(func() {
+		cancel()
+		c.WaitHotPatchLoopStopped()
+	})
+	c.StartEventLoop(ctx)
+	propagated := c.HotPatchBroadcaster.Subscribe()
+	t.Cleanup(func() {
+		c.HotPatchBroadcaster.Unsubscribe(propagated)
+	})
+
+	deadline := time.Now().Add(30 * time.Minute).Unix()
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableGoalMode:      true,
+				GoalMinIterations:   1,
+				GoalDurationSeconds: 1800,
+			},
+		},
+		GoalTimePatch: &ypb.AIGoalTimePatch{
+			Action:       ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE,
+			DeadlineUnix: deadline,
+		},
+	})
+
+	select {
+	case event := <-policyEvents:
+		var snapshot AgentPolicySnapshot
+		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
+		require.True(t, snapshot.Goal.Enabled)
+		require.EqualValues(t, 1, snapshot.Goal.MinIterations)
+		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
+		require.Equal(t, deadline, snapshot.Goal.TimeLimit.DeadlineAt)
+		require.EqualValues(t, 1800, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+	case <-ctx.Done():
+		t.Fatal("policy snapshot was not emitted")
+	}
+
+	require.True(t, c.GetEnableGoalMode())
+	require.Equal(t, deadline, c.GetGoalDeadline().Unix())
+	select {
+	case <-policyEvents:
+		t.Fatal("one combined policy dispatch must emit exactly one policy snapshot")
+	case <-time.After(100 * time.Millisecond):
+	}
+	select {
+	case <-propagated.OutputChannel():
+		t.Fatal("agent policy hotpatch must not be propagated to nested runtimes")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestHotPatch_ExecutionStrategySyncSeesCombinedPolicyState(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	const syncID = "strategy-goal-time-sync"
+	syncEvents := make(chan *schema.AiOutputEvent, 4)
+	c := NewTestConfig(ctx, WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event != nil && event.IsSync && event.SyncID == syncID &&
+			event.Type == schema.EVENT_TYPE_AGENT_POLICY_SNAPSHOT &&
+			event.NodeId == AgentPolicySnapshotNodeID {
+			syncEvents <- event
+		}
+	}))
+	t.Cleanup(func() {
+		cancel()
+		c.WaitHotPatchLoopStopped()
+	})
+	c.StartEventLoop(ctx)
+
+	deadline := time.Now().Add(2 * time.Hour).Unix()
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_ExecutionStrategy,
+		Params: &ypb.AIStartParams{
+			Strategy: &ypb.AIExecutionStrategy{
+				EnableGoalMode:      true,
+				GoalMinIterations:   1,
+				GoalDurationSeconds: 7200,
+			},
+		},
+		GoalTimePatch: &ypb.AIGoalTimePatch{
+			Action:       ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE,
+			DeadlineUnix: deadline,
+		},
+	})
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      SYNC_TYPE_AGENT_POLICY_SNAPSHOT,
+		SyncID:        syncID,
+	})
+
+	select {
+	case event := <-syncEvents:
+		var snapshot AgentPolicySnapshot
+		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
+		require.True(t, snapshot.Goal.Enabled)
+		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
+		require.Equal(t, deadline, snapshot.Goal.TimeLimit.DeadlineAt)
+	case <-ctx.Done():
+		t.Fatal("agent policy sync response was not emitted")
+	}
+}
+
 func TestGoalTimePatch_SupportsExplicitActionsWithoutOneof(t *testing.T) {
 	c := NewTestConfig(context.Background())
 	require.NoError(t, WithGoalDurationSeconds(120)(c))
+	// No task has started yet, so EXTEND has to reopen the window from the
+	// declared length plus the requested extension.
+	require.True(t, c.GetGoalDeadline().IsZero())
+	extendStartedAt := time.Now()
 
 	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
 		Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
 		ExtendSeconds: 60,
 	})(c))
 	state := c.GetGoalTimeState()
-	require.EqualValues(t, 180, state.DurationSeconds)
-	require.False(t, state.Started, "extending an unstarted window must remain lazy")
+	require.EqualValues(t, 120, state.DurationSeconds)
+	require.True(t, state.Started)
+	require.WithinDuration(t, extendStartedAt.Add(180*time.Second), c.GetGoalDeadline(), 2*time.Second)
 
 	target := time.Now().Add(5 * time.Minute).Unix()
 	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
@@ -520,16 +710,18 @@ func TestGoalTimePatch_SupportsExplicitActionsWithoutOneof(t *testing.T) {
 		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE,
 	})(c))
 	state = c.GetGoalTimeState()
-	require.Zero(t, state.DurationSeconds)
 	require.False(t, state.Started)
+	require.True(t, c.GetGoalDeadline().IsZero())
+	require.EqualValues(t, 120, c.GetGoalDurationSeconds(), "a runtime command must not rewrite declared config")
 
 	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
 		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING,
 	})(c))
 	state = c.GetGoalTimeState()
-	require.EqualValues(t, -1, state.DurationSeconds)
-	require.True(t, state.NeverEnding)
 	require.True(t, state.Started)
+	require.False(t, c.IsGoalDeadlinePassed())
+	require.GreaterOrEqual(t, c.GetGoalDeadline().UTC().Year(), 9999)
+	require.EqualValues(t, 120, c.GetGoalDurationSeconds(), "a runtime command must not rewrite declared config")
 }
 
 func TestGoalTimePatch_ExtendingExpiredDeadlineReopensFromNow(t *testing.T) {
@@ -558,8 +750,8 @@ func TestGoalTimePatch_SetDeadlineEnablesDisabledWindow(t *testing.T) {
 	})(c))
 	state := c.GetGoalTimeState()
 	require.True(t, state.Started)
-	require.Greater(t, state.DurationSeconds, int64(0))
 	require.Equal(t, target.Unix(), state.DeadlineUnix)
+	require.Zero(t, c.GetGoalDurationSeconds(), "SET_DEADLINE must not invent a declared duration")
 }
 
 func TestGoalTimePatch_RejectsInvalidMutations(t *testing.T) {

@@ -386,15 +386,21 @@ type Config struct {
 	verificationWatchdogToolBlockingEnd   func()
 
 	// iteration limit
-	MaxIterationCount        int64
-	EnableGoalMode           bool
-	GoalMinIterations        int64
-	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
-	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables one main-model review turn
-	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
+	MaxIterationCount      int64
+	EnableGoalMode         bool
+	GoalMinIterations      int64
+	GoalDurationSeconds    int64  // Declared goal window length in seconds; -1 = never auto-finish, 0 = disabled
+	GoalAcceptanceCriteria string // Goal mode acceptance criteria; non-empty enables one main-model review turn
+	// GoalDeadline is the runtime state of the current task's goal window:
+	// zero means the time gate is closed, the far-future sentinel from
+	// computeGoalDeadline(-1) means never ending, anything else is a finite
+	// deadline. GoalTimePatch may read GoalDurationSeconds but only ever writes
+	// this field, so a runtime command can never rewrite declared config.
+	GoalDeadline             time.Time
 	goalTimeRevision         uint64
 	agentPolicyRevision      uint64
 	agentPolicyEmitHandler   func()
+	agentPolicyHotpatchMu    sync.Mutex
 	DisableIncreaseIteration bool
 
 	// task config
@@ -2626,13 +2632,12 @@ func WithEnableGoalMode(enable bool) ConfigOption {
 	}
 }
 
+// WithGoalMinIterations sets the iteration gate; zero explicitly disables it.
+// Config construction supplies the default when this option is not provided.
 func WithGoalMinIterations(n int64) ConfigOption {
 	return func(c *Config) error {
 		if n < 0 {
 			return utils.Error("goal min iterations must be >= 0")
-		}
-		if n == 0 {
-			n = DefaultGoalMinIterations
 		}
 		if c.m == nil {
 			c.m = &sync.Mutex{}
@@ -2645,14 +2650,24 @@ func WithGoalMinIterations(n int64) ConfigOption {
 }
 
 // WithGoalDurationSeconds sets the goal-mode time window in seconds.
-// >0: finish is unconditionally rejected until the deadline passes.
+// >0: start counting now; finish is rejected until the deadline passes.
 // -1: finish is never auto-accepted (never-ending mode).
 // 0: time window gate is disabled (default).
 func WithGoalDurationSeconds(seconds int64) ConfigOption {
 	return func(c *Config) error {
+		if err := validateGoalDurationSeconds(seconds); err != nil {
+			return err
+		}
 		c.setGoalDurationSeconds(seconds)
 		return nil
 	}
+}
+
+func validateGoalDurationSeconds(seconds int64) error {
+	if seconds < -1 || seconds > int64((1<<63-1)/time.Second) {
+		return utils.Error("goal duration must be -1, 0, or a representable positive duration")
+	}
+	return nil
 }
 
 // WithGoalAcceptanceCriteria sets the goal-mode acceptance criteria.

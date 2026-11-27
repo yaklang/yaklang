@@ -74,8 +74,11 @@ func TestEmitAgentPolicySnapshot_UsesDedicatedStructuredEvent(t *testing.T) {
 		require.False(t, event.ShouldSave(), "runtime policy snapshots are replaceable state and must not be persisted")
 		var snapshot AgentPolicySnapshot
 		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
-		require.Equal(t, GoalTimeLimitModeNotStarted, snapshot.Goal.TimeLimit.Mode)
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode,
+			"a declared duration alone leaves the window closed")
+		require.False(t, snapshot.Goal.TimeLimit.Enabled)
 		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
+		require.EqualValues(t, 60, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 	case <-time.After(time.Second):
 		t.Fatal("agent policy snapshot event was not emitted")
 	}
@@ -99,27 +102,27 @@ func TestHandleSyncAgentPolicySnapshotEvent(t *testing.T) {
 	}
 }
 
-func TestStartGoalDeadlineNotifiesAgentPolicySnapshot(t *testing.T) {
+func TestSettingGoalDurationNotifiesAgentPolicySnapshot(t *testing.T) {
 	events := make(chan *schema.AiOutputEvent, 4)
 	cfg := NewTestConfig(context.Background(),
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			events <- event
 		}),
 		WithEnableGoalMode(true),
-		WithGoalDurationSeconds(60),
 	)
 	cfg.SetAgentPolicySnapshotEmitHandler(func() {
 		cfg.EmitAgentPolicySnapshot()
 	})
-	cfg.StartGoalDeadline()
+	require.NoError(t, WithGoalDurationSeconds(60)(cfg))
 
 	select {
 	case event := <-events:
 		var snapshot AgentPolicySnapshot
 		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
-		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-		require.Greater(t, snapshot.Goal.TimeLimit.DeadlineAt, snapshot.ServerTime)
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode)
+		require.EqualValues(t, 60, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
 	case <-time.After(time.Second):
-		t.Fatal("starting the goal deadline did not emit a policy snapshot")
+		t.Fatal("configuring the goal duration did not emit a policy snapshot")
 	}
 }

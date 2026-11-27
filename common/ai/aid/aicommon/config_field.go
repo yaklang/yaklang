@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -168,11 +167,13 @@ func (c *Config) GetGoalMinIterations() int64 {
 	if c == nil {
 		return DefaultGoalMinIterations
 	}
+	c.m.Lock()
+	defer c.m.Unlock()
 	return NormalizeGoalMinIterations(c.GoalMinIterations)
 }
 
 func NormalizeGoalMinIterations(n int64) int64 {
-	if n <= 0 {
+	if n < 0 {
 		return DefaultGoalMinIterations
 	}
 	return n
@@ -188,6 +189,9 @@ func (c *Config) GetGoalDurationSeconds() int64 {
 }
 
 // GoalTimeState is the authoritative runtime goal-time view exposed to clients.
+// DurationSeconds returns the declared config value as-is; runtime commands only
+// move GoalDeadline, so clients read Started plus DeadlineUnix to render the
+// current window.
 type GoalTimeState struct {
 	Revision        uint64
 	Started         bool
@@ -216,9 +220,9 @@ func (c *Config) GetGoalTimeState() GoalTimeState {
 	return state
 }
 
-// setGoalDurationSeconds applies a new goal time window. If the deadline has
-// already been started, a changed duration takes effect immediately from the
-// hot-reload point. Reapplying the same value does not extend the countdown.
+// setGoalDurationSeconds replaces the declared window length. It deliberately
+// does not materialize a deadline: a window belongs to a task, so only
+// RefreshGoalDeadlineForTask (task start) and GoalTimePatch may set it.
 func (c *Config) setGoalDurationSeconds(seconds int64) {
 	if c == nil {
 		return
@@ -227,21 +231,59 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 		c.m = new(sync.Mutex)
 	}
 	c.m.Lock()
-	defer c.m.Unlock()
+	changed := applyDeclaredGoalDuration(&c.GoalDurationSeconds, &c.GoalDeadline, seconds)
+	if changed {
+		c.goalTimeRevision++
+	}
+	c.m.Unlock()
+	if changed {
+		c.notifyAgentPolicySnapshotEmit()
+	}
+}
 
-	changed := c.GoalDurationSeconds != seconds
-	if !changed {
-		return
+// RefreshGoalDeadlineForTask restarts the goal time window for a new top-level
+// task from the declared duration. This is the only place, besides
+// GoalTimePatch, that materializes a deadline.
+func (c *Config) RefreshGoalDeadlineForTask() bool {
+	if c == nil {
+		return false
 	}
-	c.GoalDurationSeconds = seconds
-	c.goalTimeRevision++
-	if seconds == 0 {
-		c.GoalDeadline = time.Time{}
-		return
+	if c.m == nil {
+		c.m = new(sync.Mutex)
 	}
-	if !c.GoalDeadline.IsZero() {
-		c.GoalDeadline = computeGoalDeadline(time.Now(), seconds)
+	c.m.Lock()
+	deadline := computeGoalDeadline(time.Now(), c.GoalDurationSeconds)
+	changed := !c.GoalDeadline.Equal(deadline)
+	c.GoalDeadline = deadline
+	if changed {
+		c.goalTimeRevision++
 	}
+	c.m.Unlock()
+	if changed {
+		c.notifyAgentPolicySnapshotEmit()
+	}
+	return changed
+}
+
+// applyDeclaredGoalDuration replaces the declared window length. A positive
+// length never materializes a deadline: a countdown belongs to a task, so it is
+// opened at task start. Mode changes still apply immediately, because turning
+// the gate off must stop blocking finish now and never-ending must stop
+// counting down now.
+func applyDeclaredGoalDuration(duration *int64, deadline *time.Time, seconds int64) bool {
+	if *duration == seconds {
+		return false
+	}
+	*duration = seconds
+	switch seconds {
+	case 0:
+		*deadline = time.Time{}
+	case -1:
+		if !deadline.IsZero() {
+			*deadline = goalNeverEndingDeadline
+		}
+	}
+	return true
 }
 
 func (c *Config) GetGoalAcceptanceCriteria() string {
@@ -264,12 +306,9 @@ func (c *Config) GetGoalDeadline() time.Time {
 	return c.GoalDeadline
 }
 
-// StartGoalDeadline computes and stores the goal-mode deadline from the
-// current time + GoalDurationSeconds. If GoalDurationSeconds is 0 the
-// deadline is not set (gate disabled). If -1 the deadline is set to a
-// far-future sentinel (never-ending). This is called lazily on the first
-// finish attempt, not at config creation, so the window measures actual
-// execution time rather than session start time.
+// StartGoalDeadline initializes a missing deadline for legacy callers that set
+// GoalDurationSeconds directly. Task start goes through
+// RefreshGoalDeadlineForTask; finish checks must not start or extend the window.
 func (c *Config) StartGoalDeadline() {
 	if c == nil {
 		return
@@ -289,14 +328,23 @@ func (c *Config) StartGoalDeadline() {
 	c.notifyAgentPolicySnapshotEmit()
 }
 
+// goalNeverEndingDeadline is the far-future sentinel that represents an open
+// window which never expires. It is the only producer of that value, so the
+// window mode can be derived from GoalDeadline alone.
+var goalNeverEndingDeadline = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+
 func computeGoalDeadline(start time.Time, durationSeconds int64) time.Time {
 	if durationSeconds == 0 {
 		return time.Time{}
 	}
 	if durationSeconds == -1 {
-		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+		return goalNeverEndingDeadline
 	}
 	return start.Add(time.Duration(durationSeconds) * time.Second)
+}
+
+func isGoalNeverEndingDeadline(deadline time.Time) bool {
+	return !deadline.IsZero() && deadline.Equal(goalNeverEndingDeadline)
 }
 
 // IsGoalDeadlinePassed reports whether the goal time window has elapsed.
@@ -340,23 +388,6 @@ func (c *Config) GetExecutionPolicy() string {
 			"- 目标模式：finish 由宿主完成门禁控制；根据真实任务状态持续推进，用具体证据支撑进展。",
 			"- 门禁开放前，仅在必要时用 directly_answer 汇报进度；不要反复请求 finish，也不要清空未完成待办来过关。",
 		)
-		if c.GetGoalDurationSeconds() != 0 {
-			if c.GetGoalDurationSeconds() == -1 {
-				lines = append(lines,
-					"- 目标时间窗：无限。时间门禁不会自动放行 finish；持续推进，直至满足已设置的验收标准或用户停止会话。",
-				)
-			} else {
-				lines = append(lines,
-					fmt.Sprintf("- 目标时间窗：%d 秒。到期前不能 finish；继续深入探索、验证结果和补齐边界情况。", c.GetGoalDurationSeconds()),
-				)
-			}
-		}
-		if criteria := c.GetGoalAcceptanceCriteria(); criteria != "" {
-			lines = append(lines,
-				fmt.Sprintf("- 目标验收标准：%s", criteria),
-				"- 达到时间要求后，仍须通过验收审查才能 finish。",
-			)
-		}
 	}
 	if c.GetPreferDispatchSubReactAgents() && c.GetEnableGoalMode() {
 		lines = append(lines,
@@ -368,7 +399,7 @@ func (c *Config) GetExecutionPolicy() string {
 
 func EnsureGoalModeMaxIterations(maxIterations, goalMinIterations int64) int64 {
 	goalMinIterations = NormalizeGoalMinIterations(goalMinIterations)
-	if maxIterations <= 0 {
+	if maxIterations <= 0 || goalMinIterations == 0 {
 		return maxIterations
 	}
 	minRequired := goalMinIterations + GoalModeIterationBuffer

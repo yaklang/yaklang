@@ -48,6 +48,7 @@ func TestHandleSyncTypeTaskSnapshotEvent_ReturnsMaterializedTask(t *testing.T) {
 	require.Equal(t, "task-snapshot-sync-id", captured.SyncID)
 	require.NotContains(t, string(captured.Content), `"round"`)
 	require.NotContains(t, string(captured.Content), `"current_round"`)
+	require.NotContains(t, string(captured.Content), `"current_round_start_at"`)
 	require.NotContains(t, string(captured.Content), `"total_rounds"`)
 	require.Contains(t, string(captured.Content), `"execution_rounds"`)
 	var snapshot aicommon.SessionTaskSnapshot
@@ -74,6 +75,7 @@ func TestSessionSnapshotRounds_ExcludesQueuedTasks(t *testing.T) {
 	idle := reactloops.BuildSessionSnapshot(cfg, nil, nil)
 	require.Zero(t, idle.CurrentRound)
 	require.Zero(t, idle.TotalRounds)
+	require.Zero(t, idle.CurrentRoundStartAt)
 
 	first := queue.GetFirst()
 	require.NotNil(t, first)
@@ -83,18 +85,31 @@ func TestSessionSnapshotRounds_ExcludesQueuedTasks(t *testing.T) {
 		require.Equal(t, 1, snapshot.CurrentRound)
 		require.Equal(t, 1, snapshot.TotalRounds, "repeated emits must not count queued tasks")
 		require.Len(t, snapshot.Tasks, 1)
+		require.Zero(t, snapshot.CurrentRoundStartAt,
+			"queueing must not start the round timer before execution begins")
 	}
 	require.Equal(t, 1, queue.Len())
 	require.Nil(t, cfg.GetSessionTaskSnapshot("second"))
+
+	firstStartedAt := time.Unix(1_700_000_000, 0)
+	aicommon.BeginSessionSnapshotExecutionForTask(cfg, first, firstStartedAt)
+	snapshot := reactloops.BuildSessionSnapshot(cfg, nil, first)
+	require.Equal(t, firstStartedAt.Unix(), snapshot.CurrentRoundStartAt)
 
 	first.SetStatus(aicommon.AITaskState_Completed)
 	reactloops.BuildSessionSnapshot(cfg, nil, first)
 	second := queue.GetFirst()
 	require.NotNil(t, second)
 	second.SetStatus(aicommon.AITaskState_Processing)
-	snapshot := reactloops.BuildSessionSnapshot(cfg, nil, second)
+	snapshot = reactloops.BuildSessionSnapshot(cfg, nil, second)
 	require.Equal(t, 2, snapshot.CurrentRound)
 	require.Equal(t, 2, snapshot.TotalRounds)
+
+	secondStartedAt := firstStartedAt.Add(10 * time.Minute)
+	aicommon.BeginSessionSnapshotExecutionForTask(cfg, second, secondStartedAt)
+	snapshot = reactloops.BuildSessionSnapshot(cfg, nil, second)
+	require.Equal(t, secondStartedAt.Unix(), snapshot.CurrentRoundStartAt,
+		"the new round timer starts when execution begins, not when the task is queued")
 	require.True(t, queue.IsEmpty())
 }
 

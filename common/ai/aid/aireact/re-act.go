@@ -571,12 +571,7 @@ func (r *ReAct) SendInputEventAndWaitAccepted(event *ypb.AIInputEvent) (ret erro
 	// doing this synchronously, a directly-admitted free input could overtake a
 	// hot-patch still waiting in EventInputChan.
 	if event.GetIsConfigHotpatch() {
-		hotPatchOptions := r.config.ProcessHotPatchMessage(event)
-		r.config.PersistSessionStartParamsFromHotpatch(event)
-		for _, option := range hotPatchOptions {
-			r.config.HotPatchOptionChan.SafeFeed(option)
-		}
-		return nil
+		return r.config.DispatchHotPatch(event)
 	}
 
 	// Interactive and sync messages retain Config.processInputEvent's existing
