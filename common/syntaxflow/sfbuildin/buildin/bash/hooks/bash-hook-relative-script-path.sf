@@ -1,8 +1,8 @@
 desc(
-	mode: "source"
-	language: "general"
-	title: "源码匹配：检测到 Hook 使用相对脚本路径"
-	title_zh: "检测到 Hook 使用相对脚本路径",
+	mode: "ssa"
+	language: "bash"
+	title: "Bash：Hook 使用相对脚本路径"
+	title_zh: "Hook 使用相对脚本路径"
 	type: vuln
 	level: "middle"
 	rule_id: "source-config-hooks-relative-script-path"
@@ -18,7 +18,8 @@ Claude Code 或 Cursor 的 Hook 配置使用了相对脚本路径。工作目录
 安全相关配置缺失或过于宽松，可能暴露敏感功能或降低整体防护能力。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+Bash 语法解析：定位 `source`、`.`、`sh`、`bash` 等脚本加载命令，检查其参数是否为
+以 `./` 开头的相对路径。
 
 ### 参考
 - CWE-426
@@ -30,15 +31,20 @@ SOLUTION
 	alert_min: 1
 	"file://pos.sh": <<<POS
 source ./scripts/check.sh
+. ./lib.sh
+bash ./run.sh
 POS
 	"safefile://neg.sh": <<<NEG
 source /opt/project/scripts/check.sh
+source /opt/../shared/check.sh
+bash /opt/run.sh
+echo ./relative-not-loaded
 NEG
 )
 
-${*.sh}.pattern_regex(/(?:source|bash|sh|\.)\s+\.\/\S+/) as $p0
-${*.bash}.pattern_regex(/(?:source|bash|sh|\.)\s+\.\/\S+/) as $p1
-$p0 + $p1 as $hit
+/^(source|\.|sh|bash|zsh|dash|ksh|ash)$/ as $loader
+$loader(* as $argv) as $call
+$argv?{have: /^\.\//} as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测到 Hook 使用相对脚本路径",

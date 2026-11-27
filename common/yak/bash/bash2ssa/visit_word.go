@@ -106,9 +106,25 @@ func (ab *astBuilder) buildWord(word *syntax.Word) ssa.Value {
 	}
 	defer ab.setRange(word)()
 
-	return ab.buildParts(word.Parts, false)
+	return ab.buildParts(word.Parts, false, false)
 }
-func (ab *astBuilder) buildParts(parts []syntax.WordPart, double bool) ssa.Value {
+
+// buildArgWord builds a command argument or for-list word. Unquoted parameter
+// and command expansions are wrapped in the split intrinsics here, including
+// when they are concatenated with literals (--prefix=$dir, bar$(cmd)bar).
+func (ab *astBuilder) buildArgWord(word *syntax.Word) ssa.Value {
+	if word == nil {
+		return nil
+	}
+	if len(word.Parts) == 0 {
+		return ab.EmitConstInst("")
+	}
+	defer ab.setRange(word)()
+
+	return ab.buildParts(word.Parts, false, true)
+}
+
+func (ab *astBuilder) buildParts(parts []syntax.WordPart, double, splitFields bool) ssa.Value {
 	if text, ok := staticParts(parts, double); ok {
 		return ab.EmitConstInst(text)
 	}
@@ -117,6 +133,9 @@ func (ab *astBuilder) buildParts(parts []syntax.WordPart, double bool) ssa.Value
 		value := ab.buildWordPart(part, double)
 		if utils.IsNil(value) {
 			continue
+		}
+		if splitFields && !double {
+			value = ab.markUnquotedSplit(part, value)
 		}
 		if utils.IsNil(out) {
 			out = value
@@ -127,6 +146,47 @@ func (ab *astBuilder) buildParts(parts []syntax.WordPart, double bool) ssa.Value
 	return out
 }
 
+// markUnquotedSplit tags a word part that undergoes shell word splitting. The
+// intrinsic keeps the value as the first argument, so dataflow is unchanged,
+// and rules can match the callee to tell it apart from a quoted expansion.
+func (ab *astBuilder) markUnquotedSplit(part syntax.WordPart, value ssa.Value) ssa.Value {
+	switch p := part.(type) {
+	case *syntax.ParamExp:
+		if !paramExpSplits(p) {
+			return value
+		}
+		return ab.intrinsic("param-fields", value, ab.ifsValue())
+	case *syntax.CmdSubst:
+		return ab.intrinsic("cmd-fields", value, ab.ifsValue())
+	default:
+		return value
+	}
+}
+
+// paramExpSplits reports whether an unquoted parameter expansion can produce
+// more than one word. Special one-word parameters and ${#x} lengths cannot.
+func paramExpSplits(exp *syntax.ParamExp) bool {
+	if exp == nil || exp.Length {
+		return false
+	}
+	if exp.Param == nil {
+		return true
+	}
+	switch exp.Param.Value {
+	case "?", "$", "!", "-", "#":
+		return false
+	default:
+		return true
+	}
+}
+
+func (ab *astBuilder) ifsValue() ssa.Value {
+	if ifs := ab.PeekValue("IFS"); ifs != nil {
+		return ifs
+	}
+	return ab.EmitConstInst(" \t\n")
+}
+
 func (ab *astBuilder) buildWordPart(part syntax.WordPart, double bool) ssa.Value {
 	switch p := part.(type) {
 	case *syntax.Lit:
@@ -134,7 +194,7 @@ func (ab *astBuilder) buildWordPart(part syntax.WordPart, double bool) ssa.Value
 	case *syntax.SglQuoted:
 		return ab.EmitConstInst(quotedText(p))
 	case *syntax.DblQuoted:
-		return ab.buildParts(p.Parts, true)
+		return ab.buildParts(p.Parts, true, false)
 	case *syntax.ParamExp:
 		return ab.buildParamExp(p)
 	case *syntax.CmdSubst:

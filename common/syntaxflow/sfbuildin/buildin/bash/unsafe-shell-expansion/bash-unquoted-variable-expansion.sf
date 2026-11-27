@@ -1,0 +1,62 @@
+desc(
+	mode: "ssa"
+	language: "bash"
+	title: "Bash：命令参数中的变量展开未加引号"
+	title_zh: "命令参数中的变量展开未加引号"
+	type: vuln
+	level: "middle"
+	rule_id: "source-unquoted-variable-expansion-in-command"
+	risk: "unsafe-shell-expansion"
+	desc: <<<DESC
+### 规则说明
+变量展开必须加双引号，防止按 IFS 指定的空白或分隔符拆分成多个参数。
+
+### 风险类型
+不安全的 Shell 展开（unsafe-shell-expansion）
+
+### 影响
+未加引号的变量或命令替换可能被拆分为多个参数，导致命令注入或意外执行。
+
+### 检测方式
+Bash 语法解析：命中命令参数中未加引号的参数展开（`$var`、`${var}`、`$1`、
+`${arr[0]}` 等），包括与字面量拼接的写法（`--prefix=$dir`）。双引号内的展开、
+赋值语句右侧，以及 `[[ ]]`、`(( ))`、`case ... in` 等不做词拆分的上下文不会被误报。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+用双引号包裹变量展开；确实需要拆分时使用下划线前缀变量或显式数组。
+SOLUTION
+	alert_min: 1
+	"file://pos.sh": <<<POS
+exec $foo
+exec ${foo%.bar}
+exec $1
+exec --prefix=$dir
+echo $_foo
+POS
+	"safefile://neg.sh": <<<NEG
+exec "$foo"
+exec "${foo}"
+x=$foo
+PATH=$foo:$PATH bar
+echo $$
+echo $?
+echo ${#foo}
+case " ${seen_files} " in *" ${base} "*) return 0 ;; esac
+echo '$literal_dollar'
+# comment mentioning $docs is not an unquoted expansion
+[[ $mode == "release" ]]
+[[ -n $target && $target != *" "* ]]
+(( total += $step ))
+case $action in release) make dist ;; esac
+NEG
+)
+
+/^@bash\.param-fields$/ as $split
+$split(* as $argv) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测到命令中未加引号的变量展开",
+	title_zh: "检测到命令中未加引号的变量展开",
+	message: "检测到命令中未加引号的变量展开",
+}
