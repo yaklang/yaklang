@@ -46,7 +46,6 @@ func TestExecutionStrategyGoalModesReplaceZeros(t *testing.T) {
 		{"goal_off", &ypb.AIExecutionStrategy{}},
 	} {
 		t.Run(step.name, func(t *testing.T) {
-			before := time.Now()
 			require.NoError(t, c.DispatchHotPatch(&ypb.AIInputEvent{
 				IsConfigHotpatch: true, HotpatchType: HotPatchType_ExecutionStrategy,
 				Params: &ypb.AIStartParams{Strategy: step.strategy},
@@ -63,7 +62,9 @@ func TestExecutionStrategyGoalModesReplaceZeros(t *testing.T) {
 			require.Equal(t, step.strategy.GoalDurationSeconds, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 			if step.strategy.GoalDurationSeconds > 0 {
 				require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-				require.WithinDuration(t, before.Add(time.Duration(step.strategy.GoalDurationSeconds)*time.Second), c.GetGoalDeadline(), time.Second)
+				require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt,
+					"a declared duration must not open a window by itself")
+				require.True(t, c.GetGoalDeadline().IsZero())
 			} else {
 				require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode)
 				require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
@@ -107,6 +108,9 @@ func TestGoalTimeModeSwitchToCriteriaClearsTimeWindow(t *testing.T) {
 			GoalDurationSeconds: 10800,
 		}},
 	}))
+	// Declared config alone opens nothing; the window belongs to a task.
+	require.True(t, c.GetGoalDeadline().IsZero())
+	require.True(t, c.RefreshGoalDeadlineForTask())
 	timeSnapshot := c.BuildAgentPolicySnapshot()
 	require.Equal(t, GoalTimeLimitModeDeadline, timeSnapshot.Goal.TimeLimit.Mode)
 	require.EqualValues(t, 10800, timeSnapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
@@ -130,7 +134,9 @@ func TestGoalTimeModeSwitchToCriteriaClearsTimeWindow(t *testing.T) {
 	require.Zero(t, c.GetGoalDurationSeconds())
 }
 
-func TestExecutionStrategyOverridesGoalTimePatchDeadline(t *testing.T) {
+// A GoalTimePatch owns the running window; a strategy only replaces the declared
+// duration, so the patched deadline survives until the next task start.
+func TestExecutionStrategyKeepsPatchUntilNextTaskStart(t *testing.T) {
 	c := NewTestConfig(context.Background())
 	patchedDeadline := time.Now().Add(10 * time.Minute).Unix()
 	require.NoError(t, c.DispatchHotPatch(&ypb.AIInputEvent{
@@ -158,8 +164,13 @@ func TestExecutionStrategyOverridesGoalTimePatchDeadline(t *testing.T) {
 	require.EqualValues(t, 1, snapshot.Goal.MinIterations)
 	require.EqualValues(t, 7200, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 	require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-	require.NotEqual(t, patchedDeadline, snapshot.Goal.TimeLimit.DeadlineAt)
+	require.Equal(t, patchedDeadline, snapshot.Goal.TimeLimit.DeadlineAt,
+		"a strategy must not move the window that a patch owns")
+
+	require.True(t, c.RefreshGoalDeadlineForTask())
 	require.WithinDuration(t, before.Add(2*time.Hour), c.GetGoalDeadline(), time.Second)
+	require.NotEqual(t, patchedDeadline, c.GetGoalDeadline().Unix(),
+		"the next task start supersedes the patched window")
 }
 
 func TestExecutionStrategyAndGoalTimePatchApplyIndependently(t *testing.T) {
@@ -172,7 +183,8 @@ func TestExecutionStrategyAndGoalTimePatchApplyIndependently(t *testing.T) {
 	}))
 	require.True(t, c.GetEnableGoalMode())
 	require.Equal(t, int64(10800), c.GetGoalDurationSeconds())
-	require.False(t, c.GetGoalDeadline().IsZero(), "valid strategy must apply even when the following patch fails")
+	require.True(t, c.GetGoalDeadline().IsZero(),
+		"a valid strategy must still apply when the following patch fails, without opening a window")
 
 	before = c.BuildAgentPolicySnapshot().Goal
 	require.Error(t, c.DispatchHotPatch(&ypb.AIInputEvent{

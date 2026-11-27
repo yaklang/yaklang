@@ -220,11 +220,9 @@ func (c *Config) GetGoalTimeState() GoalTimeState {
 	return state
 }
 
-// setGoalDurationSeconds applies the declared window length and materializes a
-// window for it. Only declared config (this option and ExecutionStrategy) writes
-// GoalDurationSeconds; the window is restarted for every task by
-// RefreshGoalDeadlineForTask. Reapplying the same value preserves an existing
-// deadline, even after expiry.
+// setGoalDurationSeconds replaces the declared window length. It deliberately
+// does not materialize a deadline: a window belongs to a task, so only
+// RefreshGoalDeadlineForTask (task start) and GoalTimePatch may set it.
 func (c *Config) setGoalDurationSeconds(seconds int64) {
 	if c == nil {
 		return
@@ -233,7 +231,7 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 		c.m = new(sync.Mutex)
 	}
 	c.m.Lock()
-	changed := applyDeclaredGoalDuration(&c.GoalDurationSeconds, &c.GoalDeadline, seconds, time.Now())
+	changed := applyDeclaredGoalDuration(&c.GoalDurationSeconds, &c.GoalDeadline, seconds)
 	if changed {
 		c.goalTimeRevision++
 	}
@@ -244,9 +242,8 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 }
 
 // RefreshGoalDeadlineForTask restarts the goal time window for a new top-level
-// task from the declared duration. The deadline belongs to the task that is
-// starting now: neither the previous task's window nor a GoalTimePatch applied
-// to it may leak into the next one.
+// task from the declared duration. This is the only place, besides
+// GoalTimePatch, that materializes a deadline.
 func (c *Config) RefreshGoalDeadlineForTask() bool {
 	if c == nil {
 		return false
@@ -268,20 +265,25 @@ func (c *Config) RefreshGoalDeadlineForTask() bool {
 	return changed
 }
 
-// applyDeclaredGoalDuration replaces the declared window length and materializes
-// a window for it. Reapplying the same value preserves an existing deadline,
-// even after expiry. Runtime commands never go through this path.
-func applyDeclaredGoalDuration(duration *int64, deadline *time.Time, seconds int64, now time.Time) bool {
-	if *duration != seconds {
-		*duration = seconds
-		*deadline = computeGoalDeadline(now, seconds)
-		return true
+// applyDeclaredGoalDuration replaces the declared window length. A positive
+// length never materializes a deadline: a countdown belongs to a task, so it is
+// opened at task start. Mode changes still apply immediately, because turning
+// the gate off must stop blocking finish now and never-ending must stop
+// counting down now.
+func applyDeclaredGoalDuration(duration *int64, deadline *time.Time, seconds int64) bool {
+	if *duration == seconds {
+		return false
 	}
-	if seconds != 0 && deadline.IsZero() {
-		*deadline = computeGoalDeadline(now, seconds)
-		return true
+	*duration = seconds
+	switch seconds {
+	case 0:
+		*deadline = time.Time{}
+	case -1:
+		if !deadline.IsZero() {
+			*deadline = goalNeverEndingDeadline
+		}
 	}
-	return false
+	return true
 }
 
 func (c *Config) GetGoalAcceptanceCriteria() string {

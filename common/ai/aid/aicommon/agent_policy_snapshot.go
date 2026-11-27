@@ -73,9 +73,10 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 	defer c.m.Unlock()
 
 	c.agentPolicyRevision++
-	// The window mode is derived from the runtime deadline, not from declared
-	// config: a GoalTimePatch may close or pin the current window without
-	// rewriting the configured duration.
+	// An open window is authoritative: a GoalTimePatch may open, move or close
+	// one regardless of declared config. Without an open window the declared
+	// duration still describes the configured mode, but deadline_at stays zero
+	// because a declared duration no longer materializes a deadline by itself.
 	goalDeadline := c.GoalDeadline
 	goalTimeMode := GoalTimeLimitModeDisabled
 	goalDeadlineAt := int64(0)
@@ -85,6 +86,10 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 	case !goalDeadline.IsZero():
 		goalTimeMode = GoalTimeLimitModeDeadline
 		goalDeadlineAt = goalDeadline.Unix()
+	case c.GoalDurationSeconds == -1:
+		goalTimeMode = GoalTimeLimitModeNeverEnding
+	case c.GoalDurationSeconds > 0:
+		goalTimeMode = GoalTimeLimitModeDeadline
 	}
 
 	return &AgentPolicySnapshot{
@@ -98,7 +103,7 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 			MinIterations:      NormalizeGoalMinIterations(c.GoalMinIterations),
 			AcceptanceCriteria: c.GoalAcceptanceCriteria,
 			TimeLimit: AgentGoalTimeLimitSnapshot{
-				Enabled:                   !goalDeadline.IsZero(),
+				Enabled:                   c.GoalDurationSeconds != 0 || !goalDeadline.IsZero(),
 				Mode:                      goalTimeMode,
 				DeadlineAt:                goalDeadlineAt,
 				ConfiguredDurationSeconds: c.GoalDurationSeconds,

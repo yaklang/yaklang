@@ -361,14 +361,15 @@ func (c *Config) currentExecutionPolicyDraft() executionPolicyDraft {
 	}
 }
 
-func (d *executionPolicyDraft) applyExecutionStrategy(strategy *ypb.AIExecutionStrategy, now time.Time) error {
+func (d *executionPolicyDraft) applyExecutionStrategy(strategy *ypb.AIExecutionStrategy) error {
 	if err := validateExecutionStrategy(strategy); err != nil {
 		return err
 	}
 	// Strategy is the declarative source: it replaces the declared length and
-	// materializes a window for it. GoalTimePatch never writes the declared
-	// value, so a runtime command cannot rewrite the user's configuration.
-	if applyDeclaredGoalDuration(&d.goalDurationSeconds, &d.goalDeadline, strategy.GetGoalDurationSeconds(), now) {
+	// leaves the running window alone. GoalTimePatch never writes the declared
+	// value, and declared config never materializes a deadline, so neither
+	// direction can corrupt the other.
+	if applyDeclaredGoalDuration(&d.goalDurationSeconds, &d.goalDeadline, strategy.GetGoalDurationSeconds()) {
 		d.goalTimeRevision++
 	}
 	d.enableDispatchSubReactAgents = strategy.GetEnableMultiAgent()
@@ -581,7 +582,7 @@ func (c *Config) applyExecutionStrategy(strategy *ypb.AIExecutionStrategy) error
 	c.m.Lock()
 	defer c.m.Unlock()
 	next := c.currentExecutionPolicyDraft()
-	if err := next.applyExecutionStrategy(strategy, time.Now()); err != nil {
+	if err := next.applyExecutionStrategy(strategy); err != nil {
 		return err
 	}
 	next.commit(c)

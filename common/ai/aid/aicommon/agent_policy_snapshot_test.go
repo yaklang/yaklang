@@ -75,7 +75,8 @@ func TestEmitAgentPolicySnapshot_UsesDedicatedStructuredEvent(t *testing.T) {
 		var snapshot AgentPolicySnapshot
 		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
 		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-		require.InDelta(t, 60, snapshot.Goal.TimeLimit.DeadlineAt-snapshot.ServerTime, 1)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt,
+			"declared config must not open a window; the deadline belongs to a task")
 	case <-time.After(time.Second):
 		t.Fatal("agent policy snapshot event was not emitted")
 	}
@@ -117,8 +118,9 @@ func TestSettingGoalDurationNotifiesAgentPolicySnapshot(t *testing.T) {
 		var snapshot AgentPolicySnapshot
 		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
 		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-		require.Greater(t, snapshot.Goal.TimeLimit.DeadlineAt, snapshot.ServerTime)
+		require.EqualValues(t, 60, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
 	case <-time.After(time.Second):
-		t.Fatal("starting the goal deadline did not emit a policy snapshot")
+		t.Fatal("configuring the goal duration did not emit a policy snapshot")
 	}
 }

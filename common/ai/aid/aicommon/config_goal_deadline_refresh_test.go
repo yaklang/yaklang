@@ -54,6 +54,7 @@ func TestRefreshGoalDeadlineSupersedesPatch(t *testing.T) {
 func TestRefreshGoalDeadlineClearsDisabledWindow(t *testing.T) {
 	c := NewTestConfig(context.Background())
 	require.NoError(t, WithGoalDurationSeconds(600)(c))
+	require.True(t, c.RefreshGoalDeadlineForTask())
 	require.False(t, c.GetGoalDeadline().IsZero())
 
 	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
