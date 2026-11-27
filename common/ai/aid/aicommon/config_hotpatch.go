@@ -342,8 +342,8 @@ type executionPolicyDraft struct {
 	enableGoalMode               bool
 	goalMinIterations            int64
 	goalAcceptanceCriteria       string
-	goalDurationSeconds          int64
-	goalDeadline                 time.Time
+	goalDurationSeconds          int64     // declared config; GoalTimePatch only reads it
+	goalDeadline                 time.Time // runtime window; the only field patches write
 	goalTimeRevision             uint64
 }
 
@@ -365,7 +365,12 @@ func (d *executionPolicyDraft) applyExecutionStrategy(strategy *ypb.AIExecutionS
 	if err := validateExecutionStrategy(strategy); err != nil {
 		return err
 	}
-	applyGoalDuration(&d.goalDurationSeconds, &d.goalDeadline, &d.goalTimeRevision, strategy.GetGoalDurationSeconds(), now)
+	// Strategy is the declarative source: it replaces the declared length and
+	// materializes a window for it. GoalTimePatch never writes the declared
+	// value, so a runtime command cannot rewrite the user's configuration.
+	if applyDeclaredGoalDuration(&d.goalDurationSeconds, &d.goalDeadline, strategy.GetGoalDurationSeconds(), now) {
+		d.goalTimeRevision++
+	}
 	d.enableDispatchSubReactAgents = strategy.GetEnableMultiAgent()
 	d.preferDispatchSubReactAgents = strategy.GetEnableMultiAgent()
 	d.maxSubAgents = normalizeMaxSubAgentsLocked(strategy.GetMaxSubAgents())
@@ -387,11 +392,13 @@ func (d *executionPolicyDraft) applyGoalTimePatch(patch *ypb.AIGoalTimePatch, no
 	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND:
 		changed, err = d.extendGoalTime(patch.GetExtendSeconds(), now)
 	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE:
-		changed, err = d.setGoalDeadline(patch.GetDeadlineUnix(), now)
+		changed, err = d.setGoalDeadline(patch.GetDeadlineUnix())
 	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE:
 		changed = d.disableGoalTime()
 	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING:
 		changed = d.disableGoalDeadlineExpiry(now)
+	case ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DURATION:
+		changed, err = d.replaceGoalDuration(patch.GetDurationSeconds(), now)
 	default:
 		return fmt.Errorf("unsupported goal time action: %s", patch.GetAction())
 	}
@@ -409,16 +416,23 @@ func (d *executionPolicyDraft) extendGoalTime(delta int64, now time.Time) (bool,
 		return false, fmt.Errorf("goal time extension must not be zero")
 	}
 	switch {
-	case d.goalDurationSeconds == 0:
-		return false, fmt.Errorf("goal time window is disabled")
-	case d.goalDurationSeconds == -1:
+	case isGoalNeverEndingDeadline(d.goalDeadline):
 		return false, nil
 	case d.goalDeadline.IsZero():
-		nextDuration := d.goalDurationSeconds + delta
-		if nextDuration <= 0 {
-			return false, fmt.Errorf("goal duration must remain positive")
+		// No window is open. Read the declared length to reopen one; the
+		// declared value itself is never written back.
+		switch {
+		case d.goalDurationSeconds == 0:
+			return false, fmt.Errorf("goal time window is disabled")
+		case d.goalDurationSeconds == -1:
+			d.goalDeadline = computeGoalDeadline(now, -1)
+		default:
+			nextDuration := d.goalDurationSeconds + delta
+			if nextDuration <= 0 {
+				return false, fmt.Errorf("goal duration must remain positive")
+			}
+			d.goalDeadline = computeGoalDeadline(now, nextDuration)
 		}
-		d.goalDurationSeconds = nextDuration
 	default:
 		base := d.goalDeadline
 		if base.Before(now) {
@@ -432,32 +446,41 @@ func (d *executionPolicyDraft) extendGoalTime(delta int64, now time.Time) (bool,
 	return true, nil
 }
 
-func (d *executionPolicyDraft) setGoalDeadline(deadlineUnix int64, now time.Time) (bool, error) {
+func (d *executionPolicyDraft) setGoalDeadline(deadlineUnix int64) (bool, error) {
 	if deadlineUnix <= 0 {
 		return false, fmt.Errorf("goal deadline unix timestamp must be positive")
 	}
 	d.goalDeadline = time.Unix(deadlineUnix, 0)
-	if d.goalDurationSeconds <= 0 {
-		remaining := int64(d.goalDeadline.Sub(now) / time.Second)
-		if remaining <= 0 {
-			remaining = 1
-		}
-		d.goalDurationSeconds = remaining
-	}
 	return true, nil
 }
 
 func (d *executionPolicyDraft) disableGoalTime() bool {
-	changed := d.goalDurationSeconds != 0 || !d.goalDeadline.IsZero()
-	d.goalDurationSeconds = 0
+	changed := !d.goalDeadline.IsZero()
 	d.goalDeadline = time.Time{}
 	return changed
 }
 
 func (d *executionPolicyDraft) disableGoalDeadlineExpiry(now time.Time) bool {
-	d.goalDurationSeconds = -1
 	d.goalDeadline = computeGoalDeadline(now, -1)
 	return true
+}
+
+// replaceGoalDuration starts a fresh window of the requested length from now.
+// It is the only imperative action that can move a disabled (0) or never-ending
+// (-1) window back to a finite one, because SET_DEADLINE cannot express that
+// intent without also rewriting the duration.
+//
+// Unlike the declarative ExecutionStrategy duration, this always restarts the
+// window: the caller explicitly asked for "this much time from now".
+func (d *executionPolicyDraft) replaceGoalDuration(seconds int64, now time.Time) (bool, error) {
+	if err := validateGoalDurationSeconds(seconds); err != nil {
+		return false, err
+	}
+	if seconds <= 0 {
+		return false, fmt.Errorf("goal duration must be positive for SET_DURATION; use DISABLE or NEVER_ENDING instead")
+	}
+	d.goalDeadline = computeGoalDeadline(now, seconds)
+	return true, nil
 }
 
 func (d executionPolicyDraft) commit(c *Config) {

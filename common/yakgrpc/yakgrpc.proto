@@ -10816,6 +10816,12 @@ enum AIGoalTimeAction {
   AI_GOAL_TIME_ACTION_DISABLE = 3;
   // Keep the goal time-window gate open indefinitely.
   AI_GOAL_TIME_ACTION_NEVER_ENDING = 4;
+  // Start a fresh window of DurationSeconds from now, replacing whatever the
+  // current window was. This is the only action that moves a disabled or
+  // never-ending window back to a finite one; SET_DEADLINE cannot express that
+  // intent without also rewriting the duration. DurationSeconds must be
+  // positive; use DISABLE or NEVER_ENDING for those two states.
+  AI_GOAL_TIME_ACTION_SET_DURATION = 5;
 }
 
 message AIGoalTimePatch {
@@ -10824,6 +10830,9 @@ message AIGoalTimePatch {
   int64 ExtendSeconds = 2;
   // Absolute Unix timestamp for AI_GOAL_TIME_ACTION_SET_DEADLINE.
   int64 DeadlineUnix = 3;
+  // Window length in seconds for AI_GOAL_TIME_ACTION_SET_DURATION.
+  // Must be positive; -1 and 0 have dedicated actions.
+  int64 DurationSeconds = 4;
 }
 
 message ProbeModelVisionRequest {

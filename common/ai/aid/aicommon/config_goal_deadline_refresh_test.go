@@ -127,3 +127,109 @@ func TestRepeatedStrategyValueKeepsCurrentDeadline(t *testing.T) {
 
 	require.Equal(t, patched, c.GetGoalDeadline(), "an unchanged duration must not restart the window")
 }
+
+// TestGoalTimePatchSetDurationReopensWindow covers the frontend flow: while the
+// window is disabled or never ending, picking "1h" sends only SET_DURATION and
+// the backend opens a fresh one-hour window from now.
+func TestGoalTimePatchSetDurationReopensWindow(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		setup func(*Config)
+	}{
+		{
+			name: "from_disabled",
+			setup: func(c *Config) {
+				require.NoError(t, WithGoalDurationSeconds(0)(c))
+			},
+		},
+		{
+			name: "from_never_ending_via_patch",
+			setup: func(c *Config) {
+				require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+					Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING,
+				})(c))
+			},
+		},
+		{
+			name: "from_never_ending_via_strategy",
+			setup: func(c *Config) {
+				require.NoError(t, WithGoalDurationSeconds(-1)(c))
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := NewTestConfig(context.Background())
+			test.setup(c)
+			declaredBefore := c.GetGoalDurationSeconds()
+			startedAt := time.Now()
+
+			require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+				Action:          ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DURATION,
+				DurationSeconds: 3600,
+			})(c))
+
+			state := c.GetGoalTimeState()
+			require.True(t, state.Started)
+			require.WithinDuration(t, startedAt.Add(time.Hour), c.GetGoalDeadline(), 2*time.Second)
+			require.Equal(t, declaredBefore, c.GetGoalDurationSeconds(),
+				"SET_DURATION must only move the runtime window, not declared config")
+
+			// The runtime view is the snapshot: declared config still carries the
+			// old value, while the window is a finite deadline again.
+			limit := c.BuildAgentPolicySnapshot().Goal.TimeLimit
+			require.Equal(t, GoalTimeLimitModeDeadline, limit.Mode)
+			require.True(t, limit.Enabled)
+			require.Equal(t, c.GetGoalDeadline().Unix(), limit.DeadlineAt)
+			require.Equal(t, declaredBefore, limit.ConfiguredDurationSeconds)
+		})
+	}
+}
+
+// TestGoalTimePatchSetDurationAlwaysRestarts keeps the imperative contract: the
+// caller asked for "this much time from now", so an unchanged length still
+// restarts the window instead of being treated as a repeated declaration.
+func TestGoalTimePatchSetDurationAlwaysRestarts(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(3600)(c))
+	c.m.Lock()
+	c.GoalDeadline = time.Now().Add(time.Minute)
+	c.m.Unlock()
+
+	startedAt := time.Now()
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:          ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DURATION,
+		DurationSeconds: 3600,
+	})(c))
+	require.WithinDuration(t, startedAt.Add(time.Hour), c.GetGoalDeadline(), 2*time.Second)
+	require.EqualValues(t, 3600, c.GetGoalDurationSeconds())
+}
+
+// TestGoalTimePatchSetDurationRejectsNonPositive keeps the action unambiguous:
+// disabled and never-ending have dedicated actions.
+func TestGoalTimePatchSetDurationRejectsNonPositive(t *testing.T) {
+	for _, seconds := range []int64{0, -1, -7200} {
+		c := NewTestConfig(context.Background())
+		require.NoError(t, WithGoalDurationSeconds(600)(c))
+		before := c.GetGoalDeadline()
+
+		require.Error(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+			Action:          ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DURATION,
+			DurationSeconds: seconds,
+		})(c), "seconds=%d must be rejected", seconds)
+		require.Equal(t, before, c.GetGoalDeadline(), "a rejected command must not move the window")
+	}
+}
+
+// TestGoalTimePatchExtendDoesNotWriteDeclaredDuration pins the whole family:
+// none of the runtime commands may rewrite the user's configured length.
+func TestGoalTimePatchExtendDoesNotWriteDeclaredDuration(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(600)(c))
+
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action:        ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_EXTEND,
+		ExtendSeconds: 300,
+	})(c))
+	require.WithinDuration(t, time.Now().Add(15*time.Minute), c.GetGoalDeadline(), 2*time.Second)
+	require.EqualValues(t, 600, c.GetGoalDurationSeconds())
+}

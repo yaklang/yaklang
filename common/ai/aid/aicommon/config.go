@@ -386,12 +386,17 @@ type Config struct {
 	verificationWatchdogToolBlockingEnd   func()
 
 	// iteration limit
-	MaxIterationCount        int64
-	EnableGoalMode           bool
-	GoalMinIterations        int64
-	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
-	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables one main-model review turn
-	GoalDeadline             time.Time // Computed deadline for the current task's goal time window (zero = not started)
+	MaxIterationCount      int64
+	EnableGoalMode         bool
+	GoalMinIterations      int64
+	GoalDurationSeconds    int64  // Declared goal window length in seconds; -1 = never auto-finish, 0 = disabled
+	GoalAcceptanceCriteria string // Goal mode acceptance criteria; non-empty enables one main-model review turn
+	// GoalDeadline is the runtime state of the current task's goal window:
+	// zero means the time gate is closed, the far-future sentinel from
+	// computeGoalDeadline(-1) means never ending, anything else is a finite
+	// deadline. GoalTimePatch may read GoalDurationSeconds but only ever writes
+	// this field, so a runtime command can never rewrite declared config.
+	GoalDeadline             time.Time
 	goalTimeRevision         uint64
 	agentPolicyRevision      uint64
 	agentPolicyEmitHandler   func()

@@ -691,16 +691,18 @@ func TestGoalTimePatch_SupportsExplicitActionsWithoutOneof(t *testing.T) {
 		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE,
 	})(c))
 	state = c.GetGoalTimeState()
-	require.Zero(t, state.DurationSeconds)
 	require.False(t, state.Started)
+	require.True(t, c.GetGoalDeadline().IsZero())
+	require.EqualValues(t, 120, c.GetGoalDurationSeconds(), "a runtime command must not rewrite declared config")
 
 	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
 		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING,
 	})(c))
 	state = c.GetGoalTimeState()
-	require.EqualValues(t, -1, state.DurationSeconds)
-	require.True(t, state.NeverEnding)
 	require.True(t, state.Started)
+	require.False(t, c.IsGoalDeadlinePassed())
+	require.GreaterOrEqual(t, c.GetGoalDeadline().UTC().Year(), 9999)
+	require.EqualValues(t, 120, c.GetGoalDurationSeconds(), "a runtime command must not rewrite declared config")
 }
 
 func TestGoalTimePatch_ExtendingExpiredDeadlineReopensFromNow(t *testing.T) {
@@ -729,8 +731,8 @@ func TestGoalTimePatch_SetDeadlineEnablesDisabledWindow(t *testing.T) {
 	})(c))
 	state := c.GetGoalTimeState()
 	require.True(t, state.Started)
-	require.Greater(t, state.DurationSeconds, int64(0))
 	require.Equal(t, target.Unix(), state.DeadlineUnix)
+	require.Zero(t, c.GetGoalDurationSeconds(), "SET_DEADLINE must not invent a declared duration")
 }
 
 func TestGoalTimePatch_RejectsInvalidMutations(t *testing.T) {

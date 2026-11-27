@@ -189,6 +189,9 @@ func (c *Config) GetGoalDurationSeconds() int64 {
 }
 
 // GoalTimeState is the authoritative runtime goal-time view exposed to clients.
+// DurationSeconds returns the declared config value as-is; runtime commands only
+// move GoalDeadline, so clients read Started plus DeadlineUnix to render the
+// current window.
 type GoalTimeState struct {
 	Revision        uint64
 	Started         bool
@@ -217,11 +220,11 @@ func (c *Config) GetGoalTimeState() GoalTimeState {
 	return state
 }
 
-// setGoalDurationSeconds applies the configured window length. It materializes
-// a window immediately so configured state is observable, but the window that
-// governs a running task is restarted by RefreshGoalDeadlineForTask when that
-// task begins. Reapplying the same value preserves an existing deadline, even
-// after expiry.
+// setGoalDurationSeconds applies the declared window length and materializes a
+// window for it. Only declared config (this option and ExecutionStrategy) writes
+// GoalDurationSeconds; the window is restarted for every task by
+// RefreshGoalDeadlineForTask. Reapplying the same value preserves an existing
+// deadline, even after expiry.
 func (c *Config) setGoalDurationSeconds(seconds int64) {
 	if c == nil {
 		return
@@ -230,7 +233,10 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 		c.m = new(sync.Mutex)
 	}
 	c.m.Lock()
-	changed := applyGoalDuration(&c.GoalDurationSeconds, &c.GoalDeadline, &c.goalTimeRevision, seconds, time.Now())
+	changed := applyDeclaredGoalDuration(&c.GoalDurationSeconds, &c.GoalDeadline, seconds, time.Now())
+	if changed {
+		c.goalTimeRevision++
+	}
 	c.m.Unlock()
 	if changed {
 		c.notifyAgentPolicySnapshotEmit()
@@ -238,9 +244,9 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 }
 
 // RefreshGoalDeadlineForTask restarts the goal time window for a new top-level
-// task. The window length stays declared in Config, but the deadline belongs to
-// the task that is starting now: a previous task's window (including any
-// GoalTimePatch applied to it) must never leak into the next one.
+// task from the declared duration. The deadline belongs to the task that is
+// starting now: neither the previous task's window nor a GoalTimePatch applied
+// to it may leak into the next one.
 func (c *Config) RefreshGoalDeadlineForTask() bool {
 	if c == nil {
 		return false
@@ -262,15 +268,20 @@ func (c *Config) RefreshGoalDeadlineForTask() bool {
 	return changed
 }
 
-func applyGoalDuration(duration *int64, deadline *time.Time, revision *uint64, seconds int64, now time.Time) bool {
-	changed := *duration != seconds
-	if !changed && (seconds == 0 || !deadline.IsZero()) {
-		return false
+// applyDeclaredGoalDuration replaces the declared window length and materializes
+// a window for it. Reapplying the same value preserves an existing deadline,
+// even after expiry. Runtime commands never go through this path.
+func applyDeclaredGoalDuration(duration *int64, deadline *time.Time, seconds int64, now time.Time) bool {
+	if *duration != seconds {
+		*duration = seconds
+		*deadline = computeGoalDeadline(now, seconds)
+		return true
 	}
-	*duration = seconds
-	*revision += 1
-	*deadline = computeGoalDeadline(now, seconds)
-	return true
+	if seconds != 0 && deadline.IsZero() {
+		*deadline = computeGoalDeadline(now, seconds)
+		return true
+	}
+	return false
 }
 
 func (c *Config) GetGoalAcceptanceCriteria() string {
@@ -294,8 +305,8 @@ func (c *Config) GetGoalDeadline() time.Time {
 }
 
 // StartGoalDeadline initializes a missing deadline for legacy callers that set
-// GoalDurationSeconds directly. WithGoalDurationSeconds starts it immediately;
-// finish checks must not start or extend the window.
+// GoalDurationSeconds directly. Task start goes through
+// RefreshGoalDeadlineForTask; finish checks must not start or extend the window.
 func (c *Config) StartGoalDeadline() {
 	if c == nil {
 		return
@@ -315,14 +326,23 @@ func (c *Config) StartGoalDeadline() {
 	c.notifyAgentPolicySnapshotEmit()
 }
 
+// goalNeverEndingDeadline is the far-future sentinel that represents an open
+// window which never expires. It is the only producer of that value, so the
+// window mode can be derived from GoalDeadline alone.
+var goalNeverEndingDeadline = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+
 func computeGoalDeadline(start time.Time, durationSeconds int64) time.Time {
 	if durationSeconds == 0 {
 		return time.Time{}
 	}
 	if durationSeconds == -1 {
-		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+		return goalNeverEndingDeadline
 	}
 	return start.Add(time.Duration(durationSeconds) * time.Second)
+}
+
+func isGoalNeverEndingDeadline(deadline time.Time) bool {
+	return !deadline.IsZero() && deadline.Equal(goalNeverEndingDeadline)
 }
 
 // IsGoalDeadlinePassed reports whether the goal time window has elapsed.

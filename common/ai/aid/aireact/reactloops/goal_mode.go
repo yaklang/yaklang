@@ -83,9 +83,11 @@ func (r *ReActLoop) ApplyGoalModeGate(operator *LoopActionHandlerOperator, itera
 // --- Gate 2: Time Window ---
 
 // ShouldBlockFinishByDeadline reports whether the finish should be blocked
-// because the goal time window has not elapsed yet. Returns false if the
-// time window gate is disabled (GoalDurationSeconds == 0).
-// Configuring the duration starts the deadline; this check only observes it.
+// because the goal time window has not elapsed yet. The runtime deadline is the
+// only source of truth: a zero deadline means the time gate is closed, while the
+// never-ending sentinel is a deadline that never passes.
+// A task start (re)opens the window; GoalTimePatch may close or move it. This
+// check only observes it and never starts or extends the window.
 func (r *ReActLoop) ShouldBlockFinishByDeadline() bool {
 	if !r.IsGoalModeEnabled() {
 		return false
@@ -94,8 +96,8 @@ func (r *ReActLoop) ShouldBlockFinishByDeadline() bool {
 	if !ok {
 		return false
 	}
-	if cfg.GetGoalDurationSeconds() == 0 {
-		return false // time window gate disabled
+	if cfg.GetGoalDeadline().IsZero() {
+		return false // time window gate is closed
 	}
 	return !cfg.IsGoalDeadlinePassed()
 }
