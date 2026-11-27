@@ -42,7 +42,9 @@ jobs:
 
   setup:
     runs-on: ubuntu-22.04
-    timeout-minutes: 75
+    # 75 -> 120 to leave room for the source-build fallback (up to 40 minutes)
+    # before the scan step's own 60-minute budget on top of it.
+    timeout-minutes: 120
     needs: [check-wip]
     if: needs.check-wip.outputs.should_run_tests == 'true'
     permissions:
@@ -125,87 +127,127 @@ jobs:
           git checkout main
           git reset --hard origin/main
 
+      # The OSS download is an optimization: the scanner only needs a working
+      # `yak` binary, so a download failure must not fail the workflow. Report a
+      # warning, then let the following two steps build the binary from source.
       - name: Install Yak
+        id: install_yak
         if: steps.validate.outputs.should_skip != 'true'
-        env: 
+        env:
           SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
         run: |
+          # Verify a binary before installing so a truncated/HTML download never
+          # reaches PATH. Returns non-zero when verification fails.
+          install_yak_to_path() {
+            local binary="$1"
+            chmod +x "$binary"
+            if ! "$binary" version; then
+              return 1
+            fi
+            mkdir -p "$HOME/.local/bin"
+            if command -v sudo >/dev/null 2>&1; then
+              sudo mv "$binary" /usr/local/bin/yak || sudo mv "$binary" /usr/bin/yak || mv "$binary" "$HOME/.local/bin/yak"
+            else
+              mv "$binary" /usr/local/bin/yak 2>/dev/null || mv "$binary" /usr/bin/yak 2>/dev/null || mv "$binary" "$HOME/.local/bin/yak"
+            fi
+            export PATH="/usr/local/bin:/usr/bin:$HOME/.local/bin:$PATH"
+            yak version
+          }
+
+          DOWNLOADED=false
+
           echo "::group::Finding latest Yak version"
-          
           # 使用脚本获取合适的版本（匹配所有 alpha / beta 版本，排除 -yakit- 和 -irify-）
-          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern 'alpha|beta')
-          
-          if [ -z "$SELECTED_VERSION" ]; then
-            echo "::error::No suitable version found (alpha / beta)"
-            exit 1
+          # 版本列表或 OSS 不可用时脚本非零退出，这里不中断，交给源码构建兜底。
+          SELECTED_VERSION=""
+          if ! SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern 'alpha|beta'); then
+            echo "::warning::Failed to resolve a Yak release version from OSS"
+            SELECTED_VERSION=""
           fi
-          
-          echo "Selected version: $SELECTED_VERSION"
-          echo "SELECTED_VERSION=$SELECTED_VERSION" >> $GITHUB_ENV
+          if [ -n "$SELECTED_VERSION" ]; then
+            echo "Selected version: $SELECTED_VERSION"
+            echo "SELECTED_VERSION=$SELECTED_VERSION" >> $GITHUB_ENV
+          fi
           echo "::endgroup::"
-          
-          echo "::group::Downloading Yak binary"
-          
-          # 检测操作系统和架构
-          OS=""
-          ARCH=""
-          case "$(uname -s)" in
-            Linux*)   OS="linux" ;;
-            Darwin*)  OS="darwin" ;;
-            MINGW*)   OS="windows" ;;
-            *)        echo "::error::Unsupported OS: $(uname -s)"; exit 1 ;;
-          esac
-          
-          case "$(uname -m)" in
-            x86_64)   ARCH="amd64" ;;
-            aarch64)  ARCH="arm64" ;;
-            arm64)    ARCH="arm64" ;;
-            *)        echo "::error::Unsupported architecture: $(uname -m)"; exit 1 ;;
-          esac
-          
-          # Windows 需要 .exe 后缀
-          BINARY_NAME="yak_${OS}_${ARCH}"
-          if [ "$OS" = "windows" ]; then
-            BINARY_NAME="${BINARY_NAME}.exe"
+
+          if [ -n "$SELECTED_VERSION" ]; then
+            echo "::group::Downloading Yak binary"
+
+            # 检测操作系统和架构
+            OS=""
+            ARCH=""
+            case "$(uname -s)" in
+              Linux*)   OS="linux" ;;
+              Darwin*)  OS="darwin" ;;
+              MINGW*)   OS="windows" ;;
+              *)        OS="" ;;
+            esac
+
+            case "$(uname -m)" in
+              x86_64)   ARCH="amd64" ;;
+              aarch64)  ARCH="arm64" ;;
+              arm64)    ARCH="arm64" ;;
+              *)        ARCH="" ;;
+            esac
+
+            BINARY_NAME=""
+            if [ -n "$OS" ] && [ -n "$ARCH" ]; then
+              # Windows 需要 .exe 后缀
+              BINARY_NAME="yak_${OS}_${ARCH}"
+              if [ "$OS" = "windows" ]; then
+                BINARY_NAME="${BINARY_NAME}.exe"
+              fi
+            else
+              echo "::warning::Unsupported platform $(uname -s)/$(uname -m) for the OSS Yak binary"
+            fi
+
+            if [ -n "$BINARY_NAME" ]; then
+              DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${SELECTED_VERSION}/${BINARY_NAME}"
+              echo "Downloading from: $DOWNLOAD_URL"
+              # curl -f fails on HTTP errors instead of saving an error page as the binary.
+              if curl -fsSL "$DOWNLOAD_URL" -o yak && install_yak_to_path ./yak; then
+                DOWNLOADED=true
+              fi
+            fi
+            echo "::endgroup::"
           fi
-          
-          DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${SELECTED_VERSION}/${BINARY_NAME}"
-          echo "Downloading from: $DOWNLOAD_URL"
-          
-          if ! curl -sS -L "$DOWNLOAD_URL" -o yak; then
-            echo "::error::Failed to download Yak binary"
-            exit 1
+
+          if [ "$DOWNLOADED" != "true" ]; then
+            # Never leave a partial/broken download where a later step could run it.
+            rm -f yak
+            echo "::warning::Failed to download a usable Yak binary from OSS; falling back to building it from source with go build"
+            echo "downloaded=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-          
-          chmod +x yak
-          echo "::endgroup::"
-          
-          echo "::group::Verifying Yak installation"
-          if ! ./yak version; then
-            echo "::error::Yak installation verification failed"
-            exit 1
-          fi
-          
-          # 将 yak 移动到 PATH
-          if command -v sudo >/dev/null 2>&1; then
-            sudo mv yak /usr/local/bin/yak || sudo mv yak /usr/bin/yak || mv yak ~/.local/bin/yak
-          else
-            mv yak /usr/local/bin/yak 2>/dev/null || mv yak /usr/bin/yak 2>/dev/null || mv yak ~/.local/bin/yak
-          fi
-          
-          # 确保 yak 在 PATH 中
-          if ! command -v yak >/dev/null 2>&1; then
-            export PATH="$HOME/.local/bin:$PATH"
-          fi
-          
-          # 最终验证
-          if ! yak version; then
-            echo "::error::Yak installation verification failed after moving to PATH"
-            exit 1
-          fi
-          
+
+          echo "downloaded=true" >> "$GITHUB_OUTPUT"
           echo "Yak installed successfully: $(yak version)"
+
+      - name: Set up Go for the source-build fallback
+        if: steps.validate.outputs.should_skip != 'true' && steps.install_yak.outputs.downloaded != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+          cache: true
+
+      - name: Build Yak from source (OSS download fallback)
+        if: steps.validate.outputs.should_skip != 'true' && steps.install_yak.outputs.downloaded != 'true'
+        timeout-minutes: 40
+        env:
+          SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+          CGO_ENABLED: "1"
+        run: |
+          echo "::group::Building Yak from source"
+          mkdir -p "$HOME/.local/bin"
+          go build -trimpath -ldflags "-s -w -X 'main.yakVersion=ci-diff-code-check-fallback' -X 'main.gitHash=$(git rev-parse HEAD)' -X 'main.buildTime=$(git show -s --format=%cd)'" -o "$HOME/.local/bin/yak" common/yak/cmd/yak.go
           echo "::endgroup::"
+
+          echo "::group::Verifying the source-built Yak"
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          yak version
+          echo "::endgroup::"
+          echo "::notice::Using a Yak binary built from source because the OSS download was unavailable"
 
       - name: Generate Prog
         id: generate_prog
