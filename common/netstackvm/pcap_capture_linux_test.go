@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"testing"
@@ -15,6 +16,46 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/header"
 	"golang.org/x/sys/unix"
 )
+
+type observedLinuxCapture struct {
+	*linuxPacketCapture
+	reading chan struct{}
+	readErr error
+}
+
+func (c *observedLinuxCapture) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
+	select {
+	case c.reading <- struct{}{}:
+	default:
+	}
+	data, info, err := c.linuxPacketCapture.ReadPacketData()
+	c.readErr = err
+	return data, info, err
+}
+
+func TestLinuxCaptureStopWakesIdleReader(t *testing.T) {
+	// An empty pipe models an idle capture interface without raw socket privileges.
+	var pipe [2]int
+	require.NoError(t, unix.Pipe2(pipe[:], unix.O_NONBLOCK|unix.O_CLOEXEC))
+	defer unix.Close(pipe[1])
+	wakeFD, err := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
+	if err != nil {
+		_ = unix.Close(pipe[0])
+		t.Fatal(err)
+	}
+	capture := &observedLinuxCapture{
+		linuxPacketCapture: &linuxPacketCapture{fd: pipe[0], wakeFD: wakeFD},
+		reading:            make(chan struct{}, 1),
+	}
+	defer capture.Close()
+	fanout := &pcapFanOut{handle: capture, stop: make(chan struct{}), done: make(chan struct{})}
+	go fanout.background()
+	<-capture.reading
+	started := time.Now()
+	fanout.stopReader()
+	t.Logf("idle capture stopped after %s", time.Since(started))
+	require.ErrorIs(t, capture.readErr, io.EOF, "stop must interrupt the idle read")
+}
 
 func captureControl(level, typ int32, payload []byte) []byte {
 	b := make([]byte, unix.CmsgSpace(len(payload)))

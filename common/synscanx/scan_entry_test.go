@@ -277,6 +277,7 @@ func (r *recordingProber) Close() error { return nil }
 
 func TestSendPacketUsesIndependentSynchronousProbes(t *testing.T) {
 	var calls, opened atomic.Int32
+	timing := &synScanTiming{}
 	rec := &recordingProber{}
 	rec.probe = func(ctx context.Context, target string) (netstackvm.TCPSegment, error) {
 		calls.Add(1)
@@ -297,7 +298,7 @@ func TestSendPacketUsesIndependentSynchronousProbes(t *testing.T) {
 			return netstackvm.TCPSegment{RemoteIP: net.IPv4(10, 0, 0, 8), RemotePort: 80}, nil
 		}
 	}
-	scanner := &Scannerx{ctx: context.Background(), halfOpen: rec, config: &SynxConfig{tcpProbeTimeout: 30 * time.Millisecond, tcpProbeConcurrency: 2}, OpenPortHandlers: func(ip net.IP, port int) {
+	scanner := &Scannerx{ctx: context.Background(), halfOpen: rec, timing: timing, config: &SynxConfig{tcpProbeTimeout: 30 * time.Millisecond, tcpProbeConcurrency: 2}, OpenPortHandlers: func(ip net.IP, port int) {
 		if port != 80 || ip == nil || !ip.Equal(net.IPv4(10, 0, 0, 8)) {
 			t.Errorf("unexpected open %v:%d", ip, port)
 		}
@@ -311,6 +312,9 @@ func TestSendPacketUsesIndependentSynchronousProbes(t *testing.T) {
 	scanner.sendPacket(targetCh)
 	if calls.Load() != 5 || opened.Load() != 1 {
 		t.Fatalf("calls=%d opened=%d", calls.Load(), opened.Load())
+	}
+	if timing.tcpProbes.Load() != 5 || timing.tcpNoResponse.Load() != 1 || timing.tcpDeadline.Load() != 1 {
+		t.Fatalf("probe counts: total=%d no response=%d deadline=%d", timing.tcpProbes.Load(), timing.tcpNoResponse.Load(), timing.tcpDeadline.Load())
 	}
 	rec.mu.Lock()
 	defer rec.mu.Unlock()

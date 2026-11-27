@@ -20,6 +20,8 @@ import (
 )
 
 type FingerprintInfo struct {
+	confirmedPlainHTTP bool
+
 	protocolFields    map[string]any
 	IP                string                   `json:"ip"`
 	Port              int                      `json:"port"`

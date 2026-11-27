@@ -42,6 +42,7 @@ type Scannerx struct {
 
 	startTime   time.Time
 	summaryOnce sync.Once
+	timing      *synScanTiming
 	// halfOpen sends TCP and UDP through netstackvm.
 	halfOpen halfOpenSYN
 	// onSubmitTaskCallback: 每提交一个数据包的时候，这个 callback 调用一次
@@ -150,6 +151,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 		cancel:    cancel,
 		config:    config,
 		startTime: time.Now(),
+		timing:    newSynScanTiming(),
 		ports:     utils.NewPortsFilter(),
 		sampleIP:  sample,
 	}
@@ -159,6 +161,7 @@ func NewScannerx(ctx context.Context, sample string, config *SynxConfig) (*Scann
 	// 初始化发包相关的配置
 	err := s.initEssentialInfo()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -466,13 +469,6 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 	var openPortCount int
 	ipCountMap := make(map[string]struct{}, 16)
 	var outputFile *os.File
-	if s.config.outputFile != "" {
-		var err error
-		outputFile, err = os.OpenFile(s.config.outputFile, outputFileFlags(s.config.appendOutput), 0o644)
-		if err != nil {
-			log.Errorf("open file %v failed; %s", s.config.outputFile, err)
-		}
-	}
 
 	resultFilter := filter.NewFilter()
 	// Scan returns as soon as the probe loop is running. The filter has to
@@ -550,11 +546,7 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 				Protocol: proto,
 			}
 			s.config.callCallback(result)
-			select {
-			case <-s.ctx.Done():
-				return
-			case resultCh <- result:
-			}
+			s.timing.sendResult(s.ctx, resultCh, result)
 		}
 	}
 
@@ -565,6 +557,13 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			s.cancel()
 		}
 		return nil, fmt.Errorf("synscanx netstackvm: %w", err)
+	}
+	if s.config.outputFile != "" {
+		var err error
+		outputFile, err = os.OpenFile(s.config.outputFile, outputFileFlags(s.config.appendOutput), 0o644)
+		if err != nil {
+			log.Errorf("open file %v failed; %s", s.config.outputFile, err)
+		}
 	}
 	// 异步执行扫描流程
 	filterOwnedByScan = false
@@ -588,7 +587,9 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 
 		s.sendPacket(targetCh)
 		s.summaryOnce.Do(func() {
-			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
+			elapsed := time.Since(s.startTime)
+			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, elapsed)
+			s.timing.logSummary(s.config.RuntimeId, elapsed)
 		})
 	}()
 	return resultCh, nil

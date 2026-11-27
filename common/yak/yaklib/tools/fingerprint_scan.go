@@ -3,18 +3,22 @@ package tools
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
+	"github.com/yaklang/yaklang/common/consts"
 	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 )
 
@@ -38,6 +42,53 @@ var fingerprintInFlight atomic.Int64
 // 关键词: GetInFlightFingerprintScans, 可观测性接口
 func GetInFlightFingerprintScans() int64 {
 	return fingerprintInFlight.Load()
+}
+
+type fingerprintScanTiming struct {
+	started      time.Time
+	lastMatchEnd diagnostics.LatestTimestamp
+	matches      atomic.Int64
+	matchTime    atomic.Int64
+	sendWaits    atomic.Int64
+	sendWaitTime atomic.Int64
+}
+
+func newFingerprintScanTiming() *fingerprintScanTiming {
+	if !diagnostics.Enabled(diagnostics.LevelNormal) {
+		return nil
+	}
+	return &fingerprintScanTiming{started: time.Now()}
+}
+
+func (t *fingerprintScanTiming) match(
+	ctx context.Context,
+	match func(context.Context, string, int, ...fp.ConfigOption) (*fp.MatchResult, error),
+	host string, port int, opts ...fp.ConfigOption,
+) (*fp.MatchResult, error) {
+	if t != nil {
+		started := time.Now()
+		defer func() {
+			ended := time.Now()
+			t.lastMatchEnd.Record(ended)
+			t.matches.Add(1)
+			t.matchTime.Add(ended.Sub(started).Nanoseconds())
+		}()
+	}
+	return match(ctx, host, port, opts...)
+}
+
+func (t *fingerprintScanTiming) logSummary(source, runtimeID string) {
+	if t == nil {
+		return
+	}
+	if runtimeID == "" {
+		runtimeID = os.Getenv(consts.YAK_RUNTIME_ID)
+	}
+	// Work across different workers can overlap. Report its sum separately
+	// from the elapsed time for the scan.
+	log.Infof("servicescan timing: source=%s runtime_id=%q elapsed=%s last_probe_finished_at_ns=%d matches=%d match_time_sum=%s result_send_waits=%d result_send_wait_sum=%s",
+		source, runtimeID, time.Since(t.started), t.lastMatchEnd.UnixNano(), t.matches.Load(), time.Duration(t.matchTime.Load()),
+		t.sendWaits.Load(), time.Duration(t.sendWaitTime.Load()))
 }
 
 // maxOpenPortsPerHost 是单主机"开放端口数"熔断阈值. 在一次扫描中, 如果同一个
@@ -118,7 +169,7 @@ func openPortGuardLimit(config *fp.Config) int {
 // 永远不调用, swg.Wait/close(outC) 永远不返回, goroutine 永久泄漏.
 //
 // 关键词: fingerprint goroutine 泄漏修复, outC ctx 短路, drop on cancel
-func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, result *fp.MatchResult) {
+func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, result *fp.MatchResult, timing *fingerprintScanTiming) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -130,9 +181,21 @@ func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, res
 		return
 	default:
 	}
+	var started time.Time
+	if timing != nil {
+		started = time.Now()
+		timing.sendWaits.Add(1)
+	}
+	var dropped bool
 	select {
 	case outC <- result:
 	case <-ctx.Done():
+		dropped = true
+	}
+	if timing != nil {
+		timing.sendWaitTime.Add(time.Since(started).Nanoseconds())
+	}
+	if dropped {
 		fingerprintDropWarnOnce.Do(func() {
 			log.Warnf("fingerprint result dropped because ctx cancelled before downstream consumed; subsequent drops will be silent for this process")
 		})
@@ -247,6 +310,7 @@ func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.M
 //
 // 关键词: _scanFingerprint ctx 契约, fingerprint goroutine 退出条件
 func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, host, port string) (chan *fp.MatchResult, error) {
+	timing := newFingerprintScanTiming()
 	matcher, err := fp.NewDefaultFingerprintMatcher(config)
 	if err != nil {
 		return nil, err
@@ -325,7 +389,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 								return
 							}
 							log.Debugf("start task to scan: [%s://%s]", proto, utils.HostPort(buildinHost, portWithoutProto))
-							result, err := matcher.MatchWithContext(scanCtx, buildinHost, buildinPort)
+							result, err := timing.match(scanCtx, matcher.MatchWithContext, buildinHost, buildinPort)
 							if err != nil {
 								if len(portsInt) <= 0 {
 									if strings.Contains(fmt.Sprint(err), "excludeHosts/Ports") {
@@ -343,7 +407,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 							if result.IsOpen() {
 								tripGuard(buildinHost)
 							}
-							sendMatchResultOrDrop(scanCtx, outC, result)
+							sendMatchResultOrDrop(scanCtx, outC, result, timing)
 						}()
 					}
 				}
@@ -371,7 +435,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					}
 
 					//log.Infof("start task to scan: [%s://%s]", proto, utils.HostPort(rawHost, portWithoutProto))
-					result, err := matcher.MatchWithContext(scanCtx, rawHost, rawPort)
+					result, err := timing.match(scanCtx, matcher.MatchWithContext, rawHost, rawPort)
 					if err != nil {
 						log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 						return
@@ -380,7 +444,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 					if result.IsOpen() {
 						tripGuard(rawHost)
 					}
-					sendMatchResultOrDrop(scanCtx, outC, result)
+					sendMatchResultOrDrop(scanCtx, outC, result, timing)
 				}()
 			}
 		}
@@ -388,6 +452,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 			swg.Wait()
 			scanCancel() // 所有任务结束后再释放派生 ctx
 			filter.Close()
+			timing.logSummary("direct", matcher.Config.RuntimeId)
 			close(outC)
 		}()
 	}()
@@ -555,6 +620,7 @@ func synScanProbeTarget(res *synscan.SynScanResult) (proto string, port int, exp
 //
 // 关键词: _scanFromTargetStream ctx 契约, outC goroutine 泄漏防护
 func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
+	timing := newFingerprintScanTiming()
 	config := fp.NewConfig(opts...)
 	concurrent := config.PoolSize
 	ctx := config.Ctx
@@ -773,7 +839,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 					}
 					transportOpt = fp.WithTransportProtos(transport)
 				}
-				result, err := matcher.MatchWithContext(scanCtx, rawHost, portWithoutProto, transportOpt)
+				result, err := timing.match(scanCtx, matcher.MatchWithContext, rawHost, portWithoutProto, transportOpt)
 				if err != nil {
 					log.Errorf("failed to scan [%s://%s]: %v", proto, utils.HostPort(rawHost, portWithoutProto), err)
 					return
@@ -782,7 +848,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 					tripGuard(rawHost)
 				}
 
-				sendMatchResultOrDrop(scanCtx, outC, result)
+				sendMatchResultOrDrop(scanCtx, outC, result, timing)
 			}()
 		}
 
@@ -797,6 +863,7 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 		go func() {
 			swg.Wait()
 			scanCancel() // 所有任务结束后再释放派生 ctx
+			timing.logSummary("stream", config.RuntimeId)
 			close(outC)
 		}()
 	}()
@@ -975,6 +1042,9 @@ var FingerprintScanExports = map[string]interface{}{
 
 	// 单个请求超时时间
 	"probeTimeout": fp.WithProbeTimeoutHumanRead,
+
+	// 资产盘点已确认明文 HTTP 时直接获取 Web 指纹。
+	"preferVerifiedHTTP": fp.WithPreferVerifiedHTTP,
 
 	// proxies
 	"proxy": fp.WithProxy,

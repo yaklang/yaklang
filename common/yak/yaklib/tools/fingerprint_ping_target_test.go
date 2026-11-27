@@ -96,7 +96,11 @@ match local-fixture m|^fixture-banner$|
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	pingCh := make(chan *pingutil.PingResult)
-	out, err := _scanFromPingUtils(
+	scan, ok := FingerprintScanExports["ScanFromPing"].(func(chan *pingutil.PingResult, string, ...fp.ConfigOption) (chan *fp.MatchResult, error))
+	if !ok {
+		t.Fatal("ScanFromPing changed its exported signature")
+	}
+	out, err := scan(
 		pingCh,
 		"80",
 		fp.WithCtx(ctx),

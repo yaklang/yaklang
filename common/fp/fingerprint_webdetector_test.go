@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,6 +30,97 @@ func TestBuildWebPathRequestPacket_Order(t *testing.T) {
 
 	require.Equal(t, "GET "+webPath+" HTTP/1.1", lines[0])
 	require.Equal(t, "Host: "+target, lines[1])
+}
+
+func TestAssetInventoryVerifiedHTTP(t *testing.T) {
+	const serviceProbe = "Probe TCP GetRequest q|GET / HTTP/1.0\\r\\n\\r\\n|\nrarity 1\nmatch http m|^HTTP/1\\.[01] | p/HTTP fixture/\n"
+	webFirstPorts := utils.ParseStringToPorts(webPorts)
+	for _, https := range []bool{false, true} {
+		name := "http"
+		if https {
+			name = "https"
+		}
+		t.Run(name, func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = fmt.Fprint(w, "asset inventory fixture")
+			})
+			server := httptest.NewUnstartedServer(handler)
+			for slices.Contains(webFirstPorts, server.Listener.Addr().(*net.TCPAddr).Port) {
+				require.NoError(t, server.Listener.Close())
+				server = httptest.NewUnstartedServer(handler)
+			}
+			listener := &inventoryTLSListener{Listener: server.Listener}
+			server.Listener = listener
+			if https {
+				server.StartTLS()
+			} else {
+				server.Start()
+			}
+			defer server.Close()
+
+			addr := listener.Addr().(*net.TCPAddr)
+			matcher, err := NewDefaultFingerprintMatcher(NewConfig(
+				WithNmapRule(regressionProbeRules(t, serviceProbe)),
+				WithActiveMode(true), WithProbeTimeout(3*time.Second), WithDisableIotWebFingerprint(true),
+				WithCache(true), WithPreferVerifiedHTTP(true),
+			))
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			result, err := matcher.MatchWithContext(ctx, addr.IP.String(), addr.Port)
+			require.NoError(t, err)
+			require.True(t, result.IsOpen())
+			require.Equal(t, name, result.GetServiceName())
+			require.NotEmpty(t, result.Fingerprint.HttpFlows)
+			require.Equal(t, http.StatusOK, result.Fingerprint.HttpFlows[0].StatusCode)
+			require.Equal(t, https, result.Fingerprint.HttpFlows[0].IsHTTPS)
+			if https {
+				require.True(t, result.Fingerprint.CheckedTLS)
+				require.NotEmpty(t, result.Fingerprint.TLSInspectResults)
+				require.Equal(t, server.Certificate().Raw, result.Fingerprint.TLSInspectResults[0].Raw)
+				return
+			}
+			require.False(t, result.Fingerprint.CheckedTLS)
+			require.Empty(t, result.Fingerprint.TLSInspectResults)
+			require.Zero(t, listener.tlsConnections.Load())
+
+			full, err := matcher.MatchWithContext(ctx, addr.IP.String(), addr.Port, WithPreferVerifiedHTTP(false))
+			require.NoError(t, err)
+			require.True(t, full.Fingerprint.CheckedTLS)
+			require.Positive(t, listener.tlsConnections.Load())
+		})
+	}
+}
+
+type inventoryTLSListener struct {
+	net.Listener
+	tlsConnections atomic.Int64
+}
+
+func (l *inventoryTLSListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &inventoryTLSConn{Conn: conn, tlsConnections: &l.tlsConnections}, nil
+}
+
+type inventoryTLSConn struct {
+	net.Conn
+	firstRead      sync.Once
+	tlsConnections *atomic.Int64
+}
+
+func (c *inventoryTLSConn) Read(buffer []byte) (int, error) {
+	n, err := c.Conn.Read(buffer)
+	if n > 0 {
+		c.firstRead.Do(func() {
+			if buffer[0] == 0x16 {
+				c.tlsConnections.Add(1)
+			}
+		})
+	}
+	return n, err
 }
 
 type capturedHTTPRequest struct {

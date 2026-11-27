@@ -1,6 +1,7 @@
 package fp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -23,9 +24,7 @@ func getDeadlineFromContext(ctx context.Context, timeout time.Duration) time.Tim
 	return time.Now().Add(timeout)
 }
 
-// readBanner stops when the probe context is cancelled. StableReader only
-// watches its own timeout, so a cancelled scan used to keep the connection
-// until that timeout expired.
+// readBanner caps the reader timeout by the probe deadline.
 func readBanner(ctx context.Context, conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	if ctx == nil {
 		ctx = context.Background()
@@ -42,17 +41,29 @@ func readBanner(ctx context.Context, conn net.Conn, timeout time.Duration, maxSi
 			}
 		}
 	}
-	stop := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = conn.Close()
-		case <-stop:
+	return stableReader(conn, timeout, maxSize)
+}
+
+func exchangeProbe(ctx context.Context, conn *protocolResponseConn, payload string, config *Config, onTCPRead func(*protocolResponseConn)) (request, banner []byte) {
+	// The connection is owned by the I/O phase, including a blocked write.
+	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+
+	if payload != "" {
+		if !conn.udp {
+			_ = conn.SetWriteDeadline(getDeadlineFromContext(ctx, 3*time.Second))
 		}
-	}()
-	banner := stableReader(conn, timeout, maxSize)
-	close(stop)
-	return banner
+		data := []byte(payload)
+		n, err := conn.Write(data)
+		if !conn.udp || err == nil && n == len(data) {
+			request = data[:n]
+		}
+	}
+	if onTCPRead != nil {
+		onTCPRead(conn)
+	}
+	return request, readBanner(ctx, conn, config.ProbeTimeout, config.FingerprintDataSize)
 }
 
 func dialProbeUDP(ctx context.Context, target string, config *Config) (net.Conn, error) {
@@ -175,7 +186,7 @@ func match(rule *NmapMatch, data []rune, port int, host net.IP, safeBanner strin
 	return nil
 }
 
-func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *RuleBlock, config *Config) (open PortState, _ *FingerprintInfo, _ error) {
+func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *RuleBlock, config *Config, onTCPRead func(*protocolResponseConn)) (open PortState, _ *FingerprintInfo, _ error) {
 	rootCtx := ctx
 	ctx, cancel := context.WithTimeout(ctx, config.ProbeTimeout)
 	defer cancel()
@@ -197,23 +208,16 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			if err != nil {
 				return CLOSED, nil, utils2.Errorf("%s: %v", block.Probe.Name, err)
 			}
-			defer conn.Close()
-			var request []byte
-
 			// Send Payload
 			if block.Probe.Payload != "" {
 				log.Debugf(
 					"active probe for %s:%v probe: [%v]%s %v",
 					host, port, block.Probe.Proto, block.Probe.Name, strconv.Quote(block.Probe.Payload),
 				)
-				_ = conn.SetWriteDeadline(getDeadlineFromContext(ctx, 3*time.Second))
-				payload := []byte(block.Probe.Payload)
-				n, _ := conn.Write(payload)
-				request = payload[:n]
 			}
 
 			responseConn := &protocolResponseConn{Conn: conn}
-			banner := readBanner(ctx, responseConn, config.ProbeTimeout, config.FingerprintDataSize)
+			request, banner := exchangeProbe(ctx, responseConn, block.Probe.Payload, config, onTCPRead)
 			log.Debugf(
 				"active probe for %s:%v recv(%v)-%v: %v",
 				host, port, block.Probe.Proto, block.Probe.Name, strconv.Quote(string(banner)),
@@ -241,6 +245,10 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			if info := applyMatchRules(rootCtx, block, banner, port, host, resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
 				resultFingerprintInfo = info
 			}
+			if config.PreferVerifiedHTTP && len(config.Proxies) == 0 &&
+				(bytes.HasPrefix(request, []byte("GET ")) || bytes.HasPrefix(request, []byte("HEAD "))) {
+				resultFingerprintInfo.confirmedPlainHTTP = isSuccessfulHTTPResponse(banner)
+			}
 			resultFingerprintInfo.protocolFields = responseConn.parse(rootCtx, request, banner, TCP, port)
 			return OPEN, resultFingerprintInfo, nil
 		}
@@ -265,15 +273,8 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			if err != nil {
 				return CLOSED, resultFingerprintInfo, nil
 			}
-			defer udpConn.Close()
-
-			payload := []byte(block.Probe.Payload)
-			var request []byte
-			if n, err := udpConn.Write(payload); err == nil && n == len(payload) {
-				request = payload
-			}
 			responseConn := &protocolResponseConn{Conn: udpConn, udp: true}
-			banner := readBanner(ctx, responseConn, config.ProbeTimeout, config.FingerprintDataSize)
+			request, banner := exchangeProbe(ctx, responseConn, block.Probe.Payload, config, nil)
 			if banner != nil {
 				resultFingerprintInfo.Banner = bannerToString(banner)
 				log.Infof("%s udp banner: %v", block.Probe.Name, resultFingerprintInfo.Banner)

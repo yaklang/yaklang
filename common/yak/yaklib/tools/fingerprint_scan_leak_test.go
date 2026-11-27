@@ -51,7 +51,7 @@ func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_CancelExits(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		sendMatchResultOrDrop(ctx, outC, &fp.MatchResult{})
+		sendMatchResultOrDrop(ctx, outC, &fp.MatchResult{}, nil)
 	}()
 
 	select {
@@ -78,17 +78,21 @@ func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_BufferedSucceeds(t *testing.
 
 	outC := make(chan *fp.MatchResult, 1)
 	res := &fp.MatchResult{}
+	timing := &fingerprintScanTiming{}
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		sendMatchResultOrDrop(ctx, outC, res)
+		sendMatchResultOrDrop(ctx, outC, res, timing)
 	}()
 
 	select {
 	case <-done:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("sendMatchResultOrDrop did not return on buffered outC")
+	}
+	if waits := timing.sendWaits.Load(); waits != 0 {
+		t.Fatalf("buffered result recorded %d waits, want none", waits)
 	}
 
 	select {
@@ -108,7 +112,7 @@ func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_CancelledRetainsReadyResult(
 	for i := 0; i < 1000; i++ {
 		out := make(chan *fp.MatchResult, 1)
 		want := &fp.MatchResult{}
-		sendMatchResultOrDrop(ctx, out, want)
+		sendMatchResultOrDrop(ctx, out, want, nil)
 		select {
 		case got := <-out:
 			if got != want {
@@ -126,10 +130,11 @@ func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_CancelledFullBufferExits(t *
 	out := make(chan *fp.MatchResult, 1)
 	first := &fp.MatchResult{}
 	out <- first
+	timing := &fingerprintScanTiming{}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		sendMatchResultOrDrop(ctx, out, &fp.MatchResult{})
+		sendMatchResultOrDrop(ctx, out, &fp.MatchResult{}, timing)
 	}()
 	select {
 	case <-done:
@@ -138,5 +143,8 @@ func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_CancelledFullBufferExits(t *
 	}
 	if got := <-out; got != first {
 		t.Fatal("cancellation overwrote an earlier completed probe")
+	}
+	if waits := timing.sendWaits.Load(); waits != 1 {
+		t.Fatalf("full buffer recorded %d waits, want 1", waits)
 	}
 }

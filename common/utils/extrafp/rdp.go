@@ -2,12 +2,15 @@ package extrafp
 
 import (
 	"bytes"
+	"context"
+	"io"
+	"strconv"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
-	"time"
 )
 
 // rdp_receive_packet
@@ -47,7 +50,12 @@ var os_Multiple_2 = []byte{0x03, 0x00, 0x00, 0x13, 0x0e, 0xd0, 0x00, 0x00, 0x12,
 // version, details, err = rdp.Version("192.168.1.1:3389", 5)
 // println(version)
 // ```
-func RDPVersion(addr string, timeout time.Duration) (_ string, _ []string, finalResult error) {
+func RDPVersion(addr string, timeout time.Duration) (string, []string, error) {
+	return RDPVersionContext(context.Background(), addr, timeout)
+}
+
+// RDPVersionContext bounds supplemental identification by the probe and task deadlines.
+func RDPVersionContext(ctx context.Context, addr string, timeout time.Duration) (_ string, _ []string, finalResult error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("extrafp to rdp failed: %v", err)
@@ -56,47 +64,63 @@ func RDPVersion(addr string, timeout time.Duration) (_ string, _ []string, final
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
-	conn, err := netx.DialTCPTimeout(timeout, addr)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	conn, err := netx.DialX(addr, netx.DialX_WithTimeout(timeout), netx.DialX_WithContext(ctx), netx.DialX_WithProxy())
 	if err != nil {
+		if ctx.Err() != nil {
+			return "", nil, ctx.Err()
+		}
 		return "", nil, utils.Errorf("rdp to addr failed: %s", err)
 	}
+	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
 	var b, _ = codec.DecodeHex("030000130ee000000000000100080003000000")
-	conn.Write(b)
-	buf := utils.StableReaderEx(conn, timeout, 4096)
+	if _, err := conn.Write(b); err != nil {
+		if ctx.Err() != nil {
+			return "", nil, ctx.Err()
+		}
+		return "", nil, err
+	}
+	buf := utils.StableReader(io.LimitReader(conn, 4096), timeout, 4096)
+	if ctx.Err() != nil {
+		return "", nil, ctx.Err()
+	}
 
 	// RDP
-	if buf[0] == 0x03 && buf[1] == 0x00 && buf[2] == 0x00 {
-		if bytes.Equal(buf[:len(os______old)], os______old) {
+	if bytes.HasPrefix(buf, []byte{0x03, 0x00, 0x00}) {
+		if bytes.HasPrefix(buf, os______old) {
 			return "Windows Server 2003 or before", []string{
 				"cpe:2.3:o:microsoft:windows:2003:*",
 				"cpe:2.3:a:microsoft:remote_desktop",
 			}, nil
-		} else if bytes.Equal(buf[:len(os___xrdp_1)], os___xrdp_1) ||
-			bytes.Equal(buf[:len(os___xrdp_2)], os___xrdp_2) ||
-			bytes.Equal(buf[:len(os___xrdp_3)], os___xrdp_3) ||
-			bytes.Equal(buf[:len(os___xrdp_4)], os___xrdp_4) {
+		} else if bytes.HasPrefix(buf, os___xrdp_1) ||
+			bytes.HasPrefix(buf, os___xrdp_2) ||
+			bytes.HasPrefix(buf, os___xrdp_3) ||
+			bytes.HasPrefix(buf, os___xrdp_4) {
 			// xrdp
 			return "xrdp", []string{
 				"cpe:2.3:a:neutrinolabs:xrdp:*",
 			}, nil
-		} else if bytes.Equal(buf[:len(os___2008_1)], os___2008_1) ||
-			bytes.Equal(buf[:len(os___2008_2)], os___2008_2) ||
-			bytes.Equal(buf[:len(os___2008_3)], os___2008_3) {
+		} else if bytes.HasPrefix(buf, os___2008_1) ||
+			bytes.HasPrefix(buf, os___2008_2) ||
+			bytes.HasPrefix(buf, os___2008_3) {
 			return "Windows Server 2008 [R2] [Standard/Enterprise/Datacenter]", []string{
 				"cpe:2.3:o:microsoft:windows:server_2008:r2",
 				"cpe:2.3:a:microsoft:remote_desktop",
 			}, nil
-		} else if bytes.Equal(buf[:len(os___2012_1)], os___2012_1) ||
-			bytes.Equal(buf[:len(os___2012_2)], os___2012_2) ||
-			bytes.Equal(buf[:len(os__2012_r2)], os__2012_r2) {
+		} else if bytes.HasPrefix(buf, os___2012_1) ||
+			bytes.HasPrefix(buf, os___2012_2) ||
+			bytes.HasPrefix(buf, os__2012_r2) {
 			return "Windows Server 2012 [R2]", []string{
 				"cpe:2.3:o:microsoft:windows:server_2012:r2",
 				"cpe:2.3:a:microsoft:remote_desktop",
 			}, nil
-		} else if bytes.Equal(buf[:len(os__Vista_1)], os__Vista_1) {
+		} else if bytes.HasPrefix(buf, os__Vista_1) {
 			return "Windows Vista or later", []string{"cpe:2.3:o:microsoft:windows:vista", "cpe:2.3:a:microsoft:remote_desktop"}, nil
-		} else if bytes.Equal(buf[:len(os_Multiple_1)], os_Multiple_1) ||
-			bytes.Equal(buf[:len(os_Multiple_2)], os_Multiple_2) {
+		} else if bytes.HasPrefix(buf, os_Multiple_1) ||
+			bytes.HasPrefix(buf, os_Multiple_2) {
 			return "Windows [7/8/10/Server] 2003/2008/2012 [R2] [Standard/Enterprise] [x64] Edition", []string{
 				"cpe:2.3:o:microsoft:windows:*",
 				"cpe:2.3:a:microsoft:remote_desktop",
