@@ -31,7 +31,7 @@ const nativeOffsetBatchChunk = 500
 // call does not cache misses. Read-mode preload may cache non-empty value
 // snapshots separately; callers still receive their own row copies.
 func nativeGetOffsetsByVariable(db *gorm.DB, name string, valueID int64, programName string) ([]*IrOffset, error) {
-	query, args := offsetVariableQuery(name, valueID, programName)
+	query, args := offsetVariableQueryForDB(db, name, valueID, programName)
 	rows, err := queryOffsetRows(db, query, args...)
 	if err != nil {
 		return nil, err
@@ -71,8 +71,14 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 	return all, nil
 }
 
-// offsetVariableQuery is the single-variable lookup. It has no ORDER BY.
-// Callers sort by id.
+// offsetVariableQueryForDB selects the SQLite plan hint only for SQLite.
+// PostgreSQL rejects unary "+" on text (operator does not exist: + text).
+func offsetVariableQueryForDB(db *gorm.DB, name string, valueID int64, programName string) (string, []any) {
+	return offsetVariableQueryWithUnaryPlus(name, valueID, programName, dialectOf(db) == sqlDialectSQLite)
+}
+
+// offsetVariableQuery is the SQLite-shaped single-variable lookup. It has no
+// ORDER BY; callers sort by id.
 //
 // With a program name the name term carries a unary "+". That disqualifies
 // variable_name from driving an index. Names such as "this" repeat across
@@ -83,10 +89,18 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 // (program_name, value_id) prefix drives the lookup. Unary "+" drops the
 // column's TEXT affinity, so name must stay a string; it always is.
 func offsetVariableQuery(name string, valueID int64, programName string) (string, []any) {
+	return offsetVariableQueryWithUnaryPlus(name, valueID, programName, true)
+}
+
+func offsetVariableQueryWithUnaryPlus(name string, valueID int64, programName string, unaryPlus bool) (string, []any) {
 	query := nativeOffsetSelect + ` WHERE deleted_at IS NULL AND variable_name = ? AND value_id = ?`
 	args := []any{name, valueID}
 	if program := strings.TrimSpace(programName); program != "" {
-		query = nativeOffsetSelect + ` WHERE deleted_at IS NULL AND +variable_name = ? AND value_id = ? AND program_name = ?`
+		nameTerm := "variable_name"
+		if unaryPlus {
+			nameTerm = "+variable_name"
+		}
+		query = nativeOffsetSelect + ` WHERE deleted_at IS NULL AND ` + nameTerm + ` = ? AND value_id = ? AND program_name = ?`
 		args = append(args, program)
 	}
 	return query, args

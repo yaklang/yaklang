@@ -57,7 +57,10 @@ func nativeInsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) (bool, err
 		batchSize = 500
 	}
 
-	columnList := `"` + strings.Join(irCodeInsertColumns, `", "`) + `"`
+	columnList := make([]string, len(irCodeInsertColumns))
+	for i, column := range irCodeInsertColumns {
+		columnList[i] = QuoteIdent(db, column)
+	}
 	rowPlaceholder := "(" + strings.TrimSuffix(strings.Repeat("?,", len(irCodeInsertColumns)), ",") + ")"
 	now := time.Now()
 	for start := 0; start < len(items); start += batchSize {
@@ -93,8 +96,7 @@ func nativeInsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) (bool, err
 			args = appendIrCodeInsertArgs(args, item)
 		}
 		values := strings.TrimSuffix(strings.Repeat(rowPlaceholder+",", rowCount), ",")
-		query := bindSQLPlaceholdersDB(db,
-			`INSERT INTO "`+TableIrCodes+`" (`+columnList+`) VALUES `+values)
+		query := `INSERT INTO ` + QuoteIdent(db, TableIrCodes) + ` (` + strings.Join(columnList, ", ") + `) VALUES ` + values
 		ctx, cancel := nativeQueryContext(context.Background())
 		started := time.Now()
 		_, err := nativeExecContextDB(db, ctx, query, args...)

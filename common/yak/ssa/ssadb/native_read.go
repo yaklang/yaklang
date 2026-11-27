@@ -77,15 +77,15 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 	if db == nil || id < 0 {
 		return nil, nil
 	}
-	const columns = `SELECT id, created_at, updated_at, deleted_at, code_id, program_name, version, ` +
+	columns := `SELECT id, created_at, updated_at, deleted_at, code_id, program_name, version, ` +
 		`source_code_start_offset, source_code_end_offset, source_code_hash, opcode, opcode_name, opcode_operator, ` +
-		`name, verbose_name, short_verbose_name, "string", readable_name, readable_name_short, ` +
+		`name, verbose_name, short_verbose_name, ` + QuoteIdent(db, "string") + `, readable_name, readable_name_short, ` +
 		`current_block, current_function, is_function, formal_args, free_values, member_call_args, ` +
 		`side_effects, is_variadic, return_codes, is_external, code_blocks, enter_block, exit_block, defer_block, ` +
 		`children_function, parent_function, is_block, pred_block, succ_block, phis, has_defs, users, occulatation, ` +
 		`is_object, object_members, object_member_pairs, is_object_member, object_parent, object_key, object_owner_pairs, ` +
 		`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type, const_id ` +
-		`FROM ` + TableIrCodes + ` `
+		`FROM ` + QuoteIdent(db, TableIrCodes) + ` `
 	q := columns + `WHERE code_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`
 	args := []any{id, progName}
 	started := time.Now()
@@ -151,6 +151,16 @@ const nativeIrCodeColumns = `id, created_at, updated_at, deleted_at, code_id, pr
 	`is_object, object_members, object_member_pairs, is_object_member, object_parent, object_key, object_owner_pairs, ` +
 	`masked_codes, is_masked, variable, program_compile_hash, type_id, point, pointer, extra_information, const_type, const_id`
 
+// nativeIrCodeColumnsFor renders the shared column list for db. "string" is
+// the only identifier that needs dialect-specific quoting: it is a keyword in
+// some databases and MySQL does not accept double-quoted identifiers.
+func nativeIrCodeColumnsFor(db *gorm.DB) string {
+	if dialectOf(db) == sqlDialectMySQL {
+		return strings.ReplaceAll(nativeIrCodeColumns, `"string"`, QuoteIdent(db, "string"))
+	}
+	return nativeIrCodeColumns
+}
+
 // nativeIrCodeBatchChunk bounds the number of IN-list placeholders per query to
 // stay under SQLite's MAX_VARIABLE_NUMBER (250000). 1000 is far below that and
 // keeps each statement small.
@@ -203,7 +213,7 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 			placeholders[i] = "?"
 			args = append(args, id)
 		}
-		q := bindSQLPlaceholdersDB(db, `SELECT `+nativeIrCodeColumns+` FROM `+TableIrCodes+
+		q := bindSQLPlaceholdersDB(db, `SELECT `+nativeIrCodeColumnsFor(db)+` FROM `+QuoteIdent(db, TableIrCodes)+
 			` WHERE program_name = ? AND `+idColumn+` IN (`+joinPlaceholders(placeholders)+`) AND deleted_at IS NULL ORDER BY code_id`)
 		started := time.Now()
 		ctx, cancel := nativeQueryContext(context.Background())
@@ -288,19 +298,19 @@ func joinPlaceholders(ps []string) string {
 const irCodeConstOpcode = 5
 const irCodeConstTypeNormal = "normal"
 
-func constLookupSQL(operator, indexName string) string {
-	from := TableIrCodes
+func constLookupSQL(db *gorm.DB, operator, indexName string) string {
+	from := QuoteIdent(db, TableIrCodes)
 	// SQLite will not use the partial index for REGEXP while a plain opcode
 	// index is present: REGEXP does not constrain "string", so the opcode
 	// index looks cheaper and the query goes back to the wide rows. INDEXED BY
 	// is SQLite-only; other dialects keep the literal predicate and their own
 	// planner.
 	if indexName != "" {
-		from += ` INDEXED BY "` + indexName + `"`
+		from += ` INDEXED BY ` + QuoteIdent(db, indexName)
 	}
 	return fmt.Sprintf(
-		`SELECT code_id FROM %s WHERE program_name = ? AND opcode = %d AND const_type = '%s' AND "string" %s ? AND deleted_at IS NULL`,
-		from, irCodeConstOpcode, irCodeConstTypeNormal, operator,
+		`SELECT code_id FROM %s WHERE program_name = ? AND opcode = %d AND const_type = '%s' AND %s %s ? AND deleted_at IS NULL`,
+		from, irCodeConstOpcode, irCodeConstTypeNormal, QuoteIdent(db, "string"), operator,
 	)
 }
 
@@ -409,14 +419,10 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 	}
 	operator := "="
 	if compareMode != ExactCompare {
-		operator = "REGEXP"
-		switch db.Dialect().GetName() {
-		case "postgres", "postgresql", "cloudsqlpostgres":
-			operator = "~"
-		}
+		operator = RegexpOperator(db)
 	}
 	queryFor := func(hint string) string {
-		return bindSQLPlaceholdersDB(db, constLookupSQL(operator, hint))
+		return bindSQLPlaceholdersDB(db, constLookupSQL(db, operator, hint))
 	}
 	args := []interface{}{progName, value}
 	q := queryFor(hint)
@@ -463,10 +469,12 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 // constraint, so it reads the narrow pool in row order and joins only the
 // candidates. Either way the wide ir_codes row is touched once per hit.
 func nativeGetConstIDsFromPool(ctx context.Context, db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, string, error) {
-	from := ` FROM "` + TableIrConstPool + `" p JOIN "` + TableIrCodes + `" c` +
+	poolTable := QuoteIdent(db, TableIrConstPool)
+	codesTable := QuoteIdent(db, TableIrCodes)
+	from := ` FROM ` + poolTable + ` p JOIN ` + codesTable + ` c` +
 		` ON c.program_name = p.program_name AND c.const_id = p.const_id`
 	where := ` WHERE p.program_name = ? AND c.const_id <> 0 AND c.deleted_at IS NULL`
-	query := `SELECT c.code_id` + from + where + ` AND p."string" REGEXP ?`
+	query := `SELECT c.code_id` + from + where + ` AND p.` + QuoteIdent(db, "string") + ` ` + RegexpOperator(db) + ` ?`
 	args := []interface{}{progName, value}
 	if compareMode == ExactCompare {
 		// The search value is text, but new pool keys also cover the kind.
@@ -484,15 +492,10 @@ func nativeGetConstIDsFromPool(ctx context.Context, db *gorm.DB, progName string
 		// ir_codes (every const instruction) and probes the pool per row. An IN
 		// subquery materializes the matching pool ids first, so the wide table
 		// is probed once per hit instead.
-		operator := "REGEXP"
-		switch db.Dialect().GetName() {
-		case "postgres", "postgresql", "cloudsqlpostgres":
-			operator = "~"
-		}
-		query = `SELECT c.code_id FROM "` + TableIrCodes + `" c` +
+		query = `SELECT c.code_id FROM ` + codesTable + ` c` +
 			` WHERE c.program_name = ? AND c.const_id <> 0 AND c.deleted_at IS NULL` +
-			` AND c.const_id IN (SELECT const_id FROM "` + TableIrConstPool +
-			`" WHERE program_name = ? AND "string" ` + operator + ` ?)`
+			` AND c.const_id IN (SELECT const_id FROM ` + poolTable +
+			` WHERE program_name = ? AND ` + QuoteIdent(db, "string") + ` ` + RegexpOperator(db) + ` ?)`
 		args = []interface{}{progName, progName, value}
 	}
 	query = bindSQLPlaceholdersDB(db, query)
@@ -518,20 +521,17 @@ func nativeGetConstIDsFromPool(ctx context.Context, db *gorm.DB, progName string
 // instead of dragging ir_codes' wide rows. SQLite would otherwise pick the hash
 // index and add one row lookup per const.
 func nativeGetConstIDsFromIrConsts(ctx context.Context, db *gorm.DB, progName string, compareMode CompareMode, value string) ([]int64, string, error) {
-	query := `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND "string" REGEXP ?`
+	table := QuoteIdent(db, TableIrConsts)
+	stringColumn := QuoteIdent(db, "string")
+	query := `SELECT code_id FROM ` + table + ` WHERE program_name = ? AND ` + stringColumn + ` ` + RegexpOperator(db) + ` ?`
 	args := []interface{}{progName, value}
 	if compareMode == ExactCompare {
-		query = `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND const_hash = ? AND "string" = ?`
+		query = `SELECT code_id FROM ` + table + ` WHERE program_name = ? AND const_hash = ? AND ` + stringColumn + ` = ?`
 		args = []interface{}{progName, IrConstHash(value), value}
-	} else {
-		switch db.Dialect().GetName() {
-		case "postgres", "postgresql", "cloudsqlpostgres":
-			query = `SELECT code_id FROM "` + TableIrConsts + `" WHERE program_name = ? AND "string" ~ ?`
-		default:
-			if isSQLiteDB(db) {
-				query = `SELECT code_id FROM "` + TableIrConsts + `" NOT INDEXED WHERE program_name = ? AND "string" REGEXP ?`
-			}
-		}
+	} else if isSQLiteDB(db) {
+		// SQLite would otherwise pick the hash index and add one row lookup per
+		// const; the pattern has no range constraint, so scan the narrow table.
+		query = `SELECT code_id FROM ` + table + ` NOT INDEXED WHERE program_name = ? AND ` + stringColumn + ` REGEXP ?`
 	}
 	query = bindSQLPlaceholdersDB(db, query)
 	rows, err := nativeQueryContextDB(db, ctx, query, args...)
@@ -554,6 +554,17 @@ func nativeContextErr(err error) bool {
 	return err != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))
 }
 
+// nativePrepareQuery is the single place native SQL is adapted to a dialect:
+// "?" becomes "$n" for Postgres and DM receives its normalized query form.
+// Callers may still pass a pre-bound query; binding is idempotent.
+func nativePrepareQuery(db *gorm.DB, query string) string {
+	query = bindSQLPlaceholdersDB(db, query)
+	if damenggorm.IsDM(db) {
+		query = damenggorm.NormalizeQuery(query)
+	}
+	return query
+}
+
 func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args ...interface{}) *sql.Row {
 	if db == nil {
 		return nil
@@ -565,9 +576,7 @@ func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args 
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if damenggorm.IsDM(db) {
-		query = damenggorm.NormalizeQuery(query)
-	}
+	query = nativePrepareQuery(db, query)
 	switch q := common.(type) {
 	case *sql.DB:
 		return q.QueryRowContext(ctx, query, args...)
@@ -588,16 +597,18 @@ func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args .
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if damenggorm.IsDM(db) {
-		query = damenggorm.NormalizeQuery(query)
+	query = nativePrepareQuery(db, query)
+	common := db.CommonDB()
+	if common == nil {
+		return nil, sql.ErrConnDone
 	}
-	switch q := db.CommonDB().(type) {
+	switch q := common.(type) {
 	case *sql.DB:
 		return q.QueryContext(ctx, query, args...)
 	case *sql.Tx:
 		return q.QueryContext(ctx, query, args...)
 	default:
-		return db.CommonDB().Query(query, args...)
+		return common.Query(query, args...)
 	}
 }
 
@@ -613,15 +624,25 @@ func nativeExecContextDB(db *gorm.DB, ctx context.Context, query string, args ..
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if damenggorm.IsDM(db) {
-		query = damenggorm.NormalizeQuery(query)
+	query = nativePrepareQuery(db, query)
+	common := db.CommonDB()
+	if common == nil {
+		return nil, sql.ErrConnDone
 	}
-	switch q := db.CommonDB().(type) {
+	switch q := common.(type) {
 	case *sql.DB:
 		return q.ExecContext(ctx, query, args...)
 	case *sql.Tx:
 		return q.ExecContext(ctx, query, args...)
 	default:
-		return db.CommonDB().Exec(query, args...)
+		return common.Exec(query, args...)
 	}
+}
+
+// nativeExec runs a statement through the dialect-aware native executor with a
+// background context. Business code must use this instead of db.Exec/tx.Exec
+// when it issues hand-written SQL.
+func nativeExec(db *gorm.DB, query string, args ...interface{}) error {
+	_, err := nativeExecContextDB(db, context.Background(), query, args...)
+	return err
 }

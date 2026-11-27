@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -221,7 +222,11 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 		}
 		path = fmt.Sprintf("%s?%s", path, params.Encode())
 	case MySQL:
-		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
+		sep := "?"
+		if strings.Contains(path, "?") {
+			sep = "&"
+		}
+		path = path + sep + "charset=utf8mb4&parseTime=True&loc=Local"
 	default:
 	}
 

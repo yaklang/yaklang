@@ -85,7 +85,7 @@ func deleteProgramRowsForReplacement(tx *gorm.DB, program string) error {
 		if table == schema.TableSyntaxFlowScanTask {
 			column = "programs"
 		}
-		if err := tx.Exec(`DELETE FROM `+table+` WHERE `+column+` = ?`, program).Error; err != nil {
+		if err := nativeExec(tx, `DELETE FROM `+QuoteIdent(tx, table)+` WHERE `+QuoteIdent(tx, column)+` = ?`, program); err != nil {
 			return fmt.Errorf("%s: %w", table, err)
 		}
 	}
@@ -93,14 +93,14 @@ func deleteProgramRowsForReplacement(tx *gorm.DB, program string) error {
 		if !tx.HasTable(table) {
 			continue
 		}
-		if err := tx.Exec(`DELETE FROM `+table+` WHERE program_name = ?`, program).Error; err != nil {
+		if err := nativeExec(tx, `DELETE FROM `+QuoteIdent(tx, table)+` WHERE `+QuoteIdent(tx, "program_name")+` = ?`, program); err != nil {
 			return fmt.Errorf("%s: %w", table, err)
 		}
 	}
-	if err := tx.Exec(`DELETE FROM `+TableIrSources+` WHERE folder_path = ? AND file_name = ?`, "/", program).Error; err != nil {
+	if err := nativeExec(tx, `DELETE FROM `+QuoteIdent(tx, TableIrSources)+` WHERE `+QuoteIdent(tx, "folder_path")+` = ? AND `+QuoteIdent(tx, "file_name")+` = ?`, "/", program); err != nil {
 		return fmt.Errorf("%s folder row: %w", TableIrSources, err)
 	}
-	if err := tx.Exec(`DELETE FROM `+TableIrPrograms+` WHERE program_name = ?`, program).Error; err != nil {
+	if err := nativeExec(tx, `DELETE FROM `+QuoteIdent(tx, TableIrPrograms)+` WHERE `+QuoteIdent(tx, "program_name")+` = ?`, program); err != nil {
 		return fmt.Errorf("%s: %w", TableIrPrograms, err)
 	}
 	return nil
@@ -116,7 +116,7 @@ func renameProgramRowsForReplacement(tx *gorm.DB, staged, target string) error {
 		if !tx.HasTable(table) {
 			return fmt.Errorf("%s: table is missing", table)
 		}
-		if err := tx.Exec(`UPDATE `+table+` SET program_name = ? WHERE program_name = ?`, target, staged).Error; err != nil {
+		if err := nativeExec(tx, `UPDATE `+QuoteIdent(tx, table)+` SET `+QuoteIdent(tx, "program_name")+` = ? WHERE `+QuoteIdent(tx, "program_name")+` = ?`, target, staged); err != nil {
 			return fmt.Errorf("%s: %w", table, err)
 		}
 	}
@@ -124,15 +124,15 @@ func renameProgramRowsForReplacement(tx *gorm.DB, staged, target string) error {
 		if !tx.HasTable(table) {
 			continue
 		}
-		if err := tx.Exec(`UPDATE `+table+` SET program_name = ? WHERE program_name = ?`, target, staged).Error; err != nil {
+		if err := nativeExec(tx, `UPDATE `+QuoteIdent(tx, table)+` SET `+QuoteIdent(tx, "program_name")+` = ? WHERE `+QuoteIdent(tx, "program_name")+` = ?`, target, staged); err != nil {
 			return fmt.Errorf("%s: %w", table, err)
 		}
 	}
-	if err := tx.Exec(`UPDATE `+TableIrSources+` SET program_name = ?, file_name = ? WHERE folder_path = ? AND file_name = ?`,
-		target, target, "/", staged).Error; err != nil {
+	if err := nativeExec(tx, `UPDATE `+QuoteIdent(tx, TableIrSources)+` SET `+QuoteIdent(tx, "program_name")+` = ?, `+QuoteIdent(tx, "file_name")+` = ? WHERE `+QuoteIdent(tx, "folder_path")+` = ? AND `+QuoteIdent(tx, "file_name")+` = ?`,
+		target, target, "/", staged); err != nil {
 		return fmt.Errorf("%s folder row: %w", TableIrSources, err)
 	}
-	if err := tx.Exec(`UPDATE `+TableIrPrograms+` SET program_name = ? WHERE program_name = ?`, target, staged).Error; err != nil {
+	if err := nativeExec(tx, `UPDATE `+QuoteIdent(tx, TableIrPrograms)+` SET `+QuoteIdent(tx, "program_name")+` = ? WHERE `+QuoteIdent(tx, "program_name")+` = ?`, target, staged); err != nil {
 		return fmt.Errorf("%s: %w", TableIrPrograms, err)
 	}
 	return nil
