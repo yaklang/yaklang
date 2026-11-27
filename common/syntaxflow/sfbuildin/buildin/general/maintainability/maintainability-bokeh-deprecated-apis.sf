@@ -4,7 +4,7 @@ desc(
 	title: "源码匹配：检测到已废弃的 Bokeh API"
 	title_zh: "源码匹配：检测到已废弃的 Bokeh API"
 	type: maintainability
-	level: "middle"
+	level: "low"
 	rule_id: "source-maintainability-bokeh-deprecated-apis"
 	risk: "code-style"
 	desc: <<<DESC
@@ -35,7 +35,7 @@ NEG
 
 ${*.py}.pattern_regex(/(?:import\s+bokeh\.layouts\.widgetbox)|(?:import\s+bokeh\.models\.graphs\.from_networkx)/) as $hit
 alert $hit for {
-	level: "middle",
+	level: "low",
 	title: "检测到已废弃的 Bokeh API",
 	title_zh: "检测到已废弃的 Bokeh API",
 	message: "检测到已废弃的 Bokeh API",
