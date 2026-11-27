@@ -791,9 +791,6 @@ func (s *Server) uploadRisksToOnline(ctx context.Context, db *gorm.DB, req *ypb.
 		}
 	}
 	wg.Wait()
-	if tokenExpired {
-		return 0, 0, tokenErr
-	}
 	if total == 0 {
 		return 0, 0, utils.Errorf("没有需要上传的数据")
 	}
@@ -801,6 +798,9 @@ func (s *Server) uploadRisksToOnline(ctx context.Context, db *gorm.DB, req *ypb.
 		if err := yakit.UploadRiskToOnline(s.GetProjectDatabase(), hashes); err != nil {
 			log.Errorf("mark risk uploaded failed: %s", err)
 		}
+	}
+	if tokenExpired {
+		return 0, 0, tokenErr
 	}
 	if err := ctx.Err(); err != nil {
 		return len(success), len(failed), err
