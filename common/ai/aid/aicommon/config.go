@@ -391,7 +391,7 @@ type Config struct {
 	GoalMinIterations        int64
 	GoalDurationSeconds      int64     // Goal mode time window in seconds; -1 = never auto-finish, 0 = disabled
 	GoalAcceptanceCriteria   string    // Goal mode acceptance criteria; non-empty enables one main-model review turn
-	GoalDeadline             time.Time // Computed deadline for goal time window (zero = not started)
+	GoalDeadline             time.Time // Computed deadline for the current task's goal time window (zero = not started)
 	goalTimeRevision         uint64
 	agentPolicyRevision      uint64
 	agentPolicyEmitHandler   func()

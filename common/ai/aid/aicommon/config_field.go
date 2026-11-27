@@ -217,8 +217,11 @@ func (c *Config) GetGoalTimeState() GoalTimeState {
 	return state
 }
 
-// setGoalDurationSeconds starts a new time window as soon as it is configured.
-// Reapplying the same value preserves an existing deadline, even after expiry.
+// setGoalDurationSeconds applies the configured window length. It materializes
+// a window immediately so configured state is observable, but the window that
+// governs a running task is restarted by RefreshGoalDeadlineForTask when that
+// task begins. Reapplying the same value preserves an existing deadline, even
+// after expiry.
 func (c *Config) setGoalDurationSeconds(seconds int64) {
 	if c == nil {
 		return
@@ -232,6 +235,31 @@ func (c *Config) setGoalDurationSeconds(seconds int64) {
 	if changed {
 		c.notifyAgentPolicySnapshotEmit()
 	}
+}
+
+// RefreshGoalDeadlineForTask restarts the goal time window for a new top-level
+// task. The window length stays declared in Config, but the deadline belongs to
+// the task that is starting now: a previous task's window (including any
+// GoalTimePatch applied to it) must never leak into the next one.
+func (c *Config) RefreshGoalDeadlineForTask() bool {
+	if c == nil {
+		return false
+	}
+	if c.m == nil {
+		c.m = new(sync.Mutex)
+	}
+	c.m.Lock()
+	deadline := computeGoalDeadline(time.Now(), c.GoalDurationSeconds)
+	changed := !c.GoalDeadline.Equal(deadline)
+	c.GoalDeadline = deadline
+	if changed {
+		c.goalTimeRevision++
+	}
+	c.m.Unlock()
+	if changed {
+		c.notifyAgentPolicySnapshotEmit()
+	}
+	return changed
 }
 
 func applyGoalDuration(duration *int64, deadline *time.Time, revision *uint64, seconds int64, now time.Time) bool {
