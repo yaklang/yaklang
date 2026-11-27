@@ -17,13 +17,19 @@ type goalAcceptanceTimelineInvoker struct {
 	cfg *aicommon.Config
 }
 
-func TestGoalDeadlineStartsAtConfigurationAndFinishOnlyReadsIt(t *testing.T) {
+// Declared config only describes the window; a task start opens it, and finish
+// checks must read the deadline without ever starting or extending it.
+func TestGoalDeadlineStartsAtTaskStartAndFinishOnlyReadsIt(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()),
 		aicommon.WithEnableGoalMode(true), aicommon.WithGoalMinIterations(0), aicommon.WithGoalDurationSeconds(10800))
 	loop := NewMinimalReActLoop(cfg, mock.NewMockInvoker(ctx))
+	require.True(t, cfg.GetGoalDeadline().IsZero(), "declared config must not open the window")
+	require.False(t, loop.ShouldBlockFinishByDeadline(), "a closed window must not block finish")
+
+	require.True(t, cfg.RefreshGoalDeadlineForTask())
 	deadline := cfg.GetGoalDeadline()
 	require.WithinDuration(t, time.Now().Add(3*time.Hour), deadline, time.Second)
 	require.False(t, loop.ShouldBlockFinishAtIteration(1))

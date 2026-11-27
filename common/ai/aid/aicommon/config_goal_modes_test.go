@@ -61,7 +61,9 @@ func TestExecutionStrategyGoalModesReplaceZeros(t *testing.T) {
 			require.Equal(t, step.strategy.GoalAcceptanceCriteria, c.GetGoalAcceptanceCriteria())
 			require.Equal(t, step.strategy.GoalDurationSeconds, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 			if step.strategy.GoalDurationSeconds > 0 {
-				require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
+				// A declared duration leaves the window closed until a task starts.
+				require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode)
+				require.False(t, snapshot.Goal.TimeLimit.Enabled)
 				require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt,
 					"a declared duration must not open a window by itself")
 				require.True(t, c.GetGoalDeadline().IsZero())

@@ -493,10 +493,10 @@ func TestHotPatch_ExecutionStrategyEmitsOneCoherentPolicySnapshot(t *testing.T) 
 		require.True(t, snapshot.Goal.Enabled)
 		require.EqualValues(t, 11, snapshot.Goal.MinIterations)
 		require.Equal(t, "evidence required", snapshot.Goal.AcceptanceCriteria)
-		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-		require.EqualValues(t, 120, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
-		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt,
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode,
 			"one strategy hotpatch declares the window; it must not open one")
+		require.EqualValues(t, 120, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
 		require.True(t, snapshot.MultiAgent.Enabled)
 		require.True(t, snapshot.MultiAgent.PreferDispatch)
 		require.EqualValues(t, 6, snapshot.MultiAgent.MaxConcurrency)
@@ -545,7 +545,8 @@ func TestHotPatch_ExecutionStrategyWithoutGoalTimePatchDefersDeadline(t *testing
 		require.True(t, snapshot.Goal.Enabled)
 		require.True(t, snapshot.Goal.Effective)
 		require.EqualValues(t, 1, snapshot.Goal.MinIterations)
-		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode,
+			"no task has started, so no window is open")
 		require.EqualValues(t, 7200, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
 	case <-ctx.Done():

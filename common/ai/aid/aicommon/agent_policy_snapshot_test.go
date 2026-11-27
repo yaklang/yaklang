@@ -74,9 +74,11 @@ func TestEmitAgentPolicySnapshot_UsesDedicatedStructuredEvent(t *testing.T) {
 		require.False(t, event.ShouldSave(), "runtime policy snapshots are replaceable state and must not be persisted")
 		var snapshot AgentPolicySnapshot
 		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
-		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
-		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt,
-			"declared config must not open a window; the deadline belongs to a task")
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode,
+			"a declared duration alone leaves the window closed")
+		require.False(t, snapshot.Goal.TimeLimit.Enabled)
+		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
+		require.EqualValues(t, 60, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 	case <-time.After(time.Second):
 		t.Fatal("agent policy snapshot event was not emitted")
 	}
@@ -117,7 +119,7 @@ func TestSettingGoalDurationNotifiesAgentPolicySnapshot(t *testing.T) {
 	case event := <-events:
 		var snapshot AgentPolicySnapshot
 		require.NoError(t, json.Unmarshal(event.Content, &snapshot))
-		require.Equal(t, GoalTimeLimitModeDeadline, snapshot.Goal.TimeLimit.Mode)
+		require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode)
 		require.EqualValues(t, 60, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
 		require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
 	case <-time.After(time.Second):

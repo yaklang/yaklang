@@ -234,3 +234,123 @@ func TestGoalTimePatchExtendDoesNotWriteDeclaredDuration(t *testing.T) {
 	require.WithinDuration(t, time.Now().Add(15*time.Minute), c.GetGoalDeadline(), 2*time.Second)
 	require.EqualValues(t, 600, c.GetGoalDurationSeconds())
 }
+
+// A DISABLE patch closes the gate for the running task, and the snapshot has to
+// say so: the runtime deadline is the only thing that decides the mode, so a
+// declared duration must not keep reporting a deadline window.
+func TestGoalTimePatchDisableIsReportedAsDisabledMode(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(3600)(c))
+	require.True(t, c.RefreshGoalDeadlineForTask())
+
+	open := c.BuildAgentPolicySnapshot().Goal.TimeLimit
+	require.Equal(t, GoalTimeLimitModeDeadline, open.Mode)
+	require.True(t, open.Enabled)
+	require.Greater(t, open.DeadlineAt, int64(0))
+
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE,
+	})(c))
+
+	closed := c.BuildAgentPolicySnapshot().Goal.TimeLimit
+	require.Equal(t, GoalTimeLimitModeDisabled, closed.Mode,
+		"a runtime DISABLE must not be reported as the configured deadline mode")
+	require.False(t, closed.Enabled)
+	require.Zero(t, closed.DeadlineAt)
+	require.EqualValues(t, 3600, closed.ConfiguredDurationSeconds, "declared config stays visible")
+	require.EqualValues(t, 3600, c.GetGoalDurationSeconds(), "a runtime command never rewrites declared config")
+	require.True(t, c.GetGoalDeadline().IsZero())
+	require.False(t, c.GetGoalTimeState().Started)
+}
+
+// Any other runtime command reopens the gate that a DISABLE closed.
+func TestGoalTimePatchReopensAfterDisable(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		patch *ypb.AIGoalTimePatch
+		check func(*testing.T, time.Time)
+	}{
+		{
+			name:  "never_ending",
+			patch: &ypb.AIGoalTimePatch{Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_NEVER_ENDING},
+			check: func(t *testing.T, deadline time.Time) {
+				t.Helper()
+				require.False(t, deadline.IsZero())
+				require.GreaterOrEqual(t, deadline.UTC().Year(), 9999)
+			},
+		},
+		{
+			name:  "set_deadline",
+			patch: &ypb.AIGoalTimePatch{Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DEADLINE, DeadlineUnix: time.Now().Add(10 * time.Minute).Unix()},
+			check: func(t *testing.T, deadline time.Time) {
+				t.Helper()
+				require.WithinDuration(t, time.Now().Add(10*time.Minute), deadline, 2*time.Second)
+			},
+		},
+		{
+			name:  "set_duration",
+			patch: &ypb.AIGoalTimePatch{Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_SET_DURATION, DurationSeconds: 600},
+			check: func(t *testing.T, deadline time.Time) {
+				t.Helper()
+				require.WithinDuration(t, time.Now().Add(10*time.Minute), deadline, 2*time.Second)
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := NewTestConfig(context.Background())
+			require.NoError(t, WithGoalDurationSeconds(3600)(c))
+			require.True(t, c.RefreshGoalDeadlineForTask())
+			require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+				Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE,
+			})(c))
+			require.Equal(t, GoalTimeLimitModeDisabled, c.BuildAgentPolicySnapshot().Goal.TimeLimit.Mode)
+
+			require.NoError(t, WithGoalTimePatch(test.patch)(c))
+
+			limit := c.BuildAgentPolicySnapshot().Goal.TimeLimit
+			require.True(t, limit.Enabled, "any other command must reopen the window")
+			require.NotEqual(t, GoalTimeLimitModeDisabled, limit.Mode)
+			test.check(t, c.GetGoalDeadline())
+			require.EqualValues(t, 3600, c.GetGoalDurationSeconds(), "declared config is never rewritten")
+		})
+	}
+}
+
+// A new task reopens the window from declared config, so a DISABLE issued for one
+// task cannot silence the gate for the next one.
+func TestGoalTimePatchDisableIsClearedByNextTask(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithGoalDurationSeconds(1800)(c))
+	require.True(t, c.RefreshGoalDeadlineForTask())
+	require.NoError(t, WithGoalTimePatch(&ypb.AIGoalTimePatch{
+		Action: ypb.AIGoalTimeAction_AI_GOAL_TIME_ACTION_DISABLE,
+	})(c))
+	require.Equal(t, GoalTimeLimitModeDisabled, c.BuildAgentPolicySnapshot().Goal.TimeLimit.Mode)
+
+	require.True(t, c.RefreshGoalDeadlineForTask())
+	limit := c.BuildAgentPolicySnapshot().Goal.TimeLimit
+	require.Equal(t, GoalTimeLimitModeDeadline, limit.Mode)
+	require.True(t, limit.Enabled)
+	require.WithinDuration(t, time.Now().Add(30*time.Minute), c.GetGoalDeadline(), 2*time.Second)
+}
+
+// A goal that only configures iterations or acceptance criteria never has a time
+// window, so time_limit must stay disabled even while a task runs.
+func TestSemanticGoalNeverEnablesTimeLimit(t *testing.T) {
+	c := NewTestConfig(context.Background())
+	require.NoError(t, WithEnableGoalMode(true)(c))
+	require.NoError(t, WithGoalMinIterations(5)(c))
+	require.NoError(t, WithGoalAcceptanceCriteria("deliver evidence")(c))
+	require.Zero(t, c.GetGoalDurationSeconds())
+
+	require.False(t, c.RefreshGoalDeadlineForTask(), "a task start opens no window when none is configured")
+	require.True(t, c.GetGoalDeadline().IsZero())
+
+	snapshot := c.BuildAgentPolicySnapshot()
+	require.True(t, snapshot.Goal.Enabled, "goal mode itself is on")
+	require.False(t, snapshot.Goal.TimeLimit.Enabled,
+		"a semantic goal must never report an enabled time limit")
+	require.Equal(t, GoalTimeLimitModeDisabled, snapshot.Goal.TimeLimit.Mode)
+	require.Zero(t, snapshot.Goal.TimeLimit.DeadlineAt)
+	require.Zero(t, snapshot.Goal.TimeLimit.ConfiguredDurationSeconds)
+}

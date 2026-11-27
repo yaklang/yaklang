@@ -73,10 +73,12 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 	defer c.m.Unlock()
 
 	c.agentPolicyRevision++
-	// An open window is authoritative: a GoalTimePatch may open, move or close
-	// one regardless of declared config. Without an open window the declared
-	// duration still describes the configured mode, but deadline_at stays zero
-	// because a declared duration no longer materializes a deadline by itself.
+	// Enabled reports whether the time gate is actually in force, so it follows
+	// the runtime deadline: a goal that only configures iterations or acceptance
+	// criteria never opens a window and must never report enabled, and a window
+	// that has not started yet or was disabled by a GoalTimePatch is not enabled
+	// either. ConfiguredDurationSeconds still tells clients what the user asked
+	// for.
 	goalDeadline := c.GoalDeadline
 	goalTimeMode := GoalTimeLimitModeDisabled
 	goalDeadlineAt := int64(0)
@@ -86,10 +88,6 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 	case !goalDeadline.IsZero():
 		goalTimeMode = GoalTimeLimitModeDeadline
 		goalDeadlineAt = goalDeadline.Unix()
-	case c.GoalDurationSeconds == -1:
-		goalTimeMode = GoalTimeLimitModeNeverEnding
-	case c.GoalDurationSeconds > 0:
-		goalTimeMode = GoalTimeLimitModeDeadline
 	}
 
 	return &AgentPolicySnapshot{
@@ -103,7 +101,7 @@ func (c *Config) BuildAgentPolicySnapshot() *AgentPolicySnapshot {
 			MinIterations:      NormalizeGoalMinIterations(c.GoalMinIterations),
 			AcceptanceCriteria: c.GoalAcceptanceCriteria,
 			TimeLimit: AgentGoalTimeLimitSnapshot{
-				Enabled:                   c.GoalDurationSeconds != 0 || !goalDeadline.IsZero(),
+				Enabled:                   !goalDeadline.IsZero(),
 				Mode:                      goalTimeMode,
 				DeadlineAt:                goalDeadlineAt,
 				ConfiguredDurationSeconds: c.GoalDurationSeconds,
