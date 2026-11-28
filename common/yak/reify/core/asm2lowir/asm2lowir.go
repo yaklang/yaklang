@@ -267,6 +267,19 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 		if err != nil {
 			return nil, core.BoundaryStats{}, err
 		}
+		// An alias shares an address with a boundary the parser already
+		// classified, so inherit its mode and range instead of dropping them.
+		for _, existing := range boundaries {
+			if existing.Address == boundary.Address {
+				if existing.Mode != "" {
+					boundary.Mode = existing.Mode
+				}
+				if boundary.Size == 0 && existing.Size > 0 {
+					boundary.Size = existing.Size
+				}
+				return []core.FunctionBoundary{boundary}, stats, nil
+			}
+		}
 		return []core.FunctionBoundary{boundary}, core.BoundaryStats{Symbol: 1}, nil
 	}
 	if config.Region != nil {
@@ -337,7 +350,17 @@ func symbolBoundaries(artifact *core.Artifact) []core.FunctionBoundary {
 			continue
 		}
 		address := codeAddress(artifact.Target.Architecture, symbol.Address)
-		result = append(result, core.FunctionBoundary{Address: address, Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol})
+		size := symbol.Size
+		if size == 0 {
+			size = inferredFunctionSize(artifact, symbol, address)
+		}
+		result = append(result, core.FunctionBoundary{
+			Address: address,
+			Size:    size,
+			Name:    symbol.Name,
+			Source:  core.BoundarySymbol,
+			Mode:    symbolMode(artifact.Target.Architecture, symbol.Address),
+		})
 	}
 	return result
 }
@@ -423,11 +446,18 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		// A relocatable object places its first section at address zero, so a
 		// function value of zero is a real body. RegionAt rejects an address the
 		// image does not map.
+		address := codeAddress(artifact.Target.Architecture, symbol.Address)
 		size := symbol.Size
 		if size == 0 && artifact.Image != nil {
-			size = artifact.Image.InferredSymbolSize(symbol)
+			size = inferredFunctionSize(artifact, symbol, address)
 		}
-		return core.FunctionBoundary{Address: codeAddress(artifact.Target.Architecture, symbol.Address), Size: size, Name: symbol.Name, Source: core.BoundarySymbol}, nil
+		return core.FunctionBoundary{
+			Address: address,
+			Size:    size,
+			Name:    symbol.Name,
+			Source:  core.BoundarySymbol,
+			Mode:    symbolMode(artifact.Target.Architecture, symbol.Address),
+		}, nil
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }
@@ -547,4 +577,50 @@ func codeAddress(architecture core.Architecture, address uint64) uint64 {
 		return address &^ 1
 	}
 	return address
+}
+
+// symbolMode derives the per-function execution mode from a raw symbol value.
+// On 32-bit ARM, an odd function symbol address marks Thumb encoding.
+func symbolMode(architecture core.Architecture, address uint64) string {
+	if architecture == core.ArchARM && address&1 == 1 {
+		return "thumb"
+	}
+	return ""
+}
+
+func inferredFunctionSize(artifact *core.Artifact, symbol sym.Symbol, address uint64) uint64 {
+	if artifact == nil || artifact.Image == nil {
+		return 0
+	}
+	if address == symbol.Address {
+		return artifact.Image.InferredSymbolSize(symbol)
+	}
+	section, ok := artifact.Image.SectionAt(address)
+	if !ok {
+		return 0
+	}
+	limit := section.VirtualAddress + section.FileSize
+	if limit <= address {
+		limit = section.VirtualAddress + section.MemorySize
+	}
+	next := limit
+	for _, other := range artifact.Image.Symbols {
+		if other.Imported {
+			continue
+		}
+		otherAddr := other.Address
+		if other.Kind == sym.SymbolFunction {
+			otherAddr = codeAddress(artifact.Target.Architecture, other.Address)
+		}
+		if otherAddr <= address || otherAddr-section.VirtualAddress >= section.MemorySize {
+			continue
+		}
+		if otherAddr < next {
+			next = otherAddr
+		}
+	}
+	if next <= address {
+		return 0
+	}
+	return next - address
 }

@@ -51,6 +51,11 @@ _greeting:
 	require.Equal(t, symbol.SymbolFunction, entry.Kind)
 	require.Zero(t, entry.Address)
 
+	for _, temp := range []string{"ltmp0", "ltmp1", "ltmp2"} {
+		_, found := artifact.Image.SymbolByName(temp)
+		require.False(t, found, "assembler temporary label %s should be filtered", temp)
+	}
+
 	greeting, ok := artifact.Image.SymbolByName("greeting")
 	require.True(t, ok, "Mach-O symbol table should include the string's name")
 	require.Equal(t, symbol.SymbolObject, greeting.Kind)

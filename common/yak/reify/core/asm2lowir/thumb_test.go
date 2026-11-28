@@ -28,13 +28,16 @@ arm_func:
 .size arm_func, .-arm_func
 
 .thumb
-.globl thumb_func
+.globl thumb_func, thumb_alias
 .type thumb_func, %function
+.type thumb_alias, %function
 .thumb_func
 thumb_func:
+thumb_alias:
     movs r0, #7
     bx lr
 .size thumb_func, .-thumb_func
+.size thumb_alias, .-thumb_alias
 `
 	dir := t.TempDir()
 	source := filepath.Join(dir, "mixed.s")
@@ -55,6 +58,7 @@ thumb_func:
 		instructions int
 	}{
 		{"thumb function", asm2lowir.WithFunction("thumb_func"), 2},
+		{"thumb alias", asm2lowir.WithFunction("thumb_alias"), 2},
 		{"mixed section", asm2lowir.WithSection(".text"), 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
