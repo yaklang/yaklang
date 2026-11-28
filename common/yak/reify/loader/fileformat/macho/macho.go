@@ -25,6 +25,11 @@ const (
 	machoSegmentText           = "__TEXT"
 	machoAttrPureInstructions  = 0x80000000
 	machoAttrSomeInstructions  = 0x00000400
+	machoAttrDebug             = 0x02000000
+	machoSymbolDebugMask       = 0xe0 // N_STAB
+	machoSymbolTypeMask        = 0x0e // N_TYPE
+	machoSymbolSection         = 0x0e // N_SECT
+	machoSymbolExternal        = 0x01 // N_EXT
 )
 
 func (Loader) Kind() core.Format   { return core.FormatMachO }
@@ -157,7 +162,7 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 		if fileSize == 0 {
 			continue
 		}
-		if section.Flags&machoAttrPureInstructions != 0 || section.Flags&machoAttrSomeInstructions != 0 {
+		if section.Flags&(machoAttrPureInstructions|machoAttrSomeInstructions) != 0 {
 			hints.ExecSections = append(hints.ExecSections, core.Region{
 				Address: section.Addr,
 				Offset:  sliceOffset + uint64(section.Offset),
@@ -165,30 +170,33 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 			})
 		}
 	}
-	inExec := func(address uint64) bool {
-		for _, region := range hints.ExecSections {
-			if address >= region.Address && address-region.Address < region.Size {
-				return true
-			}
-		}
-		return false
-	}
 	if file.Symtab != nil {
 		for _, item := range file.Symtab.Syms {
-			// A relocatable Mach-O object places its first section at address zero,
-			// so a symbol value of zero is a real function there. The section
-			// check below is what rejects an undefined or data symbol.
-			if !inExec(item.Value) || item.Type&0x0e != 0x0e {
+			if item.Type&machoSymbolDebugMask != 0 || item.Type&machoSymbolTypeMask != machoSymbolSection {
+				continue
+			}
+			// N_SECT uses a one-based section ordinal. A function can start at
+			// address zero in a relocatable object, and a data symbol can name
+			// a zero-filled section with no bytes in the file.
+			if item.Sect == 0 || int(item.Sect) > len(image.Sections) {
+				continue
+			}
+			section := &image.Sections[int(item.Sect)-1]
+			if section.Flags&machoAttrDebug != 0 || item.Value < section.VirtualAddress || item.Value-section.VirtualAddress >= section.MemorySize {
 				continue
 			}
 			name := strings.TrimPrefix(item.Name, "_")
-			if name == "" {
+			if name == "" || isAssemblerTempSymbol(item) {
 				continue
+			}
+			kind := sym.SymbolObject
+			if section.Flags&(machoAttrPureInstructions|machoAttrSomeInstructions) != 0 {
+				kind = sym.SymbolFunction
 			}
 			image.Symbols = append(image.Symbols, sym.Symbol{
 				Name:    name,
 				Address: item.Value,
-				Kind:    sym.SymbolFunction,
+				Kind:    kind,
 			})
 		}
 	}
@@ -208,6 +216,15 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 		})
 	}
 	return image, target, hints, diagnostics, nil
+}
+
+// LLVM emits local Mach-O labels named ltmpN, including section anchors that
+// can share a function's address. Use the raw name to preserve source
+// symbols such as _ltmp29.
+func isAssemblerTempSymbol(item macho.Symbol) bool {
+	suffix, ok := strings.CutPrefix(item.Name, "ltmp")
+	return item.Type&machoSymbolExternal == 0 && ok && suffix != "" &&
+		strings.Trim(suffix, "0123456789") == ""
 }
 
 // openMachO opens a thin or a universal image. A universal image exposes one
