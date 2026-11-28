@@ -18,7 +18,8 @@ unsafe-implementation
 该用法属于已知危险 API 或弱密码学配置，可能被用于绕过校验、执行代码或泄露机密。
 
 ### 检测方式
-源码模式正则匹配，定位源码中的危险调用或配置。
+源码模式正则匹配。只在显式出现 `Thread` 接收者时命中（`Thread.stop()`、`Thread.currentThread().stop()`）；
+变量上的 `t.stop()` 由 struct 规则按类型匹配，`ProcessContinuation.stop()` 这类同名方法不告警。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -27,17 +28,18 @@ SOLUTION
 	alert_min: 1
 	"file://T.java": <<<POS
 class T {
-  void bad(Thread t) { t.stop(); }
+  void bad() { Thread.currentThread().stop(); }
 }
-
 POS
 	"safefile://S.java": <<<NEG
-class S { void ok(Thread t) { t.interrupt(); } }
-
+class S {
+  static class ProcessContinuation { void stop() {} }
+  void ok(ProcessContinuation p, Thread t) { p.stop(); t.interrupt(); }
+}
 NEG
 )
 
-${*.java}.pattern_regex(/\.stop\s*\(\s*\)/) as $hit
+${*.java}.pattern_regex(/\bThread\s*\.\s*(?:currentThread\s*\(\s*\)\s*\.\s*)?stop\s*\(/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 Java Thread.stop",

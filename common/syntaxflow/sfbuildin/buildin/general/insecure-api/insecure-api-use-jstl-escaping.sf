@@ -18,7 +18,9 @@ desc(
 未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配。只报告标签属性中请求可控作用域的未转义 EL 输出
+（`param`、`requestScope`、`header`、`cookie`、`pageContext.request|session`）；
+`<c:out>`、`${c.name}` 与 `pageContext.request.contextPath` 不告警。
 
 ### 参考
 - CWE-116
@@ -33,13 +35,14 @@ SOLUTION
 POS
 	"safefile://neg.jsp": <<<NEG
 <c:out value="${param.foo}" />
+<link href="${pageContext.request.contextPath}/static/app.css" />
+<div>${c.name}</div>
 <button onClick="applyPermissionChanges('${id}')">go</button>
-<a href="javascript:viewUser(\'${userId}\');">u</a>
 <%=LanguageUtil.get(pageContext, "msg", "${owners}")%>
 NEG
 )
 
-${*.jsp}.pattern_regex_not(/<(?![A-Za-z0-9]+:out)[^>\n]*\$\{[^}\n]*\}[^>\n]*>/, /'\$\{[^}\n]*\}'/, /\\'\$\{[^}\n]*\}\\'/, /javascript:[^>\n]*\$\{/, /<%[=!]?[^%]*\$\{/) as $p0
+${*.jsp}.pattern_regex_not(/<(?![A-Za-z0-9]+:out)[^>\n]*\$\{\s*(param|requestScope|header|cookie|pageContext\.(request|session))\.(?!contextPath\b)[^}\n]*\}[^>\n]*>/, /'\$\{[^}\n]*\}'/, /javascript:[^>\n]*\$\{/, /<%[=!]?[^%]*\$\{/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",

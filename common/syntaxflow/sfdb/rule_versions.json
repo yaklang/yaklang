@@ -950,8 +950,8 @@
   {
     "rule_id": "50d74e0f-2353-4367-a53c-18e8d48d22e1",
     "rule_name": "源码匹配：检测Java配置文件中不当的密码配置",
-    "hash": "3b74b8de7ef3d0f4adcaa32da8018849fe1afddc2d2cd9f194fe19e0ebad7df3",
-    "version": "20261109.0001"
+    "hash": "b0dc3b7599394c7ab1793fec01bf9db1391f690572da3f14b7465da8cb3086ed",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "b717bf17-1dee-4b38-b048-61aaaf1957a1",
@@ -2228,14 +2228,14 @@
   {
     "rule_id": "source-insecure-api-use-escapexml",
     "rule_name": "检测到使用 escapeXml",
-    "hash": "d38f43d182d52eaf3316871938f5fba3752683686903a74787c68f43aeaf6c61",
-    "version": "20261109.0001"
+    "hash": "9adb3368b7b0a631dd877e3e8a313a11ba0e48b9dd8688d4616a4a3c135a8e4f",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-insecure-api-use-jstl-escaping",
     "rule_name": "检测到使用 JSTL 转义",
-    "hash": "25742b08f68adebe8d2deeeb7fe32d87f988d77bc09167ee543121b629e01d24",
-    "version": "20261109.0001"
+    "hash": "e6188d1087f4a1e9292b8c8135dca9e8bdafad5390a589105628dba4608e98a4",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-insecure-api-var-in-href",
@@ -2270,8 +2270,8 @@
   {
     "rule_id": "source-python-eval",
     "rule_name": "检测 Python eval 调用",
-    "hash": "53cec8b51028ea43ac86f265c9953230ee6571d9512caf65b5cf7aad03940443",
-    "version": "20261109.0001"
+    "hash": "57a14b3853130de3de25620ef894a599d344ad31588614d31fbcfbc17175852c",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-python-pickle-load",
@@ -3242,8 +3242,8 @@
   {
     "rule_id": "source-insecure-api-package-dependencies-check",
     "rule_name": "检测到 npm 依赖使用变体版本",
-    "hash": "fd8a26e257a6997669c357ce120f07ea463195ae3b16898c9253aae22eafe070",
-    "version": "20261109.0001"
+    "hash": "ed04eec87fa73b7d4392cacf42a2c786e581b1ec84f50748deae3f8e17cd7846",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-insecure-api-playwright-exposed-chrome-devtools",
@@ -3332,50 +3332,50 @@
   {
     "rule_id": "source-maintainability-bokeh-deprecated-apis",
     "rule_name": "源码匹配：检测到已废弃的 Bokeh API",
-    "hash": "2607ff820e19c8eaee1f9753dfb202ec0650d0a85129164be76a4178cc72e033",
-    "version": "20261109.0001"
+    "hash": "97e5dddbc4ac0819055f7d6f594c72da3069aa161c75f588287af0aaf5f36a39",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-gemini",
     "rule_name": "源码匹配：检测到 Gemini AI 使用",
-    "hash": "166b6b6ad54e5d57fcd20a22537dc24ed98354b221148554f828965adef24300",
-    "version": "20261109.0001"
+    "hash": "b183c11cd42bd82aa46da542db88924d9131e955ef8468eba94dd2a3807b0427",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-anthprop",
     "rule_name": "源码匹配：检测到 Anthropic AI 使用",
-    "hash": "593fbeb00db7759c1488848e4d364a7986efb296cfa2af6d3f4b3c930ffed9f1",
-    "version": "20261109.0002"
+    "hash": "2bb9a9f8e6d7148ca6abe18955781bd24086ffb399ed6a0c67ada9d08b220c40",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-api",
     "rule_name": "源码匹配：检测到 AI API 调用",
-    "hash": "4614ff7adcdecc24cc59f8c022db07c70b449c2621a0ab01fd4cc4d88e772b81",
-    "version": "20261112.0001"
+    "hash": "5d8fa7d97feafa74c2a133161a837acb2b635cefae57053189399d69ff8a968d",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-gem",
     "rule_name": "源码匹配：检测到 Gemini AI API 使用",
-    "hash": "5494cd521f6019e3b8374d25a7cd22be9c10658f7fb4af8e04373f67a85055d2",
-    "version": "20261109.0002"
+    "hash": "26a966545b38c4247cbaf7598ab33eb6d4473b3d16caefbc62667f0da44ab34b",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-generic-ai-oai",
     "rule_name": "源码匹配：检测到 OpenAI AI 使用",
-    "hash": "3959e7781f2b381bfac15f6bb2e92b8d41a0c24191421586fae00d0768864d2b",
-    "version": "20261112.0001"
+    "hash": "4c586995412ada523049ba37862b0d6cc7b7a81f21cf3c1ac3ee8e313fa8b886",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-huggingface",
     "rule_name": "源码匹配：检测到 Hugging Face 使用",
-    "hash": "4f9181f9d841852491f18ccd469be45183a3096816d0ab241780b3650455d97f",
-    "version": "20261109.0001"
+    "hash": "61d1c12752f57d9622d1eedf0d5ba4fdbe34bbbd04c2f0b13ea97d05c35ebfb8",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-maintainability-detect-tensorflow",
     "rule_name": "源码匹配：检测到 TensorFlow 使用",
-    "hash": "6dbec661ee49811604effd1dd9a5812c3c6e064b9a854143965cf8f7cb9c267d",
-    "version": "20261109.0001"
+    "hash": "2d5dc6fbbc048b2a0f84b3104a38afc363b1af79a55c4e160a465923a2645095",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-portability-broken-input-line",
@@ -3830,8 +3830,8 @@
   {
     "rule_id": "struct-python-eval",
     "rule_name": "结构匹配：Python eval 调用",
-    "hash": "f9a8a0589554ad0fb94d6066f6a3df8af843ff7fd051d5adee85791d3268c8c7",
-    "version": "20261109.0001"
+    "hash": "07a1be36851e0c8ae60471253d4eac970089784888e7eafffa86931ff0fcd8ce",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-python-os-system",
@@ -4100,8 +4100,8 @@
   {
     "rule_id": "source-java-thread-stop",
     "rule_name": "源码匹配：检测 Java Thread.stop",
-    "hash": "dc164db6db908161b41603d02e412eea367256f8acfd7eefd4678205827c37d8",
-    "version": "20261109.0001"
+    "hash": "a3cdb70533887d8249eec4785a0a34dbcafb380b442fb689a886d35e0bd9db8f",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-java-util-random",
@@ -4376,8 +4376,8 @@
   {
     "rule_id": "source-python-xml-etree",
     "rule_name": "源码匹配：检测 Python xml.etree 解析",
-    "hash": "178724cea2246426d908d07a4acb719472b5660f5dedae5581b9a23f8d0553e6",
-    "version": "20261109.0001"
+    "hash": "9dbca60dbedd94ace89f685308790cea861b8fff6c45cd7a860492bf860f9849",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "source-python-xml-sax",
@@ -4640,8 +4640,8 @@
   {
     "rule_id": "struct-java-groovyshell-evaluate",
     "rule_name": "结构匹配：Java GroovyShell.evaluate",
-    "hash": "794fc226900955b2eedb2885831b5739cc3e7d717e3370a8b6e1470e81670cb5",
-    "version": "20261109.0001"
+    "hash": "1e6b5697e3becab3fdfbd462c678ceda4c4d492b556326e68108a2e47b396932",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-java-ivparameterspec",
@@ -4742,8 +4742,8 @@
   {
     "rule_id": "struct-java-thread-stop",
     "rule_name": "结构匹配：Java Thread.stop",
-    "hash": "22d285c53dec25a066c76d6a4b4759c3a34c2b51d325af135519fd05f2bf0d30",
-    "version": "20261109.0001"
+    "hash": "ad9fa9505d7aaf54750008c45660ac99bf5bf1e16b90ec30301ab1614646ba8d",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-java-trust-all-hosts",
@@ -4922,8 +4922,8 @@
   {
     "rule_id": "struct-python-compile",
     "rule_name": "结构匹配：Python compile 调用",
-    "hash": "dea36836fdb71e2d50055be1c9741be47f63e6ae608ced114be4a89251f4969a",
-    "version": "20261109.0001"
+    "hash": "d363d10543267c7d2cf250c15196e86fa026333fc72a6e8f4e5c500e5088966a",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-python-cryptography-ecb",
@@ -4952,14 +4952,14 @@
   {
     "rule_id": "struct-python-hashlib-md5",
     "rule_name": "结构匹配：Python hashlib.md5",
-    "hash": "b0a3871c18b6d79655d70b45de498ea1984c387e9af791ae2c1ddab05be68588",
-    "version": "20261109.0001"
+    "hash": "8b07103b20db92f1f968e040c13f25dc4e14acfefe3bdfd083831200c1a046d4",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-python-hashlib-sha1",
     "rule_name": "结构匹配：Python hashlib.sha1",
-    "hash": "b8fcf8a8f6d474f105f56c0776907dca98a3815757ef808aa8a69e24a0dbbef0",
-    "version": "20261109.0001"
+    "hash": "4c15ced340b31cfec494a8ae232d825a808af9539249dbcdae885026957888d0",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-python-jinja2-from-string",
@@ -5042,8 +5042,8 @@
   {
     "rule_id": "struct-python-xml-etree",
     "rule_name": "结构匹配：Python xml.etree 解析",
-    "hash": "156d7129b2853a283826fec36b9382b1719b61687660c35f3ae63e0428f2d02f",
-    "version": "20261109.0001"
+    "hash": "a9db97317a8576197bb172ae99d20ab6764ec3a90ee951467f5046c759ce2e77",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "struct-python-xml-sax",
@@ -5480,8 +5480,8 @@
   {
     "rule_id": "struct-python-model-create-request",
     "rule_name": "结构匹配：Python 模型批量接收请求体",
-    "hash": "70382cbe0390d43f2dc461d643d6e958d5b99cb2c5fb37dcd782e7172c4bced2",
-    "version": "20261109.0001"
+    "hash": "cdeceba8a9adec40572aec632173cd8de4f63e635ee34bd254615c0a2f8f2743",
+    "version": "20261127.0001"
   },
   {
     "rule_id": "a7c2d9e0-3f5b-4c6a-9d35-7e9f1a5c3b80",

@@ -4,7 +4,7 @@ desc(
 	title: "源码匹配：检测到 npm 依赖使用变体版本"
 	title_zh: "检测到 npm 依赖使用变体版本",
 	type: vuln
-	level: "middle"
+	level: "low"
 	rule_id: "source-insecure-api-package-dependencies-check"
 	risk: "sca"
 	desc: <<<DESC
@@ -18,7 +18,8 @@ npm 依赖使用了变体版本范围，可能引入未经充分验证的版本�
 依赖版本使用可变范围或存在已知漏洞，可能引入供应链攻击。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配，检测 package.json 中的 ^/~/latest 等版本范围。
+版本范围是依赖卫生问题，不是已确认漏洞，因此按 low 报告；仓库应同时提供 lockfile。
 
 ### 参考
 - CWE-427
@@ -62,7 +63,7 @@ $b - $prerelease as $e
 $d - $prerelease as $f
 $e + $f as $hit
 alert $hit for {
-	level: "middle",
+	level: "low",
 	title: "检测到 npm 依赖使用变体版本",
 	title_zh: "检测到 npm 依赖使用变体版本",
 	message: "检测到 npm 依赖使用变体版本",

@@ -4,7 +4,7 @@ desc(
 	title: "源码匹配：检测到 Anthropic AI 使用"
 	title_zh: "源码匹配：检测到 Anthropic AI 使用"
 	type: maintainability
-	level: "middle"
+	level: "low"
 	rule_id: "source-maintainability-detect-generic-ai-anthprop"
 	risk: "code-style"
 	desc: <<<DESC
@@ -25,17 +25,24 @@ DESC
 确认该 AI 使用是否符合团队规范与安全策略，按需替换或保留。
 SOLUTION
 	alert_min: 1
-	"file://pos.js": <<<POS
-anthropic
+	"file://pos.py": <<<POS
+import anthropic
+
+def ask(client=None):
+    client = client or anthropic.Anthropic()
+    return client.messages.create(model="claude-sonnet-4", max_tokens=16)
 POS
-	"safefile://pos.js": <<<NEG
-hello world
+	"safefile://pos.py": <<<NEG
+// anthropic and claude appear only in documentation here
+ANTHROPIC_API_URL = "https://example.invalid"
+class AnthropicProvider:
+    pass
 NEG
 )
 
-${/\.(js|jsx|ts|tsx|mjs|cjs|py|go|java|kt|rb|php|rs|cs|swift|scala|vue|svelte)$/}.pattern_regex(/(?:anthropic)|(?:Anthropic)|(?:claude)/) as $hit
+${/\.(js|jsx|ts|tsx|mjs|cjs|py|go|java|kt|rb|php|rs|cs|swift|scala|vue|svelte)$/}.pattern_regex(/(?m)^\s*(?:import|from)\s+anthropic\b|\banthropic\.(?:Anthropic|AsyncAnthropic|Client)\b|\bAnthropic\s*\(|\bclaude-[a-z0-9][a-z0-9.-]*/) as $hit
 alert $hit for {
-	level: "middle",
+	level: "low",
 	title: "检测到 Anthropic AI 使用",
 	title_zh: "检测到 Anthropic AI 使用",
 	message: "检测到 Anthropic AI 使用",

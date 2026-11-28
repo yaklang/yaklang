@@ -20,7 +20,7 @@ mass-assignment
 
 ### 检测方式
 这条规则使用 struct 模式，匹配编译后真实存在的调用。注释和普通字符串不会命中。它不分析参数来源，出现该调用即告警。
-匹配任意名为 `create` 的真实调用，范围很宽，普通工厂方法也会命中。确认是不是批量赋值时，以 source 规则的 `objects.create(**` 和 `objects.update(**` 为准。
+只匹配管理器上的 `*.objects.create(...)` 和 `*.objects.update(...)`：普通工厂方法、`Model.create(...)` 与 `Foo.create(...)` 不告警。
 同一检查还有 source（源码正则）。它们描述同一个问题，命中条件不同，修复时看实际告警来自哪一条。
 
 ### 参考
@@ -41,13 +41,18 @@ def bad(data):
 
 POS
 	"safefile://ok.py": <<<NEG
-def ok():
-    return 1
+class Factory:
+    @classmethod
+    def create(cls, data):
+        return data
+
+def ok(data):
+    return Factory.create(data)
 
 NEG
 )
-create as $call
-create(* as $arg) as $call
+*.objects.create(* as $call)
+*.objects.update(* as $call)
 alert $call for {
 	level: "middle",
 	title: "结构扫描：Python 模型批量接收请求体",

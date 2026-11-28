@@ -33,10 +33,13 @@ POS
 import ast
 def run(user_input):
     return ast.literal_eval(user_input)
+
+def infer(model, x):
+    return model.eval(x)
 NEG
 )
 
-${*.py}.pattern_regex(/(?m)(?<!literal_)(?<!ast\.)\beval\s*\(/) as $hit
+${*.py}.pattern_regex(/(?m)(?<![\w.])eval\s*\(/) as $hit
 alert $hit for {
 	level: "middle",
 	title: "检测 Python eval 调用",

@@ -19,6 +19,7 @@ groovy-code-execution
 
 ### 检测方式
 结构扫描在编译单元内匹配真实调用，而不是注释或字符串字面量。
+要求接收者类型是 `GroovyShell`；`base.evaluate()`、`ctx.evaluate()` 这类同名方法不告警。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -27,26 +28,27 @@ SOLUTION
 	alert_min: 1
 	"file://Dyn.java": <<<POS
 class Dyn {
-  Object bad(String code) {
-    groovy.lang.GroovyShell shell = new groovy.lang.GroovyShell();
+  Object bad(GroovyShell shell, String code) {
     return shell.evaluate(code);
   }
 }
 POS
 	"safefile://DynSafe.java": <<<NEG
 class DynSafe {
-  int ok() {
-    return 2;
+  static class Evaluator {
+    void evaluate() {}
+  }
+
+  Object ok(Evaluator base) {
+    base.evaluate();
+    return null;
   }
 }
 NEG
 )
 
-GroovyShell as $call
-GroovyShell() as $call
-GroovyShell.evaluate(* as $code) as $call
-*.evaluate(* as $code) as $call
-alert $call for {
+GroovyShell.evaluate(* as $code) as $hit
+alert $hit for {
 	level: "high",
 	title: "GroovyShell.evaluate Call",
 	title_zh: "GroovyShell.evaluate 调用",

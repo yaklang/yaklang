@@ -18,7 +18,9 @@ desc(
 未正确转义或过滤用户输入，攻击者可在页面中注入并执行恶意脚本。
 
 ### 检测方式
-源码模式正则匹配，检测代码或配置中符合该风险模式的位置。
+源码模式正则匹配。只报告请求可控作用域（`param`、`requestScope`、`header`、`cookie`、
+`pageContext.request`、`pageContext.session`）的未转义 EL 输出；
+`${c.name}`、`${resource.children}` 这类服务端模型数据不告警，`pageContext.request.contextPath` 不告警。
 
 ### 参考
 - CWE-116
@@ -36,6 +38,9 @@ ${param.foo}
 POS
 	"safefile://neg.jsp": <<<NEG
 <input type="text" name="foo" value="${fn:escapeXml(param.foo)}" />
+<div>${c.name}</div>
+<div>${resource.children}</div>
+<link href="${pageContext.request.contextPath}/static/app.css" />
 <script>
 const id = `row-${id}`;
 applyPermissionChanges('${id}');
@@ -43,7 +48,7 @@ applyPermissionChanges('${id}');
 NEG
 )
 
-${*.jsp}.pattern_regex_not(/\$\{(?![^}]*escapeXml)[^}\n]{1,120}\}/, /\$\{[^}\n]+\}`/, /'\$\{[^}\n]+\}'/, /`[^`\n]*\$\{/) as $p0
+${*.jsp}.pattern_regex(/\$\{\s*(?![^}]*escapeXml)(param|requestScope|header|cookie|pageContext\.(request|session))\.(?!contextPath\b)[^}\n]*\}/) as $p0
 $p0 as $hit
 alert $hit for {
 	level: "middle",
