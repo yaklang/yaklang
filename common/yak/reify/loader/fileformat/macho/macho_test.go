@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 )
 
 func writeValue(t *testing.T, buffer *bytes.Buffer, order binary.ByteOrder, value any) {
@@ -216,5 +217,109 @@ func TestLoadFatMachOPrefersAMD64WhenNoARM64(t *testing.T) {
 	}
 	if artifact.Target.Architecture != core.ArchAMD64 {
 		t.Fatalf("selected %s, want amd64", artifact.Target.Architecture)
+	}
+}
+
+func TestLoadMachOSymtabClassificationAndFiltering(t *testing.T) {
+	const (
+		textOffset  = 0x400
+		constOffset = 0x420
+		debugOffset = 0x440
+		strOffset   = 0x500
+		symOffset   = 0x600
+	)
+	segment := macho.Segment64{
+		Cmd: macho.LoadCmdSegment64, Len: 72 + 5*80, Addr: 0, Memsz: 0x70,
+		Offset: textOffset, Filesz: 0x50, Maxprot: 7, Prot: 5, Nsect: 5,
+	}
+	copy(segment.Name[:], "__TEXT")
+
+	makeSection := func(seg, name string, addr, size uint64, offset, flags uint32) macho.Section64 {
+		sec := macho.Section64{Addr: addr, Size: size, Offset: offset, Flags: flags}
+		copy(sec.Seg[:], seg)
+		copy(sec.Name[:], name)
+		return sec
+	}
+	sections := []macho.Section64{
+		makeSection("__TEXT", "__text", 0x00, 0x20, textOffset, machoAttrPureInstructions|machoAttrSomeInstructions),
+		makeSection("__TEXT", "__const", 0x20, 0x20, constOffset, 0),
+		makeSection("__DATA", "__bss", 0x40, 0x10, 0, 0x1),
+		makeSection("__DWARF", "__debug_info", 0x50, 0x10, debugOffset, machoAttrDebug),
+		makeSection("__TEXT", "__zeroexec", 0x60, 0x10, 0, 0x1|machoAttrPureInstructions),
+	}
+
+	var strTab bytes.Buffer
+	strTab.WriteByte(0)
+	addStr := func(name string) uint32 {
+		off := uint32(strTab.Len())
+		strTab.WriteString(name)
+		strTab.WriteByte(0)
+		return off
+	}
+
+	syms := []macho.Nlist64{
+		{Name: addStr("_entry"), Type: machoSymbolSection | machoSymbolExternal, Sect: 1, Value: 0x00},
+		{Name: addStr("ltmp0"), Type: machoSymbolSection, Sect: 1, Value: 0x00},
+		{Name: addStr("_ltmp29"), Type: machoSymbolSection, Sect: 1, Value: 0x04},
+		{Name: addStr("ltmp0"), Type: machoSymbolSection | machoSymbolExternal, Sect: 1, Value: 0x08},
+		{Name: addStr("_greeting"), Type: machoSymbolSection | machoSymbolExternal, Sect: 2, Value: 0x20},
+		{Name: addStr("_buffer"), Type: machoSymbolSection, Sect: 3, Value: 0x40},
+		{Name: addStr("_zeroexec_sym"), Type: machoSymbolSection, Sect: 5, Value: 0x60},
+		{Name: addStr("_stab_bnsym"), Type: 0x2e, Sect: 1, Value: 0x00},
+		{Name: addStr("_stab_ensym"), Type: 0x4e, Sect: 1, Value: 0x04},
+		{Name: addStr("_debug_sym"), Type: machoSymbolSection, Sect: 4, Value: 0x50},
+		{Name: addStr("_out_of_range"), Type: machoSymbolSection, Sect: 1, Value: 0x20},
+		{Name: addStr("_bad_sect"), Type: machoSymbolSection, Sect: 99, Value: 0x00},
+	}
+
+	var hdr bytes.Buffer
+	writeValue(t, &hdr, binary.LittleEndian, macho.FileHeader{
+		Magic: macho.Magic64, Cpu: macho.CpuArm64, SubCpu: 0, Type: macho.TypeObj,
+		Ncmd: 2, Cmdsz: segment.Len + 24,
+	})
+	writeValue(t, &hdr, binary.LittleEndian, uint32(0))
+	writeValue(t, &hdr, binary.LittleEndian, segment)
+	for _, sec := range sections {
+		writeValue(t, &hdr, binary.LittleEndian, sec)
+	}
+	writeValue(t, &hdr, binary.LittleEndian, macho.SymtabCmd{
+		Cmd: macho.LoadCmdSymtab, Len: 24,
+		Symoff: symOffset, Nsyms: uint32(len(syms)),
+		Stroff: strOffset, Strsize: uint32(strTab.Len()),
+	})
+
+	var symBuf bytes.Buffer
+	for _, item := range syms {
+		writeValue(t, &symBuf, binary.LittleEndian, item)
+	}
+
+	raw := make([]byte, symOffset+symBuf.Len())
+	copy(raw, hdr.Bytes())
+	copy(raw[textOffset:], []byte{0xc0, 0x03, 0x5f, 0xd6})
+	copy(raw[constOffset:], []byte("hello\x00"))
+	copy(raw[strOffset:], strTab.Bytes())
+	copy(raw[symOffset:], symBuf.Bytes())
+
+	artifact, err := Loader{}.Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []sym.Symbol{
+		{Name: "entry", Address: 0x00, Kind: sym.SymbolFunction},
+		{Name: "ltmp29", Address: 0x04, Kind: sym.SymbolFunction},
+		{Name: "ltmp0", Address: 0x08, Kind: sym.SymbolFunction},
+		{Name: "greeting", Address: 0x20, Kind: sym.SymbolObject},
+		{Name: "buffer", Address: 0x40, Kind: sym.SymbolObject},
+		{Name: "zeroexec_sym", Address: 0x60, Kind: sym.SymbolObject},
+	}
+	if len(artifact.Image.Symbols) != len(want) {
+		t.Fatalf("symbols = %+v, want %+v", artifact.Image.Symbols, want)
+	}
+	for i, expected := range want {
+		got := artifact.Image.Symbols[i]
+		if got.Name != expected.Name || got.Address != expected.Address || got.Kind != expected.Kind {
+			t.Fatalf("symbol[%d] = %+v, want %+v", i, got, expected)
+		}
 	}
 }

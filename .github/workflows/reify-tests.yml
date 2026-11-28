@@ -49,24 +49,36 @@ jobs:
           go-version-file: ./go.mod
           cache: true
 
-      # Two tests assemble a real object file to prove the loaders read what a
-      # toolchain writes. Both skip when the assembler is missing, so provide it
-      # instead of silently losing the coverage. Runners ship a versioned binary
-      # under /usr/bin, not the unversioned name.
+      # Several tests assemble real object files to prove the loaders read what
+      # a toolchain writes. They skip when llvm-mc is missing, so provide it
+      # instead of silently losing coverage. Runners ship a versioned binary
+      # under /usr/bin, and fall back to installing llvm if needed.
       - name: Provide llvm-mc
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bin"
-          for candidate in llvm-mc llvm-mc-20 llvm-mc-19 llvm-mc-18 llvm-mc-17 \
-                           llvm-mc-16 llvm-mc-15 llvm-mc-14 llvm-mc-13; do
-            if command -v "$candidate" >/dev/null 2>&1; then
-              ln -sf "$(command -v "$candidate")" "$RUNNER_TEMP/bin/llvm-mc"
-              echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-              echo "llvm-mc -> $(readlink -f "$RUNNER_TEMP/bin/llvm-mc")"
-              exit 0
-            fi
-          done
-          echo "no llvm-mc found; the COFF assembler test will skip"
+          find_llvm_mc() {
+            for candidate in llvm-mc llvm-mc-20 llvm-mc-19 llvm-mc-18 llvm-mc-17 \
+                             llvm-mc-16 llvm-mc-15 llvm-mc-14 llvm-mc-13; do
+              if command -v "$candidate" >/dev/null 2>&1; then
+                ln -sf "$(command -v "$candidate")" "$RUNNER_TEMP/bin/llvm-mc"
+                echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+                echo "llvm-mc -> $(readlink -f "$RUNNER_TEMP/bin/llvm-mc")"
+                return 0
+              fi
+            done
+            return 1
+          }
+          if find_llvm_mc; then
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends llvm
+          if find_llvm_mc; then
+            exit 0
+          fi
+          echo "::error::llvm-mc could not be located or installed"
+          exit 1
 
       - name: Build the CLI
         # cmd/reify is the only binary the directory ships, so a build failure
@@ -77,6 +89,24 @@ jobs:
         # scripts/ssa-test.sh with arguments forwards to go test and sets an
         # isolated YAKIT_HOME, which is the repository's test entry point.
         run: ./scripts/ssa-test.sh -count=1 -timeout 20m ./common/yak/reify/...
+
+      - name: Verify assembler-backed regression tests did not skip
+        run: |
+          set -euo pipefail
+          (
+            set -euo pipefail
+            ./scripts/ssa-test.sh -count=1 -v -run '^TestAssemblyUsesFunctionMode$' ./common/yak/reify/core/asm2lowir
+            ./scripts/ssa-test.sh -count=1 -v -run '^TestMachODefinedSymbols$' ./common/yak/reify/loader/fileformat/macho
+            ./scripts/ssa-test.sh -count=1 -v -run '^(TestCLIStringsAtZeroAddressSymbol|TestCLILiftsOddAddressFunctionAliases|TestCLILiftsMixedARMThumb|TestCLIStringsMachO)$' ./common/yak/reify/cmd/reify
+            ./scripts/ssa-test.sh -count=1 -v -run '^TestCOFFObjectLiftsEveryFunction$' ./common/yak/reify/test
+          ) | tee "$RUNNER_TEMP/reify-llvm-mc.log"
+          if grep -q -- '--- SKIP:' "$RUNNER_TEMP/reify-llvm-mc.log"; then
+            echo "::error::assembler-backed regression tests skipped unexpectedly"
+            exit 1
+          fi
+
+      - name: Run race detector on core and loader packages
+        run: ./scripts/ssa-test.sh -race -count=1 -timeout 10m ./common/yak/reify/core/... ./common/yak/reify/loader/...
 
       - name: Check formatting
         run: |
@@ -98,3 +128,71 @@ jobs:
           set -euo pipefail
           "$RUNNER_TEMP/reify" parsers
           "$RUNNER_TEMP/reify" loaders
+
+      - name: Smoke-test compiled reify CLI on ELF, Mach-O and COFF objects
+        run: |
+          set -euo pipefail
+          tmp=""
+          trap 'rm -rf "${tmp:-}"' EXIT
+          tmp=$(mktemp -d)
+
+          cat > "$tmp/arm.s" <<'EOF'
+          .syntax unified
+          .text
+          .arm
+          .globl arm_func
+          .type arm_func, %function
+          arm_func:
+              mov r0, #42
+              bx lr
+          .size arm_func, .-arm_func
+          .thumb
+          .globl thumb_func, thumb_alias
+          .type thumb_func, %function
+          .type thumb_alias, %function
+          .thumb_func
+          thumb_func:
+          thumb_alias:
+              movs r0, #7
+              bx lr
+          .size thumb_func, .-thumb_func
+          .size thumb_alias, .-thumb_alias
+          EOF
+          llvm-mc -triple=armv7-linux-gnueabi -filetype=obj -o "$tmp/arm.o" "$tmp/arm.s"
+
+          cat > "$tmp/macho.s" <<'EOF'
+          .text
+          .globl _entry
+          _entry:
+              ret
+          .section __TEXT,__const
+          .globl _greeting
+          _greeting:
+              .asciz "hello from Mach-O"
+          EOF
+          llvm-mc -triple=arm64-apple-darwin -filetype=obj -o "$tmp/macho.o" "$tmp/macho.s"
+
+          cat > "$tmp/coff.s" <<'EOF'
+          .data
+          .globl greeting
+          greeting:
+              .asciz "hello at zero"
+          EOF
+          llvm-mc -triple=x86_64-windows-msvc -filetype=obj -o "$tmp/coff.obj" "$tmp/coff.s"
+
+          for f in "$tmp/arm.o" "$tmp/macho.o" "$tmp/coff.obj"; do
+            "$RUNNER_TEMP/reify" check "$f" >/dev/null
+            "$RUNNER_TEMP/reify" inspect "$f" >/dev/null
+          done
+
+          "$RUNNER_TEMP/reify" strings --at greeting "$tmp/macho.o" | grep -q "hello from Mach-O"
+          "$RUNNER_TEMP/reify" strings --at greeting "$tmp/coff.obj" | grep -q "hello at zero"
+          "$RUNNER_TEMP/reify" strings --at 0 "$tmp/coff.obj" | grep -q "hello at zero"
+          "$RUNNER_TEMP/reify" lift --mode asm --func thumb_func "$tmp/arm.o" | grep -q "07 20"
+          "$RUNNER_TEMP/reify" lift --mode asm --func thumb_alias "$tmp/arm.o" | grep -q "07 20"
+          lowir_out=$("$RUNNER_TEMP/reify" lift --mode lowir "$tmp/macho.o")
+          echo "$lowir_out" | grep -q "entry"
+          if echo "$lowir_out" | grep -q "ltmp0"; then
+            echo "::error::unexpected ltmp0 in Mach-O LowIR output"
+            exit 1
+          fi
