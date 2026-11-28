@@ -341,10 +341,7 @@ func symbolBoundaries(artifact *core.Artifact) []core.FunctionBoundary {
 		if symbol.Kind != sym.SymbolFunction || symbol.Imported {
 			continue
 		}
-		// A function starts on at least a two-byte boundary on every supported
-		// target. ARM stores the Thumb marker in the low bit of the value. A
-		// relocatable object may define its first function at address zero.
-		address := symbol.Address &^ 1
+		address := codeAddress(artifact.Target.Architecture, symbol.Address)
 		result = append(result, core.FunctionBoundary{Address: address, Size: symbol.Size, Name: symbol.Name, Source: core.BoundarySymbol})
 	}
 	return result
@@ -435,7 +432,7 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 		if size == 0 && artifact.Image != nil {
 			size = artifact.Image.InferredSymbolSize(symbol)
 		}
-		return core.FunctionBoundary{Address: codeAddress(symbol.Address), Size: size, Name: symbol.Name, Source: core.BoundarySymbol}, nil
+		return core.FunctionBoundary{Address: codeAddress(artifact.Target.Architecture, symbol.Address), Size: size, Name: symbol.Name, Source: core.BoundarySymbol}, nil
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }
@@ -542,6 +539,9 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 // codeAddress clears the Thumb selector. An ARM symbol that names a Thumb
 // function stores its address with the low bit set, and the instruction stream
 // starts at the aligned address.
-func codeAddress(address uint64) uint64 {
-	return address &^ 1
+func codeAddress(architecture core.Architecture, address uint64) uint64 {
+	if architecture == core.ArchARM {
+		return address &^ 1
+	}
+	return address
 }
