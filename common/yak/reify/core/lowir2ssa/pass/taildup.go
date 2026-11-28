@@ -55,6 +55,9 @@ func jumpPredecessors(function *core.Function, target core.BlockID) []*core.Bloc
 	var result []*core.Block
 	for index := range function.Blocks {
 		block := &function.Blocks[index]
+		if len(block.Instructions) == 0 {
+			continue
+		}
 		last := block.Instructions[len(block.Instructions)-1]
 		if last.Kind != core.OpJump || len(last.Targets) != 1 || last.Targets[0] != target {
 			continue
