@@ -147,7 +147,11 @@ func (r *ReActLoop) prepareImages(ctx context.Context, references []aicommon.Pro
 	if len(references) == 0 {
 		return nil, nil
 	}
-	native, model, err := r.imageRouteForModel(r.requestModelConfig)
+	var modelConfig *ypb.AIModelConfig
+	if r.requestAIBinding != nil {
+		modelConfig = r.requestAIBinding.ModelConfig
+	}
+	native, model, err := r.imageRouteForModel(modelConfig)
 	if err != nil || !native {
 		return nil, err
 	}

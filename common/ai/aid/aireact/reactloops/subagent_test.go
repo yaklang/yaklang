@@ -89,11 +89,14 @@ func newSubReactAICallbackProbe() (aicommon.AICallbackType, *int64) {
 	return cb, &hits
 }
 
-func assertSubAgentProbeHits(t *testing.T, label string, cb aicommon.AICallbackType, hits *int64) {
+func assertSubAgentProbeHits(t *testing.T, label string, factory aicommon.AICallbackFactory, hits *int64) {
 	t.Helper()
-	require.NotNil(t, cb, "%s callback must be present on the child invoker", label)
+	require.NotNil(t, factory, "%s callback must be present on the child invoker", label)
+	cb, err := factory(nil)
+	require.NoError(t, err, "%s factory must generate without error", label)
+	require.NotNil(t, cb, "%s factory must generate a callback", label)
 	before := atomic.LoadInt64(hits)
-	_, err := cb(nil, nil)
+	_, err = cb(nil, nil)
 	require.NoError(t, err, "%s callback must run without error", label)
 	assert.Equal(t, before+1, atomic.LoadInt64(hits), "%s callback must be the one wired into the child slot", label)
 }
@@ -206,9 +209,9 @@ func TestBuildSubAgentInvoker_PassesAICallbacksToChild(t *testing.T) {
 	parentCfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
-			Original:           origCb,
-			QualityPriorityRaw: qualityCb,
-			SpeedPriorityRaw:   speedCb,
+			Original:           aicommon.FixedAICallbackFactory(origCb),
+			QualityPriorityRaw: aicommon.FixedAICallbackFactory(qualityCb),
+			SpeedPriorityRaw:   aicommon.FixedAICallbackFactory(speedCb),
 		}),
 		aicommon.WithDisableAutoSkills(true),
 	)

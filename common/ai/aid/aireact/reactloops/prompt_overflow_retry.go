@@ -105,7 +105,8 @@ func (r *ReActLoop) primaryModelContext() (provider, model, key string) {
 	if r.useSpeedPriorityAI {
 		return
 	}
-	if modelConfig := r.requestModelConfig; modelConfig != nil {
+	if r.requestAIBinding != nil && r.requestAIBinding.ModelConfig != nil {
+		modelConfig := r.requestAIBinding.ModelConfig
 		return modelConfig.GetProvider().GetType(), modelConfig.GetModelName(), aispec.ModelContextIdentity(modelConfig)
 	}
 	if config, ok := r.config.(*aicommon.Config); ok {

@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
@@ -310,7 +309,11 @@ type loopPromptBuildInput struct {
 	frozenPartitions  []aicommon.FrozenBlockPartition
 	memory            string
 	operator          *LoopActionHandlerOperator
-	modelConfig       *ypb.AIModelConfig
+	// aiBinding pins the main-model routing of this iteration. Its ModelConfig
+	// is the prompt-budget snapshot, and Callback/Quality are generated from
+	// that snapshot at capture time so overflow retries cannot re-resolve the
+	// tier while the prompt still describes the captured model.
+	aiBinding *aicommon.PrimaryAICallbackBinding
 
 	// Captured exactly once per iteration: these reads mutate loop state.
 	subAgentInput            string
@@ -343,12 +346,21 @@ func (r *ReActLoop) captureLoopPromptBuildInput(
 	// cursor. Capture before projection so only model-visible saves are acked.
 	evidenceRevision := r.subAgentSharedEvidenceRevision()
 	subAgentInput, subAgentRevision := r.prepareSubAgentPrompt()
-	var modelConfig *ypb.AIModelConfig
+	var aiBinding *aicommon.PrimaryAICallbackBinding
 	if config, ok := r.config.(*aicommon.Config); ok && !r.useSpeedPriorityAI {
-		modelConfig = config.SnapshotPrimaryModelConfig()
+		snapshot := config.SnapshotPrimaryModelConfig()
+		binding, err := config.GeneratePrimaryAICallback(snapshot)
+		if err == nil {
+			aiBinding = binding
+		} else {
+			// Keep the budget snapshot even when no callback could be generated;
+			// call targets then fall back to the config-level dynamic chain.
+			aiBinding = &aicommon.PrimaryAICallbackBinding{ModelConfig: snapshot}
+			log.Warnf("failed to generate primary AI callback for this round: %v (falling back to dynamic routing)", err)
+		}
 	}
 	return &loopPromptBuildInput{
-		modelConfig:              modelConfig,
+		aiBinding:                aiBinding,
 		nonce:                    nonce,
 		userInput:                userInput,
 		frozenUserContext:        frozenUserContext,
@@ -386,7 +398,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	if input == nil {
 		return nil, utils.Error("loop prompt build input is nil")
 	}
-	r.requestModelConfig = input.modelConfig
+	r.requestAIBinding = input.aiBinding
 	nonce, frozenUserContext := input.nonce, input.frozenUserContext
 	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
 	subAgentInput := input.subAgentInput

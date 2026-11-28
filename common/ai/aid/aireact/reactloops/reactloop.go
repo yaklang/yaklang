@@ -17,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type ReActLoopCoreGenerateCode func(
@@ -121,9 +120,13 @@ type ReActLoop struct {
 	requestTimelineItemIDs   []int64
 	imagePrompt              *imagePromptSnapshot
 	imageRejectedModel       string
-	// Pinned when the iteration captures its prompt inputs; shared by prompt
-	// rebuilds and quality requests, never by auxiliary or vision routing.
-	requestModelConfig *ypb.AIModelConfig
+	// requestAIBinding pins the main-model routing of this iteration. Its
+	// ModelConfig is the prompt-budget snapshot; Callback/Quality were generated
+	// from that same snapshot at capture time. Retries, prompt rebuilds and
+	// compression reuse it, so a hot-patch between prompt assembly and the
+	// request cannot desynchronize the token budget and the actual routing.
+	// Auxiliary loops leave it nil and fall back to Config.CallAI variants.
+	requestAIBinding *aicommon.PrimaryAICallbackBinding
 	// lastFittingTimelineThroughID is the boundary of the latest prompt the
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64

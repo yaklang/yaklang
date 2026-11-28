@@ -39,7 +39,12 @@ func TestInheritTieredAICallbackSnapshotsExplicitModel(t *testing.T) {
 	_, name, childKey := child.PrimaryModelContext()
 	require.Equal(t, "model-a", name)
 	require.Equal(t, key, childKey)
-	_, err := child.GetRawAICallbacks().QualityPriorityRaw(child, NewAIRequest("probe"))
+	factory := child.GetRawAICallbacks().QualityPriorityRaw
+	require.NotNil(t, factory)
+	cb, err := factory(nil)
+	require.NoError(t, err)
+	require.NotNil(t, cb)
+	_, err = cb(child, NewAIRequest("probe"))
 	require.NoError(t, err)
 	require.Equal(t, 1, calls)
 

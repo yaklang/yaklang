@@ -248,6 +248,31 @@ func (d *LoopResultDescriptor) finalizeLocked() {
 	d.trajectoryReceiver.Load().deliver(d.snapshot.ResponseJSON)
 }
 
+// mainAICall returns the main-model call target for this round. The loop holds
+// the binding generated at prompt-capture time, so every retry and rebuild of
+// the round uses the routing that produced the prompt budget. Auxiliary loops
+// and unbound loops keep the config-level dynamic behavior.
+func (r *ReActLoop) mainAICall() func(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	if r.requestAIBinding != nil && r.requestAIBinding.Callback != nil {
+		return func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return r.requestAIBinding.Callback(r.config, req)
+		}
+	}
+	return r.config.CallAI
+}
+
+// qualityAICall is the compression/recovery target. It stays on the pinned
+// quality callback when available; otherwise it keeps Config.CallQualityPriorityAI
+// fallback semantics.
+func (r *ReActLoop) qualityAICall() func(*aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	if r.requestAIBinding != nil && r.requestAIBinding.Quality != nil {
+		return func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return r.requestAIBinding.Quality(r.config, req)
+		}
+	}
+	return r.config.CallQualityPriorityAI
+}
+
 // callAILoopTransaction only decides and validates the model's proposed calls.
 // The caller is responsible for executing them in a later phase.
 func (r *ReActLoop) callAILoopTransaction(
@@ -664,9 +689,6 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		captureOption,
 	}
-	if !r.useSpeedPriorityAI {
-		requestOpts = append(requestOpts, aicommon.WithAIRequest_QualityModelConfig(r.requestModelConfig))
-	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
 	requestOpts = append(requestOpts, r.imageRequestOptions()...)
@@ -857,7 +879,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 			aicommon.WithAuxiliaryOnError(func(err error) { transactionErr = err }),
 		)
 	} else {
-		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallAI, postHandler, requestOpts...)
+		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.mainAICall(), postHandler, requestOpts...)
 	}
 	if transactionErr != nil {
 		r.UserStatus("暂时没能完成这一步", "This step could not be completed", aicommon.WithStatusCode("action.failed"), aicommon.WithStatusState(aicommon.StatusStateError))
@@ -976,9 +998,6 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 					}
 				})(req)
 		},
-	}
-	if !r.useSpeedPriorityAI {
-		requestOpts = append(requestOpts, aicommon.WithAIRequest_QualityModelConfig(r.requestModelConfig))
 	}
 	// Inherit the model's configured thinking level so compression can reuse
 	// the preceding main-model prefix without a forced mode switch.
@@ -1261,7 +1280,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 	}
 	var transactionErr error
 	if compressionMode {
-		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallQualityPriorityAI, postHandler, requestOpts...)
+		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.qualityAICall(), postHandler, requestOpts...)
 	} else if r.useSpeedPriorityAI {
 		// Config owns execution, not just policy lookup. LiteForge runs each
 		// response through the existing streaming parser and verifier within its
@@ -1282,7 +1301,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			aicommon.WithAuxiliaryOnError(func(err error) { transactionErr = err }),
 		)
 	} else {
-		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallAI, postHandler, requestOpts...)
+		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.mainAICall(), postHandler, requestOpts...)
 	}
 	if transactionErr != nil {
 		r.UserStatus(

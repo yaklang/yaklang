@@ -28,28 +28,37 @@ func TestModelContextRequestPinsQualityWithoutChangingAuxiliaryRouting(t *testin
 			require.NotNil(t, pinned)
 			key := aispec.ModelContextIdentity(pinned)
 			require.NotEmpty(t, key)
-			request := NewAIRequest("pinned quality request", WithAIRequest_QualityModelConfig(pinned))
+			binding, err := cfg.GeneratePrimaryAICallback(pinned)
+			require.NoError(t, err)
+			require.NotNil(t, binding)
+			require.NotNil(t, binding.Callback)
+			require.NotNil(t, binding.Quality)
 			// Neither a later global selection nor mutation of the source snapshot
-			// can replace the configuration already attached to this request.
+			// can replace the routing already generated for this round.
 			pinned.ModelName = "mutated"
 			consts.SetTieredAIConfig(pr5128TierConfig(single, "1"))
 			for _, tc := range []struct {
-				name string
-				call AICallbackType
-				want pr5128ModelCall
+				name    string
+				call    AICallbackType
+				want    pr5128ModelCall
+				wantKey bool
 			}{
-				{"quality", cfg.GetQualityPriorityAICallback(), pr5128ModelCall{"test-pr5128-quality", "Q0", "high"}},
-				{"speed", cfg.GetSpeedPriorityAICallback(), pr5128ModelCall{"test-pr5128-speed", "S1", "high"}},
-				{"vision", cfg.GetVisionPriorityAICallback(), pr5128ModelCall{"test-pr5128-vision", "V1", "high"}},
+				{"bound-quality", binding.Callback, pr5128ModelCall{"test-pr5128-quality", "Q0", "high"}, true},
+				{"compression-quality", binding.Quality, pr5128ModelCall{"test-pr5128-quality", "Q0", "high"}, true},
+				// The config-level getter still follows the latest global tier; the
+				// round binding above is what keeps prompt budget and routing aligned.
+				{"dynamic-quality", cfg.GetQualityPriorityAICallback(), pr5128ModelCall{"test-pr5128-quality", "Q1", "high"}, false},
+				{"speed", cfg.GetSpeedPriorityAICallback(), pr5128ModelCall{"test-pr5128-speed", "S1", "high"}, false},
+				{"vision", cfg.GetVisionPriorityAICallback(), pr5128ModelCall{"test-pr5128-vision", "V1", "high"}, false},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
-					if single && tc.name != "quality" {
-						tc.want.provider, tc.want.model = "test-pr5128-quality", "Q1"
-						if tc.name == "speed" {
-							tc.want.thinking = "none"
-						}
+					if single && tc.name == "speed" {
+						tc.want = pr5128ModelCall{"test-pr5128-quality", "Q1", "none"}
 					}
-					response, err := tc.call(cfg, request)
+					if single && tc.name == "vision" {
+						tc.want = pr5128ModelCall{"test-pr5128-quality", "Q1", "high"}
+					}
+					response, err := tc.call(cfg, NewAIRequest("context-binding"))
 					require.NoError(t, err)
 					_, err = io.ReadAll(response.GetOutputStreamReader("context-binding", true, cfg.GetEmitter()))
 					require.NoError(t, err)
@@ -60,7 +69,7 @@ func TestModelContextRequestPinsQualityWithoutChangingAuxiliaryRouting(t *testin
 					default:
 						t.Fatal("local provider was not called")
 					}
-					if tc.name == "quality" {
+					if tc.wantKey {
 						require.Equal(t, key, response.GetModelContextKey())
 					}
 				})

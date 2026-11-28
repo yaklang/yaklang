@@ -57,7 +57,8 @@ func TestModelContextImagePreparationUsesIterationSnapshot(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, loop.imagePrompt, "image capability must come from the captured request model")
 					require.Equal(t, wantKey, aispec.ModelContextIdentity(loop.imagePrompt.model))
-					require.Equal(t, input.modelConfig.GetImageTokenEstimator(), loop.imagePrompt.model.GetImageTokenEstimator())
+					require.NotNil(t, input.aiBinding)
+					require.Equal(t, input.aiBinding.ModelConfig.GetImageTokenEstimator(), loop.imagePrompt.model.GetImageTokenEstimator())
 					inputLimit := wantLimit
 					if result.Mode == aicommon.LoopPromptModeCompressContext {
 						// Keep the existing compression-request ceiling separate from

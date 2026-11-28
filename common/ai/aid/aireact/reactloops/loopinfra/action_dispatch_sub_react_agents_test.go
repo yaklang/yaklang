@@ -489,12 +489,12 @@ func TestRunForkedSubReactAgentJob_SetsProcessingBeforeElaboration(t *testing.T)
 		// mock invoker cannot reach a real AI backend.
 		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
 		aicommon.WithAICallbacks(&aicommon.AICallbacks{
-			Original: func(cfg aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			Original: aicommon.FixedAICallbackFactory(func(cfg aicommon.AICallerConfigIf, _ *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				rsp := cfg.NewAIResponse()
 				rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish"}`))
 				rsp.Close()
 				return rsp, nil
-			},
+			}),
 		}),
 	)
 

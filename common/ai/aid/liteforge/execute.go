@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*aicommon.ForgeResult, error) {
@@ -126,29 +127,31 @@ func Execute(ctx context.Context, r Request, opts ...aicommon.ConfigOption) (*ai
 		// Install the binder inside the ordinary model wrappers: those wrappers
 		// can wait for the provider before returning their tee response.
 		callbacks := cfg.GetRawAICallbacks()
-		bind := func(cb aicommon.AICallbackType) aicommon.AICallbackType {
-			if cb == nil {
+		bind := func(factory aicommon.AICallbackFactory) aicommon.AICallbackFactory {
+			if factory == nil {
 				return nil
 			}
-			return func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				resp, err := cb(c, req)
-				if resp != nil && err == nil {
-					resp.SetTaskIndex(req.GetTaskIndex())
-					protocol.bind(resp)
+			return func(model *ypb.AIModelConfig) (aicommon.AICallbackType, error) {
+				cb, err := factory(model)
+				if err != nil || cb == nil {
+					return cb, err
 				}
-				return resp, err
+				return func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					resp, err := cb(c, req)
+					if resp != nil && err == nil {
+						resp.SetTaskIndex(req.GetTaskIndex())
+						protocol.bind(resp)
+					}
+					return resp, err
+				}, nil
 			}
 		}
-		_ = aicommon.WithFastAICallback(bind(callbacks.Original))(cfg)
-		if callbacks.QualityPriorityRaw != nil {
-			_ = aicommon.WithQualityPriorityAICallback(bind(callbacks.QualityPriorityRaw))(cfg)
-		}
-		if callbacks.SpeedPriorityRaw != nil {
-			_ = aicommon.WithSpeedPriorityAICallback(bind(callbacks.SpeedPriorityRaw))(cfg)
-		}
-		if callbacks.VisionPriorityRaw != nil {
-			_ = aicommon.WithVisionPriorityAICallback(bind(callbacks.VisionPriorityRaw))(cfg)
-		}
+		_ = aicommon.WithAICallbacks(&aicommon.AICallbacks{
+			Original:           bind(callbacks.Original),
+			QualityPriorityRaw: bind(callbacks.QualityPriorityRaw),
+			SpeedPriorityRaw:   bind(callbacks.SpeedPriorityRaw),
+			VisionPriorityRaw:  bind(callbacks.VisionPriorityRaw),
+		})(cfg)
 	}
 	call := cfg.CallAI
 	if r.PreferSpeed {
