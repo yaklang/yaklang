@@ -302,7 +302,7 @@ func stringAddress(artifact *core.Artifact, text string) (uint64, error) {
 		return value, nil
 	}
 	if artifact.Image != nil {
-		if entry, ok := artifact.Image.SymbolByName(text); ok && entry.Address != 0 && !entry.Imported {
+		if entry, ok := artifact.Image.SymbolByName(text); ok && !entry.Imported {
 			return entry.Address, nil
 		}
 	}
