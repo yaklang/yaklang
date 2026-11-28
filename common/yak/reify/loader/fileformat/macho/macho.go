@@ -29,6 +29,7 @@ const (
 	machoSymbolDebugMask       = 0xe0 // N_STAB
 	machoSymbolTypeMask        = 0x0e // N_TYPE
 	machoSymbolSection         = 0x0e // N_SECT
+	machoSymbolExternal        = 0x01 // N_EXT
 )
 
 func (Loader) Kind() core.Format   { return core.FormatMachO }
@@ -185,7 +186,7 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 				continue
 			}
 			name := strings.TrimPrefix(item.Name, "_")
-			if name == "" {
+			if name == "" || isAssemblerTempSymbol(item) {
 				continue
 			}
 			kind := sym.SymbolObject
@@ -215,6 +216,15 @@ func inspectMachO(reader *core.ByteReader) (*core.Image, core.Target, *core.Boun
 		})
 	}
 	return image, target, hints, diagnostics, nil
+}
+
+// LLVM emits local Mach-O labels named ltmpN, including section anchors that
+// can share a function's address. Use the raw name to preserve source
+// symbols such as _ltmp29.
+func isAssemblerTempSymbol(item macho.Symbol) bool {
+	suffix, ok := strings.CutPrefix(item.Name, "ltmp")
+	return item.Type&machoSymbolExternal == 0 && ok && suffix != "" &&
+		strings.Trim(suffix, "0123456789") == ""
 }
 
 // openMachO opens a thin or a universal image. A universal image exposes one

@@ -9,11 +9,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/reify/core"
+	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
 	"github.com/yaklang/yaklang/common/yak/reify/loader"
 )
 
-func TestMachODefinedDataSymbols(t *testing.T) {
+func TestMachODefinedSymbols(t *testing.T) {
 	assembler, err := exec.LookPath("llvm-mc")
 	if err != nil {
 		t.Skip("llvm-mc is not installed")
@@ -21,6 +22,9 @@ func TestMachODefinedDataSymbols(t *testing.T) {
 	const assembly = `.text
 .globl _entry
 _entry:
+    ret
+
+_ltmp29:
     ret
 
 .section __TEXT,__const
@@ -61,4 +65,12 @@ _greeting:
 	section, ok := artifact.Image.SectionAt(buffer.Address)
 	require.True(t, ok)
 	require.Zero(t, section.FileSize)
+
+	lift, err := asm2lowir.Parse(context.Background(), artifact, asm2lowir.WithAll())
+	require.NoError(t, err)
+	var names []string
+	for _, function := range lift.IR.Functions {
+		names = append(names, function.Name)
+	}
+	require.Equal(t, []string{"entry", "ltmp29"}, names)
 }
