@@ -73,17 +73,19 @@ func ParseInstance(name string) Instance {
 		return instance
 	}
 	instance.Synthetic = strings.HasSuffix(name, "-fm")
-	groups := depthZeroGroups(name)
-	instance.Generic = len(groups) > 0
-	if instance.Generic {
-		instance.Name = replaceGroupsWithDisplay(name, groups)
-		for _, group := range groups {
-			for _, arg := range splitTypeArgs(name[group.start+1 : group.end]) {
-				instance.RawTypeArgs = append(instance.RawTypeArgs, arg)
-				instance.TypeArgs = append(instance.TypeArgs, displayTypeArg(arg))
+	if strings.ContainsAny(name, "[]") {
+		groups := depthZeroGroups(name)
+		instance.Generic = len(groups) > 0
+		if instance.Generic {
+			instance.Name = replaceGroupsWithDisplay(name, groups)
+			for _, group := range groups {
+				for _, arg := range splitTypeArgs(name[group.start+1 : group.end]) {
+					instance.RawTypeArgs = append(instance.RawTypeArgs, arg)
+					instance.TypeArgs = append(instance.TypeArgs, displayTypeArg(arg))
+				}
 			}
+			instance.Family = replaceGroups(name, groups, "[T]")
 		}
-		instance.Family = replaceGroups(name, groups, "[T]")
 	}
 
 	decl, closure := splitClosureMasked(masked)
@@ -95,9 +97,15 @@ func ParseInstance(name string) Instance {
 	}
 	firstDot := strings.Index(decl[pathEnd:], ".")
 	lastDot := strings.LastIndex(decl[pathEnd:], ".")
+	stripMaybe := func(text string) string {
+		if !instance.Generic {
+			return text
+		}
+		return stripGroups(text)
+	}
 	if firstDot < 0 {
 		// No dot after the last slash: no package part can be named.
-		instance.Function = stripGroups(declText)
+		instance.Function = stripMaybe(declText)
 		return instance
 	}
 	if firstDot != lastDot && pathEnd+firstDot+1 <= pathEnd+lastDot {
@@ -105,12 +113,16 @@ func ParseInstance(name string) Instance {
 		// path segment with a dot ("gopkg.in/yaml.v2") is read as a receiver.
 		instance.Package = name[:pathEnd+firstDot]
 		raw := name[pathEnd+firstDot+1 : pathEnd+lastDot]
-		instance.Receiver = trimReceiver(replaceGroupsWithDisplay(raw, depthZeroGroups(raw)))
-		instance.Function = stripGroups(name[pathEnd+lastDot+1 : len(decl)])
+		if instance.Generic {
+			instance.Receiver = trimReceiver(replaceGroupsWithDisplay(raw, depthZeroGroups(raw)))
+		} else {
+			instance.Receiver = trimReceiver(raw)
+		}
+		instance.Function = stripMaybe(name[pathEnd+lastDot+1 : len(decl)])
 		return instance
 	}
 	instance.Package = name[:pathEnd+firstDot]
-	instance.Function = stripGroups(name[pathEnd+firstDot+1 : len(decl)])
+	instance.Function = stripMaybe(name[pathEnd+firstDot+1 : len(decl)])
 	return instance
 }
 
@@ -145,6 +157,9 @@ func (i Instance) Identity() *symbol.Identity {
 // argument then cannot be mistaken for a package or a receiver boundary. An
 // imbalanced name is reported so the caller can leave it unsplit.
 func maskBracketContents(name string) (string, bool) {
+	if !strings.ContainsAny(name, "[]") {
+		return name, true
+	}
 	depth := 0
 	var builder strings.Builder
 	builder.Grow(len(name))

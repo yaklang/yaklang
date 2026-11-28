@@ -2,6 +2,7 @@ package golang
 
 import (
 	"bytes"
+	"debug/gosym"
 	"encoding/binary"
 	"math"
 	"testing"
@@ -149,5 +150,64 @@ func TestMetadataLimitAllowsLargeNamedPclntab(t *testing.T) {
 	}
 	if maxNamedPclntabSize <= maxMetadataSize || maxNamedPclntabSize < 85<<20 {
 		t.Fatalf("named limit must cover a real 85 MiB table: %d", maxNamedPclntabSize)
+	}
+}
+
+func TestDirectGo120TableMatchesGosym(t *testing.T) {
+	// Build a minimal valid Go 1.20 (0xfffffff1) pclntab with 2 functions and text=0x1000.
+	// Header: 8 bytes + 8*8 = 72 bytes.
+	const (
+		funcnameOff = 0x80
+		pclnOff     = 0xc0
+		textBase    = 0x1000
+	)
+	names := []byte("main.alpha\x00main.(*Box[go.shape.int]).Get\x00")
+	// 2 functab entries + 1 end sentinel = 5 uint32s + pad -> actually (2*2+1)*4 = 20 bytes -> pad to 24.
+	const funcInfoOff0 = 24
+	const funcInfoOff1 = 48
+	buf := make([]byte, pclnOff+80)
+	binary.LittleEndian.PutUint32(buf[0:], 0xfffffff1)
+	buf[6], buf[7] = 1, 8
+	binary.LittleEndian.PutUint64(buf[8+0*8:], 2)           // nfunc
+	binary.LittleEndian.PutUint64(buf[8+1*8:], 0)           // nfile
+	binary.LittleEndian.PutUint64(buf[8+2*8:], textBase)    // textStart
+	binary.LittleEndian.PutUint64(buf[8+3*8:], funcnameOff) // funcnameOffset
+	binary.LittleEndian.PutUint64(buf[8+4*8:], funcnameOff+uint64(len(names)))
+	binary.LittleEndian.PutUint64(buf[8+5*8:], funcnameOff+uint64(len(names)))
+	binary.LittleEndian.PutUint64(buf[8+6*8:], pclnOff)
+	binary.LittleEndian.PutUint64(buf[8+7*8:], pclnOff)
+	copy(buf[funcnameOff:], names)
+
+	ftab := buf[pclnOff:]
+	binary.LittleEndian.PutUint32(ftab[0:], 0x0)          // func 0 entryOff
+	binary.LittleEndian.PutUint32(ftab[4:], funcInfoOff0) // func 0 info
+	binary.LittleEndian.PutUint32(ftab[8:], 0x20)         // func 1 entryOff
+	binary.LittleEndian.PutUint32(ftab[12:], funcInfoOff1)
+	binary.LittleEndian.PutUint32(ftab[16:], 0x40) // end entryOff
+	// _func structs: +0 entryOff, +4 nameOff
+	binary.LittleEndian.PutUint32(ftab[funcInfoOff0:], 0x0)
+	binary.LittleEndian.PutUint32(ftab[funcInfoOff0+4:], 0)
+	binary.LittleEndian.PutUint32(ftab[funcInfoOff1:], 0x20)
+	binary.LittleEndian.PutUint32(ftab[funcInfoOff1+4:], uint32(len("main.alpha\x00")))
+
+	a := pclnArtifact(t, buf)
+	a.Hints.ExecSections = []core.Region{{Address: textBase, Offset: 0, Size: 0x100}}
+	direct, err := (Golang{}).Recover(a)
+	if err != nil {
+		t.Fatalf("direct Recover failed: %v", err)
+	}
+	lt := gosym.NewLineTable(buf, textBase)
+	tbl, err := gosym.NewTable(nil, lt)
+	if err != nil {
+		t.Fatalf("gosym.NewTable failed: %v", err)
+	}
+	if len(direct) != len(tbl.Funcs) || len(direct) != 2 {
+		t.Fatalf("got %d direct, %d gosym", len(direct), len(tbl.Funcs))
+	}
+	if direct[0].Name != "main.alpha" || direct[0].Address != 0x1000 {
+		t.Fatalf("direct[0] = %+v", direct[0])
+	}
+	if direct[1].Name != "main.(*Box[int]).Get" || direct[1].Mangled != "main.(*Box[go.shape.int]).Get" {
+		t.Fatalf("direct[1] = %+v", direct[1])
 	}
 }

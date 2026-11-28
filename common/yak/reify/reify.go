@@ -6,12 +6,14 @@ package reify
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/asm2lowir"
 	"github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa"
+	lowirpass "github.com/yaklang/yaklang/common/yak/reify/core/lowir2ssa/pass"
 	"github.com/yaklang/yaklang/common/yak/reify/core/ssa2source"
 	ssapass "github.com/yaklang/yaklang/common/yak/reify/core/ssa2source/pass"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -112,6 +114,18 @@ type Config struct {
 	// Format forces one loader. It is needed only for a format that carries no
 	// magic, such as a COM image.
 	Format string
+	// DiscardIR releases LowIR function bodies right after SSA conversion so
+	// callers that only query SSA do not retain both IR layers simultaneously.
+	DiscardIR bool
+	// SkipText skips SSAIR/Source text rendering when callers only query Program.
+	SkipText bool
+	// Workers bounds parallel batch workers in LiftStream/Save (<=0 picks default).
+	Workers int
+	// BatchSize bounds functions decoded per streaming/save batch (<=0 picks default).
+	BatchSize int
+	// BeforeStream is invoked by LiftStream once headers/summaries are ready and
+	// right before writing the representation body.
+	BeforeStream func(w io.Writer, header StreamHeader) error
 }
 
 // Option customizes Lift.
@@ -162,6 +176,32 @@ func WithProgramName(name string) Option {
 // ssa.ProgramCacheDBWrite before calling SaveToDatabase.
 func WithProgramCache(kind ssa.ProgramCacheKind) Option {
 	return func(config *Config) { config.CacheKind = kind }
+}
+
+// WithDiscardIR releases LowIR bodies immediately after SSA conversion.
+func WithDiscardIR() Option {
+	return func(config *Config) { config.DiscardIR = true }
+}
+
+// WithSkipText skips SSAIR and source text rendering in Lift.
+func WithSkipText() Option {
+	return func(config *Config) { config.SkipText = true }
+}
+
+// WithWorkers sets the worker concurrency for LiftStream and Save.
+func WithWorkers(n int) Option {
+	return func(config *Config) { config.Workers = n }
+}
+
+// WithBatchSize sets the function batch size for LiftStream and Save.
+func WithBatchSize(n int) Option {
+	return func(config *Config) { config.BatchSize = n }
+}
+
+// WithBeforeStream registers a callback executed once right before streaming
+// representation text in LiftStream.
+func WithBeforeStream(fn func(w io.Writer, header StreamHeader) error) Option {
+	return func(config *Config) { config.BeforeStream = fn }
 }
 
 // resolveFormat validates a forced format name against the register.
@@ -248,23 +288,9 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 			_ = result.Close()
 		}
 	}()
-	asmOptions := []asm2lowir.Option{asm2lowir.WithAsmSyntax(settings.AsmSyntax)}
-	switch {
-	case settings.Function != "":
-		asmOptions = append(asmOptions, asm2lowir.WithFunction(settings.Function))
-	case settings.Address != "":
-		region, err := addressRegion(artifact, settings.Address, settings.Size)
-		if err != nil {
-			return nil, err
-		}
-		asmOptions = append(asmOptions, asm2lowir.WithRegion(region), asm2lowir.WithExact())
-	case settings.Section != "":
-		asmOptions = append(asmOptions, asm2lowir.WithSection(settings.Section))
-	default:
-		asmOptions = append(asmOptions, asm2lowir.WithAll())
-	}
-	if settings.Mode == ModeAll {
-		asmOptions = append(asmOptions, asm2lowir.WithAssembly())
+	asmOptions, err := buildASMOptions(artifact, settings)
+	if err != nil {
+		return nil, err
 	}
 
 	if settings.Mode == ModeASM {
@@ -292,6 +318,7 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 		result.Region = displayRegion(artifact, settings)
 	}
 	result.Functions = len(parsed.IR.Functions)
+	sourceFunctions := countSourceFunctions(parsed.IR)
 	result.Blocks = countBlocks(parsed.IR)
 	result.Instructions = countInstructions(parsed.IR)
 	result.Values = countValues(parsed.IR)
@@ -303,8 +330,11 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	}
 
 	convertOptions := []lowir2ssa.Option{}
-	if len(settings.LowIRPasses) > 0 {
-		convertOptions = append(convertOptions, lowir2ssa.WithLowIRPasses(settings.LowIRPasses...))
+	if passes := effectiveLowIRPasses(settings); len(passes) > 0 {
+		convertOptions = append(convertOptions, lowir2ssa.WithLowIRPasses(passes...))
+	}
+	if settings.DiscardIR {
+		convertOptions = append(convertOptions, lowir2ssa.WithConsumeIR())
 	}
 	// A load from a table of addresses names the object it points at, so the
 	// converter reads the table through the artifact.
@@ -322,6 +352,9 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	if err != nil {
 		return nil, err
 	}
+	if settings.DiscardIR {
+		result.IR = nil
+	}
 	// A failure after conversion must close the program cache. Otherwise a DB
 	// writer can keep flushing a program that the caller never receives, and a
 	// staging program would be recreated after its cleanup.
@@ -338,10 +371,10 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 		return nil, err
 	}
 	ssa2source.AnnotateArtifact(converted.Program, artifact)
-	if settings.Mode == ModeSSAIR || settings.Mode == ModeAll {
+	if !settings.SkipText && (settings.Mode == ModeSSAIR || settings.Mode == ModeAll) {
 		result.SSAIR = lowir2ssa.Text(converted.Program)
 	}
-	if settings.Mode == ModeSSAIR {
+	if settings.SkipText || settings.Mode == ModeSSAIR {
 		ok = true
 		return result, nil
 	}
@@ -351,19 +384,99 @@ func Lift(ctx context.Context, path string, options ...Option) (*Result, error) 
 	}
 	result.Source = source
 	if settings.Mode == ModeSource {
-		result.Functions = countSourceFunctions(parsed.IR)
+		result.Functions = sourceFunctions
 	}
 	ok = true
 	return result, nil
 }
 
+func buildASMOptions(artifact *core.Artifact, settings Config) ([]asm2lowir.Option, error) {
+	asmOptions := []asm2lowir.Option{asm2lowir.WithAsmSyntax(settings.AsmSyntax)}
+	switch {
+	case settings.Function != "":
+		asmOptions = append(asmOptions, asm2lowir.WithFunction(settings.Function))
+	case settings.Address != "":
+		region, err := addressRegion(artifact, settings.Address, settings.Size)
+		if err != nil {
+			return nil, err
+		}
+		asmOptions = append(asmOptions, asm2lowir.WithRegion(region), asm2lowir.WithExact())
+	case settings.Section != "":
+		asmOptions = append(asmOptions, asm2lowir.WithSection(settings.Section))
+	default:
+		asmOptions = append(asmOptions, asm2lowir.WithAll())
+	}
+	if settings.Mode == ModeAll {
+		asmOptions = append(asmOptions, asm2lowir.WithAssembly())
+	}
+	return asmOptions, nil
+}
+
+func effectiveLowIRPasses(settings Config) []string {
+	if len(settings.LowIRPasses) > 0 {
+		return settings.LowIRPasses
+	}
+	if settings.Mode == ModeSSAIR || settings.Mode == ModeSource || settings.SkipText {
+		defaults := lowirpass.DefaultNames()
+		passes := make([]string, 0, len(defaults)+1)
+		passes = append(passes, defaults...)
+		passes = append(passes, lowirpass.PassDropDeadFlags)
+		return passes
+	}
+	return nil
+}
+
+func stringAtFunc(artifact *core.Artifact) func(uint64) (string, bool) {
+	return func(address uint64) (string, bool) { return artifact.StringAt(address, 128) }
+}
+
 func applySSAPasses(program *ssa.Program, artifact *core.Artifact, selected []string) error {
-	stringAt := func(address uint64) (string, bool) { return artifact.StringAt(address, 128) }
+	stringAt := stringAtFunc(artifact)
 	if len(selected) > 0 {
 		return ssapass.ApplySelectedWith(program, stringAt, selected...)
 	}
 	ssapass.ApplyDefault(program, stringAt)
 	return nil
+}
+
+// WriteLanguage formats recovered language metadata into w.
+func WriteLanguage(w io.Writer, report *core.LanguageReport) {
+	if report == nil || w == nil {
+		return
+	}
+	fmt.Fprintf(w, "Language: %s (%s)\n", report.Language, report.Confidence)
+	if report.Runtime != "" {
+		fmt.Fprintf(w, "Compiler: %s\n", report.Runtime)
+	}
+	for _, evidence := range report.Evidence {
+		fmt.Fprintf(w, "Evidence [%s]: %s\n", evidence.Source, evidence.Detail)
+	}
+	if abi := report.ABI; abi != nil {
+		parts := []string{fmt.Sprintf("%d argument registers", len(abi.Registers.Arguments))}
+		if abi.Registers.Return != "" {
+			parts = append(parts, "return "+abi.Registers.Return)
+		}
+		if abi.NoCalleeSave {
+			parts = append(parts, "no callee-saved")
+		}
+		fmt.Fprintf(w, "ABI: language override (%s)\n", strings.Join(parts, ", "))
+	}
+	if model := report.Strings; model != nil {
+		termination := "length-delimited"
+		if model.Layout == core.StringLayoutNulTerminated {
+			termination = "nul-terminated"
+		}
+		fmt.Fprintf(w, "Strings: %s (%s, %s)\n", model.Layout, model.Encoding, termination)
+	}
+}
+
+// WriteBoundaryStats formats boundary discovery statistics into w.
+func WriteBoundaryStats(w io.Writer, stats *core.BoundaryStats) {
+	if stats == nil || w == nil {
+		return
+	}
+	fmt.Fprintf(w, "Boundaries: symbol=%d eh_frame=%d function_start=%d init_array=%d plt=%d entry=%d call_target=%d scan=%d duplicates=%d\n",
+		stats.Symbol, stats.EHFrame, stats.FunctionStart, stats.InitArray, stats.PLT, stats.Entry, stats.Call, stats.Scan, stats.Duplicates)
 }
 
 func addressRegion(artifact *core.Artifact, addressText, sizeText string) (core.Region, error) {

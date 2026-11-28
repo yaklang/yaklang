@@ -45,6 +45,16 @@ type Options struct {
 	// table has to become the address it holds; otherwise every access stays
 	// symbolic and the object it names cannot be recovered.
 	PointerAt func(address uint64, size uint16) (uint64, bool)
+	// ConsumeIR clears each converted LowIR Function's Blocks and Facts in
+	// place right after converting it so multi-megabyte LowIR slices can be
+	// garbage-collected incrementally instead of coexisting with the full SSA.
+	ConsumeIR bool
+}
+
+// WithConsumeIR clears each function's LowIR Blocks and Facts immediately after
+// converting it to SSA.
+func WithConsumeIR() Option {
+	return func(options *Options) { options.ConsumeIR = true }
 }
 
 // WithProgramCache selects the program cache kind. ProgramCacheDBWrite makes
@@ -102,37 +112,99 @@ func Convert(ctx context.Context, ir *core.LowIR, options ...Option) (*Result, e
 	if settings.Language != "" {
 		program.Language = settings.Language
 	}
-	converter := &converter{
-		ctx:          ctx,
-		program:      program,
-		facts:        ir.Facts(),
-		pointerAt:    settings.PointerAt,
-		frameValues:  make(map[ssa.Value]bool),
-		spDerived:    make(map[ssa.Value]bool),
-		frameDerived: make(map[ssa.Value]bool),
-		diagnostics:  make([]core.Diagnostic, 0),
+	_, diagnostics, err := convertInto(ctx, program, ir, settings)
+	if err != nil {
+		return nil, err
 	}
+	return &Result{Program: program, Diagnostics: diagnostics}, nil
+}
+
+// ConvertInto converts LowIR functions into an existing YakSSA Program and
+// returns the newly created non-extern functions in LowIR order.
+func ConvertInto(ctx context.Context, program *ssa.Program, ir *core.LowIR, options ...Option) ([]*ssa.Function, []core.Diagnostic, error) {
+	if program == nil {
+		return nil, nil, fmt.Errorf("lowir2ssa: nil program")
+	}
+	if ir == nil {
+		return nil, nil, fmt.Errorf("lowir2ssa: nil LowIR")
+	}
+	if len(ir.Functions) == 0 {
+		return nil, nil, fmt.Errorf("lowir2ssa: LowIR has no functions")
+	}
+	settings := Options{ProgramName: program.GetProgramName(), CacheKind: program.DatabaseKind, Language: ssaconfig.General}
+	for _, option := range options {
+		option(&settings)
+	}
+	return convertInto(ctx, program, ir, settings)
+}
+
+func convertInto(ctx context.Context, program *ssa.Program, ir *core.LowIR, settings Options) ([]*ssa.Function, []core.Diagnostic, error) {
+	converter := &converter{
+		ctx:             ctx,
+		program:         program,
+		facts:           ir.Facts(),
+		pointerAt:       settings.PointerAt,
+		types:           make(map[core.ValueType]ssa.Type, 16),
+		signedTypes:     make(map[uint16]ssa.Type, 8),
+		blocks:          make(map[core.BlockID]*ssa.BasicBlock),
+		values:          make(map[core.ValueID]ssa.Value),
+		defs:            make(map[core.ValueID]core.Instruction),
+		variables:       make(map[string]*ssa.Variable),
+		memory:          make(map[string]*ssa.Variable),
+		memoryNames:     make(map[string]string),
+		functions:       make(map[string]*ssa.Function),
+		flags:           make(map[core.ValueID]flagInfo),
+		arguments:       make(map[string]bool),
+		loopHeaders:     make(map[core.BlockID]bool),
+		loopPhis:        make(map[core.BlockID]map[string]*ssa.Phi),
+		loopPhiOrder:    make(map[core.BlockID][]loopPhiRef),
+		loopPhiDone:     make(map[int64]bool),
+		headerStore:     make(map[core.BlockID]map[string]bool),
+		loopCarried:     make(map[core.BlockID][]string),
+		mergePhis:       make(map[core.BlockID]map[string]*ssa.Phi),
+		mergePhiOrder:   make(map[core.BlockID][]string),
+		blockOut:        make(map[core.BlockID]map[string]ssa.Value),
+		lowirBySSA:      make(map[int64]core.BlockID),
+		convertedBlocks: make(map[core.BlockID]bool),
+		domOutCache:     make(map[domRegKey]ssa.Value),
+		undefined:       make(map[string]ssa.Value),
+		memoryValid:     make(map[string]bool),
+		memoryKind:      make(map[string]memorySlotKind),
+		frameValues:     make(map[ssa.Value]bool),
+		spDerived:       make(map[ssa.Value]bool),
+		frameDerived:    make(map[ssa.Value]bool),
+		diagnostics:     make([]core.Diagnostic, 0),
+	}
+	names := settings.LowIRPasses
+	if len(names) == 0 {
+		names = pass.DefaultNames()
+	}
+	frameCleanup := containsPass(names, "remove-stackframe")
+	converted := make([]*ssa.Function, 0, len(ir.Functions))
 	for index := range ir.Functions {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		function := ir.Functions[index]
-		names := settings.LowIRPasses
-		if len(names) == 0 {
-			names = pass.DefaultNames()
-		}
 		facts := ir.FactsFor(function)
 		if err := pass.Apply(&function, facts, names...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		converter.facts = facts
-		function.FrameCleanup = containsPass(names, "remove-stackframe")
-		function.FrameKept = !function.FrameCleanup
+		function.FrameCleanup = frameCleanup
+		function.FrameKept = !frameCleanup
 		if err := convertFunctionSafely(converter, function); err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		if converter.function != nil {
+			converted = append(converted, converter.function)
+		}
+		if settings.ConsumeIR {
+			ir.Functions[index].Blocks = nil
+			ir.Functions[index].Facts = nil
 		}
 	}
-	return &Result{Program: program, Diagnostics: converter.diagnostics}, nil
+	return converted, converter.diagnostics, nil
 }
 
 // convertFunctionSafely turns a conversion panic into an error that names the
@@ -200,17 +272,19 @@ type converter struct {
 	// mergePhis holds the join phis of a block keyed by the register key, and
 	// blockOut holds the value a block leaves in each register. mergePhiOrder
 	// keeps the creation order of those phis.
-	mergePhis     map[core.BlockID]map[string]*ssa.Phi
-	mergePhiOrder map[core.BlockID][]string
-	blockOut      map[core.BlockID]map[string]ssa.Value
-	lowirBySSA    map[int64]core.BlockID
-	idom          map[core.BlockID]core.BlockID
-	predsOf       map[core.BlockID][]core.BlockID
-	current       core.BlockID
-	types         map[core.ValueType]ssa.Type
-	signedTypes   map[uint16]ssa.Type
-	undefined     map[string]ssa.Value
-	facts         core.ArchFacts
+	mergePhis       map[core.BlockID]map[string]*ssa.Phi
+	mergePhiOrder   map[core.BlockID][]string
+	blockOut        map[core.BlockID]map[string]ssa.Value
+	lowirBySSA      map[int64]core.BlockID
+	convertedBlocks map[core.BlockID]bool
+	domOutCache     map[domRegKey]ssa.Value
+	idom            map[core.BlockID]core.BlockID
+	predsOf         map[core.BlockID][]core.BlockID
+	current         core.BlockID
+	types           map[core.ValueType]ssa.Type
+	signedTypes     map[uint16]ssa.Type
+	undefined       map[string]ssa.Value
+	facts           core.ArchFacts
 	// memoryValid records whether a memory variable still holds the value its
 	// last store wrote. A store through a different address expression that may
 	// alias it clears the flag, so a later load keeps the reload.
@@ -268,31 +342,7 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.function = ssaFunction
 	c.builder = builder
 	c.entry = builder.CurrentBlock
-	c.blocks = make(map[core.BlockID]*ssa.BasicBlock, len(function.Blocks))
-	c.values = make(map[core.ValueID]ssa.Value)
-	c.defs = make(map[core.ValueID]core.Instruction)
-	c.variables = make(map[string]*ssa.Variable)
-	c.memory = make(map[string]*ssa.Variable)
-	c.memoryNames = make(map[string]string)
-	c.functions = make(map[string]*ssa.Function)
-	c.flags = make(map[core.ValueID]flagInfo)
-	c.arguments = make(map[string]bool)
-	c.loopHeaders = make(map[core.BlockID]bool)
-	c.loopPhis = make(map[core.BlockID]map[string]*ssa.Phi)
-	c.loopPhiOrder = make(map[core.BlockID][]loopPhiRef)
-	c.loopPhiDone = make(map[int64]bool)
-	c.headerStore = make(map[core.BlockID]map[string]bool)
-	c.loopCarried = make(map[core.BlockID][]string)
-	c.mergePhis = make(map[core.BlockID]map[string]*ssa.Phi)
-	c.mergePhiOrder = make(map[core.BlockID][]string)
-	c.blockOut = make(map[core.BlockID]map[string]ssa.Value)
-	c.lowirBySSA = make(map[int64]core.BlockID, len(function.Blocks))
-	c.types = make(map[core.ValueType]ssa.Type)
-	c.signedTypes = make(map[uint16]ssa.Type)
-	c.undefined = make(map[string]ssa.Value)
-	c.memoryValid = make(map[string]bool)
-	c.memoryKind = make(map[string]memorySlotKind)
-	c.frameDerived = make(map[ssa.Value]bool)
+	c.resetFunctionState()
 
 	for index, block := range function.Blocks {
 		var ssaBlock *ssa.BasicBlock
@@ -330,10 +380,59 @@ func (c *converter) convertFunction(function core.Function) error {
 		if err := c.convertBlock(block); err != nil {
 			return err
 		}
+		c.convertedBlocks[block.ID] = true
 	}
 	c.fillMergePhis()
 	ssaFunction.Finish()
 	return nil
+}
+
+type domRegKey struct {
+	block core.BlockID
+	key   string
+}
+
+const maxRetainedConverterMap = 4096
+
+func resetMap[K comparable, V any](m map[K]V) map[K]V {
+	if m == nil || len(m) > maxRetainedConverterMap {
+		return make(map[K]V)
+	}
+	clear(m)
+	return m
+}
+
+func (c *converter) resetFunctionState() {
+	c.blocks = resetMap(c.blocks)
+	c.blockOrder = c.blockOrder[:0]
+	c.values = resetMap(c.values)
+	c.defs = resetMap(c.defs)
+	c.variables = resetMap(c.variables)
+	c.memory = resetMap(c.memory)
+	c.memoryNames = resetMap(c.memoryNames)
+	c.memoryIndex = 0
+	c.functions = resetMap(c.functions)
+	c.flags = resetMap(c.flags)
+	c.arguments = resetMap(c.arguments)
+	c.loopHeaders = resetMap(c.loopHeaders)
+	c.loopPhis = resetMap(c.loopPhis)
+	c.loopPhiOrder = resetMap(c.loopPhiOrder)
+	c.loopPhiDone = resetMap(c.loopPhiDone)
+	c.headerStore = resetMap(c.headerStore)
+	c.loopCarried = resetMap(c.loopCarried)
+	c.mergePhis = resetMap(c.mergePhis)
+	c.mergePhiOrder = resetMap(c.mergePhiOrder)
+	c.blockOut = resetMap(c.blockOut)
+	c.lowirBySSA = resetMap(c.lowirBySSA)
+	c.convertedBlocks = resetMap(c.convertedBlocks)
+	c.domOutCache = resetMap(c.domOutCache)
+	c.undefined = resetMap(c.undefined)
+	c.memoryValid = resetMap(c.memoryValid)
+	c.memoryKind = resetMap(c.memoryKind)
+	c.stackStores = c.stackStores[:0]
+	c.frameValues = resetMap(c.frameValues)
+	c.spDerived = resetMap(c.spDerived)
+	c.frameDerived = resetMap(c.frameDerived)
 }
 
 func (c *converter) markLoopHeaders(function core.Function) {
@@ -356,25 +455,30 @@ func (c *converter) markLoopHeaders(function core.Function) {
 }
 
 func (c *converter) collectLoopCarried(function core.Function) {
+	if len(c.loopHeaders) == 0 {
+		return
+	}
+	headerPos := make(map[core.BlockID]int, len(c.loopHeaders))
+	maxBackEdge := make(map[core.BlockID]int, len(c.loopHeaders))
 	for position, block := range function.Blocks {
-		header := block.ID
-		if !c.loopHeaders[header] {
-			continue
+		if c.loopHeaders[block.ID] {
+			headerPos[block.ID] = position
+			maxBackEdge[block.ID] = -1
 		}
-		last := position
-		for index, block := range function.Blocks {
-			if index <= position {
-				continue
-			}
-			for _, instruction := range block.Instructions {
-				for _, target := range instruction.Targets {
-					if target == header && index > last {
-						last = index
-					}
+	}
+	for index, block := range function.Blocks {
+		for _, instruction := range block.Instructions {
+			for _, target := range instruction.Targets {
+				if hp, isHeader := headerPos[target]; isHeader && index >= hp && index > maxBackEdge[target] {
+					maxBackEdge[target] = index
 				}
 			}
 		}
-		if last <= position {
+	}
+	for position, block := range function.Blocks {
+		header := block.ID
+		last, ok := maxBackEdge[header]
+		if !ok || last < 0 {
 			continue
 		}
 		// The keys keep the order the body first touches the memory, so the phis of
@@ -715,7 +819,11 @@ func (c *converter) emitRegisterRead(instruction core.Instruction) {
 	if c.loopHeaders[c.current] {
 		key := "reg:" + view.canonical
 		if phi := c.loopPhi(key, c.registerVariable(view.canonical)); phi != nil {
-			c.setResult(instruction, phi)
+			var value ssa.Value = phi
+			if view.narrow() {
+				value = c.extractRegister(value, view)
+			}
+			c.setResult(instruction, value)
 			return
 		}
 	}
@@ -1114,6 +1222,14 @@ func (c *converter) emitIntrinsic(instruction core.Instruction) {
 			return
 		}
 	}
+	if lowered, ok := c.lowerIntrinsic(name, instruction); ok {
+		keepType := lowered.GetType()
+		c.setResult(instruction, lowered)
+		if isSignedIntegerType(keepType) {
+			lowered.SetType(keepType)
+		}
+		return
+	}
 	c.setResult(instruction, c.opaqueValue(name, instruction))
 }
 
@@ -1507,12 +1623,13 @@ func (c *converter) loopPhi(key string, variable *ssa.Variable) *ssa.Phi {
 	if variable != nil {
 		current = variable.GetValue()
 	}
-	phi := ssa.NewPhi(c.builder.CurrentBlock, key)
-	if current != nil {
-		phi.Edge = []int64{current.GetId()}
-		phi.SetType(current.GetType())
-		current.AddUser(phi)
+	if current == nil {
+		return nil
 	}
+	phi := ssa.NewPhi(c.builder.CurrentBlock, key)
+	phi.Edge = []int64{current.GetId()}
+	phi.SetType(current.GetType())
+	current.AddUser(phi)
 	c.builder.CurrentBlock.Phis = append(c.builder.CurrentBlock.Phis, phi.GetId())
 	c.program.SetVirtualRegister(phi)
 	if variable != nil {

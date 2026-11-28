@@ -7,6 +7,111 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+type inferFuncCache struct {
+	name   string
+	vals   []ssa.Value
+	rets   []*ssa.Return
+	active bool
+}
+
+func collectInferFunc(function *ssa.Function) inferFuncCache {
+	cf := inferFuncCache{name: function.GetName(), active: true}
+	for _, blockID := range function.Blocks {
+		block, ok := function.GetBasicBlockByID(blockID)
+		if !ok || block == nil {
+			continue
+		}
+		for _, id := range block.Phis {
+			if instruction, ok := function.GetInstructionById(id); ok && instruction != nil {
+				if value, ok := ssa.ToValue(instruction); ok && value != nil {
+					cf.vals = append(cf.vals, value)
+				}
+			}
+		}
+		for _, id := range block.Insts {
+			if instruction, ok := function.GetInstructionById(id); ok && instruction != nil {
+				if ret, ok := instruction.(*ssa.Return); ok && ret != nil {
+					cf.rets = append(cf.rets, ret)
+				}
+				if value, ok := ssa.ToValue(instruction); ok && value != nil {
+					cf.vals = append(cf.vals, value)
+				}
+			}
+		}
+	}
+	return cf
+}
+
+func cachedReturnsPointer(rets []*ssa.Return) bool {
+	for _, ret := range rets {
+		for _, item := range ret.GetValues() {
+			if isPointerType(item.GetType()) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func markCachedReturnNulls(rets []*ssa.Return) bool {
+	changed := false
+	for _, ret := range rets {
+		for _, item := range ret.GetValues() {
+			if setPointer(item) {
+				changed = true
+			}
+		}
+	}
+	return changed
+}
+
+func runInferRounds(funcs []inferFuncCache, localPtrs map[string]bool, sharedReturnsPtr func(string) bool) int {
+	if len(funcs) == 0 {
+		return 0
+	}
+	changed := 0
+	for round := 0; round < 12; round++ {
+		roundChanged := false
+		ptrSetGrew := false
+		for i := range funcs {
+			cf := &funcs[i]
+			if !cf.active {
+				continue
+			}
+			fnChanged := false
+			isPtr := localPtrs[cf.name] || (sharedReturnsPtr != nil && sharedReturnsPtr(cf.name))
+			if !isPtr && cachedReturnsPointer(cf.rets) {
+				localPtrs[cf.name] = true
+				isPtr = true
+				ptrSetGrew = true
+				fnChanged = true
+			}
+			if isPtr && markCachedReturnNulls(cf.rets) {
+				fnChanged = true
+			}
+			for _, value := range cf.vals {
+				if inferValueWith(value, localPtrs, sharedReturnsPtr) {
+					fnChanged = true
+					changed++
+				}
+			}
+			cf.active = fnChanged
+			if fnChanged {
+				roundChanged = true
+			}
+		}
+		if !roundChanged {
+			break
+		}
+		if ptrSetGrew {
+			for i := range funcs {
+				funcs[i].active = true
+			}
+		}
+	}
+	return changed
+}
+
 // InferTypes propagates pointer types from known C signatures and from
 // pointer arithmetic, phi nodes, and calls to functions whose return type is
 // already known. It intentionally does not guess struct layouts.
@@ -14,105 +119,18 @@ func InferTypes(program *ssa.Program) int {
 	if program == nil {
 		return 0
 	}
-	changed := 0
-	returnPointer := make(map[string]bool)
-	for round := 0; round < 12; round++ {
-		roundChanged := false
-		program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
-			if function == nil || function.IsExtern() {
-				return true
-			}
-			if !returnPointer[function.GetName()] && functionReturnsPointer(function) {
-				returnPointer[function.GetName()] = true
-				roundChanged = true
-			}
-			if returnPointer[function.GetName()] && markReturnNulls(function) {
-				roundChanged = true
-			}
-			eachFunctionValue(function, func(value ssa.Value) {
-				if inferValue(value, returnPointer) {
-					roundChanged = true
-					changed++
-				}
-			})
-			return true
-		})
-		if !roundChanged {
-			break
+	var funcs []inferFuncCache
+	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
+		if function != nil && !function.IsExtern() {
+			funcs = append(funcs, collectInferFunc(function))
 		}
-	}
-	return changed
-}
-
-func markReturnNulls(function *ssa.Function) bool {
-	changed := false
-	for _, blockID := range function.Blocks {
-		block, ok := function.GetBasicBlockByID(blockID)
-		if !ok || block == nil {
-			continue
-		}
-		for _, id := range block.Insts {
-			instruction, ok := function.GetInstructionById(id)
-			if !ok || instruction == nil {
-				continue
-			}
-			ret, ok := instruction.(*ssa.Return)
-			if !ok || ret == nil {
-				continue
-			}
-			for _, item := range ret.GetValues() {
-				if setPointer(item) {
-					changed = true
-				}
-			}
-		}
-	}
-	return changed
-}
-
-func eachFunctionValue(function *ssa.Function, visit func(ssa.Value)) {
-	for _, blockID := range function.Blocks {
-		block, ok := function.GetBasicBlockByID(blockID)
-		if !ok || block == nil {
-			continue
-		}
-		ids := make([]int64, 0, len(block.Phis)+len(block.Insts))
-		ids = append(ids, block.Phis...)
-		ids = append(ids, block.Insts...)
-		for _, id := range ids {
-			instruction, ok := function.GetInstructionById(id)
-			if !ok || instruction == nil {
-				continue
-			}
-			value, ok := ssa.ToValue(instruction)
-			if ok && value != nil {
-				visit(value)
-			}
-		}
-	}
-}
-
-func functionReturnsPointer(function *ssa.Function) bool {
-	pointer := false
-	eachFunctionValue(function, func(value ssa.Value) {
-		instruction, ok := value.(ssa.Instruction)
-		if !ok {
-			return
-		}
-		ret, ok := instruction.(*ssa.Return)
-		if !ok || ret == nil {
-			return
-		}
-		for _, item := range ret.GetValues() {
-			if isPointerType(item.GetType()) {
-				pointer = true
-			}
-		}
+		return true
 	})
-	return pointer
+	returnPointer := make(map[string]bool, len(funcs))
+	return runInferRounds(funcs, returnPointer, nil)
 }
 
-func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
+func inferValueWith(value ssa.Value, localPtrs map[string]bool, sharedReturnsPtr func(string) bool) bool {
 	changed := false
 	switch typed := value.(type) {
 	case *ssa.Call:
@@ -134,7 +152,7 @@ func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
 					changed = true
 				}
 			}
-		} else if returnPointer[name] && setPointer(typed) {
+		} else if (localPtrs[name] || (sharedReturnsPtr != nil && sharedReturnsPtr(name))) && setPointer(typed) {
 			changed = true
 		}
 	case *ssa.BinOp:

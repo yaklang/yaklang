@@ -25,12 +25,90 @@ func (c *converter) classifyMemorySlot(key string, operand core.Operand) memoryS
 	}
 	if operand.Kind == core.OperandValue {
 		if value, ok := c.values[operand.Value]; ok && value != nil {
-			if c.spDerived[value] || c.frameDerived[value] {
+			if (c.spDerived[value] || c.frameDerived[value]) && c.isFixedFrameAddress(operand.Value, 0, make(map[core.ValueID]bool)) {
 				return memorySlotFrame
 			}
 		}
 	}
 	return memorySlotOther
+}
+
+func (c *converter) isConstantCoreValue(id core.ValueID, depth int, visiting map[core.ValueID]bool) bool {
+	if depth > 16 || visiting[id] {
+		return false
+	}
+	if value, ok := c.values[id]; ok && value != nil {
+		if _, isConst := ssa.ToConstInst(value); isConst {
+			return true
+		}
+	}
+	def, ok := c.defs[id]
+	if !ok {
+		return false
+	}
+	visiting[id] = true
+	defer delete(visiting, id)
+	switch def.Kind {
+	case core.OpConstant:
+		return true
+	case core.OpCopy:
+		return len(def.Operands) > 0 && def.Operands[0].Kind == core.OperandValue &&
+			c.isConstantCoreValue(def.Operands[0].Value, depth+1, visiting)
+	default:
+		return false
+	}
+}
+
+// isFixedFrameAddress reports whether id computes a constant offset from the
+// stack or frame pointer (for example rsp + 0x18). Indexed accesses such as
+// rsp + rdx + 0x18 return false so array/slice stores stay observable.
+func (c *converter) isFixedFrameAddress(id core.ValueID, depth int, visiting map[core.ValueID]bool) bool {
+	if depth > 16 || visiting[id] {
+		return false
+	}
+	def, ok := c.defs[id]
+	if !ok {
+		return false
+	}
+	visiting[id] = true
+	defer delete(visiting, id)
+	switch def.Kind {
+	case core.OpReadRegister:
+		if len(def.Operands) == 0 {
+			return false
+		}
+		canonical := c.registerView(def.Operands[0].Name, def.Operands[0].Type.Bits).canonical
+		if canonical == "" {
+			return false
+		}
+		if canonical == c.registerView(c.facts.Frame.StackPointer, 0).canonical {
+			return true
+		}
+		if fp := c.facts.Frame.FramePointer; fp != "" && canonical == c.registerView(fp, 0).canonical {
+			return true
+		}
+		return false
+	case core.OpCopy:
+		return len(def.Operands) > 0 && def.Operands[0].Kind == core.OperandValue &&
+			c.isFixedFrameAddress(def.Operands[0].Value, depth+1, visiting)
+	case core.OpAdd:
+		if len(def.Operands) < 2 || def.Operands[0].Kind != core.OperandValue || def.Operands[1].Kind != core.OperandValue {
+			return false
+		}
+		a, b := def.Operands[0].Value, def.Operands[1].Value
+		if c.isFixedFrameAddress(a, depth+1, visiting) && c.isConstantCoreValue(b, depth+1, visiting) {
+			return true
+		}
+		return c.isFixedFrameAddress(b, depth+1, visiting) && c.isConstantCoreValue(a, depth+1, visiting)
+	case core.OpSub, core.OpAnd:
+		if len(def.Operands) < 2 || def.Operands[0].Kind != core.OperandValue || def.Operands[1].Kind != core.OperandValue {
+			return false
+		}
+		return c.isFixedFrameAddress(def.Operands[0].Value, depth+1, visiting) &&
+			c.isConstantCoreValue(def.Operands[1].Value, depth+1, visiting)
+	default:
+		return false
+	}
 }
 
 func memorySlotsMayAlias(key string, kind memorySlotKind, other string, otherKind memorySlotKind) bool {

@@ -145,18 +145,50 @@ func moduleDataSourceSection(section core.Section) bool {
 }
 
 func scanModuleDataSection(a *core.Artifact, section core.Section, tables pclnTables, order binary.ByteOrder) (moduleData, bool) {
-	data, err := a.Reader.Bytes(section.FileOffset, section.FileSize)
-	if err != nil {
+	const scanChunkSize = 4 << 20
+	chunkSize := uint64(scanChunkSize)
+	if section.FileSize < chunkSize {
+		chunkSize = section.FileSize
+	}
+	if chunkSize < moduleDataMinimumSize {
 		return moduleData{}, false
 	}
-	for offset := 0; offset+moduleDataMinimumSize <= len(data); offset += 8 {
-		address := section.VirtualAddress + uint64(offset)
-		if order.Uint64(data[offset:]) != tables.headerAddr {
-			continue
+	buf := make([]byte, int(chunkSize))
+	// moduleDataMinimumSize is 192 (multiple of 8), so keeping stride divisible by 8
+	// ensures every 8-byte aligned candidate across chunk boundaries stays aligned.
+	overlap := uint64(moduleDataMinimumSize - 8)
+	for pos := uint64(0); pos < section.FileSize; {
+		avail := section.FileSize - pos
+		if avail < moduleDataMinimumSize {
+			break
 		}
-		if found, ok := parseModuleData(data[offset:], tables, order, address, "scan "+section.Name); ok {
-			return found, true
+		readLen := avail
+		if readLen > chunkSize {
+			readLen = chunkSize
 		}
+		n, err := a.Reader.ReadAt(buf[:int(readLen)], int64(section.FileOffset+pos))
+		if n < moduleDataMinimumSize || (err != nil && n == 0) {
+			break
+		}
+		data := buf[:n]
+		for offset := 0; offset+moduleDataMinimumSize <= len(data); offset += 8 {
+			address := section.VirtualAddress + pos + uint64(offset)
+			if order.Uint64(data[offset:]) != tables.headerAddr {
+				continue
+			}
+			if found, ok := parseModuleData(data[offset:], tables, order, address, "scan "+section.Name); ok {
+				return found, true
+			}
+		}
+		if pos+uint64(n) >= section.FileSize || uint64(n) <= overlap {
+			break
+		}
+		advance := uint64(n) - overlap
+		advance &^= 7
+		if advance == 0 {
+			advance = 8
+		}
+		pos += advance
 	}
 	return moduleData{}, false
 }

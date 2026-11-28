@@ -32,7 +32,7 @@ func (c *converter) planMergePhis(function core.Function) {
 	succs := make(map[core.BlockID][]core.BlockID, len(function.Blocks))
 	for _, block := range function.Blocks {
 		for _, target := range blockSuccessors(block) {
-			if !known[target] || target == block.ID {
+			if !known[target] {
 				continue
 			}
 			succs[block.ID] = appendUniqueBlock(succs[block.ID], target)
@@ -208,29 +208,58 @@ func (c *converter) outgoingRegisterValue(blockID core.BlockID, key string) ssa.
 	if blockID == 0 {
 		return nil
 	}
+	if blockID != c.current && c.convertedBlocks[blockID] {
+		if cached, ok := c.domOutCache[domRegKey{block: blockID, key: key}]; ok {
+			return cached
+		}
+	}
+	var trailBuf [16]core.BlockID
+	trail := trailBuf[:0]
+	allConverted := true
 	node := blockID
+	var found ssa.Value
 	for {
+		if node != c.current {
+			if c.convertedBlocks[node] {
+				if cached, ok := c.domOutCache[domRegKey{block: node, key: key}]; ok {
+					found = cached
+					break
+				}
+				trail = append(trail, node)
+			} else {
+				allConverted = false
+			}
+		}
 		if values := c.blockOut[node]; values != nil {
 			if value := values[key]; value != nil {
-				return value
+				found = value
+				break
 			}
 		}
 		if phis := c.mergePhis[node]; phis != nil {
 			if phi := phis[key]; phi != nil {
-				return phi
+				found = phi
+				break
 			}
 		}
 		if phis := c.loopPhis[node]; phis != nil {
 			if phi := phis[key]; phi != nil {
-				return phi
+				found = phi
+				break
 			}
 		}
 		parent, ok := c.idom[node]
 		if !ok || parent == node || parent == 0 {
-			return nil
+			break
 		}
 		node = parent
 	}
+	if allConverted && len(trail) > 0 {
+		for _, n := range trail {
+			c.domOutCache[domRegKey{block: n, key: key}] = found
+		}
+	}
+	return found
 }
 
 func appendUniqueBlock(list []core.BlockID, value core.BlockID) []core.BlockID {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/boundindex"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/ehframe"
 )
 
@@ -29,12 +30,16 @@ type armBoundary struct {
 }
 
 type boundaryScanner struct {
-	reader  *core.ByteReader
-	hints   core.BoundaryHints
-	image   *core.Image
-	entries map[uint64]*armBoundary
-	data    map[uint64][]byte
-	stats   core.BoundaryStats
+	reader      *core.ByteReader
+	hints       core.BoundaryHints
+	image       *core.Image
+	entries     map[uint64]*armBoundary
+	index       boundindex.Index
+	sizedStarts []uint64
+	sizedMaxEnd []uint64
+	dirtySized  []uint64
+	data        map[uint64][]byte
+	stats       core.BoundaryStats
 	// defaultMode is the encoding of the image entry point. It decides the mode
 	// of every function that no symbol marks.
 	defaultMode string
@@ -125,9 +130,13 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 			existing.Name = name
 			existing.Source = source
 			existing.priority = priority
+			if size > 0 {
+				s.dirtySized = append(s.dirtySized, address)
+			}
 		} else {
 			if existing.Size == 0 && size != 0 {
 				existing.Size = size
+				s.dirtySized = append(s.dirtySized, address)
 			}
 			if existing.Name == "" && name != "" {
 				existing.Name = name
@@ -138,6 +147,10 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 	s.entries[address] = &armBoundary{
 		FunctionBoundary: core.FunctionBoundary{Address: address, Size: size, Name: name, Source: source},
 		priority:         priority,
+	}
+	s.index.Add(address)
+	if size > 0 {
+		s.dirtySized = append(s.dirtySized, address)
 	}
 	return true
 }
@@ -226,12 +239,7 @@ func (s *boundaryScanner) decode(address uint64) (armasm.Inst, bool) {
 }
 
 func (s *boundaryScanner) nextBoundary(address uint64) uint64 {
-	next := uint64(0)
-	for candidate := range s.entries {
-		if candidate > address && (next == 0 || candidate < next) {
-			next = candidate
-		}
-	}
+	next := s.index.Next(address)
 	if region := s.regionFor(address); region != nil {
 		end := region.Address + region.Size
 		if next == 0 || next > end {
@@ -269,6 +277,7 @@ func (s *boundaryScanner) walkDirectCalls() {
 			if entry, ok := s.entries[start]; ok {
 				if entry.Size == 0 || end-start > entry.Size {
 					entry.Size = end - start
+					s.dirtySized = append(s.dirtySized, start)
 				}
 			}
 		}
@@ -290,11 +299,45 @@ func (s *boundaryScanner) walkDirectCalls() {
 	}
 }
 
+func (s *boundaryScanner) rebuildSizedIndex() {
+	s.dirtySized = s.dirtySized[:0]
+	starts := s.sizedStarts[:0]
+	for start, entry := range s.entries {
+		if entry.Size > 0 {
+			starts = append(starts, start)
+		}
+	}
+	sort.Slice(starts, func(i, j int) bool { return starts[i] < starts[j] })
+	maxEnd := make([]uint64, len(starts))
+	var running uint64
+	for i, start := range starts {
+		end := start + s.entries[start].Size
+		if end < start {
+			end = ^uint64(0)
+		}
+		if end > running {
+			running = end
+		}
+		maxEnd[i] = running
+	}
+	s.sizedStarts = starts
+	s.sizedMaxEnd = maxEnd
+}
+
 // insideExisting reports whether one address falls inside a range another
 // boundary already covers.
 func (s *boundaryScanner) insideExisting(address uint64) bool {
-	for start, entry := range s.entries {
-		if entry.Size == 0 || address <= start {
+	if len(s.dirtySized) >= 64 {
+		s.rebuildSizedIndex()
+	}
+	if pos := sort.Search(len(s.sizedStarts), func(i int) bool { return s.sizedStarts[i] >= address }); pos > 0 {
+		if s.sizedMaxEnd[pos-1] > address {
+			return true
+		}
+	}
+	for _, start := range s.dirtySized {
+		entry := s.entries[start]
+		if entry == nil || entry.Size == 0 || address <= start {
 			continue
 		}
 		if address < start+entry.Size {
@@ -361,14 +404,19 @@ func staticTarget(inst armasm.Inst, address uint64) (uint64, bool) {
 }
 
 func (s *boundaryScanner) finishRanges() {
-	addresses := make([]uint64, 0, len(s.entries))
-	for address := range s.entries {
-		addresses = append(addresses, address)
-	}
-	sort.Slice(addresses, func(i, j int) bool { return addresses[i] < addresses[j] })
-	for _, address := range addresses {
+	addresses := s.index.Sorted()
+	for idx, address := range addresses {
 		entry := s.entries[address]
-		next := s.nextBoundary(address)
+		var next uint64
+		if idx+1 < len(addresses) {
+			next = addresses[idx+1]
+		}
+		if region := s.regionFor(address); region != nil {
+			end := region.Address + region.Size
+			if next == 0 || next > end {
+				next = end
+			}
+		}
 		// A range never crosses the next boundary. The recursive descent can
 		// walk past a boundary it did not know about, and an overlapping range
 		// would decode the same bytes twice.

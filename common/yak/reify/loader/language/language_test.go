@@ -173,3 +173,22 @@ func TestEveryLanguageHasOneLayer(t *testing.T) {
 		t.Fatalf("unknown kind resolved to %s, want the default C layer", got.Kind())
 	}
 }
+
+func TestMergeSymbolsReplacesSyntheticSubPlaceholders(t *testing.T) {
+	a := metadataArtifact(t, ".text", nil)
+	a.Image.Symbols = []symbol.Symbol{
+		{Name: "sub_0x1000", Address: 0x1000, Kind: symbol.SymbolFunction},
+		{Name: "custom_fn", Address: 0x2000, Size: 24, Kind: symbol.SymbolFunction},
+	}
+	recovered := []symbol.Symbol{
+		{Name: "main.alpha", Address: 0x1000, Size: 32, Kind: symbol.SymbolFunction, Source: symbol.SourcePCLNTab},
+		{Name: "main.beta", Address: 0x2000, Size: 16, Kind: symbol.SymbolFunction, Source: symbol.SourcePCLNTab},
+	}
+	mergeSymbols(a, recovered)
+	if len(a.Image.Symbols) != 3 {
+		t.Fatalf("expected 3 symbols (placeholder replaced + distinct custom_fn + recovered beta), got %d: %+v", len(a.Image.Symbols), a.Image.Symbols)
+	}
+	if s := a.Image.Symbols[0]; s.Name != "main.alpha" || s.Mangled != "" || s.Source != symbol.SourcePCLNTab || s.Size != 32 {
+		t.Fatalf("placeholder was not replaced cleanly: %+v", s)
+	}
+}

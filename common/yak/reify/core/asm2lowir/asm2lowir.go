@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -66,6 +67,14 @@ func settings(options []Option) Config {
 	return result
 }
 
+// Discover resolves function boundaries and stats without decoding instructions.
+func Discover(artifact *core.Artifact, options ...Option) ([]core.FunctionBoundary, core.BoundaryStats, error) {
+	if artifact == nil {
+		return nil, core.BoundaryStats{}, fmt.Errorf("asm2lowir: nil artifact")
+	}
+	return discover(artifact, settings(options))
+}
+
 // Parse decodes machine code into LowIR. Core only defines data; the parser
 // call, boundary discovery and symbol naming live here.
 func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Result, error) {
@@ -87,15 +96,59 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 		return nil, fmt.Errorf("asm2lowir: no function boundaries")
 	}
 
-	result := &Result{Boundaries: boundaries, BoundaryStats: stats}
-	if artifact.Language != nil {
+	result, err := parseRange(ctx, artifact, config, boundaries, 0, len(boundaries), 1, stats, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.IR.Functions) == 0 {
+		return nil, fmt.Errorf("no instructions recovered from function boundaries")
+	}
+	if len(boundaries) > 1 {
+		result.Diagnostics = filterCrossFunctionDiagnostics(result.Diagnostics)
+	}
+	return result, nil
+}
+
+// ParseBatch decodes boundaries[start:end] into LowIR while using the full
+// boundaries slice to compute function end ranges cleanly.
+func ParseBatch(ctx context.Context, artifact *core.Artifact, boundaries []core.FunctionBoundary, start, end int, nextID core.FunctionID, options ...Option) (*Result, error) {
+	if artifact == nil {
+		return nil, fmt.Errorf("asm2lowir: nil artifact")
+	}
+	if artifact.Parser == nil {
+		return nil, fmt.Errorf("%w: %s", core.ErrNoParser, artifact.Target.Architecture)
+	}
+	if err := artifact.Parser.Check(artifact.Target); err != nil {
+		return nil, fmt.Errorf("parser %s: %w", artifact.Parser.Name(), err)
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(boundaries) {
+		end = len(boundaries)
+	}
+	config := settings(options)
+	result, err := parseRange(ctx, artifact, config, boundaries, start, end, nextID, core.BoundaryStats{}, false)
+	if err != nil {
+		return nil, err
+	}
+	if len(boundaries) > 1 {
+		result.Diagnostics = filterCrossFunctionDiagnostics(result.Diagnostics)
+	}
+	return result, nil
+}
+
+func parseRange(ctx context.Context, artifact *core.Artifact, config Config, boundaries []core.FunctionBoundary, start, end int, nextID core.FunctionID, stats core.BoundaryStats, includeLanguageNotes bool) (*Result, error) {
+	result := &Result{Boundaries: boundaries[start:end], BoundaryStats: stats}
+	if includeLanguageNotes && artifact.Language != nil {
 		for _, note := range artifact.Language.Notes {
 			result.Diagnostics = append(result.Diagnostics, core.Diagnostic{Code: "language-limit", Message: note})
 		}
 	}
 	result.IR = &core.LowIR{Target: artifact.Target}
-	nextID := core.FunctionID(1)
-	for index, boundary := range boundaries {
+	var assembly strings.Builder
+	for index := start; index < end; index++ {
+		boundary := boundaries[index]
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -169,9 +222,10 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 			result.IR.Canary = parsed.IR.Canary
 		}
 		result.IR.Functions = append(result.IR.Functions, parsed.IR.Functions...)
-		result.Assembly += parsed.Assembly
+		assembly.WriteString(parsed.Assembly)
 		result.Diagnostics = append(result.Diagnostics, parsed.Diagnostics...)
 	}
+	result.Assembly = assembly.String()
 	// The global pointer base is a symbol address, and only the artifact knows it.
 	if name := result.IR.Registers.GlobalPointerSymbol; name != "" && artifact.Image != nil {
 		if symbol, ok := artifact.Image.SymbolByName(name); ok {
@@ -180,12 +234,6 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 	}
 	annotateSymbols(artifact, result.IR)
 	fillFunctionNames(result.IR)
-	if len(result.IR.Functions) == 0 {
-		return nil, fmt.Errorf("no instructions recovered from function boundaries")
-	}
-	if len(boundaries) > 1 {
-		result.Diagnostics = filterCrossFunctionDiagnostics(result.Diagnostics)
-	}
 	return result, nil
 }
 
@@ -253,6 +301,14 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 			if entry, ok := artifact.Image.SymbolByName(config.Function); ok {
 				config.Function = entry.Name
 				explicitSize = entry.Size
+			}
+		}
+		// On ARM, Thumb symbols can carry the low bit set, so parser discovery
+		// is preferred to classify aligned boundaries and mode. On other targets,
+		// a resolved sized symbol can be lifted directly without full discovery.
+		if artifact.Target.Architecture != core.ArchARM {
+			if boundary, err := functionBoundary(artifact, config.Function); err == nil && boundary.Size > 0 {
+				return []core.FunctionBoundary{boundary}, core.BoundaryStats{Symbol: 1}, nil
 			}
 		}
 		// Prefer the boundary the parser discovered. It carries the aligned
@@ -435,10 +491,7 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 	if artifact.Image == nil {
 		return core.FunctionBoundary{}, fmt.Errorf("function %q: artifact has no symbols", name)
 	}
-	for _, symbol := range artifact.Image.Symbols {
-		if symbol.Name != name && symbol.Mangled != name {
-			continue
-		}
+	find := func(symbol sym.Symbol) (core.FunctionBoundary, error) {
 		if symbol.Kind != sym.SymbolFunction {
 			return core.FunctionBoundary{}, fmt.Errorf("symbol %q is not a function", name)
 		}
@@ -460,6 +513,15 @@ func functionBoundary(artifact *core.Artifact, name string) (core.FunctionBounda
 			Source:  core.BoundarySymbol,
 			Mode:    symbolMode(artifact.Target.Architecture, symbol.Address),
 		}, nil
+	}
+	if entry, ok := artifact.Image.SymbolByName(name); ok && entry.Kind == sym.SymbolFunction {
+		return find(entry)
+	}
+	for _, symbol := range artifact.Image.Symbols {
+		if symbol.Name != name && symbol.Mangled != name {
+			continue
+		}
+		return find(symbol)
 	}
 	return core.FunctionBoundary{}, fmt.Errorf("symbol %q does not exist", name)
 }
@@ -524,10 +586,57 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 	if err != nil {
 		return nil, err
 	}
-	var text string
+	dis, err := disassembleRange(ctx, artifact, disassembler, config, boundaries, 0, len(boundaries))
+	if err != nil {
+		return nil, err
+	}
+	if dis.Instructions == 0 {
+		return nil, fmt.Errorf("no instructions recovered from function boundaries")
+	}
+	if len(boundaries) > 1 {
+		dis.Diagnostics = filterCrossFunctionDiagnostics(dis.Diagnostics)
+	}
+	return dis, nil
+}
+
+// DisassembleBatch renders machine code for boundaries[start:end].
+func DisassembleBatch(ctx context.Context, artifact *core.Artifact, boundaries []core.FunctionBoundary, start, end int, options ...Option) (*core.Disassembly, error) {
+	if artifact == nil {
+		return nil, fmt.Errorf("asm2lowir: nil artifact")
+	}
+	if artifact.Parser == nil {
+		return nil, fmt.Errorf("%w: %s", core.ErrNoParser, artifact.Target.Architecture)
+	}
+	disassembler, ok := artifact.Parser.(core.Disassembler)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", core.ErrNoDisassembler, artifact.Parser.Name())
+	}
+	if err := artifact.Parser.Check(artifact.Target); err != nil {
+		return nil, fmt.Errorf("parser %s: %w", artifact.Parser.Name(), err)
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(boundaries) {
+		end = len(boundaries)
+	}
+	config := settings(options)
+	dis, err := disassembleRange(ctx, artifact, disassembler, config, boundaries, start, end)
+	if err != nil {
+		return nil, err
+	}
+	if len(boundaries) > 1 {
+		dis.Diagnostics = filterCrossFunctionDiagnostics(dis.Diagnostics)
+	}
+	return dis, nil
+}
+
+func disassembleRange(ctx context.Context, artifact *core.Artifact, disassembler core.Disassembler, config Config, boundaries []core.FunctionBoundary, start, end int) (*core.Disassembly, error) {
+	var text strings.Builder
 	total := 0
 	diagnostics := make([]core.Diagnostic, 0)
-	for index, boundary := range boundaries {
+	for index := start; index < end; index++ {
+		boundary := boundaries[index]
 		size := boundaryRange(artifact, boundaries, index)
 		region, err := boundaryRegion(artifact, config.Region, boundary.Address, size)
 		if err != nil {
@@ -550,17 +659,11 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 		if result == nil {
 			continue
 		}
-		text += result.Text
+		text.WriteString(result.Text)
 		total += result.Instructions
 		diagnostics = append(diagnostics, result.Diagnostics...)
 	}
-	if total == 0 {
-		return nil, fmt.Errorf("no instructions recovered from function boundaries")
-	}
-	if len(boundaries) > 1 {
-		diagnostics = filterCrossFunctionDiagnostics(diagnostics)
-	}
-	return &core.Disassembly{Text: text, Instructions: total, Diagnostics: diagnostics}, nil
+	return &core.Disassembly{Text: text.String(), Instructions: total, Diagnostics: diagnostics}, nil
 }
 
 // A single ARM image can contain functions in both ARM and Thumb mode.

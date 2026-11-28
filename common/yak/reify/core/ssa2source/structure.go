@@ -21,8 +21,9 @@ type structurer struct {
 	order       []int64
 	succs       map[int64][]int64
 	preds       map[int64][]int64
-	dom         map[int64]map[int64]bool
-	pdom        map[int64]map[int64]bool
+	domIndex    map[int64]int
+	domEntry    []int
+	domExit     []int
 	ipdom       map[int64]int64
 	loops       map[int64]*loopInfo
 	loopHeaders map[int64]bool
@@ -37,17 +38,16 @@ type structurer struct {
 func newStructurer(function *ssa.Function) *structurer {
 	s := &structurer{
 		function:        function,
-		blocks:          make(map[int64]*ssa.BasicBlock),
-		succs:           make(map[int64][]int64),
-		preds:           make(map[int64][]int64),
-		dom:             make(map[int64]map[int64]bool),
-		pdom:            make(map[int64]map[int64]bool),
-		ipdom:           make(map[int64]int64),
+		blocks:          make(map[int64]*ssa.BasicBlock, len(function.Blocks)),
+		order:           make([]int64, 0, len(function.Blocks)),
+		succs:           make(map[int64][]int64, len(function.Blocks)),
+		preds:           make(map[int64][]int64, len(function.Blocks)),
+		ipdom:           make(map[int64]int64, len(function.Blocks)),
 		loops:           make(map[int64]*loopInfo),
 		loopHeaders:     make(map[int64]bool),
 		printedMergePhi: make(map[int64]bool),
-		emitted:         make(map[int64]bool),
-		rendered:        make(map[int64]int),
+		emitted:         make(map[int64]bool, len(function.Blocks)),
+		rendered:        make(map[int64]int, len(function.Blocks)),
 	}
 	for _, id := range function.Blocks {
 		block, ok := function.GetBasicBlockByID(id)
@@ -60,8 +60,8 @@ func newStructurer(function *ssa.Function) *structurer {
 	for id, block := range s.blocks {
 		s.succs[id] = blockSuccessors(block)
 	}
-	for id, targets := range s.succs {
-		for _, target := range targets {
+	for _, id := range s.order {
+		for _, target := range s.succs[id] {
 			s.preds[target] = append(s.preds[target], id)
 		}
 	}
@@ -95,134 +95,208 @@ func blockSuccessors(block *ssa.BasicBlock) []int64 {
 	}
 }
 
-func (s *structurer) computeDominators() {
-	entry := int64(0)
-	if len(s.order) > 0 {
-		entry = s.order[0]
+// computeIterativeDominators runs Cooper-Harvey-Kennedy on nodes[0..n-1] in
+// reverse postorder (where node 0 is the root), reading predecessors via preds(rpoIdx).
+func computeIterativeDominators(n int, preds func(rpoIdx int) []int) []int {
+	idom := make([]int, n)
+	for i := range idom {
+		idom[i] = -1
 	}
-	for id := range s.blocks {
-		s.dom[id] = make(map[int64]bool)
-		for other := range s.blocks {
-			s.dom[id][other] = true
+	if n == 0 {
+		return idom
+	}
+	idom[0] = 0
+	intersect := func(b1, b2 int) int {
+		f1, f2 := b1, b2
+		for f1 != f2 {
+			for f1 > f2 {
+				f1 = idom[f1]
+			}
+			for f2 > f1 {
+				f2 = idom[f2]
+			}
 		}
-	}
-	if entry != 0 {
-		s.dom[entry] = map[int64]bool{entry: true}
+		return f1
 	}
 	for changed := true; changed; {
 		changed = false
-		for _, id := range s.order {
-			if id == entry {
-				continue
-			}
-			next := map[int64]bool{id: true}
-			first := true
-			for _, pred := range s.preds[id] {
-				if len(s.dom[pred]) == 0 {
+		for i := 1; i < n; i++ {
+			newIdom := -1
+			for _, p := range preds(i) {
+				if p < 0 || idom[p] < 0 {
 					continue
 				}
-				if first {
-					for candidate := range s.dom[pred] {
-						next[candidate] = true
-					}
-					first = false
-					continue
-				}
-				for candidate := range next {
-					if candidate != id && !s.dom[pred][candidate] {
-						delete(next, candidate)
-					}
+				if newIdom < 0 {
+					newIdom = p
+				} else {
+					newIdom = intersect(p, newIdom)
 				}
 			}
-			if first {
-				continue
-			}
-			if !sameSet(next, s.dom[id]) {
-				s.dom[id] = next
+			if newIdom >= 0 && idom[i] != newIdom {
+				idom[i] = newIdom
 				changed = true
 			}
 		}
+	}
+	return idom
+}
+
+func reversePostorderIDs(entry int64, blocks map[int64]*ssa.BasicBlock, adj func(int64) []int64) []int64 {
+	type frame struct {
+		id  int64
+		pos int
+	}
+	visited := make(map[int64]bool, len(blocks))
+	post := make([]int64, 0, len(blocks))
+	visited[entry] = true
+	stack := []frame{{id: entry}}
+	for len(stack) > 0 {
+		top := &stack[len(stack)-1]
+		nbrs := adj(top.id)
+		if top.pos < len(nbrs) {
+			next := nbrs[top.pos]
+			top.pos++
+			if !visited[next] {
+				if _, ok := blocks[next]; ok {
+					visited[next] = true
+					stack = append(stack, frame{id: next})
+				}
+			}
+			continue
+		}
+		post = append(post, top.id)
+		stack = stack[:len(stack)-1]
+	}
+	for i, j := 0, len(post)-1; i < j; i, j = i+1, j-1 {
+		post[i], post[j] = post[j], post[i]
+	}
+	return post
+}
+
+func (s *structurer) computeDominators() {
+	if len(s.order) == 0 {
+		return
+	}
+	rpo := reversePostorderIDs(s.order[0], s.blocks, func(id int64) []int64 { return s.succs[id] })
+	n := len(rpo)
+	s.domIndex = make(map[int64]int, n)
+	for i, id := range rpo {
+		s.domIndex[id] = i
+	}
+	idom := computeIterativeDominators(n, func(i int) []int {
+		ps := s.preds[rpo[i]]
+		out := make([]int, 0, len(ps))
+		for _, p := range ps {
+			if idx, ok := s.domIndex[p]; ok {
+				out = append(out, idx)
+			}
+		}
+		return out
+	})
+	children := make([][]int, n)
+	for i := 1; i < n; i++ {
+		if p := idom[i]; p >= 0 && p != i {
+			children[p] = append(children[p], i)
+		}
+	}
+	s.domEntry = make([]int, n)
+	s.domExit = make([]int, n)
+	type eulerFrame struct {
+		node int
+		pos  int
+	}
+	clock := 0
+	stack := []eulerFrame{{node: 0}}
+	clock++
+	s.domEntry[0] = clock
+	for len(stack) > 0 {
+		top := &stack[len(stack)-1]
+		if top.pos < len(children[top.node]) {
+			child := children[top.node][top.pos]
+			top.pos++
+			clock++
+			s.domEntry[child] = clock
+			stack = append(stack, eulerFrame{node: child})
+			continue
+		}
+		clock++
+		s.domExit[top.node] = clock
+		stack = stack[:len(stack)-1]
 	}
 }
 
 func (s *structurer) computePostDominators() {
+	if len(s.order) == 0 {
+		return
+	}
 	const virtualExit = int64(0)
-	for id := range s.blocks {
-		s.pdom[id] = make(map[int64]bool)
-		for other := range s.blocks {
-			s.pdom[id][other] = true
-		}
-		s.pdom[id][virtualExit] = true
+	revBlocks := make(map[int64]*ssa.BasicBlock, len(s.blocks)+1)
+	for k, v := range s.blocks {
+		revBlocks[k] = v
 	}
-	s.pdom[virtualExit] = map[int64]bool{virtualExit: true}
-	for changed := true; changed; {
-		changed = false
-		for _, id := range s.order {
-			next := map[int64]bool{id: true}
-			first := true
-			for _, succ := range s.succs[id] {
-				if len(s.pdom[succ]) == 0 {
-					continue
-				}
-				if first {
-					for candidate := range s.pdom[succ] {
-						next[candidate] = true
-					}
-					first = false
-					continue
-				}
-				for candidate := range next {
-					if candidate != id && !s.pdom[succ][candidate] {
-						delete(next, candidate)
-					}
-				}
-			}
-			if first {
-				next[virtualExit] = true
-			}
-			if !sameSet(next, s.pdom[id]) {
-				s.pdom[id] = next
-				changed = true
-			}
-		}
-	}
+	revBlocks[virtualExit] = nil
+	var exitSuccs []int64
 	for _, id := range s.order {
-		best := int64(0)
-		bestSize := -1
-		for candidate := range s.pdom[id] {
-			if candidate == id {
-				continue
-			}
-			size := len(s.pdom[candidate])
-			if size > bestSize {
-				best = candidate
-				bestSize = size
+		hasMappedSucc := false
+		for _, succ := range s.succs[id] {
+			if _, ok := s.blocks[succ]; ok && succ != virtualExit {
+				hasMappedSucc = true
+				break
 			}
 		}
-		s.ipdom[id] = best
-	}
-}
-
-func sameSet(left, right map[int64]bool) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for value := range left {
-		if !right[value] {
-			return false
+		if !hasMappedSucc {
+			exitSuccs = append(exitSuccs, id)
 		}
 	}
-	return true
+	rpo := reversePostorderIDs(virtualExit, revBlocks, func(id int64) []int64 {
+		if id == virtualExit {
+			return exitSuccs
+		}
+		return s.preds[id]
+	})
+	n := len(rpo)
+	rpoIdx := make(map[int64]int, n)
+	for i, id := range rpo {
+		rpoIdx[id] = i
+	}
+	ipdomIdx := computeIterativeDominators(n, func(i int) []int {
+		id := rpo[i]
+		succs := s.succs[id]
+		out := make([]int, 0, len(succs)+1)
+		hasMapped := false
+		for _, succ := range succs {
+			if idx, ok := rpoIdx[succ]; ok {
+				out = append(out, idx)
+				hasMapped = true
+			}
+		}
+		if !hasMapped && id != virtualExit {
+			out = append(out, 0)
+		}
+		return out
+	})
+	for i := 1; i < n; i++ {
+		if p := ipdomIdx[i]; p > 0 {
+			s.ipdom[rpo[i]] = rpo[p]
+		} else {
+			s.ipdom[rpo[i]] = 0
+		}
+	}
 }
 
 func (s *structurer) dominates(header, node int64) bool {
-	return s.dom[node][header]
+	hi, okH := s.domIndex[header]
+	ni, okN := s.domIndex[node]
+	if !okH || !okN {
+		return false
+	}
+	return s.domEntry[hi] <= s.domEntry[ni] && s.domExit[ni] <= s.domExit[hi]
 }
 
 func (s *structurer) findLoops() {
 	for _, tail := range s.order {
 		for _, header := range s.succs[tail] {
-			if header == tail || !s.dominates(header, tail) {
+			if !s.dominates(header, tail) {
 				continue
 			}
 			loop := s.loops[header]
@@ -235,16 +309,26 @@ func (s *structurer) findLoops() {
 			s.collectLoopBody(loop, tail)
 		}
 	}
+	if len(s.loops) == 0 {
+		return
+	}
+	position := make(map[int64]int, len(s.order))
+	for index, node := range s.order {
+		position[node] = index
+	}
 	for _, loop := range s.loops {
+		first := len(s.order)
 		for node := range loop.body {
+			index, known := position[node]
+			if !known || index >= first {
+				continue
+			}
 			for _, succ := range s.succs[node] {
-				if !loop.body[succ] {
+				if succ != 0 && !loop.body[succ] {
+					first = index
 					loop.exit = succ
 					break
 				}
-			}
-			if loop.exit != 0 {
-				break
 			}
 		}
 	}
@@ -486,6 +570,22 @@ func (s *structurer) emitLoop(loop *loopInfo, indent string, stop map[int64]bool
 	conditionID := int64(0)
 	if ifInstruction != nil {
 		conditionID = ifInstruction.Cond
+	}
+	if len(loop.body) == 1 && bodyStart == loop.header {
+		s.emitLoopPhis(loop, header, indent, false)
+		fmt.Fprintf(s.text, "%swhile (true) {\n", indent)
+		s.renderBlockInstructions(header, indent+"  ", conditionID)
+		if ifInstruction != nil && exit != 0 {
+			fmt.Fprintf(s.text, "%s  if (!(%s)) {\n", indent, condition)
+			fmt.Fprintf(s.text, "%s    break;\n", indent)
+			fmt.Fprintf(s.text, "%s  }\n", indent)
+		}
+		s.emitLoopPhis(loop, header, indent+"  ", true)
+		fmt.Fprintf(s.text, "%s}\n", indent)
+		if exit != 0 {
+			s.emitRegion(exit, indent, stop)
+		}
+		return
 	}
 	s.emitLoopPhis(loop, header, indent, false)
 	s.renderBlockInstructions(header, indent, conditionID)

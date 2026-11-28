@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -104,6 +105,9 @@ func TestHelloExampleCompilesAndLifts(t *testing.T) {
 		t.Skip("gcc is not installed")
 	}
 	binary := filepath.Join(t.TempDir(), "hello")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, "examples/hello.c")
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build example: %v\n%s", err, output)
@@ -148,6 +152,9 @@ func TestEveryCExampleLiftsWithoutPanic(t *testing.T) {
 	for _, source := range sources {
 		t.Run(filepath.Base(source), func(t *testing.T) {
 			binary := filepath.Join(t.TempDir(), "unit")
+			if runtime.GOOS == "windows" {
+				binary += ".exe"
+			}
 			compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 			if output, err := compile.CombinedOutput(); err != nil {
 				t.Skipf("cannot build example: %v\n%s", err, output)

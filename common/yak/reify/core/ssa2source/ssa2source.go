@@ -8,6 +8,7 @@ package ssa2source
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strconv"
@@ -19,9 +20,21 @@ import (
 )
 
 // Render converts a YakSSA program into source-like text.
-func Render(ctx context.Context, program *ssa.Program) (source string, err error) {
+func Render(ctx context.Context, program *ssa.Program) (string, error) {
 	if program == nil {
 		return "", fmt.Errorf("ssa2source: nil program")
+	}
+	var output strings.Builder
+	if err := RenderTo(ctx, &output, program); err != nil {
+		return "", err
+	}
+	return output.String(), nil
+}
+
+// RenderTo streams source-like pseudocode for every non-extern function in program into w.
+func RenderTo(ctx context.Context, w io.Writer, program *ssa.Program) (err error) {
+	if program == nil {
+		return fmt.Errorf("ssa2source: nil program")
 	}
 	defer func() {
 		recovered := recover()
@@ -30,43 +43,84 @@ func Render(ctx context.Context, program *ssa.Program) (source string, err error
 		}
 		// Rendering is diagnostic output. A malformed program must produce an
 		// error the caller can print, not a crash of the whole process.
-		source, err = "", fmt.Errorf("ssa2source: render panic: %v", recovered)
+		err = fmt.Errorf("ssa2source: render panic: %v", recovered)
 	}()
-	var output strings.Builder
 	var renderErr error
+	var text strings.Builder
 	program.Funcs.ForEach(func(_ string, function *ssa.Function) bool {
-		if err := ctx.Err(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			renderErr = ctxErr
+			return false
+		}
+		if err := renderOneFunction(w, &text, function); err != nil {
 			renderErr = err
 			return false
 		}
-		if function == nil || function.IsExtern() {
-			return true
-		}
-		if strings.Contains(function.GetVerboseName(), "boundary: plt") {
-			return true
-		}
-		var text strings.Builder
-		renderFunction(&text, function)
-		cleaned, err := cleanSource(function, text.String())
-		if err != nil {
-			renderErr = err
-			return false
-		}
-		output.WriteString(renumberSource(function, cleaned))
-		output.WriteByte('\n')
 		return true
 	})
-	if renderErr != nil {
-		return "", renderErr
-	}
-	return output.String(), nil
+	return renderErr
 }
 
-var sourceValueID = regexp.MustCompile(`\bv(\d+)\b`)
+// RenderFunctionTo renders a single YakSSA function as source-like text into w.
+func RenderFunctionTo(w io.Writer, function *ssa.Function) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("ssa2source: render panic: %v", recovered)
+		}
+	}()
+	var text strings.Builder
+	return renderOneFunction(w, &text, function)
+}
+
+func renderOneFunction(w io.Writer, text *strings.Builder, function *ssa.Function) error {
+	if function == nil || function.IsExtern() {
+		return nil
+	}
+	if strings.Contains(function.GetVerboseName(), "boundary: plt") {
+		return nil
+	}
+	text.Reset()
+	renderFunction(text, function)
+	cleaned, err := cleanSource(function, text.String())
+	if err != nil {
+		return err
+	}
+	text.Reset()
+	renumberSourceInto(text, function, cleaned)
+	text.WriteByte('\n')
+	_, err = io.WriteString(w, text.String())
+	return err
+}
+
+func isSourceWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
+
+func isSourceSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
+}
+
+func isASCIIIdentStart(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_'
+}
+
+func isDeclTypeChar(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_' || b == ' ' || b == '*'
+}
+
+func isHexDigit(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
+}
 
 // renumberSource maps program-global IDs to the same per-function sequence as
 // SSAIR text: parameters, then phis and instructions in block order.
 func renumberSource(function *ssa.Function, source string) string {
+	var out strings.Builder
+	renumberSourceInto(&out, function, source)
+	return out.String()
+}
+
+func renumberSourceInto(out *strings.Builder, function *ssa.Function, source string) {
 	next := int64(1)
 	ids := make(map[int64]int64)
 	add := func(id int64) {
@@ -96,19 +150,37 @@ func renumberSource(function *ssa.Function, source string) string {
 			add(id)
 		}
 	}
-	return sourceValueID.ReplaceAllStringFunc(source, func(match string) string {
-		raw, err := strconv.ParseInt(match[1:], 10, 64)
-		if err != nil {
-			return match
+	out.Grow(len(source))
+	var numBuf [24]byte
+	lastCopied := 0
+	for i := 0; i < len(source); {
+		if source[i] == 'v' && (i == 0 || !isSourceWordByte(source[i-1])) && i+1 < len(source) && source[i+1] >= '0' && source[i+1] <= '9' {
+			j := i + 1
+			for j < len(source) && source[j] >= '0' && source[j] <= '9' {
+				j++
+			}
+			if j == len(source) || !isSourceWordByte(source[j]) {
+				if raw, err := strconv.ParseInt(source[i+1:j], 10, 64); err == nil {
+					mapped, ok := ids[raw]
+					if !ok {
+						mapped = next
+						next++
+						ids[raw] = mapped
+					}
+					out.WriteString(source[lastCopied:i])
+					out.WriteByte('v')
+					out.Write(strconv.AppendInt(numBuf[:0], mapped, 10))
+					lastCopied = j
+					i = j
+					continue
+				}
+			}
 		}
-		mapped, ok := ids[raw]
-		if !ok {
-			mapped = next
-			next++
-			ids[raw] = mapped
-		}
-		return fmt.Sprintf("v%d", mapped)
-	})
+		i++
+	}
+	if lastCopied < len(source) {
+		out.WriteString(source[lastCopied:])
+	}
 }
 
 func renderFunction(text *strings.Builder, function *ssa.Function) {
@@ -178,10 +250,205 @@ func paramTypeName(typ ssa.Type) string {
 	}
 }
 
-var sourceAssignment = regexp.MustCompile(`^\s*v(\d+)\s*=\s*(.*);\s*$`)
-var sourceDeclaration = regexp.MustCompile(`^\s*[A-Za-z_][A-Za-z0-9_ *]*\s+v(\d+);`)
-var sourceValue = regexp.MustCompile(`\bv(\d+)\b`)
-var frameBaseAlias = regexp.MustCompile(`^\s*v(\d+)\s*=\s*(entry_rsp|entry_rbp)\s*-\s*0x[0-9a-fA-F]+;\s*$`)
+// parseSourceAssignment parses lines matching `^\s*v(\d+)\s*=\s*(.*);\s*$`.
+func parseSourceAssignment(line string) (id int64, rhs string, ok bool) {
+	pos := 0
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos >= len(line) || line[pos] != 'v' {
+		return 0, "", false
+	}
+	pos++
+	numStart := pos
+	for pos < len(line) && line[pos] >= '0' && line[pos] <= '9' {
+		pos++
+	}
+	if pos == numStart {
+		return 0, "", false
+	}
+	parsedID, err := strconv.ParseInt(line[numStart:pos], 10, 64)
+	if err != nil {
+		return 0, "", false
+	}
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos >= len(line) || line[pos] != '=' {
+		return 0, "", false
+	}
+	pos++
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	end := len(line)
+	for end > pos && isSourceSpace(line[end-1]) {
+		end--
+	}
+	if end <= pos || line[end-1] != ';' {
+		return 0, "", false
+	}
+	return parsedID, line[pos : end-1], true
+}
+
+// parseSourceDeclaration parses lines matching `^\s*[A-Za-z_][A-Za-z0-9_ *]*\s+v(\d+);`.
+func parseSourceDeclaration(line string) (id int64, ok bool) {
+	pos := 0
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos >= len(line) || !isASCIIIdentStart(line[pos]) {
+		return 0, false
+	}
+	pos++
+	for pos < len(line) {
+		if isSourceSpace(line[pos]) {
+			q := pos + 1
+			for q < len(line) && isSourceSpace(line[q]) {
+				q++
+			}
+			if q < len(line) && line[q] == 'v' {
+				numStart := q + 1
+				numEnd := numStart
+				for numEnd < len(line) && line[numEnd] >= '0' && line[numEnd] <= '9' {
+					numEnd++
+				}
+				if numEnd > numStart && numEnd < len(line) && line[numEnd] == ';' {
+					if parsedID, err := strconv.ParseInt(line[numStart:numEnd], 10, 64); err == nil {
+						return parsedID, true
+					}
+				}
+			}
+		}
+		if !isDeclTypeChar(line[pos]) {
+			break
+		}
+		pos++
+	}
+	return 0, false
+}
+
+// parseFrameBaseAlias parses lines matching `^\s*v(\d+)\s*=\s*(entry_rsp|entry_rbp)\s*-\s*0x[0-9a-fA-F]+;\s*$`.
+func parseFrameBaseAlias(line string) (idStr, reg string, ok bool) {
+	pos := 0
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos >= len(line) || line[pos] != 'v' {
+		return "", "", false
+	}
+	pos++
+	numStart := pos
+	for pos < len(line) && line[pos] >= '0' && line[pos] <= '9' {
+		pos++
+	}
+	if pos == numStart {
+		return "", "", false
+	}
+	digits := line[numStart:pos]
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos >= len(line) || line[pos] != '=' {
+		return "", "", false
+	}
+	pos++
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	switch {
+	case strings.HasPrefix(line[pos:], "entry_rsp"):
+		reg = "entry_rsp"
+	case strings.HasPrefix(line[pos:], "entry_rbp"):
+		reg = "entry_rbp"
+	default:
+		return "", "", false
+	}
+	pos += len(reg)
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos >= len(line) || line[pos] != '-' {
+		return "", "", false
+	}
+	pos++
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos+2 >= len(line) || line[pos] != '0' || line[pos+1] != 'x' {
+		return "", "", false
+	}
+	pos += 2
+	hexStart := pos
+	for pos < len(line) && isHexDigit(line[pos]) {
+		pos++
+	}
+	if pos == hexStart || pos >= len(line) || line[pos] != ';' {
+		return "", "", false
+	}
+	pos++
+	for pos < len(line) && isSourceSpace(line[pos]) {
+		pos++
+	}
+	if pos != len(line) {
+		return "", "", false
+	}
+	return digits, reg, true
+}
+
+func forEachSourceValue(s string, fn func(id int64) bool) {
+	for i := 0; i < len(s); {
+		if s[i] == 'v' && (i == 0 || !isSourceWordByte(s[i-1])) && i+1 < len(s) && s[i+1] >= '0' && s[i+1] <= '9' {
+			j := i + 1
+			for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+				j++
+			}
+			if j == len(s) || !isSourceWordByte(s[j]) {
+				if id, err := strconv.ParseInt(s[i+1:j], 10, 64); err == nil {
+					if !fn(id) {
+						return
+					}
+				}
+				i = j
+				continue
+			}
+		}
+		i++
+	}
+}
+
+func replaceSourceValues(line string, replacements map[string]string) string {
+	var out strings.Builder
+	lastCopied := 0
+	for i := 0; i < len(line); {
+		if line[i] == 'v' && (i == 0 || !isSourceWordByte(line[i-1])) && i+1 < len(line) && line[i+1] >= '0' && line[i+1] <= '9' {
+			j := i + 1
+			for j < len(line) && line[j] >= '0' && line[j] <= '9' {
+				j++
+			}
+			if j == len(line) || !isSourceWordByte(line[j]) {
+				if to, ok := replacements[line[i:j]]; ok {
+					if out.Len() == 0 {
+						out.Grow(len(line))
+					}
+					out.WriteString(line[lastCopied:i])
+					out.WriteString(to)
+					lastCopied = j
+				}
+				i = j
+				continue
+			}
+		}
+		i++
+	}
+	if lastCopied == 0 {
+		return line
+	}
+	if lastCopied < len(line) {
+		out.WriteString(line[lastCopied:])
+	}
+	return out.String()
+}
 
 func cleanSource(function *ssa.Function, text string) (string, error) {
 	lines := strings.Split(text, "\n")
@@ -190,11 +457,9 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 		lines = pruneDeadAssignments(function, lines)
 	}
 	lines = pruneUnusedParameters(lines)
-	text = strings.Join(lines, "\n")
-	definitions := make(map[int64]int)
+	definitions := make(map[int64]int, len(lines))
 	for index, line := range lines {
-		if match := sourceAssignment.FindStringSubmatch(line); match != nil {
-			id, _ := strconv.ParseInt(match[1], 10, 64)
+		if id, _, ok := parseSourceAssignment(line); ok {
 			if _, exists := definitions[id]; !exists {
 				definitions[id] = index
 			}
@@ -202,19 +467,17 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 	}
 	filtered := make([]string, 0, len(lines))
 	for index, line := range lines {
-		match := sourceAssignment.FindStringSubmatch(line)
-		if match != nil {
-			id, _ := strconv.ParseInt(match[1], 10, 64)
+		if id, rhs, ok := parseSourceAssignment(line); ok {
 			value, _ := function.GetValueById(id)
 			if value == nil || !value.HasUsers() {
 				forward := false
-				for _, ref := range sourceValue.FindAllStringSubmatch(match[2], -1) {
-					refID, _ := strconv.ParseInt(ref[1], 10, 64)
-					if defIndex, ok := definitions[refID]; ok && defIndex > index {
+				forEachSourceValue(rhs, func(refID int64) bool {
+					if defIndex, exists := definitions[refID]; exists && defIndex > index {
 						forward = true
-						break
+						return false
 					}
-				}
+					return true
+				})
 				if forward {
 					continue
 				}
@@ -222,48 +485,28 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 		}
 		filtered = append(filtered, line)
 	}
-	filteredText := strings.Join(filtered, "\n")
-	lines = strings.Split(filteredText, "\n")
+	lines = filtered
 	// A value that is referenced before its defining block is declared up front.
 	// This keeps the textual source well-formed when an irreducible/loop-heavy
 	// CFG cannot be printed in strict definition order.
-	definedAt := make(map[int64]int)
-	for index, line := range lines {
-		if match := sourceAssignment.FindStringSubmatch(line); match != nil {
-			id, _ := strconv.ParseInt(match[1], 10, 64)
-			if _, exists := definedAt[id]; !exists {
-				definedAt[id] = index
-			}
-		}
-	}
-	forwardIDs := make(map[int64]bool)
-	for index, line := range lines {
-		for _, ref := range sourceValue.FindAllStringSubmatch(line, -1) {
-			id, _ := strconv.ParseInt(ref[1], 10, 64)
-			if defIndex, ok := definedAt[id]; ok && defIndex > index {
-				forwardIDs[id] = true
-			}
-		}
-	}
 	declaredIDs := make(map[int64]bool)
 	insertAt := 0
 	for index, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "function ") && strings.HasSuffix(strings.TrimSpace(line), "{") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasSuffix(trimmed, "{") && (strings.HasPrefix(trimmed, "function ") || strings.HasSuffix(trimmed, ") {")) {
 			insertAt = index + 1
 			break
 		}
 	}
 	for round := 0; round < 4; round++ {
-		definitions := make(map[int64]int)
+		definitions := make(map[int64]int, len(lines))
 		for index, line := range lines {
-			if match := sourceAssignment.FindStringSubmatch(line); match != nil {
-				id, _ := strconv.ParseInt(match[1], 10, 64)
+			if id, _, ok := parseSourceAssignment(line); ok {
 				if _, exists := definitions[id]; !exists {
 					definitions[id] = index
 				}
 			}
-			if match := sourceDeclaration.FindStringSubmatch(line); match != nil {
-				id, _ := strconv.ParseInt(match[1], 10, 64)
+			if id, ok := parseSourceDeclaration(line); ok {
 				if _, exists := definitions[id]; !exists {
 					definitions[id] = index
 				}
@@ -271,15 +514,15 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 		}
 		missing := make(map[int64]bool)
 		for index, line := range lines {
-			for _, ref := range sourceValue.FindAllStringSubmatch(line, -1) {
-				id, _ := strconv.ParseInt(ref[1], 10, 64)
+			forEachSourceValue(line, func(id int64) bool {
 				if declaredIDs[id] {
-					continue
+					return true
 				}
 				if defIndex, ok := definitions[id]; ok && defIndex > index {
 					missing[id] = true
 				}
-			}
+				return true
+			})
 		}
 		if len(missing) == 0 {
 			break
@@ -299,46 +542,40 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 		sort.Strings(declarations)
 		lines = append(lines[:insertAt], append(declarations, lines[insertAt:]...)...)
 		insertAt += len(declarations)
-		filteredText = strings.Join(lines, "\n")
 	}
-	lines = strings.Split(filteredText, "\n")
-	definitions = make(map[int64]int)
-	params := make(map[int64]bool)
+	filteredText := strings.Join(lines, "\n")
+	definitions = make(map[int64]int, len(lines))
+	params := make(map[int64]bool, len(function.Params))
 	for _, id := range function.Params {
 		params[id] = true
 	}
 	for index, line := range lines {
-		if match := sourceAssignment.FindStringSubmatch(line); match != nil {
-			id, _ := strconv.ParseInt(match[1], 10, 64)
+		if id, _, ok := parseSourceAssignment(line); ok {
 			if _, exists := definitions[id]; !exists {
 				definitions[id] = index
 			}
 		}
-		if match := sourceDeclaration.FindStringSubmatch(line); match != nil {
-			id, _ := strconv.ParseInt(match[1], 10, 64)
+		if id, ok := parseSourceDeclaration(line); ok {
 			if _, exists := definitions[id]; !exists {
 				definitions[id] = index
 			}
 		}
 	}
+	var forwardErr error
 	for index, line := range lines {
-		for _, ref := range sourceValue.FindAllStringSubmatch(line, -1) {
-			id, _ := strconv.ParseInt(ref[1], 10, 64)
-			if params[id] {
-				continue
-			}
-			if match := sourceAssignment.FindStringSubmatch(line); match != nil {
-				lhs, _ := strconv.ParseInt(match[1], 10, 64)
-				if lhs == id {
-					continue
-				}
-			}
-			if declaredIDs[id] {
-				continue
+		lhs, _, isAssign := parseSourceAssignment(line)
+		forEachSourceValue(line, func(id int64) bool {
+			if params[id] || (isAssign && lhs == id) || declaredIDs[id] {
+				return true
 			}
 			if defIndex, ok := definitions[id]; ok && defIndex > index {
-				return "", fmt.Errorf("ssa2source: forward reference in function %s: v%d", function.GetName(), id)
+				forwardErr = fmt.Errorf("ssa2source: forward reference in function %s: v%d", function.GetName(), id)
+				return false
 			}
+			return true
+		})
+		if forwardErr != nil {
+			return "", forwardErr
 		}
 	}
 	filteredText = strings.ReplaceAll(filteredText, "entry_rsp - 0x8", "entry_rsp")
@@ -347,12 +584,14 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 }
 
 func inlineFrameBaseAliases(lines []string) []string {
-	replacements := make(map[string]string)
+	var replacements map[string]string
 	filtered := make([]string, 0, len(lines))
 	for _, line := range lines {
-		match := frameBaseAlias.FindStringSubmatch(line)
-		if match != nil {
-			replacements["v"+match[1]] = match[2]
+		if digits, reg, ok := parseFrameBaseAlias(line); ok {
+			if replacements == nil {
+				replacements = make(map[string]string)
+			}
+			replacements["v"+digits] = reg
 			continue
 		}
 		filtered = append(filtered, line)
@@ -361,10 +600,7 @@ func inlineFrameBaseAliases(lines []string) []string {
 		return lines
 	}
 	for index, line := range filtered {
-		for from, to := range replacements {
-			line = strings.ReplaceAll(line, from, to)
-		}
-		filtered[index] = line
+		filtered[index] = replaceSourceValues(line, replacements)
 	}
 	return filtered
 }
@@ -396,16 +632,24 @@ func pruneUnusedParameters(lines []string) []string {
 	if len(params) == 1 && strings.TrimSpace(params[0]) == "void" {
 		return lines
 	}
-	body := strings.Join(lines[headerIndex+1:], "\n")
+	usedIdents := collectIdentifiersFromLines(lines[headerIndex+1:])
+	var body string
 	kept := make([]string, 0, len(params))
 	for _, param := range params {
 		fields := strings.Fields(param)
 		if len(fields) == 0 {
 			continue
 		}
-		name := regexp.QuoteMeta(fields[len(fields)-1])
-		if regexp.MustCompile(`\b` + name + `\b`).MatchString(body) {
+		name := fields[len(fields)-1]
+		if usedIdents[name] {
 			kept = append(kept, param)
+		} else if !isWordString(name) {
+			if body == "" {
+				body = strings.Join(lines[headerIndex+1:], "\n")
+			}
+			if regexp.MustCompile(`\b` + regexp.QuoteMeta(name) + `\b`).MatchString(body) {
+				kept = append(kept, param)
+			}
 		}
 	}
 	if len(kept) == 0 {
@@ -413,6 +657,42 @@ func pruneUnusedParameters(lines []string) []string {
 	}
 	lines[headerIndex] = header[:open+1] + strings.Join(kept, ", ") + header[closing:]
 	return lines
+}
+
+func isWordString(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func collectIdentifiersFromLines(lines []string) map[string]bool {
+	found := make(map[string]bool)
+	for _, text := range lines {
+		start := -1
+		for i := 0; i <= len(text); i++ {
+			word := false
+			if i < len(text) {
+				c := text[i]
+				word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
+			}
+			if word {
+				if start < 0 {
+					start = i
+				}
+			} else if start >= 0 {
+				found[text[start:i]] = true
+				start = -1
+			}
+		}
+	}
+	return found
 }
 
 // matchingOpenParen returns the '(' that matches the ')' at close. A function
@@ -436,42 +716,76 @@ func matchingOpenParen(text string, close int) int {
 }
 
 func pruneDeadAssignments(function *ssa.Function, lines []string) []string {
+	if len(lines) == 0 {
+		return lines
+	}
 	// A phi that names the first edge still depends on every other edge: dropping
 	// them would hide the value the other path supplies.
 	kept := phiEdgeValues(function)
-	for {
-		uses := make(map[int64]int)
-		for _, line := range lines {
-			match := sourceAssignment.FindStringSubmatch(line)
-			lhs := int64(0)
-			if match != nil {
-				lhs, _ = strconv.ParseInt(match[1], 10, 64)
-			}
-			for _, ref := range sourceValue.FindAllStringSubmatch(line, -1) {
-				id, _ := strconv.ParseInt(ref[1], 10, 64)
-				if id != lhs {
-					uses[id]++
-				}
-			}
+	lhs := make([]int64, len(lines))
+	refs := make([][]int64, len(lines))
+	defLines := make(map[int64][]int, len(lines))
+	uses := make(map[int64]int, len(lines))
+	sideEffects := make(map[int64]bool)
+	hasSideEffect := func(id int64) bool {
+		if cached, ok := sideEffects[id]; ok {
+			return cached
 		}
-		filtered := make([]string, 0, len(lines))
-		changed := false
-		for _, line := range lines {
-			match := sourceAssignment.FindStringSubmatch(line)
-			if match != nil {
-				id, _ := strconv.ParseInt(match[1], 10, 64)
-				if uses[id] == 0 && kept[id] == 0 && !assignmentHasSideEffect(function, id) {
-					changed = true
-					continue
-				}
-			}
-			filtered = append(filtered, line)
+		res := assignmentHasSideEffect(function, id)
+		sideEffects[id] = res
+		return res
+	}
+	for i, line := range lines {
+		lineLHS, _, isAssign := parseSourceAssignment(line)
+		if isAssign {
+			lhs[i] = lineLHS
+			defLines[lineLHS] = append(defLines[lineLHS], i)
 		}
-		lines = filtered
-		if !changed {
-			return lines
+		forEachSourceValue(line, func(id int64) bool {
+			if isAssign && id == lineLHS {
+				return true
+			}
+			uses[id]++
+			refs[i] = append(refs[i], id)
+			return true
+		})
+	}
+
+	dead := make([]bool, len(lines))
+	var queue []int
+	for i := range lines {
+		id := lhs[i]
+		if id != 0 && uses[id] == 0 && kept[id] == 0 && !hasSideEffect(id) {
+			queue = append(queue, i)
 		}
 	}
+	for head := 0; head < len(queue); head++ {
+		i := queue[head]
+		if dead[i] {
+			continue
+		}
+		dead[i] = true
+		for _, r := range refs[i] {
+			uses[r]--
+			if uses[r] == 0 && kept[r] == 0 && !hasSideEffect(r) {
+				for _, defIdx := range defLines[r] {
+					if !dead[defIdx] {
+						queue = append(queue, defIdx)
+					}
+				}
+			}
+		}
+	}
+	if len(queue) == 0 {
+		return lines
+	}
+	filtered := make([]string, 0, len(lines)-len(queue))
+	for i, line := range lines {
+		if !dead[i] {
+			filtered = append(filtered, line)
+		}
+	}
+	return filtered
 }
 
 // phiEdgeValues counts the values a phi names on its edges.
@@ -506,6 +820,9 @@ func phiEdgeValues(function *ssa.Function) map[int64]int {
 }
 
 func assignmentHasSideEffect(function *ssa.Function, id int64) bool {
+	if function == nil {
+		return false
+	}
 	value, ok := function.GetValueById(id)
 	if !ok || value == nil {
 		return false
@@ -631,6 +948,9 @@ func valueUsedSeen(value ssa.Value, seen map[int64]bool) bool {
 	for _, user := range node.GetUsers() {
 		switch typed := user.(type) {
 		case *ssa.BinOp:
+			if typed.Op == ssa.OpStore {
+				return true
+			}
 			if binaryFoldsAway(typed) {
 				continue
 			}
@@ -638,6 +958,9 @@ func valueUsedSeen(value ssa.Value, seen map[int64]bool) bool {
 				return true
 			}
 		case *ssa.UnOp:
+			if typed.Op == ssa.OpLoad || typed.Op == ssa.OpSpill {
+				return true
+			}
 			if valueUsedSeen(typed, seen) {
 				return true
 			}

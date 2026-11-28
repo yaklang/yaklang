@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -19,9 +20,9 @@ import (
 )
 
 // TestBinarySSAIsPersistedAndQueriedBySyntaxFlow covers the whole route:
-// C source -> ELF -> reify lift -> ssadb -> ssaapi.FromDatabase ->
-// syntaxflow. The query must find both an imported libc call (printf) and a
-// recovered local call (helper) in the persisted program.
+// C source -> native binary -> reify lift -> ssadb -> ssaapi.FromDatabase ->
+// syntaxflow. The query finds a recovered local call, plus imported libc calls
+// on targets that label the call stubs.
 func TestBinarySSAIsPersistedAndQueriedBySyntaxFlow(t *testing.T) {
 	if _, err := exec.LookPath("gcc"); err != nil {
 		t.Skip("gcc is not installed")
@@ -49,6 +50,13 @@ int main(void) {
 		t.Fatal(err)
 	}
 	binary := filepath.Join(directory, "demo")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+	textSection := ".text"
+	if runtime.GOOS == "darwin" {
+		textSection = "__TEXT,__text"
+	}
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build demo: %v\n%s", err, output)
@@ -57,7 +65,7 @@ int main(void) {
 	// File-mode audit: lift into memory and query the program directly.
 	memoryLift, err := reify.Lift(context.Background(), binary,
 		reify.WithMode(reify.ModeSSAIR),
-		reify.WithSection(".text"),
+		reify.WithSection(textSection),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, memoryLift.Program)
@@ -76,7 +84,7 @@ int main(void) {
 	defer ssadb.DeleteProgram(db, programName)
 	result, err := reify.Lift(context.Background(), binary,
 		reify.WithMode(reify.ModeSSAIR),
-		reify.WithSection(".text"),
+		reify.WithSection(textSection),
 		reify.WithProgramName(programName),
 		reify.WithProgramCache(ssa.ProgramCacheDBWrite),
 	)
@@ -102,16 +110,19 @@ int main(void) {
 		require.GreaterOrEqual(t, len(values), wantAtLeast, "rule: %s", rule)
 	}
 
-	// Imported libc function: the loader names the PLT/GOT target, so the call
-	// keeps the symbol name in ssadb.
-	assertQuery("printf(* as $args) as $call", "$call", 2)
-	assertQuery("printf(* as $args) as $call", "$args", 4)
 	// Recovered local function: the call target is an internal function.
 	assertQuery("helper(* as $args) as $call", "$call", 1)
+	calleeName := "helper"
+	if runtime.GOOS != "darwin" {
+		// The loader names the PLT/GOT target, so the call keeps its name in ssadb.
+		assertQuery("printf(* as $args) as $call", "$call", 2)
+		assertQuery("printf(* as $args) as $call", "$args", 4)
+		calleeName = "printf"
+	}
 
 	// The persisted call must expose its target through the normal value API,
 	// not only through the syntaxflow string matcher.
-	matched, err := program.SyntaxFlowWithError("printf(* as $args) as $call")
+	matched, err := program.SyntaxFlowWithError(calleeName + "(* as $args) as $call")
 	require.NoError(t, err)
 	calls, ok := matched.GetSFResult().SymbolTable.Get(strings.TrimPrefix("$call", "$"))
 	require.True(t, ok)
@@ -120,7 +131,7 @@ int main(void) {
 	require.True(t, ok)
 	callee := first.GetCallee()
 	require.NotNil(t, callee)
-	require.Equal(t, "printf", callee.GetName())
+	require.Equal(t, calleeName, callee.GetName())
 }
 
 // isolatedSSADB points the ssadb globals at one temporary SQLite database and

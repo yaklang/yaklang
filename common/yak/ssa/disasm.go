@@ -13,20 +13,22 @@ func GetTypeStr(n Value) string {
 	if utils.IsNil(n) {
 		return "<nil>"
 	}
-	return fmt.Sprintf(
-		"<%s> ", n.GetType(),
-	)
+	if t := n.GetType(); !utils.IsNil(t) {
+		return "<" + t.String() + "> "
+	}
+	return fmt.Sprintf("<%s> ", n.GetType())
 }
 
 func getStr(v Value) string {
 	return getStrFlag(v, true)
 }
-func getStrFlag(v Value, hasType bool) (op string) {
+func getStrFlag(v Value, hasType bool) string {
 	if utils.IsNil(v) {
 		return "<nil>"
 	}
+	var prefix string
 	if hasType {
-		op += GetTypeStr(v)
+		prefix = GetTypeStr(v)
 	}
 	switch v := v.(type) {
 	// case Instruction:
@@ -35,21 +37,31 @@ func getStrFlag(v Value, hasType bool) (op string) {
 		// 	return m.Func.Name + "-symbol"
 		// }
 	case *ConstInst:
-		op += v.Const.String()
-		return
+		if hasType {
+			return prefix + v.Const.String()
+		}
+		return v.Const.String()
 	case *Parameter:
-		op += v.String()
-		return
+		if hasType {
+			return prefix + v.String()
+		}
+		return v.String()
 	case *Function:
-		op += v.GetName()
-		return
+		if hasType {
+			return prefix + v.GetName()
+		}
+		return v.GetName()
 	}
 
 	// if f := v.GetFunc(); f != nil {
 	if id := v.GetId(); id != -1 {
-		op += fmt.Sprintf("t%d", v.GetId())
+		idStr := "t" + strconv.FormatInt(id, 10)
+		if hasType {
+			return prefix + idStr
+		}
+		return idStr
 	}
-	return op
+	return prefix
 }
 
 // function
@@ -69,30 +81,46 @@ func (f *Function) String() string {
 	return f.DisAsm(DisAsmDefault)
 }
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
-	ret := f.GetName() + " "
-	ret += strings.Join(
-		lo.Map(f.Params, func(id int64, _ int) string {
-			item, ok := f.GetValueById(id)
-			if !ok || utils.IsNil(item) {
-				return "<nil>"
-			} else {
-				return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
-			}
-		}),
-		", ")
-	ret += "\n"
+	var sb strings.Builder
+	if est := len(f.Blocks) * 128; est > 0 {
+		if est > 1<<20 {
+			est = 1 << 20
+		}
+		sb.Grow(est)
+	}
+	sb.WriteString(f.GetName())
+	sb.WriteByte(' ')
+	for idx, id := range f.Params {
+		if idx > 0 {
+			sb.WriteString(", ")
+		}
+		item, ok := f.GetValueById(id)
+		if !ok || utils.IsNil(item) {
+			sb.WriteString("<nil>")
+		} else {
+			sb.WriteString(GetTypeStr(item))
+			sb.WriteByte('(')
+			sb.WriteString(strconv.FormatInt(item.GetId(), 10))
+			sb.WriteString(") ")
+			sb.WriteString(item.GetName())
+		}
+	}
+	sb.WriteByte('\n')
 
 	if id := f.parent; id > 0 {
 		parent, ok := f.GetValueById(id)
 		if ok && !utils.IsNil(parent) {
-			ret += fmt.Sprintf("parent: %s\n", parent.GetName())
+			sb.WriteString("parent: ")
+			sb.WriteString(parent.GetName())
+			sb.WriteByte('\n')
 		} else {
-			ret += fmt.Sprintf("parent: <nil:%d>\n", id)
+			fmt.Fprintf(&sb, "parent: <nil:%d>\n", id)
 		}
 	}
 
 	if len(f.FreeValues) > 0 {
-		ret += "freeValue: " + strings.Join(
+		sb.WriteString("freeValue: ")
+		sb.WriteString(strings.Join(
 			lo.MapToSlice(f.FreeValues, func(name *Variable, id int64) string {
 				item, ok := f.GetValueById(id)
 				if !ok || utils.IsNil(item) {
@@ -100,11 +128,12 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				}
 				return fmt.Sprintf("%s:(%d)%s", name.GetName(), item.GetId(), item.GetName())
 			}),
-			// f.FreeValue,
-			", ") + "\n"
+			", "))
+		sb.WriteByte('\n')
 	}
 	if len(f.ParameterMembers) > 0 {
-		ret += "parameterMember: " + strings.Join(
+		sb.WriteString("parameterMember: ")
+		sb.WriteString(strings.Join(
 			lo.Map(f.ParameterMembers, func(id int64, _ int) string {
 				item, ok := f.GetValueById(id)
 				if !ok || utils.IsNil(item) {
@@ -112,10 +141,12 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				}
 				return fmt.Sprintf("%s(%d) %s", GetTypeStr(item), item.GetId(), item.GetName())
 			}),
-			", ") + "\n"
+			", "))
+		sb.WriteByte('\n')
 	}
 	if len(f.SideEffects) > 0 {
-		ret += "sideEffects: " + strings.Join(
+		sb.WriteString("sideEffects: ")
+		sb.WriteString(strings.Join(
 			lo.Map(f.SideEffects, func(se *FunctionSideEffect, _ int) string {
 				switch se.MemberCallKind {
 				case ParameterMemberCall:
@@ -134,10 +165,13 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				return se.Name
 			}),
 			",",
-		) + "\n"
+		))
+		sb.WriteByte('\n')
 	}
 	if f.GetType() != nil {
-		ret += "type: " + f.GetType().String() + "\n"
+		sb.WriteString("type: ")
+		sb.WriteString(f.GetType().String())
+		sb.WriteByte('\n')
 	}
 
 	ShowBlock := func(b *BasicBlock) {
@@ -146,39 +180,53 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		}
 
 		if flag&DisAsmWithSource == 0 {
-			ret += b.String() + "\n"
+			sb.WriteString(b.String())
+			sb.WriteByte('\n')
 			for _, p := range b.Phis {
 				phi, ok := f.GetValueById(p)
 				if !ok || utils.IsNil(phi) {
-					ret += fmt.Sprintf("\t<nil phi:%d>\n", p)
+					sb.WriteString("\t<nil phi:")
+					sb.WriteString(strconv.FormatInt(p, 10))
+					sb.WriteString(">\n")
 				} else {
-					ret += fmt.Sprintf("\t%s\n", phi)
+					sb.WriteByte('\t')
+					sb.WriteString(phi.String())
+					sb.WriteByte('\n')
 				}
 			}
 			for _, id := range b.Insts {
 				i, ok := b.GetInstructionById(id)
 				if !ok || i == nil {
-					ret += fmt.Sprintf("\t<nil inst:%d>\n", id)
+					sb.WriteString("\t<nil inst:")
+					sb.WriteString(strconv.FormatInt(id, 10))
+					sb.WriteString(">\n")
 					continue
 				}
 				if c, ok := ToConstInst(i); ok {
+					sb.WriteString("\tt")
+					sb.WriteString(strconv.FormatInt(id, 10))
+					sb.WriteString(" = ")
+					sb.WriteString(getStr(c))
 					if c.Origin > 0 {
-						ret += fmt.Sprintf("\tt%d = %s by t%d \n", id, getStr(c), c.Origin)
-					} else {
-						ret += fmt.Sprintf("\tt%d = %s\n", id, getStr(c))
+						sb.WriteString(" by t")
+						sb.WriteString(strconv.FormatInt(c.Origin, 10))
+						sb.WriteByte(' ')
 					}
+					sb.WriteByte('\n')
 					continue
 				} else if _, ok := ToUndefined(i); ok {
 					continue
 				}
-				ret += fmt.Sprintf("\t%s\n", i)
+				sb.WriteByte('\t')
+				sb.WriteString(i.String())
+				sb.WriteByte('\n')
 			}
 		} else {
-			ret += b.String()
+			sb.WriteString(b.String())
 			if bPos := b.GetRange(); bPos != nil {
-				ret += bPos.String()
+				sb.WriteString(bPos.String())
 			}
-			ret += "\n"
+			sb.WriteByte('\n')
 			insts := make([]string, 0, len(b.Insts)+len(b.Phis))
 			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
 			for _, id := range b.Phis {
@@ -219,7 +267,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			}
 			format := fmt.Sprintf("\t%%-%ds\t\t%%s\n", max)
 			for i := range insts {
-				ret += fmt.Sprintf(format, insts[i], pos[i])
+				fmt.Fprintf(&sb, format, insts[i], pos[i])
 			}
 		}
 	}
@@ -235,7 +283,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		ShowBlock(block)
 	}
 
-	return ret
+	return sb.String()
 }
 
 // ----------- basic block
@@ -243,27 +291,32 @@ func (b *BasicBlock) String() string {
 	if utils.IsNil(b) {
 		return ""
 	}
-	ret := b.GetName() + ":"
+	var sb strings.Builder
+	sb.WriteString(b.GetName())
+	sb.WriteByte(':')
 	if len(b.Preds) != 0 {
-		ret += " <- "
+		sb.WriteString(" <- ")
 		for _, id := range b.Preds {
 			pred, ok := b.GetBasicBlockByID(id)
 			if !ok || utils.IsNil(pred) {
 				log.Infof("pred is nil: %v", id)
 				continue
 			}
-			ret += pred.GetName() + " "
+			sb.WriteString(pred.GetName())
+			sb.WriteByte(' ')
 		}
 	}
 	if !utils.IsNil(b.Condition) {
 		condition, ok := b.GetValueById(b.Condition)
 		if ok && !utils.IsNil(condition) {
-			ret += " (" + getStrFlag(condition, false) + ")"
+			sb.WriteString(" (")
+			sb.WriteString(getStrFlag(condition, false))
+			sb.WriteByte(')')
 		} else {
-			ret += " (<nil condition>)"
+			sb.WriteString(" (<nil condition>)")
 		}
 	}
-	return ret
+	return sb.String()
 }
 
 // ----------- const
@@ -388,7 +441,7 @@ func (j *Jump) String() string {
 	if !ok || utils.IsNil(to) {
 		return fmt.Sprintf("jump -> <nil target:%d>", j.To)
 	}
-	return fmt.Sprintf("jump -> %v", to.GetName())
+	return "jump -> " + to.GetName()
 }
 
 // ----------- IF
@@ -402,13 +455,13 @@ func (i *If) String() string {
 	}
 	trueBranch, ok := i.GetValueById(i.True)
 	if !ok || utils.IsNil(trueBranch) {
-		return fmt.Sprintf("If [%s] true -> nil", getStr(cond))
+		return "If [" + getStr(cond) + "] true -> nil"
 	}
 	falseBranch, ok := i.GetValueById(i.False)
 	if !ok || utils.IsNil(falseBranch) {
-		return fmt.Sprintf("If [%s] true -> %s, false -> nil", getStr(cond), trueBranch.GetName())
+		return "If [" + getStr(cond) + "] true -> " + trueBranch.GetName() + ", false -> nil"
 	}
-	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(cond), trueBranch.GetName(), falseBranch.GetName())
+	return "If [" + getStr(cond) + "] true -> " + trueBranch.GetName() + ", false -> " + falseBranch.GetName()
 }
 
 // ----------- Loop
@@ -601,7 +654,7 @@ func (b *BinOp) String() string {
 		yStr = getStr(y)
 	}
 
-	return fmt.Sprintf("%s = %s %s %s", getStr(b), xStr, b.Op, yStr)
+	return getStr(b) + " = " + xStr + " " + string(b.Op) + " " + yStr
 }
 
 // ----------- UnOp
@@ -615,7 +668,7 @@ func (u *UnOp) String() string {
 		xStr = getStr(x)
 	}
 
-	return fmt.Sprintf("%s = %s %s", getStr(u), u.Op, xStr)
+	return getStr(u) + " = " + string(u.Op) + " " + xStr
 }
 
 // ----------- Interface

@@ -29,14 +29,21 @@ type boundary struct {
 }
 
 type boundaryScanner struct {
-	profile Profile
-	reader  *core.ByteReader
-	hints   core.BoundaryHints
-	image   *core.Image
-	entries map[uint64]*boundary
-	data    map[uint64][]byte
-	stats   core.BoundaryStats
+	profile     Profile
+	reader      *core.ByteReader
+	hints       core.BoundaryHints
+	image       *core.Image
+	entries     map[uint64]*boundary
+	sortedAddrs []uint64
+	pending     []uint64
+	chunkRegion uint64
+	chunkStart  uint64
+	chunkLen    uint64
+	chunkBuf    []byte
+	stats       core.BoundaryStats
 }
+
+const scannerChunkSize = 1 << 20
 
 // discoverBoundaries finds function starts using loader hints, symbols, entry,
 // direct calls and tail scanning. It does not build LowIR; asm2lowir uses the
@@ -51,7 +58,6 @@ func discoverBoundaries(profile Profile, reader *core.ByteReader, hints core.Bou
 		hints:   hints,
 		image:   image,
 		entries: make(map[uint64]*boundary),
-		data:    make(map[uint64][]byte),
 	}
 	scanner.addSymbols()
 	scanner.addEHFrame()
@@ -65,6 +71,10 @@ func discoverBoundaries(profile Profile, reader *core.ByteReader, hints core.Bou
 	scanner.finishRanges()
 	scanner.addTailScan()
 	scanner.finishRanges()
+	// Release temporary scan buffer before returning.
+	scanner.chunkBuf = nil
+	scanner.sortedAddrs = nil
+	scanner.pending = nil
 
 	functions := make([]core.FunctionBoundary, 0, len(scanner.entries))
 	for _, boundary := range scanner.entries {
@@ -117,7 +127,17 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 		FunctionBoundary: core.FunctionBoundary{Address: address, Size: size, Name: name, Source: source},
 		priority:         priority,
 	}
+	s.pending = append(s.pending, address)
 	return true
+}
+
+func (s *boundaryScanner) flushAddrs() {
+	if len(s.pending) == 0 {
+		return
+	}
+	s.sortedAddrs = append(s.sortedAddrs, s.pending...)
+	s.pending = s.pending[:0]
+	sort.Slice(s.sortedAddrs, func(i, j int) bool { return s.sortedAddrs[i] < s.sortedAddrs[j] })
 }
 
 func (s *boundaryScanner) addSymbols() {
@@ -166,13 +186,49 @@ func (s *boundaryScanner) regionFor(address uint64) *core.Region {
 	return nil
 }
 
-func (s *boundaryScanner) regionData(region *core.Region) []byte {
-	if data, ok := s.data[region.Address]; ok {
-		return data
+func (s *boundaryScanner) readBytesAt(region *core.Region, address uint64, need uint64) []byte {
+	if region == nil || address < region.Address {
+		return nil
 	}
-	data, _ := s.reader.Bytes(region.Offset, region.Size)
-	s.data[region.Address] = data
-	return data
+	offset := address - region.Address
+	if offset >= region.Size {
+		return nil
+	}
+	avail := region.Size - offset
+	if need > avail {
+		need = avail
+	}
+	if need == 0 {
+		return nil
+	}
+	if s.chunkRegion == region.Address && s.chunkLen > 0 &&
+		address >= s.chunkStart && address-s.chunkStart+need <= s.chunkLen {
+		start := int(address - s.chunkStart)
+		end := start + int(avail)
+		if end > int(s.chunkLen) {
+			end = int(s.chunkLen)
+		}
+		return s.chunkBuf[start:end]
+	}
+	chunkSize := uint64(scannerChunkSize)
+	if chunkSize < need {
+		chunkSize = need
+	}
+	if avail < chunkSize {
+		chunkSize = avail
+	}
+	if uint64(cap(s.chunkBuf)) < chunkSize {
+		s.chunkBuf = make([]byte, int(chunkSize))
+	}
+	n, err := s.reader.ReadAt(s.chunkBuf[:int(chunkSize)], int64(region.Offset+offset))
+	if n == 0 || (err != nil && n < int(need)) {
+		s.chunkLen = 0
+		return nil
+	}
+	s.chunkRegion = region.Address
+	s.chunkStart = address
+	s.chunkLen = uint64(n)
+	return s.chunkBuf[:n]
 }
 
 func (s *boundaryScanner) decode(address uint64) (x86asm.Inst, bool) {
@@ -180,15 +236,14 @@ func (s *boundaryScanner) decode(address uint64) (x86asm.Inst, bool) {
 	if region == nil {
 		return x86asm.Inst{}, false
 	}
-	data := s.regionData(region)
-	offset := address - region.Address
-	if offset >= uint64(len(data)) {
+	data := s.readBytesAt(region, address, 15)
+	if len(data) == 0 {
 		return x86asm.Inst{}, false
 	}
-	if offset+4 <= uint64(len(data)) && data[offset] == 0xf3 && data[offset+1] == 0x0f && data[offset+2] == 0x1e && (data[offset+3] == 0xfa || data[offset+3] == 0xfb) {
+	if len(data) >= 4 && data[0] == 0xf3 && data[1] == 0x0f && data[2] == 0x1e && (data[3] == 0xfa || data[3] == 0xfb) {
 		return x86asm.Inst{Op: x86asm.NOP, Len: 4}, true
 	}
-	inst, err := x86asm.Decode(data[offset:], s.profile.Mode)
+	inst, err := x86asm.Decode(data, s.profile.Mode)
 	if err != nil || inst.Len <= 0 {
 		return x86asm.Inst{}, false
 	}
@@ -196,8 +251,14 @@ func (s *boundaryScanner) decode(address uint64) (x86asm.Inst, bool) {
 }
 
 func (s *boundaryScanner) nextBoundary(address uint64) uint64 {
+	if len(s.pending) > 64 {
+		s.flushAddrs()
+	}
 	next := uint64(0)
-	for candidate := range s.entries {
+	if pos := sort.Search(len(s.sortedAddrs), func(i int) bool { return s.sortedAddrs[i] > address }); pos < len(s.sortedAddrs) {
+		next = s.sortedAddrs[pos]
+	}
+	for _, candidate := range s.pending {
 		if candidate > address && (next == 0 || candidate < next) {
 			next = candidate
 		}
@@ -341,17 +402,23 @@ func (s *boundaryScanner) indirectGOTTarget(inst x86asm.Inst, address uint64) (u
 }
 
 func (s *boundaryScanner) finishRanges() {
-	addresses := make([]uint64, 0, len(s.entries))
-	for address := range s.entries {
-		addresses = append(addresses, address)
-	}
-	sort.Slice(addresses, func(i, j int) bool { return addresses[i] < addresses[j] })
-	for _, address := range addresses {
+	s.flushAddrs()
+	for idx, address := range s.sortedAddrs {
 		entry := s.entries[address]
-		if entry.Size != 0 {
+		if entry == nil || entry.Size != 0 {
 			continue
 		}
-		if next := s.nextBoundary(address); next > address {
+		var next uint64
+		if idx+1 < len(s.sortedAddrs) {
+			next = s.sortedAddrs[idx+1]
+		}
+		if region := s.regionFor(address); region != nil {
+			end := region.Address + region.Size
+			if next == 0 || next > end {
+				next = end
+			}
+		}
+		if next > address {
 			entry.Size = next - address
 		}
 	}
@@ -388,12 +455,11 @@ func (s *boundaryScanner) scanGap(start, end uint64) {
 		if region == nil {
 			return
 		}
-		data := s.regionData(region)
-		offset := address - region.Address
-		if offset >= uint64(len(data)) {
+		data := s.readBytesAt(region, address, 1)
+		if len(data) == 0 {
 			return
 		}
-		if data[offset] == 0xcc || data[offset] == 0x90 || data[offset] == 0x00 {
+		if data[0] == 0xcc || data[0] == 0x90 || data[0] == 0x00 {
 			address++
 			continue
 		}
@@ -406,7 +472,7 @@ func (s *boundaryScanner) scanGap(start, end uint64) {
 			address++
 			continue
 		}
-		s.add(address, end-address, "", core.BoundaryScan, priorityScan)
+		s.add(address, 0, "", core.BoundaryScan, priorityScan)
 		address += 16
 	}
 }
