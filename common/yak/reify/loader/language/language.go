@@ -5,6 +5,8 @@ package language
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -145,16 +147,32 @@ func Of(a *core.Artifact) core.Language {
 // encoded name or the same display name, and is appended otherwise. The
 // container's exact size wins when it has one: a compiler table often records
 // the next entry, padding included.
+func isSyntheticSubName(name string, address uint64) bool {
+	if address == 0 || !strings.HasPrefix(name, "sub_0x") {
+		return false
+	}
+	return name == "sub_0x"+strconv.FormatUint(address, 16)
+}
+
 func mergeSymbols(a *core.Artifact, recovered []symbol.Symbol) {
 	type key struct {
 		name    string
 		address uint64
 	}
 	known := make(map[key]int, len(a.Image.Symbols))
+	var placeholderByAddr map[uint64]int
 	for i, s := range a.Image.Symbols {
 		known[key{s.Name, s.Address}] = i
 		if s.Mangled != "" {
 			known[key{s.Mangled, s.Address}] = i
+		}
+		if s.Source == "" && s.Mangled == "" && s.Kind == symbol.SymbolFunction && isSyntheticSubName(s.Name, s.Address) {
+			if placeholderByAddr == nil {
+				placeholderByAddr = make(map[uint64]int)
+			}
+			if _, exists := placeholderByAddr[s.Address]; !exists {
+				placeholderByAddr[s.Address] = i
+			}
 		}
 	}
 	for _, s := range recovered {
@@ -184,6 +202,26 @@ func mergeSymbols(a *core.Artifact, recovered []symbol.Symbol) {
 				existing.Kind = s.Kind
 			}
 			continue
+		}
+		if placeholderByAddr != nil {
+			if idx, hasPlaceholder := placeholderByAddr[s.Address]; hasPlaceholder {
+				existing := &a.Image.Symbols[idx]
+				keptSize := existing.Size
+				keptKind := existing.Kind
+				*existing = s
+				if keptSize != 0 {
+					existing.Size = keptSize
+				}
+				if existing.Kind == symbol.SymbolUnknown {
+					existing.Kind = keptKind
+				}
+				delete(placeholderByAddr, s.Address)
+				known[key{s.Name, s.Address}] = idx
+				if s.Mangled != "" {
+					known[key{s.Mangled, s.Address}] = idx
+				}
+				continue
+			}
 		}
 		known[key{s.Name, s.Address}] = len(a.Image.Symbols)
 		if s.Mangled != "" {

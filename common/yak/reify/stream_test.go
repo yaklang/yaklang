@@ -89,7 +89,7 @@ func TestLiftStreamMultiBatchAllModes(t *testing.T) {
 	}{
 		{reify.ModeASM, []string{"0x"}},
 		{reify.ModeLowIR, []string{"target:", "function ", "leaf_add"}},
-		{reify.ModeSSAIR, []string{"extern ", "combine", "leaf_add"}},
+		{reify.ModeSSAIR, []string{"type: ", "combine", "leaf_add"}},
 		{reify.ModeSource, []string{"leaf_add(", "combine(", "reify-stream-tag"}},
 	}
 
@@ -115,6 +115,13 @@ func TestLiftStreamMultiBatchAllModes(t *testing.T) {
 			require.True(t, strings.HasPrefix(text, "HEADER\n"), "missing header prefix: %q", text)
 			for _, want := range tc.contains {
 				require.Contains(t, text, want)
+			}
+			if tc.mode == reify.ModeSSAIR {
+				require.NotContains(t, text, "extern leaf_add\n")
+				require.NotContains(t, text, "extern combine\n")
+				if runtime.GOOS == "linux" {
+					require.Contains(t, text, "extern ")
+				}
 			}
 			if tc.mode == reify.ModeSource && runtime.GOOS != "darwin" {
 				require.Contains(t, text, "printf(")

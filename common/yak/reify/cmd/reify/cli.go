@@ -220,7 +220,7 @@ func (e *commandEnv) inspect(c *cli.Context) error {
 	}
 	defer func() { _ = artifact.Close() }()
 	if c.Bool("json") {
-		return writeJSON(e.stdout, inspectionReport{Scope: "metadata-only", Artifact: artifact, Parser: parser})
+		return writeInspectionJSON(e.stdout, inspectionReport{Scope: "metadata-only", Artifact: artifact, Parser: parser})
 	}
 	var text bytes.Buffer
 	fmt.Fprintln(&text, "Scope: metadata only; no disassembly or SSA")

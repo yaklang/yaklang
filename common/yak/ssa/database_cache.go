@@ -155,6 +155,12 @@ func (c *ProgramCache) MarkInstructionDirty(inst Instruction) {
 	}
 }
 
+// UsesResidentCache reports whether instructions use the single-resident
+// flush cache (as opposed to the async CompileUnitSplit writer).
+func (c *ProgramCache) UsesResidentCache() bool {
+	return c != nil && c.instructions != nil && c.instructions.residentCache != nil
+}
+
 func (c *ProgramCache) DeleteInstruction(inst Instruction) {
 	if c == nil || c.instructions == nil || utils.IsNil(inst) {
 		return

@@ -24,10 +24,34 @@ import (
 
 const (
 	defaultStreamBatchSize = 64
-	defaultSaveBatchSize   = 128
+	defaultSSABatchSize    = 32
+	defaultSaveBatchSize   = 256
 	defaultMaxWorkers      = 8
+	defaultSSAMaxWorkers   = 4
 	streamBufSize          = 256 * 1024
+	maxPooledBatchBufCap   = 4 << 20
+	largeProjectThreshold  = 16 << 20
 )
+
+var batchBufPool = sync.Pool{
+	New: func() any {
+		return new(bytes.Buffer)
+	},
+}
+
+func acquireBatchBuf() *bytes.Buffer {
+	buf := batchBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	return buf
+}
+
+func releaseBatchBuf(buf *bytes.Buffer) {
+	if buf == nil || buf.Cap() > maxPooledBatchBufCap {
+		return
+	}
+	buf.Reset()
+	batchBufPool.Put(buf)
+}
 
 // StreamHeader carries metadata available before LiftStream emits representation bytes.
 type StreamHeader struct {
@@ -148,8 +172,12 @@ func LiftStream(ctx context.Context, path string, w io.Writer, options ...Option
 		return nil
 	}
 
-	workers := resolveWorkers(settings.Workers)
+	workers := resolveWorkers(settings.Workers, defaultMaxWorkers)
 	batchSize := resolveBatchSize(settings.BatchSize, defaultStreamBatchSize)
+	if settings.Mode == ModeSSAIR || settings.Mode == ModeSource {
+		workers = resolveWorkers(settings.Workers, defaultSSAMaxWorkers)
+		batchSize = resolveBatchSize(settings.BatchSize, defaultSSABatchSize)
+	}
 
 	switch settings.Mode {
 	case ModeASM:
@@ -217,7 +245,7 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 	}
 
 	batchSize := resolveBatchSize(settings.BatchSize, defaultSaveBatchSize)
-	workers := resolveWorkers(settings.Workers)
+	workers := resolveWorkers(settings.Workers, defaultSSAMaxWorkers)
 	totalBatches := (len(boundaries) + batchSize - 1) / batchSize
 	stringAt := stringAtFunc(artifact)
 	baseConvertOpts := buildBaseConvertOptions(artifact, settings, ModeSSAIR)
@@ -234,12 +262,18 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 	cfg, err := ssaconfig.New(
 		ssaconfig.ModeSSACompile,
 		ssaconfig.WithSetProgramName(stagedName),
-		ssaconfig.WithCompileIrCacheMax(50000),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("save: invalid program config: %w", err)
 	}
 	cfg.SetCompileUnitSplit(true)
+	projectBytes := artifact.Origin.Size
+	if len(boundaries) > defaultSaveBatchSize && projectBytes < largeProjectThreshold {
+		projectBytes = largeProjectThreshold
+	}
+	if projectBytes > 0 {
+		cfg.SetCompileProjectBytes(projectBytes)
+	}
 	program := ssa.NewProgram(cfg, ssa.ProgramCacheDBWrite, ssa.Application, nil, "", 0)
 	program.Language = ssaconfig.C
 
@@ -269,14 +303,17 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 		start, end := batchBounds(len(boundaries), b, batchSize)
 		unitKey := fmt.Sprintf("reify-batch-%d", b)
 		program.BeginCompileUnit(unitKey)
+		program.Cache.DisableInstructionSpill()
 
 		parsed, err := asm2lowir.ParseBatch(ctx, artifact, boundaries, start, end, nextID, asmOptions...)
 		if err != nil {
+			program.Cache.EnableInstructionSpill()
 			program.EndCompileUnit()
 			return nil, err
 		}
 		res.Diagnostics = append(res.Diagnostics, parsed.Diagnostics...)
 		if len(parsed.IR.Functions) == 0 {
+			program.Cache.EnableInstructionSpill()
 			program.EndCompileUnit()
 			continue
 		}
@@ -289,6 +326,7 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 		funcs, convDiags, err := lowir2ssa.ConvertInto(ctx, program, parsed.IR, convertOptions...)
 		parsed = nil
 		if err != nil {
+			program.Cache.EnableInstructionSpill()
 			program.EndCompileUnit()
 			return nil, err
 		}
@@ -296,6 +334,7 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 
 		if totalBatches == 1 && summary == nil {
 			if err := applySSAPasses(program, artifact, settings.SSAPasses); err != nil {
+				program.Cache.EnableInstructionSpill()
 				program.EndCompileUnit()
 				return nil, err
 			}
@@ -306,12 +345,14 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 				activeSummary.Finalize()
 			}
 			if err := activeSummary.ApplyFunctions(funcs, stringAt, settings.SSAPasses...); err != nil {
+				program.Cache.EnableInstructionSpill()
 				program.EndCompileUnit()
 				return nil, err
 			}
 		}
 		ssa2source.AnnotateFunctions(funcs, artifact)
 		program.FlushFunctions(funcs)
+		program.Cache.EnableInstructionSpill()
 		program.EndCompileUnit()
 
 		program.DetachFinishedFunctionBodyScopes()
@@ -319,7 +360,10 @@ func Save(ctx context.Context, path, stagedName string, options ...Option) (*Sav
 		program.Cache.FlushInstructionSaver()
 		program.ReleasePersistedOrdinaryValues()
 		program.Cache.FlushAuxSavers()
-		program.CheckMemoryPressure(b, totalBatches)
+		program.Cache.FlushInstructionSaver()
+		program.ReleasePersistedOrdinaryValues()
+		program.ReleaseSettledIndexes()
+		program.CheckMemoryPressure(b+1, totalBatches)
 	}
 
 	if res.Functions == 0 {
@@ -495,7 +539,7 @@ func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error
 	}
 
 	type renderedBatch struct {
-		body        bytes.Buffer
+		body        *bytes.Buffer
 		externs     []string
 		funcs       int
 		srcFuncs    int
@@ -556,20 +600,27 @@ func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error
 			}
 			ssa2source.AnnotateFunctions(funcs, artifact)
 
+			buf := acquireBatchBuf()
 			for _, fn := range funcs {
 				if settings.Mode == ModeSSAIR {
-					if err := ssairtext.FormatTo(&chunk.body, fn); err != nil {
+					if err := ssairtext.FormatTo(buf, fn); err != nil {
+						releaseBatchBuf(buf)
 						return nil, err
 					}
 				} else {
-					if err := ssa2source.RenderFunctionTo(&chunk.body, fn); err != nil {
+					if err := ssa2source.RenderFunctionTo(buf, fn); err != nil {
+						releaseBatchBuf(buf)
 						return nil, err
 					}
 				}
 			}
+			chunk.body = buf
 			return chunk, nil
 		},
 		func(_ int, chunk *renderedBatch) error {
+			if chunk.body != nil {
+				defer releaseBatchBuf(chunk.body)
+			}
 			res.Diagnostics = append(res.Diagnostics, chunk.diagnostics...)
 			if settings.Mode == ModeSource {
 				res.Functions += chunk.srcFuncs
@@ -591,8 +642,8 @@ func streamSSAOrSource(ctx context.Context, w io.Writer, emitHeader func() error
 					}
 				}
 			}
-			if chunk.body.Len() > 0 {
-				_, err := io.Copy(w, &chunk.body)
+			if chunk.body != nil && chunk.body.Len() > 0 {
+				_, err := chunk.body.WriteTo(w)
 				return err
 			}
 			return nil
@@ -760,7 +811,7 @@ func validateSSAPasses(names []string) error {
 	return nil
 }
 
-func resolveWorkers(workers int) int {
+func resolveWorkers(workers, maxDefault int) int {
 	if workers > 0 {
 		return workers
 	}
@@ -768,8 +819,8 @@ func resolveWorkers(workers int) int {
 	if n < 1 {
 		return 1
 	}
-	if n > defaultMaxWorkers {
-		return defaultMaxWorkers
+	if n > maxDefault {
+		return maxDefault
 	}
 	return n
 }

@@ -437,6 +437,12 @@ func parseGo118TableDirect(a *core.Artifact, s core.Section, relOffset uint64, o
 	if err != nil {
 		return nil, fmt.Errorf("read pclntab funcnametab: %w", err)
 	}
+	// Copy funcnametab once into an immutable string pool so every function name
+	// and ParseInstance substring slices a single contiguous allocation instead of
+	// creating ~200K small heap strings.
+	namePool := string(funcnametab)
+	funcnametab = nil
+
 	functab, err := a.Reader.Bytes(headerFileOff+tables.pclnTable, functabBytes)
 	if err != nil {
 		return nil, fmt.Errorf("read pclntab functab: %w", err)
@@ -468,14 +474,14 @@ func parseGo118TableDirect(a *core.Artifact, s core.Section, relOffset uint64, o
 			return nil, fmt.Errorf("truncated pclntab funcdata at 0x%x", entry)
 		}
 		nameOff := order.Uint32(info[4:8])
-		if uint64(nameOff) >= uint64(len(funcnametab)) {
+		if uint64(nameOff) >= uint64(len(namePool)) {
 			return nil, fmt.Errorf("invalid pclntab name offset at 0x%x", entry)
 		}
-		nul := bytes.IndexByte(funcnametab[nameOff:], 0)
+		nul := strings.IndexByte(namePool[nameOff:], 0)
 		if nul <= 0 {
 			return nil, fmt.Errorf("invalid pclntab function at 0x%x", entry)
 		}
-		rawName := string(funcnametab[nameOff : uint64(nameOff)+uint64(nul)])
+		rawName := namePool[nameOff : uint64(nameOff)+uint64(nul)]
 		var execWin *slidingWindow
 		if execWins != nil {
 			if execWins[regionIdx] == nil {

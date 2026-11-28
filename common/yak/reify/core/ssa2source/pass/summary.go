@@ -8,16 +8,31 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-// FunctionSummary stores compact inter-procedural facts (~48 bytes per function)
+const (
+	fsWeakReturn uint8 = 1 << iota
+	fsHasValue
+	fsReturnsPtr
+	fsAllInt
+	fsIsVoid
+	fsRetKindShift = 5
+	fsRetKindMask  = 7 << fsRetKindShift
+)
+
+// FunctionSummary stores compact inter-procedural facts (4 bytes per entry)
 // extracted during streaming Pass 1 so Pass 2 and chunked CompileUnit Save can
 // run full inter-procedural passes without keeping every function's SSA body resident.
 type FunctionSummary struct {
 	Arity        uint8
-	WeakReturn   bool
-	HasValue     bool
-	ReturnsPtr   bool
-	AllInt       bool
+	Flags        uint8
 	StringParams uint16 // bit i set when formal param i has string/char* type
+}
+
+func (fs FunctionSummary) returnKind() returnKind {
+	return returnKind((fs.Flags & fsRetKindMask) >> fsRetKindShift)
+}
+
+func (fs *FunctionSummary) setReturnKind(k returnKind) {
+	fs.Flags = (fs.Flags &^ fsRetKindMask) | ((uint8(k) & 7) << fsRetKindShift)
 }
 
 type returnKind uint8
@@ -33,12 +48,9 @@ const (
 // ProgramSummary aggregates lightweight whole-program SSA facts across batches.
 type ProgramSummary struct {
 	Funcs       map[string]FunctionSummary
-	UsedResults map[string]bool
-	PtrCallers  map[string][]string // callee -> callers whose return value can flow from callee
 	Externs     map[string]bool
-	VoidFuncs   map[string]bool
-	ReturnPtrs  map[string]bool
-	ReturnTypes map[string]returnKind
+	UsedResults map[string]bool     // temporary Pass-1 state, released in Finalize
+	PtrCallers  map[string][]string // temporary Pass-1 state, released in Finalize
 	finalized   bool
 }
 
@@ -95,9 +107,8 @@ func (s *ProgramSummary) CollectFunctions(functions []*ssa.Function) {
 		}
 		name := fn.GetName()
 		fs := FunctionSummary{
-			Arity:      uint8(usedArity(fn)),
-			WeakReturn: true,
-			AllInt:     true,
+			Arity: uint8(usedArity(fn)),
+			Flags: fsWeakReturn | fsAllInt,
 		}
 		var paramMask uint16
 		for _, id := range fn.Params {
@@ -117,31 +128,30 @@ func (s *ProgramSummary) CollectFunctions(functions []*ssa.Function) {
 
 		returns := functionReturns(fn)
 		if len(returns) == 0 {
-			fs.WeakReturn = true
-			fs.HasValue = false
+			fs.Flags &^= fsHasValue | fsAllInt
 		} else {
 			for _, ret := range returns {
 				vals := ret.GetValues()
 				if len(vals) == 0 {
 					continue
 				}
-				fs.HasValue = true
+				fs.Flags |= fsHasValue
 				for _, v := range vals {
 					if !weakReturnValue(v) {
-						fs.WeakReturn = false
+						fs.Flags &^= fsWeakReturn
 					}
 					typ := v.GetType()
 					if isPointerType(typ) || isPointerSSAType(typ) {
-						fs.ReturnsPtr = true
+						fs.Flags |= fsReturnsPtr
 					}
 					if typ == nil || !isIntegerSSAType(typ) {
-						fs.AllInt = false
+						fs.Flags &^= fsAllInt
 					}
 				}
 			}
 		}
-		if !fs.HasValue {
-			fs.AllInt = false
+		if fs.Flags&fsHasValue == 0 {
+			fs.Flags &^= fsAllInt
 		}
 		s.Funcs[name] = fs
 
@@ -193,6 +203,32 @@ func (s *ProgramSummary) Merge(other *ProgramSummary) {
 	}
 }
 
+// ReturnsPointer reports whether summary recorded a pointer return for name.
+func (s *ProgramSummary) ReturnsPointer(name string) bool {
+	if s == nil {
+		return false
+	}
+	fs, ok := s.Funcs[name]
+	return ok && fs.Flags&fsReturnsPtr != 0
+}
+
+// IsVoid reports whether summary classified name as a void-returning function.
+func (s *ProgramSummary) IsVoid(name string) bool {
+	if s == nil {
+		return false
+	}
+	fs, ok := s.Funcs[name]
+	return ok && fs.Flags&fsIsVoid != 0
+}
+
+// ReturnKind returns the finalized return type category for name.
+func (s *ProgramSummary) ReturnKind(name string) returnKind {
+	if s == nil {
+		return retKindUnknown
+	}
+	return s.Funcs[name].returnKind()
+}
+
 // Finalize solves cross-function pointer return propagation and classifies void
 // and return types across the whole program summary.
 func (s *ProgramSummary) Finalize() {
@@ -200,24 +236,27 @@ func (s *ProgramSummary) Finalize() {
 		return
 	}
 	s.finalized = true
-	s.VoidFuncs = make(map[string]bool)
-	s.ReturnPtrs = make(map[string]bool)
-	s.ReturnTypes = make(map[string]returnKind, len(s.Funcs))
+
+	// Cross-batch internal calls create placeholder extern stubs in isolated Pass-1
+	// batches. Strip any symbol whose body was recovered from Externs.
+	for name := range s.Funcs {
+		delete(s.Externs, name)
+	}
 
 	// Seed pointer returners and propagate across PtrCallers via BFS.
 	var queue []string
 	for name, fs := range s.Funcs {
-		if fs.ReturnsPtr {
-			s.ReturnPtrs[name] = true
+		if fs.Flags&fsReturnsPtr != 0 {
 			queue = append(queue, name)
 		}
 	}
-	for len(queue) > 0 {
-		callee := queue[0]
-		queue = queue[1:]
+	for head := 0; head < len(queue); head++ {
+		callee := queue[head]
 		for _, caller := range s.PtrCallers[callee] {
-			if !s.ReturnPtrs[caller] {
-				s.ReturnPtrs[caller] = true
+			fs, ok := s.Funcs[caller]
+			if ok && fs.Flags&fsReturnsPtr == 0 {
+				fs.Flags |= fsReturnsPtr
+				s.Funcs[caller] = fs
 				queue = append(queue, caller)
 			}
 		}
@@ -227,23 +266,23 @@ func (s *ProgramSummary) Finalize() {
 		if _, known := symbol.Lookup(name); known {
 			continue
 		}
-		if !fs.HasValue || (fs.WeakReturn && !s.UsedResults[name]) {
-			s.VoidFuncs[name] = true
-			s.ReturnTypes[name] = retKindNull
-			continue
+		hasValue := fs.Flags&fsHasValue != 0
+		weakReturn := fs.Flags&fsWeakReturn != 0
+		if !hasValue || (weakReturn && !s.UsedResults[name]) {
+			fs.Flags |= fsIsVoid
+			fs.setReturnKind(retKindNull)
+		} else if fs.Flags&fsReturnsPtr != 0 {
+			fs.setReturnKind(retKindPtr64)
+		} else if fs.Flags&fsAllInt != 0 {
+			fs.setReturnKind(retKindI64)
+		} else {
+			fs.setReturnKind(retKindAny)
 		}
-		if s.ReturnPtrs[name] {
-			s.ReturnTypes[name] = retKindPtr64
-			continue
-		}
-		if fs.AllInt {
-			s.ReturnTypes[name] = retKindI64
-			continue
-		}
-		s.ReturnTypes[name] = retKindAny
+		s.Funcs[name] = fs
 	}
-	// Release raw dependency adjacency once finalized.
+	// Release raw Pass-1 state once finalized.
 	s.PtrCallers = nil
+	s.UsedResults = nil
 }
 
 // ApplyFunctions runs the requested (or default) SSA preparation passes on
@@ -263,11 +302,11 @@ func (s *ProgramSummary) ApplyFunctions(functions []*ssa.Function, stringAt func
 		case "apply-function-define":
 			applyFunctionDefineOn(functions)
 		case "infer-types":
-			var seed map[string]bool
+			var sharedReturnsPtr func(string) bool
 			if s != nil {
-				seed = s.ReturnPtrs
+				sharedReturnsPtr = s.ReturnsPointer
 			}
-			inferTypesOn(functions, seed)
+			inferTypesOn(functions, sharedReturnsPtr)
 		case "trim-internal-calls":
 			s.trimInternalCallsOn(functions)
 		case "mark-void-returns":
@@ -332,7 +371,7 @@ func (s *ProgramSummary) markVoidReturnsOn(functions []*ssa.Function) {
 		return
 	}
 	for _, fn := range functions {
-		if fn == nil || fn.IsExtern() || !s.VoidFuncs[fn.GetName()] {
+		if fn == nil || fn.IsExtern() || !s.IsVoid(fn.GetName()) {
 			continue
 		}
 		for _, id := range fn.Blocks {
@@ -355,7 +394,7 @@ func (s *ProgramSummary) markVoidReturnsOn(functions []*ssa.Function) {
 		}
 	}
 	eachCallInFunctions(functions, func(_ *ssa.Function, call *ssa.Call) {
-		if s.VoidFuncs[internalCallName(call)] {
+		if s.IsVoid(internalCallName(call)) {
 			call.SetType(ssa.CreateNullType())
 		}
 	})
@@ -383,14 +422,14 @@ func (s *ProgramSummary) refineReturnTypesOn(functions []*ssa.Function) {
 		if fn == nil || fn.IsExtern() || fn.Type == nil {
 			continue
 		}
-		if k, ok := s.ReturnTypes[fn.GetName()]; ok {
+		if k := s.ReturnKind(fn.GetName()); k != retKindUnknown {
 			if t := typeForKind(k); t != nil {
 				fn.Type.ReturnType = t
 			}
 		}
 	}
 	eachCallInFunctions(functions, func(_ *ssa.Function, call *ssa.Call) {
-		if k, ok := s.ReturnTypes[internalCallName(call)]; ok {
+		if k := s.ReturnKind(internalCallName(call)); k != retKindUnknown {
 			if t := typeForKind(k); t != nil {
 				call.SetType(t)
 			}
@@ -507,7 +546,7 @@ func applyFunctionDefineOn(functions []*ssa.Function) {
 	})
 }
 
-func inferTypesOn(functions []*ssa.Function, sharedPtrs map[string]bool) {
+func inferTypesOn(functions []*ssa.Function, sharedReturnsPtr func(string) bool) {
 	localPtrs := make(map[string]bool, len(functions))
 	for round := 0; round < 12; round++ {
 		roundChanged := false
@@ -516,15 +555,17 @@ func inferTypesOn(functions []*ssa.Function, sharedPtrs map[string]bool) {
 				continue
 			}
 			name := function.GetName()
-			if !localPtrs[name] && !sharedPtrs[name] && functionReturnsPointer(function) {
+			isPtr := localPtrs[name] || (sharedReturnsPtr != nil && sharedReturnsPtr(name))
+			if !isPtr && functionReturnsPointer(function) {
 				localPtrs[name] = true
+				isPtr = true
 				roundChanged = true
 			}
-			if (localPtrs[name] || sharedPtrs[name]) && markReturnNulls(function) {
+			if isPtr && markReturnNulls(function) {
 				roundChanged = true
 			}
 			eachFunctionValue(function, func(value ssa.Value) {
-				if inferValueWith(value, localPtrs, sharedPtrs) {
+				if inferValueWith(value, localPtrs, sharedReturnsPtr) {
 					roundChanged = true
 				}
 			})

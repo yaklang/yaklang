@@ -84,12 +84,16 @@ func (p *Program) FlushFunctions(functions []*Function) {
 	if p == nil || p.Cache == nil {
 		return
 	}
+	markDirty := p.Cache.UsesResidentCache()
 	for _, function := range functions {
 		if function == nil {
 			continue
 		}
 		if name := function.GetName(); name != "" {
 			p.Cache.AddVariable(name, function)
+		}
+		if !markDirty {
+			continue
 		}
 		p.Cache.MarkInstructionDirty(function)
 		for _, paramID := range function.Params {

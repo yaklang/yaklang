@@ -92,7 +92,9 @@ func renderOneFunction(w io.Writer, text *strings.Builder, function *ssa.Functio
 	return err
 }
 
-var sourceValueID = regexp.MustCompile(`\bv(\d+)\b`)
+func isSourceWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
 
 // renumberSource maps program-global IDs to the same per-function sequence as
 // SSAIR text: parameters, then phis and instructions in block order.
@@ -126,19 +128,39 @@ func renumberSource(function *ssa.Function, source string) string {
 			add(id)
 		}
 	}
-	return sourceValueID.ReplaceAllStringFunc(source, func(match string) string {
-		raw, err := strconv.ParseInt(match[1:], 10, 64)
-		if err != nil {
-			return match
+	var out strings.Builder
+	out.Grow(len(source))
+	var numBuf [24]byte
+	lastCopied := 0
+	for i := 0; i < len(source); {
+		if source[i] == 'v' && (i == 0 || !isSourceWordByte(source[i-1])) && i+1 < len(source) && source[i+1] >= '0' && source[i+1] <= '9' {
+			j := i + 1
+			for j < len(source) && source[j] >= '0' && source[j] <= '9' {
+				j++
+			}
+			if j == len(source) || !isSourceWordByte(source[j]) {
+				if raw, err := strconv.ParseInt(source[i+1:j], 10, 64); err == nil {
+					mapped, ok := ids[raw]
+					if !ok {
+						mapped = next
+						next++
+						ids[raw] = mapped
+					}
+					out.WriteString(source[lastCopied:i])
+					out.WriteByte('v')
+					out.Write(strconv.AppendInt(numBuf[:0], mapped, 10))
+					lastCopied = j
+					i = j
+					continue
+				}
+			}
 		}
-		mapped, ok := ids[raw]
-		if !ok {
-			mapped = next
-			next++
-			ids[raw] = mapped
-		}
-		return fmt.Sprintf("v%d", mapped)
-	})
+		i++
+	}
+	if lastCopied < len(source) {
+		out.WriteString(source[lastCopied:])
+	}
+	return out.String()
 }
 
 func renderFunction(text *strings.Builder, function *ssa.Function) {

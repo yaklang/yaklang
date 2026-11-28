@@ -2,6 +2,7 @@ package pass_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
@@ -77,6 +78,15 @@ block b3 @ 0x3000
 	}
 	summary.Finalize()
 
+	if !summary.Externs["malloc"] || !summary.Externs["puts"] {
+		t.Fatalf("expected malloc/puts in Externs, got: %+v", summary.Externs)
+	}
+	for _, internal := range []string{"make_ptr", "wrap_ptr", "caller"} {
+		if summary.Externs[internal] {
+			t.Fatalf("internal function %q leaked into Externs: %+v", internal, summary.Externs)
+		}
+	}
+
 	irPass2, err := lowirtext.Parse(src)
 	if err != nil {
 		t.Fatal(err)
@@ -102,4 +112,38 @@ block b3 @ 0x3000
 	if gotSource != wantSource {
 		t.Fatalf("summary pass mismatch:\n--- want ---\n%s\n--- got ---\n%s", wantSource, gotSource)
 	}
+
+	// Verify concurrent ApplyFunctions calls against finalized summary are race-free.
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			irConcurrent, err := lowirtext.Parse(src)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			convConcurrent, err := lowir2ssa.Convert(context.Background(), irConcurrent)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			var cFuncs []*ssa.Function
+			convConcurrent.Program.Funcs.ForEach(func(_ string, fn *ssa.Function) bool {
+				if fn != nil && !fn.IsExtern() {
+					cFuncs = append(cFuncs, fn)
+				}
+				return true
+			})
+			if err := summary.ApplyFunctions(cFuncs, stringAt); err != nil {
+				t.Error(err)
+				return
+			}
+			if _, err := ssa2source.Render(context.Background(), convConcurrent.Program); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
 }

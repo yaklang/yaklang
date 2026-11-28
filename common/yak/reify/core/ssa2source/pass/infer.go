@@ -116,7 +116,7 @@ func inferValue(value ssa.Value, returnPointer map[string]bool) bool {
 	return inferValueWith(value, returnPointer, nil)
 }
 
-func inferValueWith(value ssa.Value, localPtrs, sharedPtrs map[string]bool) bool {
+func inferValueWith(value ssa.Value, localPtrs map[string]bool, sharedReturnsPtr func(string) bool) bool {
 	changed := false
 	switch typed := value.(type) {
 	case *ssa.Call:
@@ -138,7 +138,7 @@ func inferValueWith(value ssa.Value, localPtrs, sharedPtrs map[string]bool) bool
 					changed = true
 				}
 			}
-		} else if (localPtrs[name] || sharedPtrs[name]) && setPointer(typed) {
+		} else if (localPtrs[name] || (sharedReturnsPtr != nil && sharedReturnsPtr(name))) && setPointer(typed) {
 			changed = true
 		}
 	case *ssa.BinOp:

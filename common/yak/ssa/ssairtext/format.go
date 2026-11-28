@@ -3,23 +3,86 @@ package ssairtext
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-var (
-	ssairAssignment      = regexp.MustCompile(`^\t(?:<([^>]+)>\s+)?(t\d+)\s+=\s+(.*)$`)
-	ssairRenumberPattern = regexp.MustCompile(`\bt(\d+)\b|\((\d+)\)`)
-)
+func isRE2Space(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
+}
+
+func isRE2Word(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
+
+// parseAssignmentLine parses a line matching `^\t(?:<([^>]+)>\s+)?(t\d+)\s+=\s+(.*)$`.
+func parseAssignmentLine(line string) (typeName, name, right string, ok bool) {
+	if len(line) < 6 || line[0] != '\t' {
+		return "", "", "", false
+	}
+	pos := 1
+	if line[pos] == '<' {
+		closeIdx := strings.IndexByte(line[pos+1:], '>')
+		if closeIdx <= 0 {
+			return "", "", "", false
+		}
+		typeName = line[pos+1 : pos+1+closeIdx]
+		pos = pos + 1 + closeIdx + 1
+		wsStart := pos
+		for pos < len(line) && isRE2Space(line[pos]) {
+			pos++
+		}
+		if pos == wsStart {
+			return "", "", "", false
+		}
+	}
+	if pos >= len(line) || line[pos] != 't' {
+		return "", "", "", false
+	}
+	nameStart := pos
+	pos++
+	if pos >= len(line) || line[pos] < '0' || line[pos] > '9' {
+		return "", "", "", false
+	}
+	for pos < len(line) && line[pos] >= '0' && line[pos] <= '9' {
+		pos++
+	}
+	name = line[nameStart:pos]
+	ws1 := pos
+	for pos < len(line) && isRE2Space(line[pos]) {
+		pos++
+	}
+	if pos == ws1 || pos >= len(line) || line[pos] != '=' {
+		return "", "", "", false
+	}
+	pos++
+	ws2 := pos
+	for pos < len(line) && isRE2Space(line[pos]) {
+		pos++
+	}
+	if pos == ws2 {
+		return "", "", "", false
+	}
+	return typeName, name, line[pos:], true
+}
 
 // Format renders a function with one type on every assigned value and an
 // aligned '=' column. Block names use '_' instead of '-'.
 func Format(function *ssa.Function) string {
 	if function == nil {
 		return ""
+	}
+	var output strings.Builder
+	_ = formatInto(&output, function)
+	return output.String()
+}
+
+func formatInto(dst *strings.Builder, function *ssa.Function) error {
+	if function == nil {
+		return nil
 	}
 	var prefix strings.Builder
 	if boundary := function.GetVerboseName(); strings.HasPrefix(boundary, "boundary:") {
@@ -32,20 +95,24 @@ func Format(function *ssa.Function) string {
 		raw = formatHeader(function)
 	}
 	lines := strings.Split(strings.TrimSuffix(raw, "\n"), "\n")
-	blockNames := make([]string, 0, len(function.Blocks))
+	var blockNames []string
 	for _, id := range function.Blocks {
 		block, ok := function.GetBasicBlockByID(id)
 		if !ok || block == nil {
 			continue
 		}
-		blockNames = append(blockNames, block.GetName())
-	}
-	sort.Slice(blockNames, func(i, j int) bool { return len(blockNames[i]) > len(blockNames[j]) })
-	replaceNames := func(line string) string {
-		for _, name := range blockNames {
-			line = strings.ReplaceAll(line, name, strings.ReplaceAll(name, "-", "_"))
+		if name := block.GetName(); strings.ContainsRune(name, '-') {
+			blockNames = append(blockNames, name)
 		}
-		return line
+	}
+	var blockReplacer *strings.Replacer
+	if len(blockNames) > 0 {
+		sort.Slice(blockNames, func(i, j int) bool { return len(blockNames[i]) > len(blockNames[j]) })
+		pairs := make([]string, 0, len(blockNames)*2)
+		for _, name := range blockNames {
+			pairs = append(pairs, name, strings.ReplaceAll(name, "-", "_"))
+		}
+		blockReplacer = strings.NewReplacer(pairs...)
 	}
 
 	type formatted struct {
@@ -57,14 +124,17 @@ func Format(function *ssa.Function) string {
 	items := make([]formatted, 0, len(lines))
 	width := 0
 	for _, line := range lines {
-		line = strings.ReplaceAll(replaceNames(line), "type-case", "type_cast")
-		match := ssairAssignment.FindStringSubmatch(line)
-		if match == nil {
+		if blockReplacer != nil {
+			line = blockReplacer.Replace(line)
+		}
+		if strings.Contains(line, "type-case") {
+			line = strings.ReplaceAll(line, "type-case", "type_cast")
+		}
+		typeName, name, right, matched := parseAssignmentLine(line)
+		if !matched {
 			items = append(items, formatted{raw: line})
 			continue
 		}
-		name := match[2]
-		typeName := match[1]
 		if typeName == "" {
 			if value, ok := function.GetValueById(parseID(name)); ok && value != nil && value.GetType() != nil {
 				typeName = value.GetType().String()
@@ -73,52 +143,109 @@ func Format(function *ssa.Function) string {
 		if typeName == "" {
 			typeName = "any"
 		}
-		left := fmt.Sprintf("<%s> %s", typeName, name)
+		left := "<" + typeName + "> " + name
 		if len(left) > width {
 			width = len(left)
 		}
-		items = append(items, formatted{left: left, right: match[3], assign: true})
+		items = append(items, formatted{left: left, right: right, assign: true})
 	}
-	var output strings.Builder
-	output.WriteString(prefix.String())
+	var preRenumber strings.Builder
+	preRenumber.Grow(len(raw) + prefix.Len() + 64)
+	preRenumber.WriteString(prefix.String())
 	for _, item := range items {
 		if !item.assign {
 			if item.raw == "type: () -> null" {
 				item.raw = "type: () -> void"
 			}
-			output.WriteString(item.raw)
-			output.WriteByte('\n')
+			preRenumber.WriteString(item.raw)
+			preRenumber.WriteByte('\n')
 			continue
 		}
-		fmt.Fprintf(&output, "\t%-*s = %s\n", width, item.left, item.right)
+		preRenumber.WriteByte('\t')
+		preRenumber.WriteString(item.left)
+		for pad := width - len(item.left); pad > 0; pad-- {
+			preRenumber.WriteByte(' ')
+		}
+		preRenumber.WriteString(" = ")
+		preRenumber.WriteString(item.right)
+		preRenumber.WriteByte('\n')
 	}
-	return renumberIDs(output.String())
+	renumberIDsInto(dst, preRenumber.String())
+	return nil
 }
 
 func renumberIDs(text string) string {
-	// Match a value reference as a whole token. A type name such as int32 also
-	// contains t32, and a substring match would rewrite the type.
+	var out strings.Builder
+	renumberIDsInto(&out, text)
+	return out.String()
+}
+
+func renumberIDsInto(out *strings.Builder, text string) {
+	// Match `\bt(\d+)\b` or `\((\d+)\)` in a single pass so type names such as
+	// int32 (where 't' is preceded by word char 'n') are left untouched.
+	out.Grow(len(text))
 	next := int64(1)
 	ids := make(map[int64]int64)
-	return ssairRenumberPattern.ReplaceAllStringFunc(text, func(match string) string {
-		sub := ssairRenumberPattern.FindStringSubmatch(match)
-		var raw int64
-		if sub[1] != "" {
-			fmt.Sscanf(sub[1], "%d", &raw)
-		} else {
-			fmt.Sscanf(sub[2], "%d", &raw)
+	var numBuf [24]byte
+	lastCopied := 0
+	for i := 0; i < len(text); {
+		switch text[i] {
+		case 't':
+			if (i == 0 || !isRE2Word(text[i-1])) && i+1 < len(text) && text[i+1] >= '0' && text[i+1] <= '9' {
+				j := i + 1
+				for j < len(text) && text[j] >= '0' && text[j] <= '9' {
+					j++
+				}
+				if j == len(text) || !isRE2Word(text[j]) {
+					if raw, err := strconv.ParseInt(text[i+1:j], 10, 64); err == nil {
+						mapped, ok := ids[raw]
+						if !ok {
+							mapped = next
+							next++
+							ids[raw] = mapped
+						}
+						out.WriteString(text[lastCopied:i])
+						out.WriteByte('t')
+						out.Write(strconv.AppendInt(numBuf[:0], mapped, 10))
+						lastCopied = j
+						i = j
+						continue
+					}
+				}
+			}
+			i++
+		case '(':
+			if i+1 < len(text) && text[i+1] >= '0' && text[i+1] <= '9' {
+				j := i + 1
+				for j < len(text) && text[j] >= '0' && text[j] <= '9' {
+					j++
+				}
+				if j < len(text) && text[j] == ')' {
+					if raw, err := strconv.ParseInt(text[i+1:j], 10, 64); err == nil {
+						mapped, ok := ids[raw]
+						if !ok {
+							mapped = next
+							next++
+							ids[raw] = mapped
+						}
+						out.WriteString(text[lastCopied:i])
+						out.WriteByte('(')
+						out.Write(strconv.AppendInt(numBuf[:0], mapped, 10))
+						out.WriteByte(')')
+						lastCopied = j + 1
+						i = j + 1
+						continue
+					}
+				}
+			}
+			i++
+		default:
+			i++
 		}
-		mapped, ok := ids[raw]
-		if !ok {
-			mapped = next
-			next++
-			ids[raw] = mapped
-		}
-		if sub[1] != "" {
-			return fmt.Sprintf("t%d", mapped)
-		}
-		return fmt.Sprintf("(%d)", mapped)
-	})
+	}
+	if lastCopied < len(text) {
+		out.WriteString(text[lastCopied:])
+	}
 }
 
 func formatHeader(function *ssa.Function) string {
@@ -148,8 +275,13 @@ func formatHeader(function *ssa.Function) string {
 }
 
 func parseID(name string) int64 {
-	var id int64
-	_, _ = fmt.Sscanf(name, "t%d", &id)
+	if !strings.HasPrefix(name, "t") {
+		return 0
+	}
+	id, err := strconv.ParseInt(name[1:], 10, 64)
+	if err != nil {
+		return 0
+	}
 	return id
 }
 
@@ -158,7 +290,9 @@ func FormatTo(w io.Writer, function *ssa.Function) error {
 	if function == nil {
 		return nil
 	}
-	_, err := io.WriteString(w, Format(function))
+	var output strings.Builder
+	_ = formatInto(&output, function)
+	_, err := io.WriteString(w, output.String())
 	return err
 }
 
