@@ -36,7 +36,7 @@
 #
 #   3. 模式匹配模式（--pattern）:
 #      - .github/workflows/diff-code-check.yml
-#        位置: 第 134 行
+#        位置: 第 163 行
 #        模式: 'alpha|beta'
 #        用途: 在代码差异检查中，选择最新的 alpha 或 beta 版本
 #
@@ -117,7 +117,7 @@ while [[ $# -gt 0 ]]; do
        用途: 在交叉构建流程中静默获取版本
 
   3. 模式匹配模式（--pattern）:
-     - .github/workflows/diff-code-check.yml (第 134 行)
+     - .github/workflows/diff-code-check.yml (第 163 行)
        模式: 'alpha|beta'
        用途: 在代码差异检查中，选择最新的 alpha 或 beta 版本
 
