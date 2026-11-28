@@ -254,6 +254,27 @@ func TestLoadPEExports(t *testing.T) {
 	}
 }
 
+func TestPEReadRVAStaysWithinRawSection(t *testing.T) {
+	raw := fixture(t, fixtureOptions{exports: true})
+	reader := newReader(t, raw)
+	file, err := pe.NewFile(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	section := file.Section(".edata")
+	section.VirtualSize = section.Size + 4
+	end := section.VirtualAddress + section.Size
+	data, err := peReadRVA(reader, file, end-2, 4)
+	if err != nil || len(data) != 2 {
+		t.Fatalf("expected the last two raw bytes, got %d bytes and error %v", len(data), err)
+	}
+	if _, err := peReadRVA(reader, file, end, 4); err == nil {
+		t.Fatal("expected an error for the zero-filled virtual tail")
+	}
+}
+
 func TestLoadPEImports(t *testing.T) {
 	raw := fixture(t, fixtureOptions{imports: true})
 	artifact, err := Loader{}.Load(context.Background(), newReader(t, raw))

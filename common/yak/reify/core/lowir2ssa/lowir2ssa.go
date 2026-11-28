@@ -532,6 +532,9 @@ func (c *converter) convertInstruction(instruction core.Instruction) {
 	case core.OpConstant:
 		c.setResult(instruction, c.constValue(firstOperand(instruction.Operands)))
 	case core.OpCopy:
+		if len(instruction.Results) == 0 {
+			return
+		}
 		value := c.operandValue(firstOperand(instruction.Operands))
 		if value == nil {
 			c.setResult(instruction, c.opaqueValue("copy", instruction))

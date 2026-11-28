@@ -113,16 +113,24 @@ func TestFunctionSelectionUsesTheDiscoveredBoundary(t *testing.T) {
 	parser := &thumbSymbolParser{}
 	artifact := testArtifact(t, parser)
 	artifact.Target = core.Target{OS: core.OSLinux, Architecture: core.ArchARM, Bits: 32, ByteOrder: core.LittleEndian}
-	artifact.Image.Symbols = []sym.Symbol{{Name: "thumb_func", Address: 0x1001, Size: 4, Kind: sym.SymbolFunction}}
+	artifact.Image.Symbols = []sym.Symbol{
+		{Name: "thumb_func", Address: 0x1001, Size: 4, Kind: sym.SymbolFunction},
+		{Name: "thumb_alias", Address: 0x1001, Size: 4, Kind: sym.SymbolFunction},
+	}
 	artifact.Hints = &core.BoundaryHints{ExecSections: []core.Region{{Address: 0x1000, Size: 16}}}
 
-	if _, err := Parse(context.Background(), artifact, WithFunction("thumb_func")); err != nil {
-		t.Fatal(err)
-	}
-	if parser.address != 0x1000 {
-		t.Fatalf("parsed address = %#x, want 0x1000", parser.address)
-	}
-	if parser.mode != "thumb" {
-		t.Fatalf("parsed mode = %q, want thumb", parser.mode)
+	for _, name := range []string{"thumb_func", "thumb_alias"} {
+		t.Run(name, func(t *testing.T) {
+			result, err := Parse(context.Background(), artifact, WithFunction(name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if parser.address != 0x1000 || parser.mode != "thumb" {
+				t.Fatalf("parsed address = %#x, mode = %q, want 0x1000 and thumb", parser.address, parser.mode)
+			}
+			if functions := result.IR.Functions; len(functions) != 1 || functions[0].Name != name || functions[0].Size != 4 {
+				t.Fatalf("unexpected functions: %+v", functions)
+			}
+		})
 	}
 }

@@ -145,8 +145,8 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 		}
 	}
 	parsePECOFFSymbols(file, image)
-	parsePEExports(file, image, directories, image.Base)
-	parsePEExceptionTable(file, &target, image, directories, hints)
+	parsePEExports(reader, file, image, directories, image.Base)
+	parsePEExceptionTable(reader, file, &target, image, directories, hints)
 	if len(image.Symbols) > 0 {
 		seen := make(map[uint64]bool, len(image.Symbols))
 		for _, item := range image.Symbols {
@@ -225,7 +225,7 @@ func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 
 // parsePEExports reads the export directory so exported functions get names and
 // exact addresses even when COFF symbols were stripped.
-func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirectory, base uint64) {
+func parsePEExports(reader *core.ByteReader, file *pe.File, image *core.Image, directories []pe.DataDirectory, base uint64) {
 	if len(directories) <= pe.IMAGE_DIRECTORY_ENTRY_EXPORT {
 		return
 	}
@@ -233,34 +233,35 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 	if directory.VirtualAddress == 0 || directory.Size < 40 {
 		return
 	}
-	data, err := peReadRVA(file, directory.VirtualAddress, directory.Size)
+	data, err := peReadRVA(reader, file, directory.VirtualAddress, 40)
 	if err != nil || len(data) < 40 {
 		return
 	}
 	order := binary.LittleEndian
-	numberOfFunctions := int(order.Uint32(data[20:24]))
-	numberOfNames := int(order.Uint32(data[24:28]))
+	numberOfFunctions := order.Uint32(data[20:24])
+	numberOfNames := order.Uint32(data[24:28])
 	functionsRVA := order.Uint32(data[28:32])
 	namesRVA := order.Uint32(data[32:36])
 	ordinalsRVA := order.Uint32(data[36:40])
-	if numberOfFunctions <= 0 || numberOfNames <= 0 || numberOfNames > numberOfFunctions {
+	const maxExportEntries = 1 << 20
+	if numberOfNames == 0 || numberOfNames > numberOfFunctions || numberOfFunctions > maxExportEntries {
 		return
 	}
-	names, err := peReadRVA(file, namesRVA, uint32(numberOfNames*4))
-	if err != nil {
+	names, err := peReadRVA(reader, file, namesRVA, numberOfNames*4)
+	if err != nil || len(names) != int(numberOfNames*4) {
 		return
 	}
-	functions, err := peReadRVA(file, functionsRVA, uint32(numberOfFunctions*4))
-	if err != nil {
+	functions, err := peReadRVA(reader, file, functionsRVA, numberOfFunctions*4)
+	if err != nil || len(functions) != int(numberOfFunctions*4) {
 		return
 	}
-	ordinals, err := peReadRVA(file, ordinalsRVA, uint32(numberOfNames*2))
-	if err != nil {
+	ordinals, err := peReadRVA(reader, file, ordinalsRVA, numberOfNames*2)
+	if err != nil || len(ordinals) != int(numberOfNames*2) {
 		return
 	}
-	for index := 0; index < numberOfNames; index++ {
+	for index := uint32(0); index < numberOfNames; index++ {
 		nameRVA := order.Uint32(names[index*4:])
-		ordinal := int(order.Uint16(ordinals[index*2:]))
+		ordinal := uint32(order.Uint16(ordinals[index*2:]))
 		if ordinal >= numberOfFunctions {
 			continue
 		}
@@ -268,7 +269,7 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 		if functionRVA == 0 {
 			continue
 		}
-		name, err := peReadCString(file, nameRVA)
+		name, err := peReadCString(reader, file, nameRVA)
 		if err != nil || name == "" {
 			continue
 		}
@@ -283,7 +284,7 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 // parsePEExceptionTable reads the pdata RUNTIME_FUNCTION table. Each entry
 // starts at a function's begin address, which gives exact boundaries without
 // disassembly.
-func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image, directories []pe.DataDirectory, hints *core.BoundaryHints) {
+func parsePEExceptionTable(reader *core.ByteReader, file *pe.File, target *core.Target, image *core.Image, directories []pe.DataDirectory, hints *core.BoundaryHints) {
 	if len(directories) <= peDirectoryException {
 		return
 	}
@@ -295,7 +296,7 @@ func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image
 	if directory.VirtualAddress == 0 || directory.Size < entrySize {
 		return
 	}
-	data, err := peReadRVA(file, directory.VirtualAddress, directory.Size)
+	data, err := peReadRVA(reader, file, directory.VirtualAddress, directory.Size)
 	if err != nil {
 		return
 	}
@@ -338,32 +339,22 @@ func uniqueAddresses(addresses []uint64) []uint64 {
 	return result
 }
 
-func peReadRVA(file *pe.File, rva, size uint32) ([]byte, error) {
+func peReadRVA(reader *core.ByteReader, file *pe.File, rva, size uint32) ([]byte, error) {
 	for _, section := range file.Sections {
 		if rva < section.VirtualAddress || rva-section.VirtualAddress >= section.VirtualSize {
 			continue
 		}
 		delta := rva - section.VirtualAddress
-		if delta+size > section.Size {
-			size = section.Size - delta
-		}
-		if size == 0 {
+		if section.Offset == 0 || delta >= section.Size || size == 0 {
 			return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
 		}
-		data, err := section.Data()
-		if err != nil {
-			return nil, err
-		}
-		if int(delta)+int(size) > len(data) {
-			size = uint32(len(data)) - delta
-		}
-		return data[delta : delta+size], nil
+		return reader.Bytes(uint64(section.Offset)+uint64(delta), uint64(min(size, section.Size-delta)))
 	}
 	return nil, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
 }
 
-func peReadCString(file *pe.File, rva uint32) (string, error) {
-	data, err := peReadRVA(file, rva, 512)
+func peReadCString(reader *core.ByteReader, file *pe.File, rva uint32) (string, error) {
+	data, err := peReadRVA(reader, file, rva, 512)
 	if err != nil {
 		return "", err
 	}

@@ -61,6 +61,23 @@ func TestConvertRejectsFunctionWithoutBlocks(t *testing.T) {
 	}
 }
 
+func TestConvertSkipsCopyWithoutResult(t *testing.T) {
+	ir := &core.LowIR{Functions: []core.Function{{
+		Name: "copy_result",
+		Blocks: []core.Block{{ID: 1, Instructions: []core.Instruction{
+			{Kind: core.OpCopy, Operands: []core.Operand{{Kind: core.OperandConstant, Literal: []byte{1}}}},
+			{Kind: core.OpReturn},
+		}}},
+	}}}
+	result, err := Convert(context.Background(), ir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Text(result.Program); !strings.HasSuffix(strings.TrimSpace(got), "\n\tret") {
+		t.Fatalf("return missing from SSAIR: %s", got)
+	}
+}
+
 func TestLowIRToSSAIRFixtures(t *testing.T) {
 	cases := loadLowIRCases(t)
 	if len(cases) == 0 {

@@ -267,6 +267,16 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 		if err != nil {
 			return nil, core.BoundaryStats{}, err
 		}
+		if artifact.Target.Architecture == core.ArchARM {
+			// The ARM scanner keeps one boundary per address. An alias can
+			// reuse its aligned range and mode while retaining its own name.
+			for _, discovered := range boundaries {
+				if discovered.Address == boundary.Address {
+					discovered.Name = boundary.Name
+					return []core.FunctionBoundary{discovered}, stats, nil
+				}
+			}
+		}
 		return []core.FunctionBoundary{boundary}, core.BoundaryStats{Symbol: 1}, nil
 	}
 	if config.Region != nil {
