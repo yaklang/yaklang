@@ -119,13 +119,8 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 		if err != nil {
 			return nil, err
 		}
-		target := artifact.Target
-		if boundary.Mode != "" {
-			// The mode is per function: one ARM image mixes ARM and Thumb code.
-			target.Mode = boundary.Mode
-		}
 		parsed, err := parseFunctionSafely(ctx, artifact.Parser, core.ParseRequest{
-			Target:       target,
+			Target:       targetForBoundary(artifact.Target, boundary),
 			Address:      region.Address,
 			Reader:       reader,
 			Syntax:       config.Syntax,
@@ -515,7 +510,7 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 			return nil, err
 		}
 		result, err := disassembler.Disassemble(ctx, core.ParseRequest{
-			Target:  artifact.Target,
+			Target:  targetForBoundary(artifact.Target, boundary),
 			Address: region.Address,
 			Reader:  reader,
 			Syntax:  config.Syntax,
@@ -537,6 +532,14 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 		diagnostics = filterCrossFunctionDiagnostics(diagnostics)
 	}
 	return &core.Disassembly{Text: text, Instructions: total, Diagnostics: diagnostics}, nil
+}
+
+// A single ARM image can contain functions in both ARM and Thumb mode.
+func targetForBoundary(target core.Target, boundary core.FunctionBoundary) core.Target {
+	if boundary.Mode != "" {
+		target.Mode = boundary.Mode
+	}
+	return target
 }
 
 // codeAddress clears the Thumb selector. An ARM symbol that names a Thumb
