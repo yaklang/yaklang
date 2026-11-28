@@ -35,6 +35,15 @@ on:
           - full
           - yakslim
         default: full
+      reflect_prune_profile:
+        description: "Release linker reflect-pruning profile (tier2, tier1, off)"
+        required: false
+        type: choice
+        options:
+          - tier2
+          - tier1
+          - off
+        default: tier2
   
   workflow_call:
     inputs:
@@ -59,6 +68,11 @@ on:
         type: boolean
         description: whether to sign windows executable
         default: false 
+      reflect_prune_profile:
+        description: "Release linker reflect-pruning profile (tier2, tier1, off)"
+        required: false
+        type: string
+        default: tier2
 
 jobs:
   build_and_upload_asset:
@@ -372,8 +386,54 @@ jobs:
           
           Write-Host "Runner: $env:PROCESSOR_ARCHITECTURE GOOS=$env:GOOS GOARCH=$env:GOARCH CGO_ENABLED=$env:CGO_ENABLED"
           Write-Host "Output file: $outputName"
-          
-          go build -trimpath -tags "${{ env.BUILD_TAGS }}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
+
+          $pruneProfile = "${{ inputs.reflect_prune_profile }}"
+          $linkSwapped = $false
+          $stockLink = ""
+          $backupLink = ""
+          try {
+            if ($pruneProfile -and $pruneProfile -ne "off" -and $pruneProfile -ne "none") {
+              $pruneDir = Join-Path $env:RUNNER_TEMP "yak-reflect-prune"
+              New-Item -ItemType Directory -Force -Path $pruneDir | Out-Null
+              $wrapperExe = Join-Path $pruneDir "reflect-prune-link.exe"
+              $patchedLink = Join-Path $pruneDir "yak-link.exe"
+              Write-Host "Preparing reflect-prune linker (profile=$pruneProfile) in $pruneDir"
+              $prevCgo = $env:CGO_ENABLED
+              $prevGoos = $env:GOOS
+              $prevGoarch = $env:GOARCH
+              $env:CGO_ENABLED = "0"
+              $env:GOOS = (go env GOHOSTOS).Trim()
+              $env:GOARCH = (go env GOHOSTARCH).Trim()
+              go build -buildvcs=false -o $wrapperExe ./tools/reflect-prune-link
+              if ($LASTEXITCODE -ne 0) { throw "Failed to build reflect-prune-link" }
+              & $wrapperExe prepare -o $patchedLink
+              if ($LASTEXITCODE -ne 0) { throw "Failed to prepare patched linker" }
+              $patterns = (& $wrapperExe patterns --profile $pruneProfile).Trim()
+              if ($LASTEXITCODE -ne 0) { throw "Failed to resolve reflect-prune patterns" }
+              $env:CGO_ENABLED = $prevCgo
+              $env:GOOS = $prevGoos
+              $env:GOARCH = $prevGoarch
+
+              # On Windows, -toolexec disables cmd/go's @argsfile for packages with hundreds of files
+              # (e.g. javajive/classparser), exceeding CreateProcess's 32KB command-line limit.
+              # Temporarily swap GOTOOLDIR\link.exe on the ephemeral runner instead and restore in finally.
+              $toolDir = (go env GOTOOLDIR).Trim()
+              $stockLink = Join-Path $toolDir "link.exe"
+              $backupLink = Join-Path $pruneDir "link.exe.stock"
+              Copy-Item -Force $stockLink $backupLink
+              Copy-Item -Force $patchedLink $stockLink
+              $linkSwapped = $true
+              $env:YAK_REFLECT_PRUNE_EXCLUDE = $patterns
+              $env:YAK_REFLECT_PRUNE_VERBOSE = "1"
+            }
+
+            go build -trimpath -tags "${{ env.BUILD_TAGS }}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
+            if ($LASTEXITCODE -ne 0) { throw "go build failed with exit code $LASTEXITCODE" }
+          } finally {
+            if ($linkSwapped -and (Test-Path $backupLink)) {
+              Copy-Item -Force $backupLink $stockLink
+            }
+          }
           echo "OUTPUT_NAME=$outputName" >> $env:GITHUB_ENV
 
       - name: Validate signing secrets
@@ -447,6 +507,8 @@ jobs:
             MANYLINUX_IMAGE=quay.io/pypa/manylinux2014_aarch64
           fi
 
+          export REFLECT_PRUNE_PROFILE="${{ inputs.reflect_prune_profile }}"
+
           if [[ "${{ inputs.os }}" == linux-* ]]; then
             bash .github/scripts/build-linux-manylinux.sh \
               "${MANYLINUX_IMAGE}" \
@@ -454,7 +516,15 @@ jobs:
               "${BUILD_TAGS}" \
               "${{ env.YAK_TAG }}"
           else
-            go build -trimpath -tags "${BUILD_TAGS}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go
+            PRUNE_ARGS=()
+            if [[ -n "${REFLECT_PRUNE_PROFILE:-}" && "${REFLECT_PRUNE_PROFILE}" != "off" && "${REFLECT_PRUNE_PROFILE}" != "none" ]]; then
+              PRUNE_DIR="$(mktemp -d /tmp/yak-reflect-prune.XXXXXX)"
+              echo "Preparing reflect-prune linker (profile=${REFLECT_PRUNE_PROFILE}) in ${PRUNE_DIR}"
+              CGO_ENABLED=0 GOOS="$(go env GOHOSTOS)" GOARCH="$(go env GOHOSTARCH)" go build -buildvcs=false -o "${PRUNE_DIR}/reflect-prune-link" ./tools/reflect-prune-link
+              "${PRUNE_DIR}/reflect-prune-link" prepare -o "${PRUNE_DIR}/yak-link"
+              PRUNE_ARGS=(-toolexec "${PRUNE_DIR}/reflect-prune-link exec --link ${PRUNE_DIR}/yak-link --profile ${REFLECT_PRUNE_PROFILE} --verbose --")
+            fi
+            go build -trimpath "${PRUNE_ARGS[@]}" -tags "${BUILD_TAGS}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go
           fi
           ls -lh "$OUTPUT_NAME"
 

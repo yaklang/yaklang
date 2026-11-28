@@ -204,12 +204,53 @@ jobs:
       - name: Validate cache policy and compile-only runner
         run: python3 -B -m unittest discover -s scripts/ci/tests -p 'test_*.py' -v
 
-      - name: Build yak binary
+      - name: Test reflect-prune-link against Go toolchain
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: go test -v -count=1 ./tools/reflect-prune-link/...
+
+      - name: Build yak binary (with reflect-prune tier2)
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
-          go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
+          set -euo pipefail
+          PRUNE_DIR="$RUNNER_TEMP/yak-reflect-prune"
+          mkdir -p "$PRUNE_DIR"
+          CGO_ENABLED=0 go build -buildvcs=false -o "$PRUNE_DIR/reflect-prune-link" ./tools/reflect-prune-link
+          "$PRUNE_DIR/reflect-prune-link" prepare -o "$PRUNE_DIR/yak-link"
+          go build \
+            -toolexec="$PRUNE_DIR/reflect-prune-link exec --link $PRUNE_DIR/yak-link --profile tier2 --verbose --" \
+            -o "$RUNNER_TEMP/yak" \
+            common/yak/cmd/yak.go
+          ls -lh "$RUNNER_TEMP/yak"
+
+      - name: Verify reflect-pruned yak fresh startup and reflection gate
+        run: |
+          set -euo pipefail
+          GATE_HOME="$(mktemp -d "$RUNNER_TEMP/yak-reflect-gate.XXXXXX")"
+          trap 'rm -rf "$GATE_HOME"' EXIT
+          GATE_SCRIPT="$GATE_HOME/gate.yak"
+          cat > "$GATE_SCRIPT" <<'EOF'
+          assert str.ToUpper("yak") == "YAK"
+          vm = js.New()
+          v, err = vm.RunString("20 + 22")
+          die(err)
+          assert v.ToInteger() == 42
+          prog, err = ssa.Parse(`<?php $x = $_GET["a"]; echo $x;`, ssa.withLanguage("php"))
+          die(err)
+          res = prog.SyntaxFlow(`$_GET as $src; $src --> * as $sink;`)
+          assert res != nil && string(prog.GetLanguage()) == "php"
+          println("REFLECT_PRUNE_GATE_OK")
+          EOF
+          LOG_FILE="$RUNNER_TEMP/yak-reflect-gate.log"
+          YAKIT_HOME="$GATE_HOME" "$RUNNER_TEMP/yak" "$GATE_SCRIPT" 2>&1 | tee "$LOG_FILE"
+          grep -q "REFLECT_PRUNE_GATE_OK" "$LOG_FILE"
+          if grep -Eq "initialize database failed|parse error with panic" "$LOG_FILE"; then
+            echo "::error::Reflect-pruned yak binary hit DB init or yak2ssa reflection panic"
+            exit 1
+          fi
 
       - name: Package yak artifact
         run: |
