@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
+	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/boundindex"
 	"github.com/yaklang/yaklang/common/yak/reify/loader/arch/internal/ehframe"
 )
 
@@ -33,6 +34,7 @@ type boundaryScanner struct {
 	hints   core.BoundaryHints
 	image   *core.Image
 	entries map[uint64]*mipsBoundary
+	index   boundindex.Index
 	data    map[uint64][]byte
 	stats   core.BoundaryStats
 }
@@ -118,6 +120,7 @@ func (s *boundaryScanner) add(address, size uint64, name string, source core.Bou
 		FunctionBoundary: core.FunctionBoundary{Address: address, Size: size, Name: name, Source: source},
 		priority:         priority,
 	}
+	s.index.Add(address)
 	return true
 }
 
@@ -199,12 +202,7 @@ func (s *boundaryScanner) decode(address uint64) (instruction, bool) {
 }
 
 func (s *boundaryScanner) nextBoundary(address uint64) uint64 {
-	next := uint64(0)
-	for candidate := range s.entries {
-		if candidate > address && (next == 0 || candidate < next) {
-			next = candidate
-		}
-	}
+	next := s.index.Next(address)
 	if region := s.regionFor(address); region != nil {
 		end := region.Address + region.Size
 		if next == 0 || next > end {
@@ -314,17 +312,23 @@ func staticTarget(inst instruction) (uint64, bool) {
 }
 
 func (s *boundaryScanner) finishRanges() {
-	addresses := make([]uint64, 0, len(s.entries))
-	for address := range s.entries {
-		addresses = append(addresses, address)
-	}
-	sort.Slice(addresses, func(i, j int) bool { return addresses[i] < addresses[j] })
-	for _, address := range addresses {
+	addresses := s.index.Sorted()
+	for idx, address := range addresses {
 		entry := s.entries[address]
 		if entry.Size != 0 {
 			continue
 		}
-		if next := s.nextBoundary(address); next > address {
+		var next uint64
+		if idx+1 < len(addresses) {
+			next = addresses[idx+1]
+		}
+		if region := s.regionFor(address); region != nil {
+			end := region.Address + region.Size
+			if next == 0 || next > end {
+				next = end
+			}
+		}
+		if next > address {
 			entry.Size = next - address
 		}
 	}

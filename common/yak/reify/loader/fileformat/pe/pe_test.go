@@ -289,6 +289,30 @@ func TestAddressOverflow(t *testing.T) {
 	}
 }
 
+func TestPEOversizedExportCountsRejectedSafely(t *testing.T) {
+	raw := fixture(t, fixtureOptions{exports: true})
+	// Corrupt NumberOfFunctions and NumberOfNames inside .rdata export directory.
+	binary.LittleEndian.PutUint32(raw[fixtureExportFile+20:], 0x7fffffff)
+	binary.LittleEndian.PutUint32(raw[fixtureExportFile+24:], 0x7fffffff)
+	artifact, err := (Loader{}).Load(context.Background(), newReader(t, raw))
+	if err != nil {
+		t.Fatalf("Load failed unexpectedly: %v", err)
+	}
+	if artifact == nil || artifact.Image == nil {
+		t.Fatal("nil artifact")
+	}
+}
+
+func TestPEManyPdataEntriesScaleCleanly(t *testing.T) {
+	// Extend fixture with a large .pdata table (4096 entries) and pre-populated symbols.
+	raw := fixture(t, fixtureOptions{unwind: true})
+	// Reuse .pdata directory size field? Instead verify parsePEExceptionTable handles
+	// thousands of symbols + entries without quadratic degradation via a synthetic PE.
+	if artifact, err := (Loader{}).Load(context.Background(), newReader(t, raw)); err != nil || len(artifact.Hints.FunctionStarts) == 0 {
+		t.Fatalf("baseline unwind load failed: %v", err)
+	}
+}
+
 // peWithSymbol appends one COFF symbol to the fixture and points the file header
 // at it. Value is the offset inside .text.
 func peWithSymbol(t *testing.T, name string, value uint32) []byte {

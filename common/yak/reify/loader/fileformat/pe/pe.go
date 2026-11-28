@@ -145,8 +145,8 @@ func inspectPE(reader *core.ByteReader) (*core.Image, core.Target, *core.Boundar
 		}
 	}
 	parsePECOFFSymbols(file, image)
-	parsePEExports(file, image, directories, image.Base)
-	parsePEExceptionTable(file, &target, image, directories, hints)
+	parsePEExports(reader, file, image, directories, image.Base)
+	parsePEExceptionTable(reader, file, &target, image, directories, hints)
 	if len(image.Symbols) > 0 {
 		seen := make(map[uint64]bool, len(image.Symbols))
 		for _, item := range image.Symbols {
@@ -204,8 +204,15 @@ func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 			continue
 		}
 		section := file.Sections[item.SectionNumber-1]
-		if section.Characteristics&(peSectionCode|peSectionExecute) == 0 {
-			continue
+		isCode := section.Characteristics&(peSectionCode|peSectionExecute) != 0
+		if !isCode {
+			if item.Name == "" || item.Name == section.Name || strings.HasPrefix(item.Name, ".") {
+				continue
+			}
+			// Keep external (2) or static (3) object symbols; skip section/auxiliary labels.
+			if item.StorageClass != 2 && item.StorageClass != 3 {
+				continue
+			}
 		}
 		// A COFF value is an offset inside its section, and a linked image adds
 		// the image base to the section address. Requiring a non-zero value would
@@ -215,17 +222,21 @@ func parsePECOFFSymbols(file *pe.File, image *core.Image) {
 			continue
 		}
 		seen[address] = true
+		kind := sym.SymbolObject
+		if isCode {
+			kind = sym.SymbolFunction
+		}
 		image.Symbols = append(image.Symbols, sym.Symbol{
 			Name:    item.Name,
 			Address: address,
-			Kind:    sym.SymbolFunction,
+			Kind:    kind,
 		})
 	}
 }
 
 // parsePEExports reads the export directory so exported functions get names and
 // exact addresses even when COFF symbols were stripped.
-func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirectory, base uint64) {
+func parsePEExports(reader *core.ByteReader, file *pe.File, image *core.Image, directories []pe.DataDirectory, base uint64) {
 	if len(directories) <= pe.IMAGE_DIRECTORY_ENTRY_EXPORT {
 		return
 	}
@@ -233,34 +244,35 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 	if directory.VirtualAddress == 0 || directory.Size < 40 {
 		return
 	}
-	data, err := peReadRVA(file, directory.VirtualAddress, directory.Size)
+	data, err := peReadRVA(reader, file, directory.VirtualAddress, 40)
 	if err != nil || len(data) < 40 {
 		return
 	}
 	order := binary.LittleEndian
-	numberOfFunctions := int(order.Uint32(data[20:24]))
-	numberOfNames := int(order.Uint32(data[24:28]))
+	numberOfFunctions := uint64(order.Uint32(data[20:24]))
+	numberOfNames := uint64(order.Uint32(data[24:28]))
 	functionsRVA := order.Uint32(data[28:32])
 	namesRVA := order.Uint32(data[32:36])
 	ordinalsRVA := order.Uint32(data[36:40])
-	if numberOfFunctions <= 0 || numberOfNames <= 0 || numberOfNames > numberOfFunctions {
+	const maxExportEntries = 1 << 20
+	if numberOfFunctions == 0 || numberOfNames == 0 || numberOfNames > numberOfFunctions || numberOfFunctions > maxExportEntries {
 		return
 	}
-	names, err := peReadRVA(file, namesRVA, uint32(numberOfNames*4))
-	if err != nil {
+	names, err := peReadRVA(reader, file, namesRVA, uint32(numberOfNames*4))
+	if err != nil || uint64(len(names)) < numberOfNames*4 {
 		return
 	}
-	functions, err := peReadRVA(file, functionsRVA, uint32(numberOfFunctions*4))
-	if err != nil {
+	functions, err := peReadRVA(reader, file, functionsRVA, uint32(numberOfFunctions*4))
+	if err != nil || uint64(len(functions)) < numberOfFunctions*4 {
 		return
 	}
-	ordinals, err := peReadRVA(file, ordinalsRVA, uint32(numberOfNames*2))
-	if err != nil {
+	ordinals, err := peReadRVA(reader, file, ordinalsRVA, uint32(numberOfNames*2))
+	if err != nil || uint64(len(ordinals)) < numberOfNames*2 {
 		return
 	}
-	for index := 0; index < numberOfNames; index++ {
+	for index := uint64(0); index < numberOfNames; index++ {
 		nameRVA := order.Uint32(names[index*4:])
-		ordinal := int(order.Uint16(ordinals[index*2:]))
+		ordinal := uint64(order.Uint16(ordinals[index*2:]))
 		if ordinal >= numberOfFunctions {
 			continue
 		}
@@ -268,7 +280,7 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 		if functionRVA == 0 {
 			continue
 		}
-		name, err := peReadCString(file, nameRVA)
+		name, err := peReadCString(reader, file, nameRVA)
 		if err != nil || name == "" {
 			continue
 		}
@@ -283,7 +295,7 @@ func parsePEExports(file *pe.File, image *core.Image, directories []pe.DataDirec
 // parsePEExceptionTable reads the pdata RUNTIME_FUNCTION table. Each entry
 // starts at a function's begin address, which gives exact boundaries without
 // disassembly.
-func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image, directories []pe.DataDirectory, hints *core.BoundaryHints) {
+func parsePEExceptionTable(reader *core.ByteReader, file *pe.File, target *core.Target, image *core.Image, directories []pe.DataDirectory, hints *core.BoundaryHints) {
 	if len(directories) <= peDirectoryException {
 		return
 	}
@@ -295,11 +307,18 @@ func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image
 	if directory.VirtualAddress == 0 || directory.Size < entrySize {
 		return
 	}
-	data, err := peReadRVA(file, directory.VirtualAddress, directory.Size)
+	data, err := peReadRVA(reader, file, directory.VirtualAddress, directory.Size)
 	if err != nil {
 		return
 	}
-	seen := make(map[uint64]bool)
+	existing := make(map[uint64]bool, len(image.Symbols))
+	for _, item := range image.Symbols {
+		if item.Imported || item.Address == 0 {
+			continue
+		}
+		existing[item.Address] = true
+	}
+	seen := make(map[uint64]bool, len(data)/int(entrySize))
 	for offset := 0; offset+int(entrySize) <= len(data); offset += int(entrySize) {
 		begin := uint32(binary.LittleEndian.Uint32(data[offset:]))
 		if begin == 0 {
@@ -311,7 +330,8 @@ func parsePEExceptionTable(file *pe.File, target *core.Target, image *core.Image
 		}
 		seen[address] = true
 		hints.FunctionStarts = append(hints.FunctionStarts, address)
-		if _, known := image.SymbolAt(address); !known {
+		if !existing[address] {
+			existing[address] = true
 			image.Symbols = append(image.Symbols, sym.Symbol{
 				Name:    fmt.Sprintf("sub_0x%x", address),
 				Address: address,
@@ -338,32 +358,43 @@ func uniqueAddresses(addresses []uint64) []uint64 {
 	return result
 }
 
-func peReadRVA(file *pe.File, rva, size uint32) ([]byte, error) {
+func peReadRVA(reader *core.ByteReader, file *pe.File, rva, size uint32) ([]byte, error) {
 	for _, section := range file.Sections {
 		if rva < section.VirtualAddress || rva-section.VirtualAddress >= section.VirtualSize {
 			continue
 		}
-		delta := rva - section.VirtualAddress
-		if delta+size > section.Size {
-			size = section.Size - delta
-		}
-		if size == 0 {
+		delta := uint64(rva - section.VirtualAddress)
+		if delta >= uint64(section.Size) {
 			return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+		}
+		readSize := uint64(size)
+		avail := uint64(section.Size) - delta
+		if readSize > avail {
+			readSize = avail
+		}
+		if readSize == 0 {
+			return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
+		}
+		if reader != nil {
+			return reader.Bytes(uint64(section.Offset)+delta, readSize)
 		}
 		data, err := section.Data()
 		if err != nil {
 			return nil, err
 		}
-		if int(delta)+int(size) > len(data) {
-			size = uint32(len(data)) - delta
+		if delta >= uint64(len(data)) {
+			return nil, fmt.Errorf("PE RVA 0x%x has no file data", rva)
 		}
-		return data[delta : delta+size], nil
+		if delta+readSize > uint64(len(data)) {
+			readSize = uint64(len(data)) - delta
+		}
+		return data[delta : delta+readSize], nil
 	}
 	return nil, fmt.Errorf("PE RVA 0x%x is not in a section", rva)
 }
 
-func peReadCString(file *pe.File, rva uint32) (string, error) {
-	data, err := peReadRVA(file, rva, 512)
+func peReadCString(reader *core.ByteReader, file *pe.File, rva uint32) (string, error) {
+	data, err := peReadRVA(reader, file, rva, 512)
 	if err != nil {
 		return "", err
 	}

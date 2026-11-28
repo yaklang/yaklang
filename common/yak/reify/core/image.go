@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -44,18 +45,93 @@ type Image struct {
 	Symbols     []symbol.Symbol `json:"symbols,omitempty"`
 	Relocations []Relocation    `json:"relocations,omitempty"`
 
-	// byAddress indexes Symbols by address, built on first use.
-	once      sync.Once
-	byAddress map[uint64][]symbol.Symbol
+	// Lazy symbol and relocation indexes, built on first lookup.
+	once         sync.Once
+	byAddress    map[uint64][]symbol.Symbol
+	byName       map[string]symbol.Symbol
+	byMangled    map[string]symbol.Symbol
+	sizedSymbols []indexedSymbol
+	sizedMaxEnd  []uint64
+	sortedAddrs  []uint64
+	relocOnce    sync.Once
+	relocByAddr  map[uint64]Relocation
+}
+
+type indexedSymbol struct {
+	sym   symbol.Symbol
+	order int
 }
 
 // SetSymbols replaces the symbol table during artifact construction. Call it
 // before publishing the image to concurrent readers; it invalidates the lazy
-// address index when a metadata layer adds or renames symbols.
+// indexes when a metadata layer adds or renames symbols.
 func (i *Image) SetSymbols(symbols []symbol.Symbol) {
 	i.Symbols = symbols
 	i.once = sync.Once{}
 	i.byAddress = nil
+	i.byName = nil
+	i.byMangled = nil
+	i.sizedSymbols = nil
+	i.sizedMaxEnd = nil
+	i.sortedAddrs = nil
+}
+
+func (i *Image) ensureSymbolIndex() {
+	i.once.Do(func() {
+		n := len(i.Symbols)
+		i.byAddress = make(map[uint64][]symbol.Symbol, n)
+		i.byName = make(map[string]symbol.Symbol, n)
+		i.byMangled = make(map[string]symbol.Symbol)
+		i.sizedSymbols = make([]indexedSymbol, 0, n)
+		i.sortedAddrs = make([]uint64, 0, n)
+		for idx, entry := range i.Symbols {
+			i.byAddress[entry.Address] = append(i.byAddress[entry.Address], entry)
+			if entry.Name != "" {
+				if _, exists := i.byName[entry.Name]; !exists {
+					i.byName[entry.Name] = entry
+				}
+			}
+			if entry.Mangled != "" {
+				if _, exists := i.byMangled[entry.Mangled]; !exists {
+					i.byMangled[entry.Mangled] = entry
+				}
+			}
+			if !entry.Imported && entry.Address != 0 {
+				i.sortedAddrs = append(i.sortedAddrs, entry.Address)
+				if entry.Size > 0 {
+					i.sizedSymbols = append(i.sizedSymbols, indexedSymbol{sym: entry, order: idx})
+				}
+			}
+		}
+		sort.Slice(i.sizedSymbols, func(a, b int) bool {
+			if i.sizedSymbols[a].sym.Address != i.sizedSymbols[b].sym.Address {
+				return i.sizedSymbols[a].sym.Address < i.sizedSymbols[b].sym.Address
+			}
+			return i.sizedSymbols[a].order < i.sizedSymbols[b].order
+		})
+		i.sizedMaxEnd = make([]uint64, len(i.sizedSymbols))
+		var maxEnd uint64
+		for idx, item := range i.sizedSymbols {
+			end := item.sym.Address + item.sym.Size
+			if end < item.sym.Address {
+				end = ^uint64(0)
+			}
+			if end > maxEnd {
+				maxEnd = end
+			}
+			i.sizedMaxEnd[idx] = maxEnd
+		}
+		sort.Slice(i.sortedAddrs, func(a, b int) bool { return i.sortedAddrs[a] < i.sortedAddrs[b] })
+		if len(i.sortedAddrs) > 1 {
+			dedup := i.sortedAddrs[:1]
+			for _, addr := range i.sortedAddrs[1:] {
+				if addr != dedup[len(dedup)-1] {
+					dedup = append(dedup, addr)
+				}
+			}
+			i.sortedAddrs = dedup
+		}
+	})
 }
 
 func (i *Image) ImageBase() uint64 {
@@ -101,12 +177,16 @@ func (i *Image) RelocationAt(address uint64) (Relocation, bool) {
 	if i == nil {
 		return Relocation{}, false
 	}
-	for _, relocation := range i.Relocations {
-		if relocation.Address == address {
-			return relocation, true
+	i.relocOnce.Do(func() {
+		i.relocByAddr = make(map[uint64]Relocation, len(i.Relocations))
+		for _, relocation := range i.Relocations {
+			if _, exists := i.relocByAddr[relocation.Address]; !exists {
+				i.relocByAddr[relocation.Address] = relocation
+			}
 		}
-	}
-	return Relocation{}, false
+	})
+	relocation, ok := i.relocByAddr[address]
+	return relocation, ok
 }
 
 // InferredSymbolSize returns the byte range a symbol covers when its format
@@ -125,16 +205,13 @@ func (i *Image) InferredSymbolSize(entry symbol.Symbol) uint64 {
 	if limit <= entry.Address {
 		limit = section.VirtualAddress + section.MemorySize
 	}
+	i.ensureSymbolIndex()
 	next := limit
-	for _, other := range i.Symbols {
-		if other.Imported || other.Address <= entry.Address {
-			continue
-		}
-		if other.Address-section.VirtualAddress >= section.MemorySize {
-			continue
-		}
-		if other.Address < next {
-			next = other.Address
+	pos := sort.Search(len(i.sortedAddrs), func(idx int) bool { return i.sortedAddrs[idx] > entry.Address })
+	if pos < len(i.sortedAddrs) {
+		cand := i.sortedAddrs[pos]
+		if cand-section.VirtualAddress < section.MemorySize && cand < next {
+			next = cand
 		}
 	}
 	if next <= entry.Address {
@@ -149,12 +226,7 @@ func (i *Image) SymbolsAt(address uint64) []symbol.Symbol {
 	if i == nil {
 		return nil
 	}
-	i.once.Do(func() {
-		i.byAddress = make(map[uint64][]symbol.Symbol, len(i.Symbols))
-		for _, entry := range i.Symbols {
-			i.byAddress[entry.Address] = append(i.byAddress[entry.Address], entry)
-		}
-	})
+	i.ensureSymbolIndex()
 	return i.byAddress[address]
 }
 
@@ -165,15 +237,12 @@ func (i *Image) SymbolByName(name string) (symbol.Symbol, bool) {
 	if i == nil || name == "" {
 		return symbol.Symbol{}, false
 	}
-	for _, entry := range i.Symbols {
-		if entry.Name == name {
-			return entry, true
-		}
+	i.ensureSymbolIndex()
+	if entry, ok := i.byName[name]; ok {
+		return entry, true
 	}
-	for _, entry := range i.Symbols {
-		if entry.Mangled == name {
-			return entry, true
-		}
+	if entry, ok := i.byMangled[name]; ok {
+		return entry, true
 	}
 	return symbol.Symbol{}, false
 }
@@ -183,5 +252,30 @@ func (i *Image) SymbolAt(address uint64) (symbol.Symbol, bool) {
 	if i == nil {
 		return symbol.Symbol{}, false
 	}
-	return symbol.At(i.Symbols, address)
+	i.ensureSymbolIndex()
+	if address != 0 {
+		if entries := i.byAddress[address]; len(entries) > 0 {
+			return entries[0], true
+		}
+	}
+	pos := sort.Search(len(i.sizedSymbols), func(idx int) bool { return i.sizedSymbols[idx].sym.Address > address })
+	if pos == 0 {
+		return symbol.Symbol{}, false
+	}
+	var best *indexedSymbol
+	for idx := pos - 1; idx >= 0; idx-- {
+		if i.sizedMaxEnd[idx] <= address {
+			break
+		}
+		cand := &i.sizedSymbols[idx]
+		if address-cand.sym.Address < cand.sym.Size {
+			if best == nil || cand.order < best.order {
+				best = cand
+			}
+		}
+	}
+	if best != nil {
+		return best.sym, true
+	}
+	return symbol.Symbol{}, false
 }

@@ -81,6 +81,10 @@ func readPclnTables(headerAddr uint64, funcCount uint64, word func(int) uint64) 
 // A named section is the cheapest source; a stripped image from another format
 // falls back to scanning the data sections for the header pointer.
 func recoverModuleData(a *core.Artifact, tables pclnTables, order binary.ByteOrder) (moduleData, bool) {
+	return recoverModuleDataWithCache(a, tables, order, nil)
+}
+
+func recoverModuleDataWithCache(a *core.Artifact, tables pclnTables, order binary.ByteOrder, cache map[uint64][]byte) (moduleData, bool) {
 	if !tables.valid() {
 		return moduleData{}, false
 	}
@@ -98,7 +102,7 @@ func recoverModuleData(a *core.Artifact, tables pclnTables, order binary.ByteOrd
 		if section.Name != ".go.module" || section.FileSize < moduleDataMinimumSize {
 			continue
 		}
-		if found, ok := scanModuleDataSection(a, section, tables, order); ok {
+		if found, ok := scanModuleDataSection(a, section, tables, order, cache); ok {
 			return found, true
 		}
 	}
@@ -109,7 +113,7 @@ func recoverModuleData(a *core.Artifact, tables pclnTables, order binary.ByteOrd
 		if !moduleDataSourceSection(section) {
 			continue
 		}
-		if found, ok := scanModuleDataSection(a, section, tables, order); ok {
+		if found, ok := scanModuleDataSection(a, section, tables, order, cache); ok {
 			return found, true
 		}
 	}
@@ -144,8 +148,24 @@ func moduleDataSourceSection(section core.Section) bool {
 	return false
 }
 
-func scanModuleDataSection(a *core.Artifact, section core.Section, tables pclnTables, order binary.ByteOrder) (moduleData, bool) {
+func readSectionCached(a *core.Artifact, section core.Section, cache map[uint64][]byte) ([]byte, error) {
+	if cache != nil {
+		if data, ok := cache[section.FileOffset]; ok && uint64(len(data)) >= section.FileSize {
+			return data[:section.FileSize], nil
+		}
+	}
 	data, err := a.Reader.Bytes(section.FileOffset, section.FileSize)
+	if err != nil {
+		return nil, err
+	}
+	if cache != nil {
+		cache[section.FileOffset] = data
+	}
+	return data, nil
+}
+
+func scanModuleDataSection(a *core.Artifact, section core.Section, tables pclnTables, order binary.ByteOrder, cache map[uint64][]byte) (moduleData, bool) {
+	data, err := readSectionCached(a, section, cache)
 	if err != nil {
 		return moduleData{}, false
 	}
@@ -220,10 +240,14 @@ func readImageRange(a *core.Artifact, address, size uint64) ([]byte, error) {
 // A symbol or validated moduledata takes precedence over the header, which
 // might need relocation. Section starts are the last resort.
 func textStart(a *core.Artifact, tables pclnTables, order binary.ByteOrder) (uint64, error) {
+	return textStartWithCache(a, tables, order, nil)
+}
+
+func textStartWithCache(a *core.Artifact, tables pclnTables, order binary.ByteOrder, cache map[uint64][]byte) (uint64, error) {
 	if entry, ok := a.Image.SymbolByName("runtime.text"); ok && entry.Address != 0 {
 		return entry.Address, nil
 	}
-	if found, ok := recoverModuleData(a, tables, order); ok {
+	if found, ok := recoverModuleDataWithCache(a, tables, order, cache); ok {
 		return found.Text, nil
 	}
 	if tables.textStart != 0 && executableRange(a, tables.textStart, 1) {

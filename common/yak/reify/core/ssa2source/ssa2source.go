@@ -248,7 +248,8 @@ func cleanSource(function *ssa.Function, text string) (string, error) {
 	declaredIDs := make(map[int64]bool)
 	insertAt := 0
 	for index, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "function ") && strings.HasSuffix(strings.TrimSpace(line), "{") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasSuffix(trimmed, "{") && (strings.HasPrefix(trimmed, "function ") || strings.HasSuffix(trimmed, ") {")) {
 			insertAt = index + 1
 			break
 		}
@@ -361,10 +362,12 @@ func inlineFrameBaseAliases(lines []string) []string {
 		return lines
 	}
 	for index, line := range filtered {
-		for from, to := range replacements {
-			line = strings.ReplaceAll(line, from, to)
-		}
-		filtered[index] = line
+		filtered[index] = sourceValue.ReplaceAllStringFunc(line, func(token string) string {
+			if to, ok := replacements[token]; ok {
+				return to
+			}
+			return token
+		})
 	}
 	return filtered
 }
@@ -397,14 +400,17 @@ func pruneUnusedParameters(lines []string) []string {
 		return lines
 	}
 	body := strings.Join(lines[headerIndex+1:], "\n")
+	usedIdents := collectIdentifiers(body)
 	kept := make([]string, 0, len(params))
 	for _, param := range params {
 		fields := strings.Fields(param)
 		if len(fields) == 0 {
 			continue
 		}
-		name := regexp.QuoteMeta(fields[len(fields)-1])
-		if regexp.MustCompile(`\b` + name + `\b`).MatchString(body) {
+		name := fields[len(fields)-1]
+		if usedIdents[name] {
+			kept = append(kept, param)
+		} else if !isWordString(name) && regexp.MustCompile(`\b`+regexp.QuoteMeta(name)+`\b`).MatchString(body) {
 			kept = append(kept, param)
 		}
 	}
@@ -413,6 +419,40 @@ func pruneUnusedParameters(lines []string) []string {
 	}
 	lines[headerIndex] = header[:open+1] + strings.Join(kept, ", ") + header[closing:]
 	return lines
+}
+
+func isWordString(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+func collectIdentifiers(text string) map[string]bool {
+	found := make(map[string]bool)
+	start := -1
+	for i := 0; i <= len(text); i++ {
+		word := false
+		if i < len(text) {
+			c := text[i]
+			word = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
+		}
+		if word {
+			if start < 0 {
+				start = i
+			}
+		} else if start >= 0 {
+			found[text[start:i]] = true
+			start = -1
+		}
+	}
+	return found
 }
 
 // matchingOpenParen returns the '(' that matches the ')' at close. A function
@@ -631,6 +671,9 @@ func valueUsedSeen(value ssa.Value, seen map[int64]bool) bool {
 	for _, user := range node.GetUsers() {
 		switch typed := user.(type) {
 		case *ssa.BinOp:
+			if typed.Op == ssa.OpStore {
+				return true
+			}
 			if binaryFoldsAway(typed) {
 				continue
 			}
@@ -638,6 +681,9 @@ func valueUsedSeen(value ssa.Value, seen map[int64]bool) bool {
 				return true
 			}
 		case *ssa.UnOp:
+			if typed.Op == ssa.OpLoad || typed.Op == ssa.OpSpill {
+				return true
+			}
 			if valueUsedSeen(typed, seen) {
 				return true
 			}

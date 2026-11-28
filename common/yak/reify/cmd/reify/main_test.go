@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -115,7 +116,14 @@ func TestCLIInspectsExecutableWithoutRunningIt(t *testing.T) {
 		t.Fatalf("bad report: %+v", report)
 	}
 	artifact := report.Artifact
-	if artifact.Origin.Name != path || artifact.Format != core.FormatELF || artifact.Target.Architecture == core.ArchUnknown {
+	wantFormat := core.FormatELF
+	switch runtime.GOOS {
+	case "windows":
+		wantFormat = core.FormatPE
+	case "darwin":
+		wantFormat = core.FormatMachO
+	}
+	if artifact.Origin.Name != path || artifact.Format != wantFormat || artifact.Target.Architecture == core.ArchUnknown {
 		t.Fatalf("bad artifact: %+v", artifact)
 	}
 	if err := core.ValidateArtifact(artifact); err != nil {
@@ -322,16 +330,26 @@ func TestCLILiftsAssembly(t *testing.T) {
 	}
 }
 
+func executableEntryPoint(t *testing.T, path string) uint64 {
+	t.Helper()
+	artifact, _, err := reify.Inspect(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = artifact.Close() }()
+	if entry, ok := artifact.Image.EntryPoint(); ok {
+		return entry
+	}
+	t.Skip("executable has no entry point")
+	return 0
+}
+
 func TestCLILiftsSSAIRAndSource(t *testing.T) {
 	path, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	file, err := elf.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	entry := executableEntryPoint(t, path)
 	for _, tc := range []struct {
 		mode     string
 		scope    string
@@ -340,7 +358,7 @@ func TestCLILiftsSSAIRAndSource(t *testing.T) {
 		{"ssair", "Scope: amd64 SSair", "ret"},
 		{"source", "Scope: amd64 source", "sub_0x"},
 	} {
-		code, out, errOut := runCLI("lift", "--mode", tc.mode, "--address", strconv.FormatUint(file.Entry, 10), "--size", "48", path)
+		code, out, errOut := runCLI("lift", "--mode", tc.mode, "--address", strconv.FormatUint(entry, 10), "--size", "48", path)
 		if code != 0 || errOut != "" {
 			t.Fatalf("mode %s: %d %q", tc.mode, code, errOut)
 		}
@@ -403,6 +421,9 @@ func TestCLIDecodesCString(t *testing.T) {
 		t.Fatal(err)
 	}
 	binary := filepath.Join(directory, "string")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build fixture: %v\n%s", err, output)
@@ -437,38 +458,34 @@ func TestCLILiftsControlFlowExample(t *testing.T) {
 	}
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "control_flow")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	source := filepath.Join("..", "..", "test", "examples", "control_flow.c")
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build example: %v\n%s", err, output)
 	}
-	file, err := elf.Open(binary)
+	artifact, _, err := reify.Inspect(context.Background(), binary)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
-	symbols, err := file.Symbols()
-	if err != nil {
-		t.Fatal(err)
-	}
-	find := func(name string) *elf.Symbol {
-		for index := range symbols {
-			if symbols[index].Name == name {
-				return &symbols[index]
-			}
+	defer func() { _ = artifact.Close() }()
+	lift := func(name string) string {
+		sym, ok := artifact.Image.SymbolByName(name)
+		if !ok {
+			t.Skip("symbol is unavailable")
 		}
-		return nil
-	}
-	lift := func(symbol *elf.Symbol) string {
-		if symbol == nil || symbol.Size == 0 {
+		size := artifact.Image.InferredSymbolSize(sym)
+		if size == 0 {
 			t.Skip("symbol is unavailable")
 		}
 		code, out, errOut := runCLI("lift", "--json", "--mode", "source",
-			"--address", strconv.FormatUint(symbol.Value, 10),
-			"--size", strconv.FormatUint(symbol.Size, 10),
+			"--address", strconv.FormatUint(sym.Address, 10),
+			"--size", strconv.FormatUint(size, 10),
 			binary)
 		if code != 0 || errOut != "" {
-			t.Fatalf("lift %s: %d %s", symbol.Name, code, errOut)
+			t.Fatalf("lift %s: %d %s", sym.Name, code, errOut)
 		}
 		var report struct {
 			Source string `json:"source"`
@@ -479,7 +496,7 @@ func TestCLILiftsControlFlowExample(t *testing.T) {
 		return report.Source
 	}
 
-	classify := lift(find("classify"))
+	classify := lift("classify")
 	for _, fragment := range []string{"classify(", "if (", "return 0x1", "return 0x0", "return 0xffffffff"} {
 		if !strings.Contains(classify, fragment) {
 			t.Fatalf("classify lacks %q:\n%s", fragment, classify)
@@ -490,11 +507,14 @@ func TestCLILiftsControlFlowExample(t *testing.T) {
 			t.Fatalf("classify keeps %q:\n%s", rejected, classify)
 		}
 	}
-	accumulate := lift(find("accumulate"))
-	for _, fragment := range []string{"classify(", "while (", "<= 0x4", "return "} {
+	accumulate := lift("accumulate")
+	for _, fragment := range []string{"classify(", "while (", "return "} {
 		if !strings.Contains(accumulate, fragment) {
 			t.Fatalf("accumulate lacks %q:\n%s", fragment, accumulate)
 		}
+	}
+	if !strings.Contains(accumulate, "<= 0x4") && !strings.Contains(accumulate, "< 0x5") {
+		t.Fatalf("accumulate lacks loop bound <= 0x4 or < 0x5:\n%s", accumulate)
 	}
 	for _, source := range []string{classify, accumulate} {
 		for _, rejected := range []string{"goto ", "phi("} {
@@ -510,13 +530,9 @@ func TestCLILiftsIntelSyntax(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file, err := elf.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	entry := executableEntryPoint(t, path)
 	code, out, errOut := runCLI("lift", "--mode", "asm", "--asm-syntax", "intel",
-		"--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
+		"--address", strconv.FormatUint(entry, 10), "--size", "16", path)
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift Intel asm: %d %s", code, errOut)
 	}
@@ -593,12 +609,8 @@ func TestCLILiftsAllMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file, err := elf.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-	code, out, errOut := runCLI("lift", "--mode", "all", "--address", strconv.FormatUint(file.Entry, 10), "--size", "16", path)
+	entry := executableEntryPoint(t, path)
+	code, out, errOut := runCLI("lift", "--mode", "all", "--address", strconv.FormatUint(entry, 10), "--size", "16", path)
 	if code != 0 || errOut != "" {
 		t.Fatalf("lift all: %d %s", code, errOut)
 	}
@@ -620,6 +632,9 @@ int helper(int x) { return x + 1; }
 int main(void) { return helper(1); }
 `), 0o644))
 	binary := filepath.Join(directory, "tiny")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	build := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Skipf("cannot build tiny program: %v\n%s", err, output)

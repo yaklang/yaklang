@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/reify/core"
 	sym "github.com/yaklang/yaklang/common/yak/reify/core/symbol"
@@ -95,6 +96,7 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 	}
 	result.IR = &core.LowIR{Target: artifact.Target}
 	nextID := core.FunctionID(1)
+	var assembly strings.Builder
 	for index, boundary := range boundaries {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -174,9 +176,10 @@ func Parse(ctx context.Context, artifact *core.Artifact, options ...Option) (*Re
 			result.IR.Canary = parsed.IR.Canary
 		}
 		result.IR.Functions = append(result.IR.Functions, parsed.IR.Functions...)
-		result.Assembly += parsed.Assembly
+		assembly.WriteString(parsed.Assembly)
 		result.Diagnostics = append(result.Diagnostics, parsed.Diagnostics...)
 	}
+	result.Assembly = assembly.String()
 	// The global pointer base is a symbol address, and only the artifact knows it.
 	if name := result.IR.Registers.GlobalPointerSymbol; name != "" && artifact.Image != nil {
 		if symbol, ok := artifact.Image.SymbolByName(name); ok {
@@ -256,6 +259,15 @@ func discover(artifact *core.Artifact, config Config) ([]core.FunctionBoundary, 
 		if artifact.Image != nil {
 			if entry, ok := artifact.Image.SymbolByName(config.Function); ok {
 				config.Function = entry.Name
+			}
+		}
+		// On ARM, a Thumb symbol may carry the low bit set, so the parser's
+		// boundary discovery is needed to determine the aligned address and
+		// execution mode. On other architectures, a resolved sized symbol can
+		// be lifted directly without scanning every function in the image.
+		if artifact.Target.Architecture != core.ArchARM {
+			if boundary, err := functionBoundary(artifact, config.Function); err == nil && boundary.Size > 0 {
+				return []core.FunctionBoundary{boundary}, core.BoundaryStats{Symbol: 1}, nil
 			}
 		}
 		// Prefer the boundary the parser discovered. It carries the aligned
@@ -500,7 +512,7 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 	if err != nil {
 		return nil, err
 	}
-	var text string
+	var text strings.Builder
 	total := 0
 	diagnostics := make([]core.Diagnostic, 0)
 	for index, boundary := range boundaries {
@@ -526,7 +538,7 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 		if result == nil {
 			continue
 		}
-		text += result.Text
+		text.WriteString(result.Text)
 		total += result.Instructions
 		diagnostics = append(diagnostics, result.Diagnostics...)
 	}
@@ -536,7 +548,7 @@ func Disassemble(ctx context.Context, artifact *core.Artifact, options ...Option
 	if len(boundaries) > 1 {
 		diagnostics = filterCrossFunctionDiagnostics(diagnostics)
 	}
-	return &core.Disassembly{Text: text, Instructions: total, Diagnostics: diagnostics}, nil
+	return &core.Disassembly{Text: text.String(), Instructions: total, Diagnostics: diagnostics}, nil
 }
 
 // codeAddress clears the Thumb selector. An ARM symbol that names a Thumb

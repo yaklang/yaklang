@@ -21,8 +21,8 @@ type structurer struct {
 	order       []int64
 	succs       map[int64][]int64
 	preds       map[int64][]int64
-	dom         map[int64]map[int64]bool
-	pdom        map[int64]map[int64]bool
+	domEntry    map[int64]int
+	domExit     map[int64]int
 	ipdom       map[int64]int64
 	loops       map[int64]*loopInfo
 	loopHeaders map[int64]bool
@@ -40,8 +40,8 @@ func newStructurer(function *ssa.Function) *structurer {
 		blocks:          make(map[int64]*ssa.BasicBlock),
 		succs:           make(map[int64][]int64),
 		preds:           make(map[int64][]int64),
-		dom:             make(map[int64]map[int64]bool),
-		pdom:            make(map[int64]map[int64]bool),
+		domEntry:        make(map[int64]int),
+		domExit:         make(map[int64]int),
 		ipdom:           make(map[int64]int64),
 		loops:           make(map[int64]*loopInfo),
 		loopHeaders:     make(map[int64]bool),
@@ -95,134 +95,171 @@ func blockSuccessors(block *ssa.BasicBlock) []int64 {
 	}
 }
 
-func (s *structurer) computeDominators() {
-	entry := int64(0)
-	if len(s.order) > 0 {
-		entry = s.order[0]
+// computeIterativeDominators computes immediate dominators over a dense-indexed
+// reverse postorder using the Cooper-Harvey-Kennedy iterative algorithm.
+func computeIterativeDominators(root int64, order []int64, preds, succs map[int64][]int64) map[int64]int64 {
+	if len(order) == 0 {
+		return nil
 	}
-	for id := range s.blocks {
-		s.dom[id] = make(map[int64]bool)
-		for other := range s.blocks {
-			s.dom[id][other] = true
+	// Iterative DFS to compute postorder without risking stack overflow on large CFGs.
+	type frame struct {
+		id    int64
+		index int
+	}
+	post := make([]int64, 0, len(order))
+	visited := make(map[int64]bool, len(order))
+	stack := []frame{{id: root, index: 0}}
+	visited[root] = true
+	for len(stack) > 0 {
+		top := &stack[len(stack)-1]
+		nexts := succs[top.id]
+		if top.index < len(nexts) {
+			next := nexts[top.index]
+			top.index++
+			if !visited[next] {
+				visited[next] = true
+				stack = append(stack, frame{id: next, index: 0})
+			}
+			continue
 		}
+		post = append(post, top.id)
+		stack = stack[:len(stack)-1]
 	}
-	if entry != 0 {
-		s.dom[entry] = map[int64]bool{entry: true}
+	rpo := make([]int64, len(post))
+	rpoIndex := make(map[int64]int, len(post))
+	for i, id := range post {
+		idx := len(post) - 1 - i
+		rpo[idx] = id
+		rpoIndex[id] = idx
+	}
+	idom := make(map[int64]int64, len(rpo))
+	idom[root] = root
+	intersect := func(left, right int64) int64 {
+		for left != right {
+			for rpoIndex[left] > rpoIndex[right] {
+				next, ok := idom[left]
+				if !ok || next == left {
+					return root
+				}
+				left = next
+			}
+			for rpoIndex[right] > rpoIndex[left] {
+				next, ok := idom[right]
+				if !ok || next == right {
+					return root
+				}
+				right = next
+			}
+		}
+		return left
 	}
 	for changed := true; changed; {
 		changed = false
-		for _, id := range s.order {
-			if id == entry {
+		for _, id := range rpo {
+			if id == root {
 				continue
 			}
-			next := map[int64]bool{id: true}
-			first := true
-			for _, pred := range s.preds[id] {
-				if len(s.dom[pred]) == 0 {
+			var candidate int64
+			hasCandidate := false
+			for _, pred := range preds[id] {
+				if _, ok := rpoIndex[pred]; !ok {
 					continue
 				}
-				if first {
-					for candidate := range s.dom[pred] {
-						next[candidate] = true
-					}
-					first = false
+				if _, known := idom[pred]; !known {
 					continue
 				}
-				for candidate := range next {
-					if candidate != id && !s.dom[pred][candidate] {
-						delete(next, candidate)
-					}
+				if !hasCandidate {
+					candidate = pred
+					hasCandidate = true
+					continue
 				}
+				candidate = intersect(pred, candidate)
 			}
-			if first {
+			if !hasCandidate {
 				continue
 			}
-			if !sameSet(next, s.dom[id]) {
-				s.dom[id] = next
+			if current, ok := idom[id]; !ok || current != candidate {
+				idom[id] = candidate
 				changed = true
 			}
 		}
+	}
+	return idom
+}
+
+func (s *structurer) computeDominators() {
+	if len(s.order) == 0 {
+		return
+	}
+	entry := s.order[0]
+	idom := computeIterativeDominators(entry, s.order, s.preds, s.succs)
+	children := make(map[int64][]int64, len(idom))
+	for _, id := range s.order {
+		if id == entry {
+			continue
+		}
+		if parent, ok := idom[id]; ok && parent != id {
+			children[parent] = append(children[parent], id)
+		}
+	}
+	// Iterative Euler tour assigns DFS entry/exit timestamps for O(1) dominance queries.
+	type frame struct {
+		id    int64
+		index int
+	}
+	timer := 0
+	stack := []frame{{id: entry, index: 0}}
+	timer++
+	s.domEntry[entry] = timer
+	for len(stack) > 0 {
+		top := &stack[len(stack)-1]
+		kids := children[top.id]
+		if top.index < len(kids) {
+			child := kids[top.index]
+			top.index++
+			timer++
+			s.domEntry[child] = timer
+			stack = append(stack, frame{id: child, index: 0})
+			continue
+		}
+		timer++
+		s.domExit[top.id] = timer
+		stack = stack[:len(stack)-1]
 	}
 }
 
 func (s *structurer) computePostDominators() {
+	if len(s.order) == 0 {
+		return
+	}
 	const virtualExit = int64(0)
-	for id := range s.blocks {
-		s.pdom[id] = make(map[int64]bool)
-		for other := range s.blocks {
-			s.pdom[id][other] = true
-		}
-		s.pdom[id][virtualExit] = true
-	}
-	s.pdom[virtualExit] = map[int64]bool{virtualExit: true}
-	for changed := true; changed; {
-		changed = false
-		for _, id := range s.order {
-			next := map[int64]bool{id: true}
-			first := true
-			for _, succ := range s.succs[id] {
-				if len(s.pdom[succ]) == 0 {
-					continue
-				}
-				if first {
-					for candidate := range s.pdom[succ] {
-						next[candidate] = true
-					}
-					first = false
-					continue
-				}
-				for candidate := range next {
-					if candidate != id && !s.pdom[succ][candidate] {
-						delete(next, candidate)
-					}
-				}
-			}
-			if first {
-				next[virtualExit] = true
-			}
-			if !sameSet(next, s.pdom[id]) {
-				s.pdom[id] = next
-				changed = true
-			}
-		}
-	}
+	revPreds := make(map[int64][]int64, len(s.order)+1)
+	revSuccs := make(map[int64][]int64, len(s.order)+1)
 	for _, id := range s.order {
-		best := int64(0)
-		bestSize := -1
-		for candidate := range s.pdom[id] {
-			if candidate == id {
-				continue
-			}
-			size := len(s.pdom[candidate])
-			if size > bestSize {
-				best = candidate
-				bestSize = size
-			}
+		succs := s.succs[id]
+		if len(succs) == 0 {
+			revPreds[id] = []int64{virtualExit}
+			revSuccs[virtualExit] = append(revSuccs[virtualExit], id)
+		} else {
+			revPreds[id] = succs
 		}
-		s.ipdom[id] = best
+		revSuccs[id] = s.preds[id]
 	}
-}
-
-func sameSet(left, right map[int64]bool) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for value := range left {
-		if !right[value] {
-			return false
-		}
-	}
-	return true
+	revOrder := append([]int64{virtualExit}, s.order...)
+	s.ipdom = computeIterativeDominators(virtualExit, revOrder, revPreds, revSuccs)
+	delete(s.ipdom, virtualExit)
 }
 
 func (s *structurer) dominates(header, node int64) bool {
-	return s.dom[node][header]
+	hIn := s.domEntry[header]
+	nIn := s.domEntry[node]
+	return hIn != 0 && nIn != 0 && hIn <= nIn && s.domExit[node] <= s.domExit[header]
 }
 
 func (s *structurer) findLoops() {
 	for _, tail := range s.order {
 		for _, header := range s.succs[tail] {
-			if header == tail || !s.dominates(header, tail) {
+			if !s.dominates(header, tail) {
 				continue
 			}
 			loop := s.loops[header]
@@ -235,8 +272,15 @@ func (s *structurer) findLoops() {
 			s.collectLoopBody(loop, tail)
 		}
 	}
-	for _, loop := range s.loops {
-		for node := range loop.body {
+	for _, header := range s.order {
+		loop := s.loops[header]
+		if loop == nil {
+			continue
+		}
+		for _, node := range s.order {
+			if !loop.body[node] {
+				continue
+			}
 			for _, succ := range s.succs[node] {
 				if !loop.body[succ] {
 					loop.exit = succ
@@ -486,6 +530,22 @@ func (s *structurer) emitLoop(loop *loopInfo, indent string, stop map[int64]bool
 	conditionID := int64(0)
 	if ifInstruction != nil {
 		conditionID = ifInstruction.Cond
+	}
+	if len(loop.body) == 1 && bodyStart == loop.header {
+		s.emitLoopPhis(loop, header, indent, false)
+		fmt.Fprintf(s.text, "%swhile (true) {\n", indent)
+		s.renderBlockInstructions(header, indent+"  ", conditionID)
+		if ifInstruction != nil && exit != 0 {
+			fmt.Fprintf(s.text, "%s  if (!(%s)) {\n", indent, condition)
+			fmt.Fprintf(s.text, "%s    break;\n", indent)
+			fmt.Fprintf(s.text, "%s  }\n", indent)
+		}
+		s.emitLoopPhis(loop, header, indent+"  ", true)
+		fmt.Fprintf(s.text, "%s}\n", indent)
+		if exit != 0 {
+			s.emitRegion(exit, indent, stop)
+		}
+		return
 	}
 	s.emitLoopPhis(loop, header, indent, false)
 	s.renderBlockInstructions(header, indent, conditionID)

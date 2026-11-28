@@ -193,3 +193,4 @@ result, err := asm2lowir.Parse(ctx, artifact, asm2lowir.WithRegion(entry), asm2l
 - [SSA](docs/ssa.md)：LowIR 到 YakSSA、伪源码和限制。
 - [命令](docs/cli.md)：命令、JSON、返回码与验证范围。
 - [设计](docs/design.md)：算法、边界与取舍。
+- [评估报告](docs/evaluation-report.md)：多尺度与多架构实测评估、缺陷分析、性能优化与回归验证总结。

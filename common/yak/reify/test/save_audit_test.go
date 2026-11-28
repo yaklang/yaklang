@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -49,6 +50,9 @@ int main(void) {
 		t.Fatal(err)
 	}
 	binary := filepath.Join(directory, "demo")
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
 	compile := exec.Command("gcc", "-O0", "-fno-pie", "-no-pie", "-fno-stack-protector", "-o", binary, source)
 	if output, err := compile.CombinedOutput(); err != nil {
 		t.Skipf("cannot build demo: %v\n%s", err, output)

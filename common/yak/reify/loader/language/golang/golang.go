@@ -155,13 +155,14 @@ func (Golang) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 		}
 	}
 	var lastErr error
+	sectionCache := make(map[uint64][]byte, len(candidates))
 	for _, s := range candidates {
 		limit := metadataLimit(s.Name, a.Format)
 		if s.FileSize == 0 || s.FileSize > limit {
 			lastErr = fmt.Errorf("section %s is empty or exceeds %d bytes", s.Name, limit)
 			continue
 		}
-		data, err := a.Reader.Bytes(s.FileOffset, s.FileSize)
+		data, err := readSectionCached(a, s, sectionCache)
 		if err != nil {
 			lastErr = err
 			continue
@@ -171,7 +172,7 @@ func (Golang) Recover(a *core.Artifact) ([]symbol.Symbol, error) {
 			if !ok {
 				continue
 			}
-			syms, err := parseGoTable(a, data[offset:], s.VirtualAddress+uint64(offset), magic, order)
+			syms, err := parseGoTableWithCache(a, data[offset:], s.VirtualAddress+uint64(offset), magic, order, sectionCache)
 			if err == nil {
 				return syms, nil
 			}
@@ -200,6 +201,10 @@ func pclnHeader(data []byte) (uint32, binary.ByteOrder, bool) {
 }
 
 func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32, order binary.ByteOrder) (symbols []symbol.Symbol, err error) {
+	return parseGoTableWithCache(a, data, headerAddr, magic, order, nil)
+}
+
+func parseGoTableWithCache(a *core.Artifact, data []byte, headerAddr uint64, magic uint32, order binary.ByteOrder, sectionCache map[uint64][]byte) (symbols []symbol.Symbol, err error) {
 	// debug/gosym handles most malformed tables itself, but its contract does
 	// not promise panic-free parsing of untrusted compiler metadata.
 	defer func() {
@@ -228,7 +233,7 @@ func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32
 			return nil, fmt.Errorf("truncated pclntab header")
 		}
 		tables := readPclnTables(headerAddr, count, func(index int) uint64 { return word(8 + index*ptr) })
-		base, err := textStart(a, tables, order)
+		base, err := textStartWithCache(a, tables, order, sectionCache)
 		if err != nil {
 			return nil, err
 		}
@@ -245,6 +250,7 @@ func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32
 	if uint64(len(table.Funcs)) != count {
 		return nil, fmt.Errorf("pclntab decoded %d of %d functions", len(table.Funcs), count)
 	}
+	execBytes := cacheExecSections(a)
 	symbols = make([]symbol.Symbol, 0, len(table.Funcs))
 	for _, f := range table.Funcs {
 		if f.Sym == nil || f.Name == "" || f.End <= f.Entry || !executableRange(a, f.Entry, f.End-f.Entry) || bytes.IndexByte([]byte(f.Name), 0) >= 0 {
@@ -261,10 +267,12 @@ func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32
 		if name == "" {
 			name = f.Name
 		}
+		rawSize := f.End - f.Entry
+		size := goFuncSizeWithCache(a, execBytes, f.Entry, rawSize, a.Target.Architecture)
 		entry := symbol.Symbol{
 			Name:       name,
 			Address:    f.Entry,
-			Size:       goFuncSize(a, f.Entry, f.End-f.Entry, a.Target.Architecture),
+			Size:       size,
 			Kind:       symbol.SymbolFunction,
 			Source:     symbol.SourcePCLNTab,
 			Convention: convention,
@@ -287,6 +295,49 @@ func parseGoTable(a *core.Artifact, data []byte, headerAddr uint64, magic uint32
 // instructions. pclntab has no exact size, so only a bounded tail is trimmed.
 const maxGoPadding = 64
 
+type cachedExecRegion struct {
+	region core.Region
+	data   []byte
+}
+
+func cacheExecSections(a *core.Artifact) []cachedExecRegion {
+	if a == nil || a.Reader == nil || a.Hints == nil {
+		return nil
+	}
+	cached := make([]cachedExecRegion, 0, len(a.Hints.ExecSections))
+	for _, region := range a.Hints.ExecSections {
+		if region.Size == 0 || region.Size > maxNamedPclntabSize {
+			continue
+		}
+		data, err := a.Reader.Bytes(region.Offset, region.Size)
+		if err != nil {
+			continue
+		}
+		cached = append(cached, cachedExecRegion{region: region, data: data})
+	}
+	return cached
+}
+
+func goFuncSizeWithCache(a *core.Artifact, execBytes []cachedExecRegion, address, size uint64, arch core.Architecture) uint64 {
+	window := size
+	if window > maxGoPadding {
+		window = maxGoPadding
+	}
+	if window == 0 {
+		return size
+	}
+	start := address + size - window
+	for _, item := range execBytes {
+		if start >= item.region.Address && start-item.region.Address < item.region.Size && window <= item.region.Size-(start-item.region.Address) {
+			offset := start - item.region.Address
+			if offset+window <= uint64(len(item.data)) {
+				return trimGoFuncPadding(item.data[offset:offset+window], size, arch)
+			}
+		}
+	}
+	return goFuncSize(a, address, size, arch)
+}
+
 func goFuncSize(a *core.Artifact, address, size uint64, arch core.Architecture) uint64 {
 	window := size
 	if window > maxGoPadding {
@@ -307,6 +358,10 @@ func goFuncSize(a *core.Artifact, address, size uint64, arch core.Architecture) 
 	if err != nil {
 		return size
 	}
+	return trimGoFuncPadding(data, size, arch)
+}
+
+func trimGoFuncPadding(data []byte, size uint64, arch core.Architecture) uint64 {
 	switch arch {
 	case core.ArchAMD64, core.Arch386, core.Arch8086:
 		for size > 1 && len(data) > 0 {

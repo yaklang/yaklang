@@ -266,11 +266,13 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.builder = builder
 	c.entry = builder.CurrentBlock
 	c.blocks = make(map[core.BlockID]*ssa.BasicBlock, len(function.Blocks))
+	c.blockOrder = make([]core.BlockID, 0, len(function.Blocks))
 	c.values = make(map[core.ValueID]ssa.Value)
 	c.defs = make(map[core.ValueID]core.Instruction)
 	c.variables = make(map[string]*ssa.Variable)
 	c.memory = make(map[string]*ssa.Variable)
 	c.memoryNames = make(map[string]string)
+	c.memoryIndex = 0
 	c.functions = make(map[string]*ssa.Function)
 	c.flags = make(map[core.ValueID]flagInfo)
 	c.arguments = make(map[string]bool)
@@ -289,6 +291,9 @@ func (c *converter) convertFunction(function core.Function) error {
 	c.undefined = make(map[string]ssa.Value)
 	c.memoryValid = make(map[string]bool)
 	c.memoryKind = make(map[string]memorySlotKind)
+	c.stackStores = c.stackStores[:0]
+	c.frameValues = make(map[ssa.Value]bool)
+	c.spDerived = make(map[ssa.Value]bool)
 	c.frameDerived = make(map[ssa.Value]bool)
 
 	for index, block := range function.Blocks {
@@ -359,19 +364,23 @@ func (c *converter) collectLoopCarried(function core.Function) {
 			continue
 		}
 		last := position
+		hasBackEdge := false
 		for index, block := range function.Blocks {
-			if index <= position {
+			if index < position {
 				continue
 			}
 			for _, instruction := range block.Instructions {
 				for _, target := range instruction.Targets {
-					if target == header && index > last {
-						last = index
+					if target == header {
+						hasBackEdge = true
+						if index > last {
+							last = index
+						}
 					}
 				}
 			}
 		}
-		if last <= position {
+		if !hasBackEdge {
 			continue
 		}
 		// The keys keep the order the body first touches the memory, so the phis of
@@ -709,7 +718,11 @@ func (c *converter) emitRegisterRead(instruction core.Instruction) {
 	if c.loopHeaders[c.current] {
 		key := "reg:" + view.canonical
 		if phi := c.loopPhi(key, c.registerVariable(view.canonical)); phi != nil {
-			c.setResult(instruction, phi)
+			var value ssa.Value = phi
+			if view.narrow() {
+				value = c.extractRegister(value, view)
+			}
+			c.setResult(instruction, value)
 			return
 		}
 	}
@@ -1108,6 +1121,14 @@ func (c *converter) emitIntrinsic(instruction core.Instruction) {
 			return
 		}
 	}
+	if lowered, ok := c.lowerIntrinsic(name, instruction); ok {
+		keepType := lowered.GetType()
+		c.setResult(instruction, lowered)
+		if isSignedIntegerType(keepType) {
+			lowered.SetType(keepType)
+		}
+		return
+	}
 	c.setResult(instruction, c.opaqueValue(name, instruction))
 }
 
@@ -1501,12 +1522,13 @@ func (c *converter) loopPhi(key string, variable *ssa.Variable) *ssa.Phi {
 	if variable != nil {
 		current = variable.GetValue()
 	}
-	phi := ssa.NewPhi(c.builder.CurrentBlock, key)
-	if current != nil {
-		phi.Edge = []int64{current.GetId()}
-		phi.SetType(current.GetType())
-		current.AddUser(phi)
+	if current == nil {
+		return nil
 	}
+	phi := ssa.NewPhi(c.builder.CurrentBlock, key)
+	phi.Edge = []int64{current.GetId()}
+	phi.SetType(current.GetType())
+	current.AddUser(phi)
 	c.builder.CurrentBlock.Phis = append(c.builder.CurrentBlock.Phis, phi.GetId())
 	c.program.SetVirtualRegister(phi)
 	if variable != nil {
